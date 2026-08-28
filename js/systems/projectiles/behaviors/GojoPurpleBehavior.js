@@ -208,6 +208,14 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.6;
           if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.6;
         }
+
+        // Clamp entity strictly within arena bounds after all Purple displacement to prevent wall clipping
+        const _purpleArena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+        if (_purpleArena) {
+          const _er = ent.r || 25;
+          ent.x = Math.max(_purpleArena.x + _er, Math.min(_purpleArena.x + _purpleArena.width - _er, ent.x));
+          ent.y = Math.max(_purpleArena.y + _er, Math.min(_purpleArena.y + _purpleArena.height - _er, ent.y));
+        }
       }
     }
 

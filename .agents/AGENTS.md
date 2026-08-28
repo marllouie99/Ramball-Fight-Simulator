@@ -90,6 +90,12 @@
   - **Locked Orientation during Charge:** To prevent the weapon from snappily flipping sides as the target moves during `CRATER_FADEIN` and `CRATER` charge phases, snapshot the initial facing angle and flip sign once at transition start (`_ultimateChargeAngle` and `_ultimateChargeFlipSign`) and hold them locked. Clear active weapon slash timers (`katanaSlashTimer = 0`) on transition to prevent leftover charging-phase purple outlines.
   - **Clockwise Spin & Cutting Edge Alignment:** Always rotate Toji clockwise (`+ Math.PI * 2 * spinProgress`) so he spins downwards/rightwards towards the target. Disable vertical scale flipping for both Toji's body and weapon during the dive (`isSpinning = true`, `baseAngle = 0`, `_katanaFlipSign = 1`) to let the Katana draw in its default orientation, ensuring the cutting edge naturally leads the clockwise rotation.
   - **Stretched Trail:** Set the crescent slash radius to match the weapon tip (`outerR = this.r + thrustDistance + 146`) and let the trail trailing-stretch counter-clockwise behind the clockwise spin up to a grand `3.8` radians, fading out in the final 30% of the dive.
+- **3-Stage Stealth Ambush Knockback & Target Displacement Engine:**
+  - **Direct Physics Driver:** Targets caught in Toji's stealth ambush (`opponent.isTargetOfAmbush = true`) are in action/AI stasis, meaning their regular `update()` loop early-returns. Therefore, `modUpdateAmbushSequence` in `tojiAmbush.js` MUST directly drive their physical displacement (`opponent.x += opponent.knockbackVx; opponent.y += opponent.knockbackVy;`), apply boundary clamping, and compute arena wall ricochets (`0.45` – `0.85` bounce multiplier).
+  - **Sequence 1 (Inverted Spear Thrust):** Directly sets `target.knockbackVx = kbVx; target.knockbackVy = kbVy;` with `32` force and `0.90` decay to propel the target forward across the arena.
+  - **Sequence 2 (Split Soul Katana Cleave):** Directly sets `target.knockbackVx = kbVx; target.knockbackVy = kbVy;` with `52` force and `0.92` decay to launch the target spinning and ricocheting across the arena.
+  - **Sequence 3 (Phantom Flurry Ping-Pong):** Slashes 1–11 apply tight, crisp flinch impulses (`6.5 + Math.random() * 2.5` force, `0.78` decay) that ping-pong the target back and forth across alternating angles within Toji's teleport pocket (~25px per strike). The 12th finisher blast delivers a massive `38` force impulse with `0.90` decay and releases all target stasis timers so the target launches across the arena into the far wall.
+  - **Collision System Guard:** Never include `isTargetOfAmbush` inside the `isImmovable` check in `physics.js`, as treating an ambush target as immovable causes the circle collision solver to push the attacker away and freeze the target in place.
 
 ## 16. Manga Action Speed Line Effects — Construction & Angle Standards
 
@@ -514,6 +520,185 @@ An unbalanced Canvas 2D state stack (calling `ctx.save()` more times than `ctx.r
      ```
 3. **Automated Continuous Verification**:
    - `npm run verify` (`scripts/verifyCodebase.js` $\rightarrow$ `scripts/testAllFighters.mjs`) automatically executes a mock Canvas stack inspector across all 43+ fighters, weapon graphics, and UI screens to verify that stack depth returns to strictly `0` after every render call.
+
+---
+
+## 27. Fighter Skin Pixel Art Conversion & Rendering Standards
+
+### 1. Aesthetic Philosophy & Fine Pixel Grid Engine
+- All fighter skin models, character costumes, dynamic cloth (capes/robes/coats), brawler gloves, and global outlines adhere to an authentic **Retro Arcade Pixel Art Style** (`P = 2.0px` standard grid unit).
+- **Faceless Minimalist Aesthetic (Rule #19 Compliance)**: Character models MUST remain faceless circle brawlers (no eyes, mouth, or nose). Identity and lore expression are conveyed strictly through iconic hair silhouettes, headgear, tailored clothing zones, collars, belts, and signature markings.
+
+### 2. The Dual-Pass Grid Quantization Pattern (Body Circle Models)
+Fighter circular body models MUST be rendered using the **Dual-Pass Grid Pattern** with coordinate snapping:
+
+```javascript
+export function drawPixelBody(ctx, r, isGhost = false) {
+  ctx.save();
+  const P = 2.0; // Standard 2.0px pixel art grid scale
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // ── PASS 1: Outer Dark Manga Ink Outline Shell (#111114 / #0E0F14) ──
+  ctx.fillStyle = isGhost ? '#111114' : '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= r + P * 0.85) {
+        ctx.fillRect(snap(gx * P), snap(gy * P), P, P);
+      }
+    }
+  }
+
+  // ── PASS 2: Stepped Pixel Fill by Character Costume Zones ──
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // Zone 1: Head / Hair / Headgear (-Y upper region: ry < -r * 0.35)
+      if (ry < -r * 0.35) {
+        let col = skinOrHairBaseColor;
+        if (ry < -r * 0.70 && Math.abs(rx) < r * 0.45) col = highlightShineColor;
+        else if (ry > -r * 0.45 || Math.abs(rx) > r * 0.75) col = shadowColor;
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone 2: Torso / Uniform / Jacket (-r * 0.35 <= ry < r * 0.25)
+      else if (ry < r * 0.25) {
+        // Accents (e.g. Zippers, Ties, Buttons, Scarf, Collar Opening)
+        if (isCenterAccessory(rx, ry)) {
+          ctx.fillStyle = accessoryColor;
+        } else {
+          let col = primarySuitColor;
+          if (ry < -r * 0.10 && Math.abs(rx) < r * 0.50) col = suitHighlightColor;
+          else if (Math.abs(rx) > r * 0.75 || ry > r * 0.16) col = suitShadowColor;
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone 3: Belt / Sash / Waistband (r * 0.25 <= ry < r * 0.55)
+      else if (ry < r * 0.55) {
+        if (isBuckleOrEmblem(rx, ry)) {
+          ctx.fillStyle = buckleColor; // With metallic glint pixel at top-left
+        } else {
+          ctx.fillStyle = beltColor;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone 4: Legs / Pants / Boots (+Y lower region: ry >= r * 0.55)
+      else {
+        let col = bootOrPantColor;
+        if (ry < r * 0.65 && Math.abs(rx) < r * 0.45) col = bootHighlightColor;
+        else if (ry > r * 0.82 || Math.abs(rx) > r * 0.70) col = bootShadowColor;
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+```
+
+### 3. Dynamic Physics Cloth & Cape Mesh Standards
+Dynamic flowing capes, trench coats, haori, and robes MUST be transformed into **Stepped Pixel Cloth Polygons**:
+- **Bézier Vertex Sampling**: Compute top curve, trailing wing tips, ripples, and bottom curve based on velocity inertia (`localVx`, `localVy`), swaying sines, and wave ripples into a sampled polygon `poly = []`.
+- **Pass 1 (Ink Outline)**: Trace all edges with stepped pixel blocks: `ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2)` in `#111114`.
+- **Pass 2 (Body Fill)**: Fill the polygon using snapped vertices `(snap(pt.x), snap(pt.y))`.
+- **Pass 3 (3D Underfold Shadow)**: Fill the lower wing / recessed fold region with a deeper shade (`#DCD8E6`).
+- **Pass 4 (Stepped Crease Lines)**: Trace internal fold curves with stepped pixel dots (`#C8C2D4`).
+- **Pass 5 (Pixel Collar Pins / Buckles)**: Render stepped circular buttons with dark ink perimeter, charcoal core, and top-left metallic specular highlight pixels (`#AAAAAA`).
+
+### 4. Stepped Brawler Gloves, Sleeves & Universal Pixel Art Hand Engine (`drawPixelHand`)
+- **Universal Hand / Fist Engine (`drawPixelHand`)**: All fighter hands, fists, and weapon grips use `drawPixelHand(ctx, cx, cy, radius, color, outlineColor)`.
+  - Step 1: `#0E0F14` dark ink pixel shell perimeter (`d <= radius + P * 0.85`).
+  - Step 2: Volumetric character skin / glove fill with top-forward specular glint pixels (`#FFFFFF`, `0.45` alpha) and heel shadow pixels (`#000000`, `0.30` alpha).
+- **Universal Hand Arc Interception (`wrapFighterDraw`)**: In `fighterFactory.js`, full-circle arcs with radius between $3.5\text{px}$ and $12\text{px}$ are automatically intercepted during `ctx.fill()` to render with `drawPixelHand`, ensuring 100% of weapon grips and hands across all 43+ fighters are rendered in pixel art style.
+- **Arm Sleeves**: Connect the body circle to the fist via a 4-point sleeve polygon outlined with stepped `#111114` pixels and filled with uniform suit pixels.
+- **Flurry Barrage Illusions**: Multi-lane staggered phase fists with stepped motion needles and concussive pixel shockwave rings.
+
+### 5. Fighter Body Circle Outline (`drawSketchyCircle`)
+- The global fighter outline decorator (`fighterFactory.js` $\rightarrow$ `wrapFighterDraw` and `fighterRenderer.js` $\rightarrow$ `drawSketchyCircle`) uses the signature **sketchy hand-drawn outline** with pre-computed paths.
+- Fighter body strokes are NOT pixelated — they retain the distinct hand-drawn sketchy aesthetic across all fighters.
+
+### 6. Universal Blueprint for Other Fighter Skins
+When converting any existing or future fighter skin to pixel art style:
+1. **Partition Character into Y-Axis Zones**:
+   - `ry < -r * 0.35`: Hair / Headwear / Headband (Gojo blindfold, Sukuna marks, Nanami 7:3 hair).
+   - `-r * 0.35 <= ry < r * 0.25`: Uniform / Kimono / Jacket (Yuta white collar + katana strap, Toji compression tee, Megumi high uniform).
+   - `r * 0.25 <= ry < r * 0.55`: Belt / Sash / Obi / Weapon Holster.
+   - `ry >= r * 0.55`: Pants / Boots / Hakama.
+2. **Apply 4-Tier Shading Hierarchy**:
+   - Level 1 (Shell): `#111114` / `#0E0F14` Dark Manga Ink.
+   - Level 2 (Base): Character primary costume tone.
+   - Level 3 (Highlight): Specular glint pixels on top curves / knuckles / buckles.
+   - Level 4 (Shadow): Ambient occlusion shadow on lower rims / folds / seams.
+3. **Synchronize Ghost Models**:
+   - Always update the fighter's `draw<Character>GhostModel` afterimage function to call `draw<Character>PixelBody(ctx, r, true)`, guaranteeing visual consistency during dodges and teleports.
+4. **Preserve Combat Transforms & Hand Visibility Guards**:
+   - Evaluate `shouldHideHands` (`state.showSkinOnly || fighter.hideHands`) before drawing hands/sleeves (Rule #20).
+   - Respect vertical scale flip (`facingLeft ? ctx.scale(1, -1) : null`) to ensure hair stays on top (`-Y`) and boots on bottom (`+Y`) (Rule #19).
+
+### 7. PNG Character Model Pixel Art Conversion Pipeline
+For fighters that utilize external PNG character models (such as Yuta, Gojo, John Wick, Nanami, Mahito, Ishida, Ichigo), follow this 3-step pipeline to convert and render them in authentic pixel art style:
+
+#### A. Dedicated Pixel Art Sprite Generation (`Assets/model/<Name>-PIXEL-SKIN.png`)
+1. Pre-render the high-res model into a $48 \times 48$ or $64 \times 64$ pixel art PNG asset saved to `Assets/model/<Name>-PIXEL-SKIN.png`.
+2. Apply **16-bit Color Quantization & Binary Alpha** during generation:
+   ```javascript
+   // Quantize colors into crisp arcade palette steps (step of 6-8)
+   r = Math.min(255, Math.round(r / 6) * 6);
+   g = Math.min(255, Math.round(g / 6) * 6);
+   b = Math.min(255, Math.round(b / 6) * 6);
+   a = a > 128 ? 255 : 0; // Binary hard alpha cut (no semi-transparent border blur)
+   ```
+
+#### B. Nearest-Neighbor Canvas 2D Rendering
+Inside the fighter skin renderer (e.g. `drawGojoBody`, `drawYutaSkin`):
+1. **Disable Image Smoothing**: ALWAYS set `ctx.imageSmoothingEnabled = false;` inside a `ctx.save()` / `ctx.restore()` block to force the browser to scale the pixel sprite using crisp nearest-neighbor sampling.
+2. **Align Scale & Centering**: Scale the $48 \times 48$ sprite directly to the fighter's radius (`drawR = r * 1.04`):
+   ```javascript
+   const img = _getPixelSkinImage();
+   if (img && img.complete && img.naturalWidth > 0) {
+     ctx.save();
+     ctx.imageSmoothingEnabled = false; // MANDATORY: Nearest-neighbor scaling for sharp pixel blocks
+     const modelScale = 1.04;
+     const drawR = r * modelScale;
+     ctx.drawImage(img, -drawR, -drawR, drawR * 2, drawR * 2);
+     ctx.restore();
+     return;
+   }
+   ```
+
+#### C. Real-Time Dynamic In-Memory Pixelation (Dynamic Fallback Pattern)
+If a pre-rendered pixel PNG is not available at load time, dynamically quantize the high-res PNG into an in-memory offscreen canvas:
+```javascript
+let _pixelCanvasCache = new Map();
+
+function getPixelatedCanvas(img, cropX, cropY, cropW, cropH, targetSize = 48) {
+  const key = `${img.src}_${targetSize}`;
+  if (_pixelCanvasCache.has(key)) return _pixelCanvasCache.get(key);
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = targetSize;
+  offscreen.height = targetSize;
+  const offCtx = offscreen.getContext('2d');
+  offCtx.imageSmoothingEnabled = false;
+  offCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, targetSize, targetSize);
+
+  _pixelCanvasCache.set(key, offscreen);
+  return offscreen;
+}
+```
+
+#### D. Outer Stroke Cohesion
+- When using PNG pixel skins, the global sketchy stroke (`drawSketchyCircle` via `wrapFighterDraw`) wraps seamlessly around the fighter, maintaining the signature hand-drawn style outline.
 
 
 

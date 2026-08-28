@@ -18,10 +18,10 @@ function _getGojoImage() {
       _gojoImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Gojo body model image at Assets/model/Saturo Gojo.png', e);
+      console.warn('Failed to load Gojo pixel body model image at Assets/model/Saturo-Gojo-PIXEL-SKIN.png', e);
       _gojoImageLoading = false;
     };
-    img.src = 'Assets/model/Saturo Gojo.png';
+    img.src = 'Assets/model/Saturo-Gojo-PIXEL-SKIN.png?v=1';
     _gojoImage = img;
   }
   return _gojoImage;
@@ -153,11 +153,9 @@ export function drawGojoBody(ctx, fighter) {
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.save();
       ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-      // Exact centered bounding-box crop of Gojo's character model (sx: 44, sy: 50, sw: 422, sh: 422)
-      // Scaled with modelScale 1.15 to match John Wick, Mahito, and Ichigo
-      const modelScale = 1.15;
+      const modelScale = 1.04;
       const drawR = r * modelScale;
-      ctx.drawImage(img, 44, 50, 422, 422, -drawR, -drawR, drawR * 2, drawR * 2);
+      ctx.drawImage(img, -drawR, -drawR, drawR * 2, drawR * 2);
       ctx.restore();
 
       // Overlays (stun, poison, etc)

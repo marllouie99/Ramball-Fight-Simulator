@@ -668,10 +668,12 @@ class ProjectileSystem {
     const dirY = Math.sin(angle);
 
     const projRadius = isFinal
-      ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 65)
-      : (isMask 
-        ? (CONFIG.ichigo?.hollowGetsugaRadius || 42) 
-        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 36) : (CONFIG.ichigo?.getsugaRadius || 38)));
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 120)
+      : (form === 'bankai_hollow'
+        ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius || 68)
+        : (form === 'hollow'
+          ? (CONFIG.ichigo?.hollowGetsugaRadius || 100)
+          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100))));
     const maxLife = 240; // Extended lifetime so wave flies all the way past window boundaries
 
     const proj = this._getProjectile();
@@ -683,16 +685,22 @@ class ProjectileSystem {
     proj.life = maxLife;
     proj.maxLife = maxLife;
     proj.color = isFinal
-      ? '#DC143C'
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaColor || '#DC143C')
       : (form === 'bankai_hollow'
         ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00')
         : (form === 'hollow'
           ? (CONFIG.ichigo?.hollowGetsugaColor || '#00E5FF')
-          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#FF1E32') : (CONFIG.ichigo?.getsugaColor || '#00D5FF'))));
+          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#DC143C') : (CONFIG.ichigo?.getsugaColor || '#00D5FF'))));
     proj.owner = ownerIndex;
     proj.damage = Number.isFinite(Number(damage)) 
       ? Number(damage) 
-      : (isFinal ? (CONFIG.ichigo?.bankaiFinalGetsugaDamage || 125) : (isMask ? (CONFIG.ichigo?.hollowGetsugaDamage || 50) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 48) : (CONFIG.ichigo?.getsugaDamage || 32))));
+      : (isFinal 
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 26) 
+        : (form === 'bankai_hollow'
+          ? (CONFIG.ichigo?.bankaiHollowGetsugaDamage || 150)
+          : (form === 'hollow'
+            ? (CONFIG.ichigo?.hollowGetsugaDamage || 100) 
+            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 100) : (CONFIG.ichigo?.getsugaDamage || 32)))));
     proj.isGetsuga = true;
     proj.getsugaForm = form;
     proj.visual = (isMask || isBankai) ? 'blackGetsuga' : 'getsuga';

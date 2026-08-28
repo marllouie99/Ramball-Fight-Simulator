@@ -16,6 +16,7 @@ export function drawSakugaImpactFrame(ctx, fighter) {
   const t = fighter.sakugaImpactTimer / fighter.sakugaImpactMaxTimer;
   const alpha = Math.max(0, t);
   const scale = 1.0 + (1.0 - t) * 0.6;
+  const P = 2.4; // Pixel art grid scale
 
   ctx.save();
   ctx.translate(fighter.sakugaImpactX, fighter.sakugaImpactY);
@@ -25,26 +26,27 @@ export function drawSakugaImpactFrame(ctx, fighter) {
 
   const seed = fighter.sakugaImpactSeed || 0.5;
 
-  // 1. ANIME ACTION SPEED LINES
-  ctx.save();
+  // 1. PIXEL-ART ACTION SPEED LINES
   const numRays = 16;
   for (let r = 0; r < numRays; r++) {
     const rayAngle = (r / numRays) * Math.PI * 2 + seed * 1.5;
     const innerRadius = 15 + seed * 10;
     const outerRadius = innerRadius + 45 + (r % 3 === 0 ? 35 : 15);
-    const rayWidth = 1.8 + (r % 2 === 0 ? 1.5 : 0.5);
+    const col = (r % 3 === 0) ? '#FFFFFF' : ((r % 2 === 0) ? '#FFD700' : '#111114');
 
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(rayAngle) * innerRadius, Math.sin(rayAngle) * innerRadius);
-    ctx.lineTo(Math.cos(rayAngle) * outerRadius, Math.sin(rayAngle) * outerRadius);
-    ctx.strokeStyle = (r % 3 === 0) ? '#FFFFFF' : ((r % 2 === 0) ? '#FFD700' : 'rgba(20, 10, 0, 0.7)');
-    ctx.lineWidth = rayWidth;
-    ctx.stroke();
+    const cosA = Math.cos(rayAngle);
+    const sinA = Math.sin(rayAngle);
+    const steps = Math.max(2, Math.round((outerRadius - innerRadius) / P));
+    ctx.fillStyle = col;
+    for (let s = 0; s <= steps; s++) {
+      const dist = innerRadius + (outerRadius - innerRadius) * (s / steps);
+      const px = Math.round((cosA * dist) / P) * P;
+      const py = Math.round((sinA * dist) / P) * P;
+      ctx.fillRect(px, py, P, P);
+    }
   }
-  ctx.restore();
 
-  // 2. PHANTOM MULTI-STRIKE FLURRY ARCS
-  ctx.save();
+  // 2. PIXEL-ART PHANTOM MULTI-STRIKE FLURRY ARCS
   const numPhantomHits = 5;
   for (let p = 0; p < numPhantomHits; p++) {
     const pAngle = (p / numPhantomHits) * Math.PI * 2 + seed * 3.0;
@@ -56,63 +58,34 @@ export function drawSakugaImpactFrame(ctx, fighter) {
     ctx.translate(px, py);
     ctx.rotate(pAngle + Math.PI / 2);
 
-    ctx.beginPath();
-    ctx.arc(0, 0, 14, -Math.PI * 0.6, Math.PI * 0.6);
-    ctx.strokeStyle = (p % 2 === 0) ? `rgba(255, 215, 0, ${alpha * 0.85})` : `rgba(255, 255, 255, ${alpha * 0.95})`;
-    ctx.lineWidth = 3.0;
-    ctx.stroke();
+    const hitSteps = 10;
+    const arcR = 14;
+    for (let i = 0; i <= hitSteps; i++) {
+      const a = -Math.PI * 0.6 + (Math.PI * 1.2) * (i / hitSteps);
+      const hx = Math.round((Math.cos(a) * arcR) / P) * P;
+      const hy = Math.round((Math.sin(a) * arcR) / P) * P;
+      ctx.fillStyle = (p % 2 === 0) ? '#FFD700' : '#FFFFFF';
+      ctx.fillRect(hx, hy, P, P);
+    }
 
-    ctx.beginPath();
-    ctx.moveTo(-18, 0);
-    ctx.lineTo(18, 0);
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 2.0;
-    ctx.stroke();
+    // White strike spine line
+    for (let x = -18; x <= 18; x += P) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(Math.round(x / P) * P, 0, P, P);
+    }
     ctx.restore();
   }
-  ctx.restore();
 
-  // 3. ANIME SAKUGA INK CLUSTERS & STARBURST RAYS
-  const numClusters = 6 + Math.floor(seed * 4);
-  for (let c = 0; c < numClusters; c++) {
-    const clusterAngle = (c / numClusters) * Math.PI * 2 + seed * 2.5;
-    const clusterDist = 20 + (seed * 12) * (c % 3 === 0 ? 1.6 : 0.6);
-    const cx = Math.cos(clusterAngle) * clusterDist;
-    const cy = Math.sin(clusterAngle) * clusterDist;
-
-    const numStrokes = 3 + Math.floor(seed * 3);
-    for (let s = 0; s < numStrokes; s++) {
-      const strokeAngle = clusterAngle + (s - 1) * 0.35 + seed * 1.2;
-      const strokeLen = 16 + seed * 20 + (s === 0 ? 14 : 0);
-      const strokeWidth = 1.8 + seed * 1.5;
-
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      const midX = cx + Math.cos(strokeAngle + 0.3) * strokeLen * 0.5;
-      const midY = cy + Math.sin(strokeAngle + 0.3) * strokeLen * 0.5;
-      const endX = cx + Math.cos(strokeAngle) * strokeLen;
-      const endY = cy + Math.sin(strokeAngle) * strokeLen;
-      ctx.quadraticCurveTo(midX, midY, endX, endY);
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = strokeWidth;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.quadraticCurveTo(midX, midY, endX, endY);
-      ctx.strokeStyle = '#FFD700';
-      ctx.lineWidth = strokeWidth * 0.45;
-      ctx.stroke();
-    }
+  // 3. PIXEL-ART CONCENTRIC IMPACT SHOCK RING
+  const ringRadius = 35 * (1.0 + (1.0 - t) * 0.4);
+  const ringSteps = Math.max(16, Math.round((Math.PI * 2 * ringRadius) / P));
+  for (let i = 0; i <= ringSteps; i++) {
+    const ang = (i / ringSteps) * Math.PI * 2;
+    const rx = Math.round((Math.cos(ang) * ringRadius) / P) * P;
+    const ry = Math.round((Math.sin(ang) * ringRadius) / P) * P;
+    ctx.fillStyle = (i % 2 === 0) ? '#FFD700' : '#FFFFFF';
+    ctx.fillRect(rx, ry, P, P);
   }
-
-  // 4. CONCENTRIC IMPACT SHOCK RING
-  ctx.beginPath();
-  ctx.arc(0, 0, 35 * (1.0 + (1.0 - t) * 0.4), 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255, 215, 0, ${alpha * 0.8})`;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
 
   ctx.restore();
 }

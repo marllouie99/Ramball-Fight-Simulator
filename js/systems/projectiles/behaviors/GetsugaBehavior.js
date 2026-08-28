@@ -55,6 +55,22 @@ export class GetsugaBehavior extends ProjectileBehavior {
         target.isDraggedByGetsuga = true;
         target.preventKnockbackBounce = true;
 
+        // Grand Finisher: Final Massive Kuroi Getsuga maintains Paralyze while carrying target
+        if (projectile.getsugaForm === 'final_bankai') {
+          const paralyzeDuration = CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28;
+          if (typeof target.applyParalyze === 'function') {
+            target.applyParalyze(paralyzeDuration);
+          } else {
+            target.paralyzeTimer = Math.max(target.paralyzeTimer || 0, paralyzeDuration);
+            if (target.statusEffects && typeof target.statusEffects.applyParalyze === 'function') {
+              target.statusEffects.applyParalyze(paralyzeDuration);
+            }
+          }
+          if (typeof target.interruptAttacks === 'function') {
+            target.interruptAttacks(true);
+          }
+        }
+
         // Check if target has reached the arena wall boundary
         let isAtWall = false;
         if (arena) {
@@ -148,10 +164,12 @@ export class GetsugaBehavior extends ProjectileBehavior {
     const isMask = form === 'hollow' || form === 'bankai_hollow';
     const isBankai = form === 'bankai' || form === 'bankai_hollow' || isFinal;
     const hitRadius = projectile.r || (isFinal
-      ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 65)
-      : (isMask
-        ? (CONFIG.ichigo?.hollowGetsugaRadius || 42)
-        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 36) : (CONFIG.ichigo?.getsugaRadius || 38))));
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 120)
+      : (form === 'bankai_hollow'
+        ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius || 68)
+        : (form === 'hollow'
+          ? (CONFIG.ichigo?.hollowGetsugaRadius || 100)
+          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100)))));
 
     // 4. Piercing Sweep: Cleave all valid enemy entities in the crescent wave's path
     for (let i = 0; i < allCandidates.length; i++) {
@@ -168,18 +186,23 @@ export class GetsugaBehavior extends ProjectileBehavior {
       const dist = Math.hypot(f.x - projectile.x, f.y - projectile.y);
       if (dist <= hitRadius + (f.r || 25)) {
         if (!projectile.hitTargets) projectile.hitTargets = new Map();
-        const hitCooldown = CONFIG.ichigo?.getsugaHitCooldown || 20;
+        const hitCooldown = isFinal
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaHitCooldown || 4)
+          : (CONFIG.ichigo?.getsugaHitCooldown || 20);
         projectile.hitTargets.set(f, hitCooldown); // Cooldown before this target can be hit again by the same wave
 
-        // Apply skill damage
-        applyDamageToTarget(f, projectile.damage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, projectile });
+        // Apply skill damage (continuous multi-tick damage for Final Getsuga)
+        const tickDamage = isFinal
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || projectile.damage || 26)
+          : projectile.damage;
+        applyDamageToTarget(f, tickDamage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, isFinalGetsugaTick: isFinal, projectile });
 
         const isGetsugaAdapted = Boolean(f.adaptedGetsuga || (f.adaptedSkills && (f.adaptedSkills['getsugaTensho'] || f.adaptedSkills['getsuga'])));
 
         // Apply knockback in wave direction
         const angle = Math.atan2(projectile.vy, projectile.vx);
         const kbForce = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 14)
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 30)
           : (isMask
             ? (CONFIG.ichigo?.hollowGetsugaKnockback || 8)
             : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6)));
@@ -187,14 +210,28 @@ export class GetsugaBehavior extends ProjectileBehavior {
           f.applyKnockback(Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce), Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce));
         }
 
-        // Apply hit stun (reduced if adapted)
-        const stunDuration = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaHitStun || 28)
-          : (isMask
+        // Apply hit stun / Paralyze effect
+        if (isFinal && !isGetsugaAdapted) {
+          // ── Grand Finisher: Final Massive Kuroi Getsuga Paralyzes Target Throughout Wave Ticks ──
+          const paralyzeDuration = CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28;
+          if (typeof f.applyParalyze === 'function') {
+            f.applyParalyze(paralyzeDuration);
+          } else {
+            f.paralyzeTimer = Math.max(f.paralyzeTimer || 0, paralyzeDuration);
+            if (f.statusEffects && typeof f.statusEffects.applyParalyze === 'function') {
+              f.statusEffects.applyParalyze(paralyzeDuration);
+            }
+          }
+          if (typeof f.interruptAttacks === 'function') {
+            f.interruptAttacks(true);
+          }
+        } else {
+          const stunDuration = isMask
             ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18)));
-        if (typeof f.applyHitStun === 'function') {
-          f.applyHitStun(isGetsugaAdapted ? Math.round(stunDuration * 0.4) : stunDuration);
+            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18));
+          if (typeof f.applyHitStun === 'function') {
+            f.applyHitStun(isGetsugaAdapted ? Math.round(stunDuration * 0.4) : stunDuration);
+          }
         }
 
         // ── 5. Apply Movement Slow Debuff (Immune if Adapted!) ──
@@ -232,15 +269,21 @@ export class GetsugaBehavior extends ProjectileBehavior {
         }
 
         // Visual impacts: specialized Bleach Getsuga Tensho spatial cleave hit effect
-        if (typeof spawnGetsugaHitEffect === 'function') {
-          spawnGetsugaHitEffect(f.x, f.y, angle, form);
+        // Skip Getsuga slice/flash hit effect for the Grand Finisher Final Kuroi Getsuga
+        if (!isFinal) {
+          if (typeof spawnGetsugaHitEffect === 'function') {
+            spawnGetsugaHitEffect(f.x, f.y, angle, form);
+          }
+
+          const flashType = (isMask) ? 'sukuna' : 'gojo';
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(f.x, f.y, flashType);
+          }
         }
 
-        const flashType = (isFinal || isMask) ? 'sukuna' : 'gojo';
-        if (typeof spawnImpactFlash === 'function') {
-          spawnImpactFlash(f.x, f.y, flashType);
-        }
+        // Ring shockwave hit effect (kept for all forms including Grand Finisher)
         if (typeof spawnMeleeClashShockwave === 'function') {
+          const flashType = (isFinal || isMask) ? 'sukuna' : 'gojo';
           const swSize = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaShockwaveSize || 110)
             : (isMask

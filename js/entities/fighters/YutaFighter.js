@@ -1,4 +1,5 @@
 import { YutaRenderer } from '../../graphics/fighters/yutaRenderer.js';
+import { drawYutaSkin, drawYutaFist } from '../../graphics/fighters/yutaSkin.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { fadeOutSound, fadeOutSoundBySrc, pauseSound, resumeSound, pauseSoundBySrc, resumeSoundBySrc } from '../../systems/soundSystem.js';
@@ -20,6 +21,8 @@ export class YutaFighter extends Fighter {
   constructor(def) {
     super(def);
     this.type = 'yuta';
+    this.themeColor = def?.themeColor || CONFIG.yuta?.themeColor || '#FF1493';
+    this.skinColor = '#FABC95';
     this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 36;
     this.meleeCooldown = 0;
     this.swordTrail = [];
@@ -824,7 +827,9 @@ export class YutaFighter extends Fighter {
     }
 
     if (this.domainActive) {
-      this.domainTimer--;
+      if (!this.isParalyzedDebuffActive()) {
+        this.domainTimer--;
+      }
       if (this.domainTimer <= 0) {
         this.domainActive = false;
         this.domainCooldown = 0;
@@ -1944,8 +1949,8 @@ export class YutaFighter extends Fighter {
     const handX = (this.r || 22) + 4 + pVal * 6;
     const handY = 10;
     
-    // Hand circle
-    ctx.fillStyle = this.color || '#EAE3F2';
+    // Hand circle (matching face skin tone)
+    ctx.fillStyle = this.skinColor || '#FABC95';
     ctx.beginPath();
     ctx.arc(handX, handY, getHandSize ? getHandSize(6, this) : 6, 0, Math.PI * 2);
     ctx.fill();
@@ -1953,202 +1958,104 @@ export class YutaFighter extends Fighter {
     ctx.lineWidth = 1.5;
     ctx.stroke();
     
-    // Growing authentic JJK Brush Cursed Energy orb directly over the hand
+    // Growing authentic JJK Pixel Cursed Energy orb directly over the hand
     if ((pVal > 0 || isFiring) && fadeAlpha > 0) {
       ctx.save();
       ctx.globalAlpha *= fadeAlpha;
 
       const time = Date.now();
+      const P = 2.4; // Pixel art grid unit
 
-      // Stage 1: Inward Converging Particle Embers (Gathering from surrounding air to form the orb)
-      const numEmbers = 28;
+      // Stage 1: Inward Converging Pixel Embers (Gathering from surrounding air to form the orb)
+      const numEmbers = 24;
       for (let i = 0; i < numEmbers; i++) {
         const emberSeed = i * 13.37;
         const speedMultiplier = 0.004 + (i % 5) * 0.002;
-        // Inward gathering velocity contracts towards hand center
         const cycleProgress = ((time * speedMultiplier + emberSeed) % 1.0);
-        // During early channeling (pVal < 0.25), particles gather from wide radius (up to 110px)
         const gatherRadius = (pVal < 0.25) ? (110 - pVal * 200) : (40 + (1 - pVal) * 50);
         const dist = Math.max(0, (1 - cycleProgress) * Math.max(15, gatherRadius));
         const angle = cycleProgress * Math.PI * 6 + emberSeed;
         
         const ex = handX + Math.cos(angle) * dist;
         const ey = handY + Math.sin(angle) * dist;
-        const emberR = 1.2 + (i % 3) * 0.8;
+        const px = Math.round(ex / P) * P;
+        const py = Math.round(ey / P) * P;
 
-        // Draw inward flying particle ember dot & trailing streak
-        ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : 'rgba(255, 105, 180, 0.9)';
-        ctx.beginPath();
-        ctx.arc(ex, ey, emberR, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw inward flying stepped pixel embers
+        ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : '#FF1493';
+        ctx.fillRect(px, py, P, P);
 
-        const tailX = ex + Math.cos(angle) * (emberR * 3);
-        const tailY = ey + Math.sin(angle) * (emberR * 3);
-        ctx.strokeStyle = 'rgba(255, 20, 147, 0.6)';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(ex, ey);
-        ctx.lineTo(tailX, tailY);
-        ctx.stroke();
+        // Trailing pixel ember
+        const tailX = Math.round((ex + Math.cos(angle) * (P * 2)) / P) * P;
+        const tailY = Math.round((ey + Math.sin(angle) * (P * 2)) / P) * P;
+        ctx.fillStyle = 'rgba(255, 20, 147, 0.6)';
+        ctx.fillRect(tailX, tailY, P, P);
       }
 
-      // Early Gathering Phase (pVal < 0.25): ONLY particles gather into a small spark core!
-      // Solid orb body ignites ONLY after particles condense (pVal >= 0.25)!
+      // Early Gathering Phase (pVal < 0.25): ONLY pixel embers gather into a small spark core!
       if (pVal < 0.25 && !isFiring) {
-        // Draw small igniting spark core as particles converge
-        const sparkR = pVal * 16;
+        const sparkR = Math.max(P, Math.round((pVal * 16) / P) * P);
         ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(handX, handY, Math.max(1, sparkR), 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(Math.round(handX / P) * P - sparkR / 2, Math.round(handY / P) * P - sparkR / 2, sparkR, sparkR);
         ctx.restore();
         return;
       }
 
-      // 20 FPS Quantized Frame Step (50ms interval) for electric snappy animation
+      // 20 FPS Quantized Frame Step (50ms interval)
       const frameStep20 = Math.floor(Date.now() / 50);
       const pseudoRand = (seed) => {
         const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
         return x - Math.floor(x);
       };
 
-      // Stage 2: Solid Orb Formation & Expansion (pVal >= 0.25 or isFiring)
+      // Stage 2: Concentric Stepped Pixel Orb Formation & Expansion
       const orbScale = isFiring ? 1.0 : Math.max(0, (pVal - 0.25) / 0.75);
-      const baseRadius = (4 + orbScale * 20) * (0.2 + 0.8 * fadeAlpha); // Grows smoothly and shrinks on fade-out
+      const baseRadius = (4 + orbScale * 20) * (0.2 + 0.8 * fadeAlpha);
       const pulse = Math.sin(frameStep20 * 0.4) * 2 * fadeAlpha;
       const r = Math.max(1, baseRadius + pulse);
 
-      // 1. Broad Magenta/Violet Ambient Glow Halo behind the orb & Yuta
-      const haloGrad = ctx.createRadialGradient(handX, handY, 0, handX, handY, r * 4.5);
-      haloGrad.addColorStop(0, 'rgba(255, 0, 200, 0.6)');
-      haloGrad.addColorStop(0.35, 'rgba(180, 0, 220, 0.35)');
-      haloGrad.addColorStop(0.7, 'rgba(100, 0, 160, 0.15)');
-      haloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      
-      ctx.fillStyle = haloGrad;
-      ctx.beginPath();
-      ctx.arc(handX, handY, r * 4.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 1.5 Snappy Electric Lightning Arcs (Randomized non-repetitive 20 FPS electric crackles)
-      const numLightning = 5;
+      // 1. Snappy Stepped Pixel Lightning Arcs (Randomized non-repetitive 20 FPS electric crackles)
+      const numLightning = 6;
       for (let i = 0; i < numLightning; i++) {
         const lAngle = (i / numLightning) * Math.PI * 2 + (pseudoRand(frameStep20 * 13 + i * 47) - 0.5) * 0.8;
         const maxLDist = r * (2.2 + pseudoRand(frameStep20 * 19 + i * 29) * 0.8);
-        ctx.strokeStyle = (pseudoRand(frameStep20 * 7 + i * 3) > 0.4) ? '#FF007F' : '#FFFFFF';
-        ctx.lineWidth = 2.0;
-        ctx.beginPath();
-        let lx = handX, ly = handY;
-        ctx.moveTo(lx, ly);
-        const steps = 5;
+        ctx.fillStyle = (pseudoRand(frameStep20 * 7 + i * 3) > 0.4) ? '#FF007F' : '#FFFFFF';
+        
+        const steps = 6;
         for (let s = 1; s <= steps; s++) {
           const stepR = (maxLDist / steps) * s;
           const jag = (pseudoRand(frameStep20 * 31 + i * 17 + s * 101) - 0.5) * 16;
-          lx = handX + Math.cos(lAngle) * stepR + Math.sin(lAngle) * jag;
-          ly = handY + Math.sin(lAngle) * stepR + Math.cos(lAngle) * jag;
-          ctx.lineTo(lx, ly);
+          const lx = Math.round((handX + Math.cos(lAngle) * stepR + Math.sin(lAngle) * jag) / P) * P;
+          const ly = Math.round((handY + Math.sin(lAngle) * stepR + Math.cos(lAngle) * jag) / P) * P;
+          ctx.fillRect(lx, ly, P, P);
         }
-        ctx.stroke();
       }
 
-      // 2. Radiating Needle Light Rays (20 FPS Stepped)
-      const numRays = 14;
-      ctx.lineWidth = 1.4;
-      for (let i = 0; i < numRays; i++) {
-        const rayAngle = (i / numRays) * Math.PI * 2 + (frameStep20 * 0.05);
-        const rayLen = r * (1.6 + pseudoRand(frameStep20 * 11 + i * 13) * 0.8);
-        const rx = handX + Math.cos(rayAngle) * rayLen;
-        const ry = handY + Math.sin(rayAngle) * rayLen;
-        
-        ctx.strokeStyle = (i % 3 === 0) ? '#000000' : 'rgba(255, 60, 200, 0.85)';
-        ctx.beginPath();
-        ctx.moveTo(handX, handY);
-        ctx.lineTo(rx, ry);
-        ctx.stroke();
-      }
+      // 2. Stepped Pixel Orb Concentric Shells
+      const orbSteps = Math.ceil((r + P * 2) / P);
+      for (let gy = -orbSteps; gy <= orbSteps; gy++) {
+        for (let gx = -orbSteps; gx <= orbSteps; gx++) {
+          const d = Math.hypot(gx * P, gy * P);
+          if (d <= r + P * 1.5) {
+            const px = Math.round((handX + gx * P) / P) * P;
+            const py = Math.round((handY + gy * P) / P) * P;
 
-      // 3. Generate randomized electric contour points for the orb body (Non-repetitive 20 FPS step noise)
-      const numPoints = 20;
-      const orbPoints = [];
-      for (let i = 0; i < numPoints; i++) {
-        const a = (i / numPoints) * Math.PI * 2;
-        const elecDistortion = (pseudoRand(frameStep20 * 53 + i * 137) - 0.5) * 5.0;
-        const currentR = r + elecDistortion;
-        orbPoints.push({
-          x: handX + Math.cos(a) * currentR,
-          y: handY + Math.sin(a) * currentR
-        });
-      }
+            let col = '#111114';
+            if (d > r + P * 0.5) {
+              col = '#111114'; // Dark ink pixel outline
+            } else if (d > r * 0.65) {
+              col = '#E6007A'; // Hot magenta pixel shell
+            } else if (d > r * 0.35) {
+              col = '#FF1493'; // Vibrant neon pink core
+            } else {
+              col = '#FFFFFF'; // Pure white-hot center block
+            }
 
-      // 4. Fill main magenta body
-      ctx.fillStyle = '#E6007A';
-      ctx.beginPath();
-      ctx.moveTo(orbPoints[0].x, orbPoints[0].y);
-      for (let i = 0; i < numPoints; i++) {
-        const p = orbPoints[i];
-        const next = orbPoints[(i + 1) % numPoints];
-        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // Outer pitch-black Calligraphy ink contour
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-
-      // 5. Snappy Randomized Electric Calligraphy Ink Hatch Cuts (20 FPS stepped, non-repetitive)
-      ctx.strokeStyle = '#000000';
-      ctx.lineCap = 'square';
-      const insetScales = [0.84, 0.93, 1.06];
-      for (let layer = 0; layer < insetScales.length; layer++) {
-        const scale = insetScales[layer];
-        ctx.beginPath();
-        for (let i = 0; i < numPoints; i++) {
-          const cutSeed = pseudoRand(frameStep20 * 73 + layer * 31 + i * 19);
-          if (cutSeed < 0.35) continue; // Random electric gaps
-
-          const p = orbPoints[i];
-          const next = orbPoints[(i + 1) % numPoints];
-          
-          const pScaleX = handX + (p.x - handX) * scale;
-          const pScaleY = handY + (p.y - handY) * scale;
-          const nextScaleX = handX + (next.x - handX) * scale;
-          const nextScaleY = handY + (next.y - handY) * scale;
-
-          const jagX = (pseudoRand(frameStep20 * 41 + i * 13 + layer * 7) - 0.5) * 6.0;
-          const jagY = (pseudoRand(frameStep20 * 97 + i * 23 + layer * 11) - 0.5) * 6.0;
-          ctx.moveTo(pScaleX, pScaleY);
-          ctx.lineTo(nextScaleX + jagX, nextScaleY + jagY);
+            ctx.fillStyle = col;
+            ctx.fillRect(px, py, P, P);
+          }
         }
-        ctx.lineWidth = layer === 2 ? 2.0 : 1.4;
-        ctx.stroke();
       }
-
-      // 6. Inner Hot Magenta Core Fill
-      ctx.fillStyle = '#FF20AA';
-      ctx.beginPath();
-      ctx.moveTo(handX + (orbPoints[0].x - handX) * 0.65, handY + (orbPoints[0].y - handY) * 0.65);
-      for (let i = 0; i < numPoints; i++) {
-        const p = orbPoints[i];
-        const next = orbPoints[(i + 1) % numPoints];
-        const px = handX + (p.x - handX) * 0.65;
-        const py = handY + (p.y - handY) * 0.65;
-        const nx = handX + (next.x - handX) * 0.65;
-        const ny = handY + (next.y - handY) * 0.65;
-        ctx.quadraticCurveTo(px, py, (px + nx) / 2, (py + ny) / 2);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // 7. Clean White Circular Core
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = 'rgba(255, 204, 238, 0.8)';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      ctx.arc(handX, handY, Math.max(3, r * 0.42), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
 
       ctx.restore();
     }
@@ -2268,75 +2175,86 @@ export class YutaFighter extends Fighter {
           ctx.scale(1, -1);
         }
 
+        const P = 2.4; // Pixel art grid scale
         const outerRadius = r + 82;
         const maxThick = 24.0;
-        const numSteps = 24;
+        const totalAngle = Math.abs(currentTipOffset - currentTailOffset);
+        const arcSteps = Math.max(16, Math.round((totalAngle * outerRadius) / (P * 1.5)));
 
-        // 1. Soft Cursed Energy Volumetric Glow Arc
-        ctx.beginPath();
-        for (let i = 0; i <= numSteps; i++) {
-          const t = i / numSteps;
+        // Pass 1: Pixel-Art Dark Ink Outline Shell
+        ctx.fillStyle = `rgba(17, 17, 20, ${0.92 * trailAlpha * fade})`;
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
           const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-          const rad = outerRadius + taper * 4.5;
-          const px = Math.cos(ang) * rad;
-          const py = Math.sin(ang) * rad;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        for (let i = numSteps; i >= 0; i--) {
-          const t = i / numSteps;
-          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-          const rad = outerRadius - (maxThick * taper) - taper * 3.5;
-          const px = Math.cos(ang) * rad;
-          const py = Math.sin(ang) * rad;
-          ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(230, 0, 120, ${0.40 * trailAlpha * fade})`;
-        ctx.fill();
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
+          const rad = outerRadius + taper * 2.0;
+          const thick = (maxThick * taper) + P * 2;
+          const innerRad = rad - thick;
 
-        // 2. Main Neon Pink / Violet Crescent Core Body
-        ctx.beginPath();
-        for (let i = 0; i <= numSteps; i++) {
-          const t = i / numSteps;
-          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-          const rad = outerRadius + taper * 1.5;
-          const px = Math.cos(ang) * rad;
-          const py = Math.sin(ang) * rad;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
+          const numRadSteps = Math.max(2, Math.round(thick / P));
+          for (let ri = 0; ri <= numRadSteps; ri++) {
+            const currentR = innerRad + (ri / numRadSteps) * thick;
+            const rawX = Math.cos(ang) * currentR;
+            const rawY = Math.sin(ang) * currentR;
+            const px = Math.round(rawX / P) * P;
+            const py = Math.round(rawY / P) * P;
+            ctx.fillRect(px, py, P, P);
+          }
         }
-        for (let i = numSteps; i >= 0; i--) {
-          const t = i / numSteps;
-          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-          const rad = outerRadius - (maxThick * taper);
-          const px = Math.cos(ang) * rad;
-          const py = Math.sin(ang) * rad;
-          ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(255, 20, 147, ${0.90 * trailAlpha * fade})`;
-        ctx.fill();
 
-        // 3. Sharp White-Hot Cutting Edge
-        ctx.beginPath();
-        for (let i = 0; i <= numSteps; i++) {
-          const t = i / numSteps;
+        // Pass 2: Stepped Pixel Vibrant Cursed Pink & Magenta Core
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
           const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-          const rad = outerRadius + taper * 1.5;
-          const px = Math.cos(ang) * rad;
-          const py = Math.sin(ang) * rad;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
+          const rad = outerRadius + taper * 1.0;
+          const thick = maxThick * taper;
+          const innerRad = rad - thick;
+
+          const numRadSteps = Math.max(1, Math.round(thick / P));
+          for (let ri = 0; ri <= numRadSteps; ri++) {
+            const rNorm = ri / numRadSteps; // 0 = inner trailing edge, 1 = outer cutting edge
+            const currentR = innerRad + rNorm * thick;
+            const rawX = Math.cos(ang) * currentR;
+            const rawY = Math.sin(ang) * currentR;
+            const px = Math.round(rawX / P) * P;
+            const py = Math.round(rawY / P) * P;
+
+            let col = '#FF1493';
+            if (rNorm > 0.85) {
+              col = '#FFF0F8'; // White-pink cutting edge
+            } else if (rNorm > 0.5) {
+              col = '#FF1493'; // Vibrant neon cursed pink
+            } else if (rNorm > 0.25) {
+              col = '#E6007A'; // Deep hot magenta
+            } else {
+              col = '#990055'; // Dark violet-magenta inner base
+            }
+
+            ctx.fillStyle = col;
+            ctx.fillRect(px, py, P, P);
+          }
+
+          // Pass 3: Leading White-Hot Pixel Cutting Edge
+          const leadRawX = Math.cos(ang) * (outerRadius + taper * 1.0);
+          const leadRawY = Math.sin(ang) * (outerRadius + taper * 1.0);
+          const lpx = Math.round(leadRawX / P) * P;
+          const lpy = Math.round(leadRawY / P) * P;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(lpx, lpy, P, P);
         }
-        ctx.strokeStyle = `rgba(255, 240, 250, ${0.98 * trailAlpha * fade})`;
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
+
+        // Pass 4: Trailing Pixel Cursed Spark Embers
+        const numEmbers = 8;
+        for (let eb = 0; eb < numEmbers; eb++) {
+          const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
+          const ebAng = currentTailOffset + ebT * (currentTipOffset - currentTailOffset);
+          const ebDist = outerRadius - 10 - eb * 4;
+          const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
+          const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+          ctx.fillStyle = (eb % 2 === 0) ? '#FF1493' : '#FFFFFF';
+          ctx.fillRect(ex, ey, P, P);
+        }
 
         ctx.restore();
       }
@@ -2490,6 +2408,13 @@ export class YutaFighter extends Fighter {
     }
 
     ctx.scale(1.2, 1.2);           // scale up the entire weapon by 20%
+
+    const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.yuta) ? state.weaponCustomizations.yuta : null;
+    if (custom) {
+      ctx.translate(custom.offsetX, custom.offsetY);
+      ctx.scale(custom.scale, custom.scale);
+      ctx.rotate(custom.angleOffset);
+    }
 
     // === Cursed Energy Katana Aura (Rendered BEHIND the blade) ===
     // Glows pink when swinging, when blocking, or when Rika/Domain is active
@@ -2836,14 +2761,22 @@ export class YutaFighter extends Fighter {
       ctx.lineWidth = 1.0;
       ctx.stroke();
 
-      // 7. Hand holding the hilt (drawn over the hilt wrapper and aura)
-      ctx.beginPath();
-      ctx.arc(-2, 0.5, getHandSize(5, this), 0, Math.PI * 2);
-      ctx.fillStyle = this.color;
-      ctx.fill();
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = '#000';
-      ctx.stroke();
+      // 7. Hands holding the hilt (drawn over the hilt wrapper and aura)
+      const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || this.hideHands;
+      if (!shouldHideHands) {
+        const handR = Math.max(4.8, getHandSize ? getHandSize(4.8, this) : 4.8);
+        const skinCol = this.skinColor || '#FABC95';
+
+        // Rear / Back Hand (Left Hand near pommel at x = -8.5 with signature silver engagement ring)
+        if (!this.hideBackHand) {
+          drawYutaFist(ctx, -8.5, 0, handR, skinCol, this, true);
+        }
+
+        // Lead / Front Hand (Right Hand near tsuba guard at x = 2.5)
+        if (!this.hideFrontHand) {
+          drawYutaFist(ctx, 2.5, 0, handR, skinCol, this, false);
+        }
+      }
 
     ctx.restore();
 
@@ -2853,11 +2786,18 @@ export class YutaFighter extends Fighter {
     if (typeof state !== 'undefined' && state.pixiApp) return;
     YutaRenderer.drawDomainBackground(ctx, this, isClashSecondary); 
   }
+  drawBody(ctx) {
+    drawYutaSkin(ctx, this);
+  }
+  drawOutline(ctx) {
+    // Outer body outline is cleanly rendered within drawYutaSkin
+  }
   draw(ctx, opponent) { YutaRenderer.draw(ctx, this, opponent); }
   _drawDomainChannelAura(ctx) { YutaRenderer._drawDomainChannelAura(ctx, this); }
   _drawRika(ctx, opponent, renderState = null) { YutaRenderer._drawRika(ctx, this, opponent, renderState); }
   _drawTopDownArmAndClaw(ctx, shoulderX, shoulderY, handX, handY, isLeft, attackTimer, isGamePlay = false) { YutaRenderer._drawTopDownArmAndClaw(ctx, this, shoulderX, shoulderY, handX, handY, isLeft, attackTimer, isGamePlay); }
   _drawRikaCursedEnergyAura(ctx, opponent, renderState = null) { YutaRenderer._drawRikaCursedEnergyAura(ctx, this, opponent, renderState); }
+  _drawRikaYutaTether(ctx, rk, renderState = null) { YutaRenderer._drawRikaYutaTether(ctx, this, rk, renderState); }
   _renderYutaAuraFrameCanvas(frameIdx, isRCT) { return YutaRenderer._renderYutaAuraFrameCanvas(this, frameIdx, isRCT); }
   _drawYutaCursedEnergyAura(ctx) { YutaRenderer._drawYutaCursedEnergyAura(ctx, this); }
   _drawYutaSwordBag(ctx) { YutaRenderer._drawYutaSwordBag(ctx, this); }

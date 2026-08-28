@@ -195,7 +195,7 @@ export class TojiFighter extends Fighter {
     if (this.ultimateActive && !force) {
       return; // PROTECTED: Never cancel or interrupt active ultimate!
     }
-    super.interruptAttacks();
+    super.interruptAttacks(force);
     this.isAmbushing = false;
     this.ambushTarget = null;
     this.ambushPhase = null;
@@ -203,11 +203,14 @@ export class TojiFighter extends Fighter {
     this.isChannelingDomain = false;
     this.ultimatePhase = null;
     this.ultimateTarget = null;
-    this.katanaSlashTimer = 0;
-    this.katanaSlashFadeTimer = 0;
-    this._lastKatanaTimer = 0;
-    this.slashSwingTimer = 0;
-    this.spearSwingTimer = 0;
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    if (force || (!isMatchEnded && (this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush))) {
+      this.katanaSlashTimer = 0;
+      this.katanaSlashFadeTimer = 0;
+      this._lastKatanaTimer = 0;
+      this.slashSwingTimer = 0;
+      this.spearSwingTimer = 0;
+    }
     this.phantomSlashTimer = 0;
     this.phantomStrikeCount = 0;
     this._activeSlashProgress = 0;
@@ -2011,131 +2014,115 @@ export class TojiFighter extends Fighter {
           endAngle = tipAngle;
         }
 
+        const P = 2.4; // Pixel art grid scale
         const outerR = this.r + thrustDistance + (isSpinningDive ? 146 : 122); // Dynamically tracks Katana blade tip!
         const thickScale = isSpinningDive ? 1.0 : (recP > 0 ? Math.pow(1 - recP, 1.4) : 1.0);
         const maxThick = 22 * thickScale; // Slim, razor-sharp crescent thickness!
-        const steps = isLowQuality ? 18 : 32;
+        const totalAngle = Math.abs(endAngle - startAngle);
+        const arcSteps = Math.max(16, Math.round((totalAngle * outerR) / (P * 1.5)));
 
-        // 1. Outer Neon Violet Glowing Aura (Slim & Crisp)
-        ctx.beginPath();
-        ctx.arc(0, 0, outerR + 4, startAngle, endAngle, false);
-        for (let i = steps; i >= 0; i--) {
-          const t = i / steps;
-          const angle = startAngle + (endAngle - startAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-          const thick = (maxThick + 5) * taper;
-          const r = (outerR + 4) - thick;
-          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+        // Pass 1: Pixel-Art Dark Cursed Ink Outline Shell
+        ctx.fillStyle = `rgba(8, 4, 16, ${0.96 * slashArcAlpha})`;
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
+          const ang = startAngle + (endAngle - startAngle) * t;
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+          const rad = outerR + taper * 2.0;
+          const thick = (maxThick * taper) + P * 2;
+          const innerRad = rad - thick;
+
+          const numRadSteps = Math.max(2, Math.round(thick / P));
+          for (let ri = 0; ri <= numRadSteps; ri++) {
+            const currentR = innerRad + (ri / numRadSteps) * thick;
+            const rawX = Math.cos(ang) * currentR;
+            const rawY = Math.sin(ang) * currentR;
+            const px = Math.round(rawX / P) * P;
+            const py = Math.round(rawY / P) * P;
+            ctx.fillRect(px, py, P, P);
+          }
         }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(160, 30, 240, ${slashArcAlpha * 0.70})`;
-        ctx.fill();
 
-        // 2. Inner Deep Crimson / Violet Secondary Flare
-        ctx.beginPath();
-        ctx.arc(0, 0, outerR + 1.5, startAngle, endAngle, false);
-        for (let i = steps; i >= 0; i--) {
-          const t = i / steps;
-          const angle = startAngle + (endAngle - startAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-          const thick = (maxThick + 2) * taper;
-          const r = (outerR + 1.5) - thick;
-          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-        }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(220, 20, 100, ${slashArcAlpha * 0.80})`;
-        ctx.fill();
+        // Pass 2: Stepped Pixel Deep Crimson / Violet Nullification Core
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
+          const ang = startAngle + (endAngle - startAngle) * t;
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+          const rad = outerR + taper * 1.0;
+          const thick = maxThick * taper;
+          const innerRad = rad - thick;
 
-        // 3. Void-Black Pitch Dark Cursed Energy Core (Slim, Long, & Jagged Notches)
-        ctx.beginPath();
-        ctx.arc(0, 0, outerR, startAngle, endAngle, false);
-        for (let i = steps; i >= 0; i--) {
-          const t = i / steps;
-          const angle = startAngle + (endAngle - startAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-          let thick = maxThick * taper;
+          const numRadSteps = Math.max(1, Math.round(thick / P));
+          for (let ri = 0; ri <= numRadSteps; ri++) {
+            const rNorm = ri / numRadSteps;
+            const currentR = innerRad + rNorm * thick;
+            const rawX = Math.cos(ang) * currentR;
+            const rawY = Math.sin(ang) * currentR;
+            const px = Math.round(rawX / P) * P;
+            const py = Math.round(rawY / P) * P;
 
-          // Subtle sharp inner teeth notches matching reference image
-          const notchPattern = Math.sin(t * Math.PI * 10);
-          if (notchPattern > 0.65 && t > 0.15 && t < 0.85) {
-            thick += 4.5 * (notchPattern - 0.65);
+            let col;
+            if (rNorm > 0.85) col = '#FFFFFF';
+            else if (rNorm > 0.6) col = '#FF2060';
+            else if (rNorm > 0.3) col = '#9B1FE8';
+            else col = '#3A055C';
+
+            ctx.fillStyle = col;
+            ctx.fillRect(px, py, P, P);
           }
 
-          const r = outerR - thick;
-          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+          // Pass 3: Leading White Razor Cutting Edge Pixels
+          const leadRawX = Math.cos(ang) * (outerR + taper * 1.0);
+          const leadRawY = Math.sin(ang) * (outerR + taper * 1.0);
+          const lpx = Math.round(leadRawX / P) * P;
+          const lpy = Math.round(leadRawY / P) * P;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(lpx, lpy, P, P);
         }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(12, 4, 20, ${slashArcAlpha * 0.96})`;
-        ctx.fill();
 
-        // 4. Electric Violet / Pure White Razor Edge Line
-        ctx.beginPath();
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          const angle = startAngle + (endAngle - startAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-          const thick = maxThick * taper;
-          const r = outerR - thick * 0.25;
-          const x = Math.cos(angle) * r;
-          const y = Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+        // Pass 4: Trailing Cursed Purple Pixel Sparks
+        const numEmbers = 8;
+        for (let eb = 0; eb < numEmbers; eb++) {
+          const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
+          const ebAng = startAngle + ebT * (endAngle - startAngle);
+          const ebDist = outerR - 10 - eb * 4;
+          const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
+          const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+          ctx.fillStyle = (eb % 2 === 0) ? '#A030FF' : '#FF1E56';
+          ctx.fillRect(ex, ey, P, P);
         }
-        ctx.strokeStyle = `rgba(235, 140, 255, ${slashArcAlpha})`;
-        ctx.lineWidth = 2.4;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        ctx.beginPath();
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          const angle = startAngle + (endAngle - startAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-          const thick = maxThick * taper;
-          const r = outerR - thick * 0.25;
-          const x = Math.cos(angle) * r;
-          const y = Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = `rgba(255, 255, 255, ${slashArcAlpha * 0.9})`;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
       } else if (this.isAmbushThrust && this.ambushPhase !== 'PHANTOM_FLURRY') {
         // Lock thrust cone to the snapshotted direction at swing-start (never drifts mid-thrust)
         const thrustFrozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
         ctx.rotate(thrustFrozenAngle);
-        // --- MASSIVE PIERCING THRUST CONE SHOCKWAVE ---
+        const P = 2.4;
         const spearTipR = this.r + thrustDistance + 10;
-        // A. Deep Purple Cursed Energy Outer Flare Cone
-        ctx.beginPath();
-        ctx.moveTo(spearTipR, -26 * slashArcAlpha);
-        ctx.lineTo(spearTipR + 85 * slashArcAlpha, 0);
-        ctx.lineTo(spearTipR, 26 * slashArcAlpha);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(160, 90, 240, ${slashArcAlpha * 0.5})`;
-        ctx.fill();
+        const coneLen = 105 * slashArcAlpha;
+        const coneH = 26 * slashArcAlpha;
 
-        // B. Crimson Nullification Energy Edge Cone
-        ctx.beginPath();
-        ctx.moveTo(spearTipR + 2, -18 * slashArcAlpha);
-        ctx.lineTo(spearTipR + 95 * slashArcAlpha, 0);
-        ctx.lineTo(spearTipR + 2, 18 * slashArcAlpha);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(255, 30, 75, ${slashArcAlpha * 0.75})`;
-        ctx.fill();
+        // Stepped pixel piercing thrust diamond cone
+        for (let lx = 0; lx <= coneLen; lx += P) {
+          const prog = lx / Math.max(1, coneLen);
+          const spread = (1 - prog) * coneH;
+          const px = Math.round((spearTipR + lx) / P) * P;
+          const topY = Math.round(-spread / P) * P;
+          const botY = Math.round(spread / P) * P;
+          
+          // Outline
+          ctx.fillStyle = '#080410';
+          ctx.fillRect(px, topY - P, P, (botY - topY) + P * 2);
 
-        // C. Hyper-Bright Razor White Piercing Thrust Core
-        ctx.beginPath();
-        ctx.moveTo(spearTipR + 5, -10 * slashArcAlpha);
-        ctx.lineTo(spearTipR + 105 * slashArcAlpha, 0);
-        ctx.lineTo(spearTipR + 5, 10 * slashArcAlpha);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(255, 255, 255, ${slashArcAlpha * 0.95})`;
-        ctx.fill();
-        ctx.strokeStyle = `rgba(255, 255, 255, ${slashArcAlpha})`;
-        ctx.lineWidth = 3;
-        ctx.stroke();
+          // Violet / Crimson Body
+          for (let py = topY; py <= botY; py += P) {
+            const vNorm = Math.abs(py) / Math.max(1, spread);
+            let col = '#FFFFFF';
+            if (vNorm > 0.7) col = '#A05AF0';
+            else if (vNorm > 0.35) col = '#FF1E4B';
+            else col = '#FFFFFF';
+
+            ctx.fillStyle = col;
+            ctx.fillRect(px, py, P, P);
+          }
+        }
       } else if (this.ambushPhase === 'PHANTOM_FLURRY') {
         // --- DUAL-WIELD PHANTOM FLURRY SLASH ARCS ---
         const drawArc = (arcAngle, radius, thick, alpha, color1, color2, color3) => {
@@ -2173,62 +2160,57 @@ export class TojiFighter extends Fighter {
 
           const tailAngle = sweepDir === 1 ? -activeTrailLength : 0;
           const tipAngle = sweepDir === 1 ? 0 : activeTrailLength;
-          const steps = isLowQuality ? 16 : 30;
-
-          // Scale thickness proportionally with the trail length to prevent blunt bulkiness when short
+          const P = 2.4;
           thick = thick * (activeTrailLength / maxTrailLength);
+          const totalAngle = Math.abs(tipAngle - tailAngle);
+          const arcSteps = Math.max(12, Math.round((totalAngle * radius) / (P * 1.5)));
 
-          ctx.beginPath();
-          ctx.arc(0, 0, radius + 4, tailAngle, tipAngle, false);
-          for (let i = steps; i >= 0; i--) {
-            const t = i / steps;
-            const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-            const th = (thick + 5) * taper;
-            ctx.lineTo(Math.cos(angle) * (radius + 4 - th), Math.sin(angle) * (radius + 4 - th));
-          }
-          ctx.fillStyle = `rgba(${color1}, ${alpha * 0.70})`;
-          ctx.fill();
-
-          ctx.beginPath();
-          ctx.arc(0, 0, radius + 1.5, tailAngle, tipAngle, false);
-          for (let i = steps; i >= 0; i--) {
-            const t = i / steps;
-            const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-            const th = (thick + 2) * taper;
-            ctx.lineTo(Math.cos(angle) * (radius + 1.5 - th), Math.sin(angle) * (radius + 1.5 - th));
-          }
-          ctx.fillStyle = `rgba(${color2}, ${alpha * 0.80})`;
-          ctx.fill();
-
-          ctx.beginPath();
-          ctx.arc(0, 0, radius, tailAngle, tipAngle, false);
-          for (let i = steps; i >= 0; i--) {
-            const t = i / steps;
+          // Pass 1: Pixel Outline
+          ctx.fillStyle = `rgba(8, 4, 16, ${0.96 * alpha})`;
+          for (let i = 0; i <= arcSteps; i++) {
+            const t = i / arcSteps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
             const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-            let th = thick * taper;
-            const notch = Math.sin(t * Math.PI * 10);
-            if (notch > 0.65 && t > 0.15 && t < 0.85) th += 4.5 * (notch - 0.65);
-            ctx.lineTo(Math.cos(angle) * (radius - th), Math.sin(angle) * (radius - th));
-          }
-          ctx.fillStyle = `rgba(${color3}, ${alpha * 0.96})`;
-          ctx.fill();
+            const rad = radius + taper * 2.0;
+            const th = (thick + 4) * taper;
+            const innerRad = rad - th;
 
-          ctx.beginPath();
-          for (let i = 0; i <= steps; i++) {
-            const t = i / steps;
-            const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-            const th = thick * taper;
-            const rEdge = radius - th * 0.25;
-            if (i === 0) ctx.moveTo(Math.cos(angle) * rEdge, Math.sin(angle) * rEdge);
-            else ctx.lineTo(Math.cos(angle) * rEdge, Math.sin(angle) * rEdge);
+            const numRadSteps = Math.max(2, Math.round(th / P));
+            for (let ri = 0; ri <= numRadSteps; ri++) {
+              const currentR = innerRad + (ri / numRadSteps) * th;
+              const rawX = Math.cos(angle) * currentR;
+              const rawY = Math.sin(angle) * currentR;
+              ctx.fillRect(Math.round(rawX / P) * P, Math.round(rawY / P) * P, P, P);
+            }
           }
-          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
+
+          // Pass 2: Stepped Pixel Core
+          for (let i = 0; i <= arcSteps; i++) {
+            const t = i / arcSteps;
+            const angle = tailAngle + (tipAngle - tailAngle) * t;
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            const rad = radius + taper * 1.0;
+            const th = thick * taper;
+            const innerRad = rad - th;
+
+            const numRadSteps = Math.max(1, Math.round(th / P));
+            for (let ri = 0; ri <= numRadSteps; ri++) {
+              const rNorm = ri / numRadSteps;
+              const currentR = innerRad + rNorm * th;
+              const rawX = Math.cos(angle) * currentR;
+              const rawY = Math.sin(angle) * currentR;
+
+              let col = (rNorm > 0.85) ? '#FFFFFF' : ((rNorm > 0.45) ? `rgb(${color2})` : `rgb(${color1})`);
+              ctx.fillStyle = col;
+              ctx.fillRect(Math.round(rawX / P) * P, Math.round(rawY / P) * P, P, P);
+            }
+
+            // White cutting edge
+            const leadRawX = Math.cos(angle) * rad;
+            const leadRawY = Math.sin(angle) * rad;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(Math.round(leadRawX / P) * P, Math.round(leadRawY / P) * P, P, P);
+          }
 
           ctx.restore();
         };
@@ -2285,112 +2267,82 @@ export class TojiFighter extends Fighter {
         const tipAngle = currentOffset;
         const tailAngle = Math.max(startOffset, currentOffset - activeTrailLength);
         const bladeReach = isKatana ? 80 : 85;
+        const P = 2.4; // Pixel art grid scale
         const outerR = (this.r + thrustDistance + bladeReach) * (editP ? editP.scale : 1.0); // Dynamically tracks active blade tip!
         const thickScale = activeTrailLength / maxTrailLength; // Scale thickness proportionally with length
         const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0) * thickScale; // Slim razor-sharp crescent thickness scaled!
-        const steps = isLowQuality ? 18 : 30;
+        const totalAngle = Math.abs(tipAngle - tailAngle);
+        const arcSteps = Math.max(16, Math.round((totalAngle * outerR) / (P * 1.5)));
 
-        // 1. Volumetric Outer Cursed Energy Shockwave Glow
-        ctx.beginPath();
-        ctx.arc(0, 0, outerR + 6, tailAngle, tipAngle, false);
-        for (let i = steps; i >= 0; i--) {
-          const t = i / steps;
+        // Pass 1: Pixel-Art Dark Cursed Ink Outline Shell
+        ctx.fillStyle = `rgba(8, 4, 16, ${0.98 * slashArcAlpha})`;
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.25) * (0.28 + 0.72 * t);
-          const thick = (maxThick + 8) * taper;
-          const r = (outerR + 6) - thick;
-          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+          const rad = outerR + taper * 2.0;
+          const thick = (maxThick * taper) + P * 2;
+          const innerRad = rad - thick;
+
+          const numRadSteps = Math.max(2, Math.round(thick / P));
+          for (let ri = 0; ri <= numRadSteps; ri++) {
+            const currentR = innerRad + (ri / numRadSteps) * thick;
+            const rawX = Math.cos(angle) * currentR;
+            const rawY = Math.sin(angle) * currentR;
+            const px = Math.round(rawX / P) * P;
+            const py = Math.round(rawY / P) * P;
+            ctx.fillRect(px, py, P, P);
+          }
         }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(160, 48, 255, ${slashArcAlpha * 0.45})`;
-        ctx.fill();
 
-        // 2. Inner Radiant Crimson Nullification Energy Flare
-        ctx.beginPath();
-        ctx.arc(0, 0, outerR + 2.5, tailAngle, tipAngle, false);
-        for (let i = steps; i >= 0; i--) {
-          const t = i / steps;
+        // Pass 2: Stepped Pixel Metallic Silver Hamon & Nullification Violet Core
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.25) * (0.28 + 0.72 * t);
-          const thick = (maxThick + 4) * taper;
-          const r = (outerR + 2.5) - thick;
-          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-        }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(255, 30, 86, ${slashArcAlpha * 0.65})`;
-        ctx.fill();
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+          const rad = outerR + taper * 1.0;
+          const thick = maxThick * taper;
+          const innerRad = rad - thick;
 
-        // 3. Void-Black Pitch Dark Cursed Energy Core (Smooth with sharp inner serration notches)
-        ctx.beginPath();
-        ctx.arc(0, 0, outerR, tailAngle, tipAngle, false);
-        for (let i = steps; i >= 0; i--) {
-          const t = i / steps;
-          const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
-          let thick = maxThick * taper;
+          const numRadSteps = Math.max(1, Math.round(thick / P));
+          for (let ri = 0; ri <= numRadSteps; ri++) {
+            const rNorm = ri / numRadSteps;
+            const currentR = innerRad + rNorm * thick;
+            const rawX = Math.cos(angle) * currentR;
+            const rawY = Math.sin(angle) * currentR;
+            const px = Math.round(rawX / P) * P;
+            const py = Math.round(rawY / P) * P;
 
-          const notchPattern = Math.sin(t * Math.PI * 10);
-          if (notchPattern > 0.65 && t > 0.15 && t < 0.85) {
-            thick += 5.0 * (notchPattern - 0.65);
+            let col;
+            if (rNorm > 0.85) col = '#FFFFFF';
+            else if (rNorm > 0.6) col = '#E2EAF5'; // Metallic silver
+            else if (rNorm > 0.35) col = '#FF1E56'; // Crimson nullification
+            else col = '#9B1FE8'; // Deep cursed violet
+
+            ctx.fillStyle = col;
+            ctx.fillRect(px, py, P, P);
           }
 
-          const r = outerR - thick;
-          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+          // Pass 3: Leading White Cutting Edge Pixels
+          const leadRawX = Math.cos(angle) * (outerR + taper * 1.0);
+          const leadRawY = Math.sin(angle) * (outerR + taper * 1.0);
+          const lpx = Math.round(leadRawX / P) * P;
+          const lpy = Math.round(leadRawY / P) * P;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(lpx, lpy, P, P);
         }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(8, 4, 16, ${slashArcAlpha * 0.98})`;
-        ctx.fill();
 
-        // 4. Bright Metallic Silver Hamon Slicing Wave
-        ctx.beginPath();
-        ctx.arc(0, 0, outerR, tailAngle, tipAngle, false);
-        for (let i = steps; i >= 0; i--) {
-          const t = i / steps;
-          const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
-          const thick = maxThick * 0.35 * taper;
-          const r = outerR - thick;
-          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+        // Pass 4: Trailing Cursed Pixel Sparks
+        const numEmbers = 8;
+        for (let eb = 0; eb < numEmbers; eb++) {
+          const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
+          const ebAng = tailAngle + ebT * (tipAngle - tailAngle);
+          const ebDist = outerR - 10 - eb * 4;
+          const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
+          const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+          ctx.fillStyle = (eb % 2 === 0) ? '#A030FF' : '#FF1E56';
+          ctx.fillRect(ex, ey, P, P);
         }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(226, 234, 245, ${slashArcAlpha * 0.85})`;
-        ctx.fill();
-
-        // 5. Electric Violet Outer Razor Edge Contour Line
-        ctx.beginPath();
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
-          const thick = maxThick * taper;
-          const r = outerR - thick * 0.18;
-          const x = Math.cos(angle) * r;
-          const y = Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = `rgba(220, 140, 255, ${slashArcAlpha * 0.95})`;
-        ctx.lineWidth = 2.8;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        // 6. Hyper-Bright Pure White-Hot Slicing Razor Edge Core
-        ctx.beginPath();
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
-          const thick = maxThick * taper;
-          const r = outerR - thick * 0.18;
-          const x = Math.cos(angle) * r;
-          const y = Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = `rgba(255, 255, 255, ${slashArcAlpha * 0.98})`;
-        ctx.lineWidth = 1.4;
-        ctx.lineCap = 'round';
-        ctx.stroke();
       }
 
       ctx.restore();

@@ -228,13 +228,15 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
       target.isFirstHitKnockback = false;
       const directAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
       const sweepSlingAngle = directAngle + 1.15;
-      const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 0.95;
+      const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 52);
 
       const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
       const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
+      target.knockbackVx = kbVx;
+      target.knockbackVy = kbVy;
       target.vx = kbVx;
       target.vy = kbVy;
-      target.knockbackDecay = 0.90;
+      target.knockbackDecay = 0.92;
       if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 
@@ -300,9 +302,10 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     const wasRCT = target.isChannelingRCT || chanState.rct;
     const wasDivineFlame = target.isChannelingDivineFlame || chanState.divineFlame;
     const wasStorm = target.isChannelingStorm || chanState.storm;
+    const wasGetsuga = target.isChannelingGetsuga || target.isChannelingBankai || chanState.getsuga || chanState.bankai;
     const wasGeneric = target.isChanneling || chanState.generic;
 
-    const wasChanneling = isAmbushThrust && (fighter.ambushTargetWasChanneling || wasPurple || wasDomain || wasRCT || wasDivineFlame || wasStorm || wasGeneric);
+    const wasChanneling = isAmbushThrust && (fighter.ambushTargetWasChanneling || wasPurple || wasDomain || wasRCT || wasDivineFlame || wasStorm || wasGetsuga || wasGeneric);
 
     if (wasChanneling) {
       const silenceFrames = CONFIG.toji?.silenceDuration || 180;
@@ -317,14 +320,22 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       target.rctChannelTimer = 0;
       target.isChannelingDivineFlame = false;
       target.isChannelingStorm = false;
+      target.isChannelingGetsuga = false;
+      target.getsugaChargeTimer = 0;
+      target.getsugaSlideTimer = 0;
+      target.isChannelingBankai = false;
+      target.bankaiChargeTimer = 0;
+      target.bankaiSlideTimer = 0;
       target.isChanneling = false;
       target.channelTimer = 0;
+      if (typeof target.interruptAttacks === 'function') target.interruptAttacks(true);
 
       if (wasPurple && target.purpleCooldown !== undefined) target.purpleCooldown = (CONFIG.gojo?.purpleCooldown || 800) / 2;
       if (wasDomain && target.domainCooldown !== undefined && !target.domainActive) target.domainCooldown = (CONFIG.gojo?.domainCooldown || CONFIG.sukuna?.domainCooldown || CONFIG.yuta?.domainCooldown || 1500) / 2;
       if (wasRCT && target.rctCooldown !== undefined) target.rctCooldown = (CONFIG.yuta?.rctCooldown || 600) / 2;
       if (wasDivineFlame && target.divineFlameCooldown !== undefined) target.divineFlameCooldown = (CONFIG.sukuna?.divineFlameCooldown || 900) / 2;
       if (wasStorm && target.stormCooldown !== undefined) target.stormCooldown = (CONFIG.zeus?.stormCooldown || 900) / 2;
+      if (wasGetsuga && target.getsugaCooldown !== undefined) target.getsugaCooldown = (CONFIG.ichigo?.getsugaCooldown || 450) / 2;
       if (wasGeneric && typeof target.ultimateCooldown === 'number' && !target.ultimateActive) target.ultimateCooldown = (target.ultimateCooldownMax || 900) / 2;
 
       spawnSparks(target.x, target.y, 18, '#A078C8');
@@ -342,13 +353,15 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     if (!target.isTurret && !target.cannotBeKnockbacked) {
       target.isFirstHitKnockback = isAmbushThrust;
       const pushAngle = isAmbushThrust ? Math.atan2(target.y - fighter.y, target.x - fighter.x) : attackAngle;
-      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 28) : (CONFIG.toji?.spearKnockback || 8.5);
+      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 32) : (CONFIG.toji?.spearKnockback || 8.5);
       
       const kbVx = Math.cos(pushAngle) * knockbackSpeed;
       const kbVy = Math.sin(pushAngle) * knockbackSpeed;
+      target.knockbackVx = kbVx;
+      target.knockbackVy = kbVy;
       target.vx = kbVx;
       target.vy = kbVy;
-      target.knockbackDecay = isAmbushThrust ? 0.84 : 0.88;
+      target.knockbackDecay = isAmbushThrust ? 0.90 : 0.88;
       if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 

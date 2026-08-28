@@ -1424,15 +1424,8 @@ export function drawMinionHealthBar(ctx, x, y, width = 38, height = 7, hp = 100,
 export const STATUS_OVERLAY_REGISTRY = [
   {
     id: 'slow',
-    isActive: (f) => !f.purpleHitTimer && ((f.statusEffects && f.statusEffects.fighter.slowTimer > 0) || f.slowTimer > 0),
-    render: (ctx, baseRadius, f) => {
-      const trappedInTojiUltimate = typeof state !== 'undefined' && state.fighters && state.fighters.some(other => 
-        other && other.ultimateActive && other.ultimateTarget === f && (other.type === 'toji' || other.characterId === 'toji')
-      );
-      if (!trappedInTojiUltimate) {
-        drawSlowEffect(ctx, baseRadius);
-      }
-    }
+    isActive: (f) => false, // Slow movement visual disabled
+    render: (ctx, baseRadius, f) => {}
   },
   {
     id: 'electricStun',

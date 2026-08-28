@@ -45,8 +45,9 @@ export function renderTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColo
 
     const isDimmed = (typeof state !== 'undefined' && state.currentHUDDimOpacity !== undefined && state.currentHUDDimOpacity > 0.1);
     const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-    ctx.fillStyle = (isDimmed || isDark) ? '#ffffff' : '#000000';
-    ctx.font = '13px "Glast Blitch", Arial';
+    const isYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+    ctx.fillStyle = isDark ? (isYuta ? '#FF1493' : '#ffffff') : (isDimmed ? '#ffffff' : '#000000');
+    ctx.font = isDark ? '700 11px "Silkscreen", "Press Start 2P", monospace' : '13px "Glast Blitch", Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fighter.name, rowX + 10, currentY + 6);
@@ -55,7 +56,7 @@ export function renderTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColo
     const maxHpVal = fighter._originalMaxHp || fighter.maxHp;
     const displayHp = Number.isInteger(curHpVal) ? `${curHpVal}` : curHpVal.toFixed(1);
     const displayMaxHp = Number.isInteger(maxHpVal) ? `${maxHpVal}` : maxHpVal.toFixed(1);
-    ctx.font = '11px Arial';
+    ctx.font = isDark ? '700 9px "Silkscreen", "Press Start 2P", monospace' : '11px Arial';
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.fillText(`${displayHp}/${displayMaxHp}`, rowX + rowW - 10, currentY + 6);
 

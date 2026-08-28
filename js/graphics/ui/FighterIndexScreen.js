@@ -707,9 +707,9 @@ function drawIndexDetailScreen() {
       else if (btn.id === 'stealth') audioSystem.playSFX('skill_dash5', 1.0);
       else if (btn.id === 'clap') audioSystem.playSFX('skill_todoclap', 2.0);
       else if (btn.id === 'takada') audioSystem.playSFX(CONFIG.todo?.takadaVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3', 3.0);
-      else if (btn.id === 'hollow' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
-      else if (btn.id === 'getsuga' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/redcharging.mp3', 1.0);
-      else if (btn.id === 'bankai' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/domainexpansion.mp3', 1.0);
+      else if (btn.id === 'hollow' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/SkillEffects/flare.mp3', 0.9);
+      else if (btn.id === 'getsuga' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/Ichigo-getsugatensho-flashstep-voiceline.mp3', 1.0);
+      else if (btn.id === 'bankai' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/Ichigo-bankai-charging-voiceline.mp3', 1.0);
       else if (btn.id === 'incinerate' && def.type === 'genos') {
         if (CONFIG.genos?.ultVoiceEnabled !== false) {
           audioSystem.playSFX(CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3', CONFIG.genos?.ultVoiceVolume ?? 3.5);

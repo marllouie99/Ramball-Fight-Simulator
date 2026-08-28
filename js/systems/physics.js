@@ -318,15 +318,15 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsAmbushLocked = a.isTargetOfAmbush || (a._counterPunchTimer && a._counterPunchTimer > 0);
-  const bIsAmbushLocked = b.isTargetOfAmbush || (b._counterPunchTimer && b._counterPunchTimer > 0);
+  const aIsCounterLocked = (a._counterPunchTimer && a._counterPunchTimer > 0);
+  const bIsCounterLocked = (b._counterPunchTimer && b._counterPunchTimer > 0);
 
-  if (aIsAmbushLocked && bIsAmbushLocked) {
-    return; // Neither moves or bounces during ambush/counter execution
+  if (aIsCounterLocked && bIsCounterLocked) {
+    return; // Neither moves or bounces during counter execution
   }
 
-  const aIsImmovable = a.isTurret || a.isDispenser || aIsFlurrying || aIsYutaBeam || aIsAmbushLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || a.isChannelingBankai;
-  const bIsImmovable = b.isTurret || b.isDispenser || bIsFlurrying || bIsYutaBeam || bIsAmbushLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || b.isChannelingBankai;
+  const aIsImmovable = a.isTurret || a.isDispenser || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
+  const bIsImmovable = b.isTurret || b.isDispenser || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -349,8 +349,8 @@ export function resolveFighterCollision(a, b) {
     if (typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
   }
 
-  // Prevent bounce impulse during ambush/counter execution
-  if (aIsAmbushLocked || bIsAmbushLocked) return;
+  // Prevent bounce impulse during counter execution
+  if (aIsCounterLocked || bIsCounterLocked) return;
 
   // Only apply impulse if fighters are moving toward each other
   const dvx = b.vx - a.vx;
@@ -878,10 +878,10 @@ export function updateFighters() {
           const nx = dx / dist;
           const ny = dy / dist;
           const overlap = minDist - dist;
-          if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai) {
+          if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
             entity.x += nx * overlap;
             entity.y += ny * overlap;
-          } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai) {
+          } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai || (entity.bankaiBurstTimer && entity.bankaiBurstTimer > 0) || (entity.isChannelingGetsuga && entity.isFinalMassiveGetsuga) || (entity.hollowMaskFormationTimer && entity.hollowMaskFormationTimer > 0) || (entity.hollowBurstTimer && entity.hollowBurstTimer > 0)) {
             fighter.x -= nx * overlap;
             fighter.y -= ny * overlap;
           } else {

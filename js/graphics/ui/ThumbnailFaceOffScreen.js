@@ -269,40 +269,48 @@ export function drawFaceOffThumbnailScreen() {
   const p3Def = currentDefs[state.p3Index] || currentDefs[2] || currentDefs[0];
   const p4Def = currentDefs[state.p4Index] || currentDefs[3] || currentDefs[0];
 
-  let leftThemeColor = p1Def?.color || '#38bdf8';
-  let rightThemeColor = p2Def?.color || '#e51a2e';
+  const getFaceOffThemeColor = (def, fallback = '#38bdf8') => {
+    if (!def) return fallback;
+    if (def.type === 'yuta' || def.id === 23 || def.id === 'yuta' || (def.name && def.name.toUpperCase().includes('YUTA'))) {
+      return '#FF1493';
+    }
+    return def.themeColor || def.color || fallback;
+  };
+
+  let leftThemeColor = getFaceOffThemeColor(p1Def, '#38bdf8');
+  let rightThemeColor = getFaceOffThemeColor(p2Def, '#e51a2e');
 
   if (mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2') {
     const t1 = Math.min(1.0, timer / 36);
     const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
     const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
-    leftThemeColor = rollP1Def?.color || leftThemeColor;
+    leftThemeColor = getFaceOffThemeColor(rollP1Def, leftThemeColor);
 
     const t2 = Math.min(1.0, timer / 48);
     const k2 = Math.min(20, Math.round(20 * (1 - Math.pow(1 - t2, 3.8))));
     const rollP2Def = getStripFighterDef(k2, 20, p2Def, getSlotSeed('p2'));
-    rightThemeColor = rollP2Def?.color || rightThemeColor;
+    rightThemeColor = getFaceOffThemeColor(rollP2Def, rightThemeColor);
   } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2') {
     const t1 = Math.min(1.0, timer / 34);
     const k1 = Math.min(14, Math.round(14 * (1 - Math.pow(1 - t1, 3.8))));
     const rollP1Def = getStripFighterDef(k1, 14, p1Def, getSlotSeed('p1'));
-    leftThemeColor = rollP1Def?.color || leftThemeColor;
+    leftThemeColor = getFaceOffThemeColor(rollP1Def, leftThemeColor);
 
     const t2 = Math.min(1.0, timer / 54);
     const k2 = Math.min(22, Math.round(22 * (1 - Math.pow(1 - t2, 3.8))));
     const rollP2Def = getStripFighterDef(k2, 22, p2Def, getSlotSeed('p2'));
-    rightThemeColor = rollP2Def?.color || rightThemeColor;
+    rightThemeColor = getFaceOffThemeColor(rollP2Def, rightThemeColor);
   } else {
     // 1v1 Duel / Stand Off / Tactical 1v1 / Tactical Standoff / TLFS
     const t1 = Math.min(1.0, timer / 38);
     const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
     const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
-    leftThemeColor = rollP1Def?.color || leftThemeColor;
+    leftThemeColor = getFaceOffThemeColor(rollP1Def, leftThemeColor);
 
     const t2 = Math.min(1.0, timer / 58);
     const k2 = Math.min(22, Math.round(22 * (1 - Math.pow(1 - t2, 3.8))));
     const rollP2Def = getStripFighterDef(k2, 22, p2Def, getSlotSeed('p2'));
-    rightThemeColor = rollP2Def?.color || rightThemeColor;
+    rightThemeColor = getFaceOffThemeColor(rollP2Def, rightThemeColor);
   }
 
   if (timer <= 2) {
@@ -337,7 +345,7 @@ export function drawFaceOffThumbnailScreen() {
       const t = Math.min(1.0, timer / ffaDurations[i]);
       const k = Math.min(ffaSlots[i], Math.round(ffaSlots[i] * (1 - Math.pow(1 - t, 3.8))));
       const rollDef = getStripFighterDef(k, ffaSlots[i], def, getSlotSeed(`ffa_${i}`));
-      return rollDef?.color || ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][i];
+      return getFaceOffThemeColor(rollDef, ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][i]);
     });
     drawFfaAnimeGrungeZigzagBackground(ctx, canvas.width, canvas.height, ffaColors, timer);
     drawFfaFaceOff(ctx, canvas.width, canvas.height, [p1Def, p2Def, p3Def, p4Def], scale, timer, exitProgress);
@@ -1722,6 +1730,9 @@ function drawFighterCleanName(ctx, cx, cy, name, accentColor, fontScale = 1.0) {
   ctx.save();
 
   const _isDarkName = (state.arenaTheme === 'dark');
+  if (_isDarkName && (upperName.includes('YUTA') || upperName.includes('OKKOTSU'))) {
+    accentColor = '#FF1493';
+  }
   const _nameFontFamily = _isDarkName ? '"Silkscreen", "Press Start 2P", monospace' : '"Outfit", "Rajdhani", sans-serif';
   const baseFontSize = _isDarkName
     ? (upperName.length > 10 ? 14 : (upperName.length > 7 ? 17 : 20))

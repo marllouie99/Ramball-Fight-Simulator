@@ -123,9 +123,11 @@ function assertCanvasStackBalance(locationTag) {
 }
 
 async function main() {
-  const { FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS } = await import('../js/core/config.js');
+  const { CONFIG, FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS } = await import('../js/core/config.js');
   const { FIGHTER_CLASS_MAP } = await import('../js/entities/factories/fighterFactory.js');
   const { state } = await import('../js/core/state.js');
+  const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+  const { drawGetsugaSlash } = await import('../js/graphics/weapons/ichigoWeaponGraphics.js');
   const { drawWeaponPreview, drawWeaponMenu } = await import('../js/graphics/ui/WeaponIndexScreen.js');
   const { drawSelectScreen } = await import('../js/graphics/ui/CharacterSelectScreen.js');
   const { drawTitleScreen } = await import('../js/graphics/ui/MainMenuScreen.js');
@@ -223,9 +225,102 @@ async function main() {
         fighter.draw(mockCtx, null);
         assertCanvasStackBalance(`Ichigo Bankai + Hollow Mask`);
 
+        // Test Hollow Mask awakening and channeling immobility
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        fighter.vx = 0;
+        fighter.vy = 0;
+        fighter.hp = 25; // Trigger <= 30% HP Hollow Awakening
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (!fighter.hollowMaskActive || fighter.hollowMaskFormationTimer <= 0) {
+          throw new Error(`Ichigo did not activate Hollow Mask formation upon <= 30% HP`);
+        }
+        const posX = fighter.x;
+        const posY = fighter.y;
+        for (let t = 0; t < 20; t++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+          if (fighter.x !== posX || fighter.y !== posY || fighter.vx !== 0 || fighter.vy !== 0) {
+            throw new Error(`Ichigo moved during Hollow Mask formation at tick ${t}: (${fighter.x}, ${fighter.y})`);
+          }
+        }
+
+        // Test Hollow Mask piece-by-piece formation drawing balance across all stages
+        for (const prog of [0.05, 0.15, 0.35, 0.55, 0.75, 0.85, 0.95, 1.00]) {
+          mockCtx.resetStackDepth();
+          fighter.hollowMaskActive = true;
+          fighter.hollowMaskFormationTimer = Math.round((1 - prog) * 325);
+          fighter.hollowMaskFormationMax = 325;
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Ichigo Hollow formation at prog ${prog}`);
+        }
+
+        // Test Getsuga recovery frames in Shikai form
+        fighter.reset();
         fighter.isChannelingGetsuga = false;
         fighter.bankaiActive = false;
         fighter.hollowMaskActive = false;
+        fighter.getsugaRecoveryTimer = 24;
+        fighter.vx = -3.5;
+        fighter.vy = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.getsugaRecoveryTimer !== 23) {
+          throw new Error(`Getsuga recovery timer failed to decrement properly in Shikai`);
+        }
+        // Ensure AI steering did not overwrite decelerating recoil velocity during recovery
+        if (Math.abs(fighter.vx) > 3.5) {
+          throw new Error(`Ichigo moved with external velocity during Shikai Getsuga recovery`);
+        }
+
+        // Test Getsuga recovery frames in Bankai form
+        fighter.reset();
+        fighter.bankaiActive = true;
+        fighter.getsugaRecoveryTimer = 20;
+        fighter.vx = -3.5;
+        fighter.vy = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.getsugaRecoveryTimer !== 19) {
+          throw new Error(`Getsuga recovery timer failed to decrement properly in Bankai`);
+        }
+        if (Math.abs(fighter.vx) > 3.5) {
+          throw new Error(`Ichigo moved with external velocity during Bankai Getsuga recovery`);
+        }
+
+        // Test Champion Screen reveal pose for Bankai + Mask form
+        mockCtx.resetStackDepth();
+        fighter.reset();
+        fighter._isWinnerReveal = true;
+        fighter.bankaiActive = true;
+        fighter.hollowMaskActive = true;
+        fighter.skin = 'bankai_mask';
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Ichigo Bankai + Mask Winner Reveal`);
+
+        // Test custom bankaiFinalGetsugaRadius and bankaiFinalGetsugaSpeed
+        mockCtx.resetStackDepth();
+        const prevRad = CONFIG.ichigo.bankaiFinalGetsugaRadius;
+        const prevSpd = CONFIG.ichigo.bankaiFinalGetsugaSpeed;
+        CONFIG.ichigo.bankaiFinalGetsugaRadius = 140;
+        CONFIG.ichigo.bankaiFinalGetsugaSpeed = 12;
+        const finalProj = projectileSystem.fireGetsugaTensho(fighter, 0, 180, 12, 'final_bankai');
+        if (finalProj.r !== 140) {
+          throw new Error(`Expected projectile radius 140 but got ${finalProj.r}`);
+        }
+        if (Math.round(Math.hypot(finalProj.vx, finalProj.vy)) !== 12) {
+          throw new Error(`Expected projectile speed 12 but got ${Math.hypot(finalProj.vx, finalProj.vy)}`);
+        }
+        drawGetsugaSlash(mockCtx, finalProj, true);
+        assertCanvasStackBalance(`Custom scaled Final Getsuga slash`);
+        CONFIG.ichigo.bankaiFinalGetsugaRadius = prevRad;
+        CONFIG.ichigo.bankaiFinalGetsugaSpeed = prevSpd;
+
+        fighter.isChannelingGetsuga = false;
+        fighter.bankaiActive = false;
+        fighter.hollowMaskActive = false;
+        fighter._isWinnerReveal = false;
+        fighter.getsugaRecoveryTimer = 0;
+        fighter.hollowMaskFormationTimer = 0;
+        fighter.hollowBurstTimer = 0;
       }
       if (fType === 'mahoraga') {
         mockCtx.resetStackDepth();

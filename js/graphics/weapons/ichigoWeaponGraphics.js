@@ -1,4 +1,5 @@
 import { state } from '../../core/state.js';
+import { CONFIG } from '../../core/config.js';
 
 export function drawGetsugaSlash(ctx, p, isBlack) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
@@ -24,17 +25,30 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   const msPerFrame = 1000 / 30;
   const qTime = Math.floor(now / msPerFrame) * msPerFrame;
 
+  // Dynamically scale visual crescent dimensions directly matching configured projectile radius
+  const baseProjRadius = isFinal
+    ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius ?? 120)
+    : (isBankaiHollow
+      ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius ?? 68)
+      : (isShikaiHollow
+        ? (CONFIG.ichigo?.hollowGetsugaRadius ?? 62)
+        : (isBankai
+          ? (CONFIG.ichigo?.bankaiGetsugaRadius ?? 58)
+          : (CONFIG.ichigo?.getsugaRadius ?? 52))));
+
+  const radiusScale = (p.r !== undefined && p.r > 0) ? (p.r / 38) : (baseProjRadius / 38);
+
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
-  const scaleMult = isFinal ? 2.85 : ((isBankaiHollow || isShikaiHollow) ? 2.15 : (isBankai ? 1.95 : 1.85));
-  ctx.scale(scale * scaleMult, scale * scaleMult);
+  ctx.scale(scale * radiusScale, scale * radiusScale);
 
-  // ── Exact Crescent Parameters ──
-  const R = isFinal ? 84 : ((isBankaiHollow || isShikaiHollow) ? 62 : (isBankai ? 54 : 56));
-  const maxThick = isFinal ? 30 : ((isBankaiHollow || isShikaiHollow) ? 22 : (isBankai ? 19 : 20));
-  const halfAngle = isFinal ? (0.70 * Math.PI) : ((isBankaiHollow || isShikaiHollow) ? (0.66 * Math.PI) : (0.64 * Math.PI));
-  const px = 2.5; // Grid-snapped pixel unit
+  // ── Exact Crescent Parameters (Normalized to 38px base, scaled seamlessly by radiusScale) ──
+  const R = 38;
+  const maxThick = isFinal ? 25 : (isBankaiHollow ? 18 : (isBankai ? 16 : 14));
+  const taperPower = isFinal ? 1.12 : 1.32;
+  const halfAngle = isFinal ? (0.72 * Math.PI) : ((isBankaiHollow || isShikaiHollow) ? (0.66 * Math.PI) : (0.64 * Math.PI));
+  const px = 2.5 / Math.max(0.5, radiusScale * 0.7); // Scale-compensated pixel unit
 
   // ── Palette Definition ──
   let cBorder, cSaturated, cBright, cCore, cAura, isDarkCore;
@@ -46,13 +60,6 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     cCore      = '#ffffff';
     cAura      = `rgba(0, 229, 255, ${(0.35 * alpha).toFixed(2)})`;
     isDarkCore = false;
-  } else if (isFinal) {
-    cBorder    = '#200005';
-    cSaturated = '#0a0002'; // Void core
-    cBright    = '#ff1133';
-    cCore      = '#ffffff';
-    cAura      = `rgba(255, 20, 60, ${(0.35 * alpha).toFixed(2)})`;
-    isDarkCore = true;
   } else if (isBankaiHollow) {
     cBorder    = '#180004';
     cSaturated = '#050002'; // Void core
@@ -67,7 +74,8 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     cCore      = '#ffffff';
     cAura      = `rgba(0, 240, 255, ${(0.35 * alpha).toFixed(2)})`;
     isDarkCore = true;
-  } else if (isBankai) {
+  } else if (isBankai || isFinal) {
+    // Kuroi Getsuga Tensho (Bankai & Grand Finisher Final Massive Kuroi Getsuga)
     cBorder    = '#220008';
     cSaturated = '#080206'; // Void black core
     cBright    = '#ff1e32';
@@ -84,29 +92,29 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   }
 
   // ── 1. Stepped Atmosphere Pixel Aura ──
-  const auraR = R + px * 2.0;
+  const auraR = R + px * (isFinal ? 3.0 : 2.0);
   ctx.fillStyle = cAura;
   for (let a = -halfAngle; a <= halfAngle; a += 0.05) {
     const sx = Math.round((Math.cos(a) * auraR) / px) * px;
     const sy = Math.round((Math.sin(a) * auraR) / px) * px;
-    ctx.fillRect(sx, sy, px, px);
+    ctx.fillRect(sx, sy, px * (isFinal ? 1.5 : 1), px * (isFinal ? 1.5 : 1));
   }
 
   // ── 2. Stepped High-Contrast Dark Border Perimeter ──
   ctx.fillStyle = cBorder;
-  const numSteps = 32;
+  const numSteps = isFinal ? 48 : 32;
   for (let i = 0; i <= numSteps; i++) {
     const t = (i / numSteps) * 2 - 1;
     const ang = t * halfAngle;
-    const sx = Math.round((Math.cos(ang) * (R + px * 0.8)) / px) * px;
-    const sy = Math.round((Math.sin(ang) * (R + px * 0.8)) / px) * px;
+    const sx = Math.round((Math.cos(ang) * (R + px * (isFinal ? 1.2 : 0.8))) / px) * px;
+    const sy = Math.round((Math.sin(ang) * (R + px * (isFinal ? 1.2 : 0.8))) / px) * px;
     ctx.fillRect(sx, sy, px, px);
   }
   for (let i = numSteps; i >= 0; i--) {
     const t = (i / numSteps) * 2 - 1;
     const ang = t * halfAngle;
     const taper = Math.cos(t * (Math.PI / 2));
-    const inR = R - maxThick * Math.pow(taper, 1.32) - px;
+    const inR = R - maxThick * Math.pow(taper, taperPower) - px;
     const sx = Math.round((Math.cos(ang) * inR) / px) * px;
     const sy = Math.round((Math.sin(ang) * inR) / px) * px;
     ctx.fillRect(sx, sy, px, px);
@@ -125,14 +133,14 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
       if (Math.abs(ang) <= halfAngle) {
         const t = ang / halfAngle;
         const taper = Math.cos(t * (Math.PI / 2));
-        const inR = R - maxThick * Math.pow(taper, 1.32);
+        const inR = R - maxThick * Math.pow(taper, taperPower);
 
         if (dist >= inR && dist <= R) {
           const depthFromApex = R - dist; // 0 at leading edge, maxThick at back
 
-          if (depthFromApex < px * 1.3) {
+          if (depthFromApex < px * 1.5) {
             ctx.fillStyle = cCore; // Razor-sharp white-hot leading edge
-          } else if (depthFromApex < px * 3.2) {
+          } else if (depthFromApex < px * (isFinal ? 6.0 : 3.2)) {
             ctx.fillStyle = cBright; // Saturated electric energy rim
           } else {
             ctx.fillStyle = isDarkCore ? cSaturated : ((Math.round(gx / px) + Math.round(gy / px)) % 2 === 0 ? cSaturated : cBright);
@@ -146,20 +154,22 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   // ── 4. Leading Apex Stepped Pixel Diamond Flare ──
   const apexX = Math.round(R / px) * px;
   ctx.fillStyle = cCore;
+  const flareSpread = isFinal ? 3 : 2;
   ctx.fillRect(apexX - px * 0.5, -px * 0.5, px, px);
-  ctx.fillRect(apexX - px * 2, -px * 0.5, px * 4, px);
-  ctx.fillRect(apexX - px * 0.5, -px * 2, px, px * 4);
+  ctx.fillRect(apexX - px * flareSpread, -px * 0.5, px * (flareSpread * 2), px);
+  ctx.fillRect(apexX - px * 0.5, -px * flareSpread, px, px * (flareSpread * 2));
 
-  // ── 5. Trailing Stepped Pixel Sparkles (3 Dynamic Motes) ──
-  for (let s = 0; s < 3; s++) {
+  // ── 5. Trailing Stepped Pixel Sparkles & Reiatsu Motes ──
+  const moteCount = isFinal ? 6 : 3;
+  for (let s = 0; s < moteCount; s++) {
     const sSeed = s * 73.1 + qTime * 0.006;
-    const sAng = (Math.sin(sSeed) * halfAngle * 0.7);
+    const sAng = (Math.sin(sSeed) * halfAngle * 0.85);
     const sT = Math.cos((sAng / halfAngle) * (Math.PI / 2));
-    const sInR = R - maxThick * Math.pow(sT, 1.32) - (px * (2 + (s % 3) * 2));
+    const sInR = R - maxThick * Math.pow(sT, taperPower) - (px * (2 + (s % 3) * 2));
     const sx = Math.round((Math.cos(sAng) * sInR) / px) * px;
     const sy = Math.round((Math.sin(sAng) * sInR) / px) * px;
 
-    ctx.fillStyle = s % 2 === 0 ? cCore : cBright;
+    ctx.fillStyle = (s % 3 === 0) ? cCore : ((s % 3 === 1) ? cBright : cBorder);
     ctx.fillRect(sx, sy, px, px);
   }
 
@@ -171,36 +181,94 @@ export function drawCeroBeam(ctx, p) {
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
   const angle = Math.atan2(vy, vx);
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+  const alpha = lifeRatio;
+  const P = 4.0; // Pixel art grid unit
+  const snap = (v) => Math.round(v / P) * P;
 
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
 
-  // Outer red energy column (cero width reads from config, default 80px)
-  const beamWidth = 60;
-  const beamLength = 400; // Large visual column
+  const beamHalfW = 32;
+  const beamLength = 420;
+  const startX = -30;
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
-  // Outer Crimson Glow
-  const grad = ctx.createLinearGradient(0, -beamWidth, 0, beamWidth);
-  grad.addColorStop(0, 'rgba(139, 0, 0, 0)');
-  grad.addColorStop(0.3, `rgba(255, 10, 10, ${0.8 * lifeRatio})`);
-  grad.addColorStop(0.5, `rgba(255, 255, 255, ${0.95 * lifeRatio})`); // white hot core
-  grad.addColorStop(0.7, `rgba(255, 10, 10, ${0.8 * lifeRatio})`);
-  grad.addColorStop(1.0, 'rgba(139, 0, 0, 0)');
+  // 1. Pixel-Art Dark Ink/Void Outer Shell
+  ctx.fillStyle = `rgba(24, 0, 4, ${0.95 * alpha})`;
+  for (let x = startX; x <= beamLength; x += P) {
+    const normX = (x - startX) / (beamLength - startX);
+    const headBulge = normX > 0.85 ? Math.sin((normX - 0.85) / 0.15 * Math.PI) * 12 : 0;
+    const curW = beamHalfW + headBulge + P * 2;
+    const topY = snap(-curW);
+    const botY = snap(curW);
+    ctx.fillRect(snap(x), topY, P, (botY - topY) + P);
+  }
 
-  ctx.fillStyle = grad;
-  ctx.fillRect(-50, -beamWidth, beamLength + 50, beamWidth * 2);
+  // 2. Stepped Energy Bands (Crimson -> Pure White Core)
+  const numBands = Math.ceil(beamHalfW / P);
+  for (let b = numBands; b >= 0; b--) {
+    const normB = b / numBands; // 1 = outer, 0 = core
+    let col;
+    if (normB > 0.75) {
+      col = `rgba(139, 0, 10, ${0.85 * alpha})`; // Dark Crimson
+    } else if (normB > 0.45) {
+      col = `rgba(255, 20, 30, ${0.92 * alpha})`; // Vivid Cero Red
+    } else if (normB > 0.20) {
+      col = `rgba(255, 120, 80, ${0.96 * alpha})`; // Hot Orange-Red
+    } else {
+      col = `rgba(255, 255, 255, ${0.98 * alpha})`; // White-hot core
+    }
 
-  // Add round energy sparks/circles on the beam tip
-  ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * lifeRatio})`;
-  ctx.beginPath();
-  ctx.arc(beamLength, 0, beamWidth * 0.6, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = col;
+    for (let x = startX; x <= beamLength; x += P) {
+      const normX = (x - startX) / (beamLength - startX);
+      const headBulge = normX > 0.85 ? Math.sin((normX - 0.85) / 0.15 * Math.PI) * 12 : 0;
+      const curW = (beamHalfW + headBulge) * normB;
+      const topY = snap(-curW);
+      const botY = snap(curW);
+      ctx.fillRect(snap(x), topY, P, Math.max(P, botY - topY));
+    }
+  }
 
-  ctx.fillStyle = `rgba(220, 10, 10, ${0.75 * lifeRatio})`;
-  ctx.beginPath();
-  ctx.arc(beamLength, 0, beamWidth * 0.9, 0, Math.PI * 2);
-  ctx.fill();
+  // 3. Pixel Shockwave Ring Columns
+  const numRings = 5;
+  for (let r = 0; r < numRings; r++) {
+    const ringPhase = ((now * 0.003 * 40 + r * (beamLength / numRings)) % beamLength);
+    const rx = snap(startX + ringPhase);
+    const rw = beamHalfW + 16;
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.75 * alpha})`;
+    ctx.fillRect(rx, snap(-rw), P, P * 2);
+    ctx.fillRect(rx, snap(rw - P * 2), P, P * 2);
+    ctx.fillStyle = `rgba(255, 40, 40, ${0.60 * alpha})`;
+    ctx.fillRect(rx - P, snap(-rw - P), P * 3, P);
+    ctx.fillRect(rx - P, snap(rw + P), P * 3, P);
+  }
+
+  // 4. Stepped Pixel Electric Arcs Crackling along beam
+  const numCrackles = 6;
+  for (let c = 0; c < numCrackles; c++) {
+    const cSeed = c * 53.7 + now * 0.015;
+    const cX1 = snap(startX + (Math.sin(cSeed) * 0.5 + 0.5) * beamLength);
+    const cY1 = snap((Math.cos(cSeed * 1.3) * beamHalfW * 0.9));
+    const cX2 = snap(cX1 + (Math.sin(cSeed * 2.1) * 24));
+    const cY2 = snap(cY1 + (Math.cos(cSeed * 2.5) * 16));
+
+    ctx.fillStyle = (c % 2 === 0) ? '#FFFFFF' : '#FF5555';
+    ctx.fillRect(cX1, cY1, P, P);
+    ctx.fillRect(snap((cX1 + cX2) / 2), snap((cY1 + cY2) / 2), P, P);
+    ctx.fillRect(cX2, cY2, P, P);
+  }
+
+  // 5. Trailing Exploding Pixel Embers
+  const numEmbers = 8;
+  for (let e = 0; e < numEmbers; e++) {
+    const eSeed = e * 89.3 + now * 0.008;
+    const ex = snap(startX + (eSeed % beamLength));
+    const ey = snap((Math.sin(eSeed * 3.7) * (beamHalfW + 20)));
+    ctx.fillStyle = (e % 2 === 0) ? '#FFFFFF' : '#FF2233';
+    ctx.fillRect(ex, ey, P, P);
+  }
 
   ctx.restore();
 }
@@ -966,7 +1034,23 @@ export function drawTensaZangetsu(ctx, x, y, angle, r, opts = {}) {
  *  - Vasto Lorde: Demonic pitch-black core with blazing blood-red trim
  */
 export function drawIchigoSlashArc(ctx, fighter) {
-  if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isGetsugaSlash || fighter.isChannelingGetsuga || fighter.isChannelingBankai || fighter.isFrozenByInfinity || (fighter.timeStopTimer && fighter.timeStopTimer > 0) || (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0)) return;
+  if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isGetsugaSlash || fighter.isChannelingGetsuga || fighter.isChannelingBankai || (fighter.shikaiReversionBurstTimer && fighter.shikaiReversionBurstTimer > 0)) return;
+
+  const isFrozen = Boolean(
+    fighter.isFrozenByInfinity ||
+    (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
+    (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0) ||
+    (fighter.electricStunTimer && fighter.electricStunTimer > 0) ||
+    (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
+    (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
+    fighter.isParalyzed ||
+    fighter.isGrabbedByMahoraga ||
+    fighter.isParalyzedByMahoraga ||
+    fighter.isWallSlammed ||
+    fighter.wallSlamPinnedX !== undefined ||
+    fighter.isTargetOfAmbush
+  );
+  if (isFrozen) return;
 
   const maxT = fighter.slashSwingMaxTimer || 22;
   const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
@@ -1020,136 +1104,109 @@ export function drawIchigoSlashArc(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
+  const P = 2.4; // Pixel art grid scale
   const outerRadius = r + (isMask ? 76 : (isShikai ? 80 : 70));
   const maxThick = isMask ? 25.0 : (isShikai ? 27.0 : 23.0);
-  const numSteps = 32;
+  const totalAngle = Math.abs(currentTipOffset - currentTailOffset);
+  const arcSteps = Math.max(16, Math.round((totalAngle * outerRadius) / (P * 1.5)));
 
-  // 1. Pass 1: Spiritual Pressure / Reiatsu Outer Soft Glow Bloom
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = i / numSteps;
+  // Pass 1: Pixel-Art Dark Ink / Void Outline Shell
+  let outlineCol = `rgba(0, 20, 58, ${0.92 * trailAlpha})`;
+  if (isMask && isBankai) outlineCol = `rgba(18, 0, 4, ${0.98 * trailAlpha})`;
+  else if (isMask) outlineCol = `rgba(18, 5, 5, ${0.95 * trailAlpha})`;
+  else if (isBankai) outlineCol = `rgba(8, 2, 4, ${0.98 * trailAlpha})`;
+
+  ctx.fillStyle = outlineCol;
+  for (let i = 0; i <= arcSteps; i++) {
+    const t = i / arcSteps;
     const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
-    const rad = outerRadius + taper * 5.5;
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  for (let i = numSteps; i >= 0; i--) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
-    const rad = outerRadius - (maxThick * taper) - taper * 4.5;
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    ctx.lineTo(px, py);
-  }
-  ctx.closePath();
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+    const rad = outerRadius + taper * 2.0;
+    const thick = (maxThick * taper) + P * 2;
+    const innerRad = rad - thick;
 
-  if (isMask && isBankai) {
-    ctx.fillStyle = `rgba(255, 20, 50, ${0.60 * trailAlpha})`;
-  } else if (isMask) {
-    ctx.fillStyle = `rgba(255, 40, 20, ${0.52 * trailAlpha})`;
-  } else if (isBankai) {
-    ctx.fillStyle = `rgba(220, 20, 30, ${0.52 * trailAlpha})`;
-  } else {
-    ctx.fillStyle = `rgba(0, 191, 255, ${0.45 * trailAlpha})`;
-  }
-  ctx.fill();
-
-  // 2. Pass 2: High-Density Core Blade Crescent Polygon
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
-    const rad = outerRadius + taper * 1.5;
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  for (let i = numSteps; i >= 0; i--) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
-    const rad = outerRadius - (maxThick * taper);
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-
-  if (isMask && isBankai) {
-    ctx.fillStyle = `rgba(8, 0, 3, ${0.98 * trailAlpha})`;
-  } else if (isMask) {
-    ctx.fillStyle = `rgba(18, 5, 5, ${0.95 * trailAlpha})`;
-  } else if (isBankai) {
-    ctx.fillStyle = `rgba(8, 2, 4, ${0.98 * trailAlpha})`;
-  } else {
-    ctx.fillStyle = `rgba(242, 246, 255, ${0.96 * trailAlpha})`;
-  }
-  ctx.fill();
-
-  // 3. Pass 3: Brilliant Cutting Edge Highlight Line
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
-    const rad = outerRadius - (maxThick * taper * 0.15);
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-
-  if (isMask && isBankai) {
-    ctx.strokeStyle = `rgba(255, 40, 30, ${0.98 * trailAlpha})`;
-    ctx.lineWidth = 2.2;
-  } else if (isMask) {
-    ctx.strokeStyle = `rgba(255, 120, 0, ${0.88 * trailAlpha})`;
-    ctx.lineWidth = 2.0;
-  } else if (isBankai) {
-    ctx.strokeStyle = `rgba(255, 30, 20, ${0.95 * trailAlpha})`;
-    ctx.lineWidth = 2.0;
-  } else {
-    ctx.strokeStyle = `rgba(255, 255, 255, ${1.0 * trailAlpha})`;
-    ctx.lineWidth = 2.0;
-  }
-  ctx.stroke();
-
-  // 4. Pass 4: Dynamic Reiatsu Speed Needles flying from cutting tip
-  if (rawProgress >= 0.15 && rawProgress <= 0.50) {
-    const sparkT = (rawProgress - 0.15) / 0.35;
-    const tipAngle = currentTipOffset;
-    const sparkCount = 3;
-    ctx.save();
-    for (let s = 0; s < sparkCount; s++) {
-      const spOffset = (s - 1) * 0.08;
-      const spAng = tipAngle + spOffset;
-      const spDist = outerRadius + 4 + (s * 3);
-      const spLen = 12 + (1 - sparkT) * 10;
-      
-      const spX1 = Math.cos(spAng) * spDist;
-      const spY1 = Math.sin(spAng) * spDist;
-      const spX2 = spX1 + Math.cos(spAng + 0.4) * spLen;
-      const spY2 = spY1 + Math.sin(spAng + 0.4) * spLen;
-
-      ctx.beginPath();
-      ctx.moveTo(spX1, spY1);
-      ctx.lineTo(spX2, spY2);
-
-      if (isMask && isBankai) ctx.strokeStyle = (s % 2 === 0) ? `rgba(255, 40, 30, ${0.92 * trailAlpha})` : `rgba(255, 255, 255, ${0.95 * trailAlpha})`;
-      else if (isMask) ctx.strokeStyle = `rgba(255, 160, 20, ${0.85 * trailAlpha})`;
-      else if (isBankai) ctx.strokeStyle = (s % 2 === 0) ? `rgba(255, 30, 20, ${0.90 * trailAlpha})` : `rgba(255, 240, 240, ${0.95 * trailAlpha})`;
-      else ctx.strokeStyle = (s % 2 === 0) ? `rgba(0, 229, 255, ${0.85 * trailAlpha})` : `rgba(255, 255, 255, ${0.90 * trailAlpha})`;
-
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
+    const numRadSteps = Math.max(2, Math.round(thick / P));
+    for (let ri = 0; ri <= numRadSteps; ri++) {
+      const currentR = innerRad + (ri / numRadSteps) * thick;
+      const rawX = Math.cos(ang) * currentR;
+      const rawY = Math.sin(ang) * currentR;
+      const px = Math.round(rawX / P) * P;
+      const py = Math.round(rawY / P) * P;
+      ctx.fillRect(px, py, P, P);
     }
-    ctx.restore();
+  }
+
+  // Pass 2: Stepped Pixel Reiatsu Core Body
+  for (let i = 0; i <= arcSteps; i++) {
+    const t = i / arcSteps;
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+    const rad = outerRadius + taper * 1.0;
+    const thick = maxThick * taper;
+    const innerRad = rad - thick;
+
+    const numRadSteps = Math.max(1, Math.round(thick / P));
+    for (let ri = 0; ri <= numRadSteps; ri++) {
+      const rNorm = ri / numRadSteps; // 0 = inner, 1 = outer edge
+      const currentR = innerRad + rNorm * thick;
+      const rawX = Math.cos(ang) * currentR;
+      const rawY = Math.sin(ang) * currentR;
+      const px = Math.round(rawX / P) * P;
+      const py = Math.round(rawY / P) * P;
+
+      let col;
+      if (isMask && isBankai) {
+        if (rNorm > 0.85) col = '#FFFFFF';
+        else if (rNorm > 0.6) col = '#FF2832';
+        else if (rNorm > 0.3) col = '#8B0000';
+        else col = '#080003';
+      } else if (isMask) {
+        if (rNorm > 0.85) col = '#FFFFFF';
+        else if (rNorm > 0.6) col = '#FFAA00';
+        else if (rNorm > 0.3) col = '#FF2814';
+        else col = '#180505';
+      } else if (isBankai) {
+        if (rNorm > 0.85) col = '#FFFFFF';
+        else if (rNorm > 0.6) col = '#FF1E28';
+        else if (rNorm > 0.3) col = '#8B0014';
+        else col = '#080204';
+      } else {
+        // Shikai Azure
+        if (rNorm > 0.85) col = '#FFFFFF';
+        else if (rNorm > 0.6) col = '#E0FFFF';
+        else if (rNorm > 0.3) col = '#00E5FF';
+        else col = '#0055DD';
+      }
+
+      ctx.fillStyle = col;
+      ctx.fillRect(px, py, P, P);
+    }
+
+    // Pass 3: Leading Razor White Cutting Edge Pixels
+    const leadRawX = Math.cos(ang) * (outerRadius + taper * 1.0);
+    const leadRawY = Math.sin(ang) * (outerRadius + taper * 1.0);
+    const lpx = Math.round(leadRawX / P) * P;
+    const lpy = Math.round(leadRawY / P) * P;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(lpx, lpy, P, P);
+  }
+
+  // Pass 4: Trailing Reiatsu Pixel Sparks
+  const numEmbers = 8;
+  for (let eb = 0; eb < numEmbers; eb++) {
+    const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
+    const ebAng = currentTailOffset + ebT * (currentTipOffset - currentTailOffset);
+    const ebDist = outerRadius - 10 - eb * 4;
+    const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
+    const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+    let col = '#FFFFFF';
+    if (isMask && isBankai) col = (eb % 2 === 0) ? '#FF1E28' : '#FFFFFF';
+    else if (isMask) col = (eb % 2 === 0) ? '#FFAA00' : '#FF2814';
+    else if (isBankai) col = (eb % 2 === 0) ? '#FF1E28' : '#FFFFFF';
+    else col = (eb % 2 === 0) ? '#00E5FF' : '#FFFFFF';
+
+    ctx.fillStyle = col;
+    ctx.fillRect(ex, ey, P, P);
   }
 
   ctx.restore();

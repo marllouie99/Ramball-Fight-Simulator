@@ -8,6 +8,7 @@
 
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 // Pre-computed normalized anime bangs coordinates with clean stylized fringe strands
 const _TOJI_BANGS = [
@@ -28,31 +29,12 @@ const _TOJI_BANGS = [
 ];
 
 /**
- * Draws Toji's hand/fist with clean tan skin tone.
+ * Draws Toji's hand/fist in clean pixel art style with warm athletic tan skin tone.
  */
 function _drawTojiFist(ctx, x, y, radius, skinColor, fighter, isBack = false) {
   ctx.save();
   ctx.translate(x, y);
-
-  // Knuckle / Fist Base Circle
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fillStyle = skinColor;
-  ctx.fill();
-
-  // Dark Outline
-  ctx.strokeStyle = '#0E0E12';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // Subtle Knuckle Crease
-  ctx.strokeStyle = '#C48A68';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-radius * 0.30, -radius * 0.15);
-  ctx.lineTo( radius * 0.30, -radius * 0.15);
-  ctx.stroke();
-
+  drawPixelHand(ctx, 0, 0, radius, skinColor || '#D4A373');
   ctx.restore();
 }
 

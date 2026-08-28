@@ -7,12 +7,28 @@ import { state } from '../../../core/state.js';
 export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = false) {
   if (!fighter.domainActive) return;
 
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+
   ctx.save();
+
+  // Strictly clip Yuta's Domain Expansion visual to the arena boundaries
+  if (arena) {
+    ctx.beginPath();
+    if (arena.shape === 'circle') {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
+    } else {
+      ctx.rect(arena.x, arena.y, arena.width, arena.height);
+    }
+    ctx.clip();
+  }
+
   const time = Date.now();
   const pulse = Math.sin(time / 300) * 0.04;
   const alphaMult = fighter.domainActive ? 1.0 : Math.min(1.0, fighter.rikaAlpha || 1.0);
 
-  const arena = CONFIG.arena;
   const centerX = arena ? (arena.x + arena.width / 2) : (fighter.domainActive && fighter.domainX !== undefined ? fighter.domainX : fighter.x);
   const centerY = arena ? (arena.y + arena.height / 2) : (fighter.domainActive && fighter.domainY !== undefined ? fighter.domainY : fighter.y);
   const arenaW = arena ? arena.width : 800;
@@ -56,7 +72,7 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
   } else if (!isClashSecondary) {
     ctx.fillStyle = fighter._cachedYutaBgGrad;
     if (arena) {
-      ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+      ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
     } else {
       ctx.fillRect(midX - 1000, midY - 1000, 2000, 2000);
     }
@@ -452,11 +468,28 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter) {
   if (!yutaFighter || !sukunaFighter || !yutaFighter.domainActive || !sukunaFighter.domainActive) return;
 
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+
+  ctx.save();
+
+  // Strictly clip domain clash rift to arena boundaries
+  if (arena) {
+    ctx.beginPath();
+    if (arena.shape === 'circle') {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
+    } else {
+      ctx.rect(arena.x, arena.y, arena.width, arena.height);
+    }
+    ctx.clip();
+  }
+
   // Check if we should execute in optimized low quality/low FPS mode
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)));
 
   const time = Date.now();
-  const arena = CONFIG.arena;
   const centerX = arena ? (arena.x + arena.width / 2) : yutaFighter.x;
   const centerY = arena ? (arena.y + arena.height / 2) : yutaFighter.y;
   const arenaW = arena ? arena.width : 800;

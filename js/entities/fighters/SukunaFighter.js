@@ -479,8 +479,8 @@ export class SukunaFighter extends Fighter {
 
     // Domain active state (Malevolent Shrine open-barrier domain slashes continue even if Sukuna is paralyzed by Unlimited Void)
     if (this.domainActive) {
-      // Freeze domain duration timer while trapped in Gojo's Unlimited Void time stop so duration is not wasted!
-      if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer) {
+      // Freeze domain duration timer while trapped in Gojo's Unlimited Void time stop or paralyzed so duration is not wasted!
+      if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer && !this.isParalyzedDebuffActive()) {
         this.domainTimer--;
       }
       if (this.domainTimer <= 0) {
@@ -634,8 +634,11 @@ export class SukunaFighter extends Fighter {
 
     if (!isGamePlaying || !isTargetAlive) {
       if (!this.isChannelingAnySkill()) {
-        this.interruptAttacks();
+        this.interruptAttacks(false);
       }
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+      if (this.slashSwingTimer > 0) this.slashSwingTimer--;
+      if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
       this.shootCooldown = 60;
       return;
     }

@@ -426,8 +426,11 @@ export class TodoFighter extends Fighter {
     return modTriggerTakadaUltimate.call(this);
   }
 
-  interruptAttacks() {
-    this.punchAnimTimer = 0;
+  interruptAttacks(forceCancelAll = false) {
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    if (forceCancelAll || (!isMatchEnded && (this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush))) {
+      this.punchAnimTimer = 0;
+    }
     this.clapAnimTimer = 0;
     this.clapWindupTimer = 0;
     this.clapHoldTimer = 0;

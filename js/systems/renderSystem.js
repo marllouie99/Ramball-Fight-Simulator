@@ -240,24 +240,39 @@ export function renderGame() {
 
       try {
 
-        // ── Dark Mode: Clip all dim effects to arena boundaries ──
-        const isDarkClip = (state.arenaTheme === 'dark') && state.arena;
-        if (isDarkClip) {
+        // ── Clip all dim effects & WebGL overlays strictly to arena boundaries ──
+        const hasArenaClip = Boolean(state.arena);
+        if (hasArenaClip) {
           state.ctx.save();
           state.ctx.beginPath();
-          state.ctx.rect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
+          if (state.arena.shape === 'circle') {
+            const cx = state.arena.x + state.arena.width / 2;
+            const cy = state.arena.y + state.arena.height / 2;
+            const ar = state.arena.radius || (state.arena.width / 2);
+            state.ctx.arc(cx, cy, ar, 0, Math.PI * 2);
+          } else {
+            state.ctx.rect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
+          }
           state.ctx.clip();
 
-          // Apply PIXI mask on WebGL effects layer to clip dim sprites to arena
-          if (state.pixiLayers?.effects && state.arena) {
+          // Apply PIXI mask on WebGL effects and environment layers to clip dim/ring sprites to arena
+          if (state.pixiLayers && (state.pixiLayers.effects || state.pixiLayers.environment) && state.arena) {
             if (!state._darkDimMask) {
               state._darkDimMask = new window.PIXI.Graphics();
             }
             state._darkDimMask.clear();
             state._darkDimMask.beginFill(0xffffff);
-            state._darkDimMask.drawRect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
+            if (state.arena.shape === 'circle') {
+              const cx = state.arena.x + state.arena.width / 2;
+              const cy = state.arena.y + state.arena.height / 2;
+              const ar = state.arena.radius || (state.arena.width / 2);
+              state._darkDimMask.drawCircle(cx, cy, ar);
+            } else {
+              state._darkDimMask.drawRect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
+            }
             state._darkDimMask.endFill();
-            state.pixiLayers.effects.mask = state._darkDimMask;
+            if (state.pixiLayers.effects) state.pixiLayers.effects.mask = state._darkDimMask;
+            if (state.pixiLayers.environment) state.pixiLayers.environment.mask = state._darkDimMask;
           }
         }
 
@@ -277,12 +292,15 @@ export function renderGame() {
         drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
         drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
 
-        // ── Dark Mode: Restore clip after dim effects ──
-        if (isDarkClip) {
+        // ── Restore clip after dim effects ──
+        if (hasArenaClip) {
           state.ctx.restore();
           // Remove PIXI mask so other WebGL layers are unaffected
           if (state.pixiLayers?.effects) {
             state.pixiLayers.effects.mask = null;
+          }
+          if (state.pixiLayers?.environment) {
+            state.pixiLayers.environment.mask = null;
           }
         }
 

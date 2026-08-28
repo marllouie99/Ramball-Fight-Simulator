@@ -13,6 +13,7 @@
 
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { 
   drawMahitoArmMorph, 
   drawMahitoSubterraneanFleshSurge, 
@@ -38,10 +39,10 @@ export function _getMahitoSkinImage() {
       _mahitoSkinImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Mahito skin image at Assets/model/MAHITO-SKIN.png', e);
+      console.warn('Failed to load Mahito pixel skin image at Assets/model/MAHITO-PIXEL-SKIN.png', e);
       _mahitoSkinImageLoading = false;
     };
-    img.src = 'Assets/model/MAHITO-SKIN.png?v=1';
+    img.src = 'Assets/model/MAHITO-PIXEL-SKIN.png?v=2';
     _mahitoSkinImage = img;
   }
   return _mahitoSkinImage;
@@ -585,9 +586,7 @@ function drawBaseMahito(ctx, r, fighter) {
   if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-    const scale = (r / 170.0);
-    ctx.scale(scale, scale);
-    ctx.drawImage(skinImg, -282.5, -257.5);
+    ctx.drawImage(skinImg, -r, -r, r * 2, r * 2);
     ctx.restore();
     return;
   }

@@ -1204,12 +1204,12 @@ export function drawSparkEffects(layer = 'all') {
           ctx.restore();
         }
       } else if (effect.type === 'saitamaCounterFrontalBlast') {
-        // Massive Wide Long Frontal Supersonic Shockwave Blast (PIXEL ART STYLE)
+        // Massive Wide Long Frontal Supersonic Shockwave Blast (PIXEL ART STYLE - YELLOW CONE SHAPE)
         const startX = effect.x;
         const startY = effect.y;
         const angle = effect.angle || 0;
         const reach = effect.reach || 750;
-        const arc = effect.arcAngle || (Math.PI * 0.75); // 135-degree wide frontal cone
+        const arc = effect.arcAngle || (Math.PI * 0.75);
         const progress = 1.0 - effect.life; // 0 to 1
         const alpha = Math.sin(effect.life * Math.PI);
 
@@ -1218,130 +1218,117 @@ export function drawSparkEffects(layer = 'all') {
           ctx.translate(startX, startY);
           ctx.rotate(angle);
 
-          // Pixel block unit for retro arcade resolution (4px grid)
-          const pxSize = 4;
-          const pxB = (gx, gy, gw, gh, fill) => {
-            if (!fill) return;
-            ctx.fillStyle = fill;
-            ctx.fillRect(
-              Math.round(gx / pxSize) * pxSize,
-              Math.round(gy / pxSize) * pxSize,
-              Math.max(pxSize, Math.round(gw / pxSize) * pxSize),
-              Math.max(pxSize, Math.round(gh / pxSize) * pxSize)
-            );
-          };
+          const P = 3.0; // Pixel art grid scale
+          const snap = (v) => Math.round(v / P) * P;
 
-          // Fast supersonic expansion along length: reaches full length by progress = 0.22
-          const currentReach = reach * Math.min(1.0, progress / 0.22);
-          const halfArc = arc * 0.5;
+          // Fast supersonic expansion along length: reaches full length by progress = 0.25
+          const currentReach = reach * Math.min(1.0, progress * 4.0);
 
-          // ── 1. Broad Outer Fiery Crimson Pixel Atmosphere (Stepped Bands) ──
-          const bandCount = 10;
-          for (let b = 0; b < bandCount; b++) {
-            const bDist = (b + 1) * (currentReach / bandCount);
-            const bRatio = b / bandCount; // 0 (near) to 1 (far)
-            const bAlpha = alpha * (1.0 - bRatio * 0.6);
-            
-            let bandColor;
-            if (bRatio < 0.3) {
-              bandColor = `rgba(255, 224, 51, ${(0.65 * bAlpha).toFixed(3)})`; // Gold
-            } else if (bRatio < 0.65) {
-              bandColor = `rgba(255, 136, 0, ${(0.50 * bAlpha).toFixed(3)})`;  // Amber
-            } else {
-              bandColor = `rgba(239, 68, 68, ${(0.35 * bAlpha).toFixed(3)})`;   // Crimson
-            }
+          // ── 1. PIXEL-ART FRACTURED YELLOW CONCUSSIVE CONE SHARDS ──
+          const shardPolys = [
+            // Top outer wing shard
+            [ { x: 0, y: 0 }, { x: currentReach * 0.40, y: -currentReach * 0.32 }, { x: currentReach * 0.65, y: -currentReach * 0.16 }, { x: currentReach * 0.32, y: 0 } ],
+            // Top mid shard
+            [ { x: 0, y: 0 }, { x: currentReach * 0.65, y: -currentReach * 0.16 }, { x: currentReach * 0.92, y: 0 }, { x: currentReach * 0.60, y: currentReach * 0.08 } ],
+            // Bottom mid shard
+            [ { x: 0, y: 0 }, { x: currentReach * 0.60, y: currentReach * 0.08 }, { x: currentReach * 0.88, y: currentReach * 0.20 }, { x: currentReach * 0.38, y: currentReach * 0.32 } ],
+            // Bottom outer wing shard
+            [ { x: 0, y: 0 }, { x: currentReach * 0.38, y: currentReach * 0.32 }, { x: currentReach * 0.62, y: currentReach * 0.42 }, { x: currentReach * 0.25, y: currentReach * 0.15 } ],
+            // Centerline supersonic piercing shard
+            [ { x: currentReach * 0.32, y: 0 }, { x: currentReach * 0.92, y: 0 }, { x: currentReach * 1.08, y: 0 }, { x: currentReach * 0.75, y: -currentReach * 0.06 } ]
+          ];
 
-            const stepCount = 14;
-            for (let s = 0; s <= stepCount; s++) {
-              const t = s / stepCount;
-              const a = -halfArc + t * arc;
-              const rDist = bDist * (0.88 + 0.12 * Math.sin(t * Math.PI));
-              const pxX = Math.cos(a) * rDist;
-              const pxY = Math.sin(a) * rDist;
-              pxB(pxX - 4, pxY - 4, 8, 8, bandColor);
-            }
-          }
-
-          // ── 2. Focused Dense Golden-Amber Supersonic Pressure Cone ──
-          const coreBandCount = 8;
-          const coreArc = halfArc * 0.65;
-          for (let cb = 0; cb < coreBandCount; cb++) {
-            const cDist = (cb + 1) * (currentReach / coreBandCount);
-            const cRatio = cb / coreBandCount;
-            const cAlpha = alpha * (1.0 - cRatio * 0.45);
-
-            let coreFill;
-            if (cRatio < 0.35) {
-              coreFill = `rgba(255, 255, 255, ${(0.92 * cAlpha).toFixed(3)})`; // White-hot core
-            } else if (cRatio < 0.70) {
-              coreFill = `rgba(255, 224, 51, ${(0.82 * cAlpha).toFixed(3)})`;  // Neon gold
-            } else {
-              coreFill = `rgba(245, 158, 11, ${(0.65 * cAlpha).toFixed(3)})`;  // Bright amber
-            }
-
-            const cStepCount = 12;
-            for (let s = 0; s <= cStepCount; s++) {
-              const t = s / cStepCount;
-              const a = -coreArc + t * (coreArc * 2);
-              const rDist = cDist * (0.94 + 0.06 * Math.sin(t * Math.PI));
-              const pxX = Math.cos(a) * rDist;
-              const pxY = Math.sin(a) * rDist;
-              pxB(pxX - 3, pxY - 3, 6, 6, coreFill);
-            }
-          }
-
-          // ── 3. Razor-Sharp Stepped Pixel Air Displacement Needles ──
-          const needleCount = 14;
-          const needleCol = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
-          const needleGlow = `rgba(255, 224, 51, ${(0.75 * alpha).toFixed(3)})`;
-
-          for (let n = 0; n < needleCount; n++) {
-            const nAngle = (-halfArc * 0.82) + (n / (needleCount - 1)) * (arc * 0.82);
-            const nDist = currentReach * (0.35 + (n % 3) * 0.28);
-            const nLen = Math.min(220, currentReach * 0.38);
-
-            const nSteps = 8;
-            for (let step = 0; step < nSteps; step++) {
-              const sProgress = step / nSteps;
-              const stepDist = (nDist - nLen * 0.5) + sProgress * nLen;
-              const sx = Math.cos(nAngle) * stepDist;
-              const sy = Math.sin(nAngle) * stepDist;
-              
-              // Taper thickness: thick in middle, needle-thin at tips
-              const thick = Math.sin(sProgress * Math.PI) * 5 + 2;
-              pxB(sx - thick * 0.5, sy - thick * 0.5, thick, thick, sProgress > 0.4 && sProgress < 0.8 ? needleCol : needleGlow);
-            }
-          }
-
-          // ── 4. Centerline Blinding Pixel Air Canyon Fissure ──
-          const beamSteps = Math.min(100, Math.round((currentReach * 1.05) / 8));
-          for (let bs = 0; bs < beamSteps; bs++) {
-            const bx = bs * 8;
-            const bThick = (Math.sin((bs / beamSteps) * Math.PI) * 4 + 3) * alpha;
-            // White core beam
-            pxB(bx, -bThick * 0.5, 8, bThick, `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`);
-            // Golden outer fringe
-            pxB(bx, -bThick * 0.5 - 2, 8, 2, `rgba(255, 224, 51, ${(0.70 * alpha).toFixed(3)})`);
-            pxB(bx, bThick * 0.5, 8, 2, `rgba(255, 224, 51, ${(0.70 * alpha).toFixed(3)})`);
-          }
-
-          // ── 5. Expanding Pixel Shockwave Diamonds along the corridor ──
-          const diamondDists = [currentReach * 0.25, currentReach * 0.55, currentReach * 0.85];
-          diamondDists.forEach(dDist => {
-            if (dDist < currentReach) {
-              const dRad = (dDist * 0.22 + 10) * alpha;
-              const dColor = `rgba(255, 224, 51, ${(0.80 * alpha).toFixed(3)})`;
-              const dWhite = `rgba(255, 255, 255, ${(0.90 * alpha).toFixed(3)})`;
-              
-              // 4-point pixel diamond ring
-              for (let dy = -dRad; dy <= dRad; dy += 4) {
-                const dx = Math.round((1 - Math.abs(dy) / dRad) * dRad * 0.6);
-                pxB(dDist + dx, dy, 4, 4, dColor);
-                pxB(dDist - dx, dy, 4, 4, dColor);
+          shardPolys.forEach((pts, sIdx) => {
+            // Pass 1: Pixel Outline
+            ctx.fillStyle = '#111114';
+            for (let j = 0; j < pts.length; j++) {
+              const p1 = pts[j];
+              const p2 = pts[(j + 1) % pts.length];
+              const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+              const steps = Math.max(2, Math.round(dist / P));
+              for (let st = 0; st <= steps; st++) {
+                const rx = p1.x + (p2.x - p1.x) * (st / steps);
+                const ry = p1.y + (p2.y - p1.y) * (st / steps);
+                ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
               }
-              pxB(dDist - 2, -2, 4, 4, dWhite); // Center glint
+            }
+
+            // Pass 2: Stepped Yellow/Gold Shard Body
+            const shardCol = (sIdx % 2 === 0) 
+              ? `rgba(255, 235, 59, ${(0.85 * alpha).toFixed(3)})`  // Radiant Safety Yellow
+              : `rgba(255, 215, 0, ${(0.90 * alpha).toFixed(3)})`;   // Vivid Golden Yellow
+            ctx.fillStyle = shardCol;
+            ctx.beginPath();
+            pts.forEach((pt, pIdx) => {
+              const px = snap(pt.x);
+              const py = snap(pt.y);
+              if (pIdx === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            });
+            ctx.closePath();
+            ctx.fill();
+
+            // Pass 3: White-Hot Highlight Edge Pixels
+            ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
+            for (let j = 0; j < pts.length; j++) {
+              const p1 = pts[j];
+              const p2 = pts[(j + 1) % pts.length];
+              const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+              const steps = Math.max(1, Math.round(dist / (P * 2)));
+              for (let st = 0; st <= steps; st++) {
+                const rx = p1.x + (p2.x - p1.x) * (st / steps);
+                const ry = p1.y + (p2.y - p1.y) * (st / steps);
+                ctx.fillRect(snap(rx), snap(ry), P, P);
+              }
             }
           });
+
+          // ── 2. STEPPED PIXEL JAGGED CONCUSSIVE FISSURE SHOCKWAVE LINES ──
+          const fissures = [
+            [ { x: 0, y: 0 }, { x: currentReach * 0.20, y: -currentReach * 0.12 }, { x: currentReach * 0.45, y: -currentReach * 0.22 }, { x: currentReach * 0.70, y: -currentReach * 0.32 } ],
+            [ { x: 0, y: 0 }, { x: currentReach * 0.25, y: 0 }, { x: currentReach * 0.55, y: currentReach * 0.02 }, { x: currentReach * 0.85, y: -currentReach * 0.02 }, { x: currentReach * 1.10, y: 0 } ],
+            [ { x: 0, y: 0 }, { x: currentReach * 0.18, y: currentReach * 0.10 }, { x: currentReach * 0.42, y: currentReach * 0.20 }, { x: currentReach * 0.68, y: currentReach * 0.30 } ]
+          ];
+
+          fissures.forEach(fiss => {
+            ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
+            for (let j = 0; j < fiss.length - 1; j++) {
+              const p1 = fiss[j];
+              const p2 = fiss[j + 1];
+              const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+              const steps = Math.max(2, Math.round(dist / P));
+              for (let st = 0; st <= steps; st++) {
+                const rx = p1.x + (p2.x - p1.x) * (st / steps);
+                const ry = p1.y + (p2.y - p1.y) * (st / steps);
+                ctx.fillRect(snap(rx), snap(ry), P * 1.5, P * 1.5);
+              }
+            }
+          });
+
+          // ── 3. CONCENTRIC STEPPED PIXEL ARC SHOCKWAVE RINGS ──
+          const numRings = 3;
+          for (let rIdx = 0; rIdx < numRings; rIdx++) {
+            const ringDist = currentReach * (0.35 + rIdx * 0.30);
+            const ringArc = arc * 0.75;
+            const ringSteps = 16;
+            ctx.fillStyle = `rgba(255, 235, 59, ${(0.75 * alpha).toFixed(3)})`;
+            for (let st = 0; st <= ringSteps; st++) {
+              const ang = -ringArc * 0.5 + (st / ringSteps) * ringArc;
+              const rx = Math.cos(ang) * ringDist;
+              const ry = Math.sin(ang) * ringDist;
+              ctx.fillRect(snap(rx), snap(ry), P * 1.5, P * 1.5);
+            }
+          }
+
+          // ── 4. FLOATING SHATTERED GOLDEN PIXEL EMBERS ──
+          const numEmbers = 12;
+          for (let eb = 0; eb < numEmbers; eb++) {
+            const ebSeed = eb * 19.7 + progress * 40;
+            const ebX = snap(currentReach * (0.15 + (eb % 6) * 0.15) + (ebSeed * 0.5));
+            const ebY = snap(((eb % 4) - 1.5) * (currentReach * 0.18) + Math.sin(ebSeed) * 15);
+            ctx.fillStyle = (eb % 2 === 0) ? '#FFEE58' : '#FFFFFF';
+            ctx.fillRect(ebX, ebY, P, P);
+          }
 
           ctx.restore();
         }

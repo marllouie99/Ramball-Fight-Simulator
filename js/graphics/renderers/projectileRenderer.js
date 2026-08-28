@@ -644,7 +644,77 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
 
-    // --- Yuta's Pure Love Beam ---
+    // --- Yuta's Cursed Speech Soundwave ("DON'T MOVE!") ---
+    if (p.visual === 'cursedSpeechWave') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      const P = 2.4; // Pixel art grid scale
+      const lifeProg = 1 - (p.life / p.maxLife); // 0 to 1
+      const currentR = p.r + lifeProg * (p.maxR - p.r);
+      const alpha = Math.max(0, (p.life / p.maxLife));
+
+      ctx.globalAlpha = alpha;
+      const steps = Math.max(20, Math.round((Math.PI * 2 * currentR) / (P * 2)));
+
+      // 1. Concentric Stepped Pixel Shockwave Rings
+      for (let i = 0; i <= steps; i++) {
+        const ang = (i / steps) * Math.PI * 2;
+        const rx = Math.cos(ang);
+        const ry = Math.sin(ang);
+
+        // Dark Outline Ring
+        const outR = currentR + P;
+        ctx.fillStyle = '#111114';
+        ctx.fillRect(Math.round(rx * outR / P) * P - P * 0.5, Math.round(ry * outR / P) * P - P * 0.5, P * 2, P * 2);
+
+        // Neon Cursed Pink Acoustic Ring
+        ctx.fillStyle = '#FF1493';
+        ctx.fillRect(Math.round(rx * currentR / P) * P, Math.round(ry * currentR / P) * P, P, P);
+
+        // Inner White Soundwave Ring
+        if (currentR > 20) {
+          const inR = currentR - P * 2;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(Math.round(rx * inR / P) * P, Math.round(ry * inR / P) * P, P, P);
+        }
+      }
+
+      // 2. Radiating Pixel Audio Frequency / Equalizer Bars
+      const numBars = 12;
+      for (let b = 0; b < numBars; b++) {
+        const bAng = (b / numBars) * Math.PI * 2 + (lifeProg * 0.4);
+        const barLen = P * (4 + ((b * 7 + p.life * 3) % 6));
+        const bCos = Math.cos(bAng);
+        const bSin = Math.sin(bAng);
+
+        for (let s = 0; s < barLen; s += P) {
+          const dist = currentR - barLen + s;
+          if (dist < 5) continue;
+          const bx = Math.round((bCos * dist) / P) * P;
+          const by = Math.round((bSin * dist) / P) * P;
+          ctx.fillStyle = (s >= barLen - P * 2) ? '#FFFFFF' : '#FF1493';
+          ctx.fillRect(bx, by, P, P);
+        }
+      }
+
+      // 3. Floating Cursed Talisman Pixel Glyphs
+      const numGlyphs = 6;
+      for (let g = 0; g < numGlyphs; g++) {
+        const gAng = (g / numGlyphs) * Math.PI * 2 + (g * 1.5);
+        const gDist = currentR * 0.75;
+        const gx = Math.round((Math.cos(gAng) * gDist) / P) * P;
+        const gy = Math.round((Math.sin(gAng) * gDist) / P) * P;
+        ctx.fillStyle = '#111114';
+        ctx.fillRect(gx - P, gy - P, P * 3, P * 3);
+        ctx.fillStyle = (g % 2 === 0) ? '#FFFFFF' : '#FF1493';
+        ctx.fillRect(gx, gy, P, P);
+      }
+
+      ctx.restore();
+      return;
+    }
+
+    // --- Yuta's Pure Love Beam (Pixel Art Mega-Beam) ---
     if (p.visual === 'yuta_pure_love_beam') {
       const ownerFighter = (typeof state !== 'undefined' && state.fighters && p.owner !== undefined) ? state.fighters[p.owner] : null;
       ctx.save();
@@ -653,17 +723,15 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       
       const length = p.length || 2500;
       const radius = p.r || 170;
+      const P = 4.0; // Pixel art unit grid scale for mega energy beam
       
-      // Keep beam solid (100% size and opacity) for the first part of its life,
-      // then rapidly shrink and fade it out during the final 30 frames!
-      let beamAlpha = 0.80; // Added transparency so underlying arena & entities remain visible
+      let beamAlpha = 0.85;
       let sizeScale = 1.0;
       if (p.life < 30) {
-        beamAlpha = Math.max(0, (p.life / 30) * 0.80);
+        beamAlpha = Math.max(0, (p.life / 30) * 0.85);
         sizeScale = Math.max(0, p.life / 30);
       }
       
-      // 20 FPS Quantized Frame Step (50ms interval)
       const frameStep20 = Math.floor(Date.now() / 50);
       const pseudoRand = (seed) => {
         const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
@@ -673,209 +741,93 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       const throb = Math.sin(frameStep20 * 0.4) * 16;
       const currentRadius = (radius + throb) * sizeScale;
       
-      // Helper: Draw smooth expanding pill-cone path (narrow at Yuta, spreads wide as it extends, rounded pill tip)
-      const drawExpandingPillPath = (startR, endR, len) => {
-        ctx.beginPath();
-        // Round origin cap at Yuta (x = 0)
-        ctx.arc(0, 0, startR, Math.PI * 0.5, -Math.PI * 0.5, false);
-        // Top spreading edge line going out to len
-        ctx.lineTo(len, -endR);
-        // Round pill tip cap at the end of the beam (x = len)
-        ctx.arc(len, 0, endR, -Math.PI * 0.5, Math.PI * 0.5, false);
-        // Bottom spreading edge line returning to origin
-        ctx.lineTo(0, startR);
-        ctx.closePath();
-      };
-
       const startBaseR = currentRadius * 0.25;
       const endBaseR = currentRadius * 2.7;
+      const colStep = P * 2; // 8px per pixel beam column
 
-      // 1. Dark Void Outer Shell (Dark Black / Deep Violet Ink Containment)
-      ctx.globalAlpha = 0.60 * beamAlpha;
-      const outerVoidGrad = ctx.createLinearGradient(0, -endBaseR * 1.3, 0, endBaseR * 1.3);
-      outerVoidGrad.addColorStop(0, 'rgba(15, 0, 25, 0.85)');
-      outerVoidGrad.addColorStop(0.25, 'rgba(120, 0, 160, 0.7)');
-      outerVoidGrad.addColorStop(0.5, 'rgba(255, 0, 180, 0.3)');
-      outerVoidGrad.addColorStop(0.75, 'rgba(120, 0, 160, 0.7)');
-      outerVoidGrad.addColorStop(1, 'rgba(15, 0, 25, 0.85)');
-      
-      ctx.fillStyle = outerVoidGrad;
-      drawExpandingPillPath(startBaseR * 1.4, endBaseR * 1.4, length);
-      ctx.fill();
+      // ── 1. STEPPED PIXEL-ART BEAM ENERGY BODY ──
+      ctx.globalAlpha = beamAlpha;
+      for (let x = 0; x <= length; x += colStep) {
+        const prog = x / length;
+        const currentR = startBaseR + (endBaseR - startBaseR) * Math.pow(prog, 0.95);
+        const px = Math.round(x / P) * P;
+        const pw = P * 2;
 
-      // Switch to lighter composite for additive energy layers
-      ctx.globalCompositeOperation = 'lighter';
+        // A. Outer Pitch-Black Manga Ink Shell
+        const outH = Math.round((currentR + P * 2) / P) * P;
+        ctx.fillStyle = '#111114';
+        ctx.fillRect(px, -outH, pw, outH * 2);
 
-      // 2. Deep Violet / Purple Beam Body Gradient (Spreading Pill Shape)
-      ctx.globalAlpha = 0.78 * beamAlpha;
-      const beamGrad = ctx.createLinearGradient(0, -endBaseR, 0, endBaseR);
-      beamGrad.addColorStop(0, 'rgba(150, 0, 180, 0.85)');    // Top Edge Deep Purple/Violet
-      beamGrad.addColorStop(0.25, 'rgba(255, 10, 140, 0.85)'); // Hot Pink
-      beamGrad.addColorStop(0.5, 'rgba(255, 20, 147, 0.90)');   // Bright Hot Pink Core
-      beamGrad.addColorStop(0.75, 'rgba(255, 10, 140, 0.85)'); // Hot Pink
-      beamGrad.addColorStop(1, 'rgba(150, 0, 180, 0.85)');    // Bottom Edge Deep Purple/Violet
-      
-      ctx.fillStyle = beamGrad;
-      drawExpandingPillPath(startBaseR, endBaseR, length);
-      ctx.fill();
+        // B. Abyssal Violet Energy Band
+        const vioH = Math.round(currentR / P) * P;
+        ctx.fillStyle = '#3A004C';
+        ctx.fillRect(px, -vioH, pw, vioH * 2);
 
-      // Outer JJK Pitch-Black Calligraphy Ink Contour
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 0.65 * beamAlpha;
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3.5;
-      drawExpandingPillPath(startBaseR, endBaseR, length);
-      ctx.stroke();
+        // C. Hot Magenta Band
+        const magH = Math.round((currentR * 0.8) / P) * P;
+        ctx.fillStyle = '#C7007A';
+        ctx.fillRect(px, -magH, pw, magH * 2);
 
-      // JJK Calligraphy Ink Brush Lines & Hatch Cuts (Pitch-black manga ink streaks streaming along the beam)
-      const numBlackLines = 8;
-      ctx.lineCap = 'square';
-      for (let i = 0; i < numBlackLines; i++) {
-        const side = (i % 2 === 0 ? -1 : 1);
-        const lineRatio = 0.25 + (i % 4) * 0.22;
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2.0 + (i % 3) * 1.0;
-        ctx.beginPath();
-        let lx = 0;
-        let ly = side * startBaseR * lineRatio;
-        ctx.moveTo(lx, ly);
-        const steps = 16;
-        const stepLen = length / steps;
-        for (let s = 1; s <= steps; s++) {
-          const prog = s / steps;
-          const cutSeed = pseudoRand(frameStep20 * 79 + i * 37 + s * 13);
-          if (cutSeed < 0.28) {
-            // Skip broken gaps for JJK Calligraphy Ink Brush technique
-            lx = s * stepLen;
-            ly = side * (startBaseR + (endBaseR - startBaseR) * prog) * lineRatio;
-            ctx.moveTo(lx, ly);
-            continue;
-          }
-          const currentSpreadY = side * (startBaseR + (endBaseR - startBaseR) * prog) * lineRatio;
-          const jag = (pseudoRand(frameStep20 * 41 + s * 19 + i * 23) - 0.5) * (8 + prog * 12);
-          lx = s * stepLen;
-          ly = currentSpreadY + jag;
-          ctx.lineTo(lx, ly);
+        // D. Neon Cursed Pink Core
+        const pnkH = Math.round((currentR * 0.52) / P) * P;
+        ctx.fillStyle = '#FF1493';
+        ctx.fillRect(px, -pnkH, pw, pnkH * 2);
+
+        // E. Pure White-Hot Center Spine
+        const whtH = Math.round((currentR * 0.22) / P) * P;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(px, -whtH, pw, Math.max(P, whtH * 2));
+
+        // Stepped Pixel Energy Shockwave Bands along the beam
+        const bandPhase = ((x - (Date.now() * 0.45)) % 140 + 140) % 140;
+        if (bandPhase < colStep * 2) {
+          const ringH = Math.round((currentR * 1.15) / P) * P;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(px, -ringH, pw, P);
+          ctx.fillRect(px, ringH - P, pw, P);
+          ctx.fillStyle = 'rgba(255, 20, 147, 0.8)';
+          ctx.fillRect(px, -ringH - P, pw, P);
+          ctx.fillRect(px, ringH, pw, P);
         }
-        ctx.stroke();
       }
 
-      ctx.globalCompositeOperation = 'lighter';
-
-      // 3. High-Intensity Red & Pink Spreading Edge Lightning (20 FPS Stepped Electric Crackles)
-      const numEdgeLightning = 6;
-      for (let i = 0; i < numEdgeLightning; i++) {
+      // ── 2. STEPPED PIXEL LIGHTNING CRACKLES & JAGGED ELECTRIC BOLTS ──
+      const numLightning = 6;
+      for (let i = 0; i < numLightning; i++) {
         const side = (i % 2 === 0 ? -1 : 1);
-        const ratio = 0.75 + (i % 3) * 0.15;
-        ctx.strokeStyle = (pseudoRand(frameStep20 * 7 + i * 13) > 0.4) ? '#FF0055' : '#FF1493';
-        ctx.lineWidth = 4.0;
-        ctx.beginPath();
-        let lx = 0;
-        let ly = side * startBaseR * ratio;
-        ctx.moveTo(lx, ly);
-        const steps = 14;
+        const ratio = 0.85 + (i % 3) * 0.25;
+        const seed = frameStep20 * 37 + i * 53;
+        ctx.fillStyle = (pseudoRand(seed) > 0.4) ? '#FFFFFF' : '#FF1493';
+
+        const steps = 18;
         const stepLen = length / steps;
-        for (let s = 1; s <= steps; s++) {
+        for (let s = 0; s < steps; s++) {
           const prog = s / steps;
           const currentSpreadY = side * (startBaseR + (endBaseR - startBaseR) * prog) * ratio;
-          // 20 FPS stepped electric jitter
-          const jag = (pseudoRand(frameStep20 * 31 + s * 17 + i * 47) - 0.5) * (14 + prog * 18);
-          lx = s * stepLen;
-          ly = currentSpreadY + jag;
-          ctx.lineTo(lx, ly);
+          const jag = (pseudoRand(seed + s * 17) - 0.5) * (20 + prog * 30);
+          const lx = Math.round((s * stepLen) / P) * P;
+          const ly = Math.round((currentSpreadY + jag) / P) * P;
+          ctx.fillRect(lx, ly, P * 1.5, P * 1.5);
         }
-        ctx.stroke();
       }
 
-      // 4. JJK-Style Pitch Black Inner Core with Hot Pink Border Envelope
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 0.75 * beamAlpha;
-      
-      // A. Vibrant Neon Pink Inner Core Envelope
-      ctx.fillStyle = '#FF1493'; // Neon Pink
-      drawExpandingPillPath(startBaseR * 0.52, endBaseR * 0.52, length);
-      ctx.fill();
-
-      // B. Pitch-Black Core Center
-      ctx.globalAlpha = 0.65 * beamAlpha;
-      ctx.fillStyle = '#000000'; // Pitch-Black Inner Core
-      drawExpandingPillPath(startBaseR * 0.44, endBaseR * 0.44, length);
-      ctx.fill();
-
-      // C. Stream white-hot glowing particles inside the pitch-black core center
-      const numCoreParticles = 18;
-      for (let i = 0; i < numCoreParticles; i++) {
-        // Deterministic properties based on index
-        const pSpeed = 15 + (i % 3) * 6; // pixels per frame
-        const pOffsetPct = ((i % 5) / 5 - 0.5) * 0.82; // vertical offset percentage (-0.41 to 0.41)
-        const pLen = 20 + (i % 4) * 10; // particle streak length
-        const pThick = 1.2 + (i % 2) * 0.8; // particle thickness
-        
-        // Horizontal position moves along the beam over time
-        const travelSpeed = pSpeed * (Date.now() * 0.001 * 60); // frame-based travel distance
-        const startX = (i * (length / numCoreParticles) + travelSpeed) % length;
-        const endX = startX + pLen;
-        
-        // Calculate core radius at these positions to keep them inside the black core
-        const currentCoreR_start = startBaseR * 0.42 + (endBaseR * 0.42 - startBaseR * 0.42) * (startX / length);
-        const currentCoreR_end = startBaseR * 0.42 + (endBaseR * 0.42 - startBaseR * 0.42) * (endX / length);
-        
-        const startY = pOffsetPct * currentCoreR_start;
-        const endY = pOffsetPct * currentCoreR_end;
-        
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.lineWidth = pThick * sizeScale; // shrink thickness as beam collapses
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
+      // ── 3. FLOATING DISPERSING PIXEL ENERGY EMBERS ──
+      const numEmbers = 24;
+      for (let i = 0; i < numEmbers; i++) {
+        const pSpeed = 22 + (i % 5) * 8;
+        const travel = ((Date.now() * 0.001 * pSpeed * 60 + i * 85) % length);
+        const prog = travel / length;
+        const beamW = (startBaseR + (endBaseR - startBaseR) * prog);
+        const side = (i % 2 === 0 ? -1 : 1);
+        const offset = side * (beamW * (0.3 + (i % 7) * 0.12));
+        const ex = Math.round(travel / P) * P;
+        const ey = Math.round(offset / P) * P;
+        const emberSize = (i % 3 === 0) ? P * 2 : P;
+        ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : ((i % 3 === 1) ? '#FF1493' : '#FF69B4');
+        ctx.fillRect(ex, ey, emberSize, emberSize);
       }
 
-      // 5. Orbiting White/Pink Cursed Energy Rings (3D perspective elliptical loops)
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.8 * beamAlpha;
-      
-      const numRings = 6;
-      const ringTime = Date.now() * 0.0035; // speed of movement
-      
-      for (let i = 0; i < numRings; i++) {
-        // Move the rings along the beam over time
-        const basePct = (i / numRings);
-        const currentPct = (basePct + (ringTime * 0.15) % 1.0) % 1.0;
-        
-        // Don't draw too close to the origin or end to prevent harsh cuts
-        if (currentPct < 0.05 || currentPct > 0.95) continue;
-        
-        const ringX = currentPct * length;
-        const ringSpreadR = startBaseR + (endBaseR - startBaseR) * currentPct;
-        
-        // Ellipse dimensions
-        const radiusY = ringSpreadR * 1.5;
-        const radiusX = radiusY * 0.28; // gives 3D tilt look
-        
-        ctx.save();
-        ctx.translate(ringX, 0);
-        // Tilt the ring relative to the beam axis
-        ctx.rotate(0.35); // ~20 degrees tilt
-        
-        // Outer pink glow ring (simulating glow without shadowBlur)
-        ctx.strokeStyle = 'rgba(255, 20, 147, 0.6)';
-        ctx.lineWidth = 5.0;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Inner white ring
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.lineWidth = 2.0;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        ctx.restore();
-      }
-
-      // Re-draw owner Yuta & Rika before light flare overlay so the beam's bright energy illuminates both of them!
+      // Re-draw owner Yuta & Rika so beam energy layers cleanly
       if (ownerFighter) {
         ctx.restore(); // Restore back to world space
         ctx.save();
@@ -891,36 +843,24 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
         ctx.rotate(p.angle);
       }
 
-      // 6. Massive Vibrant Pink Light Bloom & Flare Overlay (Illuminates Yuta with additive energy)
-      ctx.globalAlpha = 0.85 * beamAlpha;
-      ctx.globalCompositeOperation = 'lighter';
-      
-      const flareRadius = currentRadius * 1.6; // Generous bright pink light bloom overlaying Yuta
-      const originGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, flareRadius);
-      originGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');       // White hot core overlay
-      originGrad.addColorStop(0.3, 'rgba(255, 20, 147, 0.75)');     // Neon pink glow over Yuta
-      originGrad.addColorStop(0.6, 'rgba(255, 105, 180, 0.4)');    // Hot pink aura
-      originGrad.addColorStop(0.85, 'rgba(180, 0, 220, 0.2)');     // Violet outer aura
-      originGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      
-      ctx.fillStyle = originGrad;
-      ctx.beginPath();
-      ctx.arc(0, 0, flareRadius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 7. Streaming White Particle Spark Embers spreading along the beam length (20 FPS Stepped)
-      const numBeamEmbers = 35;
-      ctx.fillStyle = '#FFFFFF';
-      for (let i = 0; i < numBeamEmbers; i++) {
-        const seed = i * 47.11;
-        const emberX = ((frameStep20 * 18 + seed * 100) % length);
-        const spreadFactor = (emberX / length);
-        const maxSpreadY = startBaseR + (endBaseR - startBaseR) * spreadFactor;
-        const emberY = ((pseudoRand(frameStep20 * 13 + i * 29) - 0.5) * maxSpreadY * 1.7);
-        const emberR = 1.5 + (i % 3) * 1.2;
-        ctx.beginPath();
-        ctx.arc(emberX, emberY, emberR, 0, Math.PI * 2);
-        ctx.fill();
+      // ── 4. PIXEL-ART ORIGIN MUZZLE FLARE (Stepped Pixel Diamond Blast at Hand) ──
+      ctx.globalAlpha = 0.90 * beamAlpha;
+      const flareR = Math.round((startBaseR * 2.2) / P) * P;
+      const flareSteps = Math.ceil(flareR / P);
+      for (let gy = -flareSteps; gy <= flareSteps; gy++) {
+        for (let gx = -flareSteps; gx <= flareSteps; gx++) {
+          const manhattan = Math.abs(gx * P) + Math.abs(gy * P);
+          if (manhattan <= flareR) {
+            const fx = Math.round(gx * P / P) * P;
+            const fy = Math.round(gy * P / P) * P;
+            let col = '#FFFFFF';
+            if (manhattan > flareR * 0.7) col = '#111114';
+            else if (manhattan > flareR * 0.45) col = '#FF1493';
+            else if (manhattan > flareR * 0.25) col = '#FF69B4';
+            ctx.fillStyle = col;
+            ctx.fillRect(fx, fy, P, P);
+          }
+        }
       }
 
       ctx.restore();

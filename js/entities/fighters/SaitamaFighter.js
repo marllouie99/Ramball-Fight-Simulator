@@ -955,7 +955,7 @@ export class SaitamaFighter extends Fighter {
     const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
-    if (isInsideGojoDomain) return; // Offensive skills frozen inside Unlimited Void!
+    if (isInsideGojoDomain || (typeof this.isParalyzedDebuffActive === 'function' && this.isParalyzedDebuffActive())) return; // Offensive skills frozen while paralyzed or inside Unlimited Void!
 
     if (this.skillPunishCooldown > 0) this.skillPunishCooldown--;
     if (this.flurryCooldown > 0) this.flurryCooldown--;

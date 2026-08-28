@@ -134,6 +134,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
     rct: !!opponent.isChannelingRCT,
     divineFlame: !!opponent.isChannelingDivineFlame,
     storm: !!opponent.isChannelingStorm,
+    getsuga: !!(opponent.isChannelingGetsuga || opponent.isChannelingBankai),
     generic: !!opponent.isChanneling
   };
   fighter.ambushTargetWasChanneling = !!(
@@ -142,6 +143,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
     fighter.ambushTargetChannelState.rct ||
     fighter.ambushTargetChannelState.divineFlame ||
     fighter.ambushTargetChannelState.storm ||
+    fighter.ambushTargetChannelState.getsuga ||
     fighter.ambushTargetChannelState.generic
   );
 
@@ -212,27 +214,31 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     return;
   }
 
-  // Target is frozen via isTargetOfAmbush, so we must manually process their knockback physics here!
-  if (opponent.knockbackVx !== undefined && (Math.abs(opponent.knockbackVx) > 0.1 || Math.abs(opponent.knockbackVy) > 0.1)) {
+  // Target is in ambush stasis (actions/AI frozen), so Toji directly drives their physical displacement & arena wall ricochets!
+  if (opponent && opponent.knockbackVx !== undefined && (Math.abs(opponent.knockbackVx) > 0.05 || Math.abs(opponent.knockbackVy) > 0.05)) {
     opponent.x += opponent.knockbackVx;
     opponent.y += opponent.knockbackVy;
     
-    const arena = typeof CONFIG !== 'undefined' ? CONFIG.arena : null;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
     if (arena) {
-      let bounced = false;
-      const bounceMult = opponent.isFirstHitKnockback ? 0.35 : 0.82;
-      if (opponent.x - opponent.r < arena.x) { opponent.x = arena.x + opponent.r; opponent.knockbackVx = Math.abs(opponent.knockbackVx) * bounceMult; bounced = true; }
-      if (opponent.x + opponent.r > arena.x + arena.width) { opponent.x = arena.x + arena.width - opponent.r; opponent.knockbackVx = -Math.abs(opponent.knockbackVx) * bounceMult; bounced = true; }
-      if (opponent.y - opponent.r < arena.y) { opponent.y = arena.y + opponent.r; opponent.knockbackVy = Math.abs(opponent.knockbackVy) * bounceMult; bounced = true; }
-      if (opponent.y + opponent.r > arena.y + arena.height) { opponent.y = arena.y + arena.height - opponent.r; opponent.knockbackVy = -Math.abs(opponent.knockbackVy) * bounceMult; bounced = true; }
+      const bounceMult = opponent.isFirstHitKnockback ? 0.45 : 0.85;
+      const minX = arena.x + opponent.r;
+      const maxX = arena.x + arena.width - opponent.r;
+      const minY = arena.y + opponent.r;
+      const maxY = arena.y + arena.height - opponent.r;
+
+      if (opponent.x < minX) { opponent.x = minX; opponent.knockbackVx = Math.abs(opponent.knockbackVx) * bounceMult; }
+      if (opponent.x > maxX) { opponent.x = maxX; opponent.knockbackVx = -Math.abs(opponent.knockbackVx) * bounceMult; }
+      if (opponent.y < minY) { opponent.y = minY; opponent.knockbackVy = Math.abs(opponent.knockbackVy) * bounceMult; }
+      if (opponent.y > maxY) { opponent.y = maxY; opponent.knockbackVy = -Math.abs(opponent.knockbackVy) * bounceMult; }
     }
     
     const decay = opponent.knockbackDecay || 0.90;
     opponent.knockbackVx *= decay;
     opponent.knockbackVy *= decay;
     
-    if (Math.abs(opponent.knockbackVx) <= 0.1) opponent.knockbackVx = 0;
-    if (Math.abs(opponent.knockbackVy) <= 0.1) opponent.knockbackVy = 0;
+    if (Math.abs(opponent.knockbackVx) <= 0.05) opponent.knockbackVx = 0;
+    if (Math.abs(opponent.knockbackVy) <= 0.05) opponent.knockbackVy = 0;
   }
 
   opponent.isTargetOfAmbush = true;
@@ -571,20 +577,36 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         if (opponent && opponent.hp > 0 && !opponent.isTurret && !opponent.cannotBeKnockbacked) {
           const finalPushAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
           const finalRecoil = CONFIG.toji?.ambushFlurryFinalRecoil || 38;
-          opponent.vx = Math.cos(finalPushAngle) * finalRecoil;
-          opponent.vy = Math.sin(finalPushAngle) * finalRecoil;
+          const kbX = Math.cos(finalPushAngle) * finalRecoil;
+          const kbY = Math.sin(finalPushAngle) * finalRecoil;
+          opponent.knockbackVx = kbX;
+          opponent.knockbackVy = kbY;
+          opponent.vx = kbX;
+          opponent.vy = kbY;
+          opponent.knockbackDecay = 0.90;
           
           if (typeof opponent.applyKnockback === 'function') {
-            opponent.applyKnockback(opponent.vx, opponent.vy);
+            opponent.applyKnockback(kbX, kbY);
           }
         }
 
         // Release ALL freeze effects so opponent can actually fly from the knockback
         if (opponent) {
-          opponent.timeStopTimer = 0;
-          opponent.hitStunTimer = 0;
-          opponent._timeStopOriginalDuration = 0;
-          opponent._timeStopStartTime = null;
+          if (typeof fighter._clearTargetFreeze === 'function') {
+            fighter._clearTargetFreeze(opponent);
+          } else {
+            opponent.isTargetOfAmbush = false;
+            opponent.timeStopTimer = 0;
+            opponent.paralyzeTimer = 0;
+            opponent.hitStunTimer = 0;
+            opponent.isParalyzed = false;
+            opponent.isParalyzedByMahoraga = false;
+            if (opponent.statusEffects) opponent.statusEffects.timeStopTimer = 0;
+            delete opponent._timeStopOriginalDuration;
+            delete opponent._timeStopStartTime;
+            delete opponent._timeStopFrozenAngle;
+            delete opponent._timeStopFrozenGunAngle;
+          }
         }
 
         opponent.isTargetOfAmbush = false; 
@@ -643,13 +665,16 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
           target.gunAngle = target.angle;
 
           if (!target.isTurret && !target.cannotBeKnockbacked) {
-            target.vx = 0;
-            target.vy = 0;
             const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-            const recoilForce = isFinalStrike ? 38 : (4 + Math.random() * 2);
-            target.vx = Math.cos(pushAngle) * recoilForce;
-            target.vy = Math.sin(pushAngle) * recoilForce;
-            if (typeof target.applyKnockback === 'function') target.applyKnockback(target.vx, target.vy);
+            const recoilForce = isFinalStrike ? (CONFIG.toji?.ambushFlurryFinalRecoil || 38) : (6.5 + Math.random() * 2.5);
+            const kbX = Math.cos(pushAngle) * recoilForce;
+            const kbY = Math.sin(pushAngle) * recoilForce;
+            target.knockbackVx = kbX;
+            target.knockbackVy = kbY;
+            target.vx = kbX;
+            target.vy = kbY;
+            target.knockbackDecay = isFinalStrike ? 0.90 : 0.78;
+            if (typeof target.applyKnockback === 'function') target.applyKnockback(kbX, kbY);
           }
         }
 

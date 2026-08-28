@@ -965,12 +965,24 @@ canvas {
   border: 1.5px solid #FFFFFF !important;
 }
 
-/* Healthbar Text in Dark Mode: White */
+/* Healthbar Overlay HP Text in Dark Mode: Arcade Font & Crisp White */
 .arena-dark-mode .health-card__bar-text,
 .health-card.arena-dark-mode .health-card__bar-text {
-  color: #ffffff !important;
+  font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
+  font-size: 8px !important;
   font-weight: 700 !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95) !important;
+  letter-spacing: 0.5px !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 2px #000000 !important;
+  line-height: 1 !important;
+}
+
+.arena-dark-mode .tac-hp-badge,
+.arena-dark-mode .tac-hp,
+.arena-dark-mode .tac-hp-unit {
+  font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
+  font-size: 8.5px !important;
+  letter-spacing: 0.5px !important;
 }
 
 .arena-dark-mode .health-card__win-bullet,

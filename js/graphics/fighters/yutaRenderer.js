@@ -9,6 +9,68 @@ import { spawnBloodEffect } from '../particles/bloodEffect.js';
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
 import { renderYutaDomainBackground } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
 import { updateRika } from '../../entities/fighters/yuta/rikaLogic.js';
+import { drawYutaGhostSkin } from './yutaSkin.js';
+
+// Pre-seeded static data for Yuta Domain Channeling Pixel Art VFX (0 GC per Rule #12 & #16)
+const _YUTA_DOMAIN_EMBERS = Array.from({ length: 32 }, (_, i) => ({
+  angle: (i / 32) * Math.PI * 2 + (i * 0.47) % Math.PI,
+  distMult: 0.20 + ((i * 17) % 80) / 100, // 0.20 to 1.0 of ringRadius
+  speedY: 1.0 + ((i * 7) % 15) * 0.12,
+  size: (i % 3 === 0) ? 3 : (i % 2 === 0 ? 2 : 4), // 2px, 3px, 4px pixel blocks
+  phase: (i * 1.37) % (Math.PI * 2),
+  colorIdx: i % 4, // 0: White, 1: Hot Pink, 2: Deep Magenta, 3: Dark Violet
+  wobbleSpeed: 0.003 + ((i * 3) % 5) * 0.001,
+  wobbleAmp: 3 + (i % 4) * 2,
+}));
+
+const _YUTA_DOMAIN_FISSURES = [
+  { angle: 0.20, segments: [{ len: 0.35, off: 0.08 }, { len: 0.70, off: -0.12 }, { len: 1.0, off: 0.05 }] },
+  { angle: 1.15, segments: [{ len: 0.40, off: -0.10 }, { len: 0.75, off: 0.14 }, { len: 1.0, off: -0.06 }] },
+  { angle: 2.20, segments: [{ len: 0.30, off: 0.12 }, { len: 0.65, off: -0.09 }, { len: 1.0, off: 0.11 }] },
+  { angle: 3.35, segments: [{ len: 0.45, off: -0.07 }, { len: 0.80, off: 0.10 }, { len: 1.0, off: -0.04 }] },
+  { angle: 4.40, segments: [{ len: 0.35, off: 0.11 }, { len: 0.70, off: -0.13 }, { len: 1.0, off: 0.08 }] },
+  { angle: 5.50, segments: [{ len: 0.40, off: -0.09 }, { len: 0.75, off: 0.12 }, { len: 1.0, off: -0.05 }] },
+];
+
+function _drawPixelSteppedEllipse(ctx, cx, cy, rx, ry, P, color, thickness = 1) {
+  if (rx <= 0 || ry <= 0) return;
+  const snap = (v) => Math.round(v / P) * P;
+  const circum = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+  const steps = Math.max(16, Math.ceil(circum / P));
+  const stepAngle = (Math.PI * 2) / steps;
+
+  ctx.fillStyle = color;
+  for (let i = 0; i < steps; i++) {
+    const a = i * stepAngle;
+    const px = snap(cx + Math.cos(a) * rx);
+    const py = snap(cy + Math.sin(a) * ry);
+    ctx.fillRect(px, py, P * thickness, P * thickness);
+  }
+}
+
+function _drawPixelDiamond(ctx, cx, cy, size, P, coreColor, outerColor) {
+  const snap = (v) => Math.round(v / P) * P;
+  const s = snap(size);
+  // Outer Diamond Shell (Pass 1)
+  ctx.fillStyle = outerColor || '#111114';
+  for (let dy = -s - P; dy <= s + P; dy += P) {
+    const span = Math.max(0, (s + P) - Math.abs(dy));
+    for (let dx = -span; dx <= span; dx += P) {
+      ctx.fillRect(cx + dx, cy + dy, P, P);
+    }
+  }
+  // Inner Core Fill (Pass 2)
+  ctx.fillStyle = coreColor;
+  for (let dy = -s; dy <= s; dy += P) {
+    const span = Math.max(0, s - Math.abs(dy));
+    for (let dx = -span; dx <= span; dx += P) {
+      ctx.fillRect(cx + dx, cy + dy, P, P);
+    }
+  }
+  // White Specular Center Pixel
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(cx, cy, P, P);
+}
 
 const _yutaAuraCanvasCache = new Map();
 
@@ -98,23 +160,10 @@ export class YutaRenderer {
         ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
 
-        // 3. Phantom Body Silhouette Circle
-        ctx.beginPath();
-        ctx.arc(0, 0, fighter.r * 1.1, 0, Math.PI * 2);
-        ctx.fillStyle = '#FF1493'; // Vibrant Deep Pink
-        ctx.fill();
-        ctx.strokeStyle = '#FFFFFF'; // Crisp White Outline for extreme contrast
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
+        // 3. Phantom Body Ghost Skin Model (Rule 19 Compliant - Hair, Uniform, No Eyes)
+        drawYutaGhostSkin(ctx, 0, 0, 0, fighter.r, 0.95);
 
-        // 4. Directional Eye Glints (High-speed facing indicator)
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(fighter.r * 0.5, -fighter.r * 0.25, 3, 0, Math.PI * 2);
-        ctx.arc(fighter.r * 0.5, fighter.r * 0.25, 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 5. Extended Katana Phantom Blade Silhouette
+        // 4. Extended Katana Phantom Blade Silhouette
         const swordLength = 48;
         ctx.beginPath();
         ctx.moveTo(fighter.r * 0.6, 6);
@@ -194,6 +243,7 @@ export class YutaRenderer {
       ctx.save();
       ctx.translate(tremorX, tremorY);
       ctx.globalAlpha = fighter.rikaAlpha;
+      YutaRenderer._drawRikaYutaTether(ctx, fighter, rk, renderState);
       fighter._drawRikaCursedEnergyAura(ctx, opponent, renderState);
       fighter._drawRika(ctx, opponent, renderState);
       ctx.restore();
@@ -201,31 +251,191 @@ export class YutaRenderer {
 
     fighter.hideHpText = wasHidingHp;
     if (!fighter.hideHpText) {
+      ctx.save();
+      ctx.translate(tremorX, tremorY);
       FighterRenderer.drawHealth(ctx, fighter);
+      ctx.restore();
     }
   }
 
   static _drawDomainChannelAura(ctx, fighter) {
-    const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 180));
+    const maxCharge = Math.max(1, fighter.domainChargeMax || 180);
+    const progress = Math.min(1.0, Math.max(0, (fighter.domainChargeTimer || 0) / maxCharge));
+    if (progress <= 0) return;
+
+    const P = 2.0; // Standard 2.0px pixel art scale
+    const snap = (v) => Math.round(v / P) * P;
+    const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
     ctx.save();
-    ctx.translate(fighter.x, fighter.y);
+    ctx.translate(snap(fighter.x), snap(fighter.y - (fighter.z || 0)));
 
-    // 2. Isometric Ground Summoning Ring
-    ctx.scale(1, 0.45);
-    const ringRadius = 140 * progress;
+    const maxRadius = 150;
+    const currentR = Math.max(10, maxRadius * progress);
+    const isoAspect = 0.46; // Clean isometric floor perspective
 
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-    
-    // Fake glow for ring
-    ctx.lineWidth = 15;
-    ctx.strokeStyle = `rgba(255, 20, 147, ${progress * 0.3})`;
-    ctx.stroke();
+    // ── 1. GROUND STEPPED PIXEL DROP SHADOW (Dark Obsidian Core) ──
+    const shadowR = (fighter.r || 25) * 1.35;
+    ctx.fillStyle = 'rgba(14, 15, 20, 0.75)';
+    for (let dy = -shadowR * isoAspect; dy <= shadowR * isoAspect; dy += P) {
+      const prog = Math.abs(dy) / (shadowR * isoAspect);
+      const halfW = snap(Math.sqrt(Math.max(0, 1 - prog * prog)) * shadowR);
+      ctx.fillRect(-halfW, snap(dy), halfW * 2, P);
+    }
 
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = `rgba(255, 20, 147, ${progress})`;
-    ctx.stroke();
+    // ── 2. STEPPED PIXEL GROUND LIGHTNING FISSURES / VEINS ──
+    if (progress > 0.12) {
+      const fissureAlpha = Math.min(1.0, (progress - 0.12) / 0.35);
+      const pulseJitter = Math.sin(now * 0.02) * (P * 0.5);
+
+      for (let i = 0; i < _YUTA_DOMAIN_FISSURES.length; i++) {
+        const f = _YUTA_DOMAIN_FISSURES[i];
+        const baseAngle = f.angle + (i * 0.1);
+        let curX = 0;
+        let curY = 0;
+
+        for (let j = 0; j < f.segments.length; j++) {
+          const seg = f.segments[j];
+          const segDist = currentR * seg.len * 0.95;
+          const segAngle = baseAngle + seg.off;
+          const targetX = snap(Math.cos(segAngle) * segDist);
+          const targetY = snap(Math.sin(segAngle) * segDist * isoAspect);
+
+          // Draw stepped pixel line segment
+          const dx = targetX - curX;
+          const dy = targetY - curY;
+          const dist = Math.hypot(dx, dy);
+          const steps = Math.max(1, Math.ceil(dist / P));
+
+          for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const px = snap(curX + dx * t + (s % 2 === 0 ? pulseJitter : 0));
+            const py = snap(curY + dy * t);
+
+            // Outer dark ink pixel
+            ctx.fillStyle = `rgba(17, 17, 20, ${fissureAlpha * 0.85})`;
+            ctx.fillRect(px - P, py - P, P * 3, P * 3);
+
+            // Magenta vein pixel
+            ctx.fillStyle = `rgba(255, 20, 147, ${fissureAlpha * 0.95})`;
+            ctx.fillRect(px, py, P, P);
+
+            // Specular white center pixel on early segments
+            if (s % 3 === 0 && t < 0.6) {
+              ctx.fillStyle = `rgba(255, 255, 255, ${fissureAlpha})`;
+              ctx.fillRect(px, py, P, P);
+            }
+          }
+
+          curX = targetX;
+          curY = targetY;
+        }
+      }
+    }
+
+    // ── 3. EXPANDING STEPPED PIXEL ISOMETRIC CONCENTRIC RINGS ──
+    const outerRx = currentR;
+    const outerRy = currentR * isoAspect;
+
+    // Pass A: Outer Dark Manga Ink Shell
+    _drawPixelSteppedEllipse(ctx, 0, 0, outerRx + P, outerRy + P * isoAspect, P, `rgba(17, 17, 20, ${Math.min(1.0, progress * 1.2)})`, 2);
+
+    // Pass B: Radiant Primary Cursed Energy Ring (Magenta / Deep Pink)
+    _drawPixelSteppedEllipse(ctx, 0, 0, outerRx, outerRy, P, `rgba(255, 20, 147, ${progress})`, 1.5);
+
+    // Pass C: Hot Pink Highlight Ring
+    _drawPixelSteppedEllipse(ctx, 0, 0, outerRx - P, (outerRx - P) * isoAspect, P, `rgba(255, 105, 180, ${progress * 0.9})`, 1);
+
+    // Pass D: White Specular Pixel Glint Accents along Outer Ring
+    const glintCount = 16;
+    const glintRot = now * 0.0018;
+    ctx.fillStyle = `rgba(255, 255, 255, ${progress * 0.95})`;
+    for (let i = 0; i < glintCount; i++) {
+      const a = (i * (Math.PI * 2 / glintCount)) + glintRot;
+      const gx = snap(Math.cos(a) * outerRx);
+      const gy = snap(Math.sin(a) * outerRy);
+      ctx.fillRect(gx, gy, P, P);
+    }
+
+    // ── 4. SECONDARY INNER ROTATING STEPPED PIXEL RING ──
+    if (progress > 0.25) {
+      const innerRx = outerRx * 0.72;
+      const innerRy = innerRx * isoAspect;
+      const innerRot = -now * 0.0022;
+      const innerSteps = 32;
+
+      for (let i = 0; i < innerSteps; i++) {
+        // Dashed pixel pattern
+        if (i % 2 === 0) continue;
+        const a = (i * (Math.PI * 2 / innerSteps)) + innerRot;
+        const ix = snap(Math.cos(a) * innerRx);
+        const iy = snap(Math.sin(a) * innerRy);
+
+        // Dark ink backing
+        ctx.fillStyle = '#111114';
+        ctx.fillRect(ix - P * 0.5, iy - P * 0.5, P * 2, P * 2);
+
+        // Violet-pink cursed pixel
+        ctx.fillStyle = `rgba(217, 70, 239, ${progress})`;
+        ctx.fillRect(ix, iy, P, P);
+      }
+    }
+
+    // ── 5. 8-POINT STEPPED PIXEL CARDINAL / ORDINAL DIAMOND SEALS ──
+    if (progress > 0.30) {
+      const diamondScale = Math.min(1.0, (progress - 0.30) / 0.40);
+      const diamondSize = Math.max(P, snap(P * 2.5 * diamondScale));
+      const sealRot = now * 0.0008;
+
+      for (let i = 0; i < 8; i++) {
+        const isCardinal = (i % 2 === 0);
+        const a = (i * Math.PI / 4) + sealRot;
+        const dX = snap(Math.cos(a) * outerRx);
+        const dY = snap(Math.sin(a) * outerRy);
+
+        const coreCol = isCardinal ? '#FF1493' : '#D946EF';
+        _drawPixelDiamond(ctx, dX, dY, isCardinal ? diamondSize : diamondSize * 0.8, P, coreCol, '#111114');
+      }
+    }
+
+    // ── 6. RISING STEPPED PIXEL CURSED EMBERS / SOUL FLAME PARTICLES ──
+    for (let i = 0; i < _YUTA_DOMAIN_EMBERS.length; i++) {
+      const em = _YUTA_DOMAIN_EMBERS[i];
+      const maxRiseH = 110;
+      const travel = ((now * 0.06 * em.speedY + em.phase * 20) % maxRiseH);
+      const emberAlpha = Math.max(0, Math.min(1.0, 1.0 - (travel / maxRiseH))) * progress;
+
+      if (emberAlpha <= 0.02) continue;
+
+      const radialDist = outerRx * em.distMult * 0.90;
+      const wobble = Math.sin(now * em.wobbleSpeed + em.phase) * em.wobbleAmp;
+      const emX = snap(Math.cos(em.angle) * radialDist + wobble);
+      const emY = snap(Math.sin(em.angle) * (radialDist * isoAspect) - travel);
+
+      // Color Palette Ramp: [White Glint, Hot Pink, Radiant Magenta, Dark Violet]
+      let emColor;
+      if (em.colorIdx === 0) emColor = `rgba(255, 255, 255, ${emberAlpha * 0.95})`;
+      else if (em.colorIdx === 1) emColor = `rgba(255, 105, 180, ${emberAlpha * 0.90})`;
+      else if (em.colorIdx === 2) emColor = `rgba(255, 20, 147, ${emberAlpha * 0.85})`;
+      else emColor = `rgba(139, 0, 85, ${emberAlpha * 0.75})`;
+
+      // Dark ink outline for larger embers
+      if (em.size >= 3) {
+        ctx.fillStyle = `rgba(17, 17, 20, ${emberAlpha * 0.70})`;
+        ctx.fillRect(emX - P, emY - P, P * (em.size + 1), P * (em.size + 1));
+      }
+
+      ctx.fillStyle = emColor;
+      ctx.fillRect(emX, emY, P * em.size, P * em.size);
+    }
+
+    // ── 7. PERIODIC EXPANDING PIXEL SHOCKWAVE DIAMOND PULSE ──
+    const pulseCycle = (now * 0.002) % 1.0;
+    const pulseR = snap(currentR * pulseCycle);
+    const pulseAlpha = Math.max(0, (1.0 - pulseCycle) * 0.60 * progress);
+    if (pulseR > 10 && pulseAlpha > 0.05) {
+      _drawPixelSteppedEllipse(ctx, 0, 0, pulseR, pulseR * isoAspect, P, `rgba(255, 105, 180, ${pulseAlpha})`, 1);
+    }
 
     ctx.restore();
   }
@@ -240,7 +450,7 @@ export class YutaRenderer {
     );
 
     if (rk.killedInDomain || (isGojoDomainActive && (rk.isDying || rk.hp <= 0 || !rk.active))) {
-      return; // Do NOT render Rika white corpse inside Gojo's domain
+      return; // Do NOT render Rika corpse inside Gojo's domain
     }
 
     const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
@@ -261,8 +471,9 @@ export class YutaRenderer {
     ctx.scale(spawnScale, spawnScale);
 
     const r = (rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30;
+    const P = 2.2; // Pixel art unit grid scale
     const now = Date.now();
-    const pulse = Math.sin(now / 150) * (r * 0.06);
+    const pulse = Math.sin(now / 150) * (r * 0.05);
 
     let targetAngle = renderState ? renderState.targetAngle : 0;
     if (!renderState) {
@@ -291,51 +502,55 @@ export class YutaRenderer {
     // Rotate context so +x is forward facing
     ctx.rotate(targetAngle);
 
-    // 2. Trailing Shadow Tail extending naturally behind Rika's spine
+    // ── 1. PIXEL-ART GHOSTLY WHITE TRAILING SPIRIT TAIL (Connected Seamless Pixels) ──
     ctx.save();
-    const tailLen = r * 1.5;
-    const tailWave1 = Math.sin(now / 110) * 4;
-    const tailWave2 = Math.cos(now / 140) * 5;
+    const tailLen = r * 1.6;
+    const startTailX = -r * 0.2;
+    const endTailX = startTailX - tailLen;
 
-    const baseWidth = r * 0.28;
-    const midWidth = r * 0.16;
+    // Pass 1: Outer Dark Shadow Pixel Outline
+    ctx.fillStyle = '#111114';
+    for (let bx = startTailX; bx >= endTailX; bx -= P) {
+      const prog = Math.max(0, Math.min(1, (startTailX - bx) / tailLen));
+      const waveOffset = Math.sin((now / 140) + prog * 4) * (P * 1.8);
+      const halfH = Math.max(P * 0.6, (1.0 - prog * 0.75) * (r * 0.35));
 
-    ctx.beginPath();
-    // Top edge: extending backward behind Rika
-    ctx.moveTo(-r * 0.4, -baseWidth);
-    ctx.bezierCurveTo(
-      -r * 0.8, -midWidth + tailWave1,
-      -r * 1.2, tailWave2,
-      -tailLen, 0
-    );
-    // Bottom edge: returning to Rika's back
-    ctx.bezierCurveTo(
-      -r * 1.2, tailWave2,
-      -r * 0.8, midWidth + tailWave1,
-      -r * 0.4, baseWidth
-    );
-    ctx.closePath();
+      const px = Math.round(bx / P) * P;
+      const topY = Math.round((waveOffset - halfH - P) / P) * P;
+      const botY = Math.round((waveOffset + halfH + P) / P) * P;
+      const ph = botY - topY;
 
-    if (isGamePlay) {
-      ctx.fillStyle = '#210638';
-    } else {
-      const tailGrad = ctx.createLinearGradient(-r * 0.4, 0, -tailLen, 0);
-      tailGrad.addColorStop(0, '#420E63');
-      tailGrad.addColorStop(0.5, '#210638');
-      tailGrad.addColorStop(1, 'rgba(10, 0, 22, 0)');
-      ctx.fillStyle = tailGrad;
+      ctx.fillRect(px, topY, P, ph);
     }
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+
+    // Pass 2: Connected Stepped Pixel Fill
+    for (let bx = startTailX; bx >= endTailX; bx -= P) {
+      const prog = Math.max(0, Math.min(1, (startTailX - bx) / tailLen));
+      const waveOffset = Math.sin((now / 140) + prog * 4) * (P * 1.8);
+      const halfH = Math.max(P * 0.5, (1.0 - prog * 0.75) * (r * 0.32));
+
+      const px = Math.round(bx / P) * P;
+      const py = Math.round(waveOffset / P) * P;
+      const topY = Math.round((waveOffset - halfH) / P) * P;
+      const botY = Math.round((waveOffset + halfH) / P) * P;
+      const ph = Math.max(P, botY - topY);
+
+      // Ghostly bone-white gradient stepped fill
+      ctx.fillStyle = prog < 0.3 ? '#FFFFFF' : (prog < 0.7 ? '#E4E0EC' : '#B8B2C4');
+      ctx.fillRect(px, topY, P, ph);
+
+      // Center bright white core pixel
+      if (prog < 0.5) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(px, py - P * 0.5, P, P);
+      }
+    }
     ctx.restore();
 
     const attackTimer = rk.attackTimer || 0;
     const isAttacking = (attackTimer > 0 || (rk.leftArmTimer || 0) > 0);
 
-    // 3. Left & Right Top-Down Arms and Claws (reaching forward on both sides)
-    // Arms alternate: right fires immediately, left fires 30 frames later via its own timer.
+    // ── 2. PIXEL-ART TOP-DOWN ARMS AND CLAWS ──
     const rightArmTimer = rk.rightArmTimer || 0;
     const leftArmTimer = rk.leftArmTimer || 0;
 
@@ -344,150 +559,214 @@ export class YutaRenderer {
     // Right Arm (+y side)
     fighter._drawTopDownArmAndClaw(ctx, r * 0.2, r * 1.1, r * 1.3, r * 1.3, false, rightArmTimer, isGamePlay);
 
-    // 4. Main Torso Circle (Base Hull from top-down)
-    ctx.beginPath();
-    ctx.arc(0, 0, r + pulse * 0.5, 0, Math.PI * 2);
-    
-    if (isGamePlay) {
-      ctx.fillStyle = '#D2C8DC';
-    } else {
-      const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.2, 0, 0, r);
-      bodyGrad.addColorStop(0, '#F6F2FA');   // Bone highlight
-      bodyGrad.addColorStop(0.65, '#D2C8DC'); // Muscle grey
-      bodyGrad.addColorStop(1, '#4D3E5E');   // Outer shadow
-      ctx.fillStyle = bodyGrad;
-    }
-    
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Ribcage / Skeletal overlay on shoulders/back (skipped during active gameplay for speed)
-    if (!isGamePlay) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(70, 50, 90, 0.4)';
-      ctx.lineWidth = 2;
-      for (let i = -2; i <= 2; i++) {
-        ctx.beginPath();
-        ctx.arc(i * 4, 0, r * 0.6, -Math.PI * 0.4, Math.PI * 0.4);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-    const tendrilCount = isLowQuality ? 1 : (isGamePlay ? 3 : 5);
-    const numSegments = isLowQuality ? 3 : (isGamePlay ? 6 : 12);
-    const loopMin = isLowQuality ? 0 : (isGamePlay ? -1 : -2);
-    const loopMax = isLowQuality ? 0 : (isGamePlay ? 1 : 2);
-
-    for (let pass = 0; pass < 2; pass++) {
-      ctx.save();
-      ctx.strokeStyle = pass === 0 ? '#000000' : '#EBE5F2';
-      ctx.lineWidth = pass === 0 ? 5.5 : 3.5;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      for (let i = loopMin; i <= loopMax; i++) {
-        const offset = i * (isGamePlay ? 12 : 8); // Base y-spread
-
-        ctx.beginPath();
-        ctx.moveTo(r * 0.4, offset * 0.5); // Root on head
-
-        const tendrilLength = r * 2.5;
-
-        for (let s = 1; s <= numSegments; s++) {
-          const progress = s / numSegments;
-          const currentX = r * 0.4 - (tendrilLength * progress); // Extending backwards
-
-          // Wave amplitude grows towards the tip
-          const waveAmplitude = 14 * Math.pow(progress, 1.5);
-
-          // Traveling sine wave along the tendril's length
-          const waveY = Math.sin((now / 120) - (progress * 6) + i) * waveAmplitude;
-
-          // Tendrils spread out slightly more at the tips
-          const currentY = (offset * 0.5) + (offset * progress * 0.8) + waveY;
-
-          ctx.lineTo(currentX, currentY);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
-    } // end pass loop
-
-    // 6. Top-Down Head & Gaping Teeth Maw (Front Center at +x)
+    // ── 3. PIXEL-ART MAIN BONE-WHITE TORSO CIRCLE & SKELETAL RIBCAGE ──
     ctx.save();
-    // Head dome
-    ctx.beginPath();
-    ctx.ellipse(r * 0.5, 0, r * 0.45, r * 0.4, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#F8F5FA';
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    const torsoR = r + pulse * 0.4;
+    const steps = Math.ceil(torsoR / P);
 
-    // Head Shell Rib Lines (skipped during active gameplay)
-    if (!isGamePlay) {
-      ctx.strokeStyle = 'rgba(120, 100, 140, 0.4)';
-      ctx.lineWidth = 1.5;
-      for (let k = -2; k <= 2; k++) {
-        ctx.beginPath();
-        ctx.arc(r * 0.5, k * 4, r * 0.35, -Math.PI * 0.4, Math.PI * 0.4);
-        ctx.stroke();
+    // Outer Dark Pixel Ink Outline Shell
+    ctx.fillStyle = '#111114';
+    for (let gy = -steps; gy <= steps; gy++) {
+      for (let gx = -steps; gx <= steps; gx++) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d <= torsoR + P * 0.85) {
+          ctx.fillRect(Math.round(gx * P / P) * P, Math.round(gy * P / P) * P, P, P);
+        }
       }
     }
 
-    // Gaping Maw
-    const mouthOpen = isAttacking ? 16 : 8;
-    ctx.beginPath();
-    ctx.moveTo(r * 0.7, -mouthOpen * 0.5);
-    ctx.lineTo(r * 1.1, 0);
-    ctx.lineTo(r * 0.7, mouthOpen * 0.5);
-    ctx.closePath();
-    ctx.fillStyle = '#1A000A';
-    ctx.fill();
-
-    // Sharp Teeth inside maw (grouped path for massive Canvas draw call reduction)
-    ctx.fillStyle = '#FFFEE0';
-    ctx.beginPath();
-    for (let t = -3; t <= 3; t++) {
-      if (t === 0) continue;
-      const toothY = t * (mouthOpen * 0.12);
-      ctx.moveTo(r * 0.75, toothY);
-      ctx.lineTo(r * 0.9, toothY + (t > 0 ? 1 : -1));
-      ctx.lineTo(r * 0.8, toothY + (t > 0 ? 2 : -2));
+    // Base Bone-White Body (Stepped Pixel Fill)
+    for (let gy = -steps; gy <= steps; gy++) {
+      for (let gx = -steps; gx <= steps; gx++) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d <= torsoR) {
+          const rx = gx * P;
+          const ry = gy * P;
+          // Pure Bone-White Palette: Highlight (#FFFFFF), Body (#F8F6FA), Soft Silver-Slate Shadow (#D8D4E2 / #B8B2C4)
+          let col = '#FFFFFF';
+          if (rx < -torsoR * 0.3 || Math.abs(ry) > torsoR * 0.7) {
+            col = (rx < -torsoR * 0.65) ? '#B8B2C4' : '#D8D4E2';
+          } else if (rx > torsoR * 0.05 && Math.abs(ry) < torsoR * 0.5) {
+            col = '#FFFFFF';
+          } else {
+            col = '#F6F4FA';
+          }
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.round(rx / P) * P, Math.round(ry / P) * P, P, P);
+        }
+      }
     }
-    ctx.fill();
+
+    // Stepped Pixel Ribcage & Spinal Bone Segments on the Back/Shoulders
+    for (let rib = -2; rib <= 2; rib++) {
+      const ry = rib * (P * 3);
+      const rx = -torsoR * 0.35 + Math.abs(rib) * (P * 1.5);
+      const rw = P * 3.5;
+
+      // Dark seam under rib
+      ctx.fillStyle = '#22202A';
+      ctx.fillRect(Math.round(rx / P) * P, Math.round(ry / P) * P, rw, P);
+
+      // Raised pure white bone plate
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(Math.round(rx / P) * P + P, Math.round((ry - P) / P) * P, rw - P, P);
+    }
     ctx.restore();
 
-    // Attack Slash Ring Effect
-    if (isAttacking) {
-      ctx.strokeStyle = 'rgba(255, 180, 220, 0.8)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(r * 1.3, 0, 22, -Math.PI * 0.4, Math.PI * 0.4);
-      ctx.stroke();
+    // ── 4. PIXEL-ART FLOWING CONNECTED WHITE MANE & HAIR STRANDS (Zero Gaps) ──
+    ctx.save();
+    const hairStrandIndices = [-3, -2, -1, 0, 1, 2, 3];
+
+    hairStrandIndices.forEach((i) => {
+      const strandNorm = i / 3.0; // -1.0 to +1.0
+      const baseOffset = i * (P * 3.0);
+      const strandLen = r * (2.4 - Math.abs(strandNorm) * 0.7); // Center strands longer (~72px), outer strands slightly shorter (~51px)
+      const startX = r * 0.35 - Math.abs(strandNorm) * (r * 0.15); // Root starts naturally embedded in skull/torso
+      const endX = startX - strandLen;
+      const strandSeed = i * 1.35;
+
+      // Pass 1: Contiguous Dark Outline Pixels (drawn around the strand with no gaps)
+      ctx.fillStyle = '#111114';
+      for (let x = startX; x >= endX; x -= P) {
+        const prog = Math.max(0, Math.min(1, (startX - x) / strandLen));
+        const wave = Math.sin((now / 115) - (prog * 4.8) + strandSeed) * (P * 2.5 * Math.pow(prog, 1.25));
+        const cy = baseOffset * (1.0 + prog * 0.5) + wave;
+        const halfH = Math.max(P * 0.6, (1.0 - prog * 0.65) * (P * 1.6));
+
+        const px = Math.round(x / P) * P;
+        const topY = Math.round((cy - halfH - P) / P) * P;
+        const botY = Math.round((cy + halfH + P) / P) * P;
+        const ph = botY - topY;
+
+        ctx.fillRect(px, topY, P, ph);
+      }
+
+      // Pass 2: Contiguous Solid Stepped Pixel Fill (connected seamlessly with zero gaps)
+      for (let x = startX; x >= endX; x -= P) {
+        const prog = Math.max(0, Math.min(1, (startX - x) / strandLen));
+        const wave = Math.sin((now / 115) - (prog * 4.8) + strandSeed) * (P * 2.5 * Math.pow(prog, 1.25));
+        const cy = baseOffset * (1.0 + prog * 0.5) + wave;
+        const halfH = Math.max(P * 0.5, (1.0 - prog * 0.65) * (P * 1.4));
+
+        const px = Math.round(x / P) * P;
+        const py = Math.round(cy / P) * P;
+        const topY = Math.round((cy - halfH) / P) * P;
+        const botY = Math.round((cy + halfH) / P) * P;
+        const ph = Math.max(P, botY - topY);
+
+        // Gradient stepped bone-white palette
+        let col = '#FFFFFF';
+        if (prog > 0.75) {
+          col = '#C8C2D4';
+        } else if (prog > 0.4) {
+          col = '#EBE7F2';
+        } else {
+          col = '#FFFFFF';
+        }
+
+        ctx.fillStyle = col;
+        ctx.fillRect(px, topY, P, ph);
+
+        // Core bright highlight line along the center
+        if (prog < 0.55 && ph >= P * 1.8) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(px, py - P * 0.5, P, P);
+        }
+      }
+    });
+    ctx.restore();
+
+    // ── 5. PIXEL-ART BONE-WHITE HEAD DOME & GAPING MAW ──
+    ctx.save();
+    const headCenterX = r * 0.52;
+    const headR = r * 0.42;
+    const headSteps = Math.ceil(headR / P);
+
+    // Head Pixel Outline
+    ctx.fillStyle = '#111114';
+    for (let gy = -headSteps; gy <= headSteps; gy++) {
+      for (let gx = -headSteps; gx <= headSteps; gx++) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d <= headR + P * 0.8) {
+          ctx.fillRect(Math.round((headCenterX + gx * P) / P) * P, Math.round(gy * P / P) * P, P, P);
+        }
+      }
     }
 
-    // 8. Draw Spectacular Triple-Claw Slash Visuals on top of everything
+    // Head Dome Base Bone Fill (Pure White #FFFFFF / #F6F4FA)
+    for (let gy = -headSteps; gy <= headSteps; gy++) {
+      for (let gx = -headSteps; gx <= headSteps; gx++) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d <= headR) {
+          const rx = gx * P;
+          const ry = gy * P;
+          let col = '#FFFFFF';
+          if (rx < -headR * 0.2 || Math.abs(ry) > headR * 0.6) {
+            col = '#DCD8E6';
+          }
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.round((headCenterX + rx) / P) * P, Math.round(ry / P) * P, P, P);
+        }
+      }
+    }
+
+    // Cranial Suture Plate Cracks (Dark pixel cracks)
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(Math.round((headCenterX - P * 2) / P) * P, Math.round(-headR * 0.3 / P) * P, P * 4, P);
+    ctx.fillRect(Math.round(headCenterX / P) * P, Math.round(-headR * 0.6 / P) * P, P, P * 4);
+
+    // Gaping Maw Void (Abyssal Crimson-Black)
+    const mouthOpen = isAttacking ? 18 : 10;
+    ctx.fillStyle = '#140008';
+    ctx.beginPath();
+    ctx.moveTo(headCenterX + headR * 0.2, -mouthOpen * 0.5);
+    ctx.lineTo(headCenterX + headR * 1.3, 0);
+    ctx.lineTo(headCenterX + headR * 0.2, mouthOpen * 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sharp Stepped Pixel Teeth (Pure White Fangs)
+    ctx.fillStyle = '#FFFFFF';
+    for (let t = -3; t <= 3; t++) {
+      if (t === 0) continue;
+      const ty = t * (mouthOpen * 0.13);
+      const tx = headCenterX + headR * 0.3 + (4 - Math.abs(t)) * (P * 1.1);
+      const ptx = Math.round(tx / P) * P;
+      const pty = Math.round(ty / P) * P;
+
+      // Tooth block
+      ctx.fillRect(ptx, pty, P * 1.5, P);
+      // Tooth sharp tip
+      ctx.fillStyle = '#FFFFFA';
+      ctx.fillRect(ptx + (t > 0 ? P : -P) * 0.5 + P, pty, P, P);
+      ctx.fillStyle = '#FFFFFF';
+    }
+
+    // Glowing Pixel Cursed Eye Slit within the head
+    const eyeAlpha = 0.85 + Math.sin(now / 80) * 0.15;
+    ctx.fillStyle = `rgba(255, 20, 147, ${eyeAlpha})`;
+    const eyeX = Math.round((headCenterX + headR * 0.1) / P) * P;
+    const eyeY = 0;
+    ctx.fillRect(eyeX - P, eyeY - P, P * 3, P * 2);
+    // Pure White-Hot Center Pixel
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(eyeX, eyeY, P, P);
+
+    ctx.restore();
+
+    // ── 6. PIXEL-ART TRIPLE-CLAW SLASH VISUALS ──
     const rikaArmsForVisual = [ 
       { timer: rk.rightArmTimer || 0, isLeft: false }, 
       { timer: rk.leftArmTimer || 0, isLeft: true } 
     ];
-    
+
     try {
       rikaArmsForVisual.forEach(arm => {
         const armAttackTimer = arm.timer;
         const isLeftArm = arm.isLeft;
         if (armAttackTimer > 0) {
-          const sideSign = isLeftArm ? -1 : 1;
-          const startAng = 0.75 * sideSign;
-          const targetAng = -0.75 * sideSign;
-          
-          const idleDx = r * 1.1; 
-          const idleDy = r * 0.2 * sideSign;
-          const idleAngle = Math.atan2(idleDy, idleDx);
+          const startAng = 0.75 * (isLeftArm ? -1 : 1);
+          const targetAng = -0.75 * (isLeftArm ? -1 : 1);
           
           let slashActive = false;
           let slashProgress = 0;
@@ -519,36 +798,36 @@ export class YutaRenderer {
           
           if (slashActive && slashAlpha > 0.05) {
             ctx.save();
-            ctx.globalCompositeOperation = 'screen';
-            
             const clawRadii = [r * 1.5, r * 1.85, r * 2.2];
+            const startAngle = (isLeftArm ? 0 : 0) + startAng;
+            const endAngle = (isLeftArm ? 0 : 0) + (slashProgress === 1.0 ? targetAng : angleOffset);
+            const numSteps = 16;
             
-            const startAngle = idleAngle + startAng;
-            const endAngle = idleAngle + (slashProgress === 1.0 ? targetAng : angleOffset);
-            const anticlockwise = !isLeftArm;
-            
-            clawRadii.forEach((radius, index) => {
-               // Layer 1: Bright Purple outer backing
-               ctx.strokeStyle = `rgba(138, 43, 226, ${slashAlpha * 0.6})`;
-               ctx.lineWidth = 10 - index * 1.5;
-               ctx.lineCap = 'round';
-               ctx.beginPath();
-               ctx.arc(0, 0, radius, startAngle, endAngle, anticlockwise);
-               ctx.stroke();
-               
-               // Layer 2: Glowing Hot pink mid-layer
-               ctx.strokeStyle = `rgba(255, 20, 147, ${slashAlpha * 0.9})`;
-               ctx.lineWidth = 6 - index;
-               ctx.beginPath();
-               ctx.arc(0, 0, radius, startAngle, endAngle, anticlockwise);
-               ctx.stroke();
-               
-               // Layer 3: White-hot inner core
-               ctx.strokeStyle = `rgba(255, 255, 255, ${slashAlpha})`;
-               ctx.lineWidth = 2.5;
-               ctx.beginPath();
-               ctx.arc(0, 0, radius, startAngle, endAngle, anticlockwise);
-               ctx.stroke();
+            clawRadii.forEach((radius) => {
+              for (let s = 0; s <= numSteps; s++) {
+                const stepProg = s / numSteps;
+                const curA = startAngle + (endAngle - startAngle) * stepProg;
+                const ax = Math.cos(curA) * radius;
+                const ay = Math.sin(curA) * radius;
+
+                const sx = Math.round(ax / P) * P;
+                const sy = Math.round(ay / P) * P;
+                const sz = P * 2.0;
+
+                // Layer 1: Ethereal Silver/Lilac Glow Pixel
+                ctx.fillStyle = `rgba(220, 210, 240, ${slashAlpha * 0.8})`;
+                ctx.fillRect(sx - P, sy - P, sz + P * 2, sz + P * 2);
+
+                // Layer 2: Glowing Hot Pink Accent Pixel
+                ctx.fillStyle = `rgba(255, 20, 147, ${slashAlpha * 0.95})`;
+                ctx.fillRect(sx, sy, sz, sz);
+
+                // Layer 3: Pure White Core Pixel
+                if (stepProg > 0.3 && stepProg < 0.9) {
+                  ctx.fillStyle = `rgba(255, 255, 255, ${slashAlpha})`;
+                  ctx.fillRect(sx + P * 0.5, sy + P * 0.5, P, P);
+                }
+              }
             });
             ctx.restore();
           }
@@ -558,24 +837,35 @@ export class YutaRenderer {
       console.error("Error drawing Rika slash visual:", e);
     }
 
-    // 9. Draw Health Bar
-    if (rk.maxHp > 0 && rk.hp > 0) {
+    // ── 7. PIXEL-ART FLOATING HEALTH BAR (Upright in World Space above Rika's Model) ──
+    if (rk.maxHp > 0 && rk.hp > 0 && !rk.isDying) {
       ctx.save();
-      ctx.rotate(-targetAngle); // Un-rotate so health bar draws horizontally flat
+      // Counter-rotate targetAngle so the health bar ALWAYS stays horizontal and floats on top of Rika's model!
+      ctx.rotate(-targetAngle);
       
-      const hpRatio = Math.max(0, rk.hp / rk.maxHp);
-      const barW = r * 2.5;
+      const hpRatio = Math.max(0, Math.min(1, rk.hp / rk.maxHp));
+      const barW = Math.max(42, r * 1.8);
       const barH = 5.5;
       const barX = -barW / 2;
-      const barY = -r - 22; // Position clearly above her head
-
-      // Background frame
-      ctx.fillStyle = '#111';
-      ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+      const barY = -r * 1.45 - 8; // Floats statically on top (-Y) of Rika in world space
       
-      // Health fill color
-      ctx.fillStyle = (hpRatio > 0.5) ? '#2ecc71' : (hpRatio > 0.25) ? '#f1c40f' : '#e74c3c'; // Green for high health
-      ctx.fillRect(barX, barY, barW * hpRatio, barH);
+      // 1. Dark Shadow / Border
+      ctx.fillStyle = '#111114';
+      ctx.fillRect(Math.round(barX - 1.5), Math.round(barY - 1.5), Math.round(barW + 3), Math.round(barH + 3));
+
+      // 2. Empty Dark Trough
+      ctx.fillStyle = 'rgba(20, 20, 28, 0.9)';
+      ctx.fillRect(Math.round(barX), Math.round(barY), Math.round(barW), Math.round(barH));
+      
+      // 3. Dynamic Health Fill (Green -> Yellow -> Red)
+      const fillW = Math.round(barW * hpRatio);
+      if (fillW > 0) {
+        ctx.fillStyle = (hpRatio > 0.5) ? '#2ECC71' : (hpRatio > 0.25) ? '#F1C40F' : '#E74C3C';
+        ctx.fillRect(Math.round(barX), Math.round(barY), fillW, Math.round(barH));
+        // Top highlight glint line
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.fillRect(Math.round(barX), Math.round(barY), fillW, 1.5);
+      }
       
       ctx.restore();
     }
@@ -596,55 +886,42 @@ export class YutaRenderer {
   static _drawTopDownArmAndClaw(ctx, fighter, shoulderX, shoulderY, handX, handY, isLeft, attackTimer, isGamePlay = false) {
     ctx.save();
 
+    const P = 2.2; // Pixel art unit grid scale
     const sideSign = isLeft ? -1 : 1;
     const now = Date.now();
 
-    // Compute the idle arm vector (from shoulder to hand)
+    // Compute the idle arm vector
     const idleDx = handX - shoulderX;
     const idleDy = handY - shoulderY;
     const armLen = Math.sqrt(idleDx * idleDx + idleDy * idleDy);
-    const idleAngle = Math.atan2(idleDy, idleDx); // angle of idle arm
+    const idleAngle = Math.atan2(idleDy, idleDx);
 
     let angleOffset = 0;
-    let slashTrailAlpha = 0;
     let clawSpread = 0;
 
-    const startAng = 0.75 * sideSign;   // Outward wind-up angle offset (pull back)
-    const targetAng = -0.75 * sideSign; // Forward crossed slash angle offset (IN FRONT!)
-
-    let isSlashing = false;
-    let slashProgress = 0;
+    const startAng = 0.75 * sideSign;
+    const targetAng = -0.75 * sideSign;
 
     if (attackTimer > 0) {
       const p = Math.min(60, attackTimer);
       if (p > 52) {
         const t = (60 - p) / 8;
-        const eased = t * t;
-        angleOffset = startAng * eased;
-        clawSpread = 0.6 * eased;
+        angleOffset = startAng * (t * t);
+        clawSpread = 0.6 * (t * t);
       } else if (p > 42) {
         const t = (52 - p) / 10;
         const eased = 1 - Math.pow(1 - t, 3);
         angleOffset = startAng + (targetAng - startAng) * eased;
-        slashTrailAlpha = (1 - t) * 0.95;
         clawSpread = 0.6 - (1.1 * eased);
-        isSlashing = true;
-        slashProgress = t;
       } else {
         const t = p / 42;
         const eased = t * t;
         angleOffset = targetAng * eased;
         clawSpread = -0.3 * eased;
-        // Let the claw slash trail linger and fade out over 20 frames
-        if (p > 22) {
-          isSlashing = true;
-          slashProgress = 1.0;
-          slashTrailAlpha = ((p - 22) / 20) * 0.95;
-        }
       }
     }
 
-    // Emergence Arm Sweep & Finger Wave Animation (as she rises & pauses)
+    // Emergence Arm Sweep
     const isEmerging = (fighter.rika && fighter.rika.spawnTimer > 0);
     let emergenceAngleOffset = 0;
     let emergenceFingerFlex = 0;
@@ -652,9 +929,7 @@ export class YutaRenderer {
     if (isEmerging) {
       const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       const progress = 1 - (fighter.rika.spawnTimer / ariseMax);
-      // Arms sweep out wide during rise and pause moment
       emergenceAngleOffset = (Math.sin(progress * Math.PI) * 0.35 * sideSign);
-      // Dynamic finger wave flex as her clawed hands emerge
       emergenceFingerFlex = Math.sin((now / 100) + (isLeft ? 0 : 1.5)) * 0.22;
     }
 
@@ -664,97 +939,83 @@ export class YutaRenderer {
     const finalHandX = shoulderX + Math.cos(currentAngle) * armLen;
     const finalHandY = shoulderY + Math.sin(currentAngle) * armLen;
 
-    const elbowX = (shoulderX + finalHandX) * 0.5 + 10;
-    const elbowY = (shoulderY + finalHandY) * 0.5 + (20 * sideSign);
+    // ── 1. CONTINUOUS SOLID BONE-WHITE FOREARM (No zebra stripes / no excessive black) ──
+    const armSteps = 16; // Higher resolution for seamless contiguous connection
 
-    const wShoulder = 7;
-    const wWrist = 4.5;
+    // Pass 1: Outer Dark Contour Outline
+    ctx.fillStyle = '#111114';
+    for (let s = 0; s <= armSteps; s++) {
+      const prog = s / armSteps;
+      const ax = shoulderX + (finalHandX - shoulderX) * prog;
+      const ay = shoulderY + (finalHandY - shoulderY) * prog;
+      const armWidth = Math.max(P * 1.5, (6.5 - prog * 2.2) * P * 0.5);
+
+      const px = Math.round(ax / P) * P;
+      const py = Math.round(ay / P) * P;
+      const topY = Math.round((py - armWidth - P) / P) * P;
+      const botY = Math.round((py + armWidth + P) / P) * P;
+      const ph = botY - topY;
+
+      ctx.fillRect(px - P * 0.5, topY, P * 1.5, ph);
+    }
+
+    // Pass 2: Solid Stepped Bone-White Arm Body Fill
+    for (let s = 0; s <= armSteps; s++) {
+      const prog = s / armSteps;
+      const ax = shoulderX + (finalHandX - shoulderX) * prog;
+      const ay = shoulderY + (finalHandY - shoulderY) * prog;
+      const armWidth = Math.max(P * 1.2, (6.0 - prog * 2.2) * P * 0.5);
+
+      const px = Math.round(ax / P) * P;
+      const py = Math.round(ay / P) * P;
+      const topY = Math.round((py - armWidth) / P) * P;
+      const botY = Math.round((py + armWidth) / P) * P;
+      const ph = Math.max(P, botY - topY);
+
+      // Clean bright bone-white palette
+      let col = '#FFFFFF';
+      if (prog < 0.25) {
+        col = '#FFFFFF';
+      } else if (prog < 0.7) {
+        col = '#F8F6FC';
+      } else {
+        col = '#EAE4F2';
+      }
+
+      ctx.fillStyle = col;
+      ctx.fillRect(px, topY, P, ph);
+
+      // Subtle skeletal muscle ridge highlight
+      if (s % 2 === 0 && ph >= P * 2) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(px, py - P * 0.5, P, P);
+      }
+    }
+
+    // ── 2. PIXEL-ART PALM & 5-DIGIT WHITE CLAWS ──
+    ctx.save();
+    ctx.translate(finalHandX, finalHandY);
+    ctx.rotate(currentAngle);
+
+    // Pixel Palm (Clean Bone-White with subtle thin outline)
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(-P * 0.5, -P * 2.5, P * 6.5, P * 5);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, -P * 2, P * 5.5, P * 4);
+    // Subtle Palm Crease
+    ctx.fillStyle = '#E2DCED';
+    ctx.fillRect(P * 2, -P * 0.8, P, P * 1.6);
+
+    // 5 Pixel-Art White Claws
     const fingersData = [
-      { name: 'Thumb', baseX: 7, baseY: isLeft ? 5.5 : -5.5, len: 19, baseAngle: isLeft ? 0.65 : -0.65, thick: 4.2 },
-      { name: 'Index', baseX: 15, baseY: isLeft ? 3.5 : -3.5, len: 26, baseAngle: isLeft ? 0.22 : -0.22, thick: 4.0 },
-      { name: 'Middle', baseX: 16, baseY: 0, len: 29, baseAngle: 0, thick: 4.2 },
-      { name: 'Ring', baseX: 15, baseY: isLeft ? -3.5 : 3.5, len: 26, baseAngle: isLeft ? -0.22 : 0.22, thick: 3.8 },
-      { name: 'Pinky', baseX: 13, baseY: isLeft ? -5.5 : 5.5, len: 21, baseAngle: isLeft ? -0.45 : 0.45, thick: 3.2 }
+      { name: 'Thumb', baseX: 5, baseY: isLeft ? 5.5 : -5.5, len: 18, baseAngle: isLeft ? 0.65 : -0.65, thick: 3.6 },
+      { name: 'Index', baseX: 12, baseY: isLeft ? 3.5 : -3.5, len: 24, baseAngle: isLeft ? 0.22 : -0.22, thick: 3.6 },
+      { name: 'Middle', baseX: 14, baseY: 0, len: 27, baseAngle: 0, thick: 3.8 },
+      { name: 'Ring', baseX: 12, baseY: isLeft ? -3.5 : 3.5, len: 24, baseAngle: isLeft ? -0.22 : 0.22, thick: 3.4 },
+      { name: 'Pinky', baseX: 10, baseY: isLeft ? -5.5 : 5.5, len: 19, baseAngle: isLeft ? -0.45 : 0.45, thick: 3.0 }
     ];
     const flexIdle = ((attackTimer === 0) ? Math.sin(now / 400) * 0.05 : 0) + emergenceFingerFlex;
 
-    // Muscular Arm with tapering organic outline
-    ctx.save();
-    const armAngle = Math.atan2(finalHandY - shoulderY, finalHandX - shoulderX);
-    const nx = -Math.sin(armAngle);
-    const ny = Math.cos(armAngle);
-
-    ctx.beginPath();
-    ctx.moveTo(shoulderX + nx * wShoulder, shoulderY + ny * wShoulder);
-    ctx.quadraticCurveTo(elbowX + nx * 6, elbowY + ny * 6, finalHandX + nx * wWrist, finalHandY + ny * wWrist);
-    ctx.lineTo(finalHandX - nx * wWrist, finalHandY - ny * wWrist);
-    ctx.quadraticCurveTo(elbowX - nx * 6, elbowY - ny * 6, shoulderX - nx * wShoulder, shoulderY - ny * wShoulder);
-    ctx.closePath();
-
-    if (isGamePlay) {
-      ctx.fillStyle = '#D3C8DC';
-    } else {
-      const armGrad = ctx.createLinearGradient(shoulderX, shoulderY, finalHandX, finalHandY);
-      armGrad.addColorStop(0, '#EAE3F2');
-      armGrad.addColorStop(0.7, '#D3C8DC');
-      armGrad.addColorStop(1, '#B5A6C4');
-      ctx.fillStyle = armGrad;
-    }
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Muscle / Tendon line art on forearm
-    ctx.beginPath();
-    ctx.moveTo(shoulderX + nx * 2, shoulderY + ny * 2);
-    ctx.quadraticCurveTo(elbowX, elbowY, finalHandX + nx * 1, finalHandY + ny * 1);
-    ctx.strokeStyle = 'rgba(70, 45, 90, 0.35)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.restore();
-
-    // Hand Palm & Claws (Image 2 style organic hand rendering)
-    ctx.save();
-    ctx.translate(finalHandX, finalHandY);
-
-    // Rotate to point along forearm towards hand
-    const palmAngle = currentAngle;
-    ctx.rotate(palmAngle);
-
-    // 1. Organic Palm (Fleshy contoured palm base)
-    ctx.beginPath();
-    ctx.moveTo(0, -wWrist);
-    ctx.bezierCurveTo(6, -wWrist * 1.3, 12, -wWrist * 1.2, 16, -6);
-    ctx.bezierCurveTo(18, -2, 18, 2, 16, 6);
-    ctx.bezierCurveTo(10, wWrist * 1.3, 4, wWrist * 1.1, 0, wWrist);
-    ctx.closePath();
-
-    if (isGamePlay) {
-      ctx.fillStyle = '#D6CCE0';
-    } else {
-      const palmGrad = ctx.createRadialGradient(8, 0, 2, 8, 0, 16);
-      palmGrad.addColorStop(0, '#F6F2FA');
-      palmGrad.addColorStop(0.6, '#D6CCE0');
-      palmGrad.addColorStop(1, '#8A779E');
-      ctx.fillStyle = palmGrad;
-    }
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Palm Crease & Muscle Line Art (matching sketch style in Image 2)
-    ctx.beginPath();
-    ctx.moveTo(4, -3);
-    ctx.bezierCurveTo(9, -1, 13, 2, 15, 4);
-    ctx.moveTo(6, 3);
-    ctx.bezierCurveTo(10, 4, 13, 1, 15, -2);
-    ctx.strokeStyle = 'rgba(50, 30, 70, 0.4)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // 2. Organic Clawed Fingers (5 Digits matching Image 2 gesture)
     fingersData.forEach((f, idx) => {
       ctx.save();
       ctx.translate(f.baseX, f.baseY);
@@ -763,80 +1024,56 @@ export class YutaRenderer {
       ctx.rotate(curAngle);
 
       const l = f.len;
-      const w = f.thick;
+      const clawSteps = 12; // Higher step count for smooth continuous finger strands
 
-      const p1x = l * 0.4;
-      const p1y = isLeft ? -1.5 : 1.5;
+      // Pass 1: Finger Dark Contour Outline
+      ctx.fillStyle = '#111114';
+      for (let cs = 0; cs <= clawSteps; cs++) {
+        const cprog = cs / clawSteps;
+        const fx = cprog * l;
+        const fy = Math.pow(cprog, 1.5) * (isLeft ? 2.2 : -2.2);
+        const fw = Math.max(P * 0.5, (1.0 - cprog * 0.65) * (f.thick * 0.5));
 
-      const p2x = l * 0.75;
-      const p2y = isLeft ? 1.0 : -1.0;
+        const fpx = Math.round(fx / P) * P;
+        const fpy = Math.round(fy / P) * P;
+        const topY = Math.round((fpy - fw - P) / P) * P;
+        const botY = Math.round((fpy + fw + P) / P) * P;
+        const ph = botY - topY;
 
-      const tipX = l * 1.15;
-      const tipY = isLeft ? 3.5 : -3.5;
-
-      if (isGamePlay) {
-        // Fast simplified spiky claw triangle for gameplay (no expensive quadratic curves)
-        ctx.fillStyle = '#D2C6DE';
-        ctx.beginPath();
-        ctx.moveTo(0, -w * 0.4);
-        ctx.lineTo(tipX, tipY);
-        ctx.lineTo(0, w * 0.4);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      } else {
-        // Draw Organic Finger Body (Polygon / Path)
-        ctx.beginPath();
-        ctx.moveTo(0, -w * 0.5);
-        ctx.quadraticCurveTo(p1x, p1y - w * 0.45, p2x, p2y - w * 0.35);
-        ctx.lineTo(tipX, tipY);
-        ctx.lineTo(p2x, p2y + w * 0.35);
-        ctx.quadraticCurveTo(p1x, p1y + w * 0.45, 0, w * 0.5);
-        ctx.closePath();
-
-        const fingerGrad = ctx.createLinearGradient(0, 0, tipX, tipY);
-        fingerGrad.addColorStop(0, '#F8F5FA');
-        fingerGrad.addColorStop(0.5, '#D2C6DE');
-        fingerGrad.addColorStop(0.85, '#68547C');
-        fingerGrad.addColorStop(1, '#1E1029');
-        ctx.fillStyle = fingerGrad;
-        ctx.fill();
-
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
+        ctx.fillRect(fpx - P * 0.5, topY, P * 1.5, ph);
       }
 
-      if (!isGamePlay) {
-        // Rounded Knuckle Bulge (Joint 1)
-        ctx.beginPath();
-        ctx.arc(0, 0, w * 0.55, 0, Math.PI * 2);
-        ctx.fillStyle = '#E3D8EB';
-        ctx.fill();
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+      // Pass 2: Solid Bone-White Claw Finger Body Fill (Clean white with subtle gradient)
+      for (let cs = 0; cs <= clawSteps; cs++) {
+        const cprog = cs / clawSteps;
+        const fx = cprog * l;
+        const fy = Math.pow(cprog, 1.5) * (isLeft ? 2.2 : -2.2);
+        const fw = Math.max(P * 0.4, (1.0 - cprog * 0.65) * (f.thick * 0.45));
 
-        // Middle Joint (Joint 2) Crease Lines (Image 2 style)
-        ctx.beginPath();
-        ctx.moveTo(p1x, p1y - w * 0.4);
-        ctx.lineTo(p1x, p1y + w * 0.4);
-        ctx.moveTo(p1x + 2, p1y - w * 0.35);
-        ctx.lineTo(p1x + 2, p1y + w * 0.35);
-        ctx.strokeStyle = 'rgba(50, 25, 70, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        const fpx = Math.round(fx / P) * P;
+        const fpy = Math.round(fy / P) * P;
+        const topY = Math.round((fpy - fw) / P) * P;
+        const botY = Math.round((fpy + fw) / P) * P;
+        const ph = Math.max(P, botY - topY);
 
-        // Distal Talon / Nail highlight at tip
-        ctx.beginPath();
-        ctx.moveTo(p2x, p2y);
-        ctx.lineTo(tipX, tipY);
-        ctx.strokeStyle = '#12081A';
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
+        // Pure bone-white finger palette (minimal black, pure monstrous elegance)
+        let col = '#FFFFFF';
+        if (cprog > 0.9) {
+          col = '#C4BED0'; // Subtle dark tip accent
+        } else if (cprog > 0.5) {
+          col = '#F2EEF8';
+        } else {
+          col = '#FFFFFF';
+        }
+
+        ctx.fillStyle = col;
+        ctx.fillRect(fpx, topY, P, ph);
+
+        // Sharp White Specular Core along finger spine
+        if (cs < clawSteps - 1 && ph >= P * 1.6) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(fpx, fpy - P * 0.5, P, P);
+        }
       }
 
       ctx.restore();
@@ -854,478 +1091,149 @@ export class YutaRenderer {
     if (!showAura) return;
 
     const r = (rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30;
+    const P = 2.2;
     const now = Date.now();
-    const isGamePlay = renderState ? !!renderState.isHybrid : true;
 
-    // Stepped 30-frame anime animation loop (matching Yuta's 30fps Sakuga frame rate)
-    const frameRate = 30;
-    const frameIndex = Math.floor(Date.now() / (1000 / frameRate));
-    const time = frameIndex * 120;
-
-    let targetAngle = renderState ? renderState.targetAngle : 0;
-    if (!renderState) {
-      if (rk.timeStopTimer > 0 || rk.hitStunTimer > 0 || rk.isDying) {
-        targetAngle = rk.angle || 0;
-      } else {
-        if (opponent && !opponent.isDead) {
-          const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
-          if (opponent.isStealthed) {
-            let diff = desiredAngle - (rk.angle || 0);
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            targetAngle = (rk.angle || 0) + diff * (CONFIG.toji?.stealthTurnRate || 0.035);
-          } else {
-            targetAngle = desiredAngle;
-          }
-        } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
-          targetAngle = Math.atan2(rk.vy, rk.vx);
-        } else {
-          targetAngle = rk.angle || 0;
-        }
-      }
-    }
-
-    const yutaDx = fighter.x - rk.x;
-    const yutaDy = fighter.y - rk.y;
-    const cosA = Math.cos(-targetAngle);
-    const sinA = Math.sin(-targetAngle);
-    const localYutaX = yutaDx * cosA - yutaDy * sinA;
-    const localYutaY = yutaDx * sinA + yutaDy * cosA;
-
-    const rightArmTimer = rk.rightArmTimer || 0;
-    const leftArmTimer = rk.leftArmTimer || 0;
-
+    let targetAngle = renderState ? renderState.targetAngle : (rk.angle || 0);
     const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
-    const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
-    let ariseCeAlpha = 1.0;
-    if (rk.spawnTimer > 0) {
-      const progress = 1.0 - (rk.spawnTimer / ariseMax);
-      if (progress < 0.45) {
-        ariseCeAlpha = 0.0;
-      } else {
-        ariseCeAlpha = Math.min(1.0, (progress - 0.45) / 0.55);
-      }
-    }
-
     let drawX = renderState ? renderState.drawX : rk.x;
     let drawY = renderState ? renderState.drawY : rk.y;
-    if (!renderState && rk.spawnTimer > 0) {
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
-      const progress = 1 - (rk.spawnTimer / ariseMax);
-      const shakeAmt = (1.0 - progress * 0.4) * 5;
-      drawX += (Math.random() - 0.5) * shakeAmt;
-      drawY += (Math.random() - 0.5) * shakeAmt;
-    }
 
     ctx.save();
     ctx.translate(drawX, drawY);
     ctx.scale(spawnScale, spawnScale);
     ctx.rotate(targetAngle);
-    ctx.globalAlpha = (ctx.globalAlpha || 1.0) * ariseCeAlpha;
 
-    // === 1. Luminous Backlight ===
-    // Disabled for FPS optimization (removed screen composite + radial gradient glow)
+    // Stepped pixel cursed energy flame particles orbiting Rika
+    const numSparks = 14;
+    for (let sp = 0; sp < numSparks; sp++) {
+      const sparkSeed = sp * 77 + (now * 0.003);
+      const angle = (sp / numSparks) * Math.PI * 2 + Math.sin(sparkSeed) * 0.5;
+      const dist = r * 1.1 + (Math.sin(sparkSeed * 1.5) * r * 0.35);
+      const sx = Math.cos(angle) * dist;
+      const sy = Math.sin(angle) * dist;
 
-    // Helper: Draw a form-fitting Yuta-style flame path around points
-    const drawFlamePath = (pts, fillAlpha = 0.35) => {
-      const numPts = pts.length;
-      if (numPts < 3) return;
+      const px = Math.round(sx / P) * P;
+      const py = Math.round(sy / P) * P;
+      const pSize = (sp % 3 === 0) ? P * 2 : P;
 
-      let mx = (pts[numPts - 1].x + pts[0].x) / 2;
-      let my = (pts[numPts - 1].y + pts[0].y) / 2;
+      // Ethereal white/silver aura shell
+      ctx.fillStyle = 'rgba(230, 225, 245, 0.45)';
+      ctx.fillRect(px - P, py - P, pSize + P * 2, pSize + P * 2);
 
-      ctx.save();
+      // Glowing hot pink flame pixel
+      ctx.fillStyle = 'rgba(255, 20, 147, 0.75)';
+      ctx.fillRect(px, py, pSize, pSize);
 
-      // Soft concentric glow/bloom layer
-      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-      if (!isLowQuality) {
-        ctx.save();
-        ctx.scale(1.22, 1.22);
-        ctx.beginPath();
-        ctx.moveTo(mx, my);
-        for (let i = 0; i < numPts; i++) {
-          const p = pts[i];
-          const next = pts[(i + 1) % numPts];
-          ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-        }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(255, 105, 180, ${0.11 * ariseCeAlpha})`;
-        ctx.fill();
-        ctx.restore();
-      }
-
-      ctx.fillStyle = `rgba(255, 105, 180, ${fillAlpha})`;
-
-      ctx.beginPath();
-      ctx.moveTo(mx, my);
-      for (let i = 0; i < numPts; i++) {
-        const p = pts[i];
-        const next = pts[(i + 1) % numPts];
-        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // ink Outline
-      ctx.strokeStyle = '#000000';
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      mx = (pts[numPts - 1].x + pts[0].x) / 2;
-      my = (pts[numPts - 1].y + pts[0].y) / 2;
-      ctx.moveTo(mx, my);
-      for (let i = 0; i < numPts; i++) {
-        const p = pts[i];
-        const next = pts[(i + 1) % numPts];
-        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-      }
-      ctx.closePath();
-      ctx.stroke();
-
-      // Inner Light Pink Core Wash
-      let cx = 0, cy = 0;
-      pts.forEach(p => { cx += p.x; cy += p.y; });
-      cx /= numPts; cy /= numPts;
-
-      ctx.fillStyle = 'rgba(255, 192, 203, 0.40)';
-      ctx.beginPath();
-      let mx2 = (pts[numPts - 1].x + pts[0].x) / 2;
-      let my2 = (pts[numPts - 1].y + pts[0].y) / 2;
-      ctx.moveTo(cx + (mx2 - cx) * 0.7, cy + (my2 - cy) * 0.7);
-      for (let i = 0; i < numPts; i++) {
-        const p = pts[i];
-        const next = pts[(i + 1) % numPts];
-        const midX = (p.x + next.x) / 2;
-        const midY = (p.y + next.y) / 2;
-        const px = cx + (p.x - cx) * 0.7;
-        const py = cy + (p.y - cy) * 0.7;
-        const nx = cx + (midX - cx) * 0.7;
-        const ny = cy + (midY - cy) * 0.7;
-        ctx.quadraticCurveTo(px, py, nx, ny);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // Hatch Cuts (skipped in gameplay to optimize Electron performance)
-      if (!isGamePlay) {
-        ctx.globalAlpha = 0.9;
-        ctx.strokeStyle = '#000000';
-        ctx.lineCap = 'butt';
-
-        const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-        const isLowFps = (state.fps && state.fps < 55);
-        const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
-
-        for (let layer = 0; layer < insetScales.length; layer++) {
-          const scale = insetScales[layer];
-          const speedDir = (layer % 2 === 0 ? 1 : -1);
-          const flowTime = time * 0.003 * speedDir;
-
-          ctx.beginPath();
-          for (let i = 0; i < numPts; i++) {
-            const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
-            const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
-            const cutSeed = longWave + shortWave;
-            if (cutSeed < 0.25) continue;
-
-            const p = pts[i];
-            const next = pts[(i + 1) % numPts];
-
-            const psx = cx + (p.x - cx) * scale;
-            const psy = cy + (p.y - cy) * scale;
-            const nsx = cx + (next.x - cx) * scale;
-            const nsy = cy + (next.y - cy) * scale;
-
-            const jagX = Math.cos(i * 43) * 3;
-            const jagY = Math.sin(i * 43) * 3;
-
-            ctx.moveTo(psx, psy);
-            ctx.lineTo(nsx + jagX, nsy + jagY);
-          }
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
-        }
-      }
-
-      ctx.restore();
-    };
-
-    // Helper: Draw a form-fitting Yuta-style flame along a spine (for tendrils and tethers)
-    const drawFlameStroke = (spinePts, startW, endW) => {
-      const len = spinePts.length;
-      if (len < 2) return;
-
-      const extrude = (scale) => {
-        const poly = [];
-        for (let i = 0; i < len; i++) {
-          const p = spinePts[i];
-          let dx, dy;
-          if (i < len - 1) { dx = spinePts[i+1].x - p.x; dy = spinePts[i+1].y - p.y; }
-          else { dx = p.x - spinePts[i-1].x; dy = p.y - spinePts[i-1].y; }
-          const dist = Math.hypot(dx, dy);
-          let nx = 0, ny = -1;
-          if (dist > 0) { nx = -dy/dist; ny = dx/dist; }
-          const w = (startW + (endW - startW) * (i / (len - 1))) * scale;
-          poly.push({ x: p.x + nx * w, y: p.y + ny * w });
-        }
-        for (let i = len - 1; i >= 0; i--) {
-          const p = spinePts[i];
-          let dx, dy;
-          if (i > 0) { dx = p.x - spinePts[i-1].x; dy = p.y - spinePts[i-1].y; }
-          else { dx = spinePts[i+1].x - p.x; dy = spinePts[i+1].y - p.y; }
-          const dist = Math.hypot(dx, dy);
-          let nx = 0, ny = 1;
-          if (dist > 0) { nx = dy/dist; ny = -dx/dist; }
-          const w = (startW + (endW - startW) * (i / (len - 1))) * scale;
-          poly.push({ x: p.x + nx * w, y: p.y + ny * w });
-        }
-        return poly;
-      };
-
-      const fillPoly = extrude(1.0);
-      
-      ctx.save();
-      ctx.fillStyle = 'rgba(255, 105, 180, 0.75)';
-      ctx.beginPath();
-      ctx.moveTo(fillPoly[0].x, fillPoly[0].y);
-      for (let i = 1; i < fillPoly.length; i++) ctx.lineTo(fillPoly[i].x, fillPoly[i].y);
-      ctx.closePath();
-      ctx.fill();
-
-      // Batched outline stroke
-      ctx.strokeStyle = '#000000';
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      for (let i = 0; i < fillPoly.length - 1; i++) {
-        ctx.moveTo(fillPoly[i].x, fillPoly[i].y);
-        ctx.lineTo(fillPoly[i+1].x, fillPoly[i+1].y);
-      }
-      ctx.stroke();
-
-      const corePoly = extrude(0.7);
-      ctx.fillStyle = 'rgba(255, 192, 203, 0.85)';
-      ctx.beginPath();
-      ctx.moveTo(corePoly[0].x, corePoly[0].y);
-      for (let i = 1; i < corePoly.length; i++) ctx.lineTo(corePoly[i].x, corePoly[i].y);
-      ctx.closePath();
-      ctx.fill();
-
-      // Hatch Cuts (skipped in gameplay to optimize Electron performance)
-      if (!isGamePlay) {
-        ctx.globalAlpha = 0.9;
-        ctx.strokeStyle = '#000000';
-        ctx.lineCap = 'butt';
-
-        const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-        const isLowFps = (state.fps && state.fps < 55);
-        const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
-
-        for (let layer = 0; layer < insetScales.length; layer++) {
-          const scale = insetScales[layer];
-          const cutPoly = extrude(scale);
-          const speedDir = (layer % 2 === 0 ? 1 : -1);
-          const flowTime = time * 0.003 * speedDir;
-
-          ctx.beginPath();
-          for (let i = 0; i < cutPoly.length - 1; i++) {
-            const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
-            const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
-            const cutSeed = longWave + shortWave;
-            if (cutSeed < 0.25) continue;
-
-            const jagX = Math.cos(i * 43) * 2;
-            const jagY = Math.sin(i * 43) * 2;
-            ctx.moveTo(cutPoly[i].x, cutPoly[i].y);
-            ctx.lineTo(cutPoly[i+1].x + jagX, cutPoly[i+1].y + jagY);
-          }
-          ctx.lineWidth = 1.0;
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    };
-
-    // === 2. Tail Tether Flame ===
-    const tailWave1 = Math.sin(now / 100) * 7;
-    const tailWave2 = Math.cos(now / 130) * 9;
-    
-    const getBezierPt = (t, p0, p1, p2, p3) => {
-      const mt = 1 - t;
-      return {
-        x: mt*mt*mt*p0.x + 3*mt*mt*t*p1.x + 3*mt*t*t*p2.x + t*t*t*p3.x,
-        y: mt*mt*mt*p0.y + 3*mt*mt*t*p1.y + 3*mt*t*t*p2.y + t*t*t*p3.y
-      };
-    };
-
-    const tetherSpine = [];
-    const ts0 = { x: -r * 0.4, y: 0 };
-    const ts1 = { x: localYutaX * 0.35, y: localYutaY * 0.35 + tailWave1 };
-    const ts2 = { x: localYutaX * 0.7, y: localYutaY * 0.7 + tailWave2 };
-    const ts3 = { x: localYutaX, y: localYutaY };
-    const tsSegments = isGamePlay ? 6 : 12;
-    for (let i = 0; i <= tsSegments; i++) tetherSpine.push(getBezierPt(i/tsSegments, ts0, ts1, ts2, ts3));
-
-    drawFlameStroke(tetherSpine, r * 0.22 + 8, r * 0.06 + 5);
-
-    // === 3. Torso & Head Dome Form-Fitting Flame Body ===
-    const torsoHeadPts = [];
-    const numTH = isGamePlay ? 12 : 24;
-    for (let i = 0; i < numTH; i++) {
-      const a = (Math.PI * 2 / numTH) * i;
-      const cosA = Math.cos(a);
-      const headBonus = (cosA > 0) ? r * 0.45 * cosA : 0;
-      const baseR = r * 1.3 + headBonus;
-
-      const noise = Math.sin(a * 3.0 + time * 0.001) * 6 + Math.cos(a * 2.0 - time * 0.0012) * 4;
-      const radius = baseR + noise;
-
-      torsoHeadPts.push({
-        x: Math.cos(a) * radius,
-        y: Math.sin(a) * radius
-      });
-    }
-    drawFlamePath(torsoHeadPts);
-
-    // === 4. Wavy Crown Hair Tendrils Form-Fitting Flame Tubes (skipped in gameplay to optimize performance) ===
-    if (!isGamePlay) {
-      const tendrilMin = -2;
-      const tendrilMax = 2;
-      const tendrilSegments = 12;
-
-      for (let i = tendrilMin; i <= tendrilMax; i++) {
-        const offset = i * 8;
-        const tendrilLength = r * 2.5;
-
-        const tendrilSpine = [{ x: r * 0.4, y: offset * 0.5 }];
-        for (let s = 1; s <= tendrilSegments; s++) {
-          const progress = s / tendrilSegments;
-          const currentX = r * 0.4 - (tendrilLength * progress);
-          const waveAmplitude = 14 * Math.pow(progress, 1.5);
-          const waveY = Math.sin((now / 120) - (progress * 6) + i) * waveAmplitude;
-          const currentY = (offset * 0.5) + (offset * progress * 0.8) + waveY;
-          const flicker = Math.sin(time * 0.002 + s * 0.4 + i) * 2.5;
-          tendrilSpine.push({ x: currentX, y: currentY + flicker });
-        }
-        
-        drawFlameStroke(tendrilSpine, 6, 2.5);
+      // Specular white pixel
+      if (sp % 2 === 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.fillRect(px + P * 0.5, py + P * 0.5, P, P);
       }
     }
 
-    // === 5. Left & Right Form-Fitting Arm & Claw Flame Sleeves ===
-    const buildArmPoints = (isLeft, timer) => {
-      const sideSign = isLeft ? -1 : 1;
-      const shoulderX = r * 0.2;
-      const shoulderY = r * 1.1 * sideSign;
-      const handX = r * 1.3;
-      const handY = r * 1.3 * sideSign;
+    ctx.restore();
+  }
 
-      const idleDx = handX - shoulderX;
-      const idleDy = handY - shoulderY;
-      const armLen = Math.hypot(idleDx, idleDy);
-      const idleAngle = Math.atan2(idleDy, idleDx);
+  static _drawRikaYutaTether(ctx, fighter, rk, renderState = null) {
+    if (!fighter || !rk || !rk.active) return;
+    if (rk.killedInDomain || rk.isDying || rk.hp <= 0) return;
 
-      let angleOffset = 0;
-      let clawSpread = 0;
-      const startAng = 0.75 * sideSign;
-      const targetAng = -0.75 * sideSign;
+    const yutaX = fighter.x;
+    const yutaY = fighter.y;
+    const rikaX = renderState ? renderState.drawX : rk.x;
+    const rikaY = renderState ? renderState.drawY : rk.y;
+    const rikaAngle = renderState ? renderState.targetAngle : (rk.angle || 0);
+    const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
+    const rikaR = ((rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30) * spawnScale;
 
-      if (timer > 0) {
-        const p = Math.min(60, timer);
-        if (p > 52) {
-          const t = (60 - p) / 8;
-          angleOffset = startAng * (t * t);
-          clawSpread = 0.6 * (t * t);
-        } else if (p > 42) {
-          const t = (52 - p) / 10;
-          const eased = 1 - Math.pow(1 - t, 3);
-          angleOffset = startAng + (targetAng - startAng) * eased;
-          clawSpread = 0.6 - (1.1 * eased);
-        } else {
-          const t = p / 42;
-          angleOffset = targetAng * (t * t);
-          clawSpread = -0.3 * (t * t);
-        }
-      }
+    // Anchor at Rika's rear body along her facing angle
+    const rikaAnchorX = rikaX - Math.cos(rikaAngle) * (rikaR * 0.45);
+    const rikaAnchorY = rikaY - Math.sin(rikaAngle) * (rikaR * 0.45);
 
-      const idleBreath = (timer === 0) ? Math.sin(now / 800) * 0.03 : 0;
-      const currentAngle = idleAngle + angleOffset + idleBreath;
+    const dist = Math.hypot(rikaAnchorX - yutaX, rikaAnchorY - yutaY);
+    if (dist < 5) return;
 
-      const finalHandX = shoulderX + Math.cos(currentAngle) * armLen;
-      const finalHandY = shoulderY + Math.sin(currentAngle) * armLen;
+    const P = 2.2;
+    const isRCT = Boolean(fighter.isChannelingRCT);
 
-      const elbowX = (shoulderX + finalHandX) * 0.5 + 10;
-      const elbowY = (shoulderY + finalHandY) * 0.5 + (20 * sideSign);
+    // Color definitions strictly matching Yuta's Cursed Energy
+    const mainCeColor = isRCT ? 'rgba(50, 205, 50, 0.75)' : 'rgba(255, 20, 147, 0.75)';
+    const coreCeColor = isRCT ? 'rgba(144, 238, 144, 0.85)' : 'rgba(255, 105, 180, 0.85)';
+    const innerLightColor = isRCT ? 'rgba(200, 255, 200, 0.95)' : 'rgba(255, 192, 203, 0.95)';
+    const whiteHotColor = 'rgba(255, 255, 255, 0.95)';
 
-      const pad = 10;
+    const numSteps = Math.max(16, Math.min(60, Math.ceil(dist / (P * 2.2))));
 
-      if (isGamePlay) {
-        // Highly optimized simple arm capsule path for match gameplay
-        const rawPts = [
-          { x: shoulderX, y: shoulderY - pad * sideSign },
-          { x: elbowX, y: elbowY - pad * 1.2 * sideSign },
-          { x: finalHandX, y: finalHandY - pad * 0.8 * sideSign },
-          { x: finalHandX, y: finalHandY + pad * 0.8 * sideSign },
-          { x: elbowX, y: elbowY + pad * 1.2 * sideSign },
-          { x: shoulderX, y: shoulderY + pad * sideSign }
-        ];
-        return rawPts.map((p, idx) => {
-          const noise = Math.sin(idx * 2.3 + time * 0.0015) * 4;
-          return { x: p.x + noise, y: p.y + noise };
-        });
-      }
+    ctx.save();
 
-      const fingersData = [
-        { baseX: 7, baseY: isLeft ? 5.5 : -5.5, len: 19, baseAngle: isLeft ? 0.65 : -0.65 },
-        { baseX: 15, baseY: isLeft ? 3.5 : -3.5, len: 26, baseAngle: isLeft ? 0.22 : -0.22 },
-        { baseX: 16, baseY: 0, len: 29, baseAngle: 0 },
-        { baseX: 15, baseY: isLeft ? -3.5 : 3.5, len: 26, baseAngle: isLeft ? -0.22 : 0.22 },
-        { baseX: 13, baseY: isLeft ? -5.5 : 5.5, len: 21, baseAngle: isLeft ? -0.45 : 0.45 }
-      ];
+    // ── Layer 1: Dark Cursed Shadow Ink Outline (Static Non-Wiggling Vector) ──
+    ctx.fillStyle = '#111114';
+    for (let i = 0; i <= numSteps; i++) {
+      const t = i / numSteps;
+      const bx = yutaX + (rikaAnchorX - yutaX) * t;
+      const by = yutaY + (rikaAnchorY - yutaY) * t;
 
-      const cosP = Math.cos(currentAngle);
-      const sinP = Math.sin(currentAngle);
-      const flexIdle = (timer === 0) ? Math.sin(now / 400) * 0.05 : 0;
+      const halfW = (t * 0.65 + 0.35) * (rikaR * 0.30) + P * 0.8;
+      const px = Math.round(bx / P) * P;
+      const py = Math.round(by / P) * P;
+      const pw = Math.round((halfW * 2) / P) * P;
 
-      const fingerTips = fingersData.map((f, idx) => {
-        const curAngle = f.baseAngle + flexIdle + (clawSpread * (idx - 2) * 0.15);
-        const tipL = f.len * 1.15;
-        const localX = f.baseX + Math.cos(curAngle) * tipL;
-        const localY = f.baseY + Math.sin(curAngle) * tipL;
-        return {
-          x: finalHandX + (localX * cosP - localY * sinP),
-          y: finalHandY + (localX * sinP + localY * cosP)
-        };
-      });
+      ctx.fillRect(px - pw / 2, py - pw / 2, pw, pw);
+    }
 
-      const rawPts = [];
-      rawPts.push({ x: shoulderX, y: shoulderY - pad * sideSign });
-      rawPts.push({ x: elbowX, y: elbowY - pad * 1.2 * sideSign });
-      rawPts.push({ x: finalHandX, y: finalHandY - pad * 1.1 * sideSign });
+    // ── Layer 2: Main Cursed Energy Flame Body (Identical Color to Yuta's CE) ──
+    ctx.fillStyle = mainCeColor;
+    for (let i = 0; i <= numSteps; i++) {
+      const t = i / numSteps;
+      const bx = yutaX + (rikaAnchorX - yutaX) * t;
+      const by = yutaY + (rikaAnchorY - yutaY) * t;
 
-      const order = isLeft ? [0, 1, 2, 3, 4] : [4, 3, 2, 1, 0];
-      order.forEach(i => {
-        rawPts.push({
-          x: fingerTips[i].x + Math.cos(currentAngle) * pad * 0.8,
-          y: fingerTips[i].y + Math.sin(currentAngle) * pad * 0.8
-        });
-      });
+      const halfW = (t * 0.65 + 0.35) * (rikaR * 0.25);
+      const px = Math.round(bx / P) * P;
+      const py = Math.round(by / P) * P;
+      const pw = Math.max(P, Math.round((halfW * 2) / P) * P);
 
-      rawPts.push({ x: finalHandX, y: finalHandY + pad * 1.1 * sideSign });
-      rawPts.push({ x: elbowX, y: elbowY + pad * 1.2 * sideSign });
-      rawPts.push({ x: shoulderX, y: shoulderY + pad * sideSign });
+      ctx.fillRect(px - pw / 2, py - pw / 2, pw, pw);
+    }
 
-      return rawPts.map((p, idx) => {
-        const noise = Math.sin(idx * 2.3 + time * 0.0015) * 4;
-        return { x: p.x + noise, y: p.y + noise };
-      });
-    };
+    // ── Layer 3: Inner Radiant Cursed Energy Core ──
+    ctx.fillStyle = coreCeColor;
+    for (let i = 0; i <= numSteps; i++) {
+      const t = i / numSteps;
+      const bx = yutaX + (rikaAnchorX - yutaX) * t;
+      const by = yutaY + (rikaAnchorY - yutaY) * t;
 
-    if (!isGamePlay) {
-      drawFlamePath(buildArmPoints(true, leftArmTimer));
-      drawFlamePath(buildArmPoints(false, rightArmTimer));
+      const halfW = (t * 0.50 + 0.30) * (rikaR * 0.15);
+      const px = Math.round(bx / P) * P;
+      const py = Math.round(by / P) * P;
+      const pw = Math.max(P, Math.round((halfW * 2) / P) * P);
+
+      ctx.fillRect(px - pw / 2, py - pw / 2, pw, pw);
+    }
+
+    // ── Layer 4: Soft Light Pink Core ──
+    ctx.fillStyle = innerLightColor;
+    for (let i = 0; i <= numSteps; i += 2) {
+      const t = i / numSteps;
+      const bx = yutaX + (rikaAnchorX - yutaX) * t;
+      const by = yutaY + (rikaAnchorY - yutaY) * t;
+
+      const px = Math.round(bx / P) * P;
+      const py = Math.round(by / P) * P;
+      ctx.fillRect(px - P / 2, py - P / 2, P, P);
+    }
+
+    // ── Layer 5: Pure White Specular Filament Core ──
+    ctx.fillStyle = whiteHotColor;
+    for (let i = 2; i < numSteps; i += 4) {
+      const t = i / numSteps;
+      const bx = yutaX + (rikaAnchorX - yutaX) * t;
+      const by = yutaY + (rikaAnchorY - yutaY) * t;
+
+      const px = Math.round(bx / P) * P;
+      const py = Math.round(by / P) * P;
+      ctx.fillRect(px, py, P, P);
     }
 
     ctx.restore();
@@ -1571,45 +1479,14 @@ export class YutaRenderer {
   }
 
   static _drawYutaSwordStrap(ctx, fighter) {
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-    const facingLeft = Math.abs(fighter.gunAngle) > Math.PI / 2;
-    const baseAngle = facingLeft ? Math.PI : 0;
-    let diff = (fighter.gunAngle || 0) - baseAngle;
-    let normDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
-    if (facingLeft) {
-      normDiff = -normDiff;
-    }
-    ctx.rotate(baseAngle);
-    if (facingLeft) {
-      ctx.scale(1, -1);
-    }
-    ctx.rotate(normDiff * 0.7);
-
-    // Draw a thick strap over his right shoulder (+Y) and under his left arm (-Y)
-    ctx.strokeStyle = '#1A1A1A'; // Thick black leather strap
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-
-    ctx.beginPath();
-    ctx.moveTo(-12, -fighter.r + 2.5); // Top-left (shoulder region)
-    ctx.lineTo(12, fighter.r - 2.5);   // Bottom-right (underarm region)
-    ctx.stroke();
-
-    // A small gold buckle fitting in the middle of the chest strap
-    ctx.fillStyle = '#D4AF37';
-    ctx.fillRect(-2, -2, 4, 4);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 0.8;
-    ctx.strokeRect(-2, -2, 4, 4);
-
-    ctx.restore();
+    // Strap is cleanly and accurately rendered within drawYutaSkin
   }
 
   static _drawSpatialCracks(ctx, fighter) {
     if (!fighter.spatialCracks || fighter.spatialCracks.length === 0) return;
 
     ctx.save();
+    const P = 3.0; // Pixel art grid scale
     
     // We clean up expired cracks here
     let i = fighter.spatialCracks.length;
@@ -1623,42 +1500,96 @@ export class YutaRenderer {
 
       const progress = crack.timer / crack.maxTimer;
       const alpha = Math.max(0, progress);
-      const scale = 1 + (1 - progress) * 0.2; // slight expansion
+      const scale = 1 + (1 - progress) * 0.25;
       
       ctx.save();
       ctx.translate(crack.x, crack.y);
       ctx.rotate(crack.angle);
       ctx.scale(scale, scale);
-      
-      // Draw shattered space polygons (Sky Manipulation effect)
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.65)';
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 4;
       
-      // Draw 3 jagged polygons forming a fractured cone shape
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(120, -90);
-      ctx.lineTo(180, -45);
-      ctx.lineTo(240, 0);
-      ctx.lineTo(180, 45);
-      ctx.lineTo(120, 90);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      
-      // Inner deeper fracture lines
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(140, -30);
-      ctx.moveTo(0, 0);
-      ctx.lineTo(170, 0);
-      ctx.moveTo(0, 0);
-      ctx.lineTo(140, 30);
-      ctx.stroke();
+      // 1. Pixel-Art Fractured Sky Crystal Polygon Shards
+      const shardShapes = [
+        [ { x: 0, y: 0 }, { x: 90, y: -65 }, { x: 140, y: -30 }, { x: 70, y: 0 } ],
+        [ { x: 0, y: 0 }, { x: 140, y: -30 }, { x: 190, y: 0 }, { x: 130, y: 15 } ],
+        [ { x: 0, y: 0 }, { x: 130, y: 15 }, { x: 180, y: 40 }, { x: 80, y: 65 } ],
+        [ { x: 70, y: 0 }, { x: 190, y: 0 }, { x: 230, y: 0 }, { x: 160, y: -10 } ]
+      ];
+
+      shardShapes.forEach((pts, sIdx) => {
+        // Pixel Outline
+        ctx.fillStyle = '#111114';
+        for (let j = 0; j < pts.length; j++) {
+          const p1 = pts[j];
+          const p2 = pts[(j + 1) % pts.length];
+          const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+          const steps = Math.max(2, Math.round(dist / P));
+          for (let st = 0; st <= steps; st++) {
+            const rx = p1.x + (p2.x - p1.x) * (st / steps);
+            const ry = p1.y + (p2.y - p1.y) * (st / steps);
+            ctx.fillRect(Math.round(rx / P) * P - P * 0.5, Math.round(ry / P) * P - P * 0.5, P * 2, P * 2);
+          }
+        }
+
+        // Stepped Shard Body
+        const shardCol = (sIdx % 2 === 0) ? 'rgba(0, 255, 255, 0.75)' : 'rgba(180, 245, 255, 0.85)';
+        ctx.fillStyle = shardCol;
+        ctx.beginPath();
+        pts.forEach((pt, pIdx) => {
+          const px = Math.round(pt.x / P) * P;
+          const py = Math.round(pt.y / P) * P;
+          if (pIdx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+        ctx.fill();
+
+        // White-hot edge highlight pixels
+        ctx.fillStyle = '#FFFFFF';
+        for (let j = 0; j < pts.length; j++) {
+          const p1 = pts[j];
+          const p2 = pts[(j + 1) % pts.length];
+          const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+          const steps = Math.max(1, Math.round(dist / (P * 2)));
+          for (let st = 0; st <= steps; st++) {
+            const rx = p1.x + (p2.x - p1.x) * (st / steps);
+            const ry = p1.y + (p2.y - p1.y) * (st / steps);
+            ctx.fillRect(Math.round(rx / P) * P, Math.round(ry / P) * P, P, P);
+          }
+        }
+      });
+
+      // 2. Stepped Pixel Jagged Fissure Lines radiating from point of impact
+      const fissures = [
+        [ { x: 0, y: 0 }, { x: 45, y: -25 }, { x: 95, y: -45 }, { x: 155, y: -65 } ],
+        [ { x: 0, y: 0 }, { x: 55, y: 0 }, { x: 115, y: 5 }, { x: 185, y: 0 }, { x: 245, y: -5 } ],
+        [ { x: 0, y: 0 }, { x: 40, y: 20 }, { x: 90, y: 40 }, { x: 150, y: 65 } ]
+      ];
+
+      fissures.forEach(fiss => {
+        ctx.fillStyle = '#FFFFFF';
+        for (let j = 0; j < fiss.length - 1; j++) {
+          const p1 = fiss[j];
+          const p2 = fiss[j + 1];
+          const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+          const steps = Math.max(2, Math.round(dist / P));
+          for (let st = 0; st <= steps; st++) {
+            const rx = p1.x + (p2.x - p1.x) * (st / steps);
+            const ry = p1.y + (p2.y - p1.y) * (st / steps);
+            ctx.fillRect(Math.round(rx / P) * P, Math.round(ry / P) * P, P * 1.5, P * 1.5);
+          }
+        }
+      });
+
+      // 3. Floating shattered pixel glass embers
+      const numEmbers = 10;
+      for (let eb = 0; eb < numEmbers; eb++) {
+        const ebSeed = eb * 17.3 + (1 - progress) * 50;
+        const ebX = Math.round((40 + (eb % 5) * 35 + ebSeed * 0.4) / P) * P;
+        const ebY = Math.round(((eb % 3 - 1) * 30 + Math.sin(ebSeed) * 20) / P) * P;
+        ctx.fillStyle = (eb % 2 === 0) ? '#00FFFF' : '#FFFFFF';
+        ctx.fillRect(ebX, ebY, P, P);
+      }
 
       ctx.restore();
     }
@@ -1698,8 +1629,8 @@ export class YutaRenderer {
     // Draw the left hand (y = -14) punching forward
     ctx.translate(extension, -14);
 
-    // Left hand circle
-    ctx.fillStyle = fighter.color;
+    // Left hand circle (matching face skin tone)
+    ctx.fillStyle = fighter.skinColor || '#FABC95';
     ctx.beginPath();
     ctx.arc(0, 0, 7, 0, Math.PI * 2);
     ctx.fill();
@@ -1707,11 +1638,19 @@ export class YutaRenderer {
     ctx.lineWidth = 1.5;
     ctx.stroke();
     
-    // Draw cyan aura on the fist
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
-    ctx.beginPath();
-    ctx.arc(0, 0, 10, 0, Math.PI * 2);
-    ctx.fill();
+    // Draw cyan pixel-art aura on the fist
+    const P = 2.4;
+    const auraR = 10;
+    const auraSteps = Math.ceil(auraR / P);
+    for (let gy = -auraSteps; gy <= auraSteps; gy++) {
+      for (let gx = -auraSteps; gx <= auraSteps; gx++) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d <= auraR && d >= 5) {
+          ctx.fillStyle = (d > auraR * 0.75) ? 'rgba(0, 255, 255, 0.4)' : 'rgba(200, 255, 255, 0.8)';
+          ctx.fillRect(Math.round(gx * P / P) * P, Math.round(gy * P / P) * P, P, P);
+        }
+      }
+    }
 
     ctx.restore();
   }

@@ -651,81 +651,88 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       const totalStages = ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0));
       const isLevel8 = totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted;
 
+      const P = 2.4; // Pixel art grid scale
       const outerRadius = r + 68;
       const maxThick = 24.0;
-      const numSteps = 24;
+      const totalAngle = Math.abs(currentTipOffset - currentTailOffset);
+      const arcSteps = Math.max(16, Math.round((totalAngle * outerRadius) / (P * 1.5)));
 
-      // 1. Soft Divine Radiance Volumetric Glow Arc
-      ctx.beginPath();
-      for (let i = 0; i <= numSteps; i++) {
-        const t = i / numSteps;
+      // Pass 1: Pixel-Art Dark Ink Outline Shell
+      ctx.fillStyle = `rgba(17, 17, 20, ${0.92 * trailAlpha})`;
+      for (let i = 0; i <= arcSteps; i++) {
+        const t = i / arcSteps;
         const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-        const rad = outerRadius + taper * 4.5;
-        const px = Math.cos(ang) * rad;
-        const py = Math.sin(ang) * rad;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      for (let i = numSteps; i >= 0; i--) {
-        const t = i / numSteps;
-        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-        const rad = outerRadius - (maxThick * taper) - taper * 3.5;
-        const px = Math.cos(ang) * rad;
-        const py = Math.sin(ang) * rad;
-        ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fillStyle = isLevel8
-        ? `rgba(255, 110, 0, ${0.48 * trailAlpha})`
-        : `rgba(255, 191, 0, ${0.38 * trailAlpha})`;
-      ctx.fill();
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
+        const rad = outerRadius + taper * 2.0;
+        const thick = (maxThick * taper) + P * 2;
+        const innerRad = rad - thick;
 
-      // 2. Main Divine Gold / Fiery Crescent Core Body
-      ctx.beginPath();
-      for (let i = 0; i <= numSteps; i++) {
-        const t = i / numSteps;
-        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-        const rad = outerRadius + taper * 1.5;
-        const px = Math.cos(ang) * rad;
-        const py = Math.sin(ang) * rad;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+        const numRadSteps = Math.max(2, Math.round(thick / P));
+        for (let ri = 0; ri <= numRadSteps; ri++) {
+          const currentR = innerRad + (ri / numRadSteps) * thick;
+          const rawX = Math.cos(ang) * currentR;
+          const rawY = Math.sin(ang) * currentR;
+          const px = Math.round(rawX / P) * P;
+          const py = Math.round(rawY / P) * P;
+          ctx.fillRect(px, py, P, P);
+        }
       }
-      for (let i = numSteps; i >= 0; i--) {
-        const t = i / numSteps;
-        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-        const rad = outerRadius - (maxThick * taper);
-        const px = Math.cos(ang) * rad;
-        const py = Math.sin(ang) * rad;
-        ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fillStyle = isLevel8
-        ? `rgba(255, 140, 0, ${0.92 * trailAlpha})`
-        : `rgba(255, 215, 0, ${0.88 * trailAlpha})`;
-      ctx.fill();
 
-      // 3. Searing White-Gold Cutting Edge Line
-      ctx.beginPath();
-      for (let i = 0; i <= numSteps; i++) {
-        const t = i / numSteps;
+      // Pass 2: Stepped Pixel Divine Gold / Fiery Core
+      for (let i = 0; i <= arcSteps; i++) {
+        const t = i / arcSteps;
         const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-        const rad = outerRadius + taper * 1.5;
-        const px = Math.cos(ang) * rad;
-        const py = Math.sin(ang) * rad;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
+        const rad = outerRadius + taper * 1.0;
+        const thick = maxThick * taper;
+        const innerRad = rad - thick;
+
+        const numRadSteps = Math.max(1, Math.round(thick / P));
+        for (let ri = 0; ri <= numRadSteps; ri++) {
+          const rNorm = ri / numRadSteps; // 0 = inner, 1 = outer edge
+          const currentR = innerRad + rNorm * thick;
+          const rawX = Math.cos(ang) * currentR;
+          const rawY = Math.sin(ang) * currentR;
+          const px = Math.round(rawX / P) * P;
+          const py = Math.round(rawY / P) * P;
+
+          let col;
+          if (isLevel8) {
+            if (rNorm > 0.85) col = '#FFFFFF';
+            else if (rNorm > 0.6) col = '#FFA500';
+            else if (rNorm > 0.3) col = '#FF4500';
+            else col = '#8B0000';
+          } else {
+            if (rNorm > 0.85) col = '#FFFFE0';
+            else if (rNorm > 0.6) col = '#FFD700';
+            else if (rNorm > 0.3) col = '#DAA520';
+            else col = '#8B6508';
+          }
+
+          ctx.fillStyle = col;
+          ctx.fillRect(px, py, P, P);
+        }
+
+        // Pass 3: Leading Searing White-Gold Cutting Edge Pixels
+        const leadRawX = Math.cos(ang) * (outerRadius + taper * 1.0);
+        const leadRawY = Math.sin(ang) * (outerRadius + taper * 1.0);
+        const lpx = Math.round(leadRawX / P) * P;
+        const lpy = Math.round(leadRawY / P) * P;
+        ctx.fillStyle = isLevel8 ? '#FFFFFF' : '#FFFFEE';
+        ctx.fillRect(lpx, lpy, P, P);
       }
-      ctx.strokeStyle = isLevel8
-        ? `rgba(255, 255, 255, ${0.98 * trailAlpha})`
-        : `rgba(255, 255, 230, ${0.96 * trailAlpha})`;
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
+
+      // Pass 4: Trailing Pixel Sparks
+      const numEmbers = 8;
+      for (let eb = 0; eb < numEmbers; eb++) {
+        const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
+        const ebAng = currentTailOffset + ebT * (currentTipOffset - currentTailOffset);
+        const ebDist = outerRadius - 10 - eb * 4;
+        const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
+        const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+        ctx.fillStyle = isLevel8 ? ((eb % 2 === 0) ? '#FF4500' : '#FFFFFF') : ((eb % 2 === 0) ? '#FFD700' : '#FFFFFF');
+        ctx.fillRect(ex, ey, P, P);
+      }
 
       ctx.restore();
     }

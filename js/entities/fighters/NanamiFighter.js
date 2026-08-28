@@ -308,8 +308,8 @@ export class NanamiFighter extends Fighter {
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
     if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-      this.punchAnimTimer = 0;
-      this.slashSwingTimer = 0;
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+      if (this.slashSwingTimer > 0) this.slashSwingTimer--;
       this.hitFlashTimer = 0;
     }
 

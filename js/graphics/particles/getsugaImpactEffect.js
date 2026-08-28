@@ -214,6 +214,9 @@ export function updateGetsugaImpactEffects() {
 export function drawGetsugaImpactEffects(ctx) {
   if (_activeEffects.length === 0) return;
 
+  const P = 2.4; // Pixel art grid scale
+  const snap = (v) => Math.round(v / P) * P;
+
   ctx.save();
 
   for (let i = 0; i < _activeEffects.length; i++) {
@@ -224,7 +227,7 @@ export function drawGetsugaImpactEffects(ctx) {
     const isHollow = p.form === 'hollow' || p.form === 'bankai_hollow';
 
     // ─────────────────────────────────────────────────────────────
-    // 1. SPATIAL CLEAVE SCAR (Double-tapered crescent slice)
+    // 1. SPATIAL CLEAVE SCAR (Stepped Pixel Crescent Slice)
     // ─────────────────────────────────────────────────────────────
     if (p.type === 'slice') {
       ctx.save();
@@ -233,68 +236,81 @@ export function drawGetsugaImpactEffects(ctx) {
 
       const halfL = p.length * 0.5;
       const maxThick = p.thickness * p.alpha;
+      const steps = Math.max(10, Math.round(p.length / (P * 1.5)));
 
-      // Outer Reiatsu Glow Bloom
-      ctx.beginPath();
-      ctx.moveTo(-halfL, 0);
-      ctx.quadraticCurveTo(0, -maxThick * 1.5 + p.curve * 10, halfL, 0);
-      ctx.quadraticCurveTo(0, maxThick * 1.5 + p.curve * 10, -halfL, 0);
-      ctx.closePath();
+      // Pass 1: Pixel Outer Glow Shell
       ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.alpha * 0.55;
-      ctx.fill();
+      ctx.globalAlpha = p.alpha * 0.65;
+      for (let s = 0; s <= steps; s++) {
+        const t = (s / steps) * 2 - 1; // -1 to 1
+        const xPos = snap(t * halfL);
+        const curveOff = (1 - t * t) * p.curve * 8;
+        const curThick = (1 - t * t) * (maxThick + P * 2);
+        const topY = snap(-curThick * 0.5 + curveOff);
+        const botY = snap(curThick * 0.5 + curveOff);
+        ctx.fillRect(xPos, topY, P, Math.max(P, botY - topY));
+      }
 
-      // Pitch-Black Kuroi Void Core (or Pure White core for Shikai)
-      ctx.beginPath();
-      ctx.moveTo(-halfL * 0.9, 0);
-      ctx.quadraticCurveTo(0, -maxThick * 0.85 + p.curve * 8, halfL * 0.9, 0);
-      ctx.quadraticCurveTo(0, maxThick * 0.85 + p.curve * 8, -halfL * 0.9, 0);
-      ctx.closePath();
+      // Pass 2: Stepped Core
       ctx.fillStyle = isBankai ? p.voidColor : p.accentColor;
       ctx.globalAlpha = p.alpha * 0.95;
-      ctx.fill();
+      for (let s = 0; s <= steps; s++) {
+        const t = (s / steps) * 2 - 1;
+        const xPos = snap(t * halfL * 0.85);
+        const curveOff = (1 - t * t) * p.curve * 8;
+        const curThick = (1 - t * t) * maxThick * 0.6;
+        const topY = snap(-curThick * 0.5 + curveOff);
+        const botY = snap(curThick * 0.5 + curveOff);
+        ctx.fillRect(xPos, topY, P, Math.max(P, botY - topY));
+      }
 
-      // Sharp Cutting Edge Center Needle
-      ctx.beginPath();
-      ctx.moveTo(-halfL * 1.05, 0);
-      ctx.lineTo(halfL * 1.05, 0);
-      ctx.strokeStyle = p.accentColor;
-      ctx.lineWidth = isBankai ? 2.2 : 1.8;
+      // Pass 3: White-Hot Center Needle Spine
+      ctx.fillStyle = p.accentColor;
       ctx.globalAlpha = p.alpha * 0.98;
-      ctx.stroke();
+      for (let xPos = -halfL * 0.95; xPos <= halfL * 0.95; xPos += P) {
+        ctx.fillRect(snap(xPos), snap(p.curve * 4), P, P);
+      }
 
       ctx.restore();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 2. EXPANDING REIATSU SHOCKWAVE RING
+    // 2. EXPANDING REIATSU SHOCKWAVE RING (Stepped Pixel Ring)
     // ─────────────────────────────────────────────────────────────
     else if (p.type === 'ring') {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
-      ctx.beginPath();
-      // Elliptical shockwave elongated along the wave cutting axis
-      ctx.ellipse(0, 0, p.size, p.size * 0.65, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = Math.max(1.0, p.thickness * p.alpha);
-      ctx.globalAlpha = p.alpha * 0.80;
-      ctx.stroke();
 
-      // Inner white-hot shockwave trim
-      if (p.alpha > 0.4) {
-        ctx.beginPath();
-        ctx.ellipse(0, 0, p.size * 0.85, p.size * 0.55, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = p.accentColor;
-        ctx.lineWidth = 1.0;
-        ctx.globalAlpha = p.alpha * 0.65;
-        ctx.stroke();
+      const rX = p.size;
+      const rY = p.size * 0.65;
+      const ringSteps = Math.max(14, Math.round((Math.PI * 2 * rX) / (P * 2)));
+
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.alpha * 0.80;
+      for (let s = 0; s <= ringSteps; s++) {
+        const ang = (s / ringSteps) * Math.PI * 2;
+        const px = snap(Math.cos(ang) * rX);
+        const py = snap(Math.sin(ang) * rY);
+        ctx.fillRect(px, py, P, P);
       }
+
+      if (p.alpha > 0.4) {
+        ctx.fillStyle = p.accentColor;
+        ctx.globalAlpha = p.alpha * 0.65;
+        for (let s = 0; s <= ringSteps; s += 2) {
+          const ang = (s / ringSteps) * Math.PI * 2;
+          const px = snap(Math.cos(ang) * rX * 0.85);
+          const py = snap(Math.sin(ang) * rY * 0.85);
+          ctx.fillRect(px, py, P, P);
+        }
+      }
+
       ctx.restore();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 3. EXPLODING NEEDLE SPARKS (4-point filled needle polygons)
+    // 3. EXPLODING NEEDLE SPARKS (Stepped Pixel Needle Streaks)
     // ─────────────────────────────────────────────────────────────
     else if (p.type === 'needle') {
       ctx.save();
@@ -302,50 +318,43 @@ export function drawGetsugaImpactEffects(ctx) {
       ctx.rotate(p.angle);
 
       const len = p.length;
-      const th = p.thickness * p.alpha;
+      const th = Math.max(P, p.thickness * p.alpha);
+      const steps = Math.max(4, Math.round(len / P));
 
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(len * 0.35, -th);
-      ctx.lineTo(len, 0);
-      ctx.lineTo(len * 0.35, th);
-      ctx.closePath();
       ctx.fillStyle = p.color;
       ctx.globalAlpha = p.alpha * 0.95;
-      ctx.fill();
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const lx = snap(t * len);
+        const bulge = Math.sin(t * Math.PI) * th;
+        const topY = snap(-bulge * 0.5);
+        const botY = snap(bulge * 0.5);
+        ctx.fillRect(lx, topY, P, Math.max(P, botY - topY));
+      }
 
-      // White-hot needle core
-      ctx.beginPath();
-      ctx.moveTo(len * 0.1, 0);
-      ctx.lineTo(len * 0.4, -th * 0.4);
-      ctx.lineTo(len * 0.85, 0);
-      ctx.lineTo(len * 0.4, th * 0.4);
-      ctx.closePath();
+      // White-Hot Leading Tip
       ctx.fillStyle = p.accentColor;
-      ctx.globalAlpha = p.alpha * 0.80;
-      ctx.fill();
+      ctx.fillRect(snap(len * 0.8), 0, P, P);
 
       ctx.restore();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 4. RISING SPIRITUAL PRESSURE SMOKE WISPS
+    // 4. RISING SPIRITUAL PRESSURE SMOKE WISPS (Stepped Pixel Clusters)
     // ─────────────────────────────────────────────────────────────
     else if (p.type === 'smoke') {
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.alpha * 0.45;
-      ctx.fill();
-
-      if (isBankai) {
-        // Dark inner smoke nucleus
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * 0.55, 0, Math.PI * 2);
-        ctx.fillStyle = p.voidColor;
-        ctx.globalAlpha = p.alpha * 0.65;
-        ctx.fill();
+      ctx.globalAlpha = p.alpha * 0.55;
+      const smokeR = p.size;
+      const gR = Math.ceil(smokeR / P);
+      for (let gy = -gR; gy <= gR; gy++) {
+        for (let gx = -gR; gx <= gR; gx++) {
+          const dist = Math.sqrt(gx * gx + gy * gy) * P;
+          if (dist <= smokeR) {
+            ctx.fillStyle = (dist < smokeR * 0.5 && isBankai) ? p.voidColor : p.color;
+            ctx.fillRect(snap(p.x + gx * P), snap(p.y + gy * P), P, P);
+          }
+        }
       }
       ctx.restore();
     }

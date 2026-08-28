@@ -364,10 +364,10 @@ export function updateHybridEnvironment() {
   if (yuta) {
     const data = getYutaDomainHybridData();
     if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
-    data.sprite.x = -20;
-    data.sprite.y = -20;
-    data.sprite.width = state.canvas.width + 40;
-    data.sprite.height = state.canvas.height + 40;
+    data.sprite.x = 0;
+    data.sprite.y = 0;
+    data.sprite.width = state.canvas.width;
+    data.sprite.height = state.canvas.height;
     if (updateYuta) {
       data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
       renderYutaDomainBackground(yuta, data.ctx, isMultiDomain && yuta !== state.fighters.find(f => f.domainActive));

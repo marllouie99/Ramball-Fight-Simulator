@@ -125,12 +125,18 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             ent.applyHitStun(8);
           }
           
-          const arena = state.arena || CONFIG.arena;
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          const r = ent.r || 25;
+          const minX = arena ? (arena.x + r) : -Infinity;
+          const maxX = arena ? (arena.x + arena.width - r) : Infinity;
+          const minY = arena ? (arena.y + r) : -Infinity;
+          const maxY = arena ? (arena.y + arena.height - r) : Infinity;
+
           const isTouchingWall = arena && (
-            (ent.x - (ent.r || 20) <= arena.x + 5) ||
-            (ent.x + (ent.r || 20) >= arena.x + arena.width - 5) ||
-            (ent.y - (ent.r || 20) <= arena.y + 5) ||
-            (ent.y + (ent.r || 20) >= arena.y + arena.height - 5)
+            (ent.x <= minX + 2) ||
+            (ent.x >= maxX - 2) ||
+            (ent.y <= minY + 2) ||
+            (ent.y >= maxY - 2)
           );
 
           if (isTouchingWall) {
@@ -138,14 +144,30 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             ent.vy = 0;
             ent.knockbackVx = 0;
             ent.knockbackVy = 0;
+            if (arena) {
+              ent.x = Math.max(minX, Math.min(maxX, ent.x));
+              ent.y = Math.max(minY, Math.min(maxY, ent.y));
+            }
           } else {
-            const pushForce = p.knockback || 6;
-            const pushAngle = p.angle;
-            if (typeof ent.applyKnockback === 'function') {
-              ent.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce);
+            const isIchigo = ent.characterId === 'ichigo' || ent.type === 'ichigo' || (ent._def && (ent._def.id === 'ichigo' || ent._def.type === 'ichigo'));
+            if (!isIchigo) {
+              const pushForce = p.knockback || 6;
+              const pushAngle = p.angle;
+              if (typeof ent.applyKnockback === 'function') {
+                ent.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce, { isPureLoveBeam: true });
+              } else {
+                ent.vx = (ent.vx || 0) + Math.cos(pushAngle) * pushForce;
+                ent.vy = (ent.vy || 0) + Math.sin(pushAngle) * pushForce;
+              }
+              if (arena) {
+                ent.x = Math.max(minX, Math.min(maxX, ent.x));
+                ent.y = Math.max(minY, Math.min(maxY, ent.y));
+              }
             } else {
-              ent.vx = (ent.vx || 0) + Math.cos(pushAngle) * pushForce;
-              ent.vy = (ent.vy || 0) + Math.sin(pushAngle) * pushForce;
+              ent.vx = 0;
+              ent.vy = 0;
+              ent.knockbackVx = 0;
+              ent.knockbackVy = 0;
             }
           }
           

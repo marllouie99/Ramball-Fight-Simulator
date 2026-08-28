@@ -608,6 +608,13 @@ export function drawArena() {
         ctx.letterSpacing = '2px';
       }
 
+      const getFighterThemeColor = (f, fallbackColor = '#38BDF8') => {
+        if (!f) return fallbackColor;
+        const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
+        if (isYuta) return '#FF1493';
+        return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
+      };
+
       if (state.fighters.length === 2) {
         const f1 = state.fighters[0];
         const f2 = state.fighters[1];
@@ -642,7 +649,7 @@ export function drawArena() {
         ctx.font = nameFont;
         ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = f1.themeColor || f1.color || '#38BDF8';
+        ctx.fillStyle = getFighterThemeColor(f1, '#38BDF8');
         ctx.strokeText(name1, startX, textY);
         ctx.fillText(name1, startX, textY);
         startX += w1 + vsPadding;
@@ -661,7 +668,7 @@ export function drawArena() {
         ctx.font = nameFont;
         ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = f2.themeColor || f2.color || '#F87171';
+        ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
         ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
       } else if (state.fighters.length === 3) {
@@ -703,7 +710,7 @@ export function drawArena() {
         ctx.font = nameFont;
         ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = f1.themeColor || f1.color || '#38BDF8';
+        ctx.fillStyle = getFighterThemeColor(f1, '#38BDF8');
         ctx.strokeText(name1, startX, textY);
         ctx.fillText(name1, startX, textY);
         startX += w1 + pad;
@@ -721,7 +728,7 @@ export function drawArena() {
         ctx.font = nameFont;
         ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = f2.themeColor || f2.color || '#F87171';
+        ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
         ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
         startX += w2 + ampPad;
@@ -739,7 +746,7 @@ export function drawArena() {
         ctx.font = nameFont;
         ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = f3.themeColor || f3.color || '#FBBF24';
+        ctx.fillStyle = getFighterThemeColor(f3, '#FBBF24');
         ctx.strokeText(name3, startX, textY);
         ctx.fillText(name3, startX, textY);
       } else {
@@ -750,7 +757,7 @@ export function drawArena() {
 
         const fighterData = state.fighters.map(f => ({
           name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-          color: f.themeColor || f.color || '#F8FAFC'
+          color: getFighterThemeColor(f, '#F8FAFC')
         }));
 
         // Measure total width
@@ -1122,9 +1129,12 @@ export function drawPurpleDimScreen() {
 
 let currentTojiUltimateOpacity = 0;
 let currentSaitamaSeriousPunchOpacity = 0;
+let currentHollowMaskOpacity = 0;
 let flyHeads = [];
 let seriousPunchImg = null;
 let seriousPunchImgLoading = false;
+let hollowMaskOverlayImg = null;
+let hollowMaskOverlayImgLoading = false;
 
 function loadSeriousPunchImage() {
   if (seriousPunchImg || seriousPunchImgLoading) return;
@@ -1139,6 +1149,21 @@ function loadSeriousPunchImage() {
     seriousPunchImg = null;
   };
   seriousPunchImg.src = 'Assets/Overlays/serious-punch.png';
+}
+
+function loadHollowMaskOverlayImage() {
+  if (hollowMaskOverlayImg || hollowMaskOverlayImgLoading) return;
+  hollowMaskOverlayImgLoading = true;
+  hollowMaskOverlayImg = new Image();
+  hollowMaskOverlayImg.onload = () => {
+    hollowMaskOverlayImgLoading = false;
+  };
+  hollowMaskOverlayImg.onerror = (e) => {
+    console.error("Failed to load Hollow Mask overlay image:", e);
+    hollowMaskOverlayImgLoading = false;
+    hollowMaskOverlayImg = null;
+  };
+  hollowMaskOverlayImg.src = 'Assets/references/Hollow Mask.png';
 }
 
 export function drawTojiUltimateOverlay() {
@@ -2212,34 +2237,85 @@ function _initBankaiBurstSeeds() {
 
 /**
  * Draws cinematic Bleach anime atmospheric lighting, inward manga gravitational focus lines,
- * ground spiritual fissures, radial blast lines, and title typography during Bankai transformation.
+ * ground spiritual fissures, radial blast lines, and title typography during Bankai transformation
+ * and Hollow Awakening (smoothly displaying the Hollow Mask PNG centered in the arena during channeling).
  */
 export function drawBankaiImpactDimScreen() {
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
   const ichigo = state.fighters?.find(f => 
-    f && (f.characterId === 'ichigo' || f.type === 'ichigo') && (
+    f && f.hp > 0 && !f.isRespawning && (f.characterId === 'ichigo' || f.type === 'ichigo') && (
       f.isChannelingBankai || 
       (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) ||
       (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0) ||
       (f.hollowBurstTimer && f.hollowBurstTimer > 0)
     )
   );
-  if (!ichigo) return;
+
+  const isBankaiActiveOrChanneling = Boolean(
+    ichigo && (
+      ichigo.bankaiActive ||
+      ichigo.isChannelingBankai ||
+      (ichigo.bankaiChargeTimer && ichigo.bankaiChargeTimer > 0) ||
+      (ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0)
+    )
+  );
+
+  if (isBankaiActiveOrChanneling) {
+    currentHollowMaskOpacity = 0;
+  }
+
+  const isHollowChanneling = !isBankaiActiveOrChanneling && Boolean(
+    ichigo && ((ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) || ichigo._hollowVoicelineWait)
+  );
+
+  if (isHollowChanneling) {
+    if (!hollowMaskOverlayImg && !hollowMaskOverlayImgLoading) {
+      loadHollowMaskOverlayImage();
+    }
+    const maxH = ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
+    const formProg = Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH)));
+    // Target opacity builds up to a faint, subtle 0.20 to keep the mask less visible and ghostly
+    const targetAlpha = Math.min(0.20, formProg * 0.35);
+    currentHollowMaskOpacity += (targetAlpha - currentHollowMaskOpacity) * 0.08;
+  } else {
+    currentHollowMaskOpacity = Math.max(0, currentHollowMaskOpacity - 0.045);
+  }
+
+  if (!ichigo && currentHollowMaskOpacity <= 0.01) return;
+
+  const isFrozen = Boolean(
+    ichigo && (
+      ichigo.isFrozenByInfinity ||
+      (ichigo.timeStopTimer && ichigo.timeStopTimer > 0) ||
+      (ichigo.statusEffects && ichigo.statusEffects.timeStopTimer > 0) ||
+      (ichigo.electricStunTimer && ichigo.electricStunTimer > 0) ||
+      (ichigo.paralyzeTimer && ichigo.paralyzeTimer > 0) ||
+      (ichigo.hitStunTimer && ichigo.hitStunTimer > 0) ||
+      ichigo.isParalyzed ||
+      ichigo.isGrabbedByMahoraga ||
+      ichigo.isParalyzedByMahoraga ||
+      ichigo.isWallSlammed ||
+      ichigo.wallSlamPinnedX !== undefined ||
+      ichigo.isTargetOfAmbush
+    )
+  );
+  if (isFrozen) return;
 
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const shakeX = state.shakeX || 0;
   const shakeY = state.shakeY || 0;
-  const cx = ichigo.x + shakeX;
-  const cy = ichigo.y + shakeY;
-  const r = ichigo.r || 25;
+  const cx = (ichigo ? ichigo.x : (arena.x || 0) + (arena.width || 800) / 2) + shakeX;
+  const cy = (ichigo ? ichigo.y : (arena.y || 0) + (arena.height || 600) / 2) + shakeY;
+  const r = ichigo ? (ichigo.r || 25) : 25;
 
-  let isChanneling = Boolean(ichigo.isChannelingBankai && ichigo.bankaiChargeTimer > 0);
-  let isBursting = Boolean(ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0);
+  let isChanneling = Boolean(ichigo && ichigo.isChannelingBankai && ichigo.bankaiChargeTimer > 0);
+  let isBursting = Boolean(ichigo && ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0);
   let isHollow = !isChanneling && !isBursting && Boolean(
-    (ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) ||
-    (ichigo.hollowBurstTimer && ichigo.hollowBurstTimer > 0)
+    (ichigo && ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) ||
+    (ichigo && ichigo.hollowBurstTimer && ichigo.hollowBurstTimer > 0) ||
+    currentHollowMaskOpacity > 0.01
   );
 
   let opacity = 0;
@@ -2247,7 +2323,7 @@ export function drawBankaiImpactDimScreen() {
   let burstProg = 0;
 
   if (isChanneling) {
-    const maxB = ichigo.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 50;
+    const maxB = ichigo.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 66;
     const curB = ichigo.bankaiChargeTimer || 0;
     bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
 
@@ -2265,22 +2341,27 @@ export function drawBankaiImpactDimScreen() {
     burstProg = 1.0 - (ichigo.bankaiBurstTimer / burstMax);
     opacity = Math.pow(1.0 - burstProg, 1.3) * 0.92;
   } else if (isHollow) {
-    // Hollow Transformation burst & formation decay
-    const maxH = ichigo.hollowBurstMax || ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 54;
-    const curH = (ichigo.hollowBurstTimer !== undefined && ichigo.hollowBurstTimer > 0) 
-      ? ichigo.hollowBurstTimer 
-      : (ichigo.hollowMaskFormationTimer || 0);
-    burstProg = Math.min(1.0, Math.max(0.0, 1.0 - (curH / maxH)));
-    opacity = Math.pow(1.0 - burstProg, 1.2) * 0.88;
+    // Hollow Transformation formation (5s build-up) & burst decay
+    if (ichigo && ichigo.hollowMaskFormationTimer !== undefined && ichigo.hollowMaskFormationTimer > 0) {
+      const maxH = ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 300;
+      const formProg = Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH)));
+      opacity = Math.min(0.90, formProg * 1.25);
+    } else if (ichigo && ichigo.hollowBurstTimer !== undefined && ichigo.hollowBurstTimer > 0) {
+      const maxB = ichigo.hollowBurstMax || CONFIG.ichigo?.hollowBurstFrames || 36;
+      burstProg = Math.min(1.0, Math.max(0.0, 1.0 - ((ichigo.hollowBurstTimer || 0) / maxB)));
+      opacity = Math.pow(1.0 - burstProg, 1.3) * 0.90;
+    } else {
+      opacity = currentHollowMaskOpacity;
+    }
   }
 
-  if (opacity <= 0.01) return;
+  if (opacity <= 0.01 && currentHollowMaskOpacity <= 0.01) return;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // ── 1. Moment of Eruption Inverted Negative Flash (Frames 0-3 of burst) ──
-  if ((isBursting || isHollow) && burstProg < 0.10) {
+  // ── 1. Moment of Eruption Inverted Negative Flash (Frames 0-3 of Bankai burst) ──
+  if (isBursting && burstProg < 0.10) {
     const flashAlpha = Math.pow(1.0 - (burstProg / 0.10), 1.5) * 0.95;
     ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(3)})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2290,11 +2371,11 @@ export function drawBankaiImpactDimScreen() {
   const maxR = Math.max(canvas.width, canvas.height) * 0.95;
   const grad = ctx.createRadialGradient(cx, cy, r * 1.2, cx, cy, maxR);
   if (isHollow) {
-    // Stark monochrome White-Black theme for Hollow Transformation
-    grad.addColorStop(0.0, `rgba(255, 255, 255, ${(opacity * 0.18).toFixed(3)})`);
-    grad.addColorStop(0.25, `rgba(25, 25, 32, ${(opacity * 0.70).toFixed(3)})`);
-    grad.addColorStop(0.65, `rgba(6, 6, 10, ${(opacity * 0.94).toFixed(3)})`);
-    grad.addColorStop(1.0, `rgba(1, 1, 3, ${(opacity * 0.98).toFixed(3)})`);
+    // Pure Dark Obsidian & Crimson Void Shroud (NO white background in arena)
+    grad.addColorStop(0.0, 'rgba(15, 0, 3, 0.0)');
+    grad.addColorStop(0.25, `rgba(20, 2, 5, ${(opacity * 0.45).toFixed(3)})`);
+    grad.addColorStop(0.65, `rgba(8, 1, 3, ${(opacity * 0.75).toFixed(3)})`);
+    grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.92).toFixed(3)})`);
   } else {
     // Crimson-Black theme for Bankai
     grad.addColorStop(0.0, `rgba(40, 6, 15, ${(opacity * 0.35).toFixed(3)})`);
@@ -2329,6 +2410,419 @@ export function drawBankaiImpactDimScreen() {
         ctx.stroke();
       }
     }
+  }
+
+// ── 22 Organic Jagged Shattered Bone / Porcelain Shards for Hollow Mask Assembly ──
+const _HOLLOW_MASK_OVERLAY_SHARDS = [
+  // 1. Top Left Horn Needle Spike
+  {
+    name: 'horn_left_spike',
+    poly: [[0.00, 0.00], [0.20, 0.00], [0.26, 0.10], [0.14, 0.16], [0.02, 0.14]],
+    startDir: { x: -1.35, y: -0.95 },
+    rot: -0.58,
+    delay: 0.30,
+    seed: 0.8
+  },
+  // 2. Forehead Upper Left Wedge
+  {
+    name: 'forehead_left_plate',
+    poly: [[0.20, 0.00], [0.38, 0.00], [0.42, 0.13], [0.24, 0.20], [0.14, 0.16], [0.26, 0.10]],
+    startDir: { x: -0.85, y: -1.20 },
+    rot: 0.42,
+    delay: 0.12,
+    seed: 0.4
+  },
+  // 3. Central Crown Apex Crest
+  {
+    name: 'crown_apex',
+    poly: [[0.38, 0.00], [0.62, 0.00], [0.57, 0.12], [0.50, 0.08], [0.42, 0.13]],
+    startDir: { x: 0.0, y: -1.45 },
+    rot: -0.32,
+    delay: 0.03,
+    seed: 0.2
+  },
+  // 4. Forehead Upper Right Plate (Crimson Stripe 1)
+  {
+    name: 'forehead_right_plate',
+    poly: [[0.62, 0.00], [0.80, 0.00], [0.74, 0.10], [0.86, 0.16], [0.76, 0.20], [0.57, 0.12]],
+    startDir: { x: 0.85, y: -1.20 },
+    rot: -0.42,
+    delay: 0.15,
+    seed: 0.5
+  },
+  // 5. Top Right Horn Needle Spike (Crimson Stripe Tip)
+  {
+    name: 'horn_right_spike',
+    poly: [[0.80, 0.00], [1.00, 0.00], [0.98, 0.14], [0.86, 0.16], [0.74, 0.10]],
+    startDir: { x: 1.35, y: -0.95 },
+    rot: 0.58,
+    delay: 0.33,
+    seed: 0.9
+  },
+  // 6. Central Forehead Diamond Splinter
+  {
+    name: 'forehead_center_splinter',
+    poly: [[0.42, 0.13], [0.57, 0.12], [0.50, 0.26], [0.44, 0.23]],
+    startDir: { x: 0.15, y: -0.90 },
+    rot: 0.22,
+    delay: 0.09,
+    seed: 0.3
+  },
+  // 7. Left Temple Wing Shard
+  {
+    name: 'temple_left_wing',
+    poly: [[0.02, 0.14], [0.14, 0.16], [0.24, 0.20], [0.17, 0.33], [0.03, 0.30]],
+    startDir: { x: -1.40, y: -0.45 },
+    rot: 0.48,
+    delay: 0.21,
+    seed: 0.6
+  },
+  // 8. Left Eyebrow & Upper Socket Arch
+  {
+    name: 'brow_left_arch',
+    poly: [[0.17, 0.33], [0.24, 0.20], [0.44, 0.23], [0.47, 0.32], [0.31, 0.36], [0.15, 0.38]],
+    startDir: { x: -1.10, y: -0.20 },
+    rot: -0.36,
+    delay: 0.18,
+    seed: 0.5
+  },
+  // 9. Center Glabella Wedge (Between Eyes)
+  {
+    name: 'glabella_center',
+    poly: [[0.44, 0.23], [0.50, 0.26], [0.56, 0.23], [0.52, 0.40], [0.47, 0.32]],
+    startDir: { x: 0.0, y: -0.60 },
+    rot: -0.18,
+    delay: 0.00,
+    seed: 0.1
+  },
+  // 10. Right Eyebrow Arch (Crimson Stripes)
+  {
+    name: 'brow_right_arch',
+    poly: [[0.50, 0.26], [0.76, 0.20], [0.83, 0.33], [0.69, 0.38], [0.52, 0.40], [0.56, 0.23]],
+    startDir: { x: 1.10, y: -0.20 },
+    rot: 0.36,
+    delay: 0.24,
+    seed: 0.7
+  },
+  // 11. Right Temple Wing Shard
+  {
+    name: 'temple_right_wing',
+    poly: [[0.86, 0.16], [0.98, 0.14], [0.97, 0.30], [0.83, 0.33], [0.76, 0.20]],
+    startDir: { x: 1.40, y: -0.45 },
+    rot: -0.48,
+    delay: 0.27,
+    seed: 0.7
+  },
+  // 12. Outer Left Cheek Flange
+  {
+    name: 'cheek_outer_left',
+    poly: [[0.03, 0.30], [0.17, 0.33], [0.15, 0.38], [0.27, 0.50], [0.05, 0.53]],
+    startDir: { x: -1.35, y: 0.25 },
+    rot: -0.44,
+    delay: 0.42,
+    seed: 0.8
+  },
+  // 13. Inner Left Cheek Bone
+  {
+    name: 'cheek_inner_left',
+    poly: [[0.15, 0.38], [0.31, 0.36], [0.45, 0.40], [0.41, 0.54], [0.27, 0.50]],
+    startDir: { x: -0.90, y: 0.35 },
+    rot: 0.28,
+    delay: 0.36,
+    seed: 0.6
+  },
+  // 14. Center Nasal Bridge Column
+  {
+    name: 'nasal_ridge',
+    poly: [[0.47, 0.32], [0.52, 0.40], [0.53, 0.56], [0.45, 0.56], [0.41, 0.54], [0.45, 0.40]],
+    startDir: { x: 0.0, y: 0.10 },
+    rot: 0.12,
+    delay: 0.06,
+    seed: 0.2
+  },
+  // 15. Inner Right Cheek Plate (Crimson Marks)
+  {
+    name: 'cheek_inner_right',
+    poly: [[0.52, 0.40], [0.69, 0.38], [0.75, 0.44], [0.71, 0.54], [0.53, 0.56]],
+    startDir: { x: 0.90, y: 0.35 },
+    rot: -0.28,
+    delay: 0.39,
+    seed: 0.7
+  },
+  // 16. Outer Right Cheek Sunburst (Crimson Marks)
+  {
+    name: 'cheek_outer_right',
+    poly: [[0.83, 0.33], [0.97, 0.30], [0.95, 0.53], [0.71, 0.54], [0.75, 0.44]],
+    startDir: { x: 1.35, y: 0.25 },
+    rot: 0.44,
+    delay: 0.45,
+    seed: 0.9
+  },
+  // 17. Upper Gritted Teeth Row — Left Flank
+  {
+    name: 'upper_teeth_left',
+    poly: [[0.05, 0.53], [0.27, 0.50], [0.41, 0.54], [0.45, 0.56], [0.49, 0.62], [0.47, 0.70], [0.13, 0.68]],
+    startDir: { x: -0.75, y: 0.75 },
+    rot: 0.34,
+    delay: 0.48,
+    seed: 0.7
+  },
+  // 18. Upper Gritted Teeth Row — Right Flank (Crimson Marks)
+  {
+    name: 'upper_teeth_right',
+    poly: [[0.53, 0.56], [0.71, 0.54], [0.95, 0.53], [0.87, 0.68], [0.51, 0.70], [0.49, 0.62]],
+    startDir: { x: 0.75, y: 0.75 },
+    rot: -0.34,
+    delay: 0.51,
+    seed: 0.8
+  },
+  // 19. Lower Left Jaw Plate & Mandible Teeth
+  {
+    name: 'jaw_left_mandible',
+    poly: [[0.13, 0.68], [0.47, 0.70], [0.44, 0.82], [0.21, 0.83], [0.11, 0.76]],
+    startDir: { x: -0.95, y: 1.10 },
+    rot: -0.38,
+    delay: 0.57,
+    seed: 0.9
+  },
+  // 20. Lower Right Jaw Plate & Mandible Teeth (Crimson Marks)
+  {
+    name: 'jaw_right_mandible',
+    poly: [[0.51, 0.70], [0.87, 0.68], [0.89, 0.76], [0.79, 0.83], [0.54, 0.82]],
+    startDir: { x: 0.95, y: 1.10 },
+    rot: 0.38,
+    delay: 0.60,
+    seed: 0.9
+  },
+  // 21. Mandible Center Teeth Divider
+  {
+    name: 'mandible_center_teeth',
+    poly: [[0.47, 0.70], [0.51, 0.70], [0.54, 0.82], [0.50, 0.86], [0.44, 0.82]],
+    startDir: { x: 0.0, y: 0.90 },
+    rot: 0.16,
+    delay: 0.54,
+    seed: 0.6
+  },
+  // 22. Chin Tip Arrowhead Vertex
+  {
+    name: 'chin_tip_arrowhead',
+    poly: [[0.11, 0.76], [0.21, 0.83], [0.44, 0.82], [0.50, 0.86], [0.54, 0.82], [0.79, 0.83], [0.89, 0.76], [0.50, 1.00]],
+    startDir: { x: 0.0, y: 1.45 },
+    rot: -0.24,
+    delay: 0.63,
+    seed: 1.0
+  }
+];
+
+function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFormProg, maskImg, currentOpacity, arenaW, arenaH) {
+  // Assembly spans across 0.0 to 0.88 of total channeling formation
+  const maskAssemblyProg = Math.min(1.0, Math.max(0.0, currentFormProg / 0.86));
+  const shardFlightDuration = 0.22;
+
+  // 1. Draw Attached / Locked Shards (Stationary on Arena Floor)
+  for (let i = 0; i < _HOLLOW_MASK_OVERLAY_SHARDS.length; i++) {
+    const shard = _HOLLOW_MASK_OVERLAY_SHARDS[i];
+    if (maskAssemblyProg < shard.delay) continue;
+
+    const rawProg = (maskAssemblyProg - shard.delay) / shardFlightDuration;
+    if (rawProg < 1.0) continue; // In-flight shards handled below
+
+    // Draw clipped slice of the Hollow Mask PNG for this shard with decreased subtle opacity
+    ctx.save();
+    ctx.globalAlpha = currentOpacity;
+    ctx.beginPath();
+    shard.poly.forEach((pt, idx) => {
+      const px = destX + pt[0] * destW;
+      const py = destY + pt[1] * destH;
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(maskImg, destX, destY, destW, destH);
+    ctx.restore();
+
+    // Subtle dark organic fracture seam line
+    ctx.save();
+    ctx.globalAlpha = currentOpacity;
+    ctx.strokeStyle = 'rgba(20, 2, 8, 0.75)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    shard.poly.forEach((pt, idx) => {
+      const px = destX + pt[0] * destW;
+      const py = destY + pt[1] * destH;
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    // Sudden arrival impact flash along fracture seam (for first ~8 frames after snap)
+    if (rawProg < 1.40) {
+      const flashAlpha = Math.max(0, 1.0 - (rawProg - 1.0) / 0.40);
+      ctx.save();
+      ctx.globalAlpha = flashAlpha * currentOpacity * 1.5;
+      ctx.strokeStyle = 'rgba(255, 60, 90, 0.95)';
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      shard.poly.forEach((pt, idx) => {
+        const px = destX + pt[0] * destW;
+        const py = destY + pt[1] * destH;
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // 2. Draw In-Flight Shards Converging Smoothly 1-by-1 with Continuous Fluid Deceleration
+  for (let i = 0; i < _HOLLOW_MASK_OVERLAY_SHARDS.length; i++) {
+    const shard = _HOLLOW_MASK_OVERLAY_SHARDS[i];
+    if (maskAssemblyProg < shard.delay) continue;
+
+    const rawProg = (maskAssemblyProg - shard.delay) / shardFlightDuration;
+    if (rawProg >= 1.0) continue; // Already attached
+
+    let cx = 0, cy = 0;
+    for (const pt of shard.poly) {
+      cx += destX + pt[0] * destW;
+      cy += destY + pt[1] * destH;
+    }
+    cx /= shard.poly.length;
+    cy /= shard.poly.length;
+
+    const shardProg = Math.max(0, Math.min(1.0, rawProg));
+    // Continuous fluid deceleration power curve: smoothly converges from 1.0 to 0.0 at shardProg=1.0 without pausing
+    const remain = Math.pow(1.0 - shardProg, 2.6);
+
+    const flightDist = Math.max(arenaW, arenaH) * (0.36 + (shard.seed || 0.5) * 0.30) * remain;
+    const curOffX = shard.startDir.x * flightDist;
+    const curOffY = shard.startDir.y * flightDist;
+    const curRot = shard.rot * remain;
+    const curScale = 0.55 + 0.45 * (1.0 - remain);
+    const curAlpha = Math.min(1.0, 0.35 + shardProg * 0.65);
+
+    ctx.save();
+    ctx.globalAlpha = Math.min(currentOpacity, currentOpacity * curAlpha);
+    ctx.translate(cx + curOffX, cy + curOffY);
+    ctx.rotate(curRot);
+    ctx.scale(curScale, curScale);
+    ctx.translate(-cx, -cy);
+
+    // Draw clipped slice of the Hollow Mask PNG for this in-flight shard
+    ctx.save();
+    ctx.beginPath();
+    shard.poly.forEach((pt, idx) => {
+      const px = destX + pt[0] * destW;
+      const py = destY + pt[1] * destH;
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(maskImg, destX, destY, destW, destH);
+    ctx.restore();
+
+    // Chaotic jagged fracture edge glow with electric crimson spiritual energy
+    ctx.strokeStyle = 'rgba(235, 25, 60, 0.92)';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    shard.poly.forEach((pt, idx) => {
+      const px = destX + pt[0] * destW;
+      const py = destY + pt[1] * destH;
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+  // ── 4. Hollow Mask Arena-Spanning Overlay (Cinematic apparition assembling piece-by-piece 1-by-1 and occupying the arena) ──
+  if (!isBankaiActiveOrChanneling && currentHollowMaskOpacity > 0.01 && hollowMaskOverlayImg && hollowMaskOverlayImg.complete && hollowMaskOverlayImg.naturalWidth > 0) {
+    ctx.save();
+
+    // 1. Strictly clip to the arena boundaries (handling both circular and rectangular arenas)
+    ctx.beginPath();
+    const arenaX = (arena.x || 0) + shakeX;
+    const arenaY = (arena.y || 0) + shakeY;
+    const arenaW = arena.width || 800;
+    const arenaH = arena.height || 600;
+    const arenaCenterX = arenaX + arenaW / 2;
+    const arenaCenterY = arenaY + arenaH / 2;
+
+    if (arena.shape === 'circle') {
+      const ar = arena.radius || (arenaW / 2);
+      ctx.arc(arenaCenterX, arenaCenterY, ar, 0, Math.PI * 2);
+    } else {
+      ctx.rect(arenaX, arenaY, arenaW, arenaH);
+    }
+    ctx.clip();
+
+    const maskAlpha = Math.min(0.20, currentHollowMaskOpacity);
+
+    // 2. Scale mask to fully occupy / span across the arena with an enlarged, imposing scale
+    const aspect = (hollowMaskOverlayImg.naturalHeight / hollowMaskOverlayImg.naturalWidth) || 1.0;
+    const baseSize = Math.max(arenaW, arenaH / aspect) * 1.40;
+    const pulse = Math.sin(now * 0.003) * 0.02;
+    const maskW = baseSize * (1.0 + pulse);
+    const maskH = maskW * aspect;
+
+    const destX = arenaCenterX - maskW / 2;
+    const destY = arenaCenterY - maskH / 2;
+    const destW = maskW;
+    const destH = maskH;
+
+    const isForming = Boolean(ichigo && ((ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) || ichigo._hollowVoicelineWait));
+    const maxH = (ichigo && ichigo.hollowMaskFormationMax) || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
+    const currentFormProg = (ichigo && ichigo.hollowMaskFormationTimer > 0) 
+      ? Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH))) 
+      : 1.0;
+
+    // 3. Draw the Hollow Mask PNG FIRST (either shards 1-by-1 or fully assembled mask at decreased subtle opacity)
+    if (isForming && currentFormProg < 0.98) {
+      _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFormProg, hollowMaskOverlayImg, maskAlpha, arenaW, arenaH);
+    } else {
+      // Draw the fully assembled Hollow Mask PNG occupying the arena with decreased subtle opacity
+      ctx.save();
+      ctx.globalAlpha = maskAlpha;
+      ctx.drawImage(
+        hollowMaskOverlayImg,
+        destX,
+        destY,
+        destW,
+        destH
+      );
+      ctx.restore();
+    }
+
+    // 4. Luminous White Spiritual Dim Effect OVERLAYING ON TOP OF the PNG Mask (Strictly clipped into the arena)
+    const whiteDimAlpha = Math.min(0.65, (currentFormProg || 1.0) * 0.65);
+    if (whiteDimAlpha > 0.01) {
+      // Atmospheric white background wash across arena floor overlaying the PNG
+      ctx.fillStyle = `rgba(255, 255, 255, ${(whiteDimAlpha * 0.32).toFixed(3)})`;
+      ctx.fillRect(arenaX, arenaY, arenaW, arenaH);
+
+      // Radial spectral white Reiatsu glow expanding from center overlaying the PNG
+      const auraRadius = Math.max(arenaW, arenaH) * 0.80;
+      const whiteGrad = ctx.createRadialGradient(
+        arenaCenterX, arenaCenterY, auraRadius * 0.10,
+        arenaCenterX, arenaCenterY, auraRadius
+      );
+      whiteGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(whiteDimAlpha * 0.70).toFixed(3)})`);
+      whiteGrad.addColorStop(0.40, `rgba(245, 250, 255, ${(whiteDimAlpha * 0.48).toFixed(3)})`);
+      whiteGrad.addColorStop(0.75, `rgba(225, 238, 255, ${(whiteDimAlpha * 0.28).toFixed(3)})`);
+      whiteGrad.addColorStop(1.0, `rgba(200, 220, 255, ${(whiteDimAlpha * 0.10).toFixed(3)})`);
+      ctx.fillStyle = whiteGrad;
+      ctx.fillRect(arenaX, arenaY, arenaW, arenaH);
+    }
+
+    ctx.restore();
   }
 
   ctx.restore();

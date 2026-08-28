@@ -1,5 +1,6 @@
 import { getHandSize, CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { drawTensaZangetsuKatana, drawBankaiSwordOrbitingAura, _getShikaiSwordImage, _getShikaiSwordBladeImage } from '../weapons/ichigoWeaponGraphics.js';
 
 let _hollowMaskImage = null;
@@ -41,10 +42,10 @@ function _getIchigoBankaiImage() {
       _ichigoBankaiImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ichigo Bankai image at Assets/model/ICHIGO-BANKAI.png', e);
+      console.warn('Failed to load Ichigo Bankai pixel image at Assets/model/ICHIGO-BANKAI-PIXEL-SKIN.png', e);
       _ichigoBankaiImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-BANKAI.png';
+    img.src = 'Assets/model/ICHIGO-BANKAI-PIXEL-SKIN.png?v=1';
     _ichigoBankaiImage = img;
   }
   return _ichigoBankaiImage;
@@ -65,10 +66,10 @@ function _getIchigoShikaiImage() {
       _ichigoShikaiImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ichigo Shikai image at Assets/model/ICHIGO-SHIKAI.png', e);
+      console.warn('Failed to load Ichigo Shikai pixel image at Assets/model/ICHIGO-SHIKAI-PIXEL-SKIN.png', e);
       _ichigoShikaiImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-SHIKAI.png';
+    img.src = 'Assets/model/ICHIGO-SHIKAI-PIXEL-SKIN.png?v=1';
     _ichigoShikaiImage = img;
   }
   return _ichigoShikaiImage;
@@ -100,8 +101,14 @@ export function drawIchigoSkin(ctx, fighter) {
     fighter.isFrozenByInfinity ||
     (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
     (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0) ||
+    (fighter.electricStunTimer && fighter.electricStunTimer > 0) ||
     (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
+    (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
     fighter.isParalyzed ||
+    fighter.isGrabbedByMahoraga ||
+    fighter.isParalyzedByMahoraga ||
+    fighter.isWallSlammed ||
+    fighter.wallSlamPinnedX !== undefined ||
     fighter.isTargetOfAmbush
   );
 
@@ -118,6 +125,7 @@ export function drawIchigoSkin(ctx, fighter) {
       state.gameState === 'indexDetail' ||
       state.gameState === 'characterSelect' || 
       state.gameState === 'leaderboard' ||
+      state.gameState === 'champion' ||
       state._isFaceOffScreenActive ||
       state.isRandomRollShowoff ||
       state.previewFighter === fighter
@@ -129,11 +137,12 @@ export function drawIchigoSkin(ctx, fighter) {
 
   const isBankaiChanneling = !isFrozen && Boolean(fighter.isChannelingBankai && fighter.bankaiChargeTimer > 0);
   const isBankaiBursting = !isFrozen && Boolean(fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0);
+  const isShikaiReverting = !isFrozen && Boolean(fighter.shikaiReversionBurstTimer && fighter.shikaiReversionBurstTimer > 0);
   const auraOpacity = isBankai ? 0.85 : (isMask ? 0.65 : 0.25);
 
   let bankaiProg = 0;
   if (isBankaiChanneling) {
-    const maxB = fighter.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 50;
+    const maxB = fighter.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 66;
     bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.bankaiChargeTimer || 0) / maxB)));
   }
 
@@ -142,17 +151,19 @@ export function drawIchigoSkin(ctx, fighter) {
     _drawBankaiTransformationVortex(ctx, r, bankaiProg, now, fighter);
   } else if (isBankaiBursting) {
     _drawBankaiEruptionBurst(ctx, r, fighter, now);
+  } else if (isShikaiReverting) {
+    _drawShikaiReversionBurst(ctx, r, fighter, now);
   }
 
   const formationTimer = fighter.hollowMaskFormationTimer !== undefined ? fighter.hollowMaskFormationTimer : 0;
-  const formationMax = fighter.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 54;
+  const formationMax = fighter.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 300;
   const isForming = isMask && formationTimer > 0;
   const formationProg = isForming ? Math.min(1.0, Math.max(0.0, 1.0 - (formationTimer / formationMax))) : 1.0;
 
-  // ── 1.6. Hollow Mask Transformation Skyward Eruption Blast Pillar (White-Black Line Theme) ──
-  const isHollowBursting = !isFrozen && isMask && (isForming || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0));
+  // ── 1.6. Hollow Mask Transformation Skyward Eruption Blast Pillar (White-Black Line Theme — triggers only after formation completes) ──
+  const isHollowBursting = !isFrozen && isMask && (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0);
   if (isHollowBursting) {
-    _drawHollowEruptionBurst(ctx, r, fighter, now, formationProg);
+    _drawHollowEruptionBurst(ctx, r, fighter, now, 0);
   }
 
   // ── 1.8. Bankai & Hollow Mask 3D Ribbon Lifecycle Alpha ──
@@ -200,17 +211,28 @@ export function drawIchigoSkin(ctx, fighter) {
     }
   }
 
+  // ── 1.85. Hollow Mask Formation Channeling Visual Effect (Reiatsu Floor Pool, Inward Void Suction, Rising Embers) ──
+  if (isForming && !isFrozen) {
+    _drawHollowChannelingReiatsuAura(ctx, r, formationProg, now, fighter);
+  }
+
   // ── 1.9. Live Spiritual Pressure Aura: Back Layer (Volumetric Plasma Shroud & Floor Pool) ──
-  if (!isLowQuality && !isCountdownOrPreview && !isWeaponMenu && (isBankai || isMask || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0.05)) && !isFrozen && !isBankaiChanneling) {
+  if (!isLowQuality && !isCountdownOrPreview && !isWeaponMenu && (isBankai || isMask || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0.05)) && !isFrozen && !isBankaiChanneling && !isForming) {
     _drawBankaiLiveAura(ctx, r, isBankai, isMask, now, 'back');
   }
 
+  const isBankaiStance = isBackSlungPose && isBankai;
+
   ctx.save();
-  // ── 2. Facing / Rotation Setup (Local Character Space) ──
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
-  ctx.rotate(angle);
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) ctx.scale(1, -1);
+  // ── 2. Facing / Upright Body Setup (Rule #19 Front Profile POV) ──
+  const isHollowChanneling = Boolean(isForming || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0));
+  const rawAngle = (fighter._isWinnerReveal || isHollowChanneling || isBackSlungPose || isBankaiStance) ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const facingLeft = Math.abs(rawAngle) > Math.PI / 2;
+
+  ctx.rotate(rawAngle);
+  if (facingLeft && !isHollowChanneling) {
+    ctx.scale(1, -1);
+  }
 
   if (!isLowQuality && !isWeaponMenu && ribbonAlpha > 0.01) {
     _drawIchigoFloatingReiatsuAura(ctx, r, isBankai, isMask, isFrozen, now, 'back', ribbonAlpha, isForming, formationProg);
@@ -221,8 +243,8 @@ export function drawIchigoSkin(ctx, fighter) {
   const skinColor = '#FFE0BD';
 
   const hideHandsAndWeapon = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
-  const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand || isForming;
-  const hideBackHand = hideHandsAndWeapon || fighter.hideBackHand;
+  const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand; // Keep main sword hand firmly gripping katana
+  const hideBackHand = hideHandsAndWeapon || fighter.hideBackHand || isForming; // Back/other hand is animated reaching to face
 
   const isFrozenEntity = Boolean(
     fighter.isFrozenByInfinity ||
@@ -233,15 +255,14 @@ export function drawIchigoSkin(ctx, fighter) {
     fighter.isTargetOfAmbush
   );
 
-  const isChanneling = Boolean(fighter.isChannelingGetsuga && fighter.getsugaChargeTimer > 0);
+  const isChanneling = !isShikaiReverting && Boolean(fighter.isChannelingGetsuga && fighter.getsugaChargeTimer > 0);
   let chargeProg = 0;
   if (isChanneling) {
     const chargeMax = fighter.getsugaChargeMax || CONFIG.ichigo?.getsugaChargeFrames || 50;
     chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
   }
 
-  const isSlashing = Boolean(fighter.slashSwingTimer > 0);
-  const isBankaiStance = isBackSlungPose && isBankai;
+  const isSlashing = !isShikaiReverting && Boolean(fighter.slashSwingTimer > 0);
   let rawSlashProg = 0;
   let swingAngle = -0.16;
   let thrustDistance = 0;
@@ -265,34 +286,34 @@ export function drawIchigoSkin(ctx, fighter) {
     bodyTilt = 0.03 * raiseEase + bankaiTremble * 0.4;
   } else if (isChanneling) {
     // Dynamic 2-Handed Overhead Sword Lift-Up Charging Animation:
-    // As chargeProg increases (0 -> 1), sword lifts upward & backward from idle (-0.16 rad) up into the high sky (-2.10 rad / ~ -120°)
+    // As chargeProg increases (0 -> 1), sword lifts upward from idle (-0.16 rad) high into the sky overhead (-1.85 rad / ~ -106°)
     const liftEase = Math.min(1.0, chargeProg * 1.7);
     const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
-    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.04 * (0.3 + 0.7 * chargeProg);
+    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.03 * (0.3 + 0.7 * chargeProg);
 
-    swingAngle = -0.16 + (-2.10 - (-0.16)) * smoothLift + chargeTremble;
-    thrustDistance = -4 - 6 * smoothLift; // Pulls back close to shoulder/head
-    bodyShiftX = -1.5 - 3.0 * smoothLift; // Body coils back into power stance
-    bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.5;
+    swingAngle = -0.16 + (-1.85 - (-0.16)) * smoothLift + chargeTremble;
+    thrustDistance = -4.0 - 6.0 * smoothLift; // Pulls back close to shoulder/head
+    bodyShiftX = -1.5 - 3.0 * smoothLift;     // Body coils back into powerful overhead stance
+    bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.4;
   } else if (isSlashing) {
     const maxT = fighter.slashSwingMaxTimer || 22;
     rawSlashProg = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
 
     if (fighter.isGetsugaSlash) {
-      // Powerful instantaneous downward vertical cleave starting directly from the high lifted sword overhead pose (-2.10 rad) down to (+1.35 rad)
+      // Powerful instantaneous downward vertical cleave starting directly from the high lifted sword overhead pose (-1.85 rad) down to (+1.25 rad)
       const slashPhase = 0.20; // Snappy, instantaneous down-chop (~4-5 frames)
       if (rawSlashProg < slashPhase) {
         const p = rawSlashProg / slashPhase;
         const sweepCurve = p * p * (3 - 2 * p); // smooth cubic down-chop
-        swingAngle = -2.10 + (1.35 - (-2.10)) * sweepCurve;
+        swingAngle = -1.85 + (1.25 - (-1.85)) * sweepCurve;
         thrustDistance = -10 + 26 * Math.sin(p * Math.PI * 0.5); // -10px to +16px
-        bodyShiftX = -4.5 + 9.5 * Math.sin(p * Math.PI * 0.5); // lunges forward -4.5px to +5.0px
+        bodyShiftX = -4.5 + 9.5 * Math.sin(p * Math.PI * 0.5);  // lunges forward
         bodyTilt = -0.12 + 0.20 * Math.sin(p * Math.PI * 0.5);
       } else {
-        // Recovery phase: +1.35 rad eases smoothly back to idle -0.16 rad
+        // Recovery phase: +1.25 rad eases smoothly back to idle -0.16 rad
         const p = (rawSlashProg - slashPhase) / (1.0 - slashPhase);
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.16 + (1.35 - (-0.16)) * easeP;
+        swingAngle = -0.16 + (1.25 - (-0.16)) * easeP;
         thrustDistance = 16 * easeP;
         bodyShiftX = 5.0 * easeP;
         bodyTilt = 0.08 * easeP;
@@ -369,10 +390,10 @@ export function drawIchigoSkin(ctx, fighter) {
     const hideWeapon = fighter.hideWeapon || (typeof state !== 'undefined' && state.showSkinOnly);
     if (hideWeapon) return;
 
-    // Sword rotation and extension based on slash state vs countdown stance vs combat stance
+    // Sword rotation and extension based on slash state, combat stance, and overhead lift
     ctx.save();
     ctx.translate(thrustDistance + bodyShiftX, 0);
-    ctx.rotate(swingAngle + bodyTilt);
+    ctx.rotate(swingAngle);
     if (isBankaiStance) {
       ctx.scale(1, -1); // Orients razor cutting edge facing forward/outward and 3 fins on inner spine
     }
@@ -395,132 +416,135 @@ export function drawIchigoSkin(ctx, fighter) {
       const heelX = cutoutR * 2, heelY = 18;
 
       // 1. Draw Trailing White Cloth Ribbons from the Pommel (Dynamic 2-Pass White Cloth Ribbons)
-      if (fighter.ribbonStrands && fighter.ribbonStrands.length === 3) {
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // Hidden during fights, shown in weapon menus/previews
+      if (isWeaponMenu) {
+        if (fighter.ribbonStrands && fighter.ribbonStrands.length === 3) {
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-        const pommel = getZangetsuPommelWorldPos(fighter);
-        const swordAngle = (fighter.gunAngle || 0) + swingAngle + bodyTilt;
-        const spd = Math.hypot(fighter.vx || 0, fighter.vy || 0);
-        let perpX = (spd > 0.3) ? -(fighter.vy || 0) / spd : -Math.sin(swordAngle);
-        let perpY = (spd > 0.3) ? (fighter.vx || 0) / spd : Math.cos(swordAngle);
+          const pommel = getZangetsuPommelWorldPos(fighter);
+          const swordAngle = (fighter.gunAngle || 0) + swingAngle;
+          const spd = Math.hypot(fighter.vx || 0, fighter.vy || 0);
+          let perpX = (spd > 0.3) ? -(fighter.vy || 0) / spd : -Math.sin(swordAngle);
+          let perpY = (spd > 0.3) ? (fighter.vx || 0) / spd : Math.cos(swordAngle);
 
-        for (let s = 0; s < 3; s++) {
-          const cfg = _ZANGETSU_STRAND_CONFIGS[s];
-          const strand = fighter.ribbonStrands[s];
-          if (!strand || strand.length < 2) continue;
+          for (let s = 0; s < 3; s++) {
+            const cfg = _ZANGETSU_STRAND_CONFIGS[s];
+            const strand = fighter.ribbonStrands[s];
+            if (!strand || strand.length < 2) continue;
 
-          const rootX = pommel.x + perpX * cfg.rootOffset;
-          const rootY = pommel.y + perpY * cfg.rootOffset;
-          const dx = rootX - strand[0].x;
-          const dy = rootY - strand[0].y;
-          if (dx !== 0 || dy !== 0) {
-            strand[0].x = rootX;
-            strand[0].y = rootY;
-            if (isFrozenEntity) {
-              for (let i = 1; i < strand.length; i++) {
-                strand[i].x += dx;
-                strand[i].y += dy;
-                if (strand[i].prevX !== undefined) strand[i].prevX += dx;
-                if (strand[i].prevY !== undefined) strand[i].prevY += dy;
+            const rootX = pommel.x + perpX * cfg.rootOffset;
+            const rootY = pommel.y + perpY * cfg.rootOffset;
+            const dx = rootX - strand[0].x;
+            const dy = rootY - strand[0].y;
+            if (dx !== 0 || dy !== 0) {
+              strand[0].x = rootX;
+              strand[0].y = rootY;
+              if (isFrozenEntity) {
+                for (let i = 1; i < strand.length; i++) {
+                  strand[i].x += dx;
+                  strand[i].y += dy;
+                  if (strand[i].prevX !== undefined) strand[i].prevX += dx;
+                  if (strand[i].prevY !== undefined) strand[i].prevY += dy;
+                }
               }
             }
           }
+
+          const drawOrder = [2, 1, 0];
+
+          for (let idx = 0; idx < 3; idx++) {
+            const s = drawOrder[idx];
+            const cfg = _ZANGETSU_STRAND_CONFIGS[s];
+            const strand = fighter.ribbonStrands[s];
+            if (!strand || strand.length < 2) continue;
+
+            _drawPixelRibbonStrand(ctx, strand, cfg, 2.0);
+          }
+
+          // Stepped Pixel Knot at Pommel Wrap
+          const kx = Math.round(pommel.x / 2.0) * 2.0;
+          const ky = Math.round(pommel.y / 2.0) * 2.0;
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(kx - 4.0, ky - 4.0, 8.0, 8.0);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(kx - 2.0, ky - 2.0, 4.0, 4.0);
+
+          ctx.restore();
+        } else {
+          ctx.save();
+          ctx.fillStyle = '#cbd5e1';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 1.0;
+          ctx.beginPath();
+          ctx.moveTo(hiltX - 1, 1);
+          ctx.lineTo(hiltX - 12, 10);
+          ctx.lineTo(hiltX - 14, 24);
+          ctx.lineTo(hiltX - 2, 27);
+          ctx.lineTo(hiltX + 10, 30);
+          ctx.lineTo(hiltX + 22, 22);
+          ctx.lineTo(hiltX + 38, 20);
+          ctx.lineTo(hiltX + 36, 17);
+          ctx.lineTo(hiltX + 22, 19);
+          ctx.lineTo(hiltX + 10, 26);
+          ctx.lineTo(hiltX - 2, 24);
+          ctx.lineTo(hiltX - 10, 22);
+          ctx.lineTo(hiltX - 8, 9);
+          ctx.lineTo(hiltX - 1, 2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#e2e8f0';
+          ctx.beginPath();
+          ctx.moveTo(hiltX - 1, 1);
+          ctx.lineTo(hiltX - 8, 6);
+          ctx.lineTo(hiltX - 8, 18);
+          ctx.lineTo(hiltX + 2, 20);
+          ctx.lineTo(hiltX + 15, 22);
+          ctx.lineTo(hiltX + 28, 16);
+          ctx.lineTo(hiltX + 46, 23);
+          ctx.lineTo(hiltX + 44, 20);
+          ctx.lineTo(hiltX + 28, 13);
+          ctx.lineTo(hiltX + 15, 19);
+          ctx.lineTo(hiltX + 2, 17);
+          ctx.lineTo(hiltX - 5, 15);
+          ctx.lineTo(hiltX - 5, 5);
+          ctx.lineTo(hiltX, 2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.moveTo(hiltX - 1, 1);
+          ctx.lineTo(hiltX - 10, 8);
+          ctx.lineTo(hiltX - 11, 22);
+          ctx.lineTo(hiltX - 1, 24);
+          ctx.lineTo(hiltX + 10, 26);
+          ctx.lineTo(hiltX + 22, 12);
+          ctx.lineTo(hiltX + 38, 13);
+          ctx.lineTo(hiltX + 54, 13);
+          ctx.lineTo(hiltX + 52, 10);
+          ctx.lineTo(hiltX + 36, 10);
+          ctx.lineTo(hiltX + 22, 9);
+          ctx.lineTo(hiltX + 10, 22);
+          ctx.lineTo(hiltX - 1, 21);
+          ctx.lineTo(hiltX - 8, 19);
+          ctx.lineTo(hiltX - 7, 7);
+          ctx.lineTo(hiltX, 1);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(hiltX - 3.0, -3.5, 4.0, 7.0);
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 1.0;
+          ctx.strokeRect(hiltX - 3.0, -3.5, 4.0, 7.0);
+
+          ctx.restore();
         }
-
-        const drawOrder = [2, 1, 0];
-
-        for (let idx = 0; idx < 3; idx++) {
-          const s = drawOrder[idx];
-          const cfg = _ZANGETSU_STRAND_CONFIGS[s];
-          const strand = fighter.ribbonStrands[s];
-          if (!strand || strand.length < 2) continue;
-
-          _drawPixelRibbonStrand(ctx, strand, cfg, 2.0);
-        }
-
-        // Stepped Pixel Knot at Pommel Wrap
-        const kx = Math.round(pommel.x / 2.0) * 2.0;
-        const ky = Math.round(pommel.y / 2.0) * 2.0;
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(kx - 4.0, ky - 4.0, 8.0, 8.0);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(kx - 2.0, ky - 2.0, 4.0, 4.0);
-
-        ctx.restore();
-      } else {
-        ctx.save();
-        ctx.fillStyle = '#cbd5e1';
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(hiltX - 1, 1);
-        ctx.lineTo(hiltX - 12, 10);
-        ctx.lineTo(hiltX - 14, 24);
-        ctx.lineTo(hiltX - 2, 27);
-        ctx.lineTo(hiltX + 10, 30);
-        ctx.lineTo(hiltX + 22, 22);
-        ctx.lineTo(hiltX + 38, 20);
-        ctx.lineTo(hiltX + 36, 17);
-        ctx.lineTo(hiltX + 22, 19);
-        ctx.lineTo(hiltX + 10, 26);
-        ctx.lineTo(hiltX - 2, 24);
-        ctx.lineTo(hiltX - 10, 22);
-        ctx.lineTo(hiltX - 8, 9);
-        ctx.lineTo(hiltX - 1, 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath();
-        ctx.moveTo(hiltX - 1, 1);
-        ctx.lineTo(hiltX - 8, 6);
-        ctx.lineTo(hiltX - 8, 18);
-        ctx.lineTo(hiltX + 2, 20);
-        ctx.lineTo(hiltX + 15, 22);
-        ctx.lineTo(hiltX + 28, 16);
-        ctx.lineTo(hiltX + 46, 23);
-        ctx.lineTo(hiltX + 44, 20);
-        ctx.lineTo(hiltX + 28, 13);
-        ctx.lineTo(hiltX + 15, 19);
-        ctx.lineTo(hiltX + 2, 17);
-        ctx.lineTo(hiltX - 5, 15);
-        ctx.lineTo(hiltX - 5, 5);
-        ctx.lineTo(hiltX, 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.moveTo(hiltX - 1, 1);
-        ctx.lineTo(hiltX - 10, 8);
-        ctx.lineTo(hiltX - 11, 22);
-        ctx.lineTo(hiltX - 1, 24);
-        ctx.lineTo(hiltX + 10, 26);
-        ctx.lineTo(hiltX + 22, 12);
-        ctx.lineTo(hiltX + 38, 13);
-        ctx.lineTo(hiltX + 54, 13);
-        ctx.lineTo(hiltX + 52, 10);
-        ctx.lineTo(hiltX + 36, 10);
-        ctx.lineTo(hiltX + 22, 9);
-        ctx.lineTo(hiltX + 10, 22);
-        ctx.lineTo(hiltX - 1, 21);
-        ctx.lineTo(hiltX - 8, 19);
-        ctx.lineTo(hiltX - 7, 7);
-        ctx.lineTo(hiltX, 1);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(hiltX - 3.0, -3.5, 4.0, 7.0);
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 1.0;
-        ctx.strokeRect(hiltX - 3.0, -3.5, 4.0, 7.0);
-
-        ctx.restore();
       }
 
       // 2. Rigid Pixel Art Blade & Handle
@@ -623,14 +647,14 @@ export function drawIchigoSkin(ctx, fighter) {
           if (!hideFrontHand) {
             _drawIchigoHand(ctx, hiltX + 18, 0, skinColor, true);
           }
-        } else if (isChampionScreen && !hideFrontHand) {
-          // Front hand resting on lower-left of body circle during champion screen
+        } else if (isChampionScreen && !hideFrontHand && !isMask) {
+          // Front hand resting on lower-left of body circle during champion screen (only when mask is off)
           _drawIchigoHand(ctx, -r * 0.55, r * 0.45, skinColor, true);
         }
       }
 
       // E) Getsuga Tensho / Bankai Gathering Reiatsu Charging Aura
-      if (isChanneling) {
+      if (isChanneling && !isFrozen) {
         _drawGetsugaChargingAura(ctx, {
           isShikai: true,
           isBankai: false,
@@ -645,7 +669,7 @@ export function drawIchigoSkin(ctx, fighter) {
           cutoutCenterY: cutoutCenterY,
           cutoutR: cutoutR
         });
-      } else if (isBankaiChanneling) {
+      } else if (isBankaiChanneling && !isFrozen) {
         _drawBankaiChargingAura(ctx, tipX, tipY, heelX, heelY, cutoutCenterX, cutoutCenterY, cutoutR, bankaiProg);
       }
 
@@ -668,12 +692,12 @@ export function drawIchigoSkin(ctx, fighter) {
         bladeLen: swordLen,
         skipChain: Boolean(fighter.bankaiChainNodes && !isBackSlungPose),
         isBankaiStance: isBankaiStance,
-        isChampionScreen: isChampionScreen
+        isChampionScreen: isBankaiStance
       });
 
       // Live Kuroi Reiatsu aura emitting along the Bankai sword (during active combat only — strictly hidden during champion screen, weapon menu, character select)
       const isBattlePlaying = (typeof state !== 'undefined' && state.gameState === 'playing');
-      const shouldHideSwordAura = !isBattlePlaying || Boolean(
+      const shouldHideSwordAura = !isBattlePlaying || isShikaiReverting || Boolean(
         fighter.isWeaponMenu ||
         fighter.hideSwordAura ||
         (typeof state !== 'undefined' && (
@@ -686,7 +710,7 @@ export function drawIchigoSkin(ctx, fighter) {
           state.previewFighter === fighter
         ))
       );
-      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon && !isLowQuality && !isChampionScreen && !shouldHideSwordAura) {
+      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon && !isLowQuality && !isChampionScreen && !shouldHideSwordAura && !isFrozen && !isShikaiReverting) {
         drawBankaiSwordOrbitingAura(ctx, swordStartX, swordLen, isMask, isFrozen);
       }
 
@@ -705,7 +729,7 @@ export function drawIchigoSkin(ctx, fighter) {
       }
 
       // Getsuga Tensho / Bankai Gathering Reiatsu Charging Aura
-      if (isChanneling) {
+      if (isChanneling && !isFrozen) {
         _drawGetsugaChargingAura(ctx, {
           isShikai: false,
           isBankai: true,
@@ -715,7 +739,7 @@ export function drawIchigoSkin(ctx, fighter) {
           swordStartX: swordStartX,
           swordLen: swordLen
         });
-      } else if (isBankaiChanneling) {
+      } else if (isBankaiChanneling && !isFrozen) {
         _drawBankaiChargingAura(ctx, swordStartX + swordLen, 0, swordStartX, 0, 0, 0, 0, bankaiProg);
       }
     }
@@ -730,9 +754,8 @@ export function drawIchigoSkin(ctx, fighter) {
 
   // ── 4. Main Body Circle Clip ──
   ctx.save();
-  if (bodyShiftX !== 0 || bodyTilt !== 0) {
+  if (bodyShiftX !== 0) {
     ctx.translate(bodyShiftX, 0);
-    ctx.rotate(bodyTilt);
   }
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -742,13 +765,7 @@ export function drawIchigoSkin(ctx, fighter) {
   if (modelImg && modelImg.complete && modelImg.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-    if (isBankai) {
-      // Bankai PNG model crop: sx: 35, sy: 40, sw: 422, sh: 423
-      ctx.drawImage(modelImg, 35, 40, 422, 423, -r, -r, r * 2, r * 2);
-    } else {
-      // Shikai PNG model crop: sx: 35, sy: 41, sw: 418, sh: 422
-      ctx.drawImage(modelImg, 35, 41, 418, 422, -r, -r, r * 2, r * 2);
-    }
+    ctx.drawImage(modelImg, -r, -r, r * 2, r * 2);
     ctx.restore();
   } else {
     // ── Fallback Procedural Bankai & Shikai Aesthetics ──
@@ -965,9 +982,8 @@ export function drawIchigoSkin(ctx, fighter) {
 
   // ── 5. Outer Body Stroke, Edge Glow & Unclipped Hollow Mask Overlay ──
   ctx.save();
-  if (bodyShiftX !== 0 || bodyTilt !== 0) {
+  if (bodyShiftX !== 0) {
     ctx.translate(bodyShiftX, 0);
-    ctx.rotate(bodyTilt);
   }
 
   if (isBankaiChanneling) {
@@ -980,8 +996,13 @@ export function drawIchigoSkin(ctx, fighter) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
 
-  // ── 5.2. Fully Assembled Hollow Mask Overlay (UNCLIPPED over character body) ──
+  // ── 5.2. Fully Assembled Hollow Mask Overlay (CLIPPED strictly into character body circle) ──
   if (isMask && !isForming) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.clip();
+
     let maskCrackProgress = 0;
     if (!isChampionScreen && fighter.hollowMaskActive && fighter.hollowMaskTimer !== undefined) {
       const crackWindow = 180; // starts cracking in last 3 seconds (180 frames)
@@ -997,10 +1018,8 @@ export function drawIchigoSkin(ctx, fighter) {
     const destY = -r * 1.08;
 
     if (maskImg && maskImg.complete && maskImg.naturalWidth > 0) {
-      // Fully assembled Hollow Mask PNG (unclipped)
-      ctx.save();
+      // Fully assembled Hollow Mask PNG (clipped into body circle)
       ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
-      ctx.restore();
     } else {
       ctx.fillStyle = "#FFFFFF"; // White mask base covering upper face
       ctx.beginPath();
@@ -1036,16 +1055,42 @@ export function drawIchigoSkin(ctx, fighter) {
     if (maskCrackProgress > 0.01 && !isChampionScreen) {
       _drawHollowMaskCracks(ctx, r, maskCrackProgress, now, fighter);
     }
+
+    ctx.restore();
   }
 
-  // ── 5.5. Hollow Mask Formation Animation (UNCLIPPED over character body) ──
+  // ── 5.5. Hollow Mask Formation Animation (Attached pieces clipped to body, flying shards and hand unclipped) ──
   if (isMask && isForming) {
     const maskImg = _getHollowMaskImage();
     const destW = r * 2.15;
     const destH = r * 2.50;
     const destX = -destW / 2;
     const destY = -r * 1.08;
-    _drawHollowMaskFormation(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
+
+    // 1) Attached pieces clipped strictly to circular body
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.clip();
+    _drawHollowMaskFormationAttached(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
+    ctx.restore();
+
+    // 2) Stroke body circle outline on top of attached mask pieces
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 3) Flying shards, snap flashes, and clutching hand in unclipped space
+    _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
+  } else {
+    // Stroke crisp outer body border
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   ctx.restore();
@@ -1742,18 +1787,6 @@ function _drawGetsugaChargingAura(ctx, params) {
     ctx.quadraticCurveTo(65, 15, heelX + 4, heelY - 2);
     ctx.stroke();
 
-    // 5. Tip Condensation Burst
-    const tipFlashR = (3.5 + 9.0 * chargeProg * pulse);
-    const tipGrad = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, tipFlashR);
-    tipGrad.addColorStop(0.0, coreColor);
-    tipGrad.addColorStop(0.40, primaryColor);
-    tipGrad.addColorStop(0.80, secondaryColor);
-    tipGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = tipGrad;
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, tipFlashR, 0, Math.PI * 2);
-    ctx.fill();
-
   } else {
     // ═════════════════════════════════════════════════════════════════════
     // ── BANKAI GETSUGA TENSHO (KUROI GETSUGA) CHARGING AURA ──
@@ -1832,22 +1865,6 @@ function _drawGetsugaChargingAura(ctx, params) {
       else ctx.lineTo(bx, by);
     }
     ctx.stroke();
-
-    // 5. Tip Kuroi Getsuga Flash Point
-    const tipX_actual = bladeBaseX + actualBladeLen;
-    const tipY_actual = getSori(tipX_actual);
-    const tipFlashR = (3.5 + 9.0 * chargeProg * pulse);
-
-    const tipGrad = ctx.createRadialGradient(tipX_actual, tipY_actual, 0, tipX_actual, tipY_actual, tipFlashR);
-    tipGrad.addColorStop(0.0, coreColor);
-    tipGrad.addColorStop(0.40, primaryColor);
-    tipGrad.addColorStop(0.80, secondaryColor);
-    tipGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = tipGrad;
-    ctx.beginPath();
-    ctx.arc(tipX_actual, tipY_actual, tipFlashR, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   ctx.restore();
@@ -2143,6 +2160,183 @@ function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
   ctx.restore();
 }
 
+function _drawShikaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
+  // Timing: Surges violently upward into the sky upon reverting from Bankai back to Shikai
+  const pillarProg = Math.min(1.0, burstProg / 0.70);
+  const pillarHeight = 140 + Math.pow(pillarProg, 0.55) * 800; // Skyward beam reaching high into the air
+  const pillarBaseW = (44 + 20 * (1.0 - burstProg));
+  const pillarAlpha = Math.pow(1.0 - burstProg, 0.9) * alpha;
+
+  if (pillarAlpha <= 0.01) return;
+
+  ctx.save();
+
+  // ── 1. Colossal Outer Shikai Reiatsu Corona Shroud (Multi-Peak Needle Silhouette: Cyan-Blue, Pure White & Jet Black) ──
+  const coronaW = pillarBaseW * 1.55;
+  const coronaGrad = ctx.createLinearGradient(-coronaW, 0, coronaW, 0);
+  coronaGrad.addColorStop(0.0, 'rgba(0, 213, 255, 0.0)');
+  coronaGrad.addColorStop(0.20, `rgba(0, 213, 255, ${(0.85 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.42, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.50, `rgba(255, 255, 255, ${(1.0 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.58, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.80, `rgba(0, 213, 255, ${(0.85 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(1.0, 'rgba(0, 213, 255, 0.0)');
+
+  // Outer Multi-Peak Needle Polygon (Cyan-Blue, White, Black lines)
+  ctx.beginPath();
+  ctx.moveTo(-coronaW, 0);
+  ctx.lineTo(-coronaW * 0.75, -pillarHeight * 0.55);
+  ctx.lineTo(-coronaW * 0.60, -pillarHeight * 0.52);
+  ctx.lineTo(-coronaW * 0.40, -pillarHeight * 0.82);
+  ctx.lineTo(-coronaW * 0.25, -pillarHeight * 0.78);
+  ctx.lineTo(0, -pillarHeight);                      // Main Center Spear Peak
+  ctx.lineTo(coronaW * 0.25, -pillarHeight * 0.75);
+  ctx.lineTo(coronaW * 0.45, -pillarHeight * 0.80);
+  ctx.lineTo(coronaW * 0.65, -pillarHeight * 0.50);
+  ctx.lineTo(coronaW * 0.80, -pillarHeight * 0.54);
+  ctx.lineTo(coronaW, 0);
+  ctx.closePath();
+  ctx.fillStyle = coronaGrad;
+  ctx.fill();
+
+  // ── 2. High-Density Black Void & Stark Cyan-White Core Column ──
+  const coreW = pillarBaseW * 0.75;
+  const coreGrad = ctx.createLinearGradient(-coreW, 0, coreW, 0);
+  coreGrad.addColorStop(0.0, 'rgba(10, 15, 24, 0.0)');
+  coreGrad.addColorStop(0.20, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(0.40, `rgba(0, 213, 255, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(0.50, `rgba(255, 255, 255, ${(1.0 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(0.60, `rgba(0, 213, 255, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(0.80, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(1.0, 'rgba(10, 15, 24, 0.0)');
+
+  ctx.beginPath();
+  ctx.moveTo(-coreW, 0);
+  ctx.lineTo(-coreW * 0.60, -pillarHeight * 0.60);
+  ctx.lineTo(-coreW * 0.35, -pillarHeight * 0.88);
+  ctx.lineTo(0, -pillarHeight * 0.98);               // Core Spear Tip
+  ctx.lineTo(coreW * 0.35, -pillarHeight * 0.85);
+  ctx.lineTo(coreW * 0.60, -pillarHeight * 0.56);
+  ctx.lineTo(coreW, 0);
+  ctx.closePath();
+  ctx.fillStyle = coreGrad;
+  ctx.fill();
+
+  // ── 3. Vertical Supersonic Speed Needle Streaks Inside Pillar (CyanBlue-White-Black Lines) ──
+  const streakCount = 8;
+  for (let s = 0; s < streakCount; s++) {
+    const sNorm = (s / (streakCount - 1)) * 2 - 1; // -1 to +1
+    const sx = sNorm * (coreW * 0.75);
+    const sSpeed = 1.2 + (s % 3) * 0.4;
+    const sTravel = ((now * 0.003 * sSpeed * 60 + s * 70) % (pillarHeight * 0.85));
+    const sy = -sTravel;
+    const sLen = 45 + (1.0 - Math.abs(sNorm)) * 65;
+    const sThick = (1.5 + (1.0 - Math.abs(sNorm)) * 1.5) * (1.0 - burstProg * 0.4);
+
+    let sColor;
+    if (s % 4 === 0) sColor = `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`;       // Manga dark ink line
+    else if (s % 4 === 1) sColor = `rgba(0, 213, 255, ${(0.95 * pillarAlpha).toFixed(3)})`; // Sky-Blue Reiatsu
+    else if (s % 4 === 2) sColor = `rgba(0, 170, 255, ${(0.95 * pillarAlpha).toFixed(3)})`; // Deep Electric Cyan
+    else sColor = `rgba(255, 255, 255, ${(0.98 * pillarAlpha).toFixed(3)})`;                 // Pure White Core
+
+    ctx.fillStyle = sColor;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sLen / 2);
+    ctx.lineTo(sx + sThick, sy);
+    ctx.lineTo(sx, sy + sLen / 2);
+    ctx.lineTo(sx - sThick, sy);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── 4. Transonic Mach Vapor Expansion Discs (Horizontal Condensation Rings) ──
+  const ringDefs = [
+    { baseY: -25,  scaleX: 1.50, scaleY: 0.32, speed: 1.0, thick: 14.0 },
+    { baseY: -95,  scaleX: 1.35, scaleY: 0.28, speed: 1.15, thick: 11.0 },
+    { baseY: -185, scaleX: 1.15, scaleY: 0.24, speed: 1.30, thick: 8.5 }
+  ];
+
+  for (let rIdx = 0; rIdx < ringDefs.length; rIdx++) {
+    const rd = ringDefs[rIdx];
+    const ringProg = Math.min(1.0, burstProg * rd.speed);
+    const rx = (pillarBaseW * 0.9 + ringProg * 175 * rd.scaleX);
+    const ry = rx * rd.scaleY;
+    const curY = rd.baseY - ringProg * 35;
+    const ringA = Math.sin(Math.min(1.0, burstProg * 1.4) * Math.PI) * pillarAlpha * 0.88;
+
+    if (ringA > 0.01) {
+      ctx.save();
+      ctx.translate(0, curY);
+
+      // Outer Cyan-Blue Vapor Ring
+      ctx.strokeStyle = `rgba(0, 213, 255, ${(0.75 * ringA).toFixed(3)})`;
+      ctx.lineWidth = rd.thick * (1.0 - burstProg * 0.5);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Sharp Jet-Black Void Shock Edge
+      ctx.strokeStyle = `rgba(10, 15, 24, ${(0.95 * ringA).toFixed(3)})`;
+      ctx.lineWidth = 2.4 * (1.0 - burstProg * 0.5);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Stark Pure White Condensation Vapor Core
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * ringA).toFixed(3)})`;
+      ctx.lineWidth = 1.2 * (1.0 - burstProg * 0.5);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  // ── 5. Vertical Ascending Micro-Lightning Tendrils (Cyan-White Theme) ──
+  const boltCount = 4;
+  for (let b = 0; b < boltCount; b++) {
+    const bSide = b % 2 === 0 ? -1 : 1;
+    const startY = -40 - b * 90;
+    const bLen = (60 + (b % 2) * 45) * (1.0 - burstProg * 0.3);
+    const bx = bSide * (coreW * 0.85);
+
+    ctx.beginPath();
+    ctx.moveTo(bx, startY);
+    let curX = bx, curY = startY;
+    const segs = 4;
+    for (let s = 1; s <= segs; s++) {
+      const frac = s / segs;
+      const jag = (s % 2 === 0 ? 1 : -1) * (5.5 + Math.sin(now * 0.05 + b + s) * 3.5);
+      curX = bx + bSide * (frac * 14) + jag;
+      curY = startY - frac * bLen;
+      ctx.lineTo(curX, curY);
+    }
+    ctx.strokeStyle = `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`;
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    ctx.strokeStyle = (b % 2 === 0) ? `rgba(0, 213, 255, ${(0.98 * pillarAlpha).toFixed(3)})` : `rgba(255, 255, 255, ${(0.98 * pillarAlpha).toFixed(3)})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function _drawShikaiReversionBurst(ctx, r, fighter, now) {
+  const maxB = fighter.shikaiReversionBurstMax || CONFIG.ichigo?.shikaiReversionBurstFrames || 36;
+  const curB = fighter.shikaiReversionBurstTimer || 0;
+  const burstProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
+  const alpha = Math.pow(1.0 - burstProg, 0.85);
+
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  _drawShikaiSkywardSonicPillar(ctx, r, burstProg, alpha, now);
+  ctx.restore();
+}
+
 function _drawHollowSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
   // Timing: Surges violently upward into the sky upon Hollow Mask Awakening
   const pillarProg = Math.min(1.0, burstProg / 0.70);
@@ -2306,6 +2500,73 @@ function _drawHollowSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
   ctx.restore();
 }
 
+function _drawHollowChannelingReiatsuAura(ctx, r, formationProg, now, fighter) {
+  ctx.save();
+  const time = now * 0.003;
+  const pSize = 2.0;
+
+  // 1. Ground Ghost-White Ethereal Spiritual Pool under feet
+  const poolR = r * (1.50 + 0.20 * Math.sin(time * 6.0));
+  const poolGrad = ctx.createRadialGradient(0, 0, r * 0.35, 0, 0, poolR);
+  poolGrad.addColorStop(0.0, 'rgba(248, 248, 255, 0.60)');  // Bright Ghost White core
+  poolGrad.addColorStop(0.35, 'rgba(220, 232, 250, 0.45)'); // Spectral Silver Mist
+  poolGrad.addColorStop(0.75, 'rgba(20, 24, 35, 0.70)');   // Deep Phantom Shadow
+  poolGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+
+  ctx.fillStyle = poolGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.35, poolR * 1.25, poolR * 0.70, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Inward Ghost-White Suction / Gravity Distortion Shock Rings (Condensing spiritual pressure inward toward face)
+  const ringCount = 3;
+  for (let i = 0; i < ringCount; i++) {
+    const ringPhase = ((time * 1.6 + i * (1.0 / ringCount)) % 1.0);
+    // Inward contracting radius
+    const ringR = r * (3.4 - ringPhase * 2.4);
+    const ringAlpha = Math.sin(ringPhase * Math.PI) * 0.65 * (0.6 + 0.4 * formationProg);
+    
+    ctx.strokeStyle = (i % 2 === 0) 
+      ? `rgba(248, 248, 255, ${ringAlpha.toFixed(2)})` 
+      : `rgba(200, 218, 240, ${(ringAlpha * 0.9).toFixed(2)})`;
+    ctx.lineWidth = 2.2 * (1.0 - ringPhase * 0.4);
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.2, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // 3. Rising Ghost-White Flame Wisps, Spectral Embers & Hollow Mask Shard Motes
+  const emberCount = 12;
+  for (let e = 0; e < emberCount; e++) {
+    const eSeed = e * 37.1 + time * 2.5;
+    const eProg = ((time * 1.8 + e * (1.0 / emberCount)) % 1.0);
+    const eAng = e * (Math.PI * 2 / emberCount) + Math.sin(eSeed) * 0.5;
+    const eDist = r * (0.65 + 0.85 * (1.0 - eProg * 0.45));
+    const ex = Math.cos(eAng) * eDist;
+    const ey = Math.sin(eAng) * eDist - eProg * 38; // Rises upward toward mask
+    const eAlpha = Math.sin(eProg * Math.PI) * 0.90;
+
+    if (eAlpha > 0.05) {
+      const eColor = (e % 3 === 0) 
+        ? `rgba(255, 255, 255, ${eAlpha.toFixed(2)})` 
+        : ((e % 3 === 1) 
+          ? `rgba(248, 248, 255, ${eAlpha.toFixed(2)})` 
+          : `rgba(215, 230, 250, ${eAlpha.toFixed(2)})`);
+      _drawPixelDiamond(
+        ctx, 
+        ex, 
+        ey, 
+        3.5 * (1.0 - eProg * 0.4), 
+        eColor, 
+        '#FFFFFF', 
+        pSize
+      );
+    }
+  }
+
+  ctx.restore();
+}
+
 function _drawHollowEruptionBurst(ctx, r, fighter, now, formationProg = 0) {
   let burstProg = formationProg;
   if (fighter.hollowBurstTimer !== undefined && fighter.hollowBurstTimer > 0) {
@@ -2363,49 +2624,27 @@ function _drawBankaiActiveFlameWisps(ctx, r, now) {
 
 function _drawIchigoHand(ctx, hx, hy, skinColor, isShikai) {
   const handR = getHandSize ? getHandSize(6.5) : 6.5;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
   ctx.save();
   ctx.translate(hx, hy);
 
-  // Shihakusho black wrist sleeve cuff
+  // Shihakusho black wrist sleeve cuff in pixel art
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(-handR - 4 - P), snap(-handR * 0.9 - P), snap(5.5 + P * 2), snap(handR * 1.8 + P * 2));
   ctx.fillStyle = '#111111';
-  ctx.fillRect(-handR - 4, -handR * 0.9, 5.5, handR * 1.8);
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 0.8;
-  ctx.strokeRect(-handR - 4, -handR * 0.9, 5.5, handR * 1.8);
+  ctx.fillRect(snap(-handR - 4), snap(-handR * 0.9), snap(5.5), snap(handR * 1.8));
 
-  // White cloth bandages on wrist for Shikai
+  // White cloth bandages on wrist for Shikai in pixel art
   if (isShikai) {
-    ctx.strokeStyle = '#E0E0E0';
-    ctx.lineWidth = 0.9;
-    ctx.beginPath();
-    for (let bx = -handR - 3; bx < -handR + 1; bx += 2.5) {
-      ctx.moveTo(bx, -handR * 0.8);
-      ctx.lineTo(bx + 1.2, handR * 0.8);
-    }
-    ctx.stroke();
+    ctx.fillStyle = '#E2E8F0';
+    ctx.fillRect(snap(-handR - 3), snap(-handR * 0.6), P, snap(handR * 1.2));
+    ctx.fillRect(snap(-handR - 1), snap(-handR * 0.6), P, snap(handR * 1.2));
   }
 
-  // Clenched fist / hand base
-  ctx.fillStyle = skinColor;
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(0, 0, handR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Clenched knuckle creases
-  ctx.strokeStyle = 'rgba(160, 90, 50, 0.6)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(-handR * 0.2, -handR * 0.5);
-  ctx.lineTo(handR * 0.4, -handR * 0.3);
-  ctx.moveTo(-handR * 0.2, 0);
-  ctx.lineTo(handR * 0.5, 0);
-  ctx.moveTo(-handR * 0.2, handR * 0.5);
-  ctx.lineTo(handR * 0.4, handR * 0.3);
-  ctx.stroke();
+  // Clenched fist / hand base in authentic pixel art
+  drawPixelHand(ctx, 0, 0, handR, skinColor || '#FFE0BD');
 
   ctx.restore();
 }
@@ -2453,7 +2692,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   let bodyTilt = 0;
 
   if (isBankaiChanneling) {
-    const maxB = fighter.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 50;
+    const maxB = fighter.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 66;
     const bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.bankaiChargeTimer || 0) / maxB)));
     const raiseProg = Math.min(1.0, bankaiProg / 0.48);
     const raiseEase = raiseProg * raiseProg * (3 - 2 * raiseProg);
@@ -2468,26 +2707,26 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
     const chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
     const liftEase = Math.min(1.0, chargeProg * 1.7);
     const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
-    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.04 * (0.3 + 0.7 * chargeProg);
+    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.03 * (0.3 + 0.7 * chargeProg);
 
-    swingAngle = -0.16 + (-2.10 - (-0.16)) * smoothLift + chargeTremble;
-    thrustDistance = -4 - 6 * smoothLift;
+    swingAngle = -0.16 + (-1.85 - (-0.16)) * smoothLift + chargeTremble;
+    thrustDistance = -4.0 - 6.0 * smoothLift;
     bodyShiftX = -1.5 - 3.0 * smoothLift;
-    bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.5;
+    bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.4;
   } else if (isSlashing) {
     if (fighter.isGetsugaSlash) {
       const slashPhase = 0.20;
       if (rawSlashProg < slashPhase) {
         const p = rawSlashProg / slashPhase;
         const sweepCurve = p * p * (3 - 2 * p);
-        swingAngle = -2.10 + (1.35 - (-2.10)) * sweepCurve;
+        swingAngle = -1.85 + (1.25 - (-1.85)) * sweepCurve;
         thrustDistance = -10 + 26 * Math.sin(p * Math.PI * 0.5);
         bodyShiftX = -4.5 + 9.5 * Math.sin(p * Math.PI * 0.5);
         bodyTilt = -0.12 + 0.20 * Math.sin(p * Math.PI * 0.5);
       } else {
         const p = (rawSlashProg - slashPhase) / (1.0 - slashPhase);
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.16 + (1.35 - (-0.16)) * easeP;
+        swingAngle = -0.16 + (1.25 - (-0.16)) * easeP;
         thrustDistance = 16 * easeP;
         bodyShiftX = 5.0 * easeP;
         bodyTilt = 0.08 * easeP;
@@ -2554,7 +2793,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   // Exact 1:1 forward kinematics matching renderZangetsu:
   const innerX = swordStartX - hiltOffset;
   const innerY = 0;
-  const theta = swingAngle + bodyTilt;
+  const theta = swingAngle;
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
 
@@ -2681,8 +2920,24 @@ const _ZANGETSU_STRAND_CONFIGS = [
 export function updateZangetsuRibbonPhysics(fighter) {
   if (!fighter) return;
 
-  // Skip Shikai ribbon physics when in Bankai form (ribbons not visible)
+  // Skip Shikai ribbon physics when in Bankai form or during fights (ribbons not visible during fight)
   if (fighter.bankaiActive || fighter.skin === 'bankai') return;
+
+  const isWeaponMenu = Boolean(
+    fighter.isWeaponMenu ||
+    fighter._isFaceOff ||
+    (typeof state !== 'undefined' && (
+      state.gameState === 'weapons' || 
+      state.gameState === 'weaponDetail' || 
+      state.gameState === 'weaponStudio' || 
+      state.gameState === 'weaponIndex' || 
+      state.gameState === 'select' ||
+      state.gameState === 'index' ||
+      state.gameState === 'indexDetail' ||
+      state.previewFighter === fighter
+    ))
+  );
+  if (!isWeaponMenu) return;
 
   const isFrozen = Boolean(
     fighter.isFrozenByInfinity ||
@@ -3069,130 +3324,192 @@ const _MASK_FORMATION_SHARDS = [
   {
     name: 'crest_top',
     poly: [[0.34, 0.00], [0.66, 0.00], [0.60, 0.24], [0.40, 0.24]],
-    startDir: { x: 0.0, y: -1.0 },
-    rot: -0.18,
+    startDir: { x: 0.0, y: -1.25 },
+    rot: -0.22,
     delay: 0.00
   },
   // 1. Top Left Temple Horn Spike
   {
     name: 'horn_left',
     poly: [[0.00, 0.00], [0.34, 0.00], [0.40, 0.24], [0.08, 0.26]],
-    startDir: { x: -0.75, y: -0.65 },
-    rot: 0.25,
-    delay: 0.04
+    startDir: { x: -0.95, y: -0.75 },
+    rot: 0.32,
+    delay: 0.07
   },
   // 2. Top Right Temple Horn Spike (Crimson Stripes)
   {
     name: 'horn_right',
     poly: [[0.66, 0.00], [1.00, 0.00], [0.92, 0.26], [0.60, 0.24]],
-    startDir: { x: 0.75, y: -0.65 },
-    rot: -0.25,
-    delay: 0.04
+    startDir: { x: 0.95, y: -0.75 },
+    rot: -0.32,
+    delay: 0.14
   },
   // 3. Left Brow & Upper Eye Socket
   {
     name: 'brow_left',
     poly: [[0.08, 0.26], [0.50, 0.24], [0.50, 0.39], [0.10, 0.41]],
-    startDir: { x: -0.95, y: -0.30 },
-    rot: 0.20,
-    delay: 0.08
+    startDir: { x: -1.15, y: -0.35 },
+    rot: 0.26,
+    delay: 0.21
   },
   // 4. Right Brow & Upper Eye Socket (Crimson Stripes)
   {
     name: 'brow_right',
     poly: [[0.50, 0.24], [0.92, 0.26], [0.90, 0.41], [0.50, 0.39]],
-    startDir: { x: 0.95, y: -0.30 },
-    rot: -0.20,
-    delay: 0.08
+    startDir: { x: 1.15, y: -0.35 },
+    rot: -0.26,
+    delay: 0.28
   },
   // 5. Left Cheek & Bone-White Plate
   {
     name: 'cheek_left',
     poly: [[0.06, 0.41], [0.44, 0.39], [0.44, 0.59], [0.08, 0.60]],
-    startDir: { x: -1.0, y: 0.20 },
-    rot: -0.22,
-    delay: 0.12
+    startDir: { x: -1.25, y: 0.25 },
+    rot: -0.28,
+    delay: 0.36
   },
   // 6. Right Cheek & Visored Sunburst Plate
   {
     name: 'cheek_right',
     poly: [[0.56, 0.39], [0.94, 0.41], [0.92, 0.60], [0.56, 0.59]],
-    startDir: { x: 1.0, y: 0.20 },
-    rot: 0.22,
-    delay: 0.12
+    startDir: { x: 1.25, y: 0.25 },
+    rot: 0.28,
+    delay: 0.44
   },
   // 7. Central Nasal Ridge Bone / Center Divider
   {
     name: 'nose_bridge',
     poly: [[0.44, 0.39], [0.56, 0.39], [0.56, 0.59], [0.44, 0.59]],
-    startDir: { x: 0.0, y: -0.70 },
-    rot: 0.15,
-    delay: 0.15
+    startDir: { x: 0.0, y: -0.85 },
+    rot: 0.18,
+    delay: 0.52
   },
   // 8. Upper Gritted Teeth Row
   {
     name: 'upper_teeth',
     poly: [[0.14, 0.59], [0.86, 0.59], [0.80, 0.74], [0.20, 0.74]],
-    startDir: { x: 0.0, y: 0.75 },
-    rot: -0.12,
-    delay: 0.18
+    startDir: { x: 0.0, y: 0.95 },
+    rot: -0.16,
+    delay: 0.60
   },
   // 9. Lower Left Jaw & Teeth
   {
     name: 'jaw_left',
     poly: [[0.16, 0.74], [0.50, 0.74], [0.50, 0.90], [0.26, 0.88]],
-    startDir: { x: -0.70, y: 0.70 },
-    rot: 0.22,
-    delay: 0.22
+    startDir: { x: -0.85, y: 0.85 },
+    rot: 0.26,
+    delay: 0.68
   },
   // 10. Lower Right Jaw & Teeth (Crimson Marks)
   {
     name: 'jaw_right',
     poly: [[0.50, 0.74], [0.84, 0.74], [0.74, 0.88], [0.50, 0.90]],
-    startDir: { x: 0.70, y: 0.70 },
-    rot: -0.22,
-    delay: 0.22
+    startDir: { x: 0.85, y: 0.85 },
+    rot: -0.26,
+    delay: 0.74
   },
   // 11. Pointed Chin Tip Vertex
   {
     name: 'chin_tip',
     poly: [[0.26, 0.88], [0.74, 0.88], [0.50, 1.00]],
-    startDir: { x: 0.0, y: 1.0 },
-    delay: 0.25
+    startDir: { x: 0.0, y: 1.25 },
+    rot: 0.08,
+    delay: 0.80
   }
 ];
 
-function _drawHollowMaskFormation(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH) {
-  if (!maskImg || !maskImg.complete || maskImg.naturalWidth <= 0) return;
+function _drawHollowMaskFormationAttached(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH) {
+  if (formationProg < 0.06) return;
+  const hasImg = Boolean(maskImg && maskImg.complete && maskImg.naturalWidth > 0);
+  const maskAssemblyProg = Math.min(1.0, Math.max(0.0, (formationProg - 0.06) / 0.78));
 
-  // Spring overshoot easing function
+  for (let i = 0; i < _MASK_FORMATION_SHARDS.length; i++) {
+    const shard = _MASK_FORMATION_SHARDS[i];
+    if (maskAssemblyProg < shard.delay) continue;
+
+    const rawProg = (maskAssemblyProg - shard.delay) / 0.16;
+    if (rawProg < 1.0) continue; // Only draw once it has arrived and attached to the face!
+
+    // Draw high-contrast solid bone-white shard base
+    ctx.beginPath();
+    shard.poly.forEach((pt, idx) => {
+      const px = destX + pt[0] * destW;
+      const py = destY + pt[1] * destH;
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+
+    ctx.fillStyle = '#F8F7F2'; // Authentic bone porcelain ivory
+    ctx.fill();
+
+    // Clip strictly to polygon boundary for high-res mask texture
+    ctx.save();
+    ctx.clip();
+
+    if (hasImg) {
+      // Draw the authentic Hollow Mask PNG inside this clipped fragment
+      ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
+    } else {
+      // Procedural fallback: Crimson stripes on right-side shards
+      if (shard.name.includes('right') || shard.name === 'chin_tip') {
+        ctx.strokeStyle = '#DC143C';
+        ctx.lineWidth = 3.0;
+        ctx.beginPath();
+        ctx.moveTo(destX + destW * 0.45, destY + destH * 0.20);
+        ctx.lineTo(destX + destW * 0.85, destY + destH * 0.55);
+        ctx.moveTo(destX + destW * 0.55, destY + destH * 0.15);
+        ctx.lineTo(destX + destW * 0.92, destY + destH * 0.45);
+        ctx.stroke();
+      }
+      if (shard.name === 'upper_teeth' || shard.name.includes('jaw')) {
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let tx = destX + destW * 0.25; tx < destX + destW * 0.75; tx += 4.5) {
+          ctx.moveTo(tx, destY + destH * 0.60);
+          ctx.lineTo(tx, destY + destH * 0.85);
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // Crisp dark ink seam outline around the attached shard polygon
+    ctx.strokeStyle = (formationProg < 0.84) ? '#1A1A1A' : 'rgba(20, 20, 20, 0.65)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    shard.poly.forEach((pt, idx) => {
+      const px = destX + pt[0] * destW;
+      const py = destY + pt[1] * destH;
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.stroke();
+  }
+}
+
+function _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH) {
   const easeOutBack = (t) => {
-    const c1 = 1.35;
+    const c1 = 1.45;
     const c3 = c1 + 1;
     return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
   };
 
-  // 1. Render each flying shard ONLY after hand has clutched the face (formationProg >= 0.35)
-  if (formationProg >= 0.35) {
-    const maskAssemblyProg = Math.min(1.0, (formationProg - 0.35) / 0.45); // 0.0 to 1.0 (Phase 2)
+  const hasImg = Boolean(maskImg && maskImg.complete && maskImg.naturalWidth > 0);
+
+  // 1. Render shards that are in-flight converging towards the face + arrival snap flashes
+  if (formationProg >= 0.06) {
+    const maskAssemblyProg = Math.min(1.0, Math.max(0.0, (formationProg - 0.06) / 0.78));
 
     for (let i = 0; i < _MASK_FORMATION_SHARDS.length; i++) {
       const shard = _MASK_FORMATION_SHARDS[i];
-      const shardProg = Math.max(0, Math.min(1.0, (maskAssemblyProg - shard.delay) / Math.max(0.01, (1.0 - shard.delay))));
-      
-      // Overshoot ease curve
-      const ease = (shardProg >= 1.0) ? 1.0 : easeOutBack(shardProg);
-      const remain = Math.max(0, 1.0 - ease);
-      
-      // Tight outer trajectory flight offset directly around head & hand
-      const dist = r * 1.25 * remain;
-      const curOffX = shard.startDir.x * dist;
-      const curOffY = shard.startDir.y * dist;
-      const curRot = shard.rot * remain;
-      const curScale = (shardProg >= 1.0) ? 1.0 : (0.75 + 0.25 * Math.min(1.0, ease));
-      const curAlpha = (shardProg >= 1.0) ? 1.0 : Math.min(1.0, 0.30 + shardProg * 0.70);
+      if (maskAssemblyProg < shard.delay) continue;
 
-      // Shard centroid in local destination space
+      const rawProg = (maskAssemblyProg - shard.delay) / 0.16;
+
+      // Centroid
       let cx = 0, cy = 0;
       for (const pt of shard.poly) {
         cx += destX + pt[0] * destW;
@@ -3201,62 +3518,123 @@ function _drawHollowMaskFormation(ctx, r, formationProg, now, fighter, maskImg, 
       cx /= shard.poly.length;
       cy /= shard.poly.length;
 
-      ctx.save();
-      ctx.globalAlpha = curAlpha;
+      if (rawProg < 1.0) {
+        // In-flight shard!
+        const shardProg = Math.max(0, rawProg);
+        const ease = easeOutBack(shardProg);
+        const remain = Math.max(0, 1.0 - ease);
 
-      // Apply flight translation, rotation and scale relative to shard centroid
-      ctx.translate(cx + curOffX, cy + curOffY);
-      ctx.rotate(curRot);
-      ctx.scale(curScale, curScale);
-      ctx.translate(-cx, -cy);
+        const dist = r * 2.2 * remain;
+        const curOffX = shard.startDir.x * dist;
+        const curOffY = shard.startDir.y * dist;
+        const curRot = shard.rot * remain;
+        const curScale = 0.65 + 0.35 * Math.min(1.0, ease);
+        const curAlpha = Math.min(1.0, 0.40 + shardProg * 0.60);
 
-      // Clip strictly to polygon boundary
-      ctx.beginPath();
-      shard.poly.forEach((pt, idx) => {
-        const px = destX + pt[0] * destW;
-        const py = destY + pt[1] * destH;
-        if (idx === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      ctx.closePath();
-      ctx.clip();
+        ctx.save();
+        ctx.globalAlpha = curAlpha;
+        ctx.translate(cx + curOffX, cy + curOffY);
+        ctx.rotate(curRot);
+        ctx.scale(curScale, curScale);
+        ctx.translate(-cx, -cy);
 
-      // Draw the actual Hollow Mask PNG inside this clipped fragment cleanly
-      ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
+        // Solid bone base
+        ctx.beginPath();
+        shard.poly.forEach((pt, idx) => {
+          const px = destX + pt[0] * destW;
+          const py = destY + pt[1] * destH;
+          if (idx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+        ctx.fillStyle = '#F8F7F2';
+        ctx.fill();
 
-      ctx.restore();
+        ctx.save();
+        ctx.clip();
+        if (hasImg) {
+          ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
+        } else {
+          if (shard.name.includes('right') || shard.name === 'chin_tip') {
+            ctx.strokeStyle = '#DC143C';
+            ctx.lineWidth = 3.0;
+            ctx.beginPath();
+            ctx.moveTo(destX + destW * 0.45, destY + destH * 0.20);
+            ctx.lineTo(destX + destW * 0.85, destY + destH * 0.55);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+
+        // Glowing white-crimson outline while flying
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(0.90 * (1.0 - shardProg)).toFixed(2)})`;
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(255, 30, 0, ${(0.80 * (1.0 - shardProg)).toFixed(2)})`;
+        ctx.lineWidth = 4.0;
+        ctx.stroke();
+
+        // Spiritual pressure wisps
+        if (Math.random() < 0.35) {
+          ctx.strokeStyle = '#FF1E00';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + curOffX * 0.4 + (Math.random() - 0.5) * 8, cy + curOffY * 0.4 + (Math.random() - 0.5) * 8);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      } else if (rawProg >= 1.0 && rawProg < 1.35) {
+        // Instantaneous arrival snap flash
+        const snapRatio = (rawProg - 1.0) / 0.35;
+        const snapAlpha = Math.sin(snapRatio * Math.PI);
+        ctx.save();
+        ctx.beginPath();
+        shard.poly.forEach((pt, idx) => {
+          const px = destX + pt[0] * destW;
+          const py = destY + pt[1] * destH;
+          if (idx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * snapAlpha).toFixed(2)})`;
+        ctx.lineWidth = 3.0;
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(255, 30, 0, ${(0.85 * snapAlpha).toFixed(2)})`;
+        ctx.lineWidth = 5.0;
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   }
 
-  // 2. Hand-to-Face Clutching Animation (Anime Visored Manifestation Gesture)
+  // 2. Hand-to-Face Clutching Animation (Anime Visored Manifestation Gesture — Left / Other Hand grasps face while Right Hand holds Katana)
   let handX = 0, handY = 0, handRot = 0, handAlpha = 0, handOpen = 0;
-  if (formationProg < 0.35) {
-    // Phase 1: Hand rises to face FIRST (0.00 -> 0.35)
-    const p = formationProg / 0.35;
-    const ease = p * p * (3 - 2 * p); // smooth ease in-out
-    // Start from sword guard / chest level (r * 0.45, r * 0.35) up to upper face (0, -r * 0.32)
-    handX = (r * 0.45) * (1.0 - ease) + (0) * ease;
-    handY = (r * 0.35) * (1.0 - ease) + (-r * 0.32) * ease;
-    handRot = (0.55) * (1.0 - ease) + (-0.15) * ease;
+  if (formationProg < 0.12) {
+    const p = formationProg / 0.12;
+    const ease = p * p * (3 - 2 * p);
+    handX = (-r * 0.50) * (1.0 - ease) + (-r * 0.36) * ease;
+    handY = (r * 0.35) * (1.0 - ease) + (-r * 0.38) * ease;
+    handRot = (-0.55) * (1.0 - ease) + (0.28) * ease;
     handAlpha = Math.min(1.0, p * 1.6);
-    handOpen = ease; // fingers splaying open to clutch face
-  } else if (formationProg < 0.80) {
-    // Phase 2: Hand firmly clutching face WHILE mask pieces and ribbons assemble underneath (0.35 -> 0.80)
-    const p = (formationProg - 0.35) / 0.45;
+    handOpen = ease;
+  } else if (formationProg < 0.84) {
+    const p = (formationProg - 0.12) / 0.72;
     const tremble = Math.sin(now * 0.09) * 1.4 * (1.0 - p * 0.25);
-    handX = 0 + tremble;
-    handY = -r * 0.32 + tremble * 0.5;
-    handRot = -0.15 + tremble * 0.04;
+    handX = -r * 0.36 + tremble;
+    handY = -r * 0.38 + tremble * 0.5;
+    handRot = 0.28 + tremble * 0.04;
     handAlpha = 1.0;
     handOpen = 1.0;
   } else {
-    // Phase 3: Hand swiping downward / away as mask fuses and eyes ignite (0.80 -> 1.00)
-    const p = (formationProg - 0.80) / 0.20;
-    const ease = p * p; // accelerating pull-away
-    // Slides from face down-right toward sword grip (0, -r * 0.32) -> (r * 0.60, r * 0.40)
-    handX = (0) * (1.0 - ease) + (r * 0.60) * ease;
-    handY = (-r * 0.32) * (1.0 - ease) + (r * 0.40) * ease;
-    handRot = (-0.15) * (1.0 - ease) + (0.45) * ease;
+    const p = (formationProg - 0.84) / 0.16;
+    const ease = p * p;
+    handX = (-r * 0.36) * (1.0 - ease) + (-r * 0.65) * ease;
+    handY = (-r * 0.38) * (1.0 - ease) + (r * 0.40) * ease;
+    handRot = (0.28) * (1.0 - ease) + (-0.45) * ease;
     handAlpha = Math.max(0, 1.0 - p * 1.25);
     handOpen = 1.0 - p * 0.4;
   }
@@ -3264,15 +3642,15 @@ function _drawHollowMaskFormation(ctx, r, formationProg, now, fighter, maskImg, 
   const isBankaiForm = Boolean(fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask');
   _drawFaceClutchingHand(ctx, r, handX, handY, handRot, handAlpha, handOpen, now, isBankaiForm);
 
-  // 3. Seam snap-lock impact fusion & lightning flash when pieces converge (formationProg >= 0.80)
-  if (formationProg >= 0.80) {
-    const flashRatio = (formationProg - 0.80) / 0.20; // 0.0 -> 1.0
-    const flashAlpha = Math.sin(flashRatio * Math.PI); // Smooth pulse peak
+  // 3. Seam snap-lock impact fusion & lightning flash when all pieces converge into complete mask (formationProg >= 0.82)
+  if (formationProg >= 0.82) {
+    const flashRatio = (formationProg - 0.82) / 0.18;
+    const flashAlpha = Math.sin(flashRatio * Math.PI);
 
     if (flashAlpha > 0.01) {
       ctx.save();
       // Glowing white-hot & crimson fusion seam network
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * flashAlpha})`;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * flashAlpha).toFixed(2)})`;
       ctx.lineWidth = 2.4;
       ctx.beginPath();
       for (const shard of _MASK_FORMATION_SHARDS) {
@@ -3285,14 +3663,14 @@ function _drawHollowMaskFormation(ctx, r, formationProg, now, fighter, maskImg, 
       }
       ctx.stroke();
 
-      ctx.strokeStyle = `rgba(255, 30, 0, ${0.80 * flashAlpha})`;
+      ctx.strokeStyle = `rgba(255, 30, 0, ${(0.85 * flashAlpha).toFixed(2)})`;
       ctx.lineWidth = 4.5;
       ctx.stroke();
 
       // Radial energy flash burst on center of mask
       const grad = ctx.createRadialGradient(0, -r * 0.25, 0, 0, -r * 0.25, r * 1.35);
-      grad.addColorStop(0, `rgba(255, 255, 255, ${0.90 * flashAlpha})`);
-      grad.addColorStop(0.35, `rgba(255, 30, 0, ${0.65 * flashAlpha})`);
+      grad.addColorStop(0, `rgba(255, 255, 255, ${(0.90 * flashAlpha).toFixed(2)})`);
+      grad.addColorStop(0.35, `rgba(255, 30, 0, ${(0.65 * flashAlpha).toFixed(2)})`);
       grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
@@ -3300,18 +3678,25 @@ function _drawHollowMaskFormation(ctx, r, formationProg, now, fighter, maskImg, 
       ctx.fill();
 
       // Menacing golden hollow eyes ignition flare
-      if (formationProg >= 0.85) {
-        const eyeAlpha = Math.min(1.0, (formationProg - 0.85) / 0.15);
-        ctx.fillStyle = `rgba(255, 215, 0, ${0.95 * eyeAlpha})`;
+      if (formationProg >= 0.84) {
+        const eyeAlpha = Math.min(1.0, (formationProg - 0.84) / 0.16);
+        ctx.fillStyle = `rgba(255, 215, 0, ${(0.95 * eyeAlpha).toFixed(2)})`;
         ctx.beginPath();
-        ctx.arc(-r * 0.32, -r * 0.12, 3.2, 0, Math.PI * 2);
-        ctx.arc(r * 0.32, -r * 0.12, 3.2, 0, Math.PI * 2);
+        ctx.arc(-r * 0.32, -r * 0.12, 3.4, 0, Math.PI * 2);
+        ctx.arc(r * 0.32, -r * 0.12, 3.4, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = `rgba(255, 60, 0, ${0.80 * eyeAlpha})`;
+        ctx.fillStyle = `rgba(255, 60, 0, ${(0.80 * eyeAlpha).toFixed(2)})`;
         ctx.beginPath();
-        ctx.arc(-r * 0.32, -r * 0.12, 6.0, 0, Math.PI * 2);
-        ctx.arc(r * 0.32, -r * 0.12, 6.0, 0, Math.PI * 2);
+        ctx.arc(-r * 0.32, -r * 0.12, 6.5, 0, Math.PI * 2);
+        ctx.arc(r * 0.32, -r * 0.12, 6.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eye pupils
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        ctx.arc(-r * 0.32, -r * 0.12, 1.2, 0, Math.PI * 2);
+        ctx.arc(r * 0.32, -r * 0.12, 1.2, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -3330,7 +3715,7 @@ function _drawFaceClutchingHand(ctx, r, hx, hy, rot, alpha, open, now, isBankai)
   const handR = getHandSize ? getHandSize(6.5) : 6.5;
   const skinColor = '#FFE0BD';
 
-  // 1. Black Shihakusho Sleeve Cuff on Wrist
+  // 1. Black Shihakusho Sleeve Cuff on Wrist (Extending from lower-left toward torso)
   ctx.fillStyle = '#111111';
   ctx.fillRect(-handR * 2.2, -handR * 0.8, handR * 1.4, handR * 1.6);
   ctx.strokeStyle = '#FFFFFF';
@@ -3349,7 +3734,7 @@ function _drawFaceClutchingHand(ctx, r, hx, hy, rot, alpha, open, now, isBankai)
     ctx.stroke();
   }
 
-  // 2. Palm / Hand Back
+  // 2. Palm / Hand Back (Left Hand)
   ctx.fillStyle = skinColor;
   ctx.strokeStyle = '#111111';
   ctx.lineWidth = 1.4;
@@ -3358,13 +3743,13 @@ function _drawFaceClutchingHand(ctx, r, hx, hy, rot, alpha, open, now, isBankai)
   ctx.fill();
   ctx.stroke();
 
-  // 3. Five Detailed Fingers Splayed Across the Face (Anime Visored Pose)
+  // 3. Five Detailed Fingers Splayed Across the Face (Anime Left Hand Visored Pose)
   const fingers = [
-    { name: 'thumb',  bx: -handR * 0.4, by:  handR * 0.7, angle:  1.05, len: handR * 1.35, thick: 2.5 },
-    { name: 'index',  bx: -handR * 0.5, by: -handR * 0.4, angle: -1.25, len: handR * 1.65, thick: 2.4 },
-    { name: 'middle', bx: -handR * 0.1, by: -handR * 0.7, angle: -1.55, len: handR * 1.85, thick: 2.5 },
-    { name: 'ring',   bx:  handR * 0.4, by: -handR * 0.6, angle: -1.85, len: handR * 1.75, thick: 2.4 },
-    { name: 'pinky',  bx:  handR * 0.8, by: -handR * 0.2, angle: -2.15, len: handR * 1.45, thick: 2.2 }
+    { name: 'thumb',  bx:  handR * 0.35, by:  handR * 0.55, angle:  0.85, len: handR * 1.35, thick: 2.5 },
+    { name: 'index',  bx:  handR * 0.20, by: -handR * 0.65, angle: -1.15, len: handR * 1.65, thick: 2.4 },
+    { name: 'middle', bx: -handR * 0.15, by: -handR * 0.75, angle: -1.55, len: handR * 1.85, thick: 2.5 },
+    { name: 'ring',   bx: -handR * 0.50, by: -handR * 0.55, angle: -1.95, len: handR * 1.75, thick: 2.4 },
+    { name: 'pinky',  bx: -handR * 0.75, by: -handR * 0.25, angle: -2.35, len: handR * 1.45, thick: 2.2 }
   ];
 
   for (let i = 0; i < fingers.length; i++) {
@@ -3399,9 +3784,9 @@ function _drawFaceClutchingHand(ctx, r, hx, hy, rot, alpha, open, now, isBankai)
     ctx.arc(tipX, tipY, f.thick * 0.45, 0, Math.PI * 2);
     ctx.fill();
 
-    // Red & black Reiatsu electric sparks crackling from fingertips during clutch
+    // Ghost white & crimson Reiatsu electric sparks crackling from fingertips during clutch
     if (open > 0.65 && Math.random() < 0.40) {
-      ctx.strokeStyle = (i % 2 === 0) ? '#FF1E00' : '#111111';
+      ctx.strokeStyle = (i % 2 === 0) ? '#F8F8FF' : '#FF1E00';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(tipX, tipY);

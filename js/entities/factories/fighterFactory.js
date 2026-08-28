@@ -1,5 +1,5 @@
 import { Fighter } from '../fighter.js';
-import { drawSketchyCircle } from '../../graphics/renderers/fighterRenderer.js';
+import { drawSketchyCircle, drawPixelHand } from '../../graphics/renderers/fighterRenderer.js';
 import { NormalFighter } from '../fighters/NormalFighter.js';
 import { AimbotFighter } from '../fighters/AimbotFighter.js';
 import { MeleeFighter } from '../fighters/MeleeFighter.js';
@@ -121,21 +121,31 @@ function wrapFighterDraw(FighterClass) {
     
     let arcCalled = false;
     let arcX = 0, arcY = 0, arcR = 0;
+
+    let handArcCalled = false;
+    let handX = 0, handY = 0, handR = 0;
     
     const fighter = this;
     
     ctx.beginPath = function() {
       arcCalled = false;
+      handArcCalled = false;
       originalBeginPath.call(ctx);
     };
     
     ctx.fill = function() {
-      arcCalled = false;
-      originalFill.call(ctx);
+      if (handArcCalled) {
+        drawPixelHand(ctx, handX, handY, handR, ctx.fillStyle || fighter.color);
+        handArcCalled = false;
+      } else {
+        arcCalled = false;
+        originalFill.call(ctx);
+      }
     };
     
     ctx.clip = function() {
       arcCalled = false;
+      handArcCalled = false;
       originalClip.call(ctx);
     };
     
@@ -147,6 +157,15 @@ function wrapFighterDraw(FighterClass) {
         arcX = x;
         arcY = y;
         arcR = safeRadius;
+      } else if (safeRadius >= 3.5 && safeRadius <= 12 && (!fighter.r || Math.abs(safeRadius - fighter.r) >= 3)) {
+        const s = startAngle || 0;
+        const e = endAngle !== undefined ? endAngle : Math.PI * 2;
+        if (Math.abs(s) < 0.1 && Math.abs(e - Math.PI * 2) < 0.1) {
+          handArcCalled = true;
+          handX = x;
+          handY = y;
+          handR = safeRadius;
+        }
       }
     };
     
@@ -159,6 +178,8 @@ function wrapFighterDraw(FighterClass) {
         }
         drawSketchyCircle(ctx, arcX, arcY, arcR, seed, ctx.strokeStyle, ctx.lineWidth || 2.5);
         arcCalled = false;
+      } else if (handArcCalled) {
+        handArcCalled = false;
       } else {
         originalStroke.call(ctx);
       }

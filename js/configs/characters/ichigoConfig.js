@@ -81,7 +81,7 @@ export const ichigoConfig = {
   getsugaShockwaveSize: 40,      // Shockwave burst size on Getsuga hit
   getsugaSlideFrames: 8,         // Number of frames for braking skid slide before charge
   getsugaSlideDamping: 0.72,     // Velocity damping multiplier per frame during brake slide
-  getsugaChargeFrames: 100,      // Default standalone charging frames fallback
+  getsugaChargeFrames: 64,       // Channeling duration frames for Getsuga Tensho wave matching voiceline (~1.07s)
   getsugaSlashDuration: 24,      // Slash swing animation duration frames upon Getsuga release
   getsugaRecoveryFrames: 24,     // Breather/recovery frames held in follow-through pose after releasing Getsuga before moving
   getsugaPierce: true,           // Pierces through enemies and destroys projectiles
@@ -89,13 +89,13 @@ export const ichigoConfig = {
   getsugaRecoil: 3.5,            // Backward kinetic recoil impulse on release
   getsugaTriggerMinDist: 0,      // Minimum distance from enemy for AI to fire Getsuga
   getsugaTriggerMaxDist: 400,    // Maximum distance from enemy for AI to fire Getsuga
-  getsugaRadius: 52,             // Base projectile radius (increased scale)
+  getsugaRadius: 100,             // Base projectile radius (increased scale)
   getsugaColor: '#00D5FF',       // Shikai Getsuga theme color (Sky-Blue)
 
   // ── Passive: Hollow Mask Awakening ──
-  hollowMaskThreshold: 0.30,     // Automatically activates when HP <= 30%
-  hollowMaskDuration: 600,       // Mask duration in frames (10 seconds)
-  hollowMaskFormationFrames: 54, // Animation duration frames for hand-to-face clutch and mask piece assembly (~0.9s)
+  hollowMaskThreshold: 0.70,     // Automatically activates when HP <= 30%
+  hollowMaskDuration: 800,       // Mask duration in frames (10 seconds)
+  hollowMaskFormationFrames: 325,// Animation duration frames for hand-to-face clutch and mask assembly (~5.4s, matching exact 5.35s audio duration of voiceline)
   hollowBurstFrames: 36,         // Sky burst eruption duration frames upon Hollow transformation
   hollowSpeedMultiplier: 1.4,    // Speed boost multiplier
   hollowDamageMultiplier: 1.5,   // Damage multiplier boost
@@ -104,7 +104,9 @@ export const ichigoConfig = {
   hollowShunpoStrikesMultiplier: 1.5, // Multiplier to increase Shunpo flurry strikes during Hollow form (e.g. 2 -> 3 in Shikai, 6 -> 9 in Bankai)
   hollowSwordCooldownMultiplier: 0.65, // Multiplier reducing melee sword cooldown (e.g. 30 * 0.65 = ~19 frames for faster rapid slashing)
   hollowComboCooldownMultiplier: 0.50, // 25% cooldown reduction multiplier for Shunpo Getsuga Blitz combo during Hollow Mask (e.g. 450 * 0.75 = ~337 frames)
-  hollowGetsugaChargeMultiplier: 0.50, // Reduction multiplier reducing Getsuga Tensho charging frames during Hollow form (50% faster charge)
+  hollowGetsugaChargeMultiplier: 0.70, // Reduction multiplier reducing Getsuga Tensho charging frames during Hollow form (50% faster charge)
+  hollowGetsugaVoice1ChargeFrames: 80,  // Charging frames dynamically synchronized to when "...TENSHO!" peaks & finishes in Voice 1 (~1.33s)
+  hollowGetsugaVoice2ChargeFrames: 34,  // Charging frames dynamically synchronized to when fast "TENSHO!" peaks & finishes in Voice 2 (~0.57s)
   hollowGetsugaDamage: 100,       // Upgraded Black Getsuga damage while mask active
   hollowGetsugaSpeed: 22,        // Hollow Mask projectile travel speed
   hollowGetsugaKnockback: 8,     // Knockback force applied
@@ -114,7 +116,7 @@ export const ichigoConfig = {
   hollowGetsugaDragFrames: 18,   // Hollow Mask drag frames
   hollowGetsugaScreenShake: 5.0, // Screen shake intensity on release
   hollowGetsugaHitScreenShake: 4.5, // Screen shake intensity on projectile hit
-  hollowGetsugaRadius: 62,       // Hollow Mask Getsuga projectile radius (increased scale)
+  hollowGetsugaRadius: 100,       // Hollow Mask Getsuga projectile radius (increased scale)
   hollowGetsugaColor: '#FF1E00', // Hollow Mask Getsuga color
 
   // ── Passive: Zanjutsu Parry & Defense Mechanics ──
@@ -137,9 +139,11 @@ export const ichigoConfig = {
   bankaiDuration: 800,           // Duration of Bankai form in frames (~13.3s)
   bankaiSlideFrames: 10,         // Braking skid slide frames when initiating Bankai
   bankaiSlideDamping: 0.70,      // Velocity damping per frame during brake slide
-  bankaiChargeFrames: 50,        // Channeling duration frames for epic Bankai transformation
+  bankaiChargeFrames: 66,        // Channeling duration frames for epic Bankai transformation (~1.10s, exact audio duration of voiceline)
   bankaiBurstFrames: 36,         // Post-release transformation explosion & shatter burst duration
-  bankaiRibbonDuration: 280,     // 3D Reiatsu floating ribbon animation duration frames
+  shikaiReversionBurstFrames: 42,// Post-Bankai Shikai reversion sonic skyward blast duration (~0.70s)
+  shikaiReversionRecoveryFrames: 42, // Post-Bankai Shikai reversion breather / recovery frames before actions
+  bankaiRibbonDuration: 300,     // Total lifespan frames of the flowing 3D ribbon after Bankai release
   bankaiAuraShockwaveSize: 95,   // Shockwave burst size on Bankai activation
   bankaiScreenShake: 7,          // Screen shake intensity upon Bankai release
 
@@ -162,20 +166,21 @@ export const ichigoConfig = {
   // 4. Kuroi Getsuga Tensho Wave (Bankai Combo Release)
   bankaiGetsugaChargeFrames: 30, // Reduced faster Getsuga charging frames during Bankai form (frames)
   bankaiGetsugaDamage: 100,       // Kuroi Getsuga damage during Bankai
-  bankaiHollowGetsugaDamage: 72, // Kuroi Getsuga damage during Bankai + Hollow Mask (48 * 1.5)
+  bankaiHollowGetsugaDamage: 150,// Kuroi Getsuga damage during Bankai + Hollow Mask (100 * 1.5)
   bankaiGetsugaSpeed: 22,        // Kuroi Getsuga travel speed (pixels/frame)
-  bankaiGetsugaRadius: 58,       // Bankai Getsuga projectile radius (increased scale)
+  bankaiGetsugaRadius: 110,       // Bankai Getsuga projectile radius (increased scale)
   bankaiHollowGetsugaRadius: 68, // Bankai + Hollow Mask Getsuga projectile radius (increased scale)
   bankaiGetsugaKnockback: 8,     // Kuroi Getsuga knockback force
   bankaiGetsugaHitStun: 20,      // Kuroi Getsuga hit stun duration
   bankaiGetsugaSlowDuration: 100,// Bankai slow debuff duration (frames)
   bankaiGetsugaSlowMultiplier: 0.35, // Bankai slow speed multiplier (65% slow)
   bankaiGetsugaDragFrames: 16,   // Number of frames enemy is actively dragged with Bankai wave
+  bankaiGetsugaShockwaveSize: 42,// Shockwave burst size on Bankai Getsuga hit
   bankaiGetsugaScreenShake: 4.5, // Kuroi Getsuga screen shake intensity on release
   bankaiGetsugaHitScreenShake: 4.5, // Kuroi Getsuga screen shake intensity on projectile hit
   bankaiHollowGetsugaScreenShake: 5.5, // Screen shake on Bankai + Hollow Getsuga release
   bankaiHollowGetsugaHitScreenShake: 5.5, // Screen shake on Bankai + Hollow Getsuga hit
-  bankaiGetsugaRecoveryFrames: 18,// Recovery breather frames after releasing Getsuga in Bankai
+  bankaiGetsugaRecoveryFrames: 20,// Recovery breather frames after releasing Getsuga in Bankai
   bankaiGetsugaColor: '#DC143C', // Bankai Getsuga color (Black-Crimson Red)
 
   // 5. Frontal Supersonic Reiatsu Wind Blast (Release Impact)
@@ -189,19 +194,25 @@ export const ichigoConfig = {
   bankaiWindHitShakeDuration: 12,// Arena screen shake duration frames on wind blast hit
 
   // 6. Grand Finisher: Final Massive Kuroi Getsuga (Unleashed before Bankai ends)
-  bankaiFinalGetsugaTriggerTimer: 90,   // Bankai duration threshold frames when Grand Finisher triggers
-  bankaiFinalGetsugaChargeFrames: 100,   // Epic gathering charge frames before firing the massive wave
-  bankaiFinalGetsugaDamage: 150,        // Colossal Kuroi Getsuga damage (Ultimate Finisher)
-  bankaiFinalGetsugaRadius: 98,         // Huge projectile radius (increased scale)
-  bankaiFinalGetsugaSpeed: 10,          // Fast supersonic wave speed
+  bankaiFinalGetsugaTriggerTimer: 160,  // Bankai duration threshold frames when Grand Finisher triggers
+  bankaiFinalGetsugaChargeFrames: 80,  // Epic gathering charge frames matching exact voiceline duration (~2.46s)
+  bankaiFinalGetsugaDamage: 180,        // Total Colossal Kuroi Getsuga damage potential
+  bankaiFinalGetsugaTickDamage: 26,     // Continuous shredding damage per tick (multi-hit tick damage)
+  bankaiFinalGetsugaHitCooldown: 4,     // Re-hit tick interval frames (ticks every 4 frames / ~15 hits/sec)
+  bankaiFinalGetsugaParalyzeDuration: 28, // Paralyze debuff frames applied on hit preventing actions during tick damage
+  bankaiFinalGetsugaRadius: 120,         // Huge projectile radius (increased scale)
+  bankaiFinalGetsugaSpeed: 7,          // Fast supersonic wave speed
   bankaiFinalGetsugaKnockback: 30,      // Massive knockback blowing targets across arena
   bankaiFinalGetsugaHitStun: 28,        // Heavy hit stun
   bankaiFinalGetsugaSlowDuration: 140,  // Heavy slow duration from Final Getsuga
   bankaiFinalGetsugaSlowMultiplier: 0.20,// 80% movement speed reduction
   bankaiFinalGetsugaDragFrames: 24,     // Extensive drag frames across the battlefield
+  bankaiFinalGetsugaRecoveryFrames: 48, // Breather / recovery frames held in follow-through pose after unleashing Grand Finisher (~0.8s)
+  bankaiFinalGetsugaSlashDuration: 30,  // Extended heavy cleave follow-through swing duration frames
   bankaiFinalGetsugaScreenShake: 8.5,   // Intense screen shake on release
   bankaiFinalGetsugaHitScreenShake: 8.5,// Intense screen shake on projectile hit
   bankaiFinalGetsugaShockwaveSize: 110, // Colossal shockwave on hit
+  bankaiFinalGetsugaColor: '#DC143C',   // Final Kuroi Getsuga color theme
 
   // ─────────────────────────────────────────────
   // ── Audio Configuration, Volumes, Chances & Delays ──
@@ -215,45 +226,61 @@ export const ichigoConfig = {
     shunpoFinisherSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     shunpoFinisherHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     getsugaCharge: 'Assets/Sound Effects/Skills/redcharging.mp3',
+    comboGetsugaVoice: [
+      'Assets/Sound Effects/Skills/Ichigo-getsugatensho-flashstep-voiceline.mp3',
+      'Assets/Sound Effects/Skills/ichigo-getsugatensho-flashstep-voiceline2.mp3'
+    ],
+    hollowGetsugaVoice: [
+      'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3',
+      'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline2.mp3'
+    ],
+    hollowFlurryNoise: 'Assets/Sound Effects/Attacks/ichigo-attack-hollow-noise.mp3',
     getsugaReleaseSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     getsugaReleaseFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
     getsugaHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-    hollowAwakenFlame: 'Assets/Sound Effects/Skills/fuga.mp3',
+    hollowAwakenVoice: 'Assets/Sound Effects/Skills/ichigo-hollowtransformation-voiceline.mp3',
     hollowAwakenFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
-    bankaiCharge: 'Assets/Sound Effects/Skills/redcharging.mp3',
-    bankaiReleaseDomain: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
+    bankaiCharge: 'Assets/Sound Effects/Skills/Ichigo-bankai-charging-voiceline.mp3',
     bankaiReleaseSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     bankaiReleaseFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
     bankaiEnded: 'Assets/Sound Effects/Attacks/swordswing.mp3',
-    finalGetsugaCharge: 'Assets/Sound Effects/Skills/redcharging.mp3',
-    finalGetsugaFuga: 'Assets/Sound Effects/Skills/fuga.mp3'
+    finalGetsugaCharge: 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3',
+    finalGetsugaVoice: 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3'
   },
   soundVolumes: {
-    swordSwing: 0.80,
-    fleshHit: 0.75,
+    swordSwing: 0.50,
+    fleshHit: 0.50,
     parry: 0.85,
-    shunpoDash: 0.95,
+    shunpoDash: 0.20,
     shunpoStrikeHit: 0.75,
     shunpoFinisherSwing: 0.95,
     shunpoFinisherHit: 0.90,
     getsugaCharge: 0.85,
+    comboGetsugaVoice: 2.8,
+    hollowGetsugaVoice: 3.0,
+    hollowFlurryNoise: 2.8,
     getsugaReleaseSwing: 0.95,
     getsugaReleaseFlare: 0.85,
     getsugaHit: 0.75,
-    hollowAwakenFlame: 0.95,
+    hollowAwakenVoice: 3.0,
     hollowAwakenFlare: 0.85,
-    bankaiCharge: 1.0,
-    bankaiReleaseDomain: 1.0,
+    bankaiCharge: 2.8,
     bankaiReleaseSwing: 0.95,
     bankaiReleaseFlare: 0.90,
     bankaiEnded: 0.80,
-    finalGetsugaCharge: 1.0,
-    finalGetsugaFuga: 0.90
+    finalGetsugaCharge: 3.0,
+    finalGetsugaVoice: 3.0
   },
   soundChances: {
     parry: 1.0,
     swordSwing: 1.0,
-    shunpoDash: 1.0
+    shunpoDash: 1.0,
+    comboGetsugaVoice: 0.50, // 50% chance to play Flash Step Getsuga voiceline on Phase 2
+    hollowGetsugaVoice: 0.50, // 50% chance to play Hollow Getsuga voiceline on Phase 2
+    hollowFlurryNoise: 0.50,  // 50% chance to play Hollow attack noise during Flash Step flurry
+    hollowAwakenVoice: 1.0,
+    bankaiCharge: 1.0,
+    finalGetsugaVoice: 1.0
   },
   soundDelays: {
     swordSwing: 0,
@@ -267,15 +294,12 @@ export const ichigoConfig = {
     getsugaReleaseSwing: 0,
     getsugaReleaseFlare: 0,
     getsugaHit: 0,
-    hollowAwakenFlame: 0,
     hollowAwakenFlare: 0,
     bankaiCharge: 0,
-    bankaiReleaseDomain: 0,
     bankaiReleaseSwing: 0,
     bankaiReleaseFlare: 0,
     bankaiEnded: 0,
-    finalGetsugaCharge: 0,
-    finalGetsugaFuga: 0
+    finalGetsugaCharge: 0
   }
 };
 

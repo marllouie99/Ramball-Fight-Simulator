@@ -22,10 +22,10 @@ export function _getYujiSkinImage() {
       _yujiSkinImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Yuji skin image at Assets/model/Yuji-SKIN.png', e);
+      console.warn('Failed to load Yuji pixel skin image at Assets/model/Yuji-PIXEL-SKIN.png', e);
       _yujiSkinImageLoading = false;
     };
-    img.src = 'Assets/model/Yuji-SKIN.png?v=1';
+    img.src = 'Assets/model/Yuji-PIXEL-SKIN.png?v=1';
     _yujiSkinImage = img;
   }
   return _yujiSkinImage;
@@ -279,11 +279,10 @@ export function drawYujiSkin(ctx, fighter) {
   const yujiImg = _getYujiSkinImage();
   if (yujiImg && yujiImg.complete && yujiImg.naturalWidth > 0 && !isSukunaForm) {
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    // Exact centered crop of Yuji-SKIN.png (sx: 25, sy: 4, sw: 452, sh: 448)
-    const modelScale = 1.08;
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
+    const modelScale = 1.04;
     const drawR = r * modelScale;
-    ctx.drawImage(yujiImg, 25, 4, 452, 448, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.drawImage(yujiImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();
   } else {
     // 1. Skin base — warm peach (changes to Sukuna's pale crimson-tinged skin when Soul Swap is active/transitioning)

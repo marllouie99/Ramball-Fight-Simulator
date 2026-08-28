@@ -1096,6 +1096,7 @@ export const FIGHTER_DEFS = [
     name: 'Yuta Okkotsu',
     category: 'Anime',
     color: yutaConfig.color || '#EEEEEE', // Soft Silver / White
+    themeColor: yutaConfig.themeColor || '#FF1493', // Cursed Pink theme
     startX: yutaConfig.startX || 400,
     startY: yutaConfig.startY || 250,
     startVx: yutaConfig.startVx || 1.2,

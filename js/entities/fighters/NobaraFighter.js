@@ -81,12 +81,15 @@ export class NobaraFighter extends Fighter {
     this.blackFlashAuraTimer = 0;
   }
 
-  interruptAttacks() {
+  interruptAttacks(forceCancelAll = false) {
     this.isDetonatingHairpin = false;
     this.isResonating = false;
     this.isBlitzing = false;
-    this.slashSwingTimer = 0;
-    this.punchAnimTimer = 0;
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    if (forceCancelAll || (!isMatchEnded && (this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush))) {
+      this.slashSwingTimer = 0;
+      this.punchAnimTimer = 0;
+    }
   }
 
   update() {

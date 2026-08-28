@@ -62,6 +62,64 @@ export function drawSketchyCircle(ctx, cx, cy, r, seed, color = 'rgba(15,15,18,0
   ctx.restore();
 }
 
+/**
+ * Draws a standardized, authentic retro pixel art hand/fist for fighters and weapons.
+ * Features a stepped dark ink outline shell (#0E0F14), character color fill,
+ * deep edge/heel shadow, and subtle specular highlight glint pixel.
+ */
+export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0BD', outlineColor = '#0E0F14') {
+  if (radius <= 0) return;
+  const P = 2.0; // 2.0px pixel art grid
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((radius + P) / P);
+
+  ctx.save();
+  // 1. Stepped Dark Outer Ink Shell
+  ctx.fillStyle = outlineColor || '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const d = Math.hypot(gx * P, gy * P);
+      if (d <= radius + P * 0.85) {
+        ctx.fillRect(snap(cx + gx * P), snap(cy + gy * P), P, P);
+      }
+    }
+  }
+
+  // 2. Stepped Color Fill with Volumetric Highlight & Shadow
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const d = Math.hypot(rx, ry);
+      if (d > radius) continue;
+
+      const px = snap(cx + rx);
+      const py = snap(cy + ry);
+
+      // Top-forward highlight glint
+      if (ry < -radius * 0.35 && rx > -radius * 0.3) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.globalAlpha = 0.45;
+        ctx.fillRect(px, py, P, P);
+        ctx.globalAlpha = 1.0;
+      }
+      // Bottom/back heel shadow
+      else if (ry > radius * 0.35 || rx < -radius * 0.45) {
+        ctx.fillStyle = '#000000';
+        ctx.globalAlpha = 0.30;
+        ctx.fillRect(px, py, P, P);
+        ctx.globalAlpha = 1.0;
+      }
+      // Main hand skin/glove tone
+      else {
+        ctx.fillStyle = color || '#FFE0BD';
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
+  ctx.restore();
+}
+
 export class FighterRenderer {
   static drawBody(ctx, fighter) {
     ctx.save();
@@ -147,36 +205,45 @@ export class FighterRenderer {
     ctx.fillStyle = '#222';
     ctx.fillRect(8, -2.5, 10, 5);
     
-    // Draw Hand holding the gun
-    ctx.beginPath();
-    ctx.arc(0, 3, getHandSize(6, fighter), 0, Math.PI * 2);
-    ctx.fillStyle = fighter.color;
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
+    // Draw Hand holding the gun in pixel art style
+    drawPixelHand(ctx, 0, 3, getHandSize(6, fighter), fighter.color);
     
     ctx.restore();
   }
 
   static drawHealth(ctx, fighter) {
     if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
-    if (fighter.hp <= 0 || fighter._isWinnerReveal || fighter._isFaceOff || (fighter.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
+    if (fighter.hp <= 0 || fighter._isWinnerReveal || fighter._isFaceOff || fighter.hideHpText) return;
 
     ctx.save();
     const z = fighter.z || 0;
     const drawY = fighter.y - z;
 
-    // Health Number in center of body
-    ctx.font = 'bold 18px Arial';
+    // Health Number underneath the body (with dynamic avoidance for beam charging/Rika backing)
+    let hpY = drawY + (fighter.r || 25) + 4;
+    const isYutaBeam = Boolean(fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam);
+    if (isYutaBeam && fighter.rika && (fighter.rika.active || (fighter.rikaAlpha && fighter.rikaAlpha > 0))) {
+      const angle = (fighter.pureLoveBeamLockedAngle !== undefined) ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0);
+      const sinA = Math.sin(angle);
+      // When aiming upward (sinA < -0.15), Rika is directly below Yuta (+y), so flip HP text cleanly above Yuta's head!
+      if (sinA < -0.15) {
+        hpY = drawY - (fighter.r || 25) - 20;
+      } else {
+        // When aiming downward or horizontal, Rika is above or behind Yuta (-y), so render HP safely below Yuta
+        hpY = drawY + (fighter.r || 25) + 6;
+      }
+    }
+
+    const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+    ctx.font = isDark ? '700 13px "Silkscreen", "Press Start 2P", monospace' : 'bold 18px Arial';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'top';
     const hpText = Math.floor(fighter.hp).toString();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.strokeText(hpText, fighter.x, drawY);
+    ctx.lineWidth = isDark ? 3.5 : 4;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.strokeText(hpText, fighter.x, hpY);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(hpText, fighter.x, drawY);
+    ctx.fillText(hpText, fighter.x, hpY);
     ctx.restore();
   }
 
@@ -192,12 +259,13 @@ export class FighterRenderer {
     const text = `⏳ ${seconds}s`;
     
     const drawY = (fighter.y - (fighter.z || 0)) - (fighter.r + 22);
-    ctx.font = 'bold 11px Arial';
+    const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+    ctx.font = isDark ? '700 9.5px "Silkscreen", "Press Start 2P", monospace' : 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.lineWidth = isDark ? 2.8 : 3;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.strokeText(text, fighter.x, drawY);
     ctx.fillStyle = '#FFEE58';
     ctx.fillText(text, fighter.x, drawY);
@@ -239,10 +307,11 @@ export class FighterRenderer {
 
     // 3. Status Badge above health bar
     const drawY = -(r + 30);
-    ctx.font = 'bold 9px Outfit, Roboto, sans-serif';
+    const isDarkFracture = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+    ctx.font = isDarkFracture ? '700 8.5px "Silkscreen", "Press Start 2P", monospace' : 'bold 9px Outfit, Roboto, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = isDarkFracture ? 2.8 : 2.5;
     ctx.strokeStyle = 'rgba(15, 23, 42, 0.90)';
     ctx.strokeText('FRACTURED (+20%)', 0, drawY);
     ctx.fillStyle = '#FFD700';

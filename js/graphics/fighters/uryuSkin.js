@@ -7,6 +7,7 @@
 
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { drawUryuBow, drawSeeleSchneider } from '../weapons/uryuWeaponGraphics.js';
 
 let _uryuBodyImage = null;
@@ -67,41 +68,8 @@ export function drawUryuHand(ctx, x, y, radius, isDrawing = false) {
   ctx.lineTo(isDrawing ? -radius * 0.3 : -radius * 0.2, 0);
   ctx.stroke();
 
-  // 2. Fair Anime Skin Tone Fist (Matching face #FFE8D6)
-  ctx.fillStyle = '#FFE8D6';
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Subtle 3D skin shading
-  const skinShade = ctx.createRadialGradient(-radius * 0.25, -radius * 0.25, radius * 0.1, 0, 0, radius);
-  skinShade.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
-  skinShade.addColorStop(0.7, 'rgba(240, 205, 185, 0.20)');
-  skinShade.addColorStop(1.0, 'rgba(180, 120, 100, 0.30)');
-  ctx.fillStyle = skinShade;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 3. Knuckle & Finger Creases
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  if (isDrawing) {
-    // 2-finger archer string pinch stance (hooking over string apex)
-    ctx.moveTo(-radius * 0.4, -radius * 0.30);
-    ctx.lineTo(radius * 0.35, -radius * 0.30);
-    ctx.moveTo(-radius * 0.4, radius * 0.30);
-    ctx.lineTo(radius * 0.35, radius * 0.30);
-  } else {
-    // Standard fist grip wrapping around bow riser
-    ctx.moveTo(0, -radius * 0.45);
-    ctx.lineTo(0, radius * 0.45);
-  }
-  ctx.stroke();
+  // 2. Fair Anime Skin Tone Fist in Pixel Art (Matching face #FFE8D6)
+  drawPixelHand(ctx, 0, 0, radius, '#FFE8D6');
 
   // 4. Glowing Reishi spirit spark at string pinch point
   if (isDrawing) {

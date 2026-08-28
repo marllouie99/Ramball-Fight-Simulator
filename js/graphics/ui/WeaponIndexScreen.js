@@ -23,6 +23,7 @@ import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
 import { drawMegumiShadowBlade } from '../weapons/megumiWeaponGraphics.js';
+import { drawYutaFist } from '../fighters/yutaSkin.js';
 import { drawUryuBow } from '../weapons/uryuWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
@@ -1177,6 +1178,17 @@ function drawYutaKatana(ctx, x, y, angle) {
   ctx.lineWidth = 1.0;
   ctx.stroke();
 
+  // 7. Hands holding the hilt (drawn over the hilt wrapper and aura)
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly);
+  if (!shouldHideHands) {
+    const handR = 4.8;
+    const skinCol = '#FABC95';
+    // Rear / Back Hand (Left Hand near pommel at x = -8.5 with signature silver engagement ring)
+    drawYutaFist(ctx, -8.5, 0, handR, skinCol, null, true);
+    // Lead / Front Hand (Right Hand near tsuba guard at x = 2.5)
+    drawYutaFist(ctx, 2.5, 0, handR, skinCol, null, false);
+  }
+
   ctx.restore();
 }
 
@@ -1428,37 +1440,10 @@ function drawWeaponPreview(ctx, type, color) {
         return;
       }
 
-      case 'yuta': {
-        // Draw Yuta Katana + Rika Cursed Energy Aura in weapon preview
-        ctx.save();
-        ctx.translate(r, 0);
-        ctx.rotate(0.2);
-
-        // Katana blade
-        ctx.fillStyle = '#E8E8E8';
-        ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.rect(0, -2, 28, 4);
-        ctx.fill();
-        ctx.stroke();
-
-        // Katana tsuba (guard) & hilt
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(-2, -5, 4, 10);
-        ctx.fillStyle = '#111111';
-        ctx.fillRect(-12, -2.5, 10, 5);
-
-        // Cursed energy glow surrounding blade
-        ctx.shadowColor = '#FF1493';
-        ctx.shadowBlur = 10;
-        ctx.strokeStyle = '#FF69B4';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(0, -2, 28, 4);
-
-        ctx.restore();
+      case 'yuta':
+        // Yuta's Lore-Accurate Cursed Katana
+        drawYutaKatana(ctx, 0, 0, gunAngle);
         return;
-      }
 
       case 'Engineer':
         // Draws Engineer's shotgun active and wrench stowed on back

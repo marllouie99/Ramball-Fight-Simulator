@@ -1882,7 +1882,8 @@ function updateHealthHud() {
     const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
     const maxChars = isTactical ? 28 : (extraClass.includes('ffa-card') ? 18 : 24);
     const isDark = (state.arenaTheme === 'dark') || isTactical;
-    const defaultNameColor = isDark ? '#ffffff' : '#000000';
+    const isYutaCard = (targetFighter && (targetFighter.characterId === 'yuta' || targetFighter.type === 'yuta')) || (title && (title.toUpperCase().includes('YUTA') || title.toUpperCase().includes('OKKOTSU')));
+    const defaultNameColor = isDark ? (isYutaCard ? '#FF1493' : '#ffffff') : '#000000';
     let nameColor = defaultNameColor;
     let truncatedTitle = title;
     if (title && title.length > maxChars) {
@@ -1891,12 +1892,12 @@ function updateHealthHud() {
 
     const getTitleStyle = (color, isCj = false) => {
       if (isTactical) {
-        return `font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; line-height: 1.15; `;
+        return `color: ${color || '#ffffff'}; font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; line-height: 1.15; `;
       }
       const fontFamily = isCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
       const fontSize = isCj ? (baseFontSize + 2) : baseFontSize;
       const letterSpacing = isCj ? '1.2px' : '0.8px';
-      return `font-size: ${fontSize}px; text-transform: uppercase; font-family: ${fontFamily}; letter-spacing: ${letterSpacing}; font-weight: normal; `;
+      return `color: ${color || '#ffffff'}; font-size: ${fontSize}px; text-transform: uppercase; font-family: ${fontFamily}; letter-spacing: ${letterSpacing}; font-weight: normal; `;
     };
 
     let barsHTML = '';
@@ -1921,7 +1922,8 @@ function updateHealthHud() {
         const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol) : '';
         const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
 
-        let memberNameColor = defaultNameColor;
+        const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta' || (m.name && m.name.toUpperCase().includes('YUTA')));
+        let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
         const memberName = (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
 
         if (isMemberCj) {
@@ -2046,9 +2048,10 @@ function updateHealthHud() {
       // 1v2 Stand Off Mode: Solo player (fighters[0]) is rendered as individual card with skills & stats
       const soloFighter = fighters[0];
       if (soloFighter && !soloFighter.isTurret) {
+        const isSoloYuta = soloFighter && (soloFighter.characterId === 'yuta' || soloFighter.type === 'yuta' || (soloFighter.name && soloFighter.name.toUpperCase().includes('YUTA')));
+        let nameColor = (state.arenaTheme === 'dark') ? (isSoloYuta ? '#FF1493' : '#ffffff') : '#000000';
         const ratio = soloFighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(soloFighter.hp) / Number(soloFighter.maxHp))) : 0;
         const color = soloFighter.color || '#fff';
-        let nameColor = (state.arenaTheme === 'dark') ? '#ffffff' : '#000000';
         const fighterName = soloFighter.name || 'SOLO PLAYER';
         const fighterStats = state.leaderboard[soloFighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
@@ -2116,7 +2119,11 @@ function updateHealthHud() {
           infoContainer,
           checkbox,
           skillBars,
-          lastInfoHTML: ''
+          lastInfoHTML: '',
+          lastHpPct: -1,
+          lastBarColor: '',
+          lastHpText: '',
+          lastChecked: null
         });
       }
 
@@ -2126,22 +2133,22 @@ function updateHealthHud() {
       const isOppWinner = state.roundWinner && oppMembers.includes(state.roundWinner);
 
       const oppCardHTML = buildCard({
-        title: '',
-        scoreText: `${teamScores[1] || 0} WINS`,
+        title: 'DUO TEAM',
+        scoreText: `${state.teamScores ? state.teamScores[1] || 0 : 0} WINS`,
         fillColor: '#4da3ff',
         members: oppMembers,
-        extraClass: 'blue',
+        extraClass: isTactical ? 'blue tactical-card' : 'blue duo-1v2-card',
         shakeTimer: oppShakeTimer,
         isWinner: isOppWinner,
         borderColor: isOppWinner ? '#ffd700' : null,
         kills: oppMembers.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
         maxBullets: 0,
-        titleAlign: 'left'
+        titleAlign: 'right'
       });
 
-      const tempDiv2 = document.createElement('div');
-      tempDiv2.innerHTML = oppCardHTML;
-      const oppCardElement = tempDiv2.firstElementChild;
+      const tempOppDiv = document.createElement('div');
+      tempOppDiv.innerHTML = oppCardHTML;
+      const oppCardElement = tempOppDiv.firstElementChild;
       containerBottom.appendChild(oppCardElement);
 
       const cachedOppMembers = [];
@@ -2234,7 +2241,8 @@ function updateHealthHud() {
         if (!fighter || fighter.isTurret) return;
         const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
         const color = fighter.color || '#fff';
-        let nameColor = (state.arenaTheme === 'dark') ? '#ffffff' : '#000000';
+        const isYutaFighter = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+        let nameColor = (state.arenaTheme === 'dark') ? (isYutaFighter ? '#FF1493' : '#ffffff') : '#000000';
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
         const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;

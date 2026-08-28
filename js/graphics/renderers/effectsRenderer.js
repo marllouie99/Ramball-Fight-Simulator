@@ -1047,6 +1047,20 @@ export function drawTodoTakadaIdolScreenOverlay() {
   ctx.save();
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
+  if (arena) {
+    ctx.beginPath();
+    if (arena.shape === 'circle') {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
+    } else {
+      ctx.rect(arena.x, arena.y, arena.width, arena.height);
+    }
+    ctx.clip();
+  }
+
   // 1. Cached Full-Screen Radial Background Gradient (Suppressed when Mahito's domain OR Saitama's Serious  // 2. Batched Full-Screen Shimmering White Sparks (Always render)
   const sparkleCount = isLowPerf ? 7 : _todoSparkleSeeds.length;
   _drawBatchedIdolSparkles(ctx, _todoSparkleSeeds.slice(0, sparkleCount), screenW, screenH, now, _todoIdolOverlayAlpha);

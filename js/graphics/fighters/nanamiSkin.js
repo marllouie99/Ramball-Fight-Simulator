@@ -24,10 +24,10 @@ export function _getNanamiSkinImage() {
       _nanamiSkinImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Nanami skin image at Assets/model/Nanami-SKIN.png', e);
+      console.warn('Failed to load Nanami pixel skin image at Assets/model/Nanami-PIXEL-SKIN.png', e);
       _nanamiSkinImageLoading = false;
     };
-    img.src = 'Assets/model/Nanami-SKIN.png?v=1';
+    img.src = 'Assets/model/Nanami-PIXEL-SKIN.png?v=1';
     _nanamiSkinImage = img;
   }
   return _nanamiSkinImage;
@@ -408,11 +408,10 @@ export function drawNanamiSkin(ctx, fighter) {
   const nanamiImg = _getNanamiSkinImage();
   if (nanamiImg && nanamiImg.complete && nanamiImg.naturalWidth > 0) {
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    // Nanami-SKIN.png content bounds: sx: 13, sy: 45, sw: 454, sh: 446
-    const modelScale = 1.08;
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
+    const modelScale = 1.04;
     const drawR = r * modelScale;
-    ctx.drawImage(nanamiImg, 13, 45, 454, 446, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.drawImage(nanamiImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();
   } else {
     // A. Base Skin Fill (Warm Fair Tone)

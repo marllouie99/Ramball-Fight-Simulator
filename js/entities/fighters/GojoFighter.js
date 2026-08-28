@@ -692,18 +692,20 @@ export class GojoFighter extends Fighter {
       if (this.infinityCooldown <= 0) this.infinityActive = true;
     }
 
-    // Decrement skill cooldowns (Red, Purple, RCT, Blue, Domain, Melee) every frame without freezing inside domain
-    if (this.cooldown > 0) this.cooldown--;
-    if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
-    if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
-    if (this.domainCooldown > 0) this.domainCooldown--;
-    if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
-    if (this.healingAuraTimer > 0) this.healingAuraTimer--;
-    if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
-    if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
-    if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
-    if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
-    if (this.teleportDodgeCooldown > 0) this.teleportDodgeCooldown--;
+    // Decrement skill cooldowns (Red, Purple, RCT, Blue, Domain, Melee) when not afflicted with paralyze debuff
+    if (!this.isParalyzedDebuffActive()) {
+      if (this.cooldown > 0) this.cooldown--;
+      if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
+      if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
+      if (this.domainCooldown > 0) this.domainCooldown--;
+      if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
+      if (this.healingAuraTimer > 0) this.healingAuraTimer--;
+      if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
+      if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
+      if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
+      if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
+      if (this.teleportDodgeCooldown > 0) this.teleportDodgeCooldown--;
+    }
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
     // Completely immobilize Gojo if Toji or Saitama is actively performing an ambush/counter sequence on him
@@ -726,7 +728,9 @@ export class GojoFighter extends Fighter {
 
     // Domain active state
     if (this.domainActive) {
-      this.domainTimer--;
+      if (!this.isParalyzedDebuffActive()) {
+        this.domainTimer--;
+      }
       if (this.domainTimer <= 0) {
         this.domainActive = false;
         this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
@@ -778,7 +782,8 @@ export class GojoFighter extends Fighter {
     }
 
     if (!isGamePlaying || !hasLivingEnemies) {
-      this.interruptAttacks(true); // Hard cancel all skills so Purple is cleared immediately when enemy dies!
+      this.interruptAttacks(false); // Cancel channeling skills without hard-canceling punch animation
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
       this.shootCooldown = 60;
       return;
     }

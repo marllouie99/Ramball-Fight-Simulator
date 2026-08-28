@@ -9,7 +9,7 @@ export const yutaConfig = {
   r: 25,
   radius: 25,
   color: '#EEEEEE', // Soft Silver / White
-  themeColor: '#EEEEEE',
+  themeColor: '#FF1493', // Cursed Pink theme
   startX: 400,
   startY: 250,
   startVx: 1.2,

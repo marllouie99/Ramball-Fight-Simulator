@@ -159,9 +159,8 @@ export function drawSaitamaSkin(ctx, fighter) {
   }
 
   // ─────────────────────────────────────────────
-  // 1. DRAW CAPE (Anime Flowing Hero Cape & Collar Buttons)
+  // 1. DRAW CAPE (Authentic Pixel-Art Hero Cape & Collar Buttons)
   // ─────────────────────────────────────────────
-  ctx.save();
   const vx = fighter.vx || 0;
   const vy = fighter.vy || 0;
   const cosA = Math.cos(angle);
@@ -177,111 +176,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   const gentleSway2 = Math.cos(now * 0.0025) * (r * 0.10);
   const waveRipple = Math.sin(now * 0.006) * (r * 0.08);
 
-  // Cape Attachment / Collar Button Positions (Back of shoulders)
-  const topAttachX = -r * 0.35, topAttachY = -r * 0.35;
-  const botAttachX = -r * 0.35, botAttachY = -r * 0.05;
-
-  // Outer Cape Boundary Points (Flowing backwards into -X)
-  const topCapeTipX = -r * 1.85 + inertiaX * 0.8 + gentleSway1;
-  const topCapeTipY = -r * 0.85 + inertiaY * 0.6 - gentleSway2;
-
-  const midCapeFoldX = -r * 2.1 + inertiaX * 1.0 + gentleSway2;
-  const midCapeFoldY = 0 + inertiaY * 0.8 + waveRipple;
-
-  const botCapeTipX = -r * 1.75 + inertiaX * 0.8 - gentleSway1;
-  const botCapeTipY = r * 0.75 + inertiaY * 0.6 + gentleSway2;
-
-  // 1a. Draw Cape Shadow / Under-layer (Slightly darker grey for 3D depth)
-  ctx.fillStyle = '#E8E8E8';
-  ctx.beginPath();
-  ctx.moveTo(topAttachX, topAttachY - 3);
-  ctx.bezierCurveTo(
-    -r * 1.0 + inertiaX * 0.4, -r * 0.7 + inertiaY * 0.3 + gentleSway1,
-    -r * 1.5 + inertiaX * 0.6, -r * 0.95 + inertiaY * 0.5,
-    topCapeTipX - 4, topCapeTipY - 2
-  );
-  ctx.quadraticCurveTo(midCapeFoldX - 5, midCapeFoldY + 4, botCapeTipX - 3, botCapeTipY + 4);
-  ctx.bezierCurveTo(
-    -r * 1.3 + inertiaX * 0.6, r * 0.65 + inertiaY * 0.4,
-    -r * 0.8 + inertiaX * 0.3, r * 0.25 + inertiaY * 0.2,
-    botAttachX, botAttachY + 3
-  );
-  ctx.closePath();
-  ctx.fill();
-
-  // 1b. Main White Cape Body (#FFFFFF with clean #000000 outline)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.8;
-
-  ctx.beginPath();
-  ctx.moveTo(topAttachX, topAttachY);
-
-  // Upper wing curve flowing back & up to top cape tip
-  ctx.bezierCurveTo(
-    -r * 0.95 + inertiaX * 0.4, -r * 0.65 + inertiaY * 0.3 + gentleSway1,
-    -r * 1.45 + inertiaX * 0.7 + gentleSway2, -r * 0.9 + inertiaY * 0.5 + waveRipple,
-    topCapeTipX, topCapeTipY
-  );
-
-  // Wavy ripples along the bottom-back trailing edge
-  ctx.quadraticCurveTo(-r * 1.95 + inertiaX * 0.9 + gentleSway2, -r * 0.4 + inertiaY * 0.7, midCapeFoldX, midCapeFoldY);
-  ctx.quadraticCurveTo(-r * 1.9 + inertiaX * 0.8 - gentleSway1, r * 0.4 + inertiaY * 0.7, botCapeTipX, botCapeTipY);
-
-  // Lower wing curve sweeping back to bottom shoulder button
-  ctx.bezierCurveTo(
-    -r * 1.35 + inertiaX * 0.6 - gentleSway2, r * 0.55 + inertiaY * 0.4 - waveRipple,
-    -r * 0.75 + inertiaX * 0.3, r * 0.2 + inertiaY * 0.2,
-    botAttachX, botAttachY
-  );
-
-  ctx.lineTo(topAttachX, topAttachY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 1c. Internal Fold Creases (Anime fold accent lines)
-  ctx.strokeStyle = '#D0D0D0';
-  ctx.lineWidth = 1.6;
-
-  ctx.beginPath();
-  ctx.moveTo(topAttachX, topAttachY);
-  ctx.bezierCurveTo(
-    -r * 0.8 + inertiaX * 0.3, -r * 0.45 + gentleSway1,
-    -r * 1.3 + inertiaX * 0.6, -r * 0.3 + waveRipple,
-    midCapeFoldX + r * 0.2, midCapeFoldY - r * 0.2
-  );
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(botAttachX, botAttachY);
-  ctx.bezierCurveTo(
-    -r * 0.7 + inertiaX * 0.3, r * 0.1 - gentleSway2,
-    -r * 1.2 + inertiaX * 0.5, r * 0.3 + waveRipple,
-    botCapeTipX + r * 0.2, botCapeTipY - r * 0.1
-  );
-  ctx.stroke();
-
-  // 1d. Cape Collar Buttons
-  const drawCollarButton = (bx, by) => {
-    ctx.beginPath();
-    ctx.arc(bx, by, r * 0.11, 0, Math.PI * 2);
-    ctx.fillStyle = '#1A1A1A';
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(bx - r * 0.03, by - r * 0.03, r * 0.035, 0, Math.PI * 2);
-    ctx.fillStyle = '#666666';
-    ctx.fill();
-  };
-
-  drawCollarButton(topAttachX, topAttachY);
-  drawCollarButton(botAttachX, botAttachY);
-
-  ctx.restore();
+  drawSaitamaPixelCape(ctx, r, inertiaX, inertiaY, gentleSway1, gentleSway2, waveRipple, false);
 
   // ─────────────────────────────────────────────
   // 2. BOREDOM / POWER AURA (No shadowBlur - Rule #11)
@@ -328,46 +223,9 @@ export function drawSaitamaSkin(ctx, fighter) {
   }
 
   // ─────────────────────────────────────────────
-  // 4. MAIN CIRCLE BODY (EXACT USER DRAWING LAYOUT)
+  // 4. MAIN CIRCLE BODY (AUTHENTIC PIXEL ART MODEL)
   // ─────────────────────────────────────────────
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  // 4a. Top Bald Head Skin Section (#FFE0BD)
-  ctx.fillStyle = '#FFE0BD';
-  ctx.fillRect(-r, -r, r * 2, r * 0.65);
-
-  // 4b. Upper & Lower Yellow Hero Suit Section (#FFEB94)
-  ctx.fillStyle = '#FFEB94';
-  ctx.fillRect(-r, -r * 0.35, r * 2, r * 1.7);
-
-  // 4c. Horizontal Black Belt (#111111)
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(-r, r * 0.25, r * 2, r * 0.22);
-
-  // 4d. Golden Oval Belt Buckle in the Center (#C88A00)
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.36, r * 0.22, r * 0.16, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#C88A00';
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.0;
-  ctx.stroke();
-
-  // 4e. Crimson Red Bottom Section / Boots (#C80000)
-  ctx.fillStyle = '#C80000';
-  ctx.fillRect(-r, r * 0.68, r * 2, r * 0.4);
-
-  ctx.restore(); // Undo circle clipping
-
-  // 4f. Thick Solid Black Outer Outline Ring (#000000)
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 4.5;
-  ctx.stroke();
+  drawSaitamaPixelBody(ctx, r, false);
 
   // ── Render Front Hand (Front Layer - On Top of Body Circle) ──
   if (!shouldHideHands && !fighter.hideFrontHand) {
@@ -469,7 +327,7 @@ function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
 function drawSaitamaArm(ctx, r, handX, handY, handRadius, shoulderY, isFront = false) {
   ctx.save();
   
-  // 1. Arm Sleeve extending from torso to glove
+  // 1. Pixel-Art Arm Sleeve extending from torso to glove
   const startX = r * 0.15;
   const startY = shoulderY;
   const endX = handX;
@@ -480,23 +338,44 @@ function drawSaitamaArm(ctx, r, handX, handY, handRadius, shoulderY, isFront = f
   const dist = Math.hypot(dx, dy);
 
   if (dist > handRadius * 0.4) {
+    const P = 2.0;
+    const snap = (v) => Math.round(v / P) * P;
     const angle = Math.atan2(dy, dx);
     const perpAngle = angle + Math.PI / 2;
     const sleeveW = handRadius * 0.72;
     const px = Math.cos(perpAngle) * sleeveW;
     const py = Math.sin(perpAngle) * sleeveW;
 
-    ctx.beginPath();
-    ctx.moveTo(startX + px * 0.75, startY + py * 0.75);
-    ctx.lineTo(endX - Math.cos(angle) * (handRadius * 0.3) + px, endY - Math.sin(angle) * (handRadius * 0.3) + py);
-    ctx.lineTo(endX - Math.cos(angle) * (handRadius * 0.3) - px, endY - Math.sin(angle) * (handRadius * 0.3) - py);
-    ctx.lineTo(startX - px * 0.75, startY - py * 0.75);
-    ctx.closePath();
+    const sleevePts = [
+      { x: startX + px * 0.75, y: startY + py * 0.75 },
+      { x: endX - Math.cos(angle) * (handRadius * 0.3) + px, y: endY - Math.sin(angle) * (handRadius * 0.3) + py },
+      { x: endX - Math.cos(angle) * (handRadius * 0.3) - px, y: endY - Math.sin(angle) * (handRadius * 0.3) - py },
+      { x: startX - px * 0.75, y: startY - py * 0.75 }
+    ];
+
+    // Stepped pixel outline
+    ctx.fillStyle = '#111114';
+    for (let j = 0; j < sleevePts.length; j++) {
+      const p1 = sleevePts[j];
+      const p2 = sleevePts[(j + 1) % sleevePts.length];
+      const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const steps = Math.max(2, Math.round(len / P));
+      for (let st = 0; st <= steps; st++) {
+        const rx = p1.x + (p2.x - p1.x) * (st / steps);
+        const ry = p1.y + (p2.y - p1.y) * (st / steps);
+        ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
+      }
+    }
+
+    // Stepped pixel sleeve fill
     ctx.fillStyle = '#FFEB94';
+    ctx.beginPath();
+    sleevePts.forEach((pt, idx) => {
+      if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
+      else ctx.lineTo(snap(pt.x), snap(pt.y));
+    });
+    ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
   }
 
   // 2. Stepped Pixel-Art Red Glove
@@ -538,36 +417,59 @@ function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer) {
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    // 1. Arm Sleeve Streak connecting from body to punching glove
-    ctx.beginPath();
+    // 1. Pixel-Art Arm Sleeve Streak connecting from body to punching glove
+    const P = 2.0;
+    const snap = (v) => Math.round(v / P) * P;
     const perpY = handRadius * 0.55;
-    ctx.moveTo(r * 0.25, fistY * 0.5 - perpY * 0.6);
-    ctx.lineTo(fistX - fRadius * 0.4, fistY - perpY);
-    ctx.lineTo(fistX - fRadius * 0.4, fistY + perpY);
-    ctx.lineTo(r * 0.25, fistY * 0.5 + perpY * 0.6);
+    const sleevePts = [
+      { x: r * 0.25, y: fistY * 0.5 - perpY * 0.6 },
+      { x: fistX - fRadius * 0.4, y: fistY - perpY },
+      { x: fistX - fRadius * 0.4, y: fistY + perpY },
+      { x: r * 0.25, y: fistY * 0.5 + perpY * 0.6 }
+    ];
+
+    // Stepped pixel outline
+    ctx.fillStyle = '#111114';
+    for (let j = 0; j < sleevePts.length; j++) {
+      const p1 = sleevePts[j];
+      const p2 = sleevePts[(j + 1) % sleevePts.length];
+      const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const steps = Math.max(2, Math.round(len / P));
+      for (let st = 0; st <= steps; st++) {
+        const rx = p1.x + (p2.x - p1.x) * (st / steps);
+        const ry = p1.y + (p2.y - p1.y) * (st / steps);
+        ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
+      }
+    }
+
+    // Stepped pixel sleeve fill
+    ctx.fillStyle = 'rgba(255, 235, 148, 0.85)';
+    ctx.beginPath();
+    sleevePts.forEach((pt, idx) => {
+      if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
+      else ctx.lineTo(snap(pt.x), snap(pt.y));
+    });
     ctx.closePath();
-    ctx.fillStyle = 'rgba(255, 235, 148, 0.60)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
 
     // 2. Forward punch wind / motion blur speed lines (only while thrusting forward)
     if (forwardVel > 0) {
-      ctx.beginPath();
-      ctx.moveTo(fistX - fRadius * 1.3, fistY - fRadius * 0.8);
-      ctx.lineTo(fistX + fRadius * 0.8, fistY);
-      ctx.lineTo(fistX - fRadius * 1.3, fistY + fRadius * 0.8);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
+      ctx.fillStyle = '#FFFFFF';
+      for (let st = 0; st <= 6; st++) {
+        const sx = fistX - fRadius * 1.3 + (st / 6) * (fRadius * 2.1);
+        const sy1 = fistY - fRadius * 0.8 + (st / 6) * (fRadius * 0.8);
+        const sy2 = fistY + fRadius * 0.8 - (st / 6) * (fRadius * 0.8);
+        ctx.fillRect(snap(sx), snap(sy1), P, P);
+        ctx.fillRect(snap(sx), snap(sy2), P, P);
+      }
 
-      // Golden concussive pressure ring at tip
-      ctx.beginPath();
-      ctx.arc(fistX, fistY, fRadius + 3, -Math.PI * 0.45, Math.PI * 0.45);
-      ctx.strokeStyle = 'rgba(255, 220, 80, 0.85)';
-      ctx.lineWidth = 2.2;
-      ctx.stroke();
+      // Golden concussive pressure ring at tip (Pixel Art)
+      ctx.fillStyle = 'rgba(255, 220, 80, 0.9)';
+      for (let a = -Math.PI * 0.45; a <= Math.PI * 0.45; a += 0.2) {
+        const rx = fistX + Math.cos(a) * (fRadius + 3);
+        const ry = fistY + Math.sin(a) * (fRadius + 3);
+        ctx.fillRect(snap(rx), snap(ry), P, P);
+      }
     }
 
     // 3. Stepped Pixel-Art Ghost Red Glove
@@ -579,32 +481,294 @@ function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer) {
 }
 
 /**
+ * Helper to compute cubic bezier point
+ */
+function cubicBezierPt(p0, p1, p2, p3, t) {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return {
+    x: mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x,
+    y: mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y
+  };
+}
+
+/**
+ * Helper to compute quadratic bezier point
+ */
+function quadBezierPt(p0, p1, p2, t) {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
+    y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y
+  };
+}
+
+/**
+ * Draws Saitama's entire body circle model in authentic Pixel Art Style.
+ * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
+ */
+function drawSaitamaPixelBody(ctx, r, isGhost = false) {
+  ctx.save();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // 1. Dark Manga Ink Outline Shell (#111114)
+  ctx.fillStyle = isGhost ? '#111114' : '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= r + P * 0.85) {
+        ctx.fillRect(snap(gx * P), snap(gy * P), P, P);
+      }
+    }
+  }
+
+  // 2. Stepped Pixel Fill by Zone
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // Zone A: Top Bald Head Skin Section (ry < -r * 0.35)
+      if (ry < -r * 0.35) {
+        let col = '#FFE0BD';
+        if (ry < -r * 0.70 && Math.abs(rx) < r * 0.45) {
+          col = '#FFF2E0'; // Top bald shine highlight
+        } else if (ry > -r * 0.45 || Math.abs(rx) > r * 0.75) {
+          col = '#F2C8A4'; // Chin / cheek shadow
+        }
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone B: Yellow Hero Suit Upper & Lower (-r * 0.35 <= ry < r * 0.25)
+      else if (ry < r * 0.25) {
+        // Golden zipper pull tab at center
+        if (Math.abs(rx) < P * 0.8 && ry >= -r * 0.35 && ry <= -r * 0.05) {
+          if (ry <= -r * 0.25) {
+            ctx.fillStyle = '#C88A00'; // Zipper ring
+          } else {
+            ctx.fillStyle = '#FFFFFF'; // White zipper line
+          }
+        } else {
+          let col = '#FFEB94';
+          if (ry < -r * 0.10 && Math.abs(rx) < r * 0.50) {
+            col = '#FFF5B8'; // Chest highlight
+          } else if (Math.abs(rx) > r * 0.75 || ry > r * 0.16) {
+            col = '#E8CA65'; // Suit shadow / wrinkle
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone C: Horizontal Black Hero Belt & Buckle (r * 0.25 <= ry < r * 0.55)
+      else if (ry < r * 0.55) {
+        // Center Golden Buckle
+        const isBuckle = (Math.abs(rx) <= r * 0.28 && Math.abs(ry - r * 0.38) <= r * 0.12);
+        if (isBuckle) {
+          if (Math.abs(rx) >= r * 0.24 || Math.abs(ry - r * 0.38) >= r * 0.10) {
+            ctx.fillStyle = '#111114'; // Buckle border
+          } else if (rx < -P && ry < r * 0.38) {
+            ctx.fillStyle = '#FFF5A0'; // Metallic buckle glint
+          } else {
+            ctx.fillStyle = '#F5C400'; // Golden buckle plate
+          }
+        } else {
+          // Belt leather
+          ctx.fillStyle = (ry < r * 0.30) ? '#282832' : '#111114';
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone D: Crimson Red Boots / Lower Suit (ry >= r * 0.55)
+      else {
+        let col = '#C80000';
+        if (ry < r * 0.65 && Math.abs(rx) < r * 0.45) {
+          col = '#E52E2E'; // Top boot rim highlight
+        } else if (ry > r * 0.82 || Math.abs(rx) > r * 0.70) {
+          col = '#8A0000'; // Boot heel / edge shadow
+        }
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws Saitama's iconic hero white cape in authentic Pixel Art Style
+ */
+function drawSaitamaPixelCape(ctx, r, inertiaX = 0, inertiaY = 0, gentleSway1 = 0, gentleSway2 = 0, waveRipple = 0, isGhost = false) {
+  ctx.save();
+  const P = 2.0; // Stepped pixel grid size
+  const snap = (v) => Math.round(v / P) * P;
+
+  // Cape Attachment / Collar Button Positions (Back of shoulders)
+  const topAttach = { x: -r * 0.35, y: -r * 0.35 };
+  const botAttach = { x: -r * 0.35, y: -r * 0.05 };
+
+  // Outer Cape Boundary Points (Flowing backwards into -X)
+  const topCapeTip = {
+    x: -r * 1.85 + inertiaX * 0.8 + gentleSway1,
+    y: -r * 0.85 + inertiaY * 0.6 - gentleSway2
+  };
+  const midCapeFold = {
+    x: -r * 2.10 + inertiaX * 1.0 + gentleSway2,
+    y: 0 + inertiaY * 0.8 + waveRipple
+  };
+  const botCapeTip = {
+    x: -r * 1.75 + inertiaX * 0.8 - gentleSway1,
+    y: r * 0.75 + inertiaY * 0.6 + gentleSway2
+  };
+
+  // Sample boundary perimeter vertices into stepped pixel points
+  const poly = [];
+  const N = 20;
+
+  // 1. Top curve: topAttach -> topCapeTip
+  const c1Top = { x: -r * 0.95 + inertiaX * 0.4, y: -r * 0.65 + inertiaY * 0.3 + gentleSway1 };
+  const c2Top = { x: -r * 1.45 + inertiaX * 0.7 + gentleSway2, y: -r * 0.90 + inertiaY * 0.5 + waveRipple };
+  for (let i = 0; i <= N; i++) {
+    poly.push(cubicBezierPt(topAttach, c1Top, c2Top, topCapeTip, i / N));
+  }
+
+  // 2. Trailing edge: topCapeTip -> midCapeFold -> botCapeTip
+  const cMid1 = { x: -r * 1.95 + inertiaX * 0.9 + gentleSway2, y: -r * 0.40 + inertiaY * 0.7 };
+  const cMid2 = { x: -r * 1.90 + inertiaX * 0.8 - gentleSway1, y: r * 0.40 + inertiaY * 0.7 };
+  for (let i = 1; i <= N; i++) {
+    const t = i / N;
+    if (t <= 0.5) {
+      poly.push(quadBezierPt(topCapeTip, cMid1, midCapeFold, t * 2));
+    } else {
+      poly.push(quadBezierPt(midCapeFold, cMid2, botCapeTip, (t - 0.5) * 2));
+    }
+  }
+
+  // 3. Bottom curve: botCapeTip -> botAttach
+  const c1Bot = { x: -r * 1.35 + inertiaX * 0.6 - gentleSway2, y: r * 0.55 + inertiaY * 0.4 - waveRipple };
+  const c2Bot = { x: -r * 0.75 + inertiaX * 0.3, y: r * 0.20 + inertiaY * 0.2 };
+  for (let i = 1; i <= N; i++) {
+    poly.push(cubicBezierPt(botCapeTip, c1Bot, c2Bot, botAttach, i / N));
+  }
+
+  // Pass 1: Outer Dark Pixel Outline Shell (#111114)
+  ctx.fillStyle = '#111114';
+  for (let j = 0; j < poly.length; j++) {
+    const p1 = poly[j];
+    const p2 = poly[(j + 1) % poly.length];
+    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const steps = Math.max(2, Math.round(dist / P));
+    for (let st = 0; st <= steps; st++) {
+      const rx = p1.x + (p2.x - p1.x) * (st / steps);
+      const ry = p1.y + (p2.y - p1.y) * (st / steps);
+      ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
+    }
+  }
+
+  // Pass 2: Base White Pixel Cape Body (#FFFFFF / #F6F4FA)
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  poly.forEach((pt, idx) => {
+    const px = snap(pt.x);
+    const py = snap(pt.y);
+    if (idx === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.fill();
+
+  // Pass 3: 3D Depth Shadow Pixels along lower wing / underfolds
+  ctx.fillStyle = isGhost ? 'rgba(200, 195, 215, 0.6)' : '#DCD8E6';
+  ctx.beginPath();
+  const shadowStartIdx = Math.floor(poly.length * 0.38);
+  const shadowEndIdx = Math.floor(poly.length * 0.85);
+  ctx.moveTo(snap(poly[shadowStartIdx].x), snap(poly[shadowStartIdx].y));
+  for (let k = shadowStartIdx; k <= shadowEndIdx; k++) {
+    ctx.lineTo(snap(poly[k].x), snap(poly[k].y));
+  }
+  ctx.lineTo(snap(-r * 0.95), snap(r * 0.15));
+  ctx.closePath();
+  ctx.fill();
+
+  // Pass 4: Stepped Pixel Fold Creases
+  const drawPixelCrease = (fromPt, ctrlPt1, ctrlPt2, toPt, color) => {
+    ctx.fillStyle = color;
+    const steps = 14;
+    for (let s = 0; s <= steps; s++) {
+      const pt = cubicBezierPt(fromPt, ctrlPt1, ctrlPt2, toPt, s / steps);
+      ctx.fillRect(snap(pt.x), snap(pt.y), P, P);
+    }
+  };
+
+  const foldCol = isGhost ? 'rgba(180, 175, 195, 0.7)' : '#C8C2D4';
+  // Upper fold crease
+  drawPixelCrease(
+    topAttach,
+    { x: -r * 0.80 + inertiaX * 0.3, y: -r * 0.45 + gentleSway1 },
+    { x: -r * 1.30 + inertiaX * 0.6, y: -r * 0.30 + waveRipple },
+    { x: midCapeFold.x + r * 0.20, y: midCapeFold.y - r * 0.20 },
+    foldCol
+  );
+  // Lower fold crease
+  drawPixelCrease(
+    botAttach,
+    { x: -r * 0.70 + inertiaX * 0.3, y: r * 0.10 - gentleSway2 },
+    { x: -r * 1.20 + inertiaX * 0.5, y: r * 0.30 + waveRipple },
+    { x: botCapeTip.x + r * 0.20, y: botCapeTip.y - r * 0.10 },
+    foldCol
+  );
+
+  // Pass 5: Stepped Pixel Cape Collar Buttons
+  const drawPixelCollarButton = (bx, by) => {
+    const cx = snap(bx);
+    const cy = snap(by);
+    const btnR = snap(r * 0.12);
+    const steps = Math.ceil(btnR / P);
+
+    // Outline
+    ctx.fillStyle = '#111114';
+    for (let gy = -steps; gy <= steps; gy++) {
+      for (let gx = -steps; gx <= steps; gx++) {
+        if (Math.hypot(gx * P, gy * P) <= btnR + P * 0.5) {
+          ctx.fillRect(cx + gx * P, cy + gy * P, P, P);
+        }
+      }
+    }
+    // Button Core
+    ctx.fillStyle = '#222228';
+    for (let gy = -steps; gy <= steps; gy++) {
+      for (let gx = -steps; gx <= steps; gx++) {
+        if (Math.hypot(gx * P, gy * P) <= btnR) {
+          ctx.fillRect(cx + gx * P, cy + gy * P, P, P);
+        }
+      }
+    }
+    // Specular Glint
+    ctx.fillStyle = '#AAAAAA';
+    ctx.fillRect(cx - P, cy - P, P, P);
+  };
+
+  drawPixelCollarButton(topAttach.x, topAttach.y);
+  drawPixelCollarButton(botAttach.x, botAttach.y);
+
+  ctx.restore();
+}
+
+/**
  * Draws a full Saitama model ghost skin afterimage
  */
 function drawSaitamaGhostModel(ctx, r) {
-  // 1. Cape
-  ctx.save();
-  const topAttachX = -r * 0.35, topAttachY = -r * 0.35;
-  const botAttachX = -r * 0.35, botAttachY = -r * 0.05;
-  const topCapeTipX = -r * 1.85, topCapeTipY = -r * 0.85;
-  const midCapeFoldX = -r * 2.1, midCapeFoldY = 0;
-  const botCapeTipX = -r * 1.75, botCapeTipY = r * 0.75;
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.0;
-
-  ctx.beginPath();
-  ctx.moveTo(topAttachX, topAttachY);
-  ctx.bezierCurveTo(-r * 0.95, -r * 0.65, -r * 1.45, -r * 0.9, topCapeTipX, topCapeTipY);
-  ctx.quadraticCurveTo(-r * 1.95, -r * 0.4, midCapeFoldX, midCapeFoldY);
-  ctx.quadraticCurveTo(-r * 1.9, r * 0.4, botCapeTipX, botCapeTipY);
-  ctx.bezierCurveTo(-r * 1.35, r * 0.55, -r * 0.75, r * 0.2, botAttachX, botAttachY);
-  ctx.lineTo(topAttachX, topAttachY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  // 1. Cape (Pixel Art)
+  drawSaitamaPixelCape(ctx, r, 0, 0, 0, 0, 0, true);
 
   // 2. Hands (Back & Front - Pixel Art)
   const handRadius = Math.max(r * 0.38, 8.5);
@@ -613,45 +777,8 @@ function drawSaitamaGhostModel(ctx, r) {
   // Back Hand
   drawSaitamaPixelGlove(ctx, backHandX, backHandY, handRadius);
 
-  // 3. Body Circle
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  // Bald Head
-  ctx.fillStyle = '#FFE0BD';
-  ctx.fillRect(-r, -r, r * 2, r * 0.65);
-
-  // Yellow Suit
-  ctx.fillStyle = '#FFEB94';
-  ctx.fillRect(-r, -r * 0.35, r * 2, r * 1.7);
-
-  // Black Belt
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(-r, r * 0.25, r * 2, r * 0.22);
-
-  // Golden Buckle
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.36, r * 0.22, r * 0.16, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#C88A00';
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
-
-  // Red Boots
-  ctx.fillStyle = '#C80000';
-  ctx.fillRect(-r, r * 0.68, r * 2, r * 0.4);
-
-  ctx.restore(); // Undo clip
-
-  // Outer Body Outline
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
+  // 3. Body Circle (Pixel Art)
+  drawSaitamaPixelBody(ctx, r, true);
 
   // Front Hand (Pixel Art)
   const frontHandX = r * 0.95, frontHandY = 0;

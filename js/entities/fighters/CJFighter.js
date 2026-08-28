@@ -1759,16 +1759,18 @@ export class CJFighter extends Fighter {
       ctx.fillText(nameText, this.x, nameY);
     }
 
-    // 2. Health Number in center
-    ctx.font = 'bold 18px Arial';
+    // 2. Health Number underneath the body
+    const hpY = drawY + (this.r || 25) + 4;
+    const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+    ctx.font = isDark ? '700 13px "Silkscreen", "Press Start 2P", monospace' : 'bold 18px Arial';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'top';
     const hpText = Math.floor(this.hp).toString();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.strokeText(hpText, this.x, drawY);
+    ctx.lineWidth = isDark ? 3.5 : 4;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.strokeText(hpText, this.x, hpY);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(hpText, this.x, drawY);
+    ctx.fillText(hpText, this.x, hpY);
     ctx.restore();
   }
 

@@ -84,8 +84,8 @@ export class YujiFighter extends Fighter {
     }
 
     if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-      this.punchAnimTimer = 0;
-      this.slashSwingTimer = 0;
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+      if (this.slashSwingTimer > 0) this.slashSwingTimer--;
       this.trailGenTimer = 0;
       this.rapidSlashHitsLeft = 0;
     }
@@ -600,8 +600,11 @@ export class YujiFighter extends Fighter {
     }
   }
 
-  interruptAttacks() {
-    this.punchAnimTimer = 0;
+  interruptAttacks(forceCancelAll = false) {
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    if (forceCancelAll || (!isMatchEnded && (this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush))) {
+      this.punchAnimTimer = 0;
+    }
     this.delayedShockwaves = [];
     this.isComboDashing = false;
     this.comboTarget = null;

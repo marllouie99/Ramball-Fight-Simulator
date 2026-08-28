@@ -449,14 +449,11 @@ export class Fighter {
     if (this.beamSoundHandle) { stopSound(this.beamSoundHandle); this.beamSoundHandle = null; }
     if (this.chargeSoundHandle) { stopSound(this.chargeSoundHandle); this.chargeSoundHandle = null; }
 
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    const shouldPreserveBasicAttacks = !forceCancelAll && (isMatchEnded || (this.hp > 0 && !this.isFrozen && !this.isTargetOfAmbush));
+
     // Universal interrupts
-    this.meleeSwingActive = false;
-    this.meleeSwingTimer = 0;
-    this.meleeSlashFadeTimer = 0;
-    this.attackSwingTimer = 0;
     this.dashTimer = 0;
-    this.scytheSwingActive = false;
-    this.scytheSwingTimer = 0;
     this.stolenWindUpTimer = 0;
 
     // Musashi
@@ -508,6 +505,25 @@ export class Fighter {
     this.redEffectTimer = 0;
     this.shootCooldown = 60;
 
+    // Basic attack animation timers:
+    // Only zero them on hard cancel (e.g. onDeath, hard CC stun/freeze), but let them complete follow-through on kill / match win!
+    if (!shouldPreserveBasicAttacks) {
+      this.meleeSwingActive = false;
+      this.meleeSwingTimer = 0;
+      this.meleeSlashFadeTimer = 0;
+      this.attackSwingTimer = 0;
+      this.scytheSwingActive = false;
+      this.scytheSwingTimer = 0;
+      this.axeSwingActive = false;
+      this.punchAnimTimer = 0;
+      this.punchActiveMaxTime = 0;
+      this.spearSwingTimer = 0;
+      this.slashSwingTimer = 0;
+      this.katanaSlashTimer = 0;
+      this.recoilTimer = 0;
+      this.cleaveSwingTimer = 0;
+    }
+
     // Clear afterimages & transient attack trails
     if (this.swordTrail) this.swordTrail.length = 0;
     if (this.afterImages) this.afterImages.length = 0;
@@ -519,7 +535,6 @@ export class Fighter {
     if (this.punchEffects) this.punchEffects.length = 0;
     if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
   }
-
 
   applyTimeStop(frames) {
     this.statusEffects.applyTimeStop(frames);
@@ -549,6 +564,30 @@ export class Fighter {
     this.spinDirection = -this.spinDirection;
   }
 
+  /** Returns true if the fighter is afflicted with any paralyze, stasis, or paralysis debuff effect. */
+  isParalyzedDebuffActive() {
+    return Boolean(
+      this.isParalyzed ||
+      (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+      (this.electricStunTimer && this.electricStunTimer > 0) ||
+      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
+      (this.crimsonElectrifiedTimer && this.crimsonElectrifiedTimer > 0) ||
+      this.isParalyzedByMahoraga ||
+      this.isParalyzedByMahito ||
+      this.isFrozenByInfinity ||
+      this.isGrabbedByMahoraga ||
+      this.isWallSlammed ||
+      this.caughtInPureLoveBeam ||
+      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
+      this.isTargetOfAmbush ||
+      (this.statusEffects && (
+        this.statusEffects.isParalyzed ||
+        (this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
+        (this.statusEffects.electricStunTimer && this.statusEffects.electricStunTimer > 0)
+      ))
+    );
+  }
+
   _handleFrozenSkillCooldowns() {
     const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
     if (this._lastSkillCdTickFrame === currentFrame && currentFrame > 0) return;
@@ -562,9 +601,8 @@ export class Fighter {
       f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
 
-    // If NOT inside Gojo's Unlimited Void domain, skill & ultimate cooldowns continue ticking down!
-    // (e.g. while caught in Gojo's Hollow Purple vortex, beams, Infinity barrier repulsion, hit-stun, etc.)
-    if (!isInsideGojoDomain) {
+    // Global Paralyze / Stasis Rule: If the fighter has an active paralyze debuff or is trapped inside Gojo's domain, all skill & ultimate cooldowns are PAUSED!
+    if (!isInsideGojoDomain && !this.isParalyzedDebuffActive()) {
       this._decrementSkillCooldowns();
     }
   }
@@ -758,9 +796,12 @@ export class Fighter {
     if (this.isEvading || this.isPreSplitting || (this.owner && (this.owner.isEvading || this.owner.isPreSplitting))) {
       return; // Freeze ALL skill cooldowns during Evasion state!
     }
+    if (this.isParalyzedDebuffActive()) {
+      return; // Global Paralyze Rule: Freeze ALL skill cooldowns while afflicted with any paralyze debuff!
+    }
     if (this.vanishTimer > 0) this.vanishTimer--;
     // Universal helper to ensure skill and ultimate cooldowns continue counting down
-    // even while time-stopped, hit-stunned, caught in Hollow Purple, or frozen by Limitless Infinity!
+    // when not paralyzed or in cognitive domain
     for (const key in this) {
       if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer') || key.endsWith('CD') || key === 'shootCooldown' || key === 'attackCooldown') {
         if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer' || key === 'crimsonElectrifiedTimer' || key === 'purpleHitTimer') continue;
@@ -840,23 +881,29 @@ export class Fighter {
       this.y += this.knockbackVy;
       
       // Check for wall bounce from knockback explicitly since custom fighters might not do it after this runs
-      const arena = CONFIG.arena;
+      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
       if (arena) {
         let bounced = false;
         const currentSpeed = Math.hypot(this.knockbackVx, this.knockbackVy);
 
         // Silky Smooth Kinetic Ricochet Wall Bounce (0.82 smooth velocity reflection)
         let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
-        if (this.preventKnockbackBounce || this.isDraggedByGetsuga) bounceMult = 0; // Stick to the wall instead of bouncing
+        const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
+        const isGojoPurpleCaught = (this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0);
+        if (this.preventKnockbackBounce || this.isDraggedByGetsuga || isPureLoveBeamCaught || isGojoPurpleCaught) bounceMult = 0; // Stick to the wall instead of bouncing
 
-        if (this.x - this.r < arena.x) { this.x = arena.x + this.r; this.knockbackVx = Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
-        if (this.x + this.r > arena.x + arena.width) { this.x = arena.x + arena.width - this.r; this.knockbackVx = -Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
-        if (this.y - this.r < arena.y) { this.y = arena.y + this.r; this.knockbackVy = Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
-        if (this.y + this.r > arena.y + arena.height) { this.y = arena.y + arena.height - this.r; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
+        const minX = arena.x + this.r;
+        const maxX = arena.x + arena.width - this.r;
+        const minY = arena.y + this.r;
+        const maxY = arena.y + arena.height - this.r;
+
+        if (this.x < minX) { this.x = minX; this.knockbackVx = Math.abs(this.knockbackVx) * bounceMult; if (this.vx < 0) this.vx = 0; bounced = true; }
+        if (this.x > maxX) { this.x = maxX; this.knockbackVx = -Math.abs(this.knockbackVx) * bounceMult; if (this.vx > 0) this.vx = 0; bounced = true; }
+        if (this.y < minY) { this.y = minY; this.knockbackVy = Math.abs(this.knockbackVy) * bounceMult; if (this.vy < 0) this.vy = 0; bounced = true; }
+        if (this.y > maxY) { this.y = maxY; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; if (this.vy > 0) this.vy = 0; bounced = true; }
 
         if (bounced) {
-          const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
-          if (isPureLoveBeamCaught || this.isDraggedByGetsuga) {
+          if (isPureLoveBeamCaught || isGojoPurpleCaught || this.isDraggedByGetsuga) {
             // Pin firmly to wall surface without sliding horizontally or vertically along wall
             this.vx = 0;
             this.vy = 0;
@@ -1776,12 +1823,22 @@ export class Fighter {
       this.interruptAttacks();
     }
 
-    // Stop attacking if round/match has ended
+    // Stop initiating NEW attacks if round/match has ended
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
     const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
 
     if (!isGamePlaying) {
-      this.interruptAttacks();
+      // Allow in-progress basic attack swings and punches to smoothly finish their follow-through animations!
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+      if (this.slashSwingTimer > 0) this.slashSwingTimer--;
+      if (this.spearSwingTimer > 0) this.spearSwingTimer--;
+      if (this.katanaSlashTimer > 0) this.katanaSlashTimer--;
+      if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
+      if (this.meleeSwingTimer > 0) this.meleeSwingTimer--;
+      if (this.attackSwingTimer > 0) this.attackSwingTimer--;
+      if (this.scytheSwingTimer > 0) this.scytheSwingTimer--;
+      if (this.swipeTimer > 0) this.swipeTimer--;
+      if (this.recoilTimer > 0) this.recoilTimer--;
       this.shootCooldown = 60;
       this.applyMovementPhysics();
       this.resolveWallBounce(arena, opponent);
