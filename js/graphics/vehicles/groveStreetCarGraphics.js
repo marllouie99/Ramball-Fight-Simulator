@@ -6,7 +6,7 @@
 
 import { state } from '../../core/state.js';
 import { drawParalyzeEffect } from '../statusEffects.js';
-import { drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
+import { drawCjTec9, drawCjPixelTec9 } from '../weapons/cjWeaponGraphics.js';
 
 let _cachedHeadlightGrad = null;
 let _cachedSmokeGrad = null;
