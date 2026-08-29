@@ -273,7 +273,9 @@ export function drawJohnWickPixelBody(ctx, r) {
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.clip();
 
-    const drawR = r * 1.02;
+    // Scale up by 1.175x to compensate for the 36px transparent margins in the PNG so the model fills the circle boundary snugly
+    const scaleFactor = 1.175;
+    const drawR = r * scaleFactor;
     ctx.drawImage(skinImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();
   } else {
