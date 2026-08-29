@@ -768,6 +768,71 @@ function _drawUlquiorraPixelTail(ctx, r, fighter = null) {
 }
 
 /**
+ * Draws Ulquiorra's pixel-art brawler hand with white sleeve cuff.
+ */
+export function drawUlquiorraHand(ctx, x, y, radius, isSegunda = false, isCasting = false) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  if (isSegunda) {
+    // ── Segunda Etapa: Pitch-Black Demon Claw ──
+    ctx.fillStyle = '#07090C';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(-radius * 1.3, -radius * 0.75, radius * 1.2, radius * 1.5, 2);
+    ctx.fill();
+    ctx.stroke();
+
+    drawPixelHand(ctx, 0, 0, radius, '#0B0E14', '#000000');
+
+    // Razor Emerald-Tipped Claws
+    ctx.fillStyle = '#00FF88';
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.6, i * (radius * 0.4));
+      ctx.lineTo(radius * 1.2, i * (radius * 0.35));
+      ctx.lineTo(radius * 0.6, i * (radius * 0.4) + 1.2);
+      ctx.fill();
+    }
+  } else {
+    // ── Base & Stage 1: Arrancar White Sleeve Cuff + Alabaster Skin Hand ──
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#0F1218';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.roundRect(-radius * 1.1, -radius * 0.75, radius * 1.0, radius * 1.5, 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Black inner cuff rim seam
+    ctx.strokeStyle = '#14181F';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.25, -radius * 0.75);
+    ctx.lineTo(-radius * 0.25, radius * 0.75);
+    ctx.stroke();
+
+    // Pale Alabaster Arrancar Skin Fist (#F4F7F6)
+    drawPixelHand(ctx, 0, 0, radius, '#F4F7F6', '#0B0F14');
+  }
+
+  // Fingertip Cero/Bala Charging Spark
+  if (isCasting) {
+    ctx.fillStyle = '#00FF88';
+    ctx.beginPath();
+    ctx.arc(radius * 0.4, 0, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(radius * 0.4, 0, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
  * Main Skin Renderer for Ulquiorra Cifer.
  * Fully compliant with Rule 19 (Upright Front POV), Rule 20 (Hands), and Rule 11 (Zero shadowBlur).
  * 
