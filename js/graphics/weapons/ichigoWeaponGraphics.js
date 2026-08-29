@@ -2,9 +2,20 @@ import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 
 export function drawGetsugaSlash(ctx, p, isBlack) {
-  const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
-  const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const angle = Math.atan2(vy, vx);
+  let angle = p.angle;
+  if (p.vx !== 0 || p.vy !== 0) {
+    angle = Math.atan2(p.vy, p.vx);
+    p.angle = angle;
+  } else if (p._resumeVx !== undefined && p._resumeVy !== undefined && (p._resumeVx !== 0 || p._resumeVy !== 0)) {
+    angle = Math.atan2(p._resumeVy, p._resumeVx);
+    p.angle = angle;
+  } else if (p.launchAngle !== undefined) {
+    angle = p.launchAngle;
+  } else if (p.originalAngle !== undefined) {
+    angle = p.originalAngle;
+  } else if (angle === undefined) {
+    angle = 0;
+  }
   const owner = state.fighters && state.fighters[p.owner];
   const form = p.getsugaForm || (isBlack ? (owner && owner.hollowMaskActive ? (owner.bankaiActive ? 'bankai_hollow' : 'hollow') : 'bankai') : 'shikai');
   

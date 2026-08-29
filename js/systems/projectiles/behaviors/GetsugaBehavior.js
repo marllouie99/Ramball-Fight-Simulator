@@ -44,6 +44,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
       if (hitWall) {
         if (projectile.vx !== 0 || projectile.vy !== 0) {
+          projectile.angle = Math.atan2(projectile.vy, projectile.vx);
+          projectile.launchAngle = projectile.angle;
           projectile._resumeVx = projectile.vx;
           projectile._resumeVy = projectile.vy;
           projectile.vx = 0;
@@ -434,6 +436,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
       if (isAtWall) {
         if (projectile.vx !== 0 || projectile.vy !== 0) {
+          projectile.angle = Math.atan2(projectile.vy, projectile.vx);
+          projectile.launchAngle = projectile.angle;
           projectile._resumeVx = projectile.vx;
           projectile._resumeVy = projectile.vy;
           projectile.vx = 0;

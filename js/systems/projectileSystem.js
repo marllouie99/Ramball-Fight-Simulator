@@ -683,6 +683,11 @@ class ProjectileSystem {
     proj.y = fighter.y + dirY * tipDist;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
+    proj.angle = angle;
+    proj.launchAngle = angle;
+    proj.originalAngle = angle;
+    proj._resumeVx = dirX * speed;
+    proj._resumeVy = dirY * speed;
     proj.r = projRadius;
     proj.life = maxLife;
     proj.maxLife = maxLife;
