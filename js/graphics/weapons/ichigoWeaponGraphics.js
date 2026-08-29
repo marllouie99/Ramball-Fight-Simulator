@@ -45,9 +45,9 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
 
   // ── Exact Crescent Parameters (Normalized to 38px base, scaled seamlessly by radiusScale) ──
   const R = 38;
-  const maxThick = isFinal ? 25 : (isBankaiHollow ? 18 : (isBankai ? 16 : 14));
-  const taperPower = isFinal ? 1.12 : 1.32;
-  const halfAngle = isFinal ? (0.72 * Math.PI) : ((isBankaiHollow || isShikaiHollow) ? (0.66 * Math.PI) : (0.64 * Math.PI));
+  const maxThick = 14; // Exact same slim thickness across all forms, matching normal Getsuga Tensho!
+  const taperPower = 1.32; // Exact same slim needle-sharp double-tapering as normal Getsuga Tensho
+  const halfAngle = 0.64 * Math.PI; // Exact same slim crescent arc span as normal Getsuga Tensho
   const px = 2.5 / Math.max(0.5, radiusScale * 0.7); // Scale-compensated pixel unit
 
   // ── Palette Definition ──
@@ -122,22 +122,22 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   }
 
   // ── 1. Stepped Atmosphere Pixel Aura ──
-  const auraR = R + px * (isFinal ? 3.0 : 2.0);
+  const auraR = R + px * 2.0;
   ctx.fillStyle = cAura;
   for (let a = -halfAngle; a <= halfAngle; a += 0.05) {
     const sx = Math.round((Math.cos(a) * auraR) / px) * px;
     const sy = Math.round((Math.sin(a) * auraR) / px) * px;
-    ctx.fillRect(sx, sy, px * (isFinal ? 1.5 : 1), px * (isFinal ? 1.5 : 1));
+    ctx.fillRect(sx, sy, px, px);
   }
 
   // ── 2. Stepped High-Contrast Dark Border Perimeter ──
   ctx.fillStyle = cBorder;
-  const numSteps = isFinal ? 48 : 32;
+  const numSteps = 32;
   for (let i = 0; i <= numSteps; i++) {
     const t = (i / numSteps) * 2 - 1;
     const ang = t * halfAngle;
-    const sx = Math.round((Math.cos(ang) * (R + px * (isFinal ? 1.2 : 0.8))) / px) * px;
-    const sy = Math.round((Math.sin(ang) * (R + px * (isFinal ? 1.2 : 0.8))) / px) * px;
+    const sx = Math.round((Math.cos(ang) * (R + px * 0.8)) / px) * px;
+    const sy = Math.round((Math.sin(ang) * (R + px * 0.8)) / px) * px;
     ctx.fillRect(sx, sy, px, px);
   }
   for (let i = numSteps; i >= 0; i--) {
@@ -170,7 +170,7 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
 
           if (depthFromApex < px * 1.5) {
             ctx.fillStyle = cCore; // Razor-sharp white-hot leading edge
-          } else if (depthFromApex < px * (isFinal ? 6.0 : 3.2)) {
+          } else if (depthFromApex < px * 3.2) {
             ctx.fillStyle = cBright; // Saturated electric energy rim
           } else {
             ctx.fillStyle = isDarkCore ? cSaturated : ((Math.round(gx / px) + Math.round(gy / px)) % 2 === 0 ? cSaturated : cBright);
@@ -184,13 +184,13 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   // ── 4. Leading Apex Stepped Pixel Diamond Flare ──
   const apexX = Math.round(R / px) * px;
   ctx.fillStyle = cCore;
-  const flareSpread = isFinal ? 3 : 2;
+  const flareSpread = 2;
   ctx.fillRect(apexX - px * 0.5, -px * 0.5, px, px);
   ctx.fillRect(apexX - px * flareSpread, -px * 0.5, px * (flareSpread * 2), px);
   ctx.fillRect(apexX - px * 0.5, -px * flareSpread, px, px * (flareSpread * 2));
 
   // ── 5. Trailing Stepped Pixel Sparkles & Reiatsu Motes ──
-  const moteCount = isFinal ? 6 : 3;
+  const moteCount = 3;
   for (let s = 0; s < moteCount; s++) {
     const sSeed = s * 73.1 + qTime * 0.006;
     const sAng = (Math.sin(sSeed) * halfAngle * 0.85);
@@ -199,7 +199,7 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     const sx = Math.round((Math.cos(sAng) * sInR) / px) * px;
     const sy = Math.round((Math.sin(sAng) * sInR) / px) * px;
 
-    ctx.fillStyle = (s % 3 === 0) ? cCore : ((s % 3 === 1) ? cBright : cBorder);
+    ctx.fillStyle = (s % 3 === 0) ? cCore : ((s % 3 === 1) ? cBright : (isDarkMode ? cSaturated : cBorder));
     ctx.fillRect(sx, sy, px, px);
   }
 
