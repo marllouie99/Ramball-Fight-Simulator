@@ -161,7 +161,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
         const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 45;
         const slowMult = CONFIG.gojo?.infinitySlowMultiplier ?? 0.50;
         if (typeof attacker.applySlow === 'function') {
-          attacker.applySlow(slowDur, slowMult);
+          attacker.applySlow(slowDur, slowMult, { isInfinitySlow: true });
         } else {
           attacker.slowTimer = Math.max(attacker.slowTimer || 0, slowDur);
           attacker.slowMultiplier = Math.min(attacker.slowMultiplier || 1.0, slowMult);
@@ -175,15 +175,11 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       const overlap = minDist - dist;
 
       if (overlap > 0 && !fighter.domainActive) {
+        attacker.x += nx * (overlap + 4);
+        attacker.y += ny * (overlap + 4);
         if (!isImmovable) {
-          const halfOverlap = overlap / 2;
-          attacker.x += nx * (halfOverlap + 2);
-          attacker.y += ny * (halfOverlap + 2);
-          fighter.x -= nx * halfOverlap;
-          fighter.y -= ny * halfOverlap;
-        } else {
-          attacker.x += nx * (overlap + 3);
-          attacker.y += ny * (overlap + 3);
+          fighter.x -= nx * 2;
+          fighter.y -= ny * 2;
         }
       }
     }

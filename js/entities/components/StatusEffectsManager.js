@@ -23,7 +23,7 @@ export class StatusEffectsManager {
   }
 
   applySlow(frames, multiplier, opts = {}) {
-    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed) return;
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed && !opts.isInfinitySlow) return;
     if (this.fighter.slowTimer < frames) this.fighter.slowTimer = frames;
     this.fighter.slowMultiplier = multiplier;
   }

@@ -1109,7 +1109,7 @@ export class TojiFighter extends Fighter {
       return;
     }
 
-    // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red, Hollow Purple, and Mahoraga's Divine Shout!
+    // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red, Hollow Purple, Limitless Infinity barrier slow, and Mahoraga's Divine Shout!
     if ((this.redSlowTimer || 0) > 0) {
       this.redSlowTimer--;
       this.slowTimer = Math.max(this.slowTimer || 0, 2);
@@ -1119,6 +1119,8 @@ export class TojiFighter extends Fighter {
     } else if (this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0)) {
       this.slowTimer = Math.max(this.slowTimer || 0, 2);
       this.slowMultiplier = 0.40;
+    } else if (this.slowTimer > 0) {
+      this.slowTimer--;
     } else {
       this.slowTimer = 0;
     }

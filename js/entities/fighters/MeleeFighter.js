@@ -140,8 +140,8 @@ export class MeleeFighter extends Fighter {
           }
         }
 
-        const isToji = this.characterId === 'toji' || this.type === 'toji';
-        const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !isToji && !this.gojoInfinityImmune;
+        const isTojiAmbushing = (this.characterId === 'toji' || this.type === 'toji') && this.isAmbushing;
+        const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !isTojiAmbushing && !this.gojoInfinityImmune;
 
         if (target && !isTargetGojoInfinity) {
           const dx = target.x - this.x;
