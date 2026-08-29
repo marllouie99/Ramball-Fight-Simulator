@@ -582,19 +582,40 @@ export function updateDriveBys() {
         car.target = activeTarget;
       }
 
-      // Calculate Homie aim angles towards the target with clean angular difference
+      // Calculate individual Homie aim angles towards the target with clean angular difference
       if (activeTarget && !activeTarget.dead) {
-        const dx = activeTarget.x - car.x;
-        const dy = activeTarget.y - car.y;
-        const worldAim = Math.atan2(dy, dx);
-        const relAim = shortestAngleDiff(worldAim, car.angle);
+        const cosA = Math.cos(car.angle);
+        const sinA = Math.sin(car.angle);
 
-        car.homie1Aim = relAim;
-        car.homie2Aim = relAim;
+        const cabinX = -car.length * 0.13;
+        const cabinW = car.length * 0.54;
+        const halfW = car.width * 0.5;
+
+        // Homie 1 world pos (Front passenger window)
+        const h1LocalX = cabinX + cabinW * 0.12;
+        const h1LocalY = halfW * 0.75;
+        const h1WorldX = car.x + cosA * h1LocalX - sinA * h1LocalY;
+        const h1WorldY = car.y + sinA * h1LocalX + cosA * h1LocalY;
+        const h1WorldAim = Math.atan2(activeTarget.y - h1WorldY, activeTarget.x - h1WorldX);
+        car.homie1Aim = shortestAngleDiff(h1WorldAim, car.angle);
+
+        // Homie 2 world pos (Rear passenger window)
+        const h2LocalX = cabinX - cabinW * 0.16;
+        const h2LocalY = halfW * 0.75;
+        const h2WorldX = car.x + cosA * h2LocalX - sinA * h2LocalY;
+        const h2WorldY = car.y + sinA * h2LocalX + cosA * h2LocalY;
+        const h2WorldAim = Math.atan2(activeTarget.y - h2WorldY, activeTarget.x - h2WorldX);
+        car.homie2Aim = shortestAngleDiff(h2WorldAim, car.angle);
       } else {
         car.homie1Aim = 0;
         car.homie2Aim = 0;
       }
+
+      // Decay recoil and flash timers
+      if (car.homie1Flash > 0) car.homie1Flash--;
+      if (car.homie2Flash > 0) car.homie2Flash--;
+      if (car.homie1Recoil > 0) car.homie1Recoil = Math.max(0, car.homie1Recoil - 0.6);
+      if (car.homie2Recoil > 0) car.homie2Recoil = Math.max(0, car.homie2Recoil - 0.6);
 
       // ── DRIVE-BY MOVEMENT & DRIFT STATE MACHINE ──
       const currentSpeed = (car.speed !== undefined) ? car.speed : 6.6;

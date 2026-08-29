@@ -707,7 +707,7 @@ function _isDarkMode() {
 /**
  * Draws a Grove Street Homie leaning out of the car window in Pixel Art Style (Saitama Tech)
  */
-function _drawPixelGroveHomie(ctx, x, y, targetAngle, recoil, flashTimer, shirtColor = '#F8FAFC') {
+function _drawPixelGroveHomie(ctx, x, y, targetAngle, recoil = 0, flashTimer = 0, shirtColor = '#F8FAFC') {
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
 
@@ -749,16 +749,38 @@ function _drawPixelGroveHomie(ctx, x, y, targetAngle, recoil, flashTimer, shirtC
   ctx.fillRect(-5, -6, 3, 2);
   ctx.fillRect(2, -6, 3, 2);
 
-  // 5. Holding and Aiming Stepped Pixel TEC-9
-  const recoilDist = snap((recoil || 0) * 1.2);
-  const gunOffsetX = Math.cos(targetAngle) * (14.0 - recoilDist);
-  const gunOffsetY = Math.sin(targetAngle) * (14.0 - recoilDist);
+  // 5. Holding and Aiming Stepped Pixel TEC-9 Rotating toward Target
+  const armReach = 14.0;
+  const recoilKick = snap((recoil || 0) * 1.4);
+  const gunDist = armReach - recoilKick;
+  const gunPivotX = Math.cos(targetAngle) * gunDist;
+  const gunPivotY = Math.sin(targetAngle) * gunDist;
 
-  // Arms reaching out from window
-  ctx.fillStyle = skinColor;
-  ctx.fillRect(-3, 1, snap(gunOffsetX * 0.75), snap(gunOffsetY * 0.75));
+  // Discrete Stepped Arm reaching to gun grip
+  const armSteps = 5;
+  for (let s = 1; s <= armSteps; s++) {
+    const t = s / armSteps;
+    const ax = snap(gunPivotX * t);
+    const ay = snap(2 + (gunPivotY - 2) * t);
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(ax - P, ay - P, P * 2, P * 2);
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(ax, ay, P, P);
+  }
 
-  drawCjPixelTec9(ctx, gunOffsetX, gunOffsetY, 1.05, recoil, flashTimer);
+  // Draw TEC-9 Rotated by Target Angle
+  ctx.save();
+  ctx.translate(snap(gunPivotX), snap(gunPivotY));
+  ctx.rotate(targetAngle);
+
+  // If aiming backward (leftward in local space), flip vertically so sights/receiver stay upright
+  const isAimingBackward = Math.abs(targetAngle) > Math.PI * 0.5;
+  if (isAimingBackward) {
+    ctx.scale(1, -1);
+  }
+
+  drawCjPixelTec9(ctx, 0, 0, 1.05, recoil, flashTimer);
+  ctx.restore();
 
   ctx.restore();
 }
