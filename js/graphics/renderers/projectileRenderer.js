@@ -1685,269 +1685,150 @@ function drawGenosFireball(ctx, p) {
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
 
-  const R          = p.r || 9;      // base radius (~9px)
-  const bodyLen    = R * 3.8;       // length of the main glowing body
-  const tailLen    = R * 9.0;       // how far back the speed trails extend
-  const tipLen     = R * 2.2;       // needle tip protrusion beyond body front
-  const halfBody   = bodyLen / 2;
-  const flicker    = p.life || 0;   // deterministic per-frame flicker seed
+  // Scaled flaming cannonball radius (~14-17px sphere)
+  const R_ball  = Math.max(13, (p.r || 9) * 1.45);
+  const tailLen = R_ball * 2.8;
+  const flicker = p.life || 0;
 
   if (isDarkMode) {
-    drawGenosPixelFireball(ctx, p, R, bodyLen, tailLen, tipLen, halfBody, flicker);
+    drawGenosPixelFireball(ctx, p, R_ball, tailLen, flicker);
     ctx.restore();
     return;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 1. LONG BACKWARD SPEED TRAILS — energy smear ripping off the rear
+  // 1. TRAILING COMET FIRE PLUME — raging flame plume streaming behind the cannonball
   // ─────────────────────────────────────────────────────────────────────────
+  const tailGrad = ctx.createLinearGradient(-tailLen, 0, 0, 0);
+  tailGrad.addColorStop(0,   'rgba(255, 60,  0, 0)');
+  tailGrad.addColorStop(0.35,'rgba(255, 100, 0, 0.38)');
+  tailGrad.addColorStop(0.70,'rgba(255, 170, 0, 0.78)');
+  tailGrad.addColorStop(1.0, 'rgba(255, 230, 60, 0.95)');
 
-  // Wide soft tail — broad orange heat bloom fading into nothing
-  const tailGrad = ctx.createLinearGradient(-halfBody - tailLen, 0, -halfBody, 0);
-  tailGrad.addColorStop(0,   'rgba(255, 60, 0, 0)');
-  tailGrad.addColorStop(0.55,'rgba(255, 100, 0, 0.22)');
-  tailGrad.addColorStop(1,   'rgba(255, 160, 0, 0.55)');
   ctx.fillStyle = tailGrad;
-  // Taper: wide at body, needle-thin at tail tip
   ctx.beginPath();
-  ctx.moveTo(-halfBody - tailLen, 0);
-  ctx.lineTo(-halfBody, -R * 1.4);
-  ctx.lineTo(-halfBody, R * 1.4);
+  ctx.moveTo(-tailLen, 0);
+  ctx.quadraticCurveTo(-tailLen * 0.45, -R_ball * 1.15, 0, -R_ball * 0.85);
+  ctx.lineTo(0, R_ball * 0.85);
+  ctx.quadraticCurveTo(-tailLen * 0.45, R_ball * 1.15, -tailLen, 0);
   ctx.closePath();
   ctx.fill();
 
-  // Sharp thin speed streaks — 5 razor lines bleeding backward
-  const streakData = [
-    { yOff: 0,        alpha: 0.80, width: 0.9, lenMult: 1.00 },
-    { yOff: -R * 0.7, alpha: 0.55, width: 0.6, lenMult: 0.78 },
-    { yOff:  R * 0.7, alpha: 0.55, width: 0.6, lenMult: 0.78 },
-    { yOff: -R * 1.3, alpha: 0.30, width: 0.4, lenMult: 0.52 },
-    { yOff:  R * 1.3, alpha: 0.30, width: 0.4, lenMult: 0.52 },
-  ];
-  for (const s of streakData) {
-    const sLen = tailLen * s.lenMult;
-    const sg = ctx.createLinearGradient(-halfBody - sLen, 0, -halfBody, 0);
-    sg.addColorStop(0,   `rgba(255, 120, 0, 0)`);
-    sg.addColorStop(0.6, `rgba(255, 160, 30, ${s.alpha * 0.5})`);
-    sg.addColorStop(1,   `rgba(255, 210, 60, ${s.alpha})`);
-    ctx.beginPath();
-    ctx.moveTo(-halfBody - sLen, s.yOff);
-    ctx.lineTo(-halfBody,        s.yOff);
-    ctx.strokeStyle = sg;
-    ctx.lineWidth = s.width;
-    ctx.stroke();
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 2. OUTER BROKEN PLASMA SHELL — jagged spikes letting core light bleed through
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // Ambient halo around the body
-  const haloGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 2.6);
-  haloGrad.addColorStop(0,   'rgba(255, 200, 60, 0.55)');
-  haloGrad.addColorStop(0.45,'rgba(255, 100, 0,  0.30)');
-  haloGrad.addColorStop(1,   'rgba(255, 50,  0,  0)');
-  ctx.fillStyle = haloGrad;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, halfBody + R * 0.6, R * 2.0, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Jagged spike crown — broken orange shell that the core bursts through
-  const spikeCount = 14;
-  for (let i = 0; i < spikeCount; i++) {
-    // deterministic spike placement spread along body, alternating top/bottom
-    const side   = (i % 2 === 0) ? 1 : -1;
-    const xPos   = -halfBody + (i / (spikeCount - 1)) * bodyLen;
-    const baseAmp = R * (0.8 + ((i * 5 + flicker * 2) % 5) / 5 * 0.9);  // 0.8–1.7 R
-    const spikeH = baseAmp * side;
-    // jagged x-jitter
-    const xJit  = (((i * 7 + flicker * 3) % 7) / 7 - 0.5) * R * 0.7;
-
-    // Inner base width — narrow so the spike looks sharp
-    const bw = R * (0.25 + ((i * 3 + flicker) % 4) / 4 * 0.15);
-
-    ctx.beginPath();
-    ctx.moveTo(xPos - bw + xJit, 0);
-    ctx.lineTo(xPos + xJit,      spikeH);
-    ctx.lineTo(xPos + bw + xJit, 0);
-    ctx.closePath();
-
-    // Color: outer spikes orange→yellow; core-burst spikes near center are white-yellow
-    const coreProx = 1 - Math.abs(xPos) / halfBody; // 0 = edge, 1 = center
-    const alpha = 0.6 + coreProx * 0.35;
-    const r2 = Math.round(255);
-    const g2 = Math.round(120 + coreProx * 135);
-    ctx.fillStyle = `rgba(${r2}, ${g2}, 0, ${alpha.toFixed(2)})`;
-    ctx.fill();
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 3. MAIN PLASMA BODY — solid glowing core capsule
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const bodyGrad = ctx.createLinearGradient(-halfBody, 0, halfBody, 0);
-  bodyGrad.addColorStop(0,    'rgba(255, 110, 0, 0.85)');
-  bodyGrad.addColorStop(0.35, 'rgba(255, 180, 20, 1)');
-  bodyGrad.addColorStop(0.65, 'rgba(255, 230, 80, 1)');
-  bodyGrad.addColorStop(1,    'rgba(255, 200, 40, 0.9)');
-
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  // Rear: rounded; Front: sharp taper toward needle
-  const bodyH = R * 0.95;
-  ctx.moveTo(-halfBody, 0);            // rear center
-  ctx.lineTo(-halfBody * 0.85, -bodyH);
-  ctx.lineTo( halfBody * 0.4,  -bodyH * 0.55);
-  ctx.lineTo( halfBody,         0);    // front — converging to point
-  ctx.lineTo( halfBody * 0.4,   bodyH * 0.55);
-  ctx.lineTo(-halfBody * 0.85,  bodyH);
-  ctx.closePath();
-  ctx.fill();
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 4. SUPERHEATED WHITE INNER CORE — bright channel through the center
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const whiteGrad = ctx.createLinearGradient(-halfBody, 0, halfBody, 0);
-  whiteGrad.addColorStop(0,    'rgba(255, 230, 180, 0.5)');
-  whiteGrad.addColorStop(0.25, 'rgba(255, 255, 255, 1)');
-  whiteGrad.addColorStop(0.6,  'rgba(255, 255, 255, 1)');
-  whiteGrad.addColorStop(0.88, 'rgba(255, 255, 210, 0.85)');
-  whiteGrad.addColorStop(1,    'rgba(255, 255, 180, 0)');
-  ctx.strokeStyle = whiteGrad;
-  ctx.lineWidth = R * 0.55;
-  ctx.beginPath();
-  ctx.moveTo(-halfBody * 0.7, 0);
-  ctx.lineTo( halfBody * 0.85, 0);
-  ctx.stroke();
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 5. NEEDLE TIP — sharp piercing front point + atmospheric pressure cone
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // Pressure cone (shock wave shape ahead of the tip)
-  const coneLen = tipLen * 1.4;
-  const coneSpreadAngle = 0.38; // radians — tight cone
-  ctx.beginPath();
-  ctx.moveTo(halfBody + coneLen, 0);                            // cone apex
-  ctx.lineTo(halfBody,  Math.sin(coneSpreadAngle) * R * 0.9);   // top base
-  ctx.lineTo(halfBody, -Math.sin(coneSpreadAngle) * R * 0.9);   // bottom base
-  ctx.closePath();
-  const coneGrad = ctx.createLinearGradient(halfBody, 0, halfBody + coneLen, 0);
-  coneGrad.addColorStop(0,   'rgba(255, 240, 180, 0.70)');
-  coneGrad.addColorStop(0.5, 'rgba(255, 180, 60, 0.30)');
-  coneGrad.addColorStop(1,   'rgba(255, 120, 0, 0)');
-  ctx.fillStyle = coneGrad;
-  ctx.fill();
-
-  // Needle shaft — extremely sharp bright tip line
-  const needleGrad = ctx.createLinearGradient(halfBody, 0, halfBody + tipLen, 0);
-  needleGrad.addColorStop(0,   'rgba(255, 255, 255, 1)');
-  needleGrad.addColorStop(0.5, 'rgba(255, 230, 100, 0.9)');
-  needleGrad.addColorStop(1,   'rgba(255, 180, 0, 0)');
-  ctx.strokeStyle = needleGrad;
-  ctx.lineWidth = R * 0.28;
+  // White-hot inner core stream in the trailing plume
+  const coreTailGrad = ctx.createLinearGradient(-tailLen * 0.55, 0, 0, 0);
+  coreTailGrad.addColorStop(0,   'rgba(255, 255, 255, 0)');
+  coreTailGrad.addColorStop(0.5, 'rgba(255, 240, 180, 0.80)');
+  coreTailGrad.addColorStop(1,   'rgba(255, 255, 255, 1.0)');
+  ctx.strokeStyle = coreTailGrad;
+  ctx.lineWidth = R_ball * 0.42;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(halfBody,          0);
-  ctx.lineTo(halfBody + tipLen, 0);
+  ctx.moveTo(-tailLen * 0.55, 0);
+  ctx.lineTo(0, 0);
   ctx.stroke();
-  ctx.lineCap = 'butt';
 
-  // Pinpoint flash at the very tip
-  const tipFlash = ctx.createRadialGradient(halfBody + tipLen, 0, 0, halfBody + tipLen, 0, R * 0.85);
-  tipFlash.addColorStop(0,   'rgba(255, 255, 255, 1)');
-  tipFlash.addColorStop(0.4, 'rgba(255, 230, 100, 0.75)');
-  tipFlash.addColorStop(1,   'rgba(255, 120, 0, 0)');
-  ctx.fillStyle = tipFlash;
+  // ─────────────────────────────────────────────────────────────────────────
+  // 2. DANCING SOLAR CORONA FLAME TONGUES — licking around the ball sphere
+  // ─────────────────────────────────────────────────────────────────────────
+  const tongueCount = 12;
+  ctx.fillStyle = 'rgba(255, 90, 0, 0.88)';
   ctx.beginPath();
-  ctx.arc(halfBody + tipLen, 0, R * 0.85, 0, Math.PI * 2);
+  for (let i = 0; i <= tongueCount; i++) {
+    const ang = (i / tongueCount) * Math.PI * 2;
+    const flameAmp = R_ball * (1.0 + 0.32 * Math.sin(ang * 5 + flicker * 0.5) + 0.15 * Math.cos(ang * 8 - flicker * 0.3));
+    const px = Math.cos(ang) * flameAmp;
+    const py = Math.sin(ang) * flameAmp;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
   ctx.fill();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 3. SPHERICAL INCINERATION CANNONBALL BODY — superheated plasma orb
+  // ─────────────────────────────────────────────────────────────────────────
+  const ballGrad = ctx.createRadialGradient(R_ball * 0.2, 0, 0, 0, 0, R_ball);
+  ballGrad.addColorStop(0,    '#FFFFFF');                 // Superheated fusion core
+  ballGrad.addColorStop(0.35, 'rgba(255, 240, 80, 1.0)'); // Solar golden plasma mantle
+  ballGrad.addColorStop(0.75, 'rgba(255, 90,  0, 1.0)');  // Saturated fiery orange body
+  ballGrad.addColorStop(1.0,  'rgba(180, 20,  0, 0.92)'); // Deep magma crimson rim
+  ctx.fillStyle = ballGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, R_ball, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 4. SUPERHEATED WHITE FUSION CENTER
+  // ─────────────────────────────────────────────────────────────────────────
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(R_ball * 0.15, 0, R_ball * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 5. FLOATING TRAILING SPARK EMBERS IN WAKE
+  // ─────────────────────────────────────────────────────────────────────────
+  for (let e = 0; e < 6; e++) {
+    const ex = -tailLen * (0.60 + ((e * 0.22 + flicker * 0.05) % 0.70));
+    const ey = Math.sin(e * 3.7 + flicker * 0.4) * (R_ball * 0.65);
+    const eR = 1.6 + (e % 3) * 0.8;
+    ctx.fillStyle = (e % 2 === 0) ? '#FFE600' : '#FF5500';
+    ctx.beginPath();
+    ctx.arc(ex, ey, eR, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore();
 }
 
 /**
- * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Incineration Fireball (Dark Mode).
+ * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Flaming Cannonball (Dark Mode).
  * Uses the Saitama skin / Getsuga Tensho rasterization standard (P = 2.0px, Rule #35 compliant).
  */
-function drawGenosPixelFireball(ctx, p, R, bodyLen, tailLen, tipLen, halfBody, flicker) {
+function drawGenosPixelFireball(ctx, p, R_ball, tailLen, flicker) {
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
-  // 1. Inside fireball body test
-  const isInsideBody = (gx, gy) => {
-    if (gx < -halfBody || gx > halfBody) return false;
-    const normX = (gx + halfBody) / bodyLen;
-    let h;
-    if (normX < 0.25) {
-      h = R * 0.95 * Math.sin((normX / 0.25) * (Math.PI / 2));
-    } else if (normX > 0.65) {
-      h = R * 0.95 * (1.0 - ((normX - 0.65) / 0.35) * 0.75);
-    } else {
-      h = R * 0.95;
-    }
-    return Math.abs(gy) <= h;
+  // 1. Inside flaming cannonball sphere + dancing corona flame tongues
+  const isInsideOrb = (gx, gy) => {
+    const dist = Math.hypot(gx, gy);
+    const ang = Math.atan2(gy, gx);
+    const flameR = R_ball * (1.0 + 0.30 * Math.sin(ang * 5 + flicker * 0.5) + 0.15 * Math.cos(ang * 8 - flicker * 0.3));
+    return dist <= flameR;
   };
 
-  // 2. Needle tip test
-  const isInsideNeedle = (gx, gy) => {
-    if (gx < halfBody || gx > halfBody + tipLen) return false;
-    const t = 1.0 - (gx - halfBody) / tipLen;
-    const needleH = Math.max(P, R * 0.32 * Math.pow(t, 1.2));
-    return Math.abs(gy) <= needleH;
+  // 2. Inside trailing comet flame plume
+  const isInsideTail = (gx, gy) => {
+    if (gx > 0 || gx < -tailLen) return false;
+    const t = -gx / tailLen; // 0 at center, 1 at tail tip
+    const plumeW = R_ball * Math.pow(1.0 - t, 1.25) * (1.0 + 0.25 * Math.sin(t * 8 + flicker));
+    return Math.abs(gy) <= plumeW;
   };
 
-  // 3. Shockwave pressure cone test
-  const isInsideShockCone = (gx, gy) => {
-    const coneLen = tipLen * 1.35;
-    if (gx < halfBody || gx > halfBody + coneLen) return false;
-    const t = 1.0 - (gx - halfBody) / coneLen;
-    const coneH = R * 0.90 * t;
-    return Math.abs(gy) <= coneH;
-  };
-
-  // 4. Jagged plasma spikes test
-  const spikeCount = 12;
-  const isInsideSpikes = (gx, gy) => {
-    for (let i = 0; i < spikeCount; i++) {
-      const side = (i % 2 === 0) ? 1 : -1;
-      const xPos = -halfBody + (i / (spikeCount - 1)) * bodyLen;
-      const baseAmp = R * (0.85 + ((i * 5 + flicker * 2) % 5) / 5 * 0.85);
-      const spikeH = baseAmp * side;
-      const xJit = (((i * 7 + flicker * 3) % 7) / 7 - 0.5) * R * 0.6;
-      const bw = R * (0.28 + ((i * 3 + flicker) % 4) / 4 * 0.15);
-
-      const dx = gx - (xPos + xJit);
-      if (Math.abs(dx) <= bw) {
-        const t = 1.0 - Math.abs(dx) / bw;
-        if (side > 0 && gy >= 0 && gy <= spikeH * t) return true;
-        if (side < 0 && gy <= 0 && gy >= spikeH * t) return true;
-      }
+  // 3. Inside detached floating ember sparks
+  const emberSparks = [
+    { x: -tailLen * 0.85, y: -R_ball * 0.45, r: P * 1.2 },
+    { x: -tailLen * 1.15, y:  R_ball * 0.35, r: P * 1.2 },
+    { x: -tailLen * 1.35, y: -R_ball * 0.20, r: P * 1.2 },
+    { x: -tailLen * 0.70, y:  R_ball * 0.55, r: P * 1.2 },
+  ];
+  const isInsideEmbers = (gx, gy) => {
+    for (const em of emberSparks) {
+      if (Math.hypot(gx - em.x, gy - em.y) <= em.r) return true;
     }
     return false;
   };
 
   const isInsideFireball = (gx, gy) => {
-    return isInsideBody(gx, gy) || isInsideNeedle(gx, gy) || isInsideSpikes(gx, gy);
+    return isInsideOrb(gx, gy) || isInsideTail(gx, gy) || isInsideEmbers(gx, gy);
   };
 
-  const minX = Math.floor((-halfBody - P * 2) / P) * P;
-  const maxX = Math.ceil((halfBody + tipLen + P * 2) / P) * P;
-  const maxY = Math.ceil((R * 2.0 + P * 2) / P) * P;
+  const minX = Math.floor((-tailLen * 1.45) / P) * P;
+  const maxX = Math.ceil((R_ball * 1.5) / P) * P;
+  const maxY = Math.ceil((R_ball * 1.5) / P) * P;
 
-  // ── A. Stepped Pixel Shock Cone (Leading atmospheric pressure wave) ──
-  ctx.fillStyle = 'rgba(255, 140, 0, 0.45)';
-  for (let gy = -maxY; gy <= maxY; gy += P) {
-    for (let gx = snap(halfBody); gx <= snap(halfBody + tipLen * 1.35); gx += P) {
-      if (isInsideShockCone(gx, gy) && !isInsideFireball(gx, gy)) {
-        ctx.fillRect(snap(gx), snap(gy), P, P);
-      }
-    }
-  }
-
-  // ── B. Main Discrete 2D Fireball Grid (4-Neighbor Boundary Shell) ──
+  // ── Main Discrete 2D Cannonball Grid with 4-Neighbor Border Shell ──
   for (let gy = -maxY; gy <= maxY; gy += P) {
     for (let gx = minX; gx <= maxX; gx += P) {
       if (!isInsideFireball(gx, gy)) continue;
@@ -1966,51 +1847,19 @@ function drawGenosPixelFireball(ctx, p, R, bodyLen, tailLen, tipLen, halfBody, f
         continue;
       }
 
-      const absY = Math.abs(gy);
+      const dist = Math.hypot(gx, gy);
 
-      // Shading hierarchy based on proximity to center core line & needle tip
-      if ((absY < P * 1.5 && gx > -halfBody * 0.7 && gx < halfBody + tipLen * 0.85) || (gx > halfBody + tipLen - P * 2)) {
+      // 4-tier stepped shading hierarchy:
+      if (dist < R_ball * 0.38 || (gx <= 0 && gx > -tailLen * 0.45 && Math.abs(gy) < P * 1.2)) {
         ctx.fillStyle = '#FFFFFF'; // Superheated pure white fusion core
-      } else if (absY < R * 0.40) {
-        ctx.fillStyle = '#FFE600'; // Blinding solar golden plasma
-      } else if (absY < R * 0.75) {
-        ctx.fillStyle = '#FF5500'; // Genos signature saturated fiery orange
+      } else if (dist < R_ball * 0.72 || (gx <= 0 && Math.abs(gy) < R_ball * 0.35)) {
+        ctx.fillStyle = '#FFE600'; // Solar golden plasma
+      } else if (dist <= R_ball || (gx <= 0 && Math.abs(gy) < R_ball * 0.75)) {
+        ctx.fillStyle = '#FF5500'; // Saturated fiery orange body
       } else {
-        ctx.fillStyle = (Math.round(gx / P) + Math.round(gy / P)) % 2 === 0 ? '#FF5500' : '#B32400'; // Deep burning magma crimson
+        ctx.fillStyle = ((Math.round(gx / P) + Math.round(gy / P)) % 2 === 0) ? '#FF5500' : '#CC2A00'; // Magma crimson corona tongues
       }
       ctx.fillRect(px, py, P, P);
-    }
-  }
-
-  // ── C. Leading White Diamond Glint at Needle Tip ──
-  const tipApexX = snap(halfBody + tipLen);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(tipApexX, 0, P, P);
-  ctx.fillRect(tipApexX - P, -P, P, P * 3);
-  ctx.fillRect(tipApexX - P * 2, 0, P, P);
-
-  // ── D. Backward Stepped Speed Needles ──
-  const streakCount = 6;
-  for (let s = 0; s < streakCount; s++) {
-    const sNorm = (s / (streakCount - 1)) * 2 - 1; // -1 to +1
-    const yOff = snap(sNorm * R * 1.1);
-    const sLen = tailLen * (0.55 + (1.0 - Math.abs(sNorm)) * 0.45);
-    const startX = snap(-halfBody);
-    const endX = snap(-halfBody - sLen);
-
-    let sColor;
-    if (s % 4 === 0) sColor = '#150500';       // Obsidian streak
-    else if (s % 4 === 1) sColor = '#FF5500'; // Fiery orange
-    else if (s % 4 === 2) sColor = '#FFE600'; // Solar yellow
-    else sColor = '#FFFFFF';                  // White core
-
-    ctx.fillStyle = sColor;
-    for (let x = startX; x >= endX; x -= P) {
-      const t = (x - endX) / (startX - endX); // 0 at far tail, 1 at body
-      const thick = Math.max(P, snap(t * P * 1.5));
-      for (let dy = -thick; dy <= thick; dy += P) {
-        ctx.fillRect(x, yOff + dy, P, P);
-      }
     }
   }
 }
