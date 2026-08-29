@@ -10,6 +10,37 @@
 import { getHandSize } from '../../core/config.js';
 import { state, isChampionScreenActive } from '../../core/state.js';
 
+let _johnWickPixelSkinImage = null;
+let _johnWickPixelSkinLoading = false;
+
+/**
+ * Preload and retrieve the John Wick Pixel Art PNG body model
+ */
+export function _getJohnWickPixelSkinImage() {
+  if (_johnWickPixelSkinImage && _johnWickPixelSkinImage.complete && _johnWickPixelSkinImage.naturalWidth > 0) {
+    return _johnWickPixelSkinImage;
+  }
+  if (!_johnWickPixelSkinLoading && typeof Image !== 'undefined') {
+    _johnWickPixelSkinLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _johnWickPixelSkinImage = img;
+      _johnWickPixelSkinLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load John Wick pixel skin at Assets/model/Johnwick-pixel-skin.png', e);
+      _johnWickPixelSkinLoading = false;
+    };
+    img.src = 'Assets/model/Johnwick-pixel-skin.png?v=1';
+    _johnWickPixelSkinImage = img;
+  }
+  return _johnWickPixelSkinImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getJohnWickPixelSkinImage();
+}
+
 /**
  * Draws a tactical fist with black suit sleeve cuff in authentic Pixel Art Style.
  */
@@ -75,6 +106,35 @@ export function drawJohnWickPixelHand(ctx, x, y, radius, skinColor) {
   }
 
   ctx.restore();
+}
+
+/**
+ * Draws the discrete 4-neighbor attached stepped black stroke border around the character circle.
+ * Exact same technique used in Saitama, Gojo, Yuji, and Nanami skins.
+ */
+function drawPixelatedCircleBorder(ctx, r) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  ctx.fillStyle = '#0B0C10';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      if (
+        Math.hypot(rx + P, ry) > r ||
+        Math.hypot(rx - P, ry) > r ||
+        Math.hypot(rx, ry + P) > r ||
+        Math.hypot(rx, ry - P) > r
+      ) {
+        ctx.fillRect(snap(rx), snap(ry), P, P);
+      }
+    }
+  }
 }
 
 // Pre-seeded static particle array for aura motes (Zero GC allocation per frame)
@@ -199,9 +259,38 @@ export function drawJohnWickExcommunicadoAura(ctx, r, isForeground = false) {
 
 /**
  * Authentic 1:1 Procedural Pixel Art Body for John Wick ("The Baba Yaga")
- * Uses discrete 2D grid-scan rasterization loop with zero subpixel bleed (P = 2.0px, Rule #19 & Rule #35 compliant).
+ * Renders the pixelated skin model image (Johnwick-pixel-skin.png) with nearest-neighbor scaling
+ * and overlays the discrete 4-neighbor attached stepped pixelated black stroke border (Saitama / Gojo standard).
  */
 export function drawJohnWickPixelBody(ctx, r) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const skinImg = _getJohnWickPixelSkinImage();
+  if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.clip();
+
+    const drawR = r * 1.02;
+    ctx.drawImage(skinImg, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.restore();
+  } else {
+    // Procedural discrete pixel fallback while image is loading
+    _drawJohnWickProceduralPixelBody(ctx, r);
+  }
+
+  // ── DRAW STEPPED PIXELATED BLACK STROKE BORDER (Saitama / Gojo Tech) ──
+  drawPixelatedCircleBorder(ctx, r);
+
+  ctx.restore();
+}
+
+/**
+ * Procedural Discrete Grid-Scan Pixel Body Fallback Engine
+ */
+function _drawJohnWickProceduralPixelBody(ctx, r) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
