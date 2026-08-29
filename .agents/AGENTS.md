@@ -700,5 +700,63 @@ function getPixelatedCanvas(img, cropX, cropY, cropW, cropH, targetSize = 48) {
 #### D. Outer Stroke Cohesion
 - When using PNG pixel skins, the global sketchy stroke (`drawSketchyCircle` via `wrapFighterDraw`) wraps seamlessly around the fighter, maintaining the signature hand-drawn style outline.
 
+## 35. Universal Pixel Art Rasterization Standards (Saitama Skin & Getsuga Tensho Technique)
 
+### Overview & Core Mandate
+Whenever converting ANY visual element — including fighter skins (e.g. Saitama, Ulquiorra, Ichigo), weapon slashes, combat attack effects, projectiles (e.g. Getsuga Tensho wave), impact scars, sonic burst pillars, or atmospheric overlays — into **Pixel Art Style**, developers **MUST strictly adhere to the authentic 2D discrete grid-scan rasterization technique** established in Saitama's skin model (`js/graphics/fighters/saitamaSkin.js`) and Ichigo's Getsuga Tensho (`js/graphics/weapons/ichigoWeaponGraphics.js`).
 
+### 1. Mandatory Technical Fundamentals
+- **`ctx.imageSmoothingEnabled = false;`**: ALWAYS disable canvas image smoothing inside a `ctx.save()` / `ctx.restore()` block to force crisp, razor-sharp nearest-neighbor pixel blocks without browser blur.
+- **Fixed Discrete Grid Unit ($P = 2.0\text{px}$)**: Use a fixed integer pixel block size ($P = 2.0\text{px}$ standard). Snap all coordinate calculations to integer pixel multiples:
+  ```javascript
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  ```
+- **Prohibition of Canvas Geometric Curves & Smooth Strokes**: **NEVER** use `ctx.arc()`, `ctx.ellipse()`, `ctx.beginPath() ... ctx.stroke()`, or canvas gradient fills (`createLinearGradient` / `createRadialGradient`) to draw pixel-art shapes. All shapes MUST be rendered as discrete stepped rectangles (`ctx.fillRect(px, py, P, P)`).
+
+### 2. True 2D Grid-Scan Bounding Rasterization Engine
+All geometric shapes (circles, crescents, polygons, slashes, wings, tails, horns, beams) MUST be rasterized by iterating over a 2D integer bounding grid with continuous inside-shape geometric testing:
+```javascript
+const minX = Math.floor(bounds.minX / P) * P;
+const maxX = Math.ceil(bounds.maxX / P) * P;
+const minY = Math.floor(bounds.minY / P) * P;
+const maxY = Math.ceil(bounds.maxY / P) * P;
+
+for (let gy = minY; gy <= maxY; gy += P) {
+  for (let gx = minX; gx <= maxX; gx += P) {
+    if (!isInsideShape(gx, gy)) continue;
+
+    const pxX = snap(gx);
+    const pyY = snap(gy);
+    // Render pixel...
+  }
+}
+```
+
+### 3. 4-Neighbor Attached Boundary Shell (Zero Floating Crumbs)
+To guarantee a solid, contiguous outer outline with **zero disconnected checkerboard crumbs, gaps, or anti-aliased artifacts**, EVERY pixel art renderer MUST perform a 4-neighbor boundary adjacency test:
+```javascript
+const isBorder = !isInsideShape(gx + P, gy) ||
+                 !isInsideShape(gx - P, gy) ||
+                 !isInsideShape(gx, gy + P) ||
+                 !isInsideShape(gx, gy - P);
+
+if (isBorder) {
+  ctx.fillStyle = cBorder; // Solid dark manga ink / outline shell
+  ctx.fillRect(pxX, pyY, P, P);
+  continue;
+}
+```
+
+### 4. 4-Tier Stepped Shading & Depth Hierarchy
+Inside the shape body, calculate depth relative to the apex, leading edge, center spine, or surface normal and assign stepped discrete palette tiers:
+- **Tier 1 — Leading Cutting Edge / Glint Core**: Razor pure white-hot core (`#FFFFFF` at depth $< 1.5 P$).
+- **Tier 2 — Saturated Energy Rim / Base Tone**: Vibrant primary character theme color (e.g. `#FF0033` electric blood crimson, `#00E5FF` cyan, `#F5C400` yellow).
+- **Tier 3 — Transitional Shadow / Burning Depth**: Deep secondary tone (e.g. `#8B0014` burning crimson).
+- **Tier 4 — Void Core / Ambient Occlusion**: Abyssal black void or darkest shadow tone (`#080003` / `#0E0F14`).
+- **Tier 5 — Outer Outline Shell**: Deep attached border (`#1A0006` / `#111114`).
+
+### 5. Snapped Auxiliary Elements (Flares, Sparkles, Motes, Lightning)
+- **Diamond Flares & Reiatsu Motes**: Positioned strictly on snapped integer coordinates (`_drawPixelDiamond` or `ctx.fillRect(snap(x), snap(y), P, P)`).
+- **Vapor Condensation Rings**: Stepped perimeter loops calculating $(x, y)$ at discrete angle steps snapped to $P$.
+- **Micro-Lightning Bolts**: Stepped orthogonal/diagonal staircase lines (`while (curY > targetY || curX !== targetX)`), never smooth continuous strokes.
