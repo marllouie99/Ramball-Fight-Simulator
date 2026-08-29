@@ -4,7 +4,7 @@ import { state } from '../../../core/state.js';
 
 export class GojoBlueBehavior extends ProjectileBehavior {
   update(p, fighters, system) {
-    const pullRadius = CONFIG.gojo?.blueRadius || 90;
+    const pullRadius = p.pullRadius || CONFIG.gojo?.blueRadius || 50;
     const ownerFighter = fighters[p.owner];
     const ownerTeam = state.getFighterTeam ? state.getFighterTeam(p.owner) : null;
 

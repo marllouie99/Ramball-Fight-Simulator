@@ -68,7 +68,7 @@ export function updateHybridProjectiles() {
         if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
           size = 800;
         } else {
-          size = 256;
+          size = Math.max(256, Math.min(800, Math.ceil((p.r || 10) * 16)));
         }
         drawScale = 1.0;        // 1:1 native resolution for Gojo's projectiles (Lapse Blue & Hollow Purple)
       }

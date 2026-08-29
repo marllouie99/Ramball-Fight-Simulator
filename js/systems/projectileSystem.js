@@ -470,9 +470,16 @@ class ProjectileSystem {
   }
 
   fireGojoBlue(fighter, ownerIndex, damage, customSpawnX, customSpawnY, customAngle) {
-    const radius = CONFIG.gojo.blueRadius || 50;
-    const speed = CONFIG.gojo.blueSpeed || (CONFIG.projectile.speed * (fighter.projectileSpeedMultiplier || 1.5));
+    const pullRadius = CONFIG.gojo?.blueRadius ?? 50;
+    const speed = CONFIG.gojo?.blueSpeed || (CONFIG.projectile.speed * (fighter.projectileSpeedMultiplier || 1.5));
     const projDamage = Number(damage);
+
+    // Calculate Blue projectile radius dynamically based on blueRadius / blueScale / blueProjectileRadius
+    const baseProjR = CONFIG.gojo?.blueProjectileRadius ?? 10;
+    const scaleMultiplier = (CONFIG.gojo?.blueScale !== undefined)
+      ? CONFIG.gojo.blueScale
+      : (pullRadius / 50);
+    const radius = Math.max(2, baseProjR * scaleMultiplier);
 
     let spawnX, spawnY, dirX, dirY;
     if (customSpawnX !== undefined && customSpawnY !== undefined) {
@@ -494,7 +501,9 @@ class ProjectileSystem {
     proj.y = spawnY;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
-    proj.r = 10;
+    proj.r = radius;
+    proj.pullRadius = pullRadius;
+    proj.blueScale = scaleMultiplier;
     proj.life = 180; // Extended lifetime to reach arena walls
     proj.maxLife = 180;
     proj.color = '#00FFFF'; // Cyan
