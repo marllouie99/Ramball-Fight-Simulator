@@ -110,6 +110,8 @@ export const CONFIG = {
   },
   blackFlash: blackFlashConfig,
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
+  darkModeShowHudSkillBars: true,  // Toggle on/off to display HUD skill progress bars when Dark Mode is enabled (true = show, false = hide)
+  darkModeShowHudStats: true,      // Toggle on/off to display HUD fighter stats info (DMG, SPD, ATK, etc.) when Dark Mode is enabled (true = show, false = hide)
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
   globalScreenShakeIntensityMultiplier: 0.7, // Global multiplier for all hit effect & arena screen shake intensity (1.0 = normal, 0.5 = half shake, 0.0 = disable shake completely)
   canvasWidth: 540,                 // Logical width of the game screen

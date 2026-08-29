@@ -733,9 +733,13 @@ function updateHealthHud() {
   if (!fighters) return;
 
   // OPTIMIZATION: Auto-rebuild if HUD display mode or Arena Theme changed.
-  const hudModeChanged = state._lastHudShowFighterDescription !== CONFIG.hudShowFighterDescription;
+  const hudModeChanged = state._lastHudShowFighterDescription !== CONFIG.hudShowFighterDescription ||
+                         state._lastDarkModeShowHudSkillBars !== CONFIG.darkModeShowHudSkillBars ||
+                         state._lastDarkModeShowHudStats !== CONFIG.darkModeShowHudStats;
   const themeChanged = state._lastArenaTheme !== (state.arenaTheme || 'light');
   state._lastHudShowFighterDescription = CONFIG.hudShowFighterDescription;
+  state._lastDarkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars;
+  state._lastDarkModeShowHudStats = CONFIG.darkModeShowHudStats;
   state._lastArenaTheme = state.arenaTheme || 'light';
   if (hudModeChanged || themeChanged) {
     clearHealthHud();
@@ -833,6 +837,26 @@ function updateHealthHud() {
       }
     }
     return false;
+  };
+
+  const isDarkModeActive = () => {
+    return Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || CONFIG.arenaTheme === 'dark' || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+  };
+
+  const shouldShowHudSkillBars = () => {
+    if (isDarkModeActive()) {
+      if (CONFIG.darkModeShowHudSkillBars !== undefined) return Boolean(CONFIG.darkModeShowHudSkillBars);
+      if (CONFIG.darkModeShowSkillBars !== undefined) return Boolean(CONFIG.darkModeShowSkillBars);
+    }
+    return true;
+  };
+
+  const shouldShowHudStats = () => {
+    if (isDarkModeActive()) {
+      if (CONFIG.darkModeShowHudStats !== undefined) return Boolean(CONFIG.darkModeShowHudStats);
+      if (CONFIG.darkModeShowStats !== undefined) return Boolean(CONFIG.darkModeShowStats);
+    }
+    return true;
   };
 
   // getSkillDataForFighter is imported from ./ui/hudSkillProviders.js
@@ -1695,6 +1719,7 @@ function updateHealthHud() {
   };
 
   const generateFighterSkillsHTML = (f, align, singleColumn = false) => {
+    if (!shouldShowHudSkillBars()) return '';
     const isTac = isTacticalFighter(f) || isTacticalMatch(state);
     if (isTac) return ''; // Simple HUD mode: Only Name & Healthbar
 
@@ -1760,6 +1785,7 @@ function updateHealthHud() {
   };
 
   const generateFighterInfoHTML = (f, singleColumn = false, isTeam = false) => {
+    if (!shouldShowHudStats()) return '';
     if (!f) return '';
     const isTacFighter = isTacticalFighter(f) || isTacticalMatch(state);
     if (isTacFighter) return ''; // Simple HUD mode: Only Name & Healthbar
