@@ -44,43 +44,298 @@ function _getFadeGrad(ctx, r) {
 }
 
 /**
- * Draws CJ's hand equipped with authentic vintage cast-brass knuckles or gripping Micro-Uzi
- * Rule 20 compliant.
+ * Draws CJ's hand equipped with authentic vintage cast-brass knuckles or gripping weapons
+ * in authentic Pixel Art Style (Rule 20 compliant, Saitama Tech).
  */
-function _drawCjHand(ctx, x, y, radius, skinColor, punchProgress = 0, isHoldingGun = false) {
+export function drawCjPixelHand(ctx, x, y, radius, skinColor, punchProgress = 0, isHoldingGun = false) {
   ctx.save();
-  ctx.translate(x, y);
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
-  // 1. Black Wrist Sweatband / Watch
-  ctx.fillStyle = '#18181B';
-  ctx.strokeStyle = '#09090B';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.roundRect(-radius * 1.05, -radius * 0.65, radius * 0.55, radius * 1.30, 2);
-  ctx.fill();
-  ctx.stroke();
+  const handX = snap(x);
+  const handY = snap(y);
+  const gridR = Math.max(P * 2, radius);
+  const steps = Math.ceil(gridR / P);
 
-  // 2. Fist Base (Natural Warm Brown Skin Tone)
-  ctx.fillStyle = skinColor;
-  ctx.strokeStyle = '#3E2114';
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  ctx.arc(-radius * 0.15, 0, radius * 0.95, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // 1. Black Wrist Sweatband / Watch (Behind hand, -X)
+  const bandW = snap(radius * 0.75);
+  const bandH = snap(radius * 1.40);
+  const bandX = snap(handX - radius * 0.95);
+  const bandY = snap(handY - bandH * 0.5);
 
-  if (!isHoldingGun) {
-    // Clenched Fingers passing through the brass knuckle holes
-    ctx.fillStyle = skinColor;
-    for (let i = 0; i < _FINGER_HOLES.length; i++) {
-      const h = _FINGER_HOLES[i];
-      ctx.beginPath();
-      ctx.arc(h.x, h.y, radius * 0.32, 0, Math.PI * 2);
-      ctx.fill();
+  ctx.fillStyle = '#0E0F14'; // Sweatband outline
+  ctx.fillRect(bandX - P, bandY - P, bandW + P * 2, bandH + P * 2);
+  ctx.fillStyle = '#18181B'; // Black sweatband base
+  ctx.fillRect(bandX, bandY, bandW, bandH);
+
+  // 2. Stepped 2D Fist Body
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > gridR) continue;
+
+      const px = snap(handX + rx);
+      const py = snap(handY + ry);
+
+      // 4-neighbor attached border
+      if (
+        Math.hypot(rx + P, ry) > gridR ||
+        Math.hypot(rx - P, ry) > gridR ||
+        Math.hypot(rx, ry + P) > gridR ||
+        Math.hypot(rx, ry - P) > gridR
+      ) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Knuckle & palm shading
+      if (ry > gridR * 0.35 || rx < -gridR * 0.30) {
+        ctx.fillStyle = '#6E3F27'; // Hand shadow / knuckle crease
+      } else if (rx > 0 && ry < -gridR * 0.25) {
+        ctx.fillStyle = '#AB6B49'; // Top highlight
+      } else {
+        ctx.fillStyle = skinColor || '#8D5538'; // Natural warm brown skin
+      }
+      ctx.fillRect(px, py, P, P);
     }
+  }
 
-    // Authentic Cast-Brass Knuckle Overlay
-    drawAuthenticBrassKnucklesShape(ctx, (radius / 7.5) * 1.05, { showFingers: false });
+  // 3. Authentic Stepped Pixel Brass Knuckles (When not holding guns)
+  if (!isHoldingGun) {
+    const kX = snap(handX + gridR * 0.30);
+    const kW = snap(gridR * 0.55);
+    const kH = snap(gridR * 1.50);
+    const kY = snap(handY - kH * 0.5);
+
+    // Brass knuckle outer plate & 4 knuckle crown spikes
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(kX - P, kY - P, kW + P * 2, kH + P * 2);
+    ctx.fillStyle = '#D97706'; // Vintage cast brass gold
+    ctx.fillRect(kX, kY, kW, kH);
+
+    // Specular Brass Highlight
+    ctx.fillStyle = '#FBBF24';
+    ctx.fillRect(kX + kW - P, kY + P, P, kH - P * 2);
+
+    // 4 Finger Loop Holes
+    ctx.fillStyle = '#0E0F14';
+    const holeStep = kH / 4;
+    for (let h = 0; h < 4; h++) {
+      const hy = snap(kY + h * holeStep + holeStep * 0.2);
+      ctx.fillRect(kX + P * 0.5, hy, snap(kW * 0.5), snap(holeStep * 0.6));
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Authentic 1:1 Procedural Pixel Art Body for Carl "CJ" Johnson ("The Grove Street Cheatmaster")
+ * Uses pure discrete 2D grid-scan rasterization loop with zero subpixel bleed (P = 2.0px, Rule #19 & Rule #35 compliant).
+ * Exact same tech, grid resolution, and border calculation as Saitama's skin.
+ */
+export function drawCjPixelBody(ctx, r, isJetpackActive = false) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // Palette Constants matching Saitama tech & GTA SA CJ aesthetic
+  const C = {
+    outline: '#0E0F14',        // Pure dark manga ink border (exact Saitama tech)
+    hairBase: '#1C120C',       // Deep espresso black buzzcut
+    hairDark: '#0E0F14',       // Hair crown shadow / tape-up border
+    hairFade1: '#3D2518',      // Mid fade shadow
+    hairFade2: '#5A3622',      // Temple taper fade
+    skinBase: '#8D5538',       // Natural rich warm brown complexion
+    skinHighlight: '#AB6B49',  // Forehead highlight
+    skinShadow: '#6E3F27',     // Cheek shadow dither
+    skinStubble: '#522E1B',    // 5 o'clock jaw stubble
+    tankWhite: '#FFFFFF',      // Crisp white ribbed tank top
+    tankRib: '#E2E8F0',        // Ribbed vertical stripe shadow
+    tankTrim: '#CBD5E1',       // Scoop neckline hem trim
+    strapBase: '#784B28',      // Jetpack leather torso strap
+    strapBorder: '#3D2514',    // Strap dark edge
+    buckleSilver: '#E2E8F0',   // Heavy harness / belt buckle
+    bucklePin: '#475569',      // Buckle center pin
+    beltBase: '#18181B',       // Black leather belt
+    jeansBase: '#1E3A8A',      // Classic Grove Street dark blue denim jeans
+    jeansShadow: '#172554',    // Denim seam & pocket shadow
+  };
+
+  // Helper functions for geometric regions
+  // 1. Hairline & buzzcut test
+  const isHair = (nx, ny) => {
+    const absX = Math.abs(nx);
+    if (absX > 0.58) {
+      return ny < -0.15; // Temple & sideburn drop down
+    }
+    return ny < -0.38; // Clean horizontal tape-up lineup
+  };
+
+  // 2. Tank top test
+  const isTankTop = (nx, ny) => {
+    if (ny < 0.08 || ny >= 0.60) return false;
+    // Scoop neckline curve
+    const absX = Math.abs(nx);
+    const necklineY = 0.09 - 0.05 * Math.pow(absX / 0.85, 2.0);
+    return ny >= necklineY;
+  };
+
+  // 3. Harness straps test (when Jetpack is active)
+  const isShoulderStrap = (nx, ny) => {
+    if (!isJetpackActive || ny < 0.08 || ny >= 0.60) return false;
+    const absX = Math.abs(nx);
+    return (absX >= 0.20 && absX <= 0.34);
+  };
+
+  const isChestStrap = (nx, ny) => {
+    if (!isJetpackActive || ny < 0.28 || ny > 0.38) return false;
+    return Math.abs(nx) <= 0.50;
+  };
+
+  // 4. Belt test
+  const isBelt = (nx, ny) => {
+    return ny >= 0.60 && ny < 0.68;
+  };
+
+  // 5. Jeans test
+  const isJeans = (nx, ny) => {
+    return ny >= 0.68;
+  };
+
+  // ── Main Discrete 2D Grid Scan (Exact Saitama Tech) ──
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // Pixelated Black Stroke Border (Exact Saitama standard)
+      if (
+        Math.hypot(rx + P, ry) > r ||
+        Math.hypot(rx - P, ry) > r ||
+        Math.hypot(rx, ry + P) > r ||
+        Math.hypot(rx, ry - P) > r
+      ) {
+        ctx.fillStyle = C.outline;
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      const nx = rx / r;
+      const ny = ry / r;
+      const absX = Math.abs(nx);
+
+      // ──────────────────────────────────────────
+      // LAYER A: BUZZCUT FADE & CLEAN LINEUP
+      // ──────────────────────────────────────────
+      if (isHair(nx, ny)) {
+        const isHairEdge = !isHair(nx + P / r, ny) || !isHair(nx - P / r, ny) || !isHair(nx, ny + P / r) || !isHair(nx, ny - P / r);
+        if (isHairEdge) {
+          ctx.fillStyle = C.hairDark; // Sharp tape-up razor outline
+        } else if (ny > -0.44 && ny <= -0.38) {
+          // Temple taper fade dither
+          ctx.fillStyle = ((gx + gy) % 2 === 0) ? C.hairFade1 : C.hairFade2;
+        } else if (ny < -0.75) {
+          ctx.fillStyle = C.hairDark; // Top crown shadow
+        } else {
+          ctx.fillStyle = C.hairBase; // Main espresso buzzcut
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER B: WHITE RIBBED TANK TOP & HARNESS
+      // ──────────────────────────────────────────
+      if (isTankTop(nx, ny)) {
+        // B1. Jetpack Torso Harness
+        if (isChestStrap(nx, ny) || isShoulderStrap(nx, ny)) {
+          // Silver Center Buckle
+          if (isChestStrap(nx, ny) && absX <= 0.10) {
+            if (Math.abs(nx) <= 0.03 && ny >= 0.31 && ny <= 0.35) {
+              ctx.fillStyle = C.bucklePin;
+            } else {
+              ctx.fillStyle = C.buckleSilver;
+            }
+          } else {
+            const isStrapEdge = (
+              !isChestStrap(nx, ny + P / r) && !isShoulderStrap(nx, ny + P / r)
+            ) || (
+              !isChestStrap(nx, ny - P / r) && !isShoulderStrap(nx, ny - P / r)
+            );
+            ctx.fillStyle = isStrapEdge ? C.strapBorder : C.strapBase;
+          }
+        }
+        // B2. Tank Top Scoop Neckline Trim
+        else if (ny < 0.12) {
+          ctx.fillStyle = C.tankTrim;
+        }
+        // B3. Vertical Ribbed Stripes
+        else {
+          ctx.fillStyle = (gx % 2 === 0) ? C.tankWhite : C.tankRib;
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER C: BLACK LEATHER BELT & BUCKLE
+      // ──────────────────────────────────────────
+      if (isBelt(nx, ny)) {
+        if (absX <= 0.14) {
+          if (absX <= 0.04 && ny >= 0.62 && ny <= 0.66) {
+            ctx.fillStyle = C.bucklePin;
+          } else {
+            ctx.fillStyle = C.buckleSilver; // Silver Belt Buckle
+          }
+        } else {
+          ctx.fillStyle = C.beltBase; // Black Leather Belt
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER D: DARK BLUE DENIM JEANS
+      // ──────────────────────────────────────────
+      if (isJeans(nx, ny)) {
+        if (absX <= 0.04) {
+          ctx.fillStyle = C.jeansShadow; // Center fly seam
+        } else if (absX > 0.55 || ny > 0.88) {
+          ctx.fillStyle = C.jeansShadow; // Pocket / outer denim shadow
+        } else {
+          ctx.fillStyle = C.jeansBase; // Deep classic denim
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER E: WARM BROWN FACE & JAW SKIN
+      // ──────────────────────────────────────────
+      if (ny < -0.20 && absX < 0.32) {
+        ctx.fillStyle = C.skinHighlight; // Center forehead highlight
+      } else if (ny >= -0.02 && ny <= 0.08 && absX <= 0.40) {
+        // 5 o'clock subtle jaw stubble dither
+        ctx.fillStyle = ((gx + gy) % 2 === 0) ? C.skinStubble : C.skinBase;
+      } else if (absX > 0.48 || ny > 0.04) {
+        ctx.fillStyle = ((gx + gy) % 2 === 0) ? C.skinShadow : C.skinBase; // Cheek / jaw shadow
+      } else {
+        ctx.fillStyle = C.skinBase; // Rich natural skin tone
+      }
+      ctx.fillRect(px, py, P, P);
+    }
   }
 
   ctx.restore();
@@ -760,154 +1015,21 @@ export function drawCjSkin(ctx, fighter) {
     if (isMinigunActive) {
       const minigunRecoil = fighter.minigunRecoil || 0;
       // Back hand grips forward upright support handle loop
-      _drawCjHand(ctx, backX - minigunRecoil, backY, handRadius * 0.92, skinColor, 0, true);
+      drawCjPixelHand(ctx, backX - minigunRecoil, backY, handRadius * 0.92, skinColor, 0, true);
     } else if (isJetpackActive && isUziActive) {
       const recoilB = fighter.uziRecoilBack || 0;
       const flashB = fighter.uziFlashTimerBack || 0;
       // 1. Draw hand base FIRST behind the gun
-      _drawCjHand(ctx, backX - recoilB * 0.5 - 6, backY, handRadius * 0.92, skinColor, 0, true);
+      drawCjPixelHand(ctx, backX - recoilB * 0.5 - 6, backY, handRadius * 0.92, skinColor, 0, true);
       // 2. Draw Micro-Uzi ON TOP of the hand (never overlayed by hand)
       drawCjMicroUzi(ctx, backX, backY, 1.05, recoilB, flashB);
     } else {
-      _drawCjHand(ctx, backX, backY, handRadius * 0.92, skinColor, rawProgress, false);
+      drawCjPixelHand(ctx, backX, backY, handRadius * 0.92, skinColor, rawProgress, false);
     }
   }
 
-  // ── LAYER 2: PROCEDURAL BODY RENDERING (RULE 19 UPRIGHT FRONT POV COMPLIANT) ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-    // A. Base Skin Fill (Rich Warm Brown)
-    ctx.fillStyle = skinColor;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // B. 3D Body Shading (Rule 11: Zero shadowBlur - Radial Gradient)
-    ctx.fillStyle = _getSkinGrad(ctx, r);
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // C. White Ribbed Tank Top ("Wifebeater") on Torso (Adjusted to be bigger across chest & torso)
-    ctx.fillStyle = '#F8FAFC'; // Crisp White
-    ctx.beginPath();
-    // Torso Arc (+Y hemisphere)
-    ctx.arc(0, 0, r, Math.PI * 0.05, Math.PI * 0.95);
-    // Higher scoop neckline curve covering upper chest (Y >= 0.05r)
-    ctx.quadraticCurveTo(0, r * 0.05, r * Math.cos(Math.PI * 0.05), r * Math.sin(Math.PI * 0.05));
-    ctx.closePath();
-    ctx.fill();
-
-    // Tank Top Ribbed Texture Stripes (subtle vertical lines across enlarged torso)
-    ctx.strokeStyle = 'rgba(203, 213, 225, 0.55)';
-    ctx.lineWidth = 1.0;
-    for (let i = 0; i < _RIBBED_OFFSETS.length; i++) {
-      const rx = r * _RIBBED_OFFSETS[i];
-      ctx.beginPath();
-      ctx.moveTo(rx, r * 0.15);
-      ctx.lineTo(rx, r * 0.55);
-      ctx.stroke();
-    }
-
-    // Tank Top Scoop Neckline Hem Trim
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(r * Math.cos(Math.PI * 0.95), r * Math.sin(Math.PI * 0.95));
-    ctx.quadraticCurveTo(0, r * 0.05, r * Math.cos(Math.PI * 0.05), r * Math.sin(Math.PI * 0.05));
-    ctx.stroke();
-
-    // D. Authentic Retro-Military Leather Torso Harness (When Jetpack Active)
-    if (isJetpackActive) {
-      // Dark-Tan Leather Shoulder & Chest Cross Straps
-      ctx.fillStyle = '#784B28'; // Rich dark-tan leather
-      ctx.strokeStyle = '#3D2514';
-      ctx.lineWidth = 1.0;
-
-      // Left & Right Vertical Shoulder Straps
-      for (let i = 0; i < _SHOULDER_STRAP_OFFSETS.length; i++) {
-        const sx = r * _SHOULDER_STRAP_OFFSETS[i];
-        ctx.fillRect(sx, r * 0.08, r * 0.12, r * 0.48);
-        ctx.strokeRect(sx, r * 0.08, r * 0.12, r * 0.48);
-      }
-
-      // Horizontal Chest Cross-Strap
-      ctx.fillRect(-r * 0.45, r * 0.28, r * 0.90, r * 0.10);
-      ctx.strokeRect(-r * 0.45, r * 0.28, r * 0.90, r * 0.10);
-
-      // Heavy Silver Center Chest Buckle & D-Ring
-      ctx.fillStyle = '#E2E8F0';
-      ctx.strokeStyle = '#09090B';
-      ctx.lineWidth = 0.8;
-      ctx.fillRect(-r * 0.08, r * 0.26, r * 0.16, r * 0.14);
-      ctx.strokeRect(-r * 0.08, r * 0.26, r * 0.16, r * 0.14);
-
-      // Buckle pin
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(-r * 0.02, r * 0.28, r * 0.04, r * 0.10);
-    }
-
-    // E. Dark Blue Denim Jeans Waistband & Leather Belt (+Y bottom hemisphere)
-    // Dark Blue Denim Jeans (#1E3A8A / #1D4ED8)
-    ctx.fillStyle = '#1E3A8A';
-    ctx.beginPath();
-    ctx.arc(0, 0, r, Math.PI * 0.16, Math.PI * 0.84);
-    ctx.closePath();
-    ctx.fill();
-
-    // Black Leather Belt
-    ctx.fillStyle = '#18181B';
-    ctx.fillRect(-r * 0.85, r * 0.54, r * 1.70, r * 0.15);
-
-    // Silver Belt Buckle
-    ctx.fillStyle = '#E2E8F0';
-    ctx.strokeStyle = '#64748B';
-    ctx.lineWidth = 1.1;
-    ctx.strokeRect(-r * 0.16, r * 0.52, r * 0.32, r * 0.19);
-
-    // Denim Center Seam Line
-    ctx.strokeStyle = '#172554';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(0, r * 0.69);
-    ctx.lineTo(0, r);
-    ctx.stroke();
-
-    // G. Buzzcut Fade Hairstyle & Clean Hairline (-Y top hemisphere)
-    ctx.fillStyle = '#1C120C'; // Deep Dark Espresso Black Hair
-    ctx.beginPath();
-    // Top head curve
-    ctx.arc(0, 0, r, Math.PI * 1.15, Math.PI * 1.85);
-    // Defined clean tape-up hairline
-    ctx.quadraticCurveTo(0, -r * 0.42, r * Math.cos(Math.PI * 1.15), r * Math.sin(Math.PI * 1.15));
-    ctx.closePath();
-    ctx.fill();
-
-    // Temple Fade / Gradient Hair Shadow (Cached)
-    ctx.fillStyle = _getFadeGrad(ctx, r);
-    ctx.beginPath();
-    ctx.arc(0, -r * 0.38, r * 0.55, Math.PI * 1.05, Math.PI * 1.95);
-    ctx.fill();
-
-    // Clean Razor Hairline Contour
-    ctx.strokeStyle = '#0F0906';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(r * Math.cos(Math.PI * 1.18), r * Math.sin(Math.PI * 1.18));
-    ctx.quadraticCurveTo(0, -r * 0.42, r * Math.cos(Math.PI * 1.82), r * Math.sin(Math.PI * 1.82));
-    ctx.stroke();
-
-    ctx.restore(); // restore body clip
-
-  // ── 3. Outer Body Circle Outline ──
-  ctx.strokeStyle = '#18181B';
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
+  // ── LAYER 2: PROCEDURAL PIXEL ART BODY (SAITAMA TECH & RULE 19 COMPLIANT) ──
+  drawCjPixelBody(ctx, r, isJetpackActive);
 
   // ── LAYER 3: FRONT HAND (Front Layer — On Top of Body Circle — Minigun / Right Micro-Uzi / Fist) ──
   if (!hideFrontHand) {
@@ -927,23 +1049,23 @@ export function drawCjSkin(ctx, fighter) {
       });
 
       // 2. Draw front hand gripping the rear trigger spade housing holder at the back
-      _drawCjHand(ctx, frontX - minigunRecoil, frontY, handRadius, skinColor, 0, true);
+      drawCjPixelHand(ctx, frontX - minigunRecoil, frontY, handRadius, skinColor, 0, true);
     } else if (isTec9Active) {
       const recoilTec = fighter.tec9Recoil || 0;
       const flashTec = fighter.tec9Flash || 0;
       // 1. Draw hand base FIRST behind the gun
-      _drawCjHand(ctx, frontX - recoilTec * 0.5 - 6, frontY, handRadius, skinColor, 0, true);
+      drawCjPixelHand(ctx, frontX - recoilTec * 0.5 - 6, frontY, handRadius, skinColor, 0, true);
       // 2. Draw Intratec TEC-9 ON TOP of the hand
       drawCjTec9(ctx, frontX, frontY, 1.15, recoilTec, flashTec);
     } else if (isJetpackActive && isUziActive) {
       const recoilF = fighter.uziRecoilFront || 0;
       const flashF = fighter.uziFlashTimerFront || 0;
       // 1. Draw hand base FIRST behind the gun
-      _drawCjHand(ctx, frontX - recoilF * 0.5 - 6, frontY, handRadius, skinColor, 0, true);
+      drawCjPixelHand(ctx, frontX - recoilF * 0.5 - 6, frontY, handRadius, skinColor, 0, true);
       // 2. Draw Micro-Uzi ON TOP of the hand (never overlayed by hand)
       drawCjMicroUzi(ctx, frontX, frontY, 1.05, recoilF, flashF);
     } else {
-      _drawCjHand(ctx, frontX, frontY, handRadius, skinColor, rawProgress, false);
+      drawCjPixelHand(ctx, frontX, frontY, handRadius, skinColor, rawProgress, false);
     }
   }
 
