@@ -1592,31 +1592,41 @@ export function drawSparkEffects(layer = 'all') {
         const isGojo = effect.clashType === 'gojo' || effect.clashType === 'gojo_infinity';
         const P = 2.5;
         const radius = Math.max(P * 2, effect.size);
-        const steps = Math.ceil(radius / P);
+        const steps = Math.ceil((radius + P * 2) / P);
+        const alpha = Math.min(1.0, effect.life * 1.1);
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
 
-        // Outer themed pixel ring
-        ctx.fillStyle = isGojo ? `rgba(0, 229, 255, ${(effect.life * 0.85).toFixed(3)})` : `rgba(255, 60, 60, ${(effect.life * 0.85).toFixed(3)})`;
+        // 1. Dark Outer Obsidian Outline Shell (#081220)
+        ctx.fillStyle = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
         for (let gy = -steps; gy <= steps; gy++) {
           for (let gx = -steps; gx <= steps; gx++) {
             const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius + P && dist > radius - P * 1.5) {
-              if ((gx + gy) % 2 === 0 || effect.life > 0.5) {
-                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
-              }
+            if (dist <= radius + P * 1.5 && dist >= radius - P * 2.5) {
+              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
             }
           }
         }
 
-        // Inner white pixel core ring
-        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
+        // 2. Primary Themed Pixel Ring (Electric Cyan for Gojo / Crimson for others)
+        ctx.fillStyle = isGojo ? `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})` : `rgba(255, 60, 60, ${(alpha * 0.95).toFixed(3)})`;
         for (let gy = -steps; gy <= steps; gy++) {
           for (let gx = -steps; gx <= steps; gx++) {
             const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius * 0.75 + P && dist > radius * 0.75 - P) {
-              ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
+            if (dist <= radius + P * 0.5 && dist >= radius - P * 1.5) {
+              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
+            }
+          }
+        }
+
+        // 3. Inner White-Hot Specular Core Pixels (#FFFFFF)
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+        for (let gy = -steps; gy <= steps; gy++) {
+          for (let gx = -steps; gx <= steps; gx++) {
+            const dist = Math.hypot(gx * P, gy * P);
+            if (dist <= radius - P * 0.5 && dist >= radius - P * 1.2) {
+              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
             }
           }
         }
@@ -2064,74 +2074,50 @@ export function drawSparkEffects(layer = 'all') {
           )
         );
 
-        if (isDarkMode) {
-          // ── DARK MODE: CLEAN STEPPED PIXELATED CONCENTRIC SHOCKWAVE RING ──
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          const P = 2.0;
-          const snap = (v) => Math.round(v / P) * P;
-          const steps = 36;
+      } else if (isInfinityClash) {
+        // ── GOJO LIMITLESS BARRIER REBOUND PIXEL ART SHOCKWAVE RING (SAITAMA TECH) ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
 
-          for (let st = 0; st < steps; st++) {
-            const ang = (st / steps) * Math.PI * 2;
-            const cosA = Math.cos(ang);
-            const sinA = Math.sin(ang);
+        const P = 2.5; // Stepped pixel grid size matching Saitama skin tech
+        const radius = Math.max(P * 2, effect.size);
+        const steps = Math.ceil((radius + P * 2) / P);
+        const alpha = Math.min(1.0, effect.life * 1.15);
 
-            // Outer Obsidian Border
-            const r0 = snap(effect.size);
-            ctx.fillStyle = `rgba(8, 18, 32, ${effect.life * 0.90})`;
-            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-            // Outer Electric Cyan Pixel Ring
-            ctx.fillStyle = `rgba(0, 229, 255, ${effect.life * 0.95})`;
-            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-            // Mid Cursed Indigo Pixel Loop
-            const r1 = snap(effect.size * 0.75);
-            ctx.fillStyle = `rgba(0, 140, 255, ${effect.life * 0.85})`;
-            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-            // Inner White-Hot Core Pixel Ring
-            const r2 = snap(effect.size * 0.45);
-            ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
+        // 1. Dark Outer Obsidian Outline Shell (#081220)
+        ctx.fillStyle = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
+        for (let gy = -steps; gy <= steps; gy++) {
+          for (let gx = -steps; gx <= steps; gx++) {
+            const dist = Math.hypot(gx * P, gy * P);
+            if (dist <= radius + P * 1.5 && dist >= radius - P * 2.5) {
+              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
+            }
           }
-          ctx.restore();
-        } else {
-          // ── LIGHT MODE: SIMPLE CLEAN CONCENTRIC SHOCKWAVE RING ──
-          ctx.save();
-          ctx.globalCompositeOperation = 'source-over';
-
-          // Outer Soft Obsidian Contrast Border
-          ctx.strokeStyle = `rgba(8, 18, 32, ${effect.life * 0.70})`;
-          ctx.lineWidth = 10 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size + 1.5, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Primary Electric Cyan Ring
-          ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.95})`;
-          ctx.lineWidth = 6 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Mid Cursed Blue Ring
-          ctx.strokeStyle = `rgba(0, 140, 255, ${effect.life * 0.85})`;
-          ctx.lineWidth = 4 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Inner White-Hot Core Ring
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-          ctx.lineWidth = 2.5 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.restore();
         }
+
+        // 2. Vibrant Electric Cyan Primary Pixel Ring (#00E5FF)
+        ctx.fillStyle = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
+        for (let gy = -steps; gy <= steps; gy++) {
+          for (let gx = -steps; gx <= steps; gx++) {
+            const dist = Math.hypot(gx * P, gy * P);
+            if (dist <= radius + P * 0.5 && dist >= radius - P * 1.5) {
+              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
+            }
+          }
+        }
+
+        // 3. Inner White-Hot Specular Core Pixels (#FFFFFF)
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+        for (let gy = -steps; gy <= steps; gy++) {
+          for (let gx = -steps; gx <= steps; gx++) {
+            const dist = Math.hypot(gx * P, gy * P);
+            if (dist <= radius - P * 0.5 && dist >= radius - P * 1.2) {
+              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
+            }
+          }
+        }
+
+        ctx.restore();
       } else if (isTojiClash) {
         // ── TOJI PHYSICAL SHOCKWAVE ──
         // Outer Dark Slate Air Pressure Ring
