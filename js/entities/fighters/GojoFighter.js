@@ -1720,8 +1720,10 @@ export class GojoFighter extends Fighter {
           entity.slowMultiplier = slowMult;
         }
 
-        // Direct velocity damping for instant, tangible spatial drag
-        if (entity.vx !== undefined && entity.vy !== undefined) {
+        // Direct velocity damping for instant, tangible spatial drag ONLY when moving TOWARDS Gojo
+        // (Preserve outward velocity when entity is bouncing / flying away from the barrier!)
+        const dotToward = (this.x - entity.x) * (entity.vx || 0) + (gojoY - entY) * (entity.vy || 0);
+        if (dotToward > 0 && entity.vx !== undefined && entity.vy !== undefined) {
           entity.vx *= slowMult;
           entity.vy *= slowMult;
         }

@@ -1190,14 +1190,23 @@ export class TojiFighter extends Fighter {
     // Natural movement & wall bounce physics: nudge velocity towards opponent when stopped or low speed
     if (this.postUltimateRecoveryTimer > 0) this.postUltimateRecoveryTimer--;
     if (opponent && opponent.hp > 0 && (this.knockbackStunTimer || 0) <= 0) {
+      const isTargetGojoInfinity = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo') && !opponent.isMeleeMode && ((opponent.infinityCooldown || 0) <= 0 || opponent.infinityActive);
       // Natural movement & wall bounce physics: nudge velocity towards opponent when stopped or low speed
       const currentSpeed = Math.hypot(this.vx || 0, this.vy || 0);
-      if (currentSpeed < 0.2) {
+      if (currentSpeed < 0.2 && (!isTargetGojoInfinity || this.isAmbushing)) {
         const dx = opponent.x - this.x;
         const dy = opponent.y - this.y;
         const moveAngle = Math.atan2(dy, dx);
         this.vx = Math.cos(moveAngle) * (this.speed || 3.5);
         this.vy = Math.sin(moveAngle) * (this.speed || 3.5);
+        this.normalizeSpeed();
+      } else if (currentSpeed < 0.2 && isTargetGojoInfinity && !this.isAmbushing) {
+        // When stopped near Gojo's active barrier, roam / bounce away rather than driving straight back into the barrier
+        const dx = this.x - opponent.x;
+        const dy = this.y - opponent.y;
+        const awayAngle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.8;
+        this.vx = Math.cos(awayAngle) * (this.speed || 3.5);
+        this.vy = Math.sin(awayAngle) * (this.speed || 3.5);
         this.normalizeSpeed();
       }
     }

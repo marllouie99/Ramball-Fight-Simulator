@@ -27,7 +27,7 @@ export const gojoConfig = {
   infinityRadius: 120,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
   infinityFreezeChance: 0.9,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
   infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
-  infinityMeleePushForce: 8.5,             // Physical velocity impulse (rebound force) applied to push melee attackers away
+  infinityMeleePushForce: 12.5,            // Physical velocity impulse (rebound force) applied to push melee attackers away
   infinitySlowDuration: 45,                // Duration in frames (0.75s) of brief movement slow on barrier contact
   infinitySlowMultiplier: 0.50,            // Movement speed multiplier while slowed by Infinity barrier (50% speed)
   infinitySlowRange: 140,                  // Proximity distance (pixels) beyond barrier where approaching enemies get slowed
