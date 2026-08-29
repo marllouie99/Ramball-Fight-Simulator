@@ -1107,120 +1107,114 @@ export function drawIchigoSlashArc(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
   ctx.rotate(baseAngle);
+  ctx.imageSmoothingEnabled = false; // Authentic nearest-neighbor pixel art rendering
 
   // Mirror vertically when aiming left so swing remains top-to-bottom
   if (facingLeft) {
     ctx.scale(1, -1);
   }
 
-  const P = 2.4; // Pixel art grid scale
+  const P = 2.0; // Exact discrete pixel art grid unit matching Saitama
+  const snap = (v) => Math.round(v / P) * P;
+
   const outerRadius = r + (isMask ? 76 : (isShikai ? 80 : 70));
   const maxThick = isMask ? 25.0 : (isShikai ? 27.0 : 23.0);
-  const totalAngle = Math.abs(currentTipOffset - currentTailOffset);
-  const arcSteps = Math.max(16, Math.round((totalAngle * outerRadius) / (P * 1.5)));
+  const span = currentTipOffset - currentTailOffset;
 
-  // Pass 1: Pixel-Art Dark Ink / Void Outline Shell (Luminous in Dark Mode)
-  const isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-
+  // 1. Color Palette Setup
   let outlineCol = `rgba(0, 20, 58, ${0.92 * trailAlpha})`;
-  if (isDarkMode) {
-    if (isMask && isBankai) outlineCol = `rgba(220, 38, 38, ${0.98 * trailAlpha})`;
-    else if (isMask) outlineCol = `rgba(234, 88, 12, ${0.95 * trailAlpha})`;
-    else if (isBankai) outlineCol = `rgba(220, 38, 38, ${0.98 * trailAlpha})`;
-    else outlineCol = `rgba(2, 132, 199, ${0.92 * trailAlpha})`;
-  } else {
-    if (isMask && isBankai) outlineCol = `rgba(18, 0, 4, ${0.98 * trailAlpha})`;
-    else if (isMask) outlineCol = `rgba(18, 5, 5, ${0.95 * trailAlpha})`;
-    else if (isBankai) outlineCol = `rgba(8, 2, 4, ${0.98 * trailAlpha})`;
+  if (isBankai || isMask) {
+    outlineCol = `rgba(26, 0, 6, ${0.98 * trailAlpha})`; // Deep Obsidian Crimson outline
   }
 
-  ctx.fillStyle = outlineCol;
-  for (let i = 0; i <= arcSteps; i++) {
-    const t = i / arcSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-    const rad = outerRadius + taper * 2.0;
-    const thick = (maxThick * taper) + P * 2;
-    const innerRad = rad - thick;
+  const isInsideSlash = (rx, ry) => {
+    const dist = Math.hypot(rx, ry);
+    if (dist <= 0) return false;
+    let ang = Math.atan2(ry, rx);
+    // Align angle within swing interval
+    while (ang < currentTailOffset - Math.PI) ang += Math.PI * 2;
+    while (ang > currentTipOffset + Math.PI) ang -= Math.PI * 2;
 
-    const numRadSteps = Math.max(2, Math.round(thick / P));
-    for (let ri = 0; ri <= numRadSteps; ri++) {
-      const currentR = innerRad + (ri / numRadSteps) * thick;
-      const rawX = Math.cos(ang) * currentR;
-      const rawY = Math.sin(ang) * currentR;
-      const px = Math.round(rawX / P) * P;
-      const py = Math.round(rawY / P) * P;
-      ctx.fillRect(px, py, P, P);
-    }
-  }
+    const t = (ang - currentTailOffset) / span;
+    if (t < 0 || t > 1.0) return false;
 
-  // Pass 2: Stepped Pixel Reiatsu Core Body
-  for (let i = 0; i <= arcSteps; i++) {
-    const t = i / arcSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
     const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-    const rad = outerRadius + taper * 1.0;
     const thick = maxThick * taper;
-    const innerRad = rad - thick;
+    const outR = outerRadius + taper * 1.5;
+    const inR = outR - thick;
+    return dist >= inR && dist <= outR;
+  };
 
-    const numRadSteps = Math.max(1, Math.round(thick / P));
-    for (let ri = 0; ri <= numRadSteps; ri++) {
-      const rNorm = ri / numRadSteps; // 0 = inner, 1 = outer edge
-      const currentR = innerRad + rNorm * thick;
-      const rawX = Math.cos(ang) * currentR;
-      const rawY = Math.sin(ang) * currentR;
-      const px = Math.round(rawX / P) * P;
-      const py = Math.round(rawY / P) * P;
+  const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+  const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+  const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+  const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+
+  // ── 2. Discrete 2D Crescent Body Grid with 4-Neighbor Attached Border ──
+  for (let gy = minY; gy <= maxY; gy += P) {
+    for (let gx = minX; gx <= maxX; gx += P) {
+      if (!isInsideSlash(gx, gy)) continue;
+
+      const pxX = snap(gx);
+      const pyY = snap(gy);
+
+      // 4-neighbor attached border test matching Saitama skin technique
+      const isBorder = !isInsideSlash(gx + P, gy) ||
+                       !isInsideSlash(gx - P, gy) ||
+                       !isInsideSlash(gx, gy + P) ||
+                       !isInsideSlash(gx, gy - P);
+
+      if (isBorder) {
+        ctx.fillStyle = outlineCol;
+        ctx.fillRect(pxX, pyY, P, P);
+        continue;
+      }
+
+      const dist = Math.hypot(gx, gy);
+      let ang = Math.atan2(gy, gx);
+      while (ang < currentTailOffset - Math.PI) ang += Math.PI * 2;
+      while (ang > currentTipOffset + Math.PI) ang -= Math.PI * 2;
+      const t = (ang - currentTailOffset) / span;
+      const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+      const outR = outerRadius + taper * 1.5;
+      const depthFromApex = outR - dist;
 
       let col;
-      if (isMask && isBankai) {
-        if (rNorm > 0.85) col = '#FFFFFF';
-        else if (rNorm > 0.6) col = isDarkMode ? '#FF4D6D' : '#FF2832';
-        else if (rNorm > 0.3) col = isDarkMode ? '#FF1E28' : '#8B0000';
-        else col = isDarkMode ? '#E11D48' : '#080003';
-      } else if (isMask) {
-        if (rNorm > 0.85) col = '#FFFFFF';
-        else if (rNorm > 0.6) col = isDarkMode ? '#FFD000' : '#FFAA00';
-        else if (rNorm > 0.3) col = isDarkMode ? '#FF4500' : '#FF2814';
-        else col = isDarkMode ? '#EA580C' : '#180505';
-      } else if (isBankai) {
-        if (rNorm > 0.85) col = '#FFFFFF';
-        else if (rNorm > 0.6) col = isDarkMode ? '#FF4D6D' : '#FF1E28';
-        else if (rNorm > 0.3) col = isDarkMode ? '#FF1E28' : '#8B0014';
-        else col = isDarkMode ? '#DC2626' : '#080204';
+      if (depthFromApex < P * 1.5) {
+        col = '#FFFFFF'; // Razor-sharp white-hot cutting edge
+      } else if (isBankai || isMask) {
+        // Kuroi Getsuga Black-Red Crimson Theme
+        if (depthFromApex < P * 3.4) {
+          col = '#FF0033'; // Electric vivid blood-crimson rim
+        } else if (depthFromApex < P * 5.4) {
+          col = '#8B0014'; // Transition deep burning crimson layer
+        } else {
+          col = '#080003'; // Abyssal pitch-black obsidian void core
+        }
       } else {
         // Shikai Azure
-        if (rNorm > 0.85) col = '#FFFFFF';
-        else if (rNorm > 0.6) col = '#E0FFFF';
-        else if (rNorm > 0.3) col = '#00E5FF';
-        else col = '#0055DD';
+        if (depthFromApex < P * 3.4) {
+          col = '#00E5FF';
+        } else {
+          col = '#0055DD';
+        }
       }
 
       ctx.fillStyle = col;
-      ctx.fillRect(px, py, P, P);
+      ctx.fillRect(pxX, pyY, P, P);
     }
-
-    // Pass 3: Leading Razor White Cutting Edge Pixels
-    const leadRawX = Math.cos(ang) * (outerRadius + taper * 1.0);
-    const leadRawY = Math.sin(ang) * (outerRadius + taper * 1.0);
-    const lpx = Math.round(leadRawX / P) * P;
-    const lpy = Math.round(leadRawY / P) * P;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(lpx, lpy, P, P);
   }
 
-  // Pass 4: Trailing Reiatsu Pixel Sparks
+  // ── 3. Trailing Reiatsu Stepped Pixel Sparks ──
   const numEmbers = 8;
   for (let eb = 0; eb < numEmbers; eb++) {
     const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-    const ebAng = currentTailOffset + ebT * (currentTipOffset - currentTailOffset);
+    const ebAng = currentTailOffset + ebT * span;
     const ebDist = outerRadius - 10 - eb * 4;
-    const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
-    const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+    const ex = snap(Math.cos(ebAng) * ebDist);
+    const ey = snap(Math.sin(ebAng) * ebDist);
     let col = '#FFFFFF';
-    if (isMask && isBankai) col = (eb % 2 === 0) ? '#FF1E28' : '#FFFFFF';
-    else if (isMask) col = (eb % 2 === 0) ? '#FFAA00' : '#FF2814';
-    else if (isBankai) col = (eb % 2 === 0) ? '#FF1E28' : '#FFFFFF';
+    if (isBankai || isMask) col = (eb % 2 === 0) ? '#FF0033' : '#FFFFFF';
     else col = (eb % 2 === 0) ? '#00E5FF' : '#FFFFFF';
 
     ctx.fillStyle = col;

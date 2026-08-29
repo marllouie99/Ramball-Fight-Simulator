@@ -230,49 +230,63 @@ export function drawGetsugaImpactEffects(ctx) {
     const isHollow = p.form === 'hollow' || p.form === 'bankai_hollow';
 
     // ─────────────────────────────────────────────────────────────
-    // 1. SPATIAL CLEAVE SCAR (Stepped Pixel Crescent Slice)
+    // 1. SPATIAL CLEAVE SCAR (True 2D Grid Scan Pixel Art Crescent Slice)
     // ─────────────────────────────────────────────────────────────
     if (p.type === 'slice') {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
+      ctx.imageSmoothingEnabled = false;
 
       const halfL = p.length * 0.5;
       const maxThick = p.thickness * p.alpha;
-      const steps = Math.max(10, Math.round(p.length / (P * 1.5)));
 
-      // Pass 1: Pixel Outer Glow Shell
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.alpha * 0.65;
-      for (let s = 0; s <= steps; s++) {
-        const t = (s / steps) * 2 - 1; // -1 to 1
-        const xPos = snap(t * halfL);
-        const curveOff = (1 - t * t) * p.curve * 8;
-        const curThick = (1 - t * t) * (maxThick + P * 2);
-        const topY = snap(-curThick * 0.5 + curveOff);
-        const botY = snap(curThick * 0.5 + curveOff);
-        ctx.fillRect(xPos, topY, P, Math.max(P, botY - topY));
-      }
+      const isInsideSlice = (rx, ry) => {
+        if (Math.abs(rx) > halfL) return false;
+        const normX = rx / halfL; // -1 to 1
+        const taper = 1 - normX * normX;
+        const curveOff = taper * p.curve * 8;
+        const curThick = taper * maxThick;
+        return ry >= -curThick * 0.5 + curveOff && ry <= curThick * 0.5 + curveOff;
+      };
 
-      // Pass 2: Stepped Core
-      const isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-      ctx.fillStyle = (isBankai && !isDarkMode) ? p.voidColor : (isDarkMode ? p.voidColor : p.accentColor);
-      ctx.globalAlpha = p.alpha * 0.95;
-      for (let s = 0; s <= steps; s++) {
-        const t = (s / steps) * 2 - 1;
-        const xPos = snap(t * halfL * 0.85);
-        const curveOff = (1 - t * t) * p.curve * 8;
-        const curThick = (1 - t * t) * maxThick * 0.6;
-        const topY = snap(-curThick * 0.5 + curveOff);
-        const botY = snap(curThick * 0.5 + curveOff);
-        ctx.fillRect(xPos, topY, P, Math.max(P, botY - topY));
-      }
+      const minX = Math.floor((-halfL - P) / P) * P;
+      const maxX = Math.ceil((halfL + P) / P) * P;
+      const minY = Math.floor((-maxThick - P * 4) / P) * P;
+      const maxY = Math.ceil((maxThick + P * 4) / P) * P;
 
-      // Pass 3: White-Hot Center Needle Spine
-      ctx.fillStyle = p.accentColor;
-      ctx.globalAlpha = p.alpha * 0.98;
-      for (let xPos = -halfL * 0.95; xPos <= halfL * 0.95; xPos += P) {
-        ctx.fillRect(snap(xPos), snap(p.curve * 4), P, P);
+      for (let gy = minY; gy <= maxY; gy += P) {
+        for (let gx = minX; gx <= maxX; gx += P) {
+          if (!isInsideSlice(gx, gy)) continue;
+
+          const pxX = snap(gx);
+          const pyY = snap(gy);
+
+          const isBorder = !isInsideSlice(gx + P, gy) ||
+                           !isInsideSlice(gx - P, gy) ||
+                           !isInsideSlice(gx, gy + P) ||
+                           !isInsideSlice(gx, gy - P);
+
+          if (isBorder) {
+            ctx.fillStyle = p.color; // Outer energy shell
+            ctx.fillRect(pxX, pyY, P, P);
+            continue;
+          }
+
+          const normX = gx / halfL;
+          const taper = 1 - normX * normX;
+          const curveOff = taper * p.curve * 8;
+          const distFromCenter = Math.abs(gy - curveOff);
+
+          if (distFromCenter < P * 0.8) {
+            ctx.fillStyle = p.accentColor; // White-hot core spine
+          } else if (isBankai) {
+            ctx.fillStyle = p.voidColor; // Deep crimson or void
+          } else {
+            ctx.fillStyle = p.color;
+          }
+          ctx.fillRect(pxX, pyY, P, P);
+        }
       }
 
       ctx.restore();
