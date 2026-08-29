@@ -113,37 +113,21 @@ export function drawJohnWickPixelHand(ctx, x, y, radius, skinColor) {
  * Renders the pixelated skin model image (Johnwick-pixel-skin.png) with nearest-neighbor scaling
  * with its authentic 4-neighbor attached black pixel stroke border.
  */
-export function drawJohnWickPixelBody(ctx, r) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
-
-  const skinImg = _getJohnWickPixelSkinImage();
-  if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
-    // Scale up by 1.175x to compensate for the 36px transparent margins in the PNG so the model fills the circle boundary snugly
-    const scaleFactor = 1.175;
-    const drawR = r * scaleFactor;
-    ctx.drawImage(skinImg, -drawR, -drawR, drawR * 2, drawR * 2);
-  } else {
-    // Procedural discrete pixel fallback while image is loading
-    _drawJohnWickProceduralPixelBody(ctx, r);
-  }
-
-  ctx.restore();
-}
-
 /**
- * Procedural Discrete Grid-Scan Pixel Body Fallback Engine
+ * Authentic 1:1 Procedural Pixel Art Body for John Wick ("The Baba Yaga")
+ * Uses pure discrete 2D grid-scan rasterization loop with zero subpixel bleed (P = 2.0px, Rule #19 & Rule #35 compliant).
+ * Exact same tech, grid resolution, and border calculation as Saitama's skin.
  */
-function _drawJohnWickProceduralPixelBody(ctx, r) {
+export function drawJohnWickPixelBody(ctx, r) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
-  // Palette Constants
+  // Palette Constants matching Saitama standard
   const C = {
-    outline: '#0B0C10',        // Pure dark manga ink border
+    outline: '#0E0F14',        // Pure dark manga ink border (exact Saitama tech)
     hairBase: '#1B1C22',       // Dark charcoal hair base
     hairDark: '#0E0F14',       // Deep black hair shadows
     hairHighlight: '#343644',  // Layered hair strand sheen
@@ -270,7 +254,7 @@ function _drawJohnWickProceduralPixelBody(ctx, r) {
     return absX > shirtW && absX <= shirtW + 0.24;
   };
 
-  // ── Main Discrete 2D Grid Scan ──
+  // ── Main Discrete 2D Grid Scan (Exact Saitama Tech) ──
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -281,7 +265,7 @@ function _drawJohnWickProceduralPixelBody(ctx, r) {
       const px = snap(rx);
       const py = snap(ry);
 
-      // 4-neighbor attached border shell
+      // Pixelated Black Stroke Border (Exact Saitama tech)
       if (
         Math.hypot(rx + P, ry) > r ||
         Math.hypot(rx - P, ry) > r ||
