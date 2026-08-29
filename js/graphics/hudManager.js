@@ -843,6 +843,42 @@ function updateHealthHud() {
     return Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || CONFIG.arenaTheme === 'dark' || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
   };
 
+  const isSkillExceptionInDarkMode = (fighter, skill) => {
+    if (!fighter || !skill) return false;
+    const fId = String(fighter.characterId || fighter.type || (fighter._def && fighter._def.type) || '').toLowerCase();
+    const sId = String(skill.id || '').toLowerCase();
+    const sLabel = String(skill.label || '').toUpperCase();
+
+    // 1. Ichigo exception: BANKAI
+    if (fId === 'ichigo') {
+      if (sId === 'bankai' || sLabel.includes('BANKAI')) {
+        return true;
+      }
+    }
+
+    // 2. Toji exception: His Ultimate (Curse Inventory)
+    if (fId === 'toji') {
+      if (sId === 'ult' || sId === 'ultimate' || sLabel.includes('CURSE INVENTORY') || sLabel.includes('INVENTORY')) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const shouldShowFighterSkill = (fighter, skill) => {
+    if (isDarkModeActive()) {
+      const showAll = (CONFIG.darkModeShowHudSkillBars !== undefined)
+        ? Boolean(CONFIG.darkModeShowHudSkillBars)
+        : ((CONFIG.darkModeShowSkillBars !== undefined) ? Boolean(CONFIG.darkModeShowSkillBars) : true);
+      
+      if (!showAll) {
+        return isSkillExceptionInDarkMode(fighter, skill);
+      }
+    }
+    return true;
+  };
+
   const shouldShowHudSkillBars = () => {
     if (isDarkModeActive()) {
       if (CONFIG.darkModeShowHudSkillBars !== undefined) return Boolean(CONFIG.darkModeShowHudSkillBars);
@@ -1719,12 +1755,16 @@ function updateHealthHud() {
   };
 
   const generateFighterSkillsHTML = (f, align, singleColumn = false) => {
-    if (!shouldShowHudSkillBars()) return '';
     const isTac = isTacticalFighter(f) || isTacticalMatch(state);
     if (isTac) return ''; // Simple HUD mode: Only Name & Healthbar
 
-    const skills = getSkillDataForFighter(f);
+    const allSkills = getSkillDataForFighter(f);
+    if (!allSkills || allSkills.length === 0) return '';
+
+    // Filter skills based on Dark Mode settings & fighter-specific exceptions (e.g. Ichigo Bankai & Toji Ultimate)
+    const skills = allSkills.filter(s => shouldShowFighterSkill(f, s));
     if (!skills || skills.length === 0) return '';
+
     const isCj = f && (f.characterId === 'cj' || f.type === 'cj');
     const cjSkillClass = isCj ? ' hud-skill-box-cj' : '';
 
