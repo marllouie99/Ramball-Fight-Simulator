@@ -289,8 +289,9 @@ export class GojoFighter extends Fighter {
     }
 
     // Check Infinity Passive first (Domain sure-hit & bypassShield attacks bypass Limitless Infinity, self-damage cannot trigger Infinity)
-    // Toji Fushiguro (ISOH lore exception), Nanami 7:3 Ratio strike & Saitama Serious Counter: pierces Limitless Infinity — skip block entirely
+    // Toji Fushiguro during Ambush, Nanami 7:3 Ratio strike & Saitama Serious Counter: pierces Limitless Infinity — skip block entirely
     const isToji = attacker && (attacker.characterId === 'toji' || attacker.type === 'toji');
+    const isTojiAmbushing = isToji && (attacker.isAmbushing || opts.isAmbush || opts.isAmbushThrust || opts.isAmbushCleave || opts.skillShotId === 'tojiAmbush');
     const isSaitamaCountering = attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
       ((attacker._counterPunchTimer && attacker._counterPunchTimer > 0) ||
        (attacker._counterWindupTimer && attacker._counterWindupTimer > 0) ||
@@ -306,7 +307,7 @@ export class GojoFighter extends Fighter {
       this.isMeleeMode = false;
     }
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && f.hp > 0);
-    if ((!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !this.isChannelingPurple && !isToji && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
+    if ((!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !this.isChannelingPurple && !isTojiAmbushing && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
       const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8;
@@ -1669,8 +1670,9 @@ export class GojoFighter extends Fighter {
       if (!entity || entity === this || entity.hp <= 0 || entity.dead) continue;
       if (entity.owner === this || (entity.team !== undefined && entity.team === this.team)) continue; // Don't block self, teammates, or own summons/illusions
 
-      // Toji & Domain channelers explicitly bypass Infinity
-      if (entity.type === 'toji' || entity.characterId === 'toji') continue;
+      // Toji only bypasses Infinity when performing an active Ambush!
+      const isToji = entity.type === 'toji' || entity.characterId === 'toji';
+      if (isToji && entity.isAmbushing) continue;
       if (entity.isChannelingDomain || entity.isChannelingDomainExpansion) continue;
 
       // Saitama during Serious Skill Counter explicitly bypasses Infinity

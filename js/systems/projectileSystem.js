@@ -2920,9 +2920,10 @@ class ProjectileSystem {
               const ownerFighter = fighters[p.owner];
               const isMahoragaAdapted = ownerFighter && ownerFighter.characterId === 'mahoraga' && ownerFighter.gojoInfinityImmune;
               const isToji = ownerFighter && (ownerFighter.characterId === 'toji' || ownerFighter.type === 'toji');
+              const isTojiAmbush = isToji && (p.isAmbush || p.skillShotId === 'tojiAmbush' || (ownerFighter && ownerFighter.isAmbushing));
 
-              if (isMahoragaAdapted || isToji) {
-                p.infinityBypassed = true; // Adapted Mahoraga and Toji ISOH bypass Infinity!
+              if (isMahoragaAdapted || isTojiAmbush) {
+                p.infinityBypassed = true; // Adapted Mahoraga and Toji Ambush bypass Infinity!
               } else {
                 p.infinityBypassed = false; // Frozen by Gojo's Limitless Infinity barrier (Rule #9 compliant)
               }

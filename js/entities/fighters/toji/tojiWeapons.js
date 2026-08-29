@@ -269,14 +269,12 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
 
   for (const target of targets) {
     let wasInfinityActive = false;
-    if (target.characterId === 'gojo' && target.infinityActive) {
+    if (isAmbushThrust && target.characterId === 'gojo' && target.infinityActive) {
       wasInfinityActive = true;
       target.infinityActive = false;
       target.infinityBlockTimer = 0;
-      if (isAmbushThrust) {
-        spawnSparks(target.x, target.y, 22, 'lightningTrail', '#00E5FF');
-        spawnImpactFlash(target.x, target.y, 60, 'lightningTrail');
-      }
+      spawnSparks(target.x, target.y, 22, 'lightningTrail', '#00E5FF');
+      spawnImpactFlash(target.x, target.y, 60, 'lightningTrail');
     }
 
     applyDamageToTarget(target, thrustDamage, fighter, { isMelee: true, isTrueDamage: true, isIsoh: true, isAdaptableSkillShot: !!fighter.isAmbushing, skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null });

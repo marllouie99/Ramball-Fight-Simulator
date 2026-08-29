@@ -10,9 +10,10 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { triggerAdaptation } from '../mahoraga/mahoragaAdaptation.js';
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
-  // Toji, Adapted Mahoraga, & Saitama during Serious Skill Counter immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
+  // Toji (ONLY during Ambush), Adapted Mahoraga, & Saitama during Serious Skill Counter immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
   if (attacker && attacker !== fighter) {
     const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
+    const isTojiAmbushing = isToji && (attacker.isAmbushing || attacker.ambushPhase);
     const isSaitamaCountering = (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
       ((attacker._counterPunchTimer && attacker._counterPunchTimer > 0) ||
        (attacker._counterWindupTimer && attacker._counterWindupTimer > 0) ||
@@ -21,7 +22,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
     const isAdaptedMahoraga = (attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga') && 
                               (attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8);
-    if (isToji || isAdaptedMahoraga || isSaitamaCountering) {
+    if (isTojiAmbushing || isAdaptedMahoraga || isSaitamaCountering) {
       attacker.infinityFreezeTimer = 0;
       attacker.isFrozenByInfinity = false;
       attacker.adaptationPauseTimer = 0;
@@ -79,7 +80,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       // Domain Channeling has supreme domain hyper-armor — bypasses Infinity block completely!
       return false;
     }
-    if (attacker.characterId !== 'toji' && attacker.type !== 'toji' && !attacker.domainImmunity) {
+    const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
+    const isTojiAmbushing = isToji && (attacker.isAmbushing || attacker.ambushPhase);
+    if (!isTojiAmbushing && !attacker.domainImmunity) {
       if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
         const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
         if (hasAdapted) {

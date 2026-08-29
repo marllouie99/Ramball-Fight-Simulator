@@ -37,9 +37,9 @@ export const gojoConfig = {
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
   blueCooldown: 40,         // Fire rate for basic attack (Blue orb) - Lower is faster
   blueSpeed: 10.5,          // Speed of Blue orb projectile
-  blueRadius: 50,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
+  blueRadius: 100,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
   blueProjectileRadius: 10,  // Base visual & collision radius of Blue projectile orb (at default blueRadius: 50)
-  blueScale: 1.0,           // Explicit scale multiplier for Blue projectile visual size and hitbox
+  blueScale: 1.5,           // Explicit scale multiplier for Blue projectile visual size and hitbox
   bluePullForce: 0.5,       // Pull strength of Blue
   modeSwitchBreatherDuration: 45, // Breather pause (frames) when Gojo switches to Ranged/Blue mode (~0.75s)
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
