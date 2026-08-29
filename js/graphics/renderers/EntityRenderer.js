@@ -133,63 +133,73 @@ export function drawFighters() {
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       ctx.restore();
 
-      // Ambient Beam Light Spill on surrounding environment (only active when the beam is actively firing!)
+      // Ambient Beam Light Spill on surrounding environment (only active when the beam is actively firing in light mode)
       if (genosUltFighter.isFiringUlt) {
-        const beamAngle = (genosUltFighter.gunAngle !== undefined) ? genosUltFighter.gunAngle : (genosUltFighter.ultAngle || genosUltFighter.angle || 0);
-        const beamW = CONFIG.genos?.ultBeamWidth || 70;
-        const range = CONFIG.genos?.ultBeamRange || 1200;
-        const startOffset = genosUltFighter.r + 5;
-        const startX = genosUltFighter.x + Math.cos(beamAngle) * startOffset;
-        const startY = genosUltFighter.y + Math.sin(beamAngle) * startOffset;
-        const endX = startX + Math.cos(beamAngle) * range;
-        const endY = startY + Math.sin(beamAngle) * range;
+        const isDarkMode = Boolean(
+          typeof state !== 'undefined' && (
+            state.arenaTheme === 'dark' || 
+            state.darkMode || 
+            (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+          )
+        );
 
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
+        if (!isDarkMode) {
+          const beamAngle = (genosUltFighter.gunAngle !== undefined) ? genosUltFighter.gunAngle : (genosUltFighter.ultAngle || genosUltFighter.angle || 0);
+          const beamW = CONFIG.genos?.ultBeamWidth || 70;
+          const range = CONFIG.genos?.ultBeamRange || 1200;
+          const startOffset = genosUltFighter.r + 5;
+          const startX = genosUltFighter.x + Math.cos(beamAngle) * startOffset;
+          const startY = genosUltFighter.y + Math.sin(beamAngle) * startOffset;
+          const endX = startX + Math.cos(beamAngle) * range;
+          const endY = startY + Math.sin(beamAngle) * range;
 
-        const lightMult = genosUltFighter.isFiringUlt ? 1.0 : (genosUltFighter.isChargingUlt ? 0.45 : 0.15);
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
 
-        // 1. Wide outer ambient fill — source-over so it actually PAINTS warm light on the dark bg
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = `rgba(210, 70, 0, ${(0.45 * lightMult).toFixed(3)})`;
-        ctx.lineWidth = beamW * 2.8;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
+          const lightMult = genosUltFighter.isFiringUlt ? 1.0 : (genosUltFighter.isChargingUlt ? 0.45 : 0.15);
 
-        // 2. Mid warm gold layer — source-over for visible warm colour
-        ctx.strokeStyle = `rgba(255, 140, 10, ${(0.50 * lightMult).toFixed(3)})`;
-        ctx.lineWidth = beamW * 1.6;
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
+          // 1. Wide outer ambient fill — source-over so it actually PAINTS warm light on the dark bg
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = `rgba(210, 70, 0, ${(0.45 * lightMult).toFixed(3)})`;
+          ctx.lineWidth = beamW * 2.8;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
 
-        // 3. Bright inner core — lighter blending adds luminance on top of the painted base
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = `rgba(255, 220, 100, ${(0.60 * lightMult).toFixed(3)})`;
-        ctx.lineWidth = beamW * 0.7;
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
+          // 2. Mid warm gold layer — source-over for visible warm colour
+          ctx.strokeStyle = `rgba(255, 140, 10, ${(0.50 * lightMult).toFixed(3)})`;
+          ctx.lineWidth = beamW * 1.6;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
 
-        // 4. Radial muzzle origin bloom — source-over base then lighter pop
-        ctx.globalCompositeOperation = 'source-over';
-        const bloomR = beamW * 2.0;
-        const originGlow = ctx.createRadialGradient(startX, startY, 2, startX, startY, bloomR);
-        originGlow.addColorStop(0,    `rgba(255, 240, 180, ${(0.80 * lightMult).toFixed(3)})`);
-        originGlow.addColorStop(0.35, `rgba(255, 130, 0,   ${(0.55 * lightMult).toFixed(3)})`);
-        originGlow.addColorStop(0.70, `rgba(180, 50,  0,   ${(0.25 * lightMult).toFixed(3)})`);
-        originGlow.addColorStop(1,    'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = originGlow;
-        ctx.beginPath();
-        ctx.arc(startX, startY, bloomR, 0, Math.PI * 2);
-        ctx.fill();
+          // 3. Bright inner core — lighter blending adds luminance on top of the painted base
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = `rgba(255, 220, 100, ${(0.60 * lightMult).toFixed(3)})`;
+          ctx.lineWidth = beamW * 0.7;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
 
-        ctx.restore();
+          // 4. Radial muzzle origin bloom — source-over base then lighter pop
+          ctx.globalCompositeOperation = 'source-over';
+          const bloomR = beamW * 2.0;
+          const originGlow = ctx.createRadialGradient(startX, startY, 2, startX, startY, bloomR);
+          originGlow.addColorStop(0,    `rgba(255, 240, 180, ${(0.80 * lightMult).toFixed(3)})`);
+          originGlow.addColorStop(0.35, `rgba(255, 130, 0,   ${(0.55 * lightMult).toFixed(3)})`);
+          originGlow.addColorStop(0.70, `rgba(180, 50,  0,   ${(0.25 * lightMult).toFixed(3)})`);
+          originGlow.addColorStop(1,    'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = originGlow;
+          ctx.beginPath();
+          ctx.arc(startX, startY, bloomR, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+        }
       }
     }
   }
