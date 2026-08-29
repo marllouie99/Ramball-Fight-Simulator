@@ -679,35 +679,108 @@ export function drawUlquiorraHand(ctx, x, y, radius, isSegunda = false, isCastin
 }
 
 /**
- * Draws Ulquiorra's Demon Whip Tail (Segunda Etapa only).
+ * Draws Ulquiorra's Demon Whip Tail in True Stepped Pixel Art Style (Segunda Etapa only).
+ * Uses 2D grid scan rasterization matching drawUlquiorraPixelBody and _drawUlquiorraPixelWings.
  */
-function _drawUlquiorraTail(ctx, r) {
+function _drawUlquiorraPixelTail(ctx, r) {
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const tailSway = Math.sin(now * 0.006) * (r * 0.3);
 
   ctx.save();
-  ctx.strokeStyle = '#05070A';
-  ctx.lineWidth = 3.2;
-  ctx.lineCap = 'round';
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
-  ctx.beginPath();
-  ctx.moveTo(0, r * 0.75);
-  ctx.quadraticCurveTo(-r * 0.8 + tailSway, r * 1.2, -r * 1.4 + tailSway * 1.5, r * 0.9);
-  ctx.stroke();
+  const p0 = { x: 0, y: r * 0.70 };
+  const p1 = { x: -r * 0.80 + tailSway, y: r * 1.25 };
+  const p2 = { x: -r * 1.40 + tailSway * 1.5, y: r * 0.85 };
 
-  ctx.fillStyle = '#00FF88';
-  ctx.strokeStyle = '#05070A';
-  ctx.lineWidth = 1.2;
-  const tipX = -r * 1.4 + tailSway * 1.5;
-  const tipY = r * 0.9;
-  ctx.beginPath();
-  ctx.moveTo(tipX, tipY);
-  ctx.lineTo(tipX - 8, tipY - 5);
-  ctx.lineTo(tipX - 12, tipY);
-  ctx.lineTo(tipX - 8, tipY + 5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  const steps = 14;
+  const leftPoly = [];
+  const rightPoly = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const mt = 1 - t;
+    const px = mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x;
+    const py = mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y;
+
+    const dx = 2 * (1 - t) * (p1.x - p0.x) + 2 * t * (p2.x - p1.x);
+    const dy = 2 * (1 - t) * (p1.y - p0.y) + 2 * t * (p2.y - p1.y);
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    const halfThick = 2.2 * (1.1 - t * 0.35);
+    leftPoly.push({ x: px + nx * halfThick, y: py + ny * halfThick });
+    rightPoly.push({ x: px - nx * halfThick, y: py - ny * halfThick });
+  }
+
+  const tailPoly = [...leftPoly, ...rightPoly.reverse()];
+
+  // Emerald Arrowhead Spade Diamond at tip (aligned to tail tangent)
+  const tipX = p2.x;
+  const tipY = p2.y;
+  const endDx = 2 * (p2.x - p1.x);
+  const endDy = 2 * (p2.y - p1.y);
+  const endAngle = Math.atan2(endDy, endDx);
+  const cosA = Math.cos(endAngle);
+  const sinA = Math.sin(endAngle);
+
+  const diamondPoly = [
+    { x: tipX + cosA * 12, y: tipY + sinA * 12 },               // Front forward point
+    { x: tipX - sinA * 6.5, y: tipY + cosA * 6.5 },             // Top wing
+    { x: tipX - cosA * 4, y: tipY - sinA * 4 },                 // Rear indent
+    { x: tipX + sinA * 6.5, y: tipY - cosA * 6.5 }              // Bottom wing
+  ];
+
+  // Compute bounding box
+  let minX = 9999, maxX = -9999, minY = 9999, maxY = -9999;
+  [...tailPoly, ...diamondPoly].forEach(p => {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  });
+
+  const startGx = Math.floor((minX - P) / P);
+  const endGx   = Math.ceil((maxX + P) / P);
+  const startGy = Math.floor((minY - P) / P);
+  const endGy   = Math.ceil((maxY + P) / P);
+
+  // 2D Pixel Grid Rasterization Loop
+  for (let gy = startGy; gy <= endGy; gy++) {
+    for (let gx = startGx; gx <= endGx; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+
+      const inTail = _isPointInPoly(rx, ry, tailPoly);
+      const inDiamond = _isPointInPoly(rx, ry, diamondPoly);
+      if (!inTail && !inDiamond) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // 4-neighbor attached border test
+      const isBorder = (!_isPointInPoly(rx + P, ry, tailPoly) && !_isPointInPoly(rx + P, ry, diamondPoly)) ||
+                       (!_isPointInPoly(rx - P, ry, tailPoly) && !_isPointInPoly(rx - P, ry, diamondPoly)) ||
+                       (!_isPointInPoly(rx, ry + P, tailPoly) && !_isPointInPoly(rx, ry + P, diamondPoly)) ||
+                       (!_isPointInPoly(rx, ry - P, tailPoly) && !_isPointInPoly(rx, ry - P, diamondPoly));
+
+      if (isBorder) {
+        ctx.fillStyle = '#080A0E';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      if (inDiamond) {
+        ctx.fillStyle = '#00FF88'; // Emerald Reishi arrowhead spade
+      } else {
+        ctx.fillStyle = '#070A0F'; // Obsidian whip spine
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
 
   ctx.restore();
 }
@@ -765,7 +838,7 @@ export function drawUlquiorraSkin(ctx, fighter) {
 
   // Demonic Tail (Segunda Etapa)
   if (isSegunda) {
-    _drawUlquiorraTail(ctx, r);
+    _drawUlquiorraPixelTail(ctx, r);
   }
 
   // Back Hand / Idle Stance (Behind body layer)
