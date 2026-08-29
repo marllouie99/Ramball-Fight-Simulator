@@ -56,6 +56,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   // Skip visual/audio spam inside Gojo's own domain (Unlimited Void uses paralysis, not barrier bounces)
   if (!fighter.domainActive) {
     if (fighter._lastInfinityRingFrame !== currentFrame) {
+      fighter._lastInfinityRingFrame = currentFrame;
       triggerGlobalScreenShake(3, 6);
 
       const nowSound = Date.now();
@@ -70,7 +71,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       if (typeof spawnMeleeClashShockwave === 'function') {
         const impactX = hitX !== undefined ? hitX : fighter.x;
         const impactY = hitY !== undefined ? hitY : fighter.y;
-        spawnMeleeClashShockwave(impactX, impactY, 75, 'gojo_infinity');
+        spawnMeleeClashShockwave(impactX, impactY, 85, 'gojo_infinity');
       }
     }
   }

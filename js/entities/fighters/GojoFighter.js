@@ -1700,7 +1700,10 @@ export class GojoFighter extends Fighter {
 
       if (distSq < minDist * minDist) {
         if (typeof this.triggerInfinityBlock === 'function') {
-          this.triggerInfinityBlock(entity.x, entity.y, entity);
+          const dist = Math.sqrt(distSq) || 1;
+          const contactX = this.x + (dx / dist) * barrierRadius;
+          const contactY = gojoY + (dy / dist) * barrierRadius;
+          this.triggerInfinityBlock(contactX, contactY, entity);
         }
       } else if (distSq < slowDist * slowDist) {
         // Proximity Approach Slow: The closer the enemy gets to the barrier, the slower they move (Limitless Infinity paradox)

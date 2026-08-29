@@ -2487,7 +2487,7 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
   shockwave.friction = 1;
   shockwave.type = 'meleeClashShockwave';
   shockwave.clashType = clashType;
-  shockwave.isFlash = true;
+  shockwave.isFlash = false;
   shockwave.color = 'clash';
   if (insertIdx !== -1) {
     state.sparkEffects[insertIdx] = shockwave;
