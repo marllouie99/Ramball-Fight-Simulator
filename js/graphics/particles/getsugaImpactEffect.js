@@ -3,6 +3,8 @@
 // High-performance, zero-allocation particle pipeline for Getsuga Tensho enemy impacts.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { state } from '../../core/state.js';
+
 const MAX_GETSUGA_PARTICLES = 120;
 const _pool = [];
 const _activeEffects = [];
@@ -57,27 +59,28 @@ export function spawnGetsugaHitEffect(x, y, hitAngle = 0, form = 'shikai') {
   const isFinal = form === 'final_bankai';
   const isHollow = form === 'hollow' || form === 'bankai_hollow';
   const isBankai = form === 'bankai' || form === 'bankai_hollow' || isFinal;
+  const isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
 
   let primaryColor = '#00E5FF'; // Cyan
   let accentColor = '#FFFFFF';
-  let voidColor = '#001A33';
+  let voidColor = isDarkMode ? '#0077FF' : '#001A33';
   let smokeColor = 'rgba(0, 229, 255, 0.4)';
 
   if (isFinal) {
     primaryColor = '#FF0A20'; // Blood Scarlet
     accentColor = '#FFFFFF';
-    voidColor = '#050002';
-    smokeColor = 'rgba(255, 10, 30, 0.5)';
+    voidColor = isDarkMode ? '#FF4D6D' : '#050002';
+    smokeColor = isDarkMode ? 'rgba(255, 60, 80, 0.65)' : 'rgba(255, 10, 30, 0.5)';
   } else if (isHollow) {
     primaryColor = '#FF2814'; // Crimson Flame
     accentColor = '#FFAA00';
-    voidColor = '#080004';
-    smokeColor = 'rgba(255, 40, 20, 0.45)';
+    voidColor = isDarkMode ? '#FF6B4A' : '#080004';
+    smokeColor = isDarkMode ? 'rgba(255, 80, 40, 0.60)' : 'rgba(255, 40, 20, 0.45)';
   } else if (isBankai) {
     primaryColor = '#FF1E28'; // Kuroi Crimson
     accentColor = '#FFE5E8';
-    voidColor = '#080204';
-    smokeColor = 'rgba(220, 20, 30, 0.45)';
+    voidColor = isDarkMode ? '#FF4D6D' : '#080204';
+    smokeColor = isDarkMode ? 'rgba(255, 50, 70, 0.60)' : 'rgba(220, 20, 30, 0.45)';
   }
 
   const scale = isFinal ? 1.6 : (isHollow ? 1.25 : (isBankai ? 1.15 : 1.0));
@@ -252,7 +255,8 @@ export function drawGetsugaImpactEffects(ctx) {
       }
 
       // Pass 2: Stepped Core
-      ctx.fillStyle = isBankai ? p.voidColor : p.accentColor;
+      const isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+      ctx.fillStyle = (isBankai && !isDarkMode) ? p.voidColor : (isDarkMode ? p.voidColor : p.accentColor);
       ctx.globalAlpha = p.alpha * 0.95;
       for (let s = 0; s <= steps; s++) {
         const t = (s / steps) * 2 - 1;

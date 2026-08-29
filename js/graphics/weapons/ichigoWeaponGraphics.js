@@ -52,6 +52,7 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
 
   // ── Palette Definition ──
   let cBorder, cSaturated, cBright, cCore, cAura, isDarkCore;
+  const isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
 
   if (isInfinityFrozen) {
     cBorder    = '#001a44';
@@ -61,29 +62,58 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     cAura      = `rgba(0, 229, 255, ${(0.35 * alpha).toFixed(2)})`;
     isDarkCore = false;
   } else if (isBankaiHollow) {
-    cBorder    = '#180004';
-    cSaturated = '#050002'; // Void core
-    cBright    = '#ff2244';
-    cCore      = '#ffffff';
-    cAura      = `rgba(255, 30, 60, ${(0.35 * alpha).toFixed(2)})`;
-    isDarkCore = true;
+    if (isDarkMode) {
+      // In Dark Mode: Luminous brilliant crimson scarlet & hot coral (NO dark colors)
+      cBorder    = '#b91c1c';
+      cSaturated = '#ef4444';
+      cBright    = '#ff4d6d';
+      cCore      = '#ffffff';
+      cAura      = `rgba(255, 60, 80, ${(0.45 * alpha).toFixed(2)})`;
+      isDarkCore = false;
+    } else {
+      cBorder    = '#180004';
+      cSaturated = '#050002'; // Void core
+      cBright    = '#ff2244';
+      cCore      = '#ffffff';
+      cAura      = `rgba(255, 30, 60, ${(0.35 * alpha).toFixed(2)})`;
+      isDarkCore = true;
+    }
   } else if (isShikaiHollow) {
-    cBorder    = '#020814';
-    cSaturated = '#061020'; // Dark cyan void
-    cBright    = '#00f0ff';
-    cCore      = '#ffffff';
-    cAura      = `rgba(0, 240, 255, ${(0.35 * alpha).toFixed(2)})`;
-    isDarkCore = true;
+    if (isDarkMode) {
+      cBorder    = '#0284c7';
+      cSaturated = '#00c3ff';
+      cBright    = '#70f0ff';
+      cCore      = '#ffffff';
+      cAura      = `rgba(0, 240, 255, ${(0.45 * alpha).toFixed(2)})`;
+      isDarkCore = false;
+    } else {
+      cBorder    = '#020814';
+      cSaturated = '#061020'; // Dark cyan void
+      cBright    = '#00f0ff';
+      cCore      = '#ffffff';
+      cAura      = `rgba(0, 240, 255, ${(0.35 * alpha).toFixed(2)})`;
+      isDarkCore = true;
+    }
   } else if (isBankai || isFinal) {
     // Kuroi Getsuga Tensho (Bankai & Grand Finisher Final Massive Kuroi Getsuga)
-    cBorder    = '#220008';
-    cSaturated = '#080206'; // Void black core
-    cBright    = '#ff1e32';
-    cCore      = '#ffffff';
-    cAura      = `rgba(220, 20, 40, ${(0.32 * alpha).toFixed(2)})`;
-    isDarkCore = true;
+    if (isDarkMode) {
+      // In Dark Mode: Luminous brilliant crimson scarlet & hot coral (NO dark/black void colors)
+      cBorder    = '#dc2626';
+      cSaturated = '#ff2a42';
+      cBright    = '#ff6b81';
+      cCore      = '#ffffff';
+      cAura      = `rgba(255, 40, 60, ${(0.45 * alpha).toFixed(2)})`;
+      isDarkCore = false;
+    } else {
+      cBorder    = '#220008';
+      cSaturated = '#080206'; // Void black core
+      cBright    = '#ff1e32';
+      cCore      = '#ffffff';
+      cAura      = `rgba(220, 20, 40, ${(0.32 * alpha).toFixed(2)})`;
+      isDarkCore = true;
+    }
   } else { // Standard Shikai
-    cBorder    = '#00143a';
+    cBorder    = isDarkMode ? '#0077ff' : '#00143a';
     cSaturated = '#0066ee';
     cBright    = '#00e5ff';
     cCore      = '#ffffff';
@@ -1110,11 +1140,20 @@ export function drawIchigoSlashArc(ctx, fighter) {
   const totalAngle = Math.abs(currentTipOffset - currentTailOffset);
   const arcSteps = Math.max(16, Math.round((totalAngle * outerRadius) / (P * 1.5)));
 
-  // Pass 1: Pixel-Art Dark Ink / Void Outline Shell
+  // Pass 1: Pixel-Art Dark Ink / Void Outline Shell (Luminous in Dark Mode)
+  const isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+
   let outlineCol = `rgba(0, 20, 58, ${0.92 * trailAlpha})`;
-  if (isMask && isBankai) outlineCol = `rgba(18, 0, 4, ${0.98 * trailAlpha})`;
-  else if (isMask) outlineCol = `rgba(18, 5, 5, ${0.95 * trailAlpha})`;
-  else if (isBankai) outlineCol = `rgba(8, 2, 4, ${0.98 * trailAlpha})`;
+  if (isDarkMode) {
+    if (isMask && isBankai) outlineCol = `rgba(220, 38, 38, ${0.98 * trailAlpha})`;
+    else if (isMask) outlineCol = `rgba(234, 88, 12, ${0.95 * trailAlpha})`;
+    else if (isBankai) outlineCol = `rgba(220, 38, 38, ${0.98 * trailAlpha})`;
+    else outlineCol = `rgba(2, 132, 199, ${0.92 * trailAlpha})`;
+  } else {
+    if (isMask && isBankai) outlineCol = `rgba(18, 0, 4, ${0.98 * trailAlpha})`;
+    else if (isMask) outlineCol = `rgba(18, 5, 5, ${0.95 * trailAlpha})`;
+    else if (isBankai) outlineCol = `rgba(8, 2, 4, ${0.98 * trailAlpha})`;
+  }
 
   ctx.fillStyle = outlineCol;
   for (let i = 0; i <= arcSteps; i++) {
@@ -1157,19 +1196,19 @@ export function drawIchigoSlashArc(ctx, fighter) {
       let col;
       if (isMask && isBankai) {
         if (rNorm > 0.85) col = '#FFFFFF';
-        else if (rNorm > 0.6) col = '#FF2832';
-        else if (rNorm > 0.3) col = '#8B0000';
-        else col = '#080003';
+        else if (rNorm > 0.6) col = isDarkMode ? '#FF4D6D' : '#FF2832';
+        else if (rNorm > 0.3) col = isDarkMode ? '#FF1E28' : '#8B0000';
+        else col = isDarkMode ? '#E11D48' : '#080003';
       } else if (isMask) {
         if (rNorm > 0.85) col = '#FFFFFF';
-        else if (rNorm > 0.6) col = '#FFAA00';
-        else if (rNorm > 0.3) col = '#FF2814';
-        else col = '#180505';
+        else if (rNorm > 0.6) col = isDarkMode ? '#FFD000' : '#FFAA00';
+        else if (rNorm > 0.3) col = isDarkMode ? '#FF4500' : '#FF2814';
+        else col = isDarkMode ? '#EA580C' : '#180505';
       } else if (isBankai) {
         if (rNorm > 0.85) col = '#FFFFFF';
-        else if (rNorm > 0.6) col = '#FF1E28';
-        else if (rNorm > 0.3) col = '#8B0014';
-        else col = '#080204';
+        else if (rNorm > 0.6) col = isDarkMode ? '#FF4D6D' : '#FF1E28';
+        else if (rNorm > 0.3) col = isDarkMode ? '#FF1E28' : '#8B0014';
+        else col = isDarkMode ? '#DC2626' : '#080204';
       } else {
         // Shikai Azure
         if (rNorm > 0.85) col = '#FFFFFF';
