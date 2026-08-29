@@ -2033,6 +2033,8 @@ function _drawShikaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
         ctx.fillRect(px, py - P, P, P);
       }
     }
+  }
+
   // ── 4. Vertical Ascending Micro-Lightning Tendrils (Stepped Pixel Staircase) ──
   const boltCount = 4;
   for (let b = 0; b < boltCount; b++) {
