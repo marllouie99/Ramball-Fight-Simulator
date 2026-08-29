@@ -471,19 +471,57 @@ function _distToSegmentSq(px, py, ax, ay, bx, by) {
 
 /**
  * Draws Ulquiorra's authentic gothic Resurrección bat wings in True Stepped Pixel Art Style.
- * Uses procedural 2D grid scan rasterization matching drawUlquiorraPixelBody and Saitama's cape.
- * 4-neighbor grid testing guarantees a 100% attached, crisp outer shell with zero floating crumbs.
+ * Incorporates natural aerodynamic locomotion physics:
+ * - Idle breathing hover flutter
+ * - High-speed flight flapping frequency & amplitude modulation
+ * - Aerodynamic wind drag / speed sweep tucking
+ * - Asymmetrical flight banking on lateral turns and strafing
+ * - Supersonic Sonído dive dart compression & slash recoil flutters
  */
-function _drawUlquiorraPixelWings(ctx, r, isSegunda = false) {
+function _drawUlquiorraPixelWings(ctx, r, isSegunda = false, fighter = null) {
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-  const flapAngle = Math.sin(now * 0.004) * 0.08;
+
+  // 1. Locomotion Kinematics
+  const vx = (fighter && typeof fighter.vx === 'number') ? fighter.vx : 0;
+  const vy = (fighter && typeof fighter.vy === 'number') ? fighter.vy : 0;
+  const speed = Math.hypot(vx, vy);
+  const isDashing = Boolean(fighter && (fighter.isSonidoDashing || (fighter.sonidoTimer > 0)));
+  const isSlashing = Boolean(fighter && fighter.isSlashing);
+
+  // Local space velocity projection
+  const facingAngle = fighter ? (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)) : 0;
+  const cosA = Math.cos(facingAngle);
+  const sinA = Math.sin(facingAngle);
+  const vForward = (vx * cosA + vy * sinA);
+  const vLateral = (-vx * sinA + vy * cosA);
+
+  // 2. Flap Frequency & Power Stroke Modulation
+  const flapFrequency = 0.0035 + Math.min(0.010, (speed / 8) * 0.008);
+  const baseFlapAmp = isDashing ? 0.20 : (0.07 + Math.min(0.12, (speed / 6) * 0.09));
+  const flapPhase = Math.sin(now * flapFrequency);
+  const flapAngle = flapPhase * baseFlapAmp;
+
+  // 3. Aerodynamic Wind Drag & Speed Sweep
+  const forwardDrag = Math.max(-0.12, Math.min(0.26, (vForward / 7) * 0.24));
+  const dashTuck = isDashing ? 0.32 : 0;
+  const totalSweep = forwardDrag + dashTuck;
+
+  // 4. Asymmetrical Flight Banking on Lateral Turns / Strafing
+  const bankAngle = Math.max(-0.16, Math.min(0.16, (vLateral / 6) * 0.14));
+
+  // 5. Slash Kinetic Recoil Flutter
+  const slashFlutter = isSlashing ? Math.sin((fighter.slashProgress || 0) * Math.PI) * 0.14 : 0;
+
+  // 6. Aerodynamic Span Compression at High Speed
+  const baseWingScale = isSegunda ? 1.25 : 1.0;
+  const spanTuckScale = 1.0 - Math.min(0.14, (speed / 8) * 0.10) - (isDashing ? 0.12 : 0);
+  const wingScale = baseWingScale * spanTuckScale;
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
-  const wingScale = isSegunda ? 1.25 : 1.0;
   const membraneColor = isSegunda ? '#040508' : '#141720';
   const boneHighlight  = isSegunda ? '#00FF88' : '#2D3440';
   const shellColor     = '#080A0E';
@@ -491,7 +529,10 @@ function _drawUlquiorraPixelWings(ctx, r, isSegunda = false) {
   const drawOneWing = (sign) => {
     ctx.save();
     ctx.translate(sign * r * 0.28, -r * 0.15);
-    ctx.rotate(sign * (-0.10 + flapAngle));
+
+    // Combine natural breathing flap, aerodynamic drag sweep, turn banking, and slash recoil
+    const totalRotation = sign * (-0.10 + flapAngle - totalSweep - slashFlutter) + (sign * bankAngle);
+    ctx.rotate(totalRotation);
     ctx.scale(sign * wingScale, wingScale);
 
     // Key Landmarks
@@ -557,7 +598,7 @@ function _drawUlquiorraPixelWings(ctx, r, isSegunda = false) {
     const startGy = Math.floor((minY - P) / P);
     const endGy   = Math.ceil((maxY + P) / P);
 
-    // Discrete 2D Rasterization Loop (Exact same technique as drawUlquiorraPixelBody)
+    // Discrete 2D Rasterization Loop
     for (let gy = startGy; gy <= endGy; gy++) {
       for (let gx = startGx; gx <= endGx; gx++) {
         const rx = gx * P;
@@ -570,7 +611,7 @@ function _drawUlquiorraPixelWings(ctx, r, isSegunda = false) {
         const px = snap(rx);
         const py = snap(ry);
 
-        // 4-neighbor boundary test for pixel-perfect attached black border
+        // 4-neighbor boundary test
         const isBorder = (!_isPointInPoly(rx + P, ry, poly) && !_isPointInPoly(rx + P, ry, tuftsPoly)) ||
                          (!_isPointInPoly(rx - P, ry, poly) && !_isPointInPoly(rx - P, ry, tuftsPoly)) ||
                          (!_isPointInPoly(rx, ry + P, poly) && !_isPointInPoly(rx, ry + P, tuftsPoly)) ||
@@ -588,7 +629,6 @@ function _drawUlquiorraPixelWings(ctx, r, isSegunda = false) {
           continue;
         }
 
-        // Bone strut check (Forearm / Finger 2 / Finger 3)
         const dStrut1 = Math.sqrt(_distToSegmentSq(rx, ry, elbowApex.x, elbowApex.y, tip1.x, tip1.y));
         const dStrut2 = Math.sqrt(_distToSegmentSq(rx, ry, elbowApex.x, elbowApex.y, tip2.x, tip2.y));
         const dStrut3 = Math.sqrt(_distToSegmentSq(rx, ry, elbowApex.x, elbowApex.y, tip3.x, tip3.y));
@@ -606,7 +646,6 @@ function _drawUlquiorraPixelWings(ctx, r, isSegunda = false) {
     ctx.restore();
   };
 
-  // Draw Left Wing and Right Wing symmetrically
   drawOneWing(-1);
   drawOneWing(1);
 
@@ -614,77 +653,20 @@ function _drawUlquiorraPixelWings(ctx, r, isSegunda = false) {
 }
 
 /**
- * Draws Ulquiorra's pixel-art brawler hand with white sleeve cuff.
- */
-export function drawUlquiorraHand(ctx, x, y, radius, isSegunda = false, isCasting = false) {
-  ctx.save();
-  ctx.translate(x, y);
-
-  if (isSegunda) {
-    // ── Segunda Etapa: Pitch-Black Demon Claw ──
-    ctx.fillStyle = '#07090C';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.roundRect(-radius * 1.3, -radius * 0.75, radius * 1.2, radius * 1.5, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    drawPixelHand(ctx, 0, 0, radius, '#0B0E14', '#000000');
-
-    // Razor Emerald-Tipped Claws
-    ctx.fillStyle = '#00FF88';
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.moveTo(radius * 0.6, i * (radius * 0.4));
-      ctx.lineTo(radius * 1.2, i * (radius * 0.35));
-      ctx.lineTo(radius * 0.6, i * (radius * 0.4) + 1.2);
-      ctx.fill();
-    }
-  } else {
-    // ── Base & Stage 1: Arrancar White Sleeve Cuff + Alabaster Skin Hand ──
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#0F1218';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.roundRect(-radius * 1.1, -radius * 0.75, radius * 1.0, radius * 1.5, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Black inner cuff rim seam
-    ctx.strokeStyle = '#14181F';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(-radius * 0.25, -radius * 0.75);
-    ctx.lineTo(-radius * 0.25, radius * 0.75);
-    ctx.stroke();
-
-    // Pale Alabaster Arrancar Skin Fist (#F4F7F6)
-    drawPixelHand(ctx, 0, 0, radius, '#F4F7F6', '#0B0F14');
-  }
-
-  // Fingertip Cero/Bala Charging Spark
-  if (isCasting) {
-    ctx.fillStyle = '#00FF88';
-    ctx.beginPath();
-    ctx.arc(radius * 0.4, 0, 2.8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(radius * 0.4, 0, 1.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
-}
-
-/**
  * Draws Ulquiorra's Demon Whip Tail in True Stepped Pixel Art Style (Segunda Etapa only).
- * Uses 2D grid scan rasterization matching drawUlquiorraPixelBody and _drawUlquiorraPixelWings.
+ * Includes dynamic locomotion physics and natural movement drag.
  */
-function _drawUlquiorraPixelTail(ctx, r) {
+function _drawUlquiorraPixelTail(ctx, r, fighter = null) {
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-  const tailSway = Math.sin(now * 0.006) * (r * 0.3);
+
+  const vx = (fighter && typeof fighter.vx === 'number') ? fighter.vx : 0;
+  const vy = (fighter && typeof fighter.vy === 'number') ? fighter.vy : 0;
+  const speed = Math.hypot(vx, vy);
+
+  const tailFreq = 0.005 + Math.min(0.008, (speed / 7) * 0.006);
+  const baseSway = Math.sin(now * tailFreq) * (r * 0.28);
+  const inertiaDrag = Math.max(-r * 0.35, Math.min(r * 0.35, -vx * 0.6));
+  const tailSway = baseSway + inertiaDrag;
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -693,7 +675,7 @@ function _drawUlquiorraPixelTail(ctx, r) {
 
   const p0 = { x: 0, y: r * 0.70 };
   const p1 = { x: -r * 0.80 + tailSway, y: r * 1.25 };
-  const p2 = { x: -r * 1.40 + tailSway * 1.5, y: r * 0.85 };
+  const p2 = { x: -r * 1.40 + tailSway * 1.4, y: r * 0.85 };
 
   const steps = 14;
   const leftPoly = [];
@@ -718,7 +700,7 @@ function _drawUlquiorraPixelTail(ctx, r) {
 
   const tailPoly = [...leftPoly, ...rightPoly.reverse()];
 
-  // Emerald Arrowhead Spade Diamond at tip (aligned to tail tangent)
+  // Emerald Arrowhead Spade Diamond at tip
   const tipX = p2.x;
   const tipY = p2.y;
   const endDx = 2 * (p2.x - p1.x);
@@ -728,10 +710,10 @@ function _drawUlquiorraPixelTail(ctx, r) {
   const sinA = Math.sin(endAngle);
 
   const diamondPoly = [
-    { x: tipX + cosA * 12, y: tipY + sinA * 12 },               // Front forward point
-    { x: tipX - sinA * 6.5, y: tipY + cosA * 6.5 },             // Top wing
-    { x: tipX - cosA * 4, y: tipY - sinA * 4 },                 // Rear indent
-    { x: tipX + sinA * 6.5, y: tipY - cosA * 6.5 }              // Bottom wing
+    { x: tipX + cosA * 12, y: tipY + sinA * 12 },
+    { x: tipX - sinA * 6.5, y: tipY + cosA * 6.5 },
+    { x: tipX - cosA * 4, y: tipY - sinA * 4 },
+    { x: tipX + sinA * 6.5, y: tipY - cosA * 6.5 }
   ];
 
   // Compute bounding box
@@ -833,12 +815,12 @@ export function drawUlquiorraSkin(ctx, fighter) {
 
   // Bat Wings (Murciélago & Segunda Etapa) in Stepped Pixel Art Style
   if (isStage1 || isSegunda) {
-    _drawUlquiorraPixelWings(ctx, r, isSegunda);
+    _drawUlquiorraPixelWings(ctx, r, isSegunda, fighter);
   }
 
   // Demonic Tail (Segunda Etapa)
   if (isSegunda) {
-    _drawUlquiorraPixelTail(ctx, r);
+    _drawUlquiorraPixelTail(ctx, r, fighter);
   }
 
   // Back Hand / Idle Stance (Behind body layer)
