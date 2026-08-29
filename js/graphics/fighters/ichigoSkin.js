@@ -286,6 +286,16 @@ export function drawIchigoSkin(ctx, fighter) {
     thrustDistance = -2.0 + 9.0 * raiseEase; // Extends forward pointing at the opponent
     bodyShiftX = -1.5 + 4.5 * raiseEase;     // Focus stance lunging forward
     bodyTilt = 0.03 * raiseEase + bankaiTremble * 0.4;
+  } else if (isHollowChanneling) {
+    // Bleach Anime Iconic Hollow Mask Manifestation Pose (matches reference diagram):
+    // Left hand clutches the face/mask on upper-left/center of the body circle (-0.32 * r, -0.18 * r).
+    // Right hand is placed at the lower-right perimeter of the body circle (+0.48 * r, +0.52 * r),
+    // firmly holding Zangetsu / Tensa Zangetsu angled downwards and outwards to the right (+X, +Y)!
+    const hollowTremble = Math.sin(now * 0.08) * 0.02 * (0.3 + 0.7 * formationProg);
+    swingAngle = 0.35 + hollowTremble; // Lowered diagonal angle pointing down-right (~20° downward slope)
+    thrustDistance = 0;
+    bodyShiftX = 0;
+    bodyTilt = 0.02 * Math.sin(now * 0.07);
   } else if (isChanneling) {
     // Dynamic 2-Handed Overhead Sword Lift-Up Charging Animation:
     // As chargeProg increases (0 -> 1), sword lifts upward from idle (-0.16 rad) high into the sky overhead (-1.85 rad / ~ -106°)
@@ -392,17 +402,22 @@ export function drawIchigoSkin(ctx, fighter) {
     const hideWeapon = fighter.hideWeapon || (typeof state !== 'undefined' && state.showSkinOnly);
     if (hideWeapon) return;
 
-    // Sword rotation and extension based on slash state, combat stance, and overhead lift
+    // Sword rotation and extension based on slash state, combat stance, overhead lift, or Hollow Channeling pose
     ctx.save();
-    ctx.translate(thrustDistance + bodyShiftX, 0);
-    ctx.rotate(swingAngle);
+    if (isHollowChanneling) {
+      ctx.translate(r * 0.48, r * 0.52);
+      ctx.rotate(swingAngle);
+    } else {
+      ctx.translate(thrustDistance + bodyShiftX, 0);
+      ctx.rotate(swingAngle);
+    }
     if (isBankaiStance) {
       ctx.scale(1, -1); // Orients razor cutting edge facing forward/outward and 3 fins on inner spine
     }
 
     if (isShikai) {
       // ── Shikai Zangetsu (Accurate Silver Blade + Black Spine + Trailing Ribbons) ──
-      const swordStartX = (isSlashing || !isBackSlungPose) ? (r * 0.68) : (-r * 0.72);
+      const swordStartX = isHollowChanneling ? 0 : ((isSlashing || !isBackSlungPose) ? (r * 0.68) : (-r * 0.72));
       const swordImg = _getShikaiSwordImage();
 
       ctx.save();
@@ -638,9 +653,9 @@ export function drawIchigoSkin(ctx, fighter) {
         ctx.stroke();
       }
 
-      // D) Hands gripping Shikai handle during active combat or champion screen
+      // D) Hands gripping Shikai handle during active combat, champion screen, or Hollow Channeling
       if (!hideHandsAndWeapon) {
-        if (!isBackSlungPose) {
+        if (!isBackSlungPose || isHollowChanneling) {
           // Back hand (for 2-handed grip on heavy chop or charging stance)
           if ((isChanneling || isBankaiChanneling || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
             _drawIchigoHand(ctx, hiltX + 7, 0, skinColor, true);
@@ -679,10 +694,10 @@ export function drawIchigoSkin(ctx, fighter) {
     } else {
       // ── Tensa Zangetsu (Bankai daito) ──
       const swordLen = 94;
-      const swordStartX = isBankaiStance ? (r * 0.82 + 16) : ((isSlashing || !isBackSlungPose) ? (r * 0.65) : (-r * 0.65));
+      const swordStartX = isHollowChanneling ? 0 : (isBankaiStance ? (r * 0.82 + 16) : ((isSlashing || !isBackSlungPose) ? (r * 0.65) : (-r * 0.65)));
 
       // Render dynamic physics-based Kusari chain in world coordinates during combat
-      if (fighter.bankaiChainNodes && fighter.bankaiChainNodes.length >= 2 && !isBackSlungPose) {
+      if (fighter.bankaiChainNodes && fighter.bankaiChainNodes.length >= 2 && (!isBackSlungPose || isHollowChanneling)) {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         _drawDynamicBankaiChain(ctx, fighter.bankaiChainNodes, isMask);
@@ -692,7 +707,7 @@ export function drawIchigoSkin(ctx, fighter) {
       // Render authentic enlarged Tensa Zangetsu katana (fins, 卍 tsuba, red diamonds)
       drawTensaZangetsuKatana(ctx, swordStartX, isMask, { 
         bladeLen: swordLen,
-        skipChain: Boolean(fighter.bankaiChainNodes && !isBackSlungPose),
+        skipChain: Boolean(fighter.bankaiChainNodes && (!isBackSlungPose || isHollowChanneling)),
         isBankaiStance: isBankaiStance,
         isChampionScreen: isBankaiStance
       });
@@ -712,12 +727,12 @@ export function drawIchigoSkin(ctx, fighter) {
           state.previewFighter === fighter
         ))
       );
-      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon && !isLowQuality && !isChampionScreen && !shouldHideSwordAura && !isFrozen && !isShikaiReverting) {
+      if ((!isBackSlungPose || isBankaiStance || isHollowChanneling) && !hideHandsAndWeapon && !isLowQuality && !isChampionScreen && !shouldHideSwordAura && !isFrozen && !isShikaiReverting) {
         drawBankaiSwordOrbitingAura(ctx, swordStartX, swordLen, isMask, isFrozen);
       }
 
-      // Hands gripping Bankai hilt during active combat or Bankai victory stance
-      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon) {
+      // Hands gripping Bankai hilt during active combat, Bankai victory stance, or Hollow Channeling
+      if ((!isBackSlungPose || isBankaiStance || isHollowChanneling) && !hideHandsAndWeapon) {
         // Back hand (during 2-handed power chop or charging stance)
         if ((isChanneling || isBankaiChanneling || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
           _drawIchigoHand(ctx, swordStartX - 22, 0, skinColor, false);
@@ -859,8 +874,8 @@ export function drawIchigoSkin(ctx, fighter) {
 
   ctx.restore();
 
-  // Render sword ON TOP of body circle during active fight or Bankai champion stance
-  if (!isBackSlungPose || isBankaiStance) {
+  // Render sword ON TOP of body circle during active fight, Bankai champion stance, or Hollow Channeling
+  if (!isBackSlungPose || isBankaiStance || isHollowChanneling) {
     renderZangetsu();
   }
 
@@ -2625,6 +2640,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   );
 
   const isBankaiChanneling = Boolean(fighter.isChannelingBankai && fighter.bankaiChargeTimer > 0);
+  const isHollowChanneling = Boolean((fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter._hollowVoicelineWait);
   const isChanneling = Boolean(fighter.isChannelingGetsuga && fighter.getsugaChargeTimer > 0);
   const isSlashing = Boolean(fighter.slashSwingTimer > 0);
   const isBankaiForm = Boolean(isBankai || fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask');
@@ -2648,6 +2664,14 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
     thrustDistance = -2.0 + 9.0 * raiseEase;
     bodyShiftX = -1.5 + 4.5 * raiseEase;
     bodyTilt = 0.03 * raiseEase + bankaiTremble * 0.4;
+  } else if (isHollowChanneling) {
+    const formationTimer = fighter.hollowMaskFormationTimer !== undefined ? fighter.hollowMaskFormationTimer : 0;
+    const formationMax = fighter.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
+    const formationProg = formationTimer > 0 ? Math.min(1.0, Math.max(0.0, 1.0 - (formationTimer / formationMax))) : 1.0;
+    const hollowTremble = Math.sin(Date.now() * 0.08) * 0.02 * (0.3 + 0.7 * formationProg);
+    swingAngle = 0.35 + hollowTremble;
+    thrustDistance = 0;
+    bodyShiftX = 0;
   } else if (isChanneling) {
     const chargeMax = fighter.getsugaChargeMax || CONFIG.ichigo?.getsugaChargeFrames || 50;
     const chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
@@ -2732,7 +2756,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
     thrustDistance = 0;
   }
 
-  const swordStartX = isBankaiStance ? (r * 1.05) : ((isSlashing || !isBackSlungPose) ? (r * (isBankaiForm ? 0.65 : 0.68)) : (-r * (isBankaiForm ? 0.65 : 0.72)));
+  const swordStartX = isHollowChanneling ? 0 : (isBankaiStance ? (r * 1.05) : ((isSlashing || !isBackSlungPose) ? (r * (isBankaiForm ? 0.65 : 0.68)) : (-r * (isBankaiForm ? 0.65 : 0.72))));
   const scale = isBankaiForm ? 1.0 : 0.90;
   const hiltOffset = isBankaiForm ? (32 + 4.2) : (32 * scale);
 
@@ -2743,8 +2767,12 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
 
-  const localX = innerX * cosT - innerY * sinT + (thrustDistance + bodyShiftX);
-  let localY = innerX * sinT + innerY * cosT;
+  const localX = isHollowChanneling
+    ? (r * 0.48 + innerX * cosT - innerY * sinT)
+    : (innerX * cosT - innerY * sinT + (thrustDistance + bodyShiftX));
+  let localY = isHollowChanneling
+    ? (r * 0.52 + innerX * sinT + innerY * cosT)
+    : (innerX * sinT + innerY * cosT);
 
   // Apply facing flip
   if (facingLeft) {
@@ -3562,24 +3590,24 @@ function _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, mas
   if (formationProg < 0.12) {
     const p = formationProg / 0.12;
     const ease = p * p * (3 - 2 * p);
-    handX = (-r * 0.50) * (1.0 - ease) + (-r * 0.36) * ease;
-    handY = (r * 0.35) * (1.0 - ease) + (-r * 0.38) * ease;
+    handX = (-r * 0.50) * (1.0 - ease) + (-r * 0.32) * ease;
+    handY = (r * 0.35) * (1.0 - ease) + (-r * 0.18) * ease;
     handRot = (-0.55) * (1.0 - ease) + (0.28) * ease;
     handAlpha = Math.min(1.0, p * 1.6);
     handOpen = ease;
   } else if (formationProg < 0.84) {
     const p = (formationProg - 0.12) / 0.72;
     const tremble = Math.sin(now * 0.09) * 1.4 * (1.0 - p * 0.25);
-    handX = -r * 0.36 + tremble;
-    handY = -r * 0.38 + tremble * 0.5;
+    handX = -r * 0.32 + tremble;
+    handY = -r * 0.18 + tremble * 0.5;
     handRot = 0.28 + tremble * 0.04;
     handAlpha = 1.0;
     handOpen = 1.0;
   } else {
     const p = (formationProg - 0.84) / 0.16;
     const ease = p * p;
-    handX = (-r * 0.36) * (1.0 - ease) + (-r * 0.65) * ease;
-    handY = (-r * 0.38) * (1.0 - ease) + (r * 0.40) * ease;
+    handX = (-r * 0.32) * (1.0 - ease) + (-r * 0.65) * ease;
+    handY = (-r * 0.18) * (1.0 - ease) + (r * 0.40) * ease;
     handRot = (0.28) * (1.0 - ease) + (-0.45) * ease;
     handAlpha = Math.max(0, 1.0 - p * 1.25);
     handOpen = 1.0 - p * 0.4;
