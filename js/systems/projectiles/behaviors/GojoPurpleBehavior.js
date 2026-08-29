@@ -151,7 +151,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         (ent.gojoAdaptColorHistory && ent.gojoAdaptColorHistory.includes('#8A2BE2')) ||
         ((ent.goldAdaptationStage?.skill || 0) >= 2)
       );
-      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';
+      const isImmune = ent.immuneToCC || isPurpleAdapted;
       if (!isImmune) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;
@@ -248,7 +248,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             ent.takeDamage(dpsDamage, ownerFighter, { isPurpleDPS: true, isProjectile: true, projectile: projectile });
           }
           
-          if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
+          if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC) {
             ent.vx *= 0.8;
             ent.vy *= 0.8;
           }

@@ -967,7 +967,7 @@ export class GojoFighter extends Fighter {
         }
 
         // Lapse Blue Gravitational Distortion: Slows opponent movement while mixing Red & Blue into Purple!
-        if (!opponent.immuneToCC && opponent.characterId !== 'toji' && opponent.type !== 'toji') {
+        if (!opponent.immuneToCC) {
           if (typeof opponent.applySlow === 'function') {
             opponent.applySlow(10, 0.50);
           } else {
