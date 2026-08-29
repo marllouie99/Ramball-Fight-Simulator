@@ -139,6 +139,35 @@ export function drawGojoBody(ctx, fighter) {
         ctx.fillRect(bx, by, pxSize, pxSize);
       }
 
+      // ── 2.4 Active Impact Rebound Shockwave Ripple Ring ──
+      if (fighter.infinityBlockTimer > 0) {
+        const blockMax = fighter.infinityBlockMaxTimer || 25;
+        const blockProgress = 1.0 - (fighter.infinityBlockTimer / blockMax); // 0.0 -> 1.0
+        const rippleRadius = barrierRadius + blockProgress * 32;
+        const rippleAlpha = (1.0 - blockProgress) * 0.95;
+
+        // Dark Outer Spatial Border
+        ctx.strokeStyle = `rgba(8, 20, 36, ${rippleAlpha * 0.85})`;
+        ctx.lineWidth = Math.max(1, 6 * (1.0 - blockProgress));
+        ctx.beginPath();
+        ctx.arc(0, 0, rippleRadius + 2, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Expanding Electric Cyan Impact Ring
+        ctx.strokeStyle = `rgba(0, 229, 255, ${rippleAlpha})`;
+        ctx.lineWidth = Math.max(1, 4 * (1.0 - blockProgress));
+        ctx.beginPath();
+        ctx.arc(0, 0, rippleRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Expanding White Impact Core
+        ctx.strokeStyle = `rgba(255, 255, 255, ${rippleAlpha})`;
+        ctx.lineWidth = Math.max(1, 2 * (1.0 - blockProgress));
+        ctx.beginPath();
+        ctx.arc(0, 0, rippleRadius - 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       ctx.restore();
     }
 

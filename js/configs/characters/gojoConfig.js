@@ -101,8 +101,8 @@ export const gojoConfig = {
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
   closeRangeRadius: 220,            // Proximity distance (pixels) to enter Melee Mode
-  initialMeleeDuration: 300,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
-  meleeModeCooldown: 120,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
+  initialMeleeDuration: 250,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
+  meleeModeCooldown: 150,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
   comboDisengageDistance: 280,      // Distance (pixels) teleported away when disengaging after clash
   meleePunchDamage: 14,             // Damage dealt per martial arts punch strike
   meleePunchCooldown: 9,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
