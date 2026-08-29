@@ -3,7 +3,10 @@
 // Zanpakutō Murciélago & Lanza del Relámpago
 // Bleach: Arrancar / Hueco Mundo Arc
 //
-// Adheres strictly to:
+// Architecture & Proportions matching Ichigo's Tensa Zangetsu:
+// - Grand ~94px Katana Blade with authentic Sori curvature
+// - 32px Tsuka Hilt with Emerald Samegawa & Silk Diamond Lozenges (◆ ◆ ◆ ◆ ◆ ◆)
+// - 4-Corner Flared Espada Tsuba with Emerald Inlays & Brass Habaki
 // - Rule 11 (Zero shadowBlur - Concentric fills)
 // - Rule 15 (Double-tapered crescent slashes)
 // - Rule 20 (Skin Only & Hand Visibility)
@@ -12,12 +15,8 @@
 import { state } from '../../core/state.js';
 
 /**
- * Draws Ulquiorra's Zanpakutō: Murciélago (The Black-Winged Great Demon).
- * Features:
- * - Japanese Katana with dark emerald green silk cord wrap (Tsuka-ito).
- * - 4-corner flared Espada crossguard (Tsuba) with emerald accent inlays.
- * - Polished brass blade collar (Habaki).
- * - Sleek tempered curved katana blade with radiant green Reishi fuller gleam.
+ * Draws Ulquiorra's Zanpakutō: Murciélago (The Great Black-Winged Bat).
+ * Matching the exact anime scale, fidelity, and architecture of Ichigo's Katana.
  *
  * @param {CanvasRenderingContext2D} ctx 
  * @param {number} x Hand anchor X
@@ -27,7 +26,7 @@ import { state } from '../../core/state.js';
  * @param {boolean} isSwinging Whether actively slashing
  * @param {number} swingProgress Progress of the swing (0 to 1)
  */
-export function drawUlquiorraMurcielago(ctx, x = 0, y = 0, angle = 0, r = 25, isSwinging = false, swingProgress = 0) {
+export function drawUlquiorraMurcielago(ctx, x = 0, y = 0, angle = 0, r = 25, isSwinging = false, swingProgress = 0, opts = {}) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
 
   const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.ulquiorra)
@@ -44,327 +43,376 @@ export function drawUlquiorraMurcielago(ctx, x = 0, y = 0, angle = 0, r = 25, is
   ctx.rotate(angle + customAngle);
   ctx.scale(customScale, customScale);
 
-  const scale = r / 25;
-
-  // 1. Subtle Reishi Energy Glow (Concentric radial gradient, Rule 11 compliant)
-  const glowGrad = ctx.createRadialGradient(28 * scale, 0, 4 * scale, 28 * scale, 0, 36 * scale);
-  glowGrad.addColorStop(0, 'rgba(0, 255, 136, 0.30)');
-  glowGrad.addColorStop(0.60, 'rgba(0, 200, 100, 0.12)');
-  glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = glowGrad;
-  ctx.beginPath();
-  ctx.arc(28 * scale, 0, 36 * scale, 0, Math.PI * 2);
-  ctx.fill();
+  const swordStartX = 0;
+  const bladeLen = opts.bladeLen || 94;
+  const bladeBaseX = swordStartX + 5;
+  const tipX = swordStartX + bladeLen;
 
   // ─────────────────────────────────────────────
-  // 2. KATANA HILT & POMMEL (Extending along -X)
+  // 1. TSUKA HILT (Handle extending along -X)
   // ─────────────────────────────────────────────
-  const hiltLength = 18 * scale;
-  const hiltWidth = 4.2 * scale;
-  const pommelRadius = 2.4 * scale;
+  const hiltStartX = swordStartX - 32;
+  const hiltLen = 32;
+  const hiltHalfW = 3.4;
 
-  // A. Kashira (Pommel Cap)
-  ctx.fillStyle = '#14181F';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.2 * scale;
-  ctx.beginPath();
-  ctx.arc(-hiltLength, 0, pommelRadius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // 1a. Base Emerald Rayskin (Samegawa)
+  const sameGrad = ctx.createLinearGradient(hiltStartX, -hiltHalfW, hiltStartX, hiltHalfW);
+  sameGrad.addColorStop(0, '#043822');
+  sameGrad.addColorStop(0.5, '#008744');
+  sameGrad.addColorStop(1, '#022415');
+  ctx.fillStyle = sameGrad;
+  ctx.fillRect(hiltStartX, -hiltHalfW, hiltLen, hiltHalfW * 2);
 
-  // Gold Kashira Accent Ring
-  ctx.fillStyle = '#D4AF37';
-  ctx.beginPath();
-  ctx.arc(-hiltLength, 0, pommelRadius * 0.5, 0, Math.PI * 2);
-  ctx.fill();
+  // 1b. Black Silk Ito Wrap (Top & Bottom Edges)
+  ctx.fillStyle = '#090D12';
+  ctx.fillRect(hiltStartX, -hiltHalfW, hiltLen, 1.1);
+  ctx.fillRect(hiltStartX, hiltHalfW - 1.1, hiltLen, 1.1);
 
-  // B. Tsuka (Handle) Wrapped in Emerald Tsuka-ito
-  ctx.fillStyle = '#006633'; // Deep Emerald base wrap
-  ctx.strokeStyle = '#0B0F14';
-  ctx.lineWidth = 1.2 * scale;
-  ctx.beginPath();
-  ctx.roundRect(-hiltLength, -hiltWidth / 2, hiltLength, hiltWidth, 1.2 * scale);
-  ctx.fill();
-  ctx.stroke();
+  // 1c. Crisp Emerald Diamond Lozenges (◆ ◆ ◆ ◆ ◆ ◆) along the handle center
+  const diamonds = [
+    hiltStartX + 3.8,
+    hiltStartX + 9.2,
+    hiltStartX + 14.6,
+    hiltStartX + 20.0,
+    hiltStartX + 25.4,
+    hiltStartX + 30.0
+  ];
 
-  // Diamond Cross-Wrap Diamonds (Menuki pattern)
-  ctx.fillStyle = '#00FF88';
-  for (let i = 0; i < 4; i++) {
-    const dx = -hiltLength + 2.5 * scale + i * (3.8 * scale);
+  for (let i = 0; i < diamonds.length; i++) {
+    const cx = diamonds[i];
+    // Dark silk diagonal cross bands flanking the diamond
+    ctx.fillStyle = '#090D12';
     ctx.beginPath();
-    ctx.moveTo(dx, -hiltWidth * 0.35);
-    ctx.lineTo(dx + 1.8 * scale, 0);
-    ctx.lineTo(dx, hiltWidth * 0.35);
-    ctx.lineTo(dx - 1.8 * scale, 0);
+    ctx.moveTo(cx - 2.6, -hiltHalfW);
+    ctx.lineTo(cx, 0);
+    ctx.lineTo(cx - 2.6, hiltHalfW);
+    ctx.lineTo(cx - 3.8, hiltHalfW);
+    ctx.lineTo(cx - 1.2, 0);
+    ctx.lineTo(cx - 3.8, -hiltHalfW);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(cx + 2.6, -hiltHalfW);
+    ctx.lineTo(cx, 0);
+    ctx.lineTo(cx + 2.6, hiltHalfW);
+    ctx.lineTo(cx + 3.8, hiltHalfW);
+    ctx.lineTo(cx + 1.2, 0);
+    ctx.lineTo(cx + 3.8, -hiltHalfW);
+    ctx.closePath();
+    ctx.fill();
+
+    // Vibrant Emerald diamond core
+    ctx.fillStyle = '#00CC66';
+    ctx.beginPath();
+    ctx.moveTo(cx, -1.8);
+    ctx.lineTo(cx + 1.7, 0);
+    ctx.lineTo(cx, 1.8);
+    ctx.lineTo(cx - 1.7, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Glowing Neon-Green center highlight
+    ctx.fillStyle = '#00FF88';
+    ctx.beginPath();
+    ctx.moveTo(cx, -0.9);
+    ctx.lineTo(cx + 0.9, 0);
+    ctx.lineTo(cx, 0.9);
+    ctx.lineTo(cx - 0.9, 0);
     ctx.closePath();
     ctx.fill();
   }
 
-  // ─────────────────────────────────────────────
-  // 3. TSUBA (4-Corner Flared Espada Crossguard at X = 0)
-  // ─────────────────────────────────────────────
-  ctx.fillStyle = '#14181F';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.3 * scale;
+  // 1d. Handle Border Outlines
+  ctx.strokeStyle = '#05070A';
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(hiltStartX, -hiltHalfW, hiltLen, hiltHalfW * 2);
+
+  // 1e. Pommel Cap (Kashira) & Gold Accent Ring
+  ctx.fillStyle = '#0E1218';
+  ctx.fillRect(hiltStartX - 2.8, -hiltHalfW - 0.3, 3.0, (hiltHalfW * 2) + 0.6);
+  ctx.strokeStyle = '#1F2937';
+  ctx.lineWidth = 0.7;
+  ctx.strokeRect(hiltStartX - 2.8, -hiltHalfW - 0.3, 3.0, (hiltHalfW * 2) + 0.6);
+
+  // Gold Sarute ring loop at pommel end
+  const ringX = hiltStartX - 4.2;
   ctx.beginPath();
-  // 4-corner flared crossguard polygon
-  ctx.moveTo(0, -7.5 * scale);
-  ctx.lineTo(2.0 * scale, -4.5 * scale);
-  ctx.lineTo(3.2 * scale, 0);
-  ctx.lineTo(2.0 * scale, 4.5 * scale);
-  ctx.lineTo(0, 7.5 * scale);
-  ctx.lineTo(-2.0 * scale, 4.5 * scale);
-  ctx.lineTo(-3.2 * scale, 0);
-  ctx.lineTo(-2.0 * scale, -4.5 * scale);
+  ctx.arc(ringX, 0, 2.2, 0, Math.PI * 2);
+  ctx.strokeStyle = '#D4AF37';
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+
+  // ─────────────────────────────────────────────
+  // 2. TSUBA (4-Corner Flared Espada Crossguard)
+  // ─────────────────────────────────────────────
+  ctx.save();
+  ctx.translate(swordStartX, 0);
+
+  // 4-corner flared Espada tsuba polygon
+  ctx.fillStyle = '#121620';
+  ctx.strokeStyle = '#05070A';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.moveTo(0, -9.5);
+  ctx.lineTo(2.4, -5.5);
+  ctx.lineTo(4.2, 0);
+  ctx.lineTo(2.4, 5.5);
+  ctx.lineTo(0, 9.5);
+  ctx.lineTo(-2.4, 5.5);
+  ctx.lineTo(-4.2, 0);
+  ctx.lineTo(-2.4, -5.5);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Emerald Inlays on Tsuba corners
+  // Inner beveled ridge
+  ctx.strokeStyle = '#2B3242';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(0, -6.5);
+  ctx.lineTo(1.8, -3.8);
+  ctx.lineTo(2.8, 0);
+  ctx.lineTo(1.8, 3.8);
+  ctx.lineTo(0, 6.5);
+  ctx.lineTo(-1.8, 3.8);
+  ctx.lineTo(-2.8, 0);
+  ctx.lineTo(-1.8, -3.8);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Emerald Gem Inlays on 4 corner tips
   ctx.fillStyle = '#00FF88';
   ctx.beginPath();
-  ctx.arc(0, -5.2 * scale, 1.0 * scale, 0, Math.PI * 2);
-  ctx.arc(0, 5.2 * scale, 1.0 * scale, 0, Math.PI * 2);
+  ctx.arc(0, -7.2, 1.2, 0, Math.PI * 2);
+  ctx.arc(0, 7.2, 1.2, 0, Math.PI * 2);
+  ctx.arc(-2.8, 0, 1.1, 0, Math.PI * 2);
+  ctx.arc(2.8, 0, 1.1, 0, Math.PI * 2);
   ctx.fill();
-
-  // Habaki (Blade Collar at base)
-  ctx.fillStyle = '#E5C158'; // Brass Gold
-  ctx.strokeStyle = '#8C6D1F';
-  ctx.lineWidth = 1.0 * scale;
-  ctx.fillRect(0, -2.5 * scale, 3.5 * scale, 5.0 * scale);
-  ctx.strokeRect(0, -2.5 * scale, 3.5 * scale, 5.0 * scale);
+  ctx.restore();
 
   // ─────────────────────────────────────────────
-  // 4. TEMPERED KATANA BLADE (Extending along +X)
+  // 3. HABAKI (Blade Collar at base)
   // ─────────────────────────────────────────────
-  const bladeStart = 3.5 * scale;
-  const bladeLength = 48 * scale;
-  const bladeWidth = 3.8 * scale;
+  const habakiGrad = ctx.createLinearGradient(swordStartX, -3.2, swordStartX, 3.2);
+  habakiGrad.addColorStop(0, '#E5C158');
+  habakiGrad.addColorStop(0.5, '#FFF2A8');
+  habakiGrad.addColorStop(1, '#A08020');
+  ctx.fillStyle = habakiGrad;
+  ctx.fillRect(swordStartX, -3.2, 5.0, 6.4);
+  ctx.strokeStyle = '#6E5212';
+  ctx.lineWidth = 0.7;
+  ctx.strokeRect(swordStartX, -3.2, 5.0, 6.4);
 
-  ctx.save();
-  // Blade silhouette
+  // ─────────────────────────────────────────────
+  // 4. TEMPERED KATANA BLADE (Matching Ichigo's Sori)
+  // ─────────────────────────────────────────────
+  // Sori (Curvature) function: smooth upward katana arch toward Kissaki tip
+  const getSori = (xCoord) => {
+    const t = Math.max(0, Math.min(1.0, (xCoord - bladeBaseX) / (tipX - bladeBaseX)));
+    return -Math.pow(t, 1.45) * 8.5;
+  };
+
+  const tipY = getSori(tipX); // -8.5
+
+  // 4a. Blade Body Fill (Silver Steel & Charcoal Spine)
   ctx.beginPath();
-  ctx.moveTo(bladeStart, -bladeWidth / 2); // Spine base
-  ctx.lineTo(bladeStart + bladeLength - 6 * scale, -bladeWidth / 2); // Spine top
-  ctx.lineTo(bladeStart + bladeLength, 0); // Kissaki tip
-  ctx.lineTo(bladeStart + bladeLength - 4 * scale, bladeWidth / 2); // Ha (Edge) point
-  ctx.lineTo(bladeStart, bladeWidth / 2); // Ha base
+  // Cutting edge (smooth curved top edge at -Y)
+  ctx.moveTo(bladeBaseX, -2.8);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) - 2.8, tipX, tipY); // Needle sharp kissaki tip
+  // Spine edge (trailing bottom edge following Sori)
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) + 2.8, bladeBaseX, 2.8);
   ctx.closePath();
 
-  // Blade Metallic Steel Gradient
-  const bladeGrad = ctx.createLinearGradient(0, -bladeWidth / 2, 0, bladeWidth / 2);
-  bladeGrad.addColorStop(0, '#CBD5E1');   // Spine tone
-  bladeGrad.addColorStop(0.45, '#FFFFFF'); // Specular highlight
-  bladeGrad.addColorStop(0.55, '#E2E8F0'); // Shinogi line
-  bladeGrad.addColorStop(1.0, '#FFFFFF');  // Razor cutting edge
+  const bladeGrad = ctx.createLinearGradient(bladeBaseX, -2.8, bladeBaseX, 2.8);
+  bladeGrad.addColorStop(0, '#FFFFFF'); // Razor cutting edge
+  bladeGrad.addColorStop(0.35, '#E2E8F0');
+  bladeGrad.addColorStop(0.50, '#94A3B8'); // Hamon line
+  bladeGrad.addColorStop(0.80, '#1E293B'); // Dark spine
+  bladeGrad.addColorStop(1, '#0F172A');
   ctx.fillStyle = bladeGrad;
   ctx.fill();
 
-  // Blade Ink Outline
-  ctx.strokeStyle = '#0B0F14';
-  ctx.lineWidth = 1.2 * scale;
-  ctx.stroke();
-
-  // Shinogi Ridge Line & Reishi Fuller (Emerald energy gleam)
-  ctx.strokeStyle = '#00FF88';
-  ctx.lineWidth = 0.9 * scale;
+  // 4b. Shinogi Ridge Line (Separation along blade length)
   ctx.beginPath();
-  ctx.moveTo(bladeStart + 2 * scale, 0);
-  ctx.lineTo(bladeStart + bladeLength - 6 * scale, 0);
+  ctx.moveTo(bladeBaseX, 0.0);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50), tipX - 2.5, tipY + 0.4);
+  ctx.strokeStyle = 'rgba(0, 255, 136, 0.65)'; // Emerald Reishi fuller gleam
+  ctx.lineWidth = 0.9;
   ctx.stroke();
 
-  // Hamon Tempering Wave along cutting edge
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.lineWidth = 0.7 * scale;
+  // 4c. Razor-Sharp Pure White Cutting Edge
   ctx.beginPath();
-  for (let xPos = bladeStart + 2 * scale; xPos < bladeStart + bladeLength - 6 * scale; xPos += 4 * scale) {
-    ctx.lineTo(xPos, bladeWidth * 0.35);
-    ctx.lineTo(xPos + 2 * scale, bladeWidth * 0.15);
-  }
+  ctx.moveTo(bladeBaseX, -2.5);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) - 2.5, tipX, tipY);
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.0;
   ctx.stroke();
 
-  ctx.restore();
+  // 4d. Crisp Outer Silhouette Outline
+  ctx.beginPath();
+  ctx.moveTo(bladeBaseX, -2.8);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) - 2.8, tipX, tipY);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) + 2.8, bladeBaseX, 2.8);
+  ctx.closePath();
+  ctx.strokeStyle = '#080A0E';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
   ctx.restore();
 }
 
 /**
- * Draws Ulquiorra's Segunda Etapa Ultimate Weapon: Lanza del Relámpago (Spear of Lightning).
- * A dual-headed crackling Reishi plasma javelin.
- * 
- * @param {CanvasRenderingContext2D} ctx 
- * @param {number} x Hand anchor X
- * @param {number} y Hand anchor Y
- * @param {number} angle Spear aim angle
- * @param {number} r Fighter radius
- * @param {number} chargeRatio Charge level from 0.0 to 1.0
+ * Draws Ulquiorra's Lanza del Relámpago (Segunda Etapa Ultimate Spear).
+ * A colossal Reishi lightning javelin crackling with nuclear emerald Reishi plasma.
  */
 export function drawLanzaDelRelampago(ctx, x = 0, y = 0, angle = 0, r = 25, chargeRatio = 1.0) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
 
-  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-  const scale = (r / 25) * (0.8 + chargeRatio * 0.4);
-
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
 
-  const spearLength = 95 * scale;
-  const halfLen = spearLength / 2;
-  const pulse = Math.sin(now * 0.02) * 1.5;
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const spearLength = 110;
+  const pulse = Math.sin(now * 0.015) * 1.5;
 
-  // 1. Concentric Luminous Energy Aura (Rule 11 zero shadowBlur)
-  const auraGrad = ctx.createRadialGradient(0, 0, 8 * scale, 0, 0, (halfLen + 20) * scale);
-  auraGrad.addColorStop(0, 'rgba(0, 255, 136, 0.45)');
-  auraGrad.addColorStop(0.40, 'rgba(0, 200, 100, 0.20)');
-  auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = auraGrad;
+  // 1. Concentric Radial Lightning Core Glow (Rule 11 compliant)
+  const coreGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 40 * chargeRatio);
+  coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+  coreGrad.addColorStop(0.35, 'rgba(0, 255, 136, 0.70)');
+  coreGrad.addColorStop(0.70, 'rgba(0, 200, 100, 0.25)');
+  coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = coreGrad;
   ctx.beginPath();
-  ctx.ellipse(0, 0, (halfLen + 15) * scale, 16 * scale, 0, 0, Math.PI * 2);
+  ctx.arc(0, 0, 40 * chargeRatio, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Dual-Pointed Pure Reishi Lightning Spear Shaft
-  // Center Thick, Tapering to both tips
-  ctx.fillStyle = '#00FF88';
+  // 2. Central Lightning Shaft (White-hot energy core)
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 3.5 + pulse * 0.4;
   ctx.beginPath();
-  ctx.moveTo(-halfLen, 0); // Back tip
-  ctx.lineTo(-halfLen * 0.7, -2.5 * scale);
-  ctx.lineTo(0, -4.5 * scale - pulse * 0.3); // Center width
-  ctx.lineTo(halfLen * 0.7, -2.5 * scale);
-  ctx.lineTo(halfLen, 0); // Front tip
-  ctx.lineTo(halfLen * 0.7, 2.5 * scale);
-  ctx.lineTo(0, 4.5 * scale + pulse * 0.3);
-  ctx.lineTo(-halfLen * 0.7, 2.5 * scale);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(-spearLength * 0.4, 0);
+  ctx.lineTo(spearLength * 0.6, 0);
+  ctx.stroke();
 
-  // 3. Super White-Hot Pure Energy Core
+  ctx.strokeStyle = '#00FF88';
+  ctx.lineWidth = 6.0 + pulse * 0.6;
+  ctx.beginPath();
+  ctx.moveTo(-spearLength * 0.4, 0);
+  ctx.lineTo(spearLength * 0.6, 0);
+  ctx.stroke();
+
+  // 3. Dual Spearhead Needle Tips
   ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.moveTo(-halfLen * 0.95, 0);
-  ctx.lineTo(-halfLen * 0.6, -1.2 * scale);
-  ctx.lineTo(0, -2.0 * scale);
-  ctx.lineTo(halfLen * 0.6, -1.2 * scale);
-  ctx.lineTo(halfLen * 0.95, 0);
-  ctx.lineTo(halfLen * 0.6, 1.2 * scale);
-  ctx.lineTo(0, 2.0 * scale);
-  ctx.lineTo(-halfLen * 0.6, 1.2 * scale);
-  ctx.closePath();
-  ctx.fill();
+  ctx.strokeStyle = '#00FF88';
+  ctx.lineWidth = 1.5;
 
-  // 4. Barbed Spearhead Flares at Front & Rear Tips
-  ctx.fillStyle = '#00FF88';
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.0 * scale;
-
-  // Front Spearhead Barbs
+  // Forward Tip (+X)
   ctx.beginPath();
-  ctx.moveTo(halfLen, 0);
-  ctx.lineTo(halfLen - 12 * scale, -6 * scale);
-  ctx.lineTo(halfLen - 8 * scale, -1.5 * scale);
-  ctx.lineTo(halfLen - 12 * scale, 6 * scale);
+  ctx.moveTo(spearLength * 0.6 + 18, 0);
+  ctx.lineTo(spearLength * 0.6 - 10, -6);
+  ctx.lineTo(spearLength * 0.6 - 4, 0);
+  ctx.lineTo(spearLength * 0.6 - 10, 6);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Rear Spearhead Barbs
+  // Rear Tip (-X)
   ctx.beginPath();
-  ctx.moveTo(-halfLen, 0);
-  ctx.lineTo(-halfLen + 12 * scale, -6 * scale);
-  ctx.lineTo(-halfLen + 8 * scale, -1.5 * scale);
-  ctx.lineTo(-halfLen + 12 * scale, 6 * scale);
+  ctx.moveTo(-spearLength * 0.4 - 14, 0);
+  ctx.lineTo(-spearLength * 0.4 + 8, -5);
+  ctx.lineTo(-spearLength * 0.4 + 3, 0);
+  ctx.lineTo(-spearLength * 0.4 + 8, 5);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // 5. Orbiting Lightning Plasma Arcs
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.2 * scale;
-  ctx.beginPath();
+  // 4. Crackling Arc Flares
+  ctx.strokeStyle = '#00FF88';
+  ctx.lineWidth = 1.2;
   for (let i = 0; i < 4; i++) {
-    const seed = (now * 0.006 + i * 1.57) % (Math.PI * 2);
-    const startX = Math.cos(seed) * halfLen * 0.8;
-    const startY = Math.sin(seed * 3) * (7 * scale);
-    const midX = startX + (Math.sin(now * 0.01 + i) * 10 * scale);
-    const midY = -startY * 1.2;
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(midX, midY);
+    const t = (now * 0.005 + i * 0.25) % 1.0;
+    const lx = -spearLength * 0.3 + t * (spearLength * 0.8);
+    const flareY = Math.sin(t * Math.PI * 4 + i) * (8 + pulse);
+    ctx.beginPath();
+    ctx.moveTo(lx - 6, 0);
+    ctx.lineTo(lx, flareY);
+    ctx.lineTo(lx + 6, 0);
+    ctx.stroke();
   }
-  ctx.stroke();
 
   ctx.restore();
 }
 
 /**
- * Draws Ulquiorra's dynamic double-tapered crescent slash arc.
- * Fully compliant with Rule 15 (Needle-thin power curve tapering).
- * 
- * @param {CanvasRenderingContext2D} ctx 
- * @param {number} x Center X
- * @param {number} y Center Y
- * @param {number} angle Facing angle
- * @param {number} radius Outer arc radius
- * @param {number} progress Swing animation progress (0.0 to 1.0)
- * @param {boolean} isOscuras Whether to render the pitch-black Cero Oscuras slash
+ * Draws Ulquiorra's signature Crescent Blade Slash Arc (Rule 15 Compliant).
+ * Features sharp double-tapering and clean dynamic trail wiping.
  */
-export function drawUlquiorraSlashArc(ctx, x = 0, y = 0, angle = 0, radius = 60, progress = 0.5, isOscuras = false) {
-  if (progress <= 0 || progress >= 1) return;
+export function drawUlquiorraSlashArc(ctx, fighter) {
+  if (!fighter || !fighter.isSlashing) return;
+
+  const progress = fighter.slashProgress || 0;
+  if (progress <= 0 || progress >= 1.0) return;
 
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(fighter.x, fighter.y);
+
+  const angle = fighter.gunAngle || fighter.angle || 0;
   ctx.rotate(angle);
 
-  const arcSpan = 2.1; // ~120 degrees
-  const halfArc = arcSpan / 2;
-  const startAngle = -halfArc;
-  const endAngle = halfArc;
-  const maxThick = isOscuras ? 14 : 9;
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft && !fighter.isSpinning) {
+    ctx.scale(1, -1);
+  }
 
-  const steps = 24;
-  const outerPts = [];
-  const innerPts = [];
+  const r = fighter.r || 25;
+  const isSegunda = Boolean(fighter.segundaEtapaActive || fighter.isSegundaEtapa);
+  const slashRadius = r * (isSegunda ? 3.4 : 2.8);
+  const maxThick = isSegunda ? 18.0 : 14.0;
 
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const a = startAngle + t * (endAngle - startAngle);
-    
-    // Double-tapered thickness curve (Rule 15)
+  // Swing sweep angles
+  const startAng = -1.25 + progress * 2.5;
+  const arcSpan = Math.PI * 0.95 * Math.sin(progress * Math.PI);
+
+  const N = 24;
+  const outerPoly = [];
+  const innerPoly = [];
+
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const curAng = startAng - arcSpan * (1 - t);
+    // Rule 15 double-tapering
     const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
     const thick = maxThick * taper;
-    
-    const rOuter = radius + thick / 2;
-    const rInner = radius - thick / 2;
 
-    outerPts.push({ x: Math.cos(a) * rOuter, y: Math.sin(a) * rOuter });
-    innerPts.push({ x: Math.cos(a) * rInner, y: Math.sin(a) * rInner });
+    const outR = slashRadius + thick / 2;
+    const inR  = slashRadius - thick / 2;
+
+    outerPoly.push({ x: Math.cos(curAng) * outR, y: Math.sin(curAng) * outR });
+    innerPoly.push({ x: Math.cos(curAng) * inR,  y: Math.sin(curAng) * inR });
   }
 
-  // Draw 4-point filled polygon ribbon
+  // Draw Crescent Slash Polygon
   ctx.beginPath();
-  ctx.moveTo(outerPts[0].x, outerPts[0].y);
-  for (let i = 1; i < outerPts.length; i++) {
-    ctx.lineTo(outerPts[i].x, outerPts[i].y);
-  }
-  for (let i = innerPts.length - 1; i >= 0; i--) {
-    ctx.lineTo(innerPts[i].x, innerPts[i].y);
+  outerPoly.forEach((pt, idx) => (idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+  for (let i = innerPoly.length - 1; i >= 0; i--) {
+    ctx.lineTo(innerPoly[i].x, innerPoly[i].y);
   }
   ctx.closePath();
 
-  if (isOscuras) {
-    // Pitch-black abyss core with emerald outer glow
-    ctx.fillStyle = '#05080C';
-    ctx.fill();
-    ctx.strokeStyle = '#00FF88';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
+  const slashGrad = ctx.createRadialGradient(0, 0, slashRadius - 10, 0, 0, slashRadius + 10);
+  if (isSegunda) {
+    slashGrad.addColorStop(0, 'rgba(0, 0, 0, 0.90)'); // Black Cero Oscuras core
+    slashGrad.addColorStop(0.5, 'rgba(0, 255, 136, 0.95)');
+    slashGrad.addColorStop(1, 'rgba(0, 200, 100, 0)');
   } else {
-    // Radiant Emerald Reishi Crescent
-    const grad = ctx.createLinearGradient(outerPts[0].x, outerPts[0].y, outerPts[steps].x, outerPts[steps].y);
-    grad.addColorStop(0, 'rgba(0, 255, 136, 0.1)');
-    grad.addColorStop(0.5, 'rgba(0, 255, 136, 0.95)');
-    grad.addColorStop(1, 'rgba(255, 255, 255, 0.95)');
-    ctx.fillStyle = grad;
-    ctx.fill();
+    slashGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    slashGrad.addColorStop(0.4, 'rgba(0, 255, 136, 0.85)');
+    slashGrad.addColorStop(1, 'rgba(0, 200, 100, 0)');
   }
+  ctx.fillStyle = slashGrad;
+  ctx.fill();
 
   ctx.restore();
 }

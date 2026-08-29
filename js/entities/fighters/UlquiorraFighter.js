@@ -265,12 +265,20 @@ export class UlquiorraFighter extends Fighter {
 
     // 3. Draw Slash Arc if swinging
     if (this.isSlashing && this.slashSwingTimer > 0) {
-      const facingAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-      drawUlquiorraSlashArc(ctx, this.x, this.y, facingAngle, this.r + 35, this.slashProgress, this.segundaEtapaActive || this.stage1Active);
+      drawUlquiorraSlashArc(ctx, this);
     }
 
     // 4. Draw Health & Freeze Indicators
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+  }
+
+  triggerDemoAttack() {
+    this.isSlashing = true;
+    this.slashProgress = 0;
+    this.slashSwingTimer = this.slashSwingMaxTimer || 16;
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+    }
   }
 }

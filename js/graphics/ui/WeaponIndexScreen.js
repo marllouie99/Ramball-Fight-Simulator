@@ -275,6 +275,7 @@ function isFighterDemoAttacking(fighter) {
     (fighter.punchAnimTimer > 0) ||
     (fighter.meleeSwingTimer > 0) ||
     (fighter.slashGlowTimer > 0) ||
+    (fighter.isSlashing && fighter.slashSwingTimer > 0) ||
     (fighter.isCleaving === true) ||
     (fighter.uziFlashTimerFront > 0) ||
     (fighter.uziRecoilFront > 0) ||
@@ -876,6 +877,15 @@ function drawWeaponDetailScreen() {
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           audioSystem.playSFX(cfg.sounds?.fire || 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3', cfg.soundVolumes?.fire ?? 1.0, 1.0);
         }
+      }
+    }
+
+    if (previewFighter.isSlashing && previewFighter.slashSwingTimer > 0) {
+      previewFighter.slashSwingTimer--;
+      previewFighter.slashProgress = 1 - (previewFighter.slashSwingTimer / (previewFighter.slashSwingMaxTimer || 16));
+      if (previewFighter.slashSwingTimer <= 0) {
+        previewFighter.isSlashing = false;
+        previewFighter.slashProgress = 0;
       }
     }
 
