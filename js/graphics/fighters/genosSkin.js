@@ -85,311 +85,167 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   }
 
   // ─────────────────────────────────────────────
-  // 2. MAIN CIRCLE BODY (SLEEK COLOR THEME & HIGH-DETAIL CYBORG SUIT)
+  // 2. MAIN CIRCLE BODY (AUTHENTIC PIXEL ART MODEL)
   // ─────────────────────────────────────────────
+  drawGenosPixelBody(ctx, r, false, isChargingUlt, isSelfDestructing, fighter.isMeleeStance, now);
+
+  ctx.restore();
+}
+
+/**
+ * Draws Genos's entire body circle model in authentic Pixel Art Style.
+ * Minimalist circle cyborg aesthetic, upright front POV, faceless (Rule #19 & Rule #35 compliant).
+ */
+export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = false, isSelfDestructing = false, isMeleeStance = false, now = Date.now()) {
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
 
-  // Clip inside main body circle
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  // Opaque Base Body Fill (ensures zero background bleeding/transparency)
-  ctx.fillStyle = '#232832';
-  ctx.fill();
-
-  // 2a. Top Section — Golden Wheat Hair (#E5CC82)
-  ctx.fillStyle = '#E5CC82';
-  ctx.fillRect(-r, -r, r * 2, r * 0.75);
-
-  // Layered Spiky Hair Bangs (#D4B964)
-  ctx.fillStyle = '#D4B964';
-  ctx.beginPath();
-  ctx.moveTo(-r, -r * 0.35);
-  ctx.lineTo(-r * 0.65, -r * 0.18);
-  ctx.lineTo(-r * 0.40, -r * 0.30);
-  ctx.lineTo(-r * 0.18, -r * 0.12);
-  ctx.lineTo(0, -r * 0.28);
-  ctx.lineTo(r * 0.18, -r * 0.12);
-  ctx.lineTo(r * 0.40, -r * 0.30);
-  ctx.lineTo(r * 0.65, -r * 0.18);
-  ctx.lineTo(r, -r * 0.35);
-  ctx.lineTo(r, -r * 0.75);
-  ctx.lineTo(-r, -r * 0.75);
-  ctx.closePath();
-  ctx.fill();
-
-  // Golden Hair Sheen Highlights (#FAF0BE)
-  ctx.fillStyle = '#FAF0BE';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.50, -r * 0.55);
-  ctx.lineTo(-r * 0.30, -r * 0.38);
-  ctx.lineTo(-r * 0.20, -r * 0.55);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(r * 0.20, -r * 0.55);
-  ctx.lineTo(r * 0.35, -r * 0.38);
-  ctx.lineTo(r * 0.50, -r * 0.55);
-  ctx.fill();
-
-  // 2b. Middle Section — Dark Charcoal Tactical Vest (#1A1D24)
-  ctx.fillStyle = '#1A1D24';
-  ctx.fillRect(-r, -r * 0.22, r * 2, r * 0.62);
-
-  // Vest Armor Panel Seam Lines (Left & Right)
-  ctx.strokeStyle = '#101217';
-  ctx.lineWidth = 1.8;
-
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.42, -r * 0.22);
-  ctx.lineTo(-r * 0.42, r * 0.38);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(r * 0.42, -r * 0.22);
-  ctx.lineTo(r * 0.42, r * 0.38);
-  ctx.stroke();
-
-  // Center Zipper Line
-  ctx.beginPath();
-  ctx.moveTo(0, -r * 0.22);
-  ctx.lineTo(0, -r * 0.10);
-  ctx.stroke();
-
-  // 2c. Metallic Silver Cybernetic Shoulders & Joint Bolts
-  // Left Shoulder Armor Plate
-  ctx.fillStyle = '#C2CCD6';
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.75, -r * 0.02, r * 0.28, r * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#22262E';
-  ctx.beginPath();
-  ctx.arc(-r * 0.75, -r * 0.02, r * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#E6ECF2';
-  ctx.beginPath();
-  ctx.arc(-r * 0.75, -r * 0.02, r * 0.06, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Right Shoulder Armor Plate
-  ctx.fillStyle = '#C2CCD6';
-  ctx.beginPath();
-  ctx.ellipse(r * 0.75, -r * 0.02, r * 0.28, r * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#22262E';
-  ctx.beginPath();
-  ctx.arc(r * 0.75, -r * 0.02, r * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#E6ECF2';
-  ctx.beginPath();
-  ctx.arc(r * 0.75, -r * 0.02, r * 0.06, 0, Math.PI * 2);
-  ctx.fill();
-
-  // V-Neck Metallic Trim Collar
-  ctx.strokeStyle = '#B0B8C2';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.28, -r * 0.22);
-  ctx.lineTo(0, -r * 0.10);
-  ctx.lineTo(r * 0.28, -r * 0.22);
-  ctx.stroke();
-
-  // 2d. Incineration Chest Energy Core & Bezel Frame (Pulsing Glowing Cyan Core)
-  const coreY = -r * 0.02;
-  const coreR = r * 0.16;
-  const bloomR = r * 0.46;
-
-  // Dynamic cyan pulse math (faster, hyper-intense throb during self-destruction!)
+  // Core pulse parameters
   const pulseFreq = isSelfDestructing ? 0.03 : 0.008;
   const cyanPulse = 0.5 + Math.sin(now * pulseFreq) * 0.5;
-  const activeCoreR = isSelfDestructing ? coreR * (1.25 + cyanPulse * 0.4) : coreR;
-  const dynamicBloomR = isSelfDestructing ? r * (0.70 + cyanPulse * 0.45) : bloomR * (0.85 + cyanPulse * 0.4);
+  const coreY = -r * 0.02;
+  const activeCoreR = isSelfDestructing ? r * 0.22 : r * 0.16;
 
-  // Radial Bloom Gradient (Pulsing glowing cyan core!)
-  const bloomGrad = ctx.createRadialGradient(0, coreY, 0, 0, coreY, dynamicBloomR);
-  if (isSelfDestructing) {
-    bloomGrad.addColorStop(0, '#FFFFFF');
-    bloomGrad.addColorStop(0.2, 'rgba(0, 255, 255, 1.0)');
-    bloomGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.85)');
-    bloomGrad.addColorStop(0.8, 'rgba(0, 180, 255, 0.45)');
-    bloomGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
-  } else if (isChargingUlt) {
-    bloomGrad.addColorStop(0, '#FFFFFF');
-    bloomGrad.addColorStop(0.25, 'rgba(0, 255, 255, 0.95)');
-    bloomGrad.addColorStop(0.6, 'rgba(0, 200, 255, 0.55)');
-    bloomGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
-  } else {
-    bloomGrad.addColorStop(0, '#FFFFFF');
-    bloomGrad.addColorStop(0.25, `rgba(0, 229, 255, ${0.85 + cyanPulse * 0.15})`);
-    bloomGrad.addColorStop(0.6, `rgba(0, 200, 255, ${0.45 + cyanPulse * 0.3})`);
-    bloomGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
-  }
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
 
-  ctx.fillStyle = bloomGrad;
-  ctx.beginPath();
-  ctx.arc(0, coreY, dynamicBloomR, 0, Math.PI * 2);
-  ctx.fill();
+      const px = snap(rx);
+      const py = snap(ry);
 
-  // Self-Destruct Concentric Cyan Overload Pulse Rings radiating from core
-  if (isSelfDestructing) {
-    ctx.save();
-    for (let c = 1; c <= 3; c++) {
-      const ringR = activeCoreR + ((now * 0.08 + c * 8) % (r * 0.65));
-      const ringAlpha = Math.max(0, 1.0 - (ringR / (r * 0.65)));
-      ctx.beginPath();
-      ctx.arc(0, coreY, ringR, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(0, 255, 255, ${ringAlpha * 0.9})`;
-      ctx.lineWidth = 2.0;
-      ctx.stroke();
+      // 4-neighbor attached border test (Rule #35 & Saitama standard)
+      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+        ctx.fillStyle = '#0D1117'; // Dark manga ink border
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Zone A: Golden Wheat Spiky Hair & Bangs (ry < -r * 0.22)
+      if (ry < -r * 0.22) {
+        // Spiky layered bangs profile
+        const isBang = (
+          (ry > -r * 0.35 && Math.abs(rx) > r * 0.65) ||
+          (ry > -r * 0.30 && Math.abs(rx) > r * 0.38 && Math.abs(rx) < r * 0.55) ||
+          (ry > -r * 0.26 && Math.abs(rx) < r * 0.22)
+        );
+
+        if (isBang) {
+          ctx.fillStyle = '#D4B964'; // Bangs shadow / lower tier
+        } else if (ry < -r * 0.55 && (Math.abs(rx - r * 0.35) < r * 0.12 || Math.abs(rx + r * 0.35) < r * 0.12)) {
+          ctx.fillStyle = '#FAF0BE'; // Hair sheen highlights
+        } else {
+          ctx.fillStyle = '#E5CC82'; // Golden wheat main hair
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone B: Tactical Vest, Shoulders, Collar, & Chest Core (-r * 0.22 <= ry < r * 0.38)
+      else if (ry < r * 0.38) {
+        const coreDist = Math.hypot(rx, ry - coreY);
+
+        // B1. Central Glowing Energy Core
+        if (coreDist <= activeCoreR + P * 1.5) {
+          if (coreDist <= activeCoreR * 0.45) {
+            ctx.fillStyle = '#FFFFFF'; // Superheated fusion center
+          } else if (coreDist <= activeCoreR) {
+            ctx.fillStyle = isSelfDestructing ? '#00FFFF' : (cyanPulse > 0.6 ? '#00E5FF' : '#00B8D4'); // Glowing cyan core
+          } else {
+            ctx.fillStyle = isSelfDestructing ? '#00FFFF' : '#D4AF37'; // Golden bezel frame
+          }
+        }
+        // B2. Metallic Silver Cybernetic Shoulders (left & right)
+        else if (Math.abs(rx) > r * 0.58 && Math.abs(ry - (-r * 0.02)) < r * 0.36) {
+          const shoulderCX = rx > 0 ? r * 0.72 : -r * 0.72;
+          const sDist = Math.hypot((rx - shoulderCX) * 1.2, ry - (-r * 0.02));
+          if (sDist <= r * 0.08) {
+            ctx.fillStyle = '#E6ECF2'; // Joint bolt glint
+          } else if (sDist <= r * 0.16) {
+            ctx.fillStyle = '#22262E'; // Bolt core
+          } else {
+            ctx.fillStyle = (ry < -r * 0.08) ? '#D8E2EC' : '#A8B4C0'; // Metallic shoulder plate
+          }
+        }
+        // B3. V-Neck Metallic Collar Trim
+        else if (Math.abs(ry - (-r * 0.12 + Math.abs(rx) * 0.45)) < P * 0.9 && Math.abs(rx) <= r * 0.30 && ry <= -r * 0.02) {
+          ctx.fillStyle = '#B0B8C2'; // Metallic collar trim
+        }
+        // B4. Armor Panel Seam Lines
+        else if (Math.abs(Math.abs(rx) - r * 0.42) < P * 0.6) {
+          ctx.fillStyle = '#101217'; // Seam line
+        }
+        // B5. Tactical Vest Body
+        else {
+          let vestCol = '#1A1D24';
+          if (Math.abs(rx) < r * 0.35 && ry < r * 0.15) {
+            vestCol = '#22262F'; // Chest fabric highlight
+          } else if (Math.abs(rx) > r * 0.50 || ry > r * 0.28) {
+            vestCol = '#13151A'; // Vest shadow
+          }
+          ctx.fillStyle = vestCol;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone C: Tactical Belt & Gold Buckle (r * 0.38 <= ry < r * 0.51)
+      else if (ry < r * 0.51) {
+        // Golden Buckle at center
+        const isBuckle = (Math.abs(rx) <= r * 0.28);
+        if (isBuckle) {
+          if (Math.abs(rx) <= r * 0.12 && Math.abs(ry - r * 0.44) <= r * 0.04) {
+            ctx.fillStyle = '#241D09'; // Buckle inner slot notch
+          } else if (rx < -P && ry < r * 0.44) {
+            ctx.fillStyle = '#FFF2A8'; // Metallic buckle glint
+          } else {
+            ctx.fillStyle = '#D4AF37'; // Gold buckle plate
+          }
+        } else if (Math.abs(Math.abs(rx) - r * 0.37) < P * 0.8) {
+          ctx.fillStyle = '#A0AAB5'; // Silver belt loop
+        } else {
+          ctx.fillStyle = (ry < r * 0.44) ? '#1A1D24' : '#101216'; // Belt strap
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // Zone D: Black Combat Pants (ry >= r * 0.51)
+      else {
+        // Center fly seam line
+        if (Math.abs(rx) < P * 0.6 && ry <= r * 0.88) {
+          ctx.fillStyle = '#2A2E38'; // Pants seam line
+        } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.82) {
+          ctx.fillStyle = '#0E1013'; // Pants shadow
+        } else {
+          ctx.fillStyle = '#16181C'; // Black combat pants body
+        }
+        ctx.fillRect(px, py, P, P);
+      }
     }
-    ctx.restore();
-  }
-
-  // Central Cyan Core Disc
-  ctx.fillStyle = '#00E5FF';
-  ctx.beginPath();
-  ctx.arc(0, coreY, activeCoreR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Inner White Core Center
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(0, coreY, activeCoreR * 0.60, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Glowing Cyan Ring
-  ctx.strokeStyle = `rgba(0, 255, 255, ${0.85 + cyanPulse * 0.15})`;
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.arc(0, coreY, activeCoreR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Metallic Gold Bezel Frame around Chest Core
-  ctx.strokeStyle = isSelfDestructing ? '#00FFFF' : '#D4AF37';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.arc(0, coreY, activeCoreR + 2, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 4 Thermal Exhaust Slits around Bezel Frame
-  ctx.strokeStyle = '#1A1D24';
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 4; i++) {
-    const ventAngle = (i * Math.PI) / 2 + Math.PI / 4;
-    const vx1 = Math.cos(ventAngle) * (coreR + 3);
-    const vy1 = coreY + Math.sin(ventAngle) * (coreR + 3);
-    const vx2 = Math.cos(ventAngle) * (coreR + 7);
-    const vy2 = coreY + Math.sin(ventAngle) * (coreR + 7);
-    ctx.beginPath();
-    ctx.moveTo(vx1, vy1);
-    ctx.lineTo(vx2, vy2);
-    ctx.stroke();
-  }
-
-  // 2e. Tactical Belt & Gold Buckle
-  // Belt Strap (#101216)
-  ctx.fillStyle = '#101216';
-  ctx.fillRect(-r, r * 0.38, r * 2, r * 0.12);
-
-  // Gold Buckle (#D4AF37) with Silver Loop Details
-  ctx.fillStyle = '#D4AF37';
-  ctx.fillRect(-r * 0.28, r * 0.37, r * 0.56, r * 0.14);
-
-  // Buckle Inner Slot Notch (#241D09)
-  ctx.fillStyle = '#241D09';
-  ctx.fillRect(-r * 0.14, r * 0.40, r * 0.28, r * 0.08);
-
-  // Silver Belt Loops (#A0AAB5)
-  ctx.fillStyle = '#A0AAB5';
-  ctx.fillRect(-r * 0.40, r * 0.37, r * 0.06, r * 0.14);
-  ctx.fillRect(r * 0.34, r * 0.37, r * 0.06, r * 0.14);
-
-  // 2f. Bottom Section — Black Combat Pants (#16181C)
-  ctx.fillStyle = '#16181C';
-  ctx.fillRect(-r, r * 0.51, r * 2, r * 0.50);
-
-  // Pants Fly & Pocket Seam Lines
-  ctx.strokeStyle = '#262A32';
-  ctx.lineWidth = 1.5;
-
-  ctx.beginPath();
-  ctx.moveTo(0, r * 0.51);
-  ctx.lineTo(0, r * 0.90);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.60, r * 0.51);
-  ctx.lineTo(-r * 0.35, r * 0.85);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(r * 0.60, r * 0.51);
-  ctx.lineTo(r * 0.35, r * 0.85);
-  ctx.stroke();
-
-  // 2g. CUSTOM DEMON CYBORG BODY STROKE & ARMOR PERIMETER RING
-  // Draw stroke INSIDE clip boundary so it outlines the body perfectly without obscuring interior details!
-  ctx.beginPath();
-  ctx.arc(0, 0, r - 1.0, 0, Math.PI * 2);
-  ctx.strokeStyle = '#121418';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, r - 2.2, 0, Math.PI * 2);
-  ctx.strokeStyle = '#3A404D';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // Dynamic Incineration Core Energy Notches & Overdrive Glow
-  const isMeleeStance = fighter.isMeleeStance;
-
-  if (isChargingUlt || isSelfDestructing || isMeleeStance) {
-    const now = Date.now();
-    const pulseAlpha = 0.5 + Math.sin(now * 0.012) * 0.35;
-    const energyColor = isSelfDestructing 
-      ? `rgba(0, 229, 255, ${pulseAlpha})` 
-      : (isChargingUlt ? `rgba(255, 120, 0, ${pulseAlpha})` : `rgba(255, 85, 0, ${pulseAlpha * 0.7})`);
-
-    ctx.strokeStyle = energyColor;
-    ctx.lineWidth = 2.0;
-
-    ctx.beginPath();
-    ctx.arc(0, 0, r - 1.0, -Math.PI * 0.35, -Math.PI * 0.05);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(0, 0, r - 1.0, Math.PI * 0.65, Math.PI * 0.95);
-    ctx.stroke();
   }
 
   // 4 Segmented Cybernetic Joint Clamps (12, 3, 6, 9 o'clock)
-  const clampSize = 2.8;
-  ctx.fillStyle = '#4A5260';
-  for (let i = 0; i < 4; i++) {
-    const clampAngle = (i * Math.PI) / 2;
-    const cx = Math.cos(clampAngle) * (r - 1.0);
-    const cy = Math.sin(clampAngle) * (r - 1.0);
-    ctx.beginPath();
-    ctx.arc(cx, cy, clampSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#121418';
-    ctx.lineWidth = 1.0;
-    ctx.stroke();
+  const clampOffsets = [
+    { x: 0, y: -r + P },
+    { x: r - P, y: 0 },
+    { x: 0, y: r - P },
+    { x: -r + P, y: 0 }
+  ];
+  for (const co of clampOffsets) {
+    const cx = snap(co.x);
+    const cy = snap(co.y);
+    ctx.fillStyle = '#0D1117';
+    ctx.fillRect(cx - P, cy - P, P * 2, P * 2);
+    ctx.fillStyle = '#4A5260';
+    ctx.fillRect(cx, cy, P, P);
   }
 
-  ctx.restore(); // Undo body clip
-  ctx.restore(); // Undo body translate
+  ctx.restore();
 }
 
 /**
  * Hand Renderer for Genos — High-tech multi-layered mechanical arms with segmented armor,
- * panel lines, energy conduit grooves, joint bolts, and a glowing palm blast port cannon.
+ * panel lines, energy conduit grooves, joint bolts, and a glowing palm blast port cannon (Pixel Art).
  */
 export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
@@ -399,7 +255,7 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   const isBasicAttacking = fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0;
   const isChargingUlt = fighter.isChargingUlt || fighter.isFiringUlt;
   const isSelfDestructing = fighter.isSelfDestructing;
-  const r = fighter.r;
+  const r = fighter.r || 25;
   const hr = Math.max(r * 0.32, getHandSize(7.5)); // hand radius
 
   const isAttacking = isPunching || isChargingUlt || isBasicAttacking;
@@ -431,7 +287,6 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   // Butter-smooth sine-wave arc (0 -> 1 -> 0)
   const easePunch = Math.sin(rawProgress * Math.PI);
   const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
-  const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25) : 0;
 
   let frontHandX, frontHandY, backHandX, backHandY;
   let hideFront = fighter.hideFrontHand || (typeof state !== 'undefined' && state.showSkinOnly) || false;
@@ -530,342 +385,143 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
 }
 
 /**
- * Draws a single detailed high-tech mechanical arm / fist at (cx, cy).
+ * Draws a single detailed high-tech mechanical arm / fist in authentic Pixel Art Style.
  * @param {number} punchGlow - 0..1 sinusoidal punch impact intensity for fire aura & speed lines
  */
 function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructing, isFiringArm, blastProgress, punchGlow = 0) {
   ctx.save();
-  ctx.translate(cx, cy);
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
-  const isDarkMode = Boolean(
-    typeof state !== 'undefined' && (
-      state.arenaTheme === 'dark' || 
-      state.darkMode || 
-      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-    )
-  );
+  const handX = snap(cx);
+  const handY = snap(cy);
+  const gridR = Math.max(P * 2, hr);
+  const steps = Math.ceil(gridR / P);
 
-  // ── PUNCH IMPACT VISUAL: Fire Aura Glow + Radial Speed Lines ──
+  // ── 1. PUNCH IMPACT VISUAL: Stepped Pixel Fire Aura + Speed Lines ──
   if (punchGlow > 0.05) {
-    ctx.save();
+    const maxAuraR = snap(gridR * 2.2 * punchGlow);
+    for (let gy = -maxAuraR; gy <= maxAuraR; gy += P) {
+      for (let gx = -maxAuraR; gx <= maxAuraR; gx += P) {
+        const dist = Math.hypot(gx, gy);
+        if (dist > maxAuraR) continue;
 
-    if (isDarkMode) {
-      ctx.imageSmoothingEnabled = false;
-      const P = 2.0;
-      const snap = (v) => Math.round(v / P) * P;
-      const maxR = snap(hr * 2.2 * punchGlow);
+        const px = snap(handX + gx);
+        const py = snap(handY + gy);
 
-      // 1. Discrete 2D Stepped Pixel Fire Aura Grid
-      for (let dy = -maxR; dy <= maxR; dy += P) {
-        for (let dx = -maxR; dx <= maxR; dx += P) {
-          const dist = Math.hypot(dx, dy);
-          if (dist > maxR) continue;
-
-          if (dist >= maxR - P) {
-            ctx.fillStyle = '#150500'; // Dark manga obsidian border
-          } else if (dist < hr * 0.65) {
-            ctx.fillStyle = '#FFFFFF'; // Superheated pure white core
-          } else if (dist < hr * 1.35) {
-            ctx.fillStyle = '#FFE600'; // Solar yellow
-          } else if (dist < hr * 1.80) {
-            ctx.fillStyle = '#FF5500'; // Saturated fiery orange
-          } else {
-            ctx.fillStyle = '#CC2A00'; // Magma crimson
-          }
-          ctx.fillRect(snap(dx), snap(dy), P, P);
+        if (dist >= maxAuraR - P) {
+          ctx.fillStyle = '#150500'; // Dark obsidian border
+        } else if (dist < hr * 0.60) {
+          ctx.fillStyle = '#FFFFFF'; // Superheated pure white core
+        } else if (dist < hr * 1.30) {
+          ctx.fillStyle = '#FFE600'; // Solar yellow
+        } else if (dist < hr * 1.75) {
+          ctx.fillStyle = '#FF5500'; // Fiery orange
+        } else {
+          ctx.fillStyle = '#CC2A00'; // Magma crimson
         }
-      }
-
-      // 2. Stepped Radial Needle Streaks
-      const lineCount = 8;
-      for (let i = 0; i < lineCount; i++) {
-        const lineAngle = (i / lineCount) * Math.PI * 2;
-        const innerR = snap(hr * 1.1);
-        const outerR = snap(((i % 2 === 0) ? hr * 2.6 : hr * 1.85) * punchGlow);
-        const cosA = Math.cos(lineAngle);
-        const sinA = Math.sin(lineAngle);
-        const steps = Math.max(4, Math.round((outerR - innerR) / P));
-
-        for (let st = 0; st <= steps; st++) {
-          const dist = innerR + (st / steps) * (outerR - innerR);
-          const px = snap(cosA * dist);
-          const py = snap(sinA * dist);
-          ctx.fillStyle = (st % 2 === 0) ? '#FFFFFF' : '#FFE600';
-          ctx.fillRect(px, py, P, P);
-        }
-      }
-    } else {
-      // 1. Outer fire aura bloom (flat tinted rings — no gradient, for performance)
-      ctx.globalAlpha = punchGlow * 0.45;
-      ctx.fillStyle = '#FF8800';
-      ctx.beginPath();
-      ctx.arc(0, 0, hr * 2.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.globalAlpha = punchGlow * 0.60;
-      ctx.fillStyle = '#FF4400';
-      ctx.beginPath();
-      ctx.arc(0, 0, hr * 1.55, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.globalAlpha = punchGlow * 0.30;
-      ctx.fillStyle = '#FFDD44';
-      ctx.beginPath();
-      ctx.arc(0, 0, hr * 0.70, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 2. Radial speed lines burst (8 jagged lines radiating outward)
-      ctx.globalAlpha = punchGlow * 0.80;
-      ctx.strokeStyle = '#FFCC55';
-      ctx.lineCap = 'round';
-      const lineCount = 8;
-      for (let i = 0; i < lineCount; i++) {
-        const lineAngle = (i / lineCount) * Math.PI * 2;
-        const innerR = hr * 1.1;
-        // Alternate long/short lines for a jagged starburst
-        const outerR = (i % 2 === 0) ? hr * 2.6 : hr * 1.85;
-        ctx.lineWidth = (i % 2 === 0) ? 2.2 : 1.4;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(lineAngle) * innerR, Math.sin(lineAngle) * innerR);
-        ctx.lineTo(Math.cos(lineAngle) * outerR, Math.sin(lineAngle) * outerR);
-        ctx.stroke();
+        ctx.fillRect(px, py, P, P);
       }
     }
-
-    ctx.restore();
   }
 
-  // ── Directional Barrel Nozzle (Points towards +X aim target) ──
-  const nozzleLength = hr * 0.40;
-  ctx.fillStyle = '#1C2530';
-  ctx.strokeStyle = '#3A4555';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.rect(hr * 0.50, -hr * 0.30, nozzleLength, hr * 0.60);
-  ctx.fill();
-  ctx.stroke();
+  // ── 2. Directional Barrel Nozzle (Points towards +X aim target) ──
+  const nozzleW = snap(hr * 0.45);
+  const nozzleH = snap(hr * 0.60);
+  const nStartX = snap(handX + hr * 0.50);
+  const nStartY = snap(handY - nozzleH * 0.5);
 
-  // Glowing Muzzle Tip Ring (Front of Cannon)
-  ctx.beginPath();
-  ctx.ellipse(hr * 0.50 + nozzleLength, 0, hr * 0.12, hr * 0.30, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#0D1117';
+  ctx.fillRect(nStartX, nStartY - P, nozzleW + P, nozzleH + P * 2);
+  ctx.fillStyle = '#1C2530';
+  ctx.fillRect(nStartX, nStartY, nozzleW, nozzleH);
   ctx.fillStyle = palmColor;
-  ctx.fill();
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
+  ctx.fillRect(nStartX + nozzleW, nStartY + P, P, nozzleH - P * 2);
 
-  // ── Layer 1: Dark background plate (#1A1E25) ──
-  ctx.beginPath();
-  ctx.arc(0, 0, hr, 0, Math.PI * 2);
-  ctx.fillStyle = '#1A1E25';
-  ctx.fill();
+  // ── 3. Stepped 2D Cybernetic Fist Body ──
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > gridR) continue;
 
-  // ── Layer 2: Main armor plating gradient (#6E7D8C → #3C4654) ──
-  const armorGrad = ctx.createRadialGradient(-hr * 0.25, -hr * 0.25, 0, 0, 0, hr);
-  armorGrad.addColorStop(0, '#8A9BAD');
-  armorGrad.addColorStop(0.45, '#5C6E80');
-  armorGrad.addColorStop(1, '#2E3A46');
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.93, 0, Math.PI * 2);
-  ctx.fillStyle = armorGrad;
-  ctx.fill();
+      const px = snap(handX + rx);
+      const py = snap(handY + ry);
 
-  // ── Layer 3: Top specular highlight plate (bright chrome reflection) ──
-  ctx.beginPath();
-  ctx.ellipse(-hr * 0.18, -hr * 0.30, hr * 0.38, hr * 0.18, -Math.PI * 0.3, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(200, 220, 240, 0.30)';
-  ctx.fill();
+      // 4-neighbor attached border shell
+      if (Math.hypot(rx + P, ry) > gridR || Math.hypot(rx - P, ry) > gridR || Math.hypot(rx, ry + P) > gridR || Math.hypot(rx, ry - P) > gridR) {
+        ctx.fillStyle = '#0D1117'; // Dark manga border
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
-  // ── Layer 4: Segmented armor ring (outer knuckle guard) ──
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.92, 0, Math.PI * 2);
-  ctx.strokeStyle = '#0D1117';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.82, 0, Math.PI * 2);
-  ctx.strokeStyle = '#4A5568';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // ── Layer 5: Panel engraving lines (cross hatch grooves) ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.88, 0, Math.PI * 2);
-  ctx.clip();
-
-  ctx.strokeStyle = '#0D1117';
-  ctx.lineWidth = 1.0;
-
-  // Horizontal groove
-  ctx.beginPath();
-  ctx.moveTo(-hr * 0.85, hr * 0.08);
-  ctx.lineTo( hr * 0.85, hr * 0.08);
-  ctx.stroke();
-
-  // Angled top-left panel divide
-  ctx.beginPath();
-  ctx.moveTo(-hr * 0.5, -hr * 0.85);
-  ctx.lineTo(-hr * 0.85, hr * 0.08);
-  ctx.stroke();
-
-  // Angled top-right panel divide
-  ctx.beginPath();
-  ctx.moveTo(hr * 0.5, -hr * 0.85);
-  ctx.lineTo(hr * 0.85, hr * 0.08);
-  ctx.stroke();
-
-  // Inner bevel lines on lower section
-  ctx.strokeStyle = '#3A4555';
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(-hr * 0.60, hr * 0.28);
-  ctx.lineTo( hr * 0.60, hr * 0.28);
-  ctx.stroke();
-
-  ctx.restore(); // clip release
-
-  // ── Layer 6: Energy conduit grooves (glowing lines to palm) ──
-  const conduitColor = isChargingUlt
-    ? 'rgba(255, 200, 0, 0.85)'
-    : isSelfDestructing
-      ? 'rgba(0, 255, 255, 0.95)'
-      : 'rgba(255, 120, 30, 0.70)';
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.80, 0, Math.PI * 2);
-  ctx.clip();
-
-  ctx.strokeStyle = conduitColor;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'round';
-
-  // Left conduit line converging to center
-  ctx.beginPath();
-  ctx.moveTo(-hr * 0.55, -hr * 0.65);
-  ctx.quadraticCurveTo(-hr * 0.30, -hr * 0.10, 0, 0);
-  ctx.stroke();
-
-  // Right conduit line converging to center
-  ctx.beginPath();
-  ctx.moveTo(hr * 0.55, -hr * 0.65);
-  ctx.quadraticCurveTo(hr * 0.30, -hr * 0.10, 0, 0);
-  ctx.stroke();
-
-  // Bottom conduit line
-  ctx.beginPath();
-  ctx.moveTo(0, hr * 0.68);
-  ctx.lineTo(0, hr * 0.10);
-  ctx.stroke();
-
-  ctx.restore(); // clip release
-
-  // ── Layer 7: Joint bolt heads (top-left & top-right corners) ──
-  const boltColor = '#4A5568';
-  const boltHighlight = '#8A9BAD';
-  for (const [bx, by] of [[-hr * 0.50, -hr * 0.52], [hr * 0.50, -hr * 0.52]]) {
-    ctx.beginPath();
-    ctx.arc(bx, by, hr * 0.095, 0, Math.PI * 2);
-    ctx.fillStyle = boltColor;
-    ctx.fill();
-    ctx.strokeStyle = '#0D1117';
-    ctx.lineWidth = 1.0;
-    ctx.stroke();
-    // Tiny hex-bolt highlight glint
-    ctx.beginPath();
-    ctx.arc(bx - hr * 0.025, by - hr * 0.025, hr * 0.030, 0, Math.PI * 2);
-    ctx.fillStyle = boltHighlight;
-    ctx.fill();
+      // Palm Blast Cannon Port at Center (dist <= hr * 0.42)
+      if (dist <= hr * 0.42) {
+        if (dist <= hr * 0.16) {
+          ctx.fillStyle = '#FFFFFF'; // White-hot port core
+        } else if (dist <= hr * 0.32) {
+          ctx.fillStyle = palmColor; // Palm cannon throat
+        } else {
+          ctx.fillStyle = '#0A0D12'; // Cannon recess ring
+        }
+      }
+      // Specular Chrome Highlight (top-left)
+      else if (rx < 0 && ry < -gridR * 0.30 && dist > gridR * 0.50) {
+        ctx.fillStyle = '#D4E0EC'; // Bright chrome glint
+      }
+      // Armor Plating & Knuckle Guards
+      else {
+        let armorCol;
+        if (dist >= gridR - P * 1.5) {
+          armorCol = '#4A5568'; // Outer knuckle guard ring
+        } else if (rx > 0 && Math.abs(ry) < gridR * 0.30) {
+          armorCol = '#7A8B9D'; // Forward knuckle face
+        } else if (ry > gridR * 0.35) {
+          armorCol = '#2E3A46'; // Lower plate shadow
+        } else {
+          armorCol = '#5C6E80'; // Base metallic chrome armor
+        }
+        ctx.fillStyle = armorCol;
+      }
+      ctx.fillRect(px, py, P, P);
+    }
   }
 
-  // Bottom-center small joint bolt
-  ctx.beginPath();
-  ctx.arc(0, hr * 0.60, hr * 0.07, 0, Math.PI * 2);
-  ctx.fillStyle = boltColor;
-  ctx.fill();
-  ctx.strokeStyle = '#0D1117';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
+  // ── 4. Energy Conduit Pixels ──
+  const conduitCol = isChargingUlt ? '#FFE600' : (isSelfDestructing ? '#00FFFF' : '#FF5500');
+  ctx.fillStyle = conduitCol;
+  ctx.fillRect(snap(handX - hr * 0.55), snap(handY - hr * 0.50), P, P);
+  ctx.fillRect(snap(handX - hr * 0.35), snap(handY - hr * 0.30), P, P);
+  ctx.fillRect(snap(handX + hr * 0.55), snap(handY - hr * 0.50), P, P);
+  ctx.fillRect(snap(handX + hr * 0.35), snap(handY - hr * 0.30), P, P);
+  ctx.fillRect(snap(handX), snap(handY + hr * 0.55), P, P);
 
-  // ── Layer 8: PALM BLAST CANNON (multi-ring glowing port) ──
-  // Outer dark cannon recess ring
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.42, 0, Math.PI * 2);
-  ctx.fillStyle = '#0A0D12';
-  ctx.fill();
-
-  // Mid cannon barrel ring
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.34, 0, Math.PI * 2);
-  ctx.fillStyle = '#1C2530';
-  ctx.fill();
-  ctx.strokeStyle = '#3A4555';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // Glowing cannon throat
-  const cannonGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, hr * 0.28);
-  if (isChargingUlt) {
-    cannonGrad.addColorStop(0, '#FFFFFF');
-    cannonGrad.addColorStop(0.3, 'rgba(255, 220, 0, 0.95)');
-    cannonGrad.addColorStop(0.7, 'rgba(255, 100, 0, 0.70)');
-    cannonGrad.addColorStop(1, 'rgba(255, 60, 0, 0)');
-  } else if (isSelfDestructing) {
-    cannonGrad.addColorStop(0, '#FFFFFF');
-    cannonGrad.addColorStop(0.3, 'rgba(0, 255, 255, 0.95)');
-    cannonGrad.addColorStop(0.7, 'rgba(0, 200, 255, 0.60)');
-    cannonGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
-  } else {
-    cannonGrad.addColorStop(0, 'rgba(255, 255, 220, 0.90)');
-    cannonGrad.addColorStop(0.35, 'rgba(255, 160, 20, 0.80)');
-    cannonGrad.addColorStop(0.75, 'rgba(255, 70, 0, 0.40)');
-    cannonGrad.addColorStop(1, 'rgba(255, 50, 0, 0)');
-  }
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.28, 0, Math.PI * 2);
-  ctx.fillStyle = cannonGrad;
-  ctx.fill();
-
-  // Outer cannon ring border glow
-  ctx.beginPath();
-  ctx.arc(0, 0, hr * 0.42, 0, Math.PI * 2);
-  ctx.strokeStyle = isChargingUlt
-    ? 'rgba(255, 220, 0, 0.75)'
-    : isSelfDestructing
-      ? 'rgba(0, 255, 255, 0.95)'
-      : 'rgba(255, 100, 30, 0.55)';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // ── Outer ring ──
-  // ── Muzzle Energy Flash Cone & Expanding Shockwave Ring (Active Firing Arm - Rendered ON TOP of hand) ──
+  // ── 5. Muzzle Flash Flare (When firing basic blast) ──
   if (isFiringArm && blastProgress > 0 && blastProgress < 0.6) {
     const flashScale = Math.sin((blastProgress / 0.6) * Math.PI);
-    ctx.save();
-    ctx.translate(hr * 0.90, 0); // At nozzle tip
+    const flashR = snap(hr * 2.2 * flashScale);
+    const fx = snap(handX + hr * 0.90);
+    const fy = handY;
 
-    // 1. Multi-layer white-hot to orange heat flash aura
-    const flashGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, hr * 2.2 * flashScale);
-    flashGrad.addColorStop(0, '#FFFFFF'); // White hot core
-    flashGrad.addColorStop(0.25, 'rgba(255, 200, 50, 0.95)'); // Gold plasma
-    flashGrad.addColorStop(0.65, 'rgba(255, 80, 0, 0.60)'); // Fiery orange
-    flashGrad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    for (let gy = -flashR; gy <= flashR; gy += P) {
+      for (let gx = -flashR; gx <= flashR; gx += P) {
+        const dist = Math.hypot(gx, gy);
+        if (dist > flashR) continue;
+        const px = snap(fx + gx);
+        const py = snap(fy + gy);
 
-    ctx.fillStyle = flashGrad;
-    ctx.beginPath();
-    ctx.arc(0, 0, hr * 2.2 * flashScale, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 2. High-frequency expanding shockwave ring
-    ctx.strokeStyle = `rgba(255, 230, 180, ${0.95 * (1 - blastProgress / 0.6)})`;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, hr * 2.8 * flashScale, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.restore();
+        if (dist < flashR * 0.35) {
+          ctx.fillStyle = '#FFFFFF';
+        } else if (dist < flashR * 0.70) {
+          ctx.fillStyle = '#FFE600';
+        } else {
+          ctx.fillStyle = '#FF5500';
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
   }
 
   ctx.restore();
