@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────
 // John Wick ("The Baba Yaga") Fighter Skin & Body Model
-// High-Fidelity PNG Body Model with Procedural Fallback
+// Authentic 1:1 Procedural Pixel Art Model
 // Strictly adheres to:
 // - Rule 19 (Upright Front POV, No Eyes/Mouth/Nose Standard)
 // - Rule 20 (Hand Visibility & Skin Only Guard)
@@ -10,89 +10,69 @@
 import { getHandSize } from '../../core/config.js';
 import { state, isChampionScreenActive } from '../../core/state.js';
 
-let _johnWickImage = null;
-let _johnWickImageLoading = false;
-let _cachedBodyGrad = null;
-let _cachedBodyGradR = 0;
-
-function _getBodyGrad(ctx, r) {
-  if (!_cachedBodyGrad || _cachedBodyGradR !== r) {
-    _cachedBodyGradR = r;
-    _cachedBodyGrad = ctx.createRadialGradient(-r * 0.25, -r * 0.35, r * 0.1, 0, 0, r * 1.05);
-    _cachedBodyGrad.addColorStop(0, 'rgba(255, 245, 235, 0.25)');
-    _cachedBodyGrad.addColorStop(0.75, 'rgba(190, 120, 90, 0.15)');
-    _cachedBodyGrad.addColorStop(1, 'rgba(45, 18, 12, 0.35)');
-  }
-  return _cachedBodyGrad;
-}
-
 /**
- * Preload and retrieve the John Wick PNG body model
+ * Draws a tactical fist with black suit sleeve cuff in authentic Pixel Art Style.
  */
-function _getJohnWickImage() {
-  if (_johnWickImage && _johnWickImage.complete && _johnWickImage.naturalWidth > 0) {
-    return _johnWickImage;
-  }
-  if (!_johnWickImageLoading && typeof Image !== 'undefined') {
-    _johnWickImageLoading = true;
-    const img = new Image();
-    img.onload = () => {
-      _johnWickImage = img;
-      _johnWickImageLoading = false;
-    };
-    img.onerror = (e) => {
-      console.warn('Failed to load John Wick body model image at Assets/model/john-wick-model.png', e);
-      _johnWickImageLoading = false;
-    };
-    img.src = 'Assets/model/john-wick-model.png';
-    _johnWickImage = img;
-  }
-  return _johnWickImage;
-}
-
-// Preload immediately if running in browser/electron
-if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getJohnWickImage();
-}
-
-/**
- * Draws a tactical gloved/bare fist with black suit sleeve cuff
- */
-function _drawWickHand(ctx, x, y, radius, skinColor) {
+export function drawJohnWickPixelHand(ctx, x, y, radius, skinColor) {
   ctx.save();
-  ctx.translate(x, y);
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
-  // 1. Black Tactical Suit Sleeve Cuff
-  ctx.fillStyle = '#141517';
-  ctx.strokeStyle = '#0a0a0c';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.roundRect(-radius * 0.95, -radius * 0.75, radius * 1.9, radius * 0.55, 2);
-  ctx.fill();
-  ctx.stroke();
+  const handX = snap(x);
+  const handY = snap(y);
+  const gridR = Math.max(P * 2, radius);
+  const steps = Math.ceil(gridR / P);
 
-  // White shirt cuff peek
-  ctx.fillStyle = '#F8FAFC';
-  ctx.beginPath();
-  ctx.roundRect(-radius * 0.85, -radius * 0.35, radius * 1.7, radius * 0.22, 1);
-  ctx.fill();
+  // 1. Black Suit Sleeve Cuff (Behind hand, -X)
+  const cuffW = snap(radius * 0.9);
+  const cuffH = snap(radius * 1.5);
+  const cuffX = snap(handX - radius * 0.85);
+  const cuffY = snap(handY - cuffH * 0.5);
 
-  // 2. Fist / Hand (Natural Skin Tone)
-  ctx.fillStyle = skinColor;
-  ctx.strokeStyle = '#1E293B';
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  ctx.fillStyle = '#0B0C10'; // Outer outline
+  ctx.fillRect(cuffX - P, cuffY - P, cuffW + P * 2, cuffH + P * 2);
+  ctx.fillStyle = '#14151A'; // Black suit sleeve
+  ctx.fillRect(cuffX, cuffY, cuffW, cuffH);
 
-  // 3. Knuckle crease line
-  ctx.strokeStyle = 'rgba(120, 53, 15, 0.45)';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-radius * 0.45, 0);
-  ctx.lineTo(radius * 0.45, 0);
-  ctx.stroke();
+  // White shirt cuff peek line
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(cuffX + cuffW - P, cuffY + P, P, cuffH - P * 2);
+
+  // 2. Stepped 2D Fist Body
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > gridR) continue;
+
+      const px = snap(handX + rx);
+      const py = snap(handY + ry);
+
+      // 4-neighbor attached border
+      if (
+        Math.hypot(rx + P, ry) > gridR ||
+        Math.hypot(rx - P, ry) > gridR ||
+        Math.hypot(rx, ry + P) > gridR ||
+        Math.hypot(rx, ry - P) > gridR
+      ) {
+        ctx.fillStyle = '#0B0C10';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Knuckle & palm shading
+      if (ry > gridR * 0.35 || rx < -gridR * 0.30) {
+        ctx.fillStyle = '#CE8F6F'; // Hand shadow / knuckle crease
+      } else if (rx > 0 && ry < -gridR * 0.25) {
+        ctx.fillStyle = '#F3BF9F'; // Top highlight
+      } else {
+        ctx.fillStyle = skinColor || '#E8AC8B'; // Natural skin tone
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
 
   ctx.restore();
 }
@@ -218,6 +198,292 @@ export function drawJohnWickExcommunicadoAura(ctx, r, isForeground = false) {
 }
 
 /**
+ * Authentic 1:1 Procedural Pixel Art Body for John Wick ("The Baba Yaga")
+ * Uses discrete 2D grid-scan rasterization loop with zero subpixel bleed (P = 2.0px, Rule #19 & Rule #35 compliant).
+ */
+export function drawJohnWickPixelBody(ctx, r) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // Palette Constants
+  const C = {
+    outline: '#0B0C10',        // Pure dark manga ink border
+    hairBase: '#1B1C22',       // Dark charcoal hair base
+    hairDark: '#0E0F14',       // Deep black hair shadows
+    hairHighlight: '#343644',  // Layered hair strand sheen
+    hairSheen: '#484C5E',      // Specular glint
+    skinBase: '#E8AC8B',       // Warm peach face skin
+    skinHighlight: '#F3BF9F',  // Forehead highlight
+    skinShadow: '#CE8F6F',     // Cheek shadow dither
+    beardBase: '#121318',      // Keanu signature beard & mustache
+    beardHighlight: '#262834', // Beard texture highlight
+    scarRed: '#C42B2B',        // Cheek battle cut core
+    scarDark: '#7A1010',       // Scab line
+    scarLight: '#E86E6E',      // Slash edge glint
+    shirtWhite: '#FFFFFF',     // Crisp white dress shirt
+    shirtShadow: '#C8D0DC',    // Shirt collar fold shadow
+    suitBase: '#13141A',       // Bespoke black tailored suit jacket
+    suitLapel: '#1E2028',      // Satin lapel
+    suitHighlight: '#303340',  // Lapel edge highlight
+    tieBase: '#0E0F14',        // Charcoal black necktie
+    tieHighlight: '#2A2C38'    // Tie blade crease
+  };
+
+  // Helper functions for geometric regions
+  // 1. Hairline function
+  const getHairlineY = (nx) => {
+    return -0.42 - 0.12 * Math.cos(nx * Math.PI * 1.1);
+  };
+
+  // 2. Hanging forehead hair locks
+  const isRightHairStrand = (nx, ny) => {
+    // Character's left / viewer's right: prominent long strand plunging down to ny = -0.05
+    if (nx < 0.10 || nx > 0.40 || ny < -0.48 || ny > -0.04) return false;
+    const centerNx = 0.20 - (ny + 0.25) * 0.32;
+    const maxHalfW = 0.055 * Math.pow(1.0 - (ny + 0.04) / 0.44, 0.75);
+    return Math.abs(nx - centerNx) <= maxHalfW;
+  };
+
+  const isLeftHairStrand = (nx, ny) => {
+    // Character's right / viewer's left: secondary strand down to ny = -0.16
+    if (nx < -0.32 || nx > -0.10 || ny < -0.48 || ny > -0.15) return false;
+    const centerNx = -0.22 + (ny + 0.30) * 0.25;
+    const maxHalfW = 0.045 * Math.pow(1.0 - (ny + 0.15) / 0.33, 0.75);
+    return Math.abs(nx - centerNx) <= maxHalfW;
+  };
+
+  const isHair = (nx, ny) => {
+    const absX = Math.abs(nx);
+    if (ny < getHairlineY(nx)) return true;
+    if (absX > 0.65 && ny < -0.12 + (absX - 0.65) * 0.85) return true;
+    return isRightHairStrand(nx, ny) || isLeftHairStrand(nx, ny);
+  };
+
+  // 3. Mustache test
+  const isMustache = (nx, ny) => {
+    const absX = Math.abs(nx);
+    if (absX > 0.26) return false;
+    const topY = 0.01 + 0.09 * Math.pow(absX / 0.26, 2.0);
+    const botY = topY + 0.065 * (1.0 - (absX / 0.26) * 0.25);
+    return ny >= topY && ny <= botY;
+  };
+
+  // 4. Soul patch test
+  const isSoulPatch = (nx, ny) => {
+    if (ny < 0.12 || ny > 0.19) return false;
+    const t = (ny - 0.12) / 0.07;
+    const halfW = 0.05 * (1.0 - t * 0.8);
+    return Math.abs(nx) <= halfW;
+  };
+
+  // 5. Beard & jawline test
+  const isBeard = (nx, ny) => {
+    const absX = Math.abs(nx);
+    if (ny > 0.34) return false;
+    // Outer jawline
+    const jawY = 0.32 - 0.42 * Math.pow(absX / 0.56, 2.0);
+    if (ny > jawY) return false;
+
+    // Sideburn pointed tips
+    if (absX >= 0.42 && absX <= 0.56 && ny >= -0.10 && ny <= 0.15) {
+      const tipTopY = -0.10 + (0.56 - absX) * 1.5;
+      if (ny >= tipTopY) return true;
+    }
+
+    // Inner boundary
+    const innerY = 0.20 - 0.26 * Math.pow(absX / 0.42, 2.0);
+    return ny >= innerY;
+  };
+
+  // 6. Cheek battle cut scar test
+  const isCheekScar = (nx, ny) => {
+    // Left cheek (viewer's right, nx in [0.24, 0.39], ny in [-0.13, +0.03])
+    if (nx < 0.24 || nx > 0.39 || ny < -0.13 || ny > 0.03) return false;
+    const scarLineY = -0.05 + (nx - 0.31) * 1.15;
+    return Math.abs(ny - scarLineY) <= P / r * 0.9;
+  };
+
+  // 7. Suit and tie test
+  const getShirtHalfWidth = (ny) => {
+    if (ny < 0.10 || ny > 0.72) return 0;
+    return 0.30 * (1.0 - (ny - 0.10) / 0.62);
+  };
+
+  const isShirt = (nx, ny) => {
+    if (ny < 0.10 || ny > 0.72) return false;
+    return Math.abs(nx) <= getShirtHalfWidth(ny);
+  };
+
+  const isTie = (nx, ny) => {
+    if (ny < 0.28 || ny > 0.96) return false;
+    if (ny <= 0.38) {
+      return Math.abs(nx) <= 0.075; // Tie knot
+    }
+    if (ny <= 0.88) {
+      return Math.abs(nx) <= 0.065; // Tie blade
+    }
+    // Bottom triangular tip
+    return Math.abs(nx) <= 0.065 * (1.0 - (ny - 0.88) / 0.08);
+  };
+
+  const isLapel = (nx, ny) => {
+    if (ny < 0.12 || ny > 0.85) return false;
+    const absX = Math.abs(nx);
+    const shirtW = getShirtHalfWidth(ny);
+    // Lapels flank the shirt opening
+    return absX > shirtW && absX <= shirtW + 0.24;
+  };
+
+  // ── Main Discrete 2D Grid Scan ──
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // 4-neighbor attached border shell
+      if (
+        Math.hypot(rx + P, ry) > r ||
+        Math.hypot(rx - P, ry) > r ||
+        Math.hypot(rx, ry + P) > r ||
+        Math.hypot(rx, ry - P) > r
+      ) {
+        ctx.fillStyle = C.outline;
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      const nx = rx / r;
+      const ny = ry / r;
+      const absX = Math.abs(nx);
+
+      // ──────────────────────────────────────────
+      // LAYER A: HAIR ZONE
+      // ──────────────────────────────────────────
+      if (isHair(nx, ny)) {
+        // Strand border / edge
+        const isHairEdge = !isHair(nx + P / r, ny) || !isHair(nx - P / r, ny) || !isHair(nx, ny + P / r) || !isHair(nx, ny - P / r);
+        if (isHairEdge && ny >= -0.45) {
+          ctx.fillStyle = C.hairDark;
+        } else if (ny < -0.75 && (Math.abs(nx - 0.25) < 0.12 || Math.abs(nx + 0.25) < 0.12)) {
+          ctx.fillStyle = C.hairSheen; // Specular top sheen
+        } else if (Math.abs(Math.abs(nx) - 0.35) < P / r * 1.2 || Math.abs(Math.abs(nx) - 0.55) < P / r * 1.2) {
+          ctx.fillStyle = C.hairHighlight; // Flowing hair strand lines
+        } else if (ny > -0.15 || absX > 0.75) {
+          ctx.fillStyle = C.hairDark; // Lower hair shadow
+        } else {
+          ctx.fillStyle = C.hairBase;
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER B: BEARD, MUSTACHE & SOUL PATCH
+      // ──────────────────────────────────────────
+      if (isMustache(nx, ny) || isSoulPatch(nx, ny) || isBeard(nx, ny)) {
+        // Outline test
+        const isBeardEdge = (
+          (!isMustache(nx + P / r, ny) && !isSoulPatch(nx + P / r, ny) && !isBeard(nx + P / r, ny)) ||
+          (!isMustache(nx - P / r, ny) && !isSoulPatch(nx - P / r, ny) && !isBeard(nx - P / r, ny)) ||
+          (!isMustache(nx, ny + P / r) && !isSoulPatch(nx, ny + P / r) && !isBeard(nx, ny + P / r)) ||
+          (!isMustache(nx, ny - P / r) && !isSoulPatch(nx, ny - P / r) && !isBeard(nx, ny - P / r))
+        );
+
+        if (isBeardEdge) {
+          ctx.fillStyle = C.outline;
+        } else if ((gx + gy) % 2 === 0 && (ny > 0.22 || isMustache(nx, ny))) {
+          ctx.fillStyle = C.beardHighlight; // Beard hair texture
+        } else {
+          ctx.fillStyle = C.beardBase;
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER C: CHEEK CUT SCAR
+      // ──────────────────────────────────────────
+      if (isCheekScar(nx, ny)) {
+        if (nx > 0.34 || ny < -0.08) {
+          ctx.fillStyle = C.scarDark;
+        } else if (nx < 0.28) {
+          ctx.fillStyle = C.scarLight;
+        } else {
+          ctx.fillStyle = C.scarRed;
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER D: TORSO & SUIT (ny >= 0.10)
+      // ──────────────────────────────────────────
+      if (ny >= 0.10) {
+        // D1. Tie
+        if (isTie(nx, ny)) {
+          const isTieEdge = !isTie(nx + P / r, ny) || !isTie(nx - P / r, ny) || !isTie(nx, ny + P / r) || !isTie(nx, ny - P / r);
+          if (isTieEdge) {
+            ctx.fillStyle = C.outline;
+          } else if (Math.abs(nx) < P / r * 0.5 && ny > 0.38) {
+            ctx.fillStyle = C.tieHighlight; // Center blade crease
+          } else {
+            ctx.fillStyle = C.tieBase;
+          }
+        }
+        // D2. White Dress Shirt
+        else if (isShirt(nx, ny)) {
+          const isShirtEdge = !isShirt(nx + P / r, ny) || !isShirt(nx - P / r, ny);
+          if (isShirtEdge || ny < 0.14) {
+            ctx.fillStyle = C.shirtShadow; // Collar rim shadow
+          } else {
+            ctx.fillStyle = C.shirtWhite;
+          }
+        }
+        // D3. Suit Lapels
+        else if (isLapel(nx, ny)) {
+          const isLapelOuterEdge = Math.abs(absX - (getShirtHalfWidth(ny) + 0.24)) <= P / r * 0.8;
+          if (isLapelOuterEdge) {
+            ctx.fillStyle = C.outline;
+          } else if (Math.abs(absX - (getShirtHalfWidth(ny) + 0.20)) <= P / r * 0.8) {
+            ctx.fillStyle = C.suitHighlight; // Satin lapel edge highlight
+          } else {
+            ctx.fillStyle = C.suitLapel;
+          }
+        }
+        // D4. Suit Base Jacket
+        else {
+          ctx.fillStyle = (absX > 0.70 || ny > 0.85) ? C.outline : C.suitBase;
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // LAYER E: WARM FAIR FACE SKIN
+      // ──────────────────────────────────────────
+      if (ny < -0.22 && absX < 0.35) {
+        ctx.fillStyle = C.skinHighlight; // Center forehead highlight
+      } else if (absX > 0.50 || ny > 0.02) {
+        ctx.fillStyle = ((gx + gy) % 2 === 0) ? C.skinShadow : C.skinBase; // Cheek & chin shadow
+      } else {
+        ctx.fillStyle = C.skinBase; // Base warm skin
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
  * Main Skin Renderer for John Wick ("The Baba Yaga")
  */
 export function drawJohnWickSkin(ctx, fighter) {
@@ -283,7 +549,7 @@ export function drawJohnWickSkin(ctx, fighter) {
       // 1. Chamber / Pullback Phase: Smoothly retract arm & hand back to chest
       const chamberT = rawProgress / windupRatio;
       const easeChamber = (1 - Math.cos(chamberT * Math.PI)) * 0.5; // Smooth ease-in-out
-      frontX = r * (0.88 - 0.45 * easeChamber); // Retracts to r * 0.43
+      frontX = r * (0.88 - 0.45 * easeChamber);
       frontY = -r * (0.08 + 0.06 * easeChamber);
       backX = r * (0.45 + 0.05 * easeChamber);
       backY = r * 0.16;
@@ -291,7 +557,7 @@ export function drawJohnWickSkin(ctx, fighter) {
       // 2. Explosive Forward Stab Phase: Plunges front hand straight forward deep into target
       const thrustT = (rawProgress - windupRatio) / (thrustRatio - windupRatio);
       const easeThrust = 1 - Math.pow(1 - thrustT, 3); // Snappy ease-out cubic
-      frontX = r * (0.43 + 1.42 * easeThrust); // Lunges forward to r * 1.85!
+      frontX = r * (0.43 + 1.42 * easeThrust);
       frontY = -r * (0.14 - 0.08 * easeThrust);
       backX = r * 0.40;
       backY = r * 0.16;
@@ -299,7 +565,7 @@ export function drawJohnWickSkin(ctx, fighter) {
       // 3. Snappy Pullback Phase: Retracts hand cleanly back to guard position
       const pullT = (rawProgress - thrustRatio) / (1.0 - thrustRatio);
       const easePull = (1 - Math.cos(pullT * Math.PI)) * 0.5; // Smooth ease-in-out
-      frontX = r * (1.85 - 0.97 * easePull); // Retracts back to r * 0.88
+      frontX = r * (1.85 - 0.97 * easePull);
       frontY = -r * (0.06 + 0.02 * easePull);
       backX = r * 0.45;
       backY = r * 0.16;
@@ -329,9 +595,8 @@ export function drawJohnWickSkin(ctx, fighter) {
       const relMax = fighter.reloadMaxTime || 96;
       const relP = 1.0 - (fighter.reloadTimer / relMax);
       if (relP > 0.88) {
-        hideFrontHand = true; // Shell loading finished
+        hideFrontHand = true;
       } else {
-        // Hand brings shells up into undercarriage port 1-by-1
         const cycleP = (relP * 6) % 1.0;
         const feedOffset = -Math.sin(cycleP * Math.PI) * (r * 0.24);
         frontX = r * 0.96 + feedOffset;
@@ -339,7 +604,7 @@ export function drawJohnWickSkin(ctx, fighter) {
       }
     }
   } else if (fighter.currentEquippedWeapon === 'rifle') {
-    // Two-handed M4 Rifle: hide generic hand circles during aiming/firing so no skin overlay glitches on rifle
+    // Two-handed M4 Rifle: hide generic hand circles during aiming/firing
     const isRifleReloading = Boolean(fighter.isReloading && fighter.reloadTimer > 0);
     if (!isRifleReloading) {
       hideFrontHand = true;
@@ -349,22 +614,18 @@ export function drawJohnWickSkin(ctx, fighter) {
       const relMax = fighter.reloadMaxTime || 85;
       const relP = 1.0 - (fighter.reloadTimer / relMax);
       if (relP < 0.28) {
-        // Phase 1: Hand pulls empty magazine down out of magwell
         const p1 = relP / 0.28;
         frontX = r * 0.95 - p1 * (r * 0.12);
         frontY = r * 0.22 + p1 * (r * 0.50);
       } else if (relP < 0.55) {
-        // Phase 2: Magazine dropped! Hand reaches to vest pouch for fresh mag
         const p2 = (relP - 0.28) / 0.27;
         frontX = r * 0.55;
         frontY = r * 0.72 - Math.sin(p2 * Math.PI) * (r * 0.12);
       } else if (relP < 0.85) {
-        // Phase 3: Hand guides fresh magazine UP into the magwell
         const p3 = (relP - 0.55) / 0.30;
         frontX = r * 0.82 + p3 * (r * 0.13);
         frontY = r * 0.72 - p3 * (r * 0.50);
       } else {
-        // Phase 4: Magazine locked, hide hand
         hideFrontHand = true;
       }
     }
@@ -381,7 +642,7 @@ export function drawJohnWickSkin(ctx, fighter) {
   if (hideHandsAndWeapon || fighter.hideFrontHand) hideFrontHand = true;
   if (hideHandsAndWeapon || fighter.hideBackHand) hideBackHand = true;
   const handRadius = getHandSize(7.2);
-  const skinColor = '#F4CBB2';
+  const skinColor = '#E8AC8B';
 
   // ── ULTIMATE MODE EMANATING BLACK-GRAY ASSASSIN AURA (Background Layer) ──
   const isUltimate = Boolean(
@@ -397,7 +658,7 @@ export function drawJohnWickSkin(ctx, fighter) {
 
   // ── LAYER 1: BACK HAND (Behind Body Layer) ──
   if (!hideBackHand) {
-    _drawWickHand(ctx, backX, backY, handRadius * 0.92, skinColor);
+    drawJohnWickPixelHand(ctx, backX, backY, handRadius * 0.92, skinColor);
   }
 
   // ── EVADE BUFF / ROLL INTANGIBILITY AFTERIMAGE GHOSTS ──
@@ -414,393 +675,11 @@ export function drawJohnWickSkin(ctx, fighter) {
     ctx.fill();
     ctx.restore();
 
-    // Slightly translucent intangibility body
     ctx.globalAlpha = 0.78;
   }
 
-  // ── LAYER 2: MAIN BODY CIRCLE (PNG Model with Procedural Fallback) ──
-  const wickImg = _getJohnWickImage();
-  if (wickImg && wickImg.complete && wickImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.clip();
-    // Scale up slightly (1.075x) to compensate for transparent margins in the PNG
-    const scaleFactor = 1.075;
-    const drawR = r * scaleFactor;
-    ctx.drawImage(wickImg, -drawR, -drawR, drawR * 2, drawR * 2);
-    ctx.restore();
-  } else {
-    // Procedural Fallback
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.clip();
-
-  // ── A. Base Skin Fill ──
-  ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ── B. 3D Body Shading (Rule 11: Zero shadowBlur - Cached Gradient) ──
-  ctx.fillStyle = _getBodyGrad(ctx, r);
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ── C. TORSO & BESPOKE BLACK CONTINENTAL SUIT (+Y Bottom Hemisphere) ──
-  const suitBlack   = '#141518';       // Deep Tactical Black
-  const suitLapel   = '#222428';       // Satin Lapel Charcoal Tone
-  const suitSeam    = '#0A0B0D';       // Dark Seam Lines
-  const shirtWhite  = '#F8FAFC';      // Crisp White Dress Shirt
-  const shirtShade  = '#CBD5E1';      // Shirt Fold Shadow
-  const tieCharcoal = '#1B1D20';     // Dark Charcoal Tie Base
-  const tieBorder   = '#0A0B0D';     // Tie Edge Outline
-
-  // 1. Black Suit Jacket Base (+Y)
-  ctx.fillStyle = suitBlack;
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.26);
-  ctx.lineTo(r, r * 0.26);
-  ctx.lineTo(r, r);
-  ctx.lineTo(-r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // 2. White Dress Shirt V-Neck Chest Opening
-  ctx.fillStyle = shirtWhite;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.32, r * 0.26);
-  ctx.lineTo(r * 0.32, r * 0.26);
-  ctx.lineTo(0, r * 0.78);
-  ctx.closePath();
-  ctx.fill();
-
-  // Shirt fold shadows
-  ctx.strokeStyle = shirtShade;
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.09, r * 0.42);
-  ctx.lineTo(-r * 0.05, r * 0.60);
-  ctx.moveTo(r * 0.09, r * 0.42);
-  ctx.lineTo(r * 0.05, r * 0.60);
-  ctx.stroke();
-
-  // 3. Exposed Throat Skin (Above Shirt Collar)
-  ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.22, r * 0.20);
-  ctx.lineTo(r * 0.22, r * 0.20);
-  ctx.lineTo(r * 0.14, r * 0.32);
-  ctx.lineTo(-r * 0.14, r * 0.32);
-  ctx.closePath();
-  ctx.fill();
-
-  // Throat shadow
-  ctx.fillStyle = 'rgba(160, 80, 50, 0.28)';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.14, r * 0.22);
-  ctx.lineTo(r * 0.14, r * 0.22);
-  ctx.lineTo(0, r * 0.30);
-  ctx.closePath();
-  ctx.fill();
-
-  // 4. Charcoal Silk Necktie
-  ctx.fillStyle = tieCharcoal;
-  ctx.strokeStyle = tieBorder;
-  ctx.lineWidth = 1.2;
-
-  // Tie Knot
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.08, r * 0.30);
-  ctx.lineTo(r * 0.08, r * 0.30);
-  ctx.lineTo(r * 0.06, r * 0.44);
-  ctx.lineTo(-r * 0.06, r * 0.44);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Hanging Tie Blade
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.06, r * 0.44);
-  ctx.lineTo(r * 0.06, r * 0.44);
-  ctx.lineTo(r * 0.09, r * 0.88);
-  ctx.lineTo(0, r * 1.02);
-  ctx.lineTo(-r * 0.09, r * 0.88);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 5. White Shirt Collar Wings
-  ctx.fillStyle = shirtWhite;
-  ctx.strokeStyle = '#94A3B8';
-  ctx.lineWidth = 1.2;
-
-  // Left Collar Wing
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.30, r * 0.24);
-  ctx.lineTo(-r * 0.08, r * 0.40);
-  ctx.lineTo(-r * 0.14, r * 0.28);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Right Collar Wing
-  ctx.beginPath();
-  ctx.moveTo(r * 0.30, r * 0.24);
-  ctx.lineTo(r * 0.08, r * 0.40);
-  ctx.lineTo(r * 0.14, r * 0.28);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 6. Suit Jacket Lapels (Sharp Tailored Satin Lapels)
-  ctx.fillStyle = suitLapel;
-  ctx.strokeStyle = suitSeam;
-  ctx.lineWidth = 1.3;
-
-  // Left Lapel
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.72, r * 0.26);
-  ctx.lineTo(-r * 0.12, r * 0.74);
-  ctx.lineTo(-r * 0.24, r * 0.84);
-  ctx.lineTo(-r * 0.80, r * 0.46);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Right Lapel
-  ctx.beginPath();
-  ctx.moveTo(r * 0.72, r * 0.26);
-  ctx.lineTo(r * 0.12, r * 0.74);
-  ctx.lineTo(r * 0.24, r * 0.84);
-  ctx.lineTo(r * 0.78, r * 0.46);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Center button seam & button
-  ctx.strokeStyle = suitSeam;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(0, r * 0.74);
-  ctx.lineTo(0, r * 1.0);
-  ctx.stroke();
-
-  ctx.fillStyle = '#0F1012';
-  ctx.beginPath();
-  ctx.arc(0, r * 0.84, 1.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ── D. FACIAL DETAILS: MUSTACHE, SOUL PATCH, AND CHIN BEARD (Scaled & Proportionate) ──
-  const hairDark = '#141210';       // Deep Black Base Hair Fill
-  const hairInk  = '#0A0908';       // Bold Black Outline Stroke
-  const beardAccent = '#2D2723';    // Hair Texture Line Highlight
-
-  // 1. CHIN & JAW BEARD (Fits cleanly on face, ending at chin line y = r * 0.27, never overlaying suit!)
-  ctx.fillStyle = hairDark;
-  ctx.strokeStyle = hairInk;
-  ctx.lineWidth = 1.4;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  ctx.beginPath();
-  // Start at left cheek / sideburn junction
-  ctx.moveTo(-r * 0.50, -r * 0.04);
-  // Outer jaw curve down to left chin
-  ctx.quadraticCurveTo(-r * 0.42, r * 0.14, -r * 0.26, r * 0.25);
-  // Chin bottom curve (smooth rounded chin strap ending at y = r * 0.27)
-  ctx.quadraticCurveTo(0, r * 0.27, r * 0.26, r * 0.25);
-  // Outer jaw curve up to right cheek
-  ctx.quadraticCurveTo(r * 0.42, r * 0.14, r * 0.50, -r * 0.04);
-
-  // Inner boundary (top edge dipping under mouth and soul patch)
-  ctx.quadraticCurveTo(r * 0.28, r * 0.08, r * 0.18, r * 0.11);
-  ctx.quadraticCurveTo(r * 0.08, r * 0.18, 0, r * 0.18); // Under soul patch
-  ctx.quadraticCurveTo(-r * 0.08, r * 0.18, -r * 0.18, r * 0.11);
-  ctx.quadraticCurveTo(-r * 0.28, r * 0.08, -r * 0.50, -r * 0.04);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Interior Chin Beard Flow / Texture Lines
-  ctx.strokeStyle = beardAccent;
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  // Left chin beard contour
-  ctx.moveTo(-r * 0.32, r * 0.10);
-  ctx.quadraticCurveTo(-r * 0.26, r * 0.20, -r * 0.12, r * 0.24);
-  // Right chin beard contour
-  ctx.moveTo(r * 0.32, r * 0.10);
-  ctx.quadraticCurveTo(r * 0.26, r * 0.20, r * 0.12, r * 0.24);
-  // Center chin contour
-  ctx.moveTo(-r * 0.10, r * 0.24);
-  ctx.quadraticCurveTo(0, r * 0.26, r * 0.10, r * 0.24);
-  ctx.stroke();
-
-  // 2. SOUL PATCH (Curved Patch right under lower lip)
-  ctx.fillStyle = hairDark;
-  ctx.strokeStyle = hairInk;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.05, r * 0.10);
-  ctx.quadraticCurveTo(0, r * 0.08, r * 0.05, r * 0.10);
-  ctx.quadraticCurveTo(r * 0.04, r * 0.16, 0, r * 0.17);
-  ctx.quadraticCurveTo(-r * 0.04, r * 0.16, -r * 0.05, r * 0.10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 3. ICONIC CURVED MUSTACHE
-  ctx.fillStyle = hairDark;
-  ctx.strokeStyle = hairInk;
-  ctx.lineWidth = 1.3;
-
-  ctx.beginPath();
-  // Upper lip center-top origin
-  ctx.moveTo(0, -r * 0.02);
-  // Right wing top edge
-  ctx.quadraticCurveTo(r * 0.12, -r * 0.05, r * 0.22, r * 0.04);
-  ctx.quadraticCurveTo(r * 0.25, r * 0.08, r * 0.21, r * 0.11);
-  // Right wing bottom edge
-  ctx.quadraticCurveTo(r * 0.13, r * 0.05, r * 0.05, r * 0.05);
-  // Center bottom gap
-  ctx.lineTo(0, r * 0.03);
-  // Left wing bottom edge
-  ctx.lineTo(-r * 0.05, r * 0.05);
-  ctx.quadraticCurveTo(-r * 0.13, r * 0.05, -r * 0.21, r * 0.11);
-  ctx.quadraticCurveTo(-r * 0.25, r * 0.08, -r * 0.22, r * 0.04);
-  // Left wing top edge
-  ctx.quadraticCurveTo(-r * 0.12, -r * 0.05, 0, -r * 0.02);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Mustache Texture Accent Lines
-  ctx.strokeStyle = beardAccent;
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.06, r * 0.01);
-  ctx.quadraticCurveTo(-r * 0.14, 0, -r * 0.20, r * 0.08);
-  ctx.moveTo(r * 0.06, r * 0.01);
-  ctx.quadraticCurveTo(r * 0.14, 0, r * 0.20, r * 0.08);
-  ctx.stroke();
-
-  // 4. Subtle Battle Scratch (Diagonal cut on cheek)
-  ctx.strokeStyle = 'rgba(195, 45, 35, 0.75)';
-  ctx.lineWidth = 1.3;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(r * 0.28, -r * 0.12);
-  ctx.lineTo(r * 0.38, 0.02);
-  ctx.stroke();
-
-  // ── E. JOHN WICK CENTER-PARTED HAIR (Matching Reference Image 1) ──
-  // Reference: Thick black hair with center V-parting, double-arched forehead windows,
-  // and sleek dark gray highlight arcs along the crown.
-
-  const hairHighlight = '#443A34';  // Volumetric Crown Sheen
-  const hairHighlight2 = '#5C4E46'; // Secondary Sheen Accent
-
-  // Helper to trace the smooth double-arched M-parting hairline
-  const traceHairline = (pathCtx) => {
-    // 1. Start at left suit collar junction (hair cascades down the left flank)
-    pathCtx.moveTo(-r, r * 0.18);
-
-    // 2. Left side lock: sweeps up inner cheek line
-    pathCtx.quadraticCurveTo(-r * 0.78, -r * 0.05, -r * 0.68, -r * 0.20);
-
-    // 3. Left forehead window arch (sweeping up over left brow, then down to center part)
-    pathCtx.quadraticCurveTo(-r * 0.42, -r * 0.58, -r * 0.05, -r * 0.44);
-
-    // 4. Center V-part valley
-    pathCtx.lineTo(0, -r * 0.42);
-    pathCtx.lineTo(r * 0.05, -r * 0.44);
-
-    // 5. Right forehead window arch (sweeping up over right brow, then down to temple)
-    pathCtx.quadraticCurveTo(r * 0.42, -r * 0.58, r * 0.68, -r * 0.20);
-
-    // 6. Right side lock: sweeps down inner cheek line to right suit collar junction
-    pathCtx.quadraticCurveTo(r * 0.78, -r * 0.05, r, r * 0.18);
-  };
-
-  // ── 1. FILL SOLID VOLUMETRIC HAIR MESH ──
-  ctx.fillStyle = hairDark;
-  ctx.beginPath();
-  traceHairline(ctx);
-  // Close through top dome
-  ctx.lineTo(r, -r);
-  ctx.lineTo(-r, -r);
-  ctx.closePath();
-  ctx.fill();
-
-  // ── 2. STROKE ONLY THE EXPOSED HAIRLINE (Crisp, Clean & Symmetrical as in Image 1) ──
-  ctx.strokeStyle = hairInk;
-  ctx.lineWidth = 1.8;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  traceHairline(ctx);
-  ctx.stroke();
-
-  // ── 3. INTERNAL HAIR FLOW CONTOURS (STRICTLY INSIDE HAIR MASS) ──
-  ctx.strokeStyle = beardAccent;
-  ctx.lineWidth = 1.4;
-  ctx.lineCap = 'round';
-
-  // Left sweep from center part over left brow
-  ctx.beginPath();
-  ctx.moveTo(0, -r * 0.48);
-  ctx.quadraticCurveTo(-r * 0.32, -r * 0.58, -r * 0.76, -r * 0.26);
-  ctx.stroke();
-
-  // Right sweep from center part over right brow
-  ctx.beginPath();
-  ctx.moveTo(0, -r * 0.48);
-  ctx.quadraticCurveTo(r * 0.32, -r * 0.58, r * 0.76, -r * 0.26);
-  ctx.stroke();
-
-  // Left crown outer flow
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.20, -r * 0.75);
-  ctx.bezierCurveTo(-r * 0.60, -r * 0.65, -r * 0.85, -r * 0.35, -r * 0.92, r * 0.04);
-  ctx.stroke();
-
-  // Right crown outer flow
-  ctx.beginPath();
-  ctx.moveTo(r * 0.20, -r * 0.75);
-  ctx.bezierCurveTo(r * 0.60, -r * 0.65, r * 0.85, -r * 0.35, r * 0.92, r * 0.04);
-  ctx.stroke();
-
-  // ── 4. CROWN HIGHLIGHT SHEENS ALONG ARCH CRESTS (Matching Image 1) ──
-  ctx.strokeStyle = hairHighlight;
-  ctx.lineWidth = 1.6;
-
-  // Left crest highlight
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.15, -r * 0.78);
-  ctx.bezierCurveTo(-r * 0.38, -r * 0.72, -r * 0.60, -r * 0.52, -r * 0.72, -r * 0.30);
-  ctx.stroke();
-
-  // Right crest highlight
-  ctx.beginPath();
-  ctx.moveTo(r * 0.15, -r * 0.78);
-  ctx.bezierCurveTo(r * 0.38, -r * 0.72, r * 0.60, -r * 0.52, r * 0.72, -r * 0.30);
-  ctx.stroke();
-
-  // Secondary brighter crown sheen
-  ctx.strokeStyle = hairHighlight2;
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.20, -r * 0.70);
-  ctx.quadraticCurveTo(-r * 0.45, -r * 0.64, -r * 0.60, -r * 0.44);
-  ctx.moveTo(r * 0.20, -r * 0.70);
-  ctx.quadraticCurveTo(r * 0.45, -r * 0.64, r * 0.60, -r * 0.44);
-  ctx.stroke();
-
-  ctx.restore(); // Undo circle clipping
-  }
+  // ── LAYER 2: MAIN BODY CIRCLE (100% DISCRETE 2D PIXEL ART ENGINE) ──
+  drawJohnWickPixelBody(ctx, r);
 
   // ── PASSIVE 1: BALLISTIC TAILORED SUIT (Kevlar Weave Shimmer Overlay) ──
   if (fighter.suitShimmerTimer > 0) {
@@ -811,7 +690,6 @@ export function drawJohnWickSkin(ctx, fighter) {
     ctx.arc(0, 0, r + 1, 0, Math.PI * 2);
     ctx.clip();
 
-    // High-tech Kevlar carbon-fiber weave grid
     ctx.strokeStyle = `rgba(148, 163, 184, ${0.45 * shimmerAlpha})`;
     ctx.lineWidth = 1.0;
     const gridStep = 4.5;
@@ -828,7 +706,6 @@ export function drawJohnWickSkin(ctx, fighter) {
       ctx.stroke();
     }
 
-    // Outer Kevlar deflection shield rim
     ctx.strokeStyle = `rgba(203, 213, 225, ${0.90 * shimmerAlpha})`;
     ctx.lineWidth = 2.2;
     ctx.beginPath();
@@ -845,7 +722,7 @@ export function drawJohnWickSkin(ctx, fighter) {
 
   // ── LAYER 4: FRONT HAND (Front Layer — On Top of Body) ──
   if (!hideFrontHand) {
-    _drawWickHand(ctx, frontX, frontY, handRadius, skinColor);
+    drawJohnWickPixelHand(ctx, frontX, frontY, handRadius, skinColor);
   }
 
   // Status Overlays (Stun, Slow, Bleed, etc.)
