@@ -1736,86 +1736,84 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
   if (pillarAlpha <= 0.01) return;
 
   ctx.save();
+  ctx.imageSmoothingEnabled = false; // Authentic nearest-neighbor pixel art rendering
 
-  // ── 1. Colossal Outer Reiatsu Corona Shroud (Multi-Peak Needle Silhouette: Jet Black & Crimson Red) ──
+  const P = 2.0; // Discrete pixel art grid unit
+  const snap = (v) => Math.round(v / P) * P;
+
   const coronaW = pillarBaseW * 1.55;
-  const coronaGrad = ctx.createLinearGradient(-coronaW, 0, coronaW, 0);
-  coronaGrad.addColorStop(0.0, 'rgba(220, 20, 20, 0.0)');
-  coronaGrad.addColorStop(0.20, `rgba(220, 20, 20, ${(0.85 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.42, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.50, `rgba(255, 240, 240, ${(1.0 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.58, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.80, `rgba(220, 20, 20, ${(0.85 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(1.0, 'rgba(220, 20, 20, 0.0)');
-
-  // Outer Multi-Peak Needle Polygon
-  ctx.beginPath();
-  ctx.moveTo(-coronaW, 0);
-  ctx.lineTo(-coronaW * 0.75, -pillarHeight * 0.55);
-  ctx.lineTo(-coronaW * 0.60, -pillarHeight * 0.52);
-  ctx.lineTo(-coronaW * 0.40, -pillarHeight * 0.82);
-  ctx.lineTo(-coronaW * 0.25, -pillarHeight * 0.78);
-  ctx.lineTo(0, -pillarHeight);                      // Main Center Spear Peak
-  ctx.lineTo(coronaW * 0.25, -pillarHeight * 0.75);
-  ctx.lineTo(coronaW * 0.45, -pillarHeight * 0.80);
-  ctx.lineTo(coronaW * 0.65, -pillarHeight * 0.50);
-  ctx.lineTo(coronaW * 0.80, -pillarHeight * 0.54);
-  ctx.lineTo(coronaW, 0);
-  ctx.closePath();
-  ctx.fillStyle = coronaGrad;
-  ctx.fill();
-
-  // ── 2. High-Density Black Void & Stark Ruby-White Core Column ──
   const coreW = pillarBaseW * 0.75;
-  const coreGrad = ctx.createLinearGradient(-coreW, 0, coreW, 0);
-  coreGrad.addColorStop(0.0, 'rgba(12, 4, 10, 0.0)');
-  coreGrad.addColorStop(0.20, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.40, `rgba(255, 30, 20, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.50, `rgba(255, 255, 255, ${(1.0 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.60, `rgba(255, 30, 20, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.80, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(1.0, 'rgba(12, 4, 10, 0.0)');
 
-  ctx.beginPath();
-  ctx.moveTo(-coreW, 0);
-  ctx.lineTo(-coreW * 0.60, -pillarHeight * 0.60);
-  ctx.lineTo(-coreW * 0.35, -pillarHeight * 0.88);
-  ctx.lineTo(0, -pillarHeight * 0.98);               // Core Spear Tip
-  ctx.lineTo(coreW * 0.35, -pillarHeight * 0.85);
-  ctx.lineTo(coreW * 0.60, -pillarHeight * 0.56);
-  ctx.lineTo(coreW, 0);
-  ctx.closePath();
-  ctx.fillStyle = coreGrad;
-  ctx.fill();
+  // ── 1. Discrete 2D Stepped Skyward Sonic Pillar Column ──
+  ctx.globalAlpha = pillarAlpha;
+  for (let gy = 0; gy >= -pillarHeight; gy -= P) {
+    const yNorm = -gy / pillarHeight; // 0 at base, 1 at skyward tip
+    // Multi-peak needle polygon width profile
+    let wProfile = 1.0;
+    if (yNorm > 0.82) {
+      wProfile = (1.0 - yNorm) / 0.18; // Main Center Spear Peak
+    } else if (yNorm > 0.55) {
+      wProfile = 0.45 + 0.35 * Math.sin(((yNorm - 0.55) / 0.27) * Math.PI);
+    } else {
+      wProfile = 1.0 - yNorm * 0.45;
+    }
 
-  // ── 3. Vertical Supersonic Speed Needle Streaks Inside Pillar (Black-Crimson Lines) ──
+    const curW = Math.max(P, coronaW * wProfile);
+    const curCoreW = Math.max(P, coreW * (1.0 - yNorm * 0.75));
+
+    for (let gx = -curW; gx <= curW; gx += P) {
+      const absX = Math.abs(gx);
+      const pxX = snap(gx);
+      const pyY = snap(gy);
+
+      const isBorder = absX >= curW - P || gy >= -P || gy <= -pillarHeight + P;
+      if (isBorder) {
+        ctx.fillStyle = '#1A0006'; // Deep Obsidian Crimson outline
+        ctx.fillRect(pxX, pyY, P, P);
+        continue;
+      }
+
+      if (absX < P * 1.5) {
+        ctx.fillStyle = '#FFFFFF'; // Razor pure white-hot center spine
+      } else if (absX < curCoreW * 0.5) {
+        ctx.fillStyle = '#080003'; // Abyssal pitch-black obsidian void core
+      } else if (absX < curCoreW) {
+        ctx.fillStyle = '#8B0014'; // Transition deep burning crimson
+      } else {
+        ctx.fillStyle = (Math.round(gx / P) + Math.round(gy / P)) % 2 === 0 ? '#FF0033' : '#8B0014'; // Blood-crimson flame corona
+      }
+      ctx.fillRect(pxX, pyY, P, P);
+    }
+  }
+
+  // ── 2. Vertical Supersonic Stepped Pixel Speed Needles ──
   const streakCount = 8;
   for (let s = 0; s < streakCount; s++) {
     const sNorm = (s / (streakCount - 1)) * 2 - 1; // -1 to +1
-    const sx = sNorm * (coreW * 0.75);
+    const sx = snap(sNorm * (coreW * 0.75));
     const sSpeed = 1.2 + (s % 3) * 0.4;
     const sTravel = ((now * 0.003 * sSpeed * 60 + s * 70) % (pillarHeight * 0.85));
-    const sy = -sTravel;
+    const sy = snap(-sTravel);
     const sLen = 45 + (1.0 - Math.abs(sNorm)) * 65;
-    const sThick = (1.5 + (1.0 - Math.abs(sNorm)) * 1.5) * (1.0 - burstProg * 0.4);
+    const halfLen = sLen * 0.5;
 
     let sColor;
-    if (s % 4 === 0) sColor = `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`;       // Manga dark ink line
-    else if (s % 4 === 1) sColor = `rgba(220, 20, 20, ${(0.95 * pillarAlpha).toFixed(3)})`; // Crimson Reiatsu
-    else if (s % 4 === 2) sColor = `rgba(255, 45, 20, ${(0.95 * pillarAlpha).toFixed(3)})`; // Fiery red
-    else sColor = `rgba(255, 245, 240, ${(0.98 * pillarAlpha).toFixed(3)})`;                 // Ruby-white core
+    if (s % 4 === 0) sColor = '#1A0006';       // Obsidian ink line
+    else if (s % 4 === 1) sColor = '#FF0033'; // Electric blood crimson
+    else if (s % 4 === 2) sColor = '#8B0014'; // Deep burning red
+    else sColor = '#FFFFFF';                  // Pure white core
 
     ctx.fillStyle = sColor;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy - sLen / 2);
-    ctx.lineTo(sx + sThick, sy);
-    ctx.lineTo(sx, sy + sLen / 2);
-    ctx.lineTo(sx - sThick, sy);
-    ctx.closePath();
-    ctx.fill();
+    for (let dy = -halfLen; dy <= halfLen; dy += P) {
+      const t = 1.0 - Math.abs(dy / halfLen);
+      const thick = Math.max(P, snap(t * P * 2));
+      for (let dx = -thick; dx <= thick; dx += P) {
+        ctx.fillRect(sx + dx, sy + dy, P, P);
+      }
+    }
   }
 
-  // ── 4. Transonic Mach Vapor Expansion Discs (Horizontal Condensation Rings) ──
+  // ── 3. Transonic Mach Stepped Pixel Condensation Discs ──
   const ringDefs = [
     { baseY: -25,  scaleX: 1.50, scaleY: 0.32, speed: 1.0, thick: 14.0 },
     { baseY: -95,  scaleX: 1.35, scaleY: 0.28, speed: 1.15, thick: 11.0 },
@@ -1827,64 +1825,59 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
     const ringProg = Math.min(1.0, burstProg * rd.speed);
     const rx = (pillarBaseW * 0.9 + ringProg * 175 * rd.scaleX);
     const ry = rx * rd.scaleY;
-    const curY = rd.baseY - ringProg * 35;
+    const curY = snap(rd.baseY - ringProg * 35);
     const ringA = Math.sin(Math.min(1.0, burstProg * 1.4) * Math.PI) * pillarAlpha * 0.88;
 
     if (ringA > 0.01) {
-      ctx.save();
-      ctx.translate(0, curY);
+      const steps = Math.max(24, Math.round((Math.PI * 2 * rx) / P));
+      for (let st = 0; st < steps; st++) {
+        const ang = (st / steps) * Math.PI * 2;
+        const px = snap(Math.cos(ang) * rx);
+        const py = snap(curY + Math.sin(ang) * ry);
 
-      // Outer Crimson Vapor Ring
-      ctx.strokeStyle = `rgba(220, 20, 20, ${(0.72 * ringA).toFixed(3)})`;
-      ctx.lineWidth = rd.thick * (1.0 - burstProg * 0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
+        // Outer Blood-Crimson vapor ring
+        ctx.fillStyle = '#FF0033';
+        ctx.fillRect(px, py, P, P);
 
-      // Sharp Jet-Black Void Shock Edge
-      ctx.strokeStyle = `rgba(12, 4, 10, ${(0.95 * ringA).toFixed(3)})`;
-      ctx.lineWidth = 2.4 * (1.0 - burstProg * 0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
+        // Jet-Black Void shock ring
+        ctx.fillStyle = '#1A0006';
+        ctx.fillRect(px, py + P, P, P);
 
-      // Stark Ruby-White Condensation Vapor Core
-      ctx.strokeStyle = `rgba(255, 240, 240, ${(0.98 * ringA).toFixed(3)})`;
-      ctx.lineWidth = 1.2 * (1.0 - burstProg * 0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.restore();
+        // White-hot condensation core
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(px, py - P, P, P);
+      }
     }
   }
 
-  // ── 5. Vertical Ascending Micro-Lightning Tendrils (Black-Crimson Theme) ──
+  // ── 4. Vertical Ascending Micro-Lightning Tendrils (Stepped Pixel Staircase) ──
   const boltCount = 4;
   for (let b = 0; b < boltCount; b++) {
     const bSide = b % 2 === 0 ? -1 : 1;
-    const startY = -40 - b * 90;
+    const startY = snap(-40 - b * 90);
     const bLen = (60 + (b % 2) * 45) * (1.0 - burstProg * 0.3);
-    const bx = bSide * (coreW * 0.85);
+    const bx = snap(bSide * (coreW * 0.85));
 
-    ctx.beginPath();
-    ctx.moveTo(bx, startY);
-    let curX = bx, curY = startY;
+    let curX = bx;
+    let curY = startY;
     const segs = 4;
     for (let s = 1; s <= segs; s++) {
       const frac = s / segs;
-      const jag = (s % 2 === 0 ? 1 : -1) * (5.5 + Math.sin(now * 0.05 + b + s) * 3.5);
-      curX = bx + bSide * (frac * 14) + jag;
-      curY = startY - frac * bLen;
-      ctx.lineTo(curX, curY);
-    }
-    ctx.strokeStyle = `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
+      const targetX = snap(bx + bSide * (frac * 14) + (s % 2 === 0 ? P * 3 : -P * 3));
+      const targetY = snap(startY - frac * bLen);
 
-    ctx.strokeStyle = (b % 2 === 0) ? `rgba(255, 30, 20, ${(0.98 * pillarAlpha).toFixed(3)})` : `rgba(255, 245, 240, ${(0.98 * pillarAlpha).toFixed(3)})`;
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+      // Draw stepped orthogonal/diagonal staircase line
+      while (curY > targetY || curX !== targetX) {
+        if (curY > targetY) curY -= P;
+        if (curX < targetX) curX += P;
+        else if (curX > targetX) curX -= P;
+
+        ctx.fillStyle = '#1A0006';
+        ctx.fillRect(curX, curY, P, P);
+        ctx.fillStyle = (b % 2 === 0) ? '#FF0033' : '#FFFFFF';
+        ctx.fillRect(curX, curY - P, P, P);
+      }
+    }
   }
 
   ctx.restore();
@@ -1932,86 +1925,83 @@ function _drawShikaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
   if (pillarAlpha <= 0.01) return;
 
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
 
-  // ── 1. Colossal Outer Shikai Reiatsu Corona Shroud (Multi-Peak Needle Silhouette: Cyan-Blue, Pure White & Jet Black) ──
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
   const coronaW = pillarBaseW * 1.55;
-  const coronaGrad = ctx.createLinearGradient(-coronaW, 0, coronaW, 0);
-  coronaGrad.addColorStop(0.0, 'rgba(0, 213, 255, 0.0)');
-  coronaGrad.addColorStop(0.20, `rgba(0, 213, 255, ${(0.85 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.42, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.50, `rgba(255, 255, 255, ${(1.0 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.58, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.80, `rgba(0, 213, 255, ${(0.85 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(1.0, 'rgba(0, 213, 255, 0.0)');
-
-  // Outer Multi-Peak Needle Polygon (Cyan-Blue, White, Black lines)
-  ctx.beginPath();
-  ctx.moveTo(-coronaW, 0);
-  ctx.lineTo(-coronaW * 0.75, -pillarHeight * 0.55);
-  ctx.lineTo(-coronaW * 0.60, -pillarHeight * 0.52);
-  ctx.lineTo(-coronaW * 0.40, -pillarHeight * 0.82);
-  ctx.lineTo(-coronaW * 0.25, -pillarHeight * 0.78);
-  ctx.lineTo(0, -pillarHeight);                      // Main Center Spear Peak
-  ctx.lineTo(coronaW * 0.25, -pillarHeight * 0.75);
-  ctx.lineTo(coronaW * 0.45, -pillarHeight * 0.80);
-  ctx.lineTo(coronaW * 0.65, -pillarHeight * 0.50);
-  ctx.lineTo(coronaW * 0.80, -pillarHeight * 0.54);
-  ctx.lineTo(coronaW, 0);
-  ctx.closePath();
-  ctx.fillStyle = coronaGrad;
-  ctx.fill();
-
-  // ── 2. High-Density Black Void & Stark Cyan-White Core Column ──
   const coreW = pillarBaseW * 0.75;
-  const coreGrad = ctx.createLinearGradient(-coreW, 0, coreW, 0);
-  coreGrad.addColorStop(0.0, 'rgba(10, 15, 24, 0.0)');
-  coreGrad.addColorStop(0.20, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.40, `rgba(0, 213, 255, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.50, `rgba(255, 255, 255, ${(1.0 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.60, `rgba(0, 213, 255, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.80, `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(1.0, 'rgba(10, 15, 24, 0.0)');
 
-  ctx.beginPath();
-  ctx.moveTo(-coreW, 0);
-  ctx.lineTo(-coreW * 0.60, -pillarHeight * 0.60);
-  ctx.lineTo(-coreW * 0.35, -pillarHeight * 0.88);
-  ctx.lineTo(0, -pillarHeight * 0.98);               // Core Spear Tip
-  ctx.lineTo(coreW * 0.35, -pillarHeight * 0.85);
-  ctx.lineTo(coreW * 0.60, -pillarHeight * 0.56);
-  ctx.lineTo(coreW, 0);
-  ctx.closePath();
-  ctx.fillStyle = coreGrad;
-  ctx.fill();
+  // ── 1. Discrete 2D Stepped Skyward Sonic Pillar Column (Cyan-Blue & White Theme) ──
+  ctx.globalAlpha = pillarAlpha;
+  for (let gy = 0; gy >= -pillarHeight; gy -= P) {
+    const yNorm = -gy / pillarHeight;
+    let wProfile = 1.0;
+    if (yNorm > 0.82) {
+      wProfile = (1.0 - yNorm) / 0.18;
+    } else if (yNorm > 0.55) {
+      wProfile = 0.45 + 0.35 * Math.sin(((yNorm - 0.55) / 0.27) * Math.PI);
+    } else {
+      wProfile = 1.0 - yNorm * 0.45;
+    }
 
-  // ── 3. Vertical Supersonic Speed Needle Streaks Inside Pillar (CyanBlue-White-Black Lines) ──
-  const streakCount = 8;
-  for (let s = 0; s < streakCount; s++) {
-    const sNorm = (s / (streakCount - 1)) * 2 - 1; // -1 to +1
-    const sx = sNorm * (coreW * 0.75);
-    const sSpeed = 1.2 + (s % 3) * 0.4;
-    const sTravel = ((now * 0.003 * sSpeed * 60 + s * 70) % (pillarHeight * 0.85));
-    const sy = -sTravel;
-    const sLen = 45 + (1.0 - Math.abs(sNorm)) * 65;
-    const sThick = (1.5 + (1.0 - Math.abs(sNorm)) * 1.5) * (1.0 - burstProg * 0.4);
+    const curW = Math.max(P, coronaW * wProfile);
+    const curCoreW = Math.max(P, coreW * (1.0 - yNorm * 0.75));
 
-    let sColor;
-    if (s % 4 === 0) sColor = `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`;       // Manga dark ink line
-    else if (s % 4 === 1) sColor = `rgba(0, 213, 255, ${(0.95 * pillarAlpha).toFixed(3)})`; // Sky-Blue Reiatsu
-    else if (s % 4 === 2) sColor = `rgba(0, 170, 255, ${(0.95 * pillarAlpha).toFixed(3)})`; // Deep Electric Cyan
-    else sColor = `rgba(255, 255, 255, ${(0.98 * pillarAlpha).toFixed(3)})`;                 // Pure White Core
+    for (let gx = -curW; gx <= curW; gx += P) {
+      const absX = Math.abs(gx);
+      const pxX = snap(gx);
+      const pyY = snap(gy);
 
-    ctx.fillStyle = sColor;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy - sLen / 2);
-    ctx.lineTo(sx + sThick, sy);
-    ctx.lineTo(sx, sy + sLen / 2);
-    ctx.lineTo(sx - sThick, sy);
-    ctx.closePath();
-    ctx.fill();
+      const isBorder = absX >= curW - P || gy >= -P || gy <= -pillarHeight + P;
+      if (isBorder) {
+        ctx.fillStyle = '#00143A';
+        ctx.fillRect(pxX, pyY, P, P);
+        continue;
+      }
+
+      if (absX < P * 1.5) {
+        ctx.fillStyle = '#FFFFFF';
+      } else if (absX < curCoreW * 0.5) {
+        ctx.fillStyle = '#0066EE';
+      } else if (absX < curCoreW) {
+        ctx.fillStyle = '#00D5FF';
+      } else {
+        ctx.fillStyle = (Math.round(gx / P) + Math.round(gy / P)) % 2 === 0 ? '#00E5FF' : '#0066EE';
+      }
+      ctx.fillRect(pxX, pyY, P, P);
+    }
   }
 
-  // ── 4. Transonic Mach Vapor Expansion Discs (Horizontal Condensation Rings) ──
+  // ── 2. Vertical Supersonic Stepped Pixel Speed Needles ──
+  const streakCount = 8;
+  for (let s = 0; s < streakCount; s++) {
+    const sNorm = (s / (streakCount - 1)) * 2 - 1;
+    const sx = snap(sNorm * (coreW * 0.75));
+    const sSpeed = 1.2 + (s % 3) * 0.4;
+    const sTravel = ((now * 0.003 * sSpeed * 60 + s * 70) % (pillarHeight * 0.85));
+    const sy = snap(-sTravel);
+    const sLen = 45 + (1.0 - Math.abs(sNorm)) * 65;
+    const halfLen = sLen * 0.5;
+
+    let sColor;
+    if (s % 4 === 0) sColor = '#00143A';
+    else if (s % 4 === 1) sColor = '#00E5FF';
+    else if (s % 4 === 2) sColor = '#0077FF';
+    else sColor = '#FFFFFF';
+
+    ctx.fillStyle = sColor;
+    for (let dy = -halfLen; dy <= halfLen; dy += P) {
+      const t = 1.0 - Math.abs(dy / halfLen);
+      const thick = Math.max(P, snap(t * P * 2));
+      for (let dx = -thick; dx <= thick; dx += P) {
+        ctx.fillRect(sx + dx, sy + dy, P, P);
+      }
+    }
+  }
+
+  // ── 3. Transonic Mach Stepped Pixel Condensation Discs ──
   const ringDefs = [
     { baseY: -25,  scaleX: 1.50, scaleY: 0.32, speed: 1.0, thick: 14.0 },
     { baseY: -95,  scaleX: 1.35, scaleY: 0.28, speed: 1.15, thick: 11.0 },
@@ -2023,64 +2013,53 @@ function _drawShikaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
     const ringProg = Math.min(1.0, burstProg * rd.speed);
     const rx = (pillarBaseW * 0.9 + ringProg * 175 * rd.scaleX);
     const ry = rx * rd.scaleY;
-    const curY = rd.baseY - ringProg * 35;
+    const curY = snap(rd.baseY - ringProg * 35);
     const ringA = Math.sin(Math.min(1.0, burstProg * 1.4) * Math.PI) * pillarAlpha * 0.88;
 
     if (ringA > 0.01) {
-      ctx.save();
-      ctx.translate(0, curY);
+      const steps = Math.max(24, Math.round((Math.PI * 2 * rx) / P));
+      for (let st = 0; st < steps; st++) {
+        const ang = (st / steps) * Math.PI * 2;
+        const px = snap(Math.cos(ang) * rx);
+        const py = snap(curY + Math.sin(ang) * ry);
 
-      // Outer Cyan-Blue Vapor Ring
-      ctx.strokeStyle = `rgba(0, 213, 255, ${(0.75 * ringA).toFixed(3)})`;
-      ctx.lineWidth = rd.thick * (1.0 - burstProg * 0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
+        ctx.fillStyle = '#00E5FF';
+        ctx.fillRect(px, py, P, P);
 
-      // Sharp Jet-Black Void Shock Edge
-      ctx.strokeStyle = `rgba(10, 15, 24, ${(0.95 * ringA).toFixed(3)})`;
-      ctx.lineWidth = 2.4 * (1.0 - burstProg * 0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
+        ctx.fillStyle = '#00143A';
+        ctx.fillRect(px, py + P, P, P);
 
-      // Stark Pure White Condensation Vapor Core
-      ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * ringA).toFixed(3)})`;
-      ctx.lineWidth = 1.2 * (1.0 - burstProg * 0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.restore();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(px, py - P, P, P);
+      }
     }
-  }
-
-  // ── 5. Vertical Ascending Micro-Lightning Tendrils (Cyan-White Theme) ──
+  // ── 4. Vertical Ascending Micro-Lightning Tendrils (Stepped Pixel Staircase) ──
   const boltCount = 4;
   for (let b = 0; b < boltCount; b++) {
     const bSide = b % 2 === 0 ? -1 : 1;
-    const startY = -40 - b * 90;
+    const startY = snap(-40 - b * 90);
     const bLen = (60 + (b % 2) * 45) * (1.0 - burstProg * 0.3);
-    const bx = bSide * (coreW * 0.85);
+    const bx = snap(bSide * (coreW * 0.85));
 
-    ctx.beginPath();
-    ctx.moveTo(bx, startY);
-    let curX = bx, curY = startY;
+    let curX = bx;
+    let curY = startY;
     const segs = 4;
     for (let s = 1; s <= segs; s++) {
       const frac = s / segs;
-      const jag = (s % 2 === 0 ? 1 : -1) * (5.5 + Math.sin(now * 0.05 + b + s) * 3.5);
-      curX = bx + bSide * (frac * 14) + jag;
-      curY = startY - frac * bLen;
-      ctx.lineTo(curX, curY);
-    }
-    ctx.strokeStyle = `rgba(10, 15, 24, ${(0.95 * pillarAlpha).toFixed(3)})`;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
+      const targetX = snap(bx + bSide * (frac * 14) + (s % 2 === 0 ? P * 3 : -P * 3));
+      const targetY = snap(startY - frac * bLen);
 
-    ctx.strokeStyle = (b % 2 === 0) ? `rgba(0, 213, 255, ${(0.98 * pillarAlpha).toFixed(3)})` : `rgba(255, 255, 255, ${(0.98 * pillarAlpha).toFixed(3)})`;
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+      while (curY > targetY || curX !== targetX) {
+        if (curY > targetY) curY -= P;
+        if (curX < targetX) curX += P;
+        else if (curX > targetX) curX -= P;
+
+        ctx.fillStyle = '#00143A';
+        ctx.fillRect(curX, curY, P, P);
+        ctx.fillStyle = (b % 2 === 0) ? '#00E5FF' : '#FFFFFF';
+        ctx.fillRect(curX, curY - P, P, P);
+      }
+    }
   }
 
   ctx.restore();
