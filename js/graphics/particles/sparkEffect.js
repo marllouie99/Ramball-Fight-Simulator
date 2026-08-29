@@ -2056,51 +2056,82 @@ export function drawSparkEffects(layer = 'all') {
         ctx.restore();
       } else if (isInfinityClash) {
         // ── GOJO LIMITLESS BARRIER REBOUND SHOCKWAVE ──
-        ctx.save();
-        ctx.globalCompositeOperation = 'source-over';
+        const isDarkMode = Boolean(
+          typeof state !== 'undefined' && (
+            state.arenaTheme === 'dark' || 
+            state.darkMode || 
+            (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+          )
+        );
 
-        // 0. Dark Outer Spatial Obsidian Rim (Guarantees crisp visibility on light/white arenas!)
-        ctx.strokeStyle = `rgba(8, 20, 36, ${effect.life * 0.90})`;
-        ctx.lineWidth = 14 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size + 2, 0, Math.PI * 2);
-        ctx.stroke();
+        if (isDarkMode) {
+          // ── DARK MODE: CLEAN STEPPED PIXELATED CONCENTRIC SHOCKWAVE RING ──
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          const P = 2.0;
+          const snap = (v) => Math.round(v / P) * P;
+          const steps = 36;
 
-        // 1. Primary Outer Spatial Refraction Cyan Ring
-        ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.98})`;
-        ctx.lineWidth = 9 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
- 
-        // 2. Middle Deep Cursed Blue Ring
-        ctx.strokeStyle = `rgba(0, 120, 255, ${effect.life * 0.92})`;
-        ctx.lineWidth = 6 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
-        ctx.stroke();
- 
-        // 3. Inner White-Hot Rebound Core Ring
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-        ctx.lineWidth = 3.5 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
-        ctx.stroke();
+          for (let st = 0; st < steps; st++) {
+            const ang = (st / steps) * Math.PI * 2;
+            const cosA = Math.cos(ang);
+            const sinA = Math.sin(ang);
 
-        // 4. Radiating Spatial Distortion Ray Lines
-        ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.85})`;
-        ctx.lineWidth = 2.5 * effect.life;
-        for (let i = 0; i < 8; i++) {
-          const rayAngle = (Math.PI / 4) * i;
-          const r1 = effect.size * 0.35;
-          const r2 = effect.size * 1.15;
+            // Outer Obsidian Border
+            const r0 = snap(effect.size);
+            ctx.fillStyle = `rgba(8, 18, 32, ${effect.life * 0.90})`;
+            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+
+            // Outer Electric Cyan Pixel Ring
+            ctx.fillStyle = `rgba(0, 229, 255, ${effect.life * 0.95})`;
+            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+            // Mid Cursed Indigo Pixel Loop
+            const r1 = snap(effect.size * 0.75);
+            ctx.fillStyle = `rgba(0, 140, 255, ${effect.life * 0.85})`;
+            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+            // Inner White-Hot Core Pixel Ring
+            const r2 = snap(effect.size * 0.45);
+            ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
+          }
+          ctx.restore();
+        } else {
+          // ── LIGHT MODE: SIMPLE CLEAN CONCENTRIC SHOCKWAVE RING ──
+          ctx.save();
+          ctx.globalCompositeOperation = 'source-over';
+
+          // Outer Soft Obsidian Contrast Border
+          ctx.strokeStyle = `rgba(8, 18, 32, ${effect.life * 0.70})`;
+          ctx.lineWidth = 10 * effect.life;
           ctx.beginPath();
-          ctx.moveTo(effect.x + Math.cos(rayAngle) * r1, effect.y + Math.sin(rayAngle) * r1);
-          ctx.lineTo(effect.x + Math.cos(rayAngle) * r2, effect.y + Math.sin(rayAngle) * r2);
+          ctx.arc(effect.x, effect.y, effect.size + 1.5, 0, Math.PI * 2);
           ctx.stroke();
-        }
 
-        ctx.restore();
+          // Primary Electric Cyan Ring
+          ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.95})`;
+          ctx.lineWidth = 6 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Mid Cursed Blue Ring
+          ctx.strokeStyle = `rgba(0, 140, 255, ${effect.life * 0.85})`;
+          ctx.lineWidth = 4 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner White-Hot Core Ring
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+          ctx.lineWidth = 2.5 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.restore();
+        }
       } else if (isTojiClash) {
         // ── TOJI PHYSICAL SHOCKWAVE ──
         // Outer Dark Slate Air Pressure Ring
