@@ -2254,20 +2254,19 @@ export function drawBankaiImpactDimScreen() {
     )
   );
 
-  const isBankaiActiveOrChanneling = Boolean(
+  const isBankaiChannelingOrBursting = Boolean(
     ichigo && (
-      ichigo.bankaiActive ||
       ichigo.isChannelingBankai ||
       (ichigo.bankaiChargeTimer && ichigo.bankaiChargeTimer > 0) ||
       (ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0)
     )
   );
 
-  if (isBankaiActiveOrChanneling) {
+  if (isBankaiChannelingOrBursting) {
     currentHollowMaskOpacity = 0;
   }
 
-  const isHollowChanneling = !isBankaiActiveOrChanneling && Boolean(
+  const isHollowChanneling = !isBankaiChannelingOrBursting && Boolean(
     ichigo && ((ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) || ichigo._hollowVoicelineWait)
   );
 
@@ -2751,7 +2750,7 @@ function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFo
 }
 
   // ── 4. Hollow Mask Arena-Spanning Overlay (Cinematic apparition assembling piece-by-piece 1-by-1 and occupying the arena) ──
-  if (!isBankaiActiveOrChanneling && currentHollowMaskOpacity > 0.01 && hollowMaskOverlayImg && hollowMaskOverlayImg.complete && hollowMaskOverlayImg.naturalWidth > 0) {
+  if (!isBankaiChannelingOrBursting && currentHollowMaskOpacity > 0.01 && hollowMaskOverlayImg && hollowMaskOverlayImg.complete && hollowMaskOverlayImg.naturalWidth > 0) {
     ctx.save();
 
     // 1. Strictly clip to the arena boundaries (handling both circular and rectangular arenas)
