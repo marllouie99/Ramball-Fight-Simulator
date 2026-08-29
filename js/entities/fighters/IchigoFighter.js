@@ -825,7 +825,37 @@ export class IchigoFighter extends Fighter {
       }
     }
 
-    const chargeFrames = CONFIG.ichigo?.bankaiFinalGetsugaChargeFrames || 80;
+    const isMask = Boolean(this.hollowMaskActive || this.skin === 'bankai_mask' || this.skin === 'shikai_mask');
+    let chargeFrames = CONFIG.ichigo?.bankaiFinalGetsugaChargeFrames || 80;
+    let voiceSrc;
+    let voiceVol;
+    let voiceDurMs = 2600;
+    let chargeText = "GETSUGA...";
+    let chargeColor = "#DC143C";
+
+    if (isMask) {
+      chargeText = "BLACK KUROI GETSUGA...";
+      chargeColor = CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00';
+      const rawHollowVoice = CONFIG.ichigo?.sounds?.hollowGetsugaVoice || [
+        'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3',
+        'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline2.mp3'
+      ];
+      if (Array.isArray(rawHollowVoice)) {
+        voiceSrc = rawHollowVoice[Math.floor(Math.random() * rawHollowVoice.length)];
+      } else {
+        voiceSrc = rawHollowVoice;
+      }
+      voiceVol = CONFIG.ichigo?.soundVolumes?.hollowGetsugaVoice ?? 3.0;
+      const isShortVoiceline = typeof voiceSrc === 'string' && (voiceSrc.includes('voiceline2') || voiceSrc.includes('flashstep-voiceline2'));
+      chargeFrames = isShortVoiceline 
+        ? (CONFIG.ichigo?.hollowGetsugaVoice2ChargeFrames ?? 34) 
+        : (CONFIG.ichigo?.hollowGetsugaVoice1ChargeFrames ?? 80);
+      voiceDurMs = isShortVoiceline ? 760 : 2015;
+    } else {
+      voiceSrc = CONFIG.ichigo?.sounds?.finalGetsugaVoice || CONFIG.ichigo?.sounds?.finalGetsugaCharge || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3';
+      voiceVol = CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice ?? CONFIG.ichigo?.soundVolumes?.finalGetsugaCharge ?? 3.0;
+    }
+
     this.isChannelingGetsuga = true;
     this.isFinalMassiveGetsuga = true;
     this.isFinalGetsugaRecovery = false;
@@ -835,12 +865,9 @@ export class IchigoFighter extends Fighter {
     this.getsugaSlideTimer = 0;
 
     const now = Date.now();
-    const voiceDurMs = 2600;
     this._finalGetsugaVoiceEndTime = now + voiceDurMs;
 
-    spawnFloatingText(this.x, this.y - this.r - 28, "GETSUGA...", "#DC143C");
-    const voiceSrc = CONFIG.ichigo?.sounds?.finalGetsugaVoice || CONFIG.ichigo?.sounds?.finalGetsugaCharge || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3';
-    const voiceVol = CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice ?? CONFIG.ichigo?.soundVolumes?.finalGetsugaCharge ?? 3.0;
+    spawnFloatingText(this.x, this.y - this.r - 28, chargeText, chargeColor);
     if (typeof audioSystem !== 'undefined' && typeof audioSystem.playFighterVoiceline === 'function') {
       this._finalGetsugaVoiceHandle = audioSystem.playFighterVoiceline(this, voiceSrc, voiceVol, 1.0, 0, 0, {
         priority: 'domain',
@@ -848,10 +875,10 @@ export class IchigoFighter extends Fighter {
         durationMs: voiceDurMs
       });
     } else {
-      this._finalGetsugaVoiceHandle = this._playSound('finalGetsugaVoice', voiceSrc, voiceVol);
+      this._finalGetsugaVoiceHandle = this._playSound(isMask ? 'hollowGetsugaVoice' : 'finalGetsugaVoice', voiceSrc, voiceVol);
     }
     if (typeof triggerGlobalScreenShake === 'function') {
-      triggerGlobalScreenShake(4.5, 22);
+      triggerGlobalScreenShake(isMask ? 5.5 : 4.5, 22);
     }
   }
 
