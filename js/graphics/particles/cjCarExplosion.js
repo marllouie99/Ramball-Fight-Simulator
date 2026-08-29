@@ -323,11 +323,112 @@ export function drawCarScorchMarks(ctx) {
   ctx.restore();
 }
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
+/**
+ * Draws active car explosions in 100% Discrete Pixel Art Style (Saitama Tech)
+ */
+export function drawPixelCarExplosions(ctx) {
+  if (typeof state === 'undefined' || !state.cjCarExplosions || state.cjCarExplosions.length === 0) return;
+
+  ctx.save();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  for (let i = 0; i < state.cjCarExplosions.length; i++) {
+    const exp = state.cjCarExplosions[i];
+    if (!exp) continue;
+
+    const p = exp.timer / exp.maxTimer;
+
+    // 1. Billowing Stepped Pixel Smoke
+    if (exp.smokePuffs && exp.smokePuffs.length > 0) {
+      for (const smk of exp.smokePuffs) {
+        const smkAlpha = Math.min(0.75, (smk.life / smk.maxLife) * 0.75);
+        const sSize = Math.max(4, snap(smk.radius * 1.6));
+        ctx.fillStyle = `rgba(24, 24, 27, ${smkAlpha.toFixed(2)})`;
+        ctx.fillRect(snap(smk.x - sSize * 0.5), snap(smk.y - sSize * 0.5), sSize, sSize);
+      }
+    }
+
+    // 2. Expanding Stepped Shockwave Ring
+    if (p < 0.75) {
+      const swAlpha = (1 - (p / 0.75)) * 0.85;
+      const ringR = snap(exp.shockwaveRadius);
+      const stepCount = 24;
+      for (let s = 0; s < stepCount; s++) {
+        const sAngle = (s / stepCount) * Math.PI * 2;
+        const sX = snap(exp.x + Math.cos(sAngle) * ringR);
+        const sY = snap(exp.y + Math.sin(sAngle) * ringR);
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(sX - P, sY - P, P * 2, P * 2);
+        ctx.fillStyle = `rgba(249, 115, 22, ${swAlpha.toFixed(2)})`;
+        ctx.fillRect(sX, sY, P, P);
+      }
+    }
+
+    // 3. Blazing Stepped Pixel Fireball
+    if (p < 0.65) {
+      const fbAlpha = (1 - (p / 0.65));
+      const fbR = snap(exp.fireballRadius);
+
+      // Outer Crimson / Orange Cross
+      ctx.fillStyle = `rgba(220, 38, 38, ${(fbAlpha * 0.75).toFixed(2)})`;
+      ctx.fillRect(snap(exp.x - fbR), snap(exp.y - fbR * 0.5), fbR * 2, fbR);
+      ctx.fillRect(snap(exp.x - fbR * 0.5), snap(exp.y - fbR), fbR, fbR * 2);
+
+      // Inner Golden Core
+      ctx.fillStyle = `rgba(251, 191, 36, ${(fbAlpha * 0.90).toFixed(2)})`;
+      ctx.fillRect(snap(exp.x - fbR * 0.65), snap(exp.y - fbR * 0.35), fbR * 1.3, fbR * 0.7);
+      ctx.fillRect(snap(exp.x - fbR * 0.35), snap(exp.y - fbR * 0.65), fbR * 0.7, fbR * 1.3);
+
+      // White-Hot Center
+      ctx.fillStyle = `rgba(255, 255, 255, ${(fbAlpha * 0.98).toFixed(2)})`;
+      ctx.fillRect(snap(exp.x - fbR * 0.3), snap(exp.y - fbR * 0.3), fbR * 0.6, fbR * 0.6);
+    }
+
+    // 4. Flying Shrapnel
+    if (exp.debris && exp.debris.length > 0) {
+      for (const deb of exp.debris) {
+        ctx.save();
+        ctx.translate(snap(deb.x), snap(deb.y));
+        ctx.rotate(deb.rot);
+
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(-deb.width * 0.5 - P, -deb.height * 0.5 - P, deb.width + P * 2, deb.height + P * 2);
+        ctx.fillStyle = deb.color || '#E2E8F0';
+        ctx.fillRect(-deb.width * 0.5, -deb.height * 0.5, deb.width, deb.height);
+
+        if (deb.life > deb.maxLife * 0.3) {
+          ctx.fillStyle = '#F97316';
+          ctx.fillRect(-2, -2, 4, 4);
+        }
+        ctx.restore();
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
 /**
  * Draws active car explosions, fireballs, shockwaves, smoke, and flying shrapnel (Cached high-performance)
  */
 export function drawCarExplosions(ctx) {
   if (typeof state === 'undefined' || !state.cjCarExplosions || state.cjCarExplosions.length === 0) return;
+
+  if (_isDarkMode()) {
+    drawPixelCarExplosions(ctx);
+    return;
+  }
 
   ctx.save();
 

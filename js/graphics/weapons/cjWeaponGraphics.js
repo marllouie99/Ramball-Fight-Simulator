@@ -5,6 +5,17 @@
 // ─────────────────────────────────────────────
 
 import { getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
+
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
 
 let _brassKnuckleImg = null;
 let _brassKnuckleImgLoading = false;
@@ -106,9 +117,67 @@ function _getBulletTrailGrad(ctx) {
 }
 
 /**
+ * Draws CJ's 9mm Micro-Uzi / TEC-9 Tracer Bullet in authentic Pixel Art Style (Saitama Tech)
+ */
+export function drawCjPixelUziBullet(ctx, p) {
+  const vx = p.vx || 0;
+  const vy = p.vy || 0;
+  const angle = Math.atan2(vy, vx);
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Stepped Pixel Tracer Trail
+  if (p.history && p.history.length > 1) {
+    ctx.save();
+    for (let i = 0; i < p.history.length; i++) {
+      const h = p.history[i];
+      const alpha = (i / p.history.length) * 0.85;
+      const size = (i > p.history.length - 3) ? 4.0 : 2.5;
+      ctx.fillStyle = (i % 2 === 0) ? `rgba(245, 158, 11, ${alpha})` : `rgba(254, 240, 138, ${alpha})`;
+      ctx.fillRect(snap(h.x - size * 0.5), snap(h.y - size * 0.5), size, size);
+    }
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(snap(p.x), snap(p.y));
+  ctx.rotate(angle);
+
+  // 2. Trailing Pixel Flame / Exhaust Streak
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(-16, -1.5, 10, 3);
+  ctx.fillStyle = '#FEF08A';
+  ctx.fillRect(-8, -1.0, 6, 2);
+
+  // 3. Stepped 9mm Bullet Core with #0E0F14 Outline
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-6, -3, 13, 6);
+
+  // Brass Casing Body
+  ctx.fillStyle = '#D97706';
+  ctx.fillRect(-5, -2, 7, 4);
+
+  // Copper Pointed Tip
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(2, -2, 3, 4);
+  ctx.fillRect(5, -1, 1, 2);
+
+  // Specular Core Highlight
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-2, -1, 4, 2);
+
+  ctx.restore();
+}
+
+/**
  * Draws CJ's high-velocity 9mm Micro-Uzi tracer bullet projectile
  */
 export function drawCjUziBullet(ctx, p) {
+  if (_isDarkMode()) {
+    drawCjPixelUziBullet(ctx, p);
+    return;
+  }
+
   const vx = p.vx || 0;
   const vy = p.vy || 0;
   const angle = Math.atan2(vy, vx);
@@ -173,9 +242,39 @@ export function drawCjUziBullet(ctx, p) {
 }
 
 /**
+ * Draws Pixel Art Starburst Muzzle Flash
+ */
+export function drawCjPixelMuzzleFlash(ctx, x, y, scale = 1.0) {
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  const P = 2.0 * scale;
+
+  // Stepped Pixel Diamond Starburst
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-P * 3, -P * 3, P * 6, P * 6);
+
+  ctx.fillStyle = '#F97316'; // Fiery orange outer cross
+  ctx.fillRect(-P * 4, -P, P * 8, P * 2);
+  ctx.fillRect(-P, -P * 4, P * 2, P * 8);
+
+  ctx.fillStyle = '#FBBF24'; // Golden core
+  ctx.fillRect(-P * 2.5, -P * 2.5, P * 5, P * 5);
+
+  ctx.fillStyle = '#FFFFFF'; // White-hot center
+  ctx.fillRect(-P, -P, P * 2, P * 2);
+
+  ctx.restore();
+}
+
+/**
  * Draws sharp, vibrant Micro-Uzi Muzzle Flash
  */
 export function drawCjMuzzleFlash(ctx, x, y, scale = 1.0) {
+  if (_isDarkMode()) {
+    drawCjPixelMuzzleFlash(ctx, x, y, scale);
+    return;
+  }
+
   ctx.save();
   ctx.translate(x, y);
 
@@ -241,6 +340,88 @@ function _initUziGradients(ctx) {
 }
 
 /**
+ * Draws Authentic GTA San Andreas Micro-Uzi in 100% Discrete Pixel Art Style (Saitama Tech)
+ */
+export function drawCjPixelMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 0) {
+  ctx.save();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  const recoilOff = snap(recoil * 0.9);
+  ctx.translate(snap(x - recoilOff), snap(y));
+  ctx.scale(scale, scale);
+
+  // 1. Magazine (Steel Straight Box)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-3, 6, 6, 20);
+  ctx.fillStyle = '#1E293B'; // Dark steel magazine
+  ctx.fillRect(-2, 7, 4, 18);
+  ctx.fillStyle = '#0F172A'; // Floor plate
+  ctx.fillRect(-3, 24, 6, 2);
+
+  // 2. Pistol Grip & Lower Receiver
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-7, 2, 11, 14);
+  ctx.fillStyle = '#181B22'; // Molded black polymer grip
+  ctx.fillRect(-6, 3, 9, 12);
+  // Grip texture ribs
+  ctx.fillStyle = '#0F1116';
+  ctx.fillRect(-5, 5, 7, 2);
+  ctx.fillRect(-5, 9, 7, 2);
+
+  // Trigger Guard & Trigger
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(4, 5, 5, 8);
+  ctx.fillStyle = '#334155';
+  ctx.fillRect(5, 6, 3, 6);
+  ctx.fillStyle = '#0E0F14'; // Trigger cutout
+  ctx.fillRect(5, 7, 3, 4);
+
+  // 3. Upper Receiver (Matte Gunmetal Gray Box)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-12, -7, 32, 11);
+  ctx.fillStyle = '#334155'; // Receiver body
+  ctx.fillRect(-11, -6, 30, 9);
+  ctx.fillStyle = '#475569'; // Top cover reflection
+  ctx.fillRect(-10, -5, 28, 2);
+
+  // Top Cocking Handle
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(0, -10, 8, 4);
+  ctx.fillStyle = '#1E293B';
+  ctx.fillRect(1, -9, 6, 2);
+
+  // Ejection Port & Brass Glimpse
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(4, -4, 7, 4);
+  ctx.fillStyle = '#D97706';
+  ctx.fillRect(5, -3, 5, 2);
+
+  // 4. Barrel Nut & Short Barrel
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(19, -4, 7, 5);
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(20, -3, 5, 3);
+  ctx.fillStyle = '#0E0F14'; // Barrel bore
+  ctx.fillRect(24, -2, 2, 1);
+
+  // Front Sight Post
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(18, -9, 3, 3);
+
+  // Rear Sight Post
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-11, -9, 3, 3);
+
+  // 5. Muzzle Flash
+  if (flashTimer > 0) {
+    drawCjPixelMuzzleFlash(ctx, 27, -1.5, 1.15);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws Authentic GTA: San Andreas Micro SMG (IMI Micro-Uzi)
  * Faithful to GTA SA Mid-2000s Industrial Aesthetic & Real Firearm Architecture:
  * - Receiver and Body: Matte gunmetal gray / dark steel with industrial metallic reflections
@@ -251,6 +432,11 @@ function _initUziGradients(ctx) {
  * Rule 11 (Zero shadowBlur) & Rule 20 Compliant
  */
 export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 0) {
+  if (_isDarkMode()) {
+    drawCjPixelMicroUzi(ctx, x, y, scale, recoil, flashTimer);
+    return;
+  }
+
   _initUziGradients(ctx);
 
   ctx.save();
@@ -748,9 +934,92 @@ export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 
 }
 
 /**
+ * Draws Authentic GTA San Andreas TEC-9 in 100% Discrete Pixel Art Style (Saitama Tech)
+ */
+export function drawCjPixelTec9(ctx, x = 0, y = 0, scale = 1.0, recoil = 0, flashTimer = 0) {
+  ctx.save();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  const recoilOff = snap(recoil * 0.9);
+  ctx.translate(snap(x - recoilOff), snap(y));
+  ctx.scale(scale, scale);
+
+  // 1. Long 32-Round Straight Steel Box Magazine
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(5, 5, 7, 30);
+  ctx.fillStyle = '#1E293B';
+  ctx.fillRect(6, 6, 5, 28);
+  ctx.fillStyle = '#0F172A';
+  ctx.fillRect(5, 33, 7, 2);
+
+  // 2. Lower Receiver & Ergonomic Grip
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-8, 3, 11, 16);
+  ctx.fillStyle = '#181B22'; // Black polymer frame
+  ctx.fillRect(-7, 4, 9, 14);
+  // Grip texture
+  ctx.fillStyle = '#0F1116';
+  ctx.fillRect(-6, 6, 7, 2);
+  ctx.fillRect(-6, 10, 7, 2);
+  ctx.fillRect(-6, 14, 7, 2);
+
+  // Trigger Guard
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(2, 6, 5, 8);
+
+  // 3. Tubular Upper Receiver & Perforated Heat Shroud
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-14, -6, 42, 11);
+  ctx.fillStyle = '#334155'; // Parkerized steel finish
+  ctx.fillRect(-13, -5, 40, 9);
+  ctx.fillStyle = '#475569'; // Cylindrical highlight
+  ctx.fillRect(-12, -4, 38, 2);
+
+  // Perforated Barrel Shroud Cooling Holes (Discrete pixel dots)
+  ctx.fillStyle = '#0E0F14';
+  for (let hX = 14; hX <= 24; hX += 4) {
+    ctx.fillRect(hX, -4, 2, 2);
+    ctx.fillRect(hX + 2, -1, 2, 2);
+    ctx.fillRect(hX, 2, 2, 2);
+  }
+
+  // Ejection Port
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-2, -3, 8, 4);
+  ctx.fillStyle = '#D97706';
+  ctx.fillRect(-1, -2, 6, 2);
+
+  // 4. Threaded Barrel Extension Tip
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(27, -4, 8, 7);
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(28, -3, 6, 5);
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(33, -2, 2, 3);
+
+  // Front & Rear Sights
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(26, -8, 3, 3);
+  ctx.fillRect(-13, -8, 3, 3);
+
+  // 5. Muzzle Flash
+  if (flashTimer > 0) {
+    drawCjPixelMuzzleFlash(ctx, 36, -0.5, 1.25);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws sharp, multi-petal starburst muzzle flash on Tec-9
  */
 export function drawCjTec9MuzzleFlash(ctx, x, y, scale = 1.0) {
+  if (_isDarkMode()) {
+    drawCjPixelMuzzleFlash(ctx, x, y, scale * 1.2);
+    return;
+  }
+
   ctx.save();
   ctx.translate(x, y);
 
@@ -1922,6 +2191,103 @@ export function drawCjJetpackWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opt
 }
 
 /**
+ * Draws Authentic GTA San Andreas M134 Minigun in 100% Discrete Pixel Art Style (Saitama Tech)
+ */
+export function drawCjPixelMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}) {
+  ctx.save();
+  let posX = x;
+  let posY = y;
+  let scale = 1.0;
+
+  if (typeof gunAngle === 'object') {
+    opts = gunAngle;
+    scale = opts.scale || 1.0;
+  } else if (typeof gunAngle === 'number') {
+    if (typeof r === 'number') {
+      posX = x + (r * 0.75);
+      posY = y;
+      scale = (opts && opts.scale) ? opts.scale : 1.10;
+    } else if (typeof r === 'object') {
+      opts = r;
+      scale = opts.scale || 1.0;
+    }
+  }
+
+  const recoil = (opts && opts.recoil) ? opts.recoil : 0;
+  const flashTimer = (opts && opts.flashTimer) ? opts.flashTimer : 0;
+  const heat = (opts && opts.heat) ? Math.min(1.0, Math.max(0, opts.heat)) : 0;
+
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  const recoilOff = snap(recoil * 1.1);
+  ctx.translate(snap(posX - recoilOff), snap(posY));
+  ctx.scale(scale, scale);
+
+  // 1. Rear Dual Chainsaw Joystick Spade Grip
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-28, -8, 8, 16);
+  ctx.fillStyle = '#181B22';
+  ctx.fillRect(-27, -7, 6, 14);
+  // Red Toggle Switch / Safety Horn
+  ctx.fillStyle = '#DC2626';
+  ctx.fillRect(-27, -9, 3, 2);
+
+  // 2. Central Military-Drab Rotor Motor & Feed Chute
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-20, -12, 22, 24);
+  ctx.fillStyle = '#2E381C'; // Olive-drab motor housing
+  ctx.fillRect(-19, -11, 20, 22);
+  ctx.fillStyle = '#44542A'; // Top highlight
+  ctx.fillRect(-18, -9, 18, 4);
+
+  // Linked 7.62mm Ammo Feed Chute (Curved down-left)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-14, 11, 12, 10);
+  ctx.fillStyle = '#D97706'; // Brass linked rounds
+  ctx.fillRect(-13, 12, 10, 8);
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(-12, 13, 8, 2);
+  ctx.fillRect(-12, 17, 8, 2);
+
+  // 3. 6 Rotating Vulcan Barrels & Support Clamp Rings
+  const barrelLen = 42;
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(2, -9, barrelLen + 2, 18);
+
+  // 6 Horizontal Barrel Tubes
+  const barrelYPositions = [-7, -4, -1, 2, 5, 8];
+  for (let b = 0; b < barrelYPositions.length; b++) {
+    const bY = barrelYPositions[b];
+    // Barrel base color (Molten orange/red if high heat)
+    let barrelColor = '#334155';
+    if (heat > 0.3) {
+      barrelColor = (b % 2 === 0) ? '#EA580C' : '#F59E0B';
+    }
+    ctx.fillStyle = barrelColor;
+    ctx.fillRect(3, bY, barrelLen, 2);
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(3, bY, barrelLen * 0.7, 1);
+  }
+
+  // Intermediate Spacer Rings
+  ctx.fillStyle = '#0F172A';
+  ctx.fillRect(16, -10, 4, 20);
+  ctx.fillRect(32, -10, 4, 20);
+
+  // Front Muzzle Clamp Ring
+  ctx.fillStyle = (heat > 0.4) ? '#DC2626' : '#0F172A';
+  ctx.fillRect(3 + barrelLen - 4, -10, 5, 20);
+
+  // 4. Overheated Thermal Glow & Muzzle Flash
+  if (flashTimer > 0) {
+    drawCjPixelMuzzleFlash(ctx, 3 + barrelLen + 4, 0, 1.85);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Standalone M134 Minigun (Handheld Vulcan) renderer for Weapon Studio / UI screens & in-game CJ Ultimate
  * Authentic Grand Theft Auto: San Andreas Military-Industrial Aesthetic:
  * - Receiver and Housing: Matte military olive drab / dark army green with charcoal steel reinforcement plates
@@ -1934,6 +2300,11 @@ export function drawCjJetpackWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opt
  * Rule 11 (Zero shadowBlur) & Rule 20 Compliant
  */
 export function drawCjMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}) {
+  if (_isDarkMode()) {
+    drawCjPixelMinigun(ctx, x, y, gunAngle, r, opts);
+    return;
+  }
+
   ctx.save();
   let posX = x;
   let posY = y;
@@ -2671,9 +3042,78 @@ function _getMinigunTrailGrad(ctx) {
 }
 
 /**
+ * Draws CJ's M134 Minigun Armor-Piercing Supersonic Tracer Bullet in authentic Pixel Art Style (Saitama Tech)
+ */
+export function drawCjPixelMinigunBullet(ctx, p) {
+  const vx = p.vx || 0;
+  const vy = p.vy || 0;
+  const angle = Math.atan2(vy, vx);
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Stepped Pixel World Tracer Trail
+  if (p.history && p.history.length > 1) {
+    ctx.save();
+    for (let i = 0; i < p.history.length; i++) {
+      const h = p.history[i];
+      const alpha = (i / p.history.length) * 0.95;
+      const size = (i > p.history.length - 4) ? 5.0 : 3.0;
+      ctx.fillStyle = (i % 2 === 0) ? `rgba(249, 115, 22, ${alpha})` : `rgba(254, 240, 138, ${alpha})`;
+      ctx.fillRect(snap(h.x - size * 0.5), snap(h.y - size * 0.5), size, size);
+    }
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(snap(p.x), snap(p.y));
+  ctx.rotate(angle);
+
+  // 2. Supersonic Stepped Pixel Shockwave Chevrons
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.fillRect(-10, -6, 2, 2);
+  ctx.fillRect(-8, -4, 2, 2);
+  ctx.fillRect(-6, -2, 2, 2);
+  ctx.fillRect(-6, 2, 2, 2);
+  ctx.fillRect(-8, 4, 2, 2);
+  ctx.fillRect(-10, 6, 2, 2);
+
+  ctx.fillStyle = 'rgba(254, 240, 138, 0.50)';
+  ctx.fillRect(-18, -8, 2, 2);
+  ctx.fillRect(-16, -6, 2, 2);
+  ctx.fillRect(-14, -4, 2, 2);
+  ctx.fillRect(-14, 4, 2, 2);
+  ctx.fillRect(-16, 6, 2, 2);
+  ctx.fillRect(-18, 8, 2, 2);
+
+  // 3. Heavy 20mm AP Bullet Slug with #0E0F14 Outline
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-10, -4, 21, 8);
+
+  // Tungsten Hardened Core
+  ctx.fillStyle = '#B45309';
+  ctx.fillRect(-9, -3, 10, 6);
+  ctx.fillStyle = '#F97316';
+  ctx.fillRect(1, -3, 6, 6);
+  ctx.fillStyle = '#FBBF24';
+  ctx.fillRect(7, -2, 2, 4);
+  ctx.fillRect(9, -1, 1, 2);
+
+  // White-Hot Specular Center Line
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-5, -1, 10, 2);
+
+  ctx.restore();
+}
+
+/**
  * Draws CJ's high-velocity supersonic Minigun armor-piercing projectile with Mach shockwave rings
  */
 export function drawCjMinigunBullet(ctx, p) {
+  if (_isDarkMode()) {
+    drawCjPixelMinigunBullet(ctx, p);
+    return;
+  }
+
   const vx = p.vx || 0;
   const vy = p.vy || 0;
   const angle = Math.atan2(vy, vx);

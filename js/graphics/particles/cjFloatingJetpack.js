@@ -91,10 +91,106 @@ function _draw4PointStar(ctx, cx, cy, size) {
   ctx.fill();
 }
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
+/**
+ * Draws Floating Jetpack Model in 100% Discrete Pixel Art Style (Saitama Tech)
+ */
+function _drawPixelFloatingJetpackModel(ctx, facingFront, cosRot) {
+  const tankW = 12.0;
+  const tankH = 38.0;
+  const tankHalfH = tankH * 0.5;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Rear Mounting Frame
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-18, -16, 36, 34);
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillRect(-16, -14, 32, 30);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillRect(-14, -12, 28, 4);
+
+  // 2. Twin Olive-Drab Fuel Cylinders
+  const leftX = -17.5;
+  const rightX = 5.5;
+  const tankXs = [leftX, rightX];
+
+  for (let t = 0; t < tankXs.length; t++) {
+    const tx = snap(tankXs[t]);
+    const isLeft = (t === 0);
+
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(tx - P, -tankHalfH - P, tankW + P * 2, tankH + P * 2);
+
+    ctx.fillStyle = '#44542A'; // Olive Drab
+    ctx.fillRect(tx, -tankHalfH, tankW, tankH);
+
+    ctx.fillStyle = '#657B3E'; // Specular highlight
+    ctx.fillRect(tx + P, -tankHalfH + P, tankW - P * 2, P * 2);
+
+    // Cyan Fuel Sight Glass
+    const glassX = isLeft ? (tx + P) : (tx + tankW - P * 2);
+    ctx.fillStyle = '#06B6D4';
+    ctx.fillRect(glassX, -tankHalfH + 6, P, tankH - 12);
+  }
+
+  // 3. Central Avionics Box with Hazard Stripes & LEDs
+  const boxW = 14.0;
+  const boxH = 26.0;
+  const boxX = -7.0;
+  const boxY = -12.0;
+
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(boxX - P, boxY - P, boxW + P * 2, boxH + P * 2);
+  ctx.fillStyle = '#22280F';
+  ctx.fillRect(boxX, boxY, boxW, boxH);
+
+  // LEDs
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(boxX + 2, boxY + 2, P, P);
+  ctx.fillStyle = '#06B6D4';
+  ctx.fillRect(boxX + 6, boxY + 2, P, P);
+  ctx.fillStyle = '#10B981';
+  ctx.fillRect(boxX + 10, boxY + 2, P, P);
+
+  // Red & Black Hazard Stripes
+  ctx.fillStyle = '#DC2626';
+  ctx.fillRect(boxX + 2, boxY + 8, boxW - 4, 6);
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(boxX + 4, boxY + 8, P, 6);
+  ctx.fillRect(boxX + 8, boxY + 8, P, 6);
+
+  // 4. Downward Nozzles
+  const nozzleXs = [-20, 20];
+  for (let n = 0; n < nozzleXs.length; n++) {
+    const nX = snap(nozzleXs[n]);
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(nX - 4, tankHalfH - 4, 8, 8);
+    ctx.fillStyle = '#D97706';
+    ctx.fillRect(nX - 3, tankHalfH - 3, 6, 6);
+    ctx.fillStyle = '#1C1E24';
+    ctx.fillRect(nX - 2, tankHalfH, 4, 3);
+  }
+}
+
 /**
  * Renders the authentic GTA San Andreas DARPA Jetpack 3D model in rotating perspective
  */
 function _drawFloatingJetpackModel(ctx, facingFront, cosRot) {
+  if (_isDarkMode()) {
+    _drawPixelFloatingJetpackModel(ctx, facingFront, cosRot);
+    return;
+  }
+
   const tankW = 12.0;
   const tankH = 38.0;
   const tankHalfH = tankH * 0.5;

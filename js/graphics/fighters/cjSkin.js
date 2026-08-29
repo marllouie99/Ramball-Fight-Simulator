@@ -10,6 +10,16 @@ import { getHandSize } from '../../core/config.js';
 import { state, isChampionScreenActive } from '../../core/state.js';
 import { drawAuthenticBrassKnucklesShape, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
 let _cjImage = null;
 let _cjImageLoading = false;
 let _cachedSkinGrad = null;
@@ -342,6 +352,144 @@ export function drawCjPixelBody(ctx, r, isJetpackActive = false) {
 }
 
 /**
+ * Draws Authentic GTA San Andreas DARPA Jetpack in 100% Discrete Pixel Art Style (Saitama Tech)
+ */
+export function drawCjPixelJetpack(ctx, r, isJetpackActive) {
+  if (!isJetpackActive) return;
+
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const time = now * 0.006;
+
+  ctx.save();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  const jpX = snap(-r * 0.78);
+  const tankW = snap(r * 0.34);
+  const tankH = snap(r * 0.94);
+  const tankTopY = snap(-r * 0.54);
+  const tankBtmY = tankTopY + tankH;
+
+  // 1. Rear Aluminum Backing Frame
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(jpX - tankW * 0.85 - P, tankTopY + 2, tankW * 2.1 + P * 2, tankH - 8);
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillRect(jpX - tankW * 0.85, tankTopY + 4, tankW * 2.1, tankH - 12);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillRect(jpX - tankW * 0.85 + 2, tankTopY + 6, tankW * 2.1 - 4, 4);
+
+  // Leather Straps
+  ctx.fillStyle = '#784B28';
+  ctx.fillRect(jpX - tankW * 0.85, tankTopY + 10, tankW * 2.1, 4);
+  ctx.fillRect(jpX - tankW * 0.85, tankBtmY - 16, tankW * 2.1, 4);
+
+  // 2. Dual Olive-Drab Fuel Tanks
+  const tankXPositions = [jpX - tankW * 0.75, jpX + tankW * 0.25];
+  for (let t = 0; t < tankXPositions.length; t++) {
+    const tX = snap(tankXPositions[t]);
+    const isLeft = (t === 0);
+
+    // Tank Stepped Pixel Body & Dome Caps
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(tX - P, tankTopY - P, tankW + P * 2, tankH + P * 2);
+
+    ctx.fillStyle = '#44542A'; // Military Olive Green
+    ctx.fillRect(tX, tankTopY, tankW, tankH);
+
+    // Top Specular Highlight & Dome
+    ctx.fillStyle = '#657B3E';
+    ctx.fillRect(tX + P, tankTopY + P, tankW - P * 2, P * 2);
+
+    // Cyan Fuel Level Sight Glass
+    const glassX = isLeft ? (tX + P) : (tX + tankW - P * 2);
+    ctx.fillStyle = '#06B6D4';
+    ctx.fillRect(glassX, tankTopY + 8, P, tankH - 16);
+  }
+
+  // 3. Central Avionics Box with Hazard Chevrons & Status LEDs
+  const boxW = snap(tankW * 0.90);
+  const boxH = snap(tankH * 0.65);
+  const boxX = snap(jpX - boxW * 0.5);
+  const boxY = snap(tankTopY + 8);
+
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(boxX - P, boxY - P, boxW + P * 2, boxH + P * 2);
+  ctx.fillStyle = '#22280F'; // Dark military housing
+  ctx.fillRect(boxX, boxY, boxW, boxH);
+
+  // Status LEDs (Amber, Cyan, Green)
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(boxX + 2, boxY + 3, P, P);
+  ctx.fillStyle = '#06B6D4';
+  ctx.fillRect(boxX + 6, boxY + 3, P, P);
+  ctx.fillStyle = '#10B981';
+  ctx.fillRect(boxX + 10, boxY + 3, P, P);
+
+  // Red & Black Hazard Chevrons
+  ctx.fillStyle = '#DC2626';
+  ctx.fillRect(boxX + 2, boxY + 8, boxW - 4, 6);
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(boxX + 4, boxY + 8, P, 6);
+  ctx.fillRect(boxX + 8, boxY + 8, P, 6);
+
+  // 4. Overhead Dark Steel Exhaust Manifold Cross Pipe
+  const archLeftX = snap(tankXPositions[0] - tankW * 0.45);
+  const archRightX = snap(tankXPositions[1] + tankW * 1.45);
+  const archTopY = snap(tankTopY - 6.0);
+  const elbowY = snap(tankTopY + 6.0);
+
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(archLeftX - P, archTopY - P, (archRightX - archLeftX) + P * 2, 8);
+  ctx.fillRect(archLeftX - P, archTopY, 8, elbowY - archTopY + 4);
+  ctx.fillRect(archRightX - 6, archTopY, 8, elbowY - archTopY + 4);
+
+  ctx.fillStyle = '#3B424D'; // Steel pipe body
+  ctx.fillRect(archLeftX, archTopY, archRightX - archLeftX, 4);
+  ctx.fillRect(archLeftX, archTopY, 4, elbowY - archTopY);
+  ctx.fillRect(archRightX - 4, archTopY, 4, elbowY - archTopY);
+
+  // 5. Downward Thruster Nozzles & Stepped Pixel Rocket Flames
+  const nozzleXs = [archLeftX, archRightX];
+  for (let n = 0; n < nozzleXs.length; n++) {
+    const nX = snap(nozzleXs[n]);
+
+    // Burnt Steel Nozzle Collar
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(nX - 4, elbowY, 8, 8);
+    ctx.fillStyle = '#D97706';
+    ctx.fillRect(nX - 3, elbowY + 1, 6, 6);
+    ctx.fillStyle = '#1C1E24';
+    ctx.fillRect(nX - 2, elbowY + 5, 4, 3);
+
+    // Stepped Pixel Rocket Exhaust Flame (+Y Direction)
+    const flameWobble = Math.sin(time * 16 + n * 7) * 0.15;
+    const flameLen = snap((r * 1.50) * (1.0 + flameWobble));
+
+    // Outer Orange Flame Blocks
+    ctx.fillStyle = '#FF5500';
+    ctx.fillRect(nX - 4, elbowY + 8, 8, flameLen * 0.5);
+    ctx.fillRect(nX - 3, elbowY + 8 + flameLen * 0.5, 6, flameLen * 0.3);
+    ctx.fillRect(nX - 1, elbowY + 8 + flameLen * 0.8, 2, flameLen * 0.2);
+
+    // Inner Golden Core Flame
+    ctx.fillStyle = '#FFCC00';
+    ctx.fillRect(nX - 2, elbowY + 8, 4, flameLen * 0.6);
+    ctx.fillRect(nX - 1, elbowY + 8 + flameLen * 0.6, 2, flameLen * 0.2);
+
+    // White-Hot Throat
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(nX - 1, elbowY + 8, 2, flameLen * 0.3);
+
+    // Trailing Pixel Sparks
+    const sparkPhase = snap(((time * 30 + n * 20) % 24));
+    ctx.fillStyle = '#FFCC00';
+    ctx.fillRect(nX + (n === 0 ? -2 : 2), elbowY + 8 + flameLen + sparkPhase, 2, 2);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws CJ's 1:1 Authentic GTA San Andreas DARPA Jetpack (ROCKETMAN)
  * Correctly oriented along CJ's body axes:
  * - Mounted firmly on CJ's back (-X)
@@ -353,6 +501,11 @@ export function drawCjPixelBody(ctx, r, isJetpackActive = false) {
  */
 function _drawCjJetpack(ctx, r, isJetpackActive) {
   if (!isJetpackActive) return;
+
+  if (_isDarkMode()) {
+    drawCjPixelJetpack(ctx, r, isJetpackActive);
+    return;
+  }
 
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const time = now * 0.006;
@@ -787,11 +940,72 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
 }
 
 /**
+ * Draws Stepped Pixel Art Matrix Barrier & Floating Cash Dollar Glyph ($) Aura in Dark Mode (Saitama Tech)
+ */
+function _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = false) {
+  if (!isGodMode && !isHesoyamActive && !isRespectAura) return;
+
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const time = now * 0.0035;
+
+  ctx.save();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Stepped Pixel Matrix Barrier Rings
+  const ringCount = isGodMode ? 3 : 2;
+  const ringColor = (isGodMode || isRespectAura) ? '#F59E0B' : '#22C55E';
+
+  for (let i = 0; i < ringCount; i++) {
+    const waveProgress = ((time * 0.45 + i * (1.0 / ringCount)) % 1.0);
+    const waveR = snap(r * (1.05 + waveProgress * 0.75));
+    const stepCount = 20;
+    for (let s = 0; s < stepCount; s++) {
+      const sAngle = (s / stepCount) * Math.PI * 2;
+      const sX = snap(Math.cos(sAngle) * waveR);
+      const sY = snap(Math.sin(sAngle) * waveR);
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(sX - P, sY - P, P * 2, P * 2);
+      ctx.fillStyle = ringColor;
+      ctx.fillRect(sX, sY, P, P);
+    }
+  }
+
+  // 2. Stepped Pixel Cash Dollar Signs ($)
+  const particleCount = isGodMode ? 8 : 5;
+  for (let p = 0; p < particleCount; p++) {
+    const pAngle = time * 1.8 + (p * (Math.PI * 2 / particleCount));
+    const pDist = snap(r * (1.35 + Math.sin(time * 2.5 + p) * 0.25));
+    const px = snap(Math.cos(pAngle) * pDist);
+    const py = snap(Math.sin(pAngle) * pDist);
+
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(px - 4, py - 6, 8, 12);
+    ctx.fillStyle = isGodMode ? '#FDE047' : '#4ADE80';
+    // Pixel 8-bit Dollar symbol ($)
+    ctx.fillRect(px - 2, py - 4, 4, 1);
+    ctx.fillRect(px - 3, py - 3, 2, 2);
+    ctx.fillRect(px - 2, py - 1, 4, 1);
+    ctx.fillRect(px + 1, py, 2, 2);
+    ctx.fillRect(px - 2, py + 2, 4, 1);
+    // Vertical dollar line
+    ctx.fillRect(px - 1, py - 5, 1, 9);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws BAGUVIX God-Mode & Cheat Code Matrix Aura
  * Rule 11 & Rule 16 Compliant: Zero shadowBlur, purely geometric & gradient based.
  */
 function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = false) {
   if (!isGodMode && !isHesoyamActive && !isRespectAura) return;
+
+  if (_isDarkMode()) {
+    _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura);
+    return;
+  }
 
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const time = now * 0.0035;

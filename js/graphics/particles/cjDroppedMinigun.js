@@ -9,6 +9,16 @@
 import { state } from '../../core/state.js';
 import { drawCjMinigun } from '../weapons/cjWeaponGraphics.js';
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
 if (typeof state !== 'undefined' && !state.cjDroppedMiniguns) {
   state.cjDroppedMiniguns = [];
 }
@@ -132,15 +142,21 @@ export function drawDroppedMiniguns(ctx) {
 
     // 3. Rising Billowing Steam Particles
     if (item.steamParticles && item.steamParticles.length > 0) {
+      const isDark = _isDarkMode();
       for (let s = 0; s < item.steamParticles.length; s++) {
         const sp = item.steamParticles[s];
         const pRatio = sp.life / sp.maxLife;
         const pAlpha = pRatio * sp.alpha * fadeAlpha;
 
         ctx.fillStyle = `rgba(241, 245, 249, ${pAlpha.toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(sp.x, sp.y, sp.radius, 0, Math.PI * 2);
-        ctx.fill();
+        if (isDark) {
+          const sSize = Math.max(2, Math.round(sp.radius * 1.5 / 2) * 2);
+          ctx.fillRect(Math.round(sp.x - sSize * 0.5), Math.round(sp.y - sSize * 0.5), sSize, sSize);
+        } else {
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, sp.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
