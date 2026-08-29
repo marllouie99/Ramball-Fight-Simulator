@@ -1400,21 +1400,46 @@ function _drawOrbiting3dSlashRibbon(ctx, r, ribbon, theta, now, lzDepth, isFront
 function _drawPixelDiamond(ctx, x, y, size = 4.0, color = '#ff1e38', coreColor = '#ffffff', pSize = 2.0) {
   const gx = Math.round(x / pSize) * pSize;
   const gy = Math.round(y / pSize) * pSize;
-  const halfS = Math.max(1, Math.round(size / pSize)) * pSize;
+  const s = Math.max(pSize, Math.round(size / pSize) * pSize);
 
-  // Outer black pixel frame
+  // Solid crystalline diamond shard (NO '+' cross bars)
+  ctx.save();
+  ctx.translate(gx, gy);
+
+  // Outer dark frame
   ctx.fillStyle = '#08080c';
-  ctx.fillRect(gx - halfS - pSize, gy, (halfS + pSize) * 2 + pSize, pSize);
-  ctx.fillRect(gx, gy - halfS - pSize, pSize, (halfS + pSize) * 2 + pSize);
+  ctx.beginPath();
+  ctx.moveTo(0, -s - pSize);
+  ctx.lineTo(s + pSize, 0);
+  ctx.lineTo(0, s + pSize);
+  ctx.lineTo(-s - pSize, 0);
+  ctx.closePath();
+  ctx.fill();
 
-  // Colored cross
+  // Colored body
   ctx.fillStyle = color;
-  ctx.fillRect(gx - halfS, gy, halfS * 2 + pSize, pSize);
-  ctx.fillRect(gx, gy - halfS, pSize, halfS * 2 + pSize);
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.lineTo(s, 0);
+  ctx.lineTo(0, s);
+  ctx.lineTo(-s, 0);
+  ctx.closePath();
+  ctx.fill();
 
-  // White core center block
-  ctx.fillStyle = coreColor;
-  ctx.fillRect(gx, gy, pSize, pSize);
+  // White-hot center glint
+  if (s > pSize * 1.5) {
+    ctx.fillStyle = coreColor;
+    const coreS = s * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(0, -coreS);
+    ctx.lineTo(coreS, 0);
+    ctx.lineTo(0, coreS);
+    ctx.lineTo(-coreS, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function _drawPixelLightning(ctx, x0, y0, x1, y1, color = '#00f0ff', coreColor = '#ffffff', pSize = 2.0) {
