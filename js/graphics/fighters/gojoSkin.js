@@ -226,27 +226,34 @@ export function drawGojoPixelBody(ctx, r) {
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // 1. SCULPTED CHARCOAL BLINDFOLD GEOMETRY
+      // 1. SCULPTED CHARCOAL BLINDFOLD GEOMETRY (1:1 Anime Reference)
       // ──────────────────────────────────────────
-      // Top raised crest: center (-0.40 <= nx <= 0.40) rises from -0.34 to -0.44
-      const crestRise = (absX <= 0.40) ? (0.40 - absX) * 0.25 : 0;
-      const blindfoldTopY = -0.34 - crestRise;
+      // Top edge: Natural arched forehead curve (-0.36 at center to -0.28 at temples)
+      const getBlindfoldTopY = (ax) => {
+        return -0.34 - 0.05 * Math.cos(ax * Math.PI * 0.75);
+      };
 
-      // Bottom profile: eye dips at left/right (-0.60 to -0.15 and 0.15 to 0.60) curving down to +0.06, nose arch in center (-0.12 to 0.12) rising to -0.06
-      let blindfoldBottomY = -0.06;
-      if (absX >= 0.15 && absX <= 0.62) {
-        const dipProg = Math.sin(((absX - 0.15) / 0.47) * Math.PI);
-        blindfoldBottomY = -0.06 + dipProg * 0.13;
-      } else if (absX > 0.62) {
-        blindfoldBottomY = -0.06;
-      }
+      // Bottom edge: Distinct concave nose arch at center, smooth dual eye-cover dips (+0.10), tapering back up to temples
+      const getBlindfoldBottomY = (ax) => {
+        if (ax <= 0.82) {
+          return -0.02 + 0.12 * Math.sin(ax * (Math.PI / 0.82));
+        }
+        return -0.02 - (ax - 0.82) * 0.15;
+      };
+
+      const isInsideBlindfold = (x, y) => {
+        const ax = Math.abs(x);
+        return y >= getBlindfoldTopY(ax) && y < getBlindfoldBottomY(ax);
+      };
+
+      const blindfoldTopY = getBlindfoldTopY(absX);
+      const blindfoldBottomY = getBlindfoldBottomY(absX);
 
       // ──────────────────────────────────────────
       // ZONE A: WHITE HAIR & ICE-BLUE STRANDS (ny < blindfoldTopY)
       // ──────────────────────────────────────────
       if (ny < blindfoldTopY) {
-        // Blindfold top outline line
-        if (ny >= blindfoldTopY - P / r) {
+        if (isInsideBlindfold(nx, ny + P / r)) {
           ctx.fillStyle = C.outline;
         } else if (ny >= blindfoldTopY - (P * 2) / r) {
           ctx.fillStyle = C.blindfoldHighlight;
@@ -270,46 +277,58 @@ export function drawGojoPixelBody(ctx, r) {
         ctx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE B: SCULPTED CHARCOAL BLINDFOLD (blindfoldTopY <= ny < blindfoldBottomY)
+      // ZONE B: SCULPTED CHARCOAL BLINDFOLD (isInsideBlindfold)
       // ──────────────────────────────────────────
       else if (ny < blindfoldBottomY) {
-        let col = C.blindfoldMid;
+        const isBorder = !isInsideBlindfold(nx, ny - P / r) ||
+                         !isInsideBlindfold(nx, ny + P / r) ||
+                         !isInsideBlindfold(nx - P / r, ny) ||
+                         !isInsideBlindfold(nx + P / r, ny);
 
-        // Top highlight band
-        if (ny < blindfoldTopY + 0.08) {
-          col = C.blindfoldTop;
-        }
-        // Crease 1 (Upper horizontal crease seam at ny ~ -0.22)
-        else if (Math.abs(ny - (-0.22)) <= P / r * 0.8) {
-          col = C.blindfoldCrease1;
-        }
-        // Tier 2 (Middle fabric band at -0.20 <= ny < -0.10)
-        else if (ny >= -0.20 && ny < -0.10) {
-          col = C.blindfoldTier2;
-        }
-        // Crease 2 (Lower dark shadow seam line at ny ~ -0.10)
-        else if (Math.abs(ny - (-0.10)) <= P / r * 0.8) {
-          col = C.blindfoldCrease2;
-        }
-        // Tier 3 (Lower fabric shelf band at ny >= -0.10)
-        else if (ny >= -0.10) {
-          col = C.blindfoldTier3;
-        }
+        if (isBorder) {
+          ctx.fillStyle = C.outline;
+        } else {
+          let col = C.blindfoldMid;
 
-        // Temple corner dither
-        if (absX >= 0.60 && (gx + gy) % 2 === 0) {
-          col = C.blindfoldCorner;
-        }
+          // Top highlight sheen rim
+          if (ny < blindfoldTopY + 0.05) {
+            col = C.blindfoldTop;
+          }
+          // Dual eye bulge silk leather specular reflection (matching anime reference)
+          else if (absX >= 0.18 && absX <= 0.60 && ny >= -0.20 && ny <= 0.04) {
+            const eyeCenterX = 0.39;
+            const eyeDist = Math.hypot((absX - eyeCenterX) * 1.5, ny - (-0.08));
+            if (eyeDist <= 0.10) {
+              col = '#484C5E'; // Center eye bulge glint
+            } else if (eyeDist <= 0.18) {
+              col = '#383B4A'; // Secondary eye sheen
+            } else if (Math.abs(ny - (-0.14)) <= P / r * 0.7) {
+              col = C.blindfoldCrease1; // Fabric tension crease
+            }
+          }
+          // Crease line in center nose region
+          else if (absX <= 0.12 && Math.abs(ny - (-0.14)) <= P / r * 0.7) {
+            col = C.blindfoldCrease1;
+          }
+          // Lower shadow shelf
+          else if (ny >= blindfoldBottomY - 0.05) {
+            col = C.blindfoldCrease2;
+          }
 
-        ctx.fillStyle = col;
+          // Temple corner dither
+          if (absX >= 0.62 && (gx + gy) % 2 === 0) {
+            col = C.blindfoldCorner;
+          }
+
+          ctx.fillStyle = col;
+        }
         ctx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE C: WARM FAIR SKIN & CHEEKS (blindfoldBottomY <= ny < 0.24)
       // ──────────────────────────────────────────
       else if (ny < 0.24) {
-        // Blindfold bottom outline
-        if (ny <= blindfoldBottomY + P / r) {
+        if (isInsideBlindfold(nx, ny - P / r)) {
           ctx.fillStyle = C.outline;
         } else {
           let col = C.skinBase;
