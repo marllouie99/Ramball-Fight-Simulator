@@ -4,6 +4,16 @@
 import { CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
 /**
  * Convert a hex color string (e.g. '#8A2BE2' or '#FF1144') to an RGB string (e.g. '138, 43, 226').
  * Used for dynamic glow colors in the Dharma Wheel.
@@ -906,6 +916,8 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   // 2. Pixel Art Clenched Fist
   const fistRadius = 14.0;
   const fistGridR = Math.ceil(fistRadius / sP);
+  const isDark = _isDarkMode();
+  const fistColor = isDark ? '#FFFFFF' : (fighterObj?.skinColor || (color !== '#FFD700' && color !== '#FFEE58' ? color : '#F4F4EC'));
   for (let gy = -fistGridR; gy <= fistGridR; gy++) {
     for (let gx = -fistGridR; gx <= fistGridR; gx++) {
       const dist = Math.sqrt(gx * gx + gy * gy) * sP;
@@ -917,7 +929,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       } else if (gx <= -2 && gy <= -2 && dist < fistRadius * 0.35) {
         ctx.fillStyle = '#FFFFFF'; // Specular glint
       } else {
-        ctx.fillStyle = color;
+        ctx.fillStyle = fistColor;
       }
       ctx.fillRect(px - sP * 0.5, py - sP * 0.5, sP, sP);
     }
@@ -1145,7 +1157,8 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   const _lP = 2.0;
   const _lSnap = (v) => Math.round(v / _lP) * _lP;
   const _lGridR = Math.ceil(fistRadius / _lP);
-  const fistColor = fighter?.skinColor || fighter?.bodyColor || '#F5F5DC';
+  const isDarkLeft = _isDarkMode();
+  const fistColor = isDarkLeft ? '#FFFFFF' : (fighter?.skinColor || fighter?.bodyColor || '#F4F4EC');
   for (let gy = -_lGridR; gy <= _lGridR; gy++) {
     for (let gx = -_lGridR; gx <= _lGridR; gx++) {
       const dist = Math.sqrt(gx * gx + gy * gy) * _lP;
