@@ -10,6 +10,16 @@ import { triggerGenosSelfDestructFlash } from '../renderers/effectsRenderer.js';
 
 import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
 // PERF: Radial gradients are defined at a fixed unit radius (centered at origin) so a single
 // cached gradient can be reused for every particle instance/position/size via ctx.translate()
 // + ctx.scale(), instead of calling ctx.createRadialGradient() fresh every frame per particle.
@@ -2193,104 +2203,217 @@ export function drawSparkEffects(layer = 'all') {
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
     } else if (effect.type === 'animeImpactFrame') {
-      // ── GLOBAL PIXEL-ART PUNCH IMPACT CRESCENT & ACTION LINES ──
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      
-      ctx.translate(effect.x, effect.y);
-      ctx.rotate((effect.hitAngle || 0) + Math.PI);
+      const isDark = _isDarkMode();
 
-      const alpha = effect.life;
-      const R = effect.size;
-      const P = 2.0; // Stepped pixel unit
+      if (isDark) {
+        // ── DARK MODE SUPERSONIC PUNCH IMPACT SHOCKWAVE RINGS ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
 
-      const outerR = R * 1.12;
-      const innerR = R * 0.84;
-      const halfArc = Math.PI * 0.72;
-      const totalArc = halfArc * 2;
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate(effect.hitAngle || 0);
 
-      const isGold = (effect.color === 'gold');
-      const isBlackPink = (effect.color === 'blackpink');
-      const isOrange = (effect.color === 'orange');
-      const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity');
-      const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
+        const progress = Math.min(1.0, Math.max(0.0, 1.0 - effect.life));
+        const alpha = Math.min(1.0, effect.life * 1.35);
+        const R = effect.size;
 
-      // 1. Stepped Pixel Radial Action Lines
-      const lineCount = 14;
-      const startRad = innerR * 0.85;
+        const isGold = (effect.color === 'gold');
+        const isBlackPink = (effect.color === 'blackpink' || effect.color === 'pink');
+        const isOrange = (effect.color === 'orange');
+        const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity' || effect.color === 'gojo');
+        const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
 
-      let lineColorA, lineColorB;
-      if (isGold) { lineColorA = '#0E0F14'; lineColorB = '#FFD700'; }
-      else if (isBlackPink) { lineColorA = '#0E0F14'; lineColorB = '#FF1493'; }
-      else if (isOrange) { lineColorA = '#FFFFFF'; lineColorB = '#FF5000'; }
-      else if (isCyan) { lineColorA = '#00142D'; lineColorB = '#00E5FF'; }
-      else if (isCrimson) { lineColorA = '#140205'; lineColorB = '#FF2400'; }
-      else { lineColorA = '#0E0F14'; lineColorB = '#FFFFFF'; }
-
-      for (let i = 0; i < lineCount; i++) {
-        const a = -halfArc + (i / (lineCount - 1)) * totalArc;
-        const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
-        const col = (i % 3 === 0) ? lineColorA : lineColorB;
-        ctx.fillStyle = col;
-
-        const lineSteps = Math.max(1, Math.round(len / P));
-        for (let s = 0; s <= lineSteps; s++) {
-          const curD = startRad + s * P;
-          const px = Math.round((Math.cos(a) * curD) / P) * P;
-          const py = Math.round((Math.sin(a) * curD) / P) * P;
-          ctx.fillRect(px, py, P, P);
+        let colPrimary, colSecondary, colCore;
+        if (isGold) {
+          colPrimary = `rgba(255, 215, 0, ${alpha * 0.95})`;
+          colSecondary = `rgba(255, 245, 180, ${alpha * 0.90})`;
+          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+        } else if (isBlackPink) {
+          colPrimary = `rgba(255, 20, 147, ${alpha * 0.95})`;
+          colSecondary = `rgba(255, 182, 193, ${alpha * 0.90})`;
+          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+        } else if (isOrange) {
+          colPrimary = `rgba(255, 80, 0, ${alpha * 0.95})`;
+          colSecondary = `rgba(255, 200, 120, ${alpha * 0.90})`;
+          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+        } else if (isCyan) {
+          colPrimary = `rgba(0, 229, 255, ${alpha * 0.95})`;
+          colSecondary = `rgba(200, 250, 255, ${alpha * 0.90})`;
+          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+        } else if (isCrimson) {
+          colPrimary = `rgba(255, 36, 0, ${alpha * 0.95})`;
+          colSecondary = `rgba(255, 180, 180, ${alpha * 0.90})`;
+          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+        } else {
+          colPrimary = `rgba(255, 255, 255, ${alpha * 0.95})`;
+          colSecondary = `rgba(220, 230, 245, ${alpha * 0.90})`;
+          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
         }
-      }
 
-      // 2. Stepped 8-Segment Chopped Pixel Impact Crescent Pieces
-      const alphaFill = Math.min(1.0, alpha * 1.25);
+        // 1. Primary Expanding Supersonic Shockwave Ring (Forward-compressed Ellipse)
+        const curR1 = R * (0.35 + 0.95 * Math.pow(progress, 0.65));
+        ctx.beginPath();
+        ctx.ellipse(curR1 * 0.25 * progress, 0, curR1 * 1.15, curR1 * 0.85, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = colPrimary;
+        ctx.lineWidth = Math.max(1.5, 6.0 * effect.life);
+        ctx.stroke();
 
-      for (let sIdx = 0; sIdx < ANIME_IMPACT_SEGMENTS.length; sIdx++) {
-        const seg = ANIME_IMPACT_SEGMENTS[sIdx];
-        const segN = 8;
-        const segPeakIdx = 4;
+        // 2. Secondary Inner Compression Shockwave Ring
+        const curR2 = R * (0.20 + 0.65 * Math.pow(progress, 0.75));
+        ctx.beginPath();
+        ctx.ellipse(curR2 * 0.15 * progress, 0, curR2 * 1.05, curR2 * 0.75, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = colSecondary;
+        ctx.lineWidth = Math.max(1.0, 3.5 * effect.life);
+        ctx.stroke();
 
-        let segColor;
-        if (isGold) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FFC800';
-        else if (isBlackPink) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FF1493';
-        else if (isOrange) segColor = (sIdx % 2 === 0) ? '#FF5000' : '#FFB400';
-        else if (isCyan) segColor = (sIdx % 3 === 0) ? '#00142D' : '#00E5FF';
-        else if (isCrimson) segColor = (sIdx % 3 === 0) ? '#140205' : '#DC143C';
-        else segColor = '#0E0F14';
+        // 3. Directional Forward Supersonic Crescent Wavefront Arcs
+        const forwardDist1 = R * (0.45 + 0.75 * progress);
+        const arcR1 = R * (0.35 + 0.45 * progress);
+        ctx.beginPath();
+        ctx.arc(forwardDist1, 0, arcR1, -Math.PI * 0.52, Math.PI * 0.52);
+        ctx.strokeStyle = colCore;
+        ctx.lineWidth = Math.max(1.0, 4.0 * effect.life);
+        ctx.stroke();
 
-        ctx.fillStyle = segColor;
+        const forwardDist2 = R * (0.20 + 0.45 * progress);
+        const arcR2 = R * (0.25 + 0.30 * progress);
+        ctx.beginPath();
+        ctx.arc(forwardDist2, 0, arcR2, -Math.PI * 0.62, Math.PI * 0.62);
+        ctx.strokeStyle = colPrimary;
+        ctx.lineWidth = Math.max(1.0, 2.5 * effect.life);
+        ctx.stroke();
 
-        for (let i = 0; i <= segN; i++) {
-          const localT = i / segN;
-          const globalT = seg.t0 + localT * (seg.t1 - seg.t0);
-          const a = -halfArc + globalT * totalArc;
+        // 4. Radial Supersonic Pressure Needle Rays
+        const rayCount = 10;
+        for (let i = 0; i < rayCount; i++) {
+          const rayAngle = -Math.PI * 0.72 + (i / (rayCount - 1)) * (Math.PI * 1.44);
+          const rayStart = curR1 * 0.40;
+          const rayLen = R * (0.35 + Math.sin(i * 2.1) * 0.20) * (0.6 + 0.4 * progress);
+          const rayEnd = rayStart + rayLen;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(rayAngle) * rayStart, Math.sin(rayAngle) * rayStart * 0.85);
+          ctx.lineTo(Math.cos(rayAngle) * rayEnd, Math.sin(rayAngle) * rayEnd * 0.85);
+          ctx.strokeStyle = (i % 2 === 0) ? colSecondary : colPrimary;
+          ctx.lineWidth = Math.max(0.75, 1.8 * effect.life);
+          ctx.stroke();
+        }
 
-          let r;
-          if (i === 0 || i === segN) r = outerR * 0.80;
-          else if (i === segPeakIdx) r = outerR * seg.maxSpike;
-          else r = outerR * ((i % 2 === 0) ? 0.90 : 1.05);
+        // 5. Central Pure-White Specular Diamond Impact Point
+        const coreSize = Math.max(1.5, R * 0.16 * effect.life);
+        ctx.fillStyle = colCore;
+        ctx.beginPath();
+        ctx.moveTo(0, -coreSize);
+        ctx.lineTo(coreSize * 1.5, 0);
+        ctx.lineTo(0, coreSize);
+        ctx.lineTo(-coreSize * 0.7, 0);
+        ctx.closePath();
+        ctx.fill();
 
-          const rSpan = r - innerR;
-          const rSteps = Math.max(1, Math.round(rSpan / P));
-          for (let s = 0; s <= rSteps; s++) {
-            const curR = innerR + s * P;
-            const px = Math.round((Math.cos(a) * curR) / P) * P;
-            const py = Math.round((Math.sin(a) * curR) / P) * P;
+        ctx.restore();
+      } else {
+        // ── LIGHT MODE GLOBAL PIXEL-ART PUNCH IMPACT CRESCENT & ACTION LINES ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate((effect.hitAngle || 0) + Math.PI);
+
+        const alpha = effect.life;
+        const R = effect.size;
+        const P = 2.0; // Stepped pixel unit
+
+        const outerR = R * 1.12;
+        const innerR = R * 0.84;
+        const halfArc = Math.PI * 0.72;
+        const totalArc = halfArc * 2;
+
+        const isGold = (effect.color === 'gold');
+        const isBlackPink = (effect.color === 'blackpink');
+        const isOrange = (effect.color === 'orange');
+        const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity');
+        const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
+
+        // 1. Stepped Pixel Radial Action Lines
+        const lineCount = 14;
+        const startRad = innerR * 0.85;
+
+        let lineColorA, lineColorB;
+        if (isGold) { lineColorA = '#0E0F14'; lineColorB = '#FFD700'; }
+        else if (isBlackPink) { lineColorA = '#0E0F14'; lineColorB = '#FF1493'; }
+        else if (isOrange) { lineColorA = '#FFFFFF'; lineColorB = '#FF5000'; }
+        else if (isCyan) { lineColorA = '#00142D'; lineColorB = '#00E5FF'; }
+        else if (isCrimson) { lineColorA = '#140205'; lineColorB = '#FF2400'; }
+        else { lineColorA = '#0E0F14'; lineColorB = '#FFFFFF'; }
+
+        for (let i = 0; i < lineCount; i++) {
+          const a = -halfArc + (i / (lineCount - 1)) * totalArc;
+          const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
+          const col = (i % 3 === 0) ? lineColorA : lineColorB;
+          ctx.fillStyle = col;
+
+          const lineSteps = Math.max(1, Math.round(len / P));
+          for (let s = 0; s <= lineSteps; s++) {
+            const curD = startRad + s * P;
+            const px = Math.round((Math.cos(a) * curD) / P) * P;
+            const py = Math.round((Math.sin(a) * curD) / P) * P;
             ctx.fillRect(px, py, P, P);
           }
         }
+
+        // 2. Stepped 8-Segment Chopped Pixel Impact Crescent Pieces
+        const alphaFill = Math.min(1.0, alpha * 1.25);
+
+        for (let sIdx = 0; sIdx < ANIME_IMPACT_SEGMENTS.length; sIdx++) {
+          const seg = ANIME_IMPACT_SEGMENTS[sIdx];
+          const segN = 8;
+          const segPeakIdx = 4;
+
+          let segColor;
+          if (isGold) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FFC800';
+          else if (isBlackPink) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FF1493';
+          else if (isOrange) segColor = (sIdx % 2 === 0) ? '#FF5000' : '#FFB400';
+          else if (isCyan) segColor = (sIdx % 3 === 0) ? '#00142D' : '#00E5FF';
+          else if (isCrimson) segColor = (sIdx % 3 === 0) ? '#140205' : '#DC143C';
+          else segColor = '#0E0F14';
+
+          ctx.fillStyle = segColor;
+
+          for (let i = 0; i <= segN; i++) {
+            const localT = i / segN;
+            const globalT = seg.t0 + localT * (seg.t1 - seg.t0);
+            const a = -halfArc + globalT * totalArc;
+
+            let r;
+            if (i === 0 || i === segN) r = outerR * 0.80;
+            else if (i === segPeakIdx) r = outerR * seg.maxSpike;
+            else r = outerR * ((i % 2 === 0) ? 0.90 : 1.05);
+
+            const rSpan = r - innerR;
+            const rSteps = Math.max(1, Math.round(rSpan / P));
+            for (let s = 0; s <= rSteps; s++) {
+              const curR = innerR + s * P;
+              const px = Math.round((Math.cos(a) * curR) / P) * P;
+              const py = Math.round((Math.sin(a) * curR) / P) * P;
+              ctx.fillRect(px, py, P, P);
+            }
+          }
+        }
+
+        // 3. Central 4-Point Pure-White Specular Pixel Diamond
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(-P * 2, -P * 0.5, P * 4, P);
+        ctx.fillRect(-P * 0.5, -P * 2, P, P * 4);
+
+        ctx.restore();
       }
-
-      // 3. Central 4-Point Pure-White Specular Pixel Diamond
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(-P * 2, -P * 0.5, P * 4, P);
-      ctx.fillRect(-P * 0.5, -P * 2, P, P * 4);
-
-      ctx.restore();
     } else if (effect.type === 'punchWindSpeedLine') {
       // ── SUPERSONIC PUNCH WIND SPEED LINE STREAK ──
       ctx.save();
