@@ -85,17 +85,17 @@ function _initVehicleGradients(ctx, halfW, length, width, cabinX, cabinW, cabinH
  */
 export function drawCarHeadlights(ctx, carX, carY, carAngle, carLength = 152, carWidth = 72) {
   ctx.save();
-  ctx.translate(carX, carY);
+  ctx.translate(Math.round(carX), Math.round(carY));
   ctx.rotate(carAngle);
 
-  const frontX = carLength * 0.5 + 2;
+  const frontX = Math.round(carLength * 0.5 + 2);
   const beamLength = 240;
   const beamSpread = 64;
   const lightYs = [-carWidth * 0.32, carWidth * 0.32];
 
   for (const ly of lightYs) {
     ctx.save();
-    ctx.translate(frontX, ly);
+    ctx.translate(frontX, Math.round(ly));
 
     // Forward illumination cone
     ctx.fillStyle = _getHeadlightGrad(ctx, beamLength);
@@ -107,16 +107,13 @@ export function drawCarHeadlights(ctx, carX, carY, carAngle, carLength = 152, ca
     ctx.closePath();
     ctx.fill();
 
-    // Concentric hot core bulb flare (Rule 11 compliant: simulated glow without shadowBlur)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.beginPath();
-    ctx.arc(3, 0, 5.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(254, 240, 138, 0.65)';
-    ctx.beginPath();
-    ctx.arc(3, 0, 9.5, 0, Math.PI * 2);
-    ctx.fill();
+    // Stepped pixel bulb flares
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(1, -6, 12, 12);
+    ctx.fillStyle = '#FEF08A';
+    ctx.fillRect(2, -4, 8, 8);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(3, -2, 4, 4);
 
     ctx.restore();
   }
@@ -131,8 +128,8 @@ export function drawCarSkidMarks(ctx, skidTracks) {
   if (!skidTracks || skidTracks.length === 0) return;
 
   ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'miter';
   ctx.strokeStyle = '#0C0C10';
 
   for (let i = 0; i < skidTracks.length; i++) {
@@ -140,12 +137,12 @@ export function drawCarSkidMarks(ctx, skidTracks) {
     if (!track.points || track.points.length < 2 || track.alpha <= 0.02) continue;
 
     ctx.globalAlpha = track.alpha * 0.65;
-    ctx.lineWidth = track.width || 6.0;
+    ctx.lineWidth = Math.round((track.width || 6.0) / 2) * 2;
 
     ctx.beginPath();
-    ctx.moveTo(track.points[0].x, track.points[0].y);
+    ctx.moveTo(Math.round(track.points[0].x), Math.round(track.points[0].y));
     for (let p = 1; p < track.points.length; p++) {
-      ctx.lineTo(track.points[p].x, track.points[p].y);
+      ctx.lineTo(Math.round(track.points[p].x), Math.round(track.points[p].y));
     }
     ctx.stroke();
   }
@@ -161,7 +158,7 @@ export function drawBurnoutOilPuddle(ctx, oilPuddle) {
 }
 
 /**
- * Draws expanding billowing burnout tire smoke particles (High-performance single-pass batch)
+ * Draws expanding billowing burnout tire smoke particles (100% Discrete Stepped Pixel Blocks)
  */
 export function drawTireSmokeParticles(ctx, smokeParticles) {
   if (!smokeParticles || smokeParticles.length === 0) return;
@@ -172,10 +169,9 @@ export function drawTireSmokeParticles(ctx, smokeParticles) {
     if (!p || p.life <= 0) continue;
 
     const alpha = (p.life / 20) * (p.maxAlpha || 0.40);
+    const sSize = Math.max(4, Math.round((p.r * 2) / 2) * 2);
     ctx.fillStyle = `rgba(225, 232, 240, ${alpha.toFixed(3)})`;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(Math.round(p.x - sSize * 0.5), Math.round(p.y - sSize * 0.5), sSize, sSize);
   }
   ctx.restore();
 }
@@ -719,53 +715,57 @@ function _drawPixelGroveHomie(ctx, x, y, targetAngle, recoil, flashTimer, shirtC
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
-  // 1. Shoulders & Torso leaning out
+  // 1. Shoulders & Muscular Torso leaning out
   ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-12, -8, 24, 16);
+  ctx.fillRect(-14, -10, 28, 20);
   ctx.fillStyle = shirtColor;
-  ctx.fillRect(-11, -7, 22, 14);
+  ctx.fillRect(-12, -8, 24, 16);
 
   // Gold chain
   ctx.fillStyle = '#F59E0B';
   ctx.fillRect(-6, 2, 12, 2);
 
-  // 2. Head Circle (Stepped Pixel)
+  // 2. Head Circle (Discrete Stepped Pixel with #0E0F14 Outline)
   ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-10, -14, 20, 18);
+  ctx.fillRect(-11, -15, 22, 20);
   ctx.fillStyle = skinColor;
   ctx.fillRect(-9, -13, 18, 16);
 
-  // 3. Green Bandana
+  // 3. Green Bandana & Knots
   ctx.fillStyle = '#16A34A';
   ctx.fillRect(-9, -13, 18, 7);
-  ctx.fillStyle = '#DCFCE7'; // Paisley dots
+  // Bandana knot hanging off back
+  ctx.fillRect(-13, -11, 4, 4);
+  // Paisley dots
+  ctx.fillStyle = '#DCFCE7';
   ctx.fillRect(-5, -11, 2, 2);
   ctx.fillRect(0, -12, 2, 2);
   ctx.fillRect(4, -11, 2, 2);
 
-  // 4. Black Sunglasses
+  // 4. Black Sunglasses & Specular Shine
   ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-6, -6, 12, 4);
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.fillRect(-4, -5, 3, 1);
-  ctx.fillRect(2, -5, 3, 1);
+  ctx.fillRect(-7, -7, 14, 5);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-5, -6, 3, 2);
+  ctx.fillRect(2, -6, 3, 2);
 
   // 5. Holding and Aiming Stepped Pixel TEC-9
   const recoilDist = snap((recoil || 0) * 1.2);
   const gunOffsetX = Math.cos(targetAngle) * (14.0 - recoilDist);
   const gunOffsetY = Math.sin(targetAngle) * (14.0 - recoilDist);
 
-  // Arms reaching out
+  // Arms reaching out from window
   ctx.fillStyle = skinColor;
-  ctx.fillRect(-2, 2, snap(gunOffsetX * 0.7), snap(gunOffsetY * 0.7));
+  ctx.fillRect(-3, 1, snap(gunOffsetX * 0.75), snap(gunOffsetY * 0.75));
 
-  drawCjTec9(ctx, gunOffsetX, gunOffsetY, 1.05, recoil, flashTimer);
+  drawCjPixelTec9(ctx, gunOffsetX, gunOffsetY, 1.05, recoil, flashTimer);
 
   ctx.restore();
 }
 
 /**
- * Draws Grove Street Greenwood Sedan in 100% Discrete Pixel Art Style (Saitama Tech)
+ * Draws Authentic Grove Street Greenwood Sedan in 100% Discrete Pixel Art Style (Saitama Tech)
+ * Uses pure discrete 2D grid-scan rasterization loop with stepped #0E0F14 4-neighbor attached border.
  */
 export function drawPixelGroveStreetCar(ctx, car) {
   if (!car || car.dead) return;
@@ -776,246 +776,285 @@ export function drawPixelGroveStreetCar(ctx, car) {
   const halfW = width * 0.5;
 
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
   ctx.translate(Math.round(car.x), Math.round(car.y));
   ctx.rotate(car.angle || 0);
 
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
-  // 1. Drop Shadow Plate
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.60)';
-  ctx.fillRect(-halfL - 6, -halfW - 4, length + 12, width + 8);
+  // ── LAYER 0: DROP SHADOW ON GROUND PLANE ──
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fillRect(snap(-halfL - 6), snap(-halfW - 4), snap(length + 12), snap(width + 8));
 
-  // 2. 4 Stepped Pixel Lowrider Wheels
+  // ── LAYER 1: 4 WHITEWALL LOWRIDER WHEELS ──
   const wheelXPositions = [halfL * 0.55, -halfL * 0.55];
-  const wheelY = halfW * 0.94;
+  const wheelOffsetY = halfW * 0.92;
+  const wheelRot = car.wheelRotation || 0;
+
   for (let wx = 0; wx < 2; wx++) {
-    const xPos = snap(wheelXPositions[wx]);
-    [-wheelY, wheelY].forEach(yPos => {
+    const wX = snap(wheelXPositions[wx]);
+    [-wheelOffsetY, wheelOffsetY].forEach(wY => {
+      const centerY = snap(wY);
+      // Outer stepped tire border
       ctx.fillStyle = '#0E0F14';
-      ctx.fillRect(xPos - 16, snap(yPos - 6), 32, 12);
-      ctx.fillStyle = '#18181B'; // Black rubber tire
-      ctx.fillRect(xPos - 15, snap(yPos - 5), 30, 10);
+      ctx.fillRect(wX - 16, centerY - 6, 32, 12);
+
+      // Black rubber tire tread
+      ctx.fillStyle = '#18181B';
+      ctx.fillRect(wX - 14, centerY - 4, 28, 8);
+
       // Whitewall stripe
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(xPos - 12, snap(yPos - 3), 24, 2);
-      ctx.fillRect(xPos - 12, snap(yPos + 1), 24, 2);
-      // Chrome center dish
+      ctx.fillRect(wX - 12, centerY - 2, 24, 2);
+      ctx.fillRect(wX - 12, centerY + 2, 24, 2);
+
+      // Deep-dish chrome rim
       ctx.fillStyle = '#CBD5E1';
-      ctx.fillRect(xPos - 8, snap(yPos - 2), 16, 4);
+      ctx.fillRect(wX - 8, centerY - 2, 16, 4);
+
+      // Chrome wheel center cap & rotating spokes
+      ctx.fillStyle = '#0E0F14';
+      const spokeOff = snap(Math.sin(wheelRot) * 4);
+      ctx.fillRect(wX + spokeOff - 1, centerY - 2, 2, 4);
     });
   }
 
-  // 3. Main Car Body Box (Pale Vintage Sage Green)
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-halfL - P, -halfW - P, length + P * 2, width + P * 2);
+  // ── LAYER 2: 2D DISCRETE GRID-SCAN RASTERIZED SEDAN CHASSIS (SAITAMA TECH) ──
+  const cornerR = 6.0;
+  const inBody = (x, y) => {
+    if (Math.abs(y) > halfW || Math.abs(x) > halfL) return false;
+    // Rounded front corners (+X)
+    if (x > halfL - cornerR && Math.abs(y) > halfW - cornerR) {
+      const dx = x - (halfL - cornerR);
+      const dy = Math.abs(y) - (halfW - cornerR);
+      return Math.hypot(dx, dy) <= cornerR;
+    }
+    // Rounded rear corners (-X)
+    if (x < -halfL + cornerR && Math.abs(y) > halfW - cornerR) {
+      const dx = x - (-halfL + cornerR);
+      const dy = Math.abs(y) - (halfW - cornerR);
+      return Math.hypot(dx, dy) <= cornerR;
+    }
+    return true;
+  };
 
-  ctx.fillStyle = '#76987E'; // Pale Sage Green Paint
-  ctx.fillRect(-halfL, -halfW, length, width);
+  // Cabin / Window regions
+  const cabinX = -halfL * 0.13;
+  const cabinW = length * 0.54;
+  const cabinH = width * 0.76;
+  const cabinLeft = cabinX - cabinW * 0.5;
+  const cabinRight = cabinX + cabinW * 0.5;
+  const cabinTop = -cabinH * 0.5;
+  const cabinBtm = cabinH * 0.5;
 
-  // Hood & Trunk Panel Highlights
-  ctx.fillStyle = '#95BA9D';
-  ctx.fillRect(-halfL + 4, -halfW + 4, length - 8, 4);
-  ctx.fillRect(-halfL + 4, halfW - 8, length - 8, 4);
+  const roofW = cabinW * 0.54;
+  const roofH = cabinH * 0.82;
+  const roofLeft = cabinX - roofW * 0.5;
+  const roofRight = cabinX + roofW * 0.5;
+  const roofTop = -roofH * 0.5;
+  const roofBtm = roofH * 0.5;
 
-  // Center Crease Line
-  ctx.fillStyle = '#5A7862';
-  ctx.fillRect(-halfL + 6, -1, length - 12, 2);
+  const inCabin = (x, y) => (x >= cabinLeft && x <= cabinRight && y >= cabinTop && y <= cabinBtm);
+  const inRoof = (x, y) => (x >= roofLeft && x <= roofRight && y >= roofTop && y <= roofBtm);
 
-  // Chrome Beltline Trim & Handles
-  ctx.fillStyle = '#E2E8F0';
-  ctx.fillRect(-halfL + 8, -halfW + 2, length - 16, 2);
-  ctx.fillRect(-halfL + 8, halfW - 4, length - 16, 2);
+  const stepsX = Math.ceil((halfL + P * 2) / P);
+  const stepsY = Math.ceil((halfW + P * 2) / P);
 
-  // 4 Chrome Door Handles
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(halfL * 0.05, -halfW + 5, 8, 2);
-  ctx.fillRect(-halfL * 0.32, -halfW + 5, 8, 2);
-  ctx.fillRect(halfL * 0.05, halfW - 7, 8, 2);
-  ctx.fillRect(-halfL * 0.32, halfW - 7, 8, 2);
+  for (let gy = -stepsY; gy <= stepsY; gy++) {
+    for (let gx = -stepsX; gx <= stepsX; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
 
-  // 4. Cabin Glass & Roof
-  const cabinX = snap(-halfL * 0.13);
-  const cabinW = snap(length * 0.54);
-  const cabinH = snap(width * 0.76);
+      if (!inBody(rx, ry)) continue;
 
-  // Glass Frame
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(cabinX - cabinW * 0.5 - P, -cabinH * 0.5 - P, cabinW + P * 2, cabinH + P * 2);
-  ctx.fillStyle = '#0F172A'; // Tinted dark glass
-  ctx.fillRect(cabinX - cabinW * 0.5, -cabinH * 0.5, cabinW, cabinH);
+      const px = snap(rx);
+      const py = snap(ry);
 
-  // Windshield & Rear Glass Specular White Glints
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-  ctx.fillRect(cabinX + cabinW * 0.25, -cabinH * 0.35, 6, 2);
-  ctx.fillRect(cabinX + cabinW * 0.35, -cabinH * 0.20, 6, 2);
-  ctx.fillRect(cabinX - cabinW * 0.35, -cabinH * 0.35, 6, 2);
+      // 4-Neighbor Attached Stepped Black Border (Saitama Tech)
+      const isEdge = (
+        !inBody(rx + P, ry) ||
+        !inBody(rx - P, ry) ||
+        !inBody(rx, ry + P) ||
+        !inBody(rx, ry - P)
+      );
 
-  // Landau Vinyl Top Roof (Muted Olive Vinyl)
-  const roofW = snap(cabinW * 0.54);
-  const roofH = snap(cabinH * 0.82);
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(cabinX - roofW * 0.5 - P, -roofH * 0.5 - P, roofW + P * 2, roofH + P * 2);
-  ctx.fillStyle = '#4E6554'; // Vinyl green
-  ctx.fillRect(cabinX - roofW * 0.5, -roofH * 0.5, roofW, roofH);
-  ctx.fillStyle = '#698470'; // Highlight
-  ctx.fillRect(cabinX - roofW * 0.5 + 2, -roofH * 0.5 + 2, roofW - 4, 4);
+      if (isEdge) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
-  // 5. Chrome Front & Rear Bumpers, Grille, Lights
-  // Front Bumper
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(halfL - 2, -halfW + 2, 8, width - 4);
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(halfL - 1, -halfW + 3, 6, width - 6);
+      // 1. LANDAU VINYL TOP ROOF
+      if (inRoof(rx, ry)) {
+        const isRoofEdge = (
+          !inRoof(rx + P, ry) || !inRoof(rx - P, ry) ||
+          !inRoof(rx, ry + P) || !inRoof(rx, ry - P)
+        );
+        if (isRoofEdge) {
+          ctx.fillStyle = '#0E0F14'; // Black roof border
+        } else if (ry < roofTop + 4) {
+          ctx.fillStyle = '#698470'; // Top pale vinyl highlight
+        } else if (ry > roofBtm - 4) {
+          ctx.fillStyle = '#3D5444'; // Bottom vinyl shadow
+        } else {
+          ctx.fillStyle = '#4E6554'; // Vintage deep olive-green vinyl
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
-  // Waterfall Grille
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(halfL - 6, -halfW * 0.28, 4, width * 0.56);
-  ctx.fillStyle = '#FFFFFF';
-  for (let gy = -halfW * 0.24; gy <= halfW * 0.24; gy += 4) {
-    ctx.fillRect(halfL - 5, snap(gy), 3, 2);
+      // 2. TINTED CABIN GLASS (Windshield, Rear Glass, Side Windows)
+      if (inCabin(rx, ry)) {
+        const isCabinEdge = (
+          !inCabin(rx + P, ry) || !inCabin(rx - P, ry) ||
+          !inCabin(rx, ry + P) || !inCabin(rx, ry - P)
+        );
+        if (isCabinEdge) {
+          ctx.fillStyle = '#0E0F14'; // Pillar/glass framing
+        } else if (
+          (rx > cabinRight - 12 && Math.abs(ry - rx * 0.4) < 3) ||
+          (rx < cabinLeft + 10 && Math.abs(ry + rx * 0.4) < 3)
+        ) {
+          ctx.fillStyle = '#CBD5E1'; // Glass diagonal specular sheen
+        } else {
+          ctx.fillStyle = '#0F172A'; // Deep midnight tinted glass
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // 3. HOOD & TRUNK BODY PANELS (Vintage Pale Sage Green)
+      // Front Cowl Vents
+      if (rx >= cabinRight + 2 && rx <= cabinRight + 8 && Math.abs(ry) < halfW * 0.6) {
+        ctx.fillStyle = (gx % 2 === 0) ? '#0E0F14' : '#5A7862';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Chrome Side Beltline Trim
+      if (Math.abs(ry) >= halfW - 4 && Math.abs(ry) <= halfW - 2) {
+        ctx.fillStyle = '#E2E8F0'; // Chrome side trim
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Center Hood & Trunk Crease Line
+      if (Math.abs(ry) <= 1) {
+        ctx.fillStyle = '#5A7862'; // Center body line crease
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Sunlit Top Highlight vs Underside Shadow
+      if (ry < -halfW * 0.3) {
+        ctx.fillStyle = '#95BA9D'; // Sunlit mint-sage highlight
+      } else if (ry > halfW * 0.4) {
+        ctx.fillStyle = '#5A7862'; // Shadowed underside
+      } else {
+        ctx.fillStyle = '#76987E'; // Pale vintage sage green
+      }
+
+      ctx.fillRect(px, py, P, P);
+    }
   }
 
-  // Headlights (Dual square sealed beams)
-  ctx.fillStyle = '#FEF08A';
-  ctx.fillRect(halfL - 5, -halfW * 0.75, 4, 6);
-  ctx.fillRect(halfL - 5, -halfW * 0.50, 4, 6);
-  ctx.fillRect(halfL - 5, halfW * 0.35, 4, 6);
-  ctx.fillRect(halfL - 5, halfW * 0.60, 4, 6);
+  // ── LAYER 3: CHROME FRONT BUMPER, WATERFALL GRILLE, HEADLIGHTS ──
+  // Front Bumper Block
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(halfL - 2), snap(-halfW * 0.94), 8, snap(width * 0.88));
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillRect(snap(halfL - 1), snap(-halfW * 0.90), 6, snap(width * 0.80));
+
+  // Chrome Bumper Overriders / Black Rubber Guards
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(halfL - 2), snap(-halfW * 0.45), 8, 6);
+  ctx.fillRect(snap(halfL - 2), snap(halfW * 0.35), 8, 6);
+
+  // Chrome Waterfall Grille
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(halfL - 8), snap(-halfW * 0.28), 6, snap(width * 0.56));
+  ctx.fillStyle = '#FFFFFF';
+  for (let gy = -halfW * 0.24; gy <= halfW * 0.24; gy += 4) {
+    ctx.fillRect(snap(halfL - 7), snap(gy), 4, 2);
+  }
+
+  // Dual Square Sealed-Beam Headlights (Left & Right)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(halfL - 8), snap(-halfW * 0.78), 6, 18);
+  ctx.fillRect(snap(halfL - 8), snap(halfW * 0.38), 6, 18);
+
+  ctx.fillStyle = '#FEF08A'; // Glowing yellow/white headlights
+  ctx.fillRect(snap(halfL - 7), snap(-halfW * 0.76), 4, 6);
+  ctx.fillRect(snap(halfL - 7), snap(-halfW * 0.52), 4, 6);
+  ctx.fillRect(snap(halfL - 7), snap(halfW * 0.40), 4, 6);
+  ctx.fillRect(snap(halfL - 7), snap(halfW * 0.64), 4, 6);
 
   // Amber Turn Signals
   ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(halfL - 4, -halfW * 0.90, 3, 4);
-  ctx.fillRect(halfL - 4, halfW * 0.80, 3, 4);
+  ctx.fillRect(snap(halfL - 6), snap(-halfW * 0.90), 4, 4);
+  ctx.fillRect(snap(halfL - 6), snap(halfW * 0.80), 4, 4);
 
-  // Rear Bumper & Taillights
+  // ── LAYER 4: CHROME REAR BUMPER, TAILLIGHTS, EXHAUST PIPES ──
+  // Rear Bumper Block
   ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-halfL - 6, -halfW + 2, 8, width - 4);
+  ctx.fillRect(snap(-halfL - 6), snap(-halfW * 0.94), 8, snap(width * 0.88));
   ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(-halfL - 5, -halfW + 3, 6, width - 6);
+  ctx.fillRect(snap(-halfL - 5), snap(-halfW * 0.90), 6, snap(width * 0.80));
 
-  // Crimson Taillights
-  ctx.fillStyle = '#DC2626';
-  ctx.fillRect(-halfL - 4, -halfW * 0.80, 3, 8);
-  ctx.fillRect(-halfL - 4, halfW * 0.60, 3, 8);
+  // Dual Crimson Vertical Taillights
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(-halfL - 4), snap(-halfW * 0.80), 4, 10);
+  ctx.fillRect(snap(-halfL - 4), snap(halfW * 0.58), 4, 10);
+  ctx.fillStyle = '#DC2626'; // Bright ruby red
+  ctx.fillRect(snap(-halfL - 3), snap(-halfW * 0.78), 2, 8);
+  ctx.fillRect(snap(-halfL - 3), snap(halfW * 0.60), 2, 8);
 
-  // 6. Two Grove Street Homies Leaning Out with Pixel TEC-9s
+  // Dual Chrome Exhaust Tips
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillRect(snap(-halfL - 8), snap(-halfW * 0.60), 4, 4);
+  ctx.fillRect(snap(-halfL - 8), snap(halfW * 0.50), 4, 4);
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(-halfL - 8), snap(-halfW * 0.60 + 1), 2, 2);
+  ctx.fillRect(snap(-halfL - 8), snap(halfW * 0.50 + 1), 2, 2);
+
+  // 4 Chrome Door Handles
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(snap(halfL * 0.05), snap(-halfW + 6), 6, 2);
+  ctx.fillRect(snap(-halfL * 0.32), snap(-halfW + 6), 6, 2);
+  ctx.fillRect(snap(halfL * 0.05), snap(halfW - 8), 6, 2);
+  ctx.fillRect(-halfL * 0.32, snap(halfW - 8), 6, 2);
+
+  // ── LAYER 5: TWO GROVE STREET HOMIES LEANING OUT (PIXEL ART STYLE) ──
   const h1Aim = car.homie1Aim || 0;
   const h1Recoil = car.homie1Recoil || 0;
   const h1Flash = car.homie1Flash || 0;
-  _drawPixelGroveHomie(ctx, cabinX + cabinW * 0.12, halfW * 0.75, h1Aim, h1Recoil, h1Flash, '#F8FAFC');
+  _drawPixelGroveHomie(ctx, snap(cabinX + cabinW * 0.12), snap(halfW * 0.75), h1Aim, h1Recoil, h1Flash, '#F8FAFC');
 
   const h2Aim = car.homie2Aim || 0;
   const h2Recoil = car.homie2Recoil || 0;
   const h2Flash = car.homie2Flash || 0;
-  _drawPixelGroveHomie(ctx, cabinX - cabinW * 0.16, halfW * 0.75, h2Aim, h2Recoil, h2Flash, '#15803D');
+  _drawPixelGroveHomie(ctx, snap(cabinX - cabinW * 0.16), snap(halfW * 0.75), h2Aim, h2Recoil, h2Flash, '#15803D');
 
-  // Hit-flash
-  if (car.hitFlashTimer && car.hitFlashTimer > 0) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.80)';
-    ctx.fillRect(-halfL, -halfW, length, width);
-    car.hitFlashTimer--;
-  }
-
-  ctx.restore();
-}
-
-/**
- * Main 2D Vector Renderer for the Ultra-Realistic Grove Street Greenwood Sedan
- * Fully detailed 1980s 4-door boxy lowrider sedan with chrome moldings, Landau vinyl top,
- * realistic glass reflections, hood ornament, and 2 gang homies leaning out.
- * Optimized via Pre-Rendered Offscreen GPU Chassis Blitting.
- */
-export function drawGroveStreetCar(ctx, car) {
-  if (!car || car.dead) return;
-
-  if (_isDarkMode()) {
-    drawPixelGroveStreetCar(ctx, car);
-    return;
-  }
-
-  _initVehicleGradients(ctx);
-  const length = car.length || 152;
-  const width = car.width || 72;
-  const halfL = length * 0.5;
-  const halfW = width * 0.5;
-  const pad = 16;
-
-  ctx.save();
-  ctx.translate(car.x, car.y);
-  ctx.rotate(car.angle || 0);
-
-  // ── LAYER 1: 4 WHEELS (Pre-rendered offscreen GPU blits) ──
-  const wheelOffsetFrontX = halfL * 0.55;
-  const wheelOffsetRearX = -halfL * 0.55;
-  const wheelOffsetY = halfW * 0.94;
-  const wheelRot = (car.wheelRotation || 0);
-
-  _drawLowriderWheel(ctx, wheelOffsetFrontX, -wheelOffsetY, 30, 12.5, wheelRot);
-  _drawLowriderWheel(ctx, wheelOffsetFrontX, wheelOffsetY, 30, 12.5, wheelRot);
-  _drawLowriderWheel(ctx, wheelOffsetRearX, -wheelOffsetY, 30, 12.5, wheelRot);
-  _drawLowriderWheel(ctx, wheelOffsetRearX, wheelOffsetY, 30, 12.5, wheelRot);
-
-  // ── LAYER 2-8: PRE-RENDERED CHASSIS CONTAINER GPU BLIT (Instant 1-draw blit) ──
-  const chassisCvs = _getChassisCanvas(length, width);
-  if (chassisCvs) {
-    ctx.drawImage(chassisCvs, -halfL - pad, -halfW - pad, length + pad * 2, width + pad * 2);
-  }
-
-  // ── LAYER 9: TWO GROVE STREET HOMIES LEANING OUT (Dynamic targeting & aiming) ──
-  const cabinX = -halfL * 0.13;
-  const cabinW = length * 0.54;
-
-  const h1Aim = car.homie1Aim || 0;
-  const h1Recoil = car.homie1Recoil || 0;
-  const h1Flash = car.homie1Flash || 0;
-  _drawGroveHomie(ctx, cabinX + cabinW * 0.12, halfW * 0.75, h1Aim, h1Recoil, h1Flash, '#F8FAFC');
-
-  const h2Aim = car.homie2Aim || 0;
-  const h2Recoil = car.homie2Recoil || 0;
-  const h2Flash = car.homie2Flash || 0;
-  _drawGroveHomie(ctx, cabinX - cabinW * 0.16, halfW * 0.75, h2Aim, h2Recoil, h2Flash, '#15803D');
-
-  // ── LAYER 10: WHITE HIT-FLASH OVERLAY (WHEN VEHICLE TAKES DAMAGE) ──
+  // ── LAYER 6: WHITE HIT-FLASH OVERLAY (WHEN DAMAGED) ──
   if (car.hitFlashTimer && car.hitFlashTimer > 0) {
     const flashAlpha = Math.min(0.85, (car.hitFlashTimer / 8) * 0.85);
-    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(3)})`;
-    ctx.beginPath();
-    ctx.roundRect(-halfL, -halfW, length, width, 6.0);
-    ctx.fill();
+    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(2)})`;
+    ctx.fillRect(snap(-halfL), snap(-halfW), snap(length), snap(width));
     car.hitFlashTimer--;
   }
 
-  // ── LAYER 11: RULE 9 COMPLIANT LIMITLESS INFINITY CYAN STASIS & STUN VISUALS ──
+  // ── LAYER 7: RULE 9 COMPLIANT LIMITLESS INFINITY CYAN STASIS & STUN VISUALS ──
   if (car.isFrozenByInfinity) {
     const time = Date.now() / 200;
     const pulse = Math.sin(time * 2) * 0.5 + 0.5;
 
     ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
-    ctx.beginPath();
-    ctx.roundRect(-halfL - 2, -halfW - 2, length + 4, width + 4, 8.0);
-    ctx.fill();
+    ctx.fillRect(snap(-halfL - 2), snap(-halfW - 2), snap(length + 4), snap(width + 4));
 
     ctx.strokeStyle = 'rgba(224, 255, 255, 0.90)';
     ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.roundRect(-halfL - 4 - pulse * 3, -halfW - 4 - pulse * 3, length + 8 + pulse * 6, width + 8 + pulse * 6, 10.0);
-    ctx.stroke();
-
-    const tickCount = 12;
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
-    ctx.lineWidth = 1.5;
-    for (let t = 0; t < tickCount; t++) {
-      const tAngle = (Math.PI * 2 * t / tickCount) + (time * 0.2);
-      const radX = (length * 0.5) + 8 + pulse * 3;
-      const radY = (width * 0.5) + 8 + pulse * 3;
-      const tx = Math.cos(tAngle) * radX;
-      const ty = Math.sin(tAngle) * radY;
-      ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(tx + Math.cos(tAngle) * 6, ty + Math.sin(tAngle) * 6);
-      ctx.stroke();
-    }
+    ctx.strokeRect(snap(-halfL - 4 - pulse * 3), snap(-halfW - 4 - pulse * 3), snap(length + 8 + pulse * 6), snap(width + 8 + pulse * 6));
   } else {
     const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive);
     const isStunnedOrFrozen = Boolean(
@@ -1032,4 +1071,13 @@ export function drawGroveStreetCar(ctx, car) {
   }
 
   ctx.restore();
+}
+
+/**
+ * Main Renderer for the Grove Street Greenwood Sedan
+ * 100% Discrete 2D Grid-Scan Pixel Art Style (Saitama Tech)
+ */
+export function drawGroveStreetCar(ctx, car) {
+  if (!car || car.dead) return;
+  drawPixelGroveStreetCar(ctx, car);
 }
