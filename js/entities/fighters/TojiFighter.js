@@ -1765,7 +1765,7 @@ export class TojiFighter extends Fighter {
           const thrustProgress = Math.min(1.0, p * 4.0); // Drives forward in 3 frames, then HOLDS at +70px!
           thrustDistance = -24 + 94 * thrustProgress; // Plunges from -24px to +70px forward deep inside target body!
           offsetAngle = 0; // Pure linear piercing thrust directly forward into enemy spine
-          slashArcAlpha = Math.sin(p * Math.PI);
+          slashArcAlpha = 0; // Clean piercing thrust — NO curved weapon slash effect!
 
           if (p > 0.05 && p < 0.35 && this.chainNodes && this.chainNodes.length > 2) {
             const whipForce = -8.0;
@@ -1971,7 +1971,7 @@ export class TojiFighter extends Fighter {
 
     // 4. HIGH-IMPACT ANIME SLASH VISUAL EFFECTS (Impact & Recovery Phase)
     const isTojiPausedOrFrozen = this._isFrozenOrPaused();
-    if (slashArcAlpha > 0 && !isTojiPausedOrFrozen) {
+    if (slashArcAlpha > 0 && !isTojiPausedOrFrozen && !this.isAmbushThrust) {
       ctx.save();
       // Use the world-space origin snapshotted at swing-start so the slash arc stays
       // fixed in place and does NOT follow Toji as he moves during or after the swing.
@@ -2209,7 +2209,7 @@ export class TojiFighter extends Fighter {
         } else {
           drawArc(-0.35 + (this.spearOffset || 0), this.r + (this.spearThrust || 0) + 85, 18, slashArcAlpha, '160, 30, 240', '220, 20, 100', '12, 4, 20');
         }
-      } else {
+      } else if (!this.isAmbushThrust) {
         // --- INVERTED SPEAR / SPLIT SOUL KATANA BASIC ATTACK SLASH ---
         const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
         if (editP) {
