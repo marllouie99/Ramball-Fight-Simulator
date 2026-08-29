@@ -15,6 +15,28 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
 
   ctx.save();
 
+  const isDarkMode = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
+  if (isDarkMode && arena) {
+    ctx.beginPath();
+    if (arena.shape === 'circle') {
+      const acx = arena.x + arena.width / 2;
+      const acy = arena.y + arena.height / 2;
+      const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - (arena.wallWidth || 0);
+      ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
+    } else {
+      const ww = arena.wallWidth || 0;
+      ctx.rect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+    }
+    ctx.clip();
+  }
+
   // ── 1. BLUE GLASS TRANSLUCENT LINEAR GRADIENT (SUKUNA DOMAIN AESTHETIC IN BLUE) ──
   ctx.save();
   if (isClashSecondary) {

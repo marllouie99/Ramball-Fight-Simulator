@@ -177,6 +177,8 @@ function getMahoragaDimSprite() {
 let tojiUltimateContainer = null;
 let tojiDimSprite = null;
 let tojiFlyHeadContainer = null;
+let tojiArenaMask = null;
+let gojoArenaMask = null;
 const flyHeadSpritePool = [];
 let activeFlyHeads = [];
 let currentTojiUltimateOpacity = 0;
@@ -321,12 +323,49 @@ export function updateHybridEnvironment() {
     data.sprite.y = -20;
     data.sprite.width = state.canvas.width + 40;
     data.sprite.height = state.canvas.height + 40;
+
+    const isDarkMode = Boolean(
+      typeof state !== 'undefined' && (
+        state.arenaTheme === 'dark' || 
+        state.darkMode || 
+        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+      )
+    );
+
+    if (isDarkMode && state.arena) {
+      if (!gojoArenaMask) {
+        gojoArenaMask = new window.PIXI.Graphics();
+        layer.addChild(gojoArenaMask);
+      }
+      gojoArenaMask.clear();
+      gojoArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      const ww = arena.wallWidth || 0;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        gojoArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        gojoArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+      }
+      gojoArenaMask.endFill();
+      data.sprite.mask = gojoArenaMask;
+    } else if (data.sprite.mask) {
+      data.sprite.mask = null;
+    }
+
     if (updateGojo) {
       data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
       renderGojoDomainBackground(gojo, data.ctx, isMultiDomain && gojo !== state.fighters.find(f => f.domainActive));
       data.texture.update();
     }
   } else if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent) {
+    if (gojoArenaMask && gojoArenaMask.parent) {
+      gojoArenaMask.parent.removeChild(gojoArenaMask);
+      gojoArenaMask = null;
+    }
+    gojoDomainHybridData.sprite.mask = null;
     gojoDomainHybridData.sprite.parent.removeChild(gojoDomainHybridData.sprite);
   }
 
@@ -513,9 +552,45 @@ export function updateHybridEnvironment() {
       releaseFlyHeadSprite(head.sprite);
     }
     activeFlyHeads.length = 0;
+    if (tojiArenaMask && tojiArenaMask.parent) {
+      tojiArenaMask.parent.removeChild(tojiArenaMask);
+      tojiArenaMask = null;
+    }
+    if (container) container.mask = null;
     if (container && container.parent) container.parent.removeChild(container);
   } else if (container) {
     if (!container.parent) layer.addChild(container);
+
+    const isDarkMode = Boolean(
+      typeof state !== 'undefined' && (
+        state.arenaTheme === 'dark' || 
+        state.darkMode || 
+        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+      )
+    );
+
+    if (isDarkMode && state.arena) {
+      if (!tojiArenaMask) {
+        tojiArenaMask = new window.PIXI.Graphics();
+        layer.addChild(tojiArenaMask);
+      }
+      tojiArenaMask.clear();
+      tojiArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      const ww = arena.wallWidth || 0;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        tojiArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        tojiArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+      }
+      tojiArenaMask.endFill();
+      container.mask = tojiArenaMask;
+    } else if (container.mask) {
+      container.mask = null;
+    }
 
     // Sync dim sprite position & dimensions to cover screen cleanly
     tojiDimSprite.x = state.canvas.width / 2;
