@@ -226,8 +226,10 @@ export function drawIchigoSkin(ctx, fighter) {
   ctx.save();
   // ── 2. Facing / Upright Body Setup (Rule #19 Front Profile POV) ──
   const isHollowChanneling = Boolean(isForming || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0));
-  const rawAngle = (fighter._isWinnerReveal || isHollowChanneling || isBackSlungPose || isBankaiStance) ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
-  const facingLeft = Math.abs(rawAngle) > Math.PI / 2;
+  let rawAngle = (fighter._isWinnerReveal || isHollowChanneling || isBackSlungPose || isBankaiStance) ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  while (rawAngle > Math.PI) rawAngle -= Math.PI * 2;
+  while (rawAngle < -Math.PI) rawAngle += Math.PI * 2;
+  const facingLeft = Math.cos(rawAngle) < 0;
 
   ctx.rotate(rawAngle);
   if (facingLeft && !isHollowChanneling) {
@@ -2594,8 +2596,10 @@ function _drawIchigoHand(ctx, hx, hy, skinColor, isShikai) {
 export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   if (!fighter) return { x: 0, y: 0 };
   const r = fighter.r || 25;
-  const angle = fighter.gunAngle || 0;
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  let angle = fighter.gunAngle || 0;
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  const facingLeft = Math.cos(angle) < 0;
 
   const isFrozen = Boolean(
     fighter.isFrozenByInfinity ||

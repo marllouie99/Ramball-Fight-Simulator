@@ -481,15 +481,27 @@ export class IchigoFighter extends Fighter {
   aim(opponent) {
     if (this.isChannelingBankai) {
       const target = this._getClosestEnemy();
-      if (target && target.hp > 0 && !target.isDead) super.aim(target);
+      if (target && target.hp > 0 && !target.isDead) {
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        this.gunAngle = Math.atan2(dy, dx);
+        this.angle = this.gunAngle;
+      }
       return;
     }
     if (this.isChannelingGetsuga && this.getsugaTarget && this.getsugaTarget.hp > 0 && !this.getsugaTarget.isDead) {
-      super.aim(this.getsugaTarget);
+      const dx = this.getsugaTarget.x - this.x;
+      const dy = this.getsugaTarget.y - this.y;
+      this.gunAngle = Math.atan2(dy, dx);
+      this.angle = this.gunAngle;
       return;
     }
     if (this.shunpoComboActive && this.shunpoTarget && this.shunpoTarget.hp > 0 && !this.shunpoTarget.isDead) {
-      super.aim(this.shunpoTarget);
+      // Rule #3: Always update facing direction directly toward target upon flash-stepping and attacking
+      const dx = this.shunpoTarget.x - this.x;
+      const dy = this.shunpoTarget.y - this.y;
+      this.gunAngle = Math.atan2(dy, dx);
+      this.angle = this.gunAngle;
       return;
     }
     super.aim(opponent);

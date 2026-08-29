@@ -108,7 +108,7 @@ export const ichigoConfig = {
   hollowGetsugaVoice1ChargeFrames: 80,  // Charging frames dynamically synchronized to when "...TENSHO!" peaks & finishes in Voice 1 (~1.33s)
   hollowGetsugaVoice2ChargeFrames: 34,  // Charging frames dynamically synchronized to when fast "TENSHO!" peaks & finishes in Voice 2 (~0.57s)
   hollowGetsugaDamage: 100,       // Upgraded Black Getsuga damage while mask active
-  hollowGetsugaSpeed: 10,        // Hollow Mask projectile travel speed
+  hollowGetsugaSpeed: 15,        // Hollow Mask projectile travel speed
   hollowGetsugaKnockback: 8,     // Knockback force applied
   hollowGetsugaHitStun: 20,      // Hit stun frames applied on hit
   hollowGetsugaSlowDuration: 100,// Hollow Mask slow debuff duration (frames)

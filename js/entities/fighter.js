@@ -1633,18 +1633,26 @@ export class Fighter {
   applyAim(opponent, targetAngle) {
     // If opponent is stealthed (e.g. Toji Heavenly Restriction), aim tracking has a sluggish delayed reaction time!
     if (opponent && opponent.isStealthed) {
-      const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      let currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
+      while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
       let diff = targetAngle - currentAngle;
       while (diff < -Math.PI) diff += Math.PI * 2;
       while (diff > Math.PI) diff -= Math.PI * 2;
       const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
-      this.gunAngle = currentAngle + diff * turnRate;
-      this.angle = this.gunAngle;
+      let newAngle = currentAngle + diff * turnRate;
+      while (newAngle > Math.PI) newAngle -= Math.PI * 2;
+      while (newAngle < -Math.PI) newAngle += Math.PI * 2;
+      this.gunAngle = newAngle;
+      this.angle = newAngle;
       return;
     }
 
-    this.gunAngle = targetAngle;
-    this.angle = targetAngle;
+    let normAngle = targetAngle;
+    while (normAngle > Math.PI) normAngle -= Math.PI * 2;
+    while (normAngle < -Math.PI) normAngle += Math.PI * 2;
+    this.gunAngle = normAngle;
+    this.angle = normAngle;
   }
 
   /** Collision hook to trigger custom logic. Override in subclasses. */
