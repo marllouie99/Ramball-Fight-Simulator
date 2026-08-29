@@ -200,7 +200,8 @@ export const ichigoConfig = {
   bankaiFinalGetsugaTickDamage: 26,     // Continuous shredding damage per tick (multi-hit tick damage)
   bankaiFinalGetsugaHitCooldown: 4,     // Re-hit tick interval frames (ticks every 4 frames / ~15 hits/sec)
   bankaiFinalGetsugaParalyzeDuration: 28, // Paralyze debuff frames applied on hit preventing actions during tick damage
-  bankaiFinalGetsugaRadius: 120,         // Huge projectile radius (increased scale)
+  bankaiFinalGetsugaRadius: 100,         // Huge projectile radius (increased scale)
+  bankaiFinalGetsugaDuration: 140,      // Sustained duration frames while staying pinned against the arena wall (~2.3s)
   bankaiFinalGetsugaSpeed: 7,          // Fast supersonic wave speed
   bankaiFinalGetsugaKnockback: 30,      // Massive knockback blowing targets across arena
   bankaiFinalGetsugaHitStun: 28,        // Heavy hit stun

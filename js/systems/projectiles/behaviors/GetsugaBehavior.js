@@ -16,6 +16,66 @@ export class GetsugaBehavior extends ProjectileBehavior {
       return false;
     }
 
+    const form = projectile.getsugaForm || 'shikai';
+    const isFinal = form === 'final_bankai';
+    const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
+
+    // ── Grand Finisher: Final Massive Kuroi Getsuga Wall Pinning (Just like Gojo's Purple) ──
+    if (isFinal && arena) {
+      const pad = 24;
+      let hitWall = false;
+
+      if (projectile.x - pad < arena.x) {
+        projectile.x = arena.x + pad;
+        hitWall = true;
+      }
+      if (projectile.x + pad > arena.x + arena.width) {
+        projectile.x = arena.x + arena.width - pad;
+        hitWall = true;
+      }
+      if (projectile.y - pad < arena.y) {
+        projectile.y = arena.y + pad;
+        hitWall = true;
+      }
+      if (projectile.y + pad > arena.y + arena.height) {
+        projectile.y = arena.y + arena.height - pad;
+        hitWall = true;
+      }
+
+      if (hitWall) {
+        if (projectile.vx !== 0 || projectile.vy !== 0) {
+          projectile._resumeVx = projectile.vx;
+          projectile._resumeVy = projectile.vy;
+          projectile.vx = 0;
+          projectile.vy = 0;
+
+          // Wall impact burst & heavy screen shake on initial wall collision
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(projectile.x, projectile.y, 45, projectile.color || '#DC143C');
+          }
+          if (typeof triggerGlobalScreenShake === 'function') {
+            triggerGlobalScreenShake(6.5, 12);
+          }
+          const hitSfx = CONFIG.ichigo?.sounds?.getsugaHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+          audioSystem.playSFX(hitSfx, 1.0);
+        }
+      }
+
+      // Continuous wall grinding effects while pinned on the wall
+      if (projectile.vx === 0 && projectile.vy === 0) {
+        projectile.getsugaWallShakeCounter = (projectile.getsugaWallShakeCounter || 0) + 1;
+        if (projectile.getsugaWallShakeCounter >= 6) {
+          projectile.getsugaWallShakeCounter = 0;
+          if (typeof triggerGlobalScreenShake === 'function') {
+            triggerGlobalScreenShake(2.5, 6);
+          }
+        }
+        if (Math.random() < 0.45 && typeof spawnSparks === 'function') {
+          spawnSparks(projectile.x, projectile.y, 3, 'lightningTrail', projectile.color || '#DC143C');
+        }
+      }
+    }
+
     // 1. History tracking for speed trail rendering
     if (!projectile.history) projectile.history = [];
     projectile.history.unshift({ x: projectile.x, y: projectile.y });
@@ -159,8 +219,6 @@ export class GetsugaBehavior extends ProjectileBehavior {
     if (fighters) allCandidates.push(...fighters);
     if (typeof state !== 'undefined' && state.illusions) allCandidates.push(...state.illusions);
 
-    const form = projectile.getsugaForm || 'shikai';
-    const isFinal = form === 'final_bankai';
     const isMask = form === 'hollow' || form === 'bankai_hollow';
     const isBankai = form === 'bankai' || form === 'bankai_hollow' || isFinal;
     const hitRadius = projectile.r || (isFinal
@@ -338,6 +396,52 @@ export class GetsugaBehavior extends ProjectileBehavior {
         return true;
       }
       return false; // Stays suspended in air during Infinity freeze
+    }
+
+    const form = projectile.getsugaForm || 'shikai';
+    const isFinal = form === 'final_bankai';
+    const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
+
+    // ── Grand Finisher: Final Massive Kuroi Getsuga Stays Pinned to the Wall (Like Gojo's Purple) ──
+    if (isFinal && arena) {
+      if (projectile.life <= 0) {
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(projectile.x, projectile.y, 16, projectile.color || '#DC143C');
+        }
+        return true;
+      }
+
+      // Clamp position to arena boundaries so it sits flush against walls
+      const pad = 24;
+      let isAtWall = false;
+
+      if (projectile.x - pad < arena.x) {
+        projectile.x = arena.x + pad;
+        isAtWall = true;
+      }
+      if (projectile.x + pad > arena.x + arena.width) {
+        projectile.x = arena.x + arena.width - pad;
+        isAtWall = true;
+      }
+      if (projectile.y - pad < arena.y) {
+        projectile.y = arena.y + pad;
+        isAtWall = true;
+      }
+      if (projectile.y + pad > arena.y + arena.height) {
+        projectile.y = arena.y + arena.height - pad;
+        isAtWall = true;
+      }
+
+      if (isAtWall) {
+        if (projectile.vx !== 0 || projectile.vy !== 0) {
+          projectile._resumeVx = projectile.vx;
+          projectile._resumeVy = projectile.vy;
+          projectile.vx = 0;
+          projectile.vy = 0;
+        }
+      }
+
+      return false; // Never expire from wall collision — stays at the wall for its full duration!
     }
 
     const canvas = (typeof state !== 'undefined' && state.canvas) || null;

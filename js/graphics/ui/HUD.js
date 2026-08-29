@@ -247,6 +247,65 @@ function drawCountdown() {
   const cx = state.arena.x + state.arena.width / 2;
   const cy = state.arena.y + state.arena.height / 2;
 
+  const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+  if (isDark) {
+    const timer = countdownTimer || 0;
+    let digit = '';
+    let popP = 0;
+    let alpha = 1.0;
+
+    if (timer < 30) {
+      digit = '3';
+      popP = Math.min(1.0, (timer - 0) / 8);
+    } else if (timer < 60) {
+      digit = '2';
+      popP = Math.min(1.0, (timer - 30) / 8);
+    } else if (timer < 90) {
+      digit = '1';
+      popP = Math.min(1.0, (timer - 60) / 8);
+    } else {
+      digit = 'FIGHT!';
+      popP = Math.min(1.0, (timer - 90) / 8);
+      alpha = timer > 110 ? Math.max(0, (120 - timer) / 10) : 1.0;
+    }
+
+    const scale = 0.6 + 0.4 * (1 - Math.pow(1 - popP, 3));
+    const isFight = (digit === 'FIGHT!');
+    const fontSize = isFight ? 52 : 72;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+
+    ctx.font = `900 ${fontSize}px "Silkscreen", "Press Start 2P", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Layer 1: Ambient Glow Stroke
+    ctx.strokeStyle = isFight ? 'rgba(255, 50, 50, 0.6)' : 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = isFight ? 18 : 14;
+    ctx.strokeText(digit, 0, 0);
+
+    // Layer 2: Sharp Black Outline
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = isFight ? 8 : 7;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(digit, 0, 0);
+
+    // Layer 3: Vibrant Fill
+    ctx.fillStyle = isFight ? '#ff3344' : '#ffffff';
+    ctx.fillText(digit, 0, 0);
+
+    // Layer 4: Inner Core Highlight
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${fontSize * 0.94}px "Silkscreen", "Press Start 2P", monospace`;
+    ctx.fillText(digit, 0, isFight ? -1 : -2);
+
+    ctx.restore();
+    return;
+  }
+
   if (announcerPlayingSequence) {
     const isTactical = state.gameCategory === 'tactical' || (typeof state.mode === 'string' && (state.mode.startsWith('tactical') || state.mode.startsWith('Tactical')));
     const isSubtitleHidden = isTactical || (state.mode === '1v1' || state.mode === 'Stand Off' || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.FFA || state.mode === 'FFA');

@@ -1714,10 +1714,13 @@ function drawExitArenaTransitionWipe(ctx, width, height, exitProgress, leftColor
   ctx.fillStyle = slashGrad;
   ctx.fill();
 
-  // 2. Full-Screen Cinematic Lens Flare / White Flash Dissolve
-  const flashAlpha = Math.min(1.0, Math.pow(exitProgress, 1.6));
-  ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
-  ctx.fillRect(0, 0, width, height);
+  // 2. Full-Screen Cinematic Lens Flare / White Flash Dissolve (disabled in Dark Mode)
+  const isDarkWipe = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+  if (!isDarkWipe) {
+    const flashAlpha = Math.min(1.0, Math.pow(exitProgress, 1.6));
+    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   ctx.restore();
 }

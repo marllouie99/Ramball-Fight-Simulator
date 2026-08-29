@@ -833,6 +833,11 @@ export function startRandomFfaBattle() {
 }
 
 export function startFaceOffScreen(isThumbnailOnly = false) {
+  if (!isThumbnailOnly && (state.arenaTheme === 'dark')) {
+    // Dark Mode: Skip showoff screen, launch in-arena countdown directly!
+    startCountdown();
+    return;
+  }
   state.faceOffTimer = 0;
   state.faceOffExiting = false;
   state.faceOffExitTimer = 0;
@@ -1036,6 +1041,12 @@ export function startCountdown() {
       f.combatAuraOpacity = 1;
     }
   });
+
+  if (state.arenaTheme === 'dark') {
+    state.announcerPlayingSequence = false;
+    state.announcerSubtitle = '';
+    return;
+  }
 
   const maxRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
   let soundKey = null;

@@ -674,7 +674,9 @@ class ProjectileSystem {
         : (form === 'hollow'
           ? (CONFIG.ichigo?.hollowGetsugaRadius || 100)
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100))));
-    const maxLife = 240; // Extended lifetime so wave flies all the way past window boundaries
+    const maxLife = isFinal
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaDuration || 140)
+      : 240; // Extended lifetime so wave flies all the way past window boundaries
 
     const proj = this._getProjectile();
     proj.x = fighter.x + dirX * tipDist;

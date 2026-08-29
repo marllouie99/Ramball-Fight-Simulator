@@ -30,31 +30,26 @@ export function updateGame() {
       }
 
       if (state.faceOffAutoStart) {
-        const isDarkSkip = (state.arenaTheme === 'dark');
+        const isDark = (state.arenaTheme === 'dark');
+        if (isDark) {
+          // Dark Mode: Skip showoff screen, launch in-arena countdown directly!
+          startCountdown();
+          return;
+        }
 
-        if (isDarkSkip) {
-          // Dark Mode: Skip showoff entirely — go straight to arena with FIGHT! overlay
-          if (state.faceOffTimer === 1) {
-            triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0);
-            triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0);
-            state._darkFightTextTimer = 36; // Show "FIGHT!" text for ~0.6s in arena
-            startMatchDirectlyFromFaceOff();
-          }
-        } else {
-          // Light Mode: Full showoff with VS entrance + countdown 3... 2... 1... FIGHT!
-          if (state.faceOffTimer === 96) triggerFaceOffSFX('skill_dash5', 0.35); // VS clash
-          if (state.faceOffTimer === 126) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
-          if (state.faceOffTimer === 156) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
-          if (state.faceOffTimer === 186) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
-          if (state.faceOffTimer === 216) {
-            triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
-            triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
-          }
+        // Light Mode: Full showoff with VS entrance + countdown 3... 2... 1... FIGHT!
+        if (state.faceOffTimer === 96) triggerFaceOffSFX('skill_dash5', 0.35); // VS clash
+        if (state.faceOffTimer === 126) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
+        if (state.faceOffTimer === 156) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
+        if (state.faceOffTimer === 186) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
+        if (state.faceOffTimer === 216) {
+          triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
+          triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
+        }
 
-          // When showoff countdown concludes at frame 242, launch directly into combat!
-          if (state.faceOffTimer >= 242) {
-            startMatchDirectlyFromFaceOff();
-          }
+        // When showoff countdown concludes at frame 242, launch directly into combat!
+        if (state.faceOffTimer >= 242) {
+          startMatchDirectlyFromFaceOff();
         }
       } else {
         // Manual thumbnail hold mode: hold at frame 120 (VS settled)
@@ -67,6 +62,53 @@ export function updateGame() {
 
     // Update Logic based on state
     if (state.gameState === 'countdown') {
+      const isDark = (state.arenaTheme === 'dark');
+      if (isDark) {
+        state.countdownTimer = (state.countdownTimer || 0) + 1;
+        // In Dark Mode: 120-frame arcade countdown in arena (3 -> 2 -> 1 -> FIGHT!)
+        if (state.countdownTimer === 1) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
+        if (state.countdownTimer === 30) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
+        if (state.countdownTimer === 60) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
+        if (state.countdownTimer === 90) {
+          triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
+          triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
+        }
+
+        // Update fighters during countdown to aim guns at opponents
+        updateFighters();
+        const dt = Math.min(FRAME_TIME / 1000, 0.1);
+        flamewardenFlameSystem.update(dt);
+
+        if (state.countdownTimer >= 120) {
+          state.gameState = 'playing';
+          state._isChampionLayoutActive = false;
+          state.battleStartDelayTimer = 0;
+          state.countdownTimer = state.countdownDuration || 180;
+          startArenaBgm(true);
+          // Instant Battle Start Readiness: Clear initial spawn cooldowns so fighters attack & engage immediately
+          if (state.fighters) {
+            state.fighters.forEach(f => {
+              if (f && f.hp > 0) {
+                f._isFaceOff = false;
+                f.hideHpText = false;
+                f.shootCooldown = 0;
+                f.cooldown = 0;
+                f.meleeCooldown = 0;
+                f.forcedMeleeTimer = 0;
+                f.hitStunTimer = 0;
+                f.knockbackStunTimer = 0;
+                if (f.type === 'gojo' || (f._def && f._def.type === 'gojo')) {
+                  f.combatAuraOpacity = 1;
+                } else if (f.type === 'sukuna' || (f._def && f._def.type === 'sukuna')) {
+                  f.combatAuraOpacity = 1;
+                }
+              }
+            });
+          }
+        }
+        return;
+      }
+
       const isAnnouncerPlaying = state.announcerPlayingSequence;
       
       if (isAnnouncerPlaying) {
@@ -86,13 +128,19 @@ export function updateGame() {
         if (state.fighters) {
           state.fighters.forEach(f => {
             if (f && f.hp > 0) {
+              f._isFaceOff = false;
+              f.hideHpText = false;
               f.shootCooldown = 0;
               f.cooldown = 0;
               f.meleeCooldown = 0;
               f.forcedMeleeTimer = 0;
               f.hitStunTimer = 0;
               f.knockbackStunTimer = 0;
-
+              if (f.type === 'gojo' || (f._def && f._def.type === 'gojo')) {
+                f.combatAuraOpacity = 1;
+              } else if (f.type === 'sukuna' || (f._def && f._def.type === 'sukuna')) {
+                f.combatAuraOpacity = 1;
+              }
             }
           });
         }

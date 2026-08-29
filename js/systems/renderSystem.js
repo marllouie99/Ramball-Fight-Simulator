@@ -183,22 +183,7 @@ export function renderGame() {
       if (hudLeft) { hudLeft.style.display = 'none'; hudLeft.style.visibility = 'hidden'; }
       if (hudRight) { hudRight.style.display = 'none'; hudRight.style.visibility = 'hidden'; }
 
-      const isDarkFaceOff = (state.arenaTheme === 'dark');
-      if (isDarkFaceOff) {
-        // Dark Mode: Faceoff is skipped on frame 1 (transitions to playing instantly)
-        // This block should not be reached, but as a fallback draw black
-        const fCtx = state.ctx || (state.topLevelUiCtx);
-        const fCanvas = state.canvas || (state.topLevelUiCanvas);
-        if (fCtx && fCanvas) {
-          fCtx.save();
-          fCtx.setTransform(1, 0, 0, 1, 0, 0);
-          fCtx.fillStyle = '#000000';
-          fCtx.fillRect(0, 0, fCanvas.width, fCanvas.height);
-          fCtx.restore();
-        }
-      } else {
-        drawFaceOffThumbnailScreen();
-      }
+      drawFaceOffThumbnailScreen();
     } else {
       if (state.pixiLayers) {
         // Restore gameplay WebGL layers that were hidden during faceoff/menu screens
@@ -388,7 +373,8 @@ export function renderGame() {
 
         // Draw FPS display and logs (if not hidden by user pressing H)
         if (!state.hideFpsLogs) {
-          state.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; // Black/dark grey FPS text
+          const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+          state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)'; // Light FPS text in dark mode, dark in light mode
           state.ctx.font = '12px monospace';
           state.ctx.textAlign = 'left';
           state.ctx.fillText(`FPS: ${state.fps}`, 10, 20);
@@ -403,14 +389,14 @@ export function renderGame() {
 
             // Draw copy and hide instructions if not copied recently
             if (!state.fpsLogsCopiedTimer || state.fpsLogsCopiedTimer <= 0) {
-              state.ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'; // Dark instruction text
+              state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.65)';
               state.ctx.fillText('Press C to copy logs | Press H to hide', 10, startY - 12);
             }
 
             for (let i = 0; i < state.fpsLogs.length; i++) {
               let log = state.fpsLogs[i];
               let alpha = Math.min(1, log.timer / 60); // Fade out
-              state.ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`; // Black log list text
+              state.ctx.fillStyle = isDark ? `rgba(255, 255, 255, ${alpha})` : `rgba(0, 0, 0, ${alpha})`;
               state.ctx.fillText(log.text, 10, startY + (i * 16));
             }
           }
@@ -460,35 +446,6 @@ export function renderGame() {
         // Dark Mode: Skip white flash but still tick down the timer
         if (isDarkPlaying && state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
           state.battleStartFadeTimer = 0;
-        }
-
-        // Dark Mode: "FIGHT!" arcade text overlay during battle start delay
-        if (isDarkPlaying && state._darkFightTextTimer && state._darkFightTextTimer > 0) {
-          state._darkFightTextTimer--;
-          const uiCtx = state.topLevelUiCtx || state.ctx;
-          const arena = state.arena || { x: 50, y: 150, width: 440, height: 680 };
-          const cx = arena.x + arena.width / 2;
-          const cy = arena.y + arena.height / 2;
-          const fadeAlpha = Math.min(1.0, state._darkFightTextTimer / 10);
-          const popP = Math.min(1.0, (36 - state._darkFightTextTimer) / 8);
-          const popScale = 0.5 + 0.5 * (1 - Math.pow(1 - popP, 3));
-
-          uiCtx.save();
-          uiCtx.globalAlpha = fadeAlpha;
-          uiCtx.translate(cx, cy);
-          uiCtx.scale(popScale, popScale);
-          uiCtx.font = '900 48px "Silkscreen", "Press Start 2P", monospace';
-          uiCtx.textAlign = 'center';
-          uiCtx.textBaseline = 'middle';
-          uiCtx.strokeStyle = 'rgba(255, 50, 50, 0.6)';
-          uiCtx.lineWidth = 10;
-          uiCtx.strokeText('FIGHT!', 0, 0);
-          uiCtx.strokeStyle = '#000000';
-          uiCtx.lineWidth = 5;
-          uiCtx.strokeText('FIGHT!', 0, 0);
-          uiCtx.fillStyle = '#ffffff';
-          uiCtx.fillText('FIGHT!', 0, 0);
-          uiCtx.restore();
         }
       } else if (state.gameState === 'countdown') {
         drawCountdown();
