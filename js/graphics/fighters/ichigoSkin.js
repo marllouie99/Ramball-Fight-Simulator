@@ -1400,46 +1400,10 @@ function _drawOrbiting3dSlashRibbon(ctx, r, ribbon, theta, now, lzDepth, isFront
 function _drawPixelDiamond(ctx, x, y, size = 4.0, color = '#ff1e38', coreColor = '#ffffff', pSize = 2.0) {
   const gx = Math.round(x / pSize) * pSize;
   const gy = Math.round(y / pSize) * pSize;
-  const s = Math.max(pSize, Math.round(size / pSize) * pSize);
 
-  // Solid crystalline diamond shard (NO '+' cross bars)
-  ctx.save();
-  ctx.translate(gx, gy);
-
-  // Outer dark frame
-  ctx.fillStyle = '#08080c';
-  ctx.beginPath();
-  ctx.moveTo(0, -s - pSize);
-  ctx.lineTo(s + pSize, 0);
-  ctx.lineTo(0, s + pSize);
-  ctx.lineTo(-s - pSize, 0);
-  ctx.closePath();
-  ctx.fill();
-
-  // Colored body
+  // Single 1-block discrete pixelated particle
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, -s);
-  ctx.lineTo(s, 0);
-  ctx.lineTo(0, s);
-  ctx.lineTo(-s, 0);
-  ctx.closePath();
-  ctx.fill();
-
-  // White-hot center glint
-  if (s > pSize * 1.5) {
-    ctx.fillStyle = coreColor;
-    const coreS = s * 0.45;
-    ctx.beginPath();
-    ctx.moveTo(0, -coreS);
-    ctx.lineTo(coreS, 0);
-    ctx.lineTo(0, coreS);
-    ctx.lineTo(-coreS, 0);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.restore();
+  ctx.fillRect(gx, gy, pSize, pSize);
 }
 
 function _drawPixelLightning(ctx, x0, y0, x1, y1, color = '#00f0ff', coreColor = '#ffffff', pSize = 2.0) {
@@ -1928,6 +1892,7 @@ function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
   _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now);
 
   if (fighter.bankaiShards && fighter.bankaiShards.length > 0) {
+    const pSize = 2.0;
     for (let s = 0; s < fighter.bankaiShards.length; s++) {
       const shard = fighter.bankaiShards[s];
       const relX = shard.x - fighter.x;
@@ -1935,11 +1900,10 @@ function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
       const shardAlpha = (shard.life || 1.0) * alpha;
 
       if (shardAlpha > 0.02) {
-        ctx.save();
-        ctx.translate(relX, relY);
-        ctx.rotate(shard.rot || 0);
-        _drawPixelDiamond(ctx, 0, 0, shard.size || 6.0, shard.color || '#ff1e38', '#ffffff', 2.0);
-        ctx.restore();
+        const gx = Math.round(relX / pSize) * pSize;
+        const gy = Math.round(relY / pSize) * pSize;
+        ctx.fillStyle = shard.color || '#ff1e38';
+        ctx.fillRect(gx, gy, pSize, pSize);
       }
     }
   }
