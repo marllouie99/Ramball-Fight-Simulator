@@ -2206,20 +2206,20 @@ export function drawSparkEffects(layer = 'all') {
       const isDark = _isDarkMode();
 
       if (isDark) {
-        // ── DARK MODE SUPERSONIC PUNCH IMPACT SHOCKWAVE RINGS ──
+        // ── DARK MODE CLEAN PIXELATED SHOCKWAVE RING ONLY ──
         ctx.save();
-        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingEnabled = false;
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
 
         ctx.translate(effect.x, effect.y);
-        ctx.rotate(effect.hitAngle || 0);
 
         const progress = Math.min(1.0, Math.max(0.0, 1.0 - effect.life));
         const alpha = Math.min(1.0, effect.life * 1.35);
-        const R = effect.size;
+        const P = 2.0; // Stepped pixel grid size
+        const snap = (v) => Math.round(v / P) * P;
 
         const isGold = (effect.color === 'gold');
         const isBlackPink = (effect.color === 'blackpink' || effect.color === 'pink');
@@ -2227,91 +2227,55 @@ export function drawSparkEffects(layer = 'all') {
         const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity' || effect.color === 'gojo');
         const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
 
-        let colPrimary, colSecondary, colCore;
+        let colRing, colHighlight;
         if (isGold) {
-          colPrimary = `rgba(255, 215, 0, ${alpha * 0.95})`;
-          colSecondary = `rgba(255, 245, 180, ${alpha * 0.90})`;
-          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+          colRing = `rgba(255, 215, 0, ${alpha * 0.95})`;
+          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
         } else if (isBlackPink) {
-          colPrimary = `rgba(255, 20, 147, ${alpha * 0.95})`;
-          colSecondary = `rgba(255, 182, 193, ${alpha * 0.90})`;
-          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+          colRing = `rgba(255, 20, 147, ${alpha * 0.95})`;
+          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
         } else if (isOrange) {
-          colPrimary = `rgba(255, 80, 0, ${alpha * 0.95})`;
-          colSecondary = `rgba(255, 200, 120, ${alpha * 0.90})`;
-          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+          colRing = `rgba(255, 80, 0, ${alpha * 0.95})`;
+          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
         } else if (isCyan) {
-          colPrimary = `rgba(0, 229, 255, ${alpha * 0.95})`;
-          colSecondary = `rgba(200, 250, 255, ${alpha * 0.90})`;
-          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+          colRing = `rgba(0, 229, 255, ${alpha * 0.95})`;
+          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
         } else if (isCrimson) {
-          colPrimary = `rgba(255, 36, 0, ${alpha * 0.95})`;
-          colSecondary = `rgba(255, 180, 180, ${alpha * 0.90})`;
-          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+          colRing = `rgba(255, 36, 0, ${alpha * 0.95})`;
+          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
         } else {
-          colPrimary = `rgba(255, 255, 255, ${alpha * 0.95})`;
-          colSecondary = `rgba(220, 230, 245, ${alpha * 0.90})`;
-          colCore = `rgba(255, 255, 255, ${alpha * 0.98})`;
+          colRing = `rgba(255, 255, 255, ${alpha * 0.95})`;
+          colHighlight = `rgba(220, 240, 255, ${alpha * 0.98})`;
         }
 
-        // 1. Primary Expanding Supersonic Shockwave Ring (Forward-compressed Ellipse)
-        const curR1 = R * (0.35 + 0.95 * Math.pow(progress, 0.65));
-        ctx.beginPath();
-        ctx.ellipse(curR1 * 0.25 * progress, 0, curR1 * 1.15, curR1 * 0.85, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = colPrimary;
-        ctx.lineWidth = Math.max(1.5, 6.0 * effect.life);
-        ctx.stroke();
+        // Discrete Pixel Circle Shockwave Ring
+        const ringRadius = effect.size * (0.25 + 0.85 * Math.pow(progress, 0.65));
+        const ringThick = Math.max(P * 1.5, Math.round((P * 2.2 * effect.life) / P) * P);
+        const innerR = Math.max(0, ringRadius - ringThick);
+        const outerR = ringRadius + P * 0.5;
 
-        // 2. Secondary Inner Compression Shockwave Ring
-        const curR2 = R * (0.20 + 0.65 * Math.pow(progress, 0.75));
-        ctx.beginPath();
-        ctx.ellipse(curR2 * 0.15 * progress, 0, curR2 * 1.05, curR2 * 0.75, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = colSecondary;
-        ctx.lineWidth = Math.max(1.0, 3.5 * effect.life);
-        ctx.stroke();
+        const maxGridSteps = Math.ceil(outerR / P);
 
-        // 3. Directional Forward Supersonic Crescent Wavefront Arcs
-        const forwardDist1 = R * (0.45 + 0.75 * progress);
-        const arcR1 = R * (0.35 + 0.45 * progress);
-        ctx.beginPath();
-        ctx.arc(forwardDist1, 0, arcR1, -Math.PI * 0.52, Math.PI * 0.52);
-        ctx.strokeStyle = colCore;
-        ctx.lineWidth = Math.max(1.0, 4.0 * effect.life);
-        ctx.stroke();
+        // Render discrete pixel shockwave ring with 0 GC
+        for (let gy = -maxGridSteps; gy <= maxGridSteps; gy++) {
+          const ry = gy * P;
+          for (let gx = -maxGridSteps; gx <= maxGridSteps; gx++) {
+            const rx = gx * P;
+            const dist = Math.hypot(rx, ry);
+            if (dist < innerR || dist > outerR) continue;
 
-        const forwardDist2 = R * (0.20 + 0.45 * progress);
-        const arcR2 = R * (0.25 + 0.30 * progress);
-        ctx.beginPath();
-        ctx.arc(forwardDist2, 0, arcR2, -Math.PI * 0.62, Math.PI * 0.62);
-        ctx.strokeStyle = colPrimary;
-        ctx.lineWidth = Math.max(1.0, 2.5 * effect.life);
-        ctx.stroke();
+            const px = snap(rx);
+            const py = snap(ry);
 
-        // 4. Radial Supersonic Pressure Needle Rays
-        const rayCount = 10;
-        for (let i = 0; i < rayCount; i++) {
-          const rayAngle = -Math.PI * 0.72 + (i / (rayCount - 1)) * (Math.PI * 1.44);
-          const rayStart = curR1 * 0.40;
-          const rayLen = R * (0.35 + Math.sin(i * 2.1) * 0.20) * (0.6 + 0.4 * progress);
-          const rayEnd = rayStart + rayLen;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(rayAngle) * rayStart, Math.sin(rayAngle) * rayStart * 0.85);
-          ctx.lineTo(Math.cos(rayAngle) * rayEnd, Math.sin(rayAngle) * rayEnd * 0.85);
-          ctx.strokeStyle = (i % 2 === 0) ? colSecondary : colPrimary;
-          ctx.lineWidth = Math.max(0.75, 1.8 * effect.life);
-          ctx.stroke();
+            // Core highlight pixel line vs main colored pixel band
+            if (dist >= ringRadius - P * 0.5 && dist <= ringRadius + P * 0.5) {
+              ctx.fillStyle = colHighlight;
+            } else {
+              ctx.fillStyle = colRing;
+            }
+            ctx.fillRect(px, py, P, P);
+          }
         }
-
-        // 5. Central Pure-White Specular Diamond Impact Point
-        const coreSize = Math.max(1.5, R * 0.16 * effect.life);
-        ctx.fillStyle = colCore;
-        ctx.beginPath();
-        ctx.moveTo(0, -coreSize);
-        ctx.lineTo(coreSize * 1.5, 0);
-        ctx.lineTo(0, coreSize);
-        ctx.lineTo(-coreSize * 0.7, 0);
-        ctx.closePath();
-        ctx.fill();
 
         ctx.restore();
       } else {
