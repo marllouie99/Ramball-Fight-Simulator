@@ -2099,39 +2099,6 @@ export class TojiFighter extends Fighter {
           ctx.fillStyle = (eb % 2 === 0) ? '#A030FF' : '#FF1E56';
           ctx.fillRect(ex, ey, P, P);
         }
-      } else if (this.isAmbushThrust && this.ambushPhase !== 'PHANTOM_FLURRY') {
-        // Lock thrust cone to the snapshotted direction at swing-start (never drifts mid-thrust)
-        const thrustFrozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
-        ctx.rotate(thrustFrozenAngle);
-        const P = 2.4;
-        const spearTipR = this.r + thrustDistance + 10;
-        const coneLen = 105 * slashArcAlpha;
-        const coneH = 26 * slashArcAlpha;
-
-        // Stepped pixel piercing thrust diamond cone
-        for (let lx = 0; lx <= coneLen; lx += P) {
-          const prog = lx / Math.max(1, coneLen);
-          const spread = (1 - prog) * coneH;
-          const px = Math.round((spearTipR + lx) / P) * P;
-          const topY = Math.round(-spread / P) * P;
-          const botY = Math.round(spread / P) * P;
-          
-          // Outline
-          ctx.fillStyle = '#080410';
-          ctx.fillRect(px, topY - P, P, (botY - topY) + P * 2);
-
-          // Violet / Crimson Body
-          for (let py = topY; py <= botY; py += P) {
-            const vNorm = Math.abs(py) / Math.max(1, spread);
-            let col = '#FFFFFF';
-            if (vNorm > 0.7) col = '#A05AF0';
-            else if (vNorm > 0.35) col = '#FF1E4B';
-            else col = '#FFFFFF';
-
-            ctx.fillStyle = col;
-            ctx.fillRect(px, py, P, P);
-          }
-        }
       } else if (this.ambushPhase === 'PHANTOM_FLURRY') {
         // --- DUAL-WIELD PHANTOM FLURRY SLASH ARCS ---
         const drawArc = (arcAngle, radius, thick, alpha, color1, color2, color3) => {
