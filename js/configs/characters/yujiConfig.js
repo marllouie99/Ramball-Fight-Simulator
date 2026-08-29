@@ -65,8 +65,10 @@ export const yujiConfig = {
   soulSwapBlackFlashThreshold: 2,  // Black Flash triggers after only 2 hits during Soul Swap
   soulSwapSpeedMultiplier: 1.3,    // Movement speed boost during Soul Swap
   soulSwapRapidSlashHits: 20,      // Number of rapid 360° slash-teleport strikes Sukuna unleashes immediately on takeover
-  soulSwapRapidSlashCooldown: 15,  // Pacing frames between each slash-teleport strike (~0.27s, exact Sukuna flurry timing)
-  soulSwapHealPercent: 0.30,       // Percentage of max HP restored to Yuji upon swapping back after the 12 slashes
+  soulSwapLandingDelay: 8,         // Frames Sukuna lands and aims at target before unleashing Cleave (~133ms)
+  soulSwapSlashRecovery: 12,       // Frames of slash follow-through recovery before next teleport (~200ms)
+  soulSwapRapidSlashCooldown: 25,  // Pacing frames between each slash-teleport strike
+  soulSwapHealPercent: 0.30,       // Percentage of max HP restored to Yuji upon swapping back after the slashes
   soulSwapCooldown: 99999,         // Once per match only
 
 

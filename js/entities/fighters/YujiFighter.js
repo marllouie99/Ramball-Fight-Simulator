@@ -56,6 +56,7 @@ export class YujiFighter extends Fighter {
     this.revertTransitionTimer = 0;
     this.hasSoulSwapped = false;
     this.hasDismantleCharge = false;
+    this.rapidSlashPhase = 'IDLE'; // 'IDLE' | 'START' | 'LANDED' | 'SLASH_RECOVERY'
 
     // Skill 2: Reverse Cursed Technique (RCT)
     this.rctCooldown = 0;
@@ -71,6 +72,35 @@ export class YujiFighter extends Fighter {
     this.soulSwapTransitionTimer = 0;
     this.hasSoulSwapped = false;
     this.hasDismantleCharge = false;
+    this.rapidSlashPhase = 'IDLE';
+  }
+
+  _triggerSoulSwapRevert() {
+    this.rapidSlashHitsLeft = 0;
+    this.rapidSlashTimer = 0;
+    this.rapidSlashPhase = 'IDLE';
+    this.flurryTarget = null;
+
+    if (this.soulSwapActive) {
+      // === STOP MOVE, REVERT TRANSFORMATION ANIMATION & PASSIVE RCT HEAL YUJI ===
+      this.soulSwapActive = false;
+      this.revertTransitionTimer = 45; // 0.75s revert transformation freeze!
+      this.vx = 0;
+      this.vy = 0;
+
+      const healPercent = CONFIG.yuji?.rctHealPercent || 0.25;
+      const healAmount = Math.round(this.maxHp * healPercent);
+      if (typeof this.heal === 'function') {
+        this.heal(healAmount, { color: '#00FF00' });
+      } else {
+        this.hp = Math.min(this.maxHp, this.hp + healAmount);
+      }
+
+      spawnFloatingText(this.x, this.y - this.r - 28, "PASSIVE RCT HEAL!", "#00FF00");
+      spawnFloatingText(this.x, this.y - this.r - 48, `+${healAmount} HP`, "#00FF00");
+      audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
+      spawnImpactFlash(this.x, this.y, 45, 'rgba(0, 255, 120, 0.8)');
+    }
   }
 
   update(opponent, ownerIndex, arena) {
@@ -117,7 +147,8 @@ export class YujiFighter extends Fighter {
       const target = (typeof opponent !== 'undefined' && opponent) ? (Array.isArray(opponent) ? opponent[0] : opponent) : (state.fighters ? state.fighters.find(f => f && f !== this && !f.isDead && f.hp > 0) : null);
       if (target) {
         this.rapidSlashHitsLeft = CONFIG.yuji?.soulSwapRapidSlashHits || 12;
-        this.rapidSlashTimer = 30; // Starts on frame 1 after takeover freeze
+        this.rapidSlashTimer = 0; // Triggers first teleport immediately after freeze
+        this.rapidSlashPhase = 'START';
         this.flurryTarget = target;
       }
 
@@ -143,6 +174,7 @@ export class YujiFighter extends Fighter {
     if (isBeamTrapped && (this.rapidSlashHitsLeft || 0) > 0) {
       this.rapidSlashHitsLeft = 0;
       this.rapidSlashTimer = 0;
+      this.rapidSlashPhase = 'IDLE';
       this.flurryTarget = null;
       if (this.soulSwapActive) {
         this.soulSwapActive = false;
@@ -165,9 +197,10 @@ export class YujiFighter extends Fighter {
       if (this.punchAnimTimer > 0) this.punchAnimTimer--;
       if (this.cooldownTimer > 0) this.cooldownTimer = Math.max(0, this.cooldownTimer - 1);
       
-      // The exact frame takeover transformation pause finishes, set timer to 1 to unleash slash 1 immediately!
+      // The exact frame takeover transformation pause finishes, start initial teleport!
       if (this.soulSwapTransitionTimer <= 0) {
-        this.rapidSlashTimer = 1;
+        this.rapidSlashPhase = 'START';
+        this.rapidSlashTimer = 0;
         // Ensure punch state is fully cleared before rapid slashes begin
         this.punchAnimTimer = 0;
         const rapidSlashVoice = CONFIG.sukuna?.sounds?.rapidSlashVoiceline || CONFIG.sukuna?.rapidSlashVoiceline || 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3';
@@ -270,12 +303,14 @@ export class YujiFighter extends Fighter {
     // Skill 2 (Reverse Cursed Technique) is now a Passive that automatically heals Yuji upon reverting from Sukuna transformation.
     modUpdateReverseCursedTechnique.call(this);
 
-    // Sukuna Soul Takeover: Rapid 360° Cleave Slash Finisher after Flurry Combo
+    // Sukuna Soul Takeover: Rapid 360° Cleave Slash Sequence
+    // Flow: Teleport -> Land & Aim (Landing Delay) -> Slash (Cleave) -> Recovery Pause -> Repeat
     if ((this.rapidSlashHitsLeft || 0) > 0) {
       const isBeamTrapped = this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0) || (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0);
       if (isBeamTrapped) {
         this.rapidSlashHitsLeft = 0;
         this.rapidSlashTimer = 0;
+        this.rapidSlashPhase = 'IDLE';
         this.flurryTarget = null;
         if (this.soulSwapActive) {
           this.soulSwapActive = false;
@@ -285,134 +320,123 @@ export class YujiFighter extends Fighter {
         return;
       }
 
-      // Freeze physical movement and cancel punch animations so only slash swings display
+      // Freeze physical movement and keep punch animations cleared so only slash swings display
       this.vx = 0;
       this.vy = 0;
       this.punchAnimTimer = 0;
       if ((this._slashSoundCooldown || 0) > 0) this._slashSoundCooldown--;
-      this.rapidSlashTimer = (this.rapidSlashTimer || 0) - 1;
-      if (this.rapidSlashTimer <= 0) {
-        const ft = this.flurryTarget || targets[0];
-        if (ft && !ft.isDead && ft.hp > 0) {
-          const directAngle = Math.atan2(ft.y - this.y, ft.x - this.x);
-          const slashAngle = directAngle + (Math.random() - 0.5) * 0.45;
-          this.gunAngle = directAngle;
 
-          const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
-          const baseDamage = CONFIG.yuji?.punchDamage || 18;
-          const slashDamage = baseDamage * 1.5 * (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5);
-          const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
-
-          import('../../systems/projectileSystem.js').then(module => {
-            if (module && module.projectileSystem) {
-              module.projectileSystem.fireProjectile(
-                this,
-                ownerIndex,
-                slashDamage,
-                false,
-                slashSpeed,
-                false,
-                'ghostBlade',
-                this.x,
-                this.y,
-                slashAngle
-              );
-            }
-          });
-
-          spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
-          triggerGlobalScreenShake(6, 8);
-          spawnSparks(ft.x, ft.y, 20, 'crimsonSniper', '#8B0000');
-          this.punchAnimTimer = 0;
-          this.slashGlowTimer = 25;
-          this.slashSwingTimer = 14;
-          this.slashSwingMaxTimer = 14;
-          this.slashHand = this.slashHand === 1 ? 0 : 1;
-
-          const cleaveAngle = Math.atan2(ft.y - this.y, ft.x - this.x);
-          ft.vx = (ft.vx || 0) + Math.cos(cleaveAngle) * 3;
-          ft.vy = (ft.vy || 0) + Math.sin(cleaveAngle) * 3;
-
-          audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9);
-          audioSystem.playSFX('Assets/Sound Effects/Skills/backstab.mp3', 0.7);
-          spawnImpactFlash(this.x, this.y, 15, 'crimsonSniper');
-
-          this.rapidSlashHitsLeft--;
-
-          if (this.rapidSlashHitsLeft > 0 && ft && !ft.isDead) {
-            const oldX = this.x;
-            const oldY = this.y;
-
-            // Teleport to a dynamic surrounding position far enough from target (matching Sukuna spacing)
-            const teleportAngle = Math.random() * Math.PI * 2;
-            const targetRadius = ft.r || 20;
-            const teleportDist = targetRadius + this.r + 110 + Math.random() * 90;
-            this.x = ft.x + Math.cos(teleportAngle) * teleportDist;
-            this.y = ft.y + Math.sin(teleportAngle) * teleportDist;
-
-            if (state && state.arena) {
-              this.x = Math.max(state.arena.x + 30, Math.min(state.arena.x + state.arena.width - 30, this.x));
-              this.y = Math.max(state.arena.y + 30, Math.min(state.arena.y + state.arena.height - 30, this.y));
-            }
-            this.aim(ft);
-
-            // Spawn afterimages along the teleport path
-            spawnTeleportAfterimages(this, oldX, oldY, this.x, this.y);
-            spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-            audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.7);
-
-            if (typeof ft.applyHitStun === 'function') ft.applyHitStun(8);
-
-            // Configured pacing timer between slash-teleport strikes
-            this.rapidSlashTimer = CONFIG.yuji?.soulSwapRapidSlashCooldown ?? CONFIG.sukuna?.rapidSlashCooldown ?? 20;
-          } else {
-            this.rapidSlashHitsLeft = 0;
-            if (this.soulSwapActive) {
-              // === STOP MOVE, REVERT TRANSFORMATION ANIMATION & PASSIVE RCT HEAL YUJI ===
-              this.soulSwapActive = false;
-              this.revertTransitionTimer = 45; // 0.75s revert transformation freeze!
-              this.vx = 0;
-              this.vy = 0;
-
-              const healPercent = CONFIG.yuji?.rctHealPercent || 0.25;
-              const healAmount = Math.round(this.maxHp * healPercent);
-              if (typeof this.heal === 'function') {
-                this.heal(healAmount, { color: '#00FF00' });
-              } else {
-                this.hp = Math.min(this.maxHp, this.hp + healAmount);
-              }
-
-              spawnFloatingText(this.x, this.y - this.r - 28, "PASSIVE RCT HEAL!", "#00FF00");
-              spawnFloatingText(this.x, this.y - this.r - 48, `+${healAmount} HP`, "#00FF00");
-              audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
-              spawnImpactFlash(this.x, this.y, 45, 'rgba(0, 255, 120, 0.8)');
-            }
-          }
-        } else {
-          this.rapidSlashHitsLeft = 0;
-          if (this.soulSwapActive) {
-            // === STOP MOVE, REVERT TRANSFORMATION ANIMATION & PASSIVE RCT HEAL YUJI ===
-            this.soulSwapActive = false;
-            this.revertTransitionTimer = 45; // 0.75s revert transformation freeze!
-            this.vx = 0;
-            this.vy = 0;
-
-            const healPercent = CONFIG.yuji?.rctHealPercent || 0.25;
-            const healAmount = Math.round(this.maxHp * healPercent);
-            if (typeof this.heal === 'function') {
-              this.heal(healAmount, { color: '#00FF00' });
-            } else {
-              this.hp = Math.min(this.maxHp, this.hp + healAmount);
-            }
-
-            spawnFloatingText(this.x, this.y - this.r - 28, "PASSIVE RCT HEAL!", "#00FF00");
-            spawnFloatingText(this.x, this.y - this.r - 48, `+${healAmount} HP`, "#00FF00");
-            audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
-            spawnImpactFlash(this.x, this.y, 45, 'rgba(0, 255, 120, 0.8)');
-          }
-        }
+      const ft = this.flurryTarget || targets[0];
+      if (!ft || ft.isDead || ft.hp <= 0) {
+        this._triggerSoulSwapRevert();
+        return;
       }
-      return;
+
+      // Default phase initialization if not set
+      if (!this.rapidSlashPhase) {
+        this.rapidSlashPhase = 'START';
+      }
+
+      // Decrement active phase timer
+      if (this.rapidSlashTimer > 0) {
+        this.rapidSlashTimer--;
+        // While landed or during recovery, stay firmly aimed at target
+        this.aim(ft);
+        return;
+      }
+
+      // ── PHASE 1: TELEPORT & LAND BEFORE SLASHING ──
+      if (this.rapidSlashPhase === 'START' || this.rapidSlashPhase === 'SLASH_RECOVERY') {
+        const oldX = this.x;
+        const oldY = this.y;
+
+        // Teleport to a dynamic surrounding position around target (100–170px away)
+        const teleportAngle = Math.random() * Math.PI * 2;
+        const targetRadius = ft.r || 20;
+        const teleportDist = targetRadius + this.r + 85 + Math.random() * 65;
+        this.x = ft.x + Math.cos(teleportAngle) * teleportDist;
+        this.y = ft.y + Math.sin(teleportAngle) * teleportDist;
+
+        if (state && state.arena) {
+          this.x = Math.max(state.arena.x + 30, Math.min(state.arena.x + state.arena.width - 30, this.x));
+          this.y = Math.max(state.arena.y + 30, Math.min(state.arena.y + state.arena.height - 30, this.y));
+        }
+
+        // Aim immediately at the target from the landed position
+        this.aim(ft);
+
+        // Spawn afterimages along the teleport path
+        spawnTeleportAfterimages(this, oldX, oldY, this.x, this.y);
+        spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
+        spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
+        audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.75);
+
+        if (typeof ft.applyHitStun === 'function') ft.applyHitStun(10);
+
+        // Landed at the spot! Wait for landing delay so player clearly sees Sukuna land before slashing
+        this.rapidSlashPhase = 'LANDED';
+        this.rapidSlashTimer = CONFIG.yuji?.soulSwapLandingDelay ?? 8; // 8 frames (~133ms)
+        return;
+      }
+
+      // ── PHASE 2: UNLEASH SLASH (AFTER LANDING) ──
+      if (this.rapidSlashPhase === 'LANDED') {
+        const directAngle = Math.atan2(ft.y - this.y, ft.x - this.x);
+        const slashAngle = directAngle + (Math.random() - 0.5) * 0.35;
+        this.gunAngle = directAngle;
+
+        const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
+        const baseDamage = CONFIG.yuji?.punchDamage || 18;
+        const slashDamage = baseDamage * 1.5 * (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5);
+        const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
+
+        import('../../systems/projectileSystem.js').then(module => {
+          if (module && module.projectileSystem) {
+            module.projectileSystem.fireProjectile(
+              this,
+              ownerIndex,
+              slashDamage,
+              false,
+              slashSpeed,
+              false,
+              'ghostBlade',
+              this.x,
+              this.y,
+              slashAngle
+            );
+          }
+        });
+
+        spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
+        triggerGlobalScreenShake(6, 8);
+        spawnSparks(ft.x, ft.y, 20, 'crimsonSniper', '#8B0000');
+        this.punchAnimTimer = 0;
+        this.slashGlowTimer = 25;
+        this.slashSwingTimer = 14;
+        this.slashSwingMaxTimer = 14;
+        this.slashHand = this.slashHand === 1 ? 0 : 1;
+
+        const cleaveAngle = Math.atan2(ft.y - this.y, ft.x - this.x);
+        ft.vx = (ft.vx || 0) + Math.cos(cleaveAngle) * 3;
+        ft.vy = (ft.vy || 0) + Math.sin(cleaveAngle) * 3;
+
+        audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9);
+        audioSystem.playSFX('Assets/Sound Effects/Skills/backstab.mp3', 0.7);
+        spawnImpactFlash(this.x, this.y, 15, 'crimsonSniper');
+
+        this.rapidSlashHitsLeft--;
+
+        if (this.rapidSlashHitsLeft > 0) {
+          // Slash recovery pause before next teleport
+          this.rapidSlashPhase = 'SLASH_RECOVERY';
+          this.rapidSlashTimer = CONFIG.yuji?.soulSwapSlashRecovery ?? 12; // 12 frames (~200ms)
+        } else {
+          // All slashes completed!
+          this.rapidSlashPhase = 'IDLE';
+          this._triggerSoulSwapRevert();
+        }
+        return;
+      }
     }
 
     if (this.isComboDashing || (this.comboHitsLeft || 0) > 0 || this.isChannelingRCT) {

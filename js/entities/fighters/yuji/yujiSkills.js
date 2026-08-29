@@ -192,6 +192,7 @@ export function modUpdateComboRush(target) {
         if (this.comboHitsLeft <= 0) {
           this.rapidSlashHitsLeft = CONFIG.yuji?.soulSwapRapidSlashHits || 16;
           this.rapidSlashTimer = 0;
+          this.rapidSlashPhase = 'START';
           this.flurryTarget = t;
           const rapidSlashVoice = CONFIG.sukuna?.sounds?.rapidSlashVoiceline || CONFIG.sukuna?.rapidSlashVoiceline || 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3';
           const voiceVol = CONFIG.sukuna?.soundVolumes?.rapidSlashVoiceline ?? (CONFIG.sukuna?.rapidSlashVoiceVolume ?? 3.0);
