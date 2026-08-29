@@ -863,6 +863,34 @@ function updateHealthHud() {
       }
     }
 
+    // 3. Gojo exception: Domain Expansion (Unlimited Void)
+    if (fId === 'gojo') {
+      if (sId === 'uv' || sId === 'domain' || sLabel.includes('UNLIMITED VOID') || sLabel.includes('VOID')) {
+        return true;
+      }
+    }
+
+    // 4. Sukuna exception: Domain Expansion (Malevolent Shrine)
+    if (fId === 'sukuna') {
+      if (sId === 'ms' || sId === 'domain' || sLabel.includes('MALEVOLENT SHRINE') || sLabel.includes('SHRINE')) {
+        return true;
+      }
+    }
+
+    // 5. Yuta exception: Domain Expansion (Authentic Mutual Love)
+    if (fId === 'yuta') {
+      if (sId === 'domain' || sLabel.includes('AUTHENTIC MUTUAL LOVE') || sLabel.includes('MUTUAL LOVE')) {
+        return true;
+      }
+    }
+
+    // 6. Mahito exception: Domain Expansion (Self-Embodiment of Perfection)
+    if (fId === 'mahito') {
+      if (sId === 'domain_expansion' || sId === 'domain' || sLabel.includes('SELF-EMBODIMENT') || sLabel.includes('PERFECTION')) {
+        return true;
+      }
+    }
+
     return false;
   };
 
