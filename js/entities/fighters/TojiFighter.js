@@ -1073,7 +1073,7 @@ export class TojiFighter extends Fighter {
 
     // 2. Top-of-loop Freeze / Status Effect Guard (Rule 1 Compliant: decrements timers & returns if frozen/paralyzed)
     const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
+    if (isFrozen || this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0)) {
       this.vx = 0;
       this.vy = 0;
       this.interruptAttacks();
@@ -1109,13 +1109,16 @@ export class TojiFighter extends Fighter {
       return;
     }
 
-    // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red spatial repulsion slow and Mahoraga's Divine Shout!
+    // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red, Hollow Purple, and Mahoraga's Divine Shout!
     if ((this.redSlowTimer || 0) > 0) {
       this.redSlowTimer--;
       this.slowTimer = Math.max(this.slowTimer || 0, 2);
     } else if ((this.mahoragaShoutSlowTimer || 0) > 0) {
       this.mahoragaShoutSlowTimer--;
       this.slowTimer = Math.max(this.slowTimer || 0, 2);
+    } else if (this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0)) {
+      this.slowTimer = Math.max(this.slowTimer || 0, 2);
+      this.slowMultiplier = 0.40;
     } else {
       this.slowTimer = 0;
     }
@@ -1137,15 +1140,17 @@ export class TojiFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos)
-    this.timeStopTimer = 0;
-    if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
-    this.hitStunTimer = 0;
-    this.knockbackStunTimer = 0;
-    this.electricStunTimer = 0;
-    this.dubstepStunTimer = 0;
-    this.crimsonElectrifiedTimer = 0;
-    this._suppressFreezeTimer = 0;
+    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Purple)
+    if (!this.isCaughtInPurple && (!this.purpleHitTimer || this.purpleHitTimer <= 0)) {
+      this.timeStopTimer = 0;
+      if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
+      this.hitStunTimer = 0;
+      this.knockbackStunTimer = 0;
+      this.electricStunTimer = 0;
+      this.dubstepStunTimer = 0;
+      this.crimsonElectrifiedTimer = 0;
+      this._suppressFreezeTimer = 0;
+    }
 
     // Tick timers
     if (this.spearCooldown > 0) this.spearCooldown--;

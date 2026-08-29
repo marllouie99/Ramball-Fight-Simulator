@@ -22,22 +22,22 @@ export class StatusEffectsManager {
     return (this.fighter.silenceTimer || 0) > 0;
   }
 
-  applySlow(frames, multiplier) {
-    if (this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') return;
+  applySlow(frames, multiplier, opts = {}) {
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed) return;
     if (this.fighter.slowTimer < frames) this.fighter.slowTimer = frames;
     this.fighter.slowMultiplier = multiplier;
   }
 
-  applyHitStun(frames) {
-    if (this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') return;
+  applyHitStun(frames, opts = {}) {
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed) return;
     if (!this.fighter.hitStunTimer || this.fighter.hitStunTimer < frames) {
       this.fighter.hitStunTimer = frames;
       this.fighter.hitStunMultiplier = 0.3;
     }
   }
 
-  applyParalyze(frames) {
-    if (this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') return;
+  applyParalyze(frames, opts = {}) {
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple) return;
     if (!this.fighter.paralyzeTimer || this.fighter.paralyzeTimer < frames) {
       this.fighter.paralyzeTimer = frames;
     }

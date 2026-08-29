@@ -13,6 +13,7 @@ import { tojiIsTargetDeadOrRemoved } from './tojiAmbush.js';
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateChannelSense(fighter, opponent) {
+  if (fighter.isCaughtInPurple || (fighter.purpleHitTimer && fighter.purpleHitTimer > 0)) return false;
   if (fighter._channelInterruptCooldown > 0) fighter._channelInterruptCooldown--;
 
   if (!fighter.isAmbushing && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
@@ -119,7 +120,7 @@ export function modUpdateStealth(fighter, opponent) {
     const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 55;
 
     // Check if stealth cooldown is about to end -> launch ambush move sequence!
-    if (!fighter.isAmbushing && fighter.stealthCooldown <= ambushTrigger && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
+    if (!fighter.isAmbushing && !fighter.isCaughtInPurple && (!fighter.purpleHitTimer || fighter.purpleHitTimer <= 0) && fighter.stealthCooldown <= ambushTrigger && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
       fighter.startAmbushSequence(opponent);
       return true; // Abort update loop
     }

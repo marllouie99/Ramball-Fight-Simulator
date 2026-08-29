@@ -151,7 +151,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         (ent.gojoAdaptColorHistory && ent.gojoAdaptColorHistory.includes('#8A2BE2')) ||
         ((ent.goldAdaptationStage?.skill || 0) >= 2)
       );
-      const isImmune = ent.immuneToCC || isPurpleAdapted;
+      // Toji's Heavenly Restriction immuneToCC does NOT protect him from Hollow Purple's gravitational pull and debuffs
+      const isImmune = isPurpleAdapted || (ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji');
       if (!isImmune) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;
