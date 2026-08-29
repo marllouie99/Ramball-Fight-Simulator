@@ -1656,7 +1656,7 @@ export class GojoFighter extends Fighter {
     }
     if ((this.isMeleeMode && !isBreatherState && !isDomainChanneling && !this.domainActive) || this.hp <= 0 || this.isChannelingPurple) return;
 
-    const barrierRadius = (CONFIG.gojo?.infinityRadius !== undefined) ? (this.r + 30) : (this.r + 30);
+    const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
     const slowRange = CONFIG.gojo?.infinitySlowRange || 140;
     const slowOuterRadius = barrierRadius + slowRange;
 
