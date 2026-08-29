@@ -81,6 +81,8 @@ export const ichigoConfig = {
   getsugaDragFrames: 14,         // Number of frames the enemy is actively dragged with the wave
   getsugaScreenShake: 3.5,       // Screen shake intensity on release
   getsugaHitScreenShake: 3.5,    // Screen shake intensity on projectile hit
+  getsugaTravelShakeIntensity: 2.0, // Arena screen shake intensity as Getsuga wave travels
+  getsugaTravelShakeInterval: 6,    // Interval in frames between travel screen shake pulses
   getsugaShockwaveSize: 40,      // Shockwave burst size on Getsuga hit
   getsugaSlideFrames: 8,         // Number of frames for braking skid slide before charge
   getsugaSlideDamping: 0.72,     // Velocity damping multiplier per frame during brake slide
@@ -215,6 +217,9 @@ export const ichigoConfig = {
   bankaiFinalGetsugaSlashDuration: 30,  // Extended heavy cleave follow-through swing duration frames
   bankaiFinalGetsugaScreenShake: 8.5,   // Intense screen shake on release
   bankaiFinalGetsugaHitScreenShake: 8.5,// Intense screen shake on projectile hit
+  bankaiFinalGetsugaTravelShakeIntensity: 4.5, // Continuous arena screen shake intensity while Grand Finisher wave travels
+  bankaiFinalGetsugaTravelShakeDuration: 6,    // Screen shake duration per pulse during travel
+  bankaiFinalGetsugaTravelShakeInterval: 4,    // Interval in frames between travel screen shake pulses (shaking the entire arena)
   bankaiFinalGetsugaShockwaveSize: 110, // Colossal shockwave on hit
   bankaiFinalGetsugaColor: '#DC143C',   // Final Kuroi Getsuga color theme
 

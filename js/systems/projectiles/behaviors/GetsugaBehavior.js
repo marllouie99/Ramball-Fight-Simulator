@@ -18,7 +18,35 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
     const form = projectile.getsugaForm || 'shikai';
     const isFinal = form === 'final_bankai';
+    const isBankaiForm = form === 'bankai' || form === 'bankai_hollow';
+    const isMaskForm = form === 'hollow' || form === 'bankai_hollow';
     const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
+
+    // ── Continuous arena screen shake while Getsuga Tensho travels across the arena ──
+    if (projectile.vx !== 0 || projectile.vy !== 0) {
+      projectile.getsugaTravelShakeCounter = (projectile.getsugaTravelShakeCounter || 0) + 1;
+      const shakeInterval = isFinal
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaTravelShakeInterval || 4)
+        : (isBankaiForm
+          ? (CONFIG.ichigo?.bankaiGetsugaTravelShakeInterval || 5)
+          : (CONFIG.ichigo?.getsugaTravelShakeInterval || 6));
+
+      if (projectile.getsugaTravelShakeCounter >= shakeInterval) {
+        projectile.getsugaTravelShakeCounter = 0;
+        const shakeIntensity = isFinal
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaTravelShakeIntensity || 4.5)
+          : (isBankaiForm
+            ? (CONFIG.ichigo?.bankaiGetsugaTravelShakeIntensity || 3.0)
+            : (isMaskForm ? 2.5 : (CONFIG.ichigo?.getsugaTravelShakeIntensity || 2.0)));
+        const shakeDuration = isFinal
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaTravelShakeDuration || 6)
+          : 5;
+
+        if (typeof triggerGlobalScreenShake === 'function') {
+          triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+        }
+      }
+    }
 
     // ── Grand Finisher: Final Massive Kuroi Getsuga Wall Pinning (Just like Gojo's Purple) ──
     if (isFinal && arena) {
