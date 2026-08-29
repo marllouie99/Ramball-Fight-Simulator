@@ -1669,6 +1669,14 @@ export function drawLaylaVoidProjectile(ctx, p) {
  * speed trails ripping backward, a jagged broken plasma shell, and a needle-sharp piercing tip.
  */
 function drawGenosFireball(ctx, p) {
+  const isDarkMode = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
   const angle = (p.vx !== undefined && p.vy !== undefined && (p.vx !== 0 || p.vy !== 0))
     ? Math.atan2(p.vy, p.vx)
     : (p.angle || 0);
@@ -1677,12 +1685,18 @@ function drawGenosFireball(ctx, p) {
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
 
-  const R          = p.r;           // base radius (~9px)
+  const R          = p.r || 9;      // base radius (~9px)
   const bodyLen    = R * 3.8;       // length of the main glowing body
   const tailLen    = R * 9.0;       // how far back the speed trails extend
   const tipLen     = R * 2.2;       // needle tip protrusion beyond body front
   const halfBody   = bodyLen / 2;
   const flicker    = p.life || 0;   // deterministic per-frame flicker seed
+
+  if (isDarkMode) {
+    drawGenosPixelFireball(ctx, p, R, bodyLen, tailLen, tipLen, halfBody, flicker);
+    ctx.restore();
+    return;
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // 1. LONG BACKWARD SPEED TRAILS — energy smear ripping off the rear
@@ -1851,6 +1865,154 @@ function drawGenosFireball(ctx, p) {
   ctx.fill();
 
   ctx.restore();
+}
+
+/**
+ * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Incineration Fireball (Dark Mode).
+ * Uses the Saitama skin / Getsuga Tensho rasterization standard (P = 2.0px, Rule #35 compliant).
+ */
+function drawGenosPixelFireball(ctx, p, R, bodyLen, tailLen, tipLen, halfBody, flicker) {
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Inside fireball body test
+  const isInsideBody = (gx, gy) => {
+    if (gx < -halfBody || gx > halfBody) return false;
+    const normX = (gx + halfBody) / bodyLen;
+    let h;
+    if (normX < 0.25) {
+      h = R * 0.95 * Math.sin((normX / 0.25) * (Math.PI / 2));
+    } else if (normX > 0.65) {
+      h = R * 0.95 * (1.0 - ((normX - 0.65) / 0.35) * 0.75);
+    } else {
+      h = R * 0.95;
+    }
+    return Math.abs(gy) <= h;
+  };
+
+  // 2. Needle tip test
+  const isInsideNeedle = (gx, gy) => {
+    if (gx < halfBody || gx > halfBody + tipLen) return false;
+    const t = 1.0 - (gx - halfBody) / tipLen;
+    const needleH = Math.max(P, R * 0.32 * Math.pow(t, 1.2));
+    return Math.abs(gy) <= needleH;
+  };
+
+  // 3. Shockwave pressure cone test
+  const isInsideShockCone = (gx, gy) => {
+    const coneLen = tipLen * 1.35;
+    if (gx < halfBody || gx > halfBody + coneLen) return false;
+    const t = 1.0 - (gx - halfBody) / coneLen;
+    const coneH = R * 0.90 * t;
+    return Math.abs(gy) <= coneH;
+  };
+
+  // 4. Jagged plasma spikes test
+  const spikeCount = 12;
+  const isInsideSpikes = (gx, gy) => {
+    for (let i = 0; i < spikeCount; i++) {
+      const side = (i % 2 === 0) ? 1 : -1;
+      const xPos = -halfBody + (i / (spikeCount - 1)) * bodyLen;
+      const baseAmp = R * (0.85 + ((i * 5 + flicker * 2) % 5) / 5 * 0.85);
+      const spikeH = baseAmp * side;
+      const xJit = (((i * 7 + flicker * 3) % 7) / 7 - 0.5) * R * 0.6;
+      const bw = R * (0.28 + ((i * 3 + flicker) % 4) / 4 * 0.15);
+
+      const dx = gx - (xPos + xJit);
+      if (Math.abs(dx) <= bw) {
+        const t = 1.0 - Math.abs(dx) / bw;
+        if (side > 0 && gy >= 0 && gy <= spikeH * t) return true;
+        if (side < 0 && gy <= 0 && gy >= spikeH * t) return true;
+      }
+    }
+    return false;
+  };
+
+  const isInsideFireball = (gx, gy) => {
+    return isInsideBody(gx, gy) || isInsideNeedle(gx, gy) || isInsideSpikes(gx, gy);
+  };
+
+  const minX = Math.floor((-halfBody - P * 2) / P) * P;
+  const maxX = Math.ceil((halfBody + tipLen + P * 2) / P) * P;
+  const maxY = Math.ceil((R * 2.0 + P * 2) / P) * P;
+
+  // ── A. Stepped Pixel Shock Cone (Leading atmospheric pressure wave) ──
+  ctx.fillStyle = 'rgba(255, 140, 0, 0.45)';
+  for (let gy = -maxY; gy <= maxY; gy += P) {
+    for (let gx = snap(halfBody); gx <= snap(halfBody + tipLen * 1.35); gx += P) {
+      if (isInsideShockCone(gx, gy) && !isInsideFireball(gx, gy)) {
+        ctx.fillRect(snap(gx), snap(gy), P, P);
+      }
+    }
+  }
+
+  // ── B. Main Discrete 2D Fireball Grid (4-Neighbor Boundary Shell) ──
+  for (let gy = -maxY; gy <= maxY; gy += P) {
+    for (let gx = minX; gx <= maxX; gx += P) {
+      if (!isInsideFireball(gx, gy)) continue;
+
+      const px = snap(gx);
+      const py = snap(gy);
+
+      const isBorder = !isInsideFireball(gx + P, gy) ||
+                       !isInsideFireball(gx - P, gy) ||
+                       !isInsideFireball(gx, gy + P) ||
+                       !isInsideFireball(gx, gy - P);
+
+      if (isBorder) {
+        ctx.fillStyle = '#150500'; // Dark manga obsidian flame border
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      const absY = Math.abs(gy);
+
+      // Shading hierarchy based on proximity to center core line & needle tip
+      if ((absY < P * 1.5 && gx > -halfBody * 0.7 && gx < halfBody + tipLen * 0.85) || (gx > halfBody + tipLen - P * 2)) {
+        ctx.fillStyle = '#FFFFFF'; // Superheated pure white fusion core
+      } else if (absY < R * 0.40) {
+        ctx.fillStyle = '#FFE600'; // Blinding solar golden plasma
+      } else if (absY < R * 0.75) {
+        ctx.fillStyle = '#FF5500'; // Genos signature saturated fiery orange
+      } else {
+        ctx.fillStyle = (Math.round(gx / P) + Math.round(gy / P)) % 2 === 0 ? '#FF5500' : '#B32400'; // Deep burning magma crimson
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+
+  // ── C. Leading White Diamond Glint at Needle Tip ──
+  const tipApexX = snap(halfBody + tipLen);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(tipApexX, 0, P, P);
+  ctx.fillRect(tipApexX - P, -P, P, P * 3);
+  ctx.fillRect(tipApexX - P * 2, 0, P, P);
+
+  // ── D. Backward Stepped Speed Needles ──
+  const streakCount = 6;
+  for (let s = 0; s < streakCount; s++) {
+    const sNorm = (s / (streakCount - 1)) * 2 - 1; // -1 to +1
+    const yOff = snap(sNorm * R * 1.1);
+    const sLen = tailLen * (0.55 + (1.0 - Math.abs(sNorm)) * 0.45);
+    const startX = snap(-halfBody);
+    const endX = snap(-halfBody - sLen);
+
+    let sColor;
+    if (s % 4 === 0) sColor = '#150500';       // Obsidian streak
+    else if (s % 4 === 1) sColor = '#FF5500'; // Fiery orange
+    else if (s % 4 === 2) sColor = '#FFE600'; // Solar yellow
+    else sColor = '#FFFFFF';                  // White core
+
+    ctx.fillStyle = sColor;
+    for (let x = startX; x >= endX; x -= P) {
+      const t = (x - endX) / (startX - endX); // 0 at far tail, 1 at body
+      const thick = Math.max(P, snap(t * P * 1.5));
+      for (let dy = -thick; dy <= thick; dy += P) {
+        ctx.fillRect(x, yOff + dy, P, P);
+      }
+    }
+  }
 }
 
 /**

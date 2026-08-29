@@ -279,9 +279,11 @@ export function drawFlames() {
 // DRAW — MANGA ACTION SPEED LINES CLUSTER (Genos Machine Gun Blows & Dash)
 // ──────────────────────────────────────────
 let _genosSpeedLineSeeds = null;
+let _genosSpeedLineTheme = null;
 
-function _initGenosSpeedLineSeeds(theme = 'flurry') {
+function _initGenosSpeedLineSeeds(theme = 'flurry', isDarkMode = false) {
   _genosSpeedLineSeeds = [];
+  _genosSpeedLineTheme = `${theme}_${isDarkMode ? 'dark' : 'light'}`;
   const totalLines = 22;
 
   for (let i = 0; i < totalLines; i++) {
@@ -303,12 +305,12 @@ function _initGenosSpeedLineSeeds(theme = 'flurry') {
     // Skill 1 (flurry) uses fiery orange/gold/white/black theme; Dashes use pure black manga ink
     let color;
     if (theme === 'dash') {
-      color = 'rgba(10, 10, 15, 0.92)';
+      color = isDarkMode ? '#100500' : 'rgba(10, 10, 15, 0.92)';
     } else {
-      if (i % 4 === 0) color = 'rgba(255, 85, 0, 0.95)';       // Genos fiery orange
-      else if (i % 4 === 1) color = 'rgba(255, 200, 0, 0.95)'; // Hot golden heat
-      else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)';// White core
-      else color = 'rgba(15, 15, 22, 0.90)';                   // Crisp black manga ink line
+      if (i % 4 === 0) color = isDarkMode ? '#FF5500' : 'rgba(255, 85, 0, 0.95)';       // Genos fiery orange
+      else if (i % 4 === 1) color = isDarkMode ? '#FFCC00' : 'rgba(255, 200, 0, 0.95)'; // Hot golden heat
+      else if (i % 4 === 2) color = '#FFFFFF';                                           // White core
+      else color = isDarkMode ? '#150500' : 'rgba(15, 15, 22, 0.90)';                   // Crisp obsidian manga ink line
     }
 
     _genosSpeedLineSeeds.push({
@@ -338,16 +340,25 @@ export function drawGenosSpeedLines() {
   const ctx = state.ctx;
   if (!ctx) return;
 
+  const isDarkMode = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
   const isDashing = (genosFighter.speedBoostTimer && genosFighter.speedBoostTimer > 0) || genosFighter.isDashing;
   const activeState = genosFighter.isFlurrying ? 'flurry' : (isDashing ? 'dash' : false);
   if (!activeState) return;
 
-  if (genosFighter._lastSpeedLineState !== activeState) {
+  const expectedKey = `${activeState}_${isDarkMode ? 'dark' : 'light'}`;
+  if (_genosSpeedLineTheme !== expectedKey || genosFighter._lastSpeedLineState !== activeState) {
     _genosSpeedLineSeeds = null;
   }
   genosFighter._lastSpeedLineState = activeState;
 
-  if (!_genosSpeedLineSeeds) _initGenosSpeedLineSeeds(activeState);
+  if (!_genosSpeedLineSeeds) _initGenosSpeedLineSeeds(activeState, isDarkMode);
 
   // If dashing and moving, align with movement velocity; if flurrying (Skill 1), align with aim angle
   let lineAngle;
@@ -367,6 +378,11 @@ export function drawGenosSpeedLines() {
   const now = Date.now();
 
   ctx.save();
+  if (isDarkMode) {
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  const snap = (v) => isDarkMode ? Math.round(v / 2) * 2 : v;
 
   for (let i = 0; i < _genosSpeedLineSeeds.length; i++) {
     const seed = _genosSpeedLineSeeds[i];
@@ -384,20 +400,20 @@ export function drawGenosSpeedLines() {
     // Needle polygon points: sharp start point, top mid, sharp end point, bot mid
     const midOff = halfLen * 0.15;
     
-    const startX = lineCenterX - cosA * halfLen;
-    const startY = lineCenterY - sinA * halfLen;
+    const startX = snap(lineCenterX - cosA * halfLen);
+    const startY = snap(lineCenterY - sinA * halfLen);
 
     const midX = lineCenterX + cosA * midOff;
     const midY = lineCenterY + sinA * midOff;
 
-    const endX = lineCenterX + cosA * halfLen;
-    const endY = lineCenterY + sinA * halfLen;
+    const endX = snap(lineCenterX + cosA * halfLen);
+    const endY = snap(lineCenterY + sinA * halfLen);
 
-    const topMidX = midX + perpX * halfThick;
-    const topMidY = midY + perpY * halfThick;
+    const topMidX = snap(midX + perpX * halfThick);
+    const topMidY = snap(midY + perpY * halfThick);
 
-    const botMidX = midX - perpX * halfThick;
-    const botMidY = midY - perpY * halfThick;
+    const botMidX = snap(midX - perpX * halfThick);
+    const botMidY = snap(midY - perpY * halfThick);
 
     ctx.fillStyle = seed.color;
     ctx.beginPath();

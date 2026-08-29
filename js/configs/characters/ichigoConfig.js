@@ -116,7 +116,7 @@ export const ichigoConfig = {
   hollowGetsugaDragFrames: 18,   // Hollow Mask drag frames
   hollowGetsugaScreenShake: 5.0, // Screen shake intensity on release
   hollowGetsugaHitScreenShake: 4.5, // Screen shake intensity on projectile hit
-  hollowGetsugaRadius: 100,       // Hollow Mask Getsuga projectile radius (increased scale)
+  hollowGetsugaRadius: 110,       // Hollow Mask Getsuga projectile radius (increased scale)
   hollowGetsugaColor: '#FF1E00', // Hollow Mask Getsuga color
 
   // ── Passive: Zanjutsu Parry & Defense Mechanics ──

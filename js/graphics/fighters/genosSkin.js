@@ -537,47 +537,101 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
   ctx.save();
   ctx.translate(cx, cy);
 
+  const isDarkMode = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
   // ── PUNCH IMPACT VISUAL: Fire Aura Glow + Radial Speed Lines ──
   if (punchGlow > 0.05) {
     ctx.save();
 
-    // 1. Outer fire aura bloom (flat tinted rings — no gradient, for performance)
-    ctx.globalAlpha = punchGlow * 0.45;
-    ctx.fillStyle = '#FF8800';
-    ctx.beginPath();
-    ctx.arc(0, 0, hr * 2.2, 0, Math.PI * 2);
-    ctx.fill();
+    if (isDarkMode) {
+      ctx.imageSmoothingEnabled = false;
+      const P = 2.0;
+      const snap = (v) => Math.round(v / P) * P;
+      const maxR = snap(hr * 2.2 * punchGlow);
 
-    ctx.globalAlpha = punchGlow * 0.60;
-    ctx.fillStyle = '#FF4400';
-    ctx.beginPath();
-    ctx.arc(0, 0, hr * 1.55, 0, Math.PI * 2);
-    ctx.fill();
+      // 1. Discrete 2D Stepped Pixel Fire Aura Grid
+      for (let dy = -maxR; dy <= maxR; dy += P) {
+        for (let dx = -maxR; dx <= maxR; dx += P) {
+          const dist = Math.hypot(dx, dy);
+          if (dist > maxR) continue;
 
-    ctx.globalAlpha = punchGlow * 0.30;
-    ctx.fillStyle = '#FFDD44';
-    ctx.beginPath();
-    ctx.arc(0, 0, hr * 0.70, 0, Math.PI * 2);
-    ctx.fill();
+          if (dist >= maxR - P) {
+            ctx.fillStyle = '#150500'; // Dark manga obsidian border
+          } else if (dist < hr * 0.65) {
+            ctx.fillStyle = '#FFFFFF'; // Superheated pure white core
+          } else if (dist < hr * 1.35) {
+            ctx.fillStyle = '#FFE600'; // Solar yellow
+          } else if (dist < hr * 1.80) {
+            ctx.fillStyle = '#FF5500'; // Saturated fiery orange
+          } else {
+            ctx.fillStyle = '#CC2A00'; // Magma crimson
+          }
+          ctx.fillRect(snap(dx), snap(dy), P, P);
+        }
+      }
 
-    // 2. Radial speed lines burst (8 jagged lines radiating outward)
-    ctx.globalAlpha = punchGlow * 0.80;
-    ctx.strokeStyle = '#FFCC55';
-    ctx.lineCap = 'round';
-    const lineCount = 8;
-    for (let i = 0; i < lineCount; i++) {
-      const lineAngle = (i / lineCount) * Math.PI * 2;
-      const innerR = hr * 1.1;
-      // Alternate long/short lines for a jagged starburst
-      const outerR = (i % 2 === 0) ? hr * 2.6 : hr * 1.85;
-      ctx.lineWidth = (i % 2 === 0) ? 2.2 : 1.4;
+      // 2. Stepped Radial Needle Streaks
+      const lineCount = 8;
+      for (let i = 0; i < lineCount; i++) {
+        const lineAngle = (i / lineCount) * Math.PI * 2;
+        const innerR = snap(hr * 1.1);
+        const outerR = snap(((i % 2 === 0) ? hr * 2.6 : hr * 1.85) * punchGlow);
+        const cosA = Math.cos(lineAngle);
+        const sinA = Math.sin(lineAngle);
+        const steps = Math.max(4, Math.round((outerR - innerR) / P));
+
+        for (let st = 0; st <= steps; st++) {
+          const dist = innerR + (st / steps) * (outerR - innerR);
+          const px = snap(cosA * dist);
+          const py = snap(sinA * dist);
+          ctx.fillStyle = (st % 2 === 0) ? '#FFFFFF' : '#FFE600';
+          ctx.fillRect(px, py, P, P);
+        }
+      }
+    } else {
+      // 1. Outer fire aura bloom (flat tinted rings — no gradient, for performance)
+      ctx.globalAlpha = punchGlow * 0.45;
+      ctx.fillStyle = '#FF8800';
       ctx.beginPath();
-      ctx.moveTo(Math.cos(lineAngle) * innerR, Math.sin(lineAngle) * innerR);
-      ctx.lineTo(Math.cos(lineAngle) * outerR, Math.sin(lineAngle) * outerR);
-      ctx.stroke();
+      ctx.arc(0, 0, hr * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = punchGlow * 0.60;
+      ctx.fillStyle = '#FF4400';
+      ctx.beginPath();
+      ctx.arc(0, 0, hr * 1.55, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = punchGlow * 0.30;
+      ctx.fillStyle = '#FFDD44';
+      ctx.beginPath();
+      ctx.arc(0, 0, hr * 0.70, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Radial speed lines burst (8 jagged lines radiating outward)
+      ctx.globalAlpha = punchGlow * 0.80;
+      ctx.strokeStyle = '#FFCC55';
+      ctx.lineCap = 'round';
+      const lineCount = 8;
+      for (let i = 0; i < lineCount; i++) {
+        const lineAngle = (i / lineCount) * Math.PI * 2;
+        const innerR = hr * 1.1;
+        // Alternate long/short lines for a jagged starburst
+        const outerR = (i % 2 === 0) ? hr * 2.6 : hr * 1.85;
+        ctx.lineWidth = (i % 2 === 0) ? 2.2 : 1.4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(lineAngle) * innerR, Math.sin(lineAngle) * innerR);
+        ctx.lineTo(Math.cos(lineAngle) * outerR, Math.sin(lineAngle) * outerR);
+        ctx.stroke();
+      }
     }
 
-    ctx.globalAlpha = 1.0;
     ctx.restore();
   }
 

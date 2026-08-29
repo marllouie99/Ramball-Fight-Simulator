@@ -194,11 +194,16 @@ export class GenosFighter extends Fighter {
   drawBeamOverlay(ctx) {
     if (this.hp <= 0 || !this.isFiringUlt) return; // Beam geometry only renders while actively firing
 
+    const isDarkMode = Boolean(
+      typeof state !== 'undefined' && (
+        state.arenaTheme === 'dark' || 
+        state.darkMode || 
+        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+      )
+    );
+
     const beamAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.ultAngle || this.angle || 0);
     const now = Date.now();
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
 
     const beamW = CONFIG.genos?.ultBeamWidth || 70;
     const range = CONFIG.genos?.ultBeamRange || 1200;
@@ -211,6 +216,14 @@ export class GenosFighter extends Fighter {
 
     // Flickering beam width
     const flickerW = beamW * (0.94 + Math.sin(now * 0.12) * 0.06);
+
+    if (isDarkMode) {
+      this._drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY);
+      return;
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
 
     // ── RELEASE FLARE EFFECT (First 16 frames of beam release - Gojo Purple Style) ──
     const totalDuration = CONFIG.genos?.ultDurationFrames || 120;
@@ -350,6 +363,187 @@ export class GenosFighter extends Fighter {
       ctx.ellipse(0, 0, 8, flickerW * 0.65, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Spiral Incineration Cannon Beam (Dark Mode).
+   * Complies with Rule #35 & Saitama/Getsuga pixel art standards (P = 2.0px, discrete stepped shading).
+   */
+  _drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const P = 2.0;
+    const snap = (v) => Math.round(v / P) * P;
+
+    ctx.translate(startX, startY);
+    ctx.rotate(beamAngle);
+
+    const halfW = Math.max(P * 3, snap(flickerW * 0.5));
+    const totalDuration = CONFIG.genos?.ultDurationFrames || 120;
+    const timeFired = totalDuration - (this.ultTimer || 0);
+
+    // ── 1. Anamorphic Stepped Pixel Flare & Starburst (First 16 frames) ──
+    if (timeFired <= 16) {
+      const flareProg = timeFired / 16;
+      const flareAlpha = Math.sin(flareProg * Math.PI);
+      const flareR = snap(flickerW * (1.6 + flareProg * 1.4));
+
+      ctx.save();
+      ctx.globalAlpha = flareAlpha;
+
+      // A. Vertical Anamorphic Stepped Lens Flare Line
+      for (let gy = -flareR * 2.2; gy <= flareR * 2.2; gy += P) {
+        const absY = Math.abs(gy);
+        const normY = absY / (flareR * 2.2);
+        const thick = Math.max(P, snap((1.0 - normY) * P * 3.5));
+
+        for (let gx = -thick; gx <= thick; gx += P) {
+          const absX = Math.abs(gx);
+          if (absX < P && normY < 0.45) {
+            ctx.fillStyle = '#FFFFFF';
+          } else if (normY < 0.7) {
+            ctx.fillStyle = '#FFE600';
+          } else {
+            ctx.fillStyle = '#FF5500';
+          }
+          ctx.fillRect(snap(gx), snap(gy), P, P);
+        }
+      }
+
+      // B. 8-Point Stepped Diamond Starburst Rays
+      for (let k = 0; k < 8; k++) {
+        const rAngle = (k * Math.PI) / 4;
+        const rLen = flareR * (k % 2 === 0 ? 1.5 : 0.85);
+        const cosR = Math.cos(rAngle);
+        const sinR = Math.sin(rAngle);
+        const steps = Math.max(8, Math.round(rLen / P));
+
+        for (let st = 0; st < steps; st++) {
+          const t = st / steps;
+          const dist = t * rLen;
+          const rx = snap(cosR * dist);
+          const ry = snap(sinR * dist);
+          ctx.fillStyle = (t < 0.35) ? '#FFFFFF' : ((t < 0.75) ? '#FFE600' : '#FF5500');
+          ctx.fillRect(rx, ry, P, P);
+        }
+      }
+
+      // C. Central White-Hot Blinding Core Diamond
+      const coreR = snap(flareR * 0.45);
+      for (let dy = -coreR; dy <= coreR; dy += P) {
+        const spanX = coreR - Math.abs(dy);
+        for (let dx = -spanX; dx <= spanX; dx += P) {
+          ctx.fillStyle = (Math.abs(dx) + Math.abs(dy) < coreR * 0.5) ? '#FFFFFF' : '#FFE600';
+          ctx.fillRect(snap(dx), snap(dy), P, P);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // ── 2. Stepped 2D Pixel Beam Column (0 to range) ──
+    const tier1Half = Math.max(P, snap(halfW * 0.18)); // White-hot fusion core
+    const tier2Half = Math.max(P * 2, snap(halfW * 0.42)); // Solar golden plasma
+    const tier3Half = Math.max(P * 3, snap(halfW * 0.72)); // Fiery orange column
+    const tier4Half = halfW;                              // Magma crimson outer body
+    const auraHalf  = snap(halfW * 1.25);                 // Thermal atmosphere aura
+
+    // A. Outer Atmosphere Stepped Pixel Aura
+    ctx.fillStyle = 'rgba(255, 68, 0, 0.35)';
+    for (let gy = -auraHalf; gy <= auraHalf; gy += P) {
+      if (Math.abs(gy) <= tier4Half) continue;
+      for (let gx = 0; gx <= range; gx += P * 2) {
+        ctx.fillRect(snap(gx), snap(gy), P * 2, P);
+      }
+    }
+
+    // B. Discrete Multi-Tier Beam Column
+    for (let gy = -tier4Half; gy <= tier4Half; gy += P) {
+      const absY = Math.abs(gy);
+      const isBorder = (absY >= tier4Half - P);
+
+      let rowColor;
+      if (isBorder) {
+        rowColor = '#150500'; // Dark manga obsidian border shell
+      } else if (absY < P * 1.5) {
+        rowColor = '#FFFFFF'; // Superheated pure white-hot fusion core
+      } else if (absY <= tier1Half) {
+        rowColor = '#FFFFEE';
+      } else if (absY <= tier2Half) {
+        rowColor = '#FFE600'; // Electric golden solar plasma
+      } else if (absY <= tier3Half) {
+        rowColor = '#FF5500'; // Genos signature saturated fiery orange
+      } else {
+        rowColor = '#CC2A00'; // Deep burning magma crimson
+      }
+
+      ctx.fillStyle = rowColor;
+      ctx.fillRect(0, snap(gy), range, P);
+    }
+
+    // C. Longitudinal High-Energy Stepped Plasma Wave Pulses
+    const pulseCount = 8;
+    for (let pl = 0; pl < pulseCount; pl++) {
+      const pSpeed = 24 + (pl % 3) * 8;
+      const pTravel = snap((now * 0.06 * pSpeed + pl * 160) % range);
+      const pLen = snap(40 + (pl % 3) * 30);
+      const pY = snap(((pl % 5) - 2) * (tier2Half * 0.7));
+
+      ctx.fillStyle = (pl % 2 === 0) ? '#FFFFFF' : '#FFE600';
+      ctx.fillRect(pTravel, pY, pLen, P);
+    }
+
+    // ── 3. Stepped Muzzle Blast Arc (at base x = 0) ──
+    const muzzleR = snap(halfW * 1.35);
+    for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
+      const spanX = Math.sqrt(Math.max(0, muzzleR * muzzleR - dy * dy));
+      const absY = Math.abs(dy);
+      for (let dx = -spanX * 0.5; dx <= spanX * 0.8; dx += P) {
+        const dist = Math.hypot(dx, dy);
+        if (dist > muzzleR) continue;
+
+        if (dist >= muzzleR - P) {
+          ctx.fillStyle = '#150500';
+        } else if (dist < muzzleR * 0.3) {
+          ctx.fillStyle = '#FFFFFF';
+        } else if (dist < muzzleR * 0.6) {
+          ctx.fillStyle = '#FFE600';
+        } else if (dist < muzzleR * 0.85) {
+          ctx.fillStyle = '#FF5500';
+        } else {
+          ctx.fillStyle = '#B32400';
+        }
+        ctx.fillRect(snap(dx), snap(dy), P, P);
+      }
+    }
+
+    // ── 4. Stepped Transonic Mach Condensation Rings ──
+    const ringCount = 3;
+    for (let i = 0; i < ringCount; i++) {
+      const ringDist = snap(((now * 0.24) + i * (range / ringCount)) % range);
+      const rx = ringDist;
+      const alphaRing = (1.0 - ringDist / range);
+      if (alphaRing < 0.05) continue;
+
+      const ringW = snap(P * 3);
+      const ringH = snap(halfW * 1.25);
+      const steps = 24;
+
+      for (let st = 0; st < steps; st++) {
+        const ang = (st / steps) * Math.PI * 2;
+        const px = snap(rx + Math.cos(ang) * ringW);
+        const py = snap(Math.sin(ang) * ringH);
+
+        ctx.fillStyle = '#150500';
+        ctx.fillRect(px, py + P, P, P);
+        ctx.fillStyle = (st % 2 === 0) ? '#FFE600' : '#FF5500';
+        ctx.fillRect(px, py, P, P);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(px, py - P, P, P);
+      }
     }
 
     ctx.restore();

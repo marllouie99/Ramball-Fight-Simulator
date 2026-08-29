@@ -1917,26 +1917,69 @@ export function drawSparkEffects(layer = 'all') {
         }
       } else if (isGenosClash) {
         // ── GENOS INCINERATION STOMP SHOCKWAVE ──
-        // Outer Incineration Fiery Orange Thermal Ring
-        ctx.strokeStyle = `rgba(255, 60, 0, ${effect.life * 0.95})`;
-        ctx.lineWidth = 12 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
+        const isDarkMode = Boolean(
+          typeof state !== 'undefined' && (
+            state.arenaTheme === 'dark' || 
+            state.darkMode || 
+            (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+          )
+        );
 
-        // Middle Golden Heat Wave Ring
-        ctx.strokeStyle = `rgba(255, 170, 0, ${effect.life * 0.90})`;
-        ctx.lineWidth = 7 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
-        ctx.stroke();
+        if (isDarkMode) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          const P = 2.0;
+          const snap = (v) => Math.round(v / P) * P;
+          const steps = 36;
 
-        // Inner White-Hot Blast Core Ring
-        ctx.strokeStyle = `rgba(255, 245, 200, ${effect.life * 0.98})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
-        ctx.stroke();
+          // Discrete stepped pixel concentric shockwave loops
+          for (let st = 0; st < steps; st++) {
+            const ang = (st / steps) * Math.PI * 2;
+            const cosA = Math.cos(ang);
+            const sinA = Math.sin(ang);
+
+            // Outer Obsidian Border
+            const r0 = snap(effect.size);
+            ctx.fillStyle = '#150500';
+            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+
+            // Outer Fiery Orange Pixel Ring
+            ctx.fillStyle = '#FF5500';
+            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+            // Mid Golden Heat Loop
+            const r1 = snap(effect.size * 0.75);
+            ctx.fillStyle = '#FFE600';
+            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+            // Inner White-Hot Ring
+            const r2 = snap(effect.size * 0.45);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
+          }
+          ctx.restore();
+        } else {
+          // Outer Incineration Fiery Orange Thermal Ring
+          ctx.strokeStyle = `rgba(255, 60, 0, ${effect.life * 0.95})`;
+          ctx.lineWidth = 12 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Middle Golden Heat Wave Ring
+          ctx.strokeStyle = `rgba(255, 170, 0, ${effect.life * 0.90})`;
+          ctx.lineWidth = 7 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner White-Hot Blast Core Ring
+          ctx.strokeStyle = `rgba(255, 245, 200, ${effect.life * 0.98})`;
+          ctx.lineWidth = 4 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       } else if (isMahoragaClash) {
         // ── MAHORAGA DIVINE TELEPORT / IMPACT GROUND SHOCKWAVE ──
         // Outer Golden Divine Aura Ring
