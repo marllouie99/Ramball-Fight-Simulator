@@ -226,9 +226,9 @@ export class GetsugaBehavior extends ProjectileBehavior {
     const hitRadius = projectile.r || (isFinal
       ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 120)
       : (form === 'bankai_hollow'
-        ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius || 68)
+        ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius || (CONFIG.ichigo?.getsugaRadius || 100))
         : (form === 'hollow'
-          ? (CONFIG.ichigo?.hollowGetsugaRadius || 100)
+          ? (CONFIG.ichigo?.hollowGetsugaRadius || (CONFIG.ichigo?.getsugaRadius || 100))
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100)))));
 
     // 4. Piercing Sweep: Cleave all valid enemy entities in the crescent wave's path

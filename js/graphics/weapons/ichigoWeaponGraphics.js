@@ -40,12 +40,12 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   const baseProjRadius = isFinal
     ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius ?? 120)
     : (isBankaiHollow
-      ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius ?? 68)
+      ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius ?? (CONFIG.ichigo?.getsugaRadius ?? 100))
       : (isShikaiHollow
-        ? (CONFIG.ichigo?.hollowGetsugaRadius ?? 62)
+        ? (CONFIG.ichigo?.hollowGetsugaRadius ?? (CONFIG.ichigo?.getsugaRadius ?? 100))
         : (isBankai
-          ? (CONFIG.ichigo?.bankaiGetsugaRadius ?? 58)
-          : (CONFIG.ichigo?.getsugaRadius ?? 52))));
+          ? (CONFIG.ichigo?.bankaiGetsugaRadius ?? 110)
+          : (CONFIG.ichigo?.getsugaRadius ?? 100))));
 
   const radiusScale = (p.r !== undefined && p.r > 0) ? (p.r / 38) : (baseProjRadius / 38);
 

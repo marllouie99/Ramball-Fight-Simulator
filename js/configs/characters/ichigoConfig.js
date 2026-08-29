@@ -101,14 +101,14 @@ export const ichigoConfig = {
   hollowDamageMultiplier: 1.5,   // Damage multiplier boost
   hollowDamageReduction: 0.10,   // 20% incoming damage mitigation (Hierro) during Hollow Mask
   hollowLifesteal: 0.10,         // 15% vampiric lifesteal heal on damage dealt during Hollow Mask
-  hollowShunpoStrikesMultiplier: 1.5, // Multiplier to increase Shunpo flurry strikes during Hollow form (e.g. 2 -> 3 in Shikai, 6 -> 9 in Bankai)
+  hollowShunpoStrikesMultiplier: 1.2, // Multiplier to increase Shunpo flurry strikes during Hollow form (e.g. 2 -> 3 in Shikai, 6 -> 9 in Bankai)
   hollowSwordCooldownMultiplier: 0.65, // Multiplier reducing melee sword cooldown (e.g. 30 * 0.65 = ~19 frames for faster rapid slashing)
-  hollowComboCooldownMultiplier: 0.50, // 25% cooldown reduction multiplier for Shunpo Getsuga Blitz combo during Hollow Mask (e.g. 450 * 0.75 = ~337 frames)
+  hollowComboCooldownMultiplier: 0.25, // 25% cooldown reduction multiplier for Shunpo Getsuga Blitz combo during Hollow Mask (e.g. 450 * 0.75 = ~337 frames)
   hollowGetsugaChargeMultiplier: 0.70, // Reduction multiplier reducing Getsuga Tensho charging frames during Hollow form (50% faster charge)
   hollowGetsugaVoice1ChargeFrames: 80,  // Charging frames dynamically synchronized to when "...TENSHO!" peaks & finishes in Voice 1 (~1.33s)
   hollowGetsugaVoice2ChargeFrames: 34,  // Charging frames dynamically synchronized to when fast "TENSHO!" peaks & finishes in Voice 2 (~0.57s)
   hollowGetsugaDamage: 100,       // Upgraded Black Getsuga damage while mask active
-  hollowGetsugaSpeed: 22,        // Hollow Mask projectile travel speed
+  hollowGetsugaSpeed: 10,        // Hollow Mask projectile travel speed
   hollowGetsugaKnockback: 8,     // Knockback force applied
   hollowGetsugaHitStun: 20,      // Hit stun frames applied on hit
   hollowGetsugaSlowDuration: 100,// Hollow Mask slow debuff duration (frames)
@@ -116,7 +116,7 @@ export const ichigoConfig = {
   hollowGetsugaDragFrames: 18,   // Hollow Mask drag frames
   hollowGetsugaScreenShake: 5.0, // Screen shake intensity on release
   hollowGetsugaHitScreenShake: 4.5, // Screen shake intensity on projectile hit
-  hollowGetsugaRadius: 110,       // Hollow Mask Getsuga projectile radius (increased scale)
+  hollowGetsugaRadius: 100,       // Hollow Mask Getsuga projectile radius (increased scale)
   hollowGetsugaColor: '#FF1E00', // Hollow Mask Getsuga color
 
   // ── Passive: Zanjutsu Parry & Defense Mechanics ──
@@ -167,9 +167,9 @@ export const ichigoConfig = {
   bankaiGetsugaChargeFrames: 30, // Reduced faster Getsuga charging frames during Bankai form (frames)
   bankaiGetsugaDamage: 100,       // Kuroi Getsuga damage during Bankai
   bankaiHollowGetsugaDamage: 150,// Kuroi Getsuga damage during Bankai + Hollow Mask (100 * 1.5)
-  bankaiGetsugaSpeed: 22,        // Kuroi Getsuga travel speed (pixels/frame)
+  bankaiGetsugaSpeed: 10,        // Kuroi Getsuga travel speed (pixels/frame)
   bankaiGetsugaRadius: 110,       // Bankai Getsuga projectile radius (increased scale)
-  bankaiHollowGetsugaRadius: 68, // Bankai + Hollow Mask Getsuga projectile radius (increased scale)
+  bankaiHollowGetsugaRadius: 100,// Bankai + Hollow Mask Getsuga projectile radius (matches Shikai Getsuga scale)
   bankaiGetsugaKnockback: 8,     // Kuroi Getsuga knockback force
   bankaiGetsugaHitStun: 20,      // Kuroi Getsuga hit stun duration
   bankaiGetsugaSlowDuration: 100,// Bankai slow debuff duration (frames)
