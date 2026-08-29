@@ -257,6 +257,44 @@ export function drawJohnWickExcommunicadoAura(ctx, r, isForeground = false) {
   ctx.restore();
 }
 
+// Cached Path2D stepped pixel circle clipping mask to prevent per-frame GC allocations
+let _cachedPixelClipPath = null;
+let _cachedPixelClipR = 0;
+
+function getPixelatedCirclePath(r) {
+  if (_cachedPixelClipPath && _cachedPixelClipR === r) {
+    return _cachedPixelClipPath;
+  }
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  const path = (typeof Path2D !== 'undefined') ? new Path2D() : null;
+  if (path) {
+    for (let gy = -steps; gy <= steps; gy++) {
+      const ry = gy * P;
+      let minGx = null;
+      let maxGx = null;
+      for (let gx = -steps; gx <= steps; gx++) {
+        const rx = gx * P;
+        if (Math.hypot(rx, ry) <= r) {
+          if (minGx === null) minGx = gx;
+          maxGx = gx;
+        }
+      }
+      if (minGx !== null && maxGx !== null) {
+        const px = snap(minGx * P);
+        const py = snap(ry);
+        const pw = snap((maxGx - minGx + 1) * P);
+        path.rect(px, py, pw, P);
+      }
+    }
+  }
+  _cachedPixelClipR = r;
+  _cachedPixelClipPath = path;
+  return _cachedPixelClipPath;
+}
+
 /**
  * Authentic 1:1 Procedural Pixel Art Body for John Wick ("The Baba Yaga")
  * Renders the pixelated skin model image (Johnwick-pixel-skin.png) with nearest-neighbor scaling
@@ -266,24 +304,29 @@ export function drawJohnWickPixelBody(ctx, r) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
-  const skinImg = _getJohnWickPixelSkinImage();
-  if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
-    ctx.save();
+  // 1. Strict Discrete Stepped Pixel Mask Clipping (Zero overflow outside stroke)
+  const clipPath = getPixelatedCirclePath(r);
+  if (clipPath) {
+    ctx.clip(clipPath);
+  } else {
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.clip();
+  }
 
+  // 2. Draw Skin Model Image or Procedural Fallback
+  const skinImg = _getJohnWickPixelSkinImage();
+  if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
     // Scale up by 1.175x to compensate for the 36px transparent margins in the PNG so the model fills the circle boundary snugly
     const scaleFactor = 1.175;
     const drawR = r * scaleFactor;
     ctx.drawImage(skinImg, -drawR, -drawR, drawR * 2, drawR * 2);
-    ctx.restore();
   } else {
     // Procedural discrete pixel fallback while image is loading
     _drawJohnWickProceduralPixelBody(ctx, r);
   }
 
-  // ── DRAW STEPPED PIXELATED BLACK STROKE BORDER (Saitama / Gojo Tech) ──
+  // 3. Draw Stepped Pixelated Black Stroke Border on Top (Saitama / Gojo Tech)
   drawPixelatedCircleBorder(ctx, r);
 
   ctx.restore();
