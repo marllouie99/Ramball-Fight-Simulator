@@ -3,11 +3,12 @@
 // Zanpakutō Murciélago & Lanza del Relámpago
 // Bleach: Arrancar / Hueco Mundo Arc
 //
-// Authentic Single-Edged Japanese Katana Architecture:
+// Authentic Single-Edged Japanese Katana in True 2D Grid Scan Pixel Art:
 // - Uniform 4.8px blade width along the shaft with authentic upward Sori curvature
 // - Classic Japanese Kissaki (Tip) with upward Fukura sweep & Yokote line
 // - Mint/Seafoam green silk Tsuka-ito wrap over white Samegawa with diamond lozenges (◆ ◆ ◆ ◆ ◆ ◆)
 // - Elongated beveled Espada eye Tsuba with curved horn prongs & Brass Habaki
+// - Discrete 2D Grid Scan Rasterization (P = 2.0px) with 4-neighbor attached black border shell
 // - Rule 11 (Zero shadowBlur - Concentric fills)
 // - Rule 15 (Double-tapered crescent slashes)
 // - Rule 20 (Skin Only & Hand Visibility)
@@ -16,8 +17,23 @@
 import { state } from '../../core/state.js';
 
 /**
- * Draws Ulquiorra's Zanpakutō: Murciélago (The Great Black-Winged Bat).
- * Matching the exact anime scale, fidelity, and single-edged Katana geometry.
+ * Checks if a 2D point (x, y) is inside a closed polygon using ray-casting.
+ */
+function _isPointInPoly(x, y, poly) {
+  if (!poly || poly.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi + 1e-9) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Draws Ulquiorra's Zanpakutō: Murciélago (The Great Black-Winged Bat) in True Stepped Pixel Art Style.
+ * Uses 2D grid scan rasterization matching drawUlquiorraPixelBody and _drawUlquiorraPixelWings.
  *
  * @param {CanvasRenderingContext2D} ctx 
  * @param {number} x Hand anchor X
@@ -44,35 +60,112 @@ export function drawUlquiorraMurcielago(ctx, x = 0, y = 0, angle = 0, r = 25, is
   ctx.rotate(angle + customAngle);
   ctx.scale(customScale, customScale);
 
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
   const swordStartX = 0;
   const bladeLen = opts.bladeLen || 94;
   const bladeBaseX = swordStartX + 5.5;
   const tipX = swordStartX + bladeLen;
   const yokoteX = tipX - 10.0;
-  const halfW = 2.4; // Uniform blade half-width (4.8px total width)
+  const halfW = 2.4; // 4.8px blade thickness
 
-  // ─────────────────────────────────────────────
-  // 1. TSUKA HILT (Handle extending along -X)
-  // ─────────────────────────────────────────────
-  const hiltStartX = swordStartX - 32;
-  const hiltLen = 32;
-  const hiltHalfW = 3.4;
+  // Curvature Sori (Authentic Katana upward arch toward Kissaki)
+  const getSori = (xCoord) => {
+    const t = Math.max(0, Math.min(1.0, (xCoord - bladeBaseX) / (tipX - bladeBaseX)));
+    return -Math.pow(t, 1.45) * 7.5;
+  };
 
-  // 1a. Base White Samegawa (Rayskin)
-  ctx.fillStyle = '#F1F5F9';
-  ctx.fillRect(hiltStartX, -hiltHalfW, hiltLen, hiltHalfW * 2);
+  // 1. Blade Polygons
+  const steps = 18;
+  const spineEdge = [];
+  const cuttingEdge = [];
+  const ridgeLine = [];
 
-  // 1b. Mint/Seafoam Green Silk Ito Wrap (Top & Bottom Edges)
-  const itoGrad = ctx.createLinearGradient(hiltStartX, -hiltHalfW, hiltStartX, hiltHalfW);
-  itoGrad.addColorStop(0, '#059669');
-  itoGrad.addColorStop(0.5, '#34D399');
-  itoGrad.addColorStop(1, '#047857');
-  ctx.fillStyle = itoGrad;
-  ctx.fillRect(hiltStartX, -hiltHalfW, hiltLen, 1.2);
-  ctx.fillRect(hiltStartX, hiltHalfW - 1.2, hiltLen, 1.2);
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const curX = bladeBaseX + t * (tipX - bladeBaseX);
+    const s = getSori(curX);
+    spineEdge.push({ x: curX, y: s - halfW });
+    ridgeLine.push({ x: curX, y: s - halfW * 0.25 });
+  }
 
-  // 1c. Crisp Diamond Lozenges (◆ ◆ ◆ ◆ ◆ ◆) along the handle center
-  const diamonds = [
+  const cutSteps = 15;
+  for (let i = 0; i <= cutSteps; i++) {
+    const t = i / cutSteps;
+    const curX = bladeBaseX + t * (yokoteX - bladeBaseX);
+    const s = getSori(curX);
+    cuttingEdge.push({ x: curX, y: s + halfW });
+  }
+
+  // Fukura tip curve from yokoteX to tipX
+  const fukuraEdge = [
+    { x: yokoteX, y: getSori(yokoteX) + halfW },
+    { x: yokoteX + 5.0, y: getSori(yokoteX + 5.0) + halfW * 0.4 },
+    { x: tipX, y: getSori(tipX) - halfW }
+  ];
+
+  // Full Blade Polygon
+  const bladePoly = [
+    ...spineEdge,
+    ...fukuraEdge.slice().reverse(),
+    ...cuttingEdge.slice().reverse(),
+    { x: bladeBaseX, y: getSori(bladeBaseX) - halfW }
+  ];
+
+  // Top Spine Facet Polygon (Mune-ji)
+  const munePoly = [
+    ...spineEdge,
+    { x: tipX, y: getSori(tipX) - halfW },
+    ...ridgeLine.slice().reverse(),
+    { x: bladeBaseX, y: getSori(bladeBaseX) - halfW }
+  ];
+
+  // 2. Habaki Polygon
+  const habakiPoly = [
+    { x: swordStartX, y: -halfW - 0.8 },
+    { x: swordStartX + 5.5, y: -halfW - 0.8 },
+    { x: swordStartX + 5.5, y: halfW + 0.8 },
+    { x: swordStartX, y: halfW + 0.8 }
+  ];
+
+  // 3. Tsuba Polygon (Espada Eye + curved horn prongs)
+  const tsubaPoly = [
+    { x: 0, y: -9.5 },
+    { x: 2.2, y: -11.5 },
+    { x: 1.8, y: -6.5 },
+    { x: 3.8, y: -3.5 },
+    { x: 4.0, y: 0 },
+    { x: 3.8, y: 3.5 },
+    { x: 1.8, y: 6.5 },
+    { x: 0, y: 9.5 },
+    { x: -2.2, y: 11.5 },
+    { x: -1.8, y: 6.5 },
+    { x: -3.8, y: 3.5 },
+    { x: -4.0, y: 0 },
+    { x: -3.8, y: -3.5 },
+    { x: -1.8, y: -6.5 }
+  ];
+
+  // 4. Tsuka Hilt & Pommel Polygons
+  const hiltStartX = swordStartX - 32.0;
+  const hiltPoly = [
+    { x: hiltStartX, y: -3.4 },
+    { x: swordStartX, y: -3.4 },
+    { x: swordStartX, y: 3.4 },
+    { x: hiltStartX, y: 3.4 }
+  ];
+
+  const pommelPoly = [
+    { x: hiltStartX - 3.2, y: -3.8 },
+    { x: hiltStartX, y: -3.8 },
+    { x: hiltStartX, y: 3.8 },
+    { x: hiltStartX - 3.2, y: 3.8 }
+  ];
+
+  // 5. Diamonds on Tsuka
+  const diamondCenters = [
     hiltStartX + 3.8,
     hiltStartX + 9.2,
     hiltStartX + 14.6,
@@ -81,198 +174,127 @@ export function drawUlquiorraMurcielago(ctx, x = 0, y = 0, angle = 0, r = 25, is
     hiltStartX + 30.0
   ];
 
-  for (let i = 0; i < diamonds.length; i++) {
-    const cx = diamonds[i];
-    // Seafoam green diagonal cross bands flanking the diamond
-    ctx.fillStyle = itoGrad;
-    ctx.beginPath();
-    ctx.moveTo(cx - 2.6, -hiltHalfW);
-    ctx.lineTo(cx, 0);
-    ctx.lineTo(cx - 2.6, hiltHalfW);
-    ctx.lineTo(cx - 3.8, hiltHalfW);
-    ctx.lineTo(cx - 1.2, 0);
-    ctx.lineTo(cx - 3.8, -hiltHalfW);
-    ctx.closePath();
-    ctx.fill();
+  // Global Katana Bounding Box
+  let minX = -38, maxX = tipX + 4, minY = getSori(tipX) - 15, maxY = 15;
 
-    ctx.beginPath();
-    ctx.moveTo(cx + 2.6, -hiltHalfW);
-    ctx.lineTo(cx, 0);
-    ctx.lineTo(cx + 2.6, hiltHalfW);
-    ctx.lineTo(cx + 3.8, hiltHalfW);
-    ctx.lineTo(cx + 1.2, 0);
-    ctx.lineTo(cx + 3.8, -hiltHalfW);
-    ctx.closePath();
-    ctx.fill();
+  const startGx = Math.floor(minX / P);
+  const endGx   = Math.ceil(maxX / P);
+  const startGy = Math.floor(minY / P);
+  const endGy   = Math.ceil(maxY / P);
 
-    // Pure White / Pale Mint Rayskin Diamond Core
-    ctx.fillStyle = '#F8FAFC';
-    ctx.beginPath();
-    ctx.moveTo(cx, -1.8);
-    ctx.lineTo(cx + 1.7, 0);
-    ctx.lineTo(cx, 1.8);
-    ctx.lineTo(cx - 1.7, 0);
-    ctx.closePath();
-    ctx.fill();
-
-    // Dark grey center diamond stitch dot
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.moveTo(cx, -0.8);
-    ctx.lineTo(cx + 0.8, 0);
-    ctx.lineTo(cx, 0.8);
-    ctx.lineTo(cx - 0.8, 0);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // 1d. Handle Border Outlines
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 0.8;
-  ctx.strokeRect(hiltStartX, -hiltHalfW, hiltLen, hiltHalfW * 2);
-
-  // 1e. Pommel Cap (Kashira) & Metallic Ring
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(hiltStartX - 2.8, -hiltHalfW - 0.3, 3.0, (hiltHalfW * 2) + 0.6);
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 0.8;
-  ctx.strokeRect(hiltStartX - 2.8, -hiltHalfW - 0.3, 3.0, (hiltHalfW * 2) + 0.6);
-
-  // ─────────────────────────────────────────────
-  // 2. TSUBA (Authentic Espada Curved Eye Crossguard)
-  // ─────────────────────────────────────────────
-  ctx.save();
-  ctx.translate(swordStartX, 0);
-
-  // Main elongated eye-shaped Tsuba with curved prongs
-  ctx.fillStyle = '#CBD5E1'; // Polished silver-grey steel
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 1.0;
-
-  ctx.beginPath();
-  ctx.moveTo(0, -9.0);
-  ctx.quadraticCurveTo(2.6, -5.0, 4.0, 0);
-  ctx.quadraticCurveTo(2.6, 5.0, 0, 9.0);
-  ctx.quadraticCurveTo(-2.6, 5.0, -4.0, 0);
-  ctx.quadraticCurveTo(-2.6, -5.0, 0, -9.0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Curved eye prongs extending along blade/hilt
-  ctx.fillStyle = '#94A3B8';
-  ctx.beginPath();
-  ctx.moveTo(0, -8.0);
-  ctx.lineTo(2.0, -11.5);
-  ctx.lineTo(0.5, -9.0);
-  ctx.lineTo(0, -8.0);
-  ctx.moveTo(0, 8.0);
-  ctx.lineTo(-2.0, 11.5);
-  ctx.lineTo(-0.5, 9.0);
-  ctx.lineTo(0, 8.0);
-  ctx.closePath();
-  ctx.fill();
-
-  // Inner beveled ridge
-  ctx.strokeStyle = '#64748B';
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 2.6, 5.8, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.restore();
-
-  // ─────────────────────────────────────────────
-  // 3. HABAKI (Blade Collar at base)
-  // ─────────────────────────────────────────────
-  const habakiGrad = ctx.createLinearGradient(swordStartX, -halfW - 0.8, swordStartX, halfW + 0.8);
-  habakiGrad.addColorStop(0, '#E5C158');
-  habakiGrad.addColorStop(0.5, '#FFF2A8');
-  habakiGrad.addColorStop(1, '#A08020');
-  ctx.fillStyle = habakiGrad;
-  ctx.fillRect(swordStartX, -halfW - 0.8, 5.5, (halfW + 0.8) * 2);
-  ctx.strokeStyle = '#6E5212';
-  ctx.lineWidth = 0.7;
-  ctx.strokeRect(swordStartX, -halfW - 0.8, 5.5, (halfW + 0.8) * 2);
-
-  // ─────────────────────────────────────────────
-  // 4. AUTHENTIC SINGLE-EDGED KATANA BLADE
-  // ─────────────────────────────────────────────
-  // Sori (Curvature) function: smooth upward katana arch toward Kissaki tip
-  const getSori = (xCoord) => {
-    const t = Math.max(0, Math.min(1.0, (xCoord - bladeBaseX) / (tipX - bladeBaseX)));
-    return -Math.pow(t, 1.45) * 7.5;
+  // Helper tester for any part of the weapon
+  const inAnyKatana = (rx, ry) => {
+    return _isPointInPoly(rx, ry, bladePoly) ||
+           _isPointInPoly(rx, ry, habakiPoly) ||
+           _isPointInPoly(rx, ry, tsubaPoly) ||
+           _isPointInPoly(rx, ry, hiltPoly) ||
+           _isPointInPoly(rx, ry, pommelPoly);
   };
 
-  const midX = (bladeBaseX + tipX) / 2;
-  const midSori = getSori(midX);
-  const tipSori = getSori(tipX);
-  const yokoteSori = getSori(yokoteX);
+  // ─────────────────────────────────────────────
+  // 2D GRID SCAN PIXEL RASTERIZATION LOOP
+  // ─────────────────────────────────────────────
+  for (let gy = startGy; gy <= endGy; gy++) {
+    for (let gx = startGx; gx <= endGx; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
 
-  // 4a. Single-Edged Katana Blade Body Fill
-  ctx.beginPath();
-  // 1. Top Spine Line (Mune) - smooth upward Sori arch from base to tip apex
-  ctx.moveTo(bladeBaseX, getSori(bladeBaseX) - halfW);
-  ctx.quadraticCurveTo(midX, midSori - halfW, tipX, tipSori - halfW);
+      if (!inAnyKatana(rx, ry)) continue;
 
-  // 2. Kissaki Tip Arc (Fukura) - sharp diagonal upward curve from yokote to tip apex
-  ctx.quadraticCurveTo(tipX - 1.5, yokoteSori + halfW * 0.4, yokoteX, yokoteSori + halfW);
+      const px = snap(rx);
+      const py = snap(ry);
 
-  // 3. Bottom Cutting Edge (Ha) - perfectly parallel to the spine all the way back to base
-  ctx.quadraticCurveTo(midX, midSori + halfW, bladeBaseX, getSori(bladeBaseX) + halfW);
+      // 4-Neighbor Attached Outer Border Test
+      const isBorder = !inAnyKatana(rx + P, ry) ||
+                       !inAnyKatana(rx - P, ry) ||
+                       !inAnyKatana(rx, ry + P) ||
+                       !inAnyKatana(rx, ry - P);
 
-  // 4. Base edge meeting Habaki
-  ctx.lineTo(bladeBaseX, getSori(bladeBaseX) - halfW);
-  ctx.closePath();
+      if (isBorder) {
+        ctx.fillStyle = '#080A0E'; // Crisp solid black border shell
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
-  // Tempered Steel Gradient Fill (Polished steel body + dark spine)
-  const bladeGrad = ctx.createLinearGradient(bladeBaseX, -halfW, bladeBaseX, halfW);
-  bladeGrad.addColorStop(0, '#334155'); // Mune-ji (Dark tempered spine facet)
-  bladeGrad.addColorStop(0.32, '#64748B');
-  bladeGrad.addColorStop(0.38, '#94A3B8'); // Shinogi bevel line
-  bladeGrad.addColorStop(0.44, '#E2E8F0'); // Hira-ji (Gleaming silver steel face)
-  bladeGrad.addColorStop(0.85, '#FFFFFF'); // Razor pure-white cutting edge
-  bladeGrad.addColorStop(1, '#F8FAFC');
-  ctx.fillStyle = bladeGrad;
-  ctx.fill();
+      // 1. Pommel
+      if (_isPointInPoly(rx, ry, pommelPoly)) {
+        ctx.fillStyle = (Math.abs(ry) > 2.0) ? '#475569' : '#CBD5E1';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
-  // 4b. Shinogi Ridge Line (Running along entire blade shaft parallel to spine)
-  ctx.beginPath();
-  ctx.moveTo(bladeBaseX, getSori(bladeBaseX) - halfW * 0.25);
-  ctx.quadraticCurveTo(midX, midSori - halfW * 0.25, yokoteX, yokoteSori - halfW * 0.25);
-  ctx.lineTo(tipX, tipSori - halfW); // Leads into the kissaki point
-  ctx.strokeStyle = 'rgba(0, 255, 136, 0.70)'; // Radiant Emerald Reishi fuller gleam
-  ctx.lineWidth = 0.85;
-  ctx.stroke();
+      // 2. Tsuka Hilt (Mint silk wrap with white diamond lozenges)
+      if (_isPointInPoly(rx, ry, hiltPoly)) {
+        // Check if inside any white diamond lozenge
+        let inDiamond = false;
+        let isDiamondCenter = false;
+        for (let i = 0; i < diamondCenters.length; i++) {
+          const cx = diamondCenters[i];
+          const ddx = Math.abs(rx - cx);
+          const ddy = Math.abs(ry);
+          if (ddx / 1.7 + ddy / 1.8 <= 1.0) {
+            inDiamond = true;
+            if (ddx < 0.9 && ddy < 0.9) isDiamondCenter = true;
+            break;
+          }
+        }
 
-  // 4c. Yokote Line (Perpendicular line separating blade shaft from Kissaki tip)
-  ctx.beginPath();
-  ctx.moveTo(yokoteX, yokoteSori - halfW);
-  ctx.lineTo(yokoteX, yokoteSori + halfW);
-  ctx.strokeStyle = 'rgba(100, 116, 139, 0.65)';
-  ctx.lineWidth = 0.75;
-  ctx.stroke();
+        if (inDiamond) {
+          ctx.fillStyle = isDiamondCenter ? '#334155' : '#F8FAFC'; // White rayskin with dark center dot
+        } else if (Math.abs(ry) > 2.2) {
+          ctx.fillStyle = '#059669'; // Darker emerald edge cord
+        } else {
+          ctx.fillStyle = '#34D399'; // Vibrant mint green silk wrap
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
-  // 4d. Razor-Sharp Pure White Cutting Edge Line
-  ctx.beginPath();
-  ctx.moveTo(bladeBaseX, getSori(bladeBaseX) + halfW);
-  ctx.quadraticCurveTo(midX, midSori + halfW, yokoteX, yokoteSori + halfW);
-  ctx.quadraticCurveTo(tipX - 1.5, yokoteSori + halfW * 0.4, tipX, tipSori - halfW);
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.1;
-  ctx.stroke();
+      // 3. Tsuba (Espada Curved Eye Guard)
+      if (_isPointInPoly(rx, ry, tsubaPoly)) {
+        if (Math.abs(rx) > 2.5 || Math.abs(ry) > 7.0) {
+          ctx.fillStyle = '#64748B'; // Silver steel edge bevel
+        } else {
+          ctx.fillStyle = '#CBD5E1'; // Polished face
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
-  // 4e. Crisp Outer Silhouette Ink Outline
-  ctx.beginPath();
-  ctx.moveTo(bladeBaseX, getSori(bladeBaseX) - halfW);
-  ctx.quadraticCurveTo(midX, midSori - halfW, tipX, tipSori - halfW);
-  ctx.quadraticCurveTo(tipX - 1.5, yokoteSori + halfW * 0.4, yokoteX, yokoteSori + halfW);
-  ctx.quadraticCurveTo(midX, midSori + halfW, bladeBaseX, getSori(bladeBaseX) + halfW);
-  ctx.lineTo(bladeBaseX, getSori(bladeBaseX) - halfW);
-  ctx.closePath();
-  ctx.strokeStyle = '#080A0E';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
+      // 4. Habaki (Collar)
+      if (_isPointInPoly(rx, ry, habakiPoly)) {
+        ctx.fillStyle = (ry < 0) ? '#FFF2A8' : '#E5C158'; // Brass gold collar
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // 5. Blade
+      if (_isPointInPoly(rx, ry, bladePoly)) {
+        const curSori = getSori(rx);
+        const edgeY = curSori + halfW;
+        const spineY = curSori - halfW;
+        const ridgeY = curSori - halfW * 0.25;
+
+        // Cutting Edge Pixel Layer
+        if (ry >= edgeY - P * 0.9 || (rx >= yokoteX && ry >= spineY + (edgeY - spineY) * 0.6)) {
+          ctx.fillStyle = '#FFFFFF'; // Razor pure white cutting edge
+        }
+        // Radiant Emerald Reishi Ridge Line
+        else if (Math.abs(ry - ridgeY) <= P * 0.6) {
+          ctx.fillStyle = '#00FF88'; // Emerald Reishi fuller gleam
+        }
+        // Top Spine Facet (Mune-ji)
+        else if (_isPointInPoly(rx, ry, munePoly)) {
+          ctx.fillStyle = (ry < spineY + P * 0.8) ? '#1E293B' : '#334155'; // Dark tempered spine
+        }
+        // Polished Blade Face (Hira-ji)
+        else {
+          ctx.fillStyle = (ry > curSori) ? '#F8FAFC' : '#E2E8F0'; // Gleaming silver steel face
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
 
   ctx.restore();
 }
