@@ -400,6 +400,126 @@ export function drawJohnWickPixelBody(ctx, r) {
   ctx.restore();
 }
 
+// Pre-seeded static particle array for aura motes (Zero GC allocation per frame)
+const _WICK_AURA_MOTES = Array.from({ length: 14 }, (_, i) => ({
+  speed: 0.6 + (i % 5) * 0.25,
+  phase: (i * 0.45) % (Math.PI * 2),
+  radiusMul: 1.05 + ((i * 17) % 70) * 0.01,
+  size: 1.4 + ((i * 13) % 20) * 0.1,
+  isGold: i % 4 === 0
+}));
+
+/**
+ * Draws John Wick's Emanating Black-Gray Assassin Aura during Ultimate Mode (Excommunicado / M4 Rifle)
+ * Rule 11 & Rule 16 Compliant: Zero shadowBlur, purely geometric & gradient based.
+ */
+export function drawJohnWickExcommunicadoAura(ctx, r, isForeground = false) {
+  const now = Date.now();
+  const time = now * 0.0032;
+
+  ctx.save();
+
+  if (!isForeground) {
+    // ── 1. DEEP GROUND SHADOW / VOID VORTEX (Rule 11: Radial Gradient) ──
+    const groundGrad = ctx.createRadialGradient(0, 0, r * 0.35, 0, 0, r * 2.35);
+    groundGrad.addColorStop(0,    'rgba(5, 5, 8, 0.82)');
+    groundGrad.addColorStop(0.30, 'rgba(23, 28, 38, 0.58)');
+    groundGrad.addColorStop(0.65, 'rgba(51, 65, 85, 0.28)');
+    groundGrad.addColorStop(1,    'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = groundGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 2.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ── 2. CONCENTRIC EXPANDING DARK CORONA SHOCKWAVES ──
+    for (let w = 0; w < 2; w++) {
+      const waveProgress = ((time * 0.55 + w * 0.50) % 1.0);
+      const waveR = r * (1.05 + waveProgress * 0.85);
+      const waveAlpha = (1.0 - waveProgress) * 0.45;
+      ctx.strokeStyle = `rgba(30, 41, 59, ${waveAlpha.toFixed(3)})`;
+      ctx.lineWidth = 2.4 * (1.0 - waveProgress * 0.55);
+      ctx.beginPath();
+      ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // ── 3. EMANATING DARK FLAME & SMOKE TENDRILS (18 Organic Petals) ──
+    const tendrilCount = 18;
+    for (let i = 0; i < tendrilCount; i++) {
+      const baseA = (i / tendrilCount) * Math.PI * 2;
+      const wobble = Math.sin(time * 2.8 + i * 1.4) * 0.14;
+      const angle = baseA + wobble;
+      const len = r * (1.28 + Math.sin(time * 3.4 + i * 2.2) * 0.34);
+      const halfWidth = 0.18;
+
+      const tipX = Math.cos(angle) * len;
+      const tipY = Math.sin(angle) * len;
+      const leftX = Math.cos(baseA - halfWidth) * (r * 0.95);
+      const leftY = Math.sin(baseA - halfWidth) * (r * 0.95);
+      const rightX = Math.cos(baseA + halfWidth) * (r * 0.95);
+      const rightY = Math.sin(baseA + halfWidth) * (r * 0.95);
+      const midCtrlX = Math.cos(angle + 0.10) * (len * 0.62);
+      const midCtrlY = Math.sin(angle + 0.10) * (len * 0.62);
+
+      let color = 'rgba(10, 12, 16, 0.84)'; // Deep ink black
+      if (i % 3 === 1) color = 'rgba(51, 65, 85, 0.68)'; // Steel charcoal gray
+      else if (i % 3 === 2) color = 'rgba(30, 41, 59, 0.55)'; // Cold slate smoke
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(leftX, leftY);
+      ctx.quadraticCurveTo(midCtrlX, midCtrlY, tipX, tipY);
+      ctx.quadraticCurveTo(midCtrlX * 0.85, midCtrlY * 0.85, rightX, rightY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ── 4. ORBITING ASH & SHADOW MOTES ──
+    for (let m = 0; m < _WICK_AURA_MOTES.length; m++) {
+      const mote = _WICK_AURA_MOTES[m];
+      const motA = (time * mote.speed + mote.phase) % (Math.PI * 2);
+      const motDist = r * (mote.radiusMul + Math.sin(time * 2.2 + mote.phase) * 0.22);
+      const mx = Math.cos(motA) * motDist;
+      const my = Math.sin(motA) * motDist;
+
+      if (mote.isGold) {
+        ctx.fillStyle = 'rgba(217, 119, 6, 0.70)'; // Faint Continental Gold speck
+      } else {
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.65)'; // Slate silver ash mote
+      }
+
+      ctx.beginPath();
+      ctx.arc(mx, my, mote.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // ── FOREGROUND RIM & VOLUMETRIC SMOKE WHISPERS ──
+    // Subtle pulsating charcoal-silver rim around John Wick's circumference
+    const rimPulse = 0.55 + Math.sin(time * 4.0) * 0.25;
+    ctx.strokeStyle = `rgba(148, 163, 184, ${rimPulse.toFixed(3)})`;
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 4 Frontal smoke wisps crossing over body
+    for (let f = 0; f < 4; f++) {
+      const fAngle = (time * 1.8 + f * 1.57) % (Math.PI * 2);
+      const fDist = r * (0.45 + Math.sin(time * 2.5 + f) * 0.35);
+      const fx = Math.cos(fAngle) * fDist;
+      const fy = Math.sin(fAngle) * fDist;
+      const fw = r * 0.32;
+
+      ctx.fillStyle = (f % 2 === 0) ? 'rgba(15, 23, 42, 0.28)' : 'rgba(71, 85, 105, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(fx, fy, fw, fw * 0.55, fAngle, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
 /**
  * Main Skin Renderer for John Wick ("The Baba Yaga")
  */
