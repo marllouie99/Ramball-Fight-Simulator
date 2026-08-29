@@ -64,59 +64,23 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     cCore      = '#ffffff';
     cAura      = `rgba(0, 229, 255, ${(0.35 * alpha).toFixed(2)})`;
     isDarkCore = false;
-  } else if (isBankaiHollow) {
-    if (isDarkMode) {
-      // In Dark Mode: Luminous brilliant crimson scarlet & hot coral (NO dark colors)
-      cBorder    = '#b91c1c';
-      cSaturated = '#ef4444';
-      cBright    = '#ff4d6d';
-      cCore      = '#ffffff';
-      cAura      = `rgba(255, 60, 80, ${(0.45 * alpha).toFixed(2)})`;
-      isDarkCore = false;
-    } else {
-      cBorder    = '#180004';
-      cSaturated = '#050002'; // Void core
-      cBright    = '#ff2244';
-      cCore      = '#ffffff';
-      cAura      = `rgba(255, 30, 60, ${(0.35 * alpha).toFixed(2)})`;
-      isDarkCore = true;
-    }
   } else if (isShikaiHollow) {
-    if (isDarkMode) {
-      cBorder    = '#0284c7';
-      cSaturated = '#00c3ff';
-      cBright    = '#70f0ff';
-      cCore      = '#ffffff';
-      cAura      = `rgba(0, 240, 255, ${(0.45 * alpha).toFixed(2)})`;
-      isDarkCore = false;
-    } else {
-      cBorder    = '#020814';
-      cSaturated = '#061020'; // Dark cyan void
-      cBright    = '#00f0ff';
-      cCore      = '#ffffff';
-      cAura      = `rgba(0, 240, 255, ${(0.35 * alpha).toFixed(2)})`;
-      isDarkCore = true;
-    }
-  } else if (isBankai || isFinal) {
-    // Kuroi Getsuga Tensho (Bankai & Grand Finisher Final Massive Kuroi Getsuga)
-    if (isDarkMode) {
-      // In Dark Mode: Luminous brilliant crimson scarlet & hot coral (NO dark/black void colors)
-      cBorder    = '#dc2626';
-      cSaturated = '#ff2a42';
-      cBright    = '#ff6b81';
-      cCore      = '#ffffff';
-      cAura      = `rgba(255, 40, 60, ${(0.45 * alpha).toFixed(2)})`;
-      isDarkCore = false;
-    } else {
-      cBorder    = '#220008';
-      cSaturated = '#080206'; // Void black core
-      cBright    = '#ff1e32';
-      cCore      = '#ffffff';
-      cAura      = `rgba(220, 20, 40, ${(0.32 * alpha).toFixed(2)})`;
-      isDarkCore = true;
-    }
-  } else { // Standard Shikai
-    cBorder    = isDarkMode ? '#0077ff' : '#00143a';
+    cBorder    = '#020814';
+    cSaturated = '#061020'; // Dark cyan void
+    cBright    = '#00f0ff';
+    cCore      = '#ffffff';
+    cAura      = `rgba(0, 240, 255, ${(0.35 * alpha).toFixed(2)})`;
+    isDarkCore = true;
+  } else if (isBankai || isFinal || isBankaiHollow) {
+    // Kuroi Getsuga Tensho — Authentic Black-Red Crimson Theme
+    cBorder    = '#1A0006'; // Deep Obsidian Crimson outer border shell
+    cSaturated = '#080003'; // Abyssal pitch-black void core
+    cBright    = '#FF0033'; // Electric vivid blood-crimson flame rim
+    cCore      = '#FFFFFF'; // Razor white-hot cutting edge
+    cAura      = `rgba(220, 0, 45, ${(0.42 * alpha).toFixed(2)})`; // Radiant crimson flame atmosphere
+    isDarkCore = true;
+  } else { // Standard Shikai Azure
+    cBorder    = '#00143a';
     cSaturated = '#0066ee';
     cBright    = '#00e5ff';
     cCore      = '#ffffff';
@@ -185,8 +149,10 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
 
       if (depthFromApex < P * 1.5) {
         ctx.fillStyle = cCore; // Razor-sharp white-hot leading edge
-      } else if (depthFromApex < P * 3.2) {
-        ctx.fillStyle = cBright; // Saturated electric energy rim
+      } else if (depthFromApex < P * 3.4) {
+        ctx.fillStyle = cBright; // Saturated electric blood-crimson flame rim (#FF0033)
+      } else if (isDarkCore && depthFromApex < P * 5.2) {
+        ctx.fillStyle = '#8B0014'; // Transition deep burning crimson layer
       } else {
         ctx.fillStyle = isDarkCore ? cSaturated : ((Math.round(gx / P) + Math.round(gy / P)) % 2 === 0 ? cSaturated : cBright);
       }
@@ -212,7 +178,7 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     const sx = snap(Math.cos(sAng) * sInR);
     const sy = snap(Math.sin(sAng) * sInR);
 
-    ctx.fillStyle = (s % 3 === 0) ? cCore : ((s % 3 === 1) ? cBright : (isDarkMode ? cSaturated : cBorder));
+    ctx.fillStyle = (s % 3 === 0) ? cCore : ((s % 3 === 1) ? cBright : (isDarkCore ? '#8B0014' : cBorder));
     ctx.fillRect(sx, sy, P, P);
   }
 
