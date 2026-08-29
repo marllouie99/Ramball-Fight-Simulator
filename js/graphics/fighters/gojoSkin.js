@@ -228,9 +228,9 @@ export function drawGojoPixelBody(ctx, r) {
       // ──────────────────────────────────────────
       // 1. SCULPTED CHARCOAL BLINDFOLD GEOMETRY (1:1 Anime Reference)
       // ──────────────────────────────────────────
-      // Top edge: Natural arched forehead curve (-0.36 at center to -0.28 at temples)
+      // Top edge: Sleek, clean forehead line (-0.28) without bulky upward central bump
       const getBlindfoldTopY = (ax) => {
-        return -0.34 - 0.05 * Math.cos(ax * Math.PI * 0.75);
+        return -0.28;
       };
 
       // Bottom edge: Distinct concave nose arch at center, smooth dual eye-cover dips (+0.10), tapering back up to temples
@@ -255,8 +255,6 @@ export function drawGojoPixelBody(ctx, r) {
       if (ny < blindfoldTopY) {
         if (isInsideBlindfold(nx, ny + P / r)) {
           ctx.fillStyle = C.outline;
-        } else if (ny >= blindfoldTopY - (P * 2) / r) {
-          ctx.fillStyle = C.blindfoldHighlight;
         } else {
           let col = C.hairWhite;
           // Outer corner dither
