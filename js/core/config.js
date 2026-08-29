@@ -19,6 +19,7 @@ import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
+import { ulquiorraConfig } from '../configs/characters/ulquiorraConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
@@ -46,6 +47,7 @@ export const CONFIG = {
   ichigo: ichigoConfig,
   uryu: uryuConfig,
   ishida: uryuConfig,
+  ulquiorra: ulquiorraConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1406,6 +1408,28 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: uryuConfig.projectileSpeedMultiplier || 1.0,
     ability: uryuConfig.ability || 'The Antithesis',
     desc: uryuConfig.desc || 'The Last Quincy. Attacks from long range with Heilig Bogen spirit arrows, glides with Hirenkyaku, traps enemies with Sprenger, and reverses damage with Schrift "A": The Antithesis.',
+  },
+  {
+    id: 37,
+    name: 'Ulquiorra Cifer',
+    category: 'Anime',
+    color: ulquiorraConfig.color || '#00FF88', // Emerald Green Reiatsu
+    themeColor: ulquiorraConfig.themeColor || '#00FF88',
+    startX: ulquiorraConfig.startX || 300,
+    startY: ulquiorraConfig.startY || 250,
+    startVx: ulquiorraConfig.startVx || 1.2,
+    startVy: ulquiorraConfig.startVy || 1.0,
+    radius: ulquiorraConfig.radius || ulquiorraConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'ulquiorra',
+    hp: ulquiorraConfig.hp || 240,
+    damage: ulquiorraConfig.damage || 20,
+    cooldown: ulquiorraConfig.cooldown || 26,
+    moveSpeed: ulquiorraConfig.moveSpeed || ulquiorraConfig.speed || 6.4,
+    projectileSpeedMultiplier: ulquiorraConfig.projectileSpeedMultiplier || 1.0,
+    ability: ulquiorraConfig.ability || 'Resurrección: Segunda Etapa',
+    desc: ulquiorraConfig.desc || 'The 4th Espada. Possesses High-Speed Regeneration, Hierro defense, instantaneous Sonído vanishes, emerald Cero/Cero Oscuras beams, and evolves into Segunda Etapa with Lanza del Relámpago.',
   }
 ];
 

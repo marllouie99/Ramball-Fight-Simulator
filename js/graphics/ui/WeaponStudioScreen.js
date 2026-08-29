@@ -38,6 +38,7 @@ function initCustomizations() {
       cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       uryu: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      ulquiorra: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       megumi: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
@@ -45,6 +46,9 @@ function initCustomizations() {
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+  }
+  if (!state.weaponCustomizations.ulquiorra) {
+    state.weaponCustomizations.ulquiorra = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
   if (!state.weaponCustomizations.megumi) {
     state.weaponCustomizations.megumi = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
@@ -112,6 +116,7 @@ export function drawWeaponStudioScreen() {
     { key: 'cronos', label: 'CRONOS' },
     { key: 'ruby', label: 'RUBY' },
     { key: 'uryu', label: 'URYU' },
+    { key: 'ulquiorra', label: 'ULQUIORRA' },
     { key: 'nanami', label: 'NANAMI' },
     { key: 'megumi', label: 'MEGUMI' },
     { key: 'john_wick', label: 'JOHN WICK' },

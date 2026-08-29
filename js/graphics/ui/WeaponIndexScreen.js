@@ -23,6 +23,7 @@ import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
 import { drawMegumiShadowBlade } from '../weapons/megumiWeaponGraphics.js';
+import { drawUlquiorraMurcielago } from '../weapons/ulquiorraWeaponGraphics.js';
 import { drawYutaFist } from '../fighters/yutaSkin.js';
 import { drawUryuBow } from '../weapons/uryuWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
@@ -342,6 +343,21 @@ function drawWeaponInfoCard(ctx, def) {
     }
   }
 
+  if (def.type === 'ulquiorra' || def.type === 'ulquiorra_cifer') {
+    const isWings = Boolean(state.showUlquiorraWings);
+    const isSegunda = Boolean(state.showUlquiorraSegunda);
+    if (isSegunda) {
+      nameText = 'Ulquiorra (Resurrección: Segunda Etapa)';
+      descText = 'The terrifying second release of the Cuatro Espada. Spawns massive demonic bat wings, a razor whip tail, and pitch-black claws. Wields Lanza del Relámpago—a Reishi plasma lightning javelin that causes colossal nuclear Reishi explosions.';
+    } else if (isWings) {
+      nameText = 'Ulquiorra (Resurrección: Murciélago)';
+      descText = 'Unleashes the Great Bat Resurrección release: "Enclose, Murciélago!" Spawns giant black leathery bat wings with Reishi flutters, enhances Sonído speed, and converts basic slashes into high-density emerald crescent waves.';
+    } else {
+      nameText = 'Murciélago (Ulquiorra Cifer Katana)';
+      descText = 'Standard katana form of the Cuatro Espada with green tsuka-ito wrap and 4-corner flared Espada tsuba. Delivers swift Reishi-infused katana slashes, Bala pulses, high-speed Sonído dashes, and Hierro armor.';
+    }
+  }
+
   if (def.type === 'cj') {
     const activeIndex = (state.gameState === 'weaponDetail') ? (state.cjWeaponIndex || 0) : 0;
     if (activeIndex === 0) {
@@ -603,6 +619,52 @@ function drawWeaponDetailScreen() {
     });
   }
 
+  if (def.type === 'ulquiorra' || def.type === 'ulquiorra_cifer') {
+    const wingsToggleText = state.showUlquiorraWings ? 'WINGS: ON' : 'WINGS: OFF';
+    buttonsToDraw.push({
+      text: wingsToggleText,
+      width: 95,
+      action: () => {
+        state.showUlquiorraWings = !state.showUlquiorraWings;
+        if (state.showUlquiorraWings) {
+          state.showWeaponModel = true;
+          state.showSummonModel = false;
+        }
+        if (state.previewFighter) {
+          state.previewFighter.stage1Active = state.showUlquiorraWings;
+          state.previewFighter.wingsActive = state.showUlquiorraWings;
+          state.previewFighter.isMurcielagoActive = state.showUlquiorraWings;
+        }
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+        }
+      }
+    });
+
+    const segundaToggleText = state.showUlquiorraSegunda ? 'SEGUNDA: ON' : 'SEGUNDA: OFF';
+    buttonsToDraw.push({
+      text: segundaToggleText,
+      width: 105,
+      action: () => {
+        state.showUlquiorraSegunda = !state.showUlquiorraSegunda;
+        if (state.showUlquiorraSegunda) {
+          state.showUlquiorraWings = true;
+          state.showWeaponModel = true;
+          state.showSummonModel = false;
+        }
+        if (state.previewFighter) {
+          state.previewFighter.stage1Active = state.showUlquiorraWings;
+          state.previewFighter.wingsActive = state.showUlquiorraWings;
+          state.previewFighter.segundaEtapaActive = state.showUlquiorraSegunda;
+          state.previewFighter.isSegundaEtapa = state.showUlquiorraSegunda;
+        }
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
+        }
+      }
+    });
+  }
+
   const isAttacking = isFighterDemoAttacking(state.previewFighter);
   const demoBtnText = isAttacking ? 'ATTACKING...' : 'DEMO ATTACK';
   buttonsToDraw.push({
@@ -762,6 +824,14 @@ function drawWeaponDetailScreen() {
       previewFighter.isGodModeActive = (cjIdx === 3);
       previewFighter.isTec9Active = (cjIdx === 4);
       previewFighter.previewWeaponIndex = cjIdx;
+    }
+
+    if (def.type === 'ulquiorra' || def.type === 'ulquiorra_cifer') {
+      previewFighter.stage1Active = Boolean(state.showUlquiorraWings);
+      previewFighter.wingsActive = Boolean(state.showUlquiorraWings);
+      previewFighter.isMurcielagoActive = Boolean(state.showUlquiorraWings);
+      previewFighter.segundaEtapaActive = Boolean(state.showUlquiorraSegunda);
+      previewFighter.isSegundaEtapa = Boolean(state.showUlquiorraSegunda);
     }
 
     if (previewFighter.spearSwingTimer > 0) previewFighter.spearSwingTimer--;
@@ -984,6 +1054,58 @@ function drawWeaponDetailScreen() {
       }
       audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
     }, 30, 22, null, 3);
+  } else if (def.type === 'ulquiorra' || def.type === 'ulquiorra_cifer') {
+    const isBase = !state.showUlquiorraWings && !state.showUlquiorraSegunda;
+    const isStage1 = state.showUlquiorraWings && !state.showUlquiorraSegunda;
+    const isSegunda = Boolean(state.showUlquiorraSegunda);
+
+    const baseBtnX    = canvas.width / 2 - 120;
+    const wingsBtnX   = canvas.width / 2;
+    const segundaBtnX = canvas.width / 2 + 125;
+
+    drawButton(isBase ? '[ BASE FORM ]' : 'BASE FORM', baseBtnX, pagY, () => {
+      state.showUlquiorraWings = false;
+      state.showUlquiorraSegunda = false;
+      if (state.previewFighter) {
+        state.previewFighter.stage1Active = false;
+        state.previewFighter.wingsActive = false;
+        state.previewFighter.segundaEtapaActive = false;
+        state.previewFighter.isSegundaEtapa = false;
+      }
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+      }
+    }, 100, 22, isBase ? '#00FF88' : null, 3);
+
+    drawButton(isStage1 ? '[ STAGE 1 WINGS ]' : 'STAGE 1 WINGS', wingsBtnX, pagY, () => {
+      state.showUlquiorraWings = true;
+      state.showUlquiorraSegunda = false;
+      state.showWeaponModel = true;
+      if (state.previewFighter) {
+        state.previewFighter.stage1Active = true;
+        state.previewFighter.wingsActive = true;
+        state.previewFighter.segundaEtapaActive = false;
+        state.previewFighter.isSegundaEtapa = false;
+      }
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+      }
+    }, 115, 22, isStage1 ? '#00FF88' : null, 3);
+
+    drawButton(isSegunda ? '[ SEGUNDA ETAPA ]' : 'SEGUNDA ETAPA', segundaBtnX, pagY, () => {
+      state.showUlquiorraWings = true;
+      state.showUlquiorraSegunda = true;
+      state.showWeaponModel = true;
+      if (state.previewFighter) {
+        state.previewFighter.stage1Active = true;
+        state.previewFighter.wingsActive = true;
+        state.previewFighter.segundaEtapaActive = true;
+        state.previewFighter.isSegundaEtapa = true;
+      }
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
+      }
+    }, 115, 22, isSegunda ? '#00FF88' : null, 3);
   }
 
   // ── Tier 3: Technical Dossier Card (Y: 480 to 890) ──
@@ -1453,6 +1575,11 @@ function drawWeaponPreview(ctx, type, color) {
       case 'megumi':
         // Megumi's Shadow Blade (Second Cursed Sword) - Diagonal Upright Guard Stance
         drawMegumiShadowBlade(ctx, 0, 0, gunAngle - 1.12, r, false, 0);
+        return;
+
+      case 'ulquiorra':
+        // Ulquiorra's Zanpakuto: Murcielago
+        drawUlquiorraMurcielago(ctx, 0, 0, gunAngle, r, false, 0);
         return;
 
       case 'john_wick':

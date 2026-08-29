@@ -39,6 +39,7 @@ import { MegumiFighter } from '../fighters/MegumiFighter.js';
 import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 import { CJFighter } from '../fighters/CJFighter.js';
 import { UryuFighter } from '../fighters/UryuFighter.js';
+import { UlquiorraFighter } from '../fighters/UlquiorraFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -83,6 +84,8 @@ export const FIGHTER_CLASS_MAP = {
   'cj':        CJFighter,
   'uryu':      UryuFighter,
   'ishida':    UryuFighter,
+  'ulquiorra': UlquiorraFighter,
+  'ulquiorra_cifer': UlquiorraFighter,
   'rifle':     RifleFighter,
   'm4a1':      RifleFighter,
   'shotgun':   ShotgunFighter,

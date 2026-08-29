@@ -1234,6 +1234,45 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
+  // ── Ulquiorra Cifer: Cuatro Espada HUD Skill Bars ──
+  if (f.characterId === 'ulquiorra' || f.type === 'ulquiorra') {
+    const themeColor = f.color || '#00FF88';
+
+    // Skill 1: Sonído
+    const sMax = CONFIG.ulquiorra?.sonidoCooldown || 300;
+    const sTimer = f.sonidoCooldown !== undefined ? f.sonidoCooldown : 0;
+    const sPct = Math.max(0, Math.min(100, (1 - sTimer / sMax) * 100));
+
+    // Skill 2: Cero / Cero Oscuras
+    const cMax = CONFIG.ulquiorra?.ceroCooldown || 420;
+    const cTimer = f.ceroCooldown !== undefined ? f.ceroCooldown : 0;
+    const cPct = Math.max(0, Math.min(100, (1 - cTimer / cMax) * 100));
+    const isOscuras = Boolean(f.stage1Active || f.segundaEtapaActive);
+    const ceroLabel = isOscuras ? 'CERO OSCURAS' : 'CERO';
+
+    // Transformation Status / Ultimate
+    let ultPct = 100;
+    let ultLabel = 'BASE (MURCIÉLAGO)';
+    if (f.segundaEtapaActive) {
+      ultPct = 100;
+      ultLabel = 'SEGUNDA ETAPA (ACTIVE)';
+    } else if (f.stage1Active) {
+      ultPct = 100;
+      ultLabel = 'MURCIÉLAGO (ACTIVE)';
+    } else {
+      const maxHp = f.maxHp || 240;
+      const hpPct = (f.hp / maxHp);
+      ultPct = Math.max(0, Math.min(100, ((0.60 - Math.max(0, hpPct - 0.40)) / 0.60) * 100));
+      ultLabel = 'RESURRECCIÓN GAUGE';
+    }
+
+    return [
+      { id: 'sonido', pct: sPct, ready: sPct >= 99, color: themeColor, label: 'SONÍDO' },
+      { id: 'cero', pct: cPct, ready: cPct >= 99, color: themeColor, label: ceroLabel },
+      { id: 'resurreccion', pct: ultPct, ready: ultPct >= 99, color: themeColor, label: ultLabel }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }
