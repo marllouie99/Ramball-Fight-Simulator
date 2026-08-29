@@ -1138,6 +1138,8 @@ export class Fighter {
         color = '#FF1493'; // Deep Pink for Yuta and Rika
       } else if (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')) {
         color = '#FF2A2A'; // Red for Saitama
+      } else if ((attacker && (attacker.characterId === 'ichigo' || attacker.type === 'ichigo' || (attacker._def && attacker._def.id === 'ichigo'))) || opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) {
+        color = (typeof CONFIG !== 'undefined' && (CONFIG.ichigo?.damageNumberColor || CONFIG.ichigo?.themeColor)) || '#FF5500'; // Consistent Orange for Ichigo
       } else if (opts.isPurpleDPS) {
         color = '#bf5af2'; // Bright electric purple for Hollow Purple DPS
       }

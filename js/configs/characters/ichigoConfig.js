@@ -10,6 +10,9 @@ export const ichigoConfig = {
   radius: 25,
   color: '#FF5500', // Orange details
   themeColor: '#FF5500',
+  damageNumberColor: '#FF5500', // Consistent Orange for all floating damage numbers
+  hudNameColor: '#FF5500',
+  hudSkillBarColor: '#FF5500',
   startX: 300,
   startY: 250,
   startVx: 1.2,
