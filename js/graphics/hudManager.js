@@ -51,6 +51,32 @@ export function triggerHudHealBubble(hpBarElement, healAmount) {
   }, 2200);
 }
 
+export function isDarkModeActive() {
+  return Boolean(
+    (typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode)) ||
+    CONFIG.arenaTheme === 'dark' ||
+    (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+  );
+}
+
+export function getFighterHealthBarColor(fighter, ratio, isDark = null) {
+  if (!fighter) return '#22c55e';
+  const isCj = fighter.characterId === 'cj' || fighter.type === 'cj';
+  if (isCj) {
+    return '#FFFFFF';
+  }
+  const isDarkTheme = isDark !== null ? isDark : isDarkModeActive();
+  const themeColor = fighter.themeColor || fighter.color || '#15803d';
+
+  if (isDarkTheme) {
+    // In Dark Mode: healthbar fill color strictly stays based on fighter's theme color without transitioning to yellow-red
+    return themeColor;
+  }
+
+  // In Light Mode: standard HP color transitions (Green -> Yellow -> Red)
+  return ratio > 0.5 ? '#22c55e' : (ratio > 0.25 ? '#eab308' : '#ef4444');
+}
+
 /**
  * Checks if a specific fighter is a Tactical Shooter operative.
  */
@@ -632,7 +658,8 @@ function updateTacticalCard(cardObj, f, index, accentColor) {
   const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
   const name = (f.name || f.type || `OP ${index + 1}`).toUpperCase();
   const fighterColor = (f.color || accentColor || '#ffffff');
-  const barColor = ratio > 0.25 ? fighterColor : '#ef4444';
+  const isDark = isDarkModeActive();
+  const barColor = isDark ? (f.themeColor || f.color || accentColor || '#ffffff') : (ratio > 0.25 ? fighterColor : '#ef4444');
   const isDead = hp <= 0;
   const attackDmg = Math.round(Number(f.damage !== undefined ? f.damage : (f._def && f._def.damage)) || 0);
   const curAmmo = f.magazineBullets !== undefined ? f.magazineBullets : (f.maxMagazine || 30);
@@ -839,10 +866,6 @@ function updateHealthHud() {
     return false;
   };
 
-  const isDarkModeActive = () => {
-    return Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || CONFIG.arenaTheme === 'dark' || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-  };
-
   const isSkillExceptionInDarkMode = (fighter, skill) => {
     if (!fighter || !skill) return false;
     const fId = String(fighter.characterId || fighter.type || (fighter._def && fighter._def.type) || '').toLowerCase();
@@ -887,6 +910,41 @@ function updateHealthHud() {
     // 6. Mahito exception: Domain Expansion (Self-Embodiment of Perfection)
     if (fId === 'mahito') {
       if (sId === 'domain_expansion' || sId === 'domain' || sLabel.includes('SELF-EMBODIMENT') || sLabel.includes('PERFECTION')) {
+        return true;
+      }
+    }
+
+    // 7. Saitama exception: SERIOUS PUNCH (Serious Counter)
+    if (fId === 'saitama') {
+      if (sId === 'punish' || sId === 'counter' || sLabel.includes('SERIOUS PUNCH') || sLabel.includes('SERIOUS')) {
+        return true;
+      }
+    }
+
+    // 8. Genos exception: His Ultimate (Incineration Cannon)
+    if (fId === 'genos') {
+      if (sId === 'ult' || sId === 'ultimate' || sLabel.includes('INCINERATION CANNON') || sLabel.includes('INCINERATION')) {
+        return true;
+      }
+    }
+
+    // 9. Yuji exception: Black Flash charges
+    if (fId === 'yuji') {
+      if (sId === 'bf_threshold' || sId === 'black_flash' || sLabel.includes('BLACK FLASH')) {
+        return true;
+      }
+    }
+
+    // 10. Todo exception: Boogie (Boogie Woogie)
+    if (fId === 'todo') {
+      if (sId === 'clap' || sId === 'boogie' || sLabel.includes('BOOGIE')) {
+        return true;
+      }
+    }
+
+    // 11. Nanami exception: Decisive Strike (Ratio Lunge)
+    if (fId === 'nanami') {
+      if (sId === 'lunge' || sId === 'decisive' || sLabel.includes('DECISIVE')) {
         return true;
       }
     }
@@ -2000,10 +2058,8 @@ function updateHealthHud() {
         const isMemberCj = m && (m.characterId === 'cj' || m.type === 'cj');
         const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-        const healthyColor = isDarkTheme ? (m.themeColor || m.color || '#15803d') : '#22c55e';
-        const adaptiveHealthColor = isDarkTheme ? (m.themeColor || m.color || healthyColor) : healthyColor;
-        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? adaptiveHealthColor : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const isDarkTheme = isDarkModeActive();
+        const barColor = isMemberCj ? '#FFFFFF' : getFighterHealthBarColor(m, ratio, isDarkTheme);
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
@@ -2052,10 +2108,8 @@ function updateHealthHud() {
     } else {
       const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
       const percent = Math.round(safeRatio * 100);
-      const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-      const healthyColor = isDarkTheme ? (targetFighter?.themeColor || targetFighter?.color || '#15803d') : '#22c55e';
-      const adaptiveHealthColor = isDarkTheme ? (targetFighter?.themeColor || targetFighter?.color || healthyColor) : healthyColor;
-      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? adaptiveHealthColor : safeRatio > 0.25 ? '#eab308' : '#ef4444');
+      const isDarkTheme = isDarkModeActive();
+      const barColor = isTargetCj ? '#DC2626' : getFighterHealthBarColor(targetFighter, safeRatio, isDarkTheme);
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
       const { className } = getGlowStyles(targetFighter);
       
@@ -2477,9 +2531,8 @@ function updateHealthHud() {
         const maxHp = fighter._originalMaxHp || fighter.maxHp;
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-        const healthyColor = isDarkTheme ? (fighter.themeColor || fighter.color || '#15803d') : '#22c55e';
-        const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyColor : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const isDarkTheme = isDarkModeActive();
+        const barColor = isCj ? '#FFFFFF' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
         const glow = getGlowStyles(fighter);
         
         if (m.lastHpPct !== percent) {
@@ -2650,9 +2703,8 @@ function updateHealthHud() {
       const maxHp = fighter._originalMaxHp || fighter.maxHp;
       const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-      const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-      const healthyColor = isDarkTheme ? (fighter.themeColor || fighter.color || '#15803d') : '#22c55e';
-      const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyColor : ratio > 0.25 ? '#eab308' : '#ef4444');
+      const isDarkTheme = isDarkModeActive();
+      const barColor = isCj ? '#FFFFFF' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
       const glow = getGlowStyles(fighter);
 
       if (cachedCard.hpBarFill) {

@@ -24,7 +24,7 @@ export const ichigoConfig = {
   desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
 
   // Basic Attack: Zangetsu Cleave
-  swordDamage: 16,               // Base damage per melee slash
+  swordDamage: 15,               // Base damage per melee slash
   swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s)
   swordRange: 70,                // Melee reach (140° frontal arc)
   swordArc: 140,                 // Frontal cleave arc cone angle in degrees (Rule #7)
@@ -50,13 +50,13 @@ export const ichigoConfig = {
   shunpoRange: 220,              // Distance dashed on initial flank step
   shunpoDashDuration: 4,         // Flash step teleport duration frames
   shunpoTargetOffset: 34,        // Distance offset from target center on teleport arrival
-  shunpoStrike1Damage: 20,       // Base damage for intermediate flank slashes
+  shunpoStrike1Damage: 15,       // Base damage for intermediate flank slashes
   shunpoStrike1FreezeDuration: 0,  // Hit-pause frames on target during intermediate strikes (0 = allow enemy aiming and reactions)
   shunpoStrike1SlashDuration: 14,// Swing animation duration frames for intermediate strikes
   shunpoStrike1ScreenShake: 2.5, // Arena screen shake intensity on intermediate flurry strike hit
   shunpoStrike1ShakeDuration: 6, // Shake duration in frames on intermediate strike hit
   bankaiShunpoStrike1ScreenShake: 3.5, // Bankai intermediate flurry strike hit shake
-  shunpoStrike2Multiplier: 1.35, // Finisher damage multiplier for final flurry strike
+  shunpoStrike2Multiplier: 1.1, // Finisher damage multiplier for final flurry strike
   shunpoStrike2StunDuration: 8,  // Stun frames applied on finisher hit
   bankaiShunpoStunDuration: 8,   // Stun frames on Bankai finisher hit
   shunpoStrike2SlashDuration: 16,// Swing animation duration frames for final finisher strike
@@ -154,7 +154,7 @@ export const ichigoConfig = {
 
   // 2. Stat Multipliers & Combat Buffs
   bankaiSpeedMultiplier: 1.5,    // Movement speed multiplier during Bankai
-  bankaiDamageMultiplier: 1.4,   // Melee damage multiplier boost during Bankai
+  bankaiDamageMultiplier: 1.2,   // Melee damage multiplier boost during Bankai
 
   // 3. Bankai Combo Modifiers (Tensa Getsuga Blitz)
   bankaiComboCooldownMultiplier: 0.50, // 50% Combo cooldown reduction during Bankai (~3.75s cooldown)
@@ -201,8 +201,8 @@ export const ichigoConfig = {
   // 6. Grand Finisher: Final Massive Kuroi Getsuga (Unleashed before Bankai ends)
   bankaiFinalGetsugaTriggerTimer: 160,  // Bankai duration threshold frames when Grand Finisher triggers
   bankaiFinalGetsugaChargeFrames: 80,  // Epic gathering charge frames matching exact voiceline duration (~2.46s)
-  bankaiFinalGetsugaDamage: 180,        // Total Colossal Kuroi Getsuga damage potential
-  bankaiFinalGetsugaTickDamage: 26,     // Continuous shredding damage per tick (multi-hit tick damage)
+  bankaiFinalGetsugaDamage: 100,        // Total Colossal Kuroi Getsuga damage potential
+  bankaiFinalGetsugaTickDamage: 20,     // Continuous shredding damage per tick (multi-hit tick damage)
   bankaiFinalGetsugaHitCooldown: 4,     // Re-hit tick interval frames (ticks every 4 frames / ~15 hits/sec)
   bankaiFinalGetsugaParalyzeDuration: 28, // Paralyze debuff frames applied on hit preventing actions during tick damage
   bankaiFinalGetsugaRadius: 100,         // Huge projectile radius (increased scale)

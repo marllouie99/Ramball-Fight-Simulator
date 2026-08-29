@@ -9,7 +9,7 @@ import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../../graphics/particles/sparkEffect.js';
 import { renderGojoDomainBackground } from './gojo/gojoDomainVisuals.js';
 import { activateRed as modActivateRed, detonateRed as modDetonateRed, firePurple as modFirePurple, executePurpleRetreat as modExecutePurpleRetreat, deleteEnemyProjectilesInPurple as modDeletePurpleProj } from './gojo/gojoSkills.js';
-import { triggerInfinityBlock as modTriggerInfinityBlock, applyTeleportSlideBrake as modApplyTeleportSlideBrake, executeTeleportDodge as modExecuteTeleportDodge } from './gojo/gojoCombat.js';
+import { triggerInfinityBlock as modTriggerInfinityBlock, applyTeleportSlideBrake as modApplyTeleportSlideBrake, executeTeleportDodge as modExecuteTeleportDodge, clampEntityToArenaBounds } from './gojo/gojoCombat.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { drawGojoBody } from '../../graphics/fighters/gojoSkin.js';
@@ -1317,8 +1317,21 @@ export class GojoFighter extends Fighter {
       let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
 
       if (arena) {
-        targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-        targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+        if (arena.shape === 'circle') {
+          const acx = arena.x + arena.width / 2;
+          const acy = arena.y + arena.height / 2;
+          const ar = Math.max(10, (arena.radius || (arena.width / 2)) - this.r);
+          const cdx = targetX - acx;
+          const cdy = targetY - acy;
+          const cdist = Math.hypot(cdx, cdy);
+          if (cdist > ar && cdist > 0) {
+            targetX = acx + (cdx / cdist) * ar;
+            targetY = acy + (cdy / cdist) * ar;
+          }
+        } else {
+          targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+          targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+        }
       }
 
       this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
@@ -1351,8 +1364,21 @@ export class GojoFighter extends Fighter {
         let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
         let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
         if (arena) {
-          targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-          targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+          if (arena.shape === 'circle') {
+            const acx = arena.x + arena.width / 2;
+            const acy = arena.y + arena.height / 2;
+            const ar = Math.max(10, (arena.radius || (arena.width / 2)) - this.r);
+            const cdx = targetX - acx;
+            const cdy = targetY - acy;
+            const cdist = Math.hypot(cdx, cdy);
+            if (cdist > ar && cdist > 0) {
+              targetX = acx + (cdx / cdist) * ar;
+              targetY = acy + (cdy / cdist) * ar;
+            }
+          } else {
+            targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+            targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+          }
         }
         this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
         this.aim(opponent);
@@ -1424,8 +1450,21 @@ export class GojoFighter extends Fighter {
     let targetY = opponent.y + Math.sin(angle) * dist;
 
     if (arena) {
-      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = Math.max(10, (arena.radius || (arena.width / 2)) - this.r);
+        const cdx = targetX - acx;
+        const cdy = targetY - acy;
+        const cdist = Math.hypot(cdx, cdy);
+        if (cdist > ar && cdist > 0) {
+          targetX = acx + (cdx / cdist) * ar;
+          targetY = acy + (cdy / cdist) * ar;
+        }
+      } else {
+        targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+        targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+      }
     }
 
     this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);

@@ -286,10 +286,12 @@ canvas {
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  font-family: Arial, sans-serif;
-  font-size: 11px;
-  font-weight: normal;
-  color: #000000;
+  font-family: 'Rajdhani', 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.85);
   pointer-events: none;
   z-index: 2;
   line-height: 1;
@@ -890,13 +892,11 @@ canvas {
 .health-card.arena-dark-mode *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
 .arena-dark-mode .hud-skill-box,
 .arena-dark-mode .hud-skill-box *,
-.arena-dark-mode .health-card__bar-text,
 .arena-dark-mode .health-card__info,
 .arena-dark-mode .health-card__desc,
 .arena-dark-mode .health-card__meta,
 .arena-dark-mode .tac-name,
-.arena-dark-mode .tac-caliber,
-.arena-dark-mode .tac-hp-badge {
+.arena-dark-mode .tac-caliber {
   font-family: 'Silkscreen', 'Press Start 2P', 'Rajdhani', monospace, sans-serif !important;
 }
 
@@ -977,23 +977,24 @@ canvas {
   background: none !important;
 }
 
-/* Healthbar Overlay HP Text in Dark Mode: Arcade Font & Crisp White */
+/* Healthbar Overlay HP Text in Dark Mode: Clean Modern Font blending seamlessly with bright theme colors */
 .arena-dark-mode .health-card__bar-text,
 .health-card.arena-dark-mode .health-card__bar-text {
-  font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
-  font-size: 11px !important;
+  font-family: 'Rajdhani', 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', sans-serif !important;
+  font-size: 11.5px !important;
   font-weight: 700 !important;
-  letter-spacing: 0.5px !important;
+  letter-spacing: 0.4px !important;
   color: #ffffff !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 2px #000000 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.85) !important;
   line-height: 1 !important;
 }
 
 .arena-dark-mode .tac-hp-badge,
 .arena-dark-mode .tac-hp,
 .arena-dark-mode .tac-hp-unit {
-  font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
-  font-size: 8.5px !important;
+  font-family: 'Rajdhani', 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', monospace, sans-serif !important;
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
   letter-spacing: 0.5px !important;
 }
 

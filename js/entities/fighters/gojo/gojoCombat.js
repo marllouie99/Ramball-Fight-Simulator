@@ -9,6 +9,75 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { triggerAdaptation } from '../mahoraga/mahoragaAdaptation.js';
 
+export function clampEntityToArenaBounds(ent, arena, radius = null) {
+  if (!ent || !arena) return false;
+  const r = radius ?? ent.hitRadius ?? ent.r ?? 25;
+  let clamped = false;
+
+  if (arena.shape === 'circle') {
+    const acx = arena.x + arena.width / 2;
+    const acy = arena.y + arena.height / 2;
+    const maxR = Math.max(10, (arena.radius || (arena.width / 2)) - r);
+    const cdx = ent.x - acx;
+    const cdy = ent.y - acy;
+    const cdist = Math.hypot(cdx, cdy);
+    if (cdist > maxR && cdist > 0) {
+      ent.x = acx + (cdx / cdist) * maxR;
+      ent.y = acy + (cdy / cdist) * maxR;
+      clamped = true;
+      const cnx = cdx / cdist;
+      const cny = cdy / cdist;
+      const dot = (ent.vx || 0) * cnx + (ent.vy || 0) * cny;
+      if (dot > 0) {
+        ent.vx -= 1.5 * dot * cnx;
+        ent.vy -= 1.5 * dot * cny;
+      }
+      if (ent.knockbackVx !== undefined || ent.knockbackVy !== undefined) {
+        const kbDot = (ent.knockbackVx || 0) * cnx + (ent.knockbackVy || 0) * cny;
+        if (kbDot > 0) {
+          ent.knockbackVx -= 1.5 * kbDot * cnx;
+          ent.knockbackVy -= 1.5 * kbDot * cny;
+        }
+      }
+    }
+  } else {
+    const minX = arena.x + r;
+    const maxX = arena.x + arena.width - r;
+    const minY = arena.y + r;
+    const maxY = arena.y + arena.height - r;
+
+    if (ent.x < minX) {
+      ent.x = minX;
+      if (ent.vx < 0) ent.vx = Math.abs(ent.vx) * 0.5;
+      if (ent.knockbackVx && ent.knockbackVx < 0) ent.knockbackVx = 0;
+      clamped = true;
+    } else if (ent.x > maxX) {
+      ent.x = maxX;
+      if (ent.vx > 0) ent.vx = -Math.abs(ent.vx) * 0.5;
+      if (ent.knockbackVx && ent.knockbackVx > 0) ent.knockbackVx = 0;
+      clamped = true;
+    }
+
+    if (ent.y < minY) {
+      ent.y = minY;
+      if (ent.vy < 0) ent.vy = Math.abs(ent.vy) * 0.5;
+      if (ent.knockbackVy && ent.knockbackVy < 0) ent.knockbackVy = 0;
+      clamped = true;
+    } else if (ent.y > maxY) {
+      ent.y = maxY;
+      if (ent.vy > 0) ent.vy = -Math.abs(ent.vy) * 0.5;
+      if (ent.knockbackVy && ent.knockbackVy > 0) ent.knockbackVy = 0;
+      clamped = true;
+    }
+  }
+
+  if (clamped && typeof ent.resolveWallBounce === 'function') {
+    ent.resolveWallBounce(arena);
+  }
+
+  return clamped;
+}
+
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   // Toji (ONLY during Ambush), Adapted Mahoraga, & Saitama during Serious Skill Counter immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
   if (attacker && attacker !== fighter) {
@@ -122,7 +191,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       }
       
 
-
       // Interrupt active attack channeling on barrier collision (entity is repelled, NOT frozen; only projectiles freeze)
       if (typeof attacker.interruptAttacks === 'function') {
         attacker.interruptAttacks();
@@ -143,6 +211,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       const nx = dx / dist;
       const ny = dy / dist;
       const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
+      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
 
       // Inside Gojo's own domain: no physical pushback (Unlimited Void uses time-stop paralysis instead)
       if (!fighter.domainActive) {
@@ -151,12 +220,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
         // Push the attacker back with strong outward velocity
         attacker.vx = nx * pushForce;
         attacker.vy = ny * pushForce;
-
-        // Push Gojo back slightly in the opposite direction (if not performing major techniques/skills)
-        if (!isImmovable) {
-          fighter.vx = -nx * (pushForce * 0.4);
-          fighter.vy = -ny * (pushForce * 0.4);
-        }
 
         // Apply brief movement slow on Limitless Infinity barrier collision
         const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 45;
@@ -172,15 +235,55 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
       const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
       const attRadius = attacker.hitRadius || attacker.r || 25;
+      const gojoRadius = fighter.hitRadius || fighter.r || 25;
       const minDist = attRadius + barrierRadius;
       const overlap = minDist - dist;
 
       if (overlap > 0 && !fighter.domainActive) {
-        attacker.x += nx * (overlap + 4);
-        attacker.y += ny * (overlap + 4);
+        const oldAttX = attacker.x;
+        const oldAttY = attacker.y;
+
+        // Try pushing attacker outward away from barrier
+        attacker.x += nx * (overlap + 2);
+        attacker.y += ny * (overlap + 2);
+
+        // Clamp attacker strictly within arena boundaries so they NEVER clip outside arena walls
+        let attackerHitWall = false;
+        if (arena) {
+          attackerHitWall = clampEntityToArenaBounds(attacker, arena, attRadius);
+        }
+
+        // Measure how much the attacker was actually able to move before hitting the wall
+        const actualMovedDist = Math.hypot(attacker.x - oldAttX, attacker.y - oldAttY);
+        const unfulfilledOverlap = Math.max(0, overlap - actualMovedDist);
+
+        // If attacker is against the wall and could not be displaced enough, push Gojo back instead!
         if (!isImmovable) {
-          fighter.x -= nx * 2;
-          fighter.y -= ny * 2;
+          const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5;
+          if (unfulfilledOverlap > 0 || attackerHitWall) {
+            // Recoil Gojo backwards away from the wall & target
+            fighter.x -= nx * (unfulfilledOverlap + 4);
+            fighter.y -= ny * (unfulfilledOverlap + 4);
+            fighter.vx = -nx * pushForce;
+            fighter.vy = -ny * pushForce;
+          } else {
+            fighter.x -= nx * 2;
+            fighter.y -= ny * 2;
+            fighter.vx = -nx * (pushForce * 0.4);
+            fighter.vy = -ny * (pushForce * 0.4);
+          }
+
+          if (arena) {
+            clampEntityToArenaBounds(fighter, arena, gojoRadius);
+          }
+        }
+      } else if (!fighter.domainActive && !isImmovable) {
+        const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5;
+        fighter.vx = -nx * (pushForce * 0.4);
+        fighter.vy = -ny * (pushForce * 0.4);
+        if (arena) {
+          clampEntityToArenaBounds(attacker, arena, attRadius);
+          clampEntityToArenaBounds(fighter, arena, gojoRadius);
         }
       }
     }
@@ -205,8 +308,21 @@ export function applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, a
   let startY = targetY - ny * slideOffset;
 
   if (arena) {
-    startX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, startX));
-    startY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, startY));
+    if (arena.shape === 'circle') {
+      const acx = arena.x + arena.width / 2;
+      const acy = arena.y + arena.height / 2;
+      const ar = Math.max(10, (arena.radius || (arena.width / 2)) - fighter.r);
+      const cdx = startX - acx;
+      const cdy = startY - acy;
+      const cdist = Math.hypot(cdx, cdy);
+      if (cdist > ar && cdist > 0) {
+        startX = acx + (cdx / cdist) * ar;
+        startY = acy + (cdy / cdist) * ar;
+      }
+    } else {
+      startX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, startX));
+      startY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, startY));
+    }
   }
 
   fighter.x = startX;
@@ -250,8 +366,21 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   let targetY = fighter.y + Math.sin(angle) * dist;
 
   if (arena) {
-    targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
-    targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+    if (arena.shape === 'circle') {
+      const acx = arena.x + arena.width / 2;
+      const acy = arena.y + arena.height / 2;
+      const ar = Math.max(10, (arena.radius || (arena.width / 2)) - fighter.r);
+      const cdx = targetX - acx;
+      const cdy = targetY - acy;
+      const cdist = Math.hypot(cdx, cdy);
+      if (cdist > ar && cdist > 0) {
+        targetX = acx + (cdx / cdist) * ar;
+        targetY = acy + (cdy / cdist) * ar;
+      }
+    } else {
+      targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
+      targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+    }
   }
 
   applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, arena);
