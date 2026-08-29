@@ -656,7 +656,7 @@ class ProjectileSystem {
     const defaultSpeed = isFinal
       ? (CONFIG.ichigo?.bankaiFinalGetsugaSpeed ?? 24)
       : (isMask
-        ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 22)
+        ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 10)
         : (isBankai
           ? (CONFIG.ichigo?.bankaiGetsugaSpeed ?? 22)
           : baseSpeed));

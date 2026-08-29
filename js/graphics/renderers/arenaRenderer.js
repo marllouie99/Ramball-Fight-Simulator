@@ -2343,7 +2343,7 @@ export function drawBankaiImpactDimScreen() {
   } else if (isHollow) {
     // Hollow Transformation formation (5s build-up) & burst decay
     if (ichigo && ichigo.hollowMaskFormationTimer !== undefined && ichigo.hollowMaskFormationTimer > 0) {
-      const maxH = ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 300;
+      const maxH = ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
       const formProg = Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH)));
       opacity = Math.min(0.90, formProg * 1.25);
     } else if (ichigo && ichigo.hollowBurstTimer !== undefined && ichigo.hollowBurstTimer > 0) {

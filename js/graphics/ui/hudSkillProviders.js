@@ -862,7 +862,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50);
     }
     if (f.hollowMaskActive) {
-      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? 0.75);
+      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? 0.25);
     }
     const comboMax = Math.round(baseComboMax * cdMult);
     const comboTimer = f.shunpoCooldown !== undefined ? f.shunpoCooldown : 0;
@@ -873,8 +873,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const comboLabel = isBankaiForm ? 'TENSA GETSUGA COMBO' : 'SHUNPO GETSUGA COMBO';
 
     // ── Passive: Hollow Mask Awakening ──
-    const hollowThreshold = CONFIG.ichigo?.hollowMaskThreshold ?? 0.30;
-    const hollowMaxDuration = CONFIG.ichigo?.hollowMaskDuration || 600;
+    const hollowThreshold = CONFIG.ichigo?.hollowMaskThreshold ?? 0.70;
+    const hollowMaxDuration = CONFIG.ichigo?.hollowMaskDuration ?? 800;
     let hollowPct = 0;
     let hollowReady = false;
     let hollowLabel = 'HOLLOW MASK';

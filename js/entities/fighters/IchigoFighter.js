@@ -291,8 +291,8 @@ export class IchigoFighter extends Fighter {
     this.interruptAttacks(true); // Cancel any ongoing attack/dash to lock in place
     this.hollowMaskUsed = true;
     this.hollowMaskActive = true;
-    this.hollowMaskTimer = CONFIG.ichigo?.hollowMaskDuration || 600;
-    const chargeFrames = CONFIG.ichigo?.hollowMaskFormationFrames || 325;
+    this.hollowMaskTimer = CONFIG.ichigo?.hollowMaskDuration ?? 800;
+    const chargeFrames = CONFIG.ichigo?.hollowMaskFormationFrames ?? 325;
     this.hollowMaskFormationTimer = chargeFrames;
     this.hollowMaskFormationMax = chargeFrames;
     this.hollowBurstTimer = 0; // Starts after formation/channeling finishes!
@@ -421,17 +421,17 @@ export class IchigoFighter extends Fighter {
 
     // 3. Hierro (Iron Skin) Damage Reduction
     if (this.hollowMaskActive) {
-      const defRed = CONFIG.ichigo?.hollowDamageReduction ?? 0.20;
+      const defRed = CONFIG.ichigo?.hollowDamageReduction ?? 0.10;
       finalAmount = Math.max(1, finalAmount * (1.0 - defRed));
     }
 
     const res = super.takeDamage(finalAmount, attacker, opts);
 
-    // Immediate Hollow Mask trigger upon taking critical damage below 30% HP (only if not busy with Bankai Grand Finisher or in ambush)
+    // Immediate Hollow Mask trigger upon taking critical damage below 70% HP (only if not busy with Bankai Grand Finisher or in ambush)
     const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
     const isBusyWithFinalGetsuga = (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
     const isPendingFinalGetsuga = this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer > 0 && this.bankaiTimer <= finalThreshold;
-    if (!this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithFinalGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp > 0 && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold || 0.30)) {
+    if (!this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithFinalGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp > 0 && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold ?? 0.70)) {
       this.activateHollowMask();
     }
 
@@ -1032,7 +1032,7 @@ export class IchigoFighter extends Fighter {
     const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 11;
     const speed = isFinal
       ? (CONFIG.ichigo?.bankaiFinalGetsugaSpeed ?? 24)
-      : (isMask ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 22) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaSpeed ?? 22) : baseSpeed));
+      : (isMask ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 10) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaSpeed ?? 22) : baseSpeed));
     const ownerIndex = state.fighters.indexOf(this);
 
     const target = (this.getsugaTarget && this.getsugaTarget.hp > 0 && !this.getsugaTarget.isDead)
@@ -1061,7 +1061,7 @@ export class IchigoFighter extends Fighter {
       cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiGetsugaCooldownMultiplier ?? 0.50);
     }
     if (isMask) {
-      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowGetsugaCooldownMultiplier ?? 0.50);
+      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowGetsugaCooldownMultiplier ?? 0.25);
     }
     this.getsugaCooldown = Math.round((CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.getsugaCooldown || 450) * cdMult);
 
@@ -1141,7 +1141,7 @@ export class IchigoFighter extends Fighter {
       ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
       : (CONFIG.ichigo?.shunpoStrikes || 2);
     if (isMask) {
-      const maskStrikeMult = CONFIG.ichigo?.hollowShunpoStrikesMultiplier || 1.5;
+      const maskStrikeMult = CONFIG.ichigo?.hollowShunpoStrikesMultiplier ?? 1.2;
       maxStrikes = Math.round(maxStrikes * maskStrikeMult);
     }
     let cdMult = 1.0;
@@ -1149,7 +1149,7 @@ export class IchigoFighter extends Fighter {
       cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50);
     }
     if (isMask) {
-      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? 0.75);
+      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? 0.25);
     }
 
     const cd = Math.round((CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.shunpoCooldown || 450) * cdMult);
@@ -1290,7 +1290,7 @@ export class IchigoFighter extends Fighter {
 
           // Hollow Mask Lifesteal (High-Speed Regeneration)
           if (isMask && finalDamage > 0) {
-            const healPercent = CONFIG.ichigo?.hollowLifesteal ?? 0.15;
+            const healPercent = CONFIG.ichigo?.hollowLifesteal ?? 0.10;
             const healAmount = Math.round(finalDamage * healPercent);
             if (healAmount > 0 && this.hp < this.maxHp) {
               this.hp = Math.min(this.maxHp, this.hp + healAmount);
@@ -1349,11 +1349,11 @@ export class IchigoFighter extends Fighter {
       return;
     }
 
-    // Hollow Mask Passive Activation (Activates under 30% HP in both Shikai and Bankai, holding if Grand Finisher is pending/channeling, in ambush, or paralyzed / caught in Gojo Purple or Yuta Beam)
+    // Hollow Mask Passive Activation (Activates under 70% HP in both Shikai and Bankai, holding if Grand Finisher is pending/channeling, in ambush, or paralyzed / caught in Gojo Purple or Yuta Beam)
     const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
     const isBusyWithFinalGetsuga = (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isGetsugaSlash && this.isFinalGetsugaRecovery);
     const isPendingFinalGetsuga = this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer > 0 && this.bankaiTimer <= finalThreshold;
-    if (!this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithFinalGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold || 0.30)) {
+    if (!this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithFinalGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold ?? 0.70)) {
       this.activateHollowMask();
     }
 
@@ -1820,8 +1820,11 @@ export class IchigoFighter extends Fighter {
           let defaultStrikes = isBankai 
             ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
             : (CONFIG.ichigo?.shunpoStrikes || 2);
+          if (isBankai) {
+            defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.bankaiShunpoStrikesMultiplier || 1.8));
+          }
           if (isMask) {
-            defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.hollowShunpoStrikesMultiplier || 1.5));
+            defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.hollowShunpoStrikesMultiplier ?? 1.2));
           }
           const maxSteps = this.shunpoMaxSteps || defaultStrikes;
 
@@ -1913,8 +1916,11 @@ export class IchigoFighter extends Fighter {
       let defaultStrikes = isBankai 
         ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
         : (CONFIG.ichigo?.shunpoStrikes || 2);
+      if (isBankai) {
+        defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.bankaiShunpoStrikesMultiplier || 1.8));
+      }
       if (isMask) {
-        defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.hollowShunpoStrikesMultiplier || 1.5));
+        defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.hollowShunpoStrikesMultiplier ?? 1.2));
       }
       const maxSteps = this.shunpoMaxSteps || defaultStrikes;
       

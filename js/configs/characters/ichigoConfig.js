@@ -93,17 +93,17 @@ export const ichigoConfig = {
   getsugaColor: '#00D5FF',       // Shikai Getsuga theme color (Sky-Blue)
 
   // ── Passive: Hollow Mask Awakening ──
-  hollowMaskThreshold: 0.70,     // Automatically activates when HP <= 30%
-  hollowMaskDuration: 800,       // Mask duration in frames (10 seconds)
+  hollowMaskThreshold: 0.70,     // Automatically activates when HP <= 70%
+  hollowMaskDuration: 800,       // Mask duration in frames (~13.3s)
   hollowMaskFormationFrames: 325,// Animation duration frames for hand-to-face clutch and mask assembly (~5.4s, matching exact 5.35s audio duration of voiceline)
   hollowBurstFrames: 36,         // Sky burst eruption duration frames upon Hollow transformation
   hollowSpeedMultiplier: 1.4,    // Speed boost multiplier
   hollowDamageMultiplier: 1.5,   // Damage multiplier boost
-  hollowDamageReduction: 0.10,   // 20% incoming damage mitigation (Hierro) during Hollow Mask
-  hollowLifesteal: 0.10,         // 15% vampiric lifesteal heal on damage dealt during Hollow Mask
-  hollowShunpoStrikesMultiplier: 1.2, // Multiplier to increase Shunpo flurry strikes during Hollow form (e.g. 2 -> 3 in Shikai, 6 -> 9 in Bankai)
+  hollowDamageReduction: 0.10,   // 10% incoming damage mitigation (Hierro) during Hollow Mask
+  hollowLifesteal: 0.10,         // 10% vampiric lifesteal heal on damage dealt during Hollow Mask
+  hollowShunpoStrikesMultiplier: 1.2, // Multiplier to increase Shunpo flurry strikes during Hollow form
   hollowSwordCooldownMultiplier: 0.65, // Multiplier reducing melee sword cooldown (e.g. 30 * 0.65 = ~19 frames for faster rapid slashing)
-  hollowComboCooldownMultiplier: 0.25, // 25% cooldown reduction multiplier for Shunpo Getsuga Blitz combo during Hollow Mask (e.g. 450 * 0.75 = ~337 frames)
+  hollowComboCooldownMultiplier: 0.25, // Cooldown multiplier for Shunpo Getsuga Blitz combo during Hollow Mask
   hollowGetsugaChargeMultiplier: 0.70, // Reduction multiplier reducing Getsuga Tensho charging frames during Hollow form (50% faster charge)
   hollowGetsugaVoice1ChargeFrames: 80,  // Charging frames dynamically synchronized to when "...TENSHO!" peaks & finishes in Voice 1 (~1.33s)
   hollowGetsugaVoice2ChargeFrames: 34,  // Charging frames dynamically synchronized to when fast "TENSHO!" peaks & finishes in Voice 2 (~0.57s)

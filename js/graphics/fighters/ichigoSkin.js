@@ -156,7 +156,7 @@ export function drawIchigoSkin(ctx, fighter) {
   }
 
   const formationTimer = fighter.hollowMaskFormationTimer !== undefined ? fighter.hollowMaskFormationTimer : 0;
-  const formationMax = fighter.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 300;
+  const formationMax = fighter.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
   const isForming = isMask && formationTimer > 0;
   const formationProg = isForming ? Math.min(1.0, Math.max(0.0, 1.0 - (formationTimer / formationMax))) : 1.0;
 

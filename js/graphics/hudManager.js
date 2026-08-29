@@ -1028,7 +1028,7 @@ function updateHealthHud() {
       // 4. DEF: XX + XX
       const baseDef = 0;
       if (isMask) {
-        const defBoost = Math.round((CONFIG.ichigo?.hollowDamageReduction ?? 0.20) * 100);
+        const defBoost = Math.round((CONFIG.ichigo?.hollowDamageReduction ?? 0.10) * 100);
         info.push(`<b>DEF:</b> ${baseDef}% + ${defBoost}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         info.push(`<b>DEF:</b> ${baseDef}%`);
