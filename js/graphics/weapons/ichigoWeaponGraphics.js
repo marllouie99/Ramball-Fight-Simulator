@@ -42,13 +42,16 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
   ctx.scale(scale * radiusScale, scale * radiusScale);
+  ctx.imageSmoothingEnabled = false; // Authentic nearest-neighbor pixel art rendering
 
   // ── Exact Crescent Parameters (Normalized to 38px base, scaled seamlessly by radiusScale) ──
+  const P = 2.0; // Exact discrete pixel art grid unit matching Saitama
+  const snap = (v) => Math.round(v / P) * P;
+
   const R = 38;
   const maxThick = 14; // Exact same slim thickness across all forms, matching normal Getsuga Tensho!
   const taperPower = 1.32; // Exact same slim needle-sharp double-tapering as normal Getsuga Tensho
   const halfAngle = 0.64 * Math.PI; // Exact same slim crescent arc span as normal Getsuga Tensho
-  const px = 2.5 / Math.max(0.5, radiusScale * 0.7); // Scale-compensated pixel unit
 
   // ── Palette Definition ──
   let cBorder, cSaturated, cBright, cCore, cAura, isDarkCore;
@@ -121,86 +124,96 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     isDarkCore = false;
   }
 
-  // ── 1. Stepped Atmosphere Pixel Aura ──
-  const auraR = R + px * 2.0;
-  ctx.fillStyle = cAura;
-  for (let a = -halfAngle; a <= halfAngle; a += 0.05) {
-    const sx = Math.round((Math.cos(a) * auraR) / px) * px;
-    const sy = Math.round((Math.sin(a) * auraR) / px) * px;
-    ctx.fillRect(sx, sy, px, px);
-  }
-
-  // ── 2. Stepped High-Contrast Dark Border Perimeter ──
-  ctx.fillStyle = cBorder;
-  const numSteps = 32;
-  for (let i = 0; i <= numSteps; i++) {
-    const t = (i / numSteps) * 2 - 1;
-    const ang = t * halfAngle;
-    const sx = Math.round((Math.cos(ang) * (R + px * 0.8)) / px) * px;
-    const sy = Math.round((Math.sin(ang) * (R + px * 0.8)) / px) * px;
-    ctx.fillRect(sx, sy, px, px);
-  }
-  for (let i = numSteps; i >= 0; i--) {
-    const t = (i / numSteps) * 2 - 1;
-    const ang = t * halfAngle;
+  const isInsideGetsuga = (rx, ry) => {
+    const dist = Math.hypot(rx, ry);
+    if (dist > R || dist <= 0) return false;
+    const ang = Math.atan2(ry, rx);
+    if (Math.abs(ang) > halfAngle) return false;
+    const t = ang / halfAngle;
     const taper = Math.cos(t * (Math.PI / 2));
-    const inR = R - maxThick * Math.pow(taper, taperPower) - px;
-    const sx = Math.round((Math.cos(ang) * inR) / px) * px;
-    const sy = Math.round((Math.sin(ang) * inR) / px) * px;
-    ctx.fillRect(sx, sy, px, px);
-  }
+    const inR = R - maxThick * Math.pow(taper, taperPower);
+    return dist >= inR;
+  };
 
-  // ── 3. Dense Stepped Crescent Body Grid ──
-  const minX = Math.floor((Math.cos(halfAngle) * R - maxThick) / px) * px;
-  const maxX = Math.ceil(R / px) * px;
-  const maxY = Math.ceil((Math.sin(halfAngle) * R) / px) * px;
+  const isInsideAura = (rx, ry) => {
+    const dist = Math.hypot(rx, ry);
+    if (dist > R + P * 2.0 || dist <= 0) return false;
+    const ang = Math.atan2(ry, rx);
+    if (Math.abs(ang) > halfAngle + 0.08) return false;
+    const t = Math.min(1.0, Math.abs(ang) / halfAngle);
+    const taper = Math.cos(t * (Math.PI / 2));
+    const inR = R - (maxThick + P * 2.0) * Math.pow(taper, taperPower);
+    return dist >= inR;
+  };
 
-  for (let gy = -maxY; gy <= maxY; gy += px) {
-    for (let gx = minX; gx <= maxX; gx += px) {
-      const dist = Math.sqrt(gx * gx + gy * gy);
-      const ang = Math.atan2(gy, gx);
+  const minX = Math.floor((Math.cos(halfAngle) * R - maxThick - P * 3) / P) * P;
+  const maxX = Math.ceil((R + P * 3) / P) * P;
+  const maxY = Math.ceil((Math.sin(halfAngle) * R + P * 3) / P) * P;
 
-      if (Math.abs(ang) <= halfAngle) {
-        const t = ang / halfAngle;
-        const taper = Math.cos(t * (Math.PI / 2));
-        const inR = R - maxThick * Math.pow(taper, taperPower);
-
-        if (dist >= inR && dist <= R) {
-          const depthFromApex = R - dist; // 0 at leading edge, maxThick at back
-
-          if (depthFromApex < px * 1.5) {
-            ctx.fillStyle = cCore; // Razor-sharp white-hot leading edge
-          } else if (depthFromApex < px * 3.2) {
-            ctx.fillStyle = cBright; // Saturated electric energy rim
-          } else {
-            ctx.fillStyle = isDarkCore ? cSaturated : ((Math.round(gx / px) + Math.round(gy / px)) % 2 === 0 ? cSaturated : cBright);
-          }
-          ctx.fillRect(Math.round(gx), Math.round(gy), px, px);
-        }
+  // ── 1. Atmosphere Stepped Pixel Aura ──
+  ctx.fillStyle = cAura;
+  for (let gy = -maxY; gy <= maxY; gy += P) {
+    for (let gx = minX; gx <= maxX; gx += P) {
+      if (isInsideAura(gx, gy) && !isInsideGetsuga(gx, gy)) {
+        ctx.fillRect(snap(gx), snap(gy), P, P);
       }
     }
   }
 
-  // ── 4. Leading Apex Stepped Pixel Diamond Flare ──
-  const apexX = Math.round(R / px) * px;
+  // ── 2. Discrete 2D Crescent Body Grid with 4-Neighbor Attached Border ──
+  for (let gy = -maxY; gy <= maxY; gy += P) {
+    for (let gx = minX; gx <= maxX; gx += P) {
+      if (!isInsideGetsuga(gx, gy)) continue;
+
+      const pxX = snap(gx);
+      const pyY = snap(gy);
+
+      // 4-neighbor attached border test matching Saitama skin technique
+      const isBorder = !isInsideGetsuga(gx + P, gy) ||
+                       !isInsideGetsuga(gx - P, gy) ||
+                       !isInsideGetsuga(gx, gy + P) ||
+                       !isInsideGetsuga(gx, gy - P);
+
+      if (isBorder) {
+        ctx.fillStyle = cBorder;
+        ctx.fillRect(pxX, pyY, P, P);
+        continue;
+      }
+
+      const dist = Math.hypot(gx, gy);
+      const depthFromApex = R - dist;
+
+      if (depthFromApex < P * 1.5) {
+        ctx.fillStyle = cCore; // Razor-sharp white-hot leading edge
+      } else if (depthFromApex < P * 3.2) {
+        ctx.fillStyle = cBright; // Saturated electric energy rim
+      } else {
+        ctx.fillStyle = isDarkCore ? cSaturated : ((Math.round(gx / P) + Math.round(gy / P)) % 2 === 0 ? cSaturated : cBright);
+      }
+      ctx.fillRect(pxX, pyY, P, P);
+    }
+  }
+
+  // ── 3. Leading Apex Stepped Pixel Diamond Flare ──
+  const apexX = snap(R);
   ctx.fillStyle = cCore;
   const flareSpread = 2;
-  ctx.fillRect(apexX - px * 0.5, -px * 0.5, px, px);
-  ctx.fillRect(apexX - px * flareSpread, -px * 0.5, px * (flareSpread * 2), px);
-  ctx.fillRect(apexX - px * 0.5, -px * flareSpread, px, px * (flareSpread * 2));
+  ctx.fillRect(apexX - P * 0.5, -P * 0.5, P, P);
+  ctx.fillRect(apexX - P * flareSpread, -P * 0.5, P * (flareSpread * 2), P);
+  ctx.fillRect(apexX - P * 0.5, -P * flareSpread, P, P * (flareSpread * 2));
 
-  // ── 5. Trailing Stepped Pixel Sparkles & Reiatsu Motes ──
+  // ── 4. Trailing Stepped Pixel Sparkles & Reiatsu Motes ──
   const moteCount = 3;
   for (let s = 0; s < moteCount; s++) {
     const sSeed = s * 73.1 + qTime * 0.006;
     const sAng = (Math.sin(sSeed) * halfAngle * 0.85);
     const sT = Math.cos((sAng / halfAngle) * (Math.PI / 2));
-    const sInR = R - maxThick * Math.pow(sT, taperPower) - (px * (2 + (s % 3) * 2));
-    const sx = Math.round((Math.cos(sAng) * sInR) / px) * px;
-    const sy = Math.round((Math.sin(sAng) * sInR) / px) * px;
+    const sInR = R - maxThick * Math.pow(sT, taperPower) - (P * (2 + (s % 3) * 2));
+    const sx = snap(Math.cos(sAng) * sInR);
+    const sy = snap(Math.sin(sAng) * sInR);
 
     ctx.fillStyle = (s % 3 === 0) ? cCore : ((s % 3 === 1) ? cBright : (isDarkMode ? cSaturated : cBorder));
-    ctx.fillRect(sx, sy, px, px);
+    ctx.fillRect(sx, sy, P, P);
   }
 
   ctx.restore();
