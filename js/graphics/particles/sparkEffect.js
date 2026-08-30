@@ -20,6 +20,21 @@ function _isDarkMode() {
   );
 }
 
+function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return null;
+  let clean = hex.replace('#', '').trim();
+  if (clean.length === 3) {
+    clean = clean.split('').map(c => c + c).join('');
+  }
+  if (clean.length !== 6) return null;
+  const num = parseInt(clean, 16);
+  if (Number.isNaN(num)) return null;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `${r}, ${g}, ${b}`;
+}
+
 // PERF: Radial gradients are defined at a fixed unit radius (centered at origin) so a single
 // cached gradient can be reused for every particle instance/position/size via ctx.translate()
 // + ctx.scale(), instead of calling ctx.createRadialGradient() fresh every frame per particle.
@@ -916,41 +931,56 @@ export function drawSparkEffects(layer = 'all') {
           effect.size += (effect.targetSize - effect.size) * 0.16;
         }
         
-        const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
-        if (isGamePlay) {
-          // Gameplay-optimized dual-stroke ring
-          ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
+        const isDark = _isDarkMode();
+        if (isDark) {
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
           ctx.lineWidth = 6 * effect.life;
           ctx.beginPath();
           ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
           ctx.stroke();
 
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+          ctx.strokeStyle = `rgba(235, 245, 255, ${effect.life * 0.90})`;
           ctx.lineWidth = 2.5 * effect.life;
           ctx.beginPath();
           ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.94), 0, Math.PI * 2);
           ctx.stroke();
         } else {
-          // 1. Hot Pink Outer Glow Ring
-          ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
-          ctx.lineWidth = 7 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
+          const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
+          if (isGamePlay) {
+            // Gameplay-optimized dual-stroke ring
+            ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
+            ctx.lineWidth = 6 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+            ctx.stroke();
 
-          // 2. High-contrast Black Ink Outline Ring (visible on light backgrounds)
-          ctx.strokeStyle = `rgba(10, 2, 5, ${effect.life * 0.9})`;
-          ctx.lineWidth = 3 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
-          ctx.stroke();
+            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+            ctx.lineWidth = 2.5 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.94), 0, Math.PI * 2);
+            ctx.stroke();
+          } else {
+            // 1. Hot Pink Outer Glow Ring
+            ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
+            ctx.lineWidth = 7 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+            ctx.stroke();
 
-          // 3. Piercing White-Hot Inner Core Ring
-          ctx.strokeStyle = `rgba(255, 240, 245, ${effect.life * 0.95})`;
-          ctx.lineWidth = 2 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
-          ctx.stroke();
+            // 2. High-contrast Black Ink Outline Ring (visible on light backgrounds)
+            ctx.strokeStyle = `rgba(10, 2, 5, ${effect.life * 0.9})`;
+            ctx.lineWidth = 3 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 3. Piercing White-Hot Inner Core Ring
+            ctx.strokeStyle = `rgba(255, 240, 245, ${effect.life * 0.95})`;
+            ctx.lineWidth = 2 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
+            ctx.stroke();
+          }
         }
       } else if (effect.type === 'mahitoSoulShockwave') {
         // Expanding nested pixel-art magenta & cyan soul disfigurement shockwave rings
@@ -1609,8 +1639,21 @@ export function drawSparkEffects(layer = 'all') {
           }
         }
 
-        // 2. Primary Themed Pixel Ring (Electric Cyan for Gojo / Crimson for others)
-        ctx.fillStyle = isGojo ? `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})` : `rgba(255, 60, 60, ${(alpha * 0.95).toFixed(3)})`;
+        // 2. Primary Themed Pixel Ring (Electric Cyan for Gojo / Gold for Mahoraga / Custom Color for Getsuga / Crimson for others)
+        const isMahoraga = effect.clashType === 'mahoraga' || effect.clashType === 'gold';
+        const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
+        let ringColor;
+        if (isGojo) {
+          ringColor = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
+        } else if (isMahoraga) {
+          ringColor = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
+        } else if (isHex) {
+          const rgb = hexToRgb(effect.clashType) || '255, 60, 60';
+          ringColor = `rgba(${rgb}, ${(alpha * 0.95).toFixed(3)})`;
+        } else {
+          ringColor = `rgba(255, 60, 60, ${(alpha * 0.95).toFixed(3)})`;
+        }
+        ctx.fillStyle = ringColor;
         for (let gy = -steps; gy <= steps; gy++) {
           for (let gx = -steps; gx <= steps; gx++) {
             const dist = Math.hypot(gx * P, gy * P);
@@ -1891,12 +1934,18 @@ export function drawSparkEffects(layer = 'all') {
       const isGenosClash = (effect.clashType === 'genos' || effect.clashType === 'orange');
       const isInfinityClash = (effect.clashType === 'gojo_infinity');
 
+      const isDark = _isDarkMode();
+
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isInfinityClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`)))));
-      ctx.beginPath();
-      ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = isDark 
+        ? `rgba(0, 0, 0, 0)` 
+        : (isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isInfinityClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(0, 0, 0, 0)` : `rgba(30, 10, 40, ${effect.life * 0.4})`))))));
+      if (!isMahoragaClash) {
+        ctx.beginPath();
+        ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.globalCompositeOperation = 'lighter';
 
@@ -1937,15 +1986,7 @@ export function drawSparkEffects(layer = 'all') {
         }
       } else if (isGenosClash) {
         // ── GENOS INCINERATION STOMP SHOCKWAVE ──
-        const isDarkMode = Boolean(
-          typeof state !== 'undefined' && (
-            state.arenaTheme === 'dark' || 
-            state.darkMode || 
-            (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-          )
-        );
-
-        if (isDarkMode) {
+        if (isDark) {
           ctx.save();
           ctx.imageSmoothingEnabled = false;
           const P = 2.0;
@@ -2001,48 +2042,117 @@ export function drawSparkEffects(layer = 'all') {
           ctx.stroke();
         }
       } else if (isMahoragaClash) {
-        // ── MAHORAGA DIVINE TELEPORT / IMPACT GROUND SHOCKWAVE ──
-        // Outer Golden Divine Aura Ring
-        ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
-        ctx.lineWidth = 12 * effect.life;
-        ctx.beginPath();
-        ctx.ellipse(effect.x, effect.y + 4, effect.size * 1.15, effect.size * 0.38, 0, 0, Math.PI * 2);
-        ctx.stroke();
+        // ── MAHORAGA DIVINE IMPACT CIRCULAR SHOCKWAVE RING ──
+        if (isDark) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          const P = 2.0;
+          const snap = (v) => Math.round(v / P) * P;
+          const radius = Math.max(P * 2, effect.size);
+          const steps = Math.max(32, Math.round((Math.PI * 2 * radius) / P));
 
-        // Inner White-Hot Impact Force Ring
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-        ctx.lineWidth = 6 * effect.life;
-        ctx.beginPath();
-        ctx.ellipse(effect.x, effect.y + 4, effect.size * 0.80, effect.size * 0.26, 0, 0, Math.PI * 2);
-        ctx.stroke();
+          const alpha = Math.min(1.0, effect.life * 1.25);
+          const colBorder = `rgba(15, 12, 0, ${(alpha * 0.85).toFixed(3)})`;
+          const colOuter = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
+          const colMid = `rgba(255, 245, 150, ${(alpha * 0.90).toFixed(3)})`;
+          const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+
+          for (let st = 0; st < steps; st++) {
+            const ang = (st / steps) * Math.PI * 2;
+            const cosA = Math.cos(ang);
+            const sinA = Math.sin(ang);
+
+            // Outer Obsidian / Dark Gold Border Pixels
+            const r0 = snap(radius);
+            ctx.fillStyle = colBorder;
+            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+
+            // Outer Divine Gold Pixel Ring
+            ctx.fillStyle = colOuter;
+            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+            // Mid Light-Gold Loop
+            const r1 = snap(radius * 0.75);
+            ctx.fillStyle = colMid;
+            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+            // Inner White-Hot Specular Ring
+            const r2 = snap(radius * 0.45);
+            ctx.fillStyle = colCore;
+            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
+          }
+          ctx.restore();
+        } else {
+          // 1. Outer Golden Divine Aura Ring (Full circular arc matching other fighters)
+          ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
+          ctx.lineWidth = 12 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 2. Middle Warm Gold/Silver Ring
+          ctx.strokeStyle = `rgba(255, 235, 120, ${effect.life * 0.90})`;
+          ctx.lineWidth = 7 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 3. Inner White-Hot Impact Core Ring
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+          ctx.lineWidth = 4 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.45), 0, Math.PI * 2);
+          ctx.stroke();
+        }
       } else if (isYutaClash) {
         // ── YUTA & RIKA VS SUKUNA CLASH SHOCKWAVE ──
-        // Outer Hot Pink / Dark Magenta Ring (Yuta & Rika's Pure Love / Monstrous Cursed Energy)
-        ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.9})`;
-        ctx.lineWidth = 15 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
+        if (isDark) {
+          // Dark mode white/silver theme for Yuta shockwave
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+          ctx.lineWidth = 12 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
 
-        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.98})`;
-        ctx.lineWidth = 11 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
+          ctx.strokeStyle = `rgba(230, 240, 255, ${effect.life * 0.90})`;
+          ctx.lineWidth = 8 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // Inner Crimson Blood Ring (Sukuna's Cursed Energy)
-        ctx.strokeStyle = `rgba(255, 30, 60, ${effect.life * 0.95})`;
-        ctx.lineWidth = 8 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-        ctx.stroke();
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+          ctx.lineWidth = 4 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Outer Hot Pink / Dark Magenta Ring (Yuta & Rika's Pure Love / Monstrous Cursed Energy)
+          ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.9})`;
+          ctx.lineWidth = 15 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // White core flash
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-        ctx.stroke();
+          ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.98})`;
+          ctx.lineWidth = 11 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner Crimson Blood Ring (Sukuna's Cursed Energy)
+          ctx.strokeStyle = `rgba(255, 30, 60, ${effect.life * 0.95})`;
+          ctx.lineWidth = 8 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // White core flash
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+          ctx.lineWidth = 4 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+          ctx.stroke();
+        }
 
         // Dynamic Katana / Cleave X-shaped Cross Slash at clash center
         ctx.save();
@@ -2050,7 +2160,7 @@ export function drawSparkEffects(layer = 'all') {
         ctx.rotate(Math.PI / 4 + (1 - effect.life) * 0.2);
         const slashLen = effect.size * 0.75;
         
-        ctx.strokeStyle = `rgba(255, 30, 60, ${effect.life * 0.7})`;
+        ctx.strokeStyle = isDark ? `rgba(255, 255, 255, ${effect.life * 0.7})` : `rgba(255, 30, 60, ${effect.life * 0.7})`;
         ctx.lineWidth = 7 * effect.life;
         ctx.beginPath();
         ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
@@ -2064,16 +2174,6 @@ export function drawSparkEffects(layer = 'all') {
         ctx.moveTo(0, -slashLen); ctx.lineTo(0, slashLen);
         ctx.stroke();
         ctx.restore();
-      } else if (isInfinityClash) {
-        // ── GOJO LIMITLESS BARRIER REBOUND SHOCKWAVE ──
-        const isDarkMode = Boolean(
-          typeof state !== 'undefined' && (
-            state.arenaTheme === 'dark' || 
-            state.darkMode || 
-            (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-          )
-        );
-
       } else if (isInfinityClash) {
         // ── GOJO LIMITLESS BARRIER REBOUND PIXEL ART SHOCKWAVE RING (SAITAMA TECH) ──
         ctx.save();
@@ -2120,26 +2220,47 @@ export function drawSparkEffects(layer = 'all') {
         ctx.restore();
       } else if (isTojiClash) {
         // ── TOJI PHYSICAL SHOCKWAVE ──
-        // Outer Dark Slate Air Pressure Ring
-        ctx.strokeStyle = `rgba(45, 50, 55, ${effect.life * 0.8})`;
-        ctx.lineWidth = 18 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
+        if (isDark) {
+          // Dark mode white/silver theme for Toji shockwave
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+          ctx.lineWidth = 12 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // Middle Purple Soul Aura Ring
-        ctx.strokeStyle = `rgba(160, 80, 240, ${effect.life * 0.85})`;
-        ctx.lineWidth = 10 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.85, 0, Math.PI * 2);
-        ctx.stroke();
+          ctx.strokeStyle = `rgba(230, 240, 255, ${effect.life * 0.90})`;
+          ctx.lineWidth = 7 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // Inner White-Hot Impact Force Ring
-        ctx.strokeStyle = `rgba(250, 252, 255, ${effect.life * 0.9})`;
-        ctx.lineWidth = 6 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.6, 0, Math.PI * 2);
-        ctx.stroke();
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+          ctx.lineWidth = 4 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.50, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Outer Dark Slate Air Pressure Ring
+          ctx.strokeStyle = `rgba(45, 50, 55, ${effect.life * 0.8})`;
+          ctx.lineWidth = 18 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Middle Purple Soul Aura Ring
+          ctx.strokeStyle = `rgba(160, 80, 240, ${effect.life * 0.85})`;
+          ctx.lineWidth = 10 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.85, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner White-Hot Impact Force Ring
+          ctx.strokeStyle = `rgba(250, 252, 255, ${effect.life * 0.9})`;
+          ctx.lineWidth = 6 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
 
         // High-Speed Wind Distortion Lines (Inner Starburst)
         ctx.save();
@@ -2156,91 +2277,217 @@ export function drawSparkEffects(layer = 'all') {
         ctx.stroke();
         ctx.restore();
       } else {
-        // Outer purple ring (Gojo's cursed energy) - thick with dark outline
-        ctx.strokeStyle = `rgba(60, 0, 80, ${effect.life * 0.9})`;
-        ctx.lineWidth = 14 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Main purple ring
-        ctx.strokeStyle = `rgba(180, 60, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 10 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Inner crimson ring (Sukuna's cursed energy)
-        ctx.strokeStyle = `rgba(255, 50, 80, ${effect.life * 0.95})`;
-        ctx.lineWidth = 8 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // White core flash with dark outline
-        ctx.strokeStyle = `rgba(40, 40, 40, ${effect.life * 0.8})`;
-        ctx.lineWidth = 5 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        ctx.strokeStyle = `rgba(255, 240, 240, ${effect.life * 0.9})`;
-        ctx.lineWidth = 3 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-        ctx.stroke();
+        const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
+        if (isDark) {
+          if (isHex) {
+            const rgb = hexToRgb(effect.clashType) || '255, 255, 255';
+            // 1. Primary Themed Shockwave Ring in dark mode
+            ctx.strokeStyle = `rgba(${rgb}, ${effect.life * 0.95})`;
+            ctx.lineWidth = 10 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Secondary Compression Ring
+            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.90})`;
+            ctx.lineWidth = 6 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 3. Inner White-Hot Pressure Core
+            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+            ctx.lineWidth = 3.5 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+            ctx.stroke();
+          } else {
+            // ── DARK MODE WHITE SHOCKWAVE THEME ──
+            // 1. Crisp Pure White Primary Shockwave Ring
+            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+            ctx.lineWidth = 10 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Secondary Bright Silver-White Compression Ring
+            ctx.strokeStyle = `rgba(240, 245, 255, ${effect.life * 0.90})`;
+            ctx.lineWidth = 6 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 3. Inner White-Hot Pressure Core
+            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+            ctx.lineWidth = 3.5 * effect.life;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else if (isHex) {
+          const rgb = hexToRgb(effect.clashType) || '255, 50, 80';
+          // Outer primary themed ring based on Getsuga Tensho current color
+          ctx.strokeStyle = `rgba(${rgb}, ${effect.life * 0.95})`;
+          ctx.lineWidth = 12 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Middle compression ring
+          ctx.strokeStyle = `rgba(${rgb}, ${effect.life * 0.85})`;
+          ctx.lineWidth = 7 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.70, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner white specular core
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+          ctx.lineWidth = 3.5 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Outer purple ring (Gojo's cursed energy) - thick with dark outline
+          ctx.strokeStyle = `rgba(60, 0, 80, ${effect.life * 0.9})`;
+          ctx.lineWidth = 14 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // Main purple ring
+          ctx.strokeStyle = `rgba(180, 60, 255, ${effect.life * 0.95})`;
+          ctx.lineWidth = 10 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // Inner crimson ring (Sukuna's cursed energy)
+          ctx.strokeStyle = `rgba(255, 50, 80, ${effect.life * 0.95})`;
+          ctx.lineWidth = 8 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // White core flash with dark outline
+          ctx.strokeStyle = `rgba(40, 40, 40, ${effect.life * 0.8})`;
+          ctx.lineWidth = 5 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          ctx.strokeStyle = `rgba(255, 240, 240, ${effect.life * 0.9})`;
+          ctx.lineWidth = 3 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
 
       ctx.globalCompositeOperation = 'source-over';
     } else if (effect.type === 'mahoragaShoutShockwave') {
       // Expanding golden & silver roar shockwave ring
       effect.size += (effect.targetSize - effect.size) * 0.18;
+      const isDark = _isDarkMode();
       
       ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
+      if (isDark) {
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const radius = Math.max(P * 2, effect.size);
+        const steps = Math.max(36, Math.round((Math.PI * 2 * radius) / P));
 
-      // Outer glowing golden shockwave ring
-      ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
-      ctx.lineWidth = 12 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-      ctx.stroke();
+        const alpha = Math.min(1.0, effect.life * 1.25);
+        const colBorder = `rgba(15, 12, 0, ${(alpha * 0.85).toFixed(3)})`;
+        const colOuter = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
+        const colMid = `rgba(255, 245, 150, ${(alpha * 0.90).toFixed(3)})`;
+        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
 
-      // Middle silver contrast ring
-      ctx.strokeStyle = `rgba(224, 232, 255, ${effect.life * 0.8})`;
-      ctx.lineWidth = 6 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
-      ctx.stroke();
+        for (let st = 0; st < steps; st++) {
+          const ang = (st / steps) * Math.PI * 2;
+          const cosA = Math.cos(ang);
+          const sinA = Math.sin(ang);
 
-      // Inner white-hot core ring
-      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-      ctx.lineWidth = 4 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
-      ctx.stroke();
+          // Outer Obsidian / Dark Gold Border Pixels
+          const r0 = snap(radius);
+          ctx.fillStyle = colBorder;
+          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
 
-      ctx.globalCompositeOperation = 'source-over';
+          // Outer Divine Gold Pixel Ring
+          ctx.fillStyle = colOuter;
+          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+          // Mid Light-Gold Loop
+          const r1 = snap(radius * 0.75);
+          ctx.fillStyle = colMid;
+          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+          // Inner White-Hot Specular Ring
+          const r2 = snap(radius * 0.45);
+          ctx.fillStyle = colCore;
+          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
+        }
+      } else {
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Outer glowing golden shockwave ring
+        ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
+        ctx.lineWidth = 12 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Middle silver contrast ring
+        ctx.strokeStyle = `rgba(224, 232, 255, ${effect.life * 0.8})`;
+        ctx.lineWidth = 6 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner white-hot core ring
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.globalCompositeOperation = 'source-over';
+      }
       ctx.restore();
     } else if (effect.type === 'rikaRoarShockwave') {
       // Expanding dark purple & hot pink cursed energy roar shockwave ring
       effect.size += (effect.targetSize - effect.size) * 0.18;
+      const isDark = _isDarkMode();
       
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
 
-      // High-performance double-stroke glow without shadowBlur
-      ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
-      ctx.lineWidth = 9 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-      ctx.stroke();
+      if (isDark) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 9 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
 
-      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-      ctx.lineWidth = 4 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
-      ctx.stroke();
+        ctx.strokeStyle = `rgba(235, 245, 255, ${effect.life * 0.90})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // High-performance double-stroke glow without shadowBlur
+        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
+        ctx.lineWidth = 9 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
@@ -2658,37 +2905,6 @@ export function spawnMahoragaShoutBurst(x, y, radius = 180) {
   sw3.type = 'mahoragaShoutShockwave';
   sw3.isFlash = true; sw3.color = 'silver';
   state.sparkEffects.push(sw3);
-
-  // Outward exploding sparks
-  for (let i = 0; i < 30; i++) {
-    let insertIdx = -1;
-    if (state.sparkEffects.length >= MAX_PARTICLES) {
-      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-      const oldest = state.sparkEffects[insertIdx];
-      if (oldest) ParticleSystem.returnParticle(oldest);
-    }
-
-    const angle = (i / 30) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
-    const speed = 5 + Math.random() * 9;
-
-    const spark = ParticleSystem.getParticle();
-    spark.x = x + Math.cos(angle) * 15;
-    spark.y = y + Math.sin(angle) * 15;
-    spark.vx = Math.cos(angle) * speed;
-    spark.vy = Math.sin(angle) * speed;
-    spark.size = 2 + Math.random() * 3;
-    spark.life = 1.0;
-    spark.decay = 0.02 + Math.random() * 0.02; // lasts ~25-50 frames
-    spark.friction = 0.93;
-    spark.type = 'silver';
-    spark.color = Math.random() < 0.70 ? '#FFD700' : '#E8F5FF';
-
-    if (insertIdx !== -1) {
-      state.sparkEffects[insertIdx] = spark;
-    } else {
-      state.sparkEffects.push(spark);
-    }
-  }
 }
 
 /**

@@ -2192,17 +2192,29 @@ export function drawCjJetpackWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opt
 
 /**
  * Draws Authentic GTA San Andreas M134 Minigun in 100% Discrete Pixel Art Style (Saitama Tech)
+ * Faithful to GTA SA Mid-2000s Heavy Military Industrial Aesthetic:
+ * - Receiver and Housing: Matte military olive-drab with charcoal steel armor reinforcement plates
+ * - Underslung Drive Motor Pod: Olive-drab body with stator cooling vents, endcaps, and latch clamp
+ * - Heavy Ammo Feed Chute: Flexible segmented canvas belt with brass 7.62mm linked cartridges
+ * - 6-Barrel Gatling Cluster: Mathematical 3D rotating cylinder with depth sorting, specular flutes,
+ *   3 heavy clamp rings with tension bolts, and burnt heat-treated / incandescent molten tips
+ * - Ergonomic Rear Chainsaw Joystick Spade Grip: Scalloped finger grooves, red toggle horn, status LED
+ * - Overhead Horizontal Bridge Support Strut & Forward Carry Handle Loop Bracket with mounting pins
+ * - Tumbling Spent Brass Casings & Disintegrating Link Clips when firing
+ * - Multi-tier Rotational Pixel Starburst Muzzle Flash with blast sparks and gas venting
  */
 export function drawCjPixelMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}) {
   ctx.save();
   let posX = x;
   let posY = y;
+  let angle = 0;
   let scale = 1.0;
 
   if (typeof gunAngle === 'object') {
     opts = gunAngle;
     scale = opts.scale || 1.0;
   } else if (typeof gunAngle === 'number') {
+    angle = gunAngle;
     if (typeof r === 'number') {
       posX = x + (r * 0.75);
       posY = y;
@@ -2216,72 +2228,553 @@ export function drawCjPixelMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts
   const recoil = (opts && opts.recoil) ? opts.recoil : 0;
   const flashTimer = (opts && opts.flashTimer) ? opts.flashTimer : 0;
   const heat = (opts && opts.heat) ? Math.min(1.0, Math.max(0, opts.heat)) : 0;
+  const spinAngle = (opts && opts.spinAngle !== undefined) ? opts.spinAngle : (flashTimer > 0 ? (Date.now() * 0.02) : 0);
 
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
   const recoilOff = snap(recoil * 1.1);
   ctx.translate(snap(posX - recoilOff), snap(posY));
+  if (angle !== 0) ctx.rotate(angle);
   ctx.scale(scale, scale);
 
-  // 1. Rear Dual Chainsaw Joystick Spade Grip
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-28, -8, 8, 16);
-  ctx.fillStyle = '#181B22';
-  ctx.fillRect(-27, -7, 6, 14);
-  // Red Toggle Switch / Safety Horn
-  ctx.fillStyle = '#DC2626';
-  ctx.fillRect(-27, -9, 3, 2);
+  // ── LAYER 0: UNDERSLUNG DRIVE MOTOR POD & HEAVY AMMO FEED CHUTE ──
+  const motorX = -8;
+  const motorY = 4;
+  const motorW = 22;
+  const motorH = 10;
 
-  // 2. Central Military-Drab Rotor Motor & Feed Chute
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-20, -12, 22, 24);
-  ctx.fillStyle = '#2E381C'; // Olive-drab motor housing
-  ctx.fillRect(-19, -11, 20, 22);
-  ctx.fillStyle = '#44542A'; // Top highlight
-  ctx.fillRect(-18, -9, 18, 4);
+  // Flexible Canvas Ammo Feed Chute (Curved down-left)
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(-32, 4, 26, 12);
+  ctx.fillRect(-28, 14, 18, 6);
 
-  // Linked 7.62mm Ammo Feed Chute (Curved down-left)
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-14, 11, 12, 10);
-  ctx.fillStyle = '#D97706'; // Brass linked rounds
-  ctx.fillRect(-13, 12, 10, 8);
-  ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(-12, 13, 8, 2);
-  ctx.fillRect(-12, 17, 8, 2);
+  // Canvas Outer Belt
+  ctx.fillStyle = '#1E2515'; // Dark military canvas green
+  ctx.fillRect(-30, 6, 22, 8);
+  ctx.fillRect(-26, 14, 14, 4);
 
-  // 3. 6 Rotating Vulcan Barrels & Support Clamp Rings
-  const barrelLen = 42;
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(2, -9, barrelLen + 2, 18);
-
-  // 6 Horizontal Barrel Tubes
-  const barrelYPositions = [-7, -4, -1, 2, 5, 8];
-  for (let b = 0; b < barrelYPositions.length; b++) {
-    const bY = barrelYPositions[b];
-    // Barrel base color (Molten orange/red if high heat)
-    let barrelColor = '#334155';
-    if (heat > 0.3) {
-      barrelColor = (b % 2 === 0) ? '#EA580C' : '#F59E0B';
-    }
-    ctx.fillStyle = barrelColor;
-    ctx.fillRect(3, bY, barrelLen, 2);
+  // Articulated Metallic Steel Link Clips & 7.62mm Brass Rounds
+  const chuteRounds = [
+    { x: -28, y: 6 },
+    { x: -22, y: 8 },
+    { x: -16, y: 10 },
+    { x: -10, y: 12 }
+  ];
+  for (let c = 0; c < chuteRounds.length; c++) {
+    const cr = chuteRounds[c];
+    // Brass cartridge
+    ctx.fillStyle = '#D97706';
+    ctx.fillRect(cr.x, cr.y, 4, 6);
+    ctx.fillStyle = '#F59E0B';
+    ctx.fillRect(cr.x + 1, cr.y + 1, 2, 4);
+    ctx.fillStyle = '#FEF08A';
+    ctx.fillRect(cr.x + 1, cr.y + 1, 1, 2);
+    // Steel link clip
+    ctx.fillStyle = '#0B0D12';
+    ctx.fillRect(cr.x + 3, cr.y - 1, 2, 8);
     ctx.fillStyle = '#475569';
-    ctx.fillRect(3, bY, barrelLen * 0.7, 1);
+    ctx.fillRect(cr.x + 3, cr.y, 1, 6);
   }
 
-  // Intermediate Spacer Rings
-  ctx.fillStyle = '#0F172A';
-  ctx.fillRect(16, -10, 4, 20);
-  ctx.fillRect(32, -10, 4, 20);
+  // Cylindrical Motor Pod Body (Matte Military Olive-Drab)
+  ctx.fillStyle = '#0B0D12'; // Dark outline
+  ctx.fillRect(motorX - 1, motorY - 1, motorW + 2, motorH + 2);
 
-  // Front Muzzle Clamp Ring
-  ctx.fillStyle = (heat > 0.4) ? '#DC2626' : '#0F172A';
-  ctx.fillRect(3 + barrelLen - 4, -10, 5, 20);
+  ctx.fillStyle = '#2C361C'; // Matte olive drab body
+  ctx.fillRect(motorX, motorY, motorW, motorH);
 
-  // 4. Overheated Thermal Glow & Muzzle Flash
+  // Motor top specular highlight
+  ctx.fillStyle = '#4A5A2F';
+  ctx.fillRect(motorX + 2, motorY, motorW - 4, 2);
+  ctx.fillStyle = '#5C703A';
+  ctx.fillRect(motorX + 4, motorY, motorW - 8, 1);
+
+  // Motor underside deep shadow
+  ctx.fillStyle = '#161D0E';
+  ctx.fillRect(motorX, motorY + motorH - 2, motorW, 2);
+
+  // Stator Cooling Vents & Internal Coils
+  ctx.fillStyle = '#11160C';
+  ctx.fillRect(motorX + 4, motorY + 2, motorW - 8, motorH - 4);
+  for (let vx = motorX + 5; vx < motorX + motorW - 5; vx += 3) {
+    ctx.fillStyle = '#B45309'; // Copper armature coil glimpse
+    ctx.fillRect(vx, motorY + 3, 1, motorH - 6);
+    ctx.fillStyle = '#364323'; // Olive stator rib
+    ctx.fillRect(vx + 1, motorY + 2, 1, motorH - 4);
+  }
+
+  // Charcoal Steel End Caps
+  ctx.fillStyle = '#1E232B';
+  ctx.fillRect(motorX, motorY, 3, motorH);
+  ctx.fillRect(motorX + motorW - 3, motorY, 3, motorH);
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(motorX + motorW - 3, motorY, 1, motorH);
+
+  // Motor Center Clamp Band & Silver Latch
+  ctx.fillStyle = '#2A323D';
+  ctx.fillRect(motorX + 9, motorY - 1, 3, motorH + 2);
+  ctx.fillStyle = '#E2E8F0'; // Silver Latch
+  ctx.fillRect(motorX + 10, motorY + 2, 2, 3);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(motorX + 10, motorY + 2, 1, 1);
+
+  // ── LAYER 1: REAR CHASSIS SUPPORT BARS & TERMINAL BRACKET ──
+  // Dual Lower Support Rods (Charcoal Steel)
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(-36, -3, 20, 4);
+  ctx.fillRect(-36, 3, 20, 4);
+
+  ctx.fillStyle = '#1E232B';
+  ctx.fillRect(-35, -2, 18, 2);
+  ctx.fillRect(-35, 4, 18, 2);
+
+  ctx.fillStyle = '#475569'; // Rod top specular edge
+  ctx.fillRect(-34, -2, 16, 1);
+  ctx.fillRect(-34, 4, 16, 1);
+
+  // Rear Terminal Cross-Brace Bracket (Military Olive Drab)
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(-37, -5, 4, 12);
+  ctx.fillStyle = '#2C361C';
+  ctx.fillRect(-36, -4, 2, 10);
+  ctx.fillStyle = '#4A5A2F';
+  ctx.fillRect(-36, -4, 2, 2);
+
+  // ── LAYER 2: CENTRAL RECEIVER / ROTOR HOUSING ──
+  const recX = -16;
+  const recY = -8;
+  const recW = 25;
+  const recH = 12;
+
+  // Main Receiver Dark Outer Contour
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(recX - 1, recY - 1, recW + 2, recH + 2);
+
+  // Military Olive-Drab Armor Plate Body
+  ctx.fillStyle = '#364323';
+  ctx.fillRect(recX, recY, recW, recH);
+
+  // Receiver Top Specular Highlight
+  ctx.fillStyle = '#526435';
+  ctx.fillRect(recX + 1, recY, recW - 2, 2);
+  ctx.fillStyle = '#657C41';
+  ctx.fillRect(recX + 3, recY, recW - 6, 1);
+
+  // Receiver Underside Shadow
+  ctx.fillStyle = '#1A2111';
+  ctx.fillRect(recX, recY + recH - 2, recW, 2);
+
+  // Charcoal Steel Structural Reinforcement Top Plate
+  ctx.fillStyle = '#1E232B';
+  ctx.fillRect(recX + 2, recY + 1, recW - 4, 3);
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(recX + 2, recY + 1, recW - 4, 1);
+
+  // Top Stamped Inspection Plate & Amber Military Serial Marking
+  ctx.fillStyle = '#11160C';
+  ctx.fillRect(recX + 5, recY + 2, 10, 2);
+  ctx.fillStyle = '#F59E0B'; // Military Stencil Bar
+  ctx.fillRect(recX + 6, recY + 2, 8, 1);
+
+  // Exposed Metallic Silver Hex Screws
+  const hexXs = [recX + 3, recX + 16, recX + 20];
+  for (let h = 0; h < hexXs.length; h++) {
+    ctx.fillStyle = '#E2E8F0';
+    ctx.fillRect(hexXs[h], recY + 2, 2, 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(hexXs[h], recY + 2, 1, 1);
+  }
+
+  // Side Cylindrical Auxiliary Solenoid Housing (Charcoal Steel)
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(recX + 1, recY + 5, 14, 5);
+  ctx.fillStyle = '#1E232B';
+  ctx.fillRect(recX + 2, recY + 6, 12, 3);
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(recX + 2, recY + 6, 12, 1);
+
+  // Dual Butterfly Quick-Release T-Wing Nuts on Top Housing
+  const tNuts = [recX + 5, recX + 17];
+  for (let t = 0; t < tNuts.length; t++) {
+    const tx = tNuts[t];
+    // Vertical Stud
+    ctx.fillStyle = '#0B0D12';
+    ctx.fillRect(tx - 1, recY - 4, 3, 4);
+    ctx.fillStyle = '#94A3B8';
+    ctx.fillRect(tx, recY - 3, 1, 3);
+    // Horizontal T-Wing Nut (Metallic Silver)
+    ctx.fillStyle = '#0B0D12';
+    ctx.fillRect(tx - 3, recY - 5, 7, 3);
+    ctx.fillStyle = '#E2E8F0';
+    ctx.fillRect(tx - 2, recY - 4, 5, 1);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(tx - 1, recY - 4, 2, 1);
+  }
+
+  // Rear Rotor Block Collar (Charcoal Gunmetal Steel with Silver Bevel)
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(recX + recW - 2, recY - 1, 4, recH + 2);
+  ctx.fillStyle = '#1E232B';
+  ctx.fillRect(recX + recW - 1, recY, 2, recH);
+  ctx.fillStyle = '#64748B';
+  ctx.fillRect(recX + recW - 1, recY, 1, recH);
+
+  // ── LAYER 3: 6-BARREL GATLING CLUSTER WITH DYNAMIC 3D ROTATIONAL PROJECTION ──
+  const numBarrels = 6;
+  const clusterR = 6.0;
+  const barrelStartX = 11;
+  const barrelEndX = 55;
+  const barrelLen = barrelEndX - barrelStartX; // 44px
+
+  // Central Axle Drive Shaft
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(barrelStartX, -2, barrelLen - 2, 4);
+  ctx.fillStyle = '#181B22';
+  ctx.fillRect(barrelStartX + 1, -1, barrelLen - 4, 2);
+  // Rotating central axle flute highlight
+  const axleY = snap(Math.sin(spinAngle * 3) * 0.8);
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(barrelStartX + 2, axleY, barrelLen - 6, 1);
+
+  // Dynamic 3D Barrel Calculation
+  const barrels = [];
+  for (let i = 0; i < numBarrels; i++) {
+    const a = spinAngle + (i * Math.PI * 2) / numBarrels;
+    const by = Math.sin(a) * clusterR;
+    const depth = Math.cos(a); // -1.0 (back) to +1.0 (front)
+    barrels.push({ idx: i, angle: a, y: snap(by), depth: depth });
+  }
+
+  // Sort by depth so back barrels render first, then clamp rings, then front barrels
+  barrels.sort((a, b) => a.depth - b.depth);
+
+  // Helper to draw a discrete pixel minigun barrel
+  const drawPixelBarrel = (bY, depth, isFront) => {
+    const isBack = !isFront;
+    const bH = isFront ? 3 : 2;
+    const tipLen = 8;
+    const mainLen = barrelLen - tipLen;
+
+    // Dark outline / shadow
+    ctx.fillStyle = '#0B0D12';
+    ctx.fillRect(barrelStartX, bY - 1, barrelLen, bH + 2);
+
+    // Barrel body base color
+    let bodyColor = isFront ? '#334155' : '#1E293B';
+    let topSheen = isFront ? '#64748B' : '#334155';
+    let specColor = isFront ? '#94A3B8' : '#475569';
+
+    if (heat > 0.45) {
+      bodyColor = (depth > 0) ? '#EA580C' : '#9A3412';
+      topSheen = '#F59E0B';
+      specColor = '#FEF08A';
+    } else if (heat > 0.20) {
+      bodyColor = (depth > 0) ? '#475569' : '#1E293B';
+      topSheen = '#EA580C';
+      specColor = '#F59E0B';
+    }
+
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(barrelStartX + 1, bY, mainLen, bH);
+
+    // Specular longitudinal metallic highlight on front barrels
+    if (isFront) {
+      ctx.fillStyle = topSheen;
+      ctx.fillRect(barrelStartX + 2, bY, mainLen - 2, 1);
+      ctx.fillStyle = specColor;
+      ctx.fillRect(barrelStartX + 6, bY, (mainLen - 12) * 0.6, 1);
+    }
+
+    // Heat-Treated Muzzle Tip (Tempered Titanium Blue/Purple or Incandescent Molten Glow)
+    const tipX = barrelStartX + mainLen;
+    if (heat > 0.5) {
+      // White-hot / molten orange tip
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(tipX, bY, tipLen - 2, bH);
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(tipX + 1, bY, tipLen - 4, 1);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(tipX + tipLen - 3, bY, 2, bH);
+    } else if (heat > 0.25) {
+      // Cherry red / glowing tip
+      ctx.fillStyle = '#DC2626';
+      ctx.fillRect(tipX, bY, tipLen - 2, bH);
+      ctx.fillStyle = '#EA580C';
+      ctx.fillRect(tipX + 1, bY, tipLen - 4, 1);
+    } else {
+      // Authentic Titanium Heat-Treated Blue/Purple Sheen
+      ctx.fillStyle = '#2563EB'; // Royal heat blue
+      ctx.fillRect(tipX, bY, 3, bH);
+      ctx.fillStyle = '#4F46E5'; // Indigo/violet temper ring
+      ctx.fillRect(tipX + 3, bY, 3, bH);
+      ctx.fillStyle = '#1E232B'; // Charcoal muzzle crown
+      ctx.fillRect(tipX + 6, bY, 2, bH);
+    }
+
+    // Barrel Bore Opening (Dark Hole at Muzzle Crown)
+    ctx.fillStyle = '#0B0D12';
+    ctx.fillRect(barrelEndX - 1, bY, 1, bH);
+  };
+
+  // Helper to draw a heavy pixel clamp ring
+  const drawPixelClampRing = (ringX, isFrontMuzzle = false) => {
+    const ringW = 4;
+    const ringH = 18;
+    const ringY = -9;
+
+    ctx.fillStyle = '#0B0D12';
+    ctx.fillRect(ringX - 1, ringY - 1, ringW + 2, ringH + 2);
+
+    let ringBody = '#364323'; // Military olive drab
+    let ringHighlight = '#526435';
+    let boltColor = '#E2E8F0';
+
+    if (isFrontMuzzle && heat > 0.4) {
+      ringBody = '#EA580C';
+      ringHighlight = '#FEF08A';
+      boltColor = '#FFFFFF';
+    } else if (isFrontMuzzle && heat > 0.2) {
+      ringBody = '#DC2626';
+      ringHighlight = '#F59E0B';
+    }
+
+    ctx.fillStyle = ringBody;
+    ctx.fillRect(ringX, ringY, ringW, ringH);
+
+    // Top & center highlight bands
+    ctx.fillStyle = ringHighlight;
+    ctx.fillRect(ringX, ringY, ringW, 2);
+    ctx.fillRect(ringX + 1, ringY + 5, 2, 8);
+
+    // Dark perimeter cooling notches
+    ctx.fillStyle = '#11160C';
+    ctx.fillRect(ringX, ringY + 3, 1, 2);
+    ctx.fillRect(ringX, ringY + 13, 1, 2);
+    ctx.fillRect(ringX + ringW - 1, ringY + 3, 1, 2);
+    ctx.fillRect(ringX + ringW - 1, ringY + 13, 1, 2);
+
+    // Clamp Tension Silver Hex Bolts
+    ctx.fillStyle = boltColor;
+    ctx.fillRect(ringX + 1, ringY + 1, 2, 2);
+    ctx.fillRect(ringX + 1, ringY + ringH - 3, 2, 2);
+  };
+
+  // 3A. Draw Back Barrels (depth < 0)
+  for (let i = 0; i < barrels.length; i++) {
+    const b = barrels[i];
+    if (b.depth >= 0) continue;
+    drawPixelBarrel(b.y, b.depth, false);
+  }
+
+  // 3B. Draw 3 Heavy Clamp Rings
+  drawPixelClampRing(11, false); // Rear Collar Ring
+  drawPixelClampRing(31, false); // Mid-Barrel Stabilizer Ring
+  drawPixelClampRing(51, true);  // Front Muzzle Crown Ring
+
+  // 3C. Draw Front Barrels (depth >= 0)
+  for (let i = 0; i < barrels.length; i++) {
+    const b = barrels[i];
+    if (b.depth < 0) continue;
+    drawPixelBarrel(b.y, b.depth, true);
+  }
+
+  // 3D. Rotational Motion Blur Ring when firing or spinning
+  if (flashTimer > 0 || heat > 0.15) {
+    ctx.fillStyle = (heat > 0.4) ? 'rgba(249, 115, 22, 0.45)' : 'rgba(148, 163, 184, 0.35)';
+    ctx.fillRect(barrelStartX + 2, -7, barrelLen - 4, 1);
+    ctx.fillRect(barrelStartX + 2, 7, barrelLen - 4, 1);
+    ctx.fillRect(barrelEndX - 2, -8, 2, 16);
+  }
+
+  // ── LAYER 4: OVERHEAD HORIZONTAL BRIDGE SUPPORT STRUT & FORWARD CARRY HANDLE BRACKET ──
+  const loopX = 8;
+  const loopTopY = -18;
+  const loopH = 26;
+
+  // Upright Forward Carry Handle Loop Bracket (Olive Drab with Dark Core)
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(loopX - 3, loopTopY - 1, 6, loopH + 2);
+
+  ctx.fillStyle = '#364323';
+  ctx.fillRect(loopX - 2, loopTopY, 4, loopH);
+
+  ctx.fillStyle = '#4A5A2F'; // Highlight
+  ctx.fillRect(loopX - 2, loopTopY, 2, loopH);
+
+  // Oval Grip Hole in Loop Handle for front hand grip
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(loopX - 1, loopTopY + 3, 2, 8);
+
+  // Forward Bracket Mounting Boss Collar (Charcoal Steel)
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(loopX - 4, -7, 8, 13);
+  ctx.fillStyle = '#1E232B';
+  ctx.fillRect(loopX - 3, -6, 6, 11);
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(loopX - 3, -6, 6, 1);
+
+  // Silver Hex Mounting Pin
+  ctx.fillStyle = '#E2E8F0';
+  ctx.fillRect(loopX - 1, -2, 2, 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(loopX - 1, -2, 1, 1);
+
+  // Overhead Horizontal Bridge Support Strut (Connecting Forward Loop to Rear Spade Grip)
+  const bridgeStartX = loopX;
+  const bridgeEndX = -36;
+  const bridgeY = -15;
+  const bridgeW = bridgeStartX - bridgeEndX;
+
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(bridgeEndX - 1, bridgeY - 1, bridgeW + 2, 5);
+
+  ctx.fillStyle = '#334155';
+  ctx.fillRect(bridgeEndX, bridgeY, bridgeW, 3);
+
+  ctx.fillStyle = '#64748B'; // Top metallic sheen
+  ctx.fillRect(bridgeEndX, bridgeY, bridgeW, 1);
+
+  // Front & Rear Strut Mounting Silver Bolts
+  ctx.fillStyle = '#E2E8F0';
+  ctx.fillRect(bridgeStartX - 2, bridgeY - 1, 2, 2);
+  ctx.fillRect(bridgeEndX + 2, bridgeY - 1, 2, 2);
+
+  // ── LAYER 5: REAR CHAINSAW / JOYSTICK SPADE GRIP ──
+  const gripX = -36;
+  const gripTopY = -24;
+
+  // Ergonomic Grip Outer Dark Contour
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(gripX - 9, gripTopY - 1, 12, 30);
+  ctx.fillRect(gripX - 7, gripTopY + 28, 9, 3);
+
+  // Heavy Matte Black Polymer / Rubber Grip Body
+  ctx.fillStyle = '#0F1116';
+  ctx.fillRect(gripX - 8, gripTopY, 10, 28);
+
+  // Contoured Rear Spine Highlight
+  ctx.fillStyle = '#1E232B';
+  ctx.fillRect(gripX + 1, gripTopY + 4, 1, 22);
+
+  // Textured Scalloped Finger Grip Ribs (4 Finger Grooves)
+  ctx.fillStyle = '#181B22';
+  ctx.fillRect(gripX - 6, gripTopY + 6, 6, 18);
+
+  ctx.fillStyle = '#282D37'; // Groove divider ribs
+  for (let gy = gripTopY + 8; gy <= gripTopY + 20; gy += 4) {
+    ctx.fillRect(gripX - 7, gy, 7, 1);
+  }
+
+  // Red/Amber Thumb Safety / Fire Toggle Switch on Top Horn
+  ctx.fillStyle = '#0B0D12';
+  ctx.fillRect(gripX - 5, gripTopY - 4, 6, 5);
+  ctx.fillStyle = '#DC2626';
+  ctx.fillRect(gripX - 4, gripTopY - 3, 4, 3);
+  ctx.fillStyle = '#EF4444';
+  ctx.fillRect(gripX - 3, gripTopY - 3, 2, 1);
+
+  // Glowing Green Status LED
+  ctx.fillStyle = '#22C55E';
+  ctx.fillRect(gripX - 3, gripTopY - 1, 2, 2);
+  ctx.fillStyle = '#86EFAC';
+  ctx.fillRect(gripX - 3, gripTopY - 1, 1, 1);
+
+  // ── LAYER 6: TUMBLING 7.62MM SPENT BRASS CASINGS & DISINTEGRATING LINKS SHOWER ──
+  if (flashTimer > 0 || recoil > 1.5) {
+    const casings = [
+      { dx: -6, dy: 12, angle: spinAngle * 2.5 },
+      { dx: -12, dy: 20, angle: spinAngle * 3.0 + 1.2 },
+      { dx: -18, dy: 28, angle: spinAngle * 3.5 + 2.4 }
+    ];
+    for (let c = 0; c < casings.length; c++) {
+      const cs = casings[c];
+      ctx.save();
+      ctx.translate(snap(motorX + 4 + cs.dx), snap(motorY + motorH + cs.dy));
+      ctx.rotate(cs.angle);
+
+      // Heavy 7.62mm Brass Shell Casing
+      ctx.fillStyle = '#0B0D12';
+      ctx.fillRect(-4, -2, 8, 4);
+
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(-3, -1, 6, 2);
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(-3, -1, 4, 1);
+      ctx.fillStyle = '#B45309'; // Extractor rim
+      ctx.fillRect(-3, 0, 1, 1);
+
+      ctx.restore();
+    }
+
+    // Disintegrating Dark Steel Belt Link Clip
+    ctx.save();
+    ctx.translate(snap(motorX - 2), snap(motorY + motorH + 16));
+    ctx.rotate(-spinAngle * 2.8);
+    ctx.fillStyle = '#0B0D12';
+    ctx.fillRect(-3, -2, 6, 4);
+    ctx.fillStyle = '#1E232B';
+    ctx.fillRect(-2, -1, 4, 2);
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(-2, -1, 3, 1);
+    ctx.restore();
+  }
+
+  // ── LAYER 7: MULTI-TIER ROTATIONAL PIXEL STARBURST MUZZLE FLASH ──
   if (flashTimer > 0) {
-    drawCjPixelMuzzleFlash(ctx, 3 + barrelLen + 4, 0, 1.85);
+    const mX = barrelEndX + 2;
+    const mY = 0;
+
+    // 1. Gas Venting Jets (Top and Bottom radial vents)
+    ctx.fillStyle = '#F59E0B';
+    ctx.fillRect(mX - 4, -14, 2, 4);
+    ctx.fillRect(mX - 3, -12, 2, 4);
+    ctx.fillRect(mX - 4, 10, 2, 4);
+    ctx.fillRect(mX - 3, 8, 2, 4);
+
+    // 2. Fiery Outer Starburst Blast Spikes (Orange & Crimson)
+    ctx.fillStyle = '#EA580C';
+    // Forward primary spike
+    ctx.fillRect(mX, -2, 24, 4);
+    ctx.fillRect(mX + 24, -1, 6, 2);
+    // Vertical spikes
+    ctx.fillRect(mX + 2, -10, 4, 20);
+    ctx.fillRect(mX + 3, -14, 2, 28);
+    // 45° Diagonal spikes
+    ctx.fillRect(mX + 6, -8, 4, 4);
+    ctx.fillRect(mX + 10, -12, 3, 3);
+    ctx.fillRect(mX + 6, 4, 4, 4);
+    ctx.fillRect(mX + 10, 9, 3, 3);
+
+    // 3. Golden Yellow Mid-Burst Petals
+    ctx.fillStyle = '#FBBF24';
+    ctx.fillRect(mX + 1, -3, 16, 6);
+    ctx.fillRect(mX + 2, -7, 4, 14);
+    ctx.fillRect(mX + 4, -5, 8, 10);
+    ctx.fillRect(mX + 12, -2, 6, 4);
+
+    // 4. White-Hot Incandescent Star Core
+    ctx.fillStyle = '#FEF08A';
+    ctx.fillRect(mX + 1, -2, 10, 4);
+    ctx.fillRect(mX + 3, -4, 4, 8);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(mX + 2, -1, 6, 2);
+    ctx.fillRect(mX + 4, -3, 2, 6);
+
+    // 5. High-Velocity Ballistic Pixel Sparks
+    const sparkOffsets = [
+      { x: mX + 22, y: -6, s: 2, c: '#FFFFFF' },
+      { x: mX + 28, y: 3, s: 2, c: '#FEF08A' },
+      { x: mX + 34, y: -2, s: 3, c: '#F59E0B' },
+      { x: mX + 20, y: 8, s: 2, c: '#EA580C' },
+      { x: mX + 16, y: -12, s: 2, c: '#FBBF24' }
+    ];
+    for (let sp = 0; sp < sparkOffsets.length; sp++) {
+      const spo = sparkOffsets[sp];
+      ctx.fillStyle = spo.c;
+      ctx.fillRect(spo.x, spo.y, spo.s, spo.s);
+    }
   }
 
   ctx.restore();

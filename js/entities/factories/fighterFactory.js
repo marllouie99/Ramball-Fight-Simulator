@@ -116,6 +116,30 @@ function wrapFighterDraw(FighterClass) {
   if (!originalDraw) return;
   
   FighterClass.prototype.draw = function(ctx, opponent) {
+    const fighter = this;
+
+    // Automatic suppression shield: When fighter is incapacitated, stunned, hit by Getsuga, or in cognitive stasis,
+    // universally flush afterimages and clear active attack animations so the body draws in clean idle stance.
+    if (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed()) {
+      if (typeof fighter.clearAllAfterimages === 'function') fighter.clearAllAfterimages();
+      fighter.punchAnimTimer = 0;
+      fighter.leftPunchTimer = 0;
+      fighter.slashSwingTimer = 0;
+      fighter.katanaSlashTimer = 0;
+      fighter.spearSwingTimer = 0;
+      fighter.cleaveSwingTimer = 0;
+      fighter.meleeSwingActive = false;
+      fighter.scytheSwingActive = false;
+      fighter.axeSwingActive = false;
+      fighter.swipeActive = false;
+      fighter.sakugaImpactTimer = 0;
+      if (fighter.swordTrail) fighter.swordTrail.length = 0;
+      if (fighter.punchEffects) fighter.punchEffects.length = 0;
+      if (fighter.slashHitVisuals) fighter.slashHitVisuals.length = 0;
+      if (fighter.flurrySlashVisuals) fighter.flurrySlashVisuals.length = 0;
+      if (fighter.hitFlameWisps) fighter.hitFlameWisps.length = 0;
+    }
+
     const originalArc = ctx.arc;
     const originalStroke = ctx.stroke;
     const originalBeginPath = ctx.beginPath;
@@ -127,8 +151,6 @@ function wrapFighterDraw(FighterClass) {
 
     let handArcCalled = false;
     let handX = 0, handY = 0, handR = 0;
-    
-    const fighter = this;
     
     ctx.beginPath = function() {
       arcCalled = false;

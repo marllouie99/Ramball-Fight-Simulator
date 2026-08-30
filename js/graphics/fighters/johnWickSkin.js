@@ -9,6 +9,7 @@
 
 import { getHandSize } from '../../core/config.js';
 import { state, isChampionScreenActive } from '../../core/state.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
 let _johnWickPixelSkinImage = null;
 let _johnWickPixelSkinLoading = false;
@@ -699,7 +700,8 @@ export function drawJohnWickSkin(ctx, fighter) {
   }
 
   // ── EVADE BUFF / ROLL INTANGIBILITY AFTERIMAGE GHOSTS ──
-  const isEvading = Boolean(fighter.isRolling || (fighter.evadeBuffTimer && fighter.evadeBuffTimer > 0));
+  const isSuppressed = typeof fighter?.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
+  const isEvading = !isSuppressed && Boolean(fighter.isRolling || (fighter.evadeBuffTimer && fighter.evadeBuffTimer > 0));
   if (isEvading) {
     ctx.save();
     ctx.globalAlpha = 0.30;

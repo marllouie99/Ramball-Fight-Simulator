@@ -91,7 +91,7 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
-    domainCooldown: 1950,     // Cooldown before domain can trigger (25 seconds at 60 fps)
+    domainCooldown: 1200,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
     domainDamage: 15,          // Base damage per slash tick

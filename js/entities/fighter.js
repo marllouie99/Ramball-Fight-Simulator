@@ -24,6 +24,32 @@ import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, d
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
 
+/**
+ * Returns true if the entity is currently hit by, dragged by, or suppressed by Getsuga Tensho.
+ */
+export function isSuppressedByGetsuga(fighter) {
+  if (!fighter) return false;
+  return Boolean(
+    fighter.isDraggedByGetsuga ||
+    (fighter._hitByGetsugaTimer && fighter._hitByGetsugaTimer > 0)
+  );
+}
+
+/**
+ * Immediately cancels, hides, and clears all afterimages and active attack effects on a target hit by Getsuga Tensho.
+ */
+export function suppressAfterimagesAndAttackEffects(target) {
+  if (!target) return;
+  if (typeof target.suppressCombatAndVisuals === 'function') {
+    target.suppressCombatAndVisuals({ isGetsuga: true, timer: 24 });
+  } else {
+    if (typeof target.clearAllAfterimages === 'function') target.clearAllAfterimages();
+    else if (target.afterImages) target.afterImages.length = 0;
+    if (typeof target.clearAllAttackEffects === 'function') target.clearAllAttackEffects();
+    target._hitByGetsugaTimer = Math.max(target._hitByGetsugaTimer || 0, 24);
+  }
+}
+
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
   if (typeof opts === 'string') {
@@ -31,6 +57,12 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   } else if (!opts || typeof opts !== 'object') {
     opts = {};
   }
+
+  // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects on any target
+  if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !target.isTurret && !target.isDispenser) {
+    suppressAfterimagesAndAttackEffects(target);
+  }
+
   if (typeof attacker === 'number' && typeof state !== 'undefined' && state.fighters) {
     attacker = state.fighters[attacker] || null;
   }
@@ -366,10 +398,217 @@ export class Fighter {
    */
   canPerformBasicAttack() {
     if (this.hp <= 0 || this.isDead) return false;
-    if (this.timeStopTimer > 0 || (this.hitStunTimer || 0) > 0 || (this.paralyzeTimer || 0) > 0 || this.isParalyzed) return false;
-    if (this.isTargetOfAmbush || this.isCaughtInBeam()) return false;
+    if (this.areAttackEffectsSuppressed()) return false;
+    if (this.isCaughtInBeam()) return false;
     if (this.isAffectedBySoulDisfigurement()) return false;
     return true;
+  }
+
+  /**
+   * Universal evaluation of whether this entity's attack animations,
+   * speed lines, weapon visual effects, and afterimages should be suppressed/hidden.
+   * This is the single source of truth across all renderers and systems.
+   */
+  areAttackEffectsSuppressed() {
+    if (this.hp <= 0 || this.isDead) return true;
+    if (this.isTargetOfAmbush) return true;
+    if (this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0)) return true;
+    if (this.timeStopTimer && this.timeStopTimer > 0) return true;
+    if (this.paralyzeTimer && this.paralyzeTimer > 0) return true;
+    if (this.electricStunTimer && this.electricStunTimer > 0) return true;
+    if (this.dubstepStunTimer && this.dubstepStunTimer > 0) return true;
+    if (this.isParalyzed || this.isFrozen || this.isFrozenByInfinity) return true;
+    if (this.hitStunTimer && this.hitStunTimer > 0) return true;
+    if (this.isWallPinned || this.isWallSlammed) return true;
+    if (this.caughtInSaitamaCounter) return true;
+    if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
+
+    // Trapped in cognitive stasis of enemy domain (e.g. Gojo's Unlimited Void)
+    if (typeof state !== 'undefined' && state.fighters) {
+      const isInsideGojoDomain = state.fighters.some(f => 
+        f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+      );
+      if (isInsideGojoDomain && !this.isDomainImmune && !this.isParalyzeImmune) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Universally empties all afterimage motion trail arrays across all fighters.
+   */
+  clearAllAfterimages() {
+    if (this.afterImages) this.afterImages.length = 0;
+    if (this.stealthAfterimages && this.stealthAfterimages !== this.afterImages) this.stealthAfterimages.length = 0;
+    if (this.adaptationAfterimages && this.adaptationAfterimages !== this.afterImages) this.adaptationAfterimages.length = 0;
+    if (this._dashAfterimages && this._dashAfterimages !== this.afterImages) this._dashAfterimages.length = 0;
+    if (this._afterImages && this._afterImages !== this.afterImages) this._afterImages.length = 0;
+    if (this.shadowClones) this.shadowClones.length = 0;
+    if (this.shunpoAfterimages) this.shunpoAfterimages.length = 0;
+  }
+
+  /**
+   * Universally halts and resets all active attack animations, swings,
+   * flurries, channeling, and attached attack particle arrays.
+   */
+  clearAllAttackEffects() {
+    // Basic melee punch & swing timers
+    this.punchAnimTimer = 0;
+    this.punchActiveMaxTime = 0;
+    this.leftPunchTimer = 0;
+    this.slashSwingTimer = 0;
+    this.katanaSlashTimer = 0;
+    this.katanaSlashFadeTimer = 0;
+    this._lastKatanaTimer = 0;
+    this.spearSwingTimer = 0;
+    this.cleaveSwingTimer = 0;
+    this.meleeSwingActive = false;
+    this.meleeSwingTimer = 0;
+    this.meleeSlashFadeTimer = 0;
+    this.attackSwingTimer = 0;
+    this.scytheSwingActive = false;
+    this.scytheSwingTimer = 0;
+    this.axeSwingActive = false;
+    this.recoilTimer = 0;
+    this.swipeActive = false;
+    this.swipeTimer = 0;
+    this.basicAttackHitPauseTimer = 0;
+
+    // Flurries, combos, and rushes
+    this.isFlurrying = false;
+    this.flurryHitsLeft = 0;
+    this.flurryTimer = 0;
+    this.flurryTarget = null;
+    this.flurryVoiceTimer = 0;
+    this.rapidSlashHitsLeft = 0;
+    this.rapidSlashTimer = 0;
+    this.meleeComboCount = 0;
+    this.teleportSlideTimer = 0;
+    this.isComboDashing = false;
+    this.comboHitsLeft = 0;
+    this.delayedShockwaves = [];
+    this.blackFlashHitsLeft = 0;
+    this.blackFlashTimer = 0;
+
+    // Attached attack visual effects & trails
+    if (this.swordTrail) this.swordTrail.length = 0;
+    if (this.punchEffects) this.punchEffects.length = 0;
+    if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
+    if (this.flurrySlashVisuals) this.flurrySlashVisuals.length = 0;
+    if (this.hitFlameWisps) this.hitFlameWisps.length = 0;
+    this.sakugaImpactTimer = 0;
+
+    // Character-specific attack channeling and morph timers
+    this.thinIceBreakerPunchTimer = 0;
+    this.thinIceBreakerChargeTimer = 0;
+    this.isChannelingThinIceBreaker = false;
+    this.isChannelingPureLoveBeam = false;
+    this.pureLoveBeamChargeTimer = 0;
+    this.isFiringPureLoveBeam = false;
+    this.pureLoveBeamActiveTimer = 0;
+    this.beamRetreatSlideTimer = 0;
+    this.rikaEmergingForBeamTimer = 0;
+    this.rikaCallTimer = 0;
+    if (typeof this._stopBeamAudio === 'function') this._stopBeamAudio();
+
+    this.twinScissorAnimTimer = 0;
+    this._twinScissorData = null;
+    this.fleshSurgeAnimTimer = 0;
+    this._fleshSurgePlungeAngle = null;
+    this._fleshSurgeChain = null;
+    this.maceCannonAnimTimer = 0;
+    this._maceCannonData = null;
+    this.soulPhaseDashTimer = 0;
+    this.soulPhaseDashVector = null;
+
+    this.cleaveCutTimer = 0;
+    this.fugaTimer = 0;
+    this.isChannelingDivineFlame = false;
+    this.divineFlameChargeTimer = 0;
+    this.divineFlameRecoveryTimer = 0;
+    if (this.fugaSoundKey) {
+      try { stopLoopingSound(this.fugaSoundKey); } catch (e) {}
+      this.fugaSoundKey = null;
+    }
+
+    this.lapisBlueAnimTimer = 0;
+    this.redEffectTimer = 0;
+    this.redBuildupPhase = false;
+    this.isChannelingPurple = false;
+    this.purpleChargeTimer = 0;
+    this.purpleRecoveryTimer = 0;
+    this.combatAuraOpacity = 0;
+
+    this.isChargingUlt = false;
+    this.isFiringUlt = false;
+    this.ultTimer = 0;
+    this.speedBoostTimer = 0;
+
+    this._counterPunchTimer = 0;
+    this._counterWindupTimer = 0;
+    this._postCounterRecoveryTimer = 0;
+    this.isCountering = false;
+
+    this.isBlitzing = false;
+    this.blitzTarget = null;
+    this.ratioHitPauseTimer = 0;
+    this.isLunging = false;
+    this._chopHitDelivered = true;
+    this._chopTarget = null;
+    this.isChannelingBlackFlash = false;
+    this.blackFlashChannelTimer = 0;
+
+    this.phantomSlashTimer = 0;
+    this.phantomStrikeCount = 0;
+    this._activeSlashProgress = 0;
+    this._recoveryProgress = 0;
+    this.isAmbushing = false;
+    this.ambushTarget = null;
+    this.ambushPhase = null;
+
+    this.isShooting = false;
+    this.isDrawingBow = false;
+    this.burstRemaining = 0;
+    this.drawPhase = 'IDLE';
+    this.arrowDrawTimer = 0;
+    this.arrowDrawProgress = 0;
+    this.smoothDrawProgress = 0;
+    this.isDeployingSprenger = false;
+
+    this.isRolling = false;
+    this.rollTimer = 0;
+    this.evadeBuffTimer = 0;
+    this.cqcComboPhase = null;
+    this.cqcComboTarget = null;
+
+    this.stormActive = false;
+    this.aegisActive = false;
+    this.flameActive = false;
+    this.beamActive = false;
+    this.skillActive = false;
+    this.sphereActive = false;
+    this.hideFrontHand = false;
+    this.hideBackHand = false;
+  }
+
+  /**
+   * Universally places the entity in a combat and visual suppression state.
+   * Cancels active attacks, clears all afterimages, interrupts sounds,
+   * and sets suppression timer if requested.
+   */
+  suppressCombatAndVisuals(options = {}) {
+    if (options.isGetsuga) {
+      this._hitByGetsugaTimer = Math.max(this._hitByGetsugaTimer || 0, options.timer || 24);
+    }
+    if (options.paralyzeDuration) {
+      this.paralyzeTimer = Math.max(this.paralyzeTimer || 0, options.paralyzeDuration);
+    }
+    this.clearAllAfterimages();
+    this.clearAllAttackEffects();
+    if (typeof this.interruptAttacks === 'function') {
+      this.interruptAttacks(true);
+    }
+    this.clearAllAfterimages();
   }
 
   /** Returns true if this fighter is currently inside any active Cronos time-stop sphere. */
@@ -388,6 +627,8 @@ export class Fighter {
   /** Returns true if this fighter is caught in any active beam (e.g. Yuta's Pure Love Beam, Genos's Beam, Laser Beam, Hollow Purple, Layla Beam). */
   isCaughtInBeam() {
     return !!(
+      this.isDraggedByGetsuga ||
+      (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
       this.caughtInPureLoveBeam ||
       this.wasCaughtInPureLoveBeam ||
       (this.pureLoveBeamTimer || 0) > 0 ||
@@ -415,6 +656,11 @@ export class Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    this.clearAllAttackEffects();
+    if (forceCancelAll || this.areAttackEffectsSuppressed()) {
+      this.clearAllAfterimages();
+    }
+
     const isChanneling = this.isChannelingDivineFlame || this.isChannelingDomainExpansion || 
                          this.isChannelingDomain || this.isChannelingPurple || 
                          (this.purpleChargeTimer || 0) > 0 || (this.redEffectTimer || 0) > 0 || 
@@ -610,6 +856,11 @@ export class Fighter {
   _handleTimeStop() {
     this._tickCooldowns();
     this._processKnockbackPhysics();
+
+    if (this.areAttackEffectsSuppressed()) {
+      if (this._hitByGetsugaTimer > 0) this._hitByGetsugaTimer--;
+      this.clearAllAfterimages();
+    }
     if (this.pureLoveBeamRecoveryTimer > 0) {
       if (this.adaptedPureLoveBeam) {
         this.pureLoveBeamRecoveryTimer = 0;
@@ -1035,6 +1286,12 @@ export class Fighter {
    */
   takeDamage(amount, attacker, opts = {}) {
     const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit));
+
+    // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
+    if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {
+      suppressAfterimagesAndAttackEffects(this);
+    }
+
     const isHeal = opts.isHeal || amount < 0;
     if (isHeal) {
       if (this.hp <= 0) return false;
@@ -1197,6 +1454,11 @@ export class Fighter {
       const isBlastOrKnockback = opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2);
       if (isBlastOrKnockback && !this.isTurret && !this.isDispenser) {
         this.interruptAttacks(true);
+      }
+
+      // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
+      if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {
+        suppressAfterimagesAndAttackEffects(this);
       }
 
       // Apply global basic attack hit-pause if configured

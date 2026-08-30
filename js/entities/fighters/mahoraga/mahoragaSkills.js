@@ -17,6 +17,7 @@ function isTeleportDisabled(fighter) {
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
   );
   if (isInsideDomain || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0 || fighter.isFrozenByInfinity) return true;
+  if (fighter.isDraggedByGetsuga) return true; // Strictly disable all teleports/dashes while carried by Getsuga Tensho wave even if adapted
   const caughtInBeam = fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0;
   return caughtInBeam && !fighter.adaptedPureLoveBeam;
 }
@@ -101,7 +102,6 @@ export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
 
   spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
   spawnImpactFlash(fromX, fromY, 40, '#8A2BE2');
-  spawnSparks(fromX, fromY, 20, 'arcane', '#8A2BE2');
   spawnImpactFlash(toX, toY, 35, '#8A2BE2');
   const dashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
   const dashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
@@ -145,7 +145,6 @@ export function gojoRedTeleportDodge(fighter, gojo) {
 
   spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
   spawnImpactFlash(fromX, fromY, 40, '#FF1144');
-  spawnSparks(fromX, fromY, 20, 'arcane', '#FF1144');
   spawnImpactFlash(toX, toY, 35, '#FF1144');
   const dashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
   const dashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
@@ -160,7 +159,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
   if (!fighter.adaptationAfterimages) fighter.adaptationAfterimages = [];
   const dist = Math.hypot(newX - oldX, newY - oldY);
   const steps = Math.max(3, Math.floor(dist / 14));
-  const lifetime = CONFIG.mahoraga?.afterimageLifetimeFrames ?? 12;
+  const lifetime = CONFIG.mahoraga?.afterimageLifetimeFrames ?? 16;
 
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -175,9 +174,9 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
       toX: stepX,
       toY: stepY,
       gunAngle: customAngle !== null ? customAngle : (fighter.gunAngle || 0),
-      timer: lifetime - Math.floor(t * 4),
+      timer: lifetime,
       maxTimer: lifetime
-    }, 40);
+    }, 60);
   }
 }
 
@@ -185,7 +184,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
  * Start adaptation flash-dash toward the attacker after wheel click cinematic pause.
  */
 export function startAdaptationFlashDash(fighter, attacker) {
-  if (isTeleportDisabled(fighter)) return;
+  if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga) return;
   if (!attacker || attacker.isDead || attacker === fighter) return;
   const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
   if (isInsideDomain) return;
@@ -238,7 +237,6 @@ export function startAdaptationFlashDash(fighter, attacker) {
   spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
 
   spawnImpactFlash(fromX, fromY, 28, '#E0E0E0');
-  spawnSparks(fromX, fromY, 12, 'silver', '#FFFFFF');
   const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
   const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
   audioSystem.playSFX(tpSnd, tpVol);
@@ -324,7 +322,6 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
 
   spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
   spawnImpactFlash(fromX, fromY, 40, '#FF6F00');
-  spawnSparks(fromX, fromY, 20, 'arcane', '#FF6F00');
   spawnImpactFlash(toX, toY, 35, '#FF6F00');
   const fugaDashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
   const fugaDashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
@@ -337,7 +334,7 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
  * and Mahoraga has adapted to it, Mahoraga instantly teleports away.
  */
 export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
-  if (isTeleportDisabled(fighter)) return;
+  if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga) return;
   if (projectile && (projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
   const fromX = fighter.x;
   const fromY = fighter.y;
@@ -444,7 +441,6 @@ export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
 
   spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
   spawnImpactFlash(fromX, fromY, 40, color);
-  spawnSparks(fromX, fromY, 20, 'arcane', color);
   spawnImpactFlash(toX, toY, 35, color);
   const genDashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
   const genDashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;

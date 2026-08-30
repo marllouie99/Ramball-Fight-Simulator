@@ -97,6 +97,14 @@ export class MahitoFighter extends Fighter {
     this.originalRadius = this.r;
   }
 
+  get _dashAfterimages() {
+    return this.afterImages;
+  }
+
+  set _dashAfterimages(val) {
+    this.afterImages = val;
+  }
+
   reset() {
     super.reset();
     this.punchAnimTimer = 0;

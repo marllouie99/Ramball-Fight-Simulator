@@ -499,40 +499,35 @@ export class TurretEntity extends Fighter {
 
     drawTurret(ctx, this);
 
-    // Draw smoke particles
+    // Draw smoke particles (Discrete Pixel Art)
     if (this.smokeParticles && this.smokeParticles.length > 0) {
       for (const p of this.smokeParticles) {
-        let alpha, fillStyle;
-        if (p.isDark) {
-          alpha = Math.max(0, p.life / p.maxLife) * 0.75;
-          fillStyle = `rgba(40, 40, 40, ${alpha})`;
-        } else {
-          alpha = Math.max(0, p.life / p.maxLife) * 0.6;
-          fillStyle = `rgba(130, 130, 130, ${alpha})`;
-        }
-        ctx.fillStyle = fillStyle;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        const alpha = Math.max(0, p.life / p.maxLife) * (p.isDark ? 0.75 : 0.6);
+        const col = p.isDark ? `rgba(30, 32, 40, ${alpha.toFixed(2)})` : `rgba(148, 163, 184, ${alpha.toFixed(2)})`;
+        ctx.fillStyle = col;
+        const px = Math.round(p.x / 2) * 2;
+        const py = Math.round(p.y / 2) * 2;
+        const ps = Math.max(2, Math.round(p.size / 2) * 2);
+        ctx.fillRect(px - ps / 2, py - ps / 2, ps, ps);
       }
     }
 
-    // Heal/repair visual effect
+    // Heal/repair visual effect (Discrete Pixel Art Green Crosses)
     if (this.healTimer > 0) {
       const t = this.healTimer / 20;
       ctx.save();
-      ctx.translate(this.x, this.y);
+      ctx.translate(Math.round(this.x / 2) * 2, Math.round(this.y / 2) * 2);
 
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r * (2.5 - t * 1.2), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(0, 255, 80, ${t * 0.7})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r * 0.9, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(0, 255, 80, ${t * 0.2})`;
-      ctx.fill();
+      const healR = Math.round((this.r * (2.2 - t * 1.0)) / 2) * 2;
+      const count = 8;
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2 + (1 - t) * 0.5;
+        const hx = Math.round(Math.cos(a) * healR / 2) * 2;
+        const hy = Math.round(Math.sin(a) * healR / 2) * 2;
+        ctx.fillStyle = `rgba(34, 197, 94, ${(t * 0.9).toFixed(2)})`;
+        ctx.fillRect(hx - 1, hy - 3, 2, 6);
+        ctx.fillRect(hx - 3, hy - 1, 6, 2);
+      }
 
       ctx.restore();
     }

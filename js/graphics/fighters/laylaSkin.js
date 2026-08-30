@@ -1,4 +1,5 @@
 import { CONFIG } from '../../core/config.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
 
 
@@ -56,7 +57,8 @@ function renderLaylaGogglesDirect(ctx, r) {
 }
 
 export function drawLaylaAfterImages(ctx, fighter) {
-  if (!fighter.afterImages || fighter.afterImages.length === 0) return;
+  const isSuppressed = typeof fighter?.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
+  if (!fighter.afterImages || fighter.afterImages.length === 0 || isSuppressed) return;
   const r = fighter.r;
   
   ctx.save();

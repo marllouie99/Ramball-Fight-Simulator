@@ -46,7 +46,7 @@ export const mahoragaConfig = {
     // ── Adaptation & RCT Mechanics ──
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
     adaptationSpeedBoostPerStage: 0.15, // +15% movement speed multiplier per gold adaptation stage
-    rctRegenPerStage: 0.03,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
+    rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
     enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique flat healing on wheel click
     rctHealFlatAmount: 100,          // Heals a flat 100 HP on each wheel rotation click
     defBuffPerClickPercent: 0.02,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)

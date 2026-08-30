@@ -113,15 +113,15 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   opponent.soulPhaseDashTimer = 0;
   opponent.hideFrontHand = false;
   opponent.hideBackHand = false;
-  if (opponent.swordTrail) opponent.swordTrail.length = 0;
-  if (opponent.afterImages) opponent.afterImages.length = 0;
-  if (opponent._dashAfterimages) opponent._dashAfterimages.length = 0;
-  if (opponent.stealthAfterimages) opponent.stealthAfterimages.length = 0;
-  if (opponent.adaptationAfterimages) opponent.adaptationAfterimages.length = 0;
-  if (opponent._afterImages) opponent._afterImages.length = 0;
-  if (opponent.hitFlameWisps) opponent.hitFlameWisps.length = 0;
-  if (opponent.punchEffects) opponent.punchEffects.length = 0;
-  if (opponent.slashHitVisuals) opponent.slashHitVisuals.length = 0;
+  if (typeof opponent.clearAllAttackEffects === 'function') {
+    opponent.clearAllAttackEffects();
+  }
+  if (typeof opponent.clearAllAfterimages === 'function') {
+    opponent.clearAllAfterimages();
+  } else {
+    if (opponent.swordTrail) opponent.swordTrail.length = 0;
+    if (opponent.afterImages) opponent.afterImages.length = 0;
+  }
 
   if (!opponent.domainActive) {
     opponent.vx = 0;
@@ -260,15 +260,15 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   opponent.soulPhaseDashTimer = 0;
   opponent.hideFrontHand = false;
   opponent.hideBackHand = false;
-  if (opponent.swordTrail) opponent.swordTrail.length = 0;
-  if (opponent.afterImages) opponent.afterImages.length = 0;
-  if (opponent._dashAfterimages) opponent._dashAfterimages.length = 0;
-  if (opponent.stealthAfterimages) opponent.stealthAfterimages.length = 0;
-  if (opponent.adaptationAfterimages) opponent.adaptationAfterimages.length = 0;
-  if (opponent._afterImages) opponent._afterImages.length = 0;
-  if (opponent.hitFlameWisps) opponent.hitFlameWisps.length = 0;
-  if (opponent.punchEffects) opponent.punchEffects.length = 0;
-  if (opponent.slashHitVisuals) opponent.slashHitVisuals.length = 0;
+  if (typeof opponent.clearAllAttackEffects === 'function') {
+    opponent.clearAllAttackEffects();
+  }
+  if (typeof opponent.clearAllAfterimages === 'function') {
+    opponent.clearAllAfterimages();
+  } else {
+    if (opponent.swordTrail) opponent.swordTrail.length = 0;
+    if (opponent.afterImages) opponent.afterImages.length = 0;
+  }
 
   if (fighter.stealthAfterimages && fighter.stealthAfterimages.length > 0) {
     fastCleanArray(fighter.stealthAfterimages, (img) => {

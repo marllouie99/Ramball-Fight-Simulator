@@ -8,6 +8,7 @@ import { getHandSize } from '../../core/config.js';
 import { state, isChampionScreenActive } from '../../core/state.js';
 import { drawNanamiCleaver, drawNanamiCollapseShockwaves, drawNanamiBlackFlashActivationAura } from '../weapons/nanamiWeaponGraphics.js';
 import { GojoRenderer } from './gojoRenderer.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
 let _nanamiSkinImage = null;
 let _nanamiSkinImageLoading = false;
@@ -242,7 +243,8 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter, isFrontHand = false) {
  * Renders Nanami's dash afterimages at their recorded absolute world coordinates.
  */
 export function drawNanamiAfterImages(ctx, fighter) {
-  if (!fighter || !fighter.afterImages || fighter.afterImages.length === 0) return;
+  const isSuppressed = typeof fighter?.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
+  if (!fighter || !fighter.afterImages || fighter.afterImages.length === 0 || isSuppressed) return;
   const r = fighter.r || 25;
 
   ctx.save();

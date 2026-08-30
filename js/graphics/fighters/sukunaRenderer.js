@@ -1,4 +1,4 @@
-import { Fighter } from '../../entities/fighter.js';
+import { Fighter, isSuppressedByGetsuga } from '../../entities/fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -34,16 +34,18 @@ export class SukunaRenderer {
     // 2. Draw Front Hand ON TOP of body
     fighter._drawHandCursedEnergy(ctx, 'front');
 
+    const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+    );
+    const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : Boolean(isGojoDomainActive || isSuppressedByGetsuga(fighter) || fighter.isTargetOfAmbush);
+
     // Draw Sakuga Anime Impact Frame (red/black ink impact)
-    if (fighter.sakugaImpactTimer > 0) {
+    if (fighter.sakugaImpactTimer > 0 && !isSuppressed) {
       fighter._drawSakugaImpactFrame(ctx);
     }
 
     // Draw afterimages during flurry, dodge & melee teleports
-    const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-      f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
-    );
-    if (fighter.afterImages && fighter.afterImages.length > 0 && !isGojoDomainActive) {
+    if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
       const skipAlternate = (typeof state !== 'undefined' && state.performanceMode);
       for (let i = 0; i < fighter.afterImages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;
@@ -89,7 +91,7 @@ export class SukunaRenderer {
     }
 
     // Draw Skill 1 Slash visual arcs on flurry target (Crescent Blade Arcs)
-    if (fighter.flurrySlashVisuals && fighter.flurrySlashVisuals.length > 0) {
+    if (fighter.flurrySlashVisuals && fighter.flurrySlashVisuals.length > 0 && !isSuppressed) {
       fighter.flurrySlashVisuals.forEach(slash => {
         const ratio = slash.timer / slash.maxTimer;
         ctx.save();
@@ -342,7 +344,7 @@ export class SukunaRenderer {
 
     // 2. Draw Stepped Pixel-Art Hands (back hand behind body, front hand on top of body)
     const handRadius = getHandSize(7.5, fighter);
-    const skinColor = fighter.color || '#e0a899';
+    const skinColor = fighter.color || '#8B0000';
 
     const _drawPixelFist = (hx, hy) => {
       const P = 2.0;
@@ -360,7 +362,7 @@ export class SukunaRenderer {
         }
       }
 
-      // Inner Base Skin Tone
+      // Inner Crimson Skin Tone
       ctx.fillStyle = skinColor;
       const innerR = gridR - P * 0.4;
       for (let gy = -steps; gy <= steps; gy++) {
@@ -372,8 +374,8 @@ export class SukunaRenderer {
         }
       }
 
-      // Knuckle Shading
-      ctx.fillStyle = '#B57766';
+      // Deep Crimson Knuckle / Edge Shading
+      ctx.fillStyle = '#5B0610';
       for (let gy = 0; gy <= steps; gy++) {
         for (let gx = -steps; gx <= steps; gx++) {
           const dist = Math.hypot(gx * P, gy * P);
@@ -384,9 +386,13 @@ export class SukunaRenderer {
       }
 
       // Knuckle Specular Highlight
-      ctx.fillStyle = '#FFF0EB';
+      ctx.fillStyle = '#B21E35';
       ctx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
       ctx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
+
+      // Wrist Cursed Band Tattoo
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(Math.round(hx - innerR * 0.7), Math.round(hy - P * 0.5), P * 1.5, P * 2);
     };
 
     ctx.save();
@@ -901,18 +907,129 @@ export class SukunaRenderer {
     ctx.restore();
   }
 
-  // Helper method to render the Malevolent Shrine structure
+  // Helper method to render the Malevolent Shrine structure (Standard Vector in Light Mode, Saitama Pixel Art in Dark Mode)
   static _drawShrineBody(ctx, fighter) {
-    if (!fighter._shrineCacheCanvas) {
-      fighter._shrineCacheCanvas = document.createElement('canvas');
-      fighter._shrineCacheCanvas.width = 360;
-      fighter._shrineCacheCanvas.height = 420;
-      const offCtx = fighter._shrineCacheCanvas.getContext('2d');
-      offCtx.translate(180, 230);
-      fighter._renderFullShrineToContext(offCtx);
+    const isDark = Boolean(
+      typeof state !== 'undefined' && (
+        state.arenaTheme === 'dark' ||
+        state.darkMode ||
+        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+      )
+    );
+
+    if (isDark) {
+      if (!fighter._shrinePixelCacheCanvas) {
+        if (!fighter._shrineCacheCanvas) {
+          fighter._shrineCacheCanvas = document.createElement('canvas');
+          fighter._shrineCacheCanvas.width = 360;
+          fighter._shrineCacheCanvas.height = 420;
+          const offCtx = fighter._shrineCacheCanvas.getContext('2d');
+          offCtx.translate(180, 230);
+          fighter._renderFullShrineToContext ? fighter._renderFullShrineToContext(offCtx) : SukunaRenderer._renderFullShrineToContext(offCtx, fighter);
+        }
+
+        fighter._shrinePixelCacheCanvas = SukunaRenderer._createSaitamaPixelShrineCanvas(fighter._shrineCacheCanvas);
+      }
+
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(fighter._shrinePixelCacheCanvas, -180, -230);
+      ctx.restore();
+    } else {
+      if (!fighter._shrineCacheCanvas) {
+        fighter._shrineCacheCanvas = document.createElement('canvas');
+        fighter._shrineCacheCanvas.width = 360;
+        fighter._shrineCacheCanvas.height = 420;
+        const offCtx = fighter._shrineCacheCanvas.getContext('2d');
+        offCtx.translate(180, 230);
+        fighter._renderFullShrineToContext ? fighter._renderFullShrineToContext(offCtx) : SukunaRenderer._renderFullShrineToContext(offCtx, fighter);
+      }
+
+      ctx.drawImage(fighter._shrineCacheCanvas, -180, -230);
+    }
+  }
+
+  // Exact Saitama-style Discrete Pixel Art Generator for Malevolent Shrine (Rule 19 / Saitama Tech)
+  static _createSaitamaPixelShrineCanvas(sourceCanvas) {
+    const w = sourceCanvas.width;
+    const h = sourceCanvas.height;
+    const P = 2.0; // Exact Saitama pixel grid block size
+
+    const srcCtx = sourceCanvas.getContext('2d');
+    const srcData = srcCtx.getImageData(0, 0, w, h);
+    const data = srcData.data;
+
+    const destCanvas = document.createElement('canvas');
+    destCanvas.width = w;
+    destCanvas.height = h;
+    const destCtx = destCanvas.getContext('2d');
+    destCtx.imageSmoothingEnabled = false;
+
+    const gridCols = Math.ceil(w / P);
+    const gridRows = Math.ceil(h / P);
+
+    // Sample cell colors across PxP blocks
+    const grid = new Array(gridRows);
+    for (let gy = 0; gy < gridRows; gy++) {
+      grid[gy] = new Array(gridCols);
+      for (let gx = 0; gx < gridCols; gx++) {
+        let sumR = 0, sumG = 0, sumB = 0, sumA = 0, count = 0;
+        const startX = gx * P;
+        const startY = gy * P;
+        for (let dy = 0; dy < P; dy++) {
+          for (let dx = 0; dx < P; dx++) {
+            const x = Math.min(w - 1, startX + dx);
+            const y = Math.min(h - 1, startY + dy);
+            const idx = (y * w + x) * 4;
+            const a = data[idx + 3];
+            if (a > 20) {
+              sumR += data[idx];
+              sumG += data[idx + 1];
+              sumB += data[idx + 2];
+              sumA += a;
+              count++;
+            }
+          }
+        }
+        if (count > 0) {
+          grid[gy][gx] = {
+            r: Math.round(sumR / count),
+            g: Math.round(sumG / count),
+            b: Math.round(sumB / count),
+            a: (sumA / count) / 255
+          };
+        } else {
+          grid[gy][gx] = null;
+        }
+      }
     }
 
-    ctx.drawImage(fighter._shrineCacheCanvas, -180, -230);
+    // Step 2: Rasterize with Saitama Pixel Art Tech (Border + Stepped Fill)
+    for (let gy = 0; gy < gridRows; gy++) {
+      for (let gx = 0; gx < gridCols; gx++) {
+        const cell = grid[gy][gx];
+        if (!cell) continue;
+
+        const px = gx * P;
+        const py = gy * P;
+
+        // Saitama Tech: Check 4-neighbor boundary for Pixelated Dark Stroke Border (#0E0F14)
+        const isTopEmpty    = (gy === 0 || !grid[gy - 1][gx]);
+        const isBottomEmpty = (gy === gridRows - 1 || !grid[gy + 1][gx]);
+        const isLeftEmpty   = (gx === 0 || !grid[gy][gx - 1]);
+        const isRightEmpty  = (gx === gridCols - 1 || !grid[gy][gx + 1]);
+
+        if (isTopEmpty || isBottomEmpty || isLeftEmpty || isRightEmpty) {
+          destCtx.fillStyle = '#0E0F14'; // Saitama pixelated dark border
+          destCtx.fillRect(px, py, P, P);
+        } else {
+          destCtx.fillStyle = `rgba(${cell.r}, ${cell.g}, ${cell.b}, ${cell.a >= 0.9 ? 1 : cell.a.toFixed(2)})`;
+          destCtx.fillRect(px, py, P, P);
+        }
+      }
+    }
+
+    return destCanvas;
   }
 
   // Pre-rendered vector graphics for Malevolent Shrine (cached to offscreen canvas)

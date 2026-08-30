@@ -6,6 +6,7 @@
 
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
 let _yujiSkinImage = null;
 let _yujiSkinImageLoading = false;
@@ -45,7 +46,8 @@ export function drawYujiSkin(ctx, fighter) {
   const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
     f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
   );
-  if (!isLowQuality && fighter.afterImages && fighter.afterImages.length > 0 && !isGojoDomainActive) {
+  const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : (isGojoDomainActive || isSuppressedByGetsuga(fighter));
+  if (!isLowQuality && fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
     for (let i = 0; i < fighter.afterImages.length; i++) {
       const ai = fighter.afterImages[i];
       if (ai.timer <= 0) continue;

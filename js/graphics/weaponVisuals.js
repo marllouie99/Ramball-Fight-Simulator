@@ -31,6 +31,7 @@ export { drawWhiteRailgun, drawWhiteChargeEffect } from './weapons/ivoryWeaponGr
 export { drawSpikeWeapon, drawSingleSpike } from './weapons/spikeWeaponGraphics.js';
 export { drawBlueAimbotGun } from './weapons/rangerWeaponGraphics.js';
 export { drawEngineer, drawEngineerShotgun, drawEngineerWrench, drawEngineerShotgunModel, drawEngineerBullet, drawTurret, drawTurretBullet, drawDispenser, drawDispenserTetherBeam, drawDispenserHealingRing, Engineer_WEAPON_GRAPHICS } from './weapons/engineerWeaponGraphics.js';
+export { drawEngineerSkin, drawEngineerPixelBody, drawEngineerPixelHand } from './fighters/engineerSkin.js';
 export { drawBomberGrenade } from './weapons/bomberWeaponGraphics.js';
 export { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';

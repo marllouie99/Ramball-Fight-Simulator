@@ -153,13 +153,18 @@ export class YujiFighter extends Fighter {
       }
 
       spawnFloatingText(this.x, this.y - this.r - 28, "SUKUNA TAKES OVER!", "#CC0000");
-      if (CONFIG.yuji?.transformationSound) {
-        audioSystem.playSFX(
-          CONFIG.yuji.transformationSound,
-          CONFIG.yuji.transformationVolume ?? 2.0,
-          1.0, 0,
-          CONFIG.yuji.transformationDelay ?? 0
-        );
+      const transformSnd = CONFIG.yuji?.transformationSound || 'Assets/Sound Effects/Skills/yuji-transformation.mp3';
+      const transformVol = CONFIG.yuji?.transformationVolume ?? 2.5;
+      if (typeof audioSystem !== 'undefined') {
+        if (typeof audioSystem.playFighterVoiceline === 'function') {
+          audioSystem.playFighterVoiceline(this, transformSnd, transformVol, 1.0, 0, 0, {
+            priority: 'domain',
+            isProtected: true,
+            durationMs: 3500
+          });
+        } else {
+          audioSystem.playSFX(transformSnd, transformVol);
+        }
       }
     }
 
@@ -203,11 +208,6 @@ export class YujiFighter extends Fighter {
         this.rapidSlashTimer = 0;
         // Ensure punch state is fully cleared before rapid slashes begin
         this.punchAnimTimer = 0;
-        const rapidSlashVoice = CONFIG.sukuna?.sounds?.rapidSlashVoiceline || CONFIG.sukuna?.rapidSlashVoiceline || 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3';
-        const voiceVol = CONFIG.sukuna?.soundVolumes?.rapidSlashVoiceline ?? (CONFIG.sukuna?.rapidSlashVoiceVolume ?? 3.0);
-        if (typeof audioSystem !== 'undefined' && audioSystem.playFighterVoiceline) {
-          audioSystem.playFighterVoiceline(this, rapidSlashVoice, voiceVol);
-        }
       }
       return;
     }
@@ -625,6 +625,7 @@ export class YujiFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
     const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
     if (forceCancelAll || (!isMatchEnded && (this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush))) {
       this.punchAnimTimer = 0;
@@ -633,6 +634,8 @@ export class YujiFighter extends Fighter {
     this.isComboDashing = false;
     this.comboTarget = null;
     this.comboHitsLeft = 0;
+    if (this.afterImages) this.afterImages.length = 0;
+    if (this.punchEffects) this.punchEffects.length = 0;
     
     // Interrupt RCT channeling
     if (this.isChannelingRCT) {

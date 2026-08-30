@@ -1,4 +1,4 @@
-import { Fighter } from '../../entities/fighter.js';
+import { Fighter, isSuppressedByGetsuga } from '../../entities/fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -19,7 +19,7 @@ export class GojoRenderer {
        (f._counterWindupTimer && f._counterWindupTimer > 0) ||
        f.isCountering)
     );
-    const isSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive);
+    const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive || isSuppressedByGetsuga(fighter));
 
     // Domain Expansion Channeling Visuals (Ground ring, Aura)
     if (fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0 && !isSuppressed) {
@@ -296,7 +296,7 @@ export class GojoRenderer {
     }
 
     // Draw afterimages during teleports & high-speed moves
-    if (fighter.afterImages && fighter.afterImages.length > 0) {
+    if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
       const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
       for (let i = 0; i < fighter.afterImages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;

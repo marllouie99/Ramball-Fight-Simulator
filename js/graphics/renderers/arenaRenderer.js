@@ -598,8 +598,31 @@ export function drawArena() {
 
   // 5b. Text above Top Arena Wall (Dark Mode: Fighter Names | Light Mode: BGM Title)
   if (isDark) {
-    // In DARK MODE: Display Match Fighters Name above Top Arena Wall (e.g. "GOJO VS SUKUNA") with prominent bold typography
+    // In DARK MODE: Display Match Fighters Name above Top Arena Wall (e.g. "ENGINEER VS JOHN WICK") with prominent bold typography
     if (state.fighters && state.fighters.length > 0 && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
+      const isPrimaryFighter = (f) => Boolean(
+        f &&
+        !f.isTurret &&
+        !f.isMinion &&
+        !f.isDeployable &&
+        !f.isIceWall &&
+        !f.isIllusion &&
+        !f.isRika &&
+        !f.isEvasionMinion &&
+        !f.isTransfiguredHuman &&
+        !f.isClone &&
+        !f.owner &&
+        f.type !== 'Turret' &&
+        f.type !== 'turret' &&
+        f.type !== 'Dispenser' &&
+        f.type !== 'dispenser' &&
+        !f._def?.isTurret &&
+        !f._def?.isMinion
+      );
+
+      const mainFighters = state.fighters.filter(isPrimaryFighter);
+      if (mainFighters.length === 0) return;
+
       const textY = arena.y - 12;
       ctx.save();
       ctx.font = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
@@ -615,9 +638,9 @@ export function drawArena() {
         return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
       };
 
-      if (state.fighters.length === 2) {
-        const f1 = state.fighters[0];
-        const f2 = state.fighters[1];
+      if (mainFighters.length === 2) {
+        const f1 = mainFighters[0];
+        const f2 = mainFighters[1];
         const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
         const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
         const vsText = 'VS';
@@ -671,11 +694,11 @@ export function drawArena() {
         ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
         ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
-      } else if (state.fighters.length === 3) {
+      } else if (mainFighters.length === 3) {
         // ── 1v2 Mode: "NAME1 VS NAME2 & NAME3" with per-fighter colors ──
-        const f1 = state.fighters[0];
-        const f2 = state.fighters[1];
-        const f3 = state.fighters[2];
+        const f1 = mainFighters[0];
+        const f2 = mainFighters[1];
+        const f3 = mainFighters[2];
         const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
         const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
         const name3 = (f3.name || f3._def?.name || f3.characterId || 'P3').toUpperCase();
@@ -695,7 +718,10 @@ export function drawArena() {
         ctx.font = ampFont;
         const wAmp = ctx.measureText('&').width;
 
-        const totalW = w1 + pad + wVs + pad + w2 + ampPad + wAmp + ampPad + w3;
+        const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2');
+        const totalW = is1v2 
+          ? (w1 + pad + wVs + pad + w2 + ampPad + wAmp + ampPad + w3)
+          : (w1 + pad + wVs + pad + w2 + pad + wVs + pad + w3);
         const maxW = arena.width - 16;
         const scale = totalW > maxW ? maxW / totalW : 1.0;
 
@@ -731,18 +757,32 @@ export function drawArena() {
         ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
         ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
-        startX += w2 + ampPad;
 
-        // "&" Ampersand Accent
-        ctx.font = ampFont;
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = '#94A3B8';
-        ctx.strokeText('&', startX, textY - 1.5);
-        ctx.fillText('&', startX, textY - 1.5);
-        startX += wAmp + ampPad;
+        if (is1v2) {
+          startX += w2 + ampPad;
 
-        // Fighter 3 Name (Team Member 2)
+          // "&" Ampersand Accent
+          ctx.font = ampFont;
+          ctx.lineWidth = 3.5;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+          ctx.fillStyle = '#94A3B8';
+          ctx.strokeText('&', startX, textY - 1.5);
+          ctx.fillText('&', startX, textY - 1.5);
+          startX += wAmp + ampPad;
+        } else {
+          startX += w2 + pad;
+
+          // "VS" Accent
+          ctx.font = accentFont;
+          ctx.lineWidth = 3.5;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+          ctx.fillStyle = '#94A3B8';
+          ctx.strokeText('VS', startX, textY - 1.5);
+          ctx.fillText('VS', startX, textY - 1.5);
+          startX += wVs + pad;
+        }
+
+        // Fighter 3 Name
         ctx.font = nameFont;
         ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
@@ -750,12 +790,14 @@ export function drawArena() {
         ctx.strokeText(name3, startX, textY);
         ctx.fillText(name3, startX, textY);
       } else {
-        // Multi-fighter fallback (FFA 4+): Per-fighter colored names joined by "VS"
+        // Multi-fighter fallback (2v2 or FFA): Per-fighter colored names joined by "VS" or "&"
         const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
         const vsFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
         const pad = 10;
 
-        const fighterData = state.fighters.map(f => ({
+        const is2v2 = mainFighters.length === 4 && (state.mode === '2v2' || state.mode === 'Tactical 2v2');
+
+        const fighterData = mainFighters.map(f => ({
           name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
           color: getFighterThemeColor(f, '#F8FAFC')
         }));
@@ -767,7 +809,8 @@ export function drawArena() {
           totalW += ctx.measureText(fd.name).width;
           if (i < fighterData.length - 1) {
             ctx.font = vsFont;
-            totalW += pad + ctx.measureText('VS').width + pad;
+            const sep = (is2v2 && (i === 0 || i === 2)) ? '&' : 'VS';
+            totalW += pad + ctx.measureText(sep).width + pad;
             ctx.font = nameFont;
           }
         });
@@ -797,9 +840,10 @@ export function drawArena() {
             ctx.lineWidth = 3.5;
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
             ctx.fillStyle = '#94A3B8';
-            ctx.strokeText('VS', startX, textY - 1.5);
-            ctx.fillText('VS', startX, textY - 1.5);
-            startX += ctx.measureText('VS').width + pad;
+            const sep = (is2v2 && (i === 0 || i === 2)) ? '&' : 'VS';
+            ctx.strokeText(sep, startX, textY - 1.5);
+            ctx.fillText(sep, startX, textY - 1.5);
+            startX += ctx.measureText(sep).width + pad;
           }
         });
       }

@@ -194,11 +194,6 @@ export function modUpdateComboRush(target) {
           this.rapidSlashTimer = 0;
           this.rapidSlashPhase = 'START';
           this.flurryTarget = t;
-          const rapidSlashVoice = CONFIG.sukuna?.sounds?.rapidSlashVoiceline || CONFIG.sukuna?.rapidSlashVoiceline || 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3';
-          const voiceVol = CONFIG.sukuna?.soundVolumes?.rapidSlashVoiceline ?? (CONFIG.sukuna?.rapidSlashVoiceVolume ?? 3.0);
-          if (typeof audioSystem !== 'undefined' && audioSystem.playFighterVoiceline) {
-            audioSystem.playFighterVoiceline(this, rapidSlashVoice, voiceVol);
-          }
         }
       } else {
         // Standard Yuji brawler punch combo

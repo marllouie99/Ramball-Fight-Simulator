@@ -293,33 +293,34 @@ export class DispenserEntity extends Fighter {
     // 2. Draw Dispenser cabinet & components
     drawDispenser(ctx, this);
 
-    // 3. Draw smoke particles
+    // 3. Draw smoke particles (Discrete Pixel Art)
     if (this.smokeParticles && this.smokeParticles.length > 0) {
       for (const p of this.smokeParticles) {
         const alpha = Math.max(0, p.life / p.maxLife) * 0.75;
-        ctx.fillStyle = `rgba(40, 40, 40, ${alpha})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = `rgba(30, 32, 40, ${alpha.toFixed(2)})`;
+        const px = Math.round(p.x / 2) * 2;
+        const py = Math.round(p.y / 2) * 2;
+        const ps = Math.max(2, Math.round(p.size / 2) * 2);
+        ctx.fillRect(px - ps / 2, py - ps / 2, ps, ps);
       }
     }
 
-    // 4. Heal/repair visual effect
+    // 4. Heal/repair visual effect (Discrete Pixel Art Green Crosses)
     if (this.healTimer > 0) {
       const t = this.healTimer / 20;
       ctx.save();
-      ctx.translate(this.x, this.y);
+      ctx.translate(Math.round(this.x / 2) * 2, Math.round(this.y / 2) * 2);
 
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r * (2.4 - t * 1.2), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(0, 255, 140, ${t * 0.75})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r * 0.9, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(0, 255, 140, ${t * 0.25})`;
-      ctx.fill();
+      const healR = Math.round((this.r * (2.2 - t * 1.0)) / 2) * 2;
+      const count = 8;
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2 + (1 - t) * 0.5;
+        const hx = Math.round(Math.cos(a) * healR / 2) * 2;
+        const hy = Math.round(Math.sin(a) * healR / 2) * 2;
+        ctx.fillStyle = `rgba(34, 197, 94, ${(t * 0.9).toFixed(2)})`;
+        ctx.fillRect(hx - 1, hy - 3, 2, 6);
+        ctx.fillRect(hx - 3, hy - 1, 6, 2);
+      }
 
       ctx.restore();
     }

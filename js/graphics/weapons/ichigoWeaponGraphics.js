@@ -26,10 +26,10 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   const isShikai = form === 'shikai' && !isBankai && !isShikaiHollow;
 
   const scale = owner ? Math.max(0.9, owner.r / 22) : 1.0;
-  const lifeRatio = Math.max(0.2, (p.life || 30) / (p.maxLife || 30));
+  const lifeRatio = Math.max(0.0, (p.life || 30) / (p.maxLife || 30));
   const isInfinityFrozen = Boolean(p.isFrozenByInfinity);
   const fadeAlpha = (isInfinityFrozen && p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer < 30) ? Math.max(0, p.infinityFreezeTimer / 30) : 1.0;
-  const alpha = Math.min(1.0, lifeRatio * 1.30) * fadeAlpha;
+  const alpha = Math.min(1.0, lifeRatio * 3.5) * fadeAlpha;
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
   // Quantize time to 30 FPS for stepped retro anime feel
@@ -76,11 +76,12 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     cAura      = `rgba(0, 229, 255, ${(0.35 * alpha).toFixed(2)})`;
     isDarkCore = false;
   } else if (isShikaiHollow) {
-    cBorder    = '#020814';
-    cSaturated = '#061020'; // Dark cyan void
-    cBright    = '#00f0ff';
-    cCore      = '#ffffff';
-    cAura      = `rgba(0, 240, 255, ${(0.35 * alpha).toFixed(2)})`;
+    // ── Shikai + Hollow Mask: Monochrome White-Black Hollow Theme ──
+    cBorder    = '#141414'; // Pitch black obsidian outer border shell
+    cSaturated = '#080808'; // Pure black abyssal void core
+    cBright    = '#E8E8E8'; // Pure silver-white flame rim
+    cCore      = '#FFFFFF'; // Razor white-hot cutting edge
+    cAura      = `rgba(255, 255, 255, ${(0.38 * alpha).toFixed(2)})`; // Radiant silver-white spiritual aura
     isDarkCore = true;
   } else if (isBankai || isFinal || isBankaiHollow) {
     // Kuroi Getsuga Tensho — Authentic Black-Red Crimson Theme
@@ -99,6 +100,10 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     isDarkCore = false;
   }
 
+  // Dynamic 30 FPS quantized animation phases
+  const animTime = qTime * 0.015;
+  const flamePhase = qTime * 0.024;
+
   const isInsideGetsuga = (rx, ry) => {
     const dist = Math.hypot(rx, ry);
     if (dist > R || dist <= 0) return false;
@@ -106,13 +111,16 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     if (Math.abs(ang) > halfAngle) return false;
     const t = ang / halfAngle;
     const taper = Math.cos(t * (Math.PI / 2));
-    const inR = R - maxThick * Math.pow(taper, taperPower);
+    // Dynamic rippling trailing flame tongues (pulsing with spiritual pressure)
+    const flameFlutter = Math.sin(t * 6.0 + flamePhase * 3.0) * (P * 1.0) + Math.cos(t * 10.0 - flamePhase * 2.0) * (P * 0.6);
+    const inR = R - (maxThick + flameFlutter) * Math.pow(taper, taperPower);
     return dist >= inR;
   };
 
   const isInsideAura = (rx, ry) => {
     const dist = Math.hypot(rx, ry);
-    if (dist > R + P * 2.0 || dist <= 0) return false;
+    const auraFlutter = Math.sin(ry * 0.15 + flamePhase * 2.0) * P;
+    if (dist > R + P * 2.0 + auraFlutter || dist <= 0) return false;
     const ang = Math.atan2(ry, rx);
     if (Math.abs(ang) > halfAngle + 0.08) return false;
     const t = Math.min(1.0, Math.abs(ang) / halfAngle);
@@ -135,7 +143,7 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     }
   }
 
-  // ── 2. Discrete 2D Crescent Body Grid with 4-Neighbor Attached Border ──
+  // ── 2. Discrete 2D Crescent Body Grid with Animated Reiatsu Plasma Flow ──
   for (let gy = -maxY; gy <= maxY; gy += P) {
     for (let gx = minX; gx <= maxX; gx += P) {
       if (!isInsideGetsuga(gx, gy)) continue;
@@ -156,41 +164,67 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
       }
 
       const dist = Math.hypot(gx, gy);
+      const ang = Math.atan2(gy, gx);
       const depthFromApex = R - dist;
 
+      // ── Dynamic Flowing Reiatsu Wave ──
+      const waveFlow = Math.sin(ang * 5.0 - animTime * 4.0) + Math.cos(depthFromApex * 0.7 + animTime * 3.0);
+      const isSurge = waveFlow > 0.90;
+
       if (depthFromApex < P * 1.5) {
-        ctx.fillStyle = cCore; // Razor-sharp white-hot leading edge
+        ctx.fillStyle = cCore; // Razor-sharp white-hot leading cutting edge
       } else if (depthFromApex < P * 3.4) {
-        ctx.fillStyle = cBright; // Saturated electric blood-crimson flame rim (#FF0033)
-      } else if (isDarkCore && depthFromApex < P * 5.2) {
-        ctx.fillStyle = '#8B0014'; // Transition deep burning crimson layer
+        // Blazing flame rim pulsing with white energy surges
+        ctx.fillStyle = isSurge ? cCore : cBright;
+      } else if (isShikaiHollow) {
+        // ── Shikai + Hollow Form: Monochrome White-Black Hollow Theme ──
+        if (depthFromApex < P * 5.2) {
+          ctx.fillStyle = isSurge ? '#FFFFFF' : '#B8B8B8'; // Transition bright silver-white layer
+        } else {
+          // Streaming pure white / silver lightning crackles surging through the pitch black void
+          const crackle = Math.sin(ang * 7.5 + (gx * 0.4 + gy * 0.3) + animTime * 5.0);
+          if (crackle > 0.82) {
+            ctx.fillStyle = '#FFFFFF'; // Pure white lightning vein
+          } else if (crackle > 0.55) {
+            ctx.fillStyle = '#555555'; // Monochrome silver-gray energy undercurrent
+          } else {
+            ctx.fillStyle = cSaturated; // Pitch black void core (#080808)
+          }
+        }
+      } else if (isDarkCore) {
+        // ── Kuroi Getsuga Animated Void Core (Bankai Black-Red Crimson) ──
+        if (depthFromApex < P * 5.2) {
+          ctx.fillStyle = isSurge ? cBright : '#8B0014'; // Transition burning crimson layer
+        } else {
+          // Streaming spiritual lightning crackles surging through the pitch black void
+          const crackle = Math.sin(ang * 7.5 + (gx * 0.4 + gy * 0.3) + animTime * 5.0);
+          if (crackle > 0.85) {
+            ctx.fillStyle = cBright; // Vivid blood-crimson lightning vein (#FF0033)
+          } else if (crackle > 0.58) {
+            ctx.fillStyle = '#8B0014'; // Deep blood energy undercurrent
+          } else {
+            ctx.fillStyle = cSaturated; // Pitch-black abyssal void core (#080003)
+          }
+        }
       } else {
-        ctx.fillStyle = isDarkCore ? cSaturated : ((Math.round(gx / P) + Math.round(gy / P)) % 2 === 0 ? cSaturated : cBright);
+        // ── Shikai Azure Standard Shimmering Plasma ──
+        if (depthFromApex < P * 5.2) {
+          ctx.fillStyle = isSurge ? cCore : cBright;
+        } else {
+          const azureCrackle = Math.sin(ang * 7.0 + (gx * 0.35 - gy * 0.35) + animTime * 5.0);
+          if (azureCrackle > 0.80) {
+            ctx.fillStyle = cCore; // White electrical lightning
+          } else if (azureCrackle > 0.45) {
+            ctx.fillStyle = cBright; // Neon electric cyan (#00E5FF / #00F0FF)
+          } else {
+            // Flowing anime stepped checkerboard plasma
+            const checkStep = Math.floor(animTime * 2);
+            ctx.fillStyle = ((Math.round(gx / P) + Math.round(gy / P) + checkStep) % 2 === 0) ? cSaturated : cBright;
+          }
+        }
       }
       ctx.fillRect(pxX, pyY, P, P);
     }
-  }
-
-  // ── 3. Leading Apex Stepped Pixel Diamond Flare ──
-  const apexX = snap(R);
-  ctx.fillStyle = cCore;
-  const flareSpread = 2;
-  ctx.fillRect(apexX - P * 0.5, -P * 0.5, P, P);
-  ctx.fillRect(apexX - P * flareSpread, -P * 0.5, P * (flareSpread * 2), P);
-  ctx.fillRect(apexX - P * 0.5, -P * flareSpread, P, P * (flareSpread * 2));
-
-  // ── 4. Trailing Stepped Pixel Sparkles & Reiatsu Motes ──
-  const moteCount = 3;
-  for (let s = 0; s < moteCount; s++) {
-    const sSeed = s * 73.1 + qTime * 0.006;
-    const sAng = (Math.sin(sSeed) * halfAngle * 0.85);
-    const sT = Math.cos((sAng / halfAngle) * (Math.PI / 2));
-    const sInR = R - maxThick * Math.pow(sT, taperPower) - (P * (2 + (s % 3) * 2));
-    const sx = snap(Math.cos(sAng) * sInR);
-    const sy = snap(Math.sin(sAng) * sInR);
-
-    ctx.fillStyle = (s % 3 === 0) ? cCore : ((s % 3 === 1) ? cBright : (isDarkCore ? '#8B0014' : cBorder));
-    ctx.fillRect(sx, sy, P, P);
   }
 
   ctx.restore();

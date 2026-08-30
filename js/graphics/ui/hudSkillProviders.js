@@ -180,11 +180,17 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const windowThreshold = f.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.15);
 
     let wheelPct = 0;
-    if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0) {
+    if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0 || f.pendingGetsugaAdaptation || f.pendingPurpleAdaptation || f.pendingRedAdaptation || f.pendingDomainAdaptation) {
       wheelPct = 100;
+    } else if (f.skillExposureTimer > 0) {
+      const maxDelay = 60;
+      wheelPct = Math.max(0, Math.min(100, (1 - (f.skillExposureTimer / maxDelay)) * 100));
     } else {
       const accum = f.totalAccumDamage || 0;
       wheelPct = Math.max(0, Math.min(100, (accum / windowThreshold) * 100));
+      if (f.getsugaExposureCount === 1 && !f.adaptedGetsuga) {
+        wheelPct = Math.max(wheelPct, 50);
+      }
     }
 
     const throwMax = CONFIG.mahoraga?.throwCooldown || 1000;
@@ -231,7 +237,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
     const skillList = [
-      { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `WHEEL OF ADAPTATION - LVL ${lvlStr}` },
+      { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `WOA - LVL ${lvlStr}` },
       { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: throwLabelHtml },
       { id: 'shout', pct: shoutPct, ready: shoutPct >= 99, color: themeColor, label: 'DIVINE SHOUT' }
     ];
@@ -879,6 +885,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
     let hollowReady = false;
     let hollowLabel = 'HOLLOW MASK';
 
+    const hasPoppedBankai = Boolean(f.bankaiActive || f.bankaiUsed);
+
     if (f.hollowMaskActive) {
       const remainingTime = f.hollowMaskTimer !== undefined ? f.hollowMaskTimer : hollowMaxDuration;
       hollowPct = Math.max(0, Math.min(100, (remainingTime / hollowMaxDuration) * 100));
@@ -888,6 +896,11 @@ export function getSkillDataForFighter(f, getProjectiles) {
       hollowPct = 0;
       hollowReady = false;
       hollowLabel = 'HOLLOW MASK';
+    } else if (!hasPoppedBankai) {
+      // Hollow Mask does not progress/tick until Bankai is popped!
+      hollowPct = 0;
+      hollowReady = false;
+      hollowLabel = 'HOLLOW (BANKAI REQ)';
     } else {
       const hollowProg = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / Math.max(0.01, (1.0 - hollowThreshold))));
       hollowPct = hollowProg * 100;

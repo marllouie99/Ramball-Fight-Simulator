@@ -102,6 +102,17 @@ export class SukunaFighter extends Fighter {
 
     super.interruptAttacks(forceCancelAll);
 
+    this.flurryHitsLeft = 0;
+    this.flurryTimer = 0;
+    this.rapidSlashHitsLeft = 0;
+    this.rapidSlashTimer = 0;
+    this.isTeleporting = false;
+    this.teleportSlideTimer = 0;
+    this.cleaveCutTimer = 0;
+    if (this.afterImages) this.afterImages.length = 0;
+    if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
+    if (this.flurrySlashVisuals) this.flurrySlashVisuals.length = 0;
+
     if (forceCancelAll) {
       if (this.fugaSoundKey) {
         stopLoopingSound(this.fugaSoundKey);
@@ -275,21 +286,7 @@ export class SukunaFighter extends Fighter {
     );
   }
 
-  interruptAttacks() {
-    this.timeStopTimer = 0;
-    this.flurryHitsLeft = 0;
-    this.flurryTimer = 0;
-    this.rapidSlashHitsLeft = 0;
-    this.rapidSlashTimer = 0;
-    this.isTeleporting = false;
-    this.teleportSlideTimer = 0;
-    
-    // Cancel domain channeling & Fuga channeling
-    this.isChannelingDomainExpansion = false;
-    this.domainChargeTimer = 0;
-    this.isChannelingDivineFlame = false;
-    this.divineFlameChargeTimer = 0;
-  }
+
 
   takeDamage(amount, attacker, opts = {}) {
     // If getting meleed or hit up close, force switch into Melee Mode to punch back
@@ -455,6 +452,30 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
+    // Decrement slash sound cooldown
+    if (this._slashSoundCooldown > 0) this._slashSoundCooldown--;
+    if (this.slashGlowTimer > 0) this.slashGlowTimer--;
+
+    // ── MALEVOLENT SHRINE: OPEN-BARRIER DOMAIN PROGRESSION & TICK ──
+    // Malevolent Shrine continues to progress its duration timer and tick slashes/damage
+    // even if Sukuna is afflicted with a paralyze debuff effect, electric stun, or is in stasis!
+    if (this.domainActive) {
+      this.domainTimer--;
+      if (this.domainTimer <= 0) {
+        this.domainActive = false;
+      } else {
+        this._applyDomainEffect(arena);
+      }
+    }
+
+    // Update slash hit visuals (Ghost blade / domain slashes) so they animate even during paralyze / time stop
+    if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
+      fastCleanArray(this.slashHitVisuals, (v) => {
+        v.timer--;
+        return v.timer > 0;
+      });
+    }
+
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
@@ -472,31 +493,6 @@ export class SukunaFighter extends Fighter {
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
-
-    // Decrement slash sound cooldown
-    if (this._slashSoundCooldown > 0) this._slashSoundCooldown--;
-    if (this.slashGlowTimer > 0) this.slashGlowTimer--;
-
-    // Domain active state (Malevolent Shrine open-barrier domain slashes continue even if Sukuna is paralyzed by Unlimited Void)
-    if (this.domainActive) {
-      // Freeze domain duration timer while trapped in Gojo's Unlimited Void time stop or paralyzed so duration is not wasted!
-      if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer && !this.isParalyzedDebuffActive()) {
-        this.domainTimer--;
-      }
-      if (this.domainTimer <= 0) {
-        this.domainActive = false;
-      } else {
-        this._applyDomainEffect(arena);
-      }
-    }
-
-    // Update slash hit visuals (Ghost blade / domain slashes) so they animate even during time stop
-    if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
-      fastCleanArray(this.slashHitVisuals, (v) => {
-        v.timer--;
-        return v.timer > 0;
-      });
-    }
 
     if (this.isChannelingDomainExpansion && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0) {
       // Unstoppable Domain Channeling Hyper-Armor: Clear hitStun & status freezes so non-Toji attacks cannot interrupt!
@@ -1833,18 +1829,129 @@ export class SukunaFighter extends Fighter {
     ctx.restore();
   }
 
-  // Helper method to render the Malevolent Shrine structure
+  // Helper method to render the Malevolent Shrine structure (Standard Vector in Light Mode, Saitama Pixel Art in Dark Mode)
   _drawShrineBody(ctx) {
-    if (!this._shrineCacheCanvas) {
-      this._shrineCacheCanvas = document.createElement('canvas');
-      this._shrineCacheCanvas.width = 360;
-      this._shrineCacheCanvas.height = 420;
-      const offCtx = this._shrineCacheCanvas.getContext('2d');
-      offCtx.translate(180, 230);
-      this._renderFullShrineToContext(offCtx);
+    const isDark = Boolean(
+      typeof state !== 'undefined' && (
+        state.arenaTheme === 'dark' ||
+        state.darkMode ||
+        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+      )
+    );
+
+    if (isDark) {
+      if (!this._shrinePixelCacheCanvas) {
+        if (!this._shrineCacheCanvas) {
+          this._shrineCacheCanvas = document.createElement('canvas');
+          this._shrineCacheCanvas.width = 360;
+          this._shrineCacheCanvas.height = 420;
+          const offCtx = this._shrineCacheCanvas.getContext('2d');
+          offCtx.translate(180, 230);
+          this._renderFullShrineToContext(offCtx);
+        }
+
+        this._shrinePixelCacheCanvas = this._createSaitamaPixelShrineCanvas(this._shrineCacheCanvas);
+      }
+
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this._shrinePixelCacheCanvas, -180, -230);
+      ctx.restore();
+    } else {
+      if (!this._shrineCacheCanvas) {
+        this._shrineCacheCanvas = document.createElement('canvas');
+        this._shrineCacheCanvas.width = 360;
+        this._shrineCacheCanvas.height = 420;
+        const offCtx = this._shrineCacheCanvas.getContext('2d');
+        offCtx.translate(180, 230);
+        this._renderFullShrineToContext(offCtx);
+      }
+
+      ctx.drawImage(this._shrineCacheCanvas, -180, -230);
+    }
+  }
+
+  // Exact Saitama-style Discrete Pixel Art Generator for Malevolent Shrine (Rule 19 / Saitama Tech)
+  _createSaitamaPixelShrineCanvas(sourceCanvas) {
+    const w = sourceCanvas.width;
+    const h = sourceCanvas.height;
+    const P = 2.0; // Exact Saitama pixel grid block size
+
+    const srcCtx = sourceCanvas.getContext('2d');
+    const srcData = srcCtx.getImageData(0, 0, w, h);
+    const data = srcData.data;
+
+    const destCanvas = document.createElement('canvas');
+    destCanvas.width = w;
+    destCanvas.height = h;
+    const destCtx = destCanvas.getContext('2d');
+    destCtx.imageSmoothingEnabled = false;
+
+    const gridCols = Math.ceil(w / P);
+    const gridRows = Math.ceil(h / P);
+
+    // Sample cell colors across PxP blocks
+    const grid = new Array(gridRows);
+    for (let gy = 0; gy < gridRows; gy++) {
+      grid[gy] = new Array(gridCols);
+      for (let gx = 0; gx < gridCols; gx++) {
+        let sumR = 0, sumG = 0, sumB = 0, sumA = 0, count = 0;
+        const startX = gx * P;
+        const startY = gy * P;
+        for (let dy = 0; dy < P; dy++) {
+          for (let dx = 0; dx < P; dx++) {
+            const x = Math.min(w - 1, startX + dx);
+            const y = Math.min(h - 1, startY + dy);
+            const idx = (y * w + x) * 4;
+            const a = data[idx + 3];
+            if (a > 20) {
+              sumR += data[idx];
+              sumG += data[idx + 1];
+              sumB += data[idx + 2];
+              sumA += a;
+              count++;
+            }
+          }
+        }
+        if (count > 0) {
+          grid[gy][gx] = {
+            r: Math.round(sumR / count),
+            g: Math.round(sumG / count),
+            b: Math.round(sumB / count),
+            a: (sumA / count) / 255
+          };
+        } else {
+          grid[gy][gx] = null;
+        }
+      }
     }
 
-    ctx.drawImage(this._shrineCacheCanvas, -180, -230);
+    // Step 2: Rasterize with Saitama Pixel Art Tech (Border + Stepped Fill)
+    for (let gy = 0; gy < gridRows; gy++) {
+      for (let gx = 0; gx < gridCols; gx++) {
+        const cell = grid[gy][gx];
+        if (!cell) continue;
+
+        const px = gx * P;
+        const py = gy * P;
+
+        // Saitama Tech: Check 4-neighbor boundary for Pixelated Dark Stroke Border (#0E0F14)
+        const isTopEmpty    = (gy === 0 || !grid[gy - 1][gx]);
+        const isBottomEmpty = (gy === gridRows - 1 || !grid[gy + 1][gx]);
+        const isLeftEmpty   = (gx === 0 || !grid[gy][gx - 1]);
+        const isRightEmpty  = (gx === gridCols - 1 || !grid[gy][gx + 1]);
+
+        if (isTopEmpty || isBottomEmpty || isLeftEmpty || isRightEmpty) {
+          destCtx.fillStyle = '#0E0F14'; // Saitama pixelated dark border
+          destCtx.fillRect(px, py, P, P);
+        } else {
+          destCtx.fillStyle = `rgba(${cell.r}, ${cell.g}, ${cell.b}, ${cell.a >= 0.9 ? 1 : cell.a.toFixed(2)})`;
+          destCtx.fillRect(px, py, P, P);
+        }
+      }
+    }
+
+    return destCanvas;
   }
 
   // Pre-rendered vector graphics for Malevolent Shrine (cached to offscreen canvas)

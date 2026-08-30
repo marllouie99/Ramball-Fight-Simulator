@@ -732,18 +732,6 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
         ctx.fillRect(lpx, lpy, P, P);
       }
 
-      // Pass 4: Trailing Pixel Sparks
-      const numEmbers = 8;
-      for (let eb = 0; eb < numEmbers; eb++) {
-        const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-        const ebAng = currentTailOffset + ebT * (currentTipOffset - currentTailOffset);
-        const ebDist = outerRadius - 10 - eb * 4;
-        const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
-        const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
-        ctx.fillStyle = isLevel8 ? ((eb % 2 === 0) ? '#FF4500' : '#FFFFFF') : ((eb % 2 === 0) ? '#FFD700' : '#FFFFFF');
-        ctx.fillRect(ex, ey, P, P);
-      }
-
       ctx.restore();
     }
   }

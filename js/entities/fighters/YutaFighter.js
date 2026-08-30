@@ -1329,28 +1329,6 @@ export class YutaFighter extends Fighter {
       spawnParrySparksEffect(flashX, flashY);
       triggerGlobalScreenShake(4, 10); // Parry shake
 
-      // Apply physical pushback / deflection bounce to attacker & Yuta
-      if (attacker && attacker !== this && !attacker.isDead) {
-        let dx = attacker.x - this.x;
-        let dy = (attacker.y - (attacker.z || 0)) - (this.y - (this.z || 0));
-        let dist = Math.hypot(dx, dy);
-        if (dist < 0.1) {
-          dx = Math.cos(this.gunAngle || 0);
-          dy = Math.sin(this.gunAngle || 0);
-          dist = 1.0;
-        }
-        const nx = dx / dist;
-        const ny = dy / dist;
-
-        // Push attacker backward from deflection impact
-        attacker.vx = nx * 5.0;
-        attacker.vy = ny * 5.0;
-
-        // Yuta recoils slightly backward from heavy clash
-        this.vx = -nx * 1.8;
-        this.vy = -ny * 1.8;
-      }
-
       // Play block sound
       const parrySnd = getSkillSound(this.id, 'parry');
       if (parrySnd) {

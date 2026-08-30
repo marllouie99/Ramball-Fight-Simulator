@@ -462,6 +462,27 @@ export const SKILL_SOUNDS = {
         volume: CONFIG.ichigo?.soundVolumes?.parry !== undefined ? CONFIG.ichigo.soundVolumes.parry : 0.8,
         delay: CONFIG.ichigo?.soundDelays?.parry || 0
       };
+    },
+    get bankaiGetsugaVoice() {
+      return {
+        src: CONFIG.ichigo?.sounds?.bankaiGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3',
+        volume: CONFIG.ichigo?.soundVolumes?.bankaiGetsugaVoice !== undefined ? CONFIG.ichigo.soundVolumes.bankaiGetsugaVoice : 3.0,
+        delay: 0
+      };
+    },
+    get finalGetsugaVoice() {
+      return {
+        src: CONFIG.ichigo?.sounds?.finalGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3',
+        volume: CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice !== undefined ? CONFIG.ichigo.soundVolumes.finalGetsugaVoice : 3.0,
+        delay: 0
+      };
+    },
+    get finalHollowGetsugaVoice() {
+      return {
+        src: CONFIG.ichigo?.sounds?.finalHollowGetsugaVoice || 'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3',
+        volume: CONFIG.ichigo?.soundVolumes?.finalHollowGetsugaVoice !== undefined ? CONFIG.ichigo.soundVolumes.finalHollowGetsugaVoice : 3.0,
+        delay: 0
+      };
     }
   },
 

@@ -553,28 +553,15 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
 
-    // Engineer bullet visual - brass tracer rounds with hot glow trail
+    // Engineer bullet visual - tactical brass tracer buckshot round (John Wick style)
     if (p.visual === 'EngineerBullet') {
-      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
-      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-      const angle = Math.atan2(vy, vx);
-      const owner = state.fighters && state.fighters[p.owner];
-      const scale = owner ? Math.max(0.6, owner.r / 20) : 0.9;
-      const lifeRatio = Math.max(0.4, (p.life || 40) / (p.maxLife || 40));
-
-      drawEngineerBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      drawEngineerBullet(ctx, p);
       return;
     }
 
+    // Turret Gatling bullet visual - supersonic armor-piercing tracer round (John Wick style)
     if (p.visual === 'turretBullet') {
-      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
-      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-      const angle = Math.atan2(vy, vx);
-      const owner = state.fighters && state.fighters[p.owner];
-      const scale = owner ? Math.max(0.6, owner.r / 20) : 0.9;
-      const lifeRatio = Math.max(0.4, (p.life || 40) / (p.maxLife || 40));
-
-      drawTurretBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      drawTurretBullet(ctx, p);
       return;
     }
 

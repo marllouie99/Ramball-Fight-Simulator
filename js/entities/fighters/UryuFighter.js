@@ -129,6 +129,7 @@ export class UryuFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
     this.isShooting = false;
     this.isDrawingBow = false;
     this.burstRemaining = 0;
@@ -137,6 +138,7 @@ export class UryuFighter extends Fighter {
     this.arrowDrawProgress = 0;
     this.smoothDrawProgress = 0;
     this.isDeployingSprenger = false;
+    if (this.afterImages) this.afterImages.length = 0;
     const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
     if (forceCancelAll || (!isMatchEnded && (this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush))) {
       this.slashSwingTimer = 0;

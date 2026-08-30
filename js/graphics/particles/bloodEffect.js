@@ -589,14 +589,16 @@ export function clearAllBattleEffects() {
   if (state.fighters) {
     for (const f of state.fighters) {
       if (!f) continue;
-      if (f.hitFlameWisps) f.hitFlameWisps.length = 0;
-      if (f.afterImages) f.afterImages.length = 0;
-      if (f.stealthAfterimages) f.stealthAfterimages.length = 0;
-      if (f.adaptationAfterimages) f.adaptationAfterimages.length = 0;
-      if (f.swordTrail) f.swordTrail.length = 0;
-      if (f.punchEffects) f.punchEffects.length = 0;
-      if (f.slashHitVisuals) f.slashHitVisuals.length = 0;
-      if (f.flurrySlashVisuals) f.flurrySlashVisuals.length = 0;
+      if (typeof f.clearAllAfterimages === 'function') f.clearAllAfterimages();
+      else if (f.afterImages) f.afterImages.length = 0;
+      if (typeof f.clearAllAttackEffects === 'function') f.clearAllAttackEffects();
+      else {
+        if (f.hitFlameWisps) f.hitFlameWisps.length = 0;
+        if (f.swordTrail) f.swordTrail.length = 0;
+        if (f.punchEffects) f.punchEffects.length = 0;
+        if (f.slashHitVisuals) f.slashHitVisuals.length = 0;
+        if (f.flurrySlashVisuals) f.flurrySlashVisuals.length = 0;
+      }
     }
   }
 }

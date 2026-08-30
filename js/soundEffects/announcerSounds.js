@@ -77,7 +77,7 @@ export const ANNOUNCER_SOUNDS = {
     },
     ringbell: {
         src: 'Assets/Sound Effects/Announcer/ring-bell.mp3',
-        volume: 1.0,
+        volume: 0.7,
         speed: 1.0,
         offset: 0.0,
         duration: 2.5,

@@ -137,7 +137,8 @@ export class NanamiFighter extends Fighter {
     }
   }
 
-  interruptAttacks() {
+  interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
     if (this.ratioHitPauseTarget) {
       this.ratioHitPauseTarget.suppressFreezeOverlay = false;
       this.ratioHitPauseTarget = null;
@@ -159,10 +160,10 @@ export class NanamiFighter extends Fighter {
     this._lungePrimaryHitDone = false;
     this.isCollapsing = false;
     this.collapseTimer = 0;
-    this.isBlitzing = false;
     this.blackFlashAuraTimer = 0;
     this.blitzTimer = 0;
-    this.blitzTarget = null;
+    this.isChannelingBlackFlash = false;
+    this.blackFlashChannelTimer = 0;
     if (this.afterImages) this.afterImages.length = 0;
   }
 
@@ -735,11 +736,7 @@ export class NanamiFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 16, 'BLACK FLASH...', '#D4AF37');
   }
 
-  interruptAttacks() {
-    super.interruptAttacks();
-    this.isChannelingBlackFlash = false;
-    this.blackFlashChannelTimer = 0;
-  }
+
 
   _updateBlitz(cfg = (CONFIG.nanami || {}), arena) {
     this.vx = 0;

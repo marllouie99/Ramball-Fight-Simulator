@@ -8,87 +8,9 @@ import { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch } from '.
 import { drawMahoragaFaceWings, drawMahoragaChestNecklace, drawMahoragaSkin, drawMahoragaPixelBody } from '../../../graphics/fighters/mahoragaSkin.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
 import { isChampionScreenActive, state } from '../../../core/state.js';
+import { isSuppressedByGetsuga } from '../../fighter.js';
 
-/**
- * Draw Sakuga Anime Impact Frame (anime speed lines + multi-strike phantom flurry + ink-brush burst)
- */
-export function drawSakugaImpactFrame(ctx, fighter) {
-  const t = fighter.sakugaImpactTimer / fighter.sakugaImpactMaxTimer;
-  const alpha = Math.max(0, t);
-  const scale = 1.0 + (1.0 - t) * 0.6;
-  const P = 2.4; // Pixel art grid scale
 
-  ctx.save();
-  ctx.translate(fighter.sakugaImpactX, fighter.sakugaImpactY);
-  ctx.rotate(fighter.sakugaImpactAngle);
-  ctx.scale(scale, scale);
-  ctx.globalAlpha = alpha;
-
-  const seed = fighter.sakugaImpactSeed || 0.5;
-
-  // 1. PIXEL-ART ACTION SPEED LINES
-  const numRays = 16;
-  for (let r = 0; r < numRays; r++) {
-    const rayAngle = (r / numRays) * Math.PI * 2 + seed * 1.5;
-    const innerRadius = 15 + seed * 10;
-    const outerRadius = innerRadius + 45 + (r % 3 === 0 ? 35 : 15);
-    const col = (r % 3 === 0) ? '#FFFFFF' : ((r % 2 === 0) ? '#FFD700' : '#111114');
-
-    const cosA = Math.cos(rayAngle);
-    const sinA = Math.sin(rayAngle);
-    const steps = Math.max(2, Math.round((outerRadius - innerRadius) / P));
-    ctx.fillStyle = col;
-    for (let s = 0; s <= steps; s++) {
-      const dist = innerRadius + (outerRadius - innerRadius) * (s / steps);
-      const px = Math.round((cosA * dist) / P) * P;
-      const py = Math.round((sinA * dist) / P) * P;
-      ctx.fillRect(px, py, P, P);
-    }
-  }
-
-  // 2. PIXEL-ART PHANTOM MULTI-STRIKE FLURRY ARCS
-  const numPhantomHits = 5;
-  for (let p = 0; p < numPhantomHits; p++) {
-    const pAngle = (p / numPhantomHits) * Math.PI * 2 + seed * 3.0;
-    const pDist = 25 + Math.sin(p * 1.7) * 12;
-    const px = Math.cos(pAngle) * pDist;
-    const py = Math.sin(pAngle) * pDist;
-
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(pAngle + Math.PI / 2);
-
-    const hitSteps = 10;
-    const arcR = 14;
-    for (let i = 0; i <= hitSteps; i++) {
-      const a = -Math.PI * 0.6 + (Math.PI * 1.2) * (i / hitSteps);
-      const hx = Math.round((Math.cos(a) * arcR) / P) * P;
-      const hy = Math.round((Math.sin(a) * arcR) / P) * P;
-      ctx.fillStyle = (p % 2 === 0) ? '#FFD700' : '#FFFFFF';
-      ctx.fillRect(hx, hy, P, P);
-    }
-
-    // White strike spine line
-    for (let x = -18; x <= 18; x += P) {
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(Math.round(x / P) * P, 0, P, P);
-    }
-    ctx.restore();
-  }
-
-  // 3. PIXEL-ART CONCENTRIC IMPACT SHOCK RING
-  const ringRadius = 35 * (1.0 + (1.0 - t) * 0.4);
-  const ringSteps = Math.max(16, Math.round((Math.PI * 2 * ringRadius) / P));
-  for (let i = 0; i <= ringSteps; i++) {
-    const ang = (i / ringSteps) * Math.PI * 2;
-    const rx = Math.round((Math.cos(ang) * ringRadius) / P) * P;
-    const ry = Math.round((Math.sin(ang) * ringRadius) / P) * P;
-    ctx.fillStyle = (i % 2 === 0) ? '#FFD700' : '#FFFFFF';
-    ctx.fillRect(rx, ry, P, P);
-  }
-
-  ctx.restore();
-}
 
 /**
  * Draw Dynamic Orbiting Cursed Purple Flame Particles & Embers
@@ -199,7 +121,8 @@ export function drawCursedPurpleFlames(ctx, fighter) {
  * Render fading divine flash-dash afterimage ghosts along motion trail.
  */
 export function drawAfterimages(ctx, fighter) {
-  if (!fighter.adaptationAfterimages || fighter.adaptationAfterimages.length === 0) return;
+  const isSuppressed = typeof fighter?.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
+  if (!fighter.adaptationAfterimages || fighter.adaptationAfterimages.length === 0 || isSuppressed) return;
 
   fastCleanArray(fighter.adaptationAfterimages, (img) => {
     if (!img || img.timer <= 0) return false;
@@ -454,12 +377,7 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
     ctx.restore();
   }
 
-  if (fighter.sakugaImpactTimer > 0) {
-    if (!isGojoDomainActive) {
-      drawSakugaImpactFrame(ctx, fighter);
-    }
-    fighter.sakugaImpactTimer--;
-  }
+
 
   // Always draw Health Text on TOP
   fighter.drawHealth(ctx);

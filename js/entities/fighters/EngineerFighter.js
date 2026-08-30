@@ -11,6 +11,7 @@ import { spawnSpentCasing } from '../../graphics/particles/johnWickDroppedMagazi
 import { TurretEntity } from '../TurretEntity.js';
 import { DispenserEntity } from '../DispenserEntity.js';
 import { drawEngineer } from '../../graphics/weaponVisuals.js';
+import { drawEngineerSkin } from '../../graphics/fighters/engineerSkin.js';
 
 export class EngineerFighter extends Fighter {
   constructor(def) {
@@ -576,24 +577,36 @@ export class EngineerFighter extends Fighter {
     this.vy -= Math.sin(this.gunAngle) * recoilForce;
   }
 
-  drawGun(ctx) {
-    drawEngineer(ctx, {
-      x: this.x,
-      y: this.y,
-      gunAngle: this._isWinnerReveal ? 0 : this.gunAngle,
-      r: this.r,
-      facingRight: this._isWinnerReveal ? true : Math.abs(this.gunAngle) < Math.PI / 2,
-      wrenchActive: this.wrenchActive,
-      wrenchTimer: this.wrenchTimer,
-      wrenchAngle: this.wrenchAngle,
-      wrenchSlashFadeTimer: this.wrenchSlashFadeTimer || 0,
-      shotgunRecoilTimer: this.shotgunRecoilTimer || 0,
-      lastWeaponUsed: this.lastWeaponUsed || 'shotgun',
-      color: this.color,
-      hideHands: this.hideFrontHand || this.hideHands,
-      isWinnerReveal: Boolean(this._isWinnerReveal)
-    });
-    
+  drawSkin(ctx) {
+    drawEngineerSkin(ctx, this);
+  }
+
+  draw(ctx) {
+    if (this.hp <= 0) return;
+    const zOffset = this.z || 0;
+    const hasZ = zOffset > 0;
+
+    if (hasZ) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.scale(1, 0.5);
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,0,0,${Math.max(0.1, 0.6 - (zOffset / 150))})`;
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(this.x, this.y - zOffset);
+      ctx.translate(-this.x, -this.y);
+    }
+
+    drawEngineerSkin(ctx, this);
+
+    if (hasZ) {
+      ctx.restore();
+    }
+
     if (this.isBuildingTurret || this.isBuildingDispenser) {
       const barWidth = 40;
       const barHeight = 6;
@@ -615,5 +628,27 @@ export class EngineerFighter extends Fighter {
       ctx.lineWidth = 1;
       ctx.strokeRect(this.x - barWidth / 2, this.y - this.r - 20, barWidth, barHeight);
     }
+
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
+  }
+
+  drawGun(ctx) {
+    drawEngineer(ctx, {
+      x: this.x,
+      y: this.y,
+      gunAngle: this._isWinnerReveal ? 0 : this.gunAngle,
+      r: this.r,
+      facingRight: this._isWinnerReveal ? true : Math.abs(this.gunAngle) < Math.PI / 2,
+      wrenchActive: this.wrenchActive,
+      wrenchTimer: this.wrenchTimer,
+      wrenchAngle: this.wrenchAngle,
+      wrenchSlashFadeTimer: this.wrenchSlashFadeTimer || 0,
+      shotgunRecoilTimer: this.shotgunRecoilTimer || 0,
+      lastWeaponUsed: this.lastWeaponUsed || 'shotgun',
+      color: this.color,
+      hideHands: this.hideFrontHand || this.hideHands,
+      isWinnerReveal: Boolean(this._isWinnerReveal)
+    });
   }
 }

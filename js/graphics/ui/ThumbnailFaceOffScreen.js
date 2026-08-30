@@ -18,7 +18,6 @@ const _fighterTypePreviewCache = {};
 
 // Static seed arrays for background particles and floating debris
 let _floatingDebris = null;
-let _scratchLines = null;
 let _bgCacheCanvas = null;
 let _bgCacheCtx = null;
 let _lastBgKey = '';
@@ -117,20 +116,6 @@ function initDebrisAndScratches(width, height) {
       isSolid: (i % 2 === 0),
       colorType: colorType,
       alpha: 0.50 + ((i * 7) % 5) * 0.08
-    });
-  }
-
-  _scratchLines = [];
-  for (let i = 0; i < 18; i++) {
-    const isLeft = (i % 2 === 0);
-    _scratchLines.push({
-      startXRatio: 0.12 + ((i * 0.17) % 0.76),
-      startYRatio: 0.10 + ((i * 0.23) % 0.80),
-      length: 50 + (i % 6) * 15,
-      angle: -0.65 + ((i % 4) - 2) * 0.05,
-      width: 1.0 + (i % 3) * 0.4,
-      isLeftColor: isLeft,
-      alpha: 0.45 + (i % 3) * 0.1
     });
   }
 }
@@ -847,24 +832,6 @@ function drawGrungeBrushStrokes(ctx, width, height, topSplitX, botSplitX, leftCo
     ctx.closePath();
     ctx.fill();
   });
-
-  // 3. Fine Needle Speed Scratches across the scene
-  if (_scratchLines) {
-    _scratchLines.forEach(line => {
-      const lx = width * line.startXRatio;
-      const ly = height * line.startYRatio;
-      const ex = lx + Math.cos(line.angle) * line.length;
-      const ey = ly + Math.sin(line.angle) * line.length;
-
-      ctx.beginPath();
-      ctx.moveTo(lx, ly);
-      ctx.lineTo(ex, ey);
-      ctx.strokeStyle = line.isLeftColor ? leftColor : rightColor;
-      ctx.globalAlpha = line.alpha;
-      ctx.lineWidth = line.width;
-      ctx.stroke();
-    });
-  }
 
   ctx.restore();
 }

@@ -5,6 +5,7 @@ import { drawBlackHoleVisual } from './projectileRenderer.js';
 import { drawShurikenProjectile } from '../weaponVisuals.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray } from '../particles/visualTrailSystem.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
 export function drawBlackHoleEffects() {
   const ctx = state.ctx;
@@ -328,10 +329,8 @@ export function drawGenosSpeedLines() {
   if (!state.fighters) return;
   const genosFighter = state.fighters.find(f => {
     if (!f || f.hp <= 0 || (f.characterId !== 'genos' && f.type !== 'genos')) return false;
-    // Hide speed lines when frozen, time-stopped, hit-stunned, or ambushed
-    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush ||
-                     (f.electricStunTimer > 0) || (f.dubstepStunTimer > 0) || (f.isFrozenByInfinity);
-    if (isFrozen) return false;
+    const isSuppressed = typeof f.areAttackEffectsSuppressed === 'function' ? f.areAttackEffectsSuppressed() : isSuppressedByGetsuga(f);
+    if (isSuppressed) return false;
     const isDashing = (f.speedBoostTimer && f.speedBoostTimer > 0) || f.isDashing;
     return f.isFlurrying || isDashing;
   });
@@ -475,10 +474,8 @@ export function drawSaitamaSpeedLines() {
   if (!state.fighters) return;
   const saitamaFighter = state.fighters.find(f => {
     if (!f || f.hp <= 0 || (f.characterId !== 'saitama' && f.type !== 'saitama')) return false;
-    // Hide speed lines when frozen, time-stopped, hit-stunned, or ambushed
-    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush ||
-                     (f.electricStunTimer > 0) || (f.dubstepStunTimer > 0) || (f.isFrozenByInfinity);
-    if (isFrozen) return false;
+    const isSuppressed = typeof f.areAttackEffectsSuppressed === 'function' ? f.areAttackEffectsSuppressed() : isSuppressedByGetsuga(f);
+    if (isSuppressed) return false;
     return f.isFlurrying;
   });
   if (!saitamaFighter) return;
@@ -869,10 +866,8 @@ export function drawMahoragaSpeedLines() {
   if (!state.fighters) return;
   const mahoraga = state.fighters.find(f => {
     if (!f || f.hp <= 0 || (f.characterId !== 'mahoraga' && f.type !== 'mahoraga')) return false;
-    // Hide speed lines when frozen, time-stopped, hit-stunned, or ambushed
-    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush ||
-                     (f.electricStunTimer > 0) || (f.dubstepStunTimer > 0) || (f.isFrozenByInfinity);
-    if (isFrozen) return false;
+    const isSuppressed = typeof f.areAttackEffectsSuppressed === 'function' ? f.areAttackEffectsSuppressed() : isSuppressedByGetsuga(f);
+    if (isSuppressed) return false;
     // Draw speed lines during: Wall Slam Dash, Strike, AND the Wall Slam Execution Blitz Flurry only
     const isDashOrStrike = f.isWallSlamActive && (f.wallSlamPhase === 'dash' || f.wallSlamPhase === 'strike');
     return isDashOrStrike || (f.isBlitzActive && f.isWallSlamBlitz);

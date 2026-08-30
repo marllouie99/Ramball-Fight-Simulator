@@ -656,6 +656,16 @@ class ProjectileSystem {
    * Fires Ichigo's signature Getsuga Tensho piercing crescent wave.
    */
   fireGetsugaTensho(fighter, ownerIndex, damage, speedOverride, form = 'shikai') {
+    // Clear any previous active Getsuga Tensho from this owner so they never stack
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const prev = this.projectiles[i];
+      if (prev && (prev.owner === ownerIndex || (prev.ownerFighter && prev.ownerFighter === fighter)) && (prev.isGetsuga || prev.behaviorType === 'getsuga_tensho')) {
+        if (prev.draggedTargets) prev.draggedTargets.clear();
+        this._returnProjectile(prev);
+        this.projectiles.splice(i, 1);
+      }
+    }
+
     const isFinal = form === 'final_bankai';
     const isMask = form === 'hollow' || form === 'bankai_hollow';
     const isBankai = form === 'bankai' || form === 'bankai_hollow' || isFinal;
@@ -683,9 +693,7 @@ class ProjectileSystem {
         : (form === 'hollow'
           ? (CONFIG.ichigo?.hollowGetsugaRadius || (CONFIG.ichigo?.getsugaRadius || 100))
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100))));
-    const maxLife = isFinal
-      ? (CONFIG.ichigo?.bankaiFinalGetsugaDuration || 140)
-      : 240; // Extended lifetime so wave flies all the way past window boundaries
+    const maxLife = CONFIG.ichigo?.getsugaDuration || 150;
 
     const proj = this._getProjectile();
     proj.x = fighter.x + dirX * tipDist;
@@ -705,24 +713,27 @@ class ProjectileSystem {
       : (form === 'bankai_hollow'
         ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00')
         : (form === 'hollow'
-          ? (CONFIG.ichigo?.hollowGetsugaColor || '#00E5FF')
+          ? (CONFIG.ichigo?.hollowGetsugaColor || '#FFFFFF')
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#DC143C') : (CONFIG.ichigo?.getsugaColor || '#00D5FF'))));
     proj.owner = ownerIndex;
     proj.damage = Number.isFinite(Number(damage)) 
       ? Number(damage) 
       : (isFinal 
-        ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 26) 
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20) 
         : (form === 'bankai_hollow'
-          ? (CONFIG.ichigo?.bankaiHollowGetsugaDamage || 150)
+          ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 24)
           : (form === 'hollow'
-            ? (CONFIG.ichigo?.hollowGetsugaDamage || 100) 
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 100) : (CONFIG.ichigo?.getsugaDamage || 32)))));
+            ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 16) 
+            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16) : (CONFIG.ichigo?.getsugaTickDamage || 10)))));
     proj.isGetsuga = true;
     proj.getsugaForm = form;
     proj.visual = (isMask || isBankai) ? 'blackGetsuga' : 'getsuga';
     proj.behaviorType = 'getsuga_tensho';
-    proj.isAdaptableSkillShot = true;
+    proj.getsugaReleaseId = (fighter.characterId || 'ichigo') + '_getsuga_' + (fighter.getsugaReleaseCount || Date.now());
+    proj.id = proj.getsugaReleaseId;
+    proj.isAdaptableSkillShot = false;
     proj.skillShotId = 'getsugaTensho';
+    proj.isFinalMassiveGetsuga = isFinal;
     proj.hitTargets = new Map();
     proj.history = [];
     proj.history.push({ x: proj.x, y: proj.y });
@@ -2282,6 +2293,10 @@ class ProjectileSystem {
               p.visual === 'sukunaSlash' ||
               p.visual === 'sukunaCleave' ||
               p.visual === 'sukunaDismantleGrid' ||
+              p.visual === 'getsuga' ||
+              p.visual === 'blackGetsuga' ||
+              p.isGetsuga ||
+              p.behaviorType === 'getsuga_tensho' ||
               p.visual === 'turretBullet' ||
               p.visual === 'EngineerBullet' ||
               p.visual === 'gunslingerBullet' ||

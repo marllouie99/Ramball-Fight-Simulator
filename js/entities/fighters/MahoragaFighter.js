@@ -1,6 +1,6 @@
-import { Fighter } from '../fighter.js';
+import { Fighter, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -181,6 +181,12 @@ export class MahoragaFighter extends Fighter {
     this.skillDodgeReady = {};
     this._lastSkillShotId = null;
     this._lastSkillShotColor = null;
+    this.pendingGetsugaAdaptation = false;
+    this.pendingGetsugaAttacker = null;
+    this.pendingGetsugaProj = null;
+    this.getsugaExposureCount = 0;
+    this._lastGetsugaExposureProjId = null;
+    this.adaptedGetsuga = false;
     
     // Defense Pose Reset
     this.defensePoseType = null;
@@ -376,34 +382,12 @@ export class MahoragaFighter extends Fighter {
           }
         }
 
-        // Apply physical pushback / deflection bounce to attacker & Mahoraga
-        if (attacker && attacker !== this && !attacker.isDead) {
-          let dx = attacker.x - this.x;
-          let dy = (attacker.y - (attacker.z || 0)) - (this.y - (this.z || 0));
-          let dist = Math.hypot(dx, dy);
-          if (dist < 0.1) {
-            dx = Math.cos(this.gunAngle || 0);
-            dy = Math.sin(this.gunAngle || 0);
-            dist = 1.0;
-          }
-          const nx = dx / dist;
-          const ny = dy / dist;
-
-          const pushForce = isParry ? (CONFIG.mahoraga?.parryDeflectionPushForce ?? 5.5) : (CONFIG.mahoraga?.guardDeflectionPushForce ?? 4.0);
-          attacker.vx = nx * pushForce;
-          attacker.vy = ny * pushForce;
-
-          const recoilForce = isParry ? (CONFIG.mahoraga?.parryDeflectionRecoilForce ?? 2.0) : (CONFIG.mahoraga?.guardDeflectionRecoilForce ?? 1.5);
-          this.vx = -nx * recoilForce;
-          this.vy = -ny * recoilForce;
-        }
-
         // Deal 0 damage to Mahoraga
         return false;
       }
     }
 
-    if (opts.isAdaptableSkillShot && opts.skillShotId !== 'tojiAmbush' && opts.skillShotId !== 'purple' && !opts.isPurpleDPS && !opts.isPurple && this.adaptedSkills && this.adaptedSkills[opts.skillShotId] && this.skillDodgeReady && this.skillDodgeReady[opts.skillShotId]) {
+    if (opts.isAdaptableSkillShot && opts.skillShotId !== 'tojiAmbush' && opts.skillShotId !== 'purple' && !opts.isPurpleDPS && !opts.isPurple && opts.skillShotId !== 'getsugaTensho' && opts.skillShotId !== 'getsuga' && !opts.isGetsuga && this.adaptedSkills && this.adaptedSkills[opts.skillShotId] && this.skillDodgeReady && this.skillDodgeReady[opts.skillShotId]) {
       const registryEntry = SKILL_REGISTRY[opts.skillShotId];
       const mockProj = opts.projectile || {
         skillShotId: opts.skillShotId,
@@ -509,6 +493,15 @@ export class MahoragaFighter extends Fighter {
     super.applySlow(frames, multiplier);
   }
 
+  applyParalyze(frames, opts = {}) {
+    if ((opts && opts.isGetsuga) || opts?.skillShotId === 'getsugaTensho' || (this.adaptedGetsuga || (this.adaptedSkills && (this.adaptedSkills['getsugaTensho'] || this.adaptedSkills['getsuga'])))) {
+      if (this.adaptedGetsuga || (this.adaptedSkills && (this.adaptedSkills['getsugaTensho'] || this.adaptedSkills['getsuga']))) {
+        return; // Total immunity to Getsuga Tensho paralyze debuff!
+      }
+    }
+    super.applyParalyze(frames);
+  }
+
   applyKnockback(vx, vy) {
     if (this.isWallSlamActive || this.isWallSlamBlitz || this.isBlitzActive) {
       this.knockbackVx = 0;
@@ -518,7 +511,24 @@ export class MahoragaFighter extends Fighter {
     super.applyKnockback(vx, vy);
   }
 
+  get adaptationAfterimages() {
+    return this.afterImages;
+  }
+
+  set adaptationAfterimages(val) {
+    this.afterImages = val;
+  }
+
+  get wheelClicks() {
+    return this.adaptationStage || { melee: 0, ranged: 0, skill: 0 };
+  }
+
+  set wheelClicks(val) {
+    this.adaptationStage = val;
+  }
+
   interruptAttacks(forceCancelAll = false) {
+    const isSuppressed = this.areAttackEffectsSuppressed();
     const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
     const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
     const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
@@ -527,9 +537,13 @@ export class MahoragaFighter extends Fighter {
       ? state.fighters.find(f => f && f !== this && f.hp > 0)
       : null);
     const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110));
-    const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
+    const canAttackUnderCC = ccTenacity > 0 && inMeleeRange && Boolean(this.adapted?.melee) && ((this.adaptationStage?.melee || 0) >= 2);
 
-    if (canAttackUnderCC && !forceCancelAll) {
+    // Preserve afterimage trail during active wall slam or blitz only when not suppressed
+    const preserveAfterimages = !forceCancelAll && !isSuppressed && (this.isWallSlamActive || this.isBlitzActive || this.isWallSlamBlitz);
+    const savedAfterimages = preserveAfterimages && this.afterImages ? this.afterImages.slice() : null;
+
+    if (canAttackUnderCC && !forceCancelAll && !isSuppressed) {
       const backupMeleeSwingActive = this.meleeSwingActive;
       const backupMeleeSwingTimer = this.meleeSwingTimer;
       const backupPunchAnimTimer = this.punchAnimTimer;
@@ -543,6 +557,13 @@ export class MahoragaFighter extends Fighter {
       this.leftPunchTimer = backupLeftPunchTimer;
     } else {
       super.interruptAttacks(forceCancelAll);
+    }
+
+    // Restore afterimages that were preserved
+    if (savedAfterimages && !isSuppressed && !forceCancelAll) {
+      this.afterImages = savedAfterimages;
+    } else if (isSuppressed || forceCancelAll) {
+      this.clearAllAfterimages();
     }
   }
 
@@ -588,8 +609,9 @@ export class MahoragaFighter extends Fighter {
    */
   resolveWallBounce(arena, opponent = null) {
     if (!arena) return false;
-    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce;
+    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
     if (isBeamTrapped) {
+      this.wallBounceCount = 0;
       let clamped = false;
       if (this.x - this.r < arena.x) {
         this.x = arena.x + this.r;
@@ -644,7 +666,7 @@ export class MahoragaFighter extends Fighter {
       bounced = true;
     }
 
-    if (bounced) {
+    if (bounced && !this.isDraggedByGetsuga) {
       this.wallBounceCount = (this.wallBounceCount || 0) + 1;
 
       // On the 2nd consecutive wall collision, trigger forward dash surge directly toward enemy
@@ -708,7 +730,7 @@ export class MahoragaFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
-    if (!this.canPerformBasicAttack()) return false;
+    if (!this.canPerformBasicAttack() || this.isDraggedByGetsuga) return false;
     const opponent = (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
     if (opponent && !opponent.isDead) {
       this.aim(opponent);
@@ -735,7 +757,7 @@ export class MahoragaFighter extends Fighter {
     if (!opponent || opponent.isDead || opponent.hp <= 0) return;
     if (this.isTeammate(opponent)) return;
     if (!this.canPerformBasicAttack()) return;
-    if (this.isWallSlamActive || this.isThrowing || this.isTargetOfAmbush || this.isBlitzActive || this.isInfinityBlitz) return;
+    if (this.isWallSlamActive || this.isThrowing || this.isTargetOfAmbush || this.isBlitzActive || this.isInfinityBlitz || this.isDraggedByGetsuga) return;
 
     this.aim(opponent);
     if ((this.swordCooldown || 0) <= 0) {
@@ -812,6 +834,36 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
+    // ── PENDING GETSUGA TENSHO ADAPTATION RELEASE TICK (Triggers wheel click after the 2nd Getsuga Tensho duration is done!) ──
+    if (this.pendingGetsugaAdaptation) {
+      const proj = this.pendingGetsugaProj;
+      const isProjActive = proj && typeof projectileSystem !== 'undefined' && projectileSystem.projectiles && projectileSystem.projectiles.includes(proj) && (proj.life || 0) > 0;
+      const isDragged = Boolean(this.isDraggedByGetsuga);
+
+      if (!isProjActive && !isDragged) {
+        this.pendingGetsugaAdaptation = false;
+        const getsugaAttacker = this.pendingGetsugaAttacker;
+        this.pendingGetsugaAttacker = null;
+        this.pendingGetsugaProj = null;
+
+        this.adaptedGetsuga = true;
+        if (!this.adaptedSkills) this.adaptedSkills = {};
+        this.adaptedSkills['getsugaTensho'] = true;
+        this.adaptedSkills['getsuga'] = true;
+        this.skillDodgeReady['getsugaTensho'] = false;
+        this.skillDodgeReady['getsuga'] = false;
+        this.isParalyzed = false;
+        this.paralyzeTimer = 0;
+        if (this.statusEffects) {
+          this.statusEffects.paralyzeTimer = 0;
+        }
+
+        this._lastSkillShotId = 'getsugaTensho';
+        this._lastSkillShotColor = '#FF1E00';
+        this._triggerAdaptation('skill', getsugaAttacker);
+      }
+    }
+
     // ── PENDING DOMAIN ADAPTATION RELEASE TICK (Triggers 1 single click after Gojo's domain expires!) ──
     if (this.pendingDomainAdaptation) {
       const isInsideGojoDomain = typeof state !== 'undefined' && (
@@ -858,6 +910,22 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
+    // ── WHEEL OF ADAPTATION (WOA) TIMERS TICKING (Unstoppable celestial passive progress under all CC/paralyze) ──
+    if (this.fatalAdaptCooldown > 0) {
+      this.fatalAdaptCooldown--;
+    } else {
+      const threshold = this.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+      if ((this.totalAccumDamage || 0) >= threshold) {
+        this._triggerAdaptation('skill', null);
+      }
+    }
+    if (this.accumTimer > 0) {
+      this.accumTimer--;
+      if (this.accumTimer <= 0) {
+        this.totalAccumDamage = 0;
+      }
+    }
+
     const isFrozen = this._handleTimeStop();
     const isInfinityFrozen = handleInfinityFreeze(this);
     const isBeamParalyzed = (
@@ -885,7 +953,38 @@ export class MahoragaFighter extends Fighter {
       return; // MANDATORY: Complete paralyzing freeze so fighter is frozen and DOES NOT SLIDE during domain/time-stop/infinity!
     }
 
-    // ── MID-ACTION INTERRUPT FROM HOLLOW PURPLE, PURE LOVE BEAM, OR GENOS ULTIMATE ──
+    // ── MID-ACTION INTERRUPT FROM GETSUGA TENSHO DRAG, HOLLOW PURPLE, PURE LOVE BEAM, OR GENOS ULTIMATE ──
+    const isDraggedByGetsuga = Boolean(this.isDraggedByGetsuga);
+    if (isDraggedByGetsuga) {
+      this.interruptAttacks();
+      this.neutralStanceTimer = 0;
+      this.adaptationDashTimer = 0;
+      this.adaptationDashTarget = null;
+      this.adaptationDashIsCounter = false;
+      this.adaptationPauseTimer = 0;
+      this.isInfinityBlitz = false;
+      this.isBlitzActive = false;
+      this.blitzHitsLeft = 0;
+      this.blitzTimer = 0;
+      this.wallBounceCount = 0;
+      this._pendingCounterTarget = null;
+      this.isCleaving = false;
+      this.isShouting = false;
+      this.isThrowing = false;
+
+      if (this.isWallSlamActive) {
+        this.isWallSlamActive = false;
+        this.wallSlamPhase = null;
+        this.wallSlamTimer = 0;
+        const grabbed = this.wallSlamTarget || (state.fighters?.find(f => f && f !== this && f.hp > 0));
+        if (grabbed) {
+          grabbed.isGrabbedByMahoraga = false;
+          grabbed.z = 0;
+        }
+        spawnFloatingText(this.x, this.y - this.r - 28, 'INTERRUPTED!', '#FF3D00');
+      }
+    }
+
     const isCaughtInUltimateBeam = (
       this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
       (!this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
@@ -1011,7 +1110,7 @@ export class MahoragaFighter extends Fighter {
     // ── PROACTIVE GENERAL SKILL SHOT DODGE TRIGGERS ──
     if (projectileSystem && projectileSystem.projectiles) {
       for (const p of projectileSystem.projectiles) {
-        if (p && p.isAdaptableSkillShot && p.skillShotId !== 'purple' && !p.isGojoPurple && !p.isGojoPurpleOrb && p.behaviorType !== 'gojo_purple' && (p.life || 0) > 0) {
+        if (p && p.isAdaptableSkillShot && p.skillShotId !== 'purple' && !p.isGojoPurple && !p.isGojoPurpleOrb && p.behaviorType !== 'gojo_purple' && p.skillShotId !== 'getsugaTensho' && p.skillShotId !== 'getsuga' && !p.isGetsuga && (p.life || 0) > 0) {
           const skillId = p.skillShotId;
           if (this.adaptedSkills && this.adaptedSkills[skillId] && this.skillDodgeReady && this.skillDodgeReady[skillId]) {
             if ((this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
@@ -1026,7 +1125,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // ── PROACTIVE GENERAL SKILL SHOT DODGE TRIGGERS (OPPONENT CHARGING/FIRING STATE) ──
-    if (opponent && opponent.isFiringSkillShot && opponent.isFiringSkillShot !== 'purple') {
+    if (opponent && opponent.isFiringSkillShot && opponent.isFiringSkillShot !== 'purple' && opponent.isFiringSkillShot !== 'getsugaTensho' && opponent.isFiringSkillShot !== 'getsuga') {
       const skillId = opponent.isFiringSkillShot;
       if (this.adaptedSkills && this.adaptedSkills[skillId] && this.skillDodgeReady && this.skillDodgeReady[skillId]) {
         if ((this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
@@ -1047,6 +1146,7 @@ export class MahoragaFighter extends Fighter {
     // ── CLEAN UP GENERAL SKILL DODGE READINESS ──
     if (this.adaptedSkills && this.skillDodgeReady) {
       for (const skillId in this.adaptedSkills) {
+        if (skillId === 'getsugaTensho' || skillId === 'getsuga') continue;
         const liveProj = projectileSystem?.projectiles?.some(p => p && p.isAdaptableSkillShot && p.skillShotId === skillId && p.life > 0);
         const opponentFiring = opponent && opponent.isFiringSkillShot === skillId;
         if (!liveProj && !opponentFiring && !this.skillDodgeReady[skillId]) {
@@ -1065,7 +1165,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // ── HIGH-SPEED DIVINE FLASH-DASH TICK ──
-    if (this.adaptationDashTimer > 0 && !isCaughtInUltimateBeam) {
+    if (this.adaptationDashTimer > 0 && !isCaughtInUltimateBeam && !this.isDraggedByGetsuga) {
       this.adaptationDashTimer--;
       const maxDash = this.adaptationDashMaxTimer || (CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10);
       const progress = Math.min(1.0, Math.max(0.0, 1.0 - (this.adaptationDashTimer / maxDash)));
@@ -1254,26 +1354,11 @@ export class MahoragaFighter extends Fighter {
     if (this.cleaveCooldown > 0) this.cleaveCooldown--;
     if (this.shoutCooldown > 0) this.shoutCooldown--;
     if (this.throwCooldown > 0) this.throwCooldown--;
-    if (this.fatalAdaptCooldown > 0) {
-      this.fatalAdaptCooldown--;
-    } else {
-      const threshold = this.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
-      if ((this.totalAccumDamage || 0) >= threshold) {
-        this._triggerAdaptation('skill', null);
-      }
-    }
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.leftPunchTimer > 0) this.leftPunchTimer--;
     if (this.blitzCooldownTimer > 0) this.blitzCooldownTimer--;
     if (this.infinityBlitzCooldownTimer > 0) this.infinityBlitzCooldownTimer--;
     if (this.defensePoseTimer > 0) this.defensePoseTimer--;
-
-    if (this.accumTimer > 0) {
-      this.accumTimer--;
-      if (this.accumTimer <= 0) {
-        this.totalAccumDamage = 0;
-      }
-    }
 
 
     const isLevel8 = totalStages >= 8 || this.isMaxAdapted || ((this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0) >= 8);
@@ -1339,6 +1424,16 @@ export class MahoragaFighter extends Fighter {
 
     // ── HAND-TO-HAND BLITZ SEQUENCE ──
     if (this.isBlitzActive) {
+      if (this.isDraggedByGetsuga) {
+        this.isBlitzActive = false;
+        this.isInfinityBlitz = false;
+        this.isWallSlamBlitz = false;
+        this.wallSlamBlitzInterval = 0;
+        this.blitzHitsLeft = 0;
+        this.blitzCooldownTimer = 180;
+        return;
+      }
+
       this.vx = 0;
       this.vy = 0;
       this.knockbackVx = 0;
@@ -1373,8 +1468,8 @@ export class MahoragaFighter extends Fighter {
         const idealDist = this.r + target.r + 14;
         const idealX = target.x - Math.cos(aimAngle) * idealDist;
         const idealY = target.y - Math.sin(aimAngle) * idealDist;
-        this.x += (idealX - this.x) * 0.45;
-        this.y += (idealY - this.y) * 0.45;
+        this.x = idealX;
+        this.y = idealY;
 
         if (target.wallSlamPinnedX !== undefined && target.wallSlamPinnedY !== undefined) {
           target.x = target.wallSlamPinnedX;
@@ -1431,7 +1526,7 @@ export class MahoragaFighter extends Fighter {
             target.vx = 0;
             target.vy = 0;
           }
-        } else if ((distToTarget > maxMeleeDist && this.blitzStayTimer >= minStayFrames) || (isTargetBlitzing && distToTarget > 55)) {
+        } else if (!this.isDraggedByGetsuga && ((distToTarget > maxMeleeDist && this.blitzStayTimer >= minStayFrames) || (isTargetBlitzing && distToTarget > 55))) {
           this.blitzStayTimer = 0;
           const angles = [0, Math.PI, -Math.PI * 0.5, Math.PI * 0.5];
           const baseAngle = angles[(hitIndex - 1) % angles.length] + (Math.random() - 0.5) * 0.4;
@@ -1491,20 +1586,8 @@ export class MahoragaFighter extends Fighter {
           }
 
           const pushAngle = this.gunAngle !== undefined ? this.gunAngle : Math.atan2(target.y - this.y, target.x - this.x);
-          // Spawn golden spiky crescent effect for both punches and blade slash attacks!
-          spawnAnimePunchImpactFrame(target.x, target.y, 55, pushAngle, 'gold');
-
-          const isPunch = (hitIndex % 2 === 1);
-          if (!isPunch) {
-            this.sakugaImpactTimer = 10;
-            this.sakugaImpactMaxTimer = 10;
-            this.sakugaImpactX = target.x;
-            this.sakugaImpactY = target.y;
-            this.sakugaImpactAngle = Math.random() * Math.PI * 2;
-            this.sakugaImpactSeed = Math.random();
-          }
+          spawnImpactFlash(target.x, target.y, 35, '#FFD700');
           spawnMeleeClashShockwave(target.x, target.y, 65, 'mahoraga');
-          spawnSparks(target.x, target.y, 18, 'gold', '#FFFFFF');
           triggerGlobalScreenShake(6, 12);
 
           const animeWords = ['ORA!', 'SLAM!', 'SLASH!', 'WHAM!', 'POW!'];
@@ -1563,12 +1646,6 @@ export class MahoragaFighter extends Fighter {
           this.punchAnimMaxTimer = 18;
           this.swordCombo = (this.swordCombo || 0) + 1;
 
-          this.sakugaImpactTimer = 18;
-          this.sakugaImpactMaxTimer = 18;
-          this.sakugaImpactX = target.x;
-          this.sakugaImpactY = target.y;
-          this.sakugaImpactAngle = Math.random() * Math.PI * 2;
-          this.sakugaImpactSeed = Math.random();
           spawnImpactFlash(target.x, target.y, 90, '#FFD700');
           spawnMeleeClashShockwave(target.x, target.y, 180, 'mahoraga');
           spawnSparks(target.x, target.y, 40, 'gold', '#FFFFFF');
@@ -1666,7 +1743,7 @@ export class MahoragaFighter extends Fighter {
       const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
       const frontTargetsForAttack = this._getFrontRadiusTargets(swordRange, swordArc);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
-      const canActSkills = !isInHitReaction && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz;
+      const canActSkills = !isInHitReaction && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isDraggedByGetsuga;
 
       if (canActSkills) {
         const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;

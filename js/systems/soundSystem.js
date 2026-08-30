@@ -38,6 +38,9 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('faah') ||
          s.includes('voiceline') ||
          s.includes('voice') ||
+         s.includes('getsuga') ||
+         s.includes('bankai') ||
+         s.includes('ichigo') ||
          s.includes('homie') ||
          s.includes('noise') ||
          s.includes('clone') ||

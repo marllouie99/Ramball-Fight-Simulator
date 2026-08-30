@@ -11,7 +11,7 @@
 // - Rule 19 & 20 (Upright Faceless Skin & Hand Visibility)
 // ─────────────────────────────────────────────
 
-import { Fighter, applyDamageToTarget } from '../fighter.js';
+import { Fighter, applyDamageToTarget, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { drawUlquiorraSkin, drawUlquiorraGhostSkin } from '../../graphics/fighters/ulquiorraSkin.js';
@@ -112,6 +112,14 @@ export class UlquiorraFighter extends Fighter {
     }
 
     return result;
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
+    this.isSlashing = false;
+    this.slashSwingTimer = 0;
+    this.isSonidoDashing = false;
+    if (this.afterImages) this.afterImages.length = 0;
   }
 
   update(opponent, ownerIndex, arenaObj) {
@@ -253,8 +261,10 @@ export class UlquiorraFighter extends Fighter {
   }
 
   draw(ctx, opponent) {
+    const isSuppressed = this.areAttackEffectsSuppressed();
+
     // 1. Draw Sonído Ghost Afterimages
-    if (this.afterImages && this.afterImages.length > 0) {
+    if (this.afterImages && this.afterImages.length > 0 && !isSuppressed) {
       this.afterImages.forEach(img => {
         drawUlquiorraGhostSkin(ctx, img.x, img.y, img.angle, this.r, img.alpha, this.segundaEtapaActive);
       });
@@ -264,7 +274,7 @@ export class UlquiorraFighter extends Fighter {
     drawUlquiorraSkin(ctx, this);
 
     // 3. Draw Slash Arc if swinging
-    if (this.isSlashing && this.slashSwingTimer > 0) {
+    if (this.isSlashing && this.slashSwingTimer > 0 && !isSuppressed) {
       drawUlquiorraSlashArc(ctx, this);
     }
 

@@ -13,6 +13,7 @@
 
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { 
   drawMahitoArmMorph, 
@@ -602,7 +603,8 @@ function drawBaseMahito(ctx, r, fighter) {
 function drawMahitoDashAfterimages(ctx, fighter) {
   const isChannelingDomain = Boolean(fighter && (fighter.domainChargeTimer > 0 || fighter.isChannelingDomainExpansion));
   if (isChannelingDomain) return;
-  if (fighter.isTargetOfAmbush || fighter._suppressFreezeTimer || (fighter.timeStopTimer > 0) || (fighter.paralyzeTimer > 0 && !fighter.isParalyzedByMahito) || fighter.isFrozen) return;
+  const isSuppressed = typeof fighter?.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : (fighter.isTargetOfAmbush || fighter._suppressFreezeTimer || (fighter.timeStopTimer > 0) || (fighter.paralyzeTimer > 0 && !fighter.isParalyzedByMahito) || fighter.isFrozen || isSuppressedByGetsuga(fighter));
+  if (isSuppressed) return;
   if (!fighter._dashAfterimages || fighter._dashAfterimages.length === 0) return;
   const r = fighter.r || 25;
 

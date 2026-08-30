@@ -1,4 +1,4 @@
-import { Fighter } from '../../entities/fighter.js';
+import { Fighter, isSuppressedByGetsuga } from '../../entities/fighter.js';
 import { FighterRenderer } from '../renderers/fighterRenderer.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
@@ -113,13 +113,15 @@ export class YutaRenderer {
       YutaRenderer._drawSpatialCracks(ctx, fighter);
     }
 
+    const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
+
     // Draw the left hand punching out for Thin Ice Breaker
-    if (fighter.thinIceBreakerChargeTimer > 0 || fighter.thinIceBreakerPunchTimer > 0) {
+    if (!isSuppressed && (fighter.thinIceBreakerChargeTimer > 0 || fighter.thinIceBreakerPunchTimer > 0)) {
       YutaRenderer._drawThinIceBreakerHand(ctx, fighter);
     }
 
     // Draw afterimages during flurry & teleports (Draw ON TOP of Sakuga Impact Frame so they are never covered!)
-    if (fighter.afterImages && fighter.afterImages.length > 0) {
+    if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
       const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
       for (let i = 0; i < fighter.afterImages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;

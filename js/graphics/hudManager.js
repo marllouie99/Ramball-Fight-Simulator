@@ -872,9 +872,9 @@ function updateHealthHud() {
     const sId = String(skill.id || '').toLowerCase();
     const sLabel = String(skill.label || '').toUpperCase();
 
-    // 1. Ichigo exception: BANKAI
+    // 1. Ichigo exception: BANKAI (strictly sId === 'bankai' so 'HOLLOW (BANKAI REQ)' is hidden when darkModeShowHudSkillBars is off)
     if (fId === 'ichigo') {
-      if (sId === 'bankai' || sLabel.includes('BANKAI')) {
+      if (sId === 'bankai') {
         return true;
       }
     }
@@ -945,6 +945,34 @@ function updateHealthHud() {
     // 11. Nanami exception: Decisive Strike (Ratio Lunge)
     if (fId === 'nanami') {
       if (sId === 'lunge' || sId === 'decisive' || sLabel.includes('DECISIVE')) {
+        return true;
+      }
+    }
+
+    // 12. Mahoraga exception: Wheel of Adaptation
+    if (fId === 'mahoraga') {
+      if (sId === 'wheel' || sId === 'adaptation' || sLabel.includes('WHEEL') || sLabel.includes('ADAPTATION') || sLabel.includes('WOA')) {
+        return true;
+      }
+    }
+
+    // 13. CJ exception: BAGUVIX (God Mode)
+    if (fId === 'cj') {
+      if (sId === 'baguvix' || sId === 'godmode' || sLabel.includes('BAGUVIX') || sLabel.includes('GODMODE')) {
+        return true;
+      }
+    }
+
+    // 14. Engineer exception: Sentry
+    if (fId === 'engineer') {
+      if (sId === 'turret' || sId === 'sentry' || sLabel.includes('SENTRY') || sLabel.includes('TURRET')) {
+        return true;
+      }
+    }
+
+    // 15. John Wick exception: EXCOMMUNICADO
+    if (fId === 'john_wick' || fId === 'johnwick' || fId === 'wick') {
+      if (sId === 'ultimate' || sId === 'excommunicado' || sLabel.includes('EXCOMMUNICADO')) {
         return true;
       }
     }
@@ -1193,7 +1221,23 @@ function updateHealthHud() {
       if (f.blockPoseTimer > 0) {
         currentParry = Math.min(95, currentParry + 15);
       }
-      if (currentParry > baseParry) {
+
+      const fIdx = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(f) : -1;
+      const fTeam = (fIdx >= 0 && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(fIdx) : null;
+      const isInsideEnemyGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some((g, gIdx) => {
+        if (!g || g === f || g.hp <= 0 || !g.domainActive) return false;
+        const isGojo = (g.characterId === 'gojo' || g.type === 'gojo' || g._def?.id === 'gojo');
+        if (!isGojo) return false;
+        if (fTeam !== null && typeof state.getFighterTeam === 'function') {
+          const gTeam = state.getFighterTeam(gIdx);
+          if (gTeam !== null && gTeam === fTeam) return false;
+        }
+        return true;
+      });
+
+      if (isInsideEnemyGojoDomain) {
+        info.push(`<b>PARRY:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Domain)</span>`);
+      } else if (currentParry > baseParry) {
         const parryBoost = currentParry - baseParry;
         info.push(`<b>PARRY:</b> ${baseParry}% + ${parryBoost}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
@@ -1847,7 +1891,7 @@ function updateHealthHud() {
     const allSkills = getSkillDataForFighter(f);
     if (!allSkills || allSkills.length === 0) return '';
 
-    // Filter skills based on Dark Mode settings & fighter-specific exceptions (e.g. Ichigo Bankai & Toji Ultimate)
+    // Filter skills based on Dark Mode settings & fighter-specific exceptions (e.g. Ichigo Bankai, Toji Ultimate)
     const skills = allSkills.filter(s => shouldShowFighterSkill(f, s));
     if (!skills || skills.length === 0) return '';
 

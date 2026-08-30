@@ -64,21 +64,39 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     skillShotColor = '#8A2BE2';
   } else if (opts.isGetsuga || (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho' || opts.projectile.skillShotId === 'getsugaTensho'))) {
     skillShotId = 'getsugaTensho';
-    const gForm = opts.getsugaForm || (opts.projectile && opts.projectile.getsugaForm) || 'shikai';
-    skillShotColor = (gForm === 'bankai_hollow' || gForm === 'final_bankai') ? '#FF1E00' : (gForm === 'bankai' ? '#FF1E32' : '#00D5FF');
+    const form = opts.getsugaForm || (opts.projectile && opts.projectile.getsugaForm) || 'shikai';
+    skillShotColor = (form === 'final_bankai' || form === 'bankai' || form === 'bankai_hollow') ? '#FF1E00' : '#00D5FF';
   }
 
   let finalAmount = amount;
   const currentStage = fighter.goldAdaptationStage?.[type] || 0;
 
-  // ── 50% Damage Reduction when Adapted to Ichigo's Getsuga Tensho ──
+  // ── Getsuga Tensho 2-Exposure Adaptation Tracking & 50% Damage Reduction ──
   const isGetsugaHit = opts.isGetsuga || (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho' || opts.projectile.skillShotId === 'getsugaTensho'));
   const isGetsugaAdapted = fighter.adaptedGetsuga || 
                           (fighter.adaptedSkills && (fighter.adaptedSkills['getsugaTensho'] || fighter.adaptedSkills['getsuga'])) || 
                           (fighter.gojoAdaptColorHistory && (fighter.gojoAdaptColorHistory.includes('#00D5FF') || fighter.gojoAdaptColorHistory.includes('#FF1E32') || fighter.gojoAdaptColorHistory.includes('#FF1E00')));
 
-  if (isGetsugaHit && isGetsugaAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Getsuga Tensho!
+  if (isGetsugaHit) {
+    if (isGetsugaAdapted) {
+      finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Getsuga Tensho!
+    } else {
+      // Track distinct Getsuga wave projectile exposures
+      const projId = opts.projectile ? (opts.projectile.getsugaReleaseId || opts.projectile.id || opts.projectile) : (attacker ? (attacker.getsugaReleaseCount || 1) : 1);
+      if (fighter._lastGetsugaExposureProjId !== projId) {
+        fighter._lastGetsugaExposureProjId = projId;
+        fighter.getsugaExposureCount = (fighter.getsugaExposureCount || 0) + 1;
+
+        if (fighter.getsugaExposureCount >= 2) {
+          // 2nd Getsuga hit: queue adaptation to trigger wheel click after the duration of this Getsuga is done!
+          fighter.pendingGetsugaAdaptation = true;
+          fighter.pendingGetsugaAttacker = attacker;
+          fighter.pendingGetsugaProj = opts.projectile || null;
+          fighter._lastSkillShotId = 'getsugaTensho';
+          fighter._lastSkillShotColor = '#FF1E00';
+        }
+      }
+    }
   }
 
   // ── 50% Damage Reduction when Adapted to Hollow Purple ──
@@ -190,8 +208,24 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     }
 
     const isPurple = gojoAttackType === 'purple' || skillShotId === 'purple' || (opts.projectile && (opts.projectile.isGojoPurple || opts.projectile.isGojoPurpleOrb));
-    const isAdaptableSkill = opts.isAdaptableSkillShot || (opts.projectile && opts.projectile.isAdaptableSkillShot);
+    const isGetsuga = isGetsugaHit || skillShotId === 'getsugaTensho' || skillShotId === 'getsuga';
+    const isAdaptableSkill = (opts.isAdaptableSkillShot || (opts.projectile && opts.projectile.isAdaptableSkillShot)) && !isGetsuga;
     
+    // Always accumulate damage for all hits and continuous tick damages (Getsuga ticks, Bleed, Burn, Poison, Domain, etc.)
+    fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + finalAmount;
+    fighter.accumTimer = windowFrames;
+
+    if (gojoAttackType) {
+      fighter._lastGojoHitType = gojoAttackType;
+    }
+    if (sukunaAttackType) {
+      fighter._lastSukunaHitType = sukunaAttackType;
+    }
+    if (skillShotId) {
+      fighter._lastSkillShotId = skillShotId;
+      fighter._lastSkillShotColor = skillShotColor;
+    }
+
     if (isPurple) {
       if ((fighter.fatalAdaptCooldown || 0) <= 0 && !fighter.pendingPurpleAdaptation) {
         fighter.pendingPurpleAdaptation = true;
@@ -201,39 +235,18 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
         fighter._lastSkillShotId = 'purple';
         fighter._lastSkillShotColor = '#8A2BE2';
       }
+    } else if (isGetsuga) {
+      // Getsuga Tensho advances WOA progress on every tick and adapts after 2 wave exposures
     } else if (isAdaptableSkill) {
       if ((fighter.fatalAdaptCooldown || 0) <= 0 && !fighter.skillExposureTimer) {
         const delay = (skillShotId && SKILL_REGISTRY[skillShotId]?.adaptationDelayFrames) || 60;
         fighter.skillExposureTimer = delay; // Timer to click the wheel!
         fighter.exposedSkillType = type;
         fighter.exposedSkillAttacker = attacker;
-        
-        if (gojoAttackType) fighter._lastGojoHitType = gojoAttackType;
-        if (sukunaAttackType) fighter._lastSukunaHitType = sukunaAttackType;
-        if (skillShotId) {
-          fighter._lastSkillShotId = skillShotId;
-          fighter._lastSkillShotColor = skillShotColor;
-        }
       }
     } else {
-      // Prevent Yuta's Pure Love Beam or Genos's beam tick damage from triggering mid-beam wheel clicks
+      // Standard / tick damage threshold check
       if (!opts.isPureLoveBeam && !opts.isGenosBeam) {
-        fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + amount;
-        fighter.accumTimer = windowFrames;
-
-        if (gojoAttackType) {
-          fighter._lastGojoHitType = gojoAttackType;
-        }
-
-        if (sukunaAttackType) {
-          fighter._lastSukunaHitType = sukunaAttackType;
-        }
-
-        if (skillShotId) {
-          fighter._lastSkillShotId = skillShotId;
-          fighter._lastSkillShotColor = skillShotColor;
-        }
-
         const threshold = fighter.maxHp * thresholdPct;
         if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
           if (opts.isRed || fighter._lastGojoHitType === 'red') {
@@ -417,12 +430,14 @@ export function triggerAdaptation(fighter, type, attacker) {
     }
   }
 
-  // Save attacker for smooth divine flash-dash counter
-  if (attacker && !attacker.isDead && attacker !== fighter) {
-    fighter._pendingCounterTarget = attacker;
-  } else if (typeof state !== 'undefined' && state.fighters) {
-    const liveEnemy = state.fighters.find(f => f && f !== fighter && !f.isDead && f.hp > 0);
-    if (liveEnemy) fighter._pendingCounterTarget = liveEnemy;
+  // Save attacker for smooth divine flash-dash counter (strictly disabled when dragged by Getsuga)
+  if (!fighter.isDraggedByGetsuga) {
+    if (attacker && !attacker.isDead && attacker !== fighter) {
+      fighter._pendingCounterTarget = attacker;
+    } else if (typeof state !== 'undefined' && state.fighters) {
+      const liveEnemy = state.fighters.find(f => f && f !== fighter && !f.isDead && f.hp > 0);
+      if (liveEnemy) fighter._pendingCounterTarget = liveEnemy;
+    }
   }
 
   // ── Gojo-Specific Adaptation (Last Hit Priority) ──
@@ -614,7 +629,9 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   if (fighter.adaptedSkills[skillShotId]) return;
 
   fighter.adaptedSkills[skillShotId] = true;
-  fighter.skillDodgeReady[skillShotId] = true;
+  if (skillShotId !== 'getsugaTensho' && skillShotId !== 'getsuga') {
+    fighter.skillDodgeReady[skillShotId] = true;
+  }
 
   // Track specific old variables for backwards compatibility
   if (skillShotId === 'purple') {
@@ -625,12 +642,17 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     fighter.adaptedGetsuga = true;
     fighter.adaptedSkills['getsugaTensho'] = true;
     fighter.adaptedSkills['getsuga'] = true;
+    fighter.skillDodgeReady['getsugaTensho'] = false;
+    fighter.skillDodgeReady['getsuga'] = false;
     fighter.isSlowedByGetsuga = false;
     fighter.slowTimer = 0;
     fighter.slowMultiplier = 1.0;
+    fighter.isParalyzed = false;
+    fighter.paralyzeTimer = 0;
     if (fighter.statusEffects) {
       fighter.statusEffects.slowTimer = 0;
       fighter.statusEffects.slowMultiplier = 1.0;
+      fighter.statusEffects.paralyzeTimer = 0;
     }
   }
 
@@ -646,14 +668,13 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   const wheelY = fighter.y - fighter.r - 28;
   if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: GETSUGA TENSHO!', color || '#FF1E32');
-    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Damage Reduction & Slow Immune!', '#FFFFFF');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Damage Reduction & Paralyze Immune!', '#FFFFFF');
   } else {
     const displayName = skillShotId.toUpperCase().replace('_', ' ');
     spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} DODGE!`, color);
   }
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
-  spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
   const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
   const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
   audioSystem.playSFX(tpSnd, tpVol);
@@ -726,7 +747,7 @@ export function adaptToPureLoveBeam(fighter) {
     opponent.isChannelingDomain || opponent.domainActive
   );
 
-  if (opponent && !isEnemyFiringBeam) {
+  if (opponent && !isEnemyFiringBeam && !fighter.isDraggedByGetsuga) {
     const oldX = fighter.x;
     const oldY = fighter.y;
     const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);

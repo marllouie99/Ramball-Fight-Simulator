@@ -1,4 +1,4 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
+import { Fighter, applyDamageToTarget, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
@@ -982,34 +982,31 @@ export class TojiFighter extends Fighter {
     });
   }
 
+  get stealthAfterimages() {
+    return this.afterImages;
+  }
+
+  set stealthAfterimages(val) {
+    this.afterImages = val;
+  }
+
   _isFrozenOrPaused() {
     if (this.ultimateActive) return false;
-    return Boolean(
-      this.isFrozen ||
-      this.isFrozenByInfinity ||
-      (this.timeStopTimer && this.timeStopTimer > 0) ||
+    return this.areAttackEffectsSuppressed() || Boolean(
       (this.statusEffects && this.statusEffects.timeStopTimer > 0) ||
       (this.mahoragaAdaptationFreezeTimer && this.mahoragaAdaptationFreezeTimer > 0) ||
       this.frozenByCronos ||
       this.isCronosStasis ||
-      this.isTargetOfAmbush ||
       this.caughtInGenosFlurry ||
       this.caughtInJohnWickCombo ||
       this.caughtInPureLoveBeam ||
       (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
-      (this.paralyzeTimer && this.paralyzeTimer > 0) ||
-      (this.electricStunTimer && this.electricStunTimer > 0) ||
-      (this.hitStunTimer && this.hitStunTimer > 0) ||
       (this.stunTimer && this.stunTimer > 0) ||
       (this.knockbackStunTimer && this.knockbackStunTimer > 0) ||
-      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
-      (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) ||
-      this.isParalyzed ||
       this.isParalyzedByMahoraga ||
       this.isParalyzedByMahito ||
       this.isCaughtInPurple ||
-      (this.purpleHitTimer && this.purpleHitTimer > 0) ||
-      this.isWallPinned
+      (this.purpleHitTimer && this.purpleHitTimer > 0)
     );
   }
 

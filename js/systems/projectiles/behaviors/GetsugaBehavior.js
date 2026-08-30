@@ -2,9 +2,8 @@ import { ProjectileBehavior } from '../ProjectileBehavior.js';
 import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
-import { applyDamageToTarget } from '../../../entities/fighter.js';
-import { spawnImpactFlash, spawnMeleeClashShockwave, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
-import { spawnGetsugaHitEffect } from '../../../graphics/particles/getsugaImpactEffect.js';
+import { applyDamageToTarget, suppressAfterimagesAndAttackEffects, isSuppressedByGetsuga } from '../../../entities/fighter.js';
+import { spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 
 export class GetsugaBehavior extends ProjectileBehavior {
   update(projectile, fighters, system) {
@@ -48,25 +47,57 @@ export class GetsugaBehavior extends ProjectileBehavior {
       }
     }
 
-    // ── Grand Finisher: Final Massive Kuroi Getsuga Wall Pinning (Just like Gojo's Purple) ──
-    if (isFinal && arena) {
-      const pad = 24;
+    // ── Getsuga Tensho Wall Pinning & Clamping (Calculates true visual crescent scale extent) ──
+    if (arena) {
+      const owner = (fighters && typeof projectile.owner === 'number') ? fighters[projectile.owner] : ((typeof state !== 'undefined' && state.fighters && typeof projectile.owner === 'number') ? state.fighters[projectile.owner] : projectile.owner);
+      const form = projectile.getsugaForm || 'shikai';
+      const isFinal = form === 'final_bankai';
+      const isBankaiHollow = form === 'bankai_hollow';
+      const isShikaiHollow = form === 'hollow';
+      const isBankai = form === 'bankai' || isBankaiHollow || isFinal;
+      const ownerScale = owner ? Math.max(0.9, owner.r / 22) : 1.0;
+      const baseProjRadius = isFinal
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius ?? 120)
+        : (isBankaiHollow
+          ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius ?? (CONFIG.ichigo?.getsugaRadius ?? 100))
+          : (isShikaiHollow
+            ? (CONFIG.ichigo?.hollowGetsugaRadius ?? (CONFIG.ichigo?.getsugaRadius ?? 100))
+            : (isBankai
+              ? (CONFIG.ichigo?.bankaiGetsugaRadius ?? 110)
+              : (CONFIG.ichigo?.getsugaRadius ?? 100))));
+      const effectiveRadius = ((projectile.r !== undefined && projectile.r > 0) ? projectile.r : baseProjRadius) * ownerScale;
+
+      let ang = projectile.angle;
+      if (projectile.vx !== 0 || projectile.vy !== 0) {
+        ang = Math.atan2(projectile.vy, projectile.vx);
+      } else if (projectile.launchAngle !== undefined) {
+        ang = projectile.launchAngle;
+      } else if (projectile._resumeVx !== undefined && projectile._resumeVy !== undefined && (projectile._resumeVx !== 0 || projectile._resumeVy !== 0)) {
+        ang = Math.atan2(projectile._resumeVy, projectile._resumeVx);
+      } else if (ang === undefined) {
+        ang = 0;
+      }
+
+      // Middle top cutting edge (apex) of Getsuga Tensho
+      const apexOffsetX = Math.cos(ang) * effectiveRadius;
+      const apexOffsetY = Math.sin(ang) * effectiveRadius;
+
       let hitWall = false;
 
-      if (projectile.x - pad < arena.x) {
-        projectile.x = arena.x + pad;
+      if (projectile.vx < 0 && projectile.x + apexOffsetX <= arena.x) {
+        projectile.x = arena.x - apexOffsetX;
         hitWall = true;
       }
-      if (projectile.x + pad > arena.x + arena.width) {
-        projectile.x = arena.x + arena.width - pad;
+      if (projectile.vx > 0 && projectile.x + apexOffsetX >= arena.x + arena.width) {
+        projectile.x = arena.x + arena.width - apexOffsetX;
         hitWall = true;
       }
-      if (projectile.y - pad < arena.y) {
-        projectile.y = arena.y + pad;
+      if (projectile.vy < 0 && projectile.y + apexOffsetY <= arena.y) {
+        projectile.y = arena.y - apexOffsetY;
         hitWall = true;
       }
-      if (projectile.y + pad > arena.y + arena.height) {
-        projectile.y = arena.y + arena.height - pad;
+      if (projectile.vy > 0 && projectile.y + apexOffsetY >= arena.y + arena.height) {
+        projectile.y = arena.y + arena.height - apexOffsetY;
         hitWall = true;
       }
 
@@ -81,10 +112,10 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
           // Wall impact burst & heavy screen shake on initial wall collision
           if (typeof spawnImpactFlash === 'function') {
-            spawnImpactFlash(projectile.x, projectile.y, 45, projectile.color || '#DC143C');
+            spawnImpactFlash(projectile.x, projectile.y, isFinal ? 45 : 35, projectile.color || '#00E5FF');
           }
           if (typeof triggerGlobalScreenShake === 'function') {
-            triggerGlobalScreenShake(6.5, 12);
+            triggerGlobalScreenShake(isFinal ? 6.5 : 4.5, isFinal ? 12 : 8);
           }
           const hitSfx = CONFIG.ichigo?.sounds?.getsugaHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
           audioSystem.playSFX(hitSfx, 1.0);
@@ -97,11 +128,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
         if (projectile.getsugaWallShakeCounter >= 6) {
           projectile.getsugaWallShakeCounter = 0;
           if (typeof triggerGlobalScreenShake === 'function') {
-            triggerGlobalScreenShake(2.5, 6);
+            triggerGlobalScreenShake(isFinal ? 2.5 : 1.8, 6);
           }
-        }
-        if (Math.random() < 0.45 && typeof spawnSparks === 'function') {
-          spawnSparks(projectile.x, projectile.y, 3, 'lightningTrail', projectile.color || '#DC143C');
         }
       }
     }
@@ -128,7 +156,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
     // 3. Process Dragged Targets (Carrying caught enemies forward along with the crescent wave)
     if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
       const waveSpeed = Math.hypot(projectile.vx, projectile.vy);
-      const dirX = waveSpeed > 0.001 ? projectile.vx / waveSpeed : 1;
+      const dirX = waveSpeed > 0.001 ? projectile.vx / waveSpeed : 0;
       const dirY = waveSpeed > 0.001 ? projectile.vy / waveSpeed : 0;
       const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
 
@@ -144,10 +172,18 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
         target.isDraggedByGetsuga = true;
         target.preventKnockbackBounce = true;
+        suppressAfterimagesAndAttackEffects(target);
 
-        // Grand Finisher: Final Massive Kuroi Getsuga maintains Paralyze while carrying target
-        if (projectile.getsugaForm === 'final_bankai') {
-          const paralyzeDuration = CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28;
+        // Getsuga Tensho maintains Paralyze debuff while carrying target
+        const isTargetAdapted = Boolean(target.adaptedGetsuga || (target.adaptedSkills && (target.adaptedSkills['getsugaTensho'] || target.adaptedSkills['getsuga'])));
+        if (!isTargetAdapted) {
+          const paralyzeDuration = projectile.getsugaForm === 'final_bankai'
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28)
+            : (projectile.getsugaForm === 'bankai_hollow'
+              ? (CONFIG.ichigo?.bankaiHollowGetsugaParalyzeDuration || 24)
+              : (projectile.getsugaForm === 'hollow'
+                ? (CONFIG.ichigo?.hollowGetsugaParalyzeDuration || 20)
+                : (projectile.getsugaForm === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaParalyzeDuration || 20) : (CONFIG.ichigo?.getsugaParalyzeDuration || 18))));
           if (typeof target.applyParalyze === 'function') {
             target.applyParalyze(paralyzeDuration);
           } else {
@@ -181,11 +217,12 @@ export class GetsugaBehavior extends ProjectileBehavior {
         }
 
         if (isAtWall) {
-          // Slammed into wall: Stop all velocities and prevent multiple rapid rebounces!
+          // Slammed into wall: Stop all velocities and pin target in place without sliding
           target.vx = 0;
           target.vy = 0;
           target.knockbackVx = 0;
           target.knockbackVy = 0;
+          target.preventKnockbackBounce = true;
 
           // Single clean wall impact spark & flash (no ground/wall cracks)
           if (!target._getsugaWallImpactTimer || target._getsugaWallImpactTimer <= 0) {
@@ -201,9 +238,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
             audioSystem.playSFX(hitSfx, hitVol);
           }
 
-          // Release from active wave dragging immediately upon hitting the wall so enemy sticks cleanly
+          // Release from active wave dragging immediately upon hitting the wall so enemy stays firmly pinned in place
           target.isDraggedByGetsuga = false;
-          target.preventKnockbackBounce = false;
           projectile.draggedTargets.delete(target);
           continue;
         }
@@ -224,11 +260,6 @@ export class GetsugaBehavior extends ProjectileBehavior {
           const pad = target.r || 25;
           target.x = Math.max(arena.x + pad, Math.min(arena.x + arena.width - pad, target.x));
           target.y = Math.max(arena.y + pad, Math.min(arena.y + arena.height - pad, target.y));
-        }
-
-        // Spawn air friction & ground drag spark particles
-        if (Math.random() < 0.35 && typeof spawnSparks === 'function') {
-          spawnSparks(target.x, target.y, 2, projectile.color || '#00D5FF');
         }
 
         if (dragFrames <= 1) {
@@ -271,37 +302,94 @@ export class GetsugaBehavior extends ProjectileBehavior {
       // Check if target was recently hit by this same Getsuga wave
       if (projectile.hitTargets && projectile.hitTargets.has(f)) continue;
 
-      const dist = Math.hypot(f.x - projectile.x, f.y - projectile.y);
-      if (dist <= hitRadius + (f.r || 25)) {
+      // Precise Geometric Crescent Arc Collision Check (Matches exact visual sweep)
+      const dx = f.x - projectile.x;
+      const dy = f.y - projectile.y;
+      const dist = Math.hypot(dx, dy);
+      const tRadius = f.r || 25;
+      const projAngle = projectile.angle !== undefined ? projectile.angle : Math.atan2(projectile.vy, projectile.vx);
+      const angleToTarget = Math.atan2(dy, dx);
+      const angleDiff = Math.atan2(Math.sin(angleToTarget - projAngle), Math.cos(angleToTarget - projAngle));
+
+      const halfAngle = 0.64 * Math.PI + 0.12; // Matches visual crescent arc span (~122 deg)
+      const maxReach = hitRadius + tRadius + 8;
+
+      // Arc hit: target must be within crescent radius AND within the forward-facing arc angle
+      let isHit = (dist <= maxReach && Math.abs(angleDiff) <= halfAngle);
+
+      // Point-blank catch zone: Active during the first 6 frames after launch to catch enemies
+      // standing in melee range of Ichigo who may be behind/inside the projectile spawn point
+      if (!isHit && attacker && (projectile.life >= (projectile.maxLife || 30) - 6)) {
+        const distToAttacker = Math.hypot(f.x - attacker.x, f.y - attacker.y);
+        const reach = (attacker.r || 25) + 65 + tRadius;
+        if (distToAttacker <= reach) {
+          const toEnemyAngle = Math.atan2(f.y - attacker.y, f.x - attacker.x);
+          const pbAngleDiff = Math.atan2(Math.sin(toEnemyAngle - projAngle), Math.cos(toEnemyAngle - projAngle));
+          if (Math.abs(pbAngleDiff) <= Math.PI * 0.50) {
+            isHit = true;
+          }
+        }
+      }
+
+      if (isHit) {
         if (!projectile.hitTargets) projectile.hitTargets = new Map();
         const hitCooldown = isFinal
           ? (CONFIG.ichigo?.bankaiFinalGetsugaHitCooldown || 4)
-          : (CONFIG.ichigo?.getsugaHitCooldown || 20);
+          : (CONFIG.ichigo?.getsugaHitCooldown || 4);
         projectile.hitTargets.set(f, hitCooldown); // Cooldown before this target can be hit again by the same wave
 
-        // Apply skill damage (continuous multi-tick damage for Final Getsuga)
+        // Apply skill damage (continuous multi-tick damage for ALL Getsuga waves)
         const tickDamage = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || projectile.damage || 26)
-          : projectile.damage;
-        applyDamageToTarget(f, tickDamage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, isFinalGetsugaTick: isFinal, projectile });
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20)
+          : (form === 'bankai_hollow'
+            ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 24)
+            : (form === 'hollow'
+              ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 16)
+              : (isBankai
+                ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16)
+                : (CONFIG.ichigo?.getsugaTickDamage || projectile.damage || 10))));
+        applyDamageToTarget(f, tickDamage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, isFinalGetsugaTick: isFinal, isFinalMassiveGetsuga: isFinal, projectile });
+        suppressAfterimagesAndAttackEffects(f);
 
         const isGetsugaAdapted = Boolean(f.adaptedGetsuga || (f.adaptedSkills && (f.adaptedSkills['getsugaTensho'] || f.adaptedSkills['getsuga'])));
 
-        // Apply knockback in wave direction
-        const angle = Math.atan2(projectile.vy, projectile.vx);
-        const kbForce = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 30)
-          : (isMask
-            ? (CONFIG.ichigo?.hollowGetsugaKnockback || 8)
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6)));
-        if (typeof f.applyKnockback === 'function') {
-          f.applyKnockback(Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce), Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce));
+        const pad = f.r || 25;
+        const isTargetAtWall = arena && (
+          f.x <= arena.x + pad + 2 ||
+          f.x >= arena.x + arena.width - pad - 2 ||
+          f.y <= arena.y + pad + 2 ||
+          f.y >= arena.y + arena.height - pad - 2
+        );
+
+        // Apply knockback in wave direction ONLY if target is in the open arena (not pinned at wall)
+        if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
+          const angle = Math.atan2(projectile.vy, projectile.vx);
+          const kbForce = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 30)
+            : (isMask
+              ? (CONFIG.ichigo?.hollowGetsugaKnockback || 8)
+              : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6)));
+          if (typeof f.applyKnockback === 'function') {
+            f.applyKnockback(Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce), Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce));
+          }
+        } else {
+          // Firmly lock velocities against wall to prevent lateral sliding along the edge
+          f.vx = 0;
+          f.vy = 0;
+          f.knockbackVx = 0;
+          f.knockbackVy = 0;
+          f.preventKnockbackBounce = true;
         }
 
-        // Apply hit stun / Paralyze effect
-        if (isFinal && !isGetsugaAdapted) {
-          // ── Grand Finisher: Final Massive Kuroi Getsuga Paralyzes Target Throughout Wave Ticks ──
-          const paralyzeDuration = CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28;
+        // Apply Paralyze debuff & Hit Stun (Immune if Adapted!)
+        if (!isGetsugaAdapted) {
+          const paralyzeDuration = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28)
+            : (form === 'bankai_hollow'
+              ? (CONFIG.ichigo?.bankaiHollowGetsugaParalyzeDuration || 24)
+              : (form === 'hollow'
+                ? (CONFIG.ichigo?.hollowGetsugaParalyzeDuration || 20)
+                : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaParalyzeDuration || 20) : (CONFIG.ichigo?.getsugaParalyzeDuration || 18))));
           if (typeof f.applyParalyze === 'function') {
             f.applyParalyze(paralyzeDuration);
           } else {
@@ -313,12 +401,20 @@ export class GetsugaBehavior extends ProjectileBehavior {
           if (typeof f.interruptAttacks === 'function') {
             f.interruptAttacks(true);
           }
+          const stunDuration = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaHitStun || 28)
+            : (isMask
+              ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
+              : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18)));
+          if (typeof f.applyHitStun === 'function') {
+            f.applyHitStun(stunDuration);
+          }
         } else {
           const stunDuration = isMask
             ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
             : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18));
           if (typeof f.applyHitStun === 'function') {
-            f.applyHitStun(isGetsugaAdapted ? Math.round(stunDuration * 0.4) : stunDuration);
+            f.applyHitStun(Math.round(stunDuration * 0.4));
           }
         }
 
@@ -345,8 +441,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
           f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMultiplier);
         }
 
-        // ── 6. Register for Active Wave Dragging (Immune if Adapted!) ──
-        if (!isGetsugaAdapted) {
+        // ── 6. Register for Active Wave Dragging (Pull along with wave only in open arena) ──
+        if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
           if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
           const dragFrames = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaDragFrames || 24)
@@ -356,28 +452,21 @@ export class GetsugaBehavior extends ProjectileBehavior {
           projectile.draggedTargets.set(f, dragFrames);
         }
 
-        // Visual impacts: specialized Bleach Getsuga Tensho spatial cleave hit effect
-        // Skip Getsuga slice/flash hit effect for the Grand Finisher Final Kuroi Getsuga
-        if (!isFinal) {
-          if (typeof spawnGetsugaHitEffect === 'function') {
-            spawnGetsugaHitEffect(f.x, f.y, angle, form);
-          }
-
-          const flashType = (isMask) ? 'sukuna' : 'gojo';
-          if (typeof spawnImpactFlash === 'function') {
-            spawnImpactFlash(f.x, f.y, flashType);
-          }
-        }
-
-        // Ring shockwave hit effect (kept for all forms including Grand Finisher)
+        // Ring shockwave hit effect (Theme color matches current Getsuga Tensho color!)
         if (typeof spawnMeleeClashShockwave === 'function') {
-          const flashType = (isFinal || isMask) ? 'sukuna' : 'gojo';
+          const swColor = projectile.color || (isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaColor || '#DC143C')
+            : (form === 'bankai_hollow'
+              ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00')
+              : (form === 'hollow'
+                ? (CONFIG.ichigo?.hollowGetsugaColor || '#FFFFFF')
+                : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#DC143C') : (CONFIG.ichigo?.getsugaColor || '#00D5FF')))));
           const swSize = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaShockwaveSize || 110)
             : (isMask
               ? (CONFIG.ichigo?.hollowGetsugaShockwaveSize || 45)
               : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaShockwaveSize || 42) : (CONFIG.ichigo?.getsugaShockwaveSize || 40)));
-          spawnMeleeClashShockwave(f.x, f.y, swSize, flashType);
+          spawnMeleeClashShockwave(f.x, f.y, swSize, swColor);
         }
         if (typeof triggerGlobalScreenShake === 'function') {
           const shakeAmt = isFinal
@@ -432,11 +521,11 @@ export class GetsugaBehavior extends ProjectileBehavior {
     const isFinal = form === 'final_bankai';
     const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
 
-    // ── Grand Finisher: Final Massive Kuroi Getsuga Stays Pinned to the Wall (Like Gojo's Purple) ──
-    if (isFinal && arena) {
+    // ── All Getsuga Tensho Waves Stay Pinned to the Wall Until Lifespan Ends (Does not clip out of arena) ──
+    if (arena) {
       if (projectile.life <= 0) {
         if (typeof spawnSparks === 'function') {
-          spawnSparks(projectile.x, projectile.y, 16, projectile.color || '#DC143C');
+          spawnSparks(projectile.x, projectile.y, 16, projectile.color || '#00E5FF');
         }
         return true;
       }
@@ -445,19 +534,19 @@ export class GetsugaBehavior extends ProjectileBehavior {
       const pad = 24;
       let isAtWall = false;
 
-      if (projectile.x - pad < arena.x) {
+      if (projectile.vx < 0 && projectile.x - pad < arena.x) {
         projectile.x = arena.x + pad;
         isAtWall = true;
       }
-      if (projectile.x + pad > arena.x + arena.width) {
+      if (projectile.vx > 0 && projectile.x + pad > arena.x + arena.width) {
         projectile.x = arena.x + arena.width - pad;
         isAtWall = true;
       }
-      if (projectile.y - pad < arena.y) {
+      if (projectile.vy < 0 && projectile.y - pad < arena.y) {
         projectile.y = arena.y + pad;
         isAtWall = true;
       }
-      if (projectile.y + pad > arena.y + arena.height) {
+      if (projectile.vy > 0 && projectile.y + pad > arena.y + arena.height) {
         projectile.y = arena.y + arena.height - pad;
         isAtWall = true;
       }

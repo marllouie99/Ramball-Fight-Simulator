@@ -9,6 +9,7 @@ import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { drawUryuBow, drawSeeleSchneider } from '../weapons/uryuWeaponGraphics.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
 let _uryuBodyImage = null;
 let _uryuBodyImageLoading = false;
@@ -267,7 +268,8 @@ export function drawUryuReishiAura(ctx, fighter) {
  * Draws Uryu's dash afterimages at recorded absolute world coordinates.
  */
 export function drawUryuAfterImages(ctx, fighter) {
-  if (!fighter || !fighter.afterImages || fighter.afterImages.length === 0) return;
+  const isSuppressed = typeof fighter?.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
+  if (!fighter || !fighter.afterImages || fighter.afterImages.length === 0 || isSuppressed) return;
   const r = fighter.r || 25;
 
   ctx.save();

@@ -60,3 +60,11 @@
 - **ALL fighters and future fighters** MUST pass `this` (the attacker) as the second argument in `target.takeDamage(damage, this, opts)` calls so Mahoraga's adaptation system can correctly identify the attacker.
 - **ALL fighters and future fighters** MUST pass accurate `opts` flags (`isMelee`, `isSkill`, etc.) so Mahoraga's damage type classification works correctly.
 - **NEVER** modify or reset Mahoraga's `adaptationStage`, `adapted`, `hitsTaken`, or `gojoAdapted` from outside `MahoragaFighter.js` except during a full game reset.
+
+## 10. Getsuga Tensho Wave Drag Stasis Rule
+- When Mahoraga is carried or dragged along by Ichigo's Getsuga Tensho (`isDraggedByGetsuga === true`):
+  - **ALL forward dashes, teleports, and rebound blitzes toward Ichigo are strictly disabled**, even if Mahoraga has fully adapted to Getsuga Tensho (`adaptedGetsuga === true`).
+  - Active `adaptationDashTimer`, `isBlitzActive`, `isInfinityBlitz`, and `neutralStanceTimer` are immediately aborted and cleared.
+  - Wall impacts during wave drag clamp Mahoraga smoothly against the arena wall boundary without accumulating wall bounces (`wallBounceCount = 0`), preventing any Wall Rebound Dash or blitz triggers.
+  - `isTeleportDisabled(fighter)` unconditionally returns `true` while `isDraggedByGetsuga` is active.
+

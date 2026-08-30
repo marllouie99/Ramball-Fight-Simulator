@@ -1,5 +1,6 @@
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
 /**
  * Visual Skin Renderer for Saitama (The Caped Baldy)
@@ -11,7 +12,8 @@ export function drawSaitamaSkin(ctx, fighter) {
   const now = Date.now();
 
   // 0. Draw afterimages (Teleport / sidestep ghost model skin) at their absolute coordinates
-  if (fighter.afterImages && fighter.afterImages.length > 0) {
+  const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
+  if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
     ctx.save();
     for (let i = 0; i < fighter.afterImages.length; i++) {
       const ai = fighter.afterImages[i];

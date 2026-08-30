@@ -523,18 +523,13 @@ export class SaitamaFighter extends Fighter {
       ent.vy = 0;
       ent.isTargetOfAmbush = true;
       ent.caughtInSaitamaCounter = true;
+      if (typeof ent.suppressCombatAndVisuals === 'function') {
+        ent.suppressCombatAndVisuals();
+      }
       if (ent.characterId === 'gojo' || ent.type === 'gojo') {
         ent.infinityFadeOpacity = 0;
         ent.infinityBlockTimer = 0;
         ent.infinityActive = false;
-        ent.sakugaImpactTimer = 0;
-        ent.hitFlameWisps = [];
-        ent.punchEffects = [];
-        ent.afterImages = [];
-        ent.redEffectTimer = 0;
-        ent.redBuildupPhase = false;
-        ent.isChannelingPurple = false;
-        ent.purpleRecoveryTimer = 0;
         ent.healingAuraTimer = 0;
         ent.combatAuraOpacity = 0;
       }
@@ -647,18 +642,13 @@ export class SaitamaFighter extends Fighter {
         if (ent.statusEffects && typeof ent.statusEffects.timeStopTimer !== 'undefined') {
           ent.statusEffects.timeStopTimer = 0;
         }
+        if (typeof ent.suppressCombatAndVisuals === 'function') {
+          ent.suppressCombatAndVisuals();
+        }
         if (ent.characterId === 'gojo' || ent.type === 'gojo') {
           ent.infinityFadeOpacity = 0;
           ent.infinityBlockTimer = 0;
           ent.infinityActive = false;
-          ent.sakugaImpactTimer = 0;
-          ent.hitFlameWisps = [];
-          ent.punchEffects = [];
-          ent.afterImages = [];
-          ent.redEffectTimer = 0;
-          ent.redBuildupPhase = false;
-          ent.isChannelingPurple = false;
-          ent.purpleRecoveryTimer = 0;
           ent.healingAuraTimer = 0;
           ent.combatAuraOpacity = 0;
         }

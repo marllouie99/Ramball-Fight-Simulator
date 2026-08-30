@@ -1,4 +1,4 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
+import { Fighter, applyDamageToTarget, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -121,8 +121,14 @@ export class IchigoFighter extends Fighter {
     this.bankaiFinalGetsugaTriggered = false;
     this.isFinalMassiveGetsuga = false;
     this.isFinalGetsugaRecovery = false;
-    this._stopFinalGetsugaVoiceline();
+    this._stopFinalGetsugaVoiceline(true);
+    this._finalGetsugaVoicePlaying = false;
+    this._finalGetsugaVoiceEndTime = 0;
+    this._getsugaVoicePlaying = false;
+    this._getsugaVoiceEndTime = 0;
     this.afterImages = [];
+    this._lastBankaiTrailX = undefined;
+    this._lastBankaiTrailY = undefined;
     this.slashSwingTimer = 0;
     this.parryStanceIndex = 0;
     this.blockPoseTimer = 0;
@@ -151,11 +157,45 @@ export class IchigoFighter extends Fighter {
     this.bankaiClothStreamers = [];
   }
 
+  _isShunpoComboActive() {
+    return Boolean(
+      this.shunpoComboActive ||
+      this.isShunpoDashing ||
+      this.isShunpoDisengaging ||
+      (this.shunpoComboDelayTimer && this.shunpoComboDelayTimer > 0) ||
+      (this.shunpoDisengageDelayTimer && this.shunpoDisengageDelayTimer > 0) ||
+      (this.isChannelingGetsuga && this._isComboGetsuga) ||
+      (this.getsugaRecoveryTimer && this.getsugaRecoveryTimer > 0 && this._isComboGetsuga)
+    );
+  }
+
+  isAboutToUnleashNormalGetsuga() {
+    if (this.isDead || this.hp <= 0) return false;
+    // 1. Actively charging / channeling normal Getsuga Tensho
+    if (this.isChannelingGetsuga && !this.isFinalMassiveGetsuga) {
+      return true;
+    }
+    // 2. Normal Getsuga release swing animation / follow-through
+    if (this.isGetsugaSlash && !this.isFinalGetsugaRecovery && (this.slashSwingTimer > 0 || (this.getsugaRecoveryTimer && this.getsugaRecoveryTimer > 0))) {
+      return true;
+    }
+    // 3. Shunpo Combo: Flash step flurry finished and disengaging or preparing back-step to unleash Getsuga
+    if (this.shunpoComboActive) {
+      const maxSteps = this.shunpoMaxSteps || (this.bankaiActive ? 6 : 4);
+      if (this.isShunpoDisengaging || (this.shunpoDisengageDelayTimer && this.shunpoDisengageDelayTimer > 0) || this.shunpoComboStep >= maxSteps) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   interruptAttacks(forceCancelAll = false) {
-    // If channeling Bankai, Grand Finisher (Final Massive Kuroi Getsuga), or Hollow Awakening, do NOT cancel unless forceCancelAll is true (e.g. death)
+    // If channeling Bankai, Grand Finisher (Final Massive Kuroi Getsuga), Unified Skill Combo (Shunpo Getsuga Blitz), or Hollow Awakening, do NOT cancel unless forceCancelAll is true (e.g. death)
     if (!forceCancelAll) {
       if (this.isChannelingBankai || this.bankaiBurstTimer > 0) return;
       if (this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying()) return;
+      if (this.isAboutToUnleashNormalGetsuga() || this.isChannelingGetsuga || this._isGetsugaVoicelinePlaying()) return;
+      if (this._isShunpoComboActive()) return;
       if (this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0) return;
     }
 
@@ -166,7 +206,10 @@ export class IchigoFighter extends Fighter {
     this.shunpoComboActive = false;
     this.shunpoComboStep = 0;
     this.shunpoComboDelayTimer = 0;
+    this.shunpoDisengageDelayTimer = 0;
+    this.isShunpoDisengaging = false;
     this.shunpoTarget = null;
+    this._isComboGetsuga = false;
 
     if (!this.isFinalMassiveGetsuga || forceCancelAll) {
       this.isChannelingGetsuga = false;
@@ -189,10 +232,22 @@ export class IchigoFighter extends Fighter {
       this.hollowBurstTimer = 0;
       this.bankaiShards = [];
       this.bankaiClothStreamers = [];
+      this._isComboGetsuga = false;
     }
+
+    // Preserve existing afterimages across minor flinches so existing trails fade smoothly instead of abruptly disappearing
+    // NEVER preserve if forceCancelAll is true or if struck by Getsuga Tensho
+    const isGetsugaHit = isSuppressedByGetsuga(this);
+    const savedAfterimages = (!forceCancelAll && !isGetsugaHit && this.afterImages && this.afterImages.length > 0) ? this.afterImages.slice() : null;
 
     if (typeof super.interruptAttacks === 'function') {
       super.interruptAttacks(forceCancelAll);
+    }
+
+    if (savedAfterimages && !this.isDead && this.hp > 0 && !isGetsugaHit && !forceCancelAll) {
+      this.afterImages = savedAfterimages;
+    } else if (isGetsugaHit || forceCancelAll) {
+      if (this.afterImages) this.afterImages.length = 0;
     }
   }
 
@@ -200,10 +255,11 @@ export class IchigoFighter extends Fighter {
     // When channeling Hollow Mask, Ichigo receives knockback/pushback from any attack!
     const isChannelingHollow = Boolean(this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this._hollowVoicelineWait);
 
-    // Hyper-Armor & Beam Pushback Immunity: Complete immunity to attack pushback / knockback during Bankai (channeling, active, burst), Final Getsuga, or when caught in Yuta's Pure Love Beam
+    // Hyper-Armor & Beam Pushback Immunity: Complete immunity to attack pushback / knockback during Bankai (channeling, active, burst), Final Getsuga, Shunpo Getsuga Blitz combo, or when caught in Yuta's Pure Love Beam
     const isIchigoReiatsuArmored = !isChannelingHollow && (
       this.bankaiActive || this.isChannelingBankai || this.bankaiBurstTimer > 0 ||
-      this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isGetsugaSlash && this.isFinalGetsugaRecovery) ||
+      this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isGetsugaSlash && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying() ||
+      this._isShunpoComboActive() ||
       this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || options?.isPureLoveBeam
     );
 
@@ -221,16 +277,24 @@ export class IchigoFighter extends Fighter {
     if (this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this._hollowVoicelineWait) {
       return; // Hyper-Armor: Do not allow external attacks to freeze/pause Hollow Awakening transformation
     }
+    const isBusyWithFinalGetsuga = this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
+    if (isBusyWithFinalGetsuga || this._isShunpoComboActive() || this.isAboutToUnleashNormalGetsuga()) {
+      return; // Supreme Hyper-Armor: Do not allow external attacks to interrupt or cancel Grand Finisher / Shunpo Combo / Normal Getsuga
+    }
     super.applyTimeStop(frames);
-    if (!this.isChannelingBankai && !(this.isChannelingGetsuga && this.isFinalMassiveGetsuga) && (!this.hollowMaskFormationTimer || this.hollowMaskFormationTimer <= 0)) {
+    if (!this.isChannelingBankai && (!this.hollowMaskFormationTimer || this.hollowMaskFormationTimer <= 0)) {
       this._stopFinalGetsugaVoiceline();
       this.interruptAttacks(true);
     }
   }
 
   applyParalysis(duration, opts = {}) {
-    if ((this.isChannelingBankai || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || this.hollowMaskFormationTimer > 0) && !opts?.isWallSlam && !this.isGrabbedByMahoraga && !this.isParalyzedByMahoraga) {
-      return; // Hyper-Armor: immune to paralysis during Bankai transformation, Final Getsuga charge & Hollow Awakening
+    const isBusyWithFinalGetsuga = this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
+    if (isBusyWithFinalGetsuga || this._isShunpoComboActive() || this.isAboutToUnleashNormalGetsuga()) {
+      return; // Supreme Hyper-Armor: immune to paralysis during Final Getsuga Grand Finisher / Shunpo Combo / Normal Getsuga
+    }
+    if ((this.isChannelingBankai || this.hollowMaskFormationTimer > 0) && !opts?.isWallSlam && !this.isGrabbedByMahoraga && !this.isParalyzedByMahoraga) {
+      return; // Hyper-Armor: immune to paralysis during Bankai transformation & Hollow Awakening
     }
     this._stopFinalGetsugaVoiceline();
     if (typeof super.applyParalysis === 'function') super.applyParalysis(duration);
@@ -238,12 +302,17 @@ export class IchigoFighter extends Fighter {
   }
 
   applyHitStun(duration, opts = {}) {
+    const isBusyWithFinalGetsuga = this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
+    if (isBusyWithFinalGetsuga || this._isShunpoComboActive() || this.isAboutToUnleashNormalGetsuga()) {
+      this.hitStunTimer = 0;
+      return; // Supreme Hyper-Armor: immune to hit stun during Final Getsuga Grand Finisher / Shunpo Combo / Normal Getsuga
+    }
+
     const isHyperArmored = (this.isChannelingBankai || this.bankaiBurstTimer > 0) ||
-      (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || this.isFinalMassiveGetsuga || (this.getsugaRecoveryTimer > 0 && this.isGetsugaSlash && this.isFinalGetsugaRecovery) ||
       (this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0);
 
     if (isHyperArmored && !opts?.isWallSlam && !this.isGrabbedByMahoraga && !this.isParalyzedByMahoraga && !opts?.isIsoh && !opts?.isSoulSplit) {
-      return; // Hyper-Armor: immune to hit stun during Bankai transformation, Final Getsuga charge/recovery & Hollow Awakening
+      return; // Hyper-Armor: immune to hit stun during Bankai transformation & Hollow Awakening
     }
     if (opts?.isWallSlam || this.isGrabbedByMahoraga || this.isParalyzedByMahoraga || opts?.isIsoh || opts?.isSoulSplit) {
       this._stopFinalGetsugaVoiceline();
@@ -253,8 +322,12 @@ export class IchigoFighter extends Fighter {
   }
 
   applyElectricStun(duration, opts = {}) {
-    if ((this.isChannelingBankai || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || this.hollowMaskFormationTimer > 0) && !opts?.isWallSlam && !this.isGrabbedByMahoraga && !this.isParalyzedByMahoraga) {
-      return; // Hyper-Armor: immune to electric stun during Bankai transformation, Final Getsuga charge & Hollow Awakening
+    const isBusyWithFinalGetsuga = this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
+    if (isBusyWithFinalGetsuga || this._isShunpoComboActive() || this.isAboutToUnleashNormalGetsuga()) {
+      return; // Supreme Hyper-Armor: immune to electric stun during Final Getsuga Grand Finisher / Shunpo Combo / Normal Getsuga
+    }
+    if ((this.isChannelingBankai || this.hollowMaskFormationTimer > 0) && !opts?.isWallSlam && !this.isGrabbedByMahoraga && !this.isParalyzedByMahoraga) {
+      return; // Hyper-Armor: immune to electric stun during Bankai transformation & Hollow Awakening
     }
     this._stopFinalGetsugaVoiceline();
     if (typeof super.applyElectricStun === 'function') super.applyElectricStun(duration);
@@ -262,6 +335,9 @@ export class IchigoFighter extends Fighter {
   }
 
   isParalyzedOrBeamTrapped() {
+    if (this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying() || this._isShunpoComboActive() || this.isAboutToUnleashNormalGetsuga()) {
+      return false; // Supreme Hyper-Armor: Grand Finisher, Shunpo Combo, and Normal Getsuga are never paralyzed or beam-trapped
+    }
     if (this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this._hollowVoicelineWait) {
       return Boolean(this.isTargetOfAmbush);
     }
@@ -289,8 +365,12 @@ export class IchigoFighter extends Fighter {
 
   activateHollowMask() {
     if (this.hollowMaskUsed || this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped()) return;
+    // Hollow Mask strictly requires Bankai to have been popped first!
+    if (!this.bankaiActive && !this.bankaiUsed) return;
     // Do not interrupt Bankai Transformation or Bankai Grand Finisher (Final Massive Kuroi Getsuga)
     if (this.isChannelingBankai || this.bankaiBurstTimer > 0) return;
+    // When Ichigo is about to unleash any normal Getsuga Tensho, let him unleash it before activating Hollow Mask!
+    if (this.isAboutToUnleashNormalGetsuga() || this.isChannelingGetsuga || this._isGetsugaVoicelinePlaying()) return;
     if (this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || this._isFinalGetsugaVoicelinePlaying()) return;
     if (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) return;
     const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
@@ -345,6 +425,24 @@ export class IchigoFighter extends Fighter {
   }
 
   getParryChance() {
+    // If trapped inside an enemy Gojo's Unlimited Void Domain Expansion, parry is completely disabled (0%)
+    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+    const myTeam = (myIndex >= 0 && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : null;
+    const isInsideEnemyGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some((g, gIdx) => {
+      if (!g || g === this || g.hp <= 0 || !g.domainActive) return false;
+      const isGojo = (g.characterId === 'gojo' || g.type === 'gojo' || g._def?.id === 'gojo');
+      if (!isGojo) return false;
+      if (myTeam !== null && typeof state.getFighterTeam === 'function') {
+        const gTeam = state.getFighterTeam(gIdx);
+        if (gTeam !== null && gTeam === myTeam) return false;
+      }
+      return true;
+    });
+
+    if (isInsideEnemyGojoDomain) {
+      return 0;
+    }
+
     const isBankai = this.bankaiActive || this.skin === 'bankai';
     const isMask = this.hollowMaskActive;
     let chance = CONFIG.ichigo?.parryChance ?? 0.15;
@@ -370,19 +468,37 @@ export class IchigoFighter extends Fighter {
       return super.takeDamage(amount, attacker, opts);
     }
 
-    if (opts.isWallSlam || this.isGrabbedByMahoraga || this.isParalyzedByMahoraga || this.isTargetOfAmbush) {
+    const isAboutToUnleashNormal = this.isAboutToUnleashNormalGetsuga();
+    const isBusyWithFinalGetsuga = (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
+    const isComboActive = this._isShunpoComboActive();
+    if (!isAboutToUnleashNormal && !isBusyWithFinalGetsuga && !isComboActive && (opts.isWallSlam || this.isGrabbedByMahoraga || this.isParalyzedByMahoraga || this.isTargetOfAmbush)) {
       this._stopFinalGetsugaVoiceline();
       this.interruptAttacks(true);
     }
 
-    // 1. Reiatsu Armor (30% damage reduction during Final Getsuga charge and Hollow Awakening formation)
+    // 1. Reiatsu Armor (50% damage reduction during Getsuga charge/recovery, 30% during Shunpo Combo & Hollow Awakening formation)
     let finalAmount = amount;
-    if ((this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.hollowMaskFormationTimer && this.hollowMaskFormationTimer > 0)) {
+    if (isBusyWithFinalGetsuga || isAboutToUnleashNormal) {
+      finalAmount *= 0.50;
+    } else if (isComboActive || (this.hollowMaskFormationTimer && this.hollowMaskFormationTimer > 0)) {
       finalAmount *= 0.70;
     }
 
     // 2. Zanjutsu Parry Check (Blade deflection on incoming attack)
-    const isBusy = this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing || this.isFrozen || this.isParalyzed || this.isTargetOfAmbush || opts.isIsoh || opts.isSoulSplit;
+    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+    const myTeam = (myIndex >= 0 && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : null;
+    const isInsideEnemyGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some((g, gIdx) => {
+      if (!g || g === this || g.hp <= 0 || !g.domainActive) return false;
+      const isGojo = (g.characterId === 'gojo' || g.type === 'gojo' || g._def?.id === 'gojo');
+      if (!isGojo) return false;
+      if (myTeam !== null && typeof state.getFighterTeam === 'function') {
+        const gTeam = state.getFighterTeam(gIdx);
+        if (gTeam !== null && gTeam === myTeam) return false;
+      }
+      return true;
+    });
+
+    const isBusy = this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing || this.isFrozen || this.isParalyzed || this.isTargetOfAmbush || isInsideEnemyGojoDomain || opts.isIsoh || opts.isSoulSplit;
     if (!isBusy && !opts.bypassShield && Math.random() < this.getParryChance()) {
       // Successful Parry & Deflection!
       const isBankai = this.bankaiActive || this.skin === 'bankai';
@@ -418,13 +534,6 @@ export class IchigoFighter extends Fighter {
         triggerGlobalScreenShake(3.5, 8);
       }
 
-      // Deflection pushback on melee attacker
-      if (attacker && attacker !== this && !attacker.isDead && typeof attacker.applyKnockback === 'function') {
-        const pushAngle = Math.atan2(attacker.y - this.y, attacker.x - this.x);
-        const pushF = CONFIG.ichigo?.parryDeflectionPush || 7.0;
-        attacker.applyKnockback(Math.cos(pushAngle) * pushF, Math.sin(pushAngle) * pushF);
-      }
-
       spawnFloatingText(this.x, this.y - this.r - 20, "PARRY!", isBankai ? "#DC143C" : "#00E5FF");
       return 0; // Fully deflected / negated damage!
     }
@@ -440,13 +549,16 @@ export class IchigoFighter extends Fighter {
     if (this.isDead || this.hp <= 0) {
       this._stopFinalGetsugaVoiceline();
       this.interruptAttacks(true);
+    } else if (isBusyWithFinalGetsuga || isAboutToUnleashNormal || isComboActive) {
+      this.hitStunTimer = 0; // Supreme Poise: immune to flinch / hit-stun during Grand Finisher, Shunpo Combo & Normal Getsuga unleash
     }
 
-    // Immediate Hollow Mask trigger upon taking critical damage below 70% HP (only if not busy with Bankai Grand Finisher or in ambush)
+    // Immediate Hollow Mask trigger upon taking critical damage below 70% HP (only after Bankai has popped and not busy with Getsuga)
     const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
-    const isBusyWithFinalGetsuga = (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
     const isPendingFinalGetsuga = this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer > 0 && this.bankaiTimer <= finalThreshold;
-    if (!this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithFinalGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp > 0 && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold ?? 0.70)) {
+    const canHollowAwaken = Boolean(this.bankaiActive || this.bankaiUsed);
+    const isBusyWithGetsuga = isAboutToUnleashNormal || this.isChannelingGetsuga || isBusyWithFinalGetsuga || this._isGetsugaVoicelinePlaying();
+    if (canHollowAwaken && !this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp > 0 && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold ?? 0.70)) {
       this.activateHollowMask();
     }
 
@@ -531,6 +643,7 @@ export class IchigoFighter extends Fighter {
       this.hollowMaskFormationTimer > 0 || 
       this.hollowBurstTimer > 0 || 
       this.shikaiReversionBurstTimer > 0 ||
+      this.isAboutToUnleashNormalGetsuga() ||
       this.isChannelingGetsuga || 
       this.getsugaRecoveryTimer > 0 || 
       this._isGetsugaVoicelinePlaying() || 
@@ -558,6 +671,19 @@ export class IchigoFighter extends Fighter {
     this.vy = 0;
     this.knockbackVx = 0;
     this.knockbackVy = 0;
+
+    // Immediately flush lingering afterimages from prior dashes/combos and re-anchor Bankai trail coordinates to current position
+    this.afterImages = [];
+    this._lastBankaiTrailX = this.x;
+    this._lastBankaiTrailY = this.y;
+    this.isShunpoDashing = false;
+    this.shunpoDashTimer = 0;
+    this.shunpoComboActive = false;
+    this.shunpoComboStep = 0;
+    this.shunpoComboDelayTimer = 0;
+    this.shunpoDisengageDelayTimer = 0;
+    this.isShunpoDisengaging = false;
+    this.shunpoTarget = null;
 
     const chargeFrames = CONFIG.ichigo?.bankaiChargeFrames || 66;
 
@@ -597,6 +723,11 @@ export class IchigoFighter extends Fighter {
     this.bankaiBurstTimer = this.bankaiBurstMax;
     this.bankaiRibbonMax = CONFIG.ichigo?.bankaiRibbonDuration || 280;
     this.bankaiRibbonTimer = this.bankaiRibbonMax;
+
+    // Immediately flush afterimages and re-anchor Bankai trail coordinates to current position
+    this.afterImages = [];
+    this._lastBankaiTrailX = this.x;
+    this._lastBankaiTrailY = this.y;
 
     // Initialize 28 crystalline Reiatsu barrier diamond shards exploding outward
     this.bankaiShards = [];
@@ -733,7 +864,7 @@ export class IchigoFighter extends Fighter {
 
   shoot(ownerIndex) {
     if (this.isDead || this.hp <= 0 || this.isParalyzedOrBeamTrapped()) return false;
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive || this._isFinalGetsugaVoicelinePlaying()) return false;
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isAboutToUnleashNormalGetsuga() || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive || this._isFinalGetsugaVoicelinePlaying()) return false;
     const target = this._getClosestEnemy();
     if (target) {
       this.aim(target);
@@ -755,7 +886,10 @@ export class IchigoFighter extends Fighter {
   }
 
 
-  _stopFinalGetsugaVoiceline() {
+  _stopFinalGetsugaVoiceline(force = false) {
+    if (!force && this.hp > 0 && !this.isDead) {
+      return; // Do NOT cut off speaking voice mid-sentence on normal hits or transient recovery endings
+    }
     if (this._finalGetsugaVoiceHandle) {
       stopSound(this._finalGetsugaVoiceHandle);
       this._finalGetsugaVoiceHandle = null;
@@ -785,31 +919,14 @@ export class IchigoFighter extends Fighter {
     if (!this._getsugaVoicePlaying) return false;
     const now = Date.now();
 
-    // 1. If hard duration timestamp has elapsed, voiceline is finished
-    if (this._getsugaVoiceEndTime && now >= this._getsugaVoiceEndTime) {
-      this._getsugaVoicePlaying = false;
-      this._getsugaVoiceHandle = null;
-      return false;
-    }
-
-    // 2. If sound handle is explicitly ended or stopped
-    const handle = this._getsugaVoiceHandle || this._activeVoicelineHandle;
-    if (handle) {
-      if (typeof handle.isPlaying === 'function' && !handle.isPlaying()) {
-        this._getsugaVoicePlaying = false;
-        this._getsugaVoiceHandle = null;
-        return false;
-      }
-      if (handle.ended === true || handle.paused === true) {
-        this._getsugaVoicePlaying = false;
-        this._getsugaVoiceHandle = null;
-        return false;
-      }
+    // 1. Authoritative window: If hard duration timestamp has not elapsed, voiceline is active!
+    if (this._getsugaVoiceEndTime && now < this._getsugaVoiceEndTime) {
       return true;
     }
 
-    // 3. Fallback check on end time
-    if (this._getsugaVoiceEndTime && now < this._getsugaVoiceEndTime) {
+    // 2. If sound handle is explicitly playing past duration
+    const handle = this._getsugaVoiceHandle || this._activeVoicelineHandle;
+    if (handle && typeof handle.isPlaying === 'function' && handle.isPlaying()) {
       return true;
     }
 
@@ -826,50 +943,46 @@ export class IchigoFighter extends Fighter {
     if (!this._finalGetsugaVoicePlaying) return false;
     const now = Date.now();
 
-    // 1. If hard duration timestamp has elapsed, voiceline is finished
-    if (this._finalGetsugaVoiceEndTime && now >= this._finalGetsugaVoiceEndTime) {
-      this._finalGetsugaVoicePlaying = false;
-      this._finalGetsugaVoiceHandle = null;
-      return false;
-    }
-
-    // 2. If sound handle is explicitly ended or stopped
-    const handle = this._finalGetsugaVoiceHandle || this._activeVoicelineHandle;
-    if (handle) {
-      if (typeof handle.isPlaying === 'function' && !handle.isPlaying()) {
-        this._finalGetsugaVoicePlaying = false;
-        this._finalGetsugaVoiceHandle = null;
-        return false;
-      }
-      if (handle.ended === true || handle.paused === true) {
-        this._finalGetsugaVoicePlaying = false;
-        this._finalGetsugaVoiceHandle = null;
-        return false;
-      }
+    // 1. Authoritative window: If hard duration timestamp has not elapsed, voiceline is active!
+    if (this._finalGetsugaVoiceEndTime && now < this._finalGetsugaVoiceEndTime) {
       return true;
     }
 
-    // 3. If handle is no longer present and no active voiceline on fighter
-    if (!this._activeVoicelineHandle && !this._finalGetsugaVoiceHandle) {
-      if (!this._finalGetsugaVoiceEndTime || now >= this._finalGetsugaVoiceEndTime) {
-        this._finalGetsugaVoicePlaying = false;
-        return false;
-      }
+    // 2. If sound handle is explicitly playing past duration
+    const handle = this._finalGetsugaVoiceHandle || this._activeVoicelineHandle;
+    if (handle && typeof handle.isPlaying === 'function' && handle.isPlaying()) {
+      return true;
     }
 
-    return Boolean(this._finalGetsugaVoiceEndTime && now < this._finalGetsugaVoiceEndTime);
+    this._finalGetsugaVoicePlaying = false;
+    this._finalGetsugaVoiceHandle = null;
+    return false;
   }
 
   fireFinalMassiveGetsuga(target = null) {
-    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped()) {
+    if (this.isDead || this.hp <= 0) {
       this._stopFinalGetsugaVoiceline();
       return;
     }
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing) {
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0) {
       this._stopFinalGetsugaVoiceline();
       return;
     }
 
+    // Supreme Poise: clear any incoming hit stun or pushback displacement
+    this.hitStunTimer = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.vx = 0;
+    this.vy = 0;
+
+    // Clear and override any active dash, swing, or basic attack states so Grand Finisher immediately unleashes
+    this.isShunpoDashing = false;
+    this.shunpoDashTimer = 0;
+    this.shunpoComboActive = false;
+    this.shunpoComboStep = 0;
+    this.shunpoComboDelayTimer = 0;
+    this.shunpoTarget = null;
     this.slashSwingTimer = 0;
     this.isGetsugaSlash = false;
 
@@ -890,35 +1003,16 @@ export class IchigoFighter extends Fighter {
     }
 
     const isMask = Boolean(this.hollowMaskActive || this.skin === 'bankai_mask' || this.skin === 'shikai_mask');
-    let chargeFrames = CONFIG.ichigo?.bankaiFinalGetsugaChargeFrames || 80;
-    let voiceSrc;
-    let voiceVol;
-    let voiceDurMs = 2600;
-    let chargeText = "GETSUGA...";
-    let chargeColor = "#DC143C";
-
-    if (isMask) {
-      chargeText = "BLACK KUROI GETSUGA...";
-      chargeColor = CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00';
-      const rawHollowVoice = CONFIG.ichigo?.sounds?.hollowGetsugaVoice || [
-        'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3',
-        'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline2.mp3'
-      ];
-      if (Array.isArray(rawHollowVoice)) {
-        voiceSrc = rawHollowVoice[Math.floor(Math.random() * rawHollowVoice.length)];
-      } else {
-        voiceSrc = rawHollowVoice;
-      }
-      voiceVol = CONFIG.ichigo?.soundVolumes?.hollowGetsugaVoice ?? 3.0;
-      const isShortVoiceline = typeof voiceSrc === 'string' && (voiceSrc.includes('voiceline2') || voiceSrc.includes('flashstep-voiceline2'));
-      chargeFrames = isShortVoiceline 
-        ? (CONFIG.ichigo?.hollowGetsugaVoice2ChargeFrames ?? 34) 
-        : (CONFIG.ichigo?.hollowGetsugaVoice1ChargeFrames ?? 80);
-      voiceDurMs = isShortVoiceline ? 760 : 2015;
-    } else {
-      voiceSrc = CONFIG.ichigo?.sounds?.finalGetsugaVoice || CONFIG.ichigo?.sounds?.finalGetsugaCharge || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3';
-      voiceVol = CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice ?? CONFIG.ichigo?.soundVolumes?.finalGetsugaCharge ?? 3.0;
-    }
+    const chargeFrames = CONFIG.ichigo?.bankaiFinalGetsugaChargeFrames || 80;
+    const voiceSrc = isMask
+      ? (CONFIG.ichigo?.sounds?.finalHollowGetsugaVoice || 'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3')
+      : (CONFIG.ichigo?.sounds?.finalGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3');
+    const voiceVol = isMask
+      ? (CONFIG.ichigo?.soundVolumes?.finalHollowGetsugaVoice ?? CONFIG.ichigo?.soundVolumes?.hollowGetsugaVoice ?? 3.0)
+      : (CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice ?? 3.0);
+    const voiceDurMs = isMask ? 2015 : 2460;
+    const chargeText = isMask ? "FINAL KUROI HOLLOW GETSUGA..." : "FINAL KUROI GETSUGA...";
+    const chargeColor = isMask ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00') : (CONFIG.ichigo?.bankaiFinalGetsugaColor || '#DC143C');
 
     this.isChannelingGetsuga = true;
     this.isFinalMassiveGetsuga = true;
@@ -939,7 +1033,7 @@ export class IchigoFighter extends Fighter {
         durationMs: voiceDurMs
       });
     } else {
-      this._finalGetsugaVoiceHandle = this._playSound(isMask ? 'hollowGetsugaVoice' : 'finalGetsugaVoice', voiceSrc, voiceVol);
+      this._finalGetsugaVoiceHandle = this._playSound(isMask ? 'finalHollowGetsugaVoice' : 'finalGetsugaVoice', voiceSrc, voiceVol);
     }
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(isMask ? 5.5 : 4.5, 22);
@@ -947,9 +1041,18 @@ export class IchigoFighter extends Fighter {
   }
 
   fireGetsuga(target = null, isCombo = false) {
-    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped()) return;
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this._isFinalGetsugaVoicelinePlaying()) return;
-    if (this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer <= (CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160)) return;
+    if (this.isDead || this.hp <= 0) return;
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this._isFinalGetsugaVoicelinePlaying()) return;
+    if (!isCombo && (this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped() || this.isShunpoDashing)) return;
+
+    this._isComboGetsuga = Boolean(isCombo);
+    if (isCombo) {
+      this.hitStunTimer = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+    }
 
     this.slashSwingTimer = 0;
     this.isGetsugaSlash = false;
@@ -975,7 +1078,9 @@ export class IchigoFighter extends Fighter {
 
     const voiceChance = isMask 
       ? (CONFIG.ichigo?.soundChances?.hollowGetsugaVoice ?? 0.50)
-      : (CONFIG.ichigo?.soundChances?.comboGetsugaVoice ?? 0.50);
+      : (isBankai 
+        ? (CONFIG.ichigo?.soundChances?.bankaiGetsugaVoice ?? 0.50)
+        : (CONFIG.ichigo?.soundChances?.comboGetsugaVoice ?? 0.50));
     const shouldPlayVoiceline = Math.random() < voiceChance;
 
     let voiceSrc = null;
@@ -1014,6 +1119,13 @@ export class IchigoFighter extends Fighter {
           ? (hollowMult === 0 ? 1 : (CONFIG.ichigo?.bankaiGetsugaChargeFrames || 30)) 
           : Math.max(1, calcCharge);
       }
+    } else if (isBankai) {
+      // ── BANKAI GETSUGA TENSHO (KUROI GETSUGA) ──
+      if (shouldPlayVoiceline) {
+        voiceSrc = CONFIG.ichigo?.sounds?.bankaiGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3';
+      }
+      chargeFrames = CONFIG.ichigo?.bankaiGetsugaChargeFrames || 30;
+      durationMs = CONFIG.ichigo?.bankaiGetsugaVoiceDurationMs || 2500;
     } else if (shouldPlayVoiceline) {
       const rawVoice = CONFIG.ichigo?.sounds?.comboGetsugaVoice || [
         'Assets/Sound Effects/Skills/Ichigo-getsugatensho-flashstep-voiceline.mp3',
@@ -1027,14 +1139,12 @@ export class IchigoFighter extends Fighter {
 
       const isShortVoiceline = typeof voiceSrc === 'string' && voiceSrc.includes('voiceline2');
       chargeFrames = isShortVoiceline 
-        ? (isBankai ? (CONFIG.ichigo?.bankaiGetsugaChargeFrames || 30) : 30)
-        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaChargeFrames || 30) : (CONFIG.ichigo?.getsugaChargeFrames || 64));
+        ? 30
+        : (CONFIG.ichigo?.getsugaChargeFrames || 64);
       durationMs = isShortVoiceline ? 500 : 1100;
     } else {
       const defaultShikaiCharge = CONFIG.ichigo?.getsugaChargeFrames || 64;
-      chargeFrames = isBankai 
-        ? (CONFIG.ichigo?.bankaiGetsugaChargeFrames || 30) 
-        : defaultShikaiCharge;
+      chargeFrames = defaultShikaiCharge;
     }
 
     const slideFrames = isCombo ? 0 : (CONFIG.ichigo?.getsugaSlideFrames || 8);
@@ -1048,7 +1158,7 @@ export class IchigoFighter extends Fighter {
     const chargeColor = (isBankai && isMask) 
       ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00') 
       : (isMask 
-        ? (CONFIG.ichigo?.hollowGetsugaColor || '#00E5FF') 
+        ? (CONFIG.ichigo?.hollowGetsugaColor || '#FFFFFF') 
         : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#DC143C') : (CONFIG.ichigo?.getsugaColor || '#00D5FF')));
 
     spawnFloatingText(this.x, this.y - this.r - 28, chargeText, chargeColor);
@@ -1056,17 +1166,19 @@ export class IchigoFighter extends Fighter {
     if (shouldPlayVoiceline && voiceSrc) {
       const voiceVol = isMask 
         ? (CONFIG.ichigo?.soundVolumes?.hollowGetsugaVoice ?? 3.0) 
-        : (CONFIG.ichigo?.soundVolumes?.comboGetsugaVoice ?? 2.8);
+        : (isBankai 
+          ? (CONFIG.ichigo?.soundVolumes?.bankaiGetsugaVoice ?? 3.0)
+          : (CONFIG.ichigo?.soundVolumes?.comboGetsugaVoice ?? 2.8));
       if (typeof audioSystem !== 'undefined' && typeof audioSystem.playFighterVoiceline === 'function') {
         this._getsugaVoiceHandle = audioSystem.playFighterVoiceline(this, voiceSrc, voiceVol, 1.0, 0, 0, {
-          priority: 'protected',
+          priority: isBankai ? 'domain' : 'protected',
           isProtected: true,
           durationMs: durationMs
         });
         this._getsugaVoicePlaying = true;
         this._getsugaVoiceEndTime = Date.now() + durationMs;
       } else {
-        this._playSound(isMask ? 'hollowGetsugaVoice' : 'comboGetsugaVoice', voiceSrc, voiceVol);
+        this._playSound(isMask ? 'hollowGetsugaVoice' : (isBankai ? 'bankaiGetsugaVoice' : 'comboGetsugaVoice'), voiceSrc, voiceVol);
       }
     } else {
       const sfx = CONFIG.ichigo?.sounds?.getsugaCharge || 'Assets/Sound Effects/Skills/redcharging.mp3';
@@ -1104,7 +1216,7 @@ export class IchigoFighter extends Fighter {
     } else if (isMask) {
       form = 'hollow';
       text = '...HOLLOW GETSUGA!';
-      textColor = CONFIG.ichigo?.hollowGetsugaColor || '#00E5FF';
+      textColor = CONFIG.ichigo?.hollowGetsugaColor || '#FFFFFF';
       shakeAmt = CONFIG.ichigo?.hollowGetsugaScreenShake || 5.0;
     } else if (isBankai) {
       form = 'bankai';
@@ -1114,12 +1226,12 @@ export class IchigoFighter extends Fighter {
     }
 
     const baseDmg = isFinal
-      ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 26) * (isMask ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.5) : 1.0)
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20) * (isMask ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.5) : 1.0)
       : (isBankai && isMask
-        ? (CONFIG.ichigo?.bankaiHollowGetsugaDamage || Math.round((CONFIG.ichigo?.bankaiGetsugaDamage || 100) * (CONFIG.ichigo?.hollowDamageMultiplier || 1.5)))
+        ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 24)
         : (isMask
-          ? (CONFIG.ichigo?.hollowGetsugaDamage || 100)
-          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 100) : (CONFIG.ichigo?.getsugaDamage || 32))));
+          ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 16)
+          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16) : (CONFIG.ichigo?.getsugaTickDamage || 10))));
     const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 11;
     const speed = isFinal
       ? (CONFIG.ichigo?.bankaiFinalGetsugaSpeed ?? 24)
@@ -1137,6 +1249,7 @@ export class IchigoFighter extends Fighter {
       this.angle = this.gunAngle;
     }
 
+    this.getsugaReleaseCount = (this.getsugaReleaseCount || 0) + 1;
     if (projectileSystem && typeof projectileSystem.fireGetsugaTensho === 'function') {
       projectileSystem.fireGetsugaTensho(this, ownerIndex, baseDmg, speed, form);
     }
@@ -1220,10 +1333,17 @@ export class IchigoFighter extends Fighter {
   }
 
   performShunpoGetsugaCombo(target) {
-    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped() || this.wallSlamPinnedX !== undefined || this.isWallSlammed) return;
+    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.wallSlamPinnedX !== undefined || this.isWallSlammed) return;
     if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive || this._isFinalGetsugaVoicelinePlaying()) return;
     if (this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer <= (CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160)) return;
     if (!target || target.hp <= 0) return;
+
+    // Supreme Poise: clear incoming hit-stun and pushback displacement
+    this.hitStunTimer = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.vx = 0;
+    this.vy = 0;
     const baseAngle = Math.atan2(this.y - target.y, this.x - target.x);
     
     const isBankai = this.bankaiActive || this.skin === 'bankai';
@@ -1431,21 +1551,30 @@ export class IchigoFighter extends Fighter {
 
     // Rule #1: At the top of EVERY fighter update() method, freeze/time-stop guard checks
     const isChannelingHollow = this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this._hollowVoicelineWait;
+    const isChannelingGrandFinisher = this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying();
+    const isChannelingCombo = this._isShunpoComboActive();
+    const isAboutToUnleashNormal = this.isAboutToUnleashNormalGetsuga();
     const isFrozen = this._handleTimeStop() || 
       this.isParalyzedOrBeamTrapped();
 
-    if (isFrozen && !isChannelingHollow) {
+    if (isFrozen && !isChannelingHollow && !isChannelingGrandFinisher && !isAboutToUnleashNormal && !isChannelingCombo && !this.isChannelingBankai && this.bankaiBurstTimer <= 0) {
       this._stopFinalGetsugaVoiceline();
       this.interruptAttacks(true);
       super.update(opponent, ownerIndex, arena);
       return;
     }
+    if (isFrozen) {
+      super.update(opponent, ownerIndex, arena);
+      return;
+    }
 
-    // Hollow Mask Passive Activation (Activates under 70% HP in both Shikai and Bankai, holding if Grand Finisher is pending/channeling, in ambush, or paralyzed / caught in Gojo Purple or Yuta Beam)
+    // Hollow Mask Passive Activation (Activates under 70% HP only after Bankai has popped)
     const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
     const isBusyWithFinalGetsuga = (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isGetsugaSlash && this.isFinalGetsugaRecovery);
+    const isBusyWithGetsuga = isAboutToUnleashNormal || this.isChannelingGetsuga || isBusyWithFinalGetsuga;
     const isPendingFinalGetsuga = this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer > 0 && this.bankaiTimer <= finalThreshold;
-    if (!this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithFinalGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold ?? 0.70)) {
+    const canHollowAwaken = Boolean(this.bankaiActive || this.bankaiUsed);
+    if (canHollowAwaken && !this.hollowMaskUsed && !this.isTargetOfAmbush && !isBusyWithGetsuga && !isPendingFinalGetsuga && !this.isChannelingBankai && !this.isParalyzedOrBeamTrapped() && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold ?? 0.70)) {
       this.activateHollowMask();
     }
 
@@ -1531,6 +1660,9 @@ export class IchigoFighter extends Fighter {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.bankaiSlideTimer = 0;
+      this.afterImages = [];
+      this._lastBankaiTrailX = this.x;
+      this._lastBankaiTrailY = this.y;
 
       // Sparking crimson/black spiritual pressure motes
       if (Math.random() < 0.7) {
@@ -1614,6 +1746,9 @@ export class IchigoFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       this.bankaiSlideTimer = 0;
+      this.afterImages = [];
+      this._lastBankaiTrailX = this.x;
+      this._lastBankaiTrailY = this.y;
 
       this.bankaiBurstTimer--;
       if (this.bankaiShards && this.bankaiShards.length > 0) {
@@ -1721,6 +1856,8 @@ export class IchigoFighter extends Fighter {
           this.shunpoComboDelayTimer = 0;
           this.shunpoTarget = null;
           this.afterImages = [];
+          this._lastBankaiTrailX = undefined;
+          this._lastBankaiTrailY = undefined;
         }
       }
     }
@@ -1737,19 +1874,25 @@ export class IchigoFighter extends Fighter {
         // Bankai Finale: Unleash Massive Final Kuroi Getsuga Tensho before Bankai ends
         const finalTriggerThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
         const isPlaying = typeof state === 'undefined' || state.gameState === 'playing';
-        if (isPlaying && !this.isDemoFighter && !this._isFaceOff && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer > 0 && this.bankaiTimer <= finalTriggerThreshold && !this.isChannelingBankai && !isHollowTransforming && !this.isParalyzedOrBeamTrapped()) {
-          this.bankaiFinalGetsugaTriggered = true;
-          this.interruptAttacks();
-          const enemy = this._getClosestEnemy();
-          if (enemy && enemy.hp > 0 && !enemy.isDead) {
-            this.aim(enemy);
+        const isAboutToUnleashNormalGetsugaWave = this.isAboutToUnleashNormalGetsuga();
+        if (isPlaying && !this.isDemoFighter && !this._isFaceOff && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer > 0 && this.bankaiTimer <= finalTriggerThreshold && !this.isChannelingBankai && !isHollowTransforming) {
+          if (isAboutToUnleashNormalGetsugaWave) {
+            // When about to unleash any normal Getsuga Tensho, defer Grand Finisher so normal Getsuga unleashes first!
+            this.bankaiTimer = Math.max(this.bankaiTimer, finalTriggerThreshold + 1);
+          } else {
+            this.bankaiFinalGetsugaTriggered = true;
+            this.interruptAttacks();
+            const enemy = this._getClosestEnemy();
+            if (enemy && enemy.hp > 0 && !enemy.isDead) {
+              this.aim(enemy);
+            }
+            this.fireFinalMassiveGetsuga(enemy);
           }
-          this.fireFinalMassiveGetsuga(enemy);
         }
 
         if (this.bankaiTimer <= 0) {
-          // If still channeling the final grand finisher, recovering from it, playing the voiceline, in hollow formation, or awaiting the grand finisher, hold Bankai active!
-          if ((this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying() || isHollowTransforming || !this.bankaiFinalGetsugaTriggered) {
+          // If still channeling/about to unleash normal getsuga, grand finisher, recovering, or in hollow formation, hold Bankai active!
+          if (isAboutToUnleashNormalGetsugaWave || this.isChannelingGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying() || isHollowTransforming || !this.bankaiFinalGetsugaTriggered) {
             this.bankaiTimer = 1;
           } else {
             this.bankaiActive = false;
@@ -1779,6 +1922,8 @@ export class IchigoFighter extends Fighter {
             this.shunpoComboDelayTimer = 0;
             this.shunpoTarget = null;
             this.afterImages = [];
+            this._lastBankaiTrailX = undefined;
+            this._lastBankaiTrailY = undefined;
             this.bankaiShards = [];
             this.bankaiClothStreamers = [];
 
@@ -1792,13 +1937,17 @@ export class IchigoFighter extends Fighter {
       }
 
       // Bankai supersonic black-crimson speed afterimages with gap-free distance spacing
-      if (this.bankaiActive && !isMatchEnded) {
+      if (this.bankaiActive && !isMatchEnded && !this.isChannelingBankai && (this.bankaiBurstTimer || 0) <= 0) {
         if (this._lastBankaiTrailX === undefined) {
           this._lastBankaiTrailX = this.x;
           this._lastBankaiTrailY = this.y;
         }
         const distMoved = Math.hypot(this.x - this._lastBankaiTrailX, this.y - this._lastBankaiTrailY);
-        if (distMoved >= 14) {
+        if (distMoved > 60) {
+          // Discontinuous jump / teleport / post-transformation snap: re-anchor trail origin without interpolating across arena
+          this._lastBankaiTrailX = this.x;
+          this._lastBankaiTrailY = this.y;
+        } else if (distMoved >= 14) {
           const steps = Math.min(4, Math.floor(distMoved / 14));
           for (let s = 1; s <= steps; s++) {
             const t = s / steps;
@@ -1996,14 +2145,6 @@ export class IchigoFighter extends Fighter {
 
     // Advance Shunpo Flurry Combo or Trigger Disengage Back-Step
     if (this.shunpoComboActive && this.shunpoTarget) {
-      // If caught in a beam, cancel the entire Shunpo combo so beam drag works
-      if (this.isCaughtInBeam()) {
-        this.shunpoComboActive = false;
-        this.shunpoTarget = null;
-        this.shunpoComboDelayTimer = 0;
-        this.shunpoDisengageDelayTimer = 0;
-        // Fall through to super.update for beam drag physics
-      } else {
       const isBankai = this.bankaiActive || this.skin === 'bankai';
       const isMask = this.hollowMaskActive;
       let defaultStrikes = isBankai 
@@ -2118,7 +2259,6 @@ export class IchigoFighter extends Fighter {
           }
         }
       }
-      } // end beam-safe shunpo combo block
     }
 
     // Post-Getsuga Breather Recovery Lock (Freezes actions, animates recoil slide, and prevents movement until recovery finishes)
@@ -2163,7 +2303,7 @@ export class IchigoFighter extends Fighter {
     super.update(opponent, ownerIndex, arena);
 
     // AI Logic (autonomous decision making)
-    if (!this.playerControlled && !this.isParalyzedOrBeamTrapped() && !this.isChannelingGetsuga && this.getsugaRecoveryTimer <= 0 && !this._isGetsugaVoicelinePlaying() && !this._isFinalGetsugaVoicelinePlaying()) {
+    if (!this.playerControlled && !this.isParalyzedOrBeamTrapped() && !this.isAboutToUnleashNormalGetsuga() && !this.isChannelingGetsuga && this.getsugaRecoveryTimer <= 0 && !this._isGetsugaVoicelinePlaying() && !this._isFinalGetsugaVoicelinePlaying()) {
       const target = this._getClosestEnemy();
       if (target) {
         this.aim(target);
@@ -2178,7 +2318,7 @@ export class IchigoFighter extends Fighter {
         const isFirstTrigger = (!this.bankaiUsed && (this.hp / this.maxHp <= ultThreshold));
         const isSubsequentTrigger = (this.bankaiUsed && (damageTaken >= reqDamage));
 
-        const isBusy = this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this._isGetsugaVoicelinePlaying() || this._isFinalGetsugaVoicelinePlaying() || this.hollowMaskActive || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.isShunpoDashing || this.shunpoComboActive;
+        const isBusy = this.isAboutToUnleashNormalGetsuga() || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this._isGetsugaVoicelinePlaying() || this._isFinalGetsugaVoicelinePlaying() || this.hollowMaskActive || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.isShunpoDashing || this.shunpoComboActive;
         const canBankai = !this.bankaiActive && !this.isChannelingBankai && !isBusy && (isFirstTrigger || isSubsequentTrigger);
         if (canBankai) {
           this.activateBankai();
@@ -2188,7 +2328,7 @@ export class IchigoFighter extends Fighter {
         const isBankai = this.bankaiActive || this.skin === 'bankai';
         const comboMin = isBankai ? (CONFIG.ichigo?.bankaiComboTriggerMinDist ?? 0) : (CONFIG.ichigo?.comboTriggerMinDist ?? 0);
         const comboMax = isBankai ? (CONFIG.ichigo?.bankaiComboTriggerMaxDist || 400) : (CONFIG.ichigo?.comboTriggerMaxDist || 400);
-        if (this.shunpoCooldown <= 0 && dist >= comboMin && dist <= comboMax) {
+        if (!this.isAboutToUnleashNormalGetsuga() && this.shunpoCooldown <= 0 && dist >= comboMin && dist <= comboMax) {
           this.performShunpoGetsugaCombo(target);
           this.aim(target); // Rule #3: aim immediately after teleport
           return;
@@ -2226,20 +2366,24 @@ export class IchigoFighter extends Fighter {
   }
 
   draw(ctx) {
-    // Render afterimages with smooth alpha decay and arena boundary clipping
-    if (this.afterImages && this.afterImages.length > 0) {
+    // Render afterimages with smooth alpha decay and arena boundary clipping (strictly suppressed during Bankai channeling and burst)
+    if (this.afterImages && this.afterImages.length > 0 && !this.isChannelingBankai && (this.bankaiBurstTimer || 0) <= 0) {
       const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
       ctx.save();
 
-      // Clip afterimage drawing strictly within arena boundaries so edges never poke through arena walls
+      // Clip afterimage drawing with generous body margin so afterimages near arena walls are never sliced in half
       if (arena) {
-        if (arena.radius) {
+        const margin = (this.r || 25) + 15;
+        if (arena.shape === 'circle' || arena.radius) {
+          const cx = arena.x + (arena.width ? arena.width / 2 : 0);
+          const cy = arena.y + (arena.height ? arena.height / 2 : 0);
+          const ar = (arena.radius || (arena.width / 2)) + margin;
           ctx.beginPath();
-          ctx.arc(arena.x, arena.y, arena.radius - 1, 0, Math.PI * 2);
+          ctx.arc(cx, cy, ar, 0, Math.PI * 2);
           ctx.clip();
         } else if (arena.width && arena.height) {
           ctx.beginPath();
-          ctx.rect(arena.x, arena.y, arena.width, arena.height);
+          ctx.rect(arena.x - margin, arena.y - margin, arena.width + margin * 2, arena.height + margin * 2);
           ctx.clip();
         }
       }

@@ -48,6 +48,52 @@ export function drawSukunaSlash(ctx, p) {
   ctx.restore();
 }
 
+let _ghostBladeBuffer = null;
+let _ghostBladeLow = null;
+
+function _getGhostBladeBuffers() {
+  if (!_ghostBladeBuffer) {
+    _ghostBladeBuffer = document.createElement('canvas');
+    _ghostBladeBuffer.width = 64;
+    _ghostBladeBuffer.height = 64;
+
+    _ghostBladeLow = document.createElement('canvas');
+    _ghostBladeLow.width = 32;
+    _ghostBladeLow.height = 32;
+  }
+  return { high: _ghostBladeBuffer, low: _ghostBladeLow };
+}
+
+function _renderVectorGhostBlade(ctx, r, lifeRatio, isFrozen) {
+  // Main ghost blade crescent shape
+  ctx.globalAlpha = Math.max(0.70, 0.95 * lifeRatio);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
+  ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
+  ctx.closePath();
+  ctx.fillStyle = isFrozen ? 'rgba(0, 229, 255, 0.95)' : 'rgba(255, 180, 180, 1)';
+  ctx.fill();
+
+  // Sharp outer crescent edge
+  ctx.strokeStyle = isFrozen ? `rgba(224, 255, 255, ${0.95 * lifeRatio})` : `rgba(255, 200, 200, ${0.95 * lifeRatio})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.98, -Math.PI * 0.58, Math.PI * 0.58, false);
+  ctx.stroke();
+
+  // Sharp inner crescent edge
+  ctx.beginPath();
+  ctx.arc(r * 0.5, 0, r * 0.78, Math.PI * 0.53, -Math.PI * 0.53, true);
+  ctx.stroke();
+
+  // Thin bright center line
+  ctx.strokeStyle = isFrozen ? `rgba(255, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 220, 220, ${0.98 * lifeRatio})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.6, -Math.PI * 0.5, Math.PI * 0.5, false);
+  ctx.stroke();
+}
+
 export function drawGhostBlade(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
@@ -56,65 +102,97 @@ export function drawGhostBlade(ctx, p) {
   const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
 
+  const isFrozen = Boolean(p.isFrozenByInfinity);
+  const r = 24;
+
+  const { high, low } = _getGhostBladeBuffers();
+  const highCtx = high.getContext('2d');
+  const lowCtx = low.getContext('2d');
+
+  // Render high-res vector blade
+  highCtx.clearRect(0, 0, 64, 64);
+  highCtx.save();
+  highCtx.translate(32, 32);
+  _renderVectorGhostBlade(highCtx, r, lifeRatio, isFrozen);
+  highCtx.restore();
+
+  // Downsample to low-res discrete grid (32x32, P=2.0)
+  lowCtx.clearRect(0, 0, 32, 32);
+  lowCtx.imageSmoothingEnabled = false;
+  lowCtx.drawImage(high, 0, 0, 32, 32);
+
+  // Apply Saitama discrete outline & color snapping
+  const imgData = lowCtx.getImageData(0, 0, 32, 32);
+  const data = imgData.data;
+
+  // First pass: identify non-empty pixels
+  const w = 32, h = 32;
+  const grid = new Array(h);
+  for (let y = 0; y < h; y++) {
+    grid[y] = new Uint8Array(w);
+    for (let x = 0; x < w; x++) {
+      const a = data[(y * w + x) * 4 + 3];
+      if (a > 30) grid[y][x] = 1;
+    }
+  }
+
+  // Second pass: apply Saitama dark border (#0E0F14) and snap fill
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+      if (!grid[y][x]) {
+        data[idx + 3] = 0;
+        continue;
+      }
+
+      const isBorder = (
+        y === 0 || !grid[y - 1][x] ||
+        y === h - 1 || !grid[y + 1][x] ||
+        x === 0 || !grid[y][x - 1] ||
+        x === w - 1 || !grid[y][x + 1]
+      );
+
+      if (isBorder) {
+        data[idx] = 14;     // #0E
+        data[idx + 1] = 15; // #0F
+        data[idx + 2] = 20; // #14
+        data[idx + 3] = 255;
+      } else {
+        data[idx + 3] = 255;
+      }
+    }
+  }
+  lowCtx.putImageData(imgData, 0, 0);
+
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
   ctx.scale(scale, scale);
+  ctx.imageSmoothingEnabled = false;
 
-  const r = 24;
-  
-  // OPTIMIZED: Removed shadowBlur. Used a dark underlay path for drop shadow instead
-  ctx.beginPath();
-  ctx.arc(3, 3, r, -Math.PI * 0.6, Math.PI * 0.6, false);
-  ctx.arc(r * 0.5 + 3, 3, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-  ctx.fill();
-  
-  // Ghost trail - fading afterimages behind the blade
+  // 1. Ghost Trail - discrete stepped pixel slices
   for (let i = 3; i >= 1; i--) {
-    const trailAlpha = 0.15 * lifeRatio * (4 - i) / 3;
+    const trailAlpha = 0.22 * lifeRatio * (4 - i) / 3;
     const trailOffset = i * 8;
     ctx.save();
-    ctx.translate(-trailOffset, 0);
     ctx.globalAlpha = trailAlpha;
-    ctx.beginPath();
-    // Crescent moon shape
-    ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
-    ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
-    ctx.closePath();
-    ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.8)' : 'rgba(255, 100, 100, 1)';
-    ctx.fill();
+    ctx.drawImage(low, 0, 0, 32, 32, -32 - trailOffset, -32, 64, 64);
     ctx.restore();
   }
-  
-  // Main ghost blade - crescent moon shape (Electric Cyan if frozen by Limitless)
-  ctx.globalAlpha = Math.max(0.70, 0.95 * lifeRatio);
-  ctx.beginPath();
-  ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
-  ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
-  ctx.closePath();
-  ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.95)' : 'rgba(255, 180, 180, 1)';
-  ctx.fill();
-  
-  // Sharp outer crescent edge
-  ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(224, 255, 255, ${0.95 * lifeRatio})` : `rgba(255, 200, 200, ${0.95 * lifeRatio})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.98, -Math.PI * 0.58, Math.PI * 0.58, false);
-  ctx.stroke();
-  
-  // Sharp inner crescent edge
-  ctx.beginPath();
-  ctx.arc(r * 0.5, 0, r * 0.78, Math.PI * 0.53, -Math.PI * 0.53, true);
-  ctx.stroke();
-  
-  // Thin bright center line
-  ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(255, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 220, 220, ${0.98 * lifeRatio})`;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.6, -Math.PI * 0.5, Math.PI * 0.5, false);
-  ctx.stroke();
+
+  // 2. Main Pixelated Ghost Blade (Saitama Style)
+  ctx.drawImage(low, 0, 0, 32, 32, -32, -32, 64, 64);
+
+  // 3. Discrete trailing pixel sparks
+  const sparkCol = isFrozen ? '#00E5FF' : '#FF6666';
+  ctx.fillStyle = sparkCol;
+  const time = Date.now() * 0.01;
+  const spark1X = -14 + Math.round(Math.sin(time + (p.x || 0) * 0.1) * 3) * 2;
+  const spark1Y = -18 + Math.round(Math.cos(time * 1.5) * 2) * 2;
+  const spark2X = -16 + Math.round(Math.cos(time + (p.y || 0) * 0.1) * 3) * 2;
+  const spark2Y = 18 + Math.round(Math.sin(time * 1.3) * 2) * 2;
+  ctx.fillRect(spark1X, spark1Y, 2, 2);
+  ctx.fillRect(spark2X, spark2Y, 2, 2);
 
   ctx.restore();
 }
@@ -387,9 +465,19 @@ export function drawSukunaFurnaceArrow(ctx, p) {
         ? `rgba(255, 140, 20, ${alpha * 0.55})`
         : `rgba(220, 40, 0, ${alpha * 0.35})`;
     }
-    ctx.beginPath();
-    ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
-    ctx.fill();
+
+    const isDark = _isDarkMode();
+    if (isDark) {
+      const px = Math.round(fp.x / 2) * 2;
+      const py = Math.round((fp.y + wobY) / 2) * 2;
+      const sx = Math.max(2, Math.round(stretchX / 2) * 2);
+      const sy = Math.max(2, Math.round(stretchY / 2) * 2);
+      ctx.fillRect(px - sx / 2, py - sy / 2, sx, sy);
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
     return true;
   });
 
@@ -409,27 +497,50 @@ export function drawSukunaFurnaceArrow(ctx, p) {
     ep.vy += (Math.random() - 0.5) * 0.4; // random drift
     const prog = ep.life / ep.maxLife;
 
+    const isDark = _isDarkMode();
+
     // Ember streak trail
     if (ep.trail.length > 1) {
-      ctx.beginPath();
-      ctx.moveTo(ep.trail[0].x, ep.trail[0].y);
-      for (let t = 1; t < ep.trail.length; t++) ctx.lineTo(ep.trail[t].x, ep.trail[t].y);
-      ctx.lineTo(ep.x, ep.y);
-      ctx.strokeStyle = p.isFrozenByInfinity
-        ? `rgba(0, 229, 255, ${prog * 0.7})`
-        : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
-      ctx.lineWidth = ep.size * 0.7;
-      ctx.lineCap = 'round';
-      ctx.stroke();
+      if (isDark) {
+        ctx.fillStyle = p.isFrozenByInfinity
+          ? `rgba(0, 229, 255, ${prog * 0.7})`
+          : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
+        for (let t = 0; t < ep.trail.length; t++) {
+          const tx = Math.round(ep.trail[t].x / 2) * 2;
+          const ty = Math.round(ep.trail[t].y / 2) * 2;
+          ctx.fillRect(tx, ty, 2, 2);
+        }
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(ep.trail[0].x, ep.trail[0].y);
+        for (let t = 1; t < ep.trail.length; t++) ctx.lineTo(ep.trail[t].x, ep.trail[t].y);
+        ctx.lineTo(ep.x, ep.y);
+        ctx.strokeStyle = p.isFrozenByInfinity
+          ? `rgba(0, 229, 255, ${prog * 0.7})`
+          : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
+        ctx.lineWidth = ep.size * 0.7;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
     }
 
     // Bright ember head
-    ctx.beginPath();
-    ctx.arc(ep.x, ep.y, ep.size * (0.5 + prog * 0.8), 0, Math.PI * 2);
-    ctx.fillStyle = p.isFrozenByInfinity
-      ? `rgba(224, 255, 255, ${prog})`
-      : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
-    ctx.fill();
+    if (isDark) {
+      const ex = Math.round(ep.x / 2) * 2;
+      const ey = Math.round(ep.y / 2) * 2;
+      const es = Math.max(2, Math.round((ep.size * (0.5 + prog * 0.8)) / 2) * 2);
+      ctx.fillStyle = p.isFrozenByInfinity
+        ? `rgba(224, 255, 255, ${prog})`
+        : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
+      ctx.fillRect(ex - es / 2, ey - es / 2, es, es);
+    } else {
+      ctx.beginPath();
+      ctx.arc(ep.x, ep.y, ep.size * (0.5 + prog * 0.8), 0, Math.PI * 2);
+      ctx.fillStyle = p.isFrozenByInfinity
+        ? `rgba(224, 255, 255, ${prog})`
+        : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
+      ctx.fill();
+    }
     return true;
   });
 
@@ -471,17 +582,96 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   });
 }
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
+let _fugaBufferCanvas = null;
+let _fugaLowCanvas = null;
+
+function _getFugaBuffers() {
+  if (!_fugaBufferCanvas) {
+    _fugaBufferCanvas = document.createElement('canvas');
+    _fugaBufferCanvas.width = 360;
+    _fugaBufferCanvas.height = 240;
+
+    _fugaLowCanvas = document.createElement('canvas');
+    _fugaLowCanvas.width = 180;
+    _fugaLowCanvas.height = 120;
+  }
+  return { high: _fugaBufferCanvas, low: _fugaLowCanvas };
+}
+
 export function drawDivineFlameArrowConstruct(ctx, {
   x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
 }) {
   if (progress <= 0) return;
 
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.2)));
+  const isDark = _isDarkMode();
 
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.scale(scale, scale);
+  if (isDark) {
+    const { high, low } = _getFugaBuffers();
+    const highCtx = high.getContext('2d');
+    const lowCtx = low.getContext('2d');
+
+    highCtx.clearRect(0, 0, 360, 240);
+    highCtx.save();
+    highCtx.translate(180, 120);
+
+    // Render EXACT vector drawing into high-res offscreen buffer
+    _renderVectorDivineFlameArrow(highCtx, {
+      scale: 1.0, progress, isFlying, time, isFrozenByInfinity
+    });
+    highCtx.restore();
+
+    // Downscale to low-res discrete pixel grid (P=2.0)
+    lowCtx.clearRect(0, 0, 180, 120);
+    lowCtx.imageSmoothingEnabled = false;
+    lowCtx.drawImage(high, 0, 0, 180, 120);
+
+    // Apply Saitama discrete outline / alpha snapping
+    const imgData = lowCtx.getImageData(0, 0, 180, 120);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a < 25) {
+        data[i + 3] = 0;
+      } else if (a > 200) {
+        data[i + 3] = 255;
+      }
+    }
+    lowCtx.putImageData(imgData, 0, 0);
+
+    // Blit pixelated construct to main context with zero subpixel bleed
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.scale(scale, scale);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(low, 0, 0, 180, 120, -180, -120, 360, 240);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.scale(scale, scale);
+    _renderVectorDivineFlameArrow(ctx, {
+      scale: 1.0, progress, isFlying, time, isFrozenByInfinity
+    });
+    ctx.restore();
+  }
+}
+
+function _renderVectorDivineFlameArrow(ctx, {
+  scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
+}) {
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.2)));
 
   const notchX = -32 * progress;
   const tipX = 28 * progress;

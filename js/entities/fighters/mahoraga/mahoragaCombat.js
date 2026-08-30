@@ -5,12 +5,13 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahoragaShoutShockwave, spawnMahoragaShoutBurst } from '../../../graphics/particles/sparkEffect.js';
+import { spawnImpactFlash, spawnMeleeClashShockwave, spawnMahoragaShoutShockwave, spawnMahoragaShoutBurst } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
 import { playSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { spawnTeleportAfterimages } from './mahoragaSkills.js';
+import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 /**
  * Play a random heavy punch sound effect.
@@ -93,7 +94,8 @@ export function performMeleeAttack(fighter, opponent) {
   const isCaughtInBeam = (
     (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
     fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 ||
-    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry))
+    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry)) ||
+    fighter.isDraggedByGetsuga
   );
 
   const isInHitReaction = (fighter.knockbackStunTimer || 0) > 0 || (fighter.hitStunTimer || 0) > 0 || (fighter.electricStunTimer || 0) > 0 || (fighter.dubstepStunTimer || 0) > 0;
@@ -245,21 +247,8 @@ export function performMeleeAttack(fighter, opponent) {
 
   if (frontTargets.length > 0) {
     const targetObj = opponent || frontTargets[0];
-    const angle = targetObj ? Math.atan2(targetObj.y - fighter.y, targetObj.x - fighter.x) : (fighter.gunAngle || 0);
-    spawnAnimePunchImpactFrame(targetObj.x, targetObj.y, 55, angle, 'gold');
-    spawnSparks(targetObj.x, targetObj.y, 12, 'silver', '#FFFFFF');
+    spawnImpactFlash(targetObj.x, targetObj.y, 45, '#FFD700');
     triggerGlobalScreenShake(5, 8);
-  }
-
-  // Sakuga impact visuals on main opponent (only for sword combo hits, not punches)
-  if (!isPunch && opponent) {
-    const sakugaDuration = CONFIG.mahoraga?.sakugaImpactDurationFrames ?? 8;
-    fighter.sakugaImpactTimer = sakugaDuration;
-    fighter.sakugaImpactMaxTimer = sakugaDuration;
-    fighter.sakugaImpactX = opponent.x;
-    fighter.sakugaImpactY = opponent.y;
-    fighter.sakugaImpactAngle = Math.random() * Math.PI * 2;
-    fighter.sakugaImpactSeed = Math.random();
   }
 }
 
@@ -285,11 +274,6 @@ export function executeCleave(fighter, opponent) {
 
   spawnImpactFlash(arcX, arcY, cleaveRadius, 'silver');
   spawnMeleeClashShockwave(arcX, arcY, cleaveRadius * 1.2, 'mahoraga');
-
-  for (let i = 0; i < 20; i++) {
-    const angle = (i / 20) * Math.PI * 2;
-    spawnSparks(fighter.x + Math.cos(angle) * cleaveRadius * 0.5, fighter.y + Math.sin(angle) * cleaveRadius * 0.5, 5, 'gold', '#F5F5DC');
-  }
 
   const frontTargets = getFrontRadiusTargets(fighter, cleaveRadius, Math.PI * 1.0);
   if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
@@ -353,7 +337,7 @@ export function shootBladeBarrage(fighter, ownerIndex) {
  */
 export function initiateLevel8WallSlam(fighter, opponent) {
   if (!opponent || opponent.hp <= 0 || opponent.isDead) return;
-  if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0) return;
+  if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0 || fighter.isDraggedByGetsuga) return;
 
   // Block initiation if Mahoraga is caught inside Gojo's active Hollow Purple
   const activeOrbs = (projectileSystem && projectileSystem.projectiles)
@@ -400,7 +384,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   const isInterrupted = (
     fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 ||
     (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
-    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry))
+    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry)) ||
+    fighter.isDraggedByGetsuga
   );
 
   if (isInterrupted || !target || target.hp <= 0 || target.isDead) {
@@ -434,7 +419,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   // ── PHASE 1: IMPALE & LIFT ──
   if (fighter.wallSlamPhase === 'grab') {
     if (fighter.wallSlamTimer === 1) {
-      // Snapshot target position and angle to prevent circular feedback drift
+      // Snapshot Mahoraga and target positions and angle to prevent instant snapping/slide
+      fighter.wallSlamGrabMahoragaStartX = fighter.x;
+      fighter.wallSlamGrabMahoragaStartY = fighter.y;
       fighter.wallSlamGrabStartX = target.x;
       fighter.wallSlamGrabStartY = target.y;
       fighter.wallSlamGrabAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
@@ -466,7 +453,6 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       audioSystem.playSFX(impaleSnd, impaleVol);
       spawnFloatingText(target.x, target.y - target.r - 28, '⚔️ IMPALED!', '#FFEE58');
       spawnImpactFlash(target.x, target.y, 45, '#FF3333');
-      spawnSparks(target.x, target.y, 15, 'crimsonSniper', '#FFFFFF');
     }
     
     const angle = fighter.wallSlamGrabAngle !== undefined ? fighter.wallSlamGrabAngle : Math.atan2(target.y - fighter.y, target.x - fighter.x);
@@ -474,8 +460,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
 
     const startX = fighter.wallSlamGrabStartX;
     const startY = fighter.wallSlamGrabStartY;
+    const mahoStartX = fighter.wallSlamGrabMahoragaStartX !== undefined ? fighter.wallSlamGrabMahoragaStartX : fighter.x;
+    const mahoStartY = fighter.wallSlamGrabMahoragaStartY !== undefined ? fighter.wallSlamGrabMahoragaStartY : fighter.y;
     const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
-    const grabDist = 140; // Mahoraga lunges from this distance
 
     const shoulderOffsetX = Math.cos(angle + Math.PI / 2) * (fighter.r * 0.20);
     const shoulderOffsetY = Math.sin(angle + Math.PI / 2) * (fighter.r * 0.20);
@@ -485,10 +472,11 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     const endY = startY - Math.sin(angle) * (fighter.r + target.r + 32) - shoulderOffsetY;
 
     if (fighter.wallSlamTimer <= 12) {
-      // 1. Thrust/Lunge sub-phase: Mahoraga lunges forward; target remains completely still at start position
+      // 1. Thrust/Lunge sub-phase: Mahoraga lunges forward smoothly from actual starting coordinates
       const p = Math.min(1.0, fighter.wallSlamTimer / 12);
-      fighter.x = Math.max(minX, Math.min(maxX, endX - Math.cos(angle) * (grabDist * (1 - p))));
-      fighter.y = Math.max(minY, Math.min(maxY, endY - Math.sin(angle) * (grabDist * (1 - p))));
+      const easeP = 1 - Math.pow(1 - p, 2);
+      fighter.x = Math.max(minX, Math.min(maxX, mahoStartX + (endX - mahoStartX) * easeP));
+      fighter.y = Math.max(minY, Math.min(maxY, mahoStartY + (endY - mahoStartY) * easeP));
 
       // Play dynamic forward sword thrust swing (comboIndex 0, which corresponds to swordCombo = 3)
       fighter.swordCombo = 3;
@@ -540,7 +528,6 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       fighter.leftPunchMaxTimer = 25;
       
       spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 28, '💥 SMASH!', '#FFEE58');
-      spawnAnimePunchImpactFrame(target.x, target.y, 60, angle, 'gold');
       spawnImpactFlash(target.x, target.y, 60, '#FFEE58');
       triggerGlobalScreenShake(12, 15);
       const smashSnd = CONFIG.mahoraga?.sounds?.wallSlamImpact || 'attack_fleshhit';
@@ -611,11 +598,6 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     target.vx = fighter.wallSlamTargetVelX;
     target.vy = fighter.wallSlamTargetVelY;
 
-    // Spawn streak sparks & motion lines behind thrown target
-    if (Math.random() < 0.8) {
-      spawnSparks(target.x, target.y, 6, 'crimsonSniper', '#FFEE58');
-    }
-
     const hitLeft = (fighter.wallSlamTargetVelX < -0.1 && target.x <= minX);
     const hitRight = (fighter.wallSlamTargetVelX > 0.1 && target.x >= maxX);
     const hitTop = (fighter.wallSlamTargetVelY < -0.1 && target.y <= minY);
@@ -685,24 +667,58 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   }
   // ── PHASE 3: SUPERSONIC DASH TO PARALYZED TARGET ──
   else if (fighter.wallSlamPhase === 'dash') {
-    const dashRate = 0.45;
-    const angleToTarget = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+    if (fighter.wallSlamTimer === 1) {
+      fighter.wallSlamDashStartX = fighter.x;
+      fighter.wallSlamDashStartY = fighter.y;
+      fighter.aim(target);
+      const dashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
+      const dashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
+      audioSystem.playSFX(dashSnd, dashVol);
+    }
+    const dashDuration = 10;
+    const p = Math.min(1.0, fighter.wallSlamTimer / dashDuration);
+    const easeP = 1 - Math.pow(1 - p, 2);
+    const dashStartX = fighter.wallSlamDashStartX !== undefined ? fighter.wallSlamDashStartX : fighter.x;
+    const dashStartY = fighter.wallSlamDashStartY !== undefined ? fighter.wallSlamDashStartY : fighter.y;
+
+    const angleToTarget = Math.atan2(target.y - dashStartY, target.x - dashStartX);
     const idealDist = fighter.r + target.r + 14;
     const targetX = target.x - Math.cos(angleToTarget) * idealDist;
     const targetY = target.y - Math.sin(angleToTarget) * idealDist;
 
-    fighter.x += (targetX - fighter.x) * dashRate;
-    fighter.y += (targetY - fighter.y) * dashRate;
+    const prevX = fighter.x;
+    const prevY = fighter.y;
+
+    fighter.x = Math.max(minX, Math.min(maxX, dashStartX + (targetX - dashStartX) * easeP));
+    fighter.y = Math.max(minY, Math.min(maxY, dashStartY + (targetY - dashStartY) * easeP));
     fighter.vx = 0;
     fighter.vy = 0;
     fighter.knockbackVx = 0;
     fighter.knockbackVy = 0;
     fighter.aim(target);
 
-    const dist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
-    if (dist <= idealDist + 10 || fighter.wallSlamTimer >= 14) {
-      fighter.x = targetX;
-      fighter.y = targetY;
+    // Spawn smooth, gap-free afterimages along this frame's supersonic dash movement segment
+    if (!fighter.adaptationAfterimages) fighter.adaptationAfterimages = [];
+    const stepDist = Math.hypot(fighter.x - prevX, fighter.y - prevY);
+    if (stepDist > 0) {
+      const subSteps = Math.max(1, Math.ceil(stepDist / 12));
+      for (let s = 1; s <= subSteps; s++) {
+        const t = s / subSteps;
+        const subX = prevX + (fighter.x - prevX) * t;
+        const subY = prevY + (fighter.y - prevY) * t;
+        pushTrailCap(fighter.adaptationAfterimages, {
+          x: subX,
+          y: subY,
+          gunAngle: fighter.gunAngle || 0,
+          timer: 18,
+          maxTimer: 18
+        }, 70);
+      }
+    }
+
+    if (p >= 1.0 || fighter.wallSlamTimer >= dashDuration) {
+      fighter.x = Math.max(minX, Math.min(maxX, targetX));
+      fighter.y = Math.max(minY, Math.min(maxY, targetY));
       fighter.wallSlamPhase = 'strike';
       fighter.wallSlamTimer = 0;
     }
@@ -722,9 +738,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     target.takeDamage(followupDamage, fighter, { isMelee: true, isCritical: true });
 
     const angle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-    spawnAnimePunchImpactFrame(target.x, target.y, 70, angle, 'gold');
+    spawnImpactFlash(target.x, target.y, 65, '#FFD700');
     spawnMeleeClashShockwave(target.x, target.y, 110, 'mahoraga');
-    spawnSparks(target.x, target.y, 20, 'gold', '#FFFFFF');
     triggerGlobalScreenShake(12, 18);
     const execSwordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
     const execSwordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0;

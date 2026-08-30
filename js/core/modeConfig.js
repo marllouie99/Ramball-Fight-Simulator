@@ -53,7 +53,7 @@ export const MODE_SETTINGS = {
     rounds: 1,
     hpMultiplier: 1.0,
     fixedHp: 2500, // For the duo
-    soloFixedHp: 2000, // For the alone fighter
+    soloFixedHp: 2500, // For the alone fighter
     speedMultiplier: 1.6,
     initialFuelPickups: 2,
     arenaShakeIntensity: 6.5, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)

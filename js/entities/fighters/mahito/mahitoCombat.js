@@ -2544,8 +2544,8 @@ export function executeMahitoDomainExpansion(fighter, targetHint = null) {
   fighter._twinScissorData = null;
   fighter.soulPhaseDashTimer = 0;
   fighter.soulPhaseDashVector = null;
-  if (fighter._dashAfterimages) fighter._dashAfterimages.length = 0;
-  if (fighter.afterImages) fighter.afterImages.length = 0;
+  if (typeof fighter.clearAllAfterimages === 'function') fighter.clearAllAfterimages();
+  else if (fighter.afterImages) fighter.afterImages.length = 0;
   fighter.hideFrontHand = false;
   fighter.hideBackHand = false;
   
@@ -2564,12 +2564,8 @@ export function updateMahitoDomainExpansion(fighter) {
   // Channeling Phase
   if (fighter.domainChargeTimer > 0) {
     fighter.domainChargeTimer--;
-    if (fighter._dashAfterimages && fighter._dashAfterimages.length > 0) {
-      fighter._dashAfterimages.length = 0;
-    }
-    if (fighter.afterImages && fighter.afterImages.length > 0) {
-      fighter.afterImages.length = 0;
-    }
+    if (typeof fighter.clearAllAfterimages === 'function') fighter.clearAllAfterimages();
+    else if (fighter.afterImages) fighter.afterImages.length = 0;
 
     // Domain Expansion Hyper Armor: only Toji can interrupt (or death)
     if (fighter.hp <= 0 || fighter.isDead) {

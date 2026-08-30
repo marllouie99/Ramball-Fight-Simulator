@@ -271,7 +271,6 @@ export function renderGame() {
         drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
         drawMahoragaAdaptationDimScreen();
         drawMahoragaLevel8DimScreen();
-        drawMahoragaSpeedLines();
         drawTojiUltimateOverlay();
         drawSaitamaSeriousPunchDimScreen();
         drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
@@ -323,6 +322,7 @@ export function renderGame() {
         drawNanamiSpeedLines(); // Supersonic manga action speed lines during Nanami blitz/lunges
         drawSaitamaSpeedLines(); // Manga action speed lines during Consecutive Normal Punches
         drawIchigoBankaiSpeedLines(); // Supersonic Bankai manga speed lines during Ichigo dashes/swings
+        drawMahoragaSpeedLines(); // Supersonic manga action speed lines during Mahoraga wall slam dash/strike/blitz
         drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
         drawFighters(); // Draw fighters ON TOP of dim screens so Gojo & fighters stay 100% visible & un-tinted!
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke

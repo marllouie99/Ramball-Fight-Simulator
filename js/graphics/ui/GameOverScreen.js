@@ -501,7 +501,7 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
       audioSystem.playSFX(saitamaSnd, vol);
     }
 
-    const isSukuna = winner && (winner.characterId === 'sukuna' || winner.type === 'sukuna' || winner._def?.id === 'sukuna');
+    const isSukuna = winner && (winner.characterId === 'sukuna' || winner.type === 'sukuna' || winner._def?.id === 'sukuna') && winner.characterId !== 'yuji' && winner.type !== 'yuji';
     if (isSukuna) {
       const sukunaSnd = CONFIG.sukuna?.sounds?.championVoiceline || CONFIG.sukuna?.championVoiceline || 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3';
       const vol = CONFIG.sukuna?.soundVolumes?.championVoiceline ?? (CONFIG.sukuna?.championVoiceVolume ?? 3.5);
