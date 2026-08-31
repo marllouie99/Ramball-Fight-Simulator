@@ -91,14 +91,14 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
-    domainCooldown: 1200,     // Cooldown before domain can trigger (25 seconds at 60 fps)
-    domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
-    domainDuration: 500,      // Domain duration (3 seconds)
-    domainDamage: 15,          // Base damage per slash tick
-    domainDamageInterval: 20,  // Frames between slash ticks
+    domainCooldown: 1000,         // Cooldown before domain can trigger (~16.6s at 60 fps)
+    domainChargeMax: 120,         // Channeling duration before domain opens (2.0s at 60 fps)
+    domainDuration: 500,          // Domain active duration (~8.33s at 60 fps)
+    domainDamage: 15,             // Base damage per slash tick
+    domainDamageInterval: 20,     // Frames between slash ticks (3 ticks per second)
     domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
-    domainRadius: 240,        // Radius of the open-air death zone
-    domainRampRatePerSec: 0.12,// 10% damage increase per second targets stay inside
+    domainRadius: 240,            // Target proximity radius around shrine (0 or arena-wide if open-barrier)
+    domainRampRatePerSec: 0.10,   // Damage ramp multiplier per second target stays inside domain (10% per sec)
 
     // Audio & Voicelines
     sounds: {
@@ -107,11 +107,11 @@ export const sukunaConfig = {
     },
     soundVolumes: {
       championVoiceline: 3.5,
-      rapidSlashVoiceline: 3.0
+      rapidSlashVoiceline: 0.0
     },
     championVoiceline: 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3',
     championVoiceVolume: 3.5,
     rapidSlashVoiceline: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
-    rapidSlashVoiceVolume: 3.0
+    rapidSlashVoiceVolume: 0.0
 };
 

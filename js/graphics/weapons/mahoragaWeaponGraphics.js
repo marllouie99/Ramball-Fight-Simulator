@@ -60,6 +60,84 @@ function darkenHex(hex, factor) {
   return '#' + [dr, dg, db].map(c => c.toString(16).padStart(2, '0')).join('');
 }
 
+// ─────────────────────────────────────────────
+// STAMP BUFFER CACHES FOR DHARMA WHEEL (Zero Per-Frame Loop Churn)
+// ─────────────────────────────────────────────
+const _wheelGlowBufferCache = new Map();
+const _sphereHaloBufferCache = new Map();
+
+function _renderWheelGlowBuffer(glowR, glowColor) {
+  const _gP = 2.0;
+  const _gSnap = (v) => Math.round(v / _gP) * _gP;
+  const size = Math.ceil((glowR + _gP * 2) * 2);
+  const center = size / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const bCtx = canvas.getContext('2d');
+  bCtx.imageSmoothingEnabled = false;
+  bCtx.translate(center, center);
+
+  const glowGridR = Math.ceil(glowR / _gP);
+  for (let gy = -glowGridR; gy <= glowGridR; gy++) {
+    for (let gx = -glowGridR; gx <= glowGridR; gx++) {
+      const dist = Math.sqrt(gx * gx + gy * gy) * _gP;
+      if (dist > glowR || dist < 5) continue;
+      const norm = dist / glowR;
+      let alpha;
+      if (norm < 0.4) alpha = 1.0;
+      else if (norm < 0.7) alpha = 0.6;
+      else alpha = 0.2;
+      if (alpha < 0.05) continue;
+      const px = _gSnap(gx * _gP);
+      const py = _gSnap(gy * _gP);
+      bCtx.fillStyle = norm < 0.4
+        ? `rgba(255, 255, 255, ${alpha})`
+        : `rgba(${hexToRgb(glowColor)}, ${alpha})`;
+      bCtx.fillRect(px - _gP * 0.5, py - _gP * 0.5, _gP, _gP);
+    }
+  }
+
+  return { canvas, center };
+}
+
+function _renderSphereHaloBuffer(sphereRadius, haloR, colorLightRgb, colorRgb) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const size = Math.ceil((haloR + P * 2) * 2);
+  const center = size / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const bCtx = canvas.getContext('2d');
+  bCtx.imageSmoothingEnabled = false;
+  bCtx.translate(center, center);
+
+  const haloGridR = Math.ceil(haloR / P);
+  for (let gy = -haloGridR; gy <= haloGridR; gy++) {
+    for (let gx = -haloGridR; gx <= haloGridR; gx++) {
+      const dist = Math.sqrt(gx * gx + gy * gy) * P;
+      if (dist > haloR || dist < sphereRadius + P) continue;
+      const norm = (dist - sphereRadius) / (haloR - sphereRadius);
+      let alpha;
+      if (norm < 0.35) alpha = 0.85;
+      else if (norm < 0.7) alpha = 0.45;
+      else alpha = 0.15;
+      if (alpha < 0.1) continue;
+      const px = snap(gx * P);
+      const py = snap(gy * P);
+      bCtx.fillStyle = norm < 0.35
+        ? `rgba(${colorLightRgb}, ${alpha})`
+        : `rgba(${colorRgb}, ${alpha})`;
+      bCtx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+    }
+  }
+
+  return { canvas, center };
+}
+
 export const MAHORAGA_WEAPON_GRAPHICS = {
   wheel: {
     scaleX: 1.25,
@@ -231,30 +309,20 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.scale(scaleX, scaleY);
     const glowAlpha = fighter.wheelGlowTimer > 0 ? Math.min(1.0, fighter.wheelGlowTimer / 45) : 0.45;
     const glowColor = fighter.wheelGlowColor || '#FFD700';
-    const glowColorDark = fighter.wheelGlowColor || '#DAA520';
     const glowR = spokeRadius + 12;
-    const _gP = 2.0;
-    const _gSnap = (v) => Math.round(v / _gP) * _gP;
 
-    // Stepped pixel concentric glow rings
-    const glowGridR = Math.ceil(glowR / _gP);
-    for (let gy = -glowGridR; gy <= glowGridR; gy++) {
-      for (let gx = -glowGridR; gx <= glowGridR; gx++) {
-        const dist = Math.sqrt(gx * gx + gy * gy) * _gP;
-        if (dist > glowR || dist < 5) continue;
-        const norm = dist / glowR;
-        let alpha;
-        if (norm < 0.4) alpha = glowAlpha;
-        else if (norm < 0.7) alpha = glowAlpha * 0.6;
-        else alpha = glowAlpha * 0.2;
-        if (alpha < 0.05) continue;
-        const px = _gSnap(gx * _gP);
-        const py = _gSnap(gy * _gP);
-        ctx.fillStyle = norm < 0.4
-          ? `rgba(255, 255, 255, ${alpha})`
-          : `rgba(${hexToRgb(glowColor)}, ${alpha})`;
-        ctx.fillRect(px - _gP * 0.5, py - _gP * 0.5, _gP, _gP);
-      }
+    // Cache wheel glow stamp buffer
+    const glowStampKey = `${glowColor}_${glowR}`;
+    let glowStamp = _wheelGlowBufferCache.get(glowStampKey);
+    if (!glowStamp) {
+      glowStamp = _renderWheelGlowBuffer(glowR, glowColor);
+      _wheelGlowBufferCache.set(glowStampKey, glowStamp);
+    }
+
+    if (glowStamp) {
+      ctx.globalAlpha = glowAlpha;
+      ctx.drawImage(glowStamp.canvas, -glowStamp.center, -glowStamp.center);
+      ctx.globalAlpha = 1.0;
     }
     ctx.restore();
   }
@@ -524,27 +592,17 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     const thisSphereRgb        = hexToRgb(thisSphereColor);
     const thisSphereRgbLight   = hexToRgb(thisSphereColorLight);
 
-    // Draw steady outer energy halo around leveled spheres — stepped pixel glow ring
+    // Draw steady outer energy halo around leveled spheres — stepped pixel glow ring stamp
     if (isLeveled) {
       const haloR = sphereRadius * 3.0;
-      const haloGridR = Math.ceil(haloR / P);
-      for (let gy = -haloGridR; gy <= haloGridR; gy++) {
-        for (let gx = -haloGridR; gx <= haloGridR; gx++) {
-          const dist = Math.sqrt(gx * gx + gy * gy) * P;
-          if (dist > haloR || dist < sphereRadius + P) continue;
-          const norm = (dist - sphereRadius) / (haloR - sphereRadius);
-          let alpha;
-          if (norm < 0.35) alpha = 0.85;
-          else if (norm < 0.7) alpha = 0.45;
-          else alpha = 0.15;
-          if (alpha < 0.1) continue;
-          const px = snap(sx + gx * P);
-          const py = snap(sy + gy * P);
-          ctx.fillStyle = norm < 0.35
-            ? `rgba(${thisSphereRgbLight}, ${alpha})`
-            : `rgba(${thisSphereRgb}, ${alpha})`;
-          ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
-        }
+      const haloStampKey = `${thisSphereColor}_${sphereRadius}_${haloR}`;
+      let haloStamp = _sphereHaloBufferCache.get(haloStampKey);
+      if (!haloStamp) {
+        haloStamp = _renderSphereHaloBuffer(sphereRadius, haloR, thisSphereRgbLight, thisSphereRgb);
+        _sphereHaloBufferCache.set(haloStampKey, haloStamp);
+      }
+      if (haloStamp) {
+        ctx.drawImage(haloStamp.canvas, sx - haloStamp.center, sy - haloStamp.center);
       }
     }
 
@@ -1279,18 +1337,57 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   ctx.restore();
 }
 
-export function drawMahoragaThrow(ctx, p) {
-  const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
-  const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const moveAngle = Math.atan2(vy, vx);
-  const now = Date.now();
-  const spinAngle = moveAngle + (p.spinOffset || 0) + (now * 0.009);
+// ─────────────────────────────────────────────
+// STAMP BUFFER CACHES FOR THROWN DEBRIS (Zero Per-Frame Rasterization)
+// ─────────────────────────────────────────────
+const _debrisStampCache = new Map();
+let _debrisShadowStamp = null;
 
-  // Pixel art grid configuration (P = 2.0px)
+function _getDebrisShadowStamp() {
+  if (_debrisShadowStamp) return _debrisShadowStamp;
   const dP = 2.0;
   const snap = (v) => Math.round(v / dP) * dP;
+  const rx = 28, ry = 11;
+  const sizeX = (rx + 4) * 2;
+  const sizeY = (ry + 4) * 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = sizeX;
+  canvas.height = sizeY;
+  const bCtx = canvas.getContext('2d');
+  bCtx.imageSmoothingEnabled = false;
+  const cx = sizeX / 2, cy = sizeY / 2;
 
-  // Stepped pixel line helper
+  const gridRx = Math.ceil(rx / dP);
+  const gridRy = Math.ceil(ry / dP);
+  for (let gy = -gridRy; gy <= gridRy; gy++) {
+    for (let gx = -gridRx; gx <= gridRx; gx++) {
+      const nx = (gx * dP) / rx;
+      const ny = (gy * dP) / ry;
+      if (nx * nx + ny * ny <= 1.0) {
+        const px = snap(cx + gx * dP);
+        const py = snap(cy + gy * dP);
+        bCtx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+        bCtx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
+      }
+    }
+  }
+  _debrisShadowStamp = { canvas, cx, cy };
+  return _debrisShadowStamp;
+}
+
+function _renderDebrisStamp(visualType) {
+  const dP = 2.0;
+  const snap = (v) => Math.round(v / dP) * dP;
+  const size = 100;
+  const center = size / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const bCtx = canvas.getContext('2d');
+  bCtx.imageSmoothingEnabled = false;
+  bCtx.translate(center, center);
+
   function _debPixLine(x0, y0, x1, y1, color, thickness) {
     const dx = x1 - x0;
     const dy = y1 - y0;
@@ -1301,12 +1398,11 @@ export function drawMahoragaThrow(ctx, p) {
       const t = s / steps;
       const px = snap(x0 + dx * t);
       const py = snap(y0 + dy * t);
-      ctx.fillStyle = color;
-      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+      bCtx.fillStyle = color;
+      bCtx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
     }
   }
 
-  // Point in polygon test
   function _pointInPoly(px, py, verts) {
     let inside = false;
     for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
@@ -1319,7 +1415,6 @@ export function drawMahoragaThrow(ctx, p) {
     return inside;
   }
 
-  // Stepped pixel polygon fill & outline rasterizer
   function _drawPixelDebrisPoly(verts, colorFn, borderColor) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let i = 0; i < verts.length; i++) {
@@ -1335,17 +1430,15 @@ export function drawMahoragaThrow(ctx, p) {
     const startY = snap(minY - dP);
     const endY = snap(maxY + dP);
 
-    // Fill interior pixels with stepped shading
     for (let py = startY; py <= endY; py += dP) {
       for (let px = startX; px <= endX; px += dP) {
         if (_pointInPoly(px, py, verts)) {
-          ctx.fillStyle = colorFn(px, py);
-          ctx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
+          bCtx.fillStyle = colorFn(px, py);
+          bCtx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
         }
       }
     }
 
-    // Draw stepped pixel border
     if (borderColor) {
       for (let i = 0; i < verts.length; i++) {
         const v1 = verts[i];
@@ -1355,34 +1448,7 @@ export function drawMahoragaThrow(ctx, p) {
     }
   }
 
-  // Stepped pixel ellipse helper
-  function _debPixEllipse(cx, cy, rx, ry, fillColor) {
-    const gridRx = Math.ceil(rx / dP);
-    const gridRy = Math.ceil(ry / dP);
-    for (let gy = -gridRy; gy <= gridRy; gy++) {
-      for (let gx = -gridRx; gx <= gridRx; gx++) {
-        const nx = (gx * dP) / rx;
-        const ny = (gy * dP) / ry;
-        if (nx * nx + ny * ny <= 1.0) {
-          const px = snap(cx + gx * dP);
-          const py = snap(cy + gy * dP);
-          ctx.fillStyle = fillColor;
-          ctx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
-        }
-      }
-    }
-  }
-
-  ctx.save();
-  ctx.translate(p.x, p.y);
-
-  // 1. Pixel Art Ground Drop Shadow
-  _debPixEllipse(0, 18, 28, 11, 'rgba(0, 0, 0, 0.32)');
-
-  ctx.rotate(spinAngle);
-
-  if (p.visual === 'mahoragaBasaltMonolith') {
-    // 1. PALE BONE & SLATE BASALT MONOLITH (Pixel Art with Radiant Fissure Cracks)
+  if (visualType === 'mahoragaBasaltMonolith') {
     const monolithVerts = [
       { x: 25,  y: -4 },
       { x: 16,  y: 20 },
@@ -1392,64 +1458,51 @@ export function drawMahoragaThrow(ctx, p) {
       { x: -10, y: -26 },
       { x: 14,  y: -20 }
     ];
-
     _drawPixelDebrisPoly(
       monolithVerts,
       (px, py) => {
         const diag = (px + py + 50) / 100;
-        if (diag < 0.28) return '#F1F5F9'; // Pale bone highlight
-        if (diag < 0.52) return '#CBD5E1'; // Pale slate gray
-        if (diag < 0.76) return '#94A3B8'; // Mid slate stone
-        return '#64748B';                  // Muted stone shadow
+        if (diag < 0.28) return '#F1F5F9';
+        if (diag < 0.52) return '#CBD5E1';
+        if (diag < 0.76) return '#94A3B8';
+        return '#64748B';
       },
-      '#1E293B' // Dark slate pixel border
+      '#1E293B'
     );
-
-    // Pale Gold-White Cursed Energy Fissure Veins (Stepped pixel lines)
     _debPixLine(14, -20, 3, -2, '#FEF08A', dP * 1.1);
     _debPixLine(3, -2, -14, 12, '#FEF08A', dP * 1.1);
     _debPixLine(-8, 24, 1, 4, '#FEF08A', dP * 1.1);
     _debPixLine(1, 4, 16, -8, '#FEF08A', dP * 1.1);
-
-    // White-hot core highlight
     _debPixLine(3, -2, 16, -8, '#FFFFFF', dP * 0.7);
 
-  } else if (p.visual === 'mahoragaRuinConcrete') {
-    // 2. PALE ASH CONCRETE SLAB (Pixel Art with Muted Steel Spikes)
+  } else if (visualType === 'mahoragaRuinConcrete') {
     const concreteVerts = [
       { x: 26,  y: -12 },
       { x: 24,  y: 14 },
       { x: -22, y: 16 },
       { x: -26, y: -14 }
     ];
-
     _drawPixelDebrisPoly(
       concreteVerts,
       (px, py) => {
         const diag = (px + py + 40) / 80;
-        if (diag < 0.30) return '#E2E8F0'; // Pale ash white
-        if (diag < 0.65) return '#94A3B8'; // Soft cement gray
-        return '#475569';                  // Muted slate edge
+        if (diag < 0.30) return '#E2E8F0';
+        if (diag < 0.65) return '#94A3B8';
+        return '#475569';
       },
-      '#0F172A' // Dark charcoal pixel border
+      '#0F172A'
     );
-
-    // Muted Steel Rebar Spikes (Pixel art metal rods)
     _debPixLine(26, -6, 36, -8, '#94A3B8', dP * 1.2);
-    _debPixLine(34, -8, 36, -8, '#FFFFFF', dP * 0.7); // Tip glint
-
+    _debPixLine(34, -8, 36, -8, '#FFFFFF', dP * 0.7);
     _debPixLine(24, 8, 33, 12, '#94A3B8', dP * 1.2);
     _debPixLine(31, 11, 33, 12, '#FFFFFF', dP * 0.7);
-
     _debPixLine(-26, -4, -35, -2, '#94A3B8', dP * 1.2);
     _debPixLine(-33, -2, -35, -2, '#FFFFFF', dP * 0.7);
-
-    // Subtle Fracture Fissures (Stepped dark crack lines)
     _debPixLine(-18, -14, -4, 0, '#0F172A', dP * 0.9);
     _debPixLine(-4, 0, 20, 14, '#0F172A', dP * 0.9);
 
   } else {
-    // 3. PALE CHALK LIMESTONE RUBBLE (Pixel Art with Glowing Cursed Amber Core)
+    // mahoragaLavaRubble / default
     const chalkVerts = [
       { x: 22,  y: -8 },
       { x: 18,  y: 16 },
@@ -1458,19 +1511,16 @@ export function drawMahoragaThrow(ctx, p) {
       { x: -18, y: -20 },
       { x: 6,   y: -22 }
     ];
-
     _drawPixelDebrisPoly(
       chalkVerts,
       (px, py) => {
         const diag = (px + py + 46) / 92;
-        if (diag < 0.32) return '#F8FAFC'; // Pale chalk white
-        if (diag < 0.68) return '#E2E8F0'; // Soft ash gray
-        return '#94A3B8';                  // Pale stone base
+        if (diag < 0.32) return '#F8FAFC';
+        if (diag < 0.68) return '#E2E8F0';
+        return '#94A3B8';
       },
-      '#1E293B' // Dark slate pixel border
+      '#1E293B'
     );
-
-    // Soft Glowing Cursed Amber-Gold Core (Pixel Art Concentric Rings)
     const coreR = 8.5;
     const gridR = Math.ceil(coreR / dP);
     for (let gy = -gridR; gy <= gridR; gy++) {
@@ -1481,18 +1531,54 @@ export function drawMahoragaThrow(ctx, p) {
         const py = snap(gy * dP);
         let cColor;
         if (dist > coreR - dP * 0.6) {
-          cColor = 'rgba(202, 138, 4, 0.9)'; // Dark golden border
+          cColor = 'rgba(202, 138, 4, 0.9)';
         } else if (dist > coreR * 0.5) {
-          cColor = 'rgba(254, 240, 138, 0.85)'; // Yellow energy halo
+          cColor = 'rgba(254, 240, 138, 0.85)';
         } else if (dist > dP * 0.8) {
-          cColor = '#FEF9C3'; // Bright warm core
+          cColor = '#FEF9C3';
         } else {
-          cColor = '#FFFFFF'; // Pure white center pixel
+          cColor = '#FFFFFF';
         }
-        ctx.fillStyle = cColor;
-        ctx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
+        bCtx.fillStyle = cColor;
+        bCtx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
       }
     }
+  }
+
+  return { canvas, center };
+}
+
+export function drawMahoragaThrow(ctx, p) {
+  const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+  const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+  const moveAngle = Math.atan2(vy, vx);
+  const now = Date.now();
+  const spinAngle = moveAngle + (p.spinOffset || 0) + (now * 0.009);
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  // 1. Pixel Art Ground Drop Shadow (Stamp buffer)
+  const shadowStamp = _getDebrisShadowStamp();
+  if (shadowStamp) {
+    ctx.drawImage(shadowStamp.canvas, -shadowStamp.cx, 18 - shadowStamp.cy);
+  }
+
+  ctx.rotate(spinAngle);
+
+  // 2. Pre-rendered pixel art debris stamp
+  const visualKey = p.visual || 'mahoragaLavaRubble';
+  let debrisStamp = _debrisStampCache.get(visualKey);
+  if (!debrisStamp) {
+    debrisStamp = _renderDebrisStamp(visualKey);
+    _debrisStampCache.set(visualKey, debrisStamp);
+  }
+
+  if (debrisStamp) {
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(debrisStamp.canvas, -debrisStamp.center, -debrisStamp.center);
+    ctx.imageSmoothingEnabled = prevSmoothing;
   }
 
   ctx.restore();

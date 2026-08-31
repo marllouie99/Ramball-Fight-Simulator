@@ -179,6 +179,12 @@ export class YutaFighter extends Fighter {
       this.slashFadeTimer--;
     }
 
+    // Authentic Mutual Love Domain Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame,
+    // even if Yuta is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
+    if (this.domainCooldown > 0 && !this.domainActive && !this.isChannelingDomain) {
+      this.domainCooldown--;
+    }
+
     const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
     const isEnemyDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some((f, idx) => {
       if (!f || f === this || f.hp <= 0) return false;
@@ -192,6 +198,15 @@ export class YutaFighter extends Fighter {
       if (!isEnemyDomainActive) {
         this.timeStopTimer = 0;
         this.isFrozenByInfinity = false;
+        this.purpleHitTimer = 0;
+        this.isCaughtInPurple = false;
+        this.caughtInPureLoveBeam = false;
+        this.pureLoveBeamTimer = 0;
+        this._hitByGetsugaTimer = 0;
+        this.paralyzeTimer = 0;
+        this.isParalyzedByMahito = false;
+        this.isParalyzedByMahoraga = false;
+        this.isWallSlammed = false;
       }
       this.hitStunTimer = 0;
       this.knockbackStunTimer = 0;
@@ -603,7 +618,6 @@ export class YutaFighter extends Fighter {
     }
 
     if (this.techniqueCooldown > 0) this.techniqueCooldown--;
-    if (this.domainCooldown > 0 && !this.domainActive) this.domainCooldown--;
     if (this.pureLoveBeamCooldownTimer > 0) this.pureLoveBeamCooldownTimer--;
 
     if (this.isChannelingPureLoveBeam) {
@@ -827,9 +841,7 @@ export class YutaFighter extends Fighter {
     }
 
     if (this.domainActive) {
-      if (!this.isParalyzedDebuffActive()) {
-        this.domainTimer--;
-      }
+      this.domainTimer--;
       if (this.domainTimer <= 0) {
         this.domainActive = false;
         this.domainCooldown = 0;

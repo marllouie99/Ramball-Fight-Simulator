@@ -437,12 +437,27 @@ export function drawMahoragaChestNecklace(ctx, fighter) {
  * - Muscular Pectoral & Abdominal Grooves
  * - Shinto Ritual Chest Markings & Divine Forehead Gem
  */
-export function drawMahoragaPixelBody(ctx, r, fighter = null) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+// Cache for pre-rendered pixel-art body buffers keyed by radius 'r'
+const _cachedMahoragaBodyCanvases = new Map();
+
+function _getMahoragaBodyBuffer(r) {
+  const cached = _cachedMahoragaBodyCanvases.get(r);
+  if (cached) return cached;
+
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
+  const size = Math.ceil((r + P * 2) * 2);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const bCtx = canvas.getContext('2d');
+  bCtx.imageSmoothingEnabled = false;
+
+  // Center coordinate in buffer
+  const center = size / 2;
+  bCtx.translate(center, center);
 
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -463,8 +478,8 @@ export function drawMahoragaPixelBody(ctx, r, fighter = null) {
         Math.hypot(rx, ry + P) > r ||
         Math.hypot(rx, ry - P) > r
       ) {
-        ctx.fillStyle = '#0E0F14';
-        ctx.fillRect(px, py, P, P);
+        bCtx.fillStyle = '#0E0F14';
+        bCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -486,13 +501,13 @@ export function drawMahoragaPixelBody(ctx, r, fighter = null) {
         const isForeheadGemCore = (Math.abs(rx) <= P * 0.5 && ry >= -r * 0.74 && ry <= -r * 0.68);
 
         if (isForeheadGemCore) {
-          ctx.fillStyle = '#FFAE33';
+          bCtx.fillStyle = '#FFAE33';
         } else if (isForeheadGem) {
-          ctx.fillStyle = '#C2780A';
+          bCtx.fillStyle = '#C2780A';
         } else if (isWingSocketLeft || isWingSocketRight || isWingSocketLeftLower || isWingSocketRightLower) {
-          ctx.fillStyle = '#18181A';
+          bCtx.fillStyle = '#18181A';
         } else if (isBrowRidge) {
-          ctx.fillStyle = '#C8C8BE';
+          bCtx.fillStyle = '#C8C8BE';
         } else {
           let col = '#F4F4EC';
           if (ry < -r * 0.72) {
@@ -500,9 +515,9 @@ export function drawMahoragaPixelBody(ctx, r, fighter = null) {
           } else if (Math.abs(rx) > r * 0.70 || ry > -r * 0.25) {
             col = '#D4D4C8';
           }
-          ctx.fillStyle = col;
+          bCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        bCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE 2: CHEST & PECTORALS (-r * 0.15 <= ry < r * 0.45)
@@ -514,17 +529,17 @@ export function drawMahoragaPixelBody(ctx, r, fighter = null) {
         const isPecHighlight = (ry >= -r * 0.05 && ry <= r * 0.15 && Math.abs(rx) >= r * 0.12 && Math.abs(rx) <= r * 0.50);
 
         if (isSternum || isPecLeft || isPecRight) {
-          ctx.fillStyle = '#B4B4A8';
+          bCtx.fillStyle = '#B4B4A8';
         } else if (isPecHighlight) {
-          ctx.fillStyle = '#FFFFFF';
+          bCtx.fillStyle = '#FFFFFF';
         } else {
           let col = '#EBEBE0';
           if (Math.abs(rx) > r * 0.72 || ry > r * 0.35) {
             col = '#D0D0C4';
           }
-          ctx.fillStyle = col;
+          bCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        bCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE 3: ABDOMINALS & LOWER TORSO (ry >= r * 0.45)
@@ -537,22 +552,38 @@ export function drawMahoragaPixelBody(ctx, r, fighter = null) {
         const isAbPack2 = (ry >= r * 0.66 && ry <= r * 0.76 && Math.abs(rx) >= r * 0.08 && Math.abs(rx) <= r * 0.32);
 
         if (isLineaAlba || isAbSeam1 || isAbSeam2) {
-          ctx.fillStyle = '#A4A498';
+          bCtx.fillStyle = '#A4A498';
         } else if (isAbPack1 || isAbPack2) {
-          ctx.fillStyle = '#F8F8F2';
+          bCtx.fillStyle = '#F8F8F2';
         } else {
           let col = '#DFDFD4';
           if (Math.abs(rx) > r * 0.65 || ry > r * 0.85) {
             col = '#BEBEB2';
           }
-          ctx.fillStyle = col;
+          bCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        bCtx.fillRect(px, py, P, P);
       }
     }
   }
 
-  ctx.restore();
+  const result = { canvas, center };
+  _cachedMahoragaBodyCanvases.set(r, result);
+  return result;
+}
+
+/**
+ * Draws Mahoraga's entire circular body in authentic Pixel Art Style.
+ * High-performance offscreen buffer rendering matching Saitama, Ichigo, Yuji, Nanami, Gojo, and Mahito.
+ */
+export function drawMahoragaPixelBody(ctx, r, fighter = null) {
+  const bufferData = _getMahoragaBodyBuffer(r);
+  if (!bufferData) return;
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(bufferData.canvas, -bufferData.center, -bufferData.center);
+  ctx.imageSmoothingEnabled = prevSmoothing;
 }
 
 /**

@@ -436,6 +436,19 @@ export class GojoFighter extends Fighter {
       return;
     }
 
+    // ── UNLIMITED VOID: DOMAIN COOLDOWN & PROGRESSION EXCEPTION ──
+    // Unlimited Void domainCooldown MUST ALWAYS tick down every frame,
+    // even if Gojo is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
+    if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) {
+      this.domainCooldown--;
+    }
+
+    // Reverse Cursed Technique Cooldown Exception: reverseCursedTechniqueCooldown MUST ALWAYS tick down every frame,
+    // even if Gojo is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
+    if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) {
+      this.reverseCursedTechniqueCooldown--;
+    }
+
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
@@ -483,6 +496,15 @@ export class GojoFighter extends Fighter {
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
       this.timeStopTimer = 0;
+      this.purpleHitTimer = 0;
+      this.isCaughtInPurple = false;
+      this.caughtInPureLoveBeam = false;
+      this.pureLoveBeamTimer = 0;
+      this._hitByGetsugaTimer = 0;
+      this.paralyzeTimer = 0;
+      this.isParalyzedByMahito = false;
+      this.isParalyzedByMahoraga = false;
+      this.isWallSlammed = false;
     }
 
     const isFrozen = this._handleTimeStop() || this.isTargetOfAmbush || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity;
@@ -698,8 +720,6 @@ export class GojoFighter extends Fighter {
       if (this.cooldown > 0) this.cooldown--;
       if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
       if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
-      if (this.domainCooldown > 0) this.domainCooldown--;
-      if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
       if (this.healingAuraTimer > 0) this.healingAuraTimer--;
       if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
       if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
@@ -729,9 +749,7 @@ export class GojoFighter extends Fighter {
 
     // Domain active state
     if (this.domainActive) {
-      if (!this.isParalyzedDebuffActive()) {
-        this.domainTimer--;
-      }
+      this.domainTimer--;
       if (this.domainTimer <= 0) {
         this.domainActive = false;
         this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!

@@ -102,6 +102,13 @@ export class TodoFighter extends Fighter {
       return;
     }
 
+    // Takada-chan Ultimate Cooldown Exception: takadaUltCooldown MUST ALWAYS tick down every frame,
+    // even if Todo is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
+    if (!this.isTakadaUltActive && !this.isTakadaChanneling && (this.takadaUltCooldown || 0) > 0) {
+      const decay = (this.blackFlashTimer > 0) ? (CONFIG.blackFlash?.zone?.cooldownDecayMultiplier ?? 1.20) : 1.0;
+      this.takadaUltCooldown = Math.max(0, this.takadaUltCooldown - decay);
+    }
+
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
@@ -278,7 +285,6 @@ export class TodoFighter extends Fighter {
     if (this.boogieWoogieCooldown > 0) this.boogieWoogieCooldown = Math.max(0, this.boogieWoogieCooldown - decay);
     if (this.rockThrowCooldown > 0) this.rockThrowCooldown = Math.max(0, this.rockThrowCooldown - decay);
     if (this.rockCounterCooldown > 0) this.rockCounterCooldown = Math.max(0, this.rockCounterCooldown - decay);
-    if (this.takadaUltCooldown > 0) this.takadaUltCooldown = Math.max(0, this.takadaUltCooldown - decay);
     if (this.justSwappedTimer > 0) this.justSwappedTimer--;
     if (this.blackFlashGlowTimer > 0) this.blackFlashGlowTimer--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;

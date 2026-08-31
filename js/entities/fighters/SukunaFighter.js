@@ -47,7 +47,7 @@ export class SukunaFighter extends Fighter {
     this.divineFlameRecoveryTimer = 0;
 
     // Domain Expansion: Malevolent Shrine (Ultimate)
-    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1950; // Delay initial cast reads from CONFIG
+    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000; // Delay initial cast reads from CONFIG
     this.domainActive = false;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
@@ -186,7 +186,7 @@ export class SukunaFighter extends Fighter {
     this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 100;
     this.divineFlameRecoveryTimer = 0;
 
-    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1950;
+    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
     this.domainChargeTimer = 0;
@@ -416,6 +416,38 @@ export class SukunaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    // ── MALEVOLENT SHRINE: OPEN-BARRIER DOMAIN PROGRESSION & TICK ──
+    // Malevolent Shrine continues to progress its duration timer and tick slashes/damage
+    // even if Sukuna is afflicted with a paralyze debuff effect (Purple, Pure Love Beam, Getsuga Tensho, etc.), electric stun, or is in stasis!
+    if (this.domainActive) {
+      this.domainTimer--;
+      if (this.domainTimer <= 0) {
+        this.domainActive = false;
+      } else {
+        this._applyDomainEffect(arena);
+      }
+    }
+
+    // Malevolent Shrine Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame,
+    // even if Sukuna is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Purple / Beams / Unlimited Void!
+    if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) {
+      this.domainCooldown--;
+    }
+
+    // Reverse Cursed Technique Cooldown Exception: reverseCursedTechniqueCooldown MUST ALWAYS tick down every frame,
+    // even if Sukuna is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Purple / Beams / Unlimited Void!
+    if ((this.rctVisualTimer || 0) <= 0 && this.reverseCursedTechniqueCooldown > 0) {
+      this.reverseCursedTechniqueCooldown--;
+    }
+
+    // Update slash hit visuals (Ghost blade / domain slashes) so they animate even during paralyze / time stop
+    if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
+      fastCleanArray(this.slashHitVisuals, (v) => {
+        v.timer--;
+        return v.timer > 0;
+      });
+    }
+
     // Intro Wall Rebound Stage
     if (this.introReboundActive) {
       if (this.introReboundTimer === undefined) {
@@ -456,26 +488,6 @@ export class SukunaFighter extends Fighter {
     if (this._slashSoundCooldown > 0) this._slashSoundCooldown--;
     if (this.slashGlowTimer > 0) this.slashGlowTimer--;
 
-    // ── MALEVOLENT SHRINE: OPEN-BARRIER DOMAIN PROGRESSION & TICK ──
-    // Malevolent Shrine continues to progress its duration timer and tick slashes/damage
-    // even if Sukuna is afflicted with a paralyze debuff effect, electric stun, or is in stasis!
-    if (this.domainActive) {
-      this.domainTimer--;
-      if (this.domainTimer <= 0) {
-        this.domainActive = false;
-      } else {
-        this._applyDomainEffect(arena);
-      }
-    }
-
-    // Update slash hit visuals (Ghost blade / domain slashes) so they animate even during paralyze / time stop
-    if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
-      fastCleanArray(this.slashHitVisuals, (v) => {
-        v.timer--;
-        return v.timer > 0;
-      });
-    }
-
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
@@ -495,12 +507,22 @@ export class SukunaFighter extends Fighter {
     this._tickAttackSound();
 
     if (this.isChannelingDomainExpansion && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0) {
-      // Unstoppable Domain Channeling Hyper-Armor: Clear hitStun & status freezes so non-Toji attacks cannot interrupt!
+      // Unstoppable Domain Channeling Hyper-Armor: Clear all hitStun & paralyze freezes (Purple, Pure Love Beam, Getsuga, etc.) so non-Toji attacks cannot interrupt!
       this.hitStunTimer = 0;
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
       this.timeStopTimer = 0;
+      this.purpleHitTimer = 0;
+      this.isCaughtInPurple = false;
+      this.caughtInPureLoveBeam = false;
+      this.pureLoveBeamTimer = 0;
+      this._hitByGetsugaTimer = 0;
+      this.paralyzeTimer = 0;
+      this.isParalyzedByMahito = false;
+      this.isParalyzedByMahoraga = false;
+      this.isFrozenByInfinity = false;
+      this.isWallSlammed = false;
     }
 
     const isFrozen = this._handleTimeStop();
@@ -607,13 +629,11 @@ export class SukunaFighter extends Fighter {
     }
 
     // Update cooldowns
-    if ((this.rctVisualTimer || 0) <= 0 && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.spiderwebCooldown > 0) this.spiderwebCooldown--;
     if (!this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0 && this.divineFlameCooldown > 0) {
       this.divineFlameCooldown -= this.domainActive ? 4 : 1; // 4x faster recharge (25% cooldown duration) inside Malevolent Shrine!
       if (this.divineFlameCooldown < 0) this.divineFlameCooldown = 0;
     }
-    if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) this.domainCooldown--;
     if (!this.isChannelingDomainExpansion && !this.domainActive && (this.domainChargeTimer || 0) <= 0) this._hasPlayedDomainChannelSound = false;
     if ((this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0 && this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
@@ -679,7 +699,7 @@ export class SukunaFighter extends Fighter {
       if ((this.silenceTimer || 0) > 0) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
-        this.domainCooldown = CONFIG.sukuna?.domainCooldown || 1500;
+        this.domainCooldown = CONFIG.sukuna?.domainCooldown || 1000;
         return;
       }
       this.domainChargeTimer++;
@@ -1284,7 +1304,7 @@ export class SukunaFighter extends Fighter {
     this.domainActivationTime = Date.now();
     this.domainUseCount++;
     this.domainTimer = CONFIG.sukuna.domainDuration || 500;
-    this.domainCooldown = CONFIG.sukuna.domainCooldown || 1950;
+    this.domainCooldown = CONFIG.sukuna.domainCooldown || 1000;
     this.rapidSlashTimer = 0; // Ready for first slash immediately upon domain opening!
 
     // Position closer to the center of the arena so the top of the shrine isn't clipped
@@ -1877,7 +1897,7 @@ export class SukunaFighter extends Fighter {
     const h = sourceCanvas.height;
     const P = 2.0; // Exact Saitama pixel grid block size
 
-    const srcCtx = sourceCanvas.getContext('2d');
+    const srcCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
     const srcData = srcCtx.getImageData(0, 0, w, h);
     const data = srcData.data;
 

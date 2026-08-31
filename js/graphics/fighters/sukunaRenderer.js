@@ -955,7 +955,7 @@ export class SukunaRenderer {
     const h = sourceCanvas.height;
     const P = 2.0; // Exact Saitama pixel grid block size
 
-    const srcCtx = sourceCanvas.getContext('2d');
+    const srcCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
     const srcData = srcCtx.getImageData(0, 0, w, h);
     const data = srcData.data;
 

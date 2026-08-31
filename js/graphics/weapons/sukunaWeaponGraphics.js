@@ -50,18 +50,22 @@ export function drawSukunaSlash(ctx, p) {
 
 let _ghostBladeBuffer = null;
 let _ghostBladeLow = null;
+let _ghostBladeHighCtx = null;
+let _ghostBladeLowCtx = null;
 
 function _getGhostBladeBuffers() {
   if (!_ghostBladeBuffer) {
     _ghostBladeBuffer = document.createElement('canvas');
     _ghostBladeBuffer.width = 64;
     _ghostBladeBuffer.height = 64;
+    _ghostBladeHighCtx = _ghostBladeBuffer.getContext('2d');
 
     _ghostBladeLow = document.createElement('canvas');
     _ghostBladeLow.width = 32;
     _ghostBladeLow.height = 32;
+    _ghostBladeLowCtx = _ghostBladeLow.getContext('2d', { willReadFrequently: true });
   }
-  return { high: _ghostBladeBuffer, low: _ghostBladeLow };
+  return { high: _ghostBladeBuffer, low: _ghostBladeLow, highCtx: _ghostBladeHighCtx, lowCtx: _ghostBladeLowCtx };
 }
 
 function _renderVectorGhostBlade(ctx, r, lifeRatio, isFrozen) {
@@ -105,9 +109,7 @@ export function drawGhostBlade(ctx, p) {
   const isFrozen = Boolean(p.isFrozenByInfinity);
   const r = 24;
 
-  const { high, low } = _getGhostBladeBuffers();
-  const highCtx = high.getContext('2d');
-  const lowCtx = low.getContext('2d');
+  const { high, low, highCtx, lowCtx } = _getGhostBladeBuffers();
 
   // Render high-res vector blade
   highCtx.clearRect(0, 0, 64, 64);
@@ -594,18 +596,22 @@ function _isDarkMode() {
 
 let _fugaBufferCanvas = null;
 let _fugaLowCanvas = null;
+let _fugaHighCtx = null;
+let _fugaLowCtx = null;
 
 function _getFugaBuffers() {
   if (!_fugaBufferCanvas) {
     _fugaBufferCanvas = document.createElement('canvas');
     _fugaBufferCanvas.width = 360;
     _fugaBufferCanvas.height = 240;
+    _fugaHighCtx = _fugaBufferCanvas.getContext('2d');
 
     _fugaLowCanvas = document.createElement('canvas');
     _fugaLowCanvas.width = 180;
     _fugaLowCanvas.height = 120;
+    _fugaLowCtx = _fugaLowCanvas.getContext('2d', { willReadFrequently: true });
   }
-  return { high: _fugaBufferCanvas, low: _fugaLowCanvas };
+  return { high: _fugaBufferCanvas, low: _fugaLowCanvas, highCtx: _fugaHighCtx, lowCtx: _fugaLowCtx };
 }
 
 export function drawDivineFlameArrowConstruct(ctx, {
@@ -616,9 +622,7 @@ export function drawDivineFlameArrowConstruct(ctx, {
   const isDark = _isDarkMode();
 
   if (isDark) {
-    const { high, low } = _getFugaBuffers();
-    const highCtx = high.getContext('2d');
-    const lowCtx = low.getContext('2d');
+    const { high, low, highCtx, lowCtx } = _getFugaBuffers();
 
     highCtx.clearRect(0, 0, 360, 240);
     highCtx.save();

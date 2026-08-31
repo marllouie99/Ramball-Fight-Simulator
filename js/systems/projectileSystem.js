@@ -2945,20 +2945,40 @@ class ProjectileSystem {
             }
 
             if (!p.infinityBypassed && !p.isFrozenByInfinity) {
-              // Prune oldest frozen projectile if exceeding max limit to guarantee 60 FPS
-              const maxFrozen = CONFIG.gojo?.infinityMaxFrozenProjectiles ?? 12;
+              // Enforce strict limit on frozen projectiles to prevent visual clutter and FPS drops
+              const maxFrozen = CONFIG.gojo?.infinityMaxFrozenProjectiles ?? 2;
               let activeFrozenCount = 0;
               let oldestFrozenProj = null;
               for (let k = 0; k < this.projectiles.length; k++) {
-                if (this.projectiles[k].isFrozenByInfinity && this.projectiles[k].infinityFreezeTimer > 15) {
+                const projK = this.projectiles[k];
+                if (projK && projK.isFrozenByInfinity && (projK.infinityFreezeTimer || 0) > 0) {
                   activeFrozenCount++;
-                  if (!oldestFrozenProj || this.projectiles[k].infinityFreezeTimer < oldestFrozenProj.infinityFreezeTimer) {
-                    oldestFrozenProj = this.projectiles[k];
+                  if (!oldestFrozenProj || (projK.infinityFreezeTimer || 0) < (oldestFrozenProj.infinityFreezeTimer || 0)) {
+                    oldestFrozenProj = projK;
                   }
                 }
               }
-              if (activeFrozenCount >= maxFrozen && oldestFrozenProj) {
-                oldestFrozenProj.infinityFreezeTimer = 15; // Smoothly dissolve oldest frozen projectile
+
+              if (activeFrozenCount >= maxFrozen) {
+                const isVisualOrZeroDmg = (p.damage === 0 || p.isVisual) || p.visual === 'ghostBlade' || p.isSukunaSlash;
+                if (isVisualOrZeroDmg) {
+                  if (typeof f.triggerInfinityBlock === 'function') {
+                    f.triggerInfinityBlock(p.x, p.y);
+                  }
+                  this._returnProjectile(p);
+                  this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+                  this.projectiles.pop();
+                  i--;
+                  continue;
+                } else if (oldestFrozenProj) {
+                  const oldestIdx = this.projectiles.indexOf(oldestFrozenProj);
+                  if (oldestIdx !== -1) {
+                    this._returnProjectile(oldestFrozenProj);
+                    this.projectiles[oldestIdx] = this.projectiles[this.projectiles.length - 1];
+                    this.projectiles.pop();
+                    if (oldestIdx <= i) i--;
+                  }
+                }
               }
 
               p.isFrozenByInfinity = true;

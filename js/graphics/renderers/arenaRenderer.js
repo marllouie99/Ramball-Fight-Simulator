@@ -1711,51 +1711,67 @@ export function drawMahoragaLevel8DimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // Center the spotlight and expand radius to encompass Mahoraga, enemy fighters, Rika, AND illusion minions
+  // Reusable target buffer to eliminate per-frame array allocation & GC churn
   const activeMaho = mahoraga || state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')));
-  const activeTargets = [];
-  if (activeMaho) activeTargets.push(activeMaho);
+  let sumX = 0, sumY = 0, targetCount = 0;
+  let maxTargetDist = 80;
+
+  if (activeMaho) {
+    sumX += activeMaho.x;
+    sumY += activeMaho.y;
+    targetCount++;
+  }
   if (state.fighters) {
-    for (const f of state.fighters) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
       if (f && f !== activeMaho && f.hp > 0) {
-        activeTargets.push(f);
+        sumX += f.x;
+        sumY += f.y;
+        targetCount++;
         if (f.rika && f.rika.active && !f.rika.isDying) {
-          activeTargets.push(f.rika);
+          sumX += f.rika.x;
+          sumY += f.rika.y;
+          targetCount++;
         }
       }
     }
   }
   if (state.illusions) {
-    for (const ill of state.illusions) {
+    for (let i = 0; i < state.illusions.length; i++) {
+      const ill = state.illusions[i];
       if (ill && ill.hp > 0) {
-        activeTargets.push(ill);
+        sumX += ill.x;
+        sumY += ill.y;
+        targetCount++;
       }
     }
   }
 
   let cx = canvas.width / 2;
   let cy = canvas.height / 2;
-  let maxTargetDist = 80;
+  if (targetCount > 0) {
+    cx = sumX / targetCount;
+    cy = sumY / targetCount;
 
-  if (activeTargets.length > 0) {
-    let sumX = 0, sumY = 0;
-    for (const t of activeTargets) {
-      sumX += t.x;
-      sumY += t.y;
-    }
-    cx = sumX / activeTargets.length;
-    cy = sumY / activeTargets.length;
-
-    for (const t of activeTargets) {
-      const d = Math.hypot(t.x - cx, t.y - cy);
+    if (activeMaho) {
+      const d = Math.hypot(activeMaho.x - cx, activeMaho.y - cy);
       if (d > maxTargetDist) maxTargetDist = d;
+    }
+    if (state.fighters) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (f && f !== activeMaho && f.hp > 0) {
+          const d = Math.hypot(f.x - cx, f.y - cy);
+          if (d > maxTargetDist) maxTargetDist = d;
+        }
+      }
     }
   }
 
   const drawX = cx + shakeX;
   const drawY = cy + shakeY;
-  const spotlightInnerR = Math.max(140, Math.min(650, maxTargetDist + 90));
-  const maxRadius = Math.max(arena.width, arena.height) * 1.25;
+  const spotlightInnerR = Math.max(140, Math.min(480, maxTargetDist + 80));
+  const maxRadius = Math.max(arena.width, arena.height) * 1.15;
 
   const grad = ctx.createRadialGradient(
     drawX, drawY, spotlightInnerR * 0.4,
@@ -1769,7 +1785,7 @@ export function drawMahoragaLevel8DimScreen() {
   const opacity = baseDimOpacity + pulse * currentMahoLevel8DimOpacity;
   
   grad.addColorStop(0, 'rgba(0, 0, 0, 0.0)'); // Fully bright spotlight center
-  grad.addColorStop(Math.min(0.7, (spotlightInnerR / maxRadius)), `rgba(14, 8, 2, ${opacity * 0.35})`); // Golden-brown highlight transition
+  grad.addColorStop(Math.min(0.65, (spotlightInnerR / maxRadius)), `rgba(14, 8, 2, ${opacity * 0.35})`); // Golden-brown highlight transition
   grad.addColorStop(0.8, `rgba(6, 3, 1, ${opacity * 0.88})`); // Very dark golden-brown
   grad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.99})`); // Absolute black border
 
@@ -1781,22 +1797,20 @@ export function drawMahoragaLevel8DimScreen() {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     
-    const pulseScale = 1.0 + Math.sin(Date.now() * 0.003) * 0.08; // Pulsing light intensity
+    const pulseScale = 1.0 + Math.sin(Date.now() * 0.003) * 0.08;
 
     // 1. Wheel Light Spill (glow centered at Dharma Wheel)
     const wheelX = activeMaho.x + shakeX;
     const wheelY = activeMaho.y - activeMaho.r - 28 + shakeY;
-    const wheelGlow = ctx.createRadialGradient(
-      wheelX, wheelY, 5,
-      wheelX, wheelY, 85 * pulseScale
-    );
-    wheelGlow.addColorStop(0, `rgba(255, 215, 0, ${0.35 * currentMahoLevel8DimOpacity})`); // Gold center
-    wheelGlow.addColorStop(0.3, `rgba(255, 179, 0, ${0.15 * currentMahoLevel8DimOpacity})`); // Amber mid
+    const wheelR = 85 * pulseScale;
+    const wheelGlow = ctx.createRadialGradient(wheelX, wheelY, 5, wheelX, wheelY, wheelR);
+    wheelGlow.addColorStop(0, `rgba(255, 215, 0, ${0.35 * currentMahoLevel8DimOpacity})`);
+    wheelGlow.addColorStop(0.3, `rgba(255, 179, 0, ${0.15 * currentMahoLevel8DimOpacity})`);
     wheelGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
     
     ctx.fillStyle = wheelGlow;
     ctx.beginPath();
-    ctx.arc(wheelX, wheelY, 85 * pulseScale, 0, Math.PI * 2);
+    ctx.arc(wheelX, wheelY, wheelR, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Sword Light Spill (glow centered at extending blade)
@@ -1804,18 +1818,16 @@ export function drawMahoragaLevel8DimScreen() {
     const swordDist = activeMaho.r + 30;
     const swordX = activeMaho.x + Math.cos(swordAngle) * swordDist + shakeX;
     const swordY = activeMaho.y + Math.sin(swordAngle) * swordDist + shakeY;
+    const swordR = 110 * pulseScale;
 
-    const swordGlow = ctx.createRadialGradient(
-      swordX, swordY, 10,
-      swordX, swordY, 110 * pulseScale
-    );
-    swordGlow.addColorStop(0, `rgba(255, 235, 59, ${0.30 * currentMahoLevel8DimOpacity})`); // Bright yellow-gold
-    swordGlow.addColorStop(0.4, `rgba(255, 152, 0, ${0.12 * currentMahoLevel8DimOpacity})`); // Soft orange
+    const swordGlow = ctx.createRadialGradient(swordX, swordY, 10, swordX, swordY, swordR);
+    swordGlow.addColorStop(0, `rgba(255, 235, 59, ${0.30 * currentMahoLevel8DimOpacity})`);
+    swordGlow.addColorStop(0.4, `rgba(255, 152, 0, ${0.12 * currentMahoLevel8DimOpacity})`);
     swordGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     ctx.fillStyle = swordGlow;
     ctx.beginPath();
-    ctx.arc(swordX, swordY, 110 * pulseScale, 0, Math.PI * 2);
+    ctx.arc(swordX, swordY, swordR, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();

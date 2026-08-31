@@ -1224,6 +1224,12 @@ export class GenosFighter extends Fighter {
       return;
     }
 
+    // Incineration Cannon Ultimate Cooldown Exception: ultCooldown MUST ALWAYS tick down every frame,
+    // even if Genos is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
+    if (!this.isChargingUlt && !this.isFiringUlt && (this.ultCooldown || 0) > 0) {
+      this.ultCooldown--;
+    }
+
     // Mandatory Rule #1: TimeStop & Freeze Guard at top of update loop
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -1237,7 +1243,6 @@ export class GenosFighter extends Fighter {
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.dashCooldown > 0) this.dashCooldown--;
-    if (this.ultCooldown > 0) this.ultCooldown--;
     if (this.meleeDashDelayTimer > 0) this.meleeDashDelayTimer--;
 
     // Handle Thruster Speed Boost Decay

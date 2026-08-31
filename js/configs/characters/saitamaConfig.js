@@ -107,7 +107,7 @@ export const saitamaConfig = {
   counterPunchRecoveryFrames: 65, // Frames Saitama stands still after landing (post-punch stall)
   counterDodgeLockFrames: 20,      // Dodge cooldown after counter execution
   skillPunishCooldown: 2000,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
-  initialSkillPunishCooldown: 50, // Cooldown at the start of the round before first counter is available (2000 frames)
+  initialSkillPunishCooldown: 2000, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
   counterPunchVoiceEnabled: true,

@@ -302,6 +302,8 @@ export function applyDomainEffect(fighter, arena) {
     const shrineY = fighter.domainY || fighter.y;
     const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
 
+    const rampRate = CONFIG.sukuna?.domainRampRatePerSec ?? 0.10;
+
     state.fighters.forEach((f, idx) => {
       if (f && f !== fighter && f.hp > 0) {
         if (f.domainImmunity && f.characterId !== 'toji' && f.type !== 'toji') return;
@@ -312,7 +314,7 @@ export function applyDomainEffect(fighter, arena) {
           const timeInside = (fighter.domainTimeInsideMap.get(f) || 0) + domainDamageInterval;
           fighter.domainTimeInsideMap.set(f, timeInside);
 
-          const rampMultiplier = 1 + (timeInside / 60) * 0.10;
+          const rampMultiplier = 1 + (timeInside / 60) * rampRate;
           const finalDamage = domainDamage * rampMultiplier;
 
           // Fire a single visible ghostBlade projectile directly from Malevolent Shrine towards the target!
@@ -367,7 +369,7 @@ export function applyDomainEffect(fighter, arena) {
             const timeInside = (fighter.domainTimeInsideMap.get(ill) || 0) + domainDamageInterval;
             fighter.domainTimeInsideMap.set(ill, timeInside);
 
-            const rampMultiplier = 1 + (timeInside / 60) * 0.10;
+            const rampMultiplier = 1 + (timeInside / 60) * rampRate;
             const finalDamage = domainDamage * rampMultiplier;
 
             // Fire a single visible ghostBlade projectile directly from Malevolent Shrine towards the illusion!

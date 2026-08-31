@@ -127,7 +127,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
   if (f.characterId === 'sukuna' || f.type === 'sukuna') {
     const themeColor = f.color || '#ff4500';
-    const domainMax = CONFIG.sukuna?.domainCooldown || 1950;
+    const domainMax = CONFIG.sukuna?.domainCooldown || 1000;
     const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
     let domainPct;
     if (f.isChannelingDomainExpansion) {
