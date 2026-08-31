@@ -23,12 +23,14 @@ export class StatusEffectsManager {
   }
 
   applySlow(frames, multiplier, opts = {}) {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
     if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed && !opts.isInfinitySlow) return;
     if (this.fighter.slowTimer < frames) this.fighter.slowTimer = frames;
     this.fighter.slowMultiplier = multiplier;
   }
 
   applyHitStun(frames, opts = {}) {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
     if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed) return;
     if (!this.fighter.hitStunTimer || this.fighter.hitStunTimer < frames) {
       this.fighter.hitStunTimer = frames;
@@ -37,6 +39,7 @@ export class StatusEffectsManager {
   }
 
   applyParalyze(frames, opts = {}) {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
     if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple) return;
     if (!this.fighter.paralyzeTimer || this.fighter.paralyzeTimer < frames) {
       this.fighter.paralyzeTimer = frames;
@@ -45,6 +48,7 @@ export class StatusEffectsManager {
 
   // --- Poison ---
   applyPoison(attacker) {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
     const grenadierCfg = CONFIG.grenadier || {};
     const ticks = (typeof grenadierCfg.poisonTicks === 'number')
       ? grenadierCfg.poisonTicks
@@ -56,6 +60,11 @@ export class StatusEffectsManager {
   }
 
   handlePoison() {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) {
+      this.fighter.poisonTicks = 0;
+      this.fighter.poisonTimer = 0;
+      return;
+    }
     if (this.fighter.poisonTicks > 0) {
       this.fighter.poisonTimer++;
 
@@ -80,12 +89,18 @@ export class StatusEffectsManager {
 
   // --- Burn ---
   applyBurn(attacker) {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
     this.fighter.burnTimer = CONFIG.orange?.burnDuration || 180;
     this.fighter.burnDamageTimer = 0;
     this.fighter.lastBurnAttacker = attacker;
   }
 
   handleBurn() {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) {
+      this.fighter.burnTimer = 0;
+      this.fighter.burnDamageTimer = 0;
+      return;
+    }
     if (this.fighter.burnTimer > 0) {
       this.fighter.burnTimer--;
       this.fighter.burnDamageTimer++;
@@ -103,6 +118,7 @@ export class StatusEffectsManager {
 
   // --- Bleed ---
   applyBleed(attacker, duration, damagePerTick, intervalFrames) {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
     const bleedCfg = CONFIG.bleed || {};
     const finalDuration = duration ?? bleedCfg.defaultDuration ?? 180;
     const finalDamage = damagePerTick ?? bleedCfg.defaultDamagePerTick ?? 4;
@@ -116,6 +132,11 @@ export class StatusEffectsManager {
   }
 
   handleBleed() {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) {
+      this.fighter.bleedTimer = 0;
+      this.fighter.bleedDamageTimer = 0;
+      return;
+    }
     if (this.fighter.bleedTimer > 0) {
       this.fighter.bleedTimer--;
       this.fighter.bleedDamageTimer = (this.fighter.bleedDamageTimer || 0) + 1;
@@ -148,7 +169,7 @@ export class StatusEffectsManager {
   // --- Freeze / Time Stop ---
   applyTimeStop(frames, opts = {}) {
     // Only apply if not immune
-    if (this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') {
       return;
     }
     
@@ -176,12 +197,14 @@ export class StatusEffectsManager {
 
   handleTimeStop() {
     const fighter = this.fighter;
-    if (fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji') {
+    if (fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji') {
       fighter.timeStopTimer = 0;
       fighter.isFrozenByInfinity = false;
       fighter.electricStunTimer = 0;
       fighter.crimsonElectrifiedTimer = 0;
       fighter.dubstepStunTimer = 0;
+      fighter.hitStunTimer = 0;
+      fighter.paralyzeTimer = 0;
       return false;
     }
     const isFrozen = (fighter.crimsonElectrifiedTimer > 0) || (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || (fighter.timeStopTimer > 0);

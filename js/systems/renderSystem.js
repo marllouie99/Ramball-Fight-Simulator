@@ -323,6 +323,15 @@ export function renderGame() {
         drawSaitamaSpeedLines(); // Manga action speed lines during Consecutive Normal Punches
         drawIchigoBankaiSpeedLines(); // Supersonic Bankai manga speed lines during Ichigo dashes/swings
         drawMahoragaSpeedLines(); // Supersonic manga action speed lines during Mahoraga wall slam dash/strike/blitz
+        // Draw character ground telegraphs & targeting reticles UNDERNEATH fighters
+        if (state.fighters) {
+          for (const f of state.fighters) {
+            if (f && typeof f.drawGroundTelegraph === 'function') {
+              f.drawGroundTelegraph(state.ctx);
+            }
+          }
+        }
+
         drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
         drawFighters(); // Draw fighters ON TOP of dim screens so Gojo & fighters stay 100% visible & un-tinted!
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke

@@ -166,7 +166,7 @@ export const ichigoConfig = {
   // 3. Bankai Combo Modifiers (Tensa Getsuga Blitz)
   bankaiComboCooldownMultiplier: 0.50, // 50% Combo cooldown reduction during Bankai (~3.75s cooldown)
   bankaiShunpoCooldownMultiplier: 0.50,// Fallback alias
-  bankaiShunpoStrikes: 6,        // Flurry strike count increased from 2 to 6 during Bankai
+  bankaiShunpoStrikes: 10,        // Flurry strike count increased from 2 to 6 during Bankai
   bankaiShunpoDashDuration: 3,   // Supersonic flash step dash duration frames during Bankai
   bankaiShunpoStrike1Duration: 10,// Faster intermediate flurry swing animation in Bankai
   bankaiShunpoStrike2Duration: 14,// Faster finisher swing animation in Bankai

@@ -1421,7 +1421,7 @@ export class GenosFighter extends Fighter {
         const projDist = dx * Math.cos(this.ultAngle) + dy * Math.sin(this.ultAngle);
         const perpDist = Math.abs(-dx * Math.sin(this.ultAngle) + dy * Math.cos(this.ultAngle));
 
-        if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r) {
+        if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r && !target.isBaguvixActive && !target.isGodModeActive) {
           // Continuous beam trap lock: suppresses wall bounce reflection & angle jitter
           target.caughtInGenosBeamTimer = 10;
 

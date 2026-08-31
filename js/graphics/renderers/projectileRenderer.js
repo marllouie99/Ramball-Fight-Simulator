@@ -23,6 +23,7 @@ import { drawCjUziBullet, drawCjMinigunBullet } from '../weapons/cjWeaponGraphic
 import { _getUryuArrowImage } from '../weapons/uryuWeaponGraphics.js';
 import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeaponGraphics.js';
 import { tacticalProjectileSystem } from '../../../Tactical Force/systems/tacticalProjectileSystem.js';
+import { projectileSystem } from '../../systems/projectileSystem.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
@@ -82,6 +83,17 @@ export function drawProjectiles() {
       ctx.restore();
     }
   });
+
+  // Render Uryu's Heilig Pfeil arrows stuck in the arena walls
+  if (projectileSystem && projectileSystem.stuckArrows && projectileSystem.stuckArrows.length > 0) {
+    const fadeFrames = CONFIG.uryu?.stuckArrowFadeDuration || 30;
+    projectileSystem.stuckArrows.forEach((sa) => {
+      ctx.save();
+      ctx.globalAlpha = sa.life < fadeFrames ? Math.max(0, sa.life / fadeFrames) : 1.0;
+      drawHeiligPfeil(ctx, sa);
+      ctx.restore();
+    });
+  }
 }
 
 function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
@@ -1868,37 +1880,114 @@ function drawHeiligPfeil(ctx, p) {
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
 
+  // ── SKYWARD BEACON ARROW: Dramatic ascending glow (visible flying to sky) ──
+  if (p.isSkywardBeacon && !p.isStuck) {
+    const lifeRatio = (p.life !== undefined && p.maxLife) ? (p.life / p.maxLife) : 1.0;
+    const beaconAlpha = Math.min(1.0, lifeRatio * 1.5); // Bright at start, fades near end
+
+    // 1. Large radial glow aura around the arrow
+    const auraR = 35 + lifeRatio * 15;
+    const auraGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, auraR);
+    auraGrad.addColorStop(0, `rgba(255, 255, 255, ${(beaconAlpha * 0.95).toFixed(2)})`);
+    auraGrad.addColorStop(0.25, `rgba(0, 255, 255, ${(beaconAlpha * 0.70).toFixed(2)})`);
+    auraGrad.addColorStop(0.6, `rgba(0, 200, 255, ${(beaconAlpha * 0.30).toFixed(2)})`);
+    auraGrad.addColorStop(1.0, 'rgba(0, 200, 255, 0)');
+    ctx.fillStyle = auraGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, auraR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Wide, bright comet trail streaming behind
+    const trailLen = 80 + lifeRatio * 60;
+    const trailGrad = ctx.createLinearGradient(-trailLen, 0, 10, 0);
+    trailGrad.addColorStop(0, 'rgba(0, 200, 255, 0)');
+    trailGrad.addColorStop(0.3, `rgba(0, 229, 255, ${(beaconAlpha * 0.50).toFixed(2)})`);
+    trailGrad.addColorStop(0.7, `rgba(0, 255, 255, ${(beaconAlpha * 0.80).toFixed(2)})`);
+    trailGrad.addColorStop(1.0, `rgba(255, 255, 255, ${(beaconAlpha * 0.90).toFixed(2)})`);
+    ctx.fillStyle = trailGrad;
+    ctx.beginPath();
+    ctx.moveTo(-trailLen, 0);
+    ctx.lineTo(-10, -10);
+    ctx.lineTo(10, 0);
+    ctx.lineTo(-10, 10);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Bright white-hot core streak
+    ctx.strokeStyle = `rgba(255, 255, 255, ${(beaconAlpha * 0.95).toFixed(2)})`;
+    ctx.lineWidth = 3.0;
+    ctx.beginPath();
+    ctx.moveTo(-trailLen * 0.5, 0);
+    ctx.lineTo(5, 0);
+    ctx.stroke();
+  }
+
   const speed = Math.hypot(p.vx || 0, p.vy || 0) || 24;
   const scale = p.scale || 0.140;
   const arrowImg = (typeof _getUryuArrowImage === 'function') ? _getUryuArrowImage() : null;
   const arrowLen = 521 * scale; // ~73px
   const halfLen = arrowLen / 2; // ~36.5px
-  const trailLen = Math.min(110, speed * 3.5);
+  // 1. Radiant Cyan Speed Streak Trail streaming behind the nock (only when flying)
+  if (!p.isStuck) {
+    const isDarkMode = Boolean(
+      typeof state !== 'undefined' &&
+      (state.arenaTheme === 'dark' ||
+        state.darkMode ||
+        (typeof document !== 'undefined' &&
+          document.body &&
+          document.body.classList &&
+          document.body.classList.contains('arena-dark-mode')))
+    );
+    const trailLen = Math.min(110, speed * 3.5);
 
-  // 1. Radiant Cyan Speed Streak Trail streaming behind the nock
-  const trailGrad = ctx.createLinearGradient(-halfLen - trailLen, 0, -halfLen, 0);
-  trailGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
-  trailGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.35)');
-  trailGrad.addColorStop(1, 'rgba(0, 229, 255, 0.85)');
+    if (isDarkMode) {
+      // ── DARK MODE: STEPPED PIXEL-ART TRAIL (Getsuga Tensho Technique) ──
+      const P = 3;
+      const snap = (v) => Math.round(v / P) * P;
+      const startX = snap(-halfLen - trailLen);
+      const endX = snap(-halfLen);
 
-  ctx.fillStyle = trailGrad;
-  ctx.beginPath();
-  ctx.moveTo(-halfLen - trailLen, 0);
-  ctx.lineTo(-halfLen, -4.5);
-  ctx.lineTo(-halfLen, 4.5);
-  ctx.closePath();
-  ctx.fill();
+      for (let gx = startX; gx <= endX; gx += P) {
+        const t = (gx - startX) / (endX - startX); // 0.0 at tail to 1.0 at nock
+        const thick = Math.max(P, snap(t * 9));
+        const alpha = Math.min(0.9, t * 0.95);
 
-  // White-hot core beam trail
-  const coreTrailGrad = ctx.createLinearGradient(-halfLen - trailLen * 0.7, 0, -halfLen, 0);
-  coreTrailGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-  coreTrailGrad.addColorStop(1, 'rgba(255, 255, 255, 0.95)');
-  ctx.strokeStyle = coreTrailGrad;
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.moveTo(-halfLen - trailLen * 0.7, 0);
-  ctx.lineTo(-halfLen, 0);
-  ctx.stroke();
+        // Stepped cyan outer aura
+        ctx.fillStyle = `rgba(0, 229, 255, ${(alpha * 0.75).toFixed(2)})`;
+        ctx.fillRect(gx, -thick / 2, P, thick);
+
+        // Stepped white-hot core
+        if (t > 0.3) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${(alpha).toFixed(2)})`;
+          ctx.fillRect(gx, -P / 2, P, P);
+        }
+      }
+    } else {
+      const trailGrad = ctx.createLinearGradient(-halfLen - trailLen, 0, -halfLen, 0);
+      trailGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+      trailGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.35)');
+      trailGrad.addColorStop(1, 'rgba(0, 229, 255, 0.85)');
+
+      ctx.fillStyle = trailGrad;
+      ctx.beginPath();
+      ctx.moveTo(-halfLen - trailLen, 0);
+      ctx.lineTo(-halfLen, -4.5);
+      ctx.lineTo(-halfLen, 4.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // White-hot core beam trail
+      const coreTrailGrad = ctx.createLinearGradient(-halfLen - trailLen * 0.7, 0, -halfLen, 0);
+      coreTrailGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      coreTrailGrad.addColorStop(1, 'rgba(255, 255, 255, 0.95)');
+      ctx.strokeStyle = coreTrailGrad;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(-halfLen - trailLen * 0.7, 0);
+      ctx.lineTo(-halfLen, 0);
+      ctx.stroke();
+    }
+  }
 
   // 2. Draw Exact Pixel-Art Sacred Arrow (ISHIDA-ARROW.png) Centered at (p.x, p.y)
   if (arrowImg && arrowImg.complete && arrowImg.naturalWidth > 0) {

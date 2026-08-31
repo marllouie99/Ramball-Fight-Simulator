@@ -87,7 +87,7 @@ export class BlackHoleBehavior extends ProjectileBehavior {
       const dist = Math.hypot(dx, dy);
 
       if (dist < effectiveRadius) {
-        if (!f.immuneToCC) {
+        if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
           const nx = dist > 0 ? dx / dist : 0;
           const ny = dist > 0 ? dy / dist : 0;
           const speedFactor = Math.max(1, f.speed / (f.baseSpeed || f.speed || 1));

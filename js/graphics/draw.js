@@ -45,7 +45,7 @@ export { drawTojiSkin, drawTojiGhostSkin } from './fighters/tojiSkin.js';
 export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
 export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';
 export { drawUryuSkin, drawUryuGhostSkin } from './fighters/uryuSkin.js';
-export { drawUryuBow } from './weapons/uryuWeaponGraphics.js';
+export { drawUryuBow, drawSeeleSchneider, drawUryuSeeleSlashArc } from './weapons/uryuWeaponGraphics.js';
 export { drawUlquiorraSkin, drawUlquiorraGhostSkin } from './fighters/ulquiorraSkin.js';
 export { drawUlquiorraMurcielago, drawLanzaDelRelampago, drawUlquiorraSlashArc } from './weapons/ulquiorraWeaponGraphics.js';
 export { drawYutaSkin, drawYutaGhostSkin } from './fighters/yutaSkin.js';

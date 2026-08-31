@@ -39,6 +39,7 @@ class ProjectileSystem {
     this.projectiles = [];
     this.frozenProjectiles = []; // Decoupled: frozen projectiles are moved here, ignored by update loop
     this.stuckShurikens = []; // Array for shurikens stuck in the wall
+    this.stuckArrows = []; // Array for Uryu's arrows stuck in the wall
     this.poolSize = 500; // Pre-allocate pool size
     this.pool = Array.from({ length: this.poolSize }, (_, i) => ({ id: `proj_${i}` }));
     this.poolIndex = 0; // Circular pointer to reuse objects without array push/pop thrashing
@@ -1056,7 +1057,7 @@ class ProjectileSystem {
   checkProjectileHits(projectile, fighters) {
     if (projectile.isExplosion) return false;
     if (projectile.isPoisonSpill) return false;
-    if (projectile.isVisual) return false; // Visual-only particles skip all collision
+    if (projectile.isVisual || projectile.isSkywardBeacon) return false; // Visual-only particles and skyward beacons skip all collision
     if (projectile.isGetsuga || projectile.behaviorType === 'getsuga_tensho') return false; // Getsuga handles multi-target piercing in GetsugaBehavior
 
     // Query all active fighters and illusions directly to prevent spatial grid misses
@@ -2227,6 +2228,11 @@ class ProjectileSystem {
 
     if (p.life <= 0) return true;
 
+    // Skyward beacon arrows soar up into the clouds beyond the arena boundary without expiring on walls
+    if (p.isSkywardBeacon) {
+      return p.life <= 0;
+    }
+
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
     const pr = p.r || 5;
 
@@ -2589,7 +2595,7 @@ class ProjectileSystem {
 
           const dist = Math.hypot(dx, dy);
           if (dist < effectiveRadius) {
-            if (!f.immuneToCC) {
+            if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
               // Pull fighter toward hole center.
               // Stronger pull when the fighter is moving faster than normal,
               // so speed boosts can't let them escape the black hole.
@@ -3117,7 +3123,7 @@ class ProjectileSystem {
           continue;
         }
 
-        const isHeiligPfeil = p.visual === 'heiligPfeil' || p.isHeiligPfeil || p.type === 'heilig_pfeil';
+        const isHeiligPfeil = (p.visual === 'heiligPfeil' || p.isHeiligPfeil || p.type === 'heilig_pfeil') && !p.isSkywardBeacon;
         if (isHeiligPfeil && expired && !hit) {
           const arena = CONFIG.arena;
           const wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
@@ -3129,6 +3135,36 @@ class ProjectileSystem {
           }
           if (typeof spawnImpactFlash === 'function') {
             spawnImpactFlash(wallX, wallY, 20, '#00E5FF');
+          }
+
+          // Push stuck arrow visual (stuck in wall for configured duration, then fades out)
+          if (this.stuckArrows) {
+            const maxStuck = CONFIG.uryu?.maxStuckArrows ?? 4;
+            while (this.stuckArrows.length >= maxStuck) {
+              this.stuckArrows.shift();
+            }
+
+            const arrowAngle = (p.lastAngle !== undefined) ? p.lastAngle : Math.atan2(p.vy || 0, p.vx || 0);
+            const scale = p.scale || 0.140;
+            const arrowLen = 521 * scale;
+            // Embed arrowhead ~35% into the wall so the shaft protrudes out into the arena
+            const stuckCenterX = wallX - Math.cos(arrowAngle) * (arrowLen * 0.35);
+            const stuckCenterY = wallY - Math.sin(arrowAngle) * (arrowLen * 0.35);
+            const duration = CONFIG.uryu?.stuckArrowDuration || 90;
+
+            this.stuckArrows.push({
+              x: stuckCenterX,
+              y: stuckCenterY,
+              vx: 0,
+              vy: 0,
+              lastAngle: arrowAngle,
+              angle: arrowAngle,
+              scale: scale,
+              isPiercing: Boolean(p.isPiercing),
+              isStuck: true,
+              life: duration,
+              maxLife: duration
+            });
           }
 
           this._returnProjectile(p);
@@ -3213,6 +3249,19 @@ class ProjectileSystem {
         this.stuckShurikens[i] = this.stuckShurikens[this.stuckShurikens.length - 1];
         this.stuckShurikens.pop();
         i--;
+      }
+    }
+
+    // Update stuck arrows
+    if (this.stuckArrows) {
+      for (let i = 0; i < this.stuckArrows.length; i++) {
+        const sa = this.stuckArrows[i];
+        sa.life--;
+        if (sa.life <= 0) {
+          this.stuckArrows[i] = this.stuckArrows[this.stuckArrows.length - 1];
+          this.stuckArrows.pop();
+          i--;
+        }
       }
     }
   }
@@ -3310,6 +3359,7 @@ class ProjectileSystem {
     }
     this.frozenProjectiles.length = 0;
     this.stuckShurikens.length = 0;
+    if (this.stuckArrows) this.stuckArrows.length = 0;
 
     // Fully reset all pool instances to pristine state
     for (let i = 0; i < this.poolSize; i++) {

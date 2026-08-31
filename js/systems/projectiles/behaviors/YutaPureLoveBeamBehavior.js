@@ -103,26 +103,28 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             }
           }
 
-          ent.caughtInPureLoveBeam = true;
-          ent.wasCaughtInPureLoveBeam = true;
-          ent.pureLoveBeamTimer = 10;
-          ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
-          ent.pureLoveBeamRegenDebuffTimer = CONFIG.yuta?.pureLoveBeamRegenDebuffDuration ?? 1500; // Disable & reduce regen after beam expires
+          if (!ent.isBaguvixActive && !ent.isGodModeActive) {
+            ent.caughtInPureLoveBeam = true;
+            ent.wasCaughtInPureLoveBeam = true;
+            ent.pureLoveBeamTimer = 10;
+            ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
+            ent.pureLoveBeamRegenDebuffTimer = CONFIG.yuta?.pureLoveBeamRegenDebuffDuration ?? 1500; // Disable & reduce regen after beam expires
 
-          if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
-            ent.neutralStanceTimer = 0;
-            ent.neutralStanceCooldownTimer = 300;
-            ent.adaptationDashTimer = 0;
-            ent.isInfinityBlitz = false;
-            ent.isBlitzActive = false;
-            ent.isWallSlamActive = false;
-          }
-          
-          if (typeof ent.interruptAttacks === 'function') {
-            ent.interruptAttacks();
-          }
-          if (typeof ent.applyHitStun === 'function') {
-            ent.applyHitStun(8);
+            if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
+              ent.neutralStanceTimer = 0;
+              ent.neutralStanceCooldownTimer = 300;
+              ent.adaptationDashTimer = 0;
+              ent.isInfinityBlitz = false;
+              ent.isBlitzActive = false;
+              ent.isWallSlamActive = false;
+            }
+            
+            if (typeof ent.interruptAttacks === 'function') {
+              ent.interruptAttacks();
+            }
+            if (typeof ent.applyHitStun === 'function') {
+              ent.applyHitStun(8);
+            }
           }
           
           const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
@@ -148,7 +150,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
               ent.x = Math.max(minX, Math.min(maxX, ent.x));
               ent.y = Math.max(minY, Math.min(maxY, ent.y));
             }
-          } else {
+          } else if (!ent.isBaguvixActive && !ent.isGodModeActive) {
             const isIchigo = ent.characterId === 'ichigo' || ent.type === 'ichigo' || (ent._def && (ent._def.id === 'ichigo' || ent._def.type === 'ichigo'));
             if (!isIchigo) {
               const pushForce = p.knockback || 6;

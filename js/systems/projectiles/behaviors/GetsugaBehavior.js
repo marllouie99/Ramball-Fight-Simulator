@@ -161,7 +161,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
       const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
 
       for (const [target, dragFrames] of projectile.draggedTargets.entries()) {
-        if (!target || target.hp <= 0 || target.isDead || target.isRespawning) {
+        if (!target || target.hp <= 0 || target.isDead || target.dead || target.isRespawning) {
           if (target) {
             target.isDraggedByGetsuga = false;
             target.preventKnockbackBounce = false;
@@ -279,6 +279,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
     const allCandidates = [];
     if (fighters) allCandidates.push(...fighters);
     if (typeof state !== 'undefined' && state.illusions) allCandidates.push(...state.illusions);
+    if (typeof state !== 'undefined' && state.cjDriveBys) allCandidates.push(...state.cjDriveBys);
 
     const isMask = form === 'hollow' || form === 'bankai_hollow';
     const isBankai = form === 'bankai' || form === 'bankai_hollow' || isFinal;
@@ -293,10 +294,18 @@ export class GetsugaBehavior extends ProjectileBehavior {
     // 4. Piercing Sweep: Cleave all valid enemy entities in the crescent wave's path
     for (let i = 0; i < allCandidates.length; i++) {
       const f = allCandidates[i];
-      if (!f || f.hp <= 0 || f.isDead || f.isRespawning || f === attacker) continue;
+      if (!f || f.hp <= 0 || f.isDead || f.dead || f.isRespawning || f === attacker || f.owner === attacker) continue;
 
       const fIdx = (fighters || []).indexOf(f);
-      const isEnemy = fIdx === -1 ? true : (myTeam === null || state.getFighterTeam(fIdx) !== myTeam);
+      let isEnemy = true;
+      if (fIdx !== -1) {
+        isEnemy = (myTeam === null || state.getFighterTeam(fIdx) !== myTeam);
+      } else if (f.owner) {
+        const oIdx = (fighters || []).indexOf(f.owner);
+        if (oIdx !== -1 && myTeam !== null && typeof state.getFighterTeam === 'function') {
+          isEnemy = (state.getFighterTeam(oIdx) !== myTeam);
+        }
+      }
       if (!isEnemy) continue;
 
       // Check if target was recently hit by this same Getsuga wave
@@ -306,7 +315,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
       const dx = f.x - projectile.x;
       const dy = f.y - projectile.y;
       const dist = Math.hypot(dx, dy);
-      const tRadius = f.r || 25;
+      const tRadius = f.hitRadius || f.r || 25;
       const projAngle = projectile.angle !== undefined ? projectile.angle : Math.atan2(projectile.vy, projectile.vx);
       const angleToTarget = Math.atan2(dy, dx);
       const angleDiff = Math.atan2(Math.sin(angleToTarget - projAngle), Math.cos(angleToTarget - projAngle));
@@ -442,7 +451,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
         }
 
         // ── 6. Register for Active Wave Dragging (Pull along with wave only in open arena) ──
-        if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
+        if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0) && !f.isBaguvixActive && !f.isGodModeActive) {
           if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
           const dragFrames = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaDragFrames || 24)

@@ -29,7 +29,7 @@ export function _getUryuBodyImage() {
       console.warn('Failed to load Ishida body model image at Assets/model/Uryu-ishida.png', e);
       _uryuBodyImageLoading = false;
     };
-    img.src = 'Assets/model/Uryu-ishida.png?v=2';
+    img.src = 'Assets/model/Uryu-ishida.png?v=3';
     _uryuBodyImage = img;
   }
   return _uryuBodyImage;
@@ -347,6 +347,9 @@ export function drawUryuSkin(ctx, fighter) {
 
   // 3. Bow Drawing & Shooting Animation Progress (Buttery Smooth Kinematics)
   const isMeleeChop = Boolean(fighter.slashSwingTimer && fighter.slashSwingTimer > 0);
+  const seeleP = (fighter.seeleEquipProgress !== undefined)
+    ? fighter.seeleEquipProgress
+    : (isMeleeChop ? 1.0 : 0.0);
 
   // Smooth lerped draw progress from fighter
   const drawProgress = (fighter.smoothDrawProgress !== undefined)
@@ -406,7 +409,7 @@ export function drawUryuSkin(ctx, fighter) {
   const skinColor = '#FFE8D6'; // Warm, clear fair anime skin tone
 
   // ── LAYER 1: BACK HAND (Only at idle rest when not drawing) ──
-  if (!hideBackHand && !isDrawing && recoilTimer <= 0) {
+  if (!hideBackHand && !isDrawing && recoilTimer <= 0 && seeleP <= 0.05) {
     drawUryuHand(ctx, backX, backY, handRadius * 0.92, false);
   }
 
@@ -420,7 +423,8 @@ export function drawUryuSkin(ctx, fighter) {
   if (bodyImg && bodyImg.complete && bodyImg.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-    const modelScale = 1.032;
+    // Uryu-ishida.png has discrete stepped pixel black stroke border matching Toji tech
+    const modelScale = 1.015;
     const drawR = r * modelScale;
     ctx.drawImage(bodyImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();
@@ -935,31 +939,87 @@ export function drawUryuSkin(ctx, fighter) {
 
   ctx.restore(); // End of clipped body circle
 
-  // ── LAYER 3: HANDS & WEAPON (On top of body circle) ──
-  if (isMeleeChop) {
-    if (!hideFrontHand) {
-      const chopMax = fighter.slashSwingMaxTimer || 18;
-      const chopTimer = fighter.slashSwingTimer || 0;
-      const chopP = Math.min(1.0, Math.max(0.0, 1.0 - (chopTimer / chopMax)));
-      drawSeeleSchneider(ctx, frontX, frontY, r, chopP);
-      drawUryuHand(ctx, frontX, frontY, handRadius, false);
-    }
-  } else {
-    // 1. Ginrei Kojaku Spirit Bow & Front Hand Grip
-    if (!hideFrontHand) {
-      drawUryuBow(ctx, frontX, frontY, r, drawProgress, {
-        isAiming: isDrawing,
-        isVollstandig: Boolean(fighter.vollstandigActive),
-        recoilTimer: fighter.stringRecoilTimer || 0,
-        recoilMax: fighter.stringRecoilMax || 6
-      });
-      drawUryuHand(ctx, frontX, frontY, handRadius, false);
-    }
+  // ── LAYER 3: HANDS & WEAPON (Smooth Quincy Reishi Synthesis Transition) ──
+  const chopMax = fighter.slashSwingMaxTimer || 18;
+  const chopTimer = fighter.slashSwingTimer || 0;
+  const chopP = Math.min(1.0, Math.max(0.0, 1.0 - (chopTimer / chopMax)));
 
-    // 2. Drawing Hand (Gripping arrow nock & bowstring on top of torso during draw / recoil)
-    if (!hideBackHand && (isDrawing || recoilTimer > 0)) {
-      drawUryuHand(ctx, backX, backY, handRadius * 0.96, true);
-    }
+  // Kinematic Front-Hand Lunge Position during Seele Schneider
+  let chopFrontX = frontX;
+  let chopFrontY = frontY;
+
+  if (chopP < 0.14) {
+    const t = chopP / 0.14;
+    const easeW = Math.sin(t * (Math.PI / 2));
+    chopFrontX = frontX - easeW * (r * 0.12);
+    chopFrontY = -easeW * (r * 0.22);
+  } else if (chopP < 0.58) {
+    const t = (chopP - 0.14) / 0.44;
+    const lunge = Math.sin(t * Math.PI);
+    chopFrontX = (frontX - r * 0.12) + t * (r * 0.35) + lunge * 8.0;
+    chopFrontY = (-r * 0.22) + t * (r * 0.48);
+  } else {
+    const recP = (chopP - 0.58) / 0.42;
+    const easeRec = 0.5 + 0.5 * Math.cos(recP * Math.PI);
+    chopFrontX = frontX + easeRec * (r * 0.23);
+    chopFrontY = easeRec * (r * 0.26);
+  }
+
+  // Kinematic Back-Hand Fencing Position during Seele Schneider
+  const lungeFactor = Math.sin(chopP * Math.PI);
+  const chopBackX = -r * 0.45 - lungeFactor * 6.0;
+  const chopBackY = r * 0.25 - lungeFactor * 4.0;
+
+  const bowAlpha = (fighter.currentWeaponMode === 'SEELE' || isMeleeChop) ? 0.0 : Math.max(0, 1.0 - seeleP);
+  const seeleAlpha = Math.max(0, seeleP);
+
+  // Smooth blended hand coordinates
+  const blendedFrontX = frontX * (1 - seeleP) + chopFrontX * seeleP;
+  const blendedFrontY = frontY * (1 - seeleP) + chopFrontY * seeleP;
+
+  const stanceBackX = backX;
+  const stanceBackY = backY;
+  const blendedBackX = stanceBackX * (1 - seeleP) + chopBackX * seeleP;
+  const blendedBackY = stanceBackY * (1 - seeleP) + chopBackY * seeleP;
+
+  // 1. Ginrei Kojaku Spirit Bow (Fades out / dissolves into Reishi particles as seeleP increases)
+  if (bowAlpha > 0.01 && !hideFrontHand) {
+    drawUryuBow(ctx, blendedFrontX, blendedFrontY, r, drawProgress, {
+      isAiming: isDrawing,
+      isVollstandig: Boolean(fighter.vollstandigActive),
+      recoilTimer: fighter.stringRecoilTimer || 0,
+      recoilMax: fighter.stringRecoilMax || 6,
+      alpha: bowAlpha
+    });
+  }
+
+  // 2. Seele Schneider Spirit Blade (Materializes & extends as seeleP increases)
+  if (seeleAlpha > 0.01 && !hideFrontHand) {
+    drawSeeleSchneider(ctx, blendedFrontX, blendedFrontY, r, chopP, {
+      alpha: seeleAlpha
+    });
+  }
+
+  // 3. Reishi Assembly / Dissolve Sparks during active transition
+  if (seeleP > 0.05 && seeleP < 0.95 && Math.random() < 0.35 && typeof spawnSparks === 'function') {
+    const sparkX = fighter.x + Math.cos(angle) * blendedFrontX - Math.sin(angle) * blendedFrontY;
+    const sparkY = fighter.y + Math.sin(angle) * blendedFrontX + Math.cos(angle) * blendedFrontY;
+    spawnSparks(sparkX, sparkY, '#00E5FF', 1);
+  }
+
+  // 4. Front Hand Grip on top of active weapons
+  if (!hideFrontHand) {
+    drawUryuHand(ctx, blendedFrontX, blendedFrontY, handRadius, false);
+  }
+
+  // 5. Back Hand Grip / Fencing Counterbalance
+  const showBackHand = (bowAlpha > 0.5 && (isDrawing || recoilTimer > 0)) || (seeleAlpha > 0.08);
+  if (!hideBackHand && showBackHand) {
+    const backHandAlpha = (seeleAlpha > 0.08) ? Math.min(1.0, seeleAlpha * 1.5) : 1.0;
+    ctx.save();
+    if (backHandAlpha < 1.0) ctx.globalAlpha *= backHandAlpha;
+    drawUryuHand(ctx, blendedBackX, blendedBackY, handRadius * 0.92, true);
+    ctx.restore();
   }
 
   ctx.restore();

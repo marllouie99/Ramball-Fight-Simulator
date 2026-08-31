@@ -109,6 +109,10 @@ export const HitImpactSystem = {
       if (typeof spawnImpactFlash === 'function') {
         spawnImpactFlash(target.x, target.y, 24, '#00E5FF');
       }
+      if (typeof spawnMeleeClashShockwave === 'function') {
+        const swRadius = projectile.isLichtRegenRain ? 28 : (projectile.isPiercing ? 48 : 36);
+        spawnMeleeClashShockwave(target.x, target.y, swRadius, '#00E5FF');
+      }
       if (audioSystem && typeof audioSystem.playSFX === 'function') {
         audioSystem.playSFX('attack_fleshhit', 0.65);
       }

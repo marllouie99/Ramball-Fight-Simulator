@@ -139,11 +139,15 @@ export const URYU_WEAPON_GRAPHICS = {
  */
 export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
+  if (opts.alpha !== undefined && opts.alpha <= 0.005) return;
 
   const isVollstandig = Boolean(opts.isVollstandig);
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
   ctx.save();
+  if (opts.alpha !== undefined && opts.alpha < 1.0) {
+    ctx.globalAlpha *= Math.max(0, Math.min(1.0, opts.alpha));
+  }
   ctx.translate(x, y);
 
   const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.uryu)
@@ -633,24 +637,45 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
 
 /**
  * Draws Seele Schneider (vibrating spirit blade for melee intercept).
+ * Enhanced with 3-stage kinematic motion curve and high-frequency Reishi saw-tooth visuals.
  */
-export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0) {
+export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0, opts = {}) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
+  if (opts.alpha !== undefined && opts.alpha <= 0.005) return;
 
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
   ctx.save();
+  if (opts.alpha !== undefined && opts.alpha < 1.0) {
+    ctx.globalAlpha *= Math.max(0, Math.min(1.0, opts.alpha));
+  }
   ctx.translate(x, y);
 
-  // Swing rotational angle
-  const swingAngle = (swingProgress > 0)
-    ? -0.8 + swingProgress * 1.6
-    : 0.35;
+  // 3-Stage Kinematic Swing Angle Curve
+  let swingAngle = 0.35; // Default guard angle
+  if (swingProgress > 0 && swingProgress < 1.0) {
+    if (swingProgress < 0.14) {
+      // Phase 1: High Windup Anticipation (0.0 -> 0.14)
+      const t = swingProgress / 0.14;
+      const easeWindup = Math.sin(t * (Math.PI / 2));
+      swingAngle = 0.35 - easeWindup * 1.60; // Cock back upward to -1.25 rad (~11 o'clock)
+    } else if (swingProgress < 0.58) {
+      // Phase 2: Supersonic Downward Chop (0.14 -> 0.58)
+      const t = (swingProgress - 0.14) / 0.44;
+      const easeChop = t * t * (3 - 2 * t); // Smooth Hermite S-Curve
+      swingAngle = -1.25 + easeChop * 2.45; // Downward sweep through horizontal to +1.20 rad (~5 o'clock)
+    } else {
+      // Phase 3: Follow-Through & Cosine Deceleration Recovery (0.58 -> 1.0)
+      const recP = (swingProgress - 0.58) / 0.42;
+      const easeRec = 0.5 + 0.5 * Math.cos(recP * Math.PI); // Cosine ease-out
+      swingAngle = 0.35 + (1.20 - 0.35) * easeRec; // Smooth return to guard stance (+0.35 rad)
+    }
+  }
   ctx.rotate(swingAngle);
 
-  const bladeLen = r * 1.9;
+  const bladeLen = r * 2.1;
 
-  // 1. Handle & Silver Reishi Tube Base
+  // 1. Handle & Silver Reishi Tube Base (Polished Quincy Hilt)
   ctx.fillStyle = '#64748B';
   ctx.strokeStyle = '#0F172A';
   ctx.lineWidth = 1.2;
@@ -659,58 +684,208 @@ export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0) {
   ctx.fill();
   ctx.stroke();
 
-  // Silver tube bottom cap
+  // Silver tube bottom cap with Quincy emblem dot
   ctx.fillStyle = '#CBD5E1';
   ctx.beginPath();
   ctx.arc(0, 13, 3, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
 
-  // 2. Vibrating Spirit Blade (3M RPM Saw-Tooth Visual)
-  const vibration = (Math.sin(now * 0.08) * 0.8);
+  // 2. Vibrating Spirit Blade (3M RPM Reishi Saw-Tooth Chainsaw Edge)
+  const vibration = Math.sin(now * 0.12) * 1.1;
 
-  // Cyan outer aura
-  ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
-  ctx.lineWidth = 4.5;
+  // Outer Quincy Cyan Reishi Glow (Rule 11 compliant: layered gradient fill, zero shadowBlur)
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.35)';
+  ctx.lineWidth = 6.0;
   ctx.beginPath();
   ctx.moveTo(0, -3);
   ctx.lineTo(0, -bladeLen);
   ctx.stroke();
 
-  // Main cyan blade
-  ctx.strokeStyle = '#00E5FF';
-  ctx.lineWidth = 2.4;
+  // Inner Quincy Cyan Glow
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.70)';
+  ctx.lineWidth = 3.6;
   ctx.beginPath();
   ctx.moveTo(0, -3);
   ctx.lineTo(0, -bladeLen);
   ctx.stroke();
 
-  // White core
+  // Razor-sharp White Core
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(0, -3);
   ctx.lineTo(0, -bladeLen);
   ctx.stroke();
 
-  // Vibrating edge notches
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.lineWidth = 1.0;
-  for (let i = 0; i < 6; i++) {
-    const toothY = -8 - i * (bladeLen / 7) + vibration;
+  // High-frequency oscillating Reishi saw-tooth edge notches
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.lineWidth = 1.2;
+  const numTeeth = 7;
+  for (let i = 0; i < numTeeth; i++) {
+    const toothY = -6 - i * (bladeLen / (numTeeth + 0.5)) + vibration;
     ctx.beginPath();
-    ctx.moveTo(-2, toothY);
-    ctx.lineTo(2, toothY - 2);
+    ctx.moveTo(-3, toothY);
+    ctx.lineTo(3, toothY - 2.5);
     ctx.stroke();
   }
 
-  // Sharp tip point
+  // Sharp Reishi Diamond Tip Point
   ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
-  ctx.moveTo(0, -bladeLen - 4);
-  ctx.lineTo(3, -bladeLen + 2);
-  ctx.lineTo(-3, -bladeLen + 2);
+  ctx.moveTo(0, -bladeLen - 5);
+  ctx.lineTo(3.5, -bladeLen + 2);
+  ctx.lineTo(-3.5, -bladeLen + 2);
   ctx.closePath();
   ctx.fill();
 
   ctx.restore();
 }
+
+/**
+ * Draws Uryu Ishida's Seele Schneider Crescent Slash Arc (Rule 15 Compliant).
+ * Features 3-stage kinematic sweep, sharp double-tapering needle geometry,
+ * dynamic trail eraser, and radiant Quincy Reishi color palette.
+ */
+export function drawUryuSeeleSlashArc(ctx, fighter) {
+  if (!fighter) return;
+
+  const chopMax = fighter.slashSwingMaxTimer || 18;
+  const chopTimer = fighter.slashSwingTimer || 0;
+  if (chopTimer <= 0) return;
+
+  const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (chopTimer / chopMax)));
+  if (rawProgress <= 0 || rawProgress >= 1.0) return;
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+
+  const angle = fighter.gunAngle || fighter.angle || 0;
+  ctx.rotate(angle);
+
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft && !fighter.isSpinning) {
+    ctx.scale(1, -1);
+  }
+
+  const r = fighter.r || 25;
+  const outerRadius = r + 56;
+  const maxThick = 18.0;
+
+  // Keyframe Angle Constants matching weapon sweep kinematics:
+  const windupAngle = -1.25;  // Cocked overhead angle
+  const finishAngle = +1.20;  // Final chop sweep angle
+
+  const cutCutoff = 0.58; // Active cutting phase ends at 58% progress
+
+  let currentTipOffset = 0;
+  let currentTailOffset = 0;
+  let trailAlpha = 1.0;
+
+  if (rawProgress < cutCutoff) {
+    // ── ACTIVE CUTTING PHASE (0.0 -> 0.58) ──
+    const tCut = rawProgress / cutCutoff;
+    const easeCut = tCut * tCut * (3 - 2 * tCut); // Hermite curve
+    currentTipOffset = windupAngle + easeCut * (finishAngle - windupAngle);
+    
+    // Trail stretches backwards behind tip
+    const maxArcLength = 1.90; // Radians of crescent arc width
+    const currentSpan = maxArcLength * Math.sin(tCut * Math.PI * 0.85);
+    currentTailOffset = currentTipOffset - currentSpan;
+    trailAlpha = Math.sin(tCut * Math.PI * 0.90);
+  } else {
+    // ── RECOVERY & DYNAMIC TRAIL ERASER PHASE (0.58 -> 1.0) ──
+    const recP = (rawProgress - cutCutoff) / (1.0 - cutCutoff);
+    currentTipOffset = finishAngle;
+    
+    // Tail chases tip using power curve so trail erases cleanly from start to finish
+    const eraseFactor = Math.pow(1 - recP, 1.4);
+    const maxArcLength = 1.90;
+    currentTailOffset = currentTipOffset - maxArcLength * eraseFactor;
+    trailAlpha = Math.max(0, 1 - recP * 1.2);
+  }
+
+  if (trailAlpha <= 0.01 || currentTipOffset <= currentTailOffset) {
+    ctx.restore();
+    return;
+  }
+
+  const N = 24;
+  const outerPoly = [];
+  const innerPoly = [];
+
+  for (let i = 0; i <= N; i++) {
+    const t = i / N; // 0 at tail, 1 at tip
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+
+    // Rule 15 sharp double-tapering function: zero thickness at tip and tail
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+    const thick = maxThick * taper;
+
+    const outR = outerRadius + thick * 0.5;
+    const inR  = outerRadius - thick * 0.5;
+
+    outerPoly.push({ x: Math.cos(ang) * outR, y: Math.sin(ang) * outR });
+    innerPoly.push({ x: Math.cos(ang) * inR,  y: Math.sin(ang) * inR });
+  }
+
+  // 1. Layer 1: Radiant Quincy Cyan Reishi Glow Arc
+  ctx.beginPath();
+  outerPoly.forEach((pt, idx) => (idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+  for (let i = innerPoly.length - 1; i >= 0; i--) {
+    ctx.lineTo(innerPoly[i].x, innerPoly[i].y);
+  }
+  ctx.closePath();
+
+  const slashGrad = ctx.createRadialGradient(0, 0, outerRadius - maxThick, 0, 0, outerRadius + maxThick);
+  slashGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
+  slashGrad.addColorStop(0.3, `rgba(0, 229, 255, ${(0.45 * trailAlpha).toFixed(3)})`);
+  slashGrad.addColorStop(0.7, `rgba(56, 189, 248, ${(0.85 * trailAlpha).toFixed(3)})`);
+  slashGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+
+  ctx.fillStyle = slashGrad;
+  ctx.fill();
+
+  // 2. Layer 2: White-Hot Laser Cutting Core Line
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.25 + 0.75 * t);
+    const rad = outerRadius + taper * 1.5;
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * trailAlpha).toFixed(3)})`;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  // 3. Layer 3: Reishi Spark Gleam at Leading Blade Tip
+  if (rawProgress < cutCutoff) {
+    const tipAngle = currentTipOffset;
+    const tipX = Math.cos(tipAngle) * outerRadius;
+    const tipY = Math.sin(tipAngle) * outerRadius;
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Diamond Cross Glint
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.90)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(tipX - 7, tipY);
+    ctx.lineTo(tipX + 7, tipY);
+    ctx.moveTo(tipX, tipY - 7);
+    ctx.lineTo(tipX, tipY + 7);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+

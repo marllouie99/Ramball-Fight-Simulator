@@ -28,7 +28,7 @@ export class GojoBlueBehavior extends ProjectileBehavior {
         }
       }
 
-      if (isEnemy && !f.immuneToCC && !f.gojoBlueDragImmune) {
+      if (isEnemy && !f.immuneToCC && !f.gojoBlueDragImmune && !f.isBaguvixActive && !f.isGodModeActive) {
         const dx = p.x - f.x;
         const dy = p.y - f.y;
         const dist = Math.hypot(dx, dy);

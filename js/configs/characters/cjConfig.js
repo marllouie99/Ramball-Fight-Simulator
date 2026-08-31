@@ -102,7 +102,7 @@ export const cjConfig = {
   driveByRespectGain: 15,      // Respect gained on successful drive-by invocation
 
   // ── 7. ULTIMATE: BAGUVIX (God Mode & Minigun Riot Overdrive) ──
-  baguvixCooldown: 2500,        // 12.0s (720 frames at 60fps) cooldown
+  baguvixCooldown: 1500,        // 12.0s (720 frames at 60fps) cooldown
   baguvixDuration: 800,        // 5.0s (300 frames) invulnerability
   baguvixSpeedMultiplier: 0.28,// Significantly reduced slow walking speed (~1.54 px/frame) while wielding heavy minigun
   minigunFireRate: 5,          // Ultra-fast fire (every 2 frames = 30-45 rounds/sec)

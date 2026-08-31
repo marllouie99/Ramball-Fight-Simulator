@@ -417,6 +417,74 @@ export class CJFighter extends Fighter {
   }
 
   /**
+   * Override base cooldown handling during time-stop/paralyze/stasis.
+   * BAGUVIX God Mode cooldown must NEVER pause when CJ is afflicted with a paralyze debuff.
+   */
+  _handleFrozenSkillCooldowns() {
+    super._handleFrozenSkillCooldowns();
+    if (!this.isBaguvixActive && this.baguvixCooldown > 0) {
+      const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+      if (this._lastBaguvixCdFrame !== currentFrame) {
+        this._lastBaguvixCdFrame = currentFrame;
+        this.baguvixCooldown--;
+      }
+    }
+  }
+
+  // ── BAGUVIX GOD MODE DEBUFF IMMUNITIES ──
+  applySlow(frames, multiplier, opts = {}) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    super.applySlow(frames, multiplier, opts);
+  }
+
+  applyHitStun(frames, opts = {}) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    super.applyHitStun(frames, opts);
+  }
+
+  applyParalyze(frames, opts = {}) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    super.applyParalyze(frames, opts);
+  }
+
+  applyElectricStun(frames) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    if (typeof super.applyElectricStun === 'function') super.applyElectricStun(frames);
+    else this.electricStunTimer = 0;
+  }
+
+  applyTimeStop(frames, opts = {}) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    if (typeof super.applyTimeStop === 'function') super.applyTimeStop(frames, opts);
+    else this.timeStopTimer = 0;
+  }
+
+  applyPoison(attacker) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    super.applyPoison(attacker);
+  }
+
+  applyBurn(attacker) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    super.applyBurn(attacker);
+  }
+
+  applyBleed(attacker, duration, damagePerTick, intervalFrames) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    super.applyBleed(attacker, duration, damagePerTick, intervalFrames);
+  }
+
+  applyKnockback(kx, ky) {
+    if (this.isBaguvixActive || this.isGodModeActive) return;
+    super.applyKnockback(kx, ky);
+  }
+
+  applyStatusEffect(effectName, ...args) {
+    if (this.isBaguvixActive || this.isGodModeActive) return false;
+    return super.applyStatusEffect(effectName, ...args);
+  }
+
+  /**
    * Main Fighter Update Loop
    * Rule 1 Compliant (Early exit on freeze/time-stop, bypassed during BAGUVIX God Mode)
    */
@@ -431,16 +499,48 @@ export class CJFighter extends Fighter {
     }
     if (this.dead) return;
 
-    // Rule 1: TimeStop & Ambush early exit guard (Immune during BAGUVIX God Mode)
+    // Rule 1: TimeStop & Ambush early exit guard (Immune to all CC & debuffs during BAGUVIX God Mode)
     if (this.isBaguvixActive || this.isGodModeActive) {
       this.timeStopTimer = 0;
       this.hitStunTimer = 0;
       this.electricStunTimer = 0;
+      this.dubstepStunTimer = 0;
+      this.crimsonElectrifiedTimer = 0;
+      this.paralyzeTimer = 0;
+      this.isParalyzed = false;
+      this.isParalyzedByMahito = false;
+      this.isParalyzedByMahoraga = false;
+      this.isWallSlammed = false;
+      this.isGrabbedByMahoraga = false;
       this.isFrozenByInfinity = false;
+      this.caughtInPureLoveBeam = false;
+      this.pureLoveBeamTimer = 0;
+      this.pureLoveBeamRecoveryTimer = 0;
+      this.isCaughtInPurple = false;
+      this.purpleHitTimer = 0;
+      this.slowTimer = 0;
+      this.slowMultiplier = 1.0;
+      this.burnTimer = 0;
+      this.poisonTicks = 0;
+      this.poisonTimer = 0;
+      this.bleedTimer = 0;
+      this.bleedDamageTimer = 0;
+      this.silenceTimer = 0;
+      this.nanamiArmorFractureTimer = 0;
+      this.ratioHitPauseTimer = 0;
+      this.basicAttackHitPauseTimer = 0;
     } else {
       const isFrozen = this._handleTimeStop();
       if (isFrozen || this.isTargetOfAmbush) {
         this.interruptAttacks();
+        // BAGUVIX Cooldown must NEVER pause even when afflicted with paralyze debuffs / stasis / freeze
+        if (!this.isBaguvixActive && this.baguvixCooldown > 0) {
+          const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+          if (this._lastBaguvixCdFrame !== currentFrame) {
+            this._lastBaguvixCdFrame = currentFrame;
+            this.baguvixCooldown--;
+          }
+        }
         return;
       }
     }
@@ -453,7 +553,13 @@ export class CJFighter extends Fighter {
     if (this.respectAuraTimer > 0) this.respectAuraTimer--;
     if (!this.isJetpackActive && this.jetpackCooldown > 0) this.jetpackCooldown--;
     if (!this.isDriveByActive && this.driveByCooldown > 0) this.driveByCooldown--;
-    if (!this.isBaguvixActive && this.baguvixCooldown > 0) this.baguvixCooldown--;
+    if (!this.isBaguvixActive && this.baguvixCooldown > 0) {
+      const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+      if (this._lastBaguvixCdFrame !== currentFrame) {
+        this._lastBaguvixCdFrame = currentFrame;
+        this.baguvixCooldown--;
+      }
+    }
 
     // ── Stamina System & Sprint Fatigue Mechanic ──
     if (!this.dead && !this.isTypingCheat) {
@@ -1220,6 +1326,35 @@ export class CJFighter extends Fighter {
     this.minigunFlashTimer = 0;
     this.minigunHeat = 0.5;
     this.riotShockwaveTimer = cfg.riotShockwaveInterval || 60;
+
+    // Instantly purge all active crowd control, stun, and damage-over-time debuffs
+    this.timeStopTimer = 0;
+    this.hitStunTimer = 0;
+    this.electricStunTimer = 0;
+    this.dubstepStunTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this.paralyzeTimer = 0;
+    this.isParalyzed = false;
+    this.isParalyzedByMahito = false;
+    this.isParalyzedByMahoraga = false;
+    this.isWallSlammed = false;
+    this.isGrabbedByMahoraga = false;
+    this.isFrozenByInfinity = false;
+    this.caughtInPureLoveBeam = false;
+    this.pureLoveBeamTimer = 0;
+    this.pureLoveBeamRecoveryTimer = 0;
+    this.isCaughtInPurple = false;
+    this.purpleHitTimer = 0;
+    this.slowTimer = 0;
+    this.burnTimer = 0;
+    this.poisonTicks = 0;
+    this.poisonTimer = 0;
+    this.bleedTimer = 0;
+    this.bleedDamageTimer = 0;
+    this.silenceTimer = 0;
+    this.nanamiArmorFractureTimer = 0;
+    this.ratioHitPauseTimer = 0;
+    this.basicAttackHitPauseTimer = 0;
 
     // Reset Respect meter to 0 so it can recharge, while retaining permanent passive bonuses
     this.respect = 0;
