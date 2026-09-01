@@ -399,7 +399,7 @@ export function drawMegumiThrustEffect(ctx, fighter, rawProgress, r, baseAngle, 
  * Draws Megumi's signature Crescent Shadow Slash Wave or Ambush Thrust (Rule 15 & 16 Compliant).
  */
 export function drawMegumiSlashArc(ctx, fighter) {
-  if (!fighter || (fighter.slashSwingTimer || 0) <= 0) return;
+  if (!fighter || (fighter.slashSwingTimer || 0) <= 0 || fighter.isTargetOfAmbush || (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())) return;
 
   const maxT = fighter.slashSwingMaxTimer || 18;
   const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));

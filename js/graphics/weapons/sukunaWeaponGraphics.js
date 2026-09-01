@@ -594,24 +594,18 @@ function _isDarkMode() {
   );
 }
 
-let _fugaBufferCanvas = null;
-let _fugaLowCanvas = null;
-let _fugaHighCtx = null;
-let _fugaLowCtx = null;
+let _fugaArcadeCanvas = null;
+let _fugaArcadeCtx = null;
 
-function _getFugaBuffers() {
-  if (!_fugaBufferCanvas) {
-    _fugaBufferCanvas = document.createElement('canvas');
-    _fugaBufferCanvas.width = 360;
-    _fugaBufferCanvas.height = 240;
-    _fugaHighCtx = _fugaBufferCanvas.getContext('2d');
-
-    _fugaLowCanvas = document.createElement('canvas');
-    _fugaLowCanvas.width = 180;
-    _fugaLowCanvas.height = 120;
-    _fugaLowCtx = _fugaLowCanvas.getContext('2d', { willReadFrequently: true });
+function _getFugaArcadeBuffer() {
+  if (!_fugaArcadeCanvas) {
+    _fugaArcadeCanvas = document.createElement('canvas');
+    _fugaArcadeCanvas.width = 200;
+    _fugaArcadeCanvas.height = 120;
+    _fugaArcadeCtx = _fugaArcadeCanvas.getContext('2d');
+    _fugaArcadeCtx.imageSmoothingEnabled = false;
   }
-  return { high: _fugaBufferCanvas, low: _fugaLowCanvas, highCtx: _fugaHighCtx, lowCtx: _fugaLowCtx };
+  return { canvas: _fugaArcadeCanvas, ctx: _fugaArcadeCtx };
 }
 
 export function drawDivineFlameArrowConstruct(ctx, {
@@ -622,43 +616,26 @@ export function drawDivineFlameArrowConstruct(ctx, {
   const isDark = _isDarkMode();
 
   if (isDark) {
-    const { high, low, highCtx, lowCtx } = _getFugaBuffers();
+    const { canvas: lowCanvas, ctx: lowCtx } = _getFugaArcadeBuffer();
 
-    highCtx.clearRect(0, 0, 360, 240);
-    highCtx.save();
-    highCtx.translate(180, 120);
+    lowCtx.clearRect(0, 0, 200, 120);
+    lowCtx.imageSmoothingEnabled = false;
+    lowCtx.save();
+    lowCtx.translate(100, 60);
 
-    // Render EXACT vector drawing into high-res offscreen buffer
-    _renderVectorDivineFlameArrow(highCtx, {
+    // Render directly into the low-res arcade canvas at native coordinates
+    _renderVectorDivineFlameArrow(lowCtx, {
       scale: 1.0, progress, isFlying, time, isFrozenByInfinity
     });
-    highCtx.restore();
+    lowCtx.restore();
 
-    // Downscale to low-res discrete pixel grid (P=2.0)
-    lowCtx.clearRect(0, 0, 180, 120);
-    lowCtx.imageSmoothingEnabled = false;
-    lowCtx.drawImage(high, 0, 0, 180, 120);
-
-    // Apply Saitama discrete outline / alpha snapping
-    const imgData = lowCtx.getImageData(0, 0, 180, 120);
-    const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const a = data[i + 3];
-      if (a < 25) {
-        data[i + 3] = 0;
-      } else if (a > 200) {
-        data[i + 3] = 255;
-      }
-    }
-    lowCtx.putImageData(imgData, 0, 0);
-
-    // Blit pixelated construct to main context with zero subpixel bleed
+    // Blit with nearest-neighbor upscaling (chunky 16-bit retro arcade pixel flames at locked 60 FPS)
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
     ctx.scale(scale, scale);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(low, 0, 0, 180, 120, -180, -120, 360, 240);
+    ctx.drawImage(lowCanvas, -100, -60);
     ctx.restore();
   } else {
     ctx.save();

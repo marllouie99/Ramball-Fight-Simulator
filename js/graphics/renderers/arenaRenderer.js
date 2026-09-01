@@ -528,9 +528,10 @@ export function drawArena() {
       offCanvas.height = arena.height + padding * 2;
       const oc = offCanvas.getContext('2d');
       if (isDark) {
-        // Clean straight-line borders for Dark Mode
+        // Clean straight-line borders for Dark Mode strictly calibrated to match Light Mode visual thickness and bounds
+        const strokeW = 2.5; // Match the 2.5px average sketchy border line width to prevent optical enlargement
         oc.strokeStyle = borderColor;
-        oc.lineWidth = wallWidth;
+        oc.lineWidth = strokeW;
         oc.lineJoin = 'miter';
         oc.lineCap = 'square';
         oc.strokeRect(padding, padding, arena.width, arena.height);
@@ -1169,6 +1170,255 @@ export function drawPurpleDimScreen() {
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
+}
+
+let currentGojoDomainDimOpacity = 0;
+
+/**
+ * Draws a dark cosmic blue dim screen overlay when Gojo's Domain Expansion (Unlimited Void) is active.
+ * This dim overlay is NOT clipped to the arena — it spreads across the full screen for cinematic immersion.
+ * The domain IMAGE itself remains clipped inside the arena via WebGL masking in hybridEnvironmentRenderer.
+ */
+export function drawGojoDomainDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const gojoFighter = state.fighters?.find(f =>
+    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') && f.domainActive
+  );
+
+  let targetOpacity = 0;
+  if (gojoFighter && gojoFighter.domainActive) {
+    targetOpacity = 0.72;
+  }
+
+  // Smoothly interpolate
+  if (targetOpacity > currentGojoDomainDimOpacity) {
+    currentGojoDomainDimOpacity += (targetOpacity - currentGojoDomainDimOpacity) * 0.08;
+  } else {
+    currentGojoDomainDimOpacity += (targetOpacity - currentGojoDomainDimOpacity) * 0.06;
+  }
+
+  if (currentGojoDomainDimOpacity < 0.01) {
+    currentGojoDomainDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentGojoDomainDimOpacity;
+
+  ctx.save();
+  // Reset transform to identity screen space so full-screen dim doesn't shift with camera shake
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Base dark overlay
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Deep cosmic dark blue radial gradient centered on Gojo
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+  const cx = gojoFighter ? (gojoFighter.x + shakeX) : canvas.width / 2;
+  const cy = gojoFighter ? ((gojoFighter.y - (gojoFighter.z || 0)) + shakeY) : canvas.height / 2;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, 'rgba(60, 140, 255, 0.55)');      // Bright limitless blue core
+  grad.addColorStop(0.15, 'rgba(30, 80, 200, 0.45)');     // Deep royal blue halo
+  grad.addColorStop(0.35, 'rgba(15, 40, 140, 0.30)');     // Dark cosmic blue ring
+  grad.addColorStop(0.60, 'rgba(5, 15, 60, 0.15)');       // Deep space blue fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
+
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(0, 5, 20, ${opacity * 0.95})`;
+}
+
+let currentSukunaDomainDimOpacity = 0;
+
+/**
+ * Draws a dark crimson/blood-red dim screen overlay when Sukuna's Domain Expansion (Malevolent Shrine) is active.
+ * This dim overlay is NOT clipped to the arena — it spreads across the full screen.
+ * The domain IMAGE itself remains clipped inside the arena via WebGL masking.
+ */
+export function drawSukunaDomainDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const sukunaFighter = state.fighters?.find(f =>
+    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna') && f.domainActive
+  );
+
+  let targetOpacity = 0;
+  if (sukunaFighter && sukunaFighter.domainActive) {
+    targetOpacity = 0.75;
+  }
+
+  if (targetOpacity > currentSukunaDomainDimOpacity) {
+    currentSukunaDomainDimOpacity += (targetOpacity - currentSukunaDomainDimOpacity) * 0.08;
+  } else {
+    currentSukunaDomainDimOpacity += (targetOpacity - currentSukunaDomainDimOpacity) * 0.06;
+  }
+
+  if (currentSukunaDomainDimOpacity < 0.01) {
+    currentSukunaDomainDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentSukunaDomainDimOpacity;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Base dark overlay
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Deep crimson/blood-red radial gradient centered on Sukuna
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+  const cx = sukunaFighter ? (sukunaFighter.x + shakeX) : canvas.width / 2;
+  const cy = sukunaFighter ? ((sukunaFighter.y - (sukunaFighter.z || 0)) + shakeY) : canvas.height / 2;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, 'rgba(200, 30, 30, 0.50)');       // Bright cursed crimson core
+  grad.addColorStop(0.15, 'rgba(140, 10, 10, 0.40)');     // Deep blood red halo
+  grad.addColorStop(0.35, 'rgba(80, 5, 5, 0.25)');        // Dark crimson ring
+  grad.addColorStop(0.60, 'rgba(30, 2, 2, 0.12)');        // Deep maroon fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
+
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(10, 0, 0, ${opacity * 0.95})`;
+}
+
+let currentYutaDomainDimOpacity = 0;
+
+/**
+ * Draws a dark cursed purple/pink dim screen overlay when Yuta's Domain Expansion is active.
+ * This dim overlay is NOT clipped to the arena — it spreads across the full screen.
+ */
+export function drawYutaDomainDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const yutaFighter = state.fighters?.find(f =>
+    f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.id === 'yuta' || f._def?.type === 'yuta') && f.domainActive
+  );
+
+  let targetOpacity = 0;
+  if (yutaFighter && yutaFighter.domainActive) {
+    targetOpacity = 0.70;
+  }
+
+  if (targetOpacity > currentYutaDomainDimOpacity) {
+    currentYutaDomainDimOpacity += (targetOpacity - currentYutaDomainDimOpacity) * 0.08;
+  } else {
+    currentYutaDomainDimOpacity += (targetOpacity - currentYutaDomainDimOpacity) * 0.06;
+  }
+
+  if (currentYutaDomainDimOpacity < 0.01) {
+    currentYutaDomainDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentYutaDomainDimOpacity;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+  const cx = yutaFighter ? (yutaFighter.x + shakeX) : canvas.width / 2;
+  const cy = yutaFighter ? ((yutaFighter.y - (yutaFighter.z || 0)) + shakeY) : canvas.height / 2;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, 'rgba(180, 60, 220, 0.50)');      // Bright cursed pink-purple core
+  grad.addColorStop(0.15, 'rgba(120, 20, 180, 0.40)');    // Deep cursed purple halo
+  grad.addColorStop(0.35, 'rgba(60, 10, 120, 0.25)');     // Dark violet ring
+  grad.addColorStop(0.60, 'rgba(20, 5, 50, 0.12)');       // Deep space purple fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
+
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(5, 0, 10, ${opacity * 0.95})`;
+}
+
+let currentMahitoDomainDimOpacity = 0;
+
+/**
+ * Draws a dark teal/cursed dim screen overlay when Mahito's Domain Expansion (Self-Embodiment of Perfection) is active.
+ * This dim overlay is NOT clipped to the arena — it spreads across the full screen.
+ */
+export function drawMahitoDomainDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const mahitoFighter = state.fighters?.find(f =>
+    f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive)
+  );
+
+  let targetOpacity = 0;
+  if (mahitoFighter && (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive)) {
+    targetOpacity = 0.68;
+  }
+
+  if (targetOpacity > currentMahitoDomainDimOpacity) {
+    currentMahitoDomainDimOpacity += (targetOpacity - currentMahitoDomainDimOpacity) * 0.08;
+  } else {
+    currentMahitoDomainDimOpacity += (targetOpacity - currentMahitoDomainDimOpacity) * 0.06;
+  }
+
+  if (currentMahitoDomainDimOpacity < 0.01) {
+    currentMahitoDomainDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentMahitoDomainDimOpacity;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.85})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+  const cx = mahitoFighter ? (mahitoFighter.x + shakeX) : canvas.width / 2;
+  const cy = mahitoFighter ? ((mahitoFighter.y - (mahitoFighter.z || 0)) + shakeY) : canvas.height / 2;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, 'rgba(40, 180, 160, 0.45)');       // Bright cursed teal core
+  grad.addColorStop(0.15, 'rgba(20, 120, 110, 0.35)');     // Deep teal halo
+  grad.addColorStop(0.35, 'rgba(10, 60, 55, 0.22)');       // Dark teal ring
+  grad.addColorStop(0.60, 'rgba(5, 25, 22, 0.10)');        // Deep murky fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');              // Pitch black boundary
+
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(0, 5, 5, ${opacity * 0.95})`;
 }
 
 let currentTojiUltimateOpacity = 0;

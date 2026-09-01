@@ -89,6 +89,9 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
     target.hp = Math.max(0, Number((currentHp - effectiveAmount).toFixed(2)));
 
     if (target.hp < prevHp && effectiveAmount > 0) {
+      if (attacker && typeof attacker.onDamageDealt === 'function') {
+        attacker.onDamageDealt(target, opts.projectile || null, (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(attacker) : -1, effectiveAmount);
+      }
       const isTurretPair = Boolean(opts.projectile && opts.projectile.shotPairId);
       const isSecondTurretHit = Boolean(isTurretPair && target._lastTurretPairHitId === opts.projectile.shotPairId);
       if (isTurretPair) {
@@ -1412,6 +1415,11 @@ export class Fighter {
           spawnFloatingText(this.x, this.y - this.r - 8, damageText, color);
           this._bhTextCooldown = interval;
         }
+      }
+
+      // Notify attacker of successfully dealt damage (for lifesteal, passives, combos)
+      if (attacker && typeof attacker.onDamageDealt === 'function' && !isHeal && amount > 0) {
+        attacker.onDamageDealt(this, opts.projectile || null, (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(attacker) : -1, amount);
       }
     } else if (this.hp > prevHp || (opts.isHeal && amount < 0)) {
       // Spawn floating green heal number when actual HP increases

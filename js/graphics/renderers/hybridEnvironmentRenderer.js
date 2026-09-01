@@ -50,6 +50,72 @@ function getRikaSummonDimSprite() {
 
 let rikaRingSprite = null;
 
+let baguvixDimSprite = null;
+let currentBaguvixDimOpacity = 0;
+
+function getBaguvixDimSprite() {
+  if (!baguvixDimSprite) {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    const cx = size / 2;
+    const cy = size / 2;
+    
+    // 1. Pitch black base overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.98)';
+    ctx.fillRect(0, 0, size, size);
+    
+    // 2. High-contrast Grove Street emerald green radial gradient centered on CJ
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
+    grad.addColorStop(0, 'rgba(34, 197, 94, 0.95)');    // Vibrant neon lime-green core
+    grad.addColorStop(0.08, 'rgba(22, 163, 74, 0.88)'); // Grove Street rich emerald
+    grad.addColorStop(0.22, 'rgba(20, 83, 45, 0.92)');  // Deep emerald matrix green
+    grad.addColorStop(0.55, 'rgba(6, 44, 20, 0.97)');   // Rich dark turf green
+    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.99)');      // Pitch black perimeter
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    
+    const texture = window.PIXI.Texture.from(canvas);
+    baguvixDimSprite = new window.PIXI.Sprite(texture);
+    baguvixDimSprite.anchor.set(0.5);
+    baguvixDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+  }
+  return baguvixDimSprite;
+}
+
+let baguvixRingSprite = null;
+function getBaguvixRingSprite() {
+  if (!baguvixRingSprite && state.pixiApp) {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 64, 0, Math.PI * 2);
+    ctx.strokeStyle = '#22C55E';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 48, 0, Math.PI * 2);
+    ctx.strokeStyle = '#FACC15';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    const texture = window.PIXI.Texture.from(canvas);
+    baguvixRingSprite = new window.PIXI.Sprite(texture);
+    baguvixRingSprite.anchor.set(0.5);
+    baguvixRingSprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+  }
+  return baguvixRingSprite;
+}
+
 function getRikaRingSprite() {
   if (!rikaRingSprite && state.pixiApp) {
     const size = 256;
@@ -179,6 +245,7 @@ let tojiDimSprite = null;
 let tojiFlyHeadContainer = null;
 let tojiArenaMask = null;
 let gojoArenaMask = null;
+let sukunaArenaMask = null;
 const flyHeadSpritePool = [];
 let activeFlyHeads = [];
 let currentTojiUltimateOpacity = 0;
@@ -332,7 +399,7 @@ export function updateHybridEnvironment() {
       )
     );
 
-    if (isDarkMode && state.arena) {
+    if (state.arena) {
       if (!gojoArenaMask) {
         gojoArenaMask = new window.PIXI.Graphics();
         layer.addChild(gojoArenaMask);
@@ -376,13 +443,50 @@ export function updateHybridEnvironment() {
     bgData.sprite.y = -20;
     bgData.sprite.width = state.canvas.width + 40;
     bgData.sprite.height = state.canvas.height + 40;
+
+    const isDarkMode = Boolean(
+      typeof state !== 'undefined' && (
+        state.arenaTheme === 'dark' || 
+        state.darkMode || 
+        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+      )
+    );
+
+    if (isDarkMode && state.arena) {
+      if (!sukunaArenaMask) {
+        sukunaArenaMask = new window.PIXI.Graphics();
+        layer.addChild(sukunaArenaMask);
+      }
+      sukunaArenaMask.clear();
+      sukunaArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      const ww = arena.wallWidth || 0;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        sukunaArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        sukunaArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+      }
+      sukunaArenaMask.endFill();
+      bgData.sprite.mask = sukunaArenaMask;
+    } else if (bgData.sprite.mask) {
+      bgData.sprite.mask = null;
+    }
+
     if (updateSukuna) {
       bgData.ctx.clearRect(0, 0, bgData.canvas.width, bgData.canvas.height);
       renderSukunaDomainBackground(sukuna, bgData.ctx, isMultiDomain && sukuna !== state.fighters.find(f => f.domainActive));
       bgData.texture.update();
     }
   } else {
+    if (sukunaArenaMask && sukunaArenaMask.parent) {
+      sukunaArenaMask.parent.removeChild(sukunaArenaMask);
+      sukunaArenaMask = null;
+    }
     if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent) {
+      sukunaDomainHybridData.sprite.mask = null;
       sukunaDomainHybridData.sprite.parent.removeChild(sukunaDomainHybridData.sprite);
     }
   }
@@ -668,13 +772,72 @@ export function updateHybridEnvironment() {
     rikaRing.alpha = currentRikaSummonDimOpacity * 0.45;
   }
 
+  // 6. CJ BAGUVIX God Mode & Minigun Overdrive (100% WebGL Hybrid Acceleration - Rule 10)
+  const cjFighter = (state.fighters?.find(f =>
+    f && (f.characterId === 'cj' || f.type === 'cj' || f._def?.id === 'cj' || f._def?.type === 'cj') &&
+    (f.isBaguvixActive || f.isGodModeActive || (f.isTypingCheat && f.cheatCodeString === 'BAGUVIX'))
+  )) || (state.previewFighter && (state.previewFighter.isBaguvixActive || state.previewFighter.isGodModeActive) ? state.previewFighter : null);
+
+  let targetBaguvixOpacity = 0;
+  let cjCx = state.canvas.width / 2;
+  let cjCy = state.canvas.height / 2;
+
+  if (cjFighter && CONFIG.cj?.enableBaguvixDimScreen !== false) {
+    cjCx = cjFighter.x;
+    cjCy = cjFighter.y - (cjFighter.z || 0);
+
+    if (cjFighter.isTypingCheat && cjFighter.cheatCodeString === 'BAGUVIX') {
+      const maxTyping = (cjFighter.cheatTypingMaxTimer || 60);
+      const progress = Math.min(1.0, 1.0 - ((cjFighter.cheatTypingTimer || 0) / Math.max(1, maxTyping)));
+      targetBaguvixOpacity = 0.25 + progress * 0.45;
+    } else if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
+      const baseMax = CONFIG.cj?.baguvixDimOpacity || 0.75;
+      const pulse = Math.sin(Date.now() * 0.005) * 0.04;
+      targetBaguvixOpacity = baseMax + pulse;
+    }
+  }
+
+  if (targetBaguvixOpacity > currentBaguvixDimOpacity) {
+    currentBaguvixDimOpacity += (targetBaguvixOpacity - currentBaguvixDimOpacity) * 0.15;
+  } else {
+    currentBaguvixDimOpacity += (targetBaguvixOpacity - currentBaguvixDimOpacity) * 0.10;
+  }
+
+  const baguvixDim = getBaguvixDimSprite();
+  const baguvixRing = getBaguvixRingSprite();
+
+  if (currentBaguvixDimOpacity < 0.01) {
+    currentBaguvixDimOpacity = 0;
+    if (baguvixDim && baguvixDim.parent) baguvixDim.parent.removeChild(baguvixDim);
+    if (baguvixRing && baguvixRing.parent) baguvixRing.parent.removeChild(baguvixRing);
+  } else {
+    if (baguvixDim) {
+      if (!baguvixDim.parent) layer.addChild(baguvixDim);
+      baguvixDim.alpha = currentBaguvixDimOpacity;
+      baguvixDim.x = cjCx;
+      baguvixDim.y = cjCy;
+      baguvixDim.scale.set(scale);
+    }
+    if (baguvixRing) {
+      if (!baguvixRing.parent) layer.addChild(baguvixRing);
+      baguvixRing.x = cjCx;
+      baguvixRing.y = cjCy;
+      const pulseR = 64 + Math.sin(Date.now() * 0.008) * 10;
+      const rScale = pulseR / 64.0;
+      baguvixRing.scale.set(rScale);
+      baguvixRing.alpha = currentBaguvixDimOpacity * 0.55;
+    }
+    state.globalDimEdgeColor = `rgba(6, 44, 20, ${currentBaguvixDimOpacity * 0.95})`;
+  }
+
   // Calculate and store the maximum dim opacity to allow HTML DOM overlays to dim synchronously
   state.globalDimOpacity = Math.max(
     currentPurpleDimOpacity || 0,
     currentFurnaceDimOpacity || 0,
     opacityMaho || 0,
     currentTojiUltimateOpacity || 0,
-    currentRikaSummonDimOpacity || 0
+    currentRikaSummonDimOpacity || 0,
+    currentBaguvixDimOpacity || 0
   );
 }
 

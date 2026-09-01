@@ -37,14 +37,14 @@ export function updateGame() {
           return;
         }
 
-        // Light Mode: Full showoff with VS entrance + countdown 3... 2... 1... FIGHT!
+        // Light Mode: Full showoff with VS entrance + countdown
         if (state.faceOffTimer === 96) triggerFaceOffSFX('skill_dash5', 0.35); // VS clash
-        if (state.faceOffTimer === 126) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
-        if (state.faceOffTimer === 156) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
-        if (state.faceOffTimer === 186) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
+        if (state.faceOffTimer === 126) triggerFaceOffSFX('timertick', 0.90); // Countdown "3"
+        if (state.faceOffTimer === 156) triggerFaceOffSFX('timertick', 0.90); // Countdown "2"
+        if (state.faceOffTimer === 186) triggerFaceOffSFX('timertick', 0.90); // Countdown "1"
         if (state.faceOffTimer === 216) {
-          triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
-          triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
+          triggerFaceOffSFX('fight', 1.0); // "FIGHT!" voice
+          triggerFaceOffSFX('ringbell', 0.85); // Ring Bell gong
         }
 
         // When showoff countdown concludes at frame 242, launch directly into combat!
@@ -65,14 +65,6 @@ export function updateGame() {
       const isDark = (state.arenaTheme === 'dark');
       if (isDark) {
         state.countdownTimer = (state.countdownTimer || 0) + 1;
-        // In Dark Mode: 120-frame arcade countdown in arena (3 -> 2 -> 1 -> FIGHT!)
-        if (state.countdownTimer === 1) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
-        if (state.countdownTimer === 30) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
-        if (state.countdownTimer === 60) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
-        if (state.countdownTimer === 90) {
-          triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
-          triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
-        }
 
         // Update fighters during countdown to aim guns at opponents
         updateFighters();
@@ -163,7 +155,8 @@ export function updateGame() {
       }
     } else if (state.gameState === 'roundEnd') {
       stopArenaBgm(true);
-      // Keep fighters moving in background during winning display
+      // Keep match timer, background particles, animations, and combat systems moving naturally without pause
+      state.matchTimer = (state.matchTimer || 0) + 1;
       updateFighters();
       updateProjectiles();
       updateDriveBys();
@@ -175,13 +168,15 @@ export function updateGame() {
       // Auto next round / match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Follow For More banner)
       const hasOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
       const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
-      const autoDelay = (isFFA && state.ffaMatchComplete) ? (hasOverlay ? 480 : 380) : (hasOverlay ? 480 : 300);
+      const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
+      const autoDelay = isDark ? 180 : ((isFFA && state.ffaMatchComplete) ? (hasOverlay ? 480 : 380) : (hasOverlay ? 480 : 300));
       if (state.roundEndTimer >= autoDelay) {
         startNextRound();
       }
     } else if (state.gameState === 'matchEnd') {
       stopArenaBgm(true);
-      // Keep fighters moving in background during match end display
+      // Keep match timer, background particles, animations, and combat systems moving naturally without pause
+      state.matchTimer = (state.matchTimer || 0) + 1;
       updateFighters();
       updateProjectiles();
       updateDriveBys();
@@ -197,7 +192,8 @@ export function updateGame() {
       }
 
       // Auto next match (allow full duration for Mission Passed overlay + champion reveal)
-      const matchEndAutoDelay = hasOverlay ? 540 : 360;
+      const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
+      const matchEndAutoDelay = isDark ? 210 : (hasOverlay ? 540 : 360);
       if (state.matchEndTimer >= matchEndAutoDelay) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();

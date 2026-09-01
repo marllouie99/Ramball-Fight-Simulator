@@ -20,7 +20,7 @@ export const mahoragaConfig = {
     projectileSpeedMultiplier: 1.0,
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
     ability: 'Wheel of Adaptation',
-    desc: 'Adapts to damage types. Increase chance of parry and blocks to incoming attacks for each wheel rotation.',
+    desc: 'Adapts to damage types, gaining speed, defense, and health regeneration with each wheel rotation.',
 
     // ── Neutral Close-Quarters Attack-Teleport Stance ──
     neutralAttacksPerTeleport: 2,
@@ -49,7 +49,7 @@ export const mahoragaConfig = {
     rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
     enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique flat healing on wheel click
     rctHealFlatAmount: 100,          // Heals a flat 100 HP on each wheel rotation click
-    defBuffPerClickPercent: 0.02,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
+    defBuffPerClickPercent: 0.03,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,         // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,      // Maximum speed/KB resistance factor under stasis (60% max)
@@ -84,15 +84,15 @@ export const mahoragaConfig = {
     sakugaImpactDurationFrames: 8,  // Duration (frames) of Sakuga anime impact frame on sword combo hits
     approachSteerForce: 0.45,       // Approach steering force towards opponent in melee combat
 
-    // ── Blade Parry & Guard Mechanics ──
-    parryChancePerStage: 0.08,       // +8% parry/block chance per gold adaptation stage
-    parryMaxChance: 0.75,            // Maximum parry/block chance cap (75%)
+    // ── Blade Parry & Guard Mechanics (Disabled) ──
+    parryChancePerStage: 0.0,        // Parry mechanic removed
+    parryMaxChance: 0.0,             // Parry mechanic removed
     parryDurationFrames: 25,         // Duration (frames) of snappy blade parry pose
     guardDurationFrames: 60,         // Duration (frames) of crossed-arm face guard pose
-    parryDeflectionPushForce: 5.5,   // Pushback force applied to attacker upon blade parry
-    guardDeflectionPushForce: 4.0,   // Pushback force applied to attacker upon guard block
-    parryDeflectionRecoilForce: 2.0, // Recoil force applied to Mahoraga upon blade parry
-    guardDeflectionRecoilForce: 1.5, // Recoil force applied to Mahoraga upon guard block
+    parryDeflectionPushForce: 0.0,   // Pushback force applied to attacker upon blade parry
+    guardDeflectionPushForce: 0.0,   // Pushback force applied to attacker upon guard block
+    parryDeflectionRecoilForce: 0.0, // Recoil force applied to Mahoraga upon blade parry
+    guardDeflectionRecoilForce: 0.0, // Recoil force applied to Mahoraga upon guard block
 
     // ── Active AoE Cleave Skill ──
     cleaveCooldown: 600,             // 10 seconds cooldown for Active AoE Cleave

@@ -51,17 +51,6 @@ function getUnitRadialGradient(ctx, key, stops) {
   return gradient;
 }
 
-// Pre-allocated static segment geometry for animeImpactFrame (Zero Per-Frame Allocations)
-const ANIME_IMPACT_SEGMENTS = [
-  { t0: 0.00, t1: 0.09, maxSpike: 1.12 },
-  { t0: 0.14, t1: 0.25, maxSpike: 1.30 },
-  { t0: 0.29, t1: 0.44, maxSpike: 1.38 },
-  { t0: 0.48, t1: 0.56, maxSpike: 1.15 },
-  { t0: 0.60, t1: 0.72, maxSpike: 1.32 },
-  { t0: 0.76, t1: 0.84, maxSpike: 1.20 },
-  { t0: 0.88, t1: 0.94, maxSpike: 1.25 },
-  { t0: 0.97, t1: 0.99, maxSpike: 1.10 },
-];
 
 /**
  * Spawns spark effects at a position (visual-only, no collision).
@@ -2494,179 +2483,87 @@ export function drawSparkEffects(layer = 'all') {
     } else if (effect.type === 'animeImpactFrame') {
       const isDark = _isDarkMode();
 
-      if (isDark) {
-        // ── DARK MODE CLEAN PIXELATED SHOCKWAVE RING ONLY ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
+      // ── CLEAN PIXELATED SHOCKWAVE RING HIT EFFECT (LIGHT & DARK MODES) ──
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
 
-        ctx.translate(effect.x, effect.y);
+      ctx.translate(effect.x, effect.y);
 
-        const progress = Math.min(1.0, Math.max(0.0, 1.0 - effect.life));
-        const alpha = Math.min(1.0, effect.life * 1.35);
-        const P = 2.0; // Stepped pixel grid size
-        const snap = (v) => Math.round(v / P) * P;
+      const progress = Math.min(1.0, Math.max(0.0, 1.0 - effect.life));
+      const alpha = Math.min(1.0, effect.life * 1.35);
+      const P = 2.0; // Stepped pixel grid size
+      const snap = (v) => Math.round(v / P) * P;
 
-        const isGold = (effect.color === 'gold');
-        const isBlackPink = (effect.color === 'blackpink' || effect.color === 'pink');
-        const isOrange = (effect.color === 'orange');
-        const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity' || effect.color === 'gojo');
-        const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
+      const isGold = (effect.color === 'gold');
+      const isBlackPink = (effect.color === 'blackpink' || effect.color === 'pink');
+      const isOrange = (effect.color === 'orange');
+      const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity' || effect.color === 'gojo');
+      const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
+      const isPurple = (effect.color === 'purple' || effect.color === 'boogie');
 
-        let colRing, colHighlight;
-        if (isGold) {
-          colRing = `rgba(255, 215, 0, ${alpha * 0.95})`;
-          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-        } else if (isBlackPink) {
-          colRing = `rgba(255, 20, 147, ${alpha * 0.95})`;
-          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-        } else if (isOrange) {
-          colRing = `rgba(255, 80, 0, ${alpha * 0.95})`;
-          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-        } else if (isCyan) {
-          colRing = `rgba(0, 229, 255, ${alpha * 0.95})`;
-          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-        } else if (isCrimson) {
-          colRing = `rgba(255, 36, 0, ${alpha * 0.95})`;
-          colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+      let colRing, colHighlight;
+      if (isGold) {
+        colRing = `rgba(255, 215, 0, ${alpha * 0.95})`;
+        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+      } else if (isBlackPink) {
+        colRing = `rgba(255, 20, 147, ${alpha * 0.95})`;
+        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+      } else if (isOrange) {
+        colRing = `rgba(255, 80, 0, ${alpha * 0.95})`;
+        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+      } else if (isCyan) {
+        colRing = `rgba(0, 229, 255, ${alpha * 0.95})`;
+        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+      } else if (isCrimson) {
+        colRing = `rgba(255, 36, 0, ${alpha * 0.95})`;
+        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+      } else if (isPurple) {
+        colRing = `rgba(168, 85, 247, ${alpha * 0.95})`;
+        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+      } else {
+        if (!isDark && (effect.color === 'black' || !effect.color)) {
+          colRing = `rgba(20, 22, 28, ${alpha * 0.95})`;
+          colHighlight = `rgba(80, 90, 110, ${alpha * 0.98})`;
         } else {
           colRing = `rgba(255, 255, 255, ${alpha * 0.95})`;
           colHighlight = `rgba(220, 240, 255, ${alpha * 0.98})`;
         }
-
-        // Discrete Pixel Circle Shockwave Ring
-        const ringRadius = effect.size * (0.25 + 0.85 * Math.pow(progress, 0.65));
-        const ringThick = Math.max(P * 1.5, Math.round((P * 2.2 * effect.life) / P) * P);
-        const innerR = Math.max(0, ringRadius - ringThick);
-        const outerR = ringRadius + P * 0.5;
-
-        const maxGridSteps = Math.ceil(outerR / P);
-
-        // Render discrete pixel shockwave ring with 0 GC
-        for (let gy = -maxGridSteps; gy <= maxGridSteps; gy++) {
-          const ry = gy * P;
-          for (let gx = -maxGridSteps; gx <= maxGridSteps; gx++) {
-            const rx = gx * P;
-            const dist = Math.hypot(rx, ry);
-            if (dist < innerR || dist > outerR) continue;
-
-            const px = snap(rx);
-            const py = snap(ry);
-
-            // Core highlight pixel line vs main colored pixel band
-            if (dist >= ringRadius - P * 0.5 && dist <= ringRadius + P * 0.5) {
-              ctx.fillStyle = colHighlight;
-            } else {
-              ctx.fillStyle = colRing;
-            }
-            ctx.fillRect(px, py, P, P);
-          }
-        }
-
-        ctx.restore();
-      } else {
-        // ── LIGHT MODE GLOBAL PIXEL-ART PUNCH IMPACT CRESCENT & ACTION LINES ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate((effect.hitAngle || 0) + Math.PI);
-
-        const alpha = effect.life;
-        const R = effect.size;
-        const P = 2.0; // Stepped pixel unit
-
-        const outerR = R * 1.12;
-        const innerR = R * 0.84;
-        const halfArc = Math.PI * 0.72;
-        const totalArc = halfArc * 2;
-
-        const isGold = (effect.color === 'gold');
-        const isBlackPink = (effect.color === 'blackpink');
-        const isOrange = (effect.color === 'orange');
-        const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity');
-        const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
-
-        // 1. Stepped Pixel Radial Action Lines
-        const lineCount = 14;
-        const startRad = innerR * 0.85;
-
-        let lineColorA, lineColorB;
-        if (isGold) { lineColorA = '#0E0F14'; lineColorB = '#FFD700'; }
-        else if (isBlackPink) { lineColorA = '#0E0F14'; lineColorB = '#FF1493'; }
-        else if (isOrange) { lineColorA = '#FFFFFF'; lineColorB = '#FF5000'; }
-        else if (isCyan) { lineColorA = '#00142D'; lineColorB = '#00E5FF'; }
-        else if (isCrimson) { lineColorA = '#140205'; lineColorB = '#FF2400'; }
-        else { lineColorA = '#0E0F14'; lineColorB = '#FFFFFF'; }
-
-        for (let i = 0; i < lineCount; i++) {
-          const a = -halfArc + (i / (lineCount - 1)) * totalArc;
-          const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
-          const col = (i % 3 === 0) ? lineColorA : lineColorB;
-          ctx.fillStyle = col;
-
-          const lineSteps = Math.max(1, Math.round(len / P));
-          for (let s = 0; s <= lineSteps; s++) {
-            const curD = startRad + s * P;
-            const px = Math.round((Math.cos(a) * curD) / P) * P;
-            const py = Math.round((Math.sin(a) * curD) / P) * P;
-            ctx.fillRect(px, py, P, P);
-          }
-        }
-
-        // 2. Stepped 8-Segment Chopped Pixel Impact Crescent Pieces
-        const alphaFill = Math.min(1.0, alpha * 1.25);
-
-        for (let sIdx = 0; sIdx < ANIME_IMPACT_SEGMENTS.length; sIdx++) {
-          const seg = ANIME_IMPACT_SEGMENTS[sIdx];
-          const segN = 8;
-          const segPeakIdx = 4;
-
-          let segColor;
-          if (isGold) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FFC800';
-          else if (isBlackPink) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FF1493';
-          else if (isOrange) segColor = (sIdx % 2 === 0) ? '#FF5000' : '#FFB400';
-          else if (isCyan) segColor = (sIdx % 3 === 0) ? '#00142D' : '#00E5FF';
-          else if (isCrimson) segColor = (sIdx % 3 === 0) ? '#140205' : '#DC143C';
-          else segColor = '#0E0F14';
-
-          ctx.fillStyle = segColor;
-
-          for (let i = 0; i <= segN; i++) {
-            const localT = i / segN;
-            const globalT = seg.t0 + localT * (seg.t1 - seg.t0);
-            const a = -halfArc + globalT * totalArc;
-
-            let r;
-            if (i === 0 || i === segN) r = outerR * 0.80;
-            else if (i === segPeakIdx) r = outerR * seg.maxSpike;
-            else r = outerR * ((i % 2 === 0) ? 0.90 : 1.05);
-
-            const rSpan = r - innerR;
-            const rSteps = Math.max(1, Math.round(rSpan / P));
-            for (let s = 0; s <= rSteps; s++) {
-              const curR = innerR + s * P;
-              const px = Math.round((Math.cos(a) * curR) / P) * P;
-              const py = Math.round((Math.sin(a) * curR) / P) * P;
-              ctx.fillRect(px, py, P, P);
-            }
-          }
-        }
-
-        // 3. Central 4-Point Pure-White Specular Pixel Diamond
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(-P * 2, -P * 0.5, P * 4, P);
-        ctx.fillRect(-P * 0.5, -P * 2, P, P * 4);
-
-        ctx.restore();
       }
+
+      // Discrete Pixel Circle Shockwave Ring
+      const ringRadius = effect.size * (0.25 + 0.85 * Math.pow(progress, 0.65));
+      const ringThick = Math.max(P * 1.5, Math.round((P * 2.2 * effect.life) / P) * P);
+      const innerR = Math.max(0, ringRadius - ringThick);
+      const outerR = ringRadius + P * 0.5;
+
+      const maxGridSteps = Math.ceil(outerR / P);
+
+      // Render discrete pixel shockwave ring with 0 GC
+      for (let gy = -maxGridSteps; gy <= maxGridSteps; gy++) {
+        const ry = gy * P;
+        for (let gx = -maxGridSteps; gx <= maxGridSteps; gx++) {
+          const rx = gx * P;
+          const dist = Math.hypot(rx, ry);
+          if (dist < innerR || dist > outerR) continue;
+
+          const px = snap(rx);
+          const py = snap(ry);
+
+          // Core highlight pixel line vs main colored pixel band
+          if (dist >= ringRadius - P * 0.5 && dist <= ringRadius + P * 0.5) {
+            ctx.fillStyle = colHighlight;
+          } else {
+            ctx.fillStyle = colRing;
+          }
+          ctx.fillRect(px, py, P, P);
+        }
+      }
+
+      ctx.restore();
     } else if (effect.type === 'punchWindSpeedLine') {
       // ── SUPERSONIC PUNCH WIND SPEED LINE STREAK ──
       ctx.save();

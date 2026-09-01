@@ -306,6 +306,22 @@ if (hudModeBtn) {
   hudModeBtn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
 }
 
+if (localStorage.getItem('darkModeShowHudSkillBars') !== null) {
+  CONFIG.darkModeShowHudSkillBars = parseInt(localStorage.getItem('darkModeShowHudSkillBars'), 10);
+}
+const darkSkillsBtn = document.getElementById('btn-darkskills');
+if (darkSkillsBtn) {
+  darkSkillsBtn.innerText = Boolean(CONFIG.darkModeShowHudSkillBars) ? 'ON' : 'OFF';
+}
+
+if (localStorage.getItem('darkModeShowHudStats') !== null) {
+  CONFIG.darkModeShowHudStats = parseInt(localStorage.getItem('darkModeShowHudStats'), 10);
+}
+const darkStatsBtn = document.getElementById('btn-darkstats');
+if (darkStatsBtn) {
+  darkStatsBtn.innerText = Boolean(CONFIG.darkModeShowHudStats) ? 'ON' : 'OFF';
+}
+
 if (localStorage.getItem('showArenaTitle') !== null) {
   CONFIG.showArenaTitle = localStorage.getItem('showArenaTitle') === 'true';
 } else {
@@ -493,6 +509,16 @@ export function executeTacticalAction(action) {
     localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
     const btn = document.getElementById('btn-hudmode');
     if (btn) btn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+  } else if (action === 'toggle-darkskills') {
+    CONFIG.darkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars ? 0 : 1;
+    localStorage.setItem('darkModeShowHudSkillBars', CONFIG.darkModeShowHudSkillBars);
+    const btn = document.getElementById('btn-darkskills');
+    if (btn) btn.innerText = CONFIG.darkModeShowHudSkillBars ? 'ON' : 'OFF';
+  } else if (action === 'toggle-darkstats') {
+    CONFIG.darkModeShowHudStats = CONFIG.darkModeShowHudStats ? 0 : 1;
+    localStorage.setItem('darkModeShowHudStats', CONFIG.darkModeShowHudStats);
+    const btn = document.getElementById('btn-darkstats');
+    if (btn) btn.innerText = CONFIG.darkModeShowHudStats ? 'ON' : 'OFF';
   } else if (action === 'toggle-cinefilm') {
     state.cinefilmFilter = !state.cinefilmFilter;
     localStorage.setItem('cinefilmFilter', state.cinefilmFilter);
@@ -690,6 +716,20 @@ document.getElementById('btn-hudmode')?.addEventListener('click', (e) => {
   CONFIG.hudShowFighterDescription = !CONFIG.hudShowFighterDescription;
   localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
   e.target.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+});
+
+document.getElementById('btn-darkskills')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  CONFIG.darkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars ? 0 : 1;
+  localStorage.setItem('darkModeShowHudSkillBars', CONFIG.darkModeShowHudSkillBars);
+  e.target.innerText = CONFIG.darkModeShowHudSkillBars ? 'ON' : 'OFF';
+});
+
+document.getElementById('btn-darkstats')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  CONFIG.darkModeShowHudStats = CONFIG.darkModeShowHudStats ? 0 : 1;
+  localStorage.setItem('darkModeShowHudStats', CONFIG.darkModeShowHudStats);
+  e.target.innerText = CONFIG.darkModeShowHudStats ? 'ON' : 'OFF';
 });
 
 document.getElementById('btn-cinefilm')?.addEventListener('click', (e) => {

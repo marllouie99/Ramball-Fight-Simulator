@@ -84,9 +84,10 @@ export function drawTojiSkin(ctx, fighter) {
 
   // 1. Orientation & Mirroring (Rule 19 Upright POV)
   const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
   ctx.rotate(angle);
 
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const facingLeft = Math.abs(normAngle) > Math.PI / 2;
   if (facingLeft && !fighter.isSpinning) {
     ctx.scale(1, -1);
   }

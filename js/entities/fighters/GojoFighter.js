@@ -313,7 +313,10 @@ export class GojoFighter extends Fighter {
       const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8;
 
       if (!hasAdapted && Math.random() <= freezeChance) {
-        this.triggerInfinityBlock(attacker.x || this.x, attacker.y || this.y, attacker);
+        const contactX = opts?.projectile ? opts.projectile.x : (attacker.x || this.x);
+        const contactY = opts?.projectile ? opts.projectile.y : (attacker.y || this.y);
+        const physicalAttacker = (opts?.projectile || opts?.isProjectile || opts?.isGetsuga) ? null : attacker;
+        this.triggerInfinityBlock(contactX, contactY, physicalAttacker);
         return false;
       }
     }
@@ -804,6 +807,8 @@ export class GojoFighter extends Fighter {
       this.interruptAttacks(false); // Cancel channeling skills without hard-canceling punch animation
       if (this.punchAnimTimer > 0) this.punchAnimTimer--;
       this.shootCooldown = 60;
+      this.applyMovementPhysics();
+      this.resolveWallBounce(arena);
       return;
     }
 

@@ -754,7 +754,7 @@ export function drawUryuSeeleSlashArc(ctx, fighter) {
 
   const chopMax = fighter.slashSwingMaxTimer || 18;
   const chopTimer = fighter.slashSwingTimer || 0;
-  if (chopTimer <= 0) return;
+  if (chopTimer <= 0 || fighter.isTargetOfAmbush || (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())) return;
 
   const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (chopTimer / chopMax)));
   if (rawProgress <= 0 || rawProgress >= 1.0) return;

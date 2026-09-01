@@ -10,7 +10,7 @@ import {
   drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
-  drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
+  drawSparkEffects, drawPurpleDimScreen, drawGojoDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
@@ -57,16 +57,18 @@ export function renderGame() {
     }
 
     let stateDim = 0;
-    const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-    const dimStartFrame = hasMissionOverlay ? 160 : 60;
-    if (state.gameState === 'matchEnd') {
-      const timer = state.matchEndTimer || 0;
-      const delayedTimer = Math.max(0, timer - dimStartFrame);
-      stateDim = Math.min(0.96, (delayedTimer / 45) * 0.96);
-    } else if (state.gameState === 'roundEnd') {
-      const timer = state.roundEndTimer || 0;
-      const delayedTimer = Math.max(0, timer - dimStartFrame);
-      stateDim = Math.min(0.96, (delayedTimer / 45) * 0.96);
+    if (Boolean(state._isChampionLayoutActive)) {
+      const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+      const dimStartFrame = hasMissionOverlay ? 160 : 60;
+      if (state.gameState === 'matchEnd') {
+        const timer = state.matchEndTimer || 0;
+        const delayedTimer = Math.max(0, timer - dimStartFrame);
+        stateDim = Math.min(0.96, (delayedTimer / 45) * 0.96);
+      } else if (state.gameState === 'roundEnd') {
+        const timer = state.roundEndTimer || 0;
+        const delayedTimer = Math.max(0, timer - dimStartFrame);
+        stateDim = Math.min(0.96, (delayedTimer / 45) * 0.96);
+      }
     }
 
     const baseDim = state.globalDimOpacity || 0;
@@ -225,8 +227,9 @@ export function renderGame() {
 
       try {
 
-        // ── Clip all dim effects & WebGL overlays strictly to arena boundaries ──
-        const hasArenaClip = Boolean(state.arena);
+        // ── Clip all dim effects & WebGL overlays strictly to arena boundaries ONLY IN DARK MODE ──
+        const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
+        const hasArenaClip = isDark && Boolean(state.arena);
         if (hasArenaClip) {
           state.ctx.save();
           state.ctx.beginPath();
@@ -259,6 +262,9 @@ export function renderGame() {
             if (state.pixiLayers.effects) state.pixiLayers.effects.mask = state._darkDimMask;
             if (state.pixiLayers.environment) state.pixiLayers.environment.mask = state._darkDimMask;
           }
+        } else {
+          if (state.pixiLayers?.effects?.mask) state.pixiLayers.effects.mask = null;
+          if (state.pixiLayers?.environment?.mask) state.pixiLayers.environment.mask = null;
         }
 
         // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Rendered behind fighters so fighters stay un-tinted) ──
@@ -269,6 +275,10 @@ export function renderGame() {
         drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
         drawCjBaguvixDimScreen(); // 2D CJ BAGUVIX God Mode dark Grove Street emerald green radial dim overlay
         drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
+        drawGojoDomainDimScreen(); // Dark cosmic blue dim overlay when Gojo's Unlimited Void domain is active (full-screen, unclipped)
+        drawSukunaDomainDimScreen(); // Dark crimson dim overlay when Sukuna's Malevolent Shrine domain is active (full-screen, unclipped)
+        drawYutaDomainDimScreen(); // Dark cursed purple dim overlay when Yuta's domain is active (full-screen, unclipped)
+        drawMahitoDomainDimScreen(); // Dark teal dim overlay when Mahito's Self-Embodiment of Perfection domain is active (full-screen, unclipped)
         drawMahoragaAdaptationDimScreen();
         drawMahoragaLevel8DimScreen();
         drawTojiUltimateOverlay();

@@ -892,11 +892,7 @@ export function proceedFromFaceOffToCountdown() {
   if (state.gameState === 'faceoff') {
     state.faceOffAutoStart = true;
     if (state.faceOffTimer < 216) {
-      state.faceOffTimer = 216; // Fast-forward directly to FIGHT! burst
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0);
-        audioSystem.playSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0);
-      }
+      state.faceOffTimer = 216; // Fast-forward directly to match start
       return;
     }
     startMatchDirectlyFromFaceOff();

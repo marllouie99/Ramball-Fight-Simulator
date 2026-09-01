@@ -164,7 +164,8 @@ export function drawYutaSkin(ctx, fighter) {
   if (yutaImg && yutaImg.complete && yutaImg.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
-    const modelScale = 1.04;
+    // Scale factor 1.22 expands the art so its boundary fits flush with the outer circle, matching other fighters
+    const modelScale = 1.22;
     const drawR = r * modelScale;
     ctx.drawImage(yutaImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();
@@ -445,7 +446,7 @@ export function drawYutaGhostSkin(ctx, x, y, angle = 0, r = 25, alpha = 0.5) {
   if (yutaImg && yutaImg.complete && yutaImg.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    const modelScale = 1.04;
+    const modelScale = 1.22;
     const drawR = r * modelScale;
     ctx.drawImage(yutaImg, -drawR, -drawR, drawR * 2, drawR * 2);
     ctx.restore();

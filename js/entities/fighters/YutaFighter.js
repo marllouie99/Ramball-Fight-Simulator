@@ -470,25 +470,9 @@ export class YutaFighter extends Fighter {
           const dmgMult = this.getRikaDamageMultiplier();
           const flurryDmg = ((CONFIG.yuta.flurryDamage || 15) + bonusDmg) * dmgMult;
 
-          // 50% Auto-Block/Parry check if Mahoraga is adapted to Yuta's Flurry
-          let isFlurryParried = false;
-          if (this.flurryTarget && this.flurryTarget.adaptedYutaFlurry && Math.random() < 0.50) {
-            isFlurryParried = true;
-            spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 20, 'PARRIED!', '#FFD700');
-            spawnParrySparksEffect(this.flurryTarget.x, this.flurryTarget.y);
-            this.flurryTarget.defensePoseType = 'parry';
-            this.flurryTarget.defensePoseTimer = 15;
-            audioSystem.playSFX('attack_swordswing', 0.85);
-          }
-
-          if (!isFlurryParried) {
-            this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSkill: true, isYutaFlurry: true });
-            spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
-            spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
-          } else {
-            // Register hit for adaptation tracking if not yet fully adapted
-            this.flurryTarget.takeDamage(0, this, { isMelee: true, isSkill: true, isYutaFlurry: true });
-          }
+          this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSkill: true, isYutaFlurry: true });
+          spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
+          spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
 
           triggerGlobalScreenShake(6, 6);
 
@@ -2124,7 +2108,9 @@ export class YutaFighter extends Fighter {
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
     );
 
-    if (!isGojoDomainActive && isSwinging) {
+    const isSuppressed = this.isTargetOfAmbush || (typeof this.areAttackEffectsSuppressed === 'function' && this.areAttackEffectsSuppressed());
+
+    if (!isGojoDomainActive && !isSuppressed && isSwinging) {
       const r = this.r || 22;
       const facingLeft = Math.abs(this.gunAngle || 0) > Math.PI / 2;
       const baseAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
@@ -2143,21 +2129,35 @@ export class YutaFighter extends Fighter {
       let currentTailOffset = startOffset;
       let trailAlpha = 1.0;
 
-      if (progress < 0.65) {
-        const t = progress / 0.65;
-        const eased = 1.0 - Math.pow(1.0 - t, 2.2);
+      const totalDuration = isFlurrySwinging ? 14 : (swingDuration + recoveryDuration);
+      const rawProgress = isFlurrySwinging
+        ? Math.min(1.0, Math.max(0.0, (14 - this.flurrySlashTimer) / 14))
+        : (editP ? 0.5 : Math.min(1.0, Math.max(0.0, (maxCd - this.meleeCooldown) / totalDuration)));
+
+      const windupCutoff = isFlurrySwinging ? 0.0 : 0.08;
+      const cutCutoff = isFlurrySwinging ? 0.55 : 0.52;
+
+      if (rawProgress < windupCutoff) {
+        currentTipOffset = startOffset;
+        currentTailOffset = startOffset;
+        trailAlpha = 0.0;
+      } else if (rawProgress < cutCutoff) {
+        // Active Cutting Phase: crescent smoothly expands across the arc
+        const t = (rawProgress - windupCutoff) / (cutCutoff - windupCutoff);
+        const eased = t * t * (3 - 2 * t);
         currentTipOffset = startOffset + eased * (endOffset - startOffset);
         currentTailOffset = startOffset;
-        trailAlpha = Math.min(1.0, t * 2.5);
+        trailAlpha = Math.sin(Math.min(1.0, t * 1.5) * (Math.PI / 2));
       } else {
-        const recP = (progress - 0.65) / 0.35;
-        const easedRec = Math.pow(1.0 - recP, 1.4);
+        // Recovery / Fade Phase: Tip stays locked at endOffset while tail smoothly catches up and erases
+        const recP = (rawProgress - cutCutoff) / (1.0 - cutCutoff);
+        const easedRec = 0.5 + 0.5 * Math.cos(recP * Math.PI);
         currentTipOffset = endOffset;
         currentTailOffset = endOffset - (endOffset - startOffset) * easedRec;
-        trailAlpha = Math.max(0.0, 1.0 - recP * 1.3);
+        trailAlpha = Math.sin((1.0 - recP) * (Math.PI / 2));
       }
 
-      if (trailAlpha > 0.01 && Math.abs(currentTipOffset - currentTailOffset) >= 0.05) {
+      if (trailAlpha > 0.01 && Math.abs(currentTipOffset - currentTailOffset) >= 0.04) {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(baseAngle);
@@ -2165,84 +2165,99 @@ export class YutaFighter extends Fighter {
           ctx.scale(1, -1);
         }
 
-        const P = 2.4; // Pixel art grid scale
+        const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
+        const snap = (v) => Math.round(v / P) * P;
+
         const outerRadius = r + 82;
         const maxThick = 24.0;
-        const totalAngle = Math.abs(currentTipOffset - currentTailOffset);
-        const arcSteps = Math.max(16, Math.round((totalAngle * outerRadius) / (P * 1.5)));
+        const span = currentTipOffset - currentTailOffset;
+        const minAng = Math.min(currentTipOffset, currentTailOffset);
+        const maxAng = Math.max(currentTipOffset, currentTailOffset);
 
-        // Pass 1: Pixel-Art Dark Ink Outline Shell
-        ctx.fillStyle = `rgba(17, 17, 20, ${0.92 * trailAlpha * fade})`;
-        for (let i = 0; i <= arcSteps; i++) {
-          const t = i / arcSteps;
-          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
-          const rad = outerRadius + taper * 2.0;
-          const thick = (maxThick * taper) + P * 2;
-          const innerRad = rad - thick;
+        const outlineCol = `rgba(20, 2, 14, ${(0.96 * trailAlpha).toFixed(2)})`; // Deep Obsidian Cursed Ink shell
 
-          const numRadSteps = Math.max(2, Math.round(thick / P));
-          for (let ri = 0; ri <= numRadSteps; ri++) {
-            const currentR = innerRad + (ri / numRadSteps) * thick;
-            const rawX = Math.cos(ang) * currentR;
-            const rawY = Math.sin(ang) * currentR;
-            const px = Math.round(rawX / P) * P;
-            const py = Math.round(rawY / P) * P;
-            ctx.fillRect(px, py, P, P);
-          }
-        }
+        const isInsideSlash = (rx, ry) => {
+          const dist = Math.hypot(rx, ry);
+          if (dist <= 0) return false;
+          let ang = Math.atan2(ry, rx);
+          while (ang < minAng - Math.PI) ang += Math.PI * 2;
+          while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
 
-        // Pass 2: Stepped Pixel Vibrant Cursed Pink & Magenta Core
-        for (let i = 0; i <= arcSteps; i++) {
-          const t = i / arcSteps;
-          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
-          const rad = outerRadius + taper * 1.0;
+          if (ang < minAng || ang > maxAng) return false;
+
+          const t = (ang - currentTailOffset) / span;
+          if (t < 0 || t > 1.0) return false;
+
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
           const thick = maxThick * taper;
-          const innerRad = rad - thick;
+          const outR = outerRadius + taper * 1.5;
+          const inR = outR - thick;
+          return dist >= inR && dist <= outR;
+        };
 
-          const numRadSteps = Math.max(1, Math.round(thick / P));
-          for (let ri = 0; ri <= numRadSteps; ri++) {
-            const rNorm = ri / numRadSteps; // 0 = inner trailing edge, 1 = outer cutting edge
-            const currentR = innerRad + rNorm * thick;
-            const rawX = Math.cos(ang) * currentR;
-            const rawY = Math.sin(ang) * currentR;
-            const px = Math.round(rawX / P) * P;
-            const py = Math.round(rawY / P) * P;
+        const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+        const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+        const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+        const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
 
-            let col = '#FF1493';
-            if (rNorm > 0.85) {
-              col = '#FFF0F8'; // White-pink cutting edge
-            } else if (rNorm > 0.5) {
-              col = '#FF1493'; // Vibrant neon cursed pink
-            } else if (rNorm > 0.25) {
-              col = '#E6007A'; // Deep hot magenta
+        // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border (Clean Ichigo Style) ──
+        for (let gy = minY; gy <= maxY; gy += P) {
+          for (let gx = minX; gx <= maxX; gx += P) {
+            if (!isInsideSlash(gx, gy)) continue;
+
+            const pxX = snap(gx);
+            const pyY = snap(gy);
+
+            // 4-neighbor attached border test matching Ichigo & Saitama
+            const isBorder = !isInsideSlash(gx + P, gy) ||
+                             !isInsideSlash(gx - P, gy) ||
+                             !isInsideSlash(gx, gy + P) ||
+                             !isInsideSlash(gx, gy - P);
+
+            if (isBorder) {
+              ctx.fillStyle = outlineCol;
+              ctx.fillRect(pxX, pyY, P, P);
+              continue;
+            }
+
+            const dist = Math.hypot(gx, gy);
+            let ang = Math.atan2(gy, gx);
+            while (ang < minAng - Math.PI) ang += Math.PI * 2;
+            while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+            const t = (ang - currentTailOffset) / span;
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+            const outR = outerRadius + taper * 1.5;
+            const depthFromApex = outR - dist;
+
+            let col;
+            if (depthFromApex < P * 1.4) {
+              col = '#FFFFFF'; // Razor-sharp white-hot cutting edge apex
+            } else if (depthFromApex < P * 3.0) {
+              col = '#FFF0F8'; // Glowing pastel pink highlight rim
+            } else if (depthFromApex < P * 5.0) {
+              col = '#FF1493'; // Vibrant electric cursed hot-pink
+            } else if (depthFromApex < P * 7.2) {
+              col = '#D80075'; // Deep saturated magenta layer
             } else {
-              col = '#990055'; // Dark violet-magenta inner base
+              col = '#220016'; // Abyssal pitch-black cursed energy void core
             }
 
             ctx.fillStyle = col;
-            ctx.fillRect(px, py, P, P);
+            ctx.fillRect(pxX, pyY, P, P);
           }
-
-          // Pass 3: Leading White-Hot Pixel Cutting Edge
-          const leadRawX = Math.cos(ang) * (outerRadius + taper * 1.0);
-          const leadRawY = Math.sin(ang) * (outerRadius + taper * 1.0);
-          const lpx = Math.round(leadRawX / P) * P;
-          const lpy = Math.round(leadRawY / P) * P;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(lpx, lpy, P, P);
         }
 
-        // Pass 4: Trailing Pixel Cursed Spark Embers
+        // ── Discrete Cursed Energy Stepped Pixel Sparks ──
         const numEmbers = 8;
         for (let eb = 0; eb < numEmbers; eb++) {
           const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-          const ebAng = currentTailOffset + ebT * (currentTipOffset - currentTailOffset);
+          const ebAng = currentTailOffset + ebT * span;
           const ebDist = outerRadius - 10 - eb * 4;
-          const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
-          const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
-          ctx.fillStyle = (eb % 2 === 0) ? '#FF1493' : '#FFFFFF';
+          const ex = snap(Math.cos(ebAng) * ebDist);
+          const ey = snap(Math.sin(ebAng) * ebDist);
+          const col = (eb % 2 === 0) ? '#FF1493' : '#FFFFFF';
+
+          ctx.fillStyle = col;
           ctx.fillRect(ex, ey, P, P);
         }
 

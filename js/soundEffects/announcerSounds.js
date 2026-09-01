@@ -63,7 +63,7 @@ export const ANNOUNCER_SOUNDS = {
     },
     timertick: {
         src: 'Assets/Sound Effects/Announcer/timertick.mp3',
-        volume: 0.9,
+        volume: 0.90,
         speed: 1.0,
         offset: 0.0,
         duration: 1.5,
@@ -77,7 +77,7 @@ export const ANNOUNCER_SOUNDS = {
     },
     ringbell: {
         src: 'Assets/Sound Effects/Announcer/ring-bell.mp3',
-        volume: 0.7,
+        volume: 0.85,
         speed: 1.0,
         offset: 0.0,
         duration: 2.5,

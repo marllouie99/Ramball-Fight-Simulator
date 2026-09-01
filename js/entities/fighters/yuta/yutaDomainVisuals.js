@@ -11,8 +11,10 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 
   ctx.save();
 
-  // Strictly clip Yuta's Domain Expansion visual to the arena boundaries
-  if (arena) {
+  // In Dark Mode: Strictly clip Yuta's Domain Expansion visual to the arena boundaries
+  // In Light Mode: Let the domain visual spread across the full screen unclipped
+  const _isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
+  if (_isDarkMode && arena) {
     ctx.beginPath();
     if (arena.shape === 'circle') {
       const cx = arena.x + arena.width / 2;
@@ -78,38 +80,36 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     }
   }
 
-  if (fighter.domainActive) {
+  if (fighter.domainActive && !isMultiDomain) {
     // ── 2. DARK ATMOSPHERIC VORTEX ──
     ctx.save();
-    ctx.globalAlpha = (0.6 + pulse * 2) * alphaMult;
+    ctx.globalAlpha = (0.45 + pulse * 1.5) * alphaMult;
     
-    // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
+    // Layered alpha circles creating atmospheric depth
     ctx.beginPath();
     ctx.arc(domX, domY - arenaH * 0.45, 600, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(20, 5, 15, 0.4)';
+    ctx.fillStyle = 'rgba(20, 5, 15, 0.25)';
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(domX, domY - arenaH * 0.45, 300, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(12, 2, 7, 0.7)';
+    ctx.fillStyle = 'rgba(12, 2, 7, 0.40)';
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(domX, domY - arenaH * 0.45, 100, 0, Math.PI * 2);
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = 'rgba(5, 1, 3, 0.65)';
     ctx.fill();
     
-    const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-    if (!isMultiDomain) {
-      ctx.strokeStyle = 'rgba(50, 10, 30, 0.3)';
-      for (let i = 0; i < 6; i++) {
-        ctx.lineWidth = 15 + i * 8;
-        ctx.beginPath();
-        ctx.ellipse(domX, domY - arenaH * 0.45, 120 + i * 90, 50 + i * 35, (time * 0.0003) + (i * 0.5), 0, Math.PI * 2);
-        ctx.stroke();
-      }
+    ctx.strokeStyle = 'rgba(50, 10, 30, 0.25)';
+    for (let i = 0; i < 6; i++) {
+      ctx.lineWidth = 12 + i * 6;
+      ctx.beginPath();
+      ctx.ellipse(domX, domY - arenaH * 0.45, 120 + i * 90, 50 + i * 35, (time * 0.0003) + (i * 0.5), 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.restore();
+  }
 
     // ── 3. STATIC DOMAIN ENVIRONMENT (Katanas, Cross Pillars & Chains Cached on Offscreen Canvas) ──
     ctx.save();
@@ -454,7 +454,6 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     }
 
     ctx.restore();
-  }
 
   ctx.restore();
 }

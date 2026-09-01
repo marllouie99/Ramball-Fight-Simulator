@@ -27,9 +27,22 @@ function _getGojoImage() {
   return _gojoImage;
 }
 
-// Preload immediately if running in browser
-if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getGojoImage();
+// Offscreen Low-Res Nearest-Neighbor Arcade Buffer for Gojo's Limitless Infinity Barrier
+let _gojoInfinityArcadeCanvas = null;
+let _gojoInfinityArcadeCtx = null;
+let _gojoInfinityArcadeSize = 0;
+
+function _getGojoInfinityArcadeBuffer(size, scale = 2.5) {
+  const lowSize = Math.max(32, Math.ceil(size / scale));
+  if (!_gojoInfinityArcadeCanvas || _gojoInfinityArcadeSize !== lowSize) {
+    _gojoInfinityArcadeSize = lowSize;
+    _gojoInfinityArcadeCanvas = document.createElement('canvas');
+    _gojoInfinityArcadeCanvas.width = lowSize;
+    _gojoInfinityArcadeCanvas.height = lowSize;
+    _gojoInfinityArcadeCtx = _gojoInfinityArcadeCanvas.getContext('2d');
+    _gojoInfinityArcadeCtx.imageSmoothingEnabled = false;
+  }
+  return { canvas: _gojoInfinityArcadeCanvas, ctx: _gojoInfinityArcadeCtx, lowSize, scale };
 }
 
 export function drawGojoBody(ctx, fighter) {
@@ -80,7 +93,7 @@ export function drawGojoBody(ctx, fighter) {
       }
     }
 
-    // === PIXEL ART GOJO LIMITLESS (INFINITY) SPATIAL DISTORTION BARRIER ===
+    // === PIXEL ART GOJO LIMITLESS (INFINITY) SPATIAL DISTORTION BARRIER (Arcade Buffer) ===
     const isSaitamaCounterActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && (f.characterId === 'saitama' || f.type === 'saitama') && 
       ((f._counterPunchTimer && f._counterPunchTimer > 0) || 
@@ -98,54 +111,56 @@ export function drawGojoBody(ctx, fighter) {
       // Expanding bloom scale during fade-in (0.88 -> 1.0)
       const sizeScale = 0.88 + 0.12 * Math.sin(fadeOpacity * Math.PI * 0.5);
       const barrierRadius = (infinityR + pulse) * sizeScale;
-      const pxSize = 2.5; // Stepped pixel grid size for barrier
 
+      const ARCADE_SCALE = 2.5;
+      const fullDiam = (barrierRadius + 8) * 2;
+      const { canvas: lowCanvas, ctx: lowCtx, lowSize } = _getGojoInfinityArcadeBuffer(fullDiam, ARCADE_SCALE);
+
+      lowCtx.clearRect(0, 0, lowSize, lowSize);
+      lowCtx.imageSmoothingEnabled = false;
+
+      const lowCenter = lowSize / 2;
+      const lowRadius = barrierRadius / ARCADE_SCALE;
+      const lowPx = 1.0;
+
+      // 1. Soft Pixel Atmosphere Aura Fill
+      lowCtx.beginPath();
+      lowCtx.arc(lowCenter, lowCenter, lowRadius, 0, Math.PI * 2);
+      lowCtx.fillStyle = 'rgba(0, 229, 255, 0.18)';
+      lowCtx.fill();
+
+      // 2. Dark Outer Spatial Outline Ring
+      lowCtx.lineWidth = 1.6;
+      lowCtx.strokeStyle = 'rgba(8, 18, 32, 0.90)';
+      lowCtx.beginPath();
+      lowCtx.arc(lowCenter, lowCenter, lowRadius + lowPx, 0, Math.PI * 2);
+      lowCtx.stroke();
+
+      // 3. Electric Cyan Primary Pixel Ring
+      lowCtx.lineWidth = 1.2;
+      lowCtx.strokeStyle = 'rgba(0, 229, 255, 0.98)';
+      lowCtx.beginPath();
+      lowCtx.arc(lowCenter, lowCenter, lowRadius, 0, Math.PI * 2);
+      lowCtx.stroke();
+
+      // 4. Inner White-Hot Specular Core Pixel Ring
+      lowCtx.lineWidth = 0.9;
+      lowCtx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      lowCtx.beginPath();
+      lowCtx.arc(lowCenter, lowCenter, lowRadius - lowPx, 0, Math.PI * 2);
+      lowCtx.stroke();
+
+      // 5. Blit Low-Res Native Arcade Buffer to Main Canvas via Nearest-Neighbor Upscaling
       ctx.save();
       ctx.globalAlpha = (ctx.globalAlpha || 1.0) * fadeOpacity;
-
-      // ── 1. Soft Pixel Atmosphere Aura Fill ──
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(0, 0, barrierRadius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0, 229, 255, 0.16)';
-      ctx.fill();
-      ctx.restore();
-
-      // ── 2. Clean Stepped Concentric Pixel Perimeter Rings ──
-      // 2.1 Dark Outer Spatial Outline Ring
-      ctx.fillStyle = 'rgba(8, 18, 32, 0.85)';
-      for (let a = 0; a < 360; a += 0.8) {
-        const rad = (a * Math.PI) / 180;
-        const bx = Math.round((Math.cos(rad) * (barrierRadius + pxSize)) / pxSize) * pxSize;
-        const by = Math.round((Math.sin(rad) * (barrierRadius + pxSize)) / pxSize) * pxSize;
-        ctx.fillRect(bx, by, pxSize, pxSize);
-      }
-
-      // 2.2 Electric Cyan Primary Pixel Ring
-      ctx.fillStyle = 'rgba(0, 229, 255, 0.95)';
-      for (let a = 0; a < 360; a += 0.8) {
-        const rad = (a * Math.PI) / 180;
-        const bx = Math.round((Math.cos(rad) * barrierRadius) / pxSize) * pxSize;
-        const by = Math.round((Math.sin(rad) * barrierRadius) / pxSize) * pxSize;
-        ctx.fillRect(bx, by, pxSize, pxSize);
-      }
-
-      // 2.3 Inner White-Hot Specular Core Pixel Ring
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-      for (let a = 0; a < 360; a += 0.8) {
-        const rad = (a * Math.PI) / 180;
-        const bx = Math.round((Math.cos(rad) * (barrierRadius - pxSize)) / pxSize) * pxSize;
-        const by = Math.round((Math.sin(rad) * (barrierRadius - pxSize)) / pxSize) * pxSize;
-        ctx.fillRect(bx, by, pxSize, pxSize);
-      }
-
+      ctx.imageSmoothingEnabled = false; // Chunky stepped retro arcade pixel circles!
+      const drawSize = lowSize * ARCADE_SCALE;
+      ctx.drawImage(lowCanvas, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
       ctx.restore();
     }
 
-
-
     // ═══════════════════════════════════════════════════════════════════
-    // AUTHENTIC 1:1 PROCEDURAL PIXEL ART GOJO SATORU SKIN (Discrete Pixel Grid Engine)
+    // AUTHENTIC 1:1 PROCEDURAL PIXEL ART GOJO SATORU SKIN (High Performance Offscreen Cached)
     // ═══════════════════════════════════════════════════════════════════
     drawGojoPixelBody(ctx, fighter.r);
 
@@ -157,13 +172,12 @@ export function drawGojoBody(ctx, fighter) {
     ctx.restore();
 }
 
-/**
- * Authentic 1:1 Procedural Pixel Art Body for Gojo Satoru
- * Uses discrete stepped rasterization loop with zero subpixel bleed.
- */
-export function drawGojoPixelBody(ctx, r) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+// Offscreen canvas cache for Gojo's pixel body model (avoids 1,200 fillRect calls per frame)
+let _cachedGojoCanvas = null;
+let _cachedGojoR = 0;
+
+function _renderGojoPixelBodyToCanvas(destCtx, r) {
+  destCtx.imageSmoothingEnabled = false;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
@@ -196,6 +210,12 @@ export function drawGojoPixelBody(ctx, r) {
     uniformDither: '#181326'   // Bottom perimeter shadow
   };
 
+  const cx = destCtx.canvas.width / 2;
+  const cy = destCtx.canvas.height / 2;
+
+  destCtx.save();
+  destCtx.translate(cx, cy);
+
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -215,8 +235,8 @@ export function drawGojoPixelBody(ctx, r) {
         Math.hypot(rx, ry + P) > r ||
         Math.hypot(rx, ry - P) > r
       ) {
-        ctx.fillStyle = C.outline;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = C.outline;
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -228,12 +248,10 @@ export function drawGojoPixelBody(ctx, r) {
       // ──────────────────────────────────────────
       // 1. SCULPTED CHARCOAL BLINDFOLD GEOMETRY (1:1 Anime Reference)
       // ──────────────────────────────────────────
-      // Top edge: Sleek, clean forehead line (-0.28) without bulky upward central bump
       const getBlindfoldTopY = (ax) => {
         return -0.28;
       };
 
-      // Bottom edge: Distinct concave nose arch at center, smooth dual eye-cover dips (+0.10), tapering back up to temples
       const getBlindfoldBottomY = (ax) => {
         if (ax <= 0.82) {
           return -0.02 + 0.12 * Math.sin(ax * (Math.PI / 0.82));
@@ -254,10 +272,9 @@ export function drawGojoPixelBody(ctx, r) {
       // ──────────────────────────────────────────
       if (ny < blindfoldTopY) {
         if (isInsideBlindfold(nx, ny + P / r)) {
-          ctx.fillStyle = C.outline;
+          destCtx.fillStyle = C.outline;
         } else {
           let col = C.hairWhite;
-          // Outer corner dither
           if (absX >= 0.55) {
             const dLevel = (absX - 0.55) / 0.45;
             if (dLevel > 0.5) {
@@ -265,14 +282,12 @@ export function drawGojoPixelBody(ctx, r) {
             } else if ((gx + gy) % 3 === 0) {
               col = C.hairBlue;
             }
-          }
-          // Curved vertical hair partition lines
-          else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
+          } else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
             col = C.hairBlue;
           }
-          ctx.fillStyle = col;
+          destCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE B: SCULPTED CHARCOAL BLINDFOLD (isInsideBlindfold)
@@ -284,53 +299,44 @@ export function drawGojoPixelBody(ctx, r) {
                          !isInsideBlindfold(nx + P / r, ny);
 
         if (isBorder) {
-          ctx.fillStyle = C.outline;
+          destCtx.fillStyle = C.outline;
         } else {
           let col = C.blindfoldMid;
 
-          // Top highlight sheen rim
           if (ny < blindfoldTopY + 0.05) {
             col = C.blindfoldTop;
-          }
-          // Dual eye bulge silk leather specular reflection (matching anime reference)
-          else if (absX >= 0.18 && absX <= 0.60 && ny >= -0.20 && ny <= 0.04) {
+          } else if (absX >= 0.18 && absX <= 0.60 && ny >= -0.20 && ny <= 0.04) {
             const eyeCenterX = 0.39;
             const eyeDist = Math.hypot((absX - eyeCenterX) * 1.5, ny - (-0.08));
             if (eyeDist <= 0.10) {
-              col = '#484C5E'; // Center eye bulge glint
+              col = '#484C5E';
             } else if (eyeDist <= 0.18) {
-              col = '#383B4A'; // Secondary eye sheen
+              col = '#383B4A';
             } else if (Math.abs(ny - (-0.14)) <= P / r * 0.7) {
-              col = C.blindfoldCrease1; // Fabric tension crease
+              col = C.blindfoldCrease1;
             }
-          }
-          // Crease line in center nose region
-          else if (absX <= 0.12 && Math.abs(ny - (-0.14)) <= P / r * 0.7) {
+          } else if (absX <= 0.12 && Math.abs(ny - (-0.14)) <= P / r * 0.7) {
             col = C.blindfoldCrease1;
-          }
-          // Lower shadow shelf
-          else if (ny >= blindfoldBottomY - 0.05) {
+          } else if (ny >= blindfoldBottomY - 0.05) {
             col = C.blindfoldCrease2;
           }
 
-          // Temple corner dither
           if (absX >= 0.62 && (gx + gy) % 2 === 0) {
             col = C.blindfoldCorner;
           }
 
-          ctx.fillStyle = col;
+          destCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE C: WARM FAIR SKIN & CHEEKS (blindfoldBottomY <= ny < 0.24)
       // ──────────────────────────────────────────
       else if (ny < 0.24) {
         if (isInsideBlindfold(nx, ny - P / r)) {
-          ctx.fillStyle = C.outline;
+          destCtx.fillStyle = C.outline;
         } else {
           let col = C.skinBase;
-          // Left & right cheek shadow dither
           if (absX >= 0.55) {
             const dLevel = (absX - 0.55) / 0.45;
             if (dLevel > 0.6) {
@@ -339,54 +345,71 @@ export function drawGojoPixelBody(ctx, r) {
               col = C.skinShadow1;
             }
           }
-          ctx.fillStyle = col;
+          destCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE D: JUJUTSU HIGH UNIFORM (ny >= 0.24)
       // ──────────────────────────────────────────
       else {
-        // Center covered zipper placket (-0.06 <= nx <= 0.06)
         const isZipper = (absX <= 0.07);
         const isZipperSeam = (Math.abs(absX - 0.07) <= P / r * 0.6);
         const isZipperHighlight = (nx >= -0.06 && nx <= -0.03 && ny >= 0.28);
 
-        // Collar top horizontal rim (ny ~ 0.24)
         const isCollarRim = (ny <= 0.27 && absX <= 0.50);
         const isCollarHighlight = (ny >= 0.27 && ny <= 0.30 && absX <= 0.50);
 
-        // Horizontal ribbed collar creases (ny ~ 0.34 and ny ~ 0.44)
         const isCrease1 = (Math.abs(ny - 0.35) <= P / r * 0.7 && absX <= 0.55);
         const isCrease1Hi = (Math.abs(ny - 0.32) <= P / r * 0.7 && absX <= 0.55);
         const isCrease2 = (Math.abs(ny - 0.46) <= P / r * 0.7 && absX <= 0.65);
         const isCrease2Hi = (Math.abs(ny - 0.43) <= P / r * 0.7 && absX <= 0.65);
 
         if (isZipperHighlight) {
-          ctx.fillStyle = C.uniformHighlight;
+          destCtx.fillStyle = C.uniformHighlight;
         } else if (isZipperSeam) {
-          ctx.fillStyle = C.outline;
+          destCtx.fillStyle = C.outline;
         } else if (isZipper) {
-          ctx.fillStyle = C.uniformZipper;
+          destCtx.fillStyle = C.uniformZipper;
         } else if (isCollarRim) {
-          ctx.fillStyle = C.outline;
+          destCtx.fillStyle = C.outline;
         } else if (isCollarHighlight) {
-          ctx.fillStyle = C.uniformHighlight;
+          destCtx.fillStyle = C.uniformHighlight;
         } else if (isCrease1 || isCrease2) {
-          ctx.fillStyle = C.uniformCrease;
+          destCtx.fillStyle = C.uniformCrease;
         } else if (isCrease1Hi || isCrease2Hi) {
-          ctx.fillStyle = C.uniformHighlight;
+          destCtx.fillStyle = C.uniformHighlight;
         } else {
           let col = C.uniformBase;
           if (absX > 0.68 || ny > 0.82) {
             if ((gx + gy) % 2 === 0) col = C.uniformDither;
           }
-          ctx.fillStyle = col;
+          destCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
     }
   }
 
+  destCtx.restore();
+}
+
+/**
+ * Authentic 1:1 Procedural Pixel Art Body for Gojo Satoru (High Performance Offscreen Cached)
+ */
+export function drawGojoPixelBody(ctx, r) {
+  if (!_cachedGojoCanvas || _cachedGojoR !== r) {
+    _cachedGojoR = r;
+    const size = Math.ceil((r + 4) * 2);
+    _cachedGojoCanvas = document.createElement('canvas');
+    _cachedGojoCanvas.width = size;
+    _cachedGojoCanvas.height = size;
+    const offCtx = _cachedGojoCanvas.getContext('2d');
+    _renderGojoPixelBodyToCanvas(offCtx, r);
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(_cachedGojoCanvas, -_cachedGojoCanvas.width / 2, -_cachedGojoCanvas.height / 2);
   ctx.restore();
 }

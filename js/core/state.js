@@ -407,20 +407,13 @@ export function clearProjectiles() {
 
 export function isChampionScreenActive() {
   if (!state) return false;
-  if (state.gameState === 'matchEnd') return true;
-  if (state.ffaMatchComplete) return true;
-  
-  if (state.gameState === 'roundEnd') {
-    const roundWinner = state.roundWinner;
-    const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
-    const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
-    const winThresholdForReveal = modeRounds === 1 ? 1 : 2;
-    const hasTwoWins = winnerIndex >= 0 && state.scores && state.scores[winnerIndex] >= winThresholdForReveal;
-    if (hasTwoWins && roundWinner) {
-      return true;
-    }
-  }
-  return false;
+  const isDark = Boolean(
+    state.arenaTheme === 'dark' ||
+    state.darkMode ||
+    (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+  );
+  if (isDark) return false;
+  return Boolean(state._isChampionLayoutActive);
 }
 
 export function triggerGlobalScreenShake(intensity, duration) {

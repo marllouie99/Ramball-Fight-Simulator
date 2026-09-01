@@ -292,6 +292,9 @@ export class GetsugaBehavior extends ProjectileBehavior {
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100)))));
 
     // 4. Piercing Sweep: Cleave all valid enemy entities in the crescent wave's path
+    if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0) {
+      return false;
+    }
     for (let i = 0; i < allCandidates.length; i++) {
       const f = allCandidates[i];
       if (!f || f.hp <= 0 || f.isDead || f.dead || f.isRespawning || f === attacker || f.owner === attacker) continue;
@@ -358,6 +361,9 @@ export class GetsugaBehavior extends ProjectileBehavior {
                 ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16)
                 : (CONFIG.ichigo?.getsugaTickDamage || projectile.damage || 10))));
         applyDamageToTarget(f, tickDamage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, isFinalGetsugaTick: isFinal, isFinalMassiveGetsuga: isFinal, projectile });
+        if (attacker && typeof attacker.applyHollowLifesteal === 'function') {
+          attacker.applyHollowLifesteal(tickDamage, f);
+        }
         suppressAfterimagesAndAttackEffects(f);
 
         const isGetsugaAdapted = Boolean(f.adaptedGetsuga || (f.adaptedSkills && (f.adaptedSkills['getsugaTensho'] || f.adaptedSkills['getsuga'])));

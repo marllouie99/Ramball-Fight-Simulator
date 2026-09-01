@@ -108,12 +108,16 @@ export function drawAuthenticBrassKnucklesShape(ctx, scale = 1.0, opts = {}) {
   ctx.restore();
 }
 
+let _cachedBulletTrailGrad = null;
+
 function _getBulletTrailGrad(ctx) {
-  const g = ctx.createLinearGradient(-26, 0, 8, 0);
-  g.addColorStop(0, 'rgba(245, 158, 11, 0)');
-  g.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
-  g.addColorStop(1, 'rgba(254, 240, 138, 0.95)');
-  return g;
+  if (!_cachedBulletTrailGrad) {
+    _cachedBulletTrailGrad = ctx.createLinearGradient(-26, 0, 8, 0);
+    _cachedBulletTrailGrad.addColorStop(0, 'rgba(245, 158, 11, 0)');
+    _cachedBulletTrailGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+    _cachedBulletTrailGrad.addColorStop(1, 'rgba(254, 240, 138, 0.95)');
+  }
+  return _cachedBulletTrailGrad;
 }
 
 /**
@@ -313,6 +317,7 @@ let _cachedUziRecGrad = null;
 let _cachedUziBarrelGrad = null;
 
 function _initUziGradients(ctx) {
+  if (_cachedUziMagGrad) return;
   _cachedUziMagGrad = ctx.createLinearGradient(-2.5, 0, 2.5, 0);
   _cachedUziMagGrad.addColorStop(0.0, '#1E232B');
   _cachedUziMagGrad.addColorStop(0.35, '#3B4452');
@@ -1069,6 +1074,7 @@ let _cachedTec9ShroudGrad = null;
 let _cachedTec9CapGrad = null;
 
 function _initTec9Gradients(ctx) {
+  if (_cachedTec9MagGrad) return;
   _cachedTec9MagGrad = ctx.createLinearGradient(-3, 0, 3, 0);
   _cachedTec9MagGrad.addColorStop(0.0, '#161B22');
   _cachedTec9MagGrad.addColorStop(0.35, '#2D3644');
@@ -2798,6 +2804,8 @@ export function drawCjMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}
     return;
   }
 
+  _initMinigunGradients(ctx);
+
   ctx.save();
   let posX = x;
   let posY = y;
@@ -2857,14 +2865,8 @@ export function drawCjMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}
     ctx.fillRect(lx, motorY + motorH - 0.5, 1.4, 2.8);
   });
 
-  // Cylindrical Motor Pod Body (Matte Military Olive-Drab Finish)
-  const motorGrad = ctx.createLinearGradient(0, motorY, 0, motorY + motorH);
-  motorGrad.addColorStop(0.00, '#364323'); // Army green top highlight
-  motorGrad.addColorStop(0.30, '#4A5A2F'); // Olive drab sheen
-  motorGrad.addColorStop(0.70, '#2C361C'); // Matte body
-  motorGrad.addColorStop(1.00, '#161D0E'); // Underside shadow
-
-  ctx.fillStyle = motorGrad;
+  // Cylindrical Motor Pod Body (Matte Military Olive-Drab Finish - Cached)
+  ctx.fillStyle = _cachedMinigunMotorGrad;
   ctx.strokeStyle = '#020617';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -2918,14 +2920,8 @@ export function drawCjMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}
   const recW = 25.0;
   const recH = 12.0;
 
-  // Military Olive-Drab Upper Receiver Housing
-  const recGrad = ctx.createLinearGradient(0, recY, 0, recY + recH);
-  recGrad.addColorStop(0.00, '#364323'); // Top olive highlight
-  recGrad.addColorStop(0.25, '#526435'); // Army green specular sheen
-  recGrad.addColorStop(0.60, '#364323'); // Matte body
-  recGrad.addColorStop(1.00, '#1A2111'); // Dark army shadow
-
-  ctx.fillStyle = recGrad;
+  // Military Olive-Drab Upper Receiver Housing (Cached)
+  ctx.fillStyle = _cachedMinigunRecGrad;
   ctx.strokeStyle = '#020617';
   ctx.lineWidth = 1.3;
   ctx.beginPath();
@@ -3069,13 +3065,8 @@ export function drawCjMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}
   const loopTopY = -18.5;
   const loopH = 25.5;
 
-  // Upright Bracket Loop Ring (Olive Drab with Dark Iron Core)
-  const loopGrad = ctx.createLinearGradient(0, loopTopY, 0, loopTopY + loopH);
-  loopGrad.addColorStop(0.0, '#364323');
-  loopGrad.addColorStop(0.5, '#4A5A2F');
-  loopGrad.addColorStop(1.0, '#212915');
-
-  ctx.fillStyle = loopGrad;
+  // Upright Bracket Loop Ring (Olive Drab with Dark Iron Core - Cached)
+  ctx.fillStyle = _cachedMinigunLoopGrad;
   ctx.strokeStyle = '#020617';
   ctx.lineWidth = 1.3;
   ctx.beginPath();
@@ -3108,12 +3099,7 @@ export function drawCjMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}
   const bridgeY = -14.5;
   const bridgeH = 2.8;
 
-  const bridgeGrad = ctx.createLinearGradient(0, bridgeY, 0, bridgeY + bridgeH);
-  bridgeGrad.addColorStop(0.0, '#475569');
-  bridgeGrad.addColorStop(0.4, '#64748B'); // Metallic steel sheen
-  bridgeGrad.addColorStop(1.0, '#1E232B');
-
-  ctx.fillStyle = bridgeGrad;
+  ctx.fillStyle = _cachedMinigunBridgeGrad;
   ctx.strokeStyle = '#020617';
   ctx.lineWidth = 1.1;
   ctx.beginPath();
@@ -3253,8 +3239,14 @@ let _cachedTopBarrelGrad = null;
 let _cachedBottomBarrelGrad = null;
 let _cachedHeatGrad = null;
 let _cachedClampGrad = null;
+let _cachedMinigunMotorGrad = null;
+let _cachedMinigunRecGrad = null;
+let _cachedMinigunLoopGrad = null;
+let _cachedMinigunBridgeGrad = null;
 
 function _initMinigunGradients(ctx) {
+  if (_cachedTopBarrelGrad) return;
+
   _cachedTopBarrelGrad = ctx.createLinearGradient(0, -1.2, 0, 1.2);
   _cachedTopBarrelGrad.addColorStop(0.00, '#384556');
   _cachedTopBarrelGrad.addColorStop(0.25, '#71829B');
@@ -3278,6 +3270,36 @@ function _initMinigunGradients(ctx) {
   _cachedClampGrad.addColorStop(0.25, '#475569');
   _cachedClampGrad.addColorStop(0.70, '#1E232B');
   _cachedClampGrad.addColorStop(1.00, '#0F1217');
+
+  const motorY = 4.5;
+  const motorH = 9.5;
+  _cachedMinigunMotorGrad = ctx.createLinearGradient(0, motorY, 0, motorY + motorH);
+  _cachedMinigunMotorGrad.addColorStop(0.00, '#364323');
+  _cachedMinigunMotorGrad.addColorStop(0.30, '#4A5A2F');
+  _cachedMinigunMotorGrad.addColorStop(0.70, '#2C361C');
+  _cachedMinigunMotorGrad.addColorStop(1.00, '#161D0E');
+
+  const recY = -7.5;
+  const recH = 12.0;
+  _cachedMinigunRecGrad = ctx.createLinearGradient(0, recY, 0, recY + recH);
+  _cachedMinigunRecGrad.addColorStop(0.00, '#364323');
+  _cachedMinigunRecGrad.addColorStop(0.25, '#526435');
+  _cachedMinigunRecGrad.addColorStop(0.60, '#364323');
+  _cachedMinigunRecGrad.addColorStop(1.00, '#1A2111');
+
+  const loopTopY = -18.5;
+  const loopH = 25.5;
+  _cachedMinigunLoopGrad = ctx.createLinearGradient(0, loopTopY, 0, loopTopY + loopH);
+  _cachedMinigunLoopGrad.addColorStop(0.0, '#364323');
+  _cachedMinigunLoopGrad.addColorStop(0.5, '#4A5A2F');
+  _cachedMinigunLoopGrad.addColorStop(1.0, '#212915');
+
+  const bridgeY = -14.5;
+  const bridgeH = 2.8;
+  _cachedMinigunBridgeGrad = ctx.createLinearGradient(0, bridgeY, 0, bridgeY + bridgeH);
+  _cachedMinigunBridgeGrad.addColorStop(0.0, '#475569');
+  _cachedMinigunBridgeGrad.addColorStop(0.4, '#64748B');
+  _cachedMinigunBridgeGrad.addColorStop(1.0, '#1E232B');
 }
 
 /**
@@ -3363,14 +3385,18 @@ function _drawMinigunClampRing(ctx, x, y, w, h) {
   ctx.restore();
 }
 
+let _cachedMuzzleGlowGrad = null;
+
 function _getMuzzleGlowGrad(ctx, glowR) {
-  const g = ctx.createRadialGradient(4, 0, 0, 4, 0, 48);
-  g.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
-  g.addColorStop(0.25, 'rgba(254, 240, 138, 0.88)');
-  g.addColorStop(0.55, 'rgba(249, 115, 22, 0.55)');
-  g.addColorStop(0.82, 'rgba(220, 38, 38, 0.20)');
-  g.addColorStop(1.0, 'rgba(220, 38, 38, 0)');
-  return g;
+  if (!_cachedMuzzleGlowGrad) {
+    _cachedMuzzleGlowGrad = ctx.createRadialGradient(4, 0, 0, 4, 0, 48);
+    _cachedMuzzleGlowGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
+    _cachedMuzzleGlowGrad.addColorStop(0.25, 'rgba(254, 240, 138, 0.88)');
+    _cachedMuzzleGlowGrad.addColorStop(0.55, 'rgba(249, 115, 22, 0.55)');
+    _cachedMuzzleGlowGrad.addColorStop(0.82, 'rgba(220, 38, 38, 0.20)');
+    _cachedMuzzleGlowGrad.addColorStop(1.0, 'rgba(220, 38, 38, 0)');
+  }
+  return _cachedMuzzleGlowGrad;
 }
 
 /**
@@ -3525,13 +3551,17 @@ function _drawMinigunRotationalMuzzleFlash(ctx, x, y, scale = 1.0, spinAngle = 0
   ctx.restore();
 }
 
+let _cachedMinigunTrailGrad = null;
+
 function _getMinigunTrailGrad(ctx) {
-  const g = ctx.createLinearGradient(-38, 0, 14, 0);
-  g.addColorStop(0, 'rgba(234, 88, 12, 0)');
-  g.addColorStop(0.35, 'rgba(245, 158, 11, 0.65)');
-  g.addColorStop(0.75, 'rgba(251, 191, 36, 0.95)');
-  g.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
-  return g;
+  if (!_cachedMinigunTrailGrad) {
+    _cachedMinigunTrailGrad = ctx.createLinearGradient(-38, 0, 14, 0);
+    _cachedMinigunTrailGrad.addColorStop(0, 'rgba(234, 88, 12, 0)');
+    _cachedMinigunTrailGrad.addColorStop(0.35, 'rgba(245, 158, 11, 0.65)');
+    _cachedMinigunTrailGrad.addColorStop(0.75, 'rgba(251, 191, 36, 0.95)');
+    _cachedMinigunTrailGrad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
+  }
+  return _cachedMinigunTrailGrad;
 }
 
 /**

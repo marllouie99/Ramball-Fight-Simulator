@@ -472,7 +472,7 @@ export const SKILL_SOUNDS = {
     },
     get finalGetsugaVoice() {
       return {
-        src: CONFIG.ichigo?.sounds?.finalGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3',
+        src: CONFIG.ichigo?.sounds?.finalGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3',
         volume: CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice !== undefined ? CONFIG.ichigo.soundVolumes.finalGetsugaVoice : 3.0,
         delay: 0
       };

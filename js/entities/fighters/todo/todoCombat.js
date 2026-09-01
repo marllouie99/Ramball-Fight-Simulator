@@ -155,8 +155,8 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     // Todo enters the Zone!
     this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
   } else {
-    // Spiky Crescent Impact for normal punch
-    spawnAnimePunchImpactFrame(target.x, target.y, 55, angle);
+    // Shockwave Ring Impact for normal punch
+    spawnAnimePunchImpactFrame(target.x, target.y, 55, angle, 'purple');
     playTodoPunchSound(this, isCombo);
   }
 

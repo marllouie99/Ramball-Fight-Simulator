@@ -671,7 +671,9 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 
   const isSwinging = (punchAnimTimer > 0) || (isCleaving && (fighterObj?.cleaveWindupTimer > 0));
 
-  if (fighterObj && !isGojoDomainActive && isSwinging) {
+  const isSuppressed = fighterObj?.isTargetOfAmbush || (typeof fighterObj?.areAttackEffectsSuppressed === 'function' && fighterObj.areAttackEffectsSuppressed());
+
+  if (fighterObj && !isGojoDomainActive && !isSuppressed && isSwinging) {
     const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
     const elapsed = maxTimer - punchAnimTimer;
     const rawP = Math.min(1.0, Math.max(0.0, elapsed / maxTimer));
@@ -719,75 +721,108 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       const totalStages = ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0));
       const isLevel8 = totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted;
 
-      const P = 2.4; // Pixel art grid scale
-      const outerRadius = r + 68;
-      const maxThick = 24.0;
-      const totalAngle = Math.abs(currentTipOffset - currentTailOffset);
-      const arcSteps = Math.max(16, Math.round((totalAngle * outerRadius) / (P * 1.5)));
+      const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
+      const snap = (v) => Math.round(v / P) * P;
 
-      // Pass 1: Pixel-Art Dark Ink Outline Shell
-      ctx.fillStyle = `rgba(17, 17, 20, ${0.92 * trailAlpha})`;
-      for (let i = 0; i <= arcSteps; i++) {
-        const t = i / arcSteps;
-        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
-        const rad = outerRadius + taper * 2.0;
-        const thick = (maxThick * taper) + P * 2;
-        const innerRad = rad - thick;
+      const outerRadius = r + (isLevel8 ? 76 : 68);
+      const maxThick = isLevel8 ? 26.0 : 22.0;
+      const span = currentTipOffset - currentTailOffset;
+      const minAng = Math.min(currentTipOffset, currentTailOffset);
+      const maxAng = Math.max(currentTipOffset, currentTailOffset);
 
-        const numRadSteps = Math.max(2, Math.round(thick / P));
-        for (let ri = 0; ri <= numRadSteps; ri++) {
-          const currentR = innerRad + (ri / numRadSteps) * thick;
-          const rawX = Math.cos(ang) * currentR;
-          const rawY = Math.sin(ang) * currentR;
-          const px = Math.round(rawX / P) * P;
-          const py = Math.round(rawY / P) * P;
-          ctx.fillRect(px, py, P, P);
-        }
-      }
+      const outlineCol = `rgba(17, 17, 20, ${(0.96 * trailAlpha).toFixed(2)})`;
 
-      // Pass 2: Stepped Pixel Divine Gold / Fiery Core
-      for (let i = 0; i <= arcSteps; i++) {
-        const t = i / arcSteps;
-        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
-        const rad = outerRadius + taper * 1.0;
+      const isInsideSlash = (rx, ry) => {
+        const dist = Math.hypot(rx, ry);
+        if (dist <= 0) return false;
+        let ang = Math.atan2(ry, rx);
+        while (ang < minAng - Math.PI) ang += Math.PI * 2;
+        while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+        if (ang < minAng || ang > maxAng) return false;
+
+        const t = (ang - currentTailOffset) / span;
+        if (t < 0 || t > 1.0) return false;
+
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
         const thick = maxThick * taper;
-        const innerRad = rad - thick;
+        const outRad = outerRadius + taper * 1.5;
+        const inRad = outRad - thick;
+        return dist >= inRad && dist <= outRad;
+      };
 
-        const numRadSteps = Math.max(1, Math.round(thick / P));
-        for (let ri = 0; ri <= numRadSteps; ri++) {
-          const rNorm = ri / numRadSteps; // 0 = inner, 1 = outer edge
-          const currentR = innerRad + rNorm * thick;
-          const rawX = Math.cos(ang) * currentR;
-          const rawY = Math.sin(ang) * currentR;
-          const px = Math.round(rawX / P) * P;
-          const py = Math.round(rawY / P) * P;
+      const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+      const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+      const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+      const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+
+      // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border ──
+      for (let gy = minY; gy <= maxY; gy += P) {
+        for (let gx = minX; gx <= maxX; gx += P) {
+          if (!isInsideSlash(gx, gy)) continue;
+
+          const pxX = snap(gx);
+          const pyY = snap(gy);
+
+          const isBorder = !isInsideSlash(gx + P, gy) ||
+                           !isInsideSlash(gx - P, gy) ||
+                           !isInsideSlash(gx, gy + P) ||
+                           !isInsideSlash(gx, gy - P);
+
+          if (isBorder) {
+            ctx.fillStyle = outlineCol;
+            ctx.fillRect(pxX, pyY, P, P);
+            continue;
+          }
+
+          const dist = Math.hypot(gx, gy);
+          let ang = Math.atan2(gy, gx);
+          while (ang < minAng - Math.PI) ang += Math.PI * 2;
+          while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+          const t = (ang - currentTailOffset) / span;
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+          const outRad = outerRadius + taper * 1.5;
+          const depthFromApex = outRad - dist;
 
           let col;
           if (isLevel8) {
-            if (rNorm > 0.85) col = '#FFFFFF';
-            else if (rNorm > 0.6) col = '#FFA500';
-            else if (rNorm > 0.3) col = '#FF4500';
-            else col = '#8B0000';
+            if (depthFromApex < P * 1.4) {
+              col = '#FFFFFF';
+            } else if (depthFromApex < P * 3.0) {
+              col = '#FFA500';
+            } else if (depthFromApex < P * 5.5) {
+              col = '#FF4500';
+            } else {
+              col = '#8B0000';
+            }
           } else {
-            if (rNorm > 0.85) col = '#FFFFE0';
-            else if (rNorm > 0.6) col = '#FFD700';
-            else if (rNorm > 0.3) col = '#DAA520';
-            else col = '#8B6508';
+            if (depthFromApex < P * 1.4) {
+              col = '#FFFFEE';
+            } else if (depthFromApex < P * 3.0) {
+              col = '#FFD700';
+            } else if (depthFromApex < P * 5.5) {
+              col = '#DAA520';
+            } else {
+              col = '#5C4008';
+            }
           }
 
           ctx.fillStyle = col;
-          ctx.fillRect(px, py, P, P);
+          ctx.fillRect(pxX, pyY, P, P);
         }
+      }
 
-        // Pass 3: Leading Searing White-Gold Cutting Edge Pixels
-        const leadRawX = Math.cos(ang) * (outerRadius + taper * 1.0);
-        const leadRawY = Math.sin(ang) * (outerRadius + taper * 1.0);
-        const lpx = Math.round(leadRawX / P) * P;
-        const lpy = Math.round(leadRawY / P) * P;
-        ctx.fillStyle = isLevel8 ? '#FFFFFF' : '#FFFFEE';
-        ctx.fillRect(lpx, lpy, P, P);
+      // Trailing Divine / Fiery Pixel Sparks
+      const numEmbers = isLevel8 ? 8 : 5;
+      for (let eb = 0; eb < numEmbers; eb++) {
+        const ebT = (eb / numEmbers + (Date.now() / 250)) % 1.0;
+        const ebAng = currentTailOffset + ebT * span;
+        const ebDist = outerRadius - 8 - eb * 3.5;
+        const ex = snap(Math.cos(ebAng) * ebDist);
+        const ey = snap(Math.sin(ebAng) * ebDist);
+        const col = isLevel8 ? ((eb % 2 === 0) ? '#FF4500' : '#FFFFFF') : ((eb % 2 === 0) ? '#FFD700' : '#FFFFFF');
+
+        ctx.fillStyle = col;
+        ctx.fillRect(ex, ey, P, P);
       }
 
       ctx.restore();

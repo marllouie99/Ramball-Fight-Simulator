@@ -342,57 +342,13 @@ export class SukunaRenderer {
       if ((layer === 'all' || layer === 'back') && !hideBackHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
     }
 
-    // 2. Draw Stepped Pixel-Art Hands (back hand behind body, front hand on top of body)
+    // 2. Draw Stepped Pixel-Art Hands (High-Performance Offscreen Cached)
     const handRadius = getHandSize(7.5, fighter);
     const skinColor = fighter.color || '#8B0000';
 
+    const canvas = SukunaRenderer._getSukunaHandCanvas(handRadius, skinColor);
     const _drawPixelFist = (hx, hy) => {
-      const P = 2.0;
-      const gridR = Math.max(P * 2, handRadius);
-      const steps = Math.ceil(gridR / P);
-
-      // Outer Dark Shell
-      ctx.fillStyle = '#0E0F14';
-      for (let gy = -steps; gy <= steps; gy++) {
-        for (let gx = -steps; gx <= steps; gx++) {
-          const dist = Math.hypot(gx * P, gy * P);
-          if (dist <= gridR + P * 0.75) {
-            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
-          }
-        }
-      }
-
-      // Inner Crimson Skin Tone
-      ctx.fillStyle = skinColor;
-      const innerR = gridR - P * 0.4;
-      for (let gy = -steps; gy <= steps; gy++) {
-        for (let gx = -steps; gx <= steps; gx++) {
-          const dist = Math.hypot(gx * P, gy * P);
-          if (dist <= innerR) {
-            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
-          }
-        }
-      }
-
-      // Deep Crimson Knuckle / Edge Shading
-      ctx.fillStyle = '#5B0610';
-      for (let gy = 0; gy <= steps; gy++) {
-        for (let gx = -steps; gx <= steps; gx++) {
-          const dist = Math.hypot(gx * P, gy * P);
-          if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
-            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
-          }
-        }
-      }
-
-      // Knuckle Specular Highlight
-      ctx.fillStyle = '#B21E35';
-      ctx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
-      ctx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
-
-      // Wrist Cursed Band Tattoo
-      ctx.fillStyle = '#0E0F14';
-      ctx.fillRect(Math.round(hx - innerR * 0.7), Math.round(hy - P * 0.5), P * 1.5, P * 2);
+      ctx.drawImage(canvas, Math.round(hx - canvas.width / 2), Math.round(hy - canvas.height / 2));
     };
 
     ctx.save();
@@ -1651,6 +1607,70 @@ export class SukunaRenderer {
     baseSkulls.forEach(sk => {
       fighter._drawRealisticSkull(ctx, sk.x, sk.y, sk.s, sk.d || false);
     });
+  }
+
+  // Cached offscreen canvas for Sukuna's pixel fists (avoids 400 fillRect calls per frame)
+  static _getSukunaHandCanvas(handRadius, skinColor) {
+    if (!SukunaRenderer._handCanvas || SukunaRenderer._handR !== handRadius || SukunaRenderer._handColor !== skinColor) {
+      SukunaRenderer._handR = handRadius;
+      SukunaRenderer._handColor = skinColor;
+      const P = 2.0;
+      const gridR = Math.max(P * 2, handRadius);
+      const steps = Math.ceil(gridR / P);
+      const size = Math.ceil((gridR + P * 2) * 2);
+
+      SukunaRenderer._handCanvas = document.createElement('canvas');
+      SukunaRenderer._handCanvas.width = size;
+      SukunaRenderer._handCanvas.height = size;
+      const offCtx = SukunaRenderer._handCanvas.getContext('2d');
+      offCtx.imageSmoothingEnabled = false;
+      const hx = size / 2;
+      const hy = size / 2;
+
+      // Outer Dark Shell
+      offCtx.fillStyle = '#0E0F14';
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= gridR + P * 0.75) {
+            offCtx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Inner Crimson Skin Tone
+      offCtx.fillStyle = skinColor;
+      const innerR = gridR - P * 0.4;
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR) {
+            offCtx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Deep Crimson Knuckle / Edge Shading
+      offCtx.fillStyle = '#5B0610';
+      for (let gy = 0; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+            offCtx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Knuckle Specular Highlight
+      offCtx.fillStyle = '#B21E35';
+      offCtx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
+      offCtx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
+
+      // Wrist Cursed Band Tattoo
+      offCtx.fillStyle = '#0E0F14';
+      offCtx.fillRect(Math.round(hx - innerR * 0.7), Math.round(hy - P * 0.5), P * 1.5, P * 2);
+    }
+    return SukunaRenderer._handCanvas;
   }
 
   // PUBLIC: Draw domain liquid water floor BEFORE fighters so they aren't overlayed

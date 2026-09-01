@@ -269,8 +269,8 @@ export const ichigoConfig = {
     bankaiReleaseFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
     bankaiEnded: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     bankaiGetsugaVoice: 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3',
-    finalGetsugaCharge: 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3',
-    finalGetsugaVoice: 'Assets/Sound Effects/Skills/ichigo-getsugatensho-voiceline.mp3',
+    finalGetsugaCharge: 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3',
+    finalGetsugaVoice: 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3',
     finalHollowGetsugaVoice: 'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3'
   },
   soundVolumes: {

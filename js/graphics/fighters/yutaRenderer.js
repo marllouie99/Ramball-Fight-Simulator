@@ -800,34 +800,49 @@ export class YutaRenderer {
           
           if (slashActive && slashAlpha > 0.05) {
             ctx.save();
-            const clawRadii = [r * 1.5, r * 1.85, r * 2.2];
+            const P = 2.0;
+            const snap = (v) => Math.round(v / P) * P;
+            const clawRadii = [r * 1.45, r * 1.80, r * 2.15];
             const startAngle = (isLeftArm ? 0 : 0) + startAng;
             const endAngle = (isLeftArm ? 0 : 0) + (slashProgress === 1.0 ? targetAng : angleOffset);
-            const numSteps = 16;
+            const numSteps = 24;
             
             clawRadii.forEach((radius) => {
+              // Pass 1: Dark Obsidian Ink Outline Border
+              ctx.fillStyle = `rgba(18, 5, 14, ${slashAlpha * 0.95})`;
               for (let s = 0; s <= numSteps; s++) {
                 const stepProg = s / numSteps;
                 const curA = startAngle + (endAngle - startAngle) * stepProg;
                 const ax = Math.cos(curA) * radius;
                 const ay = Math.sin(curA) * radius;
+                const sx = snap(ax);
+                const sy = snap(ay);
+                ctx.fillRect(sx - P, sy - P, P * 3, P * 3);
+              }
 
-                const sx = Math.round(ax / P) * P;
-                const sy = Math.round(ay / P) * P;
-                const sz = P * 2.0;
+              // Pass 2: Glowing Hot Pink Core
+              ctx.fillStyle = `rgba(255, 20, 147, ${slashAlpha * 0.95})`;
+              for (let s = 0; s <= numSteps; s++) {
+                const stepProg = s / numSteps;
+                const curA = startAngle + (endAngle - startAngle) * stepProg;
+                const ax = Math.cos(curA) * radius;
+                const ay = Math.sin(curA) * radius;
+                const sx = snap(ax);
+                const sy = snap(ay);
+                ctx.fillRect(sx, sy, P, P);
+              }
 
-                // Layer 1: Ethereal Silver/Lilac Glow Pixel
-                ctx.fillStyle = `rgba(220, 210, 240, ${slashAlpha * 0.8})`;
-                ctx.fillRect(sx - P, sy - P, sz + P * 2, sz + P * 2);
-
-                // Layer 2: Glowing Hot Pink Accent Pixel
-                ctx.fillStyle = `rgba(255, 20, 147, ${slashAlpha * 0.95})`;
-                ctx.fillRect(sx, sy, sz, sz);
-
-                // Layer 3: Pure White Core Pixel
-                if (stepProg > 0.3 && stepProg < 0.9) {
-                  ctx.fillStyle = `rgba(255, 255, 255, ${slashAlpha})`;
-                  ctx.fillRect(sx + P * 0.5, sy + P * 0.5, P, P);
+              // Pass 3: Razor White Cutting Center
+              ctx.fillStyle = `rgba(255, 255, 255, ${slashAlpha})`;
+              for (let s = 0; s <= numSteps; s++) {
+                const stepProg = s / numSteps;
+                if (stepProg > 0.25 && stepProg < 0.85) {
+                  const curA = startAngle + (endAngle - startAngle) * stepProg;
+                  const ax = Math.cos(curA) * radius;
+                  const ay = Math.sin(curA) * radius;
+                  const sx = snap(ax);
+                  const sy = snap(ay);
+                  ctx.fillRect(sx, sy, P, P);
                 }
               }
             });

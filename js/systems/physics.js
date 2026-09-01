@@ -809,6 +809,38 @@ export function updateFighters() {
       }
       const opponent = getClosestOpponent(fighter);
       fighter.update(opponent, fi, state.arena);
+
+      // Post-Kill / Round End / Match End Continuous Movement:
+      // If the round or match has ended (or all opponents are dead), ensure the living winner smoothly coasts!
+      const isRoundOrMatchOver = (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || !opponent);
+      if (isRoundOrMatchOver && fighter.hp > 0 && !state._isChampionLayoutActive) {
+        // Clear stationary strike locks / melee stasis / channel freezes
+        fighter.isMeleeMode = false;
+        fighter.meleePunchCooldown = 0;
+        fighter.teleportSlideTimer = 0;
+        fighter.rapidSlashHitsLeft = 0;
+        fighter.flurryHitsLeft = 0;
+        fighter.isFlurrying = false;
+        fighter.punchAnimTimer = 0;
+        fighter.slashSwingTimer = 0;
+        fighter.modeSwitchBreatherTimer = 0;
+        fighter.purpleRecoveryTimer = 0;
+        fighter.soulSwapTransitionTimer = 0;
+        fighter.revertTransitionTimer = 0;
+
+        const cruiseSpeed = fighter.speed || 3.0;
+        const currentSpeed = Math.hypot(fighter.vx || 0, fighter.vy || 0);
+
+        if (currentSpeed > cruiseSpeed) {
+          // Smoothly decay leftover high-speed dash / lunge bursts
+          fighter.vx *= 0.94;
+          fighter.vy *= 0.94;
+        } else if (currentSpeed < 0.2) {
+          const moveAngle = (fighter.angle !== undefined && fighter.angle !== 0) ? fighter.angle : (fighter.gunAngle || 0);
+          fighter.vx = Math.cos(moveAngle) * cruiseSpeed * 0.5;
+          fighter.vy = Math.sin(moveAngle) * cruiseSpeed * 0.5;
+        }
+      }
     });
 
     // OPTIMIZED: Build spatial grid ONCE per frame for ALL entities (fighters + illusions)

@@ -1,5 +1,15 @@
 import { state } from '../../core/state.js';
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
 export function drawThermobaricExplosions(ctx) {
   if (!state.thermobaricExplosions || state.thermobaricExplosions.length === 0) return;
 
@@ -322,47 +332,66 @@ export function drawThermobaricExplosions(ctx) {
         ctx.save();
         ctx.translate(d.x - cx, d.y - cy);
         ctx.rotate(d.rot);
+        const isDark = _isDarkMode();
+
         if (d.type === 'ember') {
           ctx.globalAlpha = craterAlpha * 0.9;
-          // OPTIMIZED: Removed shadowBlur. Used layered alpha circles.
-          ctx.fillStyle = 'rgba(255, 102, 0, 0.4)';
-          ctx.beginPath();
-          ctx.arc(0, 0, d.size * 1.2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = d.color;
-          ctx.beginPath();
-          ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#FFD700';
-          ctx.beginPath();
-          ctx.arc(0, 0, d.size * 0.2, 0, Math.PI * 2);
-          ctx.fill();
+          if (isDark) {
+            const s = Math.max(2, Math.round(d.size / 2) * 2);
+            ctx.fillStyle = '#FF4500';
+            ctx.fillRect(-s, -s, s * 2, s * 2);
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(-s / 2, -s / 2, s, s);
+          } else {
+            ctx.fillStyle = 'rgba(255, 102, 0, 0.4)';
+            ctx.beginPath();
+            ctx.arc(0, 0, d.size * 1.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = d.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(0, 0, d.size * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
         } else if (d.type === 'smoke') {
           ctx.globalAlpha = craterAlpha * 0.25;
-          // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
-          ctx.fillStyle = `rgba(60, 50, 40, ${craterAlpha * 0.15})`;
-          ctx.beginPath();
-          ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = `rgba(30, 20, 15, ${craterAlpha * 0.4})`;
-          ctx.beginPath();
-          ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
-          ctx.fill();
+          if (isDark) {
+            const s = Math.max(3, Math.round(d.size / 2) * 2);
+            ctx.fillStyle = `rgba(30, 20, 15, ${craterAlpha * 0.5})`;
+            ctx.fillRect(-s / 2, -s / 2, s, s);
+          } else {
+            ctx.fillStyle = `rgba(60, 50, 40, ${craterAlpha * 0.15})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, d.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = `rgba(30, 20, 15, ${craterAlpha * 0.4})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
         } else {
           ctx.globalAlpha = craterAlpha * 0.85;
           ctx.fillStyle = d.color;
-          ctx.beginPath();
-          const s = d.size;
-          ctx.moveTo(-s * 0.5, -s * 0.3);
-          ctx.lineTo(s * 0.2, -s * 0.5);
-          ctx.lineTo(s * 0.5, s * 0.1);
-          ctx.lineTo(s * 0.1, s * 0.5);
-          ctx.lineTo(-s * 0.4, s * 0.3);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = '#111';
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
+          if (isDark) {
+            const s = Math.max(2, Math.round(d.size / 2) * 2);
+            ctx.fillRect(-s / 2, -s / 2, s, s);
+          } else {
+            ctx.beginPath();
+            const s = d.size;
+            ctx.moveTo(-s * 0.5, -s * 0.3);
+            ctx.lineTo(s * 0.2, -s * 0.5);
+            ctx.lineTo(s * 0.5, s * 0.1);
+            ctx.lineTo(s * 0.1, s * 0.5);
+            ctx.lineTo(-s * 0.4, s * 0.3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
         }
         ctx.restore();
       });

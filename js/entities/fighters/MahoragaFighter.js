@@ -1,6 +1,6 @@
 import { Fighter, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -296,95 +296,6 @@ export class MahoragaFighter extends Fighter {
 
     if (opts.isDomain && (this.adaptationDashTimer > 0 || this.isAmbushing)) {
       return false;
-    }
-
-    // Parry Check (only if not frozen by TimeStop/Infinity/Domain stasis, caught in Purple, or caught in Pure Love Beam)
-    const isFrozen = this.timeStopTimer > 0 || 
-                     this.isFrozenByInfinity || 
-                     this.isCaughtInPurple || 
-                     (this.purpleHitTimer || 0) > 0 ||
-                     this.caughtInPureLoveBeam ||
-                     (this.pureLoveBeamTimer || 0) > 0 ||
-                     (this.pureLoveBeamRecoveryTimer || 0) > 0;
-    if (!isFrozen) {
-      const totalGoldStages = (this.goldAdaptationStage?.melee || 0) + 
-                              (this.goldAdaptationStage?.ranged || 0) + 
-                              (this.goldAdaptationStage?.skill || 0);
-      
-      const parryChancePerStage = CONFIG.mahoraga?.parryChancePerStage || 0.08;
-      const parryMaxChance = CONFIG.mahoraga?.parryMaxChance || 0.75;
-      const parryChance = Math.min(parryMaxChance, totalGoldStages * parryChancePerStage);
-
-      // Energy beams, lasers, AOEs, dot ticks, and adapted beams CANNOT be parried
-      const isBeamOrLaser = opts.isPureLoveBeam || opts.isGenosBeam || opts.isBeam || opts.isLaser || opts.isLaserBeam || opts.isLaylaBeam || opts.isPurple || opts.isPurpleDPS || opts.isThinIceBreaker;
-      const isAOEOrExplosion = opts.isAOE || opts.isExplosion || opts.isDivineFlame || opts.fromBlackHole || opts.isBurn || opts.isPoison || opts.isFlame;
-      const isAlreadyAdaptedBeam = (opts.isPureLoveBeam && this.adaptedPureLoveBeam) || (opts.isGenosBeam && this.adaptedGenosBeam);
-
-      const isActuallyUnblockable = isUnblockable || isBeamOrLaser || isAOEOrExplosion || isAlreadyAdaptedBeam;
-
-      if (!isActuallyUnblockable && totalGoldStages > 0 && Math.random() < parryChance) {
-        // Roll 50% chance between active blade Parry and crossed-arm Guard
-        const isParry = Math.random() < 0.5;
-        const totalFrames = isParry 
-          ? (CONFIG.mahoraga?.parryDurationFrames || 25) 
-          : (CONFIG.mahoraga?.guardDurationFrames || 60);
-
-        this.defensePoseType = isParry ? 'parry' : 'guard';
-        this.defensePoseTimer = totalFrames;
-        this.defensePoseMaxTimer = totalFrames;
-
-        const wheelY = this.y - this.r - 28;
-
-        if (isParry) {
-          spawnFloatingText(this.x, wheelY - 20, 'PARRIED!', '#FFD700');
-          spawnParrySparksEffect(this.x, this.y);
-
-          // Spawn Yuta-style golden sparks distributed along the length of his sword
-          const swingAngle = Math.PI * 0.25; // Approximate starting angle of parry swing
-          const bladeAngle = this.gunAngle + swingAngle;
-          const shoulderX = this.x + Math.cos(this.gunAngle + Math.PI/2) * (this.r * 0.20) + Math.cos(this.gunAngle) * (this.r * 0.75);
-          const shoulderY = this.y + Math.sin(this.gunAngle + Math.PI/2) * (this.r * 0.20) + Math.sin(this.gunAngle) * (this.r * 0.75);
-          
-          for (let i = 0; i < 14; i++) {
-            const offset = 10 + Math.random() * 55;
-            const sx = shoulderX + Math.cos(bladeAngle) * offset;
-            const sy = shoulderY + Math.sin(bladeAngle) * offset;
-            spawnSparks(sx, sy, 1, 'silver', '#FFD700');
-          }
-
-          // Spin the wheel slightly as a visual indicator
-          this.wheelGlowTimer = 30;
-          this.wheelRotation = (this.wheelRotation || 0) + 0.45;
-
-          // Play parry clash sounds
-          const parrySnd = getSkillSound(this.id, 'parry');
-          if (parrySnd) {
-            audioSystem.playSFX(parrySnd.src, parrySnd.volume);
-          } else {
-            audioSystem.playSFX('attack_swordswing', 0.85);
-            audioSystem.playSFX('skill_dash5', 0.5);
-          }
-        } else {
-          // Guard / Block Pose (Crossed arms covering face)
-          spawnFloatingText(this.x, wheelY - 20, 'BLOCKED!', '#EBEBE6');
-          spawnParrySparksEffect(this.x, this.y);
-
-          // Spin the wheel slightly as a visual indicator
-          this.wheelGlowTimer = 25;
-          this.wheelRotation = (this.wheelRotation || 0) + 0.25;
-
-          // Play heavy block impact sound
-          const blockSnd = getSkillSound(this.id, 'shieldblock');
-          if (blockSnd) {
-            audioSystem.playSFX(blockSnd.src, blockSnd.volume);
-          } else {
-            audioSystem.playSFX('skill_dash5', 0.7);
-          }
-        }
-
-        // Deal 0 damage to Mahoraga
-        return false;
-      }
     }
 
     if (opts.isAdaptableSkillShot && opts.skillShotId !== 'tojiAmbush' && opts.skillShotId !== 'purple' && !opts.isPurpleDPS && !opts.isPurple && opts.skillShotId !== 'getsugaTensho' && opts.skillShotId !== 'getsuga' && !opts.isGetsuga && this.adaptedSkills && this.adaptedSkills[opts.skillShotId] && this.skillDodgeReady && this.skillDodgeReady[opts.skillShotId]) {

@@ -66,13 +66,13 @@ export const tojiConfig = {
   ambushTargetFreezeDuration: 70,    // 1st Sequence: Target freeze duration (frames) so sequence executes smoothly
   ambushKatanaChargeDuration: 30,    // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
   ambushKatanaFreezeDuration: 70,    // 2nd Sequence: Target freeze duration (frames) for Katana execution
-  ambushKnockbackForce: 48,          // High-speed knockback force launching target flying & bouncing across arena
-  ambushSpearThrustKnockback: 28,    // Physical velocity impulse on Inverted Spear backstab
+  ambushKnockbackForce: 22,          // Moderate knockback force launching target cleanly across arena
+  ambushSpearThrustKnockback: 16,    // Crisp physical velocity impulse on Inverted Spear backstab
   ambushPhantomFlurryStrikes: 12,    // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
   ambushPhantomFlurryFrameRate: 7,   // 3rd Sequence: Slower readable attack speed between each phantom strike (8 frames)
   ambushPhantomFlurryDamage: 15,     // 3rd Sequence: True Damage per phantom strike
   ambushPhantomFlurryDistance: 8,    // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
-  ambushFlurryFinalRecoil: 38,       // Final finisher blast knockback push on target
+  ambushFlurryFinalRecoil: 24,       // Clean finisher blast knockback push on target
 
   // Ultimate: Curse Inventory - Full Arsenal Unleashed (Kinkō Sōkō)
   ultimateCooldown: 1500,            // 25.0s cooldown (1500 frames)

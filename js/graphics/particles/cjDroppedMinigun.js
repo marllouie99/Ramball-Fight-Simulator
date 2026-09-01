@@ -101,11 +101,20 @@ export function updateDroppedMiniguns() {
   }
 }
 
+let _cachedDroppedMinigunShadowGrad = null;
+
 /**
  * Draws all dropped overheated miniguns and rising steam clouds
  */
 export function drawDroppedMiniguns(ctx) {
   if (typeof state === 'undefined' || !state.cjDroppedMiniguns || state.cjDroppedMiniguns.length === 0) return;
+
+  if (!_cachedDroppedMinigunShadowGrad) {
+    _cachedDroppedMinigunShadowGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 26);
+    _cachedDroppedMinigunShadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
+    _cachedDroppedMinigunShadowGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.35)');
+    _cachedDroppedMinigunShadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  }
 
   for (let i = 0; i < state.cjDroppedMiniguns.length; i++) {
     const item = state.cjDroppedMiniguns[i];
@@ -118,15 +127,11 @@ export function drawDroppedMiniguns(ctx) {
     ctx.save();
     ctx.globalAlpha = fadeAlpha;
 
-    // 1. Perspective Ground Shadow
+    // 1. Perspective Ground Shadow (Cached)
     ctx.save();
     ctx.translate(item.x, item.y + 4);
     ctx.scale(1.0, 0.45);
-    const shadowGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 26);
-    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
-    shadowGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.35)');
-    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = shadowGrad;
+    ctx.fillStyle = _cachedDroppedMinigunShadowGrad;
     ctx.beginPath();
     ctx.arc(0, 0, 26, 0, Math.PI * 2);
     ctx.fill();

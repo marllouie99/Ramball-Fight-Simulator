@@ -28,12 +28,24 @@ export function isScreenDimmedActive() {
   );
   if (isAnyDomainActive) return true;
 
-  // 2. Active non-domain ultimate strikes (e.g. Toji Swarm, Sukuna Fuga Arrow) — STRICTLY EXCLUDES HOLLOW PURPLE
+  // 2. Active non-domain ultimate strikes (e.g. Toji Swarm, Sukuna Fuga Arrow)
   const hasNonPurpleDimEffect = state.fighters.some(f => f && (
     ((f.characterId === 'toji' || f.type === 'toji') && f.ultimateActive && f.ultimatePhase !== 'CHANNELING' && !f.isChannelingDomain) ||
     (f.furnaceFireArrowTimer || 0) > 0
   ));
   if (hasNonPurpleDimEffect) return true;
+
+  // 3. Gojo Hollow Purple channeling, active orb flight, or post-fire recovery (dark purple dim screen active)
+  const isDarkTheme = (state.arenaTheme === 'dark');
+  if (!isDarkTheme) {
+    const isHollowPurpleActive = state.fighters.some(f => f && (
+      (f.characterId === 'gojo' || f.type === 'gojo') && (
+        f.isChannelingPurple ||
+        (f.purpleRecoveryTimer && f.purpleRecoveryTimer > 0)
+      )
+    ));
+    if (isHollowPurpleActive) return true;
+  }
 
   return false;
 }
@@ -61,11 +73,11 @@ export function isDarkModeActive() {
 
 export function getFighterHealthBarColor(fighter, ratio, isDark = null) {
   if (!fighter) return '#22c55e';
-  const isCj = fighter.characterId === 'cj' || fighter.type === 'cj';
+  const isDarkTheme = isDark !== null ? isDark : isDarkModeActive();
+  const isCj = !isDarkTheme && (fighter.characterId === 'cj' || fighter.type === 'cj');
   if (isCj) {
     return '#FFFFFF';
   }
-  const isDarkTheme = isDark !== null ? isDark : isDarkModeActive();
   const themeColor = fighter.themeColor || fighter.color || '#15803d';
 
   if (isDarkTheme) {
@@ -144,24 +156,27 @@ export function drawHUD() {
   const { ctx, canvas, fighters, scores, roundNum, mode, gameState, matchEndTimer, roundEndTimer, roundWinner, ffaMatchComplete } = state;
 
 
-  // Calculate HUD opacity during champion reveal fade-in
+  // Calculate HUD opacity during champion reveal fade-in (only if champion screen layout is active)
   let hudOpacity = 1;
-  if (gameState === 'matchEnd') {
-    const displayDelay = 60; // match end delay before background overlay/transition starts
-    const revealTimer = Math.max(0, matchEndTimer - (displayDelay + 45)); // match end delay plus reveal offset
-    hudOpacity = Math.max(0, 1 - (revealTimer / 30));
-  } else if (gameState === 'roundEnd') {
-    const winnerIndex = roundWinner ? fighters.indexOf(roundWinner) : -1;
-    const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
-    const winThreshold = modeRounds === 1 ? 1 : 2;
-    const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThreshold;
-    const showModel = hasTwoWins && roundWinner;
-    const isChampionReveal = ((mode === 'FFA' || mode === 'Tactical FFA' || mode === GAME_MODES.FFA || mode === GAME_MODES.TACTICAL_FFA) && ffaMatchComplete) || showModel;
-    
-    if (isChampionReveal) {
-      const displayDelay = 60; // round end delay
-      const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
-      hudOpacity = Math.max(0, 1 - (delayedTimer / 30));
+  const isChampionActive = Boolean(state._isChampionLayoutActive);
+  if (isChampionActive) {
+    if (gameState === 'matchEnd') {
+      const displayDelay = 60; // match end delay before background overlay/transition starts
+      const revealTimer = Math.max(0, matchEndTimer - (displayDelay + 45)); // match end delay plus reveal offset
+      hudOpacity = Math.max(0, 1 - (revealTimer / 30));
+    } else if (gameState === 'roundEnd') {
+      const winnerIndex = roundWinner ? fighters.indexOf(roundWinner) : -1;
+      const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
+      const winThreshold = modeRounds === 1 ? 1 : 2;
+      const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThreshold;
+      const showModel = hasTwoWins && roundWinner;
+      const isChampionReveal = ((mode === 'FFA' || mode === 'Tactical FFA' || mode === GAME_MODES.FFA || mode === GAME_MODES.TACTICAL_FFA) && ffaMatchComplete) || showModel;
+      
+      if (isChampionReveal) {
+        const displayDelay = 60; // round end delay
+        const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
+        hudOpacity = Math.max(0, 1 - (delayedTimer / 30));
+      }
     }
   }
 
@@ -796,18 +811,15 @@ function updateHealthHud() {
 
   state._hudFrameCount = (state._hudFrameCount || 0) + 1;
 
-  // ── INSTANT Dim Class Toggle (runs EVERY frame, before throttle) ──
-  {
-    const isDimmedNow = isScreenDimmedActive();
+let _cachedDimEls = null;
+let _lastDimmedState = null;
+let _lastDarkThemeState = null;
+let _lastSaitamaImpactState = null;
 
-    // Detect Saitama's counter punch impact flash (HUD text snaps to black during bright white screen flash)
-    const isSaitamaPunchImpactFlash = state.fighters && state.fighters.some(f =>
-      f && (f.characterId === 'saitama' || f.type === 'saitama') &&
-      f._counterPunchImpactFlashTimer && f._counterPunchImpactFlashTimer > 0
-    );
-
-    const isDarkTheme = (state.arenaTheme === 'dark');
-    const _dimEls = [
+function _getDimElements() {
+  if (!_cachedDimEls || !_cachedDimEls[0] || (typeof document !== 'undefined' && !document.body.contains(_cachedDimEls[0]))) {
+    if (typeof document === 'undefined') return [];
+    _cachedDimEls = [
       document.querySelector('.game-container'),
       document.querySelector('.game-box'),
       document.getElementById('hudBottomContainer'),
@@ -820,9 +832,33 @@ function updateHealthHud() {
       document.getElementById('healthHudLeft'),
       document.getElementById('healthHudRight'),
       document.body
-    ];
-    _dimEls.forEach(el => {
-      if (el) {
+    ].filter(Boolean);
+  }
+  return _cachedDimEls;
+}
+
+  // ── INSTANT Dim Class Toggle (runs EVERY frame, before throttle) ──
+  {
+    const isDimmedNow = isScreenDimmedActive();
+
+    // Detect Saitama's counter punch impact flash (HUD text snaps to black during bright white screen flash)
+    const isSaitamaPunchImpactFlash = Boolean(state.fighters && state.fighters.some(f =>
+      f && (f.characterId === 'saitama' || f.type === 'saitama') &&
+      f._counterPunchImpactFlashTimer && f._counterPunchImpactFlashTimer > 0
+    ));
+
+    const isDarkTheme = (state.arenaTheme === 'dark');
+
+    if (isDimmedNow !== _lastDimmedState || isDarkTheme !== _lastDarkThemeState || isSaitamaPunchImpactFlash !== _lastSaitamaImpactState) {
+      _lastDimmedState = isDimmedNow;
+      _lastDarkThemeState = isDarkTheme;
+      _lastSaitamaImpactState = isSaitamaPunchImpactFlash;
+
+      const dimEls = _getDimElements();
+      for (let i = 0; i < dimEls.length; i++) {
+        const el = dimEls[i];
+        if (!el) continue;
+
         if (isDimmedNow) el.classList.add('hud-dimmed');
         else el.classList.remove('hud-dimmed');
 
@@ -833,7 +869,7 @@ function updateHealthHud() {
         if (isSaitamaPunchImpactFlash) el.classList.add('hud-punch-impact');
         else el.classList.remove('hud-punch-impact');
       }
-    });
+    }
   }
 
   // Performance: Throttle expensive HUD innerHTML writes to avoid layout reflow stalls
@@ -1434,19 +1470,6 @@ function updateHealthHud() {
         const stunDir = f.stunDirection === 'left' ? 'LEFT' : f.stunDirection === 'right' ? 'RIGHT' : f.stunDirection === 'up' ? 'UP' : 'NONE';
         info.push(`<b>Stun Dir:</b> ${stunDir}`);
       } else if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
-        const totalGoldStages = (f.goldAdaptationStage?.melee || 0) + 
-                                (f.goldAdaptationStage?.ranged || 0) + 
-                                (f.goldAdaptationStage?.skill || 0);
-        const parryPerStage = CONFIG.mahoraga?.parryChancePerStage || 0.08;
-        const baseParry = Math.round((CONFIG.mahoraga?.baseParryChance || 0) * 100);
-        const bonusParry = Math.round(totalGoldStages * parryPerStage * 100);
-
-        if (bonusParry > 0) {
-          info.push(`<b>Parry:</b> ${baseParry}% + ${bonusParry}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>Parry:</b> ${baseParry}%`);
-        }
-
         const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
         const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.03;
         const currentRegenRate = totalStages * rctPerStage;
@@ -1895,7 +1918,8 @@ function updateHealthHud() {
     const skills = allSkills.filter(s => shouldShowFighterSkill(f, s));
     if (!skills || skills.length === 0) return '';
 
-    const isCj = f && (f.characterId === 'cj' || f.type === 'cj');
+    const isDarkTheme = isDarkModeActive();
+    const isCj = !isDarkTheme && f && (f.characterId === 'cj' || f.type === 'cj');
     const cjSkillClass = isCj ? ' hud-skill-box-cj' : '';
 
     return skills.map((s, index) => {
@@ -2086,23 +2110,24 @@ function updateHealthHud() {
       truncatedTitle = title.substring(0, maxChars - 1) + '…';
     }
 
+    const isDarkTheme = isDarkModeActive();
     const getTitleStyle = (color, isCj = false) => {
       if (isTactical) {
         return `color: ${color || '#ffffff'}; font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; line-height: 1.15; `;
       }
-      const fontFamily = isCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
-      const fontSize = isCj ? (baseFontSize + 2) : baseFontSize;
-      const letterSpacing = isCj ? '1.2px' : '0.8px';
+      const useCj = !isDarkTheme && isCj;
+      const fontFamily = useCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
+      const fontSize = useCj ? (baseFontSize + 2) : baseFontSize;
+      const letterSpacing = useCj ? '1.2px' : '0.8px';
       return `color: ${color || '#ffffff'}; font-size: ${fontSize}px; text-transform: uppercase; font-family: ${fontFamily}; letter-spacing: ${letterSpacing}; font-weight: normal; `;
     };
 
     let barsHTML = '';
     if (members && members.length > 0) {
       barsHTML = members.map((m, mIndex) => {
-        const isMemberCj = m && (m.characterId === 'cj' || m.type === 'cj');
+        const isMemberCj = !isDarkTheme && m && (m.characterId === 'cj' || m.type === 'cj');
         const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const isDarkTheme = isDarkModeActive();
         const barColor = isMemberCj ? '#FFFFFF' : getFighterHealthBarColor(m, ratio, isDarkTheme);
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
@@ -2150,9 +2175,8 @@ function updateHealthHud() {
         `;
       }).join('');
     } else {
-      const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
+      const isTargetCj = !isDarkTheme && targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
       const percent = Math.round(safeRatio * 100);
-      const isDarkTheme = isDarkModeActive();
       const barColor = isTargetCj ? '#DC2626' : getFighterHealthBarColor(targetFighter, safeRatio, isDarkTheme);
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
       const { className } = getGlowStyles(targetFighter);
@@ -2198,7 +2222,7 @@ function updateHealthHud() {
       }
     }
 
-    const isCardCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
+    const isCardCj = !isDarkTheme && targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
     const cjStackHTML = '';
     const winsBullets = Array.from({ length: maxBullets }, (_, i) => {
       const filled = i < wins;
@@ -2570,12 +2594,12 @@ function updateHealthHud() {
           fighter._lastHealAmount = 0;
         }
 
-        const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
+        const isDarkTheme = isDarkModeActive();
+        const isCj = !isDarkTheme && fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
         const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
         const maxHp = fighter._originalMaxHp || fighter.maxHp;
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const isDarkTheme = isDarkModeActive();
         const barColor = isCj ? '#FFFFFF' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
         const glow = getGlowStyles(fighter);
         
@@ -2742,12 +2766,12 @@ function updateHealthHud() {
         fighter._lastHealAmount = 0;
       }
 
-      const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
+      const isDarkTheme = isDarkModeActive();
+      const isCj = !isDarkTheme && fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
       const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
       const maxHp = fighter._originalMaxHp || fighter.maxHp;
       const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-      const isDarkTheme = isDarkModeActive();
       const barColor = isCj ? '#FFFFFF' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
       const glow = getGlowStyles(fighter);
 

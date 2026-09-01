@@ -9,7 +9,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunc
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
-import { renderSukunaDomainBackground, renderSukunaDomainForeground } from './sukuna/sukunaDomainVisuals.js';
+import { renderSukunaDomainBackground, renderSukunaDomainForeground, renderSukunaDomainSlashLines, clearDomainSlashLines } from './sukuna/sukunaDomainVisuals.js';
 import { checkSpiderwebTrigger as modCheckSpiderweb, activateSpiderweb as modActivateSpiderweb, fireDivineFlame as modFireDivineFlame, activateReverseCursedTechnique as modActivateRCT, doDomainRapidSlashes as modDomainRapidSlashes, applyDomainEffect as modApplyDomainEffect } from './sukuna/sukunaSkills.js';
 import { spawnTeleportAfterimages as modSpawnTeleportAfterimages, executeTeleportDodge as modExecuteTeleportDodge, teleportAwayFrom as modTeleportAwayFrom, updateMeleeCombat as modUpdateMeleeCombat } from './sukuna/sukunaCombat.js';
 import { drawSukunaBody } from '../../graphics/fighters/sukunaSkin.js';
@@ -423,6 +423,7 @@ export class SukunaFighter extends Fighter {
       this.domainTimer--;
       if (this.domainTimer <= 0) {
         this.domainActive = false;
+        clearDomainSlashLines();
       } else {
         this._applyDomainEffect(arena);
       }
@@ -656,6 +657,8 @@ export class SukunaFighter extends Fighter {
       if (this.slashSwingTimer > 0) this.slashSwingTimer--;
       if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
       this.shootCooldown = 60;
+      this.applyMovementPhysics();
+      this.resolveWallBounce(arena);
       return;
     }
 
@@ -2604,5 +2607,6 @@ export class SukunaFighter extends Fighter {
   // Draw Malevolent Shrine structure & embers (called during fighter draw, AFTER background)
   drawDomainForeground(ctx) {
     renderSukunaDomainForeground(this, ctx);
+    renderSukunaDomainSlashLines(this, ctx);
   }
 }

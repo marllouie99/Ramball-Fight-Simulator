@@ -153,6 +153,16 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
     const isTojiAmbushing = isToji && (attacker.isAmbushing || attacker.ambushPhase);
     if (!isTojiAmbushing && !attacker.domainImmunity) {
+      const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
+      const attRadius = attacker.hitRadius || attacker.r || 25;
+      const distToGojo = Math.hypot(attacker.x - fighter.x, (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0)));
+      const isPhysicalContact = distToGojo <= (barrierRadius + attRadius + 15);
+
+      // Remote attackers (such as projectile casters standing across the arena) MUST NOT be pushed
+      if (!isPhysicalContact) {
+        return true;
+      }
+
       if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
         const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
         if (hasAdapted) {
@@ -233,8 +243,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       }
       
       // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
-      const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
-      const attRadius = attacker.hitRadius || attacker.r || 25;
       const gojoRadius = fighter.hitRadius || fighter.r || 25;
       const minDist = attRadius + barrierRadius;
       const overlap = minDist - dist;

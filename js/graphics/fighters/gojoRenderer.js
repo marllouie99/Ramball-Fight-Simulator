@@ -621,49 +621,10 @@ export class GojoRenderer {
     const is200Purple = fighter.isChannelingPurple && !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
     const skinColor = fighter.skinColor || '#FFE0BD';
 
+    // 2. Draw Stepped Pixel-Art Hands (High-Performance Offscreen Cached)
+    const canvas = GojoRenderer._getGojoHandCanvas(handRadius, skinColor);
     const _drawPixelFist = (hx, hy) => {
-      const P = 2.0;
-      const gridR = Math.max(P * 2, handRadius);
-      const steps = Math.ceil(gridR / P);
-
-      // Outer Dark Shell
-      ctx.fillStyle = '#0E0F14';
-      for (let gy = -steps; gy <= steps; gy++) {
-        for (let gx = -steps; gx <= steps; gx++) {
-          const dist = Math.hypot(gx * P, gy * P);
-          if (dist <= gridR + P * 0.75) {
-            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
-          }
-        }
-      }
-
-      // Inner Base Skin Tone
-      ctx.fillStyle = skinColor;
-      const innerR = gridR - P * 0.4;
-      for (let gy = -steps; gy <= steps; gy++) {
-        for (let gx = -steps; gx <= steps; gx++) {
-          const dist = Math.hypot(gx * P, gy * P);
-          if (dist <= innerR) {
-            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
-          }
-        }
-      }
-
-      // Knuckle Shading
-      ctx.fillStyle = '#D4A882';
-      for (let gy = 0; gy <= steps; gy++) {
-        for (let gx = -steps; gx <= steps; gx++) {
-          const dist = Math.hypot(gx * P, gy * P);
-          if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
-            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
-          }
-        }
-      }
-
-      // Knuckle Specular Highlight
-      ctx.fillStyle = '#FFF5EB';
-      ctx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
-      ctx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
+      ctx.drawImage(canvas, Math.round(hx - canvas.width / 2), Math.round(hy - canvas.height / 2));
     };
 
     ctx.save();
@@ -1323,5 +1284,64 @@ export class GojoRenderer {
     ctx.fill();
 
     ctx.restore();
+  }
+  // Cached offscreen canvas for Gojo's pixel fists (avoids 400 fillRect calls per frame)
+  static _getGojoHandCanvas(handRadius, skinColor) {
+    if (!GojoRenderer._handCanvas || GojoRenderer._handR !== handRadius || GojoRenderer._handColor !== skinColor) {
+      GojoRenderer._handR = handRadius;
+      GojoRenderer._handColor = skinColor;
+      const P = 2.0;
+      const gridR = Math.max(P * 2, handRadius);
+      const steps = Math.ceil(gridR / P);
+      const size = Math.ceil((gridR + P * 2) * 2);
+
+      GojoRenderer._handCanvas = document.createElement('canvas');
+      GojoRenderer._handCanvas.width = size;
+      GojoRenderer._handCanvas.height = size;
+      const offCtx = GojoRenderer._handCanvas.getContext('2d');
+      offCtx.imageSmoothingEnabled = false;
+      const hx = size / 2;
+      const hy = size / 2;
+
+      // Outer Dark Shell
+      offCtx.fillStyle = '#0E0F14';
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= gridR + P * 0.75) {
+            offCtx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Inner Base Skin Tone
+      offCtx.fillStyle = skinColor;
+      const innerR = gridR - P * 0.4;
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR) {
+            offCtx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Knuckle Shading
+      offCtx.fillStyle = '#D4A882';
+      for (let gy = 0; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+            offCtx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Knuckle Specular Highlight
+      offCtx.fillStyle = '#FFF5EB';
+      offCtx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
+      offCtx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
+    }
+    return GojoRenderer._handCanvas;
   }
 }

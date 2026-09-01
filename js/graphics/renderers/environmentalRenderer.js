@@ -249,137 +249,42 @@ export function drawCjSanAndreasAtmosphere() {
   // GTA San Andreas atmosphere filter removed per user request
 }
 
-let currentBaguvixDimOpacity = 0;
-
 /**
  * Draws a full-screen Grove Street green domain overlay when CJ activates or is in BAGUVIX God Mode.
- * Bathes the entire screen in vibrant emerald green glass, horizontal sheen wave lines, and pulsing
- * invulnerability singularity rings around CJ (matching Gojo's Unlimited Void domain aesthetic in Grove Street green).
- * Conforms to Rule 10, Rule 11, and Rule 14.
+ * Fully accelerated via WebGL in hybridEnvironmentRenderer.js (Rule 10).
  */
 export function drawCjBaguvixDimScreen() {
+  // Handled by WebGL in hybridEnvironmentRenderer.js (Rule 10)
+  if (state.pixiApp && state.pixiLayers?.environment) return;
+
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
   if (CONFIG.cj?.enableBaguvixDimScreen === false) return;
 
-  // Find CJ fighters that are typing BAGUVIX or actively in Baguvix God Mode
   const cjFighter = (state.fighters?.find(f =>
     f && (f.characterId === 'cj' || f.type === 'cj' || f._def?.id === 'cj' || f._def?.type === 'cj') &&
     (f.isBaguvixActive || f.isGodModeActive || (f.isTypingCheat && f.cheatCodeString === 'BAGUVIX'))
   )) || (state.previewFighter && (state.previewFighter.isBaguvixActive || state.previewFighter.isGodModeActive) ? state.previewFighter : null);
 
-  let targetOpacity = 0;
-  let cx = canvas.width / 2;
-  let cy = canvas.height / 2;
-  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  if (!cjFighter) return;
 
-  if (cjFighter) {
-    cx = cjFighter.x;
-    cy = cjFighter.y - (cjFighter.z || 0);
-
-    if (cjFighter.isTypingCheat && cjFighter.cheatCodeString === 'BAGUVIX') {
-      const maxTyping = (cjFighter.cheatTypingMaxTimer || 60);
-      const progress = Math.min(1.0, 1.0 - ((cjFighter.cheatTypingTimer || 0) / Math.max(1, maxTyping)));
-      targetOpacity = 0.25 + progress * 0.45; // Smooth buildup from 0.25 to 0.70 while typing
-    } else if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
-      const baseMax = CONFIG.cj?.baguvixDimOpacity || 0.75;
-      const pulse = Math.sin(now * 0.005) * 0.04;
-      targetOpacity = baseMax + pulse;
-    }
+  let opacity = 0;
+  if (cjFighter.isTypingCheat && cjFighter.cheatCodeString === 'BAGUVIX') {
+    const maxTyping = (cjFighter.cheatTypingMaxTimer || 60);
+    const progress = Math.min(1.0, 1.0 - ((cjFighter.cheatTypingTimer || 0) / Math.max(1, maxTyping)));
+    opacity = 0.25 + progress * 0.45;
+  } else if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
+    opacity = CONFIG.cj?.baguvixDimOpacity || 0.75;
   }
 
-  // Smoothly interpolate dim opacity for seamless fade-in and gradual fade-out
-  if (targetOpacity > currentBaguvixDimOpacity) {
-    currentBaguvixDimOpacity += (targetOpacity - currentBaguvixDimOpacity) * 0.15; // Smooth fade-in
-  } else {
-    currentBaguvixDimOpacity += (targetOpacity - currentBaguvixDimOpacity) * 0.10; // Smooth clear fade-out
-  }
-
-  if (currentBaguvixDimOpacity < 0.01) {
-    currentBaguvixDimOpacity = 0;
-    return;
-  }
-
-  const shakeX = state.shakeX || 0;
-  const shakeY = state.shakeY || 0;
+  if (opacity < 0.01) return;
 
   ctx.save();
-  // Reset transform to identity screen space so full-screen dim rect is glued to screen (Rule 14)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-  const opacity = currentBaguvixDimOpacity;
-
-  // ── 1. FULL-SCREEN GROVE STREET GREEN GLASS DOMAIN GRADIENT (MATCHING GOJO DOMAIN IN GREEN) ──
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.95;
-  const roundCx = Math.round((cx + shakeX) / 10) * 10;
-  const roundCy = Math.round((cy + shakeY) / 10) * 10;
-  const key = `${roundCx}_${roundCy}_${maxDim}`;
-
-  if (!state._cachedBaguvixDimGrad || state._cachedBaguvixDimKey !== key) {
-    state._cachedBaguvixDimKey = key;
-    state._cachedBaguvixDimGrad = ctx.createRadialGradient(
-      roundCx, roundCy, 20,
-      roundCx, roundCy, maxDim
-    );
-
-    // Full-screen green glass palette across every corner of the canvas
-    state._cachedBaguvixDimGrad.addColorStop(0, 'rgba(34, 197, 94, 0.88)');   // Vibrant neon lime-green core bloom
-    state._cachedBaguvixDimGrad.addColorStop(0.25, 'rgba(22, 163, 74, 0.84)'); // Grove Street rich emerald glass tint
-    state._cachedBaguvixDimGrad.addColorStop(0.60, 'rgba(20, 83, 45, 0.88)');  // Deep emerald matrix green
-    state._cachedBaguvixDimGrad.addColorStop(1.0, 'rgba(6, 44, 20, 0.92)');   // Rich dark turf green canvas perimeter
-  }
-
-  ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.fillStyle = state._cachedBaguvixDimGrad;
+  ctx.fillStyle = `rgba(6, 44, 20, ${opacity * 0.90})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.restore();
-
-  // ── 2. HORIZONTAL EMERALD SHEEN WAVE LINES (MATCHING GOJO & SUKUNA DOMAIN FLOOR WAVES) ──
-  ctx.save();
-  const waveCount = 10;
-  ctx.lineWidth = 1;
-  for (let w = 0; w < waveCount; w++) {
-    const wy = cy - 200 + w * 45 + Math.sin(now * 0.002 + w) * 8;
-    const waveAlpha = (0.15 + Math.sin(now * 0.003 + w * 1.5) * 0.09) * opacity;
-    ctx.strokeStyle = `rgba(74, 222, 128, ${waveAlpha})`;
-    ctx.beginPath();
-    ctx.moveTo(cx - 1200, wy);
-    ctx.quadraticCurveTo(cx, wy + Math.sin(now * 0.004 + w * 2) * 12, cx + 1200, wy);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // ── 3. GOD MODE / BAGUVIX SINGULARITY & INVULNERABILITY PULSE RINGS AROUND CJ ──
-  const ringPulse = Math.sin(now * 0.004) * 6;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-
-  // Outer glowing emerald ring
-  ctx.strokeStyle = `rgba(34, 197, 94, ${0.50 * opacity})`;
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 32 + ringPulse * 0.7, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = `rgba(74, 222, 128, ${0.90 * opacity})`;
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 32 + ringPulse * 0.7, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Inner golden/white invulnerability core ring
-  ctx.strokeStyle = `rgba(250, 204, 21, ${0.95 * opacity})`;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 22 - ringPulse * 0.4, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
-  // Exclude Gojo's Limitless Infinity Barrier from screen dimming (Rule 9)
   excludeGojoInfinityFromDim(ctx);
-
   ctx.restore();
 
   state.globalDimEdgeColor = `rgba(6, 44, 20, ${opacity * 0.95})`;

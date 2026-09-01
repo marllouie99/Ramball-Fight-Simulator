@@ -18,6 +18,16 @@ import { stopArenaBgm } from '../../systems/arenaBgmSystem.js';
 // COLOR & MATH UTILITIES
 // ──────────────────────────────────────────
 
+function _isDarkMode() {
+  return Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+}
+
 function adjustBrightness(hex, percent) {
   if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return hex || '#ffffff';
   let cleanHex = hex.replace('#', '');
@@ -509,6 +519,11 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     }
   }
 
+  // Dark Mode Override: Champion layout visuals are completely removed; only the announcer & victory audio play!
+  if (_isDarkMode()) {
+    return;
+  }
+
   // 1. Smoothly Darken the Arena & Full Canvas (Deep Dark Victory Backdrop)
   const fadeAlpha = Math.min(1.0, timer / 30);
   ctx.save();
@@ -701,10 +716,11 @@ function drawRoundEndScreen() {
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
   // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
-  // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
+  // In Dark Mode, start announcer audio immediately (0 frames delay) without pausing!
+  const isDark = _isDarkMode();
   const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 180 : 75);
+  const displayDelay = isDark ? 0 : (isTactical ? 10 : (hasMissionOverlay ? 180 : 75));
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
@@ -725,7 +741,7 @@ function drawRoundEndScreen() {
   const isChampionReveal = (isFFA && (ffaMatchComplete || modeRounds === 1)) || (hasTwoWins && roundWinner);
 
   const isChampionActive = delayedTimer > 0;
-  state._isChampionLayoutActive = isChampionActive && !isTactical;
+  state._isChampionLayoutActive = isChampionActive && !isTactical && !isDark;
 
   if (isChampionActive) {
     const titleText = isChampionReveal 
@@ -745,13 +761,15 @@ function drawRoundEndScreen() {
 
 function drawWinnerReveal(winner, timer, mode) {
   const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
-  state._isChampionLayoutActive = !isTactical;
+  const isDarkMode = _isDarkMode();
+  state._isChampionLayoutActive = !isTactical && !isDarkMode;
   drawInArenaChampionLayout(winner, timer, 'CHAMPION', mode, true);
 }
 
 function drawFfaChampionReveal(winner, timer) {
   const isTactical = state.gameCategory === 'tactical' || (typeof state.mode === 'string' && (state.mode.toLowerCase().includes('tactical')));
-  state._isChampionLayoutActive = !isTactical;
+  const isDarkMode = _isDarkMode();
+  state._isChampionLayoutActive = !isTactical && !isDarkMode;
   drawInArenaChampionLayout(winner, timer, 'CHAMPION', 'FFA', true);
 }
 
@@ -774,17 +792,18 @@ function drawMatchEndScreen() {
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
   // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
-  // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
+  // In Dark Mode, start announcer audio immediately (0 frames delay) without pausing!
+  const isDark = _isDarkMode();
   const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 180 : 75);
+  const displayDelay = isDark ? 0 : (isTactical ? 10 : (hasMissionOverlay ? 180 : 75));
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 
   // Determine Match Winner Entity
   const effectiveWinner = matchWinner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
 
   const isMatchChampionActive = delayedTimer > 0;
-  state._isChampionLayoutActive = isMatchChampionActive && !isTactical;
+  state._isChampionLayoutActive = isMatchChampionActive && !isTactical && !isDark;
 
   if (isMatchChampionActive) {
     const titleText = (mode === 'TLFS') 

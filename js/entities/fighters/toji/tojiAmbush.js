@@ -88,19 +88,73 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   fighter.ambushTimer = isInterrupt ? 4 : (CONFIG.toji?.ambushFirstTeleportFrames ?? CONFIG.toji?.ambushFrontPauseDuration ?? 18);
   fighter.katanaSlashTimer = 0;
   fighter.katanaSlashFadeTimer = 0;
+  fighter.spearSwingTimer = 0;
+  fighter.slashSwingTimer = 0;
+  fighter._activeSlashProgress = 0;
+  fighter._recoveryProgress = 0;
+  fighter._lastSpearTimer = 0;
+  fighter._lastKatanaTimer = 0;
+  fighter.phantomSlashTimer = 0;
+  if (fighter.swordTrail) fighter.swordTrail.length = 0;
   fighter._secondSeqAudioPlayed = false;
+
+  // Clear beam/stun stasis from Toji himself
+  fighter.caughtInPureLoveBeam = false;
+  fighter.wasCaughtInPureLoveBeam = false;
+  fighter.pureLoveBeamTimer = 0;
+  fighter.pureLoveBeamRecoveryTimer = 0;
 
   opponent.isTargetOfAmbush = true;
   if (typeof opponent.interruptAttacks === 'function') {
     opponent.interruptAttacks(true);
   }
+  if (opponent.isFiringPureLoveBeam || opponent.isChannelingPureLoveBeam) {
+    opponent.isFiringPureLoveBeam = false;
+    opponent.isChannelingPureLoveBeam = false;
+    opponent.pureLoveBeamActiveTimer = 0;
+    opponent.pureLoveBeamChargeTimer = 0;
+    opponent.rikaEmergingForBeamTimer = 0;
+    if (typeof opponent._stopBeamAudio === 'function') {
+      opponent._stopBeamAudio();
+    }
+  }
   opponent.slashSwingTimer = 0;
   opponent.katanaSlashTimer = 0;
   opponent.katanaSlashFadeTimer = 0;
+  opponent.spearSwingTimer = 0;
   opponent.punchAnimTimer = 0;
   opponent.flurryHitsLeft = 0;
   opponent.flurrySlashTimer = 0;
   opponent.rapidSlashHitsLeft = 0;
+  opponent.cleaveSwingTimer = 0;
+  opponent.cleaveWindupTimer = 0;
+  opponent.isCleaving = false;
+  opponent.redEffectTimer = 0;
+  opponent.blueEffectTimer = 0;
+  opponent.purpleEffectTimer = 0;
+  opponent.purpleRecoveryTimer = 0;
+  opponent.isChannelingPurple = false;
+  opponent.isChannelingRed = false;
+  opponent.isChannelingBlue = false;
+  opponent.isFiringPurple = false;
+  opponent.fugaFireArrowTimer = 0;
+  opponent.isChannelingDivineFlame = false;
+  opponent.isFiringDivineFlame = false;
+  opponent.getsugaChargeTimer = 0;
+  opponent.isChannelingGetsuga = false;
+  opponent.isFiringGetsuga = false;
+  opponent.ceroTimer = 0;
+  opponent.granReyCeroTimer = 0;
+  opponent.consecutivePunchesTimer = 0;
+  opponent.seriousPunchTimer = 0;
+  opponent.isConsecutivePunches = false;
+  opponent.isSeriousPunching = false;
+  opponent.isBlitzing = false;
+  opponent.blitzStrikeIndex = 0;
+  opponent.isCollapsing = false;
+  opponent.collapseSlamTimer = 0;
+  opponent.ratioGridTimer = 0;
+  opponent.cleaveShockwaveTimer = 0;
   opponent.thinIceBreakerPunchTimer = 0;
   opponent.isChannelingThinIceBreaker = false;
   opponent.maceCannonAnimTimer = 0;
@@ -221,7 +275,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
     if (arena) {
-      const bounceMult = opponent.isFirstHitKnockback ? 0.45 : 0.85;
+      const bounceMult = opponent.isFirstHitKnockback ? 0.35 : 0.50;
       const minX = arena.x + opponent.r;
       const maxX = arena.x + arena.width - opponent.r;
       const minY = arena.y + opponent.r;
@@ -233,7 +287,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       if (opponent.y > maxY) { opponent.y = maxY; opponent.knockbackVy = -Math.abs(opponent.knockbackVy) * bounceMult; }
     }
     
-    const decay = opponent.knockbackDecay || 0.90;
+    const decay = opponent.knockbackDecay || 0.88;
     opponent.knockbackVx *= decay;
     opponent.knockbackVy *= decay;
     
@@ -245,10 +299,40 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   opponent.slashSwingTimer = 0;
   opponent.katanaSlashTimer = 0;
   opponent.katanaSlashFadeTimer = 0;
+  opponent.spearSwingTimer = 0;
   opponent.punchAnimTimer = 0;
   opponent.flurryHitsLeft = 0;
   opponent.flurrySlashTimer = 0;
   opponent.rapidSlashHitsLeft = 0;
+  opponent.cleaveSwingTimer = 0;
+  opponent.cleaveWindupTimer = 0;
+  opponent.isCleaving = false;
+  opponent.redEffectTimer = 0;
+  opponent.blueEffectTimer = 0;
+  opponent.purpleEffectTimer = 0;
+  opponent.purpleRecoveryTimer = 0;
+  opponent.isChannelingPurple = false;
+  opponent.isChannelingRed = false;
+  opponent.isChannelingBlue = false;
+  opponent.isFiringPurple = false;
+  opponent.fugaFireArrowTimer = 0;
+  opponent.isChannelingDivineFlame = false;
+  opponent.isFiringDivineFlame = false;
+  opponent.getsugaChargeTimer = 0;
+  opponent.isChannelingGetsuga = false;
+  opponent.isFiringGetsuga = false;
+  opponent.ceroTimer = 0;
+  opponent.granReyCeroTimer = 0;
+  opponent.consecutivePunchesTimer = 0;
+  opponent.seriousPunchTimer = 0;
+  opponent.isConsecutivePunches = false;
+  opponent.isSeriousPunching = false;
+  opponent.isBlitzing = false;
+  opponent.blitzStrikeIndex = 0;
+  opponent.isCollapsing = false;
+  opponent.collapseSlamTimer = 0;
+  opponent.ratioGridTimer = 0;
+  opponent.cleaveShockwaveTimer = 0;
   opponent.thinIceBreakerPunchTimer = 0;
   opponent.isChannelingThinIceBreaker = false;
   opponent.maceCannonAnimTimer = 0;
@@ -576,14 +660,14 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         // Apply the big final knockback blast before releasing the target
         if (opponent && opponent.hp > 0 && !opponent.isTurret && !opponent.cannotBeKnockbacked) {
           const finalPushAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-          const finalRecoil = CONFIG.toji?.ambushFlurryFinalRecoil || 38;
+          const finalRecoil = CONFIG.toji?.ambushFlurryFinalRecoil || 24;
           const kbX = Math.cos(finalPushAngle) * finalRecoil;
           const kbY = Math.sin(finalPushAngle) * finalRecoil;
           opponent.knockbackVx = kbX;
           opponent.knockbackVy = kbY;
           opponent.vx = kbX;
           opponent.vy = kbY;
-          opponent.knockbackDecay = 0.90;
+          opponent.knockbackDecay = 0.88;
           
           if (typeof opponent.applyKnockback === 'function') {
             opponent.applyKnockback(kbX, kbY);
@@ -666,14 +750,14 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
           if (!target.isTurret && !target.cannotBeKnockbacked) {
             const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-            const recoilForce = isFinalStrike ? (CONFIG.toji?.ambushFlurryFinalRecoil || 38) : (6.5 + Math.random() * 2.5);
+            const recoilForce = isFinalStrike ? (CONFIG.toji?.ambushFlurryFinalRecoil || 24) : (4.5 + Math.random() * 1.5);
             const kbX = Math.cos(pushAngle) * recoilForce;
             const kbY = Math.sin(pushAngle) * recoilForce;
             target.knockbackVx = kbX;
             target.knockbackVy = kbY;
             target.vx = kbX;
             target.vy = kbY;
-            target.knockbackDecay = isFinalStrike ? 0.90 : 0.78;
+            target.knockbackDecay = isFinalStrike ? 0.88 : 0.72;
             if (typeof target.applyKnockback === 'function') target.applyKnockback(kbX, kbY);
           }
         }

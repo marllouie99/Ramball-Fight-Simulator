@@ -1,102 +1,93 @@
 // ─────────────────────────────────────────────
-// SATORU GOJO DOMAIN EXPANSION (UNLIMITED VOID) VISUAL RENDERER
+// SATORU GOJO DOMAIN EXPANSION (UNLIMITED VOID / MURYŌKŪSHO)
+// Pixel Art Domain Overlay Image Renderer (Assets/Overlays/gojo-domainexpansion.png)
 // ─────────────────────────────────────────────
 import { state } from '../../../core/state.js';
 
+let _gojoDomainImg = null;
+let _gojoDomainImgLoading = false;
+
+/**
+ * Preload and retrieve Gojo's pixel art domain expansion overlay image
+ */
+function _getGojoDomainImage() {
+  if (_gojoDomainImg && _gojoDomainImg.complete && _gojoDomainImg.naturalWidth > 0) {
+    return _gojoDomainImg;
+  }
+  if (!_gojoDomainImgLoading && typeof Image !== 'undefined') {
+    _gojoDomainImgLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _gojoDomainImg = img;
+      _gojoDomainImgLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Gojo domain overlay image at Assets/Overlays/gojo-domainexpansion.png', e);
+      _gojoDomainImgLoading = false;
+    };
+    img.src = 'Assets/Overlays/gojo-domainexpansion.png';
+    _gojoDomainImg = img;
+  }
+  return _gojoDomainImg;
+}
+
+// Preload immediately if running in browser
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getGojoDomainImage();
+}
+
+/**
+ * Main Visual Renderer for Gojo's Domain Expansion (Unlimited Void / Muryōkūsho).
+ * Renders Assets/Overlays/gojo-domainexpansion.png occupying the whole arena, clipped inside the arena bounds.
+ * @param {object} fighter - The Gojo fighter instance
+ * @param {CanvasRenderingContext2D} ctx - The canvas 2D context
+ * @param {boolean} isClashSecondary - Whether this domain is secondary in a domain clash
+ */
 export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = false) {
   if (!fighter || !fighter.domainActive) return;
 
-  const time = Date.now();
-  const cx = fighter.x;
-  const cy = fighter.y;
-  const canvas = state.canvas;
   const arena = state.arena;
-  if (!canvas || !arena) return;
+  if (!arena) return;
+
+  const ax = arena.x;
+  const ay = arena.y;
+  const aw = arena.width;
+  const ah = arena.height;
+  const ww = arena.wallWidth || 4;
 
   ctx.save();
 
-  const isDarkMode = Boolean(
-    typeof state !== 'undefined' && (
-      state.arenaTheme === 'dark' || 
-      state.darkMode || 
-      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-    )
-  );
-
-  if (isDarkMode && arena) {
-    ctx.beginPath();
-    if (arena.shape === 'circle') {
-      const acx = arena.x + arena.width / 2;
-      const acy = arena.y + arena.height / 2;
-      const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - (arena.wallWidth || 0);
-      ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
-    } else {
-      const ww = arena.wallWidth || 0;
-      ctx.rect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
-    }
-    ctx.clip();
+  // 1. Clip strictly inside the arena bounds
+  ctx.beginPath();
+  if (arena.shape === 'circle') {
+    const acx = arena.x + arena.width / 2;
+    const acy = arena.y + arena.height / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+    ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
+  } else {
+    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
   }
+  ctx.clip();
 
-  // ── 1. BLUE GLASS TRANSLUCENT LINEAR GRADIENT (SUKUNA DOMAIN AESTHETIC IN BLUE) ──
-  ctx.save();
   if (isClashSecondary) {
-    ctx.globalAlpha = 0.70;
+    ctx.globalAlpha = 0.75;
   }
 
-  if (!fighter._cachedGojoBgGrad || fighter._cachedGojoBgCx !== cx || fighter._cachedGojoBgCy !== cy) {
-    fighter._cachedGojoBgCx = cx;
-    fighter._cachedGojoBgCy = cy;
-    fighter._cachedGojoBgGrad = ctx.createRadialGradient(cx, cy, 15, cx, cy, 230);
-    fighter._cachedGojoBgGrad.addColorStop(0, 'rgba(0, 120, 190, 0.78)');   // Vibrant Electric Cyan-Blue bloom around Gojo's body
-    fighter._cachedGojoBgGrad.addColorStop(0.35, 'rgba(0, 70, 130, 0.82)'); // Limitless Cyan glass tint
-    fighter._cachedGojoBgGrad.addColorStop(0.75, 'rgba(0, 35, 75, 0.88)');  // Deep Infinity Cyan-Navy
-    fighter._cachedGojoBgGrad.addColorStop(1, 'rgba(0, 18, 45, 0.92)');     // Outer dark cyan glass edge
+  // 2. Base Dark Cosmic Background
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(ax, ay, aw, ah);
+
+  // 3. Draw Gojo Domain Overlay Image occupying the whole arena
+  const img = _getGojoDomainImage();
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling preserves crisp pixel art
+    ctx.drawImage(img, ax, ay, aw, ah);
   }
 
-  ctx.fillStyle = fighter._cachedGojoBgGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.restore();
-
-  // ── 2. HORIZONTAL CYAN SHEEN WAVE LINES (MATCHING SUKUNA'S FLOOR WAVE LINES IN BLUE) ──
-  ctx.save();
-  const waveCount = 10;
-  ctx.lineWidth = 1;
-  for (let w = 0; w < waveCount; w++) {
-    const wy = cy - 150 + w * 45 + Math.sin(time * 0.002 + w) * 8;
-    const waveAlpha = 0.12 + Math.sin(time * 0.003 + w * 1.5) * 0.08;
-    ctx.strokeStyle = `rgba(0, 229, 255, ${waveAlpha})`;
-    ctx.beginPath();
-    ctx.moveTo(cx - 1200, wy);
-    ctx.quadraticCurveTo(cx, wy + Math.sin(time * 0.004 + w * 2) * 12, cx + 1200, wy);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // ── 3. INFINITE KNOWLEDGE SINGULARITY RINGS AROUND GOJO ──
-  const ringPulse = Math.sin(time * 0.004) * 6;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-
-  // Outer glowing cyan ring (tighter radius)
-  ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 30 + ringPulse * 0.7, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(0, 229, 255, 0.9)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 30 + ringPulse * 0.7, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Inner white singularity ring (tighter radius)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 22 - ringPulse * 0.4, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+  // 4. Black Overlay on top of image
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.fillRect(ax, ay, aw, ah);
 
   ctx.restore();
 }
+

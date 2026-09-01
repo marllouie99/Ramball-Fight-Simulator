@@ -9,6 +9,7 @@ import { spawnSparks, spawnImpactFlash, spawnAnimePunchImpactFrame } from '../..
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
+import { spawnDomainSlashLines } from './sukunaDomainVisuals.js';
 
 export function checkSpiderwebTrigger(fighter, arena) {
   if (fighter.spiderwebCooldown > 0) return;
@@ -281,132 +282,21 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
 }
 
 export function applyDomainEffect(fighter, arena) {
-  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-  const domainDamage = CONFIG.sukuna?.domainDamage || 15;
-  const domainDamageInterval = CONFIG.sukuna?.domainDamageInterval || 20;
+  const domainDamageInterval = CONFIG.sukuna?.domainDamageInterval || 18;
+  const slashesPerTick = CONFIG.sukuna?.domainSlashesPerTick || 3;
 
-  if (!fighter.domainTimeInsideMap) fighter.domainTimeInsideMap = new Map();
   fighter._domainFrame = (fighter._domainFrame || 0) + 1;
 
   if (fighter._domainFrame % domainDamageInterval === 0) {
-    let playedSwordSwing = false;
     if (fighter._slashSoundCooldown === undefined || fighter._slashSoundCooldown <= 0) {
       audioSystem.playSFX('attack_swordswing', 0.5);
-      fighter._slashSoundCooldown = 15;
-      playedSwordSwing = true;
+      fighter._slashSoundCooldown = 12;
     }
 
-    let hitEnemyThisTick = false;
-    const ownerIdx = state.fighters.indexOf(fighter);
-    const shrineX = fighter.domainX || fighter.x;
-    const shrineY = fighter.domainY || fighter.y;
-    const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
-
-    const rampRate = CONFIG.sukuna?.domainRampRatePerSec ?? 0.10;
-
-    state.fighters.forEach((f, idx) => {
-      if (f && f !== fighter && f.hp > 0) {
-        if (f.domainImmunity && f.characterId !== 'toji' && f.type !== 'toji') return;
-
-        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-        if (true) { // Hit EVERYONE in the domain (stray slashes hurt teammates)
-          if (isEnemy) hitEnemyThisTick = true; // Only enemies trigger the specific hit sounds
-          const timeInside = (fighter.domainTimeInsideMap.get(f) || 0) + domainDamageInterval;
-          fighter.domainTimeInsideMap.set(f, timeInside);
-
-          const rampMultiplier = 1 + (timeInside / 60) * rampRate;
-          const finalDamage = domainDamage * rampMultiplier;
-
-          // Fire a single visible ghostBlade projectile directly from Malevolent Shrine towards the target!
-          const aimAngle = Math.atan2(f.y - (shrineY - 40), f.x - shrineX);
-          if (projectileSystem) {
-            projectileSystem.fireProjectile(
-              fighter,
-              ownerIdx,
-              0, // 0 damage so the projectile is just a visual effect (domain deals instant damage below)
-              false,
-              55 + Math.random() * 20, // fast speed
-              false,
-              'ghostBlade',
-              shrineX + (Math.random() - 0.5) * 120,
-              shrineY - 60 + (Math.random() - 0.5) * 60,
-              aimAngle
-            );
-          }
-
-          let dmg = finalDamage;
-          let isCrit = false;
-          if (typeof fighter.evaluateSlashCrit === 'function') {
-            const res = fighter.evaluateSlashCrit(f, finalDamage, { isDomain: true });
-            dmg = res.finalDamage;
-            isCrit = res.isCrit;
-          }
-          f.takeDamage(dmg, fighter, { isDomain: true, bypassShield: true, isSukunaSlash: true, isCrit });
-
-          spawnSparks(f.x, f.y, 6, 'crimsonSniper', '#8B0000');
-          spawnImpactFlash(f.x, f.y, 22, 'crimsonSniper');
-        }
-      }
-    });
-
-    if (state.illusions) {
-      state.illusions.forEach((ill) => {
-        if (ill && ill.hp > 0 && typeof ill.takeDamage === 'function') {
-          let isEnemy = true;
-          if (myTeam !== null) {
-            let illOwnerIndex = -1;
-            if (ill.ownerIndex !== undefined) {
-              illOwnerIndex = ill.ownerIndex;
-            } else if (ill.owner && state.fighters.indexOf(ill.owner) !== -1) {
-              illOwnerIndex = state.fighters.indexOf(ill.owner);
-            }
-            if (illOwnerIndex !== -1) {
-              isEnemy = state.getFighterTeam(illOwnerIndex) !== myTeam;
-            }
-          }
-          if (true) { // Hit EVERYONE'S illusions in the domain
-            if (isEnemy) hitEnemyThisTick = true;
-            const timeInside = (fighter.domainTimeInsideMap.get(ill) || 0) + domainDamageInterval;
-            fighter.domainTimeInsideMap.set(ill, timeInside);
-
-            const rampMultiplier = 1 + (timeInside / 60) * rampRate;
-            const finalDamage = domainDamage * rampMultiplier;
-
-            // Fire a single visible ghostBlade projectile directly from Malevolent Shrine towards the illusion!
-            const aimAngle = Math.atan2(ill.y - (shrineY - 40), ill.x - shrineX);
-            if (projectileSystem) {
-              projectileSystem.fireProjectile(
-                fighter,
-                ownerIdx,
-                0, // 0 damage
-                false,
-                55 + Math.random() * 20, // fast speed
-                false,
-                'ghostBlade',
-                shrineX + (Math.random() - 0.5) * 120,
-                shrineY - 60 + (Math.random() - 0.5) * 60,
-                aimAngle
-              );
-            }
-
-            let dmg = finalDamage;
-            let isCrit = false;
-            if (typeof fighter.evaluateSlashCrit === 'function') {
-              const res = fighter.evaluateSlashCrit(ill, finalDamage, { isDomain: true });
-              dmg = res.finalDamage;
-              isCrit = res.isCrit;
-            }
-            ill.takeDamage(dmg, fighter, { isDomain: true, bypassShield: true, isSukunaSlash: true, isCrit });
-
-            spawnSparks(ill.x, ill.y, 6, 'crimsonSniper', '#8B0000');
-            spawnImpactFlash(ill.x, ill.y, 22, 'crimsonSniper');
-          }
-        }
-      });
-    }
-
-    if (hitEnemyThisTick && playedSwordSwing) {
-      audioSystem.playSFX('skill_backstab', 0.4);
+    // Spawn arena-clipped spatial cut lines and execute physical hits for each line
+    const hitAny = spawnDomainSlashLines(fighter, slashesPerTick);
+    if (hitAny) {
+      audioSystem.playSFX('skill_backstab', 0.45);
     }
   }
 }

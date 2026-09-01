@@ -995,9 +995,12 @@ function _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura
   ctx.restore();
 }
 
+let _cachedGodModeShieldGrad = null;
+let _cachedHesoyamShieldGrad = null;
+
 /**
  * Draws BAGUVIX God-Mode & Cheat Code Matrix Aura
- * Rule 11 & Rule 16 Compliant: Zero shadowBlur, purely geometric & gradient based.
+ * Rule 11 & Rule 12 Compliant: Zero shadowBlur, zero per-frame text measurements, cached gradients.
  */
 function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = false) {
   if (!isGodMode && !isHesoyamActive && !isRespectAura) return;
@@ -1013,7 +1016,8 @@ function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = fa
   ctx.save();
 
   // ── 1. Expanding Golden / Emerald God Mode Barrier Rings ──
-  const primaryColor = (isGodMode || isRespectAura) ? 'rgba(245, 158, 11, ' : 'rgba(34, 197, 94, ';
+  const isGolden = (isGodMode || isRespectAura);
+  const primaryColor = isGolden ? 'rgba(245, 158, 11, ' : 'rgba(34, 197, 94, ';
   const ringCount = isGodMode ? 3 : 2;
 
   for (let i = 0; i < ringCount; i++) {
@@ -1030,27 +1034,45 @@ function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = fa
   }
   ctx.setLineDash([]);
 
-  // ── 2. Floating Cash Dollar Signs ($) & Binary Cheat Particles ──
+  // ── 2. Floating Cash Dollar Signs ($) & Binary Cheat Particles (Rule 12: Geometric rendering) ──
   const particleCount = isGodMode ? 8 : 5;
+  const dollarColor = isGodMode ? '#FDE047' : '#4ADE80';
   for (let p = 0; p < particleCount; p++) {
     const pAngle = time * 1.8 + (p * (Math.PI * 2 / particleCount));
     const pDist = r * (1.35 + Math.sin(time * 2.5 + p) * 0.25);
     const px = Math.cos(pAngle) * pDist;
     const py = Math.sin(pAngle) * pDist;
 
-    ctx.fillStyle = isGodMode ? '#FDE047' : '#4ADE80';
-    ctx.font = `bold ${Math.round(r * 0.38)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('$', px, py);
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(px - 4, py - 6, 8, 12);
+    ctx.fillStyle = dollarColor;
+    // Crisp geometric dollar symbol ($) without font layout overhead
+    ctx.fillRect(px - 2, py - 4, 4, 1);
+    ctx.fillRect(px - 3, py - 3, 2, 2);
+    ctx.fillRect(px - 2, py - 1, 4, 1);
+    ctx.fillRect(px + 1, py, 2, 2);
+    ctx.fillRect(px - 2, py + 2, 4, 1);
+    ctx.fillRect(px - 1, py - 5, 1, 10);
   }
 
-  // ── 3. Subtle Radial Shield Glow Fills (Rule 11: Radial Gradient) ──
-  const shieldGrad = ctx.createRadialGradient(0, 0, r * 0.80, 0, 0, r * 1.55);
-  shieldGrad.addColorStop(0, `${primaryColor}0.10)`);
-  shieldGrad.addColorStop(0.70, `${primaryColor}0.25)`);
-  shieldGrad.addColorStop(1, `${primaryColor}0)`);
-  ctx.fillStyle = shieldGrad;
+  // ── 3. Subtle Radial Shield Glow Fills (Cached Gradients - Rule 11) ──
+  if (isGolden) {
+    if (!_cachedGodModeShieldGrad) {
+      _cachedGodModeShieldGrad = ctx.createRadialGradient(0, 0, r * 0.80, 0, 0, r * 1.55);
+      _cachedGodModeShieldGrad.addColorStop(0, 'rgba(245, 158, 11, 0.10)');
+      _cachedGodModeShieldGrad.addColorStop(0.70, 'rgba(245, 158, 11, 0.25)');
+      _cachedGodModeShieldGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    }
+    ctx.fillStyle = _cachedGodModeShieldGrad;
+  } else {
+    if (!_cachedHesoyamShieldGrad) {
+      _cachedHesoyamShieldGrad = ctx.createRadialGradient(0, 0, r * 0.80, 0, 0, r * 1.55);
+      _cachedHesoyamShieldGrad.addColorStop(0, 'rgba(34, 197, 94, 0.10)');
+      _cachedHesoyamShieldGrad.addColorStop(0.70, 'rgba(34, 197, 94, 0.25)');
+      _cachedHesoyamShieldGrad.addColorStop(1, 'rgba(34, 197, 94, 0)');
+    }
+    ctx.fillStyle = _cachedHesoyamShieldGrad;
+  }
   ctx.beginPath();
   ctx.arc(0, 0, r * 1.55, 0, Math.PI * 2);
   ctx.fill();

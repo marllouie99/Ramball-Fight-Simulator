@@ -1,16 +1,15 @@
-/**
- * Authentic 1:1 Procedural Pixel Art Body for Ryomen Sukuna
- * Uses discrete stepped rasterization loop with zero subpixel bleed.
- */
-export function drawSukunaPixelBody(ctx, r, fighter = null) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+// Offscreen canvas cache for Sukuna's pixel body model (avoids 1,000 fillRect calls per frame)
+let _cachedSukunaCanvas = null;
+let _cachedSukunaR = 0;
+let _cachedSukunaColor = '';
+
+function _renderSukunaPixelBodyToCanvas(destCtx, r, crimsonBase) {
+  destCtx.imageSmoothingEnabled = false;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
   // Palette Colors for Ryomen Sukuna (Whole Crimson Red Body + Dark Cursed Ink)
-  const crimsonBase = (fighter && fighter.color) ? fighter.color : '#8B0000';
   const C = {
     outline: '#0E0F14',        // Deep dark pixel border
     tattooBlack: '#0E0F14',    // Deep high-contrast cursed ink tattoo
@@ -20,6 +19,12 @@ export function drawSukunaPixelBody(ctx, r, fighter = null) {
     skinShadow1: '#6E0A18',    // Mid cheek & jaw edge shade
     skinShadow2: '#4A0510',    // Deep perimeter rim & bottom shadow
   };
+
+  const cx = destCtx.canvas.width / 2;
+  const cy = destCtx.canvas.height / 2;
+
+  destCtx.save();
+  destCtx.translate(cx, cy);
 
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -40,8 +45,8 @@ export function drawSukunaPixelBody(ctx, r, fighter = null) {
         Math.hypot(rx, ry + P) > r ||
         Math.hypot(rx, ry - P) > r
       ) {
-        ctx.fillStyle = C.outline;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = C.outline;
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -52,80 +57,46 @@ export function drawSukunaPixelBody(ctx, r, fighter = null) {
       // ──────────────────────────────────────────
       let isTattoo = false;
 
-      // ── A. FOREHEAD TRIDENT & CENTRAL DROPLET (Matching Reference 1:1) ──
-      // 1. Central Vertical Droplet Dot (floating in the middle)
+      // ── A. FOREHEAD TRIDENT & CENTRAL DROPLET ──
       if (absGx === 0 && (gy === -9 || gy === -8 || gy === -7)) {
         isTattoo = true;
-      }
-      // 2. Outer Top Horns (sharp tall needles)
-      else if (absGx === 4 && (gy === -10 || gy === -9 || gy === -8)) {
+      } else if (absGx === 4 && (gy === -10 || gy === -9 || gy === -8)) {
+        isTattoo = true;
+      } else if (gy === -7 && absGx === 3) {
+        isTattoo = true;
+      } else if (gy === -6 && (absGx === 2 || absGx === 3 || absGx === 4)) {
+        isTattoo = true;
+      } else if ((gy === -5 && absGx === 4) || (gy === -4 && absGx === 5)) {
+        isTattoo = true;
+      } else if (absGx === 2 && (gy === -5 || gy === -4 || gy === -3)) {
         isTattoo = true;
       }
-      // 3. Horizontal Wing Bridge (leaves gx=0,±1 open red skin)
-      else if (gy === -7 && absGx === 3) {
-        isTattoo = true;
-      }
-      else if (gy === -6 && (absGx === 2 || absGx === 3 || absGx === 4)) {
-        isTattoo = true;
-      }
-      // 4. Outer Downward Hook Flukes
-      else if ((gy === -5 && absGx === 4) || (gy === -4 && absGx === 5)) {
-        isTattoo = true;
-      }
-      // 5. Inner Downward Prongs / Fangs (long vertical needles)
-      else if (absGx === 2 && (gy === -5 || gy === -4 || gy === -3)) {
-        isTattoo = true;
-      }
-
-      // ── B. NOSE / BROW WAVE ARCH (Compact in the upper middle) ──
-      // 1. Dome crest at the top
+      // ── B. NOSE / BROW WAVE ARCH ──
       else if (gy === -2 && absGx <= 1) {
         isTattoo = true;
-      }
-      // 2. Sloping diagonal wings
-      else if (gy === -1 && absGx === 2) {
+      } else if (gy === -1 && absGx === 2) {
+        isTattoo = true;
+      } else if (gy === 0 && absGx === 3) {
         isTattoo = true;
       }
-      // 3. Sharp wingtip needles flaring outward
-      else if (gy === 0 && absGx === 3) {
-        isTattoo = true;
-      }
-
-      // ── C. CHEEK FORKS, JAWLINE & CHIN (Wide on outer face perimeter) ──
-      // High outer cheek prong
+      // ── C. CHEEK FORKS, JAWLINE & CHIN ──
       else if ((gy === -3 && absGx === 10) || (gy === -2 && absGx === 9)) {
         isTattoo = true;
-      }
-      // High inner cheek lightning prong
-      else if ((gy === -2 && absGx === 7) || (gy === -1 && absGx === 8)) {
+      } else if ((gy === -2 && absGx === 7) || (gy === -1 && absGx === 8)) {
         isTattoo = true;
-      }
-      // Cheek node joint
-      else if (absGx === 9 && (gy === 0 || gy === 1)) {
+      } else if (absGx === 9 && (gy === 0 || gy === 1)) {
         isTattoo = true;
-      }
-      // Upper steep jawline drop
-      else if ((gy === 2 && absGx === 8) || (gy === 3 && absGx === 8) || (gy === 4 && absGx === 7)) {
+      } else if ((gy === 2 && absGx === 8) || (gy === 3 && absGx === 8) || (gy === 4 && absGx === 7)) {
         isTattoo = true;
-      }
-      // Lower diagonal jawline sweep
-      else if ((gy === 5 && absGx === 6) || (gy === 6 && absGx === 5) || (gy === 7 && absGx === 4)) {
+      } else if ((gy === 5 && absGx === 6) || (gy === 6 && absGx === 5) || (gy === 7 && absGx === 4)) {
         isTattoo = true;
-      }
-      // Chin outward zigzag step
-      else if (gy === 8 && absGx === 5) {
+      } else if (gy === 8 && absGx === 5) {
         isTattoo = true;
-      }
-      // Chin inward zigzag step
-      else if (gy === 8 && absGx === 3) {
+      } else if (gy === 8 && absGx === 3) {
         isTattoo = true;
-      }
-      // Chin outer downward spike
-      else if ((gy === 9 && absGx === 4) || (gy === 10 && absGx === 3)) {
+      } else if ((gy === 9 && absGx === 4) || (gy === 10 && absGx === 3)) {
         isTattoo = true;
-      }
-      // Chin inner downward spike
-      else if (absGx === 1 && (gy === 9 || gy === 10)) {
+      } else if (absGx === 1 && (gy === 9 || gy === 10)) {
         isTattoo = true;
       }
 
@@ -133,39 +104,53 @@ export function drawSukunaPixelBody(ctx, r, fighter = null) {
       // 2. PIXEL RENDER (TATTOO vs CRIMSON FLESH)
       // ──────────────────────────────────────────
       if (isTattoo) {
-        ctx.fillStyle = C.tattooBlack;
+        destCtx.fillStyle = C.tattooBlack;
       } else {
-        // Volumetric Crimson Red Skin Shading
         let col = C.skinBase;
-
-        // Top Forehead Highlight
         if (gy < -4 && absGx < 6) {
           col = C.skinHighlight;
-        }
-        // Center Face Highlight
-        else if (gy >= -1 && gy <= 5 && absGx < 4) {
+        } else if (gy >= -1 && gy <= 5 && absGx < 4) {
           col = C.skinHighlight;
-        }
-        // Outer Periphery / Edge Shading
-        else if (absGx >= 8 || gy > 9 || gy < -9) {
+        } else if (absGx >= 8 || gy > 9 || gy < -9) {
           const dLevel = Math.max((absGx - 8) / 4, (gy - 9) / 3);
           if (dLevel > 0.5) {
             col = ((gx + gy) % 2 === 0) ? C.skinShadow2 : C.skinShadow1;
           } else {
             col = ((gx + gy) % 2 === 0) ? C.skinShadow1 : C.skinBase;
           }
-        }
-        // Soft Cheek & Lower Jaw Shade
-        else if (absGx >= 6 && gy >= 2 && gy <= 7) {
+        } else if (absGx >= 6 && gy >= 2 && gy <= 7) {
           col = ((gx + gy) % 2 === 0) ? C.skinShadow1 : C.skinBase;
         }
 
-        ctx.fillStyle = col;
+        destCtx.fillStyle = col;
       }
-      ctx.fillRect(px, py, P, P);
+      destCtx.fillRect(px, py, P, P);
     }
   }
 
+  destCtx.restore();
+}
+
+/**
+ * Authentic 1:1 Procedural Pixel Art Body for Ryomen Sukuna (High Performance Offscreen Cached)
+ */
+export function drawSukunaPixelBody(ctx, r, fighter = null) {
+  const crimsonBase = (fighter && fighter.color) ? fighter.color : '#8B0000';
+
+  if (!_cachedSukunaCanvas || _cachedSukunaR !== r || _cachedSukunaColor !== crimsonBase) {
+    _cachedSukunaR = r;
+    _cachedSukunaColor = crimsonBase;
+    const size = Math.ceil((r + 4) * 2);
+    _cachedSukunaCanvas = document.createElement('canvas');
+    _cachedSukunaCanvas.width = size;
+    _cachedSukunaCanvas.height = size;
+    const offCtx = _cachedSukunaCanvas.getContext('2d');
+    _renderSukunaPixelBodyToCanvas(offCtx, r, crimsonBase);
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(_cachedSukunaCanvas, -_cachedSukunaCanvas.width / 2, -_cachedSukunaCanvas.height / 2);
   ctx.restore();
 }
 

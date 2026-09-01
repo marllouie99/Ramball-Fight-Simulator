@@ -83,7 +83,7 @@ export const gojoConfig = {
   purpleSecondCastTextHeader200: 'PURPLE 200%',     // Skill HUD bar label for 200% cast
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
-  domainCooldown: 2000,     // 20s Ultimate cooldown
+  domainCooldown: 1000,     // 20s Ultimate cooldown
   domainChargeMax: 130,     // 2s Channeling duration before domain opens
   domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays

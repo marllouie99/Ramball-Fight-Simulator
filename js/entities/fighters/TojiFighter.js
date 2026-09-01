@@ -192,8 +192,8 @@ export class TojiFighter extends Fighter {
   }
 
   interruptAttacks(force = false) {
-    if (this.ultimateActive && !force) {
-      return; // PROTECTED: Never cancel or interrupt active ultimate!
+    if ((this.ultimateActive || this.isAmbushing) && !force) {
+      return; // PROTECTED: Never cancel or interrupt active ultimate or active ambush combo!
     }
     super.interruptAttacks(force);
     this.isAmbushing = false;
@@ -692,8 +692,7 @@ export class TojiFighter extends Fighter {
         );
         this.x = clampedSlide.x;
         this.y = clampedSlide.y;
-        this.angle = angle + Math.PI; // Face target
-        this.gunAngle = this.angle;
+        this.aim(this.ultimateTarget);
         
         // Huge velocity towards target to slide in quickly
         const dashSpeed = CONFIG.toji?.ultimateSlideSpeed ?? 40;
@@ -724,6 +723,10 @@ export class TojiFighter extends Fighter {
       this.y = clampedStrike.y;
       this.vx *= 0.82;
       this.vy *= 0.82;
+
+      if (this.ultimateTarget && !tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
+        this.aim(this.ultimateTarget);
+      }
       
       // Tick down animation timers so the weapon swing actually animates
       if (this.spearSwingTimer > 0) this.spearSwingTimer--;
@@ -2031,79 +2034,94 @@ export class TojiFighter extends Fighter {
           endAngle = tipAngle;
         }
 
-        const P = 2.4; // Pixel art grid scale
+        const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
+        const snap = (v) => Math.round(v / P) * P;
         const outerR = this.r + thrustDistance + (isSpinningDive ? 146 : 122); // Dynamically tracks Katana blade tip!
         const thickScale = isSpinningDive ? 1.0 : (recP > 0 ? Math.pow(1 - recP, 1.4) : 1.0);
         const maxThick = 22 * thickScale; // Slim, razor-sharp crescent thickness!
-        const totalAngle = Math.abs(endAngle - startAngle);
-        const arcSteps = Math.max(16, Math.round((totalAngle * outerR) / (P * 1.5)));
+        const span = endAngle - startAngle;
+        const minAng = Math.min(startAngle, endAngle);
+        const maxAng = Math.max(startAngle, endAngle);
 
-        // Pass 1: Pixel-Art Dark Cursed Ink Outline Shell
-        ctx.fillStyle = `rgba(8, 4, 16, ${0.96 * slashArcAlpha})`;
-        for (let i = 0; i <= arcSteps; i++) {
-          const t = i / arcSteps;
-          const ang = startAngle + (endAngle - startAngle) * t;
+        const outlineCol = `rgba(10, 4, 18, ${(0.96 * slashArcAlpha).toFixed(2)})`;
+
+        const isInsideSlash = (rx, ry) => {
+          const dist = Math.hypot(rx, ry);
+          if (dist <= 0) return false;
+          let ang = Math.atan2(ry, rx);
+          while (ang < minAng - Math.PI) ang += Math.PI * 2;
+          while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+          if (ang < minAng || ang > maxAng) return false;
+
+          const t = (ang - startAngle) / span;
+          if (t < 0 || t > 1.0) return false;
+
           const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
-          const rad = outerR + taper * 2.0;
-          const thick = (maxThick * taper) + P * 2;
-          const innerRad = rad - thick;
-
-          const numRadSteps = Math.max(2, Math.round(thick / P));
-          for (let ri = 0; ri <= numRadSteps; ri++) {
-            const currentR = innerRad + (ri / numRadSteps) * thick;
-            const rawX = Math.cos(ang) * currentR;
-            const rawY = Math.sin(ang) * currentR;
-            const px = Math.round(rawX / P) * P;
-            const py = Math.round(rawY / P) * P;
-            ctx.fillRect(px, py, P, P);
-          }
-        }
-
-        // Pass 2: Stepped Pixel Deep Crimson / Violet Nullification Core
-        for (let i = 0; i <= arcSteps; i++) {
-          const t = i / arcSteps;
-          const ang = startAngle + (endAngle - startAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
-          const rad = outerR + taper * 1.0;
           const thick = maxThick * taper;
-          const innerRad = rad - thick;
+          const outRad = outerR + taper * 1.5;
+          const inRad = outRad - thick;
+          return dist >= inRad && dist <= outRad;
+        };
 
-          const numRadSteps = Math.max(1, Math.round(thick / P));
-          for (let ri = 0; ri <= numRadSteps; ri++) {
-            const rNorm = ri / numRadSteps;
-            const currentR = innerRad + rNorm * thick;
-            const rawX = Math.cos(ang) * currentR;
-            const rawY = Math.sin(ang) * currentR;
-            const px = Math.round(rawX / P) * P;
-            const py = Math.round(rawY / P) * P;
+        const minX = Math.floor((-outerR - P * 2) / P) * P;
+        const maxX = Math.ceil((outerR + P * 2) / P) * P;
+        const minY = Math.floor((-outerR - P * 2) / P) * P;
+        const maxY = Math.ceil((outerR + P * 2) / P) * P;
+
+        // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border ──
+        for (let gy = minY; gy <= maxY; gy += P) {
+          for (let gx = minX; gx <= maxX; gx += P) {
+            if (!isInsideSlash(gx, gy)) continue;
+
+            const pxX = snap(gx);
+            const pyY = snap(gy);
+
+            const isBorder = !isInsideSlash(gx + P, gy) ||
+                             !isInsideSlash(gx - P, gy) ||
+                             !isInsideSlash(gx, gy + P) ||
+                             !isInsideSlash(gx, gy - P);
+
+            if (isBorder) {
+              ctx.fillStyle = outlineCol;
+              ctx.fillRect(pxX, pyY, P, P);
+              continue;
+            }
+
+            const dist = Math.hypot(gx, gy);
+            let ang = Math.atan2(gy, gx);
+            while (ang < minAng - Math.PI) ang += Math.PI * 2;
+            while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+            const t = (ang - startAngle) / span;
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+            const outRad = outerR + taper * 1.5;
+            const depthFromApex = outRad - dist;
 
             let col;
-            if (rNorm > 0.85) col = '#FFFFFF';
-            else if (rNorm > 0.6) col = '#FF2060';
-            else if (rNorm > 0.3) col = '#9B1FE8';
-            else col = '#3A055C';
+            if (depthFromApex < P * 1.4) {
+              col = '#FFFFFF';
+            } else if (depthFromApex < P * 3.0) {
+              col = '#FFF5FA';
+            } else if (depthFromApex < P * 5.0) {
+              col = '#FF2060';
+            } else if (depthFromApex < P * 7.5) {
+              col = '#9B1FE8';
+            } else {
+              col = '#220038';
+            }
 
             ctx.fillStyle = col;
-            ctx.fillRect(px, py, P, P);
+            ctx.fillRect(pxX, pyY, P, P);
           }
-
-          // Pass 3: Leading White Razor Cutting Edge Pixels
-          const leadRawX = Math.cos(ang) * (outerR + taper * 1.0);
-          const leadRawY = Math.sin(ang) * (outerR + taper * 1.0);
-          const lpx = Math.round(leadRawX / P) * P;
-          const lpy = Math.round(leadRawY / P) * P;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(lpx, lpy, P, P);
         }
 
-        // Pass 4: Trailing Cursed Purple Pixel Sparks
+        // Trailing Cursed Purple Pixel Sparks
         const numEmbers = 8;
         for (let eb = 0; eb < numEmbers; eb++) {
           const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-          const ebAng = startAngle + ebT * (endAngle - startAngle);
+          const ebAng = startAngle + ebT * span;
           const ebDist = outerR - 10 - eb * 4;
-          const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
-          const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+          const ex = snap(Math.cos(ebAng) * ebDist);
+          const ey = snap(Math.sin(ebAng) * ebDist);
           ctx.fillStyle = (eb % 2 === 0) ? '#A030FF' : '#FF1E56';
           ctx.fillRect(ex, ey, P, P);
         }
@@ -2111,7 +2129,6 @@ export class TojiFighter extends Fighter {
         // --- DUAL-WIELD PHANTOM FLURRY SLASH ARCS ---
         const drawArc = (arcAngle, radius, thick, alpha, color1, color2, color3) => {
           ctx.save();
-          // Use frozen angle so each flurry arc stays locked to the blade direction at strike-start
           const frozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
           ctx.rotate(frozenAngle + arcAngle);
           const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
@@ -2119,12 +2136,11 @@ export class TojiFighter extends Fighter {
             ctx.scale(1, -1);
           }
 
-          // Calculate swing progress: timer counts down from maxSlashFrames to 0
           const animMult = (TOJI_WEAPON_CONFIG?.animationSpeed || 1.0) * (TOJI_WEAPON_CONFIG?.katanaSlashAnimSpeed || 1.0);
           const maxSlashFrames = Math.max(1, (CONFIG.toji?.flurrySlashDuration || TOJI_WEAPON_CONFIG?.flurrySlashDuration || 12) / animMult);
           const timer = this.phantomSlashTimer || 0;
           const rawP = Math.min(1.0, Math.max(0, timer / maxSlashFrames));
-          const progress = 1 - rawP; // actual progress of swing from 0 to 1
+          const progress = 1 - rawP;
 
           const swingType = (this.phantomStrikeCount || 0) % 3;
           const sweepDir = (swingType === 1) ? 1 : -1;
@@ -2132,7 +2148,6 @@ export class TojiFighter extends Fighter {
           const maxTrailLength = Math.PI * 0.95;
           let activeTrailLength = 0;
 
-          // Growing, sustained, and erasing trail phases
           if (progress < 0.35) {
             activeTrailLength = maxTrailLength * (progress / 0.35);
           } else if (progress < 0.60) {
@@ -2144,56 +2159,69 @@ export class TojiFighter extends Fighter {
 
           const tailAngle = sweepDir === 1 ? -activeTrailLength : 0;
           const tipAngle = sweepDir === 1 ? 0 : activeTrailLength;
-          const P = 2.4;
+          const P = 2.0;
+          const snap = (v) => Math.round(v / P) * P;
           thick = thick * (activeTrailLength / maxTrailLength);
-          const totalAngle = Math.abs(tipAngle - tailAngle);
-          const arcSteps = Math.max(12, Math.round((totalAngle * radius) / (P * 1.5)));
+          const span = tipAngle - tailAngle;
+          const minAng = Math.min(tailAngle, tipAngle);
+          const maxAng = Math.max(tailAngle, tipAngle);
 
-          // Pass 1: Pixel Outline
-          ctx.fillStyle = `rgba(8, 4, 16, ${0.96 * alpha})`;
-          for (let i = 0; i <= arcSteps; i++) {
-            const t = i / arcSteps;
-            const angle = tailAngle + (tipAngle - tailAngle) * t;
+          const outlineCol = `rgba(10, 4, 18, ${(0.96 * alpha).toFixed(2)})`;
+
+          const isInsideFlurry = (rx, ry) => {
+            const dist = Math.hypot(rx, ry);
+            if (dist <= 0) return false;
+            let ang = Math.atan2(ry, rx);
+            while (ang < minAng - Math.PI) ang += Math.PI * 2;
+            while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+            if (ang < minAng || ang > maxAng) return false;
+
+            const t = (ang - tailAngle) / span;
+            if (t < 0 || t > 1.0) return false;
+
             const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-            const rad = radius + taper * 2.0;
-            const th = (thick + 4) * taper;
-            const innerRad = rad - th;
-
-            const numRadSteps = Math.max(2, Math.round(th / P));
-            for (let ri = 0; ri <= numRadSteps; ri++) {
-              const currentR = innerRad + (ri / numRadSteps) * th;
-              const rawX = Math.cos(angle) * currentR;
-              const rawY = Math.sin(angle) * currentR;
-              ctx.fillRect(Math.round(rawX / P) * P, Math.round(rawY / P) * P, P, P);
-            }
-          }
-
-          // Pass 2: Stepped Pixel Core
-          for (let i = 0; i <= arcSteps; i++) {
-            const t = i / arcSteps;
-            const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-            const rad = radius + taper * 1.0;
             const th = thick * taper;
-            const innerRad = rad - th;
+            const outRad = radius + taper * 1.5;
+            const inRad = outRad - th;
+            return dist >= inRad && dist <= outRad;
+          };
 
-            const numRadSteps = Math.max(1, Math.round(th / P));
-            for (let ri = 0; ri <= numRadSteps; ri++) {
-              const rNorm = ri / numRadSteps;
-              const currentR = innerRad + rNorm * th;
-              const rawX = Math.cos(angle) * currentR;
-              const rawY = Math.sin(angle) * currentR;
+          const minX = Math.floor((-radius - P * 2) / P) * P;
+          const maxX = Math.ceil((radius + P * 2) / P) * P;
+          const minY = Math.floor((-radius - P * 2) / P) * P;
+          const maxY = Math.ceil((radius + P * 2) / P) * P;
 
-              let col = (rNorm > 0.85) ? '#FFFFFF' : ((rNorm > 0.45) ? `rgb(${color2})` : `rgb(${color1})`);
+          for (let gy = minY; gy <= maxY; gy += P) {
+            for (let gx = minX; gx <= maxX; gx += P) {
+              if (!isInsideFlurry(gx, gy)) continue;
+
+              const pxX = snap(gx);
+              const pyY = snap(gy);
+
+              const isBorder = !isInsideFlurry(gx + P, gy) ||
+                               !isInsideFlurry(gx - P, gy) ||
+                               !isInsideFlurry(gx, gy + P) ||
+                               !isInsideFlurry(gx, gy - P);
+
+              if (isBorder) {
+                ctx.fillStyle = outlineCol;
+                ctx.fillRect(pxX, pyY, P, P);
+                continue;
+              }
+
+              const dist = Math.hypot(gx, gy);
+              let ang = Math.atan2(gy, gx);
+              while (ang < minAng - Math.PI) ang += Math.PI * 2;
+              while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+              const t = (ang - tailAngle) / span;
+              const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+              const outRad = radius + taper * 1.5;
+              const depthFromApex = outRad - dist;
+
+              let col = (depthFromApex < P * 1.4) ? '#FFFFFF' : ((depthFromApex < P * 3.2) ? `rgb(${color2})` : `rgb(${color1})`);
               ctx.fillStyle = col;
-              ctx.fillRect(Math.round(rawX / P) * P, Math.round(rawY / P) * P, P, P);
+              ctx.fillRect(pxX, pyY, P, P);
             }
-
-            // White cutting edge
-            const leadRawX = Math.cos(angle) * rad;
-            const leadRawY = Math.sin(angle) * rad;
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(Math.round(leadRawX / P) * P, Math.round(leadRawY / P) * P, P, P);
           }
 
           ctx.restore();
@@ -2214,36 +2242,27 @@ export class TojiFighter extends Fighter {
           slashArcAlpha = 1.0;
         }
 
-        // Use the snapshotted angle from when the swing started so the slash arc does NOT
-        // drift mid-swing when Toji's gunAngle updates between frames (e.g. above/below enemy).
-        // Crucially, do NOT add offsetAngle here — offsetAngle animates the weapon position,
-        // but the slash visual must stay locked at the frozen target direction for its full lifetime.
         const frozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
         ctx.rotate(frozenAngle);
         const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
         const isKatana = (this.ambushPhase === 'KATANA_SLASH' || (typeof state !== 'undefined' && state.tojiWeaponIndex === 1));
-        // Only scale Y (mirror sweep direction) for the Katana since its update loop builds in _katanaFlipSign.
-        // The Inverted Spear basic swing always sweeps clockwise, so its slash visual must never scale Y.
         if (isKatana && Math.abs(normAngle) > Math.PI / 2) {
           ctx.scale(1, -1);
         }
 
         const frozenFlip = this._slashStartFlipSign !== undefined ? this._slashStartFlipSign : _katanaFlipSign;
         
-        const p = this._activeSlashProgress !== undefined ? this._activeSlashProgress : 0;
         const recP = this._recoveryProgress !== undefined ? this._recoveryProgress : 0;
         if (recP > 0) slashArcAlpha *= (1 - recP);
 
-        // Keep the tip locked at the end of the swing (+1.25 for Katana, +1.05 for Inverted Spear) during recovery
         const endOffset = isKatana ? 1.25 : 1.05;
         const liveOffset = isKatana ? (offsetAngle * frozenFlip) : offsetAngle;
         const currentOffset = recP > 0 ? endOffset : liveOffset;
 
-        const startOffset = -1.15; // Set starting offset to -1.15 for the wider sweep range
-        const maxTrailLength = isKatana ? 1.8 : 1.6; // Increased tail length to match wider arc
+        const startOffset = -1.15;
+        const maxTrailLength = isKatana ? 1.8 : 1.6;
 
         let activeTrailLength = maxTrailLength;
-        // Erases from beginning to end during recovery phase
         if (recP > 0) {
           activeTrailLength = maxTrailLength * Math.pow(1 - recP, 1.4);
         }
@@ -2251,79 +2270,91 @@ export class TojiFighter extends Fighter {
         const tipAngle = currentOffset;
         const tailAngle = Math.max(startOffset, currentOffset - activeTrailLength);
         const bladeReach = isKatana ? 80 : 85;
-        const P = 2.4; // Pixel art grid scale
-        const outerR = (this.r + thrustDistance + bladeReach) * (editP ? editP.scale : 1.0); // Dynamically tracks active blade tip!
-        const thickScale = activeTrailLength / maxTrailLength; // Scale thickness proportionally with length
-        const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0) * thickScale; // Slim razor-sharp crescent thickness scaled!
-        const totalAngle = Math.abs(tipAngle - tailAngle);
-        const arcSteps = Math.max(16, Math.round((totalAngle * outerR) / (P * 1.5)));
+        const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
+        const snap = (v) => Math.round(v / P) * P;
+        const outerR = (this.r + thrustDistance + bladeReach) * (editP ? editP.scale : 1.0);
+        const thickScale = activeTrailLength / maxTrailLength;
+        const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0) * thickScale;
+        const span = tipAngle - tailAngle;
+        const minAng = Math.min(tailAngle, tipAngle);
+        const maxAng = Math.max(tailAngle, tipAngle);
 
-        // Pass 1: Pixel-Art Dark Cursed Ink Outline Shell
-        ctx.fillStyle = `rgba(8, 4, 16, ${0.98 * slashArcAlpha})`;
-        for (let i = 0; i <= arcSteps; i++) {
-          const t = i / arcSteps;
-          const angle = tailAngle + (tipAngle - tailAngle) * t;
+        const outlineCol = `rgba(10, 4, 18, ${(0.98 * slashArcAlpha).toFixed(2)})`;
+
+        const isInsideBasic = (rx, ry) => {
+          const dist = Math.hypot(rx, ry);
+          if (dist <= 0) return false;
+          let ang = Math.atan2(ry, rx);
+          while (ang < minAng - Math.PI) ang += Math.PI * 2;
+          while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+          if (ang < minAng || ang > maxAng) return false;
+
+          const t = (ang - tailAngle) / span;
+          if (t < 0 || t > 1.0) return false;
+
           const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
-          const rad = outerR + taper * 2.0;
-          const thick = (maxThick * taper) + P * 2;
-          const innerRad = rad - thick;
-
-          const numRadSteps = Math.max(2, Math.round(thick / P));
-          for (let ri = 0; ri <= numRadSteps; ri++) {
-            const currentR = innerRad + (ri / numRadSteps) * thick;
-            const rawX = Math.cos(angle) * currentR;
-            const rawY = Math.sin(angle) * currentR;
-            const px = Math.round(rawX / P) * P;
-            const py = Math.round(rawY / P) * P;
-            ctx.fillRect(px, py, P, P);
-          }
-        }
-
-        // Pass 2: Stepped Pixel Metallic Silver Hamon & Nullification Violet Core
-        for (let i = 0; i <= arcSteps; i++) {
-          const t = i / arcSteps;
-          const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
-          const rad = outerR + taper * 1.0;
           const thick = maxThick * taper;
-          const innerRad = rad - thick;
+          const outRad = outerR + taper * 1.5;
+          const inRad = outRad - thick;
+          return dist >= inRad && dist <= outRad;
+        };
 
-          const numRadSteps = Math.max(1, Math.round(thick / P));
-          for (let ri = 0; ri <= numRadSteps; ri++) {
-            const rNorm = ri / numRadSteps;
-            const currentR = innerRad + rNorm * thick;
-            const rawX = Math.cos(angle) * currentR;
-            const rawY = Math.sin(angle) * currentR;
-            const px = Math.round(rawX / P) * P;
-            const py = Math.round(rawY / P) * P;
+        const minX = Math.floor((-outerR - P * 2) / P) * P;
+        const maxX = Math.ceil((outerR + P * 2) / P) * P;
+        const minY = Math.floor((-outerR - P * 2) / P) * P;
+        const maxY = Math.ceil((outerR + P * 2) / P) * P;
+
+        for (let gy = minY; gy <= maxY; gy += P) {
+          for (let gx = minX; gx <= maxX; gx += P) {
+            if (!isInsideBasic(gx, gy)) continue;
+
+            const pxX = snap(gx);
+            const pyY = snap(gy);
+
+            const isBorder = !isInsideBasic(gx + P, gy) ||
+                             !isInsideBasic(gx - P, gy) ||
+                             !isInsideBasic(gx, gy + P) ||
+                             !isInsideBasic(gx, gy - P);
+
+            if (isBorder) {
+              ctx.fillStyle = outlineCol;
+              ctx.fillRect(pxX, pyY, P, P);
+              continue;
+            }
+
+            const dist = Math.hypot(gx, gy);
+            let ang = Math.atan2(gy, gx);
+            while (ang < minAng - Math.PI) ang += Math.PI * 2;
+            while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+            const t = (ang - tailAngle) / span;
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+            const outRad = outerR + taper * 1.5;
+            const depthFromApex = outRad - dist;
 
             let col;
-            if (rNorm > 0.85) col = '#FFFFFF';
-            else if (rNorm > 0.6) col = '#E2EAF5'; // Metallic silver
-            else if (rNorm > 0.35) col = '#FF1E56'; // Crimson nullification
-            else col = '#9B1FE8'; // Deep cursed violet
+            if (depthFromApex < P * 1.4) {
+              col = '#FFFFFF';
+            } else if (depthFromApex < P * 3.0) {
+              col = '#E2EAF5'; // Metallic silver
+            } else if (depthFromApex < P * 5.0) {
+              col = '#FF1E56'; // Crimson nullification
+            } else {
+              col = '#9B1FE8'; // Deep cursed violet
+            }
 
             ctx.fillStyle = col;
-            ctx.fillRect(px, py, P, P);
+            ctx.fillRect(pxX, pyY, P, P);
           }
-
-          // Pass 3: Leading White Cutting Edge Pixels
-          const leadRawX = Math.cos(angle) * (outerR + taper * 1.0);
-          const leadRawY = Math.sin(angle) * (outerR + taper * 1.0);
-          const lpx = Math.round(leadRawX / P) * P;
-          const lpy = Math.round(leadRawY / P) * P;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(lpx, lpy, P, P);
         }
 
-        // Pass 4: Trailing Cursed Pixel Sparks
+        // Trailing Cursed Pixel Sparks
         const numEmbers = 8;
         for (let eb = 0; eb < numEmbers; eb++) {
           const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-          const ebAng = tailAngle + ebT * (tipAngle - tailAngle);
+          const ebAng = tailAngle + ebT * span;
           const ebDist = outerR - 10 - eb * 4;
-          const ex = Math.round((Math.cos(ebAng) * ebDist) / P) * P;
-          const ey = Math.round((Math.sin(ebAng) * ebDist) / P) * P;
+          const ex = snap(Math.cos(ebAng) * ebDist);
+          const ey = snap(Math.sin(ebAng) * ebDist);
           ctx.fillStyle = (eb % 2 === 0) ? '#A030FF' : '#FF1E56';
           ctx.fillRect(ex, ey, P, P);
         }

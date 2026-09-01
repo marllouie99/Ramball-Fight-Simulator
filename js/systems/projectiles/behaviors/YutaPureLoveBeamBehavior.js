@@ -6,8 +6,21 @@ import { spawnImpactFlash, spawnSparks } from '../../../graphics/particles/spark
 export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
   update(p, fighters, system) {
     const ownerFighter = fighters[p.owner];
-    if (!ownerFighter || ownerFighter.hp <= 0 || ownerFighter.isDead) {
-      return true; // Extinguish and destroy beam immediately if Yuta dies!
+    if (!ownerFighter || ownerFighter.hp <= 0 || ownerFighter.isDead || (!ownerFighter.isFiringPureLoveBeam && !ownerFighter.isChannelingPureLoveBeam)) {
+      // Clear trapped status from all entities when beam terminates
+      const allTargets = [
+        ...(state.fighters || []),
+        ...(state.illusions || []),
+        ...(state.cjDriveBys || [])
+      ];
+      for (const ent of allTargets) {
+        if (ent && (ent.caughtInPureLoveBeam || ent.wasCaughtInPureLoveBeam)) {
+          ent.caughtInPureLoveBeam = false;
+          ent.wasCaughtInPureLoveBeam = false;
+          ent.pureLoveBeamTimer = 0;
+        }
+      }
+      return true; // Extinguish and destroy beam immediately!
     }
     if (ownerFighter) {
       // Beam stays glued to Yuta's hand position and locked angle

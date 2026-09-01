@@ -363,7 +363,7 @@ export function drawNanamiCleaver(ctx, x, y, gunAngle, r, swingActive = false, s
  * Rendered in world coordinates underneath the cleaver during active basic chops.
  */
 export function drawNanamiCleaverSlashArc(ctx, fighter) {
-  if (!fighter || fighter.slashSwingTimer <= 0) return;
+  if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isTargetOfAmbush || (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())) return;
 
   const maxT = fighter.slashSwingMaxTimer || 18;
   const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
@@ -434,81 +434,99 @@ export function drawNanamiCleaverSlashArc(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
+  const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
+  const snap = (v) => Math.round(v / P) * P;
+
   const outerRadius = r + (isFinalStrike ? 74 : (isBlitz ? 62 : 56));
-  const maxThick = isFinalStrike ? 32.0 : (isBlitz ? 26.0 : 24.0);
-  const numSteps = 24;
+  const maxThick = isFinalStrike ? 30.0 : (isBlitz ? 25.0 : 22.0);
+  const span = currentTipOffset - currentTailOffset;
+  const minAng = Math.min(currentTipOffset, currentTailOffset);
+  const maxAng = Math.max(currentTipOffset, currentTailOffset);
 
-  // 1. Draw Cursed Energy Outer Glow Arc (Black Flash Crimson during Blitz)
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-    const rad = outerRadius + taper * (isFinalStrike ? 7.0 : 4.5);
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  for (let i = numSteps; i >= 0; i--) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-    const rad = outerRadius - (maxThick * taper) - taper * 3.5;
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fillStyle = (isFinalStrike || isBlitz || isOvertime)
-    ? `rgba(255, 215, 0, ${0.50 * trailAlpha})`
-    : `rgba(212, 175, 55, ${0.38 * trailAlpha})`;
-  ctx.fill();
+  const outlineCol = `rgba(18, 14, 5, ${(0.96 * trailAlpha).toFixed(2)})`; // Deep Manga Ink Outline
 
-  // 2. Draw Dense Core Crescent Polygon (Brilliant 7:3 Golden Core)
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-    const rad = outerRadius + taper * 1.5;
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  for (let i = numSteps; i >= 0; i--) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-    const rad = outerRadius - (maxThick * taper);
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fillStyle = (isFinalStrike || isBlitz || isOvertime)
-    ? `rgba(255, 245, 140, ${0.95 * trailAlpha})`
-    : `rgba(255, 230, 95, ${0.88 * trailAlpha})`;
-  ctx.fill();
+  const isInsideSlash = (rx, ry) => {
+    const dist = Math.hypot(rx, ry);
+    if (dist <= 0) return false;
+    let ang = Math.atan2(ry, rx);
+    while (ang < minAng - Math.PI) ang += Math.PI * 2;
+    while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+    if (ang < minAng || ang > maxAng) return false;
 
-  // 3. Draw Sharp Razor White Cutting Edge Line
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = i / numSteps;
-    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
-    const rad = outerRadius + taper * 1.5;
-    const px = Math.cos(ang) * rad;
-    const py = Math.sin(ang) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+    const t = (ang - currentTailOffset) / span;
+    if (t < 0 || t > 1.0) return false;
+
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+    const thick = maxThick * taper;
+    const outRad = outerRadius + taper * 1.5;
+    const inRad = outRad - thick;
+    return dist >= inRad && dist <= outRad;
+  };
+
+  const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+  const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+  const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+  const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+
+  // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border ──
+  for (let gy = minY; gy <= maxY; gy += P) {
+    for (let gx = minX; gx <= maxX; gx += P) {
+      if (!isInsideSlash(gx, gy)) continue;
+
+      const pxX = snap(gx);
+      const pyY = snap(gy);
+
+      const isBorder = !isInsideSlash(gx + P, gy) ||
+                       !isInsideSlash(gx - P, gy) ||
+                       !isInsideSlash(gx, gy + P) ||
+                       !isInsideSlash(gx, gy - P);
+
+      if (isBorder) {
+        ctx.fillStyle = outlineCol;
+        ctx.fillRect(pxX, pyY, P, P);
+        continue;
+      }
+
+      const dist = Math.hypot(gx, gy);
+      let ang = Math.atan2(gy, gx);
+      while (ang < minAng - Math.PI) ang += Math.PI * 2;
+      while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+      const t = (ang - currentTailOffset) / span;
+      const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
+      const outRad = outerRadius + taper * 1.5;
+      const depthFromApex = outRad - dist;
+
+      let col;
+      if (depthFromApex < P * 1.4) {
+        col = '#FFFFFF'; // Searing white apex
+      } else if (depthFromApex < P * 2.8) {
+        col = (isFinalStrike || isBlitz || isOvertime) ? '#FFF8DC' : '#FFF275';
+      } else if (depthFromApex < P * 5.0) {
+        col = (isFinalStrike || isBlitz || isOvertime) ? '#FFD700' : '#E6C200';
+      } else if (depthFromApex < P * 7.5) {
+        col = (isFinalStrike || isBlitz || isOvertime) ? '#D4AF37' : '#B8860B';
+      } else {
+        col = '#382A0A'; // Deep amber shadow
+      }
+
+      ctx.fillStyle = col;
+      ctx.fillRect(pxX, pyY, P, P);
+    }
   }
-  ctx.strokeStyle = isFinalStrike
-    ? `rgba(255, 255, 255, ${0.98 * trailAlpha})`
-    : `rgba(255, 255, 255, ${0.96 * trailAlpha})`;
-  ctx.lineWidth = isFinalStrike ? 2.4 : 1.8;
-  ctx.stroke();
+
+  // Trailing Golden 7:3 Pixel Sparks
+  const numEmbers = isFinalStrike ? 10 : 6;
+  for (let eb = 0; eb < numEmbers; eb++) {
+    const ebT = (eb / numEmbers + (Date.now() / 250)) % 1.0;
+    const ebAng = currentTailOffset + ebT * span;
+    const ebDist = outerRadius - 8 - eb * 3.5;
+    const ex = snap(Math.cos(ebAng) * ebDist);
+    const ey = snap(Math.sin(ebAng) * ebDist);
+    const col = (eb % 2 === 0) ? '#FFD700' : '#FFFFFF';
+
+    ctx.fillStyle = col;
+    ctx.fillRect(ex, ey, P, P);
+  }
 
   ctx.restore();
 }
