@@ -33,6 +33,8 @@ export const gojoConfig = {
   infinitySlowRange: 100,                  // Proximity distance (pixels) beyond barrier where approaching enemies get slowed
   infinitySlowMinMultiplier: 0.20,         // Maximum slow strength (20% speed / 80% slow) reached right against the barrier
   infinityMaxFrozenProjectiles: 2,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
+  infinityShockwaveCooldownFrames: 6,      // Minimum frames (~100ms) between barrier rebound shockwave ring spawns to prevent FPS drops
+  infinityMaxActiveShockwaves: 2,          // Max limit of concurrent active barrier shockwave rings
 
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
   blueCooldown: 40,         // Fire rate for basic attack (Blue orb) - Lower is faster

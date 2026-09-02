@@ -119,12 +119,13 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   fighter.infinityBlockX = hitX !== undefined ? hitX : fighter.x;
   fighter.infinityBlockY = hitY !== undefined ? hitY : fighter.y;
 
-  // Frame check guard: Prevent multiple barrier rebound rings and text spawns in the same frame!
+  // Frame rate check & shockwave cooldown guard: Prevent multiple barrier rebound rings from spamming during rapid multi-hits
   const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : ((typeof state !== 'undefined' && state.matchTimer !== undefined) ? state.matchTimer : Date.now());
+  const shockwaveCooldown = CONFIG.gojo?.infinityShockwaveCooldownFrames ?? 6;
 
   // Skip visual/audio spam inside Gojo's own domain (Unlimited Void uses paralysis, not barrier bounces)
   if (!fighter.domainActive) {
-    if (fighter._lastInfinityRingFrame !== currentFrame) {
+    if (!fighter._lastInfinityRingFrame || (currentFrame - fighter._lastInfinityRingFrame) >= shockwaveCooldown) {
       fighter._lastInfinityRingFrame = currentFrame;
       triggerGlobalScreenShake(3, 6);
 

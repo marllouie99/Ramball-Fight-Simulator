@@ -4,6 +4,7 @@
 // These bypass physics and collision entirely - pure visual decoration
 // ─────────────────────────────────────────────
 import { state, triggerGlobalScreenShake } from '../../core/state.js';
+import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { fastCleanArray } from './visualTrailSystem.js';
 import { triggerGenosSelfDestructFlash } from '../renderers/effectsRenderer.js';
@@ -1609,58 +1610,61 @@ export function drawSparkEffects(layer = 'all') {
           effect.size += (effect.targetSize - effect.size) * 0.15;
         }
         const isGojo = effect.clashType === 'gojo' || effect.clashType === 'gojo_infinity';
+        const isMahoraga = effect.clashType === 'mahoraga' || effect.clashType === 'gold';
+        const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
         const P = 2.5;
+        const snap = (v) => Math.round(v / P) * P;
         const radius = Math.max(P * 2, effect.size);
-        const steps = Math.ceil((radius + P * 2) / P);
-        const alpha = Math.min(1.0, effect.life * 1.1);
+        const steps = Math.max(28, Math.min(56, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
+        const alpha = Math.min(1.0, effect.life * 1.15);
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
 
-        // 1. Dark Outer Obsidian Outline Shell (#081220)
-        ctx.fillStyle = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
-        for (let gy = -steps; gy <= steps; gy++) {
-          for (let gx = -steps; gx <= steps; gx++) {
-            const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius + P * 1.5 && dist >= radius - P * 2.5) {
-              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
-            }
-          }
-        }
-
-        // 2. Primary Themed Pixel Ring (Electric Cyan for Gojo / Gold for Mahoraga / Custom Color for Getsuga / Crimson for others)
-        const isMahoraga = effect.clashType === 'mahoraga' || effect.clashType === 'gold';
-        const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
         let ringColor;
+        let midColor;
         if (isGojo) {
           ringColor = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
+          midColor = `rgba(180, 245, 255, ${(alpha * 0.90).toFixed(3)})`;
         } else if (isMahoraga) {
           ringColor = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
+          midColor = `rgba(255, 245, 150, ${(alpha * 0.90).toFixed(3)})`;
         } else if (isHex) {
           const rgb = hexToRgb(effect.clashType) || '255, 60, 60';
           ringColor = `rgba(${rgb}, ${(alpha * 0.95).toFixed(3)})`;
+          midColor = `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(3)})`;
         } else {
           ringColor = `rgba(255, 60, 60, ${(alpha * 0.95).toFixed(3)})`;
-        }
-        ctx.fillStyle = ringColor;
-        for (let gy = -steps; gy <= steps; gy++) {
-          for (let gx = -steps; gx <= steps; gx++) {
-            const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius + P * 0.5 && dist >= radius - P * 1.5) {
-              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
-            }
-          }
+          midColor = `rgba(255, 150, 150, ${(alpha * 0.85).toFixed(3)})`;
         }
 
-        // 3. Inner White-Hot Specular Core Pixels (#FFFFFF)
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-        for (let gy = -steps; gy <= steps; gy++) {
-          for (let gx = -steps; gx <= steps; gx++) {
-            const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius - P * 0.5 && dist >= radius - P * 1.2) {
-              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
-            }
-          }
+        const colBorder = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
+        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+
+        // High-performance 1D circumference loop (eliminates 15,987 2D grid calculations per frame)
+        for (let st = 0; st < steps; st++) {
+          const ang = (st / steps) * Math.PI * 2;
+          const cosA = Math.cos(ang);
+          const sinA = Math.sin(ang);
+
+          // 1. Dark Outer Obsidian Outline Shell (#081220)
+          const r0 = snap(radius);
+          ctx.fillStyle = colBorder;
+          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+
+          // 2. Primary Themed Pixel Ring
+          ctx.fillStyle = ringColor;
+          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+          // 3. Mid Loop
+          const r1 = snap(radius * 0.75);
+          ctx.fillStyle = midColor;
+          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+          // 4. Inner White-Hot Specular Ring (#FFFFFF)
+          const r2 = snap(radius * 0.45);
+          ctx.fillStyle = colCore;
+          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
         }
 
         ctx.restore();
@@ -2165,48 +2169,75 @@ export function drawSparkEffects(layer = 'all') {
         ctx.restore();
       } else if (isInfinityClash) {
         // ── GOJO LIMITLESS BARRIER REBOUND PIXEL ART SHOCKWAVE RING (SAITAMA TECH) ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
+        if (isDark) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          const P = 2.5;
+          const snap = (v) => Math.round(v / P) * P;
+          const radius = Math.max(P * 2, effect.size);
+          const steps = Math.max(28, Math.min(56, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
+          const alpha = Math.min(1.0, effect.life * 1.15);
 
-        const P = 2.5; // Stepped pixel grid size matching Saitama skin tech
-        const radius = Math.max(P * 2, effect.size);
-        const steps = Math.ceil((radius + P * 2) / P);
-        const alpha = Math.min(1.0, effect.life * 1.15);
+          const colBorder = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
+          const colOuter = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
+          const colMid = `rgba(180, 245, 255, ${(alpha * 0.90).toFixed(3)})`;
+          const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
 
-        // 1. Dark Outer Obsidian Outline Shell (#081220)
-        ctx.fillStyle = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
-        for (let gy = -steps; gy <= steps; gy++) {
-          for (let gx = -steps; gx <= steps; gx++) {
-            const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius + P * 1.5 && dist >= radius - P * 2.5) {
-              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
-            }
+          // High-performance 1D circumference loop (eliminates 15,987 2D grid calculations per frame)
+          for (let st = 0; st < steps; st++) {
+            const ang = (st / steps) * Math.PI * 2;
+            const cosA = Math.cos(ang);
+            const sinA = Math.sin(ang);
+
+            // 1. Dark Outer Obsidian Outline Shell (#081220)
+            const r0 = snap(radius);
+            ctx.fillStyle = colBorder;
+            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+
+            // 2. Vibrant Electric Cyan Primary Pixel Ring (#00E5FF)
+            ctx.fillStyle = colOuter;
+            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+            // 3. Mid Light Cyan Loop
+            const r1 = snap(radius * 0.75);
+            ctx.fillStyle = colMid;
+            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+            // 4. Inner White-Hot Specular Ring (#FFFFFF)
+            const r2 = snap(radius * 0.45);
+            ctx.fillStyle = colCore;
+            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
           }
-        }
+          ctx.restore();
+        } else {
+          // 1. Dark Outer Obsidian Outline Ring (#081220)
+          ctx.strokeStyle = `rgba(8, 18, 32, ${effect.life * 0.90})`;
+          ctx.lineWidth = 14 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // 2. Vibrant Electric Cyan Primary Pixel Ring (#00E5FF)
-        ctx.fillStyle = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
-        for (let gy = -steps; gy <= steps; gy++) {
-          for (let gx = -steps; gx <= steps; gx++) {
-            const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius + P * 0.5 && dist >= radius - P * 1.5) {
-              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
-            }
-          }
-        }
+          // 2. Vibrant Electric Cyan Primary Ring (#00E5FF)
+          ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.98})`;
+          ctx.lineWidth = 8 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // 3. Inner White-Hot Specular Core Pixels (#FFFFFF)
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-        for (let gy = -steps; gy <= steps; gy++) {
-          for (let gx = -steps; gx <= steps; gx++) {
-            const dist = Math.hypot(gx * P, gy * P);
-            if (dist <= radius - P * 0.5 && dist >= radius - P * 1.2) {
-              ctx.fillRect(Math.round(effect.x + gx * P), Math.round(effect.y + gy * P), P, P);
-            }
-          }
-        }
+          // 3. Middle Ice-Cyan Ring
+          ctx.strokeStyle = `rgba(180, 245, 255, ${effect.life * 0.90})`;
+          ctx.lineWidth = 5 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
+          ctx.stroke();
 
-        ctx.restore();
+          // 4. Inner White-Hot Specular Core Ring
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+          ctx.lineWidth = 3.5 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.45), 0, Math.PI * 2);
+          ctx.stroke();
+        }
       } else if (isTojiClash) {
         // ── TOJI PHYSICAL SHOCKWAVE ──
         if (isDark) {
@@ -2651,6 +2682,34 @@ export function drawSparkEffects(layer = 'all') {
  * @param {string} clashType - 'gojo' or 'yuta'
  */
 export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') {
+  const isGojoInfinity = (clashType === 'gojo_infinity');
+  if (isGojoInfinity) {
+    const maxGojoInfinity = CONFIG.gojo?.infinityMaxActiveShockwaves ?? 2;
+    let gojoInfinityCount = 0;
+    let oldestGojoInfinity = null;
+
+    for (let i = 0; i < state.sparkEffects.length; i++) {
+      const p = state.sparkEffects[i];
+      if (p && p.type === 'meleeClashShockwave' && p.clashType === 'gojo_infinity' && p.life > 0) {
+        gojoInfinityCount++;
+        if (!oldestGojoInfinity || p.life < oldestGojoInfinity.life) {
+          oldestGojoInfinity = p;
+        }
+      }
+    }
+
+    if (gojoInfinityCount >= maxGojoInfinity && oldestGojoInfinity) {
+      // Re-energize and reposition the oldest active Gojo Infinity shockwave without allocating new particles
+      oldestGojoInfinity.x = x;
+      oldestGojoInfinity.y = y;
+      oldestGojoInfinity.size = radius * 0.25;
+      oldestGojoInfinity.targetSize = radius;
+      oldestGojoInfinity.life = 1.0;
+      oldestGojoInfinity.decay = 0.055;
+      return;
+    }
+  }
+
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 20;
@@ -2669,7 +2728,7 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
   shockwave.size = radius * 0.2; // starts small
   shockwave.targetSize = radius; // expands to this size
   shockwave.life = 1.0;
-  shockwave.decay = 0.04; // lasts ~25 frames
+  shockwave.decay = isGojoInfinity ? 0.055 : 0.04;
   shockwave.friction = 1;
   shockwave.type = 'meleeClashShockwave';
   shockwave.clashType = clashType;

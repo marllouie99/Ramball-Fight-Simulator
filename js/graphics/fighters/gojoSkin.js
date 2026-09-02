@@ -34,11 +34,11 @@ let _gojoInfinityArcadeSize = 0;
 
 function _getGojoInfinityArcadeBuffer(size, scale = 2.5) {
   const lowSize = Math.max(32, Math.ceil(size / scale));
-  if (!_gojoInfinityArcadeCanvas || _gojoInfinityArcadeSize !== lowSize) {
-    _gojoInfinityArcadeSize = lowSize;
+  if (!_gojoInfinityArcadeCanvas || _gojoInfinityArcadeSize < lowSize) {
+    _gojoInfinityArcadeSize = Math.max(128, lowSize);
     _gojoInfinityArcadeCanvas = document.createElement('canvas');
-    _gojoInfinityArcadeCanvas.width = lowSize;
-    _gojoInfinityArcadeCanvas.height = lowSize;
+    _gojoInfinityArcadeCanvas.width = _gojoInfinityArcadeSize;
+    _gojoInfinityArcadeCanvas.height = _gojoInfinityArcadeSize;
     _gojoInfinityArcadeCtx = _gojoInfinityArcadeCanvas.getContext('2d');
     _gojoInfinityArcadeCtx.imageSmoothingEnabled = false;
   }
@@ -155,7 +155,7 @@ export function drawGojoBody(ctx, fighter) {
       ctx.globalAlpha = (ctx.globalAlpha || 1.0) * fadeOpacity;
       ctx.imageSmoothingEnabled = false; // Chunky stepped retro arcade pixel circles!
       const drawSize = lowSize * ARCADE_SCALE;
-      ctx.drawImage(lowCanvas, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+      ctx.drawImage(lowCanvas, 0, 0, lowSize, lowSize, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
       ctx.restore();
     }
 
