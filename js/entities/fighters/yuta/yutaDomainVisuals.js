@@ -11,22 +11,6 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 
   ctx.save();
 
-  // In Dark Mode: Strictly clip Yuta's Domain Expansion visual to the arena boundaries
-  // In Light Mode: Let the domain visual spread across the full screen unclipped
-  const _isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
-  if (_isDarkMode && arena) {
-    ctx.beginPath();
-    if (arena.shape === 'circle') {
-      const cx = arena.x + arena.width / 2;
-      const cy = arena.y + arena.height / 2;
-      const ar = arena.radius || (arena.width / 2);
-      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
-    } else {
-      ctx.rect(arena.x, arena.y, arena.width, arena.height);
-    }
-    ctx.clip();
-  }
-
   const time = Date.now();
   const pulse = Math.sin(time / 300) * 0.04;
   const alphaMult = fighter.domainActive ? 1.0 : Math.min(1.0, fighter.rikaAlpha || 1.0);
@@ -46,10 +30,14 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 
   // ── 1. DARK ATMOSPHERIC VOID & ROSY AMBIENT GLOW ──
   const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+  const cvsW = (typeof state !== 'undefined' && state.canvas && state.canvas.width) ? state.canvas.width : 1920;
+  const cvsH = (typeof state !== 'undefined' && state.canvas && state.canvas.height) ? state.canvas.height : 1080;
+  const maxR = Math.max(cvsW, cvsH) * 0.85;
+
   if (!fighter._cachedYutaBgGrad || fighter._cachedYutaBgMidX !== midX || fighter._cachedYutaBgMidY !== midY) {
     fighter._cachedYutaBgMidX = midX;
     fighter._cachedYutaBgMidY = midY;
-    fighter._cachedYutaBgGrad = ctx.createRadialGradient(midX, midY, 40, midX, midY, 650);
+    fighter._cachedYutaBgGrad = ctx.createRadialGradient(midX, midY, 40, midX, midY, maxR);
     fighter._cachedYutaBgGrad.addColorStop(0, 'rgba(55, 10, 32, 0.68)');   // Dark rose core
     fighter._cachedYutaBgGrad.addColorStop(0.35, 'rgba(28, 6, 18, 0.80)'); // Deep magenta-black
     fighter._cachedYutaBgGrad.addColorStop(0.75, 'rgba(12, 3, 9, 0.90)');  // Charcoal void
@@ -73,37 +61,33 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     ctx.restore();
   } else if (!isClashSecondary) {
     ctx.fillStyle = fighter._cachedYutaBgGrad;
-    if (arena) {
-      ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
-    } else {
-      ctx.fillRect(midX - 1000, midY - 1000, 2000, 2000);
-    }
+    ctx.fillRect(0, 0, cvsW, cvsH);
   }
 
   if (fighter.domainActive && !isMultiDomain) {
     // ── 2. DARK ATMOSPHERIC VORTEX ──
     ctx.save();
-    ctx.globalAlpha = (0.45 + pulse * 1.5) * alphaMult;
+    ctx.globalAlpha = (0.6 + pulse * 2) * alphaMult;
     
     // Layered alpha circles creating atmospheric depth
     ctx.beginPath();
     ctx.arc(domX, domY - arenaH * 0.45, 600, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(20, 5, 15, 0.25)';
+    ctx.fillStyle = 'rgba(20, 5, 15, 0.4)';
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(domX, domY - arenaH * 0.45, 300, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(12, 2, 7, 0.40)';
+    ctx.fillStyle = 'rgba(12, 2, 7, 0.7)';
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(domX, domY - arenaH * 0.45, 100, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(5, 1, 3, 0.65)';
+    ctx.fillStyle = '#000000';
     ctx.fill();
     
-    ctx.strokeStyle = 'rgba(50, 10, 30, 0.25)';
+    ctx.strokeStyle = 'rgba(50, 10, 30, 0.3)';
     for (let i = 0; i < 6; i++) {
-      ctx.lineWidth = 12 + i * 6;
+      ctx.lineWidth = 15 + i * 8;
       ctx.beginPath();
       ctx.ellipse(domX, domY - arenaH * 0.45, 120 + i * 90, 50 + i * 35, (time * 0.0003) + (i * 0.5), 0, Math.PI * 2);
       ctx.stroke();

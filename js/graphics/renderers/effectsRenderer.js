@@ -203,14 +203,12 @@ export function drawFloatingTexts() {
       
       const isTactical = (state.gameCategory === 'tactical' || (state.mode && String(state.mode).toLowerCase().includes('tactical')));
 
-      // Arcade font in Dark Mode; clean modern font for Tactical; stylized comic/brush fonts for FOC Light
+      // Arcade font for Floating Text & Damage Numbers across all themes (clean modern font for Tactical)
       let targetFont;
-      if (isDark) {
-        targetFont = t.isDamage ? '700 16px "Silkscreen", "Press Start 2P", monospace' : '700 12px "Silkscreen", "Press Start 2P", monospace';
-      } else if (isTactical) {
+      if (isTactical) {
         targetFont = t.isDamage ? '900 18px "Outfit", "Segoe UI", sans-serif' : '900 13.5px "Rajdhani", "Outfit", "Segoe UI", sans-serif';
       } else {
-        targetFont = t.isDamage ? 'bold 20px "Architects Daughter"' : 'bold 18px "Glast Blitch"';
+        targetFont = t.isDamage ? '700 16px "Silkscreen", "Press Start 2P", monospace' : '700 12px "Silkscreen", "Press Start 2P", monospace';
       }
 
       if (currentFont !== targetFont) {
@@ -243,9 +241,9 @@ export function drawFloatingTexts() {
           ctx.strokeText(t.text, t.x, t.y);
         }
       } else {
-        // In Light Mode: Classic bold black outline
-        ctx.lineWidth = isTactical ? 2.6 : (t.isDamage ? 3.2 : 3.0);
-        ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+        // In Light Mode: Classic crisp black outline for arcade typography
+        ctx.lineWidth = isTactical ? 2.6 : (t.isDamage ? 3.8 : 3.4);
+        ctx.strokeStyle = 'rgba(0,0,0,0.95)';
         ctx.strokeText(t.text, t.x, t.y);
       }
 

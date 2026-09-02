@@ -1,4 +1,4 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
+import { Fighter, applyDamageToTarget, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -146,6 +146,17 @@ export class SaitamaFighter extends Fighter {
       this.caughtInGenosFlurry ||
       (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0)
     );
+
+    // Disable dodge if Saitama is caught in, dragged by, or hit by Ichigo's Getsuga Tensho
+    const isGetsugaCaught = Boolean(
+      this.isDraggedByGetsuga ||
+      (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
+      isSuppressedByGetsuga(this) ||
+      (attacker && (attacker.isGetsuga || attacker.behaviorType === 'getsuga_tensho'))
+    );
+    if (isGetsugaCaught) {
+      return false;
+    }
 
     const isExecutingSeriousCounter = (this._counterPunchTimer && this._counterPunchTimer > 0) || !!this._counterPunchTarget || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0);
 
@@ -334,7 +345,8 @@ export class SaitamaFighter extends Fighter {
     if (this.skillPunishCooldown > 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
     const isNanamiPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-    if (this.timeStopTimer > 0 || isNanamiPausing || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
+    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
+    if (this.timeStopTimer > 0 || isNanamiPausing || isGetsugaSuppressed || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
 
     // Check team alignment in 2v2/team modes ONLY.
     // getFighterTeam returns null in 1v1/FFA — null===null would falsely match as teammates, so guard with myTeam !== null.
@@ -843,7 +855,8 @@ export class SaitamaFighter extends Fighter {
   executeConsecutiveNormalPunches(opponent) {
     if (this.hp <= 0 || this.flurryCooldown > 0 || !opponent || opponent.hp <= 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
-    if (this.timeStopTimer > 0 || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
+    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
+    if (this.timeStopTimer > 0 || isGetsugaSuppressed || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
 
     // Check team alignment
     if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
@@ -945,7 +958,8 @@ export class SaitamaFighter extends Fighter {
     const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
-    if (isInsideGojoDomain || (typeof this.isParalyzedDebuffActive === 'function' && this.isParalyzedDebuffActive())) return; // Offensive skills frozen while paralyzed or inside Unlimited Void!
+    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
+    if (isInsideGojoDomain || isGetsugaSuppressed || (typeof this.isParalyzedDebuffActive === 'function' && this.isParalyzedDebuffActive())) return; // Offensive skills frozen while paralyzed, inside Unlimited Void, or caught in Getsuga Tensho!
 
     if (this.skillPunishCooldown > 0) this.skillPunishCooldown--;
     if (this.flurryCooldown > 0) this.flurryCooldown--;
@@ -995,13 +1009,22 @@ export class SaitamaFighter extends Fighter {
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
     const isNanamiPausing = Boolean((attacker && (attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0)));
 
-    if (isGuaranteedHit || isNanamiPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack)) {
+    const isGetsugaHit = Boolean(
+      opts.isGetsuga ||
+      opts.getsugaForm ||
+      (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho')) ||
+      this.isDraggedByGetsuga ||
+      (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
+      isSuppressedByGetsuga(this)
+    );
+
+    if (isGetsugaHit || isGuaranteedHit || isNanamiPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack)) {
       return super.takeDamage(amount, attacker, opts);
     }
 
     // If incoming damage is from a skill/ultimate/channeling attack and counter is ready, execute counter punch!
     const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isMachineGunBlow || opts.isChanneling;
-    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0 && !isBeamOrTickAttack) {
+    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0 && !isBeamOrTickAttack && !isGetsugaHit) {
       const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
       const distToAttacker = Math.hypot(attacker.x - this.x, attacker.y - this.y);
       if (distToAttacker <= maxRange) {
@@ -1015,7 +1038,7 @@ export class SaitamaFighter extends Fighter {
     // Ignore non-attack DOTs (poison, burn, domain environment ticks)
     const isDirectAttack = opts.isProjectile || opts.isMelee || opts.isRanged || opts.isMachineGunBlow || opts.isPhysical || opts.isBasic || opts.isSkill || opts.isUltimate || isBeamOrTickAttack || (attacker && attacker !== this && !opts.isPoison && !opts.isBurn && !opts.fromBlackHole && !opts.isDomainDPS);
 
-    if (isDirectAttack) {
+    if (isDirectAttack && !isGetsugaHit) {
       const dodgeTarget = (opts.projectile && typeof opts.projectile.x === 'number') ? opts.projectile : (attacker || null);
       const dodged = this.executeDodgeTeleport(dodgeTarget);
       if (dodged) {
@@ -1030,6 +1053,9 @@ export class SaitamaFighter extends Fighter {
    * Triggers dodge sidestep as projectiles approach near-miss radius
    */
   onProjectileApproach(projectile, attacker) {
+    if (projectile && (projectile.isGetsuga || projectile.behaviorType === 'getsuga_tensho')) {
+      return; // Do not auto-dodge when Getsuga Tensho approaches
+    }
     const src = projectile || attacker;
     this.executeDodgeTeleport(src, true);
   }
@@ -1325,8 +1351,9 @@ export class SaitamaFighter extends Fighter {
 
     // Mandatory Rule #1: Freeze / TimeStop guard at the top of update loop (bypassed only during active Serious Counter execution)
     const isFrozen = this._handleTimeStop();
+    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
-    if ((isFrozen || this.isTargetOfAmbush || isNanamiRatioPausing || (this.purpleHitTimer && this.purpleHitTimer > 0)) && !isCounteringState) {
+    if ((isFrozen || isGetsugaSuppressed || this.isTargetOfAmbush || isNanamiRatioPausing || (this.purpleHitTimer && this.purpleHitTimer > 0)) && !isCounteringState) {
       this.interruptAttacks();
       return; // MANDATORY: Stop update execution so fighter is completely frozen/paused!
     }
@@ -1335,7 +1362,7 @@ export class SaitamaFighter extends Fighter {
     this._tickCounterPunch();
 
     // Trigger Serious Counter (Teleport Behind Punch) when ability is ready
-    if (this.skillPunishCooldown <= 0 && this.hp > 0 && !this.isFrozenByInfinity && !this.isTargetOfAmbush && !isNanamiRatioPausing && (!this._counterPunchTimer || this._counterPunchTimer <= 0) && !this.isFlurrying) {
+    if (this.skillPunishCooldown <= 0 && this.hp > 0 && !this.isFrozenByInfinity && !this.isTargetOfAmbush && !isNanamiRatioPausing && !isGetsugaSuppressed && (!this._counterPunchTimer || this._counterPunchTimer <= 0) && !this.isFlurrying) {
       const targetsToScan = [];
       if (typeof state !== 'undefined') {
         if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0 && !f.isIllusion) targetsToScan.push(f); });

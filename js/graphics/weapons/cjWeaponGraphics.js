@@ -124,9 +124,9 @@ function _getBulletTrailGrad(ctx) {
  * Draws CJ's 9mm Micro-Uzi / TEC-9 Tracer Bullet in authentic Pixel Art Style (Saitama Tech)
  */
 export function drawCjPixelUziBullet(ctx, p) {
-  const vx = p.vx || 0;
-  const vy = p.vy || 0;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
@@ -182,9 +182,9 @@ export function drawCjUziBullet(ctx, p) {
     return;
   }
 
-  const vx = p.vx || 0;
-  const vy = p.vy || 0;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const len = 12;
   const width = 3.0;
 
@@ -3568,9 +3568,9 @@ function _getMinigunTrailGrad(ctx) {
  * Draws CJ's M134 Minigun Armor-Piercing Supersonic Tracer Bullet in authentic Pixel Art Style (Saitama Tech)
  */
 export function drawCjPixelMinigunBullet(ctx, p) {
-  const vx = p.vx || 0;
-  const vy = p.vy || 0;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
@@ -3637,9 +3637,9 @@ export function drawCjMinigunBullet(ctx, p) {
     return;
   }
 
-  const vx = p.vx || 0;
-  const vy = p.vy || 0;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const len = 20;
   const width = 4.2;
 

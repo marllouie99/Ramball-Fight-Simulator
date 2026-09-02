@@ -106,16 +106,16 @@ export const engineerConfig = {
     dispenserDestroyed: 'Assets/Sound Effects/Skills/machinebroken.mp3'
   },
   soundVolumes: {
-    shotgunShot: 0.95,
-    shotgunCrack: 0.85,
-    wrenchSwing: 0.90,
-    sentryGunshot: 0.80,
-    sentryDetected: 0.95,
-    sentryReloading: 0.90,
-    sentryReloaded: 0.90,
-    sentryDestroyed: 1.0,
-    dispenserHeal: 0.85,
-    dispenserDestroyed: 1.0
+    shotgunShot: 0.45,
+    shotgunCrack: 0.40,
+    wrenchSwing: 0.45,
+    sentryGunshot: 0.30,
+    sentryDetected: 0.35,
+    sentryReloading: 0.40,
+    sentryReloaded: 0.45,
+    sentryDestroyed: 0.55,
+    dispenserHeal: 0.40,
+    dispenserDestroyed: 0.50
   },
   soundChances: {
     sentryDetected: 1.0

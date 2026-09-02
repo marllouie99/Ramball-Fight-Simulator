@@ -170,7 +170,7 @@ export class EngineerFighter extends Fighter {
         spawnSpentCasing(this.x, this.y, this.gunAngle, '12gauge', this.r);
         const cfg = CONFIG.Engineer || {};
         const rackSfx = cfg.sounds?.shotgunCrack || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3';
-        const rackVol = cfg.soundVolumes?.shotgunCrack ?? 0.85;
+        const rackVol = cfg.soundVolumes?.shotgunCrack ?? 0.40;
         audioSystem.playSFX(rackSfx, rackVol);
 
         // Small chamber sparks at ejection port
@@ -520,7 +520,7 @@ export class EngineerFighter extends Fighter {
     this.wrenchCooldown = cfg.wrenchCooldown || 30;
 
     const swingSfx = cfg.sounds?.wrenchSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
-    const swingVol = cfg.soundVolumes?.wrenchSwing ?? 0.90;
+    const swingVol = cfg.soundVolumes?.wrenchSwing ?? 0.45;
     audioSystem.playSFX(swingSfx, swingVol);
 
     triggerGlobalScreenShake(8, 8);
@@ -565,7 +565,7 @@ export class EngineerFighter extends Fighter {
     spawnSparks(muzzleX, muzzleY, 5, 'gray');
 
     const shotSfx = cfg.sounds?.shotgunShot || 'Assets/Sound Effects/Attacks/shootgunshot.mp3';
-    const shotVol = cfg.soundVolumes?.shotgunShot ?? 0.95;
+    const shotVol = cfg.soundVolumes?.shotgunShot ?? 0.45;
     audioSystem.playSFX(shotSfx, shotVol);
     
     this.shotgunCooldown = cfg.shotgunCooldown || 80;

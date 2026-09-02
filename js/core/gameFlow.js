@@ -833,8 +833,8 @@ export function startRandomFfaBattle() {
 }
 
 export function startFaceOffScreen(isThumbnailOnly = false) {
-  if (!isThumbnailOnly && (state.arenaTheme === 'dark')) {
-    // Dark Mode: Skip showoff screen, launch in-arena countdown directly!
+  if (!isThumbnailOnly) {
+    // Skip showoff screen, launch in-arena countdown directly!
     startCountdown();
     return;
   }
@@ -1021,7 +1021,8 @@ export function startCountdown() {
   state.countdownTimer = 0;
   state.gameState = 'countdown';
   state.announcerSoundHandle = null;
-  state.announcerPlayingSequence = true;
+  state.announcerPlayingSequence = false;
+  state.announcerSubtitle = '';
 
   if (!state.announcerTimeoutIds) {
     state.announcerTimeoutIds = [];
@@ -1030,97 +1031,14 @@ export function startCountdown() {
   state.announcerTimeoutIds = [];
 
   // Initialize combat aura for Gojo/Sukuna during countdown
-  state.fighters.forEach(f => {
-    if (f && f._def && f._def.type === 'gojo') {
-      f.combatAuraOpacity = 1;
-    } else if (f && f._def && f._def.type === 'sukuna') {
-      f.combatAuraOpacity = 1;
-    }
-  });
-
-  if (state.arenaTheme === 'dark') {
-    state.announcerPlayingSequence = false;
-    state.announcerSubtitle = '';
-    return;
-  }
-
-  const maxRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
-  let soundKey = null;
-
-  if (state.mode === 'TLFS') {
-    soundKey = null; // No announcer for TLFS
-  } else if (state.roundNum === maxRounds) {
-    soundKey = 'finalround';
-  } else if (state.roundNum === 1) {
-    soundKey = 'round1';
-  } else if (state.roundNum === 2) {
-    soundKey = 'round2';
-  } else if (state.roundNum === 3) {
-    soundKey = 'round3';
-  } else if (state.roundNum === 4) {
-    soundKey = 'round4';
-  }
-
-  const is1v1 = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE);
-
-  let subtitleText = '';
-  if (soundKey === 'round1') {
-    subtitleText = 'Round 1, Fight!';
-  } else if (soundKey === 'round2') {
-    subtitleText = 'Round 2, Fight!';
-  } else if (soundKey === 'round3') {
-    subtitleText = 'Round 3, Fight!';
-  } else if (soundKey === 'round4') {
-    subtitleText = 'Round 4, Fight!';
-  } else if (soundKey === 'finalround') {
-    subtitleText = 'Final Round, Fight!';
-  }
-
-  if (is1v1 && state.roundNum === 1) {
-    const hasBestOf3 = !!getAnnouncerSound('bestof3');
-    if (hasBestOf3) {
-      state.announcerSubtitle = "Best of 3";
-      state.announcerSoundHandle = playAnnouncerSoundWithFallback('bestof3', () => {
-        if (state.gameState !== 'countdown' || state.roundNum !== 1) return;
-        
-        if (soundKey) {
-          state.announcerSubtitle = subtitleText;
-          state.announcerSoundHandle = playAnnouncerSoundWithFallback(soundKey, () => {
-            if (state.gameState === 'countdown') {
-              state.announcerPlayingSequence = false;
-              state.announcerSubtitle = '';
-            }
-          });
-        } else {
-          state.announcerPlayingSequence = false;
-          state.announcerSubtitle = '';
-        }
-      });
-    } else if (soundKey) {
-      state.announcerSubtitle = subtitleText;
-      state.announcerSoundHandle = playAnnouncerSoundWithFallback(soundKey, () => {
-        if (state.gameState === 'countdown') {
-          state.announcerPlayingSequence = false;
-          state.announcerSubtitle = '';
-        }
-      });
-    } else {
-      state.announcerPlayingSequence = false;
-      state.announcerSubtitle = '';
-    }
-  } else {
-    if (soundKey) {
-      state.announcerSubtitle = subtitleText;
-      state.announcerSoundHandle = playAnnouncerSoundWithFallback(soundKey, () => {
-        if (state.gameState === 'countdown') {
-          state.announcerPlayingSequence = false;
-          state.announcerSubtitle = '';
-        }
-      });
-    } else {
-      state.announcerPlayingSequence = false;
-      state.announcerSubtitle = '';
-    }
+  if (state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f._def && f._def.type === 'gojo') {
+        f.combatAuraOpacity = 1;
+      } else if (f && f._def && f._def.type === 'sukuna') {
+        f.combatAuraOpacity = 1;
+      }
+    });
   }
 }
 

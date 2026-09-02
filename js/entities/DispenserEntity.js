@@ -231,7 +231,7 @@ export class DispenserEntity extends Fighter {
     // Play sound effect ONCE whenever a fighter enters the radius
     if (newlyEntered) {
       const healSfx = cfg.sounds?.dispenserHeal || 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3';
-      const healVol = cfg.soundVolumes?.dispenserHeal ?? 0.85;
+      const healVol = cfg.soundVolumes?.dispenserHeal ?? 0.40;
       audioSystem.playSFX(healSfx, healVol);
     }
     this._tetheredFighterSet = currentTetheredSet;

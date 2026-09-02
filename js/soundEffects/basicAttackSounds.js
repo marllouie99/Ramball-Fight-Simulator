@@ -107,7 +107,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // Shotgun blast.
   15: {
     src: 'Assets/Sound Effects/Attacks/shootgunshot.mp3',
-    volume: 1.1,
+    volume: 0.45,
     delay: 0,
   },
 
@@ -165,7 +165,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // ── John Wick ─────────────────────────────
   33: {
     src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
-    volume: 0.85,
+    volume: 0.45,
     delay: 0,
   },
   default: {
@@ -275,12 +275,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   // Engineer — high-rate-of-fire automatic weapon
   'Engineer': {
     src: 'Assets/Sound Effects/Attacks/revolvershot.mp3',
-    volume: 0.45,
+    volume: 0.35,
     delay: -1,
   },
   'engineer_melee': {
     src: 'Assets/Sound Effects/Skills/hammer.mp3',
-    volume: 1.2,
+    volume: 0.45,
     delay: 0,
   },
   // Turret — Turret shot
@@ -400,12 +400,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   // John Wick - Tactical Gun-Fu Marksman
   'john_wick': {
     src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
-    volume: 0.85,
+    volume: 0.45,
     delay: 0,
   },
   'johnwick': {
     src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
-    volume: 0.85,
+    volume: 0.45,
     delay: 0,
   }
 };

@@ -232,12 +232,11 @@ export class FighterRenderer {
       }
     }
 
-    const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-    ctx.font = isDark ? '700 13px "Silkscreen", "Press Start 2P", monospace' : 'bold 18px Arial';
+    ctx.font = '700 13px "Silkscreen", "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const hpText = Math.floor(fighter.hp).toString();
-    ctx.lineWidth = isDark ? 3.5 : 4;
+    ctx.lineWidth = 3.5;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.strokeText(hpText, fighter.x, hpY);
     ctx.fillStyle = '#ffffff';
@@ -257,12 +256,11 @@ export class FighterRenderer {
     const text = `⏳ ${seconds}s`;
     
     const drawY = (fighter.y - (fighter.z || 0)) - (fighter.r + 22);
-    const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-    ctx.font = isDark ? '700 9.5px "Silkscreen", "Press Start 2P", monospace' : 'bold 11px Arial';
+    ctx.font = '700 9.5px "Silkscreen", "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     
-    ctx.lineWidth = isDark ? 2.8 : 3;
+    ctx.lineWidth = 2.8;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.strokeText(text, fighter.x, drawY);
     ctx.fillStyle = '#FFEE58';
@@ -305,11 +303,10 @@ export class FighterRenderer {
 
     // 3. Status Badge above health bar
     const drawY = -(r + 30);
-    const isDarkFracture = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-    ctx.font = isDarkFracture ? '700 8.5px "Silkscreen", "Press Start 2P", monospace' : 'bold 9px Outfit, Roboto, sans-serif';
+    ctx.font = '700 8.5px "Silkscreen", "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.lineWidth = isDarkFracture ? 2.8 : 2.5;
+    ctx.lineWidth = 2.8;
     ctx.strokeStyle = 'rgba(15, 23, 42, 0.90)';
     ctx.strokeText('FRACTURED (+20%)', 0, drawY);
     ctx.fillStyle = '#FFD700';

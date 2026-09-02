@@ -150,7 +150,7 @@ export class TurretEntity extends Fighter {
       spawnSparks(this.x, this.y, 8, 'orange');
     }
     const deathSfx = cfg.sounds?.sentryDestroyed || 'Assets/Sound Effects/Skills/engineer-sentrydestroyed.mp3';
-    const deathVol = cfg.soundVolumes?.sentryDestroyed ?? 1.0;
+    const deathVol = cfg.soundVolumes?.sentryDestroyed ?? 0.55;
     audioSystem.playSFX(deathSfx, deathVol);
   }
 
@@ -244,7 +244,7 @@ export class TurretEntity extends Fighter {
         this.isReloading = false;
         spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADED!', '#ffff00');
         const reloadedSfx = cfg.sounds?.sentryReloaded || 'Assets/Sound Effects/Skills/engineer-sentryreloaded.mp3';
-        const reloadedVol = cfg.soundVolumes?.sentryReloaded ?? 0.90;
+        const reloadedVol = cfg.soundVolumes?.sentryReloaded ?? 0.45;
         audioSystem.playSFX(reloadedSfx, reloadedVol);
       }
     }
@@ -299,7 +299,7 @@ export class TurretEntity extends Fighter {
       if (!this._hasDetectedTarget) {
         this._hasDetectedTarget = true;
         const detectSfx = cfg.sounds?.sentryDetected || 'Assets/Sound Effects/Skills/engineer-sentrydetected.mp3';
-        const detectVol = cfg.soundVolumes?.sentryDetected ?? 0.95;
+        const detectVol = cfg.soundVolumes?.sentryDetected ?? 0.35;
         audioSystem.playSFX(detectSfx, detectVol);
       }
 
@@ -432,7 +432,7 @@ export class TurretEntity extends Fighter {
     }
 
     const shotSfx = cfg.sounds?.sentryGunshot || 'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3';
-    const shotVol = cfg.soundVolumes?.sentryGunshot ?? 0.80;
+    const shotVol = cfg.soundVolumes?.sentryGunshot ?? 0.30;
     audioSystem.playSFX(shotSfx, shotVol);
 
     this.shootCooldown = this.shootCooldownMax;
@@ -445,7 +445,7 @@ export class TurretEntity extends Fighter {
       this.reloadTimer = cfg.turretReloadTime || 90;
       spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADING...', '#ff3333');
       const reloadSfx = cfg.sounds?.sentryReloading || 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3';
-      const reloadVol = cfg.soundVolumes?.sentryReloading ?? 0.90;
+      const reloadVol = cfg.soundVolumes?.sentryReloading ?? 0.40;
       audioSystem.playSFX(reloadSfx, reloadVol);
     }
 

@@ -2854,6 +2854,10 @@ class ProjectileSystem {
       p.x += p.vx;
       p.y += p.vy;
       p.life -= 1;
+      if (p.vx !== 0 || p.vy !== 0) {
+        p.lastAngle = Math.atan2(p.vy, p.vx);
+        p.angle = p.lastAngle;
+      }
 
       // TRICKSTER / CRONOS SPHERE BLENDER EFFECT:
       // If the owner has an active Time Sphere, trap their projectiles inside it!
@@ -2994,6 +2998,8 @@ class ProjectileSystem {
               p.maxLife = freezeDuration;
               p._resumeVx = p.vx;
               p._resumeVy = p.vy;
+              p.lastAngle = (p.vx !== 0 || p.vy !== 0) ? Math.atan2(p.vy, p.vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
+              p.angle = p.lastAngle;
               p.vx = 0;
               p.vy = 0;
               p.damage = 0; // Nullify damage completely

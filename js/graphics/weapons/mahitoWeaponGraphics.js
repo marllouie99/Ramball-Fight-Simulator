@@ -1361,6 +1361,8 @@ function drawFleshLoop(ctx, points, isTransformed, fadeOutAlpha = 1.0, maxBands 
     ctx.stroke();
   } else {
     // Stepped pixel body fill
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = 1.6;
     for (let i = 0; i < pCount - 1; i++) {
       const lp1 = _fleshLoopLeft[i];
       const rp1 = _fleshLoopRight[i];
@@ -1368,17 +1370,16 @@ function drawFleshLoop(ctx, points, isTransformed, fadeOutAlpha = 1.0, maxBands 
       const rp2 = _fleshLoopRight[i + 1];
 
       // Draw pixel quad segment
-      ctx.fillStyle = '#0E0F14'; // dark ink border
       ctx.beginPath();
       ctx.moveTo(lp1.x, lp1.y);
       ctx.lineTo(lp2.x, lp2.y);
       ctx.lineTo(rp2.x, rp2.y);
       ctx.lineTo(rp1.x, rp1.y);
       ctx.closePath();
-      ctx.stroke();
 
       ctx.fillStyle = isTransformed ? '#0E1322' : '#EEF3F7';
       ctx.fill();
+      ctx.stroke();
     }
 
     // Surgical cross-stitches across the stretched arm
@@ -1703,21 +1704,6 @@ export function drawMahitoMaceCannon(ctx, fighter) {
   const baseThick = isTransformed ? 12 : 9;
 
   ctx.save();
-
-  // Clip Mahito's Skill 3 (Mutated Mace Cannon) to the arena boundaries
-  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-  if (arena) {
-    ctx.beginPath();
-    if (arena.shape === 'circle') {
-      const cx = arena.x + arena.width / 2;
-      const cy = arena.y + arena.height / 2;
-      const ar = arena.radius || (arena.width / 2);
-      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
-    } else {
-      ctx.rect(arena.x, arena.y, arena.width, arena.height);
-    }
-    ctx.clip();
-  }
 
   // 1. Draw Flying Razor Bone Shrapnel Spikes in World Space
   if (data.shrapnelSpikes && data.shrapnelSpikes.length > 0) {

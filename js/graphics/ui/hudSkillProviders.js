@@ -255,7 +255,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skillList;
   }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
-    const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || '#FF2A2A';
+    const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || CONFIG.saitama?.color || f.color || '#F5C400';
 
     const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
     const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
@@ -593,7 +593,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
-    const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || '#FF2A2A';
+    const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || CONFIG.saitama?.color || f.color || '#F5C400';
 
     const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
     const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : 0;

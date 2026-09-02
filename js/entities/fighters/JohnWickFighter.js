@@ -1407,7 +1407,7 @@ export class JohnWickFighter extends Fighter {
 
                 spawnSparks(this.x + nx * this.r, this.y + ny * this.r, 14, 'cyan', '#00E5FF');
                 spawnImpactFlash(this.x + nx * this.r, this.y + ny * this.r, 32, 'layla');
-                audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.85);
+                audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.45);
                 triggerGlobalScreenShake(2.5, 6);
                 spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 14, 'INFINITY REBOUND!', '#00E5FF');
                 break;
@@ -1438,7 +1438,7 @@ export class JohnWickFighter extends Fighter {
         this.isReloading = false;
         this.magazineBullets = this.maxMagazine || cfg.magazineSize || 12;
         if (this.currentEquippedWeapon === 'shotgun') {
-          audioSystem.playSFX(cfg.shotgunCrackSound || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3', cfg.shotgunCrackVolume || 0.85); // Pump rack chamber
+          audioSystem.playSFX(cfg.shotgunCrackSound || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3', cfg.shotgunCrackVolume || 0.45); // Pump rack chamber
         }
       }
     }

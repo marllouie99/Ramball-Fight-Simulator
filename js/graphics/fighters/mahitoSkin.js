@@ -886,7 +886,7 @@ export function drawMahitoSkin(ctx, fighter) {
   }
 
   // 7. Render Front Hand Layer (On Top of Body Circle) - Rule #2 & #20
-  if (!fighter._isWinnerReveal && (!fighter.twinScissorAnimTimer || fighter.twinScissorAnimTimer <= 0) && !shouldHideHands) {
+  if (!fighter._isWinnerReveal && (!fighter.twinScissorAnimTimer || fighter.twinScissorAnimTimer <= 0) && (!fighter.fleshSurgeAnimTimer || fighter.fleshSurgeAnimTimer <= 0) && !shouldHideHands) {
     if (isChannelingDomain) {
       // Draw both hands on top of body (Left hand first, then Right hand overlapping on top)
       // Left Hand (knuckles pointing inwards to the right):
@@ -897,14 +897,6 @@ export function drawMahitoSkin(ctx, fighter) {
       ctx.translate(frontHandX, frontHandY);
       ctx.scale(-1, 1);
       drawHandFist(ctx, 0, 0, handRadius, drawTransformedHands, fighter);
-      ctx.restore();
-    } else if (!isChannelingDomain && fighter.fleshSurgeAnimTimer > 0) {
-      // Draw Front Hand Stretch Socket & Foreground Arm in world space on top of body and aura
-      ctx.save();
-      if (facingLeft) ctx.scale(1, -1);
-      ctx.rotate(-angle);
-      ctx.translate(-fighter.x, -(fighter.y - (fighter.z || 0)));
-      drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed);
       ctx.restore();
     } else if (!fighter.hideFrontHand) {
       if (isPunching && fighter.isRightPunch) {
@@ -1011,9 +1003,14 @@ export function drawMahitoSkin(ctx, fighter) {
 
   ctx.restore();
 
-  // 9. Render Front Stretch Arm, Socket & Scythe in world space (ON TOP of body circle)
-  if (!fighter._isWinnerReveal && !isChannelingDomain && fighter.twinScissorAnimTimer > 0) {
-    drawMahitoTwinScissor(ctx, fighter, 'front');
+  // 9. Render Foreground Stretch Arms, Sockets & Scythes in world space (ON TOP of body circle)
+  if (!fighter._isWinnerReveal && !isChannelingDomain) {
+    if (fighter.fleshSurgeAnimTimer > 0) {
+      drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed);
+    }
+    if (fighter.twinScissorAnimTimer > 0) {
+      drawMahitoTwinScissor(ctx, fighter, 'front');
+    }
   }
 }
 

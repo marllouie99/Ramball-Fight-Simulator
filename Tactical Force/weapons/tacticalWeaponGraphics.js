@@ -12,7 +12,7 @@ import { state } from '../../js/core/state.js';
 export function drawTacticalBullet(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vy === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const angle = Math.atan2(vy, vx);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const speed = Math.hypot(vx, vy);
 
   // Derive dynamic theme color from projectile or owner character

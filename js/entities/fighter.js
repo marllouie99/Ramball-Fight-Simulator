@@ -1397,7 +1397,7 @@ export class Fighter {
       } else if (attacker && (attacker.characterId === 'yuta' || attacker.type === 'yuta' || attacker.isRika || (attacker.isIllusion && attacker.owner && (attacker.owner.characterId === 'yuta' || attacker.owner.type === 'yuta')))) {
         color = '#FF1493'; // Deep Pink for Yuta and Rika
       } else if (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')) {
-        color = '#FF2A2A'; // Red for Saitama
+        color = (typeof CONFIG !== 'undefined' && (CONFIG.saitama?.damageNumberColor || CONFIG.saitama?.themeColor)) || attacker.color || '#F5C400'; // Bright Safety Yellow for Saitama
       } else if ((attacker && (attacker.characterId === 'ichigo' || attacker.type === 'ichigo' || (attacker._def && attacker._def.id === 'ichigo'))) || opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) {
         color = (typeof CONFIG !== 'undefined' && (CONFIG.ichigo?.damageNumberColor || CONFIG.ichigo?.themeColor)) || '#FF5500'; // Consistent Orange for Ichigo
       } else if (opts.isPurpleDPS) {

@@ -519,10 +519,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     }
   }
 
-  // Dark Mode Override: Champion layout visuals are completely removed; only the announcer & victory audio play!
-  if (_isDarkMode()) {
-    return;
-  }
+  // Champion layout visuals are completely removed in all modes; only the announcer & victory audio play!
+  return;
 
   // 1. Smoothly Darken the Arena & Full Canvas (Deep Dark Victory Backdrop)
   const fadeAlpha = Math.min(1.0, timer / 30);
@@ -715,12 +713,9 @@ function drawRoundEndScreen() {
   }
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
-  // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
-  // In Dark Mode, start announcer audio immediately (0 frames delay) without pausing!
-  const isDark = _isDarkMode();
-  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
+  // Announcer audio & voicelines start immediately (0 frames delay) without pausing!
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = isDark ? 0 : (isTactical ? 10 : (hasMissionOverlay ? 180 : 75));
+  const displayDelay = hasMissionOverlay ? 180 : 0;
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
@@ -741,7 +736,7 @@ function drawRoundEndScreen() {
   const isChampionReveal = (isFFA && (ffaMatchComplete || modeRounds === 1)) || (hasTwoWins && roundWinner);
 
   const isChampionActive = delayedTimer > 0;
-  state._isChampionLayoutActive = isChampionActive && !isTactical && !isDark;
+  state._isChampionLayoutActive = false;
 
   if (isChampionActive) {
     const titleText = isChampionReveal 
@@ -760,16 +755,12 @@ function drawRoundEndScreen() {
 // ─────────────────────────────────────────────
 
 function drawWinnerReveal(winner, timer, mode) {
-  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
-  const isDarkMode = _isDarkMode();
-  state._isChampionLayoutActive = !isTactical && !isDarkMode;
+  state._isChampionLayoutActive = false;
   drawInArenaChampionLayout(winner, timer, 'CHAMPION', mode, true);
 }
 
 function drawFfaChampionReveal(winner, timer) {
-  const isTactical = state.gameCategory === 'tactical' || (typeof state.mode === 'string' && (state.mode.toLowerCase().includes('tactical')));
-  const isDarkMode = _isDarkMode();
-  state._isChampionLayoutActive = !isTactical && !isDarkMode;
+  state._isChampionLayoutActive = false;
   drawInArenaChampionLayout(winner, timer, 'CHAMPION', 'FFA', true);
 }
 
@@ -791,19 +782,16 @@ function drawMatchEndScreen() {
   }
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
-  // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
-  // In Dark Mode, start announcer audio immediately (0 frames delay) without pausing!
-  const isDark = _isDarkMode();
-  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
+  // Announcer audio & voicelines start immediately (0 frames delay) without pausing!
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = isDark ? 0 : (isTactical ? 10 : (hasMissionOverlay ? 180 : 75));
+  const displayDelay = hasMissionOverlay ? 180 : 0;
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 
   // Determine Match Winner Entity
   const effectiveWinner = matchWinner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
 
   const isMatchChampionActive = delayedTimer > 0;
-  state._isChampionLayoutActive = isMatchChampionActive && !isTactical && !isDark;
+  state._isChampionLayoutActive = false;
 
   if (isMatchChampionActive) {
     const titleText = (mode === 'TLFS') 

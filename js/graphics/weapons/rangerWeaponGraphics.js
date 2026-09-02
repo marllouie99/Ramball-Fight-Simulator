@@ -822,9 +822,9 @@ export function drawRangerBullet(ctx, p) {
   const prevGlobalAlpha = ctx.globalAlpha;
   const prevCompositeOperation = ctx.globalCompositeOperation;
 
-  const vx = p.vx === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
-  const vy = p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const time = Date.now();
   const pulse = (Math.sin(time / 100) + 1) / 2;
   const fastPulse = (Math.sin(time / 60) + 1) / 2;

@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -11,9 +11,9 @@ export const saitamaConfig = {
   radius: 25,
   color: '#F5C400', // Bright Safety Yellow body
   themeColor: '#F5C400',
-  hudNameColor: '#FF2A2A', // Red HUD Fighter Name
-  hudSkillBarColor: '#FF2A2A', // Red HUD Skill Progress Bars
-  damageNumberColor: '#FF2A2A', // Red Floating Damage Numbers
+  hudNameColor: '#F5C400', // Yellow HUD Fighter Name
+  hudSkillBarColor: '#F5C400', // Yellow HUD Skill Progress Bars
+  damageNumberColor: '#F5C400', // Yellow Floating Damage Numbers
   startX: 300,
   startY: 250,
   startVx: 1.2,

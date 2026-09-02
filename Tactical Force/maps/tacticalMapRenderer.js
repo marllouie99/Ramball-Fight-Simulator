@@ -4,7 +4,6 @@
 // ─────────────────────────────────────────────
 
 import { STARTER_MAP } from './starterMap.js';
-import { getCurrentPlayingBgmTitle } from '../../js/systems/arenaBgmSystem.js';
 import { state } from '../../js/core/state.js';
 
 /** Main entry point for drawing the custom tactical battleground */
@@ -35,27 +34,6 @@ export function drawTacticalMap(ctx, map = STARTER_MAP) {
   ctx.strokeStyle = map.theme?.wallBorder || '#475569';
   ctx.lineWidth = wallWidth;
   ctx.strokeRect(x, y, w, h);
-
-  // 5. Background Music Title Text above Top Arena Wall
-  const bgmTitle = getCurrentPlayingBgmTitle();
-  if (bgmTitle && (typeof state !== 'undefined') && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-    const centerX = x + w / 2;
-    const textY = y - 10;
-    ctx.save();
-    ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-
-    // Dark stroke outline
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-    ctx.strokeText(bgmTitle, centerX, textY);
-
-    // High-visibility amber-gold fill
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillText(bgmTitle, centerX, textY);
-    ctx.restore();
-  }
 
   ctx.restore();
 }

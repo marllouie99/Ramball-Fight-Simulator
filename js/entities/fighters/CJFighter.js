@@ -216,6 +216,21 @@ export class CJFighter extends Fighter {
   }
 
   /**
+   * Countdown hook invoked each frame while gameState === 'countdown'.
+   * Triggers CJ's intro voiceline once as the fighters prepare to fight.
+   */
+  onCountdown(opponent) {
+    if (!this._hasPlayedIntroVoiceline && typeof state !== 'undefined' && (state.countdownTimer || 0) >= 30) {
+      this._hasPlayedIntroVoiceline = true;
+      const cjSnd = CONFIG.cj?.sounds?.introVoiceline || 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3';
+      const cjVol = CONFIG.cj?.soundVolumes?.introVoiceline ?? 3.0;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX(cjSnd, cjVol);
+      }
+    }
+  }
+
+  /**
    * Passive: RESPECT+ Accumulation & Tier Progression (Permanent Buffs)
    */
   gainRespect(amount) {
@@ -1896,12 +1911,11 @@ export class CJFighter extends Fighter {
 
     // 2. Health Number underneath the body
     const hpY = drawY + (this.r || 25) + 4;
-    const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-    ctx.font = isDark ? '700 13px "Silkscreen", "Press Start 2P", monospace' : 'bold 18px Arial';
+    ctx.font = '700 13px "Silkscreen", "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const hpText = Math.floor(this.hp).toString();
-    ctx.lineWidth = isDark ? 3.5 : 4;
+    ctx.lineWidth = 3.5;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.strokeText(hpText, this.x, hpY);
     ctx.fillStyle = '#ffffff';

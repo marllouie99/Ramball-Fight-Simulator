@@ -140,7 +140,71 @@ let currentRikaSummonDimOpacity = 0;
  * Draws a dark purple/pink cursed energy dim screen overlay when Yuta calls or summons Rika.
  */
 export function drawRikaSummonDimScreen() {
-  // Handled by WebGL
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  const yutaSummoning = state.fighters?.find(f =>
+    f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta' || f._def?.id === 'yuta') &&
+    (f.rikaCallTimer > 0 || (f.rika && f.rika.active && f.rika.spawnTimer > 0) || f.isChannelingPureLoveBeam || f.isFiringPureLoveBeam)
+  );
+
+  let targetOpacity = 0;
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+
+  if (yutaSummoning) {
+    cx = yutaSummoning.x;
+    cy = yutaSummoning.y;
+    if (yutaSummoning.isChannelingPureLoveBeam || yutaSummoning.isFiringPureLoveBeam) {
+      targetOpacity = 0.88;
+    } else if (yutaSummoning.rikaCallTimer > 0) {
+      const maxCharge = CONFIG.yuta?.rikaSummonChargeDuration || 30;
+      const progress = 1.0 - (yutaSummoning.rikaCallTimer / maxCharge);
+      targetOpacity = 0.25 + progress * 0.55;
+    } else if (yutaSummoning.rika && yutaSummoning.rika.spawnTimer > 0) {
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
+      const progress = yutaSummoning.rika.spawnTimer / ariseMax;
+      targetOpacity = 0.75 * progress;
+    }
+  }
+
+  currentRikaSummonDimOpacity += (targetOpacity - currentRikaSummonDimOpacity) * ((targetOpacity > currentRikaSummonDimOpacity) ? 0.25 : 0.08);
+  if (currentRikaSummonDimOpacity < 0.01) {
+    currentRikaSummonDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentRikaSummonDimOpacity;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Dark cursed energy base overlay
+  ctx.fillStyle = `rgba(10, 0, 18, ${opacity * 0.85})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. High-contrast cursed pink bloom centered on Yuta
+  const maxR = Math.max(canvas.width, canvas.height) * 0.65;
+  const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, maxR);
+  grad.addColorStop(0, `rgba(255, 20, 147, ${opacity * 0.45})`);
+  grad.addColorStop(0.25, `rgba(160, 10, 120, ${opacity * 0.30})`);
+  grad.addColorStop(0.60, `rgba(30, 2, 35, ${opacity * 0.15})`);
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 3. Pulsing Cursed Energy Ring around Yuta
+  ctx.beginPath();
+  const ringR = 85 + Math.sin(Date.now() * 0.01) * 15;
+  ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 20, 147, ${opacity * 0.75})`;
+  ctx.lineWidth = 8;
+  ctx.stroke();
+
+  excludeGojoInfinityFromDim(ctx);
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(10, 0, 18, ${opacity * 0.95})`;
 }
 
 let currentMahitoDomainOpacity = 0;

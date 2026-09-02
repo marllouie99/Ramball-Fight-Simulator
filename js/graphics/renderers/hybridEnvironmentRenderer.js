@@ -673,26 +673,7 @@ export function updateHybridEnvironment() {
       )
     );
 
-    if (isDarkMode && state.arena) {
-      if (!tojiArenaMask) {
-        tojiArenaMask = new window.PIXI.Graphics();
-        layer.addChild(tojiArenaMask);
-      }
-      tojiArenaMask.clear();
-      tojiArenaMask.beginFill(0xFFFFFF);
-      const arena = state.arena;
-      const ww = arena.wallWidth || 0;
-      if (arena.shape === 'circle') {
-        const acx = arena.x + arena.width / 2;
-        const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
-        tojiArenaMask.drawCircle(acx, acy, Math.max(0, ar));
-      } else {
-        tojiArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
-      }
-      tojiArenaMask.endFill();
-      container.mask = tojiArenaMask;
-    } else if (container.mask) {
+    if (container.mask) {
       container.mask = null;
     }
 

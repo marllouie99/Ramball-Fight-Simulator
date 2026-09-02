@@ -4,7 +4,7 @@ import { fastCleanArray } from '../particles/visualTrailSystem.js';
 export function drawSukunaSlash(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const angle = Math.atan2(vy, vx);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const owner = state.fighters && state.fighters[p.owner];
   const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
@@ -101,7 +101,7 @@ function _renderVectorGhostBlade(ctx, r, lifeRatio, isFrozen) {
 export function drawGhostBlade(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const angle = Math.atan2(vy, vx);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const owner = state.fighters && state.fighters[p.owner];
   const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
@@ -202,7 +202,7 @@ export function drawGhostBlade(ctx, p) {
 export function drawSukunaCleave(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const angle = Math.atan2(vy, vx);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const owner = state.fighters && state.fighters[p.owner];
   const scale = owner ? Math.max(1.2, owner.r / 15) : 1.4;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
@@ -247,7 +247,7 @@ let _fugaLocalTrailPool = [];
 export function drawSukunaFurnaceArrow(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-  const angle = Math.atan2(vy, vx);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   // 30 FPS stepped animation time for anime Sakuga travel keyframes
   const step30Frame = Math.floor(Date.now() / (1000 / 30));
   const time = step30Frame * (1000 / 30) * 0.012;

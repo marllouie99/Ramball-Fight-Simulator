@@ -1055,9 +1055,9 @@ function _getRifleCoreGrad(ctx) {
  * Draws John Wick's high-velocity 9mm tactical bullet projectile
  */
 export function drawJohnWickBullet(ctx, p) {
-  const vx = p.vx || 0;
-  const vy = p.vy || 0;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const len = 14;  // Length of the bullet core
   const width = 3.5; // Width of the bullet core
 
@@ -1793,9 +1793,9 @@ export function drawJohnWickShotgun(ctx, x, y, gunAngle, r, opts = {}) {
  * Draws a heavy 12-gauge buckshot pellet projectile
  */
 export function drawJohnWickShotgunPellet(ctx, p) {
-  const vx = p.vx || 0;
-  const vy = p.vy || 0;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
 
   if (p.history && p.history.length > 1) {
     ctx.save();
@@ -2824,9 +2824,9 @@ export function drawJohnWickRifle(ctx, x, y, gunAngle, r, opts = {}) {
  * Draws John Wick's supersonic 5.56x45mm NATO green-tip rifle bullet projectile
  */
 export function drawJohnWickRifleBullet(ctx, p) {
-  const vx = p.vx || 0;
-  const vy = p.vy || 0;
-  const angle = Math.atan2(vy, vx);
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const len = 16;
   const width = 3.2;
 

@@ -437,7 +437,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     if (p.visual === 'sword') {
       const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
       const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-      const angle = Math.atan2(vy, vx);
+      const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
       // scale down a bit relative to typical fighter radius
       const owner = state.fighters && state.fighters[p.owner];
       const scale = owner ? Math.max(0.5, owner.r / 24) : 0.9;
@@ -470,7 +470,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     if (p.visual === 'shuriken') {
       const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
       const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-      const angle = Math.atan2(vy, vx);
+      const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
       // Add rotation for spinning effect
       const spinAngle = angle + (Date.now() / 100) % (Math.PI * 2);
       const owner = state.fighters && state.fighters[p.owner];
@@ -556,7 +556,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     if (p.visual === 'gunslingerBullet') {
       const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
       const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
-      const angle = Math.atan2(vy, vx);
+      const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
       const owner = state.fighters && state.fighters[p.owner];
       const scale = owner ? Math.max(0.7, owner.r / 22) : 1.0;
       const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));

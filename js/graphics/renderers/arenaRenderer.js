@@ -1,6 +1,5 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
-import { getCurrentPlayingBgmTitle } from '../../systems/arenaBgmSystem.js';
 import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index.js';
 
 // ──────────────────────────────────────────
@@ -597,36 +596,38 @@ export function drawArena() {
 
   const centerX = arena.x + arena.width / 2;
 
-  // 5b. Text above Top Arena Wall (Dark Mode: Fighter Names | Light Mode: BGM Title)
-  if (isDark) {
-    // In DARK MODE: Display Match Fighters Name above Top Arena Wall (e.g. "ENGINEER VS JOHN WICK") with prominent bold typography
-    if (state.fighters && state.fighters.length > 0 && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-      const isPrimaryFighter = (f) => Boolean(
-        f &&
-        !f.isTurret &&
-        !f.isMinion &&
-        !f.isDeployable &&
-        !f.isIceWall &&
-        !f.isIllusion &&
-        !f.isRika &&
-        !f.isEvasionMinion &&
-        !f.isTransfiguredHuman &&
-        !f.isClone &&
-        !f.owner &&
-        f.type !== 'Turret' &&
-        f.type !== 'turret' &&
-        f.type !== 'Dispenser' &&
-        f.type !== 'dispenser' &&
-        !f._def?.isTurret &&
-        !f._def?.isMinion
-      );
+  // 5b. Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA")
+  if (state.fighters && state.fighters.length > 0 && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
+    const isPrimaryFighter = (f) => Boolean(
+      f &&
+      !f.isTurret &&
+      !f.isMinion &&
+      !f.isDeployable &&
+      !f.isIceWall &&
+      !f.isIllusion &&
+      !f.isRika &&
+      !f.isEvasionMinion &&
+      !f.isTransfiguredHuman &&
+      !f.isClone &&
+      !f.owner &&
+      f.type !== 'Turret' &&
+      f.type !== 'turret' &&
+      f.type !== 'Dispenser' &&
+      f.type !== 'dispenser' &&
+      !f._def?.isTurret &&
+      !f._def?.isMinion
+    );
 
-      const mainFighters = state.fighters.filter(isPrimaryFighter);
-      if (mainFighters.length === 0) return;
-
+    const mainFighters = state.fighters.filter(isPrimaryFighter);
+    if (mainFighters.length > 0) {
       const textY = arena.y - 12;
       ctx.save();
-      ctx.font = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      const vsFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      const accentFont = vsFont;
+      const ampFont = vsFont;
+
+      ctx.font = nameFont;
       ctx.textBaseline = 'bottom';
       if ('letterSpacing' in ctx) {
         ctx.letterSpacing = '2px';
@@ -645,9 +646,6 @@ export function drawArena() {
         const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
         const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
         const vsText = 'VS';
-
-        const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-        const vsFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
         const vsPadding = 12;
 
         ctx.font = nameFont;
@@ -671,29 +669,20 @@ export function drawArena() {
 
         // Fighter 1 Name
         ctx.font = nameFont;
-        ctx.lineWidth = 4.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = getFighterThemeColor(f1, '#38BDF8');
-        ctx.strokeText(name1, startX, textY);
         ctx.fillText(name1, startX, textY);
         startX += w1 + vsPadding;
 
         // "VS" Accent
         ctx.font = vsFont;
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = '#94A3B8';
+        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
         const vsY = textY - 1.5;
-        ctx.strokeText(vsText, startX, vsY);
         ctx.fillText(vsText, startX, vsY);
         startX += wVs + vsPadding;
 
         // Fighter 2 Name
         ctx.font = nameFont;
-        ctx.lineWidth = 4.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
-        ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
       } else if (mainFighters.length === 3) {
         // ── 1v2 Mode: "NAME1 VS NAME2 & NAME3" with per-fighter colors ──
@@ -704,9 +693,6 @@ export function drawArena() {
         const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
         const name3 = (f3.name || f3._def?.name || f3.characterId || 'P3').toUpperCase();
 
-        const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-        const accentFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-        const ampFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
         const pad = 12;
         const ampPad = 8;
 
@@ -735,28 +721,19 @@ export function drawArena() {
 
         // Fighter 1 Name (Solo)
         ctx.font = nameFont;
-        ctx.lineWidth = 4.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = getFighterThemeColor(f1, '#38BDF8');
-        ctx.strokeText(name1, startX, textY);
         ctx.fillText(name1, startX, textY);
         startX += w1 + pad;
 
         // "VS" Accent
         ctx.font = accentFont;
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = '#94A3B8';
-        ctx.strokeText('VS', startX, textY - 1.5);
+        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
         ctx.fillText('VS', startX, textY - 1.5);
         startX += wVs + pad;
 
         // Fighter 2 Name (Team Member 1)
         ctx.font = nameFont;
-        ctx.lineWidth = 4.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
-        ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
 
         if (is1v2) {
@@ -764,10 +741,7 @@ export function drawArena() {
 
           // "&" Ampersand Accent
           ctx.font = ampFont;
-          ctx.lineWidth = 3.5;
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-          ctx.fillStyle = '#94A3B8';
-          ctx.strokeText('&', startX, textY - 1.5);
+          ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
           ctx.fillText('&', startX, textY - 1.5);
           startX += wAmp + ampPad;
         } else {
@@ -775,27 +749,18 @@ export function drawArena() {
 
           // "VS" Accent
           ctx.font = accentFont;
-          ctx.lineWidth = 3.5;
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-          ctx.fillStyle = '#94A3B8';
-          ctx.strokeText('VS', startX, textY - 1.5);
+          ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
           ctx.fillText('VS', startX, textY - 1.5);
           startX += wVs + pad;
         }
 
         // Fighter 3 Name
         ctx.font = nameFont;
-        ctx.lineWidth = 4.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = getFighterThemeColor(f3, '#FBBF24');
-        ctx.strokeText(name3, startX, textY);
         ctx.fillText(name3, startX, textY);
       } else {
         // Multi-fighter fallback (2v2 or FFA): Per-fighter colored names joined by "VS" or "&"
-        const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-        const vsFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
         const pad = 10;
-
         const is2v2 = mainFighters.length === 4 && (state.mode === '2v2' || state.mode === 'Tactical 2v2');
 
         const fighterData = mainFighters.map(f => ({
@@ -828,47 +793,21 @@ export function drawArena() {
         fighterData.forEach((fd, i) => {
           // Fighter Name
           ctx.font = nameFont;
-          ctx.lineWidth = 4.5;
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
           ctx.fillStyle = fd.color;
-          ctx.strokeText(fd.name, startX, textY);
           ctx.fillText(fd.name, startX, textY);
           startX += ctx.measureText(fd.name).width;
 
           if (i < fighterData.length - 1) {
             startX += pad;
             ctx.font = vsFont;
-            ctx.lineWidth = 3.5;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-            ctx.fillStyle = '#94A3B8';
+            ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
             const sep = (is2v2 && (i === 0 || i === 2)) ? '&' : 'VS';
-            ctx.strokeText(sep, startX, textY - 1.5);
             ctx.fillText(sep, startX, textY - 1.5);
             startX += ctx.measureText(sep).width + pad;
           }
         });
       }
 
-      ctx.restore();
-    }
-  } else {
-    // In LIGHT MODE: Background Music Title Text above Top Arena Wall
-    const bgmTitle = getCurrentPlayingBgmTitle();
-    if (bgmTitle && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-      const textY = arena.y - 8;
-      ctx.save();
-      ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      
-      // Crisp light stroke outline
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.strokeText(bgmTitle, centerX, textY);
-      
-      // Amber-gold fill
-      ctx.fillStyle = '#b45309';
-      ctx.fillText(bgmTitle, centerX, textY);
       ctx.restore();
     }
   }
@@ -1184,12 +1123,18 @@ export function drawGojoDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const gojoFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') && f.domainActive
+    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') && (f.domainActive || f.isChannelingDomainExpansion)
   );
 
   let targetOpacity = 0;
-  if (gojoFighter && gojoFighter.domainActive) {
-    targetOpacity = 0.72;
+  if (gojoFighter) {
+    if (gojoFighter.domainActive) {
+      targetOpacity = 0.72;
+    } else if (gojoFighter.isChannelingDomainExpansion) {
+      const chargeMax = gojoFighter.domainChargeMax || 120;
+      const progress = Math.min(1.0, (gojoFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
+      targetOpacity = 0.25 + progress * 0.45;
+    }
   }
 
   // Smoothly interpolate
@@ -1250,12 +1195,18 @@ export function drawSukunaDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const sukunaFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna') && f.domainActive
+    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna') && (f.domainActive || f.isChannelingDomainExpansion)
   );
 
   let targetOpacity = 0;
-  if (sukunaFighter && sukunaFighter.domainActive) {
-    targetOpacity = 0.75;
+  if (sukunaFighter) {
+    if (sukunaFighter.domainActive) {
+      targetOpacity = 0.75;
+    } else if (sukunaFighter.isChannelingDomainExpansion) {
+      const chargeMax = CONFIG.sukuna?.domainChargeMax || 120;
+      const progress = Math.min(1.0, (sukunaFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
+      targetOpacity = 0.25 + progress * 0.45;
+    }
   }
 
   if (targetOpacity > currentSukunaDomainDimOpacity) {
@@ -1313,12 +1264,18 @@ export function drawYutaDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const yutaFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.id === 'yuta' || f._def?.type === 'yuta') && f.domainActive
+    f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.id === 'yuta' || f._def?.type === 'yuta') && (f.domainActive || f.isChannelingDomain)
   );
 
   let targetOpacity = 0;
-  if (yutaFighter && yutaFighter.domainActive) {
-    targetOpacity = 0.70;
+  if (yutaFighter) {
+    if (yutaFighter.domainActive) {
+      targetOpacity = 0.75;
+    } else if (yutaFighter.isChannelingDomain) {
+      const chargeMax = yutaFighter.domainChargeMax || 180;
+      const progress = Math.min(1.0, (yutaFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
+      targetOpacity = 0.25 + progress * 0.45;
+    }
   }
 
   if (targetOpacity > currentYutaDomainDimOpacity) {
@@ -1334,28 +1291,14 @@ export function drawYutaDomainDimScreen() {
 
   const opacity = currentYutaDomainDimOpacity;
 
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-  const shakeX = state.shakeX || 0;
-  const shakeY = state.shakeY || 0;
-  const cx = yutaFighter ? (yutaFighter.x + shakeX) : canvas.width / 2;
-  const cy = yutaFighter ? ((yutaFighter.y - (yutaFighter.z || 0)) + shakeY) : canvas.height / 2;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
-
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, 'rgba(180, 60, 220, 0.50)');      // Bright cursed pink-purple core
-  grad.addColorStop(0.15, 'rgba(120, 20, 180, 0.40)');    // Deep cursed purple halo
-  grad.addColorStop(0.35, 'rgba(60, 10, 120, 0.25)');     // Dark violet ring
-  grad.addColorStop(0.60, 'rgba(20, 5, 50, 0.12)');       // Deep space purple fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
-
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.restore();
+  // During domain channeling, draw smooth dark charge-up overlay; when domain is active, renderYutaDomainBackground displays the authentic full-screen void, vortex & environment
+  if (yutaFighter && yutaFighter.isChannelingDomain && !yutaFighter.domainActive) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.75})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
 
   state.globalDimEdgeColor = `rgba(5, 0, 10, ${opacity * 0.95})`;
 }
@@ -1371,12 +1314,18 @@ export function drawMahitoDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const mahitoFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive)
+    f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive || f.isChannelingDomainExpansion)
   );
 
   let targetOpacity = 0;
-  if (mahitoFighter && (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive)) {
-    targetOpacity = 0.68;
+  if (mahitoFighter) {
+    if (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive) {
+      targetOpacity = 0.68;
+    } else if (mahitoFighter.isChannelingDomainExpansion) {
+      const chargeMax = mahitoFighter.domainChargeMax || 120;
+      const progress = Math.min(1.0, (mahitoFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
+      targetOpacity = 0.25 + progress * 0.40;
+    }
   }
 
   if (targetOpacity > currentMahitoDomainDimOpacity) {
@@ -1392,31 +1341,14 @@ export function drawMahitoDomainDimScreen() {
 
   const opacity = currentMahitoDomainDimOpacity;
 
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.85})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const shakeX = state.shakeX || 0;
-  const shakeY = state.shakeY || 0;
-  const cx = mahitoFighter ? (mahitoFighter.x + shakeX) : canvas.width / 2;
-  const cy = mahitoFighter ? ((mahitoFighter.y - (mahitoFighter.z || 0)) + shakeY) : canvas.height / 2;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
-
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, 'rgba(40, 180, 160, 0.45)');       // Bright cursed teal core
-  grad.addColorStop(0.15, 'rgba(20, 120, 110, 0.35)');     // Deep teal halo
-  grad.addColorStop(0.35, 'rgba(10, 60, 55, 0.22)');       // Dark teal ring
-  grad.addColorStop(0.60, 'rgba(5, 25, 22, 0.10)');        // Deep murky fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');              // Pitch black boundary
-
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.restore();
+  // During domain channeling, draw smooth dark charge-up overlay; when domain is active, renderMahitoDomainBackground displays the authentic full-screen void & environment
+  if (mahitoFighter && mahitoFighter.isChannelingDomainExpansion && !mahitoFighter.domainActive) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.75})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
 
   state.globalDimEdgeColor = `rgba(0, 5, 5, ${opacity * 0.95})`;
 }
@@ -1504,23 +1436,7 @@ export function drawTojiUltimateOverlay() {
   );
 
   ctx.save();
-  if (isDarkMode && arena) {
-    ctx.beginPath();
-    if (arena.shape === 'circle') {
-      const acx = arena.x + arena.width / 2;
-      const acy = arena.y + arena.height / 2;
-      const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - (arena.wallWidth || 0);
-      ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
-    } else {
-      const ww = arena.wallWidth || 0;
-      ctx.rect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
-    }
-    ctx.clip();
-  } else {
-    // Reset the transform temporarily so the pitch-black overlay and swarm are perfectly glued to the camera
-    // and do not jitter or expose the edges of the screen during violent screen shakes.
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = currentTojiUltimateOpacity;
   
   // Pitch black overlay

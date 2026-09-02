@@ -78,15 +78,17 @@ export function getFighterHealthBarColor(fighter, ratio, isDark = null) {
   if (isCj) {
     return '#FFFFFF';
   }
-  const themeColor = fighter.themeColor || fighter.color || '#15803d';
 
-  if (isDarkTheme) {
-    // In Dark Mode: healthbar fill color strictly stays based on fighter's theme color without transitioning to yellow-red
-    return themeColor;
-  }
+  // Derive color theme directly from the fighter's HUD skill bar color theme
+  try {
+    const skills = getSkillDataForFighter(fighter);
+    const hudSkillColor = (skills && skills.length > 0 && skills[0]?.color) ? skills[0].color : null;
+    if (hudSkillColor) {
+      return hudSkillColor;
+    }
+  } catch (e) {}
 
-  // In Light Mode: standard HP color transitions (Green -> Yellow -> Red)
-  return ratio > 0.5 ? '#22c55e' : (ratio > 0.25 ? '#eab308' : '#ef4444');
+  return fighter.themeColor || fighter.color || '#22c55e';
 }
 
 /**
@@ -672,7 +674,6 @@ function updateTacticalCard(cardObj, f, index, accentColor) {
   const ratio = hp / maxHp;
   const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
   const name = (f.name || f.type || `OP ${index + 1}`).toUpperCase();
-  const fighterColor = (f.color || accentColor || '#ffffff');
   const isDark = isDarkModeActive();
   const barColor = isDark ? (f.themeColor || f.color || accentColor || '#ffffff') : (ratio > 0.25 ? fighterColor : '#ef4444');
   const isDead = hp <= 0;
@@ -1017,31 +1018,25 @@ function _getDimElements() {
   };
 
   const shouldShowFighterSkill = (fighter, skill) => {
-    if (isDarkModeActive()) {
-      const showAll = (CONFIG.darkModeShowHudSkillBars !== undefined)
-        ? Boolean(CONFIG.darkModeShowHudSkillBars)
-        : ((CONFIG.darkModeShowSkillBars !== undefined) ? Boolean(CONFIG.darkModeShowSkillBars) : true);
-      
-      if (!showAll) {
-        return isSkillExceptionInDarkMode(fighter, skill);
-      }
+    const showAll = (CONFIG.darkModeShowHudSkillBars !== undefined)
+      ? Boolean(CONFIG.darkModeShowHudSkillBars)
+      : ((CONFIG.darkModeShowSkillBars !== undefined) ? Boolean(CONFIG.darkModeShowSkillBars) : true);
+    
+    if (!showAll) {
+      return isSkillExceptionInDarkMode(fighter, skill);
     }
     return true;
   };
 
   const shouldShowHudSkillBars = () => {
-    if (isDarkModeActive()) {
-      if (CONFIG.darkModeShowHudSkillBars !== undefined) return Boolean(CONFIG.darkModeShowHudSkillBars);
-      if (CONFIG.darkModeShowSkillBars !== undefined) return Boolean(CONFIG.darkModeShowSkillBars);
-    }
+    if (CONFIG.darkModeShowHudSkillBars !== undefined) return Boolean(CONFIG.darkModeShowHudSkillBars);
+    if (CONFIG.darkModeShowSkillBars !== undefined) return Boolean(CONFIG.darkModeShowSkillBars);
     return true;
   };
 
   const shouldShowHudStats = () => {
-    if (isDarkModeActive()) {
-      if (CONFIG.darkModeShowHudStats !== undefined) return Boolean(CONFIG.darkModeShowHudStats);
-      if (CONFIG.darkModeShowStats !== undefined) return Boolean(CONFIG.darkModeShowStats);
-    }
+    if (CONFIG.darkModeShowHudStats !== undefined) return Boolean(CONFIG.darkModeShowHudStats);
+    if (CONFIG.darkModeShowStats !== undefined) return Boolean(CONFIG.darkModeShowStats);
     return true;
   };
 
@@ -2148,10 +2143,7 @@ function _getDimElements() {
 
         if (isMemberCj) {
           return `
-            <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '14px'};">
-              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 4px 0;">
-                <div class="health-card__title" style="${getTitleStyle(memberNameColor, isMemberCj)}margin: 0; text-align: ${titleAlign || 'left'}; flex-shrink: 0;">${memberName}</div>
-              </div>
+            <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '18px'};">
               ${generateCjGtaHudWidgetHTML(m, titleAlign, hpText, memberShakeStyle)}
               ${memberSkillsHTML ? `<div class="health-card__skills">${memberSkillsHTML}</div>` : ''}
               ${memberInfoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;">${memberInfoHTML}</div>` : ''}
@@ -2160,10 +2152,7 @@ function _getDimElements() {
         }
 
         return `
-          <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '6px'};">
-            <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 3px 0;">
-              <div class="health-card__title tac-name" style="${getTitleStyle(memberNameColor, isMemberCj)}margin: 0; text-align: ${titleAlign || 'left'}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${memberName}</div>
-            </div>
+          <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '18px'};">
             ${memberStackHTML}
             <div class="health-card__bar${cjBarClass}" style="${memberShakeStyle}">
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
@@ -2236,9 +2225,8 @@ function _getDimElements() {
       </div>
     ` : '';
 
-    const headerRowHTML = (title || rightHeaderHTML) ? `
-      <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 3px;">
-        ${title ? `<div class="health-card__title tac-name" style="${getTitleStyle(nameColor, isCardCj)}margin: 0; text-align: ${titleAlign}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${truncatedTitle}</div>` : ''}
+    const headerRowHTML = rightHeaderHTML ? `
+      <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: ${titleAlign === 'right' ? 'flex-start' : 'flex-end'}; width: 100%; gap: 6px; margin-bottom: 3px;">
         ${rightHeaderHTML}
       </div>
     ` : '';

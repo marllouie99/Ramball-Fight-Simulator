@@ -193,12 +193,12 @@ export function renderGame() {
         if (state.pixiLayers.particles) state.pixiLayers.particles.visible = true;
         if (state.pixiLayers.effects) state.pixiLayers.effects.visible = true;
         if (state.pixiLayers.environment) state.pixiLayers.environment.visible = true;
-        // Stop shaking the arena layer (keep outer background static)
+        // Keep arena and environment background layers static at (0, 0) (so full-screen background/domain does not shake)
         if (state.pixiLayers.arena?.position?.set) state.pixiLayers.arena.position.set(0, 0);
-        // OPTIMIZED: Only set positions if currently shaking or if we need to reset them to 0
+        if (state.pixiLayers.environment?.position?.set) state.pixiLayers.environment.position.set(0, 0);
+        // OPTIMIZED: Only shake in-arena projectiles, particles, and effects
         const hasShake = (shakeX !== 0 || shakeY !== 0);
         if (hasShake || state._lastShakeX !== 0 || state._lastShakeY !== 0) {
-          if (state.pixiLayers.environment?.position?.set) state.pixiLayers.environment.position.set(shakeX, shakeY);
           if (state.pixiLayers.projectiles?.position?.set) state.pixiLayers.projectiles.position.set(shakeX, shakeY);
           if (state.pixiLayers.particles?.position?.set) state.pixiLayers.particles.position.set(shakeX, shakeY);
           if (state.pixiLayers.effects?.position?.set) state.pixiLayers.effects.position.set(shakeX, shakeY);
@@ -213,17 +213,10 @@ export function renderGame() {
       
       state.globalDimEdgeColor = null; // Reset every frame
 
-      // Ensure 2D context transform matrix is clean before drawing
+      // Ensure 2D context transform matrix is clean before drawing static background & arena
       state.ctx.setTransform(1, 0, 0, 1, 0, 0);
       
       drawArena();
-
-      // Translate 2D context for inside-arena shake ONLY when shaking
-      const isShaking = (shakeX !== 0 || shakeY !== 0);
-      state.ctx.save();
-      if (isShaking) {
-        state.ctx.translate(shakeX, shakeY);
-      }
 
       try {
 
@@ -260,14 +253,27 @@ export function renderGame() {
             }
             state._darkDimMask.endFill();
             if (state.pixiLayers.effects) state.pixiLayers.effects.mask = state._darkDimMask;
-            if (state.pixiLayers.environment) state.pixiLayers.environment.mask = state._darkDimMask;
+            const hasActiveDomainOrUltimate = Boolean(
+              state.fighters && state.fighters.some(f =>
+                f && (
+                  f.domainActive || 
+                  f._mahitoDomainActive || 
+                  (f.characterId === 'toji' && f.ultimateActive) ||
+                  (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive)) ||
+                  (f.characterId === 'ichigo' && (f.isChannelingBankai || (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) || (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0))) ||
+                  (f.characterId === 'saitama' && f._counterPunchTimer > 0) ||
+                  (f.characterId === 'nanami' && f.ratioHitPauseTimer > 0)
+                )
+              )
+            );
+            if (state.pixiLayers.environment) state.pixiLayers.environment.mask = hasActiveDomainOrUltimate ? null : state._darkDimMask;
           }
         } else {
           if (state.pixiLayers?.effects?.mask) state.pixiLayers.effects.mask = null;
           if (state.pixiLayers?.environment?.mask) state.pixiLayers.environment.mask = null;
         }
 
-        // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Rendered behind fighters so fighters stay un-tinted) ──
+        // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Static, Un-shaken background environment) ──
         drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
         updateHybridEnvironment(); // WebGL & 2D full-screen dim effects (Gojo Purple, Sukuna Fuga, Mahoraga adaptation)
         drawPurpleDimScreen(); // 2D Gojo Hollow Purple radial dim overlay
@@ -296,6 +302,13 @@ export function renderGame() {
           if (state.pixiLayers?.environment) {
             state.pixiLayers.environment.mask = null;
           }
+        }
+
+        // Translate 2D context for inside-arena entities shake ONLY when shaking
+        const isShaking = (shakeX !== 0 || shakeY !== 0);
+        state.ctx.save();
+        if (isShaking) {
+          state.ctx.translate(shakeX, shakeY);
         }
 
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
@@ -469,8 +482,9 @@ export function renderGame() {
       } else if (state.gameState === 'countdown') {
         drawCountdown();
 
-        // Smooth Arena Entrance Flash Fade
-        if ((state.countdownTimer || 0) < 14) {
+        const isDarkCountdown = Boolean(state.arenaTheme === 'dark' || state.darkMode);
+        // Smooth Arena Entrance Flash Fade (disabled in Dark Mode)
+        if (!isDarkCountdown && (state.countdownTimer || 0) < 14) {
           const uiCtx = state.topLevelUiCtx || state.ctx;
           const flashAlpha = Math.max(0, 1 - (state.countdownTimer || 0) / 14);
           uiCtx.save();

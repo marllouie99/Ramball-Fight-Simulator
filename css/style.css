@@ -200,18 +200,7 @@ canvas {
 }
 
 .health-card__title {
-  font-family: 'Glast Blitch', Arial, sans-serif;
-  font-size: 20px;
-  font-weight: normal;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: #000000;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none !important;
 }
 
 .health-card__score {
@@ -849,6 +838,10 @@ canvas {
 }
 
 /* ── Solo & Team HUD Stats Font Sizing (Matches Skill Label Font Size) ── */
+.health-card__member + .health-card__member {
+  margin-top: 18px !important;
+}
+
 .health-card__member .health-card__info,
 .health-card.team-card .health-card__info,
 .health-card.solo-1v2-card .health-card__info {
@@ -875,44 +868,42 @@ canvas {
   margin-bottom: 0 !important;
 }
 
-/* Arcade Style Font Text in Dark Mode (Excluding CJ unique GTA HUD) */
-.arena-dark-mode #healthHud,
-.arena-dark-mode #healthHud *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
-.arena-dark-mode #healthHudLeft,
-.arena-dark-mode #healthHudLeft *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
-.arena-dark-mode #healthHudRight,
-.arena-dark-mode #healthHudRight *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
-.arena-dark-mode #hudBottomContainer,
-.arena-dark-mode #hudBottomContainer *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
-.arena-dark-mode #hudTopContainer,
-.arena-dark-mode #hudTopContainer *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
-.arena-dark-mode .health-card,
-.arena-dark-mode .health-card *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
-.health-card.arena-dark-mode,
-.health-card.arena-dark-mode *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
-.arena-dark-mode .hud-skill-box,
-.arena-dark-mode .hud-skill-box *,
-.arena-dark-mode .health-card__info,
-.arena-dark-mode .health-card__desc,
-.arena-dark-mode .health-card__meta,
-.arena-dark-mode .tac-name,
-.arena-dark-mode .tac-caliber {
+/* Arcade Style Font Text across all HUD modes (Excluding CJ unique GTA HUD) */
+#healthHud,
+#healthHud *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+#healthHudLeft,
+#healthHudLeft *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+#healthHudRight,
+#healthHudRight *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+#hudBottomContainer,
+#hudBottomContainer *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+#hudTopContainer,
+#hudTopContainer *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.health-card,
+.health-card *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.hud-skill-box,
+.hud-skill-box *,
+.health-card__info,
+.health-card__desc,
+.health-card__meta,
+.tac-name,
+.tac-caliber {
   font-family: 'Silkscreen', 'Press Start 2P', 'Rajdhani', monospace, sans-serif !important;
 }
 
-/* Preserve CJ Unique GTA HUD Pricedown Font in Dark Mode */
-.arena-dark-mode .hud-cj-clock-text,
-.health-card.arena-dark-mode .hud-cj-clock-text {
+/* Preserve CJ Unique GTA HUD Pricedown Font */
+.hud-cj-clock-text,
+.health-card .hud-cj-clock-text {
   font-family: 'Pricedown', 'Impact', 'Arial Black', sans-serif !important;
 }
 
-.arena-dark-mode .hud-cj-weapon-ammo,
-.health-card.arena-dark-mode .hud-cj-weapon-ammo {
+.hud-cj-weapon-ammo,
+.health-card .hud-cj-weapon-ammo {
   font-family: 'Pricedown', 'Impact', sans-serif !important;
 }
 
-.arena-dark-mode .hud-cj-money-text,
-.health-card.arena-dark-mode .hud-cj-money-text {
+.hud-cj-money-text,
+.health-card .hud-cj-money-text {
   font-family: 'Pricedown', 'Impact', 'Arial Black', sans-serif !important;
 }
 
