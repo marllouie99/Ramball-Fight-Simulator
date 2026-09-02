@@ -1,5 +1,5 @@
 import { state, getProjectiles } from '../../core/state.js';
-import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
+import { CONFIG, FIGHTER_DEFS, GAME_MODES } from '../../core/config.js';
 import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index.js';
 
 // ──────────────────────────────────────────
