@@ -640,143 +640,148 @@ export function drawArena() {
         return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
       };
 
-      if (mainFighters.length === 2) {
-        const f1 = mainFighters[0];
-        const f2 = mainFighters[1];
-        const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
-        const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
-        const vsText = 'VS';
-        const vsPadding = 12;
+      const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
+      const is2v2 = (state.mode === '2v2' || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES?.TWO_VS_TWO || state.mode === GAME_MODES?.TACTICAL_2V2);
+      const is4v4 = (state.mode === '4v4' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES?.TACTICAL_4V4);
 
-        ctx.font = nameFont;
-        const w1 = ctx.measureText(name1).width;
-        const w2 = ctx.measureText(name2).width;
+      let team0 = [];
+      let team1 = [];
 
-        ctx.font = vsFont;
+      if (typeof state.getFighterTeam === 'function') {
+        mainFighters.forEach(f => {
+          const origIdx = state.fighters.indexOf(f);
+          const t = state.getFighterTeam(origIdx);
+          if (t === 0) team0.push(f);
+          else if (t === 1) team1.push(f);
+        });
+      }
+
+      if (team0.length === 0 && team1.length === 0) {
+        if (is1v2 && mainFighters.length >= 3) {
+          team0 = [mainFighters[0]];
+          team1 = [mainFighters[1], mainFighters[2]];
+        } else if (is2v2 && mainFighters.length >= 4) {
+          team0 = [mainFighters[0], mainFighters[1]];
+          team1 = [mainFighters[2], mainFighters[3]];
+        } else if (mainFighters.length === 2) {
+          team0 = [mainFighters[0]];
+          team1 = [mainFighters[1]];
+        }
+      }
+
+      const isTeamMatch = (team0.length > 0 && team1.length > 0 && (team0.length + team1.length === mainFighters.length));
+
+      if (isTeamMatch) {
+        const team0Data = team0.map(f => ({
+          name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+          color: getFighterThemeColor(f, '#38BDF8')
+        }));
+
+        const team1Data = team1.map(f => ({
+          name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+          color: getFighterThemeColor(f, '#F87171')
+        }));
+
+        const hasStackedTeam = team0.length > 1 || team1.length > 1;
+        const nameFontSize = hasStackedTeam ? 19 : 22;
+        const customNameFont = `900 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+        const vsFontSize = hasStackedTeam ? 13 : 14;
+        const customVsFont = `800 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+
+        ctx.font = customNameFont;
+        if ('letterSpacing' in ctx) {
+          ctx.letterSpacing = '2px';
+        }
+
+        let wTeam0 = 0;
+        team0Data.forEach(td => {
+          wTeam0 = Math.max(wTeam0, ctx.measureText(td.name).width);
+        });
+
+        let wTeam1 = 0;
+        team1Data.forEach(td => {
+          wTeam1 = Math.max(wTeam1, ctx.measureText(td.name).width);
+        });
+
+        ctx.font = customVsFont;
+        if ('letterSpacing' in ctx) {
+          ctx.letterSpacing = '1.5px';
+        }
+        const vsText = 'vs';
         const wVs = ctx.measureText(vsText).width;
 
-        const totalW = w1 + vsPadding + wVs + vsPadding + w2;
-        const maxW = arena.width - 16; // 8px padding on each side
-        const scale = totalW > maxW ? maxW / totalW : 1.0;
-
-        ctx.translate(centerX, textY);
-        ctx.scale(scale, 1.0);
-        ctx.translate(-centerX, -textY);
-
-        let startX = centerX - totalW / 2;
-
-        ctx.textAlign = 'left';
-
-        // Fighter 1 Name
-        ctx.font = nameFont;
-        ctx.fillStyle = getFighterThemeColor(f1, '#38BDF8');
-        ctx.fillText(name1, startX, textY);
-        startX += w1 + vsPadding;
-
-        // "VS" Accent
-        ctx.font = vsFont;
-        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-        const vsY = textY - 1.5;
-        ctx.fillText(vsText, startX, vsY);
-        startX += wVs + vsPadding;
-
-        // Fighter 2 Name
-        ctx.font = nameFont;
-        ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
-        ctx.fillText(name2, startX, textY);
-      } else if (mainFighters.length === 3) {
-        // ── 1v2 Mode: "NAME1 VS NAME2 & NAME3" with per-fighter colors ──
-        const f1 = mainFighters[0];
-        const f2 = mainFighters[1];
-        const f3 = mainFighters[2];
-        const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
-        const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
-        const name3 = (f3.name || f3._def?.name || f3.characterId || 'P3').toUpperCase();
-
         const pad = 12;
-        const ampPad = 8;
-
-        ctx.font = nameFont;
-        const w1 = ctx.measureText(name1).width;
-        const w2 = ctx.measureText(name2).width;
-        const w3 = ctx.measureText(name3).width;
-        ctx.font = accentFont;
-        const wVs = ctx.measureText('VS').width;
-        ctx.font = ampFont;
-        const wAmp = ctx.measureText('&').width;
-
-        const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2');
-        const totalW = is1v2 
-          ? (w1 + pad + wVs + pad + w2 + ampPad + wAmp + ampPad + w3)
-          : (w1 + pad + wVs + pad + w2 + pad + wVs + pad + w3);
+        const totalW = wTeam0 + pad + wVs + pad + wTeam1;
         const maxW = arena.width - 16;
         const scale = totalW > maxW ? maxW / totalW : 1.0;
 
-        ctx.translate(centerX, textY);
-        ctx.scale(scale, 1.0);
-        ctx.translate(-centerX, -textY);
+        const bottomY = arena.y - 12;
+        const lineSpacing = 20;
+        const topY = bottomY - lineSpacing;
 
-        let startX = centerX - totalW / 2;
-        ctx.textAlign = 'left';
-
-        // Fighter 1 Name (Solo)
-        ctx.font = nameFont;
-        ctx.fillStyle = getFighterThemeColor(f1, '#38BDF8');
-        ctx.fillText(name1, startX, textY);
-        startX += w1 + pad;
-
-        // "VS" Accent
-        ctx.font = accentFont;
-        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-        ctx.fillText('VS', startX, textY - 1.5);
-        startX += wVs + pad;
-
-        // Fighter 2 Name (Team Member 1)
-        ctx.font = nameFont;
-        ctx.fillStyle = getFighterThemeColor(f2, '#F87171');
-        ctx.fillText(name2, startX, textY);
-
-        if (is1v2) {
-          startX += w2 + ampPad;
-
-          // "&" Ampersand Accent
-          ctx.font = ampFont;
-          ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-          ctx.fillText('&', startX, textY - 1.5);
-          startX += wAmp + ampPad;
-        } else {
-          startX += w2 + pad;
-
-          // "VS" Accent
-          ctx.font = accentFont;
-          ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-          ctx.fillText('VS', startX, textY - 1.5);
-          startX += wVs + pad;
+        ctx.save();
+        if (scale < 1.0) {
+          ctx.translate(centerX, bottomY);
+          ctx.scale(scale, scale);
+          ctx.translate(-centerX, -bottomY);
         }
 
-        // Fighter 3 Name
-        ctx.font = nameFont;
-        ctx.fillStyle = getFighterThemeColor(f3, '#FBBF24');
-        ctx.fillText(name3, startX, textY);
-      } else {
-        // Multi-fighter fallback (2v2 or FFA): Per-fighter colored names joined by "VS" or "&"
-        const pad = 10;
-        const is2v2 = mainFighters.length === 4 && (state.mode === '2v2' || state.mode === 'Tactical 2v2');
+        const startX = centerX - totalW / 2;
+        const vsX = startX + wTeam0 + pad;
+        const team1X = vsX + wVs + pad;
 
+        ctx.textAlign = 'left';
+
+        // Render Team 0 (Left Side)
+        ctx.font = customNameFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+        if (team0Data.length === 1) {
+          ctx.fillStyle = team0Data[0].color;
+          ctx.fillText(team0Data[0].name, startX, bottomY);
+        } else {
+          ctx.fillStyle = team0Data[0].color;
+          ctx.fillText(team0Data[0].name, startX, topY);
+          ctx.fillStyle = team0Data[1].color;
+          ctx.fillText(team0Data[1].name, startX, bottomY);
+        }
+
+        // Render Center "vs"
+        ctx.font = customVsFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
+        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
+        ctx.fillText(vsText, vsX, bottomY - 1.5);
+
+        // Render Team 1 (Right Side)
+        ctx.font = customNameFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+        if (team1Data.length === 1) {
+          ctx.fillStyle = team1Data[0].color;
+          ctx.fillText(team1Data[0].name, team1X, bottomY);
+        } else {
+          ctx.fillStyle = team1Data[0].color;
+          ctx.fillText(team1Data[0].name, team1X, topY);
+          ctx.fillStyle = team1Data[1].color;
+          ctx.fillText(team1Data[1].name, team1X, bottomY);
+        }
+
+        ctx.restore();
+      } else {
+        // Multi-fighter FFA fallback: horizontal row joined with "vs"
+        const pad = 10;
+        const vsText = 'vs';
         const fighterData = mainFighters.map(f => ({
           name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
           color: getFighterThemeColor(f, '#F8FAFC')
         }));
 
-        // Measure total width
         let totalW = 0;
         ctx.font = nameFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
         fighterData.forEach((fd, i) => {
           totalW += ctx.measureText(fd.name).width;
           if (i < fighterData.length - 1) {
             ctx.font = vsFont;
-            const sep = (is2v2 && (i === 0 || i === 2)) ? '&' : 'VS';
-            totalW += pad + ctx.measureText(sep).width + pad;
+            totalW += pad + ctx.measureText(vsText).width + pad;
             ctx.font = nameFont;
           }
         });
@@ -791,8 +796,8 @@ export function drawArena() {
         ctx.textAlign = 'left';
 
         fighterData.forEach((fd, i) => {
-          // Fighter Name
           ctx.font = nameFont;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
           ctx.fillStyle = fd.color;
           ctx.fillText(fd.name, startX, textY);
           startX += ctx.measureText(fd.name).width;
@@ -800,10 +805,10 @@ export function drawArena() {
           if (i < fighterData.length - 1) {
             startX += pad;
             ctx.font = vsFont;
+            if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
             ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-            const sep = (is2v2 && (i === 0 || i === 2)) ? '&' : 'VS';
-            ctx.fillText(sep, startX, textY - 1.5);
-            startX += ctx.measureText(sep).width + pad;
+            ctx.fillText(vsText, startX, textY - 1.5);
+            startX += ctx.measureText(vsText).width + pad;
           }
         });
       }
