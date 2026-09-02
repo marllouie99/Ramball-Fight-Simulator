@@ -10,6 +10,13 @@ export class GetsugaBehavior extends ProjectileBehavior {
     // 0. Gojo Limitless Infinity Stasis Guard: projectile frozen motionless in space
     if (projectile.isFrozenByInfinity) {
       if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
+        for (const [target] of projectile.draggedTargets.entries()) {
+          if (target) {
+            target.isDraggedByGetsuga = false;
+            target.preventKnockbackBounce = false;
+            target.z = 0;
+          }
+        }
         projectile.draggedTargets.clear();
       }
       return false;
@@ -20,6 +27,10 @@ export class GetsugaBehavior extends ProjectileBehavior {
     const isBankaiForm = form === 'bankai' || form === 'bankai_hollow';
     const isMaskForm = form === 'hollow' || form === 'bankai_hollow';
     const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
+
+    const ownerIdx = projectile.owner;
+    const attacker = (fighters && fighters[ownerIdx]) || (typeof state !== 'undefined' && state.fighters ? state.fighters[ownerIdx] : null);
+    const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : null;
 
     // ── Continuous arena screen shake while Getsuga Tensho travels across the arena ──
     if (projectile.vx !== 0 || projectile.vy !== 0) {
@@ -240,6 +251,11 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
           // Release from active wave dragging immediately upon hitting the wall so enemy stays firmly pinned in place
           target.isDraggedByGetsuga = false;
+          target.preventKnockbackBounce = false;
+          target.z = 0;
+          if (typeof target.aim === 'function' && typeof attacker !== 'undefined' && attacker && !attacker.isDead) {
+            target.aim(attacker);
+          }
           projectile.draggedTargets.delete(target);
           continue;
         }
@@ -265,16 +281,16 @@ export class GetsugaBehavior extends ProjectileBehavior {
         if (dragFrames <= 1) {
           target.isDraggedByGetsuga = false;
           target.preventKnockbackBounce = false;
+          target.z = 0;
+          if (typeof target.aim === 'function' && typeof attacker !== 'undefined' && attacker && !attacker.isDead) {
+            target.aim(attacker);
+          }
           projectile.draggedTargets.delete(target);
         } else {
           projectile.draggedTargets.set(target, dragFrames - 1);
         }
       }
     }
-
-    const ownerIdx = projectile.owner;
-    const attacker = (fighters && fighters[ownerIdx]) || (typeof state !== 'undefined' && state.fighters ? state.fighters[ownerIdx] : null);
-    const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : null;
 
     const allCandidates = [];
     if (fighters) allCandidates.push(...fighters);

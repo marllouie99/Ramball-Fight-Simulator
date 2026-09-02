@@ -479,12 +479,6 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
 
-    // Uryu Ishida Heilig Pfeil (Sacred Spirit Arrow) visual
-    if (p.visual === 'heiligPfeil' || p.isHeiligPfeil) {
-      drawHeiligPfeil(ctx, p);
-      return;
-    }
-
     // Sukuna slash visual
     if (p.visual === 'sukunaSlash') {
       drawSukunaSlash(ctx, p);
@@ -492,7 +486,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     }
 
     // Getsuga Tensho visual
-    if (p.visual === 'getsuga') {
+    if (p.visual === 'getsuga' || (p.isGetsuga && !p.visual)) {
       drawGetsugaSlash(ctx, p, false);
       return;
     }
@@ -500,6 +494,12 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     // Black Getsuga Tensho visual
     if (p.visual === 'blackGetsuga') {
       drawGetsugaSlash(ctx, p, true);
+      return;
+    }
+
+    // Uryu Ishida Heilig Pfeil (Sacred Spirit Arrow) visual
+    if ((p.visual === 'heiligPfeil' || p.type === 'heilig_pfeil' || p.isHeiligPfeil) && !p.isGetsuga && p.visual !== 'getsuga' && p.visual !== 'blackGetsuga') {
+      drawHeiligPfeil(ctx, p);
       return;
     }
 
@@ -525,12 +525,6 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     if (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace) {
       if (typeof state !== 'undefined' && state.pixiApp) return;
       drawSukunaFurnaceArrow(ctx, p);
-      return;
-    }
-
-    // Uryu Ishida Heilig Pfeil Sacred Arrow
-    if (p.visual === 'heiligPfeil' || p.isHeiligPfeil || p.type === 'heilig_pfeil') {
-      drawHeiligPfeil(ctx, p);
       return;
     }
 

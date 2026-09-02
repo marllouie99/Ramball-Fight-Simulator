@@ -267,6 +267,10 @@ export function reinitFighters(isNewMatch = false) {
           c4Cooldown: f.c4Cooldown,
           telekinesisCooldown: f.telekinesisCooldown,
           spellStealCooldown: f.spellStealCooldown,
+          hirenkyakuCooldown: f.hirenkyakuCooldown,
+          sprengerCooldown: f.sprengerCooldown,
+          seeleCooldown: f.seeleCooldown,
+          ransotengaiCooldown: f.ransotengaiCooldown,
 
           // Progressive/Passive stats
           stunChance: f.stunChance,
@@ -301,6 +305,15 @@ export function reinitFighters(isNewMatch = false) {
           ultimateActive: f.ultimateActive,
           ultimateTimer: f.ultimateTimer,
           combatAuraOpacity: f.combatAuraOpacity,
+          
+          // Uryu Ishida progressive state
+          reishiGauge: f.reishiGauge,
+          isPiercingLightActive: f.isPiercingLightActive,
+          piercingLightTimer: f.piercingLightTimer,
+          ransotengaiActive: f.ransotengaiActive,
+          ransotengaiTimer: f.ransotengaiTimer,
+          vollstandigActive: f.vollstandigActive,
+          antithesisUsed: f.antithesisUsed,
           
           // Rika state for Yuta
           rikaActiveState: (f.rika && f.rika.active) ? {
@@ -436,6 +449,10 @@ export function reinitFighters(isNewMatch = false) {
       if (saved.c4Cooldown !== undefined) fighter.c4Cooldown = saved.c4Cooldown;
       if (saved.telekinesisCooldown !== undefined) fighter.telekinesisCooldown = saved.telekinesisCooldown;
       if (saved.spellStealCooldown !== undefined) fighter.spellStealCooldown = saved.spellStealCooldown;
+      if (saved.hirenkyakuCooldown !== undefined) fighter.hirenkyakuCooldown = saved.hirenkyakuCooldown;
+      if (saved.sprengerCooldown !== undefined) fighter.sprengerCooldown = saved.sprengerCooldown;
+      if (saved.seeleCooldown !== undefined) fighter.seeleCooldown = saved.seeleCooldown;
+      if (saved.ransotengaiCooldown !== undefined) fighter.ransotengaiCooldown = saved.ransotengaiCooldown;
 
       // Passives & Stacks
       if (saved.stunChance !== undefined) fighter.stunChance = saved.stunChance;
@@ -470,6 +487,13 @@ export function reinitFighters(isNewMatch = false) {
       if (saved.ultimateActive !== undefined) fighter.ultimateActive = saved.ultimateActive;
       if (saved.ultimateTimer !== undefined) fighter.ultimateTimer = saved.ultimateTimer;
       if (saved.combatAuraOpacity !== undefined) fighter.combatAuraOpacity = saved.combatAuraOpacity;
+      if (saved.reishiGauge !== undefined) fighter.reishiGauge = saved.reishiGauge;
+      if (saved.isPiercingLightActive !== undefined) fighter.isPiercingLightActive = saved.isPiercingLightActive;
+      if (saved.piercingLightTimer !== undefined) fighter.piercingLightTimer = saved.piercingLightTimer;
+      if (saved.ransotengaiActive !== undefined) fighter.ransotengaiActive = saved.ransotengaiActive;
+      if (saved.ransotengaiTimer !== undefined) fighter.ransotengaiTimer = saved.ransotengaiTimer;
+      if (saved.vollstandigActive !== undefined) fighter.vollstandigActive = saved.vollstandigActive;
+      if (saved.antithesisUsed !== undefined) fighter.antithesisUsed = saved.antithesisUsed;
 
       // Rika state for Yuta
       if (saved.rikaActiveState && fighter.rika) {

@@ -548,6 +548,8 @@ export function drawSaitamaSpeedLines() {
   ctx.restore();
 }
 
+
+
 export function drawUltimateChannelingTexts() {
   const ctx = state.ctx;
   const fighters = state.fighters;

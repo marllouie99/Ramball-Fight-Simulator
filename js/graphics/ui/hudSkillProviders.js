@@ -1286,6 +1286,34 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
+  if (f.characterId === 'uryu' || f.type === 'uryu') {
+    const themeColor = '#00E5FF';
+
+    // Skill 1: Hirenkyaku & Licht Regen
+    const hirenkyakuMax = CONFIG.uryu?.hirenkyakuCooldown || 360;
+    const hirenkyakuTimer = f.hirenkyakuCooldown !== undefined ? f.hirenkyakuCooldown : hirenkyakuMax;
+    let hirenkyakuPct = Math.max(0, Math.min(100, (1 - (hirenkyakuTimer / hirenkyakuMax)) * 100));
+    if (f.isHirenkyakuDashing || f.isLichtRegenActive) hirenkyakuPct = 100;
+
+    // Skill 2: Sprenger
+    const sprengerMax = CONFIG.uryu?.sprengerCooldown || 540;
+    const sprengerTimer = f.sprengerCooldown !== undefined ? f.sprengerCooldown : sprengerMax;
+    let sprengerPct = Math.max(0, Math.min(100, (1 - (sprengerTimer / sprengerMax)) * 100));
+    if (f.isDeployingSprenger) sprengerPct = 100;
+
+    // Wall Bounce Flurry Indicator
+    const maxBounces = CONFIG.uryu?.wallBounceFlurryThreshold || 3;
+    const bCount = f.wallBounceCount || 0;
+    const flurryPct = f.isFlurrying ? 100 : Math.min(100, (bCount / maxBounces) * 100);
+    const flurryLabel = f.isFlurrying ? 'FLURRY (ACTIVE)' : `WALL BOUNCE (${bCount}/${maxBounces})`;
+
+    return [
+      { id: 'flurry', pct: flurryPct, ready: flurryPct >= 99 || f.isFlurrying, color: themeColor, label: flurryLabel },
+      { id: 'lichtregen', pct: hirenkyakuPct, ready: hirenkyakuPct >= 99, color: themeColor, label: 'LICHT REGEN' },
+      { id: 'sprenger', pct: sprengerPct, ready: sprengerPct >= 99, color: themeColor, label: 'SPRENGER' }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }

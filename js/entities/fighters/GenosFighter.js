@@ -982,6 +982,18 @@ export class GenosFighter extends Fighter {
     }
     try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3'); } catch (e) {}
 
+    // Release all targets from beam trap on attack interruption
+    const clearBeamTrap = (entity) => {
+      if (!entity) return;
+      entity.caughtInGenosBeam = false;
+      entity.caughtInGenosBeamTimer = 0;
+      entity.preventKnockbackBounce = false;
+    };
+    if (typeof state !== 'undefined') {
+      if (state.fighters) state.fighters.forEach(clearBeamTrap);
+      if (state.illusions) state.illusions.forEach(clearBeamTrap);
+    }
+
     super.interruptAttacks(forceCancelAll);
   }
 
@@ -1424,6 +1436,8 @@ export class GenosFighter extends Fighter {
         if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r && !target.isBaguvixActive && !target.isGodModeActive) {
           // Continuous beam trap lock: suppresses wall bounce reflection & angle jitter
           target.caughtInGenosBeamTimer = 10;
+          target.caughtInGenosBeam = true;
+          target.preventKnockbackBounce = true;
 
           // Gently align target to the beam's central axis line (soft pull allows targets to move/steer)
           const pullStrength = CONFIG.genos?.ultBeamCenterPull ?? 0.04;
@@ -1431,6 +1445,35 @@ export class GenosFighter extends Fighter {
           const centerProjY = this.y + Math.sin(this.ultAngle) * projDist;
           target.x += (centerProjX - target.x) * pullStrength;
           target.y += (centerProjY - target.y) * pullStrength;
+
+          // Strict Arena Wall Pin: prevent any bouncing or rebounding off arena walls
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          if (arena) {
+            const pad = target.r || 25;
+            const minX = arena.x + pad;
+            const maxX = arena.x + arena.width - pad;
+            const minY = arena.y + pad;
+            const maxY = arena.y + arena.height - pad;
+
+            if (target.x <= minX) {
+              target.x = minX;
+              if (target.vx < 0) target.vx = 0;
+              target.knockbackVx = 0;
+            } else if (target.x >= maxX) {
+              target.x = maxX;
+              if (target.vx > 0) target.vx = 0;
+              target.knockbackVx = 0;
+            }
+            if (target.y <= minY) {
+              target.y = minY;
+              if (target.vy < 0) target.vy = 0;
+              target.knockbackVy = 0;
+            } else if (target.y >= maxY) {
+              target.y = maxY;
+              if (target.vy > 0) target.vy = 0;
+              target.knockbackVy = 0;
+            }
+          }
         }
       }
 
@@ -1451,8 +1494,27 @@ export class GenosFighter extends Fighter {
             const pushForce = CONFIG.genos?.ultKnockbackForce || 8;
             const pushVx = Math.cos(this.ultAngle) * pushForce;
             const pushVy = Math.sin(this.ultAngle) * pushForce;
-            target.vx = target.vx * 0.4 + pushVx;
-            target.vy = target.vy * 0.4 + pushVy;
+
+            const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+            const pad = target.r || 25;
+            const isAgainstWallX = arena && ((target.x <= arena.x + pad + 2 && pushVx < 0) || (target.x >= arena.x + arena.width - pad - 2 && pushVx > 0));
+            const isAgainstWallY = arena && ((target.y <= arena.y + pad + 2 && pushVy < 0) || (target.y >= arena.y + arena.height - pad - 2 && pushVy > 0));
+
+            if (isAgainstWallX) {
+              target.vx = 0;
+              target.knockbackVx = 0;
+            } else {
+              target.vx = target.vx * 0.4 + pushVx;
+            }
+
+            if (isAgainstWallY) {
+              target.vy = 0;
+              target.knockbackVy = 0;
+            } else {
+              target.vy = target.vy * 0.4 + pushVy;
+            }
+
+            target.preventKnockbackBounce = true;
 
             // 2. Impact Flash & Laser Hit Sparks on Target
             if (typeof spawnSparks === 'function') {
@@ -1489,6 +1551,16 @@ export class GenosFighter extends Fighter {
           const recVol = CONFIG.genos?.ultRecoveryVolume ?? 1.5;
           audioSystem.playSFX(recSrc, recVol);
         }
+
+        // Release all targets from beam trap so their movement speed, steering, and abilities immediately recover!
+        const clearBeamTrap = (entity) => {
+          if (!entity) return;
+          entity.caughtInGenosBeam = false;
+          entity.caughtInGenosBeamTimer = 0;
+          entity.preventKnockbackBounce = false;
+        };
+        if (state.fighters) state.fighters.forEach(clearBeamTrap);
+        if (state.illusions) state.illusions.forEach(clearBeamTrap);
       }
       return;
     }

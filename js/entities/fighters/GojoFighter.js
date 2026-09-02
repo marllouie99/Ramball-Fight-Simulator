@@ -1,6 +1,6 @@
 import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
 import { fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
-import { Fighter } from '../fighter.js';
+import { Fighter, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -189,9 +189,11 @@ export class GojoFighter extends Fighter {
       this._hasPlayedRedChannelingSound = savedRedAudio || true;
     }
 
-    // Domain Expansion Hyper Armor: ONLY Toji (ISOH ambush/silence) can interrupt domain expansion channeling!
+    const isHitByGetsuga = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
+
+    // Domain Expansion Hyper Armor: ONLY Toji (ISOH ambush/silence) or Getsuga wave can interrupt domain expansion channeling!
     if (wasChannelingDomain) {
-      if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
+      if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0 || isHitByGetsuga) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
         this.domainCooldown = Math.max(this.domainCooldown || 0, penaltyCD + 30);
@@ -202,13 +204,13 @@ export class GojoFighter extends Fighter {
     }
 
     // Hollow Purple Hyper Armor: Normal attacks do NOT cancel Purple channeling!
-    // Only Toji's ISOH ambush/silence can interrupt it.
+    // Toji's ISOH ambush/silence or Getsuga wave cancels it.
     if (wasChannelingPurple) {
-      if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
+      if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0 || isHitByGetsuga) {
         this.isChannelingPurple = false;
         this.purpleChargeTimer = 0;
         this.purpleCooldown = Math.max(this.purpleCooldown || 0, penaltyCD);
-        this.z = 0; // Drop to ground when Toji cancels Purple
+        this.z = 0; // Drop to ground when cancelled
         if (this._purpleChargeSoundHandle) {
           fadeOutSound(this._purpleChargeSoundHandle, 200);
           this._purpleChargeSoundHandle = null;
@@ -510,13 +512,15 @@ export class GojoFighter extends Fighter {
       this.isWallSlammed = false;
     }
 
-    const isFrozen = this._handleTimeStop() || this.isTargetOfAmbush || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity;
+    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
+    const isFrozen = this._handleTimeStop() || this.isTargetOfAmbush || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || isGetsugaSuppressed;
     if (isFrozen) {
+      this.z = 0;
       if (this.isDomainPreSlide) {
         this.isDomainPreSlide = false;
         this.domainPreSlideTimer = 0;
       }
-      if (this.isChannelingDomainExpansion && (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0)) {
+      if (this.isChannelingDomainExpansion) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
       }
@@ -532,7 +536,15 @@ export class GojoFighter extends Fighter {
       }
       // Rule #1: Cancel active channeling/skills
       this.interruptAttacks();
-      return; // MANDATORY: Stop update execution so fighter is frozen!
+      if (isGetsugaSuppressed) {
+        // Rule #3: Keep facing direction tracking target while dragged
+        if (opponent && !opponent.isDead) {
+          const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+          this.gunAngle = targetAngle;
+          this.angle = targetAngle;
+        }
+      }
+      return; // MANDATORY: Stop update execution so fighter is frozen/carried!
     }
 
     if (this.redEffectTimer > 0) {
@@ -1528,8 +1540,10 @@ export class GojoFighter extends Fighter {
     if (opponent) this.target = opponent;
     const punchDamage = CONFIG.gojo.meleePunchDamage || 8;
 
-    // Trigger smooth hand punch animation (matches Sukuna's 8-frame punch timing)
-    this.punchAnimTimer = 8;
+    // Trigger smooth hand punch animation with alternating fists
+    const punchDuration = CONFIG.gojo?.meleePunchAnimDuration || 12;
+    this.punchAnimTimer = punchDuration;
+    this.punchActiveMaxTime = punchDuration;
     this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
 
     // Gather all valid enemy targets (fighters & illusions) in Gojo's punch frontal arc (90 degrees, 80px reach)
@@ -2016,6 +2030,16 @@ export class GojoFighter extends Fighter {
     const rctSrc = sound?.src || CONFIG.gojo?.sounds?.reverseCursedTechnique || 'Assets/Sound Effects/Skills/repair.mp3';
     const rctVol = sound?.volume ?? (CONFIG.gojo?.soundVolumes?.reverseCursedTechnique ?? 1.0);
     audioSystem.playSFX(rctSrc, rctVol);
+  }
+  triggerDemoAttack() {
+    const punchDuration = CONFIG.gojo?.meleePunchAnimDuration || 12;
+    this.punchAnimTimer = punchDuration;
+    this.punchActiveMaxTime = punchDuration;
+    this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1;
+    try {
+      const sound = getBasicAttackSound(this.id, this._def?.type);
+      if (sound) audioSystem.playSFX(sound.src, sound.volume);
+    } catch (e) {}
   }
   draw(ctx) { GojoRenderer.draw(ctx, this); }
   _getHandPositions() { return GojoRenderer._getHandPositions(this); }

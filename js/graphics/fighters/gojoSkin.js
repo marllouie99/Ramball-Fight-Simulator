@@ -78,12 +78,12 @@ export function drawGojoBody(ctx, fighter) {
     ctx.save();
     ctx.translate(fighter.x, fighter.y - z);
 
-    // === ANIME CHARACTER ROTATION LOGIC (Matches Yuji & Todo) ===
+    // === ANIME CHARACTER ROTATION LOGIC (Rule 19 Standard) ===
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
     const isWinnerScreen = fighter._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
-    const isFloatingOrChanneling = isWinnerScreen || (z > 0) || fighter.isChannelingPurple || ((fighter.redEffectTimer || 0) > 0) || fighter.isChannelingDomainExpansion;
+    const is200Cinematic = fighter.isChannelingPurple && (fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
-    if (!isFloatingOrChanneling) {
+    if (!isWinnerScreen && !is200Cinematic) {
       const angle = fighter.gunAngle || 0;
       ctx.rotate(angle);
 

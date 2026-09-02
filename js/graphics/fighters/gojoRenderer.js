@@ -563,13 +563,27 @@ export class GojoRenderer {
       };
     }
 
-    // Idle martial arts brawler guard stance & dynamic front hand punches
-    let frontHandX, frontHandY, backHandX = 0, backHandY = 0;
-    hideBackHand = true; // Hide back hand for brawler single front hand stance
+    // Calculate dynamic punch reach distance directly toward enemy target
+    let reachDist = 95;
+    const target = fighter.target || (typeof fighter._findNearestEnemy === 'function' ? fighter._findNearestEnemy() : null);
+    if (target && !target.isDead) {
+      const targetDist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
+      reachDist = Math.max(55, Math.min(130, targetDist - r * 0.45));
+    }
 
-    if (fighter.punchAnimTimer > 0) {
-      const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
+    // Single front hand brawler punch stance (other hand completely removed)
+    let frontHandX, frontHandY, backHandX = 0, backHandY = 0;
+    hideBackHand = true; // Other hand completely removed
+    hideFrontHand = false;
+
+    const isPunching = fighter.punchAnimTimer > 0;
+    const idleBob = Math.sin(Date.now() * 0.007) * (r * 0.05);
+
+    let targetLunge = 0;
+    if (isPunching) {
+      const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || (CONFIG.gojo?.meleePunchAnimDuration || 10);
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+      
       let easePunch = 0;
       if (rawProgress < 0.28) {
         easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
@@ -577,16 +591,18 @@ export class GojoRenderer {
         const retractT = (rawProgress - 0.28) / 0.72;
         easePunch = Math.cos(retractT * (Math.PI / 2));
       }
-      const lungeExtension = easePunch * (r * 1.5);
 
-      // All punches executed with the front hand extending forward from right edge
-      frontHandX = r * 0.95 + lungeExtension * 1.40;
-      frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
-    } else {
-      // Idle brawler guard stance: front hand at the right edge of body circle
-      frontHandX = r * 0.95;
-      frontHandY = 0;
+      targetLunge = easePunch * reachDist;
     }
+
+    // Continuous smooth exponential interpolation for fluid punching
+    if (fighter._smoothPunchLunge === undefined) fighter._smoothPunchLunge = 0;
+    fighter._smoothPunchLunge += (targetLunge - fighter._smoothPunchLunge) * 0.50;
+    if (Math.abs(targetLunge - fighter._smoothPunchLunge) < 0.15) fighter._smoothPunchLunge = targetLunge;
+
+    // Single Front Punch Hand: Forward edge base (r * 0.85) + dynamic punch reach
+    frontHandX = r * 0.85 + fighter._smoothPunchLunge + (isPunching ? 0 : idleBob);
+    frontHandY = 0;
 
     const fHand = toGlobal(frontHandX, frontHandY);
     const bHand = toGlobal(backHandX, backHandY);
@@ -630,7 +646,7 @@ export class GojoRenderer {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
 
-    // Back hand: drawn on 'back' layer for normal stances, but for 200% Purple both hands render in front on top of body
+    // Back hand: drawn on 'back' layer only when not hidden
     if (!is200Purple) {
       if ((layer === 'all' || layer === 'back') && !hideBackHand) {
         _drawPixelFist(backHandX, backHandY);
@@ -640,7 +656,7 @@ export class GojoRenderer {
     // Front hand (on top of body circle)
     if (layer === 'all' || layer === 'front') {
       if (is200Purple) {
-        // Draw both hands on top of the body circle during 200% purple launch preparation
+        // Draw left hand on top of the body circle during 200% purple launch preparation
         if (!hideBackHand) {
           _drawPixelFist(backHandX, backHandY);
         }

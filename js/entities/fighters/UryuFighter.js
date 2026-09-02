@@ -25,20 +25,31 @@ export class UryuFighter extends Fighter {
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : {};
 
-    // Basic Attack & Animation States
+    // Basic Attack (Heilig Bogen spirit arrow)
+    this.attackSpeed = cfg.attackSpeed || 1.0;
+    this.attackSpeedMultiplier = 1.0;
     this.shootCooldown = 15;
-    this.shootCooldownMax = cfg.shootCooldown || 34;
-    this.burstRemaining = 0;
+    this.shootCooldownMax = cfg.shootCooldown || 28;
     this.isShooting = false;
-    this.isDrawingBow = false;
-    this.drawPhase = 'IDLE'; // 'IDLE' | 'DRAWING' | 'RECOIL'
     this.arrowDrawTimer = 0;
-    this.arrowDrawDuration = 11;
-    this.arrowDrawProgress = 0;
+    this.arrowDrawDuration = cfg.arrowDrawDuration || 10;
+    this.drawPhase = 'IDLE'; // 'IDLE' | 'DRAWING' | 'RECOIL'
     this.smoothDrawProgress = 0;
     this.recoilHoldTimer = 0;
     this.stringRecoilTimer = 0;
     this.stringRecoilMax = 6;
+
+    // Hirenkyaku Flurry (Triggered on every 3rd arena wall rebound)
+    this.wallBounceCount = 0;
+    this._lastWallBounceTime = 0;
+    this.isFlurrying = false;
+    this.flurryPhase = 'IDLE'; // 'IDLE' | 'TELEPORT' | 'AIM' | 'SHOOT' | 'PAUSE' | 'FINISH'
+    this.flurryCurrentTeleport = 0;
+    this.flurryTotalTeleports = cfg.flurryTeleportCount || 2;
+    this.flurryTimer = 0;
+    this.flurryArrowsLeft = 0;
+    this.flurryDelayTimer = 0;
+    this.flurryTarget = null;
 
     // Melee Intercept: Seele Schneider & Weapon Switch Buffer
     this.slashSwingTimer = 0;
@@ -57,8 +68,8 @@ export class UryuFighter extends Fighter {
     this.currentWeaponMode = 'BOW'; // 'BOW' | 'SEELE'
 
     // Skill 1: Hirenkyaku (Glide Step) & Licht Regen
-    this.hirenkyakuCooldown = 0;
     this.hirenkyakuCooldownMax = cfg.hirenkyakuCooldown || 360;
+    this.hirenkyakuCooldown = this.hirenkyakuCooldownMax;
     this.isHirenkyakuDashing = false;
     this.hirenkyakuTimer = 0;
     this.hirenkyakuMaxTimer = cfg.hirenkyakuDashFrames || 5;
@@ -91,6 +102,8 @@ export class UryuFighter extends Fighter {
     this.lichtRegenArrowScale = cfg.lichtRegenArrowScale || 0.08;
     this.lichtRegenRainSpreadX = cfg.lichtRegenRainSpreadX || 150;
     this.lichtRegenRainHeight = cfg.lichtRegenRainHeight || 360;
+    this.lichtRegenSlowDuration = cfg.lichtRegenSlowDuration || 90;
+    this.lichtRegenSlowMultiplier = (typeof cfg.lichtRegenSlowMultiplier === 'number') ? cfg.lichtRegenSlowMultiplier : 0.35;
     this.lichtRegenRecoveryCooldown = cfg.lichtRegenRecoveryCooldown || 20;
     this.telegraphBeamHeight = cfg.telegraphBeamHeight || 320;
     this.telegraphRadiusMult = cfg.telegraphRadiusMult || 1.6;
@@ -99,8 +112,8 @@ export class UryuFighter extends Fighter {
     this.hirenkyakuAiMidRangeChance = cfg.hirenkyakuAiMidRangeChance || 0.006;
 
     // Skill 2: Gintō Sprenger (Pentagram Trap)
-    this.sprengerCooldown = 0;
     this.sprengerCooldownMax = cfg.sprengerCooldown || 480;
+    this.sprengerCooldown = this.sprengerCooldownMax;
     this.isDeployingSprenger = false;
     this.sprengerTimer = 0;
 
@@ -115,8 +128,8 @@ export class UryuFighter extends Fighter {
     this.ransotengaiActive = false;
     this.ransotengaiTimer = 0;
     this.ransotengaiMaxTimer = cfg.ransotengaiDuration || 360;
-    this.ransotengaiCooldown = 0;
     this.ransotengaiCooldownMax = cfg.ransotengaiCooldown || 1200;
+    this.ransotengaiCooldown = this.ransotengaiCooldownMax;
 
     // Ultimate: Vollständig & Schrift "A" The Antithesis
     this.ultimateCooldown = cfg.ultimateCooldown || 1200;
@@ -145,20 +158,30 @@ export class UryuFighter extends Fighter {
 
   reset() {
     super.reset();
-    this.shootCooldown = 15;
-    this.burstRemaining = 0;
+    this.attackSpeed = (typeof CONFIG !== 'undefined' && CONFIG.uryu?.attackSpeed) || 1.0;
+    this.attackSpeedMultiplier = 1.0;
+    this.shootCooldown = 20;
     this.isShooting = false;
-    this.isDrawingBow = false;
-    this.drawPhase = 'IDLE';
     this.arrowDrawTimer = 0;
-    this.arrowDrawDuration = 11;
-    this.arrowDrawProgress = 0;
+    this.drawPhase = 'IDLE';
     this.smoothDrawProgress = 0;
     this.recoilHoldTimer = 0;
     this.stringRecoilTimer = 0;
+    this.wallBounceCount = 0;
+    this._lastWallBounceTime = 0;
+    this.isFlurrying = false;
+    this.flurryPhase = 'IDLE';
+    this.flurryCurrentTeleport = 0;
+    this.flurryTotalTeleports = (typeof CONFIG !== 'undefined' && CONFIG.uryu?.flurryTeleportCount) || 2;
+    this.flurryTimer = 0;
+    this.flurryArrowsLeft = 0;
+    this.flurryDelayTimer = 0;
+    this.flurryTarget = null;
     this.slashSwingTimer = 0;
+    this.slashSwingImpactTimer = 0;
+    this._chopHitDelivered = true;
     this.seeleCooldown = 0;
-    this.hirenkyakuCooldown = 0;
+    this.hirenkyakuCooldown = this.hirenkyakuCooldownMax;
     this.isHirenkyakuDashing = false;
     this.hirenkyakuTimer = 0;
     this.afterImages = [];
@@ -169,34 +192,44 @@ export class UryuFighter extends Fighter {
     this.isSkywardAscending = false;
     this.skywardAscentTimer = 0;
     this._activeSkywardBeacon = null;
+    this._skywardStartAngle = undefined;
     this._skywardBeaconFired = false;
     this.isLichtRegenActive = false;
     this.lichtRegenTimer = 0;
     this.lichtRegenArrowsLeft = 0;
     this.lichtRegenFireTimer = 0;
-    this.sprengerCooldown = 0;
+    this.sprengerCooldown = this.sprengerCooldownMax;
+    this.isDeployingSprenger = false;
+    this.sprengerTimer = 0;
     this.reishiGauge = 0;
     this.isPiercingLightActive = false;
     this.piercingLightTimer = 0;
     this.ransotengaiActive = false;
     this.ransotengaiTimer = 0;
-    this.ransotengaiCooldown = 0;
+    this.ransotengaiCooldown = this.ransotengaiCooldownMax;
     this.vollstandigActive = false;
     this.antithesisUsed = false;
+    this.currentWeaponMode = 'BOW';
+    this.seeleEquipProgress = 0;
+    this.weaponSwitchTimer = 0;
   }
 
   interruptAttacks(forceCancelAll = false) {
     super.interruptAttacks(forceCancelAll);
     this.isShooting = false;
-    this.isDrawingBow = false;
-    this.burstRemaining = 0;
-    this.drawPhase = 'IDLE';
     this.arrowDrawTimer = 0;
-    this.arrowDrawProgress = 0;
+    this.drawPhase = 'IDLE';
     this.smoothDrawProgress = 0;
+    this.isFlurrying = false;
+    this.flurryPhase = 'IDLE';
+    this.flurryCurrentTeleport = 0;
+    this.flurryTimer = 0;
+    this.flurryArrowsLeft = 0;
+    this.flurryDelayTimer = 0;
+    this.flurryTarget = null;
     this.isDeployingSprenger = false;
     if (this.afterImages) this.afterImages.length = 0;
-    
+
     // Skill 1 cancel guards
     this.isHirenkyakuDashing = false;
     this.invulnerable = false;
@@ -219,15 +252,12 @@ export class UryuFighter extends Fighter {
     }
   }
 
-  /**
-   * Demo attack trigger for character selection / weapon preview.
-   */
-  triggerDemoAttack() {
-    this._initiateBowVolley(null, 0);
-  }
-
   canAim() {
     if (!super.canAim()) return false;
+    const isParalyzed = typeof this.isParalyzedDebuffActive === 'function'
+      ? this.isParalyzedDebuffActive()
+      : Boolean(this.isParalyzed || (this.paralyzeTimer && this.paralyzeTimer > 0) || (this.electricStunTimer && this.electricStunTimer > 0));
+    if (isParalyzed) return false;
     if (this.isHirenkyakuDashing || this.isPlantedPause || this.isSkywardWindup || this.isSkywardAscending || this.isLichtRegenActive) {
       return false;
     }
@@ -258,15 +288,58 @@ export class UryuFighter extends Fighter {
     return nearest;
   }
 
+  isParalyzedDebuffActive() {
+    return Boolean(
+      this.isParalyzed ||
+      (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+      (this.electricStunTimer && this.electricStunTimer > 0) ||
+      (this.statusEffects && this.statusEffects.paralyzeTimer > 0) ||
+      (this.timeStopTimer && this.timeStopTimer > 0) ||
+      (this.hitStunTimer && this.hitStunTimer > 0) ||
+      this.isFrozen ||
+      this.isFrozenByInfinity ||
+      this.isInsideCronosSphere() ||
+      this.isCaughtInBeam() ||
+      this.isTargetOfAmbush
+    );
+  }
+
   update(opponent, ownerIndex, arena) {
-    // 1. Mandatory Rule 1 Freeze & Ambush Guard
+    // 1. Mandatory Rule 1 Freeze & Ambush Guard + Paralyze & Beam Stasis Guard
     const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
+    const isParalyzed = this.isParalyzedDebuffActive();
+    const isBeamCaught = this.isCaughtInBeam();
+
+    if (isFrozen || this.isTargetOfAmbush || isParalyzed || isBeamCaught) {
       this.interruptAttacks();
-      return;
+      if (!isBeamCaught) {
+        this.vx = 0;
+        this.vy = 0;
+      }
+      if (this.afterImages && this.afterImages.length > 0) {
+        for (let i = this.afterImages.length - 1; i >= 0; i--) {
+          const ai = this.afterImages[i];
+          ai.timer--;
+          if (ai.timer <= 0) this.afterImages.splice(i, 1);
+        }
+      }
+      this.handleStatusEffects();
+      this._tickCooldowns();
+      return; // MANDATORY: Completely stops all movement, skills & actions while paralyzed, frozen, or caught in beams!
     }
 
     if (this.hp <= 0) return;
+
+    // ── HIRENKYAKU FLURRY: TRIGGERED ON EVERY 3RD WALL REBOUND ──
+    if (this.isFlurrying) {
+      this.handleStatusEffects();
+      this._tickCooldowns();
+      this._tickAttackSound();
+      this.vx = 0;
+      this.vy = 0;
+      this._updateFlurrySequence(opponent, ownerIndex, arena);
+      return;
+    }
 
     // ── PHASE 1: HIRENKYAKU DASH UPDATE ──
     if (this.isHirenkyakuDashing) {
@@ -319,7 +392,9 @@ export class UryuFighter extends Fighter {
           if (ai.timer <= 0) this.afterImages.splice(i, 1);
         }
       }
-      super.update(opponent, ownerIndex, arena);
+      this.handleStatusEffects();
+      this._tickCooldowns();
+      this._tickAttackSound();
       return;
     }
 
@@ -354,7 +429,9 @@ export class UryuFighter extends Fighter {
         }
       }
 
-      super.update(opponent, ownerIndex, arena);
+      this.handleStatusEffects();
+      this._tickCooldowns();
+      this._tickAttackSound();
       return;
     }
 
@@ -420,7 +497,9 @@ export class UryuFighter extends Fighter {
         }
       }
 
-      super.update(opponent, ownerIndex, arena);
+      this.handleStatusEffects();
+      this._tickCooldowns();
+      this._tickAttackSound();
       return;
     }
 
@@ -470,7 +549,9 @@ export class UryuFighter extends Fighter {
         }
       }
 
-      super.update(opponent, ownerIndex, arena);
+      this.handleStatusEffects();
+      this._tickCooldowns();
+      this._tickAttackSound();
       return;
     }
 
@@ -513,7 +594,9 @@ export class UryuFighter extends Fighter {
         }
       }
 
-      super.update(opponent, ownerIndex, arena);
+      this.handleStatusEffects();
+      this._tickCooldowns();
+      this._tickAttackSound();
       return;
     }
 
@@ -536,6 +619,7 @@ export class UryuFighter extends Fighter {
     if (this.weaponSwitchTimer > 0) this.weaponSwitchTimer--;
     if (this.seeleCooldown > 0) this.seeleCooldown--;
     if (this.hirenkyakuCooldown > 0) this.hirenkyakuCooldown--;
+    if (this.shootCooldown > 0) this.shootCooldown--;
     if (this.sprengerCooldown > 0) this.sprengerCooldown--;
 
     // Check if auto-switch is enabled and an enemy is within melee range
@@ -579,19 +663,19 @@ export class UryuFighter extends Fighter {
       }
     }
 
-    // ── ACTIVE BOW SHOOTING & ARROW PULL-BACK CYCLE ──
-    if (this.isShooting && this.burstRemaining > 0) {
+    // ── ACTIVE STANDARD BOW DRAWING & SHOOTING ──
+    const atkSpeed = this.getAttackSpeed();
+    if (this.isShooting) {
       const target = this._findNearestEnemy() || opponent;
       if (target) this.aim(target);
 
       if (this.drawPhase === 'DRAWING') {
-        this.isDrawingBow = true;
         this.arrowDrawTimer++;
-        const t = Math.min(1.0, this.arrowDrawTimer / this.arrowDrawDuration);
-        // Smooth cinematic pull-back easing (accelerating tension curve)
-        this.arrowDrawProgress = Math.sin(t * Math.PI * 0.5);
+        const drawLimit = Math.max(4, Math.round(this.arrowDrawDuration / atkSpeed));
+        const t = Math.min(1.0, this.arrowDrawTimer / drawLimit);
+        this.smoothDrawProgress = Math.sin(t * Math.PI * 0.5);
 
-        // Subtle Reishi gathering spark during draw
+        // Subtle Reishi gathering sparks
         if (Math.random() < 0.25 && typeof spawnSparks === 'function') {
           const angle = this.gunAngle || 0;
           const sx = this.x + Math.cos(angle) * (this.r + 10) + (Math.random() - 0.5) * 12;
@@ -599,65 +683,42 @@ export class UryuFighter extends Fighter {
           spawnSparks(sx, sy, '#00E5FF', 1);
         }
 
-        if (this.arrowDrawTimer >= this.arrowDrawDuration) {
-          // Maximum tension reached: RELEASE ARROW!
+        if (this.arrowDrawTimer >= drawLimit) {
           this._fireHeiligPfeilArrow(target || opponent, ownerIndex);
-          this.burstRemaining--;
           this.drawPhase = 'RECOIL';
-          this.recoilHoldTimer = 5;
-          this.arrowDrawProgress = 0;
+          this.recoilHoldTimer = Math.max(2, Math.round(4 / atkSpeed));
           this.stringRecoilTimer = this.stringRecoilMax;
         }
       } else if (this.drawPhase === 'RECOIL') {
         this.recoilHoldTimer--;
-        this.arrowDrawProgress = 0;
+        this.smoothDrawProgress = Math.max(0, this.smoothDrawProgress - 0.25);
         if (this.recoilHoldTimer <= 0) {
-          if (this.burstRemaining > 0) {
-            // Rapid-fire subsequent arrow draw in volley
-            this.drawPhase = 'DRAWING';
-            this.arrowDrawTimer = 0;
-            const drawSpeedMult = this.isPiercingLightActive ? 0.70 : 1.0;
-            this.arrowDrawDuration = Math.max(6, Math.round(10 * drawSpeedMult));
-            this.arrowDrawProgress = 0;
-            this._playSound('bowDraw', 'Assets/Sound Effects/Skills/redcharging.mp3', 0.50);
-          } else {
-            // Volley finished
-            this.drawPhase = 'IDLE';
-            this.isShooting = false;
-            this.isDrawingBow = false;
-            this.shootCooldown = this.shootCooldownMax;
-          }
+          this.isShooting = false;
+          this.drawPhase = 'IDLE';
+          this.shootCooldown = Math.max(8, Math.round((CONFIG.uryu?.shootCooldown || 28) / atkSpeed));
         }
       }
-    } else {
-      this.arrowDrawProgress = 0;
-      this.drawPhase = 'IDLE';
-      this.isShooting = false;
-      this.isDrawingBow = false;
+    } else if (!this.isFlurrying) {
+      this.smoothDrawProgress += (0 - this.smoothDrawProgress) * 0.35;
     }
 
-    // Direct, responsive Draw Progress tracking during draw phase
-    if (this.isShooting && this.drawPhase === 'DRAWING') {
-      this.smoothDrawProgress = this.arrowDrawProgress;
-    } else {
-      this.smoothDrawProgress += (0 - this.smoothDrawProgress) * 0.40;
+    // ── WALL REBOUND CHECK: ACCUMULATES BOUNCES TOWARD FLURRY ──
+    if (arena) {
+      this.resolveWallBounce(arena, opponent);
     }
 
     // ── PASSIVE 2: RANSŌTENGAI (HEAVENLY WILD PUPPET SUIT) ──
     if (this.ransotengaiCooldown > 0) this.ransotengaiCooldown--;
 
     const hpRatio = (this.maxHp > 0) ? (this.hp / this.maxHp) : 1.0;
-    const isHeavyCC = (this.hitStunTimer > 15 || this.electricStunTimer > 15 || (this.paralyzeTimer && this.paralyzeTimer > 15));
-    const shouldTriggerPuppet = !this.ransotengaiActive && this.ransotengaiCooldown <= 0 && (hpRatio <= (CONFIG.uryu?.ransotengaiHpThreshold || 0.30) || isHeavyCC);
+    const shouldTriggerPuppet = !this.ransotengaiActive && this.ransotengaiCooldown <= 0 && (hpRatio <= (CONFIG.uryu?.ransotengaiHpThreshold || 0.30));
 
     if (shouldTriggerPuppet) {
       this.ransotengaiActive = true;
       this.ransotengaiTimer = this.ransotengaiMaxTimer;
       this.ransotengaiCooldown = this.ransotengaiCooldownMax;
-      // Instantly purge crowd control
+      // Purge basic physical flinch on activation
       this.hitStunTimer = 0;
-      this.electricStunTimer = 0;
-      if (this.paralyzeTimer) this.paralyzeTimer = 0;
       spawnFloatingText(this.x, this.y - 35, 'RANSŌTENGAI!', '#00E5FF');
       spawnImpactFlash(this.x, this.y, '#00E5FF');
       if (typeof spawnSparks === 'function') {
@@ -673,11 +734,8 @@ export class UryuFighter extends Fighter {
         this.ransotengaiActive = false;
         this.speedMultiplier = 1.0;
       } else {
-        // Ongoing puppet stasis: immunity to flinch & stuns
+        // Ongoing puppet control: ignores basic physical flinch & gains speed boost
         this.hitStunTimer = 0;
-        this.electricStunTimer = 0;
-        if (this.paralyzeTimer) this.paralyzeTimer = 0;
-        // Controlled +30% movement speed boost (safe, non-exponential)
         this.speedMultiplier = 1.30;
       }
     }
@@ -775,9 +833,11 @@ export class UryuFighter extends Fighter {
    */
   shoot(ownerIndex) {
     if (this.hp <= 0) return;
-    const isParalyzed = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed;
+    const isParalyzed = typeof this.isParalyzedDebuffActive === 'function'
+      ? this.isParalyzedDebuffActive()
+      : Boolean((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.electricStunTimer && this.electricStunTimer > 0));
     if (isParalyzed || this.isCaughtInBeam() || this.isTargetOfAmbush) return;
-    if (this.isHirenkyakuDashing || this.isPlantedPause || this.isSkywardWindup || this.isLichtRegenActive) return;
+    if (this.isFlurrying || this.isHirenkyakuDashing || this.isPlantedPause || this.isSkywardWindup || this.isSkywardAscending || this.isLichtRegenActive) return;
     if (this.weaponSwitchTimer > 0) return; // Wait for smooth weapon switch buffer to complete
 
     const target = this._findNearestEnemy();
@@ -793,7 +853,7 @@ export class UryuFighter extends Fighter {
         this.weaponSwitchTimer = this.weaponSwitchMeleeBuffer;
       }
       this._executeSeeleSchneider(target);
-    } else if (this.burstRemaining <= 0 && !this.isShooting) {
+    } else if (!this.isShooting && this.shootCooldown <= 0) {
       if (this.currentWeaponMode !== 'BOW') {
         this.currentWeaponMode = 'BOW';
         this.weaponSwitchTimer = this.weaponSwitchDuration;
@@ -860,6 +920,11 @@ export class UryuFighter extends Fighter {
   }
 
   _triggerHirenkyakuLichtRegen(target, ownerIndex) {
+    const isParalyzed = typeof this.isParalyzedDebuffActive === 'function'
+      ? this.isParalyzedDebuffActive()
+      : Boolean((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.electricStunTimer && this.electricStunTimer > 0));
+    if (isParalyzed || this.hp <= 0 || this.isDead || this.isFrozen || this.isTargetOfAmbush) return;
+
     this.isHirenkyakuDashing = true;
     this.hirenkyakuTimer = this.hirenkyakuMaxTimer;
     this.invulnerable = true;
@@ -996,6 +1061,8 @@ export class UryuFighter extends Fighter {
         p.scale = this.lichtRegenArrowScale;
         p.isPiercing = false;
         p.isLichtRegenRain = true;
+        p.slowDuration = this.lichtRegenSlowDuration;
+        p.slowMultiplier = this.lichtRegenSlowMultiplier;
       }
     }
 
@@ -1009,18 +1076,383 @@ export class UryuFighter extends Fighter {
   }
 
   _initiateBowVolley(target, ownerIndex) {
+    if (this.isShooting || this.isFlurrying || this.hp <= 0 || this.isDead) return;
+    const enemy = target || this._findNearestEnemy();
+    if (!enemy || enemy.hp <= 0 || enemy.isDead) return;
+
     this.isShooting = true;
-    this.isDrawingBow = true;
-    this.burstRemaining = CONFIG.uryu?.burstCount || 3;
+    this.currentWeaponMode = 'BOW';
+    this.seeleEquipProgress = 0;
+    this.weaponSwitchTimer = 0;
     this.drawPhase = 'DRAWING';
     this.arrowDrawTimer = 0;
-    // First arrow has a deliberate, crisp 16-frame draw; Piercing Light accelerates by 30%
-    const drawSpeedMult = this.isPiercingLightActive ? 0.70 : 1.0;
-    this.arrowDrawDuration = Math.max(8, Math.round(16 * drawSpeedMult));
-    this.arrowDrawProgress = 0;
-    this._curOwnerIndex = ownerIndex;
+    this.smoothDrawProgress = 0.20;
+    this._curOwnerIndex = (typeof ownerIndex === 'number' && ownerIndex >= 0) ? ownerIndex : (state.fighters ? state.fighters.indexOf(this) : 0);
     if (target) this.aim(target);
-    this._playSound('bowDraw', 'Assets/Sound Effects/Skills/redcharging.mp3', 0.65);
+    this._playSound('bowDraw', 'Assets/Sound Effects/Skills/redcharging.mp3', 0.60);
+  }
+
+  /**
+   * Computes Uryu's total attack speed multiplier from base stat, buffs, and passive states.
+   */
+  getAttackSpeed() {
+    let speed = this.attackSpeed || 1.0;
+    if (typeof this.attackSpeedMultiplier === 'number') speed *= this.attackSpeedMultiplier;
+    if (this.isPiercingLightActive) speed *= 1.40; // +40% Attack Speed during Piercing Light
+    if (this.vollstandigActive) speed *= 1.25;    // +25% Attack Speed during Vollständig
+    return Math.max(0.5, speed);
+  }
+
+  /**
+   * Resolves arena wall collisions and tracks rebounds to trigger the Hirenkyaku Flurry every 3 wall bounces.
+   */
+  resolveWallBounce(arena, opponent = null) {
+    if (!arena || this.hp <= 0 || this.isDead || this.isFlurrying) return false;
+    const isParalyzed = typeof this.isParalyzedDebuffActive === 'function'
+      ? this.isParalyzedDebuffActive()
+      : Boolean((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.electricStunTimer && this.electricStunTimer > 0));
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    if (isParalyzed || this.isTargetOfAmbush || this.isFrozen || isBeamTrapped) {
+      if (isBeamTrapped && arena) {
+        this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
+        this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+      }
+      return false;
+    }
+    let bounced = false;
+
+    if (this.x - this.r < arena.x) {
+      this.x = arena.x + this.r;
+      this.vx = Math.abs(this.vx || 0);
+      bounced = true;
+    } else if (this.x + this.r > arena.x + arena.width) {
+      this.x = arena.x + arena.width - this.r;
+      this.vx = -Math.abs(this.vx || 0);
+      bounced = true;
+    }
+
+    if (this.y - this.r < arena.y) {
+      this.y = arena.y + this.r;
+      this.vy = Math.abs(this.vy || 0);
+      bounced = true;
+    } else if (this.y + this.r > arena.y + arena.height) {
+      this.y = arena.y + arena.height - this.r;
+      this.vy = -Math.abs(this.vy || 0);
+      bounced = true;
+    }
+
+    if (bounced) {
+      const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+      if (!this._lastWallBounceTime || now - this._lastWallBounceTime > 250) {
+        this._lastWallBounceTime = now;
+        this.wallBounceCount = (this.wallBounceCount || 0) + 1;
+
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(this.x, this.y, 6, 'cyan', '#00E5FF');
+        }
+
+        const maxBounces = CONFIG.uryu?.wallBounceFlurryThreshold || 3;
+        if (this.wallBounceCount >= maxBounces) {
+          this.wallBounceCount = 0;
+          spawnFloatingText(this.x, this.y - 35, `${maxBounces}/${maxBounces} FLURRY!`, '#00E5FF');
+          if (typeof spawnMeleeClashShockwave === 'function') {
+            spawnMeleeClashShockwave(this.x, this.y, 45, '#00E5FF');
+          }
+          const target = this._findNearestEnemy() || opponent;
+          if (target && !target.isDead && target.hp > 0 && !this.isFlurrying && !this.isHirenkyakuDashing && !this.isLichtRegenActive) {
+            this.triggerFlurry(target);
+          }
+        } else {
+          spawnFloatingText(this.x, this.y - 35, `${this.wallBounceCount}/${maxBounces} BOUNCE`, '#00E5FF');
+        }
+      }
+    }
+
+    return bounced;
+  }
+
+  /**
+   * Triggers the Hirenkyaku Flurry ability (configurable N teleports -> rapid burst arrows per teleport).
+   */
+  triggerFlurry(target, ownerIndex) {
+    if (this.isFlurrying || this.hp <= 0 || this.isDead) return;
+    const isParalyzed = typeof this.isParalyzedDebuffActive === 'function'
+      ? this.isParalyzedDebuffActive()
+      : Boolean((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.electricStunTimer && this.electricStunTimer > 0));
+    if (isParalyzed || this.isTargetOfAmbush || this.isFrozen) return;
+
+    const enemy = target || this._findNearestEnemy();
+    if (!enemy || enemy.hp <= 0 || enemy.isDead) return;
+
+    this.isFlurrying = true;
+    this.isShooting = false;
+    this.currentWeaponMode = 'BOW';
+    this.seeleEquipProgress = 0;
+    this.weaponSwitchTimer = 0;
+    this.slashSwingTimer = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.flurryTarget = enemy;
+    this.flurryCurrentTeleport = 0;
+    this.flurryTotalTeleports = Math.max(1, (typeof CONFIG !== 'undefined' && CONFIG.uryu?.flurryTeleportCount) || 2);
+    this.flurryPhase = 'TELEPORT_WINDUP';
+    this.flurryTimer = Math.max(1, Math.round(((typeof CONFIG !== 'undefined' && CONFIG.uryu?.flurryTeleportDelay) || 5) / this.getAttackSpeed()));
+    this.flurryArrowsLeft = 0;
+    this.flurryDelayTimer = 0;
+    this._curOwnerIndex = (typeof ownerIndex === 'number' && ownerIndex >= 0) ? ownerIndex : (state.fighters ? state.fighters.indexOf(this) : 0);
+  }
+
+  /**
+   * Updates Uryu's Hirenkyaku Flurry sequence across all configured teleports:
+   * Loop: Teleport Windup (Delay) -> Teleport -> Rapid Burst N Arrows -> (Pause -> Teleport Windup -> ...) -> Finish.
+   * Completely stops standard movement velocity (vx=0, vy=0) so the Hirenkyaku teleports handle all positioning!
+   * All delays, burst rates, and recovery cooldowns scale dynamically with attack speed.
+   */
+  _updateFlurrySequence(opponent, ownerIndex, arena) {
+    // 1. Strict velocity lock: teleportation handles all repositioning!
+    this.vx = 0;
+    this.vy = 0;
+
+    const isParalyzed = typeof this.isParalyzedDebuffActive === 'function'
+      ? this.isParalyzedDebuffActive()
+      : Boolean((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.electricStunTimer && this.electricStunTimer > 0));
+    if (isParalyzed || this.isTargetOfAmbush || this.isFrozen) {
+      this.interruptAttacks();
+      return;
+    }
+
+    const target = (this.flurryTarget && this.flurryTarget.hp > 0 && !this.flurryTarget.isDead)
+      ? this.flurryTarget
+      : (this._findNearestEnemy() || opponent);
+
+    if (!target || target.hp <= 0 || target.isDead) {
+      this.isFlurrying = false;
+      this.flurryPhase = 'IDLE';
+      this.flurryTarget = null;
+      this.smoothDrawProgress = 0;
+      this.drawPhase = 'IDLE';
+      return;
+    }
+
+    const resolvedOwner = (typeof ownerIndex === 'number' && ownerIndex >= 0)
+      ? ownerIndex
+      : (typeof this._curOwnerIndex === 'number' ? this._curOwnerIndex : (state.fighters ? state.fighters.indexOf(this) : 0));
+
+    const atkSpeed = this.getAttackSpeed();
+    const teleportDelay = Math.max(1, Math.round((CONFIG.uryu?.flurryTeleportDelay || 5) / atkSpeed));
+    const preShotDelay = Math.max(1, Math.round((CONFIG.uryu?.flurryPreShotDelay || 2) / atkSpeed));
+    const burstDelay = Math.max(1, Math.round((CONFIG.uryu?.flurryBurstDelay || 3) / atkSpeed));
+    const postVolleyDelay = Math.max(2, Math.round((CONFIG.uryu?.flurryPostVolleyDelay || 6) / atkSpeed));
+    const recoveryDelay = Math.max(2, Math.round((CONFIG.uryu?.flurryRecoveryDelay || 5) / atkSpeed));
+    const totalTeleports = this.flurryTotalTeleports || 2;
+
+    switch (this.flurryPhase) {
+      case 'TELEPORT_WINDUP': {
+        this.aim(target);
+        this.flurryTimer--;
+
+        // Spawn subtle charging Reishi sparks under feet during teleport delay
+        if (Math.random() < 0.45 && typeof spawnSparks === 'function') {
+          spawnSparks(this.x, this.y, '#00E5FF', 1);
+        }
+
+        if (this.flurryTimer <= 0) {
+          const stepIndex = this.flurryCurrentTeleport + 1;
+          const pos = this._calculateTeleportPosition(target, arena, stepIndex, totalTeleports);
+          this._spawnHirenkyakuTeleportBurst(pos.x, pos.y);
+          this.x = pos.x;
+          this.y = pos.y;
+          this.vx = 0;
+          this.vy = 0;
+          this.aim(target);
+          this._playSound('hirenkyaku', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+          this.flurryPhase = 'AIM';
+          this.flurryTimer = preShotDelay;
+          this.smoothDrawProgress = 0.90;
+          this.drawPhase = 'DRAWING';
+        }
+        break;
+      }
+
+      case 'AIM': {
+        this.aim(target);
+        this.flurryTimer--;
+        this.smoothDrawProgress = Math.min(1.0, this.smoothDrawProgress + 0.35);
+        if (this.flurryTimer <= 0) {
+          this.flurryPhase = 'SHOOT';
+          const burstCount = Math.max(1, (typeof CONFIG !== 'undefined' && (CONFIG.uryu?.flurryBurstCount || CONFIG.uryu?.burstCount)) || 3);
+          this.flurryArrowsLeft = burstCount;
+          this.flurryDelayTimer = 0; // Fire first arrow immediately on aim completion
+        }
+        break;
+      }
+
+      case 'SHOOT': {
+        this.aim(target);
+        this.flurryDelayTimer--;
+        if (this.flurryDelayTimer <= 0) {
+          if (this.flurryArrowsLeft > 0) {
+            this._fireHeiligPfeilArrow(target, resolvedOwner);
+            this.flurryArrowsLeft--;
+            this.flurryDelayTimer = burstDelay;
+            this.stringRecoilTimer = 3;
+            this.smoothDrawProgress = 0.95;
+            this.drawPhase = 'RECOIL';
+          }
+
+          // STRICT COMPLETION GUARD: ONLY proceed to next teleport/finish AFTER ALL burst arrows are fired!
+          if (this.flurryArrowsLeft <= 0) {
+            this.flurryCurrentTeleport++;
+            if (this.flurryCurrentTeleport < totalTeleports) {
+              this.flurryPhase = 'PAUSE';
+              this.flurryTimer = postVolleyDelay;
+            } else {
+              this.flurryPhase = 'FINISH';
+              this.flurryTimer = recoveryDelay;
+            }
+          }
+        }
+        break;
+      }
+
+      case 'PAUSE': {
+        this.aim(target);
+        this.flurryTimer--;
+        this.smoothDrawProgress = Math.max(0, this.smoothDrawProgress - 0.25);
+        if (this.flurryTimer <= 0) {
+          this.flurryPhase = 'TELEPORT_WINDUP';
+          this.flurryTimer = teleportDelay;
+        }
+        break;
+      }
+
+      case 'FINISH': {
+        this.aim(target);
+        this.flurryTimer--;
+        this.smoothDrawProgress = Math.max(0, this.smoothDrawProgress - 0.30);
+        if (this.flurryTimer <= 0) {
+          this.isFlurrying = false;
+          this.flurryPhase = 'IDLE';
+          this.flurryTarget = null;
+          this.smoothDrawProgress = 0;
+          this.drawPhase = 'IDLE';
+          this.shootCooldown = Math.max(8, Math.round((CONFIG.uryu?.shootCooldown || 28) / atkSpeed));
+        }
+        break;
+      }
+    }
+
+    // Decay Hirenkyaku afterimages
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = this.afterImages.length - 1; i >= 0; i--) {
+        const ai = this.afterImages[i];
+        ai.timer--;
+        if (ai.timer <= 0) this.afterImages.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * Computes an evasive tactical retreat position away from the target for Hirenkyaku flurry teleports.
+   */
+  _calculateTeleportPosition(target, arena, stepIndex, totalSteps = 2) {
+    const dist = CONFIG.uryu?.flurryTeleportDistance || 240;
+    // Direction vector pointing AWAY from the target towards Uryu's side
+    let angleAway = Math.atan2(this.y - target.y, this.x - target.x);
+    if (!Number.isFinite(angleAway) || Math.hypot(this.x - target.x, this.y - target.y) < 1) {
+      angleAway = (this.gunAngle !== undefined ? this.gunAngle : 0) + Math.PI;
+    }
+
+    // Zig-zag evasive fan angles away from the enemy for each consecutive flurry teleport step
+    let chosenAngle = angleAway;
+    if (totalSteps <= 2) {
+      if (stepIndex === 1) {
+        // Step 1: Evasive retreat to the backward-left/right flank
+        const side = Math.random() < 0.5 ? 1 : -1;
+        chosenAngle = angleAway + side * (0.28 + Math.random() * 0.22);
+      } else {
+        // Step 2: Alternate to the opposing backward flank away from target
+        const side = (stepIndex % 2 === 0) ? -1 : 1;
+        chosenAngle = angleAway + side * (0.35 + Math.random() * 0.25);
+      }
+    } else {
+      // Dynamic multi-step zig-zag back-stepping away from target
+      const side = (stepIndex % 2 === 1) ? 1 : -1;
+      const fanSpread = 0.25 + (stepIndex / totalSteps) * 0.30;
+      chosenAngle = angleAway + side * fanSpread;
+    }
+
+    let targetX = target.x + Math.cos(chosenAngle) * dist;
+    let targetY = target.y + Math.sin(chosenAngle) * dist;
+
+    // Clamp strictly within arena bounds
+    const arenaObj = arena || (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
+    if (arenaObj) {
+      const pad = this.r + 35;
+      const minX = arenaObj.x + pad;
+      const maxX = arenaObj.x + arenaObj.width - pad;
+      const minY = arenaObj.y + pad;
+      const maxY = arenaObj.y + arenaObj.height - pad;
+
+      targetX = Math.max(minX, Math.min(maxX, targetX));
+      targetY = Math.max(minY, Math.min(maxY, targetY));
+
+      // If cornered/clamped too close to target (<140px), find the furthest lateral/opposite retreat angle
+      const d = Math.hypot(targetX - target.x, targetY - target.y);
+      if (d < 140) {
+        let bestDist = d;
+        let bestX = targetX;
+        let bestY = targetY;
+
+        for (let a = -1.2; a <= 1.2; a += 0.3) {
+          const testAngle = angleAway + a;
+          const testX = Math.max(minX, Math.min(maxX, target.x + Math.cos(testAngle) * dist));
+          const testY = Math.max(minY, Math.min(maxY, target.y + Math.sin(testAngle) * dist));
+          const testDist = Math.hypot(testX - target.x, testY - target.y);
+          if (testDist > bestDist) {
+            bestDist = testDist;
+            bestX = testX;
+            bestY = testY;
+          }
+        }
+        targetX = bestX;
+        targetY = bestY;
+      }
+    }
+
+    return { x: targetX, y: targetY };
+  }
+
+  /**
+   * Spawns radiant cyan Reishi afterimage, impact flash, and sparks during Hirenkyaku teleports.
+   */
+  _spawnHirenkyakuTeleportBurst(newX, newY) {
+    if (!this.afterImages) this.afterImages = [];
+    this.afterImages.push({
+      x: this.x,
+      y: this.y,
+      timer: 16,
+      maxTimer: 16,
+      gunAngle: this.gunAngle || this.angle,
+      r: this.r
+    });
+
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 22, '#00E5FF');
+      spawnImpactFlash(newX, newY, 26, '#00E5FF');
+    }
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(this.x, this.y, 6, 'cyan', '#00E5FF');
+      spawnSparks(newX, newY, 8, 'cyan', '#00E5FF');
+      spawnSparks(newX, newY, 4, 'silverStreak', '#FFFFFF');
+    }
+    if (typeof spawnMeleeClashShockwave === 'function') {
+      spawnMeleeClashShockwave(newX, newY, 32, '#00E5FF');
+    }
   }
 
   _fireHeiligPfeilArrow(target, ownerIndex) {
@@ -1033,7 +1465,7 @@ export class UryuFighter extends Fighter {
     const speedMult = this.isPiercingLightActive ? (CONFIG.uryu?.piercingArrowSpeedMult || 1.35) : 1.0;
     const dmgMult = this.isPiercingLightActive ? (CONFIG.uryu?.piercingDamageMult || 1.25) : 1.0;
     const arrowSpeed = (CONFIG.uryu?.arrowSpeed || 24) * speedMult;
-    const arrowDmg = (CONFIG.uryu?.arrowDamage || 18) * dmgMult;
+    const arrowDmg = (CONFIG.uryu?.arrowDamage || 16) * dmgMult;
     const resolvedOwner = (typeof ownerIndex === 'number' && ownerIndex >= 0)
       ? ownerIndex
       : (typeof this._curOwnerIndex === 'number' ? this._curOwnerIndex : (state.fighters ? state.fighters.indexOf(this) : 0));
@@ -1057,6 +1489,7 @@ export class UryuFighter extends Fighter {
       if (p) {
         p.isHeiligPfeil = true;
         p.color = '#00E5FF';
+        p.scale = 0.14;
         p.isPiercing = Boolean(this.isPiercingLightActive);
         p.maxPierces = this.isPiercingLightActive ? (CONFIG.uryu?.piercingMaxPierces || 4) : 1;
         p.ignoreArmor = this.isPiercingLightActive ? (CONFIG.uryu?.piercingIgnoreArmor || 0.30) : 0;

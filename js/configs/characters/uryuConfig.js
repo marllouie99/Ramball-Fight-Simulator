@@ -5,7 +5,7 @@ export const uryuConfig = {
   // ── Base Attributes ──
   hp: 230,
   speed: 6.2,
-  moveSpeed: 6.2,
+  moveSpeed: 5.2,
   r: 25,
   radius: 25,
   color: '#00E5FF', // Quincy Radiant Cyan
@@ -22,16 +22,27 @@ export const uryuConfig = {
   desc: 'The Last Quincy. Attacks from long range with Heilig Bogen spirit arrows, glides with Hirenkyaku, traps enemies with Sprenger, and reverses damage with Schrift "A": The Antithesis.',
 
   // ── Basic Attack (Heilig Bogen: Ginrei Kojaku) ──
-  arrowSpeed: 22,                // Supersonic Reishi arrow projectile velocity
-  arrowDamage: 18,               // Base damage per arrow hit
+  attackSpeed: 1.0,              // Base attack speed multiplier
+  arrowSpeed: 24,                // Supersonic Reishi arrow projectile velocity
+  arrowDamage: 16,               // Base damage per arrow hit
   arrowRadius: 5,                // Arrow collision radius
   arrowColor: '#00E5FF',         // Radiant cyan core
   arrowTrailColor: 'rgba(0, 229, 255, 0.45)',
   arrowKnockback: 4.5,           // Pushback on hit
   arrowHitStun: 8,               // Micro-stun frames
-  burstCount: 3,                 // Arrows fired per volley
-  burstDelay: 5,                 // Frames between volley arrows
-  shootCooldown: 34,             // Base cooldown between volleys
+  shootCooldown: 28,             // Base cooldown between standard bow shots (scales with attack speed)
+  arrowDrawDuration: 10,         // Frames to draw bow for standard basic shot
+
+  // ── Hirenkyaku Flurry (Triggered every 3 arena wall rebounds) ──
+  wallBounceFlurryThreshold: 5,  // Wall rebounds required to trigger flurry (every 3 wall bounces)
+  flurryTeleportCount: 5,        // Number of Hirenkyaku teleports executed during the flurry sequence (e.g. 2, 3, 4, etc.)
+  flurryBurstCount: 3,           // Number of arrows fired per teleport burst before executing the next teleport
+  flurryBurstDelay: 3,           // Frames between consecutive rapid burst arrows (scales inversely with attack speed)
+  flurryTeleportDistance: 900,   // Evasive retreat distance away from target during Hirenkyaku flurry teleports
+  flurryTeleportDelay: 10,        // Windup delay frames before executing each teleport (scales with attack speed)
+  flurryPreShotDelay: 2,         // Snappy pre-shot aim delay right after teleport arrival before firing (scales with attack speed)
+  flurryPostVolleyDelay: 6,      // Buffer after fully shooting all flurryBurstCount arrows before next teleport (scales with attack speed)
+  flurryRecoveryDelay: 5,        // Recovery buffer at the end of the entire sequence (scales with attack speed)
   maxStuckArrows: 4,             // Maximum number of arrows allowed stuck in arena walls concurrently
   stuckArrowDuration: 90,        // Total frames stuck arrow remains in wall before fully dissipating
   stuckArrowFadeDuration: 30,    // Frames over which the stuck arrow fades to 0 opacity
@@ -64,11 +75,13 @@ export const uryuConfig = {
   lichtRegenDuration: 36,            // Torrent rain channeling duration (frames, ~0.6s)
   lichtRegenArrows: 18,              // Total micro-arrows in barrage
   lichtRegenFireInterval: 3,         // Interval between consecutive arrow drops (frames)
-  lichtRegenDamage: 6,               // Damage per micro-arrow
+  lichtRegenDamage: 14,               // Damage per micro-arrow
   lichtRegenArrowSpeed: 28,          // Velocity of falling micro-arrows
   lichtRegenArrowScale: 0.08,        // Visual scale of falling micro-arrows
   lichtRegenRainSpreadX: 150,        // Horizontal rain spread width over target (pixels)
   lichtRegenRainHeight: 360,         // Vertical spawn offset above target in sky (pixels)
+  lichtRegenSlowDuration: 90,        // Slow debuff duration applied on Licht Regen hit (frames, ~1.5s)
+  lichtRegenSlowMultiplier: 1.55,    // Movement speed multiplier while slowed (35% speed / 65% slow)
   lichtRegenRecoveryCooldown: 50,    // Recovery frame delay before resuming basic attacks
   telegraphBeamHeight: 320,          // Visual guidance light column height (pixels)
   telegraphRadiusMult: 1.6,          // Visual reticle ground radius multiplier relative to target radius

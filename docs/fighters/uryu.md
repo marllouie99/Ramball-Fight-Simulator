@@ -26,15 +26,30 @@ An ancient high-level Quincy technique that allows the user to manipulate their 
 ---
 
 ### 🏹 Basic Attack: Heilig Bogen (Ginrei Kojaku) & Seele Schneider
-Uryu dynamically switches between long-range spirit arrow volleys and close-quarters blade parries depending on opponent spacing.
+Uryu dynamically switches between long-range spirit arrow shots and close-quarters blade parries depending on opponent spacing:
 
-* **Long Range (>70px): Heilig Pfeil (Sacred Arrows)**
-  * Uryu draws his glowing cyan Reishi bow, firing rapid bursts of **3 to 5 pinpoint Heilig Pfeil arrows** in a tight supersonic trajectory.
-  * Arrows travel at high velocity (Speed 22), dealing piercing damage and applying micro-knockback.
-  * Leaves a clean trailing cyan needle streak with a crisp glass-shatter impact sound.
+* **Long Range (>70px): Heilig Bogen Spirit Arrows**
+  * Draws tension on Ginrei Kojaku and fires high-velocity **Heilig Pfeil arrows** (Speed 24, Damage 16).
+  * Draw times and recovery cooldowns scale dynamically with his **Attack Speed** (including +40% speed boost during *Piercing Light*).
 * **Close Quarters (<70px): Seele Schneider Intercept**
   * If an enemy rushes into point-blank melee range, Uryu instantly draws **Seele Schneider** (the vibrating spirit sword).
   * Executes a rapid **120° frontal arc parry slash** vibrating at 3 million rotations per second. Cuts through incoming projectiles, deals shred damage, and pushes the attacker back to reset spacing.
+
+---
+
+### ⚡ Passive Mechanic: Hirenkyaku Flurry (Every 3rd Wall Rebound)
+Whenever Uryu moves, glides, or ricochets and bounces off the **arena walls 3 times**, he immediately triggers his signature **Hirenkyaku Flurry**:
+1. **Wall Rebound Counter (1/3 -> 2/3 -> 3/3 FLURRY!):**
+   * Displays dynamic floating progress text and cyan Reishi shockwaves upon each arena wall collision.
+2. **Supersonic Multi-Teleport Flurry Burst (`flurryTeleportCount`):**
+   * **Movement Lock:** Regular movement velocity is strictly locked (`vx=0, vy=0`) while Quincy flash-steps drive all repositioning.
+   * **Teleport Windup Delay (`flurryTeleportDelay: 5`):** Gathers Reishi sparks under feet for a brief windup before instantaneously flash-stepping.
+   * **Evasive Retreat Away from Enemy (`flurryTeleportDistance: 240`):**
+     * Instead of teleporting towards or orbiting the enemy, Uryu **teleports away from the enemy** to open up tactical archery distance.
+     * **Teleport 1:** Instantly flash-steps backward away from the target (~240px) with a cyan Reishi burst and afterimage.
+     * **Rapid Burst 1:** Immediately snaps aim at the target and unloads **3 pinpoint Heilig Pfeil arrows** (`flurryBurstCount`) in a rapid supersonic burst.
+     * **Teleport 2..N:** Dynamically zig-zags and flash-steps to alternating evasive vantage points away from the enemy, firing a rapid burst of arrows upon each arrival.
+   * **Attack Speed Scaling:** All teleport delay frames, pre-aim delays, rapid burst intervals, recovery buffers, and cooldowns scale dynamically with Uryu's total Attack Speed.
 
 ---
 
@@ -43,10 +58,10 @@ A combination of instantaneous Reishi glide mobility and a devastating arrow dow
 
 * **Hirenkyaku (Glide Step):**
   * Uryu instantly glides across spirit particle platforms on the ground away from incoming threats, gaining **0.3s of evasion/i-frames**.
-  * Leaves 3 cyan manga afterimages with backward-streaming 4-point needle speed lines (`#00E5FF`, `#00B0FF`, `#FFFFFF`, `#0A192F`).
+  * Leaves 3 cyan manga afterimages.
 * **Licht Regen (Rain of Light Barrage):**
   * Immediately following Hirenkyaku (or upon reactivation), Uryu aims his bow skyward and unleashes **Licht Regen**: a concentrated ceiling volley of over **100 micro-arrows** raining down into the target zone.
-  * Traps caught opponents in rapid hit-sparks and flinch, shredding shields and suppressing dashes.
+  * Traps caught opponents in rapid hit-sparks, flinch, and applies a **slow movement debuff** (35% speed / 65% slow for 1.5s), shredding shields and suppressing dashes.
 
 ---
 

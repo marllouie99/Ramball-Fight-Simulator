@@ -577,6 +577,14 @@ export class Fighter {
     this.arrowDrawProgress = 0;
     this.smoothDrawProgress = 0;
     this.isDeployingSprenger = false;
+    this.isFlurrying = false;
+    this.flurryPhase = 'IDLE';
+    this.flurryTarget = null;
+    this.isHirenkyakuDashing = false;
+    this.isPlantedPause = false;
+    this.isSkywardWindup = false;
+    this.isSkywardAscending = false;
+    this.isLichtRegenActive = false;
 
     this.isRolling = false;
     this.rollTimer = 0;
@@ -637,6 +645,7 @@ export class Fighter {
       (this.pureLoveBeamTimer || 0) > 0 ||
       (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
       (this.caughtInGenosBeamTimer || 0) > 0 ||
+      this.caughtInGenosBeam ||
       this.caughtInGenosFlurry ||
       this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
@@ -1144,7 +1153,9 @@ export class Fighter {
         let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
         const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
         const isGojoPurpleCaught = (this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0);
-        if (this.preventKnockbackBounce || this.isDraggedByGetsuga || isPureLoveBeamCaught || isGojoPurpleCaught) bounceMult = 0; // Stick to the wall instead of bouncing
+        const isGenosBeamCaught = (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInGenosFlurry;
+        const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosBeamCaught || isPureLoveBeamCaught || isGojoPurpleCaught;
+        if (this.preventKnockbackBounce || this.isDraggedByGetsuga || isBeamTrapped) bounceMult = 0; // Stick to the wall instead of bouncing
 
         const minX = arena.x + this.r;
         const maxX = arena.x + arena.width - this.r;
@@ -1157,7 +1168,7 @@ export class Fighter {
         if (this.y > maxY) { this.y = maxY; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; if (this.vy > 0) this.vy = 0; bounced = true; }
 
         if (bounced) {
-          if (isPureLoveBeamCaught || isGojoPurpleCaught || this.isDraggedByGetsuga) {
+          if (isBeamTrapped || this.isDraggedByGetsuga) {
             // Pin firmly to wall surface without sliding horizontally or vertically along wall
             this.vx = 0;
             this.vy = 0;
@@ -1763,7 +1774,8 @@ export class Fighter {
     if (!arena && typeof state !== 'undefined') arena = state.arena;
     if (!arena) return false;
 
-    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    const isGenosTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInGenosFlurry;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
@@ -1771,22 +1783,30 @@ export class Fighter {
         this.x = arena.x + this.r;
         this.vx = 0;
         this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
         clamped = true;
       } else if (this.x + this.r > arena.x + arena.width) {
         this.x = arena.x + arena.width - this.r;
         this.vx = 0;
         this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
         clamped = true;
       }
       if (this.y - this.r < arena.y) {
         this.y = arena.y + this.r;
         this.vx = 0;
         this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
         clamped = true;
       } else if (this.y + this.r > arena.y + arena.height) {
         this.y = arena.y + arena.height - this.r;
         this.vx = 0;
         this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
         clamped = true;
       }
       return clamped;
@@ -2022,16 +2042,17 @@ export class Fighter {
     // Velocity Recovery (gradually return to target speed after knockback or slow)
     let currentSpeed = Math.hypot(this.vx, this.vy);
     // Auto-recover from zero velocity if we should be moving
-    if (targetSpeed > 0 && currentSpeed < 0.05) {
+    if (targetSpeed > 0 && currentSpeed < 0.2) {
       // Nudge in the direction of movement/body angle, not weapon gunAngle
       const nudgeAngle = (this.angle !== undefined && this.angle !== 0) ? this.angle : (Math.random() * Math.PI * 2);
-      this.vx = Math.cos(nudgeAngle) * 0.1;
-      this.vy = Math.sin(nudgeAngle) * 0.1;
-      currentSpeed = 0.1;
+      this.vx = Math.cos(nudgeAngle) * targetSpeed * 0.5;
+      this.vy = Math.sin(nudgeAngle) * targetSpeed * 0.5;
+      currentSpeed = targetSpeed * 0.5;
     }
     
     if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
+      const recoveryRate = currentSpeed < targetSpeed ? 0.15 : 0.08;
+      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * recoveryRate;
       this.vx = (this.vx / currentSpeed) * newSpeed;
       this.vy = (this.vy / currentSpeed) * newSpeed;
     }
@@ -2076,6 +2097,12 @@ export class Fighter {
 
     if (this.caughtInGenosBeamTimer > 0) {
       this.caughtInGenosBeamTimer--;
+      if (this.caughtInGenosBeamTimer <= 0) {
+        this.caughtInGenosBeam = false;
+        this.preventKnockbackBounce = false;
+      }
+    } else {
+      this.caughtInGenosBeam = false;
     }
 
     // Time stop - freeze movement if time stopped

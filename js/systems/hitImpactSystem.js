@@ -117,6 +117,20 @@ export const HitImpactSystem = {
         audioSystem.playSFX('attack_fleshhit', 0.65);
       }
 
+      // Apply slow movement debuff if projectile is from Licht Regen (Skill 1)
+      if (projectile.isLichtRegenRain) {
+        const slowDur = projectile.slowDuration || CONFIG.uryu?.lichtRegenSlowDuration || 90;
+        const slowMult = (typeof projectile.slowMultiplier === 'number') ? projectile.slowMultiplier : (CONFIG.uryu?.lichtRegenSlowMultiplier ?? 0.35);
+        if (typeof target.applySlow === 'function') {
+          target.applySlow(slowDur, slowMult, { isLichtRegen: true });
+        } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+          target.statusEffects.applySlow(slowDur, slowMult, { isLichtRegen: true });
+        } else {
+          target.slowTimer = Math.max(target.slowTimer || 0, slowDur);
+          target.slowMultiplier = Math.min(target.slowMultiplier || 1.0, slowMult);
+        }
+      }
+
       // Micro-knockback pushing target (safe, non-tunneling)
       const kb = CONFIG.uryu?.arrowKnockback || 2.2;
       const angle = (projectile.lastAngle !== undefined) ? projectile.lastAngle : (Math.atan2(projectile.vy || 0, projectile.vx || 0) || 0);
