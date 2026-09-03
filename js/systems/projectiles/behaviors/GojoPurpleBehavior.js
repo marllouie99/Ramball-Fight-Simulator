@@ -1,7 +1,7 @@
 import { ProjectileBehavior } from '../ProjectileBehavior.js';
 import { state } from '../../../core/state.js';
 import { CONFIG } from '../../../core/config.js';
-import { spawnSparks } from '../../../graphics/particles/sparkEffect.js';
+import { spawnPurpleShockwaveRings, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { triggerGlobalScreenShake } from '../../../core/state.js';
 // Re-implement areOnSameTeam locally or export it from a shared utils
 function areOnSameTeam(ownerIndex, targetIndex) {
@@ -158,20 +158,23 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const dy = projectile.y - ent.y;
         const dist = Math.hypot(dx, dy);
         
+        const isChanneling = typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill();
         if (dist > 0 && dist < trapRadius) {
           ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
           ent.isCaughtInPurple = true;
-          // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
-          if (typeof ent.interruptAttacks === 'function') {
-            ent.interruptAttacks();
-          }
-          if (typeof ent.applyTimeStop === 'function') {
-            ent.applyTimeStop(12, { isSkill: true, isUltimate: true, isPurple: true });
-          } else {
-            ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
-          }
-          if (typeof ent.applyHitStun === 'function') {
-            ent.applyHitStun(12);
+          // Complete paralysis debuff for non-channeling entities while caught in Hollow Purple gravitational vortex
+          if (!isChanneling) {
+            if (typeof ent.interruptAttacks === 'function') {
+              ent.interruptAttacks();
+            }
+            if (typeof ent.applyTimeStop === 'function') {
+              ent.applyTimeStop(12, { isSkill: true, isUltimate: true, isPurple: true });
+            } else {
+              ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
+            }
+            if (typeof ent.applyHitStun === 'function') {
+              ent.applyHitStun(12);
+            }
           }
           
           const pullStrength = purplePullForce * (1 - dist / trapRadius);
@@ -260,7 +263,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     }
     
     projectile.life -= 1;
-    if (projectile.life <= 0) return true;
+    if (projectile.life <= 0) {
+      this.triggerPurpleExplosion(projectile, fighters, system);
+      return true;
+    }
 
     projectile.x += projectile.vx;
     projectile.y += projectile.vy;
@@ -281,9 +287,108 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     return false;
   }
 
+  triggerPurpleExplosion(projectile, fighters, system) {
+    if (projectile._hasExploded) return;
+    projectile._hasExploded = true;
+
+    const actualFighters = fighters || (typeof state !== 'undefined' ? state.fighters : null) || [];
+    const ownerFighter = actualFighters[projectile.owner] || null;
+    const ownerTeam = (typeof state !== 'undefined' && state.getFighterTeam) ? state.getFighterTeam(projectile.owner) : null;
+    const isSecondCast = Boolean(projectile.is200Percent || (projectile.damageMult && projectile.damageMult > 1.2));
+    const damageMult = isSecondCast ? (CONFIG.gojo?.purpleSecondCastDamageMultiplier ?? 2.0) : 1.0;
+    
+    const baseDamage = CONFIG.gojo?.purpleExplosionDamage ?? 120;
+    const explosionDamage = baseDamage * damageMult;
+    const explosionRadius = (CONFIG.gojo?.purpleExplosionRadius ?? 280) * (isSecondCast ? 1.25 : 1.0);
+    const knockbackForce = (CONFIG.gojo?.purpleExplosionKnockback ?? 24) * (isSecondCast ? 1.3 : 1.0);
+
+    // 1. Audio & Screen Shake
+    const shakeIntensity = (CONFIG.gojo?.purpleExplosionShakeIntensity ?? 8) * (isSecondCast ? 1.4 : 1.0);
+    const shakeDuration = CONFIG.gojo?.purpleExplosionShakeDuration ?? 30;
+    triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+
+    audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 1.0);
+    audioSystem.playSFX('Assets/Sound Effects/Skills/stormstrike.mp3', 0.85);
+
+    // 2. Simple, Clean Expanding Purple Repulsion Shockwave Rings (Like Gojo's Red)
+    spawnPurpleShockwaveRings(projectile.x, projectile.y, explosionRadius, isSecondCast);
+
+    // 3. AOE Damage & Blast Knockback to all valid targets
+    const allTargets = [
+      ...(state.fighters || []),
+      ...(state.illusions || []),
+      ...(state.cjDriveBys || [])
+    ];
+
+    const radiusSq = explosionRadius * explosionRadius;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+
+    for (let i = 0; i < allTargets.length; i++) {
+      const ent = allTargets[i];
+      if (!ent || ent.hp <= 0 || ent.dead || ent === ownerFighter) continue;
+      if (ent.owner && ent.owner === ownerFighter) continue;
+
+      let isEnemy = true;
+      if (ownerTeam !== null) {
+        const checkFighter = ent.owner || ent;
+        const fi = state.fighters ? state.fighters.indexOf(checkFighter) : -1;
+        if (fi !== -1 && state.getFighterTeam) {
+          isEnemy = state.getFighterTeam(fi) !== ownerTeam;
+        }
+      }
+      if (!isEnemy) continue;
+
+      const dx = ent.x - projectile.x;
+      const dy = ent.y - projectile.y;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq <= radiusSq) {
+        const dist = Math.sqrt(distSq);
+        const falloff = 1 - (dist / explosionRadius) * 0.35; // 65% min to 100% max damage at center
+        const finalDamage = explosionDamage * falloff;
+
+        if (typeof ent.takeDamage === 'function') {
+          ent.takeDamage(finalDamage, ownerFighter, { 
+            isExplosion: true, 
+            isPurpleExplosion: true, 
+            isProjectile: true, 
+            projectile: projectile 
+          });
+        }
+
+        // Outward explosive knockback push
+        const dirX = dist > 0 ? dx / dist : (Math.random() - 0.5) * 2;
+        const dirY = dist > 0 ? dy / dist : (Math.random() - 0.5) * 2;
+        const push = knockbackForce * falloff;
+
+        ent.vx = (ent.vx || 0) * 0.2 + dirX * push;
+        ent.vy = (ent.vy || 0) * 0.2 + dirY * push;
+
+        if (ent.knockbackVx !== undefined) ent.knockbackVx = dirX * push;
+        if (ent.knockbackVy !== undefined) ent.knockbackVy = dirY * push;
+
+        // Release time-stop / stasis timers so target is blasted backward dynamically
+        if (ent.timeStopTimer > 0) ent.timeStopTimer = 0;
+        ent.isCaughtInPurple = false;
+
+        // Clamp inside arena bounds
+        if (arena) {
+          const er = ent.r || 25;
+          ent.x = Math.max(arena.x + er, Math.min(arena.x + arena.width - er, ent.x));
+          ent.y = Math.max(arena.y + er, Math.min(arena.y + arena.height - er, ent.y));
+        }
+
+        spawnSparks(ent.x, ent.y, 6, 'lightningTrail', '#BF5AF2');
+      }
+    }
+  }
+
   checkExpire(projectile, system) {
     const arena = CONFIG.arena;
-    if (projectile.life <= 0) return true;
+    if (projectile.life <= 0) {
+      this.triggerPurpleExplosion(projectile, system?.fighters || (typeof state !== 'undefined' ? state.fighters : null), system);
+      return true;
+    }
 
     // Clamp position to arena boundaries so it sticks to walls
     // Zero BOTH velocity components on wall contact so the orb stops completely
@@ -297,3 +402,4 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     return false; // Never expire from wall collision
   }
 }
+

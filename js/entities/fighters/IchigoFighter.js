@@ -7,6 +7,7 @@ import { drawIchigoSkin, updateZangetsuRibbonPhysics, updateTensaZangetsuChainPh
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
 import { drawIchigoSlashArc } from '../../graphics/weapons/ichigoWeaponGraphics.js';
+import { spawnHollowMaskShatter } from '../../graphics/particles/deathShatterEffect.js';
 import { stopSound } from '../../systems/soundSystem.js';
 
 export class IchigoFighter extends Fighter {
@@ -691,21 +692,7 @@ export class IchigoFighter extends Fighter {
   }
 
   aim(opponent) {
-    if (this.isChannelingBankai) {
-      const target = this._getClosestEnemy();
-      if (target && target.hp > 0 && !target.isDead) {
-        const dx = target.x - this.x;
-        const dy = target.y - this.y;
-        this.gunAngle = Math.atan2(dy, dx);
-        this.angle = this.gunAngle;
-      }
-      return;
-    }
-    if (this.isChannelingGetsuga && this.getsugaTarget && this.getsugaTarget.hp > 0 && !this.getsugaTarget.isDead) {
-      const dx = this.getsugaTarget.x - this.x;
-      const dy = this.getsugaTarget.y - this.y;
-      this.gunAngle = Math.atan2(dy, dx);
-      this.angle = this.gunAngle;
+    if (this.isChannelingBankai || this.isChannelingGetsuga) {
       return;
     }
     if (this.shunpoComboActive && this.shunpoTarget && this.shunpoTarget.hp > 0 && !this.shunpoTarget.isDead) {
@@ -771,6 +758,13 @@ export class IchigoFighter extends Fighter {
     this.shunpoTarget = null;
 
     const chargeFrames = CONFIG.ichigo?.bankaiChargeFrames || 66;
+    const enemy = this._getClosestEnemy();
+    if (enemy && enemy.hp > 0 && !enemy.isDead) {
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      this.gunAngle = Math.atan2(dy, dx);
+      this.angle = this.gunAngle;
+    }
 
     this.isChannelingBankai = true;
     this.bankaiChargeMax = chargeFrames;
@@ -1324,17 +1318,6 @@ export class IchigoFighter extends Fighter {
       : (isMask ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 10) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaSpeed ?? 22) : baseSpeed));
     const ownerIndex = state.fighters.indexOf(this);
 
-    const target = (this.getsugaTarget && this.getsugaTarget.hp > 0 && !this.getsugaTarget.isDead)
-      ? this.getsugaTarget
-      : this._getClosestEnemy();
-
-    if (target && target.hp > 0 && !target.isDead) {
-      const dx = target.x - this.x;
-      const dy = target.y - this.y;
-      this.gunAngle = Math.atan2(dy, dx);
-      this.angle = this.gunAngle;
-    }
-
     this.getsugaReleaseCount = (this.getsugaReleaseCount || 0) + 1;
     if (projectileSystem && typeof projectileSystem.fireGetsugaTensho === 'function') {
       projectileSystem.fireGetsugaTensho(this, ownerIndex, baseDmg, speed, form);
@@ -1748,14 +1731,7 @@ export class IchigoFighter extends Fighter {
         spawnSparks(this.x, this.y, 2, Math.random() < 0.5 ? '#FF0000' : '#111111');
       }
 
-      const enemy = this._getClosestEnemy();
-      if (enemy && enemy.hp > 0 && !enemy.isDead) {
-        const dx = enemy.x - this.x;
-        const dy = enemy.y - this.y;
-        this.gunAngle = Math.atan2(dy, dx);
-        this.angle = this.gunAngle;
-      }
-
+      // Lock facing orientation fixed at initiation; do not auto-aim while channeling Bankai
       this.bankaiChargeTimer--;
       if (this.bankaiChargeTimer <= 0) {
         this._releaseBankai();
@@ -1788,25 +1764,7 @@ export class IchigoFighter extends Fighter {
           this.vy = 0;
         }
 
-        // Continuously rotate to track and face the enemy while lifting sword overhead
-        const target = (this.getsugaTarget && this.getsugaTarget.hp > 0 && !this.getsugaTarget.isDead)
-          ? this.getsugaTarget
-          : this._getClosestEnemy();
-
-        if (target && target.hp > 0 && !target.isDead) {
-          const dx = target.x - this.x;
-          const dy = target.y - this.y;
-          const directAngle = Math.atan2(dy, dx);
-
-          // Smooth responsive rotation tracking toward target (bypassing slow stealth lag)
-          const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-          let diff = directAngle - currentAngle;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          this.gunAngle = currentAngle + diff * 0.35;
-          this.angle = this.gunAngle;
-        }
-
+        // Facing angle remains locked in the direction of the initial cast; do not auto-aim while channeling
         this.getsugaChargeTimer--;
         if (this.getsugaChargeTimer <= 0) {
           this._releaseGetsuga();

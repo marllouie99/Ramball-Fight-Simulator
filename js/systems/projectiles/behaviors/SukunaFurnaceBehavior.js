@@ -7,7 +7,9 @@ export class SukunaFurnaceBehavior extends ProjectileBehavior {
    * Spawns a Sukuna Furnace arrow projectile.
    */
   static spawn(system, x, y, vx, vy, damage, ownerIndex) {
-    audioSystem.playSFX('attack_fireball', 0.8);
+    const fireballSnd = CONFIG.sukuna?.sounds?.fugaFireball || 'Assets/Sound Effects/Attacks/fireball.mp3';
+    const fireballVol = CONFIG.sukuna?.soundVolumes?.fugaFireball ?? 0.8;
+    audioSystem.playSFX(fireballSnd, fireballVol);
     
     const proj = system._getProjectile();
     proj.x = x;

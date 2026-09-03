@@ -202,10 +202,16 @@ export class ZeusFighter extends Fighter {
       this.applyMovementPhysics();
     }
     
-    // Aim directly at opponent using master aim pipeline
+    // Aim directly at opponent using master aim pipeline (automatically disabled during storm channeling)
     this.aim(opponent);
     
     this.resolveWallBounce(arena);
+  }
+
+  canAim() {
+    if (!super.canAim()) return false;
+    if (this.isChargingStorm || this.stormActive) return false;
+    return true;
   }
   
   _activateStorm() {

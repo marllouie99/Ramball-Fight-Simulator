@@ -226,17 +226,7 @@ export class LaserFighter extends Fighter {
       // Continuous screen shake while firing
       triggerGlobalScreenShake(6, 5);
 
-      // Slowly rotate toward the target while firing the beam
-      if (opponent) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        const delta = this.normalizeAngle(targetAngle - this.gunAngle);
-        const maxRotate = CONFIG.laser.beamRotateSpeed || 0.015;
-        if (Math.abs(delta) > maxRotate) {
-          this.gunAngle += Math.sign(delta) * maxRotate;
-        } else {
-          this.gunAngle = targetAngle;
-        }
-      }
+      // Beam angle remains strictly locked in the direction it was fired; no auto-aim while firing
 
       // Check all valid targets, including fighters and illusions/clones
       const allTargets = state.fighters.concat(state.illusions || []);

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 // SUKUNA DOMAIN EXPANSION (MALEVOLENT SHRINE) VISUAL RENDERER
 // ─────────────────────────────────────────────
-import { state } from '../../../core/state.js';
+import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
@@ -323,20 +323,35 @@ export function spawnDomainSlashLines(fighter, count) {
         if (typeof target.takeDamage === 'function') {
           target.takeDamage(finalDamage, fighter, {
             isDomain: true,
+            isDomainSlash: true,
             bypassShield: true,
             isSukunaSlash: true,
+            isGuaranteedHit: true,
+            undodgeable: true,
             isCrit
           });
         }
 
-        // Lightweight single impact spark & flash
-        spawnSparks(target.x, target.y, 4, 'crimsonSniper', '#8B0000');
-        spawnImpactFlash(target.x, target.y, 18, 'crimsonSniper');
-
-        // Subtle slice impulse
+        // ── Physical Ricochet Deflection Impulse (pushes & ricochets target off cut lines) ──
         const pushDir = ((target.x - cx) * normalX + (target.y - cy) * normalY) >= 0 ? 1 : -1;
-        target.vx = (target.vx || 0) + normalX * pushDir * 1.4;
-        target.vy = (target.vy || 0) + normalY * pushDir * 1.4;
+        const ricoForce = CONFIG.sukuna?.domainSlashRicochetForce ?? 6.5;
+        target.knockbackDecay = 0.88;
+        if (target.knockbackVx !== undefined) target.knockbackVx = normalX * pushDir * ricoForce;
+        if (target.knockbackVy !== undefined) target.knockbackVy = normalY * pushDir * ricoForce;
+
+        // ── Ricochet Hit Effect & Sparks ──
+        spawnSparks(target.x, target.y, 10, 'slashRicochet');
+        spawnSparks(target.x, target.y, 6, 'parrySpark');
+        spawnSparks(target.x, target.y, 4, 'parryEmberStar');
+        spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
+
+        // Play crisp slicing ricochet audio
+        const ricoChance = CONFIG.sukuna?.soundChances?.ricochetHit ?? 1.0;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX && Math.random() <= ricoChance) {
+          const ricoSnd = CONFIG.sukuna?.sounds?.ricochetHit || 'Assets/Sound Effects/Skills/parry.mp3';
+          const ricoVol = CONFIG.sukuna?.soundVolumes?.ricochetHit ?? 0.75;
+          audioSystem.playSFX(ricoSnd, ricoVol);
+        }
       }
     });
   }
@@ -344,6 +359,15 @@ export function spawnDomainSlashLines(fighter, count) {
   // Cap pool tightly to max 8 lines
   while (_domainSlashLines.length > 8) {
     _domainSlashLines.shift();
+  }
+
+  // Small arena screen shake when Malevolent Shrine cut lines slash
+  if (_domainSlashLines.length > 0) {
+    const shakeIntensity = hitAny 
+      ? (CONFIG.sukuna?.domainSlashHitShakeIntensity ?? 2.4)
+      : (CONFIG.sukuna?.domainSlashShakeIntensity ?? 1.8);
+    const shakeDuration = CONFIG.sukuna?.domainSlashShakeDuration ?? 3;
+    triggerGlobalScreenShake(shakeIntensity, shakeDuration);
   }
 
   return hitAny;

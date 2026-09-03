@@ -1703,9 +1703,9 @@ function drawFighterCleanName(ctx, cx, cy, name, accentColor, fontScale = 1.0) {
   if (_isDarkName && (upperName.includes('YUTA') || upperName.includes('OKKOTSU'))) {
     accentColor = '#FF1493';
   }
-  const _nameFontFamily = _isDarkName ? '"Silkscreen", "Press Start 2P", monospace' : '"Outfit", "Rajdhani", sans-serif';
+  const _nameFontFamily = '"Outfit", "Rajdhani", "Segoe UI", sans-serif';
   const baseFontSize = _isDarkName
-    ? (upperName.length > 10 ? 14 : (upperName.length > 7 ? 17 : 20))
+    ? (upperName.length > 10 ? 16 : (upperName.length > 7 ? 20 : 24))
     : (upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30));
   const fontSize = Math.round(baseFontSize * fontScale);
   ctx.font = `900 ${fontSize}px ${_nameFontFamily}`;
@@ -1775,7 +1775,7 @@ function drawSavedToast(ctx, width, height, timer, leftColor = '#38bdf8', rightC
   ctx.stroke();
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = (state.arenaTheme === 'dark') ? '700 9px "Silkscreen", "Press Start 2P", monospace' : '900 12.5px "Rajdhani", sans-serif';
+  ctx.font = '900 12.5px "Rajdhani", "Outfit", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('📸 THUMBNAIL PNG SAVED TO DOWNLOADS!', width / 2, toastY + toastH / 2);

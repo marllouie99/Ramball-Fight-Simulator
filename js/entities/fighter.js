@@ -677,7 +677,7 @@ export class Fighter {
                          this.isChannelingDomain || this.isChannelingPurple || 
                          (this.purpleChargeTimer || 0) > 0 || (this.redEffectTimer || 0) > 0 || 
                          this.redBuildupPhase || this.isChannelingRCT || 
-                         (this.divineFlameChargeTimer || 0) > 0 || (this.domainChargeTimer || 0) > 0;
+                         (this.domainChargeTimer || 0) > 0;
 
     // Apply 4.5s penalty cooldown (270 frames) ONLY to the specific ability actively interrupted mid-channeling
     if (isChanneling) {
@@ -685,7 +685,7 @@ export class Fighter {
       if (this.isChannelingPurple || (this.purpleChargeTimer || 0) > 0) {
         if (typeof this.purpleCooldown === 'number') this.purpleCooldown = Math.max(this.purpleCooldown, penaltyCD);
       }
-      if (this.isChannelingDivineFlame || (this.divineFlameChargeTimer || 0) > 0) {
+      if (this.isChannelingDivineFlame) {
         if (typeof this.divineFlameCooldown === 'number') this.divineFlameCooldown = Math.max(this.divineFlameCooldown, penaltyCD);
       }
       if (this.isChannelingDomainExpansion || this.isChannelingDomain || (this.domainChargeTimer || 0) > 0) {
@@ -989,7 +989,7 @@ export class Fighter {
       (this.redEffectTimer > 0) ||
       (this.domainChargeTimer > 0) ||
       (this.ultimateChargeTimer > 0) ||
-      (this.divineFlameChargeTimer > 0) ||
+      this.isChannelingDivineFlame ||
       (this.thinIceBreakerChargeTimer > 0)
     );
   }
@@ -1257,8 +1257,7 @@ export class Fighter {
             audioSystem.playSFX('attack_fleshhit', 0.9);
             spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 80, 0.7)');
             spawnSparks(this.x, this.y, 14, 'crimsonSniper');
-            const isCaughtInBeam = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0);
-            spawnMeleeClashShockwave(this.x, this.y, 100, isCaughtInBeam ? 'yuta' : 'gojo');
+            spawnMeleeClashShockwave(this.x, this.y, 100, 'rgba(220, 220, 230, 0.85)');
           }
         }
       }
@@ -1454,7 +1453,7 @@ export class Fighter {
         }
       }
       // Apply physical directional knockback whenever taking hit damage
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isContinuous && !opts.isDomainDPS && !opts.fromBlackHole && !this.isTurret && !this.isDispenser) {
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isContinuous && !opts.isDomainDPS && !opts.isDomain && !opts.isDomainSlash && !opts.fromDomain && !opts.fromBlackHole && !this.isTurret && !this.isDispenser) {
         let kbAngle = damageAngle;
         if (opts.projectile) {
           kbAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
@@ -1596,14 +1595,14 @@ export class Fighter {
    * Delays round/match end if any enemy is currently shivering in Mahito's Soul Disfigurement build-up.
    */
   checkRoundOrMatchEnd(attacker = null) {
-    if (!state || state.gameState !== 'playing') return;
+    if (!state) return;
 
     // Helper: an entity is "in play" if alive, a doppelganger with copies, evading Mahito, or shivering in Soul Disfigurement
     const _isEffectivelyAlive = (f) => {
       if (!f || f.isTurret || f.isDispenser) return false;
       if (f.isParalyzedByMahito && (f.paralyzeTimer || 0) > 0) return true;
       if ((f.characterId === 'genos' || f.type === 'genos') && (f.isSelfDestructing || f.isSelfDestructRecovering)) return true;
-      if (f.hp > 0) return true;
+      if (f.hp > 0 && !f.dead) return true;
       const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
       if (isDoppel) {
         return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.hp > 0);
@@ -1614,6 +1613,47 @@ export class Fighter {
       }
       return false;
     };
+
+    // ── POST-MORTEM SIMULTANEOUS KILL / DRAW MECHANIC ──
+    // If the round or match was already ending, but the last remaining fighter has now ALSO died (e.g. from Gojo's flying Purple, Fuga, Getsuga, burn, etc.)
+    if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
+      const anyLiving = state.fighters && state.fighters.some(f => f && _isEffectivelyAlive(f));
+      if (!anyLiving && !state.isRoundDraw && !state.isDraw) {
+        // Both fighters/teams are dead! Convert this round into a DRAW!
+        if (state.roundWinner) {
+          const prevWinnerIdx = state.fighters.indexOf(state.roundWinner);
+          if (prevWinnerIdx >= 0 && state.scores && state.scores[prevWinnerIdx] > 0) {
+            state.scores[prevWinnerIdx]--; // Revert the tentative round win score
+          }
+        }
+        if (state.teamScores && typeof state.winningTeam !== 'undefined') {
+          if (state.teamScores[state.winningTeam] > 0) {
+            state.teamScores[state.winningTeam]--;
+          }
+        }
+
+        state.roundWinner = null;
+        state.matchWinner = null;
+        state.isRoundDraw = true;
+        state.isDraw = true;
+        state.gameState = 'roundEnd';
+        state.roundEndTimer = 0; // Reset timer so the Double KO / Draw banner is shown cleanly
+        state._isChampionLayoutActive = false;
+        state._hasPlayedChampionYouWinVoice = true; // Suppress single-player "You Win"
+        state._hasPlayedChampionVictoryVoice = true;
+
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+        if (typeof spawnFloatingText === 'function' && arena) {
+          spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
+        }
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+        }
+      }
+      return;
+    }
+
+    if (state.gameState !== 'playing') return;
 
     const aliveFighters = state.fighters.filter((f) => f && _isEffectivelyAlive(f) && f !== this);
     const aliveCount = aliveFighters.length;
@@ -1638,7 +1678,28 @@ export class Fighter {
       
       if (!team0Alive || !team1Alive) {
         stopArenaBgm(true);
+        if (!team0Alive && !team1Alive) {
+          // Double KO in Team Mode -> DRAW
+          state.roundWinner = null;
+          state.matchWinner = null;
+          state.isRoundDraw = true;
+          state.isDraw = true;
+          state.roundEndTimer = 0;
+          state.gameState = 'roundEnd';
+          stopAllSounds(true, 2000, 500);
+          stopAllLoopingSounds();
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          if (typeof spawnFloatingText === 'function' && arena) {
+            spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
+          }
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+          }
+          return;
+        }
+
         const winningTeam = team0Alive ? 0 : 1;
+        state.winningTeam = winningTeam;
         state.teamScores[winningTeam]++;
 
         const winnerFighter = state.fighters.find((f, idx) => f && _isEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam)
@@ -1668,6 +1729,23 @@ export class Fighter {
       if (aliveCount <= 1) {
         stopArenaBgm(true);
         const soleSurvivor = aliveFighters[0] || state.fighters.find(f => f && _isEffectivelyAlive(f)) || null;
+        if (!soleSurvivor) {
+          // All dead in FFA -> DRAW
+          state.roundWinner = null;
+          state.matchWinner = null;
+          state.isRoundDraw = true;
+          state.isDraw = true;
+          state.roundEndTimer = 0;
+          state.gameState = 'roundEnd';
+          stopAllSounds();
+          stopAllLoopingSounds();
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          if (typeof spawnFloatingText === 'function' && arena) {
+            spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
+          }
+          return;
+        }
+
         const winnerIndex = soleSurvivor ? state.fighters.indexOf(soleSurvivor) : -1;
 
         if (winnerIndex >= 0) {
@@ -1696,6 +1774,27 @@ export class Fighter {
       stopArenaBgm(true);
       const survivor = state.fighters.find(f => f && f !== this && _isEffectivelyAlive(f));
       const winnerFighter = survivor || ((realAttacker && realAttacker !== this && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
+      
+      if (!winnerFighter) {
+        // Both fighters dead at same moment -> DRAW
+        state.roundWinner = null;
+        state.matchWinner = null;
+        state.isRoundDraw = true;
+        state.isDraw = true;
+        state.roundEndTimer = 0;
+        state.gameState = 'roundEnd';
+        stopAllSounds();
+        stopAllLoopingSounds();
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+        if (typeof spawnFloatingText === 'function' && arena) {
+          spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
+        }
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+        }
+        return;
+      }
+
       const winnerIndex = winnerFighter ? state.fighters.indexOf(winnerFighter) : -1;
 
       if (winnerIndex >= 0) {
@@ -1878,7 +1977,44 @@ export class Fighter {
   }
 
   /**
+   * Evaluates if this fighter is currently channeling, charging, or casting an active skill/ultimate.
+   * Central single source of truth across all fighter archetypes.
+   */
+  isChannelingSkill() {
+    if (this.isChannelingDivineFlame) return true;
+    if (this.isSpiderwebChanneling || (this.spiderwebChannelTimer > 0)) return true;
+    if (this.isChannelingDomainExpansion || this.isChannelingDomain || (this.domainChargeTimer > 0) || (this.domainChannelTimer > 0) || this.isDomainPreSlide || (this.domainPreSlideTimer > 0)) return true;
+    if (this.isChannelingPurple || (this.purpleChargeTimer > 0) || (this.purpleRecoveryTimer > 0) || (this.purpleRetreatTimer > 0)) return true;
+    if (this.isChannelingRCT || (this.rctChannelTimer > 0)) return true;
+    if ((this.redEffectTimer || 0) > 0 || this.redBuildupPhase) return true;
+    if (this.isChannelingPureLoveBeam || (this.pureLoveBeamChargeTimer > 0) || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return true;
+    if (this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0)) return true;
+    if (this.isCallingRika || (this.rikaEmergenceTimer > 0) || (typeof this.isSummoningRika === 'function' && this.isSummoningRika())) return true;
+    if (this.isChannelingGetsuga || (this.getsugaChargeTimer > 0) || (this.getsugaRecoveryTimer > 0)) return true;
+    if (this.isChannelingBankai || (this.bankaiChargeTimer > 0)) return true;
+    if ((this.hollowMaskFormationTimer || 0) > 0 || (this.hollowBurstTimer || 0) > 0 || (this.bankaiBurstTimer || 0) > 0 || (this.shikaiReversionBurstTimer || 0) > 0) return true;
+    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || (this.ultTimer > 0 && (this.isChargingUlt || this.isFiringUlt))) return true;
+    if (this.isUltimateCharging || this.isUltimateFiring || (this.ultimateFireTimer > 0) || this.ultimatePhase === 'CHANNELING') return true;
+    if (this.isChargingStorm || this.stormActive) return true;
+    if (this.isChargingSeriousPunch || (this.seriousPunchChargeTimer > 0) || (this.basicPunchChargeTimer > 0) || (this._counterWindupTimer > 0) || (this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer > 0) || this.isCountering) return true;
+    if (this.isTakadaChanneling || (this.takadaChannelTimer > 0) || this.isTakadaUltActive) return true;
+    if ((this.stolenWindUpTimer || 0) > 0) return true;
+    if ((this.beamCharge || 0) > 0 || (this.beamTimer || 0) > 0 || this.beamActive || this.isFiringBeam || (this.laylaBeamTimer > 0)) return true;
+    if ((this.fleshSurgeAnimTimer || 0) > 0 || (this.twinScissorAnimTimer || 0) > 0) return true;
+    if (this.isChannelingTelekinesis || (this.tkTimer || 0) > 0) return true;
+    if (this.isDrawingBow || (this.arrowDrawTimer > 0) || this.isHirenkyakuDashing || this.isPlantedPause || this.isSkywardWindup || this.isSkywardAscending || this.isLichtRegenActive || this.isDeployingSprenger) return true;
+    if (this.isChannelingMahoraga || (this.mahoragaChannelTimer > 0)) return true;
+    if (this.isResonating || this.isDetonatingHairpin || (this.resonanceChannelTimer > 0) || (this.hairpinChannelTimer > 0)) return true;
+    if (this.isChargingCero || (this.ceroTimer > 0) || this.isChargingLanza || (this.lanzaTimer > 0)) return true;
+    if (this.isFlurrying || (this.flurryHitsLeft > 0) || (this.flurrySlashTimer > 0) || (this.machineGunBlowTimer > 0)) return true;
+    if (this.isAmbushing || this.ambushPhase) return true;
+    if (this.activePullActive) return true;
+    return false;
+  }
+
+  /**
    * Evaluates if this fighter is currently able to rotate and aim.
+   * Automatically disables auto-aim if the fighter is dead, hard-CC'd, or actively channeling a skill.
    * Subclasses can override canAim() to add character-specific skill/channeling locks.
    */
   canAim() {
@@ -1889,6 +2025,8 @@ export class Fighter {
                      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
                      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
     if (isHardCC) return false;
+    if (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) return false;
+    if (typeof this.isChannelingAnySkill === 'function' && this.isChannelingAnySkill()) return false;
     return true;
   }
 
@@ -2043,8 +2181,8 @@ export class Fighter {
     let currentSpeed = Math.hypot(this.vx, this.vy);
     // Auto-recover from zero velocity if we should be moving
     if (targetSpeed > 0 && currentSpeed < 0.2) {
-      // Nudge in the direction of movement/body angle, not weapon gunAngle
-      const nudgeAngle = (this.angle !== undefined && this.angle !== 0) ? this.angle : (Math.random() * Math.PI * 2);
+      // Pick a neutral random drift angle so fighters do not accidentally home straight towards aimed targets
+      const nudgeAngle = Math.random() * Math.PI * 2;
       this.vx = Math.cos(nudgeAngle) * targetSpeed * 0.5;
       this.vy = Math.sin(nudgeAngle) * targetSpeed * 0.5;
       currentSpeed = targetSpeed * 0.5;
@@ -2110,7 +2248,7 @@ export class Fighter {
       return;
     }
 
-    if (this.isCaughtInBeam()) {
+    if (this.isCaughtInBeam() && !this.isChannelingSkill()) {
       this.interruptAttacks();
     }
 

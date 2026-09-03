@@ -1911,7 +1911,7 @@ export class CJFighter extends Fighter {
 
     // 2. Health Number underneath the body
     const hpY = drawY + (this.r || 25) + 4;
-    ctx.font = '700 13px "Silkscreen", "Press Start 2P", monospace';
+    ctx.font = '900 13.5px "Rajdhani", "Outfit", "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const hpText = Math.floor(this.hp).toString();

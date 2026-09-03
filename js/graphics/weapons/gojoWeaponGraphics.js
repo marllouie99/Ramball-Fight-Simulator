@@ -24,23 +24,19 @@ export function drawGojoWeapon(ctx, fighter) {
         const is200 = !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
         if (is200) {
-            // 200% Hollow Purple Custom Animation Sequence:
-            // 1. Red & Blue float high near top boundary of Limitless Infinity (-r * 2.8) with wide gap (r * 2.8)
+            // ── 200% HOLLOW PURPLE RITUAL (High Sky Floating Orbs) ──
             const headX = -r * 2.8;
 
             if (mergeProgress < 0.70) {
-                // Red & Blue float high with wide gap and move inward toward center above head
                 const moveP = mergeProgress / 0.70; // 0.0 -> 1.0
                 const easeMove = Math.sin(moveP * Math.PI * 0.5);
                 const handSpreadY = r * 2.8;
                 const spreadY = handSpreadY * (1 - easeMove);
                 const t = Date.now();
 
-                // Smooth fade-in (0.0 -> 0.22 of mergeProgress)
                 const fadeInP = Math.min(1.0, mergeProgress / 0.22);
                 const orbAlpha = Math.sin(fadeInP * Math.PI * 0.5);
 
-                // Smooth size transition from small concentrated energy spark to full-sized massive orb (0.0 -> 0.35)
                 const growP = Math.min(1.0, mergeProgress / 0.35);
                 const easeGrow = Math.sin(growP * Math.PI * 0.5);
                 const scale = 0.15 + 0.85 * easeGrow;
@@ -50,14 +46,14 @@ export function drawGojoWeapon(ctx, fighter) {
                 ctx.save();
                 ctx.globalAlpha *= orbAlpha;
 
-                // Red Orb (floating high above right side - scaled up smoothly)
+                // Red Orb (high on right side)
                 drawGojoOrb(ctx, headX, spreadY, currentOrbR, t, 'red', 0);
-                // Blue Orb (floating high above left side - scaled up smoothly)
+                // Blue Orb (high on left side)
                 drawGojoOrb(ctx, headX, -spreadY, currentOrbR, t, 'blue', 0);
 
                 ctx.restore();
 
-                // Electric energy arcs between Red and Blue orbs (intensify smoothly as they approach)
+                // Electric energy arcs between high floating Red and Blue orbs
                 if (moveP > 0.10) {
                     const arcIntensity = Math.min(1.0, (moveP - 0.10) / 0.60) * orbAlpha;
                     const arcCount = 3 + Math.floor(arcIntensity * 3);
@@ -67,13 +63,11 @@ export function drawGojoWeapon(ctx, fighter) {
                     for (let a = 0; a < arcCount; a++) {
                         const seed = a * 3141.59;
                         const alpha = (0.25 + arcIntensity * 0.45 + Math.sin(t * 0.02 + seed) * 0.15) * orbAlpha;
-                        // Alternate red-purple and blue-purple arcs
                         ctx.strokeStyle = a % 2 === 0
                             ? `rgba(255, 120, 200, ${alpha})`
                             : `rgba(120, 180, 255, ${alpha})`;
                         ctx.beginPath();
                         ctx.moveTo(headX, spreadY);
-                        // Jagged midpoint with jitter
                         const midX = headX + Math.sin(t * 0.015 + seed) * 6;
                         const midY = (Math.sin(t * 0.012 + seed * 0.7) * 12) * (a / arcCount - 0.5);
                         ctx.quadraticCurveTo(midX, midY, headX, -spreadY);
@@ -82,9 +76,9 @@ export function drawGojoWeapon(ctx, fighter) {
                     ctx.restore();
                 }
             } else {
-                // Fused into massive 200% Purple orb above head — stays suspended high above head!
+                // Fused into colossal 200% Purple orb above head
                 const t = Date.now();
-                const orbX = headX; // Stays locked high above head at headX (-r * 2.8)!
+                const orbX = headX;
                 const purpleGrowP = Math.min(1.0, (mergeProgress - 0.70) / 0.12);
                 const easePurpleGrow = Math.sin(purpleGrowP * Math.PI * 0.5);
                 const baseFusionR = handRadius * 2.8;
@@ -104,29 +98,63 @@ export function drawGojoWeapon(ctx, fighter) {
 
                 drawGojoOrb(ctx, orbX, 0, orbR, t, 'purple', 5);
                 drawAnamorphicLensFlare(ctx, orbX, 0, 1.0);
-                // Second smaller vertical flare for cross-flare effect
                 drawAnamorphicLensFlare(ctx, orbX, 0, 0.5, 'red');
             }
         } else {
-            // Standard 100% Purple Animation
-            const rightY = handSpread * (1 - mergeProgress);
-            const leftY = -handSpread * (1 - mergeProgress);
+            // ── 100% HOLLOW PURPLE (Hands-Level Red & Blue Mixing) ──
+            const handDistance = r + 10;
+            const t = Date.now();
 
-            // Red Orb
-            const redR = handRadius * (1 + mergeProgress * 0.5);
-            drawGojoOrb(ctx, handDistance, rightY, redR, Date.now(), 'red', 0);
+            if (mergeProgress < 0.70) {
+                const moveP = mergeProgress / 0.70; // 0.0 -> 1.0
+                const easeMove = Math.sin(moveP * Math.PI * 0.5);
+                const handSpread = 22 * (1 - easeMove);
+                const rightY = handSpread;
+                const leftY = -handSpread;
 
-            // Blue Orb
-            const blueR = handRadius * (1 + mergeProgress * 0.5);
-            drawGojoOrb(ctx, handDistance, leftY, blueR, Date.now(), 'blue', 0);
+                const fadeInP = Math.min(1.0, mergeProgress / 0.22);
+                const orbAlpha = Math.sin(fadeInP * Math.PI * 0.5);
+                const redR = handRadius * (1.0 + moveP * 0.4);
+                const blueR = handRadius * (1.0 + moveP * 0.4);
 
-            if (mergeProgress > 0.5) {
-                const flareP = (mergeProgress - 0.5) / 0.5;
-                if (mergeProgress > 0.75) {
-                    const pScale = (mergeProgress - 0.75) / 0.25;
-                    drawGojoOrb(ctx, handDistance, 0, handRadius * 2.5 * pScale, Date.now(), 'purple', pScale * 5);
+                ctx.save();
+                ctx.globalAlpha *= orbAlpha;
+
+                // Red Orb on right hand
+                drawGojoOrb(ctx, handDistance, rightY, redR, t, 'red', 0);
+                // Blue Orb on left hand
+                drawGojoOrb(ctx, handDistance, leftY, blueR, t, 'blue', 0);
+
+                ctx.restore();
+
+                // Electric energy arcs between Red & Blue in hands
+                if (moveP > 0.15) {
+                    const arcIntensity = Math.min(1.0, (moveP - 0.15) / 0.55) * orbAlpha;
+                    ctx.save();
+                    ctx.lineWidth = 1.0 + arcIntensity * 0.8;
+                    ctx.lineCap = 'round';
+                    for (let a = 0; a < 3; a++) {
+                        const seed = a * 1337.42;
+                        const alpha = (0.25 + arcIntensity * 0.45 + Math.sin(t * 0.02 + seed) * 0.15) * orbAlpha;
+                        ctx.strokeStyle = a % 2 === 0
+                            ? `rgba(255, 120, 200, ${alpha})`
+                            : `rgba(120, 180, 255, ${alpha})`;
+                        ctx.beginPath();
+                        ctx.moveTo(handDistance, rightY);
+                        const midX = handDistance + Math.sin(t * 0.015 + seed) * 3;
+                        const midY = (Math.sin(t * 0.012 + seed * 0.7) * 8) * (a / 3 - 0.5);
+                        ctx.quadraticCurveTo(midX, midY, handDistance, leftY);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
                 }
-                drawAnamorphicLensFlare(ctx, handDistance, 0, flareP);
+            } else {
+                // Fused into 100% Purple orb between hands with lens flares
+                const purpleGrowP = Math.min(1.0, (mergeProgress - 0.70) / 0.30);
+                const pScale = purpleGrowP;
+                const orbR = handRadius * 2.6 * (0.8 + 0.2 * pScale);
+                drawGojoOrb(ctx, handDistance, 0, orbR, t, 'purple', pScale * 4);
+                drawAnamorphicLensFlare(ctx, handDistance, 0, pScale);
             }
         }
     } else {
@@ -143,10 +171,41 @@ export function drawGojoWeapon(ctx, fighter) {
         // Smoothly fade blue orb back in when Purple is about to expire (final 30 frames of recovery)
         const recoveryFade = (recoveryTimer > 0 && recoveryTimer <= 30) ? (1.0 - (recoveryTimer / 30)) : 1.0;
 
+        // Dynamic cooldown manifestation & fade logic:
+        // Hide Gojo's blue projectile/orb while on cooldown, and smoothly fade it in as Blue CD is about to be ready
+        const currentCd = Math.max(0, (fighter.shootCooldown !== undefined && fighter.shootCooldown !== null) ? fighter.shootCooldown : (fighter.cooldown || 0));
+        const maxCd = fighter.shootCooldownMax || fighter.cooldownMax || CONFIG.gojo?.blueCooldown || CONFIG.gojo?.cooldown || 60;
+        const readyThreshold = Math.max(22, Math.round(maxCd * 0.55)); // Start smooth manifestation in the last 55% of cooldown (~33 frames before shot)
+
+        let targetAlpha = 0.0;
+        if (!fighter.isMeleeMode && transition > 0) {
+            if (currentCd <= 0) {
+                targetAlpha = 1.0;
+            } else if (currentCd <= readyThreshold) {
+                // Smooth sine-eased curve from 0.0 to 1.0 as cooldown counts down to 0
+                const progress = Math.min(1.0, Math.max(0, (readyThreshold - currentCd) / readyThreshold));
+                targetAlpha = Math.sin(progress * Math.PI * 0.5);
+            } else {
+                targetAlpha = 0.0;
+            }
+        }
+
+        // Smooth persistent lerp so fade in and fade out are continuous, visible, and buttery smooth
+        if (fighter._blueOrbDisplayAlpha === undefined) {
+            fighter._blueOrbDisplayAlpha = targetAlpha;
+        }
+        const fadeSpeed = (targetAlpha > fighter._blueOrbDisplayAlpha) ? 0.10 : 0.22;
+        fighter._blueOrbDisplayAlpha += (targetAlpha - fighter._blueOrbDisplayAlpha) * fadeSpeed;
+        if (fighter._blueOrbDisplayAlpha < 0.005) {
+            fighter._blueOrbDisplayAlpha = 0;
+        }
+
+        const effectiveOrbAlpha = transition * recoveryFade * fighter._blueOrbDisplayAlpha;
+
         // Normal stance - Floating Blue orb in front with intense Bloom & prep charge
-        if (transition > 0) {
+        if (effectiveOrbAlpha > 0.005) {
             ctx.save();
-            ctx.globalAlpha = transition * recoveryFade;
+            ctx.globalAlpha = effectiveOrbAlpha;
             
             let attackFlash = 0;
             let attackPush = 0;
@@ -174,7 +233,8 @@ export function drawGojoWeapon(ctx, fighter) {
 
             const currentDist = handDistance + 5 + attackPush + chargePull;
             const attackFlashValue = attackFlash > 0 ? attackFlash : 0;
-            const effectiveRadius = handRadius * Math.sqrt(transition) * chargeScale;
+            const scaleGrowth = 0.4 + 0.6 * Math.sin((fighter._blueOrbDisplayAlpha || 0) * Math.PI * 0.5);
+            const effectiveRadius = handRadius * Math.sqrt(transition) * chargeScale * scaleGrowth;
             
             // Draw Lapse Blue Orb with firing launch spin
             ctx.save();
@@ -196,7 +256,7 @@ export function drawGojoWeapon(ctx, fighter) {
                 for (let rIdx = 0; rIdx < 3; rIdx++) {
                     const rPhase = (chargeP * 2.5 + rIdx * 0.33) % 1.0;
                     const rRadius = effectiveRadius * (2.8 - rPhase * 1.8);
-                    ctx.globalAlpha = (1 - rPhase) * transition * 0.75;
+                    ctx.globalAlpha = (1 - rPhase) * effectiveOrbAlpha * 0.75;
                     ctx.beginPath();
                     ctx.arc(0, 0, Math.max(1, rRadius), 0, Math.PI * 2);
                     ctx.stroke();

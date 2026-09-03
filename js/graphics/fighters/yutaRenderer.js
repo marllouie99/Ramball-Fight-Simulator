@@ -86,9 +86,8 @@ export class YutaRenderer {
     ctx.save();
     let tremorX = 0;
     let tremorY = 0;
-    const currentShake = (typeof state !== 'undefined' && state.screenShake) ? (state.screenShake.intensity || 0) : 0;
-    if (fighter.isChannelingDomain || currentShake > 0) {
-      const shakeAmt = fighter.isChannelingDomain ? 5.0 : Math.min(6, currentShake * 0.6);
+    if (fighter.isChannelingDomain) {
+      const shakeAmt = 3.5;
       tremorX = (Math.random() - 0.5) * shakeAmt;
       tremorY = (Math.random() - 0.5) * shakeAmt;
     }

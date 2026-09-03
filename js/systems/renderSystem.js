@@ -31,10 +31,14 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { updateHybridProjectiles, updateHybridRika, updateHybridSukunaFuga } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
+import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
 
 
 
 export function renderGame() {
+    // Update dynamic tracking camera positions and distance-adaptive zoom
+    updateCamera();
+
     // Clear the offscreen 2D canvas at the start of every frame so it's fully transparent
     // PixiJS will render this transparent canvas over its own background/particle layers
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
@@ -95,8 +99,6 @@ export function renderGame() {
     if (state.screenShake && state.screenShake.timer > 0) {
       const maxTimer = state.screenShake.maxTimer || state.screenShake.timer;
       const dampRatio = maxTimer > 0 ? (state.screenShake.timer / maxTimer) : 1.0;
-      const mult = (typeof CONFIG !== 'undefined' && CONFIG.globalScreenShakeIntensityMultiplier !== undefined) ? CONFIG.globalScreenShakeIntensityMultiplier : 1.0;
-      
       const is1v2OrFFA = (typeof state !== 'undefined') && (
         state.mode === GAME_MODES.STAND_OFF_1V2 || 
         state.mode === '1v2 Stand Off' || 
@@ -105,21 +107,17 @@ export function renderGame() {
         state.mode === 'FFA'
       );
 
-      let effectiveIntensity = state.screenShake.intensity;
-      if (is1v2OrFFA) {
-        effectiveIntensity = Math.min(3.5, effectiveIntensity);
-      }
+      const clampLimit = is1v2OrFFA ? 3.5 : 12.0;
+      let effectiveIntensity = Math.min(clampLimit, state.screenShake.intensity);
 
-      const currentIntensity = effectiveIntensity * dampRatio * mult;
+      // dampRatio smoothly decays intensity to zero as timer counts down
+      const currentIntensity = effectiveIntensity * dampRatio;
       
       shakeX = (Math.random() - 0.5) * currentIntensity * 2;
       shakeY = (Math.random() - 0.5) * currentIntensity * 2;
 
-      if (is1v2OrFFA) {
-        const clampLimit = 3.5;
-        shakeX = Math.max(-clampLimit, Math.min(clampLimit, shakeX));
-        shakeY = Math.max(-clampLimit, Math.min(clampLimit, shakeY));
-      }
+      shakeX = Math.max(-clampLimit, Math.min(clampLimit, shakeX));
+      shakeY = Math.max(-clampLimit, Math.min(clampLimit, shakeY));
 
       state.screenShake.timer--;
       if (state.screenShake.timer <= 0) {
@@ -193,17 +191,51 @@ export function renderGame() {
         if (state.pixiLayers.particles) state.pixiLayers.particles.visible = true;
         if (state.pixiLayers.effects) state.pixiLayers.effects.visible = true;
         if (state.pixiLayers.environment) state.pixiLayers.environment.visible = true;
-        // Keep arena and environment background layers static at (0, 0) (so full-screen background/domain does not shake)
-        if (state.pixiLayers.arena?.position?.set) state.pixiLayers.arena.position.set(0, 0);
-        if (state.pixiLayers.environment?.position?.set) state.pixiLayers.environment.position.set(0, 0);
-        // OPTIMIZED: Only shake in-arena projectiles, particles, and effects
-        const hasShake = (shakeX !== 0 || shakeY !== 0);
-        if (hasShake || state._lastShakeX !== 0 || state._lastShakeY !== 0) {
-          if (state.pixiLayers.projectiles?.position?.set) state.pixiLayers.projectiles.position.set(shakeX, shakeY);
-          if (state.pixiLayers.particles?.position?.set) state.pixiLayers.particles.position.set(shakeX, shakeY);
-          if (state.pixiLayers.effects?.position?.set) state.pixiLayers.effects.position.set(shakeX, shakeY);
-          state._lastShakeX = shakeX;
-          state._lastShakeY = shakeY;
+
+        const cam = state.camera;
+        const isCamActive = Boolean(cam && cam.enabled && cam.mode === 'dynamic');
+        const screenCenterX = state.canvas.width / 2;
+        const screenCenterY = state.arena ? (state.arena.y + state.arena.height / 2) : (state.canvas.height / 2);
+
+        // Keep arena outer background static at (0, 0) scale 1
+        if (state.pixiLayers.arena?.position?.set) {
+          state.pixiLayers.arena.pivot.set(0, 0);
+          state.pixiLayers.arena.position.set(0, 0);
+          state.pixiLayers.arena.scale.set(1, 1);
+        }
+
+        // Synchronize WebGL arena floor graphics (resets local transform since environment container will be transformed)
+        if (state.floorGraphics?.position?.set) {
+          state.floorGraphics.pivot.set(0, 0);
+          state.floorGraphics.position.set(0, 0);
+          state.floorGraphics.scale.set(1, 1);
+        }
+
+        // Apply camera to WebGL hybrid layers (environment, projectiles, particles, effects)
+        const applyCamToPixiLayer = (layer) => {
+          if (!layer || !layer.position?.set) return;
+          if (isCamActive) {
+            layer.pivot.set(cam.x, cam.y);
+            layer.position.set(screenCenterX + (cam.shakeX || 0), screenCenterY + (cam.shakeY || 0));
+            layer.scale.set(cam.zoom, cam.zoom);
+          } else {
+            layer.pivot.set(0, 0);
+            layer.position.set(shakeX, shakeY);
+            layer.scale.set(1, 1);
+          }
+        };
+
+        applyCamToPixiLayer(state.pixiLayers.environment);
+        applyCamToPixiLayer(state.pixiLayers.projectiles);
+        applyCamToPixiLayer(state.pixiLayers.particles);
+        applyCamToPixiLayer(state.pixiLayers.effects);
+
+        // Fighters layer contains legacyCanvasSprite (the 2D canvas), which already has the camera matrix applied inside state.ctx!
+        // So fighters layer must stay at (0, 0) scale 1 to avoid double transformation.
+        if (state.pixiLayers.fighters?.position?.set) {
+          state.pixiLayers.fighters.pivot.set(0, 0);
+          state.pixiLayers.fighters.position.set(0, 0);
+          state.pixiLayers.fighters.scale.set(1, 1);
         }
       }
       if (state.pixiApp) {
@@ -304,12 +336,9 @@ export function renderGame() {
           }
         }
 
-        // Translate 2D context for inside-arena entities shake ONLY when shaking
-        const isShaking = (shakeX !== 0 || shakeY !== 0);
+        // Apply Camera Viewport Transform (Dynamic Tracking, Distance Zoom, and Shake)
         state.ctx.save();
-        if (isShaking) {
-          state.ctx.translate(shakeX, shakeY);
-        }
+        applyCameraToCtx(state.ctx);
 
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 
@@ -447,6 +476,11 @@ export function renderGame() {
         state.ctx.setTransform(1, 0, 0, 1, 0, 0); // Always reset transform matrix cleanly
       }
 
+      // In native Canvas 2D mode, composite floating text canvas onto main canvas in identity space
+      if (!state.pixiApp && state.floatingTextCanvas) {
+        state.ctx.drawImage(state.floatingTextCanvas, 0, 0);
+      }
+
       const originalCtx = state.ctx;
       const originalCanvas = state.canvas;
 
@@ -506,6 +540,9 @@ export function renderGame() {
 
       // Render Counter-Strike style kill feed in top-right arena corner
       drawKillFeed(state.topLevelUiCtx || state.ctx);
+
+      // Render Camera Mode Toggle Notification Banner
+      drawCameraToast(state.topLevelUiCtx || state.ctx);
 
       // Restore original context and canvas
       state.ctx = originalCtx;

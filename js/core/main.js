@@ -15,6 +15,7 @@ import { clearHealthHud } from '../graphics/hudManager.js';
 import { getTacticalIcon } from '../graphics/ui/tacticalIcons.js';
 import { GAME_MODES } from './modeConfig.js';
 import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
+import { toggleCameraMode } from '../systems/cameraSystem.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
@@ -110,6 +111,8 @@ window.addEventListener('keydown', (e) => {
     }
   } else if (e.key.toLowerCase() === 'h') {
     state.hideFpsLogs = !state.hideFpsLogs;
+  } else if (e.key.toLowerCase() === 'v') {
+    toggleCameraMode();
   }
 });
 
@@ -348,6 +351,12 @@ if (fpsBtn) {
   fpsBtn.innerText = state.hideFpsLogs ? 'OFF' : 'ON';
 }
 
+const camBtn = document.getElementById('btn-camera');
+if (camBtn) {
+  const isCamOn = Boolean(state.camera && state.camera.mode === 'dynamic');
+  camBtn.innerText = isCamOn ? 'ON' : 'OFF';
+}
+
 state.cinefilmFilter = localStorage.getItem('cinefilmFilter') === 'true';
 updateCinefilmOverlay();
 
@@ -533,6 +542,10 @@ export function executeTacticalAction(action) {
     localStorage.setItem('hideFpsLogs', state.hideFpsLogs);
     const btn = document.getElementById('btn-fps');
     if (btn) btn.innerText = state.hideFpsLogs ? 'OFF' : 'ON';
+  } else if (action === 'toggle-camera') {
+    toggleCameraMode();
+    const btn = document.getElementById('btn-camera');
+    if (btn) btn.innerText = (state.camera.mode === 'dynamic') ? 'ON' : 'OFF';
   } else if (action === 'toggle-testmode') {
     state.testMode = !state.testMode;
     const btn = document.getElementById('btn-testmode');
@@ -751,6 +764,12 @@ document.getElementById('btn-fps')?.addEventListener('click', (e) => {
   state.hideFpsLogs = !state.hideFpsLogs;
   localStorage.setItem('hideFpsLogs', state.hideFpsLogs);
   e.target.innerText = state.hideFpsLogs ? 'OFF' : 'ON';
+});
+
+document.getElementById('btn-camera')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleCameraMode();
+  e.target.innerText = (state.camera.mode === 'dynamic') ? 'ON' : 'OFF';
 });
 
 document.getElementById('btn-testmode')?.addEventListener('click', (e) => {

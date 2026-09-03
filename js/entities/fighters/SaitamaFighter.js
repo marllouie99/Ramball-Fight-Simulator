@@ -1453,13 +1453,15 @@ export class SaitamaFighter extends Fighter {
     if (isChargingCounter || isPostCounter) {
       this.vx = 0;
       this.vy = 0;
-      const target = this._counterPunchTarget || opponent;
-      if (target && target.hp > 0 && typeof this.aim === 'function') {
-        this.aim(target);
-        this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-      } else if (this._counterAimAngle !== undefined) {
+      if (this._counterAimAngle !== undefined) {
         this.gunAngle = this._counterAimAngle;
         this.angle = this._counterAimAngle;
+      } else {
+        const target = this._counterPunchTarget || opponent;
+        if (target && target.hp > 0 && typeof this.aim === 'function') {
+          this.aim(target);
+          this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        }
       }
       return;
     }
@@ -1732,9 +1734,6 @@ export class SaitamaFighter extends Fighter {
     if (this.basicPunchChargeTimer > 0) {
       this.basicPunchChargeTimer--;
       const punchTgt = (this.basicPunchTarget && this.basicPunchTarget.hp > 0) ? this.basicPunchTarget : opponent;
-      if (punchTgt && punchTgt.hp > 0 && typeof this.aim === 'function') {
-        this.aim(punchTgt);
-      }
       if (this.basicPunchChargeTimer <= 0) {
         const t = this.basicPunchTarget || punchTgt;
         this.basicPunchTarget = null;

@@ -3,12 +3,12 @@ import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { applyDamageToTarget, suppressAfterimagesAndAttackEffects, isSuppressedByGetsuga } from '../../../entities/fighter.js';
-import { spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
+import { spawnImpactFlash, spawnMeleeClashShockwave, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 
 export class GetsugaBehavior extends ProjectileBehavior {
   update(projectile, fighters, system) {
     // 0. Gojo Limitless Infinity Stasis Guard: projectile frozen motionless in space
-    if (projectile.isFrozenByInfinity) {
+    if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0) {
       if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
         for (const [target] of projectile.draggedTargets.entries()) {
           if (target) {
@@ -366,6 +366,10 @@ export class GetsugaBehavior extends ProjectileBehavior {
           : (CONFIG.ichigo?.getsugaHitCooldown || 4);
         projectile.hitTargets.set(f, hitCooldown); // Cooldown before this target can be hit again by the same wave
 
+        if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0) {
+          continue;
+        }
+
         // Apply skill damage (continuous multi-tick damage for ALL Getsuga waves)
         const tickDamage = isFinal
           ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20)
@@ -375,8 +379,23 @@ export class GetsugaBehavior extends ProjectileBehavior {
               ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 16)
               : (isBankai
                 ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16)
-                : (CONFIG.ichigo?.getsugaTickDamage || projectile.damage || 10))));
+                : (CONFIG.ichigo?.getsugaTickDamage || 10))));
         applyDamageToTarget(f, tickDamage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, isFinalGetsugaTick: isFinal, isFinalMassiveGetsuga: isFinal, projectile });
+
+        // If the projectile became frozen by Gojo's Infinity during damage application, immediately halt and return
+        if (projectile.isFrozenByInfinity || projectile.damage === 0 || projectile.isVisual) {
+          if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
+            for (const [target] of projectile.draggedTargets.entries()) {
+              if (target) {
+                target.isDraggedByGetsuga = false;
+                target.preventKnockbackBounce = false;
+                target.z = 0;
+              }
+            }
+            projectile.draggedTargets.clear();
+          }
+          return false;
+        }
         if (attacker && typeof attacker.applyHollowLifesteal === 'function') {
           attacker.applyHollowLifesteal(tickDamage, f);
         }

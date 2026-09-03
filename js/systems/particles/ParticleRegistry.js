@@ -20,6 +20,21 @@ export const ParticleRegistry = {
       isFlash: false
     };
   },
+  slashRicochet: () => {
+    const rand = Math.random();
+    let color = 'rgba(255, 255, 255, 1)';
+    if (rand > 0.65) color = 'rgba(255, 45, 45, 1)';
+    else if (rand > 0.35) color = 'rgba(255, 190, 60, 1)';
+    else if (rand > 0.15) color = 'rgba(20, 5, 10, 0.9)';
+    return {
+      color,
+      decay: 0.045 + Math.random() * 0.055,
+      size: 2.0 + Math.random() * 2.8,
+      speed: 7 + Math.random() * 14,
+      friction: 0.91,
+      isFlash: false
+    };
+  },
   parryEmberStar: () => {
     const rand = Math.random();
     const color = rand > 0.5 ? 'rgba(255, 255, 255, 1)' : (rand > 0.25 ? 'rgba(255, 220, 80, 1)' : 'rgba(255, 130, 30, 1)');

@@ -1688,7 +1688,7 @@ export function drawSparkEffects(layer = 'all') {
 
         ctx.restore();
       }
-    } else if (effect.type === 'parrySpark') {
+    } else if (effect.type === 'parrySpark' || effect.type === 'slashRicochet') {
       // ── High-Velocity Metal Welding Spark Streak (Matching Reference Image) ──
       const speed = Math.hypot(effect.vx || 0, effect.vy || 0);
       const angle = Math.atan2(effect.vy || 0, effect.vx || 1);
@@ -1697,8 +1697,12 @@ export function drawSparkEffects(layer = 'all') {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
 
-      // 1. Outer Fiery Amber-Orange Glow Streak
-      ctx.strokeStyle = `rgba(255, 90, 0, ${effect.life * 0.55})`;
+      const isRicochet = effect.type === 'slashRicochet';
+      const outerColor = isRicochet ? `rgba(255, 30, 40, ${effect.life * 0.65})` : `rgba(255, 90, 0, ${effect.life * 0.55})`;
+      const midColor = isRicochet ? `rgba(255, 180, 50, ${effect.life * 0.85})` : `rgba(255, 220, 80, ${effect.life * 0.85})`;
+
+      // 1. Outer Fiery Glow Streak
+      ctx.strokeStyle = outerColor;
       ctx.lineWidth = effect.size * 2.2;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -1706,8 +1710,8 @@ export function drawSparkEffects(layer = 'all') {
       ctx.lineTo(effect.x - Math.cos(angle) * tailLen, effect.y - Math.sin(angle) * tailLen);
       ctx.stroke();
 
-      // 2. Hot Gold Inner Streak
-      ctx.strokeStyle = `rgba(255, 220, 80, ${effect.life * 0.85})`;
+      // 2. Hot Gold / Flame Inner Streak
+      ctx.strokeStyle = midColor;
       ctx.lineWidth = effect.size * 1.1;
       ctx.beginPath();
       ctx.moveTo(effect.x, effect.y);
@@ -2510,6 +2514,76 @@ export function drawSparkEffects(layer = 'all') {
       }
 
       ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
+    } else if (effect.type === 'purpleShockwaveRing') {
+      // ── Simple, Clean Expanding Purple Repulsion Shockwave Rings (Like Gojo's Red) ──
+      effect.size += (effect.targetSize - effect.size) * 0.22;
+      const alpha = Math.min(1.0, effect.life * 1.25);
+      const isDark = _isDarkMode();
+
+      ctx.save();
+      if (isDark) {
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.5;
+        const snap = (v) => Math.round(v / P) * P;
+        const radius = Math.max(P * 2, effect.size);
+        const steps = Math.max(28, Math.min(60, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
+
+        const colBorder = `rgba(10, 0, 20, ${(alpha * 0.90).toFixed(3)})`;
+        const colOuter = effect.color || `rgba(191, 90, 242, ${(alpha * 0.95).toFixed(3)})`;
+        const colMid = `rgba(233, 213, 255, ${(alpha * 0.88).toFixed(3)})`;
+        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+
+        for (let st = 0; st < steps; st++) {
+          const ang = (st / steps) * Math.PI * 2;
+          const cosA = Math.cos(ang);
+          const sinA = Math.sin(ang);
+
+          // 1. Dark Outline Shell
+          const r0 = snap(radius);
+          ctx.fillStyle = colBorder;
+          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+
+          // 2. Primary Purple Pixel Ring
+          ctx.fillStyle = colOuter;
+          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+          // 3. Mid Lavender Ring
+          const r1 = snap(radius * 0.78);
+          ctx.fillStyle = colMid;
+          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+          // 4. Inner White-Hot Specular Ring
+          const r2 = snap(radius * 0.50);
+          ctx.fillStyle = colCore;
+          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
+        }
+      } else {
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Outer expanding purple repulsion ring
+        ctx.strokeStyle = effect.color || `rgba(191, 90, 242, ${(alpha * 0.95).toFixed(3)})`;
+        ctx.lineWidth = (effect.is200 ? 7.0 : 4.8) * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Mid lavender contrast ring
+        ctx.strokeStyle = `rgba(233, 213, 255, ${(alpha * 0.85).toFixed(3)})`;
+        ctx.lineWidth = 3.0 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.80), 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner white-hot specular core ring
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`;
+        ctx.lineWidth = 2.0 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.55), 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.globalCompositeOperation = 'source-over';
+      }
       ctx.restore();
     } else if (effect.type === 'animeImpactFrame') {
       const isDark = _isDarkMode();
@@ -3458,3 +3532,61 @@ export function spawnMahitoDomainSoulTendrilStrike(startX, startY, targetX, targ
   // Organic soul bubbles floating from impact
   spawnMahitoSoulBubbles(targetX, targetY, 2);
 }
+
+/**
+ * Spawns simple, clean expanding Purple shockwave repulsion rings (like Gojo's Red).
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} radius - Max explosion radius
+ * @param {boolean} is200 - True if 200% empowered cast
+ */
+export function spawnPurpleShockwaveRings(x, y, radius = 280, is200 = false) {
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+  const fps = state.fps || 60;
+  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 6 : 12) : 25;
+
+  const ringConfigs = [
+    { startSize: 14, targetMult: 1.0, decay: 0.038, color: is200 ? 'rgba(224, 102, 255, 0.95)' : 'rgba(191, 90, 242, 0.95)' },
+    { startSize: 8,  targetMult: 0.76, decay: 0.044, color: 'rgba(138, 43, 226, 0.90)' },
+    { startSize: 4,  targetMult: 0.52, decay: 0.050, color: 'rgba(255, 255, 255, 0.95)' },
+  ];
+
+  if (is200) {
+    ringConfigs.push({ startSize: 20, targetMult: 1.18, decay: 0.032, color: 'rgba(0, 255, 255, 0.85)' });
+  }
+
+  for (let r = 0; r < ringConfigs.length; r++) {
+    const cfg = ringConfigs[r];
+    let insertIdx = -1;
+    if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
+      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const oldest = state.sparkEffects[insertIdx];
+      if (oldest) ParticleSystem.returnParticle(oldest);
+    }
+
+    const shockwave = ParticleSystem.getParticle();
+    shockwave.x = x;
+    shockwave.y = y;
+    shockwave.vx = 0;
+    shockwave.vy = 0;
+    shockwave.size = cfg.startSize;
+    shockwave.targetSize = radius * cfg.targetMult;
+    shockwave.life = 1.0;
+    shockwave.decay = cfg.decay;
+    shockwave.type = 'purpleShockwaveRing';
+    shockwave.is200 = is200;
+    shockwave.color = cfg.color;
+    shockwave.isFlash = false;
+
+    if (insertIdx !== -1) {
+      state.sparkEffects[insertIdx] = shockwave;
+    } else {
+      state.sparkEffects.push(shockwave);
+    }
+  }
+
+  // Also spawn clean impact flash & lightning sparks
+  spawnImpactFlash(x, y, radius * 0.35, '#BF5AF2');
+  spawnSparks(x, y, is200 ? 16 : 10, 'lightningTrail', '#8A2BE2');
+  spawnSparks(x, y, is200 ? 8 : 4, 'lightningTrail', '#00FFFF');
+}

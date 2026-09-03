@@ -6,6 +6,7 @@ import { drawShurikenProjectile } from '../weaponVisuals.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray } from '../particles/visualTrailSystem.js';
 import { isSuppressedByGetsuga } from '../../entities/fighter.js';
+import { applyCameraToCtx, worldToScreen } from '../../systems/cameraSystem.js';
 
 export function drawBlackHoleEffects() {
   const ctx = state.ctx;
@@ -181,6 +182,7 @@ export function drawFloatingTexts() {
   const isDark = (state.arenaTheme === 'dark');
 
   ctx.save();
+  applyCameraToCtx(ctx);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
@@ -684,10 +686,9 @@ export function drawGenosSelfDestructDimScreen() {
     const dimAlpha = chargeP * 0.92;
 
     if (dimAlpha > 0.01) {
-      const shakeX = state.shakeX || 0;
-      const shakeY = state.shakeY || 0;
-      const drawX = genos.x + shakeX;
-      const drawY = genos.y + shakeY;
+      const screenPos = worldToScreen(genos.x, genos.y);
+      const drawX = screenPos.x;
+      const drawY = screenPos.y;
 
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -716,8 +717,9 @@ export function drawGenosSelfDestructDimScreen() {
   // ── 4. If no active flash, done ──
   if (_genosSdFlashTimer <= 0) return;
 
-  const fx = _genosSdFlashX;
-  const fy = _genosSdFlashY;
+  const screenF = worldToScreen(_genosSdFlashX, _genosSdFlashY);
+  const fx = screenF.x;
+  const fy = screenF.y;
   const life = _genosSdFlashTimer / 55; // 1.0 → 0.0
 
   ctx.save();
@@ -946,13 +948,13 @@ function _drawIdolHeartPath(ctx, x, y, size) {
   ctx.fill();
 }
 
-function _drawBatchedIdolSparkles(ctx, sparkles, screenW, screenH, now, baseAlpha) {
+function _drawBatchedIdolSparkles(ctx, sparkles, arenaX, arenaY, arenaW, arenaH, now, baseAlpha) {
   ctx.fillStyle = `rgba(255, 255, 255, ${baseAlpha * 0.90})`;
   ctx.beginPath();
   for (let i = 0; i < sparkles.length; i++) {
     const sp = sparkles[i];
-    const sx = sp.relX * screenW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
-    const sy = sp.relY * screenH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
+    const sx = arenaX + sp.relX * arenaW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
+    const sy = arenaY + sp.relY * arenaH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
     ctx.moveTo(sx + sp.size, sy);
     ctx.arc(sx, sy, sp.size, 0, Math.PI * 2);
   }
@@ -963,8 +965,8 @@ function _drawBatchedIdolSparkles(ctx, sparkles, screenW, screenH, now, baseAlph
   ctx.beginPath();
   for (let i = 0; i < sparkles.length; i++) {
     const sp = sparkles[i];
-    const sx = sp.relX * screenW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
-    const sy = sp.relY * screenH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
+    const sx = arenaX + sp.relX * arenaW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
+    const sy = arenaY + sp.relY * arenaH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
     const arm = sp.size * 2.2;
     ctx.moveTo(sx - arm, sy); ctx.lineTo(sx + arm, sy);
     ctx.moveTo(sx, sy - arm); ctx.lineTo(sx, sy + arm);
@@ -997,8 +999,8 @@ function _initTodoIdolSeeds() {
     _todoSparkleSeeds.push({
       relX: Math.random(),
       relY: Math.random(),
-      speed: 0.5 + Math.random() * 0.5,
-      size: 1.5 + Math.random() * 2.0,
+      speed: 0.8 + Math.random() * 0.5,
+      size: 2.2 + Math.random() * 1.8,
       phase: Math.random() * Math.PI * 2
     });
   }
@@ -1048,8 +1050,11 @@ export function drawTodoTakadaIdolScreenOverlay() {
 
   const ctx = state.ctx;
   const canvas = state.canvas;
-  const screenW = canvas.width;
-  const screenH = canvas.height;
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
+  const arenaW = arena ? arena.width : canvas.width;
+  const arenaH = arena ? arena.height : canvas.height;
+  const arenaX = arena ? arena.x : 0;
+  const arenaY = arena ? arena.y : 0;
   const now = Date.now();
   const isLowPerf = (state.performanceMode || (state.fps && state.fps < 50));
 
@@ -1058,7 +1063,6 @@ export function drawTodoTakadaIdolScreenOverlay() {
   ctx.save();
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
-  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
   if (arena) {
     ctx.beginPath();
     if (arena.shape === 'circle') {
@@ -1072,18 +1076,18 @@ export function drawTodoTakadaIdolScreenOverlay() {
     ctx.clip();
   }
 
-  // 1. Cached Full-Screen Radial Background Gradient (Suppressed when Mahito's domain OR Saitama's Serious  // 2. Batched Full-Screen Shimmering White Sparks (Always render)
+  // 1. Batched Full-Screen Shimmering White Sparks (Always render)
   const sparkleCount = isLowPerf ? 7 : _todoSparkleSeeds.length;
-  _drawBatchedIdolSparkles(ctx, _todoSparkleSeeds.slice(0, sparkleCount), screenW, screenH, now, _todoIdolOverlayAlpha);
+  _drawBatchedIdolSparkles(ctx, _todoSparkleSeeds.slice(0, sparkleCount), arenaX, arenaY, arenaW, arenaH, now, _todoIdolOverlayAlpha);
 
-  // 3. Floating Pink & Red Hearts (Always render, drifting upward)
+  // 2. Floating Pink & Red Hearts (Always render, drifting upward)
   const heartCount = isLowPerf ? 5 : _todoHeartSeeds.length;
   for (let i = 0; i < heartCount; i++) {
     const h = _todoHeartSeeds[i];
-    const hx = h.relX * screenW + Math.sin(now * 0.0015 * h.speed + h.phase) * 25;
-    const rawY = screenH - ((now * 0.035 * h.speed + h.yOffset) % (screenH + 60));
+    const hx = arenaX + h.relX * arenaW + Math.sin(now * 0.0015 * h.speed + h.phase) * 25;
+    const rawY = arenaY + arenaH - ((now * 0.035 * h.speed + h.yOffset) % (arenaH + 60));
     const hy = rawY;
-    const heartAlpha = Math.min(1.0, Math.sin((rawY / screenH) * Math.PI)) * _todoIdolOverlayAlpha * 0.85;
+    const heartAlpha = Math.min(1.0, Math.sin(((rawY - arenaY) / arenaH) * Math.PI)) * _todoIdolOverlayAlpha * 0.85;
 
     ctx.fillStyle = h.color;
     ctx.globalAlpha = heartAlpha;

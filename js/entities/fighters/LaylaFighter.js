@@ -379,18 +379,7 @@ export class LaylaFighter extends Fighter {
       this.vy = 0;
       this.ultimateWindupTimer--;
       
-      // Aim lock onto opponent during charge if they exist
-      if (opponent) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        const delta = this.normalizeAngle(targetAngle - (this.gunAngle || this.angle));
-        const maxRotate = 0.05;
-        if (Math.abs(delta) > maxRotate) {
-          this.gunAngle += Math.sign(delta) * maxRotate;
-        } else {
-          this.gunAngle = targetAngle;
-        }
-        this.angle = this.gunAngle;
-      }
+      // Facing angle remains strictly locked to the initial cast angle; no auto-aim while charging
 
       if (this.ultimateWindupTimer <= 0) {
         this.isUltimateCharging = false;
@@ -715,11 +704,10 @@ export class LaylaFighter extends Fighter {
     ctx.save();
     let tremorX = 0;
     let tremorY = 0;
-    const currentShake = (typeof state !== 'undefined' && state.screenShake) ? (state.screenShake.intensity || 0) : 0;
     const isAnyFighterChanneling = (typeof state !== 'undefined' && state.fighters) ? state.fighters.some(f => f && (f.isChannelingDomain || f.isChannelingDomainExpansion)) : false;
     
-    if (currentShake > 0 || isAnyFighterChanneling) {
-      const shakeAmt = isAnyFighterChanneling ? 4.0 : Math.min(6, currentShake * 0.6);
+    if (isAnyFighterChanneling) {
+      const shakeAmt = 3.0;
       tremorX = (Math.random() - 0.5) * shakeAmt;
       tremorY = (Math.random() - 0.5) * shakeAmt;
     }

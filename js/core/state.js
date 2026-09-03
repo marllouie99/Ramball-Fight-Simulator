@@ -147,7 +147,25 @@ export const state = {
   bloodSquareTexture,
   arena: CONFIG.arena,
 
-
+  // Dynamic Combat Tracking Camera (Boxx Arena style)
+  camera: {
+    enabled: true,
+    mode: (typeof localStorage !== 'undefined' && localStorage.getItem('cameraMode')) || 'dynamic',
+    x: (CONFIG.arena?.x ?? 40) + (CONFIG.arena?.width ?? 450) / 2,
+    y: (CONFIG.arena?.y ?? 240) + (CONFIG.arena?.height ?? 450) / 2,
+    zoom: 1.0,
+    targetX: (CONFIG.arena?.x ?? 40) + (CONFIG.arena?.width ?? 450) / 2,
+    targetY: (CONFIG.arena?.y ?? 240) + (CONFIG.arena?.height ?? 450) / 2,
+    targetZoom: 1.0,
+    shakeX: 0,
+    shakeY: 0,
+    smoothing: 0.08,
+    zoomSmoothing: 0.06,
+    minZoom: 1.0,
+    maxZoom: 1.15,
+    toastText: '',
+    toastTimer: 0
+  },
 
   // Global screen shake
   screenShake: { timer: 0, maxTimer: 0, intensity: 0 },
@@ -437,11 +455,7 @@ export function triggerGlobalScreenShake(intensity, duration) {
   const modeKey = is1v2 ? GAME_MODES.STAND_OFF_1V2 : (isFFA ? GAME_MODES.FFA : state.mode);
   const modeSettings = (typeof MODE_SETTINGS !== 'undefined' && modeKey) ? MODE_SETTINGS[modeKey] : null;
 
-  if (is1v2) {
-    // In 1v2 mode: use the configurable arenaShakeIntensity from MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2] (defaults to 3.5)
-    targetIntensity = modeSettings?.arenaShakeIntensity ?? 3.5;
-    targetDuration = modeSettings?.arenaShakeDuration ?? 6;
-  } else if (isFFA) {
+  if (is1v2 || isFFA) {
     targetIntensity = modeSettings?.arenaShakeIntensity ?? 3.5;
     targetDuration = modeSettings?.arenaShakeDuration ?? 6;
   } else if (modeSettings && modeSettings.arenaShakeIntensity !== undefined) {
@@ -456,16 +470,38 @@ export function triggerGlobalScreenShake(intensity, duration) {
     : 1.0;
   if (mult <= 0) return;
 
-  const scaledIntensity = targetIntensity * mult;
+  // Scale by global multiplier once
+  let scaledIntensity = targetIntensity * mult;
 
-  if (scaledIntensity >= state.screenShake.intensity || state.screenShake.timer <= 0) {
+  // Hard clamp limit so multiple rapid combat explosions never tear the screen apart
+  const maxAllowedShake = (is1v2 || isFFA) ? 3.5 : 12.0;
+  scaledIntensity = Math.min(maxAllowedShake, scaledIntensity);
+
+  // If no shake is currently active, initialize cleanly
+  if (!state.screenShake || state.screenShake.timer <= 0) {
+    state.screenShake.intensity = scaledIntensity;
+    state.screenShake.timer = targetDuration;
+    state.screenShake.maxTimer = targetDuration;
+    return;
+  }
+
+  // Calculate current instantaneous remaining shake power (decayed over time)
+  const currentMax = state.screenShake.maxTimer || state.screenShake.timer || 1;
+  const currentRemainingPower = state.screenShake.intensity * Math.max(0, state.screenShake.timer / currentMax);
+
+  // Multiple shake effects: NEVER multiply or additively stack!
+  if (scaledIntensity > currentRemainingPower) {
+    // New shake is stronger than what remains of the old shake: replace with new shake cleanly
     state.screenShake.intensity = scaledIntensity;
     state.screenShake.timer = targetDuration;
     state.screenShake.maxTimer = targetDuration;
   } else {
-    if (state.screenShake.timer < targetDuration) {
+    // Existing shake is currently stronger than the new one.
+    // If the new shake's duration is longer, gently extend from currentRemainingPower without jumping to the old peak!
+    if (targetDuration > state.screenShake.timer) {
+      state.screenShake.intensity = currentRemainingPower;
       state.screenShake.timer = targetDuration;
-      state.screenShake.maxTimer = Math.max(state.screenShake.maxTimer, targetDuration);
+      state.screenShake.maxTimer = targetDuration;
     }
   }
 }

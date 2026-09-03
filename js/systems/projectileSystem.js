@@ -133,11 +133,17 @@ class ProjectileSystem {
     p.piercing = false;
     p.hitTargets = null;
     p.hitFighters = null;
+    p.blueDPS = undefined;
+    p.blueDPSInterval = undefined;
+    p.blueLastDPSTick = undefined;
+    p.isWallLingering = false;
+    p.wallLingerTimer = undefined;
     p.purpleDPS = undefined;
     p.purpleDPSInterval = undefined;
     p.purpleLastDPSTick = undefined;
     p.purpleDamagedFighters = null;
     p.purpleShakeCounter = undefined;
+    p._hasExploded = false;
     p.isAdaptableSkillShot = false;
     p.skillShotId = undefined;
     p.gridIndex = undefined;
@@ -541,6 +547,13 @@ class ProjectileSystem {
     proj.behaviorType = 'gojo_blue';
     proj.visual = 'gojoBlue'; // Distinct visual
     proj.hitTargets = new Set();
+    proj.hitFighters = new Set();
+    proj.piercing = true;
+    proj.blueDPS = CONFIG.gojo?.blueDPS ?? 65;
+    proj.blueDPSInterval = CONFIG.gojo?.blueDPSInterval ?? 10;
+    proj.blueLastDPSTick = 0;
+    proj.isWallLingering = false;
+    proj.wallLingerTimer = 0;
     
     if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
     proj.historyMax = 10;
@@ -774,15 +787,20 @@ class ProjectileSystem {
    * Triggers a thermobaric explosion upon Furnace arrow impact.
    */
   triggerThermobaricExplosion(x, y, ownerIndex, damage) {
-    const splashRadius = 140;
+    const splashRadius = CONFIG.sukuna?.divineFlameExplosionRadius || CONFIG.sukuna?.fugaExplosionRadius || CONFIG.sukuna?.thermobaricSplashRadius || 220;
     const attacker = state.fighters ? state.fighters[ownerIndex] : null;
+    const baseExplosionDmg = CONFIG.sukuna?.divineFlameExplosionDamage || CONFIG.sukuna?.fugaExplosionDamage || damage || 300;
+    const isDomainActive = attacker && attacker.domainActive;
+    const explosionDmg = isDomainActive ? Math.round(baseExplosionDmg * 1.5) : baseExplosionDmg;
     
     // Play explosion sound
     const fugaExplodeSound = getSkillSound(attacker?._def?.id || 'sukuna', 'fuga_explode');
-    if (fugaExplodeSound) playSound(fugaExplodeSound.src, fugaExplodeSound.volume);
+    const explodeSnd = CONFIG.sukuna?.sounds?.fugaExplosion || (fugaExplodeSound ? fugaExplodeSound.src : 'Assets/Sound Effects/Skills/fugaexplode.mp3');
+    const explodeVol = CONFIG.sukuna?.soundVolumes?.fugaExplosion ?? (fugaExplodeSound ? fugaExplodeSound.volume : 1.5);
+    if (explodeSnd) playSound(explodeSnd, explodeVol);
     
-    const impactShake = CONFIG.sukuna?.divineFlameShakeIntensity || 8;
-    const impactDuration = CONFIG.sukuna?.divineFlameShakeDuration || 14;
+    const impactShake = CONFIG.sukuna?.divineFlameShakeIntensity || 30;
+    const impactDuration = CONFIG.sukuna?.divineFlameShakeDuration || 25;
     triggerGlobalScreenShake(impactShake, impactDuration);
     if (typeof spawnGroundScorch === 'function') spawnGroundScorch(x, y, 60);
     if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 40, 'orange');
@@ -856,7 +874,7 @@ class ProjectileSystem {
           const dist = Math.hypot(f.x - x, f.y - y);
           if (dist <= splashRadius) {
             const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
-            const splashDmg = damage * splashRatio;
+            const splashDmg = explosionDmg * splashRatio;
 
             // 1. Interrupt and cancel any active skill channeling or attack
             if (typeof f.interruptAttacks === 'function') {
@@ -909,7 +927,8 @@ class ProjectileSystem {
                 ill.interruptAttacks(true);
               }
 
-              applyDamageToTarget(ill, damage * 0.7, attacker, { isExplosion: true });
+              const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
+              applyDamageToTarget(ill, explosionDmg * 0.7 * splashRatio, attacker, { isExplosion: true });
 
               const angle = dist > 0 ? Math.atan2(ill.y - y, ill.x - x) : Math.random() * Math.PI * 2;
               const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
@@ -1100,7 +1119,14 @@ class ProjectileSystem {
     }
 
     for (const { fighter, fi, isIllusion } of candidateEntities) {
-      if (!fighter || fighter.isAmbushing || (fighter.vanishTimer && fighter.vanishTimer > 0) || (fighter.invincibilityTimer && fighter.invincibilityTimer > 0)) continue;
+      if (!fighter || fighter.isAmbushing) continue;
+
+      const isFuga = projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace';
+
+      // Normal projectiles skip targets with active iframes or vanish.
+      // However, Fuga is a massive thermobaric missile: if it intersects a target's space,
+      // it must detonate and never pass through their body like a ghost.
+      if (!isFuga && ((fighter.vanishTimer && fighter.vanishTimer > 0) || (fighter.invincibilityTimer && fighter.invincibilityTimer > 0))) continue;
 
       // Skip projectile owner
       if (projectile.ownerFighter && projectile.ownerFighter === fighter) continue;
@@ -1120,25 +1146,9 @@ class ProjectileSystem {
       // Skip submerged or erupting entities (e.g. Megumi Shadow Sink) - projectiles pass freely over the floor shadow
       if (fighter.isSubmerged || fighter.isErupting) continue;
 
-      // Special handling for Sukuna's Fuga arrow:
-      // If the enemy is dead (e.g. killed by domain slashes), detonate immediately on impact with their body
-      const isDead = fighter.hp <= 0 || fighter.isDead;
-      if (isDead) {
-        if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
-          const hitRadius = (fighter.r || 25) + (projectile.r || 8) + 15;
-          const dx = fighter.x - projectile.x;
-          const dy = fighter.y - projectile.y;
-          if (dx * dx + dy * dy < hitRadius * hitRadius) {
-            this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
-            return true;
-          }
-        }
-        continue;
-      }
-
       // ── Swept Continuous Collision Detection (CCD) for high-speed projectiles ──
       const isTactical = projectile.visual === 'tacticalBullet';
-      const projRadius = isTactical ? Math.max(9, (projectile.r || 5) + 3) : (projectile.r || (projectile.bulletRadius || 5));
+      const projRadius = isFuga ? Math.max(18, (projectile.r || 18) + 4) : (isTactical ? Math.max(9, (projectile.r || 5) + 3) : (projectile.r || (projectile.bulletRadius || 5)));
       const hitRadius = (fighter.r || 25) + projRadius;
 
       // Calculate distance from fighter center to the line segment traveled by the projectile this frame
@@ -1157,10 +1167,12 @@ class ProjectileSystem {
       if (fighter.x < minX || fighter.x > maxX || fighter.y < minY || fighter.y > maxY) continue;
 
       let distSq;
+      let closestX = projectile.x;
+      let closestY = projectile.y;
       if (segLenSq > 0.001) {
         const t = Math.max(0, Math.min(1, ((fighter.x - prevX) * segVx + (fighter.y - prevY) * segVy) / segLenSq));
-        const closestX = prevX + t * segVx;
-        const closestY = prevY + t * segVy;
+        closestX = prevX + t * segVx;
+        closestY = prevY + t * segVy;
         const cdx = fighter.x - closestX;
         const cdy = fighter.y - closestY;
         distSq = cdx * cdx + cdy * cdy;
@@ -1177,6 +1189,29 @@ class ProjectileSystem {
       if (distSq < hitRadiusSq) {
         if (projectile.isBlackHole && projectile.hitTargets && projectile.hitTargets.has(fi)) {
           continue;
+        }
+
+        // Special handling for Sukuna's Fuga arrow:
+        // ALWAYS detonate thermobaric explosion on contact with ANY target's physical body.
+        // It NEVER pierces or passes through.
+        if (isFuga) {
+          const attacker = fighters[projectile.owner];
+          const isDead = fighter.hp <= 0 || fighter.isDead;
+          const isInvincible = (fighter.invincibilityTimer && fighter.invincibilityTimer > 0) || (fighter.vanishTimer && fighter.vanishTimer > 0);
+          if (!isDead && !isInvincible) {
+            fighter.takeDamage(Number(projectile.damage) || 35, attacker, {
+              isProjectile: true,
+              projectile,
+              isDivineFlame: true,
+              isFlame: true,
+              skipStandardDamageText: false
+            });
+            if (attacker && typeof attacker.onDamageDealt === 'function') {
+              attacker.onDamageDealt(fighter, projectile, projectile.owner);
+            }
+          }
+          this.triggerThermobaricExplosion(closestX, closestY, projectile.owner, projectile.damage);
+          return true; // Destroy Fuga immediately on contact!
         }
 
         // Grenades detonate on contact with a fighter
@@ -1299,7 +1334,12 @@ class ProjectileSystem {
             }
             
             if (projectile.behaviorType && ProjectileBehaviorManager.has(projectile.behaviorType)) {
-              return ProjectileBehaviorManager.onHit(projectile, fighter, attacker, fighters, this);
+              const shouldDestroy = ProjectileBehaviorManager.onHit(projectile, fighter, attacker, fighters, this);
+              if (!shouldDestroy) {
+                continue; // Projectile pierces or passes through
+              } else {
+                return true; // Projectile is destroyed
+              }
             }
             
             // Delegate visual and piercing logic to HitImpactSystem
@@ -1368,7 +1408,7 @@ class ProjectileSystem {
         const attacker = fighters[projectile.owner];
         applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
         
-        if (projectile.isSukunaFurnace) {
+        if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
           this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
           return true;
         } 
@@ -1400,6 +1440,11 @@ class ProjectileSystem {
             const attacker = fighters[projectile.owner];
             if (typeof rk.takeDamage === 'function') {
               rk.takeDamage(projectile.damage, attacker, { isProjectile: true, projectile });
+            }
+
+            if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
+              this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
+              return true;
             }
 
             const shouldDestroy = HitImpactSystem.processProjectileHit(rk, projectile, attacker, fighters);
@@ -2357,6 +2402,21 @@ class ProjectileSystem {
       if (p.isFrozenByInfinity) {
         p.vx = 0;
         p.vy = 0;
+        p.damage = 0;
+        p.isVisual = true;
+        if (p.draggedTargets && p.draggedTargets.size > 0) {
+          for (const [target] of p.draggedTargets.entries()) {
+            if (target) {
+              target.isDraggedByGetsuga = false;
+              target.preventKnockbackBounce = false;
+              target.z = 0;
+            }
+          }
+          p.draggedTargets.clear();
+        }
+        if (p.hitTargets) {
+          p.hitTargets.clear();
+        }
         if (p.infinityFreezeTimer === undefined) p.infinityFreezeTimer = 240;
         p.infinityFreezeTimer--;
 
@@ -2365,6 +2425,7 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
+          i--;
         }
         continue;
       }
@@ -2960,11 +3021,13 @@ class ProjectileSystem {
           if (areOnSameTeam(p.owner, fi)) continue;
 
           const infinityRadius = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
+          const projRadius = (p.isGetsuga || p.behaviorType === 'getsuga_tensho') ? (p.r || 100) : 0;
+          const effectiveInfinityRadius = infinityRadius + projRadius;
           const dx = p.x - f.x;
           const dy = p.y - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
           const isLimitlessActive = f.domainActive || (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0 || p.targetIsGojoLimitless);
-          if (distSq <= infinityRadius * infinityRadius && isLimitlessActive) {
+          if (distSq <= effectiveInfinityRadius * effectiveInfinityRadius && isLimitlessActive) {
             // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
             if (p.infinityEvaluated === undefined) {
               p.infinityEvaluated = true;
@@ -2972,11 +3035,12 @@ class ProjectileSystem {
               const isMahoragaAdapted = ownerFighter && ownerFighter.characterId === 'mahoraga' && ownerFighter.gojoInfinityImmune;
               const isToji = ownerFighter && (ownerFighter.characterId === 'toji' || ownerFighter.type === 'toji');
               const isTojiAmbush = isToji && (p.isAmbush || p.skillShotId === 'tojiAmbush' || (ownerFighter && ownerFighter.isAmbushing));
+              const freezeChance = CONFIG.gojo?.infinityFreezeChance !== undefined ? CONFIG.gojo.infinityFreezeChance : 0.90;
 
-              if (isMahoragaAdapted || isTojiAmbush) {
-                p.infinityBypassed = true; // Adapted Mahoraga and Toji Ambush bypass Infinity!
+              if (isMahoragaAdapted || isTojiAmbush || (freezeChance <= 0) || (Math.random() > freezeChance)) {
+                p.infinityBypassed = true; // Adapted Mahoraga, Toji Ambush, or failed freeze chance roll bypasses Infinity barrier
               } else {
-                p.infinityBypassed = false; // Frozen by Gojo's Limitless Infinity barrier (Rule #9 compliant)
+                p.infinityBypassed = false; // Frozen by Gojo's Limitless Infinity barrier
               }
             }
 
@@ -3030,6 +3094,19 @@ class ProjectileSystem {
               p.vy = 0;
               p.damage = 0; // Nullify damage completely
               p.isVisual = true; // Disable further damage collision
+              if (p.draggedTargets && p.draggedTargets.size > 0) {
+                for (const [target] of p.draggedTargets.entries()) {
+                  if (target) {
+                    target.isDraggedByGetsuga = false;
+                    target.preventKnockbackBounce = false;
+                    target.z = 0;
+                  }
+                }
+                p.draggedTargets.clear();
+              }
+              if (p.hitTargets) {
+                p.hitTargets.clear();
+              }
               if (typeof f.triggerInfinityBlock === 'function') {
                 f.triggerInfinityBlock(p.x, p.y);
               }

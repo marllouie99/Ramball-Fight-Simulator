@@ -130,11 +130,10 @@ export class FighterRenderer {
     ctx.save();
     let tremorX = 0;
     let tremorY = 0;
-    const currentShake = (typeof state !== 'undefined' && state.screenShake) ? (state.screenShake.intensity || 0) : 0;
     const isAnyFighterChanneling = (typeof state !== 'undefined' && state.fighters) ? state.fighters.some(f => f && (f.isChannelingDomain || f.isChannelingDomainExpansion)) : false;
     
-    if (currentShake > 0 || isAnyFighterChanneling) {
-      const shakeAmt = isAnyFighterChanneling ? 4.0 : Math.min(6, currentShake * 0.6);
+    if (isAnyFighterChanneling) {
+      const shakeAmt = 3.0;
       tremorX = (Math.random() - 0.5) * shakeAmt;
       tremorY = (Math.random() - 0.5) * shakeAmt;
     }
@@ -232,12 +231,12 @@ export class FighterRenderer {
       }
     }
 
-    ctx.font = '700 13px "Silkscreen", "Press Start 2P", monospace';
+    ctx.font = '900 17px "Rajdhani", "Outfit", "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const hpText = Math.floor(fighter.hp).toString();
-    ctx.lineWidth = 3.5;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.lineWidth = 4.0;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.strokeText(hpText, fighter.x, hpY);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(hpText, fighter.x, hpY);

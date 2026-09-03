@@ -26,7 +26,7 @@ export const ichigoConfig = {
   // Basic Attack: Zangetsu Cleave
   swordDamage: 15,               // Base damage per melee slash
   swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s)
-  swordRange: 70,                // Melee reach (140° frontal arc)
+  swordRange: 50,                // Melee reach (140° frontal arc)
   swordArc: 140,                 // Frontal cleave arc cone angle in degrees (Rule #7)
   swordFreezeDuration: 8,        // Target hit-pause freeze frames on melee strike (Rule #5)
   swordSwingDuration: 22,        // Melee slash swing animation duration in frames
@@ -38,7 +38,7 @@ export const ichigoConfig = {
   swordShockwaveSize: 35,        // Shockwave burst size on basic sword hit
 
   // ── Unified Skill Combo: Shunpo Getsuga Blitz (Flash Step Flurry -> Disengage Back-Step -> Getsuga Tensho) ──
-  comboCooldown: 450,            // Base cooldown in frames between combo activations (~7.5s)
+  comboCooldown: 800,            // Base cooldown in frames between combo activations (~7.5s)
   comboDisengageDistance: 290,   // Increased distance flash-stepped backward away from target before firing Getsuga (px)
   comboDisengageDashFrames: 3,   // Flash step duration frames for the backward disengage
   comboDisengageDelayFrames: 7,  // Delay window frames after finisher before initiating back-step in Shikai

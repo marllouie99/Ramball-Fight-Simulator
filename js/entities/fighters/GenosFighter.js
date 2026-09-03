@@ -1359,16 +1359,7 @@ export class GenosFighter extends Fighter {
         triggerGlobalScreenShake(windupShake, CONFIG.genos?.ultWindupShakeDuration || 4);
       }
 
-      // Smoothly track opponent position with heavy cannon turn speed during wind-up charge frames (no instant snapping)
-      if (opponent && opponent.hp > 0) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        let diff = targetAngle - this.ultAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-
-        const maxTurnSpeed = 0.035; // ~2 degrees per frame smooth heavy cannon turn rate
-        this.ultAngle += Math.max(-maxTurnSpeed, Math.min(maxTurnSpeed, diff));
-      }
+      // Cannon facing orientation remains strictly locked to initial cast angle; no auto-aim while charging
       this.gunAngle = this.ultAngle;
       this.angle = this.ultAngle;
 

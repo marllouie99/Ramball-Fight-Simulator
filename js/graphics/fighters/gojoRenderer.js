@@ -384,12 +384,10 @@ export class GojoRenderer {
     const isInOwnDomain = fighter.domainActive;
     if (!isSuppressed) {
       if (fighter.isChannelingPurple) {
-        if (fighter.is200PercentChannel || fighter.purpleUseCount === 1) {
-          fighter._drawJJKCursedEnergyAura(ctx, 'purple');
-        }
+        fighter._drawJJKCursedEnergyAura(ctx, 'purple');
       } else if (fighter.isChannelingRCT || fighter.healingAuraTimer > 0) {
         fighter._drawJJKCursedEnergyAura(ctx, 'rct');
-      } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.isMeleeMode || fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
+      } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.isChannelingDomainExpansion || fighter.isMeleeMode || fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
         fighter._drawJJKCursedEnergyAura(ctx, 'blue');
       }
     }
@@ -518,20 +516,14 @@ export class GojoRenderer {
       const is200 = !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
       if (is200) {
-        // 200% Purple Custom Animation Sequence:
-        // Frame 1 (mergeProgress < 0.65): Hands wide open sideways as Red and Blue float high above
-        // Frame 2 & 3 (mergeProgress >= 0.65 -> 1.00): When about to launch 200% Purple, both hands smoothly move forward and get close together in front of the body
+        // 200% Purple: Hands wide open sideways as Red and Blue float high, then clasp forward at fusion
         let handX = 0;
         let handY = r * 2.2;
 
         if (mergeProgress >= 0.65) {
           const launchP = Math.min(1.0, (mergeProgress - 0.65) / 0.35); // 0.0 -> 1.0
-          // Smooth S-curve easing for natural organic hand movement
           const easeClasp = 0.5 - 0.5 * Math.cos(launchP * Math.PI);
-          
-          // Move from 0 (side alignment) forward to front edge of body circle (r * 0.88)
           handX = easeClasp * (r * 0.88);
-          // Move from wide open (r * 2.2) inward until both hands are touching side-by-side (r * 0.30)
           handY = (r * 2.2) * (1 - easeClasp) + (r * 0.30) * easeClasp;
         }
 
@@ -539,20 +531,25 @@ export class GojoRenderer {
         const bHand = toGlobal(handX, -handY);
         return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
       } else {
-        // Standard 100% Purple gesture
+        // 100% Purple: Hands in front holding Red and Blue, merging inward together
         const handDistance = r + 10;
-        const handSpread = 14 * (1 - mergeProgress);
+        const moveP = Math.min(1.0, mergeProgress / 0.70);
+        const easeMove = Math.sin(moveP * Math.PI * 0.5);
+        const handSpread = (mergeProgress < 0.70) ? 22 * (1 - easeMove) : 0;
         const fHand = toGlobal(handDistance, handSpread);
         const bHand = toGlobal(handDistance, -handSpread);
         return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
       }
     }
 
-    // 4. Domain Expansion Hand Sign Gesture (Unlimited Void - Single Hand Sign near Collar)
+    // 4. Domain Expansion Hand Sign Gesture (Unlimited Void - Single Hand Sign near Collar facing camera)
     if (fighter.isChannelingDomainExpansion) {
       hideBackHand = true;
       hideFrontHand = false;
-      const domainHand = toGlobal(0, r * 0.28);
+      const domainHand = {
+        x: fighter.x,
+        y: (fighter.y - (fighter.z || 0)) + r * 0.28
+      };
       return {
         frontHandX: domainHand.x,
         frontHandY: domainHand.y,
@@ -634,7 +631,7 @@ export class GojoRenderer {
 
     const { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand } = hands;
     const handRadius = getHandSize(7.5, fighter);
-    const is200Purple = fighter.isChannelingPurple && !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
+    const isPurpleChanneling = fighter.isChannelingPurple;
     const skinColor = fighter.skinColor || '#FFE0BD';
 
     // 2. Draw Stepped Pixel-Art Hands (High-Performance Offscreen Cached)
@@ -647,7 +644,7 @@ export class GojoRenderer {
     ctx.imageSmoothingEnabled = false;
 
     // Back hand: drawn on 'back' layer only when not hidden
-    if (!is200Purple) {
+    if (!isPurpleChanneling) {
       if ((layer === 'all' || layer === 'back') && !hideBackHand) {
         _drawPixelFist(backHandX, backHandY);
       }
@@ -655,8 +652,8 @@ export class GojoRenderer {
 
     // Front hand (on top of body circle)
     if (layer === 'all' || layer === 'front') {
-      if (is200Purple) {
-        // Draw left hand on top of the body circle during 200% purple launch preparation
+      if (isPurpleChanneling) {
+        // Draw left hand on top of the body circle during purple launch preparation
         if (!hideBackHand) {
           _drawPixelFist(backHandX, backHandY);
         }

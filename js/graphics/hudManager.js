@@ -2127,7 +2127,7 @@ function _getDimElements() {
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
-        const hpText = (isTactical && m.hp <= 0) ? 'KIA' : `${Math.floor(Math.min(Number(m.maxHp), Math.max(0, Number(m.hp) || 0)))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
+        const hpText = (isTactical && m.hp <= 0) ? 'KIA' : `${Math.floor(Math.max(0, Number(m.hp) || 0))}`;
         const memberShakeTimer = m._healthBarShakeTimer || 0;
         const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
         const memberShakeStyle = memberShakeTimer > 0 ? `transform: translateX(${memberShakeAmount}px);` : '';
@@ -2275,7 +2275,7 @@ function _getDimElements() {
           fillColor: color,
           fillRatio: ratio,
           metaLabel: `DMG: ${parseFloat(Math.max(0, Number(soloFighter.damage) || 0).toFixed(1))}`,
-          metaValue: `${Math.floor(Math.max(0, Number(soloFighter.hp) || 0))}/${Math.floor(Math.max(0, Number(soloFighter.maxHp) || 0))}`,
+          metaValue: `${Math.floor(Math.max(0, Number(soloFighter.hp) || 0))}`,
           extraClass: isTactical ? 'tactical-card' : 'red solo-1v2-card',
           borderColor: color,
           wins: matchWins,
@@ -2492,7 +2492,7 @@ function _getDimElements() {
           fillColor: color,
           fillRatio: ratio,
           metaLabel: `DMG: ${parseFloat(Math.max(0, Number(fighter.damage) || 0).toFixed(1))}`,
-          metaValue: `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`,
+          metaValue: `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}`,
           extraClass: extraClassStr,
           borderColor: color,
           wins: matchWins,
@@ -2612,7 +2612,7 @@ function _getDimElements() {
         }
 
         const isTactical = isTacticalMatch(state);
-        const hpText = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
+        const hpText = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`;
         if (m.lastHpText !== hpText) {
           m.text.textContent = hpText;
           m.lastHpText = hpText;
@@ -2787,7 +2787,7 @@ function _getDimElements() {
 
       if (cachedCard.hpBarText) {
         const isTactical = isTacticalMatch(state);
-        const metaValue = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
+        const metaValue = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`;
         if (cachedCard.lastHpText !== metaValue) {
           cachedCard.hpBarText.textContent = metaValue;
           cachedCard.lastHpText = metaValue;

@@ -416,6 +416,7 @@ export class TojiFighter extends Fighter {
     this.ultimateChargeMax = CONFIG.toji?.ultimateChargeTime || 90; // 90 frames (1.5s channel)
     this.ultimateTarget = closest;
     if (closest) {
+      this.aim(closest);
       if (closest.afterImages) closest.afterImages.length = 0;
       if (closest._dashAfterimages) closest._dashAfterimages.length = 0;
       if (closest.stealthAfterimages) closest.stealthAfterimages.length = 0;
@@ -488,10 +489,6 @@ export class TojiFighter extends Fighter {
       this.ultimateChargeTimer++;
       this.vx = 0;
       this.vy = 0;
-      
-      if (!tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
-        this.aim(this.ultimateTarget);
-      }
 
       // Spawn domain channeling afterimages vibrating/pulsing out around Toji
       if (this.ultimateChargeTimer % 3 === 0) {

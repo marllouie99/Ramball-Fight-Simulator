@@ -1,6 +1,7 @@
 import { drawHUD } from '../hudManager.js';
 import { restartCurrentRound, goToTitle } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
+import { toggleCameraMode } from '../../systems/cameraSystem.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawSmallFighterBadge } from './CharacterSelectScreen.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
@@ -62,11 +63,10 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
   const curHpVal = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
   const maxHpVal = fighter._originalMaxHp || fighter.maxHp;
   const displayHp = Number.isInteger(curHpVal) ? `${curHpVal}` : curHpVal.toFixed(1);
-  const displayMaxHp = Number.isInteger(maxHpVal) ? `${maxHpVal}` : maxHpVal.toFixed(1);
   ctx.fillStyle = '#fff';
-  ctx.font = '700 9px "Silkscreen", "Press Start 2P", monospace';
+  ctx.font = '700 10.5px "Rajdhani", "Outfit", sans-serif';
   ctx.textAlign = alignRight ? 'left' : 'right';
-  ctx.fillText(`${displayHp}/${displayMaxHp}`, alignRight ? px + padding : px + panelW - padding, y + 17);
+  ctx.fillText(`${displayHp}`, alignRight ? px + padding : px + panelW - padding, y + 17);
 
   // Bar Background
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -148,7 +148,7 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
     const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
     const isYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
     ctx.fillStyle = isDark ? (isYuta ? '#FF1493' : '#ffffff') : (isDimmed ? '#ffffff' : '#000000');
-    ctx.font = '700 11px "Silkscreen", "Press Start 2P", monospace';
+    ctx.font = '800 12px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fighter.name, rowX + 10, currentY + 6);
@@ -156,10 +156,9 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
     const curHpVal = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
     const maxHpVal = fighter._originalMaxHp || fighter.maxHp;
     const displayHp = Number.isInteger(curHpVal) ? `${curHpVal}` : curHpVal.toFixed(1);
-    const displayMaxHp = Number.isInteger(maxHpVal) ? `${maxHpVal}` : maxHpVal.toFixed(1);
-    ctx.font = '700 9px "Silkscreen", "Press Start 2P", monospace';
+    ctx.font = '700 10.5px "Rajdhani", "Outfit", sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillText(`${displayHp}/${displayMaxHp}`, rowX + rowW - 10, currentY + 6);
+    ctx.fillText(`${displayHp}`, rowX + rowW - 10, currentY + 6);
 
     const barX = rowX + 10;
     const barY = currentY + rowH - 14;
@@ -195,13 +194,13 @@ function drawPauseScreen() {
   drawHUD(); // Keep HUD visible in background
 
   if (state.pauseMenuX === undefined) state.pauseMenuX = canvas.width / 2;
-  if (state.pauseMenuY === undefined) state.pauseMenuY = 180;
+  if (state.pauseMenuY === undefined) state.pauseMenuY = 195;
 
   const cx = state.pauseMenuX;
   const cy = state.pauseMenuY;
 
   const panelW = 260;
-  const panelH = 280;
+  const panelH = 320;
   drawPanel(cx - panelW / 2, cy - panelH / 2, panelW, panelH);
 
   // Drag handle grip bar indicator at top of panel
@@ -213,19 +212,25 @@ function drawPauseScreen() {
   ctx.restore();
 
   ctx.fillStyle = '#ffd700';
-  ctx.font = 'bold 26px Arial';
+  ctx.font = 'bold 24px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('PAUSED', cx, cy - 80);
+  ctx.fillText('PAUSED', cx, cy - 110);
 
   const btnW = 200;
-  const btnH = 36;
+  const btnH = 34;
 
-  drawButton('▶ Resume', cx, cy - 30, () => {
+  drawButton('▶ Resume', cx, cy - 65, () => {
     state.gameState = state.previousGameState || 'playing';
   }, btnW, btnH);
 
-  drawButton('↺ Restart Round', cx, cy + 20, () => {
+  const isCamDynamic = Boolean(state.camera && state.camera.mode === 'dynamic');
+  const camBtnLabel = isCamDynamic ? '📷 Cam: Dynamic' : '📷 Cam: Fixed';
+  drawButton(camBtnLabel, cx, cy - 20, () => {
+    toggleCameraMode();
+  }, btnW, btnH);
+
+  drawButton('↺ Restart Round', cx, cy + 25, () => {
     restartCurrentRound();
   }, btnW, btnH);
 
@@ -234,7 +239,7 @@ function drawPauseScreen() {
     state.gameState = 'leaderboard';
   }, btnW, btnH);
 
-  drawButton('⌂ Main Menu', cx, cy + 120, () => {
+  drawButton('⌂ Main Menu', cx, cy + 115, () => {
     goToTitle();
   }, btnW, btnH);
 }

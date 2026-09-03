@@ -76,11 +76,14 @@ export function activateSpiderweb(fighter) {
   });
 
   const sound = getSkillSound(fighter._def?.id, 'spiderweb');
-  if (sound) audioSystem.playSFX(sound.src, sound.volume);
+  const spiderwebSnd = CONFIG.sukuna?.sounds?.spiderweb || (sound ? sound.src : 'Assets/Sound Effects/Skills/hookchain.mp3');
+  const spiderwebVol = CONFIG.sukuna?.soundVolumes?.spiderweb ?? (sound ? sound.volume : 0.7);
+  audioSystem.playSFX(spiderwebSnd, spiderwebVol);
 }
 
 export function fireDivineFlame(fighter, ownerIndex) {
   fighter.isChannelingDivineFlame = false;
+  fighter.divineFlameChargeTimer = 0;
 
   if (fighter.fugaSoundKey) {
     audioSystem.emit("stopLoop", fighter.fugaSoundKey);
@@ -88,12 +91,16 @@ export function fireDivineFlame(fighter, ownerIndex) {
   }
 
   const sound = getSkillSound(fighter._def?.id, 'fuga_travel');
-  if (sound) audioSystem.playSFX(sound.src, sound.volume);
+  const fugaTravelSnd = CONFIG.sukuna?.sounds?.fugaTravel || (sound ? sound.src : 'Assets/Sound Effects/Skills/fugatravel.mp3');
+  const fugaTravelVol = CONFIG.sukuna?.soundVolumes?.fugaTravel ?? (sound ? sound.volume : 1.5);
+  audioSystem.playSFX(fugaTravelSnd, fugaTravelVol);
 
   const isDomainFuga = fighter.domainActive;
-  const normalCd = CONFIG.sukuna?.divineFlameCooldown || 1500;
+  const normalCd = CONFIG.sukuna?.divineFlameCooldown || 700;
+  const cdReduction = CONFIG.sukuna?.domainFugaCooldownReduction ?? CONFIG.sukuna?.domainFugaCooldownReductionPercent ?? 0.70;
+  const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? Math.round(normalCd * (1 - cdReduction));
   fighter.divineFlameRecoveryTimer = CONFIG.sukuna?.divineFlameRecoveryTime || 60;
-  fighter.divineFlameCooldown = normalCd;
+  fighter.divineFlameCooldown = isDomainFuga ? domainCd : normalCd;
   const shakeIntensity = isDomainFuga ? 18 : (CONFIG.sukuna?.divineFlameShakeIntensity || 30);
   const shakeDuration = isDomainFuga ? 30 : (CONFIG.sukuna?.divineFlameShakeDuration || 25);
   triggerGlobalScreenShake(shakeIntensity, shakeDuration);
@@ -101,11 +108,18 @@ export function fireDivineFlame(fighter, ownerIndex) {
   if (isDomainFuga) {
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 35, 'THERMOBARIC FUGA EXPLOSION!!', '#FF3300');
     spawnImpactFlash(fighter.x, fighter.y, 140, 'gold');
-    audioSystem.playSFX('attack_explosion', 1.0);
+    const thermoSnd = CONFIG.sukuna?.sounds?.thermobaricExplosion || 'attack_explosion';
+    const thermoVol = CONFIG.sukuna?.soundVolumes?.thermobaricExplosion ?? 1.0;
+    audioSystem.playSFX(thermoSnd, thermoVol);
   }
 
   const baseDamage = CONFIG.sukuna?.divineFlameDamage || 250;
   const damage = isDomainFuga ? Math.round(baseDamage * 1.5) : baseDamage;
+
+  if (fighter.divineFlameCastAngle !== undefined) {
+    fighter.gunAngle = fighter.divineFlameCastAngle;
+    fighter.angle = fighter.divineFlameCastAngle;
+  }
 
   if (projectileSystem && projectileSystem.fireSukunaDivineFlame) {
     projectileSystem.fireSukunaDivineFlame(fighter, ownerIndex, damage);
@@ -129,7 +143,9 @@ export function activateReverseCursedTechnique(fighter, attacker) {
   triggerGlobalScreenShake(6, 20);
 
   const sound = getSkillSound(fighter._def?.id, 'reverseCursedTechnique');
-  if (sound) audioSystem.playSFX(sound.src, sound.volume);
+  const rctSnd = CONFIG.sukuna?.sounds?.reverseCursedTechnique || (sound ? sound.src : 'Assets/Sound Effects/Skills/enhance.mp3');
+  const rctVol = CONFIG.sukuna?.soundVolumes?.reverseCursedTechnique ?? (sound ? sound.volume : 1.0);
+  audioSystem.playSFX(rctSnd, rctVol);
 }
 
 export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
@@ -204,6 +220,8 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
 
     spawnFloatingText(fighter.x, fighter.y - 30, 'CLEAVE!', '#E0E8FF');
     spawnSparks(target.x, target.y, 16, 'crimsonSniper', '#8B0000');
+    spawnSparks(target.x, target.y, 8, 'slashRicochet');
+    spawnSparks(target.x, target.y, 4, 'parrySpark');
     triggerGlobalScreenShake(5, 6);
 
     fighter.punchAnimTimer = 0;
@@ -213,12 +231,21 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     fighter.slashHand = (fighter.slashHand === 1 ? 0 : 1);
 
     const cleaveAngle = aimAngle;
-    target.vx = (target.vx || 0) + Math.cos(cleaveAngle) * 3;
-    target.vy = (target.vy || 0) + Math.sin(cleaveAngle) * 3;
+    const cleaveForce = 7.5;
+    target.knockbackDecay = 0.88;
+    if (target.knockbackVx !== undefined) target.knockbackVx = Math.cos(cleaveAngle) * cleaveForce;
+    if (target.knockbackVy !== undefined) target.knockbackVy = Math.sin(cleaveAngle) * cleaveForce;
 
     if ((fighter._slashSoundCooldown || 0) <= 0) {
-      audioSystem.playSFX('attack_swordswing', 0.9);
-      audioSystem.playSFX('skill_backstab', 0.7);
+      const swingSnd = CONFIG.sukuna?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+      const swingVol = CONFIG.sukuna?.soundVolumes?.swordSwing ?? 0.9;
+      const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3';
+      const sliceVol = CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7;
+      const ricoSnd = CONFIG.sukuna?.sounds?.ricochetHit || 'Assets/Sound Effects/Skills/parry.mp3';
+      const ricoVol = CONFIG.sukuna?.soundVolumes?.ricochetHit ?? 0.75;
+      audioSystem.playSFX(swingSnd, swingVol);
+      audioSystem.playSFX(sliceSnd, sliceVol);
+      audioSystem.playSFX(ricoSnd, ricoVol);
       fighter._slashSoundCooldown = 10;
     }
 
@@ -251,7 +278,9 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     }
     spawnImpactFlash(oldX, oldY, 15, 'crimsonSniper');
     spawnImpactFlash(fighter.x, fighter.y, 20, 'crimsonSniper');
-    audioSystem.playSFX('skill_dash3', 0.7);
+    const dashSnd = CONFIG.sukuna?.sounds?.teleportDash || 'Assets/Sound Effects/Skills/dash3.mp3';
+    const dashVol = CONFIG.sukuna?.soundVolumes?.teleportDash ?? 0.7;
+    audioSystem.playSFX(dashSnd, dashVol);
 
     if (typeof target.applyHitStun === 'function') target.applyHitStun(6);
     if (typeof fighter.applyBleed === 'function') fighter.applyBleed(target, 1);
@@ -289,14 +318,18 @@ export function applyDomainEffect(fighter, arena) {
 
   if (fighter._domainFrame % domainDamageInterval === 0) {
     if (fighter._slashSoundCooldown === undefined || fighter._slashSoundCooldown <= 0) {
-      audioSystem.playSFX('attack_swordswing', 0.5);
+      const swingSnd = CONFIG.sukuna?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+      const swingVol = (CONFIG.sukuna?.soundVolumes?.swordSwing ?? 0.9) * 0.55;
+      audioSystem.playSFX(swingSnd, swingVol);
       fighter._slashSoundCooldown = 12;
     }
 
     // Spawn arena-clipped spatial cut lines and execute physical hits for each line
     const hitAny = spawnDomainSlashLines(fighter, slashesPerTick);
     if (hitAny) {
-      audioSystem.playSFX('skill_backstab', 0.45);
+      const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3';
+      const sliceVol = (CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7) * 0.65;
+      audioSystem.playSFX(sliceSnd, sliceVol);
     }
   }
 }

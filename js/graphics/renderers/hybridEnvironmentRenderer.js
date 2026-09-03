@@ -386,18 +386,10 @@ export function updateHybridEnvironment() {
   if (gojo) {
     const data = getGojoDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
-    data.sprite.x = -20;
-    data.sprite.y = -20;
-    data.sprite.width = state.canvas.width + 40;
-    data.sprite.height = state.canvas.height + 40;
-
-    const isDarkMode = Boolean(
-      typeof state !== 'undefined' && (
-        state.arenaTheme === 'dark' || 
-        state.darkMode || 
-        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-      )
-    );
+    data.sprite.x = 0;
+    data.sprite.y = 0;
+    data.sprite.width = state.canvas.width;
+    data.sprite.height = state.canvas.height;
 
     if (state.arena) {
       if (!gojoArenaMask) {
@@ -439,20 +431,12 @@ export function updateHybridEnvironment() {
   if (sukuna) {
     const bgData = getSukunaDomainHybridData();
     if (!bgData.sprite.parent) layer.addChild(bgData.sprite);
-    bgData.sprite.x = -20;
-    bgData.sprite.y = -20;
-    bgData.sprite.width = state.canvas.width + 40;
-    bgData.sprite.height = state.canvas.height + 40;
+    bgData.sprite.x = 0;
+    bgData.sprite.y = 0;
+    bgData.sprite.width = state.canvas.width;
+    bgData.sprite.height = state.canvas.height;
 
-    const isDarkMode = Boolean(
-      typeof state !== 'undefined' && (
-        state.arenaTheme === 'dark' || 
-        state.darkMode || 
-        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-      )
-    );
-
-    if (isDarkMode && state.arena) {
+    if (state.arena) {
       if (!sukunaArenaMask) {
         sukunaArenaMask = new window.PIXI.Graphics();
         layer.addChild(sukunaArenaMask);

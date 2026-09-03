@@ -618,10 +618,7 @@ export class YutaFighter extends Fighter {
         this.rika.hp = Math.max(0, this.rika.hp - drainPerFrame);
       }
 
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent); // Continuously track and aim at opponent while charging
-      }
-
+      // Face target once at initiation; do not continuously track while charging
       this.pureLoveBeamChargeTimer++;
 
       // Massive energy gathering visuals
@@ -790,10 +787,7 @@ export class YutaFighter extends Fighter {
       this.vy = 0;
       this.hitStunTimer = 0; // Domain Hyper-Armor: prevents domain channeling from being interrupted/frozen
 
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent);
-      }
-
+      // Do not auto-aim during domain expansion channeling
       this.domainChargeTimer++;
 
       // Spawn some charge particles
@@ -900,6 +894,9 @@ export class YutaFighter extends Fighter {
       if (hasEnemies) {
         this.domainUseCount++;
         this.hasActivatedDomainAt25Hp = true;
+        if (opponent && !opponent.isDead) {
+          this.aim(opponent);
+        }
         this.isChannelingDomain = true;
         this.domainChargeTimer = 0;
         this.vx = 0;
@@ -993,6 +990,9 @@ export class YutaFighter extends Fighter {
 
       // Transition to actual beam channeling once the emergence delay finishes
       if (this.rikaEmergingForBeamTimer === 0) {
+        if (opponent && !opponent.isDead) {
+          this.aim(opponent);
+        }
         this.isChannelingPureLoveBeam = true;
         this.pureLoveBeamChargeTimer = 0;
       }
@@ -1225,8 +1225,9 @@ export class YutaFighter extends Fighter {
     const isGuarding = this.blockPoseTimer > 0;
     const blockChance = this.getParryChance();
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
+    const isChannelingSkill = typeof this.isChannelingSkill === 'function' && this.isChannelingSkill();
 
-    if (!this.domainActive && !isStunned && !isSwinging && !unblockable && !this.isSummoningRika() && this.hp > 0 && Math.random() < blockChance) {
+    if (!this.domainActive && !isChannelingSkill && !isStunned && !isSwinging && !unblockable && !this.isSummoningRika() && this.hp > 0 && Math.random() < blockChance) {
       // Successfully blocked!
       
       const isAlreadyCountering = (this.flurryHitsLeft > 0) || this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0) || (this.flurrySlashTimer > 0);

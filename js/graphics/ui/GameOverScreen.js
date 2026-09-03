@@ -474,15 +474,59 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     return;
   }
 
-  // 0. Snap Cut Arena BGM & Play Street Fighter II "YOU WIN!" Announcer Voice (Frame 1)
+  // 0. Snap Cut Arena BGM & Play Winner / Draw Announcer Audio (Frame 1)
   if (timer > 0) {
     stopArenaBgm(true);
   }
+  const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
   if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
     state._hasPlayedChampionYouWinVoice = true;
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    if (!isDraw && winner && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
       audioSystem.playSFX('Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3', 1.0);
+    } else if (isDraw && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
     }
+  }
+
+  // If Draw: render in-arena Double KO / Round Draw visual
+  if (isDraw) {
+    const centerX = arenaX + arenaW / 2;
+    const centerY = arenaY + arenaH * 0.48;
+    const popProgress = Math.min(1.0, timer / 16);
+    const popScale = 1.0 + Math.sin(popProgress * Math.PI * 0.5) * 0.12;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.scale(popScale, popScale);
+
+    ctx.fillStyle = 'rgba(8, 8, 14, 0.88)';
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    const boxW = 280;
+    const boxH = 68;
+    ctx.beginPath();
+    ctx.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 24px "Outfit", "Rajdhani", sans-serif';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.strokeText('DOUBLE K.O.', 0, -10);
+    ctx.fillStyle = '#FF3366';
+    ctx.fillText('DOUBLE K.O.', 0, -10);
+
+    ctx.font = '800 15px "Outfit", "Rajdhani", sans-serif';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeText('ROUND DRAW', 0, 16);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('ROUND DRAW', 0, 16);
+
+    ctx.restore();
+    return;
   }
 
   // 0b. Play Champion Victory Voiceline of the winning fighter strictly AFTER the SF2 "YOU WIN!" announcer finishes (Frame 68)

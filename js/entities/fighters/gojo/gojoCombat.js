@@ -147,8 +147,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   }
 
   if (attacker && attacker !== fighter) {
-    if (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion) {
-      // Domain Channeling has supreme domain hyper-armor — bypasses Infinity block completely!
+    const isChanneling = typeof attacker.isChannelingSkill === 'function' && attacker.isChannelingSkill();
+    if (isChanneling || attacker.isChannelingDomain || attacker.isChannelingDomainExpansion) {
+      // Skill & Domain Channeling has supreme hyper-armor — bypasses Infinity block & interrupts completely!
       return false;
     }
     const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
@@ -202,8 +203,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       }
       
 
-      // Interrupt active attack channeling on barrier collision (entity is repelled, NOT frozen; only projectiles freeze)
-      if (typeof attacker.interruptAttacks === 'function') {
+      // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling a skill)
+      if (!isChanneling && typeof attacker.interruptAttacks === 'function') {
         attacker.interruptAttacks();
       }
 
@@ -244,55 +245,17 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       }
       
       // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
-      const gojoRadius = fighter.hitRadius || fighter.r || 25;
       const minDist = attRadius + barrierRadius;
       const overlap = minDist - dist;
 
       if (overlap > 0 && !fighter.domainActive) {
-        const oldAttX = attacker.x;
-        const oldAttY = attacker.y;
-
-        // Try pushing attacker outward away from barrier
+        // Push attacker outward away from barrier (Gojo stands his ground and is not rebounced)
         attacker.x += nx * (overlap + 2);
         attacker.y += ny * (overlap + 2);
 
         // Clamp attacker strictly within arena boundaries so they NEVER clip outside arena walls
-        let attackerHitWall = false;
-        if (arena) {
-          attackerHitWall = clampEntityToArenaBounds(attacker, arena, attRadius);
-        }
-
-        // Measure how much the attacker was actually able to move before hitting the wall
-        const actualMovedDist = Math.hypot(attacker.x - oldAttX, attacker.y - oldAttY);
-        const unfulfilledOverlap = Math.max(0, overlap - actualMovedDist);
-
-        // If attacker is against the wall and could not be displaced enough, push Gojo back instead!
-        if (!isImmovable) {
-          const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5;
-          if (unfulfilledOverlap > 0 || attackerHitWall) {
-            // Recoil Gojo backwards away from the wall & target
-            fighter.x -= nx * (unfulfilledOverlap + 4);
-            fighter.y -= ny * (unfulfilledOverlap + 4);
-            fighter.vx = -nx * pushForce;
-            fighter.vy = -ny * pushForce;
-          } else {
-            fighter.x -= nx * 2;
-            fighter.y -= ny * 2;
-            fighter.vx = -nx * (pushForce * 0.4);
-            fighter.vy = -ny * (pushForce * 0.4);
-          }
-
-          if (arena) {
-            clampEntityToArenaBounds(fighter, arena, gojoRadius);
-          }
-        }
-      } else if (!fighter.domainActive && !isImmovable) {
-        const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5;
-        fighter.vx = -nx * (pushForce * 0.4);
-        fighter.vy = -ny * (pushForce * 0.4);
         if (arena) {
           clampEntityToArenaBounds(attacker, arena, attRadius);
-          clampEntityToArenaBounds(fighter, arena, gojoRadius);
         }
       }
     }

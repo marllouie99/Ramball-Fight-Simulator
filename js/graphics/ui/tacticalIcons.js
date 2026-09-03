@@ -99,6 +99,11 @@ export const TACTICAL_ICONS = {
     <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
   </svg>`,
 
+  camera: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </svg>`,
+
   testmode: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M10 2v7.31L4.2 19.5A2 2 0 0 0 6 22h12a2 2 0 0 0 1.8-2.5L14 9.31V2"/>
     <line x1="8.5" y1="2" x2="15.5" y2="2"/>

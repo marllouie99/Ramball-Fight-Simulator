@@ -90,56 +90,14 @@ export class SukunaRenderer {
       }
     }
 
-    // Draw Skill 1 Slash visual arcs on flurry target (Crescent Blade Arcs)
-    if (fighter.flurrySlashVisuals && fighter.flurrySlashVisuals.length > 0 && !isSuppressed) {
-      fighter.flurrySlashVisuals.forEach(slash => {
-        const ratio = slash.timer / slash.maxTimer;
-        ctx.save();
-        ctx.translate(slash.x, slash.y);
-        ctx.rotate(slash.angle);
-        ctx.scale(slash.scale, slash.scale);
 
-        const r = 26;
-        // Crescent outer & inner returning arc geometry
-        ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
-        ctx.arc(r * 0.42, 0, r * 0.82, Math.PI * 0.50, -Math.PI * 0.50, true);
-        ctx.closePath();
-
-        // Heavy black ink outline
-        ctx.fillStyle = `rgba(0, 0, 0, ${0.95 * ratio})`;
-        ctx.fill();
-        ctx.strokeStyle = `rgba(0, 0, 0, ${0.95 * ratio})`;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // Crimson crescent inner blade
-        ctx.save();
-        ctx.scale(0.85, 0.85);
-        ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.52, Math.PI * 0.52, false);
-        ctx.arc(r * 0.42, 0, r * 0.82, Math.PI * 0.48, -Math.PI * 0.48, true);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(220, 10, 10, ${0.95 * ratio})`;
-        ctx.fill();
-        ctx.restore();
-
-        // White-hot razor crescent edge line
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.98 * ratio})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
-        ctx.stroke();
-
-        ctx.restore();
-      });
-    }
 
 
 
 
     // Draw Furnace (Fuga / Open) — Volcanic magma cursed flame arrow construct
-    if (fighter.isChannelingDivineFlame) {
+    // (Rendered via WebGL hybrid container in updateHybridSukunaFuga to maintain 60 FPS when PixiJS is active)
+    if (fighter.isChannelingDivineFlame && (!state.pixiApp || !state.pixiLayers?.projectiles)) {
       const progress = fighter.divineFlameChargeTimer / fighter.divineFlameChargeMax;
       const time = Date.now() * 0.012;
 
@@ -237,14 +195,11 @@ export class SukunaRenderer {
     let frontHandX_loc, frontHandY_loc, backHandX_loc, backHandY_loc;
 
     // 1. Dynamic Slash Swing Chop Animation
-    if ((fighter.slashSwingTimer > 0 || fighter.slashGlowTimer > 0 || (fighter.rapidSlashHitsLeft > 0 && fighter.punchAnimTimer <= 0)) && !fighter.isChannelingDomainExpansion) {
+    if ((fighter.slashSwingTimer > 0 || fighter.slashGlowTimer > 0) && !fighter.isChannelingDomainExpansion) {
       const maxT = fighter.slashSwingMaxTimer || 14;
       let rawT = 1.0;
       if (fighter.slashSwingTimer > 0) {
         rawT = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
-      } else if (fighter.rapidSlashHitsLeft > 0) {
-        const rapidMax = CONFIG.sukuna?.rapidSlashCooldown || 16;
-        rawT = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.rapidSlashTimer || 0) / rapidMax)));
       }
       const easeT = Math.sin(rawT * Math.PI); // 0 -> 1 -> 0 arc extension
       const sweepAngle = (rawT - 0.5) * (Math.PI * 0.85); // Wide transverse arc sweep from -75° to +75°
@@ -329,7 +284,7 @@ export class SukunaRenderer {
     const isFuga = (fighter.isChannelingDivineFlame);
     const isFrozenByDomain = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0);
     const isMeleeMode = fighter.isMeleeMode || (fighter.punchAnimTimer > 0);
-    const isActive = !isMeleeMode && !isRCT && !isFuga && !isFrozenByDomain && ((fighter.combatAuraOpacity > 0.05) || (fighter.slashGlowTimer > 0) || (fighter.rapidSlashHitsLeft > 0) || (fighter.flurryHitsLeft > 0) || (fighter.domainActive) || (state.gameState === 'countdown'));
+    const isActive = !isMeleeMode && !isRCT && !isFuga && !isFrozenByDomain && ((fighter.combatAuraOpacity > 0.05) || (fighter.slashGlowTimer > 0) || (fighter.domainActive) || (state.gameState === 'countdown'));
 
     if (isActive) {
       let theme = 'red';

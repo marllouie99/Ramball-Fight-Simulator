@@ -159,7 +159,7 @@ export class ParticleSystem {
       // --- PIXIJS SYNC ---
       // We only convert standard sparks to PixiJS Sprites.
       // Complex procedural shapes (like scorch marks) remain on the 2D canvas.
-      const isStandardSpark = !spark.isFlash && !spark.isPinkCore && !['thunderSpark', 'groundScorch', 'arcaneGroundScorch', 'telekinesisDebris', 'parrySpark', 'parryEmberStar', 'yutaBeamPinkCore'].includes(spark.type);
+      const isStandardSpark = !spark.isFlash && !spark.isPinkCore && !['thunderSpark', 'groundScorch', 'arcaneGroundScorch', 'telekinesisDebris', 'parrySpark', 'slashRicochet', 'parryEmberStar', 'yutaBeamPinkCore'].includes(spark.type);
       if (isStandardSpark) {
         spark.isPixi = true;
         spark.sprite = this.getPixiSprite();

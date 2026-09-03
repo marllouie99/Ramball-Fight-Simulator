@@ -396,20 +396,7 @@ export class TricksterFighter extends Fighter {
       // Continuous screen shake while firing
       triggerGlobalScreenShake(6, 5);
 
-      // Slowly rotate toward the target while firing the beam
-      if (opponent) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        let delta = targetAngle - this.gunAngle;
-        while (delta > Math.PI) delta -= Math.PI * 2;
-        while (delta < -Math.PI) delta += Math.PI * 2;
-        
-        const maxRotate = CONFIG.laser.beamRotateSpeed || 0.015;
-        if (Math.abs(delta) > maxRotate) {
-          this.gunAngle += Math.sign(delta) * maxRotate;
-        } else {
-          this.gunAngle = targetAngle;
-        }
-      }
+      // Beam angle remains strictly locked in the direction it was fired; no auto-aim while firing
 
       // Check all valid targets
       const allTargets = state.fighters.concat(state.illusions || []);
@@ -443,34 +430,15 @@ export class TricksterFighter extends Fighter {
     // Charge the laser
     if (this.stolenType === 'laser' && this.stolenSkillCooldown <= 0) {
       if (opponent) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        let delta = targetAngle - this.gunAngle;
-        while (delta > Math.PI) delta -= Math.PI * 2;
-        while (delta < -Math.PI) delta += Math.PI * 2;
-        
-        // Rotate towards opponent while charging
-        const maxRotate = CONFIG.laser.aimRotateSpeed || 0.05;
-        if (Math.abs(delta) > maxRotate) {
-          this.gunAngle += Math.sign(delta) * maxRotate;
-        } else {
-          this.gunAngle = targetAngle;
-        }
-
-        // Recalculate delta after rotation for alignment check
-        delta = targetAngle - this.gunAngle;
-        while (delta > Math.PI) delta -= Math.PI * 2;
-        while (delta < -Math.PI) delta += Math.PI * 2;
-        
-        const aligned = Math.abs(delta) < (CONFIG.laser.aimThreshold || 0.1);
-
         if (this.beamCharge === 0) {
+          this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
           const chargeSound = getSkillEffectSound('solarchampion', 'lasercharge');
           if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume);
         }
         
         this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
 
-        if (aligned && this.beamCharge >= CONFIG.laser.windupDuration) {
+        if (this.beamCharge >= CONFIG.laser.windupDuration) {
           this.beamTimer = CONFIG.laser.beamDuration;
           this.stolenSkillCooldown = 300 * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
           this.beamHitState.clear();
@@ -576,9 +544,7 @@ export class TricksterFighter extends Fighter {
       this.stolenWindUpTimer--;
       this.vx = 0;
       this.vy = 0;
-      if (opponent) {
-        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      }
+      // Facing angle remains locked to the initial cast angle; no auto-aim while winding up
       
       if (this.stolenWindUpTimer === 0) {
         if (!this._hasFiredStolenSkillTrick) {
@@ -969,6 +935,7 @@ export class TricksterFighter extends Fighter {
            if (opponent) {
              const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
              if (dist <= 250) {
+               this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
                this.stolenWindUpTimer = 30; // 0.5 seconds wind-up
                skillCast = true;
              }
@@ -980,6 +947,7 @@ export class TricksterFighter extends Fighter {
            if (opponent) {
              const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
              if (dist <= (CONFIG.cronos.sphereActivationDistance || 120)) {
+               this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
                this.stolenWindUpTimer = 30; // 0.5 seconds wind-up
                skillCast = true;
              }
@@ -991,6 +959,7 @@ export class TricksterFighter extends Fighter {
            if (opponent) {
              const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
              if (dist <= (CONFIG.ruby?.activePullRange || 200)) {
+               this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
                this.stolenWindUpTimer = 30; // 0.5 seconds wind-up
                skillCast = true;
              }
@@ -1003,6 +972,9 @@ export class TricksterFighter extends Fighter {
       case 'zeus':
         // These are heavy skills! We will enter the wind-up phase first!
         if (this.stolenSkillCooldown <= 0) {
+           if (opponent) {
+             this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+           }
            this.stolenWindUpTimer = this.stolenType === 'normal' ? (CONFIG.sharpshooter?.executeWindupFrames || 30) : 30; 
            skillCast = true;
         }
@@ -1115,10 +1087,8 @@ export class TricksterFighter extends Fighter {
       case 'normal':
         if (opponent) {
            this.stolenSkillCooldown = (CONFIG.normal.shotCooldown || 70) * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
-           const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-           this.gunAngle = targetAngle;
            
-           // Fire from tip of staff
+           // Fire from tip of staff along locked cast angle (no snap auto-aim)
            const customTipDist = this.r + 20;
            const customSpawnX = this.x + Math.cos(this.gunAngle) * customTipDist;
            const customSpawnY = this.y + Math.sin(this.gunAngle) * customTipDist;

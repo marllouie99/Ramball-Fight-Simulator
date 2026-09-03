@@ -77,7 +77,9 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   spawnFloatingText(oldX, oldY - fighter.r - 10, 'EVADE!', '#FF2400');
   spawnImpactFlash(oldX, oldY, 22, 'crimsonSniper');
   spawnImpactFlash(fighter.x, fighter.y, 22, 'crimsonSniper');
-  audioSystem.playSFX('skill_dash3', 0.8);
+  const dashSnd = CONFIG.sukuna?.sounds?.teleportDash || 'Assets/Sound Effects/Skills/dash3.mp3';
+  const dashVol = CONFIG.sukuna?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(dashSnd, dashVol);
 
   spawnTeleportAfterimages(fighter, oldX, oldY, fighter.x, fighter.y);
 }
@@ -112,7 +114,9 @@ export function teleportAwayFrom(fighter, opponent, arena) {
   spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
   spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
   spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-  audioSystem.playSFX('skill_dash3', 0.8);
+  const disengageSnd = CONFIG.sukuna?.sounds?.teleportDash || 'Assets/Sound Effects/Skills/dash3.mp3';
+  const disengageVol = CONFIG.sukuna?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(disengageSnd, disengageVol);
 }
 
 export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
@@ -165,81 +169,25 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   if (!fighter.meleeComboTarget) fighter.meleeComboTarget = Math.random() < 0.5 ? 6 : 3;
 
   const distToOpponent = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
-  const attackReach = fighter.r + opponent.r + 35;
-  const isOutOfReach = distToOpponent > attackReach;
+  const punchReach = fighter.r + opponent.r + 45;
+  const isOutOfReach = distToOpponent > punchReach;
 
-  // Teleport at start of new combo sequence (meleeComboCount === 0), if out of reach, or between strikes
-  const canTeleportChase = (fighter.teleportChaseDelayTimer || 0) <= 0;
-  const shouldTeleport = canTeleportChase && (isOutOfReach || (fighter.meleeComboCount === 0) || (fighter.meleeComboCount > 0 && fighter.meleeComboCount % 2 === 0));
-
-  if (shouldTeleport) {
-    const oldX = fighter.x;
-    const oldY = fighter.y;
-
-    const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
-    const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.45 : -Math.PI * 0.45);
-    const behindOffset = opponent.r + fighter.r + 12; // Perfect spacing: cleanly inside punch reach
-    let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
-    let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
-
-    if (arena) {
-      targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
-      targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
-    }
-
-    fighter.x = targetX;
-    fighter.y = targetY;
-    if (typeof fighter.aim === 'function') fighter.aim(opponent);
-    if (opponent && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
-      opponent.aim(fighter);
-    }
-
+  // If out of reach, do NOT chase or follow the enemy in melee mode
+  if (isOutOfReach) {
     fighter.vx = 0;
     fighter.vy = 0;
-    spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
-    spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-    spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-    audioSystem.playSFX('skill_dash3', 0.6);
+    return; // Do NOT chase or follow when the enemy is out of melee range!
   }
 
-  // Verify target is inside punch reach before striking (teleport chase if target dodged out of reach)
-  let currentDist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
-  const punchReach = fighter.r + opponent.r + 45;
-  if (currentDist > punchReach) {
-    if (canTeleportChase && !shouldTeleport) {
-      const oldX = fighter.x;
-      const oldY = fighter.y;
-      const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
-      const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.45 : -Math.PI * 0.45);
-      const behindOffset = opponent.r + fighter.r + 12;
-      let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
-      let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
-      if (arena) {
-        targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
-        targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
-      }
-      fighter.x = targetX;
-      fighter.y = targetY;
-      if (typeof fighter.aim === 'function') fighter.aim(opponent);
-      if (opponent && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
-        opponent.aim(fighter);
-      }
-      spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
-      spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-      spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-      audioSystem.playSFX('skill_dash3', 0.6);
-      currentDist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
-    }
-    if (currentDist > punchReach) {
-      return; // Do NOT punch the air when target is still out of reach!
-    }
-  }
+  // Always aim directly at the opponent when punching
+  if (typeof fighter.aim === 'function') fighter.aim(opponent);
 
   // Execute punch strike
   fighter.meleeComboCount++;
   fighter.martialArtsComboCount = (fighter.martialArtsComboCount || 0) + 1;
-  fighter.punchAnimTimer = 8; // Snappy 8-frame punch animation (matching Gojo)
-  fighter.punchAnimMaxTimer = 8;
+  const punchDuration = CONFIG.sukuna?.meleePunchAnimDuration || CONFIG.sukuna?.meleePunchCooldown || 9;
+  fighter.punchAnimTimer = punchDuration;
+  fighter.punchAnimMaxTimer = punchDuration;
   fighter.punchAnimHand = (fighter.punchAnimHand === 1 ? 0 : 1);
   fighter.slashSwingTimer = 0;
 
@@ -319,7 +267,9 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   }
 
   if (!fighter._slashSoundCooldown || fighter._slashSoundCooldown <= 0) {
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/punch.mp3', 2.8);
+    const punchSnd = CONFIG.sukuna?.sounds?.punch || 'Assets/Sound Effects/Attacks/punch.mp3';
+    const punchVol = CONFIG.sukuna?.soundVolumes?.punch ?? 2.8;
+    audioSystem.playSFX(punchSnd, punchVol);
     fighter._slashSoundCooldown = 8;
   }
 
@@ -328,12 +278,9 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     fighter.meleeComboCount = 0;
     fighter.meleeComboTarget = Math.random() < 0.5 ? 6 : 3;
 
-    if (!fighter.domainActive && (fighter.flurryHitsLeft || 0) <= 0 && (fighter.forcedMeleeTimer || 0) <= 0) {
+    if (!fighter.domainActive && (fighter.forcedMeleeTimer || 0) <= 0) {
       fighter.isMeleeMode = false;
       fighter.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120; // Mandatory ranged separation!
-      if (opponent && !opponent.isDead) {
-        teleportAwayFrom(fighter, opponent, arena);
-      }
     }
   }
 

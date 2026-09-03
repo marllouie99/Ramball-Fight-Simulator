@@ -46,11 +46,6 @@ export function activateRed(fighter) {
         if (!targetF || dist < Math.hypot(targetF.x - fighter.x, targetF.y - fighter.y)) {
           targetF = f;
         }
-        // Pause & immobilize enemy movement during Red buildup so they don't run into Gojo
-        if (dist < (CONFIG.gojo?.redRange || 100) + 200) {
-          f.vx = 0;
-          f.vy = 0;
-        }
       }
     }
   });
@@ -172,11 +167,9 @@ export function firePurple(fighter, ownerIndex) {
   }
 
   let purpleLife = CONFIG.gojo?.purpleLife || 250;
-  const opponent = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0) : null;
-  if (opponent && !opponent.isDead) {
-    const fireAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-    fighter.gunAngle = fireAngle;
-    fighter.angle = fireAngle;
+  if (fighter.purpleCastAngle !== undefined) {
+    fighter.gunAngle = fighter.purpleCastAngle;
+    fighter.angle = fighter.purpleCastAngle;
   }
   if (projectileSystem && projectileSystem.fireGojoPurple) {
     const proj = projectileSystem.fireGojoPurple(
@@ -195,72 +188,26 @@ export function firePurple(fighter, ownerIndex) {
     }
   }
 
-  // Gojo's breather stasis after firing is based directly on purpleLife
-  fighter.purpleRecoveryTimer = purpleLife;
-  fighter.purpleRecoveryMaxTimer = purpleLife;
+  // Breather removed per user request: Gojo lands immediately and can freely move/act
+  fighter.purpleRecoveryTimer = 0;
+  fighter.purpleRecoveryMaxTimer = 0;
   fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1500;
-  fighter.z = 35; // Start descent from hovering altitude
+  fighter.z = 0; // Return to ground immediately
 
-  // Ensure Limitless Infinity barrier is IMMEDIATELY active during post-Purple breather state!
+  // Ensure Limitless Infinity barrier is active in Ranged mode
   fighter.infinityCooldown = 0;
   fighter.infinityActive = true;
-  fighter.infinityActiveTimer = purpleLife;
+  fighter.infinityActiveTimer = 0;
   fighter.infinityFadeOpacity = 1.0;
   fighter.isMeleeMode = false;
 
   triggerGlobalScreenShake(CONFIG.gojo?.purpleShakeIntensity || 15, CONFIG.gojo?.purpleShakeDuration || 20);
 
-  fighter.purpleRetreatTimer = CONFIG.gojo?.purpleRetreatDelay ?? 20;
+  fighter.purpleRetreatTimer = 0;
 }
 
 export function executePurpleRetreat(fighter) {
-  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-  let opponent = null;
-  if (state.fighters) {
-    let minDist = Infinity;
-    state.fighters.forEach((f, idx) => {
-      if (f && f !== fighter && f.hp > 0) {
-        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-        if (isEnemy) {
-          const d = Math.hypot(fighter.x - f.x, fighter.y - f.y);
-          if (d < minDist) {
-            minDist = d;
-            opponent = f;
-          }
-        }
-      }
-    });
-  }
-
-  if (opponent && !opponent.isDead) {
-    const oldX = fighter.x;
-    const oldY = fighter.y;
-
-    const angleAway = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x);
-    const retreatDist = CONFIG.gojo?.purpleRetreatDistance ?? 280;
-    let targetX = fighter.x + Math.cos(angleAway) * retreatDist;
-    let targetY = fighter.y + Math.sin(angleAway) * retreatDist;
-
-    const arena = CONFIG.arena;
-    if (arena) {
-      targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
-      targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
-    }
-
-    fighter.x = targetX;
-    fighter.y = targetY;
-    fighter.vx = 0;
-    fighter.vy = 0;
-    if (typeof fighter.aim === 'function') fighter.aim(opponent);
-
-    const breatherDuration = CONFIG.gojo?.modeSwitchBreatherDuration ?? 45;
-    fighter.modeSwitchBreatherTimer = breatherDuration;
-    spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
-    spawnImpactFlash(fighter.x, fighter.y, 30, 'lightningTrail');
-    const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
-    const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.9;
-    audioSystem.playSFX(dashSnd, dashVol);
-  }
+  // Gojo remains stationary in breather stasis until Purple expires; no sudden teleport
 }
 
 export function deleteEnemyProjectilesInPurple(fighter) {

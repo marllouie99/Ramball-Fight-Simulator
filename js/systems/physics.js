@@ -325,8 +325,11 @@ export function resolveFighterCollision(a, b) {
     return; // Neither moves or bounces during counter execution
   }
 
-  const aIsImmovable = a.isTurret || a.isDispenser || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
-  const bIsImmovable = b.isTurret || b.isDispenser || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
+  const aIsGojoInfinity = isEnemy && !a.isTargetOfAmbush && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.infinityActive || (!a.isMeleeMode && (a.infinityCooldown || 0) <= 0) || (a.infinityBlockTimer || 0) > 0);
+  const bIsGojoInfinity = isEnemy && !b.isTargetOfAmbush && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.infinityActive || (!b.isMeleeMode && (b.infinityCooldown || 0) <= 0) || (b.infinityBlockTimer || 0) > 0);
+
+  const aIsImmovable = a.isTurret || a.isDispenser || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || aIsGojoInfinity || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
+  const bIsImmovable = b.isTurret || b.isDispenser || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || bIsGojoInfinity || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -383,8 +386,8 @@ export function resolveFighterCollision(a, b) {
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
   if (!a.isTurret && !a.isDispenser) {
-    // Fighters in rage or melee mode ignore the bounce impulse so they can stick to their targets
-    if (!a.isInRage && !a.isMeleeMode) {
+    // Fighters in rage, melee mode, or with active Infinity ignore the bounce impulse so they hold their ground
+    if (!a.isInRage && !a.isMeleeMode && !aIsGojoInfinity) {
       a.vx -= impulse * nx + randA * impulse * tx;
       a.vy -= impulse * ny + randA * impulse * ty;
     }
@@ -392,7 +395,7 @@ export function resolveFighterCollision(a, b) {
   }
   
   if (!b.isTurret && !b.isDispenser) {
-    if (!b.isInRage && !b.isMeleeMode) {
+    if (!b.isInRage && !b.isMeleeMode && !bIsGojoInfinity) {
       b.vx += impulse * nx + randB * impulse * tx;
       b.vy += impulse * ny + randB * impulse * ty;
     }
@@ -910,7 +913,8 @@ export function updateFighters() {
           const nx = dx / dist;
           const ny = dy / dist;
           const overlap = minDist - dist;
-          if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
+          const fighterIsGojoInfinity = !fighter.isTargetOfAmbush && (fighter.characterId === 'gojo' || fighter.type === 'gojo' || fighter._def?.id === 'gojo') && (fighter.infinityActive || (!fighter.isMeleeMode && (fighter.infinityCooldown || 0) <= 0) || (fighter.infinityBlockTimer || 0) > 0);
+          if (fighter.isTurret || fighter.isDispenser || fighterIsGojoInfinity || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
             entity.x += nx * overlap;
             entity.y += ny * overlap;
           } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai || (entity.bankaiBurstTimer && entity.bankaiBurstTimer > 0) || (entity.isChannelingGetsuga && entity.isFinalMassiveGetsuga) || (entity.hollowMaskFormationTimer && entity.hollowMaskFormationTimer > 0) || (entity.hollowBurstTimer && entity.hollowBurstTimer > 0)) {

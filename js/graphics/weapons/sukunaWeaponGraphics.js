@@ -943,5 +943,4 @@ function _renderVectorDivineFlameArrow(ctx, {
   }
 
   ctx.restore(); // Restore globalCompositeOperation ('lighter')
-  ctx.restore(); // Restore transform matrix
 }

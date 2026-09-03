@@ -2,6 +2,7 @@ import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index.js';
+import { applyCameraToCtx, worldToScreen } from '../../systems/cameraSystem.js';
 
 // ──────────────────────────────────────────
 // SKETCHY BORDER HELPERS
@@ -494,24 +495,7 @@ export function drawArena() {
     }
   }
 
-  // 3. Draw Graphic Details (Halftone Dots, Action Triangles, Speed Needles) strictly OUTSIDE the arena
-  // In DARK MODE: completely hide background theme details outside the arena (pure plain black)
-  if (!hasActiveDomain && !isDark) {
-    const detailsKey = `${canvas.width}_${canvas.height}_${arena.x}_${arena.y}_${arena.width}_${arena.height}_${isDark ? 'dark' : 'light'}`;
-    if (!state._arenaOuterDetailsCanvas || state._arenaOuterDetailsCanvas._key !== detailsKey) {
-      const offCanvas = document.createElement('canvas');
-      offCanvas.width = canvas.width;
-      offCanvas.height = canvas.height;
-      const oc = offCanvas.getContext('2d');
-      drawOuterArenaGraphicDetails(oc, canvas.width, canvas.height, arena, isDark);
-      offCanvas._key = detailsKey;
-      state._arenaOuterDetailsCanvas = offCanvas;
-    }
-
-    ctx.save();
-    ctx.drawImage(state._arenaOuterDetailsCanvas, 0, 0);
-    ctx.restore();
-  }
+  // 3. Outer background theme details (Halftone Dots, Action Triangles, Speed Needles) removed for clean minimalist background
 
   // 4. Draw Arena Borders
   {
@@ -542,10 +526,35 @@ export function drawArena() {
       state._arenaBorderCanvas = offCanvas;
     }
 
-    const shakeX = state.shakeX || 0;
-    const shakeY = state.shakeY || 0;
+    // ── Draw Floor Background in Canvas 2D (Synchronized under Camera) ──
+    if (!hasActiveDomain) {
+      ctx.save();
+      applyCameraToCtx(ctx);
+      ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff');
+      if (arena.shape === 'circle') {
+        const cx = arena.x + arena.width / 2;
+        const cy = arena.y + arena.height / 2;
+        const ar = arena.radius || (arena.width / 2);
+        ctx.beginPath();
+        ctx.arc(cx, cy, ar, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+      }
+      ctx.restore();
+    } else if (hasActiveDomain && !state.pixiApp) {
+      // In native Canvas 2D mode, render active domain background under camera transform
+      const activeDomainFighter = state.fighters?.find(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
+      if (activeDomainFighter) {
+        ctx.save();
+        applyCameraToCtx(ctx);
+        activeDomainFighter.drawDomainBackground(ctx);
+        ctx.restore();
+      }
+    }
+
     ctx.save();
-    ctx.translate(shakeX, shakeY);
+    applyCameraToCtx(ctx);
     ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
 
     // ── Draw Wall Cracks (Decals) ──
@@ -578,22 +587,7 @@ export function drawArena() {
     ctx.restore();
   }
 
-  // 5. Draw "CRONOSPHERE" transparent watermark (Light Mode Only - hidden in Dark Mode)
-  if (!isDark) {
-    const centerX = arena.x + arena.width / 2;
-    const centerY = arena.y + arena.height / 2;
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(30, 120, 255, 0.05)';
-    ctx.font = '900 34px "Impact", "Trebuchet MS", "Arial Black", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    if ('letterSpacing' in ctx) {
-      ctx.letterSpacing = '6px';
-    }
-    ctx.fillText('CRONOSPHERE', centerX, centerY);
-    ctx.restore();
-  }
+  // 5. Watermark removed for clean arena floor
 
   const centerX = arena.x + arena.width / 2;
 
@@ -623,8 +617,9 @@ export function drawArena() {
     if (mainFighters.length > 0) {
       const textY = arena.y - 12;
       ctx.save();
-      const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-      const vsFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      applyCameraToCtx(ctx);
+      const nameFont = '700 34px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      const vsFont = '700 20px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
       const accentFont = vsFont;
       const ampFont = vsFont;
 
@@ -684,10 +679,10 @@ export function drawArena() {
         }));
 
         const hasStackedTeam = team0.length > 1 || team1.length > 1;
-        const nameFontSize = hasStackedTeam ? 19 : 22;
-        const customNameFont = `900 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-        const vsFontSize = hasStackedTeam ? 13 : 14;
-        const customVsFont = `800 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+        const nameFontSize = hasStackedTeam ? 24 : 34;
+        const customNameFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+        const vsFontSize = hasStackedTeam ? 15 : 20;
+        const customVsFont = `700 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
 
         ctx.font = customNameFont;
         if ('letterSpacing' in ctx) {
@@ -898,9 +893,11 @@ export function excludeGojoInfinityFromDim(ctx) {
     if (!isLimitlessActive) continue;
     
     const infinityR = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
-    const cutoutRadius = infinityR + 25;
-    const drawX = f.x + shakeX;
-    const drawY = f.y - (f.z || 0) + shakeY;
+    const camZoom = (state.camera && state.camera.mode === 'dynamic') ? state.camera.zoom : 1.0;
+    const cutoutRadius = (infinityR + 25) * camZoom;
+    const screenPos = worldToScreen(f.x, f.y - (f.z || 0));
+    const drawX = screenPos.x;
+    const drawY = screenPos.y;
 
     ctx.save();
     ctx.globalCompositeOperation = 'destination-out';
@@ -983,9 +980,11 @@ export function drawPurpleDimScreen() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Dynamic radial gradient centered on Gojo or Purple Orb
-  const maxDim = Math.max(arena.width, arena.height) * 0.70;
-  const roundCx = Math.round((cx + shakeX) / 10) * 10;
-  const roundCy = Math.round((cy + shakeY) / 10) * 10;
+  const camZoom = (state.camera && state.camera.mode === 'dynamic') ? state.camera.zoom : 1.0;
+  const screenPos = worldToScreen(cx, cy);
+  const maxDim = Math.max(arena.width, arena.height) * 0.70 * camZoom;
+  const roundCx = Math.round(screenPos.x / 10) * 10;
+  const roundCy = Math.round(screenPos.y / 10) * 10;
   const is200 = (purpleOrb && purpleOrb.is200Percent) || (gojoFighter && (gojoFighter.is200PercentChannel || gojoFighter.purpleUseCount === 1));
   const key = `${roundCx}_${roundCy}_${maxDim}_${is200}`;
 
@@ -1032,21 +1031,27 @@ export function drawPurpleDimScreen() {
         handSpreadY = f.r * 2.8;
       } else {
         headX = f.r + 10;
-        handSpreadY = 14;
+        handSpreadY = 22;
       }
       const spreadY = handSpreadY * (1 - easeMove);
 
       // Red orb canvas center (right side)
       const redLocalX = headX;
       const redLocalY = spreadY;
-      const redCanvasX = f.x + (redLocalX * cosA - redLocalY * sinA) + shakeX;
-      const redCanvasY = (f.y - (f.z || 0)) + (redLocalX * sinA + redLocalY * cosA) + shakeY;
+      const redWorldX = f.x + (redLocalX * cosA - redLocalY * sinA);
+      const redWorldY = (f.y - (f.z || 0)) + (redLocalX * sinA + redLocalY * cosA);
+      const redScreen = worldToScreen(redWorldX, redWorldY);
+      const redCanvasX = redScreen.x;
+      const redCanvasY = redScreen.y;
 
       // Blue orb canvas center (left side)
       const blueLocalX = headX;
       const blueLocalY = -spreadY;
-      const blueCanvasX = f.x + (blueLocalX * cosA - blueLocalY * sinA) + shakeX;
-      const blueCanvasY = (f.y - (f.z || 0)) + (blueLocalX * sinA + blueLocalY * cosA) + shakeY;
+      const blueWorldX = f.x + (blueLocalX * cosA - blueLocalY * sinA);
+      const blueWorldY = (f.y - (f.z || 0)) + (blueLocalX * sinA + blueLocalY * cosA);
+      const blueScreen = worldToScreen(blueWorldX, blueWorldY);
+      const blueCanvasX = blueScreen.x;
+      const blueCanvasY = blueScreen.y;
 
       // Render radiant Red & Blue bloom halos over pitch-black screen dim
       const fadeInP = Math.min(1.0, progress / 0.22);
@@ -1054,7 +1059,7 @@ export function drawPurpleDimScreen() {
       const growP = Math.min(1.0, progress / 0.35);
       const easeGrow = Math.sin(growP * Math.PI * 0.5);
       const bloomScale = is200 ? (0.20 + 0.80 * easeGrow) : 1.0;
-      const bloomRadius = (is200 ? 110 : 80) * bloomScale;
+      const bloomRadius = (is200 ? 110 : 80) * bloomScale * camZoom;
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = opacity * (1.0 - progress * 0.3) * easeFade;
@@ -1091,9 +1096,10 @@ export function drawPurpleDimScreen() {
       if (!f || !f.rika || !f.rika.active || !f.rikaAlpha || f.rikaAlpha <= 0) continue;
       const rk = f.rika;
       const rScale = rk.spawnScale ?? 1.0;
-      const cutoutRadius = Math.max(90, (rk.r || 35) * rScale * 3.0 + 60);
-      const rkX = rk.x + shakeX;
-      const rkY = rk.y + shakeY;
+      const rkScreen = worldToScreen(rk.x, rk.y);
+      const rkX = rkScreen.x;
+      const rkY = rkScreen.y;
+      const cutoutRadius = Math.max(90, ((rk.r || 35) * rScale * 3.0 + 60) * camZoom);
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
       const holeGrad = ctx.createRadialGradient(rkX, rkY, 0, rkX, rkY, cutoutRadius);
@@ -1166,10 +1172,9 @@ export function drawGojoDomainDimScreen() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 2. Deep cosmic dark blue radial gradient centered on Gojo
-  const shakeX = state.shakeX || 0;
-  const shakeY = state.shakeY || 0;
-  const cx = gojoFighter ? (gojoFighter.x + shakeX) : canvas.width / 2;
-  const cy = gojoFighter ? ((gojoFighter.y - (gojoFighter.z || 0)) + shakeY) : canvas.height / 2;
+  const center = gojoFighter ? worldToScreen(gojoFighter.x, (gojoFighter.y - (gojoFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = center.x;
+  const cy = center.y;
   const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
@@ -1236,10 +1241,9 @@ export function drawSukunaDomainDimScreen() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 2. Deep crimson/blood-red radial gradient centered on Sukuna
-  const shakeX = state.shakeX || 0;
-  const shakeY = state.shakeY || 0;
-  const cx = sukunaFighter ? (sukunaFighter.x + shakeX) : canvas.width / 2;
-  const cy = sukunaFighter ? ((sukunaFighter.y - (sukunaFighter.z || 0)) + shakeY) : canvas.height / 2;
+  const center = sukunaFighter ? worldToScreen(sukunaFighter.x, (sukunaFighter.y - (sukunaFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = center.x;
+  const cy = center.y;
   const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
@@ -1548,8 +1552,9 @@ export function drawMahoragaAdaptationDimScreen() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Dark Golden Vignette Radial Gradient centered at Mahoraga's wheel
-  const drawX = mahoraga.x + shakeX;
-  const wheelY = mahoraga.y - mahoraga.r - 28 + shakeY;
+  const screenMaho = worldToScreen(mahoraga.x, mahoraga.y - mahoraga.r - 28);
+  const drawX = screenMaho.x;
+  const wheelY = screenMaho.y;
   const maxRadius = Math.max(arena.width, arena.height) * 0.70;
   const grad = ctx.createRadialGradient(
     drawX, wheelY, 15,
@@ -1759,8 +1764,9 @@ export function drawNanamiRatioCritDimScreen() {
     // Smoothly expands from small (0.10x) to full size (1.0x) as it spins
     const rulerScale = 0.10 + 0.90 * easeSpin;
 
+    const screenImpact = worldToScreen(impactX, impactY);
     ctx.save();
-    ctx.translate(impactX + shakeX, impactY + shakeY);
+    ctx.translate(screenImpact.x, screenImpact.y);
     ctx.rotate(currentAngle);
     ctx.scale(rulerScale, rulerScale);
 
@@ -1940,8 +1946,9 @@ export function drawMahoragaLevel8DimScreen() {
     }
   }
 
-  const drawX = cx + shakeX;
-  const drawY = cy + shakeY;
+  const screenMahoC = worldToScreen(cx, cy);
+  const drawX = screenMahoC.x;
+  const drawY = screenMahoC.y;
   const spotlightInnerR = Math.max(140, Math.min(480, maxTargetDist + 80));
   const maxRadius = Math.max(arena.width, arena.height) * 1.15;
 
@@ -1972,8 +1979,9 @@ export function drawMahoragaLevel8DimScreen() {
     const pulseScale = 1.0 + Math.sin(Date.now() * 0.003) * 0.08;
 
     // 1. Wheel Light Spill (glow centered at Dharma Wheel)
-    const wheelX = activeMaho.x + shakeX;
-    const wheelY = activeMaho.y - activeMaho.r - 28 + shakeY;
+    const screenWheel = worldToScreen(activeMaho.x, activeMaho.y - activeMaho.r - 28);
+    const wheelX = screenWheel.x;
+    const wheelY = screenWheel.y;
     const wheelR = 85 * pulseScale;
     const wheelGlow = ctx.createRadialGradient(wheelX, wheelY, 5, wheelX, wheelY, wheelR);
     wheelGlow.addColorStop(0, `rgba(255, 215, 0, ${0.35 * currentMahoLevel8DimOpacity})`);
@@ -1988,8 +1996,9 @@ export function drawMahoragaLevel8DimScreen() {
     // 2. Sword Light Spill (glow centered at extending blade)
     const swordAngle = activeMaho.gunAngle !== undefined ? activeMaho.gunAngle : 0;
     const swordDist = activeMaho.r + 30;
-    const swordX = activeMaho.x + Math.cos(swordAngle) * swordDist + shakeX;
-    const swordY = activeMaho.y + Math.sin(swordAngle) * swordDist + shakeY;
+    const screenSword = worldToScreen(activeMaho.x + Math.cos(swordAngle) * swordDist, activeMaho.y + Math.sin(swordAngle) * swordDist);
+    const swordX = screenSword.x;
+    const swordY = screenSword.y;
     const swordR = 110 * pulseScale;
 
     const swordGlow = ctx.createRadialGradient(swordX, swordY, 10, swordX, swordY, swordR);
@@ -2168,9 +2177,12 @@ export function drawSaitamaSeriousPunchDimScreen() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = currentSaitamaSeriousPunchOpacity;
 
-  // Center exactly in the middle of the arena
-  const cx = arena.x + arena.width / 2;
-  const cy = arena.y + arena.height / 2;
+  // Center exactly in the middle of the arena, converted to screen space for camera tracking
+  const worldCx = arena.x + arena.width / 2;
+  const worldCy = arena.y + arena.height / 2;
+  const screenCenter = worldToScreen(worldCx, worldCy);
+  const cx = screenCenter.x;
+  const cy = screenCenter.y;
 
   // 1. Solid pitch black dimming screen (OPM Death Punch style)
   ctx.fillStyle = 'rgba(0, 0, 0, 0.99)';
@@ -2556,8 +2568,11 @@ export function drawBankaiImpactDimScreen() {
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const shakeX = state.shakeX || 0;
   const shakeY = state.shakeY || 0;
-  const cx = (ichigo ? ichigo.x : (arena.x || 0) + (arena.width || 800) / 2) + shakeX;
-  const cy = (ichigo ? ichigo.y : (arena.y || 0) + (arena.height || 600) / 2) + shakeY;
+  const worldCxB = ichigo ? ichigo.x : (arena.x || 0) + (arena.width || 800) / 2;
+  const worldCyB = ichigo ? ichigo.y : (arena.y || 0) + (arena.height || 600) / 2;
+  const screenB = worldToScreen(worldCxB, worldCyB);
+  const cx = screenB.x;
+  const cy = screenB.y;
   const r = ichigo ? (ichigo.r || 25) : 25;
 
   let isChanneling = Boolean(ichigo && ichigo.isChannelingBankai && ichigo.bankaiChargeTimer > 0);

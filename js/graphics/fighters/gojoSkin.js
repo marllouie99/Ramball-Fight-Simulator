@@ -81,9 +81,10 @@ export function drawGojoBody(ctx, fighter) {
     // === ANIME CHARACTER ROTATION LOGIC (Rule 19 Standard) ===
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
     const isWinnerScreen = fighter._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
-    const is200Cinematic = fighter.isChannelingPurple && (fighter.is200PercentChannel || fighter.purpleUseCount === 1);
+    const isChannelingPurple = fighter.isChannelingPurple;
+    const isChannelingDomain = fighter.isChannelingDomainExpansion;
 
-    if (!isWinnerScreen && !is200Cinematic) {
+    if (!isWinnerScreen && !isChannelingPurple && !isChannelingDomain) {
       const angle = fighter.gunAngle || 0;
       ctx.rotate(angle);
 

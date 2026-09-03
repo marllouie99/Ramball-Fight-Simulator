@@ -10,12 +10,39 @@ function _isDarkMode() {
   );
 }
 
+function drawPixelDisc(ctx, cx, cy, r, P) {
+  const snapR = Math.round(r / P) * P;
+  for (let gy = -snapR; gy <= snapR; gy += P) {
+    const halfW = Math.round(Math.sqrt(Math.max(0, snapR * snapR - gy * gy)) / P) * P;
+    if (halfW > 0) {
+      ctx.fillRect(cx - halfW, cy + gy, halfW * 2, P);
+    }
+  }
+}
+
+function drawPixelRing(ctx, cx, cy, r, thick, P) {
+  const snapR = Math.round(r / P) * P;
+  if (snapR <= 0) return;
+  const snapThick = Math.max(P, Math.round(thick / P) * P);
+  const numPts = Math.max(36, Math.floor(snapR * 2.2 / P));
+  const stepA = (Math.PI * 2) / numPts;
+  for (let a = 0; a < Math.PI * 2; a += stepA) {
+    const rx = Math.round((Math.cos(a) * snapR) / P) * P;
+    const ry = Math.round((Math.sin(a) * snapR) / P) * P;
+    ctx.fillRect(cx + rx - snapThick / 2, cy + ry - snapThick / 2, snapThick, snapThick);
+  }
+}
+
 export function drawThermobaricExplosions(ctx) {
   if (!state.thermobaricExplosions || state.thermobaricExplosions.length === 0) return;
 
   // 30 FPS stepped timestamp for anime Sakuga keyframe animation
   const step30Frame = Math.floor(Date.now() / (1000 / 30));
   const nowTime = step30Frame * (1000 / 30);
+
+  // Discrete pixel art grid constants (Getsuga Tensho / Genos standard)
+  const P = 3.0;
+  const snap = (v) => Math.round(v / P) * P;
 
   for (let i = state.thermobaricExplosions.length - 1; i >= 0; i--) {
     const exp = state.thermobaricExplosions[i];
@@ -40,268 +67,230 @@ export function drawThermobaricExplosions(ctx) {
     const rimPts = exp.rimPoints || [];
 
     ctx.save();
+    ctx.imageSmoothingEnabled = false;
 
-    // Helper: draw wobbly ellipse from pre-generated rim points
-    const drawWobblyEllipse = (scaleX, scaleY, rimScale) => {
-      if (rimPts.length === 0) { ctx.arc(0, 0, scaleX, 0, Math.PI * 2); return; }
+    // Helper: draw stepped pixel wobbly polygon
+    const drawPixelWobblyContour = (scaleX, scaleY, rimScale) => {
+      if (rimPts.length === 0) {
+        const steps = 32;
+        ctx.beginPath();
+        for (let s = 0; s <= steps; s++) {
+          const a = (s / steps) * Math.PI * 2;
+          const px = snap(Math.cos(a) * scaleX);
+          const py = snap(Math.sin(a) * scaleY);
+          if (s === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        return;
+      }
       ctx.beginPath();
-      for (let r = 0; r < rimPts.length; r++) {
-        const pt = rimPts[r];
-        const nextPt = rimPts[(r + 1) % rimPts.length];
+      for (let r = 0; r <= rimPts.length; r++) {
+        const idx = r % rimPts.length;
+        const pt = rimPts[idx];
         const w = pt.wobble * rimScale;
-        const px = Math.cos(pt.angle) * scaleX * w;
-        const py = Math.sin(pt.angle) * scaleY * w;
-        const nw = nextPt.wobble * rimScale;
-        const nx = Math.cos(nextPt.angle) * scaleX * nw;
-        const ny = Math.sin(nextPt.angle) * scaleY * nw;
+        const px = snap(Math.cos(pt.angle) * scaleX * w);
+        const py = snap(Math.sin(pt.angle) * scaleY * w);
         if (r === 0) ctx.moveTo(px, py);
-        const midX = (px + nx) / 2;
-        const midY = (py + ny) / 2;
-        ctx.quadraticCurveTo(px, py, midX, midY);
+        else ctx.lineTo(px, py);
       }
       ctx.closePath();
     };
 
-    // â”€â”€ CRATER LAYERS â”€â”€
+    // ── CRATER PIXEL LAYERS (Scorched Earth & Molten Magma Reservoir) ──
     ctx.save();
     ctx.translate(cx, cy);
 
+    // 1. Scorched Obsidian Perimeter
     ctx.save();
-    ctx.globalAlpha = craterAlpha * 0.7;
-    ctx.fillStyle = '#1a1008';
-    drawWobblyEllipse(R * 0.9, R * 0.65, 1.05);
+    ctx.globalAlpha = craterAlpha * 0.75;
+    ctx.fillStyle = '#140a04';
+    drawPixelWobblyContour(R * 0.9, R * 0.65, 1.05);
     ctx.fill();
     ctx.restore();
 
-    ctx.save();
-    ctx.globalAlpha = craterAlpha * 0.85;
-    ctx.fillStyle = '#0d0a06';
-    drawWobblyEllipse(R * 0.78, R * 0.56, 1.0);
-    ctx.fill();
-    ctx.restore();
-
+    // 2. Deep Pit Inner Crater
     ctx.save();
     ctx.globalAlpha = craterAlpha * 0.9;
-    const depGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.55);
-    depGrad.addColorStop(0, `rgba(40, 10, 0, ${craterAlpha})`);
-    depGrad.addColorStop(0.6, `rgba(20, 8, 2, ${craterAlpha * 0.9})`);
-    depGrad.addColorStop(1, 'rgba(15, 5, 0, 0)');
-    ctx.fillStyle = depGrad;
-    drawWobblyEllipse(R * 0.65, R * 0.45, 0.95);
+    ctx.fillStyle = '#0a0603';
+    drawPixelWobblyContour(R * 0.78, R * 0.56, 1.0);
     ctx.fill();
     ctx.restore();
 
+    // 3. Stepped Caldera Rings
     ctx.save();
     ctx.globalAlpha = craterAlpha * 0.5;
     for (let ring = 0; ring < 3; ring++) {
-      const ringR = R * (0.35 + ring * 0.12);
+      const ringR = snap(R * (0.35 + ring * 0.12));
       const ringAlpha = (1 - ring * 0.3) * craterAlpha;
-      ctx.strokeStyle = `rgba(80, 20, 0, ${ringAlpha * 0.4})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, ringR, ringR * 0.7, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.fillStyle = `rgba(90, 20, 0, ${ringAlpha * 0.6})`;
+      drawPixelRing(ctx, 0, 0, ringR, P, P);
     }
     ctx.restore();
 
+    // 4. Pulsing Molten Magma Core (Stepped Pixel Tiers)
     ctx.save();
     const magmaPulse = 0.85 + Math.sin(nowTime * 0.003 + (exp.seed || 0) * 10) * 0.15;
-    const magmaGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.4 * magmaPulse);
-    magmaGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * craterAlpha * magmaPulse})`);
-    magmaGrad.addColorStop(0.3, `rgba(255, 120, 20, ${0.7 * craterAlpha * magmaPulse})`);
-    magmaGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.45 * craterAlpha})`);
-    magmaGrad.addColorStop(1, 'rgba(80, 10, 0, 0)');
-    ctx.fillStyle = magmaGrad;
-    ctx.beginPath();
-    drawWobblyEllipse(R * 0.4 * magmaPulse, R * 0.28 * magmaPulse, 0.9);
+    ctx.globalAlpha = craterAlpha * magmaPulse;
+    ctx.fillStyle = `rgba(200, 40, 0, ${0.5 * craterAlpha})`;
+    drawPixelWobblyContour(R * 0.45 * magmaPulse, R * 0.32 * magmaPulse, 0.95);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(255, 120, 20, ${0.75 * craterAlpha * magmaPulse})`;
+    drawPixelWobblyContour(R * 0.35 * magmaPulse, R * 0.24 * magmaPulse, 0.9);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(255, 230, 80, ${0.9 * craterAlpha * magmaPulse})`;
+    drawPixelWobblyContour(R * 0.22 * magmaPulse, R * 0.15 * magmaPulse, 0.85);
     ctx.fill();
     ctx.restore();
 
-    ctx.save();
-    ctx.globalAlpha = craterAlpha * 0.6;
-    for (let v = 0; v < 6; v++) {
-      const va = (v / 6) * Math.PI * 2 + (exp.seed || 0) * 5;
-      const vLen = R * (0.25 + (exp.seed || 0.5) * 0.2);
-      ctx.strokeStyle = `rgba(255, 80, 0, ${0.7 * craterAlpha})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      const cp1x = Math.cos(va + 0.3) * vLen * 0.4;
-      const cp1y = Math.sin(va + 0.3) * vLen * 0.4 * 0.7;
-      const cp2x = Math.cos(va - 0.2) * vLen * 0.7;
-      const cp2y = Math.sin(va - 0.2) * vLen * 0.7 * 0.7;
-      const evx = Math.cos(va) * vLen;
-      const evy = Math.sin(va) * vLen * 0.7;
-      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, evx, evy);
-      ctx.stroke();
-    }
     ctx.restore();
 
-    ctx.save();
-    ctx.globalAlpha = craterAlpha * 0.35;
-    ctx.strokeStyle = `rgba(120, 40, 0, ${craterAlpha * 0.5})`;
-    ctx.lineWidth = 2.5;
-    drawWobblyEllipse(R * 0.78, R * 0.56, 1.0);
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.restore();
-
-    // ── CURVED BEZIER CRACK VEINS ──
+    // ── STEPPED PIXEL CRACK VEINS (Getsuga Tensho Technique) ──
     if (exp.cracks && exp.cracks.length > 0) {
-      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
       ctx.save();
+      ctx.imageSmoothingEnabled = false;
       exp.cracks.forEach(crack => {
         const pts = crack.points;
         if (!pts || pts.length < 2) return;
+        const crackThick = Math.max(P, snap(crack.width * 0.9));
 
-        if (isLowQuality) {
-          // Fast path: draw only 1 stroke instead of 3
-          ctx.strokeStyle = `rgba(255, 100, 0, ${0.7 * craterAlpha})`;
-          ctx.lineWidth = (crack.width + 1) * craterAlpha;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.beginPath();
-          ctx.moveTo(pts[0].x, pts[0].y);
-          for (let p = 1; p < pts.length; p++) {
-            const pt = pts[p];
-            if (pt.cpx !== undefined) {
-              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
-            } else {
-              ctx.lineTo(pt.x, pt.y);
-            }
-          }
-          ctx.stroke();
-        } else {
-          ctx.strokeStyle = `rgba(255, 80, 0, ${0.8 * craterAlpha})`;
-          ctx.lineWidth = (crack.width + 3) * craterAlpha;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.beginPath();
-          ctx.moveTo(pts[0].x, pts[0].y);
-          for (let p = 1; p < pts.length; p++) {
-            const pt = pts[p];
-            if (pt.cpx !== undefined) {
-              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
-            } else {
-              ctx.lineTo(pt.x, pt.y);
-            }
-          }
-          ctx.stroke();
+        for (let pIdx = 1; pIdx < pts.length; pIdx++) {
+          const prev = pts[pIdx - 1];
+          const curr = pts[pIdx];
+          const dx = curr.x - prev.x;
+          const dy = curr.y - prev.y;
+          const dist = Math.hypot(dx, dy);
+          const steps = Math.max(1, Math.ceil(dist / P));
 
-          ctx.strokeStyle = `rgba(15, 5, 0, ${0.9 * craterAlpha})`;
-          ctx.lineWidth = crack.width * craterAlpha;
-          ctx.shadowBlur = 0;
-          ctx.beginPath();
-          ctx.moveTo(pts[0].x, pts[0].y);
-          for (let p = 1; p < pts.length; p++) {
-            const pt = pts[p];
-            if (pt.cpx !== undefined) {
-              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
-            } else {
-              ctx.lineTo(pt.x, pt.y);
-            }
-          }
-          ctx.stroke();
+          for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const gx = snap(prev.x + dx * t);
+            const gy = snap(prev.y + dy * t);
 
-          ctx.strokeStyle = `rgba(255, 200, 100, ${0.5 * craterAlpha})`;
-          ctx.lineWidth = Math.max(0.5, (crack.width - 1) * 0.5 * craterAlpha);
-          ctx.beginPath();
-          ctx.moveTo(pts[0].x, pts[0].y);
-          for (let p = 1; p < pts.length; p++) {
-            const pt = pts[p];
-            if (pt.cpx !== undefined) {
-              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
-            } else {
-              ctx.lineTo(pt.x, pt.y);
+            // Dark obsidian crust border
+            ctx.fillStyle = `rgba(20, 5, 0, ${0.9 * craterAlpha})`;
+            ctx.fillRect(gx - crackThick, gy - crackThick, crackThick * 2 + P, crackThick * 2 + P);
+
+            // Molten magma core
+            ctx.fillStyle = `rgba(255, 160, 20, ${craterAlpha})`;
+            ctx.fillRect(gx - crackThick / 2, gy - crackThick / 2, crackThick, crackThick);
+
+            // White-hot core flash
+            if (craterAlpha > 0.6 && s % 2 === 0) {
+              ctx.fillStyle = `rgba(255, 255, 220, ${craterAlpha})`;
+              ctx.fillRect(gx, gy, P, P);
             }
           }
-          ctx.stroke();
         }
       });
       ctx.restore();
     }
 
-    // ── EXPLOSION FLASH ──
+    // ── STEPPED PIXEL-ART EXPLOSION FLASH (Getsuga Tensho Technique) ──
     ctx.save();
     ctx.translate(cx, cy);
+    ctx.imageSmoothingEnabled = false;
 
     if (explosionProgress < 1.0) {
+      // 1. Radiating Pixel Spike Rays
       if (explosionProgress < 0.5) {
         const spikeAlpha = (0.5 - explosionProgress) / 0.5;
-        ctx.save();
         const numSpikes = 14;
         for (let s = 0; s < numSpikes; s++) {
           const angle = (Math.PI * 2 / numSpikes) * s + (s % 2 === 0 ? 0.15 : -0.15);
-          const spikeLen = R * (1.0 + (exp.seed || 0.5) * 0.6) * (explosionProgress * 2.5);
-          const spikeW = (12 + s % 3 * 6) * spikeAlpha;
-          ctx.save();
-          ctx.rotate(angle);
-          ctx.fillStyle = `rgba(10, 5, 0, ${spikeAlpha * 0.9})`;
-          ctx.beginPath();
-          ctx.moveTo(R * 0.15, -spikeW * 0.3);
-          ctx.quadraticCurveTo(spikeLen * 0.5, -spikeW * 0.5, spikeLen, 0);
-          ctx.quadraticCurveTo(spikeLen * 0.5, spikeW * 0.5, R * 0.15, spikeW * 0.3);
-          ctx.closePath();
-          ctx.fill();
-          ctx.restore();
+          const spikeLen = snap(R * (1.0 + (exp.seed || 0.5) * 0.6) * (explosionProgress * 2.5));
+          const spikeW = snap((12 + s % 3 * 6) * spikeAlpha);
+          const cosA = Math.cos(angle);
+          const sinA = Math.sin(angle);
+          const stepCount = Math.max(2, Math.floor(spikeLen / P));
+
+          ctx.fillStyle = `rgba(15, 5, 0, ${spikeAlpha * 0.9})`;
+          for (let st = 1; st <= stepCount; st++) {
+            const dist = st * P;
+            const t = dist / spikeLen;
+            const w = snap(Math.sin(t * Math.PI) * spikeW);
+            const cx_s = snap(cosA * dist);
+            const cy_s = snap(sinA * dist);
+            ctx.fillRect(cx_s - w / 2, cy_s - w / 2, Math.max(P, w), Math.max(P, w));
+          }
         }
-        ctx.restore();
       }
 
       ctx.globalCompositeOperation = 'lighter';
-      ctx.lineWidth = 24 * (1 - explosionProgress);
-      ctx.strokeStyle = `rgba(180, 10, 0, ${0.85 * expAlpha})`;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.stroke();
 
-      ctx.lineWidth = 14 * (1 - explosionProgress);
-      ctx.strokeStyle = `rgba(255, 140, 0, ${0.9 * expAlpha})`;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * 0.82, 0, Math.PI * 2);
-      ctx.stroke();
+      // 2. Concentric Stepped Pixel Shockwave Rings (Getsuga Tensho Palette)
+      // (A) Outer Crimson Shockwave Ring
+      ctx.fillStyle = `rgba(200, 20, 0, ${0.9 * expAlpha})`;
+      drawPixelRing(ctx, 0, 0, radius, snap(20 * (1 - explosionProgress)), P);
 
-      ctx.lineWidth = 6 * (1 - explosionProgress);
-      ctx.strokeStyle = `rgba(255, 250, 200, ${expAlpha})`;
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
-      ctx.stroke();
+      // (B) Mid Fiery Orange Shockwave Ring
+      ctx.fillStyle = `rgba(255, 140, 0, ${0.95 * expAlpha})`;
+      drawPixelRing(ctx, 0, 0, radius * 0.82, snap(12 * (1 - explosionProgress)), P);
 
-      ctx.save();
-      const pH = R * 3.0 * Math.sin(explosionProgress * Math.PI);
-      const pW = R * 0.7 * (1 - explosionProgress * 0.4);
-      if (pH > 1) {
-        const pGrad = ctx.createLinearGradient(0, 0, 0, -pH);
-        pGrad.addColorStop(0, `rgba(255, 255, 240, ${0.95 * expAlpha})`);
-        pGrad.addColorStop(0.15, `rgba(255, 180, 30, ${0.85 * expAlpha})`);
-        pGrad.addColorStop(0.5, `rgba(220, 40, 0, ${0.6 * expAlpha})`);
-        pGrad.addColorStop(0.8, `rgba(60, 10, 0, ${0.3 * expAlpha})`);
-        pGrad.addColorStop(1, 'rgba(20, 5, 0, 0)');
-        ctx.fillStyle = pGrad;
-        ctx.beginPath();
-        ctx.moveTo(-pW * 0.5, 0);
-        ctx.bezierCurveTo(-pW * 0.6, -pH * 0.3, -pW * 0.9, -pH * 0.7, -pW * 0.4, -pH);
-        ctx.lineTo(pW * 0.4, -pH);
-        ctx.bezierCurveTo(pW * 0.9, -pH * 0.7, pW * 0.6, -pH * 0.3, pW * 0.5, 0);
-        ctx.closePath();
-        ctx.fill();
+      // (C) Inner Incandescent White Shockwave Ring
+      ctx.fillStyle = `rgba(255, 255, 240, ${expAlpha})`;
+      drawPixelRing(ctx, 0, 0, radius * 0.60, snap(5 * (1 - explosionProgress)), P);
+
+      // 3. Stepped Pixel Thermal Blast Pillar (Rising Fire Column)
+      const pH = snap(R * 3.0 * Math.sin(explosionProgress * Math.PI));
+      const pW = snap(R * 0.7 * (1 - explosionProgress * 0.4));
+      if (pH > P) {
+        for (let gy = 0; gy >= -pH; gy -= P) {
+          const t = -gy / pH; // 0 at ground, 1 at top
+          const profile = Math.sin(t * Math.PI) * (1.1 - t * 0.35) + 0.15 * Math.pow(1 - t, 2);
+          const w = snap(pW * profile);
+          if (w <= 0) continue;
+
+          const flicker = Math.sin(nowTime * 0.03 + gy * 0.2) * P;
+          const effW = Math.max(P, w + flicker);
+
+          // Dark obsidian flame outline:
+          ctx.fillStyle = `rgba(20, 5, 0, ${0.85 * expAlpha})`;
+          ctx.fillRect(snap(-effW / 2 - P), gy, P, P);
+          ctx.fillRect(snap(effW / 2), gy, P, P);
+
+          // Magma crimson body:
+          ctx.fillStyle = `rgba(220, 30, 0, ${0.9 * expAlpha})`;
+          ctx.fillRect(snap(-effW / 2), gy, snap(effW), P);
+
+          // Saturated fiery orange core:
+          const orangeW = snap(effW * 0.7);
+          ctx.fillStyle = `rgba(255, 120, 0, ${0.95 * expAlpha})`;
+          ctx.fillRect(snap(-orangeW / 2), gy, orangeW, P);
+
+          // Hot solar gold plasma:
+          const goldW = snap(effW * 0.4);
+          ctx.fillStyle = `rgba(255, 220, 40, ${expAlpha})`;
+          ctx.fillRect(snap(-goldW / 2), gy, goldW, P);
+
+          // White-hot central spine:
+          const whiteW = snap(effW * 0.18);
+          if (whiteW >= P) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${expAlpha})`;
+            ctx.fillRect(snap(-whiteW / 2), gy, whiteW, P);
+          }
+        }
       }
-      ctx.restore();
 
+      // 4. Detonation Incandescent Fireball Core (Stepped Pixel Discs)
       if (explosionProgress < 0.5) {
         const coreA = (0.5 - explosionProgress) / 0.5;
-        const coreR = radius * (0.75 - explosionProgress * 0.4);
-        const cG = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, coreR));
-        cG.addColorStop(0, `rgba(255, 255, 255, ${coreA})`);
-        cG.addColorStop(0.25, `rgba(255, 245, 210, ${0.9 * coreA})`);
-        cG.addColorStop(0.6, `rgba(255, 120, 0, ${0.5 * coreA})`);
-        cG.addColorStop(1, 'rgba(200, 20, 0, 0)');
-        ctx.fillStyle = cG;
-        ctx.beginPath();
-        ctx.arc(0, 0, Math.max(1, coreR), 0, Math.PI * 2);
-        ctx.fill();
+        const coreR = snap(radius * (0.75 - explosionProgress * 0.4));
+        if (coreR > P) {
+          ctx.fillStyle = `rgba(220, 40, 0, ${0.7 * coreA})`;
+          drawPixelDisc(ctx, 0, 0, coreR, P);
+
+          ctx.fillStyle = `rgba(255, 140, 0, ${0.85 * coreA})`;
+          drawPixelDisc(ctx, 0, 0, coreR * 0.7, P);
+
+          ctx.fillStyle = `rgba(255, 230, 60, ${0.95 * coreA})`;
+          drawPixelDisc(ctx, 0, 0, coreR * 0.45, P);
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${coreA})`;
+          drawPixelDisc(ctx, 0, 0, coreR * 0.22, P);
+        }
       }
     }
 
@@ -330,90 +319,56 @@ export function drawThermobaricExplosions(ctx) {
       }
       exp.debris.forEach((d) => {
         ctx.save();
-        ctx.translate(d.x - cx, d.y - cy);
+        ctx.translate(d.x, d.y);
         ctx.rotate(d.rot);
-        const isDark = _isDarkMode();
+        ctx.imageSmoothingEnabled = false;
 
         if (d.type === 'ember') {
-          ctx.globalAlpha = craterAlpha * 0.9;
-          if (isDark) {
-            const s = Math.max(2, Math.round(d.size / 2) * 2);
-            ctx.fillStyle = '#FF4500';
-            ctx.fillRect(-s, -s, s * 2, s * 2);
-            ctx.fillStyle = '#FFD700';
-            ctx.fillRect(-s / 2, -s / 2, s, s);
-          } else {
-            ctx.fillStyle = 'rgba(255, 102, 0, 0.4)';
-            ctx.beginPath();
-            ctx.arc(0, 0, d.size * 1.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = d.color;
-            ctx.beginPath();
-            ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#FFD700';
-            ctx.beginPath();
-            ctx.arc(0, 0, d.size * 0.2, 0, Math.PI * 2);
-            ctx.fill();
+          ctx.globalAlpha = craterAlpha * 0.95;
+          const s = Math.max(P, snap(d.size));
+          // Stepped pixel ember with white core and fiery gold halo
+          ctx.fillStyle = '#FF3300';
+          ctx.fillRect(-s, -s, s * 2, s * 2);
+          ctx.fillStyle = '#FFD700';
+          ctx.fillRect(-s / 2, -s / 2, s, s);
+          if (s >= P * 1.5) {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(-P / 2, -P / 2, P, P);
           }
         } else if (d.type === 'smoke') {
-          ctx.globalAlpha = craterAlpha * 0.25;
-          if (isDark) {
-            const s = Math.max(3, Math.round(d.size / 2) * 2);
-            ctx.fillStyle = `rgba(30, 20, 15, ${craterAlpha * 0.5})`;
-            ctx.fillRect(-s / 2, -s / 2, s, s);
-          } else {
-            ctx.fillStyle = `rgba(60, 50, 40, ${craterAlpha * 0.15})`;
-            ctx.beginPath();
-            ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = `rgba(30, 20, 15, ${craterAlpha * 0.4})`;
-            ctx.beginPath();
-            ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
+          ctx.globalAlpha = craterAlpha * 0.4;
+          const s = Math.max(P, snap(d.size));
+          ctx.fillStyle = `rgba(25, 18, 14, ${craterAlpha * 0.6})`;
+          ctx.fillRect(-s, -s, s * 2, s * 2);
+          ctx.fillStyle = `rgba(45, 30, 22, ${craterAlpha * 0.4})`;
+          ctx.fillRect(-s / 2, -s / 2, s, s);
         } else {
           ctx.globalAlpha = craterAlpha * 0.85;
-          ctx.fillStyle = d.color;
-          if (isDark) {
-            const s = Math.max(2, Math.round(d.size / 2) * 2);
-            ctx.fillRect(-s / 2, -s / 2, s, s);
-          } else {
-            ctx.beginPath();
-            const s = d.size;
-            ctx.moveTo(-s * 0.5, -s * 0.3);
-            ctx.lineTo(s * 0.2, -s * 0.5);
-            ctx.lineTo(s * 0.5, s * 0.1);
-            ctx.lineTo(s * 0.1, s * 0.5);
-            ctx.lineTo(-s * 0.4, s * 0.3);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#111';
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
+          const s = Math.max(P, snap(d.size));
+          ctx.fillStyle = '#1A0800';
+          ctx.fillRect(-s / 2 - P / 2, -s / 2 - P / 2, s + P, s + P);
+          ctx.fillStyle = d.color || '#8B2500';
+          ctx.fillRect(-s / 2, -s / 2, s, s);
         }
         ctx.restore();
       });
     }
 
-    // â”€â”€ RISING HEAT SHIMMER WISPS â”€â”€
+    // ── STEPPED PIXEL HEAT SHIMMER WISPS ──
     if (craterAlpha > 0.1) {
       ctx.save();
-      ctx.globalAlpha = craterAlpha * 0.2;
-      for (let w = 0; w < 5; w++) {
-        const wx = Math.sin(nowTime * 0.002 + w * 2.1 + (exp.seed || 0) * 8) * R * 0.4;
+      ctx.translate(cx, cy);
+      ctx.imageSmoothingEnabled = false;
+      for (let w = 0; w < 6; w++) {
+        const wx = snap(Math.sin(nowTime * 0.002 + w * 2.1 + (exp.seed || 0) * 8) * R * 0.4);
         const wPhase = ((nowTime * 0.001 + w * 1.3) % 3) / 3;
-        const wy = -wPhase * R * 2.5;
-        const wAlpha = Math.sin(wPhase * Math.PI) * craterAlpha * 0.2;
-        const wSize = 5 + wPhase * 15;
-        const hG = ctx.createRadialGradient(wx, wy, 0, wx, wy, wSize);
-        hG.addColorStop(0, `rgba(200, 100, 30, ${wAlpha})`);
-        hG.addColorStop(1, 'rgba(100, 40, 10, 0)');
-        ctx.fillStyle = hG;
-        ctx.beginPath();
-        ctx.arc(wx, wy, wSize, 0, Math.PI * 2);
-        ctx.fill();
+        const wy = snap(-wPhase * R * 2.5);
+        const wAlpha = Math.sin(wPhase * Math.PI) * craterAlpha * 0.6;
+        const wSize = Math.max(P, snap((2 + wPhase * 3) * P));
+        ctx.fillStyle = (w % 2 === 0) ? `rgba(255, 180, 30, ${wAlpha})` : `rgba(255, 80, 0, ${wAlpha})`;
+        ctx.fillRect(wx - wSize / 2, wy - wSize / 2, wSize, wSize);
+        ctx.fillStyle = `rgba(255, 255, 220, ${wAlpha * 0.9})`;
+        ctx.fillRect(wx - P / 2, wy - P / 2, P, P);
       }
       ctx.restore();
     }
@@ -425,3 +380,5 @@ export function drawThermobaricExplosions(ctx) {
     }
   }
 }
+
+

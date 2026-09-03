@@ -1,6 +1,7 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { excludeGojoInfinityFromDim } from './arenaRenderer.js';
+import { worldToScreen } from '../../systems/cameraSystem.js';
 
 /**
  * Draws a dark dim screen overlay when Zeus is charging or casting his Storm ultimate.
@@ -113,8 +114,9 @@ export function drawFurnaceDimScreen() {
 
   // Dark fiery vignette gradient centered on Sukuna/Arrow
   const opacity = currentFurnaceDimOpacity;
-  const drawCx = cx + shakeX;
-  const drawCy = cy + shakeY;
+  const screenPos = worldToScreen(cx, cy);
+  const drawCx = screenPos.x;
+  const drawCy = screenPos.y;
   const grad = ctx.createRadialGradient(drawCx, drawCy, 0, drawCx, drawCy, Math.max(canvas.width, canvas.height) * 0.95);
   grad.addColorStop(0, `rgba(255, 140, 0, ${opacity * 0.95})`);
   grad.addColorStop(0.06, `rgba(255, 70, 0, ${opacity * 0.85})`);
