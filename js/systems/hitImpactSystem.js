@@ -69,13 +69,13 @@ export const HitImpactSystem = {
       return isSukunaSlash ? false : true; // Debris breaks on target hit
     } 
     
-    if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
+    if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'rubbickSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
       if (!projectile.hitFighters) projectile.hitFighters = new Set();
       projectile.hitFighters.add(target);
       
-      const isTrickster = projectile.visual === 'tricksterSniperBullet_enhanced';
+      const isRubbick = projectile.visual === 'rubbickSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced';
       
-      if (isTrickster) {
+      if (isRubbick) {
         spawnSparks(target.x, target.y, 8, 'lightningTrail', 'rgba(0, 255, 0, 1)');
         spawnImpactFlash(target.x, target.y, 25, 'lightningTrail'); 
         if (typeof spawnCrimsonLightningImpact === 'function') {
@@ -91,7 +91,8 @@ export const HitImpactSystem = {
       
       const duration = CONFIG.sharpshooter?.electrifiedDuration || 45;
       target.crimsonElectrifiedTimer = Math.max(target.crimsonElectrifiedTimer || 0, duration);
-      target.crimsonElectrifiedTrickster = isTrickster;
+      target.crimsonElectrifiedRubbick = isRubbick;
+      target.crimsonElectrifiedTrickster = isRubbick;
       target.lastCrimsonAttacker = attacker;
       return false; // Pierce
     } 
@@ -475,7 +476,7 @@ export const HitImpactSystem = {
           const ddx = bestFighter.x - projectile.x;
           const ddy = bestFighter.y - projectile.y;
           const dist = Math.hypot(ddx, ddy) || 1;
-          const speed = Math.hypot(projectile.vx, projectile.vy) || (CONFIG.trickster?.boltSpeed || 8);
+          const speed = Math.hypot(projectile.vx, projectile.vy) || ((CONFIG.rubbick || CONFIG.trickster)?.boltSpeed || 8);
           projectile.vx = (ddx / dist) * speed;
           projectile.vy = (ddy / dist) * speed;
           projectile.life = 180;
@@ -485,7 +486,7 @@ export const HitImpactSystem = {
           projectile.wobblePhase = Math.random() * Math.PI * 2;
         } else {
           // In 1v1 (no other enemies), ricochet outward so it can continue to bounce off arena walls
-          const curSpeed = Math.hypot(projectile.vx, projectile.vy) || (CONFIG.trickster?.boltSpeed || 8);
+          const curSpeed = Math.hypot(projectile.vx, projectile.vy) || ((CONFIG.rubbick || CONFIG.trickster)?.boltSpeed || 8);
           const scatterAngle = (projectile.angle || 0) + Math.PI + (Math.random() - 0.5) * 0.8;
           projectile.vx = Math.cos(scatterAngle) * curSpeed;
           projectile.vy = Math.sin(scatterAngle) * curSpeed;

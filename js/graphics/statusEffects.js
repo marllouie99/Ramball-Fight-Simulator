@@ -212,11 +212,11 @@ export function drawDubstepStunEffect(ctx, baseRadius, timer = 45) {
   ctx.restore();
 }
 
-export function drawCrimsonElectrifiedEffect(ctx, baseRadius, isTrickster = false) {
+export function drawCrimsonElectrifiedEffect(ctx, baseRadius, isRubbick = false) {
   ctx.save();
   
   // 1. Dark crimson aura glow
-  ctx.fillStyle = isTrickster ? `rgba(0, 100, 0, ${0.4 + 0.2 * Math.sin(Date.now() / 50)})` : `rgba(100, 0, 0, ${0.4 + 0.2 * Math.sin(Date.now() / 50)})`;
+  ctx.fillStyle = isRubbick ? `rgba(0, 100, 0, ${0.4 + 0.2 * Math.sin(Date.now() / 50)})` : `rgba(100, 0, 0, ${0.4 + 0.2 * Math.sin(Date.now() / 50)})`;
   ctx.beginPath();
   ctx.arc(0, 0, baseRadius * 1.2, 0, Math.PI * 2);
   ctx.fill();
@@ -233,7 +233,7 @@ export function drawCrimsonElectrifiedEffect(ctx, baseRadius, isTrickster = fals
     const angleEnd = angleStart + (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random());
     const isWhite = Math.random() > 0.6;
     
-    if (isTrickster) {
+    if (isRubbick) {
       ctx.strokeStyle = isWhite ? 'rgba(255, 255, 255, 0.9)' : 'rgba(50, 255, 50, 0.9)';
     } else {
       ctx.strokeStyle = isWhite ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 50, 50, 0.9)';
@@ -1460,7 +1460,7 @@ export const STATUS_OVERLAY_REGISTRY = [
   {
     id: 'crimsonElectrified',
     isActive: (f) => f.crimsonElectrifiedTimer > 0,
-    render: (ctx, baseRadius, f) => drawCrimsonElectrifiedEffect(ctx, baseRadius, f.crimsonElectrifiedTrickster)
+    render: (ctx, baseRadius, f) => drawCrimsonElectrifiedEffect(ctx, baseRadius, f.crimsonElectrifiedRubbick || f.crimsonElectrifiedTrickster)
   },
   {
     id: 'poison',

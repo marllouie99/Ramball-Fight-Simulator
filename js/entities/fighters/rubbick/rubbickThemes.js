@@ -1,4 +1,4 @@
-export const TricksterRubyTheme = {
+export const RubbickRubyTheme = {
   glowShadow: 'rgba(0, 255, 100, 1)',
   aura: 'rgba(0, 10, 5, 0.85)',
   core: 'rgba(0, 255, 100, 0.9)',
@@ -21,7 +21,7 @@ export const TricksterRubyTheme = {
   panel: 'rgba(29, 127, 29, 0.6)'
 };
 
-export const TricksterCronosTheme = {
+export const RubbickCronosTheme = {
   lodOuterGlow: 'rgba(0, 200, 80, 0.8)',
   lodInnerFill: 'rgba(0, 220, 100, 0.3)',
   vol1: 'rgba(0, 220, 120, 0.20)',
@@ -34,3 +34,7 @@ export const TricksterCronosTheme = {
   pulseRing: 'rgba(0, 210, 110, 0.5)',
   crispEdge: 'rgba(0, 220, 120, 0.85)'
 };
+
+export const TricksterRubyTheme = RubbickRubyTheme;
+export const TricksterCronosTheme = RubbickCronosTheme;
+

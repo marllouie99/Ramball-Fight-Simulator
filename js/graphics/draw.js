@@ -10,7 +10,7 @@ export { drawCarExplosions, drawCarScorchMarks, spawnCarExplosion, updateCarExpl
 // DRAW — ARENA
 // ——————————————————————————————————————————————————————
 import { state, getProjectiles } from '../core/state.js';
-import { TricksterCronosTheme } from '../entities/fighters/trickster/tricksterThemes.js';
+import { RubbickCronosTheme } from '../entities/fighters/rubbick/rubbickThemes.js';
 import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from './weaponVisuals.js';
 import { flamewardenFlameSystem } from './weapons/flamewardenWeaponGraphics.js';
 

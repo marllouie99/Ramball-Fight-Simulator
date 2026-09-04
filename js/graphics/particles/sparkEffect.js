@@ -160,13 +160,13 @@ export function spawnYutaBeamLingeringParticles(startX, startY, angle, beamLengt
  * @param {number} y - Y position
  * @param {number} radius - Base radius
  */
-export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = false) {
+export function spawnCrimsonLightningImpact(x, y, radius = 60, isRubbick = false) {
   // 1. Bright white-crimson core flash
   ParticleSystem.spawn(x, y, 1, 'default', {
     vx: 0, vy: 0,
     size: radius * 0.6,
     decay: 0.08,
-    type: isTrickster ? 'tricksterLightningCore' : 'crimsonLightningCore',
+    type: isRubbick ? 'rubbickLightningCore' : 'crimsonLightningCore',
     isFlash: true,
     friction: 1,
     color: 'white'
@@ -179,10 +179,10 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = fal
       size: radius * 0.2, // starts small, expands
       targetSize: radius * (1.5 + ring * 0.8), // expand target
       decay: 0.04 + ring * 0.02,
-      type: isTrickster ? 'tricksterLightningRing' : 'crimsonLightningRing',
+      type: isRubbick ? 'rubbickLightningRing' : 'crimsonLightningRing',
       isFlash: true,
       friction: 1,
-      color: isTrickster ? 'lime' : 'crimson'
+      color: isRubbick ? 'lime' : 'crimson'
     });
   }
 
@@ -193,7 +193,7 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = fal
     const speed = 4 + Math.random() * 6;
     const rand = Math.random();
     let color;
-    if (isTrickster) {
+    if (isRubbick) {
       color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(50, 255, 50, 1)' : 'rgba(0, 150, 0, 1)');
     } else {
       color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(255, 30, 30, 1)' : 'rgba(150, 0, 0, 1)');
@@ -205,7 +205,7 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = fal
       size: 2 + Math.random() * 3,
       decay: 0.03 + Math.random() * 0.03,
       friction: 0.95,
-      type: isTrickster ? 'tricksterLightningArc' : 'crimsonLightningArc',
+      type: isRubbick ? 'rubbickLightningArc' : 'crimsonLightningArc',
       isFlash: false,
       angle: angle, // store for drawing direction
       color: color
@@ -484,7 +484,7 @@ export function spawnArcaneGlyphs(x, y, count = 12) {
  * Dead sparks are returned to the pool instead of being spliced out.
  */
 
-export function spawnSpellStealWisps(trickster, target, color, count = 20) {
+export function spawnSpellStealWisps(rubbick, target, color, count = 20) {
   for (let i = 0; i < count; i++) {
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
     if (state.sparkEffects.length >= (isMulti ? 250 : 500)) return;
@@ -503,7 +503,7 @@ export function spawnSpellStealWisps(trickster, target, color, count = 20) {
     
     spark.type = 'spellStealWisp';
     spark.isFlash = true;
-    spark.targetRef = trickster;
+    spark.targetRef = rubbick;
     spark.color = color || '#39FF14'; // Fallback to green
     spark.size = 8 + Math.random() * 6; // Much larger
     spark.life = 1.5; // Start with >1 alpha to persist longer
@@ -624,9 +624,9 @@ export function drawSparkEffects(layer = 'all') {
     ctx.globalAlpha = effect.life;
 
     if (effect.isFlash) {
-      if (effect.type === 'crimsonLightningCore' || effect.type === 'tricksterLightningCore') {
+      if (effect.type === 'crimsonLightningCore' || effect.type === 'rubbickLightningCore' || effect.type === 'tricksterLightningCore') {
         // Sharp blinding core flash with jagged edges
-        const isTrickster = effect.type === 'tricksterLightningCore';
+        const isRubbick = effect.type === 'rubbickLightningCore' || effect.type === 'tricksterLightningCore';
         effect.size += (100 * 0.8 - effect.size) * 0.2; // Expand fast
         ctx.fillStyle = `rgba(255, 255, 255, ${effect.life})`;
         
@@ -646,7 +646,7 @@ export function drawSparkEffects(layer = 'all') {
         
         // Outer colored glow (GPU blend mode lighter for fast zero-lag glow)
         ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = isTrickster ? `rgba(100, 255, 100, ${effect.life * 0.5})` : `rgba(255, 50, 50, ${effect.life * 0.5})`;
+        ctx.fillStyle = isRubbick ? `rgba(100, 255, 100, ${effect.life * 0.5})` : `rgba(255, 50, 50, ${effect.life * 0.5})`;
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.size * 1.5, 0, Math.PI * 2);
         ctx.fill();
@@ -783,14 +783,14 @@ export function drawSparkEffects(layer = 'all') {
         
         ctx.translate(-effect.x, -effect.y);
         ctx.globalCompositeOperation = 'source-over';
-      } else if (effect.type === 'crimsonLightningRing' || effect.type === 'tricksterLightningRing') {
-        const isTrickster = effect.type === 'tricksterLightningRing';
+      } else if (effect.type === 'crimsonLightningRing' || effect.type === 'rubbickLightningRing' || effect.type === 'tricksterLightningRing') {
+        const isRubbick = effect.type === 'rubbickLightningRing' || effect.type === 'tricksterLightningRing';
         // Expanding jagged crimson shockwave ring
         // Expand size toward target
         if (effect.targetSize) {
           effect.size += (effect.targetSize - effect.size) * 0.15;
         }
-        ctx.strokeStyle = isTrickster ? `rgba(0, 200, 0, ${effect.life * 0.8})` : `rgba(200, 0, 0, ${effect.life * 0.8})`;
+        ctx.strokeStyle = isRubbick ? `rgba(0, 200, 0, ${effect.life * 0.8})` : `rgba(200, 0, 0, ${effect.life * 0.8})`;
         ctx.lineWidth = 3 * effect.life;
         ctx.beginPath();
         // Draw jagged circle instead of smooth
@@ -806,7 +806,7 @@ export function drawSparkEffects(layer = 'all') {
         ctx.closePath();
         ctx.stroke();
         // Inner white ring
-        ctx.strokeStyle = isTrickster ? `rgba(200, 255, 200, ${effect.life * 0.5})` : `rgba(255, 200, 200, ${effect.life * 0.5})`;
+        ctx.strokeStyle = isRubbick ? `rgba(200, 255, 200, ${effect.life * 0.5})` : `rgba(255, 200, 200, ${effect.life * 0.5})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
         for (let seg = 0; seg <= segments; seg++) {
@@ -1885,7 +1885,7 @@ export function drawSparkEffects(layer = 'all') {
       ctx.fill();
 
       ctx.restore();
-    } else if (effect.type === 'crimsonLightningArc' || effect.type === 'tricksterLightningArc') {
+    } else if (effect.type === 'crimsonLightningArc' || effect.type === 'rubbickLightningArc' || effect.type === 'tricksterLightningArc') {
       // Lightning arc spark — draw as a short jagged line instead of a dot
       const len = effect.size * 4;
       const angle = Math.atan2(effect.vy, effect.vx);

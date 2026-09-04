@@ -70,7 +70,7 @@ export function updateStolenRubyHook(fighter) {
   }
 
   if (fighter.activePullPhase === 3) {
-    // PULL_DRAG phase — continuously drag the target toward Trickster each frame
+    // PULL_DRAG phase — continuously drag the target toward Rubbick each frame
     for (const target of targets) {
       if (target && target.hp > 0) {
         const dx = fighter.x - target.x;
@@ -127,7 +127,7 @@ export function updateStolenRubyHook(fighter) {
 }
 
 
-// Helper to apply speed boost to Trickster when inside his stolen sphere
+// Helper to apply speed boost to Rubbick when inside his stolen sphere
 function applyStolenCronosSpeed(fighter) {
   let modeMult = 1.0;
   if (typeof state !== 'undefined' && state.mode) {
@@ -229,6 +229,6 @@ export function updateStolenCronosSphere(fighter) {
 
 export function resolveStolenCronosWallBounce(fighter, arena, opponent) {
   // Rather than duplicating all 150 lines of bounce logic from Cronos,
-  // we can simply borrow the prototype method since Trickster is a Fighter too!
+  // we can simply borrow the prototype method since Rubbick is a Fighter too!
   CronosFighter.prototype.resolveWallBounce.call(fighter, arena, opponent);
 }

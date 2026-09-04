@@ -152,7 +152,7 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: 0,
   },
 
-  // ── Trickster ────────────────────────────────
+  // ── Rubbick ────────────────────────────────
   // Arcane bolt
   18: {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
@@ -172,6 +172,12 @@ export const BASIC_ATTACK_SOUNDS = {
     src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
     volume: 0.5,
     delay: 0,
+  },
+  rubbick: {
+    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+    volume: 0.6,
+    delay: 0,
+    pitchVariation: 0.1
   },
   trickster: {
     src: 'Assets/Sound Effects/Attacks/laserpew.mp3',

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
-// Trickster — Arcane Mage & Spell Steal Config
+// Rubbick — Arcane Mage & Spell Steal Config
 // ─────────────────────────────────────────────
-export const tricksterConfig = {
+export const rubbickConfig = {
   // ── Base Attributes ──
   hp: 85,
   speed: 8.2,
@@ -41,3 +41,6 @@ export const tricksterConfig = {
   spellStealDuration: 1000, // Duration stolen skill remains active (frames)
   spellStealRange: 350,
 };
+
+export const tricksterConfig = rubbickConfig;
+

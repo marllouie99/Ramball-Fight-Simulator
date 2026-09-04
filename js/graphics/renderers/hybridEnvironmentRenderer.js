@@ -607,7 +607,7 @@ export function updateHybridEnvironment() {
   }
   currentPurpleDimOpacity += (tOpPurple > currentPurpleDimOpacity) ? (tOpPurple - currentPurpleDimOpacity) * 0.15 : (tOpPurple - currentPurpleDimOpacity) * 0.18;
   
-  const isGreenOrb = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
+  const isGreenOrb = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isRubbick || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
   const spritePurple = isGreenOrb ? getGreenDimSprite() : getPurpleDimSprite();
   const otherSprite = isGreenOrb ? getPurpleDimSprite() : getGreenDimSprite();
   if (otherSprite && otherSprite.parent) otherSprite.parent.removeChild(otherSprite);

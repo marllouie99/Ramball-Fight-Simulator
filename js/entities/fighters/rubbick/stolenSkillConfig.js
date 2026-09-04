@@ -8,12 +8,12 @@ export const STOLEN_SKILL_CONFIG = {
   // Specific overrides for individual stolen skills
   skills: {
     orange: {
-      // e.g. Trickster's stolen flamethrower
+      // e.g. Rubbick's stolen flamethrower
       damageMultiplier: 1.5,
       cooldownMultiplier: 0.7
     },
     cronos: {
-      // e.g. Trickster's stolen time sphere
+      // e.g. Rubbick's stolen time sphere
       cooldownMultiplier: 0.9,
       sphereSpeedMultiplier: 5,
       sphereStaffDamage: 18,
@@ -42,7 +42,7 @@ export const STOLEN_SKILL_CONFIG = {
       cooldownMultiplier: 0.9
     },
     berserker: {
-      damageMultiplier: 1.2, // Bonus to trickster projectiles while in rage
+      damageMultiplier: 1.2, // Bonus to rubbick projectiles while in rage
       cooldownMultiplier: 0.9
     },
     gojo: {

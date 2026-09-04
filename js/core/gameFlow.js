@@ -194,7 +194,7 @@ export function reinitFighters(isNewMatch = false) {
             killedInDomain: f.rika.killedInDomain
           } : null,
           
-          // Trickster stolen spell info
+          // Rubbick stolen spell info
           stolenType: f.stolenType,
           stolenDef: f.stolenDef,
           hasStolen: f.hasStolen,
@@ -375,7 +375,7 @@ export function reinitFighters(isNewMatch = false) {
         fighter.rika.killedInDomain = saved.rikaActiveState.killedInDomain;
       }
 
-      // Trickster stolen spell info
+      // Rubbick stolen spell info
       if (saved.stolenType !== undefined) fighter.stolenType = saved.stolenType;
       if (saved.stolenDef !== undefined) fighter.stolenDef = saved.stolenDef;
       if (saved.hasStolen !== undefined) fighter.hasStolen = saved.hasStolen;

@@ -3,13 +3,13 @@ import { state } from '../../core/state.js';
 import { drawGojoOrb, drawAnamorphicLensFlare } from './gojoWeaponGraphics.js';
 
 /**
- * Trickster's Weapon: The Arcane Staff
+ * Rubbick's Weapon: The Arcane Staff
  * A long, slender shaft with a complex, ornate, asymmetrical headpiece.
  * Features floating/segmented components, a glowing green magical crystal,
  * gold/bronze ornamentation, and arcane runes.
  */
 
-export function drawTricksterStaff(ctx, fighter) {
+export function drawRubbickStaff(ctx, fighter) {
   const baseAlpha = ctx.globalAlpha;
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
@@ -180,7 +180,7 @@ export function drawTricksterStaff(ctx, fighter) {
   const crystalCenterY = topY - 22;
   
   if (fighter.stolenType === 'normal') {
-     // Draw Trickster Tension Aura for Stolen Execute (Green)
+     // Draw Rubbick Tension Aura for Stolen Execute (Green)
      const tensionIntensity = 1.0; 
      const time = Date.now() / 150;
      const s = 1.0; 
@@ -472,7 +472,7 @@ export function drawTricksterStaff(ctx, fighter) {
   ctx.restore();
 }
 
-export function drawTricksterBolt(ctx, p) {
+export function drawRubbickBolt(ctx, p) {
   if (!p || Number.isNaN(p.x) || Number.isNaN(p.y)) return;
   ctx.save();
   
@@ -576,7 +576,7 @@ export function drawTricksterBolt(ctx, p) {
   ctx.restore();
 }
 
-export function drawTricksterChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
+export function drawRubbickChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
   if (beamCharge <= 0) return;
 
   ctx.save();
@@ -644,3 +644,8 @@ export function drawTricksterChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
 
   ctx.restore();
 }
+
+export const drawTricksterStaff = drawRubbickStaff;
+export const drawTricksterBolt = drawRubbickBolt;
+export const drawTricksterChargeEffect = drawRubbickChargeEffect;
+

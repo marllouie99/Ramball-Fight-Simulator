@@ -986,7 +986,7 @@ export function drawPurpleDimScreen() {
   const roundCx = Math.round(screenPos.x / 10) * 10;
   const roundCy = Math.round(screenPos.y / 10) * 10;
   const is200 = (purpleOrb && purpleOrb.is200Percent) || (gojoFighter && (gojoFighter.is200PercentChannel || gojoFighter.purpleUseCount === 1));
-  const isGreen = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
+  const isGreen = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isRubbick || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
   const key = `${roundCx}_${roundCy}_${maxDim}_${is200}_${isGreen ? 'green' : 'purple'}`;
 
   if (!state._cachedPurpleDimGrad || state._cachedPurpleDimKey !== key) {

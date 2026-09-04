@@ -26,10 +26,11 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.r = 45;
     proj.life = CONFIG.gojo?.purpleLife || 250;
     proj.maxLife = proj.life;
-    const isGreen = Boolean(opts.colorTheme === 'green' || opts.isTrickster);
+    const isGreen = Boolean(opts.colorTheme === 'green' || opts.isRubbick || opts.isTrickster);
     proj.color = isGreen ? '#00FF64' : '#8A2BE2'; // Purple or Green
     proj.colorTheme = isGreen ? 'green' : 'purple';
-    proj.isTrickster = Boolean(opts.isTrickster);
+    proj.isRubbick = Boolean(opts.isRubbick || opts.isTrickster);
+    proj.isTrickster = proj.isRubbick;
     proj.owner = ownerIndex;
     if (opts.fighter) {
       proj.ownerFighter = opts.fighter;
@@ -127,7 +128,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         if (distSq <= effectiveRadius * effectiveRadius) {
             // Sucked into Hollow Purple and erased from existence
             otherProj.life = 0;
-            const isGreen = Boolean(projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
+            const isGreen = Boolean(projectile.isRubbick || projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
             spawnSparks(otherProj.x, otherProj.y, 3, 'purpleTrail', isGreen ? '#00FF64' : '#8A2BE2');
         }
     }
@@ -272,7 +273,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             ent.vy *= 0.8;
           }
           
-          const isGreen = Boolean(projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
+          const isGreen = Boolean(projectile.isRubbick || projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
           spawnSparks(ent.x, ent.y, 4, 'lightningTrail', isGreen ? '#00FF64' : '#8A2BE2');
         }
       }
@@ -327,7 +328,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     audioSystem.playSFX('Assets/Sound Effects/Skills/stormstrike.mp3', 0.85);
 
     // 2. Simple, Clean Expanding Repulsion Shockwave Rings (Like Gojo's Red/Purple)
-    const isGreen = Boolean(projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
+    const isGreen = Boolean(projectile.isRubbick || projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
     spawnPurpleShockwaveRings(projectile.x, projectile.y, explosionRadius, isSecondCast, isGreen);
 
     // 3. AOE Damage & Blast Knockback to all valid targets

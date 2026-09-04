@@ -1082,7 +1082,7 @@ function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = fa
 
 /**
  * Draws High-Contrast Ground Shadow Silhouette & Thruster Scorch beneath CJ when flying
- * Gives the 3D optical depth illusion of levitation/floating in mid-air (similar to Trickster & Gojo)
+ * Gives the 3D optical depth illusion of levitation/floating in mid-air (similar to Rubbick & Gojo)
  * Rule 11 Compliant (Zero shadowBlur CPU filters)
  */
 function _drawCjGroundShadow(ctx, fighter, r, z, isJetpackActive) {

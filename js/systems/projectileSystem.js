@@ -577,11 +577,12 @@ class ProjectileSystem {
     proj.life = CONFIG.gojo?.purpleLife || 250;
     proj.maxLife = proj.life;
     
-    const isTrickster = Boolean(opts.isTrickster || fighter.characterId === 'trickster' || fighter.type === 'trickster' || (fighter._def && fighter._def.type === 'trickster'));
-    const isGreen = Boolean(opts.colorTheme === 'green' || isTrickster);
-    proj.color = isGreen ? '#00FF64' : '#8A2BE2'; // Green for Trickster, Purple for Gojo
+    const isRubbick = Boolean(opts.isRubbick || opts.isTrickster || fighter.characterId === 'rubbick' || fighter.type === 'rubbick' || fighter.characterId === 'trickster' || fighter.type === 'trickster' || (fighter._def && (fighter._def.type === 'rubbick' || fighter._def.type === 'trickster')));
+    const isGreen = Boolean(opts.colorTheme === 'green' || isRubbick);
+    proj.color = isGreen ? '#00FF64' : '#8A2BE2'; // Green for Rubbick, Purple for Gojo
     proj.colorTheme = isGreen ? 'green' : 'purple';
-    proj.isTrickster = isTrickster;
+    proj.isRubbick = isRubbick;
+    proj.isTrickster = isRubbick;
 
     proj.owner = ownerIndex;
     proj.ownerFighter = fighter;
@@ -2975,7 +2976,7 @@ class ProjectileSystem {
         p.angle = p.lastAngle;
       }
 
-      // TRICKSTER / CRONOS SPHERE BLENDER EFFECT:
+      // RUBBICK / CRONOS SPHERE BLENDER EFFECT:
       // If the owner has an active Time Sphere, trap their projectiles inside it!
       const owner = fighters[p.owner];
       if (owner && owner.sphereActive && owner.sphereTimer > 0) {
@@ -3009,7 +3010,7 @@ class ProjectileSystem {
         }
       }
 
-      // ── TRICKSTER ARCANE BOLT WALL BOUNCING ──
+      // ── RUBBICK ARCANE BOLT WALL BOUNCING ──
       if (p.isArcaneBolt && !p.fadingOut) {
         const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
         const pr = p.r || 5;
@@ -3063,7 +3064,7 @@ class ProjectileSystem {
           if (bounced) {
             if ((p.bouncesLeft ?? 0) > 0) {
               p.bouncesLeft--;
-              p.damage = (p.damage || CONFIG.trickster?.boltDamage || 12) * (p.bounceDamageMultiplier || 0.7);
+              p.damage = (p.damage || (CONFIG.rubbick || CONFIG.trickster)?.boltDamage || 12) * (p.bounceDamageMultiplier || 0.7);
               // Visual impact flash & sparks on wall bounce
               spawnSparks(p.x, p.y, 8, 'arcane');
               spawnImpactFlash(p.x, p.y, 18, '#00ffff');
@@ -3504,7 +3505,8 @@ class ProjectileSystem {
 
   fireArcaneBolt(fighter, ownerIndex, damage, opponent) {
     if (!fighter || !opponent) return;
-    const speed = CONFIG.trickster?.boltSpeed || 8;
+    const rcfg = CONFIG.rubbick || CONFIG.trickster;
+    const speed = rcfg?.boltSpeed || 8;
     const radius = (CONFIG.projectile?.radius || 5) * 0.9;
     
     const targetX = opponent.x;
@@ -3555,8 +3557,8 @@ class ProjectileSystem {
     proj.owner = ownerIndex;
     proj.damage = damage;
     proj.isArcaneBolt = true;
-    proj.bouncesLeft = CONFIG.trickster?.bounceCount ?? 4;
-    proj.bounceDamageMultiplier = CONFIG.trickster?.bounceDamageMultiplier ?? 0.7;
+    proj.bouncesLeft = rcfg?.bounceCount ?? 4;
+    proj.bounceDamageMultiplier = rcfg?.bounceDamageMultiplier ?? 0.7;
     proj.wobblePhase = Math.random() * Math.PI * 2;
     proj.rotation = Math.atan2(dirY, dirX);
     proj.angle = proj.rotation;

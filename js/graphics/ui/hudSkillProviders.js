@@ -1308,11 +1308,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
-  if (f.characterId === 'trickster' || f.type === 'trickster') {
+  if (f.characterId === 'rubbick' || f.type === 'rubbick' || f.characterId === 'trickster' || f.type === 'trickster') {
     const themeColor = f.color || '#00FF64';
+    const rcfg = CONFIG.rubbick || CONFIG.trickster;
 
     // Skill 1: Telekinesis
-    const tkMax = CONFIG.trickster?.telekinesisCooldown || 400;
+    const tkMax = rcfg?.telekinesisCooldown || 400;
     const tkTimer = f.telekinesisCooldown !== undefined ? f.telekinesisCooldown : tkMax;
     let tkPct = f.tkTimer > 0 ? 100 : Math.max(0, Math.min(100, (1 - (tkTimer / tkMax)) * 100));
     const tkLabel = f.tkTimer > 0 ? 'TELEKINESIS (ACTIVE)' : 'TELEKINESIS';
@@ -1323,12 +1324,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     let stealReady = false;
 
     if (f.stolenType) {
-      const durMax = CONFIG.trickster?.spellStealDuration || 1000;
+      const durMax = rcfg?.spellStealDuration || 1000;
       stealPct = Math.max(0, Math.min(100, (f.stolenTimer / durMax) * 100));
       stealLabel = f.stolenType === 'gojo' ? 'HOLLOW PURPLE (STOLEN)' : `STOLEN: ${f.stolenType.toUpperCase()}`;
       stealReady = true;
     } else {
-      const stealMax = CONFIG.trickster?.spellStealCooldown || 700;
+      const stealMax = rcfg?.spellStealCooldown || 700;
       const stealTimer = f.spellStealCooldown !== undefined ? f.spellStealCooldown : stealMax;
       stealPct = Math.max(0, Math.min(100, (1 - (stealTimer / stealMax)) * 100));
       stealReady = stealPct >= 99;

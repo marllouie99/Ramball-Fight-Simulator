@@ -21,7 +21,7 @@ import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
 import { ulquiorraConfig } from '../configs/characters/ulquiorraConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
-import { tricksterConfig } from '../configs/characters/tricksterConfig.js';
+import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
@@ -572,9 +572,11 @@ export const CONFIG = {
     preemptiveCounterDamage: 7,
   },
 
-  /** Trickster — Spell Steal and Arcane Magic */
-  trickster: tricksterConfig,
-  Trickster: tricksterConfig,
+  /** Rubbick — Spell Steal and Arcane Magic */
+  rubbick: rubbickConfig,
+  Rubbick: rubbickConfig,
+  trickster: rubbickConfig,
+  Trickster: rubbickConfig,
 
   /** Zeus — Lightning Spell Caster */
   zeus: {
@@ -981,24 +983,24 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 18,
-    name: 'Trickster',
+    name: 'Rubbick',
     category: 'Fantasy & Magic',
-    color: tricksterConfig.color || '#03e631ff',
-    startX: tricksterConfig.startX || 310,
-    startY: tricksterConfig.startY || 230,
-    startVx: tricksterConfig.startVx || -1.2,
-    startVy: tricksterConfig.startVy || 1.0,
-    radius: tricksterConfig.radius || tricksterConfig.r || 25,
+    color: rubbickConfig.color || '#03e631ff',
+    startX: rubbickConfig.startX || 310,
+    startY: rubbickConfig.startY || 230,
+    startVx: rubbickConfig.startVx || -1.2,
+    startVy: rubbickConfig.startVy || 1.0,
+    radius: rubbickConfig.radius || rubbickConfig.r || 25,
     aimbot: false,
-    spinRate: tricksterConfig.spinRate || 0.02,
-    type: 'trickster',
-    hp: tricksterConfig.hp || 85,
-    damage: tricksterConfig.damage || 12,
-    cooldown: tricksterConfig.cooldown || 100,
-    moveSpeed: tricksterConfig.moveSpeed || tricksterConfig.speed || 8.2,
-    projectileSpeedMultiplier: tricksterConfig.projectileSpeedMultiplier || 1.0,
-    ability: tricksterConfig.ability || 'Spell Steal',
-    desc: tricksterConfig.desc || 'Fires bouncing arcane bolts. Telekinetically lifts and stuns enemies. Ultimate steals the last used enemy skill.',
+    spinRate: rubbickConfig.spinRate || 0.02,
+    type: 'rubbick',
+    hp: rubbickConfig.hp || 85,
+    damage: rubbickConfig.damage || 12,
+    cooldown: rubbickConfig.cooldown || 100,
+    moveSpeed: rubbickConfig.moveSpeed || rubbickConfig.speed || 8.2,
+    projectileSpeedMultiplier: rubbickConfig.projectileSpeedMultiplier || 1.0,
+    ability: rubbickConfig.ability || 'Spell Steal',
+    desc: rubbickConfig.desc || 'Fires bouncing arcane bolts. Telekinetically lifts and stuns enemies. Ultimate steals the last used enemy skill.',
   },
   {
     id: 19,

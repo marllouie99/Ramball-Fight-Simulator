@@ -6,10 +6,10 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { spawnSparks, spawnImpactFlash, spawnTelekinesisDebris, spawnArcaneCrater, spawnArcaneSmoke, spawnArcaneShockwave, spawnArcaneFlash, spawnArcaneGlyphs, spawnSpellStealWisps } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
-import { drawTricksterStaff, drawTricksterChargeEffect } from '../../graphics/weapons/tricksterWeaponGraphics.js';
-import { updateStolenRubyHook, updateStolenCronosSphere, resolveStolenCronosWallBounce } from './trickster/tricksterStealLogic.js';
-import { getStolenMultiplier, STOLEN_SKILL_CONFIG } from './trickster/stolenSkillConfig.js';
-import { TricksterRubyTheme, TricksterCronosTheme } from './trickster/tricksterThemes.js';
+import { drawRubbickStaff, drawRubbickChargeEffect } from '../../graphics/weapons/rubbickWeaponGraphics.js';
+import { updateStolenRubyHook, updateStolenCronosSphere, resolveStolenCronosWallBounce } from './rubbick/rubbickStealLogic.js';
+import { getStolenMultiplier, STOLEN_SKILL_CONFIG } from './rubbick/stolenSkillConfig.js';
+import { RubbickRubyTheme, RubbickCronosTheme } from './rubbick/rubbickThemes.js';
 import { drawRubyScythe } from '../../graphics/weapons/rubyWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -17,7 +17,7 @@ import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
-export class TricksterFighter extends Fighter {
+export class RubbickFighter extends Fighter {
   constructor(def) {
     super(def);
     
@@ -27,7 +27,7 @@ export class TricksterFighter extends Fighter {
     this.attackCooldown = 0;
     this.attackSwingTimer = 0;
     this.telekinesisCooldown = 0;
-    this.spellStealCooldown = CONFIG.trickster.spellStealCooldown;
+    this.spellStealCooldown = (CONFIG.rubbick || CONFIG.trickster).spellStealCooldown;
 
     // Telekinesis state
     this.tkTarget = null;
@@ -38,7 +38,7 @@ export class TricksterFighter extends Fighter {
     this.stolenType = null;
     this.stolenTimer = 0;
     this.stolenWindUpTimer = 0;
-    this.tricksterRageTimer = 0;
+    this.rubbickRageTimer = 0;
     
     // Laser state
     this.beamCharge = 0;
@@ -87,13 +87,13 @@ export class TricksterFighter extends Fighter {
     this.attackCooldown = 0;
     this.attackSwingTimer = 0;
     this.telekinesisCooldown = 0;
-    this.spellStealCooldown = CONFIG.trickster.spellStealCooldown;
+    this.spellStealCooldown = (CONFIG.rubbick || CONFIG.trickster).spellStealCooldown;
     this.tkTarget = null;
     this.tkTimer = 0;
     this.stolenType = null;
     this.stolenTimer = 0;
     this.stolenSkillCooldown = 0;
-    this.tricksterRageTimer = 0;
+    this.rubbickRageTimer = 0;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
@@ -190,7 +190,7 @@ export class TricksterFighter extends Fighter {
   }
 
   getBeamLine() {
-    // Trickster staff tip is roughly r + 75 away
+    // Rubbick staff tip is roughly r + 75 away
     const tipDist = this.r + 75;
     const startX = this.x + Math.cos(this.gunAngle) * tipDist;
     const startY = this.y + Math.sin(this.gunAngle) * tipDist;
@@ -264,7 +264,7 @@ export class TricksterFighter extends Fighter {
     const dy = target.y - this.y;
     const dist = Math.hypot(dx, dy) || 1;
 
-    // Use a damage multiplier for stolen skills if necessary, but trickster usually borrows raw config for beam
+    // Use a damage multiplier for stolen skills if necessary, but rubbick usually borrows raw config for beam
     const dmgMulti = getStolenMultiplier('laser', 'damageMultiplier');
 
     if (!hitState.initialHitDone) {
@@ -272,7 +272,7 @@ export class TricksterFighter extends Fighter {
       if (applied) {
         const slowChance = Number(CONFIG.laser.slowChance || 1);
         if (slowChance >= 1 || Math.random() <= slowChance) {
-          // Default beam slow duration and multiplier if trickster doesn't define it
+          // Default beam slow duration and multiplier if rubbick doesn't define it
           target.applySlow(CONFIG.laser.beamSlowDuration || 60, CONFIG.laser.beamSlowMultiplier || 0.4);
           spawnFloatingText(target.x, target.y - target.r - 5, 'SLOWED!', '#88ccff');
         }
@@ -549,7 +549,7 @@ export class TricksterFighter extends Fighter {
          if (this.flurryTarget && !this.flurryTarget.isDead) {
             this.strikeAngle = Math.random() * Math.PI * 2;
             
-            const flurryDmg = (CONFIG.trickster?.flurryDamage || 10) * getStolenMultiplier('musashi', 'damageMultiplier');
+            const flurryDmg = ((CONFIG.rubbick || CONFIG.trickster)?.flurryDamage || 10) * getStolenMultiplier('musashi', 'damageMultiplier');
             this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true });
             if (typeof this.flurryTarget.applyHitStun === 'function') this.flurryTarget.applyHitStun(15);
             
@@ -603,7 +603,7 @@ export class TricksterFighter extends Fighter {
         if (!this._hasFiredStolenSkillTrick) {
           this._hasFiredStolenSkillTrick = true;
           this.fireStolenSkill(opponent, ownerIndex);
-          this.attackCooldown = CONFIG.trickster.attackCooldown;
+          this.attackCooldown = (CONFIG.rubbick || CONFIG.trickster).attackCooldown;
         }
       }
       return;
@@ -673,7 +673,7 @@ export class TricksterFighter extends Fighter {
         spawnSparks(this.tkTarget.x, this.tkTarget.y, 1, 'flash');
       }
 
-      const tkTotalDuration = CONFIG.trickster.telekinesisDuration;
+      const tkTotalDuration = (CONFIG.rubbick || CONFIG.trickster).telekinesisDuration;
       const progress = 1 - (this.tkTimer / tkTotalDuration);
       
       // Calculate smooth movement progress (hover -> sweep -> hover -> slam)
@@ -789,8 +789,9 @@ export class TricksterFighter extends Fighter {
         for (let enemy of allEnemies) {
           const dx = enemy.x - this.tkTarget.x;
           const dy = enemy.y - this.tkTarget.y;
-          if (dx * dx + dy * dy < CONFIG.trickster.telekinesisStunRadius * CONFIG.trickster.telekinesisStunRadius) {
-            const stunDur = CONFIG.trickster.telekinesisStunDuration || 60;
+          const rcfg = CONFIG.rubbick || CONFIG.trickster;
+          if (dx * dx + dy * dy < rcfg.telekinesisStunRadius * rcfg.telekinesisStunRadius) {
+            const stunDur = rcfg.telekinesisStunDuration || 60;
             enemy.electricStunTimer = stunDur;
             enemy.paralyzeTimer = Math.max(enemy.paralyzeTimer || 0, stunDur);
             if (enemy.statusEffects && typeof enemy.statusEffects.applyParalyze === 'function') {
@@ -822,10 +823,11 @@ export class TricksterFighter extends Fighter {
       this.gunAngle = Math.atan2(dy, dx);
 
       // Ultimate: Spell Steal
-      if (this.spellStealCooldown <= 0 && !this.stolenType && distSq < CONFIG.trickster.spellStealRange * CONFIG.trickster.spellStealRange) {
+      const rubbickCfg = CONFIG.rubbick || CONFIG.trickster;
+      if (this.spellStealCooldown <= 0 && !this.stolenType && distSq < rubbickCfg.spellStealRange * rubbickCfg.spellStealRange) {
         const isGojoOpponent = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.type === 'gojo' || opponent._def?.id === 'gojo');
         
-        // If opponent is Gojo, Trickster can ONLY steal Hollow Purple AFTER Gojo has fired his Purple first!
+        // If opponent is Gojo, Rubbick can ONLY steal Hollow Purple AFTER Gojo has fired his Purple first!
         if (isGojoOpponent) {
           const gojoHasFiredPurple = Boolean(
             opponent.hasFiredPurple ||
@@ -835,10 +837,10 @@ export class TricksterFighter extends Fighter {
           );
 
           if (gojoHasFiredPurple) {
-            this.spellStealCooldown = CONFIG.trickster.spellStealCooldown;
+            this.spellStealCooldown = rubbickCfg.spellStealCooldown;
             this.stolenType = 'gojo';
             this.stolenColor = opponent._def?.color || '#00FF64';
-            this.stolenTimer = CONFIG.trickster.spellStealDuration;
+            this.stolenTimer = rubbickCfg.spellStealDuration;
             this.stolenSkillCooldown = 0;
             this._hasFiredStolenSkillTrick = false;
 
@@ -846,10 +848,10 @@ export class TricksterFighter extends Fighter {
             spawnSpellStealWisps(this, opponent, '#00FF64', 15);
           }
         } else {
-          this.spellStealCooldown = CONFIG.trickster.spellStealCooldown;
+          this.spellStealCooldown = rubbickCfg.spellStealCooldown;
           this.stolenType = opponent._def.type;
           this.stolenColor = opponent._def.color;
-          this.stolenTimer = CONFIG.trickster.spellStealDuration;
+          this.stolenTimer = rubbickCfg.spellStealDuration;
           this.stolenSkillCooldown = 0;
           this._hasFiredStolenSkillTrick = false;
 
@@ -860,10 +862,10 @@ export class TricksterFighter extends Fighter {
       }
 
       // Skill 1: Telekinesis
-      if (this.telekinesisCooldown <= 0 && !this.stolenType && distSq < CONFIG.trickster.telekinesisRange * CONFIG.trickster.telekinesisRange && !opponent.immuneToCC) {
-        this.telekinesisCooldown = CONFIG.trickster.telekinesisCooldown;
+      if (this.telekinesisCooldown <= 0 && !this.stolenType && distSq < rubbickCfg.telekinesisRange * rubbickCfg.telekinesisRange && !opponent.immuneToCC) {
+        this.telekinesisCooldown = rubbickCfg.telekinesisCooldown;
         this.tkTarget = opponent;
-        this.tkTimer = CONFIG.trickster.telekinesisDuration;
+        this.tkTimer = rubbickCfg.telekinesisDuration;
         
         // Apply paralyze debuff and cut off target audio & attacks immediately
         const paralyzeDuration = this.tkTimer + 2;
@@ -918,7 +920,8 @@ export class TricksterFighter extends Fighter {
 
       // Basic Attack / Spammable Stolen Attack
       if (!castedHeavy && this.attackCooldown <= 0 && !this.tkTimer) {
-        this.attackCooldown = CONFIG.trickster.attackCooldown;
+        const rubbickCfg = CONFIG.rubbick || CONFIG.trickster;
+        this.attackCooldown = rubbickCfg.attackCooldown;
         this.attackSwingTimer = 15; // 15 frames of staff swing animation
         
         let castedSpammable = false;
@@ -928,7 +931,7 @@ export class TricksterFighter extends Fighter {
         
         if (!castedSpammable) {
           // Normal Arcane Bolt
-          let dmg = CONFIG.trickster.boltDamage;
+          let dmg = rubbickCfg.boltDamage;
           if (this.stolenType === 'cronos' && this._isInsideOwnSphere && this._isInsideOwnSphere()) {
              // Apply Sphere buffs to Arcane Bolt
              const cronosCfg = STOLEN_SKILL_CONFIG.skills.cronos;
@@ -945,7 +948,7 @@ export class TricksterFighter extends Fighter {
           } else if (this.stolenType === 'berserker') {
             // Apply Berserker Rage buffs to Arcane Bolt
             const rageAttackMultiplier = CONFIG.berserker.rageAttackSpeedMultiplier || 1.1;
-            this.attackCooldown = (CONFIG.trickster.attackCooldown / rageAttackMultiplier) * getStolenMultiplier('berserker', 'cooldownMultiplier');
+            this.attackCooldown = (rubbickCfg.attackCooldown / rageAttackMultiplier) * getStolenMultiplier('berserker', 'cooldownMultiplier');
             dmg *= (CONFIG.berserker.rageDamageMultiplier || 1.8) * getStolenMultiplier('berserker', 'damageMultiplier');
             
             // Speed up the swing animation to match the faster attack speed
@@ -1119,7 +1122,7 @@ export class TricksterFighter extends Fighter {
         break;
       case 'cronos':
         this.sphereActive = true;
-        this.sphereTheme = TricksterCronosTheme;
+        this.sphereTheme = RubbickCronosTheme;
         this.sphereX = this.x;
         this.sphereY = this.y;
         this.sphereTimer = CONFIG.cronos.sphereDuration;
@@ -1169,7 +1172,7 @@ export class TricksterFighter extends Fighter {
            spawnFloatingText(this.x, this.y - this.r - 20, 'EXECUTE!', '#00ff00');
            triggerGlobalScreenShake(15, 10);
            
-           projectileSystem.fireProjectile(this, ownerIndex, finalDamage, false, finalSpeed, false, 'tricksterSniperBullet_enhanced', customSpawnX, customSpawnY);
+           projectileSystem.fireProjectile(this, ownerIndex, finalDamage, false, finalSpeed, false, 'rubbickSniperBullet_enhanced', customSpawnX, customSpawnY);
            
            let recoilForce = (CONFIG.sharpshooter?.enhancedRecoilForce || 30);
            this.vx -= Math.cos(this.gunAngle) * recoilForce;
@@ -1200,7 +1203,7 @@ export class TricksterFighter extends Fighter {
         this.attackSwingTimer = 18; // Follow-through thrust/release animation
 
         if (projectileSystem && projectileSystem.fireGojoPurple) {
-          projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isTrickster: true, colorTheme: 'green' });
+          projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isRubbick: true, isTrickster: true, colorTheme: 'green' });
         }
         
         const purpleSound = getSkillSound(21, 'purple_fire') || getSkillSound('gojo', 'hollowpurple') || { src: 'Assets/Sound Effects/Skills/hollowpurple.mp3', volume: 2.5 };
@@ -1221,9 +1224,9 @@ export class TricksterFighter extends Fighter {
 
   drawGun(ctx) {
     if (this.activePullActive) {
-      drawRubyScythe(ctx, this, TricksterRubyTheme);
+      drawRubyScythe(ctx, this, RubbickRubyTheme);
     } else {
-      drawTricksterStaff(ctx, this);
+      drawRubbickStaff(ctx, this);
     }
   }
 
@@ -1397,7 +1400,7 @@ export class TricksterFighter extends Fighter {
   }
   
   draw(ctx) {
-    // Draw debris that is currently BEHIND the Trickster
+    // Draw debris that is currently BEHIND Rubbick
     this._drawDebrisLayer(ctx, true);
     
     // Draw afterimages
@@ -1417,7 +1420,7 @@ export class TricksterFighter extends Fighter {
 
     super.draw(ctx);
     
-    // Draw debris that is currently IN FRONT of the Trickster
+    // Draw debris that is currently IN FRONT of Rubbick
     this._drawDebrisLayer(ctx, false);
 
     // Draw telekinesis visual
@@ -1528,7 +1531,7 @@ export class TricksterFighter extends Fighter {
         ctx.translate(effect.x, effect.y);
         ctx.rotate(effect.angle);
         
-        // For Trickster's stolen ability, all slashes are a magical arcane green
+        // For Rubbick's stolen ability, all slashes are a magical arcane green
         let color = '#00FF64';
         
         ctx.globalAlpha = 1 - prog;
@@ -1577,7 +1580,7 @@ export class TricksterFighter extends Fighter {
 
     // Draw Stolen Laser Charge Effect
     if (this.beamCharge > 0) {
-      drawTricksterChargeEffect(ctx, this.x, this.y, this.gunAngle, this.beamCharge, this.r);
+      drawRubbickChargeEffect(ctx, this.x, this.y, this.gunAngle, this.beamCharge, this.r);
     }
 
     // Draw teleport-in effect
@@ -1898,7 +1901,7 @@ export class TricksterFighter extends Fighter {
   }
 
   /**
-   * Domain expansion background rendering for Trickster
+   * Domain expansion background rendering for Rubbick
    */
   drawDomainBackground(ctx, isClashSecondary = false) {
     if (!this.domainActive) return;
@@ -1920,3 +1923,6 @@ export class TricksterFighter extends Fighter {
     if (!this.domainActive) return;
   }
 }
+
+export const TricksterFighter = RubbickFighter;
+

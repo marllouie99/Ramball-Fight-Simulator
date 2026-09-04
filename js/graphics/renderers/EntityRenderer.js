@@ -553,7 +553,7 @@ export function drawFighters() {
     }
   });
 
-  // Draw beam overlays (LaserFighter / Trickster laser beams) on top of fighters
+  // Draw beam overlays (LaserFighter / Rubbick laser beams) on top of fighters
   fighters.forEach((fighter) => {
     if (!fighter || fighter.hp <= 0 || typeof fighter.drawBeamOverlay !== 'function') return;
     if (isGojoDomainActive && fighter.characterId !== 'gojo') return; // Hide enemy beam overlays in Gojo's domain

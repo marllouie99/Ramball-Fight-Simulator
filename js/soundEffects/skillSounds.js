@@ -151,7 +151,27 @@ export const SKILL_SOUNDS = {
     }
   },
 
-  // ── Trickster ─────────────────────────────
+  // ── Rubbick ─────────────────────────────
+  rubbick: {
+    telekinesis: {
+      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+      volume: 0.8
+      ,
+      delay: 0
+    },
+    telekinesisDrop: {
+      src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+      volume: 0.9
+      ,
+      delay: 0
+    },
+    spellSteal: {
+      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+      volume: 0.9
+      ,
+      delay: 0
+    }
+  },
   trickster: {
     telekinesis: {
       src: 'Assets/Sound Effects/Attacks/laserpew.mp3',

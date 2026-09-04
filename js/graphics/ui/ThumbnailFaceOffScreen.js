@@ -171,7 +171,7 @@ function getFaceOffFighter(slotKey, def, targetAngle) {
   f.attackCooldown = 0;
   f.attackSwingTimer = 0;
 
-  if (type === 'trickster') {
+  if (type === 'rubbick' || type === 'trickster') {
     f.tkTarget = null;
     f.tkTimer = 0;
     f.stolenType = null;

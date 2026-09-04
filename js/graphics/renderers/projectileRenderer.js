@@ -6,7 +6,7 @@ const getNow = () => Date.now();
 import { drawBomberExplosionGraphic, drawBomberC4, drawBomberGrenade } from '../weapons/bomberWeaponGraphics.js';
 import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from '../weaponVisuals.js';
 import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from '../weapons/dopplegangerWeaponGraphics.js';
-import { drawTricksterBolt } from '../weapons/tricksterWeaponGraphics.js';
+import { drawRubbickBolt } from '../weapons/rubbickWeaponGraphics.js';
 import { drawGojoOrb, drawPurpleOrbTrail } from '../weapons/gojoWeaponGraphics.js';
 
 
@@ -870,7 +870,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
     
-    if (p.visual === 'tricksterSniperBullet_enhanced') {
+    if (p.visual === 'rubbickSniperBullet_enhanced' || p.visual === 'tricksterSniperBullet_enhanced') {
       drawCrimsonSniperBullet(ctx, p, true, true);
       return;
     }
@@ -924,7 +924,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     }
 
     if (p.isArcaneBolt) {
-      drawTricksterBolt(ctx, p);
+      drawRubbickBolt(ctx, p);
       return;
     }
 
@@ -1113,7 +1113,7 @@ export function drawBlackHoleVisual({
 
 export function drawGojoPurpleOrb(ctx, p) {
   ctx.save();
-  const isGreen = Boolean(p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
+  const isGreen = Boolean(p.isRubbick || p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
   const colorType = isGreen ? 'green' : (p.isGojoPurple ? 'purple' : 'blue');
   const visualTime = p.visualTime || Date.now();
   const is200 = !!p.is200Percent;

@@ -130,7 +130,7 @@ export class ZeusFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
-    // Visual hovering effect: float like Trickster
+    // Visual hovering effect: float like Rubbick
     this.z = 25 + Math.sin(Date.now() / 200) * 6;
 
     this.handleStatusEffects();
