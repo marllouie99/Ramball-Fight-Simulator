@@ -226,15 +226,17 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
-  // Cronos / Rubbick phases through fighters while inside his own sphere; entities inside sphere never get pushed
-  const aPhases = a._isInsideOwnSphere?.() ?? false;
-  const bPhases = b._isInsideOwnSphere?.() ?? false;
-  const isAInCronosSphere = a._frozenByCronosSphere || aPhases || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(a.x - f.sphereX, a.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + a.r)));
-  const isBInCronosSphere = b._frozenByCronosSphere || bPhases || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(b.x - f.sphereX, b.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + b.r)));
+  // Cronos / Rubbick Time Stop Sphere: entities inside or frozen by an active sphere must NEVER be pushed by collisions
+  const aInSphere = a.timeStopTimer > 0 || a._frozenByCronosSphere || a.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(a.x - f.sphereX, a.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + a.r)));
+  const bInSphere = b.timeStopTimer > 0 || b._frozenByCronosSphere || b.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(b.x - f.sphereX, b.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + b.r)));
 
-  if (aPhases || bPhases || (isAInCronosSphere && (b.sphereActive || b.characterId === 'cronos' || b.characterId === 'rubbick')) || (isBInCronosSphere && (a.sphereActive || a.characterId === 'cronos' || a.characterId === 'rubbick'))) {
-    if (a._frozenByCronosSphere) { a.vx = 0; a.vy = 0; }
-    if (b._frozenByCronosSphere) { b.vx = 0; b.vy = 0; }
+  if (aInSphere || bInSphere) {
+    if (aInSphere) {
+      a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0;
+    }
+    if (bInSphere) {
+      b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0;
+    }
     return;
   }
 

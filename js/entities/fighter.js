@@ -623,14 +623,15 @@ export class Fighter {
     this.clearAllAfterimages();
   }
 
-  /** Returns true if this fighter is currently inside any active Cronos time-stop sphere. */
+  /** Returns true if this fighter is currently inside any active Cronos time-stop sphere or frozen by it. */
   isInsideCronosSphere() {
+    if (this._frozenByCronosSphere) return true;
     if (!state || !state.fighters) return false;
     for (const f of state.fighters) {
       if (!f || !f.sphereActive || f === this) continue;
       const dx = this.x - f.sphereX;
       const dy = this.y - f.sphereY;
-      const range = CONFIG.cronos.sphereRadius;
+      const range = (CONFIG.cronos?.sphereRadius || 180) + (this.r || 25);
       if ((dx * dx + dy * dy) <= range * range) return true;
     }
     return false;
@@ -801,6 +802,13 @@ export class Fighter {
 
   applyKnockback(vx, vy, stunFrames = 0) {
     if (this.isTurret || this.isDispenser || this.isAmbushing) return;
+    if (this.timeStopTimer > 0 || this._frozenByCronosSphere || this.isInsideCronosSphere()) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+      return;
+    }
     this.knockbackVx = (this.knockbackVx || 0) + vx;
     this.knockbackVy = (this.knockbackVy || 0) + vy;
     this.vx = (this.vx || 0) + vx;
@@ -1228,6 +1236,14 @@ export class Fighter {
     const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
     this._lastKnockbackFrame = currentFrame;
+
+    if (this.timeStopTimer > 0 || this._frozenByCronosSphere || this.isInsideCronosSphere()) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+      return;
+    }
 
     // Universal knockback physics (processed for all custom fighters without breaking their steering logic)
     if (this.knockbackVx !== undefined && (Math.abs(this.knockbackVx) > 0.1 || Math.abs(this.knockbackVy) > 0.1)) {
