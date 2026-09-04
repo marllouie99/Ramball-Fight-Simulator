@@ -895,21 +895,21 @@ export function updateHybridCronospheres() {
       activeCronospheres.set(id, sprite);
     }
     
-    // Update Cronosphere state
-    const elapsed = CONFIG.cronos.sphereDuration - (fighter.sphereTimer || 0);
-    const deployProgress = Math.min(1, Math.max(0, elapsed / Math.max(1, CONFIG.cronos.sphereDuration)));
-    
     sprite.x = fighter.sphereX;
     sprite.y = fighter.sphereY;
     
-    // Scale based on deploy progress and configured radius vs texture size (512/2.05 ~ 250px radius)
+    // Maintain full configured radius at all times (do not shrink to black hole)
     const baseRadius = CONFIG.cronos.sphereRadius || 180;
-    const currentRadius = baseRadius * deployProgress;
-    const scale = currentRadius / 250.0;
+    const scale = baseRadius / 250.0;
     sprite.scale.set(scale);
     
-    // Pulse alpha slightly
-    sprite.alpha = 0.9 + 0.1 * Math.sin(Date.now() / 150);
+    // Smooth alpha handling without shrinking radius
+    const remainingTimer = fighter.sphereTimer || 0;
+    let fadeAlpha = 1.0;
+    if (remainingTimer < 10) {
+      fadeAlpha = Math.max(0, remainingTimer / 10);
+    }
+    sprite.alpha = (0.9 + 0.1 * Math.sin(Date.now() / 150)) * fadeAlpha;
   }
   
   // Cleanup inactive spheres

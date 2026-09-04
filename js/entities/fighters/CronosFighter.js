@@ -1146,8 +1146,7 @@ export class CronosFighter extends Fighter {
     // Draw time stop sphere at deployment location
     if (this.sphereActive) {
       try {
-        const elapsed = CONFIG.cronos.sphereDuration - (this.sphereTimer || 0);
-        const deployProgress = Math.min(1, Math.max(0, elapsed / Math.max(1, CONFIG.cronos.sphereDuration)));
+        const deployProgress = 1.0;
         if (typeof drawCronosSphereVisual === 'function') {
           drawCronosSphereVisual({
             ctx,

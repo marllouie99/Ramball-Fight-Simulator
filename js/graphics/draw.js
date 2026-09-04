@@ -616,8 +616,7 @@ export function drawAllCronosSpheres(ctx) {
   const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
   for (const fighter of allEntities) {
     if (!fighter || !fighter.sphereActive) continue;
-    const elapsed = CONFIG.cronos.sphereDuration - (fighter.sphereTimer || 0);
-    const deployProgress = Math.min(1, Math.max(0, elapsed / Math.max(1, CONFIG.cronos.sphereDuration)));
+    const deployProgress = 1.0;
 
     try {
       if (typeof drawCronosSphereVisual === 'function') {
