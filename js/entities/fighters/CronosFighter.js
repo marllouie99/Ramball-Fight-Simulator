@@ -520,11 +520,17 @@ export class CronosFighter extends Fighter {
     for (const target of frontTargets) {
       applyDamageToTarget(target, meleeDamage, this, { isMelee: true });
 
-      // Physical hit knockback
+      // Physical hit knockback - do not push targets inside the time stop sphere
       if (!target.isTurret) {
-        const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        target.vx += Math.cos(kbAngle) * 4;
-        target.vy += Math.sin(kbAngle) * 4;
+        const isTargetInSphere = (this.sphereActive && (Math.hypot(target.x - this.sphereX, target.y - this.sphereY) <= CONFIG.cronos.sphereRadius)) || target._frozenByCronosSphere || (target.timeStopTimer > 0 && this.sphereActive);
+        if (!isTargetInSphere) {
+          const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
+          target.vx += Math.cos(kbAngle) * 4;
+          target.vy += Math.sin(kbAngle) * 4;
+        } else {
+          target.vx = 0;
+          target.vy = 0;
+        }
       }
 
       spawnFloatingText(target.x, target.y - target.r - 5, hitText, '#FF007F');

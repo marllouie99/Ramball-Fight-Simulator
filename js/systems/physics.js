@@ -226,10 +226,17 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
-  // Cronos phases through fighters while inside his own sphere
+  // Cronos / Rubbick phases through fighters while inside his own sphere; entities inside sphere never get pushed
   const aPhases = a._isInsideOwnSphere?.() ?? false;
   const bPhases = b._isInsideOwnSphere?.() ?? false;
-  if (aPhases || bPhases) return;
+  const isAInCronosSphere = a._frozenByCronosSphere || aPhases || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(a.x - f.sphereX, a.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + a.r)));
+  const isBInCronosSphere = b._frozenByCronosSphere || bPhases || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(b.x - f.sphereX, b.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + b.r)));
+
+  if (aPhases || bPhases || (isAInCronosSphere && (b.sphereActive || b.characterId === 'cronos' || b.characterId === 'rubbick')) || (isBInCronosSphere && (a.sphereActive || a.characterId === 'cronos' || a.characterId === 'rubbick'))) {
+    if (a._frozenByCronosSphere) { a.vx = 0; a.vy = 0; }
+    if (b._frozenByCronosSphere) { b.vx = 0; b.vy = 0; }
+    return;
+  }
 
   // Toji phases through fighters during his Ultimate sequence (ethereal assassin)
   if (a.ultimateActive && (a.characterId === 'toji' || a.type === 'toji' || a.name === 'Toji' || a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
@@ -889,14 +896,19 @@ export function updateFighters() {
       if (!fighter || fighter.hp <= 0) continue;
       // Skip during Wall Slam grab or when submerged/erupting in liquid shadow
       if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga || fighter.isSubmerged || fighter.isErupting) continue;
-      // Cronos phases through illusions while inside his own sphere; Mahito phases during Phantom Soul Slip
-      if (fighter._isInsideOwnSphere?.() || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0)) continue;
+      // Cronos / Rubbick phases through illusions while sphere is active; Mahito phases during Phantom Soul Slip
+      const isFighterSpherePhasing = fighter._isInsideOwnSphere?.() || fighter.sphereActive;
+      if (isFighterSpherePhasing || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0)) continue;
 
       const nearbyEntities = spatialGrid.getNearby(fighter.x, fighter.y, fighter.r * 2 + 50);
       for (const entity of nearbyEntities) {
         if (!entity || entity === fighter) continue;
         if (!entity.isIllusion) continue; // Skip fighter-fighter collisions (already handled)
         if (!entity.hp || entity.hp <= 0 || entity.isSubmerged || entity.isErupting) continue;
+        
+        // Illusions inside Cronos sphere must never be pushed
+        const isIllusionInSphere = entity._frozenByCronosSphere || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(entity.x - f.sphereX, entity.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + entity.r)));
+        if (isIllusionInSphere) continue;
 
         const dx = entity.x - fighter.x;
         const dy = entity.y - fighter.y;
