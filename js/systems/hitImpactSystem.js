@@ -455,9 +455,9 @@ export const HitImpactSystem = {
     if (projectile.isArcaneBolt) {
       if (!projectile.hitFighters) projectile.hitFighters = new Set();
       projectile.hitFighters.add(target);
-      if (projectile.bouncesLeft > 0) {
+      if ((projectile.bouncesLeft ?? 0) > 0) {
         projectile.bouncesLeft--;
-        projectile.damage *= projectile.bounceDamageMultiplier;
+        projectile.damage *= (projectile.bounceDamageMultiplier || 0.7);
         let bestDist = Infinity;
         let bestFighter = null;
         for (let f of fighters) {
@@ -474,10 +474,25 @@ export const HitImpactSystem = {
         if (bestFighter) {
           const ddx = bestFighter.x - projectile.x;
           const ddy = bestFighter.y - projectile.y;
-          const dist = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
-          const speed = Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy) || 1;
+          const dist = Math.hypot(ddx, ddy) || 1;
+          const speed = Math.hypot(projectile.vx, projectile.vy) || (CONFIG.trickster?.boltSpeed || 8);
           projectile.vx = (ddx / dist) * speed;
           projectile.vy = (ddy / dist) * speed;
+          projectile.life = 180;
+          projectile.lastAngle = Math.atan2(projectile.vy, projectile.vx);
+          projectile.angle = projectile.lastAngle;
+          projectile.rotation = projectile.lastAngle;
+          projectile.wobblePhase = Math.random() * Math.PI * 2;
+        } else {
+          // In 1v1 (no other enemies), ricochet outward so it can continue to bounce off arena walls
+          const curSpeed = Math.hypot(projectile.vx, projectile.vy) || (CONFIG.trickster?.boltSpeed || 8);
+          const scatterAngle = (projectile.angle || 0) + Math.PI + (Math.random() - 0.5) * 0.8;
+          projectile.vx = Math.cos(scatterAngle) * curSpeed;
+          projectile.vy = Math.sin(scatterAngle) * curSpeed;
+          projectile.lastAngle = scatterAngle;
+          projectile.angle = scatterAngle;
+          projectile.rotation = scatterAngle;
+          projectile.wobblePhase = Math.random() * Math.PI * 2;
           projectile.life = 180;
         }
         return false;

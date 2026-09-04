@@ -62,6 +62,7 @@ export class TojiFighter extends Fighter {
     this.ultimateAssaultCount = 0;
     this.immuneToCC = true;
     this.domainImmunity = true;
+    this.isDomainImmune = true;
     this.postUltimateRecoveryTimer = 0;
     this._initChainPhysics();
   }
@@ -853,9 +854,9 @@ export class TojiFighter extends Fighter {
         // Snapshot the weapon's exact rendered world-space angle at launch so the 360 spin
         // begins directly from the coiled charge stance — ABSOLUTELY ZERO ANGLE SNAP OR DIRECTION FLIP!
         this._diveStartAngle = this._lastKatanaRenderAngle !== undefined ? this._lastKatanaRenderAngle : Math.atan2(dy, dx);
-        // Also snapshot the BASE angle (used by drawSplitSoulKatana to decide Y-flip state)
-        // so the sword's flip orientation is frozen for the entire spin — prevents the visual flip snap!
-        this._diveChargeBaseAngle = this.gunAngle !== undefined ? this.gunAngle : Math.atan2(dy, dx);
+        this.isSpinning = true;
+        this.angle = this._diveStartAngle;
+        this.gunAngle = this.angle;
 
         // --- GROUND SHOCKWAVE BENEATH HIS LAUNCH POSITION ---
         triggerGlobalScreenShake(6, 12);
@@ -1184,29 +1185,7 @@ export class TojiFighter extends Fighter {
     // --- HEAVENLY RESTRICTION SENSE: SKIPPED IN DEMO PREVIEW MODE ---
     if (!this.isDemoFighter && modUpdateChannelSense(this, opponent)) return;
 
-    // Natural movement & wall bounce physics: nudge velocity towards opponent when stopped or low speed
     if (this.postUltimateRecoveryTimer > 0) this.postUltimateRecoveryTimer--;
-    if (opponent && opponent.hp > 0 && (this.knockbackStunTimer || 0) <= 0) {
-      const isTargetGojoInfinity = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo') && !opponent.isMeleeMode && ((opponent.infinityCooldown || 0) <= 0 || opponent.infinityActive);
-      // Natural movement & wall bounce physics: nudge velocity towards opponent when stopped or low speed
-      const currentSpeed = Math.hypot(this.vx || 0, this.vy || 0);
-      if (currentSpeed < 0.2 && (!isTargetGojoInfinity || this.isAmbushing)) {
-        const dx = opponent.x - this.x;
-        const dy = opponent.y - this.y;
-        const moveAngle = Math.atan2(dy, dx);
-        this.vx = Math.cos(moveAngle) * (this.speed || 3.5);
-        this.vy = Math.sin(moveAngle) * (this.speed || 3.5);
-        this.normalizeSpeed();
-      } else if (currentSpeed < 0.2 && isTargetGojoInfinity && !this.isAmbushing) {
-        // When stopped near Gojo's active barrier, roam / bounce away rather than driving straight back into the barrier
-        const dx = this.x - opponent.x;
-        const dy = this.y - opponent.y;
-        const awayAngle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.8;
-        this.vx = Math.cos(awayAngle) * (this.speed || 3.5);
-        this.vy = Math.sin(awayAngle) * (this.speed || 3.5);
-        this.normalizeSpeed();
-      }
-    }
 
     // Handle Stealth Duration & Cooldown Timers (SKIPPED IN DEMO PREVIEW MODE)
     if (!this.isDemoFighter && modUpdateStealth(this, opponent)) return;
@@ -1214,16 +1193,9 @@ export class TojiFighter extends Fighter {
     // Update katana slash fade timer
     if (this.katanaSlashFadeTimer > 0) this.katanaSlashFadeTimer--;
 
-    // Basic movement and aim logic (Pure natural bounce physics!)
-    let moveVx = this.vx;
-    let moveVy = this.vy;
-    if (this.slowTimer > 0) {
-      moveVx *= this.slowMultiplier;
-      moveVy *= this.slowMultiplier;
-    }
-    this.x += moveVx;
-    this.y += moveVy;
-
+    // Standard natural movement & arena wall bounce physics (identical to all standard fighters)
+    const speedMult = this.isStealthed ? (CONFIG.toji?.stealthSpeedMultiplier || 1.30) : 1.0;
+    this.applyMovementPhysics(speedMult);
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);
 
@@ -1248,6 +1220,23 @@ export class TojiFighter extends Fighter {
    */
   _updateChainPhysics() {
     return modUpdateChain(this);
+  }
+
+  /**
+   * Universal Aiming Capability Check.
+   * Toji must ALWAYS aim at his ambush target throughout ambush phases (Rule 3).
+   */
+  canAim() {
+    if (this.hp <= 0 || this.isDead) return false;
+    if (this.isTargetOfAmbush || (this.timeStopTimer > 0)) return false;
+    const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+                     (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
+                     (this.electricStunTimer && this.electricStunTimer > 0) ||
+                     (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
+                     (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
+    if (isHardCC) return false;
+    if (this.isAmbushing) return true; // Rule 3: Toji ALWAYS aims strictly at his ambush target throughout ambush phases!
+    return true;
   }
 
   /**
@@ -1515,9 +1504,9 @@ export class TojiFighter extends Fighter {
       const maxPause = CONFIG.toji?.ambushBackChargeDuration || 25;
       const chargeRatio = Math.min(1.0, 1 - (this.ambushTimer / maxPause));
 
-      // Deep coiled weapon charging stance: hand and weapon held steady at shoulder ready to plunge
+      // Deep coiled weapon charging stance: hand and weapon held steady at shoulder ready to plunge straight forward
       thrustDistance = -24;
-      offsetAngle = 0.50 * _katanaFlipSign;
+      offsetAngle = 0;
 
       // Render Charging Weapon Energy Flare at spear tip held at shoulder
       ctx.save();
@@ -1704,8 +1693,8 @@ export class TojiFighter extends Fighter {
       if (isSpinningDive) {
         const diveTime = CONFIG.toji?.ultimateCraterDiveTime || 15;
         const spinProgress = 1 - (this.ultimateCycleTimer / diveTime);
-        thrustDistance = 28;
-        offsetAngle = 0; // Zero offset angle so renderAngle directly matches body spin angle with zero snap!
+        thrustDistance = -24 + 52 * Math.min(1.0, spinProgress * 3.0);
+        offsetAngle = 0; // Sword angle directly matches body spin angle with zero snap!
         slashArcAlpha = Math.min(1.0, spinProgress * 3.0) * (1 - Math.max(0, (spinProgress - 0.7) / 0.3));
         this._activeSlashProgress = spinProgress;
         this._recoveryProgress = 0;
@@ -1755,7 +1744,7 @@ export class TojiFighter extends Fighter {
         if (t < 0.12) {
           const p = t / 0.12;
           thrustDistance = -24 * (1 - p * 0.1); // Coiled far back at shoulder
-          offsetAngle = 0.50 * (1 - p) * _katanaFlipSign;
+          offsetAngle = 0; // Pure linear piercing thrust directly forward into enemy spine
           slashArcAlpha = 0;
         } else if (t < 0.72) {
           const p = (t - 0.12) / 0.60;
@@ -1981,19 +1970,6 @@ export class TojiFighter extends Fighter {
       if (this.ambushPhase === 'KATANA_SLASH') {
         // Use the snapshotted angle from the moment the swing began so the crescent does NOT
         // follow the live gunAngle after 1 swing (which caused it to visually change direction).
-        // Crucially, do NOT add offsetAngle to ctx.rotate here — offsetAngle animates the weapon position,
-        // but the slash visual must stay locked at the frozen target direction for its full lifetime.
-        const frozenAngle = (isSpinningDive || this._slashStartAngle === undefined) ? baseAngle : this._slashStartAngle;
-        const frozenFlip  = (isSpinningDive || this._slashStartFlipSign === undefined) ? _katanaFlipSign : this._slashStartFlipSign;
-        ctx.rotate(frozenAngle);
-        const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
-        if (Math.abs(normAngle) > Math.PI / 2) {
-          ctx.scale(1, -1);
-        }
-
-        // --- DYNAMIC SLIM, LONG, ELEGANT VOID-PURPLE ANIME CRESCENT SLASH WAVE ---
-        // tipAngle dynamically tracks the weapon tip (offsetAngle * frozenFlip).
-        // tailAngle stretches back to the start offset (-1.15) up to a max length of 1.8 radians.
         const p = this._activeSlashProgress !== undefined ? this._activeSlashProgress : 0;
         const recP = this._recoveryProgress !== undefined ? this._recoveryProgress : 0;
 
@@ -2001,19 +1977,24 @@ export class TojiFighter extends Fighter {
         let startAngle, endAngle;
         let maxTrailLength = 1.8;
         if (isSpinningDive) {
-          // Stretch and follow tip of blade during 360 spin
+          // Pure 360 degree clockwise spin starting directly from the lifted sword angle — no scale flipping!
+          ctx.rotate(renderAngle);
+
           maxTrailLength = 3.8;
           const trailLength = maxTrailLength * Math.min(1.0, p * 1.5);
           tipAngle = 0.15;
           tailAngle = tipAngle - trailLength;
-          if (frozenFlip === 1) {
-            startAngle = tipAngle - trailLength;
-            endAngle = tipAngle;
-          } else {
-            startAngle = tipAngle;
-            endAngle = tipAngle + trailLength;
-          }
+          startAngle = tailAngle;
+          endAngle = tipAngle;
         } else {
+          const frozenAngle = this._slashStartAngle === undefined ? baseAngle : this._slashStartAngle;
+          const frozenFlip  = this._slashStartFlipSign === undefined ? _katanaFlipSign : this._slashStartFlipSign;
+          ctx.rotate(frozenAngle);
+          const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
+          if (Math.abs(normAngle) > Math.PI / 2) {
+            ctx.scale(1, -1);
+          }
+
           // Keep the tip locked at the end of the swing (+1.25) during recovery
           const currentOffset = recP > 0 ? 1.25 : (offsetAngle * frozenFlip);
           const startOffset = -1.15;
@@ -2380,9 +2361,9 @@ export class TojiFighter extends Fighter {
     if (isPhantomFlurry) {
       const isKatanaActive = (this.phantomStrikeCount % 2) === 0;
       if (isKatanaActive) {
-        drawSplitSoulKatana(ctx, this.x, this.y, baseAngle + 0.35 + (this.katanaOffset || 0), this.r + (this.katanaThrust || 0), this.color, baseAngle);
+        drawSplitSoulKatana(ctx, this.x, this.y, baseAngle + (this.katanaOffset || 0), this.r + (this.katanaThrust || 0), this.color, baseAngle);
       } else {
-        drawInvertedSpear(ctx, this.x, this.y, baseAngle - 0.35 + (this.spearOffset || 0), this.r + (this.spearThrust || 0), this.chainNodes, this.color, baseAngle);
+        drawInvertedSpear(ctx, this.x, this.y, baseAngle + (this.spearOffset || 0), this.r + (this.spearThrust || 0), this.chainNodes, this.color, baseAngle);
       }
     } else if (isUltimateStriking) {
       // Ultimate Sequence Strikes: Displayed 1 by 1 (ONLY 1 weapon drawn per strike, alternating Katana vs Spear!)
@@ -2396,9 +2377,8 @@ export class TojiFighter extends Fighter {
       const isSpinningDive = this.ultimateActive && this.ultimatePhase === 'CRATER' && (this.ultimateCycleTimer || 0) <= (CONFIG.toji?.ultimateCraterDiveTime || 15);
       const isCraterCharge = this.ultimateActive && (this.ultimatePhase === 'CRATER_FADEIN' || (this.ultimatePhase === 'CRATER' && (this.ultimateCycleTimer || 0) > (CONFIG.toji?.ultimateCraterDiveTime || 15)));
       
-      // Use the snapshotted charge-end base angle so the katana's Y-flip state is FROZEN
-      // for the entire 360 spin — exactly matching the charge animation's last frame.
-      const finalBaseAngle = isSpinningDive ? (this._diveChargeBaseAngle !== undefined ? this._diveChargeBaseAngle : baseAngle) : baseAngle;
+      // Disable scale flipping during spinning dive (baseAngle = 0) so the blade cutting edge naturally leads the clockwise rotation
+      const finalBaseAngle = isSpinningDive ? 0 : baseAngle;
       drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, '#E8BD9B', finalBaseAngle);
     } else {
       drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, '#E8BD9B', baseAngle);

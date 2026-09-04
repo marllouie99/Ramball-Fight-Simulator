@@ -986,7 +986,8 @@ export function drawPurpleDimScreen() {
   const roundCx = Math.round(screenPos.x / 10) * 10;
   const roundCy = Math.round(screenPos.y / 10) * 10;
   const is200 = (purpleOrb && purpleOrb.is200Percent) || (gojoFighter && (gojoFighter.is200PercentChannel || gojoFighter.purpleUseCount === 1));
-  const key = `${roundCx}_${roundCy}_${maxDim}_${is200}`;
+  const isGreen = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
+  const key = `${roundCx}_${roundCy}_${maxDim}_${is200}_${isGreen ? 'green' : 'purple'}`;
 
   if (!state._cachedPurpleDimGrad || state._cachedPurpleDimKey !== key) {
     state._cachedPurpleDimKey = key;
@@ -997,14 +998,25 @@ export function drawPurpleDimScreen() {
     const glowR = is200 ? 140 : 90;
     const rRatio = glowR / maxDim;
 
-    // Concentrates a deep, highly saturated vibrant purple halo around the Hollow Purple orb, fading to pitch black
-    state._cachedPurpleDimGrad.addColorStop(0, 'rgba(210, 40, 255, 1.0)');           // Vibrant neon magenta-purple core
-    state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(160, 0, 255, 0.95)'); // Saturated electric royal purple
-    state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(120, 0, 220, 0.75)');  // Deep JJK cursed purple ring
-    state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(75, 0, 150, 0.45)');   // Dark violet halo bloom
-    state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(30, 0, 70, 0.20)');    // Deep night-purple transition
-    state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 0, 0, 1.0)'); // Dark outer space
-    state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');               // Pitch black boundary
+    if (isGreen) {
+      // Concentrates a vibrant green halo around the green Hollow Purple orb, fading to pitch black
+      state._cachedPurpleDimGrad.addColorStop(0, 'rgba(0, 255, 100, 1.0)');           // Vibrant neon green core
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(0, 200, 80, 0.95)'); // Saturated electric emerald
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(0, 140, 60, 0.75)');  // Deep arcane green ring
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(0, 80, 30, 0.45)');   // Dark green halo bloom
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(0, 30, 10, 0.20)');    // Deep night-green transition
+      state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 0, 0, 1.0)'); // Dark outer space
+      state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');               // Pitch black boundary
+    } else {
+      // Concentrates a deep, highly saturated vibrant purple halo around the Hollow Purple orb, fading to pitch black
+      state._cachedPurpleDimGrad.addColorStop(0, 'rgba(210, 40, 255, 1.0)');           // Vibrant neon magenta-purple core
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(160, 0, 255, 0.95)'); // Saturated electric royal purple
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(120, 0, 220, 0.75)');  // Deep JJK cursed purple ring
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(75, 0, 150, 0.45)');   // Dark violet halo bloom
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(30, 0, 70, 0.20)');    // Deep night-purple transition
+      state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 0, 0, 1.0)'); // Dark outer space
+      state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');               // Pitch black boundary
+    }
   }
 
   ctx.globalAlpha = opacity;
@@ -1301,16 +1313,34 @@ export function drawYutaDomainDimScreen() {
 
   const opacity = currentYutaDomainDimOpacity;
 
-  // During domain channeling, draw smooth dark charge-up overlay; when domain is active, renderYutaDomainBackground displays the authentic full-screen void, vortex & environment
-  if (yutaFighter && yutaFighter.isChannelingDomain && !yutaFighter.domainActive) {
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.75})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  state.globalDimEdgeColor = `rgba(5, 0, 10, ${opacity * 0.95})`;
+  // 1. Base dark atmospheric void overlay (full-screen, unclipped, immune to camera pan/zoom cropping)
+  ctx.fillStyle = `rgba(10, 2, 8, ${opacity * 0.90})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Deep cursed rose/magenta radial bloom centered on Yuta
+  const center = yutaFighter ? worldToScreen(yutaFighter.x, (yutaFighter.y - (yutaFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = center.x;
+  const cy = center.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.85;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, 'rgba(219, 39, 119, 0.52)');      // Bright cursed rose/magenta core (#db2777)
+  grad.addColorStop(0.18, 'rgba(157, 23, 77, 0.42)');    // Deep magenta halo (#9d174d)
+  grad.addColorStop(0.40, 'rgba(80, 7, 36, 0.28)');      // Dark cursed wine-purple ring (#500724)
+  grad.addColorStop(0.68, 'rgba(25, 4, 15, 0.14)');      // Charcoal-rose fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');            // Pitch black boundary
+
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(20, 2, 14, ${opacity * 0.95})`;
 }
 
 let currentMahitoDomainDimOpacity = 0;

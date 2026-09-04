@@ -210,7 +210,7 @@ export class ZeusFighter extends Fighter {
 
   canAim() {
     if (!super.canAim()) return false;
-    if (this.isChargingStorm || this.stormActive) return false;
+    if (this.stormActive) return false;
     return true;
   }
   

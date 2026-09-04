@@ -1117,11 +1117,11 @@ export class GojoRenderer {
     const totalFrames  = fighter.redEffectMaxTimer;           // e.g. 75
     const remaining    = fighter.redEffectTimer;              // counts down from totalFrames → 0
     const elapsed      = totalFrames - remaining;          // 0 → totalFrames
-    const buildupEnd   = CONFIG.gojo.redBuildupFrames || 20; // first 20 frames = Phase 1
-    const angle        = fighter.redTargetAngle || fighter.gunAngle || 0;
+    const buildupEnd   = CONFIG.gojo?.redBuildupFrames || 100; // first 100 frames = Phase 1
+    const angle        = fighter.redTargetAngle !== undefined ? fighter.redTargetAngle : (fighter.gunAngle || 0);
     const fingerDist   = fighter.r + 14;
     const time         = Date.now();
-    const maxRange     = (CONFIG.gojo.redRange || 100) + 50;
+    const maxRange     = (CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650);
 
     // Smooth screen dimming with deep crimson vignette overlay as Gojo charges Red
     let screenDimAlpha = 0;
@@ -1175,85 +1175,108 @@ export class GojoRenderer {
         if (!fighter._hasPlayedRedFlareSound) {
           fighter._hasPlayedRedFlareSound = true;
           triggerGlobalScreenShake(8, 12); // Pre-detonation flare tremor
-          const sDep = getSkillSound(fighter._def?.id, 'red_deploy');
+          const fId = fighter.characterId || fighter.id || fighter._def?.id;
+          const sDep = getSkillSound(fId, 'red_deploy');
           audioSystem.playSFX(sDep?.src || 'Assets/Sound Effects/Skills/reddeploy.mp3', sDep?.volume ?? 2.0);
         }
       }
     }
 
 
-    // ─── Phase 2 + 3: BOOM and Fade (elapsed > buildupEnd) ──────────────────
+    // ─── Phase 2 + 3: Repulsion Cone Eruption & Fade (elapsed > buildupEnd) ──
     else {
       const blastElapsed = elapsed - buildupEnd;           // 0 → (totalFrames - buildupEnd)
       const blastTotal   = totalFrames - buildupEnd;
       const blastProg    = blastElapsed / blastTotal;      // 0 → 1
 
-      // Fade-out alpha: peaks at 0 and fades toward 1
+      // Fade-out alpha: peaks at blast start and fades smoothly
       const alpha = Math.max(0, Math.sin((1 - blastProg) * Math.PI));
       ctx.globalAlpha = alpha;
 
-      const beamLength = maxRange * (0.2 + blastProg * 1.1);
-      const beamSpread = 40  * (0.4 + blastProg * 0.9);
+      const coneReach = maxRange * Math.min(1.0, 0.35 + blastProg * 1.10);
+      const halfArc = 0.38; // ~44 deg total cone angle
 
-      // 1. Repulsion cone beam
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const coneGrad = ctx.createLinearGradient(fingerDist, 0, fingerDist + beamLength, 0);
-      coneGrad.addColorStop(0,    'rgba(255, 255, 255, 1.0)');
-      coneGrad.addColorStop(0.2,  'rgba(255, 0, 51, 0.9)');
-      coneGrad.addColorStop(0.65, 'rgba(200, 0, 40, 0.45)');
-      coneGrad.addColorStop(1,    'rgba(150, 0, 20, 0)');
-      ctx.beginPath();
-      ctx.moveTo(fingerDist, 0);
-      ctx.lineTo(fingerDist + beamLength, -beamSpread);
-      ctx.quadraticCurveTo(fingerDist + beamLength * 1.1, 0, fingerDist + beamLength, beamSpread);
-      ctx.closePath();
-      ctx.fillStyle = coneGrad;
-      ctx.fill();
-      ctx.restore();
+      // Pixel art grid scale
+      const P = 4.0;
+      const snap = (v) => Math.round(v / P) * P;
 
-      // 2. JJK ink-brush arc strokes along the repulsion wave
-      ctx.strokeStyle = '#000000';
-      ctx.lineCap = 'butt';
-      ctx.lineJoin = 'miter';
-      const numArcs = 6;
-      for (let k = 0; k < numArcs; k++) {
-        const arcDist    = fingerDist + 15 + k * (beamLength / numArcs) * (0.5 + blastProg * 0.6);
-        const arcSpread  = (22 + k * 16 * blastProg) * (Math.PI / 180);
-        const numSegs    = 16;
-        for (let layer = 0; layer < 2; layer++) {
-          const offsetR = arcDist * (layer === 0 ? 1.0 : 0.95);
-          for (let i = 0; i < numSegs; i++) {
-            const a1 = -arcSpread + (arcSpread * 2 / numSegs) * i;
-            const a2 = -arcSpread + (arcSpread * 2 / numSegs) * (i + 1);
-            if (Math.sin(i * 13.7 + k * 23.1 + layer * 41.5 + time * 0.01) < -0.15) continue;
-            const pn = Math.sin(i * 3.1 + k * 5.7 + time * 0.02) * 0.5 + 0.5;
-            ctx.lineWidth = 0.6 + pn * 2.8;
-            ctx.beginPath();
-            ctx.arc(Math.sin(i * 9.1 + k * 17.3) * 0.8, Math.cos(i * 11.3 + k * 19.7) * 0.8, offsetR, a1, a2);
-            ctx.stroke();
-          }
+      // ── 1. CLEAN STEPPED PIXEL CONICAL BODY RUNS (Straight linear staircase, NO waviness) ──
+      const stepSize = P * 2; // 8px steps
+      const numSteps = Math.ceil(coneReach / stepSize);
+
+      for (let s = 0; s < numSteps; s++) {
+        const gx = fingerDist + s * stepSize;
+        const xOffset = s * stepSize;
+        if (xOffset > coneReach) break;
+
+        // Clean straight linear boundary (strictly no wavy flutter)
+        const halfW = Math.max(P * 2, snap(xOffset * Math.tan(halfArc)));
+
+        // Layer 1: Atmospheric Glow (Translucent Crimson Field)
+        ctx.fillStyle = `rgba(255, 0, 51, ${(0.22 * alpha).toFixed(3)})`;
+        ctx.fillRect(gx, -halfW - P * 2, stepSize, halfW * 2 + P * 4);
+
+        // Layer 2: Dark Manga Ink Border Rails (Top & Bottom steps)
+        ctx.fillStyle = '#110204';
+        ctx.fillRect(gx, -halfW - P, stepSize, P);
+        ctx.fillRect(gx, halfW, stepSize, P);
+
+        // Layer 3: Neon Red Flame Rim (Top & Bottom inner steps)
+        ctx.fillStyle = `rgba(255, 0, 51, ${(0.92 * alpha).toFixed(3)})`;
+        ctx.fillRect(gx, -halfW, stepSize, P * 2);
+        ctx.fillRect(gx, halfW - P * 2, stepSize, P * 2);
+
+        // Layer 4: Deep Crimson Cursed Core
+        const coreHeight = Math.max(0, halfW * 2 - P * 4);
+        if (coreHeight > 0) {
+          ctx.fillStyle = `rgba(139, 0, 20, ${(0.75 * alpha).toFixed(3)})`;
+          ctx.fillRect(gx, -halfW + P * 2, stepSize, coreHeight);
         }
+
+        // Layer 5: Straight Piercing White-Hot Centerline Beam
+        const centerW = Math.max(P, snap(halfW * 0.30));
+        ctx.fillStyle = (s % 2 === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : `rgba(255, 140, 160, ${(0.90 * alpha).toFixed(3)})`;
+        ctx.fillRect(gx, -centerW * 0.5, stepSize, centerW);
       }
 
-      // 3. Expanding crimson repulsion rings (centered on Gojo, fan toward target)
-      ctx.save();
-      ctx.strokeStyle = '#FF0033';
-      ctx.lineWidth = 3.5 * (1 - blastProg * 0.5);
-      for (let rIdx = 0; rIdx < 3; rIdx++) {
-        const ringR = (fighter.r + 15) + (rIdx * 38 + blastProg * 120);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringR, -Math.PI * 0.65, Math.PI * 0.65);
-        ctx.stroke();
-      }
-      ctx.restore();
+      // ── 2. STRAIGHT RADIAL PIXEL RAYS (Piercing straight outward, no wavy offsets) ──
+      const rayAngles = [
+        -halfArc * 0.65,
+        -halfArc * 0.32,
+        0,
+        halfArc * 0.32,
+        halfArc * 0.65
+      ];
 
-      // 4. Fingertip orb — shrinks and fades using same drawGojoOrb visual as blast releases
+      rayAngles.forEach((rayAng, rIdx) => {
+        const cosR = Math.cos(rayAng);
+        const sinR = Math.sin(rayAng);
+        const maxRayLen = coneReach * (rIdx % 2 === 0 ? 0.95 : 0.80);
+        const raySteps = Math.floor(maxRayLen / (P * 2));
+
+        ctx.fillStyle = (rayAng === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : `rgba(255, 210, 220, ${(0.80 * alpha).toFixed(3)})`;
+
+        for (let st = 1; st <= raySteps; st++) {
+          const d = st * (P * 2);
+          const rx = snap(fingerDist + cosR * d);
+          const ry = snap(sinR * d);
+          ctx.fillRect(rx, ry, P, P);
+        }
+      });
+
+      // ── 3. STEPPED PIXEL FRONTAL CAP (Stepped vertical wavefront) ──
+      const capHalfW = snap(coneReach * Math.tan(halfArc));
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
+      ctx.fillRect(snap(fingerDist + coneReach), -capHalfW, P, capHalfW * 2);
+      ctx.fillStyle = '#110204';
+      ctx.fillRect(snap(fingerDist + coneReach) + P, -capHalfW, P, capHalfW * 2);
+
+      // ── 4. Fingertip orb — shrinks and fades as the cone erupts ──
       const orbR = getHandSize(10) * (1 - blastProg * 0.85);
       if (orbR > 1) {
         ctx.globalAlpha = alpha * (1 - blastProg * 0.6);
         drawGojoOrb(ctx, fingerDist, 0, orbR, time, 'red', 0);
-        ctx.globalAlpha = alpha; // restore for anything after
+        ctx.globalAlpha = alpha;
       }
     }
 

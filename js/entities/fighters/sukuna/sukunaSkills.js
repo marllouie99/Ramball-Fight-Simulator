@@ -203,19 +203,14 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     // Multi-angle arc variance per strike
     const slashAngle = aimAngle + (Math.random() - 0.5) * 0.35;
 
-    if (projectileSystem) {
-      projectileSystem.fireProjectile(
-        fighter,
-        actualOwnerIndex,
-        slashDamage,
-        false,
-        slashSpeed,
-        false,
-        'ghostBlade',
-        fighter.x,
-        fighter.y,
-        slashAngle
-      );
+    if (typeof target.takeDamage === 'function') {
+      target.takeDamage(slashDamage, fighter, {
+        isMelee: true,
+        isSukunaSlash: true,
+        isCleave: true,
+        isDomain: true,
+        isCrit
+      });
     }
 
     spawnFloatingText(fighter.x, fighter.y - 30, 'CLEAVE!', '#E0E8FF');

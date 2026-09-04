@@ -295,6 +295,14 @@ let _bfGlowCanvas = null;
 let _sukunaGlowCanvas = null;
 let _blueGlowCanvas = null;
 
+let _cachedFistNormalCanvas = null;
+let _cachedFistSukunaCanvas = null;
+let _cachedFistRadius = 0;
+
+let _cachedYujiNormalCanvas = null;
+let _cachedYujiSukunaCanvas = null;
+let _cachedYujiR = 0;
+
 function _initYujiGlowCanvases() {
   if (typeof document === 'undefined' || _bfGlowCanvas) return;
 
@@ -338,6 +346,59 @@ function _initYujiGlowCanvases() {
   bCtx.fillRect(0, 0, 64, 64);
 }
 
+function _renderFistToCanvas(destCtx, radius, skinColor) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
+  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
+  const P = 2.0;
+  const gridR = Math.max(P * 2, radius);
+  const steps = Math.ceil(gridR / P);
+  const shadowColor = '#C99478';
+
+  // Outer Dark Pixel Border Shell
+  destCtx.fillStyle = '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= gridR + P * 0.75) {
+        destCtx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
+
+  // Inner Base Skin Tone
+  destCtx.fillStyle = skinColor;
+  const innerR = gridR - P * 0.4;
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR) {
+        destCtx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
+
+  // Knuckle Depth Shading
+  destCtx.fillStyle = shadowColor;
+  for (let gy = 0; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+        destCtx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
+
+  // Knuckle Specular Glint Pixels
+  destCtx.fillStyle = '#FFF2EB';
+  const hx = Math.round(P * 0.5);
+  const hy = Math.round(-innerR * 0.45);
+  destCtx.fillRect(hx, hy, P, P);
+  destCtx.fillRect(hx + P, hy, P, P);
+
+  destCtx.restore();
+}
+
 function _drawFist(ctx, x, y, radius, skinColor, fighter) {
   ctx.save();
 
@@ -348,10 +409,10 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter) {
 
   // 1. CE glow around fist — fast texture blit instead of per-frame createRadialGradient
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+  const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
   if (!isLowQuality && (glow > 0.01 || fighter.blackFlashTimer > 0)) {
     _initYujiGlowCanvases();
     const activeGlow = fighter.blackFlashTimer > 0 ? 1.0 : glow;
-    const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
     const glowCanvas = fighter.blackFlashTimer > 0 ? _bfGlowCanvas : (isSukunaForm ? _sukunaGlowCanvas : _blueGlowCanvas);
 
     if (glowCanvas) {
@@ -361,116 +422,43 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter) {
     }
   }
 
-  // 2. Stepped Pixel-Art Fist Body & Outer Manga Border
-  ctx.globalAlpha = 1.0;
-  const P = 2.0;
-  const gridR = Math.max(P * 2, radius);
-  const steps = Math.ceil(gridR / P);
-  const shadowColor = '#C99478';
+  // 2. Pre-rendered Stepped Pixel-Art Fist Body & Outer Manga Border (Zero Subpixel Aliasing)
+  if (typeof document !== 'undefined') {
+    if (!_cachedFistNormalCanvas || !_cachedFistSukunaCanvas || _cachedFistRadius !== radius) {
+      _cachedFistRadius = radius;
+      const size = Math.ceil((radius + 6) * 2);
 
-  // Outer Dark Pixel Border Shell
-  ctx.fillStyle = '#0E0F14';
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= gridR + P * 0.75) {
-        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
-      }
+      _cachedFistNormalCanvas = document.createElement('canvas');
+      _cachedFistNormalCanvas.width = size;
+      _cachedFistNormalCanvas.height = size;
+      const fCtxNormal = _cachedFistNormalCanvas.getContext('2d');
+      _renderFistToCanvas(fCtxNormal, radius, '#F0C090');
+
+      _cachedFistSukunaCanvas = document.createElement('canvas');
+      _cachedFistSukunaCanvas.width = size;
+      _cachedFistSukunaCanvas.height = size;
+      const fCtxSukuna = _cachedFistSukunaCanvas.getContext('2d');
+      _renderFistToCanvas(fCtxSukuna, radius, '#C03030');
+    }
+
+    const fistCanvas = isSukunaForm ? _cachedFistSukunaCanvas : _cachedFistNormalCanvas;
+    if (fistCanvas) {
+      ctx.globalAlpha = 1.0;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(fistCanvas, x - fistCanvas.width / 2, y - fistCanvas.height / 2);
     }
   }
-
-  // Inner Base Skin Tone
-  ctx.fillStyle = skinColor;
-  const innerR = gridR - P * 0.4;
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR) {
-        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
-      }
-    }
-  }
-
-  // Knuckle Depth Shading
-  ctx.fillStyle = shadowColor;
-  for (let gy = 0; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
-        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
-      }
-    }
-  }
-
-  // Knuckle Specular Glint Pixels
-  ctx.fillStyle = '#FFF2EB';
-  const hx = Math.round(x + P * 0.5);
-  const hy = Math.round(y - innerR * 0.45);
-  ctx.fillRect(hx, hy, P, P);
-  ctx.fillRect(hx + P, hy, P, P);
 
   ctx.restore();
 }
 
 /**
- * Draws an authentic golden Jujutsu High swirl / spiral button matching the anime reference.
+ * Procedural Pixel Art Render Function (Renders once to offscreen cache).
  */
-function _drawJJKSwirlButton(ctx, x, y, radius) {
-  ctx.save();
-  ctx.translate(x, y);
-
-  // 1. Dark ink socket / drop shadow
-  ctx.fillStyle = '#0E101A';
-  ctx.beginPath();
-  ctx.arc(0.4, 0.4, radius + 0.3, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. Antique Golden Metallic Base
-  const btnGrad = ctx.createLinearGradient(-radius * 0.7, -radius * 0.7, radius * 0.7, radius * 0.7);
-  btnGrad.addColorStop(0.0, '#FDE68A'); // Pale gold highlight
-  btnGrad.addColorStop(0.3, '#F59E0B'); // Warm amber gold
-  btnGrad.addColorStop(0.7, '#D97706'); // Deep golden bronze
-  btnGrad.addColorStop(1.0, '#78350F'); // Dark bronze shadow
-  ctx.fillStyle = btnGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 3. Dark Outer Button Rim
-  ctx.strokeStyle = '#3D2005';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-
-  // 4. Iconic Jujutsu High Swirl / Spiral Crest Pattern
-  ctx.strokeStyle = '#451A03';
-  ctx.lineWidth = Math.max(0.7, radius * 0.32);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  // Outer spiral arc
-  ctx.arc(0, 0, radius * 0.60, 0.2, Math.PI * 1.35);
-  ctx.stroke();
-  // Inner swirl arc
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.32, Math.PI * 0.8, Math.PI * 2.2);
-  ctx.stroke();
-
-  // 5. Specular 1px White Glint
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(-radius * 0.32, -radius * 0.32, Math.max(0.6, radius * 0.24), 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-}
-
-/**
- * Draws Yuji Itadori's entire body circle model in authentic Pixel Art Style.
- * Uses discrete stepped pixel grid rasterization matching Saitama and Ichigo.
- * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
- */
-export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
+  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
@@ -497,8 +485,8 @@ export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
 
       // Pixelated Black Stroke Border
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#0E0F14';
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = '#0E0F14';
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -526,8 +514,8 @@ export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
           col = '#1A1114'; // Dark Sukuna undercuts
         }
 
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE 2: Warm Peach Face Skin & Scars (hairlineY <= ry < r * 0.08)
@@ -560,17 +548,17 @@ export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
         }
 
         if (isSukunaMark) {
-          ctx.fillStyle = '#1A1116'; // Deep charcoal-black tattoo ink
+          destCtx.fillStyle = '#1A1116'; // Deep charcoal-black tattoo ink
         } else if (isBrowScar) {
-          ctx.fillStyle = '#944430'; // Signature dark crimson-brown scar
+          destCtx.fillStyle = '#944430'; // Signature dark crimson-brown scar
         } else if (isBrowScarHighlight) {
-          ctx.fillStyle = '#F5BCA6'; // Scar upper highlight edge
+          destCtx.fillStyle = '#F5BCA6'; // Scar upper highlight edge
         } else if (isChinScar) {
-          ctx.fillStyle = '#944430'; // Chin scar
+          destCtx.fillStyle = '#944430'; // Chin scar
         } else {
-          ctx.fillStyle = col;
+          destCtx.fillStyle = col;
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
       // ZONE 3: DETAILED RED HOODIE COWL & UNIFORM (ry >= r * 0.08)
@@ -621,18 +609,18 @@ export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
         const btn3Col = getButtonPixel(rx, ry, b3X, b3Y, b3R);
 
         if (btn1Col) {
-          ctx.fillStyle = btn1Col;
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillStyle = btn1Col;
+          destCtx.fillRect(px, py, P, P);
           continue;
         }
         if (btn2Col) {
-          ctx.fillStyle = btn2Col;
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillStyle = btn2Col;
+          destCtx.fillRect(px, py, P, P);
           continue;
         }
         if (btn3Col) {
-          ctx.fillStyle = btn3Col;
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillStyle = btn3Col;
+          destCtx.fillRect(px, py, P, P);
           continue;
         }
 
@@ -661,31 +649,31 @@ export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
         const isNavyFold2Hi = (Math.abs(ry - (r * 0.75 + rx * 0.06)) <= P * 0.8 && rx <= r * 0.42);
 
         if (isThroatSkin) {
-          ctx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
+          destCtx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
         } else if (isRedCowl) {
           if (isCowlPlacketBorderL || isCowlPlacketBorderR || isCowlTopRim || isCowlBottomSeam) {
-            ctx.fillStyle = '#1A0406'; // Dark black-crimson outline
+            destCtx.fillStyle = '#1A0406'; // Dark black-crimson outline
           } else if (isCowlMiddleCrease) {
-            ctx.fillStyle = '#6E0E14'; // Dark red middle fold crease
+            destCtx.fillStyle = '#6E0E14'; // Dark red middle fold crease
           } else if (isCowlPlacket) {
-            ctx.fillStyle = '#C81E2B'; // Rich vertical flap red
+            destCtx.fillStyle = '#C81E2B'; // Rich vertical flap red
           } else if (ry < r * 0.32) {
             // Upper Cowl Fold: Bright vivid red with top specular highlight
             let col = '#E52B38';
             if (ry < cowlTopY + P * 2.5) col = '#F44336';
-            ctx.fillStyle = col;
+            destCtx.fillStyle = col;
           } else {
             // Lower Cowl Fold: Deep rich crimson
             let col = '#B71C1C';
             if (absX > r * 0.70 || ry > r * 0.46) col = '#8A1018';
-            ctx.fillStyle = col;
+            destCtx.fillStyle = col;
           }
         } else {
           // Navy Jujutsu High Uniform
           if (isNavyFold1 || isNavyFold2) {
-            ctx.fillStyle = '#0E1322'; // Deep navy shadow crease
+            destCtx.fillStyle = '#0E1322'; // Deep navy shadow crease
           } else if (isNavyFold1Hi || isNavyFold2Hi) {
-            ctx.fillStyle = '#334168'; // Lighter denim blue fold highlight
+            destCtx.fillStyle = '#334168'; // Lighter denim blue fold highlight
           } else {
             let col = '#1D253D'; // Midnight navy base
             if (absX > r * 0.70 || ry > r * 0.85) {
@@ -693,15 +681,49 @@ export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
             } else if (ry < r * 0.65 && absX < r * 0.30) {
               col = '#242E4A';
             }
-            ctx.fillStyle = col;
+            destCtx.fillStyle = col;
           }
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
     }
   }
 
-  ctx.restore();
+  destCtx.restore();
+}
+
+/**
+ * Draws Yuji Itadori's entire body circle model in authentic Pixel Art Style (Offscreen Cached).
+ * Uses discrete stepped pixel grid rasterization matching Saitama and Ichigo.
+ * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
+ */
+export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
+  if (typeof document === 'undefined') return;
+
+  if (!_cachedYujiNormalCanvas || !_cachedYujiSukunaCanvas || _cachedYujiR !== r) {
+    _cachedYujiR = r;
+    const size = Math.ceil((r + 4) * 2);
+
+    _cachedYujiNormalCanvas = document.createElement('canvas');
+    _cachedYujiNormalCanvas.width = size;
+    _cachedYujiNormalCanvas.height = size;
+    const offCtxNormal = _cachedYujiNormalCanvas.getContext('2d');
+    _renderYujiPixelBodyToCanvas(offCtxNormal, r, false);
+
+    _cachedYujiSukunaCanvas = document.createElement('canvas');
+    _cachedYujiSukunaCanvas.width = size;
+    _cachedYujiSukunaCanvas.height = size;
+    const offCtxSukuna = _cachedYujiSukunaCanvas.getContext('2d');
+    _renderYujiPixelBodyToCanvas(offCtxSukuna, r, true);
+  }
+
+  const canvasToDraw = isSukunaForm ? _cachedYujiSukunaCanvas : _cachedYujiNormalCanvas;
+  if (canvasToDraw) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(canvasToDraw, -canvasToDraw.width / 2, -canvasToDraw.height / 2);
+    ctx.restore();
+  }
 }
 
 

@@ -1764,7 +1764,12 @@ export class IchigoFighter extends Fighter {
           this.vy = 0;
         }
 
-        // Facing angle remains locked in the direction of the initial cast; do not auto-aim while channeling
+        // Centralized smooth aim rotation while channeling Getsuga Tensho (continuous tracking without snapping on release)
+        const aimTarget = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+        if (aimTarget && aimTarget.hp > 0) {
+          this.aim(aimTarget);
+        }
+
         this.getsugaChargeTimer--;
         if (this.getsugaChargeTimer <= 0) {
           this._releaseGetsuga();

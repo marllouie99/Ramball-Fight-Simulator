@@ -11,7 +11,7 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 function isTeleportDisabled(fighter) {
   if (!fighter) return false;
-  const isInsideDomain = typeof state !== 'undefined' && (
+  const isInsideDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))

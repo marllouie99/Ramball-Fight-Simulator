@@ -149,6 +149,16 @@ export function clearHybridProjectiles() {
     data.inUse = false;
   }
   activeSprites.clear();
+  if (fugaSprite) {
+    fugaSprite.visible = false;
+    if (fugaSprite.parent) fugaSprite.parent.removeChild(fugaSprite);
+  }
+  if (fugaCtx && fugaTexture) {
+    fugaCtx.clearRect(0, 0, 600, 600);
+    fugaTexture.update();
+  }
+  _wasChannelingFuga = false;
+  fugaUpdateTick = 0;
 }
 
 let rikaSprite = null;
@@ -170,6 +180,24 @@ let fugaCanvas = null;
 let fugaCtx = null;
 let fugaTexture = null;
 let fugaUpdateTick = 0;
+let _wasChannelingFuga = false;
+let _hasDrawnCurrentFuga = false;
+
+export function resetHybridSukunaFuga() {
+  if (fugaSprite) {
+    fugaSprite.visible = false;
+    if (fugaSprite.parent) {
+      fugaSprite.parent.removeChild(fugaSprite);
+    }
+  }
+  if (fugaCtx && fugaTexture) {
+    fugaCtx.clearRect(0, 0, 600, 600);
+    fugaTexture.update();
+  }
+  _wasChannelingFuga = false;
+  _hasDrawnCurrentFuga = false;
+  fugaUpdateTick = 0;
+}
 
 export function updateHybridSukunaFuga() {
   if (!state.pixiApp || !state.pixiLayers?.projectiles) return;
@@ -177,9 +205,19 @@ export function updateHybridSukunaFuga() {
 
   const sukuna = state.fighters?.find(f => f && (f.type === 'sukuna' || f.characterId === 'sukuna') && f.isChannelingDivineFlame);
   if (!sukuna || sukuna.hp <= 0 || state.gameState === 'matchEnd') {
-    if (fugaSprite && fugaSprite.parent) {
-      fugaSprite.parent.removeChild(fugaSprite);
+    if (fugaSprite) {
+      fugaSprite.visible = false;
+      if (fugaSprite.parent) {
+        fugaSprite.parent.removeChild(fugaSprite);
+      }
     }
+    if (fugaCtx && fugaTexture && _wasChannelingFuga) {
+      fugaCtx.clearRect(0, 0, 600, 600);
+      fugaTexture.update();
+    }
+    _wasChannelingFuga = false;
+    _hasDrawnCurrentFuga = false;
+    fugaUpdateTick = 0;
     return;
   }
 
@@ -194,29 +232,52 @@ export function updateHybridSukunaFuga() {
     fugaSprite = new window.PIXI.Sprite(fugaTexture);
     fugaSprite.anchor.set(0.5);
     fugaSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+    fugaSprite.visible = false;
   }
 
-  if (!fugaSprite.parent) {
-    layer.addChild(fugaSprite);
+  const progress = sukuna.divineFlameChargeTimer / Math.max(1, sukuna.divineFlameChargeMax || 100);
+
+  // If starting a new channel, wipe any leftover texture immediately
+  if (!_wasChannelingFuga) {
+    _wasChannelingFuga = true;
+    _hasDrawnCurrentFuga = false;
+    fugaUpdateTick = 0;
+    fugaCtx.clearRect(0, 0, size, size);
+    fugaTexture.update();
+    fugaSprite.visible = false;
   }
 
   // Update position every frame for buttery-smooth movement tracking
   fugaSprite.x = sukuna.x;
   fugaSprite.y = sukuna.y;
 
+  // If charge progress hasn't started yet (progress <= 0), keep sprite completely invisible
+  if (progress <= 0) {
+    fugaSprite.visible = false;
+    if (fugaSprite.parent) {
+      fugaSprite.parent.removeChild(fugaSprite);
+    }
+    return;
+  }
+
+  if (!fugaSprite.parent) {
+    layer.addChild(fugaSprite);
+  }
+
   // OPTIMIZATION: Throttle expensive texture updates to prevent CPU-to-GPU bandwidth bottlenecks.
   fugaUpdateTick++;
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const updateInterval = isLowQuality ? 3 : 2;
 
-  if (fugaUpdateTick % updateInterval === 0) {
+  const shouldRenderNow = !_hasDrawnCurrentFuga || (fugaUpdateTick % updateInterval === 0);
+
+  if (shouldRenderNow) {
     fugaCtx.clearRect(0, 0, size, size);
     fugaCtx.save();
     
     // Center the drawing context
     fugaCtx.translate(size / 2, size / 2);
 
-    const progress = sukuna.divineFlameChargeTimer / sukuna.divineFlameChargeMax;
     const time = Date.now() * 0.012;
 
     // ── 1. CHIAROSCURO: Blinding front-light vs deep back-shadow ──
@@ -266,5 +327,11 @@ export function updateHybridSukunaFuga() {
 
     fugaCtx.restore();
     fugaTexture.update();
+    _hasDrawnCurrentFuga = true;
+  }
+
+  // ONLY show the sprite once the current cast has actually drawn into the GPU texture
+  if (_hasDrawnCurrentFuga) {
+    fugaSprite.visible = true;
   }
 }

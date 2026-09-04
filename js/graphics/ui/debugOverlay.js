@@ -2,6 +2,7 @@
 // DEBUG & PERFORMANCE OVERLAY RENDERER WITH FIGHTER CONSOLE
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
+import { getAudioLatencyMs } from '../../systems/soundSystem.js';
 
 export function renderFpsDebugOverlay(ctx) {
   if (!state) return;
@@ -14,7 +15,9 @@ export function renderFpsDebugOverlay(ctx) {
     ctx.fillStyle = state.fps < 45 ? '#ff4444' : '#00ff66';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    const text = `FPS: ${Math.round(state.fps)} | Q: ${Math.round((state.qualityLevel || 1) * 100)}%`;
+    const audioLat = getAudioLatencyMs();
+    const latStr = audioLat > 0 ? ` | A: ${audioLat}ms` : '';
+    const text = `FPS: ${Math.round(state.fps)} | Q: ${Math.round((state.qualityLevel || 1) * 100)}%${latStr}`;
     ctx.fillText(text, (state.canvas?.width || 540) - 15, 15);
   }
 

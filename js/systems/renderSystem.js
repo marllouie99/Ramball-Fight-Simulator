@@ -32,6 +32,7 @@ import { updateHybridProjectiles, updateHybridRika, updateHybridSukunaFuga } fro
 import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
+import { getAudioLatencyMs } from './soundSystem.js';
 
 
 
@@ -436,9 +437,9 @@ export function renderGame() {
         if (!state.hideFpsLogs) {
           const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
           state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)'; // Light FPS text in dark mode, dark in light mode
-          state.ctx.font = '12px monospace';
-          state.ctx.textAlign = 'left';
-          state.ctx.fillText(`FPS: ${state.fps}`, 10, 20);
+          const audioLat = getAudioLatencyMs();
+          const audioLatStr = audioLat > 0 ? ` | Lat: ${audioLat}ms` : '';
+          state.ctx.fillText(`FPS: ${state.fps}${audioLatStr}`, 10, 20);
 
           // Draw FPS Drop Causes as a log list
           if (state.fpsLogs && state.fpsLogs.length > 0) {

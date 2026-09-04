@@ -99,6 +99,17 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     }
   }
 
+  // ── 50% Damage Reduction when Adapted to Reversal Red ──
+  const isRedHit = Boolean(opts.isRed || (opts.projectile && opts.projectile.isGojoRed) || (opts.skillShotId === 'red'));
+  const isRedAdapted = Boolean((fighter.gojoAdapted && fighter.gojoAdapted.red) || 
+                               (fighter.adaptedGojo && fighter.adaptedGojo.red) ||
+                               (fighter.adaptedSkills && fighter.adaptedSkills['red']) || 
+                               (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF1144')));
+
+  if (isRedHit && isRedAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Red!
+  }
+
   // ── 50% Damage Reduction when Adapted to Hollow Purple ──
   const isPurpleHit = opts.isPurpleDPS || (opts.projectile && (opts.projectile.isGojoPurple || opts.projectile.isGojoPurpleOrb || opts.projectile.behaviorType === 'gojo_purple' || opts.projectile.skillShotId === 'purple')) || opts.isPurple;
   const isPurpleAdapted = (fighter.gojoAdapted && fighter.gojoAdapted.purple) || 
@@ -226,40 +237,12 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
       fighter._lastSkillShotColor = skillShotColor;
     }
 
-    if (isPurple) {
-      if ((fighter.fatalAdaptCooldown || 0) <= 0 && !fighter.pendingPurpleAdaptation) {
-        fighter.pendingPurpleAdaptation = true;
-        fighter.pendingPurpleAttacker = attacker;
-        fighter.pendingPurpleType = type;
-        fighter._lastGojoHitType = 'purple';
-        fighter._lastSkillShotId = 'purple';
-        fighter._lastSkillShotColor = '#8A2BE2';
-      }
-    } else if (isGetsuga) {
-      // Getsuga Tensho advances WOA progress on every tick and adapts after 2 wave exposures
-    } else if (isAdaptableSkill) {
-      if ((fighter.fatalAdaptCooldown || 0) <= 0 && !fighter.skillExposureTimer) {
-        const delay = (skillShotId && SKILL_REGISTRY[skillShotId]?.adaptationDelayFrames) || 60;
-        fighter.skillExposureTimer = delay; // Timer to click the wheel!
-        fighter.exposedSkillType = type;
-        fighter.exposedSkillAttacker = attacker;
-      }
-    } else {
-      // Standard / tick damage threshold check
-      if (!opts.isPureLoveBeam && !opts.isGenosBeam) {
-        const threshold = fighter.maxHp * thresholdPct;
-        if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
-          if (opts.isRed || fighter._lastGojoHitType === 'red') {
-            if (!fighter.pendingRedAdaptation) {
-              fighter.pendingRedAdaptation = true;
-              fighter.pendingRedAttacker = attacker;
-              fighter.pendingRedType = type;
-              fighter._lastGojoHitType = 'red';
-            }
-          } else {
-            triggerAdaptation(fighter, type, attacker);
-          }
-        }
+    // ── FATAL DAMAGE THRESHOLD EVALUATION ──
+    // The Wheel of Adaptation ONLY clicks when accumulated damage fills the WOA skill bar (meets or exceeds fatalDamageThresholdPct)
+    if (!opts.isPureLoveBeam && !opts.isGenosBeam) {
+      const threshold = fighter.maxHp * thresholdPct;
+      if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
+        triggerAdaptation(fighter, type, attacker);
       }
     }
   }
@@ -283,8 +266,18 @@ export function triggerAdaptation(fighter, type, attacker) {
     return;
   }
 
+  // Strictly enforce WOA fatalDamageThresholdPct (15% max HP): Do NOT click wheel unless accumulated damage filled WOA bar!
+  // Exceptions: Limitless Infinity 5-freeze exposure or Unlimited Void Domain survival.
+  const isInfinityAdaptation = fighter.gojoInfinityImmune && fighter._lastGojoHitType === 'infinity';
+  const isDomainAdaptation = fighter.gojoDomainAdapted || fighter._lastGojoHitType === 'domain';
+  const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+
+  if (!isInfinityAdaptation && !isDomainAdaptation && (fighter.totalAccumDamage || 0) < threshold) {
+    return;
+  }
+
   // Hold adaptation ticks while inside Gojo's Domain Expansion until domain expires!
-  const isInsideGojoDomain = typeof state !== 'undefined' && (
+  const isInsideGojoDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
@@ -295,7 +288,7 @@ export function triggerAdaptation(fighter, type, attacker) {
       fighter.pendingDomainAdaptation = {
         type: type || 'skill',
         attacker: attacker || null,
-        lastGojoHitType: fighter._lastGojoHitType,
+        lastGojoHitType: fighter._lastGojoHitType || 'domain',
         lastSukunaHitType: fighter._lastSukunaHitType,
         lastSkillShotId: fighter._lastSkillShotId,
         lastSkillShotColor: fighter._lastSkillShotColor
@@ -365,7 +358,7 @@ export function triggerAdaptation(fighter, type, attacker) {
   }
   
   const goldStage = fighter.goldAdaptationStage[type] || 0;
-  const speedBoostPerStage = CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? 0.15;
+  const speedBoostPerStage = CONFIG.mahoraga?.wheelAdaptationSpeedMultiplier ?? CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? CONFIG.mahoraga?.movementSpeedMultiplierPerAdaptation ?? 0.15;
   const speedBoostPct = Math.round((goldStage * speedBoostPerStage) * 100);
 
   const totalStages = (fighter.adaptationStage.melee || 0) + (fighter.adaptationStage.ranged || 0) + (fighter.adaptationStage.skill || 0);
@@ -375,13 +368,13 @@ export function triggerAdaptation(fighter, type, attacker) {
   const isLevel8 = totalStages >= 8 || currentStage >= 8 || fighter.isMaxAdapted;
 
   // Discrete 45-degree step click & cinematic pause on every adaptation (no stage limits!)
-  const isInfinityAdaptation = fighter.gojoInfinityImmune && fighter._lastGojoHitType === 'infinity';
   const pauseFrames = isInfinityAdaptation ? 0 : (CONFIG.mahoraga?.wheelClickDuration ?? 25);
+  const clickFrames = CONFIG.mahoraga?.wheelClickDuration ?? 25;
   fighter.adaptationPauseTimer = pauseFrames;
   fighter.adaptationPauseMax = pauseFrames;
   fighter.wheelGlowTimer = 65;
-  fighter.wheelClickTimer = pauseFrames;
-  fighter.wheelClickMax = pauseFrames;
+  fighter.wheelClickTimer = clickFrames;
+  fighter.wheelClickMax = clickFrames;
   fighter.wheelStartRotation = fighter.wheelRotation || 0;
   fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
 
@@ -482,19 +475,29 @@ export function applyGojoAdaptation(fighter, gojoType) {
       break;
     case 'red':
       adaptColor = '#FF1144';
-      fighter.gojoRedDodgeReady = true;
-      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: RED TELEPORT DODGE!', '#FF1144');
+      fighter.gojoRedDodgeReady = false; // Tanks Red instead of teleport-dodging away, with 50% damage reduction
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: RED TANK (50% REDUCED)!', '#FF1144');
       break;
     case 'blue':
       adaptColor = '#00FFFF';
-      fighter.gojoBlueDragImmune = true;
-      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: BLUE DRAG IMMUNITY!', '#00FFFF');
+      fighter.gojoBlueDragImmune = false;
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: BLUE RESISTANCE!', '#00FFFF');
       break;
     case 'infinity':
       adaptColor = '#00E5FF';
       fighter.gojoInfinityImmune = true;
       spawnFloatingText(fighter.x, wheelY - 35, '⚡ ADAPTED: INFINITY BYPASS!', '#00E5FF');
       spawnFloatingText(fighter.x, wheelY - 52, '∞ Limitless no longer works on Mahoraga!', '#FFFFFF');
+      break;
+    case 'domain':
+      adaptColor = '#00E5FF';
+      fighter.gojoDomainAdapted = true;
+      if (!fighter.gojoAdapted) fighter.gojoAdapted = {};
+      fighter.gojoAdapted.domain = true;
+      fighter.timeStopTimer = 0;
+      fighter.hitStunTimer = 0;
+      spawnFloatingText(fighter.x, wheelY - 35, '⚡ ADAPTED: UNLIMITED VOID IMMUNITY!', '#00E5FF');
+      spawnFloatingText(fighter.x, wheelY - 52, '🌌 Mahoraga moves freely inside Domain!', '#FFFFFF');
       break;
   }
 
@@ -533,7 +536,7 @@ export function handleInfinityFreeze(fighter) {
       fighter.infinityFreezeCount = (fighter.infinityFreezeCount || 0) + 1;
 
       const configCount = mahoragaAdaptationConfig.gojo?.infinity?.requiredFreezes;
-      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 5);
+      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 2);
       
       if (!fighter.gojoInfinityImmune && fighter.infinityFreezeCount >= freezesNeeded) {
         fighter._lastGojoHitType = 'infinity';
@@ -545,7 +548,7 @@ export function handleInfinityFreeze(fighter) {
           ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0)
           : null;
         triggerAdaptation(fighter, 'skill', gojoFighter || null);
-        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ LIMITLESS ADAPTED! (5/5)', '#00F3FF');
+        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, `⚡ LIMITLESS ADAPTED! (${freezesNeeded}/${freezesNeeded})`, '#00F3FF');
 
         // IMMEDIATELY BREAK OUT OF ALL FREEZES AND PAUSES ON THE FRAME HE ADAPTS (0 DELAY)!
         fighter.infinityFreezeTimer = 0;
@@ -553,13 +556,9 @@ export function handleInfinityFreeze(fighter) {
         fighter.isFrozenByInfinity = false;
         fighter._wasInfinityFrozenLastFrame = false;
         fighter.adaptationPauseTimer = 0; // 0 pause frames — do not stop moving!
-        const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
-        if (gojoFighter && !isInsideDomain) {
-          startAdaptationFlashDash(fighter, gojoFighter);
-        }
         return false; // Break out of freeze instantly!
       } else if (!fighter.gojoInfinityImmune) {
-        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, `⚙️ LIMITLESS (${fighter.infinityFreezeCount}/10)`, '#A0C8FF');
+        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, `⚙️ LIMITLESS (${fighter.infinityFreezeCount}/${freezesNeeded})`, '#A0C8FF');
       }
     }
 
@@ -690,6 +689,9 @@ export function adaptToPureLoveBeam(fighter) {
   if (!fighter || fighter.hp <= 0) return;
   if (fighter.adaptedPureLoveBeam) return; // Already adapted
 
+  const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+  if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+
   fighter.adaptedPureLoveBeam = true;
   fighter.caughtInPureLoveBeam = false;
   fighter.pureLoveBeamTimer = 0;
@@ -792,6 +794,9 @@ export function adaptToYutaFlurry(fighter) {
   if (!fighter || fighter.hp <= 0) return;
   if (fighter.adaptedYutaFlurry) return;
 
+  const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+  if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+
   fighter.adaptedYutaFlurry = true;
   if (!fighter.adapted) fighter.adapted = {};
   fighter.adapted.melee = true;
@@ -847,6 +852,9 @@ export function adaptToThinIceBreaker(fighter) {
   if (!fighter || fighter.hp <= 0) return;
   if (fighter.adaptedThinIceBreaker) return;
 
+  const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+  if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+
   fighter.adaptedThinIceBreaker = true;
   if (!fighter.adapted) fighter.adapted = {};
   fighter.adapted.skill = true;
@@ -901,6 +909,9 @@ export function adaptToThinIceBreaker(fighter) {
 export function adaptToSoulDisfigurement(fighter) {
   if (!fighter || fighter.hp <= 0) return;
   if (fighter.adaptedSoulDisfigurement) return; // Already adapted
+
+  const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+  if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
 
   fighter.adaptedSoulDisfigurement = true;
   fighter._soulDisfigurementStacks = 0;
@@ -965,6 +976,9 @@ export function adaptToSoulDisfigurement(fighter) {
 export function adaptToSaitamaCounter(fighter, attacker) {
   if (!fighter || fighter.hp <= 0 || fighter.isDead) return;
   if (fighter.adaptedSaitamaCounter) return; // Already adapted
+
+  const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+  if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
 
   fighter.adaptedSaitamaCounter = true;
   if (!fighter.adaptedSkills) fighter.adaptedSkills = {};

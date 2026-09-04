@@ -327,7 +327,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.restore();
   }
 
-  const isGojoDomainActive = typeof state !== 'undefined' && (
+  const isGojoDomainActive = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
@@ -942,21 +942,16 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   const rotatedShoulderX = shoulderX * cosB - shoulderY * sinB;
   const rotatedShoulderY = shoulderX * sinB + shoulderY * cosB;
 
-  let verticalLift = 0;
   let liftTilt = 0;
   if (fighterObj && fighterObj.isWallSlamActive && fighterObj.wallSlamPhase === 'grab') {
-    // Find the grab target
-    const opponentObj = state.fighters?.find(f => f && f !== fighterObj && f.hp > 0);
-    if (opponentObj) {
-      verticalLift = opponentObj.z || 0;
-      const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
-      const liftP = Math.min(1.0, Math.max(0.0, (fighterObj.wallSlamTimer - 12) / (holdFrames - 12)));
-      liftTilt = -0.22 * liftP; // Upward tilt of arm (approx -12 degrees)
-    }
+    const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
+    const liftP = Math.min(1.0, Math.max(0.0, (fighterObj.wallSlamTimer - 12) / (holdFrames - 12)));
+    const easeLift = Math.sin(liftP * Math.PI * 0.5);
+    liftTilt = -0.32 * easeLift; // Upward tilt of arm (~18 degrees)
   }
 
   ctx.save();
-  ctx.translate(rotatedShoulderX, rotatedShoulderY - verticalLift);
+  ctx.translate(rotatedShoulderX, rotatedShoulderY);
   
   // Rotate by gunAngle, swingAngle, and the upward lift tilt
   ctx.rotate(gunAngle + swingAngle + liftTilt);
@@ -1165,6 +1160,16 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   let lungeProgress = 0;
   const isThrowing = fighter.isThrowing || false;
   const isGuarding = fighter.defensePoseType === 'guard' && (fighter.defensePoseTimer || 0) > 0;
+  const isWallSlamGrab = fighter.isWallSlamActive && fighter.wallSlamPhase === 'grab';
+  let grabWindupProgress = 0;
+  let isGrabPowerCharging = false;
+
+  if (isWallSlamGrab && (fighter.wallSlamTimer || 0) > 12) {
+    const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
+    const windupT = Math.min(1.0, Math.max(0.0, (fighter.wallSlamTimer - 12) / (holdFrames - 12)));
+    grabWindupProgress = windupT * windupT;
+    isGrabPowerCharging = ((fighter.wallSlamTimer || 0) >= holdFrames - 16);
+  }
 
   if (isThrowing) {
     const shotsLeft = fighter.throwBarrageShotsLeft || 0;
@@ -1223,15 +1228,41 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   if (isGuarding) {
     ctx.rotate(gunAngle - Math.PI * 0.35);
     ctx.translate(-r * 0.15, 0);
+  } else if (isWallSlamGrab && grabWindupProgress > 0) {
+    // Deep menacing power windup coil behind shoulder
+    const windupAngle = -Math.PI * 0.42 * grabWindupProgress;
+    const windupOffset = -r * 0.35 - 14 * grabWindupProgress;
+    ctx.rotate(gunAngle + windupAngle);
+    ctx.translate(windupOffset, 0);
   } else {
     ctx.rotate(gunAngle);
     // When idle: rests on left side edge (-r * 0.35). When punching: lunges forward toward target (+punchLunge)
     ctx.translate(-r * 0.35 + punchLunge, 0);
   }
 
+  // Intense kinetic vibration while gathering execution punch power
+  if (isGrabPowerCharging) {
+    const jitter = (Math.random() - 0.5) * 2.2;
+    ctx.translate(jitter, jitter);
+  }
+
   // Flip Y when facing left
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
+
+  // Radiant Golden Divine Adaptation Aura around the fist while charging execution smash
+  if (isGrabPowerCharging) {
+    const auraPulse = Math.sin(Date.now() * 0.02) * 0.5 + 0.5;
+    ctx.fillStyle = `rgba(255, 215, 0, ${(0.35 + 0.25 * auraPulse).toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${(0.50 * auraPulse).toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // 1. PIXEL ART CLENCHED LEFT FIST (Radius = 14.0px, matching right sword hand size!)
   const fistRadius = 14.0;
@@ -1260,7 +1291,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
 
 
   // 3. ANIME HIGH-IMPACT PUNCH VISUAL: Distinguishable Conical Air Pressure Blast & Starburst Impact!
-  const isGojoDomainActive = typeof state !== 'undefined' && (
+  const isGojoDomainActive = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))

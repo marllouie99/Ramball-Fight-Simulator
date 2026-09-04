@@ -11,6 +11,7 @@ import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect
 import { spawnIllusionDeath } from '../../graphics/particles/illusionDeathEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { triggerHudHealBubble } from '../../graphics/hudManager.js';
+import { renderMahitoDomainBackground } from '../../graphics/renderers/environmentalRenderer.js';
 import { 
   executeIdleTransfigurationStrike, 
   executeSubterraneanFleshSurge, 
@@ -967,6 +968,13 @@ export class MahitoFighter extends Fighter {
     this.hideFrontHand = false;
     this.hideBackHand = false;
     executeMahitoDomainExpansion(this, target);
+  }
+
+  /**
+   * Draws Mahito's Domain Expansion (Self-Embodiment of Perfection) background arena overlay.
+   */
+  drawDomainBackground(ctx, isClashSecondary = false) {
+    renderMahitoDomainBackground(this, ctx, isClashSecondary);
   }
 
   triggerDemoAttack() {

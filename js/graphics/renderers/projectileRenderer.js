@@ -54,7 +54,7 @@ export function drawProjectiles() {
     }
 
     // Hide enemy projectiles inside Gojo's domain (except Sukuna's domain/shrine slashes)
-    const isSukunaSlash = p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || p.isSukunaSlash || p.isSukunaDomainSlash;
+    const isSukunaSlash = p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || p.isSukunaSlash;
     const ownerFighter = (typeof p.owner === 'number' && state.fighters) ? state.fighters[p.owner] : p.owner;
     const isOwnerGojo = ownerFighter && (ownerFighter.characterId === 'gojo' || ownerFighter.type === 'gojo');
     if (isGojoDomainActive && ownerFighter && !isOwnerGojo && !isSukunaSlash) {
@@ -1113,7 +1113,8 @@ export function drawBlackHoleVisual({
 
 export function drawGojoPurpleOrb(ctx, p) {
   ctx.save();
-  const colorType = p.isGojoPurple ? 'purple' : 'blue';
+  const isGreen = Boolean(p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
+  const colorType = isGreen ? 'green' : (p.isGojoPurple ? 'purple' : 'blue');
   const visualTime = p.visualTime || Date.now();
   const is200 = !!p.is200Percent;
   
@@ -1136,7 +1137,7 @@ export function drawGojoPurpleOrb(ctx, p) {
 
     // 1. Massive pulsating outer void distortion field
     const pulse = 1.0 + Math.sin(t * 0.008) * 0.12;
-    ctx.fillStyle = 'rgba(80, 0, 160, 0.12)';
+    ctx.fillStyle = isGreen ? 'rgba(0, 160, 60, 0.12)' : 'rgba(80, 0, 160, 0.12)';
     ctx.beginPath();
     ctx.arc(p.x, p.y, orbR * 5.5 * pulse, 0, Math.PI * 2);
     ctx.fill();
@@ -1151,11 +1152,15 @@ export function drawGojoPurpleOrb(ctx, p) {
       const rotDir = i === 0 ? 1 : -1;
       ctx.save();
       ctx.rotate((t * 0.003 * rotDir) + i * 1.2);
-      ctx.strokeStyle = `rgba(200, 100, 255, ${0.35 - i * 0.1})`;
+      ctx.strokeStyle = isGreen 
+        ? `rgba(100, 255, 150, ${0.35 - i * 0.1})`
+        : `rgba(200, 100, 255, ${0.35 - i * 0.1})`;
       ctx.beginPath();
       ctx.arc(0, 0, ringR, 0, Math.PI * 1.4);
       ctx.stroke();
-      ctx.strokeStyle = `rgba(255, 180, 255, ${0.25 - i * 0.08})`;
+      ctx.strokeStyle = isGreen 
+        ? `rgba(180, 255, 200, ${0.25 - i * 0.08})`
+        : `rgba(255, 180, 255, ${0.25 - i * 0.08})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(0, 0, ringR * 0.92, Math.PI * 0.3, Math.PI * 1.7);
@@ -1164,7 +1169,7 @@ export function drawGojoPurpleOrb(ctx, p) {
     }
     ctx.restore();
 
-    // 3. Electric purple lightning arcs (6 bolts radiating from orb center)
+    // 3. Electric lightning arcs (6 bolts radiating from orb center)
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.lineWidth = 1.8;
@@ -1175,7 +1180,9 @@ export function drawGojoPurpleOrb(ctx, p) {
       const baseAngle = (Math.PI * 2 / boltCount) * i + t * 0.002;
       const boltLen = orbR * (1.8 + Math.sin(t * 0.01 + seed) * 0.6);
       
-      ctx.strokeStyle = `rgba(220, 160, 255, ${0.5 + Math.sin(t * 0.015 + seed) * 0.3})`;
+      ctx.strokeStyle = isGreen 
+        ? `rgba(120, 255, 160, ${0.5 + Math.sin(t * 0.015 + seed) * 0.3})`
+        : `rgba(220, 160, 255, ${0.5 + Math.sin(t * 0.015 + seed) * 0.3})`;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       
@@ -1192,11 +1199,17 @@ export function drawGojoPurpleOrb(ctx, p) {
     }
     ctx.restore();
 
-    // 4. Bright white-purple inner glow bloom
+    // 4. Bright inner glow bloom
     const bloomGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, orbR * 2.2);
-    bloomGrad.addColorStop(0, 'rgba(255, 220, 255, 0.45)');
-    bloomGrad.addColorStop(0.4, 'rgba(180, 80, 255, 0.25)');
-    bloomGrad.addColorStop(1, 'rgba(120, 0, 200, 0)');
+    if (isGreen) {
+      bloomGrad.addColorStop(0, 'rgba(220, 255, 230, 0.45)');
+      bloomGrad.addColorStop(0.4, 'rgba(50, 255, 120, 0.25)');
+      bloomGrad.addColorStop(1, 'rgba(0, 180, 60, 0)');
+    } else {
+      bloomGrad.addColorStop(0, 'rgba(255, 220, 255, 0.45)');
+      bloomGrad.addColorStop(0.4, 'rgba(180, 80, 255, 0.25)');
+      bloomGrad.addColorStop(1, 'rgba(120, 0, 200, 0)');
+    }
     ctx.fillStyle = bloomGrad;
     ctx.beginPath();
     ctx.arc(p.x, p.y, orbR * 2.2, 0, Math.PI * 2);

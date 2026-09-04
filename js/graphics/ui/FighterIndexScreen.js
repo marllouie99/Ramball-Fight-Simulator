@@ -696,7 +696,10 @@ function drawIndexDetailScreen() {
       resetIndexDetailState(def, demoArea);
 
       if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
-      else if (btn.id === 'red') audioSystem.playSFX('skill_redcharging', 2.0);
+      else if (btn.id === 'red') {
+        audioSystem.playSFX('skill_redchanneling', 2.0);
+        audioSystem.playSFX('skill_redcharging', 2.0);
+      }
       else if (btn.id === 'domain' && def.type === 'gojo') audioSystem.playSFX('skill_gojodomain', 5.0);
       else if (btn.id === 'fuga') audioSystem.playSFX('skill_fuga', 3.5);
       else if (btn.id === 'domain' && def.type === 'sukuna') audioSystem.playSFX('skill_domainexpansion', 5.5);

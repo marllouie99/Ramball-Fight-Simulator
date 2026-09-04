@@ -1492,43 +1492,6 @@ function _getDimElements() {
         } else {
           info.push(`<b>DEF:</b> 0%`);
         }
-
-        // CC (Stun/Paralyze/Slow Resistance) stat
-        const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
-        const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
-        const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-        const tenacityPercent = Math.round(ccTenacity * 100);
-        if (tenacityPercent > 0) {
-          info.push(`<b>CC:</b> +${tenacityPercent}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>CC:</b> 0%`);
-        }
-
-        const adaptedSet = new Set();
-        if (f.adaptedSkills) {
-          Object.keys(f.adaptedSkills).forEach(k => { if (f.adaptedSkills[k]) adaptedSet.add(k); });
-        }
-        if (f.gojoAdapted) {
-          if (f.gojoAdapted.purple) adaptedSet.add('purple');
-          if (f.gojoAdapted.red) adaptedSet.add('red');
-          if (f.gojoAdapted.blue) adaptedSet.add('blue');
-        }
-        if (f.gojoInfinityImmune) adaptedSet.add('infinity');
-        if (f.sukunaAdapted) {
-          if (f.sukunaAdapted.divineFlame) adaptedSet.add('divineFlame');
-        }
-        if (f.adapted) {
-          if (f.adapted.melee) adaptedSet.add('melee');
-          if (f.adapted.ranged) adaptedSet.add('ranged');
-          if (f.adapted.skill && adaptedSet.size === 0) adaptedSet.add('skill');
-        }
-        const adaptedCount = adaptedSet.size;
-
-        if (adaptedCount > 0) {
-          info.push(`<b>Skills Adapted:</b> ${adaptedCount} <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>Skills Adapted:</b> ${adaptedCount}`);
-        }
       } else if (f.characterId === 'berserker' || f.type === 'berserker') {
         const rage = Math.round((f.rage || 0) * 100);
         const rageMax = Math.round((f.maxRage || 1) * 100);

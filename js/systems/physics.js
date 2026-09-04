@@ -232,8 +232,8 @@ export function resolveFighterCollision(a, b) {
   if (aPhases || bPhases) return;
 
   // Toji phases through fighters during his Ultimate sequence (ethereal assassin)
-  if (a.ultimateActive && (a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
-  if (b.ultimateActive && (b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
+  if (a.ultimateActive && (a.characterId === 'toji' || a.type === 'toji' || a.name === 'Toji' || a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
+  if (b.ultimateActive && (b.characterId === 'toji' || b.type === 'toji' || b.name === 'Toji' || b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
 
   // Megumi phases through fighters while submerged in liquid shadow or erupting (Kage no Utsuwa)
   if (a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting) return;

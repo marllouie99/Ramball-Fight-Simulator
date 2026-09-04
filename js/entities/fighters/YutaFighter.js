@@ -105,10 +105,21 @@ export class YutaFighter extends Fighter {
     return Math.min(0.98, baseChance + stackBonus);
   }
 
+  canAim() {
+    if (this.hp <= 0 || this.isDead) return false;
+    if (this.isTargetOfAmbush || (this.timeStopTimer > 0)) return false;
+    const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+                     (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
+                     (this.electricStunTimer && this.electricStunTimer > 0) ||
+                     (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
+                     (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
+    if (isHardCC) return false;
+    if (this.isFiringPureLoveBeam) return false; // Disable aim rotation ONLY while actively FIRING the beam!
+    return true;
+  }
+
   aim(target) {
-    if (this.isFiringPureLoveBeam) {
-      return; // Disable aim rotation ONLY while actively FIRING the beam!
-    }
+    if (!this.canAim()) return;
     super.aim(target);
   }
 
@@ -256,6 +267,11 @@ export class YutaFighter extends Fighter {
       this.hitStunTimer = 0;
       this.knockbackStunTimer = 0;
 
+      // Continuously rotate and aim at opponent while summoning Rika!
+      if (opponent && !opponent.isDead) {
+        this.aim(opponent);
+      }
+
       // Spawn cursed energy gathering sparks at the blade tip & palm while summoning Rika
       if (Math.random() < 0.6) {
         const tipPos = this._getKatanaTipPositions();
@@ -264,7 +280,7 @@ export class YutaFighter extends Fighter {
       if (this.rikaCallTimer % 5 === 0) {
         spawnImpactFlash(this.x, this.y, 35 + Math.random() * 15, 'rgba(255, 20, 147, 0.4)');
       }
-      return; // Skip normal update & steering to freeze Yuta completely!
+      return; // Skip movement steering to lock position while keeping aim rotation active!
     }
 
     if (this.rctCooldown > 0) this.rctCooldown--;

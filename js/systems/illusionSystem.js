@@ -602,6 +602,37 @@ export function updateIllusions() {
 
     // If bounded, steer directly towards the nearest target (unless target is Gojo with active Infinity)
     if (bounced) {
+      if (illusion._knockedBackBySaitamaBasicPunch || illusion.isWallPinnedBySaitama) {
+        illusion._knockedBackBySaitamaBasicPunch = false;
+        illusion.isWallPinnedBySaitama = false;
+        illusion.preventKnockbackBounce = false;
+        if (typeof state !== 'undefined' && arena) {
+          if (!state.wallCracks) state.wallCracks = [];
+          const dLeft = Math.abs((illusion.x - illusion.r) - arena.x);
+          const dRight = Math.abs((illusion.x + illusion.r) - (arena.x + arena.width));
+          const dTop = Math.abs((illusion.y - illusion.r) - arena.y);
+          const dBottom = Math.abs((illusion.y + illusion.r) - (arena.y + arena.height));
+          const minDist = Math.min(dLeft, dRight, dTop, dBottom);
+          let angle = 0;
+          let crackX = illusion.x;
+          let crackY = illusion.y;
+          if (minDist === dLeft) { angle = 0; crackX = arena.x; crackY = illusion.y; }
+          else if (minDist === dRight) { angle = Math.PI; crackX = arena.x + arena.width; crackY = illusion.y; }
+          else if (minDist === dTop) { angle = Math.PI / 2; crackX = illusion.x; crackY = arena.y; }
+          else { angle = -Math.PI / 2; crackX = illusion.x; crackY = arena.y + arena.height; }
+          state.wallCracks.push({
+            x: crackX,
+            y: crackY,
+            angle: angle,
+            life: 600,
+            maxLife: 600,
+            seed: Math.random() * 1000,
+            scale: CONFIG.saitama?.wallCrackScale ?? 0.45,
+            thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
+          });
+        }
+      }
+
       const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null) || illusion.moveSpeed || 1.5;
       const isGojoInfinity = nearestTarget &&
         (nearestTarget.characterId === 'gojo' || nearestTarget.type === 'gojo') &&

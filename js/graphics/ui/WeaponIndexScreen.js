@@ -354,7 +354,7 @@ function drawWeaponInfoCard(ctx, def) {
       nameText = 'Ulquiorra (Resurrección: Murciélago)';
       descText = 'Unleashes the Great Bat Resurrección release: "Enclose, Murciélago!" Spawns giant black leathery bat wings with Reishi flutters, enhances Sonído speed, and converts basic slashes into high-density emerald crescent waves.';
     } else {
-      nameText = 'Murciélago (Ulquiorra Cifer Katana)';
+      nameText = 'Murciélago (Ulquiorra Katana)';
       descText = 'Standard katana form of the Cuatro Espada with green tsuka-ito wrap and 4-corner flared Espada tsuba. Delivers swift Reishi-infused katana slashes, Bala pulses, high-speed Sonído dashes, and Hierro armor.';
     }
   }

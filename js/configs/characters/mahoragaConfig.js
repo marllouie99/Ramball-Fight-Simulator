@@ -45,16 +45,18 @@ export const mahoragaConfig = {
 
     // ── Adaptation & RCT Mechanics ──
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
+    wheelAdaptationSpeedMultiplier: 0.15, // Movement speed multiplier gained per wheel rotation / adaptation stage (+15% per stage)
     adaptationSpeedBoostPerStage: 0.15, // +15% movement speed multiplier per gold adaptation stage
+    movementSpeedMultiplierPerAdaptation: 0.01, // Movement speed multiplier per wheel adaptation stage
     rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
     enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique flat healing on wheel click
-    rctHealFlatAmount: 100,          // Heals a flat 100 HP on each wheel rotation click
+    rctHealFlatAmount: 200,          // Heals a flat 100 HP on each wheel rotation click
     defBuffPerClickPercent: 0.03,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,         // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,      // Maximum speed/KB resistance factor under stasis (60% max)
     fatalAdaptWindowFrames: 400,     // Rolling damage accumulator window (~6.6 seconds at 60fps)
-    fatalDamageThresholdPct: 0.15,   // 15% max HP damage threshold within window triggers wheel adaptation click
+    fatalDamageThresholdPct: 0.20,   // 15% max HP damage threshold within window triggers wheel adaptation click
     fatalAdaptCooldownFrames: 30,    // Cooldown frames between wheel clicks (30 frames = 0.5s)
 
     // ── Visuals, Screen Dim & Afterimages ──
@@ -66,7 +68,7 @@ export const mahoragaConfig = {
     adaptationDashSpeedFrames: 10,   // Supersonic flash-dash travel frame duration (smaller = faster)
 
     // ── Sword of Extermination & Basic Melee Attacks ──
-    swordRange: 110,                // Melee reach (110px frontal arc) for Sword of Extermination
+    swordRange: 30,                // Melee reach (110px frontal arc) for Sword of Extermination
     swordCooldown: 25,              // Frames between sword strikes (0.5s at 60fps)
     swordDamage: 15,                // True damage dealt by Sword of Extermination
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
@@ -141,9 +143,9 @@ export const mahoragaConfig = {
     neutralStanceCooldownFrames: 150,// Recharge cooldown (frames) before stance can re-trigger (~2.5s)
 
     // ── Level 8 Wall Slam & Supersonic Execution Combo ──
-    wallSlamImpaleLiftHeight: 35,     // Visual height (z-axis) when opponent is hoisted on sword
+    wallSlamImpaleLiftHeight: 45,     // Visual height (z-axis) when opponent is hoisted on sword
     wallSlamImpaleHoldFrames: 50,     // Duration (frames) opponent is held in the air on the sword
-    wallSlamPunchHitpause: 15,        // Frames of freeze/hitpause when the punch lands before wall launch
+    wallSlamPunchHitpause: 16,        // Frames of freeze/hitpause when the punch lands before wall launch
     wallSlamThrowSpeed: 45.0,         // Supersonic velocity at which opponent is hurled to the wall
     wallSlamImpactDamage: 20,         // Damage taken upon slamming into the wall
     wallSlamParalyzeDuration: 150,     // Duration (frames) opponent is paralyzed on wall contact

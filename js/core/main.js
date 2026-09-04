@@ -4,7 +4,7 @@
 
 import { state, loadFighterSelections, saveFighterSelections } from './state.js';
 import { initFlameCanvas, resizeFlameCanvas } from '../graphics/canvasManager.js';
-import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown } from './gameFlow.js';
+import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown, preloadGameSounds } from './gameFlow.js';
 import { FIGHTER_DEFS, CONFIG } from './config.js';
 import { handleUIClick, handleUIMove, captureFaceOffScreenshot } from '../graphics/ui.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
@@ -26,6 +26,9 @@ resizeFlameCanvas();
 // GRAPHICS CACHE & FONT INITIALIZATION
 // ─────────────────────────────────────────────
 initGraphicsCache();
+
+// Proactively preload all game sound effects and tracks in the background
+preloadGameSounds().catch((e) => console.warn('Audio preloading warning:', e));
 
 if (typeof document !== 'undefined' && 'fonts' in document) {
   try {

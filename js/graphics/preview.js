@@ -188,9 +188,17 @@ export function updateIndexDetailDemo(def, demoArea) {
       const lev = Math.sin(Math.min(1.0, (fighter.purpleChargeTimer || 0) / (180 * 0.4)) * Math.PI * 0.5);
       fighter.z = lev * 35;
     } else if (currentAnim === 'red' && def.type === 'gojo') {
-      fighter.redEffectTimer = 45;
-      fighter.redEffectMaxTimer = 45;
-      fighter.redBuildupPhase = true;
+      const redTotal = 125;
+      if (demoSpeed > 0) {
+        if (!fighter.redEffectMaxTimer || (fighter.redEffectTimer || 0) <= 0) {
+          fighter.redEffectMaxTimer = redTotal;
+          fighter.redEffectTimer = redTotal;
+          fighter.redBuildupPhase = true;
+          fighter._hasPlayedRedFlareSound = false;
+        } else {
+          fighter.redEffectTimer--;
+        }
+      }
     } else if (currentAnim === 'domain') {
       fighter.isChannelingDomainExpansion = true;
       fighter.domainChargeMax = 120;

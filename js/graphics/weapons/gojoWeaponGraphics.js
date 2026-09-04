@@ -24,15 +24,18 @@ export function drawGojoWeapon(ctx, fighter) {
         const is200 = !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
         if (is200) {
-            // ── 200% HOLLOW PURPLE RITUAL (High Sky Floating Orbs) ──
-            const headX = -r * 2.8;
+            // ── 200% HOLLOW PURPLE RITUAL (High Sky Floating Orbs stably above head) ──
+            const headY = -r * 2.5;
+            const t = Date.now();
+
+            ctx.save();
+            ctx.rotate(-fighter.gunAngle); // Un-rotate from gunAngle to stay stably upright above Gojo's head
 
             if (mergeProgress < 0.70) {
                 const moveP = mergeProgress / 0.70; // 0.0 -> 1.0
                 const easeMove = Math.sin(moveP * Math.PI * 0.5);
-                const handSpreadY = r * 2.8;
-                const spreadY = handSpreadY * (1 - easeMove);
-                const t = Date.now();
+                const handSpreadX = r * 2.8;
+                const spreadX = handSpreadX * (1 - easeMove);
 
                 const fadeInP = Math.min(1.0, mergeProgress / 0.22);
                 const orbAlpha = Math.sin(fadeInP * Math.PI * 0.5);
@@ -46,10 +49,10 @@ export function drawGojoWeapon(ctx, fighter) {
                 ctx.save();
                 ctx.globalAlpha *= orbAlpha;
 
-                // Red Orb (high on right side)
-                drawGojoOrb(ctx, headX, spreadY, currentOrbR, t, 'red', 0);
-                // Blue Orb (high on left side)
-                drawGojoOrb(ctx, headX, -spreadY, currentOrbR, t, 'blue', 0);
+                // Red Orb (high on right side: +X)
+                drawGojoOrb(ctx, spreadX, headY, currentOrbR, t, 'red', 0);
+                // Blue Orb (high on left side: -X)
+                drawGojoOrb(ctx, -spreadX, headY, currentOrbR, t, 'blue', 0);
 
                 ctx.restore();
 
@@ -67,18 +70,16 @@ export function drawGojoWeapon(ctx, fighter) {
                             ? `rgba(255, 120, 200, ${alpha})`
                             : `rgba(120, 180, 255, ${alpha})`;
                         ctx.beginPath();
-                        ctx.moveTo(headX, spreadY);
-                        const midX = headX + Math.sin(t * 0.015 + seed) * 6;
-                        const midY = (Math.sin(t * 0.012 + seed * 0.7) * 12) * (a / arcCount - 0.5);
-                        ctx.quadraticCurveTo(midX, midY, headX, -spreadY);
+                        ctx.moveTo(spreadX, headY);
+                        const midX = (Math.sin(t * 0.012 + seed * 0.7) * 12) * (a / arcCount - 0.5);
+                        const midY = headY + Math.sin(t * 0.015 + seed) * 6;
+                        ctx.quadraticCurveTo(midX, midY, -spreadX, headY);
                         ctx.stroke();
                     }
                     ctx.restore();
                 }
             } else {
                 // Fused into colossal 200% Purple orb above head
-                const t = Date.now();
-                const orbX = headX;
                 const purpleGrowP = Math.min(1.0, (mergeProgress - 0.70) / 0.12);
                 const easePurpleGrow = Math.sin(purpleGrowP * Math.PI * 0.5);
                 const baseFusionR = handRadius * 2.8;
@@ -87,7 +88,7 @@ export function drawGojoWeapon(ctx, fighter) {
 
                 // Pulsating energy ring around 200% Purple orb
                 ctx.save();
-                ctx.translate(orbX, 0);
+                ctx.translate(0, headY);
                 ctx.rotate(t * 0.004);
                 ctx.strokeStyle = `rgba(200, 100, 255, 0.45)`;
                 ctx.lineWidth = 2.5;
@@ -96,10 +97,12 @@ export function drawGojoWeapon(ctx, fighter) {
                 ctx.stroke();
                 ctx.restore();
 
-                drawGojoOrb(ctx, orbX, 0, orbR, t, 'purple', 5);
-                drawAnamorphicLensFlare(ctx, orbX, 0, 1.0);
-                drawAnamorphicLensFlare(ctx, orbX, 0, 0.5, 'red');
+                drawGojoOrb(ctx, 0, headY, orbR, t, 'purple', 5);
+                drawAnamorphicLensFlare(ctx, 0, headY, 1.0);
+                drawAnamorphicLensFlare(ctx, 0, headY, 0.5, 'red');
             }
+
+            ctx.restore();
         } else {
             // ── 100% HOLLOW PURPLE (Hands-Level Red & Blue Mixing) ──
             const handDistance = r + 10;
@@ -309,6 +312,13 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
         cTint       = '#f3c4ff'; // Soft lavender tint
         cWhite      = '#ffffff'; // White-hot core
         cAura       = 'rgba(180, 40, 255, 0.28)';
+    } else if (colorType === 'green') {
+        cDeep       = '#002b11'; // Deep forest jade rim
+        cSaturated  = '#00cc44'; // Rich vibrant jade/emerald body
+        cBright     = '#00ff66'; // Vibrant neon green plasma
+        cTint       = '#b3ffcc'; // Soft mint tint
+        cWhite      = '#ffffff'; // White-hot core
+        cAura       = 'rgba(0, 255, 100, 0.35)';
     } else { // blue
         cDeep       = '#00143b'; // Deep navy rim
         cSaturated  = '#0059e6'; // Rich electric blue body
@@ -416,6 +426,7 @@ export function drawPurpleOrbTrail(ctx, p, time) {
     if (!p.history || p.history.length < 2) {
         return;
     }
+    const isGreen = Boolean(p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
     
     // Quantize time to 30 FPS for stepped retro anime feel
     const msPerFrame = 1000 / 30;
@@ -441,8 +452,10 @@ export function drawPurpleOrbTrail(ctx, p, time) {
             const sx = Math.round((prev.x + dx * t) / px) * px;
             const sy = Math.round((prev.y + dy * t) / px) * px;
             
-            // Outer purple pixel block
-            ctx.fillStyle = `rgba(180, 40, 255, ${(trailAlpha * 0.7).toFixed(2)})`;
+            // Outer pixel block
+            ctx.fillStyle = isGreen 
+                ? `rgba(0, 255, 100, ${(trailAlpha * 0.7).toFixed(2)})`
+                : `rgba(180, 40, 255, ${(trailAlpha * 0.7).toFixed(2)})`;
             ctx.fillRect(sx - px * 1.5, sy - px * 1.5, px * 3, px * 3);
             
             // Inner white-hot pixel core
@@ -457,7 +470,7 @@ export function drawPurpleOrbTrail(ctx, p, time) {
             const sx = Math.round((curr.x + Math.cos(sAngle) * offset) / px) * px;
             const sy = Math.round((curr.y + Math.sin(sAngle) * offset) / px) * px;
             
-            ctx.fillStyle = i % 4 === 0 ? '#FFFFFF' : '#df66ff';
+            ctx.fillStyle = i % 4 === 0 ? '#FFFFFF' : (isGreen ? '#50ff90' : '#df66ff');
             ctx.fillRect(sx - px, sy, px * 3, px);
             ctx.fillRect(sx, sy - px, px, px * 3);
         }
@@ -490,6 +503,14 @@ export function drawAnamorphicLensFlare(ctx, x, y, flareP, colorType = 'purple')
         beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');  // Hot White Core
         beamGrad.addColorStop(0.75, 'rgba(255, 20, 60, 0.7)');
         beamGrad.addColorStop(1, 'rgba(255, 0, 50, 0)');
+    } else if (colorType === 'green') {
+        beamGrad.addColorStop(0, 'rgba(0, 255, 100, 0)');
+        beamGrad.addColorStop(0.2, 'rgba(0, 200, 80, 0.6)');
+        beamGrad.addColorStop(0.42, 'rgba(50, 255, 120, 0.9)');  // Vibrant Green
+        beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');  // Hot White Core
+        beamGrad.addColorStop(0.58, 'rgba(50, 255, 120, 0.9)');  // Vibrant Green
+        beamGrad.addColorStop(0.8, 'rgba(0, 220, 100, 0.6)');    // Emerald
+        beamGrad.addColorStop(1, 'rgba(0, 180, 80, 0)');
     } else {
         // Red on left (-X), Blue on right (+X), Purple & White in center!
         beamGrad.addColorStop(0, 'rgba(255, 0, 80, 0)');
@@ -514,6 +535,12 @@ export function drawAnamorphicLensFlare(ctx, x, y, flareP, colorType = 'purple')
         softGrad.addColorStop(0.5, 'rgba(255, 0, 30, 0.7)');
         softGrad.addColorStop(0.7, 'rgba(255, 20, 50, 0.45)');
         softGrad.addColorStop(1, 'rgba(255, 0, 40, 0)');
+    } else if (colorType === 'green') {
+        softGrad.addColorStop(0, 'rgba(0, 255, 80, 0)');
+        softGrad.addColorStop(0.25, 'rgba(0, 220, 60, 0.35)');
+        softGrad.addColorStop(0.5, 'rgba(0, 255, 100, 0.5)'); // Deep Green center
+        softGrad.addColorStop(0.75, 'rgba(0, 220, 60, 0.35)');
+        softGrad.addColorStop(1, 'rgba(0, 255, 80, 0)');
     } else {
         softGrad.addColorStop(0, 'rgba(255, 0, 60, 0)');
         softGrad.addColorStop(0.25, 'rgba(255, 20, 80, 0.35)');
@@ -526,14 +553,17 @@ export function drawAnamorphicLensFlare(ctx, x, y, flareP, colorType = 'purple')
     ctx.fillRect(-streakLength * 0.7, -softHeight * 0.5, streakLength * 1.4, softHeight);
 
     // 2. Bright Central White/Core Star Core
-    // ctx.shadowColor = colorType === 'red' ? '#FF0033' : '#D033FF'; // Removed for performance
-
     const coreR = 8.5 * alpha;
     const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR * 2.5);
     if (colorType === 'red') {
         coreGrad.addColorStop(0, '#FFFFFF');
         coreGrad.addColorStop(0.35, 'rgba(255, 100, 120, 0.95)');
         coreGrad.addColorStop(0.7, 'rgba(220, 0, 40, 0.6)');
+        coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else if (colorType === 'green') {
+        coreGrad.addColorStop(0, '#FFFFFF');
+        coreGrad.addColorStop(0.35, 'rgba(120, 255, 160, 0.95)');
+        coreGrad.addColorStop(0.7, 'rgba(0, 220, 80, 0.6)');
         coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else {
         coreGrad.addColorStop(0, '#FFFFFF');

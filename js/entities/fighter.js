@@ -431,7 +431,8 @@ export class Fighter {
       const isInsideGojoDomain = state.fighters.some(f => 
         f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
       );
-      if (isInsideGojoDomain && !this.isDomainImmune && !this.isParalyzeImmune) return true;
+      const isImmune = this.domainImmunity || this.isDomainImmune || this.isParalyzeImmune || this.characterId === 'toji' || this.type === 'toji';
+      if (isInsideGojoDomain && !isImmune) return true;
     }
 
     return false;
@@ -824,9 +825,11 @@ export class Fighter {
 
   /** Returns true if the fighter is afflicted with any paralyze, stasis, or paralysis debuff effect. */
   isParalyzedDebuffActive() {
+    const hasActiveParalyzeTimer = Boolean((this.paralyzeTimer && this.paralyzeTimer > 0) || 
+      (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0));
     return Boolean(
-      this.isParalyzed ||
-      (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+      (this.isParalyzed && hasActiveParalyzeTimer) ||
+      hasActiveParalyzeTimer ||
       (this.electricStunTimer && this.electricStunTimer > 0) ||
       (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
       (this.crimsonElectrifiedTimer && this.crimsonElectrifiedTimer > 0) ||
@@ -839,8 +842,6 @@ export class Fighter {
       (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
       this.isTargetOfAmbush ||
       (this.statusEffects && (
-        this.statusEffects.isParalyzed ||
-        (this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
         (this.statusEffects.electricStunTimer && this.statusEffects.electricStunTimer > 0)
       ))
     );
@@ -855,7 +856,7 @@ export class Fighter {
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
 
     // Check if trapped inside Gojo's Unlimited Void Domain Expansion (Rule 17: Closed barrier cognitive stasis freezes cooldowns)
-    const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+    const isInsideGojoDomain = !this.gojoDomainAdapted && !this.gojoAdapted?.domain && typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
 
@@ -884,7 +885,7 @@ export class Fighter {
         this.vy *= slowMult;
       }
     }
-    if (this.isParalyzedByMahoraga || this.paralyzeTimer > 0 || this.isWallSlammed) {
+    if (this.isParalyzedByMahoraga || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isWallSlammed) {
       if (this.wallSlamPinnedX !== undefined && this.wallSlamPinnedY !== undefined) {
         this.x = this.wallSlamPinnedX;
         this.y = this.wallSlamPinnedY;
@@ -899,11 +900,13 @@ export class Fighter {
       }
       if (this.paralyzeTimer > 0) this.paralyzeTimer--;
       if (this.paralyzeTimer <= 0) {
+        this.isParalyzed = false;
         this.isParalyzedByMahito = false;
         this.isParalyzedByMahoraga = false;
         this.isWallSlammed = false;
         this.wallSlamPinnedX = undefined;
         this.wallSlamPinnedY = undefined;
+        if (this.statusEffects) this.statusEffects.isParalyzed = false;
       }
       this.vx = 0;
       this.vy = 0;
@@ -1133,6 +1136,94 @@ export class Fighter {
     this._processKnockbackPhysics();
   }
 
+  _triggerSaitamaWallPinAndCrack(arena) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
+    if (!arena) return;
+
+    this._knockedBackBySaitamaBasicPunch = false;
+    this.isWallPinnedBySaitama = false;
+    this.preventKnockbackBounce = false;
+
+    // Apply slow debuff
+    const slowFrames = CONFIG.saitama?.wallBounceSlowFrames ?? 120;
+    const slowMult = CONFIG.saitama?.wallBounceSlowMultiplier ?? 0.35;
+    if (this.statusEffects && typeof this.statusEffects.applySlow === 'function') {
+      this.statusEffects.applySlow(slowFrames, slowMult);
+    } else {
+      this.slowTimer = Math.max(this.slowTimer || 0, slowFrames);
+      this.slowMultiplier = slowMult;
+    }
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - (this.r || 25) - 14, "SLOWED!", "#FFD700");
+    }
+
+    // Stick target to the wall for wallPinDurationFrames
+    const pinDuration = CONFIG.saitama?.wallPinDurationFrames ?? 60;
+    if (CONFIG.saitama?.disableWallPinCyanOverlay !== false) {
+      this.suppressFreezeOverlay = true;
+    }
+    if (typeof this.applyTimeStop === 'function') {
+      this.applyTimeStop(pinDuration);
+    } else {
+      this.hitStunTimer = pinDuration;
+    }
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.vx = 0;
+    this.vy = 0;
+
+    // Forcefully interrupt any ongoing dashes, teleports, or abilities
+    if (typeof this.interruptAttacks === 'function') {
+      this.interruptAttacks(true);
+    }
+
+    const wallPinShakeIntensity = CONFIG.saitama?.wallPinScreenShakeIntensity ?? 16;
+    const wallPinShakeDuration = CONFIG.saitama?.wallPinScreenShakeDuration ?? 12;
+    if (typeof triggerGlobalScreenShake === 'function') {
+      triggerGlobalScreenShake(wallPinShakeIntensity, wallPinShakeDuration);
+    }
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('attack_fleshhit', 1.0);
+    }
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 60, 'rgba(255, 50, 50, 0.9)');
+    }
+    if (typeof spawnMeleeClashShockwave === 'function') {
+      spawnMeleeClashShockwave(this.x, this.y, 120, 'gold');
+    }
+
+    // Create a persistent wall crack decal
+    if (typeof state !== 'undefined' && arena) {
+      if (!state.wallCracks) state.wallCracks = [];
+
+      const dLeft = Math.abs((this.x - this.r) - arena.x);
+      const dRight = Math.abs((this.x + this.r) - (arena.x + arena.width));
+      const dTop = Math.abs((this.y - this.r) - arena.y);
+      const dBottom = Math.abs((this.y + this.r) - (arena.y + arena.height));
+      const minDist = Math.min(dLeft, dRight, dTop, dBottom);
+
+      let angle = 0;
+      let crackX = this.x;
+      let crackY = this.y;
+
+      if (minDist === dLeft) { angle = 0; crackX = arena.x; crackY = this.y; }
+      else if (minDist === dRight) { angle = Math.PI; crackX = arena.x + arena.width; crackY = this.y; }
+      else if (minDist === dTop) { angle = Math.PI / 2; crackX = this.x; crackY = arena.y; }
+      else { angle = -Math.PI / 2; crackX = this.x; crackY = arena.y + arena.height; }
+
+      state.wallCracks.push({
+        x: crackX,
+        y: crackY,
+        angle: angle,
+        life: 600, // 10 seconds
+        maxLife: 600,
+        seed: Math.random() * 1000,
+        scale: CONFIG.saitama?.wallCrackScale ?? 0.45,
+        thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
+      });
+    }
+  }
+
   _processKnockbackPhysics() {
     const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
@@ -1175,83 +1266,17 @@ export class Fighter {
             this.knockbackVx = 0;
             this.knockbackVy = 0;
           }
-          if (this._knockedBackBySaitamaBasicPunch) {
-            this._knockedBackBySaitamaBasicPunch = false;
-            const slowFrames = CONFIG.saitama?.wallBounceSlowFrames ?? 120;
-            const slowMult = CONFIG.saitama?.wallBounceSlowMultiplier ?? 0.35;
-            if (this.statusEffects && typeof this.statusEffects.applySlow === 'function') {
-              this.statusEffects.applySlow(slowFrames, slowMult);
-            } else {
-              this.slowTimer = Math.max(this.slowTimer || 0, slowFrames);
-              this.slowMultiplier = slowMult;
-            }
-            if (typeof spawnFloatingText === 'function') {
-              spawnFloatingText(this.x, this.y - (this.r || 25) - 14, "SLOWED!", "#FFD700");
-            }
-          }
 
-          if (this.preventKnockbackBounce) {
-            this.preventKnockbackBounce = false; // Clear flag so fighter can recover smoothly after wall pin expires
-            const isSaitamaPin = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
-            
-            if (isSaitamaPin) {
-              this._knockedBackBySaitamaBasicPunch = false;
-              this.isWallPinnedBySaitama = false;
-              // They hit the wall while pinned by Saitama! Stick them to the wall for wallPinDurationFrames
-              const pinDuration = CONFIG.saitama?.wallPinDurationFrames ?? 60;
-              if (CONFIG.saitama?.disableWallPinCyanOverlay !== false) {
-                this.suppressFreezeOverlay = true;
-              }
-              if (typeof this.applyTimeStop === 'function') {
-                this.applyTimeStop(pinDuration);
-              } else {
-                this.hitStunTimer = pinDuration;
-              }
-              this.knockbackVx = 0;
-              this.knockbackVy = 0;
-              
-              // Forcefully interrupt any ongoing dashes, teleports, or abilities
-              if (typeof this.interruptAttacks === 'function') {
-                this.interruptAttacks(true);
-              }
-              
-              const wallPinShakeIntensity = CONFIG.saitama?.wallPinScreenShakeIntensity ?? 8;
-              const wallPinShakeDuration = CONFIG.saitama?.wallPinScreenShakeDuration ?? 12;
-              triggerGlobalScreenShake(wallPinShakeIntensity, wallPinShakeDuration);
-              audioSystem.playSFX('attack_fleshhit', 1.0);
-              spawnImpactFlash(this.x, this.y, 60, 'rgba(255, 50, 50, 0.9)');
-              spawnMeleeClashShockwave(this.x, this.y, 120, 'gold');
-              
-              // Create a persistent wall crack decal
-              if (typeof state !== 'undefined' && arena) {
-                if (!state.wallCracks) state.wallCracks = [];
-                let angle = 0;
-                let crackX = this.x;
-                let crackY = this.y;
-                
-                if (this.x - this.r <= arena.x + 5) { angle = 0; crackX = arena.x; } // Left wall
-                else if (this.x + this.r >= arena.x + arena.width - 5) { angle = Math.PI; crackX = arena.x + arena.width; } // Right wall
-                else if (this.y - this.r <= arena.y + 5) { angle = Math.PI / 2; crackY = arena.y; } // Top wall
-                else if (this.y + this.r >= arena.y + arena.height - 5) { angle = -Math.PI / 2; crackY = arena.y + arena.height; } // Bottom wall
-                
-                state.wallCracks.push({
-                  x: crackX,
-                  y: crackY,
-                  angle: angle,
-                  life: 600, // 10 seconds
-                  maxLife: 600,
-                  seed: Math.random() * 1000,
-                  scale: CONFIG.saitama?.wallCrackScale ?? 0.45,
-                  thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
-                });
-              }
-            } else {
-              // Non-Saitama wall contact (e.g. Getsuga drag) - cleanly stop knockback without spawning wall crack decals
-              this.knockbackVx = 0;
-              this.knockbackVy = 0;
-              this.vx = 0;
-              this.vy = 0;
-            }
+          const wasSaitamaPin = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
+          if (wasSaitamaPin) {
+            this._triggerSaitamaWallPinAndCrack(arena);
+          } else if (this.preventKnockbackBounce) {
+            this.preventKnockbackBounce = false;
+            // Non-Saitama wall contact (e.g. Getsuga drag) - cleanly stop knockback without spawning wall crack decals
+            this.knockbackVx = 0;
+            this.knockbackVy = 0;
+            this.vx = 0;
+            this.vy = 0;
           } else if (!this.isFirstHitKnockback && currentSpeed > 6) {
             triggerGlobalScreenShake(5, 6); // Subtle micro camera punch for smooth motion!
             audioSystem.playSFX('attack_fleshhit', 0.9);
@@ -1271,6 +1296,7 @@ export class Fighter {
       if (Math.abs(this.knockbackVy) <= 0.1) this.knockbackVy = 0;
       if (this.knockbackVx === 0 && this.knockbackVy === 0) {
         this._knockedBackBySaitamaBasicPunch = false;
+        this.isWallPinnedBySaitama = false;
         if (this.timeStopTimer <= 0) {
           this.suppressFreezeOverlay = false;
         }
@@ -1279,6 +1305,7 @@ export class Fighter {
       // Clear flag when knockback completes
       this.preventKnockbackBounce = false;
       this._knockedBackBySaitamaBasicPunch = false;
+      this.isWallPinnedBySaitama = false;
       if (this.timeStopTimer <= 0) {
         this.suppressFreezeOverlay = false;
       }
@@ -1873,8 +1900,9 @@ export class Fighter {
     if (!arena && typeof state !== 'undefined') arena = state.arena;
     if (!arena) return false;
 
+    const isSaitamaHit = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
     const isGenosTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInGenosFlurry;
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
@@ -1907,6 +1935,9 @@ export class Fighter {
         this.knockbackVx = 0;
         this.knockbackVy = 0;
         clamped = true;
+      }
+      if (clamped && isSaitamaHit) {
+        this._triggerSaitamaWallPinAndCrack(arena);
       }
       return clamped;
     }
@@ -2014,26 +2045,36 @@ export class Fighter {
 
   /**
    * Evaluates if this fighter is currently able to rotate and aim.
-   * Automatically disables auto-aim if the fighter is dead, hard-CC'd, or actively channeling a skill.
-   * Subclasses can override canAim() to add character-specific skill/channeling locks.
+   * Automatically disables auto-aim if the fighter is dead, hard-CC'd, or in a locked firing phase.
+   * Subclasses can override canAim() to add character-specific locks.
    */
   canAim() {
     if (this.hp <= 0 || this.isDead) return false;
     if (this.isTargetOfAmbush || (this.timeStopTimer > 0)) return false;
-    const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed ||
+    const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+                     (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
                      (this.electricStunTimer && this.electricStunTimer > 0) ||
                      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
                      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
     if (isHardCC) return false;
-    if (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) return false;
-    if (typeof this.isChannelingAnySkill === 'function' && this.isChannelingAnySkill()) return false;
+
+    // Disable auto-aim if trapped in cognitive stasis inside enemy Gojo's Unlimited Void
+    if (!this.domainImmunity && this.characterId !== 'toji' && this.type !== 'toji' && !this.gojoDomainAdapted && (!this.gojoAdapted || !this.gojoAdapted.domain)) {
+      const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+        f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive && f !== this
+      );
+      if (isInsideGojoDomain) return false;
+    }
+
+    // Lock aim during active beam firing or flurry animations (prevents unnatural snapping while firing)
+    if (this.isFiringPureLoveBeam || this.isFiringUlt || this.isFiringBeam) return false;
     return true;
   }
 
   /**
    * Master Aim Pipeline (Template Method Pattern).
-   * Executes universal validation guards and delegates custom angle application to applyAim().
-   * Future fighter classes automatically inherit all target validation and status guards.
+   * Executes universal validation guards, computes target angle, and delegates to applyAim().
+   * All fighters automatically inherit target elevation adjustments, decoy tracking, and smooth rotation.
    */
   aim(opponent) {
     if (!this.canAim() || !this.isValidAimTarget(opponent)) {
@@ -2042,7 +2083,7 @@ export class Fighter {
 
     this.hasClearLOS = true;
 
-    // Musashi ghost decoy targeting support
+    // Decoy / proxy target position support (e.g. Musashi ghost decoy)
     let targetX = opponent.x;
     let targetY = opponent.y;
     if (opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
@@ -2050,26 +2091,47 @@ export class Fighter {
       targetY = opponent.flurryGhost.y;
     }
 
-    const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
+    // Elevation-adjusted target angle
+    const targetZ = opponent.z || 0;
+    const myZ = this.z || 0;
+    const targetAngle = Math.atan2((targetY - targetZ) - (this.y - myZ), targetX - this.x);
 
-    // Delegate to subclass or standard application
+    // Delegate to centralized application (applies smooth turn rate or instant tracking)
     this.applyAim(opponent, targetAngle);
     return true;
   }
 
   /**
-   * Default aim angle application. Subclasses can override applyAim() for custom inertia or turn rate.
+   * Centralized Aim Angle Application.
+   * - During skill channeling: smoothly rotates toward target (eliminates instant snapping on unleash).
+   * - During stealth tracking: applies delayed reaction inertia.
+   * - Standard active state: tracks target angle cleanly.
    */
   applyAim(opponent, targetAngle) {
-    // If opponent is stealthed (e.g. Toji Heavenly Restriction), aim tracking has a sluggish delayed reaction time!
+    const isChanneling = typeof this.isChannelingSkill === 'function' && this.isChannelingSkill();
+
+    // Determine effective angular turn rate
+    let turnRate = 1.0;
+    if (typeof this.aimTurnRate === 'number') {
+      turnRate = this.aimTurnRate;
+    } else if (isChanneling) {
+      turnRate = this.channelTurnRate || (this._def?.channelTurnRate) || 0.045;
+    }
+
+    // Stealth tracking penalty (e.g. Toji Heavenly Restriction)
     if (opponent && opponent.isStealthed) {
+      const stealthRate = CONFIG.toji?.stealthTurnRate || 0.035;
+      turnRate = Math.min(turnRate, stealthRate);
+    }
+
+    if (turnRate < 1.0) {
       let currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
       while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
       while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
       let diff = targetAngle - currentAngle;
       while (diff < -Math.PI) diff += Math.PI * 2;
       while (diff > Math.PI) diff -= Math.PI * 2;
-      const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
+
       let newAngle = currentAngle + diff * turnRate;
       while (newAngle > Math.PI) newAngle -= Math.PI * 2;
       while (newAngle < -Math.PI) newAngle += Math.PI * 2;
@@ -2155,6 +2217,9 @@ export class Fighter {
     if (this.slowTimer > 0) {
       this.slowTimer--;
       targetSpeed *= this.slowMultiplier;
+      if (this.slowTimer <= 0) {
+        this.slowMultiplier = 1.0; // Reset slow multiplier so speed recovers immediately
+      }
     }
     // Hit stun slows the fighter significantly on impact
     if (this.hitStunTimer > 0) {
@@ -2189,7 +2254,7 @@ export class Fighter {
     }
     
     if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const recoveryRate = currentSpeed < targetSpeed ? 0.15 : 0.08;
+      const recoveryRate = currentSpeed < targetSpeed ? 0.30 : 0.08;
       const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * recoveryRate;
       this.vx = (this.vx / currentSpeed) * newSpeed;
       this.vy = (this.vy / currentSpeed) * newSpeed;

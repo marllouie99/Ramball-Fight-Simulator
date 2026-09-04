@@ -85,6 +85,7 @@ export function drawIchigoSkin(ctx, fighter) {
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const now = Date.now();
   const r = fighter.r;
+  const worldTransform = (typeof ctx.getTransform === 'function') ? ctx.getTransform() : null;
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
@@ -437,7 +438,11 @@ export function drawIchigoSkin(ctx, fighter) {
       if (isWeaponMenu) {
         if (fighter.ribbonStrands && fighter.ribbonStrands.length === 3) {
           ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          if (worldTransform && typeof ctx.setTransform === 'function') {
+            ctx.setTransform(worldTransform);
+          } else {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+          }
 
           const pommel = getZangetsuPommelWorldPos(fighter);
           const swordAngle = (fighter.gunAngle || 0) + swingAngle;
@@ -699,7 +704,11 @@ export function drawIchigoSkin(ctx, fighter) {
       // Render dynamic physics-based Kusari chain in world coordinates during combat
       if (fighter.bankaiChainNodes && fighter.bankaiChainNodes.length >= 2 && (!isBackSlungPose || isHollowChanneling)) {
         ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        if (worldTransform && typeof ctx.setTransform === 'function') {
+          ctx.setTransform(worldTransform);
+        } else {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
         _drawDynamicBankaiChain(ctx, fighter.bankaiChainNodes, isMask);
         ctx.restore();
       }

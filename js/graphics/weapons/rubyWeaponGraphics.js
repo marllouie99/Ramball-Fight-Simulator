@@ -24,10 +24,24 @@ const RubyTheme = {
   panel: 'rgba(127, 29, 29, 0.6)'
 };
 
+const _wavedTrailPool = [];
+
 export function drawRubyScythe(ctx, fighter, customTheme = null) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const theme = customTheme || RubyTheme;
   const baseAlpha = ctx.globalAlpha;
+
+  const suppressEffects = Boolean(
+    (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed()) ||
+    fighter.isTargetOfAmbush ||
+    (fighter.timeStopTimer && fighter.timeStopTimer > 0)
+  );
+
+  if (suppressEffects) {
+    fighter.bladeTrail = [];
+    fighter.scytheParticles = [];
+  }
+
   // --- Pre-calculate weapon transforms for trails and particles ---
   let currentAngle = fighter.gunAngle;
   let stretchAmount = 0;
@@ -144,8 +158,8 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   const innerY = tipY + (-12 - tipY) * 0.2;
   const innerPos = getScytheWorldPos(innerX, innerY);
 
-  let shouldAddTrail = true;
-  if (fighter.bladeTrail.length > 0) {
+  let shouldAddTrail = !suppressEffects;
+  if (shouldAddTrail && fighter.bladeTrail.length > 0) {
     const last = fighter.bladeTrail[fighter.bladeTrail.length - 1];
     const dist = Math.hypot(outerPos.x - last.outer.x, outerPos.y - last.outer.y);
     if (dist < 1 && !fighter.scytheSwingActive && !fighter.passiveSpinActive) {
@@ -162,7 +176,7 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   }
 
   // Draw Blade Trail
-  if (fighter.bladeTrail.length > 2) {
+  if (!suppressEffects && fighter.bladeTrail.length > 2) {
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
     
@@ -173,22 +187,26 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
     const msPerFrame = 1000 / 15;
     const time = Math.floor(Date.now() / msPerFrame) * msPerFrame * 0.008;
     
-    // Map points to add fiery waving effect
-    const wavedTrail = fighter.bladeTrail.map((p, i) => {
+    // Populate pooled points to add fiery waving effect without GC allocations
+    const trailLen = fighter.bladeTrail.length;
+    while (_wavedTrailPool.length < trailLen) {
+      _wavedTrailPool.push({ outer: { x: 0, y: 0 }, inner: { x: 0, y: 0 }, life: 1 });
+    }
+    for (let i = 0; i < trailLen; i++) {
+      const p = fighter.bladeTrail[i];
       const age = 1 - Math.max(0, p.life); // 0 at the head, 1 at the tail
-      // Much lower amplitude and longer wavelength for a smooth flutter
       const waveX = Math.sin(time - i * 0.2) * age * 8;
       const waveY = Math.cos(time * 0.9 - i * 0.15) * age * 8;
-      
       const innerWaveX = Math.sin(time - i * 0.2 + 1.5) * age * 5;
       const innerWaveY = Math.cos(time * 0.9 - i * 0.15 + 1.5) * age * 5;
-      
-      return {
-        outer: { x: p.outer.x + waveX, y: p.outer.y + waveY },
-        inner: { x: p.inner.x + innerWaveX, y: p.inner.y + innerWaveY },
-        life: p.life
-      };
-    });
+      const wp = _wavedTrailPool[i];
+      wp.outer.x = p.outer.x + waveX;
+      wp.outer.y = p.outer.y + waveY;
+      wp.inner.x = p.inner.x + innerWaveX;
+      wp.inner.y = p.inner.y + innerWaveY;
+      wp.life = p.life;
+    }
+    const wavedTrail = _wavedTrailPool;
     
     // Draw the main wide trail
     ctx.beginPath();
@@ -341,69 +359,71 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   }
 
   // Update and draw existing particles in world coordinates
-  if (!fighter.scytheParticles) {
-    fighter.scytheParticles = [];
-  }
-
-  const darkParticles = [];
-  const glowParticles = [];
-
-  for (let i = fighter.scytheParticles.length - 1; i >= 0; i--) {
-    const p = fighter.scytheParticles[i];
-    p.life--;
-    if (p.life <= 0) {
-      fighter.scytheParticles.splice(i, 1);
-      continue;
+  if (!suppressEffects) {
+    if (!fighter.scytheParticles) {
+      fighter.scytheParticles = [];
     }
 
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vx *= 0.94;
-    p.vy *= 0.94;
-    p.vy -= 0.08; // gently float upwards in world space
+    const darkParticles = [];
+    const glowParticles = [];
 
-    if (p.isGlow) {
-      glowParticles.push(p);
-    } else {
-      darkParticles.push(p);
+    for (let i = fighter.scytheParticles.length - 1; i >= 0; i--) {
+      const p = fighter.scytheParticles[i];
+      p.life--;
+      if (p.life <= 0) {
+        fighter.scytheParticles.splice(i, 1);
+        continue;
+      }
+
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.94;
+      p.vy *= 0.94;
+      p.vy -= 0.08; // gently float upwards in world space
+
+      if (p.isGlow) {
+        glowParticles.push(p);
+      } else {
+        darkParticles.push(p);
+      }
     }
-  }
 
-  // Draw dark inky particles
-  ctx.save();
-  ctx.globalCompositeOperation = 'source-over';
-  for (const p of darkParticles) {
-    const alpha = (p.life / p.maxLife) * p.startAlpha;
-    const size = p.startSize * (p.life / p.maxLife);
-    ctx.globalAlpha = baseAlpha * alpha;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y - size);
-    ctx.lineTo(p.x + size, p.y);
-    ctx.lineTo(p.x, p.y + size);
-    ctx.lineTo(p.x - size, p.y);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
+    // Draw dark inky particles
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    for (const p of darkParticles) {
+      const alpha = (p.life / p.maxLife) * p.startAlpha;
+      const size = p.startSize * (p.life / p.maxLife);
+      ctx.globalAlpha = baseAlpha * alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y - size);
+      ctx.lineTo(p.x + size, p.y);
+      ctx.lineTo(p.x, p.y + size);
+      ctx.lineTo(p.x - size, p.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
 
-  // Draw glow fire particles
-  ctx.save();
-  ctx.globalCompositeOperation = 'source-over';
-  for (const p of glowParticles) {
-    const alpha = (p.life / p.maxLife) * p.startAlpha;
-    const size = p.startSize * (p.life / p.maxLife);
-    ctx.globalAlpha = baseAlpha * alpha;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y - size);
-    ctx.lineTo(p.x + size, p.y);
-    ctx.lineTo(p.x, p.y + size);
-    ctx.lineTo(p.x - size, p.y);
-    ctx.closePath();
-    ctx.fill();
+    // Draw glow fire particles
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    for (const p of glowParticles) {
+      const alpha = (p.life / p.maxLife) * p.startAlpha;
+      const size = p.startSize * (p.life / p.maxLife);
+      ctx.globalAlpha = baseAlpha * alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y - size);
+      ctx.lineTo(p.x + size, p.y);
+      ctx.lineTo(p.x, p.y + size);
+      ctx.lineTo(p.x - size, p.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
@@ -630,43 +650,29 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   const headStroke = 2.5; // Scaled to ~1.4
 
   // --- Ambient Particle Emitter ---
-  // Spawns burning particles along the scythe spine curve in world coordinates
-  const spawnCount = 2; // rate of particle emission per frame
-  for (let i = 0; i < spawnCount; i++) {
+  if (!suppressEffects && (!fighter.scytheParticles || fighter.scytheParticles.length < 10) && Math.random() < 0.25) {
+    if (!fighter.scytheParticles) fighter.scytheParticles = [];
     const t = Math.random();
-    // Spine coordinates in local blade scale
     const localX = 15 + (tipX - 15) * t;
-    const localY = -12 + (tipY + 12) * t * 0.6; // spine curve
+    const localY = -12 + (tipY + 12) * t * 0.6;
 
-    // Rotate & translate manual coordinate mapping
-    let lx = localX * bladeScale;
-    let ly = localY * bladeScale;
-    lx += poleLength;
-    lx += fighter.r + gripOffset;
-    if (isFlipped) {
-      ly = -ly;
-    }
+    let lx = localX * bladeScale + poleLength + fighter.r + gripOffset;
+    let ly = (isFlipped ? -localY : localY) * bladeScale;
     const cos = Math.cos(currentAngle);
     const sin = Math.sin(currentAngle);
-    const rx = lx * cos - ly * sin;
-    const ry = lx * sin + ly * cos;
-
-    const worldX = fighter.x + rx;
-    const worldY = fighter.y + ry;
+    const worldX = fighter.x + lx * cos - ly * sin;
+    const worldY = fighter.y + lx * sin + ly * cos;
 
     const isGlow = Math.random() > 0.45;
     const color = isGlow
-      ? (Math.random() > 0.5 ? theme.glowSrc1 : theme.glowSrc2) // Deep Pink / Vivid Pink
-      : (Math.random() > 0.5 ? theme.darkSrc1 : theme.darkSrc2); // Dark Magenta ink
-
-    const vx = (Math.random() - 0.5) * 0.4;
-    const vy = (Math.random() - 0.5) * 0.4 - 0.15;
+      ? (Math.random() > 0.5 ? theme.glowSrc1 : theme.glowSrc2)
+      : (Math.random() > 0.5 ? theme.darkSrc1 : theme.darkSrc2);
 
     fighter.scytheParticles.push({
       x: worldX,
       y: worldY,
-      vx: vx,
-      vy: vy,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4 - 0.15,
       startAlpha: isGlow ? 0.7 : 0.85,
       startSize: 1.0 + Math.random() * 2.0,
       color: color,
@@ -676,123 +682,48 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
     });
   }
 
-  // --- Dark Crimson Living Aura (Semi-Realistic Energy Flames) ---
+  // --- Living Energy Flames & Heat (High-Performance Vectorized Aura) ---
   const time = Date.now() / 600;
-
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+  const originX = 12;
+  const originY = 0;
 
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
 
-  // Base origin for the aura (gnarled dark guard)
-  const originX = 12;
-  const originY = 0;
-
-  // Reusable bezier interpolation for the pure spine
-  const getSpinePoint = (t) => {
-    let activeT = Math.min(Math.max(t, 0), 1);
-    const cp1x = 45, cp1y = -20;
-    const cp2x = 35, cp2y = -70;
-    const u = 1 - activeT;
-    const tt = activeT * activeT;
-    const uu = u * u;
-    const uuu = uu * u;
-    const ttt = tt * activeT;
-    let x = uuu * originX + 3 * uu * activeT * cp1x + 3 * u * tt * cp2x + ttt * tipX;
-    let y = uuu * originY + 3 * uu * activeT * cp1y + 3 * u * tt * cp2y + ttt * tipY;
-    return { x, y };
-  };
-
-  const drawPlasma = (t, offsetLen, dragAngle, size, colorCore, colorEdge, scaleX, scaleY) => {
-    const basePt = getSpinePoint(t);
-    const nextPt = getSpinePoint(t + 0.05);
-    const dirX = nextPt.x - basePt.x;
-    const dirY = nextPt.y - basePt.y;
-    const len = Math.hypot(dirX, dirY) || 1;
-    const normX = -dirY / len;
-    const normY = dirX / len;
-
-    const dragX = normX * Math.cos(dragAngle) - (dirX / len) * Math.sin(dragAngle);
-    const dragY = normY * Math.cos(dragAngle) - (dirY / len) * Math.sin(dragAngle);
-
-    // Liquid rippling offset that flows seamlessly along the blade
-    const anim = Math.sin(time * 8 - t * 15);
-    const actualOffset = offsetLen * (0.85 + 0.15 * anim);
-
-    const px = basePt.x + dragX * actualOffset;
-    const py = basePt.y + dragY * actualOffset;
-    const angle = Math.atan2(dragY, dragX);
-
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(angle);
-    ctx.scale(scaleX, scaleY);
-
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
-    grad.addColorStop(0, colorCore);
-    grad.addColorStop(0.5, colorEdge);
-    // Automatically generate a transparent version of the edge color to prevent muddy black edges
-    const edgeParts = colorEdge.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (edgeParts) {
-      grad.addColorStop(1, `rgba(${edgeParts[1]}, ${edgeParts[2]}, ${edgeParts[3]}, 0)`);
-    } else {
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-    }
-
-    ctx.fillStyle = grad;
+  const animWave = Math.sin(time * 6) * 3;
+  const drawSpineAura = (offsetShift = 0) => {
     ctx.beginPath();
-    ctx.arc(0, 0, size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    ctx.moveTo(originX + offsetShift, originY);
+    ctx.bezierCurveTo(45 + offsetShift, -20 + animWave, 35 + offsetShift, -70 - animWave, tipX + offsetShift, tipY);
   };
 
-  // 1. Soft Dissipating Dark Volumetric Heat (Background)
-  ctx.globalCompositeOperation = 'source-over';
-  if (!isLowQuality) {
-    for (let i = 0; i < 40; i++) {
-      const t = i / 39;
+  // 1. Wide Soft Magenta Outer Flame
+  drawSpineAura(6);
+  ctx.strokeStyle = `rgba(${theme.guard1}, 0.20)`;
+  ctx.lineWidth = 22;
+  ctx.stroke();
 
-      // Animate size and position to make the dark heat billow and flow
-      const wave = Math.sin(t * 15 - time * 6);
-      // Less blur: tighter size
-      const size = 2 + t * 5 + wave * 2;
-      const offsetDist = 10 + wave * 10;
+  // 2. Mid Vivid Pink Energy Wave
+  drawSpineAura(3);
+  ctx.strokeStyle = theme.plasma2;
+  ctx.lineWidth = 12;
+  ctx.stroke();
 
-      // More transparency (lower alpha multiplier)
-      const alpha = (0.15 - t * 0.08) * (0.6 + 0.4 * wave);
+  // 3. Bright Pink Plasma Ridge
+  drawSpineAura(0);
+  ctx.strokeStyle = theme.plasma1;
+  ctx.lineWidth = 5;
+  ctx.stroke();
 
-      // Use drawPlasma to stretch the smoke so it fades out as sharp directional mist rather than round bubbles
-      drawPlasma(t, offsetDist, 1.0, size,
-        `rgba(${theme.heatSoft1}, ${Math.max(0, alpha)})`, // Rose/Pink smoke
-        `rgba(${theme.heatSoft2}, ${Math.max(0, alpha * 0.8)})`,
-        2.5, 0.6
-      );
-    }
-  }
-
-  // 2. Liquid Dark Plasma Flow (Background)
-  // Bring back the sharp needles, but make the lengths flow smoothly
-  if (!isLowQuality) {
-    for (let i = 0; i < 60; i++) {
-      const t = i / 59;
-      // Smooth wave for length instead of modulo jumps
-      const wave = Math.sin(t * 15 - time * 6);
-      const dragDist = 15 + wave * 10;
-
-      // Deep rose needles (razor sharp size=3)
-      drawPlasma(t, dragDist, 1.2, 3, theme.plasma1, theme.plasma2, 2.5, 0.4);
-    }
-  }
-
-  // 3. Dense Guard Origin
-  const guardGlowAlpha = 0.8 + Math.sin(time * 6) * 0.2;
-  const guardGlow = ctx.createRadialGradient(originX, originY, 0, originX, originY, 45);
-  guardGlow.addColorStop(0, `rgba(${theme.guard1}, ${guardGlowAlpha})`);
-  guardGlow.addColorStop(0.3, `rgba(${theme.guard2}, ${guardGlowAlpha * 0.7})`);
-  guardGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = guardGlow;
+  // 4. Guard Origin Glow (Flat fill without runtime gradient allocation)
+  ctx.fillStyle = `rgba(${theme.guard1}, 0.35)`;
   ctx.beginPath();
-  ctx.arc(originX, originY, 45, 0, Math.PI * 2);
+  ctx.arc(originX, originY, 32, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = theme.plasma2;
+  ctx.beginPath();
+  ctx.arc(originX, originY, 16, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -1013,66 +944,25 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   drawScrew(10, 8);
 
   // --- Foreground Aura ---
-  // Overlays the blade to give a true wrapping effect
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
+  // Anchored hot pink plasma ridge over blade spine
+  ctx.beginPath();
+  ctx.moveTo(10, -10);
+  ctx.bezierCurveTo(45, -20, 35, -70, tipX, tipY);
+  ctx.strokeStyle = theme.core;
+  ctx.lineWidth = 3;
+  ctx.stroke();
 
-  // A few faint smoke wisps overlapping the blade
-  if (!isLowQuality) {
-    for (let i = 0; i < 8; i++) {
-      const t = i / 7;
-      const pt = getSpinePoint(t);
-
-      const size = 3 + t * 8;
-      const alpha = (0.3 - t * 0.1) * (0.8 + 0.2 * Math.sin(time * 4 + i));
-
-      const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, size);
-      grad.addColorStop(0, `rgba(${theme.guard1}, ${alpha})`);     // Dark magenta
-      grad.addColorStop(0.5, `rgba(${theme.guard2}, ${alpha * 0.5})`);
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  ctx.globalCompositeOperation = 'source-over'; // Changed from lighter to show up on white backgrounds
-
-  // Bright sharp red liquid plasma flow
-  for (let i = 0; i < 60; i++) {
-    const t = i / 59;
-    // Flowy wave for needle length
-    const wave = Math.sin(t * 20 - time * 8);
-    const dragDist = 10 + wave * 8 + t * 5;
-
-    // Sharp (size 2)
-    drawPlasma(t, dragDist, 1.3, 2, theme.core, `rgba(${theme.heatSoft1}, 0.5)`, 4.0, 0.2); // Vivid pink plasma
-  }
-
-  // Ultra-bright glowing liquid core
-  for (let i = 0; i < 30; i++) {
-    const t = i / 29;
-    const wave = Math.sin(t * 25 - time * 10);
-    const dragDist = 5 + wave * 4 + t * 5;
-
-    // Razor sharp (size 1)
-    drawPlasma(t, dragDist, 1.4, 1, 'rgba(255, 255, 255, 1.0)', theme.plasma1, 3.5, 0.15); // White-pink core
-  }
-
-  // Dense plasma directly hugging the blade spine to anchor the heat
-  for (let i = 0; i < 30; i++) {
-    const t = i / 29;
-    // Core anchor, sharp size (1.5)
-    drawPlasma(t, 0, 0, 1.5, theme.core, `rgba(${theme.heatSoft1}, 0.6)`, 2.0, 0.6); // Vivid pink anchor
-  }
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
   ctx.restore(); // Restore foreground aura context
   ctx.restore(); // Restore main scythe translation context
 
   // 5. EFFECTS
-  if (fighter.scytheSwingActive || fighter.passiveSpinActive) {
+  if (!suppressEffects && (fighter.scytheSwingActive || fighter.passiveSpinActive)) {
     ctx.save();
 
     let progress;
@@ -1192,7 +1082,7 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
     ctx.restore();
   }
 
-  if (fighter.activePullActive && fighter.activePullPhase === 2) {
+  if (!suppressEffects && fighter.activePullActive && fighter.activePullPhase === 2) {
     ctx.save();
     ctx.globalAlpha = ctx.globalAlpha * 0.2;
     ctx.strokeStyle = '#dc2626';

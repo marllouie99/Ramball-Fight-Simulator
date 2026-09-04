@@ -17,7 +17,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 
 export class GojoPurpleBehavior extends ProjectileBehavior {
-  static spawn(system, x, y, vx, vy, damage, ownerIndex, dps) {
+  static spawn(system, x, y, vx, vy, damage, ownerIndex, dps, opts = {}) {
     const proj = system._getProjectile();
     proj.x = x;
     proj.y = y;
@@ -26,8 +26,15 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.r = 45;
     proj.life = CONFIG.gojo?.purpleLife || 250;
     proj.maxLife = proj.life;
-    proj.color = '#8A2BE2'; // Purple
+    const isGreen = Boolean(opts.colorTheme === 'green' || opts.isTrickster);
+    proj.color = isGreen ? '#00FF64' : '#8A2BE2'; // Purple or Green
+    proj.colorTheme = isGreen ? 'green' : 'purple';
+    proj.isTrickster = Boolean(opts.isTrickster);
     proj.owner = ownerIndex;
+    if (opts.fighter) {
+      proj.ownerFighter = opts.fighter;
+      opts.fighter.activePurpleProjectile = proj;
+    }
     proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (CONFIG.gojo?.purpleDamage || 70);
     
     // Core visual/behavior properties
@@ -35,6 +42,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.visual = 'gojoPurple';
     proj.isGojoPurple = true; // Backwards compat
     proj.isGojoPurpleOrb = true;
+    proj.infinityBypassed = true; // Hollow Purple erases space — bypasses Infinity
+    proj.isFrozenByInfinity = false;
+    proj.bypassShield = true;
+    proj.undodgeable = true;
     
     proj.hitTargets = new Set();
     proj.hitFighters = new Set(); // Piercing
@@ -64,6 +75,11 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
   update(projectile, fighters, system) {
     // Advance visual time for animations so it freezes when caught in time sphere
     projectile.visualTime = (projectile.visualTime || Date.now()) + 16.667;
+
+    // Hollow Purple creates an imaginary mass that erases space - it cannot be frozen or stopped by Infinity
+    projectile.isFrozenByInfinity = false;
+    projectile.infinityFreezeTimer = 0;
+    projectile.infinityBypassed = true;
 
     const isMatchOver = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd'));
 
@@ -98,15 +114,6 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     const effectiveRadius = projectile.r || CONFIG.gojo?.purpleRadius || 50; // Hit radius for damage/destruction
     const purplePullRadius = CONFIG.gojo?.purplePullRadius || 280; // Pull/suction range
     
-    // Continuous screen shake while purple orb is active
-    projectile.purpleShakeCounter = (projectile.purpleShakeCounter || 0) + 1;
-    if (projectile.purpleShakeCounter >= 5) {
-      projectile.purpleShakeCounter = 0;
-      const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 2;
-      const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 20;
-      triggerGlobalScreenShake(shakeIntensity, shakeDuration);
-    }
-    
     // Destroy incoming enemy projectiles (like Sukuna's slashes) that touch Purple
     for (let j = 0; j < system.projectiles.length; j++) {
         const otherProj = system.projectiles[j];
@@ -120,7 +127,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         if (distSq <= effectiveRadius * effectiveRadius) {
             // Sucked into Hollow Purple and erased from existence
             otherProj.life = 0;
-            spawnSparks(otherProj.x, otherProj.y, 3, 'purpleTrail', '#8A2BE2');
+            const isGreen = Boolean(projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
+            spawnSparks(otherProj.x, otherProj.y, 3, 'purpleTrail', isGreen ? '#00FF64' : '#8A2BE2');
         }
     }
     
@@ -151,8 +159,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         (ent.gojoAdaptColorHistory && ent.gojoAdaptColorHistory.includes('#8A2BE2')) ||
         ((ent.goldAdaptationStage?.skill || 0) >= 2)
       );
-      // Toji's Heavenly Restriction immuneToCC does NOT protect him from Hollow Purple's gravitational pull and debuffs
-      const isImmune = isPurpleAdapted || ent.isBaguvixActive || ent.isGodModeActive || (ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji');
+      // Toji's Heavenly Restriction immuneToCC does NOT protect him from Hollow Purple's gravitational pull and debuffs. Mahoraga is also pulled even when adapted.
+      const isImmune = ent.isBaguvixActive || ent.isGodModeActive || (ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji');
       if (!isImmune) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;
@@ -249,7 +257,14 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         if (distSq < damageRadiusSq) {
           const dpsDamage = projectile.purpleDPS * (projectile.purpleDPSInterval / 60);
           if (typeof ent.takeDamage === 'function') {
-            ent.takeDamage(dpsDamage, ownerFighter, { isPurpleDPS: true, isProjectile: true, projectile: projectile });
+            ent.takeDamage(dpsDamage, ownerFighter, { 
+              isPurpleDPS: true, 
+              isProjectile: true, 
+              projectile: projectile,
+              bypassShield: true,
+              isGuaranteedHit: true,
+              undodgeable: true
+            });
           }
           
           if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC) {
@@ -257,7 +272,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             ent.vy *= 0.8;
           }
           
-          spawnSparks(ent.x, ent.y, 4, 'lightningTrail', '#8A2BE2');
+          const isGreen = Boolean(projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
+          spawnSparks(ent.x, ent.y, 4, 'lightningTrail', isGreen ? '#00FF64' : '#8A2BE2');
         }
       }
     }
@@ -310,8 +326,9 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 1.0);
     audioSystem.playSFX('Assets/Sound Effects/Skills/stormstrike.mp3', 0.85);
 
-    // 2. Simple, Clean Expanding Purple Repulsion Shockwave Rings (Like Gojo's Red)
-    spawnPurpleShockwaveRings(projectile.x, projectile.y, explosionRadius, isSecondCast);
+    // 2. Simple, Clean Expanding Repulsion Shockwave Rings (Like Gojo's Red/Purple)
+    const isGreen = Boolean(projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
+    spawnPurpleShockwaveRings(projectile.x, projectile.y, explosionRadius, isSecondCast, isGreen);
 
     // 3. AOE Damage & Blast Knockback to all valid targets
     const allTargets = [
@@ -352,7 +369,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             isExplosion: true, 
             isPurpleExplosion: true, 
             isProjectile: true, 
-            projectile: projectile 
+            projectile: projectile,
+            bypassShield: true,
+            isGuaranteedHit: true,
+            undodgeable: true
           });
         }
 
@@ -378,7 +398,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           ent.y = Math.max(arena.y + er, Math.min(arena.y + arena.height - er, ent.y));
         }
 
-        spawnSparks(ent.x, ent.y, 6, 'lightningTrail', '#BF5AF2');
+        spawnSparks(ent.x, ent.y, 6, 'lightningTrail', isGreen ? '#00FF64' : '#BF5AF2');
       }
     }
   }

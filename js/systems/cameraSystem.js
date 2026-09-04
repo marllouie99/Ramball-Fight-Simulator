@@ -129,7 +129,7 @@ export function updateCamera() {
     return;
   }
 
-  if (!camera.enabled || camera.mode === 'fixed') {
+  if (!camera.enabled || camera.mode === 'fixed' || state.gameState === 'countdown') {
     camera.targetX = arenaCenterX;
     camera.targetY = arenaCenterY;
     camera.targetZoom = 1.0;
@@ -147,25 +147,23 @@ export function updateCamera() {
     );
 
     if (aliveFighters.length >= 2) {
-      // Calculate combat center of mass and combat spread
-      let sumX = 0;
-      let sumY = 0;
+      // Calculate combat bounding box spanning all active fighters
       let minX = Infinity;
       let maxX = -Infinity;
       let minY = Infinity;
       let maxY = -Infinity;
 
       for (const f of aliveFighters) {
-        sumX += f.x;
-        sumY += f.y;
         if (f.x < minX) minX = f.x;
         if (f.x > maxX) maxX = f.x;
         if (f.y < minY) minY = f.y;
         if (f.y > maxY) maxY = f.y;
       }
 
-      const midX = sumX / aliveFighters.length;
-      const midY = sumY / aliveFighters.length;
+      // Midpoint is the center of the bounding box spanning all active combatants
+      // (ensures 1v2, 2v2, 1v1, and FFA are never biased towards whichever team has more members!)
+      const midX = (minX + maxX) / 2;
+      const midY = (minY + maxY) / 2;
       const spanX = maxX - minX;
       const spanY = maxY - minY;
       const dist = Math.hypot(spanX, spanY);

@@ -12,18 +12,34 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../cor
 
 export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, maxReach, arcAngle = Math.PI * 0.6) {
   const targets = new Set();
-  if (primaryTarget && primaryTarget.hp > 0) {
-    targets.add(primaryTarget);
-  }
-
-  if (typeof state === 'undefined') return Array.from(targets);
-
   const halfArc = arcAngle * 0.5;
-  const fighterTeam = (typeof state.getFighterTeam === 'function' && state.fighters) 
+
+  const checkTarget = (target) => {
+    if (!target || target === fighter || target.hp <= 0) return false;
+    const dx = target.x - fighter.x;
+    const dy = target.y - fighter.y;
+    const dist = Math.hypot(dx, dy);
+    const attackReach = (fighter.r || 25) + (target.r || 20) + maxReach;
+
+    if (dist <= attackReach) {
+      const angleToOther = Math.atan2(dy, dx);
+      let diff = angleToOther - attackAngle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+
+      if (Math.abs(diff) <= halfArc) {
+        targets.add(target);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const fighterTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && state.fighters) 
     ? state.getFighterTeam(state.fighters.indexOf(fighter)) 
     : null;
 
-  if (state.fighters) {
+  if (typeof state !== 'undefined' && state.fighters && state.fighters.length > 0) {
     for (const other of state.fighters) {
       if (!other || other === fighter || other.hp <= 0) continue;
       
@@ -32,43 +48,16 @@ export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, 
         if (otherIndex >= 0 && state.getFighterTeam(otherIndex) === fighterTeam) continue;
       }
 
-      const dx = other.x - fighter.x;
-      const dy = other.y - fighter.y;
-      const dist = Math.hypot(dx, dy);
-      const attackReach = fighter.r + (other.r || 20) + maxReach;
-
-      if (dist <= attackReach) {
-        const angleToOther = Math.atan2(dy, dx);
-        let diff = angleToOther - attackAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-
-        if (Math.abs(diff) <= halfArc) {
-          targets.add(other);
-        }
-      }
+      checkTarget(other);
     }
+  } else if (primaryTarget) {
+    checkTarget(primaryTarget);
   }
 
-  if (state.illusions) {
+  if (typeof state !== 'undefined' && state.illusions) {
     for (const ill of state.illusions) {
       if (!ill || ill === fighter || ill.hp <= 0 || ill.owner === fighter) continue;
-
-      const dx = ill.x - fighter.x;
-      const dy = ill.y - fighter.y;
-      const dist = Math.hypot(dx, dy);
-      const attackReach = fighter.r + (ill.r || 20) + maxReach;
-
-      if (dist <= attackReach) {
-        const angleToOther = Math.atan2(dy, dx);
-        let diff = angleToOther - attackAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-
-        if (Math.abs(diff) <= halfArc) {
-          targets.add(ill);
-        }
-      }
+      checkTarget(ill);
     }
   }
 
@@ -250,7 +239,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
 }
 
 export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, isAmbushThrust = false) {
-  if (!fighter.canPerformBasicAttack()) return;
+  if (!fighter.canPerformBasicAttack()) return [];
   fighter.spearCooldown = fighter.spearCooldownMax;
   fighter.isAmbushThrust = isAmbushThrust;
   const speedMult = TOJI_WEAPON_CONFIG?.spearSwingAnimSpeed || 1.0;
@@ -261,7 +250,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
   audioSystem.playSFX('skill_backstab', 0.85);
 
   const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
-  const reach = CONFIG.toji?.spearRange || fighter.spearRange || 50;
+  const reach = isAmbushThrust ? (CONFIG.toji?.ambushSpearReach || 80) : (CONFIG.toji?.spearRange || fighter.spearRange || 50);
   // 120 degree frontal arc cone for Inverted Spear thrust/stab!
   const targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, Math.PI * 0.67);
 
@@ -367,12 +356,24 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       target.applyHitStun(18);
     }
 
+    // Apply Slow Movement debuff to target on basic attack hit
+    const slowFrames = CONFIG.toji?.spearSlowDuration ?? 90;
+    const slowMultiplier = CONFIG.toji?.spearSlowMultiplier ?? 0.50;
+    if (typeof target.applySlow === 'function') {
+      target.applySlow(slowFrames, slowMultiplier);
+    } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+      target.statusEffects.applySlow(slowFrames, slowMultiplier);
+    } else {
+      target.slowTimer = Math.max(target.slowTimer || 0, slowFrames);
+      target.slowMultiplier = slowMultiplier;
+    }
+
     // Apply Decrease Regen debuff to target on basic attack hit
     const regenDebuffFrames = CONFIG.toji?.regenDebuffDuration ?? 300;
     target.tojiRegenDebuffTimer = Math.max(target.tojiRegenDebuffTimer || 0, regenDebuffFrames);
     const now = Date.now();
     if (!target._lastTojiDebuffAppliedTime || now - target._lastTojiDebuffAppliedTime > 800) {
-      spawnFloatingText(target.x, target.y - target.r - 20, 'REGEN DECREASED!', '#C084FC');
+      spawnFloatingText(target.x, target.y - target.r - 20, 'SLOWED & REGEN DECREASED!', '#C084FC');
       target._lastTojiDebuffAppliedTime = now;
     }
 
@@ -385,4 +386,5 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
   fighter.ambushTargetWasChanneling = false;
   fighter.ambushTargetChannelState = null;
   triggerGlobalScreenShake(isAmbushThrust ? 6 : 3, isAmbushThrust ? 8 : 4);
+  return targets;
 }

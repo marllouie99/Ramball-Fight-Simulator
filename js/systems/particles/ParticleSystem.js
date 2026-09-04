@@ -10,6 +10,18 @@ for (let i = 0; i < SPARK_POOL_SIZE; i++) {
   sparkPool.push({});
 }
 
+/** Helper to check if a particle effect is a critical/major visual that must not be evicted by minor sparks */
+export function isProtectedParticle(spark) {
+  if (!spark) return false;
+  if (spark.isProtected) return true;
+  if (spark.type === 'saitamaCounterFrontalBlast' || spark.type === 'gojoRedFrontalBlast') return true;
+  if (spark.type === 'animeImpactFrame' || spark.type === 'animePunchImpactFrame') return true;
+  if (spark.type === 'groundScorch' || spark.type === 'arcaneGroundScorch') return true;
+  if (spark.type === 'yutaBeamPinkCore') return true;
+  if (spark.type === 'slashingBlast' || spark.type === 'ceroOscurasBeam') return true;
+  return false;
+}
+
 export class ParticleSystem {
   static getParticle() {
     if (sparkPool.length > 0) {
@@ -34,6 +46,7 @@ export class ParticleSystem {
   }
 
   static returnParticle(spark) {
+    if (!spark) return;
     if (spark.sprite) {
       spark.sprite.visible = false;
       pixiSpritePool.push(spark.sprite);
@@ -45,6 +58,9 @@ export class ParticleSystem {
     spark.vx = 0;
     spark.vy = 0;
     spark.size = 0;
+    spark.targetSize = 0;
+    spark.reach = 0;
+    spark.arcAngle = 0;
     spark.life = 0;
     spark.decay = 0;
     spark.friction = 0;
@@ -52,6 +68,7 @@ export class ParticleSystem {
     spark.color = null;
     spark.isFlash = false;
     spark.isGlow = false;
+    spark.isProtected = false;
     spark.rotation = 0;
     spark.rotationSpeed = 0;
     spark.cx = 0;
@@ -113,10 +130,16 @@ export class ParticleSystem {
     for (let i = 0; i < adjustedCount; i++) {
       let insertIdx = -1;
       if (state.sparkEffects.length >= MAX_PARTICLES) {
-        // Fast O(1) overwrite instead of O(N) shift
-        insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-        const oldest = state.sparkEffects[insertIdx];
-        if (oldest) this.returnParticle(oldest);
+        // Fast O(1) non-protected eviction
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+          const candidate = state.sparkEffects[randIdx];
+          if (candidate && !isProtectedParticle(candidate)) {
+            insertIdx = randIdx;
+            this.returnParticle(candidate);
+            break;
+          }
+        }
       }
 
       const config = generator();

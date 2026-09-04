@@ -83,6 +83,23 @@ export class RubyFighter extends Fighter {
     if (sound) audioSystem.playSFX(sound.src, sound.volume);
   }
 
+  interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
+    this.activePullActive = false;
+    this.activePullPhase = -1;
+    this.activePullPhaseTimer = 0;
+    this.pullTargets = [];
+    this.primaryHookTarget = null;
+    this.passiveSpinActive = false;
+    this.passiveSpinTimer = 0;
+    this.scytheSwingActive = false;
+    this.scytheSwingTimer = 0;
+    this.dashTimer = 0;
+    this.dashTrail = [];
+    this.bladeTrail = [];
+    this.scytheParticles = [];
+  }
+
   heal(amount) {
     if (amount <= 0 || this.hp <= 0) return;
     this.hp = Math.min(this.maxHp, this.hp + amount);
@@ -362,7 +379,11 @@ export class RubyFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    if (this._handleTimeStop()) return;
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks(true);
+      return;
+    }
 
     // Cooldowns
     if (this.scytheCooldown > 0) this.scytheCooldown--;
@@ -395,9 +416,9 @@ export class RubyFighter extends Fighter {
     const cfg = CONFIG.ruby || {};
 
     // Age dash trail
-    if (this.dashTrail) {
+    if (this.dashTrail && this.dashTrail.length > 0) {
       for (let i = this.dashTrail.length - 1; i >= 0; i--) {
-        this.dashTrail[i].alpha -= 0.02;
+        this.dashTrail[i].alpha -= 0.04;
         if (this.dashTrail[i].alpha <= 0) {
           this.dashTrail.splice(i, 1);
         }
@@ -408,19 +429,11 @@ export class RubyFighter extends Fighter {
       this.dashTimer--;
       targetSpeed = this.baseSpeed * (cfg.dashSpeedMultiplier || 3.0);
       
-      // Spawn trail when moving fast, not just when dashing
-      if (this.dashTimer > 0) {
-        if (this.dashTimer % 2 === 0) {
-          if (!this.dashTrail) this.dashTrail = [];
-          this.dashTrail.push({ x: this.x, y: this.y, alpha: 0.6 });
-        }
-      } else {
-        const currentSpeed = Math.hypot(this.vx, this.vy);
-        if (currentSpeed > 1) { // Any significant movement
-          if (Math.random() > 0.5) { // Spawn less frequently than dash
-            if (!this.dashTrail) this.dashTrail = [];
-            this.dashTrail.push({ x: this.x, y: this.y, alpha: 0.25 });
-          }
+      // Spawn trail only when actively dashing
+      if (this.dashTimer % 2 === 0) {
+        if (!this.dashTrail) this.dashTrail = [];
+        if (this.dashTrail.length < 6) {
+          this.dashTrail.push({ x: this.x, y: this.y, alpha: 0.5 });
         }
       }
 
@@ -433,14 +446,6 @@ export class RubyFighter extends Fighter {
       }
       
       const currentSpeed = Math.hypot(this.vx, this.vy);
-      
-      // Also spawn trail when moving fast here
-      if (currentSpeed > 1) {
-        if (Math.random() > 0.5) {
-          if (!this.dashTrail) this.dashTrail = [];
-          this.dashTrail.push({ x: this.x, y: this.y, alpha: 0.25 });
-        }
-      }
       if (currentSpeed === 0 && !this.activePullActive) {
         // Kickstart her movement if she was stopped by the hook
         const angle = this.angle || (Math.random() * Math.PI * 2);
@@ -459,11 +464,19 @@ export class RubyFighter extends Fighter {
     this.resolveWallBounce(arena);
   }
 
+  clearAllAfterimages() {
+    super.clearAllAfterimages();
+    if (this.dashTrail) this.dashTrail.length = 0;
+    if (this.bladeTrail) this.bladeTrail.length = 0;
+    if (this.scytheParticles) this.scytheParticles.length = 0;
+  }
+
   // ── drawing ─────────────────────────────────────────
 
   drawBody(ctx) {
+    const suppressEffects = typeof this.areAttackEffectsSuppressed === 'function' ? this.areAttackEffectsSuppressed() : (this.isTargetOfAmbush || (this.timeStopTimer > 0));
     // Draw after-images below the main body
-    if (this.dashTrail && this.dashTrail.length > 0) {
+    if (!suppressEffects && this.dashTrail && this.dashTrail.length > 0) {
       for (const trail of this.dashTrail) {
         ctx.save();
         ctx.translate(trail.x, trail.y);
@@ -483,7 +496,8 @@ export class RubyFighter extends Fighter {
   drawOutline(ctx) {
     super.drawOutline(ctx);
 
-    if (this.activePullCooldown <= 0) {
+    const suppressEffects = typeof this.areAttackEffectsSuppressed === 'function' ? this.areAttackEffectsSuppressed() : (this.isTargetOfAmbush || (this.timeStopTimer > 0));
+    if (!suppressEffects && this.activePullCooldown <= 0) {
       const cfg = CONFIG.ruby || {};
       ctx.beginPath();
       ctx.arc(this.x, this.y, cfg.activePullRange || 200, 0, Math.PI * 2);
@@ -495,24 +509,27 @@ export class RubyFighter extends Fighter {
 
   drawGun(ctx) {
     if (typeof state !== 'undefined' && state.showSkinOnly) return;
+    const suppressEffects = typeof this.areAttackEffectsSuppressed === 'function' ? this.areAttackEffectsSuppressed() : (this.isTargetOfAmbush || (this.timeStopTimer > 0));
     // Draw hook tether + target ring BEFORE the scythe so it layers behind
-    this._drawHookEffects(ctx);
+    if (!suppressEffects) {
+      this._drawHookEffects(ctx);
+    }
     drawRubyScythe(ctx, this);
   }
 
   /** Draws a visible crimson tether and glowing ring around the hooked target. */
   _drawHookEffects(ctx) {
-    if (!this.activePullActive) return;
+    const suppressEffects = typeof this.areAttackEffectsSuppressed === 'function' ? this.areAttackEffectsSuppressed() : (this.isTargetOfAmbush || (this.timeStopTimer > 0));
+    if (suppressEffects || !this.activePullActive) return;
     const phase = this.activePullPhase;
     const targets = this.pullTargets || [];
 
-    // Phases 2 (HOOK_GRAB) and 3 (PULL_DRAG) show the tether + ring
+    // Phase 2 (HOOK_GRAB) or Phase 3 (PULL_DRAG) — active tether connected to enemies
     if (phase === 2 || phase === 3) {
       for (const target of targets) {
         if (target && target.hp > 0) {
           ctx.save();
-
-          // ── Dark-Pink Chain Tether ──
+          
           const dx = target.x - this.x;
           const dy = target.y - this.y;
           const dist = Math.hypot(dx, dy);
@@ -523,7 +540,7 @@ export class RubyFighter extends Fighter {
           ctx.rotate(angle);
 
           // Glowing background line behind the chain
-          ctx.strokeStyle = 'rgba(139, 0, 84, 0.5)'; // Dark pink glow
+          ctx.strokeStyle = 'rgba(139, 0, 84, 0.4)';
           ctx.lineWidth = 6;
           ctx.beginPath();
           ctx.moveTo(0, 0);
@@ -536,39 +553,34 @@ export class RubyFighter extends Fighter {
 
           for (let i = 0; i <= numLinks; i++) {
             const linkX = i * linkSpacing;
-            ctx.save();
-            ctx.translate(linkX, 0);
-            
             if (i % 2 === 0) {
               // Flat horizontal link
-              ctx.strokeStyle = '#4A0024'; // Very dark pink outline
+              ctx.strokeStyle = '#4A0024';
               ctx.lineWidth = 3;
               ctx.beginPath();
-              ctx.ellipse(0, 0, 8, 4, 0, 0, Math.PI * 2);
+              ctx.ellipse(linkX, 0, 8, 4, 0, 0, Math.PI * 2);
               ctx.stroke();
 
-              ctx.strokeStyle = '#D81B60'; // Bright dark-pink inner
+              ctx.strokeStyle = '#D81B60';
               ctx.lineWidth = 1;
               ctx.stroke();
             } else {
-              // Vertical interlocking link (drawn thin to simulate 3D rotation)
+              // Vertical interlocking link
               ctx.strokeStyle = '#3E001E'; 
               ctx.lineWidth = 3;
               ctx.beginPath();
-              ctx.ellipse(0, 0, 3, 6, 0, 0, Math.PI * 2);
+              ctx.ellipse(linkX, 0, 3, 6, 0, 0, Math.PI * 2);
               ctx.stroke();
 
               ctx.strokeStyle = '#C2185B'; 
               ctx.lineWidth = 1;
               ctx.stroke();
             }
-            
-            ctx.restore();
           }
           ctx.restore();
 
           // ── Pulsing ring around the hooked target ──
-          const pulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.02); // fast pulse
+          const pulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.02);
           const ringRadius = target.r + 8 + pulse * 6;
 
           // Outer glow ring
@@ -585,15 +597,9 @@ export class RubyFighter extends Fighter {
           ctx.arc(target.x, target.y, ringRadius, 0, Math.PI * 2);
           ctx.stroke();
 
-          // "HOOKED" indicator glow behind the target
+          // "HOOKED" indicator glow behind the target (flat fill without runtime gradient allocation)
           const glowRadius = target.r * 1.8;
-          const gradient = ctx.createRadialGradient(
-            target.x, target.y, 0,
-            target.x, target.y, glowRadius
-          );
-          gradient.addColorStop(0, `rgba(224, 17, 95, ${0.35 * pulse})`);
-          gradient.addColorStop(1, 'rgba(224, 17, 95, 0)');
-          ctx.fillStyle = gradient;
+          ctx.fillStyle = `rgba(224, 17, 95, ${0.20 * pulse})`;
           ctx.beginPath();
           ctx.arc(target.x, target.y, glowRadius, 0, Math.PI * 2);
           ctx.fill();
@@ -616,7 +622,7 @@ export class RubyFighter extends Fighter {
       ctx.rotate(this.activePullAngle);
 
       // Glowing background line behind the chain
-      ctx.strokeStyle = `rgba(139, 0, 84, ${0.5 * t})`; // Fade in
+      ctx.strokeStyle = `rgba(139, 0, 84, ${0.5 * t})`;
       ctx.lineWidth = 6;
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -629,14 +635,11 @@ export class RubyFighter extends Fighter {
 
       for (let i = 0; i <= numLinks; i++) {
         const linkX = i * linkSpacing;
-        ctx.save();
-        ctx.translate(linkX, 0);
-        
         if (i % 2 === 0) {
           ctx.strokeStyle = '#4A0024';
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.ellipse(0, 0, 8, 4, 0, 0, Math.PI * 2);
+          ctx.ellipse(linkX, 0, 8, 4, 0, 0, Math.PI * 2);
           ctx.stroke();
           ctx.strokeStyle = '#D81B60';
           ctx.lineWidth = 1;

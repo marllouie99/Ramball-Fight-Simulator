@@ -21,6 +21,7 @@ import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
 import { ulquiorraConfig } from '../configs/characters/ulquiorraConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
+import { tricksterConfig } from '../configs/characters/tricksterConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
@@ -571,29 +572,11 @@ export const CONFIG = {
     preemptiveCounterDamage: 7,
   },
 
-  /** Trickster ΓÇö Spell Steal and Arcane Magic */
-  trickster: {
-    // Basic Attack: Arcane Bolt
-    boltDamage: 12,
-    boltSpeed: 8,
-    bounceCount: 4,
-    bounceDamageMultiplier: 0.7, // Damage multiplier on each bounce
-    attackCooldown: 100,
+  /** Trickster — Spell Steal and Arcane Magic */
+  trickster: tricksterConfig,
+  Trickster: tricksterConfig,
 
-    // Skill 1: Telekinesis
-    telekinesisCooldown: 400,
-    telekinesisDuration: 90, // Frames target is held in air
-    telekinesisStunRadius: 100, // AoE stun on landing
-    telekinesisStunDuration: 60, // Frames enemies are stunned on landing
-    telekinesisRange: 250,
-
-    // Ultimate: Spell Steal
-    spellStealCooldown: 700,
-    spellStealDuration: 1000, // 7 seconds
-    spellStealRange: 350,
-  },
-
-  /** Zeus ΓÇö Lightning Spell Caster */
+  /** Zeus — Lightning Spell Caster */
   zeus: {
     // Basic Attack: Chain Lightning (fast projectile)
     lightningDamage: 20,
@@ -979,7 +962,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 17,
-    name: 'Musashi Miyamoto',
+    name: 'Musashi',
     category: 'Japanese',
     color: '#34495e',
     startX: 290, startY: 240,
@@ -1000,20 +983,22 @@ export const FIGHTER_DEFS = [
     id: 18,
     name: 'Trickster',
     category: 'Fantasy & Magic',
-    color: '#03e631ff',
-    startX: 310, startY: 230,
-    startVx: -1.2, startVy: 1.0,
-    radius: 25,
+    color: tricksterConfig.color || '#03e631ff',
+    startX: tricksterConfig.startX || 310,
+    startY: tricksterConfig.startY || 230,
+    startVx: tricksterConfig.startVx || -1.2,
+    startVy: tricksterConfig.startVy || 1.0,
+    radius: tricksterConfig.radius || tricksterConfig.r || 25,
     aimbot: false,
-    spinRate: 0.02,
+    spinRate: tricksterConfig.spinRate || 0.02,
     type: 'trickster',
-    hp: 85,
-    damage: 12,
-    cooldown: 100,
-    moveSpeed: 8.2,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Spell Steal',
-    desc: 'Fires bouncing arcane bolts. Telekinetically lifts and stuns enemies. Ultimate steals the last used enemy skill.',
+    hp: tricksterConfig.hp || 85,
+    damage: tricksterConfig.damage || 12,
+    cooldown: tricksterConfig.cooldown || 100,
+    moveSpeed: tricksterConfig.moveSpeed || tricksterConfig.speed || 8.2,
+    projectileSpeedMultiplier: tricksterConfig.projectileSpeedMultiplier || 1.0,
+    ability: tricksterConfig.ability || 'Spell Steal',
+    desc: tricksterConfig.desc || 'Fires bouncing arcane bolts. Telekinetically lifts and stuns enemies. Ultimate steals the last used enemy skill.',
   },
   {
     id: 19,
@@ -1055,7 +1040,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 21,
-    name: 'Satoru Gojo',
+    name: 'Gojo',
     category: 'Anime',
     color: gojoConfig.color || '#E0FFFF', // Light Cyan
     startX: gojoConfig.startX || 300,
@@ -1076,7 +1061,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 22,
-    name: 'Ryomen Sukuna',
+    name: 'Sukuna',
     category: 'Anime',
     color: sukunaConfig.color || '#8B0000', // Dark Crimson
     startX: sukunaConfig.startX || 300,
@@ -1097,7 +1082,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 23,
-    name: 'Yuta Okkotsu',
+    name: 'Yuta',
     category: 'Anime',
     color: yutaConfig.color || '#EEEEEE', // Soft Silver / White
     themeColor: yutaConfig.themeColor || '#FF1493', // Cursed Pink theme
@@ -1119,7 +1104,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 99,
-    name: 'Toji Fushiguro',
+    name: 'Toji',
     category: 'Anime',
     color: tojiConfig.color || '#281438', // Dark Shadow Purple
     startX: tojiConfig.startX || 350,
@@ -1140,7 +1125,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 24,
-    name: 'Aoi Todo',
+    name: 'Todo',
     category: 'Anime',
     color: todoConfig.color || '#D2691E', // Chocolate / Brown
     startX: todoConfig.startX || 300,
@@ -1161,7 +1146,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 25,
-    name: 'Yuji Itadori',
+    name: 'Yuji',
     category: 'Anime',
     color: yujiConfig.color || '#D95C7E', // Deep pink JJK uniform
     startX: yujiConfig.startX || 300,
@@ -1245,7 +1230,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 29,
-    name: 'Ichigo Kurosaki',
+    name: 'Ichigo',
     category: 'Anime',
     color: ichigoConfig.color || '#FF5500', // Orange details
     startX: ichigoConfig.startX || 300,
@@ -1287,7 +1272,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 31,
-    name: 'Kento Nanami',
+    name: 'Nanami',
     category: 'Anime',
     color: nanamiConfig.color || '#D4AF37', // Refined Golden Sand / Warm Ochre
     startX: nanamiConfig.startX || 300,
@@ -1308,7 +1293,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 32,
-    name: 'Nobara Kugisaki',
+    name: 'Nobara',
     category: 'Anime',
     color: nobaraConfig.color || '#D94E68', // Deep Rose Crimson
     startX: nobaraConfig.startX || 300,
@@ -1371,7 +1356,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 35,
-    name: 'Megumi Fushiguro',
+    name: 'Megumi',
     category: 'Anime',
     color: megumiConfig.color || '#1C2D4A', // Midnight Navy
     startX: megumiConfig.startX || 300,
@@ -1392,7 +1377,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 36,
-    name: 'Uryu Ishida',
+    name: 'Uryu',
     category: 'Anime',
     color: uryuConfig.color || '#00E5FF', // Quincy Radiant Cyan
     startX: uryuConfig.startX || 300,
@@ -1413,7 +1398,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 37,
-    name: 'Ulquiorra Cifer',
+    name: 'Ulquiorra',
     category: 'Anime',
     color: ulquiorraConfig.color || '#00FF88', // Emerald Green Reiatsu
     themeColor: ulquiorraConfig.themeColor || '#00FF88',

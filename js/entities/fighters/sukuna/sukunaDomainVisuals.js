@@ -303,8 +303,23 @@ export function spawnDomainSlashLines(fighter, count) {
       const hitRadius = (target.r || 20) + thickness + 14;
 
       if (perpDist <= hitRadius) {
-        hitTargetsThisWave.add(target);
-        hitAny = true;
+        // ── 1. Check if target can dodge the domain slice line (e.g. Saitama's Caped Baldy Reflexes) ──
+        if (typeof target.dodgeSliceLine === 'function') {
+          const didDodge = target.dodgeSliceLine({
+            isSliceLine: true,
+            angle,
+            cx,
+            cy,
+            normalX,
+            normalY,
+            thickness,
+            attacker: fighter
+          });
+          if (didDodge) {
+            hitTargetsThisWave.add(target);
+            return; // Clean dodge! Evades damage, ricochet knockback, and sparks!
+          }
+        }
 
         const timeInside = (fighter.domainTimeInsideMap.get(target) || 0) + damageInterval;
         fighter.domainTimeInsideMap.set(target, timeInside);
@@ -320,37 +335,56 @@ export function spawnDomainSlashLines(fighter, count) {
           isCrit = res.isCrit;
         }
 
+        let tookDamage = true;
         if (typeof target.takeDamage === 'function') {
-          target.takeDamage(finalDamage, fighter, {
+          const dmgResult = target.takeDamage(finalDamage, fighter, {
             isDomain: true,
             isDomainSlash: true,
+            isSukunaDomainSliceLine: true,
             bypassShield: true,
             isSukunaSlash: true,
             isGuaranteedHit: true,
             undodgeable: true,
+            alreadyCheckedDodge: true,
+            angle,
+            normalX,
+            normalY,
+            cx,
+            cy,
+            thickness,
             isCrit
           });
+          if (dmgResult === false) {
+            tookDamage = false;
+          }
         }
 
-        // ── Physical Ricochet Deflection Impulse (pushes & ricochets target off cut lines) ──
-        const pushDir = ((target.x - cx) * normalX + (target.y - cy) * normalY) >= 0 ? 1 : -1;
-        const ricoForce = CONFIG.sukuna?.domainSlashRicochetForce ?? 6.5;
-        target.knockbackDecay = 0.88;
-        if (target.knockbackVx !== undefined) target.knockbackVx = normalX * pushDir * ricoForce;
-        if (target.knockbackVy !== undefined) target.knockbackVy = normalY * pushDir * ricoForce;
+        if (tookDamage) {
+          hitTargetsThisWave.add(target);
+          hitAny = true;
 
-        // ── Ricochet Hit Effect & Sparks ──
-        spawnSparks(target.x, target.y, 10, 'slashRicochet');
-        spawnSparks(target.x, target.y, 6, 'parrySpark');
-        spawnSparks(target.x, target.y, 4, 'parryEmberStar');
-        spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
+          // ── Physical Ricochet Deflection Impulse (pushes & ricochets target off cut lines) ──
+          const pushDir = ((target.x - cx) * normalX + (target.y - cy) * normalY) >= 0 ? 1 : -1;
+          const ricoForce = CONFIG.sukuna?.domainSlashRicochetForce ?? 6.5;
+          target.knockbackDecay = 0.88;
+          if (target.knockbackVx !== undefined) target.knockbackVx = normalX * pushDir * ricoForce;
+          if (target.knockbackVy !== undefined) target.knockbackVy = normalY * pushDir * ricoForce;
 
-        // Play crisp slicing ricochet audio
-        const ricoChance = CONFIG.sukuna?.soundChances?.ricochetHit ?? 1.0;
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX && Math.random() <= ricoChance) {
-          const ricoSnd = CONFIG.sukuna?.sounds?.ricochetHit || 'Assets/Sound Effects/Skills/parry.mp3';
-          const ricoVol = CONFIG.sukuna?.soundVolumes?.ricochetHit ?? 0.75;
-          audioSystem.playSFX(ricoSnd, ricoVol);
+          // ── Ricochet Hit Effect & Sparks ──
+          spawnSparks(target.x, target.y, 10, 'slashRicochet');
+          spawnSparks(target.x, target.y, 6, 'parrySpark');
+          spawnSparks(target.x, target.y, 4, 'parryEmberStar');
+          spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
+
+          // Play crisp slicing ricochet audio
+          const ricoChance = CONFIG.sukuna?.soundChances?.ricochetHit ?? 1.0;
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX && Math.random() <= ricoChance) {
+            const ricoSnd = CONFIG.sukuna?.sounds?.ricochetHit || 'Assets/Sound Effects/Skills/parry.mp3';
+            const ricoVol = CONFIG.sukuna?.soundVolumes?.ricochetHit ?? 0.75;
+            audioSystem.playSFX(ricoSnd, ricoVol);
+          }
+        } else {
+          hitTargetsThisWave.add(target);
         }
       }
     });

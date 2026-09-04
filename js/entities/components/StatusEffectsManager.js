@@ -40,7 +40,7 @@ export class StatusEffectsManager {
 
   applyParalyze(frames, opts = {}) {
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
-    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple) return;
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isBlue) return;
     if (!this.fighter.paralyzeTimer || this.fighter.paralyzeTimer < frames) {
       this.fighter.paralyzeTimer = frames;
     }

@@ -209,99 +209,95 @@ export function drawRikaSummonDimScreen() {
   state.globalDimEdgeColor = `rgba(10, 0, 18, ${opacity * 0.95})`;
 }
 
-let currentMahitoDomainOpacity = 0;
-let mahitoDomainImg = null;
-let mahitoDomainImgLoading = false;
+let _mahitoDomainImg = null;
+let _mahitoDomainImgLoading = false;
 
-function loadMahitoDomainImage() {
-  if (mahitoDomainImg || mahitoDomainImgLoading) return;
-  mahitoDomainImgLoading = true;
-  mahitoDomainImg = new Image();
-  mahitoDomainImg.onload = () => {
-    mahitoDomainImgLoading = false;
-  };
-  mahitoDomainImg.onerror = (e) => {
-    console.error("Failed to load Mahito domain expansion image:", e);
-    mahitoDomainImgLoading = false;
-    mahitoDomainImg = null;
-  };
-  mahitoDomainImg.src = 'Assets/Overlays/mahitos-de.png';
+/**
+ * Preload and retrieve Mahito's domain expansion overlay image (Assets/Overlays/mahitos-de.png).
+ */
+export function getMahitoDomainImage() {
+  if (_mahitoDomainImg && _mahitoDomainImg.complete && _mahitoDomainImg.naturalWidth > 0) {
+    return _mahitoDomainImg;
+  }
+  if (!_mahitoDomainImgLoading && typeof Image !== 'undefined') {
+    _mahitoDomainImgLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _mahitoDomainImg = img;
+      _mahitoDomainImgLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn("Failed to load Mahito domain expansion image at Assets/Overlays/mahitos-de.png:", e);
+      _mahitoDomainImgLoading = false;
+    };
+    img.src = 'Assets/Overlays/mahitos-de.png';
+    _mahitoDomainImg = img;
+  }
+  return _mahitoDomainImg;
+}
+
+// Preload immediately if running in browser
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  getMahitoDomainImage();
 }
 
 /**
  * Draws Mahito's Domain Expansion: Self-Embodiment of Perfection background.
- * Overlays the entire screen with mahitos-de.png at reduced opacity over a dark purple dim effect.
+ * Overlays the entire arena with Assets/Overlays/mahitos-de.png, clipped inside arena bounds.
+ * @param {object} fighter - The Mahito fighter instance
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {boolean} isClashSecondary - Whether secondary in domain clash
  */
-export function renderMahitoDomainBackground(fighter, ctx, targetCanvas = null) {
+export function renderMahitoDomainBackground(fighter, ctx, isClashSecondary = false) {
   if (typeof state === 'undefined' || !state || !ctx) return;
-  const canvas = targetCanvas || state.canvas;
-  if (!canvas) return;
+  if (!fighter || (!fighter.domainActive && !fighter._mahitoDomainActive)) return;
 
-  if (!mahitoDomainImg && !mahitoDomainImgLoading) {
-    loadMahitoDomainImage();
-  }
+  const arena = state.arena || CONFIG.arena;
+  if (!arena) return;
 
-  const isActive = Boolean(fighter && fighter.domainActive);
-
-  if (isActive) {
-    currentMahitoDomainOpacity = 1.0; // Snap in immediately when active after channeling
-  } else {
-    currentMahitoDomainOpacity = Math.max(0, currentMahitoDomainOpacity - 0.05); // Fade out smoothly
-    if (currentMahitoDomainOpacity <= 0) return;
-  }
-
-  const op = currentMahitoDomainOpacity;
+  const ax = arena.x;
+  const ay = arena.y;
+  const aw = arena.width;
+  const ah = arena.height;
+  const ww = arena.wallWidth || 4;
 
   ctx.save();
 
-  // 1. Dark Purple Dim Effect
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const maxR = Math.max(canvas.width, canvas.height) * 0.75;
+  // 1. Clip strictly inside the arena bounds
+  ctx.beginPath();
+  if (arena.shape === 'circle') {
+    const acx = arena.x + arena.width / 2;
+    const acy = arena.y + arena.height / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+    ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
+  } else {
+    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
+  }
+  ctx.clip();
 
-  const dimGrad = ctx.createRadialGradient(cx, cy, 40, cx, cy, maxR);
-  dimGrad.addColorStop(0.0, `rgba(0, 0, 0, ${op * 0.95})`);       // Pure black center
-  dimGrad.addColorStop(0.6, `rgba(36, 8, 54, ${op * 0.90})`);     // Dark transitional purple
-  dimGrad.addColorStop(1.0, `rgba(88, 28, 135, ${op * 0.85})`);   // Rich purple edge vignette
-
-  ctx.fillStyle = dimGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // 2. PNG Overlay (Clipped strictly inside Arena Inner Bounds)
-  if (mahitoDomainImg && mahitoDomainImg.complete && mahitoDomainImg.naturalWidth > 0) {
-    ctx.save();
-    
-    // Set clipping path strictly to the arena inner bounds
-    const arena = state.arena || CONFIG.arena;
-    if (arena) {
-      ctx.beginPath();
-      if (arena.shape === 'circle') {
-        const acx = arena.x + arena.width / 2;
-        const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - (arena.wallWidth || 0);
-        ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
-      } else {
-        const ww = arena.wallWidth || 0;
-        ctx.rect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
-      }
-      ctx.clip();
-
-      // Decrease opacity so fighters, spells, and arena remain clearly visible
-      ctx.globalAlpha = op * 0.50;
-
-      // Draw the image to fit the arena inner dimensions exactly
-      const ww = arena.wallWidth || 0;
-      ctx.drawImage(mahitoDomainImg, arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
-    }
-    ctx.restore();
+  if (isClashSecondary) {
+    ctx.globalAlpha = 0.75;
   }
 
-  // 3. Exclude Gojo Limitless Infinity Barrier from dark overlay (Rule #9)
+  // 2. Base Dark Purple/Black Background
+  ctx.fillStyle = '#0a0310';
+  ctx.fillRect(ax, ay, aw, ah);
+
+  // 3. Draw Mahito Domain Overlay Image (Assets/Overlays/mahitos-de.png) occupying the arena
+  const img = getMahitoDomainImage();
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling preserves crisp pixel art
+    ctx.drawImage(img, ax, ay, aw, ah);
+  }
+
+  // 4. Subtle Cursed Vignette / Overlay on top of image
+  ctx.fillStyle = 'rgba(15, 3, 20, 0.35)';
+  ctx.fillRect(ax, ay, aw, ah);
+
+  // 5. Exclude Gojo Limitless Infinity Barrier from dark overlay (Rule #9)
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
-
-  state.globalDimEdgeColor = `rgba(18, 5, 26, ${op * 0.95})`;
 }
 
 export function drawMahitoDomainOverlay(fighter) {

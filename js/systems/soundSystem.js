@@ -17,12 +17,12 @@ const _audioPool = [];
 const MAX_POOL_SIZE = 30;
 
 // Sound cache management to prevent unbounded memory growth
-const MAX_CACHE_SIZE = 250; // Maximum number of cached sounds
+const MAX_CACHE_SIZE = 1000; // Increased to ensure all preloaded game sounds remain resident
 
 // ── CONCURRENT SOUND LIMITING (prevents audio bus overload → crackling) ──
 const MAX_CONCURRENT_SOUNDS = 40; // Hard cap on simultaneous Web Audio sources
-// Micro-fade duration in seconds to prevent click/pop artifacts on start/stop
-const MICRO_FADE_IN = 0.008;  // 8ms fade-in
+// Micro-fade duration in seconds to prevent click/pop artifacts on start/stop without delaying attack transient
+const MICRO_FADE_IN = 0.002;  // 2ms fade-in (preserves crisp punch/slash attack snap)
 const MICRO_FADE_OUT = 0.015; // 15ms fade-out
 
 /**
@@ -82,18 +82,45 @@ function isAudioBufferLike(value) {
 
 let _masterLimiterNode = null;
 
-/** Get or create a shared AudioContext to avoid "too many contexts" errors. */
+/** Get or create a shared AudioContext with balanced latency to avoid underruns during screen recording. */
 function getAudioContext() {
   if (!_sharedAudioCtx || _sharedAudioCtx.state === 'closed') {
-    _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      // 'interactive' requests the lowest possible hardware audio buffer (e.g. 128-256 samples = ~2.9-5.8ms)
+      _sharedAudioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+    }
     _masterLimiterNode = null;
   }
 
   // Only attempt resume after explicit unlock attempt from a user gesture.
-  if (_audioUnlocked && _sharedAudioCtx.state === 'suspended') {
+  if (_audioUnlocked && _sharedAudioCtx && _sharedAudioCtx.state === 'suspended') {
     _sharedAudioCtx.resume().catch(() => {});
   }
   return _sharedAudioCtx;
+}
+
+/**
+ * Returns the current audio output latency in milliseconds.
+ * This is the hardware pipeline delay between scheduling a sound and it actually being audible.
+ * Useful for diagnostics and recording sync monitoring.
+ * @returns {number} Output latency in ms (0 if unavailable)
+ */
+export function getAudioLatencyMs() {
+  if (!_sharedAudioCtx) return 0;
+  const outputLat = _sharedAudioCtx.outputLatency || 0;
+  const baseLat = _sharedAudioCtx.baseLatency || 0;
+  return Math.round((outputLat > 0 ? outputLat : baseLat) * 1000 * 10) / 10;
+}
+
+/**
+ * Returns the current AudioContext time in seconds.
+ * Exposed so other systems (gameLoop) can snapshot audio clock per frame.
+ * @returns {number}
+ */
+export function getAudioCurrentTime() {
+  if (!_sharedAudioCtx) return 0;
+  return _sharedAudioCtx.currentTime;
 }
 
 /** Get or create a master DynamicsCompressor limiter to prevent digital clipping / crackling. */
@@ -137,38 +164,57 @@ export async function unlockAudio() {
   }
 }
 
+const _loadingPromises = new Map();
+
 /**
  * Pre-load an audio file so it's ready to play instantly.
  * Uses fetch + AudioContext.decodeAudioData to fully decode the audio
  * into memory, bypassing the browser's lazy loading for zero-latency playback.
  * Falls back to a standard Audio element if Web Audio API fails.
- * @param {string} src - Path to the audio file (relative or absolute)
+ * @param {string|string[]} src - Path to the audio file (relative or absolute)
  */
 export async function preloadSound(src) {
   if (!src) return;
   if (Array.isArray(src)) {
-    await Promise.all(src.map((s) => preloadSound(s)));
+    // Process in batches of 16 concurrent requests to avoid browser network queue congestion
+    const batchSize = 16;
+    for (let i = 0; i < src.length; i += batchSize) {
+      const batch = src.slice(i, i + batchSize);
+      await Promise.all(batch.map((s) => preloadSound(s)));
+    }
     return;
   }
   if (_cache.has(src)) return;
-  try {
-    const response = await fetch(src);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioCtx = getAudioContext();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    _cache.set(src, audioBuffer);
-    // Prune cache if it grows too large
-    _pruneSoundCache();
-  } catch (e) {
-    // Fallback: standard Audio element (may have loading delay)
-    const audio = new Audio(src);
-    audio.preload = 'auto';
-    audio.load();
-    _cache.set(src, audio);
-    // Prune cache if it grows too large
-    _pruneSoundCache();
+  if (_loadingPromises.has(src)) {
+    return _loadingPromises.get(src);
   }
+
+  const loadPromise = (async () => {
+    try {
+      const response = await fetch(src);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioCtx = getAudioContext();
+      if (!audioCtx) throw new Error('No AudioContext available');
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      _cache.set(src, audioBuffer);
+      _pruneSoundCache();
+    } catch (e) {
+      // Fallback: standard Audio element (may have loading delay)
+      try {
+        const audio = new Audio(src);
+        audio.preload = 'auto';
+        audio.load();
+        _cache.set(src, audio);
+        _pruneSoundCache();
+      } catch (err) {}
+    } finally {
+      _loadingPromises.delete(src);
+    }
+  })();
+
+  _loadingPromises.set(src, loadPromise);
+  return loadPromise;
 }
 
 /**
@@ -189,8 +235,8 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
   if (isAudioBufferLike(cached)) {
     try {
       const audioCtx = getAudioContext();
-      if (audioCtx.state !== 'running') {
-        throw new Error('AudioContext not running yet');
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
       }
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
@@ -211,6 +257,9 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
     } catch (e) {
       // Fall through to Audio element fallback
     }
+  }
+  if (!_cache.has(src)) {
+    preloadSound(src).catch(() => {});
   }
   // Fallback: standard Audio element
   const audio = /** @type {HTMLAudioElement} */ (cached?.cloneNode() ?? new Audio(src));
@@ -465,29 +514,8 @@ function _evictOldestSound() {
   }
   if (!candidate) return false;
 
-  const oldest = candidate;
-  if (oldest.gainNode) {
-    try {
-      const audioCtx = getAudioContext();
-      const now = audioCtx.currentTime;
-      oldest.gainNode.gain.cancelScheduledValues(now);
-      oldest.gainNode.gain.setValueAtTime(oldest.gainNode.gain.value, now);
-      oldest.gainNode.gain.linearRampToValueAtTime(0.001, now + MICRO_FADE_OUT);
-      setTimeout(() => {
-        try { if (oldest.source) oldest.source.stop(0); } catch(e) {}
-        try { if (oldest.source) oldest.source.disconnect(); } catch(e) {}
-        try { oldest.gainNode.disconnect(); } catch(e) {}
-      }, MICRO_FADE_OUT * 1000 + 5);
-    } catch(e) {
-      try { if (oldest.source) oldest.source.stop(0); } catch(e2) {}
-      try { if (oldest.source) oldest.source.disconnect(); } catch(e2) {}
-      try { if (oldest.gainNode) oldest.gainNode.disconnect(); } catch(e2) {}
-    }
-  } else if (oldest.audio) {
-    try { oldest.audio.pause(); } catch(e) {}
-    oldest.audio.currentTime = 0;
-  }
-  _activeSoundHandles.delete(oldest);
+  stopSound(candidate);
+  return true;
 }
 
 /**
@@ -534,36 +562,20 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
     }
   }
 
-  // Handle positive delay option (schedules playback after delayMs)
-  if (delay > 0) {
-    const delayMs = delay < 10 ? delay * 1000 : delay;
-    const timerId = setTimeout(() => {
-      _pendingSoundTimeouts.delete(timerId);
-      playSound(src, volume, speed, offset, 0, onEnded);
-    }, delayMs);
-    _pendingSoundTimeouts.add(timerId);
-    return null;
-  }
-
-  // Handle Array of sound sources (play each sound in the array)
-  if (Array.isArray(src)) {
-    if (src.length === 0) return null;
-    let lastResult = null;
-    for (const singleSrc of src) {
-      const res = playSound(singleSrc, volume, speed, offset, 0, onEnded);
-      if (res) lastResult = res;
-    }
-    return lastResult;
-  }
-
-  // Throttling guard: Prevent same sound file from playing multiple times in rapid succession
-  const now = performance.now();
+  // Throttling guard: Prevent same sound file from playing multiple times in rapid succession.
+  // RECORDING SYNC FIX: Use audioCtx.currentTime (hardware audio clock) instead of performance.now()
+  // so the throttle is synchronized with the same clock that schedules sounds.
+  // performance.now() drifts relative to audioCtx.currentTime under heavy CPU load (recording),
+  // causing sounds to be incorrectly throttled or double-played.
+  const audioCtx = getAudioContext();
+  const now = audioCtx ? audioCtx.currentTime * 1000 : performance.now();
   const lastTime = _lastPlayTimes.get(src) || 0;
   
-  // Frequent combat sounds (hits, swings, slashes, summons) enforce a 70ms minimum gap to prevent audio machine-gun stutter
+  // Frequent combat sounds (hits, swings, slashes, summons) enforce a 20ms minimum gap (just over 1 frame at 60fps)
+  // to avoid same-frame audio doubling while guaranteeing rapid consecutive strikes play instantly
   const srcLower = String(src).toLowerCase();
   const isCombatSound = srcLower.includes('fleshhit') || srcLower.includes('sword') || srcLower.includes('slash') || srcLower.includes('illusion') || srcLower.includes('hit') || srcLower.includes('punch') || srcLower.includes('smash');
-  const minInterval = isCombatSound ? 70 : 25;
+  const minInterval = isCombatSound ? 20 : 15;
 
   if (now - lastTime < minInterval) {
     return null;
@@ -578,41 +590,58 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
 
   const cached = _cache.get(src);
 
-  // Fast path: AudioBuffer (fully decoded during preload) — zero latency
-  if (isAudioBufferLike(cached)) {
+  // Fast path: AudioBuffer (fully decoded during preload) — zero latency Web Audio scheduling
+  if (isAudioBufferLike(cached) && audioCtx) {
     try {
-      const audioCtx = getAudioContext();
-      if (audioCtx.state === 'suspended') {
+      if (audioCtx.state === 'suspended' && _audioUnlocked) {
         audioCtx.resume().catch(() => {});
       }
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
       const targetGain = Math.max(0, Math.min(25.0, volume));
-      // Micro-fade-in to prevent click/pop artifact on playback start
-      gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
-      gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + MICRO_FADE_IN);
+
+      // Calculate hardware timeline start timestamp (delay is scheduled on audio card clock, not CPU JS loop)
+      const delaySec = delay > 0 ? (delay < 10 ? delay : delay / 1000) : 0;
+      const startTime = audioCtx.currentTime + delaySec;
+
+      // Instant zero-delay attack at startTime
+      gainNode.gain.setValueAtTime(targetGain, startTime);
       source.connect(gainNode);
       gainNode.connect(getMasterAudioDestination());
+
       const safeSpeed = Math.max(0.1, speed);
       source.playbackRate.value = safeSpeed;
-      const startTime = audioCtx.currentTime;
-      source.start(0, Math.max(0, offset));
 
-      const duration = Math.max(0, (cached.duration - Math.max(0, offset)) / safeSpeed);
+      const offsetSec = Math.max(0, offset);
+      source.start(startTime, offsetSec);
+
+      const duration = Math.max(0, (cached.duration - offsetSec) / safeSpeed);
       const endTime = startTime + duration;
 
+      let safetyTimeout = null;
       const handle = {
         src,
-        isPlaying: () => getAudioContext().currentTime < endTime,
+        startTime,
+        endTime,
+        isPlaying: () => {
+          const t = getAudioContext().currentTime;
+          return t >= startTime && t < endTime;
+        },
         duration,
         source,
-        gainNode
+        gainNode,
+        get safetyTimeout() { return safetyTimeout; }
       };
       _activeSoundHandles.add(handle);
 
       // Natural AudioBuffer completion handler: avoids clock-drift truncation from setTimeout
       source.onended = () => {
+        if (safetyTimeout) {
+          clearTimeout(safetyTimeout);
+          _pendingSoundTimeouts.delete(safetyTimeout);
+          safetyTimeout = null;
+        }
         try { source.disconnect(); } catch(e) {}
         try { gainNode.disconnect(); } catch(e) {}
         _activeSoundHandles.delete(handle);
@@ -622,17 +651,33 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
       };
 
       // Safety timeout purely for garbage collection in case onended is dropped
-      const safetyTimeout = setTimeout(() => {
+      safetyTimeout = setTimeout(() => {
         _activeSoundHandles.delete(handle);
         try { source.disconnect(); } catch(e) {}
         try { gainNode.disconnect(); } catch(e) {}
-      }, Math.max(1000, duration * 1000 + 600));
+      }, Math.max(1000, (delaySec + duration) * 1000 + 600));
       _pendingSoundTimeouts.add(safetyTimeout);
 
       return handle;
     } catch (e) {
       // Fall through to Audio element fallback
     }
+  }
+
+  // If not cached as AudioBuffer yet, asynchronously trigger preload so future plays are zero latency
+  if (!_cache.has(src)) {
+    preloadSound(src).catch(() => {});
+  }
+
+  // Handle positive delay option for fallback path
+  if (delay > 0) {
+    const delayMs = delay < 10 ? delay * 1000 : delay;
+    const timerId = setTimeout(() => {
+      _pendingSoundTimeouts.delete(timerId);
+      playSound(src, volume, speed, offset, 0, onEnded);
+    }, delayMs);
+    _pendingSoundTimeouts.add(timerId);
+    return null;
   }
 
   // Slow path: Audio element fallback (may need to load/decode on demand)
@@ -702,12 +747,28 @@ export function stopSound(soundHandle) {
   if (srcStr.includes('faah') || srcStr.includes('announcer/faah')) {
     return; // PROTECTED: Never cut faah.mp3 death audio!
   }
+  if (soundHandle.safetyTimeout) {
+    clearTimeout(soundHandle.safetyTimeout);
+    _pendingSoundTimeouts.delete(soundHandle.safetyTimeout);
+  }
   try {
     // Web Audio: micro-fade-out then disconnect to prevent click/pop
     if (soundHandle.gainNode && typeof soundHandle.gainNode.gain === 'object') {
       try {
         const audioCtx = getAudioContext();
         const now = audioCtx.currentTime;
+
+        // If sound was scheduled in the future and hasn't started yet, cancel immediately
+        if (soundHandle.startTime !== undefined && now < soundHandle.startTime) {
+          try { if (soundHandle.source) soundHandle.source.stop(0); } catch(e) {}
+          try { if (soundHandle.source) soundHandle.source.disconnect(); } catch(e) {}
+          soundHandle.gainNode.gain.cancelScheduledValues(now);
+          soundHandle.gainNode.gain.setValueAtTime(0.0001, now);
+          try { soundHandle.gainNode.disconnect(); } catch(e) {}
+          _activeSoundHandles.delete(soundHandle);
+          return;
+        }
+
         soundHandle.gainNode.gain.cancelScheduledValues(now);
         soundHandle.gainNode.gain.setValueAtTime(soundHandle.gainNode.gain.value, now);
         soundHandle.gainNode.gain.linearRampToValueAtTime(0.001, now + MICRO_FADE_OUT);
@@ -758,6 +819,13 @@ export function fadeOutSound(soundHandle, fadeMs = 350) {
     try {
       const audioCtx = getAudioContext();
       const now = audioCtx.currentTime;
+
+      // If scheduled in the future and hasn't started yet, cancel immediately
+      if (soundHandle.startTime !== undefined && now < soundHandle.startTime) {
+        stopSound(soundHandle);
+        return;
+      }
+
       const currentGain = soundHandle.gainNode.gain.value;
       soundHandle.gainNode.gain.cancelScheduledValues(now);
       soundHandle.gainNode.gain.setValueAtTime(currentGain, now);

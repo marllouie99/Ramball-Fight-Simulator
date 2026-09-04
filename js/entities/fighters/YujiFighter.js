@@ -168,11 +168,11 @@ export class YujiFighter extends Fighter {
       }
     }
 
-    // Decay hit-flash visual BEFORE freeze guard so it doesn't stay stuck at max
-    // while frozen (prevents permanent white overlay during Toji ambush hits).
-    // We only tick hitFlashTimer here because super.update() handles the full
-    // _tickCooldowns()/handlePoison()/handleBurn() and we don't want to double-call those.
-    if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+    // Decay hit-flash visual if frozen/stasis early-exit so it doesn't stay stuck at max
+    // while frozen. Super.update() / _tickCooldowns() handles normal active frames.
+    if ((this.timeStopTimer > 0 || this.isTargetOfAmbush || this.isParalyzed) && this.hitFlashTimer > 0) {
+      this.hitFlashTimer--;
+    }
 
     // TimeStop & Freeze Guards (Rule #1)
     const isBeamTrapped = this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0) || (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0);

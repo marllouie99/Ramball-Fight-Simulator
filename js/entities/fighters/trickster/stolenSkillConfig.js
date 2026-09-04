@@ -45,6 +45,10 @@ export const STOLEN_SKILL_CONFIG = {
       damageMultiplier: 1.2, // Bonus to trickster projectiles while in rage
       cooldownMultiplier: 0.9
     },
+    gojo: {
+      damageMultiplier: 1.2,
+      cooldownMultiplier: 0.8
+    },
     normal: {
       damageMultiplier: 1.5,
       cooldownMultiplier: 1.0

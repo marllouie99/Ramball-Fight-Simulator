@@ -312,7 +312,7 @@ export function drawMahoragaGammaRayRainbowOverlay(ctx, fighter) {
  * cleave windup, sakuga impact, and health bar.
  */
 export function drawMahoragaFighter(ctx, fighter, opponent) {
-  const isGojoDomainActive = typeof state !== 'undefined' && (
+  const isGojoDomainActive = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))

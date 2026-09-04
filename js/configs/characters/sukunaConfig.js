@@ -23,7 +23,7 @@ export const sukunaConfig = {
     // Basic Attack: Dismantle / Cleave Ranged Slashes
     slashSpeed: 40,                   // Supersonic travel speed of Dismantle and Cleave slashes (px/frame)
     slashDamage: 18,                  // Base damage per slash
-    slashCooldown: 50,                // Frames between ranged basic slash attacks
+    slashCooldown: 30,                // Frames between ranged basic slash attacks
 
     // Stacking Slash Crit Passive
     baseCritChance: 0.25,             // 10% base crit chance
@@ -72,6 +72,7 @@ export const sukunaConfig = {
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     divineFlameCooldown: 700,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
+    divineFlameChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Furnace / Fuga
     domainFugaCooldownReduction: 0.70, // 70% CD reduction to Fuga when inside Malevolent Shrine Domain
     domainFugaCooldownReductionPercent: 0.70, // 70% CD reduction
     divineFlameDomainCooldown: 210, // Cooldown between Fuga uses inside Domain (~3.5 seconds at 60fps)

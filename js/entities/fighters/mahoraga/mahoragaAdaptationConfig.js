@@ -8,38 +8,38 @@ export const mahoragaAdaptationConfig = {
   // ── GOJO SATORU ──
   gojo: {
     infinity: {
-      requiredFreezes: 5, // Must collide with / be frozen by Limitless 10 times to adapt
+      requiredFreezes: 2, // Must collide with / be frozen by Limitless 2 times to adapt (Rule 9 standard)
       bypassesInfinity: true
     },
-    red: { damageThresholdPct: 0.04, windowFrames: 400 },
-    blue: { damageThresholdPct: 0.03, windowFrames: 400 },
-    purple: { damageThresholdPct: 0.06, windowFrames: 600 }
+    red: { damageThresholdPct: 0.15, windowFrames: 400 },
+    blue: { damageThresholdPct: 0.15, windowFrames: 400 },
+    purple: { damageThresholdPct: 0.15, windowFrames: 600 }
   },
 
   // ── RYOMEN SUKUNA ──
   sukuna: {
-    dismantle: { damageThresholdPct: 0.10, windowFrames: 300 },
+    dismantle: { damageThresholdPct: 0.15, windowFrames: 300 },
     cleave: { damageThresholdPct: 0.15, windowFrames: 300 },
-    divineFlame: { damageThresholdPct: 0.30, windowFrames: 600 } // Fire Arrow is extremely hard to adapt to
+    divineFlame: { damageThresholdPct: 0.15, windowFrames: 600 }
   },
 
   // ── TOJI FUSHIGURO ──
   toji: {
     isoh: { canAdapt: false }, // Inverted Spear of Heaven bypasses/cancels all adaptation!
     ssk: { damageThresholdPct: 0.15, windowFrames: 300 }, // Soul Split Katana
-    flyhead: { damageThresholdPct: 0.05, windowFrames: 200 }
+    flyhead: { damageThresholdPct: 0.15, windowFrames: 200 }
   },
 
   // ── YUTA OKKOTSU ──
   yuta: {
-    rika: { damageThresholdPct: 0.10, windowFrames: 300 },
-    loveBeam: { damageThresholdPct: 0.20, windowFrames: 400 },
-    thinIceBreaker: { damageThresholdPct: 0.12, windowFrames: 300 }
+    rika: { damageThresholdPct: 0.15, windowFrames: 300 },
+    loveBeam: { damageThresholdPct: 0.15, windowFrames: 400 },
+    thinIceBreaker: { damageThresholdPct: 0.15, windowFrames: 300 }
   },
 
   // ── GENERIC FALLBACK ──
   default: {
-    damageThresholdPct: 0.10, // Default 10% Max HP
+    damageThresholdPct: 0.15, // Default 15% Max HP (matches WOA HUD skill bar)
     windowFrames: 300 // Default 5 seconds
   }
 };

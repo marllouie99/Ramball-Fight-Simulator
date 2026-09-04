@@ -9,7 +9,7 @@ import { GAME_MODES } from '../../core/modeConfig.js';
 import { fastCleanArray } from './visualTrailSystem.js';
 import { triggerGenosSelfDestructFlash } from '../renderers/effectsRenderer.js';
 
-import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
+import { ParticleSystem, isProtectedParticle } from '../../systems/particles/ParticleSystem.js';
 
 function _isDarkMode() {
   return Boolean(
@@ -617,7 +617,8 @@ export function drawSparkEffects(layer = 'all') {
     if (layer === 'foreground' && isBackground) continue;
 
     // Skip effects with non-finite coordinates to prevent createRadialGradient errors
-    if (!Number.isFinite(effect.x) || !Number.isFinite(effect.y) || !Number.isFinite(effect.size)) continue;
+    if (!Number.isFinite(effect.x) || !Number.isFinite(effect.y)) continue;
+    if (effect.size !== undefined && !Number.isFinite(effect.size)) continue;
 
     ctx.save();
     ctx.globalAlpha = effect.life;
@@ -1234,12 +1235,11 @@ export function drawSparkEffects(layer = 'all') {
           ctx.restore();
         }
       } else if (effect.type === 'saitamaCounterFrontalBlast') {
-        // Massive Wide Long Frontal Supersonic Shockwave Blast (PIXEL ART STYLE - YELLOW CONE SHAPE)
+        // ── SAITAMA CONCUSSIVE SERIOUS SHOCKWAVE (CLEAN V CONE SHAPE - PIXEL ART STYLE) ──
         const startX = effect.x;
         const startY = effect.y;
         const angle = effect.angle || 0;
         const reach = effect.reach || 750;
-        const arc = effect.arcAngle || (Math.PI * 0.75);
         const progress = 1.0 - effect.life; // 0 to 1
         const alpha = Math.sin(effect.life * Math.PI);
 
@@ -1248,115 +1248,233 @@ export function drawSparkEffects(layer = 'all') {
           ctx.translate(startX, startY);
           ctx.rotate(angle);
 
-          const P = 3.0; // Pixel art grid scale
+          // Pixel art grid scale
+          const P = 4.0;
           const snap = (v) => Math.round(v / P) * P;
 
-          // Fast supersonic expansion along length: reaches full length by progress = 0.25
-          const currentReach = reach * Math.min(1.0, progress * 4.0);
+          // Fast supersonic expansion along length: reaches full distance by progress = 0.20
+          const currentReach = reach * Math.min(1.0, progress * 4.5);
 
-          // ── 1. PIXEL-ART FRACTURED YELLOW CONCUSSIVE CONE SHARDS ──
-          const shardPolys = [
-            // Top outer wing shard
-            [ { x: 0, y: 0 }, { x: currentReach * 0.40, y: -currentReach * 0.32 }, { x: currentReach * 0.65, y: -currentReach * 0.16 }, { x: currentReach * 0.32, y: 0 } ],
-            // Top mid shard
-            [ { x: 0, y: 0 }, { x: currentReach * 0.65, y: -currentReach * 0.16 }, { x: currentReach * 0.92, y: 0 }, { x: currentReach * 0.60, y: currentReach * 0.08 } ],
-            // Bottom mid shard
-            [ { x: 0, y: 0 }, { x: currentReach * 0.60, y: currentReach * 0.08 }, { x: currentReach * 0.88, y: currentReach * 0.20 }, { x: currentReach * 0.38, y: currentReach * 0.32 } ],
-            // Bottom outer wing shard
-            [ { x: 0, y: 0 }, { x: currentReach * 0.38, y: currentReach * 0.32 }, { x: currentReach * 0.62, y: currentReach * 0.42 }, { x: currentReach * 0.25, y: currentReach * 0.15 } ],
-            // Centerline supersonic piercing shard
-            [ { x: currentReach * 0.32, y: 0 }, { x: currentReach * 0.92, y: 0 }, { x: currentReach * 1.08, y: 0 }, { x: currentReach * 0.75, y: -currentReach * 0.06 } ]
-          ];
+          // Clean, sharp V-cone opening half-angle (~55-degree total cone opening)
+          const halfArc = 0.48;
+          const stepSize = P * 2; // 8px staircase steps along X
+          const numSteps = Math.ceil(currentReach / stepSize);
 
-          shardPolys.forEach((pts, sIdx) => {
-            // Pass 1: Pixel Outline
+          // ── 1. CLEAN STEPPED PIXEL V-CONE BODY (Straight linear staircase rails, NO waviness) ──
+          for (let s = 0; s < numSteps; s++) {
+            const gx = s * stepSize;
+            if (gx > currentReach) break;
+
+            // Straight linear V boundary
+            const halfW = Math.max(P * 2, snap(gx * Math.tan(halfArc)));
+
+            // Layer 1: Concussive Atmospheric Glow (Translucent Golden-Yellow Field)
+            ctx.fillStyle = `rgba(255, 235, 59, ${(0.18 * alpha).toFixed(3)})`;
+            ctx.fillRect(gx, -halfW - P * 2, stepSize, halfW * 2 + P * 4);
+
+            // Layer 2: Dark Manga Ink Border Rails (Top & Bottom outer silhouette)
             ctx.fillStyle = '#111114';
-            for (let j = 0; j < pts.length; j++) {
-              const p1 = pts[j];
-              const p2 = pts[(j + 1) % pts.length];
-              const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-              const steps = Math.max(2, Math.round(dist / P));
-              for (let st = 0; st <= steps; st++) {
-                const rx = p1.x + (p2.x - p1.x) * (st / steps);
-                const ry = p1.y + (p2.y - p1.y) * (st / steps);
-                ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
-              }
+            ctx.fillRect(gx, -halfW - P, stepSize, P);
+            ctx.fillRect(gx, halfW, stepSize, P);
+
+            // Layer 3: Neon Safety Yellow & Radiant Gold Boundary Rails
+            ctx.fillStyle = `rgba(255, 238, 0, ${(0.96 * alpha).toFixed(3)})`; // Brilliant Safety Yellow (top rail)
+            ctx.fillRect(gx, -halfW, stepSize, P * 2);
+            ctx.fillStyle = `rgba(255, 183, 0, ${(0.96 * alpha).toFixed(3)})`; // Deep Radiant Gold (bottom rail)
+            ctx.fillRect(gx, halfW - P * 2, stepSize, P * 2);
+
+            // Layer 4: Warm Concussive Amber-Gold Core
+            const coreH = Math.max(0, halfW * 2 - P * 4);
+            if (coreH > 0) {
+              const coreAlpha = (s % 2 === 0 ? 0.38 : 0.28) * alpha;
+              ctx.fillStyle = `rgba(255, 204, 0, ${coreAlpha.toFixed(3)})`;
+              ctx.fillRect(gx, -halfW + P * 2, stepSize, coreH);
             }
 
-            // Pass 2: Stepped Yellow/Gold Shard Body
-            const shardCol = (sIdx % 2 === 0) 
-              ? `rgba(255, 235, 59, ${(0.85 * alpha).toFixed(3)})`  // Radiant Safety Yellow
-              : `rgba(255, 215, 0, ${(0.90 * alpha).toFixed(3)})`;   // Vivid Golden Yellow
-            ctx.fillStyle = shardCol;
-            ctx.beginPath();
-            pts.forEach((pt, pIdx) => {
-              const px = snap(pt.x);
-              const py = snap(pt.y);
-              if (pIdx === 0) ctx.moveTo(px, py);
-              else ctx.lineTo(px, py);
-            });
-            ctx.closePath();
-            ctx.fill();
+            // Layer 5: Blinding White-Hot Centerline Core Beam
+            const centerW = Math.max(P, snap(halfW * 0.22));
+            ctx.fillStyle = (s % 2 === 0) 
+              ? `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})` 
+              : `rgba(255, 250, 190, ${(0.92 * alpha).toFixed(3)})`;
+            ctx.fillRect(gx, -centerW * 0.5, stepSize, centerW);
+          }
 
-            // Pass 3: White-Hot Highlight Edge Pixels
-            ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
-            for (let j = 0; j < pts.length; j++) {
-              const p1 = pts[j];
-              const p2 = pts[(j + 1) % pts.length];
-              const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-              const steps = Math.max(1, Math.round(dist / (P * 2)));
-              for (let st = 0; st <= steps; st++) {
-                const rx = p1.x + (p2.x - p1.x) * (st / steps);
-                const ry = p1.y + (p2.y - p1.y) * (st / steps);
-                ctx.fillRect(snap(rx), snap(ry), P, P);
-              }
-            }
-          });
+          // Apex Fist Piercing Pixel Core
+          ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
+          ctx.fillRect(-P, -P * 2, P * 2, P * 4);
+          ctx.fillRect(-P * 2, -P, P * 4, P * 2);
 
-          // ── 2. STEPPED PIXEL JAGGED CONCUSSIVE FISSURE SHOCKWAVE LINES ──
-          const fissures = [
-            [ { x: 0, y: 0 }, { x: currentReach * 0.20, y: -currentReach * 0.12 }, { x: currentReach * 0.45, y: -currentReach * 0.22 }, { x: currentReach * 0.70, y: -currentReach * 0.32 } ],
-            [ { x: 0, y: 0 }, { x: currentReach * 0.25, y: 0 }, { x: currentReach * 0.55, y: currentReach * 0.02 }, { x: currentReach * 0.85, y: -currentReach * 0.02 }, { x: currentReach * 1.10, y: 0 } ],
-            [ { x: 0, y: 0 }, { x: currentReach * 0.18, y: currentReach * 0.10 }, { x: currentReach * 0.42, y: currentReach * 0.20 }, { x: currentReach * 0.68, y: currentReach * 0.30 } ]
-          ];
+          // ── 2. NESTED STEPPED PIXEL V-CHEVRONS (Concussive Shockwave Mach Pulses) ──
+          const numChevrons = 4;
+          for (let c = 0; c < numChevrons; c++) {
+            const cFrac = ((c + 1) / (numChevrons + 1)) * (0.25 + progress * 0.75);
+            const cDist = currentReach * cFrac;
+            if (cDist < P * 4 || cDist > currentReach) continue;
 
-          fissures.forEach(fiss => {
-            ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
-            for (let j = 0; j < fiss.length - 1; j++) {
-              const p1 = fiss[j];
-              const p2 = fiss[j + 1];
-              const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-              const steps = Math.max(2, Math.round(dist / P));
-              for (let st = 0; st <= steps; st++) {
-                const rx = p1.x + (p2.x - p1.x) * (st / steps);
-                const ry = p1.y + (p2.y - p1.y) * (st / steps);
-                ctx.fillRect(snap(rx), snap(ry), P * 1.5, P * 1.5);
-              }
-            }
-          });
+            const cHalfW = snap(cDist * Math.tan(halfArc));
+            const armSteps = Math.max(4, Math.floor(cHalfW / (P * 2)));
 
-          // ── 3. CONCENTRIC STEPPED PIXEL ARC SHOCKWAVE RINGS ──
-          const numRings = 3;
-          for (let rIdx = 0; rIdx < numRings; rIdx++) {
-            const ringDist = currentReach * (0.35 + rIdx * 0.30);
-            const ringArc = arc * 0.75;
-            const ringSteps = 16;
-            ctx.fillStyle = `rgba(255, 235, 59, ${(0.75 * alpha).toFixed(3)})`;
-            for (let st = 0; st <= ringSteps; st++) {
-              const ang = -ringArc * 0.5 + (st / ringSteps) * ringArc;
-              const rx = Math.cos(ang) * ringDist;
-              const ry = Math.sin(ang) * ringDist;
-              ctx.fillRect(snap(rx), snap(ry), P * 1.5, P * 1.5);
+            ctx.fillStyle = (c % 2 === 0)
+              ? `rgba(255, 255, 255, ${(0.96 * alpha).toFixed(3)})`
+              : `rgba(255, 238, 0, ${(0.92 * alpha).toFixed(3)})`;
+
+            // Draw V chevron pointing forward along +X with arms sweeping back
+            for (let st = 0; st <= armSteps; st++) {
+              const t = st / armSteps;
+              const px = snap(cDist - t * (cHalfW * 0.35));
+              const py = snap(t * cHalfW);
+              ctx.fillRect(px, -py - P, P * 1.5, P * 1.5);
+              ctx.fillRect(px, py, P * 1.5, P * 1.5);
             }
           }
 
-          // ── 4. FLOATING SHATTERED GOLDEN PIXEL EMBERS ──
+          // ── 3. STRAIGHT PIXEL SPEED RAYS (Piercing straight outward within V-cone) ──
+          const rayAngles = [
+            -halfArc * 0.70,
+            -halfArc * 0.35,
+            0,
+            halfArc * 0.35,
+            halfArc * 0.70
+          ];
+
+          rayAngles.forEach((rayAng, rIdx) => {
+            const cosR = Math.cos(rayAng);
+            const sinR = Math.sin(rayAng);
+            const maxRayLen = currentReach * (rIdx % 2 === 0 ? 0.96 : 0.82);
+            const raySteps = Math.floor(maxRayLen / (P * 2));
+
+            ctx.fillStyle = (rayAng === 0) 
+              ? `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})` 
+              : `rgba(255, 235, 59, ${(0.85 * alpha).toFixed(3)})`;
+
+            for (let st = 1; st <= raySteps; st++) {
+              const d = st * (P * 2);
+              const rx = snap(cosR * d);
+              const ry = snap(sinR * d);
+              ctx.fillRect(rx, ry, P, P);
+            }
+          });
+
+          // ── 4. STEPPED PIXEL FRONTAL CAP (Leading edge wavefront) ──
+          const capHalfW = snap(currentReach * Math.tan(halfArc));
+          ctx.fillStyle = `rgba(255, 255, 255, ${(0.96 * alpha).toFixed(3)})`;
+          ctx.fillRect(snap(currentReach), -capHalfW, P, capHalfW * 2);
+          ctx.fillStyle = '#111114';
+          ctx.fillRect(snap(currentReach) + P, -capHalfW, P, capHalfW * 2);
+
+          // ── 5. CLEAN PIXEL ART EMBERS (Floating within V-cone corridor) ──
+          const numEmbers = 16;
+          for (let eb = 0; eb < numEmbers; eb++) {
+            const ebDist = snap(currentReach * (0.15 + (eb / numEmbers) * 0.75));
+            const ebAng = ((eb % 7) - 3) * (halfArc * 0.25);
+            const ebX = snap(Math.cos(ebAng) * ebDist);
+            const ebY = snap(Math.sin(ebAng) * ebDist);
+            ctx.fillStyle = (eb % 3 === 0) ? '#FFFFFF' : ((eb % 2 === 0) ? '#FFEE58' : '#FFB300');
+            ctx.fillRect(ebX, ebY, P, P);
+          }
+
+          ctx.restore();
+        }
+      } else if (effect.type === 'gojoRedFrontalBlast') {
+        // ── GOJO REVERSAL RED CLEAN GEOMETRIC PIXEL ART CONE (NO WAVINESS) ──
+        const startX = effect.x;
+        const startY = effect.y;
+        const angle = effect.angle || 0;
+        const reach = effect.reach || 650;
+        const halfArc = 0.38; // ~44-degree total cone opening angle
+        const progress = 1.0 - effect.life; // 0 to 1
+        const alpha = Math.sin(effect.life * Math.PI);
+
+        if (alpha > 0.01) {
+          ctx.save();
+          ctx.translate(startX, startY);
+          ctx.rotate(angle);
+
+          // Fast supersonic expansion along cone: reaches full distance by progress = 0.20
+          const currentReach = reach * Math.min(1.0, progress * 5.0);
+
+          // Pixel art grid scale
+          const P = 4.0;
+          const snap = (v) => Math.round(v / P) * P;
+
+          // ── 1. CLEAN STEPPED PIXEL CONICAL BODY RUNS (Straight linear staircase, NO waviness) ──
+          const stepSize = P * 2; // 8px steps along X
+          const numSteps = Math.ceil(currentReach / stepSize);
+
+          for (let s = 0; s < numSteps; s++) {
+            const gx = s * stepSize;
+            if (gx > currentReach) break;
+
+            // Clean straight linear boundary (strictly no wavy flutter)
+            const halfW = Math.max(P * 2, snap(gx * Math.tan(halfArc)));
+
+            // Layer 1: Atmospheric Glow (Translucent Crimson Field)
+            ctx.fillStyle = `rgba(255, 0, 51, ${(0.22 * alpha).toFixed(3)})`;
+            ctx.fillRect(gx, -halfW - P * 2, stepSize, halfW * 2 + P * 4);
+
+            // Layer 2: Dark Manga Ink Border Rails (Top & Bottom steps)
+            ctx.fillStyle = '#110204';
+            ctx.fillRect(gx, -halfW - P, stepSize, P);
+            ctx.fillRect(gx, halfW, stepSize, P);
+
+            // Layer 3: Neon Red Flame Rim (Top & Bottom inner steps)
+            ctx.fillStyle = `rgba(255, 0, 51, ${(0.92 * alpha).toFixed(3)})`;
+            ctx.fillRect(gx, -halfW, stepSize, P * 2);
+            ctx.fillRect(gx, halfW - P * 2, stepSize, P * 2);
+
+            // Layer 4: Deep Crimson Cursed Core
+            const coreHeight = Math.max(0, halfW * 2 - P * 4);
+            if (coreHeight > 0) {
+              ctx.fillStyle = `rgba(139, 0, 20, ${(0.75 * alpha).toFixed(3)})`;
+              ctx.fillRect(gx, -halfW + P * 2, stepSize, coreHeight);
+            }
+
+            // Layer 5: Straight Piercing White-Hot Centerline Beam
+            const centerW = Math.max(P, snap(halfW * 0.30));
+            ctx.fillStyle = (s % 2 === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : `rgba(255, 140, 160, ${(0.90 * alpha).toFixed(3)})`;
+            ctx.fillRect(gx, -centerW * 0.5, stepSize, centerW);
+          }
+
+          // ── 2. STRAIGHT RADIAL PIXEL RAYS (Piercing straight outward, no wavy offsets) ──
+          const rayAngles = [
+            -halfArc * 0.65,
+            -halfArc * 0.32,
+            0,
+            halfArc * 0.32,
+            halfArc * 0.65
+          ];
+
+          rayAngles.forEach((rayAng, rIdx) => {
+            const cosR = Math.cos(rayAng);
+            const sinR = Math.sin(rayAng);
+            const maxRayLen = currentReach * (rIdx % 2 === 0 ? 0.95 : 0.80);
+            const raySteps = Math.floor(maxRayLen / (P * 2));
+
+            ctx.fillStyle = (rayAng === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : `rgba(255, 210, 220, ${(0.80 * alpha).toFixed(3)})`;
+
+            for (let st = 1; st <= raySteps; st++) {
+              const d = st * (P * 2);
+              const rx = snap(cosR * d);
+              const ry = snap(sinR * d);
+              ctx.fillRect(rx, ry, P, P);
+            }
+          });
+
+          // ── 3. STEPPED PIXEL FRONTAL CAP (Stepped vertical wavefront) ──
+          const capHalfW = snap(currentReach * Math.tan(halfArc));
+          ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
+          ctx.fillRect(snap(currentReach), -capHalfW, P, capHalfW * 2);
+          ctx.fillStyle = '#110204';
+          ctx.fillRect(snap(currentReach) + P, -capHalfW, P, capHalfW * 2);
+
+          // ── 4. STRAIGHT STEPPED PIXEL EMBERS ──
           const numEmbers = 12;
           for (let eb = 0; eb < numEmbers; eb++) {
-            const ebSeed = eb * 19.7 + progress * 40;
-            const ebX = snap(currentReach * (0.15 + (eb % 6) * 0.15) + (ebSeed * 0.5));
-            const ebY = snap(((eb % 4) - 1.5) * (currentReach * 0.18) + Math.sin(ebSeed) * 15);
-            ctx.fillStyle = (eb % 2 === 0) ? '#FFEE58' : '#FFFFFF';
+            const ebDist = snap(currentReach * (0.20 + (eb / numEmbers) * 0.70));
+            const ebAng = ((eb % 5) - 2) * (halfArc * 0.28);
+            const ebX = snap(Math.cos(ebAng) * ebDist);
+            const ebY = snap(Math.sin(ebAng) * ebDist);
+            ctx.fillStyle = (eb % 2 === 0) ? '#FFFFFF' : '#FF0033';
             ctx.fillRect(ebX, ebY, P, P);
           }
 
@@ -2786,12 +2904,18 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
 
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
-  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 20;
+  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 60 : 120) : 180;
   let insertIdx = -1;
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
-    insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-    const oldest = state.sparkEffects[insertIdx];
-    if (oldest) ParticleSystem.returnParticle(oldest);
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const cand = state.sparkEffects[randIdx];
+      if (cand && !isProtectedParticle(cand)) {
+        insertIdx = randIdx;
+        ParticleSystem.returnParticle(cand);
+        break;
+      }
+    }
   }
 
   const shockwave = ParticleSystem.getParticle();
@@ -2829,6 +2953,8 @@ export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, colo
   shockwave.hitAngle = hitAngle;
   shockwave.color = color;
 
+  shockwave.isProtected = true;
+  shockwave.isPixi = false;
   state.sparkEffects.push(shockwave);
 }
 
@@ -2841,12 +2967,18 @@ export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, colo
 export function spawnRikaRoarShockwave(x, y, radius = 180) {
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
-  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
+  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 60 : 120) : 180;
   let insertIdx = -1;
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
-    insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-    const oldest = state.sparkEffects[insertIdx];
-    if (oldest) ParticleSystem.returnParticle(oldest);
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const cand = state.sparkEffects[randIdx];
+      if (cand && !isProtectedParticle(cand)) {
+        insertIdx = randIdx;
+        ParticleSystem.returnParticle(cand);
+        break;
+      }
+    }
   }
 
   const shockwave = ParticleSystem.getParticle();
@@ -2877,12 +3009,18 @@ export function spawnRikaRoarShockwave(x, y, radius = 180) {
 export function spawnMahoragaShoutShockwave(x, y, radius = 180) {
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
-  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
+  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 60 : 120) : 180;
   let insertIdx = -1;
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
-    insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-    const oldest = state.sparkEffects[insertIdx];
-    if (oldest) ParticleSystem.returnParticle(oldest);
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const cand = state.sparkEffects[randIdx];
+      if (cand && !isProtectedParticle(cand)) {
+        insertIdx = randIdx;
+        ParticleSystem.returnParticle(cand);
+        break;
+      }
+    }
   }
 
   const shockwave = ParticleSystem.getParticle();
@@ -2963,9 +3101,15 @@ export function spawnGenosThrusterDashVisual(x, y, dashAngle = 0) {
   for (let i = 0; i < 8; i++) {
     let insertIdx = -1;
     if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
-      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-      const oldest = state.sparkEffects[insertIdx];
-      if (oldest) ParticleSystem.returnParticle(oldest);
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+        const cand = state.sparkEffects[randIdx];
+        if (cand && !isProtectedParticle(cand)) {
+          insertIdx = randIdx;
+          ParticleSystem.returnParticle(cand);
+          break;
+        }
+      }
     }
 
     const spread = backAngle + (Math.random() - 0.5) * 0.7;
@@ -3009,9 +3153,15 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
   for (let i = 0; i < lineCount; i++) {
     let insertIdx = -1;
     if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
-      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-      const oldest = state.sparkEffects[insertIdx];
-      if (oldest) ParticleSystem.returnParticle(oldest);
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+        const cand = state.sparkEffects[randIdx];
+        if (cand && !isProtectedParticle(cand)) {
+          insertIdx = randIdx;
+          ParticleSystem.returnParticle(cand);
+          break;
+        }
+      }
     }
 
     // Offset parallel lines perpendicular to punch angle
@@ -3069,6 +3219,8 @@ export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 750, ar
   blast.y = y;
   blast.vx = 0;
   blast.vy = 0;
+  blast.size = reach;
+  blast.targetSize = reach;
   blast.angle = angle;
   blast.reach = reach;
   blast.arcAngle = arcAngle;
@@ -3077,26 +3229,21 @@ export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 750, ar
   blast.friction = 1.0;
   blast.type = 'saitamaCounterFrontalBlast';
   blast.isFlash = true;
+  blast.isProtected = true;
+  blast.isPixi = false;
+  blast.sprite = null;
 
   if (state.sparkEffects) {
     state.sparkEffects.push(blast);
   }
 
-  // Sequential expanding shockwaves along the corridor
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
-  const distances = [60, 180, 320, 480, 640];
-  const radii = [90, 125, 160, 200, 240];
 
-  distances.forEach((dist, idx) => {
-    if (dist < reach) {
-      const swX = x + cosA * dist;
-      const swY = y + sinA * dist;
-      if (typeof spawnMeleeClashShockwave === 'function') {
-        spawnMeleeClashShockwave(swX, swY, radii[idx] || 120, 'gold');
-      }
-    }
-  });
+  // Crisp punch impact flash at fist origin
+  if (typeof spawnImpactFlash === 'function') {
+    spawnImpactFlash(x, y, 45, '#FFEE58');
+  }
 
   // High-speed wind streaks along the corridor
   if (typeof spawnPunchWindSpeedLines === 'function') {
@@ -3111,6 +3258,48 @@ export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 750, ar
     spawnSparks(x + cosA * 160, y + sinA * 160, 14, 'orange');
     spawnSparks(x + cosA * 320, y + sinA * 320, 10, 'crimson');
   }
+}
+
+/**
+ * Spawns a massive Jujutsu Kaisen Cursed Technique Reversal: Red frontal repulsion blast.
+ * Creates an intense crimson/ruby supersonic shockwave laser corridor with fractured shards,
+ * distortion arcs, expanding repulsion rings, and high-velocity cursed energy sparks.
+ * @param {number} x - Origin X (Gojo's position)
+ * @param {number} y - Origin Y
+ * @param {number} angle - Facing/Blast trajectory angle in radians
+ * @param {number} reach - Length of the frontal corridor (default 650px)
+ * @param {number} arcAngle - Frontal cone angle in radians (default ~80 deg)
+ */
+export function spawnGojoRedFrontalBlast(x, y, angle = 0, reach = 650, arcAngle = Math.PI * 0.45) {
+  const blast = ParticleSystem.getParticle();
+  blast.x = x;
+  blast.y = y;
+  blast.vx = 0;
+  blast.vy = 0;
+  blast.size = reach;
+  blast.targetSize = reach;
+  blast.angle = angle;
+  blast.reach = reach;
+  blast.arcAngle = arcAngle;
+  blast.life = 1.0;
+  blast.decay = 0.040; // ~25 frames duration
+  blast.friction = 1.0;
+  blast.type = 'gojoRedFrontalBlast';
+  blast.isFlash = true;
+  blast.isProtected = true;
+  blast.isPixi = false;
+  blast.sprite = null;
+
+  if (state.sparkEffects) {
+    state.sparkEffects.push(blast);
+  }
+
+  // Dense burst of directional crimson sparks along the origin & axis
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  spawnSparks(x, y, 30, 'crimsonSniper');
+  spawnSparks(x + cosA * 150, y + sinA * 150, 16, 'crimsonSniper');
+  spawnSparks(x + cosA * 320, y + sinA * 320, 12, 'crimsonSniper');
 }
 
 /**
@@ -3132,9 +3321,15 @@ export function spawnTodoClapCEParticles(x, y, angle = 0) {
   for (let i = 0; i < ceCount; i++) {
     let insertIdx = -1;
     if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
-      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-      const oldest = state.sparkEffects[insertIdx];
-      if (oldest) ParticleSystem.returnParticle(oldest);
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+        const cand = state.sparkEffects[randIdx];
+        if (cand && !isProtectedParticle(cand)) {
+          insertIdx = randIdx;
+          ParticleSystem.returnParticle(cand);
+          break;
+        }
+      }
     }
 
     const pAngle = Math.random() * Math.PI * 2;
@@ -3163,9 +3358,15 @@ export function spawnTodoClapCEParticles(x, y, angle = 0) {
   for (let i = 0; i < lineCount; i++) {
     let insertIdx = -1;
     if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
-      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
-      const oldest = state.sparkEffects[insertIdx];
-      if (oldest) ParticleSystem.returnParticle(oldest);
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const randIdx = Math.floor(Math.random() * state.sparkEffects.length);
+        const cand = state.sparkEffects[randIdx];
+        if (cand && !isProtectedParticle(cand)) {
+          insertIdx = randIdx;
+          ParticleSystem.returnParticle(cand);
+          break;
+        }
+      }
     }
 
     const lineAngle = (i / lineCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
@@ -3540,19 +3741,23 @@ export function spawnMahitoDomainSoulTendrilStrike(startX, startY, targetX, targ
  * @param {number} radius - Max explosion radius
  * @param {boolean} is200 - True if 200% empowered cast
  */
-export function spawnPurpleShockwaveRings(x, y, radius = 280, is200 = false) {
+export function spawnPurpleShockwaveRings(x, y, radius = 280, is200 = false, isGreen = false) {
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 6 : 12) : 25;
 
-  const ringConfigs = [
+  const ringConfigs = isGreen ? [
+    { startSize: 14, targetMult: 1.0, decay: 0.038, color: is200 ? 'rgba(50, 255, 120, 0.95)' : 'rgba(0, 255, 100, 0.95)' },
+    { startSize: 8,  targetMult: 0.76, decay: 0.044, color: 'rgba(0, 200, 70, 0.90)' },
+    { startSize: 4,  targetMult: 0.52, decay: 0.050, color: 'rgba(255, 255, 255, 0.95)' },
+  ] : [
     { startSize: 14, targetMult: 1.0, decay: 0.038, color: is200 ? 'rgba(224, 102, 255, 0.95)' : 'rgba(191, 90, 242, 0.95)' },
     { startSize: 8,  targetMult: 0.76, decay: 0.044, color: 'rgba(138, 43, 226, 0.90)' },
     { startSize: 4,  targetMult: 0.52, decay: 0.050, color: 'rgba(255, 255, 255, 0.95)' },
   ];
 
   if (is200) {
-    ringConfigs.push({ startSize: 20, targetMult: 1.18, decay: 0.032, color: 'rgba(0, 255, 255, 0.85)' });
+    ringConfigs.push({ startSize: 20, targetMult: 1.18, decay: 0.032, color: isGreen ? 'rgba(200, 255, 220, 0.85)' : 'rgba(0, 255, 255, 0.85)' });
   }
 
   for (let r = 0; r < ringConfigs.length; r++) {
@@ -3586,7 +3791,7 @@ export function spawnPurpleShockwaveRings(x, y, radius = 280, is200 = false) {
   }
 
   // Also spawn clean impact flash & lightning sparks
-  spawnImpactFlash(x, y, radius * 0.35, '#BF5AF2');
-  spawnSparks(x, y, is200 ? 16 : 10, 'lightningTrail', '#8A2BE2');
-  spawnSparks(x, y, is200 ? 8 : 4, 'lightningTrail', '#00FFFF');
+  spawnImpactFlash(x, y, radius * 0.35, isGreen ? '#00FF64' : '#BF5AF2');
+  spawnSparks(x, y, is200 ? 16 : 10, 'lightningTrail', isGreen ? '#00FF64' : '#8A2BE2');
+  spawnSparks(x, y, is200 ? 8 : 4, 'lightningTrail', isGreen ? '#B3FFCC' : '#00FFFF');
 }

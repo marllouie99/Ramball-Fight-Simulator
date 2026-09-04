@@ -335,6 +335,7 @@ export const state = {
   allFpsLogs: [],
   hideFpsLogs: localStorage.getItem('hideFpsLogs') === 'true',
   performanceMode: false,
+  frameAudioTime: 0,
 
   // Dynamic quality system for performance
   qualityLevel: 1.0, // 1.0 = full quality, 0.5 = half quality, etc.

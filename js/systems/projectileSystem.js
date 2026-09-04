@@ -105,8 +105,10 @@ class ProjectileSystem {
     p.isGojoBlue = false;
     p.isGojoPurple = false;
     p.isGojoPurpleOrb = false;
-    p.isGojoRed = false;
     p.isArcaneBolt = false;
+    p.bouncesLeft = undefined;
+    p.bounceDamageMultiplier = undefined;
+    p.wobblePhase = undefined;
     p.isChainLightning = false;
     p.isGetsuga = false;
     p.isGetsugaTensho = false;
@@ -560,7 +562,7 @@ class ProjectileSystem {
     this.projectiles.push(proj);
   }
 
-  fireGojoPurple(fighter, ownerIndex, damage, dps) {
+  fireGojoPurple(fighter, ownerIndex, damage, dps, opts = {}) {
     const speed = CONFIG.gojo.purpleSpeed || 6;
     const tipDist = GUN_TIP_DIST(fighter.r) + 20;
     const dirX = Math.cos(fighter.gunAngle);
@@ -574,13 +576,27 @@ class ProjectileSystem {
     proj.r = CONFIG.gojo.purpleRadius || 50;
     proj.life = CONFIG.gojo?.purpleLife || 250;
     proj.maxLife = proj.life;
-    proj.color = '#8A2BE2'; // Purple
+    
+    const isTrickster = Boolean(opts.isTrickster || fighter.characterId === 'trickster' || fighter.type === 'trickster' || (fighter._def && fighter._def.type === 'trickster'));
+    const isGreen = Boolean(opts.colorTheme === 'green' || isTrickster);
+    proj.color = isGreen ? '#00FF64' : '#8A2BE2'; // Green for Trickster, Purple for Gojo
+    proj.colorTheme = isGreen ? 'green' : 'purple';
+    proj.isTrickster = isTrickster;
+
     proj.owner = ownerIndex;
+    proj.ownerFighter = fighter;
+    if (fighter) {
+      fighter.activePurpleProjectile = proj;
+    }
     proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (CONFIG.gojo?.purpleDamage || 70);
     proj.isGojoPurple = true;
     proj.isGojoPurpleOrb = true;
     proj.behaviorType = 'gojo_purple';
     proj.visual = 'gojoPurpleOrb';
+    proj.infinityBypassed = true; // Hollow Purple erases space — bypasses Infinity
+    proj.isFrozenByInfinity = false;
+    proj.bypassShield = true;
+    proj.undodgeable = true;
     proj.isAdaptableSkillShot = true;
     proj.skillShotId = 'purple';
     proj.hitTargets = new Set();
@@ -596,13 +612,13 @@ class ProjectileSystem {
     proj.historyMax = 20;
     this.projectiles.push(proj);
 
-    // Screen shake when purple orb fires - massive impact!
-    const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 15;
-    const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 20;
+    // Screen shake when purple orb fires - crisp impact!
+    const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 4;
+    const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 12;
     triggerGlobalScreenShake(shakeIntensity, shakeDuration);
 
     // Play Hollow Purple audio effect (play once per cast, non-looping)
-    const sound = getSkillSound(21, 'purple_fire');
+    const sound = getSkillSound(21, 'purple_fire') || getSkillSound('gojo', 'hollowpurple');
     if (sound) {
       proj.purpleSoundHandle = playSound(sound.src, sound.volume);
     }
@@ -2304,8 +2320,21 @@ class ProjectileSystem {
       return p.life <= 0;
     }
 
+    // Arcane bolts bounce off walls while bouncesLeft > 0, so they don't expire on wall touch
+    if (p.isArcaneBolt && (p.bouncesLeft ?? 0) > 0) {
+      return p.life <= 0;
+    }
+
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
     const pr = p.r || 5;
+
+    if (arena && arena.shape === 'circle') {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      return (d + pr > ar);
+    }
 
     const hitLeft   = p.x - pr < arena.x;
     const hitRight  = p.x + pr > arena.x + arena.width;
@@ -2881,8 +2910,8 @@ class ProjectileSystem {
 
       // Smooth serpentine wave movement for Arcane Bolt
       if (p.isArcaneBolt) {
-        if (p.wobblePhase === undefined) {
-          p.wobblePhase = (p.id || Math.random()) * 10;
+        if (p.wobblePhase === undefined || Number.isNaN(p.wobblePhase)) {
+          p.wobblePhase = Math.random() * Math.PI * 2;
         }
         const perpX = -p.vy;
         const perpY = p.vx;
@@ -2980,6 +3009,80 @@ class ProjectileSystem {
         }
       }
 
+      // ── TRICKSTER ARCANE BOLT WALL BOUNCING ──
+      if (p.isArcaneBolt && !p.fadingOut) {
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+        const pr = p.r || 5;
+        let bounced = false;
+
+        if (arena) {
+          if (arena.shape === 'circle') {
+            const cx = arena.x + arena.width / 2;
+            const cy = arena.y + arena.height / 2;
+            const ar = arena.radius || (arena.width / 2);
+            const dist = Math.hypot(p.x - cx, p.y - cy);
+            if (dist + pr > ar && dist > 0) {
+              const nx = (p.x - cx) / dist;
+              const ny = (p.y - cy) / dist;
+              const dot = p.vx * nx + p.vy * ny;
+              if (dot > 0) {
+                p.vx -= 2 * dot * nx;
+                p.vy -= 2 * dot * ny;
+                bounced = true;
+              }
+              p.x = cx + nx * (ar - pr);
+              p.y = cy + ny * (ar - pr);
+            }
+          } else {
+            const minX = arena.x + pr;
+            const maxX = arena.x + arena.width - pr;
+            const minY = arena.y + pr;
+            const maxY = arena.y + arena.height - pr;
+
+            if (p.x < minX) {
+              p.x = minX;
+              p.vx = Math.abs(p.vx);
+              bounced = true;
+            } else if (p.x > maxX) {
+              p.x = maxX;
+              p.vx = -Math.abs(p.vx);
+              bounced = true;
+            }
+
+            if (p.y < minY) {
+              p.y = minY;
+              p.vy = Math.abs(p.vy);
+              bounced = true;
+            } else if (p.y > maxY) {
+              p.y = maxY;
+              p.vy = -Math.abs(p.vy);
+              bounced = true;
+            }
+          }
+
+          if (bounced) {
+            if ((p.bouncesLeft ?? 0) > 0) {
+              p.bouncesLeft--;
+              p.damage = (p.damage || CONFIG.trickster?.boltDamage || 12) * (p.bounceDamageMultiplier || 0.7);
+              // Visual impact flash & sparks on wall bounce
+              spawnSparks(p.x, p.y, 8, 'arcane');
+              spawnImpactFlash(p.x, p.y, 18, '#00ffff');
+              playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.4);
+              p.lastAngle = Math.atan2(p.vy, p.vx);
+              p.angle = p.lastAngle;
+              p.rotation = p.lastAngle;
+              p.wobblePhase = Math.random() * Math.PI * 2;
+            } else {
+              p.fadingOut = true;
+              p._resumeVx = p.vx;
+              p._resumeVy = p.vy;
+              p.vx = 0;
+              p.vy = 0;
+            }
+          }
+        }
+      }
+
 
 
       if (p.fadingOut) {
@@ -3012,7 +3115,7 @@ class ProjectileSystem {
       }
 
       // --- Gojo Limitless (Infinity) Spatial Projectile Interception (Checked at new position before collision) ---
-      if (!p.isGojoBlue && !p.isGojoPurple && (!p.isVisual || p.isFrozenByInfinity) && p.life > 0) {
+      if (!p.isGojoBlue && !p.isGojoPurple && !p.isGojoPurpleOrb && p.behaviorType !== 'gojo_purple' && !p.infinityBypassed && (!p.isVisual || p.isFrozenByInfinity) && p.life > 0) {
         for (let fi = 0; fi < fighters.length; fi++) {
           const f = fighters[fi];
           if (!f || f.hp <= 0) continue;
@@ -3401,9 +3504,8 @@ class ProjectileSystem {
 
   fireArcaneBolt(fighter, ownerIndex, damage, opponent) {
     if (!fighter || !opponent) return;
-    const speed = CONFIG.trickster.boltSpeed;
-    const radius = CONFIG.projectile.radius * 0.9;
-    const tipDist = GUN_TIP_DIST(fighter.r);
+    const speed = CONFIG.trickster?.boltSpeed || 8;
+    const radius = (CONFIG.projectile?.radius || 5) * 0.9;
     
     const targetX = opponent.x;
     const targetY = opponent.y;
@@ -3414,39 +3516,51 @@ class ProjectileSystem {
     const cosA = Math.cos(gunAngle);
     const sinA = Math.sin(gunAngle);
     
-    // The staff is translated and rotated in drawTricksterStaff:
-    // 1. Translated by (fighter.r * 0.4, fighter.r * 0.85)
-    // 2. Rotated by Math.PI * 0.3
-    // 3. The tip of the crystal is at (0, -75) relative to the staff
-    const tipLocalX = 75 * Math.sin(Math.PI * 0.3) + fighter.r * 0.4;
-    const tipLocalY = -75 * Math.cos(Math.PI * 0.3) + fighter.r * 0.85;
+    // Spawn forward in aim direction from staff/hand
+    const tipForward = fighter.r + 18;
+    const rawStartX = fighter.x + cosA * tipForward;
+    const rawStartY = fighter.y + sinA * tipForward;
 
-    // Prevent gun clipping when extremely close to the opponent (e.g. frozen in Time Sphere)
-    const tipOffsetDist = Math.hypot(tipLocalX, tipLocalY);
-    const maxOffset = Math.max(0, dist - opponent.r);
-    let scale = 1.0;
-    if (tipOffsetDist > maxOffset) {
-      scale = maxOffset / tipOffsetDist;
+    // Safety clamp within arena so it never spawns outside walls
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    const pr = radius;
+    let startX = rawStartX;
+    let startY = rawStartY;
+    if (arena) {
+      if (arena.shape === 'circle') {
+        const cx = arena.x + arena.width / 2;
+        const cy = arena.y + arena.height / 2;
+        const ar = arena.radius || (arena.width / 2);
+        const d = Math.hypot(startX - cx, startY - cy);
+        if (d + pr > ar && d > 0) {
+          startX = cx + ((startX - cx) / d) * (ar - pr - 2);
+          startY = cy + ((startY - cy) / d) * (ar - pr - 2);
+        }
+      } else {
+        startX = Math.max(arena.x + pr + 2, Math.min(arena.x + arena.width - pr - 2, startX));
+        startY = Math.max(arena.y + pr + 2, Math.min(arena.y + arena.height - pr - 2, startY));
+      }
     }
-    const scaledTipX = tipLocalX * scale;
-    const scaledTipY = tipLocalY * scale;
-    
-    // Convert local hand coordinates to world coordinates based on the fighter's rotation
-    const startX = fighter.x + scaledTipX * cosA - scaledTipY * sinA;
-    const startY = fighter.y + scaledTipX * sinA + scaledTipY * cosA;
+
     const proj = this._getProjectile();
     proj.x = startX;
     proj.y = startY;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
     proj.r = radius;
-    proj.life = 180; // 3 seconds max life per bounce
-    proj.maxLife = 180;
-    proj.color = '#00ffff'; // Electric cyan/blue
+    proj.life = 240; // 4 seconds max life
+    proj.maxLife = 240;
+    proj.color = '#39FF14'; // Emerald/Neon green
 
     proj.owner = ownerIndex;
     proj.damage = damage;
     proj.isArcaneBolt = true;
+    proj.bouncesLeft = CONFIG.trickster?.bounceCount ?? 4;
+    proj.bounceDamageMultiplier = CONFIG.trickster?.bounceDamageMultiplier ?? 0.7;
+    proj.wobblePhase = Math.random() * Math.PI * 2;
+    proj.rotation = Math.atan2(dirY, dirX);
+    proj.angle = proj.rotation;
+    proj.lastAngle = proj.rotation;
     proj.hitFighters = new Set();
     this.projectiles.push(proj);
   }

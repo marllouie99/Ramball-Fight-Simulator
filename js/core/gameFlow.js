@@ -1,4 +1,4 @@
-import { stopAllSounds, stopAllLoopingSounds, preloadSound, stopSound } from '../systems/soundSystem.js';
+import { stopAllSounds, stopAllLoopingSounds, preloadSound, stopSound, unlockAudio } from '../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // GAME FLOW — State transitions and round management
 // Extracted from main.js so that ui.js can import these without
@@ -30,6 +30,7 @@ import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
 import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { tacticalProjectileSystem } from '../../Tactical Force/systems/tacticalProjectileSystem.js';
+import { resetCamera } from '../systems/cameraSystem.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -46,163 +47,43 @@ const SOUND_ASSETS = {
 };
 
 
-function preloadGameSounds() {
-  // Legacy assets + basic attack sounds + skill sounds + skill effect sounds + mapped audio config sounds
-  const legacyPaths = Object.values(SOUND_ASSETS);
-  const mappedConfigPaths = Object.values(AUDIO_CONFIG);
+function extractSoundsFromObject(obj, seen = new Set(), results = []) {
+  if (!obj || typeof obj !== 'object' || seen.has(obj)) return results;
+  seen.add(obj);
+
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'string') {
+      const lower = val.toLowerCase();
+      if ((lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.ogg') || lower.includes('assets/sound')) && !results.includes(val)) {
+        results.push(val);
+      }
+    } else if (Array.isArray(val)) {
+      for (const item of val) {
+        if (typeof item === 'string') {
+          const lower = item.toLowerCase();
+          if ((lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.ogg') || lower.includes('assets/sound')) && !results.includes(item)) {
+            results.push(item);
+          }
+        }
+      }
+    } else if (typeof val === 'object' && val !== null) {
+      extractSoundsFromObject(val, seen, results);
+    }
+  }
+  return results;
+}
+
+export function preloadGameSounds() {
+  // Preload legacy assets + basic attack sounds + skill sounds + skill effect sounds + mapped audio config sounds
+  const legacyPaths = Object.values(SOUND_ASSETS).filter(Boolean);
+  const mappedConfigPaths = Object.values(AUDIO_CONFIG).filter(s => typeof s === 'string' && (s.includes('/') || s.includes('.')));
   const basicAttackPaths = getBasicAttackSoundPaths();
   const skillPaths = getSkillSoundPaths();
   const skillEffectPaths = getSkillEffectSoundPaths();
   const announcerPaths = getAnnouncerSoundPaths();
-  
-  const yujiSounds = [];
-  if (CONFIG.yuji) {
-    if (CONFIG.yuji.punchSound) yujiSounds.push(CONFIG.yuji.punchSound);
-    if (CONFIG.yuji.punchSounds) yujiSounds.push(...CONFIG.yuji.punchSounds);
-    if (CONFIG.yuji.blackFlashEnterSound) yujiSounds.push(CONFIG.yuji.blackFlashEnterSound);
-    if (CONFIG.yuji.transformationSound) yujiSounds.push(CONFIG.yuji.transformationSound);
-    if (CONFIG.yuji.victoryVoiceSound) yujiSounds.push(CONFIG.yuji.victoryVoiceSound);
-    yujiSounds.push('Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3');
-  }
-
-  const yutaSounds = [];
-  if (CONFIG.yuta) {
-    if (CONFIG.yuta.katanaSwingSound) yutaSounds.push(CONFIG.yuta.katanaSwingSound);
-    if (CONFIG.yuta.comeRikaSound) yutaSounds.push(CONFIG.yuta.comeRikaSound);
-    if (CONFIG.yuta.rikaAppearanceSound) yutaSounds.push(CONFIG.yuta.rikaAppearanceSound);
-    if (CONFIG.yuta.rikaAttackSound) yutaSounds.push(CONFIG.yuta.rikaAttackSound);
-    if (CONFIG.yuta.rikaGroundSmashSound) yutaSounds.push(CONFIG.yuta.rikaGroundSmashSound);
-    if (CONFIG.yuta.rikaGroundTrembleSound) yutaSounds.push(CONFIG.yuta.rikaGroundTrembleSound);
-    if (CONFIG.yuta.rikaNoises) yutaSounds.push(...CONFIG.yuta.rikaNoises);
-    if (CONFIG.yuta.thinIceBreakerSound) yutaSounds.push(CONFIG.yuta.thinIceBreakerSound);
-    if (CONFIG.yuta.thinIceBreakerNoiseSound) yutaSounds.push(CONFIG.yuta.thinIceBreakerNoiseSound);
-    if (CONFIG.yuta.domainChannelSound) yutaSounds.push(CONFIG.yuta.domainChannelSound);
-    if (CONFIG.yuta.domainDeploySound) yutaSounds.push(CONFIG.yuta.domainDeploySound);
-    if (CONFIG.yuta.phantomFlurryNoiseSound) yutaSounds.push(CONFIG.yuta.phantomFlurryNoiseSound);
-    if (CONFIG.yuta.pureLoveBeamChargeSound) yutaSounds.push(CONFIG.yuta.pureLoveBeamChargeSound);
-    if (CONFIG.yuta.pureLoveBeamFireSound) yutaSounds.push(CONFIG.yuta.pureLoveBeamFireSound);
-    if (CONFIG.yuta.pureLoveBeamBackgroundSound) yutaSounds.push(CONFIG.yuta.pureLoveBeamBackgroundSound);
-  }
-
-  const genosSounds = [];
-  if (CONFIG.genos) {
-    if (CONFIG.genos.basicBlastSound) genosSounds.push(CONFIG.genos.basicBlastSound);
-    if (CONFIG.genos.basicChargeSound) genosSounds.push(CONFIG.genos.basicChargeSound);
-    if (CONFIG.genos.meleePunchSound) genosSounds.push(CONFIG.genos.meleePunchSound);
-    if (CONFIG.genos.dashSound) genosSounds.push(CONFIG.genos.dashSound);
-    if (CONFIG.genos.flurryVoiceSound) genosSounds.push(CONFIG.genos.flurryVoiceSound);
-    if (CONFIG.genos.ultVoiceSound) genosSounds.push(CONFIG.genos.ultVoiceSound);
-    if (CONFIG.genos.ultChargeSound) genosSounds.push(CONFIG.genos.ultChargeSound);
-    if (CONFIG.genos.ultBlastSound) genosSounds.push(CONFIG.genos.ultBlastSound);
-    if (CONFIG.genos.ultRecoverySound) genosSounds.push(CONFIG.genos.ultRecoverySound);
-    if (CONFIG.genos.selfDestructSound) genosSounds.push(CONFIG.genos.selfDestructSound);
-  }
-
-  const saitamaSounds = [];
-  if (CONFIG.saitama) {
-    if (CONFIG.saitama.counterPunchImpactSFX) saitamaSounds.push(CONFIG.saitama.counterPunchImpactSFX);
-    if (CONFIG.saitama.counterPunchVoiceSFX) saitamaSounds.push(CONFIG.saitama.counterPunchVoiceSFX);
-    if (CONFIG.saitama.counterPunchChargingSFX) saitamaSounds.push(CONFIG.saitama.counterPunchChargingSFX);
-  }
-
-  const todoSounds = [];
-  if (CONFIG.todo) {
-    if (CONFIG.todo.punchSound) todoSounds.push(CONFIG.todo.punchSound);
-    if (CONFIG.todo.clapSound) todoSounds.push(CONFIG.todo.clapSound);
-    if (CONFIG.todo.victoryVoiceSound) todoSounds.push(CONFIG.todo.victoryVoiceSound);
-    if (CONFIG.todo.brotherVoiceSound) todoSounds.push(CONFIG.todo.brotherVoiceSound);
-    if (CONFIG.todo.takadaVoiceSound) todoSounds.push(CONFIG.todo.takadaVoiceSound);
-    if (CONFIG.todo.takadaChannelingVoiceline) todoSounds.push(CONFIG.todo.takadaChannelingVoiceline);
-    if (CONFIG.todo.takadaBackgroundSong) todoSounds.push(CONFIG.todo.takadaBackgroundSong);
-  }
-
-  const nanamiSounds = [];
-  if (CONFIG.nanami && CONFIG.nanami.sounds) {
-    for (const key of Object.keys(CONFIG.nanami.sounds)) {
-      const val = CONFIG.nanami.sounds[key];
-      if (Array.isArray(val)) {
-        nanamiSounds.push(...val);
-      } else if (typeof val === 'string') {
-        nanamiSounds.push(val);
-      }
-    }
-  }
-
-  const gojoSounds = [];
-  if (CONFIG.gojo && CONFIG.gojo.sounds) {
-    for (const key of Object.keys(CONFIG.gojo.sounds)) {
-      const val = CONFIG.gojo.sounds[key];
-      if (Array.isArray(val)) {
-        gojoSounds.push(...val);
-      } else if (typeof val === 'string') {
-        gojoSounds.push(val);
-      }
-    }
-  }
-
-  const mahitoSounds = [];
-  if (CONFIG.mahito && CONFIG.mahito.sounds) {
-    for (const key of Object.keys(CONFIG.mahito.sounds)) {
-      const val = CONFIG.mahito.sounds[key];
-      if (Array.isArray(val)) {
-        mahitoSounds.push(...val);
-      } else if (typeof val === 'string') {
-        mahitoSounds.push(val);
-      }
-    }
-  }
-
-  const mahoragaSounds = [];
-  if (CONFIG.mahoraga && CONFIG.mahoraga.sounds) {
-    for (const key of Object.keys(CONFIG.mahoraga.sounds)) {
-      const val = CONFIG.mahoraga.sounds[key];
-      if (Array.isArray(val)) {
-        mahoragaSounds.push(...val);
-      } else if (typeof val === 'string') {
-        mahoragaSounds.push(val);
-      }
-    }
-  }
-
-  const cjSounds = [];
-  if (CONFIG.cj && CONFIG.cj.sounds) {
-    for (const key of Object.keys(CONFIG.cj.sounds)) {
-      const val = CONFIG.cj.sounds[key];
-      if (Array.isArray(val)) {
-        cjSounds.push(...val);
-      } else if (typeof val === 'string') {
-        cjSounds.push(val);
-      }
-    }
-  }
-
-  const sukunaSounds = [];
-  if (CONFIG.sukuna) {
-    if (CONFIG.sukuna.sounds) {
-      for (const key of Object.keys(CONFIG.sukuna.sounds)) {
-        const val = CONFIG.sukuna.sounds[key];
-        if (Array.isArray(val)) {
-          sukunaSounds.push(...val);
-        } else if (typeof val === 'string') {
-          sukunaSounds.push(val);
-        }
-      }
-    }
-    if (CONFIG.sukuna.championVoiceline) sukunaSounds.push(CONFIG.sukuna.championVoiceline);
-    if (CONFIG.sukuna.rapidSlashVoiceline) sukunaSounds.push(CONFIG.sukuna.rapidSlashVoiceline);
-  }
-
-  const ichigoSounds = [];
-  if (CONFIG.ichigo && CONFIG.ichigo.sounds) {
-    for (const key of Object.keys(CONFIG.ichigo.sounds)) {
-      const val = CONFIG.ichigo.sounds[key];
-      if (Array.isArray(val)) {
-        ichigoSounds.push(...val);
-      } else if (typeof val === 'string') {
-        ichigoSounds.push(val);
-      }
-    }
-  }
+  const configSounds = extractSoundsFromObject(CONFIG);
+  const bgmTracks = ARENA_BGM_TRACKS.map(t => t.src).filter(Boolean);
 
   const allPaths = [...new Set([
     ...legacyPaths,
@@ -211,21 +92,10 @@ function preloadGameSounds() {
     ...skillPaths,
     ...skillEffectPaths,
     ...announcerPaths,
-    ...yujiSounds,
-    ...yutaSounds,
-    ...genosSounds,
-    ...saitamaSounds,
-    ...todoSounds,
-    ...nanamiSounds,
-    ...gojoSounds,
-    ...mahitoSounds,
-    ...mahoragaSounds,
-    ...cjSounds,
-    ...sukunaSounds,
-    ...ichigoSounds,
-    ...ARENA_BGM_TRACKS.map(t => t.src).filter(Boolean)
+    ...configSounds,
+    ...bgmTracks
   ])];
-  return Promise.all(allPaths.map(preloadSound));
+  return preloadSound(allPaths);
 }
 
 // Re-export physics update steps so callers can import them from gameFlow.js
@@ -927,6 +797,7 @@ export function proceedFromFaceOffToCountdown() {
 }
 
 export async function startGame() {
+  await unlockAudio();
   await preloadGameSounds();
   resetMatch(true); // Enters Face-Off overlay before countdown
 }
@@ -1056,6 +927,7 @@ export function startCountdown() {
   state.announcerSoundHandle = null;
   state.announcerPlayingSequence = false;
   state.announcerSubtitle = '';
+  resetCamera(true); // Center camera on arena center immediately for countdown
 
   if (!state.announcerTimeoutIds) {
     state.announcerTimeoutIds = [];

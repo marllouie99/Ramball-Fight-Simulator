@@ -85,7 +85,7 @@ export function executeTeleportDodge(fighter, attacker, arena) {
 }
 
 export function teleportAwayFrom(fighter, opponent, arena) {
-  if (!opponent || opponent.isAmbushing || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0) return;
+  if (!opponent || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0) return;
   const oldX = fighter.x;
   const oldY = fighter.y;
 

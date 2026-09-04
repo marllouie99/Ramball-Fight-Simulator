@@ -7,6 +7,7 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { resetCachedTime } from '../graphics/draw.js';
 import { updateGame } from './updateSystem.js';
 import { renderGame } from './renderSystem.js';
+import { getAudioCurrentTime } from './soundSystem.js';
 
 export const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 export const TARGET_FPS = isMobile ? 30 : 60; // Lower FPS on mobile to reduce heating
@@ -171,6 +172,7 @@ export function animate(timestamp) {
 
     // Reset cached time for this frame (performance optimization)
     resetCachedTime();
+    state.frameAudioTime = getAudioCurrentTime();
 
     // The abstracted core updates and renders!
     updateGame();

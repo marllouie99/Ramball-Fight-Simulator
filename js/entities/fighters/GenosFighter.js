@@ -1359,9 +1359,12 @@ export class GenosFighter extends Fighter {
         triggerGlobalScreenShake(windupShake, CONFIG.genos?.ultWindupShakeDuration || 4);
       }
 
-      // Cannon facing orientation remains strictly locked to initial cast angle; no auto-aim while charging
-      this.gunAngle = this.ultAngle;
-      this.angle = this.ultAngle;
+      // Centralized smooth aim rotation while charging Incineration Cannon (continuous tracking without snapping on fire)
+      const aimTarget = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+      if (aimTarget && aimTarget.hp > 0) {
+        this.aim(aimTarget);
+        this.ultAngle = this.gunAngle;
+      }
 
       if (this.ultTimer <= 0) {
         this.isChargingUlt = false;

@@ -32,7 +32,7 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       }
 
       const isChanneling = typeof f.isChannelingSkill === 'function' ? f.isChannelingSkill() : false;
-      if (isEnemy && !isChanneling && !f.immuneToCC && !f.gojoBlueDragImmune && !f.isBaguvixActive && !f.isGodModeActive) {
+      if (isEnemy && !isChanneling && !f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
         const dx = p.x - f.x;
         const dy = p.y - f.y;
         const dist = Math.hypot(dx, dy);
@@ -51,6 +51,21 @@ export class GojoBlueBehavior extends ProjectileBehavior {
           } else {
             f.slowTimer = Math.max(f.slowTimer || 0, 10);
             f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, 0.45);
+          }
+
+          // Apply Paralyze debuff to targets trapped in Blue's gravitational vortex
+          const paralyzeFrames = CONFIG.gojo?.blueParalyzeDuration || 15;
+          if (typeof f.applyParalyze === 'function') {
+            f.applyParalyze(paralyzeFrames, { isBlue: true });
+          } else {
+            f.paralyzeTimer = Math.max(f.paralyzeTimer || 0, paralyzeFrames);
+            if (f.statusEffects && typeof f.statusEffects.applyParalyze === 'function') {
+              f.statusEffects.applyParalyze(paralyzeFrames, { isBlue: true });
+            }
+          }
+
+          if (typeof f.interruptAttacks === 'function') {
+            f.interruptAttacks();
           }
 
           if (isWallLingering) {
@@ -122,6 +137,17 @@ export class GojoBlueBehavior extends ProjectileBehavior {
   }
 
   onHit(projectile, target, attacker, fighters, system) {
+    if (target && !target.isBaguvixActive && !target.isGodModeActive) {
+      const paralyzeFrames = CONFIG.gojo?.blueParalyzeDuration || 20;
+      if (typeof target.applyParalyze === 'function') {
+        target.applyParalyze(paralyzeFrames, { isBlue: true });
+      } else {
+        target.paralyzeTimer = Math.max(target.paralyzeTimer || 0, paralyzeFrames);
+        if (target.statusEffects && typeof target.statusEffects.applyParalyze === 'function') {
+          target.statusEffects.applyParalyze(paralyzeFrames, { isBlue: true });
+        }
+      }
+    }
     return HitImpactSystem.processProjectileHit(target, projectile, attacker, fighters);
   }
 

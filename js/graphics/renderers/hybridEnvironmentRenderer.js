@@ -175,6 +175,7 @@ function getFurnaceDimSprite() {
 
 let currentPurpleDimOpacity = 0;
 let purpleDimSprite = null;
+let greenDimSprite = null;
 
 function getPurpleDimSprite() {
   if (!purpleDimSprite) {
@@ -209,6 +210,39 @@ function getPurpleDimSprite() {
     purpleDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
   }
   return purpleDimSprite;
+}
+
+function getGreenDimSprite() {
+  if (!greenDimSprite) {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    const cx = size / 2;
+    const cy = size / 2;
+    
+    ctx.fillStyle = `rgba(0, 0, 0, 0.98)`;
+    ctx.fillRect(0, 0, size, size);
+    
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
+    grad.addColorStop(0, `rgba(0, 255, 100, 0.95)`);     // Intense bright green spot
+    grad.addColorStop(0.06, `rgba(0, 200, 80, 0.85)`);   // Concentrated emerald aura ring
+    grad.addColorStop(0.15, `rgba(0, 120, 50, 0.70)`);   // Deep green void aura
+    grad.addColorStop(0.30, `rgba(0, 30, 15, 0.92)`);    // Quick falloff to dark void
+    grad.addColorStop(0.55, `rgba(0, 10, 5, 0.97)`);     // Deep dark background
+    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.99)`);      // Pitch black outer screen
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    
+    const texture = window.PIXI.Texture.from(canvas);
+    greenDimSprite = new window.PIXI.Sprite(texture);
+    greenDimSprite.anchor.set(0.5);
+    greenDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+  }
+  return greenDimSprite;
 }
 
 let mahoragaDimSprite = null;
@@ -509,13 +543,13 @@ export function updateHybridEnvironment() {
 
   if (mahito) {
     const data = getMahitoDomainHybridData();
-    if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
+    if (!data.sprite.parent) layer.addChild(data.sprite);
     data.sprite.x = 0;
     data.sprite.y = 0;
     data.sprite.width = state.canvas.width;
     data.sprite.height = state.canvas.height;
     data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-    renderMahitoDomainBackground(mahito, data.ctx, data.canvas);
+    renderMahitoDomainBackground(mahito, data.ctx, isMultiDomain && mahito !== state.fighters.find(f => f.domainActive));
     data.texture.update();
   } else if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent) {
     mahitoDomainHybridData.sprite.parent.removeChild(mahitoDomainHybridData.sprite);
@@ -573,7 +607,11 @@ export function updateHybridEnvironment() {
   }
   currentPurpleDimOpacity += (tOpPurple > currentPurpleDimOpacity) ? (tOpPurple - currentPurpleDimOpacity) * 0.15 : (tOpPurple - currentPurpleDimOpacity) * 0.18;
   
-  const spritePurple = getPurpleDimSprite();
+  const isGreenOrb = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
+  const spritePurple = isGreenOrb ? getGreenDimSprite() : getPurpleDimSprite();
+  const otherSprite = isGreenOrb ? getPurpleDimSprite() : getGreenDimSprite();
+  if (otherSprite && otherSprite.parent) otherSprite.parent.removeChild(otherSprite);
+
   if (currentPurpleDimOpacity < 0.01) {
     currentPurpleDimOpacity = 0; if (spritePurple.parent) spritePurple.parent.removeChild(spritePurple);
   } else {

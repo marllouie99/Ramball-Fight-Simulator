@@ -127,7 +127,7 @@ export const uryuConfig = {
     lichtRegen: 'Assets/Sound Effects/Attacks/laserpew.mp3'
   },
   soundVolumes: {
-    bowDraw: 0.65,
+    bowDraw: 0.0,
     bowShoot: 0.85,
     arrowHit: 0.80,
     hirenkyaku: 0.75,

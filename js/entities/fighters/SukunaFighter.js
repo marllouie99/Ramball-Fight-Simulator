@@ -249,15 +249,15 @@ export class SukunaFighter extends Fighter {
   }
 
   canAim() {
-    if (this.isChannelingDivineFlame || this.isChannelingDomainExpansion) {
-      return false; // Disable auto-aim while channeling Fuga or Domain Expansion!
+    if (this.isChannelingDomainExpansion) {
+      return false; // Disable auto-aim while channeling Domain Expansion!
     }
     return super.canAim();
   }
 
   aim(target) {
-    if (this.isChannelingDivineFlame || this.isChannelingDomainExpansion) {
-      return false; // Disable auto-aim while channeling Fuga or Domain Expansion!
+    if (this.isChannelingDomainExpansion) {
+      return false; // Disable auto-aim while channeling Domain Expansion!
     }
     super.aim(target);
 
@@ -670,10 +670,11 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Lock aim in place; do not auto-aim while channeling Fuga
-      if (this.divineFlameCastAngle !== undefined) {
-        this.gunAngle = this.divineFlameCastAngle;
-        this.angle = this.divineFlameCastAngle;
+      // Centralized smooth aim rotation while channeling Divine Flame / Fuga (continuous tracking without snapping)
+      const aimTarget = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+      if (aimTarget && aimTarget.hp > 0) {
+        this.aim(aimTarget);
+        this.divineFlameCastAngle = this.gunAngle;
       }
 
       if (this.divineFlameChargeTimer >= this.divineFlameChargeMax) {
@@ -724,11 +725,20 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Directly track target during post-fire recovery (bypass canAim() pipeline)
+      // Smoothly rotate aim during post-fire recovery (no instant auto-aim snap on release!)
       if (opponent && !opponent.isDead && opponent.hp > 0) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        this.gunAngle = targetAngle;
-        this.angle = targetAngle;
+        const targetAngle = Math.atan2((opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0)), opponent.x - this.x);
+        let currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
+        while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
+        let diff = targetAngle - currentAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+
+        const turnRate = 0.04;
+        const newAngle = currentAngle + diff * turnRate;
+        this.gunAngle = newAngle;
+        this.angle = newAngle;
       }
 
       this.resolveWallBounce(arena);
@@ -739,7 +749,7 @@ export class SukunaFighter extends Fighter {
     if (this.domainActive) {
 
 
-      const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive));
+      const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
 
       // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine!
       if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
@@ -747,6 +757,11 @@ export class SukunaFighter extends Fighter {
         this.divineFlameCastAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
         this.isChannelingDivineFlame = true;
         this.divineFlameChargeTimer = 0;
+        this.punchAnimTimer = 0;
+        this.slashSwingTimer = 0;
+        this.slashGlowTimer = 0;
+        this.cleaveSwingTimer = 0;
+        this.isMeleeMode = false;
         spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA: OPEN)!', '#FF4500');
 
         const sound = getSkillSound(this._def?.id, 'divineFlame');
@@ -763,7 +778,7 @@ export class SukunaFighter extends Fighter {
 
 
 
-    const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive));
+    const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
 
     // Check for Divine Flame (Skill 2 - disabled in demo mode)
     if (!this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
@@ -775,6 +790,11 @@ export class SukunaFighter extends Fighter {
         this.isChannelingDivineFlame = true;
         this.isChannelingDomainExpansion = false; // Explicit mutual exclusion
         this.divineFlameChargeTimer = 0;
+        this.punchAnimTimer = 0;
+        this.slashSwingTimer = 0;
+        this.slashGlowTimer = 0;
+        this.cleaveSwingTimer = 0;
+        this.isMeleeMode = false;
         spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA)', '#FF4500');
 
         const sound = getSkillSound(this._def?.id, 'divineFlame');
@@ -830,8 +850,8 @@ export class SukunaFighter extends Fighter {
 
     // Switch modes based on distance & melee engagement (only when not in special states)
     if (!this.isTeleporting && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion) {
-      if (opponent && opponent.isStealthed && !this.domainActive && !(opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji')) {
-        // Disengage from melee combat while non-Toji opponent is in stealth mode
+      if (opponent && (opponent.isStealthed || opponent.isAmbushing) && !this.domainActive) {
+        // Disengage from melee combat while opponent is in stealth or ambush mode so Sukuna moves and can dodge
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
       } else if (this.meleeModeCooldown > 0) {
@@ -2237,13 +2257,5 @@ export class SukunaFighter extends Fighter {
   drawDomainForeground(ctx) {
     renderSukunaDomainForeground(this, ctx);
     renderSukunaDomainSlashLines(this, ctx);
-  }
-
-  canAim() {
-    if (this.isChannelingDivineFlame) {
-      if (this.hp <= 0 || this.isDead || this.isTargetOfAmbush || (this.timeStopTimer > 0)) return false;
-      return true; // Allow aim rotation while channeling Fuga!
-    }
-    return super.canAim();
   }
 }

@@ -258,7 +258,7 @@ export class UryuFighter extends Fighter {
       ? this.isParalyzedDebuffActive()
       : Boolean(this.isParalyzed || (this.paralyzeTimer && this.paralyzeTimer > 0) || (this.electricStunTimer && this.electricStunTimer > 0));
     if (isParalyzed) return false;
-    if (this.isHirenkyakuDashing || this.isPlantedPause || this.isSkywardWindup || this.isSkywardAscending || this.isLichtRegenActive) {
+    if (this.isHirenkyakuDashing || this.isSkywardAscending || this.isLichtRegenActive) {
       return false;
     }
     return true;

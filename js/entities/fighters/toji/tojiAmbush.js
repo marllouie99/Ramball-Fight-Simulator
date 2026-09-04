@@ -97,90 +97,13 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   fighter.phantomSlashTimer = 0;
   if (fighter.swordTrail) fighter.swordTrail.length = 0;
   fighter._secondSeqAudioPlayed = false;
+  fighter._ambushThrustHit = false;
 
   // Clear beam/stun stasis from Toji himself
   fighter.caughtInPureLoveBeam = false;
   fighter.wasCaughtInPureLoveBeam = false;
   fighter.pureLoveBeamTimer = 0;
   fighter.pureLoveBeamRecoveryTimer = 0;
-
-  opponent.isTargetOfAmbush = true;
-  if (typeof opponent.interruptAttacks === 'function') {
-    opponent.interruptAttacks(true);
-  }
-  if (opponent.isFiringPureLoveBeam || opponent.isChannelingPureLoveBeam) {
-    opponent.isFiringPureLoveBeam = false;
-    opponent.isChannelingPureLoveBeam = false;
-    opponent.pureLoveBeamActiveTimer = 0;
-    opponent.pureLoveBeamChargeTimer = 0;
-    opponent.rikaEmergingForBeamTimer = 0;
-    if (typeof opponent._stopBeamAudio === 'function') {
-      opponent._stopBeamAudio();
-    }
-  }
-  opponent.slashSwingTimer = 0;
-  opponent.katanaSlashTimer = 0;
-  opponent.katanaSlashFadeTimer = 0;
-  opponent.spearSwingTimer = 0;
-  opponent.punchAnimTimer = 0;
-  opponent.flurryHitsLeft = 0;
-  opponent.flurrySlashTimer = 0;
-  opponent.rapidSlashHitsLeft = 0;
-  opponent.cleaveSwingTimer = 0;
-  opponent.cleaveWindupTimer = 0;
-  opponent.isCleaving = false;
-  opponent.redEffectTimer = 0;
-  opponent.blueEffectTimer = 0;
-  opponent.purpleEffectTimer = 0;
-  opponent.purpleRecoveryTimer = 0;
-  opponent.isChannelingPurple = false;
-  opponent.isChannelingRed = false;
-  opponent.isChannelingBlue = false;
-  opponent.isFiringPurple = false;
-  opponent.fugaFireArrowTimer = 0;
-  opponent.isChannelingDivineFlame = false;
-  opponent.isFiringDivineFlame = false;
-  opponent.getsugaChargeTimer = 0;
-  opponent.isChannelingGetsuga = false;
-  opponent.isFiringGetsuga = false;
-  opponent.ceroTimer = 0;
-  opponent.granReyCeroTimer = 0;
-  opponent.consecutivePunchesTimer = 0;
-  opponent.seriousPunchTimer = 0;
-  opponent.isConsecutivePunches = false;
-  opponent.isSeriousPunching = false;
-  opponent.isBlitzing = false;
-  opponent.blitzStrikeIndex = 0;
-  opponent.isCollapsing = false;
-  opponent.collapseSlamTimer = 0;
-  opponent.ratioGridTimer = 0;
-  opponent.cleaveShockwaveTimer = 0;
-  opponent.thinIceBreakerPunchTimer = 0;
-  opponent.isChannelingThinIceBreaker = false;
-  opponent.maceCannonAnimTimer = 0;
-  opponent._maceCannonData = null;
-  opponent.twinScissorAnimTimer = 0;
-  opponent._twinScissorData = null;
-  opponent.fleshSurgeAnimTimer = 0;
-  opponent._fleshSurgePlungeAngle = null;
-  opponent._fleshSurgeChain = null;
-  opponent.soulPhaseDashTimer = 0;
-  opponent.hideFrontHand = false;
-  opponent.hideBackHand = false;
-  if (typeof opponent.clearAllAttackEffects === 'function') {
-    opponent.clearAllAttackEffects();
-  }
-  if (typeof opponent.clearAllAfterimages === 'function') {
-    opponent.clearAllAfterimages();
-  } else {
-    if (opponent.swordTrail) opponent.swordTrail.length = 0;
-    if (opponent.afterImages) opponent.afterImages.length = 0;
-  }
-
-  if (!opponent.domainActive) {
-    opponent.vx = 0;
-    opponent.vy = 0;
-  }
 
   fighter.ambushTargetChannelState = {
     purple: !!opponent.isChannelingPurple,
@@ -201,6 +124,20 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
     fighter.ambushTargetChannelState.generic
   );
 
+  // NOTE: Enemy is free to continue channeling, moving, and steering so they have a chance to complete or dodge!
+  opponent.isTargetOfAmbush = false;
+  if (opponent.isMeleeMode && !opponent.domainActive) {
+    opponent.isMeleeMode = false;
+    opponent.forcedMeleeTimer = 0;
+  }
+  const oppSpeed = Math.hypot(opponent.vx || 0, opponent.vy || 0);
+  if (oppSpeed < 0.5) {
+    const moveAngle = (opponent.gunAngle !== undefined ? opponent.gunAngle : (opponent.angle || 0)) + (Math.random() - 0.5);
+    const baseSpeed = opponent.speed || 3.5;
+    opponent.vx = Math.cos(moveAngle) * baseSpeed;
+    opponent.vy = Math.sin(moveAngle) * baseSpeed;
+  }
+
   const oldX = fighter.x;
   const oldY = fighter.y;
   const startAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
@@ -216,21 +153,10 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   fighter.vx = 0;
   fighter.vy = 0;
 
+  const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+  fighter.gunAngle = aimAngle;
+  fighter.angle = aimAngle;
   fighter.aim(opponent);
-
-  const freezeDuration = CONFIG.toji?.ambushTargetFreezeDuration || 70;
-  
-  if (isInterrupt || fighter.ambushTargetWasChanneling) {
-    spawnFloatingText(opponent.x, opponent.y - opponent.r - 35, 'INTERRUPTED!', '#FF1133', 35);
-    spawnCrimsonLightningImpact(opponent.x, opponent.y, 90);
-    spawnImpactFlash(opponent.x, opponent.y, 65, 'crimsonSniper');
-  }
-  if (typeof opponent.applyTimeStop === 'function') {
-    opponent.applyTimeStop(freezeDuration);
-  }
-  opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, freezeDuration);
-  opponent.vx = 0;
-  opponent.vy = 0;
 
   modSpawnTeleportAfterimages(fighter, oldX, oldY, clampedFront.x, clampedFront.y, startAngle, fighter.gunAngle);
 
@@ -269,89 +195,90 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   }
 
   // Target is in ambush stasis (actions/AI frozen), so Toji directly drives their physical displacement & arena wall ricochets!
-  if (opponent && opponent.knockbackVx !== undefined && (Math.abs(opponent.knockbackVx) > 0.05 || Math.abs(opponent.knockbackVy) > 0.05)) {
-    opponent.x += opponent.knockbackVx;
-    opponent.y += opponent.knockbackVy;
-    
-    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
-    if (arena) {
-      const bounceMult = opponent.isFirstHitKnockback ? 0.35 : 0.50;
-      const minX = arena.x + opponent.r;
-      const maxX = arena.x + arena.width - opponent.r;
-      const minY = arena.y + opponent.r;
-      const maxY = arena.y + arena.height - opponent.r;
+  if (opponent && opponent.isTargetOfAmbush) {
+    if (opponent.knockbackVx !== undefined && (Math.abs(opponent.knockbackVx) > 0.05 || Math.abs(opponent.knockbackVy) > 0.05)) {
+      opponent.x += opponent.knockbackVx;
+      opponent.y += opponent.knockbackVy;
+      
+      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
+      if (arena) {
+        const bounceMult = opponent.isFirstHitKnockback ? 0.35 : 0.50;
+        const minX = arena.x + opponent.r;
+        const maxX = arena.x + arena.width - opponent.r;
+        const minY = arena.y + opponent.r;
+        const maxY = arena.y + arena.height - opponent.r;
 
-      if (opponent.x < minX) { opponent.x = minX; opponent.knockbackVx = Math.abs(opponent.knockbackVx) * bounceMult; }
-      if (opponent.x > maxX) { opponent.x = maxX; opponent.knockbackVx = -Math.abs(opponent.knockbackVx) * bounceMult; }
-      if (opponent.y < minY) { opponent.y = minY; opponent.knockbackVy = Math.abs(opponent.knockbackVy) * bounceMult; }
-      if (opponent.y > maxY) { opponent.y = maxY; opponent.knockbackVy = -Math.abs(opponent.knockbackVy) * bounceMult; }
+        if (opponent.x < minX) { opponent.x = minX; opponent.knockbackVx = Math.abs(opponent.knockbackVx) * bounceMult; }
+        if (opponent.x > maxX) { opponent.x = maxX; opponent.knockbackVx = -Math.abs(opponent.knockbackVx) * bounceMult; }
+        if (opponent.y < minY) { opponent.y = minY; opponent.knockbackVy = Math.abs(opponent.knockbackVy) * bounceMult; }
+        if (opponent.y > maxY) { opponent.y = maxY; opponent.knockbackVy = -Math.abs(opponent.knockbackVy) * bounceMult; }
+      }
+      
+      const decay = opponent.knockbackDecay || 0.88;
+      opponent.knockbackVx *= decay;
+      opponent.knockbackVy *= decay;
+      
+      if (Math.abs(opponent.knockbackVx) <= 0.05) opponent.knockbackVx = 0;
+      if (Math.abs(opponent.knockbackVy) <= 0.05) opponent.knockbackVy = 0;
     }
-    
-    const decay = opponent.knockbackDecay || 0.88;
-    opponent.knockbackVx *= decay;
-    opponent.knockbackVy *= decay;
-    
-    if (Math.abs(opponent.knockbackVx) <= 0.05) opponent.knockbackVx = 0;
-    if (Math.abs(opponent.knockbackVy) <= 0.05) opponent.knockbackVy = 0;
-  }
 
-  opponent.isTargetOfAmbush = true;
-  opponent.slashSwingTimer = 0;
-  opponent.katanaSlashTimer = 0;
-  opponent.katanaSlashFadeTimer = 0;
-  opponent.spearSwingTimer = 0;
-  opponent.punchAnimTimer = 0;
-  opponent.flurryHitsLeft = 0;
-  opponent.flurrySlashTimer = 0;
-  opponent.rapidSlashHitsLeft = 0;
-  opponent.cleaveSwingTimer = 0;
-  opponent.cleaveWindupTimer = 0;
-  opponent.isCleaving = false;
-  opponent.redEffectTimer = 0;
-  opponent.blueEffectTimer = 0;
-  opponent.purpleEffectTimer = 0;
-  opponent.purpleRecoveryTimer = 0;
-  opponent.isChannelingPurple = false;
-  opponent.isChannelingRed = false;
-  opponent.isChannelingBlue = false;
-  opponent.isFiringPurple = false;
-  opponent.fugaFireArrowTimer = 0;
-  opponent.isChannelingDivineFlame = false;
-  opponent.isFiringDivineFlame = false;
-  opponent.getsugaChargeTimer = 0;
-  opponent.isChannelingGetsuga = false;
-  opponent.isFiringGetsuga = false;
-  opponent.ceroTimer = 0;
-  opponent.granReyCeroTimer = 0;
-  opponent.consecutivePunchesTimer = 0;
-  opponent.seriousPunchTimer = 0;
-  opponent.isConsecutivePunches = false;
-  opponent.isSeriousPunching = false;
-  opponent.isBlitzing = false;
-  opponent.blitzStrikeIndex = 0;
-  opponent.isCollapsing = false;
-  opponent.collapseSlamTimer = 0;
-  opponent.ratioGridTimer = 0;
-  opponent.cleaveShockwaveTimer = 0;
-  opponent.thinIceBreakerPunchTimer = 0;
-  opponent.isChannelingThinIceBreaker = false;
-  opponent.maceCannonAnimTimer = 0;
-  opponent._maceCannonData = null;
-  opponent.twinScissorAnimTimer = 0;
-  opponent._twinScissorData = null;
-  opponent.fleshSurgeAnimTimer = 0;
-  opponent._fleshSurgePlungeAngle = null;
-  opponent.soulPhaseDashTimer = 0;
-  opponent.hideFrontHand = false;
-  opponent.hideBackHand = false;
-  if (typeof opponent.clearAllAttackEffects === 'function') {
-    opponent.clearAllAttackEffects();
-  }
-  if (typeof opponent.clearAllAfterimages === 'function') {
-    opponent.clearAllAfterimages();
-  } else {
-    if (opponent.swordTrail) opponent.swordTrail.length = 0;
-    if (opponent.afterImages) opponent.afterImages.length = 0;
+    opponent.slashSwingTimer = 0;
+    opponent.katanaSlashTimer = 0;
+    opponent.katanaSlashFadeTimer = 0;
+    opponent.spearSwingTimer = 0;
+    opponent.punchAnimTimer = 0;
+    opponent.flurryHitsLeft = 0;
+    opponent.flurrySlashTimer = 0;
+    opponent.rapidSlashHitsLeft = 0;
+    opponent.cleaveSwingTimer = 0;
+    opponent.cleaveWindupTimer = 0;
+    opponent.isCleaving = false;
+    opponent.redEffectTimer = 0;
+    opponent.blueEffectTimer = 0;
+    opponent.purpleEffectTimer = 0;
+    opponent.purpleRecoveryTimer = 0;
+    opponent.isChannelingPurple = false;
+    opponent.isChannelingRed = false;
+    opponent.isChannelingBlue = false;
+    opponent.isFiringPurple = false;
+    opponent.fugaFireArrowTimer = 0;
+    opponent.isChannelingDivineFlame = false;
+    opponent.isFiringDivineFlame = false;
+    opponent.getsugaChargeTimer = 0;
+    opponent.isChannelingGetsuga = false;
+    opponent.isFiringGetsuga = false;
+    opponent.ceroTimer = 0;
+    opponent.granReyCeroTimer = 0;
+    opponent.consecutivePunchesTimer = 0;
+    opponent.seriousPunchTimer = 0;
+    opponent.isConsecutivePunches = false;
+    opponent.isSeriousPunching = false;
+    opponent.isBlitzing = false;
+    opponent.blitzStrikeIndex = 0;
+    opponent.isCollapsing = false;
+    opponent.collapseSlamTimer = 0;
+    opponent.ratioGridTimer = 0;
+    opponent.cleaveShockwaveTimer = 0;
+    opponent.thinIceBreakerPunchTimer = 0;
+    opponent.isChannelingThinIceBreaker = false;
+    opponent.maceCannonAnimTimer = 0;
+    opponent._maceCannonData = null;
+    opponent.twinScissorAnimTimer = 0;
+    opponent._twinScissorData = null;
+    opponent.fleshSurgeAnimTimer = 0;
+    opponent._fleshSurgePlungeAngle = null;
+    opponent.soulPhaseDashTimer = 0;
+    opponent.hideFrontHand = false;
+    opponent.hideBackHand = false;
+    if (typeof opponent.clearAllAttackEffects === 'function') {
+      opponent.clearAllAttackEffects();
+    }
+    if (typeof opponent.clearAllAfterimages === 'function') {
+      opponent.clearAllAfterimages();
+    } else {
+      if (opponent.swordTrail) opponent.swordTrail.length = 0;
+      if (opponent.afterImages) opponent.afterImages.length = 0;
+    }
   }
 
   if (fighter.stealthAfterimages && fighter.stealthAfterimages.length > 0) {
@@ -368,9 +295,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   if (fighter.ambushPhase === 'FRONT_LAUNCH') {
     fighter.vx = 0;
     fighter.vy = 0;
+    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = aimAngle;
+    fighter.angle = aimAngle;
     fighter.aim(opponent);
-    opponent.vx = 0;
-    opponent.vy = 0;
 
     fighter.ambushTimer--;
     if (fighter.ambushTimer <= 0) {
@@ -399,6 +327,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         fighter.y = clampedBack.y;
         fighter.vx = 0;
         fighter.vy = 0;
+        const aimAngleMah = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+        fighter.gunAngle = aimAngleMah;
+        fighter.angle = aimAngleMah;
         fighter.aim(opponent);
 
         // Cancel ambush & put stealth on cooldown
@@ -423,6 +354,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       fighter.vx = 0;
       fighter.vy = 0;
 
+      const backAimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+      fighter.gunAngle = backAimAngle;
+      fighter.angle = backAimAngle;
       fighter.aim(opponent);
 
       modSpawnTeleportAfterimages(fighter, frontX, frontY, clampedBack.x, clampedBack.y, startAngle, fighter.gunAngle);
@@ -436,12 +370,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   } else if (fighter.ambushPhase === 'BACK_CHARGE') {
     fighter.vx = 0;
     fighter.vy = 0;
+    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = aimAngle;
+    fighter.angle = aimAngle;
     fighter.aim(opponent);
-
-    if (!opponent.domainActive) {
-      opponent.vx = 0;
-      opponent.vy = 0;
-    }
 
     if (Math.random() < 0.75) {
       const baseAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
@@ -458,6 +390,11 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     if (fighter.ambushTimer <= 0) {
       fighter.ambushPhase = 'BACK_STAB';
 
+      const stabAimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+      fighter.gunAngle = stabAimAngle;
+      fighter.angle = stabAimAngle;
+      fighter.aim(opponent);
+
       triggerGlobalScreenShake(4, 6);
 
       spawnImpactFlash(fighter.x, fighter.y, 110, 'rgba(255, 30, 75, 0.95)');
@@ -470,29 +407,86 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       audioSystem.playSFX('attack_swordswing', 0.8);
       audioSystem.playSFX('attack_fleshhit', 0.8);
 
-      fighter.performInvertedSpearStrike(opponent, ownerIndex, true);
+      const hitTargets = fighter.performInvertedSpearStrike(opponent, ownerIndex, true);
+      const didHit = Array.isArray(hitTargets) ? (hitTargets.includes(opponent) || hitTargets.length > 0) : Boolean(hitTargets);
+      fighter._ambushThrustHit = didHit;
 
-      fighter.stealthTimer = fighter.stealthMaxDuration;
-      fighter.stealthCooldown = 0;
-      fighter.isStealthed = true;
-      fighter.stealthActive = true;
+      if (didHit) {
+        audioSystem.playSFX('attack_fleshhit', 0.8);
+        // Target successfully struck in the back! NOW apply stop movement / stasis to finish sequence!
+        opponent.isTargetOfAmbush = true;
+        if (typeof opponent.interruptAttacks === 'function') {
+          opponent.interruptAttacks(true);
+        }
+        if (opponent.isFiringPureLoveBeam || opponent.isChannelingPureLoveBeam) {
+          opponent.isFiringPureLoveBeam = false;
+          opponent.isChannelingPureLoveBeam = false;
+          opponent.pureLoveBeamActiveTimer = 0;
+          opponent.pureLoveBeamChargeTimer = 0;
+          opponent.rikaEmergingForBeamTimer = 0;
+          if (typeof opponent._stopBeamAudio === 'function') {
+            opponent._stopBeamAudio();
+          }
+        }
+        const freezeDuration = CONFIG.toji?.ambushTargetFreezeDuration || 70;
+        if (typeof opponent.applyTimeStop === 'function') {
+          opponent.applyTimeStop(freezeDuration);
+        }
+        opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, freezeDuration);
+        opponent.vx = 0;
+        opponent.vy = 0;
+
+        fighter.stealthTimer = fighter.stealthMaxDuration;
+        fighter.stealthCooldown = 0;
+        fighter.isStealthed = true;
+        fighter.stealthActive = true;
+      } else {
+        // Enemy dodged! Show DODGED text, but do NOT snap out immediately:
+        // Keep Toji in BACK_STAB phase so the thrust swing animation plays out in full!
+        spawnFloatingText(opponent.x, opponent.y - opponent.r - 20, 'DODGED!', '#00E5FF');
+        opponent.isTargetOfAmbush = false;
+      }
     }
   } else if (fighter.ambushPhase === 'BACK_STAB') {
     fighter.vx = 0;
     fighter.vy = 0;
+    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = aimAngle;
+    fighter.angle = aimAngle;
     fighter.aim(opponent);
 
     if (fighter.spearSwingTimer <= 0) {
-      fighter.ambushPhase = 'KATANA_DRAW';
-      fighter.ambushTimer = 4;
+      if (fighter._ambushThrustHit) {
+        fighter.ambushPhase = 'KATANA_DRAW';
+        fighter.ambushTimer = 4;
 
-      audioSystem.playSFX('attack_swordswing', 0.85);
-      spawnImpactFlash(fighter.x, fighter.y, 45, '#E2E6EC');
-      spawnSparks(fighter.x, fighter.y, 16, 'crimsonSniper');
+        audioSystem.playSFX('attack_swordswing', 0.85);
+        spawnImpactFlash(fighter.x, fighter.y, 45, '#E2E6EC');
+        spawnSparks(fighter.x, fighter.y, 16, 'crimsonSniper');
+      } else {
+        // Enemy dodged the back thrust! The thrust animation has finished playing, cleanly exit ambush now!
+        fighter.isAmbushing = false;
+        fighter.ambushTarget = null;
+        fighter.ambushPhase = null;
+        fighter.stealthCooldown = fighter.stealthMaxCooldown || (CONFIG.toji?.stealthCooldownFrames || 600);
+        fighter.isStealthed = false;
+        fighter.stealthActive = false;
+        fighter.isAmbushThrust = false;
+        if (opponent) opponent.isTargetOfAmbush = false;
+
+        const moveAngle = opponent ? Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x) : (fighter.gunAngle || 0);
+        fighter.vx = Math.cos(moveAngle) * (fighter.speed || 3.5);
+        fighter.vy = Math.sin(moveAngle) * (fighter.speed || 3.5);
+        fighter.normalizeSpeed();
+        return;
+      }
     }
   } else if (fighter.ambushPhase === 'KATANA_DRAW') {
     fighter.vx = 0;
     fighter.vy = 0;
+    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = aimAngle;
+    fighter.angle = aimAngle;
     fighter.aim(opponent);
 
     fighter.ambushTimer--;
@@ -505,8 +499,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     const oldY = fighter.y;
     const oldAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
 
-    fighter.aim(opponent);
-    const targetAngle = fighter.gunAngle;
+    const targetAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
     const offsetDist = opponent.r + fighter.r + 14;
 
     const rawChaseX = opponent.x - Math.cos(targetAngle) * offsetDist;
@@ -518,17 +511,20 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.vx = 0;
     fighter.vy = 0;
 
+    const chaseAimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = chaseAimAngle;
+    fighter.angle = chaseAimAngle;
+    fighter.aim(opponent);
+
     const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 70;
     if (typeof opponent.applyTimeStop === 'function') {
       opponent.applyTimeStop(katanaFreeze);
     }
     opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, katanaFreeze);
-    if (!opponent.domainActive) {
-      opponent.vx = 0;
-      opponent.vy = 0;
-    }
+    opponent.vx = 0;
+    opponent.vy = 0;
 
-    modSpawnTeleportAfterimages(fighter, oldX, oldY, clampedChase.x, clampedChase.y, oldAngle, targetAngle);
+    modSpawnTeleportAfterimages(fighter, oldX, oldY, clampedChase.x, clampedChase.y, oldAngle, chaseAimAngle);
 
     fighter.ambushTimer--;
     if (fighter.ambushTimer <= 0) {
@@ -542,12 +538,13 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   } else if (fighter.ambushPhase === 'KATANA_CHARGE') {
     fighter.vx = 0;
     fighter.vy = 0;
+    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = aimAngle;
+    fighter.angle = aimAngle;
     fighter.aim(opponent);
 
-    if (!opponent.domainActive) {
-      opponent.vx = 0;
-      opponent.vy = 0;
-    }
+    opponent.vx = 0;
+    opponent.vy = 0;
 
     const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
     const soundDelay = secondSeqSound?.delay || 0;
@@ -580,6 +577,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   } else if (fighter.ambushPhase === 'KATANA_SLASH') {
     fighter.vx = 0;
     fighter.vy = 0;
+    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = aimAngle;
+    fighter.angle = aimAngle;
+    fighter.aim(opponent);
 
     fighter.katanaSlashTimer--;
     if (fighter.katanaSlashTimer <= 0) {
@@ -603,10 +604,8 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
       const totalFlurryFrames = fighter.phantomMaxStrikes * (CONFIG.toji?.ambushPhantomFlurryFrameRate || 8) + 10;
       if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(totalFlurryFrames);
-      if (!opponent.domainActive) {
-        opponent.vx = 0;
-        opponent.vy = 0;
-      }
+      opponent.vx = 0;
+      opponent.vy = 0;
     }
   } else if (fighter.ambushPhase === 'PHANTOM_FLURRY') {
     fighter.vx = 0;
@@ -636,6 +635,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
         fighter.x = clampedPhantom.x;
         fighter.y = clampedPhantom.y;
+        const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+        fighter.gunAngle = aimAngle;
+        fighter.angle = aimAngle;
         fighter.aim(opponent);
 
         delete fighter._smoothKatanaOffset;

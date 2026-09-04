@@ -52,11 +52,13 @@ export class MahoragaFighter extends Fighter {
     };
 
     // Gojo-Specific Adaptation Tracking
-    this.gojoAdapted = { purple: false, red: false, blue: false };
+    this.gojoAdapted = { purple: false, red: false, blue: false, domain: false };
     this._lastGojoHitType = null;
     this.gojoBlueDragImmune = false;
     this.gojoPurpleDodgeReady = false;
     this.gojoRedDodgeReady = false;
+    this.gojoDomainAdapted = false;
+    this.domainExposureCount = 0;
     this.totalAccumDamage = 0;
     this.accumTimer = 0;
     this.fatalAdaptCooldown = 0;
@@ -266,12 +268,31 @@ export class MahoragaFighter extends Fighter {
 
   /**
    * Mahoraga can aim whenever not in hard CC or Pure Love Beam recovery.
+   * When adapted to Gojo's Unlimited Void Domain (gojoDomainAdapted), aim rotation is explicitly enabled.
    */
   canAim() {
-    if (!super.canAim()) return false;
-    if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0) {
-      return false;
+    if (this.hp <= 0 || this.isDead) return false;
+    if (this.isTargetOfAmbush || (this.timeStopTimer > 0)) return false;
+    const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+                     (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
+                     (this.electricStunTimer && this.electricStunTimer > 0) ||
+                     (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
+                     (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
+                     (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0);
+    if (isHardCC) return false;
+
+    // If Mahoraga has adapted to Gojo's domain, auto-aim and rotation are explicitly enabled!
+    if (this.gojoDomainAdapted || this.gojoAdapted?.domain || this.domainImmunity) {
+      return true;
     }
+
+    // When NOT adapted and inside enemy Gojo's Unlimited Void, disable auto-aim
+    const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive && f !== this
+    );
+    if (isInsideGojoDomain) return false;
+
+    if (this.isFiringPureLoveBeam || this.isFiringUlt || this.isFiringBeam) return false;
     return true;
   }
 
@@ -578,10 +599,11 @@ export class MahoragaFighter extends Fighter {
     }
 
     if (bounced && !this.isDraggedByGetsuga) {
-      this.wallBounceCount = (this.wallBounceCount || 0) + 1;
+      const now = performance.now();
+      const canReboundDash = !this._lastWallReboundTime || (now - this._lastWallReboundTime > 180);
 
-      // On the 2nd consecutive wall collision, trigger forward dash surge directly toward enemy
-      if (this.wallBounceCount >= 2) {
+      if (canReboundDash) {
+        this._lastWallReboundTime = now;
         this.wallBounceCount = 0;
 
         const target = this._findClosestEnemy(opponent || this._bounceTarget);
@@ -604,34 +626,20 @@ export class MahoragaFighter extends Fighter {
 
           // Apply high-speed physical forward dash surge directly toward the target
           const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed || 6.5;
-          const dashSpeed = Math.max(currentSpeed * 1.5, (this.speed || 6.5) * 1.8, 14.0);
+          const dashSpeed = Math.max(currentSpeed * 1.5, (this.speed || 6.5) * 2.2, 16.0);
           this.vx = (dx / dist) * dashSpeed;
           this.vy = (dy / dist) * dashSpeed;
 
           // Visual dash burst: impact sparks, flash at wall rebound point, and motion trail afterimages
-          spawnImpactFlash(this.x, this.y, 30, '#FFD700');
-          spawnSparks(this.x, this.y, 12, 'silver', '#FFFFFF');
+          spawnImpactFlash(this.x, this.y, 35, '#FFD700');
+          spawnSparks(this.x, this.y, 14, 'silver', '#FFFFFF');
           this._spawnTeleportAfterimages(this.x, this.y, this.x + this.vx * 3.5, this.y + this.vy * 3.5, angleToTarget);
           audioSystem.playSFX('skill_dash5', 0.9);
 
           // Rate-limited floating text indicator
-          const now = performance.now();
-          if (!this._lastWallBounceDashTime || (now - this._lastWallBounceDashTime > 1500)) {
+          if (!this._lastWallBounceDashTime || (now - this._lastWallBounceDashTime > 1200)) {
             this._lastWallBounceDashTime = now;
             spawnFloatingText(this.x, this.y - this.r - 25, '⚡ WALL REBOUND DASH!', '#FFD700');
-          }
-
-          // Trigger Hand-to-Hand Blitz Sequence if available
-          const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0);
-          const canTriggerBlitz = !this.isBlitzActive && !this.isInfinityBlitz && !this.isWallSlamActive && !this.isShouting && !this.isCleaving && !this.isThrowing && !isBeamTrapped && (this.blitzCooldownTimer || 0) <= 0;
-          if (canTriggerBlitz) {
-            this.isBlitzActive = true;
-            this.blitzWindupTimer = 2;
-            this.blitzHitsLeft = CONFIG.mahoraga?.blitzHitsCount ?? 10;
-            this.blitzTimer = 0;
-            this.blitzStayTimer = 999;
-            this.blitzTotalDuration = CONFIG.mahoraga?.blitzTotalDurationFrames ?? 150;
-            this.blitzTarget = target;
           }
         }
       }
@@ -713,19 +721,23 @@ export class MahoragaFighter extends Fighter {
     if (this.wheelGlowTimer > 0) this.wheelGlowTimer--;
     if (this.gammaRayRainbowTimer > 0) this.gammaRayRainbowTimer--;
 
+    const threshold = this.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+
     if (this.pendingPurpleAdaptation) {
       const livePurpleOrb = (projectileSystem && projectileSystem.projectiles)
         ? projectileSystem.projectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') && (p.life || 0) > 0)
         : null;
 
       if (!livePurpleOrb) {
-        // Purple orb has expired / despawned — trigger wheel click adaptation now!
+        // Purple orb has expired / despawned — trigger adaptation only if accumulated damage filled WOA bar
         this.pendingPurpleAdaptation = false;
         const purpleAttacker = this.pendingPurpleAttacker;
         const purpleType = this.pendingPurpleType || 'skill';
         this.pendingPurpleAttacker = null;
         this.pendingPurpleType = null;
-        this._triggerAdaptation(purpleType, purpleAttacker);
+        if ((this.totalAccumDamage || 0) >= threshold) {
+          this._triggerAdaptation(purpleType, purpleAttacker);
+        }
       }
     }
 
@@ -735,17 +747,19 @@ export class MahoragaFighter extends Fighter {
                                 (Math.hypot(this.vx, this.vy) > 3.0);
 
       if (!isKnockbackActive) {
-        // Red blast knockback slide finished — trigger wheel click adaptation now!
+        // Red blast knockback slide finished — trigger adaptation only if accumulated damage filled WOA bar
         this.pendingRedAdaptation = false;
         const redAttacker = this.pendingRedAttacker;
         const redType = this.pendingRedType || 'skill';
         this.pendingRedAttacker = null;
         this.pendingRedType = null;
-        this._triggerAdaptation(redType, redAttacker);
+        if ((this.totalAccumDamage || 0) >= threshold) {
+          this._triggerAdaptation(redType, redAttacker);
+        }
       }
     }
 
-    // ── PENDING GETSUGA TENSHO ADAPTATION RELEASE TICK (Triggers wheel click after the 2nd Getsuga Tensho duration is done!) ──
+    // ── PENDING GETSUGA TENSHO ADAPTATION RELEASE TICK ──
     if (this.pendingGetsugaAdaptation) {
       const proj = this.pendingGetsugaProj;
       const isProjActive = proj && typeof projectileSystem !== 'undefined' && projectileSystem.projectiles && projectileSystem.projectiles.includes(proj) && (proj.life || 0) > 0;
@@ -757,66 +771,56 @@ export class MahoragaFighter extends Fighter {
         this.pendingGetsugaAttacker = null;
         this.pendingGetsugaProj = null;
 
-        this.adaptedGetsuga = true;
-        if (!this.adaptedSkills) this.adaptedSkills = {};
-        this.adaptedSkills['getsugaTensho'] = true;
-        this.adaptedSkills['getsuga'] = true;
-        this.skillDodgeReady['getsugaTensho'] = false;
-        this.skillDodgeReady['getsuga'] = false;
-        this.isParalyzed = false;
-        this.paralyzeTimer = 0;
-        if (this.statusEffects) {
-          this.statusEffects.paralyzeTimer = 0;
-        }
+        if ((this.totalAccumDamage || 0) >= threshold) {
+          this.adaptedGetsuga = true;
+          if (!this.adaptedSkills) this.adaptedSkills = {};
+          this.adaptedSkills['getsugaTensho'] = true;
+          this.adaptedSkills['getsuga'] = true;
+          this.skillDodgeReady['getsugaTensho'] = false;
+          this.skillDodgeReady['getsuga'] = false;
+          this.isParalyzed = false;
+          this.paralyzeTimer = 0;
+          if (this.statusEffects) {
+            this.statusEffects.paralyzeTimer = 0;
+          }
 
-        this._lastSkillShotId = 'getsugaTensho';
-        this._lastSkillShotColor = '#FF1E00';
-        this._triggerAdaptation('skill', getsugaAttacker);
-      }
-    }
-
-    // ── PENDING DOMAIN ADAPTATION RELEASE TICK (Triggers 1 single click after Gojo's domain expires!) ──
-    if (this.pendingDomainAdaptation) {
-      const isInsideGojoDomain = typeof state !== 'undefined' && (
-        state.activeDomain === 'unlimited_void' || 
-        state.domainActive === 'unlimited_void' || 
-        (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
-      );
-
-      if (!isInsideGojoDomain) {
-        const queued = this.pendingDomainAdaptation;
-        this.pendingDomainAdaptation = null;
-        if (queued) {
-          if (queued.lastGojoHitType) this._lastGojoHitType = queued.lastGojoHitType;
-          if (queued.lastSukunaHitType) this._lastSukunaHitType = queued.lastSukunaHitType;
-          if (queued.lastSkillShotId) this._lastSkillShotId = queued.lastSkillShotId;
-          if (queued.lastSkillShotColor) this._lastSkillShotColor = queued.lastSkillShotColor;
-          this._triggerAdaptation(queued.type || 'skill', queued.attacker);
+          this._lastSkillShotId = 'getsugaTensho';
+          this._lastSkillShotColor = '#FF1E00';
+          this._triggerAdaptation('skill', getsugaAttacker);
         }
       }
     }
 
-    if (this.skillExposureTimer > 0) {
-      this.skillExposureTimer--;
-      if (this.skillExposureTimer <= 0) {
-        this._triggerAdaptation(this.exposedSkillType || 'skill', this.exposedSkillAttacker);
-        this.exposedSkillType = null;
-        this.exposedSkillAttacker = null;
-      }
-    }
-
-    const isInsideGojoDomain = typeof state !== 'undefined' && (
+    // ── GOJO DOMAIN EXPOSURE & ADAPTATION RELEASE TICK ──
+    const isInsideGojoDomain = !this.gojoDomainAdapted && !this.gojoAdapted?.domain && typeof state !== 'undefined' && (
       state.activeDomain === 'unlimited_void' || 
       state.domainActive === 'unlimited_void' || 
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
     );
 
-    // Saitama Serious Counter adaptation: wheel clicks shortly after the punch lands
-    // MUST tick BEFORE freeze guards — otherwise hit-stun/CC from the punch blocks the timer from counting down!
+    if (isInsideGojoDomain) {
+      this.domainExposureCount = (this.domainExposureCount || 0) + 1;
+    } else if (this.pendingDomainAdaptation || (this.domainExposureCount && this.domainExposureCount > 0 && !this.gojoDomainAdapted)) {
+      // Gojo's domain has ended! Release held adaptation & adapt to Unlimited Void
+      const queued = this.pendingDomainAdaptation;
+      this.pendingDomainAdaptation = null;
+      this.domainExposureCount = 0;
+      this.gojoDomainAdapted = true;
+      if (!this.gojoAdapted) this.gojoAdapted = {};
+      this.gojoAdapted.domain = true;
+      this._lastGojoHitType = 'domain';
+
+      const gojoAttacker = queued?.attacker || (state.fighters ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo')) : null);
+      this._triggerAdaptation('skill', gojoAttacker);
+    }
+
+    // Saitama Serious Counter adaptation: wheel clicks only when accumulated damage filled WOA bar
     if (this.saitamaCounterDebuffTimer > 0) {
       this.saitamaCounterDebuffTimer--;
       if (this.saitamaCounterDebuffTimer <= 0 && this.hp > 0 && !this.isDead && !this.adaptedSaitamaCounter) {
-        adaptToSaitamaCounter(this, this.saitamaCounterAttacker);
+        if ((this.totalAccumDamage || 0) >= threshold) {
+          adaptToSaitamaCounter(this, this.saitamaCounterAttacker);
+        }
         this.saitamaCounterAttacker = null;
       }
     }
@@ -845,7 +849,7 @@ export class MahoragaFighter extends Fighter {
       (!this.adaptedGenosBeam && ((this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
     );
 
-    // Rule #1 Early Exit Guard: Freeze / Gojo Domain / Ambush / Infinity / Beam Paralysis completely freezes Mahoraga!
+    // Rule #1 Early Exit Guard: Freeze / Unadapted Gojo Domain / Ambush / Infinity / Beam Paralysis completely freezes Mahoraga!
     if (this.isTargetOfAmbush || isInsideGojoDomain || isFrozen || isInfinityFrozen || isBeamParalyzed) {
       this.interruptAttacks(true);
       this.isCleaving = false;
@@ -945,7 +949,7 @@ export class MahoragaFighter extends Fighter {
     // Calculate Dynamic Movement Speed based on Gold Adaptations
     const baseSpeed = this.baseSpeed || CONFIG.mahoraga?.moveSpeed || 6.5;
     const goldStages = (this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0);
-    const speedBoost = CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? 0.15;
+    const speedBoost = CONFIG.mahoraga?.wheelAdaptationSpeedMultiplier ?? CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? CONFIG.mahoraga?.movementSpeedMultiplierPerAdaptation ?? 0.15;
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
 
     // ── PASSIVE RCT REGEN (Scales continuously per adaptation level / wheel click without cap!) ──
@@ -1066,13 +1070,8 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
-    if (this.gojoRedDodgeReady && (this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
-      const gojoFighter = state.fighters
-        ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0 && (f.redEffectTimer || 0) > 0)
-        : null;
-      if (gojoFighter) {
-        this._gojoRedTeleportDodge(gojoFighter);
-      }
+    if (this.gojoRedDodgeReady) {
+      this.gojoRedDodgeReady = false; // Mahoraga tanks Red with 50% damage reduction instead of dodging
     }
 
     // ── HIGH-SPEED DIVINE FLASH-DASH TICK ──
@@ -1083,8 +1082,14 @@ export class MahoragaFighter extends Fighter {
 
       this.x = this.dashFromX + (this.dashToX - this.dashFromX) * progress;
       this.y = this.dashFromY + (this.dashToY - this.dashFromY) * progress;
-      this.vx = 0;
-      this.vy = 0;
+
+      const dashDx = this.dashToX - this.dashFromX;
+      const dashDy = this.dashToY - this.dashFromY;
+      const dashDist = Math.hypot(dashDx, dashDy) || 1;
+      const moveSpeed = this.speed || 6.5;
+      const dashSpeed = Math.max(moveSpeed, dashDist / (maxDash || 10));
+      this.vx = (dashDx / dashDist) * dashSpeed;
+      this.vy = (dashDy / dashDist) * dashSpeed;
 
       if (this.adaptationDashTarget && !this.adaptationDashTarget.isDead) {
         this.aim(this.adaptationDashTarget);
@@ -1099,15 +1104,12 @@ export class MahoragaFighter extends Fighter {
         maxTimer: 12
       });
 
-      if (this.adaptationDashTimer === 0 && this.adaptationDashTarget && !this.adaptationDashTarget.isDead) {
+      if (this.adaptationDashTimer === 0) {
         const target = this.adaptationDashTarget;
         this.adaptationDashTarget = null;
 
         this.x = this.dashToX;
         this.y = this.dashToY;
-        this.aim(target);
-        this.vx = 0;
-        this.vy = 0;
 
         const activeArena = arena || (typeof state !== 'undefined' && state.arena ? state.arena : CONFIG.arena);
         if (activeArena) {
@@ -1123,6 +1125,11 @@ export class MahoragaFighter extends Fighter {
         if (target && !target.isDead) {
           this.aim(target);
         }
+
+        // Natural movement velocity continuation: Mahoraga never stops mid-air, moving naturally according to arena rules
+        const aimAngle = this.gunAngle !== undefined ? this.gunAngle : Math.atan2(dashDy, dashDx);
+        this.vx = Math.cos(aimAngle) * moveSpeed;
+        this.vy = Math.sin(aimAngle) * moveSpeed;
 
         if (this.adaptationDashIsCounter && target && !target.isDead) {
           const damage = CONFIG.mahoraga?.swordDamage ?? 15;
@@ -1141,75 +1148,81 @@ export class MahoragaFighter extends Fighter {
 
           this._executeShout(target, ownerIndex);
 
-        const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        const kbForce = CONFIG.mahoraga?.adaptationStrikeKnockbackForce ?? 42.0;
-        const kbVx = Math.cos(kbAngle) * kbForce;
-        const kbVy = Math.sin(kbAngle) * kbForce;
+          const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
+          const kbForce = CONFIG.mahoraga?.adaptationStrikeKnockbackForce ?? 42.0;
+          const kbVx = Math.cos(kbAngle) * kbForce;
+          const kbVy = Math.sin(kbAngle) * kbForce;
 
-        target.vx = kbVx;
-        target.vy = kbVy;
-        if (typeof target.applyKnockback === 'function') {
-          target.applyKnockback(kbVx, kbVy);
-        }
+          target.vx = kbVx;
+          target.vy = kbVy;
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(kbVx, kbVy);
+          }
 
-        target.x += target.vx;
-        target.y += target.vy;
+          target.x += target.vx;
+          target.y += target.vy;
 
-        if (target && !target.isDead) {
-          const dmg = CONFIG.mahoraga?.swordDamage ?? 15;
-          target.takeDamage(dmg, this, { isMelee: true, isSkill: true });
-          this.punchAnimTimer = 22;
-          this.punchAnimMaxTimer = 22;
-          const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
-          const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
-          audioSystem.playSFX(swordSnd, swordVol);
-          spawnImpactFlash(target.x, target.y, 45, '#FFD700');
-          spawnSparks(target.x, target.y, 15, 'gold', '#FFFFFF');
-          spawnFloatingText(this.x, this.y - this.r - 25, '⚡ ADAPTATION STRIKE!', '#FFD700');
-        }
-
-        if (this.teleportCounterPending) {
-          this.teleportCounterPending = false;
           if (target && !target.isDead) {
-            this.attackCount = (this.attackCount || 0) + 1;
-            if (this.attackCount % 2 === 0) {
-              this.leftPunchTimer = 18;
-              this.leftPunchMaxTimer = 18;
-              this._playRandomHeavyPunchSound();
-            } else {
-              this.swordCombo = (this.swordCombo || 0) + 1;
-              this.punchAnimTimer = 18;
-              this.punchAnimMaxTimer = 18;
-              const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
-              const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
-              audioSystem.playSFX(swordSnd, swordVol);
-            }
-
-            const counterTargets = this._getFrontRadiusTargets(100, Math.PI * 1.3);
-            if (target && target.hp > 0 && !target.isDead && !counterTargets.includes(target)) {
-              const dist = Math.hypot(this.x - target.x, this.y - target.y);
-              if (dist <= 100 + this.r + target.r) {
-                counterTargets.push(target);
-              }
-            }
-            for (const t of counterTargets) {
-              t.takeDamage(CONFIG.mahoraga?.teleportCounterDamage ?? 22, this, { isMelee: true, isSkill: true });
-            }
-
+            const dmg = CONFIG.mahoraga?.swordDamage ?? 15;
+            target.takeDamage(dmg, this, { isMelee: true, isSkill: true });
+            this.punchAnimTimer = 22;
+            this.punchAnimMaxTimer = 22;
+            const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+            const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
+            audioSystem.playSFX(swordSnd, swordVol);
             spawnImpactFlash(target.x, target.y, 45, '#FFD700');
             spawnSparks(target.x, target.y, 15, 'gold', '#FFFFFF');
-            spawnMeleeClashShockwave(target.x, target.y, 100, 'mahoraga');
-            triggerGlobalScreenShake(8, 15);
-            spawnFloatingText(this.x, this.y - this.r - 25, '⚡ TELEPORT ADAPTATION!', '#FFD700');
-            audioSystem.playSFX('skill_dash5', 0.8);
+            spawnFloatingText(this.x, this.y - this.r - 25, '⚡ ADAPTATION STRIKE!', '#FFD700');
           }
+
+          if (this.teleportCounterPending) {
+            this.teleportCounterPending = false;
+            if (target && !target.isDead) {
+              this.attackCount = (this.attackCount || 0) + 1;
+              if (this.attackCount % 2 === 0) {
+                this.leftPunchTimer = 18;
+                this.leftPunchMaxTimer = 18;
+                this._playRandomHeavyPunchSound();
+              } else {
+                this.swordCombo = (this.swordCombo || 0) + 1;
+                this.punchAnimTimer = 18;
+                this.punchAnimMaxTimer = 18;
+                const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+                const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
+                audioSystem.playSFX(swordSnd, swordVol);
+              }
+
+              const counterTargets = this._getFrontRadiusTargets(100, Math.PI * 1.3);
+              if (target && target.hp > 0 && !target.isDead && !counterTargets.includes(target)) {
+                const dist = Math.hypot(this.x - target.x, this.y - target.y);
+                if (dist <= 100 + this.r + target.r) {
+                  counterTargets.push(target);
+                }
+              }
+              for (const t of counterTargets) {
+                t.takeDamage(CONFIG.mahoraga?.teleportCounterDamage ?? 22, this, { isMelee: true, isSkill: true });
+              }
+
+              spawnImpactFlash(target.x, target.y, 45, '#FFD700');
+              spawnSparks(target.x, target.y, 15, 'gold', '#FFFFFF');
+              spawnMeleeClashShockwave(target.x, target.y, 100, 'mahoraga');
+              triggerGlobalScreenShake(8, 15);
+              spawnFloatingText(this.x, this.y - this.r - 25, '⚡ TELEPORT ADAPTATION!', '#FFD700');
+              audioSystem.playSFX('skill_dash5', 0.8);
+            }
+          }
+          
+          this.adaptationDashIsCounter = false;
         }
-        
-        this.adaptationDashIsCounter = false;
+
+        // Apply arena movement and physics immediately on arrival frame
+        this.applyMovementPhysics();
+        if (activeArena) {
+          this.resolveWallBounce(activeArena, target);
+        }
       }
       return;
     }
-  }
 
     // ── ADAPTATION PAUSE TICK ──
     if (this.adaptationPauseTimer > 0) {
@@ -1345,12 +1358,6 @@ export class MahoragaFighter extends Fighter {
         return;
       }
 
-      this.vx = 0;
-      this.vy = 0;
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      this.applyMovementPhysics(0);
-
       const target = this.blitzTarget || opponent;
       if (!target || target.isDead) {
         this.isBlitzActive = false;
@@ -1374,6 +1381,7 @@ export class MahoragaFighter extends Fighter {
         this.vy = 0;
         this.knockbackVx = 0;
         this.knockbackVy = 0;
+        this.applyMovementPhysics(0);
 
         const aimAngle = this.gunAngle !== undefined ? this.gunAngle : Math.atan2(target.y - this.y, target.x - this.x);
         const idealDist = this.r + target.r + 14;
@@ -1388,6 +1396,10 @@ export class MahoragaFighter extends Fighter {
           target.vx = 0;
           target.vy = 0;
         }
+      } else {
+        // Natural movement during blitz: Mahoraga never stops mid-air, moving naturally according to arena rules
+        this.applyMovementPhysics();
+        if (arena) this.resolveWallBounce(arena, target);
       }
 
       if (this.blitzWindupTimer > 0) {
@@ -1437,43 +1449,9 @@ export class MahoragaFighter extends Fighter {
             target.vx = 0;
             target.vy = 0;
           }
-        } else if (!this.isDraggedByGetsuga && ((distToTarget > maxMeleeDist && this.blitzStayTimer >= minStayFrames) || (isTargetBlitzing && distToTarget > 55))) {
-          this.blitzStayTimer = 0;
-          const angles = [0, Math.PI, -Math.PI * 0.5, Math.PI * 0.5];
-          const baseAngle = angles[(hitIndex - 1) % angles.length] + (Math.random() - 0.5) * 0.4;
-          const offsetDist = target.r + this.r + 14;
-
-          let teleX = target.x + Math.cos(baseAngle) * offsetDist;
-          let teleY = target.y + Math.sin(baseAngle) * offsetDist;
-
-          if (activeArena) {
-            const minX = activeArena.x + this.r + 5;
-            const maxX = activeArena.x + activeArena.width - this.r - 5;
-            const minY = activeArena.y + this.r + 5;
-            const maxY = activeArena.y + activeArena.height - this.r - 5;
-
-            teleX = Math.max(minX, Math.min(maxX, teleX));
-            teleY = Math.max(minY, Math.min(maxY, teleY));
-          }
-
-          const oldX = this.x;
-          const oldY = this.y;
-
-           // Set up smooth flash-dash travel using the adaptationDashSpeedFrames config
-           this.dashFromX = oldX;
-           this.dashFromY = oldY;
-           this.dashToX = teleX;
-           this.dashToY = teleY;
-           const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
-           this.adaptationDashTimer = dashFrames;
-           this.adaptationDashTarget = target;
-           this.adaptationDashIsCounter = false;
-
-           this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY);
-           audioSystem.playSFX('skill_dash5', 1.0);
-         } else {
-           this.aim(target);
-         }
+        } else {
+          this.aim(target);
+        }
 
         // 2. Perform Hand-to-Hand Martial Arts Strike / Sword Finisher
         if (hitIndex < totalHits) {
@@ -1598,6 +1576,11 @@ export class MahoragaFighter extends Fighter {
           audioSystem.playSFX('attack_explosion', 1.0);
           audioSystem.playSFX('attack_swordswing', 1.0);
           spawnFloatingText(target.x, target.y - 30, 'FINISHER CLEAVE!', '#FFD700');
+
+          // Restore natural movement momentum upon finishing the blitz
+          const naturalSpeed = this.speed || 6.5;
+          this.vx = Math.cos(kbAngle) * naturalSpeed;
+          this.vy = Math.sin(kbAngle) * naturalSpeed;
 
           this.isBlitzActive = false;
           this.isWallSlamBlitz = false;
@@ -1864,6 +1847,7 @@ export class MahoragaFighter extends Fighter {
       inner: { x: worldBaseX, y: worldBaseY }
     };
   }
+
 
 
 

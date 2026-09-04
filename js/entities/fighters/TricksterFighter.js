@@ -1,4 +1,4 @@
-import { fadeOutLoopingSound, stopLoopingSound } from '../../systems/soundSystem.js';
+import { fadeOutLoopingSound, stopLoopingSound, fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -116,6 +116,13 @@ export class TricksterFighter extends Fighter {
     this.pullPhaseHookGrab = 3;
     this.pullPhasePullDrag = 25;
     this.pullPhaseDisengage = 12;
+
+    if (this.tkTarget) {
+      this.tkTarget.isCaughtInTelekinesis = false;
+      this.tkTarget.isParalyzed = false;
+      this.tkTarget.z = 0;
+      this.tkTarget = null;
+    }
   }
 
   interruptAttacks() {
@@ -128,11 +135,58 @@ export class TricksterFighter extends Fighter {
     this.beamTimer = 0;
     this.stormActive = false;
     
+    if (this.tkTarget) {
+      this.tkTarget.isCaughtInTelekinesis = false;
+      this.tkTarget.isParalyzed = false;
+      this.tkTarget.z = 0;
+      this.tkTarget = null;
+      this.tkTimer = 0;
+    }
+
     // Stop the laser sound immediately if it's playing
     if (this._isLaserSoundPlaying && this._laserSoundKey) {
       fadeOutLoopingSound(this._laserSoundKey, 100);
       this._isLaserSoundPlaying = false;
     }
+  }
+
+  /**
+   * Silences and cuts off active skill/channeling audio on a target when caught in Telekinesis.
+   */
+  _silenceTargetAudio(target) {
+    if (!target) return;
+
+    // 1. Cut off character-specific channeling audio handles & looping sounds
+    if (target._purpleChargeSoundHandle) {
+      fadeOutSound(target._purpleChargeSoundHandle, 100);
+      target._purpleChargeSoundHandle = null;
+    }
+    if (target._domainSoundHandle) {
+      fadeOutSound(target._domainSoundHandle, 100);
+      target._domainSoundHandle = null;
+    }
+    if (target.fugaSoundKey) {
+      try { stopLoopingSound(target.fugaSoundKey); } catch (e) {}
+      target.fugaSoundKey = null;
+    }
+    if (typeof target._stopBeamAudio === 'function') target._stopBeamAudio();
+    if (typeof target._stopChannelAudio === 'function') target._stopChannelAudio();
+    if (typeof target._stopAllSounds === 'function') target._stopAllSounds();
+
+    // 2. Cut off active skill charge/channel audio sources across fighters
+    fadeOutSoundBySrc('mixing', 100);
+    fadeOutSoundBySrc('purplecharge', 100);
+    fadeOutSoundBySrc('purpledeploy', 100);
+    fadeOutSoundBySrc('redcharging', 100);
+    fadeOutSoundBySrc('redchanneling', 100);
+    fadeOutSoundBySrc('domain', 100);
+    fadeOutSoundBySrc('fuga', 100);
+    fadeOutSoundBySrc('divine_flame', 100);
+    fadeOutSoundBySrc('stormstrike', 100);
+    fadeOutSoundBySrc('charging', 100);
+    fadeOutSoundBySrc('charge', 100);
+    fadeOutSoundBySrc('laser', 100);
+    fadeOutSoundBySrc('beam', 100);
   }
 
   getBeamLine() {
@@ -542,8 +596,7 @@ export class TricksterFighter extends Fighter {
 
     if (this.stolenWindUpTimer > 0) {
       this.stolenWindUpTimer--;
-      this.vx = 0;
-      this.vy = 0;
+      this.applyMovementPhysics(0);
       // Facing angle remains locked to the initial cast angle; no auto-aim while winding up
       
       if (this.stolenWindUpTimer === 0) {
@@ -551,12 +604,6 @@ export class TricksterFighter extends Fighter {
           this._hasFiredStolenSkillTrick = true;
           this.fireStolenSkill(opponent, ownerIndex);
           this.attackCooldown = CONFIG.trickster.attackCooldown;
-        }
-        
-        // Prevent the 0-velocity physics bug by giving a tiny nudge right after heavy casts
-        if (this.vx === 0 && this.vy === 0) {
-          this.vx = 0.1;
-          this.vy = 0.1;
         }
       }
       return;
@@ -607,10 +654,19 @@ export class TricksterFighter extends Fighter {
         );
       }
       
-      // Immobilize the target (override their update if possible, but here we just lock their position)
+      // Immobilize and continuously apply paralyze debuff to the target throughout telekinesis
       this.tkTarget.vx = 0;
       this.tkTarget.vy = 0;
       this.tkTarget.timeStopTimer = 2; // Force them to be frozen
+      this.tkTarget.isCaughtInTelekinesis = true;
+      this.tkTarget.paralyzeTimer = Math.max(this.tkTarget.paralyzeTimer || 0, this.tkTimer + 2);
+      if (this.tkTarget.statusEffects && typeof this.tkTarget.statusEffects.applyParalyze === 'function') {
+        this.tkTarget.statusEffects.applyParalyze(this.tkTimer + 2);
+      }
+      if (typeof this.tkTarget.interruptAttacks === 'function') {
+        this.tkTarget.interruptAttacks();
+      }
+      this._silenceTargetAudio(this.tkTarget);
       
       // Visual lift effect is handled in drawing if we could, but let's simulate it by adding an aura
       if (Math.random() < 0.2) {
@@ -681,6 +737,9 @@ export class TricksterFighter extends Fighter {
 
       if (this.tkTimer === 0) {
         this.tkTarget.z = 0; // Reset Z
+        this.tkTarget.isCaughtInTelekinesis = false;
+        this.tkTarget.isParalyzed = false;
+        this.tkTarget.timeStopTimer = 0;
         
         // Spawn arcane crater impact graphic on the ground
         spawnArcaneCrater(this.tkTarget.x, this.tkTarget.y, 75);
@@ -718,39 +777,38 @@ export class TricksterFighter extends Fighter {
           }
         }
         
-        spawnFloatingText(this.tkTarget.x, this.tkTarget.y - 15, 'STUNNED!', '#50DCFF');
+        spawnFloatingText(this.tkTarget.x, this.tkTarget.y - 15, 'PARALYZED!', '#FFEE58');
         triggerGlobalScreenShake(8, 12); // Quick, controlled screen shake
         
         // Arcane magical landing effects
         spawnArcaneFlash(this.tkTarget.x, this.tkTarget.y);
         spawnArcaneGlyphs(this.tkTarget.x, this.tkTarget.y, 10);
 
-        // AoE Stun to nearby enemies (including target)
+        // AoE Stun and Paralyze to nearby enemies (including target)
         const allEnemies = state.fighters.filter(f => f && f.hp > 0 && f !== this);
         for (let enemy of allEnemies) {
           const dx = enemy.x - this.tkTarget.x;
           const dy = enemy.y - this.tkTarget.y;
           if (dx * dx + dy * dy < CONFIG.trickster.telekinesisStunRadius * CONFIG.trickster.telekinesisStunRadius) {
-            enemy.electricStunTimer = CONFIG.trickster.telekinesisStunDuration;
-            spawnFloatingText(enemy.x, enemy.y - enemy.r - 5, 'STUNNED', '#FFFF00');
+            const stunDur = CONFIG.trickster.telekinesisStunDuration || 60;
+            enemy.electricStunTimer = stunDur;
+            enemy.paralyzeTimer = Math.max(enemy.paralyzeTimer || 0, stunDur);
+            if (enemy.statusEffects && typeof enemy.statusEffects.applyParalyze === 'function') {
+              enemy.statusEffects.applyParalyze(stunDur);
+            }
+            if (typeof enemy.interruptAttacks === 'function') {
+              enemy.interruptAttacks();
+            }
+            this._silenceTargetAudio(enemy);
+            spawnFloatingText(enemy.x, enemy.y - enemy.r - 5, 'PARALYZED!', '#FFEE58');
           }
         }
-        // BUGFIX: Restore a tiny amount of velocity so the Fighter physics engine
-        // can rescale the target's speed back to normal. If vx/vy are exactly 0,
-        // the physics engine ignores them and the bot gets stuck forever.
         if (this.tkTarget) {
-          this.tkTarget.vx = 0.1;
-          this.tkTarget.vy = 0.1;
-          
           if (this.tkTarget.isTurret) {
             this.tkTarget._fixedX = this.tkTarget.x;
             this.tkTarget._fixedY = this.tkTarget.y;
           }
         }
-
-        // Also give the Trickster a bump because they stop moving during the channel too!
-        this.vx = 0.1;
-        this.vy = 0.1;
 
         this.tkTarget = null;
       }
@@ -765,17 +823,40 @@ export class TricksterFighter extends Fighter {
 
       // Ultimate: Spell Steal
       if (this.spellStealCooldown <= 0 && !this.stolenType && distSq < CONFIG.trickster.spellStealRange * CONFIG.trickster.spellStealRange) {
-        this.spellStealCooldown = CONFIG.trickster.spellStealCooldown;
-        this.stolenType = opponent._def.type;
-        this.stolenColor = opponent._def.color;
-        this.stolenTimer = CONFIG.trickster.spellStealDuration;
-        this.stolenSkillCooldown = 0;
-        this._hasFiredStolenSkillTrick = false;
+        const isGojoOpponent = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.type === 'gojo' || opponent._def?.id === 'gojo');
         
-        spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${this.stolenType.toUpperCase()}!`, '#00FF00');
-        
-        // Cast a visual effect where magical energy drains from the target into the Trickster
-        spawnSpellStealWisps(this, opponent, this.stolenColor, 15);
+        // If opponent is Gojo, Trickster can ONLY steal Hollow Purple AFTER Gojo has fired his Purple first!
+        if (isGojoOpponent) {
+          const gojoHasFiredPurple = Boolean(
+            opponent.hasFiredPurple ||
+            opponent._hasFiredPurpleAtLeastOnce ||
+            (opponent.purpleUseCount !== undefined && opponent.purpleUseCount > 0) ||
+            (state.projectiles && state.projectiles.some(p => p && p.isGojoPurple && p.owner === state.fighters?.indexOf(opponent)))
+          );
+
+          if (gojoHasFiredPurple) {
+            this.spellStealCooldown = CONFIG.trickster.spellStealCooldown;
+            this.stolenType = 'gojo';
+            this.stolenColor = opponent._def?.color || '#00FF64';
+            this.stolenTimer = CONFIG.trickster.spellStealDuration;
+            this.stolenSkillCooldown = 0;
+            this._hasFiredStolenSkillTrick = false;
+
+            spawnFloatingText(this.x, this.y - this.r - 20, 'STOLEN: HOLLOW PURPLE!', '#00FF00');
+            spawnSpellStealWisps(this, opponent, '#00FF64', 15);
+          }
+        } else {
+          this.spellStealCooldown = CONFIG.trickster.spellStealCooldown;
+          this.stolenType = opponent._def.type;
+          this.stolenColor = opponent._def.color;
+          this.stolenTimer = CONFIG.trickster.spellStealDuration;
+          this.stolenSkillCooldown = 0;
+          this._hasFiredStolenSkillTrick = false;
+
+          const stolenLabel = this.stolenType.toUpperCase();
+          spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${stolenLabel}!`, '#00FF00');
+          spawnSpellStealWisps(this, opponent, this.stolenColor || '#00FF64', 15);
+        }
       }
 
       // Skill 1: Telekinesis
@@ -784,10 +865,19 @@ export class TricksterFighter extends Fighter {
         this.tkTarget = opponent;
         this.tkTimer = CONFIG.trickster.telekinesisDuration;
         
-        // Interrupt attacks (so visual slashes don't get stuck hovering in the air)
+        // Apply paralyze debuff and cut off target audio & attacks immediately
+        const paralyzeDuration = this.tkTimer + 2;
+        opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, paralyzeDuration);
+        opponent.isCaughtInTelekinesis = true;
+        if (opponent.statusEffects && typeof opponent.statusEffects.applyParalyze === 'function') {
+          opponent.statusEffects.applyParalyze(paralyzeDuration);
+        }
+
+        // Interrupt attacks (so visual slashes don't get stuck hovering in the air) and cut audio
         if (typeof opponent.interruptAttacks === 'function') {
            opponent.interruptAttacks();
         }
+        this._silenceTargetAudio(opponent);
         
         // Pre-calculate drop location (Mage wants to keep distance)
         const minDistance = 150;
@@ -819,7 +909,7 @@ export class TricksterFighter extends Fighter {
       // Check heavy stolen skills every frame
       let castedHeavy = false;
       if (this.stolenType && !this.tkTimer && this.stolenSkillCooldown <= 0) {
-        if (['cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'musashi', 'normal', 'zeus'].includes(this.stolenType)) {
+        if (['cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'musashi', 'normal', 'zeus', 'gojo'].includes(this.stolenType)) {
           // It's a Heavy Spell! (One-time cast that consumes the stolen buff)
           castedHeavy = true;
           this.executeStolenSkill(opponent, ownerIndex);
@@ -871,33 +961,6 @@ export class TricksterFighter extends Fighter {
           if (projectileSystem.fireArcaneBolt) {
              projectileSystem.fireArcaneBolt(this, ownerIndex, dmg, opponent);
           }
-        }
-      }
-    }
-
-    // Stop to cast: Halt movement during the attack wind-up AND the swing follow-through
-    // Only apply wind-up halt for his own Arcane Bolt (which has a long cooldown).
-    // Fast stolen skills (like Flamethrower or Shuriken) shouldn't permanently lock him in place.
-    const isWindingUp = !this.stolenType && this.attackCooldown > 0 && this.attackCooldown <= 15;
-    const isSwinging = this.attackSwingTimer > 0;
-    
-    if (isWindingUp || isSwinging) {
-      // Don't halt if Trickster is in Berserker rage (he can move while attacking)
-      // Also don't halt if hyper-accelerated inside time sphere
-      if (this.stolenType !== 'berserker' && (!this._isInsideOwnSphere || !this._isInsideOwnSphere())) {
-        this.vx = 0;
-        this.vy = 0;
-      }
-      
-      // Prevent the 0-velocity physics bug by giving a tiny nudge right as they finish casting completely
-      let timeMultiplier = 1;
-      if (this._isInsideOwnSphere && this._isInsideOwnSphere()) {
-        timeMultiplier = CONFIG.cronos.sphereSpeedMultiplier || 5;
-      }
-      if (this.attackSwingTimer > 0 && this.attackSwingTimer <= timeMultiplier) {
-        if (this.vx === 0 && this.vy === 0) {
-          this.vx = 0.1;
-          this.vy = 0.1;
         }
       }
     }
@@ -970,13 +1033,20 @@ export class TricksterFighter extends Fighter {
       case 'grenadier':
       case 'normal':
       case 'zeus':
+      case 'gojo':
         // These are heavy skills! We will enter the wind-up phase first!
         if (this.stolenSkillCooldown <= 0) {
            if (opponent) {
              this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
            }
-           this.stolenWindUpTimer = this.stolenType === 'normal' ? (CONFIG.sharpshooter?.executeWindupFrames || 30) : 30; 
+           this.stolenWindUpTimer = this.stolenType === 'normal' 
+             ? (CONFIG.sharpshooter?.executeWindupFrames || 30) 
+             : (this.stolenType === 'gojo' ? 45 : 30); 
            skillCast = true;
+           if (this.stolenType === 'gojo') {
+             const chargeSound = getSkillSound('gojo', 'purple_charging') || { src: 'Assets/Sound Effects/Skills/mixing.mp3', volume: 1.8 };
+             if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume || 1.0);
+           }
         }
         break;
       case 'orange':
@@ -1003,7 +1073,7 @@ export class TricksterFighter extends Fighter {
     }
     
     // Clear the stolen skill after casting ONLY if it's a spammable skill
-    if (skillCast && !['musashi', 'cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'normal', 'zeus'].includes(this.stolenType)) {
+    if (skillCast && !['musashi', 'cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'normal', 'zeus', 'gojo'].includes(this.stolenType)) {
       this.stolenType = null;
       this.stolenTimer = 0;
     }
@@ -1110,6 +1180,31 @@ export class TricksterFighter extends Fighter {
              audioSystem.playSFX(enhanceSound.src, enhanceSound.volume);
            }
         }
+        break;
+      case 'gojo':
+        if (opponent) {
+           this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        }
+        const gojoDmgMult = getStolenMultiplier('gojo', 'damageMultiplier');
+        const purpleDamage = (CONFIG.gojo?.purpleDamage || 70) * gojoDmgMult;
+        const purpleDPS = (CONFIG.gojo?.purpleDPS || 150) * gojoDmgMult;
+        this.stolenSkillCooldown = (CONFIG.gojo?.purpleCooldown || 1500) * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
+        
+        spawnFloatingText(this.x, this.y - this.r - 20, 'HOLLOW PURPLE!', '#00FF64');
+        triggerGlobalScreenShake(CONFIG.gojo?.purpleShakeIntensity || 15, CONFIG.gojo?.purpleShakeDuration || 20);
+
+        // Backward recoil impulse from releasing the immense green imaginary mass
+        const recoilForce = 18;
+        this.vx -= Math.cos(this.gunAngle) * recoilForce;
+        this.vy -= Math.sin(this.gunAngle) * recoilForce;
+        this.attackSwingTimer = 18; // Follow-through thrust/release animation
+
+        if (projectileSystem && projectileSystem.fireGojoPurple) {
+          projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isTrickster: true, colorTheme: 'green' });
+        }
+        
+        const purpleSound = getSkillSound(21, 'purple_fire') || getSkillSound('gojo', 'hollowpurple') || { src: 'Assets/Sound Effects/Skills/hollowpurple.mp3', volume: 2.5 };
+        if (purpleSound) audioSystem.playSFX(purpleSound.src, purpleSound.volume || 1.5);
         break;
     }
     

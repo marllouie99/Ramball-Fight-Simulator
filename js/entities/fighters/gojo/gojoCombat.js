@@ -79,10 +79,8 @@ export function clampEntityToArenaBounds(ent, arena, radius = null) {
 }
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
-  // Toji (ONLY during Ambush), Adapted Mahoraga, & Saitama during Serious Skill Counter immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
+  // Adapted Mahoraga & Saitama during Serious Skill Counter immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
   if (attacker && attacker !== fighter) {
-    const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
-    const isTojiAmbushing = isToji && (attacker.isAmbushing || attacker.ambushPhase);
     const isSaitamaCountering = (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
       ((attacker._counterPunchTimer && attacker._counterPunchTimer > 0) ||
        (attacker._counterWindupTimer && attacker._counterWindupTimer > 0) ||
@@ -91,7 +89,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
     const isAdaptedMahoraga = (attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga') && 
                               (attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8);
-    if (isTojiAmbushing || isAdaptedMahoraga || isSaitamaCountering) {
+    if (isAdaptedMahoraga || isSaitamaCountering) {
       attacker.infinityFreezeTimer = 0;
       attacker.isFrozenByInfinity = false;
       attacker.adaptationPauseTimer = 0;
@@ -152,111 +150,109 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       // Skill & Domain Channeling has supreme hyper-armor — bypasses Infinity block & interrupts completely!
       return false;
     }
-    const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
-    const isTojiAmbushing = isToji && (attacker.isAmbushing || attacker.ambushPhase);
-    if (!isTojiAmbushing && !attacker.domainImmunity) {
-      const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
-      const attRadius = attacker.hitRadius || attacker.r || 25;
-      const distToGojo = Math.hypot(attacker.x - fighter.x, (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0)));
-      const isPhysicalContact = distToGojo <= (barrierRadius + attRadius + 15);
+    const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
+    const attRadius = attacker.hitRadius || attacker.r || 25;
+    const distToGojo = Math.hypot(attacker.x - fighter.x, (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0)));
+    const isPhysicalContact = distToGojo <= (barrierRadius + attRadius + 15);
 
-      // Remote attackers (such as projectile casters standing across the arena) MUST NOT be pushed
-      if (!isPhysicalContact) {
-        return true;
+    // Remote attackers (such as projectile casters standing across the arena) MUST NOT be pushed
+    if (!isPhysicalContact) {
+      return true;
+    }
+
+    if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
+      const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
+      if (hasAdapted) {
+        // Mahoraga adapted to Limitless — bypasses Infinity block completely!
+        attacker.infinityFreezeTimer = 0;
+        attacker.isFrozenByInfinity = false;
+        attacker.adaptationPauseTimer = 0;
+        return false;
       }
 
-      if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
-        const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
-        if (hasAdapted) {
-          // Mahoraga adapted to Limitless — bypasses Infinity block completely!
+      // Increment Limitless barrier collision counter on every contact
+      const now = Date.now();
+      if (!attacker._lastInfinityCollisionTime || now - attacker._lastInfinityCollisionTime >= 350) {
+        attacker._lastInfinityCollisionTime = now;
+        attacker.infinityCollisionCount = (attacker.infinityCollisionCount || 0) + 1;
+        const collisionsNeeded = 2; // Rule 9 standard: 2 Infinity exposures
+
+        if (!attacker.gojoInfinityImmune && attacker.infinityCollisionCount >= collisionsNeeded) {
+          attacker.gojoInfinityImmune = true;
+          attacker.adapted.melee = true;
+          attacker.adapted.skill = true;
+          attacker._lastGojoHitType = 'infinity';
+
+          if (typeof attacker._triggerAdaptation === 'function') {
+            attacker._triggerAdaptation('skill', fighter || null);
+          } else if (typeof triggerAdaptation === 'function') {
+            triggerAdaptation(attacker, 'skill', fighter || null);
+          }
           attacker.infinityFreezeTimer = 0;
+          attacker.timeStopTimer = 0;
           attacker.isFrozenByInfinity = false;
           attacker.adaptationPauseTimer = 0;
-          return false;
-        }
-
-        // Increment Limitless barrier collision counter on every contact
-        const now = Date.now();
-        if (!attacker._lastInfinityCollisionTime || now - attacker._lastInfinityCollisionTime >= 350) {
-          attacker._lastInfinityCollisionTime = now;
-          attacker.infinityCollisionCount = (attacker.infinityCollisionCount || 0) + 1;
-          const collisionsNeeded = CONFIG.mahoraga?.maxAdaptationStages || 5;
-
-          if (!attacker.gojoInfinityImmune && attacker.infinityCollisionCount >= collisionsNeeded) {
-            attacker.gojoInfinityImmune = true;
-            attacker.adapted.melee = true;
-            attacker.adapted.skill = true;
-
-            if (typeof triggerAdaptation === 'function') {
-              triggerAdaptation(attacker, 'skill', fighter || null);
-            }
-            attacker.infinityFreezeTimer = 0;
-            attacker.timeStopTimer = 0;
-            attacker.isFrozenByInfinity = false;
-            attacker.adaptationPauseTimer = 0;
-            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚡ LIMITLESS ADAPTED! (${collisionsNeeded}/${collisionsNeeded})`, '#00F3FF');
-            return false; // Instantly bypass block on adaptation frame!
-          } else if (!attacker.gojoInfinityImmune) {
-            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚙️ LIMITLESS (${attacker.infinityCollisionCount}/5)`, '#A0C8FF');
-          }
+          spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚡ LIMITLESS ADAPTED! (${collisionsNeeded}/${collisionsNeeded})`, '#00F3FF');
+          return false; // Instantly bypass block on adaptation frame!
+        } else if (!attacker.gojoInfinityImmune) {
+          spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚙️ LIMITLESS (${attacker.infinityCollisionCount}/${collisionsNeeded})`, '#A0C8FF');
         }
       }
-      
+    }
 
-      // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling a skill)
-      if (!isChanneling && typeof attacker.interruptAttacks === 'function') {
-        attacker.interruptAttacks();
+    // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling a skill)
+    if (!isChanneling && typeof attacker.interruptAttacks === 'function') {
+      attacker.interruptAttacks();
+    }
+
+    // Calculate push direction away from Gojo
+    let dx = attacker.x - fighter.x;
+    let dy = (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0));
+    let dist = Math.hypot(dx, dy);
+
+    if (dist < 0.1) {
+      const fallbackAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle + Math.PI : Math.random() * Math.PI * 2;
+      dx = Math.cos(fallbackAngle);
+      dy = Math.sin(fallbackAngle);
+      dist = 1.0;
+    }
+    
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+
+    // Inside Gojo's own domain: no physical pushback (Unlimited Void uses time-stop paralysis instead)
+    if (!fighter.domainActive) {
+      const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 12.5; // Strong clean bounce impulse from config
+
+      // Push the attacker back with strong outward velocity (rebounce off Infinity)
+      attacker.vx = nx * pushForce;
+      attacker.vy = ny * pushForce;
+
+      // Apply brief movement slow on Limitless Infinity barrier collision
+      const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 15;
+      const slowMult = CONFIG.gojo?.infinitySlowMultiplier ?? 0.70;
+      if (typeof attacker.applySlow === 'function') {
+        attacker.applySlow(slowDur, slowMult, { isInfinitySlow: true });
+      } else {
+        attacker.slowTimer = Math.max(attacker.slowTimer || 0, slowDur);
+        attacker.slowMultiplier = Math.min(attacker.slowMultiplier || 1.0, slowMult);
       }
+    }
+    
+    // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
+    const minDist = attRadius + barrierRadius;
+    const overlap = minDist - dist;
 
-      // Calculate push direction away from Gojo
-      let dx = attacker.x - fighter.x;
-      let dy = (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0));
-      let dist = Math.hypot(dx, dy);
+    if (overlap > 0 && !fighter.domainActive) {
+      // Push attacker outward away from barrier (Gojo stands his ground and is not rebounced)
+      attacker.x += nx * (overlap + 2);
+      attacker.y += ny * (overlap + 2);
 
-      if (dist < 0.1) {
-        const fallbackAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle + Math.PI : Math.random() * Math.PI * 2;
-        dx = Math.cos(fallbackAngle);
-        dy = Math.sin(fallbackAngle);
-        dist = 1.0;
-      }
-      
-      const nx = dx / dist;
-      const ny = dy / dist;
-      const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
-      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-
-      // Inside Gojo's own domain: no physical pushback (Unlimited Void uses time-stop paralysis instead)
-      if (!fighter.domainActive) {
-        const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5; // Strong clean bounce impulse from config
-
-        // Push the attacker back with strong outward velocity
-        attacker.vx = nx * pushForce;
-        attacker.vy = ny * pushForce;
-
-        // Apply brief movement slow on Limitless Infinity barrier collision
-        const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 45;
-        const slowMult = CONFIG.gojo?.infinitySlowMultiplier ?? 0.50;
-        if (typeof attacker.applySlow === 'function') {
-          attacker.applySlow(slowDur, slowMult, { isInfinitySlow: true });
-        } else {
-          attacker.slowTimer = Math.max(attacker.slowTimer || 0, slowDur);
-          attacker.slowMultiplier = Math.min(attacker.slowMultiplier || 1.0, slowMult);
-        }
-      }
-      
-      // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
-      const minDist = attRadius + barrierRadius;
-      const overlap = minDist - dist;
-
-      if (overlap > 0 && !fighter.domainActive) {
-        // Push attacker outward away from barrier (Gojo stands his ground and is not rebounced)
-        attacker.x += nx * (overlap + 2);
-        attacker.y += ny * (overlap + 2);
-
-        // Clamp attacker strictly within arena boundaries so they NEVER clip outside arena walls
-        if (arena) {
-          clampEntityToArenaBounds(attacker, arena, attRadius);
-        }
+      // Clamp attacker strictly within arena boundaries so they NEVER clip outside arena walls
+      if (arena) {
+        clampEntityToArenaBounds(attacker, arena, attRadius);
       }
     }
   }

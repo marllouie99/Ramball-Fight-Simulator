@@ -137,7 +137,8 @@ export class SaitamaFighter extends Fighter {
     if (this.hp <= 0) return false;
 
     const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
-    const isDomainDodge = isInsideDomain;
+    const isSliceLineDodge = Boolean(attacker && attacker.isSliceLine);
+    const isDomainDodge = isInsideDomain || isSliceLineDodge;
     const isBeamOrTickDodge = Boolean(
       this.isCaughtInPurple || 
       (this.purpleHitTimer && this.purpleHitTimer > 0) || 
@@ -163,7 +164,7 @@ export class SaitamaFighter extends Fighter {
     // Check if Nanami is currently executing his 7:3 Ratio hit-pause
     const isNanamiPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
 
-    if ((this.dodgeCooldown > 0 && !isDomainDodge && !isBeamOrTickDodge) || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isNanamiPausing) {
+    if ((this.dodgeCooldown > 0 && !isBeamOrTickDodge) || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isNanamiPausing) {
       return false;
     }
     // Block dodge if time-stopped by non-domain effects (unless dodging beam/purple tick)
@@ -171,8 +172,8 @@ export class SaitamaFighter extends Fighter {
       return false;
     }
 
-    // Apply dodge chance from config (default 95%)
-    const dodgeChance = CONFIG.saitama?.dodgeChance ?? 0.95;
+    // Passive: Caped Baldy Reflexes (Dodge Teleport)
+    const dodgeChance = CONFIG.saitama?.dodgeChance ?? 0.50;
     if (Math.random() > dodgeChance) {
       return false; // Dodge failed!
     }
@@ -180,24 +181,45 @@ export class SaitamaFighter extends Fighter {
     const oldX = this.x;
     const oldY = this.y;
 
-    // Reference angle relative to incoming attacker/projectile or Saitama's facing angle
-    let refAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    if (attacker && attacker !== this && typeof attacker.x === 'number' && typeof attacker.y === 'number') {
-      refAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
-    } else if (attacker && typeof attacker.vx === 'number' && typeof attacker.vy === 'number' && (attacker.vx !== 0 || attacker.vy !== 0)) {
-      refAngle = Math.atan2(attacker.vy, attacker.vx);
-    } else if (attacker && typeof attacker.angle === 'number') {
-      refAngle = attacker.angle;
+    const baseDist = CONFIG.saitama?.dodgeDistance || 100;
+    let dist = baseDist;
+    let perpAngle;
+
+    if (isSliceLineDodge) {
+      // For spatial slice lines, evade along the line normal perpendicular to the cut!
+      const nx = attacker.normalX !== undefined ? attacker.normalX : -Math.sin(attacker.angle || 0);
+      const ny = attacker.normalY !== undefined ? attacker.normalY : Math.cos(attacker.angle || 0);
+      let sideSign = 1;
+      if (typeof attacker.cx === 'number' && typeof attacker.cy === 'number') {
+        const side = (this.x - attacker.cx) * nx + (this.y - attacker.cy) * ny;
+        sideSign = side >= 0 ? 1 : -1;
+      } else {
+        this._lastDodgeSideLeft = !this._lastDodgeSideLeft;
+        sideSign = this._lastDodgeSideLeft ? 1 : -1;
+      }
+      perpAngle = Math.atan2(ny * sideSign, nx * sideSign);
+      dist = Math.max(baseDist, (this.r || 20) + (attacker.thickness || 3) + 75);
+    } else {
+      // Reference angle relative to incoming attacker/projectile or Saitama's facing angle
+      let refAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      if (attacker && attacker !== this && typeof attacker.x === 'number' && typeof attacker.y === 'number') {
+        refAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
+      } else if (attacker && typeof attacker.vx === 'number' && typeof attacker.vy === 'number' && (attacker.vx !== 0 || attacker.vy !== 0)) {
+        refAngle = Math.atan2(attacker.vy, attacker.vx);
+      } else if (attacker && typeof attacker.angle === 'number') {
+        refAngle = attacker.angle;
+      }
+
+      // Alternate left (-90 deg) and right (+90 deg) sidesteps for dynamic visual movement
+      this._lastDodgeSideLeft = !this._lastDodgeSideLeft;
+      const sideSign = this._lastDodgeSideLeft ? 1 : -1;
+      perpAngle = refAngle + (sideSign * Math.PI / 2);
+
+      if (isBeamOrTickDodge) {
+        dist = Math.max(baseDist, 120);
+      }
     }
 
-    // Alternate left (-90 deg) and right (+90 deg) sidesteps for dynamic visual movement
-    this._lastDodgeSideLeft = !this._lastDodgeSideLeft;
-    const sideSign = this._lastDodgeSideLeft ? 1 : -1;
-    let perpAngle = refAngle + (sideSign * Math.PI / 2);
-
-    // Use wide dodge distance for beams and Purple vortex to ensure clean lateral displacement outside the damage cylinder
-    const baseDist = CONFIG.saitama?.dodgeDistance || 100;
-    const dist = isBeamOrTickDodge ? Math.max(baseDist, 120) : baseDist;
     let targetX = this.x + Math.cos(perpAngle) * dist;
     let targetY = this.y + Math.sin(perpAngle) * dist;
 
@@ -211,7 +233,7 @@ export class SaitamaFighter extends Fighter {
 
       // If primary sidestep hits boundary, attempt opposite side
       if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
-        perpAngle = refAngle - (sideSign * Math.PI / 2);
+        perpAngle = perpAngle + Math.PI;
         targetX = this.x + Math.cos(perpAngle) * dist;
         targetY = this.y + Math.sin(perpAngle) * dist;
       }
@@ -249,16 +271,18 @@ export class SaitamaFighter extends Fighter {
     this.dubstepStunTimer = 0;
 
     // If dodging inside a domain, re-apply the domain time-stop so Saitama stays immobilized between dodges
-    if (isDomainDodge && savedTimeStop > 0 && !isBeamOrTickDodge) {
+    if (isDomainDodge && savedTimeStop > 0 && !isBeamOrTickDodge && !isSliceLineDodge) {
       this.timeStopTimer = savedTimeStop;
     }
 
     // MANDATORY Rule #3: Always update aim facing direction relative to opponent after changing position!
-    const targetOpponent = (attacker && attacker !== this && attacker.hp > 0 && typeof attacker.x === 'number')
+    const targetOpponent = (attacker && !attacker.isSliceLine && attacker !== this && attacker.hp > 0 && typeof attacker.x === 'number')
       ? attacker 
-      : ((attacker && attacker.owner && attacker.owner !== this && attacker.owner.hp > 0 && typeof attacker.owner.x === 'number')
-        ? attacker.owner
-        : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null));
+      : ((attacker && attacker.attacker && attacker.attacker !== this && attacker.attacker.hp > 0 && typeof attacker.attacker.x === 'number')
+        ? attacker.attacker
+        : ((attacker && attacker.owner && attacker.owner !== this && attacker.owner.hp > 0 && typeof attacker.owner.x === 'number')
+          ? attacker.owner
+          : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null)));
     if (targetOpponent && typeof targetOpponent.x === 'number') {
       const aimAngle = Math.atan2(targetOpponent.y - this.y, targetOpponent.x - this.x);
       this.gunAngle = aimAngle;
@@ -269,7 +293,7 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Apply teleport chase delay to attacker (e.g. Gojo or Sukuna) so they don't snap-teleport instantly to Saitama's new dodge position
-    const chaser = (attacker && attacker !== this) ? attacker : targetOpponent;
+    const chaser = (attacker && !attacker.isSliceLine && attacker !== this) ? attacker : (attacker && attacker.attacker ? attacker.attacker : targetOpponent);
     if (chaser) {
       const chaseDelay = CONFIG.saitama?.attackerTeleportChaseDelayFrames ?? 5;
       chaser.teleportChaseDelayTimer = Math.max(chaser.teleportChaseDelayTimer || 0, chaseDelay);
@@ -331,8 +355,19 @@ export class SaitamaFighter extends Fighter {
     this.vx = Math.cos(perpAngle) * microGlideSpeed;
     this.vy = Math.sin(perpAngle) * microGlideSpeed;
     this.dodgeStallTimer = 8; // Short 8-frame micro-glide (~0.13s)
-    this.dodgeCooldown = (isDomainDodge || isBeamOrTickDodge) ? 0 : (CONFIG.saitama?.dodgeCooldown ?? 1);
+    this.dodgeCooldown = CONFIG.saitama?.dodgeCooldown ?? 1;
     return true;
+  }
+
+  /**
+   * Passive: Caped Baldy Reflexes against Sukuna's spatial cut lines
+   * Allows Saitama to dodge through Malevolent Shrine slice lines.
+   */
+  dodgeSliceLine(lineData = {}) {
+    return this.executeDodgeTeleport({
+      isSliceLine: true,
+      ...lineData
+    });
   }
 
   /**
@@ -497,60 +532,10 @@ export class SaitamaFighter extends Fighter {
     const counterDashVol = CONFIG.saitama?.soundVolumes?.counterDash ?? 1.0;
     audioSystem.playSFX(counterDashSFX, counterDashVol);
 
-    // Freeze ALL entities in the arena (target, opponents, teammates, minions, turrets, illusions, clones)
-    // during Saitama's Serious Skill Counter wind-up
+    // Calculate wind-up duration (Idle stare + charging pose)
     const poseFrames = CONFIG.saitama?.counterPunchPoseFrames ?? 100;
     const idleFrames = CONFIG.saitama?.counterTeleportIdleFrames ?? 10;
-    const counterFreezeDuration = poseFrames + idleFrames;
-
-    const allEntities = [];
-    if (typeof state !== 'undefined') {
-      if (state.fighters) {
-        state.fighters.forEach(f => {
-          if (f && f !== this) allEntities.push(f);
-        });
-      }
-      if (state.illusions) {
-        state.illusions.forEach(ill => {
-          if (ill && ill !== this) allEntities.push(ill);
-        });
-      }
-      if (state.cjDriveBys) {
-        state.cjDriveBys.forEach(car => {
-          if (car && car !== this) allEntities.push(car);
-        });
-      }
-    }
-
-    for (const ent of allEntities) {
-      if (typeof ent.interruptAttacks === 'function') {
-        ent.interruptAttacks(true);
-      }
-      ent.isFlurrying = false;
-      ent.isChargingUlt = false;
-      ent.isFiringUlt = false;
-      ent.isCharging = false;
-      ent.isDashing = false;
-      ent.vx = 0;
-      ent.vy = 0;
-      ent.isTargetOfAmbush = true;
-      ent.caughtInSaitamaCounter = true;
-      if (typeof ent.suppressCombatAndVisuals === 'function') {
-        ent.suppressCombatAndVisuals();
-      }
-      if (ent.characterId === 'gojo' || ent.type === 'gojo') {
-        ent.infinityFadeOpacity = 0;
-        ent.infinityBlockTimer = 0;
-        ent.infinityActive = false;
-        ent.healingAuraTimer = 0;
-        ent.combatAuraOpacity = 0;
-      }
-      if (typeof ent.applyTimeStop === 'function') {
-        ent.applyTimeStop(counterFreezeDuration, { isSkill: true });
-      } else {
-        ent.timeStopTimer = counterFreezeDuration;
-      }
-    }
+    const counterWindupDuration = poseFrames + idleFrames;
 
     // Aim face at target
     if (typeof this.aim === 'function') {
@@ -565,8 +550,9 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Store target and start Phase 2 wind-up countdown (Idle stare + charging pose)
+    // NOTE: Enemies and arena entities are NOT frozen, giving them the chance to react, move, or escape!
     this._counterPunchTarget = target;
-    this._counterPunchTimer = counterFreezeDuration;
+    this._counterPunchTimer = counterWindupDuration;
 
     // Play charging voice line and background audio
     const voiceEnabled = CONFIG.saitama?.counterPunchVoiceEnabled !== false;
@@ -600,12 +586,14 @@ export class SaitamaFighter extends Fighter {
 
     this._counterPunchTimer--;
 
-    // Keep Saitama locked in place facing the target during wind-up
+    // Keep Saitama locked in place but allow him to freely rotate and track the target during wind-up
     const target = this._counterPunchTarget;
+    this.vx = 0;
+    this.vy = 0;
     if (target && target.hp > 0) {
-      this.vx = 0;
-      this.vy = 0;
       if (typeof this.aim === 'function') this.aim(target);
+      // Continuously update the committed aim angle so the punch fires wherever Saitama is facing
+      this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
     }
 
     // Phase 2: punch lands when timer expires
@@ -627,104 +615,99 @@ export class SaitamaFighter extends Fighter {
         audioSystem.playSFX(impactSrc, impactVol);
       }
 
-      // Release freeze completely on ALL entities across the arena on punch impact
-      const allEntities = [];
-      if (typeof state !== 'undefined') {
-        if (state.fighters) {
-          state.fighters.forEach(f => {
-            if (f && f !== this) allEntities.push(f);
-          });
-        }
-        if (state.illusions) {
-          state.illusions.forEach(ill => {
-            if (ill && ill !== this) allEntities.push(ill);
-          });
-        }
-        if (state.cjDriveBys) {
-          state.cjDriveBys.forEach(car => {
-            if (car && car !== this) allEntities.push(car);
-          });
-        }
-      }
-
-      for (const ent of allEntities) {
-        ent.isTargetOfAmbush = false;
-        ent.timeStopTimer = 0;
-        ent.hitStunTimer = 0;
-        if (ent.statusEffects && typeof ent.statusEffects.timeStopTimer !== 'undefined') {
-          ent.statusEffects.timeStopTimer = 0;
-        }
-        if (typeof ent.suppressCombatAndVisuals === 'function') {
-          ent.suppressCombatAndVisuals();
-        }
-        if (ent.characterId === 'gojo' || ent.type === 'gojo') {
-          ent.infinityFadeOpacity = 0;
-          ent.infinityBlockTimer = 0;
-          ent.infinityActive = false;
-          ent.healingAuraTimer = 0;
-          ent.combatAuraOpacity = 0;
-        }
-      }
+      // DO NOT snap auto-aim to the enemy on punch land! Use Saitama's current facing angle at the moment the punch fires
+      const pushAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      this._counterAimAngle = pushAngle;
 
       // Clear punchAnimTimer so _postCounterRecoveryTimer solely drives the single unified punch follow-through
       this.punchAnimTimer = 0;
 
-      const pushAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || (this._counterAimAngle !== undefined ? this._counterAimAngle : 0));
-      this._counterAimAngle = pushAngle;
       const fistX = this.x + Math.cos(pushAngle) * (this.r + 15);
       const fistY = this.y + Math.sin(pushAngle) * (this.r + 15);
 
+      const frontalReach = CONFIG.saitama?.counterFrontalReach || 750;
+      const frontalArc = CONFIG.saitama?.counterFrontalArc || (Math.PI * 0.75); // 135-degree wide frontal cone
+      const halfArc = frontalArc / 2;
+      const punchReach = this.r + (target?.r || 20) + (CONFIG.saitama?.punchReach || 90);
+      const knockbackForce = CONFIG.saitama?.counterPunchKnockback || 55;
+      const slowFrames = CONFIG.saitama?.counterPunchSlowFrames ?? 120;    // ~2s
+      const slowMult = CONFIG.saitama?.counterPunchSlowMultiplier ?? 0.35; // 35% speed
+
+      // ── DISTANCE-BASED DAMAGE FALLOFF ──
+      // Close range (within punchReach) = 100% damage, max range (frontalReach) = 20% damage minimum
+      const counterMinDamageMult = CONFIG.saitama?.counterMinDistanceDamageMult ?? 0.20;
+      const counterFullDamageRange = punchReach; // Full damage within melee punch reach
+      const getDistanceDamageMult = (dist) => {
+        if (dist <= counterFullDamageRange) return 1.0; // Point-blank = full damage
+        const falloffRange = frontalReach - counterFullDamageRange;
+        if (falloffRange <= 0) return 1.0;
+        const falloffProgress = Math.min(1.0, (dist - counterFullDamageRange) / falloffRange);
+        return 1.0 - (1.0 - counterMinDamageMult) * falloffProgress; // Linear falloff from 100% to 20%
+      };
+
+      let targetHitDirectly = false;
+
       if (target && target.hp > 0) {
-        // Floating text
-        if (typeof spawnFloatingText === 'function') {
-          spawnFloatingText(this.x, this.y - this.r - 14, 'COUNTER!', '#FFD700');
-        }
+        const targetDist = Math.hypot(target.x - this.x, target.y - this.y);
+        const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+        let targetAngleDiff = angleToTarget - pushAngle;
+        while (targetAngleDiff < -Math.PI) targetAngleDiff += Math.PI * 2;
+        while (targetAngleDiff > Math.PI) targetAngleDiff -= Math.PI * 2;
+        const inFrontalArc = Math.abs(targetAngleDiff) <= halfArc;
 
-        // Massive Counter Punch Damage (calculated dynamically from basic attack Normal Punch * multiplier)
-        const basePunchDamage = CONFIG.saitama?.punchDamage || 100;
-        const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? CONFIG.saitama?.counterPunchMultiplier ?? (CONFIG.saitama?.counterPunchDamage !== undefined ? (CONFIG.saitama.counterPunchDamage / basePunchDamage) : 20.0);
-        const massiveDamage = Math.round(basePunchDamage * damageMult);
-        applyDamageToTarget(target, massiveDamage, this, { 
-          isSkill: true, 
-          isCounter: true, 
-          isCritical: true, 
-          bypassShield: true, 
-          isSaitamaCounter: true,
-          bypassEvade: true,
-          undodgeable: true,
-          isGuaranteedHit: true,
-          isTrueDamage: true
-        });
+        // Direct Melee Hit: Target is within melee punch reach and frontal cone
+        if (targetDist <= punchReach && inFrontalArc) {
+          targetHitDirectly = true;
+          // Floating text
+          if (typeof spawnFloatingText === 'function') {
+            spawnFloatingText(this.x, this.y - this.r - 14, 'COUNTER!', '#FFD700');
+          }
 
-        // Heavy directional knockback push toward Saitama's facing angle
-        const knockbackForce = CONFIG.saitama?.counterPunchKnockback || 55;
-        const kx = Math.cos(pushAngle) * knockbackForce;
-        const ky = Math.sin(pushAngle) * knockbackForce;
-        
-        target.vx = kx;
-        target.vy = ky;
-        if (typeof target.applyKnockback === 'function') {
-          target.applyKnockback(kx, ky);
-        }
+          // Massive Counter Punch Damage (calculated dynamically from basic attack Normal Punch * multiplier)
+          // Distance falloff: close = full damage, far = reduced
+          const basePunchDamage = CONFIG.saitama?.punchDamage || 100;
+          const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? CONFIG.saitama?.counterPunchMultiplier ?? (CONFIG.saitama?.counterPunchDamage !== undefined ? (CONFIG.saitama.counterPunchDamage / basePunchDamage) : 20.0);
+          const distMult = getDistanceDamageMult(targetDist);
+          const massiveDamage = Math.round(basePunchDamage * damageMult * distMult);
+          applyDamageToTarget(target, massiveDamage, this, { 
+            isSkill: true, 
+            isCounter: true, 
+            isCritical: true, 
+            bypassShield: true, 
+            isSaitamaCounter: true,
+            bypassEvade: true,
+            undodgeable: true,
+            isGuaranteedHit: true,
+            isTrueDamage: true
+          });
 
-        // Slow movement debuff — the enemy staggers after taking the massive punch
-        const slowFrames = CONFIG.saitama?.counterPunchSlowFrames ?? 120;    // ~2s
-        const slowMult = CONFIG.saitama?.counterPunchSlowMultiplier ?? 0.35; // 35% speed
-        target.saitamaCounterDebuffTimer = slowFrames;
-        target.saitamaCounterAttacker = this;
-        if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
-          target.statusEffects.applySlow(slowFrames, slowMult);
-        } else {
-          target.slowTimer = Math.max(target.slowTimer || 0, slowFrames);
-          target.slowMultiplier = slowMult;
+          // Heavy directional knockback push toward Saitama's facing angle (scales with distance)
+          const kbMult = getDistanceDamageMult(targetDist);
+          const kx = Math.cos(pushAngle) * knockbackForce * kbMult;
+          const ky = Math.sin(pushAngle) * knockbackForce * kbMult;
+          
+          target._knockedBackBySaitamaBasicPunch = true;
+          target.preventKnockbackBounce = true;
+          target.isWallPinnedBySaitama = true;
+          target.vx = kx;
+          target.vy = ky;
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(kx, ky);
+          }
+
+          // Slow movement debuff — the enemy staggers after taking the massive punch
+          target.saitamaCounterDebuffTimer = slowFrames;
+          target.saitamaCounterAttacker = this;
+          if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+            target.statusEffects.applySlow(slowFrames, slowMult);
+          } else {
+            target.slowTimer = Math.max(target.slowTimer || 0, slowFrames);
+            target.slowMultiplier = slowMult;
+          }
         }
       }
 
       // ── Wide Long Frontal Multi-Target Shockwave Corridor (Death Punch Canyon) ──
-      const frontalReach = CONFIG.saitama?.counterFrontalReach || 750;
-      const frontalArc = CONFIG.saitama?.counterFrontalArc || (Math.PI * 0.75); // 135-degree wide frontal cone
-      const halfArc = frontalArc / 2;
-
       // Query all enemy targets (fighters & illusions) in the wide long frontal cone (Rule #6 & Rule #8)
       const collateralTargets = [];
       if (typeof state !== 'undefined') {
@@ -732,7 +715,8 @@ export class SaitamaFighter extends Fighter {
         if (state.fighters) {
           for (let i = 0; i < state.fighters.length; i++) {
             const f = state.fighters[i];
-            if (!f || f === this || f.hp <= 0 || f === target) continue;
+            if (!f || f === this || f.hp <= 0) continue;
+            if (targetHitDirectly && f === target) continue; // Target already took direct massive punch
             const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
             if (myTeam !== null && myTeam === targetTeam) continue; // Skip true teammates
             collateralTargets.push(f);
@@ -762,17 +746,20 @@ export class SaitamaFighter extends Fighter {
 
       // Deal collateral shockwave damage & push to any enemies in the wide long frontal path
       for (const enemy of collateralTargets) {
-        const dist = Math.hypot(enemy.x - fistX, enemy.y - fistY);
+        const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
         const effectiveReach = frontalReach + (enemy.r || 20);
         if (dist <= effectiveReach) {
-          const angleToEnemy = Math.atan2(enemy.y - fistY, enemy.x - fistX);
+          const angleToEnemy = Math.atan2(enemy.y - this.y, enemy.x - this.x);
           let angleDiff = angleToEnemy - pushAngle;
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-          if (Math.abs(angleDiff) <= halfArc) {
+          if (Math.abs(angleDiff) <= halfArc || dist <= (this.r + (enemy.r || 20) + 15)) {
             // Collateral enemy caught in the supersonic shockwave canyon
-            const collateralDmg = CONFIG.saitama?.counterFrontalCollateralDamage || 650;
+            // Distance falloff: close = full collateral damage, far = reduced
+            const colDistMult = getDistanceDamageMult(dist);
+            const baseCollateralDmg = CONFIG.saitama?.counterFrontalCollateralDamage || 650;
+            const collateralDmg = Math.round(baseCollateralDmg * colDistMult);
             applyDamageToTarget(enemy, collateralDmg, this, { 
               isSkill: true, 
               isCounter: true, 
@@ -785,9 +772,13 @@ export class SaitamaFighter extends Fighter {
               isTrueDamage: true
             });
 
-            // Directional knockback push pinning them backward along punch trajectory
-            const colKx = Math.cos(pushAngle) * (knockbackForce * 1.05);
-            const colKy = Math.sin(pushAngle) * (knockbackForce * 1.05);
+            // Directional knockback push pinning them backward along punch trajectory (scales with distance)
+            const colKbMult = getDistanceDamageMult(dist);
+            const colKx = Math.cos(pushAngle) * (knockbackForce * 1.05) * colKbMult;
+            const colKy = Math.sin(pushAngle) * (knockbackForce * 1.05) * colKbMult;
+            enemy._knockedBackBySaitamaBasicPunch = true;
+            enemy.preventKnockbackBounce = true;
+            enemy.isWallPinnedBySaitama = true;
             enemy.vx = colKx;
             enemy.vy = colKy;
             if (typeof enemy.applyKnockback === 'function') {
@@ -1018,7 +1009,10 @@ export class SaitamaFighter extends Fighter {
       isSuppressedByGetsuga(this)
     );
 
-    if (isGetsugaHit || isGuaranteedHit || isNanamiPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack)) {
+    // Saitama's Caped Baldy Reflexes: Sukuna's Malevolent Shrine domain slashes are physical spatial cuts — Saitama can dodge them!
+    const isSukunaDomainSlash = Boolean((opts.isDomainSlash && opts.isSukunaSlash) || opts.isSukunaDomainSliceLine);
+
+    if ((isGetsugaHit || (isGuaranteedHit && !isSukunaDomainSlash) || isNanamiPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack))) {
       return super.takeDamage(amount, attacker, opts);
     }
 
@@ -1035,11 +1029,27 @@ export class SaitamaFighter extends Fighter {
       }
     }
 
-    // Ignore non-attack DOTs (poison, burn, domain environment ticks)
-    const isDirectAttack = opts.isProjectile || opts.isMelee || opts.isRanged || opts.isMachineGunBlow || opts.isPhysical || opts.isBasic || opts.isSkill || opts.isUltimate || isBeamOrTickAttack || (attacker && attacker !== this && !opts.isPoison && !opts.isBurn && !opts.fromBlackHole && !opts.isDomainDPS);
+    // Ignore non-attack DOTs (poison, burn, domain environment ticks) — but Sukuna domain slashes ARE dodgeable direct attacks
+    const isDirectAttack = opts.isProjectile || opts.isMelee || opts.isRanged || opts.isMachineGunBlow || opts.isPhysical || opts.isBasic || opts.isSkill || opts.isUltimate || isBeamOrTickAttack || isSukunaDomainSlash || (attacker && attacker !== this && !opts.isPoison && !opts.isBurn && !opts.fromBlackHole && !opts.isDomainDPS);
 
-    if (isDirectAttack && !isGetsugaHit) {
-      const dodgeTarget = (opts.projectile && typeof opts.projectile.x === 'number') ? opts.projectile : (attacker || null);
+    if (isDirectAttack && !isGetsugaHit && !opts.alreadyCheckedDodge) {
+      let dodgeTarget = null;
+      if (opts.projectile && typeof opts.projectile.x === 'number') {
+        dodgeTarget = opts.projectile;
+      } else if (opts.isSukunaDomainSliceLine || opts.isDomainSlash) {
+        dodgeTarget = {
+          isSliceLine: true,
+          angle: opts.angle,
+          normalX: opts.normalX,
+          normalY: opts.normalY,
+          cx: opts.cx,
+          cy: opts.cy,
+          thickness: opts.thickness,
+          attacker
+        };
+      } else {
+        dodgeTarget = attacker || null;
+      }
       const dodged = this.executeDodgeTeleport(dodgeTarget);
       if (dodged) {
         return false; // Negate damage (dodged!)
@@ -1241,6 +1251,7 @@ export class SaitamaFighter extends Fighter {
       const ky = Math.sin(angleToTarget) * knockbackForce;
       target._knockedBackBySaitamaBasicPunch = true;
       target.preventKnockbackBounce = true; // Pin and stick target to wall for 1 second on wall impact instead of bouncing!
+      target.isWallPinnedBySaitama = true;
       if (typeof target.applyKnockback === 'function') {
         target.applyKnockback(kx, ky);
       } else {
@@ -1652,6 +1663,7 @@ export class SaitamaFighter extends Fighter {
                 const ky = Math.sin(angleToTarget) * knockbackForce;
                 target._knockedBackBySaitamaBasicPunch = true;
                 target.preventKnockbackBounce = true;
+                target.isWallPinnedBySaitama = true;
                 target.vx = kx;
                 target.vy = ky;
                 if (typeof target.applyKnockback === 'function') {

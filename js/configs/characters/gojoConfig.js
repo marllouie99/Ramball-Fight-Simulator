@@ -24,14 +24,14 @@ export const gojoConfig = {
   infinityCooldown: 100,                   // Recharge cooldown in frames before Infinity barrier reactivates after blocking
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact
   infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
-  infinityRadius: 100,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
+  infinityRadius: 120,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
   infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
   infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
   infinityMeleePushForce: 12.5,            // Physical velocity impulse (rebound force) applied to push melee attackers away
-  infinitySlowDuration: 45,                // Duration in frames (0.75s) of brief movement slow on barrier contact
-  infinitySlowMultiplier: 0.50,            // Movement speed multiplier while slowed by Infinity barrier (50% speed)
+  infinitySlowDuration: 15,                // Duration in frames (0.25s) of brief movement slow on barrier contact
+  infinitySlowMultiplier: 0.70,            // Movement speed multiplier while slowed by Infinity barrier (70% speed)
   infinitySlowRange: 100,                  // Proximity distance (pixels) beyond barrier where approaching enemies get slowed
-  infinitySlowMinMultiplier: 0.20,         // Maximum slow strength (20% speed / 80% slow) reached right against the barrier
+  infinitySlowMinMultiplier: 0.35,         // Maximum slow strength (35% speed / 65% slow) reached right against the barrier
   infinityMaxFrozenProjectiles: 2,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
   infinityShockwaveCooldownFrames: 6,      // Minimum frames (~100ms) between barrier rebound shockwave ring spawns to prevent FPS drops
   infinityMaxActiveShockwaves: 2,          // Max limit of concurrent active barrier shockwave rings
@@ -45,27 +45,31 @@ export const gojoConfig = {
   bluePullForce: 0.2,       // Pull strength of Blue
   blueDPS: 30,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
   blueDPSInterval: 10,      // Frames between DPS ticks (~6 ticks/sec)
+  blueParalyzeDuration: 15,  // Duration in frames of Paralyze debuff applied while caught in Blue's gravitational field
   blueWallLingerDuration: 50, // Frames (~1.5s) Blue orb stays pinned on the wall after colliding, pulling & grinding enemies
   modeSwitchBreatherDuration: 45, // Breather pause (frames) when Gojo switches to Ranged/Blue mode (~0.75s)
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
   redCooldown: 700,         // Cooldown of Red (frames)
-  redDamage: 100,            // Base damage dealt by Reversal Red blast
-  redKnockback: 25,         // Knockback force of Red
-  redRange: 100,            // Base range
-  redTriggerRange: 100,     // Range in pixels to trigger Red against enemies
-  redBlastRadius: 200,      // Explosive blast wave radius in pixels that repels enemies on detonation
-  redTotalFrames: 75,       // Total frames for full Red animation (~1.25s at 60fps)
-  redBuildupFrames: 100,     // Frames of orb manifestation before detonation
+  redDamage: 100,           // Base damage dealt by Reversal Red blast
+  redKnockback: 40,         // Supersonic knockback force of Red
+  redRange: 650,            // Base range
+  redFrontalReach: 650,     // Long frontal reach corridor in pixels
+  redFrontalArc: Math.PI * 0.45, // ~80-degree frontal cone
+  redTriggerRange: 350,     // Range in pixels to trigger Red against enemies
+  redBlastRadius: 650,      // Frontal blast reach
+  redTotalFrames: 125,      // Total frames for full Red animation (~2s at 60fps)
+  redBuildupFrames: 100,    // Frames of orb manifestation before detonation
   redSlowDuration: 120,     // Frames the post-detonation slow lasts (~2s at 60fps)
-  redSlowMultiplier: 0.95,  // Speed multiplier while slowed by Red (35% of normal)
-  redShakeIntensity: 10,    // Heavy screen shake intensity on Red detonation
+  redSlowMultiplier: 0.35,  // Speed multiplier while slowed by Red (35% of normal)
+  redShakeIntensity: 14,    // Heavy screen shake intensity on Red detonation
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
   purpleCooldown: 1200,      // Cooldown of Hollow Purple
   purpleChargeMax: 120,     // Frames required to mix Red and Blue into Purple (channeling duration)
+  purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
   purpleDamage: 70,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
   purpleRadius: 50,         // Radius of Purple orb
@@ -117,8 +121,8 @@ export const gojoConfig = {
   meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
   comboDisengageDistance: 0,      // Distance (pixels) teleported away when disengaging after clash
   meleePunchDamage: 14,             // Damage dealt per martial arts punch strike
-  meleePunchCooldown: 15,           // Frames between consecutive punches (~0.16s at 60fps)
-  meleePunchAnimDuration: 10,       // Punch extension and retraction animation frame duration
+  meleePunchCooldown: 10,           // Frames between consecutive punches (~0.16s at 60fps)
+  meleePunchAnimDuration: 15,       // Punch extension and retraction animation frame duration
   teleportSpeed: 15,                // Teleport movement slide speed
 
   // ── 8. Teleport Dodge & Evasion Mechanics (Disabled) ──

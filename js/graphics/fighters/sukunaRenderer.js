@@ -97,7 +97,7 @@ export class SukunaRenderer {
 
     // Draw Furnace (Fuga / Open) — Volcanic magma cursed flame arrow construct
     // (Rendered via WebGL hybrid container in updateHybridSukunaFuga to maintain 60 FPS when PixiJS is active)
-    if (fighter.isChannelingDivineFlame && (!state.pixiApp || !state.pixiLayers?.projectiles)) {
+    if (fighter.isChannelingDivineFlame && fighter.divineFlameChargeTimer > 0 && (!state.pixiApp || !state.pixiLayers?.projectiles)) {
       const progress = fighter.divineFlameChargeTimer / fighter.divineFlameChargeMax;
       const time = Date.now() * 0.012;
 
@@ -158,6 +158,17 @@ export class SukunaRenderer {
     fighter.drawFreezeTimer(ctx);
 
     // Use already declared isParalyzed from the top of draw method
+    if (isParalyzed) {
+      if (typeof drawParalyzeEffect === 'function') {
+        drawParalyzeEffect(ctx, fighter.r);
+      }
+      return;
+    }
+
+    // If hands are suppressed globally or by skin only mode, exit before drawing hands
+    const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+    if (shouldHideHands) return;
+
     // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
   }
 
@@ -195,7 +206,7 @@ export class SukunaRenderer {
     let frontHandX_loc, frontHandY_loc, backHandX_loc, backHandY_loc;
 
     // 1. Dynamic Slash Swing Chop Animation
-    if ((fighter.slashSwingTimer > 0 || fighter.slashGlowTimer > 0) && !fighter.isChannelingDomainExpansion) {
+    if ((fighter.slashSwingTimer > 0 || fighter.slashGlowTimer > 0) && !fighter.isChannelingDomainExpansion && !fighter.isChannelingDivineFlame) {
       const maxT = fighter.slashSwingMaxTimer || 14;
       let rawT = 1.0;
       if (fighter.slashSwingTimer > 0) {
@@ -216,7 +227,7 @@ export class SukunaRenderer {
     }
 
     // 2. Martial Arts Brawler Guard Stance & Front Hand Punch Animation
-    else if (fighter.punchAnimTimer > 0 && !fighter.isChannelingDomainExpansion) {
+    else if (fighter.punchAnimTimer > 0 && !fighter.isChannelingDomainExpansion && !fighter.isChannelingDivineFlame) {
       const maxT = fighter.punchAnimMaxTimer || fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
       let easePunch = 0;

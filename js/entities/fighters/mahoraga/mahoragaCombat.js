@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
-import { spawnImpactFlash, spawnMeleeClashShockwave, spawnMahoragaShoutShockwave, spawnMahoragaShoutBurst } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnMahoragaShoutShockwave, spawnMahoragaShoutBurst } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
@@ -85,7 +85,7 @@ export function getFrontRadiusTargets(fighter, maxRangeOffset = 75, coneAngle = 
 export function performMeleeAttack(fighter, opponent) {
   if (!fighter) return;
 
-  const isInsideDomain = typeof state !== 'undefined' && (
+  const isInsideDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
@@ -446,15 +446,6 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       }
     }
     
-    if (fighter.wallSlamTimer === 12) {
-      // Play backstab sound upon contact/impale
-      const impaleSnd = CONFIG.mahoraga?.sounds?.wallSlamImpale || 'skill_backstab';
-      const impaleVol = CONFIG.mahoraga?.soundVolumes?.wallSlamImpale ?? 1.0;
-      audioSystem.playSFX(impaleSnd, impaleVol);
-      spawnFloatingText(target.x, target.y - target.r - 28, '⚔️ IMPALED!', '#FFEE58');
-      spawnImpactFlash(target.x, target.y, 45, '#FF3333');
-    }
-    
     const angle = fighter.wallSlamGrabAngle !== undefined ? fighter.wallSlamGrabAngle : Math.atan2(target.y - fighter.y, target.x - fighter.x);
     fighter.aim({ x: target.x, y: target.y });
 
@@ -464,30 +455,58 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     const mahoStartY = fighter.wallSlamGrabMahoragaStartY !== undefined ? fighter.wallSlamGrabMahoragaStartY : fighter.y;
     const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
 
-    const shoulderOffsetX = Math.cos(angle + Math.PI / 2) * (fighter.r * 0.20);
-    const shoulderOffsetY = Math.sin(angle + Math.PI / 2) * (fighter.r * 0.20);
-
     // Calculate Mahoraga's final destination where the sword tip will touch the target's starting position
-    const endX = startX - Math.cos(angle) * (fighter.r + target.r + 32) - shoulderOffsetX;
-    const endY = startY - Math.sin(angle) * (fighter.r + target.r + 32) - shoulderOffsetY;
+    const shoulderX = fighter.r * 0.55;
+    const shoulderY = 0;
+    const cosB = Math.cos(angle);
+    const sinB = Math.sin(angle);
+    const rotShoulderX = shoulderX * cosB - shoulderY * sinB;
+    const rotShoulderY = shoulderX * sinB + shoulderY * cosB;
+
+    const bladeImpaleReach = fighter.r * 0.3 + 36;
+    const endX = startX - rotShoulderX - Math.cos(angle) * bladeImpaleReach;
+    const endY = startY - rotShoulderY - Math.sin(angle) * bladeImpaleReach;
 
     if (fighter.wallSlamTimer <= 12) {
-      // 1. Thrust/Lunge sub-phase: Mahoraga lunges forward smoothly from actual starting coordinates
+      // 1. Thrust/Lunge sub-phase: Mahoraga lunges forward smoothly with supersonic afterimages
       const p = Math.min(1.0, fighter.wallSlamTimer / 12);
       const easeP = 1 - Math.pow(1 - p, 2);
       fighter.x = Math.max(minX, Math.min(maxX, mahoStartX + (endX - mahoStartX) * easeP));
       fighter.y = Math.max(minY, Math.min(maxY, mahoStartY + (endY - mahoStartY) * easeP));
 
-      // Play dynamic forward sword thrust swing (comboIndex 0, which corresponds to swordCombo = 3)
+      // Spawn gap-free supersonic dash motion afterimages during the grab lunge
+      if (!fighter.adaptationAfterimages) fighter.adaptationAfterimages = [];
+      pushTrailCap(fighter.adaptationAfterimages, {
+        x: fighter.x,
+        y: fighter.y,
+        gunAngle: angle,
+        timer: 14,
+        maxTimer: 14
+      }, 60);
+
+      // Play dynamic forward sword thrust swing
       fighter.swordCombo = 3;
       fighter.punchAnimMaxTimer = 12;
-      fighter.punchAnimTimer = 12 - fighter.wallSlamTimer; // Ticks down from 12 to 0 to play swing
+      fighter.punchAnimTimer = 12 - fighter.wallSlamTimer;
 
       target.x = startX;
       target.y = startY;
       target.z = 0;
     } else {
-      // 2. Lift sub-phase: Mahoraga reaches target, pins them to sword tip, and hoists them into the air
+      if (fighter.wallSlamTimer === 13) {
+        // Play backstab sound upon contact/impale with explosive particles & shockwave
+        const impaleSnd = CONFIG.mahoraga?.sounds?.wallSlamImpale || 'skill_backstab';
+        const impaleVol = CONFIG.mahoraga?.soundVolumes?.wallSlamImpale ?? 1.0;
+        audioSystem.playSFX(impaleSnd, impaleVol);
+        spawnFloatingText(target.x, target.y - target.r - 28, '⚔️ IMPALED!', '#FFEE58');
+        spawnImpactFlash(target.x, target.y, 60, '#FFEE58');
+        spawnSparks(target.x, target.y, 22, 'gold', '#FFFFFF');
+        spawnSparks(target.x, target.y, 14, 'crimson', '#FF2222');
+        spawnMeleeClashShockwave(target.x, target.y, 85, 'mahoraga');
+        triggerGlobalScreenShake(10, 14);
+      }
+
+      // 2. Lift sub-phase: Mahoraga reaches target, pins them to sword blade, and hoists them high into the air
       fighter.x = Math.max(minX, Math.min(maxX, endX));
       fighter.y = Math.max(minY, Math.min(maxY, endY));
 
@@ -496,16 +515,37 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       fighter.punchAnimMaxTimer = 12;
       fighter.punchAnimTimer = 1; // Frozen at peak extension
 
-      target.x = Math.max(minX, Math.min(maxX, fighter.x + Math.cos(angle) * (fighter.r + target.r + 32) + shoulderOffsetX));
-      target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(angle) * (fighter.r + target.r + 32) + shoulderOffsetY));
-
       const liftProgress = Math.min(1.0, (fighter.wallSlamTimer - 12) / (holdFrames - 12));
-      target.z = liftProgress * (CONFIG.mahoraga?.wallSlamImpaleLiftHeight ?? 35);
+      const easeLift = Math.sin(liftProgress * Math.PI * 0.5);
+      target.z = easeLift * (CONFIG.mahoraga?.wallSlamImpaleLiftHeight ?? 45);
+
+      const liftTilt = -0.32 * easeLift; // Upward tilt of arm (~18 degrees)
+      const armAngle = angle + liftTilt;
+
+      let targetPinnedX = fighter.x + rotShoulderX + Math.cos(armAngle) * bladeImpaleReach;
+      let targetPinnedY = fighter.y + rotShoulderY + Math.sin(armAngle) * bladeImpaleReach;
+
+      // Add victim agonizing struggle tremor (high-frequency shiver in helpless stasis)
+      const struggleJitter = 2.0 * (1.0 - liftProgress * 0.25);
+      targetPinnedX += (Math.random() - 0.5) * struggleJitter;
+      targetPinnedY += (Math.random() - 0.5) * struggleJitter;
+
+      target.x = Math.max(minX, Math.min(maxX, targetPinnedX));
+      target.y = Math.max(minY, Math.min(maxY, targetPinnedY));
+
+      // Continuous golden and crimson cursed sparks dripping from the impale puncture wound
+      if (Math.random() < 0.65) {
+        spawnSparks(target.x, target.y - (target.z || 0), 2, 'gold', '#FFD700');
+        if (Math.random() < 0.35) {
+          spawnSparks(target.x, target.y - (target.z || 0), 1, 'crimson', '#FF2222');
+        }
+      }
     }
 
     target.vx = 0;
     target.vy = 0;
     target.isGrabbedByMahoraga = true;
+    if (typeof target.aim === 'function') target.aim(fighter);
     if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
 
     if (fighter.wallSlamTimer >= holdFrames) { // Hold completed
@@ -523,61 +563,51 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     fighter.punchAnimTimer = 1;
     
     if (fighter.wallSlamTimer === 1) {
-      // Trigger massive left-hand punch!
+      // Trigger massive devastating left-hand punch!
       fighter.leftPunchTimer = 25;
       fighter.leftPunchMaxTimer = 25;
       
-      spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 28, '💥 SMASH!', '#FFEE58');
-      spawnImpactFlash(target.x, target.y, 60, '#FFEE58');
-      triggerGlobalScreenShake(12, 15);
+      spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 28, '💥 OBLITERATING SMASH!', '#FFEE58');
+      spawnImpactFlash(target.x, target.y, 80, '#FFEE58');
+      spawnMeleeClashShockwave(target.x, target.y, 140, 'mahoraga');
+      spawnMahoragaShoutBurst(target.x, target.y, 110);
+      spawnSparks(target.x, target.y, 25, 'gold', '#FFFFFF');
+      spawnSparks(target.x, target.y, 18, 'crimson', '#FF2222');
+      triggerGlobalScreenShake(14, 20);
+      
       const smashSnd = CONFIG.mahoraga?.sounds?.wallSlamImpact || 'attack_fleshhit';
       const smashVol = CONFIG.mahoraga?.soundVolumes?.wallSlamImpact ?? 1.0;
       audioSystem.playSFX(smashSnd, smashVol);
+      audioSystem.playSFX('attack_groundsmash', 0.9);
     }
     
-    // Keep target locked during the first few frames of the punch hitpause
-    const shoulderOffsetX = Math.cos(angle + Math.PI / 2) * (fighter.r * 0.20);
-    const shoulderOffsetY = Math.sin(angle + Math.PI / 2) * (fighter.r * 0.20);
-    target.x = Math.max(minX, Math.min(maxX, fighter.x + Math.cos(angle) * (fighter.r + target.r + 15) + shoulderOffsetX));
-    target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(angle) * (fighter.r + target.r + 15) + shoulderOffsetY));
+    // Keep target locked during the punch hitpause
+    const punchAngle = angle;
+    const punchHitOffset = 16;
+    target.x = Math.max(minX, Math.min(maxX, fighter.x + Math.cos(punchAngle) * (fighter.r + target.r + punchHitOffset)));
+    target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(punchAngle) * (fighter.r + target.r + punchHitOffset)));
     target.vx = 0;
     target.vy = 0;
     target.isGrabbedByMahoraga = true;
     if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
 
-    const hitpause = CONFIG.mahoraga?.wallSlamPunchHitpause ?? 15;
+    const hitpause = CONFIG.mahoraga?.wallSlamPunchHitpause ?? 16;
     if (fighter.wallSlamTimer >= hitpause) { // After frames of punch hitpause, throw them!
       fighter.wallSlamPhase = 'throw';
       fighter.wallSlamTimer = 0;
       target.isGrabbedByMahoraga = false;
       target.z = 0; // Drop back to ground for the wall slam
 
-      // Calculate distances to left, right, top, and bottom walls to find the farthest wall
-      const distLeft = target.x - minX;
-      const distRight = maxX - target.x;
-      const distTop = target.y - minY;
-      const distBottom = maxY - target.y;
+      // Hurl opponent forward in the natural direction of the punch/grab attack angle
+      const throwAngle = angle;
+      fighter.aim({ x: target.x + Math.cos(throwAngle) * 100, y: target.y + Math.sin(throwAngle) * 100 });
 
-      let wallAngle = angle; // Fallback to lunge direction if check fails
-      const maxDist = Math.max(distLeft, distRight, distTop, distBottom);
-      if (maxDist === distLeft) {
-        wallAngle = Math.PI; // Throw to the far left wall
-      } else if (maxDist === distRight) {
-        wallAngle = 0;       // Throw to the far right wall
-      } else if (maxDist === distTop) {
-        wallAngle = -Math.PI / 2; // Throw to the far top wall
-      } else {
-        wallAngle = Math.PI / 2;  // Throw to the far bottom wall
-      }
-
-      fighter.aim({ x: target.x + Math.cos(wallAngle) * 100, y: target.y + Math.sin(wallAngle) * 100 });
-
-      // Hurl opponent at supersonic throw speed towards the chosen wall
+      // Hurl opponent at supersonic throw speed forward towards the arena wall
       const throwSpeed = CONFIG.mahoraga?.wallSlamThrowSpeed ?? 45.0;
-      fighter.wallSlamTargetVelX = Math.cos(wallAngle) * throwSpeed;
-      fighter.wallSlamTargetVelY = Math.sin(wallAngle) * throwSpeed;
+      fighter.wallSlamTargetVelX = Math.cos(throwAngle) * throwSpeed;
+      fighter.wallSlamTargetVelY = Math.sin(throwAngle) * throwSpeed;
 
-      triggerGlobalScreenShake(8, 14);
+      triggerGlobalScreenShake(10, 16);
       const throwSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
       const throwVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
       audioSystem.playSFX(throwSnd, throwVol);
@@ -587,22 +617,22 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   else if (fighter.wallSlamPhase === 'throw') {
     target.isGrabbedByMahoraga = false;
     
-    // Launch target at supersonic velocity toward arena wall
-    target.x += fighter.wallSlamTargetVelX * 0.5;
-    target.y += fighter.wallSlamTargetVelY * 0.5;
+    // Launch target at supersonic velocity forward toward arena wall along punch trajectory
+    target.x += fighter.wallSlamTargetVelX;
+    target.y += fighter.wallSlamTargetVelY;
 
     // Per-frame strict clamping to prevent target from ever clipping outside arena boundaries
-    target.x = Math.max(minX, Math.min(maxX, target.x));
-    target.y = Math.max(minY, Math.min(maxY, target.y));
-
-    target.vx = fighter.wallSlamTargetVelX;
-    target.vy = fighter.wallSlamTargetVelY;
-
     const hitLeft = (fighter.wallSlamTargetVelX < -0.1 && target.x <= minX);
     const hitRight = (fighter.wallSlamTargetVelX > 0.1 && target.x >= maxX);
     const hitTop = (fighter.wallSlamTargetVelY < -0.1 && target.y <= minY);
     const hitBottom = (fighter.wallSlamTargetVelY > 0.1 && target.y >= maxY);
     const hitWall = hitLeft || hitRight || hitTop || hitBottom;
+
+    target.x = Math.max(minX, Math.min(maxX, target.x));
+    target.y = Math.max(minY, Math.min(maxY, target.y));
+
+    target.vx = fighter.wallSlamTargetVelX;
+    target.vy = fighter.wallSlamTargetVelY;
 
     if (hitWall || fighter.wallSlamTimer >= 30) {
       // Final clamp target within arena boundary at wall
