@@ -370,7 +370,7 @@ export class GunSlingerFighter extends Fighter {
   }
 
   onDamageDealt(target, projectile, ownerIndex) {
-    if (!projectile.isSkill) {
+    if (projectile && !projectile.isSkill) {
       // Add a very small knockback on basic attacks
       const dx = target.x - this.x;
       const dy = target.y - this.y;

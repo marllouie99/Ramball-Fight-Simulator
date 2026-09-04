@@ -592,7 +592,7 @@ export class LaylaFighter extends Fighter {
     }
 
     // Void Mark Detonation
-    if (projectile.visual === 'layla_basic_bullet' || projectile.visual === 'layla_ultimate_bullet') {
+    if (projectile && (projectile.visual === 'layla_basic_bullet' || projectile.visual === 'layla_ultimate_bullet')) {
       if (target.voidMarkTimer && target.voidMarkTimer > 0) {
         target.voidMarkTimer = 0; // Consume mark
         

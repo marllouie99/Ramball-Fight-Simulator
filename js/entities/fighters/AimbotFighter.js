@@ -24,7 +24,7 @@ export class AimbotFighter extends Fighter {
     }
 
     // Blue fires an immediate follow-up shot only on original projectiles.
-    if (!projectile.isFollowUp && projectileSystem) {
+    if (projectile && !projectile.isFollowUp && projectileSystem) {
       spawnFloatingText(target.x, target.y - target.r - 5, 'DOUBLE SHOT!', '#00eaff');
 
       const customTipDist = this.r + CONFIG.gun.baseOffset + 24;
