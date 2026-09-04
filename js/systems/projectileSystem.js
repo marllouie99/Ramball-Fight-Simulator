@@ -2034,7 +2034,7 @@ class ProjectileSystem {
     const sphereRadius = CONFIG.cronos.sphereRadius;
     const sphereRadiusSq = sphereRadius * sphereRadius;
     const ownerIndex = state.fighters.indexOf(cronosFighter);
-    const activeMaxFrozen = maxFrozen;
+    const activeMaxFrozen = CONFIG.cronos?.maxFrozenProjectiles || 25;
 
     // OPTIMIZATION: Use spatial grid to get only nearby projectiles instead of checking all
     const nearbyProjectiles = [];
