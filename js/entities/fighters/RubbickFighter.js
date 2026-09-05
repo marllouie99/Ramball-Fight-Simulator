@@ -1,21 +1,23 @@
 import { fadeOutLoopingSound, stopLoopingSound, fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
-import { Fighter } from '../fighter.js';
+import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { spawnSparks, spawnImpactFlash, spawnTelekinesisDebris, spawnArcaneCrater, spawnArcaneSmoke, spawnArcaneShockwave, spawnArcaneFlash, spawnArcaneGlyphs, spawnSpellStealWisps } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnTelekinesisDebris, spawnArcaneCrater, spawnArcaneSmoke, spawnArcaneShockwave, spawnArcaneFlash, spawnArcaneGlyphs, spawnSpellStealWisps, spawnGojoRedFrontalBlast } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
-import { drawRubbickStaff, drawRubbickChargeEffect } from '../../graphics/weapons/rubbickWeaponGraphics.js';
+import { drawRubbickStaff, drawRubbickChargeEffect, getRubbickStaffTip } from '../../graphics/weapons/rubbickWeaponGraphics.js';
 import { updateStolenRubyHook, updateStolenCronosSphere, resolveStolenCronosWallBounce } from './rubbick/rubbickStealLogic.js';
 import { getStolenMultiplier, STOLEN_SKILL_CONFIG } from './rubbick/stolenSkillConfig.js';
-import { RubbickRubyTheme, RubbickCronosTheme } from './rubbick/rubbickThemes.js';
+import { RubbickRubyTheme, RubbickCronosTheme, isInsideEnemyGojoDomain } from './rubbick/rubbickThemes.js';
 import { drawRubyScythe } from '../../graphics/weapons/rubyWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
+import { drawRubbickSkin, drawRubbickGhostModel, drawRubbickPixelDebrisLayer } from '../../graphics/fighters/rubbickSkin.js';
+import { renderRubbickDomainBackground } from './gojo/gojoDomainVisuals.js';
 
 export class RubbickFighter extends Fighter {
   constructor(def) {
@@ -171,6 +173,7 @@ export class RubbickFighter extends Fighter {
     }
     if (typeof target._stopBeamAudio === 'function') target._stopBeamAudio();
     if (typeof target._stopChannelAudio === 'function') target._stopChannelAudio();
+    if (typeof target._stopFinalGetsugaVoiceline === 'function') target._stopFinalGetsugaVoiceline(true);
     if (typeof target._stopAllSounds === 'function') target._stopAllSounds();
 
     // 2. Cut off active skill charge/channel audio sources across fighters
@@ -187,6 +190,224 @@ export class RubbickFighter extends Fighter {
     fadeOutSoundBySrc('charge', 100);
     fadeOutSoundBySrc('laser', 100);
     fadeOutSoundBySrc('beam', 100);
+    fadeOutSoundBySrc('incineration', 100);
+    fadeOutSoundBySrc('cero', 100);
+    fadeOutSoundBySrc('getsuga', 100);
+    fadeOutSoundBySrc('bankai', 100);
+  }
+
+  /**
+   * Universally and completely cancels any active skill channeling, ultimate charging,
+   * transformations, or cast windups on a target caught in Telekinesis.
+   * Forces a full attack interruption (forceCancelAll = true), clears lingering attack effects,
+   * puts interrupted skills on penalty cooldowns, and terminates all active audio loops/handles.
+   *
+   * @param {Object} target - The enemy fighter/illusion being lifted or slammed by Telekinesis
+   * @param {boolean} isInitial - Whether this is the initial lift/interruption (spawns visual text)
+   */
+  _cancelTargetChanneling(target, isInitial = true) {
+    if (!target || target.hp <= 0 || target.isDead) return;
+
+    // Detect if target is actively channeling, charging, or casting any ability (capture before interruptAttacks resets them)
+    const wasChannelingPurple = Boolean(target.isChannelingPurple || (target.purpleChargeTimer && target.purpleChargeTimer > 0));
+    const wasChannelingDomain = Boolean(target.isChannelingDomainExpansion || target.isChannelingDomain || (target.domainChargeTimer && target.domainChargeTimer > 0));
+    const wasChannelingRed = Boolean((target.redEffectTimer && target.redEffectTimer > 0) || target.redBuildupPhase);
+    const wasChannelingRCT = Boolean(target.isChannelingRCT || (target.rctChannelTimer && target.rctChannelTimer > 0));
+    const wasChannelingDivineFlame = Boolean(target.isChannelingDivineFlame || (target.divineFlameChargeTimer && target.divineFlameChargeTimer > 0) || (target.fugaTimer && target.fugaTimer > 0));
+    const wasChannelingPureLoveBeam = Boolean(target.isChannelingPureLoveBeam || (target.pureLoveBeamChargeTimer && target.pureLoveBeamChargeTimer > 0) || target.isFiringPureLoveBeam || (target.pureLoveBeamActiveTimer && target.pureLoveBeamActiveTimer > 0) || (target.rikaEmergingForBeamTimer && target.rikaEmergingForBeamTimer > 0) || (target.rikaCallTimer && target.rikaCallTimer > 0));
+    const wasChannelingThinIce = Boolean(target.isChannelingThinIceBreaker || (target.thinIceBreakerChargeTimer && target.thinIceBreakerChargeTimer > 0));
+    const wasChannelingMahoraga = Boolean(target.isChannelingMahoraga || (target.mahoragaChannelTimer && target.mahoragaChannelTimer > 0));
+    const wasChannelingCero = Boolean(target.isChargingCero || (target.ceroChargeTimer && target.ceroChargeTimer > 0));
+    const wasChannelingBow = Boolean(target.isDrawingBow || (target.arrowDrawTimer && target.arrowDrawTimer > 0) || target.isDeployingSprenger || target.isSkywardWindup || target.isSkywardAscending || target.isFlurrying);
+    const wasChannelingGenosUlt = Boolean(target.isChargingUlt || target.isFiringUlt || (target.ultTimer && target.ultTimer > 0));
+    const wasChannelingLaylaUlt = Boolean(target.isUltimateCharging || target.isUltimateFiring || (target.ultimateWindupTimer && target.ultimateWindupTimer > 0) || (target.ultimateFireTimer && target.ultimateFireTimer > 0));
+    const wasChannelingLaser = Boolean((target.beamTimer && target.beamTimer > 0) || target.isFiringLaser || target.isChannelingBeam || (target.beamCharge && target.beamCharge > 0));
+    const wasChannelingStorm = Boolean(target.stormActive || (target.stormTimer && target.stormTimer > 0));
+    const wasChannelingSphere = Boolean(target.sphereActive || (target.sphereImpactTimer && target.sphereImpactTimer > 0));
+    const wasChannelingBlackFlash = Boolean(target.isChannelingBlackFlash || (target.blackFlashChannelTimer && target.blackFlashChannelTimer > 0));
+    const wasChannelingGetsuga = Boolean(target.isChargingGetsuga || target.isChannelingGetsuga || (target.getsugaChargeTimer && target.getsugaChargeTimer > 0));
+    const wasChannelingBankai = Boolean(target.isChannelingBankai || (target.bankaiChargeTimer && target.bankaiChargeTimer > 0) || (target.hollowMaskFormationTimer && target.hollowMaskFormationTimer > 0) || (target.hollowBurstTimer && target.hollowBurstTimer > 0));
+    const wasChannelingSeriousPunch = Boolean(target.isChargingSeriousPunch || (target.seriousPunchChargeTimer && target.seriousPunchChargeTimer > 0));
+
+    const wasChanneling = wasChannelingPurple || wasChannelingDomain || wasChannelingRed || wasChannelingRCT ||
+      wasChannelingDivineFlame || wasChannelingPureLoveBeam || wasChannelingThinIce || wasChannelingMahoraga ||
+      wasChannelingCero || wasChannelingBow || wasChannelingGenosUlt || wasChannelingLaylaUlt || wasChannelingLaser ||
+      wasChannelingStorm || wasChannelingSphere || wasChannelingBlackFlash || wasChannelingGetsuga || wasChannelingBankai ||
+      wasChannelingSeriousPunch || target.isSubmerged || target.isErupting || target.activePullActive || target.passiveSpinActive ||
+      (typeof target.isChannelingAnySkill === 'function' && target.isChannelingAnySkill());
+
+    // 1. Force interrupt all attacks and channeling abilities (passing true forces hyper-armor bypass)
+    if (typeof target.interruptAttacks === 'function') {
+      target.interruptAttacks(true);
+    }
+    if (typeof target.clearAllAttackEffects === 'function') {
+      target.clearAllAttackEffects();
+    }
+    if (typeof target.clearAllAfterimages === 'function') {
+      target.clearAllAfterimages();
+    }
+
+    // 2. Silence all channeling audio loops and handles
+    this._silenceTargetAudio(target);
+
+    // 3. Apply standard penalty cooldowns (4.5s / 270 frames) so interrupted abilities cannot immediately recast
+    const penaltyCD = 270;
+    if (wasChannelingPurple) {
+      if (target.purpleCooldown !== undefined) target.purpleCooldown = Math.max(target.purpleCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingDomain) {
+      if (target.domainCooldown !== undefined) target.domainCooldown = Math.max(target.domainCooldown || 0, penaltyCD + 30);
+    }
+    if (wasChannelingRed) {
+      if (target.redCooldown !== undefined) target.redCooldown = Math.max(target.redCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingRCT) {
+      if (target.reverseCursedTechniqueCooldown !== undefined) target.reverseCursedTechniqueCooldown = Math.max(target.reverseCursedTechniqueCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingDivineFlame) {
+      if (target.divineFlameCooldown !== undefined) target.divineFlameCooldown = Math.max(target.divineFlameCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingPureLoveBeam) {
+      if (target.pureLoveBeamCooldownTimer !== undefined) target.pureLoveBeamCooldownTimer = Math.max(target.pureLoveBeamCooldownTimer || 0, penaltyCD);
+      if (target.pureLoveBeamCooldown !== undefined) target.pureLoveBeamCooldown = Math.max(target.pureLoveBeamCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingThinIce) {
+      if (target.techniqueCooldown !== undefined) target.techniqueCooldown = Math.max(target.techniqueCooldown || 0, 180);
+      if (target.thinIceCooldown !== undefined) target.thinIceCooldown = Math.max(target.thinIceCooldown || 0, 180);
+    }
+    if (wasChannelingGetsuga) {
+      if (target.getsugaCooldown !== undefined) target.getsugaCooldown = Math.max(target.getsugaCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingGenosUlt) {
+      if (target.ultCooldown !== undefined) target.ultCooldown = Math.max(target.ultCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingLaylaUlt) {
+      if (target.destructionBarrageCooldown !== undefined) target.destructionBarrageCooldown = Math.max(target.destructionBarrageCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingLaser) {
+      if (target.shootCooldown !== undefined) target.shootCooldown = Math.max(target.shootCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingStorm) {
+      if (target.stormCooldown !== undefined) target.stormCooldown = Math.max(target.stormCooldown || 0, penaltyCD);
+    }
+    if (wasChannelingSphere) {
+      if (target.sphereCooldown !== undefined) target.sphereCooldown = Math.max(target.sphereCooldown || 0, penaltyCD);
+    }
+
+    // 4. Force reset character-specific channeling state variables
+    target.isChannelingPurple = false;
+    target.purpleChargeTimer = 0;
+    target.purpleRecoveryTimer = 0;
+    target.isChannelingDomainExpansion = false;
+    target.isChannelingDomain = false;
+    target.domainChargeTimer = 0;
+    target.isDomainPreSlide = false;
+    target.domainPreSlideTimer = 0;
+    target.redEffectTimer = 0;
+    target.redBuildupPhase = false;
+    target.redDetonated = false;
+    target.isChannelingRCT = false;
+    target.rctChannelTimer = 0;
+
+    target.isChannelingDivineFlame = false;
+    target.divineFlameChargeTimer = 0;
+    target.divineFlameRecoveryTimer = 0;
+    target.fugaTimer = 0;
+    target.cleaveCutTimer = 0;
+
+    target.isChannelingPureLoveBeam = false;
+    target.pureLoveBeamChargeTimer = 0;
+    target.isFiringPureLoveBeam = false;
+    target.pureLoveBeamActiveTimer = 0;
+    target.beamRetreatSlideTimer = 0;
+    target.rikaEmergingForBeamTimer = 0;
+    target.rikaCallTimer = 0;
+    target.isChannelingThinIceBreaker = false;
+    target.thinIceBreakerChargeTimer = 0;
+
+    target.isChannelingMahoraga = false;
+    target.mahoragaChannelTimer = 0;
+    target.isSubmerged = false;
+    target.submergeTimer = 0;
+    target.isErupting = false;
+    target.eruptTimer = 0;
+
+    target.isChargingCero = false;
+    target.ceroChargeTimer = 0;
+    target.isSonidoDashing = false;
+
+    target.isDrawingBow = false;
+    target.arrowDrawTimer = 0;
+    target.isDeployingSprenger = false;
+    target.isSkywardWindup = false;
+    target.isSkywardAscending = false;
+    target.isFlurrying = false;
+    target.burstRemaining = 0;
+    target.drawPhase = 'IDLE';
+
+    target.isChargingUlt = false;
+    target.isFiringUlt = false;
+    target.ultTimer = 0;
+    target.speedBoostTimer = 0;
+
+    target.isUltimateCharging = false;
+    target.isUltimateFiring = false;
+    target.ultimateWindupTimer = 0;
+    target.ultimateFireTimer = 0;
+    target.isDashing = false;
+    target.dashTimer = 0;
+
+    target.beamTimer = 0;
+    target.isFiringLaser = false;
+    target.isChannelingBeam = false;
+    target.beamCharge = 0;
+
+    target.stormActive = false;
+    target.stormTimer = 0;
+
+    target.sphereActive = false;
+    target.sphereImpactTimer = 0;
+
+    target.activePullActive = false;
+    target.activePullPhase = -1;
+    target.activePullPhaseTimer = 0;
+    target.pullTargets = [];
+    target.passiveSpinActive = false;
+    target.passiveSpinTimer = 0;
+
+    target.isChannelingBlackFlash = false;
+    target.blackFlashChannelTimer = 0;
+    target.isBlitzing = false;
+    target.isLunging = false;
+
+    target.isChannelingGetsuga = false;
+    target.isChargingGetsuga = false;
+    target.getsugaChargeTimer = 0;
+    target.getsugaSlideTimer = 0;
+    target.getsugaRecoveryTimer = 0;
+    target.isGetsugaSlash = false;
+    target.isChannelingBankai = false;
+    target.bankaiChargeTimer = 0;
+    target.bankaiSlideTimer = 0;
+    target.bankaiBurstTimer = 0;
+    target.shikaiReversionBurstTimer = 0;
+    target.hollowMaskFormationTimer = 0;
+    target.hollowBurstTimer = 0;
+    target.isFinalMassiveGetsuga = false;
+    target.isFinalGetsugaRecovery = false;
+    target.shunpoComboActive = false;
+    target.isShunpoDashing = false;
+
+    target.isChargingSeriousPunch = false;
+    target.seriousPunchChargeTimer = 0;
+    target.isCountering = false;
+    target.caughtInSaitamaCounter = false;
+
+    // 5. Visual cancellation feedback text
+    if (wasChanneling && isInitial) {
+      spawnFloatingText(target.x, target.y - (target.r || 25) - 28, 'CHANNELING CANCELED!', '#FF3366', 16);
+      spawnSparks(target.x, target.y, 8, 'arcane');
+    }
   }
 
   getBeamLine() {
@@ -621,10 +842,168 @@ export class RubbickFighter extends Fighter {
     if (this.stolenSkillCooldown > 0) this.stolenSkillCooldown--;
     if (this.stolenTimer > 0) {
       this.stolenTimer--;
-      if (this.stolenTimer === 0) {
+      if (this.stolenTimer === 0 && !this.stolenDomainActive) {
         this.stolenType = null;
         spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL FADED', '#2E8B57');
       }
+    }
+
+    // ─── Stolen Unlimited Void Domain Active Logic ───
+    if (this.stolenDomainActive && this.stolenDomainTimer > 0) {
+      this.stolenDomainTimer--;
+
+      // Stasis immunity inside own stolen domain
+      this.timeStopTimer = 0;
+      this.hitStunTimer = 0;
+
+      // Lock Rubbick in place while domain is active (hovering levitation)
+      this.vx = 0;
+      this.vy = 0;
+
+      // Aim at closest opponent
+      if (opponent && !opponent.isDead) {
+        const dx = opponent.x - this.x;
+        const dy = (opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0));
+        this.gunAngle = Math.atan2(dy, dx);
+        this.angle = this.gunAngle;
+      }
+
+      // Continuous active Arcane Bolts punishment on time-stopped targets!
+      if (this.attackCooldown > 0) this.attackCooldown--;
+      if (this.attackSwingTimer > 0) this.attackSwingTimer--;
+
+      if (this.attackCooldown <= 0 && opponent && !opponent.isDead) {
+        this.attackCooldown = 12; // Rapid arcane space strikes
+        this.attackSwingTimer = 10;
+        const rcfg = CONFIG.rubbick || CONFIG.trickster;
+        const boltDamage = ((rcfg?.boltDamage || 12) * 1.5) * getStolenMultiplier('gojo_domain', 'damageMultiplier');
+        if (projectileSystem && projectileSystem.fireArcaneBolt) {
+          projectileSystem.fireArcaneBolt(this, ownerIndex, boltDamage, opponent, { isDomainEmpowered: true });
+        }
+      }
+
+      // Ascending emerald sparks & space ripples around Rubbick
+      if (Math.random() < 0.35) {
+        spawnSparks(
+          this.x + (Math.random() - 0.5) * 60,
+          this.y + (Math.random() - 0.5) * 60,
+          1, 'arcaneAscendLine'
+        );
+      }
+
+      // Apply paralysis / time-stop to all enemy fighters, illusions, and cars (Rule #17: paralyzing domain)
+      const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
+      const myTeam = state.getFighterTeam ? state.getFighterTeam(myIdx) : null;
+
+      if (state.fighters) {
+        for (let i = 0; i < state.fighters.length; i++) {
+          const f = state.fighters[i];
+          if (!f || f === this || f.hp <= 0) continue;
+          const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+          if (myTeam !== null && myTeam === targetTeam) continue;
+
+          // Heavenly Restriction immunity (Toji bypasses domain)
+          if (f.domainImmunity || f.characterId === 'toji' || f.type === 'toji') continue;
+
+          if (typeof f.applyTimeStop === 'function') {
+            f.applyTimeStop(15, { isDomain: true, isUltimate: true });
+          } else {
+            f.timeStopTimer = Math.max(f.timeStopTimer || 0, 15);
+          }
+          if (typeof f.applyHitStun === 'function') {
+            f.applyHitStun(15);
+          }
+          f.vx = 0;
+          f.vy = 0;
+          if (f.knockbackVx !== undefined) f.knockbackVx = 0;
+          if (f.knockbackVy !== undefined) f.knockbackVy = 0;
+
+          // Disable Gojo's Limitless Infinity barrier while trapped inside Rubbick's stolen Unlimited Void
+          if (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') {
+            f.infinityActive = false;
+            f.infinityCooldown = 30;
+            f.infinityFadeOpacity = 0;
+            f.infinityBlockTimer = 0;
+          }
+        }
+      }
+
+      // Also freeze direct opponent if passed
+      if (opponent && opponent !== this && opponent.hp > 0) {
+        if (!opponent.domainImmunity && opponent.characterId !== 'toji' && opponent.type !== 'toji') {
+          if (typeof opponent.applyTimeStop === 'function') {
+            opponent.applyTimeStop(15, { isDomain: true, isUltimate: true });
+          } else {
+            opponent.timeStopTimer = Math.max(opponent.timeStopTimer || 0, 15);
+          }
+          if (typeof opponent.applyHitStun === 'function') {
+            opponent.applyHitStun(15);
+          }
+          opponent.vx = 0;
+          opponent.vy = 0;
+          if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
+          if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
+
+          // Disable Gojo's Limitless Infinity barrier while trapped inside Rubbick's stolen Unlimited Void
+          if (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.id === 'gojo') {
+            opponent.infinityActive = false;
+            opponent.infinityCooldown = 30;
+            opponent.infinityFadeOpacity = 0;
+            opponent.infinityBlockTimer = 0;
+          }
+        }
+      }
+
+      // Also freeze illusions
+      if (state.illusions) {
+        for (const ill of state.illusions) {
+          if (!ill || ill.hp <= 0) continue;
+          if (ill.ownerIndex !== undefined) {
+            const illTeam = state.getFighterTeam ? state.getFighterTeam(ill.ownerIndex) : null;
+            if (myTeam !== null && myTeam === illTeam) continue;
+          }
+          if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(15);
+          else ill.timeStopTimer = Math.max(ill.timeStopTimer || 0, 15);
+          if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15);
+          else ill.hitStunTimer = Math.max(ill.hitStunTimer || 0, 15);
+          ill.vx = 0;
+          ill.vy = 0;
+        }
+      }
+
+      // Domain expired
+      if (this.stolenDomainTimer <= 0) {
+        this.stolenDomainActive = false;
+        this.domainActive = false;
+        this.stolenType = null;
+        this.stolenTimer = 0;
+
+        spawnFloatingText(this.x, this.y - this.r - 20, 'DOMAIN EXPIRED', '#00FF64');
+
+        // Apply post-domain slow to all enemies (same as Gojo's domain expiry)
+        const slowDur = CONFIG.gojo?.domainPostSlowDuration ?? 180;
+        const slowMult = CONFIG.gojo?.domainPostSlowMultiplier ?? 0.35;
+        if (state.fighters) {
+          for (let i = 0; i < state.fighters.length; i++) {
+            const f = state.fighters[i];
+            if (!f || f === this || f.hp <= 0) continue;
+            const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+            if (myTeam !== null && myTeam === targetTeam) continue;
+            if (typeof f.applySlow === 'function') {
+              f.applySlow(slowDur, slowMult, { isDomainSlow: true });
+            } else {
+              f.slowTimer = Math.max(f.slowTimer || 0, slowDur);
+              f.slowMultiplier = slowMult;
+            }
+            if (typeof spawnFloatingText === 'function') {
+              spawnFloatingText(f.x, f.y - (f.r || 25) - 20, 'SLOWED!', '#00FF64');
+            }
+          }
+        }
+      }
+
+      this.resolveWallBounce(arena);
+      return;
     }
 
     // Telekinesis Logic
@@ -635,15 +1014,16 @@ export class RubbickFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       
-      // Smoothly rotate staff towards the drop location
-      const targetAngle = Math.atan2(this.tkDropY - this.y, this.tkDropX - this.x);
+      // Smoothly rotate staff towards the lifted target
+      const targetAimY = this.tkTarget.y - (this.tkTarget.z || 0);
+      const targetAngle = Math.atan2(targetAimY - (this.y - (this.z || 0)), this.tkTarget.x - this.x);
       let diff = targetAngle - this.gunAngle;
       
       // Normalize angle difference for shortest path
       while (diff < -Math.PI) diff += Math.PI * 2;
       while (diff > Math.PI) diff -= Math.PI * 2;
       
-      this.gunAngle += diff * 0.15; // 0.15 gives a nice smooth snap
+      this.gunAngle += diff * 0.35; // Responsive snap to lifted target
       
       // Spawn ascending glowing green neon particles from the drop location
       if (Math.random() < 0.6) {
@@ -663,10 +1043,7 @@ export class RubbickFighter extends Fighter {
       if (this.tkTarget.statusEffects && typeof this.tkTarget.statusEffects.applyParalyze === 'function') {
         this.tkTarget.statusEffects.applyParalyze(this.tkTimer + 2);
       }
-      if (typeof this.tkTarget.interruptAttacks === 'function') {
-        this.tkTarget.interruptAttacks();
-      }
-      this._silenceTargetAudio(this.tkTarget);
+      this._cancelTargetChanneling(this.tkTarget, false);
       
       // Visual lift effect is handled in drawing if we could, but let's simulate it by adding an aura
       if (Math.random() < 0.2) {
@@ -736,22 +1113,28 @@ export class RubbickFighter extends Fighter {
       }
 
       if (this.tkTimer === 0) {
-        this.tkTarget.z = 0; // Reset Z
-        this.tkTarget.isCaughtInTelekinesis = false;
-        this.tkTarget.isParalyzed = false;
-        this.tkTarget.timeStopTimer = 0;
+        const directTarget = this.tkTarget;
+        const slamX = directTarget ? directTarget.x : this.tkStartX;
+        const slamY = directTarget ? directTarget.y : this.tkStartY;
+
+        if (directTarget) {
+          directTarget.z = 0; // Reset Z
+          directTarget.isCaughtInTelekinesis = false;
+          directTarget.isParalyzed = false;
+          directTarget.timeStopTimer = 0;
+        }
         
         // Spawn arcane crater impact graphic on the ground
-        spawnArcaneCrater(this.tkTarget.x, this.tkTarget.y, 75);
+        spawnArcaneCrater(slamX, slamY, 75);
         
         // Spawn an expanding dark green shockwave
-        spawnArcaneShockwave(this.tkTarget.x, this.tkTarget.y);
+        spawnArcaneShockwave(slamX, slamY);
         
         // Small dust burst instead of massive explosion
         for (let i = 0; i < 4; i++) {
           spawnArcaneSmoke(
-            this.tkTarget.x + (Math.random() - 0.5) * 20,
-            this.tkTarget.y + (Math.random() - 0.5) * 20,
+            slamX + (Math.random() - 0.5) * 20,
+            slamY + (Math.random() - 0.5) * 20,
             (Math.random() - 0.5) * 4, 
             (Math.random() - 0.5) * 4, 
             'ground'
@@ -766,8 +1149,8 @@ export class RubbickFighter extends Fighter {
             // Bring them back down to ground level under the fighter's feet
             const radius = Math.random() * 20;
             const angle = Math.random() * Math.PI * 2;
-            spark.x = this.tkTarget.x + Math.cos(angle) * radius;
-            spark.y = this.tkTarget.y + Math.sin(angle) * radius;
+            spark.x = slamX + Math.cos(angle) * radius;
+            spark.y = slamY + Math.sin(angle) * radius;
 
             const speed = 4 + Math.random() * 6; // Slower blast to keep them grouped closer
             spark.vx = Math.cos(angle) * speed;
@@ -777,38 +1160,83 @@ export class RubbickFighter extends Fighter {
           }
         }
         
-        spawnFloatingText(this.tkTarget.x, this.tkTarget.y - 15, 'PARALYZED!', '#FFEE58');
         triggerGlobalScreenShake(8, 12); // Quick, controlled screen shake
         
         // Arcane magical landing effects
-        spawnArcaneFlash(this.tkTarget.x, this.tkTarget.y);
-        spawnArcaneGlyphs(this.tkTarget.x, this.tkTarget.y, 10);
+        spawnArcaneFlash(slamX, slamY);
+        spawnArcaneGlyphs(slamX, slamY, 10);
 
-        // AoE Stun and Paralyze to nearby enemies (including target)
-        const allEnemies = state.fighters.filter(f => f && f.hp > 0 && f !== this);
-        for (let enemy of allEnemies) {
-          const dx = enemy.x - this.tkTarget.x;
-          const dy = enemy.y - this.tkTarget.y;
-          const rcfg = CONFIG.rubbick || CONFIG.trickster;
-          if (dx * dx + dy * dy < rcfg.telekinesisStunRadius * rcfg.telekinesisStunRadius) {
-            const stunDur = rcfg.telekinesisStunDuration || 60;
+        // Play Telekinesis drop impact sound
+        const dropSound = getSkillSound(this._def?.id || 'rubbick', 'telekinesisDrop');
+        if (dropSound) {
+          audioSystem.playSFX(dropSound.src, dropSound.volume);
+        }
+
+        const rcfg = CONFIG.rubbick || CONFIG.trickster;
+        const slamDamage = rcfg.telekinesisLandDamage || rcfg.telekinesisDamage || 25;
+        const stunRadius = rcfg.telekinesisStunRadius || 100;
+        const stunRadiusSq = stunRadius * stunRadius;
+        const stunDur = rcfg.telekinesisStunDuration || 60;
+
+        // Query all valid enemy entities (fighters and illusions) within the landing impact zone
+        const myIdx = (state.fighters) ? state.fighters.indexOf(this) : -1;
+        const myTeam = (myIdx >= 0 && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIdx) : null;
+
+        const allCandidates = [];
+        if (state.fighters) {
+          for (let fi = 0; fi < state.fighters.length; fi++) {
+            const f = state.fighters[fi];
+            if (!f || f === this || f.hp <= 0 || f.isDead) continue;
+            if (myTeam !== null && typeof state.getFighterTeam === 'function' && state.getFighterTeam(fi) === myTeam) continue;
+            allCandidates.push(f);
+          }
+        }
+        if (state.illusions) {
+          for (let ill of state.illusions) {
+            if (!ill || ill === this || ill.hp <= 0 || ill.isDead) continue;
+            if (ill.owner && myTeam !== null && typeof state.getFighterTeam === 'function') {
+              const oIdx = state.fighters ? state.fighters.indexOf(ill.owner) : -1;
+              if (oIdx >= 0 && state.getFighterTeam(oIdx) === myTeam) continue;
+            }
+            allCandidates.push(ill);
+          }
+        }
+
+        // Apply slam impact damage, blood/flash, stun, paralyze, and channeling cancel to all enemies in the landing area
+        for (let enemy of allCandidates) {
+          const dx = enemy.x - slamX;
+          const dy = enemy.y - slamY;
+          const distSq = dx * dx + dy * dy;
+          const isDirect = (enemy === directTarget);
+
+          if (isDirect || distSq < stunRadiusSq) {
+            // Apply Telekinesis slam impact damage
+            applyDamageToTarget(enemy, slamDamage, this, {
+              isSkill: true,
+              isArcane: true,
+              isAOE: true,
+              isTelekinesis: true,
+              isSlam: true
+            });
+
+            // Impact particles & blood
+            spawnBloodEffect(enemy.x, enemy.y);
+            spawnImpactFlash(enemy.x, enemy.y);
+
+            // Stun and Paralyze debuff
             enemy.electricStunTimer = stunDur;
             enemy.paralyzeTimer = Math.max(enemy.paralyzeTimer || 0, stunDur);
             if (enemy.statusEffects && typeof enemy.statusEffects.applyParalyze === 'function') {
               enemy.statusEffects.applyParalyze(stunDur);
             }
-            if (typeof enemy.interruptAttacks === 'function') {
-              enemy.interruptAttacks();
-            }
-            this._silenceTargetAudio(enemy);
-            spawnFloatingText(enemy.x, enemy.y - enemy.r - 5, 'PARALYZED!', '#FFEE58');
+            this._cancelTargetChanneling(enemy, true);
+            spawnFloatingText(enemy.x, enemy.y - (enemy.r || 25) - 5, 'PARALYZED!', '#FFEE58');
           }
         }
-        if (this.tkTarget) {
-          if (this.tkTarget.isTurret) {
-            this.tkTarget._fixedX = this.tkTarget.x;
-            this.tkTarget._fixedY = this.tkTarget.y;
-          }
+
+        if (directTarget && directTarget.isTurret) {
+          directTarget._fixedX = directTarget.x;
+          directTarget._fixedY = directTarget.y;
         }
 
         this.tkTarget = null;
@@ -827,24 +1255,53 @@ export class RubbickFighter extends Fighter {
       if (this.spellStealCooldown <= 0 && !this.stolenType && distSq < rubbickCfg.spellStealRange * rubbickCfg.spellStealRange) {
         const isGojoOpponent = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.type === 'gojo' || opponent._def?.id === 'gojo');
         
-        // If opponent is Gojo, Rubbick can ONLY steal Hollow Purple AFTER Gojo has fired his Purple first!
+        // If opponent is Gojo, Rubbick can steal whichever skill Gojo has cast (Hollow Purple, Reversal Red, or Unlimited Void)!
         if (isGojoOpponent) {
           const gojoHasFiredPurple = Boolean(
             opponent.hasFiredPurple ||
             opponent._hasFiredPurpleAtLeastOnce ||
-            (opponent.purpleUseCount !== undefined && opponent.purpleUseCount > 0) ||
             (state.projectiles && state.projectiles.some(p => p && p.isGojoPurple && p.owner === state.fighters?.indexOf(opponent)))
           );
+          const gojoHasFiredRed = Boolean(
+            opponent.hasFiredRed ||
+            opponent._hasFiredRedAtLeastOnce
+          );
+          const gojoHasFiredDomain = Boolean(
+            opponent.hasFiredDomain ||
+            opponent._hasFiredDomainAtLeastOnce ||
+            opponent.domainActive ||
+            opponent.isChannelingDomainExpansion
+          );
 
-          if (gojoHasFiredPurple) {
+          if (gojoHasFiredPurple || gojoHasFiredRed || gojoHasFiredDomain) {
+            // Steal the skill Gojo used most recently (priority: lastCastSkill or currently active state)
+            let stolenId = 'gojo'; // default to purple
+            let skillLabel = 'HOLLOW PURPLE';
+            if (opponent.domainActive || opponent.isChannelingDomainExpansion || opponent.lastCastSkill === 'domain') {
+              stolenId = 'gojo_domain';
+              skillLabel = 'UNLIMITED VOID';
+            } else if (opponent.lastCastSkill === 'red') {
+              stolenId = 'gojo_red';
+              skillLabel = 'REVERSAL RED';
+            } else if (opponent.lastCastSkill === 'purple') {
+              stolenId = 'gojo';
+              skillLabel = 'HOLLOW PURPLE';
+            } else if (gojoHasFiredDomain && !gojoHasFiredPurple && !gojoHasFiredRed) {
+              stolenId = 'gojo_domain';
+              skillLabel = 'UNLIMITED VOID';
+            } else if (gojoHasFiredRed && !gojoHasFiredPurple && !gojoHasFiredDomain) {
+              stolenId = 'gojo_red';
+              skillLabel = 'REVERSAL RED';
+            }
+
             this.spellStealCooldown = rubbickCfg.spellStealCooldown;
-            this.stolenType = 'gojo';
-            this.stolenColor = opponent._def?.color || '#00FF64';
+            this.stolenType = stolenId;
+            this.stolenColor = '#00FF64';
             this.stolenTimer = rubbickCfg.spellStealDuration;
-            this.stolenSkillCooldown = 0;
+            this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 45; // Initial delay before casting newly stolen skill
             this._hasFiredStolenSkillTrick = false;
 
-            spawnFloatingText(this.x, this.y - this.r - 20, 'STOLEN: HOLLOW PURPLE!', '#00FF00');
+            spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${skillLabel}!`, '#00FF64');
             spawnSpellStealWisps(this, opponent, '#00FF64', 15);
           }
         } else {
@@ -852,7 +1309,7 @@ export class RubbickFighter extends Fighter {
           this.stolenType = opponent._def.type;
           this.stolenColor = opponent._def.color;
           this.stolenTimer = rubbickCfg.spellStealDuration;
-          this.stolenSkillCooldown = 0;
+          this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 45; // Initial delay before casting newly stolen skill
           this._hasFiredStolenSkillTrick = false;
 
           const stolenLabel = this.stolenType.toUpperCase();
@@ -875,11 +1332,8 @@ export class RubbickFighter extends Fighter {
           opponent.statusEffects.applyParalyze(paralyzeDuration);
         }
 
-        // Interrupt attacks (so visual slashes don't get stuck hovering in the air) and cut audio
-        if (typeof opponent.interruptAttacks === 'function') {
-           opponent.interruptAttacks();
-        }
-        this._silenceTargetAudio(opponent);
+        // Interrupt attacks, force cancel all channeling abilities, and cut audio
+        this._cancelTargetChanneling(opponent, true);
         
         // Pre-calculate drop location (Mage wants to keep distance)
         const minDistance = 150;
@@ -911,7 +1365,7 @@ export class RubbickFighter extends Fighter {
       // Check heavy stolen skills every frame
       let castedHeavy = false;
       if (this.stolenType && !this.tkTimer && this.stolenSkillCooldown <= 0) {
-        if (['cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'musashi', 'normal', 'zeus', 'gojo'].includes(this.stolenType)) {
+        if (['cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'musashi', 'normal', 'zeus', 'gojo', 'gojo_red', 'gojo_domain'].includes(this.stolenType)) {
           // It's a Heavy Spell! (One-time cast that consumes the stolen buff)
           castedHeavy = true;
           this.executeStolenSkill(opponent, ownerIndex);
@@ -925,7 +1379,7 @@ export class RubbickFighter extends Fighter {
         this.attackSwingTimer = 15; // 15 frames of staff swing animation
         
         let castedSpammable = false;
-        if (this.stolenType && ['orange', 'darkslategray', 'gunslinger'].includes(this.stolenType)) {
+        if (this.stolenType && ['orange', 'darkslategray', 'gunslinger'].includes(this.stolenType) && this.stolenSkillCooldown <= 0) {
           castedSpammable = this.executeStolenSkill(opponent, ownerIndex);
         }
         
@@ -1037,19 +1491,27 @@ export class RubbickFighter extends Fighter {
       case 'normal':
       case 'zeus':
       case 'gojo':
+      case 'gojo_red':
+      case 'gojo_domain':
         // These are heavy skills! We will enter the wind-up phase first!
         if (this.stolenSkillCooldown <= 0) {
            if (opponent) {
              this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
            }
-           this.stolenWindUpTimer = this.stolenType === 'normal' 
-             ? (CONFIG.sharpshooter?.executeWindupFrames || 30) 
-             : (this.stolenType === 'gojo' ? 45 : 30); 
-           skillCast = true;
-           if (this.stolenType === 'gojo') {
-             const chargeSound = getSkillSound('gojo', 'purple_charging') || { src: 'Assets/Sound Effects/Skills/mixing.mp3', volume: 1.8 };
-             if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume || 1.0);
-           }
+            this.stolenWindUpTimer = this.stolenType === 'normal' 
+              ? (CONFIG.sharpshooter?.executeWindupFrames || 30) 
+              : (this.stolenType === 'gojo' ? 45 : (this.stolenType === 'gojo_red' ? 35 : (this.stolenType === 'gojo_domain' ? 60 : 30))); 
+            skillCast = true;
+            if (this.stolenType === 'gojo') {
+              const chargeSound = getSkillSound('gojo', 'purple_charging') || { src: 'Assets/Sound Effects/Skills/mixing.mp3', volume: 1.8 };
+              if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume || 1.0);
+            } else if (this.stolenType === 'gojo_red') {
+              const chargeSound = getSkillSound('gojo', 'red_charging') || { src: 'Assets/Sound Effects/Skills/redcharging.mp3', volume: 2.0 };
+              if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume || 1.8);
+            } else if (this.stolenType === 'gojo_domain') {
+              // Stolen Unlimited Void wind-up: Play subtle spatial whoosh SFX (no Gojo voiceline)
+              audioSystem.playSFX('Assets/Sound Effects/Skills/woosh.mp3', 0.85);
+            }
         }
         break;
       case 'orange':
@@ -1076,7 +1538,7 @@ export class RubbickFighter extends Fighter {
     }
     
     // Clear the stolen skill after casting ONLY if it's a spammable skill
-    if (skillCast && !['musashi', 'cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'normal', 'zeus', 'gojo'].includes(this.stolenType)) {
+    if (skillCast && !['musashi', 'cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'normal', 'zeus', 'gojo', 'gojo_red', 'gojo_domain'].includes(this.stolenType)) {
       this.stolenType = null;
       this.stolenTimer = 0;
     }
@@ -1206,14 +1668,165 @@ export class RubbickFighter extends Fighter {
           projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isRubbick: true, isTrickster: true, colorTheme: 'green' });
         }
         
-        const purpleSound = getSkillSound(21, 'purple_fire') || getSkillSound('gojo', 'hollowpurple') || { src: 'Assets/Sound Effects/Skills/hollowpurple.mp3', volume: 2.5 };
+        const purpleSound = { src: 'Assets/Sound Effects/Skills/purpledeploy.mp3', volume: 1.5 };
         if (purpleSound) audioSystem.playSFX(purpleSound.src, purpleSound.volume || 1.5);
+        break;
+      case 'gojo_red':
+        if (opponent) {
+           this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        }
+        const redDmgMult = getStolenMultiplier('gojo_red', 'damageMultiplier') || getStolenMultiplier('gojo', 'damageMultiplier');
+        const redDamage = (CONFIG.gojo?.redDamage || 100) * redDmgMult;
+        const redKnockback = CONFIG.gojo?.redKnockback || 40;
+        const pushAngle = this.gunAngle !== undefined ? this.gunAngle : 0;
+        const frontalReach = CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650;
+        const frontalArc = CONFIG.gojo?.redFrontalArc || (Math.PI * 0.45);
+        const halfArc = frontalArc / 2;
+        const slowDuration = CONFIG.gojo?.redSlowDuration || 120;
+        const slowMultiplier = CONFIG.gojo?.redSlowMultiplier || 0.35;
+        this.stolenSkillCooldown = (CONFIG.gojo?.redCooldown || 1000) * getStolenMultiplier('gojo_red', 'cooldownMultiplier');
+
+        spawnFloatingText(this.x, this.y - this.r - 20, 'REVERSAL RED!', '#00FF64');
+        triggerGlobalScreenShake(CONFIG.gojo?.redShakeIntensity || 14, CONFIG.gojo?.redShakeDuration || 25);
+
+        // Backward recoil impulse
+        const redRecoilForce = 16;
+        this.vx -= Math.cos(this.gunAngle) * redRecoilForce;
+        this.vy -= Math.sin(this.gunAngle) * redRecoilForce;
+        this.attackSwingTimer = 18;
+
+        const sBlast = getSkillSound('gojo', 'red_blast');
+        const blastSnd = sBlast?.src || CONFIG.gojo?.sounds?.redBlast || 'Assets/Sound Effects/Skills/redblast.mp3';
+        const blastVol = sBlast?.volume ?? (CONFIG.gojo?.soundVolumes?.redBlast ?? 2.5);
+        audioSystem.playSFX(blastSnd, blastVol);
+
+        // Query all valid enemy targets (fighters, illusions, and cars) per Rule #6 & Rule #7
+        const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+        const validTargets = [];
+        if (typeof state !== 'undefined') {
+          if (state.fighters) {
+            for (let i = 0; i < state.fighters.length; i++) {
+              const f = state.fighters[i];
+              if (!f || f === this || f.hp <= 0) continue;
+              const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+              if (myTeam !== null && myTeam === targetTeam) continue;
+              validTargets.push(f);
+            }
+          }
+          if (state.illusions) {
+            for (const ill of state.illusions) {
+              if (!ill || ill === this || ill.hp <= 0) continue;
+              if (ill.ownerIndex !== undefined) {
+                const illTeam = state.getFighterTeam ? state.getFighterTeam(ill.ownerIndex) : null;
+                if (myTeam !== null && myTeam === illTeam) continue;
+              }
+              validTargets.push(ill);
+            }
+          }
+          if (state.cjDriveBys) {
+            for (const car of state.cjDriveBys) {
+              if (!car || car.dead || car.hp <= 0) continue;
+              if (car.owner) {
+                const carTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(car.owner)) : null;
+                if (myTeam !== null && myTeam === carTeam) continue;
+              }
+              validTargets.push(car);
+            }
+          }
+        }
+
+        for (const f of validTargets) {
+          const dist = Math.hypot(f.x - this.x, f.y - this.y);
+          const effectiveReach = frontalReach + (f.r || 20);
+
+          if (dist <= effectiveReach) {
+            const angleToEnemy = Math.atan2(f.y - this.y, f.x - this.x);
+            let angleDiff = angleToEnemy - pushAngle;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+            if (Math.abs(angleDiff) <= halfArc || dist <= (this.r + (f.r || 20) + 20)) {
+              f.timeStopTimer = 0;
+              f.isFrozenByInfinity = false;
+              f.infinityFreezeTimer = 0;
+
+              if (typeof f.takeDamage === 'function') {
+                f.takeDamage(redDamage, this, { isRed: true, isSkill: true, isAdaptableSkillShot: true, skillShotId: 'red' });
+              }
+
+              const kbVx = Math.cos(pushAngle) * redKnockback;
+              const kbVy = Math.sin(pushAngle) * redKnockback;
+              f.vx = kbVx;
+              f.vy = kbVy;
+              f.knockbackDecay = 0.92;
+
+              if (typeof f.applyRedKnockback === 'function') {
+                f.applyRedKnockback(kbVx, kbVy);
+              } else if (typeof f.applyKnockback === 'function') {
+                f.applyKnockback(kbVx, kbVy, { isRed: true });
+              }
+
+              if (typeof f.applyHitStun === 'function') {
+                f.applyHitStun(25);
+              }
+
+              if (!f.immuneToCC || f.characterId === 'toji' || f.type === 'toji') {
+                if (typeof f.applySlow === 'function') {
+                  f.applySlow(slowDuration, slowMultiplier, { isRed: true });
+                } else {
+                  f.slowTimer = Math.max(f.slowTimer || 0, slowDuration);
+                  f.slowMultiplier = slowMultiplier;
+                }
+                f.redSlowTimer = slowDuration;
+                f.redSlowMaxTimer = slowDuration;
+              }
+
+              spawnImpactFlash(f.x, f.y, 50, 'arcane');
+            }
+          }
+        }
+
+        if (typeof spawnGojoRedFrontalBlast === 'function') {
+          spawnGojoRedFrontalBlast(this.x, this.y, pushAngle, frontalReach, frontalArc, { isRubbick: true, colorTheme: 'green' });
+        }
+        break;
+      case 'gojo_domain':
+        {
+          const domainDurationMult = getStolenMultiplier('gojo_domain', 'durationMultiplier') || 0.7;
+          const domainDuration = Math.round((CONFIG.gojo?.domainDuration || 300) * domainDurationMult);
+          const domainRadius = CONFIG.gojo?.domainRadius || 400;
+
+          spawnFloatingText(this.x, this.y - this.r - 20, 'UNLIMITED VOID!', '#00FF64');
+          triggerGlobalScreenShake(CONFIG.gojo?.domainShakeIntensity || 18, CONFIG.gojo?.domainShakeDuration || 30);
+
+          // Activate Rubbick's stolen domain state
+          this.stolenDomainActive = true;
+          this.domainActive = true;
+          this.stolenDomainTimer = domainDuration;
+          this.stolenDomainMaxTimer = domainDuration;
+          this.stolenDomainRadius = domainRadius;
+          this.stolenDomainX = this.x;
+          this.stolenDomainY = this.y;
+
+          // Lock Rubbick in place during domain (hand sign channeling pose)
+          this.vx = 0;
+          this.vy = 0;
+
+          // Stolen Unlimited Void deployment: Play pure spatial time-stop sphere SFX (100% voiceline-free)
+          audioSystem.playSFX('Assets/Sound Effects/Skills/cronosphere.mp3', 1.2);
+          audioSystem.playSFX('Assets/Sound Effects/Skills/purpledeploy.mp3', 1.0);
+
+          this.stolenSkillCooldown = (CONFIG.gojo?.domainCooldown || 1200) * getStolenMultiplier('gojo_domain', 'cooldownMultiplier');
+        }
         break;
     }
     
-    // Clear the stolen skill after casting
-    this.stolenType = null;
-    this.stolenTimer = 0;
+    // Clear the stolen skill after casting (except gojo_domain which runs over time)
+    if (this.stolenType !== 'gojo_domain') {
+      this.stolenType = null;
+      this.stolenTimer = 0;
+    }
+    this.stolenWindUpTimer = 0;
   }
 
   _isInsideOwnSphere() {
@@ -1311,12 +1924,12 @@ export class RubbickFighter extends Fighter {
                   color: Math.random() > 0.6 ? '#000000' : (Math.random() > 0.4 ? '#004a20' : '#008840')
                });
            }
-       }
-    }
+        }
+     }
   }
-
+  
   _drawStaffTrail(ctx) {
-    if (this.stolenType !== 'berserker') return;
+    if (this.stolenType !== 'berserker' || isInsideEnemyGojoDomain(this)) return;
 
     if (this.staffSmokeParticles && this.staffSmokeParticles.length > 0) {
         for (const p of this.staffSmokeParticles) {
@@ -1399,101 +2012,215 @@ export class RubbickFighter extends Fighter {
     ctx.restore();
   }
   
+  drawBody(ctx) {
+    drawRubbickSkin(ctx, this);
+  }
+
   draw(ctx) {
-    // Draw debris that is currently BEHIND Rubbick
-    this._drawDebrisLayer(ctx, true);
+    // Draw debris that is currently BEHIND Rubbick (Pixel Art Style)
+    drawRubbickPixelDebrisLayer(ctx, this, true);
     
-    // Draw afterimages
+    // Draw afterimages in authentic discrete pixel ghost style
     if (this.afterImages && this.afterImages.length > 0) {
       this.afterImages.forEach(img => {
         const alpha = img.timer / 20.0;
+        const aiAngle = img.gunAngle !== undefined ? img.gunAngle : (img.angle || 0);
         ctx.save();
         ctx.globalAlpha = alpha * 0.6;
         ctx.translate(img.x, img.y);
-        ctx.beginPath();
-        ctx.arc(0, 0, this.r, 0, Math.PI * 2);
-        ctx.fillStyle = img.color || this.color;
-        ctx.fill();
+        ctx.rotate(aiAngle);
+        const facingLeft = Math.abs(aiAngle) > Math.PI / 2;
+        if (facingLeft) ctx.scale(1, -1);
+        drawRubbickGhostModel(ctx, img.r || this.r);
         ctx.restore();
       });
     }
 
     super.draw(ctx);
     
-    // Draw debris that is currently IN FRONT of Rubbick
-    this._drawDebrisLayer(ctx, false);
+    // Draw debris that is currently IN FRONT of Rubbick (Pixel Art Style)
+    drawRubbickPixelDebrisLayer(ctx, this, false);
 
-    // Draw telekinesis visual
+    // Draw telekinesis visual (Continuous Solid Pixel Art Style)
     if (this.tkTarget && this.tkTimer > 0) {
       ctx.save();
-      const dx = this.tkTarget.x - this.x;
-      const dy = this.tkTarget.y - this.y;
+      ctx.imageSmoothingEnabled = false;
+      const P = 2.0;
+      const snap = (v) => Math.round(v / P) * P;
+
+      // 1. ── ACCURATELY POSITION TETHER AT STAFF CRYSTAL TIP ──
+      const staffTip = (typeof getRubbickStaffTip === 'function') ? getRubbickStaffTip(this) : { x: this.x, y: this.y - (this.z || 0) };
+      const startX = snap(staffTip.x);
+      const startY = snap(staffTip.y);
+      const targetX = snap(this.tkTarget.x);
+      const targetY = snap(this.tkTarget.y - (this.tkTarget.z || 0));
+
+      const dx = targetX - startX;
+      const dy = targetY - startY;
       const dist = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx);
       
+      // 1. ── CONTINUOUS SOLID PIXEL ART ENERGY TETHER ──
       ctx.save();
-      ctx.translate(this.x, this.y);
+      ctx.translate(startX, startY);
       ctx.rotate(angle);
       
-      ctx.globalCompositeOperation = 'lighter';
-      
-      // Draw swirling magical ribbons
-      const timeStr = Date.now() / 150;
-      
-      // Two overlapping animated sine waves
-      for (let w = 0; w < 2; w++) {
-        ctx.beginPath();
-        for (let i = 0; i <= dist; i += 10) {
-          const amplitude = Math.sin((i / dist) * Math.PI) * 12; // Thickest in the middle
-          const offset = Math.sin(timeStr * (w === 0 ? 1 : -1.2) + i * 0.05) * amplitude;
-          if (i === 0) ctx.moveTo(i, offset);
-          else ctx.lineTo(i, offset);
-        }
-        ctx.lineTo(dist, 0); // Connect precisely to target
-        
-        ctx.strokeStyle = w === 0 ? 'rgba(50, 255, 120, 0.8)' : 'rgba(50, 220, 255, 0.8)';
-        ctx.lineWidth = 2;
-        
-        // Simulated Glow
-        ctx.save();
-        ctx.globalAlpha = 0.25;
-        ctx.lineWidth = 6;
-        ctx.stroke();
-        ctx.restore();
+      // Staff crystal emitter rune glint
+      ctx.fillStyle = '#05180B';
+      ctx.fillRect(-P * 2, -P * 2, P * 4, P * 4);
+      ctx.fillStyle = '#00FF64';
+      ctx.fillRect(-P * 1.5, -P * 1.5, P * 3, P * 3);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-P * 0.5, -P * 0.5, P, P);
 
-        ctx.lineWidth = 2;
-        ctx.stroke();
+      const timeStr = performance.now() / 150;
+      const waveColors = ['#00FF64', '#00E5FF'];
+      const waveHighlights = ['#A7F3D0', '#E0F2FE'];
+      
+      // Two overlapping animated continuous pixel sine streams
+      for (let w = 0; w < 2; w++) {
+        const points = [];
+        const step = 3.0;
+        for (let i = 0; i <= dist; i += step) {
+          const progress = i / dist;
+          const amplitude = Math.sin(progress * Math.PI) * 14; // Thickest in center
+          const rawOffset = Math.sin(timeStr * (w === 0 ? 1.4 : -1.6) + i * 0.06) * amplitude;
+          points.push({ x: snap(i), y: snap(rawOffset) });
+        }
+        // Ensure connects precisely to target center
+        points.push({ x: snap(dist), y: 0 });
+
+        if (points.length > 1) {
+          // A. Continuous Solid Dark Outline
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+          }
+          ctx.strokeStyle = '#05180B';
+          ctx.lineWidth = 5.5;
+          ctx.lineCap = 'square';
+          ctx.lineJoin = 'miter';
+          ctx.stroke();
+
+          // B. Continuous Vibrant Emerald/Cyan Energy Body
+          ctx.strokeStyle = waveColors[w];
+          ctx.lineWidth = 3.2;
+          ctx.stroke();
+
+          // C. Continuous Mint/Cyan Specular Core
+          ctx.strokeStyle = waveHighlights[w];
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+
+          // D. Pure White Center Filament
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+
+        // Traveling pixel energy rune glint on the beam
+        const packetPhase = ((timeStr * 0.8 + w * 0.5) % 1.0);
+        const packetDist = snap(dist * packetPhase);
+        const pAmp = Math.sin(packetPhase * Math.PI) * 14;
+        const pOff = snap(Math.sin(timeStr * (w === 0 ? 1.4 : -1.6) + packetDist * 0.06) * pAmp);
+        
+        ctx.fillStyle = '#05180B';
+        ctx.fillRect(packetDist - P * 2, pOff - P * 2, P * 4, P * 4);
+        ctx.fillStyle = '#00FF88';
+        ctx.fillRect(packetDist - P * 1.5, pOff - P * 1.5, P * 3, P * 3);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(packetDist - P * 0.5, pOff - P * 0.5, P, P);
       }
-      
       ctx.restore();
       
-      // Draw soft transparent green shadow indicator
-      ctx.save();
-      
-      const radius = this.tkTarget.r * 1.5;
-      const gradient = ctx.createRadialGradient(this.tkDropX, this.tkDropY, 0, this.tkDropX, this.tkDropY, radius);
-      gradient.addColorStop(0, 'rgba(50, 255, 120, 0.4)');
-      gradient.addColorStop(0.5, 'rgba(50, 255, 120, 0.2)');
-      gradient.addColorStop(1, 'rgba(50, 255, 120, 0)');
-      
-      ctx.beginPath();
-      ctx.arc(this.tkDropX, this.tkDropY, radius, 0, Math.PI * 2);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-      
-      ctx.restore();
-      
+      // 2. ── SOLID STEPPED PIXEL ART LANDING RETICLE & TARGET ZONE ──
+      const dropRadius = snap(this.tkTarget.r * 1.4);
+      const dropX = snap(this.tkDropX);
+      const dropY = snap(this.tkDropY);
+      const rGrid = Math.max(6, Math.round(dropRadius / P));
+      const size = rGrid + 3;
+      const reticleTime = performance.now() * 0.005;
+
+      // Pass 1: Solid Dark Obsidian Outline (Thick 1-2px border around ring)
+      ctx.fillStyle = '#05180B';
+      for (let gy = -size; gy <= size; gy++) {
+        for (let gx = -size; gx <= size; gx++) {
+          const d = Math.hypot(gx, gy);
+          if (Math.abs(d - rGrid) <= 1.60) {
+            ctx.fillRect(dropX + gx * P, dropY + gy * P, P, P);
+          }
+        }
+      }
+
+      // Pass 2: Vibrant Emerald / Neon Mint Pixel Ring with rotating glints
+      for (let gy = -size; gy <= size; gy++) {
+        for (let gx = -size; gx <= size; gx++) {
+          const d = Math.hypot(gx, gy);
+          if (Math.abs(d - rGrid) <= 0.65) {
+            const angle = Math.atan2(gy, gx);
+            const isGlint = Math.sin(angle * 4 + reticleTime) > 0.65;
+            ctx.fillStyle = isGlint ? '#FFFFFF' : ((Math.abs(gx + gy) % 2 === 0) ? '#00FF64' : '#60FFB0');
+            ctx.fillRect(dropX + gx * P, dropY + gy * P, P, P);
+          }
+        }
+      }
+
+      // 4 Cardinal Pixel Inward Brackets [ ]
+      const bracketDist = snap(dropRadius + P * 4);
+      const bLen = P * 3;
+
+      const drawPixelBracketPart = (bx, by, bw, bh) => {
+        // Dark outline
+        ctx.fillStyle = '#05180B';
+        ctx.fillRect(bx - P, by - P, bw + P * 2, bh + P * 2);
+        // Bright pixel fill
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(bx, by, bw, bh);
+      };
+
+      // Top [
+      drawPixelBracketPart(dropX - bLen, dropY - bracketDist, bLen * 2, P);
+      drawPixelBracketPart(dropX - bLen, dropY - bracketDist, P, bLen);
+      drawPixelBracketPart(dropX + bLen - P, dropY - bracketDist, P, bLen);
+
+      // Bottom ]
+      drawPixelBracketPart(dropX - bLen, dropY + bracketDist - P, bLen * 2, P);
+      drawPixelBracketPart(dropX - bLen, dropY + bracketDist - bLen, P, bLen);
+      drawPixelBracketPart(dropX + bLen - P, dropY + bracketDist - bLen, P, bLen);
+
+      // Left [
+      drawPixelBracketPart(dropX - bracketDist, dropY - bLen, P, bLen * 2);
+      drawPixelBracketPart(dropX - bracketDist, dropY - bLen, bLen, P);
+      drawPixelBracketPart(dropX - bracketDist, dropY + bLen - P, bLen, P);
+
+      // Right ]
+      drawPixelBracketPart(dropX + bracketDist - P, dropY - bLen, P, bLen * 2);
+      drawPixelBracketPart(dropX + bracketDist - bLen, dropY - bLen, bLen, P);
+      drawPixelBracketPart(dropX + bracketDist - bLen, dropY + bLen - P, bLen, P);
+
       ctx.restore();
     }
     
-    // If copied a skill, draw a faint aura of the copied class
+    // If copied a skill, draw an authentic orbiting pixel aura
     if (this.stolenType) {
        ctx.save();
-       ctx.beginPath();
-       ctx.arc(this.x, this.y, this.r + 8, 0, Math.PI * 2);
-       ctx.strokeStyle = `rgba(0, 255, 0, ${0.3 + Math.sin(Date.now()/100)*0.2})`;
-       ctx.lineWidth = 2;
-       ctx.stroke();
+       ctx.imageSmoothingEnabled = false;
+       const P = 2.0;
+       const snap = (v) => Math.round(v / P) * P;
+       const auraR = snap(this.r + 10);
+       const auraTime = performance.now() * 0.004;
+
+       for (let i = 0; i < 4; i++) {
+         const aAng = auraTime + (i * Math.PI / 2);
+         const ax = snap(this.x + Math.cos(aAng) * auraR);
+         const ay = snap(this.y + Math.sin(aAng) * auraR);
+
+         ctx.fillStyle = '#05180B';
+         ctx.fillRect(ax - P, ay - P, P * 3, P * 3);
+         ctx.fillStyle = (i % 2 === 0) ? (this.stolenColor || '#00FF64') : '#FFFFFF';
+         ctx.fillRect(ax, ay, P, P);
+       }
        ctx.restore();
     }
     
@@ -1579,7 +2306,7 @@ export class RubbickFighter extends Fighter {
     }
 
     // Draw Stolen Laser Charge Effect
-    if (this.beamCharge > 0) {
+    if (this.beamCharge > 0 && !isInsideEnemyGojoDomain(this)) {
       drawRubbickChargeEffect(ctx, this.x, this.y, this.gunAngle, this.beamCharge, this.r);
     }
 
@@ -1594,7 +2321,7 @@ export class RubbickFighter extends Fighter {
   }
 
   drawBeamOverlay(ctx) {
-    if (this.hp <= 0 || this.beamTimer <= 0) return;
+    if (this.hp <= 0 || this.beamTimer <= 0 || isInsideEnemyGojoDomain(this)) return;
     
     // Smooth fade in over the first 8 frames, and fade out over the last 8 frames
     const fadeOutMultiplier = Math.min(1, this.beamTimer / 8);
@@ -1722,25 +2449,29 @@ export class RubbickFighter extends Fighter {
   }
 
   _drawTeleportEffect(ctx) {
-    if (this._teleportTimer <= 0) return;
+    if (this._teleportTimer <= 0 || isInsideEnemyGojoDomain(this)) return;
     const progress = 1 - (this._teleportTimer / 20);
+    const alpha = 1 - progress;
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.translate(this.x, this.y);
+    ctx.imageSmoothingEnabled = false;
+    const P = 2.0;
+    const snap = (v) => Math.round(v / P) * P;
+    ctx.translate(snap(this.x), snap(this.y));
     
-    ctx.beginPath();
-    ctx.arc(0, 0, this.r + 30 * (1 - progress), 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(0, 255, 100, ${1 - progress})`;
-    ctx.lineWidth = 4 * progress;
-    ctx.stroke();
-    
-    // Vertical rift
-    ctx.beginPath();
-    ctx.moveTo(0, -this.r * 1.5 - 20 * (1 - progress));
-    ctx.lineTo(0, this.r * 1.5 + 20 * (1 - progress));
-    ctx.strokeStyle = `rgba(200, 255, 200, ${1 - progress})`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // Expanding stepped pixel diamond rift
+    const riftR = snap(this.r + 30 * alpha);
+    ctx.fillStyle = `rgba(5, 25, 12, ${(alpha * 0.85).toFixed(2)})`;
+    ctx.fillRect(-riftR - P, -P, (riftR + P) * 2, P * 2);
+    ctx.fillRect(-P, -riftR - P, P * 2, (riftR + P) * 2);
+
+    ctx.fillStyle = `rgba(0, 255, 100, ${alpha.toFixed(2)})`;
+    ctx.fillRect(-riftR, -P * 0.5, riftR * 2, P);
+    ctx.fillRect(-P * 0.5, -riftR, P, riftR * 2);
+
+    // Vertical central white pixel rift
+    const vLen = snap(this.r * 1.5 + 20 * alpha);
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+    ctx.fillRect(-P * 0.5, -vLen, P, vLen * 2);
     
     ctx.restore();
   }
@@ -1782,78 +2513,11 @@ export class RubbickFighter extends Fighter {
   }
 
   _drawDebrisLayer(ctx, drawBehind) {
-    if (!this.orbitingDebris || this.orbitingDebris.length === 0) return;
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    
-    const time = performance.now() / 1000; // time in seconds
-
-    for (let i = 0; i < this.orbitingDebris.length; i++) {
-      const debris = this.orbitingDebris[i];
-      const angle = debris.baseAngle + time * (debris.speed * 60);
-      const rotation = debris.baseRotation + time * (debris.rotationSpeed * 60);
-      const zPhase = debris.baseZPhase + time * (debris.zSpeed * 60);
-
-      // Math.sin(angle) < 0 is top half of 3D orbit (behind body)
-      const isBehind = Math.sin(angle) < 0;
-      if (isBehind !== drawBehind) continue;
-      
-      const dist = debris.dist;
-      const px = Math.cos(angle) * dist;
-      // Orbit Y center is centered at floating torso height (-this.z), with 3D perspective tilt
-      const py = -this.z + Math.sin(angle) * (dist * 0.38) + Math.sin(zPhase) * 5;
-      
-      // 3D Depth Scaling: Rocks behind are smaller (0.70), rocks in front are larger (1.06)
-      const depthScale = 0.88 + Math.sin(angle) * 0.18;
-      
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.rotate(rotation);
-      ctx.scale(depthScale, depthScale);
-      
-      const s = debris.size;
-      
-      // 1. Arcane Glow Aura (Green)
-      ctx.beginPath();
-      ctx.arc(0, 0, s * 1.3, 0, Math.PI * 2);
-      ctx.fillStyle = isBehind ? 'rgba(0, 255, 120, 0.12)' : 'rgba(0, 255, 120, 0.25)';
-      ctx.fill();
-
-      // 2. Base Dark Basalt Rock Polygon
-      ctx.beginPath();
-      ctx.moveTo(-s, -s * 0.5);
-      ctx.lineTo(-s * 0.3, -s * 0.9);
-      ctx.lineTo(s * 0.7, -s * 0.6);
-      ctx.lineTo(s, s * 0.3);
-      ctx.lineTo(s * 0.4, s * 0.8);
-      ctx.lineTo(-s * 0.7, s * 0.7);
-      ctx.closePath();
-      ctx.fillStyle = '#111813';
-      ctx.fill();
-      
-      // 3. Glowing Arcane Facet Texture
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.7, -s * 0.3);
-      ctx.lineTo(-s * 0.2, -s * 0.7);
-      ctx.lineTo(s * 0.5, -s * 0.4);
-      ctx.lineTo(s * 0.1, s * 0.2);
-      ctx.lineTo(-s * 0.4, 0);
-      ctx.closePath();
-      ctx.fillStyle = debris.color;
-      ctx.fill();
-      
-      // 4. Sharp Neon Green Edge Highlight
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = isBehind ? 'rgba(0, 255, 130, 0.5)' : 'rgba(0, 255, 150, 0.9)';
-      ctx.stroke();
-
-      ctx.restore();
-    }
-    ctx.restore();
+    if (isInsideEnemyGojoDomain(this)) return;
+    drawRubbickPixelDebrisLayer(ctx, this, drawBehind);
   }
   drawRageBar(ctx) {
-    if (this.stolenType !== 'berserker') return;
+    if (this.stolenType !== 'berserker' || isInsideEnemyGojoDomain(this)) return;
     if (this.rage <= 0 && this.rageTimer <= 0 && this.rageFadeTimer <= 0) return;
 
     ctx.save();
@@ -1901,26 +2565,117 @@ export class RubbickFighter extends Fighter {
   }
 
   /**
-   * Domain expansion background rendering for Rubbick
+   * Ground telegraph rendering for Rubbick (Arcane Emerald Ground Magic Circles)
+   */
+  drawGroundTelegraph(ctx) {
+    if (this.hp <= 0 || this.isDead || isInsideEnemyGojoDomain(this)) return;
+
+    // 1. Stolen Unlimited Void Wind-up Ground Summoning Circle (Arcane Emerald Green)
+    if (this.stolenType === 'gojo_domain' && this.stolenWindUpTimer > 0) {
+      const windupMax = 60;
+      const progress = Math.min(1.0, Math.max(0, 1 - (this.stolenWindUpTimer / windupMax)));
+
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.scale(1, 0.4); // Isometric perspective
+
+      const ringRadius = 160 * progress;
+
+      // Outer glowing Arcane Emerald ring
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = `rgba(0, 255, 100, ${progress * 0.95})`;
+      ctx.stroke();
+
+      // Inner rotating dashed jade/emerald ring
+      ctx.rotate(Date.now() / 300);
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
+      ctx.setLineDash([15, 15]);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = `rgba(80, 255, 150, ${progress * 1.2})`;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.restore();
+    }
+
+    // 2. Stolen Unlimited Void Active Ground Magic Circle (Continuous Pulsing Arcane Emerald)
+    if ((this.stolenDomainActive || (this.domainActive && this.stolenType === 'gojo_domain')) && this.stolenDomainTimer > 0) {
+      const time = Date.now();
+      const pulse = 0.95 + Math.sin(time * 0.005) * 0.05;
+      const ringRadius = 160 * pulse;
+
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.scale(1, 0.4); // Isometric perspective
+
+      // Outer glowing emerald ring
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(0, 255, 100, 0.85)';
+      ctx.stroke();
+
+      // Inner rotating dashed jade ring
+      ctx.rotate(time / 400);
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
+      ctx.setLineDash([16, 12]);
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = 'rgba(80, 255, 150, 0.80)';
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 8-point rotating arcane glyph star in center
+      ctx.rotate(-time / 250);
+      ctx.beginPath();
+      const starR = ringRadius * 0.55;
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4;
+        const dist = (i % 2 === 0) ? starR : starR * 0.45;
+        const px = Math.cos(a) * dist;
+        const py = Math.sin(a) * dist;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = 'rgba(0, 255, 100, 0.55)';
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Domain expansion background rendering for Rubbick (Unlimited Void in Arcane Emerald Green)
    */
   drawDomainBackground(ctx, isClashSecondary = false) {
-    if (!this.domainActive) return;
+    if (!this.domainActive && !this.stolenDomainActive) return;
+    if (isInsideEnemyGojoDomain(this)) return;
+    if (typeof state !== 'undefined' && state.pixiApp) return;
+    if (this.stolenType === 'gojo_domain' || this.stolenDomainActive) {
+      renderRubbickDomainBackground(this, ctx, isClashSecondary);
+      return;
+    }
     const arena = CONFIG.arena;
     if (!arena) return;
 
     ctx.save();
     // Dark void domain canvas background
-    ctx.fillStyle = '#050510';
+    ctx.fillStyle = '#011106';
     ctx.fillRect(-200, -200, state.canvas.width + 400, state.canvas.height + 400);
 
     // Deep arcane domain background fill
-    ctx.fillStyle = 'rgba(10, 25, 20, 0.95)';
+    ctx.fillStyle = 'rgba(5, 25, 15, 0.95)';
     ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
     ctx.restore();
   }
 
   drawDomainForeground(ctx, isClashSecondary = false) {
-    if (!this.domainActive) return;
+    if (!this.domainActive && !this.stolenDomainActive) return;
   }
 }
 

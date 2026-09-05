@@ -1,4 +1,5 @@
 import { CONFIG } from '../../core/config.js';
+import { isInsideRubbickStolenVoid } from '../../entities/fighters/rubbick/rubbickThemes.js';
 
 let _gojoImage = null;
 let _gojoImageLoading = false;
@@ -102,7 +103,7 @@ export function drawGojoBody(ctx, fighter) {
        (f._counterWindupTimer && f._counterWindupTimer > 0) ||
        f.isCountering)
     );
-    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive);
+    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive || isInsideRubbickStolenVoid(fighter));
     const fadeOpacity = isBarrierSuppressed ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();

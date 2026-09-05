@@ -49,6 +49,14 @@ export const STOLEN_SKILL_CONFIG = {
       damageMultiplier: 1.2,
       cooldownMultiplier: 0.8
     },
+    gojo_red: {
+      damageMultiplier: 1.2,
+      cooldownMultiplier: 0.8
+    },
+    gojo_domain: {
+      cooldownMultiplier: 0.8,
+      durationMultiplier: 0.7
+    },
     normal: {
       damageMultiplier: 1.5,
       cooldownMultiplier: 1.0

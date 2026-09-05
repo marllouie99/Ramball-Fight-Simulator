@@ -1128,6 +1128,9 @@ export function getFighterWeaponInfo(def) {
       return { name: 'DUAL NITEN ICHI-RYU BLADES', category: 'DUAL KATANA // KENJUTSU', desc: 'Master dual swordsmanship with supersonic dashing vacuum slashes.' };
     case 'ruby':
       return { name: 'CRESCENT ROSE SNIPER-SCYTHE', category: 'HYBRID SCYTHE // BALLISTIC', desc: 'Massive high-caliber sniper rifle embedded in a supersonic scythe.' };
+    case 'rubbick':
+    case 'trickster':
+      return { name: 'ARCANE STAFF OF THE GRAND MAGUS', category: 'ARCANE // SPELL STEAL', desc: 'Floating crystal core and gold-inlaid mahogany staff that channels arcane bolts, telekinesis, and stolen enemy skills.' };
     case 'layla':
       return { name: 'MALEFIC ENERGY CANNON', category: 'ENERGY // HYPER-RANGE', desc: 'Long-range particle beam rifle with extreme single-shot execution power.' };
     case 'ichigo':

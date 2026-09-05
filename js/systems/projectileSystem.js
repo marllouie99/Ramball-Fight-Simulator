@@ -15,6 +15,8 @@ import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
 import { ProjectileBehaviorManager } from './projectiles/ProjectileBehaviorManager.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
+import { getRubbickStaffTip } from '../graphics/weapons/rubbickWeaponGraphics.js';
+import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -3130,7 +3132,7 @@ class ProjectileSystem {
           const dx = p.x - f.x;
           const dy = p.y - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
-          const isLimitlessActive = f.domainActive || (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0 || p.targetIsGojoLimitless);
+          const isLimitlessActive = !isInsideRubbickStolenVoid(f) && (f.domainActive || (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0 || p.targetIsGojoLimitless));
           if (distSq <= effectiveInfinityRadius * effectiveInfinityRadius && isLimitlessActive) {
             // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
             if (p.infinityEvaluated === undefined) {
@@ -3186,6 +3188,10 @@ class ProjectileSystem {
               }
 
               p.isFrozenByInfinity = true;
+              if (p.isArcaneBolt) {
+                p.color = '#00E5FF';
+                p.accentColor = '#00E5FF';
+              }
               const freezeDuration = CONFIG.gojo?.infinityFreezeDuration ?? 240;
               p.infinityFreezeTimer = freezeDuration;
               p.life = freezeDuration;
@@ -3518,10 +3524,17 @@ class ProjectileSystem {
     const cosA = Math.cos(gunAngle);
     const sinA = Math.sin(gunAngle);
     
-    // Spawn forward in aim direction from staff/hand
-    const tipForward = fighter.r + 18;
-    const rawStartX = fighter.x + cosA * tipForward;
-    const rawStartY = fighter.y + sinA * tipForward;
+    // Spawn forward in aim direction from staff crystal tip
+    let rawStartX, rawStartY;
+    if (typeof getRubbickStaffTip === 'function') {
+      const tip = getRubbickStaffTip(fighter);
+      rawStartX = tip.x;
+      rawStartY = tip.y;
+    } else {
+      const tipForward = fighter.r + 75;
+      rawStartX = fighter.x + cosA * tipForward;
+      rawStartY = (fighter.y - (fighter.z || 0)) + sinA * tipForward;
+    }
 
     // Safety clamp within arena so it never spawns outside walls
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 // DOMAIN EXPANSION SYSTEM MANAGER
 // ─────────────────────────────────────────────
-import { spawnFloatingText } from '../graphics/particles/floatingText.js';
+import { spawnFloatingText } from '../core/state.js';
 import { spawnSparks } from '../graphics/particles/sparkEffect.js';
 
 /**
@@ -26,7 +26,7 @@ export function isDomainImmune(fighter) {
  */
 export function isAnyDomainActive(state) {
   if (!state || !state.fighters) return false;
-  return state.fighters.some(f => f && f.domainActive && f.hp > 0);
+  return state.fighters.some(f => f && (f.domainActive || f.stolenDomainActive) && f.hp > 0);
 }
 
 /**
@@ -36,7 +36,7 @@ export function isAnyDomainActive(state) {
  */
 export function getActiveDomains(state) {
   if (!state || !state.fighters) return [];
-  return state.fighters.filter(f => f && f.domainActive && f.hp > 0);
+  return state.fighters.filter(f => f && (f.domainActive || f.stolenDomainActive) && f.hp > 0);
 }
 
 /**
@@ -55,7 +55,7 @@ export function isMultiDomainClash(state) {
  */
 export function isAnyFighterChannelingDomain(state) {
   if (!state || !state.fighters) return false;
-  return state.fighters.some(f => f && f.hp > 0 && (f.isChannelingDomain || f.isChannelingDomainExpansion));
+  return state.fighters.some(f => f && f.hp > 0 && (f.isChannelingDomain || f.isChannelingDomainExpansion || (f.characterId === 'rubbick' && f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0)));
 }
 
 /**

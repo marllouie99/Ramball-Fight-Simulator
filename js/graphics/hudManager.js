@@ -1499,6 +1499,18 @@ function _getDimElements() {
         if (f.isEnraged) {
           info.push(`<b>ENRAGED:</b> Active <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
+      } else if (f.characterId === 'rubbick' || f.type === 'rubbick' || f.characterId === 'trickster' || f.type === 'trickster') {
+        const bounceMax = (CONFIG.rubbick || CONFIG.trickster)?.bounceCount || 4;
+        info.push(`<b>Bounces:</b> ${bounceMax}`);
+        if (f.stolenType) {
+          const stolenName = (f.stolenType === 'gojo' ? 'HOLLOW PURPLE' : (f.stolenType === 'gojo_red' ? 'REVERSAL RED' : (f.stolenType === 'gojo_domain' ? 'UNLIMITED VOID' : (f.stolenType === 'sukuna' ? 'DIVINE FLAME' : f.stolenType.toUpperCase()))));
+          info.push(`<b>Stolen:</b> <span style="color: #00FF64;">${stolenName}</span>`);
+        } else {
+          info.push(`<b>Stolen:</b> NONE`);
+        }
+        if (f.tkTimer > 0) {
+          info.push(`<b>TK:</b> <span style="color: #8A2BE2;">LIFTING</span>`);
+        }
       } else if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
         const liveCount = state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0;
         info.push(`<b>Illusions:</b> ${liveCount}`);

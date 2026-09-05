@@ -3,6 +3,7 @@ import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index.js';
 import { applyCameraToCtx, worldToScreen } from '../../systems/cameraSystem.js';
+import { isInsideRubbickStolenVoid } from '../../entities/fighters/rubbick/rubbickThemes.js';
 
 // ──────────────────────────────────────────
 // SKETCHY BORDER HELPERS
@@ -887,7 +888,7 @@ export function excludeGojoInfinityFromDim(ctx) {
     if (!f || f.hp <= 0) continue;
     const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
     if (!isGojo) continue;
-    const isBarrierSuppressed = Boolean(f.isTargetOfAmbush || f.caughtInSaitamaCounter || isSaitamaCounterActive || (f.infinityFadeOpacity !== undefined && f.infinityFadeOpacity <= 0.005));
+    const isBarrierSuppressed = Boolean(f.isTargetOfAmbush || f.caughtInSaitamaCounter || isSaitamaCounterActive || (f.infinityFadeOpacity !== undefined && f.infinityFadeOpacity <= 0.005) || isInsideRubbickStolenVoid(f));
     if (isBarrierSuppressed) continue;
     const isLimitlessActive = (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0);
     if (!isLimitlessActive) continue;
@@ -1204,6 +1205,78 @@ export function drawGojoDomainDimScreen() {
   ctx.restore();
 
   state.globalDimEdgeColor = `rgba(0, 5, 20, ${opacity * 0.95})`;
+}
+
+let currentRubbickDomainDimOpacity = 0;
+
+/**
+ * Draws a dark arcane emerald green dim screen overlay when Rubbick's stolen Domain Expansion (Unlimited Void) is active or channeling.
+ * This dim overlay is NOT clipped to the arena — it spreads across the full screen for cinematic immersion.
+ * The domain IMAGE itself remains clipped inside the arena via WebGL masking in hybridEnvironmentRenderer.
+ */
+export function drawRubbickDomainDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const rubbickFighter = state.fighters?.find(f =>
+    f && (f.characterId === 'rubbick' || f.type === 'rubbick' || f._def?.id === 'rubbick') &&
+    ((f.stolenDomainActive && (f.stolenDomainTimer || 0) > 0) || (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0))
+  );
+
+  let targetOpacity = 0;
+  if (rubbickFighter) {
+    if (rubbickFighter.stolenDomainActive) {
+      targetOpacity = 0.72;
+    } else if (rubbickFighter.stolenType === 'gojo_domain' && rubbickFighter.stolenWindUpTimer > 0) {
+      const windupMax = 60;
+      const progress = Math.min(1.0, Math.max(0, 1 - (rubbickFighter.stolenWindUpTimer / windupMax)));
+      targetOpacity = 0.25 + progress * 0.45;
+    }
+  }
+
+  // Smoothly interpolate
+  if (targetOpacity > currentRubbickDomainDimOpacity) {
+    currentRubbickDomainDimOpacity += (targetOpacity - currentRubbickDomainDimOpacity) * 0.08;
+  } else {
+    currentRubbickDomainDimOpacity += (targetOpacity - currentRubbickDomainDimOpacity) * 0.06;
+  }
+
+  if (currentRubbickDomainDimOpacity < 0.01) {
+    currentRubbickDomainDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentRubbickDomainDimOpacity;
+
+  ctx.save();
+  // Reset transform to identity screen space so full-screen dim doesn't shift with camera shake
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Base dark overlay
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Deep cosmic dark emerald radial gradient centered on Rubbick
+  const center = rubbickFighter ? worldToScreen(rubbickFighter.x, (rubbickFighter.y - (rubbickFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = center.x;
+  const cy = center.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, 'rgba(0, 255, 100, 0.55)');       // Bright arcane emerald core
+  grad.addColorStop(0.15, 'rgba(0, 180, 70, 0.45)');      // Deep emerald halo
+  grad.addColorStop(0.35, 'rgba(0, 90, 35, 0.30)');       // Dark arcane green ring
+  grad.addColorStop(0.60, 'rgba(2, 30, 12, 0.15)');       // Deep space green fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
+
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(0, 20, 8, ${opacity * 0.95})`;
 }
 
 let currentSukunaDomainDimOpacity = 0;

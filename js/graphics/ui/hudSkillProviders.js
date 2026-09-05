@@ -1312,32 +1312,144 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const themeColor = f.color || '#00FF64';
     const rcfg = CONFIG.rubbick || CONFIG.trickster;
 
-    // Skill 1: Telekinesis
-    const tkMax = rcfg?.telekinesisCooldown || 400;
-    const tkTimer = f.telekinesisCooldown !== undefined ? f.telekinesisCooldown : tkMax;
-    let tkPct = f.tkTimer > 0 ? 100 : Math.max(0, Math.min(100, (1 - (tkTimer / tkMax)) * 100));
-    const tkLabel = f.tkTimer > 0 ? 'TELEKINESIS (ACTIVE)' : 'TELEKINESIS';
+    // Helper for stolen ability display names
+    const getStolenSkillName = (type) => {
+      switch (type) {
+        case 'gojo': return 'HOLLOW PURPLE';
+        case 'gojo_red': return 'REVERSAL RED';
+        case 'gojo_domain': return 'UNLIMITED VOID';
+        case 'sukuna': return 'DIVINE FLAME';
+        case 'yuta': return 'PURE LOVE BEAM';
+        case 'cronos': return 'TIME SPHERE';
+        case 'ruby': return 'SCYTHE PULL';
+        case 'zeus': return 'ARCANE STORM';
+        case 'laser': return 'SOLAR BEAM';
+        case 'musashi': return 'PHANTOM FLURRY';
+        case 'berserker': return 'ARCANE RAGE';
+        case 'bomber': return 'BOUNCING BOMB';
+        case 'grenadier': return 'POISON GRENADE';
+        case 'normal': return 'EXECUTE SHOT';
+        case 'darkslategray': return 'SHURIKEN';
+        case 'orange': return 'FLAMETHROWER';
+        case 'gunslinger': return 'RAPID BULLETS';
+        default: return `STOLEN: ${String(type).toUpperCase()}`;
+      }
+    };
 
-    // Skill 2: Spell Steal / Stolen Ability
+    // ─────────────────────────────────────────────
+    // 1. Ultimate: Spell Steal / Stolen Ability
+    // ─────────────────────────────────────────────
     let stealPct = 0;
     let stealLabel = 'SPELL STEAL';
     let stealReady = false;
 
     if (f.stolenType) {
-      const durMax = rcfg?.spellStealDuration || 1000;
-      stealPct = Math.max(0, Math.min(100, (f.stolenTimer / durMax) * 100));
-      stealLabel = f.stolenType === 'gojo' ? 'HOLLOW PURPLE (STOLEN)' : `STOLEN: ${f.stolenType.toUpperCase()}`;
-      stealReady = true;
+      const baseName = getStolenSkillName(f.stolenType);
+      const activeProjectiles = typeof getProjectiles === 'function'
+        ? getProjectiles()
+        : (state.projectiles || (typeof state.getProjectiles === 'function' ? state.getProjectiles() : []));
+      const purpleOrb = activeProjectiles?.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0 && p.owner === state.fighters?.indexOf(f));
+
+      if (f.stolenWindUpTimer > 0) {
+        // Windup / Charging phase (progresses from 0% to 100% as cast prepares)
+        const windupMax = (f.stolenType === 'gojo' ? 45 : (f.stolenType === 'gojo_red' ? 35 : (f.stolenType === 'gojo_domain' ? 60 : (f.stolenType === 'normal' ? (CONFIG.sharpshooter?.executeWindupFrames || 30) : 30))));
+        stealPct = Math.max(0, Math.min(100, (1 - (f.stolenWindUpTimer / windupMax)) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (CHARGING)`;
+      } else if (f.stolenDomainActive && f.stolenDomainTimer > 0) {
+        // Stolen Unlimited Void active duration (drains from 100% down to 0%)
+        const domMax = f.stolenDomainMaxTimer || 210;
+        stealPct = Math.max(0, Math.min(100, (f.stolenDomainTimer / domMax) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (ACTIVE)`;
+      } else if (f.beamTimer > 0) {
+        // Solar Beam continuous channel (drains from 100% down to 0%)
+        const beamMax = CONFIG.laser?.beamDuration || 100;
+        stealPct = Math.max(0, Math.min(100, (f.beamTimer / beamMax) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (FIRING)`;
+      } else if (f.stormActive && f.stormTimer > 0) {
+        // Zeus Arcane Storm active duration (drains from 100% down to 0%)
+        const stormMax = (CONFIG.zeus?.stormDuration || 300) * (rcfg?.stormDurationMultiplier || 1);
+        stealPct = Math.max(0, Math.min(100, (f.stormTimer / stormMax) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (ACTIVE)`;
+      } else if (f.sphereActive && f.sphereTimer > 0) {
+        // Cronos Time Sphere active duration (drains from 100% down to 0%)
+        const sphereMax = CONFIG.cronos?.sphereDuration || 300;
+        stealPct = Math.max(0, Math.min(100, (f.sphereTimer / sphereMax) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (ACTIVE)`;
+      } else if (f.isInRage && f.rageTimer > 0) {
+        // Berserker Arcane Rage active duration (drains from 100% down to 0%)
+        const rageMax = CONFIG.berserker?.rageDuration || 300;
+        stealPct = Math.max(0, Math.min(100, (f.rageTimer / rageMax) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (ACTIVE)`;
+      } else if (f.flurryHitsLeft > 0) {
+        // Musashi Phantom Flurry active hits (drains from 100% down to 0%)
+        stealPct = Math.max(0, Math.min(100, (f.flurryHitsLeft / 5) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (ACTIVE)`;
+      } else if (f.activePullActive) {
+        // Ruby Scythe Pull active hook
+        stealPct = 100;
+        stealReady = false;
+        stealLabel = `${baseName} (ACTIVE)`;
+      } else if (purpleOrb) {
+        // Gojo Hollow Purple orb traveling through arena (drains from 100% down to 0%)
+        const orbMaxLife = CONFIG.gojo?.purpleLife || 250;
+        stealPct = Math.max(0, Math.min(100, (purpleOrb.life / orbMaxLife) * 100));
+        stealReady = false;
+        stealLabel = `${baseName} (ACTIVE)`;
+      } else if (f.stolenSkillCooldown > 0) {
+        // Internal cooldown for spammable stolen skills (progresses from 0% to 100%)
+        const cdMax = rcfg?.attackCooldown || 100;
+        stealPct = Math.max(0, Math.min(100, (1 - (f.stolenSkillCooldown / cdMax)) * 100));
+        stealReady = stealPct >= 99;
+        stealLabel = `${baseName} (COOLDOWN)`;
+      } else {
+        // Stolen skill is ready and held (drains as the buff timer ticks down towards expiration)
+        const durMax = rcfg?.spellStealDuration || 1000;
+        const remaining = f.stolenTimer !== undefined ? f.stolenTimer : durMax;
+        stealPct = Math.max(0, Math.min(100, (remaining / durMax) * 100));
+        stealReady = true;
+        stealLabel = `${baseName} (READY)`;
+      }
     } else {
+      // No spell stolen: Spell Steal cooldown charges up from 0% to 100%
       const stealMax = rcfg?.spellStealCooldown || 700;
       const stealTimer = f.spellStealCooldown !== undefined ? f.spellStealCooldown : stealMax;
       stealPct = Math.max(0, Math.min(100, (1 - (stealTimer / stealMax)) * 100));
       stealReady = stealPct >= 99;
+      stealLabel = 'SPELL STEAL';
+    }
+
+    // ─────────────────────────────────────────────
+    // 2. Skill 1: Telekinesis
+    // ─────────────────────────────────────────────
+    const tkMax = rcfg?.telekinesisCooldown || 400;
+    const tkTotalDuration = rcfg?.telekinesisDuration || 90;
+    let tkPct = 0;
+    let tkLabel = 'TELEKINESIS';
+    let tkReady = false;
+
+    if (f.tkTimer > 0) {
+      // Actively lifting/holding target in air (drains from 100% down to 0% until slam)
+      tkPct = Math.max(0, Math.min(100, (f.tkTimer / tkTotalDuration) * 100));
+      tkReady = false;
+      tkLabel = 'TELEKINESIS (LIFTING)';
+    } else {
+      // Cooldown phase (progresses from 0% up to 100%)
+      const tkTimer = f.telekinesisCooldown !== undefined ? f.telekinesisCooldown : 0;
+      tkPct = Math.max(0, Math.min(100, (1 - (tkTimer / tkMax)) * 100));
+      tkReady = tkPct >= 99;
+      tkLabel = 'TELEKINESIS';
     }
 
     return [
-      { id: 'spellsteal', pct: stealPct, ready: stealReady, color: themeColor, label: stealLabel },
-      { id: 'telekinesis', pct: tkPct, ready: tkPct >= 99 || f.tkTimer > 0, color: themeColor, label: tkLabel }
+      { id: 'spellsteal',  pct: stealPct, ready: stealReady, color: themeColor, label: stealLabel },
+      { id: 'telekinesis', pct: tkPct,    ready: tkReady,    color: themeColor, label: tkLabel }
     ];
   }
 

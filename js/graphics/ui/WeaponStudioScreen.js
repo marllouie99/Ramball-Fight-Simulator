@@ -37,6 +37,7 @@ function initCustomizations() {
       toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      rubbick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       uryu: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       ulquiorra: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
@@ -46,6 +47,9 @@ function initCustomizations() {
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+  }
+  if (!state.weaponCustomizations.rubbick) {
+    state.weaponCustomizations.rubbick = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
   if (!state.weaponCustomizations.ulquiorra) {
     state.weaponCustomizations.ulquiorra = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
@@ -115,6 +119,7 @@ export function drawWeaponStudioScreen() {
     { key: 'toji', label: 'TOJI' },
     { key: 'cronos', label: 'CRONOS' },
     { key: 'ruby', label: 'RUBY' },
+    { key: 'rubbick', label: 'RUBBICK' },
     { key: 'uryu', label: 'URYU' },
     { key: 'ulquiorra', label: 'ULQUIORRA' },
     { key: 'nanami', label: 'NANAMI' },
@@ -123,15 +128,15 @@ export function drawWeaponStudioScreen() {
     { key: 'cj', label: 'CJ' }
   ];
 
-  // Row 1: First 5 weapons, Row 2: Remaining
-  const row1 = weapons.slice(0, 5);
-  const row2 = weapons.slice(5);
+  // Row 1: First 6 weapons, Row 2: Remaining 6 weapons
+  const row1 = weapons.slice(0, 6);
+  const row2 = weapons.slice(6);
 
-  const r1W = 120;
-  const r1H = 22;
-  const r1Spacing = 6;
-  const r1TotalW = row1.length * r1W + (row1.length - 1) * r1Spacing;
-  let r1StartX = (canvas.width - r1TotalW) / 2;
+  const rW = 80;
+  const rH = 22;
+  const rSpacing = 5;
+  const rTotalW = row1.length * rW + (row1.length - 1) * rSpacing;
+  let r1StartX = (canvas.width - rTotalW) / 2;
 
   row1.forEach((w) => {
     const isSelected = activeWeaponKey === w.key;
@@ -147,7 +152,7 @@ export function drawWeaponStudioScreen() {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.lineWidth = 1;
     }
-    drawChamferedRect(ctx, r1StartX, 88, r1W, r1H, 4);
+    drawChamferedRect(ctx, r1StartX, 88, rW, rH, 4);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
@@ -156,9 +161,9 @@ export function drawWeaponStudioScreen() {
     ctx.font = '900 9.5px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(w.label, r1StartX + r1W / 2, 88 + r1H / 2);
+    ctx.fillText(w.label, r1StartX + rW / 2, 88 + rH / 2);
 
-    _registerButton(r1StartX, 88, r1W, r1H, () => {
+    _registerButton(r1StartX, 88, rW, rH, () => {
       state.studioSelectedWeapon = w.key;
       state.studioSelectedDetail = null;
       isDraggingBase = false;
@@ -166,15 +171,11 @@ export function drawWeaponStudioScreen() {
       activeDragFinger = -1;
       activeDragType = null;
     });
-    r1StartX += r1W + r1Spacing;
+    r1StartX += rW + rSpacing;
   });
 
-  // Row 2: Remaining 3 weapons
-  const r2W = 158;
-  const r2H = 22;
-  const r2Spacing = 6;
-  const r2TotalW = row2.length * r2W + (row2.length - 1) * r2Spacing;
-  let r2StartX = (canvas.width - r2TotalW) / 2;
+  // Row 2: Remaining 6 weapons
+  let r2StartX = (canvas.width - rTotalW) / 2;
 
   row2.forEach((w) => {
     const isSelected = activeWeaponKey === w.key;
@@ -190,7 +191,7 @@ export function drawWeaponStudioScreen() {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.lineWidth = 1;
     }
-    drawChamferedRect(ctx, r2StartX, 114, r2W, r2H, 4);
+    drawChamferedRect(ctx, r2StartX, 114, rW, rH, 4);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
@@ -199,9 +200,9 @@ export function drawWeaponStudioScreen() {
     ctx.font = '900 9.5px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(w.label, r2StartX + r2W / 2, 114 + r2H / 2);
+    ctx.fillText(w.label, r2StartX + rW / 2, 114 + rH / 2);
 
-    _registerButton(r2StartX, 114, r2W, r2H, () => {
+    _registerButton(r2StartX, 114, rW, rH, () => {
       state.studioSelectedWeapon = w.key;
       state.studioSelectedDetail = null;
       isDraggingBase = false;
@@ -209,7 +210,7 @@ export function drawWeaponStudioScreen() {
       activeDragFinger = -1;
       activeDragType = null;
     });
-    r2StartX += r2W + r2Spacing;
+    r2StartX += rW + rSpacing;
   });
 
   // ── Tier 2: Precision Viewport Stage ──
@@ -307,6 +308,7 @@ export function drawWeaponStudioScreen() {
       let offsetX = -40;
       if (activeWeaponKey === 'cronos') offsetX = -55;
       else if (activeWeaponKey === 'ruby') offsetX = -75;
+      else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
 
       const baseLx = offsetX + custom.offsetX;
       const baseLy = custom.offsetY;
@@ -840,6 +842,7 @@ if (typeof window !== 'undefined') {
       let offsetX = -40;
       if (activeWeaponKey === 'cronos') offsetX = -55;
       else if (activeWeaponKey === 'ruby') offsetX = -75;
+      else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
 
       const baseLx = offsetX + custom.offsetX;
       const baseLy = custom.offsetY;
@@ -901,6 +904,7 @@ if (typeof window !== 'undefined') {
       let offsetX = -40;
       if (activeWeaponKey === 'cronos') offsetX = -55;
       else if (activeWeaponKey === 'ruby') offsetX = -75;
+      else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
 
       if (isDraggingBase && state.studioSelectedDetail === 'position') {
         custom.offsetX = localX - offsetX;

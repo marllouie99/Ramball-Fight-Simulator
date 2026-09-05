@@ -10,7 +10,7 @@ import {
   drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
-  drawSparkEffects, drawPurpleDimScreen, drawGojoDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
+  drawSparkEffects, drawPurpleDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
@@ -315,6 +315,7 @@ export function renderGame() {
         drawCjBaguvixDimScreen(); // 2D CJ BAGUVIX God Mode dark Grove Street emerald green radial dim overlay
         drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
         drawGojoDomainDimScreen(); // Dark cosmic blue dim overlay when Gojo's Unlimited Void domain is active (full-screen, unclipped)
+        drawRubbickDomainDimScreen(); // Dark cosmic emerald green dim overlay when Rubbick's stolen Unlimited Void domain is active (full-screen, unclipped)
         drawSukunaDomainDimScreen(); // Dark crimson dim overlay when Sukuna's Malevolent Shrine domain is active (full-screen, unclipped)
         drawYutaDomainDimScreen(); // Dark cursed purple dim overlay when Yuta's domain is active (full-screen, unclipped)
         drawMahitoDomainDimScreen(); // Dark teal dim overlay when Mahito's Self-Embodiment of Perfection domain is active (full-screen, unclipped)
@@ -341,7 +342,10 @@ export function renderGame() {
         state.ctx.save();
         applyCameraToCtx(state.ctx);
 
-        const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
+        const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (
+          ((f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive) ||
+          ((f.type === 'rubbick' || f.characterId === 'rubbick') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain')))
+        ));
 
         if (!isGojoDomainActive) {
           drawFlames(); // Draw all flames to offscreen canvas (batched for performance)

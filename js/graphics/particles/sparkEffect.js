@@ -738,51 +738,59 @@ export function drawSparkEffects(layer = 'all') {
         ctx.stroke();
         
       } else if (effect.type === 'arcaneGroundScorch') {
-        // Massive, highly-detailed organic scorch mark burned into the ground
-        if (!isGamePlay) ctx.globalCompositeOperation = 'multiply';
-        
-        ctx.translate(effect.x, effect.y);
+        // ── PIXEL ART ARCANE GROUND SCORCH & RUNIC IMPACT CRATER ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.5;
+        const snap = (v) => Math.round(v / P) * P;
+        const alpha = Math.max(0, Math.min(1.0, effect.life));
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
 
-        // Deep black/blue burned organic polygon
-        ctx.fillStyle = `rgba(10, 15, 30, ${effect.life * 0.8})`;
-        ctx.beginPath();
+        // A. Stepped Pixel Scorched Crater Polygon
         if (effect.points && effect.points.length > 0) {
-          ctx.moveTo(effect.points[0].x, effect.points[0].y);
+          ctx.fillStyle = `rgba(8, 18, 12, ${(alpha * 0.85).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(snap(cx + effect.points[0].x), snap(cy + effect.points[0].y));
           for (let i = 1; i < effect.points.length; i++) {
-            ctx.lineTo(effect.points[i].x, effect.points[i].y);
+            ctx.lineTo(snap(cx + effect.points[i].x), snap(cy + effect.points[i].y));
           }
+          ctx.closePath();
+          ctx.fill();
+
+          // Dark outer pixel border
+          ctx.strokeStyle = `rgba(3, 10, 6, ${(alpha * 0.95).toFixed(3)})`;
+          ctx.lineWidth = P;
+          ctx.stroke();
         }
-        ctx.closePath();
-        ctx.fill();
-        
-        // Inner molten branching cracks (glowing blue/cyan)
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = `rgba(40, 200, 255, ${effect.life * 0.8})`;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 1 + effect.life * 1.5;
-        
-        ctx.beginPath();
-        if (effect.cracks) {
+
+        // B. Glowing Pixelated Arcane Fractures & Rune Cracks
+        if (effect.cracks && effect.cracks.length > 0) {
           for (const path of effect.cracks) {
-            if (path.length > 0) {
-              ctx.moveTo(path[0].x, path[0].y);
-              for (let i = 1; i < path.length; i++) {
-                ctx.lineTo(path[i].x, path[i].y);
+            if (!path || path.length === 0) continue;
+            for (let i = 0; i < path.length; i++) {
+              const px = snap(cx + path[i].x);
+              const py = snap(cy + path[i].y);
+              
+              // Dark outline pixel
+              ctx.fillStyle = `rgba(0, 30, 15, ${(alpha * 0.70).toFixed(3)})`;
+              ctx.fillRect(px - P, py - P, P * 3, P * 3);
+
+              // Glowing emerald fracture pixel
+              ctx.fillStyle = (i % 2 === 0) 
+                ? `rgba(0, 255, 120, ${(alpha * 0.90).toFixed(3)})`
+                : `rgba(0, 220, 180, ${(alpha * 0.80).toFixed(3)})`;
+              ctx.fillRect(px, py, P, P);
+
+              // Specular white ember in center
+              if (i === 0 || i === path.length - 1) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`;
+                ctx.fillRect(px, py, P * 0.8, P * 0.8);
               }
             }
           }
         }
-        ctx.stroke();
-        
-        // Darker outer cracks for depth
-        ctx.strokeStyle = `rgba(0, 10, 40, ${effect.life * 0.9})`; // Dark blue/black
-        ctx.lineWidth = 2 + effect.life * 2;
-        if (!isGamePlay) ctx.globalCompositeOperation = 'multiply';
-        ctx.stroke();
-        
-        ctx.translate(-effect.x, -effect.y);
-        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
       } else if (effect.type === 'crimsonLightningRing' || effect.type === 'rubbickLightningRing' || effect.type === 'tricksterLightningRing') {
         const isRubbick = effect.type === 'rubbickLightningRing' || effect.type === 'tricksterLightningRing';
         // Expanding jagged crimson shockwave ring
@@ -877,26 +885,47 @@ export function drawSparkEffects(layer = 'all') {
           }
         }
       } else if (effect.type === 'arcaneShockwave') {
-        // Expanding dark green shockwave ring
-        effect.size += (effect.targetSize - effect.size) * 0.06; // Much slower, graceful expansion
-        
-        ctx.globalCompositeOperation = 'lighter'; // Neon additive edge
-        
-        // Simulated glow ring
-        ctx.strokeStyle = effect.color.replace('1)', `${effect.life * 0.25})`);
-        ctx.lineWidth = 12 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
+        // ── PIXEL ART ARCANE SHOCKWAVE EXPANDING RING ──
+        effect.size += (effect.targetSize - effect.size) * 0.08;
+        const alpha = Math.min(1.0, effect.life * 1.25);
+        const P = 2.5;
+        const snap = (v) => Math.round(v / P) * P;
+        const radius = Math.max(P * 2, snap(effect.size));
+        const steps = Math.max(28, Math.min(60, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
 
-        // Main ring
-        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
-        ctx.lineWidth = 6 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        ctx.globalCompositeOperation = 'source-over';
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+
+        const colBorder = `rgba(5, 20, 10, ${(alpha * 0.90).toFixed(3)})`;
+        const colOuter = effect.color || `rgba(0, 255, 120, ${(alpha * 0.95).toFixed(3)})`;
+        const colMid = `rgba(160, 255, 200, ${(alpha * 0.88).toFixed(3)})`;
+        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+
+        for (let st = 0; st < steps; st++) {
+          const ang = (st / steps) * Math.PI * 2;
+          const cosA = Math.cos(ang);
+          const sinA = Math.sin(ang);
+
+          // 1. Dark Outline Shell (#05140A)
+          const r0 = snap(radius);
+          ctx.fillStyle = colBorder;
+          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+
+          // 2. Primary Emerald/Cyan Pixel Ring
+          ctx.fillStyle = colOuter;
+          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+
+          // 3. Mid Mint Ring
+          const r1 = snap(radius * 0.78);
+          ctx.fillStyle = colMid;
+          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+
+          // 4. Inner White-Hot Specular Ring
+          const r2 = snap(radius * 0.50);
+          ctx.fillStyle = colCore;
+          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
+        }
+        ctx.restore();
       } else if (effect.type === 'mahoragaShoutShockwave') {
         // Expanding golden & silver roar shockwave ring
         if (effect.targetSize) {
@@ -1384,6 +1413,7 @@ export function drawSparkEffects(layer = 'all') {
         const halfArc = 0.38; // ~44-degree total cone opening angle
         const progress = 1.0 - effect.life; // 0 to 1
         const alpha = Math.sin(effect.life * Math.PI);
+        const isGreen = effect.colorTheme === 'green' || effect.isRubbick;
 
         if (alpha > 0.01) {
           ctx.save();
@@ -1401,6 +1431,14 @@ export function drawSparkEffects(layer = 'all') {
           const stepSize = P * 2; // 8px steps along X
           const numSteps = Math.ceil(currentReach / stepSize);
 
+          const glowCol = isGreen ? `rgba(0, 255, 100, ${(0.22 * alpha).toFixed(3)})` : `rgba(255, 0, 51, ${(0.22 * alpha).toFixed(3)})`;
+          const borderCol = isGreen ? '#05180B' : '#110204';
+          const rimCol = isGreen ? `rgba(0, 255, 100, ${(0.92 * alpha).toFixed(3)})` : `rgba(255, 0, 51, ${(0.92 * alpha).toFixed(3)})`;
+          const coreCol = isGreen ? `rgba(0, 122, 51, ${(0.75 * alpha).toFixed(3)})` : `rgba(139, 0, 20, ${(0.75 * alpha).toFixed(3)})`;
+          const centerCol2 = isGreen ? `rgba(180, 255, 210, ${(0.90 * alpha).toFixed(3)})` : `rgba(255, 140, 160, ${(0.90 * alpha).toFixed(3)})`;
+          const rayCol2 = isGreen ? `rgba(180, 255, 210, ${(0.80 * alpha).toFixed(3)})` : `rgba(255, 210, 220, ${(0.80 * alpha).toFixed(3)})`;
+          const emberCol2 = isGreen ? '#00FF64' : '#FF0033';
+
           for (let s = 0; s < numSteps; s++) {
             const gx = s * stepSize;
             if (gx > currentReach) break;
@@ -1408,30 +1446,30 @@ export function drawSparkEffects(layer = 'all') {
             // Clean straight linear boundary (strictly no wavy flutter)
             const halfW = Math.max(P * 2, snap(gx * Math.tan(halfArc)));
 
-            // Layer 1: Atmospheric Glow (Translucent Crimson Field)
-            ctx.fillStyle = `rgba(255, 0, 51, ${(0.22 * alpha).toFixed(3)})`;
+            // Layer 1: Atmospheric Glow (Translucent Field)
+            ctx.fillStyle = glowCol;
             ctx.fillRect(gx, -halfW - P * 2, stepSize, halfW * 2 + P * 4);
 
             // Layer 2: Dark Manga Ink Border Rails (Top & Bottom steps)
-            ctx.fillStyle = '#110204';
+            ctx.fillStyle = borderCol;
             ctx.fillRect(gx, -halfW - P, stepSize, P);
             ctx.fillRect(gx, halfW, stepSize, P);
 
-            // Layer 3: Neon Red Flame Rim (Top & Bottom inner steps)
-            ctx.fillStyle = `rgba(255, 0, 51, ${(0.92 * alpha).toFixed(3)})`;
+            // Layer 3: Neon Flame Rim (Top & Bottom inner steps)
+            ctx.fillStyle = rimCol;
             ctx.fillRect(gx, -halfW, stepSize, P * 2);
             ctx.fillRect(gx, halfW - P * 2, stepSize, P * 2);
 
-            // Layer 4: Deep Crimson Cursed Core
+            // Layer 4: Deep Cursed Core
             const coreHeight = Math.max(0, halfW * 2 - P * 4);
             if (coreHeight > 0) {
-              ctx.fillStyle = `rgba(139, 0, 20, ${(0.75 * alpha).toFixed(3)})`;
+              ctx.fillStyle = coreCol;
               ctx.fillRect(gx, -halfW + P * 2, stepSize, coreHeight);
             }
 
             // Layer 5: Straight Piercing White-Hot Centerline Beam
             const centerW = Math.max(P, snap(halfW * 0.30));
-            ctx.fillStyle = (s % 2 === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : `rgba(255, 140, 160, ${(0.90 * alpha).toFixed(3)})`;
+            ctx.fillStyle = (s % 2 === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : centerCol2;
             ctx.fillRect(gx, -centerW * 0.5, stepSize, centerW);
           }
 
@@ -1450,7 +1488,7 @@ export function drawSparkEffects(layer = 'all') {
             const maxRayLen = currentReach * (rIdx % 2 === 0 ? 0.95 : 0.80);
             const raySteps = Math.floor(maxRayLen / (P * 2));
 
-            ctx.fillStyle = (rayAng === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : `rgba(255, 210, 220, ${(0.80 * alpha).toFixed(3)})`;
+            ctx.fillStyle = (rayAng === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : rayCol2;
 
             for (let st = 1; st <= raySteps; st++) {
               const d = st * (P * 2);
@@ -1464,7 +1502,7 @@ export function drawSparkEffects(layer = 'all') {
           const capHalfW = snap(currentReach * Math.tan(halfArc));
           ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
           ctx.fillRect(snap(currentReach), -capHalfW, P, capHalfW * 2);
-          ctx.fillStyle = '#110204';
+          ctx.fillStyle = borderCol;
           ctx.fillRect(snap(currentReach) + P, -capHalfW, P, capHalfW * 2);
 
           // ── 4. STRAIGHT STEPPED PIXEL EMBERS ──
@@ -1474,7 +1512,7 @@ export function drawSparkEffects(layer = 'all') {
             const ebAng = ((eb % 5) - 2) * (halfArc * 0.28);
             const ebX = snap(Math.cos(ebAng) * ebDist);
             const ebY = snap(Math.sin(ebAng) * ebDist);
-            ctx.fillStyle = (eb % 2 === 0) ? '#FFFFFF' : '#FF0033';
+            ctx.fillStyle = (eb % 2 === 0) ? '#FFFFFF' : emberCol2;
             ctx.fillRect(ebX, ebY, P, P);
           }
 
@@ -1547,65 +1585,139 @@ export function drawSparkEffects(layer = 'all') {
 
         ctx.restore();
       } else if (effect.type === 'arcaneFlash') {
-        // Bright radial flash beneath feet on landing
-        effect.size += (effect.targetSize - effect.size) * 0.06; // Slower size blooming
-
-        // Cache gradient per quantized life step (unit radius, reused via translate+scale below)
-        const lifeStep = Math.round(effect.life * 20) / 20;
-        const gradient = getUnitRadialGradient(ctx, `arcaneFlash_${lifeStep}`, [
-          [0, `rgba(200, 255, 230, ${lifeStep * 0.9})`],
-          [0.3, `rgba(100, 255, 180, ${lifeStep * 0.6})`],
-          [0.7, `rgba(30, 200, 100, ${lifeStep * 0.3})`],
-          [1, 'rgba(30, 200, 100, 0)']
-        ]);
-
-        ctx.globalCompositeOperation = 'lighter';
+        // ── PIXEL ART ARCANE STARBURST FLASH ──
+        effect.size += (effect.targetSize - effect.size) * 0.12;
         ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.scale(effect.size, effect.size);
-        ctx.beginPath();
-        ctx.arc(0, 0, 1, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.restore();
-        ctx.globalCompositeOperation = 'source-over';
-      } else if (effect.type === 'arcaneGlyph') {
-        // Floating arcane glyph fragments - diamonds, triangles, squares
-        ctx.translate(effect.x, effect.y);
-        effect.rotation += effect.rotationSpeed;
-        ctx.rotate(effect.rotation);
-        
-        // ctx.globalCompositeOperation = 'lighter'; // Removed so it shows up on white backgrounds!
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = effect.color.replace('1)', `${effect.life})`);
-        const s = effect.size;
-        ctx.beginPath();
-        
-        if (effect.glyphShape === 'diamond') {
-          ctx.moveTo(0, -s);
-          ctx.lineTo(s * 0.6, 0);
-          ctx.lineTo(0, s);
-          ctx.lineTo(-s * 0.6, 0);
-          ctx.closePath();
-        } else if (effect.glyphShape === 'triangle') {
-          ctx.moveTo(0, -s);
-          ctx.lineTo(s * 0.85, s * 0.7);
-          ctx.lineTo(-s * 0.85, s * 0.7);
-          ctx.closePath();
-        } else { // square
-          ctx.rect(-s * 0.5, -s * 0.5, s, s);
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.max(0, Math.min(1.0, effect.life));
+        const flashR = snap(effect.size);
+
+        // 1. Cardinal 4-Way Long Pixel Beams
+        ctx.fillStyle = `rgba(0, 255, 120, ${(alpha * 0.80).toFixed(3)})`;
+        ctx.fillRect(cx - flashR, cy - P, flashR * 2, P * 2);
+        ctx.fillRect(cx - P, cy - flashR, P * 2, flashR * 2);
+
+        // 2. Diagonal 4-Way Shorter Pixel Rays
+        const diagR = snap(flashR * 0.65);
+        for (let d = -diagR; d <= diagR; d += P) {
+          ctx.fillRect(cx + d, cy + d, P, P);
+          ctx.fillRect(cx + d, cy - d, P, P);
         }
+
+        // 3. Inner Stepped Emerald Diamond
+        const midR = snap(flashR * 0.40);
+        ctx.fillStyle = `rgba(80, 255, 180, ${(alpha * 0.90).toFixed(3)})`;
+        ctx.fillRect(cx - midR, cy - midR, midR * 2, midR * 2);
+
+        // 4. White-Hot Specular Pixel Center
+        const coreR = snap(flashR * 0.20);
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+        ctx.fillRect(cx - coreR, cy - coreR, coreR * 2, coreR * 2);
+
+        ctx.restore();
+      } else if (effect.type === 'arcaneGlyph') {
+        // ── 8-BIT / 16-BIT PIXEL RUNIC GLYPH FRAGMENTS ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.max(0, Math.min(1.0, effect.life));
+        const baseColor = effect.color || 'rgba(0, 255, 140, 1)';
+        const colBody = baseColor.replace(/[\d.]+\)$/, `${alpha.toFixed(3)})`);
+        const colCore = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`;
+        const colDark = `rgba(5, 20, 10, ${(alpha * 0.85).toFixed(3)})`;
+
+        ctx.translate(cx, cy);
+        effect.rotation += effect.rotationSpeed || 0;
+        const steppedAngle = Math.round(effect.rotation / (Math.PI / 4)) * (Math.PI / 4);
+        ctx.rotate(steppedAngle);
+
+        if (effect.glyphShape === 'diamond') {
+          // Pixel Arcane Diamond Rune (5x5 matrix)
+          ctx.fillStyle = colDark;
+          ctx.fillRect(-P * 2, -P * 3, P * 4, P);
+          ctx.fillRect(-P * 3, -P * 2, P * 6, P * 4);
+          ctx.fillRect(-P * 2, P * 2, P * 4, P);
+          ctx.fillStyle = colBody;
+          ctx.fillRect(-P * 1.5, -P * 2, P * 3, P * 4);
+          ctx.fillRect(-P * 2, -P * 1.5, P * 4, P * 3);
+          ctx.fillStyle = colCore;
+          ctx.fillRect(-P * 0.5, -P * 0.5, P, P);
+        } else if (effect.glyphShape === 'triangle') {
+          // Pixel Tri-Force Arcane Rune
+          ctx.fillStyle = colDark;
+          ctx.fillRect(-P * 2.5, P * 1.5, P * 5, P);
+          ctx.fillRect(-P * 2, P * 0.5, P * 4, P);
+          ctx.fillRect(-P * 1.5, -P * 0.5, P * 3, P);
+          ctx.fillRect(-P * 0.5, -P * 2.5, P, P * 2);
+          ctx.fillStyle = colBody;
+          ctx.fillRect(-P * 1.5, P * 0.5, P * 3, P);
+          ctx.fillRect(-P, -P * 0.5, P * 2, P);
+          ctx.fillRect(-P * 0.5, -P * 1.5, P, P);
+          ctx.fillStyle = colCore;
+          ctx.fillRect(-P * 0.5, 0, P, P);
+        } else {
+          // Pixel Arcane Rune Box / Ancient Eye
+          ctx.fillStyle = colDark;
+          ctx.fillRect(-P * 2.5, -P * 2.5, P * 5, P * 5);
+          ctx.fillStyle = colBody;
+          ctx.fillRect(-P * 1.5, -P * 1.5, P * 3, P * 3);
+          ctx.fillStyle = colCore;
+          ctx.fillRect(-P * 0.5, -P * 0.5, P, P);
+        }
+        ctx.restore();
+      } else if (effect.type === 'spellStealWisp') {
+        // ── PIXEL ART SPELL STEAL HOMING SOUL WISP ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.min(1.0, effect.life);
+        const moveAng = Math.atan2(effect.vy || 0, effect.vx || 1);
+
+        // 1. Chunky 8-Bit Pixel Soul Core (Diamond Matrix)
+        const pr = snap(Math.max(P * 2, effect.size || 6));
         
-        ctx.fill();
-        
-        // Thin bright outline for crispness
-        ctx.strokeStyle = `rgba(200, 255, 230, ${effect.life * 0.8})`;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.rotate(-effect.rotation);
-        ctx.translate(-effect.x, -effect.y);
+        // A. Obsidian Border Pixels
+        ctx.fillStyle = `rgba(5, 20, 10, ${(alpha * 0.90).toFixed(2)})`;
+        ctx.fillRect(cx - pr - P, cy - P, (pr + P) * 2, P * 2);
+        ctx.fillRect(cx - P, cy - pr - P, P * 2, (pr + P) * 2);
+        ctx.fillRect(cx - pr * 0.7, cy - pr * 0.7, pr * 1.4, pr * 1.4);
+
+        // B. Vibrant Stolen Emerald/Custom Color Body
+        ctx.fillStyle = effect.color || '#00FF64';
+        ctx.fillRect(cx - pr, cy - pr * 0.5, pr * 2, pr);
+        ctx.fillRect(cx - pr * 0.5, cy - pr, pr, pr * 2);
+
+        // C. Bright Mint Highlight
+        ctx.fillStyle = '#80FFB0';
+        ctx.fillRect(cx - pr * 0.4, cy - pr * 0.4, pr * 0.8, pr * 0.8);
+
+        // D. Pure White Specular Core
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(2)})`;
+        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
+
+        // 2. Trailing Stepped Pixel Embers behind flight trajectory
+        const tailSteps = 4;
+        for (let s = 1; s <= tailSteps; s++) {
+          const tNorm = s / tailSteps;
+          const tx = snap(effect.x - Math.cos(moveAng) * s * 6 + (Math.sin(s * 3.7 + effect.life * 10) * P * 1.5));
+          const ty = snap(effect.y - Math.sin(moveAng) * s * 6 + (Math.cos(s * 3.7 + effect.life * 10) * P * 1.5));
+          const tAlpha = alpha * (1 - tNorm) * 0.85;
+          if (tAlpha > 0.05) {
+            ctx.fillStyle = (s === 1) ? `rgba(255, 255, 255, ${tAlpha.toFixed(2)})` : `rgba(0, 255, 100, ${tAlpha.toFixed(2)})`;
+            ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
+          }
+        }
+        ctx.restore();
       } else if (effect.type === 'healing') {
         // ── Pixel Art Style Healing / RCT Sparkle (+) ──
         const P = 2.0;
@@ -1906,43 +2018,48 @@ export function drawSparkEffects(layer = 'all') {
       }
         ctx.stroke();
       } else if (effect.type === 'arcaneSmokeAirborne' || effect.type === 'arcaneSmoke' || effect.type === 'arcaneSmokeGround' || effect.type === 'laserSmoke') {
-        // Soft, expanding, rotating slow smoke
+        // ── CHUNKY PIXEL ART ARCANE SMOKE PUFF CLOUD ──
         if (effect.type === 'arcaneSmokeAirborne') {
-           effect.size += (effect.targetSize - effect.size) * 0.02; // Expand slowly
+           effect.size += (effect.targetSize - effect.size) * 0.03;
         } else {
-           effect.size += (effect.targetSize - effect.size) * 0.05; // Expand fast
+           effect.size += (effect.targetSize - effect.size) * 0.07;
         }
         
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate(effect.rotation + effect.life * effect.rotationSpeed);
-        
-        // Use a flat, solid color fill so it looks like a stylized solid cloud
-        ctx.fillStyle = effect.color;
-        
-        ctx.beginPath();
-        // Draw overlapping puffs to create a cloudy/smoky cluster
-        ctx.arc(0, 0, effect.size * 0.7, 0, Math.PI * 2); 
-        ctx.arc(-effect.size * 0.4, -effect.size * 0.2, effect.size * 0.5, 0, Math.PI * 2); 
-        ctx.arc(effect.size * 0.4, -effect.size * 0.2, effect.size * 0.5, 0, Math.PI * 2); 
-        ctx.arc(-effect.size * 0.3, effect.size * 0.4, effect.size * 0.4, 0, Math.PI * 2); 
-        ctx.arc(effect.size * 0.3, effect.size * 0.4, effect.size * 0.4, 0, Math.PI * 2);
-        
-        if (effect.type === 'arcaneSmokeAirborne') {
-           // Draw neon glowing edges FIRST
-           ctx.globalCompositeOperation = 'lighter';
-           ctx.strokeStyle = `rgba(50, 255, 120, ${effect.life * 0.9})`;
-           ctx.lineWidth = 6; // Thick stroke so the edge peeks out
-           ctx.stroke(); 
-           
-           ctx.globalCompositeOperation = 'source-over'; // Reset
-        }
-        
-        // Fill the solid inner cloud body OVER the glowing skeleton
-        // This covers the inner intersecting lines, leaving only the outer halo
-        ctx.fill();
-        
-        ctx.rotate(-(effect.rotation + effect.life * effect.rotationSpeed));
-        ctx.translate(-effect.x, -effect.y);
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.5;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.max(0, Math.min(1.0, effect.life * 0.9));
+        const smR = Math.max(P * 2, snap(effect.size * 0.75));
+
+        ctx.translate(cx, cy);
+
+        // 3 Overlapping Pixel Blocks forming a fluffy cloud cluster
+        const isAir = (effect.type === 'arcaneSmokeAirborne');
+        const colBorder = isAir ? `rgba(5, 30, 20, ${(alpha * 0.8).toFixed(2)})` : `rgba(15, 25, 20, ${(alpha * 0.7).toFixed(2)})`;
+        const colBody = isAir ? `rgba(0, 200, 140, ${(alpha * 0.65).toFixed(2)})` : `rgba(40, 100, 75, ${(alpha * 0.50).toFixed(2)})`;
+        const colHighlight = isAir ? `rgba(180, 255, 220, ${(alpha * 0.85).toFixed(2)})` : `rgba(120, 200, 160, ${(alpha * 0.60).toFixed(2)})`;
+
+        // 1. Dark Outline Blocks
+        ctx.fillStyle = colBorder;
+        ctx.fillRect(-smR - P, -smR * 0.6 - P, (smR + P) * 2, (smR * 0.6 + P) * 2);
+        ctx.fillRect(-smR * 0.6 - P, -smR - P, (smR * 0.6 + P) * 2, (smR + P) * 2);
+        ctx.fillRect(-smR * 0.4 - P, smR * 0.2 - P, (smR * 0.8 + P) * 2, (smR * 0.4 + P) * 2);
+
+        // 2. Main Smoke Body Blocks
+        ctx.fillStyle = colBody;
+        ctx.fillRect(-smR, -smR * 0.6, smR * 2, smR * 1.2);
+        ctx.fillRect(-smR * 0.6, -smR, smR * 1.2, smR * 2);
+        ctx.fillRect(-smR * 0.4, smR * 0.2, smR * 1.6, smR * 0.8);
+
+        // 3. Highlight Puff Top/Left
+        ctx.fillStyle = colHighlight;
+        ctx.fillRect(-smR * 0.6, -smR * 0.8, smR * 0.8, smR * 0.6);
+        ctx.fillRect(-smR * 0.8, -smR * 0.4, smR * 0.5, smR * 0.5);
+
+        ctx.restore();
       } else if (effect.type === 'tojiWindPebble') {
         ctx.save();
         ctx.translate(effect.x, effect.y);
@@ -1982,64 +2099,63 @@ export function drawSparkEffects(layer = 'all') {
         ctx.stroke();
         ctx.restore();
       } else if (effect.type === 'telekinesisDebris' || effect.type === 'telekinesisDebrisScattered') {
-      // Draw a detailed rocky shape with shading and magical aura
-      ctx.translate(effect.x, effect.y);
-      if (effect.rotation) ctx.rotate(effect.rotation);
-      ctx.rotate(effect.life * effect.rotationSpeed * 100 || 0);
+        // ── CHUNKY PIXEL ART TELEKINESIS ROCK & FLOATING DEBRIS ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.min(1.0, effect.life * 1.25);
+        const s = Math.max(P * 2, snap(effect.size || 6));
 
-      // Draw a subtle magical aura beneath the rock
-      if (isGamePlay) {
-        ctx.fillStyle = `rgba(46, 139, 87, ${effect.life * 0.4})`;
-        ctx.beginPath();
-        ctx.arc(0, 0, effect.size * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        const auraGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, effect.size * 1.5);
-        auraGradient.addColorStop(0, `rgba(46, 139, 87, ${effect.life * 0.6})`);
-        auraGradient.addColorStop(1, 'rgba(46, 139, 87, 0)');
-        ctx.fillStyle = auraGradient;
-        ctx.beginPath();
-        ctx.arc(0, 0, effect.size * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
+        ctx.translate(cx, cy);
+        if (effect.rotation) {
+          const snappedRot = Math.round(effect.rotation / (Math.PI / 8)) * (Math.PI / 8);
+          ctx.rotate(snappedRot);
+        }
 
-      // Rock base polygon (dark shadow side)
-      ctx.beginPath();
-      ctx.moveTo(-effect.size, -effect.size * 0.5);
-      ctx.lineTo(-effect.size * 0.3, -effect.size * 0.9);
-      ctx.lineTo(effect.size * 0.7, -effect.size * 0.6);
-      ctx.lineTo(effect.size, effect.size * 0.3);
-      ctx.lineTo(effect.size * 0.4, effect.size * 0.8);
-      ctx.lineTo(-effect.size * 0.7, effect.size * 0.7);
-      ctx.closePath();
-      ctx.fillStyle = `rgba(15, 20, 15, ${effect.life})`;
-      ctx.fill();
+        // 1. Orbiting Floating Emerald Pixel Rune/Aura (only when floating, not scattered)
+        if (effect.type === 'telekinesisDebris') {
+          const auraTime = performance.now() * 0.005 + (effect.rotation || 0);
+          for (let a = 0; a < 3; a++) {
+            const aAng = auraTime + (a * Math.PI * 2 / 3);
+            const ax = snap(Math.cos(aAng) * (s * 1.4));
+            const ay = snap(Math.sin(aAng) * (s * 1.4));
+            ctx.fillStyle = (a % 2 === 0) 
+              ? `rgba(0, 255, 100, ${(alpha * 0.80).toFixed(2)})` 
+              : `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(2)})`;
+            ctx.fillRect(ax, ay, P, P);
+          }
+        }
 
-      // Highlight/texture polygon (lit side)
-      ctx.beginPath();
-      ctx.moveTo(-effect.size * 0.9, -effect.size * 0.4);
-      ctx.lineTo(-effect.size * 0.3, -effect.size * 0.8);
-      ctx.lineTo(effect.size * 0.6, -effect.size * 0.5);
-      ctx.lineTo(effect.size * 0.1, effect.size * 0.1);
-      ctx.lineTo(-effect.size * 0.5, 0);
-      ctx.closePath();
-      ctx.fillStyle = effect.color.replace('1)', `${effect.life})`); // The green/grey color
-      ctx.fill();
-      
-      // A small bright highlight for depth (edge highlight)
-      ctx.beginPath();
-      ctx.moveTo(-effect.size * 0.2, -effect.size * 0.7);
-      ctx.lineTo(effect.size * 0.3, -effect.size * 0.4);
-      ctx.lineTo(-effect.size * 0.1, -effect.size * 0.2);
-      ctx.closePath();
-      ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.3})`;
-      ctx.fill();
-      
-      // Magical glowing outline
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = `rgba(0, 255, 100, ${effect.life * 0.6})`;
-      ctx.stroke();
-    } else if (effect.type === 'meleeClashShockwave') {
+        // 2. Chunky Pixelated Rock Body
+        // A. Obsidian Shadow Outline
+        ctx.fillStyle = `rgba(10, 18, 14, ${(alpha * 0.95).toFixed(2)})`;
+        ctx.fillRect(-s - P, -s * 0.6 - P, (s + P) * 2, (s * 0.6 + P) * 2);
+        ctx.fillRect(-s * 0.7 - P, -s - P, (s * 0.7 + P) * 2, (s + P) * 2);
+
+        // B. Dark Basalt Shadow Facet (Bottom/Right)
+        ctx.fillStyle = `rgba(28, 42, 35, ${alpha.toFixed(2)})`;
+        ctx.fillRect(-s, -s * 0.6, s * 2, s * 1.2);
+        ctx.fillRect(-s * 0.7, -s * 0.9, s * 1.4, s * 1.8);
+
+        // C. Slate-Moss Rock Midtone Facet (Center/Left)
+        ctx.fillStyle = `rgba(52, 85, 70, ${alpha.toFixed(2)})`;
+        ctx.fillRect(-s * 0.8, -s * 0.7, s * 1.2, s * 1.1);
+        ctx.fillRect(-s * 0.5, -s * 0.8, s * 1.0, s * 1.3);
+
+        // D. Bright Moss/Crystal Edge Highlight (Top/Left)
+        ctx.fillStyle = `rgba(100, 240, 160, ${(alpha * 0.90).toFixed(2)})`;
+        ctx.fillRect(-s * 0.7, -s * 0.8, s * 0.8, P);
+        ctx.fillRect(-s * 0.8, -s * 0.5, P, s * 0.6);
+
+        // E. Specular White Stone Glint
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(2)})`;
+        ctx.fillRect(-s * 0.4, -s * 0.6, P, P);
+
+        ctx.restore();
+      } else if (effect.type === 'meleeClashShockwave') {
       // Expanding ground shockwave ring for Sukuna-Gojo & Sukuna-Yuta/Rika clashes & Mahoraga teleports
       effect.size += (effect.targetSize - effect.size) * 0.08;
       const isYutaClash = (effect.clashType === 'yuta');
@@ -2826,40 +2942,70 @@ export function drawSparkEffects(layer = 'all') {
       }
 
       ctx.restore();
-    } else {
-      // Standard spark - small glowing dot
-      const safeColor = (typeof effect.color === 'string' && effect.color) ? effect.color : '#00E5FF';
-      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
-      if (isGamePlay) {
-        // During gameplay: skip per-particle radial gradient (saves huge CPU time per frame)
-        ctx.fillStyle = safeColor;
-      } else {
-        const gradient = ctx.createRadialGradient(
-          effect.x, effect.y, 0,
-          effect.x, effect.y, Math.max(0.1, effect.size || 1)
-        );
-        gradient.addColorStop(0, safeColor);
-        const halfColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0.6)') : safeColor;
-        gradient.addColorStop(0.5, halfColor);
-        
-        if (effect.type === 'crimsonSniper') {
-          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        } else if (effect.type === 'lightningTrail') {
-          const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace(/[\d.]+\)$/, '0)') : 'rgba(0, 229, 255, 0)';
-          gradient.addColorStop(1, zeroColor);
-        } else if (effect.type === 'rikaCurse') {
-          const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0)') : 'rgba(0, 0, 0, 0)';
-          gradient.addColorStop(1, zeroColor);
-        } else {
-          gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
-        }
-        ctx.fillStyle = gradient;
-      }
+    } else if (effect.type === 'arcane') {
+        // ── PIXEL ART ARCANE SPARKLE / GLINT (+) ──
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.max(0, Math.min(1.0, effect.life));
 
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size || 1), 0, Math.PI * 2);
-      ctx.fill();
-    }
+        // White-hot center pixel
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(2)})`;
+        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
+
+        // 4 cardinal emerald arms
+        ctx.fillStyle = `rgba(0, 255, 100, ${(alpha * 0.90).toFixed(2)})`;
+        ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P);
+        ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P);
+        ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P);
+        ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P);
+
+        // Tiny velocity tail step
+        if (effect.vx || effect.vy) {
+          const tx = snap(effect.x - (effect.vx || 0) * 1.8);
+          const ty = snap(effect.y - (effect.vy || 0) * 1.8);
+          ctx.fillStyle = `rgba(0, 200, 80, ${(alpha * 0.50).toFixed(2)})`;
+          ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
+        }
+
+        ctx.restore();
+      } else {
+        // Standard spark - small glowing dot
+        const safeColor = (typeof effect.color === 'string' && effect.color) ? effect.color : '#00E5FF';
+        const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
+        if (isGamePlay) {
+          // During gameplay: skip per-particle radial gradient (saves huge CPU time per frame)
+          ctx.fillStyle = safeColor;
+        } else {
+          const gradient = ctx.createRadialGradient(
+            effect.x, effect.y, 0,
+            effect.x, effect.y, Math.max(0.1, effect.size || 1)
+          );
+          gradient.addColorStop(0, safeColor);
+          const halfColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0.6)') : safeColor;
+          gradient.addColorStop(0.5, halfColor);
+          
+          if (effect.type === 'crimsonSniper') {
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          } else if (effect.type === 'lightningTrail') {
+            const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace(/[\d.]+\)$/, '0)') : 'rgba(0, 229, 255, 0)';
+            gradient.addColorStop(1, zeroColor);
+          } else if (effect.type === 'rikaCurse') {
+            const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0)') : 'rgba(0, 0, 0, 0)';
+            gradient.addColorStop(1, zeroColor);
+          } else {
+            gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+          }
+          ctx.fillStyle = gradient;
+        }
+
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size || 1), 0, Math.PI * 2);
+        ctx.fill();
+      }
 
     ctx.restore();
   }
@@ -3270,7 +3416,7 @@ export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 750, ar
  * @param {number} reach - Length of the frontal corridor (default 650px)
  * @param {number} arcAngle - Frontal cone angle in radians (default ~80 deg)
  */
-export function spawnGojoRedFrontalBlast(x, y, angle = 0, reach = 650, arcAngle = Math.PI * 0.45) {
+export function spawnGojoRedFrontalBlast(x, y, angle = 0, reach = 650, arcAngle = Math.PI * 0.45, opts = {}) {
   const blast = ParticleSystem.getParticle();
   blast.x = x;
   blast.y = y;
@@ -3289,17 +3435,20 @@ export function spawnGojoRedFrontalBlast(x, y, angle = 0, reach = 650, arcAngle 
   blast.isProtected = true;
   blast.isPixi = false;
   blast.sprite = null;
+  blast.colorTheme = opts.colorTheme || (opts.isRubbick ? 'green' : 'red');
+  blast.isRubbick = Boolean(opts.isRubbick || opts.isTrickster);
 
   if (state.sparkEffects) {
     state.sparkEffects.push(blast);
   }
 
-  // Dense burst of directional crimson sparks along the origin & axis
+  // Dense burst of directional sparks along the origin & axis
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
-  spawnSparks(x, y, 30, 'crimsonSniper');
-  spawnSparks(x + cosA * 150, y + sinA * 150, 16, 'crimsonSniper');
-  spawnSparks(x + cosA * 320, y + sinA * 320, 12, 'crimsonSniper');
+  const sparkType = (blast.colorTheme === 'green' || blast.isRubbick) ? 'arcane' : 'crimsonSniper';
+  spawnSparks(x, y, 30, sparkType);
+  spawnSparks(x + cosA * 150, y + sinA * 150, 16, sparkType);
+  spawnSparks(x + cosA * 320, y + sinA * 320, 12, sparkType);
 }
 
 /**

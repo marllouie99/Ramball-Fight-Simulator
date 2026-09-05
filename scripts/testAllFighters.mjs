@@ -533,7 +533,135 @@ async function main() {
         fighter.y = 200;
       }
 
-      // 6. Winner / Champion Reveal Stance
+      // Rubbick-specific Stolen Unlimited Void Test
+      if (fType === 'rubbick') {
+        // 1. Simulate stealing Gojo's domain
+        const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+        const mockGojo = new GojoClass(allDefs.find(d => d.type === 'gojo') || { type: 'gojo' });
+        mockGojo.x = 250;
+        mockGojo.y = 200;
+        mockGojo.hp = 400;
+        mockGojo.domainActive = true;
+        mockGojo.lastCastSkill = 'domain';
+
+        fighter.stolenType = null;
+        fighter.spellStealCooldown = 0;
+        fighter.update(mockGojo, 1, state.arena);
+
+        if (fighter.stolenType !== 'gojo_domain') {
+          throw new Error(`Rubbick failed to steal Unlimited Void: expected 'gojo_domain', got '${fighter.stolenType}'`);
+        }
+        if (fighter.stolenColor !== '#00FF64') {
+          throw new Error(`Rubbick stolenColor is not emerald green (#00FF64), got '${fighter.stolenColor}'`);
+        }
+        if (fighter.stolenSkillCooldown <= 0) {
+          throw new Error(`Expected stolenSkillCooldown > 0 delay after stealing skill, got ${fighter.stolenSkillCooldown}`);
+        }
+
+        // 2. Execute Stolen Skill Wind-Up (clearing initial delay to trigger cast)
+        fighter.stolenSkillCooldown = 0;
+        fighter.executeStolenSkill(mockGojo, 1);
+        if (fighter.stolenWindUpTimer <= 0) {
+          throw new Error("Rubbick did not enter stolenWindUpTimer on casting stolen Unlimited Void!");
+        }
+
+        // Test ground telegraph during windup
+        mockCtx.resetStackDepth();
+        fighter.drawGroundTelegraph(mockCtx);
+        assertCanvasStackBalance("Rubbick drawGroundTelegraph during stolen domain windup");
+
+        // 3. Complete wind-up to activate domain
+        fighter.stolenWindUpTimer = 1;
+        fighter.update(mockGojo, 1, state.arena);
+
+        if (!fighter.stolenDomainActive) {
+          throw new Error("Rubbick stolenDomainActive is not true after wind-up completed!");
+        }
+
+        // Test active domain ground telegraph, skin, and weapon drawing
+        mockCtx.resetStackDepth();
+        fighter.drawGroundTelegraph(mockCtx);
+        assertCanvasStackBalance("Rubbick drawGroundTelegraph during active stolen domain");
+
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Rubbick draw during active stolen domain");
+
+        mockCtx.resetStackDepth();
+        fighter.drawGun(mockCtx);
+        assertCanvasStackBalance("Rubbick drawGun during active stolen domain");
+
+        // 4. Update during active domain
+        state.fighters = [mockGojo, fighter];
+        mockGojo.domainActive = false; // Gojo's own domain is not active
+        fighter.update(mockGojo, 1, state.arena);
+        if (mockGojo.timeStopTimer <= 0) {
+          throw new Error("Mock Gojo was not time-stopped inside Rubbick's stolen domain!");
+        }
+        if (mockGojo.infinityActive) {
+          throw new Error("Mock Gojo's infinityActive was not disabled inside Rubbick's stolen domain!");
+        }
+
+        // Test Gojo's own update inside Rubbick's stolen domain
+        mockGojo.update(fighter, 0, state.arena);
+        if (mockGojo.infinityActive) {
+          throw new Error("Mock Gojo's update() re-enabled infinityActive while inside Rubbick's stolen domain!");
+        }
+        if (mockGojo.infinityFadeOpacity !== 0) {
+          throw new Error(`Mock Gojo's infinityFadeOpacity should be 0, got ${mockGojo.infinityFadeOpacity}`);
+        }
+
+        // Test Gojo taking damage inside Rubbick's stolen domain (should NOT trigger Infinity block)
+        const gojoHpBefore = mockGojo.hp;
+        mockGojo.takeDamage(20, fighter, { isMelee: true });
+        if (mockGojo.hp >= gojoHpBefore) {
+          throw new Error("Mock Gojo did not take damage inside Rubbick's stolen domain (blocked by Infinity)!");
+        }
+
+        // 5. Complete domain
+        fighter.stolenDomainTimer = 1;
+        fighter.update(mockGojo, 1, state.arena);
+        if (fighter.stolenDomainActive) {
+          throw new Error("Rubbick stolenDomainActive did not clear after timer expired!");
+        }
+
+        // Verify Gojo infinity recovers after domain ends and cooldown finishes
+        mockGojo.timeStopTimer = 0;
+        mockGojo.forcedMeleeTimer = 0;
+        mockGojo.isMeleeMode = false;
+        for (let cd = 0; cd < 40; cd++) {
+          mockGojo.update(fighter, 0, state.arena);
+        }
+        if (!mockGojo.infinityActive) {
+          throw new Error("Mock Gojo's infinityActive did not recover after Rubbick stolen domain expired!");
+        }
+
+        // Reset Rubbick state
+        fighter.stolenType = null;
+        fighter.stolenTimer = 0;
+
+        // 6. Test Rubbick inside enemy Gojo's active domain (suppress active visuals)
+        mockGojo.domainActive = true;
+        state.fighters = [fighter, mockGojo];
+        fighter.timeStopTimer = 15;
+
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Rubbick draw while inside enemy Gojo domain");
+
+        mockCtx.resetStackDepth();
+        fighter.drawGroundTelegraph(mockCtx);
+        assertCanvasStackBalance("Rubbick drawGroundTelegraph while inside enemy Gojo domain");
+
+        mockCtx.resetStackDepth();
+        fighter.drawGun(mockCtx);
+        assertCanvasStackBalance("Rubbick drawGun while inside enemy Gojo domain");
+
+        mockGojo.domainActive = false;
+        fighter.timeStopTimer = 0;
+      }
+
+      // 7. Winner / Champion Reveal Stance
       mockCtx.resetStackDepth();
       fighter._isWinnerReveal = true;
       fighter.draw(mockCtx, null);

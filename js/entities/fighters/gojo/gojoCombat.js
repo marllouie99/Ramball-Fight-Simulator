@@ -8,6 +8,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../.
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { triggerAdaptation } from '../mahoraga/mahoragaAdaptation.js';
+import { isInsideRubbickStolenVoid } from '../rubbick/rubbickThemes.js';
 
 export function clampEntityToArenaBounds(ent, arena, radius = null) {
   if (!ent || !arena) return false;
@@ -79,6 +80,14 @@ export function clampEntityToArenaBounds(ent, arena, radius = null) {
 }
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
+  // If Gojo is trapped inside Rubbick's stolen Unlimited Void, Limitless Infinity is disabled
+  if (isInsideRubbickStolenVoid(fighter)) {
+    fighter.infinityActive = false;
+    fighter.infinityFadeOpacity = 0;
+    fighter.infinityBlockTimer = 0;
+    return false;
+  }
+
   // Adapted Mahoraga & Saitama during Serious Skill Counter immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
   if (attacker && attacker !== fighter) {
     const isSaitamaCountering = (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
@@ -105,7 +114,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     fighter.isMeleeMode = false;
   }
 
-  const isInsideEnemyDomain = !fighter.domainActive && state.fighters && state.fighters.some(f => f && f !== fighter && f.domainActive && f.hp > 0);
+  const isInsideEnemyDomain = !fighter.domainActive && state.fighters && state.fighters.some(f => f && f !== fighter && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
   if (isInsideEnemyDomain && !fighter.isMeleeMode) {
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;

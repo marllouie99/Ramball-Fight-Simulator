@@ -1,6 +1,6 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
-import { renderGojoDomainBackground } from '../../entities/fighters/gojo/gojoDomainVisuals.js';
+import { renderGojoDomainBackground, renderRubbickDomainBackground } from '../../entities/fighters/gojo/gojoDomainVisuals.js';
 import { renderSukunaDomainBackground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { renderYutaDomainBackground, renderYutaSukunaDomainClashRift } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
 import { renderMahitoDomainBackground } from './environmentalRenderer.js';
@@ -392,6 +392,22 @@ function getMahitoDomainHybridData() {
   return mahitoDomainHybridData;
 }
 
+let rubbickDomainHybridData = null;
+let rubbickArenaMask = null;
+function getRubbickDomainHybridData() {
+  if (!rubbickDomainHybridData) {
+    const canvas = document.createElement('canvas');
+    canvas.width = state.canvas ? state.canvas.width : 1920;
+    canvas.height = state.canvas ? state.canvas.height : 1080;
+    const ctx = canvas.getContext('2d');
+    const texture = window.PIXI.Texture.from(canvas);
+    const sprite = new window.PIXI.Sprite(texture);
+    rubbickDomainHybridData = { canvas, ctx, texture, sprite };
+  }
+  syncDomainHybridDataSize(rubbickDomainHybridData);
+  return rubbickDomainHybridData;
+}
+
 export function updateHybridEnvironment() {
   if (!state.pixiApp || !state.pixiLayers?.environment || !state.pixiLayers?.effects) return;
   const layer = state.pixiLayers.environment;
@@ -404,7 +420,8 @@ export function updateHybridEnvironment() {
   const sukuna = state.fighters?.find(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.type === 'sukuna') && f.domainActive);
   const yuta = state.fighters?.find(f => f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta') && f.domainActive);
   const mahito = state.fighters?.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive));
-  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+  const rubbick = state.fighters?.find(f => f && (f.characterId === 'rubbick' || f.type === 'rubbick') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain')));
+  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && (f.domainActive || f.stolenDomainActive)).length > 1);
 
   domainUpdateTick++;
   
@@ -414,6 +431,7 @@ export function updateHybridEnvironment() {
   const updateInterval = isMultiDomain ? baseInterval * 2 : baseInterval;
 
   const updateGojo = (domainUpdateTick % updateInterval === 0);
+  const updateRubbick = (domainUpdateTick % updateInterval === 0);
   const updateSukuna = (domainUpdateTick % updateInterval === Math.floor(updateInterval / 3));
   const updateYuta = (domainUpdateTick % updateInterval === Math.floor(updateInterval * 2 / 3));
 
@@ -460,6 +478,52 @@ export function updateHybridEnvironment() {
     }
     gojoDomainHybridData.sprite.mask = null;
     gojoDomainHybridData.sprite.parent.removeChild(gojoDomainHybridData.sprite);
+  }
+
+  if (rubbick) {
+    const data = getRubbickDomainHybridData();
+    if (!data.sprite.parent) layer.addChild(data.sprite);
+    data.sprite.x = 0;
+    data.sprite.y = 0;
+    data.sprite.width = state.canvas.width;
+    data.sprite.height = state.canvas.height;
+
+    if (state.arena) {
+      if (!rubbickArenaMask) {
+        rubbickArenaMask = new window.PIXI.Graphics();
+        layer.addChild(rubbickArenaMask);
+      }
+      rubbickArenaMask.clear();
+      rubbickArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      const ww = arena.wallWidth || 0;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        rubbickArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        rubbickArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+      }
+      rubbickArenaMask.endFill();
+      data.sprite.mask = rubbickArenaMask;
+    } else if (data.sprite.mask) {
+      data.sprite.mask = null;
+    }
+
+    if (updateRubbick || !rubbick._rubbickDomainHybridReady) {
+      rubbick._rubbickDomainHybridReady = true;
+      data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
+      renderRubbickDomainBackground(rubbick, data.ctx, isMultiDomain && rubbick !== state.fighters.find(f => f.domainActive || f.stolenDomainActive));
+      data.texture.update();
+    }
+  } else if (rubbickDomainHybridData && rubbickDomainHybridData.sprite.parent) {
+    if (rubbickArenaMask && rubbickArenaMask.parent) {
+      rubbickArenaMask.parent.removeChild(rubbickArenaMask);
+      rubbickArenaMask = null;
+    }
+    rubbickDomainHybridData.sprite.mask = null;
+    rubbickDomainHybridData.sprite.parent.removeChild(rubbickDomainHybridData.sprite);
   }
 
   if (sukuna) {
@@ -509,16 +573,16 @@ export function updateHybridEnvironment() {
     }
   }
 
-  // Ensure explicit Z-order sorting for Domain Clashes (Gojo vs Sukuna):
+  // Ensure explicit Z-order sorting for Domain Clashes:
   // 1. Sukuna Domain Background (Liquid Floor) -> Back (Index 0)
-  // 2. Gojo Unlimited Void Background (Dark starry void overlaying floor) -> Front (Index 1)
-  if (gojo && sukuna && layer) {
-    const gojoSprite = gojoDomainHybridData?.sprite;
+  // 2. Gojo / Rubbick Unlimited Void Background (Dark starry void overlaying floor) -> Front (Index 1)
+  if ((gojo || rubbick) && sukuna && layer) {
+    const voidSprite = gojo ? gojoDomainHybridData?.sprite : rubbickDomainHybridData?.sprite;
     const sukunaBgSprite = sukunaDomainHybridData?.sprite;
 
-    if (gojoSprite && sukunaBgSprite && gojoSprite.parent === layer && sukunaBgSprite.parent === layer) {
+    if (voidSprite && sukunaBgSprite && voidSprite.parent === layer && sukunaBgSprite.parent === layer) {
       layer.setChildIndex(sukunaBgSprite, 0);
-      layer.setChildIndex(gojoSprite, 1);
+      layer.setChildIndex(voidSprite, 1);
     }
   }
 
@@ -556,9 +620,10 @@ export function updateHybridEnvironment() {
   }
 
   // Enforce deterministic domain Z-order sorting:
-  // Sukuna Background Dim/Floor (bottom) -> Gojo Background (middle) -> Mahito Background/Hands (overlays Sukuna Dim, underneath Shrine) -> Yuta Background/Crosses (top)
+  // Sukuna Background Dim/Floor (bottom) -> Gojo Background (middle) -> Rubbick Emerald Void -> Mahito Background/Hands (overlays Sukuna Dim, underneath Shrine) -> Yuta Background/Crosses (top)
   if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent === layer) layer.addChild(sukunaDomainHybridData.sprite);
   if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent === layer) layer.addChild(gojoDomainHybridData.sprite);
+  if (rubbickDomainHybridData && rubbickDomainHybridData.sprite.parent === layer) layer.addChild(rubbickDomainHybridData.sprite);
   if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent === layer) layer.addChild(mahitoDomainHybridData.sprite);
   if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent === layer) layer.addChild(yutaDomainHybridData.sprite);
   

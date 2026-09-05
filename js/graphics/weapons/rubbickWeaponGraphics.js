@@ -1,6 +1,8 @@
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawGojoOrb, drawAnamorphicLensFlare } from './gojoWeaponGraphics.js';
+import { drawRubbickPixelHand, drawRubbickArmSleeve } from '../fighters/rubbickSkin.js';
+import { isInsideEnemyGojoDomain } from '../../entities/fighters/rubbick/rubbickThemes.js';
 
 /**
  * Rubbick's Weapon: The Arcane Staff
@@ -10,12 +12,16 @@ import { drawGojoOrb, drawAnamorphicLensFlare } from './gojoWeaponGraphics.js';
  */
 
 export function drawRubbickStaff(ctx, fighter) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const baseAlpha = ctx.globalAlpha;
+  const r = fighter.r || 25;
+  const P = 2.0; // Stepped pixel art grid size
+  const snap = (v) => Math.round(v / P) * P;
+
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
   
   // Idle breathing/floating animation for the staff hand
-  const idleHover = Math.sin(Date.now() / 300) * 3;
+  const idleHover = Math.sin(Date.now() / 300) * 2.5;
   
   // Attack wind-up and swing animation
   let swingAngle = 0;
@@ -24,449 +30,448 @@ export function drawRubbickStaff(ctx, fighter) {
   if (fighter.attackCooldown > 0 && fighter.attackCooldown <= 15) {
     // Wind-up phase (pulling the staff back before casting)
     const progress = (15 - fighter.attackCooldown) / 15; // 0.0 to 1.0
-    swingAngle = progress * 0.4; // Tilt backwards
+    swingAngle = progress * 0.35; // Tilt backwards
     thrustOffset = progress * -5; // Pull backwards
   } else if (fighter.attackSwingTimer > 0) {
     // Follow-through phase (thrusting forward)
     const progress = fighter.attackSwingTimer / 15; // 1.0 down to 0.0
-    // A quick wind-up and thrust/swing forward
-    swingAngle = Math.sin(progress * Math.PI) * -0.6; // staff head swings forward
+    swingAngle = Math.sin(progress * Math.PI) * -0.45; // staff head snaps forward
     thrustOffset = Math.sin(progress * Math.PI) * 12; // thrusts outward
   }
   
-  if (fighter.stolenType === 'gojo' && fighter.stolenWindUpTimer > 0) {
-    const windupMax = 45;
-    const progress = Math.min(1.0, Math.max(0, 1 - (fighter.stolenWindUpTimer / windupMax)));
-    const gAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : 0;
-    
-    // Dynamic staff channeling animation:
-    // Phase 1 (progress 0.0 - 0.40): Staff lifts high into celestial channeling stance, tilting upward
-    // Phase 2 (progress 0.40 - 0.75): Energy fusion begins, staff levels towards target
-    // Phase 3 (progress 0.75 - 1.0): Staff thrusts forward, locked in firing alignment with intense cursed vibration
-    let staffDist = fighter.r * 0.85;
-    let angleOffset = 0;
-    let floatY = 0;
-    
-    if (progress < 0.40) {
-      const pNorm = progress / 0.40;
-      staffDist = fighter.r * 0.75 - Math.sin(pNorm * Math.PI) * 6;
-      angleOffset = -0.38 * (1 - pNorm);
-      floatY = -Math.sin(pNorm * Math.PI) * 12;
-    } else if (progress < 0.75) {
-      const pNorm = (progress - 0.40) / 0.35;
-      staffDist = fighter.r * 0.75 + pNorm * (fighter.r * 0.25);
-      angleOffset = 0;
-      floatY = -12 * (1 - pNorm);
-    } else {
-      const pNorm = (progress - 0.75) / 0.25;
-      staffDist = fighter.r * 1.0 + pNorm * 14;
-      angleOffset = 0;
-      floatY = 0;
-    }
-    
-    ctx.translate(Math.cos(gAngle) * staffDist, Math.sin(gAngle) * staffDist + floatY);
-    ctx.rotate(gAngle - (fighter.rotation || 0) + Math.PI / 2 + angleOffset);
-  } else if (fighter.stolenWindUpTimer > 0 || fighter.beamCharge > 0 || fighter.beamTimer > 0) {
-    // Point the staff exactly at the target like a rifle
-    const gAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : 0;
-    ctx.translate(Math.cos(gAngle) * fighter.r, Math.sin(gAngle) * fighter.r);
-    ctx.rotate(gAngle - (fighter.rotation || 0) + Math.PI / 2);
-  } else if (fighter.tkTimer > 0) {
-    // Telekinesis channel: lift the staff high in the right hand and point it EXACTLY at the drop location
-    ctx.translate(fighter.r * 0.4, fighter.r * 0.85);
-    // The staff is drawn along the Y axis, so its "front" (the crystal) points up (-Y).
-    // To make -Y point to gunAngle, we add Math.PI / 2.
-    const targetRot = fighter.gunAngle - (fighter.rotation || 0) + Math.PI / 2;
-    ctx.rotate(targetRot);
+  if (fighter.isPreview) {
+    // Standalone centered weapon preview in weapon arsenal / studio
+    ctx.translate(fighter.x || 0, fighter.y || 0);
+    const pAngle = (fighter.gunAngle !== undefined && fighter.gunAngle !== 0) ? (fighter.gunAngle + Math.PI / 2) : Math.PI * 0.25;
+    ctx.rotate(pAngle);
   } else {
-    // Position the staff in the "right hand" (off to the side and slightly forward)
-    ctx.translate(fighter.r * 0.4 + thrustOffset, fighter.r * 0.85 + idleHover);
-    let baseRot = Math.PI * 0.3; // Default idle angle
-    if (fighter.gunAngle !== undefined && (fighter.attackSwingTimer > 0 || (fighter.attackCooldown !== undefined && fighter.attackCooldown <= 15))) {
-      baseRot = fighter.gunAngle - (fighter.rotation || 0) + Math.PI / 2;
+    // In-game fighter coordinate system aligned with body and gunAngle
+    const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+    ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+    ctx.rotate(angle);
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
     }
-    ctx.rotate(baseRot + swingAngle);
+
+    // Determine hand grip position and staff tilt angle in fighter local space
+    let gripX = r * 0.70 + thrustOffset;
+    let gripY = r * 0.20 + idleHover;
+    let staffTilt = Math.PI / 2 - 0.22 + swingAngle; // pointing forward and ~12deg upward toward the enemy
+
+    if ((fighter.stolenType === 'gojo' || fighter.stolenType === 'gojo_red' || fighter.stolenType === 'gojo_domain') && fighter.stolenWindUpTimer > 0) {
+      const windupMax = 45;
+      const progress = Math.min(1.0, Math.max(0, 1 - (fighter.stolenWindUpTimer / windupMax)));
+      if (progress < 0.40) {
+        const pNorm = progress / 0.40;
+        gripX = r * 0.65 - Math.sin(pNorm * Math.PI) * 4;
+        gripY = -r * 0.15 - Math.sin(pNorm * Math.PI) * 6;
+        staffTilt = Math.PI / 2 - 0.45 - Math.sin(pNorm * Math.PI) * 0.20;
+      } else if (progress < 0.75) {
+        const pNorm = (progress - 0.40) / 0.35;
+        gripX = r * 0.65 + pNorm * (r * 0.25);
+        gripY = -r * 0.15 + pNorm * (r * 0.15);
+        staffTilt = Math.PI / 2 - 0.45 + pNorm * 0.45;
+      } else {
+        const pNorm = (progress - 0.75) / 0.25;
+        gripX = r * 0.90 + pNorm * 6;
+        gripY = 0;
+        staffTilt = Math.PI / 2; // horizontal pointing straight at the enemy
+      }
+    } else if (fighter.stolenWindUpTimer > 0 || fighter.beamCharge > 0 || fighter.beamTimer > 0) {
+      gripX = r * 0.85 + thrustOffset;
+      gripY = 0;
+      staffTilt = Math.PI / 2; // horizontal pointing straight at the enemy
+    } else if (fighter.tkTimer > 0) {
+      gripX = r * 0.85;
+      gripY = 0;
+      staffTilt = Math.PI / 2; // forward pointing straight at the target during Telekinesis
+    }
+
+    // Draw robe sleeve connecting right shoulder to the hand grip
+    const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter._isWinnerReveal;
+    if (!shouldHideHands && !fighter.hideFrontHand) {
+      const handRadius = getHandSize(6.5, fighter);
+      const shoulderX = r * 0.15;
+      const shoulderY = gripY > 0 ? r * 0.22 : -r * 0.22;
+      drawRubbickArmSleeve(ctx, shoulderX, shoulderY, gripX, gripY, handRadius);
+
+      if ((fighter.stolenType === 'gojo' || fighter.stolenType === 'gojo_red' || fighter.stolenType === 'gojo_domain') && fighter.stolenWindUpTimer > 0) {
+        // Dual-hand sleeve support for Gojo Purple / Red
+        const rearShoulderX = r * 0.10;
+        const rearShoulderY = r * 0.28;
+        const rearGripX = gripX - 16;
+        const rearGripY = gripY + 8;
+        drawRubbickArmSleeve(ctx, rearShoulderX, rearShoulderY, rearGripX, rearGripY, handRadius);
+      }
+    }
+
+    // Move to grip origin and orient staff
+    ctx.translate(gripX, gripY);
+    ctx.rotate(staffTilt);
   }
 
   // Staff dimensions
-  const shaftLength = 75; // Even longer for a grander look
-  const shaftThickness = 5;
+  const shaftLength = 76;
+  const shaftThickness = 6;
   const topY = -shaftLength / 2 - 12;
   const bottomY = shaftLength / 2;
 
-  // Hands will be drawn at the end
-
-  // 1. Staff Shaft (Premium Metallic/Dark Wood)
-  const shaftGrad = ctx.createLinearGradient(-shaftThickness, 0, shaftThickness, 0);
-  shaftGrad.addColorStop(0, '#1A1110'); // Dark edge
-  shaftGrad.addColorStop(0.5, '#4A322C'); // Polished center
-  shaftGrad.addColorStop(1, '#1A1110');
-  
-  ctx.fillStyle = shaftGrad;
-  ctx.beginPath();
-  ctx.roundRect(-shaftThickness / 2, topY, shaftThickness, shaftLength, 2);
-  ctx.fill();
-  ctx.stroke(); // Sharp outline
-
-  // Bronze/Gold spiral wrappings along the shaft
-  ctx.fillStyle = '#D4AF37'; // Gold
-  for (let i = topY + 15; i < bottomY - 5; i += 10) {
-    ctx.beginPath();
-    ctx.moveTo(-shaftThickness / 2 - 1, i);
-    ctx.lineTo(shaftThickness / 2 + 1, i + 3);
-    ctx.lineTo(shaftThickness / 2 + 1, i + 6);
-    ctx.lineTo(-shaftThickness / 2 - 1, i + 3);
-    ctx.closePath();
-    ctx.fill();
+  // Apply Weapon Studio Customizations if available
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.rubbick) ? state.weaponCustomizations.rubbick : null;
+  if (custom) {
+    if (custom.offsetX || custom.offsetY) {
+      ctx.translate(custom.offsetX, custom.offsetY);
+    }
+    if (custom.angleOffset) {
+      ctx.rotate(custom.angleOffset);
+    }
+    if (custom.scale && custom.scale !== 1.0) {
+      ctx.scale(custom.scale, custom.scale);
+    }
   }
 
-  // 2. Majestic Base Pommel
-  const goldGrad = ctx.createLinearGradient(-8, 0, 8, 0);
-  goldGrad.addColorStop(0, '#B8860B');
-  goldGrad.addColorStop(0.5, '#FFF8DC');
-  goldGrad.addColorStop(1, '#B8860B');
-  
-  ctx.fillStyle = goldGrad;
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = '#3A2B00';
-  ctx.beginPath();
-  ctx.ellipse(0, bottomY + 2, 7, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // Align the wrapped staff grip section (y = 8) with the hand position at (0, 0)
+  ctx.translate(0, -8);
 
-  ctx.beginPath();
-  ctx.moveTo(-3, bottomY + 7);
-  ctx.lineTo(3, bottomY + 7);
-  ctx.lineTo(0, bottomY + 14); // Sharp point
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // ─────────────────────────────────────────────
+  // 1. DISCRETE PIXEL ART STAFF SHAFT (Dark Mahogany & Gold Wraps)
+  // ─────────────────────────────────────────────
+  const halfThick = shaftThickness / 2;
+  const shaftTop = snap(topY);
+  const shaftBot = snap(bottomY);
+  const shaftH = shaftBot - shaftTop;
 
-  // 3. Ornate Asymmetrical Crown Headpiece (Gold/Bronze)
-  ctx.fillStyle = goldGrad;
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = '#3A2B00';
+  // A. Stepped Dark Manga Ink Outer Shell (#0A0F0D)
+  ctx.fillStyle = '#0A0F0D';
+  ctx.fillRect(snap(-halfThick - P), shaftTop - P, shaftThickness + P * 2, shaftH + P * 2);
 
-  // Base socket
-  ctx.beginPath();
-  ctx.moveTo(-shaftThickness / 2 - 2, topY + 8);
-  ctx.lineTo(shaftThickness / 2 + 2, topY + 8);
-  ctx.lineTo(shaftThickness / 2 + 5, topY);
-  ctx.lineTo(-shaftThickness / 2 - 5, topY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // B. Stepped Dark Mahogany Wood Base Fill
+  ctx.fillStyle = '#1C1014';
+  ctx.fillRect(snap(-halfThick), shaftTop, shaftThickness, shaftH);
 
-  // Large elegant crescent blade/wing (Left side)
-  ctx.beginPath();
-  ctx.moveTo(-4, topY);
-  ctx.bezierCurveTo(-22, topY - 10, -28, topY - 35, -8, topY - 45); // Outer sweep
-  ctx.bezierCurveTo(-14, topY - 35, -12, topY - 15, 0, topY - 10);  // Inner sweep
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // C. Polished Center Wood Highlight
+  ctx.fillStyle = '#4A2A2E';
+  ctx.fillRect(snap(-P * 0.5), shaftTop, P, shaftH);
 
-  // Secondary sharp crescent (Right side - asymmetrical)
-  ctx.beginPath();
-  ctx.moveTo(4, topY);
-  ctx.bezierCurveTo(18, topY - 5, 22, topY - 25, 6, topY - 32);
-  ctx.bezierCurveTo(12, topY - 22, 10, topY - 10, 0, topY - 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 4. Glowing Magical Crystal (Energy Core)
-  const coreColor = fighter.stolenType && fighter.stolenColor ? fighter.stolenColor : '#39FF14'; // Neon Green
-  const crystalCenterY = topY - 22;
-  
-  if (fighter.stolenType === 'normal') {
-     // Draw Rubbick Tension Aura for Stolen Execute (Green)
-     const tensionIntensity = 1.0; 
-     const time = Date.now() / 150;
-     const s = 1.0; 
-     
-     ctx.save();
-     // Align with staff tip crystal
-     ctx.translate(0, crystalCenterY); 
-     
-     // 1. Smooth Fade-in Dark Green Smoke
-     const auraGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 45 * s);
-     auraGrad.addColorStop(0, `rgba(0, 180, 0, ${0.6 * tensionIntensity * baseAlpha})`);
-     auraGrad.addColorStop(0.5, `rgba(0, 80, 0, ${0.3 * tensionIntensity * baseAlpha})`);
-     auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-     
-     ctx.fillStyle = auraGrad;
-     for (let i = -1; i <= 2; i++) {
-         const xOffset = i * 25 * s + Math.sin(time * 0.5 + i) * 10 * s;
-         const yOffset = Math.cos(time * 0.5 + i * 2) * 8 * s;
-         ctx.beginPath();
-         ctx.ellipse(xOffset, yOffset, 40 * s, 25 * s, 0, 0, Math.PI * 2);
-         ctx.fill();
-     }
-     
-     // 2. Smoke-green Lightning Ascending
-     ctx.lineCap = 'round';
-     ctx.lineJoin = 'round';
-     
-     const numSparks = 4 + Math.floor(Math.random() * 3);
-     for (let i = 0; i < numSparks; i++) {
-         const isDark = Math.random() > 0.8;
-         ctx.strokeStyle = isDark ? `rgba(0, 30, 0, ${0.9 * tensionIntensity * baseAlpha})` : `rgba(50, 255, ${50 + Math.random() * 50}, ${0.8 * tensionIntensity * baseAlpha})`;
-         ctx.lineWidth = (isDark ? 2 : 1.5) * s;
-         
-         const barrelX = (Math.random() - 0.5) * 40 * s;
-         
-         const startY = (Math.random() > 0.5 ? 1 : -1) * (15 + Math.random() * 25) * s;
-         const startX = barrelX + (Math.random() - 0.5) * 20 * s;
-         
-         ctx.beginPath();
-         ctx.moveTo(startX, startY);
-         
-         let curX = startX;
-         let curY = startY;
-         const segments = 3;
-         
-         for (let j = 1; j <= segments; j++) {
-             const t = j / segments;
-             const targetX = startX + (barrelX - startX) * t;
-             const targetY = startY * (1 - t);
-             
-             curX = targetX + (Math.random() - 0.5) * 10 * s;
-             curY = targetY + (Math.random() - 0.5) * 10 * s;
-             if (j === segments) {
-                 curX = barrelX;
-                 curY = 0;
-             }
-             ctx.lineTo(curX, curY);
-         }
-         ctx.stroke();
-     }
-     ctx.restore();
+  // D. Stepped Golden Spiral Wrappings along the Shaft
+  ctx.fillStyle = '#D4AF37';
+  for (let y = shaftTop + 16; y < shaftBot - 8; y += 12) {
+    const wy = snap(y);
+    ctx.fillRect(snap(-halfThick), wy, P * 2, P);
+    ctx.fillRect(snap(-halfThick + P), wy + P, P * 2, P);
+    ctx.fillRect(snap(-halfThick + P * 2), wy + P * 2, P * 2, P);
+    // Specular glint on gold wrap
+    ctx.fillStyle = '#FFF275';
+    ctx.fillRect(snap(-halfThick + P), wy + P, P, P);
+    ctx.fillStyle = '#D4AF37';
   }
 
-  if (fighter.stolenType === 'gojo' && fighter.stolenWindUpTimer > 0) {
-     const windupMax = 45;
-     const progress = Math.min(1.0, Math.max(0, 1 - (fighter.stolenWindUpTimer / windupMax)));
-     const time = Date.now();
-     
-     ctx.save();
-     ctx.translate(0, crystalCenterY - 15);
-     
-     // ── 1. Sacred Arcane Fusion Seal (Concentric Rotating Magic Circles) ──
-     const sealAlpha = Math.min(1.0, progress * 1.6) * baseAlpha * 0.90;
-     const sealRadius = 24 + progress * 16;
-     const sealRot = (time * 0.0035) * (1 + progress * 3.0);
-     
-     ctx.save();
-     ctx.rotate(sealRot);
-     ctx.strokeStyle = `rgba(0, 255, 100, ${sealAlpha * 0.85})`;
-     ctx.lineWidth = 1.5;
-     
-     // Outer ring
-     ctx.beginPath();
-     ctx.arc(0, 0, sealRadius, 0, Math.PI * 2);
-     ctx.stroke();
-     
-     // Inner geometric octagram ticks & concentric dashed ring
-     ctx.strokeStyle = `rgba(180, 255, 210, ${sealAlpha * 0.65})`;
-     ctx.beginPath();
-     for (let k = 0; k < 8; k++) {
-       const a = (k * Math.PI) / 4;
-       ctx.moveTo(Math.cos(a) * (sealRadius * 0.65), Math.sin(a) * (sealRadius * 0.65));
-       ctx.lineTo(Math.cos(a) * sealRadius, Math.sin(a) * sealRadius);
-     }
-     ctx.stroke();
-     
-     ctx.beginPath();
-     ctx.arc(0, 0, sealRadius * 0.65, 0, Math.PI * 2);
-     ctx.stroke();
-     ctx.restore();
+  // ─────────────────────────────────────────────
+  // 2. DISCRETE PIXEL ART BASE POMMEL & SPEAR SPIKE
+  // ─────────────────────────────────────────────
+  const pommelY = shaftBot;
+  // Pommel dark outline
+  ctx.fillStyle = '#0A0F0D';
+  ctx.fillRect(snap(-8), pommelY, 16, P * 4);
+  ctx.fillRect(snap(-4), pommelY + P * 4, 8, P * 3);
+  ctx.fillRect(snap(-2), pommelY + P * 7, 4, P * 2);
+  ctx.fillRect(0, pommelY + P * 9, P, P);
 
-     // ── 2. Dual Essence Convergence (Cyan/Emerald Attraction + Lime/Green Repulsion) ──
-     if (progress < 0.72) {
-       const convP = progress / 0.72;
-       const orbitDist = (1 - convP) * 38;
-       const orbitAngle = time * 0.016 + progress * Math.PI * 4;
-       
-       // Essence 1: Cyan-Emerald (Lapse Attraction Essence)
-       const e1X = Math.cos(orbitAngle) * orbitDist;
-       const e1Y = Math.sin(orbitAngle) * orbitDist;
-       const grad1 = ctx.createRadialGradient(e1X, e1Y, 0, e1X, e1Y, 14);
-       grad1.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-       grad1.addColorStop(0.35, 'rgba(0, 255, 200, 0.85)');
-       grad1.addColorStop(1, 'rgba(0, 150, 100, 0)');
-       ctx.fillStyle = grad1;
-       ctx.beginPath();
-       ctx.arc(e1X, e1Y, 14, 0, Math.PI * 2);
-       ctx.fill();
+  // Pommel gold fill & highlights
+  ctx.fillStyle = '#D4AF37';
+  ctx.fillRect(snap(-6), pommelY + P, 12, P * 2);
+  ctx.fillRect(snap(-2), pommelY + P * 3, 4, P * 4);
+  ctx.fillRect(0, pommelY + P * 7, P, P * 2);
 
-       // Essence 2: Lime-Green (Reversal Repulsion Essence)
-       const e2X = Math.cos(orbitAngle + Math.PI) * orbitDist;
-       const e2Y = Math.sin(orbitAngle + Math.PI) * orbitDist;
-       const grad2 = ctx.createRadialGradient(e2X, e2Y, 0, e2X, e2Y, 14);
-       grad2.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-       grad2.addColorStop(0.35, 'rgba(100, 255, 50, 0.85)');
-       grad2.addColorStop(1, 'rgba(40, 180, 0, 0)');
-       ctx.fillStyle = grad2;
-       ctx.beginPath();
-       ctx.arc(e2X, e2Y, 14, 0, Math.PI * 2);
-       ctx.fill();
+  ctx.fillStyle = '#FFF275'; // Top-left specular glint
+  ctx.fillRect(snap(-4), pommelY + P, P * 2, P);
+  ctx.fillRect(0, pommelY + P * 4, P, P);
 
-       // Inward spiraling energy spark lines
-       ctx.strokeStyle = `rgba(180, 255, 200, ${0.75 * (1 - convP)})`;
-       ctx.lineWidth = 1.3;
-       for (let i = 0; i < 4; i++) {
-         const sparkA = orbitAngle + (i * Math.PI) / 2;
-         const sDist = orbitDist + 12 + Math.sin(time * 0.02 + i) * 6;
-         ctx.beginPath();
-         ctx.moveTo(Math.cos(sparkA) * sDist, Math.sin(sparkA) * sDist);
-         ctx.lineTo(0, 0);
-         ctx.stroke();
-       }
-     }
+  // ─────────────────────────────────────────────
+  // 3. DISCRETE PIXEL ART ASYMMETRICAL CROWN HEADPIECE (Gold & Emerald Wings)
+  // ─────────────────────────────────────────────
+  const crownBaseY = shaftTop;
 
-     // ── 3. Growing Compressed Green Hollow Purple Sphere ──
-     if (progress >= 0.35) {
-       const hollowProg = (progress - 0.35) / 0.65;
-       const chargeR = 19 * Math.pow(hollowProg, 1.15);
-       if (chargeR > 1) {
-         drawGojoOrb(ctx, 0, 0, chargeR, time, 'green', hollowProg * 6);
-       }
-       
-       // Expanding emerald energy shockwave ripple rings
-       const ripplePhase = ((time * 0.06) % 1);
-       const rippleR = chargeR + ripplePhase * 24 * hollowProg;
-       ctx.strokeStyle = `rgba(0, 255, 120, ${(1 - ripplePhase) * 0.85 * hollowProg})`;
-       ctx.lineWidth = 2.0;
-       ctx.beginPath();
-       ctx.arc(0, 0, rippleR, 0, Math.PI * 2);
-       ctx.stroke();
-     }
+  // A. Golden Socket Collar
+  ctx.fillStyle = '#0A0F0D';
+  ctx.fillRect(snap(-halfThick - P * 2), crownBaseY - P * 4, shaftThickness + P * 4, P * 5);
+  ctx.fillStyle = '#D4AF37';
+  ctx.fillRect(snap(-halfThick - P), crownBaseY - P * 3, shaftThickness + P * 2, P * 3);
+  ctx.fillStyle = '#FFF275';
+  ctx.fillRect(snap(-halfThick), crownBaseY - P * 3, P, P * 2);
 
-     // ── 4. Horizontal Anamorphic Flare & Plasma Discharge ──
-     if (progress > 0.40) {
-       const flareIntensity = Math.pow((progress - 0.40) / 0.60, 1.25);
-       drawAnamorphicLensFlare(ctx, 0, 0, flareIntensity, 'green');
-     }
+  // B. Left Large Crescent Blade Wing (Stepped Pixel Rasterization)
+  const drawLeftPixelWing = () => {
+    const leftWingPixels = [
+      // { x, y, col }
+      { x: -6, y: -4, col: '#D4AF37' }, { x: -8, y: -6, col: '#D4AF37' }, { x: -10, y: -8, col: '#D4AF37' },
+      { x: -14, y: -12, col: '#D4AF37' }, { x: -18, y: -16, col: '#D4AF37' }, { x: -22, y: -22, col: '#D4AF37' },
+      { x: -24, y: -28, col: '#D4AF37' }, { x: -24, y: -34, col: '#D4AF37' }, { x: -20, y: -40, col: '#D4AF37' },
+      { x: -14, y: -44, col: '#D4AF37' }, { x: -8, y: -46, col: '#D4AF37' }, // Tip
+      // Inner fill & highlights
+      { x: -12, y: -10, col: '#FFF275' }, { x: -16, y: -14, col: '#FFF275' }, { x: -20, y: -20, col: '#FFF275' },
+      { x: -22, y: -26, col: '#FFF275' }, { x: -20, y: -34, col: '#8C6808' }, { x: -16, y: -38, col: '#8C6808' },
+      { x: -10, y: -42, col: '#8C6808' }, { x: -6, y: -44, col: '#FFF275' }
+    ];
 
-     // ── 5. Chaotic Crackling Lightning Arcs to Staff Headpiece ──
-     ctx.strokeStyle = `rgba(0, 255, 100, ${0.85 * progress})`;
-     ctx.lineWidth = 1.5 + progress * 1.0;
-     const numArcs = 3 + Math.floor(progress * 5);
-     for (let i = 0; i < numArcs; i++) {
-       const angle = Math.random() * Math.PI * 2;
-       const maxArcDist = (16 + Math.random() * 26) * (0.6 + progress * 0.6);
-       ctx.beginPath();
-       ctx.moveTo(0, 0);
-       const midX = Math.cos(angle) * (maxArcDist * 0.5) + (Math.random() - 0.5) * 8;
-       const midY = Math.sin(angle) * (maxArcDist * 0.5) + (Math.random() - 0.5) * 8;
-       ctx.lineTo(midX, midY);
-       ctx.lineTo(Math.cos(angle) * maxArcDist, Math.sin(angle) * maxArcDist);
-       ctx.stroke();
-     }
+    // Dark outline pass
+    ctx.fillStyle = '#0A0F0D';
+    leftWingPixels.forEach(pt => {
+      const px = snap(pt.x);
+      const py = snap(crownBaseY + pt.y);
+      ctx.fillRect(px - P, py - P, P * 3, P * 3);
+    });
 
-     ctx.restore();
-  }
-  
-  if (fighter.stolenWindUpTimer > 0 && fighter.stolenColor) {
-    const pulse = Math.sin(Date.now() / 50) * 0.5 + 0.5; // rapid pulse
+    // Color fill pass
+    leftWingPixels.forEach(pt => {
+      ctx.fillStyle = pt.col;
+      ctx.fillRect(snap(pt.x), snap(crownBaseY + pt.y), P * 2, P * 2);
+    });
+  };
+
+  // C. Right Secondary Crescent Blade Wing (Asymmetrical Stepped Pixel Rasterization)
+  const drawRightPixelWing = () => {
+    const rightWingPixels = [
+      { x: 6, y: -4, col: '#D4AF37' }, { x: 8, y: -6, col: '#D4AF37' }, { x: 12, y: -10, col: '#D4AF37' },
+      { x: 16, y: -16, col: '#D4AF37' }, { x: 20, y: -22, col: '#D4AF37' }, { x: 18, y: -28, col: '#D4AF37' },
+      { x: 12, y: -34, col: '#D4AF37' }, { x: 6, y: -36, col: '#D4AF37' }, // Tip
+      // Highlights & shadows
+      { x: 10, y: -8, col: '#FFF275' }, { x: 14, y: -14, col: '#FFF275' }, { x: 16, y: -20, col: '#FFF275' },
+      { x: 14, y: -26, col: '#8C6808' }, { x: 8, y: -32, col: '#8C6808' }
+    ];
+
+    // Dark outline pass
+    ctx.fillStyle = '#0A0F0D';
+    rightWingPixels.forEach(pt => {
+      const px = snap(pt.x);
+      const py = snap(crownBaseY + pt.y);
+      ctx.fillRect(px - P, py - P, P * 3, P * 3);
+    });
+
+    // Color fill pass
+    rightWingPixels.forEach(pt => {
+      ctx.fillStyle = pt.col;
+      ctx.fillRect(snap(pt.x), snap(crownBaseY + pt.y), P * 2, P * 2);
+    });
+  };
+
+  drawLeftPixelWing();
+  drawRightPixelWing();
+
+  // ─────────────────────────────────────────────
+  // 4. FLOATING DISCRETE PIXEL MANA CRYSTAL (Energy Core)
+  // ─────────────────────────────────────────────
+  const coreColor = fighter.stolenType && fighter.stolenColor ? fighter.stolenColor : '#00FF64';
+  const crystalCenterY = snap(topY - 24);
+  const inEnemyGojoDomain = isInsideEnemyGojoDomain(fighter);
+
+  // Stolen Skill Channeling Tension Auras
+  if (fighter.stolenType === 'normal' && !inEnemyGojoDomain) {
+    // Draw Rubbick Tension Aura for Stolen Execute (Green)
+    const tensionIntensity = 1.0; 
+    const time = Date.now() / 150;
+    const s = 1.0; 
     
-    // Draw an intense massive aura behind the crystal
-    ctx.fillStyle = fighter.stolenColor;
-    ctx.globalAlpha = baseAlpha * (0.5 + pulse * 0.5);
-    ctx.beginPath();
-    ctx.arc(0, crystalCenterY, 30 + pulse * 20, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = baseAlpha;
-  }
-  
-  // Outer Diamond Crystal
-  ctx.fillStyle = coreColor;
-  ctx.globalAlpha = baseAlpha * 0.8;
-  ctx.beginPath();
-  ctx.moveTo(0, crystalCenterY - 18); // top tip
-  ctx.lineTo(-9, crystalCenterY); // left point
-  ctx.lineTo(0, crystalCenterY + 12); // bottom tip
-  ctx.lineTo(9, crystalCenterY); // right point
-  ctx.closePath();
-  ctx.fill();
-  
-  // Inner Bright Core
-  ctx.globalAlpha = baseAlpha * 1.0;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.moveTo(0, crystalCenterY - 12);
-  ctx.lineTo(-4, crystalCenterY);
-  ctx.lineTo(0, crystalCenterY + 8);
-  ctx.lineTo(4, crystalCenterY);
-  ctx.closePath();
-  ctx.fill();
-
-  // 5. Rotating Energy Ring around the Crystal
-  ctx.save();
-  ctx.translate(0, crystalCenterY);
-  ctx.rotate(Date.now() / -400); // Constant slow rotation
-  ctx.strokeStyle = coreColor;
-  ctx.lineWidth = 1.5;
-  ctx.globalAlpha = baseAlpha * 0.6;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 18, 6, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  
-  // Tiny orbiting particles on the ring
-  ctx.fillStyle = '#FFFFFF';
-  ctx.globalAlpha = baseAlpha * 0.9;
-  ctx.beginPath();
-  ctx.arc(18, 0, 2, 0, Math.PI * 2);
-  ctx.arc(-18, 0, 1.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // 6. Glowing Arcane Runes etched on the shaft
-  ctx.globalAlpha = baseAlpha;
-  ctx.strokeStyle = coreColor;
-  ctx.lineWidth = 1.5;
-  
-  // Diamond Rune
-  ctx.beginPath();
-  ctx.moveTo(0, topY + 30);
-  ctx.lineTo(-2, topY + 33);
-  ctx.lineTo(0, topY + 36);
-  ctx.lineTo(2, topY + 33);
-  ctx.closePath();
-  ctx.stroke();
-
-  // Crescent Rune
-  ctx.beginPath();
-  ctx.arc(0, topY + 45, 2.5, Math.PI * 0.2, Math.PI * 1.8);
-  ctx.stroke();
-
-  // ADD HANDS
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
-  if (!shouldHideHands && !fighter.hideFrontHand) {
     ctx.save();
-    ctx.fillStyle = '#00f7ff';
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000';
-    ctx.globalAlpha = baseAlpha;
+    ctx.translate(0, crystalCenterY); 
     
-    const handR = getHandSize(6);
-    if (fighter.stolenWindUpTimer > 0) {
-      // Left hand
-      ctx.beginPath();
-      ctx.arc(-shaftThickness/2 - 4, 10, handR, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-      // Right hand
-      ctx.beginPath();
-      ctx.arc(shaftThickness/2 + 4, -10, handR, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-    } else {
-      // Single hand gripping the staff
-      ctx.beginPath();
-      ctx.arc(0, 5, handR, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
+    const auraGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 45 * s);
+    auraGrad.addColorStop(0, `rgba(0, 180, 0, ${0.6 * tensionIntensity * baseAlpha})`);
+    auraGrad.addColorStop(0.5, `rgba(0, 80, 0, ${0.3 * tensionIntensity * baseAlpha})`);
+    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = auraGrad;
+    for (let i = -1; i <= 2; i++) {
+        const xOffset = i * 25 * s + Math.sin(time * 0.5 + i) * 10 * s;
+        const yOffset = Math.cos(time * 0.5 + i * 2) * 8 * s;
+        ctx.beginPath();
+        ctx.ellipse(xOffset, yOffset, 40 * s, 25 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
     }
     ctx.restore();
+  }
+
+  if ((fighter.stolenType === 'gojo' || fighter.stolenType === 'gojo_red' || fighter.stolenType === 'gojo_domain') && fighter.stolenWindUpTimer > 0 && !inEnemyGojoDomain) {
+    const windupMax = (fighter.stolenType === 'gojo_domain' ? 60 : 45);
+    const progress = Math.min(1.0, Math.max(0, 1 - (fighter.stolenWindUpTimer / windupMax)));
+    const time = Date.now();
+    
+    ctx.save();
+    ctx.translate(0, crystalCenterY - 15);
+    
+    // Sacred Arcane Fusion Seal (Stepped Pixel Ring)
+    const sealAlpha = Math.min(1.0, progress * 1.6) * baseAlpha * 0.90;
+    const sealRadius = snap(24 + progress * 16);
+    const sealRot = (time * 0.0035) * (1 + progress * 3.0);
+    const sGrid = Math.max(4, Math.round(sealRadius / P));
+    const sSize = sGrid + 2;
+    
+    ctx.save();
+    ctx.rotate(sealRot);
+    ctx.globalAlpha = sealAlpha;
+    
+    // Solid emerald stepped pixel ring
+    ctx.fillStyle = '#00FF64';
+    for (let gy = -sSize; gy <= sSize; gy++) {
+      for (let gx = -sSize; gx <= sSize; gx++) {
+        const d = Math.hypot(gx, gy);
+        if (Math.abs(d - sGrid) <= 0.65) {
+          ctx.fillRect(gx * P, gy * P, P, P);
+        }
+      }
+    }
+    ctx.restore();
+
+    if (progress >= 0.35) {
+      const hollowProg = (progress - 0.35) / 0.65;
+      const chargeR = 19 * Math.pow(hollowProg, 1.15);
+      if (chargeR > 1) {
+        drawGojoOrb(ctx, 0, 0, chargeR, time, 'green', hollowProg * 6);
+      }
+    }
+    ctx.restore();
+  } else if ((fighter.stolenDomainActive || (fighter.domainActive && fighter.stolenType === 'gojo_domain')) && (fighter.stolenDomainTimer || 0) > 0 && !inEnemyGojoDomain) {
+    // Active Stolen Unlimited Void: Radiant Emerald Core Aura atop staff
+    const time = Date.now();
+    ctx.save();
+    ctx.translate(0, crystalCenterY - 12);
+
+    const pulse = 1.0 + Math.sin(time * 0.008) * 0.15;
+    const sealRadius = snap(22 * pulse);
+    const sealRot = time * 0.004;
+    const sGrid = Math.max(4, Math.round(sealRadius / P));
+    const sSize = sGrid + 2;
+
+    ctx.save();
+    ctx.rotate(sealRot);
+    ctx.globalAlpha = 0.85 * baseAlpha;
+    ctx.fillStyle = '#00FF64';
+    for (let gy = -sSize; gy <= sSize; gy++) {
+      for (let gx = -sSize; gx <= sSize; gx++) {
+        const d = Math.hypot(gx, gy);
+        if (Math.abs(d - sGrid) <= 0.65) {
+          ctx.fillRect(gx * P, gy * P, P, P);
+        }
+      }
+    }
+    ctx.restore();
+
+    drawGojoOrb(ctx, 0, 0, 16 * pulse, time, 'green', 4);
+    ctx.restore();
+  }
+
+  // Stepped Pixel Diamond Crystal Core (Grid Size: 10px wide x 16px high)
+  const cryW = 10;
+  const cryH = 16;
+  const cSteps = Math.ceil(cryH / P);
+
+  // Stepped Outer Dark Ink Shell
+  ctx.fillStyle = '#0A0F0D';
+  for (let gy = -cSteps; gy <= cSteps; gy++) {
+    for (let gx = -cSteps; gx <= cSteps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const d = (Math.abs(rx) / (cryW * 0.5)) + (Math.abs(ry) / (cryH * 0.5));
+      if (d <= 1.35) {
+        ctx.fillRect(snap(rx), snap(crystalCenterY + ry), P, P);
+      }
+    }
+  }
+
+  // Stepped Emerald Facets & Specular Highlight
+  for (let gy = -cSteps; gy <= cSteps; gy++) {
+    for (let gx = -cSteps; gx <= cSteps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const d = (Math.abs(rx) / (cryW * 0.5)) + (Math.abs(ry) / (cryH * 0.5));
+      if (d > 1.0) continue;
+
+      const px = snap(rx);
+      const py = snap(crystalCenterY + ry);
+
+      // Specular bright white core glint
+      if (Math.abs(rx) <= P && Math.abs(ry + P) <= P) {
+        ctx.fillStyle = '#FFFFFF';
+      }
+      // Top-left facet highlight
+      else if (rx < 0 && ry < 0) {
+        ctx.fillStyle = '#70FFAB';
+      }
+      // Center neon-green crystal body
+      else if (d <= 0.65) {
+        ctx.fillStyle = coreColor;
+      }
+      // Bottom/right shadow facet
+      else {
+        ctx.fillStyle = '#007A33';
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // 5. ROTATING DISCRETE PIXEL ENERGY RING AROUND CRYSTAL
+  // ─────────────────────────────────────────────
+  ctx.save();
+  ctx.translate(0, crystalCenterY);
+  const ringRot = (Date.now() / -450);
+  ctx.rotate(ringRot);
+
+  // Stepped pixel ring nodes
+  const ringNodes = [
+    { a: 0, r: 16 }, { a: Math.PI * 0.5, r: 8 },
+    { a: Math.PI, r: 16 }, { a: Math.PI * 1.5, r: 8 }
+  ];
+
+  ctx.fillStyle = '#00FF64';
+  ringNodes.forEach(node => {
+    const nx = snap(Math.cos(node.a) * node.r);
+    const ny = snap(Math.sin(node.a) * node.r);
+    ctx.fillRect(nx, ny, P, P);
+  });
+
+  // Orbiting specular white pixel
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(snap(Math.cos(ringRot * 2) * 16), snap(Math.sin(ringRot * 2) * 6), P, P);
+  ctx.restore();
+
+  // ─────────────────────────────────────────────
+  // 6. GLOWING ARCANE RUNES ETCHED ON SHAFT (Pixel Inlay)
+  // ─────────────────────────────────────────────
+  ctx.fillStyle = coreColor;
+  // Diamond Rune Pixels
+  const rune1Y = snap(topY + 32);
+  ctx.fillRect(0, rune1Y, P, P);
+  ctx.fillRect(-P, rune1Y + P, P, P);
+  ctx.fillRect(P, rune1Y + P, P, P);
+  ctx.fillRect(0, rune1Y + P * 2, P, P);
+
+  // Crescent Rune Pixels
+  const rune2Y = snap(topY + 46);
+  ctx.fillRect(-P, rune2Y, P, P);
+  ctx.fillRect(0, rune2Y - P, P, P);
+  ctx.fillRect(P, rune2Y, P, P);
+  ctx.fillRect(P, rune2Y + P, P, P);
+  ctx.fillRect(0, rune2Y + P * 2, P, P);
+  ctx.fillRect(-P, rune2Y + P, P, P);
+
+  // ─────────────────────────────────────────────
+  // 7. MAGUS HANDS GRIPPING THE STAFF (Pixel Art Magus Glove)
+  // ─────────────────────────────────────────────
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter._isWinnerReveal;
+  if (!shouldHideHands && !fighter.hideFrontHand) {
+    const handR = getHandSize(6.5, fighter);
+    if ((fighter.stolenType === 'gojo' || fighter.stolenType === 'gojo_red' || fighter.stolenType === 'gojo_domain') && fighter.stolenWindUpTimer > 0) {
+      // 2-Handed Channeling Grip:
+      // Front hand near upper crystal collar
+      drawRubbickPixelHand(ctx, snap(-halfThick - 3), snap(-4), handR, baseAlpha);
+      // Rear hand on lower shaft
+      drawRubbickPixelHand(ctx, snap(halfThick + 3), snap(20), handR, baseAlpha);
+    } else {
+      // Single hand firmly gripping the staff at the middle grip wrap (y = 8)
+      drawRubbickPixelHand(ctx, 0, 8, handR, baseAlpha);
+    }
   }
 
   ctx.restore();
@@ -475,111 +480,171 @@ export function drawRubbickStaff(ctx, fighter) {
 export function drawRubbickBolt(ctx, p) {
   if (!p || Number.isNaN(p.x) || Number.isNaN(p.y)) return;
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
   
   // Fade alpha if projectile is expiring / fading out
   if (p.fadingAlpha !== undefined) {
     ctx.globalAlpha *= Math.max(0, Math.min(1, p.fadingAlpha));
   }
 
-  // 1. Draw glowing trail with particles along history
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer && p.infinityFreezeTimer > 0));
+
+  // 1. ── CONTINUOUS PIXEL ART SOLID TRAIL ALONG FLIGHT HISTORY ──
   if (p.history && p.history.length > 1) {
     const histLen = p.history.length;
     
+    // Draw connected continuous solid pixel segments
     for (let i = 0; i < histLen - 1; i++) {
       const pt = p.history[i];
       const nextPt = p.history[i + 1];
       if (!pt || !nextPt || Number.isNaN(pt.x) || Number.isNaN(nextPt.x)) continue;
       
-      // Calculate how "old" this segment is (0 = tail, 1 = head)
       const progress = (i + 1) / histLen;
-      
-      // Tapering width and fading alpha
-      const currentRadius = p.r * 2.8 * progress;
-      const alpha = progress * 0.65;
-      
-      // Outer ethereal green trail segment
+      const alpha = progress * 0.95;
+      const currentWidth = snap(Math.max(P, p.r * 2.4 * progress));
+
+      // 1. Dark Outer Border (Deep Navy Obsidian when frozen, Dark Forest Obsidian when normal)
       ctx.beginPath();
-      ctx.moveTo(pt.x, pt.y);
-      ctx.lineTo(nextPt.x, nextPt.y);
-      ctx.strokeStyle = `rgba(57, 255, 20, ${alpha})`;
-      ctx.lineWidth = currentRadius;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+      ctx.moveTo(snap(pt.x), snap(pt.y));
+      ctx.lineTo(snap(nextPt.x), snap(nextPt.y));
+      ctx.strokeStyle = isFrozen 
+        ? `rgba(4, 18, 32, ${(alpha * 0.85).toFixed(2)})` 
+        : `rgba(5, 25, 12, ${(alpha * 0.85).toFixed(2)})`;
+      ctx.lineWidth = currentWidth + P * 2;
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'miter';
       ctx.stroke();
 
-      // Inner bright streak segment
+      // 2. Main Body (Frozen Cyan / Emerald Green)
       ctx.beginPath();
-      ctx.moveTo(pt.x, pt.y);
-      ctx.lineTo(nextPt.x, nextPt.y);
-      ctx.strokeStyle = `rgba(210, 255, 210, ${alpha * 1.5})`;
-      ctx.lineWidth = currentRadius * 0.35;
+      ctx.moveTo(snap(pt.x), snap(pt.y));
+      ctx.lineTo(snap(nextPt.x), snap(nextPt.y));
+      ctx.strokeStyle = isFrozen 
+        ? `rgba(0, 229, 255, ${alpha.toFixed(2)})` 
+        : `rgba(0, 255, 100, ${alpha.toFixed(2)})`;
+      ctx.lineWidth = currentWidth;
       ctx.stroke();
-      
-      // Tiny sparkles along trail history
-      if (i % 2 === 0) {
-        const sparkCount = Math.floor(progress * 2.5);
-        for (let s = 0; s < sparkCount; s++) {
-          const randX = Math.sin(pt.x * 12.345 + s * 45) * p.r * 2.2;
-          const randY = Math.cos(pt.y * 54.321 + s * 33) * p.r * 2.2;
-          
-          ctx.beginPath();
-          const sparkSize = (Math.sin(pt.x + Date.now() / 100) * 0.5 + 1.0) * progress * 1.5;
-          ctx.fillStyle = `rgba(255, 255, 255, ${progress})`;
-          ctx.arc(pt.x + randX, pt.y + randY, sparkSize, 0, Math.PI * 2);
-          ctx.fill();
+
+      // 3. Bright Mint / Ice Blue / White Core on recent segments
+      if (progress > 0.4) {
+        ctx.beginPath();
+        ctx.moveTo(snap(pt.x), snap(pt.y));
+        ctx.lineTo(snap(nextPt.x), snap(nextPt.y));
+        if (progress > 0.75) {
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+        } else {
+          ctx.strokeStyle = isFrozen 
+            ? `rgba(180, 240, 255, ${alpha.toFixed(2)})` 
+            : `rgba(180, 255, 210, ${alpha.toFixed(2)})`;
         }
+        ctx.lineWidth = Math.max(1, currentWidth * 0.4);
+        ctx.stroke();
+      }
+
+      // Discrete floating pixel ember dust along trail
+      if (i % 3 === 0) {
+        const sSeed = pt.x * 3.14 + pt.y * 7.28 + i;
+        const randOx = snap(Math.sin(sSeed) * p.r * 2.2);
+        const randOy = snap(Math.cos(sSeed * 1.5) * p.r * 2.2);
+        const sparkCol = (i % 2 === 0) 
+          ? `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(2)})` 
+          : (isFrozen ? `rgba(0, 210, 255, ${(alpha * 0.85).toFixed(2)})` : `rgba(0, 255, 160, ${(alpha * 0.85).toFixed(2)})`);
+        ctx.fillStyle = sparkCol;
+        ctx.fillRect(snap(pt.x + randOx), snap(pt.y + randOy), P, P);
       }
     }
   }
 
-  // 2. Draw the main diamond/teardrop core oriented in travel direction
-  ctx.translate(p.x, p.y);
+  // 2. ── CHUNKY PIXEL ART ARCANE DIAMOND CRYSTAL (PROJECTILE HEAD) ──
+  ctx.translate(snap(p.x), snap(p.y));
   const angle = (p.vx !== 0 || p.vy !== 0) 
     ? Math.atan2(p.vy, p.vx) 
     : (p.angle !== undefined ? p.angle : (p.rotation || 0));
   ctx.rotate(angle);
 
-  // Concentric radiant emerald & cyan aura (Rule 11 compliant: NO shadowBlur)
-  const glowR = p.r * 3.8;
-  const glowGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, glowR);
-  glowGrad.addColorStop(0, 'rgba(57, 255, 20, 0.45)');
-  glowGrad.addColorStop(0.5, 'rgba(0, 230, 180, 0.20)');
-  glowGrad.addColorStop(1, 'rgba(0, 255, 100, 0)');
-  ctx.fillStyle = glowGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, glowR, 0, Math.PI * 2);
-  ctx.fill();
+  // Discrete 8-bit / 16-bit Arcane Diamond Core
+  const pr = Math.max(P * 2, snap(p.r || 6));
 
-  // Sharp outer diamond crystal body with dark outline
-  ctx.fillStyle = 'rgba(57, 255, 20, 0.95)';
-  ctx.strokeStyle = 'rgba(10, 60, 20, 0.85)';
-  ctx.lineWidth = 1.2;
+  // A. Outer Obsidian Outline Pixels
+  ctx.fillStyle = isFrozen ? '#041628' : '#05180B';
+  // Leading nose
+  ctx.fillRect(snap(pr * 3.0), snap(-P), P * 2, P * 2);
+  ctx.fillRect(snap(pr * 2.2), snap(-P * 2), P * 2, P);
+  ctx.fillRect(snap(pr * 2.2), snap(P), P * 2, P);
+  // Upper wing
+  ctx.fillRect(snap(pr * 0.8), snap(-pr * 1.6 - P), P * 3, P);
+  ctx.fillRect(snap(-P), snap(-pr * 1.6), P * 2, P * 2);
+  // Lower wing
+  ctx.fillRect(snap(pr * 0.8), snap(pr * 1.6), P * 3, P);
+  ctx.fillRect(snap(-P), snap(pr * 1.6 - P), P * 2, P * 2);
+  // Rear tail
+  ctx.fillRect(snap(-pr * 2.0), snap(-P), P * 2, P * 2);
+  ctx.fillRect(snap(-pr * 1.2), snap(-P * 2), P * 2, P);
+  ctx.fillRect(snap(-pr * 1.2), snap(P), P * 2, P);
+
+  // B. Shaded Dark Facet (Sapphire Blue when frozen, Dark Emerald when normal)
+  ctx.fillStyle = isFrozen ? '#0066AA' : '#007A33';
   ctx.beginPath();
-  ctx.moveTo(p.r * 3.2, 0); // sharp leading tip
-  ctx.lineTo(p.r * 0.4, p.r * 1.6); // bottom wing
-  ctx.lineTo(-p.r * 1.6, 0); // rear tail
-  ctx.lineTo(p.r * 0.4, -p.r * 1.6); // top wing
+  ctx.moveTo(snap(pr * 2.6), 0);
+  ctx.lineTo(snap(pr * 0.5), snap(pr * 1.4));
+  ctx.lineTo(snap(-pr * 1.4), 0);
   ctx.closePath();
   ctx.fill();
-  ctx.stroke();
 
-  // Bright white-hot diamond core
+  // C. Vibrant Upper Body Facet (Limitless Cyan when frozen, Arcane Emerald when normal)
+  ctx.fillStyle = isFrozen ? '#00E5FF' : '#00FF64';
+  ctx.beginPath();
+  ctx.moveTo(snap(pr * 2.6), 0);
+  ctx.lineTo(snap(pr * 0.5), snap(-pr * 1.4));
+  ctx.lineTo(snap(-pr * 1.4), 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // D. Highlight Rim (Ice Cyan when frozen, Mint/Seafoam when normal)
+  ctx.fillStyle = isFrozen ? '#80E5FF' : '#80FFB0';
+  ctx.fillRect(snap(pr * 0.8), snap(-pr * 0.8), snap(pr * 1.2), P);
+  ctx.fillRect(snap(pr * 0.2), snap(-pr * 1.1), snap(pr * 0.8), P);
+
+  // E. Pure White-Hot Specular Center Diamond Core
   ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.moveTo(p.r * 2.2, 0);
-  ctx.lineTo(p.r * 0.3, p.r * 0.85);
-  ctx.lineTo(-p.r * 0.8, 0);
-  ctx.lineTo(p.r * 0.3, -p.r * 0.85);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillRect(snap(pr * 0.2), snap(-P), snap(pr * 1.0), P * 2);
+  ctx.fillRect(snap(pr * 0.6), snap(-P * 2), P, P * 4);
+
+  // F. 4 Orbiting Arcane Pixel Glints
+  const glintT = performance.now() * 0.01;
+  const glintDist = snap(pr * 2.0);
+  const glintColors = isFrozen 
+    ? ['#FFFFFF', '#00E5FF', '#80E5FF', '#38BDF8'] 
+    : ['#FFFFFF', '#00FF88', '#80FFD0', '#00E5FF'];
+  for (let g = 0; g < 4; g++) {
+    const gAng = glintT + (g * Math.PI / 2);
+    const gx = snap(Math.cos(gAng) * glintDist);
+    const gy = snap(Math.sin(gAng) * (glintDist * 0.7));
+    ctx.fillStyle = glintColors[g];
+    ctx.fillRect(gx, gy, P, P);
+  }
+
+  // G. Additional subtle frozen crystal frost pixels when caught by Infinity
+  if (isFrozen) {
+    const frostT = performance.now() * 0.005;
+    ctx.fillStyle = '#E0F7FF';
+    ctx.fillRect(snap(Math.sin(frostT * 2.1) * (pr * 2.4)), snap(Math.cos(frostT * 2.1) * (pr * 1.8)), P, P);
+    ctx.fillRect(snap(-Math.sin(frostT * 1.7) * (pr * 2.2)), snap(-Math.cos(frostT * 1.7) * (pr * 1.6)), P, P);
+    ctx.fillStyle = '#00B4D8';
+    ctx.fillRect(snap(Math.cos(frostT * 3.0) * (pr * 1.9)), snap(Math.sin(frostT * 3.0) * (pr * 1.5)), P, P);
+  }
 
   ctx.restore();
 }
 
-export function drawRubbickChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
-  if (beamCharge <= 0) return;
+export function drawRubbickChargeEffect(ctx, x, y, gunAngle, beamCharge, r, fighter) {
+  if (beamCharge <= 0 || (fighter && isInsideEnemyGojoDomain(fighter))) return;
 
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
 
@@ -587,59 +652,86 @@ export function drawRubbickChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
     ctx.scale(1, -1);
   }
 
-  // Position at the staff tip (roughly r + 75)
-  const tipDist = r + 75;
-  // Fallback to 60 if CONFIG.laser is not defined yet here
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // Position at the staff crystal tip (roughly r + 75)
+  const tipDist = snap(r + 75);
   const windupDuration = (typeof CONFIG !== 'undefined' && CONFIG.laser) ? CONFIG.laser.windupDuration : 60;
   const chargeNorm = Math.min(1, beamCharge / windupDuration);
-  const glowRadius = 15 + chargeNorm * 35;
-  const alpha = 0.2 + chargeNorm * 0.6;
-  const time = Date.now() / 80;
-  
-  // Central concentrated energy core
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(tipDist, 0, 3 + chargeNorm * 5, 0, Math.PI * 2);
-  ctx.fill();
+  const glowRadius = snap(14 + chargeNorm * 36);
+  const alpha = Math.min(1.0, 0.25 + chargeNorm * 0.75);
+  const time = performance.now() / 80;
 
-  // Expanding pulsing energy rings (Shockwaves at the tip)
-  for (let i = 0; i < 3; i++) {
-    const ringPhase = ((time * 0.5 + i * 0.33) % 1);
-    ctx.beginPath();
-    ctx.arc(tipDist, 0, glowRadius * ringPhase, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(0, 255, 100, ${(1 - ringPhase) * alpha})`;
-    ctx.lineWidth = 2 * (1 - ringPhase);
-    ctx.stroke();
+  // 1. ── CENTRAL PULSING PIXEL ENERGY CORE ──
+  const coreSize = snap(3 + chargeNorm * 6);
+  // Outer obsidian border
+  ctx.fillStyle = '#05180B';
+  ctx.fillRect(tipDist - coreSize - P, -coreSize - P, (coreSize + P) * 2, (coreSize + P) * 2);
+  // Emerald middle
+  ctx.fillStyle = '#00FF64';
+  ctx.fillRect(tipDist - coreSize, -coreSize, coreSize * 2, coreSize * 2);
+  // White-hot center
+  ctx.fillStyle = '#FFFFFF';
+  const innerSize = Math.max(P, snap(coreSize * 0.5));
+  ctx.fillRect(tipDist - innerSize, -innerSize, innerSize * 2, innerSize * 2);
+
+  // 2. ── EXPANDING STEPPED PIXEL CONCENTRIC RINGS ──
+  for (let ringIdx = 0; ringIdx < 3; ringIdx++) {
+    const ringPhase = ((time * 0.4 + ringIdx * 0.33) % 1);
+    const ringR = Math.max(P * 2, snap(glowRadius * ringPhase));
+    const ringAlpha = (1 - ringPhase) * alpha;
+    if (ringAlpha <= 0.05) continue;
+
+    const steps = Math.max(16, Math.min(36, Math.round((Math.PI * 2 * ringR) / (P * 2))));
+    
+    // Draw stepped pixel ring circumference
+    for (let st = 0; st < steps; st++) {
+      const ang = (st / steps) * Math.PI * 2;
+      const cosA = Math.cos(ang);
+      const sinA = Math.sin(ang);
+      const px = snap(tipDist + cosA * ringR);
+      const py = snap(sinA * ringR);
+
+      // Primary emerald pixel
+      ctx.fillStyle = `rgba(0, 255, 100, ${ringAlpha.toFixed(2)})`;
+      ctx.fillRect(px, py, P, P);
+
+      // Inner white glint
+      if (st % 2 === 0 && ringPhase < 0.6) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${(ringAlpha * 0.9).toFixed(2)})`;
+        ctx.fillRect(px - P, py - P, P, P);
+      }
+    }
   }
 
-  // ── Massive Sucking Particles Effect ──
-  const particleCount = 25 + Math.floor(chargeNorm * 15);
+  // 3. ── INWARD-SUCKING STEPPED PIXEL ENERGY STREAKS ──
+  const particleCount = 18 + Math.floor(chargeNorm * 12);
   for (let i = 0; i < particleCount; i++) {
-    const pPhase = ((time * 1.5 + i * 0.618) % 1); 
-    const angleOffset = i * (Math.PI * 2 / particleCount) + (time * 0.2); 
-    const inwardProgress = Math.pow(pPhase, 3);
-    
-    const maxDist = 180;
-    const currentDist = maxDist * (1 - inwardProgress);
-    
-    const xPos = tipDist + Math.cos(angleOffset) * currentDist;
-    const yPos = Math.sin(angleOffset) * currentDist;
-    
-    const tailLength = (10 + chargeNorm * 15) * (1 - inwardProgress);
-    const tailDist = currentDist + tailLength;
-    const xTail = tipDist + Math.cos(angleOffset) * tailDist;
-    const yTail = Math.sin(angleOffset) * tailDist;
+    const pPhase = ((time * 1.2 + i * 0.618) % 1);
+    const angleOffset = i * (Math.PI * 2 / particleCount) + (time * 0.15);
+    const inwardProgress = Math.pow(pPhase, 2.5);
 
-    ctx.beginPath();
-    ctx.moveTo(xPos, yPos);
-    ctx.lineTo(xTail, yTail);
-    
-    let streakAlpha = Math.min(1, inwardProgress * 2); 
-    let color = (inwardProgress > 0.8) ? `rgba(255, 255, 255, ${streakAlpha})` : `rgba(0, 255, 50, ${streakAlpha})`;
-    
-    ctx.strokeStyle = color;
-    ctx.lineWidth = (1 + chargeNorm * 1.5) * (1 - Math.pow(inwardProgress, 8));
-    ctx.stroke();
+    const maxDist = 160;
+    const currentDist = snap(maxDist * (1 - inwardProgress));
+    if (currentDist < P * 2) continue;
+
+    const streakX = snap(tipDist + Math.cos(angleOffset) * currentDist);
+    const streakY = snap(Math.sin(angleOffset) * currentDist);
+    const streakAlpha = Math.min(1.0, inwardProgress * 2.2);
+
+    // Render leading pixel dot
+    ctx.fillStyle = (inwardProgress > 0.75) 
+      ? `rgba(255, 255, 255, ${streakAlpha.toFixed(2)})`
+      : `rgba(0, 255, 80, ${streakAlpha.toFixed(2)})`;
+    ctx.fillRect(streakX, streakY, P, P);
+
+    // Trailing pixel streak step
+    const tailDist = snap(currentDist + (8 + chargeNorm * 12) * (1 - inwardProgress));
+    const tailX = snap(tipDist + Math.cos(angleOffset) * tailDist);
+    const tailY = snap(Math.sin(angleOffset) * tailDist);
+    ctx.fillStyle = `rgba(0, 200, 70, ${(streakAlpha * 0.6).toFixed(2)})`;
+    ctx.fillRect(tailX, tailY, P, P);
   }
 
   ctx.restore();
@@ -648,4 +740,82 @@ export function drawRubbickChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
 export const drawTricksterStaff = drawRubbickStaff;
 export const drawTricksterBolt = drawRubbickBolt;
 export const drawTricksterChargeEffect = drawRubbickChargeEffect;
+
+/**
+ * Calculates the exact world-space coordinates (x, y) of the crystal core at the tip of Rubbick's staff.
+ * @param {Object} fighter - Rubbick fighter instance
+ * @returns {{x: number, y: number}} World coordinates of staff crystal tip
+ */
+export function getRubbickStaffTip(fighter) {
+  if (!fighter) return { x: 0, y: 0 };
+  const r = fighter.r || 25;
+  const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  const zOffset = fighter.z || 0;
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+
+  let gripX = r * 0.70;
+  let gripY = r * 0.20;
+  let staffTilt = Math.PI / 2 - 0.22;
+
+  if ((fighter.stolenType === 'gojo' || fighter.stolenType === 'gojo_red' || fighter.stolenType === 'gojo_domain') && fighter.stolenWindUpTimer > 0) {
+    const windupMax = 45;
+    const progress = Math.min(1.0, Math.max(0, 1 - (fighter.stolenWindUpTimer / windupMax)));
+    if (progress < 0.40) {
+      const pNorm = progress / 0.40;
+      gripX = r * 0.65 - Math.sin(pNorm * Math.PI) * 4;
+      gripY = -r * 0.15 - Math.sin(pNorm * Math.PI) * 6;
+      staffTilt = Math.PI / 2 - 0.45 - Math.sin(pNorm * Math.PI) * 0.20;
+    } else if (progress < 0.75) {
+      const pNorm = (progress - 0.40) / 0.35;
+      gripX = r * 0.65 + pNorm * (r * 0.25);
+      gripY = -r * 0.15 + pNorm * (r * 0.15);
+      staffTilt = Math.PI / 2 - 0.45 + pNorm * 0.45;
+    } else {
+      const pNorm = (progress - 0.75) / 0.25;
+      gripX = r * 0.90 + pNorm * 6;
+      gripY = 0;
+      staffTilt = Math.PI / 2;
+    }
+  } else if (fighter.stolenWindUpTimer > 0 || fighter.beamCharge > 0 || fighter.beamTimer > 0 || fighter.tkTimer > 0) {
+    gripX = r * 0.85;
+    gripY = 0;
+    staffTilt = Math.PI / 2;
+  }
+
+  // Shaft top is at y = -50, with grip wrap offset y = -8, crystal is at y = -74.
+  // In grip local frame, crystal center is at localStaffX = 0, localStaffY = -82.
+  const localStaffX = 0;
+  let localStaffY = -82;
+
+  // Custom weapon studio offsets if any
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.rubbick) ? state.weaponCustomizations.rubbick : null;
+  if (custom) {
+    if (custom.scale && custom.scale !== 1.0) {
+      localStaffY *= custom.scale;
+    }
+    if (custom.angleOffset) {
+      staffTilt += custom.angleOffset;
+    }
+  }
+
+  // Rotate by staffTilt in hand coordinate frame
+  const handX = gripX - localStaffY * Math.sin(staffTilt) + localStaffX * Math.cos(staffTilt);
+  const handY = gripY + localStaffY * Math.cos(staffTilt) + localStaffX * Math.sin(staffTilt);
+
+  // Apply facingLeft Y-axis vertical flip (ctx.scale(1, -1))
+  const localX = handX;
+  const localY = facingLeft ? -handY : handY;
+
+  // Transform to world coordinates using fighter's gunAngle and hovering zOffset
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+
+  return {
+    x: fighter.x + (cosA * localX - sinA * localY),
+    y: (fighter.y - zOffset) + (sinA * localX + cosA * localY)
+  };
+}
+
+export const getTricksterStaffTip = getRubbickStaffTip;
+
 

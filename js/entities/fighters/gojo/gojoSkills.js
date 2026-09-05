@@ -76,6 +76,9 @@ export function activateRed(fighter) {
 export function detonateRed(fighter) {
   if (fighter.redDetonated) return;
   fighter.redDetonated = true;
+  fighter.hasFiredRed = true;
+  fighter._hasFiredRedAtLeastOnce = true;
+  fighter.lastCastSkill = 'red';
 
   const pushAngle = fighter.redTargetAngle !== undefined ? fighter.redTargetAngle : (fighter.gunAngle || 0);
   fighter.redTargetAngle = pushAngle;
@@ -216,6 +219,7 @@ export function firePurple(fighter, ownerIndex) {
   fighter.purpleUseCount = (fighter.purpleUseCount || 0) + 1;
   fighter.hasFiredPurple = true;
   fighter._hasFiredPurpleAtLeastOnce = true;
+  fighter.lastCastSkill = 'purple';
   const enableBoost = CONFIG.gojo?.enablePurpleSecondCastBoost !== false;
   const isSecondCast = enableBoost && (fighter.purpleUseCount === 2);
   const damageMult = isSecondCast ? (CONFIG.gojo?.purpleSecondCastDamageMultiplier ?? 2.0) : 1.0;

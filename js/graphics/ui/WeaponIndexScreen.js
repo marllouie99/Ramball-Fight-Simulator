@@ -19,6 +19,7 @@ import {
 } from '../weaponVisuals.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from '../weapons/musashiWeaponGraphics.js';
 import { drawRubyScythe } from '../weapons/rubyWeaponGraphics.js';
+import { drawRubbickStaff } from '../weapons/rubbickWeaponGraphics.js';
 import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
@@ -1314,7 +1315,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'yuta') offsetX = -40; // Katana
   else if (type === 'megumi') offsetX = -45; // Shadow Blade
   else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
-  else if (type === 'uryu') offsetX = 0; // TYBW Spirit Bow centered
+  else if (type === 'uryu' || type === 'rubbick' || type === 'trickster') offsetX = 0; // Centered
   else if (type === 'ichigo') {
     offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -55;
   }
@@ -1423,6 +1424,28 @@ function drawWeaponPreview(ctx, type, color) {
         // Ruby's huge scythe
         drawRubyScythe(ctx, { r, gunAngle, activePullActive: false, passiveSpinActive: false, scytheSwingActive: false });
         return;
+
+      case 'rubbick':
+      case 'trickster': {
+        const mockFighter = {
+          x: 0,
+          y: 0,
+          r: r,
+          gunAngle: gunAngle,
+          staffAngle: gunAngle,
+          attackCooldown: 0,
+          attackSwingTimer: 0,
+          stolenWindUpTimer: 0,
+          tkTimer: 0,
+          beamCharge: 0,
+          beamTimer: 0,
+          isPreview: true,
+          color: color || '#10b981',
+          themeColor: '#7c3aed'
+        };
+        drawRubbickStaff(ctx, mockFighter);
+        return;
+      }
 
       case 'musashi': {
         const mockFighter = {

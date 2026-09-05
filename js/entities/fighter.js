@@ -415,6 +415,7 @@ export class Fighter {
   areAttackEffectsSuppressed() {
     if (this.hp <= 0 || this.isDead) return true;
     if (this.isTargetOfAmbush) return true;
+    if (this.isCaughtInTelekinesis) return true;
     if (this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0)) return true;
     if (this.timeStopTimer && this.timeStopTimer > 0) return true;
     if (this.paralyzeTimer && this.paralyzeTimer > 0) return true;
