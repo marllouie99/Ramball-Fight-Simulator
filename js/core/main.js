@@ -569,7 +569,7 @@ export function switchGameHub(hub, playAudio = true) {
     if (tileHubTitle) tileHubTitle.innerText = 'ANIME BRAWL';
     if (tileHubSubtitle) tileHubSubtitle.innerText = 'SWITCH HUB';
     if (tileHubIcon) {
-      tileHubIcon.innerHTML = `<svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+      tileHubIcon.innerHTML = `<svg class="pixel-icon" viewBox="0 0 16 16" width="26" height="26" fill="none" shape-rendering="crispEdges">
         <path d="M2 1h3v1h1v1h1v1h1v1h1v1h1v1h1v2h1v1h2v1h1v3h-3v-1h-1v-2h-1v-1h-1V9H8V8H7V7H6V6H5V5H4V4H3V3H2V1z" fill="#ffffff"/>
         <path d="M14 1h-3v1h-1v1h-1v1H8v1H7v1H6v1H5v1H4v2H3v1H1v1H0v3h3v-1h1v-2h1v-1h1V9h1V8h1V7h1V6h1V5h1V4h1V3h1V1h-2z" fill="#ffffff"/>
         <path d="M3 2h1v1h1v1h1v1h1v1h1v1h-1v1H6V7H5V6H4V5H3V2z" fill="#ffd1dc"/>
@@ -597,7 +597,7 @@ export function switchGameHub(hub, playAudio = true) {
     if (tileHubTitle) tileHubTitle.innerText = 'TACTICAL';
     if (tileHubSubtitle) tileHubSubtitle.innerText = 'SWITCH HUB';
     if (tileHubIcon) {
-      tileHubIcon.innerHTML = `<svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+      tileHubIcon.innerHTML = `<svg class="pixel-icon" viewBox="0 0 16 16" width="26" height="26" fill="none" shape-rendering="crispEdges">
         <path d="M5 1h6v1h2v2h1v2h1v4h-1v2h-1v2h-2v1H5v-1H3v-2H2v-2H1V6h1V4h1V2h2V1z" fill="#ffffff"/>
         <path d="M5 3h6v1h2v2h1v4h-1v2h-2v1H5v-1H3v-2H2V6h1V4h2V3z" fill="#21050c"/>
         <path d="M6 4h4v1h1v1h1v4h-1v1h-1v1H6v-1H5v-1H4V6h1V5h1V4z" fill="#ffffff"/>

@@ -1297,16 +1297,15 @@ canvas {
 }
 
 /* ─────────────────────────────────────────────
-   6-TILE PIXEL ART MENU GRID (Compact 2-Column Grid)
+   6-TILE PIXEL ART MENU GRID (Perfect Square 2-Column Grid)
 ───────────────────────────────────────────── */
 .menu-grid-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 12px;
+  gap: 16px;
   width: 100%;
   box-sizing: border-box;
-  padding: 4px 0 6px 0;
-  margin: auto 0;
+  padding: 8px 2px 10px 2px;
   min-height: 0;
 }
 
@@ -1314,14 +1313,16 @@ canvas {
 .menu-grid-tactical {
   grid-template-columns: 1fr;
   grid-template-rows: repeat(3, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
 .menu-grid-tactical .menu-tile-3d {
+  aspect-ratio: unset;
+  height: 80px;
   flex-direction: row;
   justify-content: flex-start;
-  gap: 14px;
-  padding: 10px 16px;
+  gap: 16px;
+  padding: 10px 18px;
   text-align: left;
 }
 
@@ -1333,14 +1334,16 @@ canvas {
 .menu-grid-arsenal {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
 }
 
 .menu-grid-arsenal .menu-tile-3d {
+  aspect-ratio: unset;
+  height: 90px;
   flex-direction: row;
   justify-content: flex-start;
-  gap: 16px;
-  padding: 12px 18px;
+  gap: 18px;
+  padding: 14px 20px;
   text-align: left;
 }
 
@@ -1348,19 +1351,21 @@ canvas {
   align-items: flex-start;
 }
 
-/* Chunky Pixel Art 3D Button Tile (Compact 2-Column Tile) */
+/* Chunky Pixel Art 3D Button Tile (Perfect Square 1:1) */
 .menu-tile-3d {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 10px 8px;
-  height: 88px;
+  gap: 10px;
+  padding: 12px 8px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
   background: linear-gradient(180deg, #f26f88 0%, #e24968 45%, #cc2b4d 100%);
-  border: 2.5px solid #21050c;
-  border-radius: 6px;
-  box-shadow: inset 0 2px 0 #ffaec0, inset 0 -2px 0 #9e1432, 0 4px 0 #5e0d1f, 0 5px 0 #21050c;
+  border: 3px solid #21050c;
+  border-radius: 8px;
+  box-shadow: inset 0 3px 0 #ffaec0, inset 0 -3px 0 #9e1432, 0 5px 0 #5e0d1f, 0 7px 0 #21050c;
   cursor: pointer;
   transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
   user-select: none;
@@ -1373,33 +1378,33 @@ canvas {
 
 .menu-tile-3d:hover {
   background: linear-gradient(180deg, #fa7f97 0%, #eb5977 45%, #d83759 100%);
-  transform: translateY(-1px);
-  box-shadow: inset 0 2px 0 #ffc2cf, inset 0 -2px 0 #9e1432, 0 5px 0 #5e0d1f, 0 6px 0 #21050c;
+  transform: translateY(-2px);
+  box-shadow: inset 0 3px 0 #ffc2cf, inset 0 -3px 0 #9e1432, 0 7px 0 #5e0d1f, 0 9px 0 #21050c;
 }
 
 .menu-tile-3d:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 1px 0 #9e1432, 0 1px 0 #5e0d1f, 0 2px 0 #21050c;
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 0 #9e1432, 0 2px 0 #5e0d1f, 0 3px 0 #21050c;
 }
 
 /* Pixel Art Inner Emblem Badge */
 .tile-icon-box {
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   background: #b81c3b;
-  border: 2px solid #21050c;
-  border-radius: 5px;
+  border: 2.5px solid #21050c;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  box-shadow: inset 0 1px 0 #e64566, inset 0 -1px 0 #730a20;
+  font-size: 24px;
+  box-shadow: inset 0 2px 0 #e64566, inset 0 -2px 0 #730a20;
   flex-shrink: 0;
   transition: transform 0.08s ease;
 }
 
 .menu-tile-3d:hover .tile-icon-box {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .menu-tile-3d:active .tile-icon-box {
@@ -1410,28 +1415,28 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .tile-title {
   font-family: 'Press Start 2P', monospace;
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
-  line-height: 1.2;
-  text-shadow: 0 1px 0 #781028, 0 2px 0 #21050c;
+  line-height: 1.3;
+  text-shadow: 0 2px 0 #781028, 0 3px 0 #21050c;
 }
 
 .tile-subtitle {
   font-family: 'Silkscreen', 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-size: 7.5px;
   font-weight: 700;
   color: #ffd1dc;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  line-height: 1.1;
+  line-height: 1.2;
   text-shadow: 0 1px 0 #5e0d1f;
 }
 
