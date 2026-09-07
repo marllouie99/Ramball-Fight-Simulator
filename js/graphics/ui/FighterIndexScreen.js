@@ -64,22 +64,20 @@ function drawIndexScreen() {
   const currentDefs = getActiveFighterDefs();
 
   // ── Header Section ──
-  ctx.fillStyle = isTactical ? '#00e5ff' : '#64748b';
+  ctx.fillStyle = '#64748b';
   ctx.font = '900 10px "Rajdhani", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(isTactical ? 'TACTICAL SHOOTER // OPERATIVE DOSSIER // SYS.v2.5' : 'CIRCLE BATTLE // FIGHTER DOSSIER // SYS.v2.5', canvas.width / 2, 56);
 
   ctx.save();
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#f8fafc';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
-  ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)';
-  ctx.shadowBlur = 8;
   ctx.fillText(isTactical ? '[ SHOOTER ROSTER ]' : '[ FIGHTER DATABASE ]', canvas.width / 2, 78);
   ctx.restore();
 
   ctx.fillStyle = '#94a3b8';
-  ctx.font = '10.5px "Rajdhani", sans-serif';
+  ctx.font = '10px "Rajdhani", sans-serif';
   ctx.fillText(isTactical ? 'Inspect firearm combatants, ballistics data, and tactical abilities.' : 'Inspect combatant classifications, abilities, and core telemetry.', canvas.width / 2, 94);
 
   // ── Category Filter Tabs ──
@@ -92,8 +90,8 @@ function drawIndexScreen() {
   categories.forEach(cat => {
     ctx.font = 'bold 10px "Rajdhani", sans-serif';
     const textW = ctx.measureText(cat.toUpperCase()).width;
-    const btnW = textW + 18;
-    const btnH = 24;
+    const btnW = textW + 16;
+    const btnH = 22;
     
     if (currentCX + btnW > canvas.width - 20) {
       currentCX = catXStart;
@@ -104,14 +102,12 @@ function drawIndexScreen() {
     
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = isTactical ? 'rgba(0, 229, 255, 0.16)' : 'rgba(245, 158, 11, 0.16)';
-      ctx.strokeStyle = isTactical ? '#00e5ff' : '#f59e0b';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.4)' : 'rgba(245, 158, 11, 0.4)';
-      ctx.shadowBlur = 6;
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.2;
     } else {
-      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.fillStyle = 'rgba(16, 20, 28, 0.90)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
     }
     
@@ -120,8 +116,8 @@ function drawIndexScreen() {
     ctx.stroke();
     ctx.restore();
     
-    ctx.fillStyle = isSelected ? (isTactical ? '#00e5ff' : '#ffffff') : '#8899aa';
-    ctx.font = '900 10px "Rajdhani", sans-serif';
+    ctx.fillStyle = isSelected ? '#f8fafc' : '#64748b';
+    ctx.font = '900 9.5px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(cat.toUpperCase(), currentCX + btnW / 2, currentCY + btnH / 2);
@@ -131,7 +127,7 @@ function drawIndexScreen() {
        state.indexPage = 0;
     });
     
-    currentCX += btnW + 6;
+    currentCX += btnW + 5;
   });
 
   const cardsStartY = currentCY + 32;
@@ -313,12 +309,10 @@ function drawIndexDetailScreen() {
   drawButton('← RETURN', 58, headerY, () => { state.gameState = 'index'; }, 85, 24, null, 4);
 
   ctx.save();
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#f8fafc';
   ctx.font = '900 18px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
-  ctx.shadowBlur = 8;
   ctx.fillText(`[ ${def.name.toUpperCase()} ]`, canvas.width / 2, headerY);
   ctx.restore();
 
@@ -672,8 +666,6 @@ function drawIndexDetailScreen() {
       ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
-      ctx.shadowBlur = 6;
     } else {
       ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';

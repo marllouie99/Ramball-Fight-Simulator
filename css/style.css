@@ -1216,7 +1216,7 @@ canvas {
 }
 
 /* ─────────────────────────────────────────────
-   DOOM ETERNAL TACTICAL TERMINAL / MAIN MENU
+   RETRO 90S MACINTOSH / PIXEL ART OS WINDOW THEME
 ───────────────────────────────────────────── */
 .ui-screen {
   display: none;
@@ -1235,107 +1235,180 @@ canvas {
   display: flex;
 }
 
-.doom-tactical-terminal {
-  background: linear-gradient(180deg, rgba(13, 16, 23, 0.97) 0%, rgba(8, 10, 15, 0.99) 100%);
-  padding: 56px 18px 12px 18px;
-  gap: 10px;
-  color: #ffffff;
+/* Retro Pixel Dither Crimson Backdrop */
+.retro-window-screen {
+  background-color: #8b1524;
+  background-image: 
+    radial-gradient(#6d0e19 15%, transparent 16%),
+    radial-gradient(#6d0e19 15%, transparent 16%);
+  background-size: 4px 4px;
+  background-position: 0 0, 2px 2px;
+  padding: 34px 14px 10px 14px;
+  box-sizing: border-box;
   user-select: none;
   position: relative;
+  overflow: hidden;
 }
 
-.doom-tactical-terminal::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
+/* Classic Macintosh 90s OS Window Box Container */
+.retro-window-box {
+  background: #f5eedc;
+  border: 2px solid #2d080c;
+  border-radius: 4px;
+  box-shadow: 4px 5px 0px rgba(0, 0, 0, 0.45), inset 1px 1px 0px #ffffff;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  min-height: 0;
+  max-height: 900px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Pinstripe Horizontal Window Header */
+.retro-window-titlebar {
+  height: 26px;
   background: repeating-linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0.12),
-    rgba(0, 0, 0, 0.12) 2px,
-    transparent 2px,
-    transparent 4px
+    to bottom,
+    #d8ceb9 0px,
+    #d8ceb9 1px,
+    #f5eedc 1px,
+    #f5eedc 3px
   );
-  pointer-events: none;
-  opacity: 0.6;
+  border-bottom: 2px solid #2d080c;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Square Close Box [■] */
+.retro-close-box {
+  width: 14px;
+  height: 14px;
+  background: #fbf6ec;
+  border: 2px solid #2d080c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7.5px;
+  color: #2d080c;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: inset 1px 1px 0 #ffffff;
+  z-index: 2;
+}
+
+.retro-close-box:hover {
+  background: #f0b6ba;
+}
+
+/* Centered Title Badge */
+.retro-title-badge {
+  background: #f5eedc;
+  padding: 1px 10px;
+  border: 1.5px solid #2d080c;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.retro-badge-title {
+  font-family: 'Outfit', 'Press Start 2P', monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  color: #2d080c;
+  letter-spacing: 0.5px;
+  text-transform: capitalize;
+}
+
+.retro-title-fill {
+  flex: 1;
+}
+
+/* Window Inner Content Body */
+.retro-window-body {
+  padding: 8px 10px 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* Header & Breadcrumbs */
 .tactical-header {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
-  z-index: 2;
 }
 
 .tactical-breadcrumbs {
   font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: #7b8a9e;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #702028;
   text-transform: uppercase;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .tactical-breadcrumbs .crumb-sep {
-  color: #f59e0b;
+  color: #9e1a2b;
   font-weight: 900;
 }
 
 .tactical-breadcrumbs .crumb-id {
-  color: #94a3b8;
+  color: #2d080c;
 }
 
-/* Top-Level Game Hub Switcher */
+/* Top-Level Game Hub Switcher (Chunky 3D Dual Tabs) */
 .game-hub-switcher {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  margin: 4px 0 2px 0;
+  margin: 2px 0;
 }
 
 .hub-switch-btn {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: linear-gradient(135deg, rgba(22, 27, 38, 0.9) 0%, rgba(13, 16, 24, 0.95) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  gap: 6px;
+  padding: 6px 8px;
+  background: #e8dec8;
+  border: 2px solid #2d080c;
+  border-radius: 4px;
+  box-shadow: 0 3px 0 #baa88c;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.1s ease;
   text-align: left;
 }
 
-.hub-switch-btn .hub-btn-glow {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.22s ease;
+.hub-switch-btn:hover {
+  background: #f0e6d2;
 }
 
-.hub-switch-btn:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.3);
+.hub-switch-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #baa88c;
 }
 
 .hub-switch-btn .hub-btn-icon {
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.3));
 }
 
 .hub-switch-btn .hub-btn-info {
@@ -1346,11 +1419,11 @@ canvas {
 }
 
 .hub-switch-btn .hub-btn-title {
-  font-family: 'Outfit', 'Rajdhani', sans-serif;
-  font-size: 11.5px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 10.5px;
   font-weight: 900;
-  letter-spacing: 0.8px;
-  color: #cbd5e1;
+  letter-spacing: 0.5px;
+  color: #2d080c;
   text-transform: uppercase;
   line-height: 1.1;
   white-space: nowrap;
@@ -1362,8 +1435,8 @@ canvas {
   font-family: 'Rajdhani', monospace, sans-serif;
   font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.6px;
-  color: #64748b;
+  letter-spacing: 0.5px;
+  color: #63222a;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -1371,262 +1444,241 @@ canvas {
 }
 
 .hub-switch-btn .hub-active-indicator {
-  font-family: 'Rajdhani', sans-serif;
+  font-family: 'Silkscreen', 'Rajdhani', sans-serif;
   font-size: 7.5px;
   font-weight: 900;
-  letter-spacing: 1px;
-  padding: 1px 5px;
-  clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+  padding: 1px 4px;
+  border-radius: 2px;
   text-transform: uppercase;
   display: none;
   flex-shrink: 0;
 }
 
-/* Active Fight of Characters Hub */
-.hub-switch-btn[data-hub="foc"].active {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(20, 24, 34, 0.95) 100%);
-  border-color: #f59e0b;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.25), inset 0 0 12px rgba(245, 158, 11, 0.1);
-}
-.hub-switch-btn[data-hub="foc"].active .hub-btn-title {
-  color: #ffffff;
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
-}
-.hub-switch-btn[data-hub="foc"].active .hub-btn-sub {
-  color: #f59e0b;
-}
-.hub-switch-btn[data-hub="foc"].active .hub-active-indicator {
-  display: block;
-  background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.5);
+/* Active Hub Button (Rich Ruby Red 3D Button) */
+.hub-switch-btn.active {
+  background: #9e1a2b;
+  border-color: #2d080c;
+  box-shadow: 0 3px 0 #4d0a13;
 }
 
-/* Active Tactical Shooter Hub */
-.hub-switch-btn[data-hub="tactical"].active {
-  background: linear-gradient(135deg, rgba(0, 229, 255, 0.18) 0%, rgba(14, 24, 36, 0.95) 100%);
-  border-color: #00e5ff;
-  box-shadow: 0 0 14px rgba(0, 229, 255, 0.25), inset 0 0 12px rgba(0, 229, 255, 0.1);
+.hub-switch-btn.active:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #4d0a13;
 }
-.hub-switch-btn[data-hub="tactical"].active .hub-btn-title {
+
+.hub-switch-btn.active .hub-btn-title {
   color: #ffffff;
-  text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
 }
-.hub-switch-btn[data-hub="tactical"].active .hub-btn-sub {
-  color: #00e5ff;
+
+.hub-switch-btn.active .hub-btn-sub {
+  color: #fce7ea;
 }
-.hub-switch-btn[data-hub="tactical"].active .hub-active-indicator {
+
+.hub-switch-btn.active .hub-active-indicator {
   display: block;
-  background: rgba(0, 229, 255, 0.2);
-  color: #00e5ff;
-  border: 1px solid rgba(0, 229, 255, 0.5);
+  background: #f0b6ba;
+  color: #2d080c;
+  border: 1px solid #7c2d37;
 }
 
 .tactical-title-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 2px 0 6px 0;
+  margin: 1px 0 3px 0;
 }
 
 .tactical-main-title {
-  font-family: 'Outfit', 'Rajdhani', sans-serif;
-  font-size: 24px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 17px;
   font-weight: 900;
-  letter-spacing: 3px;
-  color: #ffffff;
+  letter-spacing: 1px;
+  color: #2d080c;
   text-transform: uppercase;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .tactical-main-title .title-bracket {
-  color: #f59e0b;
+  color: #9e1a2b;
   font-weight: 900;
 }
 
 .tactical-counter-badge {
-  font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 12.5px;
+  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
+  font-size: 9.5px;
   font-weight: 800;
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  padding: 3px 9px;
-  letter-spacing: 1px;
-  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  color: #2d080c;
+  background: #f0b6ba;
+  border: 1.5px solid #7c2d37;
+  padding: 1px 6px;
+  border-radius: 2px;
 }
 
-/* Category Tabs */
+/* Category Tabs (Vintage Macintosh Folder Tabs) */
 .tactical-tabs {
   display: flex;
   gap: 4px;
   width: 100%;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 6px;
+  border-bottom: 2px solid #2d080c;
+  padding-bottom: 0px;
 }
 
 .tactical-tab-btn {
   flex: 1;
-  padding: 6px 2px;
-  background: rgba(20, 24, 34, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #8899aa;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
+  padding: 4px 2px;
+  background: #e4dac2;
+  border: 2px solid #2d080c;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  color: #5c242b;
+  font-family: 'Outfit', 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   cursor: pointer;
-  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.1s ease;
   text-align: center;
 }
 
 .tactical-tab-btn:hover {
-  background: rgba(36, 44, 60, 0.9);
-  color: #ffffff;
-  border-color: rgba(245, 158, 11, 0.4);
-  transform: translateY(-1px);
+  background: #f0e6d2;
+  color: #2d080c;
 }
 
 .tactical-tab-btn.active {
-  background: rgba(245, 158, 11, 0.15);
-  color: #ffffff;
-  border-color: #f59e0b;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
-  text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  background: #f5eedc;
+  border-bottom: 2px solid #f5eedc;
+  margin-bottom: -2px;
+  color: #9e1a2b;
+  font-weight: 900;
 }
 
 /* Main Content Area */
 .tactical-content-area {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  z-index: 2;
 }
 
-/* Active Briefing / Hero Card */
+/* Active Briefing / Hero Panel (Sunken Cream Box) */
 .tactical-briefing-panel {
-  background: linear-gradient(145deg, rgba(20, 24, 34, 0.95) 0%, rgba(12, 15, 22, 0.98) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-left: 4px solid #f59e0b;
-  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
-  padding: 12px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: #ede3d0;
+  border: 2px solid #2d080c;
+  border-radius: 4px;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.12);
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   flex-shrink: 0;
 }
 
 .briefing-card-top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .briefing-icon-badge {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  background: #f0b6ba;
+  border: 2px solid #2d080c;
+  border-radius: 3px;
   flex-shrink: 0;
-  color: #f59e0b;
+  color: #2d080c;
 }
 
 .tactical-svg-icon {
-  width: 18px;
-  height: 18px;
-  stroke: #94a3b8;
+  width: 16px;
+  height: 16px;
+  stroke: #2d080c;
   display: block;
-  transition: all 0.15s ease;
 }
 
 .briefing-icon-badge .tactical-svg-icon {
-  width: 22px;
-  height: 22px;
-  stroke: #f59e0b;
+  width: 18px;
+  height: 18px;
+  stroke: #2d080c;
 }
 
 .tactical-card:hover .card-left-emblem .tactical-svg-icon,
 .tactical-card.active .card-left-emblem .tactical-svg-icon {
-  stroke: #f59e0b;
+  stroke: #2d080c;
 }
 
 .tactical-chip-btn .tactical-svg-icon {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   stroke: currentColor;
   display: inline-block;
   vertical-align: middle;
-  margin-right: 4px;
+  margin-right: 3px;
 }
 
 .briefing-title-group {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
 .briefing-title {
-  font-family: 'Outfit', 'Rajdhani', sans-serif;
-  font-size: 19px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
   font-weight: 900;
-  color: #ffffff;
-  letter-spacing: 2px;
+  color: #2d080c;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   margin: 0;
 }
 
 .briefing-tier-row {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
 .tier-pill {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10.5px;
+  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
+  font-size: 8.5px;
   font-weight: 800;
-  letter-spacing: 1px;
-  padding: 2px 7px;
-  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.06);
-  color: #cbd5e1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #f0b6ba;
+  color: #2d080c;
+  border: 1px solid #7c2d37;
 }
 
 .tier-pill.tier-amber,
 .tier-pill.tier-cyan,
 .tier-pill.tier-magenta,
 .tier-pill.tier-green {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: #f0b6ba;
+  color: #2d080c;
+  border: 1px solid #7c2d37;
 }
 
 .briefing-desc {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #94a3b8;
-  line-height: 1.35;
-  margin: 2px 0;
-  min-height: 32px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #42161b;
+  line-height: 1.3;
+  margin: 1px 0;
+  min-height: 28px;
 }
 
 .briefing-progress-block {
@@ -1638,77 +1690,61 @@ canvas {
 .briefing-progress-bar {
   width: 100%;
   height: 4px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+  background: #d8ceb9;
+  border: 1.5px solid #2d080c;
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .briefing-progress-fill {
   height: 100%;
-  background: #f59e0b;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+  background: #9e1a2b;
 }
 
 .briefing-progress-label {
-  font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 10px;
+  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
+  font-size: 8.5px;
   font-weight: 800;
-  color: #64748b;
-  letter-spacing: 1px;
+  color: #702028;
+  letter-spacing: 0.5px;
   text-align: right;
 }
 
-/* Tactical Launch CTA Button (Clean DOOM Praetor Crimson) */
+/* Chunky 3D Ruby CTA Launch Button (Matching Reference Image) */
+.btn-3d-primary,
 .tactical-launch-btn {
   width: 100%;
-  padding: 10px 14px;
-  margin-top: 4px;
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #7f1d1d 100%);
+  padding: 9px 12px;
+  margin-top: 3px;
+  background: #9e1a2b;
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  font-family: 'Outfit', 'Rajdhani', sans-serif;
-  font-size: 15px;
+  border: 2px solid #2d080c;
+  border-radius: 4px;
+  box-shadow: 0 4px 0 #4d0a13;
+  font-family: 'Outfit', 'Press Start 2P', sans-serif;
+  font-size: 13px;
   font-weight: 900;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   cursor: pointer;
-  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 6px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.12s ease;
   position: relative;
-  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.tactical-launch-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
-  transform: skewX(-25deg);
-  transition: all 0.5s ease;
-}
-
+.btn-3d-primary:hover,
 .tactical-launch-btn:hover {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #991b1b 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.55);
+  background: #b51f33;
 }
 
-.tactical-launch-btn:hover::before {
-  left: 200%;
-}
-
+.btn-3d-primary:active,
 .tactical-launch-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #4d0a13;
 }
 
 /* Operation Cards Scrollable List */
@@ -1718,64 +1754,70 @@ canvas {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-right: 4px;
+  gap: 4px;
+  padding-right: 3px;
   min-height: 0;
 }
 
 .tactical-cards-scrollview::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 
 .tactical-cards-scrollview::-webkit-scrollbar-track {
-  background: rgba(14, 18, 26, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.tactical-cards-scrollview::-webkit-scrollbar-thumb {
-  background: #f59e0b;
+  background: #e4dac2;
+  border: 1px solid #2d080c;
   border-radius: 2px;
 }
 
-/* Tactical Angled Card (Gunmetal with Amber Accent) */
+.tactical-cards-scrollview::-webkit-scrollbar-thumb {
+  background: #9e1a2b;
+  border-radius: 2px;
+}
+
+/* Chunky 3D Retro Operation Card */
 .tactical-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: rgba(18, 22, 32, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fbf6ec;
+  border: 2px solid #2d080c;
+  border-radius: 4px;
+  box-shadow: 0 3px 0 #baa88c;
   cursor: pointer;
-  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.1s ease;
   position: relative;
   flex-shrink: 0;
 }
 
 .tactical-card:hover {
-  background: rgba(28, 34, 48, 0.95);
-  border-color: rgba(245, 158, 11, 0.45);
-  transform: translateX(3px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 2px 0 0 #f59e0b;
+  background: #fff9f0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #baa88c;
+}
+
+.tactical-card:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #baa88c;
 }
 
 .tactical-card.active {
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(24, 30, 42, 0.95) 100%);
-  border-color: #f59e0b;
-  transform: translateX(4px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 3px 0 0 #f59e0b;
+  background: #ffe8cc;
+  border-color: #2d080c;
+  border-left: 5px solid #9e1a2b;
+  box-shadow: 0 2px 0 #baa88c;
 }
 
 .card-left-emblem {
-  width: 32px;
-  height: 32px;
-  font-size: 17px;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  background: #f0b6ba;
+  border: 1.5px solid #2d080c;
+  border-radius: 3px;
   flex-shrink: 0;
 }
 
@@ -1783,7 +1825,7 @@ canvas {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
@@ -1794,160 +1836,110 @@ canvas {
 }
 
 .card-title {
-  font-family: 'Outfit', 'Rajdhani', sans-serif;
-  font-size: 13.5px;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: 1.5px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: #2d080c;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
 }
 
 .card-subtitle {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  color: #64748b;
-  letter-spacing: 1px;
+  color: #63222a;
+  letter-spacing: 0.5px;
 }
 
 .card-status-pill {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 9.5px;
+  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
+  font-size: 8px;
   font-weight: 800;
-  letter-spacing: 1px;
-  padding: 1.5px 6px;
-  clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+  letter-spacing: 0.5px;
+  padding: 1px 4px;
+  border-radius: 2px;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.06);
-  color: #94a3b8;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #f0b6ba;
+  color: #2d080c;
+  border: 1px solid #7c2d37;
 }
 
 .card-status-pill.amber,
 .card-status-pill.cyan,
 .card-status-pill.magenta,
-.card-status-pill.green {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+.card-status-pill.green,
+.tactical-pill {
+  background: #f0b6ba !important;
+  color: #2d080c !important;
+  border: 1px solid #7c2d37 !important;
 }
 
 .card-progress-bar {
   width: 100%;
   height: 2px;
-  background: rgba(0, 0, 0, 0.5);
+  background: #d8ceb9;
   margin-top: 2px;
   overflow: hidden;
 }
 
-.card-progress-bar .fill {
+.card-progress-bar .fill,
+.tactical-fill {
   height: 100%;
-  background: #f59e0b;
+  background: #9e1a2b !important;
 }
 
 /* Tactical Shooter Hub Card Accent Styles */
 .tactical-card.tactical-hub-card {
-  border-left: 3px solid rgba(0, 229, 255, 0.6);
+  border-left: 2px solid #2d080c;
 }
 
 .tactical-card.tactical-hub-card:hover {
-  border-color: rgba(0, 229, 255, 0.8);
-  background: rgba(18, 32, 46, 0.95);
-  box-shadow: 0 4px 14px rgba(0, 229, 255, 0.25), inset 2px 0 0 #00e5ff;
+  background: #fff9f0;
 }
 
 .tactical-card.tactical-hub-card.active {
-  background: linear-gradient(90deg, rgba(0, 229, 255, 0.16) 0%, rgba(18, 28, 42, 0.98) 100%);
-  border-color: #00e5ff;
-  box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3), inset 3px 0 0 #00e5ff;
+  background: #ffe8cc;
+  border-left: 5px solid #9e1a2b;
 }
 
 .tactical-emblem {
-  background: rgba(0, 229, 255, 0.08) !important;
-  border-color: rgba(0, 229, 255, 0.3) !important;
+  background: #f0b6ba !important;
+  border-color: #2d080c !important;
 }
 
 .tactical-card.tactical-hub-card:hover .tactical-emblem .tactical-svg-icon,
 .tactical-card.tactical-hub-card.active .tactical-emblem .tactical-svg-icon {
-  stroke: #00e5ff !important;
+  stroke: #2d080c !important;
 }
 
-.tactical-pill {
-  background: rgba(0, 229, 255, 0.15) !important;
-  color: #00e5ff !important;
-  border: 1px solid rgba(0, 229, 255, 0.45) !important;
-  text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
-}
-
-.tactical-fill {
-  background: #00e5ff !important;
-  box-shadow: 0 0 6px rgba(0, 229, 255, 0.6) !important;
-}
-
-/* Terminal Hub Tactical Overrides */
-.doom-tactical-terminal.hub-tactical .tactical-breadcrumbs .crumb-sep {
-  color: #00e5ff;
-}
-.doom-tactical-terminal.hub-tactical .tactical-main-title .title-bracket {
-  color: #00e5ff;
-}
-.doom-tactical-terminal.hub-tactical .tactical-counter-badge {
-  color: #00e5ff;
-  background: rgba(0, 229, 255, 0.1);
-  border-color: rgba(0, 229, 255, 0.4);
-  text-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
-}
-.doom-tactical-terminal.hub-tactical .tactical-tab-btn.active {
-  background: rgba(0, 229, 255, 0.15);
-  border-color: #00e5ff;
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
-  text-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
-}
-.doom-tactical-terminal.hub-tactical .tactical-briefing-panel {
-  border-left-color: #00e5ff;
-}
-.doom-tactical-terminal.hub-tactical .briefing-icon-badge {
-  background: rgba(0, 229, 255, 0.1);
-  border-color: rgba(0, 229, 255, 0.4);
-  color: #00e5ff;
-}
-.doom-tactical-terminal.hub-tactical .briefing-icon-badge .tactical-svg-icon {
-  stroke: #00e5ff;
-}
-.doom-tactical-terminal.hub-tactical .briefing-progress-fill {
-  background: #00e5ff;
-  box-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
-}
-.doom-tactical-terminal.hub-tactical .tactical-launch-btn {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%);
-  border-color: rgba(0, 229, 255, 0.5);
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-.doom-tactical-terminal.hub-tactical .tactical-launch-btn:hover {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%);
-  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.55);
-}
-
-/* System Config Chip Buttons */
+/* Chunky 3D Coral-Pink Secondary Buttons */
+.btn-3d-secondary,
 .tactical-chip-btn {
   padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #e2e8f0;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
+  background: #f0b6ba;
+  border: 1.5px solid #2d080c;
+  border-radius: 3px;
+  box-shadow: 0 3px 0 #7c2d37;
+  color: #2d080c;
+  font-family: 'Rajdhani', monospace, sans-serif;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.6px;
   cursor: pointer;
-  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
-  transition: all 0.15s ease;
+  transition: all 0.08s ease;
   text-transform: uppercase;
 }
 
+.btn-3d-secondary:hover,
 .tactical-chip-btn:hover {
-  background: rgba(245, 158, 11, 0.18);
-  color: #ffffff;
-  border-color: #f59e0b;
+  background: #f7cad0;
+}
+
+.btn-3d-secondary:active,
+.tactical-chip-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #7c2d37;
 }
 
 /* Bottom Tactical Prompt Bar */
@@ -1955,31 +1947,30 @@ canvas {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 4px;
+  border-top: 2px solid #2d080c;
   flex-shrink: 0;
-  z-index: 2;
 }
 
 .prompt-chip {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  letter-spacing: 1px;
+  font-family: 'Rajdhani', monospace, sans-serif;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #5c242b;
+  letter-spacing: 0.6px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .prompt-chip .key {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: #cbd5e1;
-  font-size: 9.5px;
-  font-weight: 800;
+  background: #e4dac2;
+  border: 1.5px solid #2d080c;
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: #2d080c;
+  font-size: 8.5px;
+  font-weight: 900;
   font-family: monospace, sans-serif;
 }
 
@@ -1988,7 +1979,7 @@ canvas {
 }
 
 .prompt-chip#quick-toggle-theme:hover {
-  color: #f59e0b;
+  color: #9e1a2b;
 }
 
 /* ─────────────────────────────────────────────

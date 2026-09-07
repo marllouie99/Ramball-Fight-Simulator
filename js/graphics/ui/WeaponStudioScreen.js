@@ -105,10 +105,8 @@ export function drawWeaponStudioScreen() {
   ctx.fillText('CIRCLE BATTLE // WEAPON STUDIO // SYS.v2.5', canvas.width / 2, 56);
 
   ctx.save();
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#f8fafc';
   ctx.font = '900 20px "Outfit", "Rajdhani", sans-serif';
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
-  ctx.shadowBlur = 8;
   ctx.fillText('[ WEAPON STUDIO ]', canvas.width / 2, 74);
   ctx.restore();
 
@@ -142,14 +140,12 @@ export function drawWeaponStudioScreen() {
     const isSelected = activeWeaponKey === w.key;
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
       ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
-      ctx.shadowBlur = 6;
+      ctx.lineWidth = 1.2;
     } else {
-      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.fillStyle = 'rgba(16, 20, 28, 0.90)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
     }
     drawChamferedRect(ctx, r1StartX, 88, rW, rH, 4);
@@ -157,7 +153,7 @@ export function drawWeaponStudioScreen() {
     ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle = isSelected ? '#ffffff' : '#8899aa';
+    ctx.fillStyle = isSelected ? '#f8fafc' : '#64748b';
     ctx.font = '900 9.5px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -181,14 +177,12 @@ export function drawWeaponStudioScreen() {
     const isSelected = activeWeaponKey === w.key;
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
       ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
-      ctx.shadowBlur = 6;
+      ctx.lineWidth = 1.2;
     } else {
-      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.fillStyle = 'rgba(16, 20, 28, 0.90)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
     }
     drawChamferedRect(ctx, r2StartX, 114, rW, rH, 4);
@@ -196,7 +190,7 @@ export function drawWeaponStudioScreen() {
     ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle = isSelected ? '#ffffff' : '#8899aa';
+    ctx.fillStyle = isSelected ? '#f8fafc' : '#64748b';
     ctx.font = '900 9.5px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

@@ -65,10 +65,8 @@ function drawWeaponMenu() {
   ctx.fillText('CIRCLE BATTLE // ARSENAL DATABASE // SYS.v2.5', canvas.width / 2, 48);
 
   ctx.save();
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#f8fafc';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
-  ctx.shadowBlur = 8;
   ctx.fillText('[ WEAPON ARSENAL ]', canvas.width / 2, 70);
   ctx.restore();
 
@@ -78,9 +76,9 @@ function drawWeaponMenu() {
   }
 
   const tabY = 94;
-  const tabW = 160;
-  const tabH = 26;
-  const tabGap = 12;
+  const tabW = 150;
+  const tabH = 24;
+  const tabGap = 10;
   const totalTabsW = tabW * 2 + tabGap;
   const tabStartX = (canvas.width - totalTabsW) / 2;
 
@@ -116,7 +114,7 @@ function drawWeaponMenu() {
     },
     tabW,
     tabH,
-    isTac ? '#3b82f6' : null,
+    isTac ? '#f59e0b' : null,
     4
   );
 
@@ -518,8 +516,6 @@ function drawWeaponDetailScreen() {
   ctx.font = '900 18px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
-  ctx.shadowBlur = 8;
   ctx.fillText('[ WEAPON DOSSIER ]', canvas.width / 2, navY);
   ctx.restore();
 

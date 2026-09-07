@@ -198,8 +198,6 @@ function drawMinimapBlueprint(ctx, map, x, y, w, h) {
     ctx.beginPath();
     ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = '#00e5ff';
-    ctx.shadowColor = '#00e5ff';
-    ctx.shadowBlur = 4;
     ctx.fill();
   });
 
@@ -268,8 +266,6 @@ function drawTacticalMapSelectModal() {
       ctx.fillStyle = 'rgba(0, 229, 255, 0.14)';
       ctx.strokeStyle = '#00e5ff';
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(0, 229, 255, 0.45)';
-      ctx.shadowBlur = 10;
     } else {
       ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
@@ -427,8 +423,6 @@ function drawFighterSelectModal() {
       ctx.fillStyle = isTactical ? 'rgba(0, 229, 255, 0.20)' : 'rgba(245, 158, 11, 0.20)';
       ctx.strokeStyle = themeColor;
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.5)' : 'rgba(245, 158, 11, 0.4)';
-      ctx.shadowBlur = 8;
     } else {
       ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
@@ -705,10 +699,8 @@ function drawSelectScreen() {
 
   // Screen Title
   ctx.save();
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#f8fafc';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
-  ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)';
-  ctx.shadowBlur = 8;
   const titleText = isTac1v1
     ? '[ 1 VS 1 TACTICAL DUEL ]'
     : (isTacFFA
@@ -739,16 +731,14 @@ function drawSelectScreen() {
     const mapLabel = isMonolith ? '🗺️ MONOLITH' : '🗺️ SECTOR 01';
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 229, 255, 0.16)';
-    ctx.strokeStyle = '#00e5ff';
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+    ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 1;
-    ctx.shadowColor = 'rgba(0, 229, 255, 0.4)';
-    ctx.shadowBlur = 6;
     drawChamferedRect(ctx, curCtrlX, tmY, mapW, ctrlH, 4);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#00e5ff';
+    ctx.fillStyle = '#f8fafc';
     ctx.font = '900 10px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -771,14 +761,14 @@ function drawSelectScreen() {
 
   // 1. Test Mode Button
   ctx.save();
-  ctx.fillStyle = state.testMode ? (isTactical ? 'rgba(0, 229, 255, 0.15)' : 'rgba(245, 158, 11, 0.15)') : 'rgba(18, 22, 32, 0.85)';
-  ctx.strokeStyle = state.testMode ? (isTactical ? '#00e5ff' : '#f59e0b') : 'rgba(255, 255, 255, 0.12)';
+  ctx.fillStyle = state.testMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 20, 28, 0.90)';
+  ctx.strokeStyle = state.testMode ? '#f59e0b' : 'rgba(255, 255, 255, 0.10)';
   ctx.lineWidth = 1;
   drawChamferedRect(ctx, tmX, tmY, tmW, ctrlH, 4);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = state.testMode ? (isTactical ? '#00e5ff' : '#f59e0b') : '#8899aa';
+  ctx.fillStyle = state.testMode ? '#f8fafc' : '#64748b';
   ctx.font = '900 10px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -786,11 +776,7 @@ function drawSelectScreen() {
 
   ctx.beginPath();
   ctx.arc(tmX + tmW - 10, tmY + ctrlH / 2, 3, 0, Math.PI * 2);
-  ctx.fillStyle = state.testMode ? (isTactical ? '#00e5ff' : '#f59e0b') : '#475569';
-  if (state.testMode) {
-    ctx.shadowColor = isTactical ? '#00e5ff' : '#f59e0b';
-    ctx.shadowBlur = 6;
-  }
+  ctx.fillStyle = state.testMode ? '#f59e0b' : '#475569';
   ctx.fill();
   ctx.restore();
 
@@ -798,14 +784,14 @@ function drawSelectScreen() {
 
   // 2. Dummy Target Button
   ctx.save();
-  ctx.fillStyle = state.dummyEnabled ? (isTactical ? 'rgba(0, 229, 255, 0.15)' : 'rgba(245, 158, 11, 0.15)') : 'rgba(18, 22, 32, 0.85)';
-  ctx.strokeStyle = state.dummyEnabled ? (isTactical ? '#00e5ff' : '#f59e0b') : 'rgba(255, 255, 255, 0.12)';
+  ctx.fillStyle = state.dummyEnabled ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 20, 28, 0.90)';
+  ctx.strokeStyle = state.dummyEnabled ? '#f59e0b' : 'rgba(255, 255, 255, 0.10)';
   ctx.lineWidth = 1;
   drawChamferedRect(ctx, daX, tmY, daW, ctrlH, 4);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = state.dummyEnabled ? (isTactical ? '#00e5ff' : '#f59e0b') : '#8899aa';
+  ctx.fillStyle = state.dummyEnabled ? '#f8fafc' : '#64748b';
   ctx.font = '900 10px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -813,11 +799,7 @@ function drawSelectScreen() {
 
   ctx.beginPath();
   ctx.arc(daX + daW - 10, tmY + ctrlH / 2, 3, 0, Math.PI * 2);
-  ctx.fillStyle = state.dummyEnabled ? (isTactical ? '#00e5ff' : '#f59e0b') : '#475569';
-  if (state.dummyEnabled) {
-    ctx.shadowColor = isTactical ? '#00e5ff' : '#f59e0b';
-    ctx.shadowBlur = 6;
-  }
+  ctx.fillStyle = state.dummyEnabled ? '#f59e0b' : '#475569';
   ctx.fill();
   ctx.restore();
 
@@ -863,28 +845,26 @@ function drawSelectScreen() {
     
     ctx.save();
     // Outer tech ring
-    ctx.strokeStyle = isTactical ? 'rgba(0, 229, 255, 0.35)' : 'rgba(245, 158, 11, 0.35)';
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(vsX, vsY, 24, 0, Math.PI * 2);
+    ctx.arc(vsX, vsY, 22, 0, Math.PI * 2);
     ctx.stroke();
 
     // Inner shield
-    ctx.fillStyle = '#0b0d13';
-    ctx.strokeStyle = isTactical ? '#00e5ff' : '#f59e0b';
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.5)' : 'rgba(245, 158, 11, 0.4)';
-    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#080a0f';
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
+    ctx.arc(vsX, vsY, 16, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 13px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '900 12px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('VS', vsX, vsY + 1);
+    ctx.fillText('VS', vsX, vsY);
     ctx.restore();
 
     // Bottom Command Dock
@@ -941,8 +921,6 @@ function drawSelectScreen() {
       ctx.fillStyle = '#0b0d13';
       ctx.strokeStyle = isTactical ? '#00e5ff' : '#f59e0b';
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.5)' : 'rgba(245, 158, 11, 0.4)';
-      ctx.shadowBlur = 8;
       ctx.beginPath();
       ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
       ctx.fill();

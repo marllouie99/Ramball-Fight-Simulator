@@ -46,138 +46,136 @@ function handleUIClick(mx, my) {
   return false;
 }
 
-/** Draws a 45-degree chamfered polygon path (DOOM Eternal Tactical aesthetic). */
-export function drawChamferedRect(ctx, x, y, w, h, chamfer = 8) {
-  const c = Math.min(chamfer, w / 4, h / 4);
+/** Draws a rounded or chamfered rectangle path. */
+export function drawChamferedRect(ctx, x, y, w, h, radius = 4) {
+  const r = Math.min(radius, w / 4, h / 4);
   ctx.beginPath();
-  ctx.moveTo(x + c, y);
-  ctx.lineTo(x + w, y);
-  ctx.lineTo(x + w, y + h - c);
-  ctx.lineTo(x + w - c, y + h);
-  ctx.lineTo(x, y + h);
-  ctx.lineTo(x, y + c);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
 }
 
-/** Draws a semi-transparent chamfered tactical panel with disciplined gunmetal styling. */
-function drawPanel(x, y, w, h, alpha = 0.88, chamfer = 8, borderColor = null) {
+/** Draws a vintage 90s Mac OS / Pixel Art cream window panel with dark chocolate border and 3D bevel. */
+function drawPanel(x, y, w, h, alpha = 0.96, radius = 4, borderColor = null) {
   const ctx = state.ctx;
 
-  // Create clean dark slate gradient background
-  const grad = ctx.createLinearGradient(x, y, x, y + h);
-  grad.addColorStop(0, `rgba(20, 24, 34, ${alpha})`);
-  grad.addColorStop(0.5, `rgba(14, 17, 24, ${alpha})`);
-  grad.addColorStop(1, `rgba(10, 12, 18, ${alpha})`);
-
-  ctx.fillStyle = grad;
-  ctx.strokeStyle = borderColor || `rgba(255, 255, 255, ${alpha * 0.14})`;
-  ctx.lineWidth = 1;
-
   ctx.save();
-  if (borderColor) {
-    ctx.shadowColor = borderColor;
-    ctx.shadowBlur = 6;
-  }
-  drawChamferedRect(ctx, x, y, w, h, chamfer);
+  // 3D Drop shadow underneath panel
+  ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.35})`;
+  drawChamferedRect(ctx, x + 3, y + 3, w, h, radius);
+  ctx.fill();
+
+  // Warm cream/parchment panel body
+  ctx.fillStyle = `rgba(245, 238, 220, ${alpha})`;
+  ctx.strokeStyle = borderColor || '#2d080c';
+  ctx.lineWidth = 2;
+
+  drawChamferedRect(ctx, x, y, w, h, radius);
   ctx.fill();
   ctx.stroke();
+
+  // Inner subtle highlight line
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 1;
+  drawChamferedRect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, Math.max(1, radius - 1));
+  ctx.stroke();
+
   ctx.restore();
 }
 
-/** Draws a centered text button with disciplined tactical DOOM styling (Crimson CTA / Amber Hovers). */
-function drawButton(text, cx, cy, action, w = 200, h = 44, customColor = null, chamfer = 8) {
+/** Draws a chunky 3D extruded pixel button with authentic 90s depth and depress physics. */
+function drawButton(text, cx, cy, action, w = 200, h = 40, customColor = null, radius = 4) {
   const ctx = state.ctx;
   const x = cx - w / 2;
   const y = cy - h / 2;
 
-  // Check if button is hovered
+  // Check hover state
   const isHovered = _hoveredButton &&
     _mouseX >= x && _mouseX <= x + w &&
     _mouseY >= y && _mouseY <= y + h;
 
-  const isPrimary = text.includes('START') || text.includes('LAUNCH') || text.includes('LOCK IN') || text.includes('GAUNTLET');
-  
+  const upperText = (text || '').toUpperCase();
+  const isPrimary = upperText.includes('START') || upperText.includes('LAUNCH') || upperText.includes('LOCK IN') || upperText.includes('PLAY AGAIN') || upperText.includes('PLAY NOW') || upperText.includes('GAUNTLET') || upperText.includes('DEPLOY');
+  const isSecondary = upperText.includes('BACK') || upperText.includes('CANCEL') || upperText.includes('CLOSE') || upperText.includes('TUTORIAL') || upperText.includes('MAIN MENU') || upperText.includes('EDIT') || upperText.includes('RESET');
+
+  const shadowDepth = isHovered ? 4 : 3;
+  const topFaceY = isHovered ? y - 1 : y;
+
   ctx.save();
-  const grad = ctx.createLinearGradient(x, y, x, y + h);
-  
+
+  // Draw 3D Bottom Extruded Shadow Block
+  let shadowColor = '#baa88c';
+  let faceColor = '#e8dec8';
+  let textColor = '#2d080c';
+  let strokeColor = '#2d080c';
+
   if (isPrimary) {
-    if (isHovered) {
-      grad.addColorStop(0, '#ef4444');
-      grad.addColorStop(0.5, '#dc2626');
-      grad.addColorStop(1, '#991b1b');
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(220, 38, 38, 0.6)';
-      ctx.shadowBlur = 12;
-    } else {
-      grad.addColorStop(0, '#dc2626');
-      grad.addColorStop(0.5, '#b91c1c');
-      grad.addColorStop(1, '#7f1d1d');
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 1;
-      ctx.shadowColor = 'rgba(220, 38, 38, 0.3)';
-      ctx.shadowBlur = 6;
-    }
+    shadowColor = '#4d0a13';
+    faceColor = isHovered ? '#b51f33' : '#9e1a2b';
+    textColor = '#ffffff';
+    strokeColor = '#2d080c';
+  } else if (isSecondary) {
+    shadowColor = '#7c2d37';
+    faceColor = isHovered ? '#f7cad0' : '#f0b6ba';
+    textColor = '#2d080c';
+    strokeColor = '#2d080c';
   } else if (customColor) {
-    if (isHovered) {
-      grad.addColorStop(0, 'rgba(40, 48, 66, 0.98)');
-      grad.addColorStop(1, 'rgba(20, 24, 34, 0.98)');
-      ctx.strokeStyle = customColor;
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = customColor;
-      ctx.shadowBlur = 8;
-    } else {
-      grad.addColorStop(0, 'rgba(24, 30, 42, 0.9)');
-      grad.addColorStop(1, 'rgba(14, 18, 26, 0.9)');
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 1;
-    }
+    shadowColor = '#4d0a13';
+    faceColor = customColor;
+    textColor = '#ffffff';
+    strokeColor = '#2d080c';
   } else {
-    if (isHovered) {
-      grad.addColorStop(0, 'rgba(36, 44, 62, 0.98)');
-      grad.addColorStop(0.5, 'rgba(26, 32, 46, 0.98)');
-      grad.addColorStop(1, 'rgba(18, 22, 32, 0.98)');
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.35)';
-      ctx.shadowBlur = 8;
-    } else {
-      grad.addColorStop(0, 'rgba(22, 27, 38, 0.88)');
-      grad.addColorStop(0.5, 'rgba(16, 20, 28, 0.88)');
-      grad.addColorStop(1, 'rgba(12, 15, 22, 0.88)');
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = 1;
-    }
+    shadowColor = '#baa88c';
+    faceColor = isHovered ? '#f2e8d5' : '#e8dec8';
+    textColor = '#2d080c';
+    strokeColor = '#2d080c';
   }
 
-  ctx.fillStyle = grad;
-  drawChamferedRect(ctx, x, y, w, h, chamfer);
+  // Shadow bevel rectangle
+  ctx.fillStyle = shadowColor;
+  drawChamferedRect(ctx, x, topFaceY + shadowDepth, w, h, radius);
+  ctx.fill();
+
+  // Top button face
+  ctx.fillStyle = faceColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.8;
+  drawChamferedRect(ctx, x, topFaceY, w, h, radius);
   ctx.fill();
   ctx.stroke();
-  ctx.restore();
+
+  // Top highlight gloss line
+  ctx.strokeStyle = isPrimary ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + radius + 1, topFaceY + 2);
+  ctx.lineTo(x + w - radius - 1, topFaceY + 2);
+  ctx.stroke();
 
   // Button text
-  ctx.fillStyle = isHovered ? '#ffffff' : (isPrimary ? '#ffffff' : '#cbd5e1');
-  ctx.font = 'bold 13.5px "Rajdhani", "Outfit", sans-serif';
+  ctx.fillStyle = textColor;
+  ctx.font = isPrimary 
+    ? '900 13px "Outfit", "Press Start 2P", sans-serif'
+    : 'bold 11px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, topFaceY + h / 2);
 
-  if (isHovered) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(1.02, 1.02);
-    ctx.fillText(text, 0, 0);
-    ctx.restore();
-  } else {
-    ctx.fillText(text, cx, cy);
-  }
+  ctx.restore();
 
   const transform = ctx.getTransform();
   const corners = [
-    { x, y },
-    { x: x + w, y },
-    { x, y: y + h },
-    { x: x + w, y: y + h },
+    { x, y: topFaceY },
+    { x: x + w, y: topFaceY },
+    { x, y: topFaceY + h + shadowDepth },
+    { x: x + w, y: topFaceY + h + shadowDepth },
   ];
   const points = corners.map((pt) => ({
     x: transform.a * pt.x + transform.c * pt.y + transform.e,
@@ -209,46 +207,44 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight = 16) {
   }
 }
 
-function drawPremiumStatBar(ctx, x, y, width, label, valueStr, percentage, color = '#f59e0b') {
+function drawPremiumStatBar(ctx, x, y, width, label, valueStr, percentage, color = '#9e1a2b') {
   // Label
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = 'bold 10.5px "Rajdhani", sans-serif';
+  ctx.fillStyle = '#2d080c';
+  ctx.font = 'bold 10px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
-  ctx.fillText(label, x, y - 4);
+  ctx.fillText(label, x, y - 2);
   
   // Value text
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 12px "Rajdhani", sans-serif';
+  ctx.fillStyle = '#702028';
+  ctx.font = 'bold 10.5px "Rajdhani", monospace, sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(valueStr, x + width, y - 4);
+  ctx.fillText(valueStr, x + width, y - 2);
 
-  // Background bar
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-  ctx.lineWidth = 1;
+  // Background track
+  ctx.fillStyle = '#d8ceb9';
+  ctx.strokeStyle = '#2d080c';
+  ctx.lineWidth = 1.2;
   drawChamferedRect(ctx, x, y, width, 5, 2);
   ctx.fill();
   ctx.stroke();
 
-  // Foreground bar
+  // Foreground fill
   ctx.save();
   ctx.fillStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 6;
-  const fillW = Math.max(4, Math.min(width, width * percentage));
-  drawChamferedRect(ctx, x, y, fillW, 5, 2);
+  const fillW = Math.max(2, Math.min(width - 2, (width - 2) * percentage));
+  drawChamferedRect(ctx, x + 1, y + 1, fillW, 3, 1);
   ctx.fill();
   ctx.restore();
 }
 
-function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#f59e0b') {
+function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b') {
   // Metric Label on left
-  ctx.fillStyle = '#8899aa';
-  ctx.font = 'bold 10px "Rajdhani", sans-serif';
+  ctx.fillStyle = '#2d080c';
+  ctx.font = 'bold 9.5px "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, x, y + 4);
+  ctx.fillText(label, x, y + 3);
 
   const labelW = 28;
   const valueW = width > 120 ? 32 : 0;
@@ -257,30 +253,28 @@ function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#f59e0b'
   const barH = 5;
 
   // Background Track
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.lineWidth = 1;
-  drawChamferedRect(ctx, barX, y + 1.5, barW, barH, 2);
+  ctx.fillStyle = '#d8ceb9';
+  ctx.strokeStyle = '#2d080c';
+  ctx.lineWidth = 1.2;
+  drawChamferedRect(ctx, barX, y + 1, barW, barH, 2);
   ctx.fill();
   ctx.stroke();
 
   // Filled Gauge
-  const fillW = Math.min(barW, Math.max(3, (value / maxValue) * barW));
+  const fillW = Math.min(barW - 2, Math.max(2, (value / maxValue) * (barW - 2)));
   ctx.save();
   ctx.fillStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 4;
-  drawChamferedRect(ctx, barX, y + 1.5, fillW, barH, 2);
+  drawChamferedRect(ctx, barX + 1, y + 2, fillW, barH - 2, 1);
   ctx.fill();
   ctx.restore();
 
   // Metric Value on right
   if (valueW > 0) {
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = 'bold 10px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#702028';
+    ctx.font = 'bold 9.5px "Rajdhani", monospace, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText(typeof value === 'number' ? value : value, x + width, y + 4);
+    ctx.fillText(typeof value === 'number' ? value : value, x + width, y + 3);
   }
 }
 
