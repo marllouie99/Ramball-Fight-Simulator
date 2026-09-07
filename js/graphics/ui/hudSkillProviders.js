@@ -560,6 +560,39 @@ export function getSkillDataForFighter(f, getProjectiles) {
       { id: 'ecstasy',   pct: ecstasyPct,   ready: isEcstasy,          color: themeColor, label: ecstasyLabel }
     ];
   }
+  if (f.characterId === 'makima' || f.type === 'makima') {
+    const themeColor = f.color || '#A31D24';
+
+    // Skill 1: Chains of Domination (Shihai no Kusari)
+    const chainsMax = f.chainsCooldownMax || CONFIG.makima?.chainsCooldown || 540;
+    const chainsTimer = f.chainsCooldown !== undefined ? f.chainsCooldown : 0;
+    let chainsPct = Math.max(0, Math.min(100, (1 - (chainsTimer / chainsMax)) * 100));
+    if (f.isChainingActive) chainsPct = 100;
+
+    // Skill 2: Angel's Armory (1000-Year Holy Spear)
+    const angelMax = f.angelCooldownMax || CONFIG.makima?.angelCooldown || 810;
+    const angelTimer = f.angelCooldown !== undefined ? f.angelCooldown : 0;
+    let angelPct = Math.max(0, Math.min(100, (1 - (angelTimer / angelMax)) * 100));
+    if (f.isSummoningSpear) angelPct = 100;
+
+    // Ultimate: Kyoto Shrine Ritual (Gravitational Splatter)
+    const shrineMax = f.shrineCooldownMax || CONFIG.makima?.shrineCooldown || 1920;
+    const shrineTimer = f.shrineCooldown !== undefined ? f.shrineCooldown : shrineMax;
+    let shrinePct = Math.max(0, Math.min(100, (1 - (shrineTimer / shrineMax)) * 100));
+    if (f.isExecutingRitual) shrinePct = 100;
+
+    // Passive Gauge: Citizen Contract Lives
+    const lives = f.citizenLives !== undefined ? f.citizenLives : 5;
+    const citizenPct = Math.max(0, Math.min(100, (lives / (f.citizenLivesMax || 5)) * 100));
+    const citizenLabel = `CITIZEN LIVES (${lives}/5)`;
+
+    return [
+      { id: 'chains',  pct: chainsPct,  ready: chainsPct >= 99,  color: themeColor, label: 'CONTROL CHAINS' },
+      { id: 'angel',   pct: angelPct,   ready: angelPct >= 99,   color: themeColor, label: '1000-YEAR SPEAR' },
+      { id: 'shrine',  pct: shrinePct,  ready: shrinePct >= 99,  color: themeColor, label: 'SHRINE COMPRESSION' },
+      { id: 'citizen', pct: citizenPct, ready: lives > 0,        color: themeColor, label: citizenLabel }
+    ];
+  }
   if (f.characterId === 'megumi' || f.type === 'megumi') {
     const themeColor = f.color || '#1C2D4A';
 

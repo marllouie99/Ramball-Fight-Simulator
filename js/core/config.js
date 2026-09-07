@@ -20,6 +20,7 @@ import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
 import { ulquiorraConfig } from '../configs/characters/ulquiorraConfig.js';
+import { makimaConfig } from '../configs/characters/makimaConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
 import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
@@ -49,6 +50,7 @@ export const CONFIG = {
   uryu: uryuConfig,
   ishida: uryuConfig,
   ulquiorra: ulquiorraConfig,
+  makima: makimaConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1419,6 +1421,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: ulquiorraConfig.projectileSpeedMultiplier || 1.0,
     ability: ulquiorraConfig.ability || 'Resurrección: Segunda Etapa',
     desc: ulquiorraConfig.desc || 'The 4th Espada. Possesses High-Speed Regeneration, Hierro defense, instantaneous Sonído vanishes, emerald Cero/Cero Oscuras beams, and evolves into Segunda Etapa with Lanza del Relámpago.',
+  },
+  {
+    id: 38,
+    name: 'MAKIMA',
+    category: 'Anime',
+    color: makimaConfig.color || '#A31D24', // Velvet Blood Crimson
+    themeColor: makimaConfig.themeColor || '#A31D24',
+    secondaryColor: makimaConfig.secondaryColor || '#F59E0B',
+    startX: makimaConfig.startX || 300,
+    startY: makimaConfig.startY || 250,
+    startVx: makimaConfig.startVx || 1.1,
+    startVy: makimaConfig.startVy || 1.0,
+    radius: makimaConfig.radius || makimaConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'makima',
+    hp: makimaConfig.hp || 360,
+    damage: makimaConfig.damage || 32,
+    cooldown: makimaConfig.cooldown || 44,
+    moveSpeed: makimaConfig.moveSpeed || makimaConfig.speed || 5.5,
+    projectileSpeedMultiplier: makimaConfig.projectileSpeedMultiplier || 1.0,
+    ability: makimaConfig.ability || 'Control Devil & "Bang!"',
+    desc: makimaConfig.desc || 'The Control Devil. Commands absolute psychological authority. Passive: Prime Minister Accord redirects fatal blows to 5 Citizen Lives. Primary: "Bang!" supersonic kinetic hitscan shockwave with wall-bounce crush damage. Skill 1: Chains of Domination. Skill 2: Angel 1000-Year Spear. Ultimate: Kyoto Shrine Gravitational Splatter.',
   }
 ];
 

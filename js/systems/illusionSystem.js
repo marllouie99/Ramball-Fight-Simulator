@@ -602,6 +602,12 @@ export function updateIllusions() {
 
     // If bounded, steer directly towards the nearest target (unless target is Gojo with active Infinity)
     if (bounced) {
+      if (illusion.isCurrentlyWallPinnedByMakima || ((illusion.makimaWallPinTimer || 0) > 0)) {
+        illusion.vx = 0;
+        illusion.vy = 0;
+        return;
+      }
+
       if (illusion._knockedBackBySaitamaBasicPunch || illusion.isWallPinnedBySaitama) {
         illusion._knockedBackBySaitamaBasicPunch = false;
         illusion.isWallPinnedBySaitama = false;

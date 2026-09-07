@@ -406,6 +406,9 @@ export class Fighter {
     this.vanishTimer = 0;
     this.evadeBuffTimer = 0;
     this.flashStepTimer = 0;
+    this.isWallPinnedByMakima = false;
+    this.isCurrentlyWallPinnedByMakima = false;
+    this.makimaWallPinTimer = 0;
 
     this.damageDealt = 0;
     this.damageReceived = 0;
@@ -1299,6 +1302,22 @@ export class Fighter {
     if (this.vanishTimer > 0) this.vanishTimer--;
     if (this.invincibilityTimer > 0) this.invincibilityTimer--;
     if (this.flashStepTimer > 0) this.flashStepTimer--;
+    if (this.makimaWallPinTimer > 0) {
+      this.makimaWallPinTimer--;
+      this.isCurrentlyWallPinnedByMakima = true;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      if (this.makimaWallPinTimer <= 0) {
+        this.isCurrentlyWallPinnedByMakima = false;
+        this.preventKnockbackBounce = false;
+        this.suppressFreezeOverlay = false;
+        this._makimaAttacker = null;
+      }
+    } else {
+      this.isCurrentlyWallPinnedByMakima = false;
+    }
     
     // Knockback Stun: Disable AI steering velocity during knockback so ricochet executes cleanly
     if (this.knockbackStunTimer > 0) {
@@ -1398,6 +1417,60 @@ export class Fighter {
     }
   }
 
+  _triggerMakimaWallPin(arena) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
+    if (!arena) return;
+
+    this.isWallPinnedByMakima = false;
+    this.isCurrentlyWallPinnedByMakima = true;
+    this.preventKnockbackBounce = true;
+
+    // Zero out all velocity so they do not rebounce
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
+    // Stick target to the wall for wallPinDurationFrames (1.5s = 90 frames)
+    const pinDuration = (typeof CONFIG !== 'undefined' && CONFIG.makima?.wallPinDurationFrames) ? CONFIG.makima.wallPinDurationFrames : 90;
+    this.makimaWallPinTimer = pinDuration;
+    this.suppressFreezeOverlay = true;
+
+    if (typeof this.applyTimeStop === 'function') {
+      this.applyTimeStop(pinDuration);
+    } else {
+      this.hitStunTimer = pinDuration;
+    }
+
+    if (typeof this.interruptAttacks === 'function') {
+      this.interruptAttacks(true);
+    }
+
+    // Wall impact crush damage & effects
+    const wallDmg = (typeof CONFIG !== 'undefined' && CONFIG.makima?.bangWallBounceDamage) ? CONFIG.makima.bangWallBounceDamage : 22;
+    const attacker = this._makimaAttacker || null;
+    this.takeDamage(wallDmg, attacker);
+
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 45, '#F59E0B');
+    }
+    if (typeof spawnBloodEffect === 'function') {
+      spawnBloodEffect(this.x, this.y, 22, '#880000');
+    }
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(this.x, this.y, 14, '#F59E0B');
+    }
+    if (typeof triggerGlobalScreenShake === 'function') {
+      triggerGlobalScreenShake(14, 16);
+    }
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - (this.r || 25) - 14, 'WALL PINNED!', '#F59E0B');
+    }
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.85);
+    }
+  }
+
   _processKnockbackPhysics() {
     const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
@@ -1450,8 +1523,11 @@ export class Fighter {
           }
 
           const wasSaitamaPin = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
+          const wasMakimaPin = Boolean(this.isWallPinnedByMakima);
           if (wasSaitamaPin) {
             this._triggerSaitamaWallPinAndCrack(arena);
+          } else if (wasMakimaPin) {
+            this._triggerMakimaWallPin(arena);
           } else if (this.preventKnockbackBounce) {
             this.preventKnockbackBounce = false;
             // Non-Saitama wall contact (e.g. Getsuga drag) - cleanly stop knockback without spawning wall crack decals
@@ -1479,6 +1555,8 @@ export class Fighter {
       if (this.knockbackVx === 0 && this.knockbackVy === 0) {
         this._knockedBackBySaitamaBasicPunch = false;
         this.isWallPinnedBySaitama = false;
+        this.isWallPinnedByMakima = false;
+        this.preventKnockbackBounce = false;
         if (this.timeStopTimer <= 0) {
           this.suppressFreezeOverlay = false;
         }
@@ -1488,6 +1566,7 @@ export class Fighter {
       this.preventKnockbackBounce = false;
       this._knockedBackBySaitamaBasicPunch = false;
       this.isWallPinnedBySaitama = false;
+      this.isWallPinnedByMakima = false;
       if (this.timeStopTimer <= 0) {
         this.suppressFreezeOverlay = false;
       }
@@ -2122,7 +2201,8 @@ export class Fighter {
 
     const isSaitamaHit = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
     const isGenosTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInGenosFlurry;
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit;
+    const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
@@ -2158,6 +2238,8 @@ export class Fighter {
       }
       if (clamped && isSaitamaHit) {
         this._triggerSaitamaWallPinAndCrack(arena);
+      } else if (clamped && this.isWallPinnedByMakima) {
+        this._triggerMakimaWallPin(arena);
       }
       return clamped;
     }

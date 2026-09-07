@@ -413,6 +413,30 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
     volume: 0.45,
     delay: 0,
+  },
+
+  // Makima - The Control Devil ("Bang!")
+  'makima': {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
+  38: {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
+
+  // Ulquiorra - 4th Espada
+  'ulquiorra': {
+    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+    volume: 0.65,
+    delay: 0,
+  },
+  37: {
+    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+    volume: 0.65,
+    delay: 0,
   }
 };
 
