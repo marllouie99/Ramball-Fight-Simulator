@@ -257,40 +257,8 @@ export class DopplegangerFighter extends Fighter {
     // Try sword swing
     this._trySwordSwing(opponent, ownerIndex);
 
-    // Velocity Recovery (gradually return to target speed after knockback or slow)
-    // This matches the base Fighter behavior so illusions don't outrun the Doppelganger
-    let targetSpeed = this.speed;
-    if (this.slowTimer > 0) {
-      this.slowTimer--;
-      targetSpeed *= this.slowMultiplier;
-    }
-    let currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-
-    // While being knocked back, let velocity decay naturally - don't override it
-    const isKnockedBack = (this.knockbackStunTimer || 0) > 0 || currentSpeed > this.speed * 2.5;
-
-    if (isKnockedBack) {
-      // Decay knockback gradually
-      this.vx *= 0.88;
-      this.vy *= 0.88;
-      if (this.knockbackStunTimer > 0) this.knockbackStunTimer--;
-    } else {
-      // Auto-recover from zero velocity if we should be moving
-      if (targetSpeed > 0 && currentSpeed < 0.05) {
-        const nudgeAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        this.vx = Math.cos(nudgeAngle) * targetSpeed;
-        this.vy = Math.sin(nudgeAngle) * targetSpeed;
-        currentSpeed = targetSpeed;
-      } else if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-        this.vx = (this.vx / currentSpeed) * targetSpeed;
-        this.vy = (this.vy / currentSpeed) * targetSpeed;
-      }
-    }
-
-    // Movement
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
+    // Velocity Recovery and movement
+    this.applyMovementPhysics();
 
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);

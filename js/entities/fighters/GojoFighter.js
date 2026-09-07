@@ -319,7 +319,7 @@ export class GojoFighter extends Fighter {
     }
 
     const isPurple = Boolean(opts.isPurpleDPS || opts.isPurpleExplosion || opts.isPurple || opts?.projectile?.isGojoPurple || opts?.projectile?.isGojoPurpleOrb || opts?.projectile?.behaviorType === 'gojo_purple' || opts?.projectile?.colorTheme === 'green');
-    const isGuaranteedHit = Boolean(isPurple || (opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.bypassShield || opts.isIsoh || opts.isAmbush || opts.isAmbushThrust || opts.isSoulSplit || opts.isRed)) || (attacker && attacker.isAmbushing));
+    const isGuaranteedHit = Boolean(isPurple || (opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.bypassShield || opts.isIsoh || opts.isAmbush || opts.isAmbushThrust || opts.isSoulSplit || opts.isRed || opts.isDivineFlame || opts.isFuga)) || (attacker && attacker.isAmbushing));
     const isSaitamaCountering = attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
       ((attacker._counterPunchTimer && attacker._counterPunchTimer > 0) ||
        (attacker._counterWindupTimer && attacker._counterWindupTimer > 0) ||
@@ -473,8 +473,10 @@ export class GojoFighter extends Fighter {
           audioSystem.playSFX('skill_dash3', 0.8);
         }
         this.introReboundActive = false;
+        this.resumeMovement(opponent);
       } else if (this.introReboundTimer <= 0) {
         this.introReboundActive = false;
+        this.resumeMovement(opponent);
       }
       return;
     }
@@ -1112,10 +1114,27 @@ export class GojoFighter extends Fighter {
       return; // Don't do basic attacks while channeling
     }
 
-    // Post-fire breather removed per user request: Gojo does not freeze or catch his breath after Purple
+    // Post-fire Purple Breather Recovery Stasis (Gojo catches his breath after firing Hollow Purple)
     if (this.purpleRecoveryTimer > 0) {
-      this.purpleRecoveryTimer = 0;
-      this.z = 0;
+      this.purpleRecoveryTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      if (this.z > 0) {
+        this.z = Math.max(0, this.z - 0.5);
+      }
+      if (opponent && !opponent.isDead) {
+        this.aim(opponent);
+      }
+      if (this.purpleRecoveryTimer % 12 === 0) {
+        spawnSparks(this.x, this.y, 2, '#A855F7');
+      }
+      if (this.purpleRecoveryTimer <= 0) {
+        this.purpleRecoveryTimer = 0;
+        this.z = 0;
+        this.resumeMovement(opponent);
+      }
+      this.resolveWallBounce(arena);
+      return; // Pause movement & basic attacks during post-Purple breather recovery
     }
 
     // 3. Handle Mode Switch Breather (Gojo no longer freezes movement when switching to Ranged mode)
@@ -1149,6 +1168,7 @@ export class GojoFighter extends Fighter {
 
       if (this.rctChannelTimer <= 0) {
         this.isChannelingRCT = false;
+        this.resumeMovement(opponent);
       }
     }
 

@@ -34,9 +34,9 @@ function playYujiPunchSound(disableVoice = false) {
  * Executes Yuji's basic attack punch.
  * Performs a frontal-arc collision check against all enemies.
  */
-export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
-  // If already punching or slashing, don't restart (unless it's a combo flurry punch)
-  if (!isCombo && (this.punchAnimTimer > 0 || this.slashSwingTimer > 0)) return;
+export function modUpdateMeleeCombat(customTarget = null) {
+  // If already punching or slashing, don't restart
+  if (this.punchAnimTimer > 0 || this.slashSwingTimer > 0) return;
 
   const isZone = (this.blackFlashTimer > 0);
   
@@ -45,12 +45,12 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
     : (CONFIG.yuji?.blackFlashThreshold || 4);
     
   if (!isZone && this.blackFlashCharge >= thresholdForAudio) {
-    if (CONFIG.yuji?.blackFlashEnterSound && !this.soulSwapActive && Math.random() < (CONFIG.yuji?.blackFlashNoiseChance ?? 0.35)) {
+    if (CONFIG.yuji?.blackFlashEnterSound && !this.soulSwapActive && Math.random() < (CONFIG.yuji?.blackFlashNoiseChance ?? 0.05)) {
       audioSystem.playSFX(
         CONFIG.yuji.blackFlashEnterSound, 
-        CONFIG.yuji.blackFlashEnterVolume ?? 1.5,
+        CONFIG.yuji.blackFlashEnterVolume ?? 2.0,
         1.0, 0, 
-        CONFIG.yuji.blackFlashEnterDelay ?? 0
+        CONFIG.yuji.blackFlashEnterDelay ?? -0.10
       );
     }
   }
@@ -63,20 +63,18 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
     this.slashSwingMaxTimer = 14;
     this.slashHand = this.slashHand === 1 ? 0 : 1;
   } else {
-    const normalSpeed = this.punchMaxTime || 25;
-    const zoneSpeed = CONFIG.yuji?.blackFlashZonePunchSpeed || 16;
-    this.punchAnimTimer = isCombo ? 8 : (isZone ? zoneSpeed : normalSpeed);
+    const normalSpeed = this.punchMaxTime || (CONFIG.yuji?.punchSpeed || 25);
+    const zoneSpeed = CONFIG.yuji?.blackFlashZonePunchSpeed || 35;
+    this.punchAnimTimer = isZone ? zoneSpeed : normalSpeed;
     this.isRightPunch = !this.isRightPunch;
     this.hideFrontHand = false;
     this.hideBackHand = false;
   }
 
-  // Set attack cooldown (none during combo)
-  if (!isCombo) {
-    this.cooldownTimer = isZone
-      ? (CONFIG.yuji?.blackFlashZonePunchCooldown || 30)
-      : (CONFIG.yuji?.basicPunchCooldown || 35);
-  }
+  // Set attack cooldown from config
+  this.cooldownTimer = isZone
+    ? (CONFIG.yuji?.blackFlashZonePunchCooldown || 30)
+    : (CONFIG.yuji?.basicPunchCooldown || 35);
 
   // Query all valid targets (fighters & illusions) in the arena
   const allTargets = [];
@@ -98,7 +96,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
     }
   }
 
-  // If a specific custom target is forced (e.g. from combo rush), prioritize it
+  // If a specific custom target is forced, prioritize it
   let targetsToScan = allTargets;
   if (customTarget && !customTarget.isDead && customTarget.hp > 0) {
     targetsToScan = [customTarget];
@@ -131,10 +129,8 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
       if (Math.abs(angleDiff) <= arcAngle) {
         hitAny = true;
 
-        // Calculate stats
-        let damage = isCombo 
-          ? (CONFIG.yuji?.comboDamage || 12)
-          : (CONFIG.yuji?.punchDamage || 18);
+        // Calculate stats directly from config
+        let damage = CONFIG.yuji?.punchDamage || 18;
         let knockback = CONFIG.yuji?.knockback || 7;
 
         if (isBlackFlash) {
@@ -144,7 +140,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
 
         // Apply Soul Swap damage multiplier if active
         if (this.soulSwapActive) {
-          damage *= (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5);
+          damage *= (CONFIG.yuji?.soulSwapDamageMultiplier || 2.5);
         }
 
         // Apply damage & knockback
@@ -188,7 +184,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
         if (this.delayedShockwaves && didDamage !== false) {
           let swDamage = CONFIG.yuji?.shockwaveDamage || 10;
           if (this.soulSwapActive) {
-            swDamage *= (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5);
+            swDamage *= (CONFIG.yuji?.soulSwapDamageMultiplier || 2.5);
           }
           this.delayedShockwaves.push({
             target: target,

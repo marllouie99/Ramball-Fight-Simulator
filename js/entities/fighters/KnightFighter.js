@@ -540,21 +540,7 @@ export class KnightFighter extends Fighter {
     }
 
     // Normal movement / Deceleration
-    let targetSpeed = this.speed;
-    if (this.slowTimer > 0) {
-      this.slowTimer--;
-      targetSpeed *= this.slowMultiplier;
-    }
-    const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const ns = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
-      this.vx = (this.vx / currentSpeed) * ns;
-      this.vy = (this.vy / currentSpeed) * ns;
-    }
-
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * CONFIG.spin.rate;
+    this.applyMovementPhysics();
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);
 

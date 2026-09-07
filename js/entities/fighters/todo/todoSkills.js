@@ -34,8 +34,8 @@ export function modUpdateBoogieWoogie(targets) {
   if (this.isTakadaChanneling) return;
   if (this.boogieWoogieCooldown > 0 || this.clapWindupTimer > 0 || this.clapHoldTimer > 0 || (this.rockCounterComboLeft || 0) > 0) return;
 
-  // 1. If cursed rocks are active, swap with the rock anytime cooldown is up!
-  if (this.cursedRocks && this.cursedRocks.length > 0) {
+  // 1. If cursed rocks are active and Todo has no live teammate, swap with the rock anytime cooldown is up!
+  if (!hasLiveTeammate(this) && this.cursedRocks && this.cursedRocks.length > 0) {
     const rock = this.cursedRocks[0];
     this.clapAnimTimer = 20;
     this.clapWindupTimer = 7;
@@ -93,6 +93,8 @@ export function hasLiveTeammate(fighter) {
 }
 
 export function modThrowCursedRock(target) {
+  // Disable throwing cursed rocks if Todo has a live teammate (only used when solo / teammate dies)
+  if (hasLiveTeammate(this)) return;
   // Prevent throwing rocks while executing counter combo flurry
   if ((this.rockCounterComboLeft || 0) > 0) return;
   // Only 1 active rock allowed at a time
@@ -192,9 +194,9 @@ export function modUpdateCursedRocks(targets) {
       }
     }
 
-    // Proximity trigger check for Boogie Woogie swap (only if Todo is alive and able to act and rock counter cooldown is ready)
+    // Proximity trigger check for Boogie Woogie swap (only if Todo is alive, has no living teammate, and able to act)
     const isFrozen = (typeof this._handleTimeStop === 'function') ? this._handleTimeStop() : false;
-    const canSwap = !this.isDead && this.hp > 0 && !this.isDemoFighter && (this.rockCounterComboLeft || 0) <= 0 && (this.rockCounterCooldown || 0) <= 0 && !rock.hasTriggeredTeleport && !this.clapWindupTimer && !this.clapHoldTimer && !isFrozen && !this.isParalyzed && !this.isTakadaChanneling;
+    const canSwap = !this.isDead && this.hp > 0 && !this.isDemoFighter && !hasLiveTeammate(this) && (this.rockCounterComboLeft || 0) <= 0 && (this.rockCounterCooldown || 0) <= 0 && !rock.hasTriggeredTeleport && !this.clapWindupTimer && !this.clapHoldTimer && !isFrozen && !this.isParalyzed && !this.isTakadaChanneling;
 
     if (canSwap) {
       for (const enemy of enemies) {
@@ -327,10 +329,9 @@ export function modExecutePendingSwap() {
   spawnImpactFlash(this.x, this.y, 35, '#00E5FF');
   spawnTodoClapCEParticles(this.x, this.y, this.gunAngle || 0);
 
-  const vanishFrames = CONFIG.todo?.vanishDurationFrames ?? 3;
+  const vanishFrames = CONFIG.todo?.vanishDurationFrames ?? 15;
 
   if (data.type === 'fake') {
-    this.vanishTimer = vanishFrames;
     return;
   }
 
@@ -353,10 +354,15 @@ export function modExecutePendingSwap() {
       swapTarget.x = oldTodoX;
       swapTarget.y = oldTodoY;
 
-      // Flash vanish delay where both entities become invisible during swap
-      this.vanishTimer = vanishFrames;
-      if (swapTarget.characterId || !swapTarget.isRock) {
-        swapTarget.vanishTimer = vanishFrames;
+      this.vx = 0;
+      this.vy = 0;
+      swapTarget.vx = 0;
+      swapTarget.vy = 0;
+
+      // Both Todo and swapped target vanish briefly during instantaneous swap
+      this.vanishTimer = Math.max(this.vanishTimer || 0, vanishFrames);
+      if (!swapTarget.isRock) {
+        swapTarget.vanishTimer = Math.max(swapTarget.vanishTimer || 0, vanishFrames);
       }
 
       // Trigger full Boogie Woogie Swap Visual Beam between original positions
@@ -387,10 +393,6 @@ export function modExecutePendingSwap() {
   } else if (data.type === 'rescueTeammate') {
     const teammate = data.swapTarget;
     if (teammate && teammate.hp > 0) {
-      const distToTeammate = Math.hypot(this.x - teammate.x, this.y - teammate.y);
-      const minSwapDist = CONFIG.todo?.minTeammateSwapDistance || 120;
-      if (distToTeammate < minSwapDist) return;
-
       const oldTodoX = this.x;
       const oldTodoY = this.y;
       const oldTeamX = teammate.x;
@@ -401,9 +403,14 @@ export function modExecutePendingSwap() {
       teammate.x = oldTodoX;
       teammate.y = oldTodoY;
 
-      // Flash vanish delay where both Todo and partner become invisible during rescue swap
-      this.vanishTimer = vanishFrames;
-      teammate.vanishTimer = vanishFrames;
+      this.vx = 0;
+      this.vy = 0;
+      teammate.vx = 0;
+      teammate.vy = 0;
+
+      // Both Todo and rescued teammate vanish briefly during instantaneous rescue swap
+      this.vanishTimer = Math.max(this.vanishTimer || 0, vanishFrames);
+      teammate.vanishTimer = Math.max(teammate.vanishTimer || 0, vanishFrames);
 
       // Spawn Expanding Boogie Woogie Shockwave Rings at BOTH swap positions!
       spawnMeleeClashShockwave(oldTodoX, oldTodoY, 130, 'todo');
@@ -432,9 +439,9 @@ export function modExecutePendingSwap() {
 
       // Rescued teammate gains invulnerability buffer to survive the fatal hit!
       const invulnFrames = CONFIG.todo?.rescueInvulnerableFrames || 45;
-      teammate.invulnerableTimer = Math.max(teammate.invulnerableTimer || 0, invulnFrames);
+      teammate.invincibilityTimer = Math.max(teammate.invincibilityTimer || 0, invulnFrames);
 
-      // Aim Todo at nearest enemy to immediately step in and unleash combo flurry!
+      // Aim Todo at nearest enemy to immediately step in and unleash combo flurry only if in melee reach!
       let nearestEnemy = data.targetEnemy;
       if (!nearestEnemy || nearestEnemy.hp <= 0) {
         let minDist = Infinity;
@@ -454,32 +461,41 @@ export function modExecutePendingSwap() {
         }
       }
 
-      if (nearestEnemy) {
+      if (nearestEnemy && nearestEnemy.hp > 0) {
         this.aim(nearestEnemy);
-        // Initiate Todo's Brawler Counter-Attack Flurry upon swapping in!
-        const totalHits = CONFIG.todo?.rockCounterComboHits || 7;
-        const interval = CONFIG.todo?.rockCounterComboInterval || 10;
-        const comboTotalDuration = totalHits * interval + 10;
+        const distToEnemy = Math.hypot(nearestEnemy.x - this.x, nearestEnemy.y - this.y);
+        const isClose = distToEnemy <= (this.r || 25) + (nearestEnemy.r || 25) + 60;
 
-        // Stop movement mechanic: Zero velocity, 100% movement stop, and hit stun for entire combo duration
-        nearestEnemy.vx = 0;
-        nearestEnemy.vy = 0;
-        if (typeof nearestEnemy.applySlow === 'function') {
-          nearestEnemy.applySlow(comboTotalDuration, 0.0);
+        if (isClose) {
+          // Initiate Todo's Brawler Counter-Attack Flurry only when arriving in close melee reach!
+          const totalHits = CONFIG.todo?.rockCounterComboHits || 7;
+          const interval = CONFIG.todo?.rockCounterComboInterval || 10;
+          const comboTotalDuration = totalHits * interval + 10;
+
+          // Stop movement mechanic: Zero velocity, 100% movement stop, and hit stun for entire combo duration
+          nearestEnemy.vx = 0;
+          nearestEnemy.vy = 0;
+          if (typeof nearestEnemy.applySlow === 'function') {
+            nearestEnemy.applySlow(comboTotalDuration, 0.0);
+          } else {
+            nearestEnemy.slowTimer = comboTotalDuration;
+            nearestEnemy.slowMultiplier = 0.0;
+          }
+          if (typeof nearestEnemy.applyHitStun === 'function') {
+            nearestEnemy.applyHitStun(comboTotalDuration);
+          }
+
+          this.rockCounterComboLeft = totalHits;
+          this.rockCounterComboTarget = nearestEnemy;
+          this.rockCounterComboInterval = interval;
+          this.rockCounterComboTimer = 0;
+          this.rockCounterCooldown = CONFIG.todo?.rockCounterCooldown || 180;
+          playTodoRockCounterVoiceline(this);
         } else {
-          nearestEnemy.slowTimer = comboTotalDuration;
-          nearestEnemy.slowMultiplier = 0.0;
+          this.resumeMovement(nearestEnemy);
         }
-        if (typeof nearestEnemy.applyHitStun === 'function') {
-          nearestEnemy.applyHitStun(comboTotalDuration);
-        }
-
-        this.rockCounterComboLeft = totalHits;
-        this.rockCounterComboTarget = nearestEnemy;
-        this.rockCounterComboInterval = interval;
-        this.rockCounterComboTimer = 0;
-        this.rockCounterCooldown = CONFIG.todo?.rockCounterCooldown || 180;
-        playTodoRockCounterVoiceline(this);
+      } else {
+        this.resumeMovement();
       }
 
       this.justSwappedTimer = CONFIG.todo?.blackFlashWindow || 45;
@@ -504,6 +520,9 @@ export function modExecutePendingSwap() {
       spawnImpactFlash(oldRockX, oldRockY, 35, '#00E5FF');
       spawnTodoClapCEParticles(oldRockX, oldRockY, 0);
 
+      // Todo vanishes briefly during instantaneous rock swap
+      this.vanishTimer = Math.max(this.vanishTimer || 0, vanishFrames);
+
       // Trigger full Boogie Woogie Swap Visual Beam between original positions
       spawnBoogieWoogieSwapEffect(oldTodoX, oldTodoY, oldRockX, oldRockY);
 
@@ -515,8 +534,6 @@ export function modExecutePendingSwap() {
       this.y = oldRockY;
       rock.x = oldTodoX;
       rock.y = oldTodoY;
-
-      this.vanishTimer = vanishFrames;
 
       const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
       if (arena) {
@@ -603,9 +620,13 @@ export function modExecutePendingSwap() {
           this.rockCounterComboTimer = 0;
           this.rockCounterCooldown = CONFIG.todo?.rockCounterCooldown || 180;
           playTodoRockCounterVoiceline(this);
+        } else {
+          this.resumeMovement(targetEnemy);
         }
 
         this.aim(targetEnemy);
+      } else {
+        this.resumeMovement();
       }
 
       this.justSwappedTimer = CONFIG.todo?.blackFlashWindow || 45;
@@ -656,6 +677,9 @@ export function modExecutePendingSwap() {
       if (target.hitStunTimer !== undefined) {
         target.hitStunTimer = 0;
       }
+      this.resumeMovement(target);
+    } else {
+      this.resumeMovement();
     }
 
     const seqCd = CONFIG.todo?.sequenceCooldown || 180;
@@ -671,6 +695,7 @@ export function modExecutePendingSwap() {
 export function modCheckRockSwap() {
   if (!state || !state.fighters) return false;
   if (this.isTakadaChanneling) return false;
+  if (hasLiveTeammate(this)) return false; // In team matches with living teammate, rock swap is disabled
   if (this.boogieWoogieCooldown > 0 || this.clapWindupTimer > 0 || this.clapHoldTimer > 0 || (this.rockCounterComboLeft || 0) > 0) return false;
   if (this.timeStopTimer > 0 || this.electricStunTimer > 0 || this.isTargetOfAmbush) return false;
   if (!this.cursedRocks || this.cursedRocks.length === 0) return false;
@@ -872,6 +897,7 @@ export function modStartTakadaChanneling(force = false) {
   this.takadaSongStarted = false;
   this.takadaSongHandle = null;
   this.takadaSongFadedOut = false;
+  this.isTakadaBackgroundPlaying = true;
   this.takadaUltCooldown = CONFIG.todo?.ultCooldown || 1200;
   this.pureLoveBeamRecoveryTimer = 0;
   this.hitStunTimer = 0;
@@ -895,6 +921,7 @@ export function modActivateTakadaUltimate() {
   this.isTakadaChanneling = false;
   const dur = CONFIG.todo?.ultDuration ?? 5000;
   this.isTakadaUltActive = true;
+  this.isTakadaBackgroundPlaying = true;
   this.takadaUltTimer = dur;
 
   // Reduce active Skill 1 cooldown immediately upon activating ultimate

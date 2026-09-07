@@ -1777,62 +1777,80 @@ export function drawSparkEffects(layer = 'all') {
 
         ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'boogieWoogieSwapBeam') {
-        // ── AOI TODO BOOGIE WOOGIE INSTANTANEOUS SWAP BEAM & LIGHTNING ARCS ──
+        // ── AOI TODO BOOGIE WOOGIE BALANCED MEDIUM BLUE SWAP LASER LINE ──
         const x1 = effect.x;
         const y1 = effect.y;
-        const x2 = effect.targetX || x1;
-        const y2 = effect.targetY || y1;
-        const life = effect.life;
+        const x2 = effect.targetX !== undefined ? effect.targetX : x1;
+        const y2 = effect.targetY !== undefined ? effect.targetY : y1;
+        const life = Math.max(0, Math.min(1.0, effect.life));
+        const alpha = Math.min(1.0, Math.pow(life, 0.7));
 
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 1.0; // Reset outer globalAlpha to control exact layer opacities cleanly
 
-        // 1. Broad Outer Deep Cyan Spatial Distortion Energy Beam
-        ctx.strokeStyle = `rgba(0, 150, 255, ${life * 0.75})`;
-        ctx.lineWidth = 14 * life;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // 2. Vivid Electric Cyan Core Swap Beam
-        ctx.strokeStyle = `rgba(0, 240, 255, ${life * 0.95})`;
-        ctx.lineWidth = 6 * life;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // 3. White-Hot Central Beam Core
-        ctx.strokeStyle = `rgba(255, 255, 255, ${life * 0.98})`;
-        ctx.lineWidth = 2.5 * life;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // 4. Jagged Spatial Lightning Arc Overlay
-        ctx.strokeStyle = `rgba(0, 240, 255, ${life * 0.90})`;
-        ctx.lineWidth = 2.0 * life;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
         const dx = x2 - x1;
         const dy = y2 - y1;
-        const dist = Math.hypot(dx, dy);
-        const segs = 6;
-        const perpX = -dy / (dist || 1);
-        const perpY = dx / (dist || 1);
+        const dist = Math.hypot(dx, dy) || 1;
+        const perpX = -dy / dist;
+        const perpY = dx / dist;
 
+        // 1. Medium Electric Blue Outer Glow Aura (~8.0px)
+        ctx.strokeStyle = `rgba(0, 100, 255, ${alpha * 0.80})`;
+        ctx.lineWidth = Math.max(1.0, 8.0 * alpha);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 2. Neon Electric Cyan Inner Vector Beam (~4.2px)
+        ctx.strokeStyle = `rgba(0, 230, 255, ${alpha * 0.95})`;
+        ctx.lineWidth = Math.max(0.8, 4.2 * alpha);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 3. Crisp Pure-White Core Line (~1.8px)
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 1.0})`;
+        ctx.lineWidth = Math.max(0.4, 1.8 * alpha);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 4. Fine Spatial Lightning Micro-Arc (~1.2px)
+        ctx.strokeStyle = `rgba(200, 245, 255, ${alpha * 0.95})`;
+        ctx.lineWidth = Math.max(0.4, 1.2 * alpha);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        const segs = Math.max(5, Math.min(12, Math.floor(dist / 40)));
         for (let i = 1; i < segs; i++) {
           const t = i / segs;
           const side = (i % 2 === 0 ? 1 : -1);
-          const jitter = side * (12 + (Math.sin(i * 3 + life * 10) * 8)) * life;
+          const jitter = (side * 8 + Math.sin(i * 3 + life * 12) * 5) * alpha;
           const cx = x1 + dx * t + perpX * jitter;
           const cy = y1 + dy * t + perpY * jitter;
           ctx.lineTo(cx, cy);
         }
         ctx.lineTo(x2, y2);
         ctx.stroke();
+
+        // 5. Balanced Endpoint Energy Nodes
+        const dotR = Math.max(1.0, 6.0 * alpha);
+        for (const [nx, ny] of [[x1, y1], [x2, y2]]) {
+          // Cyan outer node
+          ctx.fillStyle = `rgba(0, 229, 255, ${alpha * 0.90})`;
+          ctx.beginPath();
+          ctx.arc(nx, ny, dotR, 0, Math.PI * 2);
+          ctx.fill();
+
+          // White core dot
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 1.0})`;
+          ctx.beginPath();
+          ctx.arc(nx, ny, dotR * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         ctx.restore();
       } else if (effect.type === 'meleeClashShockwave') {
@@ -3616,33 +3634,37 @@ export function spawnGenosSelfDestructExplosion(x, y, radius = 220) {
 export function spawnBoogieWoogieSwapEffect(x1, y1, x2, y2) {
   if (!state || !state.sparkEffects) return;
 
-  // 1. Swap Lightning Vector Beam (lasts ~25 frames)
+  // 1. Swap Lightning Vector Beam (lasts ~26 frames, thin crisp laser)
   const beam = ParticleSystem.getParticle();
   beam.x = x1;
   beam.y = y1;
   beam.targetX = x2;
   beam.targetY = y2;
-  beam.size = 50; // MUST be finite number so line 593 doesn't skip it!
+  beam.size = 50;
   beam.life = 1.0;
-  beam.decay = 0.04;
+  beam.decay = 0.038; // ~26 frames duration
   beam.type = 'boogieWoogieSwapBeam';
-  beam.isFlash = true; // MUST be true to route into flash particle renderer!
-  beam.isPixi = false; // MUST be false for 2D Canvas rendering!
+  beam.isFlash = true;
+  beam.isProtected = true; // Never evict
+  beam.isPixi = false;
+  beam.vx = 0;
+  beam.vy = 0;
+  beam.friction = 0;
   state.sparkEffects.push(beam);
 
   // 2. Dual Shockwaves at both Swap Positions
-  spawnMeleeClashShockwave(x1, y1, 85, 'todo');
-  spawnMeleeClashShockwave(x2, y2, 85, 'todo');
+  spawnMeleeClashShockwave(x1, y1, 65, 'todo');
+  spawnMeleeClashShockwave(x2, y2, 65, 'todo');
 
-  // 3. Dual Cyan Sakuga Impact Flashes
-  spawnImpactFlash(x1, y1, 35, '#00E5FF');
-  spawnImpactFlash(x2, y2, 35, '#00E5FF');
+  // 3. Dual Cyan Impact Flashes
+  spawnImpactFlash(x1, y1, 25, '#00E5FF');
+  spawnImpactFlash(x2, y2, 25, '#00E5FF');
 
-  // 4. Dense Electric Cyan Sparks along the Swap Trajectory
+  // 4. Subtle Electric Cyan Sparks along Swap Trajectory
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.hypot(dx, dy);
-  const steps = Math.min(22, Math.max(8, Math.floor(dist / 25)));
+  const steps = Math.min(18, Math.max(6, Math.floor(dist / 30)));
 
   for (let i = 0; i <= steps; i++) {
     const ratio = i / steps;
@@ -3650,13 +3672,13 @@ export function spawnBoogieWoogieSwapEffect(x1, y1, x2, y2) {
     const py = y1 + dy * ratio;
 
     const sparkAngle = Math.random() * Math.PI * 2;
-    const sparkSpeed = 3 + Math.random() * 8;
+    const sparkSpeed = 1.5 + Math.random() * 4;
     spawnSparks(px, py, 1, 'lightningTrail', {
       color: (i % 2 === 0) ? '#00E5FF' : '#FFFFFF',
       vx: Math.cos(sparkAngle) * sparkSpeed,
       vy: Math.sin(sparkAngle) * sparkSpeed,
-      size: 2.0 + Math.random() * 2.5,
-      decay: 0.04 + Math.random() * 0.03
+      size: 1.5 + Math.random() * 1.5,
+      decay: 0.045 + Math.random() * 0.02
     });
   }
 }

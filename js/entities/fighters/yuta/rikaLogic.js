@@ -219,15 +219,13 @@ export function updateRika(fighter, arena) {
     const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 30;
     rk.chargeTimer = chargeDuration; // Use dedicated charge timer for the spawn animation delay
 
-    // Trigger "Come, Rika!" audio (comerika.mp3) and freeze Yuta's movement
+    // Trigger "Come, Rika!" audio (comerika.mp3)
     rk.playedComeRikaSound = true;
-    fighter.rikaCallTimer = chargeDuration; // Freeze Yuta's movement and hold Katana pose
+    fighter.rikaCallTimer = chargeDuration;
     const hpRatio = fighter.hp / (fighter.maxHp || 200);
     if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.60)) {
       fighter._rikaSummonedForBeam = true;
     }
-    fighter.vx = 0;
-    fighter.vy = 0;
     if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - 35, 'COME, RIKA!', '#FF1493');
     if (typeof spawnImpactFlash === 'function') spawnImpactFlash(fighter.x, fighter.y, 45, 'rgba(255, 20, 147, 0.4)');
     if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1, 6);
@@ -260,8 +258,6 @@ export function updateRika(fighter, arena) {
       if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.60)) {
         fighter._rikaSummonedForBeam = true;
       }
-      fighter.vx = 0;
-      fighter.vy = 0;
       if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - 35, 'COME, RIKA!', '#FF1493');
       if (typeof spawnImpactFlash === 'function') spawnImpactFlash(fighter.x, fighter.y, 45, 'rgba(255, 20, 147, 0.4)');
       if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1, 6);

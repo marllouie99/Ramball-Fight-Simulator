@@ -523,12 +523,12 @@ export function shouldDuckArenaBgm() {
 
   for (let i = 0; i < state.fighters.length; i++) {
     const f = state.fighters[i];
-    if (!f || f.hp <= 0) continue;
+    if (!f) continue;
 
-    if (f.isTakadaBackgroundPlaying || f.isTakadaChanneling) {
+    if (f.isTakadaBackgroundPlaying || f.isTakadaChanneling || f.isTakadaUltActive || f.takadaSongStarted) {
       return true;
     }
-    if (f.isChannelingPureLoveBeam && f.pureLoveBeamSoundHandle) {
+    if (f.hp > 0 && f.isChannelingPureLoveBeam && f.pureLoveBeamSoundHandle) {
       return true;
     }
   }

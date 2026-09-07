@@ -81,14 +81,14 @@ export class BlackFighter extends Fighter {
     }
 
     // Try to use skill when cooldown is ready (with some randomness) and not at round start
-    if (this.skillCooldown === 0 && this.roundStartTimer === 0 && opponent && Math.random() < 0.15) {
+    if (this.skillCooldown === 0 && this.roundStartTimer === 0 && opponent && !this.isTeammate(opponent) && Math.random() < 0.15) {
       this.startSkillCharge(opponent);
     }
 
     // Normal shooting
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
-    } else if (opponent) {
+    } else if (opponent && !this.isTeammate(opponent)) {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
@@ -116,16 +116,13 @@ export class BlackFighter extends Fighter {
       }
     }
 
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
-
+    this.applyMovementPhysics();
     this.aim(opponent);
     this.resolveWallBounce(arena);
   }
 
   startSkillCharge(opponent) {
-    if (!opponent) return;
+    if (!opponent || this.isTeammate(opponent)) return;
 
     this.skillCharging = true;
     this.skillChargeTimer = CONFIG.black.skillChargeDuration;
@@ -139,7 +136,7 @@ export class BlackFighter extends Fighter {
   }
 
   summonBlackHole(opponent, ownerIndex) {
-    if (!projectileSystem || !opponent) return;
+    if (!projectileSystem || !opponent || this.isTeammate(opponent)) return;
 
     // Calculate a random position around the opponent's direction
     const angleToOpponent = Math.atan2(opponent.y - this.y, opponent.x - this.x);
@@ -160,10 +157,8 @@ export class BlackFighter extends Fighter {
     triggerGlobalScreenShake(14, 25);
     spawnFloatingText(spawnX, spawnY, 'BLACK HOLE!', '#9900ff');
 
-    // Resume gentle movement after summoning
-    const angle = Math.random() * Math.PI * 2;
-    this.vx = Math.cos(angle) * this.baseSpeed;
-    this.vy = Math.sin(angle) * this.baseSpeed;
+    // Resume movement after summoning
+    this.resumeMovement(opponent);
   }
 
   drawOutline(ctx) {

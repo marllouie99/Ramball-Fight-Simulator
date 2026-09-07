@@ -825,6 +825,7 @@ export class RubbickFighter extends Fighter {
           this._hasFiredStolenSkillTrick = true;
           this.fireStolenSkill(opponent, ownerIndex);
           this.attackCooldown = (CONFIG.rubbick || CONFIG.trickster).attackCooldown;
+          this.resumeMovement(opponent);
         }
       }
       return;
@@ -975,6 +976,7 @@ export class RubbickFighter extends Fighter {
       if (this.stolenDomainTimer <= 0) {
         this.stolenDomainActive = false;
         this.domainActive = false;
+        this._rubbickDomainHybridReady = false;
         this.stolenType = null;
         this.stolenTimer = 0;
 
@@ -1252,7 +1254,7 @@ export class RubbickFighter extends Fighter {
 
       // Ultimate: Spell Steal
       const rubbickCfg = CONFIG.rubbick || CONFIG.trickster;
-      if (this.spellStealCooldown <= 0 && !this.stolenType && distSq < rubbickCfg.spellStealRange * rubbickCfg.spellStealRange) {
+      if (this.spellStealCooldown <= 0 && !this.stolenType && !this.isTeammate(opponent) && distSq < rubbickCfg.spellStealRange * rubbickCfg.spellStealRange) {
         const isGojoOpponent = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.type === 'gojo' || opponent._def?.id === 'gojo');
         
         // If opponent is Gojo, Rubbick can steal whichever skill Gojo has cast (Hollow Purple, Reversal Red, or Unlimited Void)!
@@ -1319,7 +1321,7 @@ export class RubbickFighter extends Fighter {
       }
 
       // Skill 1: Telekinesis
-      if (this.telekinesisCooldown <= 0 && !this.stolenType && distSq < rubbickCfg.telekinesisRange * rubbickCfg.telekinesisRange && !opponent.immuneToCC) {
+      if (this.telekinesisCooldown <= 0 && !this.stolenType && !this.isTeammate(opponent) && distSq < rubbickCfg.telekinesisRange * rubbickCfg.telekinesisRange && !opponent.immuneToCC) {
         this.telekinesisCooldown = rubbickCfg.telekinesisCooldown;
         this.tkTarget = opponent;
         this.tkTimer = rubbickCfg.telekinesisDuration;
@@ -1606,7 +1608,7 @@ export class RubbickFighter extends Fighter {
         this.stolenSkillCooldown = CONFIG.grenadier.throwCooldown * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
         break;
       case 'ruby':
-         if (opponent) {
+         if (opponent && !this.isTeammate(opponent)) {
            this.stolenSkillCooldown = (CONFIG.ruby?.activePullCooldown || 240) * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
            this.activePullAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
            this.gunAngle = this.activePullAngle;
@@ -1802,6 +1804,7 @@ export class RubbickFighter extends Fighter {
           // Activate Rubbick's stolen domain state
           this.stolenDomainActive = true;
           this.domainActive = true;
+          this._rubbickDomainHybridReady = false;
           this.stolenDomainTimer = domainDuration;
           this.stolenDomainMaxTimer = domainDuration;
           this.stolenDomainRadius = domainRadius;

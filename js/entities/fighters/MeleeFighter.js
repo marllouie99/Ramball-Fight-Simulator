@@ -76,29 +76,12 @@ export class MeleeFighter extends Fighter {
       this.meleeCooldown--;
     }
 
-    // Handle slow effect (from laser beam or other sources)
-    let targetSpeed = this.speed;
-    if (this.slowTimer > 0) {
-      this.slowTimer--;
-      targetSpeed *= this.slowMultiplier;
-    }
-
-    // Apply speed reduction
-    const currentSpeed = Math.hypot(this.vx, this.vy);
-    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
-      this.vx = (this.vx / currentSpeed) * newSpeed;
-      this.vy = (this.vy / currentSpeed) * newSpeed;
-    }
+    this.applyMovementPhysics();
 
     this.trailHistory.push({ x: this.x, y: this.y, alpha: 0.5 });
     if (this.trailHistory.length > CONFIG.melee.trailLength) {
       this.trailHistory.shift();
     }
-
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * CONFIG.spin.rate;
 
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);

@@ -44,17 +44,6 @@ export const yujiConfig = {
 
 
 
-  // Skill 1: Divergent Fist Combo Rush
-  comboCooldown: 400,           // Cooldown in frames before Rush can be used again (~6.67s)
-  comboHits: 6,                 // Number of rapid punches in the combo sequence
-  comboDamage: 12,              // Damage per combo punch (each also triggers Divergent Fist)
-  comboInterval: 30,            // Frames between each combo punch (~0.17s)
-  comboDashRange: 200,          // Max range from which Yuji will dash into the target
-  baseComboDashSpeed: 15.5,     // Velocity speed during standard Divergent Fist dash
-  soulSwapComboDashRange: 350,  // Extended dash engagement range while in Soul Swap mode
-  soulSwapComboRushCooldown: 180, // Cooldown in frames for combo rush while in Soul Swap mode
-  soulSwapDashSpeed: 22.0,      // Supersonic dash speed while in Soul Swap mode
-
   // Skill 2: Reverse Cursed Technique (RCT) — Passive
   rctHealPercent: 0.25,         // Percentage of max HP restored upon reverting from Sukuna transformation
 
@@ -106,5 +95,5 @@ export const yujiConfig = {
 
   // Victory Voice Line (Team victory with Todo)
   victoryVoiceSound: 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3',
-  victoryVoiceVolume: 3.5,
+  victoryVoiceVolume: 0.0,
 };

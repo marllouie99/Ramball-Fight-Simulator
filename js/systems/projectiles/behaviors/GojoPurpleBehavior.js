@@ -3,15 +3,24 @@ import { state } from '../../../core/state.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnPurpleShockwaveRings, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { triggerGlobalScreenShake } from '../../../core/state.js';
+import { GAME_MODES } from '../../../core/modeConfig.js';
+
 // Re-implement areOnSameTeam locally or export it from a shared utils
 function areOnSameTeam(ownerIndex, targetIndex) {
-  if (ownerIndex === targetIndex) return true;
-  if (!state.mode) return false;
-  const isTeamMode = state.mode === '2v2' || state.mode === 'Stand Off';
+  if (ownerIndex === targetIndex && ownerIndex !== undefined && ownerIndex !== null && ownerIndex !== -1) return true;
+  if (!state || !state.mode) return false;
+  if (typeof ownerIndex !== 'number' || typeof targetIndex !== 'number' || ownerIndex < 0 || targetIndex < 0) return false;
+  const mode = state.mode;
+  const isTeamMode = (
+    mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' ||
+    mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' ||
+    mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' ||
+    mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4' || mode === '4v4'
+  );
   if (!isTeamMode) return false;
   const team1 = state.getFighterTeam ? state.getFighterTeam(ownerIndex) : null;
   const team2 = state.getFighterTeam ? state.getFighterTeam(targetIndex) : null;
-  return team1 !== null && team1 === team2;
+  return team1 !== null && team2 !== null && team1 === team2;
 }
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
@@ -108,18 +117,15 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       return true;
     }
 
-    const ownerTeam = state.getFighterTeam(projectile.owner);
-    const purpleSlowDuration = CONFIG.gojo?.purpleSlowDuration || 60;
-    const purpleSlowMultiplier = CONFIG.gojo?.purpleSlowMultiplier || 0.5;
-    const purplePullForce = CONFIG.gojo?.purplePullForce || 8.0;
     const effectiveRadius = projectile.r || CONFIG.gojo?.purpleRadius || 50; // Hit radius for damage/destruction
     const purplePullRadius = CONFIG.gojo?.purplePullRadius || 280; // Pull/suction range
+    const purplePullForce = CONFIG.gojo?.purplePullForce || 8.0;
     
     // Destroy incoming enemy projectiles (like Sukuna's slashes) that touch Purple
     for (let j = 0; j < system.projectiles.length; j++) {
         const otherProj = system.projectiles[j];
         if (otherProj === projectile || otherProj.isVisual || otherProj.life <= 0) continue;
-        if (areOnSameTeam(projectile.owner, otherProj.owner)) continue;
+        if (projectile.owner !== null && otherProj.owner !== null && otherProj.owner !== undefined && (projectile.owner === otherProj.owner || areOnSameTeam(projectile.owner, otherProj.owner))) continue;
         if (otherProj.isSukunaFurnace || otherProj.behaviorType === 'sukuna_furnace' || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
         
         const dx = projectile.x - otherProj.x;
@@ -133,7 +139,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         }
     }
     
-    const ownerFighter = fighters[projectile.owner];
+    const ownerFighter = fighters[projectile.owner] || projectile.ownerFighter;
     const allTargets = [
       ...(state.fighters || []),
       ...(state.illusions || []),
@@ -146,6 +152,9 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       const ent = allTargets[i];
       if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
       if (ent.owner && ent.owner === ownerFighter) continue;
+      if (ownerFighter && typeof ownerFighter.isTeammate === 'function') {
+        if (ownerFighter.isTeammate(ent) || (ent.owner && ownerFighter.isTeammate(ent.owner))) continue;
+      }
       const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
       if (entIdx !== -1 && areOnSameTeam(projectile.owner, entIdx)) continue;
       if (ent.owner) {
@@ -244,6 +253,9 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const ent = allTargets[i];
         if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
         if (ent.owner && ent.owner === ownerFighter) continue;
+        if (ownerFighter && typeof ownerFighter.isTeammate === 'function') {
+          if (ownerFighter.isTeammate(ent) || (ent.owner && ownerFighter.isTeammate(ent.owner))) continue;
+        }
         const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
         if (entIdx !== -1 && areOnSameTeam(projectile.owner, entIdx)) continue;
         if (ent.owner) {

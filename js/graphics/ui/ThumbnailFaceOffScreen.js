@@ -1705,8 +1705,8 @@ function drawFighterCleanName(ctx, cx, cy, name, accentColor, fontScale = 1.0) {
   }
   const _nameFontFamily = '"Outfit", "Rajdhani", "Segoe UI", sans-serif';
   const baseFontSize = _isDarkName
-    ? (upperName.length > 10 ? 16 : (upperName.length > 7 ? 20 : 24))
-    : (upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30));
+    ? (upperName.length > 16 ? 14 : (upperName.length > 10 ? 16 : (upperName.length > 7 ? 20 : 24)))
+    : (upperName.length > 16 ? 18 : (upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30)));
   const fontSize = Math.round(baseFontSize * fontScale);
   ctx.font = `900 ${fontSize}px ${_nameFontFamily}`;
   ctx.textAlign = 'center';

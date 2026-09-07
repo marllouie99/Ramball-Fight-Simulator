@@ -366,8 +366,9 @@ export class CJFighter extends Fighter {
 
             // Reactive thruster micro-juke to evade attack
             const jukeAngle = Math.random() * Math.PI * 2;
-            this.vx += Math.cos(jukeAngle) * 5.5;
-            this.vy += Math.sin(jukeAngle) * 5.5;
+            const curSpd = this.speed || 8.0;
+            this.vx = Math.cos(jukeAngle) * curSpd;
+            this.vy = Math.sin(jukeAngle) * curSpd;
           }
           return false; // Evaded!
         }
@@ -422,13 +423,6 @@ export class CJFighter extends Fighter {
     }
 
     return res;
-  }
-
-  /**
-   * Countdown Phase Hook
-   */
-  onCountdown(opponent) {
-    // Handled exclusively by the show-off screen countdown transition
   }
 
   /**
@@ -649,57 +643,27 @@ export class CJFighter extends Fighter {
       this.speedMultiplier = 1.0;
       this.speed = this._resolveSpeed(jetMult);
 
-      // Natural Wall Bounce Deflection Grace Period (allows clean ricochet deflection before AI resumes tracking)
+      // Natural Wall Bounce Deflection Grace Period (allows clean ricochet deflection)
       if (this.jetpackBounceGraceTimer > 0) {
         this.jetpackBounceGraceTimer--;
-        const curSpd = Math.hypot(this.vx, this.vy);
-        if (curSpd > 0) {
-          this.vx = (this.vx / curSpd) * this.speed;
-          this.vy = (this.vy / curSpd) * this.speed;
-        }
-        if (opponent && !opponent.dead && opponent.hp > 0 && typeof this.aim === 'function') {
-          this.aim(opponent);
-        }
-      } else if (opponent && !opponent.dead && opponent.hp > 0) {
-        if (typeof this.aim === 'function') {
-          this.aim(opponent);
-        }
+      }
 
-        const dx = opponent.x - this.x;
-        const dy = opponent.y - this.y;
-        const dist = Math.hypot(dx, dy);
-        const directAngle = Math.atan2(dy, dx);
+      // Aim at opponent with dual Uzis while roaming/flying naturally
+      if (opponent && !opponent.dead && opponent.hp > 0 && typeof this.aim === 'function') {
+        this.aim(opponent);
+      }
 
-        // Desired flight trajectory: circle and strafe at optimal Uzi range (~180px)
-        let flightAngle;
-        if (dist > 220) {
-          flightAngle = directAngle; // Close in rapidly
-        } else if (dist < 110) {
-          flightAngle = directAngle + Math.PI; // Back up to maintain shooting clearance
-        } else {
-          // High-speed strafe circling
-          const strafeDir = (this.jetpackTimer % 120 < 60) ? (Math.PI * 0.5) : (-Math.PI * 0.5);
-          flightAngle = directAngle + strafeDir * 0.75;
-        }
-
-        // Steer velocity smoothly at balanced flight speed
-        const targetVx = Math.cos(flightAngle) * this.speed;
-        const targetVy = Math.sin(flightAngle) * this.speed;
-        this.vx += (targetVx - this.vx) * 0.14;
-        this.vy += (targetVy - this.vy) * 0.14;
-
-        // Maintain full flight speed
-        const curSpd = Math.hypot(this.vx, this.vy);
-        if (curSpd > 0) {
-          this.vx = (this.vx / curSpd) * this.speed;
-          this.vy = (this.vy / curSpd) * this.speed;
-        }
+      // Maintain full natural flight velocity around the arena (No target chase/follow)
+      const curVelMag = Math.hypot(this.vx, this.vy);
+      if (curVelMag > 0.05) {
+        this.vx = (this.vx / curVelMag) * this.speed;
+        this.vy = (this.vy / curVelMag) * this.speed;
       } else {
-        const curVelMag = Math.hypot(this.vx, this.vy);
-        if (curVelMag > 0.05) {
-          this.vx = (this.vx / curVelMag) * this.speed;
-          this.vy = (this.vy / curVelMag) * this.speed;
-        }
+        const randAngle = (this._preCheatVx !== undefined && Math.hypot(this._preCheatVx, this._preCheatVy) > 0.05)
+          ? Math.atan2(this._preCheatVy, this._preCheatVx)
+          : (Math.random() * Math.PI * 2);
+        this.vx = Math.cos(randAngle) * this.speed;
+        this.vy = Math.sin(randAngle) * this.speed;
       }
 
       // Thruster ground burn AOE trail behind CJ
@@ -712,16 +676,6 @@ export class CJFighter extends Fighter {
         const d = Math.hypot(opponent.x - this.x, opponent.y - this.y);
         if (this.uziFireCooldown <= 0 && d <= (cfg.jetpackUziRange || 340)) {
           this._fireJetpackUzi(opponent);
-        }
-      }
-
-      // Supersonic Knuckle Dive Bomb Thruster Strike AI (if in close-medium range)
-      if (this.jetpackDiveCooldown > 0) {
-        this.jetpackDiveCooldown--;
-      } else if (opponent && !opponent.dead && opponent.hp > 0 && this.meleeCooldown <= 0) {
-        const d = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-        if (d > 85 && d < 250) {
-          this._executeJetpackDive(opponent);
         }
       }
 
@@ -847,6 +801,17 @@ export class CJFighter extends Fighter {
 
         if (this.cheatPostDelayTimer <= 0) {
           this.isTypingCheat = false;
+          // Restore pre-cheat natural wandering trajectory instead of auto-aiming at opponent
+          const targetSpeed = this.speed || this.baseSpeed || 5.5;
+          if (this._preCheatVx !== undefined && Math.hypot(this._preCheatVx, this._preCheatVy) > 0.1) {
+            const pMag = Math.hypot(this._preCheatVx, this._preCheatVy);
+            this.vx = (this._preCheatVx / pMag) * targetSpeed;
+            this.vy = (this._preCheatVy / pMag) * targetSpeed;
+          } else {
+            const randAngle = Math.random() * Math.PI * 2;
+            this.vx = Math.cos(randAngle) * targetSpeed;
+            this.vy = Math.sin(randAngle) * targetSpeed;
+          }
         }
       } else {
         this.cheatTypingTimer++;
@@ -895,16 +860,6 @@ export class CJFighter extends Fighter {
           this._executeRocketman(true); // Pickup immediately without typing once CD is ready!
           break;
         }
-      }
-    }
-
-    // Ground AI: Steer towards dropped jetpack to retrieve it ONLY when CD is ready!
-    if (!this.dead && !this.isJetpackActive && !this.isTypingCheat && !this.isBaguvixActive && this.jetpackCooldown <= 0 && hasDroppedJetpack) {
-      const nearestJetpack = state.cjDroppedJetpacks[0];
-      if (nearestJetpack) {
-        const toAngle = Math.atan2(nearestJetpack.y - this.y, nearestJetpack.x - this.x);
-        this.vx += Math.cos(toAngle) * 0.85;
-        this.vy += Math.sin(toAngle) * 0.85;
       }
     }
 
@@ -961,6 +916,11 @@ export class CJFighter extends Fighter {
    * and immediately resolves boundary bounces.
    */
   applyMovementPhysics(extraMultiplier = 1) {
+    if (this.isTypingCheat) {
+      this.vx = 0;
+      this.vy = 0;
+      return;
+    }
     if (this.isJetpackActive) {
       this.x += this.vx;
       this.y += this.vy;
@@ -1064,6 +1024,10 @@ export class CJFighter extends Fighter {
     return didBounce;
   }
 
+  isStationarySkillActive() {
+    return Boolean(this.isTypingCheat || super.isStationarySkillActive());
+  }
+
   /**
    * Override base gun shoot to disable default shooting logic (CJ uses street boxing CQC).
    * Also ensures all attacks are strictly disabled while typing cheat codes.
@@ -1081,7 +1045,16 @@ export class CJFighter extends Fighter {
     const cfg = CONFIG.cj || {};
     const framesPerChar = cfg.cheatTypingFramesPerChar || 3;
     const holdDelay = cfg.cheatTypingHoldDelay || 6;
+
+    // Remember natural moving velocity before standing still to type cheat
+    if (Math.hypot(this.vx, this.vy) > 0.1) {
+      this._preCheatVx = this.vx;
+      this._preCheatVy = this.vy;
+    }
+
     this.isTypingCheat = true;
+    this.vx = 0;
+    this.vy = 0;
     this.cheatCodeString = codeString.toUpperCase();
     this.cheatTypedChars = 1; // Instant first letter on keystroke start
     this.cheatTypingTimer = 0;
@@ -1204,6 +1177,18 @@ export class CJFighter extends Fighter {
       triggerGlobalScreenShake(6, 6);
     }
 
+    // Restore natural wandering velocity
+    const targetSpeed = this.speed || this.baseSpeed || 5.5;
+    if (this._preCheatVx !== undefined && Math.hypot(this._preCheatVx, this._preCheatVy) > 0.1) {
+      const pMag = Math.hypot(this._preCheatVx, this._preCheatVy);
+      this.vx = (this._preCheatVx / pMag) * targetSpeed;
+      this.vy = (this._preCheatVy / pMag) * targetSpeed;
+    } else {
+      const randAngle = Math.random() * Math.PI * 2;
+      this.vx = Math.cos(randAngle) * targetSpeed;
+      this.vy = Math.sin(randAngle) * targetSpeed;
+    }
+
     // Build Respect on successful skill activation
     this.gainRespect(cfg.hesoyamRespectGain || 15);
   }
@@ -1237,15 +1222,25 @@ export class CJFighter extends Fighter {
     // Clear all dropped floating jetpack pickups from the arena floor
     clearFloatingJetpacks();
 
-    // Apply high-speed flight physics immediately
+    // Apply high-speed flight physics immediately (preserve momentum or natural angle, not aimAngle)
     const baseRespectBoost = this.respect >= 50 ? (cfg.respectSpeedBoost || 0.05) : 0;
     const jetMult = (1 + baseRespectBoost) * (cfg.jetpackSpeedMultiplier || 0.70);
     this.speedMultiplier = jetMult;
     this.speed = (this.baseSpeed || cfg.speed || 5.5) * jetMult;
 
-    const launchAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
-    this.vx = Math.cos(launchAngle) * this.speed;
-    this.vy = Math.sin(launchAngle) * this.speed;
+    const curSpeed = Math.hypot(this.vx, this.vy);
+    if (curSpeed > 0.05) {
+      this.vx = (this.vx / curSpeed) * this.speed;
+      this.vy = (this.vy / curSpeed) * this.speed;
+    } else if (this._preCheatVx !== undefined && Math.hypot(this._preCheatVx, this._preCheatVy) > 0.05) {
+      const pSpd = Math.hypot(this._preCheatVx, this._preCheatVy);
+      this.vx = (this._preCheatVx / pSpd) * this.speed;
+      this.vy = (this._preCheatVy / pSpd) * this.speed;
+    } else {
+      const randAngle = Math.random() * Math.PI * 2;
+      this.vx = Math.cos(randAngle) * this.speed;
+      this.vy = Math.sin(randAngle) * this.speed;
+    }
 
     // Trigger authentic GTA San Andreas cheat notification or pickup floating text
     if (!isPickup) {
@@ -1297,6 +1292,18 @@ export class CJFighter extends Fighter {
 
     // Spawn the Greenwood sedan drive-by car
     spawnGroveStreetDriveBy(this);
+
+    // Restore natural wandering velocity
+    const targetSpeed = this.speed || this.baseSpeed || 5.5;
+    if (this._preCheatVx !== undefined && Math.hypot(this._preCheatVx, this._preCheatVy) > 0.1) {
+      const pMag = Math.hypot(this._preCheatVx, this._preCheatVy);
+      this.vx = (this._preCheatVx / pMag) * targetSpeed;
+      this.vy = (this._preCheatVy / pMag) * targetSpeed;
+    } else {
+      const randAngle = Math.random() * Math.PI * 2;
+      this.vx = Math.cos(randAngle) * targetSpeed;
+      this.vy = Math.sin(randAngle) * targetSpeed;
+    }
 
     // Build Respect on successful skill activation
     this.gainRespect(cfg.driveByRespectGain || 15);
@@ -1702,11 +1709,6 @@ export class CJFighter extends Fighter {
 
       const isHeavyCross = (this.punchAnimHand === 1);
       const aimAngle = this.gunAngle || Math.atan2(activeTarget.y - this.y, activeTarget.x - this.x);
-
-      // Kinetic Forward Step / Momentum Lunge
-      const lungeStep = isHeavyCross ? 3.8 : 2.5;
-      this.vx = (this.vx || 0) + Math.cos(aimAngle) * lungeStep;
-      this.vy = (this.vy || 0) + Math.sin(aimAngle) * lungeStep;
 
       // ── 4. Rule 8 Frontal Arc Multi-Target AOE Detection ──
       const arc = cfg.meleePunchArc || ((120 * Math.PI) / 180);

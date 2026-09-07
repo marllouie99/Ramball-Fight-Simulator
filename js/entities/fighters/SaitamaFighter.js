@@ -61,6 +61,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
+    this._flurryAimAngle = undefined;
 
     // Skill 2: Serious Side Hops
     this.sideHopsCooldown = 0;
@@ -111,6 +112,34 @@ export class SaitamaFighter extends Fighter {
     this.drawFreezeTimer(ctx);
   }
 
+  /**
+   * Checks if Saitama's Normal Punch basic attack is enabled in config.
+   */
+  isNormalPunchEnabled() {
+    if (CONFIG.saitama?.disableNormalPunch === true) return false;
+    if (CONFIG.saitama?.normalPunchEnabled !== undefined) return Boolean(CONFIG.saitama.normalPunchEnabled);
+    if (CONFIG.saitama?.punchEnabled !== undefined) return Boolean(CONFIG.saitama.punchEnabled);
+    return true;
+  }
+
+  /**
+   * Checks if Saitama's Consecutive Normal Punches (Skill 1) is enabled in config.
+   */
+  isConsecutivePunchesEnabled() {
+    if (CONFIG.saitama?.disableConsecutivePunches === true || CONFIG.saitama?.disableFlurry === true) return false;
+    if (CONFIG.saitama?.consecutivePunchesEnabled !== undefined) return Boolean(CONFIG.saitama.consecutivePunchesEnabled);
+    if (CONFIG.saitama?.flurryEnabled !== undefined) return Boolean(CONFIG.saitama.flurryEnabled);
+    return true;
+  }
+
+  /**
+   * Override base canPerformBasicAttack to respect normal punch config toggle.
+   */
+  canPerformBasicAttack() {
+    if (!this.isNormalPunchEnabled()) return false;
+    return super.canPerformBasicAttack();
+  }
+
   /** Override base gun shoot to perform Saitama's Normal Punch basic attack */
   shoot(ownerIndex) {
     // Disabled! Melee characters manually trigger attacks via distance check in update().
@@ -118,15 +147,91 @@ export class SaitamaFighter extends Fighter {
   }
 
   /**
-   * Passive: No Sell — Ignores basic hit-pause timeStops.
-   * Only allows time-stop if flagged as a skill, ultimate, or major effect.
+   * Passive: No Sell — Ignores basic hit-pause timeStops and grants total immunity during Serious Skill Counter.
+   * Only allows time-stop if flagged as a skill, ultimate, or major effect when not countering.
    */
   applyTimeStop(duration, opts = {}) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) {
+      return; // IMMUNITY: Serious Skill Counter cannot be frozen or time-stopped by any attack!
+    }
     // If it's a basic attack hit-pause without skill/ultimate flags, Saitama ignores it!
     if (!opts.isSkill && !opts.isUltimate && !opts.isInfinity && !opts.isDomain && !opts.isPurple) {
       return; // No sell!
     }
     super.applyTimeStop(duration, opts);
+  }
+
+  applyHitStun(frames, opts = {}) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) return;
+    super.applyHitStun(frames, opts);
+  }
+
+  applyParalyze(frames, opts = {}) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) return;
+    super.applyParalyze(frames, opts);
+  }
+
+  applySlow(frames, multiplier, opts = {}) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) return;
+    super.applySlow(frames, multiplier, opts);
+  }
+
+  applyKnockback(vx, vy, options = {}) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) {
+      // Saitama is completely immovable during Serious Skill Counter
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    super.applyKnockback(vx, vy, options);
+  }
+
+  applyElectricStun(frames) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) return;
+    if (typeof super.applyElectricStun === 'function') super.applyElectricStun(frames);
+    else this.electricStunTimer = Math.max(this.electricStunTimer || 0, frames);
+  }
+
+  applySilence(frames) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) return;
+    if (typeof super.applySilence === 'function') super.applySilence(frames);
+    else this.silenceTimer = Math.max(this.silenceTimer || 0, frames);
+  }
+
+  suppressCombatAndVisuals(options = {}) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState && this.hp > 0) {
+      return; // Cannot be suppressed during Serious Skill Counter
+    }
+    super.suppressCombatAndVisuals(options);
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isFlurrying ||
+      (this.flurryHitsLeft > 0) ||
+      (this.flurryTimer > 0) ||
+      (this._counterPunchTimer && this._counterPunchTimer > 0) ||
+      (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) ||
+      this.isChargingSeriousPunch ||
+      (this.seriousPunchChargeTimer > 0) ||
+      (this.basicPunchChargeTimer > 0)
+    );
+  }
+
+  isPerformingSkill() {
+    return this.isStationarySkillActive();
+  }
+
+  isChannelingSkill() {
+    return this.isStationarySkillActive();
   }
 
   /**
@@ -299,10 +404,10 @@ export class SaitamaFighter extends Fighter {
       chaser.teleportChaseDelayTimer = Math.max(chaser.teleportChaseDelayTimer || 0, chaseDelay);
     }
 
-    // Spawn smooth fading ghost model skin afterimages along dodge path dynamically scaled with distance
+    // Spawn subtle fading ghost model skin afterimages along dodge path dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
     const dodgeDist = Math.hypot(this.x - oldX, this.y - oldY);
-    const steps = Math.min(10, Math.max(3, Math.floor(dodgeDist / 25)));
+    const steps = Math.min(2, Math.max(1, Math.floor(dodgeDist / 60)));
     for (let i = 0; i <= steps; i++) {
       const p = i / steps;
       pushTrailCap(this.afterImages, {
@@ -310,9 +415,9 @@ export class SaitamaFighter extends Fighter {
         y: oldY + (this.y - oldY) * p,
         r: this.r,
         gunAngle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
-        timer: 18,
-        maxTimer: 18,
-      });
+        timer: 10,
+        maxTimer: 10,
+      }, 6);
     }
 
     // Clean impact flashes at old & new coordinates
@@ -510,13 +615,13 @@ export class SaitamaFighter extends Fighter {
     }
     this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || behindTargetAngle);
 
-    // Spawn ghost model skin afterimages along teleport trajectory dynamically scaled with distance
+    // Spawn subtle fading ghost model skin afterimages along teleport trajectory dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
     const counterDist = Math.hypot(this.x - oldX, this.y - oldY);
-    const steps = Math.min(18, Math.max(6, Math.floor(counterDist / 30)));
+    const steps = Math.min(3, Math.max(1, Math.floor(counterDist / 80)));
     for (let i = 0; i <= steps; i++) {
       const p = i / steps;
-      const duration = 22 + Math.floor(p * 8);
+      const duration = 12;
       pushTrailCap(this.afterImages, {
         x: oldX + (this.x - oldX) * p,
         y: oldY + (this.y - oldY) * p,
@@ -524,7 +629,7 @@ export class SaitamaFighter extends Fighter {
         gunAngle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
         timer: duration,
         maxTimer: duration,
-      });
+      }, 6);
     }
 
     // Teleport SFX
@@ -590,6 +695,8 @@ export class SaitamaFighter extends Fighter {
     const target = this._counterPunchTarget;
     this.vx = 0;
     this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
     if (target && target.hp > 0) {
       if (typeof this.aim === 'function') this.aim(target);
       // Continuously update the committed aim angle so the punch fires wherever Saitama is facing
@@ -633,18 +740,6 @@ export class SaitamaFighter extends Fighter {
       const slowFrames = CONFIG.saitama?.counterPunchSlowFrames ?? 120;    // ~2s
       const slowMult = CONFIG.saitama?.counterPunchSlowMultiplier ?? 0.35; // 35% speed
 
-      // ── DISTANCE-BASED DAMAGE FALLOFF ──
-      // Close range (within punchReach) = 100% damage, max range (frontalReach) = 20% damage minimum
-      const counterMinDamageMult = CONFIG.saitama?.counterMinDistanceDamageMult ?? 0.20;
-      const counterFullDamageRange = punchReach; // Full damage within melee punch reach
-      const getDistanceDamageMult = (dist) => {
-        if (dist <= counterFullDamageRange) return 1.0; // Point-blank = full damage
-        const falloffRange = frontalReach - counterFullDamageRange;
-        if (falloffRange <= 0) return 1.0;
-        const falloffProgress = Math.min(1.0, (dist - counterFullDamageRange) / falloffRange);
-        return 1.0 - (1.0 - counterMinDamageMult) * falloffProgress; // Linear falloff from 100% to 20%
-      };
-
       let targetHitDirectly = false;
 
       if (target && target.hp > 0) {
@@ -663,12 +758,10 @@ export class SaitamaFighter extends Fighter {
             spawnFloatingText(this.x, this.y - this.r - 14, 'COUNTER!', '#FFD700');
           }
 
-          // Massive Counter Punch Damage (calculated dynamically from basic attack Normal Punch * multiplier)
-          // Distance falloff: close = full damage, far = reduced
+          // Massive Counter Punch Damage (calculated dynamically from basic attack Normal Punch * multiplier, full damage regardless of distance)
           const basePunchDamage = CONFIG.saitama?.punchDamage || 100;
           const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? CONFIG.saitama?.counterPunchMultiplier ?? (CONFIG.saitama?.counterPunchDamage !== undefined ? (CONFIG.saitama.counterPunchDamage / basePunchDamage) : 20.0);
-          const distMult = getDistanceDamageMult(targetDist);
-          const massiveDamage = Math.round(basePunchDamage * damageMult * distMult);
+          const massiveDamage = Math.round(basePunchDamage * damageMult);
           applyDamageToTarget(target, massiveDamage, this, { 
             isSkill: true, 
             isCounter: true, 
@@ -681,10 +774,9 @@ export class SaitamaFighter extends Fighter {
             isTrueDamage: true
           });
 
-          // Heavy directional knockback push toward Saitama's facing angle (scales with distance)
-          const kbMult = getDistanceDamageMult(targetDist);
-          const kx = Math.cos(pushAngle) * knockbackForce * kbMult;
-          const ky = Math.sin(pushAngle) * knockbackForce * kbMult;
+          // Heavy directional knockback push toward Saitama's facing angle
+          const kx = Math.cos(pushAngle) * knockbackForce;
+          const ky = Math.sin(pushAngle) * knockbackForce;
           
           target._knockedBackBySaitamaBasicPunch = true;
           target.preventKnockbackBounce = true;
@@ -755,11 +847,9 @@ export class SaitamaFighter extends Fighter {
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
           if (Math.abs(angleDiff) <= halfArc || dist <= (this.r + (enemy.r || 20) + 15)) {
-            // Collateral enemy caught in the supersonic shockwave canyon
-            // Distance falloff: close = full collateral damage, far = reduced
-            const colDistMult = getDistanceDamageMult(dist);
+            // Collateral enemy caught in the supersonic shockwave canyon (full base damage regardless of distance)
             const baseCollateralDmg = CONFIG.saitama?.counterFrontalCollateralDamage || 650;
-            const collateralDmg = Math.round(baseCollateralDmg * colDistMult);
+            const collateralDmg = Math.round(baseCollateralDmg);
             applyDamageToTarget(enemy, collateralDmg, this, { 
               isSkill: true, 
               isCounter: true, 
@@ -772,10 +862,9 @@ export class SaitamaFighter extends Fighter {
               isTrueDamage: true
             });
 
-            // Directional knockback push pinning them backward along punch trajectory (scales with distance)
-            const colKbMult = getDistanceDamageMult(dist);
-            const colKx = Math.cos(pushAngle) * (knockbackForce * 1.05) * colKbMult;
-            const colKy = Math.sin(pushAngle) * (knockbackForce * 1.05) * colKbMult;
+            // Directional knockback push pinning them backward along punch trajectory
+            const colKx = Math.cos(pushAngle) * (knockbackForce * 1.05);
+            const colKy = Math.sin(pushAngle) * (knockbackForce * 1.05);
             enemy._knockedBackBySaitamaBasicPunch = true;
             enemy.preventKnockbackBounce = true;
             enemy.isWallPinnedBySaitama = true;
@@ -844,6 +933,7 @@ export class SaitamaFighter extends Fighter {
    * Rapid-fire multi-fist barrage dealing consecutive melee punches with a devastating finisher blow.
    */
   executeConsecutiveNormalPunches(opponent) {
+    if (!this.isConsecutivePunchesEnabled()) return false;
     if (this.hp <= 0 || this.flurryCooldown > 0 || !opponent || opponent.hp <= 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
     const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
@@ -905,11 +995,12 @@ export class SaitamaFighter extends Fighter {
     if (typeof this.aim === 'function') {
       this.aim(opponent);
     }
+    this._flurryAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
 
-    // Spawn ghost afterimages along dash path dynamically scaled with distance
+    // Spawn subtle ghost afterimages along dash path dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
     const dashDist = Math.hypot(this.x - oldX, this.y - oldY);
-    const steps = Math.min(14, Math.max(4, Math.floor(dashDist / 25)));
+    const steps = Math.min(2, Math.max(1, Math.floor(dashDist / 80)));
     for (let s = 0; s <= steps; s++) {
       const p = s / steps;
       pushTrailCap(this.afterImages, {
@@ -917,9 +1008,9 @@ export class SaitamaFighter extends Fighter {
         y: oldY + (this.y - oldY) * p,
         r: this.r,
         gunAngle: this.gunAngle || this.angle || 0,
-        timer: 16,
-        maxTimer: 16
-      });
+        timer: 10,
+        maxTimer: 10
+      }, 6);
     }
 
     // Dash sound effect
@@ -958,7 +1049,21 @@ export class SaitamaFighter extends Fighter {
     if (this.seriousPunchCooldown > 0) this.seriousPunchCooldown--;
   }
 
+  aim(target) {
+    if (this.isFlurrying && this._flurryAimAngle !== undefined) {
+      this.gunAngle = this._flurryAimAngle;
+      this.angle = this._flurryAimAngle;
+      return;
+    }
+    super.aim(target);
+  }
+
   interruptAttacks(forceCancelAll = false) {
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState && !forceCancelAll && this.hp > 0) {
+      return; // IMMUNITY: Serious Skill Counter cannot be interrupted or cancelled by any attacks while Saitama is alive!
+    }
+
     const isSilenced = (this.silenceTimer || 0) > 0;
     const isHardCC = forceCancelAll || this.isTargetOfAmbush || isSilenced || (this.timeStopTimer || 0) > 0 || (this.electricStunTimer || 0) > 0;
 
@@ -981,6 +1086,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this._flurryAccumulatedDamage = 0;
+    this._flurryAimAngle = undefined;
 
     if (this._counterPunchChargeSound) {
       fadeOutSound(this._counterPunchChargeSound, 150);
@@ -997,7 +1103,7 @@ export class SaitamaFighter extends Fighter {
     const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
     const isDomainFreeze = isInsideDomain;
     const isBeamOrTickAttack = Boolean(opts.isPurpleDPS || opts.isPureLoveBeam || opts.isBeam || opts.isLaserBeam || opts.isLaylaBeam || opts.isGenosBeam || this.isCaughtInPurple || this.caughtInPureLoveBeam);
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
     const isNanamiPausing = Boolean((attacker && (attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0)));
 
     const isGetsugaHit = Boolean(
@@ -1082,6 +1188,7 @@ export class SaitamaFighter extends Fighter {
    * Starts Serious charge wind-up animation before firing basic punch attack.
    */
   startBasicPunchCharge(target) {
+    if (!this.isNormalPunchEnabled()) return false;
     if (typeof this.canPerformBasicAttack === 'function' && !this.canPerformBasicAttack()) return false;
     if ((this._counterWindupTimer && this._counterWindupTimer > 0) ||
         (this._counterPunchTimer && this._counterPunchTimer > 0) ||
@@ -1109,6 +1216,7 @@ export class SaitamaFighter extends Fighter {
    * Multi-target frontal arc (Rule #8 & Rule #6 compliant).
    */
   executeNormalPunch(opponent) {
+    if (!this.isNormalPunchEnabled()) return false;
     if (!this.canPerformBasicAttack()) return false;
     // Disable basic attack while Serious Skill Counter is active
     if ((this._counterWindupTimer && this._counterWindupTimer > 0) ||
@@ -1330,6 +1438,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
+    this._flurryAimAngle = undefined;
     this.caughtInGenosFlurry = false;
     this.caughtInGenosBeamTimer = 0;
     this.caughtInSaitamaFlurry = false;
@@ -1367,6 +1476,21 @@ export class SaitamaFighter extends Fighter {
     if ((isFrozen || isGetsugaSuppressed || this.isTargetOfAmbush || isNanamiRatioPausing || (this.purpleHitTimer && this.purpleHitTimer > 0)) && !isCounteringState) {
       this.interruptAttacks();
       return; // MANDATORY: Stop update execution so fighter is completely frozen/paused!
+    }
+
+    // While Serious Skill Counter is active, maintain clean stasis immunity
+    if (isCounteringState) {
+      this.isTargetOfAmbush = false;
+      this.isCaughtInPurple = false;
+      this.caughtInPureLoveBeam = false;
+      this.caughtInGenosFlurry = false;
+      this.caughtInGenosBeam = false;
+      this.isFrozenByInfinity = false;
+      this.timeStopTimer = 0;
+      this.hitStunTimer = 0;
+      this.paralyzeTimer = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
     }
 
     // Phase 2: count down punch wind-up and land the blow when timer expires
@@ -1433,6 +1557,12 @@ export class SaitamaFighter extends Fighter {
             if (f && f.caughtInSaitamaCounter) f.caughtInSaitamaCounter = false;
           });
         }
+        // Give Saitama movement momentum towards the opponent so he immediately walks and fights
+        const opp = (opponent && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+        const chaseAngle = opp ? Math.atan2(opp.y - this.y, opp.x - this.x) : (this.gunAngle || this.angle || 0);
+        const spd = this.moveSpeed || this.speed || 6.0;
+        this.vx = Math.cos(chaseAngle) * (spd * 0.75);
+        this.vy = Math.sin(chaseAngle) * (spd * 0.75);
       }
     }
 
@@ -1485,17 +1615,25 @@ export class SaitamaFighter extends Fighter {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
 
-      const currentTarget = (this.flurryTarget && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
-      if (currentTarget && currentTarget.hp > 0 && typeof this.aim === 'function') {
-        this.aim(currentTarget);
+      if (this._flurryAimAngle === undefined) {
+        const currentTarget = (this.flurryTarget && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
+        if (currentTarget && currentTarget.hp > 0) {
+          this._flurryAimAngle = Math.atan2(currentTarget.y - this.y, currentTarget.x - this.x);
+        } else {
+          this._flurryAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        }
       }
+
+      // Lock Saitama's facing/aim angle completely during Consecutive Normal Punches (no aim rotation)
+      this.gunAngle = this._flurryAimAngle;
+      this.angle = this._flurryAimAngle;
 
       this.flurryTimer++;
 
       const reach = CONFIG.saitama?.flurryReach || 85;
       const maxReach = this.r + reach;
       const halfArc = (CONFIG.saitama?.flurryArcAngle || Math.PI * 0.65) / 2; // Rule #8 Frontal Arc
-      const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      const aimAngle = this._flurryAimAngle;
 
       // Query all valid targets (fighters & illusions) in the arena (Rule #6)
       const targetsToScan = [];
@@ -1714,6 +1852,15 @@ export class SaitamaFighter extends Fighter {
           this.isFlurrying = false;
           this.flurryTarget = null;
           this.flurryHitsLeft = 0;
+          this.flurryTimer = 0; // Reset flurryTimer to 0 so isPerformingSkill() doesn't freeze Saitama!
+          this._flurryAimAngle = undefined;
+
+          // Give Saitama immediate movement velocity after the final punch
+          const opp = (opponent && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+          const chaseAngle = opp ? Math.atan2(opp.y - this.y, opp.x - this.x) : aimAngle;
+          const spd = this.moveSpeed || this.speed || 6.0;
+          this.vx = Math.cos(chaseAngle) * (spd * 0.75);
+          this.vy = Math.sin(chaseAngle) * (spd * 0.75);
         }
       }
 
@@ -1769,7 +1916,7 @@ export class SaitamaFighter extends Fighter {
     const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isExecutingCounter && !this.isCaughtInBeam() && !this.isFlurrying;
 
     // ── AI: Skill 1 Consecutive Normal Punches Trigger ──
-    if (canAct && this.flurryCooldown <= 0) {
+    if (this.isConsecutivePunchesEnabled() && canAct && this.flurryCooldown <= 0) {
       let bestFlurryTarget = opponent;
       if (!bestFlurryTarget || bestFlurryTarget.hp <= 0) {
         let minDist = Infinity;
@@ -1798,7 +1945,7 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Basic attack melee punch trigger
-    if (canAct && (this.punchCooldownTimer <= 0 || !this.punchCooldownTimer)) {
+    if (this.isNormalPunchEnabled() && canAct && (this.punchCooldownTimer <= 0 || !this.punchCooldownTimer)) {
       let bestTarget = opponent;
       // In FFA/1v1 modes, opponent might be null but there are other enemies, so fallback to finding the nearest
       if (!bestTarget || bestTarget.hp <= 0) {

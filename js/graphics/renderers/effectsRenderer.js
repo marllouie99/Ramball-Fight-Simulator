@@ -936,72 +936,204 @@ export function drawMahoragaSpeedLines() {
 }
 
 
-function _drawIdolHeartPath(ctx, x, y, size) {
-  ctx.beginPath();
-  const topH = size * 0.3;
-  ctx.moveTo(x, y + topH);
-  ctx.bezierCurveTo(x, y, x - size / 2, y, x - size / 2, y + topH);
-  ctx.bezierCurveTo(x - size / 2, y + (size + topH) / 2, x, y + size * 0.9, x, y + size);
-  ctx.bezierCurveTo(x, y + size * 0.9, x + size / 2, y + (size + topH) / 2, x + size / 2, y + topH);
-  ctx.bezierCurveTo(x + size / 2, y, x, y, x, y + topH);
-  ctx.closePath();
-  ctx.fill();
-}
+// Pre-rendered Pixel Art Heart & Star Canvases for Screen-wide Takada Idol Overlay (Zero GC)
+let _cachedIdolPixelHearts = null;
+let _cachedIdolPixelStars = null;
 
-function _drawBatchedIdolSparkles(ctx, sparkles, arenaX, arenaY, arenaW, arenaH, now, baseAlpha) {
-  ctx.fillStyle = `rgba(255, 255, 255, ${baseAlpha * 0.90})`;
-  ctx.beginPath();
-  for (let i = 0; i < sparkles.length; i++) {
-    const sp = sparkles[i];
-    const sx = arenaX + sp.relX * arenaW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
-    const sy = arenaY + sp.relY * arenaH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
-    ctx.moveTo(sx + sp.size, sy);
-    ctx.arc(sx, sy, sp.size, 0, Math.PI * 2);
-  }
-  ctx.fill();
+function _initTodoIdolPixelSprites() {
+  if (typeof document === 'undefined' || _cachedIdolPixelHearts) return;
 
-  ctx.strokeStyle = `rgba(255, 240, 250, ${baseAlpha * 0.75})`;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  for (let i = 0; i < sparkles.length; i++) {
-    const sp = sparkles[i];
-    const sx = arenaX + sp.relX * arenaW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
-    const sy = arenaY + sp.relY * arenaH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
-    const arm = sp.size * 2.2;
-    ctx.moveTo(sx - arm, sy); ctx.lineTo(sx + arm, sy);
-    ctx.moveTo(sx, sy - arm); ctx.lineTo(sx, sy + arm);
+  const P = 2.0;
+
+  function createPixelHeart(w, h, map, outlineCol, coreCol, highlightCol, shadeCol) {
+    const c = document.createElement('canvas');
+    c.width = Math.round(w * P);
+    c.height = Math.round(h * P);
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+
+    for (let r = 0; r < map.length; r++) {
+      for (let col = 0; col < map[r].length; col++) {
+        const ch = map[r][col];
+        if (ch === ' ') continue;
+        if (ch === '1') g.fillStyle = outlineCol;
+        else if (ch === '2') g.fillStyle = coreCol;
+        else if (ch === '3') g.fillStyle = highlightCol;
+        else if (ch === '4') g.fillStyle = shadeCol;
+        g.fillRect(col * P, r * P, P, P);
+      }
+    }
+    return c;
   }
-  ctx.stroke();
+
+  function createPixelStar(w, h, map, outlineCol, coreCol, highlightCol) {
+    const c = document.createElement('canvas');
+    c.width = Math.round(w * P);
+    c.height = Math.round(h * P);
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+
+    for (let r = 0; r < map.length; r++) {
+      for (let col = 0; col < map[r].length; col++) {
+        const ch = map[r][col];
+        if (ch === ' ') continue;
+        if (ch === '1') g.fillStyle = outlineCol;
+        else if (ch === '2') g.fillStyle = coreCol;
+        else if (ch === '3') g.fillStyle = highlightCol;
+        g.fillRect(col * P, r * P, P, P);
+      }
+    }
+    return c;
+  }
+
+  // 7x7 Medium Heart Matrix
+  const heartMap7 = [
+    " 11 11 ",
+    "1221221",
+    "1322221",
+    "1222241",
+    " 12241 ",
+    "  141  ",
+    "   1   "
+  ];
+
+  // 9x9 Large Heart Matrix
+  const heartMap9 = [
+    "  11 11  ",
+    " 1221221 ",
+    "132222221",
+    "132222241",
+    "122222441",
+    " 1222441 ",
+    "  12241  ",
+    "   141   ",
+    "    1    "
+  ];
+
+  // 7x7 Diamond Sparkle Star Matrix
+  const starMap7 = [
+    "   1   ",
+    "  121  ",
+    " 12321 ",
+    "1233321",
+    " 12321 ",
+    "  121  ",
+    "   1   "
+  ];
+
+  // 5x5 Small Diamond Sparkle Matrix
+  const starMap5 = [
+    "  1  ",
+    " 121 ",
+    "12321",
+    " 121 ",
+    "  1  "
+  ];
+
+  // 3x3 Micro Cross Sparkle Matrix
+  const starMap3 = [
+    " 1 ",
+    "121",
+    " 1 "
+  ];
+
+  _cachedIdolPixelHearts = [
+    // Medium Hearts
+    createPixelHeart(7, 7, heartMap7, '#1F0815', '#FF2A7A', '#FFF1F2', '#9F1239'), // 0: Hot Pink
+    createPixelHeart(7, 7, heartMap7, '#1F0815', '#E11D48', '#FFE4E6', '#881337'), // 1: Crimson Red
+    createPixelHeart(7, 7, heartMap7, '#1F0815', '#FF77BC', '#FFF1F2', '#BE185D'), // 2: Rose Pink
+    createPixelHeart(7, 7, heartMap7, '#291705', '#F59E0B', '#FEF3C7', '#B45309'), // 3: Gold
+    // Large Hearts
+    createPixelHeart(9, 9, heartMap9, '#1F0815', '#FF2A7A', '#FFF1F2', '#9F1239'), // 4: Large Hot Pink
+    createPixelHeart(9, 9, heartMap9, '#1F0815', '#E11D48', '#FFE4E6', '#881337'), // 5: Large Crimson
+    createPixelHeart(9, 9, heartMap9, '#1F0815', '#FF77BC', '#FFF1F2', '#BE185D'), // 6: Large Rose Pink
+    createPixelHeart(9, 9, heartMap9, '#291705', '#F59E0B', '#FEF3C7', '#B45309')  // 7: Large Gold
+  ];
+
+  _cachedIdolPixelStars = [
+    // 7x7 Stars
+    createPixelStar(7, 7, starMap7, '#291705', '#FBBF24', '#FFFFFF'), // 0: Gold 7x7
+    createPixelStar(7, 7, starMap7, '#1E1B4B', '#E2E8F0', '#FFFFFF'), // 1: Diamond White 7x7
+    createPixelStar(7, 7, starMap7, '#2B061A', '#F472B6', '#FFFFFF'), // 2: Idol Pink 7x7
+    createPixelStar(7, 7, starMap7, '#082F49', '#38BDF8', '#FFFFFF'), // 3: Cyan 7x7
+    // 5x5 Stars
+    createPixelStar(5, 5, starMap5, '#291705', '#FBBF24', '#FFFFFF'), // 4: Gold 5x5
+    createPixelStar(5, 5, starMap5, '#1E1B4B', '#E2E8F0', '#FFFFFF'), // 5: White 5x5
+    createPixelStar(5, 5, starMap5, '#2B061A', '#F472B6', '#FFFFFF'), // 6: Pink 5x5
+    createPixelStar(5, 5, starMap5, '#082F49', '#38BDF8', '#FFFFFF'), // 7: Cyan 5x5
+    // 3x3 Micro Crosses
+    createPixelStar(3, 3, starMap3, '#291705', '#FDE68A', '#FFFFFF'), // 8: Gold 3x3
+    createPixelStar(3, 3, starMap3, '#1E1B4B', '#F8FAFC', '#FFFFFF'), // 9: White 3x3
+    createPixelStar(3, 3, starMap3, '#2B061A', '#FBCFE8', '#FFFFFF')  // 10: Pink 3x3
+  ];
 }
 
 let _todoIdolOverlayAlpha = 0;
 let _todoHeartSeeds = null;
 let _todoSparkleSeeds = null;
-let _cachedOverlayGrad = null;
-let _cachedGradW = 0;
-let _cachedGradH = 0;
+let _cachedIdolOverlayGrad = null;
+let _cachedIdolGradW = 0;
+let _cachedIdolGradH = 0;
+let _cachedIdolGradX = 0;
+let _cachedIdolGradY = 0;
+
+function _getIdolPinkOverlayGrad(ctx, x, y, w, h) {
+  if (_cachedIdolOverlayGrad && 
+      _cachedIdolGradW === w && 
+      _cachedIdolGradH === h && 
+      _cachedIdolGradX === x && 
+      _cachedIdolGradY === y) {
+    return _cachedIdolOverlayGrad;
+  }
+
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const innerR = Math.min(w, h) * 0.12;
+  const outerR = Math.max(w, h) * 0.78;
+
+  const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  // Center: Luminous soft pastel Sakura pink mist
+  grad.addColorStop(0.00, 'rgba(255, 182, 193, 0.45)');
+  // Mid: Romantic pastel Takada pink
+  grad.addColorStop(0.35, 'rgba(244, 114, 182, 0.40)');
+  // Outer Mid: Vibrant idol magenta
+  grad.addColorStop(0.68, 'rgba(219, 39, 119, 0.44)');
+  // Edges: Rich deep rose vignette
+  grad.addColorStop(1.00, 'rgba(131, 24, 67, 0.62)');
+
+  _cachedIdolOverlayGrad = grad;
+  _cachedIdolGradW = w;
+  _cachedIdolGradH = h;
+  _cachedIdolGradX = x;
+  _cachedIdolGradY = y;
+
+  return grad;
+}
 
 function _initTodoIdolSeeds() {
+  _initTodoIdolPixelSprites();
+
   _todoHeartSeeds = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     _todoHeartSeeds.push({
-      relX: (i + 0.5) / 10 + (Math.random() - 0.5) * 0.08,
-      speed: 0.7 + Math.random() * 0.4,
-      size: 11 + Math.random() * 8,
+      relX: (i + 0.5) / 12 + (Math.random() - 0.5) * 0.07,
+      speed: 0.65 + Math.random() * 0.45,
+      scale: 1.0 + Math.random() * 0.5,
       phase: Math.random() * Math.PI * 2,
-      color: i % 3 === 0 ? '#e62e5c' : (i % 3 === 1 ? '#ff5599' : '#ff77bc'),
-      yOffset: Math.random() * 600
+      spriteIdx: i % 8,
+      yOffset: Math.random() * 700
     });
   }
 
   _todoSparkleSeeds = [];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 16; i++) {
     _todoSparkleSeeds.push({
-      relX: Math.random(),
-      relY: Math.random(),
-      speed: 0.8 + Math.random() * 0.5,
-      size: 2.2 + Math.random() * 1.8,
-      phase: Math.random() * Math.PI * 2
+      relX: (i + 0.5) / 16 + (Math.random() - 0.5) * 0.08,
+      speed: 0.75 + Math.random() * 0.50,
+      scale: 0.85 + Math.random() * 0.45,
+      phase: Math.random() * Math.PI * 2,
+      spriteIdx: i % 11,
+      yOffset: Math.random() * 700
     });
   }
 }
@@ -1056,43 +1188,67 @@ export function drawTodoTakadaIdolScreenOverlay() {
   const arenaX = arena ? arena.x : 0;
   const arenaY = arena ? arena.y : 0;
   const now = Date.now();
-  const isLowPerf = (state.performanceMode || (state.fps && state.fps < 50));
+  const isLowPerf = Boolean(state.performanceMode || (state.fps && state.fps < 50));
 
   if (!_todoHeartSeeds) _initTodoIdolSeeds();
 
   ctx.save();
+  ctx.imageSmoothingEnabled = false; // Authentic crisp pixel art rendering
+
+  // 0. Dreamy Romantic Pinkish Screen Overlay (Vignette & Ambient Wash)
+  const overlayGrad = _getIdolPinkOverlayGrad(ctx, arenaX, arenaY, arenaW, arenaH);
+  if (overlayGrad) {
+    const pulse = 0.94 + Math.sin(now * 0.0028) * 0.06;
+    ctx.globalAlpha = _todoIdolOverlayAlpha * pulse;
+    ctx.fillStyle = overlayGrad;
+    ctx.fillRect(arenaX, arenaY, arenaW, arenaH);
+  }
+
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
-  if (arena) {
-    ctx.beginPath();
-    if (arena.shape === 'circle') {
-      const cx = arena.x + arena.width / 2;
-      const cy = arena.y + arena.height / 2;
-      const ar = arena.radius || (arena.width / 2);
-      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
-    } else {
-      ctx.rect(arena.x, arena.y, arena.width, arena.height);
+  // Unclipped projection: We do NOT clip to the arena geometry so that floating hearts
+  // and sparkle stars never get sliced or chopped at the boundaries.
+
+  // 1. Floating Pixel-Art Sparkles & Diamond Stars (Zero-GC texture blits)
+  if (_cachedIdolPixelStars) {
+    const sparkleCount = isLowPerf ? 8 : _todoSparkleSeeds.length;
+    for (let i = 0; i < sparkleCount; i++) {
+      const sp = _todoSparkleSeeds[i];
+      const sx = arenaX + sp.relX * arenaW + Math.sin(now * 0.0012 * sp.speed + sp.phase) * 20;
+      const rawY = arenaY + arenaH + 30 - ((now * 0.038 * sp.speed + sp.yOffset) % (arenaH + 70));
+      const sy = rawY;
+      const starAlpha = Math.min(1.0, Math.sin(((rawY - arenaY) / arenaH) * Math.PI)) * _todoIdolOverlayAlpha * 0.90;
+
+      const sprite = _cachedIdolPixelStars[sp.spriteIdx];
+      if (sprite && starAlpha > 0.01) {
+        const sprW = Math.round(sprite.width * sp.scale);
+        const sprH = Math.round(sprite.height * sp.scale);
+        ctx.globalAlpha = starAlpha;
+        ctx.drawImage(sprite, Math.round(sx - sprW / 2), Math.round(sy - sprH / 2), sprW, sprH);
+      }
     }
-    ctx.clip();
   }
 
-  // 1. Batched Full-Screen Shimmering White Sparks (Always render)
-  const sparkleCount = isLowPerf ? 7 : _todoSparkleSeeds.length;
-  _drawBatchedIdolSparkles(ctx, _todoSparkleSeeds.slice(0, sparkleCount), arenaX, arenaY, arenaW, arenaH, now, _todoIdolOverlayAlpha);
+  // 2. Floating Pixel-Art Pink & Gold Hearts (Zero-GC texture blits)
+  if (_cachedIdolPixelHearts) {
+    const heartCount = isLowPerf ? 6 : _todoHeartSeeds.length;
+    for (let i = 0; i < heartCount; i++) {
+      const h = _todoHeartSeeds[i];
+      const hx = arenaX + h.relX * arenaW + Math.sin(now * 0.0016 * h.speed + h.phase) * 28;
+      const rawY = arenaY + arenaH + 35 - ((now * 0.032 * h.speed + h.yOffset) % (arenaH + 80));
+      const hy = rawY;
+      const heartAlpha = Math.min(1.0, Math.sin(((rawY - arenaY) / arenaH) * Math.PI)) * _todoIdolOverlayAlpha * 0.88;
 
-  // 2. Floating Pink & Red Hearts (Always render, drifting upward)
-  const heartCount = isLowPerf ? 5 : _todoHeartSeeds.length;
-  for (let i = 0; i < heartCount; i++) {
-    const h = _todoHeartSeeds[i];
-    const hx = arenaX + h.relX * arenaW + Math.sin(now * 0.0015 * h.speed + h.phase) * 25;
-    const rawY = arenaY + arenaH - ((now * 0.035 * h.speed + h.yOffset) % (arenaH + 60));
-    const hy = rawY;
-    const heartAlpha = Math.min(1.0, Math.sin(((rawY - arenaY) / arenaH) * Math.PI)) * _todoIdolOverlayAlpha * 0.85;
-
-    ctx.fillStyle = h.color;
-    ctx.globalAlpha = heartAlpha;
-    _drawIdolHeartPath(ctx, hx, hy, h.size);
+      const sprite = _cachedIdolPixelHearts[h.spriteIdx];
+      if (sprite && heartAlpha > 0.01) {
+        const sprW = Math.round(sprite.width * h.scale);
+        const sprH = Math.round(sprite.height * h.scale);
+        ctx.globalAlpha = heartAlpha;
+        ctx.drawImage(sprite, Math.round(hx - sprW / 2), Math.round(hy - sprH / 2), sprW, sprH);
+      }
+    }
   }
+
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
   // 4. Radial cutout around Rika and Pure Love Beam Corridor

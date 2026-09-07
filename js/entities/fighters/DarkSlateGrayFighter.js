@@ -135,7 +135,7 @@ export class DarkSlateGrayFighter extends Fighter {
     // still occasionally trigger stealth/dodge mode without becoming
     // nearly immune to the flamethrower.
     const flameDodgeChance = Math.max(0.08, CONFIG.darkslategray.dodgeChance * 0.6);
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isDivineFlame || opts.isFuga);
     const isDodgeable = (opts.isProjectile || opts.isMelee) && !isGuaranteedHit;
 
     // Block dodge/flash-step if inside Cronos's sphere
@@ -453,22 +453,7 @@ export class DarkSlateGrayFighter extends Fighter {
     }
 
     // Movement
-    let targetSpeed = this.speed;
-    if (this.slowTimer > 0) {
-      this.slowTimer--;
-      targetSpeed *= this.slowMultiplier;
-    }
-
-    const currentSpeed = Math.hypot(this.vx, this.vy);
-    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
-      this.vx = (this.vx / currentSpeed) * newSpeed;
-      this.vy = (this.vy / currentSpeed) * newSpeed;
-    }
-
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
+    this.applyMovementPhysics();
 
     if (this.invincibilityTimer > 0 || this.flashStepTimer > 0) {
       this.stealthTrail.push({ x: this.x, y: this.y, alpha: 0.35 });

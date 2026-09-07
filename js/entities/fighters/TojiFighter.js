@@ -269,7 +269,7 @@ export class TojiFighter extends Fighter {
 
     // Heavenly Restriction / Physical Instinct Dodge: physically dodge incoming melee attacks, strikes & projectiles
     // Dodge chance significantly increases when inside an enemy Domain Expansion (0 Cursed Energy stealth mastery!)
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
     const isDirectAttack = Boolean(
       opts.isProjectile ||
       opts.projectile ||
@@ -283,9 +283,9 @@ export class TojiFighter extends Fighter {
       opts.isBasic ||
       opts.isSkill ||
       opts.isDirect ||
-      (attacker && attacker !== this && !opts.isTrueDamage && !opts.fromBlackHole && !opts.isDomainDPS && !opts.isBurn && !opts.isPoison)
+      (attacker && attacker !== this && !opts.isTrueDamage && !opts.fromBlackHole && !opts.isDomainDPS && !opts.isBurn && !opts.isPoison && !opts.isDivineFlame && !opts.isFuga)
     );
-    const isDodgeable = isDirectAttack && !opts.isTrueDamage && !isGuaranteedHit && !opts.fromBlackHole && !opts.isDomainDPS && !opts.isBurn && !opts.isPoison;
+    const isDodgeable = isDirectAttack && !opts.isTrueDamage && !isGuaranteedHit && !opts.fromBlackHole && !opts.isDomainDPS && !opts.isBurn && !opts.isPoison && !opts.isDivineFlame && !opts.isFuga;
     
     let dodgeChance = CONFIG.toji?.stealthDodgeChance ?? 0.25;
     if (isEnemyDomainActive) {

@@ -21,6 +21,7 @@ import {
   handleTacticalObstaclePass 
 } from '../../Tactical Force/systems/tacticalPhysics.js';
 import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
+import { clearFighterDomain, cleanupDeadFightersDomains } from './domainSystem.js';
 
 // ─────────────────────────────────────────────
 // SPATIAL PARTITIONING GRID
@@ -227,9 +228,12 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
+  // Toji's stealth ambush drives target displacement directly; skip fighter collision solver
+  if (a.isTargetOfAmbush || b.isTargetOfAmbush || (a.isAmbushing && (a.characterId === 'toji' || a.type === 'toji')) || (b.isAmbushing && (b.characterId === 'toji' || b.type === 'toji'))) return;
+
   // Cronos / Rubbick Time Stop Sphere: entities inside or frozen by an active sphere must NEVER be pushed by collisions
-  const aInSphere = a.timeStopTimer > 0 || a._frozenByCronosSphere || a.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(a.x - f.sphereX, a.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + a.r)));
-  const bInSphere = b.timeStopTimer > 0 || b._frozenByCronosSphere || b.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(b.x - f.sphereX, b.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + b.r)));
+  const aInSphere = !a.isTargetOfAmbush && (a._frozenByCronosSphere || a.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(a.x - f.sphereX, a.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + a.r))));
+  const bInSphere = !b.isTargetOfAmbush && (b._frozenByCronosSphere || b.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(b.x - f.sphereX, b.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + b.r))));
 
   if (aInSphere || bInSphere) {
     if (aInSphere) {
@@ -285,8 +289,8 @@ export function resolveFighterCollision(a, b) {
   const ty = nx;
 
   const overlap = (minDist - distance) / 2;
-  const isTodoCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0);
-  const effectiveOverlap = isTodoCombo ? overlap * 0.1 : overlap;
+  const isBrawlerCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0) || ((a.comboHitsLeft || 0) > 0) || ((b.comboHitsLeft || 0) > 0);
+  const effectiveOverlap = isBrawlerCombo ? overlap * 0.1 : overlap;
   
   // Pause circle-circle physical push response during Nanami's 7:3 Ratio Hit-Pause
   const isNanamiRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
@@ -328,8 +332,8 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsCounterLocked = (a._counterPunchTimer && a._counterPunchTimer > 0);
-  const bIsCounterLocked = (b._counterPunchTimer && b._counterPunchTimer > 0);
+  const aIsCounterLocked = (a._counterPunchTimer && a._counterPunchTimer > 0) || a.isCountering || (a._postCounterRecoveryTimer && a._postCounterRecoveryTimer > 0);
+  const bIsCounterLocked = (b._counterPunchTimer && b._counterPunchTimer > 0) || b.isCountering || (b._postCounterRecoveryTimer && b._postCounterRecoveryTimer > 0);
 
   if (aIsCounterLocked && bIsCounterLocked) {
     return; // Neither moves or bounces during counter execution
@@ -338,8 +342,8 @@ export function resolveFighterCollision(a, b) {
   const aIsGojoInfinity = isEnemy && !a.isTargetOfAmbush && !isInsideRubbickStolenVoid(a) && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.infinityActive || (!a.isMeleeMode && (a.infinityCooldown || 0) <= 0) || (a.infinityBlockTimer || 0) > 0);
   const bIsGojoInfinity = isEnemy && !b.isTargetOfAmbush && !isInsideRubbickStolenVoid(b) && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.infinityActive || (!b.isMeleeMode && (b.infinityCooldown || 0) <= 0) || (b.infinityBlockTimer || 0) > 0);
 
-  const aIsImmovable = a.isTurret || a.isDispenser || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || aIsGojoInfinity || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
-  const bIsImmovable = b.isTurret || b.isDispenser || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || bIsGojoInfinity || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
+  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || aIsGojoInfinity || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
+  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || bIsGojoInfinity || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -371,8 +375,8 @@ export function resolveFighterCollision(a, b) {
   const dotN = dvx * nx + dvy * ny;
   if (dotN >= 0) return;
 
-  // Prevent bounce response while Todo is delivering his combo so they don't bounce apart
-  if ((a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0)) return;
+  // Prevent bounce response while brawlers are delivering combo flurries so they don't bounce apart
+  if (isBrawlerCombo) return;
 
   // Laser slow should feel like a drag, not a push.
   // When either fighter is slowed, damp the collision impulse heavily.
@@ -442,14 +446,20 @@ function getClosestOpponent(fighter) {
   let bestDistance = Infinity;
 
   const fighterIndex = fighter._stateIdx !== undefined ? fighter._stateIdx : state.fighters.indexOf(fighter);
-  const fighterTeam = state.getFighterTeam(fighterIndex);
-  const isTeamMode = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2);
+  const fighterTeam = state.getFighterTeam ? state.getFighterTeam(fighterIndex) : null;
+  const isTeamMode = (
+    state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' ||
+    state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2' ||
+    state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' ||
+    state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4'
+  );
 
   // Check regular fighters (Pure FOC targeting without obstacle overhead)
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
     if (!other || other === fighter || other.hp <= 0) continue;
-    if (isTeamMode && fighterTeam !== null && state.getFighterTeam(i) === fighterTeam) continue;
+    if (fighter.isTeammate(other)) continue;
+    if (isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;
     
     // Ignore summoned entities (Turrets, etc) belonging to this fighter, and vice versa
     if (other.owner === fighter || fighter.owner === other) continue;
@@ -795,10 +805,11 @@ export function updateFighters() {
 
   // Continue movement during roundEnd and matchEnd for visual effect
   if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.gameState === 'playing') {
+    cleanupDeadFightersDomains(state);
     state.fighters.forEach((fighter, fi) => {
       if (!fighter) return;
-      if (fighter.vanishTimer > 0) fighter.vanishTimer--;
       if (fighter.hp <= 0) {
+        clearFighterDomain(fighter, state);
         if (typeof fighter._healthBarShakeTimer === 'number' && fighter._healthBarShakeTimer > 0) {
           fighter._healthBarShakeTimer--;
         }
@@ -884,11 +895,12 @@ export function updateFighters() {
         const j = b._stateIdx !== undefined ? b._stateIdx : state.fighters.indexOf(b);
         if (j <= i) continue; // Only check each pair once
         if (!b || b.hp <= 0) continue;
-        // Skip teammates in 2v2 mode
-        if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
+        // Skip teammates in 2v2 / 1v2 / team modes
+        if (a.isTeammate(b)) continue;
+        if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && state.getFighterTeam && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
         
-        // Skip physical collision resolution during Wall Slam grabs or when submerged/erupting in liquid shadow
-        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting) continue;
+        // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, or when submerged/erupting in liquid shadow
+        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush) continue;
 
         resolveFighterCollision(a, b);
       }

@@ -208,9 +208,9 @@ export const mahitoConfig = {
 
   // ── 11. ULTIMATE: DOMAIN EXPANSION ──────────────────────────────
   domainExpansion: {
-    cooldown: 2000,                // 33 seconds cooldown
+    cooldown: 1000,                // 33 seconds cooldown
     chargeMax: 120,                // 2 seconds channeling duration before domain opens
-    duration: 600,                 // 6.6 seconds of paralyzing stasis
+    duration: 1000,                 // 6.6 seconds of paralyzing stasis
     radius: 9999,                  // Closed barrier - covers the whole screen
     executionDamageMultiplier: 0,// Execution strike deals 50% max HP true damage
     executionHitStun: 60,          // Massive hit stun on execution
@@ -218,13 +218,17 @@ export const mahitoConfig = {
     executionScreenShake: 16,      // Massive screen shake
     slowMultiplier: 0.15,          // Move speed multiplier for trapped targets inside domain (85% slow)
     velocityDampening: 0.85,       // Velocity damping rate per frame inside domain
-    basicAttackCooldownMultiplier: 1.50, // Basic attack speed multiplier inside domain (1.50 = 1.5x faster hit & damage rate)
+    basicAttackCooldownMultiplier: 2.00, // Basic attack speed multiplier inside domain (1.50 = 1.5x faster hit & damage rate)
     attacksToTriggerDisfigurement: 5,    // Basic attack hits required inside domain to trigger Soul Disfigurement & Rupture
     disfigurementDamageMultiplier: 1.50, // Damage multiplier for Soul Disfigurement burst damage inside domain (+50% damage)
     ruptureDamageMultiplier: 5.0,        // Damage multiplier for Soul Rupture explosion damage inside domain
     anyDistanceBasicAttack: true,        // Inside domain, Idle Transfiguration basic attack triggers at ANY distance
     punchRangeMultiplier: 99999,         // Reach multiplier inside domain
     domainRangeBoost: 200,               // Displayed attack reach boost inside domain (+200px reach)
+    
+    // Domain Lifesteal Mechanics (Vampiric Soul Absorption inside Self-Embodiment of Perfection)
+    enableDomainLifesteal: true,          // Master toggle for domain lifesteal heal
+    lifestealPercent: 0.70,               // HP recovered as percentage of damage dealt inside domain (0.50 = 50% lifesteal)
   },
 
   // ── 12. SOUND EFFECTS & AUDIO VOLUME ADJUSTMENTS ───────────────────────────

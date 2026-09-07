@@ -783,6 +783,7 @@ export class NanamiFighter extends Fighter {
       } else {
         this.blitzTarget = null;
         this.isBlitzing = false;
+        this.resumeMovement(this.blitzTarget || target);
       }
     }
   }

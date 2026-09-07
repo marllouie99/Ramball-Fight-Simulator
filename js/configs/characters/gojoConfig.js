@@ -24,7 +24,7 @@ export const gojoConfig = {
   infinityCooldown: 100,                   // Recharge cooldown in frames before Infinity barrier reactivates after blocking
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact
   infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
-  infinityRadius: 120,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
+  infinityRadius: 100,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
   infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
   infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
   infinityMeleePushForce: 12.5,            // Physical velocity impulse (rebound force) applied to push melee attackers away
@@ -88,6 +88,7 @@ export const gojoConfig = {
   purpleExplosionKnockback: 24, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
   purpleExplosionShakeDuration: 30, // Duration of screen shake on explosion
+  purpleRecoveryDuration: 120,      // Breather recovery pause duration in frames (~2.0s) after firing Hollow Purple
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
   purpleSecondCastDamageMultiplier: 2.0,   // Damage multiplier for 2nd cast (2.0 = 200%)

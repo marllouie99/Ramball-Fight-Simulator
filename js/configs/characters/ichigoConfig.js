@@ -38,7 +38,10 @@ export const ichigoConfig = {
   swordShockwaveSize: 35,        // Shockwave burst size on basic sword hit
 
   // ── Unified Skill Combo: Shunpo Getsuga Blitz (Flash Step Flurry -> Disengage Back-Step -> Getsuga Tensho) ──
-  comboCooldown: 800,            // Base cooldown in frames between combo activations (~7.5s)
+  enableFlashStep: true,         // Master toggle for Flash Step (Shunpo teleport). If false, fires standalone Getsuga without teleporting
+  enableShunpo: true,            // Alias toggle for Flash Step teleport
+  comboCooldown: 450,            // Base cooldown in frames between full combo activations (~7.5s)
+  flashStepCooldown: 360,        // Cooldown when flurry attack is disabled (~6.0s in Shikai)
   comboDisengageDistance: 290,   // Increased distance flash-stepped backward away from target before firing Getsuga (px)
   comboDisengageDashFrames: 3,   // Flash step duration frames for the backward disengage
   comboDisengageDelayFrames: 7,  // Delay window frames after finisher before initiating back-step in Shikai
@@ -46,6 +49,11 @@ export const ichigoConfig = {
   comboTriggerMaxDist: 400,      // Maximum trigger distance (gap-closes with Flash Step)
 
   // Phase 1: Flash Step Multi-Strike Flurry
+  enableFlurryAttack: 1,         // Toggle multi-strike flurry slashes. When false/0, Ichigo does a single Flash Step strike -> backstep -> Getsuga (no repeating slashes)
+  enableFlurry: true,            // Alias toggle for flurry attack
+  flurryEnabled: true,           // Alias toggle for flurry attack
+  enableShunpoCombo: true,       // Alias toggle for flurry attack
+  shunpoComboEnabled: true,      // Alias toggle for flurry attack
   shunpoStrikes: 4,              // Base flurry strike count in Shikai form
   shunpoRange: 220,              // Distance dashed on initial flank step
   shunpoDashDuration: 4,         // Flash step teleport duration frames
@@ -73,7 +81,7 @@ export const ichigoConfig = {
   // Phase 2: Getsuga Tensho Wave (Released after Disengage Flash Step)
   getsugaDamage: 10,             // Base tick damage for Getsuga Tensho wave
   getsugaTickDamage: 10,         // Multi-tick shredding damage per hit
-  getsugaDuration: 100,          // Sustained duration frames pinned against arena walls (~5.0s)
+  getsugaDuration: 90,           // Sustained duration frames pinned against arena walls (~1.5s)
   getsugaTravelSpeed: 11,        // ⚡ Base travel speed of Getsuga projectile wave (pixels/frame)
   getsugaSpeed: 11,              // Base projectile speed fallback
   getsugaKnockback: 6,           // Knockback force applied
@@ -90,6 +98,7 @@ export const ichigoConfig = {
   getsugaSlideFrames: 8,         // Number of frames for braking skid slide before charge
   getsugaSlideDamping: 0.72,     // Velocity damping multiplier per frame during brake slide
   getsugaChargeFrames: 64,       // Channeling duration frames for Getsuga Tensho wave matching voiceline (~1.07s)
+  channelTurnRate: 0.08,         // Smooth auto-aim tracking turn rate while channeling Getsuga Tensho
   getsugaSlashDuration: 24,      // Slash swing animation duration frames upon Getsuga release
   getsugaRecoveryFrames: 24,     // Breather/recovery frames held in follow-through pose after releasing Getsuga before moving
   getsugaPierce: true,           // Pierces through enemies and destroys projectiles
@@ -109,15 +118,17 @@ export const ichigoConfig = {
   hollowDamageMultiplier: 1.5,   // Damage multiplier boost
   hollowDamageReduction: 0.10,   // 10% incoming damage mitigation (Hierro) during Hollow Mask
   hollowLifesteal: 0.10,         // 10% vampiric lifesteal heal on damage dealt during Hollow Mask
-  hollowShunpoStrikesMultiplier: 1.2, // Multiplier to increase Shunpo flurry strikes during Hollow form
+  hollowShunpoStrikesMultiplier: 1.1, // Multiplier to increase Shunpo flurry strikes during Hollow form
   hollowSwordCooldownMultiplier: 0.65, // Multiplier reducing melee sword cooldown (e.g. 30 * 0.65 = ~19 frames for faster rapid slashing)
   hollowComboCooldownMultiplier: 0.25, // Cooldown multiplier for Shunpo Getsuga Blitz combo during Hollow Mask
+  hollowShunpoCooldownMultiplier: 0.25,// Alias cooldown multiplier during Hollow Mask
+  hollowGetsugaCooldownMultiplier: 0.25,// Alias cooldown multiplier during Hollow Mask
   hollowGetsugaChargeMultiplier: 0.70, // Reduction multiplier reducing Getsuga Tensho charging frames during Hollow form (50% faster charge)
   hollowGetsugaVoice1ChargeFrames: 80,  // Charging frames dynamically synchronized to when "...TENSHO!" peaks & finishes in Voice 1 (~1.33s)
   hollowGetsugaVoice2ChargeFrames: 34,  // Charging frames dynamically synchronized to when fast "TENSHO!" peaks & finishes in Voice 2 (~0.57s)
   hollowGetsugaDamage: 16,        // Upgraded Black Getsuga tick damage while mask active
   hollowGetsugaTickDamage: 16,    // Multi-tick shredding damage per hit in Hollow Mask
-  hollowGetsugaDuration: 150,     // Sustained duration frames (unified with Phase 2 getsugaDuration)
+  hollowGetsugaDuration: 85,      // Sustained duration frames (~1.4s)
   hollowGetsugaHitCooldown: 4,    // Re-hit tick interval frames
   hollowGetsugaSpeed: 15,        // Hollow Mask projectile travel speed
   hollowGetsugaKnockback: 8,     // Knockback force applied
@@ -164,9 +175,10 @@ export const ichigoConfig = {
   bankaiDamageMultiplier: 1.2,   // Melee damage multiplier boost during Bankai
 
   // 3. Bankai Combo Modifiers (Tensa Getsuga Blitz)
-  bankaiComboCooldownMultiplier: 0.50, // 50% Combo cooldown reduction during Bankai (~3.75s cooldown)
+  bankaiComboCooldownMultiplier: 0.50, // Cooldown multiplier during Bankai (0.50 = ~3.0s cooldown wait between combos)
   bankaiShunpoCooldownMultiplier: 0.50,// Fallback alias
-  bankaiShunpoStrikes: 10,        // Flurry strike count increased from 2 to 6 during Bankai
+  bankaiGetsugaCooldownMultiplier: 0.50,// Fallback alias
+  bankaiShunpoStrikes: 6,        // Flurry strike count increased from 2 to 6 during Bankai
   bankaiShunpoDashDuration: 3,   // Supersonic flash step dash duration frames during Bankai
   bankaiShunpoStrike1Duration: 10,// Faster intermediate flurry swing animation in Bankai
   bankaiShunpoStrike2Duration: 14,// Faster finisher swing animation in Bankai
@@ -182,8 +194,8 @@ export const ichigoConfig = {
   bankaiGetsugaTickDamage: 16,   // Multi-tick shredding damage per hit in Bankai
   bankaiHollowGetsugaDamage: 24,// Kuroi Getsuga tick damage during Bankai + Hollow Mask
   bankaiHollowGetsugaTickDamage: 24, // Multi-tick shredding damage per hit in Bankai + Hollow Mask
-  bankaiGetsugaDuration: 150,    // Sustained duration frames (unified with Phase 2 getsugaDuration)
-  bankaiHollowGetsugaDuration: 150, // Sustained duration frames (unified with Phase 2 getsugaDuration)
+  bankaiGetsugaDuration: 75,     // Sustained duration frames (~1.25s) allowing rapid Bankai combos
+  bankaiHollowGetsugaDuration: 75, // Sustained duration frames (~1.25s)
   bankaiGetsugaHitCooldown: 4,   // Re-hit tick interval frames (ticks every 4 frames / ~15 hits/sec)
   bankaiGetsugaSpeed: 10,        // Kuroi Getsuga travel speed (pixels/frame)
   bankaiGetsugaRadius: 110,       // Bankai Getsuga projectile radius (increased scale)

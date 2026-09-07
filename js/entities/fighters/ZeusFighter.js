@@ -183,6 +183,7 @@ export class ZeusFighter extends Fighter {
       this._processStorm();
       if (this.stormTimer <= 0) {
         this.stormActive = false;
+        this.resumeMovement(opponent);
       }
     }
 

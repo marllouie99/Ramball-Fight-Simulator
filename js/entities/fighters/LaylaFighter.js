@@ -551,19 +551,8 @@ export class LaylaFighter extends Fighter {
       this.gunRecoil = Math.max(0, this.gunRecoil - 0.08);
     }
 
-    // Velocity recovery to match current target speed (including speed boost multiplier)
-    const targetSpeed = this.baseSpeed * speedMultiplier;
-    this.speed = targetSpeed;
-    const currentSpeed = Math.hypot(this.vx, this.vy);
-    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.08;
-      this.vx = (this.vx / currentSpeed) * newSpeed;
-      this.vy = (this.vy / currentSpeed) * newSpeed;
-    }
-
-    // Movement
-    this.x += this.vx;
-    this.y += this.vy;
+    // Velocity recovery and movement
+    this.applyMovementPhysics(speedMultiplier);
 
     // Smooth target tracking (like Sharpshooter)
     if (opponent) {

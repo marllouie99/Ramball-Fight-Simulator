@@ -1,6 +1,6 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { drawTodoSkin } from '../../graphics/fighters/todoSkin.js';
+import { drawTodoSkin, drawCursedRocks } from '../../graphics/fighters/todoSkin.js';
 import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
 import { modUpdateMeleeCombat } from './todo/todoCombat.js';
 import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, modCheckRockSwap, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate, applyBoogieDisorientation, applyBoogieEvadeBuff } from './todo/todoSkills.js';
@@ -71,6 +71,7 @@ export class TodoFighter extends Fighter {
     }
     this.isTakadaChanneling = false;
     this.isTakadaUltActive = false;
+    this.isTakadaBackgroundPlaying = false;
     this.takadaSongStarted = false;
     this.takadaSongFadedOut = false;
     this.hasTriggeredTakadaHpUlt = false;
@@ -141,6 +142,7 @@ export class TodoFighter extends Fighter {
         }
         if (this.takadaUltTimer <= 0) {
           this.isTakadaUltActive = false;
+          this.isTakadaBackgroundPlaying = false;
           this.takadaSongStarted = false;
           this.takadaSongFadedOut = false;
         }
@@ -157,13 +159,7 @@ export class TodoFighter extends Fighter {
       return;
     }
 
-    const hadVanish = (this.vanishTimer > 0);
     super.update(opponent, ownerIndex, arena);
-    if (hadVanish && (!this.vanishTimer || this.vanishTimer <= 0)) {
-      // Reappeared in the arena from Boogie Woogie swap: apply attack reaction delay to enemies and evasion buff to team!
-      applyBoogieDisorientation(this);
-      applyBoogieEvadeBuff(this);
-    }
 
     // Smoothly transition Todo's Cursed Energy aura opacity
     const wantsAura = (this.clapAnimTimer > 0) || (this.clapWindupTimer > 0) || (this.rockCounterComboLeft > 0) || (this.punchAnimTimer > 0) || (this.justSwappedTimer > 0);
@@ -198,27 +194,11 @@ export class TodoFighter extends Fighter {
       // Cancel any active attack or swap animations
       this.interruptAttacks();
 
-      // Check if in 1v1 mode or Stand Off mode (background song is disabled in these modes)
-      const is1v1OrStandOff = Boolean(
-        typeof state !== 'undefined' && state.mode && (
-          state.mode === '1v1' || 
-          state.mode === 'Stand Off' || 
-          state.mode === '1v2 Stand Off' ||
-          state.mode === GAME_MODES.ONE_VS_ONE ||
-          state.mode === GAME_MODES.STAND_OFF ||
-          state.mode === GAME_MODES.STAND_OFF_1V2 ||
-          (typeof state.mode === 'string' && (
-            state.mode.toLowerCase() === '1v1' || 
-            state.mode.toLowerCase().includes('stand off') || 
-            state.mode.toLowerCase().includes('standoff')
-          ))
-        )
-      );
-
       // Start background song loop fade-in right as channeling starts!
       // Uses a continuous audio loop so music plays for the ENTIRE ultDuration (e.g. 1500 frames / 25 seconds)
-      if (!is1v1OrStandOff && !this.takadaSongStarted && this.takadaChannelTimer <= 175) {
+      if (!this.takadaSongStarted && this.takadaChannelTimer <= 175) {
         this.takadaSongStarted = true;
+        this.isTakadaBackgroundPlaying = true;
         const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
         const songVol = CONFIG.todo?.takadaBackgroundSongVolume ?? 2.2;
         const fadeInMs = CONFIG.todo?.takadaSongFadeInMs ?? 3500;
@@ -241,25 +221,10 @@ export class TodoFighter extends Fighter {
     if (this.isTakadaUltActive) {
       this.takadaUltTimer--;
 
-      const is1v1OrStandOff = Boolean(
-        typeof state !== 'undefined' && state.mode && (
-          state.mode === '1v1' || 
-          state.mode === 'Stand Off' || 
-          state.mode === '1v2 Stand Off' ||
-          state.mode === GAME_MODES.ONE_VS_ONE ||
-          state.mode === GAME_MODES.STAND_OFF ||
-          state.mode === GAME_MODES.STAND_OFF_1V2 ||
-          (typeof state.mode === 'string' && (
-            state.mode.toLowerCase() === '1v1' || 
-            state.mode.toLowerCase().includes('stand off') || 
-            state.mode.toLowerCase().includes('standoff')
-          ))
-        )
-      );
-
       // If background song hasn't started yet, trigger looping fade-in
-      if (!is1v1OrStandOff && !this.takadaSongStarted) {
+      if (!this.takadaSongStarted) {
         this.takadaSongStarted = true;
+        this.isTakadaBackgroundPlaying = true;
         const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
         const songVol = CONFIG.todo?.takadaBackgroundSongVolume ?? 2.2;
         const fadeInMs = CONFIG.todo?.takadaSongFadeInMs ?? 3500;
@@ -277,6 +242,7 @@ export class TodoFighter extends Fighter {
 
       if (this.takadaUltTimer <= 0) {
         this.isTakadaUltActive = false;
+        this.isTakadaBackgroundPlaying = false;
         this.takadaSongStarted = false;
         this.takadaSongFadedOut = false;
       }
@@ -304,12 +270,18 @@ export class TodoFighter extends Fighter {
       }
     }
 
-    // Boogie Woogie Tactical Swaps (Teammate Rescue & Cursed Rock Swaps):
+    // Boogie Woogie Tactical Swaps (Teammate Rescue, Cursed Rock Swaps & Solo Opponent Swaps):
     // Strictly prevent any swaps until the rock counter combo is 100% finished!
     if ((this.rockCounterComboLeft || 0) <= 0) {
       const swappedTeammate = modCheckTeammateRescue.call(this);
       if (!swappedTeammate) {
-        modCheckRockSwap.call(this);
+        const swappedRock = modCheckRockSwap.call(this);
+        if (!swappedRock && !hasLiveTeammate(this) && this.cursedRocks.length === 0 && targets.length > 0) {
+          const dist = Math.hypot(targets[0].x - this.x, targets[0].y - this.y);
+          if (dist > 150 && (this.boogieWoogieCooldown || 0) <= 0) {
+            modUpdateBoogieWoogie.call(this, targets);
+          }
+        }
       }
     }
 
@@ -322,6 +294,7 @@ export class TodoFighter extends Fighter {
         this.rockCounterComboLeft = 0;
         this.rockCounterComboTarget = null;
         this.disengageDelayTimer = 0;
+        this.resumeMovement();
       } else {
         // Track and stay glued within strike range so intermediate knockback never cancels the combo!
         const distToTarget = Math.hypot(comboTarget.x - this.x, comboTarget.y - this.y);
@@ -344,6 +317,7 @@ export class TodoFighter extends Fighter {
           if (this.rockCounterComboLeft <= 0) {
             this.rockCounterComboTarget = null;
             this.disengageDelayTimer = 0;
+            this.resumeMovement(comboTarget);
           }
         }
       }
@@ -359,8 +333,8 @@ export class TodoFighter extends Fighter {
         
         // AI Logic: Skills skipped in demo preview mode (only basic attacks!)
         if (!this.isDemoFighter) {
-          // Todo throws cursed rocks at range to set up Boogie Woogie swaps
-          if (dist > 60 && this.rockThrowCooldown <= 0 && this.cursedRocks.length === 0) {
+          // Todo throws cursed rocks at range to set up Boogie Woogie swaps (only when solo / teammate is dead)
+          if (!hasLiveTeammate(this) && dist > 60 && this.rockThrowCooldown <= 0 && this.cursedRocks.length === 0) {
             modThrowCursedRock.call(this, target);
           }
         }
@@ -422,6 +396,7 @@ export class TodoFighter extends Fighter {
 
   triggerSecondarySkill() {
     if (this.isTakadaChanneling) return;
+    if (hasLiveTeammate(this)) return; // Disabled when teammate is alive
     if (this.rockThrowCooldown <= 0) {
       modThrowCursedRock.call(this, null);
     }
@@ -454,6 +429,7 @@ export class TodoFighter extends Fighter {
       if (!isLastSurvivor) {
         this.isTakadaChanneling = false;
         this.isTakadaUltActive = false;
+        this.isTakadaBackgroundPlaying = false;
         this.takadaChannelTimer = 0;
         this.takadaUltTimer = 0;
         this.takadaSongStarted = false;
@@ -465,6 +441,7 @@ export class TodoFighter extends Fighter {
         // Todo died last: keep background music playing for champion / round-end reveal screen!
         this.isTakadaChanneling = false;
         this.isTakadaUltActive = false;
+        this.isTakadaBackgroundPlaying = true;
         this.takadaChannelTimer = 0;
         this.takadaUltTimer = 0;
       }
@@ -495,10 +472,15 @@ export class TodoFighter extends Fighter {
   }
 
   draw(ctx) {
+    // If vanished (vanishTimer > 0), do not draw Todo's body or auras
+    if (this.vanishTimer && this.vanishTimer > 0) {
+      return;
+    }
+
     // If dead (HP <= 0), still render any active in-flight cursed rocks before returning
     if (this.hp <= 0) {
       if (this.cursedRocks && this.cursedRocks.length > 0) {
-        drawTodoSkin(ctx, this);
+        drawCursedRocks(ctx, this);
       }
       return;
     }

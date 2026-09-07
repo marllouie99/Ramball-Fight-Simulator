@@ -6,8 +6,8 @@ const checkHasTeammate = (f) => {
     const myIndex = state.fighters.indexOf(f);
     if (myIndex !== -1) {
       const myTeam = state.getFighterTeam(myIndex);
-      if (myTeam !== null) {
-        return state.fighters.some((other, idx) => idx !== myIndex && other && !other.isTurret && state.getFighterTeam(idx) === myTeam);
+      if (myTeam !== null && myTeam !== undefined) {
+        return state.fighters.some((other, idx) => idx !== myIndex && other && !other.isDead && (other.hp || 0) > 0 && !other.isTurret && !other.isIllusion && state.getFighterTeam(idx) === myTeam);
       }
     }
   }
@@ -72,8 +72,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
       rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
     }
 
-    const label100 = CONFIG.gojo?.purpleSecondCastTextHeader100 || 'PURPLE 100%';
-    const label200 = CONFIG.gojo?.purpleSecondCastTextHeader200 || 'PURPLE 200%';
+    const label100 = CONFIG.gojo?.purpleSecondCastTextHeader100 || 'PURPLE';
+    const label200 = CONFIG.gojo?.purpleSecondCastTextHeader200 || 'PURPLE';
     const purpleLabel = (f.purpleUseCount === 1) ? label200 : label100;
     return [
       { id: 'uv',     pct: domainPct, ready: domainPct >= 99, color: themeColor, label: 'UNLIMITED VOID' },
@@ -250,6 +250,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
     const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || CONFIG.saitama?.color || f.color || '#F5C400';
+    const isFlurryEnabled = CONFIG.saitama?.disableConsecutivePunches !== true && CONFIG.saitama?.disableFlurry !== true && (CONFIG.saitama?.consecutivePunchesEnabled ?? CONFIG.saitama?.flurryEnabled ?? true);
+    const isPunchEnabled = CONFIG.saitama?.disableNormalPunch !== true && (CONFIG.saitama?.normalPunchEnabled ?? CONFIG.saitama?.punchEnabled ?? true);
 
     const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
     const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
@@ -266,11 +268,15 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const punchPct = Math.max(0, Math.min(100, (1 - (punchTimer / punchMax)) * 100));
     const punchReady = punchPct >= 99;
 
-    return [
-      { id: 'punch',   pct: punchPct,   ready: punchReady,      color: themeColor, label: 'NORMAL PUNCH' },
-      { id: 'punish',  pct: punishPct,  ready: punishPct >= 99,  color: themeColor, label: 'SERIOUS PUNCH' },
-      { id: 'flurry',  pct: flurryPct,  ready: flurryPct >= 99,  color: themeColor, label: 'CONSECUTIVE PUNCHES' }
-    ];
+    const list = [];
+    if (isPunchEnabled) {
+      list.push({ id: 'punch',   pct: punchPct,   ready: punchReady,      color: themeColor, label: 'NORMAL PUNCH' });
+    }
+    list.push({ id: 'punish',  pct: punishPct,  ready: punishPct >= 99,  color: themeColor, label: 'SERIOUS PUNCH' });
+    if (isFlurryEnabled) {
+      list.push({ id: 'flurry',  pct: flurryPct,  ready: flurryPct >= 99,  color: themeColor, label: 'CONSECUTIVE PUNCHES' });
+    }
+    return list;
   }
   if (f.characterId === 'layla' || f.type === 'layla') {
     const themeColor = '#00E5FF'; 
@@ -306,9 +312,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const clapTimer = f.boogieWoogieCooldown !== undefined ? f.boogieWoogieCooldown : clapMax;
     const clapPct = Math.max(0, Math.min(100, (1 - (clapTimer / clapMax)) * 100));
 
+    const hasTeammate = checkHasTeammate(f);
     const rockMax = CONFIG.todo?.rockCooldown || 180;
     const rockTimer = f.rockThrowCooldown !== undefined ? f.rockThrowCooldown : rockMax;
-    const rockPct = Math.max(0, Math.min(100, (1 - (rockTimer / rockMax)) * 100));
+    const rockPct = hasTeammate ? 0 : Math.max(0, Math.min(100, (1 - (rockTimer / rockMax)) * 100));
+    const rockReady = !hasTeammate && rockPct >= 99;
+    const rockLabel = hasTeammate ? 'CURSED ROCK (SOLO)' : 'CURSED ROCK';
 
     const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.65;
     const hpRatio = (f.maxHp && f.maxHp > 0) ? (f.hp / f.maxHp) : 1.0;
@@ -343,16 +352,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
     return [
       { id: 'clap', pct: clapPct, ready: clapPct >= 99, color: themeColor, label: 'BOOGIE WOOGIE' },
-      { id: 'rock', pct: rockPct, ready: rockPct >= 99, color: themeColor, label: 'CURSED ROCK' },
-      { id: 'takada', pct: ultPct, ready: ultReady, color: themeColor, label: 'TAKADA-CHAN IDOL' }
+      { id: 'rock', pct: rockPct, ready: rockReady, color: themeColor, label: rockLabel },
+      { id: 'takada', pct: ultPct, ready: ultReady, color: themeColor, label: 'IDOL MOTIVATION' }
     ];
   }
   if (f.characterId === 'yuji' || f.type === 'yuji') {
-    const themeColor = '#ff3366';
-    
-    const comboMax = f.soulSwapActive ? 180 : (CONFIG.yuji?.comboCooldown || CONFIG.yuji?.comboRushCooldown || 400);
-    const comboTimer = f.comboRushCooldown !== undefined ? f.comboRushCooldown : 0;
-    const comboPct = Math.max(0, Math.min(100, (1 - (comboTimer / comboMax)) * 100));
+    const themeColor = f.color || CONFIG.yuji?.themeColor || '#D95C7E';
 
     const bfThreshold = f.soulSwapActive 
       ? (CONFIG.yuji?.soulSwapBlackFlashThreshold || 2)
@@ -374,9 +379,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return [
-      { id: 'combo',        pct: comboPct,       ready: comboPct >= 99,       color: themeColor, label: 'DIVERGENT FIST' },
-      { id: 'ult',          pct: ultPct,         ready: ultReady,             color: themeColor, label: 'SOUL SWAP' },
-      { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' }
+      { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' },
+      { id: 'ult',          pct: ultPct,         ready: ultReady,             color: themeColor, label: 'SOUL SWAP' }
     ];
   }
   if (f.characterId === 'mahito' || f.type === 'mahito') {
@@ -584,28 +588,6 @@ export function getSkillDataForFighter(f, getProjectiles) {
       { id: 'nue',      pct: nuePct,      ready: nuePct >= 99,      color: themeColor, label: 'NUE: THUNDER BIRD' },
       { id: 'shadow',   pct: sinkPct,     ready: sinkPct >= 99,     color: themeColor, label: 'SHADOW SINK' },
       { id: 'domain',   pct: domainPct,   ready: domainPct >= 99,   color: themeColor, label: domainLabel }
-    ];
-  }
-  if (f.characterId === 'saitama' || f.type === 'saitama') {
-    const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || CONFIG.saitama?.color || f.color || '#F5C400';
-
-    const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
-    const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : 0;
-    const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
-
-    const skillMax = CONFIG.saitama?.skillPunishCooldown || 2000;
-    const skillTimer = f.skillPunishCooldown !== undefined ? f.skillPunishCooldown : 0;
-    const skillPct = Math.max(0, Math.min(100, (1 - (skillTimer / skillMax)) * 100));
-
-    // Basic Attack: Normal Punch cooldown bar
-    const punchMax = CONFIG.saitama?.punchCooldown || 500;
-    const punchTimer = f.punchCooldownTimer !== undefined ? f.punchCooldownTimer : 0;
-    const punchPct = Math.max(0, Math.min(100, (1 - (punchTimer / punchMax)) * 100));
-
-    return [
-      { id: 'punch',   pct: punchPct,   ready: punchPct >= 99,  color: themeColor, label: 'NORMAL PUNCH' },
-      { id: 'flurry',  pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'CONSECUTIVE NORMAL PUNCHES' },
-      { id: 'counter', pct: skillPct,  ready: skillPct >= 99,  color: themeColor, label: 'SERIOUS COUNTER' }
     ];
   }
   if (f.characterId === 'genos' || f.type === 'genos') {
@@ -851,26 +833,9 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
   if (f.characterId === 'ichigo' || f.type === 'ichigo') {
     const themeColor = f.color || '#FF5500';
-    const isBankaiForm = Boolean(f.bankaiActive || f.skin === 'bankai');
     const curHp = f.hp !== undefined ? f.hp : (f.maxHp || 100);
     const maxHp = f.maxHp || 100;
     const hpRatio = Math.max(0, Math.min(1, curHp / maxHp));
-
-    const baseComboMax = CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.shunpoCooldown || 450;
-    let cdMult = 1.0;
-    if (isBankaiForm) {
-      cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50);
-    }
-    if (f.hollowMaskActive) {
-      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? 0.25);
-    }
-    const comboMax = Math.round(baseComboMax * cdMult);
-    const comboTimer = f.shunpoCooldown !== undefined ? f.shunpoCooldown : 0;
-    
-    // Smooth monotonic cooldown progression from 0% -> 100% (READY) per Rule 22
-    const comboPct = Math.max(0, Math.min(100, (1 - (comboTimer / comboMax)) * 100));
-    const comboReady = comboPct >= 99;
-    const comboLabel = isBankaiForm ? 'TENSA GETSUGA COMBO' : 'SHUNPO GETSUGA COMBO';
 
     // ── Passive: Hollow Mask Awakening ──
     const hollowThreshold = CONFIG.ichigo?.hollowMaskThreshold ?? 0.70;
@@ -935,7 +900,6 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return [
-      { id: 'combo',   pct: comboPct,  ready: comboReady,  color: themeColor, label: comboLabel },
       { id: 'hollow',  pct: hollowPct, ready: hollowReady, color: themeColor, label: hollowLabel },
       { id: 'bankai',  pct: ultPct,    ready: ultReady,    color: themeColor, label: 'BANKAI' }
     ];

@@ -1341,6 +1341,7 @@ export class MahoragaFighter extends Fighter {
         if (this.throwBarrageShotsLeft <= 0) {
           this.isThrowing = false;
           this.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 1000;
+          this.resumeMovement(opponent);
         }
       }
       return;

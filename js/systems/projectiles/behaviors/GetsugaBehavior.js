@@ -172,7 +172,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
       const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
 
       for (const [target, dragFrames] of projectile.draggedTargets.entries()) {
-        if (!target || target.hp <= 0 || target.isDead || target.dead || target.isRespawning) {
+        const attackerFighter = (fighters && typeof projectile.owner === 'number') ? fighters[projectile.owner] : projectile.ownerFighter;
+        if (!target || target.hp <= 0 || target.isDead || target.dead || target.isRespawning || (attackerFighter && typeof attackerFighter.isTeammate === 'function' && attackerFighter.isTeammate(target))) {
           if (target) {
             target.isDraggedByGetsuga = false;
             target.preventKnockbackBounce = false;

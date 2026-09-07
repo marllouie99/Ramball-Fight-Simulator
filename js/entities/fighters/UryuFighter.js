@@ -583,6 +583,7 @@ export class UryuFighter extends Fighter {
         this.smoothDrawProgress = 0;
         this.stringRecoilTimer = 0;
         this.shootCooldown = this.lichtRegenRecoveryCooldown;
+        this.resumeMovement(target || opponent);
       }
 
       // Update existing afterimages
@@ -1341,6 +1342,7 @@ export class UryuFighter extends Fighter {
           this.smoothDrawProgress = 0;
           this.drawPhase = 'IDLE';
           this.shootCooldown = Math.max(8, Math.round((CONFIG.uryu?.shootCooldown || 28) / atkSpeed));
+          this.resumeMovement(target);
         }
         break;
       }

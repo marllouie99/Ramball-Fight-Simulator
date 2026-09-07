@@ -52,15 +52,15 @@ export const MODE_SETTINGS = {
     label: '1v2 Stand Off',
     rounds: 1,
     hpMultiplier: 1.0,
-    fixedHp: 3000, // For the duo
+    fixedHp: 2500, // For the duo
     soloFixedHp: 3000, // For the alone fighter
-    speedMultiplier: 1.6,
+    speedMultiplier: 1.00,
     initialFuelPickups: 2,
-    arenaShakeIntensity: 6.5, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)
-    arenaShakeDuration: 6,    // Configurable arena shake duration (in frames) for 1v2 mode
+    arenaShakeIntensity: 3.5, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)
+    arenaShakeDuration: 3,    // Configurable arena shake duration (in frames) for 1v2 mode
     supportFourFighters: false, // We will manually handle 3 fighters
-    maxAfterimages: 4, // Configurable limit for afterimages in 1v2 Stand Off mode
-    afterimageDecayMultiplier: 1.5,
+    maxAfterimages: 2, // Configurable limit for afterimages in 1v2 Stand Off mode
+    afterimageDecayMultiplier: 1.1,
     teamColors: {
       team0: '#ff4d4d', // Solo
       team1: '#4da3ff', // Duo
@@ -80,11 +80,12 @@ export const MODE_SETTINGS = {
   [GAME_MODES.TWO_VS_TWO]: {
     label: '2v2',
     rounds: 5,
-    hpMultiplier: 3,
-    speedMultiplier: 1.1,
+    fixedHp: 3000, // Fixed 1000 HP for all fighters in 2v2 mode
+    hpMultiplier: 1.0,
+    speedMultiplier: 0.90,
     initialFuelPickups: 3,
     supportFourFighters: true,
-    maxAfterimages: 6,
+    maxAfterimages: 2,
     afterimageDecayMultiplier: 1.6,
     teamColors: {
       team0: '#ff4d4d',

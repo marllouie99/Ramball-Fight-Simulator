@@ -32,8 +32,8 @@ export const todoConfig = {
     basicPunchHitStun: 14,        // Hit-stun frames applied on basic punch hit
     basicPunchSlowDuration: 20,   // Movement stop duration in frames on basic punch hit
     basicPunchSlowMultiplier: 0.0, // 0.0 = 100% stop movement on basic punch hit
-    punchScreenShake: 3.5,        // Base arena screen shake intensity on melee punch hit
-    blackFlashScreenShake: 2.0,  // Massive arena screen shake on Black Flash punch
+    punchScreenShake: 0,        // Base arena screen shake intensity on melee punch hit (0 = no shake)
+    blackFlashScreenShake: 0,  // Arena screen shake on Black Flash punch (0 = no shake)
 
     // Skill 1: Boogie Woogie (Clap Teleport & Teammate Rescue)
     clapCooldown: 120,            // Cooldown in frames between Boogie Woogie claps (2.0 seconds at 60fps)
@@ -65,11 +65,11 @@ export const todoConfig = {
     rockCounterComboHits: 6,      // Number of rapid punches delivered upon teleporting in
     rockCounterComboInterval: 15, // Frames between combo punches during the attack sequence
     rockArrivalPushback: 8.0,     // Initial physics hit pushback applied upon rock proximity arrival
-    rockArrivalScreenShake: 2.0,  // Arena screen shake on rock proximity arrival
+    rockArrivalScreenShake: 0,    // Arena screen shake on rock proximity arrival
     rockCounterComboPushback: 4.5, // Intermediate punch physics hit pushback per strike during sequence
-    comboPunchScreenShake: 4.5,   // Arena screen shake on intermediate combo flurry punches
+    comboPunchScreenShake: 0,     // Arena screen shake on intermediate combo flurry punches
     rockCounterFinisherPushback: 30.0, // Final finisher punch physics hit pushback launching enemy back
-    finisherScreenShake: 2.0,    // Explosive arena screen shake on final launcher finisher punch
+    finisherScreenShake: 0,       // Explosive arena screen shake on final launcher finisher punch
     slowDuration: 60,             // Duration in frames enemy is heavily slowed when Todo teleports to them (1.0 second)
     slowMultiplier: 0.25,         // Speed multiplier during slow (0.25 = 75% movement slow)
     hitStunFrames: 20,            // Hitstun frames applied to enemy on arrival
@@ -78,7 +78,7 @@ export const todoConfig = {
     ultCooldown: 1200,            // Ultimate cooldown in frames (20.0 seconds at 60fps)
     ultDuration: 3000,            // Ultimate active duration in frames (8.0 seconds at 60fps)
     channelDuration: 180,         // Channeling windup duration in frames (3.0 seconds at 60fps)
-    hpThresholdUltTrigger: 0.65,  // HP ratio threshold (0.50 = 50% HP) that automatically triggers Takada-chan ultimate channeling
+    hpThresholdUltTrigger: 0.30,  // HP ratio threshold (0.50 = 50% HP) that automatically triggers Takada-chan ultimate channeling
     enableHpThresholdUlt: true,   // Toggle to enable/disable 50% HP threshold auto-activation
     takadaDamageMultiplier: 1.5,  // 1.5x damage output multiplier on all punches & attacks
     takadaSpeedMultiplier: 1.1,   // 1.5x movement speed boost multiplier
@@ -104,7 +104,7 @@ export const todoConfig = {
       'Assets/Sound Effects/Skills/todo-combo-voiceline2.mp3'
     ],
     comboVoiceVolume: 3.8,                                  // Combo flurry voiceline volume
-    comboVoiceChance: 1.00,                                  // 50% chance to play combo voiceline on Rock Proximity Counter-Attack
+    comboVoiceChance: 0.50,                                  // 50% chance to play combo voiceline on Rock Proximity Counter-Attack
 
     // Skill 1: Boogie Woogie Clap SFX
     clapSound: 'Assets/Sound Effects/Skills/todo-clap.mp3', // Boogie Woogie clap sound effect
@@ -124,7 +124,7 @@ export const todoConfig = {
     takadaChannelingVoiceline: 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3', // 3.0s channeling voice line
     takadaChannelingVoiceVolume: 1.0,                              // Channeling voice line volume
     takadaBackgroundSong: 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',           // Takada idol BGM (fades in & out)
-    takadaBackgroundSongVolume: 0.1 ,                               // Background song volume
+    takadaBackgroundSongVolume: 0.30 ,                               // Background song volume
     takadaSongFadeInMs: 4500,     // Ultra smooth fade-in duration in ms (3.5s) so music swells gently under voiceline
     takadaSongFadeOutMs: 2500,    // Smooth fade-out duration in ms (2.5s) at end of ultimate
     takadaDeathSongFadeOutMs: 1200 // Smooth fade-out duration in ms (1.2s) when Todo dies during ultimate/channeling

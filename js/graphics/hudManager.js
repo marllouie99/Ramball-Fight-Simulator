@@ -214,7 +214,14 @@ export function drawHUD() {
     const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
     containerBottom.classList.toggle('ffa-hud', isFfaMode && !isTactical);
     containerBottom.classList.toggle('tactical-hud', isTactical);
-    const isSingleColMode = !isTactical && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off');
+    const is1v1Mode = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && fighters && fighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
+    const isStandOffMode = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
+    const is1v2Mode = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
+    const is2v2Mode = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
+    const isTLFSMode = mode === GAME_MODES.TLFS || mode === 'TLFS';
+    const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
+    const isTeamMode = is2v2Mode || is1v2Mode || isTLFSMode || (fighters && fighters.length > 2 && !isFfaMode);
+    const isSingleColMode = (!isTactical && (is1v1Mode || isStandOffMode)) || (isCameraTracking && isTeamMode && !isTactical);
     containerBottom.classList.toggle('single-column-hud', isSingleColMode);
     containerBottom.style.opacity = hudOpacity;
     if (hudOpacity <= 0) {
@@ -775,16 +782,19 @@ function updateHealthHud() {
   const { fighters, mode, scores, teamScores } = state;
   if (!fighters) return;
 
-  // OPTIMIZATION: Auto-rebuild if HUD display mode or Arena Theme changed.
+  // OPTIMIZATION: Auto-rebuild if HUD display mode, Arena Theme, or Camera Mode changed.
+  const currentCameraMode = state.camera ? state.camera.mode : 'dynamic';
   const hudModeChanged = state._lastHudShowFighterDescription !== CONFIG.hudShowFighterDescription ||
                          state._lastDarkModeShowHudSkillBars !== CONFIG.darkModeShowHudSkillBars ||
                          state._lastDarkModeShowHudStats !== CONFIG.darkModeShowHudStats;
   const themeChanged = state._lastArenaTheme !== (state.arenaTheme || 'light');
+  const cameraModeChanged = state._lastCameraMode !== currentCameraMode;
   state._lastHudShowFighterDescription = CONFIG.hudShowFighterDescription;
   state._lastDarkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars;
   state._lastDarkModeShowHudStats = CONFIG.darkModeShowHudStats;
   state._lastArenaTheme = state.arenaTheme || 'light';
-  if (hudModeChanged || themeChanged) {
+  state._lastCameraMode = currentCameraMode;
+  if (hudModeChanged || themeChanged || cameraModeChanged) {
     clearHealthHud();
   }
 
@@ -795,7 +805,9 @@ function updateHealthHud() {
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
-  const isSingleColumnMode = (is1v1 || isStandOff) && !isTactical;
+  const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
+  const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isTLFS || (fighters && fighters.length > 2 && mode !== GAME_MODES.FFA && mode !== 'FFA' && mode !== GAME_MODES.TACTICAL_FFA && mode !== 'Tactical FFA'));
+  const isSingleColumnMode = ((is1v1 || isStandOff) && !isTactical) || isTeamSingleColumn;
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = fighters.map(f => {
@@ -1104,8 +1116,8 @@ function _getDimElements() {
       const hasDmgBoost = f.soulSwapActive || f.blackFlashTimer > 0;
       if (hasDmgBoost) {
         let currentDmg = punchBase;
-        if (f.soulSwapActive) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5));
-        if (f.blackFlashTimer > 0) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.blackFlashMultiplier || 1.5));
+        if (f.soulSwapActive) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.soulSwapDamageMultiplier || 2.5));
+        if (f.blackFlashTimer > 0) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.blackFlashMultiplier || 2.5));
         const boost = currentDmg - punchBase;
         info.push(`<b>DMG:</b> ${punchBase} + ${boost} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
@@ -2111,6 +2123,8 @@ function _getDimElements() {
         const isSingleCol = singleColumn;
         const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol) : '';
         const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
+        const skillsGridStyle = isSingleCol ? 'grid-template-columns: 1fr;' : '';
+        const infoGridStyle = isSingleCol ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; grid-template-columns: 1fr;` : `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;`;
 
         const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta' || (m.name && m.name.toUpperCase().includes('YUTA')));
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
@@ -2120,8 +2134,8 @@ function _getDimElements() {
           return `
             <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '18px'};">
               ${generateCjGtaHudWidgetHTML(m, titleAlign, hpText, memberShakeStyle)}
-              ${memberSkillsHTML ? `<div class="health-card__skills">${memberSkillsHTML}</div>` : ''}
-              ${memberInfoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;">${memberInfoHTML}</div>` : ''}
+              ${memberSkillsHTML ? `<div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>` : ''}
+              ${memberInfoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>` : ''}
             </div>
           `;
         }
@@ -2133,8 +2147,8 @@ function _getDimElements() {
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
             </div>
-            ${memberSkillsHTML ? `<div class="health-card__skills">${memberSkillsHTML}</div>` : ''}
-            ${memberInfoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;">${memberInfoHTML}</div>` : ''}
+            ${memberSkillsHTML ? `<div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>` : ''}
+            ${memberInfoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -2188,23 +2202,12 @@ function _getDimElements() {
 
     const isCardCj = !isDarkTheme && targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
     const cjStackHTML = '';
-    const winsBullets = Array.from({ length: maxBullets }, (_, i) => {
-      const filled = i < wins;
-      return `<div class="health-card__win-bullet ${filled ? 'filled' : ''}"></div>`;
-    }).join('');
-    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 3px; align-items: center; flex-shrink: 0; margin: 0;">${winsBullets}</div>` : '';
+    const winsBullets = '';
+    const winsHTML = '';
 
-    const rightHeaderHTML = winsHTML ? `
-      <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
-        ${winsHTML}
-      </div>
-    ` : '';
+    const rightHeaderHTML = '';
 
-    const headerRowHTML = rightHeaderHTML ? `
-      <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: ${titleAlign === 'right' ? 'flex-start' : 'flex-end'}; width: 100%; gap: 6px; margin-bottom: 3px;">
-        ${rightHeaderHTML}
-      </div>
-    ` : '';
+    const headerRowHTML = '';
 
     const cardBgStyle = 'background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;';
     return `
@@ -2318,13 +2321,14 @@ function _getDimElements() {
         scoreText: `${state.teamScores ? state.teamScores[1] || 0 : 0} WINS`,
         fillColor: '#4da3ff',
         members: oppMembers,
-        extraClass: isTactical ? 'blue tactical-card' : 'blue duo-1v2-card',
+        extraClass: isTactical ? 'blue tactical-card' : ('blue duo-1v2-card' + (isTeamSingleColumn ? ' single-column' : '')),
         shakeTimer: oppShakeTimer,
         isWinner: isOppWinner,
         borderColor: isOppWinner ? '#ffd700' : null,
         kills: oppMembers.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
         maxBullets: 0,
-        titleAlign: 'right'
+        titleAlign: 'right',
+        singleColumn: isTeamSingleColumn
       });
 
       const tempOppDiv = document.createElement('div');
@@ -2371,13 +2375,14 @@ function _getDimElements() {
           scoreText: `${teamScores[teamIndex] || 0} WINS`,
           fillColor: team.color,
           members: members,
-          extraClass: isTactical ? `${team.key} tactical-card` : team.key,
+          extraClass: isTactical ? `${team.key} tactical-card` : (`${team.key} team-card` + (isTeamSingleColumn ? ' single-column' : '')),
           shakeTimer,
           isWinner: isWinner,
           borderColor: isWinner ? '#ffd700' : null,
           kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
-          maxBullets: isTactical ? 0 : 3,
-          titleAlign: teamIndex === 0 ? 'left' : 'right'
+          maxBullets: 0,
+          titleAlign: teamIndex === 0 ? 'left' : 'right',
+          singleColumn: isTeamSingleColumn
         });
 
         const tempDiv = document.createElement('div');
@@ -2459,7 +2464,7 @@ function _getDimElements() {
           extraClassStr = isFfa ? 'ffa-card' : (isSingleColumnMode ? 'single-column' : '');
         }
 
-        const maxBulletsCount = (mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.TACTICAL_STANDOFF || isTactical) ? 0 : (isFfa ? 0 : 2);
+        const maxBulletsCount = 0;
 
         const cardHTML = buildCard({
           title: fighterName,

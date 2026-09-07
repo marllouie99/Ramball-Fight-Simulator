@@ -153,25 +153,10 @@ export function renderSukunaDomainForeground(fighter, ctx) {
   fighter._drawShrineBody(ctx);
   ctx.restore();
 
-  // ── DOMAIN CLASH: Crimson cleave slash arcs flickering around the Shrine ──
+  // ── DOMAIN CLASH: Crimson energy border on Sukuna's domain edge ──
   if (isYutaClash) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-
-    // 3 rotating cleave slash arcs (draw only 1 in low quality mode to save paths)
-    const slashCount = isLowQuality ? 1 : 3;
-    ctx.strokeStyle = 'rgba(255, 20, 20, 0.45)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    for (let s = 0; s < slashCount; s++) {
-      const slashAngle = (s / 3) * Math.PI * 2 + time * 0.004;
-      const slashRadius = 80 + Math.sin(time * 0.005 + s * 2) * 20;
-      const arcStart = slashAngle - 0.4;
-      const arcEnd = slashAngle + 0.4;
-      ctx.moveTo(sx + Math.cos(arcStart) * slashRadius, sy - 120 + Math.sin(arcStart) * slashRadius);
-      ctx.arc(sx, sy - 120, slashRadius, arcStart, arcEnd);
-    }
-    ctx.stroke();
 
     // Pulsing crimson energy border on Sukuna's domain edge
     const borderPulse = 0.3 + Math.sin(time / 220) * 0.15;

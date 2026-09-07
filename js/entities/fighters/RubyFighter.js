@@ -156,7 +156,7 @@ export class RubyFighter extends Fighter {
   // ── active pull (hook) ──────────────────────────────
 
   _tryActivePull(opponent, ownerIndex) {
-    if (!opponent || this.activePullCooldown > 0) return;
+    if (!opponent || this.activePullCooldown > 0 || this.isTeammate(opponent)) return;
 
     const cfg = CONFIG.ruby || {};
     const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
@@ -205,13 +205,17 @@ export class RubyFighter extends Fighter {
         // NOW we lock the targets that are currently in range and in the cone!
         this.pullTargets = [];
         const range = cfg.activePullRange || 200;
-        const myIndex = state.fighters.indexOf(this);
-        const myTeam = state.getFighterTeam(myIndex);
 
-        for (let i = 0; i < state.fighters.length; i++) {
-          const f = state.fighters[i];
+        const allCandidates = [
+          ...(state.fighters || []),
+          ...(state.illusions || []),
+          ...(state.cjDriveBys || [])
+        ];
+
+        for (let i = 0; i < allCandidates.length; i++) {
+          const f = allCandidates[i];
           if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0) continue;
-          if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
+          if (this.isTeammate(f)) continue;
 
           const fDist = Math.hypot(f.x - this.x, f.y - this.y);
           // Give a small 15px leeway because the weapon physically extends slightly past the max range
@@ -229,7 +233,7 @@ export class RubyFighter extends Fighter {
         }
         
         // Ensure the primary targeted opponent is caught IF they are still in range
-        if (this.primaryHookTarget && !this.pullTargets.includes(this.primaryHookTarget)) {
+        if (this.primaryHookTarget && !this.pullTargets.includes(this.primaryHookTarget) && !this.isTeammate(this.primaryHookTarget)) {
           const pDist = Math.hypot(this.primaryHookTarget.x - this.x, this.primaryHookTarget.y - this.y);
           if (pDist <= range + 15) {
             this.pullTargets.push(this.primaryHookTarget);
@@ -439,27 +443,12 @@ export class RubyFighter extends Fighter {
 
       this.vx = this.dashVector.x * targetSpeed;
       this.vy = this.dashVector.y * targetSpeed;
+      this.x += this.vx;
+      this.y += this.vy;
     } else {
-      if (this.slowTimer > 0) {
-        this.slowTimer--;
-        targetSpeed *= this.slowMultiplier;
-      }
-      
-      const currentSpeed = Math.hypot(this.vx, this.vy);
-      if (currentSpeed === 0 && !this.activePullActive) {
-        // Kickstart her movement if she was stopped by the hook
-        const angle = this.angle || (Math.random() * Math.PI * 2);
-        this.vx = Math.cos(angle) * targetSpeed;
-        this.vy = Math.sin(angle) * targetSpeed;
-      } else if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-        const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
-        this.vx = (this.vx / currentSpeed) * newSpeed;
-        this.vy = (this.vy / currentSpeed) * newSpeed;
-      }
+      this.applyMovementPhysics();
     }
 
-    this.x += this.vx;
-    this.y += this.vy;
     this.aim(opponent);
     this.resolveWallBounce(arena);
   }

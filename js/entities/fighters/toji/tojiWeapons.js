@@ -39,6 +39,10 @@ export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, 
     ? state.getFighterTeam(state.fighters.indexOf(fighter)) 
     : null;
 
+  if (primaryTarget && primaryTarget !== fighter && primaryTarget.hp > 0) {
+    checkTarget(primaryTarget);
+  }
+
   if (typeof state !== 'undefined' && state.fighters && state.fighters.length > 0) {
     for (const other of state.fighters) {
       if (!other || other === fighter || other.hp <= 0) continue;
@@ -50,8 +54,6 @@ export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, 
 
       checkTarget(other);
     }
-  } else if (primaryTarget) {
-    checkTarget(primaryTarget);
   }
 
   if (typeof state !== 'undefined' && state.illusions) {
@@ -217,7 +219,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
       target.isFirstHitKnockback = false;
       const directAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
       const sweepSlingAngle = directAngle + 1.15;
-      const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 22);
+      const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 52);
 
       const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
       const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
@@ -225,7 +227,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
       target.knockbackVy = kbVy;
       target.vx = kbVx;
       target.vy = kbVy;
-      target.knockbackDecay = 0.88;
+      target.knockbackDecay = 0.92;
       if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 
@@ -340,7 +342,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     if (!target.isTurret && !target.cannotBeKnockbacked) {
       target.isFirstHitKnockback = isAmbushThrust;
       const pushAngle = isAmbushThrust ? Math.atan2(target.y - fighter.y, target.x - fighter.x) : attackAngle;
-      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 16) : (CONFIG.toji?.spearKnockback || 7.0);
+      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 32) : (CONFIG.toji?.spearKnockback || 7.0);
       
       const kbVx = Math.cos(pushAngle) * knockbackSpeed;
       const kbVy = Math.sin(pushAngle) * knockbackSpeed;
@@ -348,7 +350,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       target.knockbackVy = kbVy;
       target.vx = kbVx;
       target.vy = kbVy;
-      target.knockbackDecay = isAmbushThrust ? 0.86 : 0.84;
+      target.knockbackDecay = isAmbushThrust ? 0.90 : 0.84;
       if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 

@@ -74,6 +74,7 @@ export function toggleCameraMode() {
   if (btn) {
     btn.innerText = (state.camera.mode === 'dynamic') ? 'ON' : 'OFF';
   }
+  import('../graphics/hudManager.js').then(m => m.clearHealthHud && m.clearHealthHud()).catch(() => {});
 }
 
 export function setCameraMode(mode) {
@@ -90,6 +91,7 @@ export function setCameraMode(mode) {
   if (btn) {
     btn.innerText = (state.camera.mode === 'dynamic') ? 'ON' : 'OFF';
   }
+  import('../graphics/hudManager.js').then(m => m.clearHealthHud && m.clearHealthHud()).catch(() => {});
 }
 
 export function updateCamera() {

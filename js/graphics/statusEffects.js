@@ -539,15 +539,15 @@ const _bfDebuffPtsOcc = new Uint8Array(8);
 
 /**
  * Renders the snappy, 3D orbiting Black Flash visual debuff on the enemy.
- * High-performance implementation with pre-allocated coordinate buffers.
+ * High-performance implementation with pre-allocated coordinate buffers and smooth orbit curves (Zero shivering).
  */
 export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const t = Date.now();
   
-  // High speed phase for stroboscopic crackle
-  const pulse = Math.sin(t * 0.04) * 0.15 + 0.75;
+  // Smooth, pulsating cursed energy aura
+  const pulse = Math.sin(t * 0.008) * 0.15 + 0.85;
   ctx.globalAlpha = pulse;
 
   const steps = 6;
@@ -559,7 +559,7 @@ export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
     const rx = baseRadius * band.rxMult;
     const ry = baseRadius * band.ryMult;
     const baseAngle = t * band.speed + b * 2.1;
-    const arcLen = 0.5 + Math.sin(t * 0.045 + b * 11) * 0.35;
+    const arcLen = 0.65 + Math.sin(t * 0.003 + b * 2.1) * 0.25;
     
     for (let i = 0; i <= steps; i++) {
       const theta = baseAngle + (i / steps) * arcLen;
@@ -567,18 +567,8 @@ export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
       const y0 = ry * Math.sin(theta);
       const z = Math.sin(theta);
 
-      let jx = 0;
-      let jy = 0;
-      if (i > 0 && i < steps) {
-        const displace = 4.5 + Math.random() * 5.5;
-        jx = (Math.random() - 0.5) * displace;
-        jy = (Math.random() - 0.5) * displace;
-      }
-
-      const xMod = x0 + jx;
-      const yMod = y0 + jy;
-      const rx_rot = Math.round((xMod * band.cosTilt - yMod * band.sinTilt) / P) * P;
-      const ry_rot = Math.round((xMod * band.sinTilt + yMod * band.cosTilt) / P) * P;
+      const rx_rot = Math.round((x0 * band.cosTilt - y0 * band.sinTilt) / P) * P;
+      const ry_rot = Math.round((x0 * band.sinTilt + y0 * band.cosTilt) / P) * P;
       
       const distSq = rx_rot * rx_rot + ry_rot * ry_rot;
       _bfDebuffPtsX[i] = rx_rot;
@@ -622,30 +612,6 @@ export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
           ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
         }
       }
-    }
-
-    // Branching spark discharge (Stepped pixel crackle streak - No Diamonds)
-    if (Math.random() < 0.25 && _bfDebuffPtsOcc[3] === 0) {
-      const len = 6 + Math.random() * 8;
-      const ba = Math.random() * Math.PI * 2;
-      const bx0 = _bfDebuffPtsX[3];
-      const by0 = _bfDebuffPtsY[3];
-      const bx1 = Math.round((bx0 + Math.cos(ba) * len) / P) * P;
-      const by1 = Math.round((by0 + Math.sin(ba) * len) / P) * P;
-
-      // Dark red outer streak
-      ctx.fillStyle = '#B30000';
-      const d = Math.hypot(bx1 - bx0, by1 - by0);
-      const st = Math.max(1, Math.round(d / P));
-      for (let s = 0; s <= st; s++) {
-        const px = Math.round((bx0 + (bx1 - bx0) * (s / st)) / P) * P;
-        const py = Math.round((by0 + (by1 - by0) * (s / st)) / P) * P;
-        ctx.fillRect(px - P, py - P, P * 2, P * 2);
-      }
-
-      // Pure white tip
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(bx1 - P * 0.5, by1 - P * 0.5, P, P);
     }
   }
 
@@ -706,6 +672,9 @@ export function drawVoidMarkEffect(ctx, baseRadius) {
  * Triggered when the target is paralyzed by Mahito and about to explode (Soul Rupture).
  * Boils protrude from the EDGE of the body circle outward, starting as tiny bumps
  * and slowly growing grotesquely large before detonation.
+ *
+ * OPTIMIZED: Replaced O(n²) pixel-grid double-loops with direct arc/fill geometry.
+ * ~14,400 fillRect calls → ~50 draw calls per frame (>99% reduction).
  */
 export function drawMahitoFleshBubblyDeformLocal(ctx, r = 25, paralyzeTimer = 45, color = '#A855F7', entity = null) {
   // progress: 0 at start of paralysis -> 1 at detonation
@@ -726,33 +695,26 @@ export function drawMahitoFleshBubblyDeformLocal(ctx, r = 25, paralyzeTimer = 45
       const boilColors = ['#D946EF', '#A855F7', '#C026D3', '#9333EA', '#E879F9'];
       for (let i = 0; i < count; i++) {
         entity._mahitoFleshDeformSeeds.push({
-          angle: (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45, // evenly distributed around body edge
-          maxSizeMult: 0.40 + Math.random() * 0.65,      // max boil radius relative to body r (0.40 to 1.05)
-          phase: Math.random() * Math.PI * 2,             // animation wobble offset
-          speed: 1.2 + Math.random() * 2.0,               // pulsation speed
-          edgeOffset: 0.70 + Math.random() * 0.30,        // how far along the edge
-          color: boilColors[i % boilColors.length]
+          angle: (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45,
+          maxSizeMult: 0.40 + Math.random() * 0.65,
+          phase: Math.random() * Math.PI * 2,
+          speed: 1.2 + Math.random() * 2.0,
+          edgeOffset: 0.70 + Math.random() * 0.30,
+          color: boilColors[i % boilColors.length],
+          sutureAngle: Math.random() * Math.PI // Pre-seed suture cut angle
         });
       }
     }
     seeds = entity._mahitoFleshDeformSeeds;
   } else {
-    // Fallback static seeds
-    seeds = [
-      { angle: 2.3,  maxSizeMult: 0.75, phase: 0,   speed: 1.5, edgeOffset: 0.85, color: '#D946EF' },
-      { angle: -0.8, maxSizeMult: 0.90, phase: 1.8, speed: 2.0, edgeOffset: 0.90, color: '#A855F7' },
-      { angle: 3.8,  maxSizeMult: 0.65, phase: 3.5, speed: 1.2, edgeOffset: 0.80, color: '#C026D3' },
-      { angle: 0.9,  maxSizeMult: 0.55, phase: 5.2, speed: 2.5, edgeOffset: 0.95, color: '#9333EA' },
-      { angle: 5.1,  maxSizeMult: 0.70, phase: 2.0, speed: 1.8, edgeOffset: 0.88, color: '#E879F9' },
-      { angle: 1.6,  maxSizeMult: 0.60, phase: 4.1, speed: 1.6, edgeOffset: 0.82, color: '#D946EF' }
-    ];
+    seeds = _FALLBACK_BOIL_SEEDS;
   }
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
-  const P = Math.max(1.5, Math.round(r / 15)); // Stepped pixel grid size
-  const now = Date.now() * 0.007;
+  const P = Math.max(1.5, Math.round(r / 15));
+  const now = (typeof state !== 'undefined' && state.frameCount) ? (state.frameCount * 0.1167) : (Date.now() * 0.007);
 
   // Immediate swelling curve: starts visibly at 35% size and balloons rapidly to full size
   const growthCurve = 0.35 + 0.65 * Math.pow(progress, 1.1);
@@ -772,63 +734,62 @@ export function drawMahitoFleshBubblyDeformLocal(ctx, r = 25, paralyzeTimer = 45
     const bx = Math.round((Math.cos(seed.angle) * edgeDist) / P) * P;
     const by = Math.round((Math.sin(seed.angle) * edgeDist) / P) * P;
 
-    const rSteps = Math.ceil(boilR / P);
+    // 1. Outer Dark Ink Rim — single arc stroke instead of O(n²) pixel scan
+    ctx.beginPath();
+    ctx.arc(bx, by, boilR, 0, Math.PI * 2);
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = P * 1.2;
+    ctx.stroke();
 
-    // 1. Pixel Art Outer Dark Ink Rim
-    ctx.fillStyle = '#0E0B11';
-    for (let gy = -rSteps; gy <= rSteps; gy++) {
-      for (let gx = -rSteps; gx <= rSteps; gx++) {
-        const dist = Math.hypot(gx * P, gy * P);
-        if (dist <= boilR + P * 0.4 && dist > boilR - P * 0.8) {
-          ctx.fillRect(bx + gx * P, by + gy * P, P, P);
-        }
-      }
-    }
-
-    // 2. Pixel Art Cursed Flesh Body Fill
+    // 2. Cursed Flesh Body Fill — single arc fill instead of O(n²) pixel scan
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.max(1, boilR - P * 0.4), 0, Math.PI * 2);
     ctx.fillStyle = seed.color || '#A855F7';
-    for (let gy = -rSteps; gy <= rSteps; gy++) {
-      for (let gx = -rSteps; gx <= rSteps; gx++) {
-        const dist = Math.hypot(gx * P, gy * P);
-        if (dist <= boilR - P * 0.4) {
-          ctx.fillRect(bx + gx * P, by + gy * P, P, P);
-        }
-      }
-    }
+    ctx.fill();
 
-    // 3. Pixel Art Bottom-Right Deep Shadow Dither
+    // 3. Bottom-Right Deep Shadow — clipped quarter-arc instead of O(n²) pixel scan
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(bx, by, boilR + P, boilR + P); // clip to bottom-right quadrant
+    ctx.clip();
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.max(1, boilR - P * 0.8), 0, Math.PI * 2);
     ctx.fillStyle = '#581C87';
-    for (let gy = 0; gy <= rSteps; gy++) {
-      for (let gx = 0; gx <= rSteps; gx++) {
-        const dist = Math.hypot(gx * P, gy * P);
-        if (dist <= boilR - P * 0.8 && dist > boilR * 0.45) {
-          if ((gx + gy) % 2 === 0 || dist > boilR * 0.70) {
-            ctx.fillRect(bx + gx * P, by + gy * P, P, P);
-          }
-        }
-      }
-    }
+    ctx.fill();
+    // Punch out inner circle for the donut-ring shadow look
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.max(0.5, boilR * 0.45), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
 
-    // 4. Pixel Art Top-Left Square Specular Highlight
+    // 4. Top-Left Square Specular Highlight
     ctx.fillStyle = '#FFFFFF';
     const specSize = Math.max(P, Math.round(boilR * 0.28 / P) * P);
     ctx.fillRect(bx - Math.round(boilR * 0.4 / P) * P, by - Math.round(boilR * 0.4 / P) * P, specSize, specSize);
 
-    // 5. Pixel Art Surgical Suture Across Large Boils
+    // 5. Surgical Suture Across Large Boils (linear loop — already cheap, ~10 fillRect max)
     if (boilR > 6 * P) {
       const cosA = Math.cos(seed.angle + Math.PI / 2);
       const sinA = Math.sin(seed.angle + Math.PI / 2);
       const cutLen = Math.round((boilR * 0.9) / P);
 
-      // Dark incision pixel line
-      ctx.fillStyle = '#0E0B11';
-      for (let s = -cutLen; s <= cutLen; s++) {
-        const px = Math.round((bx + cosA * s * P) / P) * P;
-        const py = Math.round((by + sinA * s * P) / P) * P;
-        ctx.fillRect(px, py, P, P);
-      }
+      // Dark incision line — single stroke path instead of per-pixel fillRect
+      ctx.beginPath();
+      ctx.moveTo(
+        Math.round((bx + cosA * -cutLen * P) / P) * P,
+        Math.round((by + sinA * -cutLen * P) / P) * P
+      );
+      ctx.lineTo(
+        Math.round((bx + cosA * cutLen * P) / P) * P,
+        Math.round((by + sinA * cutLen * P) / P) * P
+      );
+      ctx.strokeStyle = '#0E0B11';
+      ctx.lineWidth = P;
+      ctx.stroke();
 
-      // Cross-stitch staples
+      // Cross-stitch staples (only 3 iterations × 2 rects = 6 fillRect — negligible)
       ctx.fillStyle = '#FFFFFF';
       for (let j = -1; j <= 1; j++) {
         const cx = Math.round((bx + cosA * (j * cutLen * 0.55) * P) / P) * P;
@@ -844,6 +805,16 @@ export function drawMahitoFleshBubblyDeformLocal(ctx, r = 25, paralyzeTimer = 45
   ctx.restore();
 }
 
+// Pre-allocated static fallback seeds (zero GC churn)
+const _FALLBACK_BOIL_SEEDS = [
+  { angle: 2.3,  maxSizeMult: 0.75, phase: 0,   speed: 1.5, edgeOffset: 0.85, color: '#D946EF', sutureAngle: 0.5 },
+  { angle: -0.8, maxSizeMult: 0.90, phase: 1.8, speed: 2.0, edgeOffset: 0.90, color: '#A855F7', sutureAngle: 1.2 },
+  { angle: 3.8,  maxSizeMult: 0.65, phase: 3.5, speed: 1.2, edgeOffset: 0.80, color: '#C026D3', sutureAngle: 2.1 },
+  { angle: 0.9,  maxSizeMult: 0.55, phase: 5.2, speed: 2.5, edgeOffset: 0.95, color: '#9333EA', sutureAngle: 0.8 },
+  { angle: 5.1,  maxSizeMult: 0.70, phase: 2.0, speed: 1.8, edgeOffset: 0.88, color: '#E879F9', sutureAngle: 1.7 },
+  { angle: 1.6,  maxSizeMult: 0.60, phase: 4.1, speed: 1.6, edgeOffset: 0.82, color: '#D946EF', sutureAngle: 2.5 }
+];
+
 export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTimer = 45, color = '#FFEE58', entity = null) {
   ctx.save();
 
@@ -857,7 +828,7 @@ export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTi
     ctx.rotate(-angle);
   }
 
-  const time = Date.now() * 0.004;
+  const time = (typeof state !== 'undefined' && state.frameCount) ? (state.frameCount * 0.0667) : (Date.now() * 0.004);
   const numRings = 2;
   
   // 1. Tilted 3D golden rings orbiting above head
@@ -967,8 +938,11 @@ const _S3_STK7 = [0.40, 0.50];
 const _S3_STK9 = [0.40, 0.50, 0.20, 0.80];
 
 /**
- * Draws Mahito's Soul Disfigurement Stitches on an afflicted enemy's body in authentic Pixel-Art style.
- * Features stepped 2px pixel incision cuts, pixel staple cross-stitches with knot dots, and orbiting 4-point diamond pixel glints.
+ * Draws Mahito's Soul Disfigurement Stitches on an afflicted enemy's body.
+ * Features stepped incision cuts, staple cross-stitches with knot dots, and orbiting diamond glints.
+ *
+ * OPTIMIZED: Replaced O(n²) rim ripple scan with arc stroke + dashed pattern.
+ * Consolidated suture seam passes into stroke paths. ~1000 fillRect → ~30 draw calls.
  */
 export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
   if (stacks <= 0) return;
@@ -977,72 +951,72 @@ export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
   ctx.imageSmoothingEnabled = false;
 
   const r = baseRadius || 25;
-  const P = Math.max(1.5, Math.round(r / 15)); // Stepped 2px pixel grid
-  const now = Date.now() * 0.005;
+  const P = Math.max(1.5, Math.round(r / 15));
+  const now = (typeof state !== 'undefined' && state.frameCount) ? (state.frameCount * 0.0833) : (Date.now() * 0.005);
   const pulse = Math.sin(now * 2.5) * 0.5 + 0.5;
 
-  // 1. Stepped Pixel Soul Distortion Rim Ripple on Target Body
+  // 1. Soul Distortion Rim Ripple — single arc stroke with dashed pattern instead of O(n²) scan
   const rimR = r + 2.5 + pulse * 1.5;
-  const rimSteps = Math.ceil(rimR / P);
-  ctx.fillStyle = `rgba(217, 70, 239, ${(0.45 + pulse * 0.35).toFixed(3)})`;
-  for (let gy = -rimSteps; gy <= rimSteps; gy++) {
-    for (let gx = -rimSteps; gx <= rimSteps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= rimR && dist > rimR - P * 1.1) {
-        if ((gx + gy) % 2 === 0 || pulse > 0.6) {
-          ctx.fillRect(gx * P, gy * P, P, P);
-        }
-      }
-    }
+  ctx.beginPath();
+  ctx.arc(0, 0, rimR, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(217, 70, 239, ${(0.45 + pulse * 0.35).toFixed(3)})`;
+  ctx.lineWidth = P;
+  // Dashed pattern simulates the (gx+gy)%2 checkerboard gaps from the original pixel scan
+  if (pulse > 0.6) {
+    ctx.setLineDash([]); // solid when pulse > 0.6 (matches original: all pixels drawn)
+  } else {
+    ctx.setLineDash([P * 1.2, P * 0.8]); // alternating gaps simulate checkerboard
   }
+  ctx.stroke();
+  ctx.setLineDash([]); // reset
 
-  // Helper to draw a stepped pixel surgical suture cut with cross-stitches on the enemy's body
-  const drawPixelSutureSeam = (x1, y1, x2, y2, stitchPositions, crossLen = 3.6) => {
+  // Helper to draw a suture seam with cross-stitches (consolidated stroke paths)
+  const drawSutureSeam = (x1, y1, x2, y2, stitchPositions, crossLen = 3.6) => {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const len = Math.hypot(dx, dy) || 1;
-    const steps = Math.max(1, Math.round(len / P));
     const ux = dx / len;
     const uy = dy / len;
     const px = -uy;
     const py = ux;
 
-    // A. Cursed Energy Seepage Underlay (Stepped Magenta Pixel Glow)
-    ctx.fillStyle = `rgba(217, 70, 239, ${(0.65 + pulse * 0.35).toFixed(3)})`;
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const cx = Math.round((x1 + dx * t) / P) * P;
-      const cy = Math.round((y1 + dy * t) / P) * P;
-      ctx.fillRect(cx - P, cy, P * 3, P);
-      ctx.fillRect(cx, cy - P, P, P * 3);
-    }
+    // A. Cursed Energy Seepage Underlay — wide stroke path instead of per-step fillRect
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = `rgba(217, 70, 239, ${(0.65 + pulse * 0.35).toFixed(3)})`;
+    ctx.lineWidth = P * 3;
+    ctx.stroke();
 
-    // B. Dark Incision Suture Pixel Line
-    ctx.fillStyle = '#0E0F14';
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const cx = Math.round((x1 + dx * t) / P) * P;
-      const cy = Math.round((y1 + dy * t) / P) * P;
-      ctx.fillRect(cx, cy, P, P);
-    }
+    // B. Dark Incision Suture Line — thin stroke path
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = P;
+    ctx.stroke();
 
-    // C. Pixel Staple Cross-Stitches (|| ... ||)
+    // C. Staple Cross-Stitches — batched by color
     const stapleHalfLen = Math.max(1, Math.round(crossLen / P));
+    // Dark cross-lines (batch all into one path)
+    ctx.beginPath();
     for (let i = 0; i < stitchPositions.length; i++) {
       const t = stitchPositions[i];
-      const cx = Math.round((x1 + dx * t) / P) * P;
-      const cy = Math.round((y1 + dy * t) / P) * P;
+      const cx = x1 + dx * t;
+      const cy = y1 + dy * t;
+      ctx.moveTo(cx - px * stapleHalfLen * P, cy - py * stapleHalfLen * P);
+      ctx.lineTo(cx + px * stapleHalfLen * P, cy + py * stapleHalfLen * P);
+    }
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = P;
+    ctx.stroke();
 
-      // Staple cross-line
-      ctx.fillStyle = '#0E0F14';
-      for (let k = -stapleHalfLen; k <= stapleHalfLen; k++) {
-        const sx = Math.round((cx + px * k * P) / P) * P;
-        const sy = Math.round((cy + py * k * P) / P) * P;
-        ctx.fillRect(sx, sy, P, P);
-      }
-
-      // Knot endpoint dots (bright highlight knots)
-      ctx.fillStyle = '#FAF5FF';
+    // Knot endpoint dots (bright highlight) — batch all into fillRect
+    ctx.fillStyle = '#FAF5FF';
+    for (let i = 0; i < stitchPositions.length; i++) {
+      const t = stitchPositions[i];
+      const cx = x1 + dx * t;
+      const cy = y1 + dy * t;
       const kx1 = Math.round((cx - px * stapleHalfLen * P) / P) * P;
       const ky1 = Math.round((cy - py * stapleHalfLen * P) / P) * P;
       const kx2 = Math.round((cx + px * stapleHalfLen * P) / P) * P;
@@ -1057,18 +1031,18 @@ export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
 
   // Suture 1: Transverse Diagonal Suture across upper-mid body (1+ stacks)
   const s1Stitches = (stacks >= 3) ? _S1_STK3 : (stacks >= 2 ? _S1_STK2 : _S1_STK1);
-  drawPixelSutureSeam(-r * 0.70, -r * 0.25, r * 0.65, r * 0.15, s1Stitches, 3.6);
+  drawSutureSeam(-r * 0.70, -r * 0.25, r * 0.65, r * 0.15, s1Stitches, 3.6);
 
   // Suture 2: Vertical Suture down the left flank (3+ stacks)
   if (stacks >= 3 || stacks >= Math.ceil(maxStacks * 0.6)) {
     const s2Stitches = (stacks >= maxStacks) ? _S2_STK8 : (stacks >= 4 ? _S2_STK6 : _S2_STK4);
-    drawPixelSutureSeam(-r * 0.25, -r * 0.70, -r * 0.15, r * 0.65, s2Stitches, 3.2);
+    drawSutureSeam(-r * 0.25, -r * 0.70, -r * 0.15, r * 0.65, s2Stitches, 3.2);
   }
 
   // Suture 3: Forehead / Crest Accent Suture (Max Stacks)
   if (stacks >= maxStacks) {
     const s3Stitches = _S3_STK9;
-    drawPixelSutureSeam(r * 0.10, -r * 0.65, r * 0.55, -r * 0.30, s3Stitches, 2.8);
+    drawSutureSeam(r * 0.10, -r * 0.65, r * 0.55, -r * 0.30, s3Stitches, 2.8);
   }
 
   // 2. Orbiting 4-Point Pixel Diamond Cursed Energy Glints
@@ -1091,9 +1065,12 @@ export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
 }
 
 /**
- * Draws Mahito's Floating Surgical Stitch Indicator above an afflicted enemy in authentic 16-Bit Pixel-Art.
+ * Draws Mahito's Floating Surgical Stitch Indicator above an afflicted enemy in 16-Bit Pixel-Art.
  * Features pixel-grid suture tracks, dim inactive staple ticks, active glowing magenta staples with 1px specular cores,
  * and critical 5-stack hot-pink pixel flares.
+ *
+ * OPTIMIZED: Replaced Date.now() with frame-based timing. Batched same-color fillRect calls to
+ * eliminate per-iteration fillStyle toggling in inactive stitches.
  */
 export function drawSoulDisfigurementCounter(ctx, x, y, baseRadius, stacks = 1, timer = 300) {
   if (stacks <= 0) return;
@@ -1103,7 +1080,7 @@ export function drawSoulDisfigurementCounter(ctx, x, y, baseRadius, stacks = 1, 
 
   const r = baseRadius || 25;
   const P = 2.0; // Fixed 2px pixel-art unit
-  const now = Date.now() * 0.004;
+  const now = (typeof state !== 'undefined' && state.frameCount) ? (state.frameCount * 0.0667) : (Date.now() * 0.004);
   const hoverY = Math.round((Math.sin(now * 2.5) * 2.0) / P) * P;
 
   const cfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
@@ -1118,10 +1095,10 @@ export function drawSoulDisfigurementCounter(ctx, x, y, baseRadius, stacks = 1, 
   const isCritical = stacks >= maxStacks;
   const pulse = Math.sin(now * 4) * 0.5 + 0.5;
 
-  const gap = 6.0; // Horizontal spacing per stitch staple (multiples of P)
+  const gap = 6.0;
   const halfTrack = Math.round((((maxStacks - 1) * gap) / 2) / P) * P;
 
-  // 1. Pixel-Art Suture Tether Threads extending down toward the head
+  // 1. Suture Tether Threads extending down toward the head
   ctx.fillStyle = '#0E0F14';
   const leftTx = -Math.round(halfTrack * 0.45 / P) * P;
   const rightTx = Math.round(halfTrack * 0.45 / P) * P;
@@ -1130,29 +1107,29 @@ export function drawSoulDisfigurementCounter(ctx, x, y, baseRadius, stacks = 1, 
     ctx.fillRect(leftTx + Math.round(s * 0.5) * P, ty, P, P);
     ctx.fillRect(rightTx - Math.round(s * 0.5) * P, ty, P, P);
   }
-  // Cross-ticks on tether threads
   ctx.fillRect(leftTx - P, P * 2, P * 3, P);
   ctx.fillRect(rightTx - P, P * 2, P * 3, P);
 
-  // 2. Main Suture Incision Pixel Cut Seam Line
-  // Magenta glow underlay
+  // 2. Main Suture Incision Seam Line
   ctx.fillStyle = isCritical ? `rgba(255, 0, 127, ${(0.7 + pulse * 0.3).toFixed(3)})` : `rgba(217, 70, 239, ${(0.45 + pulse * 0.3).toFixed(3)})`;
   ctx.fillRect(-halfTrack - P * 3, -P, (halfTrack * 2) + P * 6, P * 3);
 
-  // Dark surgical incision core
   ctx.fillStyle = '#0E0F14';
   ctx.fillRect(-halfTrack - P * 2, 0, (halfTrack * 2) + P * 4, P);
 
-  // 3. Inactive Stitches (Dim Dark Slate Pixel Staples)
+  // 3. Inactive Stitches — batched by color to avoid per-iteration fillStyle switches
   if (stacks < maxStacks) {
+    // Draw all slate bodies first
     ctx.fillStyle = '#1E293B';
     for (let i = stacks; i < maxStacks; i++) {
+      ctx.fillRect(-halfTrack + i * gap, -P * 2, P, P * 4);
+    }
+    // Then all dark knots
+    ctx.fillStyle = '#0E0F14';
+    for (let i = stacks; i < maxStacks; i++) {
       const sx = -halfTrack + i * gap;
-      ctx.fillRect(sx, -P * 2, P, P * 4); // 2x4 vertical tick
-      ctx.fillStyle = '#0E0F14';
-      ctx.fillRect(sx, -P * 2, P, P);     // top knot
-      ctx.fillRect(sx, P * 2 - P, P, P);  // bot knot
-      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(sx, -P * 2, P, P);
+      ctx.fillRect(sx, P * 2 - P, P, P);
     }
   }
 

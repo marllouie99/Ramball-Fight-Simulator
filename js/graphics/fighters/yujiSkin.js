@@ -237,7 +237,7 @@ export function drawYujiSkin(ctx, fighter) {
       const maxP = fighter.punchActiveMaxTime || fighter.punchMaxTime || 22;
       rawT = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxP)));
     } else {
-      const slashCd = CONFIG.yuji?.soulSwapRapidSlashCooldown || 20;
+      const slashCd = CONFIG.yuji?.soulSwapRapidSlashCooldown || 25;
       const timerVal = fighter.rapidSlashTimer || 0;
       rawT = Math.min(1.0, Math.max(0.0, 1.0 - (timerVal / slashCd)));
     }

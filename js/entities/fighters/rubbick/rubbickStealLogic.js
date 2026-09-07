@@ -21,13 +21,17 @@ export function updateStolenRubyHook(fighter) {
       // NOW we lock the targets that are currently in range and in the cone!
       fighter.pullTargets = [];
       const range = cfg.activePullRange || 200;
-      const myIndex = state.fighters.indexOf(fighter);
-      const myTeam = state.getFighterTeam(myIndex);
 
-      for (let i = 0; i < state.fighters.length; i++) {
-        const f = state.fighters[i];
+      const allCandidates = [
+        ...(state.fighters || []),
+        ...(state.illusions || []),
+        ...(state.cjDriveBys || [])
+      ];
+
+      for (let i = 0; i < allCandidates.length; i++) {
+        const f = allCandidates[i];
         if (!f || f === fighter || f.hp <= 0 || f.invincibilityTimer > 0) continue;
-        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
+        if (fighter.isTeammate(f)) continue;
 
         const fDist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
         // Give a small 15px leeway because the weapon physically extends slightly past the max range
@@ -45,7 +49,7 @@ export function updateStolenRubyHook(fighter) {
       }
       
       // Ensure the primary targeted opponent is caught IF they are still in range
-      if (fighter.primaryHookTarget && !fighter.pullTargets.includes(fighter.primaryHookTarget)) {
+      if (fighter.primaryHookTarget && !fighter.pullTargets.includes(fighter.primaryHookTarget) && !fighter.isTeammate(fighter.primaryHookTarget)) {
         const pDist = Math.hypot(fighter.primaryHookTarget.x - fighter.x, fighter.primaryHookTarget.y - fighter.y);
         if (pDist <= range + 15) {
           fighter.pullTargets.push(fighter.primaryHookTarget);

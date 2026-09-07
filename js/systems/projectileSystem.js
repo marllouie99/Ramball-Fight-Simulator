@@ -26,10 +26,20 @@ let visualUpdateFrame = 0;
  * Returns false for non-2v2 modes or if fighters are on different teams.
  */
 function areOnSameTeam(ownerIndex, targetIndex) {
-  if (state.mode !== GAME_MODES.TWO_VS_TWO && state.mode !== GAME_MODES.STAND_OFF_1V2) return false;
-  const ownerTeam = state.getFighterTeam(ownerIndex);
-  const targetTeam = state.getFighterTeam(targetIndex);
-  return ownerTeam !== null && ownerTeam === targetTeam;
+  if (ownerIndex === targetIndex && ownerIndex !== undefined && ownerIndex !== null && ownerIndex !== -1) return true;
+  if (!state || !state.mode) return false;
+  if (typeof ownerIndex !== 'number' || typeof targetIndex !== 'number' || ownerIndex < 0 || targetIndex < 0) return false;
+  const mode = state.mode;
+  const isTeamMode = (
+    mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' ||
+    mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' ||
+    mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' ||
+    mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4' || mode === '4v4'
+  );
+  if (!isTeamMode) return false;
+  const ownerTeam = typeof state.getFighterTeam === 'function' ? state.getFighterTeam(ownerIndex) : null;
+  const targetTeam = typeof state.getFighterTeam === 'function' ? state.getFighterTeam(targetIndex) : null;
+  return ownerTeam !== null && targetTeam !== null && ownerTeam === targetTeam;
 }
 
 /**
@@ -545,6 +555,7 @@ class ProjectileSystem {
     proj.maxLife = 180;
     proj.color = '#00FFFF'; // Cyan
     proj.owner = ownerIndex;
+    proj.ownerFighter = fighter;
     proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
     
     proj.isGojoBlue = true;
@@ -752,7 +763,13 @@ class ProjectileSystem {
         : (form === 'hollow'
           ? (CONFIG.ichigo?.hollowGetsugaRadius || (CONFIG.ichigo?.getsugaRadius || 100))
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100))));
-    const maxLife = CONFIG.ichigo?.getsugaDuration || 150;
+    const maxLife = isFinal
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaDuration || 150)
+      : (form === 'bankai_hollow'
+        ? (CONFIG.ichigo?.bankaiHollowGetsugaDuration || (CONFIG.ichigo?.bankaiGetsugaDuration || 75))
+        : (form === 'hollow'
+          ? (CONFIG.ichigo?.hollowGetsugaDuration || (CONFIG.ichigo?.getsugaDuration || 85))
+          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDuration || 75) : (CONFIG.ichigo?.getsugaDuration || 90))));
 
     const proj = this._getProjectile();
     proj.x = fighter.x + dirX * tipDist;
@@ -775,6 +792,7 @@ class ProjectileSystem {
           ? (CONFIG.ichigo?.hollowGetsugaColor || '#FFFFFF')
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#DC143C') : (CONFIG.ichigo?.getsugaColor || '#00D5FF'))));
     proj.owner = ownerIndex;
+    proj.ownerFighter = fighter;
     proj.damage = Number.isFinite(Number(damage)) 
       ? Number(damage) 
       : (isFinal 
@@ -888,88 +906,117 @@ class ProjectileSystem {
     if (sound) playSound(sound.src, sound.volume || 0.8);
 
     if (state.fighters) {
+      const myTeam = (typeof state.getFighterTeam === 'function' && typeof ownerIndex === 'number') ? state.getFighterTeam(ownerIndex) : null;
       state.fighters.forEach((f, idx) => {
-        if (f && f.hp > 0 && idx !== ownerIndex) {
-          const dist = Math.hypot(f.x - x, f.y - y);
-          if (dist <= splashRadius) {
-            const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
-            const splashDmg = explosionDmg * splashRatio;
+        if (!f || f.hp <= 0 || idx === ownerIndex) return;
+        const fTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(idx) : null;
+        if (myTeam !== null && fTeam !== null && myTeam === fTeam) return;
 
-            // 1. Interrupt and cancel any active skill channeling or attack
-            if (typeof f.interruptAttacks === 'function') {
-              f.interruptAttacks(true);
-            }
+        const dist = Math.hypot(f.x - x, f.y - y);
+        if (dist <= splashRadius) {
+          const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
+          const splashDmg = explosionDmg * splashRatio;
 
-            f.takeDamage(splashDmg, attacker, { isExplosion: true, isDivineFlame: true });
-            
-            // Apply burn effect to targets hit by Fuga
-            if (typeof f.applyBurn === 'function') {
-              f.burnTimer = CONFIG.sukuna?.divineFlameBurnDuration || CONFIG.orange.burnDuration;
-              f.burnDamageTimer = 0;
-              f.lastBurnAttacker = attacker;
-            }
-            
-            // 2. Blast off target with strong outward kinetic blast knockback
-            const angle = dist > 0 ? Math.atan2(f.y - y, f.x - x) : Math.random() * Math.PI * 2;
-            const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
-            const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
+          // 1. Interrupt and cancel any active skill channeling or attack
+          if (typeof f.interruptAttacks === 'function') {
+            f.interruptAttacks(true);
+          }
 
-            const pushVx = Math.cos(angle) * pushForce * 1.35;
-            const pushVy = Math.sin(angle) * pushForce * 1.35;
+          // 2. Hide and suppress active attack effects on the hit target
+          if (typeof f.suppressCombatAndVisuals === 'function') {
+            f.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+          } else {
+            if (typeof f.clearAllAfterimages === 'function') f.clearAllAfterimages();
+            if (typeof f.clearAllAttackEffects === 'function') f.clearAllAttackEffects();
+            f._hitByFugaTimer = Math.max(f._hitByFugaTimer || 0, 45);
+          }
 
-            if (typeof f.applyKnockback === 'function') {
-              f.applyKnockback(pushVx, pushVy);
-            } else {
-              f.knockbackVx = (f.knockbackVx || 0) + pushVx;
-              f.knockbackVy = (f.knockbackVy || 0) + pushVy;
-              f.vx += pushVx;
-              f.vy += pushVy;
-              f.knockbackStunTimer = Math.max(f.knockbackStunTimer || 0, 22);
-            }
+          f.takeDamage(splashDmg, attacker, {
+            isExplosion: true,
+            isDivineFlame: true,
+            isFuga: true,
+            isFlame: true,
+            bypassShield: true,
+            bypassEvade: true,
+            undodgeable: true,
+            isGuaranteedHit: true
+          });
+          
+          // Apply burn effect to targets hit by Fuga
+          if (typeof f.applyBurn === 'function') {
+            f.burnTimer = CONFIG.sukuna?.divineFlameBurnDuration || (CONFIG.orange && CONFIG.orange.burnDuration) || 180;
+            f.burnDamageTimer = 0;
+            f.lastBurnAttacker = attacker;
+          }
+          
+          // 3. Blast off target with strong outward kinetic blast knockback
+          const angle = dist > 0 ? Math.atan2(f.y - y, f.x - x) : Math.random() * Math.PI * 2;
+          const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
+          const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
 
-            if (typeof f.applyHitStun === 'function') {
-              f.applyHitStun(25); // 25 frames (~0.4s) hit stun while blasted outward
-            }
+          const pushVx = Math.cos(angle) * pushForce * 1.35;
+          const pushVy = Math.sin(angle) * pushForce * 1.35;
+
+          if (typeof f.applyKnockback === 'function') {
+            f.applyKnockback(pushVx, pushVy);
+          } else {
+            f.knockbackVx = (f.knockbackVx || 0) + pushVx;
+            f.knockbackVy = (f.knockbackVy || 0) + pushVy;
+            f.vx += pushVx;
+            f.vy += pushVy;
           }
         }
       });
     }
 
     if (state.illusions) {
+      const myTeam = (typeof state.getFighterTeam === 'function' && typeof ownerIndex === 'number') ? state.getFighterTeam(ownerIndex) : null;
       state.illusions.forEach((ill) => {
-        if (ill && ill.hp > 0) {
-          const illOwner = ill.owner?.fighterIndex ?? (state.fighters ? state.fighters.indexOf(ill.owner) : -1);
-          if (illOwner !== ownerIndex) {
-            const dist = Math.hypot(ill.x - x, ill.y - y);
-            if (dist <= splashRadius) {
-              if (typeof ill.interruptAttacks === 'function') {
-                ill.interruptAttacks(true);
-              }
+        if (!ill || ill.hp <= 0) return;
+        const illOwner = ill.owner?.fighterIndex ?? (state.fighters ? state.fighters.indexOf(ill.owner) : -1);
+        if (illOwner === ownerIndex) return;
+        if (myTeam !== null && illOwner !== -1 && state.getFighterTeam(illOwner) === myTeam) return;
 
-              const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
-              applyDamageToTarget(ill, explosionDmg * 0.7 * splashRatio, attacker, { isExplosion: true });
+        const dist = Math.hypot(ill.x - x, ill.y - y);
+        if (dist <= splashRadius) {
+          if (typeof ill.interruptAttacks === 'function') {
+            ill.interruptAttacks(true);
+          }
 
-              const angle = dist > 0 ? Math.atan2(ill.y - y, ill.x - x) : Math.random() * Math.PI * 2;
-              const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
-              const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
+          if (typeof ill.suppressCombatAndVisuals === 'function') {
+            ill.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+          } else {
+            if (typeof ill.clearAllAfterimages === 'function') ill.clearAllAfterimages();
+            if (typeof ill.clearAllAttackEffects === 'function') ill.clearAllAttackEffects();
+            ill._hitByFugaTimer = Math.max(ill._hitByFugaTimer || 0, 45);
+          }
 
-              const pushVx = Math.cos(angle) * pushForce * 1.35;
-              const pushVy = Math.sin(angle) * pushForce * 1.35;
+          const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
+          applyDamageToTarget(ill, explosionDmg * 0.7 * splashRatio, attacker, {
+            isExplosion: true,
+            isDivineFlame: true,
+            isFuga: true,
+            isFlame: true,
+            bypassShield: true,
+            bypassEvade: true,
+            undodgeable: true,
+            isGuaranteedHit: true
+          });
 
-              if (typeof ill.applyKnockback === 'function') {
-                ill.applyKnockback(pushVx, pushVy);
-              } else {
-                ill.knockbackVx = (ill.knockbackVx || 0) + pushVx;
-                ill.knockbackVy = (ill.knockbackVy || 0) + pushVy;
-                ill.vx += pushVx;
-                ill.vy += pushVy;
-                ill.knockbackStunTimer = Math.max(ill.knockbackStunTimer || 0, 22);
-              }
+          const angle = dist > 0 ? Math.atan2(ill.y - y, ill.x - x) : Math.random() * Math.PI * 2;
+          const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
+          const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
 
-              if (typeof ill.applyHitStun === 'function') {
-                ill.applyHitStun(25);
-              }
-            }
+          const pushVx = Math.cos(angle) * pushForce * 1.35;
+          const pushVy = Math.sin(angle) * pushForce * 1.35;
+
+          if (typeof ill.applyKnockback === 'function') {
+            ill.applyKnockback(pushVx, pushVy);
+          } else {
+            ill.knockbackVx = (ill.knockbackVx || 0) + pushVx;
+            ill.knockbackVy = (ill.knockbackVy || 0) + pushVy;
+            ill.vx += pushVx;
+            ill.vy += pushVy;
           }
         }
       });
@@ -1218,11 +1265,25 @@ class ProjectileSystem {
           const isDead = fighter.hp <= 0 || fighter.isDead;
           const isInvincible = (fighter.invincibilityTimer && fighter.invincibilityTimer > 0) || (fighter.vanishTimer && fighter.vanishTimer > 0);
           if (!isDead && !isInvincible) {
-            fighter.takeDamage(Number(projectile.damage) || 35, attacker, {
+            // Suppress active attack effects immediately on direct Fuga impact
+            if (typeof fighter.suppressCombatAndVisuals === 'function') {
+              fighter.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+            } else {
+              if (typeof fighter.clearAllAfterimages === 'function') fighter.clearAllAfterimages();
+              if (typeof fighter.clearAllAttackEffects === 'function') fighter.clearAllAttackEffects();
+              fighter._hitByFugaTimer = Math.max(fighter._hitByFugaTimer || 0, 45);
+            }
+
+            fighter.takeDamage(Number(projectile.damage) || 300, attacker, {
               isProjectile: true,
               projectile,
               isDivineFlame: true,
+              isFuga: true,
               isFlame: true,
+              bypassShield: true,
+              bypassEvade: true,
+              undodgeable: true,
+              isGuaranteedHit: true,
               skipStandardDamageText: false
             });
             if (attacker && typeof attacker.onDamageDealt === 'function') {
@@ -2706,6 +2767,7 @@ class ProjectileSystem {
         for (let fi = 0; fi < fighters.length; fi++) {
           if (!fighters[fi]) continue;
           if (fi === ownerIndex) continue;
+          if (areOnSameTeam(ownerIndex, fi)) continue;
           const f = fighters[fi];
           const dx = p.x - f.x;
           const dy = p.y - f.y;
@@ -2814,6 +2876,7 @@ class ProjectileSystem {
           // Skip visual-only and non-physical projectiles
           if (otherProj.isVisual || otherProj.isExplosion || otherProj.isPoisonSpill) continue;
           if (otherProj.isBlackHole) continue;
+          if (p.owner !== null && otherProj.owner !== null && otherProj.owner !== undefined && (p.owner === otherProj.owner || areOnSameTeam(p.owner, otherProj.owner))) continue;
 
           const otherProjOwner = fighters[otherProj.owner];
           if (otherProjOwner && otherProjOwner._def && otherProjOwner._def.type === 'black') continue;

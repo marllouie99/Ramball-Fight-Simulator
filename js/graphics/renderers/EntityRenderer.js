@@ -531,11 +531,11 @@ export function drawFighters() {
     }
   });
 
-  // Render in-flight cursed rocks from any defeated Todo fighters
+  // Render in-flight cursed rocks from any defeated or vanished Todo fighters
   if (state.fighters) {
     for (let i = 0; i < state.fighters.length; i++) {
       const f = state.fighters[i];
-      if (f && f.hp <= 0 && f.cursedRocks && f.cursedRocks.length > 0 && typeof drawCursedRocks === 'function') {
+      if (f && (f.hp <= 0 || (f.vanishTimer && f.vanishTimer > 0)) && f.cursedRocks && f.cursedRocks.length > 0 && typeof drawCursedRocks === 'function') {
         drawCursedRocks(ctx, f);
       }
     }

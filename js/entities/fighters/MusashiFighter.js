@@ -107,7 +107,7 @@ export class MusashiFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
 
     // Preemptive Strike counter (teleport behind attacker when hit)
     if (this.preemptiveActiveTimer > 0 && attacker && !opts.isCounter && !isGuaranteedHit) {
@@ -486,23 +486,8 @@ export class MusashiFighter extends Fighter {
     }
 
     // Normal movement
-    let targetSpeed = currentSpeed;
-    if (this.slowTimer > 0) {
-      this.slowTimer--;
-      targetSpeed *= this.slowMultiplier;
-    }
-
-    const moveSpeedSq = this.vx * this.vx + this.vy * this.vy;
-    const actualSpeed = Math.sqrt(moveSpeedSq);
-    
-    if (actualSpeed > 0 && Math.abs(actualSpeed - targetSpeed) > 0.05) {
-      const ns = actualSpeed + (targetSpeed - actualSpeed) * 0.05;
-      this.vx = (this.vx / actualSpeed) * ns;
-      this.vy = (this.vy / actualSpeed) * ns;
-    }
-
-    this.x += this.vx;
-    this.y += this.vy;
+    this.applyMovementPhysics();
+    const actualSpeed = Math.hypot(this.vx, this.vy);
 
     // Continuous weapon trail effect when moving fast
     if (actualSpeed > 2 && !this.isSheathed) {
@@ -561,7 +546,7 @@ export class MusashiFighter extends Fighter {
     
     // Face opponent or movement dir
     if (!isAttacking) {
-      if (opponent && moveSpeedSq < 1) {
+      if (opponent && actualSpeed < 1) {
          this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       } else {
          this.gunAngle = Math.atan2(this.vy, this.vx);

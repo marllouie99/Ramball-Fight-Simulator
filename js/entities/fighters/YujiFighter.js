@@ -5,7 +5,7 @@ import { drawYujiSkin } from '../../graphics/fighters/yujiSkin.js';
 import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { modUpdateMeleeCombat } from './yuji/yujiCombat.js';
-import { modUpdateComboRush, modUpdateReverseCursedTechnique } from './yuji/yujiSkills.js';
+import { modUpdateReverseCursedTechnique } from './yuji/yujiSkills.js';
 import { spawnMeleeClashShockwave, spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnTeleportAfterimages } from './sukuna/sukunaCombat.js';
@@ -24,7 +24,7 @@ export class YujiFighter extends Fighter {
 
     // Core combat variables
     this.punchAnimTimer = 0;
-    this.punchMaxTime = CONFIG.yuji?.punchSpeed || 16;
+    this.punchMaxTime = CONFIG.yuji?.punchSpeed || 25;
     this.isRightPunch = true;
     this.hideFrontHand = false;
     this.hideBackHand = false;
@@ -42,13 +42,6 @@ export class YujiFighter extends Fighter {
     // Divergent Fist delayed shockwaves queue
     this.delayedShockwaves = [];
 
-    // Skill 1: Divergent Fist Combo Rush
-    this.comboRushCooldown = 0;
-    this.isComboDashing = false;
-    this.comboTarget = null;
-    this.comboHitsLeft = 0;
-    this.comboIntervalTimer = 0;
-
     // Soul Swap state
     this.soulSwapActive = false;
     this.soulSwapTimer = 0;
@@ -58,7 +51,7 @@ export class YujiFighter extends Fighter {
     this.hasDismantleCharge = false;
     this.rapidSlashPhase = 'IDLE'; // 'IDLE' | 'START' | 'LANDED' | 'SLASH_RECOVERY'
 
-    // Skill 2: Reverse Cursed Technique (RCT)
+    // Reverse Cursed Technique (RCT) Passive
     this.rctCooldown = 0;
     this.isChannelingRCT = false;
     this.rctChannelTimer = 0;
@@ -134,7 +127,7 @@ export class YujiFighter extends Fighter {
     if (this.hp / this.maxHp <= (CONFIG.yuji?.soulSwapHpThreshold || 0.30) && !this.hasSoulSwapped && !isFightingSukuna) {
       this.hasSoulSwapped = true;
       this.soulSwapActive = true;
-      this.soulSwapTimer = CONFIG.yuji?.soulSwapDuration || 500;
+      this.soulSwapTimer = CONFIG.yuji?.soulSwapDuration || 800;
       this.soulSwapTransitionTimer = 30; // 0.5s takeover transformation freeze!
       this.hasDismantleCharge = true;
 
@@ -143,10 +136,10 @@ export class YujiFighter extends Fighter {
       this.punchAnimTimer = 0;
       this.slashSwingTimer = 0;
 
-      // Queue the 12 rapid slash-teleport sequence to start right after transformation freeze!
+      // Queue the rapid slash-teleport sequence to start right after transformation freeze!
       const target = (typeof opponent !== 'undefined' && opponent) ? (Array.isArray(opponent) ? opponent[0] : opponent) : (state.fighters ? state.fighters.find(f => f && f !== this && !f.isDead && f.hp > 0) : null);
       if (target) {
-        this.rapidSlashHitsLeft = CONFIG.yuji?.soulSwapRapidSlashHits || 12;
+        this.rapidSlashHitsLeft = CONFIG.yuji?.soulSwapRapidSlashHits || 20;
         this.rapidSlashTimer = 0; // Triggers first teleport immediately after freeze
         this.rapidSlashPhase = 'START';
         this.flurryTarget = target;
@@ -251,7 +244,7 @@ export class YujiFighter extends Fighter {
     }
 
     // Smoothly transition Yuji's Cursed Energy aura opacity
-    const wantsAura = (this.punchAnimTimer > 0) || (this.blackFlashCharge > 0) || this.soulSwapActive || (this.comboHitsLeft > 0) || this.isComboDashing || this.isChannelingRCT || (this.blackFlashTimer > 0);
+    const wantsAura = (this.punchAnimTimer > 0) || (this.blackFlashCharge > 0) || this.soulSwapActive || this.isChannelingRCT || (this.blackFlashTimer > 0);
     if (wantsAura) {
       this.combatAuraOpacity = Math.min(1.0, this.combatAuraOpacity + 0.12);
     } else {
@@ -263,7 +256,6 @@ export class YujiFighter extends Fighter {
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.cooldownTimer > 0) this.cooldownTimer = Math.max(0, this.cooldownTimer - decay);
-    if (this.comboRushCooldown > 0) this.comboRushCooldown = Math.max(0, this.comboRushCooldown - decay);
     if (this.rctCooldown > 0) this.rctCooldown = Math.max(0, this.rctCooldown - decay);
 
     // Process delayed shockwaves (Divergent Fist passive)
@@ -297,10 +289,7 @@ export class YujiFighter extends Fighter {
       targets = [opponent];
     }
 
-    // Execute Skill 1 (Divergent Fist Combo Rush)
-    modUpdateComboRush.call(this, targets[0]);
-
-    // Skill 2 (Reverse Cursed Technique) is now a Passive that automatically heals Yuji upon reverting from Sukuna transformation.
+    // Passive RCT Technique handler
     modUpdateReverseCursedTechnique.call(this);
 
     // Sukuna Soul Takeover: Rapid 360° Cleave Slash Sequence
@@ -387,7 +376,7 @@ export class YujiFighter extends Fighter {
 
         const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
         const baseDamage = CONFIG.yuji?.punchDamage || 18;
-        const slashDamage = baseDamage * 1.5 * (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5);
+        const slashDamage = baseDamage * 1.5 * (CONFIG.yuji?.soulSwapDamageMultiplier || 2.5);
         const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
 
         import('../../systems/projectileSystem.js').then(module => {
@@ -439,8 +428,8 @@ export class YujiFighter extends Fighter {
       }
     }
 
-    if (this.isComboDashing || (this.comboHitsLeft || 0) > 0 || this.isChannelingRCT) {
-      return; // Skip normal AI basic attacks/behavior during combo rush or RCT
+    if (this.isChannelingRCT) {
+      return; // Skip normal AI basic attacks/behavior during RCT
     }
 
     // AI logic: drive basic attacks in melee range
@@ -459,7 +448,7 @@ export class YujiFighter extends Fighter {
         }
 
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        const reach = CONFIG.yuji?.punchRange || 65;
+        const reach = CONFIG.yuji?.punchRange || 50;
         const maxPunchReach = this.r + target.r + reach;
 
         if (dist <= maxPunchReach && (this.cooldownTimer || 0) <= 0) {
@@ -469,9 +458,7 @@ export class YujiFighter extends Fighter {
       }
     }
 
-
-
-    if (this.blackFlashTimer > 0) {
+    if (this.blackFlashTimer > 0 && Math.hypot(this.vx, this.vy) > 0.8) {
       if (!this.afterImages) this.afterImages = [];
       pushTrailCap(this.afterImages, {
         x: this.x,
@@ -498,7 +485,7 @@ export class YujiFighter extends Fighter {
       this.hasDismantleCharge = false; // Consume charge
       
       const baseDamage = CONFIG.yuji?.punchDamage || 18;
-      const dismantleDamage = baseDamage * 1.5 * (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5);
+      const dismantleDamage = baseDamage * 1.5 * (CONFIG.yuji?.soulSwapDamageMultiplier || 2.5);
       const dismantleSpeed = CONFIG.sukuna?.slashSpeed || 40;
       const ownerIndex = state.fighters.indexOf(this);
       
@@ -526,8 +513,8 @@ export class YujiFighter extends Fighter {
       
       const isZone = (this.blackFlashTimer > 0);
       this.cooldownTimer = isZone
-        ? (CONFIG.yuji?.blackFlashZonePunchCooldown || 14)
-        : (CONFIG.yuji?.basicPunchCooldown || 25);
+        ? (CONFIG.yuji?.blackFlashZonePunchCooldown || 30)
+        : (CONFIG.yuji?.basicPunchCooldown || 35);
       return;
     }
 
@@ -551,7 +538,7 @@ export class YujiFighter extends Fighter {
       }
     }
 
-    const reach = CONFIG.yuji?.punchRange || 65;
+    const reach = CONFIG.yuji?.punchRange || 50;
     for (const target of allTargets) {
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
       const maxPunchReach = this.r + target.r + reach;
@@ -571,57 +558,11 @@ export class YujiFighter extends Fighter {
   }
 
   triggerSecondarySkill() {
-    if (this.soulSwapTransitionTimer > 0 || this.revertTransitionTimer > 0 || (this.rapidSlashHitsLeft || 0) > 0) return;
-    if ((this.comboRushCooldown || 0) <= 0 && !this.isComboDashing && (this.comboHitsLeft || 0) <= 0) {
-      let bestTarget = null;
-      let closestDist = Infinity;
-      const allTargets = [];
-      if (state && state.fighters) {
-        for (let i = 0; i < state.fighters.length; i++) {
-          const f = state.fighters[i];
-          if (!f || f === this || f.hp <= 0 || f.isIllusion) continue;
-          if (state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(this)) === state.getFighterTeam(i)) continue;
-          allTargets.push(f);
-        }
-      }
-      if (state && state.illusions) {
-        for (let ill of state.illusions) {
-          if (!ill || ill === this || ill.hp <= 0) continue;
-          if (ill.ownerIndex !== undefined && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(this)) === state.getFighterTeam(ill.ownerIndex)) continue;
-          allTargets.push(ill);
-        }
-      }
-      const range = CONFIG.yuji?.comboDashRange || 200;
-      for (const target of allTargets) {
-        const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        if (dist <= range && dist < closestDist) {
-          closestDist = dist;
-          bestTarget = target;
-        }
-      }
-      if (bestTarget) {
-        this.isComboDashing = true;
-        this.comboTarget = bestTarget;
-        this.comboRushCooldown = CONFIG.yuji?.comboCooldown || 400;
-        audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.85);
-      }
-    }
+    // Yuji's Divergent Fist is a passive delayed shockwave on hit
   }
 
   triggerTertiarySkill() {
-    if (this.soulSwapTransitionTimer > 0 || this.revertTransitionTimer > 0 || (this.rapidSlashHitsLeft || 0) > 0) return;
-    // Skill 2: Reverse Cursed Technique (RCT)
-    // Only usable once per round typically, requires HP < 100%, and can't be used while doing other attacks
-    if (this.rctCooldown <= 0 && this.hp < this.maxHp && !this.isComboDashing && (this.comboHitsLeft || 0) <= 0) {
-      // AI check: prefer using it when HP is low, but player can trigger anytime HP < 100%
-      const rctChannelTime = CONFIG.yuji?.rctChannelDuration || 45;
-      this.isChannelingRCT = true;
-      this.rctChannelTimer = rctChannelTime;
-      this.rctCooldown = CONFIG.yuji?.rctCooldown || 900;
-      
-      // Floating text indication
-      spawnFloatingText(this.x, this.y - this.r - 30, 'RCT', '#00FF00');
-    }
+    // Reverse Cursed Technique is a passive heal on reverting from Soul Swap
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -631,9 +572,6 @@ export class YujiFighter extends Fighter {
       this.punchAnimTimer = 0;
     }
     this.delayedShockwaves = [];
-    this.isComboDashing = false;
-    this.comboTarget = null;
-    this.comboHitsLeft = 0;
     if (this.afterImages) this.afterImages.length = 0;
     if (this.punchEffects) this.punchEffects.length = 0;
     

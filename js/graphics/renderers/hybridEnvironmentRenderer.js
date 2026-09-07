@@ -64,17 +64,13 @@ function getBaguvixDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     
-    // 1. Pitch black base overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.98)';
-    ctx.fillRect(0, 0, size, size);
-    
-    // 2. High-contrast Grove Street emerald green radial gradient centered on CJ
+    // High-contrast Grove Street emerald green radial gradient centered on CJ
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-    grad.addColorStop(0, 'rgba(34, 197, 94, 0.95)');    // Vibrant neon lime-green core
-    grad.addColorStop(0.08, 'rgba(22, 163, 74, 0.88)'); // Grove Street rich emerald
-    grad.addColorStop(0.22, 'rgba(20, 83, 45, 0.92)');  // Deep emerald matrix green
-    grad.addColorStop(0.55, 'rgba(6, 44, 20, 0.97)');   // Rich dark turf green
-    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.99)');      // Pitch black perimeter
+    grad.addColorStop(0, 'rgba(34, 197, 94, 0.70)');    // Vibrant neon lime-green core
+    grad.addColorStop(0.12, 'rgba(22, 163, 74, 0.60)'); // Grove Street rich emerald
+    grad.addColorStop(0.35, 'rgba(20, 83, 45, 0.50)');  // Deep emerald matrix green
+    grad.addColorStop(0.70, 'rgba(6, 44, 20, 0.35)');   // Rich dark turf green
+    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');       // Fully transparent perimeter
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -82,7 +78,7 @@ function getBaguvixDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     baguvixDimSprite = new window.PIXI.Sprite(texture);
     baguvixDimSprite.anchor.set(0.5);
-    baguvixDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    baguvixDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
   }
   return baguvixDimSprite;
 }
@@ -363,6 +359,7 @@ function getSukunaDomainHybridData() {
 }
 
 let yutaDomainHybridData = null;
+let yutaArenaMask = null;
 function getYutaDomainHybridData() {
   if (!yutaDomainHybridData) {
     const canvas = document.createElement('canvas');
@@ -378,6 +375,7 @@ function getYutaDomainHybridData() {
 }
 
 let mahitoDomainHybridData = null;
+let mahitoArenaMask = null;
 function getMahitoDomainHybridData() {
   if (!mahitoDomainHybridData) {
     const canvas = document.createElement('canvas');
@@ -416,12 +414,12 @@ export function updateHybridEnvironment() {
   const scale = (maxDim * 2.5) / 512;
   
   // 0. Domain Expansions
-  const gojo = state.fighters?.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive);
-  const sukuna = state.fighters?.find(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.type === 'sukuna') && f.domainActive);
-  const yuta = state.fighters?.find(f => f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta') && f.domainActive);
-  const mahito = state.fighters?.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive));
-  const rubbick = state.fighters?.find(f => f && (f.characterId === 'rubbick' || f.type === 'rubbick') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain')));
-  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && (f.domainActive || f.stolenDomainActive)).length > 1);
+  const gojo = state.fighters?.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive && f.hp > 0);
+  const sukuna = state.fighters?.find(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.type === 'sukuna') && f.domainActive && f.hp > 0);
+  const yuta = state.fighters?.find(f => f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta') && f.domainActive && f.hp > 0);
+  const mahito = state.fighters?.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive) && f.hp > 0);
+  const rubbick = state.fighters?.find(f => f && (f.characterId === 'rubbick' || f.type === 'rubbick') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain')) && f.hp > 0);
+  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && (f.domainActive || f.stolenDomainActive) && f.hp > 0).length > 1);
 
   domainUpdateTick++;
   
@@ -434,6 +432,7 @@ export function updateHybridEnvironment() {
   const updateRubbick = (domainUpdateTick % updateInterval === 0);
   const updateSukuna = (domainUpdateTick % updateInterval === Math.floor(updateInterval / 3));
   const updateYuta = (domainUpdateTick % updateInterval === Math.floor(updateInterval * 2 / 3));
+  const updateMahito = (domainUpdateTick % updateInterval === Math.floor(updateInterval / 2));
 
   if (gojo) {
     const data = getGojoDomainHybridData();
@@ -524,6 +523,13 @@ export function updateHybridEnvironment() {
     }
     rubbickDomainHybridData.sprite.mask = null;
     rubbickDomainHybridData.sprite.parent.removeChild(rubbickDomainHybridData.sprite);
+    if (state.fighters) {
+      for (const f of state.fighters) {
+        if (f && (f.characterId === 'rubbick' || f.type === 'rubbick')) {
+          f._rubbickDomainHybridReady = false;
+        }
+      }
+    }
   }
 
   if (sukuna) {
@@ -593,6 +599,30 @@ export function updateHybridEnvironment() {
     data.sprite.y = 0;
     data.sprite.width = state.canvas.width;
     data.sprite.height = state.canvas.height;
+
+    if (state.arena) {
+      if (!yutaArenaMask) {
+        yutaArenaMask = new window.PIXI.Graphics();
+        layer.addChild(yutaArenaMask);
+      }
+      yutaArenaMask.clear();
+      yutaArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      const ww = arena.wallWidth || 0;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        yutaArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        yutaArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+      }
+      yutaArenaMask.endFill();
+      data.sprite.mask = yutaArenaMask;
+    } else if (data.sprite.mask) {
+      data.sprite.mask = null;
+    }
+
     if (updateYuta) {
       data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
       renderYutaDomainBackground(yuta, data.ctx, isMultiDomain && yuta !== state.fighters.find(f => f.domainActive));
@@ -601,8 +631,15 @@ export function updateHybridEnvironment() {
       }
       data.texture.update();
     }
-  } else if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent) {
-    yutaDomainHybridData.sprite.parent.removeChild(yutaDomainHybridData.sprite);
+  } else {
+    if (yutaArenaMask && yutaArenaMask.parent) {
+      yutaArenaMask.parent.removeChild(yutaArenaMask);
+      yutaArenaMask = null;
+    }
+    if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent) {
+      yutaDomainHybridData.sprite.mask = null;
+      yutaDomainHybridData.sprite.parent.removeChild(yutaDomainHybridData.sprite);
+    }
   }
 
   if (mahito) {
@@ -612,11 +649,45 @@ export function updateHybridEnvironment() {
     data.sprite.y = 0;
     data.sprite.width = state.canvas.width;
     data.sprite.height = state.canvas.height;
-    data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-    renderMahitoDomainBackground(mahito, data.ctx, isMultiDomain && mahito !== state.fighters.find(f => f.domainActive));
-    data.texture.update();
-  } else if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent) {
-    mahitoDomainHybridData.sprite.parent.removeChild(mahitoDomainHybridData.sprite);
+
+    if (state.arena) {
+      if (!mahitoArenaMask) {
+        mahitoArenaMask = new window.PIXI.Graphics();
+        layer.addChild(mahitoArenaMask);
+      }
+      mahitoArenaMask.clear();
+      mahitoArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      const ww = arena.wallWidth || 0;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        mahitoArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        mahitoArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+      }
+      mahitoArenaMask.endFill();
+      data.sprite.mask = mahitoArenaMask;
+    } else if (data.sprite.mask) {
+      data.sprite.mask = null;
+    }
+
+    if (updateMahito || !mahito._mahitoDomainHybridReady) {
+      mahito._mahitoDomainHybridReady = true;
+      data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
+      renderMahitoDomainBackground(mahito, data.ctx, isMultiDomain && mahito !== state.fighters.find(f => f.domainActive));
+      data.texture.update();
+    }
+  } else {
+    if (mahitoArenaMask && mahitoArenaMask.parent) {
+      mahitoArenaMask.parent.removeChild(mahitoArenaMask);
+      mahitoArenaMask = null;
+    }
+    if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent) {
+      mahitoDomainHybridData.sprite.mask = null;
+      mahitoDomainHybridData.sprite.parent.removeChild(mahitoDomainHybridData.sprite);
+    }
   }
 
   // Enforce deterministic domain Z-order sorting:
@@ -947,7 +1018,7 @@ export function updateHybridCronospheres() {
   const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
   
   for (const fighter of allEntities) {
-    if (!fighter || !fighter.sphereActive) continue;
+    if (!fighter || !fighter.sphereActive || fighter.hp <= 0) continue;
     
     const id = fighter.id;
     currentIds.add(id);

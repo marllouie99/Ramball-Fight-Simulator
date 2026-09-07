@@ -288,14 +288,16 @@ export function renderGame() {
             if (state.pixiLayers.effects) state.pixiLayers.effects.mask = state._darkDimMask;
             const hasActiveDomainOrUltimate = Boolean(
               state.fighters && state.fighters.some(f =>
-                f && (
+                f && f.hp > 0 && (
                   f.domainActive || 
+                  f.stolenDomainActive ||
                   f._mahitoDomainActive || 
                   (f.characterId === 'toji' && f.ultimateActive) ||
                   (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive)) ||
                   (f.characterId === 'ichigo' && (f.isChannelingBankai || (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) || (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0))) ||
                   (f.characterId === 'saitama' && f._counterPunchTimer > 0) ||
-                  (f.characterId === 'nanami' && f.ratioHitPauseTimer > 0)
+                  (f.characterId === 'nanami' && f.ratioHitPauseTimer > 0) ||
+                  (f.characterId === 'todo' && (f.isTakadaUltActive || f.isTakadaChanneling))
                 )
               )
             );
@@ -318,7 +320,7 @@ export function renderGame() {
         drawRubbickDomainDimScreen(); // Dark cosmic emerald green dim overlay when Rubbick's stolen Unlimited Void domain is active (full-screen, unclipped)
         drawSukunaDomainDimScreen(); // Dark crimson dim overlay when Sukuna's Malevolent Shrine domain is active (full-screen, unclipped)
         drawYutaDomainDimScreen(); // Dark cursed purple dim overlay when Yuta's domain is active (full-screen, unclipped)
-        drawMahitoDomainDimScreen(); // Dark teal dim overlay when Mahito's Self-Embodiment of Perfection domain is active (full-screen, unclipped)
+        drawMahitoDomainDimScreen(); // Dark cursed purple dim overlay when Mahito's Self-Embodiment of Perfection domain is active (full-screen, unclipped)
         drawMahoragaAdaptationDimScreen();
         drawMahoragaLevel8DimScreen();
         drawTojiUltimateOverlay();
@@ -342,7 +344,7 @@ export function renderGame() {
         state.ctx.save();
         applyCameraToCtx(state.ctx);
 
-        const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (
+        const isGojoDomainActive = state.fighters && state.fighters.some(f => f && f.hp > 0 && (
           ((f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive) ||
           ((f.type === 'rubbick' || f.characterId === 'rubbick') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain')))
         ));
@@ -366,7 +368,7 @@ export function renderGame() {
         // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) on top of the arena border & floor, but behind fighters
         if (state.fighters) {
           for (const f of state.fighters) {
-            if (f && f.domainActive && typeof f.drawDomainForeground === 'function') {
+            if (f && f.hp > 0 && (f.domainActive || f.stolenDomainActive) && typeof f.drawDomainForeground === 'function') {
               f.drawDomainForeground(state.ctx);
             }
           }

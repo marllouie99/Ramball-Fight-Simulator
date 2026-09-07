@@ -971,6 +971,53 @@ export class MahitoFighter extends Fighter {
   }
 
   /**
+   * Notified whenever Mahito successfully deals damage to any entity.
+   * Drives the vampiric Soul Lifesteal mechanic inside Domain Expansion.
+   */
+  onDamageDealt(target, projectile, ownerIndex, damageAmount) {
+    super.onDamageDealt(target, projectile, ownerIndex, damageAmount);
+    if (this.domainActive && damageAmount > 0) {
+      this.applyDomainLifesteal(damageAmount, target);
+    }
+  }
+
+  /**
+   * Applies vampiric soul lifesteal HP recovery while Self-Embodiment of Perfection domain is active.
+   */
+  applyDomainLifesteal(damageDealt, target = null) {
+    if (!this.domainActive || this.hp <= 0 || this.isDead || damageDealt <= 0) return;
+    const domCfg = CONFIG.mahito?.domainExpansion || {};
+    if (domCfg.enableDomainLifesteal === false) return;
+    const lifestealPercent = (domCfg.lifestealPercent !== undefined) ? domCfg.lifestealPercent : 0.50;
+    if (lifestealPercent <= 0) return;
+
+    const healAmount = damageDealt * lifestealPercent;
+    if (healAmount <= 0) return;
+
+    const healed = this.heal(healAmount, { color: '#00FF66' });
+    if (healed) {
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (!this._lastDomainLifestealTextTime || now - this._lastDomainLifestealTextTime >= 180) {
+        this._lastDomainLifestealTextTime = now;
+        spawnFloatingText(this.x + (Math.random() - 0.5) * 16, (this.y - (this.z || 0)) - this.r - 22, `+${Math.round(healAmount)} SOUL HEAL`, '#D946EF');
+      }
+
+      if (typeof triggerHudHealBubble === 'function') {
+        const myIdx = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+        if (myIdx >= 0) triggerHudHealBubble(myIdx, healAmount);
+      }
+
+      // Luminous cursed energy / soul absorption particles to Mahito
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(this.x, this.y, '#D946EF', 4);
+      }
+      if (target && typeof spawnMahitoSoulBubbles === 'function') {
+        spawnMahitoSoulBubbles(target.x, target.y, 3);
+      }
+    }
+  }
+
+  /**
    * Draws Mahito's Domain Expansion (Self-Embodiment of Perfection) background arena overlay.
    */
   drawDomainBackground(ctx, isClashSecondary = false) {
@@ -1129,9 +1176,12 @@ export class MahitoFighter extends Fighter {
         applyTimeStop(duration) {
           this.timeStopTimer = Math.max(this.timeStopTimer || 0, duration);
         },
+        isStationarySkillActive() { return false; },
         isPerformingSkill() { return false; },
+        isChannelingSkill() { return false; },
         isCaughtInBeam() { return false; },
-        normalizeSpeed() {}
+        normalizeSpeed() {},
+        resumeMovement() {}
       };
       if (typeof state !== 'undefined' && state.illusions) {
         state.illusions.push(copy);

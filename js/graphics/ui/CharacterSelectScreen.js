@@ -81,7 +81,7 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
     ctx.font = 'bold 8.5px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    let nameStr = def.name;
+    let nameStr = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
     if (nameStr.length > 7) nameStr = nameStr.substring(0, 6) + '.';
     ctx.fillText(nameStr.toUpperCase(), cellX + cellW / 2, cellY + cellH - 3);
     
@@ -460,7 +460,7 @@ function drawFighterSelectModal() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 
-    let shortName = def.name;
+    let shortName = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
     if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
     ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
 
@@ -562,7 +562,12 @@ function drawFighterSelectModal() {
 
   // Champion Name
   ctx.fillStyle = '#ffffff';
-  ctx.font = '900 16px "Outfit", "Rajdhani", sans-serif';
+  let champNameFontSize = 16;
+  ctx.font = `900 ${champNameFontSize}px "Outfit", "Rajdhani", sans-serif`;
+  while (ctx.measureText(selectedDef.name.toUpperCase()).width > (detailW - 16) && champNameFontSize > 10) {
+    champNameFontSize--;
+    ctx.font = `900 ${champNameFontSize}px "Outfit", "Rajdhani", sans-serif`;
+  }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 114);

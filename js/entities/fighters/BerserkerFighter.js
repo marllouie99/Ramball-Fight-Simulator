@@ -143,15 +143,6 @@ export class BerserkerFighter extends Fighter {
     opponent.takeDamage(damage, this, { isMelee: true });
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#8b0000');
 
-    // IMPACT EFFECTS: Screen shake + sparks
-    const shakeIntensity = this.isInRage ? 8 : 5;
-    this.axeHitShakeX = (Math.random() - 0.5) * shakeIntensity;
-    this.axeHitShakeY = (Math.random() - 0.5) * shakeIntensity;
-    this.axeHitShakeTimer = 8;
-    
-    // Global arena shake
-    triggerGlobalScreenShake(this.isInRage ? 12 : 8, 8);
-
     // Spawn sparks at impact point
     const sparkCount = this.isInRage ? 15 : 10;
     spawnSparks(opponent.x, opponent.y, sparkCount, this.isInRage ? 'crimson' : 'flash');

@@ -256,14 +256,16 @@ export function firePurple(fighter, ownerIndex) {
     }
   }
 
-  // Breather removed per user request: Gojo lands immediately and can freely move/act
-  fighter.purpleRecoveryTimer = 0;
-  fighter.purpleRecoveryMaxTimer = 0;
-  fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1500;
+  // Post-fire Purple Breather Recovery Stasis (Gojo pauses to catch his breath while purple orb travels)
+  const recoveryDuration = CONFIG.gojo?.purpleRecoveryDuration || 120;
+  fighter.purpleRecoveryTimer = recoveryDuration;
+  fighter.purpleRecoveryMaxTimer = recoveryDuration;
+  fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1200;
   fighter.shootCooldown = fighter.shootCooldownMax ?? 60; // Reset basic attack cooldown so it resumes cleanly once purple expires
-  fighter.z = 0; // Return to ground immediately
+  fighter.vx = 0;
+  fighter.vy = 0;
 
-  // Ensure Limitless Infinity barrier is active in Ranged mode
+  // Ensure Limitless Infinity barrier is active during breather recovery in Ranged mode
   fighter.infinityCooldown = 0;
   fighter.infinityActive = true;
   fighter.infinityActiveTimer = 0;

@@ -81,28 +81,6 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
   ctx.beginPath();
   ctx.roundRect(barX, barY, barW * hpRatio, barH, 4);
   ctx.fill();
-
-  if (state.mode === 'FFA' && typeof fighterIndex === 'number') {
-    const winCount = state.scores[fighterIndex] || 0;
-    const maxWins = 2;
-    const bulletSize = 8;
-    const bulletGap = 8;
-    const totalWidth = maxWins * bulletSize + (maxWins - 1) * bulletGap;
-    const startX = alignRight ? px + panelW - padding - totalWidth : px + padding;
-    const bulletY = y + panelH - 14;
-
-    for (let i = 0; i < maxWins; i += 1) {
-      const bulletX = startX + i * (bulletSize + bulletGap) + bulletSize / 2;
-      const filled = i < winCount;
-      ctx.beginPath();
-      ctx.arc(bulletX, bulletY, bulletSize / 2, 0, Math.PI * 2);
-      ctx.fillStyle = filled ? fighter.color : 'transparent';
-      ctx.fill();
-      ctx.strokeStyle = filled ? fighter.color : 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-  }
 }
 
 function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamName) {

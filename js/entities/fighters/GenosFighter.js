@@ -1204,6 +1204,7 @@ export class GenosFighter extends Fighter {
         if (typeof spawnFloatingText === 'function') {
           spawnFloatingText(this.x, this.y - this.r - 24, "SYSTEMS REBOOTED!", "#00FFDD");
         }
+        this.resumeMovement(opponent);
         }
       }
       return; // Stop movement & attacks during breather recovery!
@@ -1774,6 +1775,7 @@ export class GenosFighter extends Fighter {
           if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.caughtInGenosFlurry = false; });
         }
         this.flurryTarget = null;
+        this.resumeMovement(opponent);
       }
       return;
     }

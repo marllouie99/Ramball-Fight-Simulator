@@ -23,6 +23,7 @@ import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunc
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
+import { clearFighterDomain } from '../systems/domainSystem.js';
 
 /**
  * Returns true if the entity is currently hit by, dragged by, or suppressed by Getsuga Tensho.
@@ -31,7 +32,17 @@ export function isSuppressedByGetsuga(fighter) {
   if (!fighter) return false;
   return Boolean(
     fighter.isDraggedByGetsuga ||
-    (fighter._hitByGetsugaTimer && fighter._hitByGetsugaTimer > 0)
+    (fighter._hitByGetsugaTimer && fighter._hitByGetsugaTimer > 0) ||
+    (fighter._hitByFugaTimer && fighter._hitByFugaTimer > 0) ||
+    (fighter._hitByDivineFlameTimer && fighter._hitByDivineFlameTimer > 0)
+  );
+}
+
+export function isSuppressedByFuga(fighter) {
+  if (!fighter) return false;
+  return Boolean(
+    (fighter._hitByFugaTimer && fighter._hitByFugaTimer > 0) ||
+    (fighter._hitByDivineFlameTimer && fighter._hitByDivineFlameTimer > 0)
   );
 }
 
@@ -61,6 +72,17 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects on any target
   if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !target.isTurret && !target.isDispenser) {
     suppressAfterimagesAndAttackEffects(target);
+  }
+
+  // Fuga / Divine Flame hit reaction: immediately suppress afterimages and active attack effects on any target
+  if ((opts.isDivineFlame || opts.isFuga || (opts.projectile && (opts.projectile.isSukunaFurnace || opts.projectile.behaviorType === 'sukuna_furnace'))) && !target.isTurret && !target.isDispenser) {
+    if (typeof target.suppressCombatAndVisuals === 'function') {
+      target.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+    } else {
+      if (typeof target.clearAllAfterimages === 'function') target.clearAllAfterimages();
+      if (typeof target.clearAllAttackEffects === 'function') target.clearAllAttackEffects();
+      target._hitByFugaTimer = Math.max(target._hitByFugaTimer || 0, 45);
+    }
   }
 
   if (typeof attacker === 'number' && typeof state !== 'undefined' && state.fighters) {
@@ -171,7 +193,7 @@ export class Fighter {
     
     const sizeMult = CONFIG.globalFighter?.sizeMultiplier ?? 1.0;
     const internalScale = CONFIG.internalScale ?? 1.0;
-    this.r = def.radius * sizeMult * internalScale;
+    this.r = (def.radius ?? 25) * sizeMult * internalScale;
     this.aimbot = def.aimbot || false;
     this.maxHp = def.hp || 100;
     this.damage = def.damage || 10;
@@ -262,10 +284,12 @@ export class Fighter {
   /** Check if another fighter/entity is on the same team. */
   isTeammate(other) {
     if (!other || other === this) return false;
-    if (this.team !== undefined && other.team !== undefined && this.team === other.team) return true;
+    const resolvedOther = other.owner || other;
+    if (resolvedOther === this) return true;
+    if (this.team !== undefined && resolvedOther.team !== undefined && this.team === resolvedOther.team) return true;
     if (typeof state !== 'undefined' && state && typeof state.getFighterTeam === 'function' && state.fighters) {
       const myIdx = state.fighters.indexOf(this);
-      const otherIdx = state.fighters.indexOf(other);
+      const otherIdx = state.fighters.indexOf(resolvedOther);
       if (myIdx !== -1 && otherIdx !== -1) {
         const myTeam = state.getFighterTeam(myIdx);
         const otherTeam = state.getFighterTeam(otherIdx);
@@ -378,6 +402,10 @@ export class Fighter {
     this.paralyzeTimer = 0;
     this.isParalyzedByMahito = false;
     this.isGrabbedByMahoraga = false;
+    this.invincibilityTimer = 0;
+    this.vanishTimer = 0;
+    this.evadeBuffTimer = 0;
+    this.flashStepTimer = 0;
 
     this.damageDealt = 0;
     this.damageReceived = 0;
@@ -417,6 +445,8 @@ export class Fighter {
     if (this.isTargetOfAmbush) return true;
     if (this.isCaughtInTelekinesis) return true;
     if (this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0)) return true;
+    if (this._hitByFugaTimer && this._hitByFugaTimer > 0) return true;
+    if (this._hitByDivineFlameTimer && this._hitByDivineFlameTimer > 0) return true;
     if (this.timeStopTimer && this.timeStopTimer > 0) return true;
     if (this.paralyzeTimer && this.paralyzeTimer > 0) return true;
     if (this.electricStunTimer && this.electricStunTimer > 0) return true;
@@ -602,6 +632,7 @@ export class Fighter {
     this.sphereActive = false;
     this.hideFrontHand = false;
     this.hideBackHand = false;
+    this._stationaryStallFrames = 0;
   }
 
   /**
@@ -612,6 +643,9 @@ export class Fighter {
   suppressCombatAndVisuals(options = {}) {
     if (options.isGetsuga) {
       this._hitByGetsugaTimer = Math.max(this._hitByGetsugaTimer || 0, options.timer || 24);
+    }
+    if (options.isDivineFlame || options.isFuga) {
+      this._hitByFugaTimer = Math.max(this._hitByFugaTimer || 0, options.timer || 45);
     }
     if (options.paralyzeDuration) {
       this.paralyzeTimer = Math.max(this.paralyzeTimer || 0, options.paralyzeDuration);
@@ -646,7 +680,6 @@ export class Fighter {
       this.caughtInPureLoveBeam ||
       this.wasCaughtInPureLoveBeam ||
       (this.pureLoveBeamTimer || 0) > 0 ||
-      (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
       (this.caughtInGenosBeamTimer || 0) > 0 ||
       this.caughtInGenosBeam ||
       this.caughtInGenosFlurry ||
@@ -668,6 +701,147 @@ export class Fighter {
 
   applyParalyze(frames) {
     this.statusEffects.applyParalyze(frames);
+  }
+
+  /**
+   * Evaluates whether this entity is actively engaged in a stationary skill channeling or casting state.
+   * NOTE: This explicitly excludes persistent transformation or mode buffs (e.g. Bankai, Storm Mode,
+   * Unlimited Void domain buff, Awakenings) during which fighters are fully mobile.
+   * @returns {boolean}
+   */
+  isStationarySkillActive() {
+    if (this.isRika) {
+      return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
+    }
+    return !!(
+      this.isTypingCheat ||
+      this.isChannelingPureLoveBeam ||
+      this.isFiringPureLoveBeam ||
+      (this.pureLoveBeamChargeTimer && this.pureLoveBeamChargeTimer > 0) ||
+      (this.pureLoveBeamActiveTimer && this.pureLoveBeamActiveTimer > 0) ||
+      (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0) ||
+      (this.pureLoveBeamBreatherTimer && this.pureLoveBeamBreatherTimer > 0) ||
+      this.isCallingRika ||
+      (this.rikaEmergenceTimer && this.rikaEmergenceTimer > 0) ||
+      this.isChannelingThinIceBreaker ||
+      (this.thinIceBreakerChargeTimer && this.thinIceBreakerChargeTimer > 0) ||
+      (this.thinIceBreakerPunchTimer && this.thinIceBreakerPunchTimer > 0) ||
+      this.isChannelingPurple ||
+      this.isChargingPurple ||
+      this.isFiringPurple ||
+      this.isCastingRed ||
+      this.isCastingBlue ||
+      this.redBuildupPhase ||
+      this.blueBuildupPhase ||
+      (this.purpleChargeTimer && this.purpleChargeTimer > 0) ||
+      (this.purpleRecoveryTimer && this.purpleRecoveryTimer > 0) ||
+      (this.redEffectTimer && this.redEffectTimer > 0) ||
+      this.isChannelingDivineFlame ||
+      this.isChargingFuga ||
+      this.isFiringFuga ||
+      (this.divineFlameChargeTimer && this.divineFlameChargeTimer > 0) ||
+      (this.divineFlameRecoveryTimer && this.divineFlameRecoveryTimer > 0) ||
+      this.isChannelingDomainExpansion ||
+      this.isChannelingDomain ||
+      (this.domainChargeTimer && this.domainChargeTimer > 0) ||
+      (this.domainChannelTimer && this.domainChannelTimer > 0) ||
+      this.isChannelingRCT ||
+      (this.rctChannelTimer && this.rctChannelTimer > 0) ||
+      this.isChannelingGetsuga ||
+      (this.getsugaChargeTimer && this.getsugaChargeTimer > 0) ||
+      (this.getsugaRecoveryTimer && this.getsugaRecoveryTimer > 0) ||
+      (this.getsugaSlideTimer && this.getsugaSlideTimer > 0) ||
+      this.isChannelingBankai ||
+      (this.bankaiChargeTimer && this.bankaiChargeTimer > 0) ||
+      (this.bankaiBurstTimer && this.bankaiBurstTimer > 0) ||
+      (this.hollowMaskFormationTimer && this.hollowMaskFormationTimer > 0) ||
+      (this.hollowBurstTimer && this.hollowBurstTimer > 0) ||
+      this._hollowVoicelineWait ||
+      (this.shikaiReversionBurstTimer && this.shikaiReversionBurstTimer > 0) ||
+      this.isShunpoDashing ||
+      this.shunpoComboActive ||
+      this.isShunpoDisengaging ||
+      (this.shunpoComboDelayTimer && this.shunpoComboDelayTimer > 0) ||
+      (this.shunpoDisengageDelayTimer && this.shunpoDisengageDelayTimer > 0) ||
+      this.skillCharging ||
+      (this.skillChargeTimer && this.skillChargeTimer > 0) ||
+      (this.beamTimer && this.beamTimer > 0) ||
+      this.isFlurrying ||
+      (this.flurryHitsLeft && this.flurryHitsLeft > 0) ||
+      (this.rapidSlashHitsLeft && this.rapidSlashHitsLeft > 0) ||
+      this.isChargingSeriousPunch ||
+      this.isSideHopping ||
+      (this.seriousPunchChargeTimer && this.seriousPunchChargeTimer > 0) ||
+      (this.basicPunchChargeTimer && this.basicPunchChargeTimer > 0) ||
+      this.isCountering ||
+      (this._counterPunchTimer && this._counterPunchTimer > 0) ||
+      (this._counterWindupTimer && this._counterWindupTimer > 0) ||
+      (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) ||
+      this.isAmbushing ||
+      this.isChargingUlt ||
+      this.isFiringUlt ||
+      (this.ultimateChargeTimer && this.ultimateChargeTimer > 0) ||
+      (this.stolenWindUpTimer && this.stolenWindUpTimer > 0) ||
+      (this.fleshSurgeAnimTimer && this.fleshSurgeAnimTimer > 0) ||
+      (this.twinScissorAnimTimer && this.twinScissorAnimTimer > 0) ||
+      (this.maceCannonAnimTimer && this.maceCannonAnimTimer > 0) ||
+      this.isTakadaChanneling ||
+      (this.takadaChannelTimer && this.takadaChannelTimer > 0) ||
+      (this.rockCounterComboLeft && this.rockCounterComboLeft > 0) ||
+      (this.comboHitsLeft && this.comboHitsLeft > 0) ||
+      this.isDrawingBow ||
+      (this.arrowDrawTimer && this.arrowDrawTimer > 0) ||
+      this.isPlantedPause ||
+      this.isSkywardWindup ||
+      this.isSkywardAscending ||
+      this.isLichtRegenActive ||
+      (this.ceroTimer && this.ceroTimer > 0) ||
+      (this.lanzaTimer && this.lanzaTimer > 0) ||
+      (this.spiderwebChannelTimer && this.spiderwebChannelTimer > 0) ||
+      (this.incinerateChargeTimer && this.incinerateChargeTimer > 0) ||
+      (this.machineGunFlurryTimer && this.machineGunFlurryTimer > 0) ||
+      (this.machineGunBlowTimer && this.machineGunBlowTimer > 0) ||
+      this.isIncinerating
+    );
+  }
+
+  /** Alias / compatibility wrapper pointing to authoritative isStationarySkillActive. */
+  isPerformingSkill() {
+    return this.isStationarySkillActive();
+  }
+
+  /** Alias / compatibility wrapper pointing to authoritative isStationarySkillActive. */
+  isChannelingSkill() {
+    return this.isStationarySkillActive();
+  }
+
+  /**
+   * Universally resumes movement by computing an immediate directional velocity vector.
+   * Should be invoked on skill completion, flurry end, counter release, and CC recovery.
+   * @param {Object} [target] - Target entity to orient toward
+   * @param {number} [speedMultiplier=1.0] - Speed modifier
+   * @param {number} [forcedAngle=null] - Explicit directional angle override
+   */
+  resumeMovement(target = null, speedMultiplier = 1.0, forcedAngle = null) {
+    if (this.hp <= 0 || this.isDead) return;
+    this._stationaryStallFrames = 0;
+
+    let moveAngle;
+    if (forcedAngle !== null && forcedAngle !== undefined && !Number.isNaN(forcedAngle)) {
+      moveAngle = forcedAngle;
+    } else if (target && typeof target.x === 'number' && typeof target.y === 'number' && !Number.isNaN(target.x)) {
+      moveAngle = Math.atan2(target.y - this.y, target.x - this.x);
+    } else if (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) {
+      moveAngle = this.gunAngle;
+    } else if (this.angle !== undefined && !Number.isNaN(this.angle)) {
+      moveAngle = this.angle;
+    } else {
+      moveAngle = Math.random() * Math.PI * 2;
+    }
+
+    const targetSpeed = Math.max(0.5, (this.speed || 3.0) * speedMultiplier);
+    this.vx = Math.cos(moveAngle) * targetSpeed;
+    this.vy = Math.sin(moveAngle) * targetSpeed;
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -729,9 +903,6 @@ export class Fighter {
     this.swipeActive = false;
     this.swipeTimer = 0;
 
-    // Cronos
-    this.sphereActive = false;
-
     // Ruby
     this.flameActive = false;
 
@@ -764,7 +935,42 @@ export class Fighter {
     this.isChannelingPurple = false;
     this.purpleChargeTimer = 0;
     this.redEffectTimer = 0;
-    this.shootCooldown = 60;
+    // Saitama
+    this.seriousPunchChargeTimer = 0;
+    this.basicPunchChargeTimer = 0;
+    if (forceCancelAll || this.hp <= 0 || !this.isCountering) {
+      this._counterPunchTimer = 0;
+      this._postCounterRecoveryTimer = 0;
+      this.isCountering = false;
+    }
+
+    // Yuta / Rika
+    this.isChannelingPureLoveBeam = false;
+    this.isFiringPureLoveBeam = false;
+    this.pureLoveBeamChargeTimer = 0;
+    this.pureLoveBeamBreatherTimer = 0;
+    this.isCallingRika = false;
+    this.rikaEmergenceTimer = 0;
+    this.thinIceBreakerChargeTimer = 0;
+    this.thinIceBreakerPunchTimer = 0;
+
+    // Todo
+    this.isTakadaChanneling = false;
+    this.takadaChannelTimer = 0;
+    this.rockCounterComboLeft = 0;
+    this.rockCounterComboTarget = null;
+    this.clapWindupTimer = 0;
+    this.clapAnimTimer = 0;
+
+    // Ichigo / Uryu
+    this.getsugaChargeTimer = 0;
+    this.getsugaRecoveryTimer = 0;
+    this.arrowDrawTimer = 0;
+    this.isPlantedPause = false;
+    this.isSkywardWindup = false;
+    this.isSkywardAscending = false;
+
+    this._stationaryStallFrames = 0;
 
     // Basic attack animation timers:
     // Only zero them on hard cancel (e.g. onDeath, hard CC stun/freeze), but let them complete follow-through on kill / match win!
@@ -803,7 +1009,12 @@ export class Fighter {
 
   applyKnockback(vx, vy, stunFrames = 0) {
     if (this.isTurret || this.isDispenser || this.isAmbushing) return;
-    if (this.timeStopTimer > 0 || this._frozenByCronosSphere || this.isInsideCronosSphere()) {
+    if (this.isCountering || (this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0)) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere())) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.vx = 0;
@@ -881,18 +1092,12 @@ export class Fighter {
 
     if (this.areAttackEffectsSuppressed()) {
       if (this._hitByGetsugaTimer > 0) this._hitByGetsugaTimer--;
+      if (this._hitByFugaTimer > 0) this._hitByFugaTimer--;
+      if (this._hitByDivineFlameTimer > 0) this._hitByDivineFlameTimer--;
       this.clearAllAfterimages();
     }
-    if (this.pureLoveBeamRecoveryTimer > 0) {
-      if (this.adaptedPureLoveBeam) {
-        this.pureLoveBeamRecoveryTimer = 0;
-      } else {
-        this.pureLoveBeamRecoveryTimer--;
-        // Heavy slow instead of full freeze — enemy is slowed during recovery but can move and recover
-        const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.20;
-        this.vx *= slowMult;
-        this.vy *= slowMult;
-      }
+    if (this.pureLoveBeamRecoveryTimer > 0 && this.adaptedPureLoveBeam) {
+      this.pureLoveBeamRecoveryTimer = 0;
     }
     if (this.isParalyzedByMahoraga || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isWallSlammed) {
       if (this.wallSlamPinnedX !== undefined && this.wallSlamPinnedY !== undefined) {
@@ -956,55 +1161,6 @@ export class Fighter {
     return isFrozen;
   }
 
-  isPerformingSkill() {
-    if (this.isRika) {
-      return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
-    }
-    return !!(
-      this.isAmbushing ||
-      this.ultimateActive ||
-      this.isChargingUlt ||
-      this.isFiringUlt ||
-      this.isFlurrying ||
-      this.isDashing ||
-      this.isCharging ||
-      this.isChargingPurple ||
-      this.isFiringPurple ||
-      this.isCastingRed ||
-      this.isCastingBlue ||
-      this.isChargingFuga ||
-      this.isFiringFuga ||
-      this.isChargingSeriousPunch ||
-      this.isSideHopping ||
-      this.isChannelingDomain ||
-      this.isChannelingDomainExpansion ||
-      this.isChannelingDivineFlame ||
-      this.isChannelingPurple ||
-      this.isChannelingRCT ||
-      this.isChannelingStorm ||
-      this.isChanneling ||
-      this.redBuildupPhase ||
-      this.blueBuildupPhase ||
-      this.meleeSwingActive ||
-      this.scytheSwingActive ||
-      this.swipeActive ||
-      this.axeSwingActive ||
-      this.flameActive ||
-      this.beamActive ||
-      this.skillActive ||
-      (this.flurryHitsLeft > 0) ||
-      (this.rapidSlashHitsLeft > 0) ||
-      (this.dashTimer > 0) ||
-      (this.ultTimer > 0) ||
-      (this.flurryTimer > 0) ||
-      (this.purpleChargeTimer > 0) ||
-      (this.redEffectTimer > 0) ||
-      (this.domainChargeTimer > 0) ||
-      (this.ultimateChargeTimer > 0) ||
-      this.isChannelingDivineFlame ||
-      (this.thinIceBreakerChargeTimer > 0)
-    );
-  }
 
   applyPoison(attacker) {
     this.statusEffects.applyPoison(attacker);
@@ -1019,6 +1175,7 @@ export class Fighter {
   }
 
   onDeath() {
+    clearFighterDomain(this, typeof state !== 'undefined' ? state : null);
     this.interruptAttacks(true);
     this.hitFlashTimer = 0; // Clear residual white hit-flash so corpses don't render white
 
@@ -1074,7 +1231,6 @@ export class Fighter {
     if (this.isParalyzedDebuffActive()) {
       return; // Global Paralyze Rule: Freeze ALL skill cooldowns while afflicted with any paralyze debuff!
     }
-    if (this.vanishTimer > 0) this.vanishTimer--;
     // Universal helper to ensure skill and ultimate cooldowns continue counting down
     // when not paralyzed or in cognitive domain
     for (const key in this) {
@@ -1112,9 +1268,15 @@ export class Fighter {
     if (this.pureLoveBeamRegenDebuffTimer > 0) {
       this.pureLoveBeamRegenDebuffTimer--;
     }
+    if (this.pureLoveBeamRecoveryTimer > 0) {
+      this.pureLoveBeamRecoveryTimer--;
+    }
     if (this.tojiRegenDebuffTimer > 0) {
       this.tojiRegenDebuffTimer--;
     }
+    if (this._hitByGetsugaTimer > 0) this._hitByGetsugaTimer--;
+    if (this._hitByFugaTimer > 0) this._hitByFugaTimer--;
+    if (this._hitByDivineFlameTimer > 0) this._hitByDivineFlameTimer--;
     if (this.hitStunTimer > 0) this.hitStunTimer--;
     if (this.caughtInLaserBeamTimer > 0) this.caughtInLaserBeamTimer--;
     if (this.caughtInLaylaBeamTimer > 0) this.caughtInLaylaBeamTimer--;
@@ -1134,6 +1296,9 @@ export class Fighter {
     if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
     if (this.evadeBuffTimer > 0) this.evadeBuffTimer--;
     if (this.nanamiArmorFractureTimer > 0) this.nanamiArmorFractureTimer--;
+    if (this.vanishTimer > 0) this.vanishTimer--;
+    if (this.invincibilityTimer > 0) this.invincibilityTimer--;
+    if (this.flashStepTimer > 0) this.flashStepTimer--;
     
     // Knockback Stun: Disable AI steering velocity during knockback so ricochet executes cleanly
     if (this.knockbackStunTimer > 0) {
@@ -1238,7 +1403,7 @@ export class Fighter {
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
     this._lastKnockbackFrame = currentFrame;
 
-    if (this.timeStopTimer > 0 || this._frozenByCronosSphere || this.isInsideCronosSphere()) {
+    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere())) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.vx = 0;
@@ -1338,15 +1503,53 @@ export class Fighter {
     }
   }
 
+  /**
+   * Universally resumes or assigns directional movement velocity to this fighter.
+   * Can be called whenever a skill, flurry, channel, domain, or counter concludes.
+   * @param {object|null} target - Enemy or aim target to steer toward
+   * @param {number} speedMultiplier - Speed multiplier to apply (default 1.0)
+   * @param {number|null} forcedAngle - Explicit angle in radians if provided
+   */
+  resumeMovement(target = null, speedMultiplier = 1.0, forcedAngle = null) {
+    if (this.hp <= 0 || this.isDead) return;
+    this._stationaryStallFrames = 0;
+    const baseSpeed = (this.speed || 3.5) * speedMultiplier;
+    let angle = forcedAngle;
+    if (angle === null || angle === undefined) {
+      if (target && !target.isDead && target.hp > 0) {
+        angle = Math.atan2(target.y - this.y, target.x - this.x);
+      } else if (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) {
+        angle = this.gunAngle;
+      } else if (this.angle !== undefined && !Number.isNaN(this.angle)) {
+        angle = this.angle;
+      } else {
+        angle = Math.random() * Math.PI * 2;
+      }
+    }
+    this.vx = Math.cos(angle) * baseSpeed;
+    this.vy = Math.sin(angle) * baseSpeed;
+  }
+
   /** Centralized damage dealer and death/game over check.
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
   takeDamage(amount, attacker, opts = {}) {
-    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit));
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga));
 
     // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
     if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {
       suppressAfterimagesAndAttackEffects(this);
+    }
+
+    // Fuga / Divine Flame hit reaction: immediately suppress afterimages and active attack effects
+    if ((opts.isDivineFlame || opts.isFuga || (opts.projectile && (opts.projectile.isSukunaFurnace || opts.projectile.behaviorType === 'sukuna_furnace'))) && !this.isTurret && !this.isDispenser) {
+      if (typeof this.suppressCombatAndVisuals === 'function') {
+        this.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+      } else {
+        if (typeof this.clearAllAfterimages === 'function') this.clearAllAfterimages();
+        if (typeof this.clearAllAttackEffects === 'function') this.clearAllAttackEffects();
+        this._hitByFugaTimer = Math.max(this._hitByFugaTimer || 0, 45);
+      }
     }
 
     const isHeal = opts.isHeal || amount < 0;
@@ -1497,7 +1700,7 @@ export class Fighter {
         }
       }
       // Apply physical directional knockback whenever taking hit damage
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isContinuous && !opts.isDomainDPS && !opts.isDomain && !opts.isDomainSlash && !opts.fromDomain && !opts.fromBlackHole && !this.isTurret && !this.isDispenser) {
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isDivineFlame && !opts.isContinuous && !opts.isDomainDPS && !opts.isDomain && !opts.isDomainSlash && !opts.fromDomain && !opts.fromBlackHole && !this.isTurret && !this.isDispenser) {
         let kbAngle = damageAngle;
         if (opts.projectile) {
           kbAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
@@ -2029,35 +2232,7 @@ export class Fighter {
    * Central single source of truth across all fighter archetypes.
    */
   isChannelingSkill() {
-    if (this.isChannelingDivineFlame) return true;
-    if (this.isSpiderwebChanneling || (this.spiderwebChannelTimer > 0)) return true;
-    if (this.isChannelingDomainExpansion || this.isChannelingDomain || (this.domainChargeTimer > 0) || (this.domainChannelTimer > 0) || this.isDomainPreSlide || (this.domainPreSlideTimer > 0)) return true;
-    if (this.isChannelingPurple || (this.purpleChargeTimer > 0) || (this.purpleRecoveryTimer > 0) || (this.purpleRetreatTimer > 0)) return true;
-    if (this.isChannelingRCT || (this.rctChannelTimer > 0)) return true;
-    if ((this.redEffectTimer || 0) > 0 || this.redBuildupPhase) return true;
-    if (this.isChannelingPureLoveBeam || (this.pureLoveBeamChargeTimer > 0) || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return true;
-    if (this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0)) return true;
-    if (this.isCallingRika || (this.rikaEmergenceTimer > 0) || (typeof this.isSummoningRika === 'function' && this.isSummoningRika())) return true;
-    if (this.isChannelingGetsuga || (this.getsugaChargeTimer > 0) || (this.getsugaRecoveryTimer > 0)) return true;
-    if (this.isChannelingBankai || (this.bankaiChargeTimer > 0)) return true;
-    if ((this.hollowMaskFormationTimer || 0) > 0 || (this.hollowBurstTimer || 0) > 0 || (this.bankaiBurstTimer || 0) > 0 || (this.shikaiReversionBurstTimer || 0) > 0) return true;
-    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || (this.ultTimer > 0 && (this.isChargingUlt || this.isFiringUlt))) return true;
-    if (this.isUltimateCharging || this.isUltimateFiring || (this.ultimateFireTimer > 0) || this.ultimatePhase === 'CHANNELING') return true;
-    if (this.isChargingStorm || this.stormActive) return true;
-    if (this.isChargingSeriousPunch || (this.seriousPunchChargeTimer > 0) || (this.basicPunchChargeTimer > 0) || (this._counterWindupTimer > 0) || (this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer > 0) || this.isCountering) return true;
-    if (this.isTakadaChanneling || (this.takadaChannelTimer > 0) || this.isTakadaUltActive) return true;
-    if ((this.stolenWindUpTimer || 0) > 0) return true;
-    if ((this.beamCharge || 0) > 0 || (this.beamTimer || 0) > 0 || this.beamActive || this.isFiringBeam || (this.laylaBeamTimer > 0)) return true;
-    if ((this.fleshSurgeAnimTimer || 0) > 0 || (this.twinScissorAnimTimer || 0) > 0) return true;
-    if (this.isChannelingTelekinesis || (this.tkTimer || 0) > 0) return true;
-    if (this.isDrawingBow || (this.arrowDrawTimer > 0) || this.isHirenkyakuDashing || this.isPlantedPause || this.isSkywardWindup || this.isSkywardAscending || this.isLichtRegenActive || this.isDeployingSprenger) return true;
-    if (this.isChannelingMahoraga || (this.mahoragaChannelTimer > 0)) return true;
-    if (this.isResonating || this.isDetonatingHairpin || (this.resonanceChannelTimer > 0) || (this.hairpinChannelTimer > 0)) return true;
-    if (this.isChargingCero || (this.ceroTimer > 0) || this.isChargingLanza || (this.lanzaTimer > 0)) return true;
-    if (this.isFlurrying || (this.flurryHitsLeft > 0) || (this.flurrySlashTimer > 0) || (this.machineGunBlowTimer > 0)) return true;
-    if (this.isAmbushing || this.ambushPhase) return true;
-    if (this.activePullActive) return true;
-    return false;
+    return this.isStationarySkillActive();
   }
 
   /**
@@ -2243,6 +2418,11 @@ export class Fighter {
       this.hitStunTimer--;
       targetSpeed *= this.hitStunMultiplier;
     }
+    // Pure Love Beam post-beam recovery slow
+    if (this.pureLoveBeamRecoveryTimer > 0) {
+      const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.40;
+      targetSpeed *= slowMult;
+    }
     // Crimson electrified visual timer
     if (this.crimsonElectrifiedTimer > 0) {
       this.crimsonElectrifiedTimer--;
@@ -2261,13 +2441,45 @@ export class Fighter {
 
     // Velocity Recovery (gradually return to target speed after knockback or slow)
     let currentSpeed = Math.hypot(this.vx, this.vy);
-    // Auto-recover from zero velocity if we should be moving
-    if (targetSpeed > 0 && currentSpeed < 0.2) {
-      // Pick a neutral random drift angle so fighters do not accidentally home straight towards aimed targets
-      const nudgeAngle = Math.random() * Math.PI * 2;
-      this.vx = Math.cos(nudgeAngle) * targetSpeed * 0.5;
-      this.vy = Math.sin(nudgeAngle) * targetSpeed * 0.5;
-      currentSpeed = targetSpeed * 0.5;
+    const isStationaryState = (typeof this.isStationarySkillActive === 'function' && this.isStationarySkillActive()) ||
+                              (typeof this.isPerformingSkill === 'function' && this.isPerformingSkill()) || 
+                              (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) ||
+                              ((this.comboHitsLeft || 0) > 0) ||
+                              ((this.rockCounterComboLeft || 0) > 0);
+
+    // Auto-recover from zero velocity immediately when the fighter is supposed to be moving
+    if (!isStationaryState && targetSpeed > 0 && currentSpeed < 0.2) {
+      // Forward momentum along current aim angle or facing angle
+      const forwardAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (Math.random() * Math.PI * 2);
+      this.vx = Math.cos(forwardAngle) * targetSpeed;
+      this.vy = Math.sin(forwardAngle) * targetSpeed;
+      currentSpeed = targetSpeed;
+      this._stationaryStallFrames = 0;
+    }
+
+    // Fail-Safe Movement Stall Watchdog: Detect and unstick frozen/stalled movement
+    const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
+    const isUnderHardCC = (this.timeStopTimer > 0) ||
+                          (this.paralyzeTimer > 0) ||
+                          (this.electricStunTimer > 0) ||
+                          (this.dubstepStunTimer > 0) ||
+                          (this.isTargetOfAmbush) ||
+                          (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
+
+    if (isGamePlaying && this.hp > 0 && !this.isDead && !isUnderHardCC && currentSpeed < 0.2) {
+      this._stationaryStallFrames = (this._stationaryStallFrames || 0) + 1;
+      // If stalled motionless for >= 15 frames (~0.25s) without an actively ticking hard CC / channel
+      if (this._stationaryStallFrames >= 15) {
+        this._stationaryStallFrames = 0;
+        if (targetSpeed > 0) {
+          const moveAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (Math.random() * Math.PI * 2);
+          this.vx = Math.cos(moveAngle) * targetSpeed;
+          this.vy = Math.sin(moveAngle) * targetSpeed;
+          currentSpeed = targetSpeed;
+        }
+      }
+    } else {
+      this._stationaryStallFrames = 0;
     }
     
     if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
@@ -2334,22 +2546,23 @@ export class Fighter {
       this.interruptAttacks();
     }
 
+    // Decrement basic attack swing and punch animation follow-through timers
+    if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+    if (this.slashSwingTimer > 0) this.slashSwingTimer--;
+    if (this.spearSwingTimer > 0) this.spearSwingTimer--;
+    if (this.katanaSlashTimer > 0) this.katanaSlashTimer--;
+    if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
+    if (this.meleeSwingTimer > 0) this.meleeSwingTimer--;
+    if (this.attackSwingTimer > 0) this.attackSwingTimer--;
+    if (this.scytheSwingTimer > 0) this.scytheSwingTimer--;
+    if (this.swipeTimer > 0) this.swipeTimer--;
+    if (this.recoilTimer > 0) this.recoilTimer--;
+
     // Stop initiating NEW attacks if round/match has ended
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
     const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
 
     if (!isGamePlaying) {
-      // Allow in-progress basic attack swings and punches to smoothly finish their follow-through animations!
-      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
-      if (this.slashSwingTimer > 0) this.slashSwingTimer--;
-      if (this.spearSwingTimer > 0) this.spearSwingTimer--;
-      if (this.katanaSlashTimer > 0) this.katanaSlashTimer--;
-      if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
-      if (this.meleeSwingTimer > 0) this.meleeSwingTimer--;
-      if (this.attackSwingTimer > 0) this.attackSwingTimer--;
-      if (this.scytheSwingTimer > 0) this.scytheSwingTimer--;
-      if (this.swipeTimer > 0) this.swipeTimer--;
-      if (this.recoilTimer > 0) this.recoilTimer--;
       this.shootCooldown = 60;
       this.applyMovementPhysics();
       this.resolveWallBounce(arena, opponent);

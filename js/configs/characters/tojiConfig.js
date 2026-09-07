@@ -23,8 +23,8 @@ export const tojiConfig = {
 
   // Passive: Heavenly Restriction (Tenyo Jubaku)
   stealthDodgeChance: 0.35,          // Base chance (25%) to physically dodge incoming melee attacks, strikes & projectiles outside domains (displays "MISS!")
-  domainDodgeChance: 0.10,           // Increased chance (100%) to physically dodge when inside an enemy Domain Expansion (Heavenly Restriction 0 Cursed Energy stealth!)
-  domainDodgeBonus: 0.10,           // Bonus dodge rate added when inside an enemy domain
+  domainDodgeChance: 0.80,           // Increased chance (100%) to physically dodge when inside an enemy Domain Expansion (Heavenly Restriction 0 Cursed Energy stealth!)
+  domainDodgeBonus: 0.50,           // Bonus dodge rate added when inside an enemy domain
   parryChance: 0.10,                 // 10% chance to parry incoming strikes/projectiles with Inverted Spear
   parryAmbushCooldownFrames: 360,   // Cooldown (frames) before a parry triggers a 3-Stage Ambush inside enemy domains (360 frames = 6.0s)
   domainImmunity: true,              // Ignores all Domain Expansion effects completely
@@ -40,7 +40,7 @@ export const tojiConfig = {
   channelReactionFrames: 10,         // Delay in frames before Toji reacts to a channeled skill (10 frames = ~0.16s)
 
   // Primary Melee: Inverted Spear of Heaven (Amanosakahoko)
-  spearRange: 100,                    // Distance required to land melee hit (50px)
+  spearRange: 60,                    // Distance required to land melee hit (50px)
   spearCooldown: 75,                 // Spaced frames between basic melee strikes (0.92s swing)
   spearDamage: 15,                   // Base damage per swing
   spearKnockback: 2.5,               // Physical push velocity impulse on basic attack hit
@@ -73,13 +73,13 @@ export const tojiConfig = {
   ambushTargetFreezeDuration: 70,    // 1st Sequence: Target freeze duration (frames) applied upon successful back thrust hit
   ambushKatanaChargeDuration: 30,    // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
   ambushKatanaFreezeDuration: 70,    // 2nd Sequence: Target freeze duration (frames) for Katana execution
-  ambushKnockbackForce: 22,          // Moderate knockback force launching target cleanly across arena
-  ambushSpearThrustKnockback: 16,    // Crisp physical velocity impulse on Inverted Spear backstab
+  ambushKnockbackForce: 15,          // Massive knockback force launching target cleanly across arena
+  ambushSpearThrustKnockback: 32,    // Crisp physical velocity impulse on Inverted Spear backstab
   ambushPhantomFlurryStrikes: 12,    // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
   ambushPhantomFlurryFrameRate: 7,   // 3rd Sequence: Slower readable attack speed between each phantom strike (8 frames)
   ambushPhantomFlurryDamage: 15,     // 3rd Sequence: True Damage per phantom strike
   ambushPhantomFlurryDistance: 8,    // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
-  ambushFlurryFinalRecoil: 24,       // Clean finisher blast knockback push on target
+  ambushFlurryFinalRecoil: 38,       // Clean finisher blast knockback push on target
 
   // Ultimate: Curse Inventory - Full Arsenal Unleashed (Kinkō Sōkō)
   ultimateCooldown: 1500,            // 25.0s cooldown (1500 frames)
@@ -124,7 +124,7 @@ export const tojiConfig = {
     backThrust: 2.2,
     secondWeaponAttack: 2.2,
     phantomFlurry: 3.0,
-    ultimateChanneling: 3.0,
+    ultimateChanneling: 0.0,
     vanish: 5.0,
     dashStrike: 1.0,
     finalBlowCharging: 3.5,

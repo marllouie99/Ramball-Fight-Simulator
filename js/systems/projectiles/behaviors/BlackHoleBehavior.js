@@ -2,16 +2,24 @@ import { ProjectileBehavior } from '../ProjectileBehavior.js';
 import { CONFIG } from '../../../core/config.js';
 import { state } from '../../../core/state.js';
 import { applyDamageToTarget } from '../../../entities/fighter.js';
+import { GAME_MODES } from '../../../core/modeConfig.js';
 
 // Re-implement areOnSameTeam locally or export it from a shared utils
 function areOnSameTeam(ownerIndex, targetIndex) {
-  if (ownerIndex === targetIndex) return true;
-  if (!state.mode) return false;
-  const isTeamMode = state.mode === '2v2' || state.mode === 'Stand Off';
+  if (ownerIndex === targetIndex && ownerIndex !== undefined && ownerIndex !== null && ownerIndex !== -1) return true;
+  if (!state || !state.mode) return false;
+  if (typeof ownerIndex !== 'number' || typeof targetIndex !== 'number' || ownerIndex < 0 || targetIndex < 0) return false;
+  const mode = state.mode;
+  const isTeamMode = (
+    mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' ||
+    mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' ||
+    mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' ||
+    mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4' || mode === '4v4'
+  );
   if (!isTeamMode) return false;
   const team1 = state.getFighterTeam ? state.getFighterTeam(ownerIndex) : null;
   const team2 = state.getFighterTeam ? state.getFighterTeam(targetIndex) : null;
-  return team1 !== null && team1 === team2;
+  return team1 !== null && team2 !== null && team1 === team2;
 }
 
 export class BlackHoleBehavior extends ProjectileBehavior {
@@ -75,9 +83,10 @@ export class BlackHoleBehavior extends ProjectileBehavior {
     const tickInterval = p.maxLife <= 60 ? 1 : 60;
     const ownerHasEnemyInHole = ctx.ownerHasEnemyInHole;
 
-    // Apply pull to fighters
+    // Apply pull to fighters (skip teammates in 1v2 / 2v2)
     for (let fi = 0; fi < fighters.length; fi++) {
       if (!fighters[fi] || fi === ownerIndex) continue;
+      if (areOnSameTeam(ownerIndex, fi)) continue;
       const f = fighters[fi];
       const dx = p.x - f.x;
       const dy = p.y - f.y;
@@ -155,6 +164,7 @@ export class BlackHoleBehavior extends ProjectileBehavior {
             illusion.vx = (illusion.vx || 0) + nx * correction;
             illusion.vy = (illusion.vy || 0) + ny * correction;
           }
+
           illusion.vx = (illusion.vx || 0) + nx * pullStrength;
           illusion.vy = (illusion.vy || 0) + ny * pullStrength;
 
@@ -169,10 +179,11 @@ export class BlackHoleBehavior extends ProjectileBehavior {
       }
     }
 
-    // Apply pull to other projectiles
+    // Apply pull to other projectiles (skip teammates' projectiles)
     for (let j = 0; j < system.projectiles.length; j++) {
       const otherProj = system.projectiles[j];
       if (otherProj === p || otherProj.isVisual || otherProj.isExplosion || otherProj.isPoisonSpill || otherProj.isBlackHole || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
+      if (p.owner !== null && otherProj.owner !== null && otherProj.owner !== undefined && (p.owner === otherProj.owner || areOnSameTeam(p.owner, otherProj.owner))) continue;
       
       const otherProjOwner = fighters[otherProj.owner];
       if (otherProjOwner && otherProjOwner._def && otherProjOwner._def.type === 'black') continue;

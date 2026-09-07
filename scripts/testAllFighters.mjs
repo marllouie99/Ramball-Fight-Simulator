@@ -128,11 +128,15 @@ async function main() {
   const { state } = await import('../js/core/state.js');
   const { projectileSystem } = await import('../js/systems/projectileSystem.js');
   const { drawGetsugaSlash } = await import('../js/graphics/weapons/ichigoWeaponGraphics.js');
+  const { drawTodoTakadaIdolScreenOverlay } = await import('../js/graphics/renderers/effectsRenderer.js');
+  const { spawnBlackFlash, updateBlackFlashEffects, drawBlackFlashEffects, clearBlackFlashEffects } = await import('../js/graphics/particles/blackFlashEffect.js');
   const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
   const { drawWeaponPreview, drawWeaponMenu } = await import('../js/graphics/ui/WeaponIndexScreen.js');
   const { drawSelectScreen } = await import('../js/graphics/ui/CharacterSelectScreen.js');
   const { drawTitleScreen } = await import('../js/graphics/ui/MainMenuScreen.js');
   const { drawIndexScreen } = await import('../js/graphics/ui/FighterIndexScreen.js');
+  const { drawRubbickDomainDimScreen, drawBankaiImpactDimScreen } = await import('../js/graphics/renderers/arenaRenderer.js');
+  const { drawCjBaguvixDimScreen } = await import('../js/graphics/renderers/environmentalRenderer.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -140,7 +144,7 @@ async function main() {
   state.ctx = mockCtx;
   state.arena = { x: 0, y: 0, width: 540, height: 960 };
   state.fighters = [];
-  state.gameState = 'match';
+  state.gameState = 'playing';
   state.pixiLayers = {
     projectiles: { addChild: () => {} },
     environment: { addChild: () => {} }
@@ -203,6 +207,35 @@ async function main() {
       assertCanvasStackBalance(`Fighter '${fType}' stun/timestop state`);
       fighter.isFrozenByInfinity = false;
       fighter.timeStopTimer = 0;
+
+      // 4.5. Movement Velocity Recovery & Watchdog Verification
+      if (typeof fighter.isStationarySkillActive !== 'function') {
+        throw new Error(`Fighter '${fType}' missing isStationarySkillActive method!`);
+      }
+      if (typeof fighter.resumeMovement !== 'function') {
+        throw new Error(`Fighter '${fType}' missing resumeMovement method!`);
+      }
+      // Test direct resumeMovement handoff
+      fighter.vx = 0;
+      fighter.vy = 0;
+      fighter.resumeMovement(dummyOpponent);
+      const resumedSpeed = Math.hypot(fighter.vx, fighter.vy);
+      if (resumedSpeed < 0.1) {
+        throw new Error(`Fighter '${fType}' resumeMovement failed to produce initial velocity: got speed ${resumedSpeed}`);
+      }
+
+      // Test stall watchdog recovery from zero velocity when not stationary
+      fighter.vx = 0;
+      fighter.vy = 0;
+      fighter._stationaryStallFrames = 0;
+      // Allow up to 16 frames to trigger movement recovery or stall watchdog
+      for (let f = 0; f < 16; f++) {
+        fighter.update(dummyOpponent, 0, state.arena);
+      }
+      const stallRecoveredSpeed = Math.hypot(fighter.vx, fighter.vy);
+      if (!fighter.isStationarySkillActive() && stallRecoveredSpeed < 0.05) {
+        throw new Error(`Fighter '${fType}' failed movement stall watchdog recovery (still at 0 velocity after 16 frames)! Details: speed=${fighter.speed}, baseSpeed=${fighter.baseSpeed}, isStationary=${fighter.isStationarySkillActive()}, hp=${fighter.hp}, dummyHp=${dummyOpponent.hp}, stallFrames=${fighter._stationaryStallFrames}`);
+      }
 
       // 5. Special Transformations, Forms & Skill Channeling
       if (fType === 'ichigo') {
@@ -316,7 +349,73 @@ async function main() {
         assertCanvasStackBalance(`Custom scaled Final Getsuga slash`);
         CONFIG.ichigo.bankaiFinalGetsugaRadius = prevRad;
         CONFIG.ichigo.bankaiFinalGetsugaSpeed = prevSpd;
+        if (projectileSystem.projectiles.includes(finalProj)) {
+          const idx = projectileSystem.projectiles.indexOf(finalProj);
+          projectileSystem.projectiles.splice(idx, 1);
+        }
 
+        // Test enableFlashStep and enableFlurryAttack config toggles
+        fighter.reset();
+        fighter.bankaiActive = false;
+        fighter.hollowMaskActive = false;
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+
+        // 1. Test with Flash Step ON, Flurry Attack OFF (Flash Step to enemy with single strike, then backstep into Getsuga)
+        CONFIG.ichigo.enableFlashStep = true;
+        CONFIG.ichigo.enableFlurryAttack = false;
+        fighter.performShunpoGetsugaCombo(dummyOpponent);
+        if (!fighter.isShunpoDashing || !fighter.shunpoComboActive) {
+          throw new Error(`Ichigo failed to initiate Flash Step when enableFlurryAttack is false!`);
+        }
+        if (fighter.shunpoMaxSteps !== 1) {
+          throw new Error(`Ichigo maxSteps is ${fighter.shunpoMaxSteps} instead of 1 when enableFlurryAttack is false!`);
+        }
+
+        // Advance through Flash Step arrival, strike, disengage, and transition to Getsuga Tensho
+        for (let f = 0; f < 30; f++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+          if (fighter.isChannelingGetsuga) break;
+        }
+        if (!fighter.isChannelingGetsuga && fighter.getsugaRecoveryTimer <= 0) {
+          throw new Error(`Ichigo failed to unleash Getsuga Tensho after single Flash Step strike!`);
+        }
+
+        // 2. Test with Flash Step OFF (Standalone Getsuga without teleporting)
+        fighter.reset();
+        CONFIG.ichigo.enableFlashStep = false;
+        CONFIG.ichigo.enableFlurryAttack = false;
+        fighter.x = 200;
+        fighter.y = 200;
+        fighter.shunpoCooldown = 0;
+        fighter.getsugaCooldown = 0;
+        fighter.performShunpoGetsugaCombo(dummyOpponent);
+        if (fighter.isShunpoDashing || fighter.shunpoComboActive) {
+          throw new Error(`Ichigo dashed when enableFlashStep is false!`);
+        }
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (!fighter.isChannelingGetsuga || fighter.isShunpoDashing) {
+          throw new Error(`Ichigo failed to fire standalone Getsuga Tensho when enableFlashStep is false!`);
+        }
+
+        // 3. Test with Flash Step ON, Flurry Attack ON (Full Flurry Multi-Strike Combo)
+        CONFIG.ichigo.enableFlashStep = true;
+        CONFIG.ichigo.enableFlurryAttack = true;
+        fighter.reset();
+        fighter.shunpoCooldown = 0;
+        fighter.getsugaCooldown = 0;
+        fighter.x = 200;
+        fighter.y = 200;
+        fighter.performShunpoGetsugaCombo(dummyOpponent);
+        if (!fighter.shunpoComboActive || fighter.shunpoComboStep !== 1 || fighter.shunpoMaxSteps <= 1) {
+          throw new Error(`Ichigo failed to initiate multi-strike flurry combo when enableFlurryAttack is true!`);
+        }
+
+        fighter.reset();
         fighter.isChannelingGetsuga = false;
         fighter.bankaiActive = false;
         fighter.hollowMaskActive = false;
@@ -324,6 +423,7 @@ async function main() {
         fighter.getsugaRecoveryTimer = 0;
         fighter.hollowMaskFormationTimer = 0;
         fighter.hollowBurstTimer = 0;
+        fighter.activeGetsugaProjectile = null;
       }
       if (fType === 'mahoraga') {
         mockCtx.resetStackDepth();
@@ -344,6 +444,31 @@ async function main() {
         fighter.interruptAttacks(false);
         fighter.isFrozenByInfinity = false;
         fighter.timeStopTimer = 0;
+      }
+      if (fType === 'mahito') {
+        mockCtx.resetStackDepth();
+        fighter.reset();
+        fighter.hp = 100;
+        fighter.maxHp = 230;
+
+        // 1. Outside domain: no domain lifesteal
+        fighter.domainActive = false;
+        fighter.onDamageDealt(dummyOpponent, null, 0, 40);
+        if (fighter.hp !== 100) {
+          throw new Error(`Mahito gained lifesteal outside of Domain Expansion! Expected HP 100, got ${fighter.hp}`);
+        }
+
+        // 2. Inside domain: domain lifesteal recovers HP from damage dealt
+        fighter.domainActive = true;
+        const lifestealPct = (CONFIG.mahito?.domainExpansion?.lifestealPercent !== undefined) ? CONFIG.mahito.domainExpansion.lifestealPercent : 0.50;
+        const expectedHp = 100 + (40 * lifestealPct);
+        fighter.onDamageDealt(dummyOpponent, null, 0, 40);
+        if (fighter.hp !== expectedHp) {
+          throw new Error(`Mahito failed to gain domain lifesteal! Expected HP ${expectedHp}, got ${fighter.hp}`);
+        }
+
+        fighter.reset();
+        fighter.domainActive = false;
       }
       if (fType === 'sukuna') {
         mockCtx.resetStackDepth();
@@ -473,6 +598,99 @@ async function main() {
         if (!hasBankaiSkill || !hasHollowSkill) {
           throw new Error("Ichigo skills must include both 'bankai' and 'hollow'!");
         }
+
+        // Test 11: Ichigo attack actions are strictly gated while Getsuga Tensho wave is active
+        fighter.reset();
+        fighter.isChannelingGetsuga = false;
+        fighter.getsugaRecoveryTimer = 0;
+        fighter.swordCooldown = 0;
+        fighter.shunpoCooldown = 0;
+
+        // Fire a test getsuga wave
+        const activeGetsuga = projectileSystem.fireGetsugaTensho(fighter, 0, 10, 10, 'shikai');
+        if (!fighter.isGetsugaActive()) {
+          throw new Error("isGetsugaActive() should return true while Getsuga wave is in projectileSystem!");
+        }
+
+        if (fighter.canPerformBasicAttack()) {
+          throw new Error("canPerformBasicAttack() must return false while Getsuga wave is active!");
+        }
+
+        // shoot() must return false
+        const shootRes = fighter.shoot(0);
+        if (shootRes) {
+          throw new Error("shoot() must not execute while Getsuga wave is active!");
+        }
+
+        // performMeleeCleave() must not trigger swing
+        fighter.slashSwingTimer = 0;
+        fighter.performMeleeCleave(dummyOpponent);
+        if (fighter.slashSwingTimer > 0) {
+          throw new Error("performMeleeCleave() must not execute while Getsuga wave is active!");
+        }
+
+        // performShunpoGetsugaCombo() must be gated by shunpoCooldown
+        fighter.shunpoCooldown = 100;
+        fighter.performShunpoGetsugaCombo(dummyOpponent);
+        if (fighter.shunpoComboActive || fighter.isShunpoDashing) {
+          throw new Error("performShunpoGetsugaCombo() must not execute while shunpoCooldown > 0!");
+        }
+        fighter.shunpoCooldown = 0;
+
+        // fireGetsuga() (non-combo) must not trigger
+        fighter.fireGetsuga(dummyOpponent, false);
+        if (fighter.isChannelingGetsuga) {
+          throw new Error("fireGetsuga() must not execute while Getsuga wave is active!");
+        }
+
+        // fireFinalMassiveGetsuga() must not trigger
+        fighter.fireFinalMassiveGetsuga(dummyOpponent);
+        if (fighter.isChannelingGetsuga || fighter.isFinalMassiveGetsuga) {
+          throw new Error("fireFinalMassiveGetsuga() must not execute while Getsuga wave is active!");
+        }
+
+        // Clean up test projectile
+        if (projectileSystem.projectiles.includes(activeGetsuga)) {
+          const idx = projectileSystem.projectiles.indexOf(activeGetsuga);
+          projectileSystem.projectiles.splice(idx, 1);
+        }
+        fighter.activeGetsugaProjectile = null;
+
+        if (fighter.isGetsugaActive()) {
+          throw new Error("isGetsugaActive() should return false after projectile removal!");
+        }
+        if (!fighter.canPerformBasicAttack()) {
+          throw new Error("canPerformBasicAttack() should return true after Getsuga wave is gone!");
+        }
+
+        // Test 12: Hollow Mask overlay rendering with camera tracking enabled (Dynamic Mode & Fixed Mode)
+        mockCtx.resetStackDepth();
+        fighter.reset();
+        fighter.hollowMaskActive = true;
+        fighter.hollowMaskFormationTimer = 100;
+        fighter.hollowMaskFormationMax = 325;
+
+        // Test with Dynamic Camera Tracking mode enabled (zoomed and panned)
+        state.camera = {
+          enabled: true,
+          mode: 'dynamic',
+          x: state.arena.x + state.arena.width / 2 + 30,
+          y: state.arena.y + state.arena.height / 2 - 20,
+          zoom: 1.12,
+          shakeX: 0,
+          shakeY: 0
+        };
+        drawBankaiImpactDimScreen();
+        assertCanvasStackBalance("Hollow Mask Overlay with Dynamic Camera Tracking");
+
+        // Test with Fixed Camera mode
+        state.camera.mode = 'fixed';
+        state.camera.zoom = 1.0;
+        drawBankaiImpactDimScreen();
+        assertCanvasStackBalance("Hollow Mask Overlay with Fixed Camera Mode");
+
+        fighter.reset();
+        fighter.hollowMaskFormationTimer = 0;
       }
 
       if (fType === 'mahoraga') {
@@ -533,6 +751,123 @@ async function main() {
         fighter.y = 200;
       }
 
+      // Todo-specific Pixel Art Skin & Boogie Woogie Animations Test
+      if (fType === 'todo') {
+        // 1. Idle Pixel Art Model
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo idle pixel art model");
+
+        // 2. Brawler Punch Animation
+        mockCtx.resetStackDepth();
+        fighter.punchAnimTimer = 10;
+        fighter.punchActiveMaxTime = 14;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo brawler punch animation");
+        fighter.punchAnimTimer = 0;
+
+        // 3. Boogie Woogie Clap Animation (Windup & Impact Collision Flash)
+        mockCtx.resetStackDepth();
+        fighter.clapWindupTimer = 4;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo Boogie Woogie clap windup");
+
+        mockCtx.resetStackDepth();
+        fighter.clapWindupTimer = 0;
+        fighter.clapAnimTimer = 10;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo Boogie Woogie clap impact flash");
+        fighter.clapAnimTimer = 0;
+
+        // 4. Takada-chan Idol Ultimate Aura & Smart Boundary Clamping
+        mockCtx.resetStackDepth();
+        fighter.isTakadaUltActive = true;
+        // Test at center
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo Takada-chan idol ultimate aura (center)");
+        
+        // Test near top arena wall
+        fighter.x = 250;
+        fighter.y = (state.arena?.y || 0) + 5;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo Takada-chan idol banner top clamping");
+
+        // Test near left arena wall
+        fighter.x = (state.arena?.x || 0) + 5;
+        fighter.y = 250;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo Takada-chan idol banner left clamping");
+
+        // Test near right arena wall
+        fighter.x = (state.arena?.x || 0) + (state.arena?.width || 500) - 5;
+        fighter.y = 250;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo Takada-chan idol banner right clamping");
+
+        // Test floating pixel hearts & stars screen overlay during channeling & ultimate
+        state.fighters = [fighter, dummyOpponent];
+        fighter.isTakadaChanneling = true;
+        fighter.isTakadaUltActive = false;
+        mockCtx.resetStackDepth();
+        drawTodoTakadaIdolScreenOverlay();
+        assertCanvasStackBalance("Todo Takada idol screen overlay (channeling)");
+
+        fighter.isTakadaChanneling = false;
+        fighter.isTakadaUltActive = true;
+        mockCtx.resetStackDepth();
+        drawTodoTakadaIdolScreenOverlay();
+        assertCanvasStackBalance("Todo Takada idol screen overlay (ultimate)");
+
+        // Test low performance mode
+        state.performanceMode = true;
+        mockCtx.resetStackDepth();
+        drawTodoTakadaIdolScreenOverlay();
+        assertCanvasStackBalance("Todo Takada idol screen overlay (low perf)");
+        state.performanceMode = false;
+
+        fighter.isTakadaUltActive = false;
+        fighter.isTakadaChanneling = false;
+        fighter.x = 200;
+        fighter.y = 200;
+
+        // 5. Black Flash Zone State
+        mockCtx.resetStackDepth();
+        fighter.justSwappedTimer = 30;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo Black Flash zone state");
+        fighter.justSwappedTimer = 0;
+
+        // 6. Cursed Rocks Drawing
+        mockCtx.resetStackDepth();
+        fighter.cursedRocks = [{ x: 300, y: 250, radius: 12, hasTriggeredTeleport: false }];
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo cursed rocks drawing");
+        fighter.cursedRocks = [];
+
+        // 7. Winner Reveal Podium Mode
+        mockCtx.resetStackDepth();
+        fighter._isWinnerReveal = true;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Todo winner reveal podium display");
+        fighter._isWinnerReveal = false;
+
+        // 8. High-Performance Black Flash Particle Spawning & Drawing Test
+        clearBlackFlashEffects();
+        spawnBlackFlash(250, 300);
+        spawnBlackFlash(255, 305);
+        mockCtx.resetStackDepth();
+        drawBlackFlashEffects(mockCtx);
+        assertCanvasStackBalance("Black Flash drawing pass 1");
+
+        for (let frame = 0; frame < 15; frame++) {
+          updateBlackFlashEffects(false);
+          mockCtx.resetStackDepth();
+          drawBlackFlashEffects(mockCtx);
+          assertCanvasStackBalance(`Black Flash drawing frame ${frame}`);
+        }
+        clearBlackFlashEffects();
+      }
+
       // Rubbick-specific Stolen Unlimited Void Test
       if (fType === 'rubbick') {
         // 1. Simulate stealing Gojo's domain
@@ -544,6 +879,9 @@ async function main() {
         mockGojo.domainActive = true;
         mockGojo.lastCastSkill = 'domain';
 
+        fighter.reset();
+        fighter.x = 250;
+        fighter.y = 300;
         fighter.stolenType = null;
         fighter.spellStealCooldown = 0;
         fighter.update(mockGojo, 1, state.arena);
@@ -659,6 +997,113 @@ async function main() {
 
         mockGojo.domainActive = false;
         fighter.timeStopTimer = 0;
+
+        // 7. Verify Rubbick stolen domain background & emerald green dim screen rendering
+        fighter.stolenDomainActive = true;
+        mockCtx.resetStackDepth();
+        fighter.drawDomainBackground(mockCtx);
+        assertCanvasStackBalance("Rubbick drawDomainBackground");
+
+        mockCtx.resetStackDepth();
+        drawRubbickDomainDimScreen();
+        assertCanvasStackBalance("Rubbick drawRubbickDomainDimScreen");
+        fighter.stolenDomainActive = false;
+      }
+
+      // CJ BAGUVIX God Mode Emerald Green Overlay & Cheat Typing Immobility Test
+      if (fType === 'cj') {
+        fighter.isBaguvixActive = true;
+        mockCtx.resetStackDepth();
+        drawCjBaguvixDimScreen();
+        assertCanvasStackBalance("CJ drawCjBaguvixDimScreen");
+        fighter.isBaguvixActive = false;
+
+        // Test cheat typing immobility
+        fighter.x = 200;
+        fighter.y = 200;
+        fighter.vx = 4;
+        fighter.vy = 4;
+        fighter.startCheatTyping('BAGUVIX', () => {});
+        if (fighter.vx !== 0 || fighter.vy !== 0) {
+          throw new Error(`CJ vx/vy should be 0 upon startCheatTyping, got (${fighter.vx}, ${fighter.vy})`);
+        }
+        if (!fighter.isStationarySkillActive()) {
+          throw new Error(`CJ isStationarySkillActive() should return true while typing!`);
+        }
+
+        // Simulate 10 frames of typing update with enemy nearby
+        for (let t = 0; t < 10; t++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+          if (fighter.x !== 200 || fighter.y !== 200) {
+            throw new Error(`CJ position drifted while typing cheat: expected (200, 200), got (${fighter.x}, ${fighter.y})`);
+          }
+          if (fighter.vx !== 0 || fighter.vy !== 0) {
+            throw new Error(`CJ velocity should remain 0 while typing cheat, got (${fighter.vx}, ${fighter.vy})`);
+          }
+        }
+        fighter.isTypingCheat = false;
+      }
+
+      // Yuta-specific Domain Activation, Hyper-Armor, & Domain Clash Test
+      if (fType === 'yuta') {
+        console.log("   Testing Yuta domain clash deployment inside Sukuna's domain...");
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+
+        // 1. Verify Yuta can trigger domain even if Rika is dead/inactive
+        if (fighter.rika) {
+          fighter.rika.active = false;
+          fighter.rika.hp = 0;
+          fighter.rika.isDying = true;
+        }
+        fighter.domainUseCount = 0;
+        fighter.hp = fighter.maxHp * 0.50; // Dropped below 60% threshold
+
+        const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+        const mockSukuna = new SukunaClass(allDefs.find(d => d.type === 'sukuna') || { type: 'sukuna' });
+        mockSukuna.x = 350;
+        mockSukuna.y = 200;
+        mockSukuna.hp = 300;
+        mockSukuna.domainActive = true; // Sukuna's Malevolent Shrine is active
+
+        state.fighters = [fighter, mockSukuna];
+        fighter.update(mockSukuna, 0, state.arena);
+
+        if (!fighter.isChannelingDomain) {
+          throw new Error("Yuta failed to start channeling domain when Rika was dead/inactive!");
+        }
+
+        // 2. Verify Hyper-Armor: forceCancelAll / blast damage does NOT cancel domain channeling
+        fighter.interruptAttacks(true);
+        if (!fighter.isChannelingDomain) {
+          throw new Error("Yuta domain channeling was cancelled by interruptAttacks(true)!");
+        }
+
+        // 3. Verify Domain Clash Acceleration: domainChargeTimer increases at accelerated rate (2 per frame)
+        const initialCharge = fighter.domainChargeTimer;
+        fighter.update(mockSukuna, 0, state.arena);
+        const chargeDelta = fighter.domainChargeTimer - initialCharge;
+        if (chargeDelta < 2) {
+          throw new Error(`Yuta domain clash charge rate is ${chargeDelta}, expected >= 2!`);
+        }
+
+        // 4. Simulate until domain deploy: should deploy in ~45 frames and restore Rika to full health
+        while (fighter.isChannelingDomain) {
+          fighter.update(mockSukuna, 0, state.arena);
+        }
+
+        if (!fighter.domainActive) {
+          throw new Error("Yuta domain failed to activate after channeling!");
+        }
+        if (!fighter.rika || !fighter.rika.active || fighter.rika.hp <= 0) {
+          throw new Error("Yuta domain deployment failed to auto-summon and restore Rika!");
+        }
+
+        // Cleanup
+        fighter.domainActive = false;
+        mockSukuna.domainActive = false;
+        state.fighters = [fighter, dummyOpponent];
       }
 
       // 7. Winner / Champion Reveal Stance
@@ -667,10 +1112,245 @@ async function main() {
       fighter.draw(mockCtx, null);
       assertCanvasStackBalance(`Fighter '${fType}' WinnerReveal stance`);
 
+      // 8. Saitama specific punch toggle tests
+      if (fType === 'saitama') {
+        // Test Normal Punch toggle
+        CONFIG.saitama.normalPunchEnabled = false;
+        if (fighter.isNormalPunchEnabled() !== false || fighter.canPerformBasicAttack() !== false) {
+          throw new Error('Saitama normalPunchEnabled=false failed');
+        }
+        let hudBars = getSkillDataForFighter(fighter);
+        if (hudBars.some(b => b.id === 'punch')) {
+          throw new Error('Saitama HUD still displays punch when normalPunchEnabled=false');
+        }
+
+        // Test Consecutive Punches toggle
+        CONFIG.saitama.normalPunchEnabled = true;
+        CONFIG.saitama.consecutivePunchesEnabled = false;
+        if (fighter.isConsecutivePunchesEnabled() !== false || fighter.executeConsecutiveNormalPunches(dummyOpponent) !== false) {
+          throw new Error('Saitama consecutivePunchesEnabled=false failed');
+        }
+        hudBars = getSkillDataForFighter(fighter);
+        if (hudBars.some(b => b.id === 'flurry')) {
+          throw new Error('Saitama HUD still displays flurry when consecutivePunchesEnabled=false');
+        }
+
+        // Test disable flags
+        CONFIG.saitama.consecutivePunchesEnabled = true;
+        CONFIG.saitama.disableNormalPunch = true;
+        CONFIG.saitama.disableConsecutivePunches = true;
+        if (fighter.isNormalPunchEnabled() !== false || fighter.isConsecutivePunchesEnabled() !== false) {
+          throw new Error('Saitama disable flags failed');
+        }
+
+        // Reset to default
+        CONFIG.saitama.disableNormalPunch = false;
+        CONFIG.saitama.disableConsecutivePunches = false;
+        CONFIG.saitama.normalPunchEnabled = true;
+        CONFIG.saitama.consecutivePunchesEnabled = true;
+      }
+
+      // 9. CJ specific non-chase movement tests
+      if (fType === 'cj') {
+        // Activate Jetpack mode and verify natural velocity orientation
+        fighter.isJetpackActive = true;
+        fighter.speed = 8.4;
+        fighter.vx = 8.4;
+        fighter.vy = 0;
+        dummyOpponent.x = fighter.x;
+        dummyOpponent.y = fighter.y + 300; // Opponent is directly below
+        fighter.update(dummyOpponent, 0, state.arena);
+        // After update in Jetpack mode, velocity should remain primarily horizontal (not forced straight down to follow opponent)
+        if (Math.abs(fighter.vx) < 5.0) {
+          throw new Error('CJ Jetpack velocity was artificially steered to chase the opponent');
+        }
+        fighter.isJetpackActive = false;
+      }
+
+      // 10. Toji specific back thrust knockback & displacement tests
+      if (fType === 'toji') {
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 240;
+        dummyOpponent.y = 200;
+        fighter.gunAngle = 0;
+        fighter.angle = 0;
+        dummyOpponent.knockbackVx = 0;
+        dummyOpponent.knockbackVy = 0;
+        state.fighters = [fighter, dummyOpponent];
+
+        // Perform Inverted Spear back thrust
+        const hitTargets = fighter.performInvertedSpearStrike(dummyOpponent, 0, true);
+        if (!hitTargets || hitTargets.length === 0) {
+          throw new Error('Toji back thrust strike did not land on target');
+        }
+        if (Math.abs(dummyOpponent.knockbackVx) < 25) {
+          throw new Error(`Toji back thrust knockback velocity was insufficient: ${dummyOpponent.knockbackVx} (expected ~32)`);
+        }
+        if (dummyOpponent.knockbackDecay !== 0.90) {
+          throw new Error(`Toji back thrust knockback decay was incorrect: ${dummyOpponent.knockbackDecay} (expected 0.90)`);
+        }
+
+        // Setup ambush stasis and verify modUpdateAmbushSequence drives displacement
+        fighter.isAmbushing = true;
+        fighter.ambushPhase = 'BACK_STAB';
+        dummyOpponent.isTargetOfAmbush = true;
+        const initialX = dummyOpponent.x;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (dummyOpponent.x <= initialX) {
+          throw new Error(`Toji ambush sequence did not propel target forward: initialX=${initialX}, currentX=${dummyOpponent.x}`);
+        }
+        if (dummyOpponent.knockbackVx === 0) {
+          throw new Error('Toji ambush target knockback was prematurely zeroed');
+        }
+
+        // Clean up test state
+        fighter.isAmbushing = false;
+        fighter.ambushTarget = null;
+        fighter.ambushPhase = null;
+        dummyOpponent.isTargetOfAmbush = false;
+        dummyOpponent.knockbackVx = 0;
+        dummyOpponent.knockbackVy = 0;
+      }
+
+      // 11. Gojo specific Hollow Purple Breather Recovery Stasis Test
+      if (fType === 'gojo') {
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 250;
+        state.fighters = [fighter, dummyOpponent];
+
+        // Fire Hollow Purple to trigger breather recovery
+        fighter._firePurple(0);
+        if (fighter.purpleRecoveryTimer !== 120) {
+          throw new Error(`Expected Gojo purpleRecoveryTimer to be 120, got ${fighter.purpleRecoveryTimer}`);
+        }
+        if (!fighter.isStationarySkillActive()) {
+          throw new Error('Expected isStationarySkillActive() to return true during Gojo Purple breather');
+        }
+
+        // Test Canvas 2D stack balance while drawing breather stasis visuals
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance('Gojo Purple Breather Stasis Visuals');
+
+        // Test breather recovery frame update
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.purpleRecoveryTimer !== 119) {
+          throw new Error(`Expected purpleRecoveryTimer to decrement to 119, got ${fighter.purpleRecoveryTimer}`);
+        }
+        if (fighter.vx !== 0 || fighter.vy !== 0) {
+          throw new Error(`Expected Gojo vx/vy to remain 0 during breather, got (${fighter.vx}, ${fighter.vy})`);
+        }
+        if (!fighter.infinityActive) {
+          throw new Error('Expected Limitless Infinity barrier to remain active during breather');
+        }
+
+        // Clean up
+        fighter.purpleRecoveryTimer = 0;
+        fighter.z = 0;
+      }
+
     } catch (err) {
       console.error(`❌ [RUNTIME ERROR in fighter '${fType}'] during simulation:`, err);
       errors++;
     }
+  }
+
+  // 6.5 Domain Cleanup On Death in 1v2 / 2v2 Matches Test
+  console.log('🌌 [Domain Cleanup on Death Test] Verifying active domains/spheres terminate upon fighter death in multi-fighter matches...');
+  try {
+    const { clearFighterDomain, cleanupDeadFightersDomains, isAnyDomainActive } = await import('../js/systems/domainSystem.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const { YutaFighter } = await import('../js/entities/fighters/YutaFighter.js');
+    const { CronosFighter } = await import('../js/entities/fighters/CronosFighter.js');
+    const { MahitoFighter } = await import('../js/entities/fighters/MahitoFighter.js');
+    const { Fighter } = await import('../js/entities/Fighter.js');
+
+    // Test Gojo Unlimited Void death clearing
+    const gojo = new GojoFighter({ startX: 250, startY: 250, type: 'gojo', color: '#FFFFFF' });
+    const enemy1 = new Fighter({ startX: 100, startY: 100, type: 'default', color: '#FF0000' });
+    const enemy2 = new Fighter({ startX: 400, startY: 400, type: 'default', color: '#FF0000' });
+    state.fighters = [gojo, enemy1, enemy2];
+    gojo.domainActive = true;
+    gojo.domainTimer = 300;
+    enemy1.timeStopTimer = 300;
+    enemy2.timeStopTimer = 300;
+
+    gojo.hp = 0;
+    gojo.onDeath();
+    if (gojo.domainActive) {
+      throw new Error('Expected Gojo domainActive to be false after death');
+    }
+    if (enemy1.timeStopTimer !== 0 || enemy2.timeStopTimer !== 0) {
+      throw new Error('Expected trapped enemies to be unfrozen when Gojo dies');
+    }
+
+    // Test Sukuna Malevolent Shrine death clearing
+    const sukuna = new SukunaFighter({ startX: 250, startY: 250, type: 'sukuna', color: '#FF0000' });
+    state.fighters = [sukuna, enemy1, enemy2];
+    sukuna.domainActive = true;
+    sukuna.domainTimer = 500;
+    sukuna.hp = 0;
+    sukuna.onDeath();
+    if (sukuna.domainActive) {
+      throw new Error('Expected Sukuna domainActive to be false after death');
+    }
+
+    // Test Yuta domain death clearing
+    const yuta = new YutaFighter({ startX: 250, startY: 250, type: 'yuta', color: '#D946EF' });
+    state.fighters = [yuta, enemy1, enemy2];
+    yuta.domainActive = true;
+    yuta.domainTimer = 500;
+    yuta.domainSwords = [{ x: 100, y: 100 }];
+    yuta.hp = 0;
+    yuta.onDeath();
+    if (yuta.domainActive) {
+      throw new Error('Expected Yuta domainActive to be false after death');
+    }
+    if (yuta.domainSwords.length !== 0) {
+      throw new Error('Expected Yuta domainSwords to be cleared after death');
+    }
+
+    // Test Mahito domain death clearing
+    const mahito = new MahitoFighter({ startX: 250, startY: 250, type: 'mahito', color: '#8B5CF6' });
+    state.fighters = [mahito, enemy1, enemy2];
+    mahito.domainActive = true;
+    mahito.domainTimer = 500;
+    enemy1.isFrozenByMahitoDomain = true;
+    mahito.hp = 0;
+    mahito.onDeath();
+    if (mahito.domainActive) {
+      throw new Error('Expected Mahito domainActive to be false after death');
+    }
+    if (enemy1.isFrozenByMahitoDomain) {
+      throw new Error('Expected enemy to be unfrozen when Mahito dies');
+    }
+
+    // Test Cronos time stop sphere death clearing
+    const cronos = new CronosFighter({ startX: 250, startY: 250, type: 'cronos', color: '#00F3FF' });
+    state.fighters = [cronos, enemy1, enemy2];
+    cronos.sphereActive = true;
+    cronos.sphereTimer = 300;
+    enemy1.timeStopTimer = 300;
+    enemy1._frozenByCronosSphere = true;
+    cronos.hp = 0;
+    cronos.onDeath();
+    if (cronos.sphereActive) {
+      throw new Error('Expected Cronos sphereActive to be false after death');
+    }
+    if (enemy1.timeStopTimer !== 0 || enemy1._frozenByCronosSphere) {
+      throw new Error('Expected trapped fighters to be unfrozen when Cronos dies');
+    }
+  } catch (err) {
+    console.error('❌ [DOMAIN DEATH CLEANUP TEST ERROR]:', err);
+    errors++;
   }
 
   // 7. Weapon Previews Canvas Stack Balance Check

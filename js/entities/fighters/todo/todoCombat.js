@@ -106,26 +106,6 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     if (typeof target.applyKnockback === 'function') {
       target.applyKnockback(Math.cos(angle) * knockback, Math.sin(angle) * knockback);
     }
-
-
-    // Arena Screen Shake Dispatcher
-    if (typeof triggerGlobalScreenShake === 'function') {
-      if (isBlackFlash) {
-        const shake = CONFIG.todo?.blackFlashScreenShake || 2.0;
-        triggerGlobalScreenShake(shake, 14);
-      } else if (isCombo) {
-        if (this.rockCounterComboLeft <= 1) {
-          const shake = CONFIG.todo?.finisherScreenShake || 2.0;
-          triggerGlobalScreenShake(shake, 10);
-        } else {
-          const shake = CONFIG.todo?.comboPunchScreenShake || 4.5;
-          triggerGlobalScreenShake(shake, 4);
-        }
-      } else {
-        const shake = CONFIG.todo?.punchScreenShake || 3.5;
-        triggerGlobalScreenShake(shake, 5);
-      }
-    }
   }
 
 

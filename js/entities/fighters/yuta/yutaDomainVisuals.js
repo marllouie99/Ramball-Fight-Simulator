@@ -11,6 +11,26 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 
   ctx.save();
 
+  // 1. Strictly clip Yuta's Domain Expansion environment visuals inside the arena bounds
+  if (arena) {
+    const ax = arena.x;
+    const ay = arena.y;
+    const aw = arena.width;
+    const ah = arena.height;
+    const ww = arena.wallWidth || 4;
+
+    ctx.beginPath();
+    if (arena.shape === 'circle') {
+      const acx = ax + aw / 2;
+      const acy = ay + ah / 2;
+      const ar = (arena.radius !== undefined ? arena.radius : (aw / 2)) - ww;
+      ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
+    } else {
+      ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
+    }
+    ctx.clip();
+  }
+
   const time = Date.now();
   const pulse = Math.sin(time / 300) * 0.04;
   const alphaMult = fighter.domainActive ? 1.0 : Math.min(1.0, fighter.rikaAlpha || 1.0);

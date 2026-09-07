@@ -68,7 +68,7 @@ export const yutaConfig = {
   // Summon Companion: Rika Orimoto
   rikaMaxHp: 500,                          // Maximum health pool when summoned
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
-  rikaSummonHpThreshold: 0.60,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
+  rikaSummonHpThreshold: 0.70,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
   rikaRechargeHpRatio: 0.20,               // HP ratio in damage required to re-summon Rika (20% of max HP)
   rikaSummonChargeDuration: 30,            // Channeling/pause duration when Yuta calls Rika (frames)
   rikaAriseDuration: 45,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
@@ -98,10 +98,11 @@ export const yutaConfig = {
   domain2HpDamageRequired: 0.75,           // 2nd Domain requirement: Yuta MUST take 20% max HP damage AFTER 1st domain ends!
   domainMaxUses: 2,                        // Max number of Domain Expansion activations per round (allows 2 uses)
   domainChargeMax: 90,                     // Channeling duration before domain opens (1.5 seconds)
+  domainClashChargeSpeed: 2,               // 2x charge acceleration when clashing inside another domain (~45 frames / 0.75s deploy)
   domainDuration: 500,                     // Frames domain stays active (~6.67 seconds at 60fps)
   domainRadius: 350,                       // Radius of the domain boundary in pixels
   domainCooldownReduction: 0.8,            // Technique cooldown reduction ratio inside domain (80% faster)
-  domainRctHealRate: 0.05,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
+  domainRctHealRate: 0.50,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
   domainRikaRegenMultiplier: 1.10,          // 2x RCT regen multiplier inside domain while Rika is alive
   domainRikaDamageMultiplier: 1.50,         // 1.5x damage dealt multiplier inside domain while Rika is alive
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
@@ -115,7 +116,7 @@ export const yutaConfig = {
   pureLoveBeamDamagePerTick: 10,           // Rapid multi-hit damage
   pureLoveBeamWidth: 200,                  // Massive beam radius/width
   pureLoveBeamLength: 2500,                // Screen spanning length
-  pureLoveBeamKnockback: 6,                // Outward push per tick
+  pureLoveBeamKnockback: 2,                // Outward push per tick
   pureLoveBeamSlowMultiplier: 0.20,        // Speed reduction multiplier applied during beam recovery phase
   pureLoveBeamStunDuration: 120,           // Recovery stun duration frames after beam exposure
   pureLoveBeamShakeIntensity: 6,            // Arena shake intensity while beam is active (decays in final 30%)

@@ -433,7 +433,7 @@ export function drawArena() {
     return;
   }
 
-  const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
+  const hasActiveDomain = state.fighters && state.fighters.some(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive) && typeof f.drawDomainBackground === 'function');
 
   // 1. Draw outer background container (Original Colors)
   if (typeof window !== 'undefined' && window.PIXI && pixiApp && pixiLayers?.arena) {
@@ -545,7 +545,7 @@ export function drawArena() {
       ctx.restore();
     } else if (hasActiveDomain && !state.pixiApp) {
       // In native Canvas 2D mode, render active domain background under camera transform
-      const activeDomainFighter = state.fighters?.find(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
+      const activeDomainFighter = state.fighters?.find(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive) && typeof f.drawDomainBackground === 'function');
       if (activeDomainFighter) {
         ctx.save();
         applyCameraToCtx(ctx);
@@ -1148,7 +1148,7 @@ export function drawGojoDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const gojoFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') && (f.domainActive || f.isChannelingDomainExpansion)
+    f && f.hp > 0 && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') && (f.domainActive || f.isChannelingDomainExpansion)
   );
 
   let targetOpacity = 0;
@@ -1184,23 +1184,8 @@ export function drawGojoDomainDimScreen() {
   ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Deep cosmic dark blue radial gradient centered on Gojo
-  const center = gojoFighter ? worldToScreen(gojoFighter.x, (gojoFighter.y - (gojoFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
-  const cx = center.x;
-  const cy = center.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
-
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, 'rgba(60, 140, 255, 0.55)');      // Bright limitless blue core
-  grad.addColorStop(0.15, 'rgba(30, 80, 200, 0.45)');     // Deep royal blue halo
-  grad.addColorStop(0.35, 'rgba(15, 40, 140, 0.30)');     // Dark cosmic blue ring
-  grad.addColorStop(0.60, 'rgba(5, 15, 60, 0.15)');       // Deep space blue fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
-
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Exclude Gojo Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
@@ -1219,13 +1204,13 @@ export function drawRubbickDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const rubbickFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'rubbick' || f.type === 'rubbick' || f._def?.id === 'rubbick') &&
-    ((f.stolenDomainActive && (f.stolenDomainTimer || 0) > 0) || (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0))
+    f && f.hp > 0 && (f.characterId === 'rubbick' || f.type === 'rubbick' || f._def?.id === 'rubbick') &&
+    ((f.stolenDomainActive && (f.stolenDomainTimer || 0) > 0) || (f.stolenType === 'gojo_domain' && (f.stolenWindUpTimer > 0 || f.domainActive)))
   );
 
   let targetOpacity = 0;
   if (rubbickFighter) {
-    if (rubbickFighter.stolenDomainActive) {
+    if (rubbickFighter.stolenDomainActive || (rubbickFighter.domainActive && rubbickFighter.stolenType === 'gojo_domain')) {
       targetOpacity = 0.72;
     } else if (rubbickFighter.stolenType === 'gojo_domain' && rubbickFighter.stolenWindUpTimer > 0) {
       const windupMax = 60;
@@ -1252,27 +1237,12 @@ export function drawRubbickDomainDimScreen() {
   // Reset transform to identity screen space so full-screen dim doesn't shift with camera shake
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Base dark overlay
-  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
+  // 1. Base dark emerald green overlay
+  ctx.fillStyle = `rgba(1, 24, 10, ${opacity * 0.88})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Deep cosmic dark emerald radial gradient centered on Rubbick
-  const center = rubbickFighter ? worldToScreen(rubbickFighter.x, (rubbickFighter.y - (rubbickFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
-  const cx = center.x;
-  const cy = center.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
-
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, 'rgba(0, 255, 100, 0.55)');       // Bright arcane emerald core
-  grad.addColorStop(0.15, 'rgba(0, 180, 70, 0.45)');      // Deep emerald halo
-  grad.addColorStop(0.35, 'rgba(0, 90, 35, 0.30)');       // Dark arcane green ring
-  grad.addColorStop(0.60, 'rgba(2, 30, 12, 0.15)');       // Deep space green fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
-
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Exclude Gojo Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
@@ -1291,7 +1261,7 @@ export function drawSukunaDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const sukunaFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna') && (f.domainActive || f.isChannelingDomainExpansion)
+    f && f.hp > 0 && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna') && (f.domainActive || f.isChannelingDomainExpansion)
   );
 
   let targetOpacity = 0;
@@ -1325,23 +1295,8 @@ export function drawSukunaDomainDimScreen() {
   ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Deep crimson/blood-red radial gradient centered on Sukuna
-  const center = sukunaFighter ? worldToScreen(sukunaFighter.x, (sukunaFighter.y - (sukunaFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
-  const cx = center.x;
-  const cy = center.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.75;
-
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, 'rgba(200, 30, 30, 0.50)');       // Bright cursed crimson core
-  grad.addColorStop(0.15, 'rgba(140, 10, 10, 0.40)');     // Deep blood red halo
-  grad.addColorStop(0.35, 'rgba(80, 5, 5, 0.25)');        // Dark crimson ring
-  grad.addColorStop(0.60, 'rgba(30, 2, 2, 0.12)');        // Deep maroon fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');             // Pitch black boundary
-
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Exclude Gojo Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
@@ -1359,7 +1314,7 @@ export function drawYutaDomainDimScreen() {
   if (!ctx || !canvas) return;
 
   const yutaFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.id === 'yuta' || f._def?.type === 'yuta') && (f.domainActive || f.isChannelingDomain)
+    f && f.hp > 0 && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.id === 'yuta' || f._def?.type === 'yuta') && (f.domainActive || f.isChannelingDomain)
   );
 
   let targetOpacity = 0;
@@ -1393,23 +1348,8 @@ export function drawYutaDomainDimScreen() {
   ctx.fillStyle = `rgba(10, 2, 8, ${opacity * 0.90})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Deep cursed rose/magenta radial bloom centered on Yuta
-  const center = yutaFighter ? worldToScreen(yutaFighter.x, (yutaFighter.y - (yutaFighter.z || 0))) : { x: canvas.width / 2, y: canvas.height / 2 };
-  const cx = center.x;
-  const cy = center.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.85;
-
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, 'rgba(219, 39, 119, 0.52)');      // Bright cursed rose/magenta core (#db2777)
-  grad.addColorStop(0.18, 'rgba(157, 23, 77, 0.42)');    // Deep magenta halo (#9d174d)
-  grad.addColorStop(0.40, 'rgba(80, 7, 36, 0.28)');      // Dark cursed wine-purple ring (#500724)
-  grad.addColorStop(0.68, 'rgba(25, 4, 15, 0.14)');      // Charcoal-rose fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');            // Pitch black boundary
-
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = 'screen';
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Exclude Gojo Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
@@ -1419,28 +1359,30 @@ export function drawYutaDomainDimScreen() {
 let currentMahitoDomainDimOpacity = 0;
 
 /**
- * Draws a dark teal/cursed dim screen overlay when Mahito's Domain Expansion (Self-Embodiment of Perfection) is active.
- * This dim overlay is NOT clipped to the arena — it spreads across the full screen.
+ * Draws a dark cursed purple dim screen overlay when Mahito's Domain Expansion (Self-Embodiment of Perfection) is active or channeling.
+ * This dim overlay is NOT clipped to the arena — it spreads across the full screen for cinematic immersion.
+ * The domain IMAGE itself remains clipped inside the arena via WebGL masking in hybridEnvironmentRenderer.
  */
 export function drawMahitoDomainDimScreen() {
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
   const mahitoFighter = state.fighters?.find(f =>
-    f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive || f.isChannelingDomainExpansion)
+    f && f.hp > 0 && (f.characterId === 'mahito' || f.type === 'mahito' || f._def?.id === 'mahito' || f._def?.type === 'mahito') && (f.domainActive || f._mahitoDomainActive || f.isChannelingDomainExpansion)
   );
 
   let targetOpacity = 0;
   if (mahitoFighter) {
     if (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive) {
-      targetOpacity = 0.68;
+      targetOpacity = 0.72;
     } else if (mahitoFighter.isChannelingDomainExpansion) {
       const chargeMax = mahitoFighter.domainChargeMax || 120;
       const progress = Math.min(1.0, (mahitoFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
-      targetOpacity = 0.25 + progress * 0.40;
+      targetOpacity = 0.25 + progress * 0.45;
     }
   }
 
+  // Smoothly interpolate
   if (targetOpacity > currentMahitoDomainDimOpacity) {
     currentMahitoDomainDimOpacity += (targetOpacity - currentMahitoDomainDimOpacity) * 0.08;
   } else {
@@ -1454,16 +1396,20 @@ export function drawMahitoDomainDimScreen() {
 
   const opacity = currentMahitoDomainDimOpacity;
 
-  // During domain channeling, draw smooth dark charge-up overlay; when domain is active, renderMahitoDomainBackground displays the authentic full-screen void & environment
-  if (mahitoFighter && mahitoFighter.isChannelingDomainExpansion && !mahitoFighter.domainActive) {
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.75})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  }
+  ctx.save();
+  // Reset transform to identity screen space so full-screen dim doesn't shift with camera shake
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  state.globalDimEdgeColor = `rgba(0, 5, 5, ${opacity * 0.95})`;
+  // 1. Base dark atmospheric void overlay (full-screen, unclipped, immune to camera pan/zoom cropping)
+  ctx.fillStyle = `rgba(10, 2, 16, ${opacity * 0.88})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Exclude Gojo Limitless Infinity Barrier from dark overlay (Rule #9)
+  excludeGojoInfinityFromDim(ctx);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(15, 2, 20, ${opacity * 0.95})`;
 }
 
 let currentTojiUltimateOpacity = 0;
@@ -1587,10 +1533,12 @@ export function drawTojiUltimateOverlay() {
     ctx.globalCompositeOperation = 'screen';
     
     // 1. Toji Cinematic Spotlight / Ethereal Backlight
-    const tojiScreenX = toji.x + (state.shakeX || 0);
-    const tojiScreenY = (toji.y - (toji.z || 0)) + (state.shakeY || 0);
-    const tojiSpotR = (toji.r || 25) * 5.0; // ~125px radius bloom
-    const tojiGrad = ctx.createRadialGradient(tojiScreenX, tojiScreenY, 10, tojiScreenX, tojiScreenY, tojiSpotR);
+    const tojiZoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+    const tojiScreen = worldToScreen(toji.x, toji.y - (toji.z || 0));
+    const tojiScreenX = tojiScreen.x;
+    const tojiScreenY = tojiScreen.y;
+    const tojiSpotR = (toji.r || 25) * 5.0 * tojiZoom; // ~125px radius bloom
+    const tojiGrad = ctx.createRadialGradient(tojiScreenX, tojiScreenY, 10 * tojiZoom, tojiScreenX, tojiScreenY, tojiSpotR);
     tojiGrad.addColorStop(0,    'rgba(215, 140, 255, 0.85)'); // Electric Violet Core
     tojiGrad.addColorStop(0.30, 'rgba(160, 48, 255, 0.55)');
     tojiGrad.addColorStop(0.65, 'rgba(100, 20, 180, 0.25)');
@@ -1603,10 +1551,11 @@ export function drawTojiUltimateOverlay() {
     // 2. Target Cinematic Threat Spotlight (The Enemy)
     const target = toji.ultimateTarget;
     if (target && target.hp > 0) {
-      const targetScreenX = target.x + (state.shakeX || 0);
-      const targetScreenY = (target.y - (target.z || 0)) + (state.shakeY || 0);
-      const targetSpotR = (target.r || 25) * 5.0; // ~125px radius bloom
-      const targetGrad = ctx.createRadialGradient(targetScreenX, targetScreenY, 10, targetScreenX, targetScreenY, targetSpotR);
+      const targetScreen = worldToScreen(target.x, target.y - (target.z || 0));
+      const targetScreenX = targetScreen.x;
+      const targetScreenY = targetScreen.y;
+      const targetSpotR = (target.r || 25) * 5.0 * tojiZoom; // ~125px radius bloom
+      const targetGrad = ctx.createRadialGradient(targetScreenX, targetScreenY, 10 * tojiZoom, targetScreenX, targetScreenY, targetSpotR);
       targetGrad.addColorStop(0,    'rgba(255, 90, 130, 0.85)'); // Radiant Crimson Core
       targetGrad.addColorStop(0.30, 'rgba(255, 30, 86, 0.55)');
       targetGrad.addColorStop(0.65, 'rgba(180, 15, 50, 0.25)');
@@ -3121,17 +3070,22 @@ function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFo
   if (!isBankaiChannelingOrBursting && currentHollowMaskOpacity > 0.01 && hollowMaskOverlayImg && hollowMaskOverlayImg.complete && hollowMaskOverlayImg.naturalWidth > 0) {
     ctx.save();
 
-    // 1. Strictly clip to the arena boundaries (handling both circular and rectangular arenas)
-    ctx.beginPath();
-    const arenaX = (arena.x || 0) + shakeX;
-    const arenaY = (arena.y || 0) + shakeY;
-    const arenaW = arena.width || 800;
-    const arenaH = arena.height || 600;
-    const arenaCenterX = arenaX + arenaW / 2;
-    const arenaCenterY = arenaY + arenaH / 2;
+    // 1. Strictly clip to the arena boundaries in screen space (handling dynamic camera pan, distance zoom, and shake)
+    const zoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+    const worldArenaCenterX = (arena.x || 0) + (arena.width || 800) / 2;
+    const worldArenaCenterY = (arena.y || 0) + (arena.height || 600) / 2;
+    const screenCenter = worldToScreen(worldArenaCenterX, worldArenaCenterY);
+    const arenaCenterX = screenCenter.x;
+    const arenaCenterY = screenCenter.y;
 
+    const arenaW = (arena.width || 800) * zoom;
+    const arenaH = (arena.height || 600) * zoom;
+    const arenaX = arenaCenterX - arenaW / 2;
+    const arenaY = arenaCenterY - arenaH / 2;
+
+    ctx.beginPath();
     if (arena.shape === 'circle') {
-      const ar = arena.radius || (arenaW / 2);
+      const ar = (arena.radius || ((arena.width || 800) / 2)) * zoom;
       ctx.arc(arenaCenterX, arenaCenterY, ar, 0, Math.PI * 2);
     } else {
       ctx.rect(arenaX, arenaY, arenaW, arenaH);

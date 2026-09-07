@@ -90,11 +90,34 @@ export class YutaFighter extends Fighter {
   }
 
   isSummoningRika() {
-    if ((this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0 || (this.beamRetreatSlideTimer || 0) > 0) return true;
-    if (this.rika) {
-      if ((this.rika.chargeTimer || 0) > 0 || (this.rika.spawnTimer || 0) > 0) return true;
-    }
+    if ((this.rikaEmergingForBeamTimer || 0) > 0 || (this.beamRetreatSlideTimer || 0) > 0) return true;
     return false;
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isChannelingPureLoveBeam ||
+      this.isFiringPureLoveBeam ||
+      (this.pureLoveBeamChargeTimer > 0) ||
+      (this.pureLoveBeamBreatherTimer > 0) ||
+      (this.rikaEmergingForBeamTimer > 0) ||
+      (this.beamRetreatSlideTimer > 0) ||
+      this.isChannelingDomain ||
+      (this.domainChargeTimer > 0) ||
+      this.isChannelingThinIceBreaker ||
+      (this.thinIceBreakerPunchTimer > 0) ||
+      (this.flurryHitsLeft > 0) ||
+      (this.flurryTimer > 0) ||
+      (this.rctRevivalTimer > 0)
+    );
+  }
+
+  isPerformingSkill() {
+    return this.isStationarySkillActive();
+  }
+
+  isChannelingSkill() {
+    return this.isStationarySkillActive();
   }
 
   getParryChance() {
@@ -204,9 +227,9 @@ export class YutaFighter extends Fighter {
       return isEnemy && isParalyzingDomain;
     });
 
-    if (!this.isGrabbedByMahoraga && (this.isChannelingDomain || this.isChannelingPureLoveBeam || (this.rikaCallTimer > 0) || (this.rikaEmergingForBeamTimer > 0))) {
-      // Hyper-Armor: Yuta has hyper-armor against basic hitStun & knockback, BUT active Domain Expansion from an enemy overrules hyper-armor!
-      if (!isEnemyDomainActive) {
+    if (!this.isGrabbedByMahoraga && (this.isChannelingDomain || this.isChannelingPureLoveBeam || (this.rikaEmergingForBeamTimer > 0))) {
+      // Hyper-Armor: Yuta has hyper-armor while channeling Domain Expansion or Pure Love Beam
+      if (this.isChannelingDomain || !isEnemyDomainActive) {
         this.timeStopTimer = 0;
         this.isFrozenByInfinity = false;
         this.purpleHitTimer = 0;
@@ -227,7 +250,7 @@ export class YutaFighter extends Fighter {
       this.knockbackVy = 0;
     }
 
-    const isFrozen = this._handleTimeStop() || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
+    const isFrozen = (!this.isChannelingDomain && !this.domainActive && this._handleTimeStop()) || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
     if (isFrozen || this.isTargetOfAmbush) {
       // Pause active beam audio handles while frozen in domain stasis
       if (this.isChannelingPureLoveBeam || this.rikaEmergingForBeamTimer > 0 || this.isFiringPureLoveBeam) {
@@ -253,24 +276,13 @@ export class YutaFighter extends Fighter {
       return; // Hold Yuta in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
     }
 
-    // Freeze Yuta's movement for a moment while he calls for Rika (prevent during Domain Expansion)
+    // Decay rikaCallTimer and spawn visual CE gathering sparks at katana tip without freezing movement
     if (this.domainActive || this.isChannelingDomain) {
       this.rikaCallTimer = 0;
     }
 
     if (this.rikaCallTimer > 0 && !this.domainActive && !this.isChannelingDomain) {
       this.rikaCallTimer--;
-      this.vx = 0;
-      this.vy = 0;
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      this.hitStunTimer = 0;
-      this.knockbackStunTimer = 0;
-
-      // Continuously rotate and aim at opponent while summoning Rika!
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent);
-      }
 
       // Spawn cursed energy gathering sparks at the blade tip & palm while summoning Rika
       if (Math.random() < 0.6) {
@@ -280,7 +292,6 @@ export class YutaFighter extends Fighter {
       if (this.rikaCallTimer % 5 === 0) {
         spawnImpactFlash(this.x, this.y, 35 + Math.random() * 15, 'rgba(255, 20, 147, 0.4)');
       }
-      return; // Skip movement steering to lock position while keeping aim rotation active!
     }
 
     if (this.rctCooldown > 0) this.rctCooldown--;
@@ -306,6 +317,7 @@ export class YutaFighter extends Fighter {
         spawnFloatingText(this.x, this.y - 40, 'RCT COMPLETE', '#88FF88');
         triggerGlobalScreenShake(5, 10);
         spawnImpactFlash(this.x, this.y, 50, 'silver'); // Safe flash color
+        this.resumeMovement(opponent);
       }
 
       // Update pos manually since we skip super.update()
@@ -325,7 +337,6 @@ export class YutaFighter extends Fighter {
     const shouldFreezeMove = this.isFiringPureLoveBeam || 
                              this.isChannelingPureLoveBeam || 
                              (this.rikaEmergingForBeamTimer > 0) || 
-                             (this.rikaCallTimer > 0) || 
                              (this.pureLoveBeamBreatherTimer > 0) ||
                              this.isChannelingDomain;
 
@@ -706,6 +717,7 @@ export class YutaFighter extends Fighter {
       // Rika's HP already fully drained during charge phase — no additional drain needed here
       if (this.pureLoveBeamActiveTimer <= 0) {
         this.isFiringPureLoveBeam = false;
+        this.pureLoveBeamChargeTimer = 0; // Reset charge timer
         this.pureLoveBeamBreatherTimer = 60; // 1-second post-beam breather recovery pause!
 
         // Dense burst of lingering pink-whitecore particles along the beam path upon expiration!
@@ -795,6 +807,15 @@ export class YutaFighter extends Fighter {
         const headY = this.y + Math.sin(this.gunAngle) * 12;
         spawnSparks(headX, headY, 2, 'rgba(255, 255, 255, 0.8)', { color: 'rgba(220, 220, 240, 0.5)' });
       }
+
+      if (this.pureLoveBeamBreatherTimer === 0) {
+        this.pureLoveBeamChargeTimer = 0;
+        const opp = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+        const chaseAngle = opp ? Math.atan2(opp.y - this.y, opp.x - this.x) : (this.gunAngle || this.angle || 0);
+        const spd = this.speed || 3.0;
+        this.vx = Math.cos(chaseAngle) * (spd * 0.8);
+        this.vy = Math.sin(chaseAngle) * (spd * 0.8);
+      }
       return; // Pause actions during post-beam breather recovery
     }
 
@@ -803,11 +824,20 @@ export class YutaFighter extends Fighter {
       this.vy = 0;
       this.hitStunTimer = 0; // Domain Hyper-Armor: prevents domain channeling from being interrupted/frozen
 
-      // Do not auto-aim during domain expansion channeling
-      this.domainChargeTimer++;
+      // Check if casting inside an active enemy domain (Domain Clash scenario)
+      const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+      const isClashingInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some((f, idx) => {
+        if (!f || f === this || f.hp <= 0) return false;
+        const isEnemy = myTeam === null || (state.getFighterTeam && state.getFighterTeam(idx) !== myTeam);
+        return isEnemy && (f.domainActive || f.stolenDomainActive);
+      });
+
+      // Domain Clash acceleration: Deploy faster (2x charge speed, ~45 frames / 0.75s) when clashing inside an enemy domain!
+      const chargeIncrement = isClashingInsideDomain ? (CONFIG.yuta?.domainClashChargeSpeed ?? 2) : 1;
+      this.domainChargeTimer += chargeIncrement;
 
       // Spawn some charge particles
-      if (this.domainChargeTimer % 3 === 0) {
+      if (this.domainChargeTimer % 3 === 0 || isClashingInsideDomain) {
         spawnSparks(this.x + (Math.random()-0.5)*30, this.y + (Math.random()-0.5)*30, 3, 'silver', { color: 'rgba(255, 105, 180, 1)', blendMode: 0 });
       }
       if (this.domainChargeTimer % 15 === 0) {
@@ -815,8 +845,8 @@ export class YutaFighter extends Fighter {
       }
 
       // Play domain_activate audio before deploying
-      const deployAudioFrame = CONFIG.yuta.domainDeployAudioFrame ?? this.domainChargeMax;
-      if (this.domainChargeTimer === deployAudioFrame && !this._playedDeployAudio) {
+      const deployAudioFrame = CONFIG.yuta.domainDeployAudioFrame ?? (isClashingInsideDomain ? Math.max(1, this.domainChargeMax - 30) : this.domainChargeMax);
+      if (this.domainChargeTimer >= deployAudioFrame && !this._playedDeployAudio) {
         this._playedDeployAudio = true;
         if (CONFIG.yuta?.domainDeploySound) {
           audioSystem.playSFX(
@@ -895,7 +925,7 @@ export class YutaFighter extends Fighter {
     const hpDamageNeededFor2ndDomain = (this.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.75);
     const hpLostSince1stDomain = this.domain2DamageTaken || 0;
 
-    const canActivate = (!this.domainActive && !this.isChannelingDomain && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0 && this.rika && this.rika.active && this.rika.hp > 0);
+    const canActivate = (!this.domainActive && !this.isChannelingDomain && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0 && this.rika);
     const isFirstTrigger = (this.domainUseCount === 0 && hpRatio <= domainHpThreshold1);
     const isSecondTrigger = (this.domainUseCount === 1 && hpLostSince1stDomain >= hpDamageNeededFor2ndDomain);
 
@@ -912,6 +942,11 @@ export class YutaFighter extends Fighter {
         this.hasActivatedDomainAt25Hp = true;
         if (opponent && !opponent.isDead) {
           this.aim(opponent);
+        }
+        if (this.rika) {
+          this.rika.killedInDomain = false;
+          this.rika.isDying = false;
+          this.rika.disappearing = false;
         }
         this.isChannelingDomain = true;
         this.domainChargeTimer = 0;
@@ -1235,8 +1270,8 @@ export class YutaFighter extends Fighter {
     const isSwinging = (this.meleeCooldown > maxCd - 15);
 
     // Ignore unblockable damage types (including Gojo's purple orb & Nanami 7:3 Ratio Crit)
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield);
-    const unblockable = isGuaranteedHit || opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.isDivineFlame || opts.isFuga);
+    const unblockable = isGuaranteedHit || opts.isPoison || opts.isBurn || opts.isFlame || opts.isDivineFlame || opts.isFuga || opts.isExplosion || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
 
     const isGuarding = this.blockPoseTimer > 0;
     const blockChance = this.getParryChance();
@@ -1377,8 +1412,15 @@ export class YutaFighter extends Fighter {
       }
     }
 
-    // Track 3-second damage window for non-fatal heavy damage RCT heal trigger
-    if (amount > 0 && this.invincibilityTimer <= 0) {
+    // Track 3-second damage window for non-fatal heavy damage RCT heal trigger.
+    // IMPORTANT: Exclude ALL guaranteed-hit and high-knockback damage sources from
+    // accumulating into the heal-freeze window. These powerful attacks (Fuga, explosions,
+    // ultimates, domain attacks, etc.) apply massive knockback that should send Yuta
+    // flying across the arena — NOT freeze him in a stationary 2.5s heal pose.
+    // Using isGuaranteedHit (already computed above) ensures any future guaranteed-hit
+    // ability is automatically excluded without needing per-flag whitelisting here.
+    const isHighImpactDamage = isGuaranteedHit || opts.isExplosion || opts.isKnockback || opts.isAOE || opts.isUltimate || opts.isDomain || opts.isStorm;
+    if (amount > 0 && this.invincibilityTimer <= 0 && !isHighImpactDamage) {
       const now = Date.now();
       if (!this.damageWindow) this.damageWindow = [];
       this.damageWindow.push({ amount, time: now });
@@ -1489,6 +1531,7 @@ export class YutaFighter extends Fighter {
 
   activatePureLoveBeam() {
     this.isChannelingPureLoveBeam = false;
+    this.pureLoveBeamChargeTimer = 0; // Reset charge timer so isChannelingSkill() clears cleanly
     this.isFiringPureLoveBeam = true;
     this.pureLoveBeamActiveTimer = CONFIG.yuta?.pureLoveBeamDuration || 280;
     this.pureLoveBeamCooldownTimer = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
@@ -1555,6 +1598,19 @@ export class YutaFighter extends Fighter {
     this.domainX = this.x;
     this.domainY = this.y;
     this.rikaCallTimer = 0; // Force clear any call freeze
+
+    // Give Yuta an immediate movement burst into action upon domain deployment
+    const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
+    const targetEnemy = (state && state.fighters) ? state.fighters.find((f, idx) => {
+      if (!f || f === this || f.hp <= 0) return false;
+      const enemyTeam = state.getFighterTeam(idx);
+      return myTeam === null || enemyTeam === null || myTeam !== enemyTeam;
+    }) : null;
+
+    const moveAngle = targetEnemy ? Math.atan2(targetEnemy.y - this.y, targetEnemy.x - this.x) : (Math.random() * Math.PI * 2);
+    const initSpeed = this.speed || 3;
+    this.vx = Math.cos(moveAngle) * initSpeed * 0.8;
+    this.vy = Math.sin(moveAngle) * initSpeed * 0.8;
 
     // Auto-summon Rika when domain activates
     if (this.rika) {
@@ -1774,7 +1830,10 @@ export class YutaFighter extends Fighter {
 
     super.interruptAttacks(forceCancelAll);
 
-    if (forceCancelAll) {
+    // ONLY death, Toji ISOH ambush, or explicit silence can hard-cancel Yuta's ultimate hyper-armor
+    const isHardCancelled = this.hp <= 0 || this.isDead || this.isTargetOfAmbush || (this.silenceTimer || 0) > 0;
+
+    if (isHardCancelled) {
       this._stopBeamAudio();
       this.beamRetreatSlideTimer = 0;
       this.isChannelingDomain = false;
@@ -1790,26 +1849,11 @@ export class YutaFighter extends Fighter {
       return;
     }
 
-    // Hyper-Armor Protection: Preserve Yuta's channeling states against normal hitstun/slashes!
-    // ONLY Toji ISOH ambush or explicit silence can break Yuta's ultimate hyper-armor.
-    if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
-      this._stopBeamAudio();
-      this.beamRetreatSlideTimer = 0;
-      this.isChannelingDomain = false;
-      this.domainChargeTimer = 0;
-      this.isChannelingPureLoveBeam = false;
-      this.pureLoveBeamChargeTimer = 0;
-      this.isFiringPureLoveBeam = false;
-      this.pureLoveBeamActiveTimer = 0;
-      this.rikaEmergingForBeamTimer = 0;
-      this.rikaCallTimer = 0;
-      this.isChannelingThinIceBreaker = false;
-      this.thinIceBreakerChargeTimer = 0;
-      return;
-    }
+    // Hyper-Armor Protection: Preserve Yuta's channeling states against normal hitstun/slashes/blasts!
     if (wasChannelingDomain) {
       this.isChannelingDomain = true;
       this.domainChargeTimer = currentDomainCharge;
+      this.domainCooldown = 0;
     }
     if (wasChannelingBeam) {
       this.isChannelingPureLoveBeam = true;
