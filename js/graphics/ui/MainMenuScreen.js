@@ -380,28 +380,60 @@ function drawModeSelection(cx, cy) {
 
     ctx.save();
     if (selected) {
-      ctx.fillStyle = '#9e1a2b';
-      ctx.strokeStyle = '#2d080c';
-      ctx.lineWidth = 1.5;
-    } else {
-      ctx.fillStyle = '#e8dec8';
-      ctx.strokeStyle = '#2d080c';
-      ctx.lineWidth = 1.2;
-    }
+      // 3D Shadow
+      ctx.fillStyle = '#5e0d1f';
+      drawChamferedRect(ctx, startX, btnY + 2.5, buttonWidth, buttonHeight, 3);
+      ctx.fill();
 
-    drawChamferedRect(ctx, startX, btnY, buttonWidth, buttonHeight, 3);
-    ctx.fill();
-    ctx.stroke();
+      // Top Face
+      const grad = ctx.createLinearGradient(startX, btnY, startX, btnY + buttonHeight);
+      grad.addColorStop(0, '#f26f88');
+      grad.addColorStop(1, '#cc2b4d');
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.8;
+      drawChamferedRect(ctx, startX, btnY, buttonWidth, buttonHeight, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      // Inset Highlight
+      ctx.strokeStyle = '#ffaec0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(startX + 2, btnY + 1.5);
+      ctx.lineTo(startX + buttonWidth - 2, btnY + 1.5);
+      ctx.stroke();
+
+      // Text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 7.5px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(mode.label, startX + buttonWidth / 2, btnY + buttonHeight / 2 + 0.5);
+    } else {
+      // 3D Shadow
+      ctx.fillStyle = '#baa88c';
+      drawChamferedRect(ctx, startX, btnY + 2, buttonWidth, buttonHeight, 3);
+      ctx.fill();
+
+      // Top Face
+      ctx.fillStyle = '#faedf0';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.6;
+      drawChamferedRect(ctx, startX, btnY, buttonWidth, buttonHeight, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      // Text
+      ctx.fillStyle = '#21050c';
+      ctx.font = '700 7px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(mode.label, startX + buttonWidth / 2, btnY + buttonHeight / 2 + 0.5);
+    }
     ctx.restore();
 
-    // Mode text
-    ctx.fillStyle = selected ? '#ffffff' : '#2d080c';
-    ctx.font = '900 10px "Outfit", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(mode.label, startX + buttonWidth / 2, cy);
-
-    _registerButton(startX, btnY, buttonWidth, buttonHeight, () => {
+    _registerButton(startX, btnY, buttonWidth, buttonHeight + 2, () => {
       if (state.mode !== mode.id) {
         state.mode = mode.id;
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {

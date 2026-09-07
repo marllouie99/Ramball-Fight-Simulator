@@ -162,11 +162,11 @@ function drawButton(text, cx, cy, action, w = 200, h = 40, customColor = null, r
   // Button text
   ctx.fillStyle = textColor;
   ctx.font = isPrimary 
-    ? '900 13px "Outfit", "Press Start 2P", sans-serif'
-    : 'bold 11px "Outfit", "Rajdhani", sans-serif';
+    ? '700 8.5px "Press Start 2P", monospace'
+    : '700 7.5px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, cx, topFaceY + h / 2);
+  ctx.fillText(text, cx, topFaceY + h / 2 + 0.5);
 
   ctx.restore();
 
@@ -210,19 +210,19 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight = 16) {
 function drawPremiumStatBar(ctx, x, y, width, label, valueStr, percentage, color = '#9e1a2b') {
   // Label
   ctx.fillStyle = '#2d080c';
-  ctx.font = 'bold 10px "Outfit", "Rajdhani", sans-serif';
+  ctx.font = '700 7.5px "Silkscreen", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
   ctx.fillText(label, x, y - 2);
   
   // Value text
   ctx.fillStyle = '#702028';
-  ctx.font = 'bold 10.5px "Rajdhani", monospace, sans-serif';
+  ctx.font = '700 7.5px "Silkscreen", monospace';
   ctx.textAlign = 'right';
   ctx.fillText(valueStr, x + width, y - 2);
 
   // Background track
-  ctx.fillStyle = '#d8ceb9';
+  ctx.fillStyle = '#eed8dc';
   ctx.strokeStyle = '#2d080c';
   ctx.lineWidth = 1.2;
   drawChamferedRect(ctx, x, y, width, 5, 2);
@@ -241,7 +241,7 @@ function drawPremiumStatBar(ctx, x, y, width, label, valueStr, percentage, color
 function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b') {
   // Metric Label on left
   ctx.fillStyle = '#2d080c';
-  ctx.font = 'bold 9.5px "Rajdhani", sans-serif';
+  ctx.font = '700 7.5px "Silkscreen", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x, y + 3);
@@ -253,7 +253,7 @@ function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b'
   const barH = 5;
 
   // Background Track
-  ctx.fillStyle = '#d8ceb9';
+  ctx.fillStyle = '#eed8dc';
   ctx.strokeStyle = '#2d080c';
   ctx.lineWidth = 1.2;
   drawChamferedRect(ctx, barX, y + 1, barW, barH, 2);
@@ -271,7 +271,7 @@ function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b'
   // Metric Value on right
   if (valueW > 0) {
     ctx.fillStyle = '#702028';
-    ctx.font = 'bold 9.5px "Rajdhani", monospace, sans-serif';
+    ctx.font = '700 7.5px "Silkscreen", monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText(typeof value === 'number' ? value : value, x + width, y + 3);

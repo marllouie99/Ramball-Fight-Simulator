@@ -659,35 +659,30 @@ export function closeArenaBgmModal() {
 export function drawArenaBgmSelector(ctx, x, y, width, height) {
   const currentTrack = getSelectedArenaBgmTrack();
   const isOff = currentTrack.id === 'off';
-  const isRandom = currentTrack.id === 'random';
 
   ctx.save();
-  if (isOff) {
-    ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = 1;
-  } else {
-    ctx.fillStyle = isRandom ? 'rgba(0, 229, 255, 0.14)' : 'rgba(245, 158, 11, 0.14)';
-    ctx.strokeStyle = isRandom ? '#00e5ff' : '#f59e0b';
-    ctx.lineWidth = 1;
-  }
+  ctx.fillStyle = !isOff ? '#5e0d1f' : '#baa88c';
+  drawChamferedRect(ctx, x, y + 2, width, height, 3);
+  ctx.fill();
 
-  drawChamferedRect(ctx, x, y, width, height, 4);
+  ctx.fillStyle = !isOff ? '#f26f88' : '#faedf0';
+  ctx.strokeStyle = '#21050c';
+  ctx.lineWidth = 1.6;
+  drawChamferedRect(ctx, x, y, width, height, 3);
   ctx.fill();
   ctx.stroke();
 
-  const labelColor = isOff ? '#8899aa' : (isRandom ? '#00e5ff' : '#ffd700');
-  ctx.fillStyle = labelColor;
-  ctx.font = '900 10px "Rajdhani", "Outfit", sans-serif';
+  ctx.fillStyle = !isOff ? '#ffffff' : '#21050c';
+  ctx.font = '700 6.5px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   
-  const displayLabel = `🎵 BGM: ${currentTrack.shortName}`;
-  ctx.fillText(displayLabel, x + width / 2, y + height / 2);
+  const displayLabel = isOff ? 'BGM: OFF' : `BGM:${currentTrack.shortName.slice(0, 5)}`;
+  ctx.fillText(displayLabel, x + width / 2, y + height / 2 + 0.5);
 
   ctx.restore();
 
-  _registerButton(x, y, width, height, () => {
+  _registerButton(x, y, width, height + 2, () => {
     openArenaBgmModal();
     if (typeof state !== 'undefined' && state.audioSystem?.playSFX) {
       state.audioSystem.playSFX('skill_dash1', 0.2);
@@ -702,7 +697,7 @@ export function drawArenaBgmModal(ctx) {
 
   // 1. Fullscreen Dimmed Modal Backdrop
   ctx.save();
-  ctx.fillStyle = 'rgba(3, 5, 8, 0.85)';
+  ctx.fillStyle = 'rgba(33, 5, 12, 0.88)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
@@ -717,71 +712,69 @@ export function drawArenaBgmModal(ctx) {
   const mx = (canvas.width - modalW) / 2;
   const my = (canvas.height - modalH) / 2;
 
-  ctx.save();
-  ctx.fillStyle = 'rgba(10, 14, 22, 0.98)';
-  ctx.strokeStyle = '#f59e0b';
-  ctx.lineWidth = 1.5;
-  ctx.shadowColor = 'rgba(245, 158, 11, 0.35)';
-  ctx.shadowBlur = 12;
-  drawChamferedRect(ctx, mx, my, modalW, modalH, 8);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  drawPanel(mx, my, modalW, modalH, 0.98, 6, '#21050c');
 
   // Modal Header
   ctx.save();
-  ctx.fillStyle = '#f59e0b';
-  ctx.font = '900 9px "Rajdhani", monospace';
+  ctx.fillStyle = '#b81c3b';
+  ctx.font = '700 7.5px "Silkscreen", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('SYS // AUDIO OPERATIONS // AUTO-SYNC ENABLED', mx + 20, my + 14);
+  ctx.fillText('SYS // AUDIO OPERATIONS // AUTO-SYNC ENABLED', mx + 18, my + 14);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 17px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText('[ SELECT ARENA SOUNDTRACK ]', mx + 20, my + 26);
+  ctx.fillStyle = '#21050c';
+  ctx.font = '700 10.5px "Press Start 2P", monospace';
+  ctx.fillText('[ SELECT ARENA SOUNDTRACK ]', mx + 18, my + 26);
+  ctx.restore();
 
   // Close 'X' Button
-  const closeBtnSize = 22;
+  const closeBtnSize = 20;
   const closeBtnX = mx + modalW - closeBtnSize - 16;
-  const closeBtnY = my + 18;
+  const closeBtnY = my + 16;
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-  ctx.lineWidth = 1;
-  drawChamferedRect(ctx, closeBtnX, closeBtnY, closeBtnSize, closeBtnSize, 4);
+  ctx.save();
+  ctx.fillStyle = '#5e0d1f';
+  drawChamferedRect(ctx, closeBtnX, closeBtnY + 2, closeBtnSize, closeBtnSize, 3);
+  ctx.fill();
+
+  ctx.fillStyle = '#f26f88';
+  ctx.strokeStyle = '#21050c';
+  ctx.lineWidth = 1.5;
+  drawChamferedRect(ctx, closeBtnX, closeBtnY, closeBtnSize, closeBtnSize, 3);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = '#ff6b6b';
-  ctx.font = '900 12px "Outfit", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 8px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('✕', closeBtnX + closeBtnSize / 2, closeBtnY + closeBtnSize / 2);
+  ctx.fillText('✕', closeBtnX + closeBtnSize / 2, closeBtnY + closeBtnSize / 2 + 0.5);
+  ctx.restore();
 
-  _registerButton(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize, () => {
+  _registerButton(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize + 2, () => {
     closeArenaBgmModal();
   });
 
   // Top Action Bar (Import / Open Folder)
-  const barY = my + 48;
+  const barY = my + 46;
   const barBtnH = 20;
   
   if (isElectron) {
     // Open Folder in Windows Explorer
     const openBtnW = 122;
-    const openBtnX = mx + 20;
+    const openBtnX = mx + 18;
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 229, 255, 0.12)';
-    ctx.strokeStyle = '#00e5ff';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.2;
     drawChamferedRect(ctx, openBtnX, barY, openBtnW, barBtnH, 3);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#00e5ff';
-    ctx.font = '900 8.5px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#21050c';
+    ctx.font = '700 6.5px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('📁 OPEN MUSIC FOLDER', openBtnX + openBtnW / 2, barY + barBtnH / 2);
+    ctx.fillText('📁 OPEN FOLDER', openBtnX + openBtnW / 2, barY + barBtnH / 2 + 0.5);
     ctx.restore();
 
     _registerButton(openBtnX, barY, openBtnW, barBtnH, () => {
@@ -792,17 +785,17 @@ export function drawArenaBgmModal(ctx) {
     const rescanBtnW = 90;
     const rescanBtnX = openBtnX + openBtnW + 8;
     ctx.save();
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.2;
     drawChamferedRect(ctx, rescanBtnX, barY, rescanBtnW, barBtnH, 3);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#f59e0b';
-    ctx.font = '900 8.5px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#21050c';
+    ctx.font = '700 6.5px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🔄 RESCAN FOLDER', rescanBtnX + rescanBtnW / 2, barY + barBtnH / 2);
+    ctx.fillText('🔄 RESCAN', rescanBtnX + rescanBtnW / 2, barY + barBtnH / 2 + 0.5);
     ctx.restore();
 
     _registerButton(rescanBtnX, barY, rescanBtnW, barBtnH, () => {
@@ -814,17 +807,17 @@ export function drawArenaBgmModal(ctx) {
     const importBtnW = 100;
     const importBtnX = rescanBtnX + rescanBtnW + 8;
     ctx.save();
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.2;
     drawChamferedRect(ctx, importBtnX, barY, importBtnW, barBtnH, 3);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#10b981';
-    ctx.font = '900 8.5px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '700 6.5px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('➕ IMPORT MP3', importBtnX + importBtnW / 2, barY + barBtnH / 2);
+    ctx.fillText('➕ IMPORT', importBtnX + importBtnW / 2, barY + barBtnH / 2 + 0.5);
     ctx.restore();
 
     _registerButton(importBtnX, barY, importBtnW, barBtnH, () => {
@@ -833,20 +826,20 @@ export function drawArenaBgmModal(ctx) {
     });
   } else {
     // Standard Browser: Import MP3 & Drag Drop indicator
-    const importBtnW = modalW - 40;
-    const importBtnX = mx + 20;
+    const importBtnW = modalW - 36;
+    const importBtnX = mx + 18;
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 229, 255, 0.10)';
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.4;
     drawChamferedRect(ctx, importBtnX, barY, importBtnW, barBtnH, 3);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#00e5ff';
-    ctx.font = '900 9px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '700 7px "Silkscreen", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('📂 CLICK TO IMPORT MP3s  /  DRAG & DROP SONGS HERE', importBtnX + importBtnW / 2, barY + barBtnH / 2);
+    ctx.fillText('📂 CLICK TO IMPORT MP3s / DRAG SONGS HERE', importBtnX + importBtnW / 2, barY + barBtnH / 2);
     ctx.restore();
 
     _registerButton(importBtnX, barY, importBtnW, barBtnH, () => {
@@ -856,37 +849,35 @@ export function drawArenaBgmModal(ctx) {
   }
 
   // ── 2B. INTERACTIVE BGM VOLUME CONTROLLER ──
-  const volY = my + 74;
+  const volY = my + 72;
   const volH = 22;
   const currentVol = getArenaBgmVolume();
   const isMuted = currentVol <= 0.001;
 
   // 1. Mute Toggle / Volume Level Badge Button
-  const muteBtnX = mx + 20;
-  const muteBtnW = 76;
+  const muteBtnX = mx + 18;
+  const muteBtnW = 84;
   ctx.save();
-  if (isMuted) {
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 1.2;
-  } else {
-    ctx.fillStyle = 'rgba(0, 229, 255, 0.12)';
-    ctx.strokeStyle = '#00e5ff';
-    ctx.lineWidth = 1;
-  }
+  ctx.fillStyle = isMuted ? '#5e0d1f' : '#baa88c';
+  drawChamferedRect(ctx, muteBtnX, volY + 2, muteBtnW, volH, 3);
+  ctx.fill();
+
+  ctx.fillStyle = isMuted ? '#f26f88' : '#faedf0';
+  ctx.strokeStyle = '#21050c';
+  ctx.lineWidth = 1.5;
   drawChamferedRect(ctx, muteBtnX, volY, muteBtnW, volH, 3);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = isMuted ? '#ef4444' : '#00e5ff';
-  ctx.font = '900 9px "Rajdhani", sans-serif';
+  ctx.fillStyle = isMuted ? '#ffffff' : '#21050c';
+  ctx.font = '700 6.5px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const volText = isMuted ? '🔇 MUTED' : `🔊 VOL: ${Math.round(currentVol * 100)}%`;
-  ctx.fillText(volText, muteBtnX + muteBtnW / 2, volY + volH / 2);
+  const volText = isMuted ? 'MUTED' : `VOL:${Math.round(currentVol * 100)}%`;
+  ctx.fillText(volText, muteBtnX + muteBtnW / 2, volY + volH / 2 + 0.5);
   ctx.restore();
 
-  _registerButton(muteBtnX, volY, muteBtnW, volH, () => {
+  _registerButton(muteBtnX, volY, muteBtnW, volH + 2, () => {
     toggleArenaBgmMute();
     if (state.audioSystem?.playSFX) state.audioSystem.playSFX('skill_dash1', 0.2);
   });
@@ -895,32 +886,36 @@ export function drawArenaBgmModal(ctx) {
   const minusBtnX = muteBtnX + muteBtnW + 6;
   const stepBtnW = 20;
   ctx.save();
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-  ctx.lineWidth = 1;
+  ctx.fillStyle = '#baa88c';
+  drawChamferedRect(ctx, minusBtnX, volY + 2, stepBtnW, volH, 3);
+  ctx.fill();
+
+  ctx.fillStyle = '#faedf0';
+  ctx.strokeStyle = '#21050c';
+  ctx.lineWidth = 1.5;
   drawChamferedRect(ctx, minusBtnX, volY, stepBtnW, volH, 3);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = '#21050c';
+  ctx.font = '700 8px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('−', minusBtnX + stepBtnW / 2, volY + volH / 2);
+  ctx.fillText('-', minusBtnX + stepBtnW / 2, volY + volH / 2 + 0.5);
   ctx.restore();
 
-  _registerButton(minusBtnX, volY, stepBtnW, volH, () => {
+  _registerButton(minusBtnX, volY, stepBtnW, volH + 2, () => {
     setArenaBgmVolume(Math.max(0, currentVol - 0.05));
     if (state.audioSystem?.playSFX) state.audioSystem.playSFX('skill_dash1', 0.15);
   });
 
   // 3. Interactive Slider Bar
   const plusBtnW = 20;
-  const maxBtnW = 38;
+  const maxBtnW = 42;
   const sliderGap = 6;
   const sliderX = minusBtnX + stepBtnW + sliderGap;
   const rightControlsW = plusBtnW + sliderGap + maxBtnW;
-  const sliderW = modalW - 40 - (muteBtnW + 6 + stepBtnW + sliderGap + sliderGap + rightControlsW);
+  const sliderW = modalW - 36 - (muteBtnW + 6 + stepBtnW + sliderGap + sliderGap + rightControlsW);
 
   // Save bounds for drag interactions
   _volumeSliderBounds = { x: sliderX, y: volY, w: sliderW, h: volH };
@@ -930,32 +925,29 @@ export function drawArenaBgmModal(ctx) {
 
   ctx.save();
   // Slider Track Background
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-  ctx.lineWidth = 1;
-  drawChamferedRect(ctx, sliderX, trackY, sliderW, trackH, 3);
+  ctx.fillStyle = '#eed8dc';
+  ctx.strokeStyle = '#21050c';
+  ctx.lineWidth = 1.2;
+  drawChamferedRect(ctx, sliderX, trackY, sliderW, trackH, 2);
   ctx.fill();
   ctx.stroke();
 
-  // Slider Filled Progress (Cyan to Amber gradient)
+  // Slider Filled Progress (Coral gradient)
   if (currentVol > 0) {
     const fillW = Math.max(4, sliderW * currentVol);
-    const grad = ctx.createLinearGradient(sliderX, trackY, sliderX + fillW, trackY);
-    grad.addColorStop(0, '#00e5ff');
-    grad.addColorStop(1, '#f59e0b');
-    ctx.fillStyle = grad;
-    drawChamferedRect(ctx, sliderX, trackY, fillW, trackH, 3);
+    ctx.fillStyle = '#cc2b4d';
+    drawChamferedRect(ctx, sliderX + 1, trackY + 1, fillW - 2, trackH - 2, 1);
     ctx.fill();
   }
 
-  // Glowing Slider Thumb Knob
+  // Slider Thumb Knob
   const thumbX = sliderX + sliderW * currentVol;
   const thumbY = volY + volH / 2;
-  ctx.fillStyle = isMuted ? '#ef4444' : '#ffd700';
-  ctx.strokeStyle = '#ffffff';
+  ctx.fillStyle = isMuted ? '#cc2b4d' : '#f59e0b';
+  ctx.strokeStyle = '#21050c';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(thumbX, thumbY, 5.5, 0, Math.PI * 2);
+  ctx.arc(thumbX, thumbY, 5, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -971,21 +963,25 @@ export function drawArenaBgmModal(ctx) {
   // 4. Plus (+5%) Step Button
   const plusBtnX = sliderX + sliderW + sliderGap;
   ctx.save();
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-  ctx.lineWidth = 1;
+  ctx.fillStyle = '#baa88c';
+  drawChamferedRect(ctx, plusBtnX, volY + 2, plusBtnW, volH, 3);
+  ctx.fill();
+
+  ctx.fillStyle = '#faedf0';
+  ctx.strokeStyle = '#21050c';
+  ctx.lineWidth = 1.5;
   drawChamferedRect(ctx, plusBtnX, volY, plusBtnW, volH, 3);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = '#21050c';
+  ctx.font = '700 8px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('+', plusBtnX + plusBtnW / 2, volY + volH / 2);
+  ctx.fillText('+', plusBtnX + plusBtnW / 2, volY + volH / 2 + 0.5);
   ctx.restore();
 
-  _registerButton(plusBtnX, volY, plusBtnW, volH, () => {
+  _registerButton(plusBtnX, volY, plusBtnW, volH + 2, () => {
     setArenaBgmVolume(Math.min(1.0, currentVol + 0.05));
     if (state.audioSystem?.playSFX) state.audioSystem.playSFX('skill_dash1', 0.15);
   });
@@ -993,34 +989,37 @@ export function drawArenaBgmModal(ctx) {
   // 5. Max / 100% Quick Button
   const maxBtnX = plusBtnX + plusBtnW + sliderGap;
   ctx.save();
-  ctx.fillStyle = 'rgba(245, 158, 11, 0.10)';
-  ctx.strokeStyle = '#f59e0b';
-  ctx.lineWidth = 1;
+  ctx.fillStyle = '#baa88c';
+  drawChamferedRect(ctx, maxBtnX, volY + 2, maxBtnW, volH, 3);
+  ctx.fill();
+
+  ctx.fillStyle = '#faedf0';
+  ctx.strokeStyle = '#21050c';
+  ctx.lineWidth = 1.5;
   drawChamferedRect(ctx, maxBtnX, volY, maxBtnW, volH, 3);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = '#f59e0b';
-  ctx.font = '900 8.5px "Rajdhani", sans-serif';
+  ctx.fillStyle = '#21050c';
+  ctx.font = '700 6.5px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('100%', maxBtnX + maxBtnW / 2, volY + volH / 2);
+  ctx.fillText('MAX', maxBtnX + maxBtnW / 2, volY + volH / 2 + 0.5);
   ctx.restore();
 
-  _registerButton(maxBtnX, volY, maxBtnW, volH, () => {
+  _registerButton(maxBtnX, volY, maxBtnW, volH + 2, () => {
     setArenaBgmVolume(1.0);
     if (state.audioSystem?.playSFX) state.audioSystem.playSFX('skill_dash1', 0.2);
   });
 
   // Divider Line
-  ctx.fillStyle = '#f59e0b';
-  ctx.fillRect(mx + 20, my + 102, modalW - 40, 1.2);
-  ctx.restore();
+  ctx.fillStyle = '#21050c';
+  ctx.fillRect(mx + 18, my + 100, modalW - 36, 1.5);
 
   // 3. Scrollable Track Cards Viewport
-  const listX = mx + 20;
-  const listY = my + 108;
-  const itemW = modalW - 40;
+  const listX = mx + 18;
+  const listY = my + 106;
+  const itemW = modalW - 36;
   const itemH = 44;
   const gap = 5;
   const viewH = 265;
@@ -1049,18 +1048,24 @@ export function drawArenaBgmModal(ctx) {
     // 1. Card Container
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.18)';
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.35)';
-      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#5e0d1f';
+      drawChamferedRect(ctx, itemX, itemY + 2, itemW, itemH, 4);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff5f7';
+      ctx.strokeStyle = '#b81c3b';
+      ctx.lineWidth = 1.8;
     } else {
-      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#baa88c';
+      drawChamferedRect(ctx, itemX, itemY + 2, itemW, itemH, 4);
+      ctx.fill();
+
+      ctx.fillStyle = '#faedf0';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.4;
     }
 
-    drawChamferedRect(ctx, itemX, itemY, itemW, itemH, 5);
+    drawChamferedRect(ctx, itemX, itemY, itemW, itemH, 4);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
@@ -1079,80 +1084,72 @@ export function drawArenaBgmModal(ctx) {
     // 3. Track Title & Subtitle
     const textX = itemX + 36;
     ctx.save();
-    ctx.fillStyle = isSelected ? '#ffffff' : '#94a3b8';
-    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillStyle = isSelected ? '#b81c3b' : '#21050c';
+    ctx.font = '700 8px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(track.name, textX, itemY + 8);
 
-    ctx.fillStyle = isSelected ? '#f59e0b' : '#64748b';
-    ctx.font = '900 8px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#8b1524';
+    ctx.font = '700 7px "Silkscreen", monospace';
     const subtitle = track.id === 'random' 
       ? 'RANDOM SOUNDTRACK PER MATCH' 
       : (track.id === 'off' ? 'DISABLE ARENA SOUNDTRACK' : (track.isCustom ? 'IMPORTED CUSTOM AUDIO' : 'ARENA SOUNDTRACK'));
-    ctx.fillText(subtitle, textX, itemY + 26);
+    ctx.fillText(subtitle, textX, itemY + 24);
     ctx.restore();
 
     // 4. Select / Active Pill Badge
-    const selectBtnW = isSelected ? 60 : 50;
+    const selectBtnW = isSelected ? 66 : 56;
     const btnH = 22;
     const selectBtnX = itemX + itemW - selectBtnW - 8;
     const selectBtnY = itemY + (itemH - btnH) / 2;
 
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#cc2b4d';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.5;
       drawChamferedRect(ctx, selectBtnX, selectBtnY, selectBtnW, btnH, 3);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#ffd700';
-      ctx.font = '900 9px "Rajdhani", sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 6.5px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('● ACTIVE', selectBtnX + selectBtnW / 2, selectBtnY + btnH / 2);
+      ctx.fillText('ACTIVE', selectBtnX + selectBtnW / 2, selectBtnY + btnH / 2 + 0.5);
     } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#eed8dc';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.2;
       drawChamferedRect(ctx, selectBtnX, selectBtnY, selectBtnW, btnH, 3);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#64748b';
-      ctx.font = '900 9px "Rajdhani", sans-serif';
+      ctx.fillStyle = '#21050c';
+      ctx.font = '700 6.5px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('SELECT', selectBtnX + selectBtnW / 2, selectBtnY + btnH / 2);
+      ctx.fillText('SELECT', selectBtnX + selectBtnW / 2, selectBtnY + btnH / 2 + 0.5);
     }
     ctx.restore();
 
     // 5. Play / Stop (Preview) Button
-    const previewBtnW = 26;
+    const previewBtnW = 24;
     const previewBtnX = selectBtnX - previewBtnW - 6;
     const previewBtnY = selectBtnY;
 
     if (hasAudio) {
       ctx.save();
-      if (isPreviewing) {
-        ctx.fillStyle = 'rgba(0, 229, 255, 0.28)';
-        ctx.strokeStyle = '#00e5ff';
-        ctx.lineWidth = 1.2;
-        ctx.shadowColor = 'rgba(0, 229, 255, 0.4)';
-        ctx.shadowBlur = 8;
-      } else {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
-        ctx.lineWidth = 1;
-      }
+      ctx.fillStyle = isPreviewing ? '#f26f88' : '#eed8dc';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.2;
       drawChamferedRect(ctx, previewBtnX, previewBtnY, previewBtnW, btnH, 3);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = isPreviewing ? '#00e5ff' : '#cbd5e1';
-      ctx.font = 'bold 11px sans-serif';
+      ctx.fillStyle = isPreviewing ? '#ffffff' : '#21050c';
+      ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(isPreviewing ? '⏸' : '▶', previewBtnX + previewBtnW / 2, previewBtnY + btnH / 2);
@@ -1160,16 +1157,16 @@ export function drawArenaBgmModal(ctx) {
     }
 
     // 6. Delete Button for Custom Imported Tracks
-    let delBtnX = previewBtnX - 26;
+    let delBtnX = previewBtnX - 24;
     if (track.isCustom) {
       ctx.save();
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#eed8dc';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.2;
       drawChamferedRect(ctx, delBtnX, previewBtnY, 20, btnH, 3);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = '#cc2b4d';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1208,33 +1205,18 @@ export function drawArenaBgmModal(ctx) {
     const scrollBarY = listY + (_modalScrollY / maxScroll) * (viewH - scrollBarH);
     const scrollBarX = listX + itemW + 4;
     ctx.save();
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.5)';
+    ctx.fillStyle = '#b81c3b';
     ctx.fillRect(scrollBarX, scrollBarY, 3, scrollBarH);
     ctx.restore();
   }
 
   // 4. Modal Footer: Confirm / Close Button
-  const confirmH = 26;
-  const confirmW = modalW - 40;
-  const confirmX = mx + 20;
+  const confirmH = 28;
+  const confirmW = modalW - 36;
+  const confirmX = mx + 18;
   const confirmY = my + modalH - confirmH - 12;
 
-  ctx.save();
-  ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
-  ctx.strokeStyle = '#f59e0b';
-  ctx.lineWidth = 1.2;
-  drawChamferedRect(ctx, confirmX, confirmY, confirmW, confirmH, 4);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 10.5px "Rajdhani", "Outfit", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('CONFIRM & CLOSE [ESC]', confirmX + confirmW / 2, confirmY + confirmH / 2);
-  ctx.restore();
-
-  _registerButton(confirmX, confirmY, confirmW, confirmH, () => {
+  drawButton('CONFIRM & CLOSE [ESC]', confirmX + confirmW / 2, confirmY + confirmH / 2, () => {
     closeArenaBgmModal();
-  });
+  }, confirmW, confirmH, null, 4);
 }
