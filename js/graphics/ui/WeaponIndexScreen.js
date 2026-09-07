@@ -57,6 +57,9 @@ function drawWeaponMenu() {
 
   updatePreviewBalls();
 
+  // ── Unified Top Back Button ──
+  drawButton('◀ BACK', 52, 60, () => { goToTitle(); }, 76, 26);
+
   // ── Header Section ──
   ctx.fillStyle = '#64748b';
   ctx.font = '900 10px "Rajdhani", monospace';

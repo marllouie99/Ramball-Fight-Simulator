@@ -1450,55 +1450,60 @@ canvas {
 .subview-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 6px;
+  position: relative;
+  height: 34px;
+  padding: 0 4px 6px 4px;
   border-bottom: 3px solid #21050c;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   flex-shrink: 0;
 }
 
 .menu-back-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 12px;
+  padding: 5px 10px;
   background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
-  border: 2.5px solid #21050c;
-  border-radius: 6px;
-  box-shadow: inset 0 2px 0 #ffaec0, 0 4px 0 #5e0d1f, 0 5px 0 #21050c;
+  border: 2px solid #21050c;
+  border-radius: 5px;
+  box-shadow: inset 0 2px 0 #ffaec0, 0 3px 0 #5e0d1f, 0 4px 0 #21050c;
   color: #ffffff;
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px;
+  font-size: 7.5px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   text-shadow: 0 1px 0 #5e0d1f;
   cursor: pointer;
   transition: all 0.08s ease;
+  z-index: 2;
   flex-shrink: 0;
 }
 
 .menu-back-btn:hover {
   background: linear-gradient(180deg, #fa7f97 0%, #d83759 100%);
-  transform: translateY(-1px);
-  box-shadow: inset 0 2px 0 #ffc2cf, 0 5px 0 #5e0d1f, 0 6px 0 #21050c;
+  transform: translateY(-50%) translateY(-1px);
+  box-shadow: inset 0 2px 0 #ffc2cf, 0 4px 0 #5e0d1f, 0 5px 0 #21050c;
 }
 
 .menu-back-btn:active {
-  transform: translateY(3px);
+  transform: translateY(-50%) translateY(2px);
   box-shadow: inset 0 1px 0 #9e1432, 0 1px 0 #5e0d1f, 0 2px 0 #21050c;
 }
 
 .subview-heading {
+  width: 100%;
   font-family: 'Press Start 2P', monospace;
   font-size: 9px;
   font-weight: 700;
   color: #21050c;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  flex: 1;
   text-align: center;
-  padding-right: 60px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

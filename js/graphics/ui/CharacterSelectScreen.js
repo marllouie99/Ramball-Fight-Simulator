@@ -680,6 +680,9 @@ function drawSelectScreen() {
 
   updatePreviewBalls();
 
+  // ── Unified Top Back Button ──
+  drawButton('◀ BACK', 52, 64, () => { goToTitle(); }, 76, 26);
+
   // ── Header Section ──
   // Tactical Breadcrumb
   const isTactical = state.gameCategory === 'tactical' || mode === 'Tactical 2v2' || mode === 'Tactical FFA' || mode === 'Tactical 4v4' || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1;

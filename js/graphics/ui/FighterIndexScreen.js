@@ -60,6 +60,9 @@ function drawIndexScreen() {
 
   updatePreviewBalls();
 
+  // ── Unified Top Back Button ──
+  drawButton('◀ BACK', 52, 64, () => { goToTitle(); }, 76, 26);
+
   const isTactical = state.gameCategory === 'tactical';
   const currentDefs = getActiveFighterDefs();
 

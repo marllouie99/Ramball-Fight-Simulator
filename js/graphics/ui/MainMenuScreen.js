@@ -76,7 +76,7 @@ function drawLeaderboardScreen() {
     ctx.fillRect(winX + 2, ly, winW - 4, 1);
   }
 
-  // Close box [■]
+  // Close box [■] (Click to return)
   const closeBoxSize = 14;
   const closeBoxX = winX + 8;
   const closeBoxY = winY + 6;
@@ -87,6 +87,12 @@ function drawLeaderboardScreen() {
   ctx.strokeRect(closeBoxX, closeBoxY, closeBoxSize, closeBoxSize);
   ctx.fillStyle = '#2d080c';
   ctx.fillRect(closeBoxX + 4, closeBoxY + 4, 6, 6);
+  _registerButton(closeBoxX, closeBoxY, closeBoxSize, closeBoxSize, () => {
+    const returnState = state.leaderboardReturnState || 'title';
+    state.leaderboardReturnState = null;
+    clearHealthHud();
+    state.gameState = returnState;
+  });
 
   // Title Badge
   const badgeW = 160;
