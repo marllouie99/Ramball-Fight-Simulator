@@ -581,7 +581,7 @@ export class GojoFighter extends Fighter {
     const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
     const isFrozen = this._handleTimeStop() || this.isTargetOfAmbush || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || isGetsugaSuppressed;
     if (isFrozen) {
-      this.z = 0;
+      if (!this.isCaughtInTelekinesis) this.z = 0;
       if (this.isDomainPreSlide) {
         this.isDomainPreSlide = false;
         this.domainPreSlideTimer = 0;
@@ -1717,6 +1717,7 @@ export class GojoFighter extends Fighter {
   }
 
   _checkInfinityCollisions() {
+    if (this.isCaughtInTelekinesis || (this.timeStopTimer && this.timeStopTimer > 0)) return;
     const inRubbickVoid = isInsideRubbickStolenVoid(this);
     if (inRubbickVoid) {
       this.infinityActive = false;
@@ -1752,6 +1753,9 @@ export class GojoFighter extends Fighter {
     for (const entity of allTargets) {
       if (!entity || entity === this || entity.hp <= 0 || entity.dead) continue;
       if (entity.owner === this || (entity.team !== undefined && entity.team === this.team)) continue; // Don't block self, teammates, or own summons/illusions
+
+      // Don't interrupt or block an entity currently channeling Telekinesis
+      if (entity.tkTimer > 0 || (entity.tkTarget && entity.tkTarget.hp > 0)) continue;
 
       const isChanneling = typeof entity.isChannelingSkill === 'function' ? entity.isChannelingSkill() : false;
       if (isChanneling || entity.isChannelingDomain || entity.isChannelingDomainExpansion) continue;

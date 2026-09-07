@@ -80,6 +80,11 @@ export function clampEntityToArenaBounds(ent, arena, radius = null) {
 }
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
+  // If Gojo is paralyzed in Telekinesis, Limitless Infinity cannot trigger reactive blocks
+  if (fighter.isCaughtInTelekinesis) {
+    return false;
+  }
+
   // If Gojo is trapped inside Rubbick's stolen Unlimited Void, Limitless Infinity is disabled
   if (isInsideRubbickStolenVoid(fighter)) {
     fighter.infinityActive = false;
@@ -154,7 +159,12 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   }
 
   if (attacker && attacker !== fighter) {
-    const isChanneling = typeof attacker.isChannelingSkill === 'function' && attacker.isChannelingSkill();
+    // Attackers actively channeling Telekinesis have supreme hyper-armor — bypasses Infinity block & interrupts completely
+    if (attacker.tkTimer > 0 || attacker.tkTarget) {
+      return false;
+    }
+
+    const isChanneling = (typeof attacker.isChannelingSkill === 'function' && attacker.isChannelingSkill()) || (attacker.tkTimer > 0);
     if (isChanneling || attacker.isChannelingDomain || attacker.isChannelingDomainExpansion) {
       // Skill & Domain Channeling has supreme hyper-armor — bypasses Infinity block & interrupts completely!
       return false;
@@ -209,8 +219,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       }
     }
 
-    // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling a skill)
-    if (!isChanneling && typeof attacker.interruptAttacks === 'function') {
+    // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling a skill or telekinesis)
+    if (!isChanneling && !attacker.tkTimer && typeof attacker.interruptAttacks === 'function') {
       attacker.interruptAttacks();
     }
 

@@ -42,6 +42,13 @@ export const rubbickConfig = {
   spellStealDuration: 1000, // Duration stolen skill remains active (frames)
   spellStealRange: 350,
   spellStealCastDelay: 45, // Delay in frames before casting a newly stolen skill
+
+  // ── Audio Configuration ──
+  sounds: {
+    spellSteal: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3',
+    telekinesis: 'Assets/Sound Effects/Skills/rubbick-telekenesis.mp3',
+    telekinesisDrop: 'Assets/Sound Effects/Skills/rubbick-groundsmash.mp3',
+  }
 };
 
 export const tricksterConfig = rubbickConfig;

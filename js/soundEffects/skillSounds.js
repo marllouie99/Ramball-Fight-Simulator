@@ -152,43 +152,54 @@ export const SKILL_SOUNDS = {
   },
 
   // ── Rubbick ─────────────────────────────
-  rubbick: {
+  18: {
     telekinesis: {
-      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
-      volume: 0.8
-      ,
+      src: 'Assets/Sound Effects/Skills/rubbick-telekenesis.mp3',
+      volume: 0.85,
       delay: 0
     },
     telekinesisDrop: {
-      src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-      volume: 0.9
-      ,
+      src: 'Assets/Sound Effects/Skills/rubbick-groundsmash.mp3',
+      volume: 0.9,
       delay: 0
     },
     spellSteal: {
-      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
-      volume: 0.9
-      ,
+      src: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3',
+      volume: 0.9,
+      delay: 0
+    }
+  },
+  rubbick: {
+    telekinesis: {
+      src: 'Assets/Sound Effects/Skills/rubbick-telekenesis.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    telekinesisDrop: {
+      src: 'Assets/Sound Effects/Skills/rubbick-groundsmash.mp3',
+      volume: 0.9,
+      delay: 0
+    },
+    spellSteal: {
+      src: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3',
+      volume: 0.9,
       delay: 0
     }
   },
   trickster: {
     telekinesis: {
-      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
-      volume: 0.8
-      ,
+      src: 'Assets/Sound Effects/Skills/rubbick-telekenesis.mp3',
+      volume: 0.85,
       delay: 0
     },
     telekinesisDrop: {
-      src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-      volume: 0.9
-      ,
+      src: 'Assets/Sound Effects/Skills/rubbick-groundsmash.mp3',
+      volume: 0.9,
       delay: 0
     },
     spellSteal: {
-      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
-      volume: 0.9
-      ,
+      src: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3',
+      volume: 0.9,
       delay: 0
     }
   },
@@ -700,6 +711,8 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS[33] || SKILL_SOUNDS['john_wick'];
     } else if (strKey.includes('ichigo')) {
       fighterConfig = SKILL_SOUNDS[29] || SKILL_SOUNDS['ichigo'];
+    } else if (strKey.includes('rubbick') || strKey.includes('trickster')) {
+      fighterConfig = SKILL_SOUNDS[18] || SKILL_SOUNDS['rubbick'];
     }
   }
 

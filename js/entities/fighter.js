@@ -785,6 +785,8 @@ export class Fighter {
       this.isFiringUlt ||
       (this.ultimateChargeTimer && this.ultimateChargeTimer > 0) ||
       (this.stolenWindUpTimer && this.stolenWindUpTimer > 0) ||
+      (this.tkTimer && this.tkTimer > 0) ||
+      (this.tkTarget && this.tkTimer > 0) ||
       (this.fleshSurgeAnimTimer && this.fleshSurgeAnimTimer > 0) ||
       (this.twinScissorAnimTimer && this.twinScissorAnimTimer > 0) ||
       (this.maceCannonAnimTimer && this.maceCannonAnimTimer > 0) ||

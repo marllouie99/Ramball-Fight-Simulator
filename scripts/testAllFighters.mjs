@@ -1008,6 +1008,43 @@ async function main() {
         drawRubbickDomainDimScreen();
         assertCanvasStackBalance("Rubbick drawRubbickDomainDimScreen");
         fighter.stolenDomainActive = false;
+
+        // 8. Test Rubbick Telekinesis vs Gojo's Limitless Infinity barrier
+        mockGojo.domainActive = false;
+        mockGojo.isMeleeMode = false;
+        mockGojo.infinityActive = true;
+        mockGojo.infinityCooldown = 0;
+        mockGojo.hp = 400;
+        mockGojo.x = 250;
+        mockGojo.y = 200;
+
+        fighter.reset();
+        fighter.x = 250;
+        fighter.y = 350;
+        fighter.telekinesisCooldown = 0;
+        state.fighters = [fighter, mockGojo];
+
+        // Trigger telekinesis on Gojo
+        fighter.update(mockGojo, 0, state.arena);
+        if (!fighter.tkTimer || fighter.tkTarget !== mockGojo) {
+          throw new Error("Rubbick failed to lift Gojo with Telekinesis!");
+        }
+
+        // Simulate collision with Gojo's infinity barrier during Telekinesis
+        mockGojo.triggerInfinityBlock(fighter.x, fighter.y, fighter);
+
+        if (!fighter.tkTimer || !fighter.tkTarget) {
+          throw new Error("Rubbick canceled Telekinesis when colliding with Gojo's Infinity barrier!");
+        }
+
+        // Run Gojo update during Telekinesis - verify Infinity collision check does not cancel Rubbick's Telekinesis
+        mockGojo.update(fighter, 1, state.arena);
+        if (!fighter.tkTimer || !fighter.tkTarget) {
+          throw new Error("Gojo's update canceled Rubbick's Telekinesis!");
+        }
+
+        // Clean up
+        fighter.interruptAttacks(true);
       }
 
       // CJ BAGUVIX God Mode Emerald Green Overlay & Cheat Typing Immobility Test

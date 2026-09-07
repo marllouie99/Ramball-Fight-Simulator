@@ -127,8 +127,22 @@ export class RubbickFighter extends Fighter {
     }
   }
 
-  interruptAttacks() {
-    super.interruptAttacks();
+  isStationarySkillActive() {
+    return Boolean(
+      (this.tkTimer > 0 && this.tkTarget) ||
+      (this.stolenWindUpTimer > 0) ||
+      (this.beamTimer > 0) ||
+      this.activePullActive ||
+      super.isStationarySkillActive()
+    );
+  }
+
+  isChannelingSkill() {
+    return this.isStationarySkillActive();
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
     this.stolenWindUpTimer = 0;
     this.activePullActive = false;
     this.activePullPhase = -1;
@@ -137,7 +151,8 @@ export class RubbickFighter extends Fighter {
     this.beamTimer = 0;
     this.stormActive = false;
     
-    if (this.tkTarget) {
+    // Telekinesis is a supreme channeled arcane skill; only cancel if forceCancelAll is true (death, hard CC)
+    if (forceCancelAll && this.tkTarget) {
       this.tkTarget.isCaughtInTelekinesis = false;
       this.tkTarget.isParalyzed = false;
       this.tkTarget.z = 0;
@@ -1010,6 +1025,14 @@ export class RubbickFighter extends Fighter {
 
     // Telekinesis Logic
     if (this.tkTimer > 0 && this.tkTarget) {
+      if (this.tkTarget.hp <= 0 || this.tkTarget.isDead || this.hp <= 0 || this.isDead) {
+        this.tkTarget.isCaughtInTelekinesis = false;
+        this.tkTarget.isParalyzed = false;
+        this.tkTarget.z = 0;
+        this.tkTarget = null;
+        this.tkTimer = 0;
+        return;
+      }
       this.tkTimer--;
 
       // Stop moving while channeling
@@ -1169,9 +1192,9 @@ export class RubbickFighter extends Fighter {
         spawnArcaneGlyphs(slamX, slamY, 10);
 
         // Play Telekinesis drop impact sound
-        const dropSound = getSkillSound(this._def?.id || 'rubbick', 'telekinesisDrop');
+        const dropSound = getSkillSound(this._def?.id || 'rubbick', 'telekinesisDrop') || { src: 'Assets/Sound Effects/Skills/rubbick-groundsmash.mp3', volume: 0.9 };
         if (dropSound) {
-          audioSystem.playSFX(dropSound.src, dropSound.volume);
+          audioSystem.playSFX(dropSound.src, dropSound.volume || 0.9);
         }
 
         const rcfg = CONFIG.rubbick || CONFIG.trickster;
@@ -1305,6 +1328,11 @@ export class RubbickFighter extends Fighter {
 
             spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${skillLabel}!`, '#00FF64');
             spawnSpellStealWisps(this, opponent, '#00FF64', 15);
+
+            const stealSound = getSkillSound(this._def?.id || 'rubbick', 'spellSteal') || { src: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3', volume: 0.9 };
+            if (stealSound) {
+              audioSystem.playSFX(stealSound.src, stealSound.volume || 0.9);
+            }
           }
         } else {
           this.spellStealCooldown = rubbickCfg.spellStealCooldown;
@@ -1317,6 +1345,11 @@ export class RubbickFighter extends Fighter {
           const stolenLabel = this.stolenType.toUpperCase();
           spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${stolenLabel}!`, '#00FF00');
           spawnSpellStealWisps(this, opponent, this.stolenColor || '#00FF64', 15);
+
+          const stealSound = getSkillSound(this._def?.id || 'rubbick', 'spellSteal') || { src: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3', volume: 0.9 };
+          if (stealSound) {
+            audioSystem.playSFX(stealSound.src, stealSound.volume || 0.9);
+          }
         }
       }
 
@@ -1362,6 +1395,12 @@ export class RubbickFighter extends Fighter {
         
         // Massive initial burst of rocks from the ground
         spawnTelekinesisDebris(opponent.x, opponent.y, 25);
+
+        // Play Telekinesis lift sound
+        const tkSound = getSkillSound(this._def?.id || 'rubbick', 'telekinesis') || { src: 'Assets/Sound Effects/Skills/rubbick-telekenesis.mp3', volume: 0.85 };
+        if (tkSound) {
+          audioSystem.playSFX(tkSound.src, tkSound.volume || 0.85);
+        }
       }
 
       // Check heavy stolen skills every frame
@@ -1817,7 +1856,6 @@ export class RubbickFighter extends Fighter {
 
           // Stolen Unlimited Void deployment: Play pure spatial time-stop sphere SFX (100% voiceline-free)
           audioSystem.playSFX('Assets/Sound Effects/Skills/cronosphere.mp3', 1.2);
-          audioSystem.playSFX('Assets/Sound Effects/Skills/purpledeploy.mp3', 1.0);
 
           this.stolenSkillCooldown = (CONFIG.gojo?.domainCooldown || 1200) * getStolenMultiplier('gojo_domain', 'cooldownMultiplier');
         }

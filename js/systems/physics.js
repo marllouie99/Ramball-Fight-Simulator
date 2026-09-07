@@ -231,6 +231,9 @@ export function resolveFighterCollision(a, b) {
   // Toji's stealth ambush drives target displacement directly; skip fighter collision solver
   if (a.isTargetOfAmbush || b.isTargetOfAmbush || (a.isAmbushing && (a.characterId === 'toji' || a.type === 'toji')) || (b.isAmbushing && (b.characterId === 'toji' || b.type === 'toji'))) return;
 
+  // Telekinesis: lifted entity is in 3D air stasis and moved directly by Rubbick; skip ground circle collision push
+  if (a.isCaughtInTelekinesis || b.isCaughtInTelekinesis) return;
+
   // Cronos / Rubbick Time Stop Sphere: entities inside or frozen by an active sphere must NEVER be pushed by collisions
   const aInSphere = !a.isTargetOfAmbush && (a._frozenByCronosSphere || a.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(a.x - f.sphereX, a.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + a.r))));
   const bInSphere = !b.isTargetOfAmbush && (b._frozenByCronosSphere || b.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(b.x - f.sphereX, b.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + b.r))));
