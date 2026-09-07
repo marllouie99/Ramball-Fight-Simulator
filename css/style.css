@@ -1302,10 +1302,11 @@ canvas {
 .menu-grid-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 10px;
+  gap: 10px 12px;
   width: 100%;
   box-sizing: border-box;
   padding: 4px 0 6px 0;
+  margin: auto 0;
   min-height: 0;
 }
 
@@ -1353,9 +1354,9 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 6px;
-  height: 82px;
+  gap: 7px;
+  padding: 10px 8px;
+  height: 88px;
   background: linear-gradient(180deg, #f26f88 0%, #e24968 45%, #cc2b4d 100%);
   border: 2.5px solid #21050c;
   border-radius: 6px;
