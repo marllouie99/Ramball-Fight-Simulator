@@ -148,85 +148,72 @@
                 </footer>
               </div>
 
-              <!-- PANE 2: BATTLE MODES SUB-VIEW -->
+              <!-- PANE 2: BATTLE MODES SUB-VIEW (Clean 6-Tile Grid) -->
               <div id="menu-view-battle" class="menu-view-pane">
                 <div class="subview-header">
                   <button class="menu-back-btn" data-back="main">◀ BACK</button>
                   <span class="subview-heading" id="battle-subview-heading">SELECT BATTLE MODE</span>
                 </div>
-                <div class="subview-cards-list" id="battle-modes-list">
-                  <!-- 1v1 Mode -->
-                  <div class="tactical-card active" data-action="mode-1v1">
-                    <div class="card-left-emblem">⚔️</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">1V1 DUEL</span>
-                        <span class="card-status-pill">RANKED</span>
-                      </div>
-                      <div class="card-subtitle">STANDARD 1V1 ARENA COMBAT</div>
+                <div class="menu-grid-container">
+                  <!-- Row 1, Col 1: 1v1 Mode -->
+                  <div class="menu-tile-3d tactical-card active" data-action="mode-1v1">
+                    <div class="tile-icon-box">⚔️</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">1V1 DUEL</div>
+                      <div class="tile-subtitle">RANKED 1V1</div>
                     </div>
                   </div>
 
-                  <!-- 1v1 Stand Off Mode -->
-                  <div class="tactical-card" data-action="mode-standoff">
-                    <div class="card-left-emblem">🛡️</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">1V1 STAND-OFF</span>
-                        <span class="card-status-pill">2000 HP</span>
-                      </div>
-                      <div class="card-subtitle">HIGH-STAKES SUDDEN DEATH DUEL</div>
+                  <!-- Row 1, Col 2: 1v1 Stand Off Mode -->
+                  <div class="menu-tile-3d tactical-card" data-action="mode-standoff">
+                    <div class="tile-icon-box">🛡️</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">STAND-OFF</div>
+                      <div class="tile-subtitle">2000 HP DUEL</div>
                     </div>
                   </div>
 
-                  <!-- Battle Random Mode -->
-                  <div class="tactical-card" data-action="mode-random-standoff">
-                    <div class="card-left-emblem">🎲</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">BATTLE RANDOM</span>
-                        <span class="card-status-pill">INSTANT</span>
-                      </div>
-                      <div class="card-subtitle">RANDOM 1V1 STAND-OFF DUEL</div>
+                  <!-- Row 2, Col 1: Battle Random Mode -->
+                  <div class="menu-tile-3d tactical-card" data-action="mode-random-standoff">
+                    <div class="tile-icon-box">🎲</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">RANDOM</div>
+                      <div class="tile-subtitle">INSTANT 1V1</div>
                     </div>
                   </div>
 
-                  <!-- 2v2 Tag Team -->
-                  <div class="tactical-card" data-action="mode-2v2">
-                    <div class="card-left-emblem">👥</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">2V2 TAG TEAM</span>
-                        <span class="card-status-pill">CO-OP</span>
-                      </div>
-                      <div class="card-subtitle">DUO ARENA SKIRMISH</div>
+                  <!-- Row 2, Col 2: 2v2 Tag Team -->
+                  <div class="menu-tile-3d tactical-card" data-action="mode-2v2">
+                    <div class="tile-icon-box">👥</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">2V2 TEAM</div>
+                      <div class="tile-subtitle">CO-OP BRAWL</div>
                     </div>
                   </div>
 
-                  <!-- Free For All -->
-                  <div class="tactical-card" data-action="mode-ffa">
-                    <div class="card-left-emblem">🎯</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">FREE FOR ALL</span>
-                        <span class="card-status-pill">CHAOS</span>
-                      </div>
-                      <div class="card-subtitle">4-PLAYER BATTLE ROYALE</div>
+                  <!-- Row 3, Col 1: Free For All -->
+                  <div class="menu-tile-3d tactical-card" data-action="mode-ffa">
+                    <div class="tile-icon-box">🎯</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">FREE FOR ALL</div>
+                      <div class="tile-subtitle">4-PLAYER CHAOS</div>
                     </div>
                   </div>
 
-                  <!-- 1v2 Stand Off -->
-                  <div class="tactical-card" data-action="mode-standoff1v2">
-                    <div class="card-left-emblem">🔥</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">1V2 STAND-OFF</span>
-                        <span class="card-status-pill">SURVIVAL</span>
-                      </div>
-                      <div class="card-subtitle">ASYMMETRICAL ARENA SHOWDOWN</div>
+                  <!-- Row 3, Col 2: 1v2 Stand Off -->
+                  <div class="menu-tile-3d tactical-card" data-action="mode-standoff1v2">
+                    <div class="tile-icon-box">🔥</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">1V2 STAND-OFF</div>
+                      <div class="tile-subtitle">SOLO SURVIVAL</div>
                     </div>
                   </div>
                 </div>
+
+                <footer class="tactical-footer">
+                  <div class="prompt-chip"><span class="key">CLICK</span> LAUNCH</div>
+                  <div class="prompt-chip" id="quick-toggle-theme"><span class="key">THEME</span> TOGGLE</div>
+                </footer>
               </div>
 
               <!-- PANE 3: TACTICAL SHOOTER MODES SUB-VIEW -->
@@ -235,38 +222,34 @@
                   <button class="menu-back-btn" data-back="main">◀ BACK</button>
                   <span class="subview-heading">TACTICAL FIREFIGHT</span>
                 </div>
-                <div class="subview-cards-list">
-                  <div class="tactical-card active" data-action="tactical-1v1">
-                    <div class="card-left-emblem">🔫</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">1V1 DUEL</span>
-                        <span class="card-status-pill">1 VS 1</span>
-                      </div>
-                      <div class="card-subtitle">TACTICAL FIREARM DUEL</div>
+                <div class="menu-grid-container menu-grid-tactical">
+                  <div class="menu-tile-3d tactical-card active" data-action="tactical-1v1">
+                    <div class="tile-icon-box">🔫</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">1V1 DUEL</div>
+                      <div class="tile-subtitle">TACTICAL 1V1</div>
                     </div>
                   </div>
-                  <div class="tactical-card" data-action="tactical-2v2">
-                    <div class="card-left-emblem">👥</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">2V2 FIREFIGHT</span>
-                        <span class="card-status-pill">CT VS T</span>
-                      </div>
-                      <div class="card-subtitle">2 VS 2 TACTICAL TEAM BATTLE</div>
+                  <div class="menu-tile-3d tactical-card" data-action="tactical-2v2">
+                    <div class="tile-icon-box">👥</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">2V2 FIREFIGHT</div>
+                      <div class="tile-subtitle">CT VS T TEAMS</div>
                     </div>
                   </div>
-                  <div class="tactical-card" data-action="tactical-ffa">
-                    <div class="card-left-emblem">🎯</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">TACTICAL FFA</span>
-                        <span class="card-status-pill">4-PLAYER</span>
-                      </div>
-                      <div class="card-subtitle">FREE FOR ALL BREACH DEATHMATCH</div>
+                  <div class="menu-tile-3d tactical-card" data-action="tactical-ffa">
+                    <div class="tile-icon-box">🎯</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">TACTICAL FFA</div>
+                      <div class="tile-subtitle">4-PLAYER DEATHMATCH</div>
                     </div>
                   </div>
                 </div>
+
+                <footer class="tactical-footer">
+                  <div class="prompt-chip"><span class="key">CLICK</span> LAUNCH</div>
+                  <div class="prompt-chip" id="quick-toggle-theme"><span class="key">THEME</span> TOGGLE</div>
+                </footer>
               </div>
 
               <!-- PANE 4: ARSENAL & STUDIO SUB-VIEW -->
@@ -275,28 +258,27 @@
                   <button class="menu-back-btn" data-back="main">◀ BACK</button>
                   <span class="subview-heading">WEAPONS & ARSENAL</span>
                 </div>
-                <div class="subview-cards-list">
-                  <div class="tactical-card active" data-action="screen-weapons">
-                    <div class="card-left-emblem">🗡️</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title" id="card-arsenal-title">WEAPON ARSENAL</span>
-                        <span class="card-status-pill">INSPECT</span>
-                      </div>
-                      <div class="card-subtitle" id="card-arsenal-subtitle">WEAPON PREVIEW & SKINS</div>
+                <div class="menu-grid-container menu-grid-arsenal">
+                  <div class="menu-tile-3d tactical-card active" data-action="screen-weapons">
+                    <div class="tile-icon-box">🗡️</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title" id="card-arsenal-title">WEAPON ARSENAL</div>
+                      <div class="tile-subtitle" id="card-arsenal-subtitle">PREVIEW & SKINS</div>
                     </div>
                   </div>
-                  <div class="tactical-card" data-action="screen-weaponstudio" id="card-studio-wrap">
-                    <div class="card-left-emblem">🛠️</div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">WEAPON STUDIO</span>
-                        <span class="card-status-pill">STUDIO</span>
-                      </div>
-                      <div class="card-subtitle">CUSTOM WEAPON GEOMETRY EDITOR</div>
+                  <div class="menu-tile-3d tactical-card" data-action="screen-weaponstudio" id="card-studio-wrap">
+                    <div class="tile-icon-box">🛠️</div>
+                    <div class="tile-text-wrap">
+                      <div class="tile-title">WEAPON STUDIO</div>
+                      <div class="tile-subtitle">GEOMETRY EDITOR</div>
                     </div>
                   </div>
                 </div>
+
+                <footer class="tactical-footer">
+                  <div class="prompt-chip"><span class="key">CLICK</span> INSPECT</div>
+                  <div class="prompt-chip" id="quick-toggle-theme"><span class="key">THEME</span> TOGGLE</div>
+                </footer>
               </div>
 
               <!-- PANE 5: SETTINGS & CONFIG SUB-VIEW -->

@@ -636,8 +636,8 @@ document.querySelector('.retro-close-box')?.addEventListener('click', () => {
   showMenuView('menu-view-main');
 });
 
-// Tactical Card Selection & Click inside subviews
-document.querySelectorAll('.tactical-card').forEach(card => {
+// Tactical Card Selection & Click inside subviews (for non-tile cards like system settings)
+document.querySelectorAll('.tactical-card:not(.menu-tile-3d)').forEach(card => {
   card.addEventListener('click', (e) => {
     if (e.target && e.target.tagName === 'BUTTON') return;
     const action = card.getAttribute('data-action');
