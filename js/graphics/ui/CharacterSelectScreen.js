@@ -1068,13 +1068,6 @@ function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
     startFaceOffScreen(true);
   }, thumbBtnW, 46, '#d97706', 6);
   drawButton('RANDOMIZE', randBtnX, actionRowY, onRandomize, randBtnW, 46, null, 6);
-
-  // Bottom Hotkey prompts in Silkscreen font
-  ctx.fillStyle = '#ffd1dc';
-  ctx.font = '700 7.5px "Silkscreen", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('[SPACE] START  •  [T] THUMBNAIL  •  [R] RANDOMIZE  •  [ESC] BACK', canvas.width / 2, 915);
 }
 
 function randomize1v1Fighters() {
