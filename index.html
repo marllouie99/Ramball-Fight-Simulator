@@ -84,103 +84,39 @@
             </div>
 
             <div class="retro-window-body">
-              <!-- Top Header & Breadcrumbs -->
-              <header class="tactical-header">
-                <div class="tactical-breadcrumbs">
-                  <span class="crumb-root">CIRCLE BATTLE</span>
-                  <span class="crumb-sep">//</span>
-                  <span class="crumb-sub" id="crumb-sub-label">FIGHT OF CHARACTERS</span>
-                  <span class="crumb-sep">//</span>
-                  <span class="crumb-id" id="crumb-id-label">ANIME ARENA</span>
-                </div>
+              <!-- Top-Level Game Hub Switcher (Clean 3D Dual Tabs) -->
+              <div class="game-hub-switcher" role="tablist">
+                <button id="btn-hub-foc" class="hub-switch-btn active" data-hub="foc">
+                  <span class="hub-btn-icon">⚔️</span>
+                  <span class="hub-btn-title">ANIME BRAWL</span>
+                </button>
+                <button id="btn-hub-tactical" class="hub-switch-btn" data-hub="tactical">
+                  <span class="hub-btn-icon">🎯</span>
+                  <span class="hub-btn-title">TACTICAL SHOOTER</span>
+                </button>
+              </div>
 
-                <!-- Top-Level Game Hub Switcher (Retro 3D Dual Tabs) -->
-                <div class="game-hub-switcher" role="tablist">
-                  <button id="btn-hub-foc" class="hub-switch-btn active" data-hub="foc">
-                    <span class="hub-btn-icon">⚔️</span>
-                    <div class="hub-btn-info">
-                      <span class="hub-btn-title">FIGHT OF CHARACTERS</span>
-                      <span class="hub-btn-sub">ANIME & JUJUTSU BRAWL</span>
-                    </div>
-                    <span class="hub-active-indicator">ACTIVE</span>
-                  </button>
-                  <button id="btn-hub-tactical" class="hub-switch-btn" data-hub="tactical">
-                    <span class="hub-btn-icon">🎯</span>
-                    <div class="hub-btn-info">
-                      <span class="hub-btn-title">TACTICAL SHOOTER</span>
-                      <span class="hub-btn-sub">GUNS & BALLISTICS ONLY</span>
-                    </div>
-                    <span class="hub-active-indicator">ACTIVE</span>
-                  </button>
-                </div>
+              <!-- Category Tabs Navigation Bar (Vintage Folder Tabs) -->
+              <nav class="tactical-tabs" role="tablist">
+                <button class="tactical-tab-btn active" data-category="all">
+                  <span class="tab-tag">ALL</span>
+                </button>
+                <button class="tactical-tab-btn" data-category="modes">
+                  <span class="tab-tag" id="tab-modes-label">BATTLE</span>
+                </button>
+                <button class="tactical-tab-btn" data-category="arsenal">
+                  <span class="tab-tag" id="tab-arsenal-label">ARSENAL</span>
+                </button>
+                <button class="tactical-tab-btn" data-category="database">
+                  <span class="tab-tag" id="tab-database-label">DATABASE</span>
+                </button>
+                <button class="tactical-tab-btn" data-category="system">
+                  <span class="tab-tag">SETTINGS</span>
+                </button>
+              </nav>
 
-                <div class="tactical-title-row">
-                  <div class="tactical-main-title">
-                    <span class="title-bracket">[</span>
-                    <span class="title-text" id="tactical-category-label">OPERATIONS</span>
-                    <span class="title-bracket">]</span>
-                  </div>
-                  <div class="tactical-counter-badge" id="tactical-counter-badge">(10 READY)</div>
-                </div>
-
-                <!-- Category Tabs Navigation Bar (Vintage Folder Tabs) -->
-                <nav class="tactical-tabs" role="tablist">
-                  <button class="tactical-tab-btn active" data-category="all">
-                    <span class="tab-tag">ALL</span>
-                  </button>
-                  <button class="tactical-tab-btn" data-category="modes">
-                    <span class="tab-tag" id="tab-modes-label">BATTLE</span>
-                  </button>
-                  <button class="tactical-tab-btn" data-category="arsenal">
-                    <span class="tab-tag" id="tab-arsenal-label">ARSENAL</span>
-                  </button>
-                  <button class="tactical-tab-btn" data-category="database">
-                    <span class="tab-tag" id="tab-database-label">DATABASE</span>
-                  </button>
-                  <button class="tactical-tab-btn" data-category="system">
-                    <span class="tab-tag">SYSTEM</span>
-                  </button>
-                </nav>
-              </header>
-
-              <!-- Main Content Layout -->
+              <!-- Main Content Layout (Spacious Full-Height Action List) -->
               <div class="tactical-content-area">
-                <!-- Active Briefing / Inspection Hero Card (Sunken Cream Panel) -->
-                <section class="tactical-briefing-panel" id="tactical-briefing-panel">
-                  <div class="briefing-card-top">
-                    <div class="briefing-icon-badge" id="briefing-icon">
-                      <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-4.5-4.5"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/></svg>
-                    </div>
-                    <div class="briefing-title-group">
-                      <h2 class="briefing-title" id="briefing-title">1V1 DUEL</h2>
-                      <div class="briefing-tier-row">
-                        <span class="tier-pill" id="briefing-tag-1">★ RANKED</span>
-                        <span class="tier-pill" id="briefing-tag-2">★ TIER 1</span>
-                        <span class="tier-pill" id="briefing-tag-3">★ DEPLOYABLE</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <p class="briefing-desc" id="briefing-desc">
-                    Direct high-stakes single duel. Choose your champion, test your reflexes, and unleash ultimate techniques.
-                  </p>
-
-                  <!-- Progress / Status Bar -->
-                  <div class="briefing-progress-block">
-                    <div class="briefing-progress-bar">
-                      <div class="briefing-progress-fill" style="width: 100%;"></div>
-                    </div>
-                    <div class="briefing-progress-label" id="briefing-progress-label">STATUS: 100% OPERATIONAL</div>
-                  </div>
-
-                  <!-- Chunky 3D Ruby CTA Launch Button -->
-                  <button id="btn-tactical-launch" class="tactical-launch-btn btn-3d-primary">
-                    <span class="launch-text" id="launch-button-text">LAUNCH OPERATION</span>
-                    <span class="launch-arrow">▶</span>
-                  </button>
-                </section>
-
-                <!-- Operation Cards Scrollable List -->
                 <div class="tactical-cards-scrollview" id="tactical-cards-list">
               <!-- ============================================== -->
               <!-- FIGHT OF CHARACTERS CARDS (data-hub="foc") -->

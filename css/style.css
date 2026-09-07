@@ -1373,20 +1373,23 @@ canvas {
   color: #2d080c;
 }
 
-/* Top-Level Game Hub Switcher (Chunky 3D Dual Tabs) */
+/* Top-Level Game Hub Switcher (Clean 3D Dual Tabs) */
 .game-hub-switcher {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  margin: 2px 0;
+  margin: 4px 0 6px 0;
+  flex-shrink: 0;
 }
 
 .hub-switch-btn {
   flex: 1;
+  height: 38px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 10px;
   background: #e8dec8;
   border: 2px solid #2d080c;
   border-radius: 4px;
@@ -1394,7 +1397,7 @@ canvas {
   cursor: pointer;
   position: relative;
   transition: all 0.1s ease;
-  text-align: left;
+  box-sizing: border-box;
 }
 
 .hub-switch-btn:hover {
@@ -1407,51 +1410,18 @@ canvas {
 }
 
 .hub-switch-btn .hub-btn-icon {
-  font-size: 14px;
+  font-size: 15px;
   flex-shrink: 0;
-}
-
-.hub-switch-btn .hub-btn-info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
 }
 
 .hub-switch-btn .hub-btn-title {
   font-family: 'Outfit', sans-serif;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 900;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
   color: #2d080c;
   text-transform: uppercase;
-  line-height: 1.1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.hub-switch-btn .hub-btn-sub {
-  font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #63222a;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.hub-switch-btn .hub-active-indicator {
-  font-family: 'Silkscreen', 'Rajdhani', sans-serif;
-  font-size: 7.5px;
-  font-weight: 900;
-  padding: 1px 4px;
-  border-radius: 2px;
-  text-transform: uppercase;
-  display: none;
-  flex-shrink: 0;
 }
 
 /* Active Hub Button (Rich Ruby Red 3D Button) */
@@ -1470,71 +1440,26 @@ canvas {
   color: #ffffff;
 }
 
-.hub-switch-btn.active .hub-btn-sub {
-  color: #fce7ea;
-}
-
-.hub-switch-btn.active .hub-active-indicator {
-  display: block;
-  background: #f0b6ba;
-  color: #2d080c;
-  border: 1px solid #7c2d37;
-}
-
-.tactical-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 1px 0 3px 0;
-}
-
-.tactical-main-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 17px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  color: #2d080c;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.tactical-main-title .title-bracket {
-  color: #9e1a2b;
-  font-weight: 900;
-}
-
-.tactical-counter-badge {
-  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
-  font-size: 9.5px;
-  font-weight: 800;
-  color: #2d080c;
-  background: #f0b6ba;
-  border: 1.5px solid #7c2d37;
-  padding: 1px 6px;
-  border-radius: 2px;
-}
-
 /* Category Tabs (Vintage Macintosh Folder Tabs) */
 .tactical-tabs {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   width: 100%;
   border-bottom: 2px solid #2d080c;
-  padding-bottom: 0px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
 }
 
 .tactical-tab-btn {
   flex: 1;
-  padding: 4px 2px;
+  padding: 6px 2px;
   background: #e4dac2;
   border: 2px solid #2d080c;
   border-bottom: none;
   border-radius: 4px 4px 0 0;
   color: #5c242b;
-  font-family: 'Outfit', 'Rajdhani', sans-serif;
-  font-size: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -1560,202 +1485,21 @@ canvas {
 .tactical-content-area {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Active Briefing / Hero Panel (Sunken Cream Box) */
-.tactical-briefing-panel {
-  background: #ede3d0;
-  border: 2px solid #2d080c;
-  border-radius: 4px;
-  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.12);
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-.briefing-card-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.briefing-icon-badge {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f0b6ba;
-  border: 2px solid #2d080c;
-  border-radius: 3px;
-  flex-shrink: 0;
-  color: #2d080c;
-}
-
-.tactical-svg-icon {
-  width: 16px;
-  height: 16px;
-  stroke: #2d080c;
-  display: block;
-}
-
-.briefing-icon-badge .tactical-svg-icon {
-  width: 18px;
-  height: 18px;
-  stroke: #2d080c;
-}
-
-.tactical-card:hover .card-left-emblem .tactical-svg-icon,
-.tactical-card.active .card-left-emblem .tactical-svg-icon {
-  stroke: #2d080c;
-}
-
-.tactical-chip-btn .tactical-svg-icon {
-  width: 11px;
-  height: 11px;
-  stroke: currentColor;
-  display: inline-block;
-  vertical-align: middle;
-  margin-right: 3px;
-}
-
-.briefing-title-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.briefing-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 16px;
-  font-weight: 900;
-  color: #2d080c;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  margin: 0;
-}
-
-.briefing-tier-row {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.tier-pill {
-  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
-  font-size: 8.5px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  padding: 1px 5px;
-  border-radius: 2px;
-  text-transform: uppercase;
-  background: #f0b6ba;
-  color: #2d080c;
-  border: 1px solid #7c2d37;
-}
-
-.tier-pill.tier-amber,
-.tier-pill.tier-cyan,
-.tier-pill.tier-magenta,
-.tier-pill.tier-green {
-  background: #f0b6ba;
-  color: #2d080c;
-  border: 1px solid #7c2d37;
-}
-
-.briefing-desc {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #42161b;
-  line-height: 1.3;
-  margin: 1px 0;
-  min-height: 28px;
-}
-
-.briefing-progress-block {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.briefing-progress-bar {
-  width: 100%;
-  height: 4px;
-  background: #d8ceb9;
-  border: 1.5px solid #2d080c;
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.briefing-progress-fill {
-  height: 100%;
-  background: #9e1a2b;
-}
-
-.briefing-progress-label {
-  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
-  font-size: 8.5px;
-  font-weight: 800;
-  color: #702028;
-  letter-spacing: 0.5px;
-  text-align: right;
-}
-
-/* Chunky 3D Ruby CTA Launch Button (Matching Reference Image) */
-.btn-3d-primary,
-.tactical-launch-btn {
-  width: 100%;
-  padding: 9px 12px;
-  margin-top: 3px;
-  background: #9e1a2b;
-  color: #ffffff;
-  border: 2px solid #2d080c;
-  border-radius: 4px;
-  box-shadow: 0 4px 0 #4d0a13;
-  font-family: 'Outfit', 'Press Start 2P', sans-serif;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.12s ease;
-  position: relative;
-  box-sizing: border-box;
-}
-
-.btn-3d-primary:hover,
-.tactical-launch-btn:hover {
-  background: #b51f33;
-}
-
-.btn-3d-primary:active,
-.tactical-launch-btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 #4d0a13;
-}
-
-/* Operation Cards Scrollable List */
+/* Operation Cards Scrollable List (Spacious & Clean) */
 .tactical-cards-scrollview {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-right: 3px;
+  gap: 7px;
+  padding-right: 4px;
+  padding-bottom: 4px;
   min-height: 0;
 }
 
@@ -1774,16 +1518,18 @@ canvas {
   border-radius: 2px;
 }
 
-/* Chunky 3D Retro Operation Card */
+/* Chunky 3D Retro Operation Card (Big, Spacious & Pushable) */
 .tactical-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 12px;
+  padding: 10px 12px;
+  height: 56px;
+  box-sizing: border-box;
   background: #fbf6ec;
   border: 2px solid #2d080c;
   border-radius: 4px;
-  box-shadow: 0 3px 0 #baa88c;
+  box-shadow: 0 4px 0 #baa88c;
   cursor: pointer;
   transition: all 0.1s ease;
   position: relative;
@@ -1791,9 +1537,9 @@ canvas {
 }
 
 .tactical-card:hover {
-  background: #fff9f0;
+  background: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 4px 0 #baa88c;
+  box-shadow: 0 5px 0 #baa88c;
 }
 
 .tactical-card:active {
@@ -1805,20 +1551,27 @@ canvas {
   background: #ffe8cc;
   border-color: #2d080c;
   border-left: 5px solid #9e1a2b;
-  box-shadow: 0 2px 0 #baa88c;
+  box-shadow: 0 3px 0 #baa88c;
 }
 
 .card-left-emblem {
-  width: 26px;
-  height: 26px;
-  font-size: 13px;
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #f0b6ba;
   border: 1.5px solid #2d080c;
-  border-radius: 3px;
+  border-radius: 4px;
   flex-shrink: 0;
+}
+
+.tactical-svg-icon {
+  width: 17px;
+  height: 17px;
+  stroke: #2d080c;
+  display: block;
 }
 
 .card-content {
@@ -1837,32 +1590,36 @@ canvas {
 
 .card-title {
   font-family: 'Outfit', sans-serif;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 900;
   color: #2d080c;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
 }
 
 .card-subtitle {
   font-family: 'Rajdhani', sans-serif;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   color: #63222a;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-status-pill {
   font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
-  font-size: 8px;
+  font-size: 8.5px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  padding: 1px 4px;
-  border-radius: 2px;
+  padding: 2px 6px;
+  border-radius: 3px;
   text-transform: uppercase;
   background: #f0b6ba;
   color: #2d080c;
-  border: 1px solid #7c2d37;
+  border: 1.5px solid #7c2d37;
+  flex-shrink: 0;
 }
 
 .card-status-pill.amber,
@@ -1872,21 +1629,11 @@ canvas {
 .tactical-pill {
   background: #f0b6ba !important;
   color: #2d080c !important;
-  border: 1px solid #7c2d37 !important;
+  border: 1.5px solid #7c2d37 !important;
 }
 
 .card-progress-bar {
-  width: 100%;
-  height: 2px;
-  background: #d8ceb9;
-  margin-top: 2px;
-  overflow: hidden;
-}
-
-.card-progress-bar .fill,
-.tactical-fill {
-  height: 100%;
-  background: #9e1a2b !important;
+  display: none;
 }
 
 /* Tactical Shooter Hub Card Accent Styles */
@@ -1895,7 +1642,7 @@ canvas {
 }
 
 .tactical-card.tactical-hub-card:hover {
-  background: #fff9f0;
+  background: #ffffff;
 }
 
 .tactical-card.tactical-hub-card.active {
@@ -1908,22 +1655,17 @@ canvas {
   border-color: #2d080c !important;
 }
 
-.tactical-card.tactical-hub-card:hover .tactical-emblem .tactical-svg-icon,
-.tactical-card.tactical-hub-card.active .tactical-emblem .tactical-svg-icon {
-  stroke: #2d080c !important;
-}
-
 /* Chunky 3D Coral-Pink Secondary Buttons */
 .btn-3d-secondary,
 .tactical-chip-btn {
-  padding: 3px 8px;
+  padding: 4px 9px;
   background: #f0b6ba;
   border: 1.5px solid #2d080c;
   border-radius: 3px;
   box-shadow: 0 3px 0 #7c2d37;
   color: #2d080c;
   font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 800;
   letter-spacing: 0.6px;
   cursor: pointer;
@@ -1947,9 +1689,10 @@ canvas {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 4px;
+  padding-top: 6px;
   border-top: 2px solid #2d080c;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .prompt-chip {
