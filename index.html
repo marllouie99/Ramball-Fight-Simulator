@@ -10,7 +10,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Bangers&family=Permanent+Marker&family=Outfit:wght@800;900&family=Press+Start+2P&family=Rajdhani:wght@700;900&family=Silkscreen:wght@400;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=15" />
+  <link rel="stylesheet" href="css/style.css?v=20" />
   <style>
     /* Optimize HTML & Body for Centered Canvas Preview */
     html,
@@ -74,15 +74,6 @@
         <!-- TITLE SCREEN: RETRO 90S MAC OS PIXEL WINDOW BOX -->
         <div id="title-screen" class="ui-screen active retro-window-screen">
           <div class="retro-window-box">
-            <!-- Pinstriped Window Title Bar -->
-            <div class="retro-window-titlebar">
-              <div class="retro-close-box">■</div>
-              <div class="retro-title-badge">
-                <span class="retro-badge-title">Operations</span>
-              </div>
-              <div class="retro-title-fill"></div>
-            </div>
-
             <div class="retro-window-body">
               <!-- PANE 1: MAIN 6-TILE GRID MENU (Clean 2x3 Grid matching user's layout) -->
               <div id="menu-view-main" class="menu-view-pane active">
@@ -189,11 +180,6 @@
                     </div>
                   </div>
                 </div>
-
-                <footer class="tactical-footer">
-                  <div class="prompt-chip"><span class="key">CLICK</span> SELECT</div>
-                  <div class="prompt-chip" id="quick-toggle-theme"><span class="key">THEME</span> TOGGLE</div>
-                </footer>
               </div>
 
               <!-- PANE 2: BATTLE MODES SUB-VIEW (Clean 6-Tile Grid) -->
@@ -308,11 +294,6 @@
                     </div>
                   </div>
                 </div>
-
-                <footer class="tactical-footer">
-                  <div class="prompt-chip"><span class="key">CLICK</span> LAUNCH</div>
-                  <div class="prompt-chip" id="quick-toggle-theme"><span class="key">THEME</span> TOGGLE</div>
-                </footer>
               </div>
 
               <!-- PANE 3: TACTICAL SHOOTER MODES SUB-VIEW -->
@@ -369,11 +350,6 @@
                     </div>
                   </div>
                 </div>
-
-                <footer class="tactical-footer">
-                  <div class="prompt-chip"><span class="key">CLICK</span> LAUNCH</div>
-                  <div class="prompt-chip" id="quick-toggle-theme"><span class="key">THEME</span> TOGGLE</div>
-                </footer>
               </div>
 
               <!-- PANE 4: ARSENAL & STUDIO SUB-VIEW -->
@@ -412,11 +388,6 @@
                     </div>
                   </div>
                 </div>
-
-                <footer class="tactical-footer">
-                  <div class="prompt-chip"><span class="key">CLICK</span> INSPECT</div>
-                  <div class="prompt-chip" id="quick-toggle-theme"><span class="key">THEME</span> TOGGLE</div>
-                </footer>
               </div>
 
               <!-- PANE 5: SETTINGS & CONFIG SUB-VIEW -->
@@ -589,7 +560,12 @@
                   </div>
 
                   <div class="tactical-card system-card" data-action="toggle-arenatitle">
-                    <div class="card-left-emblem">🏷️</div>
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M7 2h7v7l-6 6-7-7 6-6z" fill="#ffffff"/>
+                        <path d="M10 4h2v2h-2V4z" fill="#21050c"/>
+                      </svg>
+                    </div>
                     <div class="card-content">
                       <div class="card-title-row">
                         <span class="card-title">ARENA TITLE</span>

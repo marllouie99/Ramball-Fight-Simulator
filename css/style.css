@@ -1245,7 +1245,7 @@ canvas {
     radial-gradient(#3d0711 15%, transparent 16%);
   background-size: 6px 6px;
   background-position: 0 0, 3px 3px;
-  padding: 34px 14px 10px 14px;
+  padding: 24px 14px;
   box-sizing: border-box;
   user-select: none;
   position: relative;
@@ -1262,94 +1262,17 @@ canvas {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  max-height: 900px;
+  max-height: 920px;
   overflow: hidden;
   box-sizing: border-box;
 }
 
-/* Pixel Striped Title Bar */
-.retro-window-titlebar {
-  height: 28px;
-  background: repeating-linear-gradient(
-    to bottom,
-    #e85d75 0px,
-    #e85d75 2px,
-    #faedf0 2px,
-    #faedf0 4px
-  );
-  border-bottom: 3px solid #21050c;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  position: relative;
-  flex-shrink: 0;
-}
-
-/* Pixel Square Close Box [■] */
-.retro-close-box {
-  width: 16px;
-  height: 16px;
-  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
-  border: 2px solid #21050c;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 8px;
-  color: #ffffff;
-  font-weight: 900;
-  cursor: pointer;
-  box-shadow: inset 0 1px 0 #ffaec0, 0 2px 0 #5e0d1f;
-  z-index: 2;
-  transition: transform 0.08s ease;
-}
-
-.retro-close-box:hover {
-  background: linear-gradient(180deg, #fa7f97 0%, #d83759 100%);
-  transform: translateY(-1px);
-}
-
-.retro-close-box:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 1px 0 #9e1432;
-}
-
-/* Centered Pixel Title Badge */
-.retro-title-badge {
-  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
-  padding: 3px 14px;
-  border: 2px solid #21050c;
-  border-radius: 4px;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-  box-shadow: inset 0 1px 0 #ffaec0, 0 2px 0 #5e0d1f;
-}
-
-.retro-badge-title {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 8px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  text-shadow: 0 1px 0 #5e0d1f;
-}
-
-.retro-title-fill {
-  flex: 1;
-}
-
 /* Window Inner Content Body */
 .retro-window-body {
-  padding: 8px 10px 6px 10px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1712,47 +1635,6 @@ canvas {
 }
 
 /* Bottom Tactical Pixel Prompt Bar */
-.tactical-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 6px;
-  border-top: 2.5px solid #21050c;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.prompt-chip {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
-  font-weight: 700;
-  color: #5e0d1f;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.prompt-chip .key {
-  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
-  border: 1.5px solid #21050c;
-  padding: 2px 5px;
-  border-radius: 3px;
-  color: #ffffff;
-  font-size: 6.5px;
-  font-weight: 700;
-  font-family: 'Press Start 2P', monospace;
-  box-shadow: inset 0 1px 0 #ffaec0, 0 2px 0 #5e0d1f;
-  text-shadow: 0 1px 0 #5e0d1f;
-}
-
-.prompt-chip#quick-toggle-theme {
-  cursor: pointer;
-}
-
-.prompt-chip#quick-toggle-theme:hover {
-  color: #cc2b4d;
-}
 
 /* ─────────────────────────────────────────────
    Retro Cinefilm Filter Overlay
