@@ -753,32 +753,21 @@ function drawSelectScreen() {
   const isTac1v1 = isTactical && (mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === '1v1');
   const isTacFFA = isTactical && (mode === 'Tactical FFA' || mode === GAME_MODES.TACTICAL_FFA);
 
-  ctx.fillStyle = '#ffd1dc';
-  ctx.font = '700 8px "Silkscreen", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  const breadcrumbText = isTac1v1
-    ? 'TACTICAL SHOOTER // 1 VS 1 DUEL // SYS.v2.5'
-    : (isTacFFA
-      ? 'TACTICAL SHOOTER // 4-PLAYER FFA // SYS.v2.5'
-      : (isTactical ? 'TACTICAL SHOOTER // 2 VS 2 SETUP // SYS.v2.5' : 'CIRCLE MINI-BATTLE // SYS.v2.5'));
-  ctx.fillText(breadcrumbText, canvas.width / 2, 54);
-
-  // Screen Title
+  // Screen Title: FIGHT OF LARPERS 101
   ctx.save();
   const titleText = isTac1v1
-    ? '[ 1 VS 1 TACTICAL DUEL ]'
+    ? '[ 1 VS 1 DUEL ]'
     : (isTacFFA
-      ? '[ 4-PLAYER TACTICAL FFA ]'
-      : (isTactical ? '[ 2 VS 2 TACTICAL FIREFIGHT ]' : '[ TACTICAL DEPLOYMENT ]'));
+      ? '[ 4-PLAYER FFA ]'
+      : (isTactical ? '[ 2 VS 2 FIREFIGHT ]' : '[ FIGHT OF LARPERS 101 ]'));
   
   ctx.fillStyle = '#21050c';
-  ctx.font = '700 13px "Press Start 2P", monospace';
+  ctx.font = '700 12px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(titleText, canvas.width / 2 + 1, 74 + 2);
+  ctx.fillText(titleText, canvas.width / 2 + 1, 64 + 2);
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(titleText, canvas.width / 2, 74);
+  ctx.fillText(titleText, canvas.width / 2, 64);
   ctx.restore();
 
   // Mode Selection Tabs (Shifted down to Y = 104)

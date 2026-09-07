@@ -1,7 +1,7 @@
 {
-  "name": "circle-mini-battle",
+  "name": "fight-of-larpers-101",
   "version": "1.0.0",
-  "description": "Mini-Battle arena designed for 9:16 OBS capture and Electron desktop app",
+  "description": "Fight of Larpers 101 - Mini-Battle arena designed for 9:16 OBS capture and Electron desktop app",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
@@ -12,8 +12,8 @@
   "author": "",
   "license": "ISC",
   "build": {
-    "appId": "com.circleminibattle.app",
-    "productName": "Circle Mini-Battle",
+    "appId": "com.fightoflarpers101.app",
+    "productName": "Fight of Larpers 101",
     "win": {
       "target": [
         "nsis",
