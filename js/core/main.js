@@ -363,59 +363,31 @@ if (camBtn) {
 state.cinefilmFilter = localStorage.getItem('cinefilmFilter') === 'true';
 updateCinefilmOverlay();
 
-// Tactical Terminal State
-let activeTacticalAction = 'mode-1v1';
+// Tactical Terminal & Menu Navigation State
+export function showMenuView(paneId, playAudio = true) {
+  const panes = document.querySelectorAll('.menu-view-pane');
+  panes.forEach(p => p.classList.remove('active'));
 
-export function updateBriefingPanel(cardEl, playAudio = true) {
-  if (!cardEl) return;
-  const title = cardEl.getAttribute('data-title') || 'TACTICAL OPERATION';
-  const desc = cardEl.getAttribute('data-desc') || 'Select an operation to proceed to deployment.';
-  const iconKey = cardEl.getAttribute('data-icon') || 'duel';
-  const action = cardEl.getAttribute('data-action') || 'mode-1v1';
-  const tag1 = cardEl.getAttribute('data-tag1') || '■ OPERATION';
-  const tag2 = cardEl.getAttribute('data-tag2') || '■ TIER 1';
-  const tag3 = cardEl.getAttribute('data-tag3') || '■ READY';
-
-  activeTacticalAction = action;
-
-  const briefingTitle = document.getElementById('briefing-title');
-  const briefingDesc = document.getElementById('briefing-desc');
-  const briefingIcon = document.getElementById('briefing-icon');
-  const tagEl1 = document.getElementById('briefing-tag-1');
-  const tagEl2 = document.getElementById('briefing-tag-2');
-  const tagEl3 = document.getElementById('briefing-tag-3');
-  const launchText = document.getElementById('launch-button-text');
-  const progressLabel = document.getElementById('briefing-progress-label');
-
-  if (briefingTitle) briefingTitle.innerText = title;
-  if (briefingDesc) briefingDesc.innerText = desc;
-  if (briefingIcon) briefingIcon.innerHTML = getTacticalIcon(iconKey);
-  if (tagEl1) tagEl1.innerText = tag1;
-  if (tagEl2) tagEl2.innerText = tag2;
-  if (tagEl3) tagEl3.innerText = tag3;
-
-  if (progressLabel) {
-    progressLabel.innerText = (state.gameCategory === 'tactical')
-      ? 'STATUS: 100% ARMED & READY'
-      : 'STATUS: 100% OPERATIONAL';
+  const targetPane = document.getElementById(paneId);
+  if (targetPane) {
+    targetPane.classList.add('active');
   }
 
-  if (launchText) {
-    if (action.startsWith('mode-') || action.startsWith('tactical-')) {
-      launchText.innerText = 'LAUNCH ' + title;
-    } else if (action.startsWith('screen-')) {
-      launchText.innerText = 'OPEN ' + title;
-    } else {
-      launchText.innerText = 'CONFIGURE ' + title;
+  const badge = document.querySelector('.retro-badge-title');
+  if (badge) {
+    if (paneId === 'menu-view-main') {
+      badge.innerText = (state.gameCategory === 'tactical') ? 'Tactical Ops' : 'Operations';
+    } else if (paneId === 'menu-view-battle' || paneId === 'menu-view-tactical-battle') {
+      badge.innerText = 'Battle Modes';
+    } else if (paneId === 'menu-view-arsenal') {
+      badge.innerText = 'Arsenal & Studio';
+    } else if (paneId === 'menu-view-settings') {
+      badge.innerText = 'Settings';
     }
   }
 
-  // Update active state across cards
-  document.querySelectorAll('.tactical-card').forEach(c => c.classList.remove('active'));
-  cardEl.classList.add('active');
-
   if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-    audioSystem.playSFX('skill_dash5', 0.12);
+    audioSystem.playSFX('skill_dash1', 0.2);
   }
 }
 
@@ -562,167 +534,127 @@ export function executeTacticalAction(action) {
 }
 
 // ─────────────────────────────────────────────
-// GAME HUB SWITCHER & FILTERING
+// GAME HUB SWITCHER
 // ─────────────────────────────────────────────
-const focCategoryLabelMap = {
-  all: 'OPERATIONS',
-  modes: 'BATTLE MODES',
-  arsenal: 'ARSENAL & STUDIO',
-  database: 'DATABASE & STATS',
-  system: 'SYSTEM CONFIG',
-};
-
-const tacticalCategoryLabelMap = {
-  all: 'OPERATIONS',
-  modes: 'TACTICAL MODES',
-  arsenal: 'FIREARMS ARMORY',
-  database: 'SHOOTER ROSTER',
-  system: 'SYSTEM CONFIG',
-};
-
-export function filterTacticalCards(category = 'all', hub = null) {
-  const activeHub = hub || state.gameCategory || 'foc';
-  const cards = document.querySelectorAll('.tactical-card');
-  let visibleCount = 0;
-  let firstVisible = null;
-
-  cards.forEach(card => {
-    const cardCat = card.getAttribute('data-category');
-    const cardHub = card.getAttribute('data-hub') || 'all';
-
-    const matchCategory = (category === 'all' || cardCat === category);
-    const matchHub = (cardHub === 'all' || cardHub === activeHub);
-
-    if (matchCategory && matchHub) {
-      card.style.display = 'flex';
-      visibleCount++;
-      if (!firstVisible) firstVisible = card;
-    } else {
-      card.style.display = 'none';
-    }
-  });
-
-  const badge = document.getElementById('tactical-counter-badge');
-  if (badge) badge.innerText = `(${visibleCount} READY)`;
-
-  if (firstVisible) {
-    updateBriefingPanel(firstVisible, false);
-  }
-}
-
 export function switchGameHub(hub, playAudio = true) {
   state.gameCategory = hub;
 
-  const btnFoc = document.getElementById('btn-hub-foc');
-  const btnTactical = document.getElementById('btn-hub-tactical');
+  const tileBattleTitle = document.getElementById('tile-battle-title');
+  const tileBattleSubtitle = document.getElementById('tile-battle-subtitle');
+  const tileArsenalTitle = document.getElementById('tile-arsenal-title');
+  const tileArsenalSubtitle = document.getElementById('tile-arsenal-subtitle');
+  const tileIndexTitle = document.getElementById('tile-index-title');
+  const tileIndexSubtitle = document.getElementById('tile-index-subtitle');
+  const tileHubTitle = document.getElementById('tile-hub-title');
+  const tileHubSubtitle = document.getElementById('tile-hub-subtitle');
+  const tileHubIcon = document.getElementById('tile-hub-icon');
+  const cardArsenalTitle = document.getElementById('card-arsenal-title');
+  const cardArsenalSubtitle = document.getElementById('card-arsenal-subtitle');
+  const cardStudioWrap = document.getElementById('card-studio-wrap');
   const titleScreen = document.getElementById('title-screen');
-  const crumbSub = document.getElementById('crumb-sub-label');
-  const crumbId = document.getElementById('crumb-id-label');
-  const tabModesLabel = document.getElementById('tab-modes-label');
-  const tabArsenalLabel = document.getElementById('tab-arsenal-label');
-  const tabDatabaseLabel = document.getElementById('tab-database-label');
-  const catLabel = document.getElementById('tactical-category-label');
+  const badge = document.querySelector('.retro-badge-title');
 
   if (hub === 'tactical') {
     state.mode = GAME_MODES.TACTICAL_FFA || 'Tactical FFA';
     state.arena = { ...STARTER_MAP.arena };
     loadFighterSelections('tactical');
-    activeTacticalAction = 'tactical-ffa';
-    btnFoc?.classList.remove('active');
-    btnTactical?.classList.add('active');
     titleScreen?.classList.add('hub-tactical');
-    if (crumbSub) crumbSub.innerText = 'TACTICAL SHOOTER';
-    if (crumbId) crumbId.innerText = 'GUNS & BALLISTICS';
-    if (tabModesLabel) tabModesLabel.innerText = 'OPERATIONS';
-    if (tabArsenalLabel) tabArsenalLabel.innerText = 'ARMORY';
-    if (tabDatabaseLabel) tabDatabaseLabel.innerText = 'ROSTER';
+    if (badge) badge.innerText = 'Tactical Ops';
+    if (tileBattleTitle) tileBattleTitle.innerText = 'FIREFIGHT';
+    if (tileBattleSubtitle) tileBattleSubtitle.innerText = 'BALLISTIC MODES';
+    if (tileArsenalTitle) tileArsenalTitle.innerText = 'ARMORY';
+    if (tileArsenalSubtitle) tileArsenalSubtitle.innerText = 'FIREARMS & STATS';
+    if (tileIndexTitle) tileIndexTitle.innerText = 'ROSTER';
+    if (tileIndexSubtitle) tileIndexSubtitle.innerText = 'GUNSLINGERS';
+    if (tileHubTitle) tileHubTitle.innerText = 'ANIME BRAWL';
+    if (tileHubSubtitle) tileHubSubtitle.innerText = 'SWITCH HUB';
+    if (tileHubIcon) tileHubIcon.innerText = '⚔️';
+    if (cardArsenalTitle) cardArsenalTitle.innerText = 'FIREARMS ARMORY';
+    if (cardArsenalSubtitle) cardArsenalSubtitle.innerText = 'BALLISTICS & SKINS';
+    if (cardStudioWrap) cardStudioWrap.style.display = 'none';
     applyArenaTheme('dark');
   } else {
     state.mode = GAME_MODES.ONE_VS_ONE || '1v1';
     state.arena = { ...CONFIG.arena };
     loadFighterSelections('foc');
-    activeTacticalAction = 'mode-1v1';
-    btnTactical?.classList.remove('active');
-    btnFoc?.classList.add('active');
     titleScreen?.classList.remove('hub-tactical');
-    if (crumbSub) crumbSub.innerText = 'FIGHT OF CHARACTERS';
-    if (crumbId) crumbId.innerText = 'ANIME ARENA';
-    if (tabModesLabel) tabModesLabel.innerText = 'BATTLE';
-    if (tabArsenalLabel) tabArsenalLabel.innerText = 'ARSENAL';
-    if (tabDatabaseLabel) tabDatabaseLabel.innerText = 'DATABASE';
+    if (badge) badge.innerText = 'Operations';
+    if (tileBattleTitle) tileBattleTitle.innerText = 'BATTLE';
+    if (tileBattleSubtitle) tileBattleSubtitle.innerText = 'COMBAT MODES';
+    if (tileArsenalTitle) tileArsenalTitle.innerText = 'ARSENAL';
+    if (tileArsenalSubtitle) tileArsenalSubtitle.innerText = 'WEAPONS & STUDIO';
+    if (tileIndexTitle) tileIndexTitle.innerText = 'INDEX';
+    if (tileIndexSubtitle) tileIndexSubtitle.innerText = '24 FIGHTERS';
+    if (tileHubTitle) tileHubTitle.innerText = 'TACTICAL';
+    if (tileHubSubtitle) tileHubSubtitle.innerText = 'SWITCH HUB';
+    if (tileHubIcon) tileHubIcon.innerText = '🎯';
+    if (cardArsenalTitle) cardArsenalTitle.innerText = 'WEAPON ARSENAL';
+    if (cardArsenalSubtitle) cardArsenalSubtitle.innerText = 'WEAPON PREVIEW & SKINS';
+    if (cardStudioWrap) cardStudioWrap.style.display = 'flex';
     applyArenaTheme(localStorage.getItem('arenaTheme') || 'light');
   }
 
-  const activeTab = document.querySelector('.tactical-tab-btn.active');
-  const currentCategory = activeTab ? activeTab.getAttribute('data-category') : 'all';
-  const labelMap = (hub === 'tactical') ? tacticalCategoryLabelMap : focCategoryLabelMap;
-  if (catLabel) catLabel.innerText = labelMap[currentCategory] || 'OPERATIONS';
+  showMenuView('menu-view-main', false);
 
   if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
     audioSystem.playSFX('skill_dash1', 0.25);
   }
-
-  filterTacticalCards(currentCategory, hub);
 }
 
-// Hub Switcher Button Listeners
-document.getElementById('btn-hub-foc')?.addEventListener('click', () => {
-  switchGameHub('foc');
-});
-
-document.getElementById('btn-hub-tactical')?.addEventListener('click', () => {
-  switchGameHub('tactical');
-});
-
-// Category Tabs Switching
-const tabButtons = document.querySelectorAll('.tactical-tab-btn');
-tabButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const category = btn.getAttribute('data-category');
-    tabButtons.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-
-    const labelMap = (state.gameCategory === 'tactical') ? tacticalCategoryLabelMap : focCategoryLabelMap;
-    const catLabel = document.getElementById('tactical-category-label');
-    if (catLabel) catLabel.innerText = labelMap[category] || 'OPERATIONS';
-
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('skill_dash1', 0.2);
+// 6-Tile Menu Grid Click Handlers
+document.querySelectorAll('.menu-tile-3d').forEach(tile => {
+  tile.addEventListener('click', () => {
+    const action = tile.getAttribute('data-action');
+    if (action === 'open-battle') {
+      if (state.gameCategory === 'tactical') {
+        showMenuView('menu-view-tactical-battle');
+      } else {
+        showMenuView('menu-view-battle');
+      }
+    } else if (action === 'open-arsenal') {
+      showMenuView('menu-view-arsenal');
+    } else if (action === 'open-settings') {
+      showMenuView('menu-view-settings');
+    } else if (action === 'toggle-hub') {
+      const nextHub = (state.gameCategory === 'tactical') ? 'foc' : 'tactical';
+      switchGameHub(nextHub);
+    } else if (action) {
+      executeTacticalAction(action);
     }
-
-    filterTacticalCards(category, state.gameCategory || 'foc');
   });
 });
 
-// Tactical Card Selection & Click
-document.querySelectorAll('.tactical-card').forEach(card => {
-  card.addEventListener('mouseenter', () => {
-    updateBriefingPanel(card, true);
+// Sub-view Back Buttons
+document.querySelectorAll('.menu-back-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    showMenuView('menu-view-main');
   });
+});
+
+// Titlebar close box returns to main menu if in subview
+document.querySelector('.retro-close-box')?.addEventListener('click', () => {
+  showMenuView('menu-view-main');
+});
+
+// Tactical Card Selection & Click inside subviews
+document.querySelectorAll('.tactical-card').forEach(card => {
   card.addEventListener('click', (e) => {
-    // If clicking directly on a child button inside system card, let the button handler fire
     if (e.target && e.target.tagName === 'BUTTON') return;
-    updateBriefingPanel(card, false);
     const action = card.getAttribute('data-action');
     if (action) executeTacticalAction(action);
   });
 });
 
-// Launch Button
-document.getElementById('btn-tactical-launch')?.addEventListener('click', () => {
-  executeTacticalAction(activeTacticalAction);
-});
-
 // System Buttons Handlers
 document.getElementById('btn-theme')?.addEventListener('click', (e) => {
   e.stopPropagation();
-  if (state.gameCategory === 'tactical') return; // Enforce dark mode in Tactical mode
+  if (state.gameCategory === 'tactical') return;
   const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
   applyArenaTheme(nextTheme);
 });
 
 document.getElementById('quick-toggle-theme')?.addEventListener('click', () => {
-  if (state.gameCategory === 'tactical') return; // Enforce dark mode in Tactical mode
+  if (state.gameCategory === 'tactical') return;
   const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
   applyArenaTheme(nextTheme);
 });
@@ -794,19 +726,14 @@ document.getElementById('btn-bgm')?.addEventListener('click', (e) => {
   e.target.innerText = nextTrack.name;
 });
 
-// Initialize initial cards filter on boot
-filterTacticalCards('all', state.gameCategory || 'foc');
+// Initialize initial menu view on boot
+showMenuView('menu-view-main', false);
 
-// Keyboard / Tactical Controller Prompts
+// Keyboard Navigation
 window.addEventListener('keydown', (e) => {
   if (state.gameState === 'title') {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const activeTab = document.querySelector('.tactical-tab-btn.active');
-      const tabs = Array.from(document.querySelectorAll('.tactical-tab-btn'));
-      const idx = tabs.indexOf(activeTab);
-      const nextIdx = (idx + 1) % tabs.length;
-      tabs[nextIdx]?.click();
+    if (e.key === 'Escape' || e.key === 'Backspace') {
+      showMenuView('menu-view-main');
     } else if (e.key === '1') {
       switchGameHub('foc');
     } else if (e.key === '2') {

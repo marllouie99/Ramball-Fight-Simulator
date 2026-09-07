@@ -1344,154 +1344,187 @@ canvas {
   box-sizing: border-box;
 }
 
-/* Header & Breadcrumbs */
-.tactical-header {
-  display: flex;
+/* ─────────────────────────────────────────────
+   MENU VIEW PANES & NAVIGATION SYSTEM
+───────────────────────────────────────────── */
+.menu-view-pane {
+  display: none;
   flex-direction: column;
-  gap: 3px;
-  flex-shrink: 0;
-}
-
-.tactical-breadcrumbs {
-  font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-  color: #702028;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.tactical-breadcrumbs .crumb-sep {
-  color: #9e1a2b;
-  font-weight: 900;
-}
-
-.tactical-breadcrumbs .crumb-id {
-  color: #2d080c;
-}
-
-/* Top-Level Game Hub Switcher (Clean 3D Dual Tabs) */
-.game-hub-switcher {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  margin: 4px 0 6px 0;
-  flex-shrink: 0;
-}
-
-.hub-switch-btn {
   flex: 1;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 10px;
-  background: #e8dec8;
-  border: 2px solid #2d080c;
-  border-radius: 4px;
-  box-shadow: 0 3px 0 #baa88c;
-  cursor: pointer;
-  position: relative;
-  transition: all 0.1s ease;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
-.hub-switch-btn:hover {
-  background: #f0e6d2;
+.menu-view-pane.active {
+  display: flex;
 }
 
-.hub-switch-btn:active {
+/* ─────────────────────────────────────────────
+   6-TILE HOME MENU GRID (Clean 2x3 Grid Layout)
+───────────────────────────────────────────── */
+.menu-grid-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 12px;
+  flex: 1;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 4px 0 6px 0;
+  min-height: 0;
+}
+
+/* Chunky 3D Retro Menu Tile */
+.menu-tile-3d {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 8px;
+  background: #fbf6ec;
+  border: 2px solid #2d080c;
+  border-radius: 6px;
+  box-shadow: 0 4px 0 #baa88c;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+  text-align: center;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.menu-tile-3d:hover {
+  background: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #baa88c;
+}
+
+.menu-tile-3d:active {
   transform: translateY(2px);
   box-shadow: 0 1px 0 #baa88c;
 }
 
-.hub-switch-btn .hub-btn-icon {
+/* Iconic 3D Tile Icon Badge */
+.tile-icon-box {
+  width: 52px;
+  height: 52px;
+  background: #f0b6ba;
+  border: 2px solid #2d080c;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  box-shadow: 0 3px 0 #7c2d37;
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+
+.menu-tile-3d:hover .tile-icon-box {
+  transform: scale(1.05);
+}
+
+.menu-tile-3d:active .tile-icon-box {
+  transform: scale(0.95);
+}
+
+.tile-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.tile-title {
+  font-family: 'Outfit', sans-serif;
   font-size: 15px;
+  font-weight: 900;
+  color: #2d080c;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.tile-subtitle {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #702028;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Hub Tile Accent */
+.menu-tile-hub {
+  background: #fdf5e6;
+}
+
+.menu-tile-hub .tile-icon-box {
+  background: #f0b6ba;
+}
+
+/* ─────────────────────────────────────────────
+   SUB-VIEWS & HEADERS
+───────────────────────────────────────────── */
+.subview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #2d080c;
+  margin-bottom: 8px;
   flex-shrink: 0;
 }
 
-.hub-switch-btn .hub-btn-title {
+.menu-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  background: #f0b6ba;
+  border: 2px solid #2d080c;
+  border-radius: 4px;
+  box-shadow: 0 3px 0 #7c2d37;
+  color: #2d080c;
   font-family: 'Outfit', sans-serif;
   font-size: 11.5px;
   font-weight: 900;
   letter-spacing: 0.6px;
-  color: #2d080c;
   text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* Active Hub Button (Rich Ruby Red 3D Button) */
-.hub-switch-btn.active {
-  background: #9e1a2b;
-  border-color: #2d080c;
-  box-shadow: 0 3px 0 #4d0a13;
-}
-
-.hub-switch-btn.active:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 #4d0a13;
-}
-
-.hub-switch-btn.active .hub-btn-title {
-  color: #ffffff;
-}
-
-/* Category Tabs (Vintage Macintosh Folder Tabs) */
-.tactical-tabs {
-  display: flex;
-  gap: 5px;
-  width: 100%;
-  border-bottom: 2px solid #2d080c;
-  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.08s ease;
   flex-shrink: 0;
 }
 
-.tactical-tab-btn {
-  flex: 1;
-  padding: 6px 2px;
-  background: #e4dac2;
-  border: 2px solid #2d080c;
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
-  color: #5c242b;
+.menu-back-btn:hover {
+  background: #f7cad0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #7c2d37;
+}
+
+.menu-back-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #7c2d37;
+}
+
+.subview-heading {
   font-family: 'Outfit', sans-serif;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 900;
+  color: #2d080c;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.1s ease;
-  text-align: center;
-}
-
-.tactical-tab-btn:hover {
-  background: #f0e6d2;
-  color: #2d080c;
-}
-
-.tactical-tab-btn.active {
-  background: #f5eedc;
-  border-bottom: 2px solid #f5eedc;
-  margin-bottom: -2px;
-  color: #9e1a2b;
-  font-weight: 900;
-}
-
-/* Main Content Area */
-.tactical-content-area {
-  display: flex;
-  flex-direction: column;
   flex: 1;
-  min-height: 0;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Operation Cards Scrollable List (Spacious & Clean) */
-.tactical-cards-scrollview {
+.subview-cards-list {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1503,17 +1536,17 @@ canvas {
   min-height: 0;
 }
 
-.tactical-cards-scrollview::-webkit-scrollbar {
+.subview-cards-list::-webkit-scrollbar {
   width: 5px;
 }
 
-.tactical-cards-scrollview::-webkit-scrollbar-track {
+.subview-cards-list::-webkit-scrollbar-track {
   background: #e4dac2;
   border: 1px solid #2d080c;
   border-radius: 2px;
 }
 
-.tactical-cards-scrollview::-webkit-scrollbar-thumb {
+.subview-cards-list::-webkit-scrollbar-thumb {
   background: #9e1a2b;
   border-radius: 2px;
 }
