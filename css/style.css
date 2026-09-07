@@ -1235,14 +1235,16 @@ canvas {
   display: flex;
 }
 
-/* Retro Pixel Dither Crimson Backdrop */
+/* ─────────────────────────────────────────────
+   PIXEL ART RETRO WINDOW BOX & BUTTON SYSTEM
+───────────────────────────────────────────── */
 .retro-window-screen {
-  background-color: #8b1524;
+  background-color: #5c0f1c;
   background-image: 
-    radial-gradient(#6d0e19 15%, transparent 16%),
-    radial-gradient(#6d0e19 15%, transparent 16%);
-  background-size: 4px 4px;
-  background-position: 0 0, 2px 2px;
+    radial-gradient(#3d0711 15%, transparent 16%),
+    radial-gradient(#3d0711 15%, transparent 16%);
+  background-size: 6px 6px;
+  background-position: 0 0, 3px 3px;
   padding: 34px 14px 10px 14px;
   box-sizing: border-box;
   user-select: none;
@@ -1250,12 +1252,12 @@ canvas {
   overflow: hidden;
 }
 
-/* Classic Macintosh 90s OS Window Box Container */
+/* Pixel Art Window Box Container */
 .retro-window-box {
-  background: #f5eedc;
-  border: 2px solid #2d080c;
-  border-radius: 4px;
-  box-shadow: 4px 5px 0px rgba(0, 0, 0, 0.45), inset 1px 1px 0px #ffffff;
+  background: #faedf0;
+  border: 3px solid #21050c;
+  border-radius: 8px;
+  box-shadow: 4px 6px 0px rgba(0, 0, 0, 0.55), inset 1px 1px 0px #ffffff;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1265,17 +1267,17 @@ canvas {
   box-sizing: border-box;
 }
 
-/* Pinstripe Horizontal Window Header */
+/* Pixel Striped Title Bar */
 .retro-window-titlebar {
-  height: 26px;
+  height: 28px;
   background: repeating-linear-gradient(
     to bottom,
-    #d8ceb9 0px,
-    #d8ceb9 1px,
-    #f5eedc 1px,
-    #f5eedc 3px
+    #e85d75 0px,
+    #e85d75 2px,
+    #faedf0 2px,
+    #faedf0 4px
   );
-  border-bottom: 2px solid #2d080c;
+  border-bottom: 3px solid #21050c;
   display: flex;
   align-items: center;
   padding: 0 8px;
@@ -1283,33 +1285,41 @@ canvas {
   flex-shrink: 0;
 }
 
-/* Square Close Box [■] */
+/* Pixel Square Close Box [■] */
 .retro-close-box {
-  width: 14px;
-  height: 14px;
-  background: #fbf6ec;
-  border: 2px solid #2d080c;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
+  border: 2px solid #21050c;
+  border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 7.5px;
-  color: #2d080c;
+  font-size: 8px;
+  color: #ffffff;
   font-weight: 900;
-  line-height: 1;
   cursor: pointer;
-  box-shadow: inset 1px 1px 0 #ffffff;
+  box-shadow: inset 0 1px 0 #ffaec0, 0 2px 0 #5e0d1f;
   z-index: 2;
+  transition: transform 0.08s ease;
 }
 
 .retro-close-box:hover {
-  background: #f0b6ba;
+  background: linear-gradient(180deg, #fa7f97 0%, #d83759 100%);
+  transform: translateY(-1px);
 }
 
-/* Centered Title Badge */
+.retro-close-box:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 #9e1432;
+}
+
+/* Centered Pixel Title Badge */
 .retro-title-badge {
-  background: #f5eedc;
-  padding: 1px 10px;
-  border: 1.5px solid #2d080c;
+  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
+  padding: 3px 14px;
+  border: 2px solid #21050c;
+  border-radius: 4px;
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -1317,15 +1327,17 @@ canvas {
   align-items: center;
   justify-content: center;
   z-index: 2;
+  box-shadow: inset 0 1px 0 #ffaec0, 0 2px 0 #5e0d1f;
 }
 
 .retro-badge-title {
-  font-family: 'Outfit', 'Press Start 2P', monospace, sans-serif;
-  font-size: 11px;
-  font-weight: 900;
-  color: #2d080c;
-  letter-spacing: 0.5px;
-  text-transform: capitalize;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 #5e0d1f;
 }
 
 .retro-title-fill {
@@ -1362,7 +1374,7 @@ canvas {
 }
 
 /* ─────────────────────────────────────────────
-   6-TILE HOME MENU GRID (Clean 2x3 Grid Layout)
+   6-TILE PIXEL ART MENU GRID
 ───────────────────────────────────────────── */
 .menu-grid-container {
   display: grid;
@@ -1414,7 +1426,7 @@ canvas {
   align-items: flex-start;
 }
 
-/* Chunky 3D Retro Menu Tile */
+/* Chunky Pixel Art 3D Button Tile */
 .menu-tile-3d {
   display: flex;
   flex-direction: column;
@@ -1422,12 +1434,12 @@ canvas {
   justify-content: center;
   gap: 10px;
   padding: 12px 8px;
-  background: #fbf6ec;
-  border: 2px solid #2d080c;
-  border-radius: 6px;
-  box-shadow: 0 4px 0 #baa88c;
+  background: linear-gradient(180deg, #f26f88 0%, #e24968 45%, #cc2b4d 100%);
+  border: 3px solid #21050c;
+  border-radius: 8px;
+  box-shadow: inset 0 3px 0 #ffaec0, inset 0 -3px 0 #9e1432, 0 6px 0 #5e0d1f, 0 8px 0 #21050c;
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
   user-select: none;
   text-align: center;
   box-sizing: border-box;
@@ -1437,30 +1449,30 @@ canvas {
 }
 
 .menu-tile-3d:hover {
-  background: #ffffff;
+  background: linear-gradient(180deg, #fa7f97 0%, #eb5977 45%, #d83759 100%);
   transform: translateY(-2px);
-  box-shadow: 0 6px 0 #baa88c;
+  box-shadow: inset 0 3px 0 #ffc2cf, inset 0 -3px 0 #9e1432, 0 8px 0 #5e0d1f, 0 10px 0 #21050c;
 }
 
 .menu-tile-3d:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 #baa88c;
+  transform: translateY(4px);
+  box-shadow: inset 0 2px 0 #9e1432, 0 2px 0 #5e0d1f, 0 3px 0 #21050c;
 }
 
-/* Iconic 3D Tile Icon Badge */
+/* Pixel Art Inner Emblem Badge */
 .tile-icon-box {
-  width: 52px;
-  height: 52px;
-  background: #f0b6ba;
-  border: 2px solid #2d080c;
+  width: 48px;
+  height: 48px;
+  background: #b81c3b;
+  border: 2.5px solid #21050c;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  box-shadow: 0 3px 0 #7c2d37;
+  font-size: 24px;
+  box-shadow: inset 0 2px 0 #e64566, inset 0 -2px 0 #730a20;
   flex-shrink: 0;
-  transition: transform 0.1s ease;
+  transition: transform 0.08s ease;
 }
 
 .menu-tile-3d:hover .tile-icon-box {
@@ -1475,36 +1487,38 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .tile-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 15px;
-  font-weight: 900;
-  color: #2d080c;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #ffffff;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  line-height: 1.1;
+  line-height: 1.3;
+  text-shadow: 0 2px 0 #781028, 0 3px 0 #21050c;
 }
 
 .tile-subtitle {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 11px;
+  font-family: 'Silkscreen', 'Press Start 2P', monospace;
+  font-size: 8px;
   font-weight: 700;
-  color: #702028;
-  letter-spacing: 0.5px;
+  color: #ffd1dc;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
-  line-height: 1;
+  line-height: 1.2;
+  text-shadow: 0 1px 0 #5e0d1f;
 }
 
-/* Hub Tile Accent */
+/* Hub Tile Highlight */
 .menu-tile-hub {
-  background: #fdf5e6;
+  background: linear-gradient(180deg, #fa7f97 0%, #eb5977 45%, #d83759 100%);
 }
 
 .menu-tile-hub .tile-icon-box {
-  background: #f0b6ba;
+  background: #96122c;
 }
 
 /* ─────────────────────────────────────────────
@@ -1515,7 +1529,7 @@ canvas {
   align-items: center;
   gap: 10px;
   padding-bottom: 6px;
-  border-bottom: 2px solid #2d080c;
+  border-bottom: 3px solid #21050c;
   margin-bottom: 6px;
   flex-shrink: 0;
 }
@@ -1524,39 +1538,40 @@ canvas {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 12px;
-  background: #f0b6ba;
-  border: 2px solid #2d080c;
-  border-radius: 4px;
-  box-shadow: 0 3px 0 #7c2d37;
-  color: #2d080c;
-  font-family: 'Outfit', sans-serif;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.6px;
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
+  border: 2.5px solid #21050c;
+  border-radius: 6px;
+  box-shadow: inset 0 2px 0 #ffaec0, 0 4px 0 #5e0d1f, 0 5px 0 #21050c;
+  color: #ffffff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
+  text-shadow: 0 1px 0 #5e0d1f;
   cursor: pointer;
   transition: all 0.08s ease;
   flex-shrink: 0;
 }
 
 .menu-back-btn:hover {
-  background: #f7cad0;
+  background: linear-gradient(180deg, #fa7f97 0%, #d83759 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 0 #7c2d37;
+  box-shadow: inset 0 2px 0 #ffc2cf, 0 5px 0 #5e0d1f, 0 6px 0 #21050c;
 }
 
 .menu-back-btn:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 #7c2d37;
+  transform: translateY(3px);
+  box-shadow: inset 0 1px 0 #9e1432, 0 1px 0 #5e0d1f, 0 2px 0 #21050c;
 }
 
 .subview-heading {
-  font-family: 'Outfit', sans-serif;
-  font-size: 13px;
-  font-weight: 900;
-  color: #2d080c;
-  letter-spacing: 0.8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: #21050c;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
   flex: 1;
   text-align: center;
@@ -1583,166 +1598,103 @@ canvas {
 }
 
 .subview-cards-list::-webkit-scrollbar-track {
-  background: #e4dac2;
-  border: 1px solid #2d080c;
+  background: #fcedf0;
+  border: 1px solid #21050c;
   border-radius: 2px;
 }
 
 .subview-cards-list::-webkit-scrollbar-thumb {
-  background: #9e1a2b;
+  background: #cc2b4d;
   border-radius: 2px;
 }
 
-/* Chunky 3D Retro Operation Card (Big, Spacious & Pushable) */
-.tactical-card {
+/* Pixel Art System Config Cards (Settings View) */
+.tactical-card.system-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   height: 56px;
   box-sizing: border-box;
-  background: #fbf6ec;
-  border: 2px solid #2d080c;
-  border-radius: 4px;
-  box-shadow: 0 4px 0 #baa88c;
+  background: #fcedf0;
+  border: 2.5px solid #21050c;
+  border-radius: 6px;
+  box-shadow: inset 0 2px 0 #ffffff, 0 4px 0 #baa88c, 0 5px 0 #21050c;
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: all 0.08s ease;
   position: relative;
   flex-shrink: 0;
 }
 
-.tactical-card:hover {
+.tactical-card.system-card:hover {
   background: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 5px 0 #baa88c;
+  box-shadow: inset 0 2px 0 #ffffff, 0 5px 0 #baa88c, 0 6px 0 #21050c;
 }
 
-.tactical-card:active {
+.tactical-card.system-card:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 #baa88c;
+  box-shadow: inset 0 1px 0 #baa88c, 0 2px 0 #21050c;
 }
 
-.tactical-card.active {
-  background: #ffe8cc;
-  border-color: #2d080c;
-  border-left: 5px solid #9e1a2b;
-  box-shadow: 0 3px 0 #baa88c;
-}
-
-.card-left-emblem {
-  width: 32px;
-  height: 32px;
-  font-size: 15px;
+.tactical-card.system-card .card-left-emblem {
+  width: 34px;
+  height: 34px;
+  background: #b81c3b;
+  border: 2px solid #21050c;
+  border-radius: 5px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0b6ba;
-  border: 1.5px solid #2d080c;
-  border-radius: 4px;
+  box-shadow: inset 0 1px 0 #e64566;
   flex-shrink: 0;
 }
 
-.tactical-svg-icon {
-  width: 17px;
-  height: 17px;
-  stroke: #2d080c;
-  display: block;
-}
-
-.card-content {
+.tactical-card.system-card .card-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
-.card-title-row {
+.tactical-card.system-card .card-title-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.card-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 13.5px;
-  font-weight: 900;
-  color: #2d080c;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-}
-
-.card-subtitle {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #63222a;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-status-pill {
-  font-family: 'Silkscreen', 'Rajdhani', monospace, sans-serif;
+.tactical-card.system-card .card-title {
+  font-family: 'Press Start 2P', monospace;
   font-size: 8.5px;
-  font-weight: 800;
+  font-weight: 700;
+  color: #21050c;
   letter-spacing: 0.5px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  text-transform: uppercase;
-  background: #f0b6ba;
-  color: #2d080c;
-  border: 1.5px solid #7c2d37;
-  flex-shrink: 0;
 }
 
-.card-status-pill.amber,
-.card-status-pill.cyan,
-.card-status-pill.magenta,
-.card-status-pill.green,
-.tactical-pill {
-  background: #f0b6ba !important;
-  color: #2d080c !important;
-  border: 1.5px solid #7c2d37 !important;
+.tactical-card.system-card .card-subtitle {
+  font-family: 'Silkscreen', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  color: #702028;
+  letter-spacing: 0.5px;
 }
 
-.card-progress-bar {
-  display: none;
-}
-
-/* Tactical Shooter Hub Card Accent Styles */
-.tactical-card.tactical-hub-card {
-  border-left: 2px solid #2d080c;
-}
-
-.tactical-card.tactical-hub-card:hover {
-  background: #ffffff;
-}
-
-.tactical-card.tactical-hub-card.active {
-  background: #ffe8cc;
-  border-left: 5px solid #9e1a2b;
-}
-
-.tactical-emblem {
-  background: #f0b6ba !important;
-  border-color: #2d080c !important;
-}
-
-/* Chunky 3D Coral-Pink Secondary Buttons */
+/* Pixel Art 3D Chip Buttons */
 .btn-3d-secondary,
 .tactical-chip-btn {
-  padding: 4px 9px;
-  background: #f0b6ba;
-  border: 1.5px solid #2d080c;
-  border-radius: 3px;
-  box-shadow: 0 3px 0 #7c2d37;
-  color: #2d080c;
-  font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
+  border: 2px solid #21050c;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 #ffaec0, 0 3px 0 #5e0d1f;
+  color: #ffffff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 0 #5e0d1f;
   cursor: pointer;
   transition: all 0.08s ease;
   text-transform: uppercase;
@@ -1750,46 +1702,48 @@ canvas {
 
 .btn-3d-secondary:hover,
 .tactical-chip-btn:hover {
-  background: #f7cad0;
+  background: linear-gradient(180deg, #fa7f97 0%, #d83759 100%);
 }
 
 .btn-3d-secondary:active,
 .tactical-chip-btn:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 #7c2d37;
+  box-shadow: inset 0 1px 0 #9e1432, 0 1px 0 #5e0d1f;
 }
 
-/* Bottom Tactical Prompt Bar */
+/* Bottom Tactical Pixel Prompt Bar */
 .tactical-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding-top: 6px;
-  border-top: 2px solid #2d080c;
+  border-top: 2.5px solid #21050c;
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 .prompt-chip {
-  font-family: 'Rajdhani', monospace, sans-serif;
-  font-size: 9.5px;
-  font-weight: 800;
-  color: #5c242b;
-  letter-spacing: 0.6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  font-weight: 700;
+  color: #5e0d1f;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .prompt-chip .key {
-  background: #e4dac2;
-  border: 1.5px solid #2d080c;
-  padding: 1px 4px;
-  border-radius: 2px;
-  color: #2d080c;
-  font-size: 8.5px;
-  font-weight: 900;
-  font-family: monospace, sans-serif;
+  background: linear-gradient(180deg, #f26f88 0%, #cc2b4d 100%);
+  border: 1.5px solid #21050c;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: #ffffff;
+  font-size: 6.5px;
+  font-weight: 700;
+  font-family: 'Press Start 2P', monospace;
+  box-shadow: inset 0 1px 0 #ffaec0, 0 2px 0 #5e0d1f;
+  text-shadow: 0 1px 0 #5e0d1f;
 }
 
 .prompt-chip#quick-toggle-theme {
@@ -1797,7 +1751,7 @@ canvas {
 }
 
 .prompt-chip#quick-toggle-theme:hover {
-  color: #9e1a2b;
+  color: #cc2b4d;
 }
 
 /* ─────────────────────────────────────────────
