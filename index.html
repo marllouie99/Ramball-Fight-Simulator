@@ -10,7 +10,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Bangers&family=Permanent+Marker&family=Outfit:wght@800;900&family=Press+Start+2P&family=Rajdhani:wght@700;900&family=Silkscreen:wght@400;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20" />
+  <link rel="stylesheet" href="css/style.css?v=25" />
   <style>
     /* Optimize HTML & Body for Centered Canvas Preview */
     html,
@@ -182,17 +182,16 @@
                 </div>
               </div>
 
-              <!-- PANE 2: BATTLE MODES SUB-VIEW (Clean 6-Tile Grid) -->
+              <!-- PANE 2: BATTLE MODES SUB-VIEW (Horizontal Card List matching Settings) -->
               <div id="menu-view-battle" class="menu-view-pane">
                 <div class="subview-header">
                   <button class="menu-back-btn" data-back="main">◀ BACK</button>
                   <span class="subview-heading" id="battle-subview-heading">SELECT BATTLE MODE</span>
                 </div>
-                <div class="menu-grid-container">
-                  <!-- Row 1, Col 1: 1v1 Mode -->
-                  <div class="menu-tile-3d" data-action="mode-1v1">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                <div class="subview-cards-list">
+                  <div class="tactical-card system-card" data-action="mode-1v1">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M2 1h3v1h1v1h1v1h1v1h1v1h1v1h1v2h1v1h2v1h1v3h-3v-1h-1v-2h-1v-1h-1V9H8V8H7V7H6V6H5V5H4V4H3V3H2V1z" fill="#ffffff"/>
                         <path d="M14 1h-3v1h-1v1h-1v1H8v1H7v1H6v1H5v1H4v2H3v1H1v1H0v3h3v-1h1v-2h1v-1h1V9h1V8h1V7h1V6h1V5h1V4h1V3h1V1h-2z" fill="#ffffff"/>
                         <path d="M3 2h1v1h1v1h1v1h1v1h1v1h-1v1H6V7H5V6H4V5H3V2z" fill="#ffd1dc"/>
@@ -201,16 +200,18 @@
                         <path d="M1 14h2v1H1z M13 14h2v1h-2z" fill="#21050c"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">1V1 DUEL</div>
-                      <div class="tile-subtitle">RANKED 1V1</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">1V1 DUEL</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">RANKED 1V1</div>
                     </div>
                   </div>
 
-                  <!-- Row 1, Col 2: 1v1 Stand Off Mode -->
-                  <div class="menu-tile-3d" data-action="mode-standoff">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="mode-standoff">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M2 1h12v7h-1v3h-1v2h-1v1H9v1H7v-1H6v-1H5v-2H4v-3H3V8H2V1z" fill="#21050c"/>
                         <path d="M3 2h10v5h-1v3h-1v2h-1v1H9v1H7v-1H6v-1H5v-2H4v-3H3V2z" fill="#ffffff"/>
                         <path d="M4 3h3v5H4V3z M8 3h4v5H8V3z" fill="#ffb8cb"/>
@@ -218,16 +219,18 @@
                         <path d="M7 3h2v10H7z" fill="#ffffff"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">STAND-OFF</div>
-                      <div class="tile-subtitle">2000 HP DUEL</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">STAND-OFF</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">2000 HP DUEL</div>
                     </div>
                   </div>
 
-                  <!-- Row 2, Col 1: Battle Random Mode -->
-                  <div class="menu-tile-3d" data-action="mode-random-standoff">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="mode-random-standoff">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M2 2h12v12H2V2z" fill="#21050c"/>
                         <path d="M3 3h10v10H3V3z" fill="#ffffff"/>
                         <path d="M3 3h10v1H3z M3 3h1v10H3z" fill="#ffd1dc"/>
@@ -235,16 +238,18 @@
                         <path d="M5 5h2v2H5V5z M9 5h2v2H9V5z M7 7h2v2H7V7z M5 9h2v2H5V9z M9 9h2v2H9V9z" fill="#21050c"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">RANDOM</div>
-                      <div class="tile-subtitle">INSTANT 1V1</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">RANDOM</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">INSTANT 1V1</div>
                     </div>
                   </div>
 
-                  <!-- Row 2, Col 2: 2v2 Tag Team -->
-                  <div class="menu-tile-3d" data-action="mode-2v2">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="mode-2v2">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M3 3h4v4H3V3z M1 8h8v6H1V8z" fill="#ffffff"/>
                         <path d="M4 4h2v2H4V4z" fill="#ffd1dc"/>
                         <path d="M2 9h6v4H2V9z" fill="#ffb8cb"/>
@@ -254,16 +259,18 @@
                         <path d="M0 7h10v1H0z M6 7h10v1H6z" fill="#21050c"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">2V2 TEAM</div>
-                      <div class="tile-subtitle">CO-OP BRAWL</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">2V2 TEAM</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">CO-OP BRAWL</div>
                     </div>
                   </div>
 
-                  <!-- Row 3, Col 1: Free For All -->
-                  <div class="menu-tile-3d" data-action="mode-ffa">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="mode-ffa">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M5 1h6v1h2v2h1v2h1v4h-1v2h-1v2h-2v1H5v-1H3v-2H2v-2H1V6h1V4h1V2h2V1z" fill="#ffffff"/>
                         <path d="M5 3h6v1h2v2h1v4h-1v2h-2v1H5v-1H3v-2H2V6h1V4h2V3z" fill="#21050c"/>
                         <path d="M6 4h4v1h1v1h1v4h-1v1h-1v1H6v-1H5v-1H4V6h1V5h1V4z" fill="#ffffff"/>
@@ -272,25 +279,30 @@
                         <path d="M7 0h2v3H7V0z M7 13h2v3H7v-3z M0 7h3v2H0V7z M13 7h3v2h-3V7z" fill="#ffffff"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">FREE FOR ALL</div>
-                      <div class="tile-subtitle">4-PLAYER CHAOS</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">FREE FOR ALL</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">4-PLAYER CHAOS</div>
                     </div>
                   </div>
 
-                  <!-- Row 3, Col 2: 1v2 Stand Off -->
-                  <div class="menu-tile-3d" data-action="mode-standoff1v2">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="mode-standoff1v2">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M7 1h2v2h1v2h1v1h1v3h-1v3h-1v2H9v1H6v-1H5v-1H4v-2H3V9h1V6h1V4h1V3h1V1z" fill="#21050c"/>
                         <path d="M7 2h2v2h1v2h1v1h-1v3h-1v2H9v1H6v-1H5v-1H4v-2H3V9h2V7h1V5h1V4h1V2z" fill="#ffffff"/>
                         <path d="M7 4h1v2h1v2h1v1h-1v2H8v1H6v-1H5V9h2V7h1V5h-1V4z" fill="#ffb8cb"/>
                         <path d="M7 6h1v2h1v1H7v2H6V9h1V6z" fill="#ffd1dc"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">1V2 STAND-OFF</div>
-                      <div class="tile-subtitle">SOLO SURVIVAL</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">1V2 STAND-OFF</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">SOLO SURVIVAL</div>
                     </div>
                   </div>
                 </div>
@@ -302,23 +314,26 @@
                   <button class="menu-back-btn" data-back="main">◀ BACK</button>
                   <span class="subview-heading">TACTICAL FIREFIGHT</span>
                 </div>
-                <div class="menu-grid-container menu-grid-tactical">
-                  <div class="menu-tile-3d" data-action="tactical-1v1">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                <div class="subview-cards-list">
+                  <div class="tactical-card system-card" data-action="tactical-1v1">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M2 4h12v4h-6v1h-1v4H3v-5h1V5H2V4z" fill="#ffffff"/>
                         <path d="M3 5h10v2H7v1H5v1H4v4H3V5z" fill="#ffd1dc"/>
                         <path d="M5 8h2v2H5V8z" fill="#21050c"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">1V1 DUEL</div>
-                      <div class="tile-subtitle">TACTICAL 1V1</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">1V1 DUEL</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">TACTICAL 1V1</div>
                     </div>
                   </div>
-                  <div class="menu-tile-3d" data-action="tactical-2v2">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="tactical-2v2">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M3 3h4v4H3V3z M1 8h8v6H1V8z" fill="#ffffff"/>
                         <path d="M4 4h2v2H4V4z" fill="#ffd1dc"/>
                         <path d="M2 9h6v4H2V9z" fill="#ffb8cb"/>
@@ -328,14 +343,17 @@
                         <path d="M0 7h10v1H0z M6 7h10v1H6z" fill="#21050c"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">2V2 FIREFIGHT</div>
-                      <div class="tile-subtitle">CT VS T TEAMS</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">2V2 FIREFIGHT</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">CT VS T TEAMS</div>
                     </div>
                   </div>
-                  <div class="menu-tile-3d" data-action="tactical-ffa">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="tactical-ffa">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M5 1h6v1h2v2h1v2h1v4h-1v2h-1v2h-2v1H5v-1H3v-2H2v-2H1V6h1V4h1V2h2V1z" fill="#ffffff"/>
                         <path d="M5 3h6v1h2v2h1v4h-1v2h-2v1H5v-1H3v-2H2V6h1V4h2V3z" fill="#21050c"/>
                         <path d="M6 4h4v1h1v1h1v4h-1v1h-1v1H6v-1H5v-1H4V6h1V5h1V4z" fill="#ffffff"/>
@@ -344,9 +362,12 @@
                         <path d="M7 0h2v3H7V0z M7 13h2v3H7v-3z M0 7h3v2H0V7z M13 7h3v2h-3V7z" fill="#ffffff"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">TACTICAL FFA</div>
-                      <div class="tile-subtitle">4-PLAYER DEATHMATCH</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">TACTICAL FFA</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                      <div class="card-subtitle">4-PLAYER DEATHMATCH</div>
                     </div>
                   </div>
                 </div>
@@ -358,33 +379,39 @@
                   <button class="menu-back-btn" data-back="main">◀ BACK</button>
                   <span class="subview-heading">WEAPONS & ARSENAL</span>
                 </div>
-                <div class="menu-grid-container menu-grid-arsenal">
-                  <div class="menu-tile-3d" data-action="screen-weapons">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                <div class="subview-cards-list">
+                  <div class="tactical-card system-card" data-action="screen-weapons">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M14 1h-2v1h-1v1h-1v1h-1v1H8v1H7v1H6v1H5v1H4v1H3v2H1v3h3v-2h2v-1h1v-1h1V9h1V8h1V7h1V6h1V5h1V4h1V3h1V1h-2z" fill="#ffffff"/>
                         <path d="M13 2h-1v1h-1v1h-1v1H9v1H8v1H7v1h1v-1h1V7h1V6h1V5h1V4h1V2h-1z" fill="#ffd1dc"/>
                         <path d="M3 11h2v2H3v-2z" fill="#cf3355"/>
                         <path d="M2 13h1v1H2v-1z" fill="#21050c"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title" id="card-arsenal-title">WEAPON ARSENAL</div>
-                      <div class="tile-subtitle" id="card-arsenal-subtitle">PREVIEW & SKINS</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title" id="card-arsenal-title">WEAPON ARSENAL</span>
+                        <button class="tactical-chip-btn">OPEN</button>
+                      </div>
+                      <div class="card-subtitle" id="card-arsenal-subtitle">PREVIEW & SKINS</div>
                     </div>
                   </div>
-                  <div class="menu-tile-3d" data-action="screen-weaponstudio" id="card-studio-wrap">
-                    <div class="tile-icon-box">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="28" height="28" fill="none" shape-rendering="crispEdges">
+                  <div class="tactical-card system-card" data-action="screen-weaponstudio" id="card-studio-wrap">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
                         <path d="M8 2h6v4h-2V5h-1V4H9V3H8V2z" fill="#ffffff"/>
                         <path d="M7 4h2v2H7V4z" fill="#ffd1dc"/>
                         <path d="M5 6h2v2H5V6z M4 8h2v2H4V8z M3 10h2v2H3v-2z M2 12h2v2H2v-2z" fill="#ffffff"/>
                         <path d="M1 13h2v2H1v-2z" fill="#cf3355"/>
                       </svg>
                     </div>
-                    <div class="tile-text-wrap">
-                      <div class="tile-title">WEAPON STUDIO</div>
-                      <div class="tile-subtitle">GEOMETRY EDITOR</div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">WEAPON STUDIO</span>
+                        <button class="tactical-chip-btn">CUSTOMIZE</button>
+                      </div>
+                      <div class="card-subtitle">GEOMETRY EDITOR</div>
                     </div>
                   </div>
                 </div>
