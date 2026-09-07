@@ -1297,15 +1297,13 @@ canvas {
 }
 
 /* ─────────────────────────────────────────────
-   6-TILE PIXEL ART MENU GRID
+   6-TILE PIXEL ART MENU GRID (Compact 2-Column Grid)
 ───────────────────────────────────────────── */
 .menu-grid-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: repeat(3, 1fr);
-  gap: 12px;
-  flex: 1;
-  height: 100%;
+  gap: 8px 10px;
+  width: 100%;
   box-sizing: border-box;
   padding: 4px 0 6px 0;
   min-height: 0;
@@ -1315,14 +1313,14 @@ canvas {
 .menu-grid-tactical {
   grid-template-columns: 1fr;
   grid-template-rows: repeat(3, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .menu-grid-tactical .menu-tile-3d {
   flex-direction: row;
   justify-content: flex-start;
-  gap: 16px;
-  padding: 12px 18px;
+  gap: 14px;
+  padding: 10px 16px;
   text-align: left;
 }
 
@@ -1334,14 +1332,14 @@ canvas {
 .menu-grid-arsenal {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
 }
 
 .menu-grid-arsenal .menu-tile-3d {
   flex-direction: row;
   justify-content: flex-start;
-  gap: 18px;
-  padding: 16px 20px;
+  gap: 16px;
+  padding: 12px 18px;
   text-align: left;
 }
 
@@ -1349,51 +1347,52 @@ canvas {
   align-items: flex-start;
 }
 
-/* Chunky Pixel Art 3D Button Tile */
+/* Chunky Pixel Art 3D Button Tile (Compact 2-Column Tile) */
 .menu-tile-3d {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 12px 8px;
+  gap: 6px;
+  padding: 8px 6px;
+  height: 82px;
   background: linear-gradient(180deg, #f26f88 0%, #e24968 45%, #cc2b4d 100%);
-  border: 3px solid #21050c;
-  border-radius: 8px;
-  box-shadow: inset 0 3px 0 #ffaec0, inset 0 -3px 0 #9e1432, 0 6px 0 #5e0d1f, 0 8px 0 #21050c;
+  border: 2.5px solid #21050c;
+  border-radius: 6px;
+  box-shadow: inset 0 2px 0 #ffaec0, inset 0 -2px 0 #9e1432, 0 4px 0 #5e0d1f, 0 5px 0 #21050c;
   cursor: pointer;
   transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
   user-select: none;
   text-align: center;
   box-sizing: border-box;
   position: relative;
-  height: 100%;
   min-height: 0;
+  flex-shrink: 0;
 }
 
 .menu-tile-3d:hover {
   background: linear-gradient(180deg, #fa7f97 0%, #eb5977 45%, #d83759 100%);
-  transform: translateY(-2px);
-  box-shadow: inset 0 3px 0 #ffc2cf, inset 0 -3px 0 #9e1432, 0 8px 0 #5e0d1f, 0 10px 0 #21050c;
+  transform: translateY(-1px);
+  box-shadow: inset 0 2px 0 #ffc2cf, inset 0 -2px 0 #9e1432, 0 5px 0 #5e0d1f, 0 6px 0 #21050c;
 }
 
 .menu-tile-3d:active {
-  transform: translateY(4px);
-  box-shadow: inset 0 2px 0 #9e1432, 0 2px 0 #5e0d1f, 0 3px 0 #21050c;
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 #9e1432, 0 1px 0 #5e0d1f, 0 2px 0 #21050c;
 }
 
 /* Pixel Art Inner Emblem Badge */
 .tile-icon-box {
-  width: 48px;
-  height: 48px;
+  width: 32px;
+  height: 32px;
   background: #b81c3b;
-  border: 2.5px solid #21050c;
-  border-radius: 6px;
+  border: 2px solid #21050c;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  box-shadow: inset 0 2px 0 #e64566, inset 0 -2px 0 #730a20;
+  font-size: 18px;
+  box-shadow: inset 0 1px 0 #e64566, inset 0 -1px 0 #730a20;
   flex-shrink: 0;
   transition: transform 0.08s ease;
 }
@@ -1410,28 +1409,28 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .tile-title {
   font-family: 'Press Start 2P', monospace;
-  font-size: 10.5px;
+  font-size: 8.5px;
   font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  line-height: 1.3;
-  text-shadow: 0 2px 0 #781028, 0 3px 0 #21050c;
+  line-height: 1.2;
+  text-shadow: 0 1px 0 #781028, 0 2px 0 #21050c;
 }
 
 .tile-subtitle {
   font-family: 'Silkscreen', 'Press Start 2P', monospace;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
   color: #ffd1dc;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: 1.1;
   text-shadow: 0 1px 0 #5e0d1f;
 }
 
