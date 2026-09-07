@@ -1042,7 +1042,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 21,
-    name: 'LIMITLESS',
+    name: 'GOJO',
     category: 'Anime',
     color: gojoConfig.color || '#E0FFFF', // Light Cyan
     startX: gojoConfig.startX || 300,
@@ -1063,7 +1063,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 22,
-    name: 'CURSE KING',
+    name: 'SUKUNA',
     category: 'Anime',
     color: sukunaConfig.color || '#8B0000', // Dark Crimson
     startX: sukunaConfig.startX || 300,
@@ -1084,7 +1084,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 23,
-    name: 'BUSH CAMPER',
+    name: 'YUTA',
     category: 'Anime',
     color: yutaConfig.color || '#EEEEEE', // Soft Silver / White
     themeColor: yutaConfig.themeColor || '#FF1493', // Cursed Pink theme
@@ -1127,7 +1127,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 24,
-    name: 'BOOGIE WOOGIE MAN',
+    name: 'TODO',
     category: 'Anime',
     color: todoConfig.color || '#D2691E', // Chocolate / Brown
     startX: todoConfig.startX || 300,
@@ -1148,7 +1148,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 25,
-    name: 'BLACK FLASH MAN',
+    name: 'YUJI',
     category: 'Anime',
     color: yujiConfig.color || '#D95C7E', // Deep pink JJK uniform
     startX: yujiConfig.startX || 300,
@@ -1190,7 +1190,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 27,
-    name: 'BALDY',
+    name: 'SAITAMA',
     category: 'Anime',
     color: saitamaConfig.color || '#F5C400', // Bright Safety Yellow
     startX: saitamaConfig.startX || 300,
@@ -1211,7 +1211,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 28,
-    name: 'CYBORG',
+    name: 'GENOS',
     category: 'Anime',
     color: genosConfig.color || '#FF5500', // Incineration Orange
     startX: genosConfig.startX || 300,
@@ -1232,7 +1232,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 29,
-    name: 'SOUL REAPER',
+    name: 'ICHIGOAT',
     category: 'Anime',
     color: ichigoConfig.color || '#FF5500', // Orange details
     startX: ichigoConfig.startX || 300,
@@ -1253,7 +1253,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 30,
-    name: 'CURSE DISASTER',
+    name: 'MAHITO',
     category: 'Anime',
     color: mahitoConfig.color || '#C026D3', // Vivid Magenta-Violet / Cursed Energy
     startX: mahitoConfig.startX || 300,
@@ -1274,7 +1274,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 31,
-    name: '7:3 RATIO GUY',
+    name: 'NANAMI',
     category: 'Anime',
     color: nanamiConfig.color || '#D4AF37', // Refined Golden Sand / Warm Ochre
     startX: nanamiConfig.startX || 300,
@@ -1295,7 +1295,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 32,
-    name: 'STRAW DOLL',
+    name: 'NOBARA',
     category: 'Anime',
     color: nobaraConfig.color || '#D94E68', // Deep Rose Crimson
     startX: nobaraConfig.startX || 300,
@@ -1358,7 +1358,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 35,
-    name: 'MEGUMI - TEN SHADOWS',
+    name: 'MEGUMI',
     category: 'Anime',
     color: megumiConfig.color || '#1C2D4A', // Midnight Navy
     startX: megumiConfig.startX || 300,
@@ -1379,7 +1379,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 36,
-    name: 'QUINCY',
+    name: 'ISHIDA',
     category: 'Anime',
     color: uryuConfig.color || '#00E5FF', // Quincy Radiant Cyan
     startX: uryuConfig.startX || 300,
@@ -1400,7 +1400,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 37,
-    name: 'SEGUNDA ETAPA',
+    name: 'ULQUIORRA',
     category: 'Anime',
     color: ulquiorraConfig.color || '#00FF88', // Emerald Green Reiatsu
     themeColor: ulquiorraConfig.themeColor || '#00FF88',
@@ -1426,7 +1426,7 @@ export const FIGHTER_DEFS = [
 if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
   FIGHTER_DEFS.push({
     id: 100,
-    name: 'DIVINE GENERAL',
+    name: 'MAHORAGA',
     category: 'Anime',
     color: mahoragaConfig.color || '#F5F5DC', // Beige / Off-White
     themeColor: mahoragaConfig.themeColor || '#FFD700',

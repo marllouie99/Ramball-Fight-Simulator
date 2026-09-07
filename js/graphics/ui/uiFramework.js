@@ -188,14 +188,34 @@ function drawButton(text, cx, cy, action, w = 200, h = 40, customColor = null, r
   _registerButton(minX, minY, maxX - minX, maxY - minY, action);
 }
 
-function wrapText(ctx, text, x, y, maxWidth, lineHeight = 16) {
+function fitSingleLineText(ctx, text, maxWidth) {
+  if (!text) return '';
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let truncated = text;
+  while (truncated.length > 0 && ctx.measureText(truncated + '...').width > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated ? (truncated + '...') : '';
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight = 16, maxLines = Infinity) {
   const words = (text || '').split(' ');
   let line = '';
+  let linesDrawn = 0;
   for (let i = 0; i < words.length; i += 1) {
     const testLine = line ? `${line} ${words[i]}` : words[i];
     const metrics = ctx.measureText(testLine);
     if (metrics.width > maxWidth && line) {
+      if (linesDrawn + 1 >= maxLines) {
+        let truncLine = line;
+        while (truncLine.length > 0 && ctx.measureText(truncLine + '...').width > maxWidth) {
+          truncLine = truncLine.slice(0, -1);
+        }
+        ctx.fillText(truncLine + '...', x, y);
+        return;
+      }
       ctx.fillText(line, x, y);
+      linesDrawn++;
       line = words[i];
       y += lineHeight;
     } else {
@@ -203,6 +223,14 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight = 16) {
     }
   }
   if (line) {
+    if (linesDrawn >= maxLines) {
+      let truncLine = line;
+      while (truncLine.length > 0 && ctx.measureText(truncLine + '...').width > maxWidth) {
+        truncLine = truncLine.slice(0, -1);
+      }
+      ctx.fillText(truncLine + '...', x, y);
+      return;
+    }
     ctx.fillText(line, x, y);
   }
 }
@@ -278,4 +306,4 @@ function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b'
   }
 }
 
-export { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar };
+export { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, fitSingleLineText, drawPremiumStatBar, drawStatBar };

@@ -4,7 +4,7 @@
 
 import { state } from '../core/state.js';
 import { playLoopingSound, stopLoopingSound, setLoopingSoundVolume } from './soundSystem.js';
-import { _registerButton, drawChamferedRect } from '../graphics/ui/uiFramework.js';
+import { _registerButton, drawChamferedRect, drawPanel, drawButton, fitSingleLineText } from '../graphics/ui/uiFramework.js';
 
 export const ARENA_BGM_LOOP_KEY = 'arena_bgm_loop';
 export const ARENA_BGM_PREVIEW_KEY = 'arena_bgm_preview';
@@ -677,7 +677,8 @@ export function drawArenaBgmSelector(ctx, x, y, width, height) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   
-  const displayLabel = isOff ? 'BGM: OFF' : `BGM:${currentTrack.shortName.slice(0, 5)}`;
+  const rawLabel = isOff ? 'BGM: OFF' : `BGM:${currentTrack.shortName || currentTrack.name}`;
+  const displayLabel = fitSingleLineText(ctx, rawLabel, width - 12);
   ctx.fillText(displayLabel, x + width / 2, y + height / 2 + 0.5);
 
   ctx.restore();
@@ -713,6 +714,7 @@ export function drawArenaBgmModal(ctx) {
   const my = (canvas.height - modalH) / 2;
 
   drawPanel(mx, my, modalW, modalH, 0.98, 6, '#21050c');
+  _registerButton(mx, my, modalW, modalH, () => {});
 
   // Modal Header
   ctx.save();
@@ -1083,25 +1085,30 @@ export function drawArenaBgmModal(ctx) {
 
     // 3. Track Title & Subtitle
     const textX = itemX + 36;
+    const selectBtnW = isSelected ? 66 : 56;
+    const selectBtnX = itemX + itemW - selectBtnW - 8;
+    const previewBtnW = 24;
+    const previewBtnX = selectBtnX - previewBtnW - 6;
+    const rightBtnsStartX = track.isCustom ? (previewBtnX - 28) : (hasAudio ? (previewBtnX - 8) : (selectBtnX - 8));
+    const maxTitleW = Math.max(60, rightBtnsStartX - textX);
+
     ctx.save();
     ctx.fillStyle = isSelected ? '#b81c3b' : '#21050c';
-    ctx.font = '700 8px "Press Start 2P", monospace';
+    ctx.font = '700 7.5px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(track.name, textX, itemY + 8);
+    ctx.fillText(fitSingleLineText(ctx, track.name, maxTitleW), textX, itemY + 8);
 
     ctx.fillStyle = '#8b1524';
-    ctx.font = '700 7px "Silkscreen", monospace';
+    ctx.font = '700 6.5px "Silkscreen", monospace';
     const subtitle = track.id === 'random' 
       ? 'RANDOM SOUNDTRACK PER MATCH' 
       : (track.id === 'off' ? 'DISABLE ARENA SOUNDTRACK' : (track.isCustom ? 'IMPORTED CUSTOM AUDIO' : 'ARENA SOUNDTRACK'));
-    ctx.fillText(subtitle, textX, itemY + 24);
+    ctx.fillText(fitSingleLineText(ctx, subtitle, maxTitleW), textX, itemY + 24);
     ctx.restore();
 
     // 4. Select / Active Pill Badge
-    const selectBtnW = isSelected ? 66 : 56;
     const btnH = 22;
-    const selectBtnX = itemX + itemW - selectBtnW - 8;
     const selectBtnY = itemY + (itemH - btnH) / 2;
 
     ctx.save();
@@ -1135,8 +1142,6 @@ export function drawArenaBgmModal(ctx) {
     ctx.restore();
 
     // 5. Play / Stop (Preview) Button
-    const previewBtnW = 24;
-    const previewBtnX = selectBtnX - previewBtnW - 6;
     const previewBtnY = selectBtnY;
 
     if (hasAudio) {
@@ -1174,26 +1179,30 @@ export function drawArenaBgmModal(ctx) {
       ctx.restore();
     }
 
-    // Card click callback (select track)
-    _registerButton(itemX, itemY, itemW, itemH, () => {
-      setSavedArenaBgmId(track.id);
-      if (typeof state !== 'undefined' && state.audioSystem?.playSFX) {
-        state.audioSystem.playSFX('skill_dash1', 0.25);
+    // Card click callback (select track - clipped to viewport)
+    const clickY = Math.max(listY, itemY);
+    const clickH = Math.min(listY + viewH, itemY + itemH) - clickY;
+    if (clickH > 10) {
+      _registerButton(itemX, clickY, itemW, clickH, () => {
+        setSavedArenaBgmId(track.id);
+        if (typeof state !== 'undefined' && state.audioSystem?.playSFX) {
+          state.audioSystem.playSFX('skill_dash1', 0.25);
+        }
+      });
+
+      // Preview button click callback
+      if (hasAudio && previewBtnY >= listY && previewBtnY + btnH <= listY + viewH) {
+        _registerButton(previewBtnX, previewBtnY, previewBtnW, btnH, () => {
+          previewTrack(track.id);
+        });
       }
-    });
 
-    // Preview button click callback
-    if (hasAudio) {
-      _registerButton(previewBtnX, previewBtnY, previewBtnW, btnH, () => {
-        previewTrack(track.id);
-      });
-    }
-
-    // Delete custom track click callback
-    if (track.isCustom) {
-      _registerButton(delBtnX, previewBtnY, 20, btnH, () => {
-        deleteCustomTrackFromDB(track.id);
-      });
+      // Delete custom track click callback
+      if (track.isCustom && previewBtnY >= listY && previewBtnY + btnH <= listY + viewH) {
+        _registerButton(delBtnX, previewBtnY, 20, btnH, () => {
+          deleteCustomTrackFromDB(track.id);
+        });
+      }
     }
   });
 

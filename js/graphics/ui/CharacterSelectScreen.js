@@ -3,10 +3,9 @@ import { state, saveFighterSelections } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
-import { drawModeSelection } from './MainMenuScreen.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { clearHealthHud } from '../hudManager.js';
-import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
+import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, fitSingleLineText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { spawnFloatingText } from '../../core/state.js';
@@ -239,6 +238,14 @@ function drawTacticalMapSelectModal() {
   ctx.fillStyle = 'rgba(33, 5, 12, 0.88)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Backdrop click closes modal
+  _registerButton(0, 0, canvas.width, canvas.height, () => {
+    isTacticalMapModalOpen = false;
+  });
+
+  // Blocker over modal panel window
+  _registerButton(mx, my, modalW, modalH, () => {});
+
   // Draw main outer retro cream-pink panel
   drawPanel(mx, my, modalW, modalH, 0.98, 6, '#21050c');
 
@@ -385,6 +392,14 @@ function drawFighterSelectModal() {
   // Retro dim backdrop overlay
   ctx.fillStyle = 'rgba(33, 5, 12, 0.88)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Backdrop click closes modal
+  _registerButton(0, 0, canvas.width, canvas.height, () => {
+    selectingSlot = null;
+  });
+
+  // Blocker over modal panel window
+  _registerButton(mx, my, modalW, modalH, () => {});
 
   const isTactical = state.gameCategory === 'tactical';
   const currentDefs = getActiveFighterDefs();
@@ -666,14 +681,14 @@ function drawFighterSelectModal() {
 
   // Weapon Title
   ctx.fillStyle = '#b81c3b';
-  ctx.font = '700 7px "Press Start 2P", monospace';
+  ctx.font = '700 6.5px "Press Start 2P", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(`WEAPON // ${modalWeaponInfo.name}`, barX + 8, mWeaponBoxY + 7);
+  ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${modalWeaponInfo.name}`, barW - 16), barX + 8, mWeaponBoxY + 7);
 
   ctx.fillStyle = '#8b1524';
-  ctx.font = '700 6.5px "Silkscreen", monospace';
-  ctx.fillText(`[ ${modalWeaponInfo.category} ]`, barX + 8, mWeaponBoxY + 20);
+  ctx.font = '700 6px "Silkscreen", monospace';
+  ctx.fillText(fitSingleLineText(ctx, `[ ${modalWeaponInfo.category} ]`, barW - 16), barX + 8, mWeaponBoxY + 20);
 
   // Live Weapon Graphic Stage
   const mStageX = barX + barW / 2;
@@ -696,14 +711,14 @@ function drawFighterSelectModal() {
   // Ability Header & Text Below
   const mAbilityY = mWeaponBoxY + mWeaponBoxH + 8;
   ctx.fillStyle = '#b81c3b';
-  ctx.font = '700 7px "Press Start 2P", monospace';
+  ctx.font = '700 6.5px "Press Start 2P", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(`ABILITY // ${selectedDef.ability.toUpperCase()}`, barX, mAbilityY);
+  ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${selectedDef.ability.toUpperCase()}`, barW), barX, mAbilityY);
 
   ctx.fillStyle = '#21050c';
-  ctx.font = '700 7.5px "Silkscreen", monospace';
-  wrapText(ctx, selectedDef.desc, barX, mAbilityY + 14, barW, 12);
+  ctx.font = '700 7px "Silkscreen", monospace';
+  wrapText(ctx, selectedDef.desc, barX, mAbilityY + 14, barW, 11, 4);
 
   // Footer Action Buttons
   const footerY = my + modalH - 34;
@@ -770,21 +785,15 @@ function drawSelectScreen() {
   ctx.fillText(titleText, canvas.width / 2, 64);
   ctx.restore();
 
-  // Mode Selection Tabs (Shifted down to Y = 104)
-  const modeButtonY = 104;
-  drawModeSelection(canvas.width / 2, modeButtonY);
-
-  // Tactical Sub-Controls (Map Selector, Test Mode, Dummy Target & Arena BGM - Shifted to Y = 128)
-  const mapW = isTactical ? 122 : 0;
-  const tmW = 86;
-  const daW = 96;
-  const bgmW = 106;
-  const ctrlH = 22;
-  const gap = 6;
-  const totalCtrlW = (isTactical ? mapW + gap : 0) + tmW + daW + bgmW + gap * 2;
+  // Tactical Sub-Controls (Map Selector & Arena BGM)
+  const mapW = isTactical ? 130 : 0;
+  const bgmW = 130;
+  const ctrlH = 24;
+  const gap = 10;
+  const totalCtrlW = (isTactical ? mapW + gap : 0) + bgmW;
   const startCtrlX = canvas.width / 2 - totalCtrlW / 2;
   
-  const tmY = 128;
+  const tmY = 96;
   let curCtrlX = startCtrlX;
   if (isTactical) {
     const activeMap = state.activeMap || STARTER_MAP;
@@ -820,75 +829,16 @@ function drawSelectScreen() {
     curCtrlX += mapW + gap;
   }
 
-  const tmX = curCtrlX;
-  const daX = tmX + tmW + gap;
-  const bgmX = daX + daW + gap;
+  // Arena BGM Selector Button
+  drawArenaBgmSelector(ctx, curCtrlX, tmY, bgmW, ctrlH);
 
-  // 1. Test Mode Button
-  ctx.save();
-  ctx.fillStyle = state.testMode ? '#5e0d1f' : '#baa88c';
-  drawChamferedRect(ctx, tmX, tmY + 2, tmW, ctrlH, 3);
-  ctx.fill();
-
-  ctx.fillStyle = state.testMode ? '#f26f88' : '#faedf0';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.6;
-  drawChamferedRect(ctx, tmX, tmY, tmW, ctrlH, 3);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = state.testMode ? '#ffffff' : '#21050c';
-  ctx.font = '700 6.5px "Press Start 2P", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('TEST MODE', tmX + tmW / 2, tmY + ctrlH / 2 + 0.5);
-  ctx.restore();
-
-  _registerButton(tmX, tmY, tmW, ctrlH + 2, () => { state.testMode = !state.testMode; });
-
-  // 2. Dummy Target Button
-  ctx.save();
-  ctx.fillStyle = state.dummyEnabled ? '#5e0d1f' : '#baa88c';
-  drawChamferedRect(ctx, daX, tmY + 2, daW, ctrlH, 3);
-  ctx.fill();
-
-  ctx.fillStyle = state.dummyEnabled ? '#f26f88' : '#faedf0';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.6;
-  drawChamferedRect(ctx, daX, tmY, daW, ctrlH, 3);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = state.dummyEnabled ? '#ffffff' : '#21050c';
-  ctx.font = '700 6.5px "Press Start 2P", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('DUMMY TARGET', daX + daW / 2, tmY + ctrlH / 2 + 0.5);
-  ctx.restore();
-
-  _registerButton(daX, tmY, daW, ctrlH + 2, () => {
-    state.dummyEnabled = !state.dummyEnabled;
-    if (!state.dummyEnabled) {
-      const dummyIdx = FIGHTER_DEFS.findIndex(d => d.type === 'dummy');
-      if (dummyIdx !== -1) {
-        if (state.p1Index === dummyIdx) state.p1Index = 0;
-        if (state.p2Index === dummyIdx) state.p2Index = 1;
-        if (state.p3Index === dummyIdx) state.p3Index = 2;
-        if (state.p4Index === dummyIdx) state.p4Index = 3;
-      }
-    }
-  });
-
-  // 3. Arena BGM Selector Button
-  drawArenaBgmSelector(ctx, bgmX, tmY, bgmW, ctrlH);
-
-  // ── Main Combatant Grid (Shifted to topY = 158) ──
-  const topY = 158;
+  // ── Main Combatant Grid ──
+  const topY = 134;
   const margin = 16;
   const cardGap = 12;
   const totalCardW = canvas.width - margin * 2;
   const cardW = Math.floor((totalCardW - cardGap) / 2); // 248px
-  const fullCardH = 650; // Expands to Y = 808!
+  const fullCardH = 680; // Expands to Y = 814, leaving clean space before bottom command dock
 
   if (isTac1v1 || (!isTactical && (mode === '1v1' || mode === 'Stand Off'))) {
     const leftX = margin;
@@ -1201,8 +1151,11 @@ export function getFighterWeaponInfo(def) {
 
 function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLarge = false) {
   const { ctx } = state;
-  // Track card bounds for direct mouse wheel cycling
-  if (enabled) {
+  const isAnyModalOpen = (selectingSlot !== null || isTacticalMapModalOpen || isArenaBgmModalOpen());
+  const isInteractive = enabled && !isAnyModalOpen;
+
+  // Track card bounds for direct mouse wheel cycling (only when interactive)
+  if (isInteractive) {
     _playerCardBounds.push({ slotProp, x, y, w, h });
   }
 
@@ -1232,7 +1185,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
   const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
 
   // Register click on card to open character selection modal
-  if (enabled) {
+  if (isInteractive) {
     _registerButton(x, y, w, h, () => {
       selectingSlot = slotProp;
       modalInspectIndex = state[slotProp] ?? 0;
@@ -1257,6 +1210,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
   // Helper function to cycle fighters for this slot
   const cycleFighter = (direction) => {
+    if (!isInteractive) return;
     const availableFighters = currentDefs.map((d, idx) => ({ d, idx }))
       .filter(({ d }) => !(!state.dummyEnabled && d.type === 'dummy'));
     const pos = availableFighters.findIndex(f => f.idx === state[slotProp]);
@@ -1327,8 +1281,8 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     drawStatBar(ctx, 'SPD', def.speed || 2, 4, statBoxX, statBoxY + 32, statBoxW, '#7c2d37');
 
     // ── Ability Dossier Sub-Panel (Warm Cream Sub-box) ──
-    const abilityY = y + 238;
-    const abilityH = 76;
+    const abilityY = y + 224;
+    const abilityH = 88;
     
     ctx.save();
     ctx.fillStyle = '#fff5f7';
@@ -1340,18 +1294,18 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.restore();
 
     ctx.fillStyle = '#b81c3b';
-    ctx.font = '700 7px "Press Start 2P", monospace';
+    ctx.font = '700 6.5px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(`ABILITY // ${def.ability.toUpperCase()}`, statBoxX + 8, abilityY + 7);
+    ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, statBoxW - 16), statBoxX + 8, abilityY + 7);
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7.5px "Silkscreen", monospace';
-    wrapText(ctx, def.desc, statBoxX + 8, abilityY + 22, statBoxW - 16, 12);
+    ctx.font = '700 7px "Silkscreen", monospace';
+    wrapText(ctx, def.desc, statBoxX + 8, abilityY + 20, statBoxW - 16, 11, 5);
 
     // ── Live Weapon Graphic Visual Stage Sub-Panel (Warm Cream Sub-box) ──
     const weaponY = abilityY + abilityH + 8;
-    const weaponH = 284;
+    const weaponH = 296;
 
     ctx.save();
     ctx.fillStyle = '#fff5f7';
@@ -1364,18 +1318,18 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
     // Weapon Header & Category
     ctx.fillStyle = '#b81c3b';
-    ctx.font = '700 7px "Press Start 2P", monospace';
+    ctx.font = '700 6.5px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(`WEAPON // ${weaponInfo.name}`, statBoxX + 8, weaponY + 8);
+    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, statBoxW - 16), statBoxX + 8, weaponY + 7);
 
     ctx.fillStyle = '#8b1524';
-    ctx.font = '700 6.5px "Silkscreen", monospace';
-    ctx.fillText(`[ ${weaponInfo.category} ]`, statBoxX + 8, weaponY + 22);
+    ctx.font = '700 6px "Silkscreen", monospace';
+    ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, statBoxW - 16), statBoxX + 8, weaponY + 20);
 
     // Live Weapon Center Stage
     const wStageX = statBoxX + statBoxW / 2;
-    const wStageY = weaponY + 115;
+    const wStageY = weaponY + 114;
 
     // Stage pedestal ring
     ctx.save();
@@ -1395,10 +1349,10 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
     // Weapon Description Telemetry
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7.5px "Silkscreen", monospace';
+    ctx.font = '700 7px "Silkscreen", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 218, statBoxW - 16, 12);
+    wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 222, statBoxW - 16, 11, 4);
 
     // Change Fighter Button
     const btnW = w - 24;
@@ -1426,11 +1380,11 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.font = '700 8.5px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(def.name.toUpperCase(), detailX, y + 32);
+    ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 32);
 
     ctx.fillStyle = '#8b1524';
     ctx.font = '700 6.5px "Silkscreen", monospace';
-    ctx.fillText(`CLASS // ${def.type.toUpperCase()}`, detailX, y + 46);
+    ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 46);
 
     drawStatBar(ctx, 'HP', def.hp, 150, detailX, y + 58, detailW, '#cc2b4d');
     drawStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 74, detailW, '#f59e0b');
@@ -1451,10 +1405,10 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.restore();
 
     ctx.fillStyle = '#b81c3b';
-    ctx.font = '700 7px "Press Start 2P", monospace';
+    ctx.font = '700 6.5px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(`WEAPON // ${weaponInfo.name}`, x + 15, weaponBoxY + 6);
+    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, boxW - 65), x + 15, weaponBoxY + 6);
 
     // Mini Live Weapon render on right
     const miniWX = x + boxW - 35;
@@ -1468,7 +1422,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.fillStyle = '#21050c';
     ctx.font = '700 7px "Silkscreen", monospace';
     ctx.textAlign = 'left';
-    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 15, weaponBoxY + 18, boxW - 75, 10.5);
+    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 15, weaponBoxY + 18, boxW - 75, 10.5, 4);
 
     // Quick cycle arrows + Change Fighter Button
     const arrowW = 28;
@@ -1576,6 +1530,11 @@ window.addEventListener('keydown', (e) => {
 // Event listeners for character select screen & modal scrolling
 window.addEventListener('wheel', (e) => {
   if (state.gameState !== 'select') return;
+
+  // Block card wheel cycling when Arena BGM or Tactical Map modal is active
+  if (isArenaBgmModalOpen() || isTacticalMapModalOpen) {
+    return;
+  }
 
   const activeCanvas = (state.pixiApp && state.pixiApp.view) ? state.pixiApp.view : state.canvas;
   const rect = (activeCanvas && activeCanvas.getBoundingClientRect) ? activeCanvas.getBoundingClientRect() : { left: 0, top: 0, width: state.canvas.width, height: state.canvas.height };

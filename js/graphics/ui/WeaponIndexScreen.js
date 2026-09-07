@@ -5,7 +5,7 @@ import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { clearHealthHud } from '../hudManager.js';
-import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
+import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect, fitSingleLineText } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { getFighterWeaponInfo } from './CharacterSelectScreen.js';
 import {
@@ -32,13 +32,92 @@ import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun
 import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
-import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
+
+// ─────────────────────────────────────────────
+// REVIEW STUDIO SIMULATION STATE
+// ─────────────────────────────────────────────
+
+const _reviewDummy = {
+  x: 0,
+  y: 0,
+  homeX: 0,
+  homeY: 0,
+  vx: 0,
+  vy: 0,
+  r: 22,
+  hp: 1000,
+  maxHp: 1000,
+  hitFlash: 0,
+  stasisTimer: 0,
+  takeDamage(amt) {
+    this.hp = Math.max(0, this.hp - amt);
+    this.hitFlash = 12;
+  },
+  applyKnockback(kx, ky) {
+    this.vx += kx;
+    this.vy += ky;
+  },
+  applyHitStun(t) {
+    this.hitFlash = Math.max(this.hitFlash, t);
+  },
+  applyTimeStop(t) {
+    this.stasisTimer = Math.max(this.stasisTimer, t);
+  },
+  reset() {
+    this.x = this.homeX;
+    this.y = this.homeY;
+    this.vx = 0;
+    this.vy = 0;
+    this.hp = 1000;
+    this.hitFlash = 0;
+    this.stasisTimer = 0;
+  }
+};
+
+let _reviewParticles = [];
+let _reviewDamageTexts = [];
+let _reviewProjectiles = [];
+let _reviewActiveSkill = null;
+let _reviewSkillTimer = 0;
+let _reviewSkillMaxTimer = 0;
+let _reviewFrameStepRequested = false;
+
+function spawnReviewDamageText(x, y, text, color = '#ffffff') {
+  _reviewDamageTexts.push({
+    x: x + (Math.random() - 0.5) * 20,
+    y: y - 10 + (Math.random() - 0.5) * 10,
+    text,
+    color,
+    life: 45,
+    maxLife: 45,
+    vy: -1.2 - Math.random() * 0.8
+  });
+}
+
+function spawnReviewImpactSparks(x, y, color = '#ffcc00', count = 8) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 5;
+    _reviewParticles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: 1.5 + Math.random() * 2.5,
+      color,
+      life: 20 + Math.random() * 15,
+      maxLife: 35
+    });
+  }
+}
+
+// ─────────────────────────────────────────────
+// 1. FIGHTER & WEAPON REVIEW ROSTER GRID
+// ─────────────────────────────────────────────
 
 function drawWeaponMenu() {
   const { ctx, canvas } = state;
   
-  // Reset context to prevent leaks from previous frames
   ctx.globalAlpha = 1.0;
   ctx.globalCompositeOperation = 'source-over';
   ctx.shadowBlur = 0;
@@ -57,29 +136,29 @@ function drawWeaponMenu() {
 
   updatePreviewBalls();
 
-  // ── Unified Top Back Button ──
+  // Unified Top Back Button
   drawButton('◀ BACK', 52, 60, () => { goToTitle(); }, 76, 26);
 
-  // ── Header Section ──
+  // Header Section
   ctx.fillStyle = '#64748b';
   ctx.font = '900 10px "Rajdhani", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('CIRCLE BATTLE // ARSENAL DATABASE // SYS.v2.5', canvas.width / 2, 48);
+  ctx.fillText('CIRCLE BATTLE // COMBATANT & ARSENAL REVIEW // SYS.v3.0', canvas.width / 2, 48);
 
   ctx.save();
   ctx.fillStyle = '#f8fafc';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText('[ WEAPON ARSENAL ]', canvas.width / 2, 70);
+  ctx.fillText('[ FIGHTER & WEAPON REVIEW ]', canvas.width / 2, 70);
   ctx.restore();
 
-  // ── Category Switcher Tabs ──
+  // Category Switcher Tabs
   if (!state.weaponCategoryTab) {
     state.weaponCategoryTab = (state.gameCategory === 'tactical') ? 'tactical' : 'foc';
   }
 
   const tabY = 94;
-  const tabW = 150;
+  const tabW = 160;
   const tabH = 24;
   const tabGap = 10;
   const totalTabsW = tabW * 2 + tabGap;
@@ -88,7 +167,7 @@ function drawWeaponMenu() {
   // Tab 1: FOC Fantasy / Anime Weapons
   const isFoc = state.weaponCategoryTab !== 'tactical';
   drawButton(
-    isFoc ? '⚔️ [ FOC WEAPONS ]' : '⚔️ FOC WEAPONS',
+    isFoc ? '⚔️ [ FOC FIGHTERS & ARSENAL ]' : '⚔️ FOC FIGHTERS & ARSENAL',
     tabStartX + tabW / 2,
     tabY,
     () => {
@@ -106,7 +185,7 @@ function drawWeaponMenu() {
   // Tab 2: Tactical Force Firearms
   const isTac = state.weaponCategoryTab === 'tactical';
   drawButton(
-    isTac ? '🎯 [ TACTICAL FIREARMS ]' : '🎯 TACTICAL FIREARMS',
+    isTac ? '🎯 [ TACTICAL OPERATIVES ]' : '🎯 TACTICAL OPERATIVES',
     tabStartX + tabW + tabGap + tabW / 2,
     tabY,
     () => {
@@ -151,30 +230,66 @@ function drawWeaponMenu() {
     ctx.fillStyle = def.color || '#f59e0b';
     ctx.fillRect(cardX + 2, cardY + 12, 3, cardH - 24);
 
-    // Text Layout
+    // 1. Fighter Avatar Preview (Left Circular Stage)
+    const avatarX = cardX + 38;
+    const avatarY = cardY + cardH / 2;
+    const avatarR = 24;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.strokeStyle = def.color || 'rgba(245, 158, 11, 0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(avatarX, avatarY + 18, 22, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    const previewImg = getFighterPreview(idx);
+    if (previewImg) {
+      ctx.drawImage(previewImg, avatarX - avatarR, avatarY - avatarR, avatarR * 2, avatarR * 2);
+    } else {
+      ctx.fillStyle = def.color || '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(avatarX, avatarY, avatarR * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 2. Center Text Layout (Fighter & Weapon Telemetry)
+    const textStartX = cardX + 74;
+    const textMaxW = cardW - 190;
+
+    // Fighter Name
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 16px "Outfit", "Rajdhani", sans-serif';
+    ctx.font = '900 15px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(def.name.toUpperCase(), cardX + 20, cardY + 14);
+    const cleanName = fitSingleLineText(ctx, def.name.toUpperCase(), textMaxW);
+    ctx.fillText(cleanName, textStartX, cardY + 14);
 
     // Weapon Designation & Category
     ctx.fillStyle = '#f59e0b';
-    ctx.font = '900 10.5px "Rajdhani", sans-serif';
-    ctx.fillText(`WEAPON // ${weaponInfo.name}`, cardX + 20, cardY + 34);
+    ctx.font = '900 10px "Rajdhani", sans-serif';
+    const cleanWpn = fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, textMaxW);
+    ctx.fillText(cleanWpn, textStartX, cardY + 34);
 
     ctx.fillStyle = '#64748b';
     ctx.font = '900 8.5px "Rajdhani", sans-serif';
-    ctx.fillText(`[ ${weaponInfo.category} ]`, cardX + 20, cardY + 49);
+    ctx.fillText(`[ ${weaponInfo.category} // ${(def.category || 'COMBATANT').toUpperCase()} ]`, textStartX, cardY + 48);
 
     // Description snippet
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px "Rajdhani", Arial, sans-serif';
-    wrapText(ctx, weaponInfo.desc, cardX + 20, cardY + 65, cardW - 145, 12.5);
+    wrapText(ctx, weaponInfo.desc, textStartX, cardY + 63, textMaxW, 12, 2);
 
-    // Live Weapon Preview Stage Pedestal
-    const previewSize = 88;
-    const previewX = cardX + cardW - previewSize / 2 - 16;
+    // Quick Telemetry Badges (Bottom Line)
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '900 8.5px "Rajdhani", monospace';
+    ctx.fillText(`HP ${def.hp || 100} • DMG ${def.damage || 10} • SPD ${(def.moveSpeed || 5).toFixed(1)}`, textStartX, cardY + 96);
+
+    // 3. Right Weapon Preview Stage Pedestal
+    const previewSize = 84;
+    const previewX = cardX + cardW - previewSize / 2 - 14;
     const previewY = cardY + cardH / 2;
 
     ctx.save();
@@ -189,8 +304,7 @@ function drawWeaponMenu() {
 
     ctx.save();
     ctx.translate(previewX, previewY);
-    ctx.scale(0.72, 0.72);
-    // Subtle floating animation per card
+    ctx.scale(0.70, 0.70);
     ctx.translate(0, Math.sin(Date.now() / 300 + idx) * 3);
     drawWeaponPreview(ctx, def.type, def.color);
     ctx.restore();
@@ -198,14 +312,25 @@ function drawWeaponMenu() {
     // Make card clickable
     _registerButton(cardX, cardY, cardW, cardH, () => {
       state.selectedWeapon = def;
-      state.showWeaponModel = false;
+      state.reviewTab = state.reviewTab || 'model';
+      state.modelAngle = 0;
+      state.modelZoom = 2.2;
+      state.modelAutoSpin = false;
+      state.showWeaponModel = true;
       state.showSummonModel = false;
-      state.slashEditMode = false;
+      state.showSkinOnly = false;
+      state.skillDemoSpeed = 1.0;
+      state.skillDemoPaused = false;
+      _reviewDummy.reset();
+      _reviewParticles = [];
+      _reviewDamageTexts = [];
+      _reviewProjectiles = [];
+      state.previewFighter = null;
       state.gameState = 'weaponDetail';
     });
   });
 
-  // ── Pagination Controls Bar ──
+  // Pagination Controls Bar
   const navY = startY + itemsPerPage * (cardH + cardSpacing) + 2;
   const navBtnW = 90;
   const navBtnH = 30;
@@ -265,9 +390,8 @@ function drawWeaponMenu() {
 }
 
 // ─────────────────────────────────────────────
-// WEAPON DETAIL SCREEN
+// 2. COMBAT & SKILL ANIMATION DISPATCH ENGINE
 // ─────────────────────────────────────────────
-
 
 function isFighterDemoAttacking(fighter) {
   if (!fighter) return false;
@@ -291,9 +415,491 @@ function isFighterDemoAttacking(fighter) {
   );
 }
 
+function triggerWeaponDemoAttack(def) {
+  if (!def) return;
+  state.showWeaponModel = true;
+  state.showSummonModel = false;
+
+  if (!state.previewFighter || state.previewFighter.type !== def.type) {
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    state.previewFighter = new FighterClass({
+      ...def,
+      startX: 0,
+      startY: 0,
+      startVx: 0,
+      startVy: 0,
+    });
+    state.previewFighter.hideHpText = true;
+  }
+
+  const fighter = state.previewFighter;
+  fighter.x = 0;
+  fighter.y = 0;
+  fighter.angle = 0;
+
+  if (typeof fighter.triggerDemoAttack === 'function') {
+    fighter.triggerDemoAttack();
+  } else {
+    fighter.punchAnimTimer = 16;
+    fighter.katanaSlashTimer = 20;
+    fighter.spearSwingTimer = 18;
+    fighter.slashSwingTimer = 16;
+    fighter.isSlashing = true;
+    fighter.muzzleFlashTimer = 6;
+    fighter.gunRecoil = 1.0;
+  }
+}
+
+function triggerReviewSkill(skillType, def, fighter, dummy) {
+  if (!fighter || !dummy) return;
+  _reviewActiveSkill = skillType;
+  _reviewSkillTimer = 30;
+  _reviewSkillMaxTimer = 30;
+
+  const dx = dummy.x - fighter.x;
+  const dy = dummy.y - fighter.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const dirX = dx / dist;
+  const dirY = dy / dist;
+
+  fighter.gunAngle = Math.atan2(dy, dx);
+  fighter.angle = fighter.gunAngle;
+
+  const dmgBase = def.damage || 15;
+
+  if (skillType === 'basic') {
+    triggerWeaponDemoAttack(def);
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.8);
+      }
+    } catch (e) {}
+
+    setTimeout(() => {
+      dummy.takeDamage(dmgBase);
+      dummy.applyKnockback(dirX * 6, dirY * 6);
+      spawnReviewImpactSparks(dummy.x, dummy.y, def.color || '#f59e0b', 10);
+      spawnReviewDamageText(dummy.x, dummy.y - dummy.r - 8, `-${dmgBase}`, '#ffffff');
+    }, 120);
+
+  } else if (skillType === 'skill1') {
+    _reviewSkillTimer = 45;
+    _reviewSkillMaxTimer = 45;
+
+    if (def.type === 'gojo') {
+      fighter.redCooldown = 0;
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'REVERSAL RED!', '#ff3b30');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/red.mp3', 0.9); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 30,
+        y: fighter.y + dirY * 30,
+        vx: dirX * 10,
+        vy: dirY * 10,
+        r: 12,
+        color: '#ff3b30',
+        type: 'red',
+        life: 30
+      });
+    } else if (def.type === 'sukuna') {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'DISMANTLE!', '#ef4444');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/sukuna-slash.mp3', 0.9); } catch (e) {}
+      for (let i = -1; i <= 1; i++) {
+        _reviewProjectiles.push({
+          x: fighter.x + dirX * 25,
+          y: fighter.y + dirY * 25 + i * 15,
+          vx: dirX * 14,
+          vy: dirY * 14,
+          r: 8,
+          color: '#ef4444',
+          type: 'slash',
+          life: 25
+        });
+      }
+    } else if (def.type === 'ichigo') {
+      fighter.katanaSlashTimer = 26;
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'GETSUGA TENSHO!', '#38bdf8');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 35,
+        y: fighter.y + dirY * 35,
+        vx: dirX * 12,
+        vy: dirY * 12,
+        r: 20,
+        color: '#38bdf8',
+        type: 'getsuga',
+        life: 35
+      });
+    } else if (def.type === 'ulquiorra') {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'CERO OSCURAS!', '#10b981');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 30,
+        y: fighter.y + dirY * 30,
+        vx: dirX * 15,
+        vy: dirY * 15,
+        r: 16,
+        color: '#10b981',
+        type: 'cero',
+        life: 25
+      });
+    } else if (def.type === 'layla') {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'MALEFIC BOMB!', '#00e5ff');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.85); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 30,
+        y: fighter.y + dirY * 30,
+        vx: dirX * 8,
+        vy: dirY * 8,
+        r: 14,
+        color: '#00e5ff',
+        type: 'bomb',
+        life: 40
+      });
+    } else if (def.type === 'cj') {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'DUAL UZI SPRAY!', '#22c55e');
+      for (let i = 0; i < 8; i++) {
+        setTimeout(() => {
+          _reviewProjectiles.push({
+            x: fighter.x + dirX * 25,
+            y: fighter.y + dirY * 25 + (Math.random() - 0.5) * 12,
+            vx: dirX * 16,
+            vy: dirY * 16,
+            r: 3,
+            color: '#fbbf24',
+            type: 'bullet',
+            life: 20
+          });
+          try { audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-m4-shot.mp3', 0.7); } catch (e) {}
+        }, i * 40);
+      }
+    } else {
+      fighter.katanaSlashTimer = 22;
+      fighter.punchAnimTimer = 18;
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, `${(def.ability || 'SPECIAL SKILL').toUpperCase()}!`, def.color || '#f59e0b');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.9); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 30,
+        y: fighter.y + dirY * 30,
+        vx: dirX * 11,
+        vy: dirY * 11,
+        r: 12,
+        color: def.color || '#f59e0b',
+        type: 'pulse',
+        life: 30
+      });
+    }
+
+  } else if (skillType === 'ultimate') {
+    _reviewSkillTimer = 70;
+    _reviewSkillMaxTimer = 70;
+
+    if (def.type === 'gojo') {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 16, '200% HOLLOW PURPLE!', '#a855f7');
+      dummy.applyTimeStop(60);
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 1.0); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 40,
+        y: fighter.y + dirY * 40,
+        vx: dirX * 9,
+        vy: dirY * 9,
+        r: 28,
+        color: '#a855f7',
+        type: 'purple',
+        life: 55
+      });
+    } else if (def.type === 'sukuna') {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 16, 'FUGA // FIRE ARROW!', '#f97316');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 1.0); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 40,
+        y: fighter.y + dirY * 40,
+        vx: dirX * 13,
+        vy: dirY * 13,
+        r: 22,
+        color: '#f97316',
+        type: 'fuga',
+        life: 45
+      });
+    } else if (def.type === 'toji') {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 16, 'STEALTH AMBUSH FLURRY!', '#a855f7');
+      dummy.applyTimeStop(50);
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => {
+          dummy.takeDamage(dmgBase * 1.5);
+          dummy.applyKnockback((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+          spawnReviewImpactSparks(dummy.x, dummy.y, '#a855f7', 8);
+          spawnReviewDamageText(dummy.x, dummy.y - dummy.r - 5, 'CLEAVE!', '#c084fc');
+        }, i * 80);
+      }
+    } else {
+      spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 16, 'ULTIMATE BURST!', '#fbbf24');
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.95); } catch (e) {}
+      _reviewProjectiles.push({
+        x: fighter.x + dirX * 35,
+        y: fighter.y + dirY * 35,
+        vx: dirX * 10,
+        vy: dirY * 10,
+        r: 24,
+        color: '#fbbf24',
+        type: 'ultimate',
+        life: 45
+      });
+    }
+
+  } else if (skillType === 'dash') {
+    _reviewSkillTimer = 25;
+    _reviewSkillMaxTimer = 25;
+    spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'SUPERSONIC DASH!', '#38bdf8');
+    try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.9); } catch (e) {}
+
+    const startFx = fighter.x;
+    const startFy = fighter.y;
+    fighter.x += dirX * 90;
+    fighter.y += dirY * 90;
+    spawnReviewImpactSparks(fighter.x, fighter.y, '#38bdf8', 12);
+
+    setTimeout(() => {
+      fighter.x = startFx;
+      fighter.y = startFy;
+    }, 400);
+  }
+}
+
+// ─────────────────────────────────────────────
+// 3. MULTI-WEAPON & FORM SELECTOR RIBBON
+// ─────────────────────────────────────────────
+
+function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, currentTab) {
+  if (!def) return;
+  const barY = (currentTab === 'skills') 
+    ? (stageY + 44) 
+    : (stageY + stageH - 26);
+  
+  const buttons = [];
+
+  if (def.type === 'toji') {
+    state.tojiWeaponIndex = state.tojiWeaponIndex || 0;
+    buttons.push({
+      text: '🗡️ INVERTED SPEAR',
+      active: state.tojiWeaponIndex === 0,
+      width: 150,
+      action: () => {
+        state.tojiWeaponIndex = 0;
+        if (state.previewFighter) state.previewFighter.tojiWeaponIndex = 0;
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '⚔️ SPLIT SOUL KATANA',
+      active: state.tojiWeaponIndex === 1,
+      width: 165,
+      action: () => {
+        state.tojiWeaponIndex = 1;
+        if (state.previewFighter) state.previewFighter.tojiWeaponIndex = 1;
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+  } else if (def.type === 'john_wick' || def.type === 'johnwick') {
+    state.johnWickWeaponIndex = state.johnWickWeaponIndex || 0;
+    const wList = [
+      { name: '🔫 PIT VIPER 9MM', wpn: 'pistol', pencil: false, w: 120 },
+      { name: '💥 BENELLI M4', wpn: 'shotgun', pencil: false, w: 110 },
+      { name: '🎯 M4A1 CARBINE', wpn: 'rifle', pencil: false, w: 115 },
+      { name: '✏️ NO. 2 PENCIL', wpn: 'pistol', pencil: true, w: 110 },
+    ];
+    wList.forEach((wItem, idx) => {
+      buttons.push({
+        text: wItem.name,
+        active: state.johnWickWeaponIndex === idx,
+        width: wItem.w,
+        action: () => {
+          state.johnWickWeaponIndex = idx;
+          if (state.previewFighter) {
+            state.previewFighter.currentEquippedWeapon = wItem.wpn;
+            state.previewFighter.isPencilEquipped = wItem.pencil;
+          }
+          try { audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-gunswitch.mp3', 0.9); } catch (e) {}
+        }
+      });
+    });
+  } else if (def.type === 'cj') {
+    state.cjWeaponIndex = state.cjWeaponIndex || 0;
+    const cjList = [
+      { name: '🥊 BRASS KNUCKLES', w: 125 },
+      { name: '🚀 JETPACK', w: 85 },
+      { name: '🔫 MICRO-UZI', w: 95 },
+      { name: '⚙️ MINIGUN', w: 85 },
+      { name: '💥 TEC-9', w: 75 }
+    ];
+    cjList.forEach((cItem, idx) => {
+      buttons.push({
+        text: cItem.name,
+        active: state.cjWeaponIndex === idx,
+        width: cItem.w,
+        action: () => {
+          state.cjWeaponIndex = idx;
+          if (state.previewFighter) {
+            state.previewFighter.previewWeaponIndex = idx;
+            state.previewFighter.z = (idx === 1 || idx === 2) ? 24 : 0;
+            state.previewFighter.isJetpackActive = (idx === 1 || idx === 2);
+            state.previewFighter.isBaguvixActive = (idx === 3);
+            state.previewFighter.isGodModeActive = (idx === 3);
+            state.previewFighter.isTec9Active = (idx === 4);
+          }
+          try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+        }
+      });
+    });
+  } else if (def.type === 'ichigo') {
+    const isShikai = (state.selectedIchigoSkin !== 'bankai');
+    const isMask = Boolean(state.showHollowMask);
+    buttons.push({
+      text: '⚔️ SHIKAI',
+      active: isShikai,
+      width: 85,
+      action: () => {
+        state.selectedIchigoSkin = 'shikai';
+        if (state.previewFighter) state.previewFighter.skin = 'shikai';
+      }
+    });
+    buttons.push({
+      text: '🗡️ BANKAI',
+      active: !isShikai,
+      width: 85,
+      action: () => {
+        state.selectedIchigoSkin = 'bankai';
+        if (state.previewFighter) state.previewFighter.skin = 'bankai';
+      }
+    });
+    buttons.push({
+      text: isMask ? '🎭 MASK: ON' : '🎭 MASK: OFF',
+      active: isMask,
+      width: 105,
+      action: () => {
+        state.showHollowMask = !state.showHollowMask;
+        if (state.previewFighter) {
+          state.previewFighter.hollowMaskActive = state.showHollowMask;
+          state.previewFighter.demoShatterTimer = 0;
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '💥 SHATTER',
+      active: false,
+      width: 90,
+      action: () => {
+        state.showHollowMask = true;
+        if (state.previewFighter) {
+          state.previewFighter.hollowMaskActive = true;
+          state.previewFighter.demoShatterTimer = 75;
+        }
+      }
+    });
+  } else if (def.type === 'ulquiorra') {
+    const isBase = !state.showUlquiorraWings && !state.showUlquiorraSegunda;
+    const isStage1 = state.showUlquiorraWings && !state.showUlquiorraSegunda;
+    const isSegunda = Boolean(state.showUlquiorraSegunda);
+
+    buttons.push({
+      text: '⚔️ BASE FORM',
+      active: isBase,
+      width: 115,
+      action: () => {
+        state.showUlquiorraWings = false;
+        state.showUlquiorraSegunda = false;
+        if (state.previewFighter) {
+          state.previewFighter.stage1Active = false;
+          state.previewFighter.wingsActive = false;
+          state.previewFighter.segundaEtapaActive = false;
+          state.previewFighter.isSegundaEtapa = false;
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '🦇 STAGE 1 WINGS',
+      active: isStage1,
+      width: 135,
+      action: () => {
+        state.showUlquiorraWings = true;
+        state.showUlquiorraSegunda = false;
+        if (state.previewFighter) {
+          state.previewFighter.stage1Active = true;
+          state.previewFighter.wingsActive = true;
+          state.previewFighter.segundaEtapaActive = false;
+          state.previewFighter.isSegundaEtapa = false;
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '⚡ SEGUNDA ETAPA',
+      active: isSegunda,
+      width: 135,
+      action: () => {
+        state.showUlquiorraWings = true;
+        state.showUlquiorraSegunda = true;
+        if (state.previewFighter) {
+          state.previewFighter.stage1Active = true;
+          state.previewFighter.wingsActive = true;
+          state.previewFighter.segundaEtapaActive = true;
+          state.previewFighter.isSegundaEtapa = true;
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9); } catch (e) {}
+      }
+    });
+  } else if (def.type === 'megumi') {
+    state.megumiWeaponIndex = state.megumiWeaponIndex || 0;
+    buttons.push({
+      text: '🗡️ SHADOW BLADE',
+      active: state.megumiWeaponIndex === 0,
+      width: 140,
+      action: () => {
+        state.megumiWeaponIndex = 0;
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '🐺 TOTALITY CLAWS',
+      active: state.megumiWeaponIndex === 1,
+      width: 145,
+      action: () => {
+        state.megumiWeaponIndex = 1;
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+  }
+
+  if (buttons.length === 0) return;
+
+  const totalBtnWidth = buttons.reduce((acc, b) => acc + b.width, 0);
+  const gap = 6;
+  const totalRowW = totalBtnWidth + (buttons.length - 1) * gap;
+  let currentBtnX = (state.canvas.width - totalRowW) / 2;
+
+  buttons.forEach(btn => {
+    drawButton(
+      btn.text,
+      currentBtnX + btn.width / 2,
+      barY,
+      btn.action,
+      btn.width,
+      22,
+      btn.active ? '#f59e0b' : null,
+      3
+    );
+    currentBtnX += btn.width + gap;
+  });
+}
+
+// ─────────────────────────────────────────────
+// 4. TECHNICAL DOSSIER CARD COMPONENT
+// ─────────────────────────────────────────────
+
 function drawWeaponInfoCard(ctx, def) {
   const { canvas } = state;
-  const containerW = canvas.width - 32; // 508px
+  const containerW = canvas.width - 32;
   const containerX = 16;
   const panelY = 478;
   const panelH = 410;
@@ -393,7 +999,8 @@ function drawWeaponInfoCard(ctx, def) {
   ctx.font = '900 19px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(nameText.toUpperCase(), containerX + 18, panelY + 16);
+  const cleanHeader = fitSingleLineText(ctx, nameText.toUpperCase(), containerW - 36);
+  ctx.fillText(cleanHeader, containerX + 18, panelY + 16);
 
   ctx.fillStyle = '#64748b';
   ctx.font = '900 9.5px "Rajdhani", sans-serif';
@@ -442,39 +1049,16 @@ function drawWeaponInfoCard(ctx, def) {
   ctx.font = '900 10px "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('TECHNICAL SPECIFICATIONS & FIELD MECHANICS //', containerX + 18, statY + 14);
+  ctx.fillText('TECHNICAL SPECIFICATIONS & COMBAT MECHANICS //', containerX + 18, statY + 14);
 
   ctx.fillStyle = '#94a3b8';
   ctx.font = '10.5px "Rajdhani", Arial, sans-serif';
   wrapText(ctx, descText || '', containerX + 18, statY + 32, containerW - 36, 14.5);
 }
 
-function triggerWeaponDemoAttack(def) {
-  if (!def) return;
-  state.showWeaponModel = true;
-  state.showSummonModel = false;
-
-  if (!state.previewFighter || state.previewFighter.type !== def.type) {
-    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-    state.previewFighter = new FighterClass({
-      ...def,
-      startX: 0,
-      startY: 0,
-      startVx: 0,
-      startVy: 0,
-    });
-    state.previewFighter.hideHpText = true;
-  }
-
-  const fighter = state.previewFighter;
-  fighter.x = 0;
-  fighter.y = 0;
-  fighter.angle = 0;
-
-  if (typeof fighter.triggerDemoAttack === 'function') {
-    fighter.triggerDemoAttack();
-  }
-}
+// ─────────────────────────────────────────────
+// 5. UNIFIED FIGHTER & WEAPON REVIEW STUDIO SCREEN
+// ─────────────────────────────────────────────
 
 function drawWeaponDetailScreen() {
   const { ctx, canvas } = state;
@@ -486,9 +1070,10 @@ function drawWeaponDetailScreen() {
 
   const hasSummon = ['yuta', 'doppleganger', 'Engineer', 'black'].includes(def.type);
 
-  if (state.showWeaponModel === undefined) {
-    state.showWeaponModel = false;
-  }
+  if (state.reviewTab === undefined) state.reviewTab = 'model';
+  if (state.modelAngle === undefined) state.modelAngle = 0;
+  if (state.modelZoom === undefined) state.modelZoom = 2.2;
+  if (state.skillDemoSpeed === undefined) state.skillDemoSpeed = 1.0;
 
   // Reset context to prevent leaks
   ctx.resetTransform();
@@ -509,8 +1094,7 @@ function drawWeaponDetailScreen() {
 
   // ── Tier 1: Header Bar (Y: 58) ──
   const navY = 58; 
-  drawButton('← ARSENAL', 58, navY, () => {
-    state.clawEditMode = false;
+  drawButton('← ROSTER', 58, navY, () => {
     state.gameState = 'weapons';
   }, 85, 24, null, 4);
 
@@ -519,7 +1103,7 @@ function drawWeaponDetailScreen() {
   ctx.font = '900 18px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('[ WEAPON DOSSIER ]', canvas.width / 2, navY);
+  ctx.fillText('[ FIGHTER & WEAPON REVIEW ]', canvas.width / 2, navY);
   ctx.restore();
 
   const activeList = TACTICAL_FIGHTER_DEFS.some(f => f.type === def.type) ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
@@ -527,279 +1111,123 @@ function drawWeaponDetailScreen() {
   if (currentIdx > 0) {
     drawButton('◄ PREV', canvas.width - 95, navY, () => {
       state.selectedWeapon = activeList[currentIdx - 1];
+      state.previewFighter = null;
+      _reviewDummy.reset();
     }, 55, 24, null, 3);
   }
   if (currentIdx < activeList.length - 1) {
     drawButton('NEXT ►', canvas.width - 34, navY, () => {
       state.selectedWeapon = activeList[currentIdx + 1];
+      state.previewFighter = null;
+      _reviewDummy.reset();
     }, 55, 24, null, 3);
   }
 
-  // ── Tier 1b: Mode Action Filter Chips Bar (Y: 88) ──
+  // ── Tier 1b: 3-Pillar Review Mode Tabs (Y: 88) ──
   const actionY = 88;
-  const buttonsToDraw = [];
+  const pillarW = 150;
+  const pillarH = 24;
+  const pillarGap = 8;
+  const totalPillarW = pillarW * 3 + pillarGap * 2;
+  const pillarStartX = (canvas.width - totalPillarW) / 2;
 
-  const modelToggleText = state.showWeaponModel ? 'WEAPON ONLY' : 'FIGHTER MODEL';
-  buttonsToDraw.push({
-    text: modelToggleText,
-    width: 110,
-    action: () => {
-      state.showWeaponModel = !state.showWeaponModel;
-      if (state.showWeaponModel) {
-        state.showSummonModel = false;
-      } else {
-        state.slashEditMode = false;
-      }
-    }
-  });
+  // Pillar 1: Model
+  const isModelTab = (state.reviewTab === 'model');
+  drawButton(
+    isModelTab ? '🥋 [ FIGHTER MODEL ]' : '🥋 FIGHTER MODEL',
+    pillarStartX + pillarW / 2,
+    actionY,
+    () => { state.reviewTab = 'model'; },
+    pillarW,
+    pillarH,
+    isModelTab ? '#f59e0b' : null,
+    4
+  );
 
-  const skinOnlyToggleText = state.showSkinOnly ? 'SKIN: ON' : 'SKIN: OFF';
-  buttonsToDraw.push({
-    text: skinOnlyToggleText,
-    width: 85,
-    action: () => {
-      state.showSkinOnly = !state.showSkinOnly;
-      if (state.showSkinOnly) {
-        state.showWeaponModel = true;
-        state.showSummonModel = false;
-      }
-    }
-  });
+  // Pillar 2: Skills
+  const isSkillsTab = (state.reviewTab === 'skills');
+  drawButton(
+    isSkillsTab ? '⚡ [ SKILL ANIMATIONS ]' : '⚡ SKILL ANIMATIONS',
+    pillarStartX + pillarW + pillarGap + pillarW / 2,
+    actionY,
+    () => { 
+      state.reviewTab = 'skills';
+      _reviewDummy.reset();
+    },
+    pillarW,
+    pillarH,
+    isSkillsTab ? '#f59e0b' : null,
+    4
+  );
 
-  if (def.type === 'ichigo') {
-    const maskToggleText = state.showHollowMask ? 'MASK: ON' : 'MASK: OFF';
-    buttonsToDraw.push({
-      text: maskToggleText,
-      width: 90,
-      action: () => {
-        state.showHollowMask = !state.showHollowMask;
-        if (state.previewFighter) {
-          state.previewFighter.hollowMaskActive = state.showHollowMask;
-          state.previewFighter.demoShatterTimer = 0;
-          if (state.showHollowMask) {
-            state.previewFighter.hollowMaskFormationTimer = 54;
-            state.previewFighter.hollowMaskFormationMax = 54;
-            state.previewFighter.hollowMaskTimer = 600;
-            audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
-          } else {
-            state.previewFighter.hollowMaskFormationTimer = 0;
-          }
-        }
-      }
-    });
+  // Pillar 3: Weapon
+  const isWeaponTab = (state.reviewTab === 'weapon');
+  drawButton(
+    isWeaponTab ? '⚔️ [ WEAPON ARSENAL ]' : '⚔️ WEAPON ARSENAL',
+    pillarStartX + (pillarW + pillarGap) * 2 + pillarW / 2,
+    actionY,
+    () => { state.reviewTab = 'weapon'; },
+    pillarW,
+    pillarH,
+    isWeaponTab ? '#f59e0b' : null,
+    4
+  );
 
-    const isForming = state.previewFighter && state.previewFighter.hollowMaskFormationTimer > 0;
-    buttonsToDraw.push({
-      text: isForming ? 'FORMING...' : 'FORM MASK',
-      width: 100,
-      action: () => {
-        state.showHollowMask = true;
-        if (state.previewFighter) {
-          state.previewFighter.hollowMaskActive = true;
-          state.previewFighter.demoShatterTimer = 0;
-          state.previewFighter.hollowMaskFormationTimer = 54;
-          state.previewFighter.hollowMaskFormationMax = 54;
-          state.previewFighter.hollowMaskTimer = 600;
-          audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
-        }
-      }
-    });
-
-    const isShattering = state.previewFighter && state.previewFighter.demoShatterTimer > 0;
-    buttonsToDraw.push({
-      text: isShattering ? 'CRACKING...' : 'SHATTER MASK',
-      width: 110,
-      action: () => {
-        state.showHollowMask = true;
-        if (state.previewFighter) {
-          state.previewFighter.hollowMaskActive = true;
-          state.previewFighter.hollowMaskFormationTimer = 0;
-          state.previewFighter.demoShatterTimer = 75;
-        }
-      }
-    });
-  }
-
-  if (def.type === 'ulquiorra' || def.type === 'ulquiorra_cifer') {
-    const wingsToggleText = state.showUlquiorraWings ? 'WINGS: ON' : 'WINGS: OFF';
-    buttonsToDraw.push({
-      text: wingsToggleText,
-      width: 95,
-      action: () => {
-        state.showUlquiorraWings = !state.showUlquiorraWings;
-        if (state.showUlquiorraWings) {
-          state.showWeaponModel = true;
-          state.showSummonModel = false;
-        }
-        if (state.previewFighter) {
-          state.previewFighter.stage1Active = state.showUlquiorraWings;
-          state.previewFighter.wingsActive = state.showUlquiorraWings;
-          state.previewFighter.isMurcielagoActive = state.showUlquiorraWings;
-        }
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-        }
-      }
-    });
-
-    const segundaToggleText = state.showUlquiorraSegunda ? 'SEGUNDA: ON' : 'SEGUNDA: OFF';
-    buttonsToDraw.push({
-      text: segundaToggleText,
-      width: 105,
-      action: () => {
-        state.showUlquiorraSegunda = !state.showUlquiorraSegunda;
-        if (state.showUlquiorraSegunda) {
-          state.showUlquiorraWings = true;
-          state.showWeaponModel = true;
-          state.showSummonModel = false;
-        }
-        if (state.previewFighter) {
-          state.previewFighter.stage1Active = state.showUlquiorraWings;
-          state.previewFighter.wingsActive = state.showUlquiorraWings;
-          state.previewFighter.segundaEtapaActive = state.showUlquiorraSegunda;
-          state.previewFighter.isSegundaEtapa = state.showUlquiorraSegunda;
-        }
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
-        }
-      }
-    });
-  }
-
-  const isAttacking = isFighterDemoAttacking(state.previewFighter);
-  const demoBtnText = isAttacking ? 'ATTACKING...' : 'DEMO ATTACK';
-  buttonsToDraw.push({
-    text: demoBtnText,
-    width: 110,
-    action: () => { 
-      state.showWeaponModel = true;
-      state.showSummonModel = false;
-      triggerWeaponDemoAttack(def); 
-    }
-  });
-
-  if (hasSummon) {
-    const summonLabel = (def.type === 'yuta') ? 'RIKA' : (def.type === 'Engineer' ? 'SENTRY' : 'SUMMON');
-    const summonToggleText = state.showSummonModel ? `${summonLabel}: ON` : `${summonLabel}: OFF`;
-    buttonsToDraw.push({
-      text: summonToggleText,
-      width: 95,
-      action: () => {
-        state.showSummonModel = !state.showSummonModel;
-        if (state.showSummonModel) {
-          state.showWeaponModel = false;
-          state.showSkinOnly = false;
-          state.slashEditMode = false;
-        }
-      }
-    });
-  }
-
-  const totalBtnWidth = buttonsToDraw.reduce((acc, b) => acc + b.width, 0);
-  const gap = 8;
-  const totalRowW = totalBtnWidth + (buttonsToDraw.length - 1) * gap;
-  let currentBtnX = (canvas.width - totalRowW) / 2;
-
-  buttonsToDraw.forEach(btn => {
-    drawButton(btn.text, currentBtnX + btn.width / 2, actionY, btn.action, btn.width, 24, null, 4);
-    currentBtnX += btn.width + gap;
-  });
-
-  // ── Tier 2: Hero Weapon Showcase Stage (Y: 110 to 470, H: 360px) ──
+  // ── Tier 2: Hero Stage (Y: 110 to 470, H: 360px) ──
   const stageX = 16;
   const stageY = 110;
-  const stageW = canvas.width - 32; // 508px
+  const stageW = canvas.width - 32;
   const stageH = 360;
   const heroX = canvas.width / 2;
   const heroY = stageY + 160;
 
   drawPanel(stageX, stageY, stageW, stageH, 0.94, 8);
 
-  // Background inside Stage (Plain White Review Canvas)
   ctx.save();
   ctx.beginPath();
   drawChamferedRect(ctx, stageX + 1, stageY + 1, stageW - 2, stageH - 2, 7);
   ctx.clip();
 
-  // Plain White Background Fill
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(stageX, stageY, stageW, stageH);
 
-  // Animated Hero Weapon Display
-  const currentScale = state.weaponPreviewScale || 2.4;
-  ctx.save();
-  ctx.translate(heroX, heroY);
-  ctx.scale(currentScale, currentScale);
-  ctx.translate(0, state.clawEditMode ? 0 : Math.sin(Date.now() / 400) * 6);
-  
-  if (state.showSummonModel) {
-    if (!state.previewSummonFighter || state.previewSummonFighter.type !== def.type) {
-      const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-      state.previewSummonFighter = new FighterClass({
-        ...def,
-        startX: 0,
-        startY: 0,
-        startVx: 0,
-        startVy: 0,
-      });
+  if (!state.previewFighter || state.previewFighter.type !== def.type) {
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    state.previewFighter = new FighterClass({
+      ...def,
+      startX: 0,
+      startY: 0,
+      startVx: 0,
+      startVy: 0,
+    });
+    state.previewFighter.hideHpText = true;
+  }
+  const previewFighter = state.previewFighter;
+
+  // ═════════════════════════════════════════════
+  // PILLAR 1: FIGHTER MODEL INSPECTOR
+  // ═════════════════════════════════════════════
+  if (state.reviewTab === 'model') {
+    if (state.modelAutoSpin) {
+      state.modelAngle = (state.modelAngle || 0) + 0.02;
     }
-    const previewFighter = state.previewSummonFighter;
-    previewFighter.hideHpText = true;
+
+    ctx.save();
+    ctx.translate(heroX, heroY);
+    ctx.scale(state.modelZoom || 2.2, state.modelZoom || 2.2);
+
+    ctx.translate(0, Math.sin(Date.now() / 400) * 4);
+
     previewFighter.x = 0;
     previewFighter.y = 0;
-    previewFighter.angle = 0;
+    previewFighter.gunAngle = state.modelAngle || 0;
+    previewFighter.angle = state.modelAngle || 0;
 
-    try {
-      if (def.type === 'yuta' && previewFighter.rika) {
-        previewFighter.rika.active = true;
-        previewFighter.rika.x = 0;
-        previewFighter.rika.y = 0;
-        previewFighter.cursedEnergyAlpha = 1.0;
-        
-        if ((state.previewRightArmTimer || 0) > 0) {
-          state.previewRightArmTimer--;
-          if (state.previewRightArmTimer === 30 && (state.previewLeftArmTimer || 0) <= 0) {
-            state.previewLeftArmTimer = 60;
-          }
-        }
-        if ((state.previewLeftArmTimer || 0) > 0) {
-          state.previewLeftArmTimer--;
-        }
-        previewFighter.rika.attackTimer  = state.previewRightArmTimer || 0;
-        previewFighter.rika.leftArmTimer = state.previewLeftArmTimer  || 0;
-
-        if (state.previewShowCursedEnergy) {
-          previewFighter._drawRikaCursedEnergyAura(ctx);
-        }
-        previewFighter._drawRika(ctx, { x: 100, y: 0 });
-      } else {
-        previewFighter.draw(ctx, { x: 100, y: 0 });
-      }
-    } catch (e) {
-      console.error('Preview summon draw error:', e);
-    }
-  } else if (state.showWeaponModel) {
-    if (!state.previewFighter || state.previewFighter.type !== def.type) {
-      const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-      state.previewFighter = new FighterClass({
-        ...def,
-        startX: 0,
-        startY: 0,
-        startVx: 0,
-        startVy: 0,
-      });
-      state.previewFighter.hideHpText = true;
-    }
-
-    const previewFighter = state.previewFighter;
-    previewFighter.x = 0;
-    previewFighter.y = 0;
-
+    // Synchronize weapon and form states
     if (def.type === 'ichigo') {
       previewFighter.skin = state.selectedIchigoSkin || 'shikai';
-      if (previewFighter.demoShatterTimer !== undefined && previewFighter.demoShatterTimer > 0) {
+      if (previewFighter.demoShatterTimer > 0) {
         previewFighter.hollowMaskActive = true;
-        previewFighter.hollowMaskTimer = Math.round((previewFighter.demoShatterTimer / 75) * 160);
         previewFighter.demoShatterTimer--;
         if (previewFighter.demoShatterTimer <= 0) {
           previewFighter.hollowMaskActive = false;
@@ -808,16 +1236,19 @@ function drawWeaponDetailScreen() {
         }
       } else {
         previewFighter.hollowMaskActive = Boolean(state.showHollowMask);
-        if (previewFighter.hollowMaskFormationTimer > 0) {
-          previewFighter.hollowMaskFormationTimer--;
-        }
-        if (previewFighter.hollowMaskActive && (previewFighter.hollowMaskTimer === undefined || previewFighter.hollowMaskTimer <= 0)) {
-          previewFighter.hollowMaskTimer = 600;
-        }
       }
-    }
-
-    if (def.type === 'cj') {
+    } else if (def.type === 'ulquiorra') {
+      previewFighter.stage1Active = Boolean(state.showUlquiorraWings);
+      previewFighter.wingsActive = Boolean(state.showUlquiorraWings);
+      previewFighter.segundaEtapaActive = Boolean(state.showUlquiorraSegunda);
+      previewFighter.isSegundaEtapa = Boolean(state.showUlquiorraSegunda);
+    } else if (def.type === 'toji') {
+      previewFighter.tojiWeaponIndex = state.tojiWeaponIndex || 0;
+    } else if (def.type === 'john_wick' || def.type === 'johnwick') {
+      const jIdx = state.johnWickWeaponIndex || 0;
+      previewFighter.currentEquippedWeapon = ['pistol', 'shotgun', 'rifle', 'pistol'][jIdx];
+      previewFighter.isPencilEquipped = (jIdx === 3);
+    } else if (def.type === 'cj') {
       const cjIdx = state.cjWeaponIndex || 0;
       previewFighter.z = (cjIdx === 1 || cjIdx === 2) ? 24 : 0;
       previewFighter.isJetpackActive = (cjIdx === 1 || cjIdx === 2);
@@ -827,306 +1258,360 @@ function drawWeaponDetailScreen() {
       previewFighter.previewWeaponIndex = cjIdx;
     }
 
-    if (def.type === 'ulquiorra' || def.type === 'ulquiorra_cifer') {
-      previewFighter.stage1Active = Boolean(state.showUlquiorraWings);
-      previewFighter.wingsActive = Boolean(state.showUlquiorraWings);
-      previewFighter.isMurcielagoActive = Boolean(state.showUlquiorraWings);
-      previewFighter.segundaEtapaActive = Boolean(state.showUlquiorraSegunda);
-      previewFighter.isSegundaEtapa = Boolean(state.showUlquiorraSegunda);
-    }
-
-    if (previewFighter.spearSwingTimer > 0) previewFighter.spearSwingTimer--;
-    if (previewFighter.katanaSlashTimer > 0) previewFighter.katanaSlashTimer--;
-    if (previewFighter.punchAnimTimer > 0) previewFighter.punchAnimTimer--;
-    if (previewFighter.slashSwingTimer > 0) previewFighter.slashSwingTimer--;
-    if (previewFighter.recoilTimer > 0) previewFighter.recoilTimer--;
-    if (previewFighter.slashGlowTimer > 0) previewFighter.slashGlowTimer--;
-    if (previewFighter.meleeCooldown > 0) previewFighter.meleeCooldown--;
-    if (previewFighter.wheelGlowTimer > 0) previewFighter.wheelGlowTimer--;
-    if (previewFighter.tec9Recoil > 0) previewFighter.tec9Recoil = Math.max(0, previewFighter.tec9Recoil - 0.6);
-    if (previewFighter.tec9Flash > 0) previewFighter.tec9Flash--;
-    if (previewFighter.uziRecoilFront > 0) previewFighter.uziRecoilFront = Math.max(0, previewFighter.uziRecoilFront - 0.5);
-    if (previewFighter.uziRecoilBack > 0) previewFighter.uziRecoilBack = Math.max(0, previewFighter.uziRecoilBack - 0.5);
-    if (previewFighter.uziFlashTimerFront > 0) previewFighter.uziFlashTimerFront--;
-    if (previewFighter.uziFlashTimerBack > 0) previewFighter.uziFlashTimerBack--;
-    if (previewFighter.minigunRecoil > 0) previewFighter.minigunRecoil = Math.max(0, previewFighter.minigunRecoil - 0.8);
-    if (previewFighter.minigunFlashTimer > 0) {
-      previewFighter.minigunFlashTimer--;
-      previewFighter.minigunSpinAngle = (previewFighter.minigunSpinAngle || 0) + 0.45;
-    }
-    if (previewFighter.minigunHeat > 0) previewFighter.minigunHeat = Math.max(0, previewFighter.minigunHeat - 0.02);
-
-    // Tactical Force Firearm Preview Timers
-    if (previewFighter.muzzleFlashTimer > 0) previewFighter.muzzleFlashTimer--;
-    if (previewFighter.gunRecoil > 0) previewFighter.gunRecoil = Math.max(0, previewFighter.gunRecoil - 0.12);
-    if (previewFighter.pumpTimer > 0) {
-      previewFighter.pumpTimer--;
-      if (previewFighter.pumpTimer === 11 && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        const cfg = CONFIG.spas12 || CONFIG.shotgun || {};
-        audioSystem.playSFX(cfg.sounds?.pump || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3', cfg.soundVolumes?.pump ?? 1.0, 1.0);
+    try {
+      if (state.showSummonModel && def.type === 'yuta' && previewFighter.rika) {
+        previewFighter.rika.active = true;
+        previewFighter.rika.x = 0;
+        previewFighter.rika.y = 0;
+        previewFighter._drawRika(ctx, { x: 100, y: 0 });
+      } else if (state.showWeaponOnly) {
+        drawWeaponPreview(ctx, def.type, def.color);
+      } else {
+        const fakeTarget = { x: Math.cos(state.modelAngle) * 80, y: Math.sin(state.modelAngle) * 80, r: 25, hp: 100, maxHp: 100 };
+        previewFighter.draw(ctx, fakeTarget);
+        updateDeathEffects();
+        drawDeathEffects();
       }
+    } catch (e) {
+      console.error('Model render error:', e);
     }
-    if (previewFighter.burstShotsRemaining > 0) {
-      previewFighter.burstTimer--;
-      if (previewFighter.burstTimer <= 0) {
-        previewFighter.burstShotsRemaining--;
-        previewFighter.burstTimer = 4;
-        previewFighter.muzzleFlashTimer = 3;
-        previewFighter.gunRecoil = 0.9;
-        const cfg = CONFIG.m4a1 || CONFIG.rifle || {};
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX(cfg.sounds?.fire || 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3', cfg.soundVolumes?.fire ?? 1.0, 1.0);
+
+    ctx.restore();
+
+    // Zoom controls overlay
+    const zoomX = stageX + stageW - 32;
+    const zoomY = stageY + 36;
+    const zoomPct = Math.round(((state.modelZoom || 2.2) / 2.2) * 100);
+
+    drawButton('🔍+', zoomX, zoomY, () => {
+      state.modelZoom = Math.min(4.5, (state.modelZoom || 2.2) + 0.3);
+    }, 32, 22, null, 2);
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '900 9px "Rajdhani", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${zoomPct}%`, zoomX, zoomY + 20);
+
+    drawButton('🔍-', zoomX, zoomY + 40, () => {
+      state.modelZoom = Math.max(1.0, (state.modelZoom || 2.2) - 0.3);
+    }, 32, 22, null, 2);
+
+    // Layer Display Modes (Top Left inside Stage)
+    const layerY = stageY + 20;
+    const isSkinOnly = Boolean(state.showSkinOnly);
+    const isWpnOnly = Boolean(state.showWeaponOnly);
+    const isFull = !isSkinOnly && !isWpnOnly && !state.showSummonModel;
+
+    drawButton(isFull ? '[ FULL FIGHTER ]' : 'FULL FIGHTER', stageX + 65, layerY, () => {
+      state.showSkinOnly = false;
+      state.showWeaponOnly = false;
+      state.showSummonModel = false;
+      state.showWeaponModel = true;
+    }, 105, 20, isFull ? '#f59e0b' : null, 2);
+
+    drawButton(isSkinOnly ? '[ SKIN ONLY ]' : 'SKIN ONLY', stageX + 175, layerY, () => {
+      state.showSkinOnly = true;
+      state.showWeaponOnly = false;
+      state.showSummonModel = false;
+      state.showWeaponModel = true;
+    }, 85, 20, isSkinOnly ? '#f59e0b' : null, 2);
+
+    drawButton(isWpnOnly ? '[ WEAPON ONLY ]' : 'WEAPON ONLY', stageX + 275, layerY, () => {
+      state.showSkinOnly = false;
+      state.showWeaponOnly = true;
+      state.showSummonModel = false;
+      state.showWeaponModel = false;
+    }, 95, 20, isWpnOnly ? '#f59e0b' : null, 2);
+
+    if (hasSummon) {
+      const isSummon = Boolean(state.showSummonModel);
+      drawButton(isSummon ? '[ COMPANION ]' : 'COMPANION', stageX + 380, layerY, () => {
+        state.showSummonModel = !state.showSummonModel;
+        state.showSkinOnly = false;
+        state.showWeaponOnly = false;
+      }, 90, 20, isSummon ? '#f59e0b' : null, 2);
+    }
+
+    // Multi-Weapon & Form Selector Ribbon (Prominent in Model Tab)
+    drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, 'model');
+
+  // ═════════════════════════════════════════════
+  // PILLAR 2: SKILL ANIMATION STUDIO
+  // ═════════════════════════════════════════════
+  } else if (state.reviewTab === 'skills') {
+    const arenaX = stageX + 6;
+    const arenaY = stageY + 36;
+    const arenaW = stageW - 12;
+    const arenaH = stageH - 76;
+
+    const fighterHomeX = arenaX + 90;
+    const fighterHomeY = arenaY + arenaH / 2;
+    _reviewDummy.homeX = arenaX + arenaW - 90;
+    _reviewDummy.homeY = arenaY + arenaH / 2;
+
+    if (_reviewDummy.x === 0 && _reviewDummy.y === 0) {
+      _reviewDummy.x = _reviewDummy.homeX;
+      _reviewDummy.y = _reviewDummy.homeY;
+    }
+
+    previewFighter.x = fighterHomeX;
+    previewFighter.y = fighterHomeY;
+
+    const simSpeed = state.skillDemoPaused ? (_reviewFrameStepRequested ? 1.0 : 0) : (state.skillDemoSpeed || 1.0);
+    _reviewFrameStepRequested = false;
+
+    if (simSpeed > 0) {
+      _reviewDummy.vx *= 0.88;
+      _reviewDummy.vy *= 0.88;
+      _reviewDummy.x += _reviewDummy.vx * simSpeed;
+      _reviewDummy.y += _reviewDummy.vy * simSpeed;
+      _reviewDummy.x += (_reviewDummy.homeX - _reviewDummy.x) * 0.08 * simSpeed;
+      _reviewDummy.y += (_reviewDummy.homeY - _reviewDummy.y) * 0.08 * simSpeed;
+
+      if (_reviewDummy.hitFlash > 0) _reviewDummy.hitFlash -= simSpeed;
+      if (_reviewDummy.stasisTimer > 0) _reviewDummy.stasisTimer -= simSpeed;
+
+      for (let i = _reviewProjectiles.length - 1; i >= 0; i--) {
+        const p = _reviewProjectiles[i];
+        p.x += p.vx * simSpeed;
+        p.y += p.vy * simSpeed;
+        p.life -= simSpeed;
+
+        const dist = Math.hypot(p.x - _reviewDummy.x, p.y - _reviewDummy.y);
+        if (dist < p.r + _reviewDummy.r) {
+          _reviewDummy.takeDamage(def.damage * 2 || 35);
+          _reviewDummy.applyKnockback(p.vx * 0.5, p.vy * 0.5);
+          spawnReviewImpactSparks(_reviewDummy.x, _reviewDummy.y, p.color, 12);
+          spawnReviewDamageText(_reviewDummy.x, _reviewDummy.y - _reviewDummy.r - 8, `-${def.damage * 2 || 35}`, p.color);
+          _reviewProjectiles.splice(i, 1);
+          continue;
+        }
+
+        if (p.life <= 0) {
+          _reviewProjectiles.splice(i, 1);
         }
       }
-    }
 
-    if (previewFighter.isSlashing && previewFighter.slashSwingTimer > 0) {
-      previewFighter.slashSwingTimer--;
-      previewFighter.slashProgress = 1 - (previewFighter.slashSwingTimer / (previewFighter.slashSwingMaxTimer || 16));
-      if (previewFighter.slashSwingTimer <= 0) {
-        previewFighter.isSlashing = false;
-        previewFighter.slashProgress = 0;
+      for (let i = _reviewParticles.length - 1; i >= 0; i--) {
+        const pt = _reviewParticles[i];
+        pt.x += pt.vx * simSpeed;
+        pt.y += pt.vy * simSpeed;
+        pt.life -= simSpeed;
+        if (pt.life <= 0) _reviewParticles.splice(i, 1);
+      }
+
+      for (let i = _reviewDamageTexts.length - 1; i >= 0; i--) {
+        const dt = _reviewDamageTexts[i];
+        dt.y += dt.vy * simSpeed;
+        dt.life -= simSpeed;
+        if (dt.life <= 0) _reviewDamageTexts.splice(i, 1);
       }
     }
+
+    // Grid background
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.06)';
+    ctx.lineWidth = 1;
+    for (let gx = arenaX; gx < arenaX + arenaW; gx += 26) {
+      ctx.beginPath();
+      ctx.moveTo(gx, arenaY);
+      ctx.lineTo(gx, arenaY + arenaH);
+      ctx.stroke();
+    }
+    for (let gy = arenaY; gy < arenaY + arenaH; gy += 26) {
+      ctx.beginPath();
+      ctx.moveTo(arenaX, gy);
+      ctx.lineTo(arenaX + arenaW, gy);
+      ctx.stroke();
+    }
+
+    previewFighter.aim(_reviewDummy);
 
     try {
-      const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
-      previewFighter.draw(ctx, fakeTarget);
-      updateDeathEffects();
-      drawDeathEffects();
-    } catch (e) {
-      console.error('Preview draw error:', e);
+      ctx.save();
+      ctx.translate(previewFighter.x, previewFighter.y);
+      ctx.scale(1.4, 1.4);
+      const localTarget = { x: (_reviewDummy.x - previewFighter.x) / 1.4, y: (_reviewDummy.y - previewFighter.y) / 1.4, r: 22, hp: 100 };
+      previewFighter.draw(ctx, localTarget);
+      ctx.restore();
+    } catch (e) {}
+
+    // Sparring Dummy Target
+    ctx.save();
+    const isHit = _reviewDummy.hitFlash > 0;
+    const isStasis = _reviewDummy.stasisTimer > 0;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(_reviewDummy.x, _reviewDummy.y + 20, 20, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (isStasis) {
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(_reviewDummy.x, _reviewDummy.y, 28, 10, Date.now() / 200, 0, Math.PI * 2);
+      ctx.stroke();
     }
-  } else {
+
+    ctx.fillStyle = isHit ? '#ef4444' : '#1e293b';
+    ctx.strokeStyle = isHit ? '#ffffff' : '#e2e8f0';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(_reviewDummy.x, _reviewDummy.y, _reviewDummy.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = isHit ? '#ffffff' : '#f87171';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(_reviewDummy.x - _reviewDummy.r - 4, _reviewDummy.y);
+    ctx.lineTo(_reviewDummy.x + _reviewDummy.r + 4, _reviewDummy.y);
+    ctx.moveTo(_reviewDummy.x, _reviewDummy.y - _reviewDummy.r - 4);
+    ctx.lineTo(_reviewDummy.x, _reviewDummy.y + _reviewDummy.r + 4);
+    ctx.stroke();
+
+    const dummyHpW = 44;
+    const dummyHpH = 4;
+    const hpPct = Math.max(0, _reviewDummy.hp / _reviewDummy.maxHp);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(_reviewDummy.x - dummyHpW / 2, _reviewDummy.y - _reviewDummy.r - 12, dummyHpW, dummyHpH);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(_reviewDummy.x - dummyHpW / 2, _reviewDummy.y - _reviewDummy.r - 12, dummyHpW * hpPct, dummyHpH);
+    ctx.restore();
+
+    _reviewProjectiles.forEach(p => {
+      ctx.save();
+      ctx.fillStyle = p.color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    _reviewParticles.forEach(pt => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+      ctx.fillStyle = pt.color;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    _reviewDamageTexts.forEach(dt => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, dt.life / dt.maxLife);
+      ctx.fillStyle = dt.color;
+      ctx.font = '900 12px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(dt.text, dt.x, dt.y);
+      ctx.restore();
+    });
+
+    // Playback Speed Controls Bar
+    const ctrlY = stageY + 18;
+    const isPaused = Boolean(state.skillDemoPaused);
+    drawButton(isPaused ? '▶ PLAY' : '⏸ PAUSE', stageX + 50, ctrlY, () => {
+      state.skillDemoPaused = !state.skillDemoPaused;
+    }, 65, 20, isPaused ? '#10b981' : null, 2);
+
+    if (isPaused) {
+      drawButton('⏭ STEP', stageX + 115, ctrlY, () => {
+        _reviewFrameStepRequested = true;
+      }, 55, 20, null, 2);
+    }
+
+    const spd = state.skillDemoSpeed || 1.0;
+    drawButton(spd === 0.25 ? '[ 0.25x ]' : '0.25x', stageX + 185, ctrlY, () => { state.skillDemoSpeed = 0.25; state.skillDemoPaused = false; }, 55, 20, spd === 0.25 ? '#f59e0b' : null, 2);
+    drawButton(spd === 0.50 ? '[ 0.5x ]' : '0.5x', stageX + 245, ctrlY, () => { state.skillDemoSpeed = 0.50; state.skillDemoPaused = false; }, 48, 20, spd === 0.50 ? '#f59e0b' : null, 2);
+    drawButton(spd === 1.00 ? '[ 1.0x ]' : '1.0x', stageX + 300, ctrlY, () => { state.skillDemoSpeed = 1.00; state.skillDemoPaused = false; }, 48, 20, spd === 1.00 ? '#f59e0b' : null, 2);
+    drawButton(spd === 2.00 ? '[ 2.0x ]' : '2.0x', stageX + 355, ctrlY, () => { state.skillDemoSpeed = 2.00; state.skillDemoPaused = false; }, 48, 20, spd === 2.00 ? '#f59e0b' : null, 2);
+
+    drawButton('↺ RESET DUMMY', stageX + stageW - 65, ctrlY, () => {
+      _reviewDummy.reset();
+      _reviewProjectiles = [];
+      _reviewParticles = [];
+      _reviewDamageTexts = [];
+    }, 95, 20, null, 2);
+
+    // Multi-Weapon switcher inside skills tab
+    drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, 'skills');
+
+    // Bottom Skill Trigger Rack
+    const rackY = stageY + stageH - 24;
+    const btnW = 115;
+    const btnGap = 8;
+    const rackStartX = (canvas.width - (btnW * 4 + btnGap * 3)) / 2;
+
+    drawButton('⚔️ BASIC ATK', rackStartX + btnW / 2, rackY, () => {
+      triggerReviewSkill('basic', def, previewFighter, _reviewDummy);
+    }, btnW, 22, null, 3);
+
+    drawButton('✦ SKILL 1', rackStartX + btnW + btnGap + btnW / 2, rackY, () => {
+      triggerReviewSkill('skill1', def, previewFighter, _reviewDummy);
+    }, btnW, 22, '#38bdf8', 3);
+
+    drawButton('★ ULTIMATE', rackStartX + (btnW + btnGap) * 2 + btnW / 2, rackY, () => {
+      triggerReviewSkill('ultimate', def, previewFighter, _reviewDummy);
+    }, btnW, 22, '#f59e0b', 3);
+
+    drawButton('💨 DASH', rackStartX + (btnW + btnGap) * 3 + btnW / 2, rackY, () => {
+      triggerReviewSkill('dash', def, previewFighter, _reviewDummy);
+    }, btnW, 22, '#a855f7', 3);
+
+  // ═════════════════════════════════════════════
+  // PILLAR 3: WEAPON & ARSENAL DOSSIER
+  // ═════════════════════════════════════════════
+  } else if (state.reviewTab === 'weapon') {
+    ctx.save();
+    ctx.translate(heroX, heroY);
+    const wpnScale = state.weaponPreviewScale || 2.4;
+    ctx.scale(wpnScale, wpnScale);
+    ctx.translate(0, Math.sin(Date.now() / 400) * 6);
     drawWeaponPreview(ctx, def.type, def.color);
-  }
-  ctx.restore(); // Restore Weapon Scale
+    ctx.restore();
 
-  ctx.restore(); // Restore Stage Clip
+    // Zoom Controls Overlay (Top Right)
+    const zoomX = stageX + stageW - 32;
+    const zoomY = stageY + 36;
+    const zoomPct = Math.round(((state.weaponPreviewScale || 2.4) / 2.4) * 100);
 
-  // Zoom Steppers overlay inside stage (Top Right)
-  const zoomX = stageX + stageW - 32;
-  const zoomY = stageY + 36;
-  const zoomPct = Math.round(((state.weaponPreviewScale || 2.4) / 2.4) * 100);
-
-  drawButton('🔍+', zoomX, zoomY, () => {
-    state.weaponPreviewScale = Math.min(4.8, (state.weaponPreviewScale || 2.4) + 0.4);
-  }, 32, 22, null, 2);
-
-  ctx.fillStyle = '#f59e0b';
-  ctx.font = '900 9.5px "Rajdhani", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`${zoomPct}%`, zoomX, zoomY + 20);
-
-  drawButton('🔍-', zoomX, zoomY + 40, () => {
-    state.weaponPreviewScale = Math.max(1.0, (state.weaponPreviewScale || 2.4) - 0.4);
-  }, 32, 22, null, 2);
-
-  // Multi-Weapon Sub-Selectors (Toji, John Wick, Ichigo) inside bottom of stage
-  const pagY = stageY + stageH - 24;
-
-  if (def.type === 'toji') {
-    state.tojiWeaponIndex = state.tojiWeaponIndex || 0;
-    const currentWeaponLabel = (state.tojiWeaponIndex === 0) 
-      ? '1/2: INVERTED SPEAR OF HEAVEN' 
-      : '2/2: SPLIT SOUL KATANA';
+    drawButton('🔍+', zoomX, zoomY, () => {
+      state.weaponPreviewScale = Math.min(4.8, (state.weaponPreviewScale || 2.4) + 0.4);
+    }, 32, 22, null, 2);
 
     ctx.fillStyle = '#f59e0b';
-    ctx.font = '900 11px "Rajdhani", monospace';
+    ctx.font = '900 9px "Rajdhani", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(currentWeaponLabel, canvas.width / 2, pagY);
+    ctx.fillText(`${zoomPct}%`, zoomX, zoomY + 20);
 
-    drawButton('◄', canvas.width / 2 - 135, pagY, () => {
-      state.tojiWeaponIndex = (state.tojiWeaponIndex === 0) ? 1 : 0;
-      state.previewFighter = null;
-    }, 30, 22, null, 3);
+    drawButton('🔍-', zoomX, zoomY + 40, () => {
+      state.weaponPreviewScale = Math.max(1.0, (state.weaponPreviewScale || 2.4) - 0.4);
+    }, 32, 22, null, 2);
 
-    drawButton('►', canvas.width / 2 + 135, pagY, () => {
-      state.tojiWeaponIndex = (state.tojiWeaponIndex === 0) ? 1 : 0;
-      state.previewFighter = null;
-    }, 30, 22, null, 3);
-  } else if (def.type === 'john_wick' || def.type === 'johnwick') {
-    state.johnWickWeaponIndex = state.johnWickWeaponIndex || 0;
-    const labels = ['1/4: PIT VIPER 9MM', '2/4: BENELLI M4 SHOTGUN', '3/4: M4A1 CARBINE', '4/4: THE NO. 2 PENCIL'];
-    const currentWeaponLabel = labels[state.johnWickWeaponIndex] || labels[0];
-
-    ctx.fillStyle = '#f59e0b';
-    ctx.font = '900 11px "Rajdhani", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(currentWeaponLabel, canvas.width / 2, pagY);
-
-    drawButton('◄', canvas.width / 2 - 135, pagY, () => {
-      state.johnWickWeaponIndex = (state.johnWickWeaponIndex + 3) % 4;
-      if (state.previewFighter) {
-        if (state.johnWickWeaponIndex === 0) { state.previewFighter.currentEquippedWeapon = 'pistol'; state.previewFighter.isPencilEquipped = false; }
-        else if (state.johnWickWeaponIndex === 1) { state.previewFighter.currentEquippedWeapon = 'shotgun'; state.previewFighter.isPencilEquipped = false; }
-        else if (state.johnWickWeaponIndex === 2) { state.previewFighter.currentEquippedWeapon = 'rifle'; state.previewFighter.isPencilEquipped = false; }
-        else { state.previewFighter.currentEquippedWeapon = 'pistol'; state.previewFighter.isPencilEquipped = true; }
-      }
-      audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-gunswitch.mp3', 0.9);
-    }, 30, 22, null, 3);
-
-    drawButton('►', canvas.width / 2 + 135, pagY, () => {
-      state.johnWickWeaponIndex = (state.johnWickWeaponIndex + 1) % 4;
-      if (state.previewFighter) {
-        if (state.johnWickWeaponIndex === 0) { state.previewFighter.currentEquippedWeapon = 'pistol'; state.previewFighter.isPencilEquipped = false; }
-        else if (state.johnWickWeaponIndex === 1) { state.previewFighter.currentEquippedWeapon = 'shotgun'; state.previewFighter.isPencilEquipped = false; }
-        else if (state.johnWickWeaponIndex === 2) { state.previewFighter.currentEquippedWeapon = 'rifle'; state.previewFighter.isPencilEquipped = false; }
-        else { state.previewFighter.currentEquippedWeapon = 'pistol'; state.previewFighter.isPencilEquipped = true; }
-      }
-      audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-gunswitch.mp3', 0.9);
-    }, 30, 22, null, 3);
-  } else if (def.type === 'ichigo') {
-    const maskActive = Boolean(state.showHollowMask);
-    const isShattering = state.previewFighter && state.previewFighter.demoShatterTimer > 0;
-    const shikaiBtnX  = canvas.width / 2 - 145;
-    const bankaiBtnX  = canvas.width / 2 - 55;
-    const maskBtnX    = canvas.width / 2 + 45;
-    const shatterBtnX = canvas.width / 2 + 150;
-
-    drawButton('SHIKAI', shikaiBtnX, pagY, () => {
-      state.selectedIchigoSkin = 'shikai';
-      if (state.previewFighter) state.previewFighter.skin = 'shikai';
-    }, 70, 22, null, 3);
-
-    drawButton('BANKAI', bankaiBtnX, pagY, () => {
-      state.selectedIchigoSkin = 'bankai';
-      if (state.previewFighter) state.previewFighter.skin = 'bankai';
-    }, 70, 22, null, 3);
-
-    const maskLabel = maskActive ? 'MASK: ON' : 'MASK: OFF';
-    drawButton(maskLabel, maskBtnX, pagY, () => {
-      state.showHollowMask = !state.showHollowMask;
-      if (state.previewFighter) {
-        state.previewFighter.hollowMaskActive = state.showHollowMask;
-        state.previewFighter.demoShatterTimer = 0;
-        if (state.showHollowMask) {
-          state.previewFighter.hollowMaskFormationTimer = 54;
-          state.previewFighter.hollowMaskFormationMax = 54;
-          state.previewFighter.hollowMaskTimer = 600;
-          audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
-        } else {
-          state.previewFighter.hollowMaskFormationTimer = 0;
-        }
-      }
-    }, 85, 22, null, 3);
-
-    const shatterLabel = isShattering ? 'CRACKING...' : 'SHATTER';
-    drawButton(shatterLabel, shatterBtnX, pagY, () => {
-      state.showHollowMask = true;
-      if (state.previewFighter) {
-        state.previewFighter.hollowMaskActive = true;
-        state.previewFighter.demoShatterTimer = 75;
-      }
-    }, 85, 22, null, 3);
-  } else if (def.type === 'cj') {
-    state.cjWeaponIndex = state.cjWeaponIndex || 0;
-    const labels = [
-      '1/5: BRASS KNUCKLES',
-      '2/5: DARPA JETPACK',
-      '3/5: MICRO SMG (MICRO-UZI)',
-      '4/5: M134 MINIGUN',
-      '5/5: INTRATEC TEC-9'
-    ];
-    const currentWeaponLabel = labels[state.cjWeaponIndex] || labels[0];
-
-    ctx.fillStyle = '#16a34a';
-    ctx.font = '900 11px "Rajdhani", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(currentWeaponLabel, canvas.width / 2, pagY);
-
-    drawButton('◄', canvas.width / 2 - 135, pagY, () => {
-      state.cjWeaponIndex = (state.cjWeaponIndex + 4) % 5;
-      if (state.previewFighter) {
-        const idx = state.cjWeaponIndex;
-        state.previewFighter.z = (idx === 1 || idx === 2) ? 24 : 0;
-        state.previewFighter.isJetpackActive = (idx === 1 || idx === 2);
-        state.previewFighter.isBaguvixActive = (idx === 3);
-        state.previewFighter.isGodModeActive = (idx === 3);
-        state.previewFighter.previewWeaponIndex = idx;
-      }
-      audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-    }, 30, 22, null, 3);
-
-    drawButton('►', canvas.width / 2 + 135, pagY, () => {
-      state.cjWeaponIndex = (state.cjWeaponIndex + 1) % 5;
-      if (state.previewFighter) {
-        const idx = state.cjWeaponIndex;
-        state.previewFighter.z = (idx === 1 || idx === 2) ? 24 : 0;
-        state.previewFighter.isJetpackActive = (idx === 1 || idx === 2);
-        state.previewFighter.isBaguvixActive = (idx === 3);
-        state.previewFighter.isGodModeActive = (idx === 3);
-        state.previewFighter.previewWeaponIndex = idx;
-      }
-      audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-    }, 30, 22, null, 3);
-  } else if (def.type === 'ulquiorra' || def.type === 'ulquiorra_cifer') {
-    const isBase = !state.showUlquiorraWings && !state.showUlquiorraSegunda;
-    const isStage1 = state.showUlquiorraWings && !state.showUlquiorraSegunda;
-    const isSegunda = Boolean(state.showUlquiorraSegunda);
-
-    const baseBtnX    = canvas.width / 2 - 120;
-    const wingsBtnX   = canvas.width / 2;
-    const segundaBtnX = canvas.width / 2 + 125;
-
-    drawButton(isBase ? '[ BASE FORM ]' : 'BASE FORM', baseBtnX, pagY, () => {
-      state.showUlquiorraWings = false;
-      state.showUlquiorraSegunda = false;
-      if (state.previewFighter) {
-        state.previewFighter.stage1Active = false;
-        state.previewFighter.wingsActive = false;
-        state.previewFighter.segundaEtapaActive = false;
-        state.previewFighter.isSegundaEtapa = false;
-      }
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-      }
-    }, 100, 22, isBase ? '#00FF88' : null, 3);
-
-    drawButton(isStage1 ? '[ STAGE 1 WINGS ]' : 'STAGE 1 WINGS', wingsBtnX, pagY, () => {
-      state.showUlquiorraWings = true;
-      state.showUlquiorraSegunda = false;
-      state.showWeaponModel = true;
-      if (state.previewFighter) {
-        state.previewFighter.stage1Active = true;
-        state.previewFighter.wingsActive = true;
-        state.previewFighter.segundaEtapaActive = false;
-        state.previewFighter.isSegundaEtapa = false;
-      }
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-      }
-    }, 115, 22, isStage1 ? '#00FF88' : null, 3);
-
-    drawButton(isSegunda ? '[ SEGUNDA ETAPA ]' : 'SEGUNDA ETAPA', segundaBtnX, pagY, () => {
-      state.showUlquiorraWings = true;
-      state.showUlquiorraSegunda = true;
-      state.showWeaponModel = true;
-      if (state.previewFighter) {
-        state.previewFighter.stage1Active = true;
-        state.previewFighter.wingsActive = true;
-        state.previewFighter.segundaEtapaActive = true;
-        state.previewFighter.isSegundaEtapa = true;
-      }
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
-      }
-    }, 115, 22, isSegunda ? '#00FF88' : null, 3);
+    // Multi-Weapon Selectors (Prominent in Weapon Arsenal Tab)
+    drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, 'weapon');
   }
+
+  ctx.restore();
 
   // ── Tier 3: Technical Dossier Card (Y: 480 to 890) ──
   drawWeaponInfoCard(ctx, def);
 
   // ── Tier 4: Bottom Navigation Dock (Y: 926) ──
-  drawButton('⌂ BACK TO ARSENAL', canvas.width / 2, canvas.height - 34, () => {
-    state.clawEditMode = false;
+  drawButton('⌂ BACK TO ROSTER', canvas.width / 2, canvas.height - 34, () => {
     state.gameState = 'weapons';
   }, 160, 28, null, 4);
 }
+
+// ─────────────────────────────────────────────
+// 6. WEAPON GRAPHICS & PREVIEW RENDERERS
+// ─────────────────────────────────────────────
 
 function drawYutaKatana(ctx, x, y, angle) {
   ctx.save();
@@ -1164,14 +1649,14 @@ function drawYutaKatana(ctx, x, y, angle) {
   ctx.strokeStyle = '#000000';
   ctx.strokeRect(-15, -2.5, 23, 5);
 
-  // Menuki (Tiny gold ornaments inside the black tsuka gaps)
+  // Menuki
   ctx.fillStyle = '#DAA520';
   for (let dx = -13.25; dx <= 6; dx += 3.5) {
     ctx.fillRect(dx, -0.5, 1, 1);
   }
 
-  // 3. Tsuka-ito (Red criss-cross wrap pattern)
-  ctx.strokeStyle = '#D11A2A'; // Red wrap
+  // 3. Tsuka-ito
+  ctx.strokeStyle = '#D11A2A';
   ctx.lineWidth = 1.2;
   ctx.lineCap = 'butt';
   for (let dx = -15; dx <= 6; dx += 3.5) {
@@ -1185,16 +1670,16 @@ function drawYutaKatana(ctx, x, y, angle) {
     ctx.stroke();
   }
 
-  // Fuchi (Dark Golden Hilt Collar)
+  // Fuchi
   ctx.fillStyle = '#8B6508';
   ctx.fillRect(8, -2.5, 2, 5);
   ctx.strokeRect(8, -2.5, 2, 5);
 
-  // Left Seppa (Spacer washer)
+  // Left Seppa
   ctx.fillStyle = '#DAA520';
   ctx.fillRect(10, -4, 0.8, 8);
 
-  // 4. Tsuba (Golden Rounded Rectangular Guard)
+  // 4. Tsuba
   ctx.fillStyle = '#C5A059';
   ctx.beginPath();
   ctx.moveTo(10.8, -7);
@@ -1211,41 +1696,40 @@ function drawYutaKatana(ctx, x, y, angle) {
   ctx.strokeStyle = '#000000';
   ctx.stroke();
 
-  // Tsuba Details (two hitsu-ana holes / engravings in the guard)
+  // Tsuba Details
   ctx.fillStyle = '#1A1A1A';
   ctx.fillRect(12.3, -4.5, 1, 1.2);
   ctx.fillRect(12.3, 3.3, 1, 1.2);
 
-  // Right Seppa (Spacer washer)
+  // Right Seppa
   ctx.fillStyle = '#DAA520';
   ctx.fillRect(14.8, -4, 0.8, 8);
 
-  // 5. Habaki (Golden Blade Collar)
+  // 5. Habaki
   ctx.fillStyle = '#FFD700';
   ctx.fillRect(15.6, -2, 3.4, 4);
   ctx.strokeRect(15.6, -2, 3.4, 4);
 
-  // 6. Blade — Curved katana shape with authentic sori (gentle upward arc)
+  // 6. Blade
   ctx.beginPath();
   ctx.moveTo(19, -1.8);
   ctx.quadraticCurveTo(49, -4.2, 81, -8.0);
   ctx.quadraticCurveTo(78, -3.5, 75, -2.2);
   ctx.quadraticCurveTo(49, 1.2, 19, 2.2);
   ctx.closePath();
-  ctx.fillStyle = '#E5E8E8'; // Polished silver steel
+  ctx.fillStyle = '#E5E8E8';
   ctx.fill();
 
-  // Second, overlay the dark spine (Shinogi-ji) ending at the Yokote line (tip division)
   ctx.beginPath();
   ctx.moveTo(19, -1.8);
   ctx.quadraticCurveTo(49, -4.0, 75, -6.8);
   ctx.lineTo(75, -4.2);
   ctx.quadraticCurveTo(49, -0.8, 19, 0.2);
   ctx.closePath();
-  ctx.fillStyle = '#2F3538'; // Dark spine steel
+  ctx.fillStyle = '#2F3538';
   ctx.fill();
 
-  // Hamon line (temper line) — complex wavy boundary line
+  // Hamon line
   ctx.beginPath();
   ctx.moveTo(19, 0.2);
   for (let x = 19; x <= 75; x += 3.5) {
@@ -1256,7 +1740,7 @@ function drawYutaKatana(ctx, x, y, angle) {
   ctx.lineWidth = 0.5;
   ctx.stroke();
 
-  // Metallic Mune Highlight — bright shine along the back spine of the blade
+  // Mune Highlight
   ctx.beginPath();
   ctx.moveTo(19, -1.8);
   ctx.quadraticCurveTo(49, -4.2, 81, -8.0);
@@ -1264,7 +1748,7 @@ function drawYutaKatana(ctx, x, y, angle) {
   ctx.lineWidth = 0.5;
   ctx.stroke();
 
-  // Third, draw a clean black stroke outline over the entire outer blade boundary
+  // Blade outline
   ctx.beginPath();
   ctx.moveTo(19, -1.8);
   ctx.quadraticCurveTo(49, -4.2, 81, -8.0);
@@ -1275,14 +1759,12 @@ function drawYutaKatana(ctx, x, y, angle) {
   ctx.lineWidth = 1.0;
   ctx.stroke();
 
-  // 7. Hands holding the hilt (drawn over the hilt wrapper and aura)
+  // 7. Hands holding the hilt
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly);
   if (!shouldHideHands) {
     const handR = 4.8;
     const skinCol = '#FABC95';
-    // Rear / Back Hand (Left Hand near pommel at x = -8.5 with signature silver engagement ring)
     drawYutaFist(ctx, -8.5, 0, handR, skinCol, null, true);
-    // Lead / Front Hand (Right Hand near tsuba guard at x = 2.5)
     drawYutaFist(ctx, 2.5, 0, handR, skinCol, null, false);
   }
 
@@ -1290,31 +1772,21 @@ function drawYutaKatana(ctx, x, y, angle) {
 }
 
 function drawWeaponPreview(ctx, type, color) {
-  // Draw the real weapon designs used by the fighter implementations.
-  // The preview caller already translates to the preview center.
   const now = Date.now();
-  // Important: weapon previews should NOT spin in the WEAPON menu.
-  // Keep them at a stable angle based on the current render time,
-  // but quantize to avoid visible rotation.
   const gunAngle = (state.gameState === 'weaponDetail' && state.weaponPreviewAngle !== undefined) ? state.weaponPreviewAngle : 0;
+  const r = 25;
 
-  // We map the type to the same underlying visual functions.
-  // The in-game visuals expect absolute positions, but our preview draws around (0,0)
-  // so we pass x=y=0.
-  const r = 25; // approximate fighter radius for consistent weapon sizing
-
-  // Offset the canvas to perfectly center the weapon (which is usually drawn at X = r)
-  let offsetX = -40; // Default offset for most right-handed weapons
-  if (type === 'black') offsetX = 0; // Symmetrical
+  let offsetX = -40;
+  if (type === 'black') offsetX = 0;
   else if (type === 'knight' || type === 'musashi') offsetX = -20; 
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
-  else if (type === 'cronos') offsetX = -55; // Huge blade
-  else if (type === 'ruby') offsetX = -75; // Massive scythe
-  else if (type === 'toji') offsetX = -40; // Inverted Spear
-  else if (type === 'yuta') offsetX = -40; // Katana
-  else if (type === 'megumi') offsetX = -45; // Shadow Blade
-  else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
-  else if (type === 'uryu' || type === 'rubbick' || type === 'trickster') offsetX = 0; // Centered
+  else if (type === 'cronos') offsetX = -55;
+  else if (type === 'ruby') offsetX = -75;
+  else if (type === 'toji') offsetX = -40;
+  else if (type === 'yuta') offsetX = -40;
+  else if (type === 'megumi') offsetX = -45;
+  else if (type === 'layla') offsetX = -30;
+  else if (type === 'uryu' || type === 'rubbick' || type === 'trickster') offsetX = 0;
   else if (type === 'ichigo') {
     offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -55;
   }
@@ -1354,7 +1826,7 @@ function drawWeaponPreview(ctx, type, color) {
         return;
 
       case 'ichigo': {
-        const isShikaiActive = (state.selectedIchigoSkin === 'shikai');
+        const isShikaiActive = (state.selectedIchigoSkin !== 'bankai');
         if (isShikaiActive) {
           drawShikaiZangetsu(ctx, 0, 0, gunAngle, r);
         } else {
@@ -1369,58 +1841,47 @@ function drawWeaponPreview(ctx, type, color) {
 
       case 'crimsonsniper':
       case 'normal':
-        // Sniper rifle (uses color tint internally via stroke/fill)
         drawRedSniperGun(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'aimbot':
-        // Aimbot laser gun
         drawBlueAimbotGun(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'grenadier':
-        // Alchemist grenade launcher
         drawGreenBottleGun(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'laser':
-        // Ivory railgun
         drawWhiteRailgun(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'knight':
-        // Gray knight shield + sword
         drawGrayShield(ctx, 0, 0, gunAngle, 0, 'none', r);
         drawGraySword(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'darkslategray':
-        // Assassin shuriken/melee dual visual — draw a shuriken stance
         drawDarkSlateGrayShuriken(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'orange':
-        // Flamethrower gun
         drawOrangeFlamethrowerGun(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'berserker':
-        // Dual axes
         drawBerserkerDualAxes(ctx, 0, 0, gunAngle, r, false, false, 0, 0, 24);
         return;
 
       case 'cronos':
-        // Cronos crescent blade (melee weapon visual)
         drawCronosCrescentBlade(ctx, 0, 0, gunAngle, r, false, 0, 0, 10, 1);
         return;
 
       case 'yuta':
-        // Yuta's Lore-Accurate Cursed Katana
         drawYutaKatana(ctx, 0, 0, gunAngle);
         return;
 
       case 'ruby':
-        // Ruby's huge scythe
         drawRubyScythe(ctx, { r, gunAngle, activePullActive: false, passiveSpinActive: false, scytheSwingActive: false });
         return;
 
@@ -1468,14 +1929,10 @@ function drawWeaponPreview(ctx, type, color) {
         const skinAccentColor = '#FFD700';
         ctx.save();
         ctx.translate(r, 0);
-
-        // Draw grenade launcher barrel
         ctx.fillStyle = skinColor;
         ctx.fillRect(0, -6, 20, 12);
         ctx.fillStyle = '#3B2A18';
         ctx.fillRect(15, -4, 8, 8);
-
-        // Draw grenade texture pattern
         ctx.fillStyle = skinAccentColor;
         for (let i = 0; i < 3; i++) {
           ctx.beginPath();
@@ -1486,7 +1943,6 @@ function drawWeaponPreview(ctx, type, color) {
         return;
       }
 
-
       case 'uryu':
         ctx.save();
         ctx.scale(0.72, 0.72);
@@ -1495,19 +1951,15 @@ function drawWeaponPreview(ctx, type, color) {
         return;
 
       case 'gunslinger':
-        // Dual revolvers
         drawGunSlingerDualRevolver(0, 0, gunAngle, gunAngle + 0.18, r, false, 0);
         return;
 
       case 'melee':
-        // Spike fighter uses spike weapon visual
         drawSpikeWeapon(ctx, 0, 0, gunAngle, r, false, now);
         return;
 
       case 'black': {
         ctx.save();
-
-        // Left orb
         ctx.save();
         ctx.translate(-r - 8, 0);
         const pulse = Math.sin(Date.now() / 200) * 0.2 + 1;
@@ -1523,15 +1975,8 @@ function drawWeaponPreview(ctx, type, color) {
         ctx.strokeStyle = '#9900ff';
         ctx.lineWidth = 1;
         ctx.stroke();
-
-        const orbitAngle = Date.now() / 150;
-        ctx.beginPath();
-        ctx.arc(Math.cos(orbitAngle) * 6, Math.sin(orbitAngle) * 6, 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#df80ff';
-        ctx.fill();
         ctx.restore();
 
-        // Right orb
         ctx.save();
         ctx.translate(r + 8, 0);
         const pulse2 = Math.sin(Date.now() / 200 + Math.PI) * 0.2 + 1;
@@ -1547,40 +1992,22 @@ function drawWeaponPreview(ctx, type, color) {
         ctx.strokeStyle = '#9900ff';
         ctx.lineWidth = 1;
         ctx.stroke();
-
-        const orbitAngle2 = Date.now() / 150 + Math.PI;
-        ctx.beginPath();
-        ctx.arc(Math.cos(orbitAngle2) * 6, Math.sin(orbitAngle2) * 6, 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#df80ff';
-        ctx.fill();
         ctx.restore();
 
         ctx.restore();
         return;
       }
 
-      case 'yuta':
-        // Yuta's Lore-Accurate Cursed Katana
-        drawYutaKatana(ctx, 0, 0, gunAngle);
-        return;
-
       case 'Engineer':
-        // Draws Engineer's shotgun active and wrench stowed on back
         drawEngineer(ctx, { x: 0, y: 0, gunAngle: gunAngle, r: r, lastWeaponUsed: 'shotgun' });
         return;
 
       case 'zeus':
-        // Draws the Master Bolt
         drawZeusWeapon(ctx, 0, 0, gunAngle, r, Date.now() / 200);
         return;
 
       case 'toji': {
-        // Detail screen uses manual pagination index; Grid cards auto-cycle every 2.5 seconds
-        const isDetail = (state.gameState === 'weaponDetail');
-        const activeIndex = isDetail 
-          ? (state.tojiWeaponIndex || 0) 
-          : (Math.floor(Date.now() / 2500) % 2);
-        
+        const activeIndex = (state.tojiWeaponIndex || 0);
         if (activeIndex === 0) {
           drawInvertedSpear(ctx, 0, 0, gunAngle, r);
         } else {
@@ -1590,37 +2017,28 @@ function drawWeaponPreview(ctx, type, color) {
       }
 
       case 'mahoraga':
-        // Mahoraga's Sword of Extermination Wrist Blade
         drawMahoragaSword(ctx, 0, 0, gunAngle, r);
         return;
 
       case 'mahito':
-        // Mahito's 5-Blade Scalpel Claws
         drawMahitoClawWeapon(ctx, 0, 0, gunAngle, r, false);
         return;
 
       case 'nanami':
-        // Nanami's Wrapped Blunt Cleaver
         drawNanamiCleaver(ctx, 0, 0, gunAngle, r, false);
         return;
 
       case 'megumi':
-        // Megumi's Shadow Blade (Second Cursed Sword) - Diagonal Upright Guard Stance
         drawMegumiShadowBlade(ctx, 0, 0, gunAngle - 1.12, r, false, 0);
         return;
 
       case 'ulquiorra':
-        // Ulquiorra's Zanpakuto: Murcielago
         drawUlquiorraMurcielago(ctx, 0, 0, gunAngle, r, false, 0);
         return;
 
       case 'john_wick':
       case 'johnwick': {
-        const isDetail = (state.gameState === 'weaponDetail');
-        const activeIndex = isDetail 
-          ? (state.johnWickWeaponIndex || 0) 
-          : 0;
-        
+        const activeIndex = (state.johnWickWeaponIndex || 0);
         if (activeIndex === 0) {
           drawJohnWickPistol(ctx, 0, 0, gunAngle, r);
         } else if (activeIndex === 1) {
@@ -1634,12 +2052,7 @@ function drawWeaponPreview(ctx, type, color) {
       }
 
       case 'cj': {
-        const isStudio = (state.gameState === 'weaponStudio');
-        const isDetail = (state.gameState === 'weaponDetail');
-        const activeIndex = isStudio 
-          ? (state.studioCjWeaponIndex || 0) 
-          : (isDetail ? (state.cjWeaponIndex || 0) : 0);
-
+        const activeIndex = (state.cjWeaponIndex || 0);
         if (activeIndex === 0) {
           drawCjBrassKnuckles(ctx, 0, 0, gunAngle, r, { standalone: true });
         } else if (activeIndex === 1) {
@@ -1655,7 +2068,6 @@ function drawWeaponPreview(ctx, type, color) {
       }
 
       default:
-        // Fallback: draw the default gray gun used by base fighters
         ctx.save();
         ctx.translate(r, 0);
         ctx.fillStyle = '#444';
@@ -1667,8 +2079,6 @@ function drawWeaponPreview(ctx, type, color) {
     }
   } catch (e) {
     console.warn('Weapon preview render failed:', type, e);
-
-    // Last-resort fallback
     ctx.save();
     ctx.translate(r, 0);
     ctx.fillStyle = '#444';
@@ -1687,12 +2097,17 @@ if (eventTarget && typeof eventTarget.addEventListener === 'function') {
     if (state.gameState === 'weaponDetail') {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.3 : 0.3;
-      state.weaponPreviewScale = Math.min(4.8, Math.max(1.0, (state.weaponPreviewScale || 2.4) + delta));
+      if (state.reviewTab === 'model') {
+        state.modelZoom = Math.min(4.5, Math.max(1.0, (state.modelZoom || 2.2) + delta));
+      } else if (state.reviewTab === 'weapon') {
+        state.weaponPreviewScale = Math.min(4.8, Math.max(1.0, (state.weaponPreviewScale || 2.4) + delta));
+      }
       return;
     }
     if (state.gameState === 'weapons') {
       e.preventDefault();
-      const totalPages = Math.ceil(FIGHTER_DEFS.length / 5);
+      const activeDefs = (state.weaponCategoryTab === 'tactical') ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
+      const totalPages = Math.ceil(activeDefs.length / 5);
       if (e.deltaY > 0 && state.weaponPage < totalPages - 1) {
         state.weaponPage++;
       } else if (e.deltaY < 0 && state.weaponPage > 0) {
@@ -1701,107 +2116,36 @@ if (eventTarget && typeof eventTarget.addEventListener === 'function') {
       return;
     }
   }, { passive: false });
-}
 
-// Interactive Claw Editor Drag & Resize Logic
-let isDraggingClaw = false;
-let activeDragFinger = -1;
-let activeDragType = null;
+  let isDraggingModel = false;
+  let lastDragX = 0;
 
-if (typeof window !== 'undefined') {
-  if (eventTarget && typeof eventTarget.addEventListener === 'function') {
-    eventTarget.addEventListener('mousedown', (e) => {
-      if (state.gameState !== 'weaponDetail' || !state.clawEditMode || !state.selectedWeapon || state.selectedWeapon.type !== 'mahito') return;
+  eventTarget.addEventListener('mousedown', (e) => {
+    if (state.gameState !== 'weaponDetail' || state.reviewTab !== 'model') return;
+    const rect = eventTarget.getBoundingClientRect();
+    const scaleX = state.canvas.width / rect.width;
+    const scaleY = state.canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
 
-      const rect = eventTarget.getBoundingClientRect();
-      const scaleX = state.canvas.width / rect.width;
-      const scaleY = state.canvas.height / rect.height;
-      const mx = (e.clientX - rect.left) * scaleX;
-      const my = (e.clientY - rect.top) * scaleY;
+    if (mx >= 16 && mx <= state.canvas.width - 16 && my >= 110 && my <= 470) {
+      isDraggingModel = true;
+      lastDragX = mx;
+      state.modelAutoSpin = false;
+    }
+  });
 
-      const currentScale = state.weaponPreviewScale || 2.4;
-      const heroY = state.canvas.height * 0.30;
-      const offsetX = -40;
-      const handX = 25;
-
-      // Convert mouse coordinates back to local space of preview display
-      const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
-      const localY = (my - heroY) / currentScale;
-
-      const blades = state.mahitoClawCustomBlades;
-      if (!blades) return;
-
-      for (let i = 0; i < blades.length; i++) {
-        const b = blades[i];
-        const kx = handX + b.knuckleX;
-        const ky = b.knuckleY;
-
-        const cosAngle = Math.cos(b.fanAngle);
-        const sinAngle = Math.sin(b.fanAngle);
-        const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
-        const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
-
-        // 1. Detect Knuckle Click (10px local radius hit box)
-        if (Math.hypot(localX - kx, localY - ky) < 10) {
-          isDraggingClaw = true;
-          activeDragFinger = i;
-          activeDragType = 'knuckle';
-          return;
-        }
-
-        // 2. Detect Tip Click (10px local radius hit box)
-        if (Math.hypot(localX - tx, localY - ty) < 10) {
-          isDraggingClaw = true;
-          activeDragFinger = i;
-          activeDragType = 'tip';
-          return;
-        }
-      }
-    });
-
-    eventTarget.addEventListener('mousemove', (e) => {
-      if (!isDraggingClaw || activeDragFinger < 0 || !state.mahitoClawCustomBlades) return;
-
-      const rect = eventTarget.getBoundingClientRect();
-      const scaleX = state.canvas.width / rect.width;
-      const scaleY = state.canvas.height / rect.height;
-      const mx = (e.clientX - rect.left) * scaleX;
-      const my = (e.clientY - rect.top) * scaleY;
-
-      const currentScale = state.weaponPreviewScale || 2.4;
-      const heroY = state.canvas.height * 0.30;
-      const offsetX = -40;
-      const handX = 25;
-
-      const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
-      const localY = (my - heroY) / currentScale;
-
-      const b = state.mahitoClawCustomBlades[activeDragFinger];
-      if (!b) return;
-
-      if (activeDragType === 'knuckle') {
-        b.knuckleX = localX - handX;
-        b.knuckleY = localY;
-      } else if (activeDragType === 'tip') {
-        const dx = localX - (handX + b.knuckleX);
-        const dy = localY - b.knuckleY;
-        const dist = Math.hypot(dx, dy);
-        
-        // Calculate length and rotation angle with correct trigonometric offset for b.tipY
-        if (dist > Math.abs(b.tipY)) {
-          b.length = Math.sqrt(dist * dist - b.tipY * b.tipY);
-          b.fanAngle = Math.atan2(dy, dx) - Math.atan2(b.tipY, b.length);
-        } else {
-          b.length = 15;
-          b.fanAngle = Math.atan2(dy, dx);
-        }
-      }
-    });
-  }
+  eventTarget.addEventListener('mousemove', (e) => {
+    if (!isDraggingModel || state.gameState !== 'weaponDetail' || state.reviewTab !== 'model') return;
+    const rect = eventTarget.getBoundingClientRect();
+    const scaleX = state.canvas.width / rect.width;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const dx = mx - lastDragX;
+    lastDragX = mx;
+    state.modelAngle = (state.modelAngle || 0) + dx * 0.02;
+  });
 
   window.addEventListener('mouseup', () => {
-    isDraggingClaw = false;
-    activeDragFinger = -1;
-    activeDragType = null;
+    isDraggingModel = false;
   });
 }
