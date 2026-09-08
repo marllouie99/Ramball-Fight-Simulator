@@ -610,7 +610,11 @@ export function modExecutePendingSwap() {
             }
           } else {
             if (typeof targetEnemy.triggerInfinityBlock === 'function') {
-              targetEnemy.triggerInfinityBlock(this.x, this.y, this);
+              const barrierR = CONFIG.gojo?.infinityRadius ?? (targetEnemy.r + 30);
+              const contactAngle = Math.atan2(this.y - targetEnemy.y, this.x - targetEnemy.x);
+              const bx = targetEnemy.x + Math.cos(contactAngle) * barrierR;
+              const by = targetEnemy.y + Math.sin(contactAngle) * barrierR;
+              targetEnemy.triggerInfinityBlock(bx, by, this);
             }
           }
 

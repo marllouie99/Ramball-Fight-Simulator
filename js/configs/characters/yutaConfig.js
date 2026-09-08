@@ -99,11 +99,11 @@ export const yutaConfig = {
   domainMaxUses: 2,                        // Max number of Domain Expansion activations per round (allows 2 uses)
   domainChargeMax: 90,                     // Channeling duration before domain opens (1.5 seconds)
   domainClashChargeSpeed: 2,               // 2x charge acceleration when clashing inside another domain (~45 frames / 0.75s deploy)
-  domainDuration: 500,                     // Frames domain stays active (~6.67 seconds at 60fps)
+  domainDuration: 800,                     // Frames domain stays active (~6.67 seconds at 60fps)
   domainRadius: 350,                       // Radius of the domain boundary in pixels
   domainCooldownReduction: 0.8,            // Technique cooldown reduction ratio inside domain (80% faster)
-  domainRctHealRate: 0.50,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
-  domainRikaRegenMultiplier: 1.10,          // 2x RCT regen multiplier inside domain while Rika is alive
+  domainRctHealRate: 0.90,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
+  domainRikaRegenMultiplier: 1.50,          // 2x RCT regen multiplier inside domain while Rika is alive
   domainRikaDamageMultiplier: 1.50,         // 1.5x damage dealt multiplier inside domain while Rika is alive
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
   domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)

@@ -49,9 +49,11 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 
   const strikeSound = getSkillEffectSound('toji', 'strike');
   if (strikeSound) {
-    audioSystem.playSFX(strikeSound.src, strikeSound.volume);
+    const sVol = strikeSound.volume ?? CONFIG.toji?.soundVolumes?.dashStrike ?? 1.0;
+    audioSystem.playSFX(strikeSound.src, sVol);
   } else {
-    audioSystem.playSFX('skill_dash5', 1.0);
+    const dashVol = CONFIG.toji?.soundVolumes?.dashStrike ?? 1.0;
+    audioSystem.playSFX('skill_dash5', dashVol);
   }
 
   const steps = 3;
@@ -163,7 +165,9 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   spawnImpactFlash(oldX, oldY, 25, '#A040FF');
   spawnImpactFlash(fighter.x, fighter.y, 30, '#A040FF'); 
   const tpSound = getSkillEffectSound('toji', 'firstseqteleport');
-  audioSystem.playSFX(tpSound?.src || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpSound?.volume || 1.0, tpSound?.speed || 1.0, 0, tpSound?.delay || 0);
+  const tpVol = tpSound?.volume ?? CONFIG.toji?.soundVolumes?.firstSeqTeleport ?? 3.0;
+  const tpDelay = tpSound?.delay ?? CONFIG.toji?.soundDelays?.firstSeqTeleport ?? -0.10;
+  audioSystem.playSFX(tpSound?.src || CONFIG.toji?.sounds?.firstSeqTeleport || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpVol, tpSound?.speed || 1.0, 0, tpDelay);
 }
 
 export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
@@ -175,8 +179,20 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
   if (tojiIsTargetDeadOrRemoved(fighter, opponent) || !fighter.isAmbushing) {
     if (typeof state !== 'undefined') {
-      if (state.fighters) state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
+      if (state.fighters) state.fighters.forEach(f => {
+        if (f) {
+          f.isTargetOfAmbush = false;
+          if (f.characterId === 'gojo' && f._wasInfinityActiveBeforeAmbush) {
+            f.infinityActive = true;
+            delete f._wasInfinityActiveBeforeAmbush;
+          }
+        }
+      });
       if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });
+    }
+    if (opponent && opponent.characterId === 'gojo' && opponent._wasInfinityActiveBeforeAmbush) {
+      opponent.infinityActive = true;
+      delete opponent._wasInfinityActiveBeforeAmbush;
     }
     fighter.isAmbushing = false;
     fighter.ambushTarget = null;
@@ -364,8 +380,11 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       spawnImpactFlash(frontX, frontY, 30, '#A040FF');
       spawnImpactFlash(clampedBack.x, clampedBack.y, 35, 'rgba(255, 30, 75, 0.8)');
       const strikeSound = getSkillEffectSound('toji', 'strike');
-      if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume);
-      audioSystem.playSFX('skill_backstab', 0.8);
+      if (strikeSound) {
+        const sVol = strikeSound.volume ?? CONFIG.toji?.soundVolumes?.dashStrike ?? 1.0;
+        audioSystem.playSFX(strikeSound.src, sVol);
+      }
+      audioSystem.playSFX('skill_backstab', CONFIG.toji?.soundVolumes?.spearBackstab ?? 0.85);
     }
   } else if (fighter.ambushPhase === 'BACK_CHARGE') {
     fighter.vx = 0;
@@ -403,8 +422,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       spawnSparks(fighter.x, fighter.y, 20, 'crimson');
 
       const backthrustSound = getSkillEffectSound('toji', 'backthrust');
-      audioSystem.playSFX(backthrustSound?.src || 'Assets/Sound Effects/Skills/toji-backthrust.mp3', backthrustSound?.volume || 1.2, backthrustSound?.speed || 1.0, 0, backthrustSound?.delay || 0);
-      audioSystem.playSFX('attack_swordswing', 0.8);
+      const btVol = backthrustSound?.volume ?? CONFIG.toji?.soundVolumes?.backThrust ?? 2.2;
+      const btDelay = backthrustSound?.delay ?? CONFIG.toji?.soundDelays?.backThrust ?? -0.20;
+      audioSystem.playSFX(backthrustSound?.src || CONFIG.toji?.sounds?.backThrust || 'Assets/Sound Effects/Skills/toji-backthrust.mp3', btVol, backthrustSound?.speed || 1.0, 0, btDelay);
+      audioSystem.playSFX('attack_swordswing', CONFIG.toji?.soundVolumes?.spearSwing ?? 0.85);
       audioSystem.playSFX('attack_fleshhit', 0.8);
 
       const hitTargets = fighter.performInvertedSpearStrike(opponent, ownerIndex, true);
@@ -550,12 +571,13 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     opponent.vy = 0;
 
     const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
-    const soundDelay = secondSeqSound?.delay || 0;
+    const soundDelay = secondSeqSound?.delay ?? CONFIG.toji?.soundDelays?.secondWeaponAttack ?? -0.30;
     if (!fighter._secondSeqAudioPlayed && soundDelay < 0) {
       const advanceFrames = Math.round(Math.abs(soundDelay < -10 ? soundDelay / 1000 : soundDelay) * 60);
       if (fighter.ambushTimer <= advanceFrames) {
         fighter._secondSeqAudioPlayed = true;
-        audioSystem.playSFX(secondSeqSound);
+        const s2Vol = secondSeqSound?.volume ?? CONFIG.toji?.soundVolumes?.secondWeaponAttack ?? 2.2;
+        audioSystem.playSFX(secondSeqSound?.src || CONFIG.toji?.sounds?.secondWeaponAttack || 'Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3', s2Vol);
       }
     }
 
@@ -573,9 +595,13 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.ambushTimer--;
     if (fighter.ambushTimer <= 0) {
       fighter.ambushPhase = 'KATANA_SLASH';
-      fighter.katanaSlashTimer = 22; 
-
-      fighter.performSplitSoulKatanaSlash(opponent, ownerIndex);
+      fighter.katanaSlashTimer = 26; 
+      fighter._katanaHitApplied = false;
+      fighter._slashOriginX = fighter.x;
+      fighter._slashOriginY = fighter.y;
+      fighter._slashStartAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+      const normAngle = Math.atan2(Math.sin(fighter._slashStartAngle), Math.cos(fighter._slashStartAngle));
+      fighter._slashStartFlipSign = Math.abs(normAngle) > Math.PI / 2 ? -1 : 1;
     }
   } else if (fighter.ambushPhase === 'KATANA_SLASH') {
     fighter.vx = 0;
@@ -585,9 +611,52 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.angle = aimAngle;
     fighter.aim(opponent);
 
-    fighter.katanaSlashTimer--;
+    // Keep target locked in position strictly before the blade connects (frames 1-5) so the chop lands dead center!
+    if (!fighter._katanaHitApplied && opponent && opponent.isTargetOfAmbush) {
+      opponent.vx = 0;
+      opponent.vy = 0;
+      opponent.knockbackVx = 0;
+      opponent.knockbackVy = 0;
+    }
+
+    // Trigger physical Katana cleave impact early on blade contact (frame 5-6 / katanaSlashTimer <= 21 out of 26)
+    // This perfectly aligns with when the downward chop sweeps through the opponent!
+    if (!fighter._katanaHitApplied && fighter.katanaSlashTimer <= 21) {
+      fighter._katanaHitApplied = true;
+      fighter.performSplitSoulKatanaSlash(opponent, ownerIndex);
+      // Immediately apply first step of displacement on hit frame with arena boundary handling
+      if (opponent && opponent.knockbackVx !== undefined) {
+        opponent.x += opponent.knockbackVx;
+        opponent.y += opponent.knockbackVy;
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
+        if (arena) {
+          const bounceMult = 0.65;
+          const minX = arena.x + (opponent.r || 20);
+          const maxX = arena.x + arena.width - (opponent.r || 20);
+          const minY = arena.y + (opponent.r || 20);
+          const maxY = arena.y + arena.height - (opponent.r || 20);
+          if (opponent.x < minX) { opponent.x = minX; opponent.knockbackVx = Math.abs(opponent.knockbackVx) * bounceMult; }
+          if (opponent.x > maxX) { opponent.x = maxX; opponent.knockbackVx = -Math.abs(opponent.knockbackVx) * bounceMult; }
+          if (opponent.y < minY) { opponent.y = minY; opponent.knockbackVy = Math.abs(opponent.knockbackVy) * bounceMult; }
+          if (opponent.y > maxY) { opponent.y = maxY; opponent.knockbackVy = -Math.abs(opponent.knockbackVy) * bounceMult; }
+        }
+        const decay = opponent.knockbackDecay || 0.92;
+        opponent.knockbackVx *= decay;
+        opponent.knockbackVy *= decay;
+      }
+    }
+
     if (fighter.katanaSlashTimer <= 0) {
       fighter.katanaSlashTimer = 0;
+      fighter.katanaSlashFadeTimer = 12;
+      if (!fighter._katanaHitApplied) {
+        fighter._katanaHitApplied = true;
+        fighter.performSplitSoulKatanaSlash(opponent, ownerIndex);
+        if (opponent && opponent.knockbackVx !== undefined) {
+          opponent.x += opponent.knockbackVx;
+          opponent.y += opponent.knockbackVy;
+        }
+      }
 
       fighter.ambushPhase = 'PHANTOM_FLURRY';
       fighter.isAmbushThrust = false;
@@ -609,6 +678,8 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(totalFlurryFrames);
       opponent.vx = 0;
       opponent.vy = 0;
+      opponent.knockbackVx = 0;
+      opponent.knockbackVy = 0;
     }
   } else if (fighter.ambushPhase === 'PHANTOM_FLURRY') {
     fighter.vx = 0;
@@ -660,7 +731,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
         audioSystem.playSFX('attack_swordswing', 1.1);
         const strikeSound = getSkillEffectSound('toji', 'strike');
-        if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume * 0.7);
+        if (strikeSound) {
+          const sVol = (strikeSound.volume ?? CONFIG.toji?.soundVolumes?.dashStrike ?? 1.0) * 0.7;
+          audioSystem.playSFX(strikeSound.src, sVol);
+        }
       } else {
         // Apply the big final knockback blast before releasing the target
         if (opponent && opponent.hp > 0 && !opponent.isTurret && !opponent.cannotBeKnockbacked) {
@@ -721,8 +795,20 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         fighter.slashSwingTimer = 0;
         if (fighter.swordTrail) fighter.swordTrail.length = 0;
         if (typeof state !== 'undefined') {
-          if (state.fighters) state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
+          if (state.fighters) state.fighters.forEach(f => {
+            if (f) {
+              f.isTargetOfAmbush = false;
+              if (f.characterId === 'gojo' && f._wasInfinityActiveBeforeAmbush) {
+                f.infinityActive = true;
+                delete f._wasInfinityActiveBeforeAmbush;
+              }
+            }
+          });
           if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });
+        }
+        if (opponent && opponent.characterId === 'gojo' && opponent._wasInfinityActiveBeforeAmbush) {
+          opponent.infinityActive = true;
+          delete opponent._wasInfinityActiveBeforeAmbush;
         }
       }
     }
@@ -741,7 +827,14 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         const strikeDmg = CONFIG.toji?.ambushPhantomFlurryDamage || 15;
 
         for (const target of flurryTargets) {
-          applyDamageToTarget(target, strikeDmg, fighter, { isMelee: true, isTrueDamage: true, isAdaptableSkillShot: true, skillShotId: 'tojiAmbush' });
+          applyDamageToTarget(target, strikeDmg, fighter, {
+            isMelee: true,
+            isTrueDamage: true,
+            bypassShield: true,
+            isAmbushFlurry: true,
+            isAdaptableSkillShot: true,
+            skillShotId: 'tojiAmbush'
+          });
           target.hitFlashTimer = 8; 
           if (typeof target.applyHitStun === 'function') target.applyHitStun(flurryFrameRate + 2);
 
@@ -766,7 +859,6 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
             target.vx = kbX;
             target.vy = kbY;
             target.knockbackDecay = isFinalStrike ? 0.90 : 0.78;
-            if (typeof target.applyKnockback === 'function') target.applyKnockback(kbX, kbY);
           }
         }
 
@@ -780,7 +872,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         if (isFinalStrike) {
            spawnCrimsonLightningImpact(contactX, contactY, 130);
            const finSound = getSkillEffectSound('toji', 'strike');
-           if (finSound) audioSystem.playSFX(finSound.src, finSound.volume || 1.0);
+           if (finSound) {
+             const fVol = finSound.volume ?? CONFIG.toji?.soundVolumes?.dashStrike ?? 1.0;
+             audioSystem.playSFX(finSound.src, fVol);
+           }
            audioSystem.playSFX('attack_swordswing', 0.9);
         }
       }

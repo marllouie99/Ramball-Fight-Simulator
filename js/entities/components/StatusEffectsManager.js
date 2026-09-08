@@ -1,6 +1,7 @@
 import { CONFIG } from '../../core/config.js';
 import { fastCleanArray } from '../../graphics/particles/visualTrailSystem.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
+import { isInsideRubbickStolenVoid } from '../fighters/rubbick/rubbickThemes.js';
 
 export class StatusEffectsManager {
   // Static registry for global debuff / status effect processors
@@ -16,6 +17,27 @@ export class StatusEffectsManager {
   constructor(fighter) {
     this.fighter = fighter;
     this._lastStatusTickFrame = -1;
+  }
+
+  get paralyzeTimer() {
+    return this.fighter.paralyzeTimer || 0;
+  }
+  set paralyzeTimer(val) {
+    this.fighter.paralyzeTimer = val;
+  }
+
+  get isParalyzed() {
+    return Boolean(this.fighter.isParalyzed || (this.fighter.paralyzeTimer && this.fighter.paralyzeTimer > 0));
+  }
+  set isParalyzed(val) {
+    this.fighter.isParalyzed = Boolean(val);
+  }
+
+  get timeStopTimer() {
+    return this.fighter.timeStopTimer || 0;
+  }
+  set timeStopTimer(val) {
+    this.fighter.timeStopTimer = val;
   }
 
   isSilenced() {
@@ -321,8 +343,8 @@ export class StatusEffectsManager {
         delete fighter._timeStopOriginalDuration;
         delete fighter._timeStopStartTime;
 
-        // Restore baseline movement velocity if fighter is stationary and not channeling/building
-        if (fighter.vx === 0 && fighter.vy === 0 && (fighter.speed || 0) > 0 && !fighter.isBuildingTurret && !fighter.isChannelingDomain && !fighter.isCountering) {
+        // Restore baseline movement velocity if fighter is stationary and not channeling/building/in stasis
+        if (fighter.vx === 0 && fighter.vy === 0 && (fighter.speed || 0) > 0 && !fighter.isBuildingTurret && !fighter.isChannelingDomain && !fighter.isCountering && !isInsideRubbickStolenVoid(fighter) && (fighter.timeStopTimer || 0) <= 0) {
           const arenaCenterX = (typeof CONFIG !== 'undefined' && CONFIG.arena) ? (CONFIG.arena.x + CONFIG.arena.width / 2) : fighter.x;
           const arenaCenterY = (typeof CONFIG !== 'undefined' && CONFIG.arena) ? (CONFIG.arena.y + CONFIG.arena.height / 2) : fighter.y;
           const recoverAngle = Math.atan2(arenaCenterY - fighter.y, arenaCenterX - fighter.x) + (Math.random() - 0.5) * 0.4;

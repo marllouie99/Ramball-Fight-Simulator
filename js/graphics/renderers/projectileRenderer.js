@@ -45,7 +45,10 @@ export function drawProjectiles() {
   const minY = -cullPadding;
   const maxY = canvasH + cullPadding;
 
-  const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
+  const isGojoDomainActive = state.fighters && state.fighters.some(f => f && f.hp > 0 && (
+    ((f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive) ||
+    ((f.type === 'rubbick' || f.characterId === 'rubbick' || f.type === 'trickster' || f.characterId === 'trickster' || f._def?.id === 'rubbick' || f._def?.id === 'trickster') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain') || (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0)))
+  ));
 
   projectiles.forEach((p) => {
     // Skip off-screen projectiles for performance
@@ -53,11 +56,19 @@ export function drawProjectiles() {
       return;
     }
 
-    // Hide enemy projectiles inside Gojo's domain (except Sukuna's domain/shrine slashes)
+    // Hide enemy projectiles inside Gojo's domain (except Sukuna slashes, Rubbick Arcane Bolts, frozen barrier projectiles, or domain-empowered attacks)
     const isSukunaSlash = p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || p.isSukunaSlash;
-    const ownerFighter = (typeof p.owner === 'number' && state.fighters) ? state.fighters[p.owner] : p.owner;
+    const ownerFighter = p.ownerFighter || ((typeof p.owner === 'number' && state.fighters) ? state.fighters[p.owner] : p.owner);
     const isOwnerGojo = ownerFighter && (ownerFighter.characterId === 'gojo' || ownerFighter.type === 'gojo');
-    if (isGojoDomainActive && ownerFighter && !isOwnerGojo && !isSukunaSlash) {
+    const isOwnerRubbick = Boolean(
+      p.isRubbick || p.isTrickster || p.isArcaneBolt || (ownerFighter && (
+        ownerFighter.characterId === 'rubbick' || ownerFighter.type === 'rubbick' ||
+        ownerFighter.characterId === 'trickster' || ownerFighter.type === 'trickster' ||
+        (ownerFighter._def && (ownerFighter._def.id === 'rubbick' || ownerFighter._def.id === 'trickster'))
+      ))
+    );
+    const isImmuneFromDomainCull = p.isFrozenByInfinity || p.isArcaneBolt || p.isDomainEmpowered || isSukunaSlash || isOwnerGojo || isOwnerRubbick || (ownerFighter && (ownerFighter.stolenDomainActive || ownerFighter.domainActive || ownerFighter.domainImmunity));
+    if (isGojoDomainActive && ownerFighter && !isImmuneFromDomainCull) {
       return;
     }
 
@@ -1113,8 +1124,10 @@ export function drawBlackHoleVisual({
 
 export function drawGojoPurpleOrb(ctx, p) {
   ctx.save();
-  const isGreen = Boolean(p.isRubbick || p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
-  const colorType = isGreen ? 'green' : (p.isGojoPurple ? 'purple' : 'blue');
+  const isBlue = Boolean(p.visual === 'gojoBlue' || p.isGojoBlue);
+  // Blue projectiles must NEVER render green — green is strictly reserved for Rubbick's stolen Hollow Purple!
+  const isGreen = !isBlue && Boolean(p.isRubbick || p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
+  const colorType = isBlue ? 'blue' : (isGreen ? 'green' : (p.isGojoPurple ? 'purple' : 'blue'));
   const visualTime = p.visualTime || Date.now();
   const is200 = !!p.is200Percent;
   

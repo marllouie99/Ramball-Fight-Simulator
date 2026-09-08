@@ -79,14 +79,15 @@ export function clampEntityToArenaBounds(ent, arena, radius = null) {
   return clamped;
 }
 
-export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
+export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects = true) {
   // If Gojo is paralyzed in Telekinesis, Limitless Infinity cannot trigger reactive blocks
   if (fighter.isCaughtInTelekinesis) {
     return false;
   }
 
-  // If Gojo is trapped inside Rubbick's stolen Unlimited Void, Limitless Infinity is disabled
-  if (isInsideRubbickStolenVoid(fighter)) {
+  // If Gojo is trapped inside Rubbick's stolen Unlimited Void or Purple is in flight, Limitless Infinity is disabled
+  const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0);
+  if (isInsideRubbickStolenVoid(fighter) || isPurpleInFlight) {
     fighter.infinityActive = false;
     fighter.infinityFadeOpacity = 0;
     fighter.infinityBlockTimer = 0;
@@ -103,7 +104,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
     const isAdaptedMahoraga = (attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga') && 
                               (attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8);
-    if (isAdaptedMahoraga || isSaitamaCountering) {
+    const isTojiAssaultBypassing = (attacker.characterId === 'toji' || attacker.type === 'toji') &&
+      (attacker.isAmbushing || attacker.ultimateActive);
+    if (isAdaptedMahoraga || isSaitamaCountering || isTojiAssaultBypassing) {
       attacker.infinityFreezeTimer = 0;
       attacker.isFrozenByInfinity = false;
       attacker.adaptationPauseTimer = 0;
@@ -112,31 +115,67 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   }
 
   const isDomainChanneling = fighter.isDomainPreSlide || fighter.isChannelingDomainExpansion;
-  const isBreatherState = (fighter.purpleRecoveryTimer || 0) > 0 || (fighter.purpleRetreatTimer || 0) > 0;
-  if (isBreatherState || isDomainChanneling) {
+  const isBreatherState = (fighter.purpleRetreatTimer || 0) > 0;
+  if (!isPurpleInFlight && (isBreatherState || isDomainChanneling)) {
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;
     fighter.isMeleeMode = false;
   }
 
   const isInsideEnemyDomain = !fighter.domainActive && state.fighters && state.fighters.some(f => f && f !== fighter && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
-  if (isInsideEnemyDomain && !fighter.isMeleeMode) {
+  if (isInsideEnemyDomain && !fighter.isMeleeMode && !isPurpleInFlight) {
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;
   }
-  if (fighter.isChannelingPurple || fighter.domainActive || (fighter.isMeleeMode && !isBreatherState && !isDomainChanneling)) return false;
+  if (fighter.isChannelingPurple || isPurpleInFlight || fighter.domainActive || (fighter.isMeleeMode && !isBreatherState && !isDomainChanneling)) return false;
+
+  const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
+  const gojoY = fighter.y - (fighter.z || 0);
+
+  // Compute incoming attack vector strictly relative to Gojo
+  let contactAngle;
+  if (hitX !== undefined && hitY !== undefined) {
+    const dx = hitX - fighter.x;
+    const dy = hitY - gojoY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0.1) {
+      contactAngle = Math.atan2(dy, dx);
+    }
+  }
+
+  if (contactAngle === undefined && attacker && attacker !== fighter) {
+    const attY = attacker.y - (attacker.z || 0);
+    const dx = attacker.x - fighter.x;
+    const dy = attY - gojoY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0.1) {
+      contactAngle = Math.atan2(dy, dx);
+    } else if (attacker.vx !== 0 || attacker.vy !== 0) {
+      contactAngle = Math.atan2(-attacker.vy, -attacker.vx);
+    }
+  }
+
+  if (contactAngle === undefined) {
+    // Face strictly in front of Gojo (Rule 3/19: NEVER behind Gojo)
+    contactAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle : 0;
+  }
+
+  // Clamped contact point exactly on the outer surface of Gojo's Limitless Infinity barrier
+  const impactX = fighter.x + Math.cos(contactAngle) * barrierRadius;
+  const impactY = gojoY + Math.sin(contactAngle) * barrierRadius;
 
   fighter.infinityBlockTimer = 25;
   fighter.infinityBlockMaxTimer = 25;
-  fighter.infinityBlockX = hitX !== undefined ? hitX : fighter.x;
-  fighter.infinityBlockY = hitY !== undefined ? hitY : fighter.y;
+  fighter.infinityBlockX = impactX;
+  fighter.infinityBlockY = impactY;
+  fighter.infinityBlockAngle = contactAngle;
 
   // Frame rate check & shockwave cooldown guard: Prevent multiple barrier rebound rings from spamming during rapid multi-hits
   const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : ((typeof state !== 'undefined' && state.matchTimer !== undefined) ? state.matchTimer : Date.now());
   const shockwaveCooldown = CONFIG.gojo?.infinityShockwaveCooldownFrames ?? 6;
 
-  // Skip visual/audio spam inside Gojo's own domain (Unlimited Void uses paralysis, not barrier bounces)
-  if (!fighter.domainActive) {
+  // Skip visual/audio spam inside Gojo's own domain (Unlimited Void uses paralysis, not barrier bounces) or during continuous proximity holding
+  if (!fighter.domainActive && spawnEffects) {
     if (!fighter._lastInfinityRingFrame || (currentFrame - fighter._lastInfinityRingFrame) >= shockwaveCooldown) {
       fighter._lastInfinityRingFrame = currentFrame;
       triggerGlobalScreenShake(3, 6);
@@ -149,11 +188,15 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
         audioSystem.playSFX(infSnd, infVol);
       }
      
-      // Spawn visual barrier rebound ring effect at the impact position
+      // Spawn visual barrier rebound ring effect at the impact position on the barrier perimeter
       if (typeof spawnMeleeClashShockwave === 'function') {
-        const impactX = hitX !== undefined ? hitX : fighter.x;
-        const impactY = hitY !== undefined ? hitY : fighter.y;
         spawnMeleeClashShockwave(impactX, impactY, 85, 'gojo_infinity');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(impactX, impactY, 8, 'cyan', '#00E5FF');
+      }
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(impactX, impactY, 25, '#00E5FF');
       }
     }
   }
@@ -169,7 +212,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       // Skill & Domain Channeling has supreme hyper-armor — bypasses Infinity block & interrupts completely!
       return false;
     }
-    const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
     const attRadius = attacker.hitRadius || attacker.r || 25;
     const distToGojo = Math.hypot(attacker.x - fighter.x, (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0)));
     const isPhysicalContact = distToGojo <= (barrierRadius + attRadius + 15);
@@ -230,7 +272,14 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     let dist = Math.hypot(dx, dy);
 
     if (dist < 0.1) {
-      const fallbackAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle + Math.PI : Math.random() * Math.PI * 2;
+      // Direct overlap: Push attacker outward in front of Gojo or opposite to attacker velocity, NEVER behind Gojo
+      let fallbackAngle;
+      if (attacker.vx !== 0 || attacker.vy !== 0) {
+        // Attacker moved into Gojo; bounce them back where they came from
+        fallbackAngle = Math.atan2(-attacker.vy, -attacker.vx);
+      } else {
+        fallbackAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle : 0;
+      }
       dx = Math.cos(fallbackAngle);
       dy = Math.sin(fallbackAngle);
       dist = 1.0;

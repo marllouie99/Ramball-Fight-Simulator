@@ -1191,11 +1191,15 @@ export class NanamiFighter extends Fighter {
         // Gojo Limitless Infinity Guard
         const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && !ent.isMeleeMode && ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
         if (isGojoInfinity) {
+          const barrierR = CONFIG.gojo?.infinityRadius ?? (ent.r + 30);
+          const contactAngle = Math.atan2(this.y - ent.y, this.x - ent.x);
+          const bx = ent.x + Math.cos(contactAngle) * barrierR;
+          const by = ent.y + Math.sin(contactAngle) * barrierR;
           if (typeof ent.triggerInfinityBlock === 'function') {
-            ent.triggerInfinityBlock(this.x, this.y, this);
+            ent.triggerInfinityBlock(bx, by, this);
           }
           this.interruptAttacks();
-          spawnSparks(ent.x, ent.y, 10, '#00E5FF', '#FFFFFF');
+          spawnSparks(bx, by, 10, '#00E5FF', '#FFFFFF');
           if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(2.5, 8);
           return;
         }

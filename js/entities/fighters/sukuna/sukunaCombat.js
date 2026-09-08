@@ -242,13 +242,15 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
       isCrit = res.isCrit;
     }
     // Pass isSkill: true (matching Gojo) to bypass basic attack flinch lock and allow dynamic target tracking
-    target.takeDamage(finalDmg, fighter, { isMelee: true, isSukunaSlash: true, isCrit, isSkill: true });
+    const didDamage = target.takeDamage(finalDmg, fighter, { isMelee: true, isCrit, isSkill: true });
     if (target && typeof target.aim === 'function' && !target.isTargetOfAmbush) {
       target.aim(fighter);
     }
 
-    // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
-    spawnAnimePunchImpactFrame(target.x, target.y, 55, punchAngle, 'crimson');
+    if (didDamage !== false) {
+      // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
+      spawnAnimePunchImpactFrame(target.x, target.y, 55, punchAngle, 'crimson');
+    }
   }
 
   triggerGlobalScreenShake(4, 5);

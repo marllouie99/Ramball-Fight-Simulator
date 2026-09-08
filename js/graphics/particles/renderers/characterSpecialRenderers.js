@@ -663,3 +663,240 @@ export function drawBoogieWoogieSwapBeam(ctx, effect) {
 
   ctx.restore();
 }
+
+/**
+ * Renders an expanding, discrete 2D pixel-art arcane magic circle (Runic Cast Sigil)
+ * whenever Rubbick fires a basic attack (Arcane Bolt).
+ * Adheres strictly to Rule #11 (no shadowBlur) and discrete stepped pixel art.
+ */
+export function drawRubbickCastSigil(ctx, effect) {
+  if (!effect) return;
+  effect.size += (effect.targetSize - effect.size) * 0.20;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const cx = snap(effect.x);
+  const cy = snap(effect.y);
+  const alpha = Math.max(0, Math.min(1.0, effect.life));
+  const progress = 1.0 - alpha;
+  const r = snap(effect.size);
+  if (r < P) {
+    ctx.restore();
+    return;
+  }
+
+  const baseCol = effect.color || '#00FF64';
+  const ang = effect.angle !== undefined ? effect.angle : 0;
+  effect.rotation = (effect.rotation || 0) + 0.08;
+
+  ctx.translate(cx, cy);
+  ctx.rotate(ang);
+
+  // Optical aperture perspective: tilt circle slightly along attack vector
+  ctx.scale(0.55 + 0.45 * (1 - progress * 0.5), 1.0);
+
+  // 1. Dark ink backing ring for high-contrast visibility
+  ctx.strokeStyle = `rgba(6, 18, 10, ${(alpha * 0.88).toFixed(3)})`;
+  ctx.lineWidth = P * 2.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 2. Main Outer Emerald Runic Ring with Stepped Inscriptions
+  ctx.strokeStyle = baseCol;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = P;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 3. Concentric Inner Mint Ring & Interlocking Sacred 8-Pointed Star
+  const innerR = snap(r * 0.60);
+  if (innerR > P * 2) {
+    ctx.strokeStyle = '#70FFAB';
+    ctx.lineWidth = P;
+    ctx.beginPath();
+    ctx.arc(0, 0, innerR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Sacred 8-pointed star (two interleaved rotated squares)
+    const starRot = effect.rotation * 0.5;
+    for (let s = 0; s < 2; s++) {
+      const offAng = starRot + (s * Math.PI / 4);
+      ctx.beginPath();
+      for (let pt = 0; pt <= 4; pt++) {
+        const pAng = offAng + (pt * Math.PI / 2);
+        const px = snap(Math.cos(pAng) * innerR);
+        const py = snap(Math.sin(pAng) * innerR);
+        if (pt === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.strokeStyle = (s === 0) ? '#E6FFF0' : 'rgba(0, 255, 100, 0.7)';
+      ctx.lineWidth = P * 0.8;
+      ctx.stroke();
+    }
+  }
+
+  // 4. Rotating Cardinal Diamond Runes with Specular Cores
+  const rot = effect.rotation;
+  for (let i = 0; i < 4; i++) {
+    const nodeAng = rot + (i * Math.PI * 0.5);
+    const nx = snap(Math.cos(nodeAng) * r);
+    const ny = snap(Math.sin(nodeAng) * r);
+
+    // Dark outline
+    ctx.fillStyle = '#06120A';
+    ctx.fillRect(nx - P * 2, ny - P * 2, P * 4, P * 4);
+    // Emerald diamond
+    ctx.fillStyle = baseCol;
+    ctx.fillRect(nx - P * 1.5, ny - P * 0.5, P * 3, P);
+    ctx.fillRect(nx - P * 0.5, ny - P * 1.5, P, P * 3);
+    // Specular white center
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(nx - P * 0.5, ny - P * 0.5, P, P);
+  }
+
+  // 5. Cardinal & Diagonal Aperture Ray Spikes
+  for (let i = 0; i < 8; i++) {
+    const rayAng = rot * 0.5 + (i * Math.PI * 0.25);
+    const isCardinal = (i % 2 === 0);
+    const rayStart = isCardinal ? r - P * 2 : innerR;
+    const rayEnd = isCardinal ? r + P * 4 : r - P;
+    const rx1 = snap(Math.cos(rayAng) * rayStart);
+    const ry1 = snap(Math.sin(rayAng) * rayStart);
+    const rx2 = snap(Math.cos(rayAng) * rayEnd);
+    const ry2 = snap(Math.sin(rayAng) * rayEnd);
+
+    ctx.strokeStyle = isCardinal ? '#FFFFFF' : '#70FFAB';
+    ctx.lineWidth = P;
+    ctx.beginPath();
+    ctx.moveTo(rx1, ry1);
+    ctx.lineTo(rx2, ry2);
+    ctx.stroke();
+  }
+
+  // 6. Central Anamorphic Emerald Optical Flare on burst frames
+  if (progress < 0.60) {
+    const flareProg = 1.0 - (progress / 0.60);
+    const streakLen = snap(70 * Math.sin(flareProg * Math.PI * 0.5));
+
+    // Intense cross flare along the aperture plane
+    ctx.fillStyle = `rgba(255, 255, 255, ${(flareProg * alpha).toFixed(3)})`;
+    ctx.fillRect(-P * 0.5, -streakLen, P, streakLen * 2);
+
+    // Mint wings
+    ctx.fillStyle = `rgba(112, 255, 171, ${(flareProg * alpha * 0.8).toFixed(3)})`;
+    ctx.fillRect(-P, -snap(streakLen * 0.7), P * 2, snap(streakLen * 1.4));
+
+    // Emerald halo
+    ctx.fillStyle = `rgba(0, 255, 100, ${(flareProg * alpha * 0.5).toFixed(3)})`;
+    ctx.fillRect(-P * 2, -snap(streakLen * 0.4), P * 4, snap(streakLen * 0.8));
+  }
+
+  // 7. Central Arcane Flash Core on initial burst frames
+  if (progress < 0.40) {
+    const coreProg = 1.0 - (progress / 0.40);
+    const coreR = snap(r * 0.40 * coreProg);
+    if (coreR > P) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${(coreProg * alpha).toFixed(3)})`;
+      ctx.fillRect(-coreR, -P, coreR * 2, P * 2);
+      ctx.fillRect(-P, -coreR, P * 2, coreR * 2);
+      ctx.fillStyle = baseCol;
+      ctx.fillRect(-coreR * 0.6, -coreR * 0.6, coreR * 1.2, coreR * 1.2);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders an authentic 3D-perspective-squashed ground summoning matrix
+ * directly beneath Rubbick on the arena floor when executing a basic attack.
+ */
+export function drawRubbickGroundSigil(ctx, effect) {
+  if (!effect) return;
+  effect.size += (effect.targetSize - effect.size) * 0.16;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const cx = snap(effect.x);
+  const cy = snap(effect.y);
+  const alpha = Math.max(0, Math.min(1.0, effect.life));
+  const r = snap(effect.size);
+  if (r < P * 2) {
+    ctx.restore();
+    return;
+  }
+
+  const baseCol = effect.color || '#00FF64';
+  effect.rotation = (effect.rotation || 0) + 0.04;
+
+  ctx.translate(cx, cy);
+  // Perspective squashing for 3D floor plane
+  ctx.scale(1.0, 0.45);
+
+  // 1. Dark ink backing
+  ctx.strokeStyle = `rgba(5, 18, 10, ${(alpha * 0.85).toFixed(3)})`;
+  ctx.lineWidth = P * 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 2. Main Outer Emerald Floor Ring
+  ctx.strokeStyle = baseCol;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = P;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 3. Inner Concentric Mint Ring
+  const innerR = snap(r * 0.60);
+  ctx.strokeStyle = '#70FFAB';
+  ctx.beginPath();
+  ctx.arc(0, 0, innerR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 4. Rotating 6-node Arcane Glyphs along outer ring
+  const rot = effect.rotation;
+  for (let i = 0; i < 6; i++) {
+    const nodeAng = rot + (i * Math.PI / 3);
+    const nx = snap(Math.cos(nodeAng) * r);
+    const ny = snap(Math.sin(nodeAng) * r);
+
+    ctx.fillStyle = '#06120A';
+    ctx.fillRect(nx - P, ny - P, P * 2, P * 2);
+    ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : baseCol;
+    ctx.fillRect(nx - P * 0.5, ny - P * 0.5, P, P);
+  }
+
+  // 5. Connecting Hexagram / Star Spokes
+  for (let i = 0; i < 6; i++) {
+    const spokeAng = rot + (i * Math.PI / 3);
+    const sx1 = snap(Math.cos(spokeAng) * innerR);
+    const sy1 = snap(Math.sin(spokeAng) * innerR);
+    const sx2 = snap(Math.cos(spokeAng) * r);
+    const sy2 = snap(Math.sin(spokeAng) * r);
+
+    ctx.strokeStyle = `rgba(112, 255, 171, ${(alpha * 0.75).toFixed(3)})`;
+    ctx.lineWidth = P;
+    ctx.beginPath();
+    ctx.moveTo(sx1, sy1);
+    ctx.lineTo(sx2, sy2);
+    ctx.stroke();
+  }
+
+  // 6. Central ground pulse
+  const pulseR = snap(r * 0.35 * alpha);
+  ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.60).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, pulseR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+

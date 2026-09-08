@@ -756,13 +756,17 @@ export class JohnWickFighter extends Fighter {
             (target.infinityCooldown <= 0 || target.domainActive || !target.isMeleeMode);
 
           if (isTargetGojoInfinity) {
+            const barrierR = CONFIG.gojo?.infinityRadius ?? (target.r + 30);
+            const contactAngle = Math.atan2(this.y - target.y, this.x - target.x);
+            const bx = target.x + Math.cos(contactAngle) * barrierR;
+            const by = target.y + Math.sin(contactAngle) * barrierR;
             if (typeof target.triggerInfinityBlock === 'function') {
-              target.triggerInfinityBlock(this.x, this.y, this);
+              target.triggerInfinityBlock(bx, by, this);
             }
             this.vx = -Math.cos(facing) * 12;
             this.vy = -Math.sin(facing) * 12;
-            spawnSparks(target.x, target.y, 12, 'cyan', '#00E5FF');
-            spawnImpactFlash(target.x, target.y, 28, 'layla');
+            spawnSparks(bx, by, 12, 'cyan', '#00E5FF');
+            spawnImpactFlash(bx, by, 28, 'layla');
             const deflectSfx = cfg.sounds?.bulletDeflect || 'Assets/Sound Effects/Skills/parry.mp3';
             const deflectVol = cfg.soundVolumes?.bulletDeflect ?? 0.85;
             audioSystem.playSFX(deflectSfx, deflectVol);

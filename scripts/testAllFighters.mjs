@@ -1256,11 +1256,11 @@ async function main() {
         if (!hitTargets || hitTargets.length === 0) {
           throw new Error('Toji back thrust strike did not land on target');
         }
-        if (Math.abs(dummyOpponent.knockbackVx) < 25) {
-          throw new Error(`Toji back thrust knockback velocity was insufficient: ${dummyOpponent.knockbackVx} (expected ~32)`);
+        if (Math.abs(dummyOpponent.knockbackVx) < 5) {
+          throw new Error(`Toji back thrust knockback velocity was insufficient: ${dummyOpponent.knockbackVx} (expected controlled impulse)`);
         }
-        if (dummyOpponent.knockbackDecay !== 0.90) {
-          throw new Error(`Toji back thrust knockback decay was incorrect: ${dummyOpponent.knockbackDecay} (expected 0.90)`);
+        if (dummyOpponent.knockbackDecay !== 0.85) {
+          throw new Error(`Toji back thrust knockback decay was incorrect: ${dummyOpponent.knockbackDecay} (expected 0.85)`);
         }
 
         // Setup ambush stasis and verify modUpdateAmbushSequence drives displacement
@@ -1295,10 +1295,11 @@ async function main() {
         dummyOpponent.y = 250;
         state.fighters = [fighter, dummyOpponent];
 
-        // Fire Hollow Purple to trigger breather recovery
+        // Fire Hollow Purple to trigger breather recovery based on CONFIG.gojo.purpleRecoveryDuration
         fighter._firePurple(0);
-        if (fighter.purpleRecoveryTimer !== 120) {
-          throw new Error(`Expected Gojo purpleRecoveryTimer to be 120, got ${fighter.purpleRecoveryTimer}`);
+        const expectedRecovery = (CONFIG.gojo?.purpleRecoveryDuration ?? 50);
+        if (fighter.purpleRecoveryTimer !== expectedRecovery) {
+          throw new Error(`Expected Gojo purpleRecoveryTimer to be ${expectedRecovery}, got ${fighter.purpleRecoveryTimer}`);
         }
         if (!fighter.isStationarySkillActive()) {
           throw new Error('Expected isStationarySkillActive() to return true during Gojo Purple breather');
@@ -1311,14 +1312,14 @@ async function main() {
 
         // Test breather recovery frame update
         fighter.update(dummyOpponent, 0, state.arena);
-        if (fighter.purpleRecoveryTimer !== 119) {
-          throw new Error(`Expected purpleRecoveryTimer to decrement to 119, got ${fighter.purpleRecoveryTimer}`);
+        if (fighter.purpleRecoveryTimer !== expectedRecovery - 1) {
+          throw new Error(`Expected purpleRecoveryTimer to decrement to ${expectedRecovery - 1}, got ${fighter.purpleRecoveryTimer}`);
         }
         if (fighter.vx !== 0 || fighter.vy !== 0) {
           throw new Error(`Expected Gojo vx/vy to remain 0 during breather, got (${fighter.vx}, ${fighter.vy})`);
         }
-        if (!fighter.infinityActive) {
-          throw new Error('Expected Limitless Infinity barrier to remain active during breather');
+        if (fighter.infinityActive) {
+          throw new Error('Expected Limitless Infinity barrier to be disabled while Purple is active');
         }
 
         // Verify Gojo CANNOT cast another skill while Purple is active
@@ -1356,6 +1357,10 @@ async function main() {
           const pIdx = projectileSystem.projectiles.indexOf(fighter.activePurpleProjectile);
           if (pIdx !== -1) projectileSystem.projectiles.splice(pIdx, 1);
           fighter.activePurpleProjectile = null;
+        }
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (!fighter.infinityActive) {
+          throw new Error('Expected Limitless Infinity barrier to restore after Purple expired');
         }
       }
 

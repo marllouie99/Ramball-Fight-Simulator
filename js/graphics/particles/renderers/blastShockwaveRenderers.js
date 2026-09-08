@@ -844,31 +844,35 @@ export function drawPunchWindSpeedLine(ctx, effect) {
   const lineAngle = effect.angle || 0;
   const len = (effect.length || 150) * (0.6 + 0.4 * effect.life);
   const halfLen = len / 2;
+  const maxThick = (effect.size || 2.5) * effect.life;
+  const midOff = halfLen * 0.15; // Offset bulge toward leading tip (Rule #16)
 
   ctx.translate(effect.x, effect.y);
   ctx.rotate(lineAngle);
 
-  const grad = ctx.createLinearGradient(-halfLen, 0, halfLen, 0);
+  // 4-point double-tapered filled needle polygon (Rule #16)
   const col = effect.color || '#FF8800';
-  grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-  grad.addColorStop(0.25, col);
-  grad.addColorStop(0.75, col);
-  grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-  ctx.strokeStyle = grad;
-  ctx.lineWidth = (effect.size || 2.5) * effect.life;
+  ctx.fillStyle = col;
+  ctx.globalAlpha = alpha;
   ctx.beginPath();
-  ctx.moveTo(-halfLen, 0);
-  ctx.lineTo(halfLen, 0);
-  ctx.stroke();
+  ctx.moveTo(-halfLen, 0);            // sharp trailing tip
+  ctx.lineTo(midOff, -maxThick * 0.5); // top mid
+  ctx.lineTo(halfLen, 0);             // sharp leading tip
+  ctx.lineTo(midOff, maxThick * 0.5);  // bot mid
+  ctx.closePath();
+  ctx.fill();
 
   if (effect.isCore) {
-    ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(2)})`;
-    ctx.lineWidth = Math.max(1, (effect.size || 2.5) * 0.45 * effect.life);
+    ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(2)})`;
+    const coreLen = halfLen * 0.65;
+    const coreThick = Math.max(0.6, maxThick * 0.45);
     ctx.beginPath();
-    ctx.moveTo(-halfLen * 0.65, 0);
-    ctx.lineTo(halfLen * 0.65, 0);
-    ctx.stroke();
+    ctx.moveTo(-coreLen, 0);
+    ctx.lineTo(midOff * 0.65, -coreThick * 0.5);
+    ctx.lineTo(coreLen, 0);
+    ctx.lineTo(midOff * 0.65, coreThick * 0.5);
+    ctx.closePath();
+    ctx.fill();
   }
 
   ctx.restore();

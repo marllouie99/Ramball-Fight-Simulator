@@ -710,29 +710,31 @@ export class GenosFighter extends Fighter {
 
           if (Math.abs(angleDiff) <= halfArc) {
             hitAny = true;
-            applyDamageToTarget(target, damage, this, { isBasic: true });
+            const didDamage = applyDamageToTarget(target, damage, this, { isBasic: true });
 
-            const pushForce = CONFIG.genos?.meleePunchKnockback || 9.0;
-            const pushAngle = Math.atan2(target.y - this.y, target.x - this.x);
-            const pushVx = Math.cos(pushAngle) * pushForce;
-            const pushVy = Math.sin(pushAngle) * pushForce;
-            if (typeof target.applyKnockback === 'function') {
-              target.applyKnockback(pushVx, pushVy);
-            } else {
-              target.vx += pushVx;
-              target.vy += pushVy;
-            }
-            if (typeof spawnAnimePunchImpactFrame === 'function') {
-              spawnAnimePunchImpactFrame(target.x, target.y, 55, pushAngle, 'gold');
-            }
-            if (typeof spawnMeleeClashShockwave === 'function') {
-              spawnMeleeClashShockwave(target.x, target.y, 65, 'gojo');
-            }
-            if (typeof spawnImpactFlash === 'function') {
-              spawnImpactFlash(target.x, target.y, 30, '#FF8800');
-            }
-            if (typeof spawnSparks === 'function') {
-              spawnSparks(target.x, target.y, 8, 'orange');
+            if (didDamage !== false) {
+              const pushForce = CONFIG.genos?.meleePunchKnockback || 9.0;
+              const pushAngle = Math.atan2(target.y - this.y, target.x - this.x);
+              const pushVx = Math.cos(pushAngle) * pushForce;
+              const pushVy = Math.sin(pushAngle) * pushForce;
+              if (typeof target.applyKnockback === 'function') {
+                target.applyKnockback(pushVx, pushVy);
+              } else {
+                target.vx += pushVx;
+                target.vy += pushVy;
+              }
+              if (typeof spawnAnimePunchImpactFrame === 'function') {
+                spawnAnimePunchImpactFrame(target.x, target.y, 55, pushAngle, 'gold');
+              }
+              if (typeof spawnMeleeClashShockwave === 'function') {
+                spawnMeleeClashShockwave(target.x, target.y, 65, 'gojo');
+              }
+              if (typeof spawnImpactFlash === 'function') {
+                spawnImpactFlash(target.x, target.y, 30, '#FF8800');
+              }
+              if (typeof spawnSparks === 'function') {
+                spawnSparks(target.x, target.y, 8, 'orange');
+              }
             }
           }
         }
@@ -1719,51 +1721,53 @@ export class GenosFighter extends Fighter {
             if (Math.abs(angleDiff) <= halfArc) {
               flurryHitAny = true;
               const hitDmg = isFinalHit ? damage * 2.2 : damage;
-              applyDamageToTarget(target, hitDmg, this, { isSkill: true, isRanged: true, isMachineGunBlow: true });
+              const didDamage = applyDamageToTarget(target, hitDmg, this, { isSkill: true, isRanged: true, isMachineGunBlow: true });
 
-              if (isFinalHit) {
-                target.caughtInGenosFlurry = false;
-                // Final hit: apply heavy finisher knockback push & extended hit-pause
-                if (typeof target.applyTimeStop === 'function') {
-                  target.applyTimeStop(20, { isSkill: true });
-                }
-                const pushForce = 18.0;
-                const pushVx = Math.cos(angleToTarget) * pushForce;
-                const pushVy = Math.sin(angleToTarget) * pushForce;
-                if (typeof target.applyKnockback === 'function') {
-                  target.applyKnockback(pushVx, pushVy);
+              if (didDamage !== false) {
+                if (isFinalHit) {
+                  target.caughtInGenosFlurry = false;
+                  // Final hit: apply heavy finisher knockback push & extended hit-pause
+                  if (typeof target.applyTimeStop === 'function') {
+                    target.applyTimeStop(20, { isSkill: true });
+                  }
+                  const pushForce = 18.0;
+                  const pushVx = Math.cos(angleToTarget) * pushForce;
+                  const pushVy = Math.sin(angleToTarget) * pushForce;
+                  if (typeof target.applyKnockback === 'function') {
+                    target.applyKnockback(pushVx, pushVy);
+                  } else {
+                    target.vx += pushVx;
+                    target.vy += pushVy;
+                  }
                 } else {
-                  target.vx += pushVx;
-                  target.vy += pushVy;
+                  // Non-final hits: Stop movement & freeze enemy in place so they stay pinned during Machine Gun Blows!
+                  target.vx = 0;
+                  target.vy = 0;
+                  target.caughtInGenosFlurry = true;
+                  if (target.knockbackVx !== undefined) target.knockbackVx = 0;
+                  if (target.knockbackVy !== undefined) target.knockbackVy = 0;
+                  if (typeof target.applyTimeStop === 'function') {
+                    target.applyTimeStop(12, { isSkill: true });
+                  }
                 }
-              } else {
-                // Non-final hits: Stop movement & freeze enemy in place so they stay pinned during Machine Gun Blows!
-                target.vx = 0;
-                target.vy = 0;
-                target.caughtInGenosFlurry = true;
-                if (target.knockbackVx !== undefined) target.knockbackVx = 0;
-                if (target.knockbackVy !== undefined) target.knockbackVy = 0;
-                if (typeof target.applyTimeStop === 'function') {
-                  target.applyTimeStop(12, { isSkill: true });
-                }
-              }
 
-              // Supersonic wind blast speed lines on impact
-              if (typeof spawnPunchWindSpeedLines === 'function') {
-                spawnPunchWindSpeedLines(target.x, target.y, angleToTarget, isFinalHit ? 240 : 160, 'orange');
-              }
-              // Spiky anime impact crescent + shockwave ring — Genos fiery orange theme
-              if (typeof spawnAnimePunchImpactFrame === 'function') {
-                spawnAnimePunchImpactFrame(target.x, target.y, isFinalHit ? 85 : 62, angleToTarget, 'orange');
-              }
-              if (typeof spawnMeleeClashShockwave === 'function') {
-                spawnMeleeClashShockwave(target.x, target.y, isFinalHit ? 90 : 65, 'genos');
-              }
-              if (typeof spawnImpactFlash === 'function') {
-                spawnImpactFlash(target.x, target.y, isFinalHit ? 45 : 30, '#FF5500');
-              }
-              if (typeof spawnSparks === 'function') {
-                spawnSparks(target.x, target.y, isFinalHit ? 14 : 7, 'orange');
+                // Supersonic wind blast speed lines on impact
+                if (typeof spawnPunchWindSpeedLines === 'function') {
+                  spawnPunchWindSpeedLines(target.x, target.y, angleToTarget, isFinalHit ? 240 : 160, 'orange');
+                }
+                // Spiky anime impact crescent + shockwave ring — Genos fiery orange theme
+                if (typeof spawnAnimePunchImpactFrame === 'function') {
+                  spawnAnimePunchImpactFrame(target.x, target.y, isFinalHit ? 85 : 62, angleToTarget, 'orange');
+                }
+                if (typeof spawnMeleeClashShockwave === 'function') {
+                  spawnMeleeClashShockwave(target.x, target.y, isFinalHit ? 90 : 65, 'genos');
+                }
+                if (typeof spawnImpactFlash === 'function') {
+                  spawnImpactFlash(target.x, target.y, isFinalHit ? 45 : 30, '#FF5500');
+                }
+                if (typeof spawnSparks === 'function') {
+                  spawnSparks(target.x, target.y, isFinalHit ? 14 : 7, 'orange');
+                }
               }
             }
           }

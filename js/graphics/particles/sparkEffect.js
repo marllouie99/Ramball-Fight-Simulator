@@ -37,6 +37,8 @@ import {
   drawBoogieWoogieSwapBeam,
   drawCrimsonLightningCore,
   drawCrimsonLightningRing,
+  drawRubbickCastSigil,
+  drawRubbickGroundSigil,
 } from './renderers/characterSpecialRenderers.js';
 
 function _isDarkMode() {
@@ -543,6 +545,116 @@ export function spawnSpellStealWisps(rubbick, target, color, count = 20) {
 }
 
 /**
+ * Spawns an authentic discrete pixel-art Arcane Cast Sigil and muzzle burst
+ * at the tip of Rubbick's staff when executing a basic attack (Arcane Bolt).
+ * @param {number} x - Staff crystal tip X
+ * @param {number} x - Staff crystal tip X
+ * @param {number} y - Staff crystal tip Y
+ * @param {number} angle - Aim angle / firing direction
+ * @param {string} color - Theme color (defaults to '#00FF64')
+ * @param {object} [fighter] - Rubbick fighter entity instance for ground decal / floor anchoring
+ */
+export function spawnRubbickCastEffect(x, y, angle = 0, color = '#00FF64', fighter = null) {
+  if (!state.sparkEffects) return;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+  if (state.sparkEffects.length >= (isMulti ? 250 : 500)) return;
+
+  // 1. Expanding Arcane Runic Sigil (Magic Circle)
+  const sigil = ParticleSystem.getParticle();
+  sigil.x = x;
+  sigil.y = y;
+  sigil.vx = Math.cos(angle) * 0.4;
+  sigil.vy = Math.sin(angle) * 0.4;
+  sigil.size = 10;
+  sigil.targetSize = 38;
+  sigil.life = 1.0;
+  sigil.decay = 1 / 18; // ~18 frames duration
+  sigil.friction = 0.92;
+  sigil.type = 'rubbickCastSigil';
+  sigil.angle = angle;
+  sigil.rotation = Math.random() * Math.PI * 2;
+  sigil.color = color;
+  state.sparkEffects.push(sigil);
+
+  // 2. High-brightness emerald-white muzzle flash burst
+  const flash = ParticleSystem.getParticle();
+  flash.x = x;
+  flash.y = y;
+  flash.vx = 0;
+  flash.vy = 0;
+  flash.size = 16;
+  flash.targetSize = 32;
+  flash.life = 1.0;
+  flash.decay = 1 / 10; // 10 frames
+  flash.friction = 0;
+  flash.type = 'arcaneFlash';
+  flash.color = 'rgba(180, 255, 210, 1)';
+  state.sparkEffects.push(flash);
+
+  // 3. Directional Arcane Muzzle Sparks (Tight cone forward along angle)
+  const sparkColors = ['#FFFFFF', '#00FF64', '#70FFAB', '#00E5FF'];
+  const sparkCount = 8;
+  for (let i = 0; i < sparkCount; i++) {
+    const sAng = angle + (Math.random() - 0.5) * 0.55;
+    const speed = 5 + Math.random() * 8;
+    const spark = ParticleSystem.getParticle();
+    spark.x = x;
+    spark.y = y;
+    spark.vx = Math.cos(sAng) * speed;
+    spark.vy = Math.sin(sAng) * speed;
+    spark.size = 2.0 + Math.random() * 2.5;
+    spark.life = 1.0;
+    spark.decay = 0.09 + Math.random() * 0.05; // 8-12 frames
+    spark.friction = 0.88;
+    spark.type = 'arcane';
+    spark.color = sparkColors[i % sparkColors.length];
+    state.sparkEffects.push(spark);
+  }
+
+  // 4. Subtle drifting arcane glyph fragments
+  for (let g = 0; g < 3; g++) {
+    const gAng = angle + (Math.random() - 0.5) * 0.8;
+    const gSpeed = 1.5 + Math.random() * 2.5;
+    const glyph = ParticleSystem.getParticle();
+    glyph.x = x + Math.cos(gAng) * 8;
+    glyph.y = y + Math.sin(gAng) * 8;
+    glyph.vx = Math.cos(gAng) * gSpeed;
+    glyph.vy = Math.sin(gAng) * gSpeed - 0.3;
+    glyph.size = 3 + Math.random() * 3;
+    glyph.life = 1.0;
+    glyph.decay = 0.04 + Math.random() * 0.03; // ~15-25 frames
+    glyph.friction = 0.94;
+    glyph.type = 'arcaneGlyph';
+    glyph.rotation = Math.random() * Math.PI * 2;
+    glyph.rotationSpeed = (Math.random() - 0.5) * 0.15;
+    glyph.color = sparkColors[g % sparkColors.length];
+    glyph.glyphShape = (g % 2 === 0) ? 'diamond' : 'triangle';
+    state.sparkEffects.push(glyph);
+  }
+
+  // 5. Supersonic Arcane Needle Speed Lines (Rule #16)
+  spawnPunchWindSpeedLines(x, y, angle, 160, 'emerald');
+
+  // 6. Ground Summoning Matrix beneath Rubbick's feet on the arena floor
+  if (fighter && Number.isFinite(fighter.x) && Number.isFinite(fighter.y)) {
+    const groundSigil = ParticleSystem.getParticle();
+    groundSigil.x = fighter.x;
+    groundSigil.y = fighter.y;
+    groundSigil.vx = 0;
+    groundSigil.vy = 0;
+    groundSigil.size = 14;
+    groundSigil.targetSize = (fighter.r || 25) * 2.3;
+    groundSigil.life = 1.0;
+    groundSigil.decay = 1 / 20; // ~20 frames duration
+    groundSigil.friction = 0.90;
+    groundSigil.type = 'rubbickGroundSigil';
+    groundSigil.rotation = Math.random() * Math.PI * 2;
+    groundSigil.color = color;
+    state.sparkEffects.push(groundSigil);
+  }
+}
+
+/**
  * Update all spark physics and lifespans
  * @param {boolean} frozen - Whether time is stopped (sparks still decay)
  */
@@ -934,11 +1046,13 @@ function drawArcaneSparkle(ctx, effect) {
   const cx = snap(effect.x);
   const cy = snap(effect.y);
   const alpha = Math.max(0, Math.min(1.0, effect.life));
+  const baseCol = effect.color || '#00FF64';
 
   ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(2)})`;
   ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
 
-  ctx.fillStyle = `rgba(0, 255, 100, ${(alpha * 0.90).toFixed(2)})`;
+  ctx.fillStyle = baseCol;
+  ctx.globalAlpha = alpha * 0.90;
   ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P);
   ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P);
   ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P);
@@ -947,7 +1061,7 @@ function drawArcaneSparkle(ctx, effect) {
   if (effect.vx || effect.vy) {
     const tx = snap(effect.x - (effect.vx || 0) * 1.8);
     const ty = snap(effect.y - (effect.vy || 0) * 1.8);
-    ctx.fillStyle = `rgba(0, 200, 80, ${(alpha * 0.50).toFixed(2)})`;
+    ctx.globalAlpha = alpha * 0.50;
     ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
   }
 
@@ -1030,6 +1144,8 @@ const SPARK_RENDERERS = {
   arcaneFlash: drawArcaneFlash,
   arcaneGlyph: drawArcaneGlyph,
   spellStealWisp: drawSpellStealWisp,
+  rubbickCastSigil: drawRubbickCastSigil,
+  rubbickGroundSigil: drawRubbickGroundSigil,
   healing: drawHealingEffect,
   yutaBeamPinkCore: drawYutaBeamPinkCore,
   boogieWoogieSwapBeam: drawBoogieWoogieSwapBeam,
@@ -1423,7 +1539,10 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
     line.type = 'punchWindSpeedLine';
     line.isCore = Math.random() < 0.6;
 
-    if (theme === 'orange') {
+    if (theme === 'emerald' || theme === 'arcane') {
+      const colors = ['#FFFFFF', '#00FF64', '#70FFAB', '#00E5FF', '#06120A'];
+      line.color = colors[Math.floor(Math.random() * colors.length)];
+    } else if (theme === 'orange') {
       const colors = ['#FFFFFF', '#FF5500', '#FF9900', '#FFCC00', '#FF3300'];
       line.color = colors[Math.floor(Math.random() * colors.length)];
     } else {

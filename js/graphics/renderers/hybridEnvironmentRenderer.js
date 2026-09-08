@@ -418,8 +418,12 @@ export function updateHybridEnvironment() {
   const sukuna = state.fighters?.find(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.type === 'sukuna') && f.domainActive && f.hp > 0);
   const yuta = state.fighters?.find(f => f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta') && f.domainActive && f.hp > 0);
   const mahito = state.fighters?.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive) && f.hp > 0);
-  const rubbick = state.fighters?.find(f => f && (f.characterId === 'rubbick' || f.type === 'rubbick') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain')) && f.hp > 0);
-  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && (f.domainActive || f.stolenDomainActive) && f.hp > 0).length > 1);
+  const rubbick = state.fighters?.find(f => f && 
+    (f.characterId === 'rubbick' || f.type === 'rubbick' || f.characterId === 'trickster' || f.type === 'trickster' || f._def?.id === 'rubbick' || f._def?.id === 'trickster') && 
+    (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain') || (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0)) && 
+    f.hp > 0
+  );
+  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && (f.domainActive || f.stolenDomainActive || (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0)) && f.hp > 0).length > 1);
 
   domainUpdateTick++;
   
@@ -525,7 +529,7 @@ export function updateHybridEnvironment() {
     rubbickDomainHybridData.sprite.parent.removeChild(rubbickDomainHybridData.sprite);
     if (state.fighters) {
       for (const f of state.fighters) {
-        if (f && (f.characterId === 'rubbick' || f.type === 'rubbick')) {
+        if (f && (f.characterId === 'rubbick' || f.type === 'rubbick' || f.characterId === 'trickster' || f.type === 'trickster' || f._def?.id === 'rubbick' || f._def?.id === 'trickster')) {
           f._rubbickDomainHybridReady = false;
         }
       }

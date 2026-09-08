@@ -111,18 +111,17 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
 
   // Effects
   if (isBlackFlash) {
-    // Full JJK-style Black Flash — void implosion + crimson screen flash + cursed energy bolts (No punch attack visual)
-    spawnBlackFlash(target.x, target.y);
-    playTodoPunchSound(this, isCombo);
-    const bfAudioCfg = CONFIG.blackFlash?.audio || {};
-    const sound = getSkillSound(this.id, 'blackflash');
-    const bfVol = bfAudioCfg.volume ?? sound?.volume ?? 1.5;
-    const bfElecVol = bfAudioCfg.electricVolume ?? bfVol;
-    const bfSrc = bfAudioCfg.src || sound?.src || 'Assets/Sound Effects/Skills/blackflash1.mp3';
-    const bfSrc2 = bfAudioCfg.src2 || sound?.src2 || 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3';
-    if (bfSrc) audioSystem.playSFX(bfSrc, bfVol);
-    if (bfSrc2) audioSystem.playSFX(bfSrc2, bfElecVol);
     if (didDamage !== false) {
+      // Full JJK-style Black Flash — void implosion + crimson screen flash + cursed energy bolts (No punch attack visual)
+      spawnBlackFlash(target.x, target.y);
+      const bfAudioCfg = CONFIG.blackFlash?.audio || {};
+      const sound = getSkillSound(this.id, 'blackflash');
+      const bfVol = bfAudioCfg.volume ?? sound?.volume ?? 1.5;
+      const bfElecVol = bfAudioCfg.electricVolume ?? bfVol;
+      const bfSrc = bfAudioCfg.src || sound?.src || 'Assets/Sound Effects/Skills/blackflash1.mp3';
+      const bfSrc2 = bfAudioCfg.src2 || sound?.src2 || 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3';
+      if (bfSrc) audioSystem.playSFX(bfSrc, bfVol);
+      if (bfSrc2) audioSystem.playSFX(bfSrc2, bfElecVol);
       if (typeof target.applySlow === 'function') {
         target.applySlow(
           CONFIG.blackFlash?.debuff?.slowDuration ?? 70,
@@ -130,13 +129,15 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
         );
       }
       target.blackFlashDebuffTimer = CONFIG.blackFlash?.debuff?.healReductionDuration ?? 270;
+      // Todo enters the Zone!
+      this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
     }
-    
-    // Todo enters the Zone!
-    this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
+    playTodoPunchSound(this, isCombo);
   } else {
     // Shockwave Ring Impact for normal punch
-    spawnAnimePunchImpactFrame(target.x, target.y, 55, angle, 'purple');
+    if (didDamage !== false) {
+      spawnAnimePunchImpactFrame(target.x, target.y, 55, angle, 'purple');
+    }
     playTodoPunchSound(this, isCombo);
   }
 

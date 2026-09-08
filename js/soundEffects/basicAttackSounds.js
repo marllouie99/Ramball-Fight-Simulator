@@ -295,6 +295,19 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.01,
     delay: 0,
   },
+  // Rubbick / Trickster — Arcane Bolt
+  'rubbick': {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.65,
+    delay: 0,
+    pitchVariation: 0.1
+  },
+  'trickster': {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.65,
+    delay: 0,
+    pitchVariation: 0.1
+  },
   // Gojo — Blue Orbs & Melee punches
   'gojo': {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',

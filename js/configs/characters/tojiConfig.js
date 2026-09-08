@@ -40,7 +40,7 @@ export const tojiConfig = {
   channelReactionFrames: 10,         // Delay in frames before Toji reacts to a channeled skill (10 frames = ~0.16s)
 
   // Primary Melee: Inverted Spear of Heaven (Amanosakahoko)
-  spearRange: 60,                    // Distance required to land melee hit (50px)
+  spearRange: 50,                    // Distance required to land melee hit (50px)
   spearCooldown: 75,                 // Spaced frames between basic melee strikes (0.92s swing)
   spearDamage: 15,                   // Base damage per swing
   spearKnockback: 2.5,               // Physical push velocity impulse on basic attack hit
@@ -71,15 +71,15 @@ export const tojiConfig = {
   ambushSpearArc: Math.PI * 0.67,    // 1st Sequence: 120° frontal arc cone angle for Inverted Spear backstab thrust
   ambushBackThrustDamage: 50,        // 1st Sequence: True Damage of the Inverted Spear backstab thrust
   ambushTargetFreezeDuration: 70,    // 1st Sequence: Target freeze duration (frames) applied upon successful back thrust hit
-  ambushKatanaChargeDuration: 30,    // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
+  ambushKatanaChargeDuration: 25,    // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
   ambushKatanaFreezeDuration: 70,    // 2nd Sequence: Target freeze duration (frames) for Katana execution
-  ambushKnockbackForce: 15,          // Massive knockback force launching target cleanly across arena
-  ambushSpearThrustKnockback: 32,    // Crisp physical velocity impulse on Inverted Spear backstab
+  ambushKnockbackForce: 20,          // Massive knockback force launching target cleanly across arena
+  ambushSpearThrustKnockback: 8.5,   // Controlled physical flinch impulse on Inverted Spear backstab thrust
   ambushPhantomFlurryStrikes: 12,    // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
   ambushPhantomFlurryFrameRate: 7,   // 3rd Sequence: Slower readable attack speed between each phantom strike (8 frames)
   ambushPhantomFlurryDamage: 15,     // 3rd Sequence: True Damage per phantom strike
   ambushPhantomFlurryDistance: 8,    // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
-  ambushFlurryFinalRecoil: 38,       // Clean finisher blast knockback push on target
+  ambushFlurryFinalRecoil: 20,       // Clean finisher blast knockback push on target
 
   // Ultimate: Curse Inventory - Full Arsenal Unleashed (Kinkō Sōkō)
   ultimateCooldown: 1500,            // 25.0s cooldown (1500 frames)
@@ -87,17 +87,21 @@ export const tojiConfig = {
   ultimateSwarmDuration: 500,        // Total sensory deprivation slow duration on target
   ultimateMaxStrikes: 8,             // Number of flash-step strikes before the final crater slam
   ultimateAssaultDamage: 80,         // True Damage per flash-step strike
+  ultimateAssaultRicochetForce: 10,  // Kinetic ricochet knockback force launching enemy across arena into wall bounces
+  ultimateAssaultStunDuration: 30,   // Stun debuff duration (frames) applied to enemy on each strike hit (renders orbiting stun rings)
   ultimateCraterDamage: 65,          // Massive crater slam True Damage
   ultimateCraterRadius: 180,         // Blast radius of the final crater slam
   ultimateCraterReach: 185,          // Frontal reach distance (px) for multi-target 360 final blow sweep
   ultimateCraterArc: Math.PI * 1.35, // 243° wide frontal sweeping arc angle
+  ultimateCraterDistance: 320,       // Distance (px) Toji slides away from target into aerial vantage position before final crater slam
   ultimateVanishDuration: 5,         // Frames spent invisible in the shadows between strikes
   ultimateStrikeDuration: 20,        // Total frames he is visible during a strike (smooth & readable swing)
   ultimateSlideDistance: 100,        // Spawning offset distance (px) before sliding in
   ultimateSlideSpeed: 50,            // Inward slide speed
   ultimateCraterChargeTime: 90,      // Frames spent hovering in the air winding up the katana
-  ultimateCraterDiveTime: 15,        // Frames spent diving down to the ground
-  ultimateCraterFadeInFrames: 30,    // Frames for Toji to fade in above target before crater slam
+  ultimateCraterDiveTime: 16,        // Frames spent diving straight towards the enemy
+  ultimateCraterSpinTime: 14,        // Frames spent executing the 360 final blow rotation at the enemy
+  ultimateCraterFadeInFrames: 35,    // Frames spent sliding away to the distant vantage position
   ultimateDodgeMultiplier: 3.0,      // Dodge chance multiplier during ultimate
 
   // Audio Configuration, Volume & Timing Delay Adjustments
@@ -124,7 +128,7 @@ export const tojiConfig = {
     backThrust: 2.2,
     secondWeaponAttack: 2.2,
     phantomFlurry: 3.0,
-    ultimateChanneling: 0.0,
+    ultimateChanneling: 1.0,
     vanish: 5.0,
     dashStrike: 1.0,
     finalBlowCharging: 3.5,

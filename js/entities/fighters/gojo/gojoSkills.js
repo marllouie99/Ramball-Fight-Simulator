@@ -256,8 +256,8 @@ export function firePurple(fighter, ownerIndex) {
     }
   }
 
-  // Post-fire Purple Breather Recovery Stasis (Gojo pauses to catch his breath while purple orb travels)
-  const recoveryDuration = CONFIG.gojo?.purpleRecoveryDuration || 120;
+  // Post-fire Purple Breather Recovery Stasis (Gojo pauses to catch his breath based on purpleRecoveryDuration config)
+  const recoveryDuration = CONFIG.gojo?.purpleRecoveryDuration ?? 50;
   fighter.purpleRecoveryTimer = recoveryDuration;
   fighter.purpleRecoveryMaxTimer = recoveryDuration;
   fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1200;
@@ -265,11 +265,12 @@ export function firePurple(fighter, ownerIndex) {
   fighter.vx = 0;
   fighter.vy = 0;
 
-  // Ensure Limitless Infinity barrier is active during breather recovery in Ranged mode
+  // When Gojo fires Purple, disable his Limitless Infinity barrier until the Purple life expires
+  fighter.infinityActive = false;
   fighter.infinityCooldown = 0;
-  fighter.infinityActive = true;
   fighter.infinityActiveTimer = 0;
-  fighter.infinityFadeOpacity = 1.0;
+  fighter.infinityFadeOpacity = 0;
+  fighter.infinityBlockTimer = 0;
   fighter.isMeleeMode = false;
 
   fighter.purpleRetreatTimer = 0;

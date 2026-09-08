@@ -114,7 +114,21 @@ function _buildRubbickDomainCanvas(img) {
     _rubbickDomainCanvasReady = true;
     return _rubbickDomainCanvas;
   } catch (err) {
-    console.warn('Failed to build Rubbick green domain canvas:', err);
+    try {
+      const w = img.naturalWidth || 540;
+      const h = img.naturalHeight || 960;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const fallbackCtx = canvas.getContext('2d');
+      if (fallbackCtx) {
+        fallbackCtx.filter = 'hue-rotate(190deg) saturate(1.8) brightness(0.95)';
+        fallbackCtx.drawImage(img, 0, 0, w, h);
+        _rubbickDomainCanvas = canvas;
+        _rubbickDomainCanvasReady = true;
+        return _rubbickDomainCanvas;
+      }
+    } catch (_) {}
     return null;
   }
 }
@@ -151,10 +165,15 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   const isRubbick = Boolean(
     options.isRubbick ||
     options.colorTheme === 'green' ||
-    (fighter && (fighter.characterId === 'rubbick' || fighter.type === 'rubbick' || fighter.stolenDomainActive || fighter.stolenType === 'gojo_domain'))
+    (fighter && (
+      fighter.characterId === 'rubbick' || fighter.type === 'rubbick' ||
+      fighter.characterId === 'trickster' || fighter.type === 'trickster' ||
+      fighter._def?.id === 'rubbick' || fighter._def?.id === 'trickster' ||
+      fighter.stolenDomainActive || fighter.stolenType === 'gojo_domain'
+    ))
   );
 
-  const isActive = fighter && (fighter.domainActive || fighter.stolenDomainActive);
+  const isActive = fighter && (fighter.domainActive || fighter.stolenDomainActive || (fighter.stolenType === 'gojo_domain' && fighter.stolenWindUpTimer > 0));
   if (!isActive) return;
 
   const arena = state.arena;
@@ -190,9 +209,27 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
 
   // 3. Draw Domain Overlay Image occupying the whole arena
   const img = isRubbick ? _getRubbickDomainImage() : _getGojoDomainImage();
-  if (img && (img.complete || img.width > 0)) {
+  const baseImg = _getGojoDomainImage();
+  if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling preserves crisp pixel art
-    ctx.drawImage(img, ax, ay, aw, ah);
+    if (isRubbick && img === baseImg) {
+      // Fallback: If Rubbick's dedicated emerald canvas failed to construct (e.g. cross-origin/tainted canvas),
+      // tint the base image to vivid Arcane Emerald Green via Canvas filter + color overlay
+      ctx.save();
+      try {
+        ctx.filter = 'hue-rotate(190deg) saturate(1.8) brightness(0.95)';
+      } catch (_) {}
+      ctx.drawImage(img, ax, ay, aw, ah);
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 255, 100, 0.20)';
+      ctx.globalCompositeOperation = 'color';
+      ctx.fillRect(ax, ay, aw, ah);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, ax, ay, aw, ah);
+    }
   } else if (isRubbick) {
     // Procedural Emerald Cosmic Nebula fallback while asset initializes
     const cx = ax + aw / 2;

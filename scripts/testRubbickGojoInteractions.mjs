@@ -79,12 +79,14 @@ import { strict as assert } from 'assert';
 async function runTests() {
   console.log('🧪 Running Rubbick & Gojo Interaction Tests...');
 
-  const { state } = await import('../js/core/state.js');
+  const { CONFIG } = await import('../js/core/config.js');
+  const { state, registerProjectileSystem } = await import('../js/core/state.js');
   const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
   const { RubbickFighter } = await import('../js/entities/fighters/RubbickFighter.js');
   const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+  registerProjectileSystem(projectileSystem);
 
-  state.arena = { width: 1000, height: 1000, radius: 450, cx: 500, cy: 500 };
+  state.arena = { x: 0, y: 0, width: 1000, height: 1000, radius: 450, cx: 500, cy: 500, shape: 'circle' };
   state.projectiles = [];
   projectileSystem.projectiles = [];
 
@@ -253,25 +255,230 @@ async function runTests() {
     assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/nanami-collapse-voiceline.mp3'), true, 'nanami voiceline must be classified as voiceline');
     assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/comerika.mp3'), true, 'comerika must be classified as voiceline');
     assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/ragescream.mp3'), true, 'ragescream must be classified as voiceline');
+    assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/purpledeploy.mp3'), true, 'purpledeploy.mp3 must be classified as voiceline');
+    assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/mixing.mp3'), true, 'mixing.mp3 must be classified as voiceline');
 
     // SFX must not be classified as voicelines
     assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/cronosphere.mp3'), false, 'cronosphere.mp3 must NOT be classified as voiceline');
-    assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/purpledeploy.mp3'), false, 'purpledeploy.mp3 must NOT be classified as voiceline');
     assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/redblast.mp3'), false, 'redblast.mp3 must NOT be classified as voiceline');
     assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/fugatravel.mp3'), false, 'fugatravel.mp3 must NOT be classified as voiceline');
     assert.equal(isVoicelineAudio('Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3'), false, 'Rubbick-spellsteal.mp3 must NOT be classified as voiceline');
+    assert.equal(isVoicelineAudio('Assets/Sound Effects/Attacks/laserbeam.mp3'), false, 'laserbeam.mp3 must NOT be classified as voiceline');
 
     // 3. Test rubbick.playStolenSFX filters out voicelines
     assert.equal(rubbick.playStolenSFX('Assets/Sound Effects/Skills/hollowpurple.mp3'), null, 'playStolenSFX must suppress hollowpurple');
+    assert.equal(rubbick.playStolenSFX('Assets/Sound Effects/Skills/purpledeploy.mp3'), null, 'playStolenSFX must suppress purpledeploy');
+    assert.equal(rubbick.playStolenSFX('Assets/Sound Effects/Skills/mixing.mp3'), null, 'playStolenSFX must suppress mixing');
     assert.equal(rubbick.playStolenSFX('Assets/Sound Effects/Skills/fuga.mp3'), null, 'playStolenSFX must suppress fuga');
     assert.equal(rubbick.playStolenSFX('Assets/Sound Effects/Skills/todo-combo-voiceline.mp3'), null, 'playStolenSFX must suppress todo voiceline');
     assert.notEqual(rubbick.playStolenSFX('Assets/Sound Effects/Skills/cronosphere.mp3'), null, 'playStolenSFX should allow cronosphere SFX');
 
-    // Allow 20ms to elapse so the sound system frame throttle (15ms) clears for purpledeploy
+    // Allow 20ms to elapse so the sound system frame throttle (15ms) clears for laserbeam
     await new Promise(r => setTimeout(r, 25));
-    assert.notEqual(rubbick.playStolenSFX('Assets/Sound Effects/Skills/purpledeploy.mp3'), null, 'playStolenSFX should allow purpledeploy SFX');
+    assert.notEqual(rubbick.playStolenSFX('Assets/Sound Effects/Attacks/laserbeam.mp3'), null, 'playStolenSFX should allow laserbeam SFX');
 
     console.log('     ✓ Universal stolen voiceline suppression engine verified 100% across all abilities!');
+  }
+
+  // ── TEST SUITE 5: Rubbick Projectiles Render and Are Not Culled When Gojo's Domain Is Active ──
+  console.log('  5. Testing Rubbick Projectile Visibility During Active Gojo Domain...');
+  {
+    const { drawProjectiles } = await import('../js/graphics/renderers/projectileRenderer.js');
+    const gojo = new GojoFighter({ startX: 200, startY: 200, type: 'gojo', color: '#00E5FF' });
+    const rubbick = new RubbickFighter({ startX: 400, startY: 200, type: 'rubbick', color: '#00FF64' });
+    state.fighters = [gojo, rubbick];
+    state.projectiles = [];
+    projectileSystem.projectiles = [];
+
+    // Activate Gojo's domain
+    gojo.domainActive = true;
+    gojo.domainTimer = 200;
+
+    // Fire an Arcane Bolt from Rubbick
+    projectileSystem.fireArcaneBolt(rubbick, 1, 15, gojo);
+    assert.equal(projectileSystem.projectiles.length, 1, 'Arcane Bolt should be spawned');
+    const bolt = projectileSystem.projectiles[0];
+    assert.equal(bolt.isArcaneBolt, true, 'Projectile should be marked isArcaneBolt');
+
+    // Render projectiles with mock canvas context
+    let renderedCount = 0;
+    const testCtx = createMockCtx();
+    testCtx.stroke = () => { renderedCount++; };
+    testCtx.fill = () => { renderedCount++; };
+    testCtx.fillRect = () => { renderedCount++; };
+
+    state.ctx = testCtx;
+    drawProjectiles();
+
+    assert(renderedCount > 0, 'Rubbick Arcane Bolt MUST render even when Gojo Domain is active!');
+    console.log('     ✓ Rubbick Arcane Bolt renders successfully inside active Gojo Domain!');
+  }
+
+  // ── TEST SUITE 6: Limitless Infinity Freeze and Oldest Projectile Recycling Array Safety ──
+  console.log('  6. Testing Limitless Infinity Projectile Interception & Recycling Safety...');
+  {
+    const gojo = new GojoFighter({ startX: 200, startY: 200, type: 'gojo', color: '#00E5FF' });
+    const rubbick = new RubbickFighter({ startX: 230, startY: 200, type: 'rubbick', color: '#00FF64' });
+    state.fighters = [gojo, rubbick];
+    gojo.isMeleeMode = false;
+    gojo.infinityCooldown = 0;
+    gojo.infinityActive = true;
+
+    const origFreezeChance = CONFIG.gojo?.infinityFreezeChance;
+    if (CONFIG.gojo) CONFIG.gojo.infinityFreezeChance = 1.0;
+
+    state.projectiles = [];
+    projectileSystem.projectiles = [];
+
+    // Fire bolt 1 at Gojo (enters infinity)
+    projectileSystem.fireArcaneBolt(rubbick, 1, 15, gojo);
+    // Position directly in infinity barrier
+    projectileSystem.projectiles[0].x = gojo.x + 25;
+    projectileSystem.projectiles[0].y = gojo.y;
+
+    projectileSystem.update(state.fighters);
+    assert.equal(projectileSystem.projectiles[0].isFrozenByInfinity, true, 'Bolt 1 must be frozen in infinity');
+
+    // Fire bolt 2 at Gojo
+    projectileSystem.fireArcaneBolt(rubbick, 1, 15, gojo);
+    projectileSystem.projectiles[1].x = gojo.x + 25;
+    projectileSystem.projectiles[1].y = gojo.y;
+    projectileSystem.update(state.fighters);
+    assert.equal(projectileSystem.projectiles[1].isFrozenByInfinity, true, 'Bolt 2 must be frozen in infinity');
+
+    // Fire bolt 3 at Gojo (exceeds maxFrozen=2 -> triggers oldest frozen recycling via splice)
+    projectileSystem.fireArcaneBolt(rubbick, 1, 15, gojo);
+    projectileSystem.projectiles[2].x = gojo.x + 25;
+    projectileSystem.projectiles[2].y = gojo.y;
+    projectileSystem.update(state.fighters);
+
+    // Verify exactly 2 frozen projectiles remain and array is not corrupted/popped unexpectedly
+    const frozenCount = projectileSystem.projectiles.filter(p => p && p.isFrozenByInfinity).length;
+    assert.equal(frozenCount, 2, 'Exactly maxFrozen (2) frozen projectiles must remain active');
+    if (CONFIG.gojo) CONFIG.gojo.infinityFreezeChance = origFreezeChance;
+    console.log('     ✓ Limitless Infinity projectile recycling safely maintains clean array bounds!');
+  }
+
+  // ── TEST SUITE 7: Stolen Domain Expansion Immediate Space Strikes & Visibility ──
+  console.log('  7. Testing Stolen Domain Expansion Immediate Space Strikes & Visibility...');
+  {
+    const gojo = new GojoFighter({ startX: 200, startY: 200, type: 'gojo', color: '#00E5FF' });
+    const rubbick = new RubbickFighter({ startX: 400, startY: 200, type: 'rubbick', color: '#00FF64' });
+    state.fighters = [gojo, rubbick];
+    state.projectiles = [];
+    projectileSystem.projectiles = [];
+
+    // Give Rubbick stolen gojo_domain
+    rubbick.stolenType = 'gojo_domain';
+    rubbick.stolenWindUpTimer = 1; // 1 frame before deployment
+
+    // Ground telegraph must be visible during windup
+    let telegraphDrawn = 0;
+    const mockCtx = createMockCtx();
+    mockCtx.stroke = () => { telegraphDrawn++; };
+    rubbick.drawGroundTelegraph(mockCtx);
+    assert(telegraphDrawn > 0, 'Ground summoning telegraph MUST render during stolen domain windup!');
+
+    // Update to trigger deployment
+    rubbick.update(gojo, 1, state.arena);
+
+    // After deployment:
+    assert.equal(rubbick.stolenDomainActive, true, 'Stolen domain must be active');
+    assert.equal(rubbick.attackCooldown, 0, 'Attack cooldown MUST be reset to 0 upon domain deployment!');
+
+    // Next update frame: rapid arcane space strike should immediately spawn
+    rubbick.update(gojo, 1, state.arena);
+    const domainBolt = projectileSystem.projectiles.find(p => p.isArcaneBolt && p.isDomainEmpowered);
+    assert(domainBolt, 'Domain-empowered Arcane Bolt must fire immediately upon domain activation!');
+    console.log('     ✓ Stolen Domain Expansion space strikes fire immediately from frame 1!');
+  }
+
+  // ── TEST SUITE 8: Rubbick Skill Lockout While Active Arena Skill (Hollow Purple) Is Cast ──
+  console.log('  8. Testing Rubbick Skill Lockout While Active Arena Skill (Hollow Purple) Is Cast...');
+  {
+    const gojo = new GojoFighter({ startX: 200, startY: 200, type: 'gojo', color: '#00E5FF' });
+    const rubbick = new RubbickFighter({ startX: 400, startY: 200, type: 'rubbick', color: '#00FF64' });
+    state.fighters = [gojo, rubbick];
+    state.projectiles = [];
+    projectileSystem.projectiles = [];
+
+    // Part 8A: Rubbick steals and casts Hollow Purple
+    rubbick.reset();
+    rubbick.stolenType = 'gojo';
+    rubbick.stolenSkillCooldown = 0;
+    rubbick.stolenTimer = 500;
+
+    // Execute windup and fire
+    rubbick.executeStolenSkill(gojo, 1);
+    rubbick.stolenWindUpTimer = 0;
+    rubbick.fireStolenSkill(gojo, 1);
+
+    // Verify Purple projectile is alive in the arena
+    assert(rubbick.hasActivePurpleProjectile(), 'Rubbick must detect active Hollow Purple projectile in arena');
+    assert(rubbick.hasActiveSkillInArena(), 'hasActiveSkillInArena must return true while Purple is active');
+    assert.equal(rubbick.stolenType, 'gojo', 'stolenType must remain "gojo" while Purple is active in the arena');
+
+    // Part 8B: All skill casting queries MUST be blocked
+    assert.equal(rubbick.canCastSpellSteal(), false, 'Spell Steal must be blocked while Purple is active');
+    assert.equal(rubbick.canCastTelekinesis(), false, 'Telekinesis must be blocked while Purple is active');
+    assert.equal(rubbick.canCastStolenSkill(), false, 'Casting another stolen skill must be blocked while Purple is active');
+    assert.equal(rubbick.executeStolenSkill(gojo, 1), false, 'executeStolenSkill must return false while active skill is in arena');
+
+    // Part 8C: AI update loop does NOT trigger Telekinesis or Spell Steal while Purple is in arena
+    rubbick.spellStealCooldown = 0;
+    rubbick.telekinesisCooldown = 0;
+    rubbick.update(gojo, 1, state.arena);
+
+    assert.equal(rubbick.tkTimer, 0, 'Telekinesis must NOT be cast while Purple is active in arena');
+    assert.equal(rubbick.stolenType, 'gojo', 'Spell Steal must NOT overwrite or trigger while Purple is active');
+
+    // Part 8D: Other persistent arena skills also trigger hasActiveSkillInArena
+    const testFighter = new RubbickFighter({ startX: 400, startY: 200, type: 'rubbick', color: '#00FF64' });
+    testFighter.reset();
+    assert.equal(testFighter.hasActiveSkillInArena(), false, 'Idle Rubbick has no active skill in arena');
+
+    // Cronos Time Sphere
+    testFighter.sphereActive = true;
+    testFighter.sphereTimer = 100;
+    assert.equal(testFighter.hasActiveSkillInArena(), true, 'Time Sphere triggers hasActiveSkillInArena');
+    assert.equal(testFighter.canCastTelekinesis(), false, 'Telekinesis blocked during Time Sphere');
+    assert.equal(testFighter.canCastSpellSteal(), false, 'Spell Steal blocked during Time Sphere');
+    testFighter.sphereActive = false;
+    testFighter.sphereTimer = 0;
+    assert.equal(testFighter.hasActiveSkillInArena(), false, 'Ending Time Sphere clears active arena skill');
+
+    // Telekinesis
+    testFighter.tkTimer = 30;
+    testFighter.tkTarget = gojo;
+    assert.equal(testFighter.hasActiveSkillInArena(), true, 'Active Telekinesis triggers hasActiveSkillInArena');
+    testFighter.tkTimer = 0;
+    testFighter.tkTarget = null;
+    assert.equal(testFighter.hasActiveSkillInArena(), false, 'Ending Telekinesis clears active arena skill');
+
+    // Part 8E: Expiration of Purple projectile unlocks Rubbick
+    // Expire the active Purple projectile
+    if (rubbick.activePurpleProjectile) {
+      rubbick.activePurpleProjectile.life = 0;
+    }
+    state.projectiles = [];
+    projectileSystem.projectiles = [];
+    rubbick.spellStealCooldown = 500; // Keep on cooldown to test clean expiration before re-stealing
+    rubbick.telekinesisCooldown = 500; // Keep on cooldown to test clean expiration before re-casting
+
+    // Next update frame: should detect projectile expiration, clear stolenType, and unlock skills
+    rubbick.update(gojo, 1, state.arena);
+
+    assert.equal(rubbick.hasActivePurpleProjectile(), false, 'Purple projectile is no longer active');
+    assert.equal(rubbick.hasActiveSkillInArena(), false, 'hasActiveSkillInArena is false after projectile expiration');
+    assert.equal(rubbick.stolenType, null, 'stolenType is cleared to null upon Purple expiration');
+
+    // Reset cooldowns to 0 and verify skills are now queryable as ready / castable
+    rubbick.spellStealCooldown = 0;
+    rubbick.telekinesisCooldown = 0;
+    assert.equal(rubbick.canCastSpellSteal(), true, 'Spell Steal is unlocked after Purple expires');
+    assert.equal(rubbick.canCastTelekinesis(), true, 'Telekinesis is unlocked after Purple expires');
+
+    console.log('     ✓ Rubbick skill lockout during active arena skill (Hollow Purple & others) fully verified!');
   }
 
   console.log('✅ ALL INTERACTION TESTS PASSED CLEANLY!');

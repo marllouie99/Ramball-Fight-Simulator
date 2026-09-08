@@ -153,23 +153,25 @@ export function modUpdateMeleeCombat(customTarget = null) {
 
         // Visual effects (Suppress standard punch impact visual when Black Flash is triggered)
         if (!isBlackFlash) {
-          spawnAnimePunchImpactFrame(target.x, target.y, 55, angleToTarget, 'blackpink');
+          if (didDamage !== false) {
+            spawnAnimePunchImpactFrame(target.x, target.y, 55, angleToTarget, 'blackpink');
+          }
         }
 
         if (isBlackFlash) {
-          spawnBlackFlash(target.x, target.y);
-          if (this.blackFlashTimer <= 0) {
-            spawnFloatingText(target.x, target.y - target.r - 25, "BLACK FLASH", "#ff0000");
-          }
-          const bfAudioCfg = CONFIG.blackFlash?.audio || {};
-          const sound = getSkillSound(this.id, 'blackflash');
-          const bfVol = bfAudioCfg.volume ?? sound?.volume ?? 1.5;
-          const bfElecVol = bfAudioCfg.electricVolume ?? bfVol;
-          const bfSrc = bfAudioCfg.src || sound?.src || 'Assets/Sound Effects/Skills/blackflash1.mp3';
-          const bfSrc2 = bfAudioCfg.src2 || sound?.src2 || 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3';
-          if (bfSrc) audioSystem.playSFX(bfSrc, bfVol);
-          if (bfSrc2) audioSystem.playSFX(bfSrc2, bfElecVol);
           if (didDamage !== false) {
+            spawnBlackFlash(target.x, target.y);
+            if (this.blackFlashTimer <= 0) {
+              spawnFloatingText(target.x, target.y - target.r - 25, "BLACK FLASH", "#ff0000");
+            }
+            const bfAudioCfg = CONFIG.blackFlash?.audio || {};
+            const sound = getSkillSound(this.id, 'blackflash');
+            const bfVol = bfAudioCfg.volume ?? sound?.volume ?? 1.5;
+            const bfElecVol = bfAudioCfg.electricVolume ?? bfVol;
+            const bfSrc = bfAudioCfg.src || sound?.src || 'Assets/Sound Effects/Skills/blackflash1.mp3';
+            const bfSrc2 = bfAudioCfg.src2 || sound?.src2 || 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3';
+            if (bfSrc) audioSystem.playSFX(bfSrc, bfVol);
+            if (bfSrc2) audioSystem.playSFX(bfSrc2, bfElecVol);
             if (typeof target.applySlow === 'function') {
               target.applySlow(
                 CONFIG.blackFlash?.debuff?.slowDuration ?? 70,

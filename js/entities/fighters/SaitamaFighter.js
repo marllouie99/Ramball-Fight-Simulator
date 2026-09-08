@@ -1352,75 +1352,77 @@ export class SaitamaFighter extends Fighter {
       const finalDamage = Math.round(baseDmg * boredomMult);
 
       // Deal damage (Rule #6 compliant) - pass isMelee: true, isSkill: true to skip hit-pause
-      applyDamageToTarget(target, finalDamage, this, { isMelee: true, isSkill: true });
+      const didDamage = applyDamageToTarget(target, finalDamage, this, { isMelee: true, isSkill: true });
 
-      // Physical knockback push (Massive knockback!)
-      const knockbackForce = CONFIG.saitama?.punchKnockback || 100;
-      const kx = Math.cos(angleToTarget) * knockbackForce;
-      const ky = Math.sin(angleToTarget) * knockbackForce;
-      target._knockedBackBySaitamaBasicPunch = true;
-      target.preventKnockbackBounce = true; // Pin and stick target to wall for 1 second on wall impact instead of bouncing!
-      target.isWallPinnedBySaitama = true;
-      if (typeof target.applyKnockback === 'function') {
-        target.applyKnockback(kx, ky);
-      } else {
-        target.knockbackVx = kx;
-        target.knockbackVy = ky;
-        target.vx = kx;
-        target.vy = ky;
-      }
-
-      // Play serious punch impact audio on hit with smooth fade out
-      if (typeof audioSystem !== 'undefined') {
-        const impactSFX = CONFIG.saitama?.punchImpactSFX || 'Assets/Sound Effects/Attacks/explosion.mp3';
-        const impactVol = CONFIG.saitama?.punchImpactVolume ?? 2.0;
-        const soundHandle = audioSystem.playSFX(impactSFX, impactVol);
-
-        const fadeDelay = CONFIG.saitama?.punchImpactFadeDelayMs ?? 350;
-        const fadeDuration = CONFIG.saitama?.punchImpactFadeDurationMs ?? 900;
-        if (soundHandle && typeof fadeOutSound === 'function') {
-          setTimeout(() => {
-            fadeOutSound(soundHandle, fadeDuration);
-          }, fadeDelay);
+      if (didDamage !== false) {
+        // Physical knockback push (Massive knockback!)
+        const knockbackForce = CONFIG.saitama?.punchKnockback || 100;
+        const kx = Math.cos(angleToTarget) * knockbackForce;
+        const ky = Math.sin(angleToTarget) * knockbackForce;
+        target._knockedBackBySaitamaBasicPunch = true;
+        target.preventKnockbackBounce = true; // Pin and stick target to wall for 1 second on wall impact instead of bouncing!
+        target.isWallPinnedBySaitama = true;
+        if (typeof target.applyKnockback === 'function') {
+          target.applyKnockback(kx, ky);
+        } else {
+          target.knockbackVx = kx;
+          target.knockbackVy = ky;
+          target.vx = kx;
+          target.vy = ky;
         }
-      }
 
-      // Screen shake & heavy visual impact
-      if (typeof triggerGlobalScreenShake === 'function') {
-        const shakeIntensity = CONFIG.saitama?.punchScreenShakeIntensity ?? 12;
-        const shakeDuration = CONFIG.saitama?.punchScreenShakeDuration ?? 10;
-        triggerGlobalScreenShake(shakeIntensity, shakeDuration);
-      }
-      if (typeof spawnImpactFlash === 'function') {
-        spawnImpactFlash(target.x, target.y, 40, 'default');
-      }
-      if (typeof spawnAnimePunchImpactFrame === 'function') {
-        spawnAnimePunchImpactFrame(target.x, target.y, 60, angleToTarget, 'gold');
-      }
-      if (typeof spawnMeleeClashShockwave === 'function') {
-        spawnMeleeClashShockwave(target.x, target.y, 75, 'gold');
-      }
-      if (typeof spawnSparks === 'function') {
-        spawnSparks(target.x, target.y, 14, 'crimson', '#F5C400');
-      }
+        // Play serious punch impact audio on hit with smooth fade out
+        if (typeof audioSystem !== 'undefined') {
+          const impactSFX = CONFIG.saitama?.punchImpactSFX || 'Assets/Sound Effects/Attacks/explosion.mp3';
+          const impactVol = CONFIG.saitama?.punchImpactVolume ?? 2.0;
+          const soundHandle = audioSystem.playSFX(impactSFX, impactVol);
 
-      // Concussive pressure shockwave push on surrounding entities (60px radius)
-      const shockwaveR = CONFIG.saitama?.shockwaveRadius || 60;
-      const shockwaveKb = CONFIG.saitama?.shockwaveKnockback ?? 12;
-      for (const other of targetsToScan) {
-        if (other === target) continue;
-        const otherDist = Math.hypot(other.x - target.x, other.y - target.y);
-        if (otherDist <= shockwaveR + other.r && otherDist > 0) {
-          const pushAngle = Math.atan2(other.y - target.y, other.x - target.x);
-          other.vx += Math.cos(pushAngle) * shockwaveKb;
-          other.vy += Math.sin(pushAngle) * shockwaveKb;
+          const fadeDelay = CONFIG.saitama?.punchImpactFadeDelayMs ?? 350;
+          const fadeDuration = CONFIG.saitama?.punchImpactFadeDurationMs ?? 900;
+          if (soundHandle && typeof fadeOutSound === 'function') {
+            setTimeout(() => {
+              fadeOutSound(soundHandle, fadeDuration);
+            }, fadeDelay);
+          }
         }
+
+        // Screen shake & heavy visual impact
+        if (typeof triggerGlobalScreenShake === 'function') {
+          const shakeIntensity = CONFIG.saitama?.punchScreenShakeIntensity ?? 12;
+          const shakeDuration = CONFIG.saitama?.punchScreenShakeDuration ?? 10;
+          triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+        }
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(target.x, target.y, 40, 'default');
+        }
+        if (typeof spawnAnimePunchImpactFrame === 'function') {
+          spawnAnimePunchImpactFrame(target.x, target.y, 60, angleToTarget, 'gold');
+        }
+        if (typeof spawnMeleeClashShockwave === 'function') {
+          spawnMeleeClashShockwave(target.x, target.y, 75, 'gold');
+        }
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(target.x, target.y, 14, 'crimson', '#F5C400');
+        }
+
+        // Concussive pressure shockwave push on surrounding entities (60px radius)
+        const shockwaveR = CONFIG.saitama?.shockwaveRadius || 60;
+        const shockwaveKb = CONFIG.saitama?.shockwaveKnockback ?? 12;
+        for (const other of targetsToScan) {
+          if (other === target) continue;
+          const otherDist = Math.hypot(other.x - target.x, other.y - target.y);
+          if (otherDist <= shockwaveR + other.r && otherDist > 0) {
+            const pushAngle = Math.atan2(other.y - target.y, other.x - target.x);
+            other.vx += Math.cos(pushAngle) * shockwaveKb;
+            other.vy += Math.sin(pushAngle) * shockwaveKb;
+          }
+        }
+
+        // Reset passive boredom stacks upon landing damage
+        this.boredomStacks = 0;
+        this.boredomTimer = 0;
       }
     }
-
-    // Reset passive boredom stacks upon landing damage
-    this.boredomStacks = 0;
-    this.boredomTimer = 0;
   }
 
   reset() {

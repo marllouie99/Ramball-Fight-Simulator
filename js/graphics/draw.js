@@ -1,5 +1,5 @@
 export { drawFuelPickups } from './renderers/arenaRenderer.js';
-export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTodoTakadaIdolScreenOverlay } from './renderers/effectsRenderer.js';
+export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawTodoTakadaIdolScreenOverlay } from './renderers/effectsRenderer.js';
 export { drawFighters, drawIllusions } from './renderers/EntityRenderer.js';
 export { drawDriveBys, drawDriveByGroundEffects } from '../systems/cjDriveBySystem.js';
 export { drawBamEffects, spawnBamEffect, updateBamEffects, clearBamEffects } from './particles/bamImpactEffect.js';
@@ -52,6 +52,7 @@ export { drawYutaSkin, drawYutaGhostSkin } from './fighters/yutaSkin.js';
 export { drawSukunaBody, drawSukunaPixelBody } from './fighters/sukunaSkin.js';
 export { drawEngineerSkin } from './fighters/engineerSkin.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
+export { spawnTojiCleaveHitEffect, drawTojiImpactEffects, updateTojiImpactEffects } from './particles/tojiImpactEffect.js';
 
 
 import { drawProjectiles as modDrawProjectiles, drawBlackHoleVisual } from './renderers/projectileRenderer.js';

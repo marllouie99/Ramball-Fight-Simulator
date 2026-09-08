@@ -426,7 +426,8 @@ export function drawPurpleOrbTrail(ctx, p, time) {
     if (!p.history || p.history.length < 2) {
         return;
     }
-    const isGreen = Boolean(p.isRubbick || p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
+    const isBlue = Boolean(p.visual === 'gojoBlue' || p.isGojoBlue);
+    const isGreen = !isBlue && Boolean(p.isRubbick || p.isTrickster || p.colorTheme === 'green' || p.color === '#00FF64');
     
     // Quantize time to 30 FPS for stepped retro anime feel
     const msPerFrame = 1000 / 30;

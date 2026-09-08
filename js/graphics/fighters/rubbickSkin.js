@@ -53,7 +53,7 @@ function quadBezierPt(p0, p1, p2, t) {
  * - Zone C: Ornate gold runic magus sash & brass buckle.
  * - Zone D: Layered wizard robe skirt with shadow folds and emerald edge highlights.
  */
-export function drawRubbickPixelBody(ctx, r, isGhost = false) {
+export function drawRubbickPixelBody(ctx, r, isGhost = false, isAttacking = false) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const steps = Math.ceil((r + P) / P);
@@ -88,13 +88,14 @@ export function drawRubbickPixelBody(ctx, r, isGhost = false) {
         if (inVisorBand) {
           if (Math.abs(rx) <= r * 0.32 && ry >= -r * 0.32 && ry <= -r * 0.26) {
             // Bright white-green arcane slit core
-            if (Math.abs(rx) <= r * 0.12 && ry >= -r * 0.30 && ry <= -r * 0.28) {
+            const flareW = isAttacking ? r * 0.22 : r * 0.12;
+            if (Math.abs(rx) <= flareW && ry >= -r * 0.30 && ry <= -r * 0.28) {
               ctx.fillStyle = '#E6FFF0'; // Specular core flare
             } else {
-              ctx.fillStyle = '#00FF64'; // Vivid neon-green visor slit
+              ctx.fillStyle = isAttacking ? '#50FF95' : '#00FF64'; // Vivid neon-green visor slit
             }
           } else if (Math.abs(rx) <= r * 0.38) {
-            ctx.fillStyle = '#008A3B'; // Slit outer energy gradient
+            ctx.fillStyle = isAttacking ? '#00B84D' : '#008A3B'; // Slit outer energy gradient
           } else {
             ctx.fillStyle = '#080D0A'; // Inner cowl shadow veil
           }
@@ -145,12 +146,13 @@ export function drawRubbickPixelBody(ctx, r, isGhost = false) {
         const inDiamondGem = (crystalDistX * 1.3 + crystalDistY <= r * 0.26);
 
         if (inDiamondGem) {
-          if (crystalDistX * 1.3 + crystalDistY <= r * 0.12) {
+          const coreDist = isAttacking ? r * 0.18 : r * 0.12;
+          if (crystalDistX * 1.3 + crystalDistY <= coreDist) {
             ctx.fillStyle = '#FFFFFF'; // Bright crystal glint
-          } else if (crystalDistX * 1.3 + crystalDistY <= r * 0.20) {
-            ctx.fillStyle = '#00FF64'; // Vivid arcane green core
+          } else if (crystalDistX * 1.3 + crystalDistY <= (isAttacking ? r * 0.24 : r * 0.20)) {
+            ctx.fillStyle = isAttacking ? '#50FF95' : '#00FF64'; // Vivid arcane green core
           } else {
-            ctx.fillStyle = '#009E44'; // Emerald facet shadow
+            ctx.fillStyle = isAttacking ? '#00D154' : '#009E44'; // Emerald facet shadow
           }
           ctx.fillRect(px, py, P, P);
           continue;
@@ -671,11 +673,20 @@ export function drawRubbickSkin(ctx, fighter) {
 
   // Podium preview check: suppresses combat animation offsets during winner reveal podium display ONLY
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const isAttacking = !isPodiumPreview && (fighter.attackSwingTimer > 0);
+  const maxSwing = fighter.attackSwingMaxTimer || 16;
+  const attackProg = isAttacking ? (fighter.attackSwingTimer / maxSwing) : 0;
 
   const angle = isPodiumPreview ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
   ctx.rotate(angle);
   const facingLeft = Math.abs(angle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
+
+  // Subtle physical cast recoil along aim axis
+  const recoilX = isAttacking ? -Math.sin(attackProg * Math.PI) * 4.5 : 0;
+  if (recoilX !== 0) {
+    ctx.translate(recoilX, 0);
+  }
 
   // ─────────────────────────────────────────────
   // 1. DRAW CAPE (Authentic Pixel-Art Grand Magus Mantle)
@@ -688,19 +699,20 @@ export function drawRubbickSkin(ctx, fighter) {
   let localVy = -vx * sinA + vy * cosA;
   if (facingLeft) localVy = -localVy;
 
-  const inertiaX = Math.max(-r * 1.2, Math.min(r * 0.8, -localVx * 2.2));
+  const attackCapeImpulse = isAttacking ? Math.sin(attackProg * Math.PI) * (r * 0.45) : 0;
+  const inertiaX = Math.max(-r * 1.2, Math.min(r * 0.8, -localVx * 2.2 - attackCapeImpulse));
   const inertiaY = Math.max(-r * 1.0, Math.min(r * 1.0, -localVy * 2.2));
 
   const gentleSway1 = Math.sin(now * 0.003) * (r * 0.12);
   const gentleSway2 = Math.cos(now * 0.0025) * (r * 0.10);
-  const waveRipple = Math.sin(now * 0.006) * (r * 0.08);
+  const waveRipple = Math.sin(now * 0.006) * (r * 0.08) + (isAttacking ? Math.sin(attackProg * Math.PI * 2) * (r * 0.15) : 0);
 
   drawRubbickPixelCape(ctx, r, inertiaX, inertiaY, gentleSway1, gentleSway2, waveRipple, false);
 
   // ─────────────────────────────────────────────
   // 2. MAIN CIRCLE BODY (AUTHENTIC PIXEL ART MODEL)
   // ─────────────────────────────────────────────
-  drawRubbickPixelBody(ctx, r, false);
+  drawRubbickPixelBody(ctx, r, false, isAttacking);
 
   // ─────────────────────────────────────────────
   // 3. ARCANE RUNIC AURA (No shadowBlur - Rule #11)
@@ -728,6 +740,25 @@ export function drawRubbickSkin(ctx, fighter) {
     // Telekinesis channel off-hand gesture pointing forward
     if (fighter.tkTimer > 0) {
       drawRubbickArm(ctx, r, r * 0.80, r * 0.15, handRadius, -r * 0.20, true);
+    }
+    // Basic Attack: Grand Magus mystical off-hand spellcasting gesture
+    else if (isAttacking && !fighter.hideWeapon && (!fighter.stolenWindUpTimer || fighter.stolenWindUpTimer <= 0)) {
+      const gestureProg = Math.sin(attackProg * Math.PI);
+      const offHandX = r * 0.35 + gestureProg * (r * 0.30);
+      const offHandY = -r * 0.25 - gestureProg * (r * 0.15);
+      drawRubbickArm(ctx, r, offHandX, offHandY, handRadius, -r * 0.20, true);
+
+      // Arcane fingertip spark flourish
+      if (attackProg > 0.25) {
+        const sparkAlpha = Math.sin(((attackProg - 0.25) / 0.75) * Math.PI);
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 255, 255, ${(sparkAlpha * 0.95).toFixed(2)})`;
+        ctx.fillRect(offHandX + 3, offHandY - 2, 2, 2);
+        ctx.fillStyle = `rgba(0, 255, 100, ${(sparkAlpha * 0.85).toFixed(2)})`;
+        ctx.fillRect(offHandX + 2, offHandY - 3, 4, 1);
+        ctx.fillRect(offHandX + 2, offHandY, 4, 1);
+        ctx.restore();
+      }
     }
     // Unarmed or stolen non-staff weapon fallback
     else if (fighter.isUnarmed || fighter.hideWeapon) {

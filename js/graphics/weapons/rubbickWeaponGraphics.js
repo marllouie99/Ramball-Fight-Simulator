@@ -33,10 +33,20 @@ export function drawRubbickStaff(ctx, fighter) {
     swingAngle = progress * 0.35; // Tilt backwards
     thrustOffset = progress * -5; // Pull backwards
   } else if (fighter.attackSwingTimer > 0) {
-    // Follow-through phase (thrusting forward)
-    const progress = fighter.attackSwingTimer / 15; // 1.0 down to 0.0
-    swingAngle = Math.sin(progress * Math.PI) * -0.45; // staff head snaps forward
-    thrustOffset = Math.sin(progress * Math.PI) * 12; // thrusts outward
+    // Dynamic spellcasting thrust and flourish
+    const maxTimer = fighter.attackSwingMaxTimer || 16;
+    const progress = Math.min(1.0, Math.max(0, fighter.attackSwingTimer / maxTimer)); // 1.0 down to 0.0
+    if (progress > 0.65) {
+      // Phase 1: Dynamic forward snap toward the target
+      const t = (1.0 - progress) / 0.35; // 0.0 to 1.0
+      thrustOffset = Math.sin(t * Math.PI * 0.5) * 20;
+      swingAngle = Math.sin(t * Math.PI * 0.5) * 0.32;
+    } else {
+      // Phase 2: Smooth easing return with magical settle resonance
+      const recT = progress / 0.65; // 1.0 down to 0.0
+      thrustOffset = recT * 20 * Math.pow(recT, 0.5);
+      swingAngle = recT * 0.32 - Math.sin((1 - recT) * Math.PI * 2) * 0.08 * recT;
+    }
   }
   
   if (fighter.isPreview) {
@@ -379,6 +389,9 @@ export function drawRubbickStaff(ctx, fighter) {
     }
   }
 
+  const isAttacking = fighter.attackSwingTimer > 0;
+  const attackProgress = isAttacking ? (fighter.attackSwingTimer / (fighter.attackSwingMaxTimer || 16)) : 0;
+
   // Stepped Emerald Facets & Specular Highlight
   for (let gy = -cSteps; gy <= cSteps; gy++) {
     for (let gx = -cSteps; gx <= cSteps; gx++) {
@@ -390,21 +403,22 @@ export function drawRubbickStaff(ctx, fighter) {
       const px = snap(rx);
       const py = snap(crystalCenterY + ry);
 
-      // Specular bright white core glint
-      if (Math.abs(rx) <= P && Math.abs(ry + P) <= P) {
+      // Specular bright white core glint (expands during attack)
+      const coreLimit = isAttacking ? P * 2 : P;
+      if (Math.abs(rx) <= coreLimit && Math.abs(ry + P) <= coreLimit) {
         ctx.fillStyle = '#FFFFFF';
       }
       // Top-left facet highlight
       else if (rx < 0 && ry < 0) {
-        ctx.fillStyle = '#70FFAB';
+        ctx.fillStyle = isAttacking ? '#E6FFF0' : '#70FFAB';
       }
       // Center neon-green crystal body
-      else if (d <= 0.65) {
-        ctx.fillStyle = coreColor;
+      else if (d <= (isAttacking ? 0.80 : 0.65)) {
+        ctx.fillStyle = isAttacking ? '#50FF95' : coreColor;
       }
       // Bottom/right shadow facet
       else {
-        ctx.fillStyle = '#007A33';
+        ctx.fillStyle = isAttacking ? '#00A847' : '#007A33';
       }
       ctx.fillRect(px, py, P, P);
     }
@@ -415,16 +429,19 @@ export function drawRubbickStaff(ctx, fighter) {
   // ─────────────────────────────────────────────
   ctx.save();
   ctx.translate(0, crystalCenterY);
-  const ringRot = (Date.now() / -450);
+  const spinMult = isAttacking ? 4.5 : 1.0;
+  const ringRot = (Date.now() / -450) * spinMult;
   ctx.rotate(ringRot);
+
+  const ringRadiusBonus = isAttacking ? Math.sin(attackProgress * Math.PI) * 6 : 0;
 
   // Stepped pixel ring nodes
   const ringNodes = [
-    { a: 0, r: 16 }, { a: Math.PI * 0.5, r: 8 },
-    { a: Math.PI, r: 16 }, { a: Math.PI * 1.5, r: 8 }
+    { a: 0, r: 16 + ringRadiusBonus }, { a: Math.PI * 0.5, r: 8 + ringRadiusBonus * 0.5 },
+    { a: Math.PI, r: 16 + ringRadiusBonus }, { a: Math.PI * 1.5, r: 8 + ringRadiusBonus * 0.5 }
   ];
 
-  ctx.fillStyle = '#00FF64';
+  ctx.fillStyle = isAttacking ? '#E6FFF0' : '#00FF64';
   ringNodes.forEach(node => {
     const nx = snap(Math.cos(node.a) * node.r);
     const ny = snap(Math.sin(node.a) * node.r);
@@ -433,7 +450,19 @@ export function drawRubbickStaff(ctx, fighter) {
 
   // Orbiting specular white pixel
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(snap(Math.cos(ringRot * 2) * 16), snap(Math.sin(ringRot * 2) * 6), P, P);
+  ctx.fillRect(snap(Math.cos(ringRot * 2) * (16 + ringRadiusBonus)), snap(Math.sin(ringRot * 2) * (6 + ringRadiusBonus * 0.4)), P, P);
+
+  // Cast Starburst Glint on peak attack frames
+  if (isAttacking && attackProgress > 0.45) {
+    const burstAlpha = Math.sin(((attackProgress - 0.45) / 0.55) * Math.PI);
+    ctx.fillStyle = `rgba(255, 255, 255, ${(burstAlpha * 0.95).toFixed(2)})`;
+    const flareR = snap(10 + (1.0 - attackProgress) * 8);
+    ctx.fillRect(-flareR, -P * 0.5, flareR * 2, P);
+    ctx.fillRect(-P * 0.5, -flareR, P, flareR * 2);
+    ctx.fillStyle = `rgba(0, 255, 100, ${(burstAlpha * 0.85).toFixed(2)})`;
+    ctx.fillRect(-snap(flareR * 0.5), -snap(flareR * 0.5), snap(flareR), snap(flareR));
+  }
+
   ctx.restore();
 
   // ─────────────────────────────────────────────
@@ -483,7 +512,7 @@ export function drawRubbickBolt(ctx, p) {
   ctx.imageSmoothingEnabled = false;
   
   // Fade alpha if projectile is expiring / fading out
-  if (p.fadingAlpha !== undefined) {
+  if (p.fadingOut && p.fadingAlpha !== undefined) {
     ctx.globalAlpha *= Math.max(0, Math.min(1, p.fadingAlpha));
   }
 
@@ -756,6 +785,20 @@ export function getRubbickStaffTip(fighter) {
   let gripX = r * 0.70;
   let gripY = r * 0.20;
   let staffTilt = Math.PI / 2 - 0.22;
+
+  if (fighter.attackSwingTimer > 0) {
+    const maxTimer = fighter.attackSwingMaxTimer || 16;
+    const progress = Math.min(1.0, Math.max(0, fighter.attackSwingTimer / maxTimer));
+    if (progress > 0.65) {
+      const t = (1.0 - progress) / 0.35;
+      gripX += Math.sin(t * Math.PI * 0.5) * 20;
+      staffTilt += Math.sin(t * Math.PI * 0.5) * 0.32;
+    } else {
+      const recT = progress / 0.65;
+      gripX += recT * 20 * Math.pow(recT, 0.5);
+      staffTilt += recT * 0.32 - Math.sin((1 - recT) * Math.PI * 2) * 0.08 * recT;
+    }
+  }
 
   if ((fighter.stolenType === 'gojo' || fighter.stolenType === 'gojo_red' || fighter.stolenType === 'gojo_domain') && fighter.stolenWindUpTimer > 0) {
     const windupMax = 45;

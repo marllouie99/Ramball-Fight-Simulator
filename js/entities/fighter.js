@@ -24,6 +24,7 @@ import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, d
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
 import { clearFighterDomain } from '../systems/domainSystem.js';
+import { isInsideRubbickStolenVoid } from './fighters/rubbick/rubbickThemes.js';
 
 /**
  * Returns true if the entity is currently hit by, dragged by, or suppressed by Getsuga Tensho.
@@ -974,7 +975,7 @@ export class Fighter {
       this.knockbackVy = 0;
       return;
     }
-    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere())) {
+    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.vx = 0;
@@ -1074,13 +1075,19 @@ export class Fighter {
       }
       if (this.paralyzeTimer > 0) this.paralyzeTimer--;
       if (this.paralyzeTimer <= 0) {
+        this.paralyzeTimer = 0;
         this.isParalyzed = false;
         this.isParalyzedByMahito = false;
         this.isParalyzedByMahoraga = false;
         this.isWallSlammed = false;
         this.wallSlamPinnedX = undefined;
         this.wallSlamPinnedY = undefined;
-        if (this.statusEffects) this.statusEffects.isParalyzed = false;
+        delete this._timeStopFrozenAngle;
+        delete this._timeStopFrozenGunAngle;
+        if (this.statusEffects) {
+          this.statusEffects.isParalyzed = false;
+          this.statusEffects.paralyzeTimer = 0;
+        }
       }
       this.vx = 0;
       this.vy = 0;
@@ -1424,7 +1431,7 @@ export class Fighter {
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
     this._lastKnockbackFrame = currentFrame;
 
-    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere())) {
+    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.vx = 0;
@@ -1698,18 +1705,25 @@ export class Fighter {
         }
       }
       // Apply physical directional knockback whenever taking hit damage
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isDivineFlame && !opts.isContinuous && !opts.isDomainDPS && !opts.isDomain && !opts.isDomainSlash && !opts.fromDomain && !opts.fromBlackHole && !this.isTurret && !this.isDispenser) {
+      const isDomainHazard = opts.isDomainDPS || opts.isDomain || opts.isDomainSlash || opts.fromDomain || opts.isDomainEmpowered || (opts.projectile && (opts.projectile.isDomainDPS || opts.projectile.fromDomain || opts.projectile.isDomainEmpowered));
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isDivineFlame && !opts.isContinuous && !isDomainHazard && !opts.fromBlackHole && !this.isTurret && !this.isDispenser && !isInsideRubbickStolenVoid(this)) {
         let kbAngle = damageAngle;
         if (opts.projectile) {
           kbAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
         }
         if (kbAngle !== null) {
           const attackerConfig = (attacker?.characterId && CONFIG[attacker.characterId]) || attacker?.customConfig || {};
-          const baseKb = opts.knockbackForce || opts.projectile?.knockbackForce || attackerConfig.knockbackForce || (opts.isMelee ? 2.5 : (opts.isProjectile ? 1.5 : 1.0));
-          const kbVx = Math.cos(kbAngle) * baseKb;
-          const kbVy = Math.sin(kbAngle) * baseKb;
-          const stunFrames = opts.isHeavy ? 15 : (opts.isKnockback || opts.isExplosion ? 10 : 0);
-          this.applyKnockback(kbVx, kbVy, stunFrames);
+          const baseKb = typeof opts.knockbackForce === 'number'
+            ? opts.knockbackForce
+            : (typeof opts.projectile?.knockbackForce === 'number'
+              ? opts.projectile.knockbackForce
+              : (attackerConfig.knockbackForce || (opts.isMelee ? 2.5 : (opts.isProjectile ? 1.5 : 1.0))));
+          if (baseKb > 0) {
+            const kbVx = Math.cos(kbAngle) * baseKb;
+            const kbVy = Math.sin(kbAngle) * baseKb;
+            const stunFrames = opts.isHeavy ? 15 : (opts.isKnockback || opts.isExplosion ? 10 : 0);
+            this.applyKnockback(kbVx, kbVy, stunFrames);
+          }
         }
       }
 

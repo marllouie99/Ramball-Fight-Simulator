@@ -19,6 +19,20 @@ class AudioEventEmitter {
     // Explicit event routing to the underlying low-level soundSystem
     if (event === 'playSFX') {
       const [id, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null] = args;
+      if (typeof id === 'object' && id !== null && !Array.isArray(id)) {
+        const obj = id;
+        const objSrc = AUDIO_CONFIG[obj.src] || obj.src;
+        const objVol = obj.volume !== undefined ? obj.volume : volume;
+        const objSpd = obj.speed !== undefined ? obj.speed : speed;
+        const objOff = obj.offset !== undefined ? obj.offset : offset;
+        const objDel = obj.delay !== undefined ? obj.delay : delay;
+        const objEnd = obj.onEnded !== undefined ? obj.onEnded : onEnded;
+        if (objVol <= 0.0001) return null;
+        if (typeof objSrc === 'string' && !objSrc.includes('/') && !objSrc.includes('.')) {
+          return null;
+        }
+        return playSound(objSrc, objVol, objSpd, objOff, objDel, objEnd);
+      }
       if (volume <= 0.0001) return null;
       const src = AUDIO_CONFIG[id] || id; // Fallback to string if not mapped
       if (typeof src === 'string' && !src.includes('/') && !src.includes('.')) {

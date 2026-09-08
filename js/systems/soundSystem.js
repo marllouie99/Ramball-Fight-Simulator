@@ -79,6 +79,11 @@ export function isVoicelineAudio(src) {
   return s.includes('voiceline') ||
          s.includes('voice') ||
          s.includes('hollowpurple') ||
+         s.includes('purpledeploy') ||
+         s.includes('mixing') ||
+         s.includes('reddeploy') ||
+         s.includes('redcharging') ||
+         s.includes('redchanneling') ||
          s.includes('gojodomain') ||
          s.includes('yutadomainexpansion') ||
          s.includes('domainexpansion') ||

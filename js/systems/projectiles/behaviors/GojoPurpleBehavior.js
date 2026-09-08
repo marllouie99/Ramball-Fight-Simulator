@@ -324,7 +324,19 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     projectile._hasExploded = true;
 
     const actualFighters = fighters || (typeof state !== 'undefined' ? state.fighters : null) || [];
-    const ownerFighter = actualFighters[projectile.owner] || null;
+    const ownerFighter = actualFighters[projectile.owner] || projectile.ownerFighter || null;
+    if (ownerFighter && (ownerFighter.characterId === 'gojo' || ownerFighter.type === 'gojo')) {
+      ownerFighter.activePurpleProjectile = null;
+      if (ownerFighter.purpleRecoveryTimer > 0) {
+        ownerFighter.purpleRecoveryTimer = 0;
+        ownerFighter.resumeMovement?.(null);
+      }
+      if (!ownerFighter.isMeleeMode && !ownerFighter.isTargetOfAmbush && ownerFighter.hp > 0) {
+        ownerFighter.infinityActive = true;
+        ownerFighter.infinityCooldown = 0;
+        ownerFighter.infinityActiveTimer = 0;
+      }
+    }
     const ownerTeam = (typeof state !== 'undefined' && state.getFighterTeam) ? state.getFighterTeam(projectile.owner) : null;
     const isSecondCast = Boolean(projectile.is200Percent || (projectile.damageMult && projectile.damageMult > 1.2));
     const damageMult = isSecondCast ? (CONFIG.gojo?.purpleSecondCastDamageMultiplier ?? 2.0) : 1.0;

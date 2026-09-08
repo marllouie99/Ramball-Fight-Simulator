@@ -3,7 +3,7 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { spawnSparks, spawnImpactFlash, spawnTelekinesisDebris, spawnArcaneCrater, spawnArcaneSmoke, spawnArcaneShockwave, spawnArcaneFlash, spawnArcaneGlyphs, spawnSpellStealWisps, spawnGojoRedFrontalBlast } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnTelekinesisDebris, spawnArcaneCrater, spawnArcaneSmoke, spawnArcaneShockwave, spawnArcaneFlash, spawnArcaneGlyphs, spawnSpellStealWisps, spawnGojoRedFrontalBlast, spawnRubbickCastEffect } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
 import { drawRubbickStaff, drawRubbickChargeEffect, getRubbickStaffTip } from '../../graphics/weapons/rubbickWeaponGraphics.js';
@@ -28,6 +28,7 @@ export class RubbickFighter extends Fighter {
     
     this.attackCooldown = 0;
     this.attackSwingTimer = 0;
+    this.attackSwingMaxTimer = 16;
     this.telekinesisCooldown = 0;
     this.spellStealCooldown = (CONFIG.rubbick || CONFIG.trickster).spellStealCooldown;
 
@@ -88,6 +89,7 @@ export class RubbickFighter extends Fighter {
     this.z = 25;
     this.attackCooldown = 0;
     this.attackSwingTimer = 0;
+    this.attackSwingMaxTimer = 16;
     this.telekinesisCooldown = 0;
     this.spellStealCooldown = (CONFIG.rubbick || CONFIG.trickster).spellStealCooldown;
     this.tkTarget = null;
@@ -119,12 +121,142 @@ export class RubbickFighter extends Fighter {
     this.pullPhasePullDrag = 25;
     this.pullPhaseDisengage = 12;
 
+    this.activePurpleProjectile = null;
+    this._hasFiredStolenSkillTrick = false;
+
     if (this.tkTarget) {
       this.tkTarget.isCaughtInTelekinesis = false;
       this.tkTarget.isParalyzed = false;
       this.tkTarget.z = 0;
       this.tkTarget = null;
     }
+  }
+
+  hasActivePurpleProjectile() {
+    if (this.activePurpleProjectile) {
+      const isAlive = (this.activePurpleProjectile.life || 0) > 0;
+      const inProjSystem = projectileSystem?.projectiles?.includes(this.activePurpleProjectile);
+      const inStateProj = state?.projectiles?.includes(this.activePurpleProjectile);
+      if (isAlive && (inProjSystem || inStateProj)) {
+        return true;
+      } else {
+        this.activePurpleProjectile = null;
+      }
+    }
+    const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
+    const matchesOwner = (p) => {
+      if (!p) return false;
+      if (p.ownerFighter) return p.ownerFighter === this;
+      return myIdx !== -1 && (p.owner === myIdx || p.ownerIndex === myIdx);
+    };
+    const isPurpleProj = (p) => (
+      p &&
+      (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') &&
+      (p.isRubbick || p.isTrickster || p.colorTheme === 'green' || p.ownerFighter === this) &&
+      (p.life || 0) > 0 &&
+      matchesOwner(p)
+    );
+
+    if (projectileSystem?.projectiles) {
+      const found = projectileSystem.projectiles.find(isPurpleProj);
+      if (found) {
+        this.activePurpleProjectile = found;
+        return true;
+      }
+    }
+    if (state?.projectiles) {
+      const found = state.projectiles.find(isPurpleProj);
+      if (found) {
+        this.activePurpleProjectile = found;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  isPurpleActive() {
+    return this.hasActivePurpleProjectile();
+  }
+
+  hasActiveSkillInArena() {
+    // 1. Hollow Purple projectile active in the arena
+    if (this.hasActivePurpleProjectile()) {
+      return true;
+    }
+    // 2. Stolen Domain Expansion (Unlimited Void) active
+    if (this.stolenDomainActive && (this.stolenDomainTimer || 0) > 0) {
+      return true;
+    }
+    // 3. Stolen Time Sphere (Cronos) active
+    if (this.sphereActive && (this.sphereTimer || 0) > 0) {
+      return true;
+    }
+    // 4. Stolen Arcane Storm (Zeus) active
+    if (this.stormActive && (this.stormTimer || 0) > 0) {
+      return true;
+    }
+    // 5. Telekinesis actively lifting or slamming a target
+    if (this.tkTimer > 0 && this.tkTarget) {
+      return true;
+    }
+    // 6. Stolen Scythe Pull (Ruby) actively hooking
+    if (this.activePullActive && (this.activePullPhaseTimer || 0) > 0) {
+      return true;
+    }
+    // 7. Stolen Phantom Flurry (Musashi) active strikes
+    if ((this.flurryHitsLeft || 0) > 0) {
+      return true;
+    }
+    // 8. Stolen Solar Beam (Laser) firing
+    if ((this.beamTimer || 0) > 0) {
+      return true;
+    }
+    // 9. Stolen skill charging/windup in progress
+    if ((this.stolenWindUpTimer || 0) > 0) {
+      return true;
+    }
+    // 10. Active Bomber or Grenadier projectile in flight (if Rubbick casted bomber/grenadier)
+    if (this.stolenType === 'bomber' || this.stolenType === 'grenadier') {
+      const projs = projectileSystem?.projectiles || state?.projectiles;
+      if (projs && projs.length > 0) {
+        const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
+        const matchesOwner = (p) => {
+          if (!p) return false;
+          if (p.ownerFighter) return p.ownerFighter === this;
+          return myIdx !== -1 && (p.owner === myIdx || p.ownerIndex === myIdx);
+        };
+        const hasActiveGrenade = projs.some(p =>
+          p && (p.isBomberGrenade || p.isGrenade) && (p.life || 0) > 0 && matchesOwner(p)
+        );
+        if (hasActiveGrenade) return true;
+      }
+    }
+    return false;
+  }
+
+  canCastSpellSteal() {
+    if (this.isDead || this.hp <= 0) return false;
+    if (this.spellStealCooldown > 0) return false;
+    if (this.stolenType) return false;
+    if (this.hasActiveSkillInArena()) return false;
+    return true;
+  }
+
+  canCastTelekinesis() {
+    if (this.isDead || this.hp <= 0) return false;
+    if (this.telekinesisCooldown > 0) return false;
+    if (this.stolenType) return false;
+    if (this.hasActiveSkillInArena()) return false;
+    return true;
+  }
+
+  canCastStolenSkill() {
+    if (this.isDead || this.hp <= 0) return false;
+    if (!this.stolenType) return false;
+    if (this.stolenSkillCooldown > 0) return false;
+    if (this.stolenWindUpTimer > 0) return false;
+    if (this.hasActiveSkillInArena()) return false;
+    return true;
   }
 
   isStationarySkillActive() {
@@ -856,8 +988,10 @@ export class RubbickFighter extends Fighter {
         if (!this._hasFiredStolenSkillTrick) {
           this._hasFiredStolenSkillTrick = true;
           this.fireStolenSkill(opponent, ownerIndex);
-          this.attackCooldown = (CONFIG.rubbick || CONFIG.trickster).attackCooldown;
-          this.resumeMovement(opponent);
+          this.attackCooldown = (this.stolenType === 'gojo_domain' || this.stolenDomainActive) ? 0 : (CONFIG.rubbick || CONFIG.trickster).attackCooldown;
+          if (this.stolenType !== 'gojo_domain' && !this.stolenDomainActive) {
+            this.resumeMovement(opponent);
+          }
         }
       }
       return;
@@ -873,10 +1007,52 @@ export class RubbickFighter extends Fighter {
     if (this.telekinesisCooldown > 0) this.telekinesisCooldown--; // Keep ability cooldowns normal
     if (this.spellStealCooldown > 0) this.spellStealCooldown--;
     if (this.stolenSkillCooldown > 0) this.stolenSkillCooldown--;
-    if (this.stolenTimer > 0) {
-      this.stolenTimer--;
-      if (this.stolenTimer === 0 && !this.stolenDomainActive) {
+    // Lifecycle cleanup for persistent stolen skills when their arena presence terminates
+    if (this._hasFiredStolenSkillTrick && (this.stolenWindUpTimer || 0) <= 0) {
+      if (this.stolenType === 'gojo') {
+        if (!this.hasActivePurpleProjectile()) {
+          this.stolenType = null;
+          this.stolenTimer = 0;
+          this.activePurpleProjectile = null;
+          this._hasFiredStolenSkillTrick = false;
+          spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL EXHAUSTED', '#00FF64');
+        }
+      } else if (this.stolenType === 'cronos' && !this.sphereActive) {
         this.stolenType = null;
+        this.stolenTimer = 0;
+        this._hasFiredStolenSkillTrick = false;
+        spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL EXHAUSTED', '#00FF64');
+      } else if (this.stolenType === 'zeus' && !this.stormActive) {
+        this.stolenType = null;
+        this.stolenTimer = 0;
+        this._hasFiredStolenSkillTrick = false;
+        spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL EXHAUSTED', '#00FF64');
+      } else if (this.stolenType === 'musashi' && (!this.flurryHitsLeft || this.flurryHitsLeft <= 0)) {
+        this.stolenType = null;
+        this.stolenTimer = 0;
+        this._hasFiredStolenSkillTrick = false;
+        spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL EXHAUSTED', '#00FF64');
+      } else if (this.stolenType === 'ruby' && !this.activePullActive) {
+        this.stolenType = null;
+        this.stolenTimer = 0;
+        this._hasFiredStolenSkillTrick = false;
+        spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL EXHAUSTED', '#00FF64');
+      } else if (this.stolenType === 'gojo_domain' && !this.stolenDomainActive) {
+        this.stolenType = null;
+        this.stolenTimer = 0;
+        this._hasFiredStolenSkillTrick = false;
+        spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL EXHAUSTED', '#00FF64');
+      }
+    }
+
+    if (this.stolenTimer > 0) {
+      // Do not tick down stolenTimer while the stolen skill is actively cast/present in the arena
+      if (!this.hasActiveSkillInArena()) {
+        this.stolenTimer--;
+      }
+      if (this.stolenTimer === 0 && !this.hasActiveSkillInArena()) {
+        this.stolenType = null;
+        this._hasFiredStolenSkillTrick = false;
         spawnFloatingText(this.x, this.y - this.r - 20, 'SPELL FADED', '#2E8B57');
       }
     }
@@ -908,11 +1084,16 @@ export class RubbickFighter extends Fighter {
       if (this.attackCooldown <= 0 && opponent && !opponent.isDead) {
         this.attackCooldown = 12; // Rapid arcane space strikes
         this.attackSwingTimer = 10;
+        this.attackSwingMaxTimer = 10;
         const rcfg = CONFIG.rubbick || CONFIG.trickster;
         const boltDamage = ((rcfg?.boltDamage || 12) * 1.5) * getStolenMultiplier('gojo_domain', 'damageMultiplier');
         if (projectileSystem && projectileSystem.fireArcaneBolt) {
-          projectileSystem.fireArcaneBolt(this, ownerIndex, boltDamage, opponent, { isDomainEmpowered: true });
+          projectileSystem.fireArcaneBolt(this, ownerIndex, boltDamage, opponent, { isDomainEmpowered: true, knockbackForce: 0, isDomainDPS: true });
         }
+
+        const tip = (typeof getRubbickStaffTip === 'function') ? getRubbickStaffTip(this) : { x: this.x, y: this.y - (this.z || 0) };
+        spawnRubbickCastEffect(tip.x, tip.y, this.gunAngle, '#80FFB0', this);
+        triggerGlobalScreenShake(1.2, 3);
       }
 
       // Ascending emerald sparks & space ripples around Rubbick
@@ -950,13 +1131,26 @@ export class RubbickFighter extends Fighter {
           f.vy = 0;
           if (f.knockbackVx !== undefined) f.knockbackVx = 0;
           if (f.knockbackVy !== undefined) f.knockbackVy = 0;
+          if (typeof f.interruptAttacks === 'function') {
+            f.interruptAttacks(true);
+          }
 
-          // Disable Gojo's Limitless Infinity barrier while trapped inside Rubbick's stolen Unlimited Void
+          // Disable Gojo's Limitless Infinity barrier & cancel skills while trapped inside Rubbick's stolen Unlimited Void
           if (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') {
             f.infinityActive = false;
             f.infinityCooldown = 30;
             f.infinityFadeOpacity = 0;
             f.infinityBlockTimer = 0;
+            f.isDomainPreSlide = false;
+            f.domainPreSlideTimer = 0;
+            f.isChannelingDomainExpansion = false;
+            f.domainChargeTimer = 0;
+            f.isChannelingPurple = false;
+            f.purpleChargeTimer = 0;
+            f.redEffectTimer = 0;
+            f.redBuildupPhase = false;
+            f.forcedMeleeTimer = 0;
+            f.isMeleeMode = false;
           }
         }
       }
@@ -976,13 +1170,26 @@ export class RubbickFighter extends Fighter {
           opponent.vy = 0;
           if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
           if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
+          if (typeof opponent.interruptAttacks === 'function') {
+            opponent.interruptAttacks(true);
+          }
 
-          // Disable Gojo's Limitless Infinity barrier while trapped inside Rubbick's stolen Unlimited Void
+          // Disable Gojo's Limitless Infinity barrier & cancel skills while trapped inside Rubbick's stolen Unlimited Void
           if (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.id === 'gojo') {
             opponent.infinityActive = false;
             opponent.infinityCooldown = 30;
             opponent.infinityFadeOpacity = 0;
             opponent.infinityBlockTimer = 0;
+            opponent.isDomainPreSlide = false;
+            opponent.domainPreSlideTimer = 0;
+            opponent.isChannelingDomainExpansion = false;
+            opponent.domainChargeTimer = 0;
+            opponent.isChannelingPurple = false;
+            opponent.purpleChargeTimer = 0;
+            opponent.redEffectTimer = 0;
+            opponent.redBuildupPhase = false;
+            opponent.forcedMeleeTimer = 0;
+            opponent.isMeleeMode = false;
           }
         }
       }
@@ -1294,7 +1501,7 @@ export class RubbickFighter extends Fighter {
 
       // Ultimate: Spell Steal
       const rubbickCfg = CONFIG.rubbick || CONFIG.trickster;
-      if (this.spellStealCooldown <= 0 && !this.stolenType && !this.isTeammate(opponent) && distSq < rubbickCfg.spellStealRange * rubbickCfg.spellStealRange) {
+      if (this.spellStealCooldown <= 0 && !this.stolenType && !this.hasActiveSkillInArena() && !this.isTeammate(opponent) && distSq < rubbickCfg.spellStealRange * rubbickCfg.spellStealRange) {
         const isGojoOpponent = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.type === 'gojo' || opponent._def?.id === 'gojo');
         
         // If opponent is Gojo, Rubbick can steal whichever skill Gojo has cast (Hollow Purple, Reversal Red, or Unlimited Void)!
@@ -1391,7 +1598,7 @@ export class RubbickFighter extends Fighter {
       }
 
       // Skill 1: Telekinesis
-      if (this.telekinesisCooldown <= 0 && !this.stolenType && !this.isTeammate(opponent) && distSq < rubbickCfg.telekinesisRange * rubbickCfg.telekinesisRange && !opponent.immuneToCC) {
+      if (this.telekinesisCooldown <= 0 && !this.stolenType && !this.hasActiveSkillInArena() && !this.isTeammate(opponent) && distSq < rubbickCfg.telekinesisRange * rubbickCfg.telekinesisRange && !opponent.immuneToCC) {
         this.telekinesisCooldown = rubbickCfg.telekinesisCooldown;
         this.tkTarget = opponent;
         this.tkTimer = rubbickCfg.telekinesisDuration;
@@ -1442,7 +1649,7 @@ export class RubbickFighter extends Fighter {
 
       // Check heavy stolen skills every frame
       let castedHeavy = false;
-      if (this.stolenType && !this.tkTimer && this.stolenSkillCooldown <= 0) {
+      if (this.stolenType && !this.tkTimer && !this.hasActiveSkillInArena() && this.stolenSkillCooldown <= 0) {
         if (['cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'musashi', 'normal', 'zeus', 'gojo', 'gojo_red', 'gojo_domain'].includes(this.stolenType)) {
           // It's a Heavy Spell! (One-time cast that consumes the stolen buff)
           castedHeavy = true;
@@ -1454,14 +1661,20 @@ export class RubbickFighter extends Fighter {
       if (!castedHeavy && this.attackCooldown <= 0 && !this.tkTimer) {
         const rubbickCfg = CONFIG.rubbick || CONFIG.trickster;
         this.attackCooldown = rubbickCfg.attackCooldown;
-        this.attackSwingTimer = 15; // 15 frames of staff swing animation
+        this.attackSwingTimer = 16; // 16 frames of staff swing animation
+        this.attackSwingMaxTimer = 16;
         
         let castedSpammable = false;
-        if (this.stolenType && ['orange', 'darkslategray', 'gunslinger'].includes(this.stolenType) && this.stolenSkillCooldown <= 0) {
+        if (this.stolenType && ['orange', 'darkslategray', 'gunslinger'].includes(this.stolenType) && !this.hasActiveSkillInArena() && this.stolenSkillCooldown <= 0) {
           castedSpammable = this.executeStolenSkill(opponent, ownerIndex);
         }
         
         if (!castedSpammable) {
+          // Aim toward opponent before firing and triggering VFX
+          if (opponent && !opponent.isDead) {
+            this.gunAngle = Math.atan2(opponent.y - (this.y - (this.z || 0)), opponent.x - this.x);
+          }
+
           // Normal Arcane Bolt
           let dmg = rubbickCfg.boltDamage;
           if (this.stolenType === 'cronos' && this._isInsideOwnSphere && this._isInsideOwnSphere()) {
@@ -1471,11 +1684,11 @@ export class RubbickFighter extends Fighter {
              dmg = cronosCfg.sphereStaffDamage || 18;
              
              // Ensure swing animation finishes before the next attack
-             this.attackSwingTimer = Math.min(15, cronosCfg.sphereStaffCooldown || 40);
+             this.attackSwingTimer = Math.min(16, cronosCfg.sphereStaffCooldown || 40);
+             this.attackSwingMaxTimer = this.attackSwingTimer;
              
-             // Aim before swinging the visual effect
-             if (opponent) {
-                this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+             if (opponent && !opponent.isDead) {
+                this.gunAngle = Math.atan2(opponent.y - (this.y - (this.z || 0)), opponent.x - this.x);
              }
           } else if (this.stolenType === 'berserker') {
             // Apply Berserker Rage buffs to Arcane Bolt
@@ -1485,16 +1698,29 @@ export class RubbickFighter extends Fighter {
             
             // Speed up the swing animation to match the faster attack speed
             const totalSpeedUp = rageAttackMultiplier / getStolenMultiplier('berserker', 'cooldownMultiplier');
-            this.attackSwingTimer = Math.max(5, Math.floor(15 / totalSpeedUp));
+            this.attackSwingTimer = Math.max(5, Math.floor(16 / totalSpeedUp));
+            this.attackSwingMaxTimer = this.attackSwingTimer;
             
-            // Aim before swinging the visual effect
-            if (opponent) {
-               this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+            if (opponent && !opponent.isDead) {
+               this.gunAngle = Math.atan2(opponent.y - (this.y - (this.z || 0)), opponent.x - this.x);
             }
           }
           
           if (projectileSystem.fireArcaneBolt) {
              projectileSystem.fireArcaneBolt(this, ownerIndex, dmg, opponent);
+          }
+
+          // ── Arcane Cast Visual Effect at Staff Crystal Tip ──
+          const tip = getRubbickStaffTip(this);
+          const castColor = (this.stolenType && this.stolenColor) ? this.stolenColor : '#00FF64';
+          spawnRubbickCastEffect(tip.x, tip.y, this.gunAngle, castColor, this);
+
+          // Subtle physical feedback & attack sound
+          triggerGlobalScreenShake(1.2, 3);
+          const sound = getBasicAttackSound(this._def?.id, this._def?.type);
+          if (sound) {
+            this._attackSoundTimer = sound.delay;
+            this._attackSoundConfig = sound;
           }
         }
       }
@@ -1525,6 +1751,9 @@ export class RubbickFighter extends Fighter {
   }
 
   executeStolenSkill(opponent, ownerIndex) {
+    if (this.hasActiveSkillInArena()) {
+      return false;
+    }
     let skillCast = false;
     // Map of copied active skills
     switch (this.stolenType) {
@@ -1581,11 +1810,11 @@ export class RubbickFighter extends Fighter {
               : (this.stolenType === 'gojo' ? 45 : (this.stolenType === 'gojo_red' ? 35 : (this.stolenType === 'gojo_domain' ? 60 : 30))); 
             skillCast = true;
             if (this.stolenType === 'gojo') {
-              const chargeSound = getSkillSound('gojo', 'purple_charging') || { src: 'Assets/Sound Effects/Skills/mixing.mp3', volume: 1.8 };
-              if (chargeSound) this.playStolenSFX(chargeSound, 1.0);
+              // Stolen Hollow Purple wind-up: Pure sci-fi laser charge SFX (no Gojo voiceline)
+              this.playStolenSFX('Assets/Sound Effects/SkillEffects/lasercharge.mp3', 0.85);
             } else if (this.stolenType === 'gojo_red') {
-              const chargeSound = getSkillSound('gojo', 'red_charging') || { src: 'Assets/Sound Effects/Skills/redcharging.mp3', volume: 2.0 };
-              if (chargeSound) this.playStolenSFX(chargeSound, 1.8);
+              // Stolen Reversal Red wind-up: Pure sci-fi laser charge SFX (no Gojo voiceline)
+              this.playStolenSFX('Assets/Sound Effects/SkillEffects/lasercharge.mp3', 0.75);
             } else if (this.stolenType === 'gojo_domain') {
               // Stolen Unlimited Void wind-up: Play subtle spatial whoosh SFX (no Gojo voiceline)
               this.playStolenSFX('Assets/Sound Effects/Skills/woosh.mp3', 0.85);
@@ -1625,6 +1854,7 @@ export class RubbickFighter extends Fighter {
   }
 
   fireStolenSkill(opponent, ownerIndex) {
+    this._hasFiredStolenSkillTrick = true;
     switch (this.stolenType) {
       case 'musashi':
          this.flurryHitsLeft = 5;
@@ -1743,11 +1973,14 @@ export class RubbickFighter extends Fighter {
         this.attackSwingTimer = 18; // Follow-through thrust/release animation
 
         if (projectileSystem && projectileSystem.fireGojoPurple) {
-          projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isRubbick: true, isTrickster: true, colorTheme: 'green', suppressVoice: true });
+          const purpleProj = projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isRubbick: true, isTrickster: true, colorTheme: 'green', suppressVoice: true });
+          if (purpleProj) {
+            this.activePurpleProjectile = purpleProj;
+          }
         }
         
-        const purpleSound = { src: 'Assets/Sound Effects/Skills/purpledeploy.mp3', volume: 1.5 };
-        if (purpleSound) this.playStolenSFX(purpleSound, 1.5);
+        // Stolen Hollow Purple cast release: Pure arcane laser beam SFX (no Gojo voiceline)
+        this.playStolenSFX('Assets/Sound Effects/Attacks/laserbeam.mp3', 0.95);
         break;
       case 'gojo_red':
         if (opponent) {
@@ -1890,17 +2123,75 @@ export class RubbickFighter extends Fighter {
           // Lock Rubbick in place during domain (hand sign channeling pose)
           this.vx = 0;
           this.vy = 0;
+          this.attackCooldown = 0; // Immediate arcane space strikes upon deployment!
 
           // Stolen Unlimited Void deployment: Play pure spatial time-stop sphere SFX (100% voiceline-free)
           this.playStolenSFX('Assets/Sound Effects/Skills/cronosphere.mp3', 1.2);
+
+          // Rule #17: Paralyzing Domain Stasis - Immediately freeze all enemies on deployment frame!
+          const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+          const freezeTargets = [];
+          if (Array.isArray(state.fighters)) {
+            for (const f of state.fighters) {
+              if (f && f !== this && !f.isDead && f.hp > 0) {
+                const fTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(f)) : null;
+                if (!myTeam || fTeam !== myTeam) freezeTargets.push(f);
+              }
+            }
+          }
+          if (Array.isArray(state.illusions)) {
+            for (const ill of state.illusions) {
+              if (ill && ill.owner !== this && !ill.isDead && ill.hp > 0) {
+                freezeTargets.push(ill);
+              }
+            }
+          }
+          if (opponent && !freezeTargets.includes(opponent)) {
+            freezeTargets.push(opponent);
+          }
+
+          for (const target of freezeTargets) {
+            if (target.domainImmunity || target.characterId === 'toji' || target.type === 'toji') continue;
+            if (typeof target.applyTimeStop === 'function') {
+              target.applyTimeStop(15, { isDomain: true, isUltimate: true });
+            } else {
+              target.timeStopTimer = Math.max(target.timeStopTimer || 0, 15);
+            }
+            if (typeof target.applyHitStun === 'function') {
+              target.applyHitStun(15);
+            }
+            target.vx = 0;
+            target.vy = 0;
+            if (target.knockbackVx !== undefined) target.knockbackVx = 0;
+            if (target.knockbackVy !== undefined) target.knockbackVy = 0;
+            if (typeof target.interruptAttacks === 'function') {
+              target.interruptAttacks(true);
+            }
+            if (target.characterId === 'gojo' || target.type === 'gojo' || target._def?.id === 'gojo') {
+              target.isDomainPreSlide = false;
+              target.domainPreSlideTimer = 0;
+              target.isChannelingDomainExpansion = false;
+              target.domainChargeTimer = 0;
+              target.isChannelingPurple = false;
+              target.purpleChargeTimer = 0;
+              target.redEffectTimer = 0;
+              target.redBuildupPhase = false;
+              target.forcedMeleeTimer = 0;
+              target.isMeleeMode = false;
+              target.infinityActive = false;
+              target.infinityFadeOpacity = 0;
+              target.infinityBlockTimer = 0;
+            }
+          }
 
           this.stolenSkillCooldown = (CONFIG.gojo?.domainCooldown || 1200) * getStolenMultiplier('gojo_domain', 'cooldownMultiplier');
         }
         break;
     }
     
-    // Clear the stolen skill after casting (except gojo_domain which runs over time)
-    if (this.stolenType !== 'gojo_domain') {
+    // Clear the stolen skill after casting ONLY if it does not remain active in the arena over time
+    const persistentArenaSkills = ['gojo', 'gojo_domain', 'cronos', 'zeus', 'musashi', 'ruby'];
+    if (!persistentArenaSkills.includes(this.stolenType)) {
       this.stolenType = null;
       this.stolenTimer = 0;
     }
@@ -1938,34 +2229,45 @@ export class RubbickFighter extends Fighter {
     }
     this.staffSmokeParticles = this.staffSmokeParticles.filter(p => p.life > 0);
 
-    if (isTimeStopped || this.stolenType !== 'berserker') return;
+    if (isTimeStopped || (this.stolenType !== 'berserker' && this.attackSwingTimer <= 0)) return;
 
     const isSwinging = this.attackSwingTimer > 0;
     const speed = Math.hypot(this.vx, this.vy);
-    const isMoving = speed > 0.5;
+    const isMoving = speed > 0.5 && this.stolenType === 'berserker';
 
     if (isSwinging || isMoving) {
-       // Staff head position calculation
-       const idleHover = 0; 
-       const progress = isSwinging ? this.attackSwingTimer / 15 : 0;
-       const swingAngle = Math.sin(progress * Math.PI) * -0.6;
-       const thrustOffset = Math.sin(progress * Math.PI) * 12;
+       let worldX, worldY, staffAngle;
 
-       const tx = this.r * 0.4 + thrustOffset;
-       const ty = this.r * 0.85 + idleHover;
-       const staffRot = Math.PI * 0.3 + swingAngle;
+       if (this.stolenType === 'berserker') {
+         // Berserker melee slash calculation
+         const idleHover = 0; 
+         const progress = isSwinging ? this.attackSwingTimer / 15 : 0;
+         const swingAngle = Math.sin(progress * Math.PI) * -0.6;
+         const thrustOffset = Math.sin(progress * Math.PI) * 12;
 
-       const headLocalX = 0;
-       const headLocalY = -50;
+         const tx = this.r * 0.4 + thrustOffset;
+         const ty = this.r * 0.85 + idleHover;
+         const staffRot = Math.PI * 0.3 + swingAngle;
 
-       const rotX = headLocalX * Math.cos(staffRot) - headLocalY * Math.sin(staffRot);
-       const rotY = headLocalX * Math.sin(staffRot) + headLocalY * Math.cos(staffRot);
+         const headLocalX = 0;
+         const headLocalY = -50;
 
-       const gunX = tx + rotX;
-       const gunY = ty + rotY;
+         const rotX = headLocalX * Math.cos(staffRot) - headLocalY * Math.sin(staffRot);
+         const rotY = headLocalX * Math.sin(staffRot) + headLocalY * Math.cos(staffRot);
 
-       const worldX = this.x + gunX * Math.cos(this.gunAngle) - gunY * Math.sin(this.gunAngle);
-       const worldY = this.y + gunX * Math.sin(this.gunAngle) + gunY * Math.cos(this.gunAngle);
+         const gunX = tx + rotX;
+         const gunY = ty + rotY;
+
+         worldX = this.x + gunX * Math.cos(this.gunAngle) - gunY * Math.sin(this.gunAngle);
+         worldY = this.y + gunX * Math.sin(this.gunAngle) + gunY * Math.cos(this.gunAngle);
+         staffAngle = this.gunAngle + staffRot;
+       } else {
+         // Rubbick Grand Magus basic attack spellcasting staff tip tracking
+         const tip = (typeof getRubbickStaffTip === 'function') ? getRubbickStaffTip(this) : { x: this.x, y: this.y - (this.z || 0) };
+         worldX = tip.x;
+         worldY = tip.y;
+         staffAngle = this.gunAngle + Math.PI / 2;
+       }
 
        let shouldPush = true;
        if (this.staffTrail.length > 0) {
@@ -1981,25 +2283,29 @@ export class RubbickFighter extends Fighter {
                jitter: Math.random() * 4 - 2
            });
 
-           const smokeCount = isSwinging ? 3 : 1;
+           const smokeCount = isSwinging ? 2 : 1;
            for (let i = 0; i < smokeCount; i++) {
-               const staffAngle = this.gunAngle + staffRot;
-               const shaftOffset = Math.random() * 35;
+               const shaftOffset = Math.random() * 25;
                const px = worldX - Math.cos(staffAngle) * shaftOffset;
                const py = worldY - Math.sin(staffAngle) * shaftOffset;
 
+               const isRubbickBasic = (this.stolenType !== 'berserker');
+               const smokeColor = isRubbickBasic
+                 ? (Math.random() > 0.6 ? '#06120A' : (Math.random() > 0.3 ? '#00FF64' : '#70FFAB'))
+                 : (Math.random() > 0.6 ? '#000000' : (Math.random() > 0.4 ? '#004a20' : '#008840'));
+
                this.staffSmokeParticles.push({
-                  x: px + (Math.random() - 0.5) * 15,
-                  y: py + (Math.random() - 0.5) * 15,
-                  vx: (Math.random() - 0.5) * 1.5,
-                  vy: (Math.random() - 0.5) * 1.5 - 0.5,
-                  life: 15 + Math.random() * 10,
-                  maxLife: 25,
-                  size: 6 + Math.random() * 6,
-                  stretch: 0.4 + Math.random() * 0.4,
+                  x: px + (Math.random() - 0.5) * 8,
+                  y: py + (Math.random() - 0.5) * 8,
+                  vx: (Math.random() - 0.5) * 1.2,
+                  vy: (Math.random() - 0.5) * 1.2 - 0.3,
+                  life: 12 + Math.random() * 8,
+                  maxLife: 20,
+                  size: 4 + Math.random() * 4,
+                  stretch: 0.5 + Math.random() * 0.3,
                   angle: Math.random() * Math.PI * 2,
                   spin: (Math.random() - 0.5) * 0.1,
-                  color: Math.random() > 0.6 ? '#000000' : (Math.random() > 0.4 ? '#004a20' : '#008840')
+                  color: smokeColor
                });
            }
         }
@@ -2007,7 +2313,7 @@ export class RubbickFighter extends Fighter {
   }
   
   _drawStaffTrail(ctx) {
-    if (this.stolenType !== 'berserker' || isInsideEnemyGojoDomain(this)) return;
+    if ((this.stolenType !== 'berserker' && this.attackSwingTimer <= 0) || isInsideEnemyGojoDomain(this)) return;
 
     if (this.staffSmokeParticles && this.staffSmokeParticles.length > 0) {
         for (const p of this.staffSmokeParticles) {
@@ -2076,7 +2382,13 @@ export class RubbickFighter extends Fighter {
         ctx.fill();
     };
 
-    if (this.isInRage) {
+    if (this.stolenType !== 'berserker') {
+      // Magnificent multi-layered Arcane Emerald / Mint / White core crescent trail during basic attack
+      drawCrescentPolygon(this.staffTrail, 6, 18, 10, 14);     // Dark Obsidian Ink Silhouette (#06120A)
+      drawCrescentPolygon(this.staffTrail, 0, 255, 100, 8);    // Arcane Emerald Aura (#00FF64)
+      drawCrescentPolygon(this.staffTrail, 112, 255, 171, 4);  // High-frequency Mint Layer (#70FFAB)
+      drawCrescentPolygon(this.staffTrail, 255, 255, 255, 1.5);// Pure White Hot Center Core
+    } else if (this.isInRage) {
       // Draw massive green anime-style trails when in rage
       drawCrescentPolygon(this.staffTrail, 0, 0, 0, 16);     // Black Aura
       drawCrescentPolygon(this.staffTrail, 0, 220, 100, 8);  // Green Aura
@@ -2646,7 +2958,7 @@ export class RubbickFighter extends Fighter {
    * Ground telegraph rendering for Rubbick (Arcane Emerald Ground Magic Circles)
    */
   drawGroundTelegraph(ctx) {
-    if (this.hp <= 0 || this.isDead || isInsideEnemyGojoDomain(this)) return;
+    if (this.hp <= 0 || this.isDead) return;
 
     // 1. Stolen Unlimited Void Wind-up Ground Summoning Circle (Arcane Emerald Green)
     if (this.stolenType === 'gojo_domain' && this.stolenWindUpTimer > 0) {
@@ -2732,7 +3044,6 @@ export class RubbickFighter extends Fighter {
    */
   drawDomainBackground(ctx, isClashSecondary = false) {
     if (!this.domainActive && !this.stolenDomainActive) return;
-    if (isInsideEnemyGojoDomain(this)) return;
     if (typeof state !== 'undefined' && state.pixiApp) return;
     if (this.stolenType === 'gojo_domain' || this.stolenDomainActive) {
       renderRubbickDomainBackground(this, ctx, isClashSecondary);

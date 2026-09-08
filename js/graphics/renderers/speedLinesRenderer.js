@@ -402,3 +402,123 @@ export function drawIchigoBankaiSpeedLines() {
   // Disabled per user request: no speed lines during Ichigo's Bankai form
   return;
 }
+
+// ──────────────────────────────────────────
+// Toji Fushiguro Stealth Ambush & Slash Speed Lines (Rule 16 Compliant)
+// ──────────────────────────────────────────
+let _tojiSpeedLineSeeds = null;
+let _tojiSpeedLineTheme = null;
+
+function _initTojiSpeedLineSeeds(isDarkMode = false) {
+  _tojiSpeedLineSeeds = [];
+  _tojiSpeedLineTheme = isDarkMode ? 'dark' : 'light';
+  const totalLines = 22;
+
+  for (let i = 0; i < totalLines; i++) {
+    const norm = (i / (totalLines - 1)) * 2 - 1; // -1.0 to +1.0
+    const perpOffset = norm * 36 + (Math.random() - 0.5) * 6;
+    const normDist = 1 - Math.abs(norm);
+    const len = 38 + normDist * 58 + Math.random() * 16;
+    const maxThick = 1.0 + normDist * 1.3 + Math.random() * 0.4;
+    const speed = 16 + Math.random() * 10;
+    const phase = Math.random() * 120;
+
+    let color;
+    if (i % 4 === 0) color = isDarkMode ? '#FF2060' : 'rgba(255, 30, 86, 0.95)';       // Soul-split Crimson
+    else if (i % 4 === 1) color = isDarkMode ? '#B040FF' : 'rgba(155, 31, 232, 0.95)'; // Cursed Violet
+    else if (i % 4 === 2) color = '#FFFFFF';                                           // White-hot core
+    else color = isDarkMode ? '#0A0014' : 'rgba(10, 4, 18, 0.92)';                    // Crisp dark manga ink line
+
+    _tojiSpeedLineSeeds.push({
+      perpOffset,
+      len,
+      maxThick,
+      speed,
+      phase,
+      color
+    });
+  }
+}
+
+export function drawTojiSpeedLines() {
+  if (!state.fighters) return;
+  const tojiFighter = state.fighters.find(f => {
+    if (!f || f.hp <= 0 || (f.characterId !== 'toji' && f.type !== 'toji')) return false;
+    const isSuppressed = typeof f.areAttackEffectsSuppressed === 'function' ? f.areAttackEffectsSuppressed() : isSuppressedByGetsuga(f);
+    if (isSuppressed) return false;
+    const isAmbushSlashing = f.isAmbushing && (f.ambushPhase === 'KATANA_SLASH' || f.ambushPhase === 'PHANTOM_FLURRY');
+    const isUltSlashing = f.ultimateActive && (f.ultimatePhase === 'CRATER' || f.ultimatePhase === 'STRIKING');
+    return isAmbushSlashing || isUltSlashing;
+  });
+  if (!tojiFighter) return;
+
+  const ctx = state.ctx;
+  if (!ctx) return;
+
+  const isDarkMode = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' || 
+      state.darkMode || 
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
+  const activeKey = `${tojiFighter.ambushPhase || tojiFighter.ultimatePhase}_${isDarkMode ? 'dark' : 'light'}`;
+  if (_tojiSpeedLineTheme !== activeKey || tojiFighter._lastSpeedLinePhase !== tojiFighter.ambushPhase) {
+    _tojiSpeedLineSeeds = null;
+  }
+  tojiFighter._lastSpeedLinePhase = tojiFighter.ambushPhase;
+
+  if (!_tojiSpeedLineSeeds) _initTojiSpeedLineSeeds(isDarkMode);
+
+  const lineAngle = tojiFighter.gunAngle !== undefined ? tojiFighter.gunAngle : (tojiFighter.angle || 0);
+  const cosA = Math.cos(lineAngle);
+  const sinA = Math.sin(lineAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
+
+  const cx = tojiFighter.x;
+  const cy = tojiFighter.y;
+  const now = Date.now();
+
+  ctx.save();
+
+  for (let i = 0; i < _tojiSpeedLineSeeds.length; i++) {
+    const seed = _tojiSpeedLineSeeds[i];
+    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 100);
+    const backOffset = tojiFighter.r * 1.2;
+    const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
+    const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
+
+    const halfLen = seed.len / 2;
+    const halfThick = seed.maxThick / 2;
+    const midOff = halfLen * 0.15;
+
+    const startX = lineCenterX - cosA * halfLen;
+    const startY = lineCenterY - sinA * halfLen;
+
+    const midX = lineCenterX + cosA * midOff;
+    const midY = lineCenterY + sinA * midOff;
+
+    const endX = lineCenterX + cosA * halfLen;
+    const endY = lineCenterY + sinA * halfLen;
+
+    const topMidX = midX + perpX * halfThick;
+    const topMidY = midY + perpY * halfThick;
+
+    const botMidX = midX - perpX * halfThick;
+    const botMidY = midY - perpY * halfThick;
+
+    ctx.fillStyle = seed.color;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(topMidX, topMidY);
+    ctx.lineTo(endX, endY);
+    ctx.lineTo(botMidX, botMidY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+

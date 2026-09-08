@@ -346,23 +346,19 @@ export class GojoFighter extends Fighter {
     audioSystem.playSFX(sndSrc, sndVol);
   }
 
-  triggerInfinityBlock(hitX, hitY, attacker) {
-    return modTriggerInfinityBlock(this, hitX, hitY, attacker);
+  triggerInfinityBlock(hitX, hitY, attacker, spawnEffects = true) {
+    return modTriggerInfinityBlock(this, hitX, hitY, attacker, spawnEffects);
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    const isSpatialOrRanged = Boolean(opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.isProjectile || opts.isGetsuga || opts.isFlame || opts.isDivineFlame || opts.fromDomain || opts.isTick || opts.isTickDamage || opts.isContinuous || opts.isRed);
-    const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 85;
-    const isAttackerAmbushing = attacker && (attacker.isAmbushing || (attacker.isStealthed && !this.domainActive));
-    if (!isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
-      if (!this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0) {
-        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
-        this.isMeleeMode = true;
-      }
-    }
-
     const isPurple = Boolean(opts.isPurpleDPS || opts.isPurpleExplosion || opts.isPurple || opts?.projectile?.isGojoPurple || opts?.projectile?.isGojoPurpleOrb || opts?.projectile?.behaviorType === 'gojo_purple' || opts?.projectile?.colorTheme === 'green');
-    const isGuaranteedHit = Boolean(isPurple || (opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.bypassShield || opts.isIsoh || opts.isAmbush || opts.isAmbushThrust || opts.isSoulSplit || opts.isRed || opts.isDivineFlame || opts.isFuga)) || (attacker && attacker.isAmbushing));
+    const isIsohHit = Boolean(opts && (opts.isIsoh || opts.isAmbushThrust));
+    const isTojiUltimateAssault = Boolean(
+      (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji') && attacker.ultimateActive) ||
+      (opts && (opts.isTojiUltimateAssault || opts.isTojiUltimateFinalBlow || (opts.isIsoh && attacker && (attacker.characterId === 'toji' || attacker.type === 'toji'))))
+    );
+    const isAmbushHit = Boolean(this.isTargetOfAmbush || (attacker && attacker.isAmbushing) || isTojiUltimateAssault || (opts && (opts.isAmbushKatana || opts.isAmbushFlurry || opts.isTojiUltimateAssault || opts.isTojiUltimateFinalBlow)));
+    const isGuaranteedHit = Boolean(isPurple || isIsohHit || isAmbushHit || isTojiUltimateAssault || (opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDomain || opts.isDomainSlash || (opts.isSukunaSlash && (opts.isDomain || opts.isDomainSlash)) || opts.bypassShield || opts.isRed || opts.isDivineFlame || opts.isFuga)));
     const isSaitamaCountering = attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
       ((attacker._counterPunchTimer && attacker._counterPunchTimer > 0) ||
        (attacker._counterWindupTimer && attacker._counterWindupTimer > 0) ||
@@ -371,31 +367,55 @@ export class GojoFighter extends Fighter {
        attacker.isCountering);
     const isAttackerChannelingDomain = attacker && (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion);
     const inRubbickVoid = isInsideRubbickStolenVoid(this);
-    if (inRubbickVoid) {
+    const isPurpleInFlight = (typeof this.isPurpleActive === 'function' && this.isPurpleActive()) || ((this.purpleRecoveryTimer || 0) > 0);
+    if (inRubbickVoid || isPurpleInFlight) {
       this.infinityActive = false;
       this.infinityFadeOpacity = 0;
       this.infinityBlockTimer = 0;
     }
     const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
-    const isBreatherState = (this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0;
-    if (!inRubbickVoid && (isBreatherState || isDomainChanneling)) {
+    const isBreatherState = (this.purpleRetreatTimer || 0) > 0;
+    if (!inRubbickVoid && !isPurpleInFlight && (isBreatherState || isDomainChanneling)) {
       this.infinityActive = true;
       this.infinityCooldown = 0;
       this.isMeleeMode = false;
     }
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
-    if (!inRubbickVoid && !isPurple && (!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !this.isChannelingPurple && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !opts?.projectile?.infinityBypassed) {
+    if (isInsideEnemyDomain && !this.isTargetOfAmbush && !this.isMeleeMode && !isPurpleInFlight) {
+      this.infinityActive = true;
+      this.infinityCooldown = 0;
+    }
+
+    // --- GOJO LIMITLESS INFINITY INTERCEPTION ---
+    // If Infinity is active, Gojo intercepts incoming melee and projectile attacks, completely blocking 100% of damage!
+    const isInfinityBarrierReady = !inRubbickVoid && !isPurple && !isPurpleInFlight && !this.isTargetOfAmbush && !isTojiUltimateAssault && this.infinityActive && (this.infinityCooldown || 0) <= 0 && !this.isChannelingPurple && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && !(attacker.isAmbushing) && !(attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')) && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !opts?.projectile?.infinityBypassed;
+    if (isInfinityBarrierReady) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
       const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8;
 
-      if (!hasAdapted && Math.random() <= freezeChance) {
-        const contactX = opts?.projectile ? opts.projectile.x : (attacker.x || this.x);
-        const contactY = opts?.projectile ? opts.projectile.y : (attacker.y || this.y);
+      if (!hasAdapted) {
+        const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
+        const gojoY = this.y - (this.z || 0);
+        let srcX = opts?.projectile ? opts.projectile.x : (attacker ? attacker.x : this.x);
+        let srcY = opts?.projectile ? opts.projectile.y : (attacker ? (attacker.y - (attacker.z || 0)) : gojoY);
+        let dx = srcX - this.x;
+        let dy = srcY - gojoY;
+        let dist = Math.hypot(dx, dy);
+        let contactAngle;
+        if (dist > 0.1) {
+          contactAngle = Math.atan2(dy, dx);
+        } else if (attacker && (attacker.vx !== 0 || attacker.vy !== 0)) {
+          contactAngle = Math.atan2(-attacker.vy, -attacker.vx);
+        } else {
+          contactAngle = (this.gunAngle !== undefined) ? this.gunAngle : 0;
+        }
+        const contactX = this.x + Math.cos(contactAngle) * barrierRadius;
+        const contactY = gojoY + Math.sin(contactAngle) * barrierRadius;
         const physicalAttacker = (opts?.projectile || opts?.isProjectile || opts?.isGetsuga) ? null : attacker;
         this.triggerInfinityBlock(contactX, contactY, physicalAttacker);
 
-        // Immediately freeze incoming projectile (such as Getsuga Tensho) in Limitless stasis
+        // Immediately freeze incoming projectile in Limitless stasis
         if (opts?.projectile && !opts.projectile.infinityBypassed && !isPurple) {
           const p = opts.projectile;
           p.isFrozenByInfinity = true;
@@ -425,7 +445,18 @@ export class GojoFighter extends Fighter {
             p.hitTargets.clear();
           }
         }
-        return false;
+        return false; // BLOCKED 100% BY INFINITY!
+      }
+    }
+
+    // If hit was NOT blocked by Infinity (e.g. Inverted Spear of Heaven ISOH, or Infinity on cooldown), transition to melee combat if close
+    const isSpatialOrRanged = Boolean(opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.isProjectile || opts.isGetsuga || opts.isFlame || opts.isDivineFlame || opts.fromDomain || opts.isTick || opts.isTickDamage || opts.isContinuous || opts.isRed);
+    const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 85;
+    const isAttackerAmbushing = attacker && (attacker.isAmbushing || (attacker.isStealthed && !this.domainActive) || (attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')));
+    if (!isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
+      if (!this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0) {
+        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
+        this.isMeleeMode = true;
       }
     }
 
@@ -481,6 +512,38 @@ export class GojoFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    const inRubbickVoid = isInsideRubbickStolenVoid(this);
+    if (inRubbickVoid) {
+      this.timeStopTimer = Math.max(this.timeStopTimer || 0, 15);
+      this.hitStunTimer = Math.max(this.hitStunTimer || 0, 15);
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.isDomainPreSlide = false;
+      this.domainPreSlideTimer = 0;
+      this.isChannelingDomainExpansion = false;
+      this.domainChargeTimer = 0;
+      this.isChannelingPurple = false;
+      this.purpleChargeTimer = 0;
+      this.redEffectTimer = 0;
+      this.redBuildupPhase = false;
+      this.redBuildupTimer = 0;
+      this.forcedMeleeTimer = 0;
+      this.isMeleeMode = false;
+      this.infinityActive = false;
+      this.infinityFadeOpacity = 0;
+      this.infinityBlockTimer = 0;
+      if (typeof this.interruptAttacks === 'function') {
+        this.interruptAttacks(true);
+      }
+      if (this.domainCooldown > 0) this.domainCooldown--;
+      if (this.purpleCooldown > 0) this.purpleCooldown--;
+      if (this.redCooldown > 0) this.redCooldown--;
+      if (this.teleportDodgeCooldown > 0) this.teleportDodgeCooldown--;
+      return;
+    }
+
     const myIdx = ownerIndex !== undefined ? ownerIndex : (state.fighters ? state.fighters.indexOf(this) : 0);
     const myTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : (this.team !== undefined ? this.team : null);
 
@@ -602,7 +665,7 @@ export class GojoFighter extends Fighter {
       this.timeStopTimer = 0; 
     }
 
-    if ((this.isChannelingPurple || this.isChannelingDomainExpansion || this.redEffectTimer > 0 || this.redBuildupPhase) && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0) {
+    if ((this.isChannelingPurple || this.isChannelingDomainExpansion || this.redEffectTimer > 0 || this.redBuildupPhase) && !this.isTargetOfAmbush && !isInsideRubbickStolenVoid(this) && (this.silenceTimer || 0) <= 0) {
       // Unstoppable Hyper-Armor during Purple Channeling, Domain Channeling & Red Buildup: Clear hitStun & status freezes so non-Toji attacks cannot interrupt!
       this.hitStunTimer = 0;
       this.electricStunTimer = 0;
@@ -645,6 +708,15 @@ export class GojoFighter extends Fighter {
       }
       // Rule #1: Cancel active channeling/skills
       this.interruptAttacks();
+      // Ensure Gojo resets to Ranged mode with Infinity active when knocked back or distanced from enemy
+      if (this.isMeleeMode && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 120 || this.knockbackVx !== 0 || this.knockbackVy !== 0 || this.paralyzeTimer > 0)) {
+        this.isMeleeMode = false;
+      }
+      if (!inRubbickVoid && !this.isTargetOfAmbush && !this.isMeleeMode && this.hp > 0) {
+        this.infinityActive = true;
+        this.infinityCooldown = 0;
+        this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05);
+      }
       if (isGetsugaSuppressed) {
         // Rule #3: Keep facing direction tracking target while dragged
         if (opponent && !opponent.isDead) {
@@ -738,11 +810,10 @@ export class GojoFighter extends Fighter {
         this.hp = Math.min(this.maxHp, this.hp + passiveRate);
       }
     }
+    const isPurpleInFlight = (typeof this.isPurpleActive === 'function' && this.isPurpleActive()) || ((this.purpleRecoveryTimer || 0) > 0);
 
-    const inRubbickVoid = isInsideRubbickStolenVoid(this);
-
-    // In Ranged Mode (when not in melee mode), Gojo's Limitless Infinity barrier is ALWAYS active (unless trapped in Rubbick's stolen Unlimited Void)!
-    if (inRubbickVoid) {
+    // In Ranged Mode (when not in melee mode), Gojo's Limitless Infinity barrier is ALWAYS active (unless trapped in Rubbick's stolen Unlimited Void or Purple is in flight)!
+    if (inRubbickVoid || isPurpleInFlight) {
       this.infinityActive = false;
       this.infinityFadeOpacity = 0;
       this.infinityBlockTimer = 0;
@@ -753,8 +824,8 @@ export class GojoFighter extends Fighter {
     }
 
     const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
-    const isBreatherState = (this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0;
-    if (!inRubbickVoid && (isBreatherState || isDomainChanneling)) {
+    const isBreatherState = (this.purpleRetreatTimer || 0) > 0;
+    if (!inRubbickVoid && !isPurpleInFlight && (isBreatherState || isDomainChanneling)) {
       this.infinityActive = true;
       this.infinityCooldown = 0;
       this.isMeleeMode = false;
@@ -773,20 +844,20 @@ export class GojoFighter extends Fighter {
     // Detect if Gojo is inside an ENEMY's domain (not his own and not Rubbick's stolen void)
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
 
-    // Force Infinity active inside enemy domains only when NOT in melee mode
-    if (!inRubbickVoid && isInsideEnemyDomain && !isUnderAmbush && !this.isMeleeMode) {
+    // Force Infinity active inside enemy domains only when NOT in melee mode and Purple is not in flight
+    if (!inRubbickVoid && isInsideEnemyDomain && !isUnderAmbush && !this.isMeleeMode && !isPurpleInFlight) {
       this.infinityActive = true;
       this.infinityCooldown = 0;
     }
 
-    const barrierShouldBeActive = !inRubbickVoid && !isUnderAmbush && (!this.isMeleeMode || isBreatherState || isDomainChanneling) && !this.isChannelingPurple && !this.domainActive && this.hp > 0;
+    const barrierShouldBeActive = !inRubbickVoid && !isUnderAmbush && !isPurpleInFlight && (!this.isMeleeMode || isBreatherState || isDomainChanneling) && !this.isChannelingPurple && !this.domainActive && this.hp > 0;
     if (barrierShouldBeActive) {
       this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05); // ~20 frames smooth fade-in
     } else {
-      this.infinityFadeOpacity = (isUnderAmbush || inRubbickVoid) ? 0 : Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
+      this.infinityFadeOpacity = (isUnderAmbush || inRubbickVoid || isPurpleInFlight) ? 0 : Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
     }
 
-    if (isUnderAmbush || inRubbickVoid) {
+    if (isUnderAmbush || inRubbickVoid || isPurpleInFlight) {
       this.infinityBlockTimer = 0;
     }
 
@@ -841,7 +912,7 @@ export class GojoFighter extends Fighter {
 
     if (this.infinityCooldown > 0) {
       this.infinityCooldown--;
-      if (this.infinityCooldown <= 0 && !isInsideRubbickStolenVoid(this)) this.infinityActive = true;
+      if (this.infinityCooldown <= 0 && !isInsideRubbickStolenVoid(this) && !isPurpleInFlight) this.infinityActive = true;
     }
 
     // Decrement skill cooldowns (Red, Purple, RCT, Blue, Domain, Melee) when not afflicted with paralyze debuff
@@ -962,6 +1033,13 @@ export class GojoFighter extends Fighter {
 
     // Handle Pre-Domain Slide Phase (smooth slide before stopping to channel)
     if (this.isDomainPreSlide) {
+      if (inRubbickVoid || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0) {
+        this.isDomainPreSlide = false;
+        this.domainPreSlideTimer = 0;
+        this.vx = 0;
+        this.vy = 0;
+        return;
+      }
       this.hitStunTimer = 0; // Hyper-armor while preparing Domain Expansion
       if (isSilenced && this.isTargetOfAmbush) {
         this.isDomainPreSlide = false;
@@ -1021,7 +1099,7 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (!this.isDemoFighter && !isSilenced && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+    if (!this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
       // Initiate smooth Pre-Domain Slide Phase before stopping to channel
       this.isDomainPreSlide = true;
       this.domainPreSlideTimer = 18; // ~18 frames smooth glide deceleration
@@ -1175,6 +1253,12 @@ export class GojoFighter extends Fighter {
         this.purpleRecoveryTimer = 0;
         this.z = 0;
         this.resumeMovement(opponent);
+        // Breather recovery expired — restore Limitless Infinity barrier cleanly if Purple is not still in flight
+        if (!this.isMeleeMode && !this.isTargetOfAmbush && !isInsideRubbickStolenVoid(this) && this.hp > 0 && !this.isPurpleActive()) {
+          this.infinityActive = true;
+          this.infinityCooldown = 0;
+          this.infinityActiveTimer = 0;
+        }
       }
       this.resolveWallBounce(arena);
       return; // Pause movement & basic attacks during post-Purple breather recovery
@@ -1305,8 +1389,8 @@ export class GojoFighter extends Fighter {
           this.forcedMeleeTimer = 0;
           this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? 120;
         }
-      } else if (isBeingMeleed && this.meleeModeCooldown <= 0) {
-        // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
+      } else if (isBeingMeleed && (!this.infinityActive || (this.infinityCooldown || 0) > 0) && this.meleeModeCooldown <= 0) {
+        // Cooldown is READY, Infinity is down, and enemy is in melee range: ENTER MELEE MODE!
         this.isMeleeMode = true;
         this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
       }
@@ -1759,7 +1843,8 @@ export class GojoFighter extends Fighter {
   _checkInfinityCollisions() {
     if (this.isCaughtInTelekinesis || (this.timeStopTimer && this.timeStopTimer > 0)) return;
     const inRubbickVoid = isInsideRubbickStolenVoid(this);
-    if (inRubbickVoid) {
+    const isPurpleInFlight = (typeof this.isPurpleActive === 'function' && this.isPurpleActive()) || ((this.purpleRecoveryTimer || 0) > 0);
+    if (inRubbickVoid || isPurpleInFlight) {
       this.infinityActive = false;
       this.infinityFadeOpacity = 0;
       this.infinityBlockTimer = 0;
@@ -1767,18 +1852,18 @@ export class GojoFighter extends Fighter {
     }
 
     const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
-    const isBreatherState = (this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0;
-    if (isBreatherState || isDomainChanneling) {
+    const isBreatherState = (this.purpleRetreatTimer || 0) > 0;
+    if (!isPurpleInFlight && (isBreatherState || isDomainChanneling)) {
       this.infinityActive = true;
       this.infinityCooldown = 0;
       this.isMeleeMode = false;
     }
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
-    if (isInsideEnemyDomain && !this.isTargetOfAmbush && !this.isMeleeMode) {
+    if (isInsideEnemyDomain && !this.isTargetOfAmbush && !this.isMeleeMode && !isPurpleInFlight) {
       this.infinityActive = true;
       this.infinityCooldown = 0;
     }
-    if ((this.isMeleeMode && !isBreatherState && !isDomainChanneling && !this.domainActive) || this.hp <= 0 || this.isChannelingPurple) return;
+    if ((this.isMeleeMode && !isBreatherState && !isDomainChanneling && !this.domainActive) || this.hp <= 0 || this.isChannelingPurple || isPurpleInFlight) return;
 
     const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
     const slowRange = CONFIG.gojo?.infinitySlowRange || 140;
@@ -1791,8 +1876,12 @@ export class GojoFighter extends Fighter {
     ];
 
     for (const entity of allTargets) {
-      if (!entity || entity === this || entity.hp <= 0 || entity.dead) continue;
-      if (entity.owner === this || (entity.team !== undefined && entity.team === this.team)) continue; // Don't block self, teammates, or own summons/illusions
+      if (entity.owner === this) continue;
+      const myIdx = (state.fighters) ? state.fighters.indexOf(this) : -1;
+      const entIdx = (state.fighters) ? state.fighters.indexOf(entity) : -1;
+      const myTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : (this.team !== undefined ? this.team : null);
+      const entTeam = (state.getFighterTeam && entIdx >= 0) ? state.getFighterTeam(entIdx) : (entity.team !== undefined ? entity.team : null);
+      if (myTeam !== null && entTeam !== null && myTeam === entTeam && myIdx !== entIdx) continue;
 
       // Don't interrupt or block an entity currently channeling Telekinesis
       if (entity.tkTimer > 0 || (entity.tkTarget && entity.tkTarget.hp > 0)) continue;
@@ -1814,6 +1903,11 @@ export class GojoFighter extends Fighter {
                                 (entity.gojoInfinityImmune || entity.isMaxAdapted || entity.isInfinityBlitz || entity.isWallSlamActive || totalMahoragaStages >= 8);
       if (isMahoragaAdapted) continue;
 
+      // Toji during ultimate (ultimateMaxStrikes & final blow dive) or stealth ambush bypasses Infinity barrier collision/slow
+      const isTojiAssaultBypassing = (entity.characterId === 'toji' || entity.type === 'toji') &&
+        (entity.isAmbushing || entity.ultimateActive);
+      if (isTojiAssaultBypassing) continue;
+
       const entY = entity.y - (entity.z || 0);
       const gojoY = this.y - (this.z || 0);
       const dx = entity.x - this.x;
@@ -1825,32 +1919,46 @@ export class GojoFighter extends Fighter {
 
       if (distSq < minDist * minDist) {
         if (typeof this.triggerInfinityBlock === 'function') {
-          const dist = Math.sqrt(distSq) || 1;
-          const contactX = this.x + (dx / dist) * barrierRadius;
-          const contactY = gojoY + (dy / dist) * barrierRadius;
-          this.triggerInfinityBlock(contactX, contactY, entity);
+          let contactAngle;
+          if (distSq > 0.01) {
+            contactAngle = Math.atan2(dy, dx);
+          } else if (entity.vx !== 0 || entity.vy !== 0) {
+            contactAngle = Math.atan2(-entity.vy, -entity.vx);
+          } else if (entity.gunAngle !== undefined) {
+            contactAngle = entity.gunAngle + Math.PI;
+          } else {
+            contactAngle = (this.gunAngle !== undefined) ? this.gunAngle : 0;
+          }
+          const contactX = this.x + Math.cos(contactAngle) * barrierRadius;
+          const contactY = gojoY + Math.sin(contactAngle) * barrierRadius;
+          const isInitialContact = !entity._inInfinityContact;
+          entity._inInfinityContact = true;
+          this.triggerInfinityBlock(contactX, contactY, entity, isInitialContact);
         }
-      } else if (distSq < slowDist * slowDist) {
-        // Proximity Approach Slow: The closer the enemy gets to the barrier, the slower they move (Limitless Infinity paradox)
-        const dist = Math.sqrt(distSq);
-        const distFromBarrier = Math.max(0, dist - minDist);
-        const proximityRatio = 1.0 - Math.min(1.0, distFromBarrier / slowRange); // 0.0 at outer edge -> 1.0 at barrier edge
-        const minSlowMult = CONFIG.gojo?.infinitySlowMinMultiplier ?? 0.20;
-        const slowMult = Math.max(minSlowMult, 1.0 - proximityRatio * (1.0 - minSlowMult));
+      } else {
+        entity._inInfinityContact = false;
+        if (distSq < slowDist * slowDist) {
+          // Proximity Approach Slow: The closer the enemy gets to the barrier, the slower they move (Limitless Infinity paradox)
+          const dist = Math.sqrt(distSq);
+          const distFromBarrier = Math.max(0, dist - minDist);
+          const proximityRatio = 1.0 - Math.min(1.0, distFromBarrier / slowRange); // 0.0 at outer edge -> 1.0 at barrier edge
+          const minSlowMult = CONFIG.gojo?.infinitySlowMinMultiplier ?? 0.20;
+          const slowMult = Math.max(minSlowMult, 1.0 - proximityRatio * (1.0 - minSlowMult));
 
-        // Apply slow debuff
-        if (typeof entity.applySlow === 'function') {
-          entity.applySlow(3, slowMult, { isInfinitySlow: true });
-        } else if (entity.statusEffects && typeof entity.statusEffects.applySlow === 'function') {
-          entity.statusEffects.applySlow(3, slowMult);
-        } else {
-          entity.slowTimer = Math.max(entity.slowTimer || 0, 3);
-          entity.slowMultiplier = slowMult;
-        }
+          // Apply slow debuff
+          if (typeof entity.applySlow === 'function') {
+            entity.applySlow(3, slowMult, { isInfinitySlow: true });
+          } else if (entity.statusEffects && typeof entity.statusEffects.applySlow === 'function') {
+            entity.statusEffects.applySlow(3, slowMult);
+          } else {
+            entity.slowTimer = Math.max(entity.slowTimer || 0, 3);
+            entity.slowMultiplier = slowMult;
+          }
 
-        // Subtle spatial distortion particles while slowed near barrier
-        if (Math.random() < 0.15 && typeof spawnSparks === 'function') {
-          spawnSparks(entity.x, entY, 1, '#00E5FF', '#FFFFFF');
+          // Subtle spatial distortion particles while slowed near barrier
+          if (Math.random() < 0.15 && typeof spawnSparks === 'function') {
+            spawnSparks(entity.x, entY, 1, '#00E5FF', '#FFFFFF');
+          }
         }
       }
     }

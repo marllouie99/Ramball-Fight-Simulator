@@ -53,7 +53,7 @@ class ProjectileSystem {
     this.stuckShurikens = []; // Array for shurikens stuck in the wall
     this.stuckArrows = []; // Array for Uryu's arrows stuck in the wall
     this.poolSize = 500; // Pre-allocate pool size
-    this.pool = Array.from({ length: this.poolSize }, (_, i) => ({ id: `proj_${i}` }));
+    this.pool = Array.from({ length: this.poolSize }, (_, i) => ({ id: `proj_${i}`, _poolId: `proj_${i}` }));
     this.poolIndex = 0; // Circular pointer to reuse objects without array push/pop thrashing
     this.maxActiveProjectiles = 200; // Dynamic limit based on fighter count
     this._preallocatePool();
@@ -71,6 +71,7 @@ class ProjectileSystem {
   }
 
   _resetProjectileProperties(p) {
+    if (p._poolId) p.id = p._poolId;
     p.x = 0;
     p.y = 0;
     p.vx = 0;
@@ -90,6 +91,7 @@ class ProjectileSystem {
     p.damage = 0;
     p.isFollowUp = false;
     p.fadingOut = false;
+    p.fadingAlpha = undefined;
     p._resumeVx = undefined;
     p._resumeVy = undefined;
     p.isFrozenByInfinity = false;
@@ -117,6 +119,20 @@ class ProjectileSystem {
     p.isGojoBlue = false;
     p.isGojoPurple = false;
     p.isGojoPurpleOrb = false;
+    p.isRubbick = false;
+    p.isTrickster = false;
+    p.colorTheme = undefined;
+    p.isDomainEmpowered = false;
+    p.isDomainDPS = false;
+    p.fromDomain = false;
+    p.knockbackForce = undefined;
+    p.is200Percent = false;
+    p.visualTime = undefined;
+    p.undodgeable = false;
+    p.bypassShield = false;
+    p.infinityBypassed = false;
+    p.blueScale = undefined;
+    p.pullRadius = undefined;
     p.isArcaneBolt = false;
     p.bouncesLeft = undefined;
     p.bounceDamageMultiplier = undefined;
@@ -554,11 +570,19 @@ class ProjectileSystem {
     proj.life = 180; // Extended lifetime to reach arena walls
     proj.maxLife = 180;
     proj.color = '#00FFFF'; // Cyan
+    proj.colorTheme = 'blue';
+    proj.isRubbick = false;
+    proj.isTrickster = false;
+    proj.isDomainEmpowered = false;
+    proj.isDomainDPS = false;
+    proj.fromDomain = false;
     proj.owner = ownerIndex;
     proj.ownerFighter = fighter;
     proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
     
     proj.isGojoBlue = true;
+    proj.isGojoPurple = false;
+    proj.isGojoPurpleOrb = false;
     proj.behaviorType = 'gojo_blue';
     proj.visual = 'gojoBlue'; // Distinct visual
     proj.hitTargets = new Set();
@@ -3245,9 +3269,10 @@ class ProjectileSystem {
                   const oldestIdx = this.projectiles.indexOf(oldestFrozenProj);
                   if (oldestIdx !== -1) {
                     this._returnProjectile(oldestFrozenProj);
-                    this.projectiles[oldestIdx] = this.projectiles[this.projectiles.length - 1];
-                    this.projectiles.pop();
-                    if (oldestIdx <= i) i--;
+                    this.projectiles.splice(oldestIdx, 1);
+                    if (oldestIdx <= i) {
+                      i--;
+                    }
                   }
                 }
               }
@@ -3574,11 +3599,12 @@ class ProjectileSystem {
     this.projectiles.push(proj);
   }
 
-  fireArcaneBolt(fighter, ownerIndex, damage, opponent) {
+  fireArcaneBolt(fighter, ownerIndex, damage, opponent, options = {}) {
     if (!fighter || !opponent) return;
     const rcfg = CONFIG.rubbick || CONFIG.trickster;
-    const speed = rcfg?.boltSpeed || 8;
-    const radius = (CONFIG.projectile?.radius || 5) * 0.9;
+    const isDomainEmpowered = Boolean(options.isDomainEmpowered);
+    const speed = (isDomainEmpowered ? (rcfg?.boltSpeed || 8) * 1.35 : (rcfg?.boltSpeed || 8));
+    const radius = (CONFIG.projectile?.radius || 5) * (isDomainEmpowered ? 1.25 : 0.9);
     
     const targetX = opponent.x;
     const targetY = opponent.y;
@@ -3607,9 +3633,11 @@ class ProjectileSystem {
     let startX = rawStartX;
     let startY = rawStartY;
     if (arena) {
+      const ax = arena.x !== undefined ? arena.x : (arena.cx !== undefined ? arena.cx - arena.width / 2 : 0);
+      const ay = arena.y !== undefined ? arena.y : (arena.cy !== undefined ? arena.cy - arena.height / 2 : 0);
       if (arena.shape === 'circle') {
-        const cx = arena.x + arena.width / 2;
-        const cy = arena.y + arena.height / 2;
+        const cx = arena.cx !== undefined ? arena.cx : (ax + arena.width / 2);
+        const cy = arena.cy !== undefined ? arena.cy : (ay + arena.height / 2);
         const ar = arena.radius || (arena.width / 2);
         const d = Math.hypot(startX - cx, startY - cy);
         if (d + pr > ar && d > 0) {
@@ -3617,8 +3645,8 @@ class ProjectileSystem {
           startY = cy + ((startY - cy) / d) * (ar - pr - 2);
         }
       } else {
-        startX = Math.max(arena.x + pr + 2, Math.min(arena.x + arena.width - pr - 2, startX));
-        startY = Math.max(arena.y + pr + 2, Math.min(arena.y + arena.height - pr - 2, startY));
+        startX = Math.max(ax + pr + 2, Math.min(ax + arena.width - pr - 2, startX));
+        startY = Math.max(ay + pr + 2, Math.min(ay + arena.height - pr - 2, startY));
       }
     }
 
@@ -3630,11 +3658,18 @@ class ProjectileSystem {
     proj.r = radius;
     proj.life = 240; // 4 seconds max life
     proj.maxLife = 240;
-    proj.color = '#39FF14'; // Emerald/Neon green
+    proj.color = isDomainEmpowered ? '#80FFB0' : '#39FF14'; // Brilliant Mint / Emerald green
 
     proj.owner = ownerIndex;
+    proj.ownerFighter = fighter;
+    proj.isRubbick = true;
+    proj.isTrickster = true;
+    proj.fadingOut = false;
+    proj.fadingAlpha = undefined;
     proj.damage = damage;
     proj.isArcaneBolt = true;
+    proj.visual = 'arcaneBolt';
+    proj.isDomainEmpowered = isDomainEmpowered;
     proj.bouncesLeft = rcfg?.bounceCount ?? 4;
     proj.bounceDamageMultiplier = rcfg?.bounceDamageMultiplier ?? 0.7;
     proj.wobblePhase = Math.random() * Math.PI * 2;
@@ -3642,6 +3677,13 @@ class ProjectileSystem {
     proj.angle = proj.rotation;
     proj.lastAngle = proj.rotation;
     proj.hitFighters = new Set();
+    if (proj.history) {
+      proj.history.length = 0;
+      proj.history.push({ x: startX, y: startY });
+    } else {
+      proj.history = [{ x: startX, y: startY }];
+    }
+    proj.historyMax = 30;
     this.projectiles.push(proj);
   }
 

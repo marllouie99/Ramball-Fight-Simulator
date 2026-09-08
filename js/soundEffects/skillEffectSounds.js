@@ -103,55 +103,54 @@ export const SKILL_EFFECT_SOUNDS = {
   // ── Toji Fushiguro ──────────────────────────
   toji: {
     finalblowcharging: {
-      src: 'Assets/Sound Effects/Skills/tojo-finalblow-charging.mp3',
-      volume: 4.5,
-      delay: -0.10,
+      src: CONFIG.toji?.sounds?.finalBlowCharging || 'Assets/Sound Effects/Skills/tojo-finalblow-charging.mp3',
+      volume: CONFIG.toji?.soundVolumes?.finalBlowCharging !== undefined ? CONFIG.toji.soundVolumes.finalBlowCharging : 4.5,
+      delay: CONFIG.toji?.soundDelays?.finalBlowCharging !== undefined ? CONFIG.toji.soundDelays.finalBlowCharging : -0.10,
     },
-
     ultimatefinalblow: {
-      src: 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3',
-      volume: 4.5,
-      delay: 0,
+      src: CONFIG.toji?.sounds?.ultimateFinalBlow || 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3',
+      volume: CONFIG.toji?.soundVolumes?.ultimateFinalBlow !== undefined ? CONFIG.toji.soundVolumes.ultimateFinalBlow : 4.5,
+      delay: CONFIG.toji?.soundDelays?.ultimateFinalBlow !== undefined ? CONFIG.toji.soundDelays.ultimateFinalBlow : 0,
     },
     secondweaponattack: {
-      src: 'Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3',
-      volume: 4.2,
-      delay: -0.30,
+      src: CONFIG.toji?.sounds?.secondWeaponAttack || 'Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3',
+      volume: CONFIG.toji?.soundVolumes?.secondWeaponAttack !== undefined ? CONFIG.toji.soundVolumes.secondWeaponAttack : 4.2,
+      delay: CONFIG.toji?.soundDelays?.secondWeaponAttack !== undefined ? CONFIG.toji.soundDelays.secondWeaponAttack : -0.30,
     },
     backthrust: {
-      src: 'Assets/Sound Effects/Skills/toji-backthrust.mp3',
-      volume: 4.2,
-      delay: -0.20,
+      src: CONFIG.toji?.sounds?.backThrust || 'Assets/Sound Effects/Skills/toji-backthrust.mp3',
+      volume: CONFIG.toji?.soundVolumes?.backThrust !== undefined ? CONFIG.toji.soundVolumes.backThrust : 4.2,
+      delay: CONFIG.toji?.soundDelays?.backThrust !== undefined ? CONFIG.toji.soundDelays.backThrust : -0.20,
     },
     firstseqteleport: {
-      src: 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3',
-      volume: 4.0,
-      delay: -0.10,
+      src: CONFIG.toji?.sounds?.firstSeqTeleport || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3',
+      volume: CONFIG.toji?.soundVolumes?.firstSeqTeleport !== undefined ? CONFIG.toji.soundVolumes.firstSeqTeleport : 4.0,
+      delay: CONFIG.toji?.soundDelays?.firstSeqTeleport !== undefined ? CONFIG.toji.soundDelays.firstSeqTeleport : -0.10,
     },
     ultimatechanneling: {
-      src: 'Assets/Sound Effects/Skills/toji-ultimatechanneling.mp3',
-      volume: 4.0,
-      delay: 0,
+      src: CONFIG.toji?.sounds?.ultimateChanneling || 'Assets/Sound Effects/Skills/toji-ultimatechanneling.mp3',
+      volume: CONFIG.toji?.soundVolumes?.ultimateChanneling !== undefined ? CONFIG.toji.soundVolumes.ultimateChanneling : 4.0,
+      delay: CONFIG.toji?.soundDelays?.ultimateChanneling !== undefined ? CONFIG.toji.soundDelays.ultimateChanneling : 0,
     },
     vanish: {
-      src: 'Assets/Sound Effects/Skills/woosh.mp3',
-      volume: 5.0,
-      delay: 0,
+      src: CONFIG.toji?.sounds?.vanish || 'Assets/Sound Effects/Skills/woosh.mp3',
+      volume: CONFIG.toji?.soundVolumes?.vanish !== undefined ? CONFIG.toji.soundVolumes.vanish : 5.0,
+      delay: CONFIG.toji?.soundDelays?.vanish !== undefined ? CONFIG.toji.soundDelays.vanish : 0,
     },
     strike: {
-      src: 'Assets/Sound Effects/Skills/dash5.mp3',
-      volume: 1.0,
-      delay: 0,
+      src: CONFIG.toji?.sounds?.dashStrike || 'Assets/Sound Effects/Skills/dash5.mp3',
+      volume: CONFIG.toji?.soundVolumes?.dashStrike !== undefined ? CONFIG.toji.soundVolumes.dashStrike : 1.0,
+      delay: CONFIG.toji?.soundDelays?.dashStrike !== undefined ? CONFIG.toji.soundDelays.dashStrike : 0,
     },
     phantomflurry: {
-      src: 'Assets/Sound Effects/Skills/toji-3rdseq-phantomflurry.mp3',
-      volume: 4.0,
-      delay: 0,
+      src: CONFIG.toji?.sounds?.phantomFlurry || 'Assets/Sound Effects/Skills/toji-3rdseq-phantomflurry.mp3',
+      volume: CONFIG.toji?.soundVolumes?.phantomFlurry !== undefined ? CONFIG.toji.soundVolumes.phantomFlurry : 4.0,
+      delay: CONFIG.toji?.soundDelays?.phantomFlurry !== undefined ? CONFIG.toji.soundDelays.phantomFlurry : 0,
     },
     dash: {
-      src: 'Assets/Sound Effects/Skills/dash5.mp3',
-      volume: 1.0,
-      delay: 0,
+      src: CONFIG.toji?.sounds?.dashStrike || 'Assets/Sound Effects/Skills/dash5.mp3',
+      volume: CONFIG.toji?.soundVolumes?.dashStrike !== undefined ? CONFIG.toji.soundVolumes.dashStrike : 1.0,
+      delay: CONFIG.toji?.soundDelays?.dashStrike !== undefined ? CONFIG.toji.soundDelays.dashStrike : 0,
     },
   },
 
@@ -276,6 +275,43 @@ export function getSkillEffectSound(fighterName, effectName) {
         volume: CONFIG.mahoraga.soundVolumes?.dash !== undefined ? CONFIG.mahoraga.soundVolumes.dash : 1.0,
         speed: 1.0
       };
+    }
+  }
+
+  // Dynamic overrides for Toji from tojiConfig.js
+  if (lowerName.includes('toji') && CONFIG.toji) {
+    const tojiKeyMap = {
+      ultimatechanneling: 'ultimateChanneling',
+      finalblowcharging: 'finalBlowCharging',
+      ultimatefinalblow: 'ultimateFinalBlow',
+      secondweaponattack: 'secondWeaponAttack',
+      backthrust: 'backThrust',
+      firstseqteleport: 'firstSeqTeleport',
+      phantomflurry: 'phantomFlurry',
+      vanish: 'vanish',
+      strike: 'dashStrike',
+      dash: 'dashStrike',
+      dashstrike: 'dashStrike',
+      spearswing: 'spearSwing',
+      spearbackstab: 'spearBackstab',
+      parrydodge: 'parryDodge',
+      groundsmash: 'groundSmash'
+    };
+
+    const cfgKey = tojiKeyMap[lowerEffect] || lowerEffect;
+    const staticEntry = SKILL_EFFECT_SOUNDS.toji?.[lowerEffect];
+    const src = CONFIG.toji.sounds?.[cfgKey] || staticEntry?.src;
+    if (src) {
+      const volume = CONFIG.toji.soundVolumes?.[cfgKey] !== undefined 
+        ? CONFIG.toji.soundVolumes[cfgKey] 
+        : (staticEntry?.volume ?? 1.0);
+      const delay = CONFIG.toji.soundDelays?.[cfgKey] !== undefined 
+        ? CONFIG.toji.soundDelays[cfgKey] 
+        : (staticEntry?.delay ?? 0);
+      const speed = CONFIG.toji.soundSpeeds?.[cfgKey] !== undefined 
+        ? CONFIG.toji.soundSpeeds[cfgKey] 
+        : (staticEntry?.speed ?? 1.0);
+      return { src, volume, delay, speed };
     }
   }
 

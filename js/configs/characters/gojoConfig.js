@@ -24,7 +24,7 @@ export const gojoConfig = {
   infinityCooldown: 100,                   // Recharge cooldown in frames before Infinity barrier reactivates after blocking
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact
   infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
-  infinityRadius: 100,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
+  infinityRadius: 110,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
   infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
   infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
   infinityMeleePushForce: 12.5,            // Physical velocity impulse (rebound force) applied to push melee attackers away
@@ -37,7 +37,7 @@ export const gojoConfig = {
   infinityMaxActiveShockwaves: 2,          // Max limit of concurrent active barrier shockwave rings
 
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
-  blueCooldown: 200,         // Fire rate for basic attack (Blue orb) - Lower is faster
+  blueCooldown: 100,         // Fire rate for basic attack (Blue orb) - Lower is faster
   blueSpeed: 10.5,          // Speed of Blue orb projectile
   blueRadius: 100,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
   blueProjectileRadius: 15,  // Base visual & collision radius of Blue projectile orb (at default blueRadius: 50)
@@ -88,10 +88,10 @@ export const gojoConfig = {
   purpleExplosionKnockback: 24, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
   purpleExplosionShakeDuration: 30, // Duration of screen shake on explosion
-  purpleRecoveryDuration: 120,      // Breather recovery pause duration in frames (~2.0s) after firing Hollow Purple
+  purpleRecoveryDuration: 50,      // Breather recovery pause duration in frames after firing Hollow Purple (50 frames = ~0.83s)
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
-  purpleSecondCastDamageMultiplier: 2.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
+  purpleSecondCastDamageMultiplier: 1.5,   // Damage multiplier for 2nd cast (2.0 = 200%)
   purpleSecondCastChargeMax: 160,           // Channeling duration in frames for 200% Hollow Purple (~3.0s at 60fps)
   purpleSecondCastTextBanner: '200% HOLLOW PURPLE!', // Floating text displayed on 2nd cast release
   purpleSecondCastTextHeader100: 'PURPLE 100%',     // Skill HUD bar label for 100% cast
@@ -110,7 +110,7 @@ export const gojoConfig = {
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 25% or below
   reverseCursedTechniqueHealAmount: 500,   // Flat HP healed per RCT trigger
-  reverseCursedTechniqueCooldown: 700,     // 15 second cooldown between RCT heals
+  reverseCursedTechniqueCooldown: 1500,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
   passiveRctHealRate: 0,                   // Disabled

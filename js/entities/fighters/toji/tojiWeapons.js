@@ -5,9 +5,11 @@
 import { applyDamageToTarget } from '../../fighter.js';
 import { CONFIG } from '../../../core/config.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
-import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnGroundScorch } from '../../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../../graphics/particles/bloodEffect.js';
+import { spawnTojiCleaveHitEffect } from '../../../graphics/particles/tojiImpactEffect.js';
 import { TOJI_WEAPON_CONFIG } from '../../../graphics/weapons/tojiWeaponGraphics.js';
+import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
 
 export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, maxReach, arcAngle = Math.PI * 0.6) {
@@ -190,22 +192,64 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
     audioSystem.playSFX(secondSeqSound);
   }
   fighter._secondSeqAudioPlayed = false;
-  audioSystem.playSFX('attack_swordswing', 1.0);
-  audioSystem.playSFX('attack_fleshhit', 1.2);
+  audioSystem.playSFX('attack_swordswing', 1.25);
+  audioSystem.playSFX('attack_fleshhit', 1.35);
+  audioSystem.playSFX('attack_groundsmash', 1.1);
 
   const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
   const reach = CONFIG.toji?.katanaRange || fighter.katanaRange || 75;
   // Wide 160 degree frontal arc cleave for Katana!
   const targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, Math.PI * 0.88);
 
+  if (fighter.isAmbushing && primaryTarget && primaryTarget.hp > 0 && !targets.includes(primaryTarget)) {
+    targets.push(primaryTarget);
+  }
+
   const damage = CONFIG.toji?.katanaDamage || 35;
   const soulWoundDuration = CONFIG.toji?.soulWoundDuration || 180;
 
   for (const target of targets) {
-    applyDamageToTarget(target, damage, fighter, { isMelee: true, isTrueDamage: true, isSoulSplit: true, isAdaptableSkillShot: !!fighter.isAmbushing, skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null });
+    const didDamage = applyDamageToTarget(target, damage, fighter, {
+      isMelee: true,
+      isTrueDamage: true,
+      isSoulSplit: true,
+      bypassShield: !!fighter.isAmbushing,
+      isAmbushKatana: !!fighter.isAmbushing,
+      isAdaptableSkillShot: !!fighter.isAmbushing,
+      skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null
+    });
+
+    const isTargetGojo = target && (target.characterId === 'gojo' || target.type === 'gojo' || target._def?.id === 'gojo');
+    const isBlockedByInfinity = !fighter.isAmbushing && didDamage === false && isTargetGojo && target.infinityActive && (target.infinityCooldown || 0) <= 0;
+
+    if (isBlockedByInfinity) {
+      // Split Soul Katana does NOT possess ISOH curse nullification in neutral — blocked 100% by Limitless Infinity!
+      // Spawn clean deflection clash on the barrier perimeter, NOT on Gojo's body
+      const blockX = target.infinityBlockX ?? target.x;
+      const blockY = target.infinityBlockY ?? target.y;
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(blockX, blockY, 20, 'cyan', '#00E5FF');
+      }
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(blockX, blockY, 40, '#00E5FF');
+      }
+      continue;
+    }
+
     target.soulWoundTimer = soulWoundDuration;
 
-    if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
+    if (fighter.isAmbushing) {
+      target.isTargetOfAmbush = true;
+      const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 70;
+      if (typeof target.applyTimeStop === 'function') {
+        target.applyTimeStop(katanaFreeze);
+      }
+      target.paralyzeTimer = Math.max(target.paralyzeTimer || 0, katanaFreeze);
+      delete target._timeStopFrozenAngle;
+      delete target._timeStopFrozenGunAngle;
+    } else if (typeof fighter._clearTargetFreeze === 'function') {
+      fighter._clearTargetFreeze(target);
+    }
     const targetHitAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
     let angleDiff = targetHitAngle - (target.angle || 0);
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
@@ -218,7 +262,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
     if (!target.isTurret && !target.cannotBeKnockbacked) {
       target.isFirstHitKnockback = false;
       const directAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-      const sweepSlingAngle = directAngle + 1.15;
+      const sweepSlingAngle = directAngle;
       const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 52);
 
       const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
@@ -228,16 +272,28 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
       target.vx = kbVx;
       target.vy = kbVy;
       target.knockbackDecay = 0.92;
-      if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 
-    spawnBloodEffect(target, 16, attackAngle);
-    spawnImpactFlash(target.x, target.y, 180, 'rgba(255, 30, 75, 0.95)');
-    spawnCrimsonLightningImpact(target.x, target.y, 140);
-    spawnSparks(target.x, target.y, 50, 'crimsonSniper');
+    spawnTojiCleaveHitEffect(target.x, target.y, attackAngle);
+    if (typeof spawnGroundScorch === 'function') {
+      spawnGroundScorch(target.x, target.y, 65, 90, 'crimson');
+    }
+    spawnBloodEffect(target, 35, attackAngle);
+    spawnImpactFlash(target.x, target.y, 240, 'rgba(255, 30, 75, 0.95)');
+    spawnImpactFlash(target.x, target.y, 150, '#FFFFFF');
+    spawnCrimsonLightningImpact(target.x, target.y, 180);
+    if (typeof spawnAnimePunchImpactFrame === 'function') {
+      spawnAnimePunchImpactFrame(target.x, target.y, 100, attackAngle, 'crimson');
+    }
+    if (typeof spawnMeleeClashShockwave === 'function') {
+      spawnMeleeClashShockwave(target.x, target.y, 140, 'rgba(255, 30, 75, 0.95)');
+      spawnMeleeClashShockwave(target.x, target.y, 85, '#A020F0');
+    }
+    spawnSparks(target.x, target.y, 70, 'crimsonSniper');
+    spawnSparks(target.x, target.y, 40, 'crimson');
   }
 
-  triggerGlobalScreenShake(8, 10);
+  triggerGlobalScreenShake(16, 14);
 }
 
 export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, isAmbushThrust = false) {
@@ -262,13 +318,22 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     let wasInfinityActive = false;
     if (isAmbushThrust && target.characterId === 'gojo' && target.infinityActive) {
       wasInfinityActive = true;
+      target._wasInfinityActiveBeforeAmbush = true;
       target.infinityActive = false;
       target.infinityBlockTimer = 0;
       spawnSparks(target.x, target.y, 22, 'lightningTrail', '#00E5FF');
       spawnImpactFlash(target.x, target.y, 60, 'lightningTrail');
     }
 
-    applyDamageToTarget(target, thrustDamage, fighter, { isMelee: true, isTrueDamage: true, isIsoh: true, isAdaptableSkillShot: !!fighter.isAmbushing, skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null });
+    applyDamageToTarget(target, thrustDamage, fighter, {
+      isMelee: true,
+      isTrueDamage: true,
+      isIsoh: true,
+      bypassShield: true,
+      isAmbushThrust: !!isAmbushThrust,
+      isAdaptableSkillShot: !!fighter.isAmbushing,
+      skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null
+    });
 
     delete target._timeStopFrozenAngle;
     delete target._timeStopFrozenGunAngle;
@@ -281,7 +346,9 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     }
     target.gunAngle = target.angle;
 
-    if (wasInfinityActive) {
+    // During ambush thrust, Gojo is impaled by ISOH in ambush stasis — do NOT restore infinityActive here!
+    // It will be restored when the ambush sequence fully ends.
+    if (wasInfinityActive && !isAmbushThrust) {
       target.infinityActive = true;
     }
 
@@ -342,7 +409,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     if (!target.isTurret && !target.cannotBeKnockbacked) {
       target.isFirstHitKnockback = isAmbushThrust;
       const pushAngle = isAmbushThrust ? Math.atan2(target.y - fighter.y, target.x - fighter.x) : attackAngle;
-      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 32) : (CONFIG.toji?.spearKnockback || 7.0);
+      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 8.5) : (CONFIG.toji?.spearKnockback || 2.5);
       
       const kbVx = Math.cos(pushAngle) * knockbackSpeed;
       const kbVy = Math.sin(pushAngle) * knockbackSpeed;
@@ -350,7 +417,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       target.knockbackVy = kbVy;
       target.vx = kbVx;
       target.vy = kbVy;
-      target.knockbackDecay = isAmbushThrust ? 0.90 : 0.84;
+      target.knockbackDecay = isAmbushThrust ? 0.85 : 0.84;
       if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 

@@ -456,6 +456,13 @@ export const HitImpactSystem = {
     if (projectile.isArcaneBolt) {
       if (!projectile.hitFighters) projectile.hitFighters = new Set();
       projectile.hitFighters.add(target);
+
+      // Arcane Bolt impact feedback
+      const hitColor = projectile.color || '#00FF64';
+      spawnSparks(target.x, target.y, 8, 'arcane', hitColor);
+      spawnImpactFlash(target.x, target.y, 22, '#70FFAB');
+      triggerGlobalScreenShake(1.5, 4);
+
       if ((projectile.bouncesLeft ?? 0) > 0) {
         projectile.bouncesLeft--;
         projectile.damage *= (projectile.bounceDamageMultiplier || 0.7);
@@ -498,6 +505,9 @@ export const HitImpactSystem = {
         }
         return false;
       } else {
+        spawnSparks(target.x, target.y, 14, 'arcane', hitColor);
+        spawnImpactFlash(target.x, target.y, 30, '#FFFFFF');
+        triggerGlobalScreenShake(2.5, 5);
         return true;
       }
     } 

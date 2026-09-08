@@ -1345,7 +1345,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       const activeProjectiles = typeof getProjectiles === 'function'
         ? getProjectiles()
         : (state.projectiles || (typeof state.getProjectiles === 'function' ? state.getProjectiles() : []));
-      const purpleOrb = activeProjectiles?.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0 && p.owner === state.fighters?.indexOf(f));
+      const purpleOrb = f.activePurpleProjectile || activeProjectiles?.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0 && (p.ownerFighter === f || p.owner === state.fighters?.indexOf(f)));
 
       if (f.stolenWindUpTimer > 0) {
         // Windup / Charging phase (progresses from 0% to 100% as cast prepares)
@@ -1418,8 +1418,9 @@ export function getSkillDataForFighter(f, getProjectiles) {
       const stealMax = rcfg?.spellStealCooldown || 700;
       const stealTimer = f.spellStealCooldown !== undefined ? f.spellStealCooldown : stealMax;
       stealPct = Math.max(0, Math.min(100, (1 - (stealTimer / stealMax)) * 100));
-      stealReady = stealPct >= 99;
-      stealLabel = 'SPELL STEAL';
+      const isSkillActive = (typeof f.hasActiveSkillInArena === 'function') ? f.hasActiveSkillInArena() : false;
+      stealReady = stealPct >= 99 && !isSkillActive;
+      stealLabel = stealReady ? 'SPELL STEAL (READY)' : (isSkillActive ? 'SPELL STEAL (BLOCKED)' : 'SPELL STEAL');
     }
 
     // ─────────────────────────────────────────────
@@ -1440,8 +1441,9 @@ export function getSkillDataForFighter(f, getProjectiles) {
       // Cooldown phase (progresses from 0% up to 100%)
       const tkTimer = f.telekinesisCooldown !== undefined ? f.telekinesisCooldown : 0;
       tkPct = Math.max(0, Math.min(100, (1 - (tkTimer / tkMax)) * 100));
-      tkReady = tkPct >= 99;
-      tkLabel = 'TELEKINESIS';
+      const isSkillActive = (typeof f.hasActiveSkillInArena === 'function') ? f.hasActiveSkillInArena() : false;
+      tkReady = tkPct >= 99 && !isSkillActive;
+      tkLabel = tkReady ? 'TELEKINESIS (READY)' : (isSkillActive ? 'TELEKINESIS (BLOCKED)' : 'TELEKINESIS');
     }
 
     return [

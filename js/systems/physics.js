@@ -228,8 +228,10 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
-  // Toji's stealth ambush drives target displacement directly; skip fighter collision solver
-  if (a.isTargetOfAmbush || b.isTargetOfAmbush || (a.isAmbushing && (a.characterId === 'toji' || a.type === 'toji')) || (b.isAmbushing && (b.characterId === 'toji' || b.type === 'toji'))) return;
+  // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
+  const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive);
+  const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive);
+  if (a.isTargetOfAmbush || b.isTargetOfAmbush || aIsTojiAssault || bIsTojiAssault) return;
 
   // Telekinesis: lifted entity is in 3D air stasis and moved directly by Rubbick; skip ground circle collision push
   if (a.isCaughtInTelekinesis || b.isCaughtInTelekinesis) return;
@@ -319,6 +321,28 @@ export function resolveFighterCollision(a, b) {
     b.x += nx * effectiveOverlap * 2;
     b.y += ny * effectiveOverlap * 2;
     if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
+    return;
+  }
+
+  // Entities inside Rubbick's stolen Unlimited Void are locked in complete stasis and cannot be pushed
+  const aInRubbickVoid = isInsideRubbickStolenVoid(a);
+  const bInRubbickVoid = isInsideRubbickStolenVoid(b);
+  if (aInRubbickVoid && bInRubbickVoid) {
+    a.vx = 0; a.vy = 0; b.vx = 0; b.vy = 0;
+    return;
+  }
+  if (aInRubbickVoid) {
+    a.vx = 0; a.vy = 0;
+    b.x += nx * effectiveOverlap * 2;
+    b.y += ny * effectiveOverlap * 2;
+    if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
+    return;
+  }
+  if (bInRubbickVoid) {
+    b.vx = 0; b.vy = 0;
+    a.x -= nx * effectiveOverlap * 2;
+    a.y -= ny * effectiveOverlap * 2;
+    if (state && state.arena && typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
     return;
   }
 

@@ -13,6 +13,7 @@ export {
   drawMahoragaSpeedLines,
   drawNanamiSpeedLines,
   drawIchigoBankaiSpeedLines,
+  drawTojiSpeedLines,
 } from './speedLinesRenderer.js';
 
 export {

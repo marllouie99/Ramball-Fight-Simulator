@@ -13,7 +13,7 @@ import {
   drawSparkEffects, drawPurpleDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
-  drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
+  drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
@@ -24,6 +24,7 @@ import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelganger
 import { drawBlackFlashEffects } from '../graphics/particles/blackFlashEffect.js';
 import { drawLightningEffects } from '../graphics/particles/lightningEffects.js';
 import { drawGetsugaImpactEffects, updateGetsugaImpactEffects } from '../graphics/particles/getsugaImpactEffect.js';
+import { drawTojiImpactEffects, updateTojiImpactEffects } from '../graphics/particles/tojiImpactEffect.js';
 import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaDomainVisuals.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
@@ -293,6 +294,7 @@ export function renderGame() {
                 f && f.hp > 0 && (
                   f.domainActive || 
                   f.stolenDomainActive ||
+                  (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0) ||
                   f._mahitoDomainActive || 
                   (f.characterId === 'toji' && f.ultimateActive) ||
                   (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive)) ||
@@ -348,7 +350,7 @@ export function renderGame() {
 
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && f.hp > 0 && (
           ((f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive) ||
-          ((f.type === 'rubbick' || f.characterId === 'rubbick') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain')))
+          ((f.type === 'rubbick' || f.characterId === 'rubbick' || f.type === 'trickster' || f.characterId === 'trickster' || f._def?.id === 'rubbick' || f._def?.id === 'trickster') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain') || (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0)))
         ));
 
         if (!isGojoDomainActive) {
@@ -384,6 +386,7 @@ export function renderGame() {
         drawSaitamaSpeedLines(); // Manga action speed lines during Consecutive Normal Punches
         drawIchigoBankaiSpeedLines(); // Supersonic Bankai manga speed lines during Ichigo dashes/swings
         drawMahoragaSpeedLines(); // Supersonic manga action speed lines during Mahoraga wall slam dash/strike/blitz
+        drawTojiSpeedLines(); // Supersonic manga action speed lines during Toji stealth ambush & Katana slashes
         // Draw character ground telegraphs & targeting reticles UNDERNEATH fighters
         if (state.fighters) {
           for (const f of state.fighters) {
@@ -430,6 +433,8 @@ export function renderGame() {
         drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
         updateGetsugaImpactEffects();
         drawGetsugaImpactEffects(state.ctx); // Draw Bleach Getsuga Tensho spatial cleave impact effects
+        updateTojiImpactEffects();
+        drawTojiImpactEffects(state.ctx); // Draw Toji Split Soul Katana spatial soul cleave impact effects
 
         // Nanami 7:3 Ratio Ruler & Blood Rupture overlay renders ON TOP of all fighters & entities
         drawNanamiRatioCritDimScreen();
