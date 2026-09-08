@@ -215,6 +215,49 @@ Inside this local coordinate frame:
 - **Front Hand (Front Layer — On Top of Body)**: Positioned at guard center `(0, 0)` in idle stance.
 - During punches, hands alternate lunging forward along `+X` (`r * 0.85 + lungeExtension * 1.40`) with opposite recoil (`oppositeRecoil = -Math.sin(...)`).
 
+### 19.1 Hair & Pixel-Art Silhouette Standards (Anti-Blob & Proportion Rules)
+
+#### Vertical Proportion Bands (Mandatory Coordinate Ranges)
+When rendering a fighter body circle (radius `r`), vertical space along the Y-axis must adhere strictly to these proportional bands to prevent crushing facial or uniform details:
+- **`-r * 1.15` to `-r * 0.35` (Crown Spikes & Outer Hair Volume)**: Top-most hair layer. Hair crown spikes must extend slightly beyond the body circle radius (`-r * 1.05` to `-r * 1.15`) to break the circle silhouette and prevent the character from looking like a flat "bowling ball".
+- **`-r * 0.35` to `-r * 0.18` (Bang Tips & Hairline Termination)**: Bangs, fringes, and hair locks terminate here. **NEVER** allow bangs to extend past `y = -r * 0.12`.
+- **`-r * 0.18` to `+r * 0.15` (Face / Forehead Zone)**: Reserved strictly for face skin, eye accessories (blindfolds, goggles), scars, and thematic markings. Never obscure this zone with hair strands.
+- **`+r * 0.15` to `+r * 0.60` (Neck, Collar, Upper Chest)**: Crewneck rim, hoodie cowl, shirt collar, ties, ribbons, robes.
+- **`+r * 0.60` to `+r * 1.00` (Lower Torso, Belt, Pants/Hakama)**: Waistband, pleats, sash, coat skirts.
+
+#### Prohibition of Sine-Wave Procedural Hair
+- **STRICT PROHIBITION**: **NEVER** generate hair using continuous trigonometric sine/cosine wave formulas (e.g. `Math.sin(nx * freq) * amplitude`). Sine wave generation produces unnatural, repetitive corrugated ridges resembling a pleated curtain or comb teeth rather than anime hair.
+- **MANDATORY PATTERN: Discrete Lock Arrays**:
+  Procedural hair must always be defined as an array of discrete, normalized lock coordinates with staggered strand lengths, variable widths, and sharp triangular/trapezoidal tips (refer to `_TOJI_BANGS` in `tojiSkin.js`):
+  ```javascript
+  const _BANGS = [
+    { nx:  0.88, ny: -0.32 },
+    { nx:  0.72, ny: -0.22 }, // Right outer fringe
+    { nx:  0.44, ny: -0.20 }, // Right mid strand
+    { nx:  0.18, ny: -0.10 }, // Signature Center-Right Long Spike
+    { nx: -0.08, ny: -0.16 }, // Center-Left strand
+    { nx: -0.36, ny: -0.18 }, // Left mid strand
+    { nx: -0.66, ny: -0.18 }, // Left long side lock
+    { nx: -0.88, ny: -0.32 }
+  ];
+  ```
+
+#### 4-Tone Hair Color Palette Standard
+Hair rendering must not be flat or rely on random continuous gradients. Structure pixel hair using a 4-tier palette:
+1. **Tier 1: Root / Undercut Tone**: Deep charcoal/black undertone (`#0A0A0E` or deeply saturated dark shadow) placed along the temples, undercuts, and under-bang drop shadows.
+2. **Tier 2: Base Tone**: The signature anime hair color (e.g. Jet Black `#0E0F14` for Toji, Salmon Pink `#D9847A` for Yuji, Snow White `#F8F9FA` for Gojo).
+3. **Tier 3: Mid-Lock Shadow / Dimension**: A 15–20% darker or warmer tone defining the crevices between lock clumps.
+4. **Tier 4: Crown / Specular Glint**: Highlights near the upper crown (`-r * 0.70` to `-r * 0.90`), giving dimension under overhead lighting.
+
+#### High-Definition Pixel-Art Model Precedence (PNG Models)
+- Whenever possible, prioritize high-definition pixel-art PNG models stored in `Assets/model/<Character>-SKIN.png` (matching the Toji and Yuji implementations).
+- When drawing pixel-art image models onto Canvas 2D:
+  - **ALWAYS** set `ctx.imageSmoothingEnabled = false` before calling `drawImage()` to preserve crisp, authentic nearest-neighbor pixel edges.
+  - Apply procedural canvas fallback drawing only when the image asset is not yet loaded or missing.
+
+#### Mandatory Visual Verification (Playwright Verification)
+- Whenever an agent modifies, refactors, or creates a fighter skin model, the agent **MUST** visually verify the skin using Playwright (e.g. taking a screenshot of the Fighter Index Screen or Character Select screen) to inspect hair silhouette, proportions, and facing-direction mirroring before declaring the task complete.
+
 ## 20. Fighter Hand Visibility & Skin Only Guard Standard
 - All fighter skin renderers, custom brawler hand rendering methods, and weapon graphics MUST evaluate `fighter.hideFrontHand` / `fighter.hideBackHand` OR the global `state.showSkinOnly` state before rendering any hands, fists, or weapon grips.
 - Standard hand draw pattern across all existing and future fighter skin renderers:
