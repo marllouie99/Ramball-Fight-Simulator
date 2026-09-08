@@ -11,7 +11,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 
 export function activateRed(fighter) {
-  if ((fighter.redEffectTimer || 0) > 0 || fighter.redBuildupPhase) return;
+  if ((fighter.redEffectTimer || 0) > 0 || fighter.redBuildupPhase || (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive())) return;
 
   const buildupFrames = CONFIG.gojo?.redBuildupFrames || 100;
   const blastFadeFrames = 25;

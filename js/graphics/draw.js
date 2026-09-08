@@ -34,8 +34,8 @@ import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelganger
 import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
-import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
-import { drawArena, drawPurpleDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen } from './renderers/arenaRenderer.js';
+import { drawArena } from './renderers/arenaRenderer.js';
+import { drawPurpleDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen } from './renderers/domainDimOverlays.js';
 import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen } from './renderers/environmentalRenderer.js';
 import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';

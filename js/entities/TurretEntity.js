@@ -158,6 +158,7 @@ export class TurretEntity extends Fighter {
     if (this.hp <= 0) return;
     this.hp = Math.min(this.hp + amount, this.maxHp);
     this.healTimer = 20; // Triggers repair visual effect
+    spawnFloatingText(this.x, this.y - this.r - 10, `+${Math.round(amount)} HP`, '#00FF00');
   }
 
   update(opponent, ownerIndex, arena) {
@@ -564,14 +565,4 @@ export class TurretEntity extends Fighter {
       ctx.strokeRect(startX, reloadY, width, height);
     }
   }
-
-  heal(amount) {
-    if (this.hp <= 0) return;
-    this.hp += amount;
-    if (this.hp > this.maxHp) this.hp = this.maxHp;
-    this.healTimer = 20; // Trigger repair visual effect
-    spawnFloatingText(this.x, this.y - this.r - 10, `+${Math.round(amount)} HP`, '#00FF00');
-  }
-
-
 }

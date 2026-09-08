@@ -42,6 +42,13 @@ export class DopplegangerFighter extends Fighter {
     state.illusions = state.illusions.filter(ill => ill.owner !== this);
   }
 
+  isEffectivelyAlive() {
+    if (typeof state !== 'undefined' && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.hp > 0)) {
+      return true;
+    }
+    return super.isEffectivelyAlive();
+  }
+
 
 
   // Auto-lock toward enemy upon wall bounce

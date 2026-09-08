@@ -330,15 +330,18 @@ export class OrangeFighter extends Fighter {
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // Draw glow effect
-    ctx.shadowColor = startColor;
-    ctx.shadowBlur = 10;
+    // Outer glow simulation (Rule 11 compliant: layered concentric strokes, zero shadowBlur)
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
-    ctx.strokeStyle = `rgba(255, 150, 0, ${0.3 + fuelRatio * 0.4})`;
-    ctx.lineWidth = meterThickness + 2;
+    ctx.strokeStyle = `rgba(255, 150, 0, ${(0.15 + fuelRatio * 0.25).toFixed(2)})`;
+    ctx.lineWidth = meterThickness + 4;
     ctx.stroke();
-    ctx.shadowBlur = 0;
+
+    ctx.beginPath();
+    ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
+    ctx.strokeStyle = `rgba(255, 180, 50, ${(0.25 + fuelRatio * 0.30).toFixed(2)})`;
+    ctx.lineWidth = meterThickness + 1.5;
+    ctx.stroke();
 
     // Draw fuel text in center
     ctx.fillStyle = '#ffffff00';

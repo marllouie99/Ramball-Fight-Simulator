@@ -870,15 +870,45 @@ async function main() {
 
       // Rubbick-specific Stolen Unlimited Void Test
       if (fType === 'rubbick') {
-        // 1. Simulate stealing Gojo's domain
         const GojoClass = FIGHTER_CLASS_MAP['gojo'];
         const mockGojo = new GojoClass(allDefs.find(d => d.type === 'gojo') || { type: 'gojo' });
         mockGojo.x = 250;
         mockGojo.y = 200;
         mockGojo.hp = 400;
-        mockGojo.domainActive = true;
-        mockGojo.lastCastSkill = 'domain';
 
+        // 1a. Verify Rubbick CANNOT steal while Gojo is channeling Domain Expansion
+        mockGojo.isChannelingDomainExpansion = true;
+        mockGojo.domainActive = false;
+        mockGojo.hasFiredDomain = false;
+        fighter.reset();
+        fighter.x = 250;
+        fighter.y = 300;
+        fighter.stolenType = null;
+        fighter.spellStealCooldown = 0;
+        fighter.telekinesisCooldown = 999;
+        fighter.update(mockGojo, 1, state.arena);
+        if (fighter.stolenType !== null) {
+          throw new Error(`Rubbick should NOT steal domain while Gojo is channeling: got '${fighter.stolenType}'`);
+        }
+
+        // 1b. Verify Rubbick CANNOT steal while Gojo's domain is active (has not expired yet)
+        mockGojo.isChannelingDomainExpansion = false;
+        mockGojo.domainActive = true;
+        mockGojo.hasFiredDomain = true;
+        mockGojo.lastCastSkill = 'domain';
+        fighter.stolenType = null;
+        fighter.spellStealCooldown = 0;
+        fighter.telekinesisCooldown = 999;
+        fighter.update(mockGojo, 1, state.arena);
+        if (fighter.stolenType !== null) {
+          throw new Error(`Rubbick should NOT steal domain while Gojo's domain is active: got '${fighter.stolenType}'`);
+        }
+
+        // 1c. Verify Rubbick CAN steal Unlimited Void AFTER Gojo's domain expires
+        mockGojo.domainActive = false;
+        mockGojo.isChannelingDomainExpansion = false;
+        mockGojo.hasFiredDomain = true;
+        mockGojo.lastCastSkill = 'domain';
         fighter.reset();
         fighter.x = 250;
         fighter.y = 300;
@@ -887,7 +917,7 @@ async function main() {
         fighter.update(mockGojo, 1, state.arena);
 
         if (fighter.stolenType !== 'gojo_domain') {
-          throw new Error(`Rubbick failed to steal Unlimited Void: expected 'gojo_domain', got '${fighter.stolenType}'`);
+          throw new Error(`Rubbick failed to steal Unlimited Void after domain expired: expected 'gojo_domain', got '${fighter.stolenType}'`);
         }
         if (fighter.stolenColor !== '#00FF64') {
           throw new Error(`Rubbick stolenColor is not emerald green (#00FF64), got '${fighter.stolenColor}'`);
@@ -965,6 +995,9 @@ async function main() {
 
         // Verify Gojo infinity recovers after domain ends and cooldown finishes
         mockGojo.timeStopTimer = 0;
+        mockGojo.hitStunTimer = 0;
+        mockGojo.paralyzeTimer = 0;
+        mockGojo.isCaughtInTelekinesis = false;
         mockGojo.forcedMeleeTimer = 0;
         mockGojo.isMeleeMode = false;
         for (let cd = 0; cd < 40; cd++) {
@@ -1288,9 +1321,42 @@ async function main() {
           throw new Error('Expected Limitless Infinity barrier to remain active during breather');
         }
 
+        // Verify Gojo CANNOT cast another skill while Purple is active
+        if (!fighter.isPurpleActive()) {
+          throw new Error('Expected isPurpleActive() to be true while Purple is in projectileSystem');
+        }
+        if (fighter.canPerformBasicAttack()) {
+          throw new Error('canPerformBasicAttack() should be false while Purple is active');
+        }
+        // Attempt to activate Reversal Red while Purple is active -> must fail
+        const redResult = fighter._activateRed();
+        if (redResult !== false || fighter.redBuildupPhase) {
+          throw new Error('Gojo should not be able to cast Reversal Red while Purple is active');
+        }
+        // Attempt to activate Domain Expansion while Purple is active -> must fail
+        fighter.domainCooldown = 0;
+        fighter.isChannelingDomainExpansion = false;
+        fighter.domainActive = false;
+        fighter._activateDomain(state.arena);
+        if (fighter.domainActive) {
+          throw new Error('Gojo should not be able to activate Domain Expansion while Purple is active');
+        }
+        // Attempt to activate RCT while Purple is active -> must fail
+        fighter.reverseCursedTechniqueCooldown = 0;
+        fighter._activateReverseCursedTechnique(dummyOpponent, state.arena);
+        if (fighter.isChannelingRCT) {
+          throw new Error('Gojo should not be able to activate RCT while Purple is active');
+        }
+
         // Clean up
         fighter.purpleRecoveryTimer = 0;
         fighter.z = 0;
+        if (fighter.activePurpleProjectile) {
+          fighter.activePurpleProjectile.life = 0;
+          const pIdx = projectileSystem.projectiles.indexOf(fighter.activePurpleProjectile);
+          if (pIdx !== -1) projectileSystem.projectiles.splice(pIdx, 1);
+          fighter.activePurpleProjectile = null;
+        }
       }
 
     } catch (err) {

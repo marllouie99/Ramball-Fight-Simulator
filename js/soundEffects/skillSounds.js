@@ -740,3 +740,81 @@ export function getSkillSoundPaths() {
   }
   return paths;
 }
+
+/**
+ * Get all skill sound file paths for a specific fighter for high-priority match preloading.
+ * @param {number|string} idOrType
+ * @returns {string[]}
+ */
+export function getFighterSkillSoundPaths(idOrType) {
+  const paths = [];
+  if (idOrType === undefined || idOrType === null) return paths;
+
+  let fighterConfig = SKILL_SOUNDS[idOrType];
+  const strKey = String(idOrType).toLowerCase();
+
+  if (!fighterConfig && (typeof idOrType === 'string' || typeof idOrType === 'number')) {
+    const parsedNum = parseInt(strKey, 10);
+    if (!isNaN(parsedNum) && SKILL_SOUNDS[parsedNum]) {
+      fighterConfig = SKILL_SOUNDS[parsedNum];
+    } else if (strKey.includes('gojo')) {
+      fighterConfig = SKILL_SOUNDS[21];
+    } else if (strKey.includes('sukuna')) {
+      fighterConfig = SKILL_SOUNDS[22];
+    } else if (strKey.includes('yuta') || strKey.includes('rika')) {
+      fighterConfig = SKILL_SOUNDS[23];
+    } else if (strKey.includes('toji')) {
+      fighterConfig = SKILL_SOUNDS[99];
+    } else if (strKey.includes('todo')) {
+      fighterConfig = SKILL_SOUNDS[24];
+    } else if (strKey.includes('yuji')) {
+      fighterConfig = SKILL_SOUNDS[25];
+    } else if (strKey.includes('mahoraga')) {
+      fighterConfig = SKILL_SOUNDS[100];
+    } else if (strKey.includes('genos')) {
+      fighterConfig = SKILL_SOUNDS['genos'];
+    } else if (strKey.includes('john')) {
+      fighterConfig = SKILL_SOUNDS[33] || SKILL_SOUNDS['john_wick'];
+    } else if (strKey.includes('ichigo')) {
+      fighterConfig = SKILL_SOUNDS[29] || SKILL_SOUNDS['ichigo'];
+    } else if (strKey.includes('rubbick') || strKey.includes('trickster')) {
+      fighterConfig = SKILL_SOUNDS[18] || SKILL_SOUNDS['rubbick'];
+    }
+  }
+
+  if (fighterConfig) {
+    for (const skill of Object.values(fighterConfig)) {
+      if (Array.isArray(skill)) {
+        for (const item of skill) {
+          if (item && item.src) paths.push(item.src);
+        }
+      } else if (skill && skill.src) {
+        paths.push(skill.src);
+      }
+    }
+  }
+
+  // Also extract any character-specific sounds from CONFIG[characterId]
+  const charConfig = CONFIG && (CONFIG[idOrType] || CONFIG[strKey]);
+  if (charConfig) {
+    const collectAudioPaths = (obj, depth = 0) => {
+      if (!obj || depth > 3) return;
+      for (const val of Object.values(obj)) {
+        if (typeof val === 'string' && (val.endsWith('.mp3') || val.endsWith('.wav') || val.endsWith('.ogg'))) {
+          paths.push(val);
+        } else if (Array.isArray(val)) {
+          for (const sub of val) {
+            if (typeof sub === 'string' && (sub.endsWith('.mp3') || sub.endsWith('.wav') || sub.endsWith('.ogg'))) {
+              paths.push(sub);
+            }
+          }
+        } else if (typeof val === 'object') {
+          collectAudioPaths(val, depth + 1);
+        }
+      }
+    };
+    collectAudioPaths(charConfig);
+  }
+
+  return [...new Set(paths)];
+}

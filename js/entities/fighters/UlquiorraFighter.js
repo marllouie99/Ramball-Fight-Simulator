@@ -82,6 +82,17 @@ export class UlquiorraFighter extends Fighter {
     this.regenAmount = cfg.regenAmount || 6;
 
     this.combatAuraOpacity = 0.35;
+    this.damageNumberColor = '#00FF88';
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isSkywardWindup ||
+      this.isSkywardAscending ||
+      (this.ceroTimer > 0) ||
+      (this.lanzaTimer > 0) ||
+      super.isStationarySkillActive?.()
+    );
   }
 
   _playSound(key, defaultSfx, defaultVol = 0.85) {

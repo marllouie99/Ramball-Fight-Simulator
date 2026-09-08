@@ -46,9 +46,8 @@ app.setPath('userData', tempUserDataPath);
 app.commandLine.appendSwitch('high-dpi-support', '1');
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
-// Disable HTTP and GPU cache to completely eliminate "Access Denied" disk-caching conflicts on Windows
-app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
-app.commandLine.appendSwitch('disable-http-cache');
+// Enable GPU shader disk cache & HTTP cache inside tempUserDataPath (outside OneDrive)
+// to persist compiled WebGL shaders and audio buffers across sessions, eliminating cold-start shader compilation drops.
 
 // Prevent Chromium from throttling the game loop to 15-30 FPS when the window is unfocused or occluded by OBS
 app.commandLine.appendSwitch('disable-renderer-backgrounding');

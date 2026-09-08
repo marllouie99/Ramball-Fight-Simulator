@@ -42,6 +42,10 @@ export function initRika(fighter) {
     trembleStopTimer: 0,
     knockbackVx: 0,
     knockbackVy: 0,
+    damageNumberColor: '#FF1493',
+    isStationarySkillActive: function() {
+      return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
+    },
     isPerformingSkill: function() {
       return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
     },

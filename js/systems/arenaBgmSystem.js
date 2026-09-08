@@ -543,14 +543,16 @@ export function startArenaBgm(forceNew = false) {
     return;
   }
 
-  let chosenSrc = null;
-  if (trackId === 'random') {
-    const validTracks = ARENA_BGM_TRACKS.filter(t => t.src !== null);
-    const randTrack = validTracks[Math.floor(Math.random() * validTracks.length)];
-    chosenSrc = randTrack?.src;
-  } else {
-    const track = ARENA_BGM_TRACKS.find(t => t.id === trackId);
-    chosenSrc = track ? track.src : null;
+  let chosenSrc = state.activeMatchBgmSrc || null;
+  if (!chosenSrc) {
+    if (trackId === 'random') {
+      const validTracks = ARENA_BGM_TRACKS.filter(t => t.src !== null);
+      const randTrack = validTracks[Math.floor(Math.random() * validTracks.length)];
+      chosenSrc = randTrack?.src;
+    } else {
+      const track = ARENA_BGM_TRACKS.find(t => t.id === trackId);
+      chosenSrc = track ? track.src : null;
+    }
   }
 
   stopPreview();

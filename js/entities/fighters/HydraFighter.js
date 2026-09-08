@@ -227,21 +227,6 @@ export class HydraFighter extends Fighter {
       }
     }
   }
-  
-  performStolenAttack(opponent) {
-    this.attackSwingTimer = 15;
-    this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    
-    const damage = this.damage * 2; // Deal some damage with the stolen weapon
-    opponent.takeDamage(damage, this, { isMelee: true });
-    
-    // Tiny dash forward
-    this.vx += Math.cos(this.gunAngle) * 3;
-    this.vy += Math.sin(this.gunAngle) * 3;
-    
-    spawnFloatingText(opponent.x, opponent.y, 'SMACK!', '#ccc');
-    audioSystem.playSFX('attack_swordswing', 0.5);
-  }
 
   drawBody(ctx) {
     drawHydraBody(ctx, this);

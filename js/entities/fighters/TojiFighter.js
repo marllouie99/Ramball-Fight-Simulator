@@ -22,6 +22,9 @@ export class TojiFighter extends Fighter {
     super(def);
     this.characterId = 'toji';
     this.type = 'toji';
+    this.domainImmunity = true;
+    this.isDomainImmune = true;
+    this.damageNumberColor = '#e9d5ff';
     
     // Heavenly Restriction Stealth Passive (Configurable Duration & Cooldown)
     this.stealthMaxDuration = CONFIG.toji?.stealthDuration || 240;
@@ -63,6 +66,7 @@ export class TojiFighter extends Fighter {
     this.immuneToCC = true;
     this.domainImmunity = true;
     this.isDomainImmune = true;
+    this.isKnockbackStunImmune = true;
     this.postUltimateRecoveryTimer = 0;
     this._initChainPhysics();
   }
@@ -91,6 +95,16 @@ export class TojiFighter extends Fighter {
         this.spearSwingTimer = 55;
       }
     }
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isAmbushing ||
+      this.isChargingUlt ||
+      this.isFiringUlt ||
+      (this.ultimateChargeTimer && this.ultimateChargeTimer > 0) ||
+      super.isStationarySkillActive()
+    );
   }
 
   applySlow(frames, multiplier, options = {}) {

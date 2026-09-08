@@ -1323,10 +1323,17 @@ export function drawMinionHealthBar(ctx, x, y, width = 38, height = 7, hp = 100,
   ctx.save();
   ctx.translate(x, y);
 
-  // 1. Sleek Outer Drop Shadow
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-  ctx.shadowBlur = 4;
-  ctx.shadowOffsetY = 1.5;
+  // 1. Sleek Outer Drop Shadow (Rule 11 compliant: offset dark underlay path, zero shadowBlur)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.60)';
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(-hw, -hh + 1.5, w, h, cornerR);
+  } else {
+    ctx.arc(-hw + cornerR, 1.5, cornerR, Math.PI / 2, -Math.PI / 2);
+    ctx.arc(hw - cornerR, 1.5, cornerR, -Math.PI / 2, Math.PI / 2);
+    ctx.closePath();
+  }
+  ctx.fill();
 
   // 2. Dark Obsidian Pill Background Track & Border
   ctx.fillStyle = 'rgba(15, 17, 26, 0.92)';
@@ -1342,11 +1349,6 @@ export function drawMinionHealthBar(ctx, x, y, width = 38, height = 7, hp = 100,
     ctx.closePath();
   }
   ctx.fill();
-
-  // Clear shadow before stroke & fill
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
   ctx.stroke();
 
   // 3. Depleted Red Track & Active Green Fill Inside Clipped Pill

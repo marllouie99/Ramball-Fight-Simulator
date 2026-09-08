@@ -463,7 +463,7 @@ export class Fighter {
     // Trapped in cognitive stasis of enemy domain (e.g. Gojo's Unlimited Void)
     if (typeof state !== 'undefined' && state.fighters) {
       const isInsideGojoDomain = state.fighters.some(f => 
-        f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+        f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
       );
       const isImmune = this.domainImmunity || this.isDomainImmune || this.isParalyzeImmune || this.characterId === 'toji' || this.type === 'toji';
       if (isInsideGojoDomain && !isImmune) return true;
@@ -716,98 +716,53 @@ export class Fighter {
     if (this.isRika) {
       return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
     }
-    return !!(
-      this.isTypingCheat ||
-      this.isChannelingPureLoveBeam ||
-      this.isFiringPureLoveBeam ||
-      (this.pureLoveBeamChargeTimer && this.pureLoveBeamChargeTimer > 0) ||
-      (this.pureLoveBeamActiveTimer && this.pureLoveBeamActiveTimer > 0) ||
-      (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0) ||
-      (this.pureLoveBeamBreatherTimer && this.pureLoveBeamBreatherTimer > 0) ||
-      this.isCallingRika ||
-      (this.rikaEmergenceTimer && this.rikaEmergenceTimer > 0) ||
-      this.isChannelingThinIceBreaker ||
-      (this.thinIceBreakerChargeTimer && this.thinIceBreakerChargeTimer > 0) ||
-      (this.thinIceBreakerPunchTimer && this.thinIceBreakerPunchTimer > 0) ||
-      this.isChannelingPurple ||
-      this.isChargingPurple ||
-      this.isFiringPurple ||
-      this.isCastingRed ||
-      this.isCastingBlue ||
-      this.redBuildupPhase ||
-      this.blueBuildupPhase ||
-      (this.purpleChargeTimer && this.purpleChargeTimer > 0) ||
-      (this.purpleRecoveryTimer && this.purpleRecoveryTimer > 0) ||
-      (this.redEffectTimer && this.redEffectTimer > 0) ||
-      this.isChannelingDivineFlame ||
-      this.isChargingFuga ||
-      this.isFiringFuga ||
-      (this.divineFlameChargeTimer && this.divineFlameChargeTimer > 0) ||
-      (this.divineFlameRecoveryTimer && this.divineFlameRecoveryTimer > 0) ||
-      this.isChannelingDomainExpansion ||
-      this.isChannelingDomain ||
-      (this.domainChargeTimer && this.domainChargeTimer > 0) ||
-      (this.domainChannelTimer && this.domainChannelTimer > 0) ||
-      this.isChannelingRCT ||
-      (this.rctChannelTimer && this.rctChannelTimer > 0) ||
-      this.isChannelingGetsuga ||
-      (this.getsugaChargeTimer && this.getsugaChargeTimer > 0) ||
-      (this.getsugaRecoveryTimer && this.getsugaRecoveryTimer > 0) ||
-      (this.getsugaSlideTimer && this.getsugaSlideTimer > 0) ||
-      this.isChannelingBankai ||
-      (this.bankaiChargeTimer && this.bankaiChargeTimer > 0) ||
-      (this.bankaiBurstTimer && this.bankaiBurstTimer > 0) ||
-      (this.hollowMaskFormationTimer && this.hollowMaskFormationTimer > 0) ||
-      (this.hollowBurstTimer && this.hollowBurstTimer > 0) ||
-      this._hollowVoicelineWait ||
-      (this.shikaiReversionBurstTimer && this.shikaiReversionBurstTimer > 0) ||
-      this.isShunpoDashing ||
-      this.shunpoComboActive ||
-      this.isShunpoDisengaging ||
-      (this.shunpoComboDelayTimer && this.shunpoComboDelayTimer > 0) ||
-      (this.shunpoDisengageDelayTimer && this.shunpoDisengageDelayTimer > 0) ||
+    return Boolean(
+      this.isChannelingStationarySkill ||
+      this.isChannelingSkillActive ||
       this.skillCharging ||
       (this.skillChargeTimer && this.skillChargeTimer > 0) ||
       (this.beamTimer && this.beamTimer > 0) ||
       this.isFlurrying ||
       (this.flurryHitsLeft && this.flurryHitsLeft > 0) ||
       (this.rapidSlashHitsLeft && this.rapidSlashHitsLeft > 0) ||
-      this.isChargingSeriousPunch ||
-      this.isSideHopping ||
-      (this.seriousPunchChargeTimer && this.seriousPunchChargeTimer > 0) ||
-      (this.basicPunchChargeTimer && this.basicPunchChargeTimer > 0) ||
       this.isCountering ||
       (this._counterPunchTimer && this._counterPunchTimer > 0) ||
       (this._counterWindupTimer && this._counterWindupTimer > 0) ||
       (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) ||
-      this.isAmbushing ||
-      this.isChargingUlt ||
-      this.isFiringUlt ||
-      (this.ultimateChargeTimer && this.ultimateChargeTimer > 0) ||
-      (this.stolenWindUpTimer && this.stolenWindUpTimer > 0) ||
-      (this.tkTimer && this.tkTimer > 0) ||
-      (this.tkTarget && this.tkTimer > 0) ||
-      (this.fleshSurgeAnimTimer && this.fleshSurgeAnimTimer > 0) ||
-      (this.twinScissorAnimTimer && this.twinScissorAnimTimer > 0) ||
-      (this.maceCannonAnimTimer && this.maceCannonAnimTimer > 0) ||
-      this.isTakadaChanneling ||
-      (this.takadaChannelTimer && this.takadaChannelTimer > 0) ||
-      (this.rockCounterComboLeft && this.rockCounterComboLeft > 0) ||
-      (this.comboHitsLeft && this.comboHitsLeft > 0) ||
-      this.isDrawingBow ||
-      (this.arrowDrawTimer && this.arrowDrawTimer > 0) ||
-      this.isPlantedPause ||
-      this.isSkywardWindup ||
-      this.isSkywardAscending ||
-      this.isLichtRegenActive ||
-      (this.ceroTimer && this.ceroTimer > 0) ||
-      (this.lanzaTimer && this.lanzaTimer > 0) ||
-      (this.spiderwebChannelTimer && this.spiderwebChannelTimer > 0) ||
-      (this.incinerateChargeTimer && this.incinerateChargeTimer > 0) ||
-      (this.machineGunFlurryTimer && this.machineGunFlurryTimer > 0) ||
-      (this.machineGunBlowTimer && this.machineGunBlowTimer > 0) ||
-      this.isIncinerating
+      this.isChannelingDomainExpansion ||
+      this.isChannelingDomain ||
+      (this.domainChargeTimer && this.domainChargeTimer > 0) ||
+      (this.domainChannelTimer && this.domainChannelTimer > 0) ||
+      this.isChannelingRCT ||
+      (this.rctChannelTimer && this.rctChannelTimer > 0)
     );
+  }
+
+  /**
+   * Determines the floating damage number text color for this attacker.
+   * Subclasses can configure `this.damageNumberColor` or override this method.
+   * @param {Object} [opts={}]
+   * @returns {string}
+   */
+  getDamageNumberColor(opts = {}) {
+    if (opts.isPurpleDPS) return '#bf5af2';
+    if (opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) {
+      return (typeof CONFIG !== 'undefined' && (CONFIG.ichigo?.damageNumberColor || CONFIG.ichigo?.themeColor)) || '#FF5500';
+    }
+    if (this.damageNumberColor) return this.damageNumberColor;
+    return this.color || '#ff4444';
+  }
+
+  /**
+   * Checks whether this fighter is still effectively in play / active,
+   * even if HP is 0 (e.g. self-destruct reboot, active illusions/clones, evasion proxies).
+   * @returns {boolean}
+   */
+  isEffectivelyAlive() {
+    if (this.isTurret || this.isDispenser) return false;
+    if (this.isParalyzedByMahito && (this.paralyzeTimer || 0) > 0) return true;
+    if (this.hp > 0 && !this.dead) return true;
+    return false;
   }
 
   /** Alias / compatibility wrapper pointing to authoritative isStationarySkillActive. */
@@ -834,7 +789,7 @@ export class Fighter {
     let moveAngle;
     if (forcedAngle !== null && forcedAngle !== undefined && !Number.isNaN(forcedAngle)) {
       moveAngle = forcedAngle;
-    } else if (target && typeof target.x === 'number' && typeof target.y === 'number' && !Number.isNaN(target.x)) {
+    } else if (target && !target.isDead && target.hp > 0 && typeof target.x === 'number' && typeof target.y === 'number' && !Number.isNaN(target.x)) {
       moveAngle = Math.atan2(target.y - this.y, target.x - this.x);
     } else if (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) {
       moveAngle = this.gunAngle;
@@ -1030,7 +985,7 @@ export class Fighter {
     this.knockbackVy = (this.knockbackVy || 0) + vy;
     this.vx = (this.vx || 0) + vx;
     this.vy = (this.vy || 0) + vy;
-    if (stunFrames > 0 && this.characterId !== 'toji' && this.type !== 'toji') {
+    if (stunFrames > 0 && !this.isKnockbackStunImmune && this.characterId !== 'toji' && this.type !== 'toji') {
       this.knockbackStunTimer = Math.max(this.knockbackStunTimer || 0, stunFrames);
     }
   }
@@ -1082,7 +1037,7 @@ export class Fighter {
 
     // Check if trapped inside Gojo's Unlimited Void Domain Expansion (Rule 17: Closed barrier cognitive stasis freezes cooldowns)
     const isInsideGojoDomain = !this.gojoDomainAdapted && !this.gojoAdapted?.domain && typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-      f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+      f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
 
     // Global Paralyze / Stasis Rule: If the fighter has an active paralyze debuff or is trapped inside Gojo's domain, all skill & ultimate cooldowns are PAUSED!
@@ -1164,15 +1119,6 @@ export class Fighter {
       this._handleFrozenSkillCooldowns();
     }
     return isFrozen;
-  }
-
-
-  applyPoison(attacker) {
-    this.statusEffects.applyPoison(attacker);
-  }
-
-  applyBurn(attacker) {
-    this.statusEffects.applyBurn(attacker);
   }
 
   onDamageDealt(target, projectile, ownerIndex) {
@@ -1584,33 +1530,6 @@ export class Fighter {
     }
   }
 
-  /**
-   * Universally resumes or assigns directional movement velocity to this fighter.
-   * Can be called whenever a skill, flurry, channel, domain, or counter concludes.
-   * @param {object|null} target - Enemy or aim target to steer toward
-   * @param {number} speedMultiplier - Speed multiplier to apply (default 1.0)
-   * @param {number|null} forcedAngle - Explicit angle in radians if provided
-   */
-  resumeMovement(target = null, speedMultiplier = 1.0, forcedAngle = null) {
-    if (this.hp <= 0 || this.isDead) return;
-    this._stationaryStallFrames = 0;
-    const baseSpeed = (this.speed || 3.5) * speedMultiplier;
-    let angle = forcedAngle;
-    if (angle === null || angle === undefined) {
-      if (target && !target.isDead && target.hp > 0) {
-        angle = Math.atan2(target.y - this.y, target.x - this.x);
-      } else if (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) {
-        angle = this.gunAngle;
-      } else if (this.angle !== undefined && !Number.isNaN(this.angle)) {
-        angle = this.angle;
-      } else {
-        angle = Math.random() * Math.PI * 2;
-      }
-    }
-    this.vx = Math.cos(angle) * baseSpeed;
-    this.vy = Math.sin(angle) * baseSpeed;
-  }
-
   /** Centralized damage dealer and death/game over check.
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
@@ -1725,21 +1644,19 @@ export class Fighter {
 
     // Spawn floating damage number when actual HP was reduced
     if (this.hp < prevHp && amount > 0 && !opts.skipStandardDamageText && !isSecondTurretHit) {
-      let color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
-      if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji')) {
-        color = '#e9d5ff'; // Highly visible bright lavender for Toji
-      } else if (attacker && (attacker.characterId === 'gojo' || attacker.type === 'gojo')) {
-        color = '#00E5FF'; // Electric Cyan for Gojo
-      } else if (attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna')) {
-        color = '#ff4455'; // Bright Crimson Flame for Sukuna
-      } else if (attacker && (attacker.characterId === 'yuta' || attacker.type === 'yuta' || attacker.isRika || (attacker.isIllusion && attacker.owner && (attacker.owner.characterId === 'yuta' || attacker.owner.type === 'yuta')))) {
-        color = '#FF1493'; // Deep Pink for Yuta and Rika
-      } else if (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')) {
-        color = (typeof CONFIG !== 'undefined' && (CONFIG.saitama?.damageNumberColor || CONFIG.saitama?.themeColor)) || attacker.color || '#F5C400'; // Bright Safety Yellow for Saitama
-      } else if ((attacker && (attacker.characterId === 'ichigo' || attacker.type === 'ichigo' || (attacker._def && attacker._def.id === 'ichigo'))) || opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) {
-        color = (typeof CONFIG !== 'undefined' && (CONFIG.ichigo?.damageNumberColor || CONFIG.ichigo?.themeColor)) || '#FF5500'; // Consistent Orange for Ichigo
-      } else if (opts.isPurpleDPS) {
+      let color = this.color || '#ff4444';
+      if (opts.isPurpleDPS) {
         color = '#bf5af2'; // Bright electric purple for Hollow Purple DPS
+      } else if (attacker) {
+        if (typeof attacker.getDamageNumberColor === 'function') {
+          color = attacker.getDamageNumberColor(opts);
+        } else if (attacker.isIllusion && attacker.owner && typeof attacker.owner.getDamageNumberColor === 'function') {
+          color = attacker.owner.getDamageNumberColor(opts);
+        } else if (attacker.damageNumberColor) {
+          color = attacker.damageNumberColor;
+        } else if (attacker.color) {
+          color = attacker.color;
+        }
       }
       const damageText = `${Math.round(amount)}`;
       this._healthBarShakeTimer = 12;
@@ -1855,17 +1772,8 @@ export class Fighter {
       // Helper: an entity is in play if alive, a Doppelganger with illusions, evading Mahito, or Genos in Overdrive/Recovery
       const _isEffectivelyAlive = (f) => {
         if (!f || f.isTurret || f.isDispenser) return false;
-        if ((f.characterId === 'genos' || f.type === 'genos') && (f.isSelfDestructing || f.isSelfDestructRecovering)) return true;
-        if (f.hp > 0) return true;
-        const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
-        if (isDoppel) {
-          return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.hp > 0);
-        }
-        const isMahitoEvading = (f.characterId === 'mahito' || f.type === 'mahito') && f.isEvading;
-        if (isMahitoEvading) {
-          return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.isEvasionMinion && ill.hp > 0);
-        }
-        return false;
+        if (typeof f.isEffectivelyAlive === 'function') return f.isEffectivelyAlive();
+        return f.hp > 0 && !f.dead;
       };
 
       const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
@@ -1896,16 +1804,9 @@ export class Fighter {
         }
       };
 
-      // If the dying fighter is a Doppelganger, evading Mahito, paralyzed in Soul Disfigurement, or Genos in Core Overdrive/Recovery, don't end the round yet
-      const isThisDoppel = this.type === 'doppleganger' || this._def?.type === 'doppleganger' || this.characterId === 'doppleganger';
-      const isThisMahitoEvading = (this.characterId === 'mahito' || this.type === 'mahito') && this.isEvading;
-      const isThisParalyzedBySoul = Boolean(this.isParalyzedByMahito && (this.paralyzeTimer || 0) > 0);
-      const isThisGenosOverdrive = (this.characterId === 'genos' || this.type === 'genos') && (this.isSelfDestructing || this.isSelfDestructRecovering);
-
-      if ((isThisDoppel && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.hp > 0)) ||
-          (isThisMahitoEvading && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.isEvasionMinion && ill.hp > 0)) ||
-          isThisParalyzedBySoul || isThisGenosOverdrive) {
-        // Round continues until explosion/reboot completes!
+      // If the dying fighter is still effectively active (e.g. Doppelganger illusions, Mahito evasion, Genos overdrive), defer round end
+      if (this.isEffectivelyAlive()) {
+        // Round continues until explosion/reboot/clones complete!
         recordKill();
         return true;
       }
@@ -1928,18 +1829,8 @@ export class Fighter {
     // Helper: an entity is "in play" if alive, a doppelganger with copies, evading Mahito, or shivering in Soul Disfigurement
     const _isEffectivelyAlive = (f) => {
       if (!f || f.isTurret || f.isDispenser) return false;
-      if (f.isParalyzedByMahito && (f.paralyzeTimer || 0) > 0) return true;
-      if ((f.characterId === 'genos' || f.type === 'genos') && (f.isSelfDestructing || f.isSelfDestructRecovering)) return true;
-      if (f.hp > 0 && !f.dead) return true;
-      const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
-      if (isDoppel) {
-        return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.hp > 0);
-      }
-      const isMahitoEvading = (f.characterId === 'mahito' || f.type === 'mahito') && f.isEvading;
-      if (isMahitoEvading) {
-        return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.isEvasionMinion && ill.hp > 0);
-      }
-      return false;
+      if (typeof f.isEffectivelyAlive === 'function') return f.isEffectivelyAlive();
+      return f.hp > 0 && !f.dead;
     };
 
     // ── POST-MORTEM SIMULTANEOUS KILL / DRAW MECHANIC ──
@@ -2312,14 +2203,6 @@ export class Fighter {
   }
 
   /**
-   * Evaluates if this fighter is currently channeling, charging, or casting an active skill/ultimate.
-   * Central single source of truth across all fighter archetypes.
-   */
-  isChannelingSkill() {
-    return this.isStationarySkillActive();
-  }
-
-  /**
    * Evaluates if this fighter is currently able to rotate and aim.
    * Automatically disables auto-aim if the fighter is dead, hard-CC'd, or in a locked firing phase.
    * Subclasses can override canAim() to add character-specific locks.
@@ -2335,9 +2218,9 @@ export class Fighter {
     if (isHardCC) return false;
 
     // Disable auto-aim if trapped in cognitive stasis inside enemy Gojo's Unlimited Void
-    if (!this.domainImmunity && this.characterId !== 'toji' && this.type !== 'toji' && !this.gojoDomainAdapted && (!this.gojoAdapted || !this.gojoAdapted.domain)) {
+    if (!this.domainImmunity && !this.isDomainImmune && this.characterId !== 'toji' && this.type !== 'toji' && !this.gojoDomainAdapted && (!this.gojoAdapted || !this.gojoAdapted.domain)) {
       const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-        f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive && f !== this
+        f && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive && f !== this
       );
       if (isInsideGojoDomain) return false;
     }

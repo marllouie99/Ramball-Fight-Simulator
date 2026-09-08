@@ -33,8 +33,12 @@ import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserke
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
 import { getAudioLatencyMs } from './soundSystem.js';
-
-
+// Cached DOM elements to adhere strictly to Rule 13 (UI & DOM Query Caching Requirement)
+let _cachedHudTop = null;
+let _cachedHudBot = null;
+let _cachedHudMain = null;
+let _cachedHudLeft = null;
+let _cachedHudRight = null;
 
 export function renderGame() {
     // Update dynamic tracking camera positions and distance-adaptive zoom
@@ -87,8 +91,6 @@ export function renderGame() {
     if (Math.abs(state.currentHUDDimOpacity - targetDim) < 0.005) {
       state.currentHUDDimOpacity = targetDim;
     }
-
-    document.documentElement.style.setProperty('--global-dim-opacity', state.currentHUDDimOpacity);
 
     // Apply global screen shake (dampened smoothly back to zero as timer expires)
     let shakeX = 0, shakeY = 0;
@@ -173,16 +175,16 @@ export function renderGame() {
         if (state.pixiLayers.effects) state.pixiLayers.effects.visible = false;
         if (state.pixiLayers.environment) state.pixiLayers.environment.visible = false;
       }
-      const hudTop = document.getElementById('hudTopContainer');
-      const hudBot = document.getElementById('hudBottomContainer');
-      const hudMain = document.getElementById('healthHud');
-      const hudLeft = document.getElementById('healthHudLeft');
-      const hudRight = document.getElementById('healthHudRight');
-      if (hudTop) { hudTop.style.display = 'none'; hudTop.style.visibility = 'hidden'; }
-      if (hudBot) { hudBot.style.display = 'none'; hudBot.style.visibility = 'hidden'; }
-      if (hudMain) { hudMain.style.display = 'none'; hudMain.style.visibility = 'hidden'; }
-      if (hudLeft) { hudLeft.style.display = 'none'; hudLeft.style.visibility = 'hidden'; }
-      if (hudRight) { hudRight.style.display = 'none'; hudRight.style.visibility = 'hidden'; }
+      if (!_cachedHudTop) _cachedHudTop = document.getElementById('hudTopContainer');
+      if (!_cachedHudBot) _cachedHudBot = document.getElementById('hudBottomContainer');
+      if (!_cachedHudMain) _cachedHudMain = document.getElementById('healthHud');
+      if (!_cachedHudLeft) _cachedHudLeft = document.getElementById('healthHudLeft');
+      if (!_cachedHudRight) _cachedHudRight = document.getElementById('healthHudRight');
+      if (_cachedHudTop) { _cachedHudTop.style.display = 'none'; _cachedHudTop.style.visibility = 'hidden'; }
+      if (_cachedHudBot) { _cachedHudBot.style.display = 'none'; _cachedHudBot.style.visibility = 'hidden'; }
+      if (_cachedHudMain) { _cachedHudMain.style.display = 'none'; _cachedHudMain.style.visibility = 'hidden'; }
+      if (_cachedHudLeft) { _cachedHudLeft.style.display = 'none'; _cachedHudLeft.style.visibility = 'hidden'; }
+      if (_cachedHudRight) { _cachedHudRight.style.display = 'none'; _cachedHudRight.style.visibility = 'hidden'; }
 
       drawFaceOffThumbnailScreen();
     } else {
@@ -562,7 +564,11 @@ export function renderGame() {
       state.legacyCanvasSprite.texture.update();
     }
     if (state.floatingTextSprite && state.floatingTextSprite.texture) {
-      state.floatingTextSprite.texture.update();
+      const hasFloatingTexts = Boolean(state.floatingTexts && state.floatingTexts.length > 0);
+      state.floatingTextSprite.visible = hasFloatingTexts;
+      if (hasFloatingTexts) {
+        state.floatingTextSprite.texture.update();
+      }
     }
     if (state.topLevelUiSprite && state.topLevelUiSprite.texture) {
       state.topLevelUiSprite.texture.update();

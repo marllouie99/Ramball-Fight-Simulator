@@ -81,6 +81,21 @@ class AudioEventEmitter {
   playFighterVoiceline(fighter, id, volume = 1.0, speed = 1.0, offset = 0, delay = 0, options = {}) {
     if (!fighter) return this.playSFX(id, volume, speed, offset, delay);
 
+    // Universal Rule: Rubbick NEVER speaks stolen character voicelines!
+    const isRubbick = Boolean(
+      fighter.characterId === 'rubbick' || 
+      fighter.type === 'rubbick' || 
+      fighter.characterId === 'trickster' || 
+      fighter.type === 'trickster' || 
+      fighter._def?.id === 'rubbick' || 
+      fighter._def?.type === 'rubbick' ||
+      fighter._def?.id === 'trickster' || 
+      fighter._def?.type === 'trickster'
+    );
+    if (isRubbick) {
+      return null;
+    }
+
     const now = Date.now();
     const newPriority = options.priority || (options.isProtected ? 'protected' : 'normal');
 

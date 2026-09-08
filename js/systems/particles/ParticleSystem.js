@@ -22,6 +22,22 @@ export function isProtectedParticle(spark) {
   return false;
 }
 
+export function warmUpPixiSpritePool(count = 40) {
+  if (typeof window === 'undefined' || !window.PIXI || !state.baseCircleTexture || !state.pixiLayers || !state.pixiLayers.particles) return;
+  while (pixiSpritePool.length < count) {
+    const s = new window.PIXI.Sprite(state.baseCircleTexture);
+    s.anchor.set(0.5);
+    s.blendMode = window.PIXI.BLEND_MODES.ADD;
+    s.visible = false;
+    state.pixiLayers.particles.addChild(s);
+    pixiSpritePool.push(s);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  setTimeout(() => warmUpPixiSpritePool(40), 10);
+}
+
 export class ParticleSystem {
   static getParticle() {
     if (sparkPool.length > 0) {

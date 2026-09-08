@@ -127,30 +127,6 @@ export class MahoragaFighter extends Fighter {
     return (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
   }
 
-  takeDamage(amount, attacker, opts = {}) {
-    const result = super.takeDamage(amount, attacker, opts);
-    // Cancel Level 8 Wall Slam sequence (impale, throw, dash, strike flurry) if hit by Gojo's Red or caught in Gojo's Purple
-    const shouldCancel = (opts.isRed || opts.isPurpleDPS) && this.isWallSlamActive;
-    if (shouldCancel) {
-      this.isWallSlamActive = false;
-      this.wallSlamPhase = null;
-      this.wallSlamTimer = 0;
-
-      // Release any grabbed targets
-      const opponent = state.fighters?.find(f => f && f !== this && f.hp > 0);
-      if (opponent) {
-        opponent.isGrabbedByMahoraga = false;
-        opponent.z = 0;
-      }
-
-      if (typeof spawnFloatingText === 'function') {
-        const cancelReason = opts.isRed ? 'SLAM CANCELED!' : 'PURPLE INTERRUPT!';
-        spawnFloatingText(this.x, this.y - this.r - 28, cancelReason, '#FF3D00');
-      }
-    }
-    return result;
-  }
-
   reset() {
     super.reset();
     
@@ -247,23 +223,6 @@ export class MahoragaFighter extends Fighter {
     this.throwBarrageShotsLeft = 0;
     this.throwBarrageTimer = 0;
     this.wallBounceCount = 0;
-  }
-
-  interruptAttacks() {
-    super.interruptAttacks();
-    this.isCleaving = false;
-    this.cleaveWindupTimer = 0;
-    this.isShouting = false;
-    this.shoutWindupTimer = 0;
-    this.isThrowing = false;
-    this.throwBarrageShotsLeft = 0;
-    this.throwBarrageTimer = 0;
-    this.defensePoseTimer = 0;
-    this.punchAnimTimer = 0;
-    this.leftPunchTimer = 0;
-    this.currentPunchProgress = 0;
-    this.sakugaImpactTimer = 0;
-    if (this.adaptationAfterimages) this.adaptationAfterimages.length = 0;
   }
 
   /**
@@ -380,6 +339,27 @@ export class MahoragaFighter extends Fighter {
 
     const { finalAmount, type } = handleAdaptationDamage(this, amount, attacker, opts);
     const result = super.takeDamage(finalAmount, attacker, opts);
+
+    // Cancel Level 8 Wall Slam sequence (impale, throw, dash, strike flurry) if hit by Gojo's Red or caught in Gojo's Purple
+    const shouldCancel = (opts.isRed || opts.isPurpleDPS) && this.isWallSlamActive;
+    if (shouldCancel) {
+      this.isWallSlamActive = false;
+      this.wallSlamPhase = null;
+      this.wallSlamTimer = 0;
+
+      // Release any grabbed targets
+      const opponent = state.fighters?.find(f => f && f !== this && f.hp > 0);
+      if (opponent) {
+        opponent.isGrabbedByMahoraga = false;
+        opponent.z = 0;
+      }
+
+      if (typeof spawnFloatingText === 'function') {
+        const cancelReason = opts.isRed ? 'SLAM CANCELED!' : 'PURPLE INTERRUPT!';
+        spawnFloatingText(this.x, this.y - this.r - 28, cancelReason, '#FF3D00');
+      }
+    }
+
     return result;
   }
 
@@ -489,6 +469,18 @@ export class MahoragaFighter extends Fighter {
       this.leftPunchTimer = backupLeftPunchTimer;
     } else {
       super.interruptAttacks(forceCancelAll);
+      this.isCleaving = false;
+      this.cleaveWindupTimer = 0;
+      this.isShouting = false;
+      this.shoutWindupTimer = 0;
+      this.isThrowing = false;
+      this.throwBarrageShotsLeft = 0;
+      this.throwBarrageTimer = 0;
+      this.defensePoseTimer = 0;
+      this.punchAnimTimer = 0;
+      this.leftPunchTimer = 0;
+      this.currentPunchProgress = 0;
+      this.sakugaImpactTimer = 0;
     }
 
     // Restore afterimages that were preserved

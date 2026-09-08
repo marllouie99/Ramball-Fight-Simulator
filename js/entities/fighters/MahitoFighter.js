@@ -106,6 +106,22 @@ export class MahitoFighter extends Fighter {
     this.afterImages = val;
   }
 
+  isStationarySkillActive() {
+    return Boolean(
+      (this.fleshSurgeAnimTimer > 0) ||
+      (this.twinScissorAnimTimer > 0) ||
+      (this.maceCannonAnimTimer > 0) ||
+      super.isStationarySkillActive?.()
+    );
+  }
+
+  isEffectivelyAlive() {
+    if (this.isEvading && typeof state !== 'undefined' && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.isEvasionMinion && ill.hp > 0)) {
+      return true;
+    }
+    return super.isEffectivelyAlive();
+  }
+
   reset() {
     super.reset();
     this.punchAnimTimer = 0;
@@ -185,8 +201,24 @@ export class MahitoFighter extends Fighter {
     spawnImpactFlash(this.x, this.y, 40, 'rgba(168, 85, 247, 0.7)');
   }
 
-  takeDamage(amount, source, opts = {}) {
+  takeDamage(amount, attacker, opts = {}) {
     if (amount <= 0) return false;
+
+    // Dodge chance ONLY works while actively in small clone evasion state!
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts?.bypassEvade);
+    const isActivelyInCloneState = Boolean(this.isEvading && (this.evasionTimer || 0) > 0);
+    if (isActivelyInCloneState && !isGuaranteedHit) {
+      const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
+      if (Math.random() < dodgeChance) {
+        const now = Date.now();
+        if (!this._lastEvadeTextTime || now - this._lastEvadeTextTime > 200) {
+          this._lastEvadeTextTime = now;
+          spawnFloatingText(this.x, this.y - this.r - 12, 'EVADE!', '#E0FFFF');
+          audioSystem.playSFX('effect_dash', 0.5);
+        }
+        return false; // Attack dodged completely!
+      }
+    }
 
     let finalDamage = amount;
 
@@ -200,7 +232,7 @@ export class MahitoFighter extends Fighter {
       finalDamage *= (1 - reduction);
     }
 
-    const res = super.takeDamage(finalDamage, source, opts);
+    const res = super.takeDamage(finalDamage, attacker, opts);
     if (res) {
       this.noDamageTimer = 0;
     }
@@ -1358,25 +1390,6 @@ export class MahitoFighter extends Fighter {
     const manualTarget = this._findClosestEnemy();
     if (manualTarget) this.aim(manualTarget);
     this.executeIdleTransfigurationStrike(manualTarget);
-  }
-
-  takeDamage(amount, attacker, opts = {}) {
-    // Dodge chance ONLY works while actively in small clone evasion state!
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts?.bypassEvade);
-    const isActivelyInCloneState = Boolean(this.isEvading && (this.evasionTimer || 0) > 0);
-    if (isActivelyInCloneState && !isGuaranteedHit) {
-      const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
-      if (Math.random() < dodgeChance) {
-        const now = Date.now();
-        if (!this._lastEvadeTextTime || now - this._lastEvadeTextTime > 200) {
-          this._lastEvadeTextTime = now;
-          spawnFloatingText(this.x, this.y - this.r - 12, 'EVADE!', '#E0FFFF');
-          audioSystem.playSFX('effect_dash', 0.5);
-        }
-        return false; // Attack dodged completely!
-      }
-    }
-    return super.takeDamage(amount, attacker, opts);
   }
 
   draw(ctx) {

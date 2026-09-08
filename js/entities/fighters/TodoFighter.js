@@ -62,6 +62,16 @@ export class TodoFighter extends Fighter {
     this.teammateDamageResetTimer = 0;
   }
 
+  isStationarySkillActive() {
+    return Boolean(
+      this.isTakadaChanneling ||
+      (this.takadaChannelTimer > 0) ||
+      (this.rockCounterComboLeft > 0) ||
+      (this.comboHitsLeft > 0) ||
+      super.isStationarySkillActive?.()
+    );
+  }
+
   reset() {
     super.reset();
     this.afterImages = [];

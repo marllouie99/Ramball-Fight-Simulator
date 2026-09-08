@@ -493,3 +493,16 @@ export function getBasicAttackSoundPaths() {
   return paths;
 }
 
+/**
+ * Get basic attack sound paths for a specific fighter for high-priority match preloading.
+ * @param {number|string} id
+ * @param {string} [type]
+ * @returns {string[]}
+ */
+export function getFighterBasicAttackSoundPaths(id, type) {
+  const cfg = getBasicAttackSound(id, type);
+  if (!cfg || !cfg.src) return [];
+  if (Array.isArray(cfg.src)) return cfg.src.slice();
+  return [cfg.src];
+}
+

@@ -22,6 +22,7 @@ export class YutaFighter extends Fighter {
     super(def);
     this.type = 'yuta';
     this.themeColor = def?.themeColor || CONFIG.yuta?.themeColor || '#FF1493';
+    this.damageNumberColor = '#FF1493';
     this.skinColor = '#FABC95';
     this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 36;
     this.meleeCooldown = 0;

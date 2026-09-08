@@ -631,10 +631,12 @@ class ProjectileSystem {
     const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 12;
     triggerGlobalScreenShake(shakeIntensity, shakeDuration);
 
-    // Play Hollow Purple audio effect (play once per cast, non-looping)
-    const sound = getSkillSound(21, 'purple_fire') || getSkillSound('gojo', 'hollowpurple');
-    if (sound) {
-      proj.purpleSoundHandle = playSound(sound.src, sound.volume);
+    // Play Hollow Purple audio effect (play once per cast, non-looping; suppressed for Rubbick)
+    if (!isRubbick && !opts.suppressVoice) {
+      const sound = getSkillSound(21, 'purple_fire') || getSkillSound('gojo', 'hollowpurple');
+      if (sound) {
+        proj.purpleSoundHandle = playSound(sound.src, sound.volume);
+      }
     }
     return proj;
   }

@@ -84,6 +84,28 @@ export class GojoFighter extends Fighter {
     this.domainPreSlideTimer = 0;
     this.purpleUseCount = 0;
     this.is200PercentChannel = false;
+    this.damageNumberColor = '#00E5FF';
+    this.isParalyzingDomain = true;
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isChannelingPurple ||
+      this.isChargingPurple ||
+      this.isFiringPurple ||
+      this.isCastingRed ||
+      this.isCastingBlue ||
+      this.redBuildupPhase ||
+      this.blueBuildupPhase ||
+      (this.purpleChargeTimer > 0) ||
+      (this.purpleRecoveryTimer > 0) ||
+      (this.redEffectTimer > 0) ||
+      this.isChannelingDomainExpansion ||
+      (this.domainChargeTimer > 0) ||
+      this.isChannelingRCT ||
+      (this.rctChannelTimer > 0) ||
+      super.isStationarySkillActive?.()
+    );
   }
 
   reset() {
@@ -263,15 +285,36 @@ export class GojoFighter extends Fighter {
 
   isPurpleActive() {
     if (this.activePurpleProjectile) {
-      if ((this.activePurpleProjectile.life || 0) > 0 && projectileSystem?.projectiles?.includes(this.activePurpleProjectile)) {
+      const isAlive = (this.activePurpleProjectile.life || 0) > 0;
+      const inProjSystem = projectileSystem?.projectiles?.includes(this.activePurpleProjectile);
+      const inStateProj = state?.projectiles?.includes(this.activePurpleProjectile);
+      if (isAlive && (inProjSystem || inStateProj)) {
         return true;
       } else {
         this.activePurpleProjectile = null;
       }
     }
+    const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
+    const matchesOwner = (p) => (
+      p.ownerFighter === this ||
+      (myIdx !== -1 && (p.owner === myIdx || p.ownerIndex === myIdx))
+    );
+    const isPurpleProj = (p) => (
+      p &&
+      (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') &&
+      (p.life || 0) > 0 &&
+      matchesOwner(p)
+    );
+
     if (projectileSystem?.projectiles) {
-      const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
-      const found = projectileSystem.projectiles.find(p => p && (p.isGojoPurple || p.behaviorType === 'gojo_purple') && (p.owner === myIdx || p.ownerFighter === this) && (p.life || 0) > 0);
+      const found = projectileSystem.projectiles.find(isPurpleProj);
+      if (found) {
+        this.activePurpleProjectile = found;
+        return true;
+      }
+    }
+    if (state?.projectiles) {
+      const found = state.projectiles.find(isPurpleProj);
       if (found) {
         this.activePurpleProjectile = found;
         return true;
@@ -419,7 +462,7 @@ export class GojoFighter extends Fighter {
     // Low-HP RCT Healing Auto-Trigger
     // The cooldown sentinel is set immediately inside _activateReverseCursedTechnique before any logic runs,
     // so back-to-back hits in the same frame cannot double-trigger.
-    if (!opts.isHeal && !opts.isSaitamaCounter && !opts.isSeriousPunch && (CONFIG.gojo?.enableRCTHeal !== false) && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
+    if (!opts.isHeal && !opts.isSaitamaCounter && !opts.isSeriousPunch && !this.isPurpleActive() && (CONFIG.gojo?.enableRCTHeal !== false) && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
       const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.25;
       if (this.hp / this.maxHp <= threshold) {
         const opponent = attacker || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
@@ -978,7 +1021,7 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (!this.isDemoFighter && !isSilenced && !this.isChannelingAnySkill() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+    if (!this.isDemoFighter && !isSilenced && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
       // Initiate smooth Pre-Domain Slide Phase before stopping to channel
       this.isDomainPreSlide = true;
       this.domainPreSlideTimer = 18; // ~18 frames smooth glide deceleration
@@ -1026,7 +1069,7 @@ export class GojoFighter extends Fighter {
 
     // Check for Hollow Purple (Skill)
     // Don't cast if Sukuna is already channeling Fuga to prevent simultaneous freezes
-    if (!this.isChannelingAnySkill() && this.purpleCooldown <= 0 && opponent && this.forcedMeleeTimer <= 0 && !opponent.isChannelingDivineFlame) {
+    if (!this.isChannelingAnySkill() && !this.isPurpleActive() && this.purpleCooldown <= 0 && opponent && this.forcedMeleeTimer <= 0 && !opponent.isChannelingDivineFlame) {
       if (opponent && !opponent.isDead) {
         super.aim(opponent); // Aim at target once at cast start
       }
@@ -1173,7 +1216,7 @@ export class GojoFighter extends Fighter {
     }
 
     // Check for Red (Close-range repel: holds Red ready until an enemy gets nearby)
-    if (!this.isChannelingAnySkill() && this.redCooldown <= 0 && this.forcedMeleeTimer <= 0) {
+    if (!this.isChannelingAnySkill() && !this.isPurpleActive() && this.redCooldown <= 0 && this.forcedMeleeTimer <= 0) {
       const triggerRange = CONFIG.gojo.redTriggerRange || 280;
       let hasNearbyEnemy = false;
 
@@ -1428,10 +1471,6 @@ export class GojoFighter extends Fighter {
     const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
     const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.8;
     audioSystem.playSFX(dashSnd, dashVol);
-  }
-
-  _applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena) {
-    modApplyTeleportSlideBrake(this, oldX, oldY, targetX, targetY, arena);
   }
 
   /**
@@ -1701,6 +1740,7 @@ export class GojoFighter extends Fighter {
   }
 
   _activateRed() {
+    if (this.isPurpleActive()) return false;
     return modActivateRed(this);
   }
 
@@ -1822,6 +1862,7 @@ export class GojoFighter extends Fighter {
 
 
   _activateDomain(arena) {
+    if (this.isPurpleActive()) return;
     this.isChannelingDomainExpansion = false;
     this.domainChargeTimer = 0;
     this._hasPlayedDomainChannelSound = false;
@@ -1935,7 +1976,7 @@ export class GojoFighter extends Fighter {
   }
 
   _checkReverseCursedTechnique(opponent, arena) {
-    if (this.isDead || this.isChannelingAnySkill() || this.isChannelingRCT) return;
+    if (this.isDead || this.isChannelingAnySkill() || this.isChannelingRCT || this.isPurpleActive()) return;
     if (this.reverseCursedTechniqueCooldown > 0) return;
 
     const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.25;
@@ -1949,7 +1990,7 @@ export class GojoFighter extends Fighter {
 
   _activateReverseCursedTechnique(opponent, arena) {
     // Guard: bail immediately if already cooling down or already channeling RCT — prevents double-heal from re-entrant calls
-    if (this.isDead || this.hp <= 0) return;
+    if (this.isDead || this.hp <= 0 || this.isPurpleActive()) return;
     if ((this.reverseCursedTechniqueCooldown || 0) > 0 || this.isChannelingRCT) return;
     // Set cooldown immediately as sentinel before ANY heal/visual logic runs
     this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;

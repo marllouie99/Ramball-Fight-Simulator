@@ -140,6 +140,17 @@ export class UryuFighter extends Fighter {
     this.combatAuraOpacity = 0.35;
     this.hideFrontHand = false;
     this.hideBackHand = false;
+    this.damageNumberColor = '#00E5FF';
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isDrawingBow ||
+      (this.arrowDrawTimer > 0) ||
+      this.isPlantedPause ||
+      this.isLichtRegenActive ||
+      super.isStationarySkillActive?.()
+    );
   }
 
   _playSound(key, defaultSfx, defaultVol = 0.85) {

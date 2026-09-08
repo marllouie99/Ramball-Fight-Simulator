@@ -1,4 +1,4 @@
-import { fadeOutLoopingSound, stopLoopingSound, fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
+import { fadeOutLoopingSound, stopLoopingSound, fadeOutSound, fadeOutSoundBySrc, isVoicelineAudio } from '../../systems/soundSystem.js';
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -209,6 +209,23 @@ export class RubbickFighter extends Fighter {
     fadeOutSoundBySrc('cero', 100);
     fadeOutSoundBySrc('getsuga', 100);
     fadeOutSoundBySrc('bankai', 100);
+  }
+
+  /**
+   * Safe audio player for stolen ability SFX.
+   * Universally filters out and suppresses character voicelines and vocal speech.
+   * Rubbick will only play pure sound effects (SFX) when channeling or unleashing stolen skills.
+   */
+  playStolenSFX(srcOrObj, defaultVol = 1.0, speed = 1.0, offset = 0, delay = 0) {
+    if (!srcOrObj) return null;
+    const src = typeof srcOrObj === 'object' && srcOrObj.src ? srcOrObj.src : srcOrObj;
+    const vol = (typeof srcOrObj === 'object' && srcOrObj.volume !== undefined) ? srcOrObj.volume : defaultVol;
+    
+    // STRICT UNIVERSAL RULE: Rubbick NEVER steals or triggers someone else's character voicelines!
+    if (isVoicelineAudio(src)) {
+      return null;
+    }
+    return audioSystem.playSFX(src, vol, speed, offset, delay);
   }
 
   /**
@@ -593,10 +610,10 @@ export class RubbickFighter extends Fighter {
     spawnSparks(target.x, target.y, 10, 'arcane');
     
     const stormSound = getSkillSound(99, 'storm');
-    if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.6);
+    if (stormSound) this.playStolenSFX(stormSound, 0.6);
 
     const thunderSound = getSkillSound('zeus', 'thunderstrike');
-    if (thunderSound) audioSystem.playSFX(thunderSound.src, (thunderSound.volume || 1.0) * 0.6);
+    if (thunderSound) this.playStolenSFX(thunderSound, (thunderSound.volume || 1.0) * 0.6);
     
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
     state.zeusStormStrikes.push({
@@ -723,7 +740,7 @@ export class RubbickFighter extends Fighter {
         if (this.beamCharge === 0) {
           this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
           const chargeSound = getSkillEffectSound('solarchampion', 'lasercharge');
-          if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume);
+          if (chargeSound) this.playStolenSFX(chargeSound);
         }
         
         this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
@@ -1282,56 +1299,76 @@ export class RubbickFighter extends Fighter {
         
         // If opponent is Gojo, Rubbick can steal whichever skill Gojo has cast (Hollow Purple, Reversal Red, or Unlimited Void)!
         if (isGojoOpponent) {
-          const gojoHasFiredPurple = Boolean(
-            opponent.hasFiredPurple ||
-            opponent._hasFiredPurpleAtLeastOnce ||
-            (state.projectiles && state.projectiles.some(p => p && p.isGojoPurple && p.owner === state.fighters?.indexOf(opponent)))
+          const isGojoDomainChanneling = Boolean(
+            opponent.isChannelingDomainExpansion ||
+            opponent.isDomainPreSlide ||
+            (opponent.domainChargeTimer && opponent.domainChargeTimer > 0)
           );
-          const gojoHasFiredRed = Boolean(
-            opponent.hasFiredRed ||
-            opponent._hasFiredRedAtLeastOnce
-          );
-          const gojoHasFiredDomain = Boolean(
-            opponent.hasFiredDomain ||
-            opponent._hasFiredDomainAtLeastOnce ||
-            opponent.domainActive ||
-            opponent.isChannelingDomainExpansion
-          );
+          const isGojoDomainActive = Boolean(opponent.domainActive);
 
-          if (gojoHasFiredPurple || gojoHasFiredRed || gojoHasFiredDomain) {
-            // Steal the skill Gojo used most recently (priority: lastCastSkill or currently active state)
-            let stolenId = 'gojo'; // default to purple
-            let skillLabel = 'HOLLOW PURPLE';
-            if (opponent.domainActive || opponent.isChannelingDomainExpansion || opponent.lastCastSkill === 'domain') {
-              stolenId = 'gojo_domain';
-              skillLabel = 'UNLIMITED VOID';
-            } else if (opponent.lastCastSkill === 'red') {
-              stolenId = 'gojo_red';
-              skillLabel = 'REVERSAL RED';
-            } else if (opponent.lastCastSkill === 'purple') {
-              stolenId = 'gojo';
-              skillLabel = 'HOLLOW PURPLE';
-            } else if (gojoHasFiredDomain && !gojoHasFiredPurple && !gojoHasFiredRed) {
-              stolenId = 'gojo_domain';
-              skillLabel = 'UNLIMITED VOID';
-            } else if (gojoHasFiredRed && !gojoHasFiredPurple && !gojoHasFiredDomain) {
-              stolenId = 'gojo_red';
-              skillLabel = 'REVERSAL RED';
-            }
+          // DO NOT let Rubbick steal skill on Gojo's domain when he's channeling;
+          // he should be able to steal the skill AFTER Gojo's domain expires!
+          if (!isGojoDomainChanneling && !isGojoDomainActive) {
+            const gojoHasFiredPurple = Boolean(
+              opponent.hasFiredPurple ||
+              opponent._hasFiredPurpleAtLeastOnce ||
+              (state.projectiles && state.projectiles.some(p => p && (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') && p.owner === state.fighters?.indexOf(opponent)))
+            );
+            const gojoHasFiredRed = Boolean(
+              opponent.hasFiredRed ||
+              opponent._hasFiredRedAtLeastOnce
+            );
+            const gojoDomainExpired = Boolean(
+              !opponent.domainActive &&
+              !opponent.isChannelingDomainExpansion &&
+              !opponent.isDomainPreSlide &&
+              (opponent.hasFiredDomain || opponent._hasFiredDomainAtLeastOnce || opponent.lastCastSkill === 'domain')
+            );
 
-            this.spellStealCooldown = rubbickCfg.spellStealCooldown;
-            this.stolenType = stolenId;
-            this.stolenColor = '#00FF64';
-            this.stolenTimer = rubbickCfg.spellStealDuration;
-            this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 45; // Initial delay before casting newly stolen skill
-            this._hasFiredStolenSkillTrick = false;
+            if (gojoHasFiredPurple || gojoHasFiredRed || gojoDomainExpired) {
+              // Steal the skill Gojo used most recently (priority: lastCastSkill or currently active state)
+              let stolenId = null;
+              let skillLabel = '';
 
-            spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${skillLabel}!`, '#00FF64');
-            spawnSpellStealWisps(this, opponent, '#00FF64', 15);
+              if (opponent.lastCastSkill === 'domain' && gojoDomainExpired) {
+                stolenId = 'gojo_domain';
+                skillLabel = 'UNLIMITED VOID';
+              } else if (opponent.lastCastSkill === 'red') {
+                stolenId = 'gojo_red';
+                skillLabel = 'REVERSAL RED';
+              } else if (opponent.lastCastSkill === 'purple') {
+                stolenId = 'gojo';
+                skillLabel = 'HOLLOW PURPLE';
+              } else if (gojoDomainExpired && !gojoHasFiredPurple && !gojoHasFiredRed) {
+                stolenId = 'gojo_domain';
+                skillLabel = 'UNLIMITED VOID';
+              } else if (gojoHasFiredRed && !gojoHasFiredPurple && !gojoDomainExpired) {
+                stolenId = 'gojo_red';
+                skillLabel = 'REVERSAL RED';
+              } else if (gojoHasFiredPurple) {
+                stolenId = 'gojo';
+                skillLabel = 'HOLLOW PURPLE';
+              } else if (gojoDomainExpired) {
+                stolenId = 'gojo_domain';
+                skillLabel = 'UNLIMITED VOID';
+              }
 
-            const stealSound = getSkillSound(this._def?.id || 'rubbick', 'spellSteal') || { src: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3', volume: 0.9 };
-            if (stealSound) {
-              audioSystem.playSFX(stealSound.src, stealSound.volume || 0.9);
+              if (stolenId) {
+                this.spellStealCooldown = rubbickCfg.spellStealCooldown;
+                this.stolenType = stolenId;
+                this.stolenColor = '#00FF64';
+                this.stolenTimer = rubbickCfg.spellStealDuration;
+                this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 45; // Initial delay before casting newly stolen skill
+                this._hasFiredStolenSkillTrick = false;
+
+                spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${skillLabel}!`, '#00FF64');
+                spawnSpellStealWisps(this, opponent, '#00FF64', 15);
+
+                const stealSound = getSkillSound(this._def?.id || 'rubbick', 'spellSteal') || { src: 'Assets/Sound Effects/Skills/Rubbick-spellsteal.mp3', volume: 0.9 };
+                if (stealSound) {
+                  audioSystem.playSFX(stealSound.src, stealSound.volume || 0.9);
+                }
+              }
             }
           }
         } else {
@@ -1545,13 +1582,13 @@ export class RubbickFighter extends Fighter {
             skillCast = true;
             if (this.stolenType === 'gojo') {
               const chargeSound = getSkillSound('gojo', 'purple_charging') || { src: 'Assets/Sound Effects/Skills/mixing.mp3', volume: 1.8 };
-              if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume || 1.0);
+              if (chargeSound) this.playStolenSFX(chargeSound, 1.0);
             } else if (this.stolenType === 'gojo_red') {
               const chargeSound = getSkillSound('gojo', 'red_charging') || { src: 'Assets/Sound Effects/Skills/redcharging.mp3', volume: 2.0 };
-              if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume || 1.8);
+              if (chargeSound) this.playStolenSFX(chargeSound, 1.8);
             } else if (this.stolenType === 'gojo_domain') {
               // Stolen Unlimited Void wind-up: Play subtle spatial whoosh SFX (no Gojo voiceline)
-              audioSystem.playSFX('Assets/Sound Effects/Skills/woosh.mp3', 0.85);
+              this.playStolenSFX('Assets/Sound Effects/Skills/woosh.mp3', 0.85);
             }
         }
         break;
@@ -1640,7 +1677,7 @@ export class RubbickFighter extends Fighter {
         spawnFloatingText(this.x, this.y - this.r - 20, 'ARCANE STORM!', '#00ff64');
         triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
         const stormSound = getSkillSound(99, 'storm');
-        if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.7);
+        if (stormSound) this.playStolenSFX(stormSound, 0.7);
         break;
       case 'grenadier':
         projectileSystem.fireGrenade(this, ownerIndex, (CONFIG.grenadier.poisonDamagePerTick || 10) * getStolenMultiplier(this.stolenType, 'damageMultiplier'), opponent);
@@ -1683,7 +1720,7 @@ export class RubbickFighter extends Fighter {
            
            const enhanceSound = getSkillSound(1, 'enhance'); // 1 is Sharpshooter ID
            if (enhanceSound) {
-             audioSystem.playSFX(enhanceSound.src, enhanceSound.volume);
+             this.playStolenSFX(enhanceSound);
            }
         }
         break;
@@ -1706,11 +1743,11 @@ export class RubbickFighter extends Fighter {
         this.attackSwingTimer = 18; // Follow-through thrust/release animation
 
         if (projectileSystem && projectileSystem.fireGojoPurple) {
-          projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isRubbick: true, isTrickster: true, colorTheme: 'green' });
+          projectileSystem.fireGojoPurple(this, ownerIndex, purpleDamage, purpleDPS, { isRubbick: true, isTrickster: true, colorTheme: 'green', suppressVoice: true });
         }
         
         const purpleSound = { src: 'Assets/Sound Effects/Skills/purpledeploy.mp3', volume: 1.5 };
-        if (purpleSound) audioSystem.playSFX(purpleSound.src, purpleSound.volume || 1.5);
+        if (purpleSound) this.playStolenSFX(purpleSound, 1.5);
         break;
       case 'gojo_red':
         if (opponent) {
@@ -1739,7 +1776,7 @@ export class RubbickFighter extends Fighter {
         const sBlast = getSkillSound('gojo', 'red_blast');
         const blastSnd = sBlast?.src || CONFIG.gojo?.sounds?.redBlast || 'Assets/Sound Effects/Skills/redblast.mp3';
         const blastVol = sBlast?.volume ?? (CONFIG.gojo?.soundVolumes?.redBlast ?? 2.5);
-        audioSystem.playSFX(blastSnd, blastVol);
+        this.playStolenSFX(blastSnd, blastVol);
 
         // Query all valid enemy targets (fighters, illusions, and cars) per Rule #6 & Rule #7
         const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
@@ -1855,7 +1892,7 @@ export class RubbickFighter extends Fighter {
           this.vy = 0;
 
           // Stolen Unlimited Void deployment: Play pure spatial time-stop sphere SFX (100% voiceline-free)
-          audioSystem.playSFX('Assets/Sound Effects/Skills/cronosphere.mp3', 1.2);
+          this.playStolenSFX('Assets/Sound Effects/Skills/cronosphere.mp3', 1.2);
 
           this.stolenSkillCooldown = (CONFIG.gojo?.domainCooldown || 1200) * getStolenMultiplier('gojo_domain', 'cooldownMultiplier');
         }

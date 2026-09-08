@@ -8,8 +8,36 @@ import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { fastCleanArray } from './visualTrailSystem.js';
 import { triggerGenosSelfDestructFlash } from '../renderers/effectsRenderer.js';
-
 import { ParticleSystem, isProtectedParticle } from '../../systems/particles/ParticleSystem.js';
+
+import { drawGroundScorch, drawArcaneGroundScorch } from './renderers/groundDecalRenderers.js';
+import {
+  drawMeleeClashShockwave,
+  drawMahoragaShoutShockwave,
+  drawRikaRoarShockwave,
+  drawPurpleShockwaveRing,
+  drawAnimeImpactFrame,
+  drawPunchWindSpeedLine,
+  drawSaitamaCounterFrontalBlast,
+  drawGojoRedFrontalBlast,
+  drawArcaneShockwave,
+} from './renderers/blastShockwaveRenderers.js';
+import {
+  drawMahitoSoulBubble,
+  drawMahitoSoulShockwave,
+  drawMahitoSoulCoreFlash,
+  drawMahitoClawScratchBurst,
+  drawMahitoDomainSoulTendrilStrike,
+  drawCursedBiteMaw,
+  drawArcaneFlash,
+  drawArcaneGlyph,
+  drawSpellStealWisp,
+  drawHealingEffect,
+  drawYutaBeamPinkCore,
+  drawBoogieWoogieSwapBeam,
+  drawCrimsonLightningCore,
+  drawCrimsonLightningRing,
+} from './renderers/characterSpecialRenderers.js';
 
 function _isDarkMode() {
   return Boolean(
@@ -588,17 +616,453 @@ export function updateSparkEffects(frozen = false) {
       effect.sprite.rotation = effect.rotation;
     }
 
-    // Remove dead effects — return to pool instead of splice
+    // Remove dead effects
     if (effect.life <= 0) {
-      ParticleSystem.returnParticle(effect);
+      if (effect.isPixi && effect.sprite && effect.sprite.parent) {
+        effect.sprite.parent.removeChild(effect.sprite);
+        effect.sprite.destroy();
+      }
       return false;
     }
     return true;
   });
 }
 
+function drawCrimsonSniperFlash(ctx, effect) {
+  const gradient = getUnitRadialGradient(ctx, 'crimsonSniperFlash', [
+    [0, 'rgba(0, 0, 0, 0.8)'],
+    [0.3, 'rgba(200, 0, 20, 0.6)'],
+    [1, 'rgba(50, 0, 0, 0)']
+  ]);
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  ctx.scale(effect.size, effect.size);
+  ctx.beginPath();
+  ctx.arc(0, 0, 1, 0, Math.PI * 2);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawArcaneAscendLine(ctx, effect) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const cx = snap(effect.x);
+  const cy = snap(effect.y);
+  const alpha = Math.max(0, Math.min(1.0, effect.life));
+  const baseColor = effect.color || 'rgba(0, 255, 102, 1)';
+
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+  ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
+
+  ctx.fillStyle = baseColor.replace(/[\d\.]+\)$/, `${(alpha * 0.95).toFixed(2)})`);
+  ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P);
+  ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P);
+  ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P);
+  ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P);
+
+  ctx.fillStyle = baseColor.replace(/[\d\.]+\)$/, `${(alpha * 0.40).toFixed(2)})`);
+  ctx.fillRect(cx - P * 2.5, cy - P * 0.5, P, P);
+  ctx.fillRect(cx + P * 1.5, cy - P * 0.5, P, P);
+  ctx.fillRect(cx - P * 0.5, cy - P * 2.5, P, P);
+  ctx.fillRect(cx - P * 0.5, cy + P * 1.5, P, P);
+
+  const tailSteps = 4;
+  for (let s = 1; s <= tailSteps; s++) {
+    const tNorm = s / tailSteps;
+    const tx = snap(effect.x - effect.vx * s * 3.5);
+    const ty = snap(effect.y - effect.vy * s * 3.5);
+    const tailAlpha = alpha * (1 - tNorm) * 0.75;
+    if (tailAlpha > 0.05) {
+      ctx.fillStyle = (s === 1)
+        ? `rgba(255, 255, 255, ${tailAlpha.toFixed(2)})`
+        : baseColor.replace(/[\d\.]+\)$/, `${tailAlpha.toFixed(2)})`);
+      ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
+    }
+  }
+}
+
+function drawThunderSpark(ctx, effect) {
+  ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
+  ctx.lineWidth = effect.size * 0.8;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  ctx.moveTo(effect.x, effect.y);
+  
+  const tailX = effect.x - effect.vx * 3;
+  const tailY = effect.y - effect.vy * 3;
+  const midX = (effect.x + tailX) / 2 + (Math.random() - 0.5) * effect.size * 3;
+  const midY = (effect.y + tailY) / 2 + (Math.random() - 0.5) * effect.size * 3;
+  
+  ctx.lineTo(midX, midY);
+  ctx.lineTo(tailX, tailY);
+  ctx.stroke();
+}
+
+function drawParrySpark(ctx, effect) {
+  const speed = Math.hypot(effect.vx || 0, effect.vy || 0);
+  const angle = Math.atan2(effect.vy || 0, effect.vx || 1);
+  const tailLen = Math.max(10, speed * (2.8 + (1 - effect.life) * 1.6));
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const isRicochet = effect.type === 'slashRicochet';
+  const outerColor = isRicochet ? `rgba(255, 30, 40, ${effect.life * 0.65})` : `rgba(255, 90, 0, ${effect.life * 0.55})`;
+  const midColor = isRicochet ? `rgba(255, 180, 50, ${effect.life * 0.85})` : `rgba(255, 220, 80, ${effect.life * 0.85})`;
+
+  ctx.strokeStyle = outerColor;
+  ctx.lineWidth = effect.size * 2.2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(effect.x, effect.y);
+  ctx.lineTo(effect.x - Math.cos(angle) * tailLen, effect.y - Math.sin(angle) * tailLen);
+  ctx.stroke();
+
+  ctx.strokeStyle = midColor;
+  ctx.lineWidth = effect.size * 1.1;
+  ctx.beginPath();
+  ctx.moveTo(effect.x, effect.y);
+  ctx.lineTo(effect.x - Math.cos(angle) * (tailLen * 0.75), effect.y - Math.sin(angle) * (tailLen * 0.75));
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+  ctx.lineWidth = Math.max(1, effect.size * 0.45);
+  ctx.beginPath();
+  ctx.moveTo(effect.x, effect.y);
+  ctx.lineTo(effect.x - Math.cos(angle) * (tailLen * 0.45), effect.y - Math.sin(angle) * (tailLen * 0.45));
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(255, 255, 255, ${effect.life})`;
+  ctx.beginPath();
+  ctx.arc(effect.x, effect.y, Math.max(1.3, effect.size * 0.5), 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawParryEmberStar(ctx, effect) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.translate(effect.x, effect.y);
+  if (effect.rotation !== undefined) {
+    effect.rotation += effect.rotationSpeed || 0.1;
+    ctx.rotate(effect.rotation);
+  }
+
+  const starSize = effect.size * (0.8 + Math.sin(effect.life * Math.PI) * 0.5);
+  const alpha = effect.life;
+
+  ctx.fillStyle = `rgba(255, 140, 10, ${alpha * 0.6})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, starSize * 1.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+  ctx.beginPath();
+  ctx.moveTo(0, -starSize * 2.4);
+  ctx.lineTo(starSize * 0.35, -starSize * 0.35);
+  ctx.lineTo(starSize * 2.4, 0);
+  ctx.lineTo(starSize * 0.35, starSize * 0.35);
+  ctx.lineTo(0, starSize * 2.4);
+  ctx.lineTo(-starSize * 0.35, starSize * 0.35);
+  ctx.lineTo(-starSize * 2.4, 0);
+  ctx.lineTo(-starSize * 0.35, -starSize * 0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawCrimsonLightningArc(ctx, effect) {
+  const len = effect.size * 4;
+  const angle = Math.atan2(effect.vy, effect.vx);
+  ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
+  ctx.lineWidth = 1 + effect.life;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(effect.x, effect.y);
+  for (let seg = 1; seg <= 3; seg++) {
+    const t = seg / 3;
+    const jx = (Math.random() - 0.5) * len * 0.4;
+    const jy = (Math.random() - 0.5) * len * 0.4;
+    ctx.lineTo(
+      effect.x + Math.cos(angle) * len * t + jx,
+      effect.y + Math.sin(angle) * len * t + jy
+    );
+  }
+  ctx.stroke();
+}
+
+function drawArcaneSmoke(ctx, effect) {
+  if (effect.type === 'arcaneSmokeAirborne') {
+    effect.size += (effect.targetSize - effect.size) * 0.03;
+  } else {
+    effect.size += (effect.targetSize - effect.size) * 0.07;
+  }
+  
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.5;
+  const snap = (v) => Math.round(v / P) * P;
+  const cx = snap(effect.x);
+  const cy = snap(effect.y);
+  const alpha = Math.max(0, Math.min(1.0, effect.life * 0.9));
+  const smR = Math.max(P * 2, snap(effect.size * 0.75));
+
+  ctx.translate(cx, cy);
+
+  const isAir = (effect.type === 'arcaneSmokeAirborne');
+  const colBorder = isAir ? `rgba(5, 30, 20, ${(alpha * 0.8).toFixed(2)})` : `rgba(15, 25, 20, ${(alpha * 0.7).toFixed(2)})`;
+  const colBody = isAir ? `rgba(0, 200, 140, ${(alpha * 0.65).toFixed(2)})` : `rgba(40, 100, 75, ${(alpha * 0.50).toFixed(2)})`;
+  const colHighlight = isAir ? `rgba(180, 255, 220, ${(alpha * 0.85).toFixed(2)})` : `rgba(120, 200, 160, ${(alpha * 0.60).toFixed(2)})`;
+
+  ctx.fillStyle = colBorder;
+  ctx.fillRect(-smR - P, -smR * 0.6 - P, (smR + P) * 2, (smR * 0.6 + P) * 2);
+  ctx.fillRect(-smR * 0.6 - P, -smR - P, (smR * 0.6 + P) * 2, (smR + P) * 2);
+  ctx.fillRect(-smR * 0.4 - P, smR * 0.2 - P, (smR * 0.8 + P) * 2, (smR * 0.4 + P) * 2);
+
+  ctx.fillStyle = colBody;
+  ctx.fillRect(-smR, -smR * 0.6, smR * 2, smR * 1.2);
+  ctx.fillRect(-smR * 0.6, -smR, smR * 1.2, smR * 2);
+  ctx.fillRect(-smR * 0.4, smR * 0.2, smR * 1.6, smR * 0.8);
+
+  ctx.fillStyle = colHighlight;
+  ctx.fillRect(-smR * 0.6, -smR * 0.8, smR * 0.8, smR * 0.6);
+  ctx.fillRect(-smR * 0.8, -smR * 0.4, smR * 0.5, smR * 0.5);
+
+  ctx.restore();
+}
+
+function drawTojiWindPebble(ctx, effect) {
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  ctx.rotate(effect.rotation || 0);
+  ctx.fillStyle = effect.color || '#3A3D40';
+  ctx.globalAlpha = Math.min(1.0, effect.life * 1.3);
+  
+  ctx.beginPath();
+  const s = effect.size;
+  ctx.moveTo(-s, -s * 0.6);
+  ctx.lineTo(s * 0.8, -s * 0.8);
+  ctx.lineTo(s, s * 0.4);
+  ctx.lineTo(-s * 0.4, s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawTojiWindLeaf(ctx, effect) {
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  ctx.rotate((effect.rotation || 0) + effect.life * 0.1);
+  ctx.fillStyle = effect.color || '#2E8B57';
+  ctx.globalAlpha = Math.min(1.0, effect.life * 1.3);
+  
+  const lw = effect.size * 1.6;
+  const lh = effect.size * 0.8;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, lw, lh, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-lw * 0.7, 0);
+  ctx.lineTo(lw * 0.7, 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTelekinesisDebris(ctx, effect) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const cx = snap(effect.x);
+  const cy = snap(effect.y);
+  const alpha = Math.min(1.0, effect.life * 1.25);
+  const s = Math.max(P * 2, snap(effect.size || 6));
+
+  ctx.translate(cx, cy);
+  if (effect.rotation) {
+    const snappedRot = Math.round(effect.rotation / (Math.PI / 8)) * (Math.PI / 8);
+    ctx.rotate(snappedRot);
+  }
+
+  if (effect.type === 'telekinesisDebris') {
+    const auraTime = performance.now() * 0.005 + (effect.rotation || 0);
+    for (let a = 0; a < 3; a++) {
+      const aAng = auraTime + (a * Math.PI * 2 / 3);
+      const ax = snap(Math.cos(aAng) * (s * 1.4));
+      const ay = snap(Math.sin(aAng) * (s * 1.4));
+      ctx.fillStyle = (a % 2 === 0) 
+        ? `rgba(0, 255, 100, ${(alpha * 0.80).toFixed(2)})` 
+        : `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(2)})`;
+      ctx.fillRect(ax, ay, P, P);
+    }
+  }
+
+  ctx.fillStyle = `rgba(10, 18, 14, ${(alpha * 0.95).toFixed(2)})`;
+  ctx.fillRect(-s - P, -s * 0.6 - P, (s + P) * 2, (s * 0.6 + P) * 2);
+  ctx.fillRect(-s * 0.7 - P, -s - P, (s * 0.7 + P) * 2, (s + P) * 2);
+
+  ctx.fillStyle = `rgba(28, 42, 35, ${alpha.toFixed(2)})`;
+  ctx.fillRect(-s, -s * 0.6, s * 2, s * 1.2);
+  ctx.fillRect(-s * 0.7, -s * 0.9, s * 1.4, s * 1.8);
+
+  ctx.fillStyle = `rgba(52, 85, 70, ${alpha.toFixed(2)})`;
+  ctx.fillRect(-s * 0.8, -s * 0.7, s * 1.2, s * 1.1);
+  ctx.fillRect(-s * 0.5, -s * 0.8, s * 1.0, s * 1.3);
+
+  ctx.fillStyle = `rgba(100, 240, 160, ${(alpha * 0.90).toFixed(2)})`;
+  ctx.fillRect(-s * 0.7, -s * 0.8, s * 0.8, P);
+  ctx.fillRect(-s * 0.8, -s * 0.5, P, s * 0.6);
+
+  ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(2)})`;
+  ctx.fillRect(-s * 0.4, -s * 0.6, P, P);
+
+  ctx.restore();
+}
+
+function drawArcaneSparkle(ctx, effect) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const cx = snap(effect.x);
+  const cy = snap(effect.y);
+  const alpha = Math.max(0, Math.min(1.0, effect.life));
+
+  ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(2)})`;
+  ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
+
+  ctx.fillStyle = `rgba(0, 255, 100, ${(alpha * 0.90).toFixed(2)})`;
+  ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P);
+  ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P);
+  ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P);
+  ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P);
+
+  if (effect.vx || effect.vy) {
+    const tx = snap(effect.x - (effect.vx || 0) * 1.8);
+    const ty = snap(effect.y - (effect.vy || 0) * 1.8);
+    ctx.fillStyle = `rgba(0, 200, 80, ${(alpha * 0.50).toFixed(2)})`;
+    ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
+  }
+
+  ctx.restore();
+}
+
+function drawDefaultImpactFlash(ctx, effect) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const flashR = Math.max(P * 2, effect.size * effect.life);
+
+  ctx.fillStyle = `rgba(255, 200, 80, ${(effect.life * 0.75).toFixed(3)})`;
+  ctx.fillRect(effect.x - flashR, effect.y - P, flashR * 2, P * 2);
+  ctx.fillRect(effect.x - P, effect.y - flashR, P * 2, flashR * 2);
+
+  ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
+  const coreR = Math.max(P, Math.round((flashR * 0.4) / P) * P);
+  ctx.fillRect(effect.x - coreR, effect.y - coreR, coreR * 2, coreR * 2);
+
+  ctx.restore();
+}
+
+function drawStandardSpark(ctx, effect, isGamePlay) {
+  const safeColor = (typeof effect.color === 'string' && effect.color) ? effect.color : '#00E5FF';
+  if (isGamePlay) {
+    ctx.fillStyle = safeColor;
+  } else {
+    const r = Math.max(0.1, effect.size || 1);
+    const gradient = ctx.createRadialGradient(effect.x, effect.y, 0, effect.x, effect.y, r);
+    gradient.addColorStop(0, safeColor);
+    const halfColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0.6)') : safeColor;
+    gradient.addColorStop(0.5, halfColor);
+    if (effect.type === 'crimsonSniper') {
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else if (effect.type === 'lightningTrail') {
+      const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace(/[\d.]+\)$/, '0)') : 'rgba(0, 229, 255, 0)';
+      gradient.addColorStop(1, zeroColor);
+    } else if (effect.type === 'rikaCurse') {
+      const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0)') : 'rgba(0, 0, 0, 0)';
+      gradient.addColorStop(1, zeroColor);
+    } else {
+      gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+    }
+    ctx.fillStyle = gradient;
+  }
+
+  ctx.beginPath();
+  ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size || 1), 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─────────────────────────────────────────────
+// O(1) SPARK RENDERER DISPATCH TABLE
+// Replaces 2,400+ line linear if-else ladders with instant dictionary lookup
+// ─────────────────────────────────────────────
+const SPARK_RENDERERS = {
+  // Ground Decals
+  groundScorch: (ctx, effect, isGamePlay) => drawGroundScorch(ctx, effect, isGamePlay),
+  arcaneGroundScorch: (ctx, effect) => drawArcaneGroundScorch(ctx, effect),
+
+  // Blast & Shockwaves
+  meleeClashShockwave: drawMeleeClashShockwave,
+  mahoragaShoutShockwave: drawMahoragaShoutShockwave,
+  rikaRoarShockwave: drawRikaRoarShockwave,
+  purpleShockwaveRing: drawPurpleShockwaveRing,
+  animeImpactFrame: drawAnimeImpactFrame,
+  punchWindSpeedLine: drawPunchWindSpeedLine,
+  saitamaCounterFrontalBlast: drawSaitamaCounterFrontalBlast,
+  gojoRedFrontalBlast: drawGojoRedFrontalBlast,
+  arcaneShockwave: drawArcaneShockwave,
+
+  // Character Specials
+  mahitoSoulBubble: drawMahitoSoulBubble,
+  mahitoSoulShockwave: drawMahitoSoulShockwave,
+  mahitoSoulCoreFlash: drawMahitoSoulCoreFlash,
+  mahitoClawScratchBurst: drawMahitoClawScratchBurst,
+  mahitoDomainSoulTendrilStrike: drawMahitoDomainSoulTendrilStrike,
+  cursedBiteMaw: drawCursedBiteMaw,
+  arcaneFlash: drawArcaneFlash,
+  arcaneGlyph: drawArcaneGlyph,
+  spellStealWisp: drawSpellStealWisp,
+  healing: drawHealingEffect,
+  yutaBeamPinkCore: drawYutaBeamPinkCore,
+  boogieWoogieSwapBeam: drawBoogieWoogieSwapBeam,
+  crimsonLightningCore: drawCrimsonLightningCore,
+  rubbickLightningCore: drawCrimsonLightningCore,
+  tricksterLightningCore: drawCrimsonLightningCore,
+  crimsonLightningRing: drawCrimsonLightningRing,
+  rubbickLightningRing: drawCrimsonLightningRing,
+  tricksterLightningRing: drawCrimsonLightningRing,
+
+  // Compact Particles
+  crimsonSniperFlash: drawCrimsonSniperFlash,
+  arcaneAscendLine: drawArcaneAscendLine,
+  thunderSpark: drawThunderSpark,
+  parrySpark: drawParrySpark,
+  slashRicochet: drawParrySpark,
+  parryEmberStar: drawParryEmberStar,
+  crimsonLightningArc: drawCrimsonLightningArc,
+  rubbickLightningArc: drawCrimsonLightningArc,
+  tricksterLightningArc: drawCrimsonLightningArc,
+  arcaneSmokeAirborne: drawArcaneSmoke,
+  arcaneSmoke: drawArcaneSmoke,
+  arcaneSmokeGround: drawArcaneSmoke,
+  laserSmoke: drawArcaneSmoke,
+  tojiWindPebble: drawTojiWindPebble,
+  tojiWindLeaf: drawTojiWindLeaf,
+  telekinesisDebris: drawTelekinesisDebris,
+  telekinesisDebrisScattered: drawTelekinesisDebris,
+  arcane: drawArcaneSparkle,
+};
+
 /**
- * Draws all spark effects using gradient-based glow (no shadowBlur).
+ * Draws all spark effects using O(1) table dispatch (no shadowBlur).
  */
 export function drawSparkEffects(layer = 'all') {
   const { ctx } = state;
@@ -623,2407 +1087,14 @@ export function drawSparkEffects(layer = 'all') {
     ctx.save();
     ctx.globalAlpha = effect.life;
 
-    if (effect.isFlash) {
-      if (effect.type === 'crimsonLightningCore' || effect.type === 'rubbickLightningCore' || effect.type === 'tricksterLightningCore') {
-        // Sharp blinding core flash with jagged edges
-        const isRubbick = effect.type === 'rubbickLightningCore' || effect.type === 'tricksterLightningCore';
-        effect.size += (100 * 0.8 - effect.size) * 0.2; // Expand fast
-        ctx.fillStyle = `rgba(255, 255, 255, ${effect.life})`;
-        
-        ctx.beginPath();
-        // Draw a starburst/jagged flash shape
-        const points = 12;
-        for (let p = 0; p < points; p++) {
-          const angle = (p / points) * Math.PI * 2;
-          const r = p % 2 === 0 ? effect.size : effect.size * 0.4;
-          const px = effect.x + Math.cos(angle) * r;
-          const py = effect.y + Math.sin(angle) * r;
-          if (p === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fill();
-        
-        // Outer colored glow (GPU blend mode lighter for fast zero-lag glow)
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = isRubbick ? `rgba(100, 255, 100, ${effect.life * 0.5})` : `rgba(255, 50, 50, ${effect.life * 0.5})`;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
-      } else if (effect.type === 'mahitoSoulBubble') {
-        ctx.globalCompositeOperation = 'source-over';
-        const col = effect.bubbleColor || { fill: 'rgba(217, 70, 239, 0.65)', stroke: '#F5D0FE' };
-        const curSize = effect.size + (effect.targetSize - effect.size) * (1 - effect.life);
-        const wobbleX = Math.sin((effect.wobblePhase || 0) + (1 - effect.life) * 8) * 4;
-        const px = effect.x + wobbleX;
-        const py = effect.y;
-
-        ctx.beginPath();
-        ctx.arc(px, py, Math.max(1, curSize), 0, Math.PI * 2);
-        ctx.fillStyle = col.fill;
-        ctx.fill();
-
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = col.stroke;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(px - curSize * 0.35, py - curSize * 0.35, Math.max(0.5, curSize * 0.28), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.85})`;
-        ctx.fill();
-
-        ctx.globalCompositeOperation = 'source-over';
-      } else if (effect.type === 'groundScorch') {
-        // Massive, highly-detailed organic scorch mark burned into the ground
-        if (!isGamePlay) ctx.globalCompositeOperation = 'multiply';
-        
-        ctx.translate(effect.x, effect.y);
-
-        // Deep burned organic polygon (dark blue/black for thunder, dark red/black for crimson)
-        const isThunder = effect.color === 'thunder';
-        ctx.fillStyle = isThunder ? `rgba(0, 10, 30, ${effect.life * 0.8})` : `rgba(30, 0, 0, ${effect.life * 0.8})`;
-        ctx.beginPath();
-        if (effect.points && effect.points.length > 0) {
-          ctx.moveTo(effect.points[0].x, effect.points[0].y);
-          for (let i = 1; i < effect.points.length; i++) {
-            ctx.lineTo(effect.points[i].x, effect.points[i].y);
-          }
-        }
-        ctx.closePath();
-        ctx.fill();
-        
-        // Inner molten branching cracks (cyan for thunder, orange/red for crimson)
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = isThunder ? `rgba(0, 220, 255, ${effect.life * 0.8})` : `rgba(255, 60, 10, ${effect.life * 0.8})`;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 1 + effect.life * 1.5;
-        
-        ctx.beginPath();
-        if (effect.cracks && !isThunder) {
-          // Rapidly shoot the cracks outward like a shockwave fracture!
-          const shockwaveProgress = Math.min(1.0, (1.0 - effect.life) * 12.0); // Reaches 1.0 extremely fast
-
-          ctx.strokeStyle = `rgba(255, 60, 10, ${effect.life * 0.8})`;
-          ctx.lineWidth = 1 + effect.life * 1.5;
-          for (const path of effect.cracks) {
-            if (path.length > 0) {
-              const drawSegments = Math.max(1, Math.floor(path.length * shockwaveProgress));
-              ctx.moveTo(path[0].x, path[0].y);
-              for (let i = 1; i < drawSegments; i++) {
-                ctx.lineTo(path[i].x, path[i].y);
-              }
-            }
-          }
-          ctx.stroke();
-        }
-      } else if (effect.type === 'thunderSpark') {
-        // Draw as a small jagged lightning bolt trailing behind its velocity
-        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
-        ctx.lineWidth = effect.size * 0.8;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'miter';
-        ctx.beginPath();
-        ctx.moveTo(effect.x, effect.y);
-        
-        // Draw a jagged tail based on velocity
-        const tailX = effect.x - effect.vx * 3;
-        const tailY = effect.y - effect.vy * 3;
-        const midX = (effect.x + tailX) / 2 + (Math.random() - 0.5) * effect.size * 3;
-        const midY = (effect.y + tailY) / 2 + (Math.random() - 0.5) * effect.size * 3;
-        
-        ctx.lineTo(midX, midY);
-        ctx.lineTo(tailX, tailY);
-        ctx.stroke();
-        
-      } else if (effect.type === 'arcaneGroundScorch') {
-        // ── PIXEL ART ARCANE GROUND SCORCH & RUNIC IMPACT CRATER ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.5;
-        const snap = (v) => Math.round(v / P) * P;
-        const alpha = Math.max(0, Math.min(1.0, effect.life));
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-
-        // A. Stepped Pixel Scorched Crater Polygon
-        if (effect.points && effect.points.length > 0) {
-          ctx.fillStyle = `rgba(8, 18, 12, ${(alpha * 0.85).toFixed(3)})`;
-          ctx.beginPath();
-          ctx.moveTo(snap(cx + effect.points[0].x), snap(cy + effect.points[0].y));
-          for (let i = 1; i < effect.points.length; i++) {
-            ctx.lineTo(snap(cx + effect.points[i].x), snap(cy + effect.points[i].y));
-          }
-          ctx.closePath();
-          ctx.fill();
-
-          // Dark outer pixel border
-          ctx.strokeStyle = `rgba(3, 10, 6, ${(alpha * 0.95).toFixed(3)})`;
-          ctx.lineWidth = P;
-          ctx.stroke();
-        }
-
-        // B. Glowing Pixelated Arcane Fractures & Rune Cracks
-        if (effect.cracks && effect.cracks.length > 0) {
-          for (const path of effect.cracks) {
-            if (!path || path.length === 0) continue;
-            for (let i = 0; i < path.length; i++) {
-              const px = snap(cx + path[i].x);
-              const py = snap(cy + path[i].y);
-              
-              // Dark outline pixel
-              ctx.fillStyle = `rgba(0, 30, 15, ${(alpha * 0.70).toFixed(3)})`;
-              ctx.fillRect(px - P, py - P, P * 3, P * 3);
-
-              // Glowing emerald fracture pixel
-              ctx.fillStyle = (i % 2 === 0) 
-                ? `rgba(0, 255, 120, ${(alpha * 0.90).toFixed(3)})`
-                : `rgba(0, 220, 180, ${(alpha * 0.80).toFixed(3)})`;
-              ctx.fillRect(px, py, P, P);
-
-              // Specular white ember in center
-              if (i === 0 || i === path.length - 1) {
-                ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`;
-                ctx.fillRect(px, py, P * 0.8, P * 0.8);
-              }
-            }
-          }
-        }
-        ctx.restore();
-      } else if (effect.type === 'crimsonLightningRing' || effect.type === 'rubbickLightningRing' || effect.type === 'tricksterLightningRing') {
-        const isRubbick = effect.type === 'rubbickLightningRing' || effect.type === 'tricksterLightningRing';
-        // Expanding jagged crimson shockwave ring
-        // Expand size toward target
-        if (effect.targetSize) {
-          effect.size += (effect.targetSize - effect.size) * 0.15;
-        }
-        ctx.strokeStyle = isRubbick ? `rgba(0, 200, 0, ${effect.life * 0.8})` : `rgba(200, 0, 0, ${effect.life * 0.8})`;
-        ctx.lineWidth = 3 * effect.life;
-        ctx.beginPath();
-        // Draw jagged circle instead of smooth
-        const segments = 24;
-        for (let seg = 0; seg <= segments; seg++) {
-          const theta = (seg / segments) * Math.PI * 2;
-          const jitter = (Math.random() - 0.5) * effect.size * 0.15;
-          const rx = effect.x + Math.cos(theta) * (effect.size + jitter);
-          const ry = effect.y + Math.sin(theta) * (effect.size + jitter);
-          if (seg === 0) ctx.moveTo(rx, ry);
-          else ctx.lineTo(rx, ry);
-        }
-        ctx.closePath();
-        ctx.stroke();
-        // Inner white ring
-        ctx.strokeStyle = isRubbick ? `rgba(200, 255, 200, ${effect.life * 0.5})` : `rgba(255, 200, 200, ${effect.life * 0.5})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let seg = 0; seg <= segments; seg++) {
-          const theta = (seg / segments) * Math.PI * 2;
-          const jitter = (Math.random() - 0.5) * effect.size * 0.1;
-          const rx = effect.x + Math.cos(theta) * (effect.size * 0.85 + jitter);
-          const ry = effect.y + Math.sin(theta) * (effect.size * 0.85 + jitter);
-          if (seg === 0) ctx.moveTo(rx, ry);
-          else ctx.lineTo(rx, ry);
-        }
-        ctx.closePath();
-        ctx.stroke();
-      } else if (effect.type === 'crimsonSniperFlash') {
-        // Impact flash - radial gradient glow (cached: stops are life-independent, fade via ctx.globalAlpha)
-        const gradient = getUnitRadialGradient(ctx, 'crimsonSniperFlash', [
-          [0, 'rgba(0, 0, 0, 0.8)'],
-          [0.3, 'rgba(200, 0, 20, 0.6)'],
-          [1, 'rgba(50, 0, 0, 0)']
-        ]);
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.scale(effect.size, effect.size);
-        ctx.beginPath();
-        ctx.arc(0, 0, 1, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.restore();
-      } else if (effect.type === 'arcaneAscendLine') {
-        // ── Pixel Art Style Regen / Healing Ascending Particle ──
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.max(0, Math.min(1.0, effect.life));
-        const baseColor = effect.color || 'rgba(0, 255, 102, 1)';
-
-        // 1. Leading Pixel Art Cross / Sparkle (+)
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
-        // White-hot center pixel
-        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
-
-        // 4 cardinal pixel arms (Regen Emerald / Green)
-        ctx.fillStyle = baseColor.replace(/[\d\.]+\)$/, `${(alpha * 0.95).toFixed(2)})`);
-        ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P); // Left
-        ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P); // Right
-        ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P); // Top
-        ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P); // Bottom
-
-        // Outer corner glow pixels (soft halo)
-        ctx.fillStyle = baseColor.replace(/[\d\.]+\)$/, `${(alpha * 0.40).toFixed(2)})`);
-        ctx.fillRect(cx - P * 2.5, cy - P * 0.5, P, P);
-        ctx.fillRect(cx + P * 1.5, cy - P * 0.5, P, P);
-        ctx.fillRect(cx - P * 0.5, cy - P * 2.5, P, P);
-        ctx.fillRect(cx - P * 0.5, cy + P * 1.5, P, P);
-
-        // 2. Stepped Ascending Pixel Tail trailing behind
-        const tailSteps = 4;
-        for (let s = 1; s <= tailSteps; s++) {
-          const tNorm = s / tailSteps;
-          const tx = snap(effect.x - effect.vx * s * 3.5);
-          const ty = snap(effect.y - effect.vy * s * 3.5);
-          const tailAlpha = alpha * (1 - tNorm) * 0.75;
-          if (tailAlpha > 0.05) {
-            ctx.fillStyle = (s === 1)
-              ? `rgba(255, 255, 255, ${tailAlpha.toFixed(2)})`
-              : baseColor.replace(/[\d\.]+\)$/, `${tailAlpha.toFixed(2)})`);
-            ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
-          }
-        }
-      } else if (effect.type === 'arcaneShockwave') {
-        // ── PIXEL ART ARCANE SHOCKWAVE EXPANDING RING ──
-        effect.size += (effect.targetSize - effect.size) * 0.08;
-        const alpha = Math.min(1.0, effect.life * 1.25);
-        const P = 2.5;
-        const snap = (v) => Math.round(v / P) * P;
-        const radius = Math.max(P * 2, snap(effect.size));
-        const steps = Math.max(28, Math.min(60, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
-
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-
-        const colBorder = `rgba(5, 20, 10, ${(alpha * 0.90).toFixed(3)})`;
-        const colOuter = effect.color || `rgba(0, 255, 120, ${(alpha * 0.95).toFixed(3)})`;
-        const colMid = `rgba(160, 255, 200, ${(alpha * 0.88).toFixed(3)})`;
-        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-
-        for (let st = 0; st < steps; st++) {
-          const ang = (st / steps) * Math.PI * 2;
-          const cosA = Math.cos(ang);
-          const sinA = Math.sin(ang);
-
-          // 1. Dark Outline Shell (#05140A)
-          const r0 = snap(radius);
-          ctx.fillStyle = colBorder;
-          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-          // 2. Primary Emerald/Cyan Pixel Ring
-          ctx.fillStyle = colOuter;
-          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-          // 3. Mid Mint Ring
-          const r1 = snap(radius * 0.78);
-          ctx.fillStyle = colMid;
-          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-          // 4. Inner White-Hot Specular Ring
-          const r2 = snap(radius * 0.50);
-          ctx.fillStyle = colCore;
-          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-        }
-        ctx.restore();
-      } else if (effect.type === 'mahoragaShoutShockwave') {
-        // Expanding golden & silver roar shockwave ring
-        if (effect.targetSize) {
-          effect.size += (effect.targetSize - effect.size) * 0.16;
-        }
-        
-        // 1. Golden Outer Glow Ring
-        ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.85})`;
-        ctx.lineWidth = 7 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 2. Silver Contrast Ring
-        ctx.strokeStyle = `rgba(224, 232, 255, ${effect.life * 0.9})`;
-        ctx.lineWidth = 3 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
-        ctx.stroke();
-      } else if (effect.type === 'rikaRoarShockwave') {
-        // Expanding hot-pink & dark ink cursed roar shockwave ring
-        if (effect.targetSize) {
-          effect.size += (effect.targetSize - effect.size) * 0.16;
-        }
-        
-        const isDark = _isDarkMode();
-        if (isDark) {
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-          ctx.lineWidth = 6 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = `rgba(235, 245, 255, ${effect.life * 0.90})`;
-          ctx.lineWidth = 2.5 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.94), 0, Math.PI * 2);
-          ctx.stroke();
-        } else {
-          const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
-          if (isGamePlay) {
-            // Gameplay-optimized dual-stroke ring
-            ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
-            ctx.lineWidth = 6 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-            ctx.stroke();
-
-            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-            ctx.lineWidth = 2.5 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.94), 0, Math.PI * 2);
-            ctx.stroke();
-          } else {
-            // 1. Hot Pink Outer Glow Ring
-            ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
-            ctx.lineWidth = 7 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // 2. High-contrast Black Ink Outline Ring (visible on light backgrounds)
-            ctx.strokeStyle = `rgba(10, 2, 5, ${effect.life * 0.9})`;
-            ctx.lineWidth = 3 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
-            ctx.stroke();
-
-            // 3. Piercing White-Hot Inner Core Ring
-            ctx.strokeStyle = `rgba(255, 240, 245, ${effect.life * 0.95})`;
-            ctx.lineWidth = 2 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
-            ctx.stroke();
-          }
-        }
-      } else if (effect.type === 'mahitoSoulShockwave') {
-        // Expanding nested pixel-art magenta & cyan soul disfigurement shockwave rings
-        if (effect.targetSize) {
-          effect.size += (effect.targetSize - effect.size) * 0.16;
-        }
-
-        const P = 2.5; // Stepped pixel grid size
-        const radius = effect.size;
-        const steps = Math.ceil(radius / P);
-
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-
-        if (effect.color === 'magenta') {
-          // Stepped pixel shockwave ring (hot purple/magenta)
-          ctx.fillStyle = `rgba(217, 70, 239, ${(effect.life * 0.85).toFixed(3)})`;
-          for (let gy = -steps; gy <= steps; gy++) {
-            for (let gx = -steps; gx <= steps; gx++) {
-              const dist = Math.hypot(gx * P, gy * P);
-              if (dist <= radius + P && dist > radius - P * 1.5) {
-                if ((gx + gy) % 2 === 0 || effect.life > 0.5) {
-                  ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
-                }
-              }
-            }
-          }
-
-          // Dark ink contrast pixel ring
-          ctx.fillStyle = `rgba(15, 5, 20, ${(effect.life * 0.90).toFixed(3)})`;
-          for (let gy = -steps; gy <= steps; gy++) {
-            for (let gx = -steps; gx <= steps; gx++) {
-              const dist = Math.hypot(gx * P, gy * P);
-              if (dist <= radius - P * 1.5 && dist > radius - P * 2.5) {
-                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
-              }
-            }
-          }
-        } else {
-          // Inner cyan/white pixel shockwave ring
-          ctx.fillStyle = `rgba(0, 229, 255, ${(effect.life * 0.90).toFixed(3)})`;
-          for (let gy = -steps; gy <= steps; gy++) {
-            for (let gx = -steps; gx <= steps; gx++) {
-              const dist = Math.hypot(gx * P, gy * P);
-              if (dist <= radius + P && dist > radius - P * 1.2) {
-                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
-              }
-            }
-          }
-
-          // Bright white core pixel ring
-          ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
-          for (let gy = -steps; gy <= steps; gy++) {
-            for (let gx = -steps; gx <= steps; gx++) {
-              const dist = Math.hypot(gx * P, gy * P);
-              if (dist <= radius && dist > radius - P * 0.8) {
-                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
-              }
-            }
-          }
-        }
-        ctx.restore();
-      } else if (effect.type === 'mahitoSoulCoreFlash') {
-        // Stepped 8-bit starburst flash representing organic soul shifting & blood rupture
-        effect.size += (effect.targetSize - effect.size) * 0.22;
-
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.5;
-
-        // 1. Pixel Art 8-Bit Starburst Core
-        const points = 16;
-        for (let p = 0; p < points; p++) {
-          const angle = (p / points) * Math.PI * 2;
-          const factor = (p % 4 === 0) ? 1.0 : (p % 2 === 0 ? 0.65 : 0.35);
-          const rayLen = effect.size * factor;
-          const raySteps = Math.max(1, Math.round(rayLen / P));
-
-          ctx.fillStyle = (p % 2 === 0) 
-            ? `rgba(220, 38, 38, ${(effect.life * 0.85).toFixed(3)})` 
-            : `rgba(217, 70, 239, ${(effect.life * 0.90).toFixed(3)})`;
-
-          for (let s = 0; s <= raySteps; s++) {
-            const rx = Math.round((effect.x + Math.cos(angle) * s * P) / P) * P;
-            const ry = Math.round((effect.y + Math.sin(angle) * s * P) / P) * P;
-            ctx.fillRect(rx, ry, P, P);
-          }
-        }
-
-        // 2. Pure-White 4-Point Pixel Core Diamond
-        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
-        const coreSize = Math.max(P * 2, Math.round((effect.size * 0.25) / P) * P);
-        ctx.fillRect(effect.x - coreSize, effect.y - P, coreSize * 2, P * 2);
-        ctx.fillRect(effect.x - P, effect.y - coreSize, P * 2, coreSize * 2);
-
-        ctx.restore();
-      } else if (effect.type === 'mahitoClawScratchBurst') {
-        // 5-Blade Razor Claw Slash Lacerations cutting across target
-        const ang = effect.angle || 0;
-        const radius = effect.size || 35;
-        const alpha = Math.sin(effect.life * Math.PI);
-        const slashOffsets = [-14, -7, 0, 7, 14];
-
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate(ang);
-
-        slashOffsets.forEach((offY, idx) => {
-          const cutLen = radius * (1.1 + (2 - Math.abs(idx - 2)) * 0.25);
-          const startX = -cutLen * 0.5;
-          const endX = cutLen * 0.5;
-          const thick = (idx === 2 ? 3.5 : 2.5) * alpha;
-
-          // Double-tapered razor laceration streak
-          ctx.beginPath();
-          ctx.moveTo(startX, offY);
-          ctx.quadraticCurveTo(0, offY - thick, endX, offY);
-          ctx.quadraticCurveTo(0, offY + thick, startX, offY);
-          ctx.closePath();
-
-          // Crimson + Magenta Cursed Energy fill
-          ctx.fillStyle = (idx % 2 === 0)
-            ? `rgba(220, 38, 38, ${(0.92 * alpha).toFixed(3)})`
-            : `rgba(217, 70, 239, ${(0.88 * alpha).toFixed(3)})`;
-          ctx.fill();
-
-          // White-hot core streak
-          ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
-          ctx.lineWidth = 1.0;
-          ctx.beginPath();
-          ctx.moveTo(startX, offY);
-          ctx.lineTo(endX, offY);
-          ctx.stroke();
-        });
-
-        ctx.restore();
-      } else if (effect.type === 'mahitoDomainSoulTendrilStrike') {
-        // Long-range Transfigured Flesh Tendril / Soul Arm reaching from Mahito to target
-        const startX = effect.startX !== undefined ? effect.startX : effect.x;
-        const startY = effect.startY !== undefined ? effect.startY : effect.y;
-        const targetX = effect.targetX !== undefined ? effect.targetX : effect.x;
-        const targetY = effect.targetY !== undefined ? effect.targetY : effect.y;
-        const dx = targetX - startX;
-        const dy = targetY - startY;
-        const totalDist = Math.hypot(dx, dy) || 1;
-        const baseAngle = Math.atan2(dy, dx);
-        const cosA = Math.cos(baseAngle);
-        const sinA = Math.sin(baseAngle);
-        const perpX = -sinA;
-        const perpY = cosA;
-
-        const progress = 1.0 - effect.life; // 0 to 1
-        const reachRatio = Math.min(1.0, progress / 0.20);
-        const easeReach = Math.sin(reachRatio * (Math.PI / 2));
-        const currentDist = totalDist * easeReach;
-        const currentEndX = startX + cosA * currentDist;
-        const currentEndY = startY + sinA * currentDist;
-
-        const alpha = Math.sin(effect.life * Math.PI);
-        if (alpha > 0.01) {
-          ctx.save();
-
-          // 1. Outer Cursed Energy Aura Glow Stream (Magenta/Violet)
-          ctx.strokeStyle = effect.isTransformed
-            ? `rgba(217, 70, 239, ${(0.65 * alpha).toFixed(3)})`
-            : `rgba(192, 38, 211, ${(0.60 * alpha).toFixed(3)})`;
-          ctx.lineWidth = 14.0 * alpha;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          const segments = Math.max(6, Math.floor(currentDist / 22));
-          for (let s = 1; s <= segments; s++) {
-            const t = s / segments;
-            const px = startX + (currentEndX - startX) * t;
-            const py = startY + (currentEndY - startY) * t;
-            const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (6.0 * (1 - t * 0.4));
-            ctx.lineTo(px + perpX * wave, py + perpY * wave);
-          }
-          ctx.stroke();
-
-          // 2. Dense Transfigured Flesh Tendril Body (Dark violet / organic muscle sinew)
-          ctx.strokeStyle = effect.isTransformed ? '#4A044E' : '#3B0764';
-          ctx.lineWidth = 7.5 * alpha;
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          for (let s = 1; s <= segments; s++) {
-            const t = s / segments;
-            const px = startX + (currentEndX - startX) * t;
-            const py = startY + (currentEndY - startY) * t;
-            const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (5.0 * (1 - t * 0.4));
-            ctx.lineTo(px + perpX * wave, py + perpY * wave);
-          }
-          ctx.stroke();
-
-          // 3. Inner Luminous Lilac-White Soul Channel
-          ctx.strokeStyle = `rgba(245, 208, 254, ${(0.92 * alpha).toFixed(3)})`;
-          ctx.lineWidth = 2.2 * alpha;
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          for (let s = 1; s <= segments; s++) {
-            const t = s / segments;
-            const px = startX + (currentEndX - startX) * t;
-            const py = startY + (currentEndY - startY) * t;
-            const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (3.5 * (1 - t * 0.4));
-            ctx.lineTo(px + perpX * wave, py + perpY * wave);
-          }
-          ctx.stroke();
-
-          // 4. Black Surgical Stitches crossing the tendril at segment joints
-          ctx.strokeStyle = `rgba(15, 15, 20, ${(0.95 * alpha).toFixed(3)})`;
-          ctx.lineWidth = 1.8 * alpha;
-          for (let s = 1; s < segments; s++) {
-            if (s % 2 === 0) {
-              const t = s / segments;
-              const px = startX + (currentEndX - startX) * t;
-              const py = startY + (currentEndY - startY) * t;
-              const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (4.0 * (1 - t * 0.4));
-              const cx = px + perpX * wave;
-              const cy = py + perpY * wave;
-              ctx.beginPath();
-              ctx.moveTo(cx - perpX * 5.0, cy - perpY * 5.0);
-              ctx.lineTo(cx + perpX * 5.0, cy + perpY * 5.0);
-              ctx.stroke();
-            }
-          }
-
-          // 5. Giant Transfigured Claw at Tip (materializing as it reaches target)
-          if (reachRatio >= 0.5) {
-            ctx.save();
-            ctx.translate(currentEndX, currentEndY);
-            ctx.rotate(baseAngle);
-
-            const clawTalons = [-10, -3.5, 3.5, 10];
-            clawTalons.forEach((offY, cIdx) => {
-              const talonLen = (cIdx === 1 || cIdx === 2) ? 26 : 19;
-              ctx.fillStyle = effect.isTransformed ? '#C026D3' : '#F5D0FE';
-              ctx.beginPath();
-              ctx.moveTo(-4, offY);
-              ctx.lineTo(talonLen, offY * 0.6);
-              ctx.lineTo(-4, offY + (offY >= 0 ? 2.5 : -2.5));
-              ctx.closePath();
-              ctx.fill();
-
-              ctx.strokeStyle = '#181C26';
-              ctx.lineWidth = 1.2;
-              ctx.stroke();
-            });
-
-            // Hand knuckle node
-            ctx.fillStyle = effect.isTransformed ? '#3B0764' : '#581C87';
-            ctx.beginPath();
-            ctx.arc(-2, 0, 9, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#F5D0FE';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.restore();
-          }
-
-          ctx.restore();
-        }
-      } else if (effect.type === 'saitamaCounterFrontalBlast') {
-        // ── SAITAMA CONCUSSIVE SERIOUS SHOCKWAVE (CLEAN V CONE SHAPE - PIXEL ART STYLE) ──
-        const startX = effect.x;
-        const startY = effect.y;
-        const angle = effect.angle || 0;
-        const reach = effect.reach || 750;
-        const progress = 1.0 - effect.life; // 0 to 1
-        const alpha = Math.sin(effect.life * Math.PI);
-
-        if (alpha > 0.01) {
-          ctx.save();
-          ctx.translate(startX, startY);
-          ctx.rotate(angle);
-
-          // Pixel art grid scale
-          const P = 4.0;
-          const snap = (v) => Math.round(v / P) * P;
-
-          // Fast supersonic expansion along length: reaches full distance by progress = 0.20
-          const currentReach = reach * Math.min(1.0, progress * 4.5);
-
-          // Clean, sharp V-cone opening half-angle (~55-degree total cone opening)
-          const halfArc = 0.48;
-          const stepSize = P * 2; // 8px staircase steps along X
-          const numSteps = Math.ceil(currentReach / stepSize);
-
-          // ── 1. CLEAN STEPPED PIXEL V-CONE BODY (Straight linear staircase rails, NO waviness) ──
-          for (let s = 0; s < numSteps; s++) {
-            const gx = s * stepSize;
-            if (gx > currentReach) break;
-
-            // Straight linear V boundary
-            const halfW = Math.max(P * 2, snap(gx * Math.tan(halfArc)));
-
-            // Layer 1: Concussive Atmospheric Glow (Translucent Golden-Yellow Field)
-            ctx.fillStyle = `rgba(255, 235, 59, ${(0.18 * alpha).toFixed(3)})`;
-            ctx.fillRect(gx, -halfW - P * 2, stepSize, halfW * 2 + P * 4);
-
-            // Layer 2: Dark Manga Ink Border Rails (Top & Bottom outer silhouette)
-            ctx.fillStyle = '#111114';
-            ctx.fillRect(gx, -halfW - P, stepSize, P);
-            ctx.fillRect(gx, halfW, stepSize, P);
-
-            // Layer 3: Neon Safety Yellow & Radiant Gold Boundary Rails
-            ctx.fillStyle = `rgba(255, 238, 0, ${(0.96 * alpha).toFixed(3)})`; // Brilliant Safety Yellow (top rail)
-            ctx.fillRect(gx, -halfW, stepSize, P * 2);
-            ctx.fillStyle = `rgba(255, 183, 0, ${(0.96 * alpha).toFixed(3)})`; // Deep Radiant Gold (bottom rail)
-            ctx.fillRect(gx, halfW - P * 2, stepSize, P * 2);
-
-            // Layer 4: Warm Concussive Amber-Gold Core
-            const coreH = Math.max(0, halfW * 2 - P * 4);
-            if (coreH > 0) {
-              const coreAlpha = (s % 2 === 0 ? 0.38 : 0.28) * alpha;
-              ctx.fillStyle = `rgba(255, 204, 0, ${coreAlpha.toFixed(3)})`;
-              ctx.fillRect(gx, -halfW + P * 2, stepSize, coreH);
-            }
-
-            // Layer 5: Blinding White-Hot Centerline Core Beam
-            const centerW = Math.max(P, snap(halfW * 0.22));
-            ctx.fillStyle = (s % 2 === 0) 
-              ? `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})` 
-              : `rgba(255, 250, 190, ${(0.92 * alpha).toFixed(3)})`;
-            ctx.fillRect(gx, -centerW * 0.5, stepSize, centerW);
-          }
-
-          // Apex Fist Piercing Pixel Core
-          ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
-          ctx.fillRect(-P, -P * 2, P * 2, P * 4);
-          ctx.fillRect(-P * 2, -P, P * 4, P * 2);
-
-          // ── 2. NESTED STEPPED PIXEL V-CHEVRONS (Concussive Shockwave Mach Pulses) ──
-          const numChevrons = 4;
-          for (let c = 0; c < numChevrons; c++) {
-            const cFrac = ((c + 1) / (numChevrons + 1)) * (0.25 + progress * 0.75);
-            const cDist = currentReach * cFrac;
-            if (cDist < P * 4 || cDist > currentReach) continue;
-
-            const cHalfW = snap(cDist * Math.tan(halfArc));
-            const armSteps = Math.max(4, Math.floor(cHalfW / (P * 2)));
-
-            ctx.fillStyle = (c % 2 === 0)
-              ? `rgba(255, 255, 255, ${(0.96 * alpha).toFixed(3)})`
-              : `rgba(255, 238, 0, ${(0.92 * alpha).toFixed(3)})`;
-
-            // Draw V chevron pointing forward along +X with arms sweeping back
-            for (let st = 0; st <= armSteps; st++) {
-              const t = st / armSteps;
-              const px = snap(cDist - t * (cHalfW * 0.35));
-              const py = snap(t * cHalfW);
-              ctx.fillRect(px, -py - P, P * 1.5, P * 1.5);
-              ctx.fillRect(px, py, P * 1.5, P * 1.5);
-            }
-          }
-
-          // ── 3. STRAIGHT PIXEL SPEED RAYS (Piercing straight outward within V-cone) ──
-          const rayAngles = [
-            -halfArc * 0.70,
-            -halfArc * 0.35,
-            0,
-            halfArc * 0.35,
-            halfArc * 0.70
-          ];
-
-          rayAngles.forEach((rayAng, rIdx) => {
-            const cosR = Math.cos(rayAng);
-            const sinR = Math.sin(rayAng);
-            const maxRayLen = currentReach * (rIdx % 2 === 0 ? 0.96 : 0.82);
-            const raySteps = Math.floor(maxRayLen / (P * 2));
-
-            ctx.fillStyle = (rayAng === 0) 
-              ? `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})` 
-              : `rgba(255, 235, 59, ${(0.85 * alpha).toFixed(3)})`;
-
-            for (let st = 1; st <= raySteps; st++) {
-              const d = st * (P * 2);
-              const rx = snap(cosR * d);
-              const ry = snap(sinR * d);
-              ctx.fillRect(rx, ry, P, P);
-            }
-          });
-
-          // ── 4. STEPPED PIXEL FRONTAL CAP (Leading edge wavefront) ──
-          const capHalfW = snap(currentReach * Math.tan(halfArc));
-          ctx.fillStyle = `rgba(255, 255, 255, ${(0.96 * alpha).toFixed(3)})`;
-          ctx.fillRect(snap(currentReach), -capHalfW, P, capHalfW * 2);
-          ctx.fillStyle = '#111114';
-          ctx.fillRect(snap(currentReach) + P, -capHalfW, P, capHalfW * 2);
-
-          // ── 5. CLEAN PIXEL ART EMBERS (Floating within V-cone corridor) ──
-          const numEmbers = 16;
-          for (let eb = 0; eb < numEmbers; eb++) {
-            const ebDist = snap(currentReach * (0.15 + (eb / numEmbers) * 0.75));
-            const ebAng = ((eb % 7) - 3) * (halfArc * 0.25);
-            const ebX = snap(Math.cos(ebAng) * ebDist);
-            const ebY = snap(Math.sin(ebAng) * ebDist);
-            ctx.fillStyle = (eb % 3 === 0) ? '#FFFFFF' : ((eb % 2 === 0) ? '#FFEE58' : '#FFB300');
-            ctx.fillRect(ebX, ebY, P, P);
-          }
-
-          ctx.restore();
-        }
-      } else if (effect.type === 'gojoRedFrontalBlast') {
-        // ── GOJO REVERSAL RED CLEAN GEOMETRIC PIXEL ART CONE (NO WAVINESS) ──
-        const startX = effect.x;
-        const startY = effect.y;
-        const angle = effect.angle || 0;
-        const reach = effect.reach || 650;
-        const halfArc = 0.38; // ~44-degree total cone opening angle
-        const progress = 1.0 - effect.life; // 0 to 1
-        const alpha = Math.sin(effect.life * Math.PI);
-        const isGreen = effect.colorTheme === 'green' || effect.isRubbick;
-
-        if (alpha > 0.01) {
-          ctx.save();
-          ctx.translate(startX, startY);
-          ctx.rotate(angle);
-
-          // Fast supersonic expansion along cone: reaches full distance by progress = 0.20
-          const currentReach = reach * Math.min(1.0, progress * 5.0);
-
-          // Pixel art grid scale
-          const P = 4.0;
-          const snap = (v) => Math.round(v / P) * P;
-
-          // ── 1. CLEAN STEPPED PIXEL CONICAL BODY RUNS (Straight linear staircase, NO waviness) ──
-          const stepSize = P * 2; // 8px steps along X
-          const numSteps = Math.ceil(currentReach / stepSize);
-
-          const glowCol = isGreen ? `rgba(0, 255, 100, ${(0.22 * alpha).toFixed(3)})` : `rgba(255, 0, 51, ${(0.22 * alpha).toFixed(3)})`;
-          const borderCol = isGreen ? '#05180B' : '#110204';
-          const rimCol = isGreen ? `rgba(0, 255, 100, ${(0.92 * alpha).toFixed(3)})` : `rgba(255, 0, 51, ${(0.92 * alpha).toFixed(3)})`;
-          const coreCol = isGreen ? `rgba(0, 122, 51, ${(0.75 * alpha).toFixed(3)})` : `rgba(139, 0, 20, ${(0.75 * alpha).toFixed(3)})`;
-          const centerCol2 = isGreen ? `rgba(180, 255, 210, ${(0.90 * alpha).toFixed(3)})` : `rgba(255, 140, 160, ${(0.90 * alpha).toFixed(3)})`;
-          const rayCol2 = isGreen ? `rgba(180, 255, 210, ${(0.80 * alpha).toFixed(3)})` : `rgba(255, 210, 220, ${(0.80 * alpha).toFixed(3)})`;
-          const emberCol2 = isGreen ? '#00FF64' : '#FF0033';
-
-          for (let s = 0; s < numSteps; s++) {
-            const gx = s * stepSize;
-            if (gx > currentReach) break;
-
-            // Clean straight linear boundary (strictly no wavy flutter)
-            const halfW = Math.max(P * 2, snap(gx * Math.tan(halfArc)));
-
-            // Layer 1: Atmospheric Glow (Translucent Field)
-            ctx.fillStyle = glowCol;
-            ctx.fillRect(gx, -halfW - P * 2, stepSize, halfW * 2 + P * 4);
-
-            // Layer 2: Dark Manga Ink Border Rails (Top & Bottom steps)
-            ctx.fillStyle = borderCol;
-            ctx.fillRect(gx, -halfW - P, stepSize, P);
-            ctx.fillRect(gx, halfW, stepSize, P);
-
-            // Layer 3: Neon Flame Rim (Top & Bottom inner steps)
-            ctx.fillStyle = rimCol;
-            ctx.fillRect(gx, -halfW, stepSize, P * 2);
-            ctx.fillRect(gx, halfW - P * 2, stepSize, P * 2);
-
-            // Layer 4: Deep Cursed Core
-            const coreHeight = Math.max(0, halfW * 2 - P * 4);
-            if (coreHeight > 0) {
-              ctx.fillStyle = coreCol;
-              ctx.fillRect(gx, -halfW + P * 2, stepSize, coreHeight);
-            }
-
-            // Layer 5: Straight Piercing White-Hot Centerline Beam
-            const centerW = Math.max(P, snap(halfW * 0.30));
-            ctx.fillStyle = (s % 2 === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : centerCol2;
-            ctx.fillRect(gx, -centerW * 0.5, stepSize, centerW);
-          }
-
-          // ── 2. STRAIGHT RADIAL PIXEL RAYS (Piercing straight outward, no wavy offsets) ──
-          const rayAngles = [
-            -halfArc * 0.65,
-            -halfArc * 0.32,
-            0,
-            halfArc * 0.32,
-            halfArc * 0.65
-          ];
-
-          rayAngles.forEach((rayAng, rIdx) => {
-            const cosR = Math.cos(rayAng);
-            const sinR = Math.sin(rayAng);
-            const maxRayLen = currentReach * (rIdx % 2 === 0 ? 0.95 : 0.80);
-            const raySteps = Math.floor(maxRayLen / (P * 2));
-
-            ctx.fillStyle = (rayAng === 0) ? `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})` : rayCol2;
-
-            for (let st = 1; st <= raySteps; st++) {
-              const d = st * (P * 2);
-              const rx = snap(cosR * d);
-              const ry = snap(sinR * d);
-              ctx.fillRect(rx, ry, P, P);
-            }
-          });
-
-          // ── 3. STEPPED PIXEL FRONTAL CAP (Stepped vertical wavefront) ──
-          const capHalfW = snap(currentReach * Math.tan(halfArc));
-          ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
-          ctx.fillRect(snap(currentReach), -capHalfW, P, capHalfW * 2);
-          ctx.fillStyle = borderCol;
-          ctx.fillRect(snap(currentReach) + P, -capHalfW, P, capHalfW * 2);
-
-          // ── 4. STRAIGHT STEPPED PIXEL EMBERS ──
-          const numEmbers = 12;
-          for (let eb = 0; eb < numEmbers; eb++) {
-            const ebDist = snap(currentReach * (0.20 + (eb / numEmbers) * 0.70));
-            const ebAng = ((eb % 5) - 2) * (halfArc * 0.28);
-            const ebX = snap(Math.cos(ebAng) * ebDist);
-            const ebY = snap(Math.sin(ebAng) * ebDist);
-            ctx.fillStyle = (eb % 2 === 0) ? '#FFFFFF' : emberCol2;
-            ctx.fillRect(ebX, ebY, P, P);
-          }
-
-          ctx.restore();
-        }
-      } else if (effect.type === 'cursedBiteMaw') {
-        // Cursed Jaw Bite Attack Visual (Fanged jaws snapping shut over target)
-        const ang = effect.angle || 0;
-        const progress = 1.0 - effect.life;
-        const snapProgress = Math.min(1.0, progress / 0.50);
-        const easeSnap = Math.pow(snapProgress, 2.5);
-        const currentJawAngle = (1.0 - easeSnap) * 0.70 + 0.03;
-
-        const jawRadius = effect.size || 28;
-        const mainColor = effect.color || '#D946EF';
-
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate(ang);
-
-        for (let side = -1; side <= 1; side += 2) {
-          ctx.save();
-          ctx.rotate(side * currentJawAngle);
-
-          // Cursed Dark Jaw Frame
-          ctx.fillStyle = '#181C26';
-          ctx.strokeStyle = mainColor;
-          ctx.lineWidth = 2.2;
-
-          ctx.beginPath();
-          ctx.arc(0, 0, jawRadius, -Math.PI * 0.35, Math.PI * 0.35);
-          ctx.lineTo(jawRadius * 0.2, 0);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-
-          // Sharp Fanged Teeth (3 large white fangs per jaw)
-          ctx.fillStyle = '#FFFFFF';
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 1.0;
-
-          const teethAngles = [-Math.PI * 0.22, 0, Math.PI * 0.22];
-          teethAngles.forEach(tAng => {
-            const fangBaseX = Math.cos(tAng) * jawRadius;
-            const fangBaseY = Math.sin(tAng) * jawRadius;
-            const fangTipX = Math.cos(tAng) * (jawRadius * 0.55);
-            const fangTipY = Math.sin(tAng) * (jawRadius * 0.55);
-            const perpX = -Math.sin(tAng) * 3.5;
-            const perpY = Math.cos(tAng) * 3.5;
-
-            ctx.beginPath();
-            ctx.moveTo(fangBaseX + perpX, fangBaseY + perpY);
-            ctx.lineTo(fangTipX, fangTipY);
-            ctx.lineTo(fangBaseX - perpX, fangBaseY - perpY);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-          });
-
-          ctx.restore();
-        }
-
-        // Central Impact Crunch Flash when jaws snap shut
-        if (snapProgress >= 0.8) {
-          ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-          ctx.beginPath();
-          ctx.arc(0, 0, jawRadius * 0.45, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.restore();
-      } else if (effect.type === 'arcaneFlash') {
-        // ── PIXEL ART ARCANE STARBURST FLASH ──
-        effect.size += (effect.targetSize - effect.size) * 0.12;
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.max(0, Math.min(1.0, effect.life));
-        const flashR = snap(effect.size);
-
-        // 1. Cardinal 4-Way Long Pixel Beams
-        ctx.fillStyle = `rgba(0, 255, 120, ${(alpha * 0.80).toFixed(3)})`;
-        ctx.fillRect(cx - flashR, cy - P, flashR * 2, P * 2);
-        ctx.fillRect(cx - P, cy - flashR, P * 2, flashR * 2);
-
-        // 2. Diagonal 4-Way Shorter Pixel Rays
-        const diagR = snap(flashR * 0.65);
-        for (let d = -diagR; d <= diagR; d += P) {
-          ctx.fillRect(cx + d, cy + d, P, P);
-          ctx.fillRect(cx + d, cy - d, P, P);
-        }
-
-        // 3. Inner Stepped Emerald Diamond
-        const midR = snap(flashR * 0.40);
-        ctx.fillStyle = `rgba(80, 255, 180, ${(alpha * 0.90).toFixed(3)})`;
-        ctx.fillRect(cx - midR, cy - midR, midR * 2, midR * 2);
-
-        // 4. White-Hot Specular Pixel Center
-        const coreR = snap(flashR * 0.20);
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-        ctx.fillRect(cx - coreR, cy - coreR, coreR * 2, coreR * 2);
-
-        ctx.restore();
-      } else if (effect.type === 'arcaneGlyph') {
-        // ── 8-BIT / 16-BIT PIXEL RUNIC GLYPH FRAGMENTS ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.max(0, Math.min(1.0, effect.life));
-        const baseColor = effect.color || 'rgba(0, 255, 140, 1)';
-        const colBody = baseColor.replace(/[\d.]+\)$/, `${alpha.toFixed(3)})`);
-        const colCore = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`;
-        const colDark = `rgba(5, 20, 10, ${(alpha * 0.85).toFixed(3)})`;
-
-        ctx.translate(cx, cy);
-        effect.rotation += effect.rotationSpeed || 0;
-        const steppedAngle = Math.round(effect.rotation / (Math.PI / 4)) * (Math.PI / 4);
-        ctx.rotate(steppedAngle);
-
-        if (effect.glyphShape === 'diamond') {
-          // Pixel Arcane Diamond Rune (5x5 matrix)
-          ctx.fillStyle = colDark;
-          ctx.fillRect(-P * 2, -P * 3, P * 4, P);
-          ctx.fillRect(-P * 3, -P * 2, P * 6, P * 4);
-          ctx.fillRect(-P * 2, P * 2, P * 4, P);
-          ctx.fillStyle = colBody;
-          ctx.fillRect(-P * 1.5, -P * 2, P * 3, P * 4);
-          ctx.fillRect(-P * 2, -P * 1.5, P * 4, P * 3);
-          ctx.fillStyle = colCore;
-          ctx.fillRect(-P * 0.5, -P * 0.5, P, P);
-        } else if (effect.glyphShape === 'triangle') {
-          // Pixel Tri-Force Arcane Rune
-          ctx.fillStyle = colDark;
-          ctx.fillRect(-P * 2.5, P * 1.5, P * 5, P);
-          ctx.fillRect(-P * 2, P * 0.5, P * 4, P);
-          ctx.fillRect(-P * 1.5, -P * 0.5, P * 3, P);
-          ctx.fillRect(-P * 0.5, -P * 2.5, P, P * 2);
-          ctx.fillStyle = colBody;
-          ctx.fillRect(-P * 1.5, P * 0.5, P * 3, P);
-          ctx.fillRect(-P, -P * 0.5, P * 2, P);
-          ctx.fillRect(-P * 0.5, -P * 1.5, P, P);
-          ctx.fillStyle = colCore;
-          ctx.fillRect(-P * 0.5, 0, P, P);
-        } else {
-          // Pixel Arcane Rune Box / Ancient Eye
-          ctx.fillStyle = colDark;
-          ctx.fillRect(-P * 2.5, -P * 2.5, P * 5, P * 5);
-          ctx.fillStyle = colBody;
-          ctx.fillRect(-P * 1.5, -P * 1.5, P * 3, P * 3);
-          ctx.fillStyle = colCore;
-          ctx.fillRect(-P * 0.5, -P * 0.5, P, P);
-        }
-        ctx.restore();
-      } else if (effect.type === 'spellStealWisp') {
-        // ── PIXEL ART SPELL STEAL HOMING SOUL WISP ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.min(1.0, effect.life);
-        const moveAng = Math.atan2(effect.vy || 0, effect.vx || 1);
-
-        // 1. Chunky 8-Bit Pixel Soul Core (Diamond Matrix)
-        const pr = snap(Math.max(P * 2, effect.size || 6));
-        
-        // A. Obsidian Border Pixels
-        ctx.fillStyle = `rgba(5, 20, 10, ${(alpha * 0.90).toFixed(2)})`;
-        ctx.fillRect(cx - pr - P, cy - P, (pr + P) * 2, P * 2);
-        ctx.fillRect(cx - P, cy - pr - P, P * 2, (pr + P) * 2);
-        ctx.fillRect(cx - pr * 0.7, cy - pr * 0.7, pr * 1.4, pr * 1.4);
-
-        // B. Vibrant Stolen Emerald/Custom Color Body
-        ctx.fillStyle = effect.color || '#00FF64';
-        ctx.fillRect(cx - pr, cy - pr * 0.5, pr * 2, pr);
-        ctx.fillRect(cx - pr * 0.5, cy - pr, pr, pr * 2);
-
-        // C. Bright Mint Highlight
-        ctx.fillStyle = '#80FFB0';
-        ctx.fillRect(cx - pr * 0.4, cy - pr * 0.4, pr * 0.8, pr * 0.8);
-
-        // D. Pure White Specular Core
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(2)})`;
-        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
-
-        // 2. Trailing Stepped Pixel Embers behind flight trajectory
-        const tailSteps = 4;
-        for (let s = 1; s <= tailSteps; s++) {
-          const tNorm = s / tailSteps;
-          const tx = snap(effect.x - Math.cos(moveAng) * s * 6 + (Math.sin(s * 3.7 + effect.life * 10) * P * 1.5));
-          const ty = snap(effect.y - Math.sin(moveAng) * s * 6 + (Math.cos(s * 3.7 + effect.life * 10) * P * 1.5));
-          const tAlpha = alpha * (1 - tNorm) * 0.85;
-          if (tAlpha > 0.05) {
-            ctx.fillStyle = (s === 1) ? `rgba(255, 255, 255, ${tAlpha.toFixed(2)})` : `rgba(0, 255, 100, ${tAlpha.toFixed(2)})`;
-            ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
-          }
-        }
-        ctx.restore();
-      } else if (effect.type === 'healing') {
-        // ── Pixel Art Style Healing / RCT Sparkle (+) ──
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.max(0, Math.min(1.0, effect.life));
-        const col = effect.color || 'rgba(56, 189, 248, 1)';
-
-        // White-hot center pixel
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
-        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
-
-        // 4 cardinal healing arms
-        ctx.fillStyle = col.replace(/[\d\.]+\)$/, `${(alpha * 0.90).toFixed(2)})`);
-        ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P);
-        ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P);
-        ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P);
-        ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P);
-
-        // Soft corner pixel halo
-        ctx.fillStyle = col.replace(/[\d\.]+\)$/, `${(alpha * 0.35).toFixed(2)})`);
-        ctx.fillRect(cx - P * 1.5, cy - P * 1.5, P, P);
-        ctx.fillRect(cx + P * 0.5, cy - P * 1.5, P, P);
-        ctx.fillRect(cx - P * 1.5, cy + P * 0.5, P, P);
-        ctx.fillRect(cx + P * 0.5, cy + P * 0.5, P, P);
-      } else if (effect.type === 'yutaBeamPinkCore' || effect.isPinkCore) {
-        // Lingering pink/magenta orb with pure white-hot center core (Matching user reference image)
-        const alpha = Math.max(0, Math.min(1.0, effect.life));
-        const lifeStep = Math.round(alpha * 20) / 20;
-
-        // 1. Smooth, glowing radial gradient halo (Magenta / Deep Pink Bloom)
-        const glowRadius = effect.size * 4.5;
-        const gradient = getUnitRadialGradient(ctx, `yutaPinkCore_${lifeStep}`, [
-          [0, `rgba(255, 255, 255, ${lifeStep})`],
-          [0.15, `rgba(255, 230, 255, ${lifeStep * 0.95})`],
-          [0.35, `rgba(235, 20, 190, ${lifeStep * 0.85})`],
-          [0.65, `rgba(180, 0, 160, ${lifeStep * 0.40})`],
-          [1, 'rgba(100, 0, 120, 0)']
-        ]);
-
-        ctx.globalCompositeOperation = 'lighter'; // Additive blending for overlapping glowing orbs
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.scale(glowRadius, glowRadius);
-        ctx.beginPath();
-        ctx.arc(0, 0, 1, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.restore();
-
-        // 2. Piercing crisp solid pure-white central dot
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.98})`;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1.0, effect.size * 0.5), 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.globalCompositeOperation = 'source-over';
-      } else if (effect.type === 'boogieWoogieSwapBeam') {
-        // ── AOI TODO BOOGIE WOOGIE BALANCED MEDIUM BLUE SWAP LASER LINE ──
-        const x1 = effect.x;
-        const y1 = effect.y;
-        const x2 = effect.targetX !== undefined ? effect.targetX : x1;
-        const y2 = effect.targetY !== undefined ? effect.targetY : y1;
-        const life = Math.max(0, Math.min(1.0, effect.life));
-        const alpha = Math.min(1.0, Math.pow(life, 0.7));
-
-        ctx.save();
-        ctx.globalAlpha = 1.0; // Reset outer globalAlpha to control exact layer opacities cleanly
-
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const dist = Math.hypot(dx, dy) || 1;
-        const perpX = -dy / dist;
-        const perpY = dx / dist;
-
-        // 1. Medium Electric Blue Outer Glow Aura (~8.0px)
-        ctx.strokeStyle = `rgba(0, 100, 255, ${alpha * 0.80})`;
-        ctx.lineWidth = Math.max(1.0, 8.0 * alpha);
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // 2. Neon Electric Cyan Inner Vector Beam (~4.2px)
-        ctx.strokeStyle = `rgba(0, 230, 255, ${alpha * 0.95})`;
-        ctx.lineWidth = Math.max(0.8, 4.2 * alpha);
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // 3. Crisp Pure-White Core Line (~1.8px)
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 1.0})`;
-        ctx.lineWidth = Math.max(0.4, 1.8 * alpha);
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // 4. Fine Spatial Lightning Micro-Arc (~1.2px)
-        ctx.strokeStyle = `rgba(200, 245, 255, ${alpha * 0.95})`;
-        ctx.lineWidth = Math.max(0.4, 1.2 * alpha);
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        const segs = Math.max(5, Math.min(12, Math.floor(dist / 40)));
-        for (let i = 1; i < segs; i++) {
-          const t = i / segs;
-          const side = (i % 2 === 0 ? 1 : -1);
-          const jitter = (side * 8 + Math.sin(i * 3 + life * 12) * 5) * alpha;
-          const cx = x1 + dx * t + perpX * jitter;
-          const cy = y1 + dy * t + perpY * jitter;
-          ctx.lineTo(cx, cy);
-        }
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // 5. Balanced Endpoint Energy Nodes
-        const dotR = Math.max(1.0, 6.0 * alpha);
-        for (const [nx, ny] of [[x1, y1], [x2, y2]]) {
-          // Cyan outer node
-          ctx.fillStyle = `rgba(0, 229, 255, ${alpha * 0.90})`;
-          ctx.beginPath();
-          ctx.arc(nx, ny, dotR, 0, Math.PI * 2);
-          ctx.fill();
-
-          // White core dot
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 1.0})`;
-          ctx.beginPath();
-          ctx.arc(nx, ny, dotR * 0.45, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.restore();
-      } else if (effect.type === 'meleeClashShockwave') {
-        if (effect.targetSize) {
-          effect.size += (effect.targetSize - effect.size) * 0.15;
-        }
-        const isGojo = effect.clashType === 'gojo' || effect.clashType === 'gojo_infinity';
-        const isMahoraga = effect.clashType === 'mahoraga' || effect.clashType === 'gold';
-        const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
-        const P = 2.5;
-        const snap = (v) => Math.round(v / P) * P;
-        const radius = Math.max(P * 2, effect.size);
-        const steps = Math.max(28, Math.min(56, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
-        const alpha = Math.min(1.0, effect.life * 1.15);
-
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-
-        let ringColor;
-        let midColor;
-        if (isGojo) {
-          ringColor = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
-          midColor = `rgba(180, 245, 255, ${(alpha * 0.90).toFixed(3)})`;
-        } else if (isMahoraga) {
-          ringColor = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
-          midColor = `rgba(255, 245, 150, ${(alpha * 0.90).toFixed(3)})`;
-        } else if (isHex) {
-          const rgb = hexToRgb(effect.clashType) || '255, 60, 60';
-          ringColor = `rgba(${rgb}, ${(alpha * 0.95).toFixed(3)})`;
-          midColor = `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(3)})`;
-        } else {
-          ringColor = `rgba(255, 60, 60, ${(alpha * 0.95).toFixed(3)})`;
-          midColor = `rgba(255, 150, 150, ${(alpha * 0.85).toFixed(3)})`;
-        }
-
-        const colBorder = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
-        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-
-        // High-performance 1D circumference loop (eliminates 15,987 2D grid calculations per frame)
-        for (let st = 0; st < steps; st++) {
-          const ang = (st / steps) * Math.PI * 2;
-          const cosA = Math.cos(ang);
-          const sinA = Math.sin(ang);
-
-          // 1. Dark Outer Obsidian Outline Shell (#081220)
-          const r0 = snap(radius);
-          ctx.fillStyle = colBorder;
-          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-          // 2. Primary Themed Pixel Ring
-          ctx.fillStyle = ringColor;
-          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-          // 3. Mid Loop
-          const r1 = snap(radius * 0.75);
-          ctx.fillStyle = midColor;
-          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-          // 4. Inner White-Hot Specular Ring (#FFFFFF)
-          const r2 = snap(radius * 0.45);
-          ctx.fillStyle = colCore;
-          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-        }
-
-        ctx.restore();
-      } else {
-        // ── Default Pixel Art Impact Flash ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.0;
-        const flashR = Math.max(P * 2, effect.size * effect.life);
-        const flashSteps = Math.ceil(flashR / P);
-
-        // 8-bit starburst pixel cross
-        ctx.fillStyle = `rgba(255, 200, 80, ${(effect.life * 0.75).toFixed(3)})`;
-        ctx.fillRect(effect.x - flashR, effect.y - P, flashR * 2, P * 2);
-        ctx.fillRect(effect.x - P, effect.y - flashR, P * 2, flashR * 2);
-
-        // Center diamond
-        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
-        const coreR = Math.max(P, Math.round((flashR * 0.4) / P) * P);
-        ctx.fillRect(effect.x - coreR, effect.y - coreR, coreR * 2, coreR * 2);
-
-        ctx.restore();
-      }
-    } else if (effect.type === 'parrySpark' || effect.type === 'slashRicochet') {
-      // ── High-Velocity Metal Welding Spark Streak (Matching Reference Image) ──
-      const speed = Math.hypot(effect.vx || 0, effect.vy || 0);
-      const angle = Math.atan2(effect.vy || 0, effect.vx || 1);
-      const tailLen = Math.max(10, speed * (2.8 + (1 - effect.life) * 1.6));
-
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-
-      const isRicochet = effect.type === 'slashRicochet';
-      const outerColor = isRicochet ? `rgba(255, 30, 40, ${effect.life * 0.65})` : `rgba(255, 90, 0, ${effect.life * 0.55})`;
-      const midColor = isRicochet ? `rgba(255, 180, 50, ${effect.life * 0.85})` : `rgba(255, 220, 80, ${effect.life * 0.85})`;
-
-      // 1. Outer Fiery Glow Streak
-      ctx.strokeStyle = outerColor;
-      ctx.lineWidth = effect.size * 2.2;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(effect.x, effect.y);
-      ctx.lineTo(effect.x - Math.cos(angle) * tailLen, effect.y - Math.sin(angle) * tailLen);
-      ctx.stroke();
-
-      // 2. Hot Gold / Flame Inner Streak
-      ctx.strokeStyle = midColor;
-      ctx.lineWidth = effect.size * 1.1;
-      ctx.beginPath();
-      ctx.moveTo(effect.x, effect.y);
-      ctx.lineTo(effect.x - Math.cos(angle) * (tailLen * 0.75), effect.y - Math.sin(angle) * (tailLen * 0.75));
-      ctx.stroke();
-
-      // 3. White-Hot Intense Needle Core
-      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-      ctx.lineWidth = Math.max(1, effect.size * 0.45);
-      ctx.beginPath();
-      ctx.moveTo(effect.x, effect.y);
-      ctx.lineTo(effect.x - Math.cos(angle) * (tailLen * 0.45), effect.y - Math.sin(angle) * (tailLen * 0.45));
-      ctx.stroke();
-
-      // 4. Glowing White Head Tip Dot
-      ctx.fillStyle = `rgba(255, 255, 255, ${effect.life})`;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, Math.max(1.3, effect.size * 0.5), 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    } else if (effect.type === 'parryEmberStar') {
-      // ── Splintering Metal Welding Ember Sparkle (4-Point Star Glint) ──
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.translate(effect.x, effect.y);
-      if (effect.rotation !== undefined) {
-        effect.rotation += effect.rotationSpeed || 0.1;
-        ctx.rotate(effect.rotation);
-      }
-
-      const starSize = effect.size * (0.8 + Math.sin(effect.life * Math.PI) * 0.5);
-      const alpha = effect.life;
-
-      // Outer Fiery Orange Halo
-      ctx.fillStyle = `rgba(255, 140, 10, ${alpha * 0.6})`;
-      ctx.beginPath();
-      ctx.arc(0, 0, starSize * 1.6, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 4-Point White-Hot Sparkle Cross
-      ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
-      ctx.beginPath();
-      ctx.moveTo(0, -starSize * 2.4);
-      ctx.lineTo(starSize * 0.35, -starSize * 0.35);
-      ctx.lineTo(starSize * 2.4, 0);
-      ctx.lineTo(starSize * 0.35, starSize * 0.35);
-      ctx.lineTo(0, starSize * 2.4);
-      ctx.lineTo(-starSize * 0.35, starSize * 0.35);
-      ctx.lineTo(-starSize * 2.4, 0);
-      ctx.lineTo(-starSize * 0.35, -starSize * 0.35);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.restore();
-    } else if (effect.type === 'crimsonLightningArc' || effect.type === 'rubbickLightningArc' || effect.type === 'tricksterLightningArc') {
-      // Lightning arc spark — draw as a short jagged line instead of a dot
-      const len = effect.size * 4;
-      const angle = Math.atan2(effect.vy, effect.vx);
-      ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
-      ctx.lineWidth = 1 + effect.life;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(effect.x, effect.y);
-      // 3-segment jagged line
-      for (let seg = 1; seg <= 3; seg++) {
-        const t = seg / 3;
-        const jx = (Math.random() - 0.5) * len * 0.4;
-        const jy = (Math.random() - 0.5) * len * 0.4;
-        ctx.lineTo(
-          effect.x + Math.cos(angle) * len * t + jx,
-          effect.y + Math.sin(angle) * len * t + jy
-        );
-      }
-        ctx.stroke();
-      } else if (effect.type === 'arcaneSmokeAirborne' || effect.type === 'arcaneSmoke' || effect.type === 'arcaneSmokeGround' || effect.type === 'laserSmoke') {
-        // ── CHUNKY PIXEL ART ARCANE SMOKE PUFF CLOUD ──
-        if (effect.type === 'arcaneSmokeAirborne') {
-           effect.size += (effect.targetSize - effect.size) * 0.03;
-        } else {
-           effect.size += (effect.targetSize - effect.size) * 0.07;
-        }
-        
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.5;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.max(0, Math.min(1.0, effect.life * 0.9));
-        const smR = Math.max(P * 2, snap(effect.size * 0.75));
-
-        ctx.translate(cx, cy);
-
-        // 3 Overlapping Pixel Blocks forming a fluffy cloud cluster
-        const isAir = (effect.type === 'arcaneSmokeAirborne');
-        const colBorder = isAir ? `rgba(5, 30, 20, ${(alpha * 0.8).toFixed(2)})` : `rgba(15, 25, 20, ${(alpha * 0.7).toFixed(2)})`;
-        const colBody = isAir ? `rgba(0, 200, 140, ${(alpha * 0.65).toFixed(2)})` : `rgba(40, 100, 75, ${(alpha * 0.50).toFixed(2)})`;
-        const colHighlight = isAir ? `rgba(180, 255, 220, ${(alpha * 0.85).toFixed(2)})` : `rgba(120, 200, 160, ${(alpha * 0.60).toFixed(2)})`;
-
-        // 1. Dark Outline Blocks
-        ctx.fillStyle = colBorder;
-        ctx.fillRect(-smR - P, -smR * 0.6 - P, (smR + P) * 2, (smR * 0.6 + P) * 2);
-        ctx.fillRect(-smR * 0.6 - P, -smR - P, (smR * 0.6 + P) * 2, (smR + P) * 2);
-        ctx.fillRect(-smR * 0.4 - P, smR * 0.2 - P, (smR * 0.8 + P) * 2, (smR * 0.4 + P) * 2);
-
-        // 2. Main Smoke Body Blocks
-        ctx.fillStyle = colBody;
-        ctx.fillRect(-smR, -smR * 0.6, smR * 2, smR * 1.2);
-        ctx.fillRect(-smR * 0.6, -smR, smR * 1.2, smR * 2);
-        ctx.fillRect(-smR * 0.4, smR * 0.2, smR * 1.6, smR * 0.8);
-
-        // 3. Highlight Puff Top/Left
-        ctx.fillStyle = colHighlight;
-        ctx.fillRect(-smR * 0.6, -smR * 0.8, smR * 0.8, smR * 0.6);
-        ctx.fillRect(-smR * 0.8, -smR * 0.4, smR * 0.5, smR * 0.5);
-
-        ctx.restore();
-      } else if (effect.type === 'tojiWindPebble') {
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate(effect.rotation || 0);
-        ctx.fillStyle = effect.color || '#3A3D40';
-        ctx.globalAlpha = Math.min(1.0, effect.life * 1.3);
-        
-        // Irregular tiny pebble shape
-        ctx.beginPath();
-        const s = effect.size;
-        ctx.moveTo(-s, -s * 0.6);
-        ctx.lineTo(s * 0.8, -s * 0.8);
-        ctx.lineTo(s, s * 0.4);
-        ctx.lineTo(-s * 0.4, s);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      } else if (effect.type === 'tojiWindLeaf') {
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate((effect.rotation || 0) + effect.life * 0.1);
-        ctx.fillStyle = effect.color || '#2E8B57';
-        ctx.globalAlpha = Math.min(1.0, effect.life * 1.3);
-        
-        // Delicate leaf shape (pointed oval with central vein)
-        const lw = effect.size * 1.6;
-        const lh = effect.size * 0.8;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, lw, lh, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.lineWidth = 0.7;
-        ctx.beginPath();
-        ctx.moveTo(-lw * 0.7, 0);
-        ctx.lineTo(lw * 0.7, 0);
-        ctx.stroke();
-        ctx.restore();
-      } else if (effect.type === 'telekinesisDebris' || effect.type === 'telekinesisDebrisScattered') {
-        // ── CHUNKY PIXEL ART TELEKINESIS ROCK & FLOATING DEBRIS ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.min(1.0, effect.life * 1.25);
-        const s = Math.max(P * 2, snap(effect.size || 6));
-
-        ctx.translate(cx, cy);
-        if (effect.rotation) {
-          const snappedRot = Math.round(effect.rotation / (Math.PI / 8)) * (Math.PI / 8);
-          ctx.rotate(snappedRot);
-        }
-
-        // 1. Orbiting Floating Emerald Pixel Rune/Aura (only when floating, not scattered)
-        if (effect.type === 'telekinesisDebris') {
-          const auraTime = performance.now() * 0.005 + (effect.rotation || 0);
-          for (let a = 0; a < 3; a++) {
-            const aAng = auraTime + (a * Math.PI * 2 / 3);
-            const ax = snap(Math.cos(aAng) * (s * 1.4));
-            const ay = snap(Math.sin(aAng) * (s * 1.4));
-            ctx.fillStyle = (a % 2 === 0) 
-              ? `rgba(0, 255, 100, ${(alpha * 0.80).toFixed(2)})` 
-              : `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(2)})`;
-            ctx.fillRect(ax, ay, P, P);
-          }
-        }
-
-        // 2. Chunky Pixelated Rock Body
-        // A. Obsidian Shadow Outline
-        ctx.fillStyle = `rgba(10, 18, 14, ${(alpha * 0.95).toFixed(2)})`;
-        ctx.fillRect(-s - P, -s * 0.6 - P, (s + P) * 2, (s * 0.6 + P) * 2);
-        ctx.fillRect(-s * 0.7 - P, -s - P, (s * 0.7 + P) * 2, (s + P) * 2);
-
-        // B. Dark Basalt Shadow Facet (Bottom/Right)
-        ctx.fillStyle = `rgba(28, 42, 35, ${alpha.toFixed(2)})`;
-        ctx.fillRect(-s, -s * 0.6, s * 2, s * 1.2);
-        ctx.fillRect(-s * 0.7, -s * 0.9, s * 1.4, s * 1.8);
-
-        // C. Slate-Moss Rock Midtone Facet (Center/Left)
-        ctx.fillStyle = `rgba(52, 85, 70, ${alpha.toFixed(2)})`;
-        ctx.fillRect(-s * 0.8, -s * 0.7, s * 1.2, s * 1.1);
-        ctx.fillRect(-s * 0.5, -s * 0.8, s * 1.0, s * 1.3);
-
-        // D. Bright Moss/Crystal Edge Highlight (Top/Left)
-        ctx.fillStyle = `rgba(100, 240, 160, ${(alpha * 0.90).toFixed(2)})`;
-        ctx.fillRect(-s * 0.7, -s * 0.8, s * 0.8, P);
-        ctx.fillRect(-s * 0.8, -s * 0.5, P, s * 0.6);
-
-        // E. Specular White Stone Glint
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(2)})`;
-        ctx.fillRect(-s * 0.4, -s * 0.6, P, P);
-
-        ctx.restore();
-      } else if (effect.type === 'meleeClashShockwave') {
-      // Expanding ground shockwave ring for Sukuna-Gojo & Sukuna-Yuta/Rika clashes & Mahoraga teleports
-      effect.size += (effect.targetSize - effect.size) * 0.08;
-      const isYutaClash = (effect.clashType === 'yuta');
-      const isTojiClash = (effect.clashType === 'toji');
-      const isMahoragaClash = (effect.clashType === 'mahoraga');
-      const isTodoClap = (effect.clashType === 'todo');
-      const isGenosClash = (effect.clashType === 'genos' || effect.clashType === 'orange');
-      const isInfinityClash = (effect.clashType === 'gojo_infinity');
-
-      const isDark = _isDarkMode();
-
-      // Ground impact shadow (dark circle at base for visibility on white)
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isDark 
-        ? `rgba(0, 0, 0, 0)` 
-        : (isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isInfinityClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(0, 0, 0, 0)` : `rgba(30, 10, 40, ${effect.life * 0.4})`))))));
-      if (!isMahoragaClash) {
-        ctx.beginPath();
-        ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.globalCompositeOperation = 'lighter';
-
-      if (isTodoClap) {
-        // ── AOI TODO BOOGIE WOOGIE CLAP SHOCKWAVE ──
-        // 1. Outer Electric Cyan Cursed Energy Ring
-        ctx.strokeStyle = `rgba(0, 240, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 10 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 1.1, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 2. Vivid Electric Blue Second Ring
-        ctx.strokeStyle = `rgba(0, 150, 255, ${effect.life * 0.90})`;
-        ctx.lineWidth = 6 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 3. Inner White-Hot Clap Pressure Core
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 0.40, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 4. Radiant Cursed Energy Rays radiating from clap center
-        ctx.strokeStyle = `rgba(0, 240, 255, ${effect.life * 0.85})`;
-        ctx.lineWidth = 2.5 * effect.life;
-        for (let i = 0; i < 6; i++) {
-          const rayAngle = (Math.PI / 3) * i;
-          const r1 = effect.size * 0.3;
-          const r2 = effect.size * 1.2;
-          ctx.beginPath();
-          ctx.moveTo(effect.x + Math.cos(rayAngle) * r1, effect.y + Math.sin(rayAngle) * r1);
-          ctx.lineTo(effect.x + Math.cos(rayAngle) * r2, effect.y + Math.sin(rayAngle) * r2);
-          ctx.stroke();
-        }
-      } else if (isGenosClash) {
-        // ── GENOS INCINERATION STOMP SHOCKWAVE ──
-        if (isDark) {
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          const P = 2.0;
-          const snap = (v) => Math.round(v / P) * P;
-          const steps = 36;
-
-          // Discrete stepped pixel concentric shockwave loops
-          for (let st = 0; st < steps; st++) {
-            const ang = (st / steps) * Math.PI * 2;
-            const cosA = Math.cos(ang);
-            const sinA = Math.sin(ang);
-
-            // Outer Obsidian Border
-            const r0 = snap(effect.size);
-            ctx.fillStyle = '#150500';
-            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-            // Outer Fiery Orange Pixel Ring
-            ctx.fillStyle = '#FF5500';
-            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-            // Mid Golden Heat Loop
-            const r1 = snap(effect.size * 0.75);
-            ctx.fillStyle = '#FFE600';
-            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-            // Inner White-Hot Ring
-            const r2 = snap(effect.size * 0.45);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-          }
-          ctx.restore();
-        } else {
-          // Outer Incineration Fiery Orange Thermal Ring
-          ctx.strokeStyle = `rgba(255, 60, 0, ${effect.life * 0.95})`;
-          ctx.lineWidth = 12 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Middle Golden Heat Wave Ring
-          ctx.strokeStyle = `rgba(255, 170, 0, ${effect.life * 0.90})`;
-          ctx.lineWidth = 7 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Inner White-Hot Blast Core Ring
-          ctx.strokeStyle = `rgba(255, 245, 200, ${effect.life * 0.98})`;
-          ctx.lineWidth = 4 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      } else if (isMahoragaClash) {
-        // ── MAHORAGA DIVINE IMPACT CIRCULAR SHOCKWAVE RING ──
-        if (isDark) {
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          const P = 2.0;
-          const snap = (v) => Math.round(v / P) * P;
-          const radius = Math.max(P * 2, effect.size);
-          const steps = Math.max(32, Math.round((Math.PI * 2 * radius) / P));
-
-          const alpha = Math.min(1.0, effect.life * 1.25);
-          const colBorder = `rgba(15, 12, 0, ${(alpha * 0.85).toFixed(3)})`;
-          const colOuter = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
-          const colMid = `rgba(255, 245, 150, ${(alpha * 0.90).toFixed(3)})`;
-          const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-
-          for (let st = 0; st < steps; st++) {
-            const ang = (st / steps) * Math.PI * 2;
-            const cosA = Math.cos(ang);
-            const sinA = Math.sin(ang);
-
-            // Outer Obsidian / Dark Gold Border Pixels
-            const r0 = snap(radius);
-            ctx.fillStyle = colBorder;
-            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-            // Outer Divine Gold Pixel Ring
-            ctx.fillStyle = colOuter;
-            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-            // Mid Light-Gold Loop
-            const r1 = snap(radius * 0.75);
-            ctx.fillStyle = colMid;
-            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-            // Inner White-Hot Specular Ring
-            const r2 = snap(radius * 0.45);
-            ctx.fillStyle = colCore;
-            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-          }
-          ctx.restore();
-        } else {
-          // 1. Outer Golden Divine Aura Ring (Full circular arc matching other fighters)
-          ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
-          ctx.lineWidth = 12 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // 2. Middle Warm Gold/Silver Ring
-          ctx.strokeStyle = `rgba(255, 235, 120, ${effect.life * 0.90})`;
-          ctx.lineWidth = 7 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
-          ctx.stroke();
-
-          // 3. Inner White-Hot Impact Core Ring
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-          ctx.lineWidth = 4 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.45), 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      } else if (isYutaClash) {
-        // ── YUTA & RIKA VS SUKUNA CLASH SHOCKWAVE ──
-        if (isDark) {
-          // Dark mode white/silver theme for Yuta shockwave
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-          ctx.lineWidth = 12 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = `rgba(230, 240, 255, ${effect.life * 0.90})`;
-          ctx.lineWidth = 8 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-          ctx.lineWidth = 4 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-          ctx.stroke();
-        } else {
-          // Outer Hot Pink / Dark Magenta Ring (Yuta & Rika's Pure Love / Monstrous Cursed Energy)
-          ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.9})`;
-          ctx.lineWidth = 15 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.98})`;
-          ctx.lineWidth = 11 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Inner Crimson Blood Ring (Sukuna's Cursed Energy)
-          ctx.strokeStyle = `rgba(255, 30, 60, ${effect.life * 0.95})`;
-          ctx.lineWidth = 8 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // White core flash
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-          ctx.lineWidth = 4 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-
-        // Dynamic Katana / Cleave X-shaped Cross Slash at clash center
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate(Math.PI / 4 + (1 - effect.life) * 0.2);
-        const slashLen = effect.size * 0.75;
-        
-        ctx.strokeStyle = isDark ? `rgba(255, 255, 255, ${effect.life * 0.7})` : `rgba(255, 30, 60, ${effect.life * 0.7})`;
-        ctx.lineWidth = 7 * effect.life;
-        ctx.beginPath();
-        ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
-        ctx.moveTo(0, -slashLen); ctx.lineTo(0, slashLen);
-        ctx.stroke();
-
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 3.5 * effect.life;
-        ctx.beginPath();
-        ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
-        ctx.moveTo(0, -slashLen); ctx.lineTo(0, slashLen);
-        ctx.stroke();
-        ctx.restore();
-      } else if (isInfinityClash) {
-        // ── GOJO LIMITLESS BARRIER REBOUND PIXEL ART SHOCKWAVE RING (SAITAMA TECH) ──
-        if (isDark) {
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          const P = 2.5;
-          const snap = (v) => Math.round(v / P) * P;
-          const radius = Math.max(P * 2, effect.size);
-          const steps = Math.max(28, Math.min(56, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
-          const alpha = Math.min(1.0, effect.life * 1.15);
-
-          const colBorder = `rgba(8, 18, 32, ${(alpha * 0.90).toFixed(3)})`;
-          const colOuter = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
-          const colMid = `rgba(180, 245, 255, ${(alpha * 0.90).toFixed(3)})`;
-          const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-
-          // High-performance 1D circumference loop (eliminates 15,987 2D grid calculations per frame)
-          for (let st = 0; st < steps; st++) {
-            const ang = (st / steps) * Math.PI * 2;
-            const cosA = Math.cos(ang);
-            const sinA = Math.sin(ang);
-
-            // 1. Dark Outer Obsidian Outline Shell (#081220)
-            const r0 = snap(radius);
-            ctx.fillStyle = colBorder;
-            ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-            // 2. Vibrant Electric Cyan Primary Pixel Ring (#00E5FF)
-            ctx.fillStyle = colOuter;
-            ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-            // 3. Mid Light Cyan Loop
-            const r1 = snap(radius * 0.75);
-            ctx.fillStyle = colMid;
-            ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-            // 4. Inner White-Hot Specular Ring (#FFFFFF)
-            const r2 = snap(radius * 0.45);
-            ctx.fillStyle = colCore;
-            ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-          }
-          ctx.restore();
-        } else {
-          // 1. Dark Outer Obsidian Outline Ring (#081220)
-          ctx.strokeStyle = `rgba(8, 18, 32, ${effect.life * 0.90})`;
-          ctx.lineWidth = 14 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // 2. Vibrant Electric Cyan Primary Ring (#00E5FF)
-          ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.98})`;
-          ctx.lineWidth = 8 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // 3. Middle Ice-Cyan Ring
-          ctx.strokeStyle = `rgba(180, 245, 255, ${effect.life * 0.90})`;
-          ctx.lineWidth = 5 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
-          ctx.stroke();
-
-          // 4. Inner White-Hot Specular Core Ring
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-          ctx.lineWidth = 3.5 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.45), 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      } else if (isTojiClash) {
-        // ── TOJI PHYSICAL SHOCKWAVE ──
-        if (isDark) {
-          // Dark mode white/silver theme for Toji shockwave
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-          ctx.lineWidth = 12 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = `rgba(230, 240, 255, ${effect.life * 0.90})`;
-          ctx.lineWidth = 7 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-          ctx.lineWidth = 4 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.50, 0, Math.PI * 2);
-          ctx.stroke();
-        } else {
-          // Outer Dark Slate Air Pressure Ring
-          ctx.strokeStyle = `rgba(45, 50, 55, ${effect.life * 0.8})`;
-          ctx.lineWidth = 18 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Middle Purple Soul Aura Ring
-          ctx.strokeStyle = `rgba(160, 80, 240, ${effect.life * 0.85})`;
-          ctx.lineWidth = 10 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.85, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Inner White-Hot Impact Force Ring
-          ctx.strokeStyle = `rgba(250, 252, 255, ${effect.life * 0.9})`;
-          ctx.lineWidth = 6 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.6, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-
-        // High-Speed Wind Distortion Lines (Inner Starburst)
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate((1 - effect.life) * 0.5);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.5})`;
-        ctx.lineWidth = 2 * effect.life;
-        ctx.beginPath();
-        for (let i = 0; i < 8; i++) {
-           const angle = (i / 8) * Math.PI * 2;
-           ctx.moveTo(Math.cos(angle) * (effect.size * 0.2), Math.sin(angle) * (effect.size * 0.2));
-           ctx.lineTo(Math.cos(angle) * (effect.size * 0.9), Math.sin(angle) * (effect.size * 0.9));
-        }
-        ctx.stroke();
-        ctx.restore();
-      } else {
-        const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
-        if (isDark) {
-          if (isHex) {
-            const rgb = hexToRgb(effect.clashType) || '255, 255, 255';
-            // 1. Primary Themed Shockwave Ring in dark mode
-            ctx.strokeStyle = `rgba(${rgb}, ${effect.life * 0.95})`;
-            ctx.lineWidth = 10 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // 2. Secondary Compression Ring
-            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.90})`;
-            ctx.lineWidth = 6 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // 3. Inner White-Hot Pressure Core
-            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-            ctx.lineWidth = 3.5 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-            ctx.stroke();
-          } else {
-            // ── DARK MODE WHITE SHOCKWAVE THEME ──
-            // 1. Crisp Pure White Primary Shockwave Ring
-            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-            ctx.lineWidth = 10 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // 2. Secondary Bright Silver-White Compression Ring
-            ctx.strokeStyle = `rgba(240, 245, 255, ${effect.life * 0.90})`;
-            ctx.lineWidth = 6 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // 3. Inner White-Hot Pressure Core
-            ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-            ctx.lineWidth = 3.5 * effect.life;
-            ctx.beginPath();
-            ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-        } else if (isHex) {
-          const rgb = hexToRgb(effect.clashType) || '255, 50, 80';
-          // Outer primary themed ring based on Getsuga Tensho current color
-          ctx.strokeStyle = `rgba(${rgb}, ${effect.life * 0.95})`;
-          ctx.lineWidth = 12 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Middle compression ring
-          ctx.strokeStyle = `rgba(${rgb}, ${effect.life * 0.85})`;
-          ctx.lineWidth = 7 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.70, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Inner white specular core
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
-          ctx.lineWidth = 3.5 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-          ctx.stroke();
-        } else {
-          // Outer purple ring (Gojo's cursed energy) - thick with dark outline
-          ctx.strokeStyle = `rgba(60, 0, 80, ${effect.life * 0.9})`;
-          ctx.lineWidth = 14 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-          
-          // Main purple ring
-          ctx.strokeStyle = `rgba(180, 60, 255, ${effect.life * 0.95})`;
-          ctx.lineWidth = 10 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
-          
-          // Inner crimson ring (Sukuna's cursed energy)
-          ctx.strokeStyle = `rgba(255, 50, 80, ${effect.life * 0.95})`;
-          ctx.lineWidth = 8 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-          ctx.stroke();
-          
-          // White core flash with dark outline
-          ctx.strokeStyle = `rgba(40, 40, 40, ${effect.life * 0.8})`;
-          ctx.lineWidth = 5 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-          ctx.stroke();
-          
-          ctx.strokeStyle = `rgba(255, 240, 240, ${effect.life * 0.9})`;
-          ctx.lineWidth = 3 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-
-      ctx.globalCompositeOperation = 'source-over';
-    } else if (effect.type === 'mahoragaShoutShockwave') {
-      // Expanding golden & silver roar shockwave ring
-      effect.size += (effect.targetSize - effect.size) * 0.18;
-      const isDark = _isDarkMode();
-      
-      ctx.save();
-      if (isDark) {
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const radius = Math.max(P * 2, effect.size);
-        const steps = Math.max(36, Math.round((Math.PI * 2 * radius) / P));
-
-        const alpha = Math.min(1.0, effect.life * 1.25);
-        const colBorder = `rgba(15, 12, 0, ${(alpha * 0.85).toFixed(3)})`;
-        const colOuter = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
-        const colMid = `rgba(255, 245, 150, ${(alpha * 0.90).toFixed(3)})`;
-        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-
-        for (let st = 0; st < steps; st++) {
-          const ang = (st / steps) * Math.PI * 2;
-          const cosA = Math.cos(ang);
-          const sinA = Math.sin(ang);
-
-          // Outer Obsidian / Dark Gold Border Pixels
-          const r0 = snap(radius);
-          ctx.fillStyle = colBorder;
-          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-          // Outer Divine Gold Pixel Ring
-          ctx.fillStyle = colOuter;
-          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-          // Mid Light-Gold Loop
-          const r1 = snap(radius * 0.75);
-          ctx.fillStyle = colMid;
-          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-          // Inner White-Hot Specular Ring
-          const r2 = snap(radius * 0.45);
-          ctx.fillStyle = colCore;
-          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-        }
-      } else {
-        ctx.globalCompositeOperation = 'lighter';
-
-        // Outer glowing golden shockwave ring
-        ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
-        ctx.lineWidth = 12 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Middle silver contrast ring
-        ctx.strokeStyle = `rgba(224, 232, 255, ${effect.life * 0.8})`;
-        ctx.lineWidth = 6 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Inner white-hot core ring
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.globalCompositeOperation = 'source-over';
-      }
-      ctx.restore();
-    } else if (effect.type === 'rikaRoarShockwave') {
-      // Expanding dark purple & hot pink cursed energy roar shockwave ring
-      effect.size += (effect.targetSize - effect.size) * 0.18;
-      const isDark = _isDarkMode();
-      
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-
-      if (isDark) {
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 9 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.strokeStyle = `rgba(235, 245, 255, ${effect.life * 0.90})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
-        ctx.stroke();
-      } else {
-        // High-performance double-stroke glow without shadowBlur
-        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
-        ctx.lineWidth = 9 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.restore();
-    } else if (effect.type === 'purpleShockwaveRing') {
-      // ── Simple, Clean Expanding Purple Repulsion Shockwave Rings (Like Gojo's Red) ──
-      effect.size += (effect.targetSize - effect.size) * 0.22;
-      const alpha = Math.min(1.0, effect.life * 1.25);
-      const isDark = _isDarkMode();
-
-      ctx.save();
-      if (isDark) {
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.5;
-        const snap = (v) => Math.round(v / P) * P;
-        const radius = Math.max(P * 2, effect.size);
-        const steps = Math.max(28, Math.min(60, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
-
-        const colBorder = `rgba(10, 0, 20, ${(alpha * 0.90).toFixed(3)})`;
-        const colOuter = effect.color || `rgba(191, 90, 242, ${(alpha * 0.95).toFixed(3)})`;
-        const colMid = `rgba(233, 213, 255, ${(alpha * 0.88).toFixed(3)})`;
-        const colCore = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
-
-        for (let st = 0; st < steps; st++) {
-          const ang = (st / steps) * Math.PI * 2;
-          const cosA = Math.cos(ang);
-          const sinA = Math.sin(ang);
-
-          // 1. Dark Outline Shell
-          const r0 = snap(radius);
-          ctx.fillStyle = colBorder;
-          ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
-
-          // 2. Primary Purple Pixel Ring
-          ctx.fillStyle = colOuter;
-          ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
-
-          // 3. Mid Lavender Ring
-          const r1 = snap(radius * 0.78);
-          ctx.fillStyle = colMid;
-          ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
-
-          // 4. Inner White-Hot Specular Ring
-          const r2 = snap(radius * 0.50);
-          ctx.fillStyle = colCore;
-          ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-        }
-      } else {
-        ctx.globalCompositeOperation = 'lighter';
-
-        // Outer expanding purple repulsion ring
-        ctx.strokeStyle = effect.color || `rgba(191, 90, 242, ${(alpha * 0.95).toFixed(3)})`;
-        ctx.lineWidth = (effect.is200 ? 7.0 : 4.8) * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Mid lavender contrast ring
-        ctx.strokeStyle = `rgba(233, 213, 255, ${(alpha * 0.85).toFixed(3)})`;
-        ctx.lineWidth = 3.0 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.80), 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Inner white-hot specular core ring
-        ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`;
-        ctx.lineWidth = 2.0 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.55), 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.globalCompositeOperation = 'source-over';
-      }
-      ctx.restore();
-    } else if (effect.type === 'animeImpactFrame') {
-      const isDark = _isDarkMode();
-
-      // ── CLEAN PIXELATED SHOCKWAVE RING HIT EFFECT (LIGHT & DARK MODES) ──
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-
-      ctx.translate(effect.x, effect.y);
-
-      const progress = Math.min(1.0, Math.max(0.0, 1.0 - effect.life));
-      const alpha = Math.min(1.0, effect.life * 1.35);
-      const P = 2.0; // Stepped pixel grid size
-      const snap = (v) => Math.round(v / P) * P;
-
-      const isGold = (effect.color === 'gold');
-      const isBlackPink = (effect.color === 'blackpink' || effect.color === 'pink');
-      const isOrange = (effect.color === 'orange');
-      const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity' || effect.color === 'gojo');
-      const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
-      const isPurple = (effect.color === 'purple' || effect.color === 'boogie');
-
-      let colRing, colHighlight;
-      if (isGold) {
-        colRing = `rgba(255, 215, 0, ${alpha * 0.95})`;
-        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-      } else if (isBlackPink) {
-        colRing = `rgba(255, 20, 147, ${alpha * 0.95})`;
-        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-      } else if (isOrange) {
-        colRing = `rgba(255, 80, 0, ${alpha * 0.95})`;
-        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-      } else if (isCyan) {
-        colRing = `rgba(0, 229, 255, ${alpha * 0.95})`;
-        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-      } else if (isCrimson) {
-        colRing = `rgba(255, 36, 0, ${alpha * 0.95})`;
-        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-      } else if (isPurple) {
-        colRing = `rgba(168, 85, 247, ${alpha * 0.95})`;
-        colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
-      } else {
-        if (!isDark && (effect.color === 'black' || !effect.color)) {
-          colRing = `rgba(20, 22, 28, ${alpha * 0.95})`;
-          colHighlight = `rgba(80, 90, 110, ${alpha * 0.98})`;
-        } else {
-          colRing = `rgba(255, 255, 255, ${alpha * 0.95})`;
-          colHighlight = `rgba(220, 240, 255, ${alpha * 0.98})`;
-        }
-      }
-
-      // Discrete Pixel Circle Shockwave Ring
-      const ringRadius = effect.size * (0.25 + 0.85 * Math.pow(progress, 0.65));
-      const ringThick = Math.max(P * 1.5, Math.round((P * 2.2 * effect.life) / P) * P);
-      const innerR = Math.max(0, ringRadius - ringThick);
-      const outerR = ringRadius + P * 0.5;
-
-      const maxGridSteps = Math.ceil(outerR / P);
-
-      // Render discrete pixel shockwave ring with 0 GC
-      for (let gy = -maxGridSteps; gy <= maxGridSteps; gy++) {
-        const ry = gy * P;
-        for (let gx = -maxGridSteps; gx <= maxGridSteps; gx++) {
-          const rx = gx * P;
-          const dist = Math.hypot(rx, ry);
-          if (dist < innerR || dist > outerR) continue;
-
-          const px = snap(rx);
-          const py = snap(ry);
-
-          // Core highlight pixel line vs main colored pixel band
-          if (dist >= ringRadius - P * 0.5 && dist <= ringRadius + P * 0.5) {
-            ctx.fillStyle = colHighlight;
-          } else {
-            ctx.fillStyle = colRing;
-          }
-          ctx.fillRect(px, py, P, P);
-        }
-      }
-
-      ctx.restore();
-    } else if (effect.type === 'punchWindSpeedLine') {
-      // ── SUPERSONIC PUNCH WIND SPEED LINE STREAK ──
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-
-      const alpha = Math.min(1.0, effect.life * 1.4);
-      const lineAngle = effect.angle || 0;
-      const len = (effect.length || 150) * (0.6 + 0.4 * effect.life);
-      const halfLen = len / 2;
-
-      ctx.translate(effect.x, effect.y);
-      ctx.rotate(lineAngle);
-
-      // Gradient line stroke fading smoothly at both ends
-      const grad = ctx.createLinearGradient(-halfLen, 0, halfLen, 0);
-      const col = effect.color || '#FF8800';
-      grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-      grad.addColorStop(0.25, col);
-      grad.addColorStop(0.75, col);
-      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = (effect.size || 2.5) * effect.life;
-      ctx.beginPath();
-      ctx.moveTo(-halfLen, 0);
-      ctx.lineTo(halfLen, 0);
-      ctx.stroke();
-
-      // White-hot core center streak for supersonic punch feel
-      if (effect.isCore) {
-        ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(2)})`;
-        ctx.lineWidth = Math.max(1, (effect.size || 2.5) * 0.45 * effect.life);
-        ctx.beginPath();
-        ctx.moveTo(-halfLen * 0.65, 0);
-        ctx.lineTo(halfLen * 0.65, 0);
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    } else if (effect.type === 'arcane') {
-        // ── PIXEL ART ARCANE SPARKLE / GLINT (+) ──
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const P = 2.0;
-        const snap = (v) => Math.round(v / P) * P;
-        const cx = snap(effect.x);
-        const cy = snap(effect.y);
-        const alpha = Math.max(0, Math.min(1.0, effect.life));
-
-        // White-hot center pixel
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(2)})`;
-        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
-
-        // 4 cardinal emerald arms
-        ctx.fillStyle = `rgba(0, 255, 100, ${(alpha * 0.90).toFixed(2)})`;
-        ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P);
-        ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P);
-        ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P);
-        ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P);
-
-        // Tiny velocity tail step
-        if (effect.vx || effect.vy) {
-          const tx = snap(effect.x - (effect.vx || 0) * 1.8);
-          const ty = snap(effect.y - (effect.vy || 0) * 1.8);
-          ctx.fillStyle = `rgba(0, 200, 80, ${(alpha * 0.50).toFixed(2)})`;
-          ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
-        }
-
-        ctx.restore();
-      } else {
-        // Standard spark - small glowing dot
-        const safeColor = (typeof effect.color === 'string' && effect.color) ? effect.color : '#00E5FF';
-        const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
-        if (isGamePlay) {
-          // During gameplay: skip per-particle radial gradient (saves huge CPU time per frame)
-          ctx.fillStyle = safeColor;
-        } else {
-          const gradient = ctx.createRadialGradient(
-            effect.x, effect.y, 0,
-            effect.x, effect.y, Math.max(0.1, effect.size || 1)
-          );
-          gradient.addColorStop(0, safeColor);
-          const halfColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0.6)') : safeColor;
-          gradient.addColorStop(0.5, halfColor);
-          
-          if (effect.type === 'crimsonSniper') {
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-          } else if (effect.type === 'lightningTrail') {
-            const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace(/[\d.]+\)$/, '0)') : 'rgba(0, 229, 255, 0)';
-            gradient.addColorStop(1, zeroColor);
-          } else if (effect.type === 'rikaCurse') {
-            const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0)') : 'rgba(0, 0, 0, 0)';
-            gradient.addColorStop(1, zeroColor);
-          } else {
-            gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
-          }
-          ctx.fillStyle = gradient;
-        }
-
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size || 1), 0, Math.PI * 2);
-        ctx.fill();
-      }
+    const renderer = SPARK_RENDERERS[effect.type];
+    if (renderer) {
+      renderer(ctx, effect, isGamePlay);
+    } else if (effect.isFlash) {
+      drawDefaultImpactFlash(ctx, effect);
+    } else {
+      drawStandardSpark(ctx, effect, isGamePlay);
+    }
 
     ctx.restore();
   }

@@ -554,11 +554,42 @@ const _tacticalCards = {
   bottom: []
 };
 
+// ── Persistent Module-Level Cache for Screen Dimming DOM Elements (Rule #13) ──
+let _cachedDimEls = null;
+let _lastDimmedState = null;
+let _lastDarkThemeState = null;
+let _lastSaitamaImpactState = null;
+
+function _getDimElements() {
+  if (!_cachedDimEls || !_cachedDimEls[0] || (typeof document !== 'undefined' && !document.body.contains(_cachedDimEls[0]))) {
+    if (typeof document === 'undefined') return [];
+    _cachedDimEls = [
+      document.querySelector('.game-container'),
+      document.querySelector('.game-box'),
+      document.getElementById('hudBottomContainer'),
+      document.getElementById('hudTopContainer'),
+      document.getElementById('hudTopLeft'),
+      document.getElementById('hudTopRight'),
+      document.getElementById('hudBottomLeft'),
+      document.getElementById('hudBottomRight'),
+      document.getElementById('healthHud'),
+      document.getElementById('healthHudLeft'),
+      document.getElementById('healthHudRight'),
+      document.body
+    ].filter(Boolean);
+  }
+  return _cachedDimEls;
+}
+
 export function clearHealthHud() {
   _hudCache.teams.clear();
   _hudCache.fighters.clear();
   _tacticalCards.top = [];
   _tacticalCards.bottom = [];
+  _lastDimmedState = null;
+  _lastDarkThemeState = null;
+  _lastSaitamaImpactState = null;
+  _cachedDimEls = null;
 
   if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
   if (!_cachedContainerLeft) _cachedContainerLeft = document.getElementById('healthHudLeft');
@@ -824,33 +855,7 @@ function updateHealthHud() {
 
   state._hudFrameCount = (state._hudFrameCount || 0) + 1;
 
-let _cachedDimEls = null;
-let _lastDimmedState = null;
-let _lastDarkThemeState = null;
-let _lastSaitamaImpactState = null;
-
-function _getDimElements() {
-  if (!_cachedDimEls || !_cachedDimEls[0] || (typeof document !== 'undefined' && !document.body.contains(_cachedDimEls[0]))) {
-    if (typeof document === 'undefined') return [];
-    _cachedDimEls = [
-      document.querySelector('.game-container'),
-      document.querySelector('.game-box'),
-      document.getElementById('hudBottomContainer'),
-      document.getElementById('hudTopContainer'),
-      document.getElementById('hudTopLeft'),
-      document.getElementById('hudTopRight'),
-      document.getElementById('hudBottomLeft'),
-      document.getElementById('hudBottomRight'),
-      document.getElementById('healthHud'),
-      document.getElementById('healthHudLeft'),
-      document.getElementById('healthHudRight'),
-      document.body
-    ].filter(Boolean);
-  }
-  return _cachedDimEls;
-}
-
-  // ── INSTANT Dim Class Toggle (runs EVERY frame, before throttle) ──
+  // ── INSTANT Dim Class Toggle (runs ONLY on state transition, before throttle) ──
   {
     const isDimmedNow = isScreenDimmedActive();
 

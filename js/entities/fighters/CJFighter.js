@@ -1033,7 +1033,8 @@ export class CJFighter extends Fighter {
    * Also ensures all attacks are strictly disabled while typing cheat codes.
    */
   shoot(ownerIndex) {
-    if (this.dead || this.isTypingCheat) return;
+    if (this.dead || this.isTypingCheat) return false;
+    return false;
   }
 
   /**
@@ -1873,14 +1874,6 @@ export class CJFighter extends Fighter {
 
   interruptAttacks() {
     this.punchAnimTimer = 0;
-  }
-
-  /**
-   * Basic Attack Shoot Override
-   * Pure melee brawler: disables default gun projectiles during basic attacks.
-   */
-  shoot(ownerIndex) {
-    return false;
   }
 
   /**

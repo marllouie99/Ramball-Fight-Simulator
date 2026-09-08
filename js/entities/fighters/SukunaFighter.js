@@ -80,6 +80,23 @@ export class SukunaFighter extends Fighter {
     this.slashHitCount = 0;
     this.critChance = CONFIG.sukuna?.baseCritChance || 0.25;
     this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 0.25;
+    this.damageNumberColor = '#ff4455';
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isChannelingDivineFlame ||
+      this.isChargingFuga ||
+      this.isFiringFuga ||
+      (this.divineFlameChargeTimer > 0) ||
+      (this.divineFlameRecoveryTimer > 0) ||
+      this.isChannelingDomainExpansion ||
+      this.isChannelingDomain ||
+      (this.domainChargeTimer > 0) ||
+      (this.domainChannelTimer > 0) ||
+      (this.spiderwebChannelTimer > 0) ||
+      super.isStationarySkillActive?.()
+    );
   }
 
   interruptAttacks(forceCancelAll = false) {

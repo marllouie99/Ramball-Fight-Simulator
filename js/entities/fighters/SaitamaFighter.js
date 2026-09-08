@@ -19,6 +19,7 @@ export class SaitamaFighter extends Fighter {
 
     // Model visual customization
     this.color = CONFIG.saitama?.color || '#F5C400';
+    this.damageNumberColor = (typeof CONFIG !== 'undefined' && (CONFIG.saitama?.damageNumberColor || CONFIG.saitama?.themeColor)) || '#F5C400';
     const sizeMult = CONFIG.globalFighter?.sizeMultiplier ?? 1.0;
     const internalScale = CONFIG.internalScale ?? 1.0;
     const baseRadius = def.radius || CONFIG.saitama?.radius || 25;

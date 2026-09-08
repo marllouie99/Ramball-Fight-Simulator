@@ -67,6 +67,35 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('ui');
 }
 
+/**
+ * Checks whether an audio source is a fighter voice line, vocal chant,
+ * or character speech that should not be stolen or played by Rubbick.
+ * @param {string} src
+ * @returns {boolean}
+ */
+export function isVoicelineAudio(src) {
+  if (!src) return false;
+  const s = String(src).toLowerCase();
+  return s.includes('voiceline') ||
+         s.includes('voice') ||
+         s.includes('hollowpurple') ||
+         s.includes('gojodomain') ||
+         s.includes('yutadomainexpansion') ||
+         s.includes('domainexpansion') ||
+         s.includes('shrine') ||
+         (s.includes('fuga') && !s.includes('travel') && !s.includes('explode') && !s.includes('ignite')) ||
+         s.includes('mybestfriend') ||
+         s.includes('bestfriend') ||
+         s.includes('tadaka') ||
+         s.includes('takada') ||
+         s.includes('brother') ||
+         s.includes('champion') ||
+         s.includes('homie') ||
+         s.includes('dialogue') ||
+         s.includes('ragescream') ||
+         s.includes('comerika');
+}
+
 function _pruneSoundCache() {
   if (_cache.size > MAX_CACHE_SIZE) {
     // Remove oldest entries (Map maintains insertion order)
@@ -173,14 +202,31 @@ const _loadingPromises = new Map();
  * Falls back to a standard Audio element if Web Audio API fails.
  * @param {string|string[]} src - Path to the audio file (relative or absolute)
  */
-export async function preloadSound(src) {
+export async function preloadSound(src, options = {}) {
   if (!src) return;
   if (Array.isArray(src)) {
-    // Process in batches of 16 concurrent requests to avoid browser network queue congestion
-    const batchSize = 16;
+    const isPriority = Boolean(options && options.priority);
+    const isIdle = Boolean(options && options.idle);
+    const batchSize = isPriority ? 6 : (options.batchSize || (isIdle ? 2 : 6));
+    const yieldMs = isPriority ? 4 : (isIdle ? 80 : 16);
+
     for (let i = 0; i < src.length; i += batchSize) {
+      // If a match is currently in countdown or active combat, pause idle background preloading
+      // so 100% of CPU and media thread bandwidth is dedicated to smooth 60 FPS combat
+      while (isIdle && typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'playing')) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+
       const batch = src.slice(i, i + batchSize);
-      await Promise.all(batch.map((s) => preloadSound(s)));
+      await Promise.all(batch.map((s) => preloadSound(s, options)));
+      // Yield to the event loop so rendering and game loop run smoothly
+      await new Promise(r => {
+        if (isIdle && typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+          window.requestIdleCallback(() => setTimeout(r, 10), { timeout: 120 });
+        } else {
+          setTimeout(r, yieldMs);
+        }
+      });
     }
     return;
   }
@@ -190,6 +236,19 @@ export async function preloadSound(src) {
   }
 
   const loadPromise = (async () => {
+    // Full-length music tracks (3-5MB MP3s) stream efficiently via HTMLAudioElement without CPU decoding spikes
+    const isMusic = typeof src === 'string' && (src.includes('ARENA-BGMUSIC') || src.includes('bgmusic') || src.includes('CPS1') || src.includes('background-song'));
+    if (isMusic) {
+      try {
+        const audio = new Audio(src);
+        audio.preload = 'auto';
+        audio.load();
+        _cache.set(src, audio);
+        _pruneSoundCache();
+      } catch (err) {}
+      return;
+    }
+
     try {
       const response = await fetch(src);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -262,7 +321,7 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
     preloadSound(src).catch(() => {});
   }
   // Fallback: standard Audio element
-  const audio = /** @type {HTMLAudioElement} */ (cached?.cloneNode() ?? new Audio(src));
+  const audio = /** @type {HTMLAudioElement} */ ((cached && typeof cached.cloneNode === 'function') ? cached.cloneNode() : new Audio(src));
   const targetVol = Math.max(0, Math.min(1, volume));
   audio.loop = true;
   audio.playbackRate = Math.max(0.1, speed);

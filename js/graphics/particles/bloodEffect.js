@@ -78,6 +78,22 @@ export function generateThemeBloodPalette(color) {
   ];
 }
 
+export function warmUpBloodSpritePool(count = 40) {
+  if (typeof window === 'undefined' || !window.PIXI || !state.bloodSquareTexture || !state.pixiLayers || !state.pixiLayers.particles) return;
+  while (bloodSpritePool.length < count) {
+    const s = new window.PIXI.Sprite(state.bloodSquareTexture);
+    s.anchor.set(0.5);
+    s.visible = false;
+    state.pixiLayers.particles.addChild(s);
+    bloodSpritePool.push(s);
+  }
+}
+
+// Pre-warm pool on module load if PixiJS is already active
+if (typeof window !== 'undefined') {
+  setTimeout(() => warmUpBloodSpritePool(40), 10);
+}
+
 function getBloodSprite() {
   if (typeof window === 'undefined' || !window.PIXI || !state.bloodSquareTexture || !state.pixiLayers || !state.pixiLayers.particles) {
     return null;

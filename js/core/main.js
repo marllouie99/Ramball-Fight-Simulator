@@ -27,8 +27,15 @@ resizeFlameCanvas();
 // ─────────────────────────────────────────────
 initGraphicsCache();
 
-// Proactively preload all game sound effects and tracks in the background
-preloadGameSounds().catch((e) => console.warn('Audio preloading warning:', e));
+// Pre-render PixiJS stage once during startup to pre-compile WebGL shaders and initialize GPU pipelines
+if (state.pixiApp && typeof state.pixiApp.render === 'function') {
+  try {
+    state.pixiApp.render();
+  } catch (e) {}
+}
+
+// Proactively preload all game sound effects and tracks lazily in background idle time
+preloadGameSounds(true).catch((e) => console.warn('Audio preloading warning:', e));
 
 if (typeof document !== 'undefined' && 'fonts' in document) {
   try {

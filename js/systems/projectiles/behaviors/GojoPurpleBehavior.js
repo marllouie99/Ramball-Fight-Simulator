@@ -69,13 +69,16 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.history.push({ x: proj.x, y: proj.y });
     proj.historyMax = 20;
     
-    // Setup sound
-    const sfx = getSkillSound('gojo', 'hollowpurple');
-    if (sfx) {
-      const audio = audioSystem.playSFX(sfx.src, sfx.volume);
-      if (audio) {
-        audio.loop = true;
-        proj.purpleSoundHandle = audio;
+    // Setup sound (suppressed for Rubbick)
+    const isRubbick = Boolean(opts?.isRubbick || opts?.isTrickster || proj.isRubbick || fighter?.characterId === 'rubbick' || fighter?.type === 'rubbick' || fighter?.characterId === 'trickster' || fighter?.type === 'trickster');
+    if (!isRubbick && !opts?.suppressVoice) {
+      const sfx = getSkillSound('gojo', 'hollowpurple');
+      if (sfx) {
+        const audio = audioSystem.playSFX(sfx.src, sfx.volume);
+        if (audio) {
+          audio.loop = true;
+          proj.purpleSoundHandle = audio;
+        }
       }
     }
     

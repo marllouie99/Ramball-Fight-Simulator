@@ -85,6 +85,24 @@ export class GenosFighter extends Fighter {
 
     // Movement-driven body rotation
     this.bodyRotAngle = 0; // smoothly tracks velocity direction
+    this.damageNumberColor = CONFIG.genos?.color || '#FF5500';
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      (this.incinerateChargeTimer > 0) ||
+      (this.machineGunFlurryTimer > 0) ||
+      (this.machineGunBlowTimer > 0) ||
+      this.isIncinerating ||
+      this.isSelfDestructing ||
+      this.isSelfDestructRecovering ||
+      super.isStationarySkillActive?.()
+    );
+  }
+
+  isEffectivelyAlive() {
+    if (this.isSelfDestructing || this.isSelfDestructRecovering) return true;
+    return super.isEffectivelyAlive();
   }
 
   reset() {

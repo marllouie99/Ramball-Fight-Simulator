@@ -1108,7 +1108,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 99,
-    name: 'SORCERER KILLER',
+    name:'TOJI',
     category: 'Anime',
     color: tojiConfig.color || '#281438', // Dark Shadow Purple
     startX: tojiConfig.startX || 350,

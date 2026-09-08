@@ -206,11 +206,11 @@ async function main() {
 
       gojoBlueBehavior.update(blueProj, state.fighters, mockSystem);
 
-      if (p1.vx !== 0 || p1.vy !== 0) {
-        console.error(`❌ [Gojo Lapse Blue]: Teammate p1 was accelerated/pulled in mode ${mode}: vx=${p1.vx}, vy=${p1.vy}`);
+      if (p1.x !== 240 || p1.y !== 250) {
+        console.error(`❌ [Gojo Lapse Blue]: Teammate p1 was accelerated/pulled in mode ${mode}: x=${p1.x}, y=${p1.y}`);
         errors++;
       }
-      if (p2.vx === 0 && p2.vy === 0) {
+      if (p2.x === 260 && p2.y === 250) {
         console.error(`❌ [Gojo Lapse Blue]: Enemy p2 was NOT pulled in mode ${mode}`);
         errors++;
       }

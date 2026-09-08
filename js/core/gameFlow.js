@@ -10,8 +10,8 @@ import { state, createFighterInstance, clearProjectiles } from './state.js';
 import { STARTER_MAP, MONOLITH_MAP } from '../../Tactical Force/maps/index.js';
 import { updateFighters, updateProjectiles, spawnFuelPickup } from '../systems/physics.js';
 import { audioSystem } from '../systems/audioSystem.js';
-import { getBasicAttackSoundPaths } from '../soundEffects/basicAttackSounds.js';
-import { getSkillSoundPaths } from '../soundEffects/skillSounds.js';
+import { getBasicAttackSoundPaths, getFighterBasicAttackSoundPaths } from '../soundEffects/basicAttackSounds.js';
+import { getSkillSoundPaths, getFighterSkillSoundPaths } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSoundPaths } from '../soundEffects/skillEffectSounds.js';
 import { getAnnouncerSoundPaths, getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -24,7 +24,7 @@ import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 import { clearDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { clearDriveBys } from '../systems/cjDriveBySystem.js';
 import { clearFloatingJetpacks } from '../graphics/particles/cjFloatingJetpack.js';
-import { startArenaBgm, stopArenaBgm, ARENA_BGM_TRACKS } from '../systems/arenaBgmSystem.js';
+import { startArenaBgm, stopArenaBgm, ARENA_BGM_TRACKS, getSavedArenaBgmId } from '../systems/arenaBgmSystem.js';
 import { clearDroppedMiniguns } from '../graphics/particles/cjDroppedMinigun.js';
 import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
 import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
@@ -74,7 +74,88 @@ function extractSoundsFromObject(obj, seen = new Set(), results = []) {
   return results;
 }
 
-export function preloadGameSounds() {
+/**
+ * Fast-path priority preloader for the active match combatants.
+ * Gathers essential combat impact sounds, announcer countdown SFX, the selected
+ * arena BGM track, and the active fighters' specific attack and skill sounds.
+ * Decodes this compact set (~10-15 files) immediately with high priority so all
+ * active combat audio is 100% resident in Web Audio memory before countdown ends.
+ */
+export function preloadActiveMatchSounds(fighters) {
+  const activeFighters = (fighters || state.fighters || []).filter(Boolean);
+  const activePaths = [
+    // Core physical combat hits
+    'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    'Assets/Sound Effects/Attacks/punch.mp3',
+    'Assets/Sound Effects/Attacks/swordswing.mp3',
+    'Assets/Sound Effects/Attacks/groundSmash.mp3',
+    'Assets/Sound Effects/Attacks/explosion.mp3',
+    'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    // In-arena countdown & announcer
+    'Assets/Sound Effects/Announcer/timertick.mp3',
+    'Assets/Sound Effects/Announcer/fight.mp3',
+    'Assets/Sound Effects/Announcer/ring-bell.mp3',
+    'Assets/Sound Effects/Announcer/bell.mp3',
+    'Assets/Sound Effects/Announcer/faah.mp3'
+  ];
+
+  // Active match Arena BGM (only the chosen track, not all 7 tracks!)
+  try {
+    const trackId = getSavedArenaBgmId();
+    if (trackId !== 'off') {
+      let chosenSrc = null;
+      if (trackId === 'random') {
+        const validTracks = ARENA_BGM_TRACKS.filter(t => t.src !== null);
+        if (validTracks.length > 0) {
+          const randTrack = validTracks[Math.floor(Math.random() * validTracks.length)];
+          chosenSrc = randTrack?.src;
+        }
+      } else {
+        const track = ARENA_BGM_TRACKS.find(t => t.id === trackId);
+        chosenSrc = track ? track.src : null;
+      }
+      if (chosenSrc) {
+        state.activeMatchBgmSrc = chosenSrc;
+        activePaths.push(chosenSrc);
+      }
+    }
+  } catch (e) {}
+
+  // Active fighters' specific basic attacks & skills
+  for (const f of activeFighters) {
+    if (!f) continue;
+    const def = f._def || f;
+    const fId = f.fighterIndex !== undefined ? f.fighterIndex : def.id;
+    const fType = f.type || def.type || f.characterId;
+
+    // Basic attack sound
+    activePaths.push(...getFighterBasicAttackSoundPaths(fId, fType));
+
+    // Skill sounds
+    activePaths.push(...getFighterSkillSoundPaths(fId));
+    if (fType && fType !== fId) {
+      activePaths.push(...getFighterSkillSoundPaths(fType));
+    }
+    if (f.characterId && f.characterId !== fType) {
+      activePaths.push(...getFighterSkillSoundPaths(f.characterId));
+    }
+
+    // Config custom sounds
+    const cfg = (f.characterId && CONFIG[f.characterId]) || (fType && CONFIG[fType]);
+    if (cfg && cfg.sounds) {
+      Object.values(cfg.sounds).forEach(val => {
+        if (typeof val === 'string' && (val.includes('/') || val.includes('.'))) {
+          activePaths.push(val);
+        }
+      });
+    }
+  }
+
+  const uniqueActivePaths = [...new Set(activePaths.filter(Boolean))];
+  return preloadSound(uniqueActivePaths, { priority: true });
+}
+
+export function preloadGameSounds(isIdle = true) {
   // Preload legacy assets + basic attack sounds + skill sounds + skill effect sounds + mapped audio config sounds
   const legacyPaths = Object.values(SOUND_ASSETS).filter(Boolean);
   const mappedConfigPaths = Object.values(AUDIO_CONFIG).filter(s => typeof s === 'string' && (s.includes('/') || s.includes('.')));
@@ -95,7 +176,7 @@ export function preloadGameSounds() {
     ...configSounds,
     ...bgmTracks
   ])];
-  return preloadSound(allPaths);
+  return preloadSound(allPaths, { idle: isIdle });
 }
 
 // Re-export physics update steps so callers can import them from gameFlow.js
@@ -798,8 +879,9 @@ export function proceedFromFaceOffToCountdown() {
 
 export async function startGame() {
   await unlockAudio();
-  await preloadGameSounds();
-  resetMatch(true); // Enters Face-Off overlay before countdown
+  resetMatch(true); // Enters Face-Off overlay before countdown immediately
+  // Prioritize active match audio first so combatants' sounds are fully decoded before countdown ends
+  preloadActiveMatchSounds(state.fighters);
 }
 
 export function startNextRound() {
@@ -944,6 +1026,8 @@ export function startCountdown() {
         f.combatAuraOpacity = 1;
       }
     });
+    // Ensure active match audio is preloaded with high priority during countdown
+    preloadActiveMatchSounds(state.fighters);
   }
 }
 
