@@ -133,7 +133,7 @@ export class RubyFighter extends Fighter {
     if (dist > range) return;
 
     this.scytheSwingAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    this.gunAngle = this.scytheSwingAngle;
+    this.applyAim(opponent, this.scytheSwingAngle);
     this.scytheSwingActive = true;
     this.scytheSwingTimer = this.scytheSwingDuration;
     this.scytheCooldown = cfg.scytheCooldown || 40;
@@ -165,7 +165,7 @@ export class RubyFighter extends Fighter {
 
     // Lock-in the angle and target
     this.activePullAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    this.gunAngle = this.activePullAngle;
+    this.applyAim(opponent, this.activePullAngle);
     this.activePullActive = true;
     this.activePullPhase = 0; // WIND_UP
     this.activePullPhaseTimer = this.pullPhaseWindUp;

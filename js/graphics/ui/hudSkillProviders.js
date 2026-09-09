@@ -566,49 +566,130 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
   if (f.characterId === 'makima' || f.type === 'makima') {
-    const themeColor = f.color || '#A31D24';
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
-
-    const enableSkill1 = cfg.enableSkill1 ?? cfg.enableChains ?? cfg.enableChainsOfDomination ?? true;
-    const enableSkill2 = cfg.enableSkill2 ?? cfg.enableAngel ?? cfg.enableAngelArmory ?? cfg.enableThousandYearSpear ?? true;
-    const enableUlt = cfg.enableUltimate ?? cfg.enableShrine ?? cfg.enableShrineRitual ?? true;
-    const enablePassive = cfg.enableCitizenContract ?? cfg.enablePassive ?? cfg.citizenContractEnabled ?? true;
-
+    const mcfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const themeColor = mcfg.hudSkillBarColor || mcfg.themeColor || f.color || '#A31D24';
     const skills = [];
 
-    // Skill 1: Chains of Domination (Shihai no Kusari)
+    // 1. Primary: "Bang!"
+    const enableBang = mcfg.enableBang ?? true;
+    if (enableBang) {
+      const bangMax = f.bangCooldownMax || mcfg.bangCooldown || 44;
+      const bangTimer = f.bangCooldown !== undefined ? f.bangCooldown : 0;
+      const bangPct = Math.max(0, Math.min(100, (1 - (bangTimer / bangMax)) * 100));
+      const bangReady = bangPct >= 99;
+      skills.push({
+        id: 'bang',
+        pct: bangPct,
+        ready: bangReady,
+        color: themeColor,
+        label: bangReady ? 'BANG! (READY)' : 'BANG!'
+      });
+    }
+
+    // 2. Skill 1: Chains of Domination (Shihai no Kusari)
+    const enableSkill1 = mcfg.enableSkill1 ?? mcfg.enableChains ?? true;
     if (enableSkill1) {
-      const chainsMax = f.chainsCooldownMax || cfg.chainsCooldown || 540;
-      const chainsTimer = f.chainsCooldown !== undefined ? f.chainsCooldown : 0;
-      let chainsPct = Math.max(0, Math.min(100, (1 - (chainsTimer / chainsMax)) * 100));
-      if (f.isChainingActive) chainsPct = 100;
-      skills.push({ id: 'chains', pct: chainsPct, ready: chainsPct >= 99, color: themeColor, label: 'CONTROL CHAINS' });
+      if (f.isChainingActive) {
+        skills.push({
+          id: 'chains',
+          pct: 100,
+          ready: false,
+          color: themeColor,
+          label: 'CHAINS (ACTIVE)'
+        });
+      } else {
+        const chainsMax = f.chainsCooldownMax || mcfg.chainsCooldown || 540;
+        const chainsTimer = f.chainsCooldown !== undefined ? f.chainsCooldown : 0;
+        const chainsPct = Math.max(0, Math.min(100, (1 - (chainsTimer / chainsMax)) * 100));
+        const chainsReady = chainsPct >= 99;
+        skills.push({
+          id: 'chains',
+          pct: chainsPct,
+          ready: chainsReady,
+          color: themeColor,
+          label: chainsReady ? 'CHAINS (READY)' : 'CHAINS OF DOMINATION'
+        });
+      }
     }
 
-    // Skill 2: Angel's Armory (1000-Year Holy Spear)
-    if (enableSkill2) {
-      const angelMax = f.angelCooldownMax || cfg.angelCooldown || 810;
-      const angelTimer = f.angelCooldown !== undefined ? f.angelCooldown : 0;
-      let angelPct = Math.max(0, Math.min(100, (1 - (angelTimer / angelMax)) * 100));
-      if (f.isSummoningSpear) angelPct = 100;
-      skills.push({ id: 'angel', pct: angelPct, ready: angelPct >= 99, color: themeColor, label: '1000-YEAR SPEAR' });
-    }
-
-    // Ultimate: Kyoto Shrine Ritual (Gravitational Splatter)
-    if (enableUlt) {
-      const shrineMax = f.shrineCooldownMax || cfg.shrineCooldown || 1920;
-      const shrineTimer = f.shrineCooldown !== undefined ? f.shrineCooldown : shrineMax;
-      let shrinePct = Math.max(0, Math.min(100, (1 - (shrineTimer / shrineMax)) * 100));
-      if (f.isExecutingRitual) shrinePct = 100;
-      skills.push({ id: 'shrine', pct: shrinePct, ready: shrinePct >= 99, color: themeColor, label: 'SHRINE COMPRESSION' });
-    }
-
-    // Passive Gauge: Citizen Contract Lives
+    // 3. Passive: Prime Minister Contract (Citizen Lives)
+    const enablePassive = mcfg.enableCitizenContract ?? mcfg.enablePassive ?? true;
     if (enablePassive) {
-      const lives = f.citizenLives !== undefined ? f.citizenLives : 5;
-      const citizenPct = Math.max(0, Math.min(100, (lives / (f.citizenLivesMax || 5)) * 100));
-      const citizenLabel = `CITIZEN LIVES (${lives}/5)`;
-      skills.push({ id: 'citizen', pct: citizenPct, ready: lives > 0, color: themeColor, label: citizenLabel });
+      if (f.isRevivingFromContract || f.isShatterReviving) {
+        const reviveMax = f.reviveStasisMax || 75;
+        const reviveElapsed = Math.max(0, reviveMax - (f.reviveStasisTimer || 0));
+        const revivePct = Math.max(0, Math.min(100, (reviveElapsed / reviveMax) * 100));
+        skills.push({
+          id: 'contract',
+          pct: revivePct,
+          ready: false,
+          color: themeColor,
+          label: 'REASSEMBLING (CONTRACT)'
+        });
+      } else {
+        const livesMax = f.citizenLivesMax || 5;
+        const livesCur = f.citizenLives !== undefined ? f.citizenLives : livesMax;
+        const livesPct = Math.max(0, Math.min(100, (livesCur / livesMax) * 100));
+        skills.push({
+          id: 'contract',
+          pct: livesPct,
+          ready: livesCur > 0,
+          color: themeColor,
+          label: livesCur > 0 ? `CONTRACT: ${livesCur} LIVES` : 'CONTRACT: EXHAUSTED'
+        });
+      }
+    }
+
+    // 4. Skill 2: Angel's Armory (1000-Year Holy Spear)
+    const enableSkill2 = mcfg.enableSkill2 ?? mcfg.enableAngelArmory ?? false;
+    if (enableSkill2) {
+      if (f.isSummoningSpear) {
+        skills.push({
+          id: 'angel',
+          pct: 100,
+          ready: false,
+          color: themeColor,
+          label: '1000-YR SPEAR (SUMMONING)'
+        });
+      } else {
+        const angelMax = f.angelCooldownMax || mcfg.angelCooldown || 810;
+        const angelTimer = f.angelCooldown !== undefined ? f.angelCooldown : 0;
+        const angelPct = Math.max(0, Math.min(100, (1 - (angelTimer / angelMax)) * 100));
+        const angelReady = angelPct >= 99;
+        skills.push({
+          id: 'angel',
+          pct: angelPct,
+          ready: angelReady,
+          color: themeColor,
+          label: angelReady ? 'ANGEL ARMORY (READY)' : 'ANGEL\'S ARMORY'
+        });
+      }
+    }
+
+    // 5. Ultimate: Kyoto Shrine Ritual (Gravitational Splatter)
+    const enableUlt = mcfg.enableUltimate ?? mcfg.enableShrine ?? false;
+    if (enableUlt) {
+      if (f.isExecutingRitual) {
+        skills.push({
+          id: 'shrine',
+          pct: 100,
+          ready: false,
+          color: themeColor,
+          label: 'RITUAL (EXECUTING)'
+        });
+      } else {
+        const shrineMax = f.shrineCooldownMax || mcfg.shrineCooldown || 1920;
+        const shrineTimer = f.shrineCooldown !== undefined ? f.shrineCooldown : shrineMax;
+        const shrinePct = Math.max(0, Math.min(100, (1 - (shrineTimer / shrineMax)) * 100));
+        const shrineReady = shrinePct >= 99;
+        skills.push({
+          id: 'shrine',
+          pct: shrinePct,
+          ready: shrineReady,
+          color: themeColor,
+          label: shrineReady ? 'KYOTO RITUAL (READY)' : 'KYOTO SHRINE RITUAL'
+        });
+      }
     }
 
     return skills;

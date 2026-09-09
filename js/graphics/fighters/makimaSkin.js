@@ -696,47 +696,7 @@ function _drawShatteredMakimaSkin(ctx, fighter, r, now) {
   const particles = fighter.bloodParticles || fighter.shatteredPieces || [];
 
   // ─────────────────────────────────────────────
-  // 1. CORE SACRIFICIAL BLOOD POOL & DEVIL'S CONCENTRIC EYE
-  // ─────────────────────────────────────────────
-  // A dark visceral blood core at (0, 0) into which the blood shatters return
-  const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.95);
-  coreGrad.addColorStop(0, '#FFFFFF');
-  coreGrad.addColorStop(0.20, 'rgba(245, 158, 11, 0.95)'); // Solar Gold Contract Filament
-  coreGrad.addColorStop(0.55, 'rgba(163, 29, 36, 0.80)');  // Velvet Makima Crimson
-  coreGrad.addColorStop(1.0, 'rgba(9, 10, 15, 0.0)');
-  ctx.fillStyle = coreGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.95, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Concentric Devil Eye Rings (CSM Control Devil Iris)
-  const eyeR = r * 0.52;
-  ctx.strokeStyle = '#F59E0B';
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.arc(0, 0, eyeR * 0.85, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = '#FBBF24';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.arc(0, 0, eyeR * 0.55, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = '#F59E0B';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, eyeR * 0.30, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Center pupil
-  ctx.fillStyle = '#880808';
-  ctx.beginPath();
-  ctx.arc(0, 0, eyeR * 0.15, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ─────────────────────────────────────────────
-  // 2. 60 PARTICLES REBUILDING MAKIMA'S BODY PIECE-BY-PIECE
+  // 60 PARTICLES REBUILDING MAKIMA'S BODY PIECE-BY-PIECE
   // ─────────────────────────────────────────────
   let landedCount = 0;
 

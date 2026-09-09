@@ -18,9 +18,9 @@ export class NormalFighter extends Fighter {
     super(def);
     this.lastAimAligned = false;
 
-    // Sharpshooter (was Crimson Sniper) Magazine system
     this.isSniper = (this._def?.id === 1);
     if (this.isSniper) {
+      this.aimTurnRate = 0.25;
       this.magazineBullets = CONFIG.normal.magazineSize;
       this.maxMagazine = CONFIG.normal.magazineSize;
       this.reloadTimer = 0;
@@ -215,15 +215,7 @@ export class NormalFighter extends Fighter {
     this.x += this.vx * moveMultiplier;
     this.y += this.vy * moveMultiplier;
     
-    if (this.isSniper && opponent) {
-      if (!this.isReloading) {
-        // Sharpshooter uses Target Lock: constantly track the opponent instead of spinning wildly
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        const diff = this.normalizeAngle(targetAngle - this.angle);
-        // Smoothly and quickly interpolate aiming angle (25% per frame)
-        this.angle += diff * 0.25;
-      }
-    } else {
+    if (!this.isSniper) {
       // Normal spinning behavior
       this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate) * spinMultiplier;
     }

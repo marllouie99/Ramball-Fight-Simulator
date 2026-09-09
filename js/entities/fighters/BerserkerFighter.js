@@ -129,7 +129,7 @@ export class BerserkerFighter extends Fighter {
     // Add random angle for madman swings (wider spread during rage)
     const randomSpread = this.isInRage ? Math.PI : Math.PI / 2; // +/- 90 degrees in rage, +/- 45 normally
     this.axeSwingAngle = baseAngle + (Math.random() - 0.5) * randomSpread;
-    this.gunAngle = this.axeSwingAngle;
+    this.applyAim(opponent, this.axeSwingAngle);
     this.axeWindupTimer = this.axeWindupDuration; // Brief wind-up before swing
     this.axeSwingActive = false; // Swing starts after wind-up
     this.axeSwingDuration = CONFIG.berserker.axeSwingDurationFrames ?? 24;

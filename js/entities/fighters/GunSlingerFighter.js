@@ -202,33 +202,32 @@ export class GunSlingerFighter extends Fighter {
   }
 
   aim(opponent, secondaryOpponent = null) {
-    if (!opponent) return;
-
-    let targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
-    if (opponent.isStealthed) {
-      let diff = targetAngle - (this.rightGunAngle || 0);
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      this.rightGunAngle = (this.rightGunAngle || 0) + diff * turnRate;
-    } else {
-      this.rightGunAngle = targetAngle; // Instant fast lock-on!
+    if (!this.canAim() || !this.isValidAimTarget(opponent)) {
+      return false;
     }
-    this.gunAngle = this.rightGunAngle;
 
-    if (secondaryOpponent) {
-      let secTargetAngle = Math.atan2(secondaryOpponent.y - this.y, secondaryOpponent.x - this.x);
+    super.aim(opponent);
+    this.rightGunAngle = this.gunAngle;
+
+    if (secondaryOpponent && this.isValidAimTarget(secondaryOpponent)) {
+      const secTargetAngle = Math.atan2(secondaryOpponent.y - this.y, secondaryOpponent.x - this.x);
+      let turnRate = 1.0;
       if (secondaryOpponent.isStealthed) {
-        let diff = secTargetAngle - (this.leftGunAngle || 0);
+        turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
+      }
+      if (turnRate < 1.0) {
+        let currentAngle = this.leftGunAngle !== undefined ? this.leftGunAngle : (this.angle || 0);
+        let diff = secTargetAngle - currentAngle;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        this.leftGunAngle = (this.leftGunAngle || 0) + diff * turnRate;
+        this.leftGunAngle = currentAngle + diff * turnRate;
       } else {
-        this.leftGunAngle = secTargetAngle; // Instant fast lock-on!
+        this.leftGunAngle = secTargetAngle;
       }
     } else {
       this.leftGunAngle = this.rightGunAngle;
     }
+    return true;
   }
 
   getTargets() {

@@ -183,7 +183,27 @@ export function isStandOffMode() {
  * Spawns a standard blood effect at the fighter's position upon taking damage.
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null, customOpts = null) {
-  if (amount <= 0 || !fighter) return;
+  // Support both spawnBloodEffect(entity, amount, damageAngle, customOpts)
+  // and legacy/direct coordinate format spawnBloodEffect(x, y, amount, colorOrOpts, damageAngle)
+  let entity = fighter;
+  let dmgAmount = amount;
+  let angle = damageAngle;
+  let opts = customOpts;
+
+  if (typeof fighter === 'number' && typeof amount === 'number') {
+    entity = { x: fighter, y: amount, r: 25 };
+    dmgAmount = typeof damageAngle === 'number' ? damageAngle : 10;
+    if (typeof customOpts === 'string') {
+      opts = { color: customOpts };
+    } else if (typeof customOpts === 'object' && customOpts !== null) {
+      opts = customOpts;
+    } else {
+      opts = null;
+    }
+    angle = null;
+  }
+
+  if (dmgAmount <= 0 || !entity) return;
   if (!state.bloodEffects) state.bloodEffects = [];
   const isStandOff = isStandOffMode();
   const isFFA = state && state.mode === GAME_MODES.FFA;
@@ -196,13 +216,13 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null, custo
 
   const isTactical = (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().includes('tactical')));
   const tacticalEnabled = (CONFIG && CONFIG.tactical && CONFIG.tactical.enableThemeColoredBlood !== false);
-  const targetColor = (customOpts && customOpts.color) || (fighter && (fighter.color || fighter.themeColor || (fighter._def && fighter._def.color)));
+  const targetColor = (opts && opts.color) || (entity && (entity.color || entity.themeColor || (entity._def && entity._def.color)));
 
   let bloodPalette;
-  if (customOpts && Array.isArray(customOpts.palette)) {
-    bloodPalette = customOpts.palette.map(parseColorToHexNum);
-  } else if (customOpts && customOpts.color) {
-    bloodPalette = generateThemeBloodPalette(customOpts.color);
+  if (opts && Array.isArray(opts.palette)) {
+    bloodPalette = opts.palette.map(parseColorToHexNum);
+  } else if (opts && opts.color) {
+    bloodPalette = generateThemeBloodPalette(opts.color);
   } else if (isTactical && tacticalEnabled && targetColor) {
     bloodPalette = generateThemeBloodPalette(targetColor);
   } else {
@@ -216,15 +236,15 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null, custo
   const divisor = hitCfg.damageDivisor ?? 10.0;
   const minDrops = hitCfg.minDroplets ?? 2;
   const maxDrops = hitCfg.maxDroplets ?? 4;
-  const baseParticleCount = Math.max(minDrops, Math.min(maxDrops, Math.floor(amount / divisor) || minDrops));
-  const particleCount = (customOpts && customOpts.count !== undefined)
-    ? Math.max(1, Math.floor(customOpts.count * qualityMultiplier))
+  const baseParticleCount = Math.max(minDrops, Math.min(maxDrops, Math.floor(dmgAmount / divisor) || minDrops));
+  const particleCount = (opts && opts.count !== undefined)
+    ? Math.max(1, Math.floor(opts.count * qualityMultiplier))
     : Math.max(1, Math.floor(baseParticleCount * qualityMultiplier));
 
   // Blood MUST be authentic crimson red / dark blood, never washed-out white
-  const fx = typeof fighter.x === 'number' ? fighter.x : 0;
-  const fy = typeof fighter.y === 'number' ? fighter.y : 0;
-  const fr = typeof fighter.r === 'number' ? fighter.r : 25;
+  const fx = typeof entity.x === 'number' ? entity.x : 0;
+  const fy = typeof entity.y === 'number' ? entity.y : 0;
+  const fr = typeof entity.r === 'number' ? entity.r : 25;
 
   const arena = (state && state.arena) || (CONFIG && CONFIG.arena) || { x: 0, y: 0, width: 1200, height: 800 };
   const wallW = (arena && arena.wallWidth) || 4;

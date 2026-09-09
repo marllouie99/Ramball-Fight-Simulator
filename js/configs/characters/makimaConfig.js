@@ -19,7 +19,7 @@ export const makimaConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 1.0,
-  damage: 32,
+  damage: 100,
   cooldown: 100,
   projectileSpeedMultiplier: 1.0,
   ability: 'Control Devil & "Bang!"',
@@ -29,13 +29,13 @@ export const makimaConfig = {
   // ABILITY MASTER TOGGLE SWITCHES (true = Enabled, false = Disabled)
   // ──────────────────────────────────────────
   enableBang: true,                 // Master toggle for Primary Attack: "Bang!"
-  enableSkill1: 0,               // Master toggle for Skill 1: Chains of Domination (Shihai no Kusari)
+  enableSkill1: 1,               // Master toggle for Skill 1: Chains of Domination (Shihai no Kusari)
   enableSkill2: 0,               // Master toggle for Skill 2: Angel's Armory (1000-Year Holy Spear)
   enableUltimate: 0,             // Master toggle for Ultimate: Kyoto Shrine Ritual (Compression Splatter)
   enableCitizenContract: true,      // Master toggle for Passive 1: Prime Minister Contract & Shatter Revive
 
   // Passive 1: Prime Minister Contract (Citizen Redirection)
-  maxCitizenLives: 5,               // 5 citizen sacrifice stocks
+  maxCitizenLives: 3,               // 5 citizen sacrifice stocks
   citizenReviveHpPercent: 0.50,     // Revives with 50% Max HP
   citizenReviveDurationFrames: 75,  // 1.25s death shatter & magnetic reassembly duration
   citizenDamageReduction: 0.20,     // 20% passive damage reduction while stocks remain
@@ -43,7 +43,7 @@ export const makimaConfig = {
   citizenShockwaveKnockback: 24,    // Repel force
 
   // Primary Attack: "Bang!" (Lightning-Fast Full-Screen Invisible Beam)
-  bangDamage: 200,                   // Direct hit damage
+  bangDamage: 100,                   // Direct hit damage
   bangWallBounceDamage: 22,         // Bonus damage when slammed into arena walls
   bangKnockbackForce: 46,           // Massive directional knockback
   bangRange: 1600,                  // Full-screen lightning-fast beam reach
@@ -60,9 +60,12 @@ export const makimaConfig = {
   enableChains: true,               // Alias toggle for Skill 1
   chainsCooldown: 540,              // 9.0s (540 frames)
   chainsRange: 420,                 // Tether reach
+  chainsMinDistance: 175,           // Minimum leash distance to prevent enemies getting too close to Makima
   chainsDamage: 24,                 // Initial latch damage
   chainsBleedDps: 8,                // Internal bleeding DPS
-  chainsStasisFrames: 72,           // 1.2s target-only stasis lock (Rule 5)
+  chainsDuration: 240,              // 4.0s (240 frames) tether & stasis duration for enemy fighters
+  chainsDurationFrames: 500,        // Alias duration in frames for fighters
+  chainsStasisFrames: 240,          // Alias duration in frames for fighters
   chainsPullSpeed: 11.5,            // Speed targets are reeled toward Makima
   chainsMinionHijackDuration: 360,  // 6.0s duration when hijacking enemy clones/minions
 

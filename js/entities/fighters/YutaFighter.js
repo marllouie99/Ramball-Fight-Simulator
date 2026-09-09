@@ -131,7 +131,7 @@ export class YutaFighter extends Fighter {
 
   canAim() {
     if (this.hp <= 0 || this.isDead) return false;
-    if (this.isTargetOfAmbush || (this.timeStopTimer > 0)) return false;
+    if (this.isTargetOfAmbush || (this.timeStopTimer > 0 && !this.isChainedByMakima)) return false;
     const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
                      (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
                      (this.electricStunTimer && this.electricStunTimer > 0) ||

@@ -215,6 +215,7 @@ export class DopplegangerFighter extends Fighter {
 
     // Hit!
     this.swordSwingAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    this.applyAim(opponent, this.swordSwingAngle);
     this.swordSwingActive = true;
     this.swordSwingTimer = this.swordSwingDuration;
     this.swordCooldown = CONFIG.doppleganger.swordCooldown;

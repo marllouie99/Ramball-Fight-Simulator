@@ -125,71 +125,7 @@ export function drawYujiSkin(ctx, fighter) {
     }
   }
 
-  // ── Soul Swap Swirling Rotating Crimson Energy Rings - Optimized to eliminate nested save/restore ──
-  if (fighter.soulSwapActive && !isLowQuality) {
-    const time = now;
-    const ringRotation = time * 0.005;
-    const ringRadius = r * 1.35; // slightly larger than body
 
-    ctx.save();
-    ctx.rotate(ringRotation);
-
-    // Draw 2-3 counter-rotating crimson/red elliptical rings (reduced in low quality)
-    const ringCount = isLowQuality ? 2 : 3;
-    for (let i = 0; i < ringCount; i++) {
-      ctx.beginPath();
-      ctx.ellipse(0, 0, ringRadius, ringRadius * (0.22 + i * 0.06), 0, 0, Math.PI * 2);
-      
-      // Outer glow outline
-      ctx.strokeStyle = `rgba(230, 0, 10, 0.45)`;
-      ctx.lineWidth = 4 - i * 0.8;
-      ctx.stroke();
-
-      // Inner sharp core
-      ctx.strokeStyle = `rgba(255, 30, 0, 0.85)`;
-      ctx.lineWidth = 1.8 - i * 0.3;
-      ctx.stroke();
-
-      ctx.rotate(Math.PI / 3);
-    }
-    ctx.restore();
-  }
-
-  // ── Soul Swap transformation transition effect (concentric shockwaves) ──
-  if (fighter.soulSwapTransitionTimer > 0) {
-    const progress = 1.0 - (fighter.soulSwapTransitionTimer / 45); // 0 to 1
-    
-    // Draw expanding shockwaves (fewer waves in performance/low quality mode)
-    const wavesCount = isLowQuality ? 1 : 3;
-    for (let i = 0; i < wavesCount; i++) {
-      const p = (progress + i * 0.3) % 1.0;
-      const radius = r + (p * 70); // expand up to r + 70px
-      const alpha = 1.0 - p;
-      
-      ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(180, 0, 0, ${alpha * 0.8})`;
-      ctx.lineWidth = 4 + (1 - p) * 6;
-      ctx.stroke();
-      
-      // Draw crackling black electric sparks radiating outward along the wave radius (skipped in low quality)
-      if (!isLowQuality) {
-        ctx.strokeStyle = `rgba(15, 15, 15, ${alpha * 0.9})`;
-        ctx.lineWidth = 2.0;
-        ctx.beginPath();
-        for (let j = 0; j < 8; j++) {
-          const angle = (Math.PI / 4) * j + p * 3.5;
-          const sx = Math.cos(angle) * (radius - 8);
-          const sy = Math.sin(angle) * (radius - 8);
-          const ex = Math.cos(angle) * (radius + 8);
-          const ey = Math.sin(angle) * (radius + 8);
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(ex, ey);
-        }
-        ctx.stroke();
-      }
-    }
-  }
 
   const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
   ctx.rotate(angle);

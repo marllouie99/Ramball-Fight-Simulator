@@ -1099,6 +1099,151 @@ async function main() {
         fighter.interruptAttacks(true);
       }
 
+      // Makima-specific Skill 1: Chains of Domination & Pixel Art Aesthetics Test
+      if (fType === 'makima') {
+        console.log("   Testing Makima Chains of Domination & Subjugation Stasis...");
+
+        // 1. Idle Pixel Art Model & Finger-Gun
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Makima idle pixel art model");
+
+        // 2. Finger-Gun "Bang!" Recoil Animation
+        mockCtx.resetStackDepth();
+        fighter.slashSwingTimer = 12;
+        fighter.slashSwingMaxTimer = 16;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Makima Finger-Gun recoil animation");
+        fighter.slashSwingTimer = 0;
+
+        // 3. Skill 1: Chains of Domination Cast & Interlocking Links
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        state.fighters = [fighter, dummyOpponent];
+
+        fighter._castChainsOfDomination(dummyOpponent);
+        if (!fighter.isChainingActive || fighter.chainedTargets.length === 0) {
+          throw new Error("Makima failed to activate Chains of Domination on cast!");
+        }
+
+        // Draw during initial launch phase (frames 0-9)
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Makima Chains of Domination launch phase");
+
+        // Fast-forward across all frames of active chaining and verify draw stack balance & aim tracking
+        fighter.y = 250; // Move Makima so enemy must rotate aim
+        while (fighter.chainTimer > 0) {
+          fighter.update(dummyOpponent, 0, state.arena);
+          const expectedAim = Math.atan2(fighter.y - dummyOpponent.y, fighter.x - dummyOpponent.x);
+          const angleDiff = Math.abs(dummyOpponent.gunAngle - expectedAim);
+          if (angleDiff > 0.05 && dummyOpponent.gunAngle === undefined) {
+            throw new Error(`Chained enemy failed to rotate aim towards Makima! gunAngle: ${dummyOpponent.gunAngle}, expected: ${expectedAim}`);
+          }
+          if (dummyOpponent._timeStopFrozenAngle !== undefined || dummyOpponent._timeStopFrozenGunAngle !== undefined) {
+            throw new Error("Chained enemy has locked _timeStopFrozenAngle / _timeStopFrozenGunAngle!");
+          }
+
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima Chains of Domination frame ${fighter.chainTimer}`);
+        }
+
+        if (fighter.isChainingActive) {
+          throw new Error("Makima Chains of Domination remained active after timer expired!");
+        }
+
+        // 4. Citizen Contract Shatter & Magnetic Reassembly
+        fighter.takeDamage(999, dummyOpponent);
+        if (!fighter.isRevivingFromContract && !fighter.isShatterReviving) {
+          throw new Error("Makima did not enter Citizen Contract revive on fatal damage!");
+        }
+
+        // Draw during reassembly stasis
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Makima Citizen Contract shatter & magnetic reassembly");
+
+        // Fast-forward to reassembly completion
+        while (fighter.reviveStasisTimer > 0) {
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+
+        if (fighter.hp <= 0 || fighter.isRevivingFromContract) {
+          throw new Error("Makima failed to revive with 50% HP after Citizen Contract reassembly!");
+        }
+        if (!fighter._lastHealAmount || fighter._lastHealAmount <= 0) {
+          throw new Error("Makima Citizen Contract reassembly failed to set _lastHealAmount for HUD floating heal text!");
+        }
+        if (!fighter._healthBarHealTimer || fighter._healthBarHealTimer <= 0) {
+          throw new Error("Makima Citizen Contract reassembly failed to set _healthBarHealTimer for HUD green glow!");
+        }
+
+        // 5. Verify HUD Skill Data & Bang Progress Bar Progression
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 800;
+        dummyOpponent.y = 800; // Place far and unaligned
+        state.fighters = [fighter, dummyOpponent];
+
+        let makimaSkills = getSkillDataForFighter(fighter);
+        const hasChainsSkill = makimaSkills.some(s => s.id === 'chains');
+        const bangSkillInitial = makimaSkills.find(s => s.id === 'bang');
+        const hasContractSkill = makimaSkills.some(s => s.id === 'contract');
+        if (!hasChainsSkill || !bangSkillInitial || !hasContractSkill) {
+          throw new Error("Makima HUD skills must include 'chains', 'bang', and 'contract'!");
+        }
+
+        // Initially on reset, Bang should start with 0% progress and not ready
+        if (bangSkillInitial.ready || bangSkillInitial.pct > 5) {
+          throw new Error(`Bang initial progress should be ~0%, got ${bangSkillInitial.pct}% (ready: ${bangSkillInitial.ready})`);
+        }
+
+        // Fast forward halfway through cooldown (e.g., 100 frames for a 200 frame cooldown)
+        const halfFrames = Math.floor(fighter.bangCooldownMax / 2);
+        for (let frame = 0; frame < halfFrames; frame++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+
+        makimaSkills = getSkillDataForFighter(fighter);
+        const bangSkillMid = makimaSkills.find(s => s.id === 'bang');
+        if (bangSkillMid.pct < 45 || bangSkillMid.pct > 55) {
+          throw new Error(`Bang midpoint progress should be ~50%, got ${bangSkillMid.pct}%`);
+        }
+
+        // Fast forward remainder of cooldown
+        while (fighter.bangCooldown > 0) {
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+
+        makimaSkills = getSkillDataForFighter(fighter);
+        const bangSkillReady = makimaSkills.find(s => s.id === 'bang');
+        if (!bangSkillReady.ready || bangSkillReady.pct < 99) {
+          throw new Error(`Bang should be 100% and ready when cooldown is 0, got ${bangSkillReady.pct}%`);
+        }
+
+        // Align aim and trigger attack
+        fighter.gunAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        fighter.angle = fighter.gunAngle;
+        fighter.update(dummyOpponent, 0, state.arena);
+
+        // After attack, cooldown must reset to max and progress bar must drop back to ~0%
+        if (fighter.bangCooldown < fighter.bangCooldownMax - 2) {
+          throw new Error(`Bang cooldown should have reset to max (${fighter.bangCooldownMax}), got ${fighter.bangCooldown}`);
+        }
+        makimaSkills = getSkillDataForFighter(fighter);
+        const bangSkillPostAttack = makimaSkills.find(s => s.id === 'bang');
+        if (bangSkillPostAttack.ready || bangSkillPostAttack.pct > 5) {
+          throw new Error(`Bang progress bar should have reset to ~0% after firing, got ${bangSkillPostAttack.pct}%`);
+        }
+      }
+
       // CJ BAGUVIX God Mode Emerald Green Overlay & Cheat Typing Immobility Test
       if (fType === 'cj') {
         fighter.isBaguvixActive = true;

@@ -870,7 +870,7 @@ export class RubbickFighter extends Fighter {
     if (this.stolenType === 'laser' && this.stolenSkillCooldown <= 0) {
       if (opponent) {
         if (this.beamCharge === 0) {
-          this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+          this.aim(opponent);
           const chargeSound = getSkillEffectSound('solarchampion', 'lasercharge');
           if (chargeSound) this.playStolenSFX(chargeSound);
         }
@@ -949,7 +949,7 @@ export class RubbickFighter extends Fighter {
             const oldY = this.y;
             this.x = this.flurryTarget.x + Math.cos(angle) * dist;
             this.y = this.flurryTarget.y + Math.sin(angle) * dist;
-            this.gunAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+            this.aim(this.flurryTarget);
 
             if (!this.afterImages) this.afterImages = [];
             const teleportDist = Math.hypot(this.x - oldX, this.y - oldY);
@@ -1071,10 +1071,7 @@ export class RubbickFighter extends Fighter {
 
       // Aim at closest opponent
       if (opponent && !opponent.isDead) {
-        const dx = opponent.x - this.x;
-        const dy = (opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0));
-        this.gunAngle = Math.atan2(dy, dx);
-        this.angle = this.gunAngle;
+        this.aim(opponent);
       }
 
       // Continuous active Arcane Bolts punishment on time-stopped targets!
@@ -1497,7 +1494,7 @@ export class RubbickFighter extends Fighter {
       const dy = opponent.y - this.y;
       const distSq = dx * dx + dy * dy;
 
-      this.gunAngle = Math.atan2(dy, dx);
+      this.aim(opponent);
 
       // Ultimate: Spell Steal
       const rubbickCfg = CONFIG.rubbick || CONFIG.trickster;
@@ -1672,7 +1669,7 @@ export class RubbickFighter extends Fighter {
         if (!castedSpammable) {
           // Aim toward opponent before firing and triggering VFX
           if (opponent && !opponent.isDead) {
-            this.gunAngle = Math.atan2(opponent.y - (this.y - (this.z || 0)), opponent.x - this.x);
+            this.aim(opponent);
           }
 
           // Normal Arcane Bolt
@@ -1688,7 +1685,7 @@ export class RubbickFighter extends Fighter {
              this.attackSwingMaxTimer = this.attackSwingTimer;
              
              if (opponent && !opponent.isDead) {
-                this.gunAngle = Math.atan2(opponent.y - (this.y - (this.z || 0)), opponent.x - this.x);
+                this.aim(opponent);
              }
           } else if (this.stolenType === 'berserker') {
             // Apply Berserker Rage buffs to Arcane Bolt
@@ -1702,7 +1699,7 @@ export class RubbickFighter extends Fighter {
             this.attackSwingMaxTimer = this.attackSwingTimer;
             
             if (opponent && !opponent.isDead) {
-               this.gunAngle = Math.atan2(opponent.y - (this.y - (this.z || 0)), opponent.x - this.x);
+               this.aim(opponent);
             }
           }
           
@@ -1762,7 +1759,7 @@ export class RubbickFighter extends Fighter {
            if (opponent) {
              const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
              if (dist <= 250) {
-               this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+               this.aim(opponent);
                this.stolenWindUpTimer = 30; // 0.5 seconds wind-up
                skillCast = true;
              }
@@ -1774,7 +1771,7 @@ export class RubbickFighter extends Fighter {
            if (opponent) {
              const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
              if (dist <= (CONFIG.cronos.sphereActivationDistance || 120)) {
-               this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+               this.aim(opponent);
                this.stolenWindUpTimer = 30; // 0.5 seconds wind-up
                skillCast = true;
              }
@@ -1786,7 +1783,7 @@ export class RubbickFighter extends Fighter {
            if (opponent) {
              const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
              if (dist <= (CONFIG.ruby?.activePullRange || 200)) {
-               this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+               this.aim(opponent);
                this.stolenWindUpTimer = 30; // 0.5 seconds wind-up
                skillCast = true;
              }
@@ -1803,7 +1800,7 @@ export class RubbickFighter extends Fighter {
         // These are heavy skills! We will enter the wind-up phase first!
         if (this.stolenSkillCooldown <= 0) {
            if (opponent) {
-             this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+             this.aim(opponent);
            }
             this.stolenWindUpTimer = this.stolenType === 'normal' 
               ? (CONFIG.sharpshooter?.executeWindupFrames || 30) 
@@ -1956,7 +1953,7 @@ export class RubbickFighter extends Fighter {
         break;
       case 'gojo':
         if (opponent) {
-           this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+           this.aim(opponent);
         }
         const gojoDmgMult = getStolenMultiplier('gojo', 'damageMultiplier');
         const purpleDamage = (CONFIG.gojo?.purpleDamage || 70) * gojoDmgMult;
@@ -1984,7 +1981,7 @@ export class RubbickFighter extends Fighter {
         break;
       case 'gojo_red':
         if (opponent) {
-           this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+           this.aim(opponent);
         }
         const redDmgMult = getStolenMultiplier('gojo_red', 'damageMultiplier') || getStolenMultiplier('gojo', 'damageMultiplier');
         const redDamage = (CONFIG.gojo?.redDamage || 100) * redDmgMult;

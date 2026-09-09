@@ -205,8 +205,8 @@ export class StatusEffectsManager {
       this.fighter._timeStopOriginalDuration = frames;
       this.fighter.timeStopTimer = frames;
       
-      // Snapshot angles on fresh timeStop to lock orientation in place
-      if (currentRemaining <= 0) {
+      // Snapshot angles on fresh timeStop to lock orientation in place (unless chained by Makima)
+      if (currentRemaining <= 0 && !this.fighter.isChainedByMakima) {
         if (typeof this.fighter._timeStopFrozenAngle !== 'number') {
           this.fighter._timeStopFrozenAngle = this.fighter.angle;
         }
@@ -311,11 +311,13 @@ export class StatusEffectsManager {
     // Return true when time stop is active (and handled) to allow callers to short-circuit.
     if (fighter.timeStopTimer > 0) {
       fighter.timeStopTimer--;
-      if (typeof fighter._timeStopFrozenAngle === 'number') {
-        fighter.angle = fighter._timeStopFrozenAngle;
-      }
-      if (typeof fighter._timeStopFrozenGunAngle === 'number') {
-        fighter.gunAngle = fighter._timeStopFrozenGunAngle;
+      if (!fighter.isChainedByMakima) {
+        if (typeof fighter._timeStopFrozenAngle === 'number') {
+          fighter.angle = fighter._timeStopFrozenAngle;
+        }
+        if (typeof fighter._timeStopFrozenGunAngle === 'number') {
+          fighter.gunAngle = fighter._timeStopFrozenGunAngle;
+        }
       }
 
       // Continuously decrement skill & ultimate cooldowns while frozen (EXCEPT inside Gojo's Unlimited Void Domain)

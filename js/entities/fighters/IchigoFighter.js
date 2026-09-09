@@ -552,8 +552,7 @@ export class IchigoFighter extends Fighter {
       // Rule #3: Always update facing direction directly toward target upon flash-stepping and attacking
       const dx = this.shunpoTarget.x - this.x;
       const dy = this.shunpoTarget.y - this.y;
-      this.gunAngle = Math.atan2(dy, dx);
-      this.angle = this.gunAngle;
+      this.applyAim(this.shunpoTarget, Math.atan2(dy, dx));
       return;
     }
     super.aim(opponent);

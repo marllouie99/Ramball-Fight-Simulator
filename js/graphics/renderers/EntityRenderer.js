@@ -7,6 +7,7 @@ import { drawSketchyCircle } from './fighterRenderer.js';
 import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal, drawParalyzeEffect, drawMinionHealthBar } from '../statusEffects.js';
 import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 import { drawCursedRocks } from '../fighters/todoSkin.js';
+import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 
 let _sortedFightersBuffer = [];
 
@@ -428,7 +429,7 @@ export function drawFighters() {
       fighter.caughtInSaitamaFlurry
     );
 
-    if (isFighterStunned && !isParalyzedByMahito) {
+    if (isFighterStunned && !isParalyzedByMahito && !fighter.isChainedByMakima) {
       const dur = fighter.paralyzeTimer || fighter.timeStopTimer || fighter.electricStunTimer || fighter.hitStunTimer || 45;
       ctx.save();
       ctx.translate(fighter.x + shiverX, (fighter.y - (fighter.z || 0)) + shiverY);
@@ -437,6 +438,13 @@ export function drawFighters() {
       if (typeof state !== 'undefined' && state.frameCount !== undefined) {
         fighter._stunRenderedFrame = state.frameCount;
       }
+    }
+
+    // Makima Chains of Domination Body-Wrapping Chains & Subjugation Collar Overlay
+    if (fighter.isChainedByMakima && fighter._makimaChainer && fighter._makimaChainer.isChainingActive) {
+      ctx.save();
+      drawTargetChainsOverlay(ctx, fighter, fighter._makimaChainer);
+      ctx.restore();
     }
 
     // Embedded Mahito Bone Spikes attached to body
@@ -1380,11 +1388,18 @@ export function drawIllusions() {
       illusion.isTargetOfAmbush ||
       illusion.caughtInSaitamaFlurry
     );
-    if (isIllusionStunned) {
+    if (isIllusionStunned && !illusion.isChainedByMakima) {
       const dur = illusion.paralyzeTimer || illusion.timeStopTimer || illusion.electricStunTimer || illusion.hitStunTimer || 45;
       const isMahito = Boolean(illusion.isParalyzedByMahito);
       const color = isMahito ? '#A855F7' : '#FFEE58';
       drawParalyzeEffect(ctx, illusion.r || 25, isMahito, dur, color, illusion);
+    }
+
+    // Makima Chains of Domination Body-Wrapping Chains & Subjugation Collar Overlay
+    if (illusion.isChainedByMakima && illusion._makimaChainer && illusion._makimaChainer.isChainingActive) {
+      ctx.save();
+      drawTargetChainsOverlay(ctx, illusion, illusion._makimaChainer);
+      ctx.restore();
     }
 
     if (illusion._embeddedMahitoSpikes && illusion._embeddedMahitoSpikes.length > 0) {

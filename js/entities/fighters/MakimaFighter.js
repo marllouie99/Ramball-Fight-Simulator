@@ -16,6 +16,7 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SPEED_MULTIPLIER, MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawMakimaSkin } from '../../graphics/fighters/makimaSkin.js';
+import { drawMakimaChainsOfDomination } from '../../graphics/weapons/makimaWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { spawnDeathShatter } from '../../graphics/particles/deathShatterEffect.js';
@@ -61,6 +62,8 @@ export class MakimaFighter extends Fighter {
     // Primary: "Bang." (Supersonic Kinetic Shockwave)
     this.bangCooldownMax = cfg.bangCooldown || 44;
     this.bangCooldown = this.bangCooldownMax;
+    this.shootCooldownMax = this.bangCooldownMax;
+    this.shootCooldown = this.bangCooldownMax;
     this.activeBangBeams = [];
 
     // Aiming & Turn Rate (Controlled Aim Rotation — No Instant Snap Auto-Aim)
@@ -72,7 +75,7 @@ export class MakimaFighter extends Fighter {
     this.chainsCooldown = this.chainsCooldownMax;
     this.isChainingActive = false;
     this.chainTimer = 0;
-    this.chainMaxTimer = cfg.chainsStasisFrames || 72;
+    this.chainMaxTimer = cfg.chainsDuration || cfg.chainsDurationFrames || cfg.chainsStasisFrames || 240;
     this.chainedTargets = [];
 
     // Skill 2: Angel's Armory (1000-Year Holy Spear)
@@ -96,20 +99,45 @@ export class MakimaFighter extends Fighter {
   reset() {
     super.reset();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const hpRatio = cfg.maxHpRatio ?? 0.50;
+    const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
+    if (modeFixed) {
+      this.maxHp = Math.round(modeFixed * hpRatio);
+    } else {
+      this.maxHp = Math.round((this._def?.hp || 100) * (MODE_HP_MULTIPLIER[state.mode] || 1) * hpRatio);
+    }
+    this.hp = this.maxHp;
     this.citizenLives = this.citizenLivesMax || 5;
     this.isRevivingFromContract = false;
     this.isShatterReviving = false;
     this.reviveStasisTimer = 0;
     this.shatteredPieces = null;
+    this.bloodParticles = null;
     this.punchAnimTimer = 0;
     this.slashSwingTimer = 0;
-    this.bangCooldown = cfg.bangCooldown || 44;
-    this.chainsCooldown = cfg.chainsCooldown || 540;
-    this.angelCooldown = cfg.angelCooldown || 810;
-    this.shrineCooldown = cfg.shrineCooldown || 1920;
+    this.bangCooldownMax = cfg.bangCooldown || 44;
+    this.bangCooldown = this.bangCooldownMax;
+    this.shootCooldownMax = this.bangCooldownMax;
+    this.shootCooldown = this.bangCooldownMax;
+    this.chainsCooldownMax = cfg.chainsCooldown || 540;
+    this.chainsCooldown = this.chainsCooldownMax;
+    this.angelCooldownMax = cfg.angelCooldown || 810;
+    this.angelCooldown = this.angelCooldownMax;
+    this.shrineCooldownMax = cfg.shrineCooldown || 1920;
+    this.shrineCooldown = this.shrineCooldownMax;
+    if (this.chainedTargets) {
+      for (let t of this.chainedTargets) {
+        if (t) {
+          t.isChainedByMakima = false;
+          t._makimaChainer = null;
+          delete t._timeStopFrozenAngle;
+          delete t._timeStopFrozenGunAngle;
+        }
+      }
+    }
+    this.chainedTargets = [];
     this.isChainingActive = false;
     this.chainTimer = 0;
-    this.chainedTargets = [];
     this.isSummoningSpear = false;
     this.spearTimer = 0;
     this.activeHalberds = [];
@@ -208,12 +236,10 @@ export class MakimaFighter extends Fighter {
   }
 
   /**
-   * Overrides base Fighter.shoot() to trigger Makima's "Bang!" basic attack.
+   * Overrides base Fighter.shoot() to delegate to the AI combat loop with aim alignment.
    */
   shoot(ownerIndex) {
-    if (!this.canPerformBasicAttack()) return false;
-    this._castBangAttack();
-    return true;
+    return false;
   }
 
   /**
@@ -260,12 +286,17 @@ export class MakimaFighter extends Fighter {
         this.bloodParticles = null;
         this.hp = targetHp;
 
+        // Trigger HUD health bar floating heal bubble popup, green glow pulse, and shake
+        this._lastHealAmount = targetHp;
+        this._healthBarHealTimer = 35;
+        this._healthBarShakeTimer = 8;
+
         // Radiant reassembly flash & audio burst
-        spawnImpactFlash(this.x, this.y, '#FFFFFF', 45);
+        spawnImpactFlash(this.x, this.y, 45, '#FFFFFF');
         spawnSparks(this.x, this.y, 22, '#F59E0B');
         triggerGlobalScreenShake(12, 16);
         audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 0.85);
-        spawnFloatingText('REGENERATED (50% HP)', this.x, this.y - 32, '#10B981', 16);
+        spawnFloatingText(this.x, this.y - 32, `+${targetHp} (REGENERATED)`, '#10B981');
 
         // Radial compressional repel shockwave pushing nearby attackers away
         const repelR = (typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenShockwaveRadius) ? CONFIG.makima.citizenShockwaveRadius : 150;
@@ -287,7 +318,7 @@ export class MakimaFighter extends Fighter {
 
     if (this.hp <= 0) return;
 
-    // ── 3. ANIMATION TIMERS ──
+    // ── 3. ANIMATION & COOLDOWN TIMERS ──
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.punchAnimTimer <= 0 && this.slashSwingTimer <= 0) {
@@ -425,7 +456,7 @@ export class MakimaFighter extends Fighter {
         this._initShatteredPieces();
 
         // ── 2. SACRIFICIAL BLOOD SPLATTER & CITIZEN TRANSFER FX ──
-        spawnBloodEffect(this.x, this.y, 42, '#880000');
+        spawnBloodEffect(this, 42, null, { color: '#880000' });
         spawnSparks(this.x, this.y, 26, '#F59E0B');
         spawnImpactFlash(this.x, this.y, '#FFFFFF', 40);
         triggerGlobalScreenShake(14, 20);
@@ -435,9 +466,9 @@ export class MakimaFighter extends Fighter {
         audioSystem.playSFX('Assets/Sound Effects/Skills/rubbick-groundsmash.mp3', 0.85);
 
         // Floating texts for sacrificial citizen contract
-        spawnFloatingText('PRIME MINISTER CONTRACT', this.x, this.y - 50, '#F59E0B', 18);
+        spawnFloatingText(this.x, this.y - 50, 'PRIME MINISTER CONTRACT', '#F59E0B');
         const remLivesText = this.citizenLives === 1 ? '1 LIFE LEFT' : `${this.citizenLives} LIVES LEFT`;
-        spawnFloatingText(`-1 CITIZEN SACRIFICED (${remLivesText})`, this.x, this.y - 28, '#A31D24', 15);
+        spawnFloatingText(this.x, this.y - 28, `-1 CITIZEN SACRIFICED (${remLivesText})`, '#A31D24');
         return true;
       } else {
         // No citizen lives left: Makima dies normally
@@ -528,7 +559,7 @@ export class MakimaFighter extends Fighter {
         t.makimaKnockbackWindow = 35;
         t._makimaAttacker = this;
 
-        spawnBloodEffect(t.x, t.y, 18, '#880000');
+        spawnBloodEffect(t, 18, angle, { color: '#880000' });
         spawnImpactFlash(t.x, t.y, '#F59E0B', 26);
         spawnFloatingText('BANG!', t.x, t.y - 28, '#F59E0B', 18);
       }
@@ -539,23 +570,55 @@ export class MakimaFighter extends Fighter {
    * Skill 1: Chains of Domination (Shihai no Kusari)
    */
   _castChainsOfDomination(primaryTarget) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    this.chainMaxTimer = cfg.chainsDuration || cfg.chainsDurationFrames || cfg.chainsStasisFrames || this.chainMaxTimer || 240;
     this.chainsCooldown = this.chainsCooldownMax;
     this.isChainingActive = true;
     this.chainTimer = this.chainMaxTimer;
     this.chainedTargets = [];
 
+    const range = cfg.chainsRange || 420;
+    const initialDamage = cfg.chainsDamage || 24;
+
+    // SFX: Sharp metallic chain whip rattle + deep demonic gravity pull hum
+    audioSystem.playSFX('Assets/Sound Effects/Skills/hookchain.mp3', 0.90);
+    audioSystem.playSFX('Assets/Sound Effects/Skills/gravitypull.mp3', 0.65);
+
+    // Casting shockwave & sparks at Makima
+    triggerGlobalScreenShake(7, 12);
+    spawnSparks(this.x, this.y, 16, '#F59E0B');
+    spawnImpactFlash(this.x, this.y, '#F59E0B', 28);
+    spawnFloatingText('DOMINATION CHAINS', this.x, this.y - 38, '#F59E0B', 16);
+
     const allTargets = this._getAllValidTargets();
     for (let t of allTargets) {
       const d = Math.hypot(t.x - this.x, t.y - this.y);
-      if (d <= 420) {
+      if (d <= range) {
         this.chainedTargets.push(t);
+        t.isChainedByMakima = true;
+        t._makimaChainer = this;
 
         // Apply hit-pause exclusively to target per Rule 5!
         if (typeof t.applyTimeStop === 'function') {
           t.applyTimeStop(this.chainMaxTimer);
         }
+        delete t._timeStopFrozenAngle;
+        delete t._timeStopFrozenGunAngle;
 
-        applyDamageToTarget(t, 24, this, 'curse');
+        // Allow target to aim towards Makima immediately
+        const aimAngle = Math.atan2(this.y - t.y, this.x - t.x);
+        if (typeof t.applyAim === 'function') {
+          t.applyAim(this, aimAngle);
+        } else if (typeof t.aim === 'function') {
+          t.aim(this);
+        } else {
+          t.gunAngle = aimAngle;
+          t.angle = aimAngle;
+        }
+
+        applyDamageToTarget(t, initialDamage, this, 'curse');
+        spawnSparks(t.x, t.y, 14, '#A31D24');
+        spawnImpactFlash(t.x, t.y, '#F59E0B', 26);
         spawnFloatingText('KNEEL', t.x, t.y - 28, '#A31D24', 15);
 
         // Subjugate illusions / clones to fight for Makima
@@ -572,27 +635,81 @@ export class MakimaFighter extends Fighter {
     this.chainTimer--;
     if (this.chainTimer <= 0) {
       this.isChainingActive = false;
+      for (let t of this.chainedTargets) {
+        if (t) {
+          t.isChainedByMakima = false;
+          t._makimaChainer = null;
+          delete t._timeStopFrozenAngle;
+          delete t._timeStopFrozenGunAngle;
+          if (!t.isDead && (t.hp === undefined || t.hp > 0)) {
+            spawnSparks(t.x, t.y, 8, '#F59E0B');
+            spawnImpactFlash(t.x, t.y, '#FFFFFF', 18);
+          }
+        }
+      }
       this.chainedTargets = [];
       return;
     }
 
-    // Pull tethered enemies toward Makima and apply bleed
-    for (let t of this.chainedTargets) {
-      if (!t || t.isDead || t.hp <= 0) continue;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const pullSpeed = cfg.chainsPullSpeed || 11.5;
+    const minDistance = cfg.chainsMinDistance || cfg.chainsTetherDistance || 175;
+    const bleedDmg = cfg.chainsBleedDps ? Math.max(2, Math.round(cfg.chainsBleedDps / 2)) : 4;
+
+    // Pull tethered enemies toward Makima (stopping at minDistance so they don't get too close)
+    for (let i = this.chainedTargets.length - 1; i >= 0; i--) {
+      const t = this.chainedTargets[i];
+      if (!t || t.isDead || (t.hp !== undefined && t.hp <= 0)) {
+        if (t) {
+          t.isChainedByMakima = false;
+          t._makimaChainer = null;
+          delete t._timeStopFrozenAngle;
+          delete t._timeStopFrozenGunAngle;
+        }
+        this.chainedTargets.splice(i, 1);
+        continue;
+      }
+
+      t.isChainedByMakima = true;
+      t._makimaChainer = this;
+      delete t._timeStopFrozenAngle;
+      delete t._timeStopFrozenGunAngle;
+
       const dx = this.x - t.x;
       const dy = this.y - t.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist > this.r + t.r + 15) {
-        const pullSpeed = 10.5;
-        t.x += (dx / dist) * pullSpeed;
-        t.y += (dy / dist) * pullSpeed;
+      if (dist > minDistance) {
+        // Reel the enemy in smoothly up to minDistance
+        const step = Math.min(pullSpeed, dist - minDistance);
+        t.x += (dx / dist) * step;
+        t.y += (dy / dist) * step;
+      }
+
+      // Allow enemy to rotate their aim to Makima (do not lock aim rotation)
+      const aimAngle = Math.atan2(this.y - t.y, this.x - t.x);
+      if (typeof t.applyAim === 'function') {
+        t.applyAim(this, aimAngle);
+      } else if (typeof t.aim === 'function') {
+        t.aim(this);
+      } else {
+        t.gunAngle = aimAngle;
+        t.angle = aimAngle;
+      }
+
+      // Arena boundary safety
+      if (state.arena) {
+        const tr = t.r || 25;
+        t.x = Math.max(state.arena.x + tr, Math.min(state.arena.x + state.arena.width - tr, t.x));
+        t.y = Math.max(state.arena.y + tr, Math.min(state.arena.y + state.arena.height - tr, t.y));
       }
 
       // Bleed tick every 15 frames
       if (this.chainTimer % 15 === 0) {
-        applyDamageToTarget(t, 4, this, 'bleed');
-        spawnBloodEffect(t.x, t.y, 4, '#8B0000');
+        applyDamageToTarget(t, bleedDmg, this, 'bleed');
+        spawnBloodEffect(t, bleedDmg, null, { color: '#8B0000' });
+        spawnSparks(t.x, t.y, 4, '#F59E0B');
+        audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.55);
       }
     }
   }
@@ -605,7 +722,7 @@ export class MakimaFighter extends Fighter {
     this.isSummoningSpear = true;
     this.spearTimer = this.spearMaxTimer;
     this.spearTarget = target;
-    spawnFloatingText('1000-YEAR SPEAR', this.x, this.y - 35, '#F59E0B', 16);
+    spawnFloatingText(this.x, this.y - 35, '1000-YEAR SPEAR', '#F59E0B');
   }
 
   _updateAngelSpearSummon() {
@@ -619,8 +736,8 @@ export class MakimaFighter extends Fighter {
         const ty = this.spearTarget.y;
 
         triggerGlobalScreenShake(14, 20);
-        spawnImpactFlash(tx, ty, '#FFFFFF', 45);
-        spawnSparks(tx, ty, '#F59E0B', 24);
+        spawnImpactFlash(tx, ty, 45, '#FFFFFF');
+        spawnSparks(tx, ty, 24, '#F59E0B');
 
         // 1000-Year Spear True Damage Impact
         const allTargets = this._getAllValidTargets();
@@ -630,7 +747,7 @@ export class MakimaFighter extends Fighter {
             applyDamageToTarget(t, 135, this, 'true');
             t.knockbackVx = ((t.x - tx) || 1) * 16;
             t.knockbackVy = ((t.y - ty) || 1) * 16;
-            spawnBloodEffect(t.x, t.y, 22, '#A31D24');
+            spawnBloodEffect(t, 22, null, { color: '#A31D24' });
           }
         }
       }
@@ -655,7 +772,7 @@ export class MakimaFighter extends Fighter {
       }
     }
 
-    spawnFloatingText('SHRINE COMPRESSION RITUAL', this.x, this.y - 40, '#A31D24', 18);
+    spawnFloatingText(this.x, this.y - 40, 'SHRINE COMPRESSION RITUAL', '#A31D24');
     triggerGlobalScreenShake(8, 16);
   }
 
@@ -671,14 +788,14 @@ export class MakimaFighter extends Fighter {
         const executeDmg = Math.round(maxHp * 0.45 + 280);
 
         applyDamageToTarget(t, executeDmg, this, 'true');
-        spawnBloodEffect(t.x, t.y, 45, '#770000');
-        spawnImpactFlash(t.x, t.y, '#A31D24', 60);
+        spawnBloodEffect(t, 45, null, { color: '#770000' });
+        spawnImpactFlash(t.x, t.y, 60, '#A31D24');
         triggerGlobalScreenShake(20, 30);
 
         if (t.hp <= 0 || t.hp <= maxHp * 0.25) {
           t.hp = 0;
           t.isDead = true;
-          spawnFloatingText('COMPRESSED', t.x, t.y - 30, '#880000', 20);
+          spawnFloatingText(t.x, t.y - 30, 'COMPRESSED', '#880000');
         }
       }
     }
@@ -742,7 +859,7 @@ export class MakimaFighter extends Fighter {
             const wallDmg = CONFIG.makima?.bangWallBounceDamage || 22;
             applyDamageToTarget(t, wallDmg, this, 'impact');
             spawnImpactFlash(t.x, t.y, '#F59E0B', 30);
-            spawnBloodEffect(t.x, t.y, 22, '#880000');
+            spawnBloodEffect(t, 22, null, { color: '#880000' });
             spawnSparks(t.x, t.y, 14, '#F59E0B');
             triggerGlobalScreenShake(14, 16);
             spawnFloatingText('WALL PINNED!', t.x, t.y - 25, '#F59E0B', 18);
@@ -821,35 +938,22 @@ export class MakimaFighter extends Fighter {
     return Math.hypot(px - projX, py - projY) <= threshold;
   }
 
-  reset() {
-    super.reset();
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
-    const hpRatio = cfg.maxHpRatio ?? 0.50;
-    const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
-    if (modeFixed) {
-      this.maxHp = Math.round(modeFixed * hpRatio);
-    } else {
-      this.maxHp = Math.round((this._def?.hp || 100) * (MODE_HP_MULTIPLIER[state.mode] || 1) * hpRatio);
+  interruptAttacks(forceCancelAll = false) {
+    this.punchAnimTimer = 0;
+    this.slashSwingTimer = 0;
+    this.isShooting = false;
+    this.isSummoningSpear = false;
+    if (this.chainedTargets) {
+      for (let t of this.chainedTargets) {
+        if (t) {
+          t.isChainedByMakima = false;
+          t._makimaChainer = null;
+          delete t._timeStopFrozenAngle;
+          delete t._timeStopFrozenGunAngle;
+        }
+      }
+      this.chainedTargets = [];
     }
-    this.hp = this.maxHp;
-    this.citizenLives = this.citizenLivesMax;
-    this.isRevivingFromContract = false;
-    this.isShatterReviving = false;
-    this.reviveStasisTimer = 0;
-    this.shatteredPieces = null;
-    this.bloodParticles = null;
-    this.punchAnimTimer = 0;
-    this.slashSwingTimer = 0;
-    this.isShooting = false;
-    this.isSummoningSpear = false;
-    this.isChainingActive = false;
-  }
-
-  interruptAttacks() {
-    this.punchAnimTimer = 0;
-    this.slashSwingTimer = 0;
-    this.isShooting = false;
-    this.isSummoningSpear = false;
     this.isChainingActive = false;
   }
 
@@ -912,29 +1016,9 @@ export class MakimaFighter extends Fighter {
       ctx.restore();
     }
 
-    // 2. Draw Active Chains of Domination Tether Lines
-    if (this.isChainingActive && this.chainedTargets) {
-      ctx.save();
-      for (let t of this.chainedTargets) {
-        if (!t || t.isDead) continue;
-        const chainProgress = (Date.now() * 0.008);
-
-        ctx.strokeStyle = 'rgba(163, 29, 36, 0.85)';
-        ctx.lineWidth = 2.4;
-        ctx.setLineDash([6, 4]);
-        ctx.lineDashOffset = -chainProgress * 12;
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(t.x, t.y);
-        ctx.stroke();
-
-        // Inner glowing golden link core
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.90)';
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-      ctx.restore();
+    // 2. Draw Active Chains of Domination (Shihai no Kusari)
+    if (this.isChainingActive) {
+      drawMakimaChainsOfDomination(ctx, this);
     }
 
     // 3. Draw 1000-Year Holy Spear Summoning Overhead

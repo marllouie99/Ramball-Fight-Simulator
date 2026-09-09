@@ -391,7 +391,7 @@ export class YujiFighter extends Fighter {
       // ── PHASE 2: UNLEASH SLASH (AFTER LANDING) ──
       if (this.rapidSlashPhase === 'LANDED') {
         const directAngle = Math.atan2(ft.y - this.y, ft.x - this.x);
-        this.gunAngle = directAngle;
+        this.applyAim(ft, directAngle);
 
         const fi = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : (ownerIndex !== undefined ? ownerIndex : 0);
         const baseDamage = CONFIG.yuji?.punchDamage || 18;

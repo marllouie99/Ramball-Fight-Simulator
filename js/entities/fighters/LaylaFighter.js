@@ -19,6 +19,7 @@ export class LaylaFighter extends Fighter {
     super(def);
     
     // Ascending Power passive
+    this.aimTurnRate = 0.25;
     this.powerStacks = 0;
     this.maxStacks = CONFIG.layla.maxStacks || 10;
     this.stackTimer = 0;
@@ -342,8 +343,7 @@ export class LaylaFighter extends Fighter {
     
     // Face the target explicitly when starting the charge
     if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      this.angle = this.gunAngle;
+      this.aim(opponent);
     }
     
     spawnFloatingText(this.x, this.y - this.r - 25, 'DESTRUCTION RUSH!', '#00E5FF');
@@ -553,15 +553,6 @@ export class LaylaFighter extends Fighter {
 
     // Velocity recovery and movement
     this.applyMovementPhysics(speedMultiplier);
-
-    // Smooth target tracking (like Sharpshooter)
-    if (opponent) {
-      const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      const diff = this.normalizeAngle(targetAngle - this.angle);
-      this.angle += diff * 0.25;
-    } else {
-      this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
-    }
 
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);

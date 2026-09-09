@@ -428,7 +428,7 @@ export class MusashiFighter extends Fighter {
       }
 
       if (distSq <= rangeHit) {
-        this.gunAngle = Math.atan2(dy, dx);
+        this.aim(opponent);
         
         // 1. Niten Strike
         if (this.nitenCooldown <= 0 && !isAttacking) {
@@ -544,16 +544,17 @@ export class MusashiFighter extends Fighter {
       }
     }
     
-    // Face opponent or movement dir
+    // Face opponent or movement dir via master aim pipeline
     if (!isAttacking) {
-      if (opponent && actualSpeed < 1) {
-         this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      } else {
-         this.gunAngle = Math.atan2(this.vy, this.vx);
+      if (opponent) {
+        this.aim(opponent);
+      } else if (Math.hypot(this.vx, this.vy) > 0.1) {
+        const moveAngle = Math.atan2(this.vy, this.vx);
+        this.gunAngle = moveAngle;
+        this.angle = moveAngle;
       }
     }
     
-    this.angle += actualSpeed * CONFIG.spin.rate;
     this.resolveWallBounce(arena, opponent);
   }
 
