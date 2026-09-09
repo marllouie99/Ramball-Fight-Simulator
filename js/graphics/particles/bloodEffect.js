@@ -423,6 +423,94 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
 }
 
 /**
+ * Spawns natural angular-physics blood shatter particles when Makima shatters.
+ * High-velocity 360-degree radial blast with directional bias along the impact angle,
+ * natural ballistic parabolic arcs, air drag, and wall/floor collision physics.
+ */
+export function spawnMakimaBloodShatter(fighterOrX, optsOrY = {}, maybeAngle = null) {
+  if (fighterOrX === null || fighterOrX === undefined) return;
+  if (!state.bloodEffects) state.bloodEffects = [];
+
+  let fx = 0;
+  let fy = 0;
+  let fr = 25;
+  let impactAngle = null;
+
+  if (typeof fighterOrX === 'number') {
+    fx = fighterOrX;
+    fy = typeof optsOrY === 'number' ? optsOrY : 0;
+    impactAngle = typeof maybeAngle === 'number' ? maybeAngle : null;
+  } else if (fighterOrX && typeof fighterOrX === 'object') {
+    fx = typeof fighterOrX.x === 'number' ? fighterOrX.x : 0;
+    fy = typeof fighterOrX.y === 'number' ? fighterOrX.y : 0;
+    fr = typeof fighterOrX.r === 'number' ? fighterOrX.r : 25;
+    impactAngle = (typeof optsOrY === 'object' && optsOrY && optsOrY.angle !== undefined)
+      ? optsOrY.angle
+      : (typeof maybeAngle === 'number' ? maybeAngle : null);
+  } else {
+    return;
+  }
+
+  const arena = (state && state.arena) || (CONFIG && CONFIG.arena) || { x: 0, y: 0, width: 1200, height: 800 };
+  const wallW = (arena && arena.wallWidth) || 4;
+  const arenaLeft = arena.x + wallW;
+  const arenaRight = arena.x + arena.width - wallW;
+  const arenaTop = arena.y + wallW;
+  const arenaBottom = arena.y + arena.height - wallW;
+
+  const clampFx = Math.max(arenaLeft + 6, Math.min(arenaRight - 6, fx));
+  const clampFy = Math.max(arenaTop + 6, Math.min(arenaBottom - 6, fy));
+
+  const qualityMultiplier = state.qualityLevel || 1.0;
+  const particleCount = Math.max(18, Math.floor(34 * qualityMultiplier));
+
+  // Authentic Makima palette: deep coagulated dark red, velvet crimson, bright arterial, and solar gold
+  const bloodColors = [0x880808, 0xA31D24, 0xDC2626, 0x450A0A, 0x990000, 0xF59E0B];
+
+  for (let i = 0; i < particleCount; i++) {
+    // Natural angular distribution: Full 360-degree explosive burst with directional bias if impact angle is present
+    let angle;
+    if (impactAngle !== null && impactAngle !== undefined) {
+      if (i % 3 === 0) {
+        // Forward impact spray cone
+        angle = impactAngle + (Math.random() - 0.5) * (Math.PI * 0.65);
+      } else {
+        // Full radial shatter blast
+        angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.45;
+      }
+    } else {
+      // Complete uniform 360-degree angular distribution
+      angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.45;
+    }
+
+    // Dynamic speed range: fast explosive kinetic burst (5.5px to 14.5px per frame)
+    const speed = 5.5 + Math.random() * 9.0;
+    const size = 2.2 + Math.random() * 3.2; // Crisp pixel droplet size
+    const color = bloodColors[i % bloodColors.length];
+
+    // Natural upward ballistic kick based on angle
+    const upKick = (Math.sin(angle) < 0 ? 1.2 : 0.4) * (1.5 + Math.random() * 3.0);
+
+    const startX = Math.max(arenaLeft + size / 2, Math.min(arenaRight - size / 2, clampFx + (Math.random() - 0.5) * fr * 0.6));
+    const startY = Math.max(arenaTop + size / 2, Math.min(arenaBottom - size / 2, clampFy + (Math.random() - 0.5) * fr * 0.6));
+
+    addOrOverwriteBloodParticle({
+      x: startX,
+      y: startY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - upKick,
+      size: size,
+      numericColor: color,
+      life: 1.0,
+      decay: 0.007 + Math.random() * 0.005, // Lingers naturally on floor for ~2.5 to 3.5 seconds
+      airResistance: 0.965,
+      friction: 0.84,
+      onGround: false
+    }, 300);
+  }
+}
+
+/**
  * Spawns a visceral, directional crimson blood burst when Nanami unpauses from a 7:3 Ratio Severance.
  */
 export function spawnNanamiRatioBloodBurst(target, count = 16, angle = null) {

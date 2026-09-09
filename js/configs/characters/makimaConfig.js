@@ -36,7 +36,7 @@ export const makimaConfig = {
 
   // Passive 1: Prime Minister Contract (Citizen Redirection)
   maxCitizenLives: 3,               // 5 citizen sacrifice stocks
-  citizenReviveHpPercent: 0.50,     // Revives with 50% Max HP
+  citizenReviveHpPercent: 1.00,     // Revives with 50% Max HP
   citizenReviveDurationFrames: 75,  // 1.25s death shatter & magnetic reassembly duration
   citizenDamageReduction: 0.20,     // 20% passive damage reduction while stocks remain
   citizenShockwaveRadius: 150,      // Repel shockwave radius on revive
@@ -88,4 +88,82 @@ export const makimaConfig = {
   shrineExecuteThreshold: 0.25,     // Instant execute if target HP <= 25%
   shrineChannelFrames: 110,         // 1.83s cinematic execution sequence
   shrineStasisDuration: 120,        // All-enemy ritual stasis lock duration
+
+  // ──────────────────────────────────────────
+  // AUDIO CONFIGURATION, VOLUME & TIMING DELAYS (Organized same as Nanami)
+  // ──────────────────────────────────────────
+  sounds: {
+    // Primary Attack: "Bang!"
+    bangGunshot: 'Assets/Sound Effects/Skills/makima-bang.mp3',
+    bangWallPin: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+
+    // Passive 1: Prime Minister Contract & Shatter Reassembly
+    contractShatter: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    contractSmash: 'Assets/Sound Effects/Skills/rubbick-groundsmash.mp3',
+    contractReassemble: 'Assets/Sound Effects/Skills/enhance.mp3',
+    revertVoicelines: [
+      'Assets/Sound Effects/Skills/makima-revert-voiceline.mp3',
+      'Assets/Sound Effects/Skills/makima-revert-voiceline2.mp3',
+      'Assets/Sound Effects/Skills/makima-revert-voiceline3.mp3'
+    ],
+    revertVoiceline: 'Assets/Sound Effects/Skills/makima-revert-voiceline.mp3',
+
+    // Skill 1: Chains of Domination (Shihai no Kusari)
+    chainsHook: 'Assets/Sound Effects/Skills/hookchain.mp3',
+    chainsGravity: 'Assets/Sound Effects/Skills/gravitypull.mp3',
+    chainsBleed: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    chainVoicelines: [
+      'Assets/Sound Effects/Skills/makima-chain-voiceline1.mp3',
+      'Assets/Sound Effects/Skills/makima-chain-voiceline2.mp3',
+      'Assets/Sound Effects/Skills/makima-chain-voiceline3.mp3',
+      'Assets/Sound Effects/Skills/makima-chain-voiceline4.mp3'
+    ],
+    chainVoiceline: 'Assets/Sound Effects/Skills/makima-chain-voiceline1.mp3',
+
+    // Skill 2: Angel's Armory (1000-Year Holy Spear)
+    spearSummon: 'Assets/Sound Effects/Skills/woosh.mp3',
+    spearExplosion: 'Assets/Sound Effects/Attacks/explosion.mp3',
+
+    // Ultimate: Kyoto Shrine Ritual: Gravitational Splatter
+    shrineRitual: 'Assets/Sound Effects/Skills/shrine.mp3',
+    shrineSplatter: 'Assets/Sound Effects/Attacks/groundSmash.mp3'
+  },
+  soundVolumes: {
+    bangGunshot: 1.50,
+    bangWallPin: 0.85,
+    contractShatter: 0.95,
+    contractSmash: 0.85,
+    contractReassemble: 0.85,
+    revertVoicelines: 3.5,
+    revertVoiceline: 3.5,
+    chainsHook: 0.90,
+    chainsGravity: 0.65,
+    chainsBleed: 0.55,
+    chainVoicelines: 3.5,
+    chainVoiceline: 3.5,
+    spearSummon: 0.85,
+    spearExplosion: 1.00,
+    shrineRitual: 1.20,
+    shrineSplatter: 1.30
+  },
+  soundChances: {
+    revertVoiceline: 1.0, // 100% chance to play one of Makima's revert voicelines upon reassembling
+    chainVoiceline: 1.0 // 100% chance to play one of Makima's chain voicelines when chaining an enemy
+  },
+  soundDelays: {
+    bangGunshot: 0,
+    bangWallPin: 0,
+    contractShatter: 0,
+    contractSmash: 0,
+    contractReassemble: 0,
+    revertVoiceline: 0,
+    chainsHook: 0,
+    chainsGravity: 0,
+    chainsBleed: 0,
+    chainVoiceline: 0,
+    spearSummon: 0,
+    spearExplosion: 0,
+    shrineRitual: 0,
+    shrineSplatter: 0
+  }
 };

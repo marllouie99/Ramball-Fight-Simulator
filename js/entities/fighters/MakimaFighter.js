@@ -18,7 +18,7 @@ import { MODE_SPEED_MULTIPLIER, MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../
 import { drawMakimaSkin } from '../../graphics/fighters/makimaSkin.js';
 import { drawMakimaChainsOfDomination } from '../../graphics/weapons/makimaWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
-import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
+import { spawnBloodEffect, spawnFatalBloodSplash, spawnMakimaBloodShatter } from '../../graphics/particles/bloodEffect.js';
 import { spawnDeathShatter } from '../../graphics/particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -254,6 +254,8 @@ export class MakimaFighter extends Fighter {
       return;
     }
 
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+
     // ── 2. CITIZEN CONTRACT SHATTER & REASSEMBLY STASIS HANDLING ──
     if (this.isRevivingFromContract || this.isShatterReviving) {
       this.reviveStasisTimer--;
@@ -295,8 +297,27 @@ export class MakimaFighter extends Fighter {
         spawnImpactFlash(this.x, this.y, 45, '#FFFFFF');
         spawnSparks(this.x, this.y, 22, '#F59E0B');
         triggerGlobalScreenShake(12, 16);
-        audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 0.85);
+        const reassembleSnd = cfg.sounds?.contractReassemble || 'Assets/Sound Effects/Skills/enhance.mp3';
+        const reassembleVol = cfg.soundVolumes?.contractReassemble ?? 0.85;
+        audioSystem.playSFX(reassembleSnd, reassembleVol);
         spawnFloatingText(this.x, this.y - 32, `+${targetHp} (REGENERATED)`, '#10B981');
+
+        // Play Makima Revert Voiceline (randomly selects from configured revert voicelines)
+        const revertSounds = cfg.sounds?.revertVoicelines || (cfg.sounds?.revertVoiceline ? [cfg.sounds.revertVoiceline] : [
+          'Assets/Sound Effects/Skills/makima-revert-voiceline.mp3',
+          'Assets/Sound Effects/Skills/makima-revert-voiceline2.mp3',
+          'Assets/Sound Effects/Skills/makima-revert-voiceline3.mp3'
+        ]);
+        const revertVoiceChance = cfg.soundChances?.revertVoiceline ?? 1.0;
+        if (revertSounds && revertSounds.length > 0 && Math.random() < revertVoiceChance) {
+          const selectedRevertVoice = revertSounds[Math.floor(Math.random() * revertSounds.length)];
+          const revertVoiceVol = cfg.soundVolumes?.revertVoicelines ?? cfg.soundVolumes?.revertVoiceline ?? 3.5;
+          if (typeof audioSystem.playFighterVoiceline === 'function') {
+            audioSystem.playFighterVoiceline(this, selectedRevertVoice, revertVoiceVol);
+          } else {
+            audioSystem.playSFX(selectedRevertVoice, revertVoiceVol);
+          }
+        }
 
         // Radial compressional repel shockwave pushing nearby attackers away
         const repelR = (typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenShockwaveRadius) ? CONFIG.makima.citizenShockwaveRadius : 150;
@@ -455,15 +476,23 @@ export class MakimaFighter extends Fighter {
         // Initialize shattered pieces for magnetic reassembly animation
         this._initShatteredPieces();
 
-        // ── 2. SACRIFICIAL BLOOD SPLATTER & CITIZEN TRANSFER FX ──
-        spawnBloodEffect(this, 42, null, { color: '#880000' });
+        // ── 2. NATURAL ANGLE PHYSICS BLOOD SHATTER & CITIZEN TRANSFER FX ──
+        const impactAngle = (attacker && typeof attacker.x === 'number')
+          ? Math.atan2(this.y - attacker.y, this.x - attacker.x)
+          : (opts && opts.angle !== undefined ? opts.angle : null);
+        spawnMakimaBloodShatter(this, { angle: impactAngle });
         spawnSparks(this.x, this.y, 26, '#F59E0B');
         spawnImpactFlash(this.x, this.y, '#FFFFFF', 40);
         triggerGlobalScreenShake(14, 20);
 
         // Audio: Deep flesh impact + heavy cinematic bass hit
-        audioSystem.playSFX('attack_fleshhit', 0.95);
-        audioSystem.playSFX('Assets/Sound Effects/Skills/rubbick-groundsmash.mp3', 0.85);
+        const shatterSnd = cfg.sounds?.contractShatter || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+        const shatterVol = cfg.soundVolumes?.contractShatter ?? 0.95;
+        audioSystem.playSFX(shatterSnd, shatterVol);
+
+        const smashSnd = cfg.sounds?.contractSmash || 'Assets/Sound Effects/Skills/rubbick-groundsmash.mp3';
+        const smashVol = cfg.soundVolumes?.contractSmash ?? 0.85;
+        audioSystem.playSFX(smashSnd, smashVol);
 
         // Floating texts for sacrificial citizen contract
         spawnFloatingText(this.x, this.y - 50, 'PRIME MINISTER CONTRACT', '#F59E0B');
@@ -471,7 +500,11 @@ export class MakimaFighter extends Fighter {
         spawnFloatingText(this.x, this.y - 28, `-1 CITIZEN SACRIFICED (${remLivesText})`, '#A31D24');
         return true;
       } else {
-        // No citizen lives left: Makima dies normally
+        // No citizen lives left: Makima dies normally with natural angle blood shatter
+        const impactAngle = (attacker && typeof attacker.x === 'number')
+          ? Math.atan2(this.y - attacker.y, this.x - attacker.x)
+          : (opts && opts.angle !== undefined ? opts.angle : null);
+        spawnMakimaBloodShatter(this, { angle: impactAngle });
         return super.takeDamage(effectiveAmount, attacker, opts);
       }
     }
@@ -512,7 +545,9 @@ export class MakimaFighter extends Fighter {
     });
 
     // Audio SFX: High-caliber crisp gunshot "Bang!"
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/desert-eagle-fire.mp3', 0.75);
+    const gunshotSnd = cfg.sounds?.bangGunshot || 'Assets/Sound Effects/Skills/makima-bang.mp3';
+    const gunshotVol = cfg.soundVolumes?.bangGunshot ?? 1.50;
+    audioSystem.playSFX(gunshotSnd, gunshotVol);
 
     // Kinetic muzzle shockwave & screen shake
     triggerGlobalScreenShake(8, 12);
@@ -580,9 +615,32 @@ export class MakimaFighter extends Fighter {
     const range = cfg.chainsRange || 420;
     const initialDamage = cfg.chainsDamage || 24;
 
-    // SFX: Sharp metallic chain whip rattle + deep demonic gravity pull hum
-    audioSystem.playSFX('Assets/Sound Effects/Skills/hookchain.mp3', 0.90);
-    audioSystem.playSFX('Assets/Sound Effects/Skills/gravitypull.mp3', 0.65);
+    // SFX: Sharp metallic chain whip rattle + deep demonic gravity pull hum from config
+    const hookSnd = cfg.sounds?.chainsHook || 'Assets/Sound Effects/Skills/hookchain.mp3';
+    const hookVol = cfg.soundVolumes?.chainsHook ?? 0.90;
+    audioSystem.playSFX(hookSnd, hookVol);
+
+    const gravSnd = cfg.sounds?.chainsGravity || 'Assets/Sound Effects/Skills/gravitypull.mp3';
+    const gravVol = cfg.soundVolumes?.chainsGravity ?? 0.65;
+    audioSystem.playSFX(gravSnd, gravVol);
+
+    // Play Makima Chain Voiceline (randomly selects from configured chain voicelines)
+    const chainSounds = cfg.sounds?.chainVoicelines || (cfg.sounds?.chainVoiceline ? [cfg.sounds.chainVoiceline] : [
+      'Assets/Sound Effects/Skills/makima-chain-voiceline1.mp3',
+      'Assets/Sound Effects/Skills/makima-chain-voiceline2.mp3',
+      'Assets/Sound Effects/Skills/makima-chain-voiceline3.mp3',
+      'Assets/Sound Effects/Skills/makima-chain-voiceline4.mp3'
+    ]);
+    const voiceChance = cfg.soundChances?.chainVoiceline ?? 1.0;
+    if (chainSounds && chainSounds.length > 0 && Math.random() < voiceChance) {
+      const selectedVoice = chainSounds[Math.floor(Math.random() * chainSounds.length)];
+      const voiceVol = cfg.soundVolumes?.chainVoicelines ?? cfg.soundVolumes?.chainVoiceline ?? 3.5;
+      if (typeof audioSystem.playFighterVoiceline === 'function') {
+        audioSystem.playFighterVoiceline(this, selectedVoice, voiceVol);
+      } else {
+        audioSystem.playSFX(selectedVoice, voiceVol);
+      }
+    }
 
     // Casting shockwave & sparks at Makima
     triggerGlobalScreenShake(7, 12);
@@ -709,7 +767,9 @@ export class MakimaFighter extends Fighter {
         applyDamageToTarget(t, bleedDmg, this, 'bleed');
         spawnBloodEffect(t, bleedDmg, null, { color: '#8B0000' });
         spawnSparks(t.x, t.y, 4, '#F59E0B');
-        audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.55);
+        const bleedSnd = cfg.sounds?.chainsBleed || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+        const bleedVol = cfg.soundVolumes?.chainsBleed ?? 0.55;
+        audioSystem.playSFX(bleedSnd, bleedVol);
       }
     }
   }
@@ -718,11 +778,16 @@ export class MakimaFighter extends Fighter {
    * Skill 2: Angel's Armory (1000-Year Holy Spear)
    */
   _castAngelArmory(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     this.angelCooldown = this.angelCooldownMax;
     this.isSummoningSpear = true;
     this.spearTimer = this.spearMaxTimer;
     this.spearTarget = target;
     spawnFloatingText(this.x, this.y - 35, '1000-YEAR SPEAR', '#F59E0B');
+
+    const summonSnd = cfg.sounds?.spearSummon || 'Assets/Sound Effects/Skills/woosh.mp3';
+    const summonVol = cfg.soundVolumes?.spearSummon ?? 0.85;
+    audioSystem.playSFX(summonSnd, summonVol);
   }
 
   _updateAngelSpearSummon() {
@@ -735,9 +800,14 @@ export class MakimaFighter extends Fighter {
         const tx = this.spearTarget.x;
         const ty = this.spearTarget.y;
 
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
         triggerGlobalScreenShake(14, 20);
         spawnImpactFlash(tx, ty, 45, '#FFFFFF');
         spawnSparks(tx, ty, 24, '#F59E0B');
+
+        const explosionSnd = cfg.sounds?.spearExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3';
+        const explosionVol = cfg.soundVolumes?.spearExplosion ?? 1.00;
+        audioSystem.playSFX(explosionSnd, explosionVol);
 
         // 1000-Year Spear True Damage Impact
         const allTargets = this._getAllValidTargets();
@@ -758,6 +828,7 @@ export class MakimaFighter extends Fighter {
    * Ultimate: Kyoto Shrine Ritual (Sacrificial Compression Splatter)
    */
   _castKyotoShrineRitual(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     this.shrineCooldown = this.shrineCooldownMax;
     this.isExecutingRitual = true;
     this.ritualTimer = this.ritualMaxTimer;
@@ -774,6 +845,10 @@ export class MakimaFighter extends Fighter {
 
     spawnFloatingText(this.x, this.y - 40, 'SHRINE COMPRESSION RITUAL', '#A31D24');
     triggerGlobalScreenShake(8, 16);
+
+    const ritualSnd = cfg.sounds?.shrineRitual || 'Assets/Sound Effects/Skills/shrine.mp3';
+    const ritualVol = cfg.soundVolumes?.shrineRitual ?? 1.20;
+    audioSystem.playSFX(ritualSnd, ritualVol);
   }
 
   _updateKyotoShrineRitual() {
@@ -787,10 +862,15 @@ export class MakimaFighter extends Fighter {
         const maxHp = t.maxHp || 400;
         const executeDmg = Math.round(maxHp * 0.45 + 280);
 
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
         applyDamageToTarget(t, executeDmg, this, 'true');
         spawnBloodEffect(t, 45, null, { color: '#770000' });
         spawnImpactFlash(t.x, t.y, 60, '#A31D24');
         triggerGlobalScreenShake(20, 30);
+
+        const splatterSnd = cfg.sounds?.shrineSplatter || 'Assets/Sound Effects/Attacks/groundSmash.mp3';
+        const splatterVol = cfg.soundVolumes?.shrineSplatter ?? 1.30;
+        audioSystem.playSFX(splatterSnd, splatterVol);
 
         if (t.hp <= 0 || t.hp <= maxHp * 0.25) {
           t.hp = 0;
@@ -863,7 +943,9 @@ export class MakimaFighter extends Fighter {
             spawnSparks(t.x, t.y, 14, '#F59E0B');
             triggerGlobalScreenShake(14, 16);
             spawnFloatingText('WALL PINNED!', t.x, t.y - 25, '#F59E0B', 18);
-            audioSystem.playSFX('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.85);
+            const wallPinSnd = CONFIG.makima?.sounds?.bangWallPin || 'Assets/Sound Effects/Attacks/groundSmash.mp3';
+            const wallPinVol = CONFIG.makima?.soundVolumes?.bangWallPin ?? 0.85;
+            audioSystem.playSFX(wallPinSnd, wallPinVol);
           }
         }
       }
