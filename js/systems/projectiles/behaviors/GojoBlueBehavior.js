@@ -48,11 +48,15 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       if (ownerIndex !== -1 && fi !== -1 && areOnSameTeam(ownerIndex, fi)) continue;
 
       const isChanneling = typeof f.isChannelingSkill === 'function' ? f.isChannelingSkill() : false;
-      if (!isChanneling && !f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
+      const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
+      if ((!isChanneling || isSaitamaCounter) && !f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
         const dx = p.x - f.x;
         const dy = p.y - f.y;
         const dist = Math.hypot(dx, dy);
         if (dist < pullRadius) {
+          if (isSaitamaCounter && typeof f.interruptAttacks === 'function') {
+            f.interruptAttacks(true);
+          }
           const isWallLingering = p.isWallLingering;
           if (dist > 0) {
             const pullStrength = isWallLingering ? 4.8 : 3.5;

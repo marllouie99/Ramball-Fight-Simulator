@@ -1999,6 +1999,9 @@ export class GojoFighter extends Fighter {
       const actVol = activateSound?.volume ?? (CONFIG.gojo?.soundVolumes?.domainActivate ?? 5.0);
       audioSystem.playSFX(actSrc, actVol);
     }
+
+    // Immediately freeze and interrupt channeling/counter skills on all entities in the arena
+    this._applyDomainEffect();
   }
 
   _applyDomainEffect() {
@@ -2010,9 +2013,13 @@ export class GojoFighter extends Fighter {
 
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
         if (true) { // Freeze EVERYONE (including teammates)
+          // If the target is channeling any skill or active counter (e.g. Saitama Serious Skill Counter), force cancel it immediately!
+          if (typeof f.interruptAttacks === 'function') {
+            f.interruptAttacks(true);
+          }
           // Absolute paralysis / brain overload from Unlimited Void
           if (typeof f.applyHitStun === 'function') {
-            f.applyHitStun(15);
+            f.applyHitStun(15, { isDomain: true, isUltimate: true });
           }
           if (typeof f.applyTimeStop === 'function') {
             f.applyTimeStop(15, { isDomain: true, isUltimate: true });
@@ -2043,10 +2050,11 @@ export class GojoFighter extends Fighter {
           }
           
           if (true) { // Freeze EVERYONE (including teammates' illusions)
-            if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15);
+            if (typeof ill.interruptAttacks === 'function') ill.interruptAttacks(true);
+            if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15, { isDomain: true, isUltimate: true });
             else ill.hitStunTimer = Math.max(ill.hitStunTimer || 0, 15);
 
-            if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(15);
+            if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(15, { isDomain: true, isUltimate: true });
             else ill.timeStopTimer = Math.max(ill.timeStopTimer || 0, 15);
 
             ill.vx = 0;

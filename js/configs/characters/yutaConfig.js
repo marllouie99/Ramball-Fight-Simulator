@@ -21,7 +21,10 @@ export const yutaConfig = {
   desc: 'Summons Rika to assist Yuta in fight and uses Authentic Mutual Love domain.',
 
   // Passive: Reverse Cursed Technique (RCT) & Passive Regeneration
-  regenRate: 0.05,                         // HP restored per frame passively
+  regenRate: 0.02,                         // HP restored per frame passively (Yuta alone: 1.2 HP/s)
+  rikaActiveRegenRate: 0.06,               // Base RCT healing rate per frame when Rika is active outside domain (~3.6 HP/s)
+  rikaActiveRegenMultiplier: 0.2,         // Regen multiplier applied when Rika is active outside domain
+  rikaActiveDamageMultiplier: 1.50,        // Damage multiplier applied when Rika is active outside domain
   rctRevivalHpThreshold: 0.05,             // Triggers RCT revival when HP drops to 5% or below
   rctRevivalHealPercent: 0.15,             // Percentage of max HP restored upon RCT revival
   rctRevivalDuration: 150,                 // Frames the revival heal process lasts (2.5 seconds at 60fps)
@@ -34,7 +37,7 @@ export const yutaConfig = {
 
   // Basic Attack: Katana Melee
   meleeCooldown: 36,                       // Frames between katana strikes
-  meleeRange: 70,                          // Katana blade length reach distance in pixels
+  meleeRange: 50,                          // Katana blade length reach distance in pixels
   meleeDamage: 15,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
   meleeKnockback: 6.5,                     // Outward push force on katana melee strike
@@ -103,8 +106,9 @@ export const yutaConfig = {
   domainRadius: 350,                       // Radius of the domain boundary in pixels
   domainCooldownReduction: 0.8,            // Technique cooldown reduction ratio inside domain (80% faster)
   domainRctHealRate: 0.90,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
-  domainRikaRegenMultiplier: 1.50,          // 2x RCT regen multiplier inside domain while Rika is alive
-  domainRikaDamageMultiplier: 1.50,         // 1.5x damage dealt multiplier inside domain while Rika is alive
+  domainRegenMultiplier: 2.0,              // Domain expansion baseline RCT regen multiplier (when Rika is absent)
+  domainRikaRegenMultiplier: 3.0,          // Total RCT regen multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
+  domainRikaDamageMultiplier: 3.0,         // Total damage dealt multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
   domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
 

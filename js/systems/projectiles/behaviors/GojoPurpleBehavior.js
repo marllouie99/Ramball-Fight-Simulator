@@ -180,13 +180,14 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const dist = Math.hypot(dx, dy);
         
         const isChanneling = typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill();
+        const isSaitamaCounter = Boolean(ent && (ent.characterId === 'saitama' || ent.type === 'saitama') && (ent.isCountering || (ent._counterPunchTimer && ent._counterPunchTimer > 0) || (ent._postCounterRecoveryTimer && ent._postCounterRecoveryTimer > 0)));
         if (dist > 0 && dist < trapRadius) {
           ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
           ent.isCaughtInPurple = true;
           // Complete paralysis debuff for non-channeling entities while caught in Hollow Purple gravitational vortex
-          if (!isChanneling) {
+          if (!isChanneling || isSaitamaCounter) {
             if (typeof ent.interruptAttacks === 'function') {
-              ent.interruptAttacks();
+              ent.interruptAttacks(true);
             }
             if (typeof ent.applyTimeStop === 'function') {
               ent.applyTimeStop(12, { isSkill: true, isUltimate: true, isPurple: true });

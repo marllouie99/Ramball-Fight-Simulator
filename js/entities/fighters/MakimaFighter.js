@@ -14,10 +14,11 @@
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { MODE_SPEED_MULTIPLIER } from '../../core/modeConfig.js';
+import { MODE_SPEED_MULTIPLIER, MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawMakimaSkin } from '../../graphics/fighters/makimaSkin.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
+import { spawnDeathShatter } from '../../graphics/particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
 export class MakimaFighter extends Fighter {
@@ -28,6 +29,16 @@ export class MakimaFighter extends Fighter {
     this.color = '#A31D24'; // Velvet Blood Crimson
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+
+    // In every game mode, Makima has 50% max HP based on the fixed HP in that game mode
+    const hpRatio = cfg.maxHpRatio ?? 0.50;
+    const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
+    if (modeFixed) {
+      this.maxHp = Math.round(modeFixed * hpRatio);
+    } else {
+      this.maxHp = Math.round((def?.hp || 100) * (MODE_HP_MULTIPLIER[state.mode] || 1) * hpRatio);
+    }
+    this.hp = this.maxHp;
 
     // Animation & Combat States
     this.punchAnimTimer = 0;
@@ -42,7 +53,10 @@ export class MakimaFighter extends Fighter {
     this.citizenLivesMax = cfg.maxCitizenLives || 5;
     this.citizenLives = this.citizenLivesMax;
     this.isRevivingFromContract = false;
+    this.isShatterReviving = false;
+    this.reviveStasisMax = cfg.citizenReviveDurationFrames || 75;
     this.reviveStasisTimer = 0;
+    this.shatteredPieces = null;
 
     // Primary: "Bang." (Supersonic Kinetic Shockwave)
     this.bangCooldownMax = cfg.bangCooldown || 44;
@@ -84,7 +98,9 @@ export class MakimaFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     this.citizenLives = this.citizenLivesMax || 5;
     this.isRevivingFromContract = false;
+    this.isShatterReviving = false;
     this.reviveStasisTimer = 0;
+    this.shatteredPieces = null;
     this.punchAnimTimer = 0;
     this.slashSwingTimer = 0;
     this.bangCooldown = cfg.bangCooldown || 44;
@@ -106,11 +122,73 @@ export class MakimaFighter extends Fighter {
   }
 
   isStationarySkillActive() {
-    return Boolean(this.isExecutingRitual || this.isSummoningSpear || this.isRevivingFromContract || super.isStationarySkillActive?.());
+    return Boolean(this.isExecutingRitual || this.isSummoningSpear || this.isRevivingFromContract || this.isShatterReviving || super.isStationarySkillActive?.());
+  }
+
+  isEffectivelyAlive() {
+    if (this.hp > 0 && !this.isDead) return true;
+    if (this.isRevivingFromContract || this.isShatterReviving) return true;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const enablePassive = cfg.enableCitizenContract ?? cfg.enablePassive ?? cfg.citizenContractEnabled ?? true;
+    if (enablePassive && this.citizenLives > 0) return true;
+    return false;
+  }
+
+  _initShatteredPieces() {
+    const r = this.r || 25;
+    const bloodParticles = [];
+    const count = 60;
+    const goldenAngle = 2.399963229728653; // Phyllotaxis golden angle (~137.5°)
+
+    for (let i = 0; i < count; i++) {
+      // Golden ratio spiral distribution evenly covers Makima's entire body circle
+      const normR = Math.sqrt((i + 0.5) / count);
+      const targetDist = normR * (r * 0.94);
+      const targetTheta = i * goldenAngle;
+      const targetX = Math.cos(targetTheta) * targetDist;
+      const targetY = Math.sin(targetTheta) * targetDist;
+
+      // Radial scatter explosion vector outward into the arena
+      const scatterAngle = targetDist > 1 ? Math.atan2(targetY, targetX) + (Math.random() - 0.5) * 0.35 : (i / count) * Math.PI * 2;
+      const scatterDist = r * (1.8 + Math.random() * 3.4); // 45px to 130px burst radius
+      const scatterX = Math.cos(scatterAngle) * scatterDist;
+      const scatterY = Math.sin(scatterAngle) * scatterDist;
+
+      const size = 2.0 + Math.random() * 3.5;          // 2.0px to 5.5px droplet radius
+      const speedMult = 0.85 + Math.random() * 0.30;
+      const delay = (i % 16) * 0.014;                  // cascading staggered return timing
+
+      // Palette of authentic arterial & cursed blood shades
+      let color;
+      const roll = i % 5;
+      if (roll === 0) color = '#880808';       // Dark arterial red
+      else if (roll === 1) color = '#A31D24';  // Velvet Makima crimson
+      else if (roll === 2) color = '#DC2626';  // Bright blood red
+      else if (roll === 3) color = '#450A0A';  // Deep coagulated blood
+      else color = '#F59E0B';                  // Solar gold contract essence droplet
+
+      bloodParticles.push({
+        targetX,
+        targetY,
+        scatterX,
+        scatterY,
+        size,
+        speedMult,
+        delay,
+        color,
+        hasLanded: false
+      });
+    }
+
+    this.shatteredPieces = bloodParticles;
+    this.bloodParticles = bloodParticles;
   }
 
   canPerformBasicAttack() {
-    if (this.isExecutingRitual || this.isSummoningSpear || this.isRevivingFromContract || this.isChainingActive) return false;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
+    if (!enableBang) return false;
+    if (this.isExecutingRitual || this.isSummoningSpear || this.isRevivingFromContract || this.isShatterReviving || this.isChainingActive) return false;
     return super.canPerformBasicAttack ? super.canPerformBasicAttack() : true;
   }
 
@@ -150,20 +228,71 @@ export class MakimaFighter extends Fighter {
       return;
     }
 
-    if (this.hp <= 0) return;
-
-    // Citizen Contract Revive Stasis Handling
-    if (this.isRevivingFromContract) {
+    // ── 2. CITIZEN CONTRACT SHATTER & REASSEMBLY STASIS HANDLING ──
+    if (this.isRevivingFromContract || this.isShatterReviving) {
       this.reviveStasisTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+
+      // Pulse sacrificial crimson cursed energy sparks
+      if (this.reviveStasisTimer % 4 === 0) {
+        spawnSparks(this.x + (Math.random() - 0.5) * 20, this.y + (Math.random() - 0.5) * 20, 2, 'crimsonSniper');
+      }
+
+      const elapsed = this.reviveStasisMax - this.reviveStasisTimer;
+      const targetHp = Math.round(this.maxHp * ((typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenReviveHpPercent) ? CONFIG.makima.citizenReviveHpPercent : 0.50));
+
+      // Revert Phase (frames 25 to 75): smoothly fill HP bar up to 50%
+      if (elapsed >= 25) {
+        const fillP = Math.max(0, Math.min(1.0, (elapsed - 25) / (this.reviveStasisMax - 25)));
+        this.hp = Math.round(targetHp * fillP);
+      } else {
+        this.hp = 0;
+      }
+
+      // Reassembly Complete: Snap whole model back to full form
       if (this.reviveStasisTimer <= 0) {
         this.isRevivingFromContract = false;
+        this.isShatterReviving = false;
+        this.shatteredPieces = null;
+        this.bloodParticles = null;
+        this.hp = targetHp;
+
+        // Radiant reassembly flash & audio burst
+        spawnImpactFlash(this.x, this.y, '#FFFFFF', 45);
+        spawnSparks(this.x, this.y, 22, '#F59E0B');
+        triggerGlobalScreenShake(12, 16);
+        audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 0.85);
+        spawnFloatingText('REGENERATED (50% HP)', this.x, this.y - 32, '#10B981', 16);
+
+        // Radial compressional repel shockwave pushing nearby attackers away
+        const repelR = (typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenShockwaveRadius) ? CONFIG.makima.citizenShockwaveRadius : 150;
+        const kbForce = (typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenShockwaveKnockback) ? CONFIG.makima.citizenShockwaveKnockback : 24;
+        const allTargets = this._getAllValidTargets();
+        for (let t of allTargets) {
+          const d = Math.hypot(t.x - this.x, t.y - this.y);
+          if (d < repelR && d > 0) {
+            const nx = (t.x - this.x) / d;
+            const ny = (t.y - this.y) / d;
+            t.knockbackVx = nx * kbForce;
+            t.knockbackVy = ny * kbForce;
+            applyDamageToTarget(t, 15, this, 'shockwave');
+          }
+        }
       }
-      return; // In brief stasis while contract transfers injury
+      return; // Early return while in stasis
     }
 
-    // ── 2. ANIMATION TIMERS ──
+    if (this.hp <= 0) return;
+
+    // ── 3. ANIMATION TIMERS ──
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
+    if (this.punchAnimTimer <= 0 && this.slashSwingTimer <= 0) {
+      this.isShooting = false;
+    }
     if (this.bangCooldown > 0) this.bangCooldown--;
     if (this.chainsCooldown > 0) this.chainsCooldown--;
     if (this.angelCooldown > 0) this.angelCooldown--;
@@ -176,7 +305,7 @@ export class MakimaFighter extends Fighter {
       if (beam.life <= 0) this.activeBangBeams.splice(i, 1);
     }
 
-    // ── 3. SKILL CHANNEL EXECUTION ──
+    // ── 4. SKILL CHANNEL EXECUTION ──
     if (this.isExecutingRitual) {
       this._updateKyotoShrineRitual();
       return;
@@ -191,37 +320,41 @@ export class MakimaFighter extends Fighter {
       this._updateChainsOfDomination();
     }
 
-    // ── 4. STANDARD FIGHTER PHYSICS & MOVEMENT ──
+    // ── 5. STANDARD FIGHTER PHYSICS & MOVEMENT ──
     super.update(opponent, fi, arena);
 
-    // ── 5. AI COMBAT & TARGET ACQUISITION ──
+    // ── 6. AI COMBAT & TARGET ACQUISITION ──
     const target = this._acquirePrimaryTarget(opponent);
     if (target) {
       this.aim(target);
 
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
-      // A. Ultimate: Kyoto Shrine Ritual Check
-      if (this.shrineCooldown <= 0 && (target.hp <= target.maxHp * 0.45 || this.hp <= this.maxHp * 0.50)) {
+      // A. Ultimate: Kyoto Shrine Ritual Check (Config Toggle: enableUltimate / enableShrine)
+      const enableUlt = cfg.enableUltimate ?? cfg.enableShrine ?? cfg.enableShrineRitual ?? true;
+      if (enableUlt && this.shrineCooldown <= 0 && (target.hp <= target.maxHp * 0.45 || this.hp <= this.maxHp * 0.50)) {
         this._castKyotoShrineRitual(target);
         return;
       }
 
-      // B. Skill 2: Angel's Armory (1000-Year Spear) Check
-      if (this.angelCooldown <= 0 && dist <= 600) {
+      // B. Skill 2: Angel's Armory (1000-Year Spear) Check (Config Toggle: enableSkill2 / enableAngelArmory)
+      const enableSkill2 = cfg.enableSkill2 ?? cfg.enableAngel ?? cfg.enableAngelArmory ?? cfg.enableThousandYearSpear ?? true;
+      if (enableSkill2 && this.angelCooldown <= 0 && dist <= 600) {
         this._castAngelArmory(target);
         return;
       }
 
-      // C. Skill 1: Chains of Domination Check
-      if (this.chainsCooldown <= 0 && dist <= 420 && !this.isChainingActive) {
+      // C. Skill 1: Chains of Domination Check (Config Toggle: enableSkill1 / enableChains)
+      const enableSkill1 = cfg.enableSkill1 ?? cfg.enableChains ?? cfg.enableChainsOfDomination ?? true;
+      if (enableSkill1 && this.chainsCooldown <= 0 && dist <= 420 && !this.isChainingActive) {
         this._castChainsOfDomination(target);
         return;
       }
 
-      // D. Primary Attack: "Bang!" (Lightning-Fast Full-Screen Beam)
-      // Must be aligned with target after smooth rotation before firing
-      if (this.bangCooldown <= 0 && dist <= 1600) {
+      // D. Primary Attack: "Bang!" (Config Toggle: enableBang / bangEnabled)
+      const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
+      if (enableBang && this.bangCooldown <= 0 && dist <= 1600) {
         if (this.isAimAlignedWithTarget(target)) {
           this._castBangAttack(target);
         }
@@ -261,40 +394,58 @@ export class MakimaFighter extends Fighter {
 
   /**
    * Passive: Contract with the Prime Minister.
-   * Intercepts fatal blows and transfers damage to Japan's citizen stocks.
+   * Intercepts fatal blows, shatters body, consumes 1 citizen stock, and magnetically reassembles with 50% HP.
    */
-  takeDamage(amount, attacker, damageType = 'physical') {
-    // 20% flat damage reduction while citizen lives remain
-    const effectiveAmount = (this.citizenLives > 0) ? amount * 0.80 : amount;
+  takeDamage(amount, attacker, opts = {}) {
+    if (this.isRevivingFromContract || this.isShatterReviving) return false;
 
-    if (this.hp - effectiveAmount <= 0 && this.citizenLives > 0) {
-      // Consume 1 Citizen Life Stock
-      this.citizenLives--;
-      this.hp = Math.round(this.maxHp * 0.40);
-      this.isRevivingFromContract = true;
-      this.reviveStasisTimer = 22;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const enablePassive = cfg.enableCitizenContract ?? cfg.enablePassive ?? cfg.citizenContractEnabled ?? true;
 
-      spawnFloatingText('CITIZEN REDIRECTION', this.x, this.y - 32, '#F59E0B', 16);
-      spawnBloodEffect(this.x, this.y, 18, '#880000');
-      triggerGlobalScreenShake(12, 18);
+    // 20% flat damage reduction while citizen lives remain (if passive is enabled)
+    const hasDamageReduction = enablePassive && this.citizenLives > 0;
+    const effectiveAmount = hasDamageReduction ? amount * 0.80 : amount;
 
-      // Radial compressional repel shockwave pushing nearby attackers away
-      const repelR = 140;
-      const allTargets = this._getAllValidTargets();
-      for (let t of allTargets) {
-        const d = Math.hypot(t.x - this.x, t.y - this.y);
-        if (d < repelR && d > 0) {
-          const nx = (t.x - this.x) / d;
-          const ny = (t.y - this.y) / d;
-          t.knockbackVx = nx * 22;
-          t.knockbackVy = ny * 22;
-          applyDamageToTarget(t, 15, this, 'shockwave');
-        }
+    if (this.hp - effectiveAmount <= 0) {
+      if (enablePassive && this.citizenLives > 0) {
+        // ── 1. CONSUME 1 CITIZEN LIFE & ENTER DEATH SHATTER STATE ──
+        this.citizenLives--;
+        this.hp = 0; // Empty HP bar at the moment of shattering!
+        this.isRevivingFromContract = true;
+        this.isShatterReviving = true;
+        this.reviveStasisMax = (typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenReviveDurationFrames) ? CONFIG.makima.citizenReviveDurationFrames : 75;
+        this.reviveStasisTimer = this.reviveStasisMax;
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+        this.interruptAttacks(true);
+
+        // Initialize shattered pieces for magnetic reassembly animation
+        this._initShatteredPieces();
+
+        // ── 2. SACRIFICIAL BLOOD SPLATTER & CITIZEN TRANSFER FX ──
+        spawnBloodEffect(this.x, this.y, 42, '#880000');
+        spawnSparks(this.x, this.y, 26, '#F59E0B');
+        spawnImpactFlash(this.x, this.y, '#FFFFFF', 40);
+        triggerGlobalScreenShake(14, 20);
+
+        // Audio: Deep flesh impact + heavy cinematic bass hit
+        audioSystem.playSFX('attack_fleshhit', 0.95);
+        audioSystem.playSFX('Assets/Sound Effects/Skills/rubbick-groundsmash.mp3', 0.85);
+
+        // Floating texts for sacrificial citizen contract
+        spawnFloatingText('PRIME MINISTER CONTRACT', this.x, this.y - 50, '#F59E0B', 18);
+        const remLivesText = this.citizenLives === 1 ? '1 LIFE LEFT' : `${this.citizenLives} LIVES LEFT`;
+        spawnFloatingText(`-1 CITIZEN SACRIFICED (${remLivesText})`, this.x, this.y - 28, '#A31D24', 15);
+        return true;
+      } else {
+        // No citizen lives left: Makima dies normally
+        return super.takeDamage(effectiveAmount, attacker, opts);
       }
-      return;
     }
 
-    super.takeDamage(effectiveAmount, attacker, damageType);
+    return super.takeDamage(effectiveAmount, attacker, opts);
   }
 
   /**
@@ -670,9 +821,34 @@ export class MakimaFighter extends Fighter {
     return Math.hypot(px - projX, py - projY) <= threshold;
   }
 
+  reset() {
+    super.reset();
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const hpRatio = cfg.maxHpRatio ?? 0.50;
+    const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
+    if (modeFixed) {
+      this.maxHp = Math.round(modeFixed * hpRatio);
+    } else {
+      this.maxHp = Math.round((this._def?.hp || 100) * (MODE_HP_MULTIPLIER[state.mode] || 1) * hpRatio);
+    }
+    this.hp = this.maxHp;
+    this.citizenLives = this.citizenLivesMax;
+    this.isRevivingFromContract = false;
+    this.isShatterReviving = false;
+    this.reviveStasisTimer = 0;
+    this.shatteredPieces = null;
+    this.bloodParticles = null;
+    this.punchAnimTimer = 0;
+    this.slashSwingTimer = 0;
+    this.isShooting = false;
+    this.isSummoningSpear = false;
+    this.isChainingActive = false;
+  }
+
   interruptAttacks() {
     this.punchAnimTimer = 0;
     this.slashSwingTimer = 0;
+    this.isShooting = false;
     this.isSummoningSpear = false;
     this.isChainingActive = false;
   }

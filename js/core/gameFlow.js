@@ -467,15 +467,20 @@ export function reinitFighters(isNewMatch = false) {
   if (state.mode === 'TLFS' && state.fighters[0]) {
     const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 500;
     if (!state.fighters[0].isTurret && !state.fighters[0].isMinion) {
-      state.fighters[0].maxHp = fixedHp;
-      state.fighters[0].hp = fixedHp;
+      const f = state.fighters[0];
+      const isMakima = (f.characterId === 'makima' || f.type === 'makima');
+      const hp = isMakima ? Math.round(fixedHp * 0.50) : fixedHp;
+      f.maxHp = hp;
+      f.hp = hp;
     }
   } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
     const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
     const soloFixedHp = MODE_SETTINGS[state.mode]?.soloFixedHp || 2000;
     state.fighters.forEach((f, idx) => {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
-        const hp = idx === 0 ? soloFixedHp : fixedHp;
+        const baseHp = idx === 0 ? soloFixedHp : fixedHp;
+        const isMakima = (f.characterId === 'makima' || f.type === 'makima');
+        const hp = isMakima ? Math.round(baseHp * 0.50) : baseHp;
         f.maxHp = hp;
         f.hp = hp;
       }
@@ -484,8 +489,10 @@ export function reinitFighters(isNewMatch = false) {
     const fixedHp = MODE_SETTINGS[state.mode].fixedHp;
     state.fighters.forEach((f) => {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
-        f.maxHp = fixedHp;
-        f.hp = fixedHp;
+        const isMakima = (f.characterId === 'makima' || f.type === 'makima');
+        const hp = isMakima ? Math.round(fixedHp * 0.50) : fixedHp;
+        f.maxHp = hp;
+        f.hp = hp;
       }
     });
   }

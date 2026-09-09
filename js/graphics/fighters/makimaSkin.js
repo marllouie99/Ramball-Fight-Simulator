@@ -26,6 +26,12 @@ export function drawMakimaSkin(ctx, fighter) {
   const r = fighter.r || 25;
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
 
+  // If Makima is currently shattered / reassembling from Citizen Contract
+  if (fighter.shatteredPieces && fighter.shatteredPieces.length > 0) {
+    _drawShatteredMakimaSkin(ctx, fighter, r, Date.now());
+    return;
+  }
+
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
@@ -38,22 +44,34 @@ export function drawMakimaSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // 3. Animation States & Recoil Tracking
-  const isShooting = !isPodiumPreview && (fighter.slashSwingTimer > 0 || fighter.punchAnimTimer > 0 || fighter.isShooting);
+  // 3. Animation States & Handgun Recoil Engine
+  const isShooting = !isPodiumPreview && ((fighter.slashSwingTimer && fighter.slashSwingTimer > 0) || (fighter.punchAnimTimer && fighter.punchAnimTimer > 0));
   let rawProgress = 0;
+  let recoilKickX = 0;
+  let recoilRiseY = 0;
+
   if (isShooting) {
     const maxT = fighter.slashSwingMaxTimer || fighter.punchMaxTime || 16;
-    const curTimer = fighter.slashSwingTimer > 0 ? fighter.slashSwingTimer : (fighter.punchAnimTimer > 0 ? fighter.punchAnimTimer : (fighter.shootTimer || 0));
+    const curTimer = fighter.slashSwingTimer > 0 ? fighter.slashSwingTimer : fighter.punchAnimTimer;
     rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (curTimer / maxT)));
+
+    // Smooth continuous recoil curve: rises smoothly in frames 0-4, cushions at apex, returns smoothly in frames 5-16
+    let recoilCurve = 0;
+    if (rawProgress < 0.25) {
+      const t = rawProgress / 0.25;
+      recoilCurve = Math.pow(Math.sin(t * Math.PI * 0.5), 1.6);
+    } else {
+      const t = (rawProgress - 0.25) / 0.75;
+      recoilCurve = Math.pow(Math.cos(t * Math.PI * 0.5), 2.0);
+    }
+
+    recoilKickX = -7.5 * recoilCurve;
+    recoilRiseY = -3.8 * recoilCurve;
   }
 
-  // Finger Gun dynamic forward aim & recoil kickback
-  const recoilCurve = isShooting ? Math.sin(rawProgress * Math.PI) : 0;
-  const lungeExtension = isShooting ? (Math.sin(rawProgress * Math.PI * 0.5) * (r * 0.38) - Math.pow(recoilCurve, 2) * (r * 0.22)) : 0;
-
-  // Hand Coordinates (Enlarged and stylishly anchored)
-  const frontX = r * 0.95 + lungeExtension;
-  const frontY = r * 0.04 - (recoilCurve * 4.0);
+  // Hand Coordinates (Rest position at r * 0.95, kicks back sharply on fire)
+  const frontX = r * 0.95 + recoilKickX;
+  const frontY = r * 0.04 + recoilRiseY;
   const backX = -r * 0.24;
   const backY = -r * 0.45;
 
@@ -343,23 +361,73 @@ export function drawMakimaPixelFingerGun(ctx, x, y, progress, r, isShooting) {
   const skinOutline = '#0E0F14';
   const skinHighlight = '#FFFFFF';
 
-  // Recoil upward pitch angle during shot
-  const recoilPitch = isShooting ? -Math.sin(progress * Math.PI) * 0.40 : 0;
+  // Recoil upward pitch angle & hammer dynamic snap during shot (Synchronized Smooth C1 Curve)
+  let recoilPitch = 0;
+  let hammerSnap = 0;
+  if (isShooting) {
+    let recoilCurve = 0;
+    if (progress < 0.25) {
+      const t = progress / 0.25;
+      recoilCurve = Math.pow(Math.sin(t * Math.PI * 0.5), 1.6);
+      hammerSnap = Math.sin(t * Math.PI) * 0.12;
+    } else {
+      const t = (progress - 0.25) / 0.75;
+      recoilCurve = Math.pow(Math.cos(t * Math.PI * 0.5), 2.0);
+      hammerSnap = 0;
+    }
+    recoilPitch = -0.28 * recoilCurve; // ~16° smooth muzzle climb
+  }
   ctx.rotate(recoilPitch);
 
-  // 1. Kinetic Muzzle Shockwave Pixels on Firing (Rule 11 Zero shadowBlur)
-  if (isShooting && progress < 0.65) {
-    const shockAlpha = (1.0 - (progress / 0.65));
+  // 1. Kinetic Muzzle Flash, Supersonic Shockwave & Gunsmoke (Rule 11 Zero shadowBlur)
+  if (isShooting) {
     const muzzleTipX = 24.0;
-    const shockDist = muzzleTipX + progress * 26;
+    // A. High-intensity muzzle flash star (Smooth fade over initial frames)
+    if (progress < 0.22) {
+      const flashAlpha = Math.pow(1.0 - (progress / 0.22), 1.5);
+      // Bright white-hot core
+      ctx.fillStyle = `rgba(255, 255, 255, ${(flashAlpha * 0.98).toFixed(3)})`;
+      ctx.fillRect(snap(muzzleTipX), snap(-2), P * 2, P * 2);
 
-    ctx.fillStyle = `rgba(245, 158, 11, ${(shockAlpha * 0.90).toFixed(3)})`;
-    ctx.fillRect(snap(shockDist), snap(-5), P, 10);
-    ctx.fillRect(snap(shockDist + 2), snap(-3), P, 6);
-    ctx.fillRect(snap(shockDist + 4), snap(-1), P, 2);
+      // Amber / Orange kinetic cross flash
+      ctx.fillStyle = `rgba(245, 158, 11, ${(flashAlpha * 0.92).toFixed(3)})`;
+      ctx.fillRect(snap(muzzleTipX - 2), snap(-5), P, 10);
+      ctx.fillRect(snap(muzzleTipX + 4), snap(-3), P, 6);
+      ctx.fillRect(snap(muzzleTipX + 6), snap(-1), P, 2);
+      ctx.fillRect(snap(muzzleTipX + 2), snap(-1), 4, P);
 
-    ctx.fillStyle = `rgba(255, 255, 255, ${(shockAlpha * 0.95).toFixed(3)})`;
-    ctx.fillRect(snap(shockDist + 2), snap(-1.5), P, 3);
+      // Ejecting micro sparks
+      ctx.fillStyle = `rgba(251, 191, 36, ${(flashAlpha * 0.95).toFixed(3)})`;
+      ctx.fillRect(snap(muzzleTipX + 6), snap(-6), P, P);
+      ctx.fillRect(snap(muzzleTipX + 4), snap(4), P, P);
+    }
+
+    // B. Supersonic air-compression shockwave ring advancing smoothly ahead
+    if (progress >= 0.05 && progress < 0.55) {
+      const pShock = (progress - 0.05) / 0.50;
+      const shockAlpha = Math.sin(pShock * Math.PI) * 0.80;
+      const shockDist = muzzleTipX + pShock * 28.0;
+
+      ctx.fillStyle = `rgba(245, 158, 11, ${(shockAlpha * 0.80).toFixed(3)})`;
+      ctx.fillRect(snap(shockDist), snap(-7), P, 14);
+      ctx.fillRect(snap(shockDist + 2), snap(-4), P, 8);
+      ctx.fillRect(snap(shockDist + 4), snap(-1.5), P, 3);
+
+      ctx.fillStyle = `rgba(255, 255, 255, ${shockAlpha.toFixed(3)})`;
+      ctx.fillRect(snap(shockDist), snap(-2), P, 4);
+    }
+
+    // C. Subtle Gunsmoke wisps curling upward during recovery
+    if (progress >= 0.30 && progress < 0.85) {
+      const pSmoke = (progress - 0.30) / 0.55;
+      const smokeAlpha = Math.sin(pSmoke * Math.PI) * 0.50;
+      const smokeDist = muzzleTipX - pSmoke * 4.0;
+      const smokeRise = -pSmoke * 10.0;
+
+      ctx.fillStyle = `rgba(226, 232, 240, ${(smokeAlpha * 0.75).toFixed(3)})`;
+      ctx.fillRect(snap(smokeDist), snap(smokeRise - 2), P, P);
+      ctx.fillRect(snap(smokeDist + 2), snap(smokeRise - 5), P, P);
+    }
   }
 
   // 2. Public Safety Crisp White Shirt Sleeve & Cuff (Wrist Base at -X)
@@ -451,33 +519,43 @@ export function drawMakimaPixelFingerGun(ctx, x, y, progress, r, isShooting) {
   ctx.fillStyle = skinHighlight;
   ctx.fillRect(snap(baseR + fingerLen - P), snap(-halfW), P, P);
 
-  // 5. Cocked Thumb Hammer (Pointing upright -Y)
-  const thumbH = 9.0;
-  const thumbW = 4.2;
+  // 5. Cocked Thumb Hammer (Shortened proportional ~5.8px height with hammer strike dynamic)
+  const thumbH = 5.8;
+  const thumbW = 4.0;
+  const thumbBaseX = snap(-thumbW * 0.5);
+  const thumbBaseY = snap(-baseR);
+
+  ctx.save();
+  ctx.translate(thumbBaseX, thumbBaseY);
+  if (hammerSnap !== 0) {
+    ctx.rotate(hammerSnap);
+  }
 
   // Thumb Outline Shell
   ctx.fillStyle = skinOutline;
-  ctx.fillRect(snap(-thumbW * 0.5 - 1.0), snap(-baseR - thumbH - 1.0), thumbW + 2.0, thumbH + 2.0);
+  ctx.fillRect(-P, snap(-thumbH) - P, thumbW + P * 2, snap(thumbH) + P);
 
   // Thumb Core Base
   ctx.fillStyle = skinBase;
-  ctx.fillRect(snap(-thumbW * 0.5), snap(-baseR - thumbH), thumbW, thumbH);
+  ctx.fillRect(0, snap(-thumbH), thumbW, snap(thumbH));
 
   // Thumb Back Edge Highlight (Left strip)
   ctx.fillStyle = skinHighlight;
-  ctx.fillRect(snap(-thumbW * 0.5), snap(-baseR - thumbH + 1.0), P, thumbH - 2.0);
+  ctx.fillRect(0, snap(-thumbH) + P, P, snap(thumbH) - P);
 
   // Thumb Inner Depth Shadow (Right strip)
   ctx.fillStyle = skinShadow;
-  ctx.fillRect(snap(thumbW * 0.5 - P), snap(-baseR - thumbH + 2.0), P, thumbH - 2.0);
+  ctx.fillRect(thumbW - P, snap(-thumbH) + P, P, snap(thumbH) - P);
 
   // Thumb Base Joint Notch Crease
   ctx.fillStyle = skinDeepShadow;
-  ctx.fillRect(snap(-thumbW * 0.5), snap(-baseR - thumbH * 0.45), thumbW, P);
+  ctx.fillRect(0, snap(-thumbH * 0.45), thumbW, P);
 
   // Cocked Thumb Tip Nail Highlight
   ctx.fillStyle = skinHighlight;
-  ctx.fillRect(snap(-thumbW * 0.5 + 0.5), snap(-baseR - thumbH), thumbW - 1.0, P);
+  ctx.fillRect(0, snap(-thumbH), thumbW, P);
+
+  ctx.restore();
 
   ctx.restore();
 }
@@ -538,6 +616,294 @@ function _drawFist(ctx, x, y, radius, skinColor, shadowColor) {
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(P * 0.5, -innerR * 0.45, P, P);
   ctx.fillRect(P * 1.5, -innerR * 0.20, P, P);
+
+  ctx.restore();
+}
+
+// ── High-Performance Cached Off-Screen Body for Particle-Driven Reformation ──
+let _cachedBodyCanvas = null;
+let _cachedBodyRadius = 0;
+let _maskCanvas = null;
+
+function _getOrCreateBodyCanvas(r) {
+  const size = Math.ceil(r * 2 + 70);
+  if (!_cachedBodyCanvas || _cachedBodyRadius !== r) {
+    if (typeof document !== 'undefined' && document.createElement) {
+      _cachedBodyCanvas = document.createElement('canvas');
+      _cachedBodyCanvas.width = size;
+      _cachedBodyCanvas.height = size;
+      _cachedBodyRadius = r;
+      const bCtx = _cachedBodyCanvas.getContext('2d');
+      if (bCtx) {
+        bCtx.save();
+        bCtx.translate(size * 0.5, size * 0.5);
+        const handRadius = getHandSize(8.2);
+        _drawFist(bCtx, -r * 0.24, -r * 0.45, handRadius * 0.85, '#FEE5D6', '#EDB8A2');
+        _drawMakimaPixelBraid(bCtx, r);
+        drawMakimaPixelBody(bCtx, r);
+        drawMakimaPixelFingerGun(bCtx, r * 0.95, r * 0.04, 0, r, false);
+        bCtx.restore();
+      }
+    }
+  }
+  return _cachedBodyCanvas;
+}
+
+function _getMaskCanvas(size) {
+  if (!_maskCanvas || _maskCanvas.width !== size) {
+    if (typeof document !== 'undefined' && document.createElement) {
+      _maskCanvas = document.createElement('canvas');
+      _maskCanvas.width = size;
+      _maskCanvas.height = size;
+    }
+  }
+  return _maskCanvas;
+}
+
+/**
+ * Renders Makima's Blood Particle Shatter & Time-Reversed Reassembly.
+ * When fatally wounded, Makima shatters into 60 visceral blood droplets that explode outward,
+ * suspend at apex, and then time-reverse to stream back into her core with liquid trailing ribbons,
+ * reforming her full pixel art body inside the converging blood.
+ * Adheres strictly to Rule 11 (Zero shadowBlur) and Rule 19 (Upright orientation).
+ */
+function _drawShatteredMakimaSkin(ctx, fighter, r, now) {
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+
+  // 1. Angle and upright front POV orientation (Rule 19)
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const angle = isPodiumPreview ? 0 : (fighter.gunAngle || 0);
+  ctx.rotate(angle);
+
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
+
+  // Calculate overall revival progress normP (0.0 to 1.0 across 75 frames)
+  let normP = 0;
+  if (fighter.hp <= 0 && !fighter.isRevivingFromContract && !fighter.isShatterReviving) {
+    normP = 0;
+  } else if (fighter._isWinnerReveal) {
+    normP = 1.0;
+  } else if (fighter.reviveStasisTimer !== undefined) {
+    const maxT = fighter.reviveStasisMax || 75;
+    const elapsed = maxT - Math.max(0, fighter.reviveStasisTimer);
+    normP = Math.min(1.0, Math.max(0.0, elapsed / maxT));
+  }
+
+  const particles = fighter.bloodParticles || fighter.shatteredPieces || [];
+
+  // ─────────────────────────────────────────────
+  // 1. CORE SACRIFICIAL BLOOD POOL & DEVIL'S CONCENTRIC EYE
+  // ─────────────────────────────────────────────
+  // A dark visceral blood core at (0, 0) into which the blood shatters return
+  const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.95);
+  coreGrad.addColorStop(0, '#FFFFFF');
+  coreGrad.addColorStop(0.20, 'rgba(245, 158, 11, 0.95)'); // Solar Gold Contract Filament
+  coreGrad.addColorStop(0.55, 'rgba(163, 29, 36, 0.80)');  // Velvet Makima Crimson
+  coreGrad.addColorStop(1.0, 'rgba(9, 10, 15, 0.0)');
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.95, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Concentric Devil Eye Rings (CSM Control Devil Iris)
+  const eyeR = r * 0.52;
+  ctx.strokeStyle = '#F59E0B';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(0, 0, eyeR * 0.85, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#FBBF24';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(0, 0, eyeR * 0.55, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#F59E0B';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.arc(0, 0, eyeR * 0.30, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Center pupil
+  ctx.fillStyle = '#880808';
+  ctx.beginPath();
+  ctx.arc(0, 0, eyeR * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ─────────────────────────────────────────────
+  // 2. 60 PARTICLES REBUILDING MAKIMA'S BODY PIECE-BY-PIECE
+  // ─────────────────────────────────────────────
+  let landedCount = 0;
+
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    const targetX = p.targetX !== undefined ? p.targetX : 0;
+    const targetY = p.targetY !== undefined ? p.targetY : 0;
+    const scatterX = p.scatterX !== undefined ? p.scatterX : Math.cos(p.angle || 0) * (p.maxDist || 60);
+    const scatterY = p.scatterY !== undefined ? p.scatterY : Math.sin(p.angle || 0) * (p.maxDist || 60);
+
+    let currX = 0;
+    let currY = 0;
+    let hasLanded = false;
+
+    if (normP < 0.20) {
+      // Phase 1: Explosive shatter outward from her body into the arena
+      const burstP = normP / 0.20;
+      const burstEase = 1.0 - Math.pow(1.0 - burstP, 3.0);
+      currX = targetX * (1.0 - burstEase) + scatterX * burstEase;
+      currY = targetY * (1.0 - burstEase) + scatterY * burstEase;
+      hasLanded = false;
+    } else if (normP < 0.28) {
+      // Phase 2: Mid-air suspension at peak scatter positions
+      const tremble = Math.sin(now * 0.06 + i * 1.4) * 1.5;
+      currX = scatterX + Math.cos(i) * tremble;
+      currY = scatterY + Math.sin(i) * tremble;
+      hasLanded = false;
+    } else {
+      // Phase 3: Reverse trajectory directly back to target position on her body!
+      const pStart = 0.28 + (p.delay || 0);
+      const pEnd = 0.74 + (p.delay || 0) * 0.35;
+      const rawP = Math.min(1.0, Math.max(0.0, (normP - pStart) / (pEnd - pStart)));
+      const pullEase = Math.pow(rawP, 2.3);
+      currX = scatterX * (1.0 - pullEase) + targetX * pullEase;
+      currY = scatterY * (1.0 - pullEase) + targetY * pullEase;
+      hasLanded = (rawP >= 0.96);
+    }
+
+    p.currX = currX;
+    p.currY = currY;
+    p.hasLanded = hasLanded;
+    if (hasLanded) landedCount++;
+  }
+
+  // ─────────────────────────────────────────────
+  // 3. HIGH-PERFORMANCE PARTICLE-DRIVEN REFORMATION (ZERO FPS DROP!)
+  // The body is stamped and revealed ONLY where particles have landed!
+  // Uses GPU-accelerated destination-in composite masking (Eliminates CPU ctx.clip bottleneck)
+  // ─────────────────────────────────────────────
+  if (landedCount > 0 && typeof document !== 'undefined') {
+    const bodyCanvas = _getOrCreateBodyCanvas(r);
+    if (bodyCanvas) {
+      const size = bodyCanvas.width || Math.ceil(r * 2 + 70);
+      const half = size * 0.5;
+
+      if (landedCount >= particles.length) {
+        // 100% of particles have landed! Blit directly (0.01ms)
+        ctx.drawImage(bodyCanvas, -half, -half);
+      } else {
+        // Progressive particle-driven reveal using destination-in
+        const maskCanvas = _getMaskCanvas(size);
+        if (maskCanvas) {
+          const mCtx = maskCanvas.getContext('2d');
+          if (mCtx) {
+            mCtx.clearRect(0, 0, size, size);
+
+            // 1. Draw static pre-rendered body
+            mCtx.drawImage(bodyCanvas, 0, 0);
+
+            // 2. Mask with landed particles using destination-in (GPU-accelerated composite blend)
+            mCtx.globalCompositeOperation = 'destination-in';
+            mCtx.beginPath();
+            const stampR = 9.5;
+            for (let i = 0; i < particles.length; i++) {
+              const p = particles[i];
+              if (p.hasLanded) {
+                const tx = (p.targetX !== undefined ? p.targetX : 0) + half;
+                const ty = (p.targetY !== undefined ? p.targetY : 0) + half;
+                mCtx.moveTo(tx + stampR, ty);
+                mCtx.arc(tx, ty, stampR, 0, Math.PI * 2);
+              }
+            }
+            mCtx.fill();
+            mCtx.globalCompositeOperation = 'source-over';
+
+            // 3. Blit to main canvas in one single drawImage call
+            ctx.drawImage(maskCanvas, -half, -half);
+          }
+        }
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // 4. DRAW IN-FLIGHT PARTICLES (Disappear as they land on her body)
+  // ─────────────────────────────────────────────
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    if (!p.hasLanded) {
+      // Clean droplet flying in air
+      ctx.beginPath();
+      ctx.arc(p.currX, p.currY, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+
+      // Specular glint highlight
+      ctx.beginPath();
+      ctx.arc(p.currX - p.size * 0.3, p.currY - p.size * 0.3, p.size * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.fill();
+    } else if (normP < 0.78) {
+      // Landing glint spark on newly assembled piece
+      if (Math.random() < 0.18) {
+        ctx.fillStyle = '#F59E0B';
+        const tx = p.targetX !== undefined ? p.targetX : 0;
+        const ty = p.targetY !== undefined ? p.targetY : 0;
+        ctx.fillRect(tx + (Math.random() - 0.5) * 3, ty + (Math.random() - 0.5) * 3, 2, 2);
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // 4. DIVINE HALO SHOCKWAVE ON FULL RESTORATION (normP >= 0.80)
+  // ─────────────────────────────────────────────
+  if (normP >= 0.80) {
+    const flashPct = (normP - 0.80) / 0.20;
+    const haloR = r * (0.85 + flashPct * 0.55);
+
+    ctx.save();
+    // Outer Solar Gold Halo
+    ctx.beginPath();
+    ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(245, 158, 11, ${(1.0 - flashPct * 0.4).toFixed(3)})`;
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    // Inner Amber Halo
+    ctx.beginPath();
+    ctx.arc(0, 0, haloR * 0.72, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(251, 191, 36, ${(1.0 - flashPct * 0.6).toFixed(3)})`;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // 8 Radiant Crown Rays
+    const rayCount = 8;
+    for (let k = 0; k < rayCount; k++) {
+      const rayAngle = (k / rayCount) * Math.PI * 2 + (now * 0.0025);
+      const inX = Math.cos(rayAngle) * haloR;
+      const inY = Math.sin(rayAngle) * haloR;
+      const outX = Math.cos(rayAngle) * (haloR + 9.0 * flashPct);
+      const outY = Math.sin(rayAngle) * (haloR + 9.0 * flashPct);
+      ctx.beginPath();
+      ctx.moveTo(inX, inY);
+      ctx.lineTo(outX, outY);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(1.0 - flashPct * 0.5).toFixed(3)})`;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
+
+    // Converging white/gold immaculate flash wash
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (1.0 + (1.0 - flashPct) * 0.4), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${(flashPct * 0.55).toFixed(3)})`;
+    ctx.fill();
+
+    ctx.restore();
+  }
 
   ctx.restore();
 }

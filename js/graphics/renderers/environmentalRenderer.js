@@ -41,18 +41,39 @@ export function drawStormDimScreen() {
   if (opacity < 0.01) return;
   
   ctx.save();
-  // Reset the transform temporarily so the plain dark overlay is perfectly glued to the screen
-  // and does not expose edges or jitter during shakes
+  // Reset the transform temporarily so the dark overlay is perfectly glued to the screen
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+
+  // 1. Dark thunderstorm navy atmosphere overlay
+  ctx.fillStyle = `rgba(4, 12, 34, ${opacity * 0.85})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Electric cyan / lightning blue radial aura centered on Zeus
+  const screenPos = zeus ? worldToScreen(zeus.x, zeus.y - (zeus.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, 'rgba(0, 230, 255, 0.65)');       // Electric thunder cyan core
+  grad.addColorStop(0.18, 'rgba(40, 140, 250, 0.50)');   // Storm lightning halo
+  grad.addColorStop(0.40, 'rgba(18, 65, 170, 0.35)');    // Deep thunder blue ring
+  grad.addColorStop(0.70, 'rgba(6, 20, 75, 0.18)');      // Stormcloud fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
 
   // Exclude Gojo's Limitless Infinity Barrier from screen dimming
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
   
-  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity})`;
+  state.globalDimEdgeColor = `rgba(4, 12, 34, ${opacity})`;
 }
 
 let currentFurnaceDimOpacity = 0;
@@ -118,12 +139,12 @@ export function drawFurnaceDimScreen() {
   const drawCx = screenPos.x;
   const drawCy = screenPos.y;
   const grad = ctx.createRadialGradient(drawCx, drawCy, 0, drawCx, drawCy, Math.max(canvas.width, canvas.height) * 0.95);
-  grad.addColorStop(0, `rgba(255, 140, 0, ${opacity * 0.95})`);
-  grad.addColorStop(0.06, `rgba(255, 70, 0, ${opacity * 0.85})`);
-  grad.addColorStop(0.15, `rgba(160, 25, 0, ${opacity * 0.70})`);
-  grad.addColorStop(0.35, `rgba(25, 4, 2, ${opacity * 0.92})`);
-  grad.addColorStop(0.65, `rgba(5, 1, 1, ${opacity * 0.97})`);
-  grad.addColorStop(1, `rgba(0, 0, 0, ${opacity * 0.99})`);
+  grad.addColorStop(0, `rgba(255, 160, 20, ${opacity * 0.95})`);
+  grad.addColorStop(0.08, `rgba(255, 80, 0, ${opacity * 0.88})`);
+  grad.addColorStop(0.20, `rgba(180, 35, 0, ${opacity * 0.75})`);
+  grad.addColorStop(0.45, `rgba(75, 12, 4, ${opacity * 0.88})`);
+  grad.addColorStop(0.75, `rgba(38, 5, 2, ${opacity * 0.92})`);
+  grad.addColorStop(1.0, `rgba(18, 2, 2, ${opacity * 0.95})`);
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -133,7 +154,7 @@ export function drawFurnaceDimScreen() {
 
   ctx.restore();
   
-  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
+  state.globalDimEdgeColor = `rgba(25, 4, 2, ${opacity * 0.98})`;
 }
 
 let currentRikaSummonDimOpacity = 0;
@@ -182,12 +203,22 @@ export function drawRikaSummonDimScreen() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // 1. Dark cursed energy base overlay
-  ctx.fillStyle = `rgba(10, 0, 18, ${opacity * 0.85})`;
+  ctx.fillStyle = `rgba(24, 2, 28, ${opacity * 0.85})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // This overlay renders in screen space, while fighters render in world space.
+  // Convert Yuta's position (and the ring radius) through the active camera so
+  // the bloom and ring remain locked to him during dynamic camera tracking.
+  const screenPos = worldToScreen(cx, cy - (yutaSummoning?.z || 0));
+  const camZoom = (state.camera?.enabled && state.camera.mode === 'dynamic')
+    ? state.camera.zoom
+    : 1;
+  const screenX = screenPos.x;
+  const screenY = screenPos.y;
+
   // 2. High-contrast cursed pink bloom centered on Yuta
-  const maxR = Math.max(canvas.width, canvas.height) * 0.65;
-  const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, maxR);
+  const maxR = Math.max(canvas.width, canvas.height) * 0.65 * camZoom;
+  const grad = ctx.createRadialGradient(screenX, screenY, 30 * camZoom, screenX, screenY, maxR);
   grad.addColorStop(0, `rgba(255, 20, 147, ${opacity * 0.45})`);
   grad.addColorStop(0.25, `rgba(160, 10, 120, ${opacity * 0.30})`);
   grad.addColorStop(0.60, `rgba(30, 2, 35, ${opacity * 0.15})`);
@@ -197,8 +228,8 @@ export function drawRikaSummonDimScreen() {
 
   // 3. Pulsing Cursed Energy Ring around Yuta
   ctx.beginPath();
-  const ringR = 85 + Math.sin(Date.now() * 0.01) * 15;
-  ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+  const ringR = (85 + Math.sin(Date.now() * 0.01) * 15) * camZoom;
+  ctx.arc(screenX, screenY, ringR, 0, Math.PI * 2);
   ctx.strokeStyle = `rgba(255, 20, 147, ${opacity * 0.75})`;
   ctx.lineWidth = 8;
   ctx.stroke();
@@ -206,7 +237,7 @@ export function drawRikaSummonDimScreen() {
   excludeGojoInfinityFromDim(ctx);
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(10, 0, 18, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(22, 2, 26, ${opacity * 0.95})`;
 }
 
 let _mahitoDomainImg = null;
@@ -363,5 +394,4 @@ export function drawCjBaguvixDimScreen() {
 
   state.globalDimEdgeColor = `rgba(6, 44, 20, ${opacity * 0.95})`;
 }
-
 

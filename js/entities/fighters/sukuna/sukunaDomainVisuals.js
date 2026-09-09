@@ -54,10 +54,10 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   if (!fighter._cachedLiquidGrad || fighter._cachedLiquidGradH !== screenH) {
     fighter._cachedLiquidGradH = screenH;
     fighter._cachedLiquidGrad = ctx.createLinearGradient(0, 0, 0, screenH);
-    fighter._cachedLiquidGrad.addColorStop(0, 'rgba(15, 2, 5, 0.88)');
-    fighter._cachedLiquidGrad.addColorStop(0.3, 'rgba(40, 4, 10, 0.82)');
-    fighter._cachedLiquidGrad.addColorStop(0.7, 'rgba(25, 3, 8, 0.86)');
-    fighter._cachedLiquidGrad.addColorStop(1, 'rgba(10, 1, 3, 0.92)');
+    fighter._cachedLiquidGrad.addColorStop(0, 'rgba(42, 4, 10, 0.92)');
+    fighter._cachedLiquidGrad.addColorStop(0.3, 'rgba(78, 8, 18, 0.88)');
+    fighter._cachedLiquidGrad.addColorStop(0.7, 'rgba(52, 6, 14, 0.90)');
+    fighter._cachedLiquidGrad.addColorStop(1, 'rgba(28, 3, 8, 0.95)');
   }
 
   ctx.fillStyle = fighter._cachedLiquidGrad;
@@ -68,7 +68,7 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   // Horizontal liquid water wave sheen lines across the floor (batched single-stroke for 60 FPS performance)
   const waveCount = isLowQuality ? 3 : (isMultiDomain ? 5 : 10);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(240, 80, 80, 0.16)';
+  ctx.strokeStyle = 'rgba(255, 90, 90, 0.24)';
   ctx.beginPath();
   for (let w = 0; w < waveCount; w++) {
     const wy = sy - 150 + w * 45 + Math.sin(time * 0.002 + w) * 8;

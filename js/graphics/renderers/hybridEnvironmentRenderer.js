@@ -25,17 +25,13 @@ function getRikaSummonDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     
-    // 1. Pitch black base overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.98)';
-    ctx.fillRect(0, 0, size, size);
-    
-    // 2. High-contrast hot pink / deep violet radial gradient centered on Yuta
+    // High-contrast hot pink / deep violet radial gradient centered on Yuta
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-    grad.addColorStop(0, 'rgba(255, 20, 147, 0.95)');   // Bright intense hot pink center
-    grad.addColorStop(0.06, 'rgba(230, 0, 160, 0.85)'); // Concentrated magenta/purple aura ring
-    grad.addColorStop(0.18, 'rgba(20, 2, 35, 0.92)');   // Falloff to deep dark violet
-    grad.addColorStop(0.55, 'rgba(5, 1, 6, 0.97)');     // Deep dark background
-    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.99)');      // Pitch black outer screen
+    grad.addColorStop(0, 'rgba(255, 20, 147, 0.75)');   // Bright intense hot pink center
+    grad.addColorStop(0.12, 'rgba(220, 20, 180, 0.65)'); // Concentrated magenta/purple aura ring
+    grad.addColorStop(0.35, 'rgba(90, 10, 110, 0.50)');  // Falloff to deep dark violet
+    grad.addColorStop(0.70, 'rgba(28, 4, 34, 0.35)');    // Deep cursed background
+    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');        // Fully transparent perimeter
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -43,7 +39,7 @@ function getRikaSummonDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     rikaSummonDimSprite = new window.PIXI.Sprite(texture);
     rikaSummonDimSprite.anchor.set(0.5);
-    rikaSummonDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    rikaSummonDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
   }
   return rikaSummonDimSprite;
 }
@@ -145,18 +141,13 @@ function getFurnaceDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     
-    // 1. Pitch black base overlay
-    ctx.fillStyle = `rgba(0, 0, 0, 0.98)`;
-    ctx.fillRect(0, 0, size, size);
-
-    // 2. Tight, high-contrast radial flame gradient centered on Sukuna/Arrow
+    // Tight, high-contrast radial flame gradient centered on Sukuna/Arrow
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-    grad.addColorStop(0, `rgba(255, 140, 0, 0.95)`);   // Bright intense fiery orange spot at Fuga cast center
-    grad.addColorStop(0.06, `rgba(255, 70, 0, 0.85)`);  // Concentrated orange-red flame ring
-    grad.addColorStop(0.15, `rgba(160, 25, 0, 0.70)`); // Deep crimson flame aura
-    grad.addColorStop(0.30, `rgba(25, 4, 2, 0.92)`);   // Quick falloff to dark void
-    grad.addColorStop(0.55, `rgba(5, 1, 1, 0.97)`);    // Deep dark background
-    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.99)`);    // Pitch black outer screen
+    grad.addColorStop(0, `rgba(255, 140, 0, 0.75)`);   // Bright intense fiery orange spot at Fuga cast center
+    grad.addColorStop(0.12, `rgba(255, 60, 0, 0.65)`);  // Concentrated orange-red flame ring
+    grad.addColorStop(0.35, `rgba(180, 25, 5, 0.50)`);  // Deep crimson flame aura
+    grad.addColorStop(0.70, `rgba(40, 4, 2, 0.35)`);    // Rich fiery dark charcoal
+    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.0)`);       // Fully transparent perimeter
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -164,7 +155,7 @@ function getFurnaceDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     furnaceDimSprite = new window.PIXI.Sprite(texture);
     furnaceDimSprite.anchor.set(0.5);
-    furnaceDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    furnaceDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
   }
   return furnaceDimSprite;
 }
@@ -184,18 +175,13 @@ function getPurpleDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     
-    // 1. Pitch black base overlay
-    ctx.fillStyle = `rgba(0, 0, 0, 0.98)`;
-    ctx.fillRect(0, 0, size, size);
-    
-    // 2. Tight, high-contrast electric purple radial gradient centered on Gojo's Purple cast/orb position
+    // Tight, high-contrast electric purple radial gradient centered on Gojo's Purple cast/orb position
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-    grad.addColorStop(0, `rgba(195, 80, 255, 0.95)`);   // Intense bright electric purple spot at Purple center
-    grad.addColorStop(0.06, `rgba(147, 51, 234, 0.85)`);  // Concentrated violet-purple aura ring
-    grad.addColorStop(0.15, `rgba(88, 28, 135, 0.70)`);   // Deep purple void aura
-    grad.addColorStop(0.30, `rgba(20, 2, 35, 0.92)`);    // Quick falloff to dark void
-    grad.addColorStop(0.55, `rgba(5, 1, 10, 0.97)`);     // Deep dark background
-    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.99)`);     // Pitch black outer screen
+    grad.addColorStop(0, `rgba(195, 80, 255, 0.75)`);   // Intense bright electric purple spot at Purple center
+    grad.addColorStop(0.12, `rgba(147, 51, 234, 0.65)`); // Concentrated violet-purple aura ring
+    grad.addColorStop(0.35, `rgba(88, 28, 135, 0.50)`);  // Deep purple void aura
+    grad.addColorStop(0.70, `rgba(24, 4, 38, 0.35)`);    // Deep dark violet background
+    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.0)`);        // Fully transparent perimeter
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -203,7 +189,7 @@ function getPurpleDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     purpleDimSprite = new window.PIXI.Sprite(texture);
     purpleDimSprite.anchor.set(0.5);
-    purpleDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    purpleDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
   }
   return purpleDimSprite;
 }
@@ -219,16 +205,12 @@ function getGreenDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     
-    ctx.fillStyle = `rgba(0, 0, 0, 0.98)`;
-    ctx.fillRect(0, 0, size, size);
-    
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-    grad.addColorStop(0, `rgba(0, 255, 100, 0.95)`);     // Intense bright green spot
-    grad.addColorStop(0.06, `rgba(0, 200, 80, 0.85)`);   // Concentrated emerald aura ring
-    grad.addColorStop(0.15, `rgba(0, 120, 50, 0.70)`);   // Deep green void aura
-    grad.addColorStop(0.30, `rgba(0, 30, 15, 0.92)`);    // Quick falloff to dark void
-    grad.addColorStop(0.55, `rgba(0, 10, 5, 0.97)`);     // Deep dark background
-    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.99)`);      // Pitch black outer screen
+    grad.addColorStop(0, `rgba(0, 255, 120, 0.75)`);     // Intense bright green spot
+    grad.addColorStop(0.12, `rgba(0, 210, 90, 0.65)`);   // Concentrated emerald aura ring
+    grad.addColorStop(0.35, `rgba(0, 130, 55, 0.50)`);   // Deep green void aura
+    grad.addColorStop(0.70, `rgba(2, 45, 18, 0.35)`);    // Deep jade background
+    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.0)`);        // Fully transparent perimeter
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -236,7 +218,7 @@ function getGreenDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     greenDimSprite = new window.PIXI.Sprite(texture);
     greenDimSprite.anchor.set(0.5);
-    greenDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    greenDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
   }
   return greenDimSprite;
 }
@@ -254,10 +236,11 @@ function getMahoragaDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     const grad = ctx.createRadialGradient(cx, cy, size * 0.02, cx, cy, size * 0.5);
-    grad.addColorStop(0, `rgba(40, 30, 8, 0.65)`);
-    grad.addColorStop(0.25, `rgba(18, 12, 3, 0.88)`);
-    grad.addColorStop(0.60, `rgba(8, 4, 1, 0.96)`);
-    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.98)`);
+    grad.addColorStop(0, `rgba(255, 215, 0, 0.70)`);     // Bright antique gold core
+    grad.addColorStop(0.15, `rgba(218, 165, 32, 0.55)`); // Radiating golden amber halo
+    grad.addColorStop(0.35, `rgba(130, 85, 12, 0.40)`);  // Deep bronze amber ring
+    grad.addColorStop(0.70, `rgba(45, 28, 5, 0.25)`);    // Dark golden brown fade
+    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.0)`);        // Fully transparent perimeter
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -265,7 +248,7 @@ function getMahoragaDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     mahoragaDimSprite = new window.PIXI.Sprite(texture);
     mahoragaDimSprite.anchor.set(0.5);
-    mahoragaDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    mahoragaDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
   }
   return mahoragaDimSprite;
 }
@@ -727,7 +710,7 @@ export function updateHybridEnvironment() {
   } else {
     if (!spriteFuga.parent) layer.addChild(spriteFuga);
     spriteFuga.alpha = currentFurnaceDimOpacity; spriteFuga.x = cxFuga; spriteFuga.y = cyFuga; spriteFuga.scale.set(scale);
-    state.globalDimEdgeColor = `rgba(0, 0, 0, ${currentFurnaceDimOpacity * 0.98})`;
+    state.globalDimEdgeColor = `rgba(25, 4, 2, ${currentFurnaceDimOpacity * 0.98})`;
   }
 
   // 2. Gojo Purple
@@ -757,7 +740,7 @@ export function updateHybridEnvironment() {
   } else {
     if (!spritePurple.parent) layer.addChild(spritePurple);
     spritePurple.alpha = currentPurpleDimOpacity; spritePurple.x = cxPurple; spritePurple.y = cyPurple; spritePurple.scale.set(scale);
-    state.globalDimEdgeColor = `rgba(0, 0, 0, ${currentPurpleDimOpacity * 0.98})`;
+    state.globalDimEdgeColor = isGreenOrb ? `rgba(2, 24, 10, ${currentPurpleDimOpacity * 0.95})` : `rgba(20, 2, 32, ${currentPurpleDimOpacity * 0.95})`;
   }
   
   // 3. Mahoraga
@@ -903,7 +886,7 @@ export function updateHybridEnvironment() {
     rikaSummonDim.x = rikaCx;
     rikaSummonDim.y = rikaCy;
     rikaSummonDim.scale.set(scale);
-    state.globalDimEdgeColor = `rgba(0, 0, 0, ${currentRikaSummonDimOpacity * 0.98})`;
+    state.globalDimEdgeColor = `rgba(22, 2, 26, ${currentRikaSummonDimOpacity * 0.95})`;
 
     // Render Pulsing Ring (100% GPU WebGL Matrix Scaling)
     if (!rikaRing.parent) layer.addChild(rikaRing);

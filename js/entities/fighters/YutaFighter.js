@@ -69,6 +69,7 @@ export class YutaFighter extends Fighter {
     // RCT Revival & Healing
     this.hasUsedRCTRevival = false;
     this.rctRevivalTimer = 0;
+    this.rctHealTimer = 0;
     this.rctCooldown = 0;
     this.damageWindow = [];
 
@@ -106,9 +107,8 @@ export class YutaFighter extends Fighter {
       this.isChannelingDomain ||
       (this.domainChargeTimer > 0) ||
       this.isChannelingThinIceBreaker ||
-      (this.thinIceBreakerPunchTimer > 0) ||
       (this.flurryHitsLeft > 0) ||
-      (this.flurryTimer > 0) ||
+      ((this.flurryTimer || 0) > 0) ||
       (this.rctRevivalTimer > 0)
     );
   }
@@ -157,6 +157,7 @@ export class YutaFighter extends Fighter {
     super.reset();
     this.hasUsedRCTRevival = false;
     this.rctRevivalTimer = 0;
+    this.rctHealTimer = 0;
     this.rctCooldown = 0;
     this.damageWindow = [];
     this.parryCount = 0;
@@ -297,9 +298,25 @@ export class YutaFighter extends Fighter {
 
     if (this.rctCooldown > 0) this.rctCooldown--;
 
-    // If reviving/healing via RCT, handle RCT and skip normal logic
+    // Non-fatal RCT Heal: Smooth HP regeneration over time without freezing movement or attacks
+    if (this.rctHealTimer > 0) {
+      this.rctHealTimer--;
+      const targetHp = this.maxHp * (CONFIG.yuta.rctRevivalHealPercent || 0.15);
+      const healAmount = targetHp / 120;
+      this.hp = Math.min(this.maxHp, this.hp + healAmount);
+
+      if (this.rctHealTimer % 8 === 0) {
+        spawnSparks(this.x, this.y, 3, '#88FF88', '#00FF00');
+        if (this.rctHealTimer % 30 === 0) {
+          spawnFloatingText(this.x, this.y - 20, '+RCT', '#00FF00');
+        }
+      }
+    }
+
+    // If reviving via fatal RCT Revival, handle revival pose and skip normal logic
     if (this.rctRevivalTimer > 0) {
       this.rctRevivalTimer--;
+      if (this.invincibilityTimer > 0) this.invincibilityTimer--;
       this.vx = 0;
       this.vy = 0;
 
@@ -386,11 +403,37 @@ export class YutaFighter extends Fighter {
 
     if (this.isChannelingThinIceBreaker) {
       this.thinIceBreakerChargeTimer--;
-      
-      this.vx = 0;
-      this.vy = 0;
+
+      // Dynamic target re-acquisition if target died, vanished, or swapped (e.g. Todo Boogie Woogie in 1v2)
+      if (!this.flurryTarget || this.flurryTarget.isDead || (this.flurryTarget.hp || 0) <= 0 || (this.flurryTarget.vanishTimer && this.flurryTarget.vanishTimer > 0)) {
+        const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
+        let nearest = null;
+        let nearestD = 400;
+        if (state && state.fighters) {
+          for (let i = 0; i < state.fighters.length; i++) {
+            const f = state.fighters[i];
+            if (!f || f === this || f.hp <= 0 || f.isIllusion) continue;
+            const tTeam = state.getFighterTeam ? state.getFighterTeam(i) : f.team;
+            if (myTeam !== null && tTeam !== null && myTeam === tTeam) continue;
+            const d = Math.hypot(f.x - this.x, f.y - this.y);
+            if (d < nearestD) {
+              nearestD = d;
+              nearest = f;
+            }
+          }
+        }
+        if (nearest) this.flurryTarget = nearest;
+      }
+
       if (this.flurryTarget && !this.flurryTarget.isDead) {
         this.aim(this.flurryTarget);
+        // Forward lunge momentum toward target instead of cardboard cutout freeze
+        const punchAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+        this.vx = Math.cos(punchAngle) * 4.0;
+        this.vy = Math.sin(punchAngle) * 4.0;
+      } else {
+        this.vx *= 0.5;
+        this.vy *= 0.5;
       }
       
       // Visuals for charging
@@ -401,13 +444,21 @@ export class YutaFighter extends Fighter {
 
       if (this.thinIceBreakerChargeTimer <= 0) {
         this.isChannelingThinIceBreaker = false;
-        this.thinIceBreakerPunchTimer = 22; // 22 frames for punch follow-through
+        this.thinIceBreakerPunchTimer = 12; // Visual punch follow-through
         // Execute Thin Ice Breaker!
-        const angle = this.flurryTarget ? Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x) : (this.gunAngle || 0);
+        const angle = (this.flurryTarget && !this.flurryTarget.isDead) ? Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x) : (this.gunAngle || 0);
         executeThinIceBreaker(this, angle);
         this.flurryTarget = null; // Clear flurry target after executing Thin Ice Breaker!
+
+        // Instantly restore forward movement toward target or facing direction
+        const moveAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (Math.random() * Math.PI * 2);
+        const spd = this.speed || 3.5;
+        this.vx = Math.cos(moveAngle) * spd;
+        this.vy = Math.sin(moveAngle) * spd;
       }
-      return; // Freeze Yuta while he winds up
+      this.x += this.vx;
+      this.y += this.vy;
+      return;
     }
     if (this.trailGenTimer > 0) {
       this.trailGenTimer--;
@@ -426,7 +477,7 @@ export class YutaFighter extends Fighter {
     // Phantom Flurry Execution Logic
     if (this.flurrySlashTimer > 0) this.flurrySlashTimer--;
 
-    const isFlurryActive = (this.flurryHitsLeft > 0) || (this.flurryTimer > 0) || (this.flurryHitsLeft === 0 && this.flurryTarget !== null);
+    const isFlurryActive = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0);
     if (isFlurryActive) {
       this.flurryGhost = this.posHistory[0] || { x: this.x, y: this.y };
       this.vx *= 0.1;
@@ -441,19 +492,19 @@ export class YutaFighter extends Fighter {
         if (this.flurryHitsLeft <= 0) {
           this.flurryGhost = null;
           const target = this.flurryTarget;
+          this.flurryHitsLeft = 0;
+          this.flurryTimer = 0;
 
           // Immediately follow up completed Flurry with Thin Ice Breaker!
-          if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 350) {
+          if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 400) {
             this.aim(target);
             this.isChannelingThinIceBreaker = true;
-            this.thinIceBreakerChargeTimer = 14;
+            this.thinIceBreakerChargeTimer = 8;
             audioSystem.playSFX('skill_dash5', 0.9);
             spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
           } else {
             this.flurryTarget = null; // Clear if not transitioning
           }
-          this.flurryHitsLeft = 0;
-          this.flurryTimer = 0;
           return; // Flurry finished
         }
 
@@ -490,9 +541,9 @@ export class YutaFighter extends Fighter {
         if (this.flurryTarget && !this.flurryTarget.isDead) {
           this.activeSlashType = (this.activeSlashType === undefined) ? 0 : (this.activeSlashType + 1) % 3;
           this.trailGenTimer = 40;
-          this.flurrySlashTimer = 18; // 18-frame smooth swing animation (matches flurryTimer to hold pose)
+          this.flurrySlashTimer = 18; // 18-frame smooth swing animation
           this.meleeCooldown = this.meleeCooldownMax; // trigger swing animation
-          this.flurryTimer = 18; // 18-frame interval per teleport hit for clean readability
+          this.flurryTimer = (this.flurryHitsLeft === 0) ? 0 : 14; // Seamless 0-delay cancel into Thin Ice Breaker on final hit!
 
           const bonusDmg = this.pureLoveBeamBonusDamage || 0;
           const dmgMult = this.getRikaDamageMultiplier();
@@ -538,15 +589,22 @@ export class YutaFighter extends Fighter {
           spawnImpactFlash(this.x, this.y, 20, 'silver');
           audioSystem.playSFX('skill_dash3', 0.7);
 
-          // Play sword swing sound
-          const swingSnd = getBasicAttackSound(this.id, this._def?.type);
-          if (swingSnd) {
-            audioSystem.playSFX(swingSnd.src, swingSnd.volume);
-          } else {
-            audioSystem.playSFX('attack_swordswing', 0.6);
-          }
+          // If this was the final hit, cancel directly into Thin Ice Breaker without dead idle delay
+          if (this.flurryHitsLeft === 0) {
+            this.flurryTimer = 0;
+            this.flurryGhost = null;
+            const target = this.flurryTarget;
 
-          // Removed target time-stop/freeze during flurry per user request
+            if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 400) {
+              this.aim(target);
+              this.isChannelingThinIceBreaker = true;
+              this.thinIceBreakerChargeTimer = 8;
+              audioSystem.playSFX('skill_dash5', 0.9);
+              spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
+            } else {
+              this.flurryTarget = null;
+            }
+          }
 
         } else {
           this.flurryHitsLeft = 0;
@@ -890,9 +948,9 @@ export class YutaFighter extends Fighter {
         }
 
         // Domain Reverse Cursed Technique (RCT): Continuous accelerated healing inside Authentic Mutual Love!
-         if (this.hp > 0 && this.hp < this.maxHp) {
+        if (this.hp > 0 && this.hp < this.maxHp) {
           const regenMult = this.getRikaRegenMultiplier();
-          const rctRate = (CONFIG.yuta.domainRctHealRate || 0.05) * regenMult;
+          const rctRate = (CONFIG.yuta?.domainRctHealRate ?? 0.90) * regenMult;
           this.hp = Math.min(this.maxHp, this.hp + rctRate);
 
           if (Math.random() < 0.12) {
@@ -907,7 +965,8 @@ export class YutaFighter extends Fighter {
     // RCT healing outside domain when Rika is active on the battlefield
     if (!this.domainActive && this.hp > 0 && this.hp < this.maxHp && this.isRikaAliveInDomain()) {
       const regenMult = this.getRikaRegenMultiplier();
-      const rctRate = (CONFIG.yuta.domainRctHealRate || 0.05) * regenMult;
+      const rctBase = CONFIG.yuta?.rikaActiveRegenRate ?? 0.06;
+      const rctRate = rctBase * regenMult;
       this.hp = Math.min(this.maxHp, this.hp + rctRate);
 
       if (Math.random() < 0.12) {
@@ -1270,8 +1329,8 @@ export class YutaFighter extends Fighter {
     const maxCd = this.meleeCooldownMax;
     const isSwinging = (this.meleeCooldown > maxCd - 15);
 
-    // Ignore unblockable damage types (including Gojo's purple orb & Nanami 7:3 Ratio Crit)
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.isDivineFlame || opts.isFuga);
+    // Ignore unblockable damage types (including Gojo's purple orb, Nanami 7:3 Ratio Crit, and Saitama punches)
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isSaitamaPunch || opts.isSeriousPunch || opts.bypassShield || opts.isDivineFlame || opts.isFuga || (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')));
     const unblockable = isGuaranteedHit || opts.isPoison || opts.isBurn || opts.isFlame || opts.isDivineFlame || opts.isFuga || opts.isExplosion || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
 
     const isGuarding = this.blockPoseTimer > 0;
@@ -1398,7 +1457,7 @@ export class YutaFighter extends Fighter {
 
     // Check for fatal blow to trigger RCT Revival
     if (!this.hasUsedRCTRevival && this.invincibilityTimer <= 0 && amount > 0 && !opts.isSaitamaCounter && !opts.isSeriousPunch && !opts.isStorm && !opts.isHeal) {
-      if (amount < this.hp && this.hp - amount <= 0 && this.hp > 0) {
+      if (this.hp - amount <= 0 && this.hp > 0) {
         this.hasUsedRCTRevival = true;
         const duration = CONFIG.yuta.rctRevivalDuration || 150; // 2.5 seconds by default
         this.rctRevivalTimer = duration;
@@ -1413,45 +1472,39 @@ export class YutaFighter extends Fighter {
       }
     }
 
-    // Track 3-second damage window for non-fatal heavy damage RCT heal trigger.
-    // IMPORTANT: Exclude ALL guaranteed-hit and high-knockback damage sources from
-    // accumulating into the heal-freeze window. These powerful attacks (Fuga, explosions,
-    // ultimates, domain attacks, etc.) apply massive knockback that should send Yuta
-    // flying across the arena — NOT freeze him in a stationary 2.5s heal pose.
-    // Using isGuaranteedHit (already computed above) ensures any future guaranteed-hit
-    // ability is automatically excluded without needing per-flag whitelisting here.
-    const isHighImpactDamage = isGuaranteedHit || opts.isExplosion || opts.isKnockback || opts.isAOE || opts.isUltimate || opts.isDomain || opts.isStorm;
-    if (amount > 0 && this.invincibilityTimer <= 0 && !isHighImpactDamage) {
-      const now = Date.now();
-      if (!this.damageWindow) this.damageWindow = [];
-      this.damageWindow.push({ amount, time: now });
-
-      // Keep only damage entries from the last 3000ms (3 seconds)
-      this.damageWindow = this.damageWindow.filter(d => now - d.time <= 3000);
-
-      const totalDamageIn3s = this.damageWindow.reduce((sum, d) => sum + d.amount, 0);
-      const rctDamageThreshold = this.maxHp * 0.20; // 20% of max HP taken within 3 seconds
-
-      // Only trigger non-fatal RCT revival if the damage would NOT be lethal (lethal damage goes to super.takeDamage to trigger death cleanly!)
-      const isLethal = (this.hp - amount) <= 0;
-      if (!isLethal && totalDamageIn3s >= rctDamageThreshold && (this.rctCooldown || 0) <= 0 && this.rctRevivalTimer <= 0) {
-        const duration = CONFIG.yuta.rctRevivalDuration || 150;
-        this.rctRevivalTimer = duration;
-        this.invincibilityTimer = duration;
-        this.rctCooldown = 600; // 10 second cooldown between heavy damage RCT triggers
-        this.damageWindow = [];
-
-        spawnFloatingText(this.x, this.y - 40, 'RCT HEAL!', '#00FF66');
-        triggerGlobalScreenShake(6, 10);
-      }
-    }
-
+    // Apply damage via super.takeDamage
     const result = super.takeDamage(amount, attacker, opts);
-    if (result && amount > 0) {
+
+    if (result && amount > 0 && this.hp > 0 && !this.isDead) {
       if (this.domainUseCount === 1 && !this.domainActive) {
         this.domain2DamageTaken = (this.domain2DamageTaken || 0) + amount;
       }
+
+      // Track 3-second damage window for non-fatal heavy damage RCT heal trigger.
+      if (!opts.isHeal && !opts.isStorm && (this.rctCooldown || 0) <= 0 && this.rctRevivalTimer <= 0 && (this.rctHealTimer || 0) <= 0) {
+        const now = Date.now();
+        if (!this.damageWindow) this.damageWindow = [];
+        this.damageWindow.push({ amount, time: now });
+
+        // Keep only damage entries from the last 3000ms (3 seconds)
+        this.damageWindow = this.damageWindow.filter(d => now - d.time <= 3000);
+
+        const totalDamageIn3s = this.damageWindow.reduce((sum, d) => sum + d.amount, 0);
+        const rctDamageThreshold = this.maxHp * 0.20; // 20% of max HP taken within 3 seconds
+
+        if (totalDamageIn3s >= rctDamageThreshold) {
+          const duration = 120; // 2 seconds of gradual regeneration
+          this.rctHealTimer = duration;
+          // Non-fatal RCT heal activates regeneration over time without godmode invincibility or freezing movement
+          this.rctCooldown = 600; // 10 second cooldown between heavy damage RCT triggers
+          this.damageWindow = [];
+
+          spawnFloatingText(this.x, this.y - 40, 'RCT HEAL!', '#00FF66');
+          triggerGlobalScreenShake(6, 10);
+        }
+      }
     }
+
     return result;
   }
 
@@ -1692,18 +1745,24 @@ export class YutaFighter extends Fighter {
     return !!(this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0);
   }
 
-  // Returns the current damage multiplier: base mult when Rika is alive, doubled when domain is also active
+  // Returns the current damage multiplier: base mult when Rika is alive, or domain mult when domain is also active
   getRikaDamageMultiplier() {
-    if (!this.isRikaAliveInDomain()) return 1.0;
-    const baseMult = CONFIG.yuta.domainRikaDamageMultiplier || 1.50;
-    return this.domainActive ? baseMult * 2 : baseMult;
+    if (!this.isRikaAliveInDomain()) {
+      return this.domainActive ? (CONFIG.yuta?.domainDamageMultiplier ?? 1.50) : 1.0;
+    }
+    const baseMult = CONFIG.yuta?.rikaActiveDamageMultiplier ?? CONFIG.yuta?.domainRikaDamageMultiplier ?? 1.50;
+    const domainMult = CONFIG.yuta?.domainRikaDamageMultiplier ?? (baseMult * 2);
+    return this.domainActive ? domainMult : baseMult;
   }
 
-  // Returns the current regen multiplier: base mult when Rika is alive, doubled when domain is also active
+  // Returns the current regen multiplier: base mult when Rika is alive, or domain mult when domain is active
   getRikaRegenMultiplier() {
-    if (!this.isRikaAliveInDomain()) return 1.0;
-    const baseMult = CONFIG.yuta.domainRikaRegenMultiplier || 1.10;
-    return this.domainActive ? baseMult * 2 : baseMult;
+    if (!this.isRikaAliveInDomain()) {
+      return this.domainActive ? (CONFIG.yuta?.domainRegenMultiplier ?? 2.0) : 1.0;
+    }
+    const baseMult = CONFIG.yuta?.rikaActiveRegenMultiplier ?? 1.50;
+    const domainMult = CONFIG.yuta?.domainRikaRegenMultiplier ?? (baseMult * 2);
+    return this.domainActive ? domainMult : baseMult;
   }
 
   shoot(ownerIndex) {
@@ -1847,6 +1906,9 @@ export class YutaFighter extends Fighter {
       this.rikaCallTimer = 0;
       this.isChannelingThinIceBreaker = false;
       this.thinIceBreakerChargeTimer = 0;
+      this.flurryHitsLeft = 0;
+      this.flurryTimer = 0;
+      this.flurryTarget = null;
       return;
     }
 

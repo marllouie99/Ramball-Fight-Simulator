@@ -27,6 +27,15 @@ export const yujiConfig = {
   punchRange: 50,               // Additional melee reach (90° arc brawler)
   basicPunchCooldown: 35,       // Cooldown in frames between basic punches (~0.3s)
 
+  // Skill 1: Divergent Fist Dash — Gap-closing supersonic rush into punch
+  divergentDashCooldown: 240,   // Cooldown in frames between dashes (4.0s at 60fps)
+  divergentDashRange: 280,      // Max trigger distance for dash (px)
+  divergentDashMinRange: 60,    // Min distance to initiate dash (prevents dashing when already in point-blank melee)
+  divergentDashSpeed: 17.5,     // Supersonic dash velocity
+  divergentDashMaxDuration: 20, // Max frames dash can persist before safety timeout
+  divergentDashSound: 'Assets/Sound Effects/Skills/dash3.mp3',
+  divergentDashVolume: 0.85,
+
   // Passive: Divergent Fist — Delayed shockwave after each punch
   shockwaveDelay: 6,            // Frames after impact before shockwave fires
   shockwaveDamage: 10,          // Damage of the delayed cursed energy shockwave

@@ -359,6 +359,10 @@ export function getSkillDataForFighter(f, getProjectiles) {
   if (f.characterId === 'yuji' || f.type === 'yuji') {
     const themeColor = f.color || CONFIG.yuji?.themeColor || '#D95C7E';
 
+    const dashMax = CONFIG.yuji?.divergentDashCooldown || 240;
+    const dashPct = Math.max(0, Math.min(100, (1 - (f.divergentDashCooldown || 0) / dashMax) * 100));
+    const dashReady = (f.divergentDashCooldown || 0) <= 0;
+
     const bfThreshold = f.soulSwapActive 
       ? (CONFIG.yuji?.soulSwapBlackFlashThreshold || 2)
       : (f.blackFlashThreshold || CONFIG.yuji?.blackFlashThreshold || 4);
@@ -379,6 +383,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return [
+      { id: 'dash',         pct: dashPct,        ready: dashReady,            color: themeColor, label: 'DIVERGENT DASH' },
       { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' },
       { id: 'ult',          pct: ultPct,         ready: ultReady,             color: themeColor, label: 'SOUL SWAP' }
     ];
@@ -562,36 +567,51 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
   if (f.characterId === 'makima' || f.type === 'makima') {
     const themeColor = f.color || '#A31D24';
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+
+    const enableSkill1 = cfg.enableSkill1 ?? cfg.enableChains ?? cfg.enableChainsOfDomination ?? true;
+    const enableSkill2 = cfg.enableSkill2 ?? cfg.enableAngel ?? cfg.enableAngelArmory ?? cfg.enableThousandYearSpear ?? true;
+    const enableUlt = cfg.enableUltimate ?? cfg.enableShrine ?? cfg.enableShrineRitual ?? true;
+    const enablePassive = cfg.enableCitizenContract ?? cfg.enablePassive ?? cfg.citizenContractEnabled ?? true;
+
+    const skills = [];
 
     // Skill 1: Chains of Domination (Shihai no Kusari)
-    const chainsMax = f.chainsCooldownMax || CONFIG.makima?.chainsCooldown || 540;
-    const chainsTimer = f.chainsCooldown !== undefined ? f.chainsCooldown : 0;
-    let chainsPct = Math.max(0, Math.min(100, (1 - (chainsTimer / chainsMax)) * 100));
-    if (f.isChainingActive) chainsPct = 100;
+    if (enableSkill1) {
+      const chainsMax = f.chainsCooldownMax || cfg.chainsCooldown || 540;
+      const chainsTimer = f.chainsCooldown !== undefined ? f.chainsCooldown : 0;
+      let chainsPct = Math.max(0, Math.min(100, (1 - (chainsTimer / chainsMax)) * 100));
+      if (f.isChainingActive) chainsPct = 100;
+      skills.push({ id: 'chains', pct: chainsPct, ready: chainsPct >= 99, color: themeColor, label: 'CONTROL CHAINS' });
+    }
 
     // Skill 2: Angel's Armory (1000-Year Holy Spear)
-    const angelMax = f.angelCooldownMax || CONFIG.makima?.angelCooldown || 810;
-    const angelTimer = f.angelCooldown !== undefined ? f.angelCooldown : 0;
-    let angelPct = Math.max(0, Math.min(100, (1 - (angelTimer / angelMax)) * 100));
-    if (f.isSummoningSpear) angelPct = 100;
+    if (enableSkill2) {
+      const angelMax = f.angelCooldownMax || cfg.angelCooldown || 810;
+      const angelTimer = f.angelCooldown !== undefined ? f.angelCooldown : 0;
+      let angelPct = Math.max(0, Math.min(100, (1 - (angelTimer / angelMax)) * 100));
+      if (f.isSummoningSpear) angelPct = 100;
+      skills.push({ id: 'angel', pct: angelPct, ready: angelPct >= 99, color: themeColor, label: '1000-YEAR SPEAR' });
+    }
 
     // Ultimate: Kyoto Shrine Ritual (Gravitational Splatter)
-    const shrineMax = f.shrineCooldownMax || CONFIG.makima?.shrineCooldown || 1920;
-    const shrineTimer = f.shrineCooldown !== undefined ? f.shrineCooldown : shrineMax;
-    let shrinePct = Math.max(0, Math.min(100, (1 - (shrineTimer / shrineMax)) * 100));
-    if (f.isExecutingRitual) shrinePct = 100;
+    if (enableUlt) {
+      const shrineMax = f.shrineCooldownMax || cfg.shrineCooldown || 1920;
+      const shrineTimer = f.shrineCooldown !== undefined ? f.shrineCooldown : shrineMax;
+      let shrinePct = Math.max(0, Math.min(100, (1 - (shrineTimer / shrineMax)) * 100));
+      if (f.isExecutingRitual) shrinePct = 100;
+      skills.push({ id: 'shrine', pct: shrinePct, ready: shrinePct >= 99, color: themeColor, label: 'SHRINE COMPRESSION' });
+    }
 
     // Passive Gauge: Citizen Contract Lives
-    const lives = f.citizenLives !== undefined ? f.citizenLives : 5;
-    const citizenPct = Math.max(0, Math.min(100, (lives / (f.citizenLivesMax || 5)) * 100));
-    const citizenLabel = `CITIZEN LIVES (${lives}/5)`;
+    if (enablePassive) {
+      const lives = f.citizenLives !== undefined ? f.citizenLives : 5;
+      const citizenPct = Math.max(0, Math.min(100, (lives / (f.citizenLivesMax || 5)) * 100));
+      const citizenLabel = `CITIZEN LIVES (${lives}/5)`;
+      skills.push({ id: 'citizen', pct: citizenPct, ready: lives > 0, color: themeColor, label: citizenLabel });
+    }
 
-    return [
-      { id: 'chains',  pct: chainsPct,  ready: chainsPct >= 99,  color: themeColor, label: 'CONTROL CHAINS' },
-      { id: 'angel',   pct: angelPct,   ready: angelPct >= 99,   color: themeColor, label: '1000-YEAR SPEAR' },
-      { id: 'shrine',  pct: shrinePct,  ready: shrinePct >= 99,  color: themeColor, label: 'SHRINE COMPRESSION' },
-      { id: 'citizen', pct: citizenPct, ready: lives > 0,        color: themeColor, label: citizenLabel }
-    ];
+    return skills;
   }
   if (f.characterId === 'megumi' || f.type === 'megumi') {
     const themeColor = f.color || '#1C2D4A';

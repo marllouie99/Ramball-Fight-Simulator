@@ -45,6 +45,132 @@ export function excludeGojoInfinityFromDim(ctx) {
   }
 }
 
+// ──────────────────────────────────────────
+// DOMAIN ARENA VIGNETTE CUTOUT HELPER
+// Clears the arena interior during active Domain Expansions
+// so domain artwork (swords, shrine, hands, void) remains 100% visible,
+// leaving dark atmospheric color framing outside the arena with a subtle edge vignette.
+// ──────────────────────────────────────────
+export function applyDomainArenaVignetteCutout(ctx) {
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  if (!arena || !ctx) return;
+
+  const zoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+  const worldArenaCenterX = (arena.x || 0) + (arena.width || 800) / 2;
+  const worldArenaCenterY = (arena.y || 0) + (arena.height || 600) / 2;
+  const screenCenter = worldToScreen(worldArenaCenterX, worldArenaCenterY);
+  const arenaCenterX = screenCenter.x;
+  const arenaCenterY = screenCenter.y;
+
+  if (isNaN(arenaCenterX) || isNaN(arenaCenterY)) return;
+
+  const arenaW = (arena.width || 800) * zoom;
+  const arenaH = (arena.height || 600) * zoom;
+  const arenaX = arenaCenterX - arenaW / 2;
+  const arenaY = arenaCenterY - arenaH / 2;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+
+  if (arena.shape === 'circle') {
+    const ar = (arena.radius || ((arena.width || 800) / 2)) * zoom;
+    const innerR = ar * 0.85;
+
+    // 1. Clear solid center interior (100% transparent, completely unobstructed)
+    ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
+    ctx.beginPath();
+    ctx.arc(arenaCenterX, arenaCenterY, innerR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Subtle soft edge vignette at circular arena wall boundary
+    const ringGrad = ctx.createRadialGradient(
+      arenaCenterX, arenaCenterY, innerR,
+      arenaCenterX, arenaCenterY, ar
+    );
+    ringGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+    ringGrad.addColorStop(0.60, 'rgba(0, 0, 0, 0.70)');
+    ringGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.15)');
+
+    ctx.fillStyle = ringGrad;
+    ctx.beginPath();
+    ctx.arc(arenaCenterX, arenaCenterY, ar, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Rectangular Arena
+    const vignetteSize = Math.max(16, Math.min(arenaW, arenaH) * 0.08); // Subtle ~25-35px border vignette
+    const innerX = arenaX + vignetteSize;
+    const innerY = arenaY + vignetteSize;
+    const innerW = Math.max(0, arenaW - vignetteSize * 2);
+    const innerH = Math.max(0, arenaH - vignetteSize * 2);
+
+    if (innerW > 0 && innerH > 0) {
+      // 1. Clear solid center interior (100% transparent, completely unobstructed)
+      ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
+      ctx.fillRect(innerX, innerY, innerW, innerH);
+
+      // 2. Subtle soft edge vignettes along the 4 borders
+      // Top border
+      const topGrad = ctx.createLinearGradient(innerX, arenaY, innerX, innerY);
+      topGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+      topGrad.addColorStop(1, 'rgba(0, 0, 0, 1.0)');
+      ctx.fillStyle = topGrad;
+      ctx.fillRect(innerX, arenaY, innerW, vignetteSize);
+
+      // Bottom border
+      const botGrad = ctx.createLinearGradient(innerX, innerY + innerH, innerX, arenaY + arenaH);
+      botGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+      botGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+      ctx.fillStyle = botGrad;
+      ctx.fillRect(innerX, innerY + innerH, innerW, vignetteSize);
+
+      // Left border
+      const leftGrad = ctx.createLinearGradient(arenaX, innerY, innerX, innerY);
+      leftGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+      leftGrad.addColorStop(1, 'rgba(0, 0, 0, 1.0)');
+      ctx.fillStyle = leftGrad;
+      ctx.fillRect(arenaX, innerY, vignetteSize, innerH);
+
+      // Right border
+      const rightGrad = ctx.createLinearGradient(innerX + innerW, innerY, arenaX + arenaW, innerY);
+      rightGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+      rightGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+      ctx.fillStyle = rightGrad;
+      ctx.fillRect(innerX + innerW, innerY, vignetteSize, innerH);
+
+      // 3. Four soft corner blends
+      // Top-Left corner
+      const tlGrad = ctx.createRadialGradient(innerX, innerY, 0, innerX, innerY, vignetteSize);
+      tlGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+      tlGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+      ctx.fillStyle = tlGrad;
+      ctx.fillRect(arenaX, arenaY, vignetteSize, vignetteSize);
+
+      // Top-Right corner
+      const trGrad = ctx.createRadialGradient(innerX + innerW, innerY, 0, innerX + innerW, innerY, vignetteSize);
+      trGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+      trGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+      ctx.fillStyle = trGrad;
+      ctx.fillRect(innerX + innerW, arenaY, vignetteSize, vignetteSize);
+
+      // Bottom-Left corner
+      const blGrad = ctx.createRadialGradient(innerX, innerY + innerH, 0, innerX, innerY + innerH, vignetteSize);
+      blGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+      blGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+      ctx.fillStyle = blGrad;
+      ctx.fillRect(arenaX, innerY + innerH, vignetteSize, vignetteSize);
+
+      // Bottom-Right corner
+      const brGrad = ctx.createRadialGradient(innerX + innerW, innerY + innerH, 0, innerX + innerW, innerY + innerH, vignetteSize);
+      brGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+      brGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+      ctx.fillStyle = brGrad;
+      ctx.fillRect(innerX + innerW, innerY + innerH, vignetteSize, vignetteSize);
+    }
+  }
+
+  ctx.restore();
+}
+
 let currentPurpleDimOpacity = 0;
 
 /**
@@ -103,9 +229,11 @@ export function drawPurpleDimScreen() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   const opacity = currentPurpleDimOpacity;
+  const is200 = (purpleOrb && purpleOrb.is200Percent) || (gojoFighter && (gojoFighter.is200PercentChannel || gojoFighter.purpleUseCount === 1));
+  const isGreen = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isRubbick || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
 
-  // Dark base black overlay (instead of purple)
-  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.92})`;
+  // Dark rich cursed royal purple / void overlay
+  ctx.fillStyle = isGreen ? `rgba(2, 24, 10, ${opacity * 0.88})` : `rgba(20, 2, 32, ${opacity * 0.88})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Dynamic radial gradient centered on Gojo or Purple Orb
@@ -114,8 +242,6 @@ export function drawPurpleDimScreen() {
   const maxDim = Math.max(arena.width, arena.height) * 0.70 * camZoom;
   const roundCx = Math.round(screenPos.x / 10) * 10;
   const roundCy = Math.round(screenPos.y / 10) * 10;
-  const is200 = (purpleOrb && purpleOrb.is200Percent) || (gojoFighter && (gojoFighter.is200PercentChannel || gojoFighter.purpleUseCount === 1));
-  const isGreen = Boolean(purpleOrb && (purpleOrb.colorTheme === 'green' || purpleOrb.isRubbick || purpleOrb.isTrickster || purpleOrb.color === '#00FF64'));
   const key = `${roundCx}_${roundCy}_${maxDim}_${is200}_${isGreen ? 'green' : 'purple'}`;
 
   if (!state._cachedPurpleDimGrad || state._cachedPurpleDimKey !== key) {
@@ -128,21 +254,21 @@ export function drawPurpleDimScreen() {
     const rRatio = glowR / maxDim;
 
     if (isGreen) {
-      state._cachedPurpleDimGrad.addColorStop(0, 'rgba(0, 255, 100, 1.0)');           // Vibrant neon green core
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(0, 200, 80, 0.95)'); // Saturated electric emerald
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(0, 140, 60, 0.75)');  // Deep arcane green ring
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(0, 80, 30, 0.45)');   // Dark green halo bloom
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(0, 30, 10, 0.20)');    // Deep night-green transition
-      state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 0, 0, 1.0)'); // Dark outer space
-      state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');               // Pitch black boundary
+      state._cachedPurpleDimGrad.addColorStop(0, 'rgba(0, 255, 120, 1.0)');           // Vibrant neon green core
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(0, 210, 90, 0.95)'); // Saturated electric emerald
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(0, 150, 65, 0.75)');  // Deep arcane green ring
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(0, 90, 35, 0.48)');   // Dark green halo bloom
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(0, 40, 15, 0.28)');    // Deep night-green transition
+      state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 25, 10, 0.60)'); // Deep arcane green space
+      state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 15, 6, 0.40)');               // Outer boundary
     } else {
-      state._cachedPurpleDimGrad.addColorStop(0, 'rgba(210, 40, 255, 1.0)');           // Vibrant neon magenta-purple core
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(160, 0, 255, 0.95)'); // Saturated electric royal purple
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(120, 0, 220, 0.75)');  // Deep JJK cursed purple ring
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(75, 0, 150, 0.45)');   // Dark violet halo bloom
-      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(30, 0, 70, 0.20)');    // Deep night-purple transition
-      state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 0, 0, 1.0)'); // Dark outer space
-      state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');               // Pitch black boundary
+      state._cachedPurpleDimGrad.addColorStop(0, 'rgba(220, 60, 255, 1.0)');           // Vibrant neon magenta-purple core
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(170, 20, 255, 0.95)'); // Saturated electric royal purple
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(130, 10, 230, 0.75)');  // Deep JJK cursed purple ring
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(85, 5, 160, 0.48)');   // Dark violet halo bloom
+      state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(40, 2, 80, 0.28)');    // Deep night-purple transition
+      state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(25, 2, 50, 0.60)'); // Deep cursed purple space
+      state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(15, 1, 28, 0.40)');               // Outer boundary
     }
   }
 
@@ -256,7 +382,7 @@ export function drawPurpleDimScreen() {
 
   ctx.restore();
   
-  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
+  state.globalDimEdgeColor = isGreen ? `rgba(2, 24, 10, ${opacity * 0.95})` : `rgba(20, 2, 32, ${opacity * 0.95})`;
 }
 
 let currentGojoDomainDimOpacity = 0;
@@ -299,16 +425,37 @@ export function drawGojoDomainDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Base dark overlay
-  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
+  // 1. Base dark cosmic blue atmosphere overlay
+  ctx.fillStyle = `rgba(4, 10, 36, ${opacity * 0.85})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Deep cosmic dark blue / limitless cyan radial gradient centered on Gojo
+  const screenPos = gojoFighter ? worldToScreen(gojoFighter.x, gojoFighter.y - (gojoFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, `rgba(0, 160, 220, ${opacity * 0.55})`);        // Limitless cyan-blue core
+  grad.addColorStop(0.18, `rgba(15, 80, 180, ${opacity * 0.45})`);     // Deep royal blue halo
+  grad.addColorStop(0.40, `rgba(8, 35, 120, ${opacity * 0.30})`);      // Dark cosmic blue ring
+  grad.addColorStop(0.70, `rgba(4, 14, 55, ${opacity * 0.15})`);       // Deep astral fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 3. Clear arena interior with subtle edge vignette so Unlimited Void cosmic artwork is 100% visible
+  if (gojoFighter && gojoFighter.domainActive) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
 
   // Exclude Gojo Limitless Infinity Barrier from full-screen dimming
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(0, 5, 20, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(4, 10, 36, ${opacity * 0.95})`;
 }
 
 let currentRubbickDomainDimOpacity = 0;
@@ -352,15 +499,36 @@ export function drawRubbickDomainDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Base dark emerald green overlay
-  ctx.fillStyle = `rgba(1, 24, 10, ${opacity * 0.88})`;
+  // 1. Base dark emerald green atmosphere overlay
+  ctx.fillStyle = `rgba(3, 30, 12, ${opacity * 0.85})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Arcane emerald radial gradient centered on Rubick
+  const screenPos = rubbickFighter ? worldToScreen(rubbickFighter.x, rubbickFighter.y - (rubbickFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, `rgba(0, 190, 90, ${opacity * 0.55})`);         // Arcane emerald core
+  grad.addColorStop(0.18, `rgba(0, 140, 65, ${opacity * 0.45})`);      // Deep emerald halo
+  grad.addColorStop(0.40, `rgba(0, 75, 35, ${opacity * 0.30})`);       // Arcane green ring
+  grad.addColorStop(0.70, `rgba(2, 35, 15, ${opacity * 0.15})`);       // Deep jade fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 3. Clear arena interior with subtle edge vignette so stolen domain artwork is 100% visible
+  if (rubbickFighter && (rubbickFighter.stolenDomainActive || (rubbickFighter.domainActive && rubbickFighter.stolenType === 'gojo_domain'))) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
 
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(0, 20, 8, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(3, 30, 12, ${opacity * 0.95})`;
 }
 
 let currentSukunaDomainDimOpacity = 0;
@@ -403,20 +571,42 @@ export function drawSukunaDomainDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.88})`;
+  // 1. Base dark crimson atmosphere overlay
+  ctx.fillStyle = `rgba(32, 4, 8, ${opacity * 0.85})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Deep crimson/blood-red radial gradient centered on Sukuna
+  const screenPos = sukunaFighter ? worldToScreen(sukunaFighter.x, sukunaFighter.y - (sukunaFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, `rgba(180, 20, 25, ${opacity * 0.55})`);        // Deep malevolent crimson core
+  grad.addColorStop(0.18, `rgba(120, 12, 18, ${opacity * 0.45})`);     // Blood red halo
+  grad.addColorStop(0.40, `rgba(60, 6, 12, ${opacity * 0.30})`);       // Dark crimson ring
+  grad.addColorStop(0.70, `rgba(35, 4, 8, ${opacity * 0.15})`);        // Deep maroon fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 3. Clear arena interior with subtle edge vignette so Malevolent Shrine artwork is 100% visible
+  if (sukunaFighter && sukunaFighter.domainActive) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
 
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(10, 0, 0, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(32, 4, 8, ${opacity * 0.95})`;
 }
 
 let currentYutaDomainDimOpacity = 0;
 
 /**
- * Draws a dark cursed purple/pink dim screen overlay when Yuta's Domain Expansion is active.
+ * Draws a dark cursed pink/magenta-rose dim screen overlay matching Yuta's Authentic Mutual Love Domain Expansion.
  */
 export function drawYutaDomainDimScreen() {
   const { ctx, canvas } = state;
@@ -453,14 +643,36 @@ export function drawYutaDomainDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  ctx.fillStyle = `rgba(10, 2, 8, ${opacity * 0.90})`;
+  // 1. Base dark cursed pink/wine atmosphere overlay matching domain theme
+  ctx.fillStyle = `rgba(32, 5, 24, ${opacity * 0.88})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Deep cursed pink & magenta-rose radial aura centered on Yuta
+  const screenPos = yutaFighter ? worldToScreen(yutaFighter.x, yutaFighter.y - (yutaFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, `rgba(255, 30, 150, ${opacity * 0.60})`);       // Vibrant cursed authentic love pink core
+  grad.addColorStop(0.18, `rgba(215, 20, 130, ${opacity * 0.50})`);    // Deep cursed magenta-pink halo
+  grad.addColorStop(0.40, `rgba(135, 12, 85, ${opacity * 0.35})`);     // Dark royal rose void
+  grad.addColorStop(0.70, `rgba(55, 6, 38, ${opacity * 0.18})`);       // Deep wine-plum transition
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 3. Clear arena interior with subtle edge vignette so domain artwork is 100% visible
+  if (yutaFighter && yutaFighter.domainActive) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
 
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(20, 2, 14, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(32, 5, 24, ${opacity * 0.95})`;
 }
 
 let currentMahitoDomainDimOpacity = 0;
@@ -503,14 +715,36 @@ export function drawMahitoDomainDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  ctx.fillStyle = `rgba(10, 2, 16, ${opacity * 0.88})`;
+  // 1. Base dark cursed violet atmosphere overlay
+  ctx.fillStyle = `rgba(24, 3, 32, ${opacity * 0.85})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. Cursed soul violet radial gradient centered on Mahito
+  const screenPos = mahitoFighter ? worldToScreen(mahitoFighter.x, mahitoFighter.y - (mahitoFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0, `rgba(175, 45, 210, ${opacity * 0.55})`);       // Radiant soul violet core
+  grad.addColorStop(0.18, `rgba(125, 30, 170, ${opacity * 0.45})`);    // Deep cursed purple halo
+  grad.addColorStop(0.40, `rgba(65, 10, 95, ${opacity * 0.30})`);      // Dark violet ring
+  grad.addColorStop(0.70, `rgba(28, 4, 40, ${opacity * 0.15})`);       // Deep soul fade
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 3. Clear arena interior with subtle edge vignette so woven hands artwork is 100% visible
+  if (mahitoFighter && (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive)) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
 
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(15, 2, 20, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(24, 3, 32, ${opacity * 0.95})`;
 }
 
 let currentTojiUltimateOpacity = 0;
@@ -700,17 +934,18 @@ export function drawMahoragaAdaptationDimScreen() {
     drawX, wheelY, 15,
     drawX, wheelY, maxRadius
   );
-  grad.addColorStop(0, `rgba(40, 30, 8, ${opacity * 0.65})`);
-  grad.addColorStop(0.25, `rgba(18, 12, 3, ${opacity * 0.88})`);
-  grad.addColorStop(0.60, `rgba(8, 4, 1, ${opacity * 0.96})`);
-  grad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.98})`);
+  grad.addColorStop(0, `rgba(255, 215, 0, ${opacity * 0.55})`);
+  grad.addColorStop(0.20, `rgba(218, 165, 32, ${opacity * 0.48})`);
+  grad.addColorStop(0.50, `rgba(130, 85, 12, ${opacity * 0.72})`);
+  grad.addColorStop(0.80, `rgba(45, 28, 5, ${opacity * 0.88})`);
+  grad.addColorStop(1.0, `rgba(18, 10, 2, ${opacity * 0.95})`);
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.restore();
   
-  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
+  state.globalDimEdgeColor = `rgba(18, 10, 2, ${opacity * 0.95})`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -121,31 +121,48 @@ export function executeThinIceBreaker(fighter, angle) {
     }
   });
 
-  // Hit detection
-  state.fighters.forEach(target => {
-    if (target !== fighter && target.hp > 0) {
-      const dx = target.x - originX;
-      const dy = target.y - originY;
-      const dist = Math.hypot(dx, dy);
-      if (dist < range) {
-        let targetAngle = Math.atan2(dy, dx);
-        let angleDiff = targetAngle - angle;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+  // Hit detection across enemies & illusions (Rule #6 compliant, teammates excluded)
+  const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(fighter)) : fighter.team;
+  const targetsToScan = [];
+  if (state.fighters) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (!f || f === fighter || f.hp <= 0 || f.isIllusion) continue;
+      const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : f.team;
+      if (myTeam !== null && targetTeam !== null && myTeam === targetTeam) continue;
+      targetsToScan.push(f);
+    }
+  }
+  if (state.illusions) {
+    for (const ill of state.illusions) {
+      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
+      if (myTeam !== null && ill.owner && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
+      targetsToScan.push(ill);
+    }
+  }
+
+  targetsToScan.forEach(target => {
+    const dx = target.x - originX;
+    const dy = target.y - originY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < range) {
+      let targetAngle = Math.atan2(dy, dx);
+      let angleDiff = targetAngle - angle;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      
+      if (Math.abs(angleDiff) < coneArc / 2) {
+        // Unblockable hit via 'fromBlackHole' trick which ignores parries, plus isThinIceBreaker flag
+        target.takeDamage(damage, fighter, { fromBlackHole: true, isThinIceBreaker: true }); 
+        state.thinIceBreakerDimTimer = 18; // Trigger quick screen dim effect
         
-        if (Math.abs(angleDiff) < coneArc / 2) {
-          // Unblockable hit via 'fromBlackHole' trick which ignores parries, plus isThinIceBreaker flag
-          target.takeDamage(damage, fighter, { fromBlackHole: true, isThinIceBreaker: true }); 
-          state.thinIceBreakerDimTimer = 18; // Trigger quick screen dim effect
-          
-          // Apply massive knockback
-          const knockbackForce = CONFIG.yuta?.thinIceBreakerKnockback || 35;
-          if (typeof target.applyKnockback === 'function') {
-            target.applyKnockback(Math.cos(angle) * knockbackForce, Math.sin(angle) * knockbackForce);
-          } else {
-            target.vx = Math.cos(angle) * knockbackForce;
-            target.vy = Math.sin(angle) * knockbackForce;
-          }
+        // Apply massive knockback
+        const knockbackForce = CONFIG.yuta?.thinIceBreakerKnockback || 35;
+        if (typeof target.applyKnockback === 'function') {
+          target.applyKnockback(Math.cos(angle) * knockbackForce, Math.sin(angle) * knockbackForce);
+        } else {
+          target.vx = Math.cos(angle) * knockbackForce;
+          target.vy = Math.sin(angle) * knockbackForce;
         }
       }
     }

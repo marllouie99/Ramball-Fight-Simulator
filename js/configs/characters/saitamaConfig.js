@@ -30,9 +30,9 @@ export const saitamaConfig = {
   disableNormalPunch: false,       // If true, disables Normal Punch basic attack
   punchDamage: 500, // Massive basic attack damage
   punchKnockback: 100, // Massive knockback force
-  punchReach: 80,
+  punchReach: 50,
   punchArcAngle: Math.PI * 0.5, // 90 degree arc angle
-  punchCooldown: 1500, // ~0.5s cooldown
+  punchCooldown: 1000, // ~0.6s cooldown at 60fps
   punchWindup: 0,
   punchWindupFrames: 0,
   punchMaxTime: 22,                // Smooth punch animation frames
@@ -48,6 +48,8 @@ export const saitamaConfig = {
   punchScreenShakeDuration: 10,    // Arena screen shake duration (frames) on basic attack punch hit
   punchFrontalReach: 420,          // Frontal supersonic shockwave blast reach (px) on normal punch
   punchFrontalArc: Math.PI * 0.65, // Frontal shockwave blast cone angle on normal punch
+  punchFrontalDamage: 500,         // Damage dealt across the long frontal supersonic shockwave blast cone
+  punchTriggerDistance: 110,       // AI trigger distance threshold for initiating Normal Punch (px)
   wallPinScreenShakeIntensity: 30,  // Arena screen shake intensity on wall pin impact
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
 
@@ -55,19 +57,21 @@ export const saitamaConfig = {
   consecutivePunchesEnabled: 1, // Set to false to disable Consecutive Normal Punches (Skill 1)
   flurryEnabled: true,             // Alias toggle
   disableConsecutivePunches: false, // If true, disables Consecutive Normal Punches
-  flurryDamage: 100,                 // Damage per rapid punch hit
+  flurryDamage: 50,                 // Damage per rapid punch hit
   flurryHitCount: 10,               // 10 rapid consecutive normal punches
   flurryHitInterval: 4,             // Frames between consecutive punch hits (~0.066s)
   flurryReach: 95,                  // Range of flurry punches
   flurryArcAngle: Math.PI * 0.65,   // ~117-degree frontal cone (Rule #8)
+  flurryFrontalReach: 320,          // Frontal supersonic corridor reach (px) during rapid flurry punches
+  flurryFrontalDamage: 50,         // Damage per rapid flurry punch in the frontal corridor
   flurryDashOffset: 25,             // Distance offset when dashing to target
   flurryForwardSlideSpeed: 4.5,     // Forward slide step (px) Saitama advances on each punch
   flurryPushbackPerHit: 7.0,        // Backward push distance (px) applied to enemy on each punch
-  flurryFinalSlamDamage: 200,        // Final devastating finisher punch
+  flurryFinalSlamDamage: 100,        // Final devastating finisher punch
   flurryFinalSlamKnockback: 65,     // Heavy knockback on final blow
   flurryFinalFrontalReach: 560,     // Frontal supersonic shockwave blast reach (px) on flurry final punch
   flurryFinalFrontalArc: Math.PI * 0.70, // Frontal shockwave blast cone angle on flurry final punch
-  flurryCooldown: 1000,              // Cooldown frames at 60fps
+  flurryCooldown: 1200,              // Cooldown frames at 60fps
   flurryTriggerDistance: 260,       // AI trigger distance threshold
   flurryInitialHitPauseFrames: 20,  // Target hit-pause on flurry start
   flurryHoldHitPauseFrames: 8,      // Target hit-pause during flurry cycle

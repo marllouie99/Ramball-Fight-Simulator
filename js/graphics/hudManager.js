@@ -845,7 +845,7 @@ function updateHealthHud() {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false},${f.isJetpackActive || false},${q(f.jetpackTimer)},${f.isBaguvixActive || false},${q(f.hesoyamShield)},${q(f.respect)},${q(f.jetpackCooldown)},${q(f.driveByCooldown)},${q(f.baguvixCooldown)},${q(f.baguvixTimer)},${q(f.driveByTimer)},${f.hasUsedHesoyam || false},${f.isDriveByActive || false},${f.isTypingCheat || false}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${q(f.divergentDashCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false},${f.isJetpackActive || false},${q(f.jetpackTimer)},${f.isBaguvixActive || false},${q(f.hesoyamShield)},${q(f.respect)},${q(f.jetpackCooldown)},${q(f.driveByCooldown)},${q(f.baguvixCooldown)},${q(f.baguvixTimer)},${q(f.driveByTimer)},${f.hasUsedHesoyam || false},${f.isDriveByActive || false},${f.isTypingCheat || false}`;
   }).join('|');
   const hpChanged = currentHpStr !== state._lastHpStr;
   const skillsChanged = currentSkillsStr !== state._lastSkillsStr;
@@ -1100,18 +1100,22 @@ function updateHealthHud() {
       }
 
       // 3. Regen Stat Line
+      const activeRate = f.domainActive
+        ? (CONFIG.yuta?.domainRctHealRate || 0.90)
+        : (isRikaAlive ? (CONFIG.yuta?.rikaActiveRegenRate || 0.06) : baseRegen);
+      const regenMult = (f.domainActive || isRikaAlive)
+        ? (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (f.domainActive ? (CONFIG.yuta?.domainRikaRegenMultiplier || 3.0) : (CONFIG.yuta?.rikaActiveRegenMultiplier || 1.50)))
+        : 1.0;
+      const currentRegen = activeRate * regenMult;
+
       if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
         info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
       } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
-        const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.05) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 1.10)) : baseRegen;
         const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50);
         const debuffedRegen = currentRegen * debuffMult;
         info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
       } else if (f.domainActive || isRikaAlive) {
-        const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 1.10);
-        const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.05;
-        const rctRate = domainRctHealRate * regenMult;
-        const bonusRegen = rctRate - baseRegen;
+        const bonusRegen = Math.max(0, currentRegen - baseRegen);
         info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);

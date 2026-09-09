@@ -331,10 +331,20 @@ export class Fighter {
       d.type === 'minion'
     );
 
-    if (!isTurretOrMinion && MODE_SETTINGS[state.mode]?.fixedHp) {
-      this.maxHp = MODE_SETTINGS[state.mode].fixedHp;
+    const isMakima = Boolean(
+      this.characterId === 'makima' ||
+      this.type === 'makima' ||
+      d.characterId === 'makima' ||
+      d.type === 'makima'
+    );
+    const hpRatio = isMakima ? ((typeof CONFIG !== 'undefined' && CONFIG.makima?.maxHpRatio) ? CONFIG.makima.maxHpRatio : 0.50) : 1.0;
+    const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || (isMakima ? (MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp) : null);
+
+    if (!isTurretOrMinion && (MODE_SETTINGS[state.mode]?.fixedHp || (isMakima && modeFixed))) {
+      const baseFixed = MODE_SETTINGS[state.mode]?.fixedHp || modeFixed;
+      this.maxHp = Math.round(baseFixed * hpRatio);
     } else {
-      this.maxHp = baseHp * (MODE_HP_MULTIPLIER[state.mode] || 1);
+      this.maxHp = Math.round(baseHp * (MODE_HP_MULTIPLIER[state.mode] || 1) * hpRatio);
     }
     if (!Number.isFinite(this.maxHp) || this.maxHp <= 0) {
       console.warn('Invalid fighter maxHp, resetting to default', d, state.mode, this.maxHp);
@@ -584,9 +594,14 @@ export class Fighter {
     this.speedBoostTimer = 0;
 
     this._counterPunchTimer = 0;
+    this._counterPunchTarget = null;
     this._counterWindupTimer = 0;
     this._postCounterRecoveryTimer = 0;
     this.isCountering = false;
+    if (this._counterPunchChargeSound) {
+      try { fadeOutSound(this._counterPunchChargeSound, 100); } catch (e) {}
+      this._counterPunchChargeSound = null;
+    }
 
     this.isBlitzing = false;
     this.blitzTarget = null;
@@ -726,6 +741,9 @@ export class Fighter {
       this.isFlurrying ||
       (this.flurryHitsLeft && this.flurryHitsLeft > 0) ||
       (this.rapidSlashHitsLeft && this.rapidSlashHitsLeft > 0) ||
+      this.soulSwapActive ||
+      (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0) ||
+      (this.revertTransitionTimer && this.revertTransitionTimer > 0) ||
       this.isCountering ||
       (this._counterPunchTimer && this._counterPunchTimer > 0) ||
       (this._counterWindupTimer && this._counterWindupTimer > 0) ||
@@ -901,6 +919,8 @@ export class Fighter {
     this.basicPunchChargeTimer = 0;
     if (forceCancelAll || this.hp <= 0 || !this.isCountering) {
       this._counterPunchTimer = 0;
+      this._counterPunchTarget = null;
+      this._counterWindupTimer = 0;
       this._postCounterRecoveryTimer = 0;
       this.isCountering = false;
     }
@@ -1541,7 +1561,7 @@ export class Fighter {
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
   takeDamage(amount, attacker, opts = {}) {
-    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga));
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isSaitamaPunch || opts.isSeriousPunch || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga));
 
     // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
     if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {

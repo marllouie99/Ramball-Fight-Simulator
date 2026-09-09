@@ -618,8 +618,8 @@ export function drawArena() {
       const textY = arena.y - 12;
       ctx.save();
       applyCameraToCtx(ctx);
-      const nameFont = '700 34px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-      const vsFont = '700 20px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      const nameFont = '700 42px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      const vsFont = '700 24px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
       const accentFont = vsFont;
       const ampFont = vsFont;
 
@@ -679,9 +679,9 @@ export function drawArena() {
         }));
 
         const hasStackedTeam = team0.length > 1 || team1.length > 1;
-        const nameFontSize = hasStackedTeam ? 24 : 34;
+        const nameFontSize = hasStackedTeam ? 34 : 42;
         const customNameFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-        const vsFontSize = hasStackedTeam ? 15 : 20;
+        const vsFontSize = hasStackedTeam ? 22 : 24;
         const customVsFont = `700 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
 
         ctx.font = customNameFont;
@@ -706,20 +706,22 @@ export function drawArena() {
         const vsText = 'vs';
         const wVs = ctx.measureText(vsText).width;
 
-        const pad = 12;
+        const pad = 14;
         const totalW = wTeam0 + pad + wVs + pad + wTeam1;
         const maxW = arena.width - 16;
         const scale = totalW > maxW ? maxW / totalW : 1.0;
 
         const bottomY = arena.y - 12;
-        const lineSpacing = 20;
+        const lineSpacing = hasStackedTeam ? 34 : 0;
         const topY = bottomY - lineSpacing;
+        const midY = (topY + bottomY) / 2;
 
         ctx.save();
         if (scale < 1.0) {
-          ctx.translate(centerX, bottomY);
+          const scaleAnchorY = hasStackedTeam ? midY : bottomY;
+          ctx.translate(centerX, scaleAnchorY);
           ctx.scale(scale, scale);
-          ctx.translate(-centerX, -bottomY);
+          ctx.translate(-centerX, -scaleAnchorY);
         }
 
         const startX = centerX - totalW / 2;
@@ -733,7 +735,7 @@ export function drawArena() {
         if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
         if (team0Data.length === 1) {
           ctx.fillStyle = team0Data[0].color;
-          ctx.fillText(team0Data[0].name, startX, bottomY);
+          ctx.fillText(team0Data[0].name, startX, hasStackedTeam ? midY : bottomY);
         } else {
           ctx.fillStyle = team0Data[0].color;
           ctx.fillText(team0Data[0].name, startX, topY);
@@ -745,14 +747,14 @@ export function drawArena() {
         ctx.font = customVsFont;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
         ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-        ctx.fillText(vsText, vsX, bottomY - 1.5);
+        ctx.fillText(vsText, vsX, (hasStackedTeam ? midY : bottomY) - 1.5);
 
         // Render Team 1 (Right Side)
         ctx.font = customNameFont;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
         if (team1Data.length === 1) {
           ctx.fillStyle = team1Data[0].color;
-          ctx.fillText(team1Data[0].name, team1X, bottomY);
+          ctx.fillText(team1Data[0].name, team1X, hasStackedTeam ? midY : bottomY);
         } else {
           ctx.fillStyle = team1Data[0].color;
           ctx.fillText(team1Data[0].name, team1X, topY);
@@ -878,6 +880,7 @@ export function drawArena() {
 // ──────────────────────────────────────────
 export {
   excludeGojoInfinityFromDim,
+  applyDomainArenaVignetteCutout,
   drawPurpleDimScreen,
   drawGojoDomainDimScreen,
   drawRubbickDomainDimScreen,

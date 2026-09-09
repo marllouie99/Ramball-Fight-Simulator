@@ -399,11 +399,8 @@ export function isTodoTakadaOverlayActive() {
 export function drawTodoTakadaIdolScreenOverlay() {
   if (!state || !state.fighters || !state.ctx || !state.canvas) return;
 
-  // Single pass fighter search
+  // Single pass fighter search for Todo
   let todoFighter = null;
-  let yutaFighter = null;
-  let isMahitoDomainActive = false;
-  let isSaitamaSeriousPunchActive = false;
   const fighters = state.fighters;
   for (let i = 0; i < fighters.length; i++) {
     const f = fighters[i];
@@ -411,17 +408,7 @@ export function drawTodoTakadaIdolScreenOverlay() {
     const charId = f.characterId || f.type || f._def?.type || f._def?.id;
     if (charId === 'todo' && (f.isTakadaChanneling || f.isTakadaUltActive)) {
       todoFighter = f;
-    } else if (charId === 'yuta' && f.rika) {
-      yutaFighter = f;
-    } else if (charId === 'mahito' && f.domainActive) {
-      isMahitoDomainActive = true;
-    } else if (charId === 'saitama' && (
-      (f._counterPunchTimer && f._counterPunchTimer > 0) ||
-      (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) ||
-      f.isChargingSeriousPunch ||
-      f.isCountering
-    )) {
-      isSaitamaSeriousPunchActive = true;
+      break;
     }
   }
 
@@ -497,62 +484,6 @@ export function drawTodoTakadaIdolScreenOverlay() {
         ctx.globalAlpha = heartAlpha;
         ctx.drawImage(sprite, Math.round(hx - sprW / 2), Math.round(hy - sprH / 2), sprW, sprH);
       }
-    }
-  }
-
-  ctx.globalAlpha = _todoIdolOverlayAlpha;
-
-  // 3. Radial cutout around Rika and Pure Love Beam Corridor
-  if (!isMahitoDomainActive && yutaFighter && yutaFighter.rika) {
-    const rk = yutaFighter.rika;
-    const isRikaActive = rk.active || 
-      (yutaFighter.rikaEmergingForBeamTimer && yutaFighter.rikaEmergingForBeamTimer > 0) || 
-      yutaFighter.isChannelingPureLoveBeam || 
-      yutaFighter.isFiringPureLoveBeam || 
-      (yutaFighter.rikaAlpha !== undefined && yutaFighter.rikaAlpha > 0);
-
-    if (isRikaActive) {
-      const rkX = rk.x;
-      const rkY = rk.y;
-      const cutoutRadius = (rk.radius || rk.r || 65) + 110;
-
-      ctx.save();
-      ctx.globalCompositeOperation = 'destination-out';
-      const cutoutGrad = ctx.createRadialGradient(rkX, rkY, 20, rkX, rkY, cutoutRadius);
-      cutoutGrad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');
-      cutoutGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0.8)');
-      cutoutGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-
-      ctx.fillStyle = cutoutGrad;
-      ctx.beginPath();
-      ctx.arc(rkX, rkY, cutoutRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    if (yutaFighter.isFiringPureLoveBeam) {
-      const beamAngle = yutaFighter.pureLoveBeamLockedAngle !== undefined ? yutaFighter.pureLoveBeamLockedAngle : (yutaFighter.gunAngle || 0);
-      const beamOffset = (yutaFighter.r || 22) + 14;
-      const startX = yutaFighter.x + Math.cos(beamAngle) * beamOffset;
-      const startY = yutaFighter.y + Math.sin(beamAngle) * beamOffset;
-      const beamLen = 2500;
-      const beamWidth = 220;
-
-      ctx.save();
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.translate(startX, startY);
-      ctx.rotate(beamAngle);
-
-      const beamGrad = ctx.createLinearGradient(0, -beamWidth / 2, 0, beamWidth / 2);
-      beamGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.0)');
-      beamGrad.addColorStop(0.25, 'rgba(0, 0, 0, 0.9)');
-      beamGrad.addColorStop(0.5, 'rgba(0, 0, 0, 1.0)');
-      beamGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.9)');
-      beamGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-
-      ctx.fillStyle = beamGrad;
-      ctx.fillRect(0, -beamWidth / 2, beamLen, beamWidth);
-      ctx.restore();
     }
   }
 

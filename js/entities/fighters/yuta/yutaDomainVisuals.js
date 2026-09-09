@@ -58,21 +58,21 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     fighter._cachedYutaBgMidX = midX;
     fighter._cachedYutaBgMidY = midY;
     fighter._cachedYutaBgGrad = ctx.createRadialGradient(midX, midY, 40, midX, midY, maxR);
-    fighter._cachedYutaBgGrad.addColorStop(0, 'rgba(55, 10, 32, 0.68)');   // Dark rose core
-    fighter._cachedYutaBgGrad.addColorStop(0.35, 'rgba(28, 6, 18, 0.80)'); // Deep magenta-black
-    fighter._cachedYutaBgGrad.addColorStop(0.75, 'rgba(12, 3, 9, 0.90)');  // Charcoal void
-    fighter._cachedYutaBgGrad.addColorStop(1, 'rgba(4, 1, 4, 0.96)');      // Deep black outer edge
+    fighter._cachedYutaBgGrad.addColorStop(0, 'rgba(90, 12, 50, 0.78)');   // Vibrant cursed rose core
+    fighter._cachedYutaBgGrad.addColorStop(0.30, 'rgba(55, 8, 38, 0.85)'); // Deep cursed magenta void
+    fighter._cachedYutaBgGrad.addColorStop(0.65, 'rgba(32, 5, 24, 0.90)'); // Dark royal violet void
+    fighter._cachedYutaBgGrad.addColorStop(1.0, 'rgba(12, 2, 10, 0.96)');  // Deep cursed black outer edge
   }
 
   if (isMultiDomain) {
     // During Domain Clash: Clip void with a feathered radial gradient so Yuta's void blends smoothly into Sukuna's blood pool
     ctx.save();
     const clashGrad = ctx.createRadialGradient(domX, domY, 40, domX, domY, domainRadius + 120);
-    clashGrad.addColorStop(0, 'rgba(55, 10, 32, 0.72)');   // Dark rose core
-    clashGrad.addColorStop(0.35, 'rgba(28, 6, 18, 0.82)'); // Deep magenta-black
-    clashGrad.addColorStop(0.70, 'rgba(12, 3, 9, 0.78)');  // Charcoal void
-    clashGrad.addColorStop(0.85, 'rgba(6, 1, 4, 0.35)');   // Feathering start
-    clashGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');          // Fully transparent outer edge
+    clashGrad.addColorStop(0, 'rgba(90, 12, 50, 0.80)');   // Vibrant cursed rose core
+    clashGrad.addColorStop(0.30, 'rgba(55, 8, 38, 0.85)'); // Deep cursed magenta-black
+    clashGrad.addColorStop(0.65, 'rgba(32, 5, 24, 0.82)'); // Dark royal violet void
+    clashGrad.addColorStop(0.85, 'rgba(16, 2, 12, 0.40)'); // Feathering start
+    clashGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');        // Fully transparent outer edge
 
     ctx.fillStyle = clashGrad;
     ctx.beginPath();

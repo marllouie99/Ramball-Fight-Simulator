@@ -108,6 +108,9 @@ export { spatialGrid };
  */
 export function isFighterEffectivelyAlive(fighter) {
   if (!fighter) return false;
+  if (typeof fighter.isEffectivelyAlive === 'function') {
+    return fighter.isEffectivelyAlive();
+  }
   // If an entity is paralyzed by Mahito's Soul Disfigurement build-up, they remain in play until the rupture explosion detonates!
   if (fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
     return true;
@@ -121,6 +124,17 @@ export function isFighterEffectivelyAlive(fighter) {
   const isMahitoEvading = (fighter.characterId === 'mahito' || fighter.type === 'mahito') && fighter.isEvading;
   if (isMahitoEvading) {
     return state.illusions && state.illusions.some(ill => ill && ill.owner === fighter && ill.isEvasionMinion && ill.hp > 0);
+  }
+  const isMakima = (fighter.characterId === 'makima' || fighter.type === 'makima');
+  if (isMakima) {
+    if (fighter.isRevivingFromContract || fighter.isShatterReviving) {
+      return true;
+    }
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const enablePassive = cfg.enableCitizenContract ?? cfg.enablePassive ?? cfg.citizenContractEnabled ?? true;
+    if (enablePassive && (fighter.citizenLives > 0)) {
+      return true;
+    }
   }
   return false;
 }
@@ -353,8 +367,8 @@ export function resolveFighterCollision(a, b) {
     return; // Complete immunity to circle-circle overlap separation and bounce during Mahoraga's Wall Slam & Execution Flurry!
   }
 
-  const aIsFlurrying = a.isFlurrying || b.caughtInGenosFlurry || b.caughtInSaitamaFlurry;
-  const bIsFlurrying = b.isFlurrying || a.caughtInGenosFlurry || a.caughtInSaitamaFlurry;
+  const aIsFlurrying = a.isFlurrying || ((a.characterId === 'genos' || a.type === 'genos') && b.caughtInGenosFlurry) || ((a.characterId === 'saitama' || a.type === 'saitama') && b.caughtInSaitamaFlurry);
+  const bIsFlurrying = b.isFlurrying || ((b.characterId === 'genos' || b.type === 'genos') && a.caughtInGenosFlurry) || ((b.characterId === 'saitama' || b.type === 'saitama') && a.caughtInSaitamaFlurry);
 
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
@@ -427,18 +441,21 @@ export function resolveFighterCollision(a, b) {
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
   if (!a.isTurret && !a.isDispenser) {
-    // Fighters in rage, melee mode, or with active Infinity ignore the bounce impulse so they hold their ground
-    if (!a.isInRage && !a.isMeleeMode && !aIsGojoInfinity) {
-      a.vx -= impulse * nx + randA * impulse * tx;
-      a.vy -= impulse * ny + randA * impulse * ty;
+    // Fighters in rage or with active Infinity ignore the bounce impulse so they hold their ground
+    // Melee mode fighters absorb 35% of the impulse to hold ground while still sliding/separating cleanly
+    if (!a.isInRage && !aIsGojoInfinity) {
+      const meleeDamp = a.isMeleeMode ? 0.35 : 1.0;
+      a.vx -= (impulse * nx + randA * impulse * tx) * meleeDamp;
+      a.vy -= (impulse * ny + randA * impulse * ty) * meleeDamp;
     }
     a.normalizeSpeed();
   }
   
   if (!b.isTurret && !b.isDispenser) {
-    if (!b.isInRage && !b.isMeleeMode && !bIsGojoInfinity) {
-      b.vx += impulse * nx + randB * impulse * tx;
-      b.vy += impulse * ny + randB * impulse * ty;
+    if (!b.isInRage && !bIsGojoInfinity) {
+      const meleeDamp = b.isMeleeMode ? 0.35 : 1.0;
+      b.vx += (impulse * nx + randB * impulse * tx) * meleeDamp;
+      b.vy += (impulse * ny + randB * impulse * ty) * meleeDamp;
     }
     b.normalizeSpeed();
   }
@@ -484,7 +501,8 @@ function getClosestOpponent(fighter) {
   // Check regular fighters (Pure FOC targeting without obstacle overhead)
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
-    if (!other || other === fighter || other.hp <= 0) continue;
+    const isOtherAlive = other && (other.hp > 0 || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(other)));
+    if (!other || other === fighter || !isOtherAlive) continue;
     if (fighter.isTeammate(other)) continue;
     if (isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;
     
@@ -835,7 +853,10 @@ export function updateFighters() {
     cleanupDeadFightersDomains(state);
     state.fighters.forEach((fighter, fi) => {
       if (!fighter) return;
-      if (fighter.hp <= 0) {
+      const isMakimaReviving = Boolean(
+        fighter && (fighter.isRevivingFromContract || fighter.isShatterReviving || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0))
+      );
+      if (fighter.hp <= 0 && !isMakimaReviving) {
         clearFighterDomain(fighter, state);
         if (typeof fighter._healthBarShakeTimer === 'number' && fighter._healthBarShakeTimer > 0) {
           fighter._healthBarShakeTimer--;

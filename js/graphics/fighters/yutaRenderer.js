@@ -23,14 +23,6 @@ const _YUTA_DOMAIN_EMBERS = Array.from({ length: 32 }, (_, i) => ({
   wobbleAmp: 3 + (i % 4) * 2,
 }));
 
-const _YUTA_DOMAIN_FISSURES = [
-  { angle: 0.20, segments: [{ len: 0.35, off: 0.08 }, { len: 0.70, off: -0.12 }, { len: 1.0, off: 0.05 }] },
-  { angle: 1.15, segments: [{ len: 0.40, off: -0.10 }, { len: 0.75, off: 0.14 }, { len: 1.0, off: -0.06 }] },
-  { angle: 2.20, segments: [{ len: 0.30, off: 0.12 }, { len: 0.65, off: -0.09 }, { len: 1.0, off: 0.11 }] },
-  { angle: 3.35, segments: [{ len: 0.45, off: -0.07 }, { len: 0.80, off: 0.10 }, { len: 1.0, off: -0.04 }] },
-  { angle: 4.40, segments: [{ len: 0.35, off: 0.11 }, { len: 0.70, off: -0.13 }, { len: 1.0, off: 0.08 }] },
-  { angle: 5.50, segments: [{ len: 0.40, off: -0.09 }, { len: 0.75, off: 0.12 }, { len: 1.0, off: -0.05 }] },
-];
 
 function _drawPixelSteppedEllipse(ctx, cx, cy, rx, ry, P, color, thickness = 1) {
   if (rx <= 0 || ry <= 0) return;
@@ -284,55 +276,6 @@ export class YutaRenderer {
       ctx.fillRect(-halfW, snap(dy), halfW * 2, P);
     }
 
-    // ── 2. STEPPED PIXEL GROUND LIGHTNING FISSURES / VEINS ──
-    if (progress > 0.12) {
-      const fissureAlpha = Math.min(1.0, (progress - 0.12) / 0.35);
-      const pulseJitter = Math.sin(now * 0.02) * (P * 0.5);
-
-      for (let i = 0; i < _YUTA_DOMAIN_FISSURES.length; i++) {
-        const f = _YUTA_DOMAIN_FISSURES[i];
-        const baseAngle = f.angle + (i * 0.1);
-        let curX = 0;
-        let curY = 0;
-
-        for (let j = 0; j < f.segments.length; j++) {
-          const seg = f.segments[j];
-          const segDist = currentR * seg.len * 0.95;
-          const segAngle = baseAngle + seg.off;
-          const targetX = snap(Math.cos(segAngle) * segDist);
-          const targetY = snap(Math.sin(segAngle) * segDist * isoAspect);
-
-          // Draw stepped pixel line segment
-          const dx = targetX - curX;
-          const dy = targetY - curY;
-          const dist = Math.hypot(dx, dy);
-          const steps = Math.max(1, Math.ceil(dist / P));
-
-          for (let s = 0; s <= steps; s++) {
-            const t = s / steps;
-            const px = snap(curX + dx * t + (s % 2 === 0 ? pulseJitter : 0));
-            const py = snap(curY + dy * t);
-
-            // Outer dark ink pixel
-            ctx.fillStyle = `rgba(17, 17, 20, ${fissureAlpha * 0.85})`;
-            ctx.fillRect(px - P, py - P, P * 3, P * 3);
-
-            // Magenta vein pixel
-            ctx.fillStyle = `rgba(255, 20, 147, ${fissureAlpha * 0.95})`;
-            ctx.fillRect(px, py, P, P);
-
-            // Specular white center pixel on early segments
-            if (s % 3 === 0 && t < 0.6) {
-              ctx.fillStyle = `rgba(255, 255, 255, ${fissureAlpha})`;
-              ctx.fillRect(px, py, P, P);
-            }
-          }
-
-          curX = targetX;
-          curY = targetY;
-        }
-      }
-    }
 
     // ── 3. EXPANDING STEPPED PIXEL ISOMETRIC CONCENTRIC RINGS ──
     const outerRx = currentR;
@@ -1388,7 +1331,7 @@ export class YutaRenderer {
   }
 
   static _drawYutaCursedEnergyAura(ctx, fighter) {
-    const isRCT = (fighter.rctRevivalTimer > 0);
+    const isRCT = (fighter.rctRevivalTimer > 0) || (fighter.rctHealTimer > 0);
     const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
 
     let activeMultiplier = fighter.cursedEnergyAlpha || 0;
@@ -1399,7 +1342,9 @@ export class YutaRenderer {
 
     let progress = 0;
     if (isRCT) {
-      progress = Math.min(1.0, fighter.rctRevivalTimer / (CONFIG.yuta.rctRevivalDuration || 150));
+      const activeTimer = fighter.rctRevivalTimer > 0 ? fighter.rctRevivalTimer : fighter.rctHealTimer;
+      const maxTimer = fighter.rctRevivalTimer > 0 ? (CONFIG.yuta.rctRevivalDuration || 150) : 120;
+      progress = Math.min(1.0, activeTimer / maxTimer);
     } else if (fighter.isChannelingDomain) {
       progress = fighter.domainChargeTimer / fighter.domainChargeMax;
     } else if (fighter.techniqueCooldown > fighter.cooldown - 30) {

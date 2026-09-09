@@ -96,6 +96,10 @@ export class BlackHoleBehavior extends ProjectileBehavior {
       const dist = Math.hypot(dx, dy);
 
       if (dist < effectiveRadius) {
+        const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
+        if (isSaitamaCounter && typeof f.interruptAttacks === 'function') {
+          f.interruptAttacks(true);
+        }
         if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
           const nx = dist > 0 ? dx / dist : 0;
           const ny = dist > 0 ? dy / dist : 0;
