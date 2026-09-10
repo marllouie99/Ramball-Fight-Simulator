@@ -641,8 +641,70 @@ export class GojoFighter extends Fighter {
     if (this.sakugaImpactTimer > 0) {
       this.sakugaImpactTimer--;
     }
+    // ── UNLIMITED VOID: DOMAIN EXPANSION PROGRESSION & DRAIN ──
+    // Unlimited Void continues to progress its duration timer and drain naturally
+    // even if Gojo is afflicted with a paralyze debuff effect, electric stun, or is caught in ambush!
     if (this.domainActive) {
-      this._applyDomainEffect();
+      this.domainTimer--;
+      if (this.domainTimer <= 0) {
+        this.domainActive = false;
+        this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
+        this.isMeleeMode = false;
+        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Enforce separation
+        this.postDomainFadeInTimer = 90; // ~1.5 seconds of fade-in after domain ends
+
+        // Unfreeze all enemy fighters when Gojo's domain expires and apply slow movement debuff!
+        const slowDur = CONFIG.gojo?.domainPostSlowDuration ?? 180; // 3.0s slow
+        const slowMult = CONFIG.gojo?.domainPostSlowMultiplier ?? 0.35; // 35% movement speed
+
+        if (state.fighters) {
+          const myIdx = state.fighters.indexOf(this);
+          const currentTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : (this.team !== undefined ? this.team : null);
+          state.fighters.forEach(f => {
+            if (f && f !== this && f.hp > 0) {
+              const isEnemy = currentTeam === null || (state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(f)) !== currentTeam : f.team !== this.team);
+              f.timeStopTimer = 0;
+              f.hitStunTimer = 0;
+              delete f._timeStopOriginalDuration;
+              delete f._timeStopStartTime;
+              delete f._timeStopFrozenAngle;
+              delete f._timeStopFrozenGunAngle;
+
+              if (isEnemy && (!f.domainImmunity && !f.gojoDomainAdapted && !f.gojoAdapted?.domain && f.characterId !== 'toji' && f.type !== 'toji')) {
+                if (typeof f.applySlow === 'function') {
+                  f.applySlow(slowDur, slowMult, { isDomainSlow: true });
+                } else {
+                  f.slowTimer = Math.max(f.slowTimer || 0, slowDur);
+                  f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMult);
+                }
+                if (typeof spawnFloatingText === 'function') {
+                  spawnFloatingText(f.x, f.y - f.r - 20, 'SLOWED!', '#BF5AF2', 20);
+                }
+              }
+            }
+          });
+        }
+        if (state.illusions) {
+          state.illusions.forEach(ill => {
+            if (ill && ill.owner !== this && ill.hp > 0) {
+              ill.timeStopTimer = 0;
+              ill.hitStunTimer = 0;
+              if (typeof ill.applySlow === 'function') {
+                ill.applySlow(slowDur, slowMult, { isDomainSlow: true });
+              } else {
+                ill.slowTimer = Math.max(ill.slowTimer || 0, slowDur);
+                ill.slowMultiplier = Math.min(ill.slowMultiplier || 1.0, slowMult);
+              }
+            }
+          });
+        }
+      } else {
+        // Force hand-to-hand combat during domain expansion!
+        this.isMeleeMode = true;
+        this.forcedMeleeTimer = Math.max(this.forcedMeleeTimer, 30);
+        this.meleeModeCooldown = 0;
+        this._applyDomainEffect();
+      }
     }
 
     if (this.redEffectTimer > 0) {
@@ -940,67 +1002,7 @@ export class GojoFighter extends Fighter {
     // Check for Reverse Cursed Technique (Self heal at low HP)
     this._checkReverseCursedTechnique(opponent, arena);
 
-    // Domain active state
-    if (this.domainActive) {
-      this.domainTimer--;
-      if (this.domainTimer <= 0) {
-        this.domainActive = false;
-        this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
-        this.isMeleeMode = false;
-        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Enforce separation
-        this.postDomainFadeInTimer = 90; // ~1.5 seconds of fade-in after domain ends
 
-        // Unfreeze all enemy fighters when Gojo's domain expires and apply slow movement debuff!
-        const slowDur = CONFIG.gojo?.domainPostSlowDuration ?? 180; // 3.0s slow
-        const slowMult = CONFIG.gojo?.domainPostSlowMultiplier ?? 0.35; // 35% movement speed
-
-        if (state.fighters) {
-          state.fighters.forEach(f => {
-            if (f && f !== this && f.hp > 0) {
-              const isEnemy = myTeam === null || (state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(f)) !== myTeam : f.team !== this.team);
-              f.timeStopTimer = 0;
-              f.hitStunTimer = 0;
-              delete f._timeStopOriginalDuration;
-              delete f._timeStopStartTime;
-              delete f._timeStopFrozenAngle;
-              delete f._timeStopFrozenGunAngle;
-
-              if (isEnemy && (!f.domainImmunity && !f.gojoDomainAdapted && !f.gojoAdapted?.domain && f.characterId !== 'toji' && f.type !== 'toji')) {
-                if (typeof f.applySlow === 'function') {
-                  f.applySlow(slowDur, slowMult, { isDomainSlow: true });
-                } else {
-                  f.slowTimer = Math.max(f.slowTimer || 0, slowDur);
-                  f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMult);
-                }
-                if (typeof spawnFloatingText === 'function') {
-                  spawnFloatingText(f.x, f.y - f.r - 20, 'SLOWED!', '#BF5AF2', 20);
-                }
-              }
-            }
-          });
-        }
-        if (state.illusions) {
-          state.illusions.forEach(ill => {
-            if (ill && ill.owner !== this && ill.hp > 0) {
-              ill.timeStopTimer = 0;
-              ill.hitStunTimer = 0;
-              if (typeof ill.applySlow === 'function') {
-                ill.applySlow(slowDur, slowMult, { isDomainSlow: true });
-              } else {
-                ill.slowTimer = Math.max(ill.slowTimer || 0, slowDur);
-                ill.slowMultiplier = Math.min(ill.slowMultiplier || 1.0, slowMult);
-              }
-            }
-          });
-        }
-      } else {
-        // Force hand-to-hand combat during domain expansion!
-        this.isMeleeMode = true;
-        this.forcedMeleeTimer = Math.max(this.forcedMeleeTimer, 30);
-        this.meleeModeCooldown = 0;
-        this._applyDomainEffect();
-      }
-    }
 
     // Stop attacking if round/match has ended or if all enemies are dead!
     // IMPORTANT: Never interrupt mid-channel (Red buildup or Purple charge) as it would silence their charge audio.

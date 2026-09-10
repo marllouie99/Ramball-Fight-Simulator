@@ -80,7 +80,7 @@ export const sukunaConfig = {
     divineFlameChargeMax: 100,      // Charge up duration (1.5 seconds)
     divineFlameDamage: 1000,         // Primary direct hit nuke damage
     divineFlameExplosionRadius: 200, // Thermobaric nuke explosion AOE blast radius in pixels
-    divineFlameExplosionDamage: 300, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
+    divineFlameExplosionDamage: 800, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
     thermobaricSplashRadius: 220,  // Thermobaric explosion splash damage radius
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
     divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
@@ -88,16 +88,17 @@ export const sukunaConfig = {
     divineFlameChannelShakeDuration: 5,   // Tremor pulse duration
     divineFlameShakeIntensity: 30,  // Powerful impactful arena shake on Fuga nuke explosion!
     divineFlameShakeDuration: 25,   // Arena shake duration on Fuga impact
-    divineFlameKnockback: 20,      // Explosive knockback velocity applied to targets hit by Fuga
+    divineFlameKnockback: 40,      // Explosive knockback velocity applied to targets hit by Fuga
+    divineFlameKnockbackStun: 25,  // Duration of knockback stun in frames ensuring smooth ricochet
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
     domainCooldown: 1500,         // Cooldown before domain can trigger (~16.6s at 60 fps)
     domainChargeMax: 120,         // Channeling duration before domain opens (2.0s at 60 fps)
     domainDuration: 800,          // Domain active duration (~8.33s at 60 fps)
-    domainDamage: 15,             // Base damage per slash line hit (legacy fallback)
-    domainSlashDamage: 15,        // Base damage dealt by each individual spatial cut line hit
-    domainDamageInterval: 18,     // Frames between slash barrages (~3.3 waves per second)
+    domainDamage: 10,             // Base damage per slash line hit (legacy fallback)
+    domainSlashDamage: 10,        // Base damage dealt by each individual spatial cut line hit
+    domainDamageInterval: 8,     // Frames between slash barrages (~3.3 waves per second)
     domainSlashesPerTick: 3,      // Number of spatial cut lines spawned per barrage
     domainSlashShakeIntensity: 1.8, // Small arena screen shake when Malevolent Shrine cut lines slash
     domainSlashShakeDuration: 3,    // Duration of cut line arena shake (in frames)

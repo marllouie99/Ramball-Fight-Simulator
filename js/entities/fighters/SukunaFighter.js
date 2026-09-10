@@ -987,9 +987,6 @@ export class SukunaFighter extends Fighter {
       this.domainY = this.y;
     }
 
-    // Prevent Fuga right after domain
-    this.divineFlameCooldown = 600;
-
     spawnFloatingText(this.domainX, this.domainY + 50, 'MALEVOLENT SHRINE', '#8B0000');
 
     const sound = getSkillSound(this._def?.id, 'domain');

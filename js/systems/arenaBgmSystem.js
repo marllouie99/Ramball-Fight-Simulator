@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { state } from '../core/state.js';
+import { CONFIG } from '../core/config.js';
 import { playLoopingSound, stopLoopingSound, setLoopingSoundVolume } from './soundSystem.js';
 import { _registerButton, drawChamferedRect, drawPanel, drawButton, fitSingleLineText } from '../graphics/ui/uiFramework.js';
 
@@ -521,11 +522,13 @@ export function shouldDuckArenaBgm() {
     return true;
   }
 
+  const isTodoBgmEnabled = (typeof CONFIG !== 'undefined' && CONFIG.todo?.enableTakadaBackgroundSong !== false);
+
   for (let i = 0; i < state.fighters.length; i++) {
     const f = state.fighters[i];
     if (!f) continue;
 
-    if (f.isTakadaBackgroundPlaying || f.isTakadaChanneling || f.isTakadaUltActive || f.takadaSongStarted) {
+    if (isTodoBgmEnabled && (f.isTakadaBackgroundPlaying || f.isTakadaChanneling || f.isTakadaUltActive || f.takadaSongStarted)) {
       return true;
     }
     if (f.hp > 0 && f.isChannelingPureLoveBeam && f.pureLoveBeamSoundHandle) {

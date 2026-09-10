@@ -441,8 +441,11 @@ export class MahitoFighter extends Fighter {
       return;
     }
 
-    // Self-Embodiment of Perfection Domain Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame,
-    // even if Mahito is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
+    // Self-Embodiment of Perfection Domain Progression & Cooldown:
+    // When Domain is active, domainTimer MUST tick down every frame and drain naturally even if Mahito is stunned, paralyzed, or frozen!
+    updateMahitoDomainExpansion(this);
+
+    // Domain Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame when not active
     if (this.domainCooldown > 0 && !this.domainActive && (this.domainChargeTimer || 0) <= 0) {
       this.domainCooldown--;
     }
@@ -488,8 +491,7 @@ export class MahitoFighter extends Fighter {
 
     if (this.soulMultiplicityCooldown > 0) this.soulMultiplicityCooldown--;
 
-    // Update Domain Expansion (Channeling & Active Barrier)
-    updateMahitoDomainExpansion(this);
+    // Domain Expansion Channeling Lock / Freeze State
     if (this.domainChargeTimer > 0) {
       if (this._dashAfterimages) this._dashAfterimages.length = 0;
       if (this.afterImages) this.afterImages.length = 0;

@@ -37,9 +37,10 @@ export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, 
     return false;
   };
 
-  const fighterTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && state.fighters) 
+  const rawTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && state.fighters) 
     ? state.getFighterTeam(state.fighters.indexOf(fighter)) 
     : null;
+  const fighterTeam = (rawTeam !== null && rawTeam !== undefined) ? rawTeam : null;
 
   if (primaryTarget && primaryTarget !== fighter && primaryTarget.hp > 0) {
     checkTarget(primaryTarget);
@@ -51,7 +52,8 @@ export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, 
       
       if (fighterTeam !== null && typeof state.getFighterTeam === 'function') {
         const otherIndex = state.fighters.indexOf(other);
-        if (otherIndex >= 0 && state.getFighterTeam(otherIndex) === fighterTeam) continue;
+        const otherTeam = otherIndex >= 0 ? state.getFighterTeam(otherIndex) : null;
+        if (otherTeam !== null && otherTeam !== undefined && otherTeam === fighterTeam) continue;
       }
 
       checkTarget(other);
@@ -238,7 +240,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
 
     target.soulWoundTimer = soulWoundDuration;
 
-    if (fighter.isAmbushing) {
+    if (fighter.isAmbushing && target && target.hp > 0 && !target.isDead && !target.isRevivingFromContract && !target.isShatterReviving) {
       target.isTargetOfAmbush = true;
       const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 70;
       if (typeof target.applyTimeStop === 'function') {
@@ -421,20 +423,22 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 
-    if (isAmbushThrust && typeof target.applyHitStun === 'function') {
+    if (isAmbushThrust && target && target.hp > 0 && !target.isDead && !target.isRevivingFromContract && !target.isShatterReviving && typeof target.applyHitStun === 'function') {
       target.applyHitStun(18);
     }
 
     // Apply Slow Movement debuff to target on basic attack hit
-    const slowFrames = CONFIG.toji?.spearSlowDuration ?? 90;
-    const slowMultiplier = CONFIG.toji?.spearSlowMultiplier ?? 0.50;
-    if (typeof target.applySlow === 'function') {
-      target.applySlow(slowFrames, slowMultiplier);
-    } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
-      target.statusEffects.applySlow(slowFrames, slowMultiplier);
-    } else {
-      target.slowTimer = Math.max(target.slowTimer || 0, slowFrames);
-      target.slowMultiplier = slowMultiplier;
+    if (target && target.hp > 0 && !target.isDead && !target.isRevivingFromContract && !target.isShatterReviving) {
+      const slowFrames = CONFIG.toji?.spearSlowDuration ?? 90;
+      const slowMultiplier = CONFIG.toji?.spearSlowMultiplier ?? 0.50;
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(slowFrames, slowMultiplier);
+      } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+        target.statusEffects.applySlow(slowFrames, slowMultiplier);
+      } else {
+        target.slowTimer = Math.max(target.slowTimer || 0, slowFrames);
+        target.slowMultiplier = slowMultiplier;
+      }
     }
 
     // Apply Decrease Regen debuff to target on basic attack hit
@@ -455,5 +459,5 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
   fighter.ambushTargetWasChanneling = false;
   fighter.ambushTargetChannelState = null;
   triggerGlobalScreenShake(isAmbushThrust ? 6 : 3, isAmbushThrust ? 8 : 4);
-  return targets;
+  return Array.from(targets);
 }

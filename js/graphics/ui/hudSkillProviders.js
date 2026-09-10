@@ -301,7 +301,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return [
       { id: 'bomb', pct: bombPct, ready: bombPct >= 99, color: themeColor, label: 'MALEFIC BOMB' },
       { id: 'dash', pct: dashPct, ready: dashPct >= 99, color: themeColor, label: 'VOID PROJECTILE' },
-      { id: 'ult',  pct: ultPct,  ready: ultPct >= 99,  color: '#00E5FF', label: 'DESTRUCTION RUSH' }
+      { id: 'ult',  pct: ultPct,  ready: ultPct >= 99,  color: themeColor, label: 'DESTRUCTION RUSH' }
     ];
   }
   if (f.characterId === 'todo' || f.type === 'todo') {
@@ -571,9 +571,9 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const skills = [];
 
     // 1. Primary: "Bang!"
-    const enableBang = mcfg.enableBang ?? true;
+    const enableBang = mcfg.enableBang ?? mcfg.bangEnabled ?? true;
     if (enableBang) {
-      const bangMax = f.bangCooldownMax || mcfg.bangCooldown || 44;
+      const bangMax = f.bangCooldownMax || mcfg.bangCooldown || 200;
       const bangTimer = f.bangCooldown !== undefined ? f.bangCooldown : 0;
       const bangPct = Math.max(0, Math.min(100, (1 - (bangTimer / bangMax)) * 100));
       const bangReady = bangPct >= 99;
@@ -582,23 +582,48 @@ export function getSkillDataForFighter(f, getProjectiles) {
         pct: bangPct,
         ready: bangReady,
         color: themeColor,
-        label: bangReady ? 'BANG! (READY)' : 'BANG!'
+        label: 'BANG!'
       });
     }
 
     // 2. Skill 1: Chains of Domination (Shihai no Kusari)
-    const enableSkill1 = mcfg.enableSkill1 ?? mcfg.enableChains ?? true;
+    const enableSkill1 = mcfg.enableSkill1 ?? mcfg.enableChains ?? mcfg.enableChainsOfDomination ?? true;
     if (enableSkill1) {
-      if (f.isChainingActive) {
+      if (f.isPreparingChain) {
+        const windupMax = f.chainWindupMax || mcfg.chainsWindupFrames || 14;
+        const curTimer = f.chainWindupTimer !== undefined ? f.chainWindupTimer : 0;
+        const windupPct = Math.max(0, Math.min(100, (curTimer / windupMax) * 100));
         skills.push({
           id: 'chains',
-          pct: 100,
+          pct: windupPct,
           ready: false,
           color: themeColor,
-          label: 'CHAINS (ACTIVE)'
+          label: 'CHAINS OF DOMINATION'
+        });
+      } else if (f.isThrowingChain && !f.isChainingActive) {
+        const throwMax = f.chainThrowAnimMax || 22;
+        const curTimer = f.chainThrowAnimTimer !== undefined ? f.chainThrowAnimTimer : 0;
+        const throwPct = Math.max(0, Math.min(100, (curTimer / throwMax) * 100));
+        skills.push({
+          id: 'chains',
+          pct: throwPct,
+          ready: false,
+          color: themeColor,
+          label: 'CHAINS OF DOMINATION'
+        });
+      } else if (f.isChainingActive) {
+        const chainMax = f.chainMaxTimer || mcfg.chainsDuration || mcfg.chainsDurationFrames || mcfg.chainsStasisFrames || 240;
+        const chainCur = f.chainTimer !== undefined ? f.chainTimer : 0;
+        const chainPct = Math.max(0, Math.min(100, (chainCur / chainMax) * 100));
+        skills.push({
+          id: 'chains',
+          pct: chainPct,
+          ready: false,
+          color: themeColor,
+          label: 'CHAINS OF DOMINATION'
         });
       } else {
-        const chainsMax = f.chainsCooldownMax || mcfg.chainsCooldown || 540;
+        const chainsMax = f.chainsCooldownMax || mcfg.chainsCooldown || 500;
         const chainsTimer = f.chainsCooldown !== undefined ? f.chainsCooldown : 0;
         const chainsPct = Math.max(0, Math.min(100, (1 - (chainsTimer / chainsMax)) * 100));
         const chainsReady = chainsPct >= 99;
@@ -607,7 +632,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
           pct: chainsPct,
           ready: chainsReady,
           color: themeColor,
-          label: chainsReady ? 'CHAINS (READY)' : 'CHAINS OF DOMINATION'
+          label: 'CHAINS OF DOMINATION'
         });
       }
     }
@@ -615,8 +640,13 @@ export function getSkillDataForFighter(f, getProjectiles) {
     // 3. Passive: Prime Minister Contract (Citizen Lives)
     const enablePassive = mcfg.enableCitizenContract ?? mcfg.enablePassive ?? true;
     if (enablePassive) {
+      const livesMax = f.citizenLivesMax || mcfg.maxCitizenLives || 3;
+      const livesCur = f.citizenLives !== undefined ? f.citizenLives : livesMax;
+      const livesText = livesCur === 1 ? '1 LIFE' : `${livesCur} LIVES`;
+      const contractLabel = livesCur > 0 ? `CONTRACT - ${livesText}` : 'CONTRACT - 0 LIVES';
+
       if (f.isRevivingFromContract || f.isShatterReviving) {
-        const reviveMax = f.reviveStasisMax || 75;
+        const reviveMax = f.reviveStasisMax || mcfg.citizenReviveDurationFrames || 75;
         const reviveElapsed = Math.max(0, reviveMax - (f.reviveStasisTimer || 0));
         const revivePct = Math.max(0, Math.min(100, (reviveElapsed / reviveMax) * 100));
         skills.push({
@@ -624,35 +654,36 @@ export function getSkillDataForFighter(f, getProjectiles) {
           pct: revivePct,
           ready: false,
           color: themeColor,
-          label: 'REASSEMBLING (CONTRACT)'
+          label: contractLabel
         });
       } else {
-        const livesMax = f.citizenLivesMax || 5;
-        const livesCur = f.citizenLives !== undefined ? f.citizenLives : livesMax;
         const livesPct = Math.max(0, Math.min(100, (livesCur / livesMax) * 100));
         skills.push({
           id: 'contract',
           pct: livesPct,
           ready: livesCur > 0,
           color: themeColor,
-          label: livesCur > 0 ? `CONTRACT: ${livesCur} LIVES` : 'CONTRACT: EXHAUSTED'
+          label: contractLabel
         });
       }
     }
 
     // 4. Skill 2: Angel's Armory (1000-Year Holy Spear)
-    const enableSkill2 = mcfg.enableSkill2 ?? mcfg.enableAngelArmory ?? false;
+    const enableSkill2 = mcfg.enableSkill2 ?? mcfg.enableAngel ?? mcfg.enableAngelArmory ?? mcfg.enableThousandYearSpear ?? false;
     if (enableSkill2) {
       if (f.isSummoningSpear) {
+        const spearMax = f.spearMaxTimer || mcfg.thousandYearSpearChannelFrames || 100;
+        const spearCur = f.spearTimer !== undefined ? f.spearTimer : 0;
+        const spearPct = Math.max(0, Math.min(100, (spearCur / spearMax) * 100));
         skills.push({
           id: 'angel',
-          pct: 100,
+          pct: spearPct,
           ready: false,
           color: themeColor,
-          label: '1000-YR SPEAR (SUMMONING)'
+          label: "ANGEL'S ARMORY"
         });
       } else {
-        const angelMax = f.angelCooldownMax || mcfg.angelCooldown || 810;
+        const angelMax = f.angelCooldownMax || mcfg.angelCooldown || 1500;
         const angelTimer = f.angelCooldown !== undefined ? f.angelCooldown : 0;
         const angelPct = Math.max(0, Math.min(100, (1 - (angelTimer / angelMax)) * 100));
         const angelReady = angelPct >= 99;
@@ -661,21 +692,24 @@ export function getSkillDataForFighter(f, getProjectiles) {
           pct: angelPct,
           ready: angelReady,
           color: themeColor,
-          label: angelReady ? 'ANGEL ARMORY (READY)' : 'ANGEL\'S ARMORY'
+          label: "ANGEL'S ARMORY"
         });
       }
     }
 
     // 5. Ultimate: Kyoto Shrine Ritual (Gravitational Splatter)
-    const enableUlt = mcfg.enableUltimate ?? mcfg.enableShrine ?? false;
+    const enableUlt = mcfg.enableUltimate ?? mcfg.enableShrine ?? mcfg.enableShrineRitual ?? false;
     if (enableUlt) {
       if (f.isExecutingRitual) {
+        const ritualMax = f.ritualMaxTimer || mcfg.shrineChannelFrames || 110;
+        const ritualCur = f.ritualTimer !== undefined ? f.ritualTimer : 0;
+        const ritualPct = Math.max(0, Math.min(100, (ritualCur / ritualMax) * 100));
         skills.push({
           id: 'shrine',
-          pct: 100,
+          pct: ritualPct,
           ready: false,
           color: themeColor,
-          label: 'RITUAL (EXECUTING)'
+          label: 'KYOTO SHRINE RITUAL'
         });
       } else {
         const shrineMax = f.shrineCooldownMax || mcfg.shrineCooldown || 1920;
@@ -687,7 +721,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
           pct: shrinePct,
           ready: shrineReady,
           color: themeColor,
-          label: shrineReady ? 'KYOTO RITUAL (READY)' : 'KYOTO SHRINE RITUAL'
+          label: 'KYOTO SHRINE RITUAL'
         });
       }
     }
@@ -1477,42 +1511,42 @@ export function getSkillDataForFighter(f, getProjectiles) {
         const sphereMax = CONFIG.cronos?.sphereDuration || 300;
         stealPct = Math.max(0, Math.min(100, (f.sphereTimer / sphereMax) * 100));
         stealReady = false;
-        stealLabel = `${baseName} (ACTIVE)`;
+        stealLabel = baseName;
       } else if (f.isInRage && f.rageTimer > 0) {
         // Berserker Arcane Rage active duration (drains from 100% down to 0%)
         const rageMax = CONFIG.berserker?.rageDuration || 300;
         stealPct = Math.max(0, Math.min(100, (f.rageTimer / rageMax) * 100));
         stealReady = false;
-        stealLabel = `${baseName} (ACTIVE)`;
+        stealLabel = baseName;
       } else if (f.flurryHitsLeft > 0) {
         // Musashi Phantom Flurry active hits (drains from 100% down to 0%)
         stealPct = Math.max(0, Math.min(100, (f.flurryHitsLeft / 5) * 100));
         stealReady = false;
-        stealLabel = `${baseName} (ACTIVE)`;
+        stealLabel = baseName;
       } else if (f.activePullActive) {
         // Ruby Scythe Pull active hook
         stealPct = 100;
         stealReady = false;
-        stealLabel = `${baseName} (ACTIVE)`;
+        stealLabel = baseName;
       } else if (purpleOrb) {
         // Gojo Hollow Purple orb traveling through arena (drains from 100% down to 0%)
         const orbMaxLife = CONFIG.gojo?.purpleLife || 250;
         stealPct = Math.max(0, Math.min(100, (purpleOrb.life / orbMaxLife) * 100));
         stealReady = false;
-        stealLabel = `${baseName} (ACTIVE)`;
+        stealLabel = baseName;
       } else if (f.stolenSkillCooldown > 0) {
         // Internal cooldown for spammable stolen skills (progresses from 0% to 100%)
         const cdMax = rcfg?.attackCooldown || 100;
         stealPct = Math.max(0, Math.min(100, (1 - (f.stolenSkillCooldown / cdMax)) * 100));
         stealReady = stealPct >= 99;
-        stealLabel = `${baseName} (COOLDOWN)`;
+        stealLabel = baseName;
       } else {
         // Stolen skill is ready and held (drains as the buff timer ticks down towards expiration)
         const durMax = rcfg?.spellStealDuration || 1000;
         const remaining = f.stolenTimer !== undefined ? f.stolenTimer : durMax;
         stealPct = Math.max(0, Math.min(100, (remaining / durMax) * 100));
         stealReady = true;
-        stealLabel = `${baseName} (READY)`;
+        stealLabel = baseName;
       }
     } else {
       // No spell stolen: Spell Steal cooldown charges up from 0% to 100%
@@ -1521,7 +1555,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       stealPct = Math.max(0, Math.min(100, (1 - (stealTimer / stealMax)) * 100));
       const isSkillActive = (typeof f.hasActiveSkillInArena === 'function') ? f.hasActiveSkillInArena() : false;
       stealReady = stealPct >= 99 && !isSkillActive;
-      stealLabel = stealReady ? 'SPELL STEAL (READY)' : (isSkillActive ? 'SPELL STEAL (BLOCKED)' : 'SPELL STEAL');
+      stealLabel = 'SPELL STEAL';
     }
 
     // ─────────────────────────────────────────────
@@ -1537,14 +1571,14 @@ export function getSkillDataForFighter(f, getProjectiles) {
       // Actively lifting/holding target in air (drains from 100% down to 0% until slam)
       tkPct = Math.max(0, Math.min(100, (f.tkTimer / tkTotalDuration) * 100));
       tkReady = false;
-      tkLabel = 'TELEKINESIS (LIFTING)';
+      tkLabel = 'TELEKINESIS';
     } else {
       // Cooldown phase (progresses from 0% up to 100%)
       const tkTimer = f.telekinesisCooldown !== undefined ? f.telekinesisCooldown : 0;
       tkPct = Math.max(0, Math.min(100, (1 - (tkTimer / tkMax)) * 100));
       const isSkillActive = (typeof f.hasActiveSkillInArena === 'function') ? f.hasActiveSkillInArena() : false;
       tkReady = tkPct >= 99 && !isSkillActive;
-      tkLabel = tkReady ? 'TELEKINESIS (READY)' : (isSkillActive ? 'TELEKINESIS (BLOCKED)' : 'TELEKINESIS');
+      tkLabel = 'TELEKINESIS';
     }
 
     return [

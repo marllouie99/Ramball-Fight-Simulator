@@ -480,7 +480,7 @@ export function updateProjectiles() {
   }
 }
 
-function getClosestOpponent(fighter) {
+export function getClosestOpponent(fighter) {
   const isTactical = (typeof state !== 'undefined' && state.gameCategory === 'tactical') || isTacticalFighter(fighter) || (typeof state !== 'undefined' && String(state.mode || '').toLowerCase().startsWith('tactical'));
   if (isTactical) {
     return getTacticalClosestOpponent(fighter);
@@ -498,17 +498,28 @@ function getClosestOpponent(fighter) {
     state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4'
   );
 
+  // Mind-Control Puppetry: If chained by Makima or if Rika is chained by Makima, prioritize attacking Rika companion
+  if ((fighter.isChainedByMakima || (fighter.rika && (fighter.rika.isChainedByMakima || fighter.rika.isMindControlledByMakima))) && fighter.rika && fighter.rika.active && fighter.rika.hp > 0 && !fighter.rika.isDying) {
+    const dx = fighter.rika.x - fighter.x;
+    const dy = fighter.rika.y - fighter.y;
+    const dSq = dx * dx + dy * dy;
+    if (dSq < bestDistance) {
+      bestDistance = dSq;
+      closest = fighter.rika;
+    }
+  }
+
   // Check regular fighters (Pure FOC targeting without obstacle overhead)
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
     const isOtherAlive = other && (other.hp > 0 || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(other)));
     if (!other || other === fighter || !isOtherAlive) continue;
     if (fighter.isTeammate(other)) continue;
-    if (isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;
+    if (!fighter.isChainedByMakima && !other.isChainedByMakima && isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;
     
-    // Ignore summoned entities (Turrets, etc) belonging to this fighter, and vice versa
-    if (other.owner === fighter || fighter.owner === other) continue;
-    if (other.owner && other.owner === fighter.owner) continue; // Same owner
+    // Ignore summoned entities (Turrets, etc) belonging to this fighter (unless mind-controlled)
+    if (!fighter.isChainedByMakima && !other.isChainedByMakima && (other.owner === fighter || fighter.owner === other)) continue;
+    if (!fighter.isChainedByMakima && !other.isChainedByMakima && other.owner && other.owner === fighter.owner) continue;
 
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;
@@ -520,16 +531,17 @@ function getClosestOpponent(fighter) {
     }
   }
 
-  // Also check illusions - they are valid targets (but not the fighter's own illusions)
+  // Also check illusions - they are valid targets (including own illusions if mind-controlled)
   if (state.illusions) {
     for (let i = 0; i < state.illusions.length; i++) {
       const illusion = state.illusions[i];
       if (!illusion || illusion.hp <= 0 || (illusion.vanishTimer && illusion.vanishTimer > 0)) continue;
-      if (illusion.owner === fighter) continue;
-      if (isTeamMode && fighterTeam !== null && illusion.owner) {
+      if (fighter.isTeammate(illusion)) continue;
+      if (!fighter.isChainedByMakima && !illusion.isChainedByMakima && illusion.owner === fighter) continue;
+      if (!fighter.isChainedByMakima && !illusion.isChainedByMakima && isTeamMode && fighterTeam !== null && illusion.owner) {
         const _illOwnerIdx = illusion.owner._stateIdx !== undefined ? illusion.owner._stateIdx : state.fighters.indexOf(illusion.owner);
         const ownerTeam = state.getFighterTeam(_illOwnerIdx);
-        if (ownerTeam === fighterTeam) continue;
+        if (ownerTeam === fighterTeam && !illusion.owner.isChainedByMakima) continue;
       }
       const dx = illusion.x - fighter.x;
       const dy = illusion.y - fighter.y;
@@ -547,11 +559,11 @@ function getClosestOpponent(fighter) {
     for (let i = 0; i < state.cjDriveBys.length; i++) {
       const car = state.cjDriveBys[i];
       if (!car || car.dead || car.hp <= 0 || car.phase === 'WAITING_REENTER') continue;
-      if (car.owner === fighter || (fighter.owner && car.owner === fighter.owner)) continue;
-      if (isTeamMode && fighterTeam !== null && car.owner) {
+      if (!fighter.isChainedByMakima && (car.owner === fighter || (fighter.owner && car.owner === fighter.owner))) continue;
+      if (!fighter.isChainedByMakima && isTeamMode && fighterTeam !== null && car.owner) {
         const _carOwnerIdx = car.owner._stateIdx !== undefined ? car.owner._stateIdx : state.fighters.indexOf(car.owner);
         const ownerTeam = state.getFighterTeam(_carOwnerIdx);
-        if (ownerTeam === fighterTeam) continue;
+        if (ownerTeam === fighterTeam && !car.owner.isChainedByMakima) continue;
       }
       const dx = car.x - fighter.x;
       const dy = car.y - fighter.y;
@@ -943,9 +955,20 @@ export function updateFighters() {
         const j = b._stateIdx !== undefined ? b._stateIdx : state.fighters.indexOf(b);
         if (j <= i) continue; // Only check each pair once
         if (!b || b.hp <= 0) continue;
-        // Skip teammates in 2v2 / 1v2 / team modes
-        if (a.isTeammate(b)) continue;
-        if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && state.getFighterTeam && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
+        // Skip teammates in 2v2 / 1v2 / team modes (only if actually on same original team and neither is mind-controlled)
+        const isTeamMode = (
+          state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' ||
+          state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2' ||
+          state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' ||
+          state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4'
+        );
+        if (!a.isChainedByMakima && !b.isChainedByMakima && !a.isMindControlledByMakima && !b.isMindControlledByMakima && isTeamMode && state.getFighterTeam) {
+          const teamI = state.getFighterTeam(i);
+          const teamJ = state.getFighterTeam(j);
+          if (teamI !== null && teamJ !== null && teamI === teamJ) {
+            continue;
+          }
+        }
         
         // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, or when submerged/erupting in liquid shadow
         if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush) continue;

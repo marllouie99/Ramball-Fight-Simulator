@@ -56,10 +56,10 @@ export function drawThermobaricExplosions(ctx) {
 
     const explosionFrames = 50;
     const explosionElapsed60 = Math.min(explosionFrames, elapsed60);
-    const explosionElapsed30 = Math.floor(explosionElapsed60 / 2) * 2;
-    const explosionProgress = Math.min(1.0, explosionElapsed30 / explosionFrames);
+    const explosionProgress = Math.min(1.0, Math.max(0.02, explosionElapsed60 / explosionFrames));
     const expAlpha = Math.max(0, 1 - explosionProgress);
-    const radius = exp.radius + (exp.maxRadius - exp.radius) * Math.sin(explosionProgress * Math.PI * 0.5);
+    const blastExpansion = 1 - Math.pow(1 - explosionProgress, 2.2);
+    const radius = exp.radius + (exp.maxRadius - exp.radius) * blastExpansion;
 
     const R = exp.maxRadius;
     const cx = exp.x;
@@ -200,7 +200,7 @@ export function drawThermobaricExplosions(ctx) {
         const numSpikes = 14;
         for (let s = 0; s < numSpikes; s++) {
           const angle = (Math.PI * 2 / numSpikes) * s + (s % 2 === 0 ? 0.15 : -0.15);
-          const spikeLen = snap(R * (1.0 + (exp.seed || 0.5) * 0.6) * (explosionProgress * 2.5));
+          const spikeLen = snap(R * (1.0 + (exp.seed || 0.5) * 0.6) * Math.min(1.0, (explosionProgress + 0.05) * 2.5));
           const spikeW = snap((12 + s % 3 * 6) * spikeAlpha);
           const cosA = Math.cos(angle);
           const sinA = Math.sin(angle);
@@ -234,7 +234,7 @@ export function drawThermobaricExplosions(ctx) {
       drawPixelRing(ctx, 0, 0, radius * 0.60, snap(5 * (1 - explosionProgress)), P);
 
       // 3. Stepped Pixel Thermal Blast Pillar (Rising Fire Column)
-      const pH = snap(R * 3.0 * Math.sin(explosionProgress * Math.PI));
+      const pH = snap(R * 3.0 * Math.sin(Math.min(1.0, explosionProgress * 1.35) * Math.PI));
       const pW = snap(R * 0.7 * (1 - explosionProgress * 0.4));
       if (pH > P) {
         for (let gy = 0; gy >= -pH; gy -= P) {

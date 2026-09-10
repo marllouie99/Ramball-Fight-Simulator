@@ -29,9 +29,9 @@ export const makimaConfig = {
   // ABILITY MASTER TOGGLE SWITCHES (true = Enabled, false = Disabled)
   // ──────────────────────────────────────────
   enableBang: true,                 // Master toggle for Primary Attack: "Bang!"
-  enableSkill1: 1,               // Master toggle for Skill 1: Chains of Domination (Shihai no Kusari)
-  enableSkill2: 0,               // Master toggle for Skill 2: Angel's Armory (1000-Year Holy Spear)
-  enableUltimate: 0,             // Master toggle for Ultimate: Kyoto Shrine Ritual (Compression Splatter)
+  enableSkill1: 1,                  // Master toggle for Skill 1: Chains of Domination (Shihai no Kusari)
+  enableSkill2: 0,                  // Master toggle for Skill 2: Angel's Armory (1000-Year Holy Spear)
+  enableUltimate: 0,                // Master toggle for Ultimate: Kyoto Shrine Ritual (Compression Splatter)
   enableCitizenContract: true,      // Master toggle for Passive 1: Prime Minister Contract & Shatter Revive
 
   // Passive 1: Prime Minister Contract (Citizen Redirection)
@@ -50,34 +50,38 @@ export const makimaConfig = {
   bangCooldown: 200,                 // ~0.73s cooldown between shots
   bangBeamWidth: 32,                // Kinetic shockwave cylinder width
   bangPierceProjectiles: true,      // Pierces and destroys incoming enemy projectiles
-  wallPinDurationFrames: 50,        // 1.5 seconds (90 frames) wall-stick duration on collision
+  wallPinDurationFrames: 20,        // 1.5 seconds (90 frames) wall-stick duration on collision
 
   // Aiming & Turn Rate (Controlled Aim Rotation — No Instant Snap Auto-Aim)
-  aimTurnRate: 0.055,               // Smooth rotational turn rate (~3.15°/frame)
+  aimTurnRate: 0.095,               // Smooth rotational turn rate (~3.15°/frame)
   aimAlignmentThreshold: 0.18,      // Must be aligned within ~10° to fire "Bang!"
 
   // Skill 1: Chains of Domination (Shihai no Kusari)
   enableChains: true,               // Alias toggle for Skill 1
-  chainsCooldown: 540,              // 9.0s (540 frames)
-  chainsRange: 420,                 // Tether reach
+  chainsCooldown: 500,              // 9.0s (540 frames)
+  chainsRange: 400,                 // Tether reach in pixels
+  chainsWindupFrames: 14,           // Windup / telegraph duration in frames before chain throw (auto-aim disabled so target can dodge)
+  chainsThrowSpeed: 0.40,           // Chain throw projectile speed (0.10 = 10% speed / ~1.55s slow throw, 1.0 or 45 = default fast throw)
+  // chainsLaunchFrames: 9,         // Optional: explicit throw animation duration in frames (overridden by chainsThrowSpeed if set)
   chainsMinDistance: 175,           // Minimum leash distance to prevent enemies getting too close to Makima
-  chainsDamage: 24,                 // Initial latch damage
-  chainsBleedDps: 8,                // Internal bleeding DPS
+  chainsDamage: 10,                 // Initial latch damage
+  chainsBleedDps: 0,                // Internal bleeding DPS
   chainsDuration: 240,              // 4.0s (240 frames) tether & stasis duration for enemy fighters
   chainsDurationFrames: 500,        // Alias duration in frames for fighters
   chainsStasisFrames: 240,          // Alias duration in frames for fighters
-  chainsPullSpeed: 11.5,            // Speed targets are reeled toward Makima
+  chainsPullSpeed: 7.5,            // Speed targets are reeled toward Makima
+  chainsBreakDistance: 400,         // Distance in pixels at which the chain snaps and breaks when enemy is knocked back
   chainsMinionHijackDuration: 360,  // 6.0s duration when hijacking enemy clones/minions
 
   // Skill 2: Angel's Armory (100-Year Halberds & 1000-Year Spear)
   enableAngelArmory: true,          // Alias toggle for Skill 2
   enableThousandYearSpear: true,    // Alias toggle for 1000-Year Spear
-  angelCooldown: 810,               // 13.5s (810 frames)
+  angelCooldown: 1500,               // 13.5s (810 frames)
   halberdDamage: 25,                // Damage per halberd (3 burst projectiles)
   halberdSpeed: 16.0,               // Projectile flight velocity
-  thousandYearSpearDamage: 135,     // 1000-Year Spear True Damage on direct hit
-  thousandYearSpearRadius: 150,     // Holy explosion AOE radius
-  thousandYearSpearChannelFrames: 50, // 0.83s divine spear summon channel
+  thousandYearSpearDamage: 140,     // 1000-Year Spear True Damage on direct hit
+  thousandYearSpearRadius: 160,     // Holy explosion AOE radius
+  thousandYearSpearChannelFrames: 100, // 0.83s divine spear summon channel
 
   // Ultimate: Kyoto Shrine Ritual: Gravitational Splatter
   enableShrine: true,               // Alias toggle for Ultimate
@@ -111,6 +115,7 @@ export const makimaConfig = {
     // Skill 1: Chains of Domination (Shihai no Kusari)
     chainsHook: 'Assets/Sound Effects/Skills/hookchain.mp3',
     chainsGravity: 'Assets/Sound Effects/Skills/gravitypull.mp3',
+    chainsRattle: 'Assets/Sound Effects/Skills/hookchain.mp3',
     chainsBleed: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     chainVoicelines: [
       'Assets/Sound Effects/Skills/makima-chain-voiceline1.mp3',
@@ -138,6 +143,7 @@ export const makimaConfig = {
     revertVoiceline: 3.5,
     chainsHook: 0.90,
     chainsGravity: 0.65,
+    chainsRattle: 0.70,
     chainsBleed: 0.55,
     chainVoicelines: 3.5,
     chainVoiceline: 3.5,
@@ -148,7 +154,7 @@ export const makimaConfig = {
   },
   soundChances: {
     revertVoiceline: 1.0, // 100% chance to play one of Makima's revert voicelines upon reassembling
-    chainVoiceline: 1.0 // 100% chance to play one of Makima's chain voicelines when chaining an enemy
+    chainVoiceline: 0.50 // 100% chance to play one of Makima's chain voicelines when chaining an enemy
   },
   soundDelays: {
     bangGunshot: 0,

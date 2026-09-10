@@ -766,6 +766,12 @@ export class RubbickFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
     
+    // ─── Stolen Unlimited Void Domain Active Logic ───
+    if (this.stolenDomainActive && (this.stolenDomainTimer || 0) > 0) {
+      this._updateStolenDomain(opponent, ownerIndex, arena);
+      return;
+    }
+
     const isTimeStopped = this._handleTimeStop();
     if (typeof this._updateStaffTrail === 'function') this._updateStaffTrail(isTimeStopped);
     if (isTimeStopped) return;
@@ -1057,192 +1063,7 @@ export class RubbickFighter extends Fighter {
       }
     }
 
-    // ─── Stolen Unlimited Void Domain Active Logic ───
-    if (this.stolenDomainActive && this.stolenDomainTimer > 0) {
-      this.stolenDomainTimer--;
 
-      // Stasis immunity inside own stolen domain
-      this.timeStopTimer = 0;
-      this.hitStunTimer = 0;
-
-      // Lock Rubbick in place while domain is active (hovering levitation)
-      this.vx = 0;
-      this.vy = 0;
-
-      // Aim at closest opponent
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent);
-      }
-
-      // Continuous active Arcane Bolts punishment on time-stopped targets!
-      if (this.attackCooldown > 0) this.attackCooldown--;
-      if (this.attackSwingTimer > 0) this.attackSwingTimer--;
-
-      if (this.attackCooldown <= 0 && opponent && !opponent.isDead) {
-        this.attackCooldown = 12; // Rapid arcane space strikes
-        this.attackSwingTimer = 10;
-        this.attackSwingMaxTimer = 10;
-        const rcfg = CONFIG.rubbick || CONFIG.trickster;
-        const boltDamage = ((rcfg?.boltDamage || 12) * 1.5) * getStolenMultiplier('gojo_domain', 'damageMultiplier');
-        if (projectileSystem && projectileSystem.fireArcaneBolt) {
-          projectileSystem.fireArcaneBolt(this, ownerIndex, boltDamage, opponent, { isDomainEmpowered: true, knockbackForce: 0, isDomainDPS: true });
-        }
-
-        const tip = (typeof getRubbickStaffTip === 'function') ? getRubbickStaffTip(this) : { x: this.x, y: this.y - (this.z || 0) };
-        spawnRubbickCastEffect(tip.x, tip.y, this.gunAngle, '#80FFB0', this);
-        triggerGlobalScreenShake(1.2, 3);
-      }
-
-      // Ascending emerald sparks & space ripples around Rubbick
-      if (Math.random() < 0.35) {
-        spawnSparks(
-          this.x + (Math.random() - 0.5) * 60,
-          this.y + (Math.random() - 0.5) * 60,
-          1, 'arcaneAscendLine'
-        );
-      }
-
-      // Apply paralysis / time-stop to all enemy fighters, illusions, and cars (Rule #17: paralyzing domain)
-      const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
-      const myTeam = state.getFighterTeam ? state.getFighterTeam(myIdx) : null;
-
-      if (state.fighters) {
-        for (let i = 0; i < state.fighters.length; i++) {
-          const f = state.fighters[i];
-          if (!f || f === this || f.hp <= 0) continue;
-          const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
-          if (myTeam !== null && myTeam === targetTeam) continue;
-
-          // Heavenly Restriction immunity (Toji bypasses domain)
-          if (f.domainImmunity || f.characterId === 'toji' || f.type === 'toji') continue;
-
-          if (typeof f.applyTimeStop === 'function') {
-            f.applyTimeStop(15, { isDomain: true, isUltimate: true });
-          } else {
-            f.timeStopTimer = Math.max(f.timeStopTimer || 0, 15);
-          }
-          if (typeof f.applyHitStun === 'function') {
-            f.applyHitStun(15);
-          }
-          f.vx = 0;
-          f.vy = 0;
-          if (f.knockbackVx !== undefined) f.knockbackVx = 0;
-          if (f.knockbackVy !== undefined) f.knockbackVy = 0;
-          if (typeof f.interruptAttacks === 'function') {
-            f.interruptAttacks(true);
-          }
-
-          // Disable Gojo's Limitless Infinity barrier & cancel skills while trapped inside Rubbick's stolen Unlimited Void
-          if (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') {
-            f.infinityActive = false;
-            f.infinityCooldown = 30;
-            f.infinityFadeOpacity = 0;
-            f.infinityBlockTimer = 0;
-            f.isDomainPreSlide = false;
-            f.domainPreSlideTimer = 0;
-            f.isChannelingDomainExpansion = false;
-            f.domainChargeTimer = 0;
-            f.isChannelingPurple = false;
-            f.purpleChargeTimer = 0;
-            f.redEffectTimer = 0;
-            f.redBuildupPhase = false;
-            f.forcedMeleeTimer = 0;
-            f.isMeleeMode = false;
-          }
-        }
-      }
-
-      // Also freeze direct opponent if passed
-      if (opponent && opponent !== this && opponent.hp > 0) {
-        if (!opponent.domainImmunity && opponent.characterId !== 'toji' && opponent.type !== 'toji') {
-          if (typeof opponent.applyTimeStop === 'function') {
-            opponent.applyTimeStop(15, { isDomain: true, isUltimate: true });
-          } else {
-            opponent.timeStopTimer = Math.max(opponent.timeStopTimer || 0, 15);
-          }
-          if (typeof opponent.applyHitStun === 'function') {
-            opponent.applyHitStun(15);
-          }
-          opponent.vx = 0;
-          opponent.vy = 0;
-          if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
-          if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
-          if (typeof opponent.interruptAttacks === 'function') {
-            opponent.interruptAttacks(true);
-          }
-
-          // Disable Gojo's Limitless Infinity barrier & cancel skills while trapped inside Rubbick's stolen Unlimited Void
-          if (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.id === 'gojo') {
-            opponent.infinityActive = false;
-            opponent.infinityCooldown = 30;
-            opponent.infinityFadeOpacity = 0;
-            opponent.infinityBlockTimer = 0;
-            opponent.isDomainPreSlide = false;
-            opponent.domainPreSlideTimer = 0;
-            opponent.isChannelingDomainExpansion = false;
-            opponent.domainChargeTimer = 0;
-            opponent.isChannelingPurple = false;
-            opponent.purpleChargeTimer = 0;
-            opponent.redEffectTimer = 0;
-            opponent.redBuildupPhase = false;
-            opponent.forcedMeleeTimer = 0;
-            opponent.isMeleeMode = false;
-          }
-        }
-      }
-
-      // Also freeze illusions
-      if (state.illusions) {
-        for (const ill of state.illusions) {
-          if (!ill || ill.hp <= 0) continue;
-          if (ill.ownerIndex !== undefined) {
-            const illTeam = state.getFighterTeam ? state.getFighterTeam(ill.ownerIndex) : null;
-            if (myTeam !== null && myTeam === illTeam) continue;
-          }
-          if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(15);
-          else ill.timeStopTimer = Math.max(ill.timeStopTimer || 0, 15);
-          if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15);
-          else ill.hitStunTimer = Math.max(ill.hitStunTimer || 0, 15);
-          ill.vx = 0;
-          ill.vy = 0;
-        }
-      }
-
-      // Domain expired
-      if (this.stolenDomainTimer <= 0) {
-        this.stolenDomainActive = false;
-        this.domainActive = false;
-        this._rubbickDomainHybridReady = false;
-        this.stolenType = null;
-        this.stolenTimer = 0;
-
-        spawnFloatingText(this.x, this.y - this.r - 20, 'DOMAIN EXPIRED', '#00FF64');
-
-        // Apply post-domain slow to all enemies (same as Gojo's domain expiry)
-        const slowDur = CONFIG.gojo?.domainPostSlowDuration ?? 180;
-        const slowMult = CONFIG.gojo?.domainPostSlowMultiplier ?? 0.35;
-        if (state.fighters) {
-          for (let i = 0; i < state.fighters.length; i++) {
-            const f = state.fighters[i];
-            if (!f || f === this || f.hp <= 0) continue;
-            const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
-            if (myTeam !== null && myTeam === targetTeam) continue;
-            if (typeof f.applySlow === 'function') {
-              f.applySlow(slowDur, slowMult, { isDomainSlow: true });
-            } else {
-              f.slowTimer = Math.max(f.slowTimer || 0, slowDur);
-              f.slowMultiplier = slowMult;
-            }
-            if (typeof spawnFloatingText === 'function') {
-              spawnFloatingText(f.x, f.y - (f.r || 25) - 20, 'SLOWED!', '#00FF64');
-            }
-          }
-        }
-      }
-
-      this.resolveWallBounce(arena);
-      return;
-    }
 
     // Telekinesis Logic
     if (this.tkTimer > 0 && this.tkTarget) {
@@ -2207,6 +2028,191 @@ export class RubbickFighter extends Fighter {
     } else {
       drawRubbickStaff(ctx, this);
     }
+  }
+
+  _updateStolenDomain(opponent, ownerIndex, arena) {
+    this.stolenDomainTimer--;
+
+    // Stasis immunity inside own stolen domain
+    this.timeStopTimer = 0;
+    this.hitStunTimer = 0;
+
+    // Lock Rubbick in place while domain is active (hovering levitation)
+    this.vx = 0;
+    this.vy = 0;
+
+    // Aim at closest opponent
+    if (opponent && !opponent.isDead) {
+      this.aim(opponent);
+    }
+
+    // Continuous active Arcane Bolts punishment on time-stopped targets!
+    if (this.attackCooldown > 0) this.attackCooldown--;
+    if (this.attackSwingTimer > 0) this.attackSwingTimer--;
+
+    if (this.attackCooldown <= 0 && opponent && !opponent.isDead) {
+      this.attackCooldown = 12; // Rapid arcane space strikes
+      this.attackSwingTimer = 10;
+      this.attackSwingMaxTimer = 10;
+      const rcfg = CONFIG.rubbick || CONFIG.trickster;
+      const boltDamage = ((rcfg?.boltDamage || 12) * 1.5) * getStolenMultiplier('gojo_domain', 'damageMultiplier');
+      if (projectileSystem && projectileSystem.fireArcaneBolt) {
+        projectileSystem.fireArcaneBolt(this, ownerIndex, boltDamage, opponent, { isDomainEmpowered: true, knockbackForce: 0, isDomainDPS: true });
+      }
+
+      const tip = (typeof getRubbickStaffTip === 'function') ? getRubbickStaffTip(this) : { x: this.x, y: this.y - (this.z || 0) };
+      spawnRubbickCastEffect(tip.x, tip.y, this.gunAngle, '#80FFB0', this);
+      triggerGlobalScreenShake(1.2, 3);
+    }
+
+    // Ascending emerald sparks & space ripples around Rubbick
+    if (Math.random() < 0.35) {
+      spawnSparks(
+        this.x + (Math.random() - 0.5) * 60,
+        this.y + (Math.random() - 0.5) * 60,
+        1, 'arcaneAscendLine'
+      );
+    }
+
+    // Apply paralysis / time-stop to all enemy fighters, illusions, and cars (Rule #17: paralyzing domain)
+    const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
+    const myTeam = state.getFighterTeam ? state.getFighterTeam(myIdx) : null;
+
+    if (state.fighters) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0) continue;
+        const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+        if (myTeam !== null && myTeam === targetTeam) continue;
+
+        // Heavenly Restriction immunity (Toji bypasses domain)
+        if (f.domainImmunity || f.characterId === 'toji' || f.type === 'toji') continue;
+
+        if (typeof f.applyTimeStop === 'function') {
+          f.applyTimeStop(15, { isDomain: true, isUltimate: true });
+        } else {
+          f.timeStopTimer = Math.max(f.timeStopTimer || 0, 15);
+        }
+        if (typeof f.applyHitStun === 'function') {
+          f.applyHitStun(15);
+        }
+        f.vx = 0;
+        f.vy = 0;
+        if (f.knockbackVx !== undefined) f.knockbackVx = 0;
+        if (f.knockbackVy !== undefined) f.knockbackVy = 0;
+        if (typeof f.interruptAttacks === 'function') {
+          f.interruptAttacks(true);
+        }
+
+        // Disable Gojo's Limitless Infinity barrier & cancel skills while trapped inside Rubbick's stolen Unlimited Void
+        if (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') {
+          f.infinityActive = false;
+          f.infinityCooldown = 30;
+          f.infinityFadeOpacity = 0;
+          f.infinityBlockTimer = 0;
+          f.isDomainPreSlide = false;
+          f.domainPreSlideTimer = 0;
+          f.isChannelingDomainExpansion = false;
+          f.domainChargeTimer = 0;
+          f.isChannelingPurple = false;
+          f.purpleChargeTimer = 0;
+          f.redEffectTimer = 0;
+          f.redBuildupPhase = false;
+          f.forcedMeleeTimer = 0;
+          f.isMeleeMode = false;
+        }
+      }
+    }
+
+    // Also freeze direct opponent if passed
+    if (opponent && opponent !== this && opponent.hp > 0) {
+      if (!opponent.domainImmunity && opponent.characterId !== 'toji' && opponent.type !== 'toji') {
+        if (typeof opponent.applyTimeStop === 'function') {
+          opponent.applyTimeStop(15, { isDomain: true, isUltimate: true });
+        } else {
+          opponent.timeStopTimer = Math.max(opponent.timeStopTimer || 0, 15);
+        }
+        if (typeof opponent.applyHitStun === 'function') {
+          opponent.applyHitStun(15);
+        }
+        opponent.vx = 0;
+        opponent.vy = 0;
+        if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
+        if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
+        if (typeof opponent.interruptAttacks === 'function') {
+          opponent.interruptAttacks(true);
+        }
+
+        // Disable Gojo's Limitless Infinity barrier & cancel skills while trapped inside Rubbick's stolen Unlimited Void
+        if (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.id === 'gojo') {
+          opponent.infinityActive = false;
+          opponent.infinityCooldown = 30;
+          opponent.infinityFadeOpacity = 0;
+          opponent.infinityBlockTimer = 0;
+          opponent.isDomainPreSlide = false;
+          opponent.domainPreSlideTimer = 0;
+          opponent.isChannelingDomainExpansion = false;
+          opponent.domainChargeTimer = 0;
+          opponent.isChannelingPurple = false;
+          opponent.purpleChargeTimer = 0;
+          opponent.redEffectTimer = 0;
+          opponent.redBuildupPhase = false;
+          opponent.forcedMeleeTimer = 0;
+          opponent.isMeleeMode = false;
+        }
+      }
+    }
+
+    // Also freeze illusions
+    if (state.illusions) {
+      for (const ill of state.illusions) {
+        if (!ill || ill.hp <= 0) continue;
+        if (ill.ownerIndex !== undefined) {
+          const illTeam = state.getFighterTeam ? state.getFighterTeam(ill.ownerIndex) : null;
+          if (myTeam !== null && myTeam === illTeam) continue;
+        }
+        if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(15);
+        else ill.timeStopTimer = Math.max(ill.timeStopTimer || 0, 15);
+        if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15);
+        else ill.hitStunTimer = Math.max(ill.hitStunTimer || 0, 15);
+        ill.vx = 0;
+        ill.vy = 0;
+      }
+    }
+
+    // Domain expired
+    if (this.stolenDomainTimer <= 0) {
+      this.stolenDomainActive = false;
+      this.domainActive = false;
+      this._rubbickDomainHybridReady = false;
+      this.stolenType = null;
+      this.stolenTimer = 0;
+
+      spawnFloatingText(this.x, this.y - this.r - 20, 'DOMAIN EXPIRED', '#00FF64');
+
+      // Apply post-domain slow to all enemies (same as Gojo's domain expiry)
+      const slowDur = CONFIG.gojo?.domainPostSlowDuration ?? 180;
+      const slowMult = CONFIG.gojo?.domainPostSlowMultiplier ?? 0.35;
+      if (state.fighters) {
+        for (let i = 0; i < state.fighters.length; i++) {
+          const f = state.fighters[i];
+          if (!f || f === this || f.hp <= 0) continue;
+          const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+          if (myTeam !== null && myTeam === targetTeam) continue;
+          if (typeof f.applySlow === 'function') {
+            f.applySlow(slowDur, slowMult, { isDomainSlow: true });
+          } else {
+            f.slowTimer = Math.max(f.slowTimer || 0, slowDur);
+            f.slowMultiplier = slowMult;
+          }
+          if (typeof spawnFloatingText === 'function') {
+            spawnFloatingText(f.x, f.y - (f.r || 25) - 20, 'SLOWED!', '#00FF64');
+          }
+        }
+      }
+    }
+
+    this.resolveWallBounce(arena);
   }
 
   _updateStaffTrail(isTimeStopped = false) {

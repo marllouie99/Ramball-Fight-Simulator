@@ -74,8 +74,9 @@ export function modExecuteKatanaMelee(fighter, angle) {
   // Collect all enemy illusions & minions in frontal Katana blade arc
   if (state.illusions) {
     for (const ill of state.illusions) {
-      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika || (ill.vanishTimer && ill.vanishTimer > 0)) continue;
-      if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
+      const isControlledRika = fighter.isMakimaControlledRikaTarget?.(ill);
+      if (!ill || ill.hp <= 0 || (!isControlledRika && (ill.owner === fighter || ill.isRika)) || (ill.vanishTimer && ill.vanishTimer > 0)) continue;
+      if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
 
       const dx = ill.x - fighter.x;
       const dy = ill.y - fighter.y;

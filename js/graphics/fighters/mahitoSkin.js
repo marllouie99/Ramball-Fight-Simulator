@@ -932,13 +932,7 @@ export function drawMahitoSkin(ctx, fighter) {
     }
   }
 
-  // 8. Gojo Infinity Freeze / Time Stop Overlay Standard (Rule #9)
-  if (fighter.timeStopTimer > 0 || fighter.isFrozenByInfinity) {
-    ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
-    ctx.beginPath();
-    ctx.arc(0, 0, r + 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Status overlays & Stun visuals are handled uniformly by EntityRenderer / StatusEffectsManager (Rule #9)
 
   // Draw status overlays (slow, electric stun, black flash, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {

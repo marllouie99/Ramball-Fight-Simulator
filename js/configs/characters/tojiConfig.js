@@ -6,7 +6,7 @@ export const tojiConfig = {
   // Base Attributes
   hp: 420,
   speed: 5.6,
-  moveSpeed: 5.6,
+  moveSpeed: 8.6,
   r: 25,
   radius: 25,
   color: '#281438', // Dark Shadow Purple

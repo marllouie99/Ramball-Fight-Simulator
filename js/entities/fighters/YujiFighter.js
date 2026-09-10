@@ -79,13 +79,6 @@ export class YujiFighter extends Fighter {
     this.rapidSlashPhase = 'IDLE';
   }
 
-  isEffectivelyAlive() {
-    if (this.soulSwapActive || (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0) || (this.revertTransitionTimer && this.revertTransitionTimer > 0)) {
-      return true;
-    }
-    return super.isEffectivelyAlive();
-  }
-
   takeDamage(amount, attacker, opts = {}) {
     if (opts.isHeal || amount < 0) {
       return super.takeDamage(amount, attacker, opts);
@@ -96,7 +89,7 @@ export class YujiFighter extends Fighter {
     // Auto-trigger Soul Swap if fatal or drops below threshold before having swapped
     if (!this.hasSoulSwapped && this.hp > 0) {
       if ((this.hp - incoming) <= thresholdHp) {
-        // Prevent fatal one-shot death before/during transformation!
+        // Prevent fatal one-shot death on the triggering hit so he can transform
         const safeDamage = Math.min(incoming, Math.max(0, this.hp - 1));
         const result = super.takeDamage(safeDamage, attacker, opts);
         if (this.hp <= 0) {
@@ -109,12 +102,21 @@ export class YujiFighter extends Fighter {
       }
     }
 
-    // While in active Soul Swap or takeover transition, grant full Super Armor & fatal death protection
+    // While in active Soul Swap or takeover transition, take damage normally but maintain super armor while alive
     if (this.soulSwapActive || (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0)) {
-      // Prevent fatal death until transformation ends
-      const safeDamage = Math.min(incoming, Math.max(0, this.hp - 1));
-      const result = super.takeDamage(safeDamage, attacker, { ...opts, isContinuous: true });
-      if (this.hp <= 0) this.hp = 1;
+      const result = super.takeDamage(incoming, attacker, opts);
+      if (this.hp <= 0 || this.dead || this._hasDied) {
+        this.dead = true;
+        this.isDead = true;
+        this.soulSwapActive = false;
+        this.soulSwapTimer = 0;
+        this.soulSwapTransitionTimer = 0;
+        this.rapidSlashHitsLeft = 0;
+        this.rapidSlashTimer = 0;
+        this.rapidSlashPhase = 'IDLE';
+        this.flurryTarget = null;
+        return result;
+      }
       // Clear all hit-stuns / hit-pauses / knockback stuns
       this.hitStunTimer = 0;
       this.knockbackStunTimer = 0;

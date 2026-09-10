@@ -29,6 +29,18 @@ function areOnSameTeam(ownerIndex, targetIndex) {
   if (ownerIndex === targetIndex && ownerIndex !== undefined && ownerIndex !== null && ownerIndex !== -1) return true;
   if (!state || !state.mode) return false;
   if (typeof ownerIndex !== 'number' || typeof targetIndex !== 'number' || ownerIndex < 0 || targetIndex < 0) return false;
+
+  const ownerFighter = state.fighters ? state.fighters[ownerIndex] : null;
+  const targetFighter = state.fighters ? state.fighters[targetIndex] : null;
+
+  // Mind-Control Puppetry: Invert projectile team hit checks
+  if (ownerFighter && ownerFighter.isChainedByMakima) {
+    if (targetFighter === ownerFighter._makimaChainer || (ownerFighter._makimaChainer && ownerFighter._makimaChainer.isTeammate(targetFighter))) {
+      return true;
+    }
+    return false;
+  }
+
   const mode = state.mode;
   const isTeamMode = (
     mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' ||
@@ -859,15 +871,18 @@ class ProjectileSystem {
     // Play explosion sound
     const fugaExplodeSound = getSkillSound(attacker?._def?.id || 'sukuna', 'fuga_explode');
     const explodeSnd = CONFIG.sukuna?.sounds?.fugaExplosion || (fugaExplodeSound ? fugaExplodeSound.src : 'Assets/Sound Effects/Skills/fugaexplode.mp3');
-    const explodeVol = CONFIG.sukuna?.soundVolumes?.fugaExplosion ?? (fugaExplodeSound ? fugaExplodeSound.volume : 1.5);
-    if (explodeSnd) playSound(explodeSnd, explodeVol);
-    
     const impactShake = CONFIG.sukuna?.divineFlameShakeIntensity || 30;
     const impactDuration = CONFIG.sukuna?.divineFlameShakeDuration || 25;
     triggerGlobalScreenShake(impactShake, impactDuration);
     if (typeof spawnGroundScorch === 'function') spawnGroundScorch(x, y, 60);
-    if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 40, 'orange');
-    if (typeof spawnSparks === 'function') spawnSparks(x, y, 6, 'orange', '#FF4500');
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(x, y, Math.max(120, splashRadius * 0.75), '#FFAA00');
+      spawnImpactFlash(x, y, Math.max(60, splashRadius * 0.40), '#FFFFFF');
+    }
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(x, y, 16, 'orange', '#FF4500');
+      spawnSparks(x, y, 8, 'gold', '#FFEE88');
+    }
 
     // Generate organic curved ground cracks (bezier veins) radiating from impact
     const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
@@ -924,7 +939,7 @@ class ProjectileSystem {
 
     if (!state.thermobaricExplosions) state.thermobaricExplosions = [];
     state.thermobaricExplosions.push({
-      x, y, radius: 10, maxRadius: splashRadius, life: 90, maxLife: 90,
+      x, y, radius: Math.max(25, splashRadius * 0.12), maxRadius: splashRadius, life: 90, maxLife: 90,
       cracks, debris, rimPoints, seed: Math.random()
     });
 
@@ -976,20 +991,29 @@ class ProjectileSystem {
           }
           
           // 3. Blast off target with strong outward kinetic blast knockback
-          const angle = dist > 0 ? Math.atan2(f.y - y, f.x - x) : Math.random() * Math.PI * 2;
+          let angle;
+          if (dist > 15) {
+            angle = Math.atan2(f.y - y, f.x - x);
+          } else if (attacker && (attacker.x !== f.x || attacker.y !== f.y)) {
+            angle = Math.atan2(f.y - attacker.y, f.x - attacker.x);
+          } else {
+            angle = (attacker && attacker.gunAngle !== undefined) ? attacker.gunAngle : (Math.random() * Math.PI * 2);
+          }
           const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
-          const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
+          const pushForce = baseKnockback * Math.max(0.65, 1 - (dist / splashRadius) * 0.45);
 
           const pushVx = Math.cos(angle) * pushForce * 1.35;
           const pushVy = Math.sin(angle) * pushForce * 1.35;
+          const stunFrames = CONFIG.sukuna?.divineFlameKnockbackStun || 25;
 
           if (typeof f.applyKnockback === 'function') {
-            f.applyKnockback(pushVx, pushVy);
+            f.applyKnockback(pushVx, pushVy, stunFrames);
           } else {
             f.knockbackVx = (f.knockbackVx || 0) + pushVx;
             f.knockbackVy = (f.knockbackVy || 0) + pushVy;
             f.vx += pushVx;
             f.vy += pushVy;
+            f.knockbackStunTimer = Math.max(f.knockbackStunTimer || 0, stunFrames);
           }
         }
       });
@@ -1029,20 +1053,29 @@ class ProjectileSystem {
             isGuaranteedHit: true
           });
 
-          const angle = dist > 0 ? Math.atan2(ill.y - y, ill.x - x) : Math.random() * Math.PI * 2;
+          let angle;
+          if (dist > 15) {
+            angle = Math.atan2(ill.y - y, ill.x - x);
+          } else if (attacker && (attacker.x !== ill.x || attacker.y !== ill.y)) {
+            angle = Math.atan2(ill.y - attacker.y, ill.x - attacker.x);
+          } else {
+            angle = (attacker && attacker.gunAngle !== undefined) ? attacker.gunAngle : (Math.random() * Math.PI * 2);
+          }
           const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
-          const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
+          const pushForce = baseKnockback * Math.max(0.65, 1 - (dist / splashRadius) * 0.45);
 
           const pushVx = Math.cos(angle) * pushForce * 1.35;
           const pushVy = Math.sin(angle) * pushForce * 1.35;
+          const stunFrames = CONFIG.sukuna?.divineFlameKnockbackStun || 25;
 
           if (typeof ill.applyKnockback === 'function') {
-            ill.applyKnockback(pushVx, pushVy);
+            ill.applyKnockback(pushVx, pushVy, stunFrames);
           } else {
             ill.knockbackVx = (ill.knockbackVx || 0) + pushVx;
             ill.knockbackVy = (ill.knockbackVy || 0) + pushVy;
             ill.vx += pushVx;
             ill.vy += pushVy;
+            ill.knockbackStunTimer = Math.max(ill.knockbackStunTimer || 0, stunFrames);
           }
         }
       });
@@ -1485,6 +1518,11 @@ class ProjectileSystem {
     for (const illusion of state.illusions || []) {
       if (!illusion || illusion.hp <= 0) continue;
 
+      const projectileOwner = fighters[projectile.owner];
+      const isControlledOwnRika = Boolean(
+        projectileOwner?.isMakimaControlledRikaTarget?.(illusion)
+      );
+
       // Skip friendly illusions
       let illusionOwnerIndex = illusion.owner?.fighterIndex;
       if (typeof illusionOwnerIndex !== 'number' || illusionOwnerIndex < 0) {
@@ -1496,7 +1534,7 @@ class ProjectileSystem {
       }
 
       if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
-        if (projectile.owner === illusionOwnerIndex || (typeof areOnSameTeam === 'function' && areOnSameTeam(projectile.owner, illusionOwnerIndex))) continue;
+        if (!isControlledOwnRika && (projectile.owner === illusionOwnerIndex || (typeof areOnSameTeam === 'function' && areOnSameTeam(projectile.owner, illusionOwnerIndex)))) continue;
       }
 
       // Skip if this projectile has piercing and already hit this illusion
@@ -1534,7 +1572,11 @@ class ProjectileSystem {
       if (f && f.rika && f.rika.active && f.rika.hp > 0) {
         const rk = f.rika;
         const ownerIdx = fighters.indexOf(f);
-        if (projectile.owner === ownerIdx || (typeof areOnSameTeam === 'function' && areOnSameTeam(projectile.owner, ownerIdx))) continue;
+        const projectileOwner = fighters[projectile.owner];
+        const isControlledOwnRika = Boolean(
+          projectileOwner?.isMakimaControlledRikaTarget?.(rk)
+        );
+        if (!isControlledOwnRika && (projectile.owner === ownerIdx || (typeof areOnSameTeam === 'function' && areOnSameTeam(projectile.owner, ownerIdx)))) continue;
         if (projectile.hitFighters && projectile.hitFighters.has(rk)) continue;
 
         const hitRadius = (rk.r || 22) + projectile.r;
@@ -3319,6 +3361,18 @@ class ProjectileSystem {
       const expired = this.isProjectileExpired(p);
 
       if (hit || expired) {
+        const isFuga = p.isSukunaFurnace || p.visual === 'sukunaFurnaceArrow' || p.behaviorType === 'sukuna_furnace';
+        if (isFuga) {
+          if (expired && !hit && !p.isFrozenByInfinity) {
+            this.triggerThermobaricExplosion(p.x, p.y, p.owner, p.damage);
+          }
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+          continue;
+        }
+
         if (p.isMahitoBodyRepel) {
           this.triggerMahitoBodyRepelSummon(p);
           this._returnProjectile(p);

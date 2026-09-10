@@ -210,7 +210,7 @@ export const mahitoConfig = {
   domainExpansion: {
     cooldown: 1000,                // 33 seconds cooldown
     chargeMax: 120,                // 2 seconds channeling duration before domain opens
-    duration: 1000,                 // 6.6 seconds of paralyzing stasis
+    duration: 500,                 // 6.6 seconds of paralyzing stasis
     radius: 9999,                  // Closed barrier - covers the whole screen
     executionDamageMultiplier: 0,// Execution strike deals 50% max HP true damage
     executionHitStun: 60,          // Massive hit stun on execution

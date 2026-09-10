@@ -93,14 +93,17 @@ Makima naturally asserts psychological authority over the battlefield:
 ---
 
 ### ⛓️ Skill 1: Chains of Domination (*Shihai no Kusari — 支配の鎖*)
-* **Type**: Multi-Target Tether Pull & Mind Subjugation
+* **Type**: Directional Skillshot / Multi-Target Tether Pull & Mind Subjugation (Missable & Dodgeable)
 * **Cooldown**: `9.0 seconds` (`540 frames`)
+* **Windup Duration**: Configurable via `chainsWindupFrames` (default `14 frames`, ~0.23s telegraph)
+* **Throw Speed**: Configurable via `chainsThrowSpeed` (default `45.0 px/frame`) and `chainsLaunchFrames` (default `9 frames`)
 * **Damage**: `24 Initial Damage` + `8/sec Bleed`
 * **Mechanics**:
-  * Makima extends 3 ethereal crimson chains from her fingertips or collar, latching onto up to 3 nearby targets (fighters, clones, or minions).
-  * **Tether Stasis & Pull**: Pulls linked targets toward Makima at `12 px/frame` while inflicting a `1.2s` forced kneeling hit-stun (`applyTimeStop` applied exclusively to targets per Rule 5).
-  * **Minion Hijacking**: If a chain latches onto an enemy summon or illusion (e.g., Doppelganger clone, Megumi Shikigami, or Turret), Makima **subjugates their mind**, turning them into loyal allies for `6.0 seconds` to attack their original creator!
-  * **Command: Kneel**: Enemies linked by the chains have their damage output reduced by `25%` for the duration.
+  * **Pre-Throw Windup & Auto-Aim Rotation Disabled**: When about to throw her chain (`_prepareChainsOfDomination`), Makima enters a brief `14-frame` telegraph stance accompanied by a sharp metallic chain rattle SFX and glowing cursed wrist aperture. During this windup, **her auto-aim rotation is completely disabled (`canAim() = false`) and her facing direction is strictly locked**. This allows agile or moving opponents to strafe or dash out of the trajectory line before the chain is released, making the skill genuinely missable and dodgeable!
+  * **Directional Skillshot (No Auto-Aim Snap & Configurable Throw Speed)**: Makima throws ethereal crimson-gold chains strictly along her locked aim vector across a `420px` corridor. Throw velocity is fully configurable via `CONFIG.makima.chainsThrowSpeed` (or `chainsLaunchFrames`). The skill does **not** auto-aim snap to enemies; if no enemy intersects the chain's path, the chains miss, extend out to max range, and smoothly dissipate with floating *"MISSED"* text.
+  * **Tether Stasis & Pull**: When enemies or illusions intersect the thrown chain corridor, the harpoons latch on, pulling linked targets toward Makima at `11.5 px/frame` (stopping at a safe tether distance) while inflicting hit-pause exclusively on targets per Rule 5.
+  * **Minion Hijacking**: If a chain latches onto an enemy summon or illusion (e.g., Doppelganger clone, Megumi Shikigami, or Turret), Makima **subjugates their mind**, turning them into loyal allies to attack their original creator!
+  * **Command: Kneel**: Enemies linked by the chains have their damage output suppressed while taking continuous bleed damage ticks.
 
 ---
 

@@ -2637,9 +2637,7 @@ export function updateMahitoDomainExpansion(fighter) {
 
   // Active Phase
   if (fighter.domainActive) {
-    if (!fighter.isParalyzedDebuffActive()) {
-      fighter.domainTimer--;
-    }
+    fighter.domainTimer--;
     if (fighter.domainTimer <= 0) {
       fighter.domainActive = false;
       // When domain expires naturally, unfreeze targets

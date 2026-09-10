@@ -33,9 +33,7 @@ export function isSuppressedByGetsuga(fighter) {
   if (!fighter) return false;
   return Boolean(
     fighter.isDraggedByGetsuga ||
-    (fighter._hitByGetsugaTimer && fighter._hitByGetsugaTimer > 0) ||
-    (fighter._hitByFugaTimer && fighter._hitByFugaTimer > 0) ||
-    (fighter._hitByDivineFlameTimer && fighter._hitByDivineFlameTimer > 0)
+    (fighter._hitByGetsugaTimer && fighter._hitByGetsugaTimer > 0)
   );
 }
 
@@ -65,7 +63,7 @@ export function suppressAfterimagesAndAttackEffects(target) {
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
   if (typeof opts === 'string') {
-    opts = { source: opts };
+    opts = { source: opts, isBleed: opts === 'bleed', isCurse: opts === 'curse' };
   } else if (!opts || typeof opts !== 'object') {
     opts = {};
   }
@@ -121,11 +119,13 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
         target._lastTurretPairHitId = opts.projectile.shotPairId;
       }
 
-      // Trigger global white hit flash visual effect
-      target.hitFlashTimer = 8;
+      // Trigger global white hit flash visual effect for non-DoT hits
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isBleed && opts.source !== 'bleed' && !opts.isElectrified) {
+        target.hitFlashTimer = 8;
+      }
 
       // Play flesh hit audio effect unless it's a continuous DPS/dot effect or duplicate turret pair hit
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified && !isSecondTurretHit) {
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified && !opts.isBleed && opts.source !== 'bleed' && !isSecondTurretHit) {
         audioSystem.playSFX('attack_fleshhit', 0.6);
       } else if (opts.isPurpleDPS || opts.isDomainDPS) {
         const now = Date.now();
@@ -285,11 +285,60 @@ export class Fighter {
   /** Check if another fighter/entity is on the same team. */
   isTeammate(other) {
     if (!other || other === this) return false;
+
+    // Mind-Control Puppetry: When mind-controlled by Makima, allegiances invert
+    if (this.isMindControlledByMakima) {
+      // Makima and Makima's original teammates are considered friendly allies
+      if (other === this._makimaChainer) return true;
+      // BUT own summon/companion (Rika) or other entities originally owned by this fighter are NEVER teammates while mind-controlled!
+      if (other.isRika || other.owner === this || other._makimaOriginalOwner === this) return false;
+      if (this._makimaChainer) {
+        if (other.owner === this._makimaChainer && !other._makimaOriginalOwner) return true;
+        if (typeof state !== 'undefined' && state && typeof state.getFighterTeam === 'function' && state.fighters) {
+          const chainerIdx = state.fighters.indexOf(this._makimaChainer);
+          const otherIdx = state.fighters.indexOf(other.owner || other);
+          if (chainerIdx !== -1 && otherIdx !== -1) {
+            const chainerTeam = state.getFighterTeam(chainerIdx);
+            const otherTeam = state.getFighterTeam(otherIdx);
+            if (chainerTeam !== null && otherTeam !== null && chainerTeam === otherTeam) return true;
+          }
+        }
+      }
+      // Former allies, summons, Rika, illusions, and self-owned entities are now hostile targets!
+      return false;
+    }
+
+    if (other.isMindControlledByMakima) {
+      if (this === other._makimaChainer) return true;
+      // If this is the original summoner/companion of other, they are hostile!
+      if (other.isRika && (this === other.owner || this === other._makimaOriginalOwner)) return false;
+      if (this.isRika && (other === this.owner || other === this._makimaOriginalOwner)) return false;
+      if (other._makimaChainer) {
+        if (this.owner === other._makimaChainer && !this._makimaOriginalOwner) return true;
+        if (typeof state !== 'undefined' && state && typeof state.getFighterTeam === 'function' && state.fighters) {
+          const chainerIdx = state.fighters.indexOf(other._makimaChainer);
+          const thisIdx = state.fighters.indexOf(this.owner || this);
+          if (chainerIdx !== -1 && thisIdx !== -1) {
+            const chainerTeam = state.getFighterTeam(chainerIdx);
+            const thisTeam = state.getFighterTeam(thisIdx);
+            if (chainerTeam !== null && thisTeam !== null && chainerTeam === thisTeam) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // If Rika is chained/dominated by Makima, Rika and Yuta are NOT teammates
+    if ((this.isRika && (this.isChainedByMakima || this.isMindControlledByMakima)) || (other.isRika && (other.isChainedByMakima || other.isMindControlledByMakima))) {
+      if (this.isRika && (other === this.owner || other === this._makimaOriginalOwner)) return false;
+      if (other.isRika && (this === other.owner || this === other._makimaOriginalOwner)) return false;
+    }
+
     const resolvedOther = other.owner || other;
     if (resolvedOther === this) return true;
     if (this.team !== undefined && resolvedOther.team !== undefined && this.team === resolvedOther.team) return true;
     if (typeof state !== 'undefined' && state && typeof state.getFighterTeam === 'function' && state.fighters) {
-      const myIdx = state.fighters.indexOf(this);
+      const myIdx = state.fighters.indexOf(this.owner || this);
       const otherIdx = state.fighters.indexOf(resolvedOther);
       if (myIdx !== -1 && otherIdx !== -1) {
         const myTeam = state.getFighterTeam(myIdx);
@@ -421,7 +470,12 @@ export class Fighter {
     this.isCurrentlyWallPinnedByMakima = false;
     this.makimaWallPinTimer = 0;
     this.isChainedByMakima = false;
+    this.isMindControlledByMakima = false;
     this._makimaChainer = null;
+
+    this.dead = false;
+    this.isDead = false;
+    this._hasDied = false;
 
     this.damageDealt = 0;
     this.damageReceived = 0;
@@ -466,12 +520,21 @@ export class Fighter {
     if (this.timeStopTimer && this.timeStopTimer > 0) return true;
     if (this.paralyzeTimer && this.paralyzeTimer > 0) return true;
     if (this.electricStunTimer && this.electricStunTimer > 0) return true;
+    if (this.crimsonElectrifiedTimer && this.crimsonElectrifiedTimer > 0) return true;
     if (this.dubstepStunTimer && this.dubstepStunTimer > 0) return true;
-    if (this.isParalyzed || this.isFrozen || this.isFrozenByInfinity) return true;
+    if (this.freezeTimer && this.freezeTimer > 0) return true;
+    if (this.stunTimer && this.stunTimer > 0) return true;
+    if (this.knockbackStunTimer && this.knockbackStunTimer > 0) return true;
+    if (this.basicAttackHitPauseTimer && this.basicAttackHitPauseTimer > 0) return true;
     if (this.hitStunTimer && this.hitStunTimer > 0) return true;
-    if (this.isWallPinned || this.isWallSlammed) return true;
-    if (this.caughtInSaitamaCounter) return true;
+    if (this.isParalyzed || this.isFrozen || this.isFrozenByInfinity || this.isParalyzedByMahito || this.isParalyzedByMahoraga) return true;
+    if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || (this.makimaWallPinTimer && this.makimaWallPinTimer > 0)) return true;
+    if (this.isGrabbedByMahoraga) return true;
+    if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
     if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
+    if (this.isRevivingFromContract || this.isShatterReviving || (this.reviveStasisTimer && this.reviveStasisTimer > 0)) return true;
+    if (this.isCaughtInBlackHole || this._insideBlackHole || (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam())) return true;
+    if (this.statusEffects && (this.statusEffects.timeStopTimer > 0 || this.statusEffects.paralyzeTimer > 0 || this.statusEffects.isParalyzed || (this.statusEffects.hitStunTimer && this.statusEffects.hitStunTimer > 0))) return true;
 
     // Trapped in cognitive stasis of enemy domain (e.g. Gojo's Unlimited Void)
     if (typeof state !== 'undefined' && state.fighters) {
@@ -997,7 +1060,7 @@ export class Fighter {
       this.knockbackVy = 0;
       return;
     }
-    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
+    if (!this.isTargetOfAmbush && !this.isChainedByMakima && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.vx = 0;
@@ -1110,6 +1173,9 @@ export class Fighter {
           this.statusEffects.isParalyzed = false;
           this.statusEffects.paralyzeTimer = 0;
         }
+        if (!this.isParalyzedByMahoraga && !this.isWallSlammed) {
+          return false;
+        }
       }
       this.vx = 0;
       this.vy = 0;
@@ -1119,6 +1185,14 @@ export class Fighter {
     if (this.isGrabbedByMahoraga) {
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0)) {
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
       this._handleFrozenSkillCooldowns();
       return true;
     }
@@ -1155,6 +1229,9 @@ export class Fighter {
   }
 
   onDeath() {
+    this.dead = true;
+    this.isDead = true;
+    this._hasDied = true;
     clearFighterDomain(this, typeof state !== 'undefined' ? state : null);
     this.interruptAttacks(true);
     this.hitFlashTimer = 0; // Clear residual white hit-flash so corpses don't render white
@@ -1270,6 +1347,12 @@ export class Fighter {
     if (this._healthBarHitTimer > 0) this._healthBarHitTimer--;
     if (this._healthBarHealTimer > 0) this._healthBarHealTimer--;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+    if (this._soulDisfigurementTimer > 0) {
+      this._soulDisfigurementTimer--;
+      if (this._soulDisfigurementTimer <= 0) {
+        this._soulDisfigurementStacks = 0;
+      }
+    }
     if (this.rctVisualTimer > 0) this.rctVisualTimer--;
     if (this.blackFlashDebuffTimer > 0) this.blackFlashDebuffTimer--;
     if (this.blackFlashTimer > 0) this.blackFlashTimer--;
@@ -1291,6 +1374,25 @@ export class Fighter {
         this.preventKnockbackBounce = false;
         this.suppressFreezeOverlay = false;
         this._makimaAttacker = null;
+
+        // Push fighter cleanly off the wall into the arena with natural bounce velocity
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
+        if (arena) {
+          const tRadius = this.r || 25;
+          let nx = 0;
+          let ny = 0;
+          if (this.x - tRadius <= arena.x + 12) nx = 1;
+          else if (this.x + tRadius >= arena.x + arena.width - 12) nx = -1;
+          if (this.y - tRadius <= arena.y + 12) ny = 1;
+          else if (this.y + tRadius >= arena.y + arena.height - 12) ny = -1;
+
+          if (nx !== 0 || ny !== 0) {
+            const exitAngle = Math.atan2(ny + (Math.random() - 0.5) * 0.8, nx + (Math.random() - 0.5) * 0.8);
+            const moveSpeed = this.speed || 3.0;
+            this.vx = Math.cos(exitAngle) * moveSpeed;
+            this.vy = Math.sin(exitAngle) * moveSpeed;
+          }
+        }
       }
     } else {
       this.isCurrentlyWallPinnedByMakima = false;
@@ -1453,7 +1555,7 @@ export class Fighter {
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
     this._lastKnockbackFrame = currentFrame;
 
-    if (!this.isTargetOfAmbush && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
+    if (!this.isTargetOfAmbush && !this.isChainedByMakima && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.vx = 0;
@@ -1610,7 +1712,11 @@ export class Fighter {
       attackerIndex !== targetIndex &&
       state.getFighterTeam(attackerIndex) === state.getFighterTeam(targetIndex)
     ) {
-      return false;
+      const attackerIsChained = Boolean(attacker && (attacker.isChainedByMakima || attacker.isMindControlledByMakima));
+      const targetIsChained = Boolean(this.isChainedByMakima || this.isMindControlledByMakima);
+      if (!attackerIsChained && !targetIsChained) {
+        return false;
+      }
     }
 
     // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks (e.g. Boogie Woogie swap buff)
@@ -1764,15 +1870,16 @@ export class Fighter {
       const isBasicAttack = !opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && 
                             !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
                             !opts.isSkill && !opts.isUltimate && !opts.isRikaAttack && 
-                            !opts.isExplosion && !opts.isAOE;
+                            !opts.isExplosion && !opts.isAOE && !opts.isBleed && opts.source !== 'bleed' && 
+                            !opts.isCurse && opts.source !== 'curse';
       if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0 && !this.isTurret && !this.isDispenser && !isSecondTurretHit) {
         if (!this.isPerformingSkill()) {
           this.basicAttackHitPauseTimer = CONFIG.basicAttackHitPauseDuration;
         }
       }
 
-      // Play hit sound and trigger hit flash
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam) {
+      // Play hit sound and trigger hit flash (exclude DoT ticks like poison, burn, flame, bleed, curse)
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse') {
         if (!this.isTurret && !this.isDispenser) {
           if (!isSecondTurretHit) {
             audioSystem.playSFX('attack_fleshhit', 0.6);
@@ -1791,6 +1898,8 @@ export class Fighter {
       }
     if (this.hp === 0 && !this._hasDied) {
       this._hasDied = true;
+      this.dead = true;
+      this.isDead = true;
       // Clear flame particles if the dying fighter is the Flamewarden
       if (this._def && this._def.type === 'orange') {
         flamewardenFlameSystem.clear();
@@ -2104,6 +2213,7 @@ export class Fighter {
         }
       }
     }
+    return true;
   }
 
   /** Heals the fighter by a given amount and triggers the green health bar edge glow effect. */
@@ -2261,8 +2371,9 @@ export class Fighter {
       if (isInsideGojoDomain) return false;
     }
 
-    // Lock aim during active beam firing or flurry animations (prevents unnatural snapping while firing)
+    // Lock aim during active beam firing, flurry animations, or chain release (prevents unnatural snapping while firing)
     if (this.isFiringPureLoveBeam || this.isFiringUlt || this.isFiringBeam) return false;
+    if (this.isThrowingChain) return false;
     return true;
   }
 
@@ -2448,7 +2559,9 @@ export class Fighter {
                               (typeof this.isPerformingSkill === 'function' && this.isPerformingSkill()) || 
                               (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) ||
                               ((this.comboHitsLeft || 0) > 0) ||
-                              ((this.rockCounterComboLeft || 0) > 0);
+                              ((this.rockCounterComboLeft || 0) > 0) ||
+                              this.isCurrentlyWallPinnedByMakima ||
+                              ((this.makimaWallPinTimer || 0) > 0);
 
     // Auto-recover from zero velocity immediately when the fighter is supposed to be moving
     if (!isStationaryState && targetSpeed > 0 && currentSpeed < 0.2) {
@@ -2467,6 +2580,8 @@ export class Fighter {
                           (this.electricStunTimer > 0) ||
                           (this.dubstepStunTimer > 0) ||
                           (this.isTargetOfAmbush) ||
+                          this.isCurrentlyWallPinnedByMakima ||
+                          ((this.makimaWallPinTimer || 0) > 0) ||
                           (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
 
     if (isGamePlaying && this.hp > 0 && !this.isDead && !isUnderHardCC && currentSpeed < 0.2) {
@@ -2475,7 +2590,7 @@ export class Fighter {
       if (this._stationaryStallFrames >= 15) {
         this._stationaryStallFrames = 0;
         if (targetSpeed > 0) {
-          const moveAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (Math.random() * Math.PI * 2);
+          const moveAngle = Math.random() * Math.PI * 2;
           this.vx = Math.cos(moveAngle) * targetSpeed;
           this.vy = Math.sin(moveAngle) * targetSpeed;
           currentSpeed = targetSpeed;

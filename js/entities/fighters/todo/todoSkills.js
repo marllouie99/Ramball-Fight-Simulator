@@ -896,12 +896,13 @@ export function modStartTakadaChanneling(force = false) {
   }
 
   const channelFrames = CONFIG.todo?.channelDuration || 180;
+  const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
   this.isTakadaChanneling = true;
   this.takadaChannelTimer = channelFrames;
   this.takadaSongStarted = false;
   this.takadaSongHandle = null;
   this.takadaSongFadedOut = false;
-  this.isTakadaBackgroundPlaying = true;
+  this.isTakadaBackgroundPlaying = isSongEnabled;
   this.takadaUltCooldown = CONFIG.todo?.ultCooldown || 1200;
   this.pureLoveBeamRecoveryTimer = 0;
   this.hitStunTimer = 0;
@@ -922,10 +923,11 @@ export function modStartTakadaChanneling(force = false) {
  * Activates Takada-chan Idol Ultimate mode after the 3-second channeling phase finishes.
  */
 export function modActivateTakadaUltimate() {
+  const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
   this.isTakadaChanneling = false;
   const dur = CONFIG.todo?.ultDuration ?? 5000;
   this.isTakadaUltActive = true;
-  this.isTakadaBackgroundPlaying = true;
+  this.isTakadaBackgroundPlaying = isSongEnabled;
   this.takadaUltTimer = dur;
 
   // Reduce active Skill 1 cooldown immediately upon activating ultimate

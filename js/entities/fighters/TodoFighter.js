@@ -85,6 +85,10 @@ export class TodoFighter extends Fighter {
     this.takadaSongStarted = false;
     this.takadaSongFadedOut = false;
     this.hasTriggeredTakadaHpUlt = false;
+    this.takadaUltCooldown = 0;
+    this.takadaChannelTimer = 0;
+    this.takadaUltTimer = 0;
+    this.pendingTakadaHpUlt = false;
   }
 
   updateCursedRocks(targets) {
@@ -206,7 +210,8 @@ export class TodoFighter extends Fighter {
 
       // Start background song loop fade-in right as channeling starts!
       // Uses a continuous audio loop so music plays for the ENTIRE ultDuration (e.g. 1500 frames / 25 seconds)
-      if (!this.takadaSongStarted && this.takadaChannelTimer <= 175) {
+      const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
+      if (isSongEnabled && !this.takadaSongStarted && this.takadaChannelTimer <= 175) {
         this.takadaSongStarted = true;
         this.isTakadaBackgroundPlaying = true;
         const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
@@ -232,7 +237,8 @@ export class TodoFighter extends Fighter {
       this.takadaUltTimer--;
 
       // If background song hasn't started yet, trigger looping fade-in
-      if (!this.takadaSongStarted) {
+      const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
+      if (isSongEnabled && !this.takadaSongStarted) {
         this.takadaSongStarted = true;
         this.isTakadaBackgroundPlaying = true;
         const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
@@ -448,10 +454,10 @@ export class TodoFighter extends Fighter {
         const fadeOutMs = CONFIG.todo?.takadaDeathSongFadeOutMs ?? 1200;
         audioSystem.stopLoop(loopKey, fadeOutMs);
       } else {
-        // Todo died last: keep background music playing for champion / round-end reveal screen!
+        // Todo died last: keep background music playing for champion / round-end reveal screen if song was active!
         this.isTakadaChanneling = false;
         this.isTakadaUltActive = false;
-        this.isTakadaBackgroundPlaying = true;
+        this.isTakadaBackgroundPlaying = Boolean(this.takadaSongStarted && CONFIG.todo?.enableTakadaBackgroundSong !== false);
         this.takadaChannelTimer = 0;
         this.takadaUltTimer = 0;
       }

@@ -233,8 +233,11 @@ export class TojiFighter extends Fighter {
     this._activeSlashProgress = 0;
     this._recoveryProgress = 0;
     if (this.swordTrail) this.swordTrail.length = 0;
-    if (this.stealthAfterimages) this.stealthAfterimages.length = 0;
-    if (this.afterImages) this.afterImages.length = 0;
+    // Heavenly Restriction (0 Cursed Energy): interruptAttacks MUST NEVER cancel stealth state!
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
     if (typeof state !== 'undefined') {
       if (state.fighters) {
         state.fighters.forEach(f => {
@@ -247,25 +250,55 @@ export class TojiFighter extends Fighter {
         });
       }
     }
+    this._initChainPhysics();
   }
 
   applyTimeStop(frames) {
     if (this.ultimateActive) return;
     super.applyTimeStop(frames);
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
   }
 
   applyHitStun(frames) {
     if (this.ultimateActive) return;
     super.applyHitStun(frames);
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
   }
 
   applyParalyze(frames) {
     if (this.ultimateActive) return;
     if (typeof super.applyParalyze === 'function') super.applyParalyze(frames);
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
+  }
+
+  applyKnockback(vx, vy, stunDuration) {
+    super.applyKnockback(vx, vy, stunDuration);
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
+  }
+
+  suppressCombatAndVisuals(options = {}) {
+    super.suppressCombatAndVisuals(options);
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
   }
 
   /**
    * Overrides takeDamage to implement Inverted Spear Melee Parry & Ambush Counter-Attack.
+   * Preserves Heavenly Restriction Stealth when taking hits or stuns.
    */
   takeDamage(amount, attacker, opts = {}) {
     if (opts.isHeal) return super.takeDamage(amount, attacker, opts);
@@ -375,7 +408,15 @@ export class TojiFighter extends Fighter {
       return false; // Damage parried & negated!
     }
 
-    return super.takeDamage(amount, attacker, opts);
+    const applied = super.takeDamage(amount, attacker, opts);
+
+    // Heavenly Restriction (0 Cursed Energy): Taking damage or hit-stun preserves active stealth state if stealth is active
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
+
+    return applied;
   }
 
   /**
@@ -845,9 +886,8 @@ export class TojiFighter extends Fighter {
         const color = colors[this.ultimateAssaultCount % 4];
         
         spawnImpactFlash(this.ultimateTarget.x, this.ultimateTarget.y, 45, color);
-        spawnMeleeClashShockwave(this.ultimateTarget.x, this.ultimateTarget.y, 80, 'toji');
-        spawnSparks(this.ultimateTarget.x, this.ultimateTarget.y, 16, 'slashRicochet');
-        spawnSparks(this.ultimateTarget.x, this.ultimateTarget.y, 12, 'parrySpark');
+        const hitAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+        spawnBloodEffect(this.ultimateTarget.x, this.ultimateTarget.y, 16, '#B30000', hitAngle);
         audioSystem.playSFX('attack_swordswing', 0.9);
         audioSystem.playSFX('attack_fleshhit', 0.9);
         audioSystem.playSFX('skill_backstab', 0.85);
@@ -1085,14 +1125,14 @@ export class TojiFighter extends Fighter {
 
         if (this.ultimateCycleTimer % 3 === 0) {
           triggerGlobalScreenShake(3, 4);
-          spawnSparks(this.x, this.y, 6, 'crimsonSniper');
         }
       } else {
         // Impact — he's already at the target from the smooth dive
         triggerGlobalScreenShake(12, 40);
         spawnImpactFlash(this.x, this.y, 140, 'rgba(255, 30, 75, 0.95)');
-        spawnCrimsonLightningImpact(this.x, this.y, 160);
-        spawnSparks(this.x, this.y, 50, 'crimsonSniper');
+        if (typeof spawnGroundScorch === 'function') {
+          spawnGroundScorch(this.x, this.y, 90, 180, 'crimson');
+        }
         audioSystem.playSFX('attack_groundsmash', 1.2);
         
         // Multi-target Frontal Arc AOE on 360 Spin Dive Final Blow (Rule 7 & Rule 6 compliant)
@@ -1117,8 +1157,7 @@ export class TojiFighter extends Fighter {
           });
           
           const hitAngle = Math.atan2(hitTarget.y - this.y, hitTarget.x - this.x);
-          spawnBloodEffect(hitTarget.x, hitTarget.y, 25, '#B30000', hitAngle);
-          spawnSparks(hitTarget.x, hitTarget.y, 20, 'crimsonSniper');
+          spawnBloodEffect(hitTarget.x, hitTarget.y, 35, '#B30000', hitAngle);
 
           // 1. Clear hard time-stop stasis so target can physically fly/ricochet across arena
           hitTarget.timeStopTimer = 0;
@@ -1286,6 +1325,9 @@ export class TojiFighter extends Fighter {
    * Main update loop for Toji's mechanics.
    */
   update(opponent, ownerIndex, arena) {
+    // Top-of-frame housekeeping & timer ticking (Rule 1 Compliant: hitFlashTimer, cooldowns, etc.)
+    this._tickCooldowns();
+
     // 0. Ultimate Super Armor & Complete Freeze/Stasis Immunity:
     // When performing Curse Inventory - Full Arsenal Unleashed ultimate, Toji is completely immune
     // to all freeze attacks, stuns, paralyze effects, domain locks, or status interruptions.
@@ -1337,6 +1379,19 @@ export class TojiFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       this.interruptAttacks();
+      return;
+    }
+
+    // 1.5. Makima Chains of Domination Physical Restraint Guard
+    if (this.isChainedByMakima && !this.isMindControlledByMakima) {
+      this.vx = 0;
+      this.vy = 0;
+      this.isAmbushing = false;
+      this.ambushTarget = null;
+      this.ambushPhase = null;
+      this.interruptAttacks();
+      this._handleFrozenSkillCooldowns();
+      if (opponent && opponent.hp > 0) this.aim(this._makimaChainer || opponent);
       return;
     }
 
@@ -1411,8 +1466,8 @@ export class TojiFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Purple)
-    if (!this.isCaughtInPurple && (!this.purpleHitTimer || this.purpleHitTimer <= 0)) {
+    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Purple/Chains/WallPins)
+    if (!this.isCaughtInPurple && (!this.purpleHitTimer || this.purpleHitTimer <= 0) && !this.isChainedByMakima && !this.isCurrentlyWallPinnedByMakima && (!this.makimaWallPinTimer || this.makimaWallPinTimer <= 0)) {
       this.timeStopTimer = 0;
       if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
       this.hitStunTimer = 0;
@@ -1739,42 +1794,6 @@ export class TojiFighter extends Fighter {
       const tremorVal = (Math.random() - 0.5) * 1.5 * chargeRatio;
       thrustDistance += tremorVal;
       offsetAngle += (Math.random() - 0.5) * 0.025 * chargeRatio;
-
-      // Render Charging Energy Flare at spear tip held at shoulder
-      ctx.save();
-      const renderAngle = baseAngle + offsetAngle;
-      const tipX = this.x + Math.cos(renderAngle) * (this.r + 26 + thrustDistance);
-      const tipY = this.y + Math.sin(renderAngle) * (this.r + 26 + thrustDistance);
-
-      // A. Charging Energy Flare Outer Ring
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 12 + chargeRatio * 22, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(220, 30, 255, ${0.45 + chargeRatio * 0.45})`;
-      ctx.lineWidth = 3.5;
-      ctx.stroke();
-
-      // B. Hyper-Bright Inner Core
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 5 + chargeRatio * 9, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + chargeRatio * 0.3})`;
-      ctx.fill();
-
-      // C. Radiating Energy Spikes / Rays
-      if (!isLowQuality) {
-        const rayCount = 8;
-        ctx.strokeStyle = `rgba(180, 50, 255, ${0.5 + chargeRatio * 0.5})`;
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        for (let r = 0; r < rayCount; r++) {
-          const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 75);
-          const r1 = 6;
-          const r2 = 18 + chargeRatio * 20;
-          ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
-          ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
     } else if (this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH')) {
       const maxPause = CONFIG.toji?.ambushBackChargeDuration || 25;
       const chargeRatio = Math.min(1.0, 1 - (this.ambushTimer / maxPause));
@@ -1782,42 +1801,6 @@ export class TojiFighter extends Fighter {
       // Deep coiled weapon charging stance: hand and weapon held steady at shoulder ready to plunge straight forward
       thrustDistance = -24;
       offsetAngle = 0;
-
-      // Render Charging Weapon Energy Flare at spear tip held at shoulder
-      ctx.save();
-      const renderAngle = baseAngle + offsetAngle;
-      const tipX = this.x + Math.cos(renderAngle) * (this.r + 26 + thrustDistance);
-      const tipY = this.y + Math.sin(renderAngle) * (this.r + 26 + thrustDistance);
-
-      // A. Charging Energy Flare Outer Ring
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 10 + chargeRatio * 20, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 30, 75, ${0.5 + chargeRatio * 0.5})`;
-      ctx.lineWidth = 3.5;
-      ctx.stroke();
-
-      // B. Hyper-Bright Inner Core
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 5 + chargeRatio * 8, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + chargeRatio * 0.3})`;
-      ctx.fill();
-
-      // C. Radiating Energy Spikes / Rays (reduced count in low quality)
-      if (!isLowQuality) {
-        const rayCount = 8;
-        ctx.strokeStyle = `rgba(160, 90, 240, ${0.6 + chargeRatio * 0.4})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let r = 0; r < rayCount; r++) {
-          const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 80);
-          const r1 = 6;
-          const r2 = 18 + chargeRatio * 18;
-          ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
-          ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
     } else if (this.ambushPhase === 'KATANA_CHARGE') {
       const fadeInTotal = this.craterFadeInTotal || 30;
       const craterChargeTotal = CONFIG.toji?.ultimateCraterChargeTime || 80;
@@ -1849,42 +1832,8 @@ export class TojiFighter extends Fighter {
       thrustDistance += tremorVal;
       offsetAngle += (Math.random() - 0.5) * 0.025 * chargeRatio;
 
-      // Render Katana Charging Soul Flare at blade tip (intensifies as he coils back!)
-      ctx.save();
       const renderAngle = baseAngle + offsetAngle;
       this._lastKatanaRenderAngle = renderAngle;
-      const tipX = this.x + Math.cos(renderAngle) * (this.r + 32 + thrustDistance);
-      const tipY = this.y + Math.sin(renderAngle) * (this.r + 32 + thrustDistance);
-
-        // Soft Purple Atmospheric Blade Tip Aura
-        ctx.beginPath();
-        ctx.arc(tipX, tipY, 6 + chargeRatio * 14, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(140, 70, 220, ${0.35 + chargeRatio * 0.35})`;
-        ctx.lineWidth = 2.0;
-        ctx.stroke();
-
-        // Soft Silver-Violet Core
-        ctx.beginPath();
-        ctx.arc(tipX, tipY, 3 + chargeRatio * 5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(240, 230, 255, ${0.5 + chargeRatio * 0.3})`;
-        ctx.fill();
-
-        // Soft Radiating Energy Rays (batched into single stroke, skip in low quality)
-        if (!isLowQuality) {
-          const rayCount = 6;
-          ctx.strokeStyle = `rgba(160, 90, 240, ${0.3 + chargeRatio * 0.35})`;
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          for (let r = 0; r < rayCount; r++) {
-            const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 80);
-            const r1 = 5;
-            const r2 = 12 + chargeRatio * 14;
-            ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
-            ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
-          }
-          ctx.stroke();
-        }
-        ctx.restore();
 
       // Render Whirling Wind Air-Stream Arcs around Toji (skip in low quality)
       if (!isLowQuality) {

@@ -10,6 +10,7 @@ import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js'
 import { renderYutaDomainBackground } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
 import { updateRika } from '../../entities/fighters/yuta/rikaLogic.js';
 import { drawYutaGhostSkin } from './yutaSkin.js';
+import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 
 // Pre-seeded static data for Yuta Domain Channeling Pixel Art VFX (0 GC per Rule #12 & #16)
 const _YUTA_DOMAIN_EMBERS = Array.from({ length: 32 }, (_, i) => ({
@@ -240,6 +241,13 @@ export class YutaRenderer {
       fighter._drawRikaCursedEnergyAura(ctx, opponent, renderState);
       fighter._drawRika(ctx, opponent, renderState);
       ctx.restore();
+
+      if (rk.isChainedByMakima || rk.isMindControlledByMakima) {
+        ctx.save();
+        ctx.translate(tremorX, tremorY);
+        drawTargetChainsOverlay(ctx, rk, rk._makimaChainer || null);
+        ctx.restore();
+      }
     }
 
     fighter.hideHpText = wasHidingHp;
@@ -1096,7 +1104,7 @@ export class YutaRenderer {
 
   static _drawRikaYutaTether(ctx, fighter, rk, renderState = null) {
     if (!fighter || !rk || !rk.active) return;
-    if (rk.killedInDomain || rk.isDying || rk.hp <= 0) return;
+    if (rk.killedInDomain || rk.isDying || rk.hp <= 0 || rk.isChainedByMakima || rk.isMindControlledByMakima) return;
 
     const yutaX = fighter.x;
     const yutaY = fighter.y;

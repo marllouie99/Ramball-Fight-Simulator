@@ -323,18 +323,46 @@ export function updateIllusions() {
     // Fetch spatial grid and nearest targets early for steering/attacks
     const nearbyEntities = spatialGrid.getNearby(illusion.x, illusion.y, illusion.r * 2 + 100);
     let nearestTarget = null;
+    const forcedSummonerTarget = (
+      (illusion.isChainedByMakima || illusion.isMindControlledByMakima) &&
+      illusion._makimaOriginalOwner &&
+      illusion._makimaOriginalOwner.hp > 0 &&
+      !illusion._makimaOriginalOwner.isDead
+    ) ? illusion._makimaOriginalOwner : null;
     // Cache owner's team index once for this illusion's entire update tick
     const _isTeamMode = (state.mode === '2v2' || state.mode === '1v2 Stand Off');
     const _ownerStateIdx = (_isTeamMode && illusion.owner) ? state.fighters.indexOf(illusion.owner) : -1;
     const _ownerTeam = _ownerStateIdx >= 0 ? state.getFighterTeam(_ownerStateIdx) : null;
     if (!insideSphere) {
-      let nearestDist = Infinity;
+      let nearestDist = forcedSummonerTarget ? -Infinity : Infinity;
+      if (forcedSummonerTarget) nearestTarget = forcedSummonerTarget;
       const isTargetValid = (entity) => {
         if (!entity || !entity.hp || entity.hp <= 0) return false;
         if (entity === illusion) return false;
         
         const targetOwner = entity.isIllusion ? entity.owner : entity;
-        if (!targetOwner || targetOwner === illusion.owner) return false;
+        if (!targetOwner) return false;
+
+        // A directly chained summon is subjugated to Makima and prioritizes
+        // striking the summoner it was taken from.
+        if ((illusion.isChainedByMakima || illusion.isMindControlledByMakima) &&
+            illusion._makimaOriginalOwner &&
+            targetOwner === illusion._makimaOriginalOwner &&
+            !entity.isIllusion) {
+          return true;
+        }
+
+        // If this illusion's owner is chained/mind-controlled by Makima, target the owner!
+        if (illusion.owner && (illusion.owner.isChainedByMakima || illusion.owner.isMindControlledByMakima)) {
+          if (targetOwner === illusion.owner && !entity.isIllusion) return true;
+        }
+
+        // If the target (or target's owner) is chained/mind-controlled by Makima, they are hostile!
+        if (targetOwner.isChainedByMakima || targetOwner.isMindControlledByMakima) {
+          if (targetOwner !== illusion.owner) return true;
+        }
+
+        if (targetOwner === illusion.owner) return false;
         
         if (_isTeamMode && illusion.owner) {
           const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
@@ -344,6 +372,7 @@ export function updateIllusions() {
       };
 
       for (const entity of nearbyEntities) {
+        if (forcedSummonerTarget) break;
         if (!isTargetValid(entity)) continue;
         const dx = entity.x - illusion.x;
         const dy = entity.y - illusion.y;
@@ -694,16 +723,33 @@ export function updateIllusions() {
 
     // Try to attack nearby fighters (independent targeting, not following owner) (Bypassed for evasion clones)
     if (illusion.isEvasionMinion) continue;
-    for (const entity of nearbyEntities) {
+    const attackCandidates = forcedSummonerTarget ? [forcedSummonerTarget] : nearbyEntities;
+    for (const entity of attackCandidates) {
       if (!entity || !entity.hp || entity.hp <= 0) continue;
       if (entity === illusion) continue;
       
       const targetOwner = entity.isIllusion ? entity.owner : entity;
-      if (!targetOwner || targetOwner === illusion.owner) continue;
+      if (!targetOwner) continue;
 
-      if (_isTeamMode && illusion.owner) {
-        const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
-        if (entityTeam !== null && entityTeam === _ownerTeam) continue;
+      let isHostile = false;
+      if ((illusion.isChainedByMakima || illusion.isMindControlledByMakima) &&
+          illusion._makimaOriginalOwner &&
+          targetOwner === illusion._makimaOriginalOwner &&
+          !entity.isIllusion) {
+        isHostile = true;
+      }
+      if (illusion.owner && (illusion.owner.isChainedByMakima || illusion.owner.isMindControlledByMakima)) {
+        if (targetOwner === illusion.owner && !entity.isIllusion) isHostile = true;
+      }
+      if (!isHostile && (targetOwner.isChainedByMakima || targetOwner.isMindControlledByMakima)) {
+        if (targetOwner !== illusion.owner) isHostile = true;
+      }
+      if (!isHostile) {
+        if (targetOwner === illusion.owner) continue;
+        if (_isTeamMode && illusion.owner) {
+          const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
+          if (entityTeam !== null && entityTeam === _ownerTeam) continue;
+        }
       }
       if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0 || (entity.vanishTimer && entity.vanishTimer > 0)) continue;
 

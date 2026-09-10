@@ -244,7 +244,7 @@ export class FighterRenderer {
   }
 
   static drawFreezeTimer(ctx, fighter) {
-    if (fighter._suppressFreezeTimer || fighter.isTargetOfAmbush) return;
+    if (fighter._suppressFreezeTimer || fighter.isTargetOfAmbush || fighter.isChainedByMakima || fighter.suppressFreezeOverlay) return;
     if (!fighter._timeStopStartTime || !fighter._timeStopOriginalDuration) return;
     
     ctx.save();

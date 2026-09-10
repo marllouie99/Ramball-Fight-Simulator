@@ -204,6 +204,13 @@ export class YutaFighter extends Fighter {
     // so she doesn't accidentally get frozen when Yuta is disabled!
     updateRika(this, arena || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null));
 
+    // Makima's chain reverses Yuta's allegiance. Always retain Rika as his
+    // combat target while she is active, even if another target was resolved
+    // before her summon state updated this frame.
+    if (this.isMakimaControlledRikaTarget(this.rika)) {
+      opponent = this.rika;
+    }
+
     // Allow visual trail and slash effects to decay even while frozen
     if (this.swordTrail && this.swordTrail.length > 0) {
       fastCleanArray(this.swordTrail, (t) => {
@@ -213,6 +220,47 @@ export class YutaFighter extends Fighter {
     }
     if (this.slashFadeTimer > 0) {
       this.slashFadeTimer--;
+    }
+
+    // Authentic Mutual Love Domain Progression & Cooldown:
+    // When Domain is active, domainTimer MUST tick down every frame and drain naturally even if Yuta is stunned, paralyzed, or caught in ambush!
+    if (this.domainActive) {
+      this.domainTimer--;
+      if (this.domainTimer <= 0) {
+        this.domainActive = false;
+        this.domainCooldown = 0;
+        this.domain2HpBaseline = this.hp; // Snapshot HP baseline when 1st domain ends
+        spawnFloatingText(this.x, this.y - 40, 'DOMAIN ENDED', '#cccccc');
+
+        // If Rika died during domain, snapshot Yuta's HP so taking damage outside domain starts recharging Rika!
+        if (this.rika && (!this.rika.active || this.rika.isDying || this.rika.hp <= 0)) {
+          this.rika.hasSummonedAt50Hp = true;
+          this.rikaRechargeHpBaseline = this.hp;
+        }
+      } else {
+        // Continuous ambient cursed energy vibration inside domain
+        if (this.domainTimer % 25 === 0) {
+          triggerGlobalScreenShake(4, 12);
+        }
+
+        // Domain buffs: Faster cooldowns
+        if (this.techniqueCooldown > 0) {
+          this.techniqueCooldown -= (1 / (1 - (CONFIG.yuta.domainCooldownReduction || 0.8))) - 1;
+        }
+
+        // Domain Reverse Cursed Technique (RCT): Continuous accelerated healing inside Authentic Mutual Love!
+        if (this.hp > 0 && this.hp < this.maxHp) {
+          const regenMult = this.getRikaRegenMultiplier();
+          const rctRate = (CONFIG.yuta?.domainRctHealRate ?? 0.90) * regenMult;
+          this.hp = Math.min(this.maxHp, this.hp + rctRate);
+
+          if (Math.random() < 0.12) {
+            if (Math.random() < 0.25) {
+              spawnFloatingText(this.x, this.y - 25, regenMult > 2.0 ? '+RCT 4x' : (regenMult > 1.0 ? '+RCT 2x' : '+RCT'), '#00FF00');
+            }
+          }
+        }
+      }
     }
 
     // Authentic Mutual Love Domain Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame,
@@ -522,8 +570,9 @@ export class YutaFighter extends Fighter {
 
         if (state.illusions) {
           state.illusions.forEach(ill => {
-            if (!ill || ill.hp <= 0 || ill.owner === this || ill.isRika || (ill.vanishTimer && ill.vanishTimer > 0)) return;
-            if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
+            const isControlledRika = this.isMakimaControlledRikaTarget(ill);
+            if (!ill || ill.hp <= 0 || (!isControlledRika && (ill.owner === this || ill.isRika)) || (ill.vanishTimer && ill.vanishTimer > 0)) return;
+            if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
             if (Math.hypot(ill.x - this.x, ill.y - this.y) < 450) {
               possibleTargets.push(ill);
             }
@@ -923,44 +972,7 @@ export class YutaFighter extends Fighter {
       return; // Stop other logic while channeling
     }
 
-    if (this.domainActive) {
-      this.domainTimer--;
-      if (this.domainTimer <= 0) {
-        this.domainActive = false;
-        this.domainCooldown = 0;
-        this.domain2HpBaseline = this.hp; // Snapshot HP baseline when 1st domain ends
-        spawnFloatingText(this.x, this.y - 40, 'DOMAIN ENDED', '#cccccc');
 
-        // If Rika died during domain, snapshot Yuta's HP so taking damage outside domain starts recharging Rika!
-        if (this.rika && (!this.rika.active || this.rika.isDying || this.rika.hp <= 0)) {
-          this.rika.hasSummonedAt50Hp = true;
-          this.rikaRechargeHpBaseline = this.hp;
-        }
-      } else {
-        // Continuous ambient cursed energy vibration inside domain
-        if (this.domainTimer % 25 === 0) {
-          triggerGlobalScreenShake(4, 12);
-        }
-
-        // Domain buffs: Faster cooldowns
-        if (this.techniqueCooldown > 0) {
-          this.techniqueCooldown -= (1 / (1 - (CONFIG.yuta.domainCooldownReduction || 0.8))) - 1;
-        }
-
-        // Domain Reverse Cursed Technique (RCT): Continuous accelerated healing inside Authentic Mutual Love!
-        if (this.hp > 0 && this.hp < this.maxHp) {
-          const regenMult = this.getRikaRegenMultiplier();
-          const rctRate = (CONFIG.yuta?.domainRctHealRate ?? 0.90) * regenMult;
-          this.hp = Math.min(this.maxHp, this.hp + rctRate);
-
-          if (Math.random() < 0.12) {
-            if (Math.random() < 0.25) {
-              spawnFloatingText(this.x, this.y - 25, regenMult > 2.0 ? '+RCT 4x' : (regenMult > 1.0 ? '+RCT 2x' : '+RCT'), '#00FF00');
-            }
-          }
-        }
-      }
-    }
 
     // RCT healing outside domain when Rika is active on the battlefield
     if (!this.domainActive && this.hp > 0 && this.hp < this.maxHp && this.isRikaAliveInDomain()) {
@@ -1113,8 +1125,9 @@ export class YutaFighter extends Fighter {
     // Pure Love Beam Trigger: Automatically triggers when HP <= threshold and Rika is active
     const pureLoveBeamThreshold = CONFIG.yuta.pureLoveBeamHpThreshold ?? 0.60;
     const isRikaActive = (this.isRikaAliveInDomain() || (this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0));
+    const isControlledRika = this.isMakimaControlledRikaTarget(this.rika);
 
-    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive) {
+    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive && !isControlledRika) {
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
       const hasEnemies = state.fighters.some((f, idx) => {
         if (!f || f.hp <= 0 || f === this) return false;
@@ -1223,11 +1236,12 @@ export class YutaFighter extends Fighter {
 
       for (let i = 0; i < allTargets.length; i++) {
         const enemy = allTargets[i];
-        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed || enemy.isRika || enemy.owner === this) continue;
+        const isControlledRika = this.isMakimaControlledRikaTarget(enemy);
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed || (!isControlledRika && (enemy.isRika || enemy.owner === this))) continue;
 
         if (enemy.owner) {
           const ownerTeam = state.getFighterTeam(state.fighters.indexOf(enemy.owner));
-          if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+          if (!isControlledRika && myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
         } else {
           const enemyTeam = state.getFighterTeam(state.fighters.indexOf(enemy));
           if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
@@ -1742,7 +1756,21 @@ export class YutaFighter extends Fighter {
   }
 
   isRikaAliveInDomain() {
-    return !!(this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0);
+    return !!(this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0 && !this.rika.isChainedByMakima && !this.rika.isMindControlledByMakima);
+  }
+
+  /** Makima-controlled Yuta or Makima-controlled Rika causes Rika to be treated as a hostile target. */
+  isMakimaControlledRikaTarget(target) {
+    return Boolean(
+      ((this.isChainedByMakima || this.isMindControlledByMakima) || (target && (target.isChainedByMakima || target.isMindControlledByMakima))) &&
+      target &&
+      target.isRika &&
+      (target.owner === this || target._makimaOriginalOwner === this) &&
+      target.active &&
+      target.hp > 0 &&
+      !target.isDying &&
+      !target.disappearing
+    );
   }
 
   // Returns the current damage multiplier: base mult when Rika is alive, or domain mult when domain is also active
@@ -1783,11 +1811,12 @@ export class YutaFighter extends Fighter {
 
     for (let i = 0; i < allTargets.length; i++) {
       const enemy = allTargets[i];
-      if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isRika || enemy.owner === this || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+      const isControlledRika = this.isMakimaControlledRikaTarget(enemy);
+      if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
 
       if (enemy.owner) {
         const ownerTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy.owner)) : enemy.owner.team;
-        if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+        if (!isControlledRika && myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
       } else {
         const enemyTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy)) : enemy.team;
         if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
@@ -1818,10 +1847,11 @@ export class YutaFighter extends Fighter {
       let closestRangedDist = Infinity;
       for (let i = 0; i < allTargets.length; i++) {
         const enemy = allTargets[i];
-        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isRika || enemy.owner === this || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+        const isControlledRika = this.isMakimaControlledRikaTarget(enemy);
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
         if (enemy.owner) {
           const ownerTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy.owner)) : enemy.owner.team;
-          if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+          if (!isControlledRika && myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
         } else {
           const enemyTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy)) : enemy.team;
           if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;

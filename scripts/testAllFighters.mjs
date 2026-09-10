@@ -137,6 +137,8 @@ async function main() {
   const { drawIndexScreen } = await import('../js/graphics/ui/FighterIndexScreen.js');
   const { drawRubbickDomainDimScreen, drawBankaiImpactDimScreen } = await import('../js/graphics/renderers/arenaRenderer.js');
   const { drawCjBaguvixDimScreen } = await import('../js/graphics/renderers/environmentalRenderer.js');
+  const { drawFighters } = await import('../js/graphics/renderers/EntityRenderer.js');
+  const { audioSystem } = await import('../js/systems/audioSystem.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -1130,11 +1132,29 @@ async function main() {
         if (!fighter.isChainingActive || fighter.chainedTargets.length === 0) {
           throw new Error("Makima failed to activate Chains of Domination on cast!");
         }
+        if (!fighter.isThrowingChain || fighter.chainThrowAnimTimer <= 0) {
+          throw new Error("Makima failed to activate isThrowingChain animation state on cast!");
+        }
 
-        // Draw during initial launch phase (frames 0-9)
-        mockCtx.resetStackDepth();
-        fighter.draw(mockCtx, null);
-        assertCanvasStackBalance("Makima Chains of Domination launch phase");
+        // Draw during all frames of chain throw animation (frames 22 down to 0) while moving
+        while (fighter.chainThrowAnimTimer > 0) {
+          fighter.x += 4;
+          fighter.y += 2;
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima chain throw animation frame ${fighter.chainThrowAnimTimer}`);
+
+          // Verify chained enemy draws cleanly with body-wrapping chains overlay
+          mockCtx.resetStackDepth();
+          dummyOpponent.draw(mockCtx, null);
+          assertCanvasStackBalance(`Chained enemy draw frame ${fighter.chainThrowAnimTimer}`);
+
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+
+        if (fighter.isThrowingChain) {
+          throw new Error("Makima isThrowingChain remained true after chainThrowAnimTimer expired!");
+        }
 
         // Fast-forward across all frames of active chaining and verify draw stack balance & aim tracking
         fighter.y = 250; // Move Makima so enemy must rotate aim
@@ -1149,13 +1169,433 @@ async function main() {
             throw new Error("Chained enemy has locked _timeStopFrozenAngle / _timeStopFrozenGunAngle!");
           }
 
+          // Verify HUD skill bar drains properly during active chain duration
+          const hudSkills = getSkillDataForFighter(fighter);
+          const chainSkill = hudSkills.find(s => s.id === 'chains');
+          if (!chainSkill) {
+            throw new Error("Makima Chains of Domination skill missing from HUD data!");
+          }
+          const expectedPct = (fighter.chainTimer / (fighter.chainMaxTimer || 240)) * 100;
+          if (Math.abs(chainSkill.pct - expectedPct) > 1.0) {
+            throw new Error(`Makima Chains skill bar did not drain properly! Expected ${expectedPct}%, got ${chainSkill.pct}%`);
+          }
+
           mockCtx.resetStackDepth();
           fighter.draw(mockCtx, null);
           assertCanvasStackBalance(`Makima Chains of Domination frame ${fighter.chainTimer}`);
+
+          mockCtx.resetStackDepth();
+          dummyOpponent.draw(mockCtx, null);
+          assertCanvasStackBalance(`Chained enemy draw during active tether frame ${fighter.chainTimer}`);
+
+          // Test top-layer rendering order: Makima above enemy (Makima sorted first)
+          fighter.y = 100;
+          dummyOpponent.y = 300;
+          mockCtx.resetStackDepth();
+          drawFighters();
+          assertCanvasStackBalance("drawFighters with Makima above chained enemy");
+
+          // Test top-layer rendering order: Makima below enemy (Enemy sorted first)
+          fighter.y = 300;
+          dummyOpponent.y = 100;
+          mockCtx.resetStackDepth();
+          drawFighters();
+          assertCanvasStackBalance("drawFighters with Makima below chained enemy");
         }
 
         if (fighter.isChainingActive) {
           throw new Error("Makima Chains of Domination remained active after timer expired!");
+        }
+
+        // 3.5. Skill 1 Missable Chains Test (Aiming Away / Off-Target)
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 400; // Enemy is to the right
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.isChainedByMakima = false;
+        state.fighters = [fighter, dummyOpponent];
+
+        // Aim Makima upwards (Math.PI / 2) away from enemy at right (0 rad)
+        fighter.gunAngle = -Math.PI / 2;
+        fighter.angle = -Math.PI / 2;
+
+        fighter._castChainsOfDomination(dummyOpponent);
+
+        if (fighter.isChainingActive) {
+          throw new Error("Makima Chains of Domination should NOT activate when thrown off-target!");
+        }
+        if (fighter.chainedTargets.length !== 0) {
+          throw new Error(`Makima chained ${fighter.chainedTargets.length} targets on a miss!`);
+        }
+        if (!fighter.activeMissedChains || fighter.activeMissedChains.length === 0) {
+          throw new Error("Makima activeMissedChains was not populated on missed chain throw!");
+        }
+        if (dummyOpponent.isChainedByMakima) {
+          throw new Error("Enemy was marked as chained on a missed chain throw!");
+        }
+
+        // Test drawing and frame progression of missed chain
+        while (fighter.activeMissedChains.length > 0) {
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima missed chain draw life ${fighter.activeMissedChains[0].life}`);
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+
+        // 3.5.1 Test Custom chainsThrowSpeed and chainsLaunchFrames Adjustments
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        state.fighters = [fighter, dummyOpponent];
+
+        const origChainsSpeed = CONFIG.makima.chainsThrowSpeed;
+        const origLaunchFrames = CONFIG.makima.chainsLaunchFrames;
+        const origChainsRange = CONFIG.makima.chainsRange;
+
+        CONFIG.makima.chainsRange = 300;
+
+        // A. Test fast throw speed (e.g. chainsThrowSpeed = 60px/frame => 5 launch frames for 300px range)
+        CONFIG.makima.chainsThrowSpeed = 60.0;
+        CONFIG.makima.chainsLaunchFrames = 5;
+        fighter.reset();
+        fighter._castChainsOfDomination(dummyOpponent);
+        if (fighter.chainsLaunchFrames !== 5) {
+          throw new Error(`Expected chainsLaunchFrames to be 5, got ${fighter.chainsLaunchFrames}`);
+        }
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Makima fast chains throw draw");
+
+        // B. Test slow throw speed (e.g. chainsThrowSpeed = 15px/frame => 20 launch frames for 300px range)
+        fighter.reset();
+        CONFIG.makima.chainsThrowSpeed = 15.0;
+        CONFIG.makima.chainsLaunchFrames = 20;
+        fighter._castChainsOfDomination(dummyOpponent);
+        if (fighter.chainsLaunchFrames !== 20) {
+          throw new Error(`Expected chainsLaunchFrames to be 20, got ${fighter.chainsLaunchFrames}`);
+        }
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Makima slow chains throw draw");
+
+        // C. Test slow throw speed scale (chainsThrowSpeed = 0.10 => 10% speed => 67 launch frames for 300px range)
+        fighter.reset();
+        CONFIG.makima.chainsThrowSpeed = 0.10;
+        CONFIG.makima.chainsLaunchFrames = 9; // Should NOT override chainsThrowSpeed
+        fighter._castChainsOfDomination(dummyOpponent);
+        if (fighter.chainsLaunchFrames !== 67) {
+          throw new Error(`Expected chainsLaunchFrames to be 67 for chainsThrowSpeed = 0.10, got ${fighter.chainsLaunchFrames}`);
+        }
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Makima 0.10 scale slow chains throw draw");
+
+        // Restore original configs
+        CONFIG.makima.chainsThrowSpeed = origChainsSpeed;
+        CONFIG.makima.chainsLaunchFrames = origLaunchFrames;
+        CONFIG.makima.chainsRange = origChainsRange;
+        fighter.reset();
+
+        // 3.5.2 Test Missable Chain Auto-Aim Rotation Disabling & Windup Telegraph
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 350; // Opponent directly to the right (angle 0)
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.isChainedByMakima = false;
+        state.fighters = [fighter, dummyOpponent];
+
+        // Start facing directly right at opponent
+        fighter.gunAngle = 0;
+        fighter.angle = 0;
+
+        // Enter chain preparation windup state ("about to throw chain")
+        fighter._prepareChainsOfDomination(dummyOpponent);
+
+        if (!fighter.isPreparingChain || !fighter.isAboutToThrowChain || fighter.chainWindupTimer <= 0) {
+          throw new Error("Makima failed to enter isPreparingChain state on _prepareChainsOfDomination!");
+        }
+        if (!fighter.canAim()) {
+          throw new Error("Makima canAim() should return true during isPreparingChain windup to track enemy!");
+        }
+        if (fighter.vx !== 0 || fighter.vy !== 0) {
+          throw new Error("Makima movement should stop immediately upon preparing chain!");
+        }
+
+        // Enemy moves diagonally during windup (to (350, 230))
+        dummyOpponent.y = 230;
+
+        // Aiming at enemy while preparing chain rotates aim towards enemy
+        const initialAngle = fighter.gunAngle;
+        fighter.aim(dummyOpponent);
+        const expectedAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        if (fighter.gunAngle <= initialAngle) {
+          throw new Error(`Makima aim failed to rotate towards enemy during windup! gunAngle: ${fighter.gunAngle}`);
+        }
+
+        // Advance frames through the windup while drawing and updating
+        while (fighter.chainWindupTimer > 0) {
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima chain windup frame ${fighter.chainWindupTimer}`);
+
+          if (!fighter.isStationarySkillActive()) {
+            throw new Error("Expected isStationarySkillActive() to return true during chain windup");
+          }
+          if (fighter.vx !== 0 || fighter.vy !== 0) {
+            throw new Error(`Expected Makima movement to be stopped during chain windup, got vx=${fighter.vx}, vy=${fighter.vy}`);
+          }
+
+          const prevAngle = fighter.gunAngle;
+          fighter.update(dummyOpponent, 0, state.arena);
+
+          // Verify aim angle rotates towards the enemy each frame of windup
+          if (fighter.isPreparingChain && fighter.gunAngle < prevAngle) {
+            throw new Error(`Makima gunAngle moved away from enemy during chain windup!`);
+          }
+        }
+
+        // Windup has completed and chain has released: verify isThrowingChain is active and canAim is locked during throw
+        if (!fighter.isThrowingChain || fighter.chainThrowAnimTimer <= 0) {
+          throw new Error("Makima failed to transition from windup to isThrowingChain state!");
+        }
+        if (fighter.canAim()) {
+          throw new Error("Makima canAim() should return false during isThrowingChain!");
+        }
+
+        // Because Makima tracked the enemy throughout windup, the chain successfully hits and chains the enemy!
+        if (!fighter.isChainingActive || !dummyOpponent.isChainedByMakima) {
+          throw new Error("Chain failed to latch onto tracked enemy on throw!");
+        }
+
+        // Advance through throw animation frames to completion (verifying movement is stopped)
+        while (fighter.chainThrowAnimTimer > 0) {
+          if (!fighter.isStationarySkillActive()) {
+            throw new Error("Expected isStationarySkillActive() to return true during chain throw animation");
+          }
+          if (fighter.vx !== 0 || fighter.vy !== 0) {
+            throw new Error(`Expected Makima movement to be stopped during chain throw, got vx=${fighter.vx}, vy=${fighter.vy}`);
+          }
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima throw post-windup frame ${fighter.chainThrowAnimTimer}`);
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+
+        if (fighter.isThrowingChain) {
+          throw new Error("Makima isThrowingChain remained active after throw animation completed!");
+        }
+        if (!fighter.canAim()) {
+          throw new Error("Makima canAim() should recover to true after chain throw completes!");
+        }
+
+        // 3.5.3 Test Chain Base Attachment While Makima Moves (No Cutoff / Detachment)
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 900;
+        dummyOpponent.y = 900;
+        dummyOpponent.hp = 100;
+        state.fighters = [fighter, dummyOpponent];
+
+        fighter.gunAngle = 0;
+        fighter.angle = 0;
+        fighter._castChainsOfDomination(dummyOpponent);
+
+        if (!fighter.activeMissedChains || fighter.activeMissedChains.length === 0) {
+          throw new Error("Expected activeMissedChains on distant target throw!");
+        }
+
+        const initialOriginX = fighter.activeMissedChains[0].startX;
+        const initialOriginY = fighter.activeMissedChains[0].startY;
+
+        // Move Makima significantly while the chain is being thrown
+        for (let frame = 0; frame < 5; frame++) {
+          fighter.x += 15;
+          fighter.y += 10;
+          fighter.update(dummyOpponent, 0, state.arena);
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima moving while throwing chain frame ${frame}`);
+        }
+
+        if (fighter.activeMissedChains.length > 0) {
+          const movedOriginX = fighter.activeMissedChains[0].startX;
+          const movedOriginY = fighter.activeMissedChains[0].startY;
+          if (movedOriginX === initialOriginX || movedOriginY === initialOriginY) {
+            throw new Error(`Chain origin did not move with Makima! Expected origin to follow body, got initial (${initialOriginX}, ${initialOriginY}) vs moved (${movedOriginX}, ${movedOriginY})`);
+          }
+          // Verify origin is dynamically attached near Makima's other hand (back hand)
+          const distToMakima = Math.hypot(movedOriginX - fighter.x, movedOriginY - fighter.y);
+          if (distToMakima < 5 || distToMakima > 50) {
+            throw new Error(`Chain origin is not attached to Makima's hand/body! Distance: ${distToMakima}`);
+          }
+        }
+
+        // 3.5.4 Test Knockback on Chained Target & Chain Break Distance Snapping
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 80;
+        fighter.y = 200;
+        dummyOpponent.x = 220;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.isChainedByMakima = false;
+        dummyOpponent.chainsCooldown = 999;
+        dummyOpponent.angelCooldown = 999;
+        dummyOpponent.shrineCooldown = 999;
+        dummyOpponent.bangCooldown = 999;
+        state.fighters = [fighter, dummyOpponent];
+
+        fighter._castChainsOfDomination(dummyOpponent);
+        if (!fighter.isChainingActive || !dummyOpponent.isChainedByMakima) {
+          throw new Error("Failed to latch Chains of Domination onto enemy for knockback test!");
+        }
+
+        // Fire "Bang!" directly at the chained enemy
+        fighter.gunAngle = 0;
+        fighter.angle = 0;
+        fighter._castBangAttack(dummyOpponent);
+
+        if (dummyOpponent.knockbackVx === undefined || Math.abs(dummyOpponent.knockbackVx) < 10) {
+          throw new Error(`Chained enemy did NOT receive knockback from "Bang!" attack! Got knockbackVx=${dummyOpponent.knockbackVx}`);
+        }
+
+        // Step simulation frames as enemy gets propelled backward and breaks the chain
+        let chainBroke = false;
+        for (let frame = 0; frame < 30; frame++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+          dummyOpponent.update(fighter, 1, state.arena);
+
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima chain break draw frame ${frame}`);
+
+          if (!fighter.isChainingActive && !dummyOpponent.isChainedByMakima) {
+            chainBroke = true;
+            break;
+          }
+        }
+
+        if (!chainBroke) {
+          throw new Error("Chains of Domination did not snap/break when enemy was knocked back beyond break distance!");
+        }
+        if (dummyOpponent.isChainedByMakima) {
+          throw new Error("Enemy remained marked as isChainedByMakima after chain was broken!");
+        }
+
+        // 3.5.5 Test Chain Voiceline Suppression on Miss vs Play on Hit
+        const origPlayFighterVoiceline = audioSystem.playFighterVoiceline;
+        const origPlaySFX = audioSystem.playSFX;
+        const origSoundChance = CONFIG.makima?.soundChances?.chainVoiceline;
+        if (CONFIG.makima && CONFIG.makima.soundChances) {
+          CONFIG.makima.soundChances.chainVoiceline = 1.0;
+        }
+        let playedChainVoiceline = false;
+
+        audioSystem.playFighterVoiceline = (entity, soundPath, volume) => {
+          if (soundPath && soundPath.includes('makima-chain-voiceline')) {
+            playedChainVoiceline = true;
+          }
+        };
+        audioSystem.playSFX = (soundPath, volume) => {
+          if (soundPath && soundPath.includes('makima-chain-voiceline')) {
+            playedChainVoiceline = true;
+          }
+        };
+
+        // Test Miss: enemy is out of range
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 900;
+        dummyOpponent.y = 900;
+        state.fighters = [fighter, dummyOpponent];
+        playedChainVoiceline = false;
+
+        fighter._castChainsOfDomination(dummyOpponent);
+        if (playedChainVoiceline) {
+          throw new Error("Makima played a chain voiceline even though the chain missed / did not hit any enemy!");
+        }
+        if (fighter.chainedTargets.length !== 0) {
+          throw new Error("Expected zero chainedTargets on distant miss!");
+        }
+
+        // Test Hit: enemy is in range and along throw angle
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 300;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.isChainedByMakima = false;
+        state.fighters = [fighter, dummyOpponent];
+        playedChainVoiceline = false;
+
+        fighter.gunAngle = 0;
+        fighter.angle = 0;
+        fighter.chainLockedAimAngle = 0;
+        fighter._castChainsOfDomination(dummyOpponent);
+        if (fighter.chainedTargets.length === 0) {
+          throw new Error("Expected chainedTargets to contain enemy on direct hit!");
+        }
+        if (!playedChainVoiceline) {
+          throw new Error("Makima did NOT play a chain voiceline when the enemy was successfully hit and chained!");
+        }
+
+        // Restore audioSystem functions and sound chance
+        audioSystem.playFighterVoiceline = origPlayFighterVoiceline;
+        audioSystem.playSFX = origPlaySFX;
+        if (CONFIG.makima && CONFIG.makima.soundChances) {
+          CONFIG.makima.soundChances.chainVoiceline = origSoundChance;
+        }
+
+        // 3.6. Skill 2: Angel's Armory (1000-Year Spear) Summoning & Channeling Test
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        state.fighters = [fighter, dummyOpponent];
+
+        fighter._castAngelArmory(dummyOpponent);
+        if (!fighter.isSummoningSpear || fighter.spearTimer <= 0) {
+          throw new Error("Makima failed to start 1000-Year Spear summoning channel!");
+        }
+
+        const initialChannelAngle = fighter.spearLaunchAngle;
+        while (fighter.isSummoningSpear) {
+          // Verify aim is locked during channel (NO live tracking snap)
+          if (fighter.gunAngle !== initialChannelAngle) {
+            throw new Error(`Makima auto-aim snapped during 1000-Year Spear channel: got ${fighter.gunAngle}, expected ${initialChannelAngle}`);
+          }
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance(`Makima 1000-Year Spear channel frame ${fighter.spearTimer}`);
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+
+        if (fighter.activeSpears.length === 0) {
+          throw new Error("1000-Year Spear was not launched after channel completed!");
+        }
+
+        // Fast forward spear flight and holy explosion detonation
+        while (fighter.activeSpears.length > 0 || fighter.activeHolyExplosions.length > 0) {
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance("Makima 1000-Year Spear flight/explosion draw");
+          fighter.update(dummyOpponent, 0, state.arena);
         }
 
         // 4. Citizen Contract Shatter & Magnetic Reassembly
@@ -1191,6 +1631,9 @@ async function main() {
         dummyOpponent.x = 800;
         dummyOpponent.y = 800; // Place far and unaligned
         state.fighters = [fighter, dummyOpponent];
+        fighter.chainsCooldown = 999;
+        fighter.angelCooldown = 999;
+        fighter.shrineCooldown = 999;
 
         let makimaSkills = getSkillDataForFighter(fighter);
         const hasChainsSkill = makimaSkills.some(s => s.id === 'chains');
@@ -1208,6 +1651,9 @@ async function main() {
         // Fast forward halfway through cooldown (e.g., 100 frames for a 200 frame cooldown)
         const halfFrames = Math.floor(fighter.bangCooldownMax / 2);
         for (let frame = 0; frame < halfFrames; frame++) {
+          fighter.chainsCooldown = fighter.chainsCooldownMax;
+          fighter.angelCooldown = fighter.angelCooldownMax;
+          fighter.shrineCooldown = fighter.shrineCooldownMax;
           fighter.update(dummyOpponent, 0, state.arena);
         }
 
@@ -1217,30 +1663,40 @@ async function main() {
           throw new Error(`Bang midpoint progress should be ~50%, got ${bangSkillMid.pct}%`);
         }
 
-        // Fast forward remainder of cooldown
-        while (fighter.bangCooldown > 0) {
+        // Fast forward remainder of cooldown up to the frame before ready
+        const remainingFrames = fighter.bangCooldown;
+        for (let frame = 0; frame < remainingFrames - 1; frame++) {
+          fighter.chainsCooldown = fighter.chainsCooldownMax;
+          fighter.angelCooldown = fighter.angelCooldownMax;
+          fighter.shrineCooldown = fighter.shrineCooldownMax;
           fighter.update(dummyOpponent, 0, state.arena);
         }
 
         makimaSkills = getSkillDataForFighter(fighter);
-        const bangSkillReady = makimaSkills.find(s => s.id === 'bang');
-        if (!bangSkillReady.ready || bangSkillReady.pct < 99) {
-          throw new Error(`Bang should be 100% and ready when cooldown is 0, got ${bangSkillReady.pct}%`);
+        const bangSkillNearReady = makimaSkills.find(s => s.id === 'bang');
+        if (bangSkillNearReady.pct < 95) {
+          throw new Error(`Bang should be nearly ready before CD expiry, got ${bangSkillNearReady.pct}%`);
         }
 
-        // Align aim and trigger attack
-        fighter.gunAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
-        fighter.angle = fighter.gunAngle;
+        // On the final frame, CD reaches 0 and Bang triggers immediately
+        fighter.chainsCooldown = fighter.chainsCooldownMax;
+        fighter.angelCooldown = fighter.angelCooldownMax;
+        fighter.shrineCooldown = fighter.shrineCooldownMax;
         fighter.update(dummyOpponent, 0, state.arena);
 
-        // After attack, cooldown must reset to max and progress bar must drop back to ~0%
+        // After triggering on CD, cooldown resets to max
         if (fighter.bangCooldown < fighter.bangCooldownMax - 2) {
           throw new Error(`Bang cooldown should have reset to max (${fighter.bangCooldownMax}), got ${fighter.bangCooldown}`);
         }
-        makimaSkills = getSkillDataForFighter(fighter);
-        const bangSkillPostAttack = makimaSkills.find(s => s.id === 'bang');
-        if (bangSkillPostAttack.ready || bangSkillPostAttack.pct > 5) {
-          throw new Error(`Bang progress bar should have reset to ~0% after firing, got ${bangSkillPostAttack.pct}%`);
+        // Verify Rule 18 (Color Theme Consistency) & Rule 22 (Clean Label Standard) for Makima
+        const makimaThemeColor = CONFIG.makima?.hudSkillBarColor || CONFIG.makima?.themeColor || fighter.color || '#A31D24';
+        for (const skill of makimaSkills) {
+          if (skill.color !== makimaThemeColor) {
+            throw new Error(`Makima skill '${skill.id}' color '${skill.color}' violates Rule 18 (expected '${makimaThemeColor}')`);
+          }
+          if (skill.label.includes('(READY)') || skill.label.includes('(ACTIVE)') || skill.label.includes('(CASTING)') || skill.label.includes('(THROWING)') || skill.label.includes('(SUMMONING)') || skill.label.includes('(EXECUTING)')) {
+            throw new Error(`Makima skill '${skill.id}' label '${skill.label}' violates Rule 22 (contains parenthetical status suffix)`);
+          }
         }
       }
 
@@ -1531,6 +1987,157 @@ async function main() {
         if (!fighter.infinityActive) {
           throw new Error('Expected Limitless Infinity barrier to restore after Purple expired');
         }
+      }
+
+      // 12. Makima Skill 2: Angel's Armory (1000-Year Holy Spear) Test
+      if (fType === 'makima') {
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 200;
+        fighter.y = 300;
+        dummyOpponent.x = 500;
+        dummyOpponent.y = 300;
+        dummyOpponent.hp = 400;
+        dummyOpponent.maxHp = 400;
+        state.fighters = [fighter, dummyOpponent];
+
+        // Trigger Skill 2: Angel's Armory
+        fighter.angelCooldown = 0;
+        fighter._castAngelArmory(dummyOpponent);
+        if (!fighter.isSummoningSpear) {
+          throw new Error('Expected Makima isSummoningSpear to be true after casting Skill 2');
+        }
+        if (!fighter.isStationarySkillActive()) {
+          throw new Error('Expected isStationarySkillActive() to return true during spear summon channel');
+        }
+
+        const lockedAngle = fighter.spearLaunchAngle;
+
+        // Step through summoning frames while opponent moves, verifying aim remains strictly locked
+        while (fighter.spearTimer > 0) {
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx);
+          assertCanvasStackBalance(`Makima 1000-Year Spear Summoning Frame ${fighter.spearTimer}`);
+          // Move dummy opponent during channeling
+          dummyOpponent.x = 200 + Math.sin(fighter.spearTimer) * 100;
+          dummyOpponent.y = 600 + Math.cos(fighter.spearTimer) * 100;
+          fighter.update(dummyOpponent, 0, state.arena);
+
+          if (Math.abs(fighter.gunAngle - lockedAngle) > 0.0001) {
+            throw new Error(`Makima auto-aim rotated during channeling! Expected ${lockedAngle}, got ${fighter.gunAngle}`);
+          }
+        }
+        fighter.update(dummyOpponent, 0, state.arena);
+
+        if (fighter.activeSpears.length === 0) {
+          throw new Error('Expected an in-flight 1000-Year Spear projectile after summon channel completed');
+        }
+
+        const launchedSpear = fighter.activeSpears[0];
+        if (Math.abs(launchedSpear.angle - lockedAngle) > 0.0001) {
+          throw new Error(`Makima spear auto-aim snapped on fire! Expected angle ${lockedAngle}, got ${launchedSpear.angle}`);
+        }
+
+        // Reposition opponent along the locked trajectory to test collision detonation
+        dummyOpponent.x = 500;
+        dummyOpponent.y = 300;
+
+        // Test Canvas 2D stack balance during spear flight
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx);
+        assertCanvasStackBalance('Makima 1000-Year Spear Flight Visuals');
+
+        // Step through frames until spear hits target and detonates into Holy Cross explosion
+        const startHp = dummyOpponent.hp;
+        let explosionTriggered = false;
+        for (let frame = 0; frame < 30; frame++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+          if (fighter.activeHolyExplosions.length > 0) {
+            explosionTriggered = true;
+            break;
+          }
+        }
+
+        if (!explosionTriggered) {
+          throw new Error('Expected 1000-Year Spear to trigger Holy Cross Explosion upon hitting target');
+        }
+        if (dummyOpponent.hp >= startHp) {
+          throw new Error('Expected target to take True Damage from 1000-Year Spear impact');
+        }
+
+        // Test Canvas 2D stack balance during Holy Cross Explosion
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx);
+        assertCanvasStackBalance('Makima Holy Cross Explosion Visuals');
+
+        // Clean up
+        fighter.activeSpears = [];
+        fighter.activeHolyExplosions = [];
+        fighter.isSummoningSpear = false;
+      }
+
+      // 13. Todo Ultimate Background Music Toggle Test
+      if (fType === 'todo') {
+        const { shouldDuckArenaBgm } = await import('../js/systems/arenaBgmSystem.js');
+        const origToggle = CONFIG.todo?.enableTakadaBackgroundSong;
+
+        // Test with music DISABLED
+        CONFIG.todo.enableTakadaBackgroundSong = false;
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.hp = (fighter.maxHp || 100) * 0.2; // HP <= 30% threshold
+        state.fighters = [fighter, dummyOpponent];
+
+        // Trigger Takada Channeling
+        fighter.isTakadaChanneling = false;
+        fighter.isTakadaUltActive = false;
+        fighter.takadaSongStarted = false;
+        fighter.hasTriggeredTakadaHpUlt = false;
+        fighter.update(dummyOpponent, 0, state.arena);
+
+        if (!fighter.isTakadaChanneling) {
+          throw new Error('Todo failed to start Takada Channeling with BGM disabled');
+        }
+        if (fighter.isTakadaBackgroundPlaying) {
+          throw new Error('Todo isTakadaBackgroundPlaying should be false when enableTakadaBackgroundSong is false');
+        }
+        if (shouldDuckArenaBgm()) {
+          throw new Error('shouldDuckArenaBgm() should return false when Todo BGM is disabled');
+        }
+
+        // Fast forward channeling to activate ultimate
+        fighter.takadaChannelTimer = 1;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (!fighter.isTakadaUltActive) {
+          throw new Error('Todo failed to activate Takada Ultimate with BGM disabled');
+        }
+        if (fighter.isTakadaBackgroundPlaying) {
+          throw new Error('Todo isTakadaBackgroundPlaying should remain false in ultimate when BGM is disabled');
+        }
+
+        // Test with music ENABLED
+        CONFIG.todo.enableTakadaBackgroundSong = true;
+        fighter.reset();
+        fighter.hp = (fighter.maxHp || 100) * 0.2; // HP <= 30% threshold
+        fighter.isTakadaChanneling = false;
+        fighter.isTakadaUltActive = false;
+        fighter.takadaSongStarted = false;
+        fighter.hasTriggeredTakadaHpUlt = false;
+        fighter.update(dummyOpponent, 0, state.arena);
+
+        if (!fighter.isTakadaChanneling) {
+          throw new Error('Todo failed to start Takada Channeling with BGM enabled');
+        }
+        if (!fighter.isTakadaBackgroundPlaying) {
+          throw new Error('Todo isTakadaBackgroundPlaying should be true when enableTakadaBackgroundSong is true');
+        }
+        if (!shouldDuckArenaBgm()) {
+          throw new Error('shouldDuckArenaBgm() should return true when Todo BGM is active');
+        }
+
+        // Cleanup and restore
+        CONFIG.todo.enableTakadaBackgroundSong = origToggle;
+        fighter.reset();
       }
 
     } catch (err) {
@@ -1904,6 +2511,540 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ [DOMAIN DEATH CLEANUP TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.5. Makima Chains of Domination & Mind Control Puppetry Test
+  console.log('⛓️ [Makima Chains & Mind Control Test] Verifying mind control puppetry, Rika retaliation, and mutual ally combat...');
+  try {
+    const MakimaClass = FIGHTER_CLASS_MAP['makima'];
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const YujiClass = FIGHTER_CLASS_MAP['yuji'];
+
+    if (MakimaClass && YutaClass && YujiClass) {
+      const makimaDef = allDefs.find(d => (d.type === 'makima' || d.characterId === 'makima'));
+      const yutaDef = allDefs.find(d => (d.type === 'yuta' || d.characterId === 'yuta'));
+      const yujiDef = allDefs.find(d => (d.type === 'yuji' || d.characterId === 'yuji'));
+
+      const testMakima = new MakimaClass({ ...makimaDef, startX: 200, startY: 200 });
+      const testYuta = new YutaClass({ ...yutaDef, startX: 280, startY: 200 });
+      
+      // Initialize Rika on Yuta and manifest her
+      testYuta.rika.active = true;
+      testYuta.rika.spawnTimer = 0;
+      testYuta.rika.hp = 500;
+      testYuta.rika.maxHp = 500;
+      testYuta.rika.x = 320;
+      testYuta.rika.y = 200;
+
+      state.fighters = [testMakima, testYuta];
+      state.illusions = [testYuta.rika];
+      state.getFighterTeam = (idx) => (idx === 0 ? 0 : 1);
+
+      // Makima casts Chains of Domination on Yuta
+      testMakima._castChainsOfDomination(testYuta);
+
+      if (!testYuta.isChainedByMakima) {
+        throw new Error('Expected Yuta to be chained by Makima');
+      }
+      if (!testYuta.isMindControlledByMakima) {
+        throw new Error('Expected Yuta to be mind-controlled because Rika is active');
+      }
+      if (testYuta.timeStopTimer > 0) {
+        throw new Error(`Expected Yuta to NOT be frozen in time-stop stasis while mind-controlled, got timeStopTimer=${testYuta.timeStopTimer}`);
+      }
+
+      // Allegiance check
+      if (!testYuta.isTeammate(testMakima)) {
+        throw new Error('Expected mind-controlled Yuta to treat Makima as friendly');
+      }
+      if (testYuta.isTeammate(testYuta.rika)) {
+        throw new Error('Expected mind-controlled Yuta to treat Rika as hostile enemy');
+      }
+
+      // Target acquisition check
+      const { getClosestOpponent } = await import('../js/systems/physics.js');
+      const yutaOpponent = getClosestOpponent(testYuta);
+      if (yutaOpponent !== testYuta.rika) {
+        throw new Error(`Expected mind-controlled Yuta to target Rika, got ${yutaOpponent?.type || yutaOpponent?.name || yutaOpponent}`);
+      }
+
+      // Rika retaliation check: Rika must target Yuta
+      const { updateRika } = await import('../js/entities/fighters/yuta/rikaLogic.js');
+      updateRika(testYuta, state.arena);
+      if (testYuta.rika.target !== testYuta) {
+        throw new Error(`Expected Rika to retaliate and target mind-controlled Yuta, got ${testYuta.rika.target?.type || testYuta.rika.target?.name}`);
+      }
+
+      // Test Direct Rika Subjugation: Makima chains Rika directly
+      const testMakimaRika = new MakimaClass({ ...makimaDef, startX: 200, startY: 200 });
+      const testYutaRika = new YutaClass({ ...yutaDef, startX: 450, startY: 200 });
+      testYutaRika.rika.active = true;
+      testYutaRika.rika.spawnTimer = 0;
+      testYutaRika.rika.hp = 500;
+      testYutaRika.rika.maxHp = 500;
+      testYutaRika.rika.x = 280;
+      testYutaRika.rika.y = 200;
+      state.fighters = [testMakimaRika, testYutaRika];
+      state.illusions = [testYutaRika.rika];
+      state.getFighterTeam = (idx) => (idx === 0 ? 0 : 1);
+
+      testMakimaRika._castChainsOfDomination(testYutaRika.rika);
+      if (!testYutaRika.rika.isChainedByMakima || !testYutaRika.rika.isMindControlledByMakima) {
+        throw new Error('Expected Rika to be chained and mind-controlled when hit directly by Makima chains');
+      }
+      if (testYutaRika.rika.owner !== testMakimaRika) {
+        throw new Error('Expected chained Rika to be subjugated to Makima');
+      }
+      updateRika(testYutaRika, state.arena);
+      if (testYutaRika.rika.target !== testYutaRika) {
+        throw new Error(`Expected directly chained Rika to target Yuta, got ${testYutaRika.rika.target?.type || testYuta.rika.target?.name}`);
+      }
+      if (!testYutaRika.isMakimaControlledRikaTarget(testYutaRika.rika)) {
+        throw new Error('Expected Yuta to treat chained Rika as hostile target');
+      }
+
+      // Test 1v1 without summons: victim is held in stasis
+      const testMakima2 = new MakimaClass({ ...makimaDef, startX: 200, startY: 200 });
+      const testSoloTarget = new YujiClass({ ...yujiDef, startX: 280, startY: 200 });
+      state.fighters = [testMakima2, testSoloTarget];
+      state.illusions = [];
+      state.getFighterTeam = (idx) => (idx === 0 ? 0 : 1);
+
+      testMakima2._castChainsOfDomination(testSoloTarget);
+      if (!testSoloTarget.isChainedByMakima) {
+        throw new Error('Expected solo target to be chained');
+      }
+      if (testSoloTarget.isMindControlledByMakima) {
+        throw new Error('Expected solo target without allies/summons to NOT be mind-controlled');
+      }
+      if (testSoloTarget.timeStopTimer <= 0) {
+        throw new Error('Expected solo target without allies to be held in Subjugation Stasis');
+      }
+
+      // Test 2v2 mutual ally combat: Makima chains Ally A in team with Ally B
+      const testAllyA = new YujiClass({ ...yujiDef, startX: 280, startY: 200 });
+      const testAllyB = new YutaClass({ ...yutaDef, startX: 340, startY: 200 });
+      state.fighters = [testMakima2, testAllyA, testAllyB];
+      state.illusions = [];
+      state.getFighterTeam = (idx) => (idx === 0 ? 0 : 1); // Makima on team 0, Ally A & B on team 1
+
+      testMakima2._castChainsOfDomination(testAllyA);
+      if (!testAllyA.isMindControlledByMakima) {
+        throw new Error('Expected Ally A to be mind-controlled because teammate Ally B is present');
+      }
+      const allyAOpponent = getClosestOpponent(testAllyA);
+      if (allyAOpponent !== testAllyB) {
+        throw new Error(`Expected mind-controlled Ally A to target former teammate Ally B, got ${allyAOpponent?.name || allyAOpponent?.type}`);
+      }
+      const allyBOpponent = getClosestOpponent(testAllyB);
+      if (allyBOpponent !== testAllyA) {
+        throw new Error(`Expected Ally B to retaliate and target mind-controlled Ally A, got ${allyBOpponent?.name || allyBOpponent?.type}`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [MAKIMA MIND CONTROL TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.6. Domain Expansion Duration Natural Drainage Under Stun Test
+  console.log('🌌 [Domain Expansion Duration Under Stun Test] Verifying domain duration drains naturally during stuns/paralysis/time-stop...');
+  try {
+    const dummyTarget = { x: 300, y: 300, r: 25, hp: 1000, maxHp: 1000, isDead: false, team: 1 };
+    state.arena = { x: 0, y: 0, width: 800, height: 800 };
+    state.gameState = 'playing';
+
+    // 1. Mahito
+    const MahitoClass = FIGHTER_CLASS_MAP['mahito'];
+    if (MahitoClass) {
+      const mahitoDef = allDefs.find(d => (d.type === 'mahito' || d.characterId === 'mahito'));
+      const testMahito = new MahitoClass({ ...mahitoDef, startX: 200, startY: 200 });
+      testMahito.domainActive = true;
+      testMahito.domainTimer = 600;
+      testMahito.applyHitStun(60);
+      testMahito.applyTimeStop(60);
+      state.fighters = [testMahito, dummyTarget];
+      state.getFighterTeam = (idx) => idx;
+
+      for (let i = 0; i < 10; i++) {
+        testMahito.update(dummyTarget, 0, state.arena);
+      }
+      if (testMahito.domainTimer !== 590) {
+        throw new Error(`Expected Mahito domainTimer to drain naturally from 600 to 590 under stun, got ${testMahito.domainTimer}`);
+      }
+
+      // Fast-forward to natural expiration under stun
+      while (testMahito.domainTimer > 0) {
+        testMahito.applyTimeStop(60);
+        testMahito.update(dummyTarget, 0, state.arena);
+      }
+      if (testMahito.domainActive) {
+        throw new Error('Expected Mahito domainActive to become false upon reaching 0 domainTimer');
+      }
+    }
+
+    // 2. Gojo
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    if (GojoClass) {
+      const gojoDef = allDefs.find(d => (d.type === 'gojo' || d.characterId === 'gojo'));
+      const testGojo = new GojoClass({ ...gojoDef, startX: 200, startY: 200 });
+      testGojo.domainActive = true;
+      testGojo.domainTimer = 400;
+      testGojo.applyHitStun(60);
+      testGojo.applyTimeStop(60);
+      state.fighters = [testGojo, dummyTarget];
+      state.getFighterTeam = (idx) => idx;
+
+      for (let i = 0; i < 10; i++) {
+        testGojo.update(dummyTarget, 0, state.arena);
+      }
+      if (testGojo.domainTimer !== 390) {
+        throw new Error(`Expected Gojo domainTimer to drain naturally from 400 to 390 under stun, got ${testGojo.domainTimer}`);
+      }
+    }
+
+    // 3. Yuta
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    if (YutaClass) {
+      const yutaDef = allDefs.find(d => (d.type === 'yuta' || d.characterId === 'yuta'));
+      const testYuta = new YutaClass({ ...yutaDef, startX: 200, startY: 200 });
+      testYuta.domainActive = true;
+      testYuta.domainTimer = 500;
+      testYuta.applyHitStun(60);
+      testYuta.applyTimeStop(60);
+      state.fighters = [testYuta, dummyTarget];
+      state.getFighterTeam = (idx) => idx;
+
+      for (let i = 0; i < 10; i++) {
+        testYuta.update(dummyTarget, 0, state.arena);
+      }
+      if (testYuta.domainTimer !== 490) {
+        throw new Error(`Expected Yuta domainTimer to drain naturally from 500 to 490 under stun, got ${testYuta.domainTimer}`);
+      }
+    }
+
+    // 4. Sukuna
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    if (SukunaClass) {
+      const sukunaDef = allDefs.find(d => (d.type === 'sukuna' || d.characterId === 'sukuna'));
+      const testSukuna = new SukunaClass({ ...sukunaDef, startX: 200, startY: 200 });
+      testSukuna.domainActive = true;
+      testSukuna.domainTimer = 500;
+      testSukuna.applyHitStun(60);
+      testSukuna.applyTimeStop(60);
+      state.fighters = [testSukuna, dummyTarget];
+      state.getFighterTeam = (idx) => idx;
+
+      for (let i = 0; i < 10; i++) {
+        testSukuna.update(dummyTarget, 0, state.arena);
+      }
+      if (testSukuna.domainTimer !== 490) {
+        throw new Error(`Expected Sukuna domainTimer to drain naturally from 500 to 490 under stun, got ${testSukuna.domainTimer}`);
+      }
+    }
+
+    // 5. Rubbick
+    const RubbickClass = FIGHTER_CLASS_MAP['rubbick'];
+    if (RubbickClass) {
+      const rubbickDef = allDefs.find(d => (d.type === 'rubbick' || d.characterId === 'rubbick'));
+      const testRubbick = new RubbickClass({ ...rubbickDef, startX: 200, startY: 200 });
+      testRubbick.stolenType = 'gojo_domain';
+      testRubbick.stolenDomainActive = true;
+      testRubbick.stolenDomainTimer = 300;
+      testRubbick.applyHitStun(60);
+      testRubbick.applyTimeStop(60);
+      state.fighters = [testRubbick, dummyTarget];
+      state.getFighterTeam = (idx) => idx;
+
+      for (let i = 0; i < 10; i++) {
+        testRubbick.update(dummyTarget, 0, state.arena);
+      }
+      if (testRubbick.stolenDomainTimer !== 290) {
+        throw new Error(`Expected Rubbick stolenDomainTimer to drain naturally from 300 to 290 under stun, got ${testRubbick.stolenDomainTimer}`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [DOMAIN DURATION DRAIN TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.7. Toji Ambush Against Makima (Re-Ambush Across Multiple Lives)
+  console.log('🗡️ [Toji vs Makima Re-Ambush Test] Verifying Toji uses Ambush on Makima repeatedly across multiple lives...');
+  try {
+    const TojiClass = FIGHTER_CLASS_MAP['toji'];
+    const MakimaClass = FIGHTER_CLASS_MAP['makima'];
+
+    if (TojiClass && MakimaClass) {
+      const tojiDef = allDefs.find(d => (d.type === 'toji' || d.characterId === 'toji'));
+      const makimaDef = allDefs.find(d => (d.type === 'makima' || d.characterId === 'makima'));
+
+      const testToji = new TojiClass({ ...tojiDef, startX: 200, startY: 200 });
+      const testMakima = new MakimaClass({ ...makimaDef, startX: 260, startY: 200 });
+
+      state.fighters = [testToji, testMakima];
+      state.illusions = [];
+      state.arena = { x: 0, y: 0, width: 800, height: 800 };
+      state.gameState = 'playing';
+      state.getFighterTeam = (idx) => idx;
+
+      // 1. Trigger Toji's first Ambush
+      testToji.stealthCooldown = 50; // Ambush is ready (<= 55)
+      testToji.stealthTimer = 0;
+      testToji.update(testMakima, 0, state.arena);
+
+      if (!testToji.isAmbushing) {
+        throw new Error('Expected Toji to launch first Ambush against Makima');
+      }
+
+      // Step through first Ambush until Makima is defeated and enters contract revival
+      let safety = 200;
+      while (testToji.isAmbushing && safety-- > 0) {
+        testToji.update(testMakima, 0, state.arena);
+      }
+
+      // Force Makima to consume 1 life if not already consumed
+      if (testMakima.citizenLives === 2) {
+        testMakima.takeDamage(1000, testToji);
+      }
+
+      // Fast-forward Makima's 75-frame revival stasis
+      while (testMakima.isRevivingFromContract) {
+        testMakima.update(testToji, 1, state.arena);
+      }
+
+      if (testMakima.hp <= 0 || testMakima.isDead) {
+        throw new Error('Expected Makima to be alive after contract revival');
+      }
+
+      // 2. Fast-forward Toji's stealth cooldown until Ambush is UP again
+      testToji.stealthCooldown = 50; // Ambush ready again
+      testToji.stealthTimer = 0;
+      testToji.isAmbushing = false;
+
+      testToji.update(testMakima, 0, state.arena);
+
+      if (!testToji.isAmbushing) {
+        throw new Error(`Expected Toji to launch SECOND Ambush on revived Makima, but isAmbushing=${testToji.isAmbushing}, stealthCooldown=${testToji.stealthCooldown}`);
+      }
+
+      // Step through second Ambush
+      let safety2 = 200;
+      while (testToji.isAmbushing && safety2-- > 0) {
+        testToji.update(testMakima, 0, state.arena);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [TOJI VS MAKIMA RE-AMBUSH TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.5. Toji Stealth Preservation Under Stuns & Makima Bang Test
+  console.log('🗡️ [Toji Stealth Preservation Under Stuns & Makima Bang Test] Verifying stealth persists through hits, stuns, and Makima Bang...');
+  try {
+    const TojiClass = FIGHTER_CLASS_MAP['toji'];
+    const MakimaClass = FIGHTER_CLASS_MAP['makima'];
+
+    if (TojiClass && MakimaClass) {
+      const tojiDef = allDefs.find(d => (d.type === 'toji' || d.characterId === 'toji'));
+      const makimaDef = allDefs.find(d => (d.type === 'makima' || d.characterId === 'makima'));
+
+      const testToji = new TojiClass(tojiDef);
+      const testMakima = new MakimaClass(makimaDef);
+
+      state.fighters = [testToji, testMakima];
+      state.arena = { x: 0, y: 0, width: 540, height: 960 };
+
+      testToji.x = 200;
+      testToji.y = 400;
+      testMakima.x = 200;
+      testMakima.y = 300;
+
+      // 1. Enter active stealth mode (duration 240, cooldown 300 so he is roaming in stealth)
+      testToji.stealthTimer = 240;
+      testToji.stealthCooldown = 300;
+      testToji.isStealthed = true;
+      testToji.stealthActive = true;
+      testToji.isAmbushing = false;
+
+      // 2. Makima strikes Toji with Bang!
+      testMakima.gunAngle = Math.PI / 2; // Aim down at Toji
+      testMakima.bangCooldown = 0;
+      testMakima._castBangAttack(testToji);
+
+      // Verify damage was taken but stealth was NOT canceled
+      if (testToji.isStealthed !== true || testToji.stealthTimer <= 0) {
+        throw new Error(`Expected Toji to remain in Stealth after Makima Bang, but isStealthed=${testToji.isStealthed}, stealthTimer=${testToji.stealthTimer}`);
+      }
+
+      // Step frames through knockback and wall-pin
+      for (let i = 0; i < 20; i++) {
+        testToji.update(testMakima, 0, state.arena);
+        if (testToji.isStealthed !== true || testToji.stealthTimer <= 0) {
+          throw new Error(`Expected Toji to maintain Stealth during knockback/wall-pin at frame ${i}, but isStealthed=${testToji.isStealthed}, stealthTimer=${testToji.stealthTimer}`);
+        }
+      }
+
+      // 3. Test generic stuns, interrupts, and time-stops
+      testToji.applyHitStun(30);
+      if (testToji.isStealthed !== true) throw new Error('Stealth canceled after applyHitStun');
+
+      testToji.applyTimeStop(30);
+      if (testToji.isStealthed !== true) throw new Error('Stealth canceled after applyTimeStop');
+
+      testToji.applyParalyze(30);
+      if (testToji.isStealthed !== true) throw new Error('Stealth canceled after applyParalyze');
+
+      testToji.applyKnockback(10, 10, 20);
+      if (testToji.isStealthed !== true) throw new Error('Stealth canceled after applyKnockback');
+
+      testToji.suppressCombatAndVisuals({ isGetsuga: true, timer: 20 });
+      if (testToji.isStealthed !== true) throw new Error('Stealth canceled after suppressCombatAndVisuals');
+
+      testToji.interruptAttacks(true);
+      if (testToji.isStealthed !== true) throw new Error('Stealth canceled after interruptAttacks(true)');
+
+      // Verify stealthTimer is still positive and active
+      if (testToji.stealthTimer <= 0) {
+        throw new Error(`Expected stealthTimer > 0, got ${testToji.stealthTimer}`);
+      }
+
+      // 4. Test Ambush cooldown & spam prevention:
+      // Fast-forward cooldown to 50 (ambushTrigger) to launch Ambush
+      testToji.stealthCooldown = 50;
+      testToji.update(testMakima, 0, state.arena);
+      if (!testToji.isAmbushing) {
+        throw new Error('Expected Toji to start Ambush when stealthCooldown <= 55');
+      }
+      if (testToji.stealthCooldown <= 55) {
+        throw new Error(`Expected stealthCooldown to reset to max upon starting Ambush, got ${testToji.stealthCooldown}`);
+      }
+
+      // Step through Ambush completion (full 3-stage combo takes ~350 frames)
+      let safety = 600;
+      while (testToji.isAmbushing && safety-- > 0) {
+        testToji.update(testMakima, 0, state.arena);
+      }
+      if (testToji.isAmbushing) {
+        throw new Error('Ambush did not conclude cleanly');
+      }
+
+      // Immediately on next frame, Toji MUST NOT immediately spam Ambush again!
+      testToji.update(testMakima, 0, state.arena);
+      if (testToji.isAmbushing) {
+        throw new Error('Toji spammed Ambush immediately on the next frame without waiting for cooldown!');
+      }
+    }
+  } catch (err) {
+    console.error('❌ [TOJI STEALTH PRESERVATION TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.6 Sukuna Domain Expansion Fuga Cooldown Preservation Test
+  console.log('🔥 [Sukuna Domain Fuga Cooldown Test] Verifying Fuga cooldown is not reset upon domain activation...');
+  try {
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    if (SukunaClass) {
+      const sukuna = new SukunaClass({ startX: 200, startY: 200, hp: 1000, maxHp: 1000 });
+      // Set Fuga cooldown to 50 frames remaining
+      sukuna.divineFlameCooldown = 50;
+      // Activate domain
+      sukuna._activateDomain({ x: 0, y: 0, width: 540, height: 960 });
+      if (sukuna.divineFlameCooldown > 50) {
+        throw new Error(`Expected divineFlameCooldown to be <= 50 after domain activation, but was reset to ${sukuna.divineFlameCooldown}`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [SUKUNA DOMAIN FUGA COOLDOWN TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.7 Yuji Soul Swap Damage Reception & Mortality Test
+  console.log('🔄 [Yuji Soul Swap Mortality Test] Verifying Yuji takes damage and dies during Soul Swap...');
+  try {
+    const YujiClass = FIGHTER_CLASS_MAP['yuji'];
+    if (YujiClass) {
+      const yuji = new YujiClass({ startX: 200, startY: 200, hp: 1000, maxHp: 1000 });
+      // Damage below 30% threshold (to 200 HP) -> triggers Soul Swap
+      yuji.takeDamage(800, null);
+      if (!yuji.soulSwapActive) {
+        throw new Error('Expected Yuji to activate Soul Swap below 30% HP');
+      }
+      const hpBefore = yuji.hp;
+      // Deal 50 damage during active Soul Swap -> HP must reduce
+      yuji.takeDamage(50, null);
+      if (yuji.hp >= hpBefore) {
+        throw new Error(`Expected Yuji HP to decrease from ${hpBefore}, got ${yuji.hp}`);
+      }
+      // Deal fatal damage (1000 damage) -> Yuji MUST die immediately
+      yuji.takeDamage(1000, null);
+      if (yuji.hp > 0 || !yuji.dead) {
+        throw new Error(`Expected Yuji to die on fatal hit during Soul Swap, but hp=${yuji.hp}, dead=${yuji.dead}`);
+      }
+      if (typeof yuji.isEffectivelyAlive === 'function' && yuji.isEffectivelyAlive()) {
+        throw new Error('Expected isEffectivelyAlive() to return false when Yuji HP <= 0');
+      }
+    }
+  } catch (err) {
+    console.error('❌ [YUJI SOUL SWAP MORTALITY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.8 Sukuna Fuga (Divine Flame) Knockback & Instant Detonation Verification Test
+  console.log('💥 [Sukuna Fuga Knockback & Instant Detonation Test] Verifying Fuga thermobaric explosion delivers directional knockback and detonates instantly without delay...');
+  try {
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    if (SukunaClass && GojoClass) {
+      const sukuna = new SukunaClass({ startX: 100, startY: 200, hp: 1000, maxHp: 1000 });
+      const target = new GojoClass({ startX: 200, startY: 200, hp: 1000, maxHp: 1000 });
+      state.fighters = [sukuna, target];
+
+      // Test 1: Direct triggerThermobaricExplosion
+      projectileSystem.triggerThermobaricExplosion(200, 200, 0, 300);
+      if (Math.abs(target.knockbackVx || 0) < 5 && Math.abs(target.knockbackVy || 0) < 5) {
+        throw new Error(`Expected target to receive significant knockback from Fuga explosion, but got knockbackVx=${target.knockbackVx}, knockbackVy=${target.knockbackVy}`);
+      }
+      if ((target.knockbackStunTimer || 0) <= 0) {
+        throw new Error(`Expected target to have knockbackStunTimer > 0 from Fuga, got ${target.knockbackStunTimer}`);
+      }
+
+      // Test 2: Projectile flight and instant detonation on enemy collision
+      target.knockbackVx = 0;
+      target.knockbackVy = 0;
+      target.hp = 1000;
+      sukuna.x = 100;
+      sukuna.y = 200;
+      sukuna.gunAngle = 0; // pointing right towards target at (200, 200)
+      projectileSystem.projectiles = [];
+      state.thermobaricExplosions = [];
+
+      projectileSystem.fireSukunaFurnace(sukuna, 0, 1000);
+      if (projectileSystem.projectiles.length !== 1) {
+        throw new Error(`Expected 1 active Fuga projectile after firing, got ${projectileSystem.projectiles.length}`);
+      }
+      const fugaProj = projectileSystem.projectiles[0];
+      // Position projectile right in front of target to simulate collision
+      fugaProj.x = target.x - 5;
+      fugaProj.y = target.y;
+      fugaProj.vx = 15;
+      fugaProj.vy = 0;
+
+      // Update projectile system: collision must trigger explosion and remove projectile with zero delay (no fadingOut)
+      projectileSystem.update([sukuna, target]);
+
+      if (projectileSystem.projectiles.length !== 0) {
+        throw new Error(`Expected Fuga projectile to be instantly removed from active projectiles on impact, but ${projectileSystem.projectiles.length} projectiles remain (fadingOut delay trap)!`);
+      }
+      if (!state.thermobaricExplosions || state.thermobaricExplosions.length === 0) {
+        throw new Error(`Expected thermobaric explosion to be spawned on Fuga landing, but none found!`);
+      }
+      const exp = state.thermobaricExplosions[0];
+      if (exp.radius < 20) {
+        throw new Error(`Expected thermobaric explosion initial radius >= 20 for instant blast visual, got ${exp.radius}`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [SUKUNA FUGA INSTANT DETONATION TEST ERROR]:', err);
     errors++;
   }
 

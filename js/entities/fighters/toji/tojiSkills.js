@@ -8,43 +8,76 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { tojiIsTargetDeadOrRemoved } from './tojiAmbush.js';
 
+function getTojiTarget(fighter, opponent) {
+  let target = opponent;
+  if (tojiIsTargetDeadOrRemoved(fighter, target)) {
+    if (typeof state !== 'undefined' && state.fighters) {
+      const myIdx = state.fighters.indexOf(fighter);
+      const myTeam = (typeof state.getFighterTeam === 'function' && myIdx >= 0) ? state.getFighterTeam(myIdx) : (fighter.team !== undefined ? fighter.team : null);
+      let closestEnemy = null;
+      let closestDist = Infinity;
+      const candidates = [...state.fighters, ...(state.illusions || [])];
+      for (const cand of candidates) {
+        if (!cand || cand === fighter || tojiIsTargetDeadOrRemoved(fighter, cand)) continue;
+        const candIdx = state.fighters.indexOf(cand);
+        const candTeam = (typeof state.getFighterTeam === 'function' && candIdx >= 0) ? state.getFighterTeam(candIdx) : (cand.team !== undefined ? cand.team : (cand.owner ? cand.owner.team : null));
+        if (myTeam !== null && candTeam !== null && myTeam === candTeam) continue;
+        const d = Math.hypot(cand.x - fighter.x, cand.y - fighter.y);
+        if (d < closestDist) {
+          closestDist = d;
+          closestEnemy = cand;
+        }
+      }
+      if (closestEnemy) {
+        target = closestEnemy;
+      }
+    }
+  }
+  return target;
+}
+
 /**
  * Checks if target is channeling a skill and initiates channel-interrupt ambush sequence.
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateChannelSense(fighter, opponent) {
-  if (fighter.isCaughtInPurple || (fighter.purpleHitTimer && fighter.purpleHitTimer > 0)) return false;
+  if (fighter.isChainedByMakima || fighter.isCaughtInPurple || (fighter.purpleHitTimer && fighter.purpleHitTimer > 0)) return false;
   if (fighter._channelInterruptCooldown > 0) fighter._channelInterruptCooldown--;
 
-  if (!fighter.isAmbushing && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
+  const target = getTojiTarget(fighter, opponent);
+
+  if (!fighter.isAmbushing && !tojiIsTargetDeadOrRemoved(fighter, target)) {
     const isTargetChanneling = !!(
-      opponent.isChargingUlt ||
-      opponent.isFiringUlt ||
-      opponent.isCharging ||
-      opponent.isChannelingPurple ||
-      opponent.isChannelingDomainExpansion ||
-      opponent.isChannelingDomain ||
-      opponent.isChannelingRCT ||
-      (opponent.rctRevivalTimer || 0) > 0 ||
-      opponent.isChannelingDivineFlame ||
-      opponent.isChannelingStorm ||
-      opponent.isChargingFuga ||
-      opponent.isFiringFuga ||
-      opponent.isChargingSeriousPunch ||
-      (opponent.purpleChargeTimer || 0) > 0 ||
-      (opponent.basicPunchChargeTimer || 0) > 0 ||
-      (opponent._counterPunchTimer || 0) > 0 ||
-      (opponent.flurryHitsLeft || 0) > 0 ||
-      opponent.isFlurrying ||
-      opponent.isCastingRed ||
-      opponent.isCastingBlue ||
-      (opponent.isChanneling === true) ||
-      (typeof opponent.isPerformingSkill === 'function' && opponent.isPerformingSkill())
+      target.isChargingUlt ||
+      target.isFiringUlt ||
+      target.isCharging ||
+      target.isChannelingPurple ||
+      target.isChannelingDomainExpansion ||
+      target.isChannelingDomain ||
+      target.isChannelingRCT ||
+      (target.rctRevivalTimer || 0) > 0 ||
+      target.isChannelingDivineFlame ||
+      target.isChannelingStorm ||
+      target.isChargingFuga ||
+      target.isFiringFuga ||
+      target.isChargingSeriousPunch ||
+      (target.purpleChargeTimer || 0) > 0 ||
+      (target.basicPunchChargeTimer || 0) > 0 ||
+      (target._counterPunchTimer || 0) > 0 ||
+      (target.flurryHitsLeft || 0) > 0 ||
+      target.isFlurrying ||
+      target.isCastingRed ||
+      target.isCastingBlue ||
+      target.isPreparingChain ||
+      target.isSummoningSpear ||
+      target.isExecutingRitual ||
+      (target.isChanneling === true) ||
+      (typeof target.isPerformingSkill === 'function' && target.isPerformingSkill())
     );
 
     if (isTargetChanneling) {
       const detectionRadius = CONFIG.toji?.channelDetectionRadius || 550;
-      const dist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
+      const dist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
 
       // 1. Initial Detection & Instant Reaction
       if (dist <= detectionRadius && !fighter._hasAttemptedChannelInterrupt && !(fighter._channelInterruptCooldown > 0)) {
@@ -71,7 +104,7 @@ export function modUpdateChannelSense(fighter, opponent) {
           fighter._channelInterruptCooldown = CONFIG.toji?.channelInterruptCooldownFrames || 800;
 
           // Forcefully break current state & launch Sequence 1 Ambush to interrupt!
-          fighter.startAmbushSequence(opponent, true);
+          fighter.startAmbushSequence(target, true);
           return true; // Abort update loop
         }
       }
@@ -89,6 +122,35 @@ export function modUpdateChannelSense(fighter, opponent) {
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateStealth(fighter, opponent) {
+  if (!fighter) return false;
+
+  const target = getTojiTarget(fighter, opponent);
+  const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 55;
+  const isAmbushReady = (fighter.stealthCooldown <= ambushTrigger);
+
+  const isStunnedOrPinned = Boolean(
+    fighter.isFrozen ||
+    fighter.isTargetOfAmbush ||
+    fighter.isChainedByMakima ||
+    fighter.isCaughtInPurple ||
+    (fighter.purpleHitTimer && fighter.purpleHitTimer > 0) ||
+    fighter.isParalyzed ||
+    (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
+    (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
+    fighter.isCurrentlyWallPinnedByMakima ||
+    (fighter.makimaWallPinTimer && fighter.makimaWallPinTimer > 0) ||
+    fighter.isWallPinnedBySaitama ||
+    (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
+    (fighter.redKnockbackTimer && fighter.redKnockbackTimer > 0)
+  );
+  const canAmbush = !fighter.isAmbushing && !isStunnedOrPinned;
+
+  // If Ambush is ready and target is valid, launch Ambush sequence immediately!
+  if (isAmbushReady && canAmbush && !tojiIsTargetDeadOrRemoved(fighter, target)) {
+    fighter.startAmbushSequence(target);
+    return true; // Abort update loop
+  }
+
   if (fighter.stealthTimer > 0) {
     fighter.stealthTimer--;
     fighter.isStealthed = true;
@@ -117,14 +179,6 @@ export function modUpdateStealth(fighter, opponent) {
       fighter._channelInterruptCooldown = 0;
     }
   } else if (fighter.stealthCooldown > 0) {
-    const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 55;
-
-    // Check if stealth cooldown is about to end -> launch ambush move sequence!
-    if (!fighter.isAmbushing && !fighter.isCaughtInPurple && (!fighter.purpleHitTimer || fighter.purpleHitTimer <= 0) && fighter.stealthCooldown <= ambushTrigger && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
-      fighter.startAmbushSequence(opponent);
-      return true; // Abort update loop
-    }
-
     fighter.stealthCooldown--;
     fighter.isStealthed = false;
     fighter.stealthActive = false;

@@ -1087,7 +1087,7 @@ export function drawPixelGroveStreetCar(ctx, car) {
       car.isTargetOfAmbush ||
       car.caughtInSaitamaFlurry
     );
-    if (isStunnedOrFrozen && !isGojoDomainActive) {
+    if (isStunnedOrFrozen && !isGojoDomainActive && !car.isChainedByMakima) {
       drawParalyzeEffect(ctx, 44, false, car.timeStopTimer || car.hitStunTimer || 45, '#FFEE58', car);
     }
   }

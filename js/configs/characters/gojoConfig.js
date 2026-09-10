@@ -37,7 +37,7 @@ export const gojoConfig = {
   infinityMaxActiveShockwaves: 2,          // Max limit of concurrent active barrier shockwave rings
 
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
-  blueCooldown: 100,         // Fire rate for basic attack (Blue orb) - Lower is faster
+  blueCooldown: 200,         // Fire rate for basic attack (Blue orb) - Lower is faster
   blueSpeed: 10.5,          // Speed of Blue orb projectile
   blueRadius: 100,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
   blueProjectileRadius: 15,  // Base visual & collision radius of Blue projectile orb (at default blueRadius: 50)

@@ -1031,6 +1031,13 @@ function updateHealthHud() {
       }
     }
 
+    // 16. Makima exception: Chains of Domination / Kyoto Shrine Ritual / Prime Minister Contract
+    if (fId === 'makima') {
+      if (sId === 'chains' || sId === 'shrine' || sId === 'contract' || sLabel.includes('CHAINS') || sLabel.includes('SHRINE') || sLabel.includes('CONTRACT')) {
+        return true;
+      }
+    }
+
     return false;
   };
 

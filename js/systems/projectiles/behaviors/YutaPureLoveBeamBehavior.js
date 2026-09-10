@@ -58,7 +58,8 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
       for (let i = 0; i < allTargets.length; i++) {
         const ent = allTargets[i];
         if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
-        if (ent.owner && ent.owner === ownerFighter) continue;
+        const isControlledRika = ownerFighter.isMakimaControlledRikaTarget?.(ent);
+        if (ent.owner && ent.owner === ownerFighter && !isControlledRika) continue;
         
         let isEnemy = true;
         if (ownerTeam !== null) {
@@ -68,6 +69,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             isEnemy = state.getFighterTeam(entIdx) !== ownerTeam;
           }
         }
+        if (isControlledRika) isEnemy = true;
         if (!isEnemy) continue;
 
         // Line-to-Circle Collision & Origin Proximity Check

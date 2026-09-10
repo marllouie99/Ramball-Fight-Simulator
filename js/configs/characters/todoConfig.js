@@ -121,6 +121,7 @@ export const todoConfig = {
     victoryVoiceVolume: 3.0,                                                                // Victory voice line volume
 
     // Ultimate: Takada-chan Voicelines & BGM
+    enableTakadaBackgroundSong: false,                              // Toggle to enable/disable Takada idol background music during ultimate
     takadaChannelingVoiceline: 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3', // 3.0s channeling voice line
     takadaChannelingVoiceVolume: 1.0,                              // Channeling voice line volume
     takadaBackgroundSong: 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',           // Takada idol BGM (fades in & out)

@@ -410,20 +410,6 @@ export function drawMeleeClashShockwave(ctx, effect) {
       ctx.arc(effect.x, effect.y, effect.size * 0.6, 0, Math.PI * 2);
       ctx.stroke();
     }
-
-    ctx.save();
-    ctx.translate(effect.x, effect.y);
-    ctx.rotate((1 - effect.life) * 0.5);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.5})`;
-    ctx.lineWidth = 2 * effect.life;
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) {
-       const angle = (i / 8) * Math.PI * 2;
-       ctx.moveTo(Math.cos(angle) * (effect.size * 0.2), Math.sin(angle) * (effect.size * 0.2));
-       ctx.lineTo(Math.cos(angle) * (effect.size * 0.9), Math.sin(angle) * (effect.size * 0.9));
-    }
-    ctx.stroke();
-    ctx.restore();
   } else {
     const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
     if (isDark) {

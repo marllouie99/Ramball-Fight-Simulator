@@ -219,7 +219,7 @@ export class StatusEffectsManager {
 
   handleTimeStop() {
     const fighter = this.fighter;
-    if (fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) {
+    if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima) {
       fighter.timeStopTimer = 0;
       fighter.isFrozenByInfinity = false;
       fighter.electricStunTimer = 0;
@@ -317,6 +317,22 @@ export class StatusEffectsManager {
         }
         if (typeof fighter._timeStopFrozenGunAngle === 'number') {
           fighter.gunAngle = fighter._timeStopFrozenGunAngle;
+        }
+      }
+
+      // If the target is chained by Makima and received knockback (e.g. from "Bang!"), integrate knockback displacement!
+      if (fighter.isChainedByMakima && fighter.knockbackVx !== undefined && (Math.abs(fighter.knockbackVx) > 0.1 || Math.abs(fighter.knockbackVy) > 0.1)) {
+        fighter.x += fighter.knockbackVx;
+        fighter.y += fighter.knockbackVy;
+        fighter.knockbackVx *= 0.88;
+        fighter.knockbackVy *= 0.88;
+        if (Math.abs(fighter.knockbackVx) <= 0.1) fighter.knockbackVx = 0;
+        if (Math.abs(fighter.knockbackVy) <= 0.1) fighter.knockbackVy = 0;
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : ((typeof CONFIG !== 'undefined') ? CONFIG.arena : null);
+        if (arena) {
+          const tr = fighter.r || 25;
+          fighter.x = Math.max(arena.x + tr, Math.min(arena.x + arena.width - tr, fighter.x));
+          fighter.y = Math.max(arena.y + tr, Math.min(arena.y + arena.height - tr, fighter.y));
         }
       }
 

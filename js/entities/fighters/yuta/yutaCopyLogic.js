@@ -135,8 +135,9 @@ export function executeThinIceBreaker(fighter, angle) {
   }
   if (state.illusions) {
     for (const ill of state.illusions) {
-      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
-      if (myTeam !== null && ill.owner && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
+      const isControlledRika = fighter.isMakimaControlledRikaTarget?.(ill);
+      if (!ill || ill.hp <= 0 || (!isControlledRika && (ill.owner === fighter || ill.isRika))) continue;
+      if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
       targetsToScan.push(ill);
     }
   }

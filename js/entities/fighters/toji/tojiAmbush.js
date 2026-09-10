@@ -19,15 +19,26 @@ export function tojiIsTargetDeadOrRemoved(fighter, target) {
     return target.hp <= 0;
   }
 
-  // 1. Basic properties
-  if (target.hp <= 0 || target.isDead || target._hasDied) return true;
+  // 1. If target is actively in a revival stasis animation (e.g. Makima citizen sacrifice animation or Yuta RCT revival), treat as temporarily unavailable for new ambushes
+  if (target.isRevivingFromContract || target.isShatterReviving || (target.rctRevivalTimer && target.rctRevivalTimer > 0)) {
+    return true;
+  }
 
-  // 2. Special case for Yuta's Rika
+  // 2. Basic alive properties: check if HP is 0 or fighter is marked dead
+  if (target.hp <= 0 || target.isDead || target.dead) {
+    // If target has revival capability and currently has HP > 0, they are not dead
+    if (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive() && target.hp > 0) {
+      return false;
+    }
+    return true;
+  }
+
+  // 3. Special case for Yuta's Rika
   if (target.isRika) {
     if (!target.active || target.isDying || target.disappearing) return true;
   }
 
-  // 3. Check if target is still in the active state lists
+  // 4. Check if target is still in the active state lists
   if (typeof state !== 'undefined') {
     const inFighters = state.fighters && state.fighters.includes(target);
     const inIllusions = state.illusions && state.illusions.includes(target);
@@ -82,12 +93,16 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 }
 
 export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
-  if (tojiIsTargetDeadOrRemoved(fighter, opponent)) return;
+  if (fighter.isChainedByMakima || tojiIsTargetDeadOrRemoved(fighter, opponent)) return;
 
   fighter.isAmbushing = true;
   fighter.ambushTarget = opponent;
   fighter.ambushPhase = 'FRONT_LAUNCH';
   fighter.ambushTimer = isInterrupt ? 4 : (CONFIG.toji?.ambushFirstTeleportFrames ?? CONFIG.toji?.ambushFrontPauseDuration ?? 18);
+  fighter.stealthCooldown = fighter.stealthMaxCooldown || (CONFIG.toji?.stealthCooldown || 500);
+  fighter.stealthTimer = 0;
+  fighter.isStealthed = true;
+  fighter.stealthActive = true;
   fighter.katanaSlashTimer = 0;
   fighter.katanaSlashFadeTimer = 0;
   fighter.spearSwingTimer = 0;
@@ -182,22 +197,61 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       if (state.fighters) state.fighters.forEach(f => {
         if (f) {
           f.isTargetOfAmbush = false;
+          if (typeof fighter._clearTargetFreeze === 'function') {
+            fighter._clearTargetFreeze(f);
+          } else {
+            f.timeStopTimer = 0;
+            f.paralyzeTimer = 0;
+            f.hitStunTimer = 0;
+            f.isParalyzed = false;
+          }
           if (f.characterId === 'gojo' && f._wasInfinityActiveBeforeAmbush) {
             f.infinityActive = true;
             delete f._wasInfinityActiveBeforeAmbush;
           }
         }
       });
-      if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });
+      if (state.illusions) state.illusions.forEach(ill => {
+        if (ill) {
+          ill.isTargetOfAmbush = false;
+          if (typeof fighter._clearTargetFreeze === 'function') {
+            fighter._clearTargetFreeze(ill);
+          } else {
+            ill.timeStopTimer = 0;
+            ill.paralyzeTimer = 0;
+            ill.hitStunTimer = 0;
+            ill.isParalyzed = false;
+          }
+        }
+      });
     }
-    if (opponent && opponent.characterId === 'gojo' && opponent._wasInfinityActiveBeforeAmbush) {
-      opponent.infinityActive = true;
-      delete opponent._wasInfinityActiveBeforeAmbush;
+    if (opponent) {
+      if (typeof fighter._clearTargetFreeze === 'function') {
+        fighter._clearTargetFreeze(opponent);
+      } else {
+        opponent.isTargetOfAmbush = false;
+        opponent.timeStopTimer = 0;
+        opponent.paralyzeTimer = 0;
+        opponent.hitStunTimer = 0;
+        opponent.isParalyzed = false;
+        opponent.isParalyzedByMahoraga = false;
+        if (opponent.statusEffects) opponent.statusEffects.timeStopTimer = 0;
+        delete opponent._timeStopOriginalDuration;
+        delete opponent._timeStopStartTime;
+        delete opponent._timeStopFrozenAngle;
+        delete opponent._timeStopFrozenGunAngle;
+      }
+      if (opponent.characterId === 'gojo' && opponent._wasInfinityActiveBeforeAmbush) {
+        opponent.infinityActive = true;
+        delete opponent._wasInfinityActiveBeforeAmbush;
+      }
     }
     fighter.isAmbushing = false;
     fighter.ambushTarget = null;
     fighter.ambushPhase = null;
-    fighter.stealthCooldown = 0;
+    fighter.stealthCooldown = fighter.stealthMaxCooldown || (CONFIG.toji?.stealthCooldownFrames || 600);
+    fighter.isStealthed = false;
+    fighter.stealthActive = false;
     fighter.katanaSlashTimer = 0;
     fighter.katanaSlashFadeTimer = 0;
     fighter._lastKatanaTimer = 0;
@@ -436,7 +490,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         audioSystem.playSFX('attack_fleshhit', 0.8);
         // Target successfully struck in the back! NOW apply stop movement / stasis to finish sequence (unless countering with Serious Skill Counter)!
         const isCounteringOpponent = Boolean(opponent.isCountering || (opponent._counterPunchTimer && opponent._counterPunchTimer > 0) || (opponent._postCounterRecoveryTimer && opponent._postCounterRecoveryTimer > 0));
-        if (!isCounteringOpponent) {
+        if (!isCounteringOpponent && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
           opponent.isTargetOfAmbush = true;
           if (typeof opponent.interruptAttacks === 'function') {
             opponent.interruptAttacks(true);
@@ -460,8 +514,6 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
           opponent.vy = 0;
         }
 
-        fighter.stealthTimer = fighter.stealthMaxDuration;
-        fighter.stealthCooldown = 0;
         fighter.isStealthed = true;
         fighter.stealthActive = true;
       } else {
@@ -540,13 +592,15 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.angle = chaseAimAngle;
     fighter.aim(opponent);
 
-    const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 70;
-    if (typeof opponent.applyTimeStop === 'function') {
-      opponent.applyTimeStop(katanaFreeze);
+    if (!tojiIsTargetDeadOrRemoved(fighter, opponent)) {
+      const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 70;
+      if (typeof opponent.applyTimeStop === 'function') {
+        opponent.applyTimeStop(katanaFreeze);
+      }
+      opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, katanaFreeze);
+      opponent.vx = 0;
+      opponent.vy = 0;
     }
-    opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, katanaFreeze);
-    opponent.vx = 0;
-    opponent.vy = 0;
 
     modSpawnTeleportAfterimages(fighter, oldX, oldY, clampedChase.x, clampedChase.y, oldAngle, chaseAimAngle);
 
@@ -674,12 +728,14 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         -Math.PI * 0.25,
       ];
 
-      const totalFlurryFrames = fighter.phantomMaxStrikes * (CONFIG.toji?.ambushPhantomFlurryFrameRate || 8) + 10;
-      if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(totalFlurryFrames);
-      opponent.vx = 0;
-      opponent.vy = 0;
-      opponent.knockbackVx = 0;
-      opponent.knockbackVy = 0;
+      if (!tojiIsTargetDeadOrRemoved(fighter, opponent)) {
+        const totalFlurryFrames = fighter.phantomMaxStrikes * (CONFIG.toji?.ambushPhantomFlurryFrameRate || 8) + 10;
+        if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(totalFlurryFrames);
+        opponent.vx = 0;
+        opponent.vy = 0;
+        opponent.knockbackVx = 0;
+        opponent.knockbackVy = 0;
+      }
     }
   } else if (fighter.ambushPhase === 'PHANTOM_FLURRY') {
     fighter.vx = 0;
@@ -781,10 +837,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         fighter.vy = Math.sin(escapeAngle) * (fighter.speed || 3);
         fighter.normalizeSpeed();
 
-        fighter.stealthTimer = CONFIG.toji?.stealthDuration || 240;
-        fighter.stealthCooldown = 0;
-        fighter.isStealthed = true;
-        fighter.stealthActive = true;
+        fighter.stealthTimer = 0;
+        fighter.stealthCooldown = fighter.stealthMaxCooldown || (CONFIG.toji?.stealthCooldown || 500);
+        fighter.isStealthed = false;
+        fighter.stealthActive = false;
 
         fighter.isAmbushing = false;
         fighter.ambushTarget = null;

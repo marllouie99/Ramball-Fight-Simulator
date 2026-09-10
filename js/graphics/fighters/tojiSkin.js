@@ -2,7 +2,7 @@
 // TOJI FUSHIGURO FIGHTER SKIN & BODY MODEL
 // The Sorcerer Killer (Jujutsu Kaisen)
 // Supports High-Definition Pixel-Art Model from:
-// Assets/model/Toji-SKIN.png
+// Assets/model/Toji-skin.png
 // With procedural canvas fallback matching the model sheet:
 // 1. Signature Jet-Black Bangs & Spiky Side Locks
 // 2. Warm Tan Skin Face with Corner Lip Scar
@@ -31,10 +31,10 @@ export function _getTojiSkinImage() {
       _tojiSkinImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Toji pixel skin image at Assets/model/Toji-SKIN.png', e);
+      console.warn('Failed to load Toji pixel skin image at Assets/model/Toji-skin.png', e);
       _tojiSkinImageLoading = false;
     };
-    img.src = 'Assets/model/Toji-SKIN.png?v=1';
+    img.src = 'Assets/model/Toji-skin.png?v=1';
     _tojiSkinImage = img;
   }
   return _tojiSkinImage;
@@ -96,8 +96,8 @@ export function drawTojiSkin(ctx, fighter) {
   const skinTan       = '#E8BD9B';
   const shirtBlack    = '#15161B';
   const shirtCollar   = '#0C0D10';
-  const hakamaWhite   = '#FFFFFF';
-  const hakamaShadow  = '#D4DAE4';
+  const hakamaWhite   = '#E4E7EB';
+  const hakamaShadow  = '#C2C8D2';
   const sashBlack     = '#101115';
   const hairBlack     = '#0E0F14';
 
@@ -111,7 +111,7 @@ export function drawTojiSkin(ctx, fighter) {
   if (tojiImg && tojiImg.complete && tojiImg.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
-    // Toji-SKIN.png has transparent padding around the character art (399px art inside 500px canvas)
+    // Toji-skin.png has transparent padding around the character art (399px art inside 500px canvas)
     // Scale factor 1.265 expands the art so its boundary fits flush with the outer circle stroke
     const modelScale = 1.265;
     const drawR = r * modelScale;
@@ -138,17 +138,17 @@ export function drawTojiSkin(ctx, fighter) {
       ctx.fill();
     }
 
-    // B. CLEAN SOLID BLACK CREWNECK SHIRT TEXTURE (+Y Mid Torso: y = +0.26*r to +0.66*r, fully spanning edge-to-edge)
+    // B. CLEAN SOLID BLACK CREWNECK SHIRT TEXTURE (+Y Mid Torso: y = +0.20*r to +0.72*r, fully spanning edge-to-edge)
     ctx.fillStyle = shirtBlack;
-    ctx.fillRect(-r * 1.05, r * 0.26, r * 2.1, r * 0.40);
+    ctx.fillRect(-r * 1.05, r * 0.20, r * 2.1, r * 0.52);
 
     // Clean Curved Crewneck Collar (Framing the throat/neck)
     ctx.fillStyle = shirtCollar;
     ctx.beginPath();
-    ctx.moveTo(-r * 0.38, r * 0.26);
-    ctx.quadraticCurveTo(0, r * 0.38, r * 0.38, r * 0.26);
-    ctx.lineTo(r * 0.33, r * 0.23);
-    ctx.quadraticCurveTo(0, r * 0.34, -r * 0.33, r * 0.23);
+    ctx.moveTo(-r * 0.38, r * 0.20);
+    ctx.quadraticCurveTo(0, r * 0.32, r * 0.38, r * 0.20);
+    ctx.lineTo(r * 0.33, r * 0.17);
+    ctx.quadraticCurveTo(0, r * 0.28, -r * 0.33, r * 0.17);
     ctx.closePath();
     ctx.fill();
 
@@ -156,30 +156,30 @@ export function drawTojiSkin(ctx, fighter) {
     ctx.strokeStyle = '#08090C';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(-r * 0.38, r * 0.26);
-    ctx.quadraticCurveTo(0, r * 0.38, r * 0.38, r * 0.26);
+    ctx.moveTo(-r * 0.38, r * 0.20);
+    ctx.quadraticCurveTo(0, r * 0.32, r * 0.38, r * 0.20);
     ctx.stroke();
 
-    // C. CLEAN WHITE HAKAMA PANTS TEXTURE (+Y Bottom: y = +0.66*r to +1.0*r, fully spanning edge-to-edge)
+    // C. CLEAN WHITE HAKAMA PANTS TEXTURE (+Y Bottom: y = +0.72*r to +1.0*r, only at the bottom hem)
     ctx.fillStyle = hakamaWhite;
-    ctx.fillRect(-r * 1.05, r * 0.66, r * 2.1, r * 0.40);
+    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.35);
 
     // Hakama Vertical Pleat Shadows
     ctx.strokeStyle = hakamaShadow;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     // Center pleat
-    ctx.moveTo(0, r * 0.76);
+    ctx.moveTo(0, r * 0.78);
     ctx.lineTo(0, r);
     // Left pleats
-    ctx.moveTo(-r * 0.38, r * 0.72);
+    ctx.moveTo(-r * 0.38, r * 0.76);
     ctx.lineTo(-r * 0.42, r);
-    ctx.moveTo(-r * 0.70, r * 0.72);
+    ctx.moveTo(-r * 0.70, r * 0.76);
     ctx.lineTo(-r * 0.74, r);
     // Right pleats
-    ctx.moveTo(r * 0.38, r * 0.72);
+    ctx.moveTo(r * 0.38, r * 0.76);
     ctx.lineTo(r * 0.42, r);
-    ctx.moveTo(r * 0.70, r * 0.72);
+    ctx.moveTo(r * 0.70, r * 0.76);
     ctx.lineTo(r * 0.74, r);
     ctx.stroke();
 
@@ -187,49 +187,50 @@ export function drawTojiSkin(ctx, fighter) {
     ctx.strokeStyle = '#0E0E12';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.moveTo(-r, r * 0.66);
-    ctx.lineTo(r, r * 0.66);
+    ctx.moveTo(-r, r * 0.72);
+    ctx.lineTo(r, r * 0.72);
     ctx.stroke();
 
     // Black Cord Sash Band across waist (Edge-to-edge)
     ctx.fillStyle = sashBlack;
-    ctx.fillRect(-r * 1.05, r * 0.66, r * 2.1, r * 0.07);
+    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.06);
 
     // White Belt Loops
     ctx.fillStyle = hakamaWhite;
     ctx.strokeStyle = '#0E0E12';
     ctx.lineWidth = 1.0;
-    ctx.strokeRect(-r * 0.42, r * 0.65, r * 0.08, r * 0.09);
-    ctx.fillRect(-r * 0.42, r * 0.65, r * 0.08, r * 0.09);
-    ctx.strokeRect(r * 0.34, r * 0.65, r * 0.08, r * 0.09);
-    ctx.fillRect(r * 0.34, r * 0.65, r * 0.08, r * 0.09);
+    ctx.strokeRect(-r * 0.42, r * 0.71, r * 0.08, r * 0.08);
+    ctx.fillRect(-r * 0.42, r * 0.71, r * 0.08, r * 0.08);
+    ctx.strokeRect(r * 0.34, r * 0.71, r * 0.08, r * 0.08);
+    ctx.fillRect(r * 0.34, r * 0.71, r * 0.08, r * 0.08);
 
     // Centered Black Ribbon Bow Knot
     ctx.fillStyle = '#060709';
     ctx.beginPath();
-    ctx.ellipse(0, r * 0.72, r * 0.10, r * 0.06, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, r * 0.76, r * 0.09, r * 0.05, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Left Ribbon Loop
     ctx.fillStyle = sashBlack;
     ctx.beginPath();
-    ctx.ellipse(-r * 0.14, r * 0.71, r * 0.10, r * 0.05, -0.25, 0, Math.PI * 2);
+    ctx.ellipse(-r * 0.12, r * 0.75, r * 0.09, r * 0.04, -0.25, 0, Math.PI * 2);
     ctx.fill();
 
     // Right Ribbon Loop
+    ctx.fillStyle = sashBlack;
     ctx.beginPath();
-    ctx.ellipse(r * 0.14, r * 0.71, r * 0.10, r * 0.05, 0.25, 0, Math.PI * 2);
+    ctx.ellipse(r * 0.12, r * 0.75, r * 0.09, r * 0.04, 0.25, 0, Math.PI * 2);
     ctx.fill();
 
-    // Two Dangling Ribbon Tails Trailing Down (Matching Reference Photo)
+    // Two Dangling Ribbon Tails Trailing Down
     ctx.strokeStyle = '#060709';
     ctx.lineWidth = 0.8;
     // Left Tail
     ctx.beginPath();
-    ctx.moveTo(-r * 0.04, r * 0.73);
-    ctx.lineTo(-r * 0.14, r * 0.94);
+    ctx.moveTo(-r * 0.04, r * 0.77);
+    ctx.lineTo(-r * 0.12, r * 0.94);
     ctx.lineTo(-r * 0.05, r * 0.96);
-    ctx.lineTo(0, r * 0.74);
+    ctx.lineTo(0, r * 0.78);
     ctx.closePath();
     ctx.fillStyle = sashBlack;
     ctx.fill();
@@ -237,10 +238,10 @@ export function drawTojiSkin(ctx, fighter) {
 
     // Right Tail
     ctx.beginPath();
-    ctx.moveTo(0, r * 0.74);
+    ctx.moveTo(0, r * 0.78);
     ctx.lineTo(r * 0.05, r * 0.96);
-    ctx.lineTo(r * 0.14, r * 0.94);
-    ctx.lineTo(r * 0.04, r * 0.73);
+    ctx.lineTo(r * 0.12, r * 0.94);
+    ctx.lineTo(r * 0.04, r * 0.77);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -251,24 +252,24 @@ export function drawTojiSkin(ctx, fighter) {
     ctx.lineWidth = 1.8;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(r * 0.20, r * 0.12);
-    ctx.lineTo(r * 0.36, r * 0.21);
+    ctx.moveTo(r * 0.20, r * 0.08);
+    ctx.lineTo(r * 0.36, r * 0.17);
     ctx.stroke();
 
     // Deep cut inner crease
     ctx.strokeStyle = '#4A160E';
     ctx.lineWidth = 1.0;
     ctx.beginPath();
-    ctx.moveTo(r * 0.21, r * 0.125);
-    ctx.lineTo(r * 0.35, r * 0.205);
+    ctx.moveTo(r * 0.21, r * 0.085);
+    ctx.lineTo(r * 0.35, r * 0.165);
     ctx.stroke();
 
     // Subtle upper highlight
     ctx.strokeStyle = 'rgba(255, 220, 205, 0.55)';
     ctx.lineWidth = 0.6;
     ctx.beginPath();
-    ctx.moveTo(r * 0.20, r * 0.10);
-    ctx.lineTo(r * 0.34, r * 0.19);
+    ctx.moveTo(r * 0.20, r * 0.06);
+    ctx.lineTo(r * 0.34, r * 0.15);
     ctx.stroke();
     ctx.restore();
 
@@ -316,6 +317,13 @@ export function drawTojiSkin(ctx, fighter) {
   }
 
   ctx.restore(); // End clipped body circle
+
+  // Outer Crisp Pixel Silhouette Outline (ensures fighter body never vanishes into arena floor)
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
 
   // Status Overlays (Stun, Freeze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
@@ -370,35 +378,35 @@ export function drawTojiGhostSkin(ctx, x, y, angle = 0, r = 25, alpha = 0.5, isD
 
     // B. Black Shirt Texture
     ctx.fillStyle = '#15161B';
-    ctx.fillRect(-r * 1.05, r * 0.26, r * 2.1, r * 0.40);
+    ctx.fillRect(-r * 1.05, r * 0.20, r * 2.1, r * 0.52);
 
     // Shirt Collar
     ctx.strokeStyle = '#0C0D10';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.arc(0, r * 0.16, r * 0.38, 0.2, Math.PI - 0.2);
+    ctx.arc(0, r * 0.12, r * 0.38, 0.2, Math.PI - 0.2);
     ctx.stroke();
 
     // C. White Hakama Pants Texture
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(-r * 1.05, r * 0.66, r * 2.1, r * 0.40);
+    ctx.fillStyle = '#E4E7EB';
+    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.35);
 
     // Black Sash Band
     ctx.fillStyle = '#101115';
-    ctx.fillRect(-r * 1.05, r * 0.66, r * 2.1, r * 0.07);
+    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.06);
 
     // Ribbon knot
     ctx.fillStyle = '#060709';
     ctx.beginPath();
-    ctx.ellipse(0, r * 0.72, r * 0.10, r * 0.06, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, r * 0.76, r * 0.09, r * 0.05, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // D. Lip Scar
     ctx.strokeStyle = '#7D3224';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(r * 0.20, r * 0.12);
-    ctx.lineTo(r * 0.36, r * 0.21);
+    ctx.moveTo(r * 0.20, r * 0.08);
+    ctx.lineTo(r * 0.36, r * 0.17);
     ctx.stroke();
 
     // E. Solid Jet-Black Anime Hair

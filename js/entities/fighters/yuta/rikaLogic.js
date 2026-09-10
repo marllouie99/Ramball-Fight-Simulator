@@ -161,12 +161,18 @@ export function updateRika(fighter, arena) {
   const rk = fighter.rika;
   const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
   clampRikaToArena(rk, currentArena);
+
+  // If Yuta or Rika is chained or mind-controlled by Makima, ensure Rika is NOT in time-stop stasis so she can act!
+  if ((fighter && (fighter.isChainedByMakima || fighter.isMindControlledByMakima)) || rk.isChainedByMakima || rk.isMindControlledByMakima) {
+    rk.timeStopTimer = 0;
+  }
   
   const isFrozen = (fighter.timeStopTimer > 0) || 
                    (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || 
                    (fighter.crimsonElectrifiedTimer > 0) || (fighter.isFrozenByInfinity);
                    
-  if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || fighter.pureLoveBeamBreatherTimer > 0) {
+  const isRikaDominated = Boolean(rk.isChainedByMakima || rk.isMindControlledByMakima);
+  if (!isRikaDominated && (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || fighter.pureLoveBeamBreatherTimer > 0)) {
     // Glue Rika behind Yuta's back with a smooth orbital follow delay so her position lags naturally when Yuta aims
     if (rk.beamFollowAngle === undefined) {
       rk.beamFollowAngle = fighter.gunAngle || 0;
@@ -826,17 +832,26 @@ export function updateRika(fighter, arena) {
       const contactX = (rk.x + rk.target.x) * 0.5;
       const contactY = (rk.y + rk.target.y) * 0.5;
 
-      const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+      const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
       const aoeTargets = new Set();
       aoeTargets.add(rk.target);
+
+      const isRikaDominated = Boolean(rk.isChainedByMakima || rk.isMindControlledByMakima);
+      const isYutaDominated = Boolean(fighter && (fighter.isChainedByMakima || fighter.isMindControlledByMakima));
 
       // Collect all enemy fighters in AOE radius
       if (state.fighters) {
         for (let i = 0; i < state.fighters.length; i++) {
           const enemy = state.fighters[i];
-          if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0 || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
-          const enemyTeam = state.getFighterTeam(i);
-          if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+          if (!enemy || enemy.hp <= 0 || enemy.invincibilityTimer > 0 || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+          
+          if (isRikaDominated) {
+            if (enemy === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(enemy))) continue;
+          } else {
+            if (enemy === fighter && !isYutaDominated) continue;
+            const enemyTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+            if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam && !enemy.isChainedByMakima && !enemy.isMindControlledByMakima) continue;
+          }
 
           const d = Math.hypot(enemy.x - contactX, enemy.y - contactY);
           if (d <= aoeRadius + enemy.r) {
@@ -848,8 +863,16 @@ export function updateRika(fighter, arena) {
       // Collect all enemy illusions/minions in AOE radius
       if (state.illusions) {
         for (const ill of state.illusions) {
-          if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
-          if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
+          if (!ill || ill.hp <= 0 || ill.isRika) continue;
+          if (isRikaDominated) {
+            if (ill.owner === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(ill.owner))) continue;
+          } else {
+            if (ill.owner === fighter && !isYutaDominated) continue;
+            if (myTeam !== null && ill.owner && state.getFighterTeam) {
+              const illTeam = state.getFighterTeam(state.fighters.indexOf(ill.owner));
+              if (illTeam === myTeam && !ill.owner.isChainedByMakima && !ill.owner.isMindControlledByMakima) continue;
+            }
+          }
 
           const d = Math.hypot(ill.x - contactX, ill.y - contactY);
           if (d <= aoeRadius + (ill.r || 20)) {
@@ -863,9 +886,10 @@ export function updateRika(fighter, arena) {
       const knockbackForce = CONFIG.yuta?.rikaHitKnockback || 16;
       const recoilForce = CONFIG.yuta?.rikaHitRecoil || 6;
       const hitStunDuration = CONFIG.yuta?.rikaHitStun || 12;
+      const attackOwner = isRikaDominated ? (rk._makimaChainer || rk.owner) : (fighter._makimaChainer || fighter);
 
       for (const target of aoeTargets) {
-        target.takeDamage(rikaDmg, fighter, { isPhysical: true, isRikaAttack: true });
+        target.takeDamage(rikaDmg, attackOwner, { isPhysical: true, isRikaAttack: true });
 
         const pushAngle = Math.atan2(target.y - rk.y, target.x - rk.x);
         const smashVx = Math.cos(pushAngle) * knockbackForce;
@@ -1027,17 +1051,41 @@ export function updateRika(fighter, arena) {
 }
 
 function findRikaTarget(fighter, rk) {
+  // If Makima chains Rika directly, her domination target is the Yuta who
+  // summoned her. This has priority over all regular enemy targeting.
+  if (rk.isChainedByMakima || rk.isMindControlledByMakima) {
+    const originalOwner = rk._makimaOriginalOwner || (rk.owner !== rk._makimaChainer ? rk.owner : null) || fighter;
+    if (originalOwner && originalOwner.hp > 0 && !originalOwner.isDead) {
+      rk.target = originalOwner;
+      rk.timeStopTimer = 0;
+      return;
+    }
+  }
+
+  // Retaliation: If Yuta is chained or mind-controlled by Makima, Rika prioritizes attacking Yuta!
+  if (fighter && (fighter.isChainedByMakima || fighter.isMindControlledByMakima) && fighter.hp > 0) {
+    rk.target = fighter;
+    rk.timeStopTimer = 0;
+    return;
+  }
+
   let closestDist = Infinity;
   let closestTarget = null;
-  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+  const isRikaDominated = Boolean(rk.isChainedByMakima || rk.isMindControlledByMakima);
+  const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
 
   // Check main enemy fighters
   for (let i = 0; i < state.fighters.length; i++) {
     const enemy = state.fighters[i];
-    if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0 || enemy.isStealthed || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+    if (!enemy || enemy.hp <= 0 || enemy.invincibilityTimer > 0 || enemy.isStealthed || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
     
-    const enemyTeam = state.getFighterTeam(i);
-    if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+    if (isRikaDominated) {
+      if (enemy === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(enemy))) continue;
+    } else {
+      if (enemy === fighter) continue;
+      const enemyTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+      if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam && !enemy.isChainedByMakima && !enemy.isMindControlledByMakima) continue;
+    }
 
     const dist = Math.hypot(enemy.x - rk.x, enemy.y - rk.y);
     if (dist < closestDist) {
@@ -1049,11 +1097,16 @@ function findRikaTarget(fighter, rk) {
   // Also check illusions and summoned minions (Doppelganger illusions, Hydra copies, etc.)
   if (state.illusions) {
     for (const ill of state.illusions) {
-      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
+      if (!ill || ill.hp <= 0 || ill.isRika) continue;
       
-      if (myTeam !== null && ill.owner) {
-        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ill.owner));
-        if (ownerTeam === myTeam) continue;
+      if (isRikaDominated) {
+        if (ill.owner === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(ill.owner))) continue;
+      } else {
+        if (ill.owner === fighter) continue;
+        if (myTeam !== null && ill.owner && state.getFighterTeam) {
+          const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ill.owner));
+          if (ownerTeam === myTeam && !ill.owner.isChainedByMakima && !ill.owner.isMindControlledByMakima) continue;
+        }
       }
 
       const dist = Math.hypot(ill.x - rk.x, ill.y - rk.y);

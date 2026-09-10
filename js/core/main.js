@@ -350,6 +350,16 @@ if (bgmBtn) {
   bgmBtn.innerText = getSelectedArenaBgmTrack().name;
 }
 
+if (localStorage.getItem('todo_enableTakadaBackgroundSong') !== null) {
+  if (CONFIG.todo) {
+    CONFIG.todo.enableTakadaBackgroundSong = localStorage.getItem('todo_enableTakadaBackgroundSong') === 'true';
+  }
+}
+const todoBgmBtn = document.getElementById('btn-todobgm');
+if (todoBgmBtn) {
+  todoBgmBtn.innerText = (CONFIG.todo?.enableTakadaBackgroundSong !== false) ? 'ON' : 'OFF';
+}
+
 state.performanceMode = localStorage.getItem('performanceMode') === 'true';
 const perfBtn = document.getElementById('btn-performance');
 if (perfBtn) {
@@ -537,6 +547,14 @@ export function executeTacticalAction(action) {
     localStorage.setItem('showArenaTitle', CONFIG.showArenaTitle);
     const btn = document.getElementById('btn-arenatitle');
     if (btn) btn.innerText = CONFIG.showArenaTitle ? 'ON' : 'OFF';
+  } else if (action === 'toggle-todobgm') {
+    const isEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
+    if (CONFIG.todo) {
+      CONFIG.todo.enableTakadaBackgroundSong = !isEnabled;
+    }
+    localStorage.setItem('todo_enableTakadaBackgroundSong', (!isEnabled).toString());
+    const btn = document.getElementById('btn-todobgm');
+    if (btn) btn.innerText = (!isEnabled) ? 'ON' : 'OFF';
   }
 }
 
@@ -741,6 +759,16 @@ document.getElementById('btn-bgm')?.addEventListener('click', (e) => {
   e.stopPropagation();
   const nextTrack = cycleNextArenaBgmTrack();
   e.target.innerText = nextTrack.name;
+});
+
+document.getElementById('btn-todobgm')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
+  if (CONFIG.todo) {
+    CONFIG.todo.enableTakadaBackgroundSong = !isEnabled;
+  }
+  localStorage.setItem('todo_enableTakadaBackgroundSong', (!isEnabled).toString());
+  e.target.innerText = (!isEnabled) ? 'ON' : 'OFF';
 });
 
 // Initialize initial menu view on boot

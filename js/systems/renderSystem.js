@@ -386,7 +386,6 @@ export function renderGame() {
         drawSaitamaSpeedLines(); // Manga action speed lines during Consecutive Normal Punches
         drawIchigoBankaiSpeedLines(); // Supersonic Bankai manga speed lines during Ichigo dashes/swings
         drawMahoragaSpeedLines(); // Supersonic manga action speed lines during Mahoraga wall slam dash/strike/blitz
-        drawTojiSpeedLines(); // Supersonic manga action speed lines during Toji stealth ambush & Katana slashes
         // Draw character ground telegraphs & targeting reticles UNDERNEATH fighters
         if (state.fighters) {
           for (const f of state.fighters) {

@@ -441,9 +441,9 @@ export function drawFighters() {
     }
 
     // Makima Chains of Domination Body-Wrapping Chains & Subjugation Collar Overlay
-    if (fighter.isChainedByMakima && fighter._makimaChainer && fighter._makimaChainer.isChainingActive) {
+    if (fighter.isChainedByMakima) {
       ctx.save();
-      drawTargetChainsOverlay(ctx, fighter, fighter._makimaChainer);
+      drawTargetChainsOverlay(ctx, fighter, fighter._makimaChainer || null);
       ctx.restore();
     }
 
@@ -455,11 +455,9 @@ export function drawFighters() {
       ctx.restore();
     }
 
-    // ── TOJI ULTIMATE HIGHLIGHT PASS: Both Toji and the Enemy Target get highlighted ──
+    // ── TOJI ULTIMATE HIGHLIGHT PASS: Ethereal Violet Rim Glow around Toji ──
     const activeTojiUlt = fighters ? fighters.find(f => f && (f.characterId === 'toji' || f.type === 'toji') && f.ultimateActive) : null;
-    if (activeTojiUlt && (fighter === activeTojiUlt || fighter === activeTojiUlt.ultimateTarget)) {
-      const isToji = (fighter === activeTojiUlt);
-      const target = activeTojiUlt.ultimateTarget;
+    if (activeTojiUlt && fighter === activeTojiUlt) {
       if (fighter.hp > 0) {
         ctx.save();
         ctx.translate(fighter.x + shiverX, (fighter.y - (fighter.z || 0)) + shiverY);
@@ -468,63 +466,18 @@ export function drawFighters() {
         const now = Date.now();
         const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
 
-        if (isToji) {
-          // 1. Ethereal Violet / Pure White Cursed Energy Rim Glow around Toji
-          ctx.strokeStyle = `rgba(215, 140, 255, ${0.75 + 0.25 * pulse})`;
-          ctx.lineWidth = 3.2;
-          ctx.beginPath();
-          ctx.arc(0, 0, fr + 3, 0, Math.PI * 2);
-          ctx.stroke();
+        // Ethereal Violet / Pure White Cursed Energy Rim Glow around Toji
+        ctx.strokeStyle = `rgba(215, 140, 255, ${0.75 + 0.25 * pulse})`;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, fr + 3, 0, Math.PI * 2);
+        ctx.stroke();
 
-          ctx.strokeStyle = `rgba(255, 255, 255, ${0.60 + 0.35 * pulse})`;
-          ctx.lineWidth = 1.6;
-          ctx.beginPath();
-          ctx.arc(0, 0, fr + 1.5, 0, Math.PI * 2);
-          ctx.stroke();
-        } else if (target && fighter === target) {
-          // 2. Threat Lock-On Crimson Halo & Tactical Brackets on the Enemy Target
-          ctx.strokeStyle = `rgba(255, 45, 90, ${0.80 + 0.20 * pulse})`;
-          ctx.lineWidth = 3.2;
-          ctx.beginPath();
-          ctx.arc(0, 0, fr + 3, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = `rgba(255, 255, 255, ${0.70 + 0.25 * pulse})`;
-          ctx.lineWidth = 1.6;
-          ctx.beginPath();
-          ctx.arc(0, 0, fr + 1.5, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Tactical Target Brackets (4 corners)
-          const bLen = 8;
-          const bDist = fr + 7 + pulse * 2;
-          ctx.strokeStyle = `rgba(255, 50, 90, ${0.85 + 0.15 * pulse})`;
-          ctx.lineWidth = 2.0;
-          // Top-Left
-          ctx.beginPath();
-          ctx.moveTo(-bDist, -bDist + bLen);
-          ctx.lineTo(-bDist, -bDist);
-          ctx.lineTo(-bDist + bLen, -bDist);
-          ctx.stroke();
-          // Top-Right
-          ctx.beginPath();
-          ctx.moveTo(bDist - bLen, -bDist);
-          ctx.lineTo(bDist, -bDist);
-          ctx.lineTo(bDist, -bDist + bLen);
-          ctx.stroke();
-          // Bottom-Left
-          ctx.beginPath();
-          ctx.moveTo(-bDist, bDist - bLen);
-          ctx.lineTo(-bDist, bDist);
-          ctx.lineTo(-bDist + bLen, bDist);
-          ctx.stroke();
-          // Bottom-Right
-          ctx.beginPath();
-          ctx.moveTo(bDist - bLen, bDist);
-          ctx.lineTo(bDist, bDist);
-          ctx.lineTo(bDist, bDist - bLen);
-          ctx.stroke();
-        }
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.60 + 0.35 * pulse})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(0, 0, fr + 1.5, 0, Math.PI * 2);
+        ctx.stroke();
 
         ctx.restore();
       }
@@ -1331,6 +1284,9 @@ export function drawIllusions() {
         ctx.restore();
         drawSoulDisfigurementCounter(ctx, illusion.x, illusion.y, illusion.r, illusion._soulDisfigurementStacks, illusion._soulDisfigurementTimer);
       }
+      if (illusion.isChainedByMakima) {
+        drawTargetChainsOverlay(ctx, illusion, illusion._makimaChainer || null);
+      }
       continue; // Skip standard doppelganger loop
     }
 
@@ -1377,7 +1333,7 @@ export function drawIllusions() {
 
     const isIllusionStunned = Boolean(
       (illusion.paralyzeTimer && illusion.paralyzeTimer > 0) ||
-      (illusion.timeStopTimer && illusion.timeStopTimer > 0) ||
+      (illusion.timeStopTimer && illusion.timeStopTimer > 0 && !illusion.suppressFreezeOverlay && !illusion.isChainedByMakima) ||
       (illusion.electricStunTimer && illusion.electricStunTimer > 0) ||
       (illusion.hitStunTimer && illusion.hitStunTimer > 0) ||
       illusion.isParalyzed ||
@@ -1395,32 +1351,15 @@ export function drawIllusions() {
       drawParalyzeEffect(ctx, illusion.r || 25, isMahito, dur, color, illusion);
     }
 
-    // Makima Chains of Domination Body-Wrapping Chains & Subjugation Collar Overlay
-    if (illusion.isChainedByMakima && illusion._makimaChainer && illusion._makimaChainer.isChainingActive) {
-      ctx.save();
-      drawTargetChainsOverlay(ctx, illusion, illusion._makimaChainer);
-      ctx.restore();
-    }
-
-    if (illusion._embeddedMahitoSpikes && illusion._embeddedMahitoSpikes.length > 0) {
-      drawEmbeddedMahitoSpikes(ctx, illusion.r, illusion);
-    }
-
-    // Global hit flash visual effect
-    if (illusion.hitFlashTimer > 0) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.beginPath();
-      ctx.arc(0, 0, illusion.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${illusion.hitFlashTimer / 8})`;
-      ctx.fill();
-      ctx.restore();
-    }
-
     // Draw floating minion healthbar above head
     ctx.rotate(-illusion.angle);
     drawMinionHealthBar(ctx, 0, -illusion.r - 14, Math.max(32, illusion.r * 1.4), 6, illusion.hp, illusion.maxHp || 100, illusion.color || '#A855F7');
     ctx.restore();
+
+    // Makima Chains of Domination Body-Wrapping Chains & Subjugation Collar Overlay
+    if (illusion.isChainedByMakima) {
+      drawTargetChainsOverlay(ctx, illusion, illusion._makimaChainer || null);
+    }
 
     // Draw illusion sword (always visible, not just during swings)
     drawDopplegangerPurpleSword(
