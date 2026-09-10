@@ -671,6 +671,50 @@ export const SKILL_SOUNDS = {
       volume: 0.55,
       delay: 0
     }
+  },
+
+  // ── Reze (The Bomb Devil) ───────────────────
+  'reze': {
+    pinpull: {
+      src: 'Assets/Sound Effects/Skills/parry.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    sparkburst: {
+      src: 'Assets/Sound Effects/Attacks/flamespray1.mp3',
+      volume: 0.70,
+      delay: 0
+    },
+    sparkexplosion: {
+      src: 'Assets/Sound Effects/Attacks/explosion.mp3',
+      volume: 0.65,
+      delay: 0
+    },
+    decoyblast: {
+      src: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    rocketjet: {
+      src: 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
+      volume: 0.80,
+      delay: 0
+    },
+    nukecharge: {
+      src: 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    nukedive: {
+      src: 'Assets/Sound Effects/Skills/fugatravel.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    nukeimpact: {
+      src: 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3',
+      volume: 1.0,
+      delay: 0
+    }
   }
 };
 
@@ -713,6 +757,8 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS[29] || SKILL_SOUNDS['ichigo'];
     } else if (strKey.includes('rubbick') || strKey.includes('trickster')) {
       fighterConfig = SKILL_SOUNDS[18] || SKILL_SOUNDS['rubbick'];
+    } else if (strKey.includes('reze')) {
+      fighterConfig = SKILL_SOUNDS['reze'];
     }
   }
 
@@ -779,6 +825,8 @@ export function getFighterSkillSoundPaths(idOrType) {
       fighterConfig = SKILL_SOUNDS[29] || SKILL_SOUNDS['ichigo'];
     } else if (strKey.includes('rubbick') || strKey.includes('trickster')) {
       fighterConfig = SKILL_SOUNDS[18] || SKILL_SOUNDS['rubbick'];
+    } else if (strKey.includes('reze')) {
+      fighterConfig = SKILL_SOUNDS['reze'];
     }
   }
 

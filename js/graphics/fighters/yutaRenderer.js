@@ -1051,6 +1051,7 @@ export class YutaRenderer {
   }
 
   static _drawRikaCursedEnergyAura(ctx, fighter, opponent, renderState = null) {
+    if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
     const rk = fighter.rika;
     if (!rk) return;
 
@@ -1339,11 +1340,12 @@ export class YutaRenderer {
   }
 
   static _drawYutaCursedEnergyAura(ctx, fighter) {
+    if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+
     const isRCT = (fighter.rctRevivalTimer > 0) || (fighter.rctHealTimer > 0);
-    const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
 
     let activeMultiplier = fighter.cursedEnergyAlpha || 0;
-    if (isRCT || isCountdown || fighter._isWinnerReveal || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0)) {
+    if (isRCT || fighter._isWinnerReveal || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0)) {
       activeMultiplier = 1.0;
     }
     if (activeMultiplier <= 0.01) return;

@@ -78,6 +78,7 @@ const _BANGS_COORDS = [
  * Zero floating objects, zero pulsing scaling (Rule 11 compliant).
  */
 export function drawNanamiCursedEnergyAura(ctx, fighter) {
+  if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
   const r = fighter.r || 25;
   const isOvertime = Boolean(fighter.isOvertimeActive || ((fighter.hp / (fighter.maxHp || 420)) <= 0.40));
   
@@ -309,7 +310,7 @@ export function drawNanamiSkin(ctx, fighter) {
 
   // 1. Draw JJK Cursed Energy Aura when in close combat or Overtime
   // Delegates all alpha/gating logic to drawNanamiCursedEnergyAura itself.
-  if (!fighter._isWinnerReveal) {
+  if (!fighter._isWinnerReveal && (typeof state === 'undefined' || state.gameState !== 'countdown')) {
     drawNanamiCursedEnergyAura(ctx, fighter);
   }
 

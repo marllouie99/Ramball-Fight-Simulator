@@ -65,7 +65,7 @@ export function drawMegumiFist(ctx, x, y, radius, skinColor = '#FFE0BD', fighter
   ctx.stroke();
 
   // Subtle Seafoam / Jade Cursed Energy Wisps around hands if channeling
-  if (fighter && (fighter.combatAuraOpacity > 0.1 || fighter.isSubmerged || fighter.totalityActive)) {
+  if (fighter && (typeof state === 'undefined' || state.gameState !== 'countdown') && (fighter.combatAuraOpacity > 0.1 || fighter.isSubmerged || fighter.totalityActive)) {
     const auraAlpha = Math.min(1.0, (fighter.combatAuraOpacity || 0.6) * 0.7);
     ctx.strokeStyle = `rgba(46, 230, 168, ${auraAlpha})`;
     ctx.lineWidth = 1.4;

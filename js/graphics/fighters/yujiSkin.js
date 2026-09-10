@@ -344,9 +344,10 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter) {
   const glow = Math.max(aura, (charge / chargeMax) * 0.85);
 
   // 1. CE glow around fist — fast texture blit instead of per-frame createRadialGradient
+  const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
-  if (!isLowQuality && (glow > 0.01 || fighter.blackFlashTimer > 0)) {
+  if (!isCountdown && !isLowQuality && (glow > 0.01 || fighter.blackFlashTimer > 0)) {
     _initYujiGlowCanvases();
     const activeGlow = fighter.blackFlashTimer > 0 ? 1.0 : glow;
     const glowCanvas = fighter.blackFlashTimer > 0 ? _bfGlowCanvas : (isSukunaForm ? _sukunaGlowCanvas : _blueGlowCanvas);

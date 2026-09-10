@@ -387,7 +387,7 @@ export class GojoRenderer {
         fighter._drawJJKCursedEnergyAura(ctx, 'purple');
       } else if (fighter.isChannelingRCT || fighter.healingAuraTimer > 0) {
         fighter._drawJJKCursedEnergyAura(ctx, 'rct');
-      } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.isChannelingDomainExpansion || fighter.isMeleeMode || fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
+      } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.isChannelingDomainExpansion || fighter.isMeleeMode || fighter.combatAuraOpacity > 0 || fighter._isWinnerReveal)) {
         fighter._drawJJKCursedEnergyAura(ctx, 'blue');
       }
     }
@@ -777,6 +777,8 @@ export class GojoRenderer {
    * Smooth, flowing flame silhouette with thick dark ink contour (not spiky).
    */
   static _drawJJKCursedEnergyAura(ctx, fighter, colorTheme = 'blue', overrideX = null, overrideY = null, overrideRadius = null) {
+    if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+
     // Calculate smooth fade-in & fade-out progress
     let progress = 1.0;
     if (overrideX !== null) {

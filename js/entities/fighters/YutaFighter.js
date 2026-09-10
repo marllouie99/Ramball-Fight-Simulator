@@ -671,7 +671,7 @@ export class YutaFighter extends Fighter {
     const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
     // Suppress CE aura when frozen by Gojo's domain (time stop / hit stun)
     const isFrozenByDomain = (this.timeStopTimer > 0) || (this.hitStunTimer > 0);
-    const targetAura = (!isFrozenByDomain && (this.isChannelingDomain || this.domainActive || (this.rikaCallTimer > 0) || (this.rika && this.rika.active) || isCountdown)) ? 1.0 : 0.0;
+    const targetAura = (!isCountdown && !isFrozenByDomain && (this.isChannelingDomain || this.domainActive || (this.rikaCallTimer > 0) || (this.rika && this.rika.active))) ? 1.0 : 0.0;
     if (this.cursedEnergyAlpha === undefined) this.cursedEnergyAlpha = 0;
     if (this.cursedEnergyAlpha < targetAura) {
       this.cursedEnergyAlpha = Math.min(targetAura, this.cursedEnergyAlpha + 0.04); // Fades in over ~25 frames

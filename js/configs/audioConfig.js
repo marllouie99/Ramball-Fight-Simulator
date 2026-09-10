@@ -31,6 +31,8 @@ export const AUDIO_CONFIG = {
   'skill_domainexpansion': 'Assets/Sound Effects/Skills/domainexpansion.mp3',
   'skill_enhance': 'Assets/Sound Effects/Skills/enhance.mp3',
   'skill_fuga': 'Assets/Sound Effects/Skills/fuga.mp3',
+  'skill_fuga_explode': 'Assets/Sound Effects/Skills/fugaexplode.mp3',
+  'fuga_explode': 'Assets/Sound Effects/Skills/fugaexplode.mp3',
   'skill_gojodomain': 'Assets/Sound Effects/Skills/gojodomain.mp3',
   'skill_machinebroken': 'Assets/Sound Effects/Skills/machinebroken.mp3',
   'skill_mixing': 'Assets/Sound Effects/Skills/mixing.mp3',
@@ -103,5 +105,15 @@ export const AUDIO_CONFIG = {
   'skill_cj_intro_voiceline': 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3',
   'skill_cj_respectoverlay_bgmusic': 'Assets/Sound Effects/Skills/cj-respectoverlay-bgmusic.mp3',
   'skill_cj_typeclick1letter_noise': 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3',
-  'typeClickNoise': 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3'
+  'typeClickNoise': 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3',
+
+  // Reze (Bomb Devil)
+  'skill_reze_pin_pull': 'Assets/Sound Effects/Skills/parry.mp3',
+  'skill_reze_spark_burst': 'Assets/Sound Effects/Attacks/flamespray1.mp3',
+  'skill_reze_explosion_small': 'Assets/Sound Effects/Attacks/explosion.mp3',
+  'skill_reze_explosion_large': 'Assets/Sound Effects/Skills/fugaexplode.mp3',
+  'skill_reze_rocket_jet': 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
+  'skill_reze_nuke_charge': 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
+  'skill_reze_nuke_dive': 'Assets/Sound Effects/Skills/fugatravel.mp3',
+  'skill_reze_nuke_impact': 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3'
 };

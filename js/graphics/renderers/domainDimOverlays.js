@@ -2,6 +2,7 @@ import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { worldToScreen } from '../../systems/cameraSystem.js';
 import { isInsideRubbickStolenVoid } from '../../entities/fighters/rubbick/rubbickThemes.js';
+import { isTodoTakadaOverlayActive } from './specialOverlayRenderer.js';
 
 // ──────────────────────────────────────────
 // GOJO INFINITY CUTOUT HELPER
@@ -178,6 +179,7 @@ let currentPurpleDimOpacity = 0;
  * actively moving as a projectile, or in post-fire recovery.
  */
 export function drawPurpleDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
@@ -391,6 +393,7 @@ let currentGojoDomainDimOpacity = 0;
  * Draws a dark cosmic blue dim screen overlay when Gojo's Domain Expansion (Unlimited Void) is active.
  */
 export function drawGojoDomainDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
@@ -464,6 +467,7 @@ let currentRubbickDomainDimOpacity = 0;
  * Draws a dark arcane emerald green dim screen overlay when Rubbick's stolen Domain Expansion (Unlimited Void) is active or channeling.
  */
 export function drawRubbickDomainDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
@@ -537,6 +541,7 @@ let currentSukunaDomainDimOpacity = 0;
  * Draws a dark crimson/blood-red dim screen overlay when Sukuna's Domain Expansion (Malevolent Shrine) is active.
  */
 export function drawSukunaDomainDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
@@ -609,6 +614,7 @@ let currentYutaDomainDimOpacity = 0;
  * Draws a dark cursed pink/magenta-rose dim screen overlay matching Yuta's Authentic Mutual Love Domain Expansion.
  */
 export function drawYutaDomainDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
@@ -681,6 +687,7 @@ let currentMahitoDomainDimOpacity = 0;
  * Draws a dark cursed purple dim screen overlay when Mahito's Domain Expansion (Self-Embodiment of Perfection) is active or channeling.
  */
 export function drawMahitoDomainDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
@@ -787,6 +794,7 @@ function loadHollowMaskOverlayImage() {
 }
 
 export function drawTojiUltimateOverlay() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
@@ -908,6 +916,7 @@ export function drawTojiUltimateOverlay() {
  * Draws a dark golden cinematic dim screen overlay when Mahoraga adapts and rotates his 3D Dharma Wheel.
  */
 export function drawMahoragaAdaptationDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   if (CONFIG.mahoraga?.enableGoldenScreenDim === false) return;
 
   const { ctx, canvas, arena } = state;
@@ -1082,6 +1091,7 @@ function _drawPaintSplatter(ctx, cx, cy, scale = 1.0, color = '#E50018', bgDark 
  * Draws a high-contrast 7:3 Ratio ruler and graphic paint splatter overlay when Nanami lands a 7:3 Ratio Crit.
  */
 export function drawNanamiRatioCritDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   if (CONFIG.nanami?.enableRatioDimScreen === false) return;
 
   const { ctx, canvas, arena } = state;
@@ -1206,6 +1216,7 @@ export function drawNanamiRatioCritDimScreen() {
 let currentMahoLevel8DimOpacity = 0;
 
 export function drawMahoragaLevel8DimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
@@ -1353,6 +1364,7 @@ export function drawMahoragaLevel8DimScreen() {
 }
 
 export function drawSaitamaSeriousPunchDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
@@ -1674,6 +1686,7 @@ function _initBankaiBurstSeeds() {
 }
 
 export function drawBankaiImpactDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 

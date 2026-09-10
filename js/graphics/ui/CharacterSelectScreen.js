@@ -655,6 +655,29 @@ function drawFighterSelectModal() {
 
   // Stat Bars
   let textY = detailY + 146;
+  if (selectedDef.type === 'reze') {
+    const isHybrid = Boolean(state.showRezeTransformation);
+    drawButton(
+      isHybrid ? '💣 BOMB DEVIL' : '🌸 HUMAN FORM',
+      previewX,
+      detailY + 142,
+      () => {
+        state.showRezeTransformation = !state.showRezeTransformation;
+        try {
+          if (state.showRezeTransformation) {
+            audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
+          } else {
+            audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+          }
+        } catch (e) {}
+      },
+      115,
+      18,
+      isHybrid ? '#b81c3b' : null,
+      3
+    );
+    textY += 20;
+  }
   const barW = detailW - 20;
   const barX = detailX + 10;
 

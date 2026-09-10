@@ -57,7 +57,8 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
  * Renders JJK-authentic Cursed Energy Flame Aura engulfing Mahito.
  * Uses the exact same Sakuga JJK Cursed Energy engine as Gojo, Yuji, and Todo (recolored to Mahito's magenta/violet theme).
  */
-function drawMahitoCursedEnergyAura(ctx, fighter) {
+export function drawMahitoCursedEnergyAura(ctx, fighter) {
+  if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
   if (typeof GojoRenderer !== 'undefined' && typeof GojoRenderer._drawJJKCursedEnergyAura === 'function') {
     // When split into clones, only the chosen clone with hasCursedEnergyAura renders the CE aura!
     if (fighter.isEvading || fighter.isEvasionMinion) {

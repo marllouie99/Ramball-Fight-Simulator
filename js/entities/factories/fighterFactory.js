@@ -41,6 +41,7 @@ import { CJFighter } from '../fighters/CJFighter.js';
 import { UryuFighter } from '../fighters/UryuFighter.js';
 import { UlquiorraFighter } from '../fighters/UlquiorraFighter.js';
 import { MakimaFighter } from '../fighters/MakimaFighter.js';
+import { RezeFighter } from '../fighters/RezeFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -89,6 +90,7 @@ export const FIGHTER_CLASS_MAP = {
   'ulquiorra': UlquiorraFighter,
   'ulquiorra_cifer': UlquiorraFighter,
   'makima':    MakimaFighter,
+  'reze':      RezeFighter,
   'rifle':     RifleFighter,
   'm4a1':      RifleFighter,
   'shotgun':   ShotgunFighter,

@@ -6,6 +6,7 @@ import { GAME_MODES } from '../core/modeConfig.js';
 import { state, registerProjectileSystem, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound, fadeOutSound, fadeOutSoundBySrc } from './soundSystem.js';
+import { audioSystem } from './audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
@@ -871,6 +872,22 @@ class ProjectileSystem {
     // Play explosion sound
     const fugaExplodeSound = getSkillSound(attacker?._def?.id || 'sukuna', 'fuga_explode');
     const explodeSnd = CONFIG.sukuna?.sounds?.fugaExplosion || (fugaExplodeSound ? fugaExplodeSound.src : 'Assets/Sound Effects/Skills/fugaexplode.mp3');
+    const explodeVol = (typeof CONFIG.sukuna?.soundVolumes?.fugaExplosion === 'number')
+      ? CONFIG.sukuna.soundVolumes.fugaExplosion
+      : (fugaExplodeSound ? (fugaExplodeSound.volume || 1.5) : 1.5);
+
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX(explodeSnd, explodeVol);
+      const blastSnd = CONFIG.sukuna?.sounds?.thermobaricExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3';
+      const blastVol = (typeof CONFIG.sukuna?.soundVolumes?.thermobaricExplosion === 'number')
+        ? CONFIG.sukuna.soundVolumes.thermobaricExplosion
+        : 0.55;
+      if (blastSnd) {
+        audioSystem.playSFX(blastSnd, blastVol);
+      }
+    } else if (typeof playSound === 'function') {
+      playSound(explodeSnd, explodeVol);
+    }
     const impactShake = CONFIG.sukuna?.divineFlameShakeIntensity || 30;
     const impactDuration = CONFIG.sukuna?.divineFlameShakeDuration || 25;
     triggerGlobalScreenShake(impactShake, impactDuration);
@@ -942,9 +959,6 @@ class ProjectileSystem {
       x, y, radius: Math.max(25, splashRadius * 0.12), maxRadius: splashRadius, life: 90, maxLife: 90,
       cracks, debris, rimPoints, seed: Math.random()
     });
-
-    const sound = getSkillEffectSound('explosion');
-    if (sound) playSound(sound.src, sound.volume || 0.8);
 
     if (state.fighters) {
       const myTeam = (typeof state.getFighterTeam === 'function' && typeof ownerIndex === 'number') ? state.getFighterTeam(ownerIndex) : null;

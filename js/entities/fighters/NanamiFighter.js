@@ -541,7 +541,7 @@ export class NanamiFighter extends Fighter {
 
     const isDoingMeleeCombat = inMeleeRange || this.slashSwingTimer > 0 || this.punchAnimTimer > 0 || this.isOvertimeActive;
     if (typeof state !== 'undefined' && state.gameState === 'countdown') {
-      this.combatAuraOpacity = 1.0;
+      this.combatAuraOpacity = 0.0;
     } else if (isDoingMeleeCombat) {
       this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.12);
     } else {

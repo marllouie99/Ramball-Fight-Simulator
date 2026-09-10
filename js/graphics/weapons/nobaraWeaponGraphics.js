@@ -24,7 +24,8 @@ export function drawNobaraHammer(ctx, x = 0, y = 0, angle = 0, r = 25, isSwingin
   const hScale = r / 25; // Proportional scale
 
   // 1. Cursed Energy Ambient Aura / Black Flash Sparks around Hammer Head
-  if (isBlackFlash) {
+  const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+  if (!isCountdown && isBlackFlash) {
     // Red-Black spatial lightning aura
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 3.5;
@@ -37,7 +38,7 @@ export function drawNobaraHammer(ctx, x = 0, y = 0, angle = 0, r = 25, isSwingin
     ctx.beginPath();
     ctx.arc(14 * hScale, -2 * hScale, 12.5 * hScale, 0, Math.PI * 2);
     ctx.stroke();
-  } else {
+  } else if (!isCountdown) {
     // Subtle Deep Rose Cursed Energy Shimmer
     const glowGrad = ctx.createRadialGradient(14 * hScale, -2 * hScale, 2 * hScale, 14 * hScale, -2 * hScale, 14 * hScale);
     glowGrad.addColorStop(0, 'rgba(217, 78, 104, 0.45)');

@@ -612,8 +612,10 @@ export class MahitoFighter extends Fighter {
 
       // Smooth Cursed Energy opacity
       const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
-      const isCombatActive = this.punchAnimTimer > 0 || this.twinScissorAnimTimer > 0 || this.isTransformed || isCountdown || this._isWinnerReveal;
-      if (isCombatActive) {
+      const isCombatActive = !isCountdown && (this.punchAnimTimer > 0 || this.twinScissorAnimTimer > 0 || this.isTransformed || this._isWinnerReveal);
+      if (isCountdown) {
+        this.combatAuraOpacity = 0.0;
+      } else if (isCombatActive) {
         this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.12);
       } else {
         this.combatAuraOpacity = Math.max(0.0, (this.combatAuraOpacity || 0) - 0.04);
@@ -675,8 +677,10 @@ export class MahitoFighter extends Fighter {
 
       // Smooth Cursed Energy opacity
       const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
-      const isCombatActive = this.punchAnimTimer > 0 || this.fleshSurgeAnimTimer > 0 || this.isTransformed || isCountdown || this._isWinnerReveal;
-      if (isCombatActive) {
+      const isCombatActive = !isCountdown && (this.punchAnimTimer > 0 || this.fleshSurgeAnimTimer > 0 || this.isTransformed || this._isWinnerReveal);
+      if (isCountdown) {
+        this.combatAuraOpacity = 0.0;
+      } else if (isCombatActive) {
         this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.12);
       } else {
         this.combatAuraOpacity = Math.max(0.0, (this.combatAuraOpacity || 0) - 0.04);
@@ -746,8 +750,10 @@ export class MahitoFighter extends Fighter {
     // Dynamic Cursed Energy combat aura opacity management
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
     const isDoingClawAttack = this.punchAnimTimer > 0 && this.morphType === 'claw';
-    const isCombatActive = isCountdown || this._isWinnerReveal || isDoingClawAttack;
-    if (isCombatActive) {
+    const isCombatActive = !isCountdown && (this._isWinnerReveal || isDoingClawAttack);
+    if (isCountdown) {
+      this.combatAuraOpacity = 0.0;
+    } else if (isCombatActive) {
       this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.12);
     } else {
       this.combatAuraOpacity = Math.max(0.0, (this.combatAuraOpacity || 0) - 0.04);

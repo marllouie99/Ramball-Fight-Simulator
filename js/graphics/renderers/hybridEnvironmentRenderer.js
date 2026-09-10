@@ -6,6 +6,7 @@ import { renderYutaDomainBackground, renderYutaSukunaDomainClashRift } from '../
 import { renderMahitoDomainBackground } from './environmentalRenderer.js';
 import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
 import { drawCronosSphereVisual } from '../draw.js';
+import { isTodoTakadaOverlayActive } from './specialOverlayRenderer.js';
 
 let furnaceDimSprite = null;
 let currentFurnaceDimOpacity = 0;
@@ -391,6 +392,69 @@ function getRubbickDomainHybridData() {
 
 export function updateHybridEnvironment() {
   if (!state.pixiApp || !state.pixiLayers?.environment || !state.pixiLayers?.effects) return;
+
+  if (typeof state !== 'undefined' && state.disableDimEffects) {
+    if (gojoDomainHybridData?.sprite?.parent) {
+      if (gojoArenaMask?.parent) gojoArenaMask.parent.removeChild(gojoArenaMask);
+      gojoArenaMask = null;
+      gojoDomainHybridData.sprite.mask = null;
+      gojoDomainHybridData.sprite.parent.removeChild(gojoDomainHybridData.sprite);
+    }
+    if (rubbickDomainHybridData?.sprite?.parent) {
+      if (rubbickArenaMask?.parent) rubbickArenaMask.parent.removeChild(rubbickArenaMask);
+      rubbickArenaMask = null;
+      rubbickDomainHybridData.sprite.mask = null;
+      rubbickDomainHybridData.sprite.parent.removeChild(rubbickDomainHybridData.sprite);
+    }
+    if (sukunaDomainHybridData?.sprite?.parent) {
+      if (sukunaArenaMask?.parent) sukunaArenaMask.parent.removeChild(sukunaArenaMask);
+      sukunaArenaMask = null;
+      sukunaDomainHybridData.sprite.mask = null;
+      sukunaDomainHybridData.sprite.parent.removeChild(sukunaDomainHybridData.sprite);
+    }
+    if (yutaDomainHybridData?.sprite?.parent) {
+      if (yutaArenaMask?.parent) yutaArenaMask.parent.removeChild(yutaArenaMask);
+      yutaArenaMask = null;
+      yutaDomainHybridData.sprite.mask = null;
+      yutaDomainHybridData.sprite.parent.removeChild(yutaDomainHybridData.sprite);
+    }
+    if (mahitoDomainHybridData?.sprite?.parent) {
+      if (mahitoArenaMask?.parent) mahitoArenaMask.parent.removeChild(mahitoArenaMask);
+      mahitoArenaMask = null;
+      mahitoDomainHybridData.sprite.mask = null;
+      mahitoDomainHybridData.sprite.parent.removeChild(mahitoDomainHybridData.sprite);
+    }
+    if (furnaceDimSprite?.parent) furnaceDimSprite.parent.removeChild(furnaceDimSprite);
+    if (purpleDimSprite?.parent) purpleDimSprite.parent.removeChild(purpleDimSprite);
+    if (greenDimSprite?.parent) greenDimSprite.parent.removeChild(greenDimSprite);
+    if (mahoragaDimSprite?.parent) mahoragaDimSprite.parent.removeChild(mahoragaDimSprite);
+    if (tojiUltimateContainer?.parent) {
+      for (const head of activeFlyHeads) {
+        releaseFlyHeadSprite(head.sprite);
+      }
+      activeFlyHeads.length = 0;
+      if (tojiArenaMask?.parent) {
+        tojiArenaMask.parent.removeChild(tojiArenaMask);
+        tojiArenaMask = null;
+      }
+      tojiUltimateContainer.mask = null;
+      tojiUltimateContainer.parent.removeChild(tojiUltimateContainer);
+    }
+    if (rikaSummonDimSprite?.parent) rikaSummonDimSprite.parent.removeChild(rikaSummonDimSprite);
+    if (rikaRingSprite?.parent) rikaRingSprite.parent.removeChild(rikaRingSprite);
+    if (baguvixDimSprite?.parent) baguvixDimSprite.parent.removeChild(baguvixDimSprite);
+    if (baguvixRingSprite?.parent) baguvixRingSprite.parent.removeChild(baguvixRingSprite);
+
+    currentFurnaceDimOpacity = 0;
+    currentPurpleDimOpacity = 0;
+    currentTojiUltimateOpacity = 0;
+    currentRikaSummonDimOpacity = 0;
+    currentBaguvixDimOpacity = 0;
+    state.globalDimOpacity = 0;
+    state.globalDimEdgeColor = null;
+    return;
+  }
+
   const layer = state.pixiLayers.environment;
   const dimLayer = state.pixiLayers.effects;
   const maxDim = Math.max(state.canvas.width, state.canvas.height);

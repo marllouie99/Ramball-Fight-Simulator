@@ -176,11 +176,14 @@ export class TodoFighter extends Fighter {
     super.update(opponent, ownerIndex, arena);
 
     // Smoothly transition Todo's Cursed Energy aura opacity
-    const wantsAura = (this.clapAnimTimer > 0) || (this.clapWindupTimer > 0) || (this.rockCounterComboLeft > 0) || (this.punchAnimTimer > 0) || (this.justSwappedTimer > 0);
-    if (wantsAura) {
-      this.combatAuraOpacity = Math.min(1.0, this.combatAuraOpacity + 0.12);
+    const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+    const wantsAura = !isCountdown && ((this.clapAnimTimer > 0) || (this.clapWindupTimer > 0) || (this.rockCounterComboLeft > 0) || (this.punchAnimTimer > 0) || (this.justSwappedTimer > 0));
+    if (isCountdown) {
+      this.combatAuraOpacity = 0.0;
+    } else if (wantsAura) {
+      this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.12);
     } else {
-      this.combatAuraOpacity = Math.max(0.0, this.combatAuraOpacity - 0.05); // Smooth fade-out
+      this.combatAuraOpacity = Math.max(0.0, (this.combatAuraOpacity || 0) - 0.05); // Smooth fade-out
     }
 
     // Targets already extracted at top of update() for cursed rock updates

@@ -105,6 +105,7 @@ export const gojoConfig = {
   domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
   domainPostSlowDuration: 180, // 3.0s slow movement debuff after domain expires
   domainPostSlowMultiplier: 0.35, // 35% movement speed while debuffed after domain
+  domainPunchDamageMultiplier: 1.0, // Damage multiplier for martial arts punches inside Unlimited Void (1.5 = 150% damage)
 
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing

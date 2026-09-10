@@ -14,7 +14,7 @@ import {
   drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
-  drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
+  drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
   drawDroppedMiniguns, updateDroppedMiniguns
@@ -313,24 +313,28 @@ export function renderGame() {
         }
 
         // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Static, Un-shaken background environment) ──
-        drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
-        updateHybridEnvironment(); // WebGL & 2D full-screen dim effects (Gojo Purple, Sukuna Fuga, Mahoraga adaptation)
-        drawPurpleDimScreen(); // 2D Gojo Hollow Purple radial dim overlay
-        drawFurnaceDimScreen(); // 2D Sukuna Fuga Furnace radial dim overlay
-        drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
-        drawCjBaguvixDimScreen(); // 2D CJ BAGUVIX God Mode dark Grove Street emerald green radial dim overlay
-        drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
-        drawGojoDomainDimScreen(); // Dark cosmic blue dim overlay when Gojo's Unlimited Void domain is active (full-screen, unclipped)
-        drawRubbickDomainDimScreen(); // Dark cosmic emerald green dim overlay when Rubbick's stolen Unlimited Void domain is active (full-screen, unclipped)
-        drawSukunaDomainDimScreen(); // Dark crimson dim overlay when Sukuna's Malevolent Shrine domain is active (full-screen, unclipped)
-        drawYutaDomainDimScreen(); // Dark cursed purple dim overlay when Yuta's domain is active (full-screen, unclipped)
-        drawMahitoDomainDimScreen(); // Dark cursed purple dim overlay when Mahito's Self-Embodiment of Perfection domain is active (full-screen, unclipped)
-        drawMahoragaAdaptationDimScreen();
-        drawMahoragaLevel8DimScreen();
-        drawTojiUltimateOverlay();
-        drawSaitamaSeriousPunchDimScreen();
-        drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
-        drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
+        if (!state.disableDimEffects) {
+          drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
+          updateHybridEnvironment(); // WebGL & 2D full-screen dim effects (Gojo Purple, Sukuna Fuga, Mahoraga adaptation)
+          drawPurpleDimScreen(); // 2D Gojo Hollow Purple radial dim overlay
+          drawFurnaceDimScreen(); // 2D Sukuna Fuga Furnace radial dim overlay
+          drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
+          drawCjBaguvixDimScreen(); // 2D CJ BAGUVIX God Mode dark Grove Street emerald green radial dim overlay
+          drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
+          drawGojoDomainDimScreen(); // Dark cosmic blue dim overlay when Gojo's Unlimited Void domain is active (full-screen, unclipped)
+          drawRubbickDomainDimScreen(); // Dark cosmic emerald green dim overlay when Rubbick's stolen Unlimited Void domain is active (full-screen, unclipped)
+          drawSukunaDomainDimScreen(); // Dark crimson dim overlay when Sukuna's Malevolent Shrine domain is active (full-screen, unclipped)
+          drawYutaDomainDimScreen(); // Dark cursed purple dim overlay when Yuta's domain is active (full-screen, unclipped)
+          drawMahitoDomainDimScreen(); // Dark cursed purple dim overlay when Mahito's Self-Embodiment of Perfection domain is active (full-screen, unclipped)
+          drawMahoragaAdaptationDimScreen();
+          drawMahoragaLevel8DimScreen();
+          drawTojiUltimateOverlay();
+          drawSaitamaSeriousPunchDimScreen();
+          drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
+          drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
+        } else {
+          updateHybridEnvironment(); // Cleans up and detaches any active WebGL dim sprites
+        }
 
         // ── Restore clip after dim effects ──
         if (hasArenaClip) {
@@ -369,15 +373,6 @@ export function renderGame() {
           drawThermobaricExplosions(state.ctx); 
         }
 
-        // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) on top of the arena border & floor, but behind fighters
-        if (state.fighters) {
-          for (const f of state.fighters) {
-            if (f && f.hp > 0 && (f.domainActive || f.stolenDomainActive) && typeof f.drawDomainForeground === 'function') {
-              f.drawDomainForeground(state.ctx);
-            }
-          }
-        }
-
         // Draw drive-by skid marks, burnout oil puddle & headlights on the ground, before fighters
         drawDriveByGroundEffects(state.ctx);
 
@@ -396,7 +391,17 @@ export function renderGame() {
         }
 
         drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
-        drawFighters(); // Draw fighters ON TOP of dim screens so Gojo & fighters stay 100% visible & un-tinted!
+
+        // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) on top of the arena border, floor & idol overlay, but behind fighters
+        if (state.fighters) {
+          for (const f of state.fighters) {
+            if (f && f.hp > 0 && (f.domainActive || f.stolenDomainActive) && typeof f.drawDomainForeground === 'function') {
+              f.drawDomainForeground(state.ctx);
+            }
+          }
+        }
+
+        drawFighters(); // Draw fighters ON TOP of dim screens & domain structures so fighters stay 100% visible & un-tinted!
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke
         drawIllusions(); // Draw Doppleganger illusions
         drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
@@ -436,7 +441,9 @@ export function renderGame() {
         drawTojiImpactEffects(state.ctx); // Draw Toji Split Soul Katana spatial soul cleave impact effects
 
         // Nanami 7:3 Ratio Ruler & Blood Rupture overlay renders ON TOP of all fighters & entities
-        drawNanamiRatioCritDimScreen();
+        if (!state.disableDimEffects) {
+          drawNanamiRatioCritDimScreen();
+        }
 
         // Composite flame canvas onto main canvas (clipped to arena bounds)
         compositeFlameCanvas();

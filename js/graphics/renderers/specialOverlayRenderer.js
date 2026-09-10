@@ -41,6 +41,10 @@ export function triggerGenosSelfDestructFlash(x, y) {
 }
 
 export function drawGenosSelfDestructDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) {
+    if (_genosSdFlashTimer > 0) _genosSdFlashTimer--;
+    return;
+  }
   const ctx = state.ctx;
   if (!ctx || !state.fighters) return;
 
@@ -393,7 +397,15 @@ function _initTodoIdolSeeds() {
 }
 
 export function isTodoTakadaOverlayActive() {
-  return _todoIdolOverlayAlpha > 0.01;
+  if (_todoIdolOverlayAlpha > 0.01) return true;
+  if (typeof state !== 'undefined' && state.fighters) {
+    return state.fighters.some(f => 
+      f && f.hp > 0 && 
+      (f.characterId === 'todo' || f.type === 'todo' || f._def?.id === 'todo' || f._def?.type === 'todo') && 
+      (f.isTakadaChanneling || f.isTakadaUltActive)
+    );
+  }
+  return false;
 }
 
 export function drawTodoTakadaIdolScreenOverlay() {

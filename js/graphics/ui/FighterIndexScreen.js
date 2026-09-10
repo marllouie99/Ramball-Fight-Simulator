@@ -377,6 +377,30 @@ function drawIndexDetailScreen() {
   ctx.textBaseline = 'middle';
   ctx.fillText(`LVL MAX // ${def.type.toUpperCase()}`, avatarStageX, avatarStageY + 57);
 
+  // Reze Transformation Toggle Button in Dossier
+  if (def.type === 'reze') {
+    const isHybrid = Boolean(state.showRezeTransformation);
+    drawButton(
+      isHybrid ? '💣 BOMB DEVIL' : '🌸 HUMAN FORM',
+      avatarStageX,
+      avatarStageY + 74,
+      () => {
+        state.showRezeTransformation = !state.showRezeTransformation;
+        try {
+          if (state.showRezeTransformation) {
+            audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
+          } else {
+            audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+          }
+        } catch (e) {}
+      },
+      105,
+      18,
+      isHybrid ? '#ff6b1a' : '#f59e0b',
+      3
+    );
+  }
+
   // Right Side of Tier 1: Fighter Header & Identity
   const infoX = containerX + 144;
   let curY = dossierY + 14;

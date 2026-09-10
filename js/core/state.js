@@ -220,6 +220,7 @@ export const state = {
   arenaTheme: 'light', // 'light' | 'dark'
   testMode: false, // Disables leaderboard recording
   cinefilmFilter: false, // Retro Cinefilm 35mm filter toggle
+  disableDimEffects: (typeof localStorage !== 'undefined' && localStorage.getItem('disableDimEffects') === 'true') || false, // Global dim effects toggle
   dummyAggressive: false, // Whether target dummies fight back
   dummyEnabled: true, // Whether Target Dummy appears in fighter selection
   scores: [0, 0, 0, 0],

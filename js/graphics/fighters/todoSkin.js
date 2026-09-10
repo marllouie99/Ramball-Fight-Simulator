@@ -212,17 +212,18 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
 
+  const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
   const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || (fighter && fighter._isWinnerReveal));
-  const inBFState = (fighter && (fighter.justSwappedTimer > 0 || fighter.blackFlashGlowTimer > 0));
+  const inBFState = !isCountdown && (fighter && (fighter.justSwappedTimer > 0 || fighter.blackFlashGlowTimer > 0));
   const bfVal = fighter ? Math.max(fighter.justSwappedTimer || 0, fighter.blackFlashGlowTimer || 0) : 0;
   const alpha = isMatchEnded ? 0.90 : (bfVal / 45);
 
   // 1. CE glow around fist
-  const opacity = (fighter && fighter._isWinnerReveal) ? 0 : ((fighter && fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 0.0);
+  const opacity = (fighter && (fighter._isWinnerReveal || isCountdown)) ? 0 : ((fighter && fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 0.0);
   const glow = Math.max(opacity, inBFState ? alpha : 0);
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
 
-  if (!isLowQuality && glow > 0.01) {
+  if (!isCountdown && !isLowQuality && glow > 0.01) {
     _initTodoGlowCanvases();
     const glowCanvas = inBFState ? _todoBfGlowCanvas : _todoBlueGlowCanvas;
     if (glowCanvas) {
@@ -680,8 +681,9 @@ export function drawTodoSkin(ctx, fighter) {
     ctx.restore();
   }
 
-  // 2. Draw Cursed Energy body aura if opacity > 0 (disabled on winner reveal / podium)
-  const auraOpacity = isPodiumPreview ? 0 : (fighter.combatAuraOpacity || 0);
+  // 2. Draw Cursed Energy body aura if opacity > 0 (disabled on countdown / winner reveal / podium)
+  const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+  const auraOpacity = (isPodiumPreview || isCountdown) ? 0 : (fighter.combatAuraOpacity || 0);
   if (auraOpacity > 0.01) {
     ctx.save();
     ctx.globalAlpha = auraOpacity;
@@ -690,7 +692,7 @@ export function drawTodoSkin(ctx, fighter) {
   }
 
   // 3. Black Flash Zone Visual Indicator (Stepped pixel crackling lightning streaks)
-  const inBFState = !isPodiumPreview && Boolean(fighter.justSwappedTimer > 0 || fighter.blackFlashGlowTimer > 0 || fighter.blackFlashTimer > 0);
+  const inBFState = !isPodiumPreview && !isCountdown && Boolean(fighter.justSwappedTimer > 0 || fighter.blackFlashGlowTimer > 0 || fighter.blackFlashTimer > 0);
   if (inBFState) {
     const bfVal = Math.max(fighter.justSwappedTimer || 0, fighter.blackFlashGlowTimer || 0, fighter.blackFlashTimer || 0);
     const pulse = 0.6 + Math.sin(now * 0.015) * 0.4;
@@ -948,7 +950,8 @@ export function drawCursedRocks(ctx, fighter) {
 /**
  * Render JJK Cursed Energy Cyan Flame Aura surrounding Todo's body
  */
-function drawTodoCursedEnergyAura(ctx, fighter) {
+export function drawTodoCursedEnergyAura(ctx, fighter) {
+  if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
   const r = fighter.r;
   const time = Date.now();
 

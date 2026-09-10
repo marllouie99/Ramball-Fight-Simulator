@@ -954,8 +954,7 @@ export class GojoFighter extends Fighter {
     // Smooth fade IN & fade OUT for Cursed Energy combat aura
     if (this.combatAuraOpacity === undefined) this.combatAuraOpacity = 0;
     if (state.gameState === 'countdown') {
-      // Keep aura at full opacity during countdown for dramatic effect
-      this.combatAuraOpacity = 1.0;
+      this.combatAuraOpacity = 0.0;
     } else if (this.isChannelingPurple) {
       // Smoothly fade OUT body aura while mixing Red & Blue into Purple (focusing energy into the orbs)
       this.combatAuraOpacity = Math.max(0, this.combatAuraOpacity - 0.05);
@@ -1737,7 +1736,8 @@ export class GojoFighter extends Fighter {
   _meleePunch(opponent) {
     if (opponent) this.target = opponent;
     const basePunchDamage = CONFIG.gojo?.meleePunchDamage ?? 14;
-    const punchDamage = this.domainActive ? Math.round(basePunchDamage * 1.5) : basePunchDamage;
+    const domainMultiplier = CONFIG.gojo?.domainPunchDamageMultiplier ?? 1.5;
+    const punchDamage = this.domainActive ? Math.round(basePunchDamage * domainMultiplier) : basePunchDamage;
 
     // Trigger smooth hand punch animation with alternating fists basing strictly on Section 7 config
     const punchDuration = CONFIG.gojo?.meleePunchAnimDuration ?? 10;

@@ -122,7 +122,7 @@ export function drawYutaFist(ctx, x, y, radius, skinColor = '#FABC95', fighter =
   }
 
   // 4. Subtle Cursed Energy (Pink/Magenta Bloom) around hands when active
-  if (fighter && (fighter.combatAuraOpacity > 0.1 || fighter.isChannelingDomain || (fighter.flurrySlashTimer || 0) > 0)) {
+  if (fighter && (typeof state === 'undefined' || state.gameState !== 'countdown') && (fighter.combatAuraOpacity > 0.1 || fighter.isChannelingDomain || (fighter.flurrySlashTimer || 0) > 0)) {
     const auraAlpha = Math.min(1.0, (fighter.combatAuraOpacity || 0.6) * 0.8);
     ctx.strokeStyle = `rgba(255, 20, 147, ${auraAlpha})`;
     ctx.lineWidth = 1.4;

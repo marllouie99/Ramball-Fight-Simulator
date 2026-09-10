@@ -1,6 +1,3 @@
-// ─────────────────────────────────────────────
-// SUKUNA DOMAIN EXPANSION (MALEVOLENT SHRINE) VISUAL RENDERER
-// ─────────────────────────────────────────────
 import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';

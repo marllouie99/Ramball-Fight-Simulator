@@ -380,6 +380,12 @@ if (camBtn) {
 state.cinefilmFilter = localStorage.getItem('cinefilmFilter') === 'true';
 updateCinefilmOverlay();
 
+state.disableDimEffects = localStorage.getItem('disableDimEffects') === 'true';
+const dimEffectsBtn = document.getElementById('btn-dimeffects');
+if (dimEffectsBtn) {
+  dimEffectsBtn.innerText = state.disableDimEffects ? 'OFF' : 'ON';
+}
+
 // Tactical Terminal & Menu Navigation State
 export function showMenuView(paneId, playAudio = true) {
   const panes = document.querySelectorAll('.menu-view-pane');
@@ -524,6 +530,11 @@ export function executeTacticalAction(action) {
     state.cinefilmFilter = !state.cinefilmFilter;
     localStorage.setItem('cinefilmFilter', state.cinefilmFilter);
     updateCinefilmOverlay();
+  } else if (action === 'toggle-dimeffects') {
+    state.disableDimEffects = !state.disableDimEffects;
+    localStorage.setItem('disableDimEffects', state.disableDimEffects);
+    const btn = document.getElementById('btn-dimeffects');
+    if (btn) btn.innerText = state.disableDimEffects ? 'OFF' : 'ON';
   } else if (action === 'toggle-perf') {
     state.performanceMode = !state.performanceMode;
     localStorage.setItem('performanceMode', state.performanceMode);
@@ -720,6 +731,13 @@ document.getElementById('btn-cinefilm')?.addEventListener('click', (e) => {
   state.cinefilmFilter = !state.cinefilmFilter;
   localStorage.setItem('cinefilmFilter', state.cinefilmFilter);
   updateCinefilmOverlay();
+});
+
+document.getElementById('btn-dimeffects')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  state.disableDimEffects = !state.disableDimEffects;
+  localStorage.setItem('disableDimEffects', state.disableDimEffects);
+  e.target.innerText = state.disableDimEffects ? 'OFF' : 'ON';
 });
 
 document.getElementById('btn-performance')?.addEventListener('click', (e) => {

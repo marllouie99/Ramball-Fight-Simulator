@@ -869,6 +869,34 @@ function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, curre
         try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
       }
     });
+  } else if (def.type === 'reze') {
+    const isHybrid = Boolean(state.showRezeTransformation);
+    buttons.push({
+      text: '🌸 HUMAN FORM',
+      active: !isHybrid,
+      width: 130,
+      action: () => {
+        state.showRezeTransformation = false;
+        if (state.previewFighter) {
+          state.previewFighter.isHybridModeActive = false;
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '💣 BOMB DEVIL',
+      active: isHybrid,
+      width: 130,
+      action: () => {
+        state.showRezeTransformation = true;
+        if (state.previewFighter) {
+          state.previewFighter.isHybridModeActive = true;
+        }
+        try {
+          audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
+        } catch (e) {}
+      }
+    });
   }
 
   if (buttons.length === 0) return;
@@ -964,6 +992,17 @@ function drawWeaponInfoCard(ctx, def) {
     } else {
       nameText = 'Murciélago (Ulquiorra Katana)';
       descText = 'Standard katana form of the Cuatro Espada with green tsuka-ito wrap and 4-corner flared Espada tsuba. Delivers swift Reishi-infused katana slashes, Bala pulses, high-speed Sonído dashes, and Hierro armor.';
+    }
+  }
+
+  if (def.type === 'reze') {
+    const isHybrid = Boolean(state.showRezeTransformation);
+    if (isHybrid) {
+      nameText = 'Reze (Bomb Devil Hybrid Form)';
+      descText = 'The Bomb Devil awakened! Reze pulls her collar pin, transforming her head into a living torpedo atomic warhead with dynamite bandoliers. Gains supersonic propulsion speed, increased blast punch radius, and unleashes the apocalyptic Megaton Tsar Nuke.';
+    } else {
+      nameText = 'Reze (Soviet Assassin)';
+      descText = 'The charming Soviet assassin. Armed with detonating martial arts punches, high-velocity Spark Flechette spread shots, explosive Decoy Clones, and supersonic Rocket Lunges. Pulling her collar pin triggers an explosive radial revive into Bomb Devil form.';
     }
   }
 
@@ -1256,6 +1295,8 @@ function drawWeaponDetailScreen() {
       previewFighter.isGodModeActive = (cjIdx === 3);
       previewFighter.isTec9Active = (cjIdx === 4);
       previewFighter.previewWeaponIndex = cjIdx;
+    } else if (def.type === 'reze') {
+      previewFighter.isHybridModeActive = Boolean(state.showRezeTransformation);
     }
 
     try {

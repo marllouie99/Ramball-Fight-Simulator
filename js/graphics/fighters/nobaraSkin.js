@@ -30,6 +30,7 @@ const _NOBARA_HAIRLINE = [
  * Rule 11 Compliant: Zero shadowBlur CPU Gaussian filtering.
  */
 export function drawNobaraCursedEnergyAura(ctx, fighter) {
+  if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
   const r = fighter.r || 25;
   const isEcstasy = Boolean(fighter.isEcstasyActive || ((fighter.hp / (fighter.maxHp || 400)) <= 0.50));
   const isBlitzing = Boolean(fighter.isBlitzing || (fighter.blackFlashAuraTimer && fighter.blackFlashAuraTimer > 0));
@@ -98,7 +99,7 @@ export function drawNobaraSkin(ctx, fighter) {
   ctx.translate(fighter.x, fighter.y);
 
   // 1. Draw Cursed Energy Aura
-  if (!isPodiumPreview) {
+  if (!isPodiumPreview && (typeof state === 'undefined' || state.gameState !== 'countdown')) {
     drawNobaraCursedEnergyAura(ctx, fighter);
   }
 

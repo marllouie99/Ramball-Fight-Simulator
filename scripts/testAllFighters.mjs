@@ -454,6 +454,75 @@ async function main() {
         fighter.isFrozenByInfinity = false;
         fighter.timeStopTimer = 0;
       }
+      if (fType === 'reze') {
+        mockCtx.resetStackDepth();
+        fighter.reset();
+
+        // 1. Verify HUD skill bars
+        const hudSkills = getSkillDataForFighter(fighter);
+        if (!hudSkills || hudSkills.length !== 4) {
+          throw new Error(`Reze HUD skill bars expected 4 skills, got ${hudSkills?.length}`);
+        }
+        for (let s of hudSkills) {
+          if (s.color !== '#FF6B1A') {
+            throw new Error(`Reze HUD skill '${s.label}' violated Rule 18 with mismatched color ${s.color}`);
+          }
+        }
+
+        // 2. Test Collar Pin Revive on lethal damage
+        fighter.hp = 10;
+        fighter.reviveStocks = 1;
+        fighter.isHybridModeActive = false;
+        fighter.takeDamage(100, dummyOpponent, false, 100);
+
+        if (fighter.reviveStocks !== 0) {
+          throw new Error(`Reze Collar Pin Revive failed to consume revive stock! Remaining: ${fighter.reviveStocks}`);
+        }
+        if (!fighter.isHybridModeActive) {
+          throw new Error(`Reze Collar Pin Revive failed to activate Bomb Devil Hybrid Form!`);
+        }
+        if (fighter.hp <= 0) {
+          throw new Error(`Reze Collar Pin Revive failed to restore HP! HP: ${fighter.hp}`);
+        }
+
+        // 3. Test Spark Flechette projectile barrage
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 200;
+        fighter.sparkCooldown = 0;
+        fighter._fireSparkFlechettes(dummyOpponent);
+        if (fighter.activeFlechettes.length !== 3) {
+          throw new Error(`Reze failed to spawn 3 Spark Flechettes! Spawned: ${fighter.activeFlechettes.length}`);
+        }
+
+        // 4. Test Decoy Bomb spawn
+        fighter.decoyCooldown = 0;
+        fighter._deployDecoyBomb(dummyOpponent);
+        if (fighter.activeDecoys.length !== 1) {
+          throw new Error(`Reze failed to spawn Decoy Bomb! Count: ${fighter.activeDecoys.length}`);
+        }
+
+        // 5. Test Rocket Lunge
+        fighter.rocketCooldown = 0;
+        fighter._activateRocketLunge(dummyOpponent);
+        if (!fighter.isRocketLunging) {
+          throw new Error(`Reze failed to initiate Rocket Lunge!`);
+        }
+
+        // 6. Test Megaton Tsar Nuke Ultimate
+        fighter.nukeCooldown = 0;
+        fighter._activateMegatonNuke(dummyOpponent);
+        if (!fighter.isExecutingNuke || fighter.nukePhase !== 'TRANSFORM') {
+          throw new Error(`Reze failed to initiate Megaton Tsar Nuke Ultimate!`);
+        }
+
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Reze Bomb Devil Ultimate and Combat Draw`);
+
+        fighter.reset();
+      }
       if (fType === 'mahito') {
         mockCtx.resetStackDepth();
         fighter.reset();

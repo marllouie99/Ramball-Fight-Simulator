@@ -1024,13 +1024,12 @@ export function startCountdown() {
   state.announcerTimeoutIds.forEach(id => clearTimeout(id));
   state.announcerTimeoutIds = [];
 
-  // Initialize combat aura for Gojo/Sukuna during countdown
+  // Reset Cursed Energy combat aura for JJK fighters during countdown
   if (state.fighters) {
     state.fighters.forEach(f => {
-      if (f && f._def && f._def.type === 'gojo') {
-        f.combatAuraOpacity = 1;
-      } else if (f && f._def && f._def.type === 'sukuna') {
-        f.combatAuraOpacity = 1;
+      if (f) {
+        f.combatAuraOpacity = 0;
+        f.cursedEnergyAlpha = 0;
       }
     });
     // Ensure active match audio is preloaded with high priority during countdown

@@ -350,10 +350,12 @@ export function drawTojiGhostSkin(ctx, x, y, angle = 0, r = 25, alpha = 0.5, isD
   }
 
   // 1. Spectral Cursed Energy Outer Glow Aura
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 1.30, 0, Math.PI * 2);
-  ctx.fillStyle = isDomain ? 'rgba(160, 48, 255, 0.35)' : 'rgba(255, 30, 86, 0.28)';
-  ctx.fill();
+  if (typeof state === 'undefined' || state.gameState !== 'countdown') {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.30, 0, Math.PI * 2);
+    ctx.fillStyle = isDomain ? 'rgba(160, 48, 255, 0.35)' : 'rgba(255, 30, 86, 0.28)';
+    ctx.fill();
+  }
 
   // 2. Clipped Body Circle with Toji's actual skin model
   ctx.save();

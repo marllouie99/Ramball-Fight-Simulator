@@ -21,6 +21,7 @@ import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
 import { ulquiorraConfig } from '../configs/characters/ulquiorraConfig.js';
 import { makimaConfig } from '../configs/characters/makimaConfig.js';
+import { rezeConfig } from '../configs/characters/rezeConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
 import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
@@ -51,6 +52,7 @@ export const CONFIG = {
   ishida: uryuConfig,
   ulquiorra: ulquiorraConfig,
   makima: makimaConfig,
+  reze: rezeConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1444,6 +1446,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: makimaConfig.projectileSpeedMultiplier || 1.0,
     ability: makimaConfig.ability || 'Control Devil & "Bang!"',
     desc: makimaConfig.desc || 'The Control Devil. Commands absolute psychological authority. Passive: Prime Minister Accord redirects fatal blows to 5 Citizen Lives. Primary: "Bang!" supersonic kinetic hitscan shockwave with wall-bounce crush damage. Skill 1: Chains of Domination. Skill 2: Angel 1000-Year Spear. Ultimate: Kyoto Shrine Gravitational Splatter.',
+  },
+  {
+    id: 39,
+    name: 'REZE',
+    category: 'Anime',
+    color: rezeConfig.color || '#FF6B1A', // Tangerine Flame Orange
+    themeColor: rezeConfig.themeColor || '#FF6B1A',
+    secondaryColor: rezeConfig.secondaryColor || '#FFE600',
+    startX: rezeConfig.startX || 300,
+    startY: rezeConfig.startY || 250,
+    startVx: rezeConfig.startVx || 1.1,
+    startVy: rezeConfig.startVy || 1.0,
+    radius: rezeConfig.radius || rezeConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'reze',
+    hp: rezeConfig.hp || 340,
+    damage: rezeConfig.damage || 22,
+    cooldown: rezeConfig.cooldown || 28,
+    moveSpeed: rezeConfig.moveSpeed || rezeConfig.speed || 5.8,
+    projectileSpeedMultiplier: rezeConfig.projectileSpeedMultiplier || 1.0,
+    ability: rezeConfig.ability || 'Bomb Devil & "Megaton Tsar Nuke"',
+    desc: rezeConfig.desc || 'The Bomb Devil Hybrid. High-speed explosive brawler and Soviet assassin. Pulls collar pin to trigger an explosive revive and Bomb Devil transformation. Attacks with 120° blast punches, Spark Flechette projectile spreads, Decoy Bombs, Rocket Lunges, and the apocalyptic Megaton Tsar Nuke.',
   }
 ];
 

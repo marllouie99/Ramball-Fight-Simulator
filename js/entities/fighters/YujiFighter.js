@@ -451,11 +451,14 @@ export class YujiFighter extends Fighter {
     super.update(opponent, ownerIndex, arena);
 
     // Smoothly transition Yuji's Cursed Energy aura opacity
-    const wantsAura = (this.punchAnimTimer > 0) || (this.blackFlashCharge > 0) || this.soulSwapActive || this.isChannelingRCT || (this.blackFlashTimer > 0);
-    if (wantsAura) {
-      this.combatAuraOpacity = Math.min(1.0, this.combatAuraOpacity + 0.12);
+    const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+    const wantsAura = !isCountdown && ((this.punchAnimTimer > 0) || (this.blackFlashCharge > 0) || this.soulSwapActive || this.isChannelingRCT || (this.blackFlashTimer > 0));
+    if (isCountdown) {
+      this.combatAuraOpacity = 0.0;
+    } else if (wantsAura) {
+      this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.12);
     } else {
-      this.combatAuraOpacity = Math.max(0.0, this.combatAuraOpacity - 0.05);
+      this.combatAuraOpacity = Math.max(0.0, (this.combatAuraOpacity || 0) - 0.05);
     }
 
     // Cooldown management (operating at 120% potential inside the Zone)

@@ -1587,6 +1587,50 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
+  if (f.characterId === 'reze' || f.type === 'reze') {
+    const themeColor = f.color || '#FF6B1A';
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+
+    // 1. Ultimate: Megaton Tsar Nuke
+    const nukeMax = f.nukeCooldownMax || cfg.nukeCooldown || 1500;
+    const nukeTimer = f.nukeCooldown !== undefined ? f.nukeCooldown : nukeMax;
+    let nukePct = 0;
+    let nukeLabel = 'MEGATON NUKE';
+    if (f.isExecutingNuke) {
+      nukePct = 100;
+      nukeLabel = 'NUKE (DIVING)';
+    } else if (f.isHybridModeActive) {
+      const hybridMax = f.hybridModeMaxTimer || cfg.hybridModeDurationFrames || 600;
+      const hybridCur = f.hybridModeTimer !== undefined ? f.hybridModeTimer : hybridMax;
+      nukePct = Math.max(0, Math.min(100, (hybridCur / hybridMax) * 100));
+      nukeLabel = 'BOMB HYBRID';
+    } else {
+      nukePct = Math.max(0, Math.min(100, (1 - (nukeTimer / nukeMax)) * 100));
+    }
+
+    // 2. Primary: Spark Flechette
+    const sparkMax = f.sparkCooldownMax || cfg.sparkCooldown || 180;
+    const sparkTimer = f.sparkCooldown !== undefined ? f.sparkCooldown : 0;
+    const sparkPct = Math.max(0, Math.min(100, (1 - (sparkTimer / sparkMax)) * 100));
+
+    // 3. Secondary: Decoy Bomb
+    const decoyMax = f.decoyCooldownMax || cfg.decoyCooldown || 420;
+    const decoyTimer = f.decoyCooldown !== undefined ? f.decoyCooldown : 0;
+    const decoyPct = Math.max(0, Math.min(100, (1 - (decoyTimer / decoyMax)) * 100));
+
+    // 4. Mobility: Rocket Lunge
+    const rocketMax = f.rocketCooldownMax || cfg.rocketCooldown || 300;
+    const rocketTimer = f.rocketCooldown !== undefined ? f.rocketCooldown : 0;
+    const rocketPct = f.isRocketLunging ? 100 : Math.max(0, Math.min(100, (1 - (rocketTimer / rocketMax)) * 100));
+
+    return [
+      { id: 'nuke',    pct: nukePct,    ready: nukePct >= 99,    color: themeColor, label: nukeLabel },
+      { id: 'spark',   pct: sparkPct,   ready: sparkPct >= 99,   color: themeColor, label: 'SPARK FLECHETTE' },
+      { id: 'decoy',   pct: decoyPct,   ready: decoyPct >= 99,   color: themeColor, label: 'DECOY BOMB' },
+      { id: 'rocket',  pct: rocketPct,  ready: rocketPct >= 99,  color: themeColor, label: 'ROCKET LUNGE' }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }

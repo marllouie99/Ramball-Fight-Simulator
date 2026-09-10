@@ -22,7 +22,7 @@ export class SukunaRenderer {
       fighter._drawSukunaCursedEnergyAura(ctx, 'fuga');
     } else if (fighter.isChannelingDomainExpansion && !fighter.domainActive && !isParalyzed) {
       fighter._drawSukunaCursedEnergyAura(ctx, 'domain');
-    } else if (!isFrozenByDomain && (fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
+    } else if (!isFrozenByDomain && (fighter.combatAuraOpacity > 0 || fighter._isWinnerReveal)) {
       fighter._drawSukunaCursedEnergyAura(ctx, 'red');
     }
 
@@ -295,7 +295,7 @@ export class SukunaRenderer {
     const isFuga = (fighter.isChannelingDivineFlame);
     const isFrozenByDomain = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0);
     const isMeleeMode = fighter.isMeleeMode || (fighter.punchAnimTimer > 0);
-    const isActive = !isMeleeMode && !isRCT && !isFuga && !isFrozenByDomain && ((fighter.combatAuraOpacity > 0.05) || (fighter.slashGlowTimer > 0) || (fighter.domainActive) || (state.gameState === 'countdown'));
+    const isActive = !isMeleeMode && !isRCT && !isFuga && !isFrozenByDomain && (typeof state === 'undefined' || state.gameState !== 'countdown') && ((fighter.combatAuraOpacity > 0.05) || (fighter.slashGlowTimer > 0) || (fighter.domainActive));
 
     if (isActive) {
       let theme = 'red';
@@ -467,6 +467,8 @@ export class SukunaRenderer {
 
   // Draw Sukuna's Cursed Energy Aura
   static _drawSukunaCursedEnergyAura(ctx, fighter, colorTheme = 'red', overrideX = null, overrideY = null, overrideRadius = null) {
+    if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+
     // Calculate smooth fade-in & fade-out progress
     let progress = 1.0;
     if (overrideX !== null) {

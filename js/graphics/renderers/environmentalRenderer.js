@@ -8,6 +8,7 @@ import { worldToScreen } from '../../systems/cameraSystem.js';
  * The overlay opacity increases during charge, then stays at max while strikes are active.
  */
 export function drawStormDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
   
@@ -82,6 +83,7 @@ let currentFurnaceDimOpacity = 0;
  * Draws a dark fiery dim screen overlay with flame lightning when Sukuna channels or fires Furnace (Fuga).
  */
 export function drawFurnaceDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
@@ -163,6 +165,7 @@ let currentRikaSummonDimOpacity = 0;
  * Draws a dark purple/pink cursed energy dim screen overlay when Yuta calls or summons Rika.
  */
 export function drawRikaSummonDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
@@ -359,6 +362,7 @@ export function drawCjSanAndreasAtmosphere() {
  * Fully accelerated via WebGL in hybridEnvironmentRenderer.js (Rule 10).
  */
 export function drawCjBaguvixDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
   // Handled by WebGL in hybridEnvironmentRenderer.js (Rule 10)
   if (state.pixiApp && state.pixiLayers?.environment) return;
 
