@@ -134,11 +134,44 @@ export class SaitamaFighter extends Fighter {
   }
 
   /**
+   * Calculates the strict cardinal angle (UP / DOWN / LEFT / RIGHT STRAIGHT) towards the target.
+   * Standard: 0 (Right), Math.PI (Left), Math.PI / 2 (Down), -Math.PI / 2 (Up).
+   */
+  _getCardinalAngle(target) {
+    if (!target) return (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : 0;
+    const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+    const myY = this.y - (this.z || 0);
+    const dx = (target.x !== undefined ? target.x : this.x) - this.x;
+    const dy = targetY - myY;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? 0 : Math.PI;
+    } else {
+      return dy >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+  }
+
+  /**
    * Override base canPerformBasicAttack to respect normal punch config toggle.
    */
   canPerformBasicAttack() {
     if (!this.isNormalPunchEnabled()) return false;
     return super.canPerformBasicAttack();
+  }
+
+  /**
+   * Universal Aim Validation Guard.
+   * Disables auto-aim completely during Serious Skill Counter passive and Consecutive Normal Punches flurry.
+   */
+  canAim() {
+    const isCounterActive = Boolean(
+      this.isCountering || 
+      (this._counterPunchTimer && this._counterPunchTimer > 0) || 
+      (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0)
+    );
+    if (isCounterActive || this.isFlurrying) {
+      return false;
+    }
+    return super.canAim();
   }
 
   /** Override base gun shoot to perform Saitama's Normal Punch basic attack */
@@ -758,14 +791,11 @@ export class SaitamaFighter extends Fighter {
     this.paralyzeTimer = 0;
     this.isParalyzed = false;
 
-    // MANDATORY Rule #3: Immediately aim facing direction at the target's back
-    const behindTargetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+    // MANDATORY Rule #3: Immediately aim facing direction at the target's back along strict cardinal direction
+    const behindTargetAngle = this._getCardinalAngle(target);
     this.gunAngle = behindTargetAngle;
     this.angle = behindTargetAngle;
-    if (typeof this.aim === 'function') {
-      this.aim(target);
-    }
-    this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || behindTargetAngle);
+    this._counterAimAngle = behindTargetAngle;
 
     // Spawn subtle fading ghost model skin afterimages along teleport trajectory dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
@@ -794,10 +824,6 @@ export class SaitamaFighter extends Fighter {
     const idleFrames = CONFIG.saitama?.counterTeleportIdleFrames ?? 10;
     const counterWindupDuration = poseFrames + idleFrames;
 
-    // Aim face at target
-    if (typeof this.aim === 'function') {
-      this.aim(target);
-    }
     this.punchAnimTimer = 0;
 
     // Impact flash at teleport origin and behind enemy
@@ -869,16 +895,14 @@ export class SaitamaFighter extends Fighter {
 
     this._counterPunchTimer--;
 
-    // Keep Saitama locked in place but allow him to freely rotate and track the target during wind-up
-    const target = this._counterPunchTarget;
+    // Keep Saitama locked in place and strictly hold the committed aim angle without auto-tracking or snapping to the enemy
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
     this.knockbackVy = 0;
-    if (target && target.hp > 0) {
-      if (typeof this.aim === 'function') this.aim(target);
-      // Continuously update the committed aim angle so the punch fires wherever Saitama is facing
-      this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    if (this._counterAimAngle !== undefined) {
+      this.gunAngle = this._counterAimAngle;
+      this.angle = this._counterAimAngle;
     }
 
     // Phase 2: punch lands when timer expires
@@ -900,8 +924,10 @@ export class SaitamaFighter extends Fighter {
         audioSystem.playSFX(impactSrc, impactVol);
       }
 
-      // DO NOT snap auto-aim to the enemy on punch land! Use Saitama's current facing angle at the moment the punch fires
-      const pushAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      // DO NOT snap auto-aim to the enemy on punch land! Punch strictly along the locked aim angle
+      const pushAngle = this._counterAimAngle !== undefined ? this._counterAimAngle : (this.gunAngle || this.angle || 0);
+      this.gunAngle = pushAngle;
+      this.angle = pushAngle;
       this._counterAimAngle = pushAngle;
 
       // Clear punchAnimTimer so _postCounterRecoveryTimer solely drives the single unified punch follow-through
@@ -936,9 +962,9 @@ export class SaitamaFighter extends Fighter {
             spawnFloatingText(this.x, this.y - this.r - 14, 'COUNTER!', '#FFD700');
           }
 
-          // Massive Counter Punch Damage (calculated dynamically from basic attack Normal Punch * multiplier, full damage regardless of distance)
+          // Massive Counter Punch Damage (calculated directly from basic attack Normal Punch * counterPunchDamageMultiplier)
           const basePunchDamage = CONFIG.saitama?.punchDamage || 100;
-          const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? CONFIG.saitama?.counterPunchMultiplier ?? (CONFIG.saitama?.counterPunchDamage !== undefined ? (CONFIG.saitama.counterPunchDamage / basePunchDamage) : 20.0);
+          const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? 20.0;
           const massiveDamage = Math.round(basePunchDamage * damageMult);
           applyDamageToTarget(target, massiveDamage, this, { 
             isSkill: true, 
@@ -1154,14 +1180,22 @@ export class SaitamaFighter extends Fighter {
     const oldX = this.x;
     const oldY = this.y;
 
-    // Supersonic dash into close melee range
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+
+    // Arena boundary clamp for opponent if already near the edge
+    if (arena && opponent) {
+      const oppR = opponent.r || 25;
+      opponent.x = Math.max(arena.x + oppR, Math.min(arena.x + arena.width - oppR, opponent.x));
+      opponent.y = Math.max(arena.y + oppR, Math.min(arena.y + arena.height - oppR, opponent.y));
+    }
+
+    // Supersonic dash into close melee range along cardinal approach vector
     const flurryOffset = CONFIG.saitama?.flurryDashOffset ?? 25;
-    const angleToTarget = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    let targetX = opponent.x - Math.cos(angleToTarget) * (this.r + opponent.r + flurryOffset);
-    let targetY = opponent.y - Math.sin(angleToTarget) * (this.r + opponent.r + flurryOffset);
+    const cardinalAngle = this._getCardinalAngle(opponent);
+    let targetX = opponent.x - Math.cos(cardinalAngle) * (this.r + opponent.r + flurryOffset);
+    let targetY = opponent.y - Math.sin(cardinalAngle) * (this.r + opponent.r + flurryOffset);
 
     // Arena boundary clamp
-    const arena = CONFIG.arena;
     if (arena) {
       const minX = arena.x + this.r + 10;
       const maxX = arena.x + arena.width - this.r - 10;
@@ -1177,10 +1211,9 @@ export class SaitamaFighter extends Fighter {
     this.vy = 0;
     this.knockbackVx = 0;
     this.knockbackVy = 0;
-    if (typeof this.aim === 'function') {
-      this.aim(opponent);
-    }
-    this._flurryAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
+    this._flurryAimAngle = cardinalAngle;
 
     // Spawn subtle ghost afterimages along dash path dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
@@ -1233,12 +1266,18 @@ export class SaitamaFighter extends Fighter {
   }
 
   aim(target) {
-    if (this.isFlurrying && this._flurryAimAngle !== undefined) {
-      this.gunAngle = this._flurryAimAngle;
-      this.angle = this._flurryAimAngle;
-      return;
+    if (!this.canAim()) {
+      const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+      if (isCounteringState && this._counterAimAngle !== undefined) {
+        this.gunAngle = this._counterAimAngle;
+        this.angle = this._counterAimAngle;
+      } else if (this.isFlurrying && this._flurryAimAngle !== undefined) {
+        this.gunAngle = this._flurryAimAngle;
+        this.angle = this._flurryAimAngle;
+      }
+      return false;
     }
-    super.aim(target);
+    return super.aim(target);
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -1850,19 +1889,13 @@ export class SaitamaFighter extends Fighter {
     const isPostCounter = this._postCounterRecoveryTimer > 0;
     const isDodgeStalling = this.dodgeStallTimer > 0;
 
-    // Lock Saitama completely in place during Serious Counter windup or recovery (no forward steering drift)
+    // Lock Saitama completely in place during Serious Counter windup or recovery (no forward steering drift or aim tracking)
     if (isChargingCounter || isPostCounter) {
       this.vx = 0;
       this.vy = 0;
       if (this._counterAimAngle !== undefined) {
         this.gunAngle = this._counterAimAngle;
         this.angle = this._counterAimAngle;
-      } else {
-        const target = this._counterPunchTarget || opponent;
-        if (target && target.hp > 0 && typeof this.aim === 'function') {
-          this.aim(target);
-          this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        }
       }
       return;
     }
@@ -1877,14 +1910,10 @@ export class SaitamaFighter extends Fighter {
 
       if (this._flurryAimAngle === undefined) {
         const currentTarget = (this.flurryTarget && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
-        if (currentTarget && currentTarget.hp > 0) {
-          this._flurryAimAngle = Math.atan2(currentTarget.y - this.y, currentTarget.x - this.x);
-        } else {
-          this._flurryAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        }
+        this._flurryAimAngle = this._getCardinalAngle(currentTarget);
       }
 
-      // Lock Saitama's facing/aim angle completely during Consecutive Normal Punches (no aim rotation)
+      // Lock Saitama's facing/aim angle completely during Consecutive Normal Punches (strictly cardinal UP/DOWN/LEFT/RIGHT)
       this.gunAngle = this._flurryAimAngle;
       this.angle = this._flurryAimAngle;
 
@@ -1959,6 +1988,14 @@ export class SaitamaFighter extends Fighter {
                 const holdPause = CONFIG.saitama?.flurryHoldHitPauseFrames ?? 8;
                 target.applyTimeStop(holdPause);
               }
+
+              // Arena boundary clamp to ensure pinned target never clips out of the arena
+              const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+              if (arena) {
+                const tR = target.r || 25;
+                target.x = Math.max(arena.x + tR, Math.min(arena.x + arena.width - tR, target.x));
+                target.y = Math.max(arena.y + tR, Math.min(arena.y + arena.height - tR, target.y));
+              }
             }
           }
         }
@@ -1979,7 +2016,7 @@ export class SaitamaFighter extends Fighter {
         this.y += Math.sin(aimAngle) * forwardStep;
 
         // Arena boundary clamp for Saitama
-        const arena = CONFIG.arena;
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
         if (arena) {
           const minX = arena.x + this.r + 10;
           const maxX = arena.x + arena.width - this.r - 10;
@@ -1987,6 +2024,26 @@ export class SaitamaFighter extends Fighter {
           const maxY = arena.y + arena.height - this.r - 10;
           this.x = Math.max(minX, Math.min(maxX, this.x));
           this.y = Math.max(minY, Math.min(maxY, this.y));
+        }
+
+        // If flurry target is pinned against the wall, keep Saitama at clean melee spacing instead of overlapping into target
+        if (this.flurryTarget && this.flurryTarget.hp > 0) {
+          const t = this.flurryTarget;
+          const tR = t.r || 25;
+          const minSpacing = this.r + tR + 5;
+          const currentDist = Math.hypot(t.x - this.x, t.y - this.y);
+          if (currentDist < minSpacing) {
+            this.x = t.x - Math.cos(aimAngle) * minSpacing;
+            this.y = t.y - Math.sin(aimAngle) * minSpacing;
+            if (arena) {
+              const minX = arena.x + this.r + 10;
+              const maxX = arena.x + arena.width - this.r - 10;
+              const minY = arena.y + this.r + 10;
+              const maxY = arena.y + arena.height - this.r - 10;
+              this.x = Math.max(minX, Math.min(maxX, this.x));
+              this.y = Math.max(minY, Math.min(maxY, this.y));
+            }
+          }
         }
 
         // Play heavy punch audio on each hit
@@ -2064,6 +2121,13 @@ export class SaitamaFighter extends Fighter {
                 target.timeStopTimer = 0;
                 target.hitStunTimer = 0;
 
+                // Mandatory arena boundary clamp before applying final blow knockback
+                if (arena) {
+                  const tR = target.r || 25;
+                  target.x = Math.max(arena.x + tR, Math.min(arena.x + arena.width - tR, target.x));
+                  target.y = Math.max(arena.y + tR, Math.min(arena.y + arena.height - tR, target.y));
+                }
+
                 if (didDamage !== false) {
                   // Final blow: heavy knockback push along aim trajectory & screen shake
                   const knockbackForce = CONFIG.saitama?.flurryFinalSlamKnockback || 65;
@@ -2107,6 +2171,13 @@ export class SaitamaFighter extends Fighter {
                 const pushPerHit = CONFIG.saitama?.flurryPushbackPerHit || 7.0;
                 target.x += Math.cos(aimAngle) * pushPerHit;
                 target.y += Math.sin(aimAngle) * pushPerHit;
+
+                // Mandatory arena boundary clamp to strictly prevent enemies from clipping outside the arena
+                if (arena) {
+                  const tR = target.r || 25;
+                  target.x = Math.max(arena.x + tR, Math.min(arena.x + arena.width - tR, target.x));
+                  target.y = Math.max(arena.y + tR, Math.min(arena.y + arena.height - tR, target.y));
+                }
 
                 // Visual sparks feedback
                 if (typeof spawnSparks === 'function') {

@@ -203,9 +203,18 @@ export const BASIC_ATTACK_SOUNDS = {
 
   // ── Sukuna (ID 22) ───────────────────
   22: {
-    src: ['Assets/Sound Effects/Attacks/swordswing.mp3', 'Assets/Sound Effects/Skills/backstab.mp3'],
-    volume: 0.6,
-    delay: 0,
+    get src() {
+      return [
+        CONFIG.sukuna?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3',
+        CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3'
+      ];
+    },
+    get volume() {
+      return CONFIG.sukuna?.soundVolumes?.swordSwing !== undefined ? CONFIG.sukuna.soundVolumes.swordSwing : 0.50;
+    },
+    get delay() {
+      return CONFIG.sukuna?.soundDelays?.swordSwing || 0;
+    }
   },
 
   // ── Yuta (ID 23) ─────────────────────
@@ -217,15 +226,76 @@ export const BASIC_ATTACK_SOUNDS = {
 
   // ── Gojo (ID 21) ─────────────────────
   21: {
-    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
-    volume: 0.6,
-    delay: 0,
+    get src() {
+      return CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/plasma_drone.mp3';
+    },
+    get volume() {
+      return CONFIG.gojo?.soundVolumes?.blueOrb !== undefined ? CONFIG.gojo.soundVolumes.blueOrb : 0.35;
+    },
+    get delay() {
+      return CONFIG.gojo?.soundDelays?.blueOrb || 0;
+    }
   },
 
   // ── Layla (ID 26) ────────────────────
   26: {
     src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
     volume: 0.45,
+    delay: 0,
+  },
+
+  // ── Genos (ID 28) ────────────────────
+  28: {
+    get src() {
+      return CONFIG.genos?.basicBlastSound || 'Assets/Sound Effects/Attacks/genos-range-attack.mp3';
+    },
+    get volume() {
+      return CONFIG.genos?.basicBlastVolume !== undefined ? CONFIG.genos.basicBlastVolume : 0.9;
+    },
+    delay: 0,
+  },
+
+  // ── Ichigo (ID 29) ───────────────────
+  29: {
+    get src() {
+      return CONFIG.ichigo?.sounds?.getsugaSlash || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.ichigo?.soundVolumes?.getsugaSlash !== undefined ? CONFIG.ichigo.soundVolumes.getsugaSlash : 0.75;
+    },
+    delay: 0,
+  },
+
+  // ── Mahito (ID 30) ───────────────────
+  30: {
+    get src() {
+      return CONFIG.mahito?.sounds?.punch || 'Assets/Sound Effects/Attacks/punch.mp3';
+    },
+    get volume() {
+      return CONFIG.mahito?.soundVolumes?.punch !== undefined ? CONFIG.mahito.soundVolumes.punch : 1.0;
+    },
+    delay: 0,
+  },
+
+  // ── Nanami (ID 31) ───────────────────
+  31: {
+    get src() {
+      return CONFIG.nanami?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.nanami?.soundVolumes?.swordSwing !== undefined ? CONFIG.nanami.soundVolumes.swordSwing : 0.75;
+    },
+    delay: 0,
+  },
+
+  // ── Nobara (ID 32) ───────────────────
+  32: {
+    get src() {
+      return CONFIG.nobara?.sounds?.nailThrow || 'Assets/Sound Effects/Skills/hammer.mp3';
+    },
+    get volume() {
+      return CONFIG.nobara?.soundVolumes?.nailThrow !== undefined ? CONFIG.nobara.soundVolumes.nailThrow : 0.7;
+    },
     delay: 0,
   },
 
@@ -241,6 +311,74 @@ export const BASIC_ATTACK_SOUNDS = {
     get volume() {
       return CONFIG.cj?.soundVolumes?.punchHit !== undefined ? CONFIG.cj.soundVolumes.punchHit : 0.8;
     },
+    delay: 0,
+  },
+
+  // ── Uryu / Ishida (ID 36) ─────────────
+  36: {
+    get src() {
+      return CONFIG.uryu?.sounds?.arrowShoot || 'Assets/Sound Effects/Attacks/laserpew.mp3';
+    },
+    get volume() {
+      return CONFIG.uryu?.soundVolumes?.arrowShoot !== undefined ? CONFIG.uryu.soundVolumes.arrowShoot : 0.65;
+    },
+    delay: 0,
+  },
+
+  // ── Ulquiorra (ID 37) ─────────────────
+  37: {
+    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+    volume: 0.65,
+    delay: 0,
+  },
+
+  // ── Makima (ID 38) ────────────────────
+  38: {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
+
+  // ── Reze (ID 39) ──────────────────────
+  39: {
+    get src() {
+      return CONFIG.reze?.sounds?.spark || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+    },
+    get volume() {
+      return CONFIG.reze?.soundVolumes?.spark !== undefined ? CONFIG.reze.soundVolumes.spark : 0.75;
+    },
+    delay: 0,
+  },
+
+  // ── Toji (ID 99) ──────────────────────
+  99: {
+    get src() {
+      return CONFIG.toji?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.toji?.soundVolumes?.swordSwing !== undefined ? CONFIG.toji.soundVolumes.swordSwing : 0.8;
+    },
+    delay: 0,
+  },
+
+  // ── Circe / Grenadier (ID 4) ──────────
+  4: {
+    src: 'Assets/Sound Effects/Attacks/grenade.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+
+  // ── Musashi (ID 17) ───────────────────
+  17: {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // ── Hydra (ID 20) ─────────────────────
+  20: {
+    src: 'Assets/Sound Effects/Attacks/plasma_drone.mp3',
+    volume: 0.6,
     delay: 0,
   }
 };
@@ -310,14 +448,26 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   },
   // Gojo — Blue Orbs & Melee punches
   'gojo': {
-    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
-    volume: 0.6,
-    delay: 0,
+    get src() {
+      return CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/plasma_drone.mp3';
+    },
+    get volume() {
+      return CONFIG.gojo?.soundVolumes?.blueOrb !== undefined ? CONFIG.gojo.soundVolumes.blueOrb : 0.35;
+    },
+    get delay() {
+      return CONFIG.gojo?.soundDelays?.blueOrb || 0;
+    }
   },
   'gojo_melee': {
-    src: 'Assets/Sound Effects/Attacks/punch.mp3',
-    volume: 2.8,
-    delay: 0,
+    get src() {
+      return CONFIG.gojo?.sounds?.meleePunch || 'Assets/Sound Effects/Attacks/punch.mp3';
+    },
+    get volume() {
+      return CONFIG.gojo?.soundVolumes?.meleePunch !== undefined ? CONFIG.gojo.soundVolumes.meleePunch : 0.90;
+    },
+    get delay() {
+      return CONFIG.gojo?.soundDelays?.meleePunch || 0;
+    }
   },
   // Saitama — Caped Baldy martial punches (matches Gojo punch attack audio)
   'saitama': {
@@ -351,14 +501,29 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   },
   // Sukuna — Dismantle slashes & Melee punches
   'sukuna': {
-    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
-    volume: 0.6,
-    delay: 0,
+    get src() {
+      return [
+        CONFIG.sukuna?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3',
+        CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3'
+      ];
+    },
+    get volume() {
+      return CONFIG.sukuna?.soundVolumes?.swordSwing !== undefined ? CONFIG.sukuna.soundVolumes.swordSwing : 0.50;
+    },
+    get delay() {
+      return CONFIG.sukuna?.soundDelays?.swordSwing || 0;
+    }
   },
   'sukuna_melee': {
-    src: 'Assets/Sound Effects/Attacks/punch.mp3',
-    volume: 2.8,
-    delay: 0,
+    get src() {
+      return CONFIG.sukuna?.sounds?.punch || 'Assets/Sound Effects/Attacks/punch.mp3';
+    },
+    get volume() {
+      return CONFIG.sukuna?.soundVolumes?.punch !== undefined ? CONFIG.sukuna.soundVolumes.punch : 1.40;
+    },
+    get delay() {
+      return CONFIG.sukuna?.soundDelays?.punch || 0;
+    }
   },
   // Mahoraga — Heavy martial punches & rapid strikes
   'mahoraga': {
@@ -428,13 +593,114 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
 
-  // Makima - The Control Devil ("Bang!")
-  'makima': {
-    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
-    volume: 0.75,
+  // Genos — Incineration Palm Fireball Blasts & Melee Punches
+  'genos': {
+    get src() {
+      return CONFIG.genos?.basicBlastSound || 'Assets/Sound Effects/Attacks/genos-range-attack.mp3';
+    },
+    get volume() {
+      return CONFIG.genos?.basicBlastVolume !== undefined ? CONFIG.genos.basicBlastVolume : 0.9;
+    },
     delay: 0,
   },
-  38: {
+  'genos_melee': {
+    get src() {
+      return CONFIG.genos?.meleePunchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
+    },
+    get volume() {
+      return CONFIG.genos?.meleePunchVolume !== undefined ? CONFIG.genos.meleePunchVolume : 1.0;
+    },
+    delay: 0,
+  },
+
+  // Toji — ISOH & Split Soul Katana Slashes
+  'toji': {
+    get src() {
+      return CONFIG.toji?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.toji?.soundVolumes?.swordSwing !== undefined ? CONFIG.toji.soundVolumes.swordSwing : 0.8;
+    },
+    delay: 0,
+  },
+
+  // Ichigo — Getsuga Slashes
+  'ichigo': {
+    get src() {
+      return CONFIG.ichigo?.sounds?.getsugaSlash || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.ichigo?.soundVolumes?.getsugaSlash !== undefined ? CONFIG.ichigo.soundVolumes.getsugaSlash : 0.75;
+    },
+    delay: 0,
+  },
+
+  // Mahito — Idle Transfiguration & Brawler Punches
+  'mahito': {
+    get src() {
+      return CONFIG.mahito?.sounds?.punch || 'Assets/Sound Effects/Attacks/punch.mp3';
+    },
+    get volume() {
+      return CONFIG.mahito?.soundVolumes?.punch !== undefined ? CONFIG.mahito.soundVolumes.punch : 1.0;
+    },
+    delay: 0,
+  },
+
+  // Nanami — 7:3 Ratio Technique Cleaver Swings
+  'nanami': {
+    get src() {
+      return CONFIG.nanami?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.nanami?.soundVolumes?.swordSwing !== undefined ? CONFIG.nanami.soundVolumes.swordSwing : 0.75;
+    },
+    delay: 0,
+  },
+
+  // Nobara — Straw Doll Technique Nails
+  'nobara': {
+    get src() {
+      return CONFIG.nobara?.sounds?.nailThrow || 'Assets/Sound Effects/Skills/hammer.mp3';
+    },
+    get volume() {
+      return CONFIG.nobara?.soundVolumes?.nailThrow !== undefined ? CONFIG.nobara.soundVolumes.nailThrow : 0.7;
+    },
+    delay: 0,
+  },
+
+  // Uryu / Ishida — Heilig Bogen Sacred Bow
+  'uryu': {
+    get src() {
+      return CONFIG.uryu?.sounds?.arrowShoot || 'Assets/Sound Effects/Attacks/laserpew.mp3';
+    },
+    get volume() {
+      return CONFIG.uryu?.soundVolumes?.arrowShoot !== undefined ? CONFIG.uryu.soundVolumes.arrowShoot : 0.65;
+    },
+    delay: 0,
+  },
+  'ishida': {
+    get src() {
+      return CONFIG.uryu?.sounds?.arrowShoot || 'Assets/Sound Effects/Attacks/laserpew.mp3';
+    },
+    get volume() {
+      return CONFIG.uryu?.soundVolumes?.arrowShoot !== undefined ? CONFIG.uryu.soundVolumes.arrowShoot : 0.65;
+    },
+    delay: 0,
+  },
+
+  // Reze — Bomb Devil Explosive Spark Punches
+  'reze': {
+    get src() {
+      return CONFIG.reze?.sounds?.spark || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+    },
+    get volume() {
+      return CONFIG.reze?.soundVolumes?.spark !== undefined ? CONFIG.reze.soundVolumes.spark : 0.75;
+    },
+    delay: 0,
+  },
+
+  // Makima - The Control Devil ("Bang!")
+  'makima': {
     src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
     volume: 0.75,
     delay: 0,
@@ -446,9 +712,30 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.65,
     delay: 0,
   },
-  37: {
-    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
-    volume: 0.65,
+
+  // Circe / Grenadier — Potion / Grenade Throw
+  'circe': {
+    src: 'Assets/Sound Effects/Attacks/grenade.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+  'grenadier': {
+    src: 'Assets/Sound Effects/Attacks/grenade.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+
+  // Musashi — Dual Katana Slash
+  'musashi': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // Hydra — Toxic Spit
+  'hydra': {
+    src: 'Assets/Sound Effects/Attacks/plasma_drone.mp3',
+    volume: 0.6,
     delay: 0,
   }
 };

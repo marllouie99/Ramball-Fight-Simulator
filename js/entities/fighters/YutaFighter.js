@@ -1524,7 +1524,7 @@ export class YutaFighter extends Fighter {
 
   resolveWallBounce(arena, opponent) {
     if (!arena || this.hp <= 0 || this.isDead) return false;
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || this.caughtInGenosFlurry || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
     if (isBeamTrapped) {
       this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
       this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));

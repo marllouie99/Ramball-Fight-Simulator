@@ -940,7 +940,9 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     }
 
     if (p.visual === 'gojoBlue' || p.isGojoPurple) {
-      // Defer to hybridProjectileRenderer.js
+      if (!state.pixiApp || !state.pixiLayers?.projectiles) {
+        drawGojoPurpleOrb(ctx, p);
+      }
       return;
     }
 

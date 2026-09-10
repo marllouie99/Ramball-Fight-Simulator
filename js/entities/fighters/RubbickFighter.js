@@ -1622,6 +1622,15 @@ export class RubbickFighter extends Fighter {
         if (this.stolenSkillCooldown <= 0) {
            if (opponent) {
              this.aim(opponent);
+             if (this.stolenType === 'gojo') {
+               const isTargetLeft = opponent.x < this.x;
+               this.gunAngle = isTargetLeft ? Math.PI : 0;
+               this.angle = this.gunAngle;
+             } else if (this.stolenType === 'gojo_red') {
+               const isTargetUp = opponent.y < this.y;
+               this.gunAngle = isTargetUp ? -Math.PI / 2 : Math.PI / 2;
+               this.angle = this.gunAngle;
+             }
            }
             this.stolenWindUpTimer = this.stolenType === 'normal' 
               ? (CONFIG.sharpshooter?.executeWindupFrames || 30) 
@@ -1772,10 +1781,12 @@ export class RubbickFighter extends Fighter {
            }
         }
         break;
-      case 'gojo':
-        if (opponent) {
-           this.aim(opponent);
-        }
+      case 'gojo': {
+        const horizontalAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle))
+          ? ((Math.cos(this.gunAngle) < 0) ? Math.PI : 0)
+          : ((opponent && opponent.x < this.x) ? Math.PI : 0);
+        this.gunAngle = horizontalAngle;
+        this.angle = horizontalAngle;
         const gojoDmgMult = getStolenMultiplier('gojo', 'damageMultiplier');
         const purpleDamage = (CONFIG.gojo?.purpleDamage || 70) * gojoDmgMult;
         const purpleDPS = (CONFIG.gojo?.purpleDPS || 150) * gojoDmgMult;
@@ -1800,14 +1811,17 @@ export class RubbickFighter extends Fighter {
         // Stolen Hollow Purple cast release: Pure arcane laser beam SFX (no Gojo voiceline)
         this.playStolenSFX('Assets/Sound Effects/Attacks/laserbeam.mp3', 0.95);
         break;
-      case 'gojo_red':
-        if (opponent) {
-           this.aim(opponent);
-        }
+      }
+      case 'gojo_red': {
+        const verticalAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle))
+          ? ((Math.sin(this.gunAngle) < 0) ? -Math.PI / 2 : Math.PI / 2)
+          : ((opponent && opponent.y < this.y) ? -Math.PI / 2 : Math.PI / 2);
+        this.gunAngle = verticalAngle;
+        this.angle = verticalAngle;
         const redDmgMult = getStolenMultiplier('gojo_red', 'damageMultiplier') || getStolenMultiplier('gojo', 'damageMultiplier');
         const redDamage = (CONFIG.gojo?.redDamage || 100) * redDmgMult;
         const redKnockback = CONFIG.gojo?.redKnockback || 40;
-        const pushAngle = this.gunAngle !== undefined ? this.gunAngle : 0;
+        const pushAngle = verticalAngle;
         const frontalReach = CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650;
         const frontalArc = CONFIG.gojo?.redFrontalArc || (Math.PI * 0.45);
         const halfArc = frontalArc / 2;
@@ -1919,6 +1933,7 @@ export class RubbickFighter extends Fighter {
           spawnGojoRedFrontalBlast(this.x, this.y, pushAngle, frontalReach, frontalArc, { isRubbick: true, colorTheme: 'green' });
         }
         break;
+      }
       case 'gojo_domain':
         {
           const domainDurationMult = getStolenMultiplier('gojo_domain', 'durationMultiplier') || 0.7;

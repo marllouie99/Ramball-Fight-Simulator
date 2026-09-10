@@ -34,23 +34,47 @@ export function activateRed(fighter) {
   fighter.vx = 0;
   fighter.vy = 0;
 
-  // Find and lock target angle toward nearest enemy
-  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-  let targetF = null;
-  state.fighters.forEach((f, idx) => {
-    if (f && f !== fighter && f.hp > 0) {
-      const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-      if (isEnemy) {
-        const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
-        if (!targetF || dist < Math.hypot(targetF.x - fighter.x, targetF.y - fighter.y)) {
-          targetF = f;
+  // Find and lock target angle strictly to vertical Up (-Math.PI / 2) or Down (Math.PI / 2) without snapping
+  const fighterY = fighter.y - (fighter.z || 0);
+  let verticalAngle;
+  if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
+    verticalAngle = (Math.sin(fighter.redTargetAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+  } else {
+    let targetF = (typeof fighter._findVerticallyAlignedEnemy === 'function')
+      ? (fighter._findVerticallyAlignedEnemy() || fighter._redTargetRef)
+      : fighter._redTargetRef;
+
+    if (!targetF && state.fighters) {
+      const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
+      let closestDist = Infinity;
+      state.fighters.forEach((f, idx) => {
+        if (f && f !== fighter && f.hp > 0) {
+          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+          if (isEnemy) {
+            const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
+            if (dist < closestDist) {
+              closestDist = dist;
+              targetF = f;
+            }
+          }
         }
-      }
+      });
     }
-  });
-  
-  fighter._redTargetRef = targetF;
-  fighter.redTargetAngle = targetF ? Math.atan2(targetF.y - fighter.y, targetF.x - fighter.x) : fighter.gunAngle;
+    
+    fighter._redTargetRef = targetF;
+    if (targetF && typeof targetF.y === 'number') {
+      const targetY = targetF.y - (targetF.z || 0);
+      verticalAngle = (targetY < fighterY) ? -Math.PI / 2 : Math.PI / 2;
+    } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+      verticalAngle = (Math.sin(fighter.gunAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+    } else {
+      verticalAngle = -Math.PI / 2;
+    }
+  }
+
+  fighter.redTargetAngle = verticalAngle;
+  fighter.gunAngle = verticalAngle;
+  fighter.angle = verticalAngle;
 
   // Light buildup sparks
   spawnSparks(fighter.x, fighter.y, 12, 'crimsonSniper');
@@ -80,8 +104,17 @@ export function detonateRed(fighter) {
   fighter._hasFiredRedAtLeastOnce = true;
   fighter.lastCastSkill = 'red';
 
-  const pushAngle = fighter.redTargetAngle !== undefined ? fighter.redTargetAngle : (fighter.gunAngle || 0);
+  let pushAngle;
+  if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
+    pushAngle = (Math.sin(fighter.redTargetAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+  } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+    pushAngle = (Math.sin(fighter.gunAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+  } else {
+    pushAngle = -Math.PI / 2;
+  }
   fighter.redTargetAngle = pushAngle;
+  fighter.gunAngle = pushAngle;
+  fighter.angle = pushAngle;
 
   const frontalReach = CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650;
   const frontalArc = CONFIG.gojo?.redFrontalArc || (Math.PI * 0.45); // ~80-degree frontal cone
@@ -233,10 +266,21 @@ export function firePurple(fighter, ownerIndex) {
   }
 
   let purpleLife = CONFIG.gojo?.purpleLife || 250;
-  if (fighter.purpleCastAngle !== undefined) {
-    fighter.gunAngle = fighter.purpleCastAngle;
-    fighter.angle = fighter.purpleCastAngle;
+
+  // Lock release angle strictly to committed cast angle (no snapping auto-aim upon firing)
+  let horizontalAngle;
+  if (fighter.purpleCastAngle !== undefined && !Number.isNaN(fighter.purpleCastAngle)) {
+    horizontalAngle = (Math.cos(fighter.purpleCastAngle) < 0) ? Math.PI : 0;
+  } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+    horizontalAngle = (Math.cos(fighter.gunAngle) < 0) ? Math.PI : 0;
+  } else {
+    horizontalAngle = 0;
   }
+
+  fighter.purpleCastAngle = horizontalAngle;
+  fighter.gunAngle = horizontalAngle;
+  fighter.angle = horizontalAngle;
+
   if (projectileSystem && projectileSystem.fireGojoPurple) {
     const proj = projectileSystem.fireGojoPurple(
       fighter, 
@@ -262,8 +306,23 @@ export function firePurple(fighter, ownerIndex) {
   fighter.purpleRecoveryMaxTimer = recoveryDuration;
   fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1200;
   fighter.shootCooldown = fighter.shootCooldownMax ?? 60; // Reset basic attack cooldown so it resumes cleanly once purple expires
-  fighter.vx = 0;
-  fighter.vy = 0;
+  if (recoveryDuration > 0) {
+    fighter.vx = 0;
+    fighter.vy = 0;
+  } else {
+    // If no recovery timer configured, immediately move backwards away from target / purple cast angle
+    let backwardAngle;
+    if (fighter.purpleCastAngle !== undefined && !Number.isNaN(fighter.purpleCastAngle)) {
+      backwardAngle = fighter.purpleCastAngle + Math.PI;
+    } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+      backwardAngle = fighter.gunAngle + Math.PI;
+    } else {
+      backwardAngle = (fighter.angle || 0) + Math.PI;
+    }
+    if (typeof fighter.resumeMovement === 'function') {
+      fighter.resumeMovement(null, 1.0, backwardAngle);
+    }
+  }
 
   // When Gojo fires Purple, disable his Limitless Infinity barrier until the Purple life expires
   fighter.infinityActive = false;

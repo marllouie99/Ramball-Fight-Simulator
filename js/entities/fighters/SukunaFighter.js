@@ -276,6 +276,24 @@ export class SukunaFighter extends Fighter {
     if (this.isChannelingDomainExpansion) {
       return false; // Disable auto-aim while channeling Domain Expansion!
     }
+    if (this.isChannelingDivineFlame || (this.divineFlameRecoveryTimer || 0) > 0) {
+      const cardinal = (this.divineFlameCastAngle !== undefined && !Number.isNaN(this.divineFlameCastAngle))
+        ? this.divineFlameCastAngle
+        : this._getCardinalAngle(target);
+      this.gunAngle = cardinal;
+      this.angle = cardinal;
+      return false;
+    }
+
+    if (!this.isMeleeMode) {
+      // In Ranged Mode (Basic Attack Dismantle): Aim strictly in 4 cardinal directions (Up, Down, Left, Right)
+      const aimTarget = target || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+      const cardinalAngle = this._getCardinalAngle(aimTarget);
+      this.gunAngle = cardinalAngle;
+      this.angle = cardinalAngle;
+      return true;
+    }
+
     super.aim(target);
 
     // When stationary, body facing matches gunAngle (target aim direction).
@@ -284,6 +302,7 @@ export class SukunaFighter extends Fighter {
     if (speed <= 0.05) {
       this.angle = this.gunAngle;
     }
+    return true;
   }
 
   /**
@@ -377,29 +396,19 @@ export class SukunaFighter extends Fighter {
     if (!projectileSystem) return;
 
     // Find closest valid enemy target
-    let closestEnemy = null;
-    let minDist = Infinity;
-    const myTeam = state.getFighterTeam(ownerIndex);
-
-    if (state.fighters) {
-      state.fighters.forEach((f, idx) => {
-        if (f && f !== this && f.hp > 0) {
-          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-          if (isEnemy) {
-            const dist = Math.hypot(f.x - this.x, f.y - this.y);
-            if (dist < minDist) {
-              minDist = dist;
-              closestEnemy = f;
-            }
-          }
-        }
-      });
-    }
+    const closestEnemy = typeof this._findClosestEnemy === 'function'
+      ? this._findClosestEnemy()
+      : (this.target || null);
 
     if (!closestEnemy) return; // No targets available (e.g., won the match)
 
     const slashDamage = CONFIG.sukuna?.slashDamage ?? this.damage;
     const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
+
+    // Determine strict cardinal angle (Up, Down, Left, Right)
+    const cardinalAngle = this._getCardinalAngle(closestEnemy);
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
 
     // Trigger single-hand slicing chop animation with off-hand strictly hidden
     this.punchAnimTimer = 0;
@@ -408,7 +417,7 @@ export class SukunaFighter extends Fighter {
     this.slashGlowTimer = 20;
     this.slashHand = (this.slashHand === 1 ? 0 : 1); // Strict toggle: 0 = Right hand, 1 = Left hand
 
-    // Ranged Attack: Dismantle Slash
+    // Ranged Attack: Dismantle Slash (firing strictly in cardinal direction)
     projectileSystem.fireProjectile(
       this,
       ownerIndex,
@@ -416,7 +425,10 @@ export class SukunaFighter extends Fighter {
       false,
       slashSpeed,
       false,
-      'ghostBlade'
+      'ghostBlade',
+      undefined,
+      undefined,
+      cardinalAngle
     );
     spawnFloatingText(this.x, this.y - this.r - 20, 'DISMANTLE!', '#E0E8FF');
     if (this._slashSoundCooldown <= 0) {
@@ -424,8 +436,6 @@ export class SukunaFighter extends Fighter {
       playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.7);
       this._slashSoundCooldown = 12; // ~0.2 seconds at 60fps
     }
-
-
   }
 
   update(opponent, ownerIndex, arena) {
@@ -688,11 +698,10 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Centralized smooth aim rotation while channeling Divine Flame / Fuga (continuous tracking without snapping)
-      const aimTarget = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
-      if (aimTarget && aimTarget.hp > 0) {
-        this.aim(aimTarget);
-        this.divineFlameCastAngle = this.gunAngle;
+      // Lock cardinal firing stance fixed in place; do not continuously auto-aim or rotate while channeling
+      if (this.divineFlameCastAngle !== undefined && !Number.isNaN(this.divineFlameCastAngle)) {
+        this.gunAngle = this.divineFlameCastAngle;
+        this.angle = this.divineFlameCastAngle;
       }
 
       if (this.divineFlameChargeTimer >= this.divineFlameChargeMax) {
@@ -743,20 +752,10 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Smoothly rotate aim during post-fire recovery (no instant auto-aim snap on release!)
-      if (opponent && !opponent.isDead && opponent.hp > 0) {
-        const targetAngle = Math.atan2((opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0)), opponent.x - this.x);
-        let currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
-        while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
-        let diff = targetAngle - currentAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-
-        const turnRate = 0.04;
-        const newAngle = currentAngle + diff * turnRate;
-        this.gunAngle = newAngle;
-        this.angle = newAngle;
+      // Lock cardinal firing stance fixed in place during post-fire recovery
+      if (this.divineFlameCastAngle !== undefined && !Number.isNaN(this.divineFlameCastAngle)) {
+        this.gunAngle = this.divineFlameCastAngle;
+        this.angle = this.divineFlameCastAngle;
       }
 
       this.resolveWallBounce(arena);
@@ -769,25 +768,30 @@ export class SukunaFighter extends Fighter {
 
       const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
 
-      // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine!
+      // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine when enemy is cardinally aligned (Up, Down, Left, Straight/Right)!
       if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
-        this.aim(opponent);
-        this.divineFlameCastAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        this.isChannelingDivineFlame = true;
-        this.divineFlameChargeTimer = 0;
-        this.punchAnimTimer = 0;
-        this.slashSwingTimer = 0;
-        this.slashGlowTimer = 0;
-        this.cleaveSwingTimer = 0;
-        this.isMeleeMode = false;
-        spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA: OPEN)!', '#FF4500');
+        const alignedResult = this._findCardinalAlignedEnemy(opponent);
+        if (alignedResult) {
+          const { target: alignedTarget, cardinalAngle } = alignedResult;
+          this.divineFlameCastAngle = cardinalAngle;
+          this.gunAngle = cardinalAngle;
+          this.angle = cardinalAngle;
+          this.isChannelingDivineFlame = true;
+          this.divineFlameChargeTimer = 0;
+          this.punchAnimTimer = 0;
+          this.slashSwingTimer = 0;
+          this.slashGlowTimer = 0;
+          this.cleaveSwingTimer = 0;
+          this.isMeleeMode = false;
+          spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA: OPEN)!', '#FF4500');
 
-        const sound = getSkillSound(this._def?.id, 'divineFlame');
-        if (sound) {
-          this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
-          playLoopingSound(this.fugaSoundKey, sound.src, sound.volume);
+          const sound = getSkillSound(this._def?.id, 'divineFlame');
+          if (sound) {
+            this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
+            playLoopingSound(this.fugaSoundKey, sound.src, sound.volume);
+          }
+          return;
         }
-        return;
       }
     }
 
@@ -800,27 +804,32 @@ export class SukunaFighter extends Fighter {
 
     // Check for Divine Flame (Skill 2 - disabled in demo mode)
     if (!this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
-      const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
-      const safeDistance = 200;
-      if (distSq > safeDistance ** 2) {
-        this.aim(opponent);
-        this.divineFlameCastAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        this.isChannelingDivineFlame = true;
-        this.isChannelingDomainExpansion = false; // Explicit mutual exclusion
-        this.divineFlameChargeTimer = 0;
-        this.punchAnimTimer = 0;
-        this.slashSwingTimer = 0;
-        this.slashGlowTimer = 0;
-        this.cleaveSwingTimer = 0;
-        this.isMeleeMode = false;
-        spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA)', '#FF4500');
+      const alignedResult = this._findCardinalAlignedEnemy(opponent);
+      if (alignedResult) {
+        const { target: alignedTarget, cardinalAngle } = alignedResult;
+        const distSq = (this.x - alignedTarget.x) ** 2 + (this.y - alignedTarget.y) ** 2;
+        const safeDistance = 120;
+        if (distSq > safeDistance ** 2) {
+          this.divineFlameCastAngle = cardinalAngle;
+          this.gunAngle = cardinalAngle;
+          this.angle = cardinalAngle;
+          this.isChannelingDivineFlame = true;
+          this.isChannelingDomainExpansion = false; // Explicit mutual exclusion
+          this.divineFlameChargeTimer = 0;
+          this.punchAnimTimer = 0;
+          this.slashSwingTimer = 0;
+          this.slashGlowTimer = 0;
+          this.cleaveSwingTimer = 0;
+          this.isMeleeMode = false;
+          spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA)', '#FF4500');
 
-        const sound = getSkillSound(this._def?.id, 'divineFlame');
-        if (sound) {
-          this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
-          playLoopingSound(this.fugaSoundKey, sound.src, sound.volume);
+          const sound = getSkillSound(this._def?.id, 'divineFlame');
+          if (sound) {
+            this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
+            playLoopingSound(this.fugaSoundKey, sound.src, sound.volume);
+          }
+          return; // Prevent melee/shoot in the same frame
         }
-        return; // Prevent melee/shoot in the same frame
       }
     }
 
@@ -2028,5 +2037,158 @@ export class SukunaFighter extends Fighter {
   drawDomainForeground(ctx) {
     renderSukunaDomainForeground(this, ctx);
     renderSukunaDomainSlashLines(this, ctx);
+  }
+
+  _getCardinalAngle(target) {
+    if (!target) return (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : 0;
+    const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+    const sukunaY = this.y - (this.z || 0);
+    const dx = (target.x !== undefined ? target.x : this.x) - this.x;
+    const dy = targetY - sukunaY;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? 0 : Math.PI;
+    } else {
+      return dy >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+  }
+
+  _findClosestEnemy(preferredOpponent = null) {
+    if (preferredOpponent && !preferredOpponent.isDead && preferredOpponent.hp > 0) {
+      return preferredOpponent;
+    }
+    let closest = null;
+    let minDist = Infinity;
+    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+    const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
+
+    const allTargets = [];
+    if (typeof state !== 'undefined') {
+      if (state.fighters) allTargets.push(...state.fighters);
+      if (state.illusions) allTargets.push(...state.illusions);
+      if (state.cjDriveBys) allTargets.push(...state.cjDriveBys);
+    }
+
+    for (const ent of allTargets) {
+      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable) continue;
+      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
+      if (ent.owner === this) continue;
+      if (myTeam !== null && myTeam !== undefined) {
+        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+        if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
+        if (ent.team !== undefined && ent.team === myTeam) continue;
+      }
+
+      const dist = Math.hypot(ent.x - this.x, ent.y - this.y);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = ent;
+      }
+    }
+    return closest;
+  }
+
+  _findCardinalAlignedEnemy(preferredOpponent = null) {
+    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+    const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
+
+    const candidates = [];
+    if (preferredOpponent && !preferredOpponent.isDead && preferredOpponent.hp > 0) {
+      candidates.push(preferredOpponent);
+    }
+    if (typeof state !== 'undefined') {
+      if (state.fighters) {
+        for (const f of state.fighters) {
+          if (f && !candidates.includes(f)) candidates.push(f);
+        }
+      }
+      if (state.illusions) {
+        for (const ill of state.illusions) {
+          if (ill && !candidates.includes(ill)) candidates.push(ill);
+        }
+      }
+      if (state.cjDriveBys) {
+        for (const car of state.cjDriveBys) {
+          if (car && !candidates.includes(car)) candidates.push(car);
+        }
+      }
+    }
+
+    const maxCorridorHalfWidth = CONFIG.sukuna?.divineFlameCorridorHalfWidth ?? 45;
+    const maxDetectionAngle = CONFIG.sukuna?.divineFlameDetectionAngle ?? (Math.PI * 0.08);
+    const maxRange = CONFIG.sukuna?.divineFlameTriggerRange || 850;
+    const sukunaY = this.y - (this.z || 0);
+
+    let bestTarget = null;
+    let bestDist = Infinity;
+    let bestAngle = 0;
+
+    for (const ent of candidates) {
+      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable) continue;
+      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
+      if (ent.owner === this) continue;
+      if (myTeam !== null && myTeam !== undefined) {
+        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+        if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
+        if (ent.team !== undefined && ent.team === myTeam) continue;
+      }
+
+      const entY = ent.y - (ent.z || 0);
+      const dx = ent.x - this.x;
+      const dy = entY - sukunaY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > maxRange) continue;
+      if (dist < (this.r + 5)) continue;
+
+      const angle = Math.atan2(dy, dx);
+      let isAligned = false;
+      let cardinal = 0;
+
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        // Horizontal dominance: Right (0) or Left (Math.PI)
+        if (dx >= 0) {
+          let diff = Math.abs(angle);
+          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+          if (diff <= maxDetectionAngle && Math.abs(dy) <= maxCorridorHalfWidth) {
+            isAligned = true;
+            cardinal = 0;
+          }
+        } else {
+          let diff = Math.abs(Math.abs(angle) - Math.PI);
+          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+          if (diff <= maxDetectionAngle && Math.abs(dy) <= maxCorridorHalfWidth) {
+            isAligned = true;
+            cardinal = Math.PI;
+          }
+        }
+      } else {
+        // Vertical dominance: Down (Math.PI / 2) or Up (-Math.PI / 2)
+        if (dy >= 0) {
+          let diff = Math.abs(angle - (Math.PI / 2));
+          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+          if (diff <= maxDetectionAngle && Math.abs(dx) <= maxCorridorHalfWidth) {
+            isAligned = true;
+            cardinal = Math.PI / 2;
+          }
+        } else {
+          let diff = Math.abs(angle - (-Math.PI / 2));
+          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+          if (diff <= maxDetectionAngle && Math.abs(dx) <= maxCorridorHalfWidth) {
+            isAligned = true;
+            cardinal = -Math.PI / 2;
+          }
+        }
+      }
+
+      if (isAligned) {
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestTarget = ent;
+          bestAngle = cardinal;
+        }
+      }
+    }
+
+    return bestTarget ? { target: bestTarget, cardinalAngle: bestAngle } : null;
   }
 }

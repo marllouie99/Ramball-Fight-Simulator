@@ -94,7 +94,7 @@ export function performMeleeAttack(fighter, opponent) {
   const isCaughtInBeam = (
     (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
     fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 ||
-    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry)) ||
+    fighter.caughtInGenosFlurry ||
     fighter.isDraggedByGetsuga
   );
 
@@ -384,7 +384,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   const isInterrupted = (
     fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 ||
     (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
-    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry)) ||
+    fighter.caughtInGenosFlurry ||
     fighter.isDraggedByGetsuga
   );
 

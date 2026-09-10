@@ -66,6 +66,12 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     skillShotId = 'getsugaTensho';
     const form = opts.getsugaForm || (opts.projectile && opts.projectile.getsugaForm) || 'shikai';
     skillShotColor = (form === 'final_bankai' || form === 'bankai' || form === 'bankai_hollow') ? '#FF1E00' : '#00D5FF';
+  } else if (opts.isGenosBeam || (opts.projectile && opts.projectile.isGenosBeam)) {
+    skillShotId = 'genosBeam';
+    skillShotColor = '#FF5500';
+  } else if (opts.isMachineGunBlow || opts.isGenosMachineBlow || opts.isGenosFlurry) {
+    skillShotId = 'genosMachineBlow';
+    skillShotColor = '#FF5500';
   }
 
   let finalAmount = amount;
@@ -128,6 +134,31 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
 
   if (isPureLoveBeamHit && isPureLoveBeamAdapted) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Pure Love Beam (same as Gojo's Purple)!
+  }
+
+  // ── 50% Damage Reduction when Adapted to Genos's Spiral Incineration Cannon Beam (same logic as Gojo's Purple) ──
+  const isGenosBeamHit = Boolean(opts.isGenosBeam || opts.isIncinerationCannon || (opts.projectile && opts.projectile.isGenosBeam));
+  const isGenosBeamAdapted = Boolean(
+    fighter.adaptedGenosBeam || 
+    (fighter.adaptedSkills && (fighter.adaptedSkills['genosBeam'] || fighter.adaptedSkills['incinerationCannon'])) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF5500') && fighter.adapted?.skill)
+  );
+
+  if (isGenosBeamHit && isGenosBeamAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Genos's Beam!
+  }
+
+  // ── 50% Damage Reduction when Adapted to Genos's Machine Gun Blows (same logic as Gojo's Purple) ──
+  const isGenosFlurryHit = Boolean(opts.isMachineGunBlow || opts.isGenosMachineBlow || opts.isGenosFlurry);
+  const isGenosFlurryAdapted = Boolean(
+    fighter.adaptedGenosFlurry || 
+    fighter.adaptedGenosMachineBlow || 
+    (fighter.adaptedSkills && (fighter.adaptedSkills['genosMachineBlow'] || fighter.adaptedSkills['genosFlurry'])) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF5500') && fighter.adapted?.melee)
+  );
+
+  if (isGenosFlurryHit && isGenosFlurryAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Genos's Machine Gun Blows!
   }
 
   // ── 50% Damage Reduction when Adapted to Soul Disfigurement ──
@@ -239,7 +270,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
 
     // ── FATAL DAMAGE THRESHOLD EVALUATION ──
     // The Wheel of Adaptation ONLY clicks when accumulated damage fills the WOA skill bar (meets or exceeds fatalDamageThresholdPct)
-    if (!opts.isPureLoveBeam && !opts.isGenosBeam) {
+    if (!opts.isPureLoveBeam) {
       const threshold = fighter.maxHp * thresholdPct;
       if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
         triggerAdaptation(fighter, type, attacker);
@@ -259,9 +290,7 @@ export function triggerAdaptation(fighter, type, attacker) {
   // Block any general adaptation wheel clicks while caught in beam paralysis
   const isCaughtInBeam = fighter.caughtInPureLoveBeam || 
                          (fighter.pureLoveBeamTimer || 0) > 0 || 
-                         (fighter.pureLoveBeamRecoveryTimer || 0) > 0 ||
-                         (fighter.caughtInGenosBeamTimer || 0) > 0 || 
-                         fighter.caughtInGenosFlurry;
+                         (fighter.pureLoveBeamRecoveryTimer || 0) > 0;
   if (isCaughtInBeam) {
     return;
   }
@@ -665,7 +694,25 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   }
 
   const wheelY = fighter.y - fighter.r - 28;
-  if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
+  if (skillShotId === 'genosBeam' || skillShotId === 'incinerationCannon') {
+    fighter.adaptedGenosBeam = true;
+    fighter.adaptedSkills['genosBeam'] = true;
+    if (!fighter.adapted) fighter.adapted = {};
+    fighter.adapted.skill = true;
+    fighter.skillDodgeReady['genosBeam'] = false;
+    fighter.skillDodgeReady['incinerationCannon'] = false;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: INCINERATION CANNON!', color || '#FF5500');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Beam Damage Reduction!', '#FFFFFF');
+  } else if (skillShotId === 'genosMachineBlow' || skillShotId === 'genosFlurry') {
+    fighter.adaptedGenosFlurry = true;
+    fighter.adaptedGenosMachineBlow = true;
+    fighter.adaptedSkills['genosMachineBlow'] = true;
+    if (!fighter.adapted) fighter.adapted = {};
+    fighter.adapted.melee = true;
+    fighter.skillDodgeReady['genosMachineBlow'] = false;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: MACHINE GUN BLOWS!', color || '#FF5500');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Flurry Damage Reduction!', '#FFFFFF');
+  } else if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: GETSUGA TENSHO!', color || '#FF1E32');
     spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Damage Reduction & Paralyze Immune!', '#FFFFFF');
   } else {

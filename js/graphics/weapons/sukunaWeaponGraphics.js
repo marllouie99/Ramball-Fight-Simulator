@@ -242,8 +242,6 @@ export function drawSukunaCleave(ctx, p) {
   ctx.restore();
 }
 
-let _fugaLocalTrailPool = [];
-
 export function drawSukunaFurnaceArrow(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
@@ -256,18 +254,12 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   // Performance: Detect low quality mode (explicit performance settings only)
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.2)));
 
-  // Initialize trail history and particle systems
+  // Initialize particle systems
   if (!p._fugaFlameTimer) p._fugaFlameTimer = 0;
   p._fugaFlameTimer++;
 
-  if (!p._trailHistory) p._trailHistory = [];
   if (!p.flameParticles) p.flameParticles = [];
   if (!p.emberParticles) p.emberParticles = [];
-
-  // Record position trail for the long streaming fire wake (shorter trail in low quality)
-  p._trailHistory.push({ x: p.x, y: p.y, time: time });
-  const maxTrailLen = isLowQuality ? 16 : 48;
-  while (p._trailHistory.length > maxTrailLen) p._trailHistory.shift();
 
   // ─── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched (fewer in low quality)
   const spawnRate = isLowQuality ? 1 : 3;
@@ -315,115 +307,6 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
-
-  // ─────────────────────────────────────────────────────────
-  // LAYER 0: LONG TURBULENT FIRE WAKE (drawn from trail history)
-  // A massive streaking energy wake that makes the arrow look
-  // like it's ripping through the air and igniting everything
-  // ─────────────────────────────────────────────────────────
-  if (p._trailHistory.length > 3) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-
-    // Convert trail history to local coordinates
-    const cosA = Math.cos(-angle);
-    const sinA = Math.sin(-angle);
-    if (!_fugaLocalTrailPool || _fugaLocalTrailPool.length < p._trailHistory.length) {
-      _fugaLocalTrailPool = [];
-      for (let k = 0; k < 60; k++) _fugaLocalTrailPool.push({ x: 0, y: 0 });
-    }
-    const localTrail = _fugaLocalTrailPool;
-    for (let k = 0; k < p._trailHistory.length; k++) {
-      const pt = p._trailHistory[k];
-      const dx = pt.x - p.x;
-      const dy = pt.y - p.y;
-      localTrail[k].x = dx * cosA - dy * sinA;
-      localTrail[k].y = dx * sinA + dy * cosA;
-    }
-
-    // Draw multiple layered turbulent fire tongues along the trail (draw only 1 layer in low quality mode)
-    const wakeLayers = isLowQuality ? 1 : 3;
-    for (let layer = 0; layer < wakeLayers; layer++) {
-      const widthMul = layer === 0 ? 1.0 : layer === 1 ? 0.6 : 0.3;
-      const baseWidth = (18 + speed * 0.5) * widthMul;
-
-      ctx.beginPath();
-      const len = localTrail.length;
-
-      // Top edge with turbulence
-      for (let j = len - 1; j >= 0; j--) {
-        const t = j / (len - 1); // 0=oldest, 1=newest
-        const fadeWidth = baseWidth * (0.15 + t * 0.85);
-        const turb = Math.sin(time * 7.0 - j * 0.6 + layer * 2.1) * fadeWidth * 0.4;
-        const turb2 = Math.cos(time * 5.3 + j * 0.9 + layer * 1.3) * fadeWidth * 0.25;
-        const yOff = fadeWidth + turb + turb2;
-        if (j === len - 1) ctx.moveTo(localTrail[j].x, localTrail[j].y - yOff);
-        else ctx.lineTo(localTrail[j].x, localTrail[j].y - yOff);
-      }
-
-      // Bottom edge with turbulence (reversed)
-      for (let j = 0; j < len; j++) {
-        const t = j / (len - 1);
-        const fadeWidth = baseWidth * (0.15 + t * 0.85);
-        const turb = Math.sin(time * 7.0 - j * 0.6 + layer * 2.1 + 3.14) * fadeWidth * 0.4;
-        const turb2 = Math.cos(time * 5.3 + j * 0.9 + layer * 1.3 + 1.57) * fadeWidth * 0.25;
-        const yOff = fadeWidth + turb + turb2;
-        ctx.lineTo(localTrail[j].x, localTrail[j].y + yOff);
-      }
-
-      ctx.closePath();
-
-      // Color cascade: white → yellow → golden orange → deep orange → crimson
-      const trailStartX = localTrail[len - 1].x;
-      const trailEndX = localTrail[0].x;
-
-      if (isLowQuality) {
-        // Fast flat fill instead of allocating linear gradients on the CPU per frame
-        ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 160, 255, 0.4)' : 'rgba(255, 120, 0, 0.35)';
-        ctx.fill();
-      } else {
-        const wakeGrad = ctx.createLinearGradient(trailStartX, 0, trailEndX, 0);
-        if (p.isFrozenByInfinity) {
-          if (layer === 0) {
-            wakeGrad.addColorStop(0, `rgba(0, 120, 255, ${0.40})`);
-            wakeGrad.addColorStop(0.3, `rgba(0, 80, 220, ${0.30})`);
-            wakeGrad.addColorStop(0.7, `rgba(0, 40, 180, ${0.15})`);
-            wakeGrad.addColorStop(1, 'rgba(0, 10, 80, 0)');
-          } else if (layer === 1) {
-            wakeGrad.addColorStop(0, `rgba(0, 229, 255, ${0.60})`);
-            wakeGrad.addColorStop(0.25, `rgba(0, 160, 255, ${0.45})`);
-            wakeGrad.addColorStop(0.6, `rgba(0, 90, 220, ${0.25})`);
-            wakeGrad.addColorStop(1, 'rgba(0, 20, 100, 0)');
-          } else {
-            wakeGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85})`);
-            wakeGrad.addColorStop(0.15, `rgba(224, 255, 255, ${0.70})`);
-            wakeGrad.addColorStop(0.4, `rgba(0, 229, 255, ${0.50})`);
-            wakeGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
-          }
-        } else {
-          if (layer === 0) {
-            wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
-            wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
-            wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
-            wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
-          } else if (layer === 1) {
-            wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
-            wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
-            wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
-            wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
-          } else {
-            wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
-            wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
-            wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
-            wakeGrad.addColorStop(1, 'rgba(200, 60, 0, 0)');
-          }
-        }
-        ctx.fillStyle = wakeGrad;
-        ctx.fill();
-      }
-    }
-    ctx.restore();
-  }
 
   // ═════════════════════════════════════════════════════════
   // LAYER 1: FLUID FLAME BLOBS — curling, twisting smoke-fire
@@ -547,27 +430,6 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   });
 
   ctx.restore(); // lighter
-
-  // ═════════════════════════════════════════════════════════
-  // LAYER 3: TURBULENT AIR-RIP SHOCKWAVE LINES (completely skipped in low quality to save paths)
-  // ═════════════════════════════════════════════════════════
-  if (!isLowQuality) {
-    ctx.save();
-    ctx.globalAlpha = 0.35;
-    ctx.strokeStyle = p.isFrozenByInfinity ? 'rgba(0, 255, 255, 0.7)' : 'rgba(255, 200, 100, 0.4)';
-    ctx.lineWidth = 1.0;
-    ctx.lineCap = 'round';
-    for (let i = 0; i < 5; i++) {
-      const yOff = (i - 2) * 6 + Math.sin(time * 8 + i * 1.7) * 4;
-      const startX = -10 - Math.random() * 10;
-      const endX = startX - 25 - Math.random() * 35;
-      ctx.beginPath();
-      ctx.moveTo(startX, yOff);
-      ctx.lineTo(endX, yOff + Math.sin(time * 6 + i) * 3);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
 
   ctx.restore(); // restore translate/rotate
 
@@ -780,9 +642,9 @@ function _renderVectorDivineFlameArrow(ctx, {
   // ═════════════════════════════════════════════════════════
   for (let side of [-1, 1]) {
     const tailPhase = time * 7.5 + side * 1.5;
-    const plumeScale = isFlying ? 1.6 : 1.0;
+    const plumeScale = isFlying ? 0.7 : 1.0;
     const fletchLen = (40 + Math.sin(tailPhase) * 10) * progress * plumeScale;
-    const fletchSpread = (20 + Math.cos(tailPhase * 0.8) * 7) * progress;
+    const fletchSpread = (isFlying ? 7 : (20 + Math.cos(tailPhase * 0.8) * 7)) * progress;
 
     ctx.beginPath();
     ctx.moveTo(notchX + 8 * progress, 0);

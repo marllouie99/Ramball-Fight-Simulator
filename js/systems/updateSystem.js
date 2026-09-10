@@ -78,6 +78,11 @@ export function updateGame() {
               f.forcedMeleeTimer = 0;
               f.hitStunTimer = 0;
               f.knockbackStunTimer = 0;
+              // Prevent fighters from charging directly forward into each other at battle start
+              const startAngle = Math.random() * Math.PI * 2;
+              const spd = f.speed || 3.0;
+              f.vx = Math.cos(startAngle) * spd;
+              f.vy = Math.sin(startAngle) * spd;
               if (f.type === 'gojo' || (f._def && f._def.type === 'gojo')) {
                 f.combatAuraOpacity = 1;
               } else if (f.type === 'sukuna' || (f._def && f._def.type === 'sukuna')) {

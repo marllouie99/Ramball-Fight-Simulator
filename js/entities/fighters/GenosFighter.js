@@ -88,16 +88,102 @@ export class GenosFighter extends Fighter {
     this.damageNumberColor = CONFIG.genos?.color || '#FF5500';
   }
 
+  /**
+   * Calculates the strict cardinal angle (UP / DOWN / LEFT / RIGHT STRAIGHT) towards the target.
+   * Standard: 0 (Right), Math.PI (Left), Math.PI / 2 (Down), -Math.PI / 2 (Up).
+   */
+  _getCardinalAngle(target) {
+    if (!target) return (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : 0;
+    const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+    const genosY = this.y - (this.z || 0);
+    const dx = (target.x !== undefined ? target.x : this.x) - this.x;
+    const dy = targetY - genosY;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? 0 : Math.PI;
+    } else {
+      return dy >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+  }
+
+  /**
+   * Finds the closest valid enemy target in the arena.
+   */
+  _findClosestEnemy(preferredOpponent) {
+    if (preferredOpponent && preferredOpponent !== this && preferredOpponent.hp > 0 && !preferredOpponent.isDead) {
+      return preferredOpponent;
+    }
+    let bestTarget = null;
+    let bestDist = Infinity;
+    const allEntities = [];
+    if (typeof state !== 'undefined') {
+      if (state.fighters) allEntities.push(...state.fighters);
+      if (state.illusions) allEntities.push(...state.illusions);
+    }
+    for (const e of allEntities) {
+      if (!e || e === this || e.isDead || e.hp <= 0) continue;
+      if (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') {
+        const rootEntity = e.owner || e;
+        const myTeam = state.getFighterTeam(state.fighters?.indexOf(this));
+        const otherTeam = state.getFighterTeam(state.fighters?.indexOf(rootEntity));
+        if (myTeam !== null && myTeam !== undefined && otherTeam !== null && otherTeam !== undefined && myTeam === otherTeam) continue;
+      }
+      const d = Math.hypot(e.x - this.x, e.y - this.y);
+      if (d < bestDist) {
+        bestDist = d;
+        bestTarget = e;
+      }
+    }
+    return bestTarget;
+  }
+
   isStationarySkillActive() {
     return Boolean(
       (this.incinerateChargeTimer > 0) ||
       (this.machineGunFlurryTimer > 0) ||
       (this.machineGunBlowTimer > 0) ||
       this.isIncinerating ||
+      this.isChargingUlt ||
+      this.isFiringUlt ||
       this.isSelfDestructing ||
       this.isSelfDestructRecovering ||
       super.isStationarySkillActive?.()
     );
+  }
+
+  canAim() {
+    if (this.isChargingUlt || this.isFiringUlt || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating || this.machineGunFlurryTimer > 0 || this.machineGunBlowTimer > 0) {
+      return false; // Disable auto-aim while channeling ultimate beam or stationary skills!
+    }
+    return super.canAim();
+  }
+
+  aim(target) {
+    if (this.isChargingUlt || this.isFiringUlt) {
+      // Strictly preserve locked ult angle without snapping auto-aim to moving targets
+      if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
+        this.gunAngle = this.ultAngle;
+        this.angle = this.ultAngle;
+      }
+      return false;
+    }
+
+    if (this.isFlurrying) {
+      // Strictly preserve locked Machine Gun Blows cardinal angle
+      if (this.flurryAimAngle !== undefined && !Number.isNaN(this.flurryAimAngle)) {
+        this.gunAngle = this.flurryAimAngle;
+        this.angle = this.flurryAimAngle;
+      }
+      return false;
+    }
+
+    if (!this.canAim()) return false;
+
+    // In Ranged Mode (Incineration Palm Blast) & Melee: Aim strictly in 4 cardinal directions (Up, Down, Left, Right)
+    const aimTarget = target || this._findClosestEnemy();
+    const cardinalAngle = this._getCardinalAngle(aimTarget);
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
+    return true;
   }
 
   isEffectivelyAlive() {
@@ -127,46 +213,82 @@ export class GenosFighter extends Fighter {
 
     if (this.isChargingUlt) {
       ctx.save();
-      const beamW = CONFIG.genos?.ultBeamWidth || 70;
       // Start guide line right at the mechanical hands
       const startOffset = this.r + 5;
       const startX = this.x + Math.cos(beamAngle) * startOffset;
       const startY = this.y + Math.sin(beamAngle) * startOffset;
-      const range = CONFIG.genos?.ultBeamRange || 600;
-      const endX = startX + Math.cos(beamAngle) * range;
-      const endY = startY + Math.sin(beamAngle) * range;
+      const range = CONFIG.genos?.ultBeamRange || 700;
 
-      // 1. Guide laser line (pulsing orange/red)
-      ctx.strokeStyle = 'rgba(255, 50, 0, 0.7)';
-      ctx.lineWidth = 3.5 + Math.sin(now * 0.04) * 1.5;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
+      ctx.translate(startX, startY);
+      ctx.rotate(beamAngle);
 
-      // 2. Guide laser core
-      ctx.strokeStyle = '#FFAA00';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
+      // 1. Continuous Solid Precision Targeting Laser (Clean, Solid, High-Tech Core)
+      // A. Outer Thermal Bloom Aura
+      ctx.fillStyle = 'rgba(255, 68, 0, 0.20)';
+      ctx.fillRect(0, -6, range, 12);
 
-      // 3. Crackling energy guide rings collapsing onto nozzle
+      // B. Secondary Radiant Fiery Orange Glow
+      ctx.fillStyle = 'rgba(255, 85, 0, 0.45)';
+      ctx.fillRect(0, -3.5, range, 7);
+
+      // C. Deep Incineration Crimson Border
+      ctx.fillStyle = '#CC2A00';
+      ctx.fillRect(0, -2, range, 4);
+
+      // D. Solar Golden Plasma Line
+      ctx.fillStyle = '#FFE600';
+      ctx.fillRect(0, -1, range, 2);
+
+      // E. Ultra Pure White Center Precision Fusion Core Line
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, -0.5, range, 1);
+
+      // 2. High-Speed Longitudinal Energy Pulse Nodes
+      const pulseCount = 4;
+      for (let p = 0; p < pulseCount; p++) {
+        const pTravel = ((now * 0.35) + p * (range / pulseCount)) % range;
+        const pLen = 32;
+        ctx.fillStyle = 'rgba(255, 230, 0, 0.60)';
+        ctx.fillRect(pTravel - 4, -2, Math.min(pLen + 8, range - pTravel + 4), 4);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(pTravel, -1, Math.min(pLen, range - pTravel), 2);
+      }
+
+      // 3. Collapsing Inward Diamond Focus Rings (Energy Gathering)
       const ringCount = 3;
       for (let i = 0; i < ringCount; i++) {
-        const ringProgress = ((now * 0.015) + (i / ringCount)) % 1.0;
-        const dist = 80 * (1.0 - ringProgress);
-        const rx = startX - Math.cos(beamAngle) * dist;
-        const ry = startY - Math.sin(beamAngle) * dist;
-        
-        ctx.strokeStyle = `rgba(255, 140, 0, ${ringProgress * 0.8})`;
+        const ringProgress = ((now * 0.003) + (i / ringCount)) % 1.0;
+        const dist = 80 * (1.0 - ringProgress); // Collapses towards 0 (hands)
+        const ringR = 4 + ringProgress * 10;
+
+        ctx.strokeStyle = (i % 2 === 0) ? '#FFE600' : '#FF5500';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(rx, ry, 6 + ringProgress * 14, 0, Math.PI * 2);
+        ctx.moveTo(dist - ringR, 0);
+        ctx.lineTo(dist, -ringR);
+        ctx.lineTo(dist + ringR, 0);
+        ctx.lineTo(dist, ringR);
+        ctx.closePath();
         ctx.stroke();
       }
+
+      // 4. Muzzle Ignition Charge Diamond at Emitter Origin (0, 0)
+      const chargePulse = 0.85 + Math.sin(now * 0.08) * 0.15;
+      const flareR = 8 * chargePulse;
+      for (let dy = -flareR; dy <= flareR; dy += 2) {
+        const spanX = Math.round(flareR - Math.abs(dy));
+        const norm = Math.abs(dy) / flareR;
+        ctx.fillStyle = norm < 0.35 ? '#FFFFFF' : (norm < 0.7 ? '#FFE600' : '#FF5500');
+        ctx.fillRect(-spanX, dy, spanX * 2, 2);
+      }
+
+      // 5. Targeting Reticle / Endpoint Crosshair at `range`
+      const reticleR = 6;
+      ctx.fillStyle = '#FFE600';
+      ctx.fillRect(range - reticleR, -1, reticleR * 2, 2);
+      ctx.fillRect(range - 1, -reticleR, 2, reticleR * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(range - 2, -2, 4, 4);
 
       ctx.restore();
     }
@@ -208,17 +330,9 @@ export class GenosFighter extends Fighter {
     drawGenosHands(ctx, this);
   }
 
-  // Draw the beam overlay on top of all fighters, outlines, and hands!
+  // Draw the beam overlay on top of all fighters, outlines, and hands in authentic Pixel Art style!
   drawBeamOverlay(ctx) {
     if (this.hp <= 0 || !this.isFiringUlt) return; // Beam geometry only renders while actively firing
-
-    const isDarkMode = Boolean(
-      typeof state !== 'undefined' && (
-        state.arenaTheme === 'dark' || 
-        state.darkMode || 
-        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-      )
-    );
 
     const beamAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.ultAngle || this.angle || 0);
     const now = Date.now();
@@ -235,162 +349,15 @@ export class GenosFighter extends Fighter {
     // Flickering beam width
     const flickerW = beamW * (0.94 + Math.sin(now * 0.12) * 0.06);
 
-    if (isDarkMode) {
-      this._drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY);
-      return;
-    }
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-
-    // ── RELEASE FLARE EFFECT (First 16 frames of beam release - Gojo Purple Style) ──
-    const totalDuration = CONFIG.genos?.ultDurationFrames || 120;
-    const timeFired = totalDuration - (this.ultTimer || 0);
-    if (timeFired <= 16) {
-      const flareProgress = timeFired / 16;
-      const flareAlpha = Math.sin(flareProgress * Math.PI); // Ramps up to 1 and down to 0
-      const flareRadius = flickerW * (1.6 + flareProgress * 1.4);
-      
-      ctx.save();
-      ctx.translate(startX, startY);
-      ctx.rotate(beamAngle);
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = flareAlpha;
-
-      // 1. Perpendicular Anamorphic Lens Flare Line (Orange/Gold/White)
-      const flareGrad = ctx.createLinearGradient(0, -flareRadius * 2.2, 0, flareRadius * 2.2);
-      flareGrad.addColorStop(0, 'rgba(255, 60, 0, 0)');
-      flareGrad.addColorStop(0.3, 'rgba(255, 140, 0, 0.75)');
-      flareGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
-      flareGrad.addColorStop(0.7, 'rgba(255, 140, 0, 0.75)');
-      flareGrad.addColorStop(1, 'rgba(255, 60, 0, 0)');
-
-      ctx.strokeStyle = flareGrad;
-      ctx.lineWidth = 7.0 * flareAlpha;
-      ctx.beginPath();
-      ctx.moveTo(0, -flareRadius * 2.2);
-      ctx.lineTo(0, flareRadius * 2.2);
-      ctx.stroke();
-
-      // 2. 8-Point Radiant Incineration Starburst Flare Rays
-      ctx.strokeStyle = `rgba(255, 230, 150, ${flareAlpha * 0.95})`;
-      ctx.lineWidth = 2.5;
-      for (let k = 0; k < 8; k++) {
-        const rAngle = (k * Math.PI) / 4;
-        const rLen = flareRadius * (k % 2 === 0 ? 1.5 : 0.85);
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(rAngle) * rLen, Math.sin(rAngle) * rLen);
-        ctx.stroke();
-      }
-
-      // 3. Central Blinding Fusion Core Flare
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(0, 0, flareRadius * 0.45, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    // ── Bloom layered strokes ──
-    // Layer 1: Wide Thermal Bloom
-    ctx.strokeStyle = 'rgba(255, 60, 0, 0.09)';
-    ctx.lineWidth = flickerW * 1.70;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-
-    // Layer 2: Secondary heat wave bloom
-    ctx.strokeStyle = 'rgba(255, 80, 0, 0.22)';
-    ctx.lineWidth = flickerW * 1.35;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-
-    // Layer 3: Outer fire flare plume
-    ctx.strokeStyle = 'rgba(255, 100, 0, 0.45)';
-    ctx.lineWidth = flickerW * 1.10;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-
-    // Layer 4: Main Incineration Column
-    ctx.strokeStyle = 'rgba(255, 140, 0, 0.70)';
-    ctx.lineWidth = flickerW * 0.82;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-
-    // Layer 5: Inner Plasma Core
-    ctx.strokeStyle = 'rgba(255, 225, 0, 0.90)';
-    ctx.lineWidth = flickerW * 0.50;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-
-    // Layer 6: Fusion Core Center (White)
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = flickerW * 0.20;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-
-    // ── Muzzle Burst Bloom ──
-    ctx.fillStyle = 'rgba(255, 60, 0, 0.45)';
-    ctx.beginPath();
-    ctx.arc(startX, startY, flickerW * 1.15, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(255, 150, 0, 0.75)';
-    ctx.beginPath();
-    ctx.arc(startX, startY, flickerW * 0.75, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(255, 230, 100, 0.92)';
-    ctx.beginPath();
-    ctx.arc(startX, startY, flickerW * 0.45, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(startX, startY, flickerW * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ── Shockwave Rings ──
-    const ringCount = 3;
-    for (let i = 0; i < ringCount; i++) {
-      const ringDist = ((now * 0.24) + i * (range / ringCount)) % range;
-      const rx = startX + Math.cos(beamAngle) * ringDist;
-      const ry = startY + Math.sin(beamAngle) * ringDist;
-      
-      ctx.strokeStyle = `rgba(255, 230, 150, ${(1.0 - ringDist / range) * 0.75})`;
-      ctx.lineWidth = 3.5;
-      
-      ctx.save();
-      ctx.translate(rx, ry);
-      ctx.rotate(beamAngle);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 8, flickerW * 0.65, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    ctx.restore();
+    this._drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY, startOffset);
   }
 
   /**
-   * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Spiral Incineration Cannon Beam (Dark Mode).
-   * Renders in unrotated world coordinates (P = 2.0px) for authentic staircase pixel edges matching Rule #35.
+   * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Spiral Incineration Cannon Beam.
+   * Renders with multi-tiered plasma core, 3D stepped spiral helix coils, obsidian manga borders,
+   * diamond mach shockwaves, and stepped anamorphic starburst flare matching Rule #35.
    */
-  _drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY) {
+  _drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY, startOffset) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     const P = 2.0;
@@ -398,22 +365,20 @@ export class GenosFighter extends Fighter {
 
     const cosA = Math.cos(beamAngle);
     const sinA = Math.sin(beamAngle);
-    const perpX = -sinA;
-    const perpY = cosA;
 
     const halfW = Math.max(P * 3, snap(flickerW * 0.5));
     const tier1Half = Math.max(P, snap(halfW * 0.18)); // Superheated white fusion core
-    const tier2Half = Math.max(P * 2, snap(halfW * 0.42)); // Solar golden plasma
-    const tier3Half = Math.max(P * 3, snap(halfW * 0.72)); // Saturated fiery orange column
+    const tier2Half = Math.max(P * 2, snap(halfW * 0.40)); // Solar golden plasma
+    const tier3Half = Math.max(P * 3, snap(halfW * 0.68)); // Saturated fiery orange column
     const tier4Half = halfW;                              // Magma crimson outer body
     const auraHalf  = snap(halfW * 1.30);                 // Stepped pixel thermal aura
 
     const totalDuration = CONFIG.genos?.ultDurationFrames || 120;
     const timeFired = totalDuration - (this.ultTimer || 0);
 
-    // ── 1. Anamorphic Stepped Pixel Flare & Starburst (First 16 frames) ──
-    if (timeFired <= 16) {
-      const flareProg = timeFired / 16;
+    // ── 1. Anamorphic Stepped Pixel Flare & Starburst (First 18 frames) ──
+    if (timeFired <= 18) {
+      const flareProg = timeFired / 18;
       const flareAlpha = Math.sin(flareProg * Math.PI);
       const flareR = snap(flickerW * (1.6 + flareProg * 1.4));
 
@@ -447,7 +412,7 @@ export class GenosFighter extends Fighter {
         const cosR = Math.cos(rAngle);
         const sinR = Math.sin(rAngle);
 
-        for (let st = 0; st <= rLen; st += P * 0.75) {
+        for (let st = 0; st <= rLen; st += P * 1.5) {
           const wx = snap(startX + cosR * st);
           const wy = snap(startY + sinR * st);
           ctx.fillStyle = (st < rLen * 0.35) ? '#FFFFFF' : ((st < rLen * 0.75) ? '#FFE600' : '#FF5500');
@@ -470,129 +435,163 @@ export class GenosFighter extends Fighter {
       ctx.restore();
     }
 
-    // ── 2. Discrete 2D Stepped Pixel Beam Grid in World Space (0 to range) ──
-    const stepL = P * 0.75;
-    const stepV = P * 0.75;
+    // ── 2. Pixel Art Beam Body Alignment ──
+    ctx.save();
+    ctx.translate(startX, startY);
+    ctx.rotate(beamAngle);
 
-    // A. Outer Atmosphere Stepped Pixel Aura
-    ctx.fillStyle = 'rgba(255, 68, 0, 0.40)';
-    for (let u = 0; u <= range; u += stepL) {
-      const cx = startX + cosA * u;
-      const cy = startY + sinA * u;
-      for (let v = -auraHalf; v <= auraHalf; v += stepV) {
+    // ── 0. Palm Root Funnel (Seamless bridging from Genos's hands to beam origin) ──
+    const startOffsetVal = startOffset || (this.r + 5);
+    const minX = -snap(startOffsetVal - 6);
+    for (let fx = minX; fx <= 0; fx += P) {
+      const progress = (fx - minX) / (-minX || 1);
+      const curT4 = Math.max(P * 2, snap((0.35 + 0.65 * progress) * tier4Half));
+      const curT3 = Math.max(P, snap((0.35 + 0.65 * progress) * tier3Half));
+      const curT2 = Math.max(P, snap((0.35 + 0.65 * progress) * tier2Half));
+      const curT1 = Math.max(P, snap((0.35 + 0.65 * progress) * tier1Half));
+
+      // Border rim
+      ctx.fillStyle = '#800A00';
+      ctx.fillRect(fx, -curT4 - P, P, (curT4 + P) * 2);
+
+      // Tier 4 Magma Crimson
+      ctx.fillStyle = '#CC2A00';
+      ctx.fillRect(fx, -curT4, P, curT4 * 2);
+
+      // Tier 3 Fiery Orange
+      ctx.fillStyle = '#FF5500';
+      ctx.fillRect(fx, -curT3, P, curT3 * 2);
+
+      // Tier 2 Solar Gold
+      ctx.fillStyle = '#FFE600';
+      ctx.fillRect(fx, -curT2, P, curT2 * 2);
+
+      // Tier 1 Lemon-White
+      ctx.fillStyle = '#FFFFEE';
+      ctx.fillRect(fx, -curT1, P, curT1 * 2);
+
+      // White Core Fusion Line
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(fx, -P, P, P * 2);
+    }
+
+    // A. Outer Atmosphere Dithered Pixel Aura
+    ctx.fillStyle = 'rgba(255, 68, 0, 0.25)';
+    const ditherStep = P * 2;
+    for (let u = 0; u <= range; u += ditherStep) {
+      for (let v = -auraHalf; v <= auraHalf; v += ditherStep) {
         const absV = Math.abs(v);
         if (absV <= tier4Half) continue;
-        const wx = snap(cx + perpX * v);
-        const wy = snap(cy + perpY * v);
-        ctx.fillRect(wx, wy, P, P);
-      }
-    }
-
-    // B. Discrete Multi-Tier Beam Column with Obsidian Borders
-    for (let u = 0; u <= range; u += stepL) {
-      const cx = startX + cosA * u;
-      const cy = startY + sinA * u;
-
-      for (let v = -tier4Half; v <= tier4Half; v += stepV) {
-        const absV = Math.abs(v);
-        const isBorder = (absV >= tier4Half - P);
-
-        let pixelColor;
-        if (isBorder) {
-          pixelColor = '#150500'; // Dark manga obsidian border shell
-        } else if (absV < P * 1.2) {
-          pixelColor = '#FFFFFF'; // Superheated pure white-hot fusion core
-        } else if (absV <= tier1Half) {
-          pixelColor = '#FFFFEE';
-        } else if (absV <= tier2Half) {
-          pixelColor = '#FFE600'; // Solar golden plasma
-        } else if (absV <= tier3Half) {
-          pixelColor = '#FF5500'; // Genos signature fiery orange
-        } else {
-          pixelColor = '#CC2A00'; // Magma crimson outer body
+        if (((u / ditherStep) + (v / ditherStep)) % 2 === 0) {
+          ctx.fillRect(u, v, P, P);
         }
-
-        const wx = snap(cx + perpX * v);
-        const wy = snap(cy + perpY * v);
-        ctx.fillStyle = pixelColor;
-        ctx.fillRect(wx, wy, P, P);
       }
     }
 
-    // C. Longitudinal High-Energy Stepped Plasma Wave Pulses
-    const pulseCount = 8;
+    // B. Deep Incineration Crimson Outer Border (Fiery pixel perimeter with NO black stripes)
+    ctx.fillStyle = '#800A00';
+    ctx.fillRect(0, -tier4Half - P, range, (tier4Half + P) * 2);
+
+    // C. Tier 4 Magma Crimson Outer Body
+    ctx.fillStyle = '#CC2A00';
+    ctx.fillRect(0, -tier4Half, range, tier4Half * 2);
+
+    // D. Tier 3 Saturated Fiery Orange Column (Genos Signature Flame)
+    ctx.fillStyle = '#FF5500';
+    ctx.fillRect(0, -tier3Half, range, tier3Half * 2);
+
+    // E. Tier 2 Solar Golden Plasma
+    ctx.fillStyle = '#FFE600';
+    ctx.fillRect(0, -tier2Half, range, tier2Half * 2);
+
+    // F. Tier 1 Superheated Lemon-White Fusion Core
+    ctx.fillStyle = '#FFFFEE';
+    ctx.fillRect(0, -tier1Half, range, tier1Half * 2);
+
+    // G. Ultra Pure White Center Fusion Line
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, -P, range, P * 2);
+
+    // H. Stepped Sawtooth Pixel Edge Detail along Outer Perimeter (Deep Crimson & Fiery Orange)
+    const sawStep = P * 4;
+    for (let u = 0; u <= range; u += sawStep) {
+      const offsetTop = ((u / sawStep) % 2 === 0) ? P : 0;
+      const offsetBot = ((u / sawStep) % 2 === 1) ? P : 0;
+      ctx.fillStyle = '#800A00';
+      ctx.fillRect(u, -tier4Half - P - offsetTop, sawStep, P);
+      ctx.fillRect(u, tier4Half + offsetBot, sawStep, P);
+      ctx.fillStyle = '#FF5500';
+      ctx.fillRect(u, -tier4Half - offsetTop, sawStep, P);
+      ctx.fillRect(u, tier4Half - P + offsetBot, sawStep, P);
+    }
+
+    // ── 3. Longitudinal High-Energy Stepped Plasma Wave Pulses (Superheated White & Solar Gold) ──
+    const pulseCount = 6;
     for (let pl = 0; pl < pulseCount; pl++) {
-      const pSpeed = 24 + (pl % 3) * 8;
-      const pTravel = snap((now * 0.06 * pSpeed + pl * 160) % range);
-      const pLen = snap(40 + (pl % 3) * 30);
-      const pY = snap(((pl % 5) - 2) * (tier2Half * 0.65));
+      const pSpeed = 28 + (pl % 3) * 8;
+      const pTravel = snap((now * 0.06 * pSpeed + pl * 200) % range);
+      const pLen = snap(48 + (pl % 3) * 32);
+      const pY = snap(((pl % 3) - 1) * (tier2Half * 0.5));
 
       ctx.fillStyle = (pl % 2 === 0) ? '#FFFFFF' : '#FFE600';
-      for (let pu = pTravel; pu <= pTravel + pLen && pu <= range; pu += stepL) {
-        const wx = snap(startX + cosA * pu + perpX * pY);
-        const wy = snap(startY + sinA * pu + perpY * pY);
-        ctx.fillRect(wx, wy, P, P);
-      }
+      ctx.fillRect(pTravel, pY - P, Math.min(pLen, range - pTravel), P * 2);
     }
 
-    // ── 3. Stepped Muzzle Blast Arc at (startX, startY) in World Coordinates ──
-    const muzzleR = snap(halfW * 1.35);
-    for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
-      const absY = Math.abs(dy);
-      for (let dx = -muzzleR; dx <= muzzleR; dx += P) {
-        const dist = Math.hypot(dx, dy);
-        if (dist > muzzleR) continue;
-
-        const wx = snap(startX + dx);
-        const wy = snap(startY + dy);
-
-        if (dist >= muzzleR - P) {
-          ctx.fillStyle = '#150500';
-        } else if (dist < muzzleR * 0.30) {
-          ctx.fillStyle = '#FFFFFF';
-        } else if (dist < muzzleR * 0.60) {
-          ctx.fillStyle = '#FFE600';
-        } else if (dist < muzzleR * 0.85) {
-          ctx.fillStyle = '#FF5500';
-        } else {
-          ctx.fillStyle = '#B32400';
-        }
-        ctx.fillRect(wx, wy, P, P);
-      }
-    }
-
-    // ── 4. Stepped Transonic Mach Condensation Rings in World Coordinates ──
+    // ── 4. Stepped Transonic Mach Condensation Diamond Shockwaves (Pure Luminous Plasma) ──
     const ringCount = 3;
     for (let i = 0; i < ringCount; i++) {
       const ringDist = snap(((now * 0.24) + i * (range / ringCount)) % range);
       const alphaRing = (1.0 - ringDist / range);
       if (alphaRing < 0.05) continue;
 
-      const rcx = startX + cosA * ringDist;
-      const rcy = startY + sinA * ringDist;
-      const ringW = snap(P * 3);
-      const ringH = snap(halfW * 1.25);
-      const steps = 28;
+      const ringW = snap(P * 4);
+      const ringH = snap(halfW * 1.35);
 
-      for (let st = 0; st < steps; st++) {
-        const ang = (st / steps) * Math.PI * 2;
-        const rx = Math.cos(ang) * ringW;
-        const ry = Math.sin(ang) * ringH;
+      ctx.fillStyle = (i % 2 === 0) ? '#FFE600' : '#FF7700';
+      for (let dy = -ringH; dy <= ringH; dy += P) {
+        const spanX = Math.round(((ringH - Math.abs(dy)) / ringH) * ringW);
+        ctx.fillRect(ringDist - spanX, dy, P, P);
+        ctx.fillRect(ringDist + spanX, dy, P, P);
+      }
 
-        // Rotate ring orientation to align perpendicular to beam vector
-        const wx = snap(rcx + rx * cosA - ry * sinA);
-        const wy = snap(rcy + rx * sinA + ry * cosA);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(ringDist, -ringH, P, P * 2);
+      ctx.fillRect(ringDist, ringH - P, P, P * 2);
+    }
 
-        ctx.fillStyle = '#150500';
-        ctx.fillRect(wx + P, wy, P, P);
-        ctx.fillRect(wx - P, wy, P, P);
-        ctx.fillStyle = (st % 2 === 0) ? '#FFE600' : '#FF5500';
-        ctx.fillRect(wx, wy, P, P);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(wx, wy, P, P);
+    // ── 5. Stepped Pixel Embers & Sparks ──
+    for (let e = 0; e < 14; e++) {
+      const eDist = snap((now * 0.15 * (12 + (e % 5) * 4) + e * 95) % range);
+      const eSide = (e % 2 === 0) ? 1 : -1;
+      const eY = snap(eSide * (tier3Half + P * 2 + ((e * 7) % 18)));
+      ctx.fillStyle = (e % 3 === 0) ? '#FFFFFF' : ((e % 3 === 1) ? '#FFE600' : '#FF5500');
+      ctx.fillRect(eDist, eY, P, P);
+    }
+
+    // ── 6. Stepped Muzzle Diamond Flare at Local (0, 0) (Seamless Origin & Zero Cutoffs) ──
+    const muzzleR = snap(halfW * 1.15);
+    for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
+      const spanX = snap(muzzleR * (1.0 - Math.abs(dy) / muzzleR));
+      for (let dx = -spanX; dx <= spanX; dx += P) {
+        const normDist = (Math.abs(dx) + Math.abs(dy)) / muzzleR;
+        if (normDist > 1.0) continue;
+
+        if (normDist >= 0.90) {
+          ctx.fillStyle = '#800A00';
+        } else if (normDist <= 0.22) {
+          ctx.fillStyle = '#FFFFFF';
+        } else if (normDist <= 0.48) {
+          ctx.fillStyle = '#FFE600';
+        } else if (normDist <= 0.74) {
+          ctx.fillStyle = '#FF5500';
+        } else {
+          ctx.fillStyle = '#CC2A00';
+        }
+        ctx.fillRect(dx, dy, P, P);
       }
     }
 
+    ctx.restore();
     ctx.restore();
   }
 
@@ -675,7 +674,12 @@ export class GenosFighter extends Fighter {
       return;
     }
 
-    const angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    // Determine target and lock to strict cardinal angle (UP / DOWN / LEFT / RIGHT STRAIGHT)
+    const target = this._findClosestEnemy();
+    const cardinalAngle = this._getCardinalAngle(target);
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
+    const angle = cardinalAngle;
 
     // ── MELEE MODE (PUNCH ATTACK) ──
     if (this.isMeleeStance || this.heatAmmo <= 0) {
@@ -840,6 +844,10 @@ export class GenosFighter extends Fighter {
   }
 
   executeBasicBlast(opponent) {
+    const target = opponent || this._findClosestEnemy();
+    const cardinalAngle = this._getCardinalAngle(target);
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
     const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
     this.shoot(ownerIndex >= 0 ? ownerIndex : 0);
   }
@@ -856,12 +864,24 @@ export class GenosFighter extends Fighter {
     const oldX = this.x;
     const oldY = this.y;
 
-    // Dash into close range
+    // Strict cardinal aiming (UP / DOWN / LEFT / RIGHT)
+    const cardinalAngle = this._getCardinalAngle(opponent);
+    this.flurryAimAngle = cardinalAngle;
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
+
+    // Dash into close range strictly along the cardinal vector
     const flurryOffset = CONFIG.genos?.dashes?.flurryDashOffset ?? 25;
-    const angleToTarget = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    this.x = opponent.x - Math.cos(angleToTarget) * (this.r + opponent.r + flurryOffset);
-    this.y = opponent.y - Math.sin(angleToTarget) * (this.r + opponent.r + flurryOffset);
-    this.aim(opponent);
+    this.x = opponent.x - Math.cos(cardinalAngle) * (this.r + opponent.r + flurryOffset);
+    this.y = opponent.y - Math.sin(cardinalAngle) * (this.r + opponent.r + flurryOffset);
+
+    // Arena boundary clamp
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    if (arena) {
+      const pad = this.r || 25;
+      this.x = Math.max(arena.x + pad, Math.min(arena.x + arena.width - pad, this.x));
+      this.y = Math.max(arena.y + pad, Math.min(arena.y + arena.height - pad, this.y));
+    }
 
     // Spawn smooth fading trail afterimages along the dash path
     if (!this.afterImages) this.afterImages = [];
@@ -872,7 +892,7 @@ export class GenosFighter extends Fighter {
         x: oldX + (this.x - oldX) * p,
         y: oldY + (this.y - oldY) * p,
         r: this.r,
-        gunAngle: this.gunAngle || this.angle || 0,
+        gunAngle: this.flurryAimAngle,
         timer: 10 + s * 2,
         maxTimer: 10 + s * 2
       });
@@ -1018,14 +1038,17 @@ export class GenosFighter extends Fighter {
   }
 
   executeSpiralIncinerationCannon(opponent) {
-    if (this.ultCooldown > 0 || !opponent) return;
+    if (this.ultCooldown > 0) return;
+    const target = opponent || this._findClosestEnemy();
+    if (!target && (!this.gunAngle || Number.isNaN(this.gunAngle))) return;
 
     this.isChargingUlt = true;
     this.ultTimer = CONFIG.genos?.ultWindupFrames || 60;
     this.ultCooldown = CONFIG.genos?.ultCooldown || 1680;
-    this.ultAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    this.gunAngle = this.ultAngle;
-    this.angle = this.ultAngle;
+    const cardinalAngle = this._getCardinalAngle(target);
+    this.ultAngle = cardinalAngle;
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
 
     spawnFloatingText(this.x, this.y - this.r - 28, "SPIRAL INCINERATION CANNON!", "#FF3300");
     const windupShake = CONFIG.genos?.ultWindupShakeIntensity || 0;
@@ -1374,17 +1397,16 @@ export class GenosFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
 
+      // Strictly lock aim to the committed ultAngle upon casting; NO auto-aim tracking or snapping to moving targets!
+      if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
+        this.gunAngle = this.ultAngle;
+        this.angle = this.ultAngle;
+      }
+
       // Optional windup channeling shake (disabled by default when ultWindupShakeIntensity = 0)
       const windupShake = CONFIG.genos?.ultWindupShakeIntensity || 0;
       if (windupShake > 0) {
         triggerGlobalScreenShake(windupShake, CONFIG.genos?.ultWindupShakeDuration || 4);
-      }
-
-      // Centralized smooth aim rotation while charging Incineration Cannon (continuous tracking without snapping on fire)
-      const aimTarget = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
-      if (aimTarget && aimTarget.hp > 0) {
-        this.aim(aimTarget);
-        this.ultAngle = this.gunAngle;
       }
 
       if (this.ultTimer <= 0) {
@@ -1408,9 +1430,11 @@ export class GenosFighter extends Fighter {
       this.ultTimer--;
       this.vx = 0;
       this.vy = 0;
-      // Lock facing angle during beam fire (no rotating)
-      this.gunAngle = this.ultAngle;
-      this.angle = this.ultAngle;
+      // Strictly lock facing angle during beam fire (no rotating, no auto-aim snapping)
+      if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
+        this.gunAngle = this.ultAngle;
+        this.angle = this.ultAngle;
+      }
 
       // Configurable beam blast loop screen shake
       const firingShake = CONFIG.genos?.ultFiringShakeIntensity ?? 2.5;
@@ -1439,9 +1463,11 @@ export class GenosFighter extends Fighter {
           }
         });
       }
+      if (opponent && opponent !== this && opponent.hp > 0 && !targetsToScan.includes(opponent)) {
+        targetsToScan.push(opponent);
+      }
 
-      // ── Per-Frame Beam Pin & Axis Center Lock ──
-      // Prevents targets caught in beam from rebouncing off arena walls or bouncing sideways
+      // ── Per-Frame Movement Slow & Visual Sizzling Heat Sparks ──
       for (const target of targetsToScan) {
         const dx = target.x - this.x;
         const dy = target.y - this.y;
@@ -1449,44 +1475,18 @@ export class GenosFighter extends Fighter {
         const perpDist = Math.abs(-dx * Math.sin(this.ultAngle) + dy * Math.cos(this.ultAngle));
 
         if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r && !target.isBaguvixActive && !target.isGodModeActive) {
-          // Continuous beam trap lock: suppresses wall bounce reflection & angle jitter
-          target.caughtInGenosBeamTimer = 10;
-          target.caughtInGenosBeam = true;
-          target.preventKnockbackBounce = true;
+          // Apply movement slow so enemy can freely move and steer, but at reduced speed
+          const slowMult = CONFIG.genos?.ultSlowMultiplier ?? 0.45;
+          if (typeof target.applySlow === 'function') {
+            target.applySlow(8, slowMult, { isGenosBeam: true });
+          } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+            target.statusEffects.applySlow(8, slowMult, { isGenosBeam: true });
+          }
 
-          // Gently align target to the beam's central axis line (soft pull allows targets to move/steer)
-          const pullStrength = CONFIG.genos?.ultBeamCenterPull ?? 0.04;
-          const centerProjX = this.x + Math.cos(this.ultAngle) * projDist;
-          const centerProjY = this.y + Math.sin(this.ultAngle) * projDist;
-          target.x += (centerProjX - target.x) * pullStrength;
-          target.y += (centerProjY - target.y) * pullStrength;
-
-          // Strict Arena Wall Pin: prevent any bouncing or rebounding off arena walls
-          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-          if (arena) {
-            const pad = target.r || 25;
-            const minX = arena.x + pad;
-            const maxX = arena.x + arena.width - pad;
-            const minY = arena.y + pad;
-            const maxY = arena.y + arena.height - pad;
-
-            if (target.x <= minX) {
-              target.x = minX;
-              if (target.vx < 0) target.vx = 0;
-              target.knockbackVx = 0;
-            } else if (target.x >= maxX) {
-              target.x = maxX;
-              if (target.vx > 0) target.vx = 0;
-              target.knockbackVx = 0;
-            }
-            if (target.y <= minY) {
-              target.y = minY;
-              if (target.vy < 0) target.vy = 0;
-              target.knockbackVy = 0;
-            } else if (target.y >= maxY) {
-              target.y = maxY;
-              if (target.vy > 0) target.vy = 0;
-              target.knockbackVy = 0;
+          // Frequent sizzling heat sparks while inside incinerator beam
+          if (this.ultTimer % 3 === 0) {
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(target.x, target.y, 3, 'orange');
             }
           }
         }
@@ -1505,41 +1505,35 @@ export class GenosFighter extends Fighter {
           if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r) {
             applyDamageToTarget(target, damage, this, { isSkill: true, isUltimate: true, isGenosBeam: true });
             
-            // 1. Controlled Directional Incineration Beam Push (blends with user movement velocity)
-            const pushForce = CONFIG.genos?.ultKnockbackForce || 8;
+            // Gentle directional plasma push along the beam axis without locking velocity or steering
+            const pushForce = CONFIG.genos?.ultKnockbackForce ?? 3.5;
             const pushVx = Math.cos(this.ultAngle) * pushForce;
             const pushVy = Math.sin(this.ultAngle) * pushForce;
 
-            const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-            const pad = target.r || 25;
-            const isAgainstWallX = arena && ((target.x <= arena.x + pad + 2 && pushVx < 0) || (target.x >= arena.x + arena.width - pad - 2 && pushVx > 0));
-            const isAgainstWallY = arena && ((target.y <= arena.y + pad + 2 && pushVy < 0) || (target.y >= arena.y + arena.height - pad - 2 && pushVy > 0));
-
-            if (isAgainstWallX) {
-              target.vx = 0;
-              target.knockbackVx = 0;
+            if (typeof target.applyKnockback === 'function') {
+              target.applyKnockback(pushVx * 0.4, pushVy * 0.4);
             } else {
-              target.vx = target.vx * 0.4 + pushVx;
+              target.vx += pushVx * 0.25;
+              target.vy += pushVy * 0.25;
             }
 
-            if (isAgainstWallY) {
-              target.vy = 0;
-              target.knockbackVy = 0;
-            } else {
-              target.vy = target.vy * 0.4 + pushVy;
-            }
-
-            target.preventKnockbackBounce = true;
-
-            // 2. Impact Flash & Laser Hit Sparks on Target
-            if (typeof spawnSparks === 'function') {
-              spawnSparks(target.x, target.y, 5, 'laserHit');
+            // High-Draw Pixel Art Shockwave Ring, Heat Blast & Sizzling Hit Sparks on Target
+            if (typeof spawnMeleeClashShockwave === 'function') {
+              spawnMeleeClashShockwave(target.x, target.y, (target.r || 25) * 2.8, 'genos');
             }
             if (typeof spawnImpactFlash === 'function') {
-              spawnImpactFlash(target.x, target.y, 22);
+              spawnImpactFlash(target.x, target.y, (target.r || 25) * 2.2);
+            }
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(target.x, target.y, 8, 'orange');
+              spawnSparks(target.x, target.y, 5, 'laserHit');
+            }
+            if (typeof spawnGroundScorch === 'function') {
+              spawnGroundScorch(target.x, target.y, (target.r || 25) * 1.3);
             }
           }
         }
+      }
 
         // Clear projectiles in beam path
         if (state.projectiles) {
@@ -1555,7 +1549,6 @@ export class GenosFighter extends Fighter {
             }
           }
         }
-      }
 
       if (this.ultTimer <= 0) {
         this.isFiringUlt = false;
@@ -1644,16 +1637,16 @@ export class GenosFighter extends Fighter {
     // 3. Skill 1: Machine Gun Blows Flurry Update
     if (this.isFlurrying) {
       const currentTarget = (this.flurryTarget && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
-      if (currentTarget && currentTarget.hp > 0) {
-        this.aim(currentTarget);
-      }
+      const aimAngle = (this.flurryAimAngle !== undefined && !Number.isNaN(this.flurryAimAngle)) ? this.flurryAimAngle : this._getCardinalAngle(currentTarget);
+      this.flurryAimAngle = aimAngle;
+      this.gunAngle = aimAngle;
+      this.angle = aimAngle;
 
       this.flurryTimer++;
 
       const reach = CONFIG.genos?.flurryReach || 70;
       const damage = CONFIG.genos?.flurryDamage || 10;
       const halfArc = (CONFIG.genos?.flurryArcAngle || Math.PI * 0.5) / 2;
-      const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
 
       const targetsToScan = [];
       if (state.fighters) {
@@ -1721,18 +1714,24 @@ export class GenosFighter extends Fighter {
             if (Math.abs(angleDiff) <= halfArc) {
               flurryHitAny = true;
               const hitDmg = isFinalHit ? damage * 2.2 : damage;
-              const didDamage = applyDamageToTarget(target, hitDmg, this, { isSkill: true, isRanged: true, isMachineGunBlow: true });
+              const didDamage = applyDamageToTarget(target, hitDmg, this, { 
+                isSkill: true, 
+                isRanged: true, 
+                isMachineGunBlow: true, 
+                isGenosMachineBlow: true, 
+                isGenosFlurry: true 
+              });
 
               if (didDamage !== false) {
                 if (isFinalHit) {
                   target.caughtInGenosFlurry = false;
-                  // Final hit: apply heavy finisher knockback push & extended hit-pause
+                  // Final hit: apply heavy finisher knockback push & extended hit-pause strictly along cardinal direction
                   if (typeof target.applyTimeStop === 'function') {
                     target.applyTimeStop(20, { isSkill: true });
                   }
                   const pushForce = 18.0;
-                  const pushVx = Math.cos(angleToTarget) * pushForce;
-                  const pushVy = Math.sin(angleToTarget) * pushForce;
+                  const pushVx = Math.cos(aimAngle) * pushForce;
+                  const pushVy = Math.sin(aimAngle) * pushForce;
                   if (typeof target.applyKnockback === 'function') {
                     target.applyKnockback(pushVx, pushVy);
                   } else {
@@ -1753,11 +1752,11 @@ export class GenosFighter extends Fighter {
 
                 // Supersonic wind blast speed lines on impact
                 if (typeof spawnPunchWindSpeedLines === 'function') {
-                  spawnPunchWindSpeedLines(target.x, target.y, angleToTarget, isFinalHit ? 240 : 160, 'orange');
+                  spawnPunchWindSpeedLines(target.x, target.y, aimAngle, isFinalHit ? 240 : 160, 'orange');
                 }
                 // Spiky anime impact crescent + shockwave ring — Genos fiery orange theme
                 if (typeof spawnAnimePunchImpactFrame === 'function') {
-                  spawnAnimePunchImpactFrame(target.x, target.y, isFinalHit ? 85 : 62, angleToTarget, 'orange');
+                  spawnAnimePunchImpactFrame(target.x, target.y, isFinalHit ? 85 : 62, aimAngle, 'orange');
                 }
                 if (typeof spawnMeleeClashShockwave === 'function') {
                   spawnMeleeClashShockwave(target.x, target.y, isFinalHit ? 90 : 65, 'genos');
@@ -1789,6 +1788,7 @@ export class GenosFighter extends Fighter {
 
       if (this.flurryHitsLeft <= 0) {
         this.isFlurrying = false;
+        this.flurryAimAngle = undefined;
         if (this.flurryTarget) {
           this.flurryTarget.caughtInGenosFlurry = false;
         }

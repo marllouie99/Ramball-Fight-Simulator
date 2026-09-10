@@ -281,8 +281,23 @@ export class MakimaFighter extends Fighter {
     return true;
   }
 
+  _getCardinalAngle(target) {
+    if (!target) return (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : 0;
+    const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+    const makimaY = this.y - (this.z || 0);
+    const dx = (target.x !== undefined ? target.x : this.x) - this.x;
+    const dy = targetY - makimaY;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? 0 : Math.PI;
+    } else {
+      return dy >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+  }
+
   /**
-   * Master aim override: locks gunAngle and angle during chain windup and throw.
+   * Master aim override: locks gunAngle and angle during chain throw.
+   * In normal combat (and when doing Bang!), aims strictly in 4 cardinal directions (Up, Down, Left, Right).
+   * During chain windup / skill prep, tracks enemy directly.
    */
   aim(target) {
     if (!this.canAim()) {
@@ -292,7 +307,16 @@ export class MakimaFighter extends Fighter {
       }
       return false;
     }
-    return super.aim(target);
+
+    if (this.isPreparingChain || (this.chainWindupTimer && this.chainWindupTimer > 0) || this.isSummoningSpear || this.isExecutingRitual) {
+      return super.aim(target);
+    }
+
+    const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
+    const cardinalAngle = this._getCardinalAngle(aimTarget);
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
+    return true;
   }
 
   /**
@@ -704,7 +728,12 @@ export class MakimaFighter extends Fighter {
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this.isShooting = true;
 
-    const angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    // Determine strict cardinal angle (Up, Down, Left, Right)
+    const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
+    const cardinalAngle = this._getCardinalAngle(aimTarget);
+    this.gunAngle = cardinalAngle;
+    this.angle = cardinalAngle;
+    const angle = cardinalAngle;
     const range = cfg.bangRange || 1600;
     const beamW = cfg.bangBeamWidth || 32;
 

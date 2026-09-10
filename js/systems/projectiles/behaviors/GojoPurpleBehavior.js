@@ -115,7 +115,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       return false; // Continue traveling during victory screen
     }
 
-    if (state.gameState !== 'playing') {
+    if (typeof state !== 'undefined' && state.gameState && state.gameState !== 'playing' && state.gameState !== 'countdown' && !isMatchOver) {
       projectile.life = 0;
       return true;
     }
@@ -330,7 +330,24 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       ownerFighter.activePurpleProjectile = null;
       if (ownerFighter.purpleRecoveryTimer > 0) {
         ownerFighter.purpleRecoveryTimer = 0;
-        ownerFighter.resumeMovement?.(null);
+        ownerFighter.z = 0;
+        let backwardAngle;
+        const target = (typeof ownerFighter._findClosestEnemy === 'function')
+          ? ownerFighter._findClosestEnemy()
+          : (actualFighters?.find(f => f && f !== ownerFighter && f.hp > 0) || null);
+        if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+          backwardAngle = Math.atan2(ownerFighter.y - target.y, ownerFighter.x - target.x);
+        } else if (ownerFighter.purpleCastAngle !== undefined && !Number.isNaN(ownerFighter.purpleCastAngle)) {
+          backwardAngle = ownerFighter.purpleCastAngle + Math.PI;
+        } else if (ownerFighter.gunAngle !== undefined && !Number.isNaN(ownerFighter.gunAngle)) {
+          backwardAngle = ownerFighter.gunAngle + Math.PI;
+        } else {
+          backwardAngle = (ownerFighter.angle || 0) + Math.PI;
+        }
+        ownerFighter.resumeMovement?.(target, 1.0, backwardAngle);
+        if (target && typeof ownerFighter.aim === 'function' && !ownerFighter.isTargetOfAmbush && (ownerFighter.timeStopTimer || 0) <= 0) {
+          ownerFighter.aim(target);
+        }
       }
       if (!ownerFighter.isMeleeMode && !ownerFighter.isTargetOfAmbush && ownerFighter.hp > 0) {
         ownerFighter.infinityActive = true;
@@ -433,20 +450,49 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
   }
 
   checkExpire(projectile, system) {
-    const arena = CONFIG.arena;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
     if (projectile.life <= 0) {
       this.triggerPurpleExplosion(projectile, system?.fighters || (typeof state !== 'undefined' ? state.fighters : null), system);
       return true;
     }
 
     // Clamp position to arena boundaries so it sticks to walls
-    // Zero BOTH velocity components on wall contact so the orb stops completely
+    // Zero velocity components on wall contact so the orb stops completely
     // instead of sliding along the wall edge
-    const halfR = projectile.r / 2;
-    if (projectile.x - halfR < arena.x) { projectile.x = arena.x + halfR; projectile.vx = 0; projectile.vy = 0; }
-    if (projectile.x + halfR > arena.x + arena.width) { projectile.x = arena.x + arena.width - halfR; projectile.vx = 0; projectile.vy = 0; }
-    if (projectile.y - halfR < arena.y) { projectile.y = arena.y + halfR; projectile.vx = 0; projectile.vy = 0; }
-    if (projectile.y + halfR > arena.y + arena.height) { projectile.y = arena.y + arena.height - halfR; projectile.vx = 0; projectile.vy = 0; }
+    if (arena) {
+      const halfR = (projectile.r || 50) / 2;
+      if (arena.shape === 'circle') {
+        const cx = arena.x + arena.width / 2;
+        const cy = arena.y + arena.height / 2;
+        const ar = arena.radius || (arena.width / 2);
+        const d = Math.hypot(projectile.x - cx, projectile.y - cy);
+        if (d + halfR >= ar && d > 0) {
+          const nx = (projectile.x - cx) / d;
+          const ny = (projectile.y - cy) / d;
+          projectile.x = cx + nx * (ar - halfR);
+          projectile.y = cy + ny * (ar - halfR);
+          projectile.vx = 0;
+          projectile.vy = 0;
+        }
+      } else {
+        if (projectile.x - halfR < arena.x) {
+          projectile.x = arena.x + halfR;
+          projectile.vx = 0;
+        }
+        if (projectile.x + halfR > arena.x + arena.width) {
+          projectile.x = arena.x + arena.width - halfR;
+          projectile.vx = 0;
+        }
+        if (projectile.y - halfR < arena.y) {
+          projectile.y = arena.y + halfR;
+          projectile.vy = 0;
+        }
+        if (projectile.y + halfR > arena.y + arena.height) {
+          projectile.y = arena.y + arena.height - halfR;
+          projectile.vy = 0;
+        }
+      }
+    }
 
     return false; // Never expire from wall collision
   }

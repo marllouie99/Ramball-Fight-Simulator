@@ -37,6 +37,7 @@ export class MeleeFighter extends Fighter {
   /** Contact damage hook. */
   onCollide(opponent) {
     if (this.isCaughtInBeam()) return;
+    if (this.isTeammate(opponent)) return;
     if (this.meleeCooldown === 0) {
       // TUNING: contact damage and melee hit cooldown can be adjusted here.
       opponent.takeDamage(this.damage, this, { isMelee: true });

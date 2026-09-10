@@ -20,7 +20,7 @@ export const genosConfig = {
   // Basic Attack: Incineration Palms (Ranged Fire Blasts)
   blastDamage: 14,
   blastRange: 350,
-  blastSpeed: 20,
+  blastSpeed: 10,
   blastAoeRadius: 35,
   blastCooldown: 27, // ~0.45s at 60fps
 
@@ -78,7 +78,7 @@ export const genosConfig = {
   blastProjectileRadius: 9,
 
   // Ultimate: Spiral Incineration Cannon
-  initialUltCooldown: 1500, // Initial cooldown at match start (28s at 60fps)
+  initialUltCooldown: 800, // Initial cooldown at match start (28s at 60fps)
   ultCooldown: 800, // 28 seconds at 60fps
   ultWindupFrames: 60, // 1.0s windup
   ultDurationFrames: 120, // 2.0s beam duration

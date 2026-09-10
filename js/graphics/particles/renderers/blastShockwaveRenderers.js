@@ -145,53 +145,40 @@ export function drawMeleeClashShockwave(ctx, effect) {
       ctx.stroke();
     }
   } else if (isGenosClash) {
-    if (isDark) {
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      const P = 2.0;
-      const snap = (v) => Math.round(v / P) * P;
-      const steps = 36;
+    const alpha = effect.life;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const P = 2.0;
+    const snap = (v) => Math.round(v / P) * P;
+    const radius = Math.max(P * 2, effect.size);
+    const steps = Math.max(32, Math.min(64, Math.round((Math.PI * 2 * radius) / (P * 1.5))));
 
-      for (let st = 0; st < steps; st++) {
-        const ang = (st / steps) * Math.PI * 2;
-        const cosA = Math.cos(ang);
-        const sinA = Math.sin(ang);
+    for (let st = 0; st < steps; st++) {
+      const ang = (st / steps) * Math.PI * 2;
+      const cosA = Math.cos(ang);
+      const sinA = Math.sin(ang);
 
-        const r0 = snap(effect.size);
-        ctx.fillStyle = '#150500';
-        ctx.fillRect(snap(effect.x + cosA * (r0 + P)), snap(effect.y + sinA * (r0 + P)), P, P);
+      // Outer Crimson Ring
+      const r0 = snap(radius);
+      ctx.fillStyle = `rgba(204, 42, 0, ${(alpha * 0.90).toFixed(3)})`;
+      ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
 
-        ctx.fillStyle = '#FF5500';
-        ctx.fillRect(snap(effect.x + cosA * r0), snap(effect.y + sinA * r0), P, P);
+      // Saturated Fiery Orange Mid Ring
+      const r1 = snap(radius * 0.82);
+      ctx.fillStyle = `rgba(255, 85, 0, ${(alpha * 0.95).toFixed(3)})`;
+      ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
 
-        const r1 = snap(effect.size * 0.75);
-        ctx.fillStyle = '#FFE600';
-        ctx.fillRect(snap(effect.x + cosA * r1), snap(effect.y + sinA * r1), P, P);
+      // Solar Golden Core Ring
+      const r2 = snap(radius * 0.60);
+      ctx.fillStyle = `rgba(255, 230, 0, ${(alpha * 0.98).toFixed(3)})`;
+      ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
 
-        const r2 = snap(effect.size * 0.45);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(snap(effect.x + cosA * r2), snap(effect.y + sinA * r2), P, P);
-      }
-      ctx.restore();
-    } else {
-      ctx.strokeStyle = `rgba(255, 60, 0, ${effect.life * 0.95})`;
-      ctx.lineWidth = 12 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = `rgba(255, 170, 0, ${effect.life * 0.90})`;
-      ctx.lineWidth = 7 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = `rgba(255, 245, 200, ${effect.life * 0.98})`;
-      ctx.lineWidth = 4 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
-      ctx.stroke();
+      // Pure Superheated White Core Flash
+      const r3 = snap(radius * 0.35);
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
+      ctx.fillRect(snap(effect.x + cosA * r3), snap(effect.y + sinA * r3), P, P);
     }
+    ctx.restore();
   } else if (isMahoragaClash) {
     if (isDark) {
       ctx.save();

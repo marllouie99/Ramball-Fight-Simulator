@@ -45,18 +45,18 @@ export const mahoragaConfig = {
 
     // ── Adaptation & RCT Mechanics ──
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
-    wheelAdaptationSpeedMultiplier: 0.15, // Movement speed multiplier gained per wheel rotation / adaptation stage (+15% per stage)
-    adaptationSpeedBoostPerStage: 0.15, // +15% movement speed multiplier per gold adaptation stage
+    wheelAdaptationSpeedMultiplier: 0.05, // Movement speed multiplier gained per wheel rotation / adaptation stage (+15% per stage)
+    adaptationSpeedBoostPerStage: 0.05, // +15% movement speed multiplier per gold adaptation stage
     movementSpeedMultiplierPerAdaptation: 0.01, // Movement speed multiplier per wheel adaptation stage
     rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
     enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique flat healing on wheel click
-    rctHealFlatAmount: 350,          // Heals a flat 100 HP on each wheel rotation click
-    defBuffPerClickPercent: 0.03,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
+    rctHealFlatAmount: 500,          // Heals a flat 100 HP on each wheel rotation click
+    defBuffPerClickPercent: 0.02,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,         // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,      // Maximum speed/KB resistance factor under stasis (60% max)
     fatalAdaptWindowFrames: 400,     // Rolling damage accumulator window (~6.6 seconds at 60fps)
-    fatalDamageThresholdPct: 0.20,   // 15% max HP damage threshold within window triggers wheel adaptation click
+    fatalDamageThresholdPct: 0.25,   // 15% max HP damage threshold within window triggers wheel adaptation click
     fatalAdaptCooldownFrames: 30,    // Cooldown frames between wheel clicks (30 frames = 0.5s)
 
     // ── Visuals, Screen Dim & Afterimages ──
@@ -115,7 +115,7 @@ export const mahoragaConfig = {
     throwMinDistance: 240,           // Minimum distance required to trigger rapid throw skill
     throwBarrageCount: 10,           // Number of rapid projectiles hurled in a single barrage
     throwBarrageInterval: 10,        // Frames between each rapid throw in the barrage (~0.16s)
-    throwDamage: 14,                 // Damage per thrown projectile in barrage
+    throwDamage: 20,                 // Damage per thrown projectile in barrage
     throwSpeed: 20,                  // Projectile velocity
     throwKnockback: 7.0,             // Physical pushback force per projectile impact
     throwAimRotationSpeed: 0.06,     // Aim tracking rotation speed during throw barrage

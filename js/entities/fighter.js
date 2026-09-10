@@ -351,9 +351,9 @@ export class Fighter {
 
   /** Restores all dynamic values to their initial states. */
   reset() {
-    const d = this._def;
-    this.x = d.startX;
-    this.y = d.startY;
+    const d = this._def || {};
+    this.x = d.startX !== undefined ? d.startX : (d.x !== undefined ? d.x : 0);
+    this.y = d.startY !== undefined ? d.startY : (d.y !== undefined ? d.y : 0);
 
     const baseHp = Number(d.hp || 100);
     // Store original base speed before any multipliers (used for spin rate calculations)
@@ -756,7 +756,7 @@ export class Fighter {
     return false;
   }
 
-  /** Returns true if this fighter is caught in any active beam (e.g. Yuta's Pure Love Beam, Genos's Beam, Laser Beam, Hollow Purple, Layla Beam). */
+  /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Yuta's Pure Love Beam, Laser Beam, Hollow Purple, Layla Beam). */
   isCaughtInBeam() {
     return !!(
       this.isDraggedByGetsuga ||
@@ -764,8 +764,6 @@ export class Fighter {
       this.caughtInPureLoveBeam ||
       this.wasCaughtInPureLoveBeam ||
       (this.pureLoveBeamTimer || 0) > 0 ||
-      (this.caughtInGenosBeamTimer || 0) > 0 ||
-      this.caughtInGenosBeam ||
       this.caughtInGenosFlurry ||
       this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
@@ -775,16 +773,16 @@ export class Fighter {
     );
   }
 
-  applySlow(frames, multiplier) {
-    this.statusEffects.applySlow(frames, multiplier);
+  applySlow(frames, multiplier, opts = {}) {
+    this.statusEffects.applySlow(frames, multiplier, opts);
   }
 
-  applyHitStun(frames) {
-    this.statusEffects.applyHitStun(frames);
+  applyHitStun(frames, opts = {}) {
+    this.statusEffects.applyHitStun(frames, opts);
   }
 
-  applyParalyze(frames) {
-    this.statusEffects.applyParalyze(frames);
+  applyParalyze(frames, opts = {}) {
+    this.statusEffects.applyParalyze(frames, opts);
   }
 
   /**
@@ -1578,8 +1576,8 @@ export class Fighter {
         let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
         const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
         const isGojoPurpleCaught = (this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0);
-        const isGenosBeamCaught = (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInGenosFlurry;
-        const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosBeamCaught || isPureLoveBeamCaught || isGojoPurpleCaught;
+        const isGenosFlurryCaught = Boolean(this.caughtInGenosFlurry);
+        const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosFlurryCaught || isPureLoveBeamCaught || isGojoPurpleCaught;
         if (this.preventKnockbackBounce || this.isDraggedByGetsuga || isBeamTrapped) bounceMult = 0; // Stick to the wall instead of bouncing
 
         const minX = arena.x + this.r;
@@ -2239,7 +2237,7 @@ export class Fighter {
     if (!arena) return false;
 
     const isSaitamaHit = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
-    const isGenosTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInGenosBeam || this.caughtInGenosFlurry;
+    const isGenosTrapped = Boolean(this.caughtInGenosFlurry);
     const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));
     const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned;
     if (isBeamTrapped) {
@@ -2560,15 +2558,16 @@ export class Fighter {
                               (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) ||
                               ((this.comboHitsLeft || 0) > 0) ||
                               ((this.rockCounterComboLeft || 0) > 0) ||
+                              (this.isChainedByMakima && !this.isMindControlledByMakima) ||
                               this.isCurrentlyWallPinnedByMakima ||
                               ((this.makimaWallPinTimer || 0) > 0);
 
     // Auto-recover from zero velocity immediately when the fighter is supposed to be moving
     if (!isStationaryState && targetSpeed > 0 && currentSpeed < 0.2) {
-      // Forward momentum along current aim angle or facing angle
-      const forwardAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (Math.random() * Math.PI * 2);
-      this.vx = Math.cos(forwardAngle) * targetSpeed;
-      this.vy = Math.sin(forwardAngle) * targetSpeed;
+      // Move in a random direction instead of charging forward along gunAngle
+      const moveAngle = Math.random() * Math.PI * 2;
+      this.vx = Math.cos(moveAngle) * targetSpeed;
+      this.vy = Math.sin(moveAngle) * targetSpeed;
       currentSpeed = targetSpeed;
       this._stationaryStallFrames = 0;
     }

@@ -530,8 +530,9 @@ export function reinitFighters(isNewMatch = false) {
         fighter.gunAngle = pt.angle;
         fighter.angle = pt.angle;
         const spd = fighter.speed || 1.5;
-        fighter.vx = Math.cos(pt.angle) * spd;
-        fighter.vy = Math.sin(pt.angle) * spd;
+        const moveAngle = Math.random() * Math.PI * 2;
+        fighter.vx = Math.cos(moveAngle) * spd;
+        fighter.vy = Math.sin(moveAngle) * spd;
       });
     } else {
       // ── Starter Map (Sector 01) & Dynamic Tactical Spawns ──
@@ -642,8 +643,9 @@ export function reinitFighters(isNewMatch = false) {
       state.fighters[0].gunAngle = 0;
       state.fighters[0].rightGunAngle = 0;
       state.fighters[0].leftGunAngle = 0;
-      state.fighters[0].vx = state.fighters[0].speed;
-      state.fighters[0].vy = 0;
+      const angle0 = Math.random() * Math.PI * 2;
+      state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
+      state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
     }
 
     // Team 2: Duo on right
@@ -654,8 +656,9 @@ export function reinitFighters(isNewMatch = false) {
       state.fighters[1].gunAngle = Math.PI;
       state.fighters[1].rightGunAngle = Math.PI;
       state.fighters[1].leftGunAngle = Math.PI;
-      state.fighters[1].vx = -state.fighters[1].speed;
-      state.fighters[1].vy = 0;
+      const angle1 = Math.random() * Math.PI * 2;
+      state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
+      state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
     }
 
     if (state.fighters[2]) {
@@ -665,8 +668,9 @@ export function reinitFighters(isNewMatch = false) {
       state.fighters[2].gunAngle = Math.PI;
       state.fighters[2].rightGunAngle = Math.PI;
       state.fighters[2].leftGunAngle = Math.PI;
-      state.fighters[2].vx = -state.fighters[2].speed;
-      state.fighters[2].vy = 0;
+      const angle2 = Math.random() * Math.PI * 2;
+      state.fighters[2].vx = Math.cos(angle2) * state.fighters[2].speed;
+      state.fighters[2].vy = Math.sin(angle2) * state.fighters[2].speed;
     }
   } else {
     // 1v1: Fighters on opposite sides, aligned horizontally, facing each other
@@ -681,8 +685,9 @@ export function reinitFighters(isNewMatch = false) {
     state.fighters[0].gunAngle = 0;
     state.fighters[0].rightGunAngle = 0;
     state.fighters[0].leftGunAngle = 0;
-    state.fighters[0].vx = state.fighters[0].speed;
-    state.fighters[0].vy = 0;
+    const angle0 = Math.random() * Math.PI * 2;
+    state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
+    state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
 
     state.fighters[1].x = rightX;
     state.fighters[1].y = centerY;
@@ -691,8 +696,9 @@ export function reinitFighters(isNewMatch = false) {
     state.fighters[1].gunAngle = Math.PI;
     state.fighters[1].rightGunAngle = Math.PI;
     state.fighters[1].leftGunAngle = Math.PI;
-    state.fighters[1].vx = -state.fighters[1].speed;
-    state.fighters[1].vy = 0;
+    const angle1 = Math.random() * Math.PI * 2;
+    state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
+    state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
   }
 }
 

@@ -292,35 +292,20 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
 
     // Inside Gojo's own domain: no physical pushback (Unlimited Void uses time-stop paralysis instead)
     if (!fighter.domainActive) {
-      const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 12.5; // Strong clean bounce impulse from config
-
-      // Push the attacker back with strong outward velocity (rebounce off Infinity)
-      attacker.vx = nx * pushForce;
-      attacker.vy = ny * pushForce;
-
-      // Apply brief movement slow on Limitless Infinity barrier collision
-      const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 15;
-      const slowMult = CONFIG.gojo?.infinitySlowMultiplier ?? 0.70;
+      // Apply movement slow on Limitless Infinity barrier collision without pushing the enemy back
+      const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 20;
+      const slowMult = CONFIG.gojo?.infinitySlowMinMultiplier ?? CONFIG.gojo?.infinitySlowMultiplier ?? 0.35;
       if (typeof attacker.applySlow === 'function') {
         attacker.applySlow(slowDur, slowMult, { isInfinitySlow: true });
       } else {
         attacker.slowTimer = Math.max(attacker.slowTimer || 0, slowDur);
         attacker.slowMultiplier = Math.min(attacker.slowMultiplier || 1.0, slowMult);
       }
-    }
-    
-    // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
-    const minDist = attRadius + barrierRadius;
-    const overlap = minDist - dist;
 
-    if (overlap > 0 && !fighter.domainActive) {
-      // Push attacker outward away from barrier (Gojo stands his ground and is not rebounced)
-      attacker.x += nx * (overlap + 2);
-      attacker.y += ny * (overlap + 2);
-
-      // Clamp attacker strictly within arena boundaries so they NEVER clip outside arena walls
-      if (arena) {
-        clampEntityToArenaBounds(attacker, arena, attRadius);
+      // Smoothly dampen attacker's velocity so they slow to a crawl on the barrier instead of being flung back
+      if (attacker.vx !== 0 || attacker.vy !== 0) {
+        attacker.vx *= 0.70;
+        attacker.vy *= 0.70;
       }
     }
   }

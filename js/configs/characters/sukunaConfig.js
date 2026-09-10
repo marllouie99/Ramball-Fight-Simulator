@@ -22,8 +22,8 @@ export const sukunaConfig = {
 
     // Basic Attack: Dismantle / Cleave Ranged Slashes
     slashSpeed: 40,                   // Supersonic travel speed of Dismantle and Cleave slashes (px/frame)
-    slashDamage: 18,                  // Base damage per slash
-    slashCooldown: 30,                // Frames between ranged basic slash attacks
+    slashDamage: 40,                  // Base damage per slash
+    slashCooldown: 100,                // Frames between ranged basic slash attacks
 
     // Stacking Slash Crit Passive
     baseCritChance: 0.25,             // 10% base crit chance
@@ -73,11 +73,14 @@ export const sukunaConfig = {
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     divineFlameCooldown: 700,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
     divineFlameChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Furnace / Fuga
+    divineFlameCorridorHalfWidth: 45, // Straight corridor half-width for cardinal alignment detection (Up, Down, Left, Straight/Right)
+    divineFlameDetectionAngle: Math.PI * 0.08, // Maximum angular deviation from cardinal angle (~14.4 deg)
+    divineFlameTriggerRange: 850,     // Maximum range to initiate Furnace (Fuga)
     domainFugaCooldownReduction: 0.70, // 70% CD reduction to Fuga when inside Malevolent Shrine Domain
     domainFugaCooldownReductionPercent: 0.70, // 70% CD reduction
     divineFlameDomainCooldown: 210, // Cooldown between Fuga uses inside Domain (~3.5 seconds at 60fps)
     domainFugaCooldownTickRate: 0.2,  // Rate multiplier for cooldown ticks inside Domain (4x faster recharge)
-    divineFlameChargeMax: 100,      // Charge up duration (1.5 seconds)
+    divineFlameChargeMax: 80,      // Charge up duration (1.5 seconds)
     divineFlameDamage: 1000,         // Primary direct hit nuke damage
     divineFlameExplosionRadius: 200, // Thermobaric nuke explosion AOE blast radius in pixels
     divineFlameExplosionDamage: 800, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
@@ -88,7 +91,7 @@ export const sukunaConfig = {
     divineFlameChannelShakeDuration: 5,   // Tremor pulse duration
     divineFlameShakeIntensity: 30,  // Powerful impactful arena shake on Fuga nuke explosion!
     divineFlameShakeDuration: 25,   // Arena shake duration on Fuga impact
-    divineFlameKnockback: 40,      // Explosive knockback velocity applied to targets hit by Fuga
+    divineFlameKnockback: 10,      // Explosive knockback velocity applied to targets hit by Fuga
     divineFlameKnockbackStun: 25,  // Duration of knockback stun in frames ensuring smooth ricochet
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
@@ -135,15 +138,15 @@ export const sukunaConfig = {
       fleshSlice: 0.40,
       teleportDash: 0.45,
       ricochetHit: 0.0,
-      fugaChant: 1.75,
+      fugaChant: 0.0,
       fugaIgnite: 1.00,
       fugaTravel: 0.80,
       fugaFireball: 0.45,
       fugaExplosion: 0.80,
       thermobaricExplosion: 0.55,
-      domainChannel: 2.75,
+      domainChannel: 0.75,
       domainActivate: 0.80,
-      domainExpansion: 1.75,
+      domainExpansion: 0.75,
       domainDeploy: 0.55,
       spiderweb: 0.40,
       reverseCursedTechnique: 0.55,

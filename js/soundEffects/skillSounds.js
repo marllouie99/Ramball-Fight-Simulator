@@ -222,124 +222,307 @@ export const SKILL_SOUNDS = {
 
   // ── Gojo ─────────────────────────────
   21: {
-    domain_channel: {
-      src: 'Assets/Sound Effects/Skills/gojodomain.mp3',
-      volume: 5.0
-      ,
-      delay: 0
+    get domain_channel() {
+      return {
+        src: CONFIG.gojo?.sounds?.domainChannel || 'Assets/Sound Effects/Skills/gojodomain.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.domainChannel !== undefined ? CONFIG.gojo.soundVolumes.domainChannel : 0.70,
+        delay: CONFIG.gojo?.soundDelays?.domainChannel || 0
+      };
     },
-    domain_expansion: {
-      src: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
-      volume: 5.0
-      ,
-      delay: 0
+    get domainchannel() { return this.domain_channel; },
+    get domain_expansion() {
+      return {
+        src: CONFIG.gojo?.sounds?.domainExpansion || 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.domainExpansion !== undefined ? CONFIG.gojo.soundVolumes.domainExpansion : 0.70,
+        delay: CONFIG.gojo?.soundDelays?.domainExpansion || 0
+      };
     },
-    domain_activate: {
-      src: 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3',
-      volume: 5.0
-      ,
-      delay: -0.10
+    get domainexpansion() { return this.domain_expansion; },
+    get domain_activate() {
+      return {
+        src: CONFIG.gojo?.sounds?.domainActivate || 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.domainActivate !== undefined ? CONFIG.gojo.soundVolumes.domainActivate : 0.70,
+        delay: CONFIG.gojo?.soundDelays?.domainActivate !== undefined ? CONFIG.gojo.soundDelays.domainActivate : -0.10
+      };
     },
-    purple_charge: {
-      src: 'Assets/Sound Effects/Skills/mixing.mp3',
-      volume: 5.0
-      ,
-      delay: -0.10
+    get domainactivate() { return this.domain_activate; },
+    get domain() { return this.domain_activate; },
+    get purple_charge() {
+      return {
+        src: CONFIG.gojo?.sounds?.purpleCharge || 'Assets/Sound Effects/Skills/mixing.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.purpleCharge !== undefined ? CONFIG.gojo.soundVolumes.purpleCharge : 0.0,
+        delay: CONFIG.gojo?.soundDelays?.purpleCharge !== undefined ? CONFIG.gojo.soundDelays.purpleCharge : -0.10
+      };
     },
-    purple_fire: {
-      src: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
-      volume: 1.0,
-      delay: 0
+    get purplecharge() { return this.purple_charge; },
+    get purple_flare() {
+      return {
+        src: CONFIG.gojo?.sounds?.purpleFlare || 'Assets/Sound Effects/Skills/dash3.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.purpleFlare !== undefined ? CONFIG.gojo.soundVolumes.purpleFlare : 0.45,
+        delay: CONFIG.gojo?.soundDelays?.purpleFlare || 0
+      };
     },
-    purple_deploy: {
-      src: 'Assets/Sound Effects/Skills/purpledeploy.mp3',
-      volume: 2.5,
-      delay: 0
+    get purpleflare() { return this.purple_flare; },
+    get purple_fire() {
+      return {
+        src: CONFIG.gojo?.sounds?.purpleFire || 'Assets/Sound Effects/Skills/hollowpurple.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.purpleFire !== undefined ? CONFIG.gojo.soundVolumes.purpleFire : 0.55,
+        delay: CONFIG.gojo?.soundDelays?.purpleFire || 0
+      };
     },
-    red_charging: {
-      src: 'Assets/Sound Effects/Skills/redcharging.mp3',
-      volume: 2.0,
-      delay: 0
+    get purplefire() { return this.purple_fire; },
+    get hollowpurple() { return this.purple_fire; },
+    get purple() { return this.purple_fire; },
+    get purple_deploy() {
+      return {
+        src: CONFIG.gojo?.sounds?.purpleDeploy || 'Assets/Sound Effects/Skills/purpledeploy.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.purpleDeploy !== undefined ? CONFIG.gojo.soundVolumes.purpleDeploy : 1.00,
+        delay: CONFIG.gojo?.soundDelays?.purpleDeploy || 0
+      };
     },
-    red_channeling: {
-      src: 'Assets/Sound Effects/Skills/redchanneling.mp3',
-      volume: 1.8,
-      delay: 0
+    get purpledeploy() { return this.purple_deploy; },
+    get red_charging() {
+      return {
+        src: CONFIG.gojo?.sounds?.redCharging || 'Assets/Sound Effects/Skills/redcharging.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.redCharging !== undefined ? CONFIG.gojo.soundVolumes.redCharging : 0.0,
+        delay: CONFIG.gojo?.soundDelays?.redCharging || 0
+      };
     },
-    red_deploy: {
-      src: 'Assets/Sound Effects/Skills/reddeploy.mp3',
-      volume: 2.0,
-      delay: 0
+    get redcharging() { return this.red_charging; },
+    get red_channeling() {
+      return {
+        src: CONFIG.gojo?.sounds?.redChanneling || 'Assets/Sound Effects/Skills/redchanneling.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.redChanneling !== undefined ? CONFIG.gojo.soundVolumes.redChanneling : 0.0,
+        delay: CONFIG.gojo?.soundDelays?.redChanneling || 0
+      };
     },
-    red_blast: {
-      src: 'Assets/Sound Effects/Skills/redblast.mp3',
-      volume: 2.5,
-      delay: 0
+    get redchanneling() { return this.red_channeling; },
+    get red_deploy() {
+      return {
+        src: CONFIG.gojo?.sounds?.redDeploy || 'Assets/Sound Effects/Skills/reddeploy.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.redDeploy !== undefined ? CONFIG.gojo.soundVolumes.redDeploy : 0.0,
+        delay: CONFIG.gojo?.soundDelays?.redDeploy || 0
+      };
     },
-    reverse_cursed_technique: {
-      src: 'Assets/Sound Effects/Skills/repair.mp3',
-      volume: 1.0,
-      delay: 0
+    get reddeploy() { return this.red_deploy; },
+    get red_blast() {
+      return {
+        src: CONFIG.gojo?.sounds?.redBlast || 'Assets/Sound Effects/Skills/redblast.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.redBlast !== undefined ? CONFIG.gojo.soundVolumes.redBlast : 0.80,
+        delay: CONFIG.gojo?.soundDelays?.redBlast || 0
+      };
     },
-    reversecursedtechnique: {
-      src: 'Assets/Sound Effects/Skills/repair.mp3',
-      volume: 1.0,
-      delay: 0
-    }
+    get redblast() { return this.red_blast; },
+    get reverse_cursed_technique() {
+      return {
+        src: CONFIG.gojo?.sounds?.reverseCursedTechnique || 'Assets/Sound Effects/Skills/repair.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.reverseCursedTechnique !== undefined ? CONFIG.gojo.soundVolumes.reverseCursedTechnique : 0.55,
+        delay: CONFIG.gojo?.soundDelays?.reverseCursedTechnique || 0
+      };
+    },
+    get reversecursedtechnique() { return this.reverse_cursed_technique; },
+    get rct() { return this.reverse_cursed_technique; },
+    get blue_orb() {
+      return {
+        src: CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/plasma_drone.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.blueOrb !== undefined ? CONFIG.gojo.soundVolumes.blueOrb : 0.35,
+        delay: CONFIG.gojo?.soundDelays?.blueOrb || 0
+      };
+    },
+    get blueorb() { return this.blue_orb; },
+    get melee_punch() {
+      return {
+        src: CONFIG.gojo?.sounds?.meleePunch || 'Assets/Sound Effects/Attacks/punch.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.meleePunch !== undefined ? CONFIG.gojo.soundVolumes.meleePunch : 0.90,
+        delay: CONFIG.gojo?.soundDelays?.meleePunch || 0
+      };
+    },
+    get meleepunch() { return this.melee_punch; },
+    get punch() { return this.melee_punch; },
+    get teleport_dash() {
+      return {
+        src: CONFIG.gojo?.sounds?.teleportDash || 'Assets/Sound Effects/Skills/dash3.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.teleportDash !== undefined ? CONFIG.gojo.soundVolumes.teleportDash : 0.45,
+        delay: CONFIG.gojo?.soundDelays?.teleportDash || 0
+      };
+    },
+    get teleportdash() { return this.teleport_dash; },
+    get dash() { return this.teleport_dash; },
+    get infinity_collide() {
+      return {
+        src: CONFIG.gojo?.sounds?.infinityCollide || 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.infinityCollide !== undefined ? CONFIG.gojo.soundVolumes.infinityCollide : 0.55,
+        delay: CONFIG.gojo?.soundDelays?.infinityCollide || 0
+      };
+    },
+    get infinitycollide() { return this.infinity_collide; }
   },
 
   // ── Sukuna ───────────────────────────
   22: {
-    domain_channel: {
-      src: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
-      volume: 5.5
-      ,
-      delay: 0
+    get domain_channel() {
+      return {
+        src: CONFIG.sukuna?.sounds?.domainChannel || 'Assets/Sound Effects/Skills/domainexpansion.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.domainChannel !== undefined ? CONFIG.sukuna.soundVolumes.domainChannel : 0.75,
+        delay: CONFIG.sukuna?.soundDelays?.domainChannel || 0
+      };
     },
-    domain_activate: {
-      src: 'Assets/Sound Effects/Skills/shrine.mp3',
-      volume: 1.5
-      ,
-      delay: 0
+    get domainchannel() { return this.domain_channel; },
+    get domain_activate() {
+      return {
+        src: CONFIG.sukuna?.sounds?.domainActivate || 'Assets/Sound Effects/Skills/shrine.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.domainActivate !== undefined ? CONFIG.sukuna.soundVolumes.domainActivate : 0.80,
+        delay: CONFIG.sukuna?.soundDelays?.domainActivate || 0
+      };
     },
-    divineflame: {
-      src: 'Assets/Sound Effects/Skills/fugaignite.mp3',
-      volume: 2.0
-      ,
-      delay: 0
+    get domainactivate() { return this.domain_activate; },
+    get domain() { return this.domain_activate; },
+    get domain_expansion() {
+      return {
+        src: CONFIG.sukuna?.sounds?.domainExpansion || 'Assets/Sound Effects/Skills/shrine.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.domainExpansion !== undefined ? CONFIG.sukuna.soundVolumes.domainExpansion : 0.75,
+        delay: CONFIG.sukuna?.soundDelays?.domainExpansion || 0
+      };
     },
-    fuga_fire: {
-      src: 'Assets/Sound Effects/Skills/fuga.mp3',
-      volume: 3.5
-      ,
-      delay: 0
+    get domainexpansion() { return this.domain_expansion; },
+    get domain_deploy() {
+      return {
+        src: CONFIG.sukuna?.sounds?.domainDeploy || 'Assets/Sound Effects/Skills/domainexpansion.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.domainDeploy !== undefined ? CONFIG.sukuna.soundVolumes.domainDeploy : 0.55,
+        delay: 0
+      };
     },
-    fuga_travel: {
-      src: 'Assets/Sound Effects/Skills/fugatravel.mp3',
-      volume: 1.5
-      ,
-      delay: 0
+    get domaindeploy() { return this.domain_deploy; },
+    get divineflame() {
+      return {
+        src: CONFIG.sukuna?.sounds?.fugaIgnite || 'Assets/Sound Effects/Skills/fugaignite.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.fugaIgnite !== undefined ? CONFIG.sukuna.soundVolumes.fugaIgnite : 1.00,
+        delay: CONFIG.sukuna?.soundDelays?.fugaIgnite || 0
+      };
     },
-    fuga_explode: {
-      src: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
-      volume: 1.5,
-      delay: 0
+    get divine_flame() { return this.divineflame; },
+    get fugaignite() { return this.divineflame; },
+    get fuga_ignite() { return this.divineflame; },
+    get fuga_fire() {
+      return {
+        src: CONFIG.sukuna?.sounds?.fugaChant || 'Assets/Sound Effects/Skills/fuga.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.fugaChant !== undefined ? CONFIG.sukuna.soundVolumes.fugaChant : 0.0,
+        delay: CONFIG.sukuna?.soundDelays?.fugaChant || 0
+      };
     },
-    rapidslash: {
-      src: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
-      volume: 3.0,
-      delay: 0
+    get fugafire() { return this.fuga_fire; },
+    get fugachant() { return this.fuga_fire; },
+    get fuga_chant() { return this.fuga_fire; },
+    get fuga() { return this.fuga_fire; },
+    get fuga_travel() {
+      return {
+        src: CONFIG.sukuna?.sounds?.fugaTravel || 'Assets/Sound Effects/Skills/fugatravel.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.fugaTravel !== undefined ? CONFIG.sukuna.soundVolumes.fugaTravel : 0.80,
+        delay: CONFIG.sukuna?.soundDelays?.fugaTravel || 0
+      };
     },
-    rapidslash_voiceline: {
-      src: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
-      volume: 3.0,
-      delay: 0
+    get fugatravel() { return this.fuga_travel; },
+    get fuga_explode() {
+      return {
+        src: CONFIG.sukuna?.sounds?.fugaExplosion || 'Assets/Sound Effects/Skills/fugaexplode.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.fugaExplosion !== undefined ? CONFIG.sukuna.soundVolumes.fugaExplosion : 0.80,
+        delay: CONFIG.sukuna?.soundDelays?.fugaExplosion || 0
+      };
     },
-    champion_voiceline: {
-      src: 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3',
-      volume: 3.5,
-      delay: 0
-    }
+    get fugaexplode() { return this.fuga_explode; },
+    get fuga_explosion() { return this.fuga_explode; },
+    get fugaexplosion() { return this.fuga_explode; },
+    get fuga_fireball() {
+      return {
+        src: CONFIG.sukuna?.sounds?.fugaFireball || 'Assets/Sound Effects/Attacks/flamespray1.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.fugaFireball !== undefined ? CONFIG.sukuna.soundVolumes.fugaFireball : 0.45,
+        delay: 0
+      };
+    },
+    get fugafireball() { return this.fuga_fireball; },
+    get thermobaric() {
+      return {
+        src: CONFIG.sukuna?.sounds?.thermobaricExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.thermobaricExplosion !== undefined ? CONFIG.sukuna.soundVolumes.thermobaricExplosion : 0.55,
+        delay: 0
+      };
+    },
+    get thermobaric_explosion() { return this.thermobaric; },
+    get thermobaricexplosion() { return this.thermobaric; },
+    get spiderweb() {
+      return {
+        src: CONFIG.sukuna?.sounds?.spiderweb || 'Assets/Sound Effects/Skills/hookchain.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.spiderweb !== undefined ? CONFIG.sukuna.soundVolumes.spiderweb : 0.40,
+        delay: 0
+      };
+    },
+    get reverse_cursed_technique() {
+      return {
+        src: CONFIG.sukuna?.sounds?.reverseCursedTechnique || 'Assets/Sound Effects/Skills/enhance.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.reverseCursedTechnique !== undefined ? CONFIG.sukuna.soundVolumes.reverseCursedTechnique : 0.55,
+        delay: 0
+      };
+    },
+    get reversecursedtechnique() { return this.reverse_cursed_technique; },
+    get rct() { return this.reverse_cursed_technique; },
+    get rapidslash() {
+      return {
+        src: CONFIG.sukuna?.sounds?.rapidSlashVoiceline || 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.rapidSlashVoiceline !== undefined ? CONFIG.sukuna.soundVolumes.rapidSlashVoiceline : 0.0,
+        delay: 0
+      };
+    },
+    get rapidslash_voiceline() { return this.rapidslash; },
+    get rapidslashvoiceline() { return this.rapidslash; },
+    get champion_voiceline() {
+      return {
+        src: CONFIG.sukuna?.sounds?.championVoiceline || 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.championVoiceline !== undefined ? CONFIG.sukuna.soundVolumes.championVoiceline : 1.75,
+        delay: CONFIG.sukuna?.soundDelays?.championVoiceline || 68
+      };
+    },
+    get championvoiceline() { return this.champion_voiceline; },
+    get punch() {
+      return {
+        src: CONFIG.sukuna?.sounds?.punch || 'Assets/Sound Effects/Attacks/punch.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.punch !== undefined ? CONFIG.sukuna.soundVolumes.punch : 1.40,
+        delay: CONFIG.sukuna?.soundDelays?.punch || 0
+      };
+    },
+    get sword_swing() {
+      return {
+        src: CONFIG.sukuna?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.swordSwing !== undefined ? CONFIG.sukuna.soundVolumes.swordSwing : 0.50,
+        delay: CONFIG.sukuna?.soundDelays?.swordSwing || 0
+      };
+    },
+    get swordswing() { return this.sword_swing; },
+    get flesh_slice() {
+      return {
+        src: CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.fleshSlice !== undefined ? CONFIG.sukuna.soundVolumes.fleshSlice : 0.40,
+        delay: CONFIG.sukuna?.soundDelays?.fleshSlice || 0
+      };
+    },
+    get fleshslice() { return this.flesh_slice; },
+    get teleport_dash() {
+      return {
+        src: CONFIG.sukuna?.sounds?.teleportDash || 'Assets/Sound Effects/Skills/dash3.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.teleportDash !== undefined ? CONFIG.sukuna.soundVolumes.teleportDash : 0.45,
+        delay: CONFIG.sukuna?.soundDelays?.teleportDash || 0
+      };
+    },
+    get teleportdash() { return this.teleport_dash; },
+    get dash() { return this.teleport_dash; },
+    get ricochet_hit() {
+      return {
+        src: CONFIG.sukuna?.sounds?.ricochetHit || 'Assets/Sound Effects/Skills/parry.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.ricochetHit !== undefined ? CONFIG.sukuna.soundVolumes.ricochetHit : 0.0,
+        delay: CONFIG.sukuna?.soundDelays?.ricochetHit || 0
+      };
+    },
+    get ricochethit() { return this.ricochet_hit; },
+    get ricochet() { return this.ricochet_hit; }
   },
 
   // ── Yuta ─────────────────────────────

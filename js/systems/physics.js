@@ -287,13 +287,17 @@ export function resolveFighterCollision(a, b) {
   a.onCollide(b);
   b.onCollide(a);
 
-  // Burn spread: if one fighter is burning and the other is not (and cooldown allows)
-  if (a.burnTimer > 0 && b.burnTimer === 0 && a.burnSpreadCooldown === 0) {
+  const teamA = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(a._stateIdx !== undefined ? a._stateIdx : (state.fighters ? state.fighters.indexOf(a) : -1)) : null;
+  const teamB = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(b._stateIdx !== undefined ? b._stateIdx : (state.fighters ? state.fighters.indexOf(b) : -1)) : null;
+  const isEnemy = (typeof a.isTeammate === 'function') ? !a.isTeammate(b) : ((typeof b.isTeammate === 'function') ? !b.isTeammate(a) : (teamA === null || teamB === null || teamA !== teamB));
+
+  // Burn spread: if one fighter is burning and the other is an enemy (and cooldown allows)
+  if (isEnemy && a.burnTimer > 0 && b.burnTimer === 0 && a.burnSpreadCooldown === 0) {
     b.applyBurn(a);
     a.burnSpreadCooldown = CONFIG.orange.burnSpreadCooldown;
     spawnFloatingText(b.x, b.y - b.r - 8, 'BURN SPREAD!', '#ff6600');
   }
-  if (b.burnTimer > 0 && a.burnTimer === 0 && b.burnSpreadCooldown === 0) {
+  if (isEnemy && b.burnTimer > 0 && a.burnTimer === 0 && b.burnSpreadCooldown === 0) {
     a.applyBurn(b);
     b.burnSpreadCooldown = CONFIG.orange.burnSpreadCooldown;
     spawnFloatingText(a.x, a.y - a.r - 8, 'BURN SPREAD!', '#ff6600');
@@ -319,10 +323,6 @@ export function resolveFighterCollision(a, b) {
 
   const aIsGojoDomain = a.domainActive && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo');
   const bIsGojoDomain = b.domainActive && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo');
-  
-  const teamA = state.getFighterTeam(a._stateIdx !== undefined ? a._stateIdx : state.fighters.indexOf(a));
-  const teamB = state.getFighterTeam(b._stateIdx !== undefined ? b._stateIdx : state.fighters.indexOf(b));
-  const isEnemy = teamA === null || teamB === null || teamA !== teamB;
 
   // Inside Gojo's Unlimited Void domain: The frozen enemy MUST NOT be pushed back on physical contact
   if (aIsGojoDomain && isEnemy) {
@@ -383,8 +383,18 @@ export function resolveFighterCollision(a, b) {
   const aIsGojoInfinity = isEnemy && !a.isTargetOfAmbush && !isInsideRubbickStolenVoid(a) && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.infinityActive || (!a.isMeleeMode && (a.infinityCooldown || 0) <= 0) || (a.infinityBlockTimer || 0) > 0);
   const bIsGojoInfinity = isEnemy && !b.isTargetOfAmbush && !isInsideRubbickStolenVoid(b) && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.infinityActive || (!b.isMeleeMode && (b.infinityCooldown || 0) <= 0) || (b.infinityBlockTimer || 0) > 0);
 
-  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || aIsGojoInfinity || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
-  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || bIsGojoInfinity || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
+  // Apply Limitless Infinity movement slow on physical collision instead of pushing enemies back
+  if (aIsGojoInfinity && !b.gojoInfinityImmune) {
+    if (typeof b.applySlow === 'function') b.applySlow(20, 0.35, { isInfinitySlow: true });
+    else { b.slowTimer = Math.max(b.slowTimer || 0, 20); b.slowMultiplier = Math.min(b.slowMultiplier || 1.0, 0.35); }
+  }
+  if (bIsGojoInfinity && !a.gojoInfinityImmune) {
+    if (typeof a.applySlow === 'function') a.applySlow(20, 0.35, { isInfinitySlow: true });
+    else { a.slowTimer = Math.max(a.slowTimer || 0, 20); a.slowMultiplier = Math.min(a.slowMultiplier || 1.0, 0.35); }
+  }
+
+  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
+  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -407,9 +417,6 @@ export function resolveFighterCollision(a, b) {
     if (typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
   }
 
-  // Prevent bounce impulse during counter execution
-  if (aIsCounterLocked || bIsCounterLocked) return;
-
   // Only apply impulse if fighters are moving toward each other
   const dvx = b.vx - a.vx;
   const dvy = b.vy - a.vy;
@@ -419,9 +426,9 @@ export function resolveFighterCollision(a, b) {
   // Prevent bounce response while brawlers are delivering combo flurries so they don't bounce apart
   if (isBrawlerCombo) return;
 
-  // Laser slow should feel like a drag, not a push.
-  // When either fighter is slowed, damp the collision impulse heavily.
-  const slowActive = (a.slowTimer > 0) || (b.slowTimer > 0);
+  // Laser slow & Infinity barrier contact should feel like a drag, not a push.
+  // When either fighter is slowed or in contact with Infinity, damp the collision impulse heavily.
+  const slowActive = (a.slowTimer > 0) || (b.slowTimer > 0) || aIsGojoInfinity || bIsGojoInfinity;
 
   const { restitution } = CONFIG.collision;
   const rawImpulse = -(1 + restitution) * dotN / 2;
@@ -441,23 +448,31 @@ export function resolveFighterCollision(a, b) {
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
   if (!a.isTurret && !a.isDispenser) {
-    // Fighters in rage or with active Infinity ignore the bounce impulse so they hold their ground
-    // Melee mode fighters absorb 35% of the impulse to hold ground while still sliding/separating cleanly
-    if (!a.isInRage && !aIsGojoInfinity) {
-      const meleeDamp = a.isMeleeMode ? 0.35 : 1.0;
-      a.vx -= (impulse * nx + randA * impulse * tx) * meleeDamp;
-      a.vy -= (impulse * ny + randA * impulse * ty) * meleeDamp;
+    // Fighters in rage, active Infinity, or counter-lock ignore the bounce impulse so they hold their ground
+    // When bouncing off an immovable entity (e.g. counter lock or turret), the mobile entity does not damp the bounce
+    if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked) {
+      const meleeDamp = (a.isMeleeMode && !bIsImmovable) ? 0.35 : 1.0;
+      const mult = bIsImmovable ? 2.0 : 1.0;
+      a.vx -= (impulse * mult * nx + randA * impulse * tx) * meleeDamp;
+      a.vy -= (impulse * mult * ny + randA * impulse * ty) * meleeDamp;
+      a.normalizeSpeed();
+    } else if (aIsCounterLocked) {
+      a.vx = 0;
+      a.vy = 0;
     }
-    a.normalizeSpeed();
   }
   
   if (!b.isTurret && !b.isDispenser) {
-    if (!b.isInRage && !bIsGojoInfinity) {
-      const meleeDamp = b.isMeleeMode ? 0.35 : 1.0;
-      b.vx += (impulse * nx + randB * impulse * tx) * meleeDamp;
-      b.vy += (impulse * ny + randB * impulse * ty) * meleeDamp;
+    if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked) {
+      const meleeDamp = (b.isMeleeMode && !aIsImmovable) ? 0.35 : 1.0;
+      const mult = aIsImmovable ? 2.0 : 1.0;
+      b.vx += (impulse * mult * nx + randB * impulse * tx) * meleeDamp;
+      b.vy += (impulse * mult * ny + randB * impulse * ty) * meleeDamp;
+      b.normalizeSpeed();
+    } else if (bIsCounterLocked) {
+      b.vx = 0;
+      b.vy = 0;
     }
-    b.normalizeSpeed();
   }
 }
 
@@ -955,20 +970,6 @@ export function updateFighters() {
         const j = b._stateIdx !== undefined ? b._stateIdx : state.fighters.indexOf(b);
         if (j <= i) continue; // Only check each pair once
         if (!b || b.hp <= 0) continue;
-        // Skip teammates in 2v2 / 1v2 / team modes (only if actually on same original team and neither is mind-controlled)
-        const isTeamMode = (
-          state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' ||
-          state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2' ||
-          state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' ||
-          state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4'
-        );
-        if (!a.isChainedByMakima && !b.isChainedByMakima && !a.isMindControlledByMakima && !b.isMindControlledByMakima && isTeamMode && state.getFighterTeam) {
-          const teamI = state.getFighterTeam(i);
-          const teamJ = state.getFighterTeam(j);
-          if (teamI !== null && teamJ !== null && teamI === teamJ) {
-            continue;
-          }
-        }
         
         // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, or when submerged/erupting in liquid shadow
         if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush) continue;
@@ -1012,7 +1013,12 @@ export function updateFighters() {
           const ny = dy / dist;
           const overlap = minDist - dist;
           const fighterIsGojoInfinity = !fighter.isTargetOfAmbush && !isInsideRubbickStolenVoid(fighter) && (fighter.characterId === 'gojo' || fighter.type === 'gojo' || fighter._def?.id === 'gojo') && (fighter.infinityActive || (!fighter.isMeleeMode && (fighter.infinityCooldown || 0) <= 0) || (fighter.infinityBlockTimer || 0) > 0);
-          if (fighter.isTurret || fighter.isDispenser || fighterIsGojoInfinity || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
+          // Gojo Infinity slows colliding entities instead of pushing them back
+          if (fighterIsGojoInfinity && !entity.gojoInfinityImmune) {
+            if (typeof entity.applySlow === 'function') entity.applySlow(20, 0.35, { isInfinitySlow: true });
+            else { entity.slowTimer = Math.max(entity.slowTimer || 0, 20); entity.slowMultiplier = Math.min(entity.slowMultiplier || 1.0, 0.35); }
+          }
+          if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
             entity.x += nx * overlap;
             entity.y += ny * overlap;
           } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai || (entity.bankaiBurstTimer && entity.bankaiBurstTimer > 0) || (entity.isChannelingGetsuga && entity.isFinalMassiveGetsuga) || (entity.hollowMaskFormationTimer && entity.hollowMaskFormationTimer > 0) || (entity.hollowBurstTimer && entity.hollowBurstTimer > 0)) {

@@ -336,14 +336,14 @@ class ProjectileSystem {
     }
     const projDamage = Number(damage);
 
-    // Use custom spawn position if provided, otherwise calculate from gun tip
     let spawnX, spawnY, dirX, dirY;
-    if (customSpawnX !== undefined && customSpawnY !== undefined) {
+    const angle = (customAngle !== undefined) ? customAngle : (fighter.gunAngle !== undefined ? fighter.gunAngle : 0);
+    dirX = Math.cos(angle);
+    dirY = Math.sin(angle);
+
+    if (customSpawnX != null && customSpawnY != null) {
       spawnX = customSpawnX;
       spawnY = customSpawnY;
-      const angle = customAngle !== undefined ? customAngle : fighter.gunAngle;
-      dirX = Math.cos(angle);
-      dirY = Math.sin(angle);
     } else {
       let tipDist = GUN_TIP_DIST(fighter.r);
       if (fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {
@@ -357,8 +357,6 @@ class ProjectileSystem {
           tipDist = 12.5 + (44.0 * 1.05); // Exact Intratec TEC-9 muzzle tip
         }
       }
-      dirX = Math.cos(fighter.gunAngle);
-      dirY = Math.sin(fighter.gunAngle);
       
       // Prevent "gun clipping" by scaling down the tip spawn offset if an enemy is too close
       if (typeof state !== 'undefined' && state.fighters && typeof spatialGrid !== 'undefined') {
@@ -514,13 +512,13 @@ class ProjectileSystem {
   }
   
   /**
-   * Spawns a Chain Lightning projectile for Zeus.
+   * Spawns a chain lightning projectile for Zeus.
    */
-  fireChainLightning(fighter, ownerIndex, damage, chainCount) {
-    const tipDist = GUN_TIP_DIST(fighter.r);
-    const speed = CONFIG.zeus.lightningSpeed || 18;
+  fireChainLightning(fighter, ownerIndex, damage, chainCount = 3) {
+    const tipDist = GUN_TIP_DIST(fighter.r) + 15;
     const dirX = Math.cos(fighter.gunAngle);
     const dirY = Math.sin(fighter.gunAngle);
+    const speed = CONFIG.zeus?.lightningSpeed || (CONFIG.projectile.speed * 1.5);
     
     const proj = this._getProjectile();
     proj.x = fighter.x + dirX * tipDist;
@@ -558,16 +556,24 @@ class ProjectileSystem {
     const radius = Math.max(2, baseProjR * scaleMultiplier);
 
     let spawnX, spawnY, dirX, dirY;
-    if (customSpawnX !== undefined && customSpawnY !== undefined) {
+    const rawAngle = (customAngle !== undefined) ? customAngle : (fighter.gunAngle !== undefined ? fighter.gunAngle : 0);
+    const cosA = Math.cos(rawAngle);
+    const sinA = Math.sin(rawAngle);
+
+    // Snap Blue projectile strictly to 4 cardinal directions: Up (0, -1), Down (0, 1), Left (-1, 0), Right (1, 0)
+    if (Math.abs(cosA) >= Math.abs(sinA)) {
+      dirX = cosA >= 0 ? 1 : -1;
+      dirY = 0;
+    } else {
+      dirX = 0;
+      dirY = sinA >= 0 ? 1 : -1;
+    }
+
+    if (customSpawnX != null && customSpawnY != null) {
       spawnX = customSpawnX;
       spawnY = customSpawnY;
-      const angle = customAngle !== undefined ? customAngle : fighter.gunAngle;
-      dirX = Math.cos(angle);
-      dirY = Math.sin(angle);
     } else {
       const tipDist = GUN_TIP_DIST(fighter.r);
-      dirX = Math.cos(fighter.gunAngle);
-      dirY = Math.sin(fighter.gunAngle);
       spawnX = fighter.x + dirX * tipDist;
       spawnY = fighter.y + dirY * tipDist;
     }
@@ -618,9 +624,18 @@ class ProjectileSystem {
     const dirX = Math.cos(fighter.gunAngle);
     const dirY = Math.sin(fighter.gunAngle);
     
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    let spawnX = fighter.x + dirX * tipDist;
+    let spawnY = fighter.y + dirY * tipDist;
+    if (arena && arena.width && arena.height) {
+      const margin = 10;
+      spawnX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, spawnX));
+      spawnY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, spawnY));
+    }
+
     const proj = this._getProjectile();
-    proj.x = fighter.x + dirX * tipDist;
-    proj.y = fighter.y + dirY * tipDist;
+    proj.x = spawnX;
+    proj.y = spawnY;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
     proj.r = CONFIG.gojo.purpleRadius || 50;
@@ -723,8 +738,11 @@ class ProjectileSystem {
   fireSukunaFurnace(fighter, ownerIndex, damage) {
     const speed = CONFIG.sukuna?.divineFlameSpeed || (CONFIG.projectile.speed * 1.8);
     const tipDist = GUN_TIP_DIST(fighter.r) + 15;
-    const dirX = Math.cos(fighter.gunAngle);
-    const dirY = Math.sin(fighter.gunAngle);
+    const angle = (fighter.divineFlameCastAngle !== undefined && !Number.isNaN(fighter.divineFlameCastAngle))
+      ? fighter.divineFlameCastAngle
+      : (fighter.gunAngle !== undefined ? fighter.gunAngle : 0);
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
     
     const proj = this._getProjectile();
     proj.x = fighter.x + dirX * tipDist;

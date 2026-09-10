@@ -40,6 +40,20 @@ export class StatusEffectsManager {
     this.fighter.timeStopTimer = val;
   }
 
+  get slowTimer() {
+    return this.fighter.slowTimer || 0;
+  }
+  set slowTimer(val) {
+    this.fighter.slowTimer = val;
+  }
+
+  get slowMultiplier() {
+    return this.fighter.slowMultiplier !== undefined ? this.fighter.slowMultiplier : 1.0;
+  }
+  set slowMultiplier(val) {
+    this.fighter.slowMultiplier = val;
+  }
+
   isSilenced() {
     return (this.fighter.silenceTimer || 0) > 0;
   }

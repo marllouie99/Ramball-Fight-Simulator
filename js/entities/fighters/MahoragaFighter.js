@@ -295,7 +295,7 @@ export class MahoragaFighter extends Fighter {
     const isBeamDamage = (
       (!this.adaptedPureLoveBeam && (opts.isPureLoveBeam || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
       (opts.isPurple || opts.isPurpleDPS || this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0) ||
-      (!this.adaptedGenosBeam && (opts.isGenosBeam || (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
+      this.caughtInGenosFlurry
     );
 
     if (isBeamDamage) {
@@ -838,7 +838,7 @@ export class MahoragaFighter extends Fighter {
     const isBeamParalyzed = (
       (!this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
       this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
-      (!this.adaptedGenosBeam && ((this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
+      this.caughtInGenosFlurry
     );
 
     // Rule #1 Early Exit Guard: Freeze / Unadapted Gojo Domain / Ambush / Infinity / Beam Paralysis completely freezes Mahoraga!
@@ -895,7 +895,7 @@ export class MahoragaFighter extends Fighter {
     const isCaughtInUltimateBeam = (
       this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
       (!this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
-      (!this.adaptedGenosBeam && ((this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
+      this.caughtInGenosFlurry
     );
 
     if (isCaughtInUltimateBeam) {

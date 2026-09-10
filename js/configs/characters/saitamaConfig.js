@@ -18,7 +18,7 @@ export const saitamaConfig = {
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  damage: 100,
+  damage: 500,
   cooldown: 200,
   projectileSpeedMultiplier: 1.0,
   ability: 'One Punch',
@@ -49,7 +49,7 @@ export const saitamaConfig = {
   punchFrontalReach: 420,          // Frontal supersonic shockwave blast reach (px) on normal punch
   punchFrontalArc: Math.PI * 0.65, // Frontal shockwave blast cone angle on normal punch
   punchFrontalDamage: 500,         // Damage dealt across the long frontal supersonic shockwave blast cone
-  punchTriggerDistance: 110,       // AI trigger distance threshold for initiating Normal Punch (px)
+  punchTriggerDistance: 50,       // AI trigger distance threshold for initiating Normal Punch (px)
   wallPinScreenShakeIntensity: 30,  // Arena screen shake intensity on wall pin impact
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
 
@@ -101,10 +101,9 @@ export const saitamaConfig = {
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
-  counterPunchDamageMultiplier: 20.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
-  counterPunchMultiplier: 20.0,    // Alias multiplier
+  counterPunchDamageMultiplier: 5.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
   counterFrontalReach: 1000,        // Long frontal shockwave blast reach (px)
-  counterFrontalArc: (135 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
+  counterFrontalArc: (120 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
   counterFrontalCollateralDamage: 2000, // Damage dealt to collateral enemies caught in the wide long frontal blast
   counterWindupFrames: 50,        // Frames Saitama waits before teleporting (reaction delay)
   counterTeleportIdleFrames: 10,  // Frames Saitama stands completely still (staring) after teleporting before starting the charge

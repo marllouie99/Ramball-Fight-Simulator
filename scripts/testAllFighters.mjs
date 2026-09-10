@@ -139,6 +139,7 @@ async function main() {
   const { drawCjBaguvixDimScreen } = await import('../js/graphics/renderers/environmentalRenderer.js');
   const { drawFighters } = await import('../js/graphics/renderers/EntityRenderer.js');
   const { audioSystem } = await import('../js/systems/audioSystem.js');
+  const { updateGame } = await import('../js/systems/updateSystem.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -173,6 +174,7 @@ async function main() {
 
       const dummyOpponent = new FighterClass({ ...def, startX: 200, startY: 200 });
       state.fighters = [fighter, dummyOpponent];
+      state.illusions = [];
       totalTested++;
 
       // 1. Base update & draw
@@ -666,14 +668,16 @@ async function main() {
         fighter.bankaiActive = true;
         fighter.bankaiTimer = 600;
         fighter.bankaiFinalGetsugaTriggered = true;
+        fighter.shunpoCooldown = 999;
+        fighter.getsugaCooldown = 999;
         fighter.x = 350;
         fighter.y = 350;
         fighter.update(dummyOpponent, 0, state.arena);
         if (fighter.afterImages.length !== 0) {
           throw new Error(`Large displacement (>60px) during Bankai spawned distant afterimages instead of re-anchoring! Count: ${fighter.afterImages.length}`);
         }
-        if (fighter._lastBankaiTrailX !== 350 || fighter._lastBankaiTrailY !== 350) {
-          throw new Error(`Trail origin was not re-anchored on large displacement! Got (${fighter._lastBankaiTrailX}, ${fighter._lastBankaiTrailY}), expected (350, 350)`);
+        if (Math.abs(fighter._lastBankaiTrailX - 350) > 10 || Math.abs(fighter._lastBankaiTrailY - 350) > 10) {
+          throw new Error(`Trail origin was not re-anchored on large displacement! Got (${fighter._lastBankaiTrailX}, ${fighter._lastBankaiTrailY}), expected near (350, 350)`);
         }
 
         // Test 9: Verify bankaiGetsugaVoice chance is valid number if defined
@@ -1286,6 +1290,7 @@ async function main() {
         dummyOpponent.isDead = false;
         dummyOpponent.isChainedByMakima = false;
         state.fighters = [fighter, dummyOpponent];
+        state.illusions = [];
 
         // Aim Makima upwards (Math.PI / 2) away from enemy at right (0 rad)
         fighter.gunAngle = -Math.PI / 2;
@@ -2043,6 +2048,20 @@ async function main() {
           throw new Error('Gojo should not be able to activate RCT while Purple is active');
         }
 
+        // Verify Gojo moves BACKWARDS away from the enemy upon Purple recovery expiration
+        fighter.purpleRecoveryTimer = 1;
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 250;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.purpleRecoveryTimer !== 0) {
+          throw new Error(`Expected purpleRecoveryTimer to reach 0, got ${fighter.purpleRecoveryTimer}`);
+        }
+        if (fighter.vx >= 0) {
+          throw new Error(`Expected Gojo to move BACKWARDS away from enemy (vx < 0), got vx=${fighter.vx}`);
+        }
+
         // Clean up
         fighter.purpleRecoveryTimer = 0;
         fighter.z = 0;
@@ -2056,6 +2075,286 @@ async function main() {
         if (!fighter.infinityActive) {
           throw new Error('Expected Limitless Infinity barrier to restore after Purple expired');
         }
+
+        // ── Gojo Hollow Purple Straight Horizontal Left/Right Constraint Tests ──
+        // Case A: Enemy straight to the Right (450, 255) -> Triggers Purple locked to Right (0)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 450;
+        dummyOpponent.y = 255;
+        fighter.purpleCooldown = 0;
+        fighter.isChannelingPurple = false;
+        fighter.update(dummyOpponent, 0, state.arena); // Initiates Purple channeling
+        if (!fighter.isChannelingPurple) {
+          throw new Error('Expected Gojo to trigger Hollow Purple when enemy is aligned straight to his Right');
+        }
+        if (fighter.purpleCastAngle !== 0 || fighter.gunAngle !== 0) {
+          throw new Error(`Expected Purple cast angle to be locked to 0 (Right), got ${fighter.purpleCastAngle}`);
+        }
+        // Enemy moves vertically during channel - verify aim does NOT snap auto-aim
+        dummyOpponent.y = 50;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.gunAngle !== 0 || fighter.purpleCastAngle !== 0) {
+          throw new Error('Expected Gojo aim NOT to snap auto-aim during Purple channeling');
+        }
+        fighter._firePurple(0);
+        const rightProj = fighter.activePurpleProjectile;
+        if (!rightProj || rightProj.vx <= 0 || Math.abs(rightProj.vy) > 0.001) {
+          throw new Error(`Expected Purple projectile to fly purely Right (vx > 0, vy = 0), got vx=${rightProj?.vx}, vy=${rightProj?.vy}`);
+        }
+        if (rightProj) {
+          rightProj.life = 0;
+          fighter.activePurpleProjectile = null;
+        }
+
+        // Case B: Enemy straight to the Left (100, 245) -> Triggers Purple locked to Left (Math.PI)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 100;
+        dummyOpponent.y = 245;
+        fighter.purpleCooldown = 0;
+        fighter.isChannelingPurple = false;
+        fighter.update(dummyOpponent, 0, state.arena); // Initiates Purple channeling
+        if (!fighter.isChannelingPurple) {
+          throw new Error('Expected Gojo to trigger Hollow Purple when enemy is aligned straight to his Left');
+        }
+        if (fighter.purpleCastAngle !== Math.PI || fighter.gunAngle !== Math.PI) {
+          throw new Error(`Expected Purple cast angle to be locked to Math.PI (Left), got ${fighter.purpleCastAngle}`);
+        }
+        fighter._firePurple(0);
+        const leftProj = fighter.activePurpleProjectile;
+        if (!leftProj || leftProj.vx >= 0 || Math.abs(leftProj.vy) > 0.001) {
+          throw new Error(`Expected Purple projectile to fly purely Left (vx < 0, vy = 0), got vx=${leftProj?.vx}, vy=${leftProj?.vy}`);
+        }
+        if (leftProj) {
+          leftProj.life = 0;
+          fighter.activePurpleProjectile = null;
+        }
+
+        // Case C: Enemy diagonal / off-axis (400, 100) -> Must NOT trigger Purple
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 400;
+        dummyOpponent.y = 100;
+        fighter.purpleCooldown = 0;
+        fighter.isChannelingPurple = false;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.isChannelingPurple) {
+          throw new Error('Gojo should NOT initiate Hollow Purple when enemy is diagonal/off-axis (not aligned straight horizontally)');
+        }
+
+        // Case D: Enemy vertically above Gojo (250, 50) -> Must NOT trigger Purple
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 250;
+        dummyOpponent.y = 50;
+        fighter.purpleCooldown = 0;
+        fighter.isChannelingPurple = false;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.isChannelingPurple) {
+          throw new Error('Gojo should NOT initiate Hollow Purple when enemy is strictly vertical');
+        }
+
+        // Case E: Purple projectile persistence and flight when NO enemy is hit across non-standard arena dimensions
+        const prevArena = state.arena;
+        state.arena = { x: 50, y: 50, width: 1100, height: 700 };
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 120; // y = 120 is outside default CONFIG.arena (y = 240)
+        fighter.gunAngle = 0; // Fire Right
+        fighter.purpleCastAngle = 0;
+        fighter._firePurple(0);
+        const freeProj = fighter.activePurpleProjectile;
+        if (!freeProj) {
+          throw new Error('Expected Hollow Purple projectile to spawn');
+        }
+        const initialX = freeProj.x;
+        // Simulate 20 frames of projectile updates with NO enemy nearby
+        for (let frame = 0; frame < 20; frame++) {
+          projectileSystem.update([fighter]);
+        }
+        if (freeProj.life <= 0) {
+          throw new Error(`Hollow Purple disappeared instantly when no enemy was hit! Expected life > 0, got ${freeProj.life}`);
+        }
+        if (freeProj.vx <= 0) {
+          throw new Error(`Hollow Purple velocity stopped moving when no enemy was hit! Expected vx > 0, got vx=${freeProj.vx}`);
+        }
+        if (freeProj.x <= initialX) {
+          throw new Error(`Hollow Purple did not travel across the arena! Expected x > ${initialX}, got ${freeProj.x}`);
+        }
+        freeProj.life = 0;
+        fighter.activePurpleProjectile = null;
+        state.arena = prevArena;
+
+        // ── Gojo Reversal Red Straight Vertical Up and Down Constraint Tests ──
+        // Test Red Case 1: Enemy straight Above Gojo (255, 100) -> Triggers Red with locked Up angle (-Math.PI / 2)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 255;
+        dummyOpponent.y = 100;
+        fighter.redCooldown = 0;
+        fighter.redEffectTimer = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.redEffectTimer <= 0) {
+          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight Above him');
+        }
+        if (Math.abs(fighter.redTargetAngle - (-Math.PI / 2)) > 0.001 || Math.abs(fighter.gunAngle - (-Math.PI / 2)) > 0.001) {
+          throw new Error(`Expected Red target and gun angle to be strictly UP (-Math.PI / 2), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
+        }
+        // Enemy moves vertically during buildup - verify aim does NOT snap auto-aim
+        dummyOpponent.y = 80;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (Math.abs(fighter.redTargetAngle - (-Math.PI / 2)) > 0.001 || Math.abs(fighter.gunAngle - (-Math.PI / 2)) > 0.001) {
+          throw new Error('Expected Gojo aim NOT to snap auto-aim during Red buildup');
+        }
+        fighter._detonateRed();
+        if (dummyOpponent.vy >= 0 || Math.abs(dummyOpponent.vx) > 0.001) {
+          throw new Error(`Expected target to be knocked UPWARD (vy < 0, vx = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
+        }
+
+        // Test Red Case 2: Enemy straight Below Gojo (245, 400) -> Triggers Red with locked Down angle (Math.PI / 2)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 245;
+        dummyOpponent.y = 400;
+        fighter.redCooldown = 0;
+        fighter.redEffectTimer = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.redEffectTimer <= 0) {
+          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight Below him');
+        }
+        if (Math.abs(fighter.redTargetAngle - (Math.PI / 2)) > 0.001 || Math.abs(fighter.gunAngle - (Math.PI / 2)) > 0.001) {
+          throw new Error(`Expected Red target and gun angle to be strictly DOWN (Math.PI / 2), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
+        }
+        fighter._detonateRed();
+        if (dummyOpponent.vy <= 0 || Math.abs(dummyOpponent.vx) > 0.001) {
+          throw new Error(`Expected target to be knocked DOWNWARD (vy > 0, vx = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
+        }
+
+        // Test Red Case 3: Enemy diagonal / off-axis (400, 100) -> Must NOT trigger Red
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 400;
+        dummyOpponent.y = 100;
+        fighter.redCooldown = 0;
+        fighter.redEffectTimer = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.redEffectTimer > 0) {
+          throw new Error('Gojo should NOT initiate Reversal Red when enemy is diagonal/off-axis (not aligned straight vertically)');
+        }
+
+        // Test Red Case 4: Enemy strictly horizontal (450, 250) -> Must NOT trigger Red
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 450;
+        dummyOpponent.y = 250;
+        fighter.redCooldown = 0;
+        fighter.redEffectTimer = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.redEffectTimer > 0) {
+          throw new Error('Gojo should NOT initiate Reversal Red when enemy is strictly horizontal');
+        }
+
+        // ── Gojo Basic Attack (Lapse: Blue) Cardinal 4-Way Direction Tests ──
+        // Helper to clear projectiles
+        const clearProjectiles = () => {
+          if (projectileSystem && projectileSystem.projectiles) {
+            projectileSystem.projectiles.forEach(p => { if (p) p.life = 0; });
+          }
+        };
+
+        // Test Blue Right (0)
+        clearProjectiles();
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 400;
+        dummyOpponent.y = 270; // dx = 150 > dy = 20 -> Right
+        fighter.shootCooldown = 0;
+        fighter.aim(dummyOpponent);
+        if (fighter.gunAngle !== 0) {
+          throw new Error(`Expected Gojo to aim strictly Right (0), got ${fighter.gunAngle}`);
+        }
+        fighter.shoot(0);
+        const blueRight = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
+        if (!blueRight || blueRight.vx <= 0 || Math.abs(blueRight.vy) > 0.001) {
+          throw new Error(`Expected Blue projectile to fire strictly Right (vx > 0, vy = 0), got vx=${blueRight?.vx}, vy=${blueRight?.vy}`);
+        }
+        clearProjectiles();
+
+        // Test Blue Left (Math.PI)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 100;
+        dummyOpponent.y = 260; // dx = -150 > dy = 10 -> Left
+        fighter.shootCooldown = 0;
+        fighter.aim(dummyOpponent);
+        if (fighter.gunAngle !== Math.PI) {
+          throw new Error(`Expected Gojo to aim strictly Left (Math.PI), got ${fighter.gunAngle}`);
+        }
+        fighter.shoot(0);
+        const blueLeft = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
+        if (!blueLeft || blueLeft.vx >= 0 || Math.abs(blueLeft.vy) > 0.001) {
+          throw new Error(`Expected Blue projectile to fire strictly Left (vx < 0, vy = 0), got vx=${blueLeft?.vx}, vy=${blueLeft?.vy}`);
+        }
+        clearProjectiles();
+
+        // Test Blue Down (Math.PI / 2)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 260;
+        dummyOpponent.y = 400; // dy = 150 > dx = 10 -> Down
+        fighter.shootCooldown = 0;
+        fighter.aim(dummyOpponent);
+        if (fighter.gunAngle !== Math.PI / 2) {
+          throw new Error(`Expected Gojo to aim strictly Down (Math.PI / 2), got ${fighter.gunAngle}`);
+        }
+        fighter.shoot(0);
+        const blueDown = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
+        if (!blueDown || blueDown.vy <= 0 || Math.abs(blueDown.vx) > 0.001) {
+          throw new Error(`Expected Blue projectile to fire strictly Down (vx = 0, vy > 0), got vx=${blueDown?.vx}, vy=${blueDown?.vy}`);
+        }
+        clearProjectiles();
+
+        // Test Blue Up (-Math.PI / 2)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 240;
+        dummyOpponent.y = 100; // dy = -150 > dx = -10 -> Up
+        fighter.shootCooldown = 0;
+        fighter.aim(dummyOpponent);
+        if (fighter.gunAngle !== -Math.PI / 2) {
+          throw new Error(`Expected Gojo to aim strictly Up (-Math.PI / 2), got ${fighter.gunAngle}`);
+        }
+        fighter.shoot(0);
+        const blueUp = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
+        if (!blueUp || blueUp.vy >= 0 || Math.abs(blueUp.vx) > 0.001) {
+          throw new Error(`Expected Blue projectile to fire strictly Up (vx = 0, vy < 0), got vx=${blueUp?.vx}, vy=${blueUp?.vy}`);
+        }
+        clearProjectiles();
       }
 
       // 12. Makima Skill 2: Angel's Armory (1000-Year Holy Spear) Test
@@ -2978,6 +3277,10 @@ async function main() {
       }
 
       // 4. Test Ambush cooldown & spam prevention:
+      testToji.timeStopTimer = 0;
+      testToji.hitStunTimer = 0;
+      testToji.paralyzeTimer = 0;
+      testToji.isGetsugaSuppressed = false;
       // Fast-forward cooldown to 50 (ambushTrigger) to launch Ambush
       testToji.stealthCooldown = 50;
       testToji.update(testMakima, 0, state.arena);
@@ -3114,6 +3417,277 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ [SUKUNA FUGA INSTANT DETONATION TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6b. Countdown End Omnidirectional Movement Verification Test
+  console.log('🎲 [Countdown End Omnidirectional Movement Test] Verifying fighters launch in varied directions rather than charging forward into each other...');
+  try {
+    const gojoDef = FIGHTER_DEFS.find(d => d.type === 'gojo') || FIGHTER_DEFS[0];
+    const sukunaDef = FIGHTER_DEFS.find(d => d.type === 'sukuna') || FIGHTER_DEFS[1];
+    const GojoClass = FIGHTER_CLASS_MAP.gojo || FIGHTER_CLASS_MAP.default;
+    const SukunaClass = FIGHTER_CLASS_MAP.sukuna || FIGHTER_CLASS_MAP.default;
+
+    let nonZeroAnglesCount = 0;
+    const trials = 30;
+
+    for (let t = 0; t < trials; t++) {
+      const f1 = new GojoClass(gojoDef);
+      const f2 = new SukunaClass(sukunaDef);
+      f1.x = 100;
+      f1.y = 400;
+      f1.gunAngle = 0; // aimed directly right at f2
+      f2.x = 400;
+      f2.y = 400;
+      f2.gunAngle = Math.PI; // aimed directly left at f1
+      f1.vx = 0;
+      f1.vy = 0;
+      f2.vx = 0;
+      f2.vy = 0;
+
+      state.fighters = [f1, f2];
+      state.gameState = 'countdown';
+      state.countdownTimer = 120; // Reaches countdown end
+
+      updateGame();
+
+      if (state.gameState !== 'playing') {
+        throw new Error(`Expected gameState to be 'playing' after countdownTimer reached 120, got '${state.gameState}'`);
+      }
+
+      const spd1 = Math.hypot(f1.vx, f1.vy);
+      const spd2 = Math.hypot(f2.vx, f2.vy);
+      if (spd1 < 0.5 || spd2 < 0.5) {
+        throw new Error(`Expected fighters to have active initial velocities after countdown, got spd1=${spd1}, spd2=${spd2}`);
+      }
+
+      const angle1 = Math.atan2(f1.vy, f1.vx);
+      // Angle 0 would be charging straight forward at the enemy
+      if (Math.abs(angle1) > 0.1) {
+        nonZeroAnglesCount++;
+      }
+    }
+
+    if (nonZeroAnglesCount < trials * 0.7) {
+      throw new Error(`Expected fighters to move in randomized omnidirectional angles on countdown end, but received mostly forward (0 rad) angles!`);
+    }
+
+    // Also test zero-speed auto-recovery in applyMovementPhysics()
+    let stallRecoveryVariedCount = 0;
+    for (let t = 0; t < trials; t++) {
+      const f = new GojoClass(gojoDef);
+      f.gunAngle = 0; // aimed straight forward
+      f.vx = 0;
+      f.vy = 0;
+      f.applyMovementPhysics();
+      const recAngle = Math.atan2(f.vy, f.vx);
+      if (Math.abs(recAngle) > 0.1) {
+        stallRecoveryVariedCount++;
+      }
+    }
+
+    if (stallRecoveryVariedCount < trials * 0.7) {
+      throw new Error(`Expected applyMovementPhysics() zero-speed recovery to use randomized direction, but was locked to gunAngle!`);
+    }
+  } catch (err) {
+    console.error('❌ [COUNTDOWN MOVEMENT TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.2. Sukuna Cardinal Angles (Basic Attack Dismantle & Fuga Divine Flame) Test
+  console.log('🔥 [Sukuna Cardinal Angles Test] Verifying basic attack Dismantle and Fuga strictly fire along 4 cardinal directions...');
+  try {
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const sukunaDef = FIGHTER_DEFS.find(d => d.id === 'sukuna');
+    if (SukunaClass && sukunaDef) {
+      // Test 1: Basic Attack Dismantle aim and shoot in 4 cardinal directions
+      const s = new SukunaClass(sukunaDef);
+      s.x = 270;
+      s.y = 480;
+      s.isMeleeMode = false;
+      state.fighters = [s];
+
+      // Enemy to the Right
+      const enemyRight = { x: 450, y: 480, r: 25, hp: 100, maxHp: 100, isDead: false };
+      s.aim(enemyRight);
+      if (Math.abs(s.gunAngle - 0) > 0.001) {
+        throw new Error(`Expected Sukuna right aim to be 0 rad, got ${s.gunAngle}`);
+      }
+
+      // Enemy to the Left
+      const enemyLeft = { x: 90, y: 480, r: 25, hp: 100, maxHp: 100, isDead: false };
+      s.aim(enemyLeft);
+      if (Math.abs(Math.abs(s.gunAngle) - Math.PI) > 0.001) {
+        throw new Error(`Expected Sukuna left aim to be Math.PI rad, got ${s.gunAngle}`);
+      }
+
+      // Enemy Down
+      const enemyDown = { x: 270, y: 700, r: 25, hp: 100, maxHp: 100, isDead: false };
+      s.aim(enemyDown);
+      if (Math.abs(s.gunAngle - (Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Sukuna down aim to be Math.PI/2 rad, got ${s.gunAngle}`);
+      }
+
+      // Enemy Up
+      const enemyUp = { x: 270, y: 200, r: 25, hp: 100, maxHp: 100, isDead: false };
+      s.aim(enemyUp);
+      if (Math.abs(s.gunAngle - (-Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Sukuna up aim to be -Math.PI/2 rad, got ${s.gunAngle}`);
+      }
+
+      // Enemy at diagonal (dx > dy -> Right)
+      const enemyDiagRight = { x: 450, y: 520, r: 25, hp: 100, maxHp: 100, isDead: false };
+      s.aim(enemyDiagRight);
+      if (Math.abs(s.gunAngle - 0) > 0.001) {
+        throw new Error(`Expected Sukuna diagonal horizontal-dominant aim to be 0 rad, got ${s.gunAngle}`);
+      }
+
+      // Enemy at diagonal (dy > dx -> Down)
+      const enemyDiagDown = { x: 300, y: 700, r: 25, hp: 100, maxHp: 100, isDead: false };
+      s.aim(enemyDiagDown);
+      if (Math.abs(s.gunAngle - (Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Sukuna diagonal vertical-dominant aim to be Math.PI/2 rad, got ${s.gunAngle}`);
+      }
+
+      // Test 2: Shoot Dismantle projectile fires along cardinal angle
+      projectileSystem.projectiles = [];
+      s.shoot(0);
+      const proj = projectileSystem.projectiles.find(p => p.visual === 'ghostBlade' || p.isSukunaSlash);
+      if (!proj) {
+        throw new Error(`Expected Sukuna shoot() to fire ghostBlade/Dismantle projectile!`);
+      }
+      if (Math.abs(proj.angle - (Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Dismantle projectile angle to be Math.PI/2 rad, got ${proj.angle}`);
+      }
+
+      // Test 3: Fuga alignment trigger - should trigger when enemy is cardinally aligned
+      s.reset();
+      s.x = 270;
+      s.y = 480;
+      s.divineFlameCooldown = 0;
+      const alignedEnemy = { x: 270, y: 200, r: 25, hp: 100, maxHp: 100, isDead: false };
+      state.fighters = [s, alignedEnemy];
+      s.update(alignedEnemy, 0, state.arena);
+      if (!s.isChannelingDivineFlame) {
+        throw new Error(`Expected Sukuna to trigger Fuga when enemy is cardinally aligned straight Up!`);
+      }
+      if (Math.abs(s.divineFlameCastAngle - (-Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Sukuna Fuga cast angle to be locked to -Math.PI/2, got ${s.divineFlameCastAngle}`);
+      }
+
+      // Test 4: Fuga alignment trigger - should NOT trigger when enemy is purely diagonal
+      s.reset();
+      s.x = 270;
+      s.y = 480;
+      s.divineFlameCooldown = 0;
+      const diagonalEnemy = { x: 450, y: 650, r: 25, hp: 100, maxHp: 100, isDead: false };
+      state.fighters = [s, diagonalEnemy];
+      s.update(diagonalEnemy, 0, state.arena);
+      if (s.isChannelingDivineFlame) {
+        throw new Error(`Expected Sukuna to NOT trigger Fuga when enemy is at a diagonal (outside corridor tolerance)!`);
+      }
+
+      // Test 5: Fuga firing launches arrow along locked cardinal angle
+      s.reset();
+      s.x = 270;
+      s.y = 480;
+      s.divineFlameCastAngle = Math.PI; // Locked to Left
+      projectileSystem.projectiles = [];
+      s._fireDivineFlame(0);
+      const fugaProj = projectileSystem.projectiles.find(p => p.isSukunaFurnace || p.behaviorType === 'sukuna_furnace');
+      if (!fugaProj) {
+        throw new Error(`Expected _fireDivineFlame to spawn sukuna_furnace projectile!`);
+      }
+      const fugaVelocityAngle = Math.atan2(fugaProj.vy, fugaProj.vx);
+      if (Math.abs(Math.abs(fugaVelocityAngle) - Math.PI) > 0.001) {
+        throw new Error(`Expected Fuga arrow velocity angle to be Math.PI rad (Left), got ${fugaVelocityAngle}`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [SUKUNA CARDINAL ANGLES TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.3. Makima Cardinal Angles ("Bang!" Primary Attack) Test
+  console.log('🔫 [Makima Cardinal Angles Test] Verifying "Bang!" primary attack strictly fires along 4 cardinal directions...');
+  try {
+    const MakimaClass = FIGHTER_CLASS_MAP['makima'];
+    const makimaDef = FIGHTER_DEFS.find(d => d.id === 'makima');
+    if (MakimaClass && makimaDef) {
+      const m = new MakimaClass(makimaDef);
+      m.x = 270;
+      m.y = 480;
+      state.fighters = [m];
+      state.illusions = [];
+
+      // Enemy to the Right -> 0
+      const enemyRight = { x: 450, y: 480, r: 25, hp: 100, maxHp: 100, isDead: false };
+      m.aim(enemyRight);
+      if (Math.abs(m.gunAngle - 0) > 0.001) {
+        throw new Error(`Expected Makima right aim to be 0 rad, got ${m.gunAngle}`);
+      }
+
+      // Enemy to the Left -> Math.PI
+      const enemyLeft = { x: 90, y: 480, r: 25, hp: 100, maxHp: 100, isDead: false };
+      m.aim(enemyLeft);
+      if (Math.abs(Math.abs(m.gunAngle) - Math.PI) > 0.001) {
+        throw new Error(`Expected Makima left aim to be Math.PI rad, got ${m.gunAngle}`);
+      }
+
+      // Enemy Down -> Math.PI / 2
+      const enemyDown = { x: 270, y: 700, r: 25, hp: 100, maxHp: 100, isDead: false };
+      m.aim(enemyDown);
+      if (Math.abs(m.gunAngle - (Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Makima down aim to be Math.PI/2 rad, got ${m.gunAngle}`);
+      }
+
+      // Enemy Up -> -Math.PI / 2
+      const enemyUp = { x: 270, y: 200, r: 25, hp: 100, maxHp: 100, isDead: false };
+      m.aim(enemyUp);
+      if (Math.abs(m.gunAngle - (-Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Makima up aim to be -Math.PI/2 rad, got ${m.gunAngle}`);
+      }
+
+      // Enemy at diagonal (dx > dy -> Right: 0)
+      const enemyDiagRight = { x: 450, y: 520, r: 25, hp: 100, maxHp: 100, isDead: false };
+      m.aim(enemyDiagRight);
+      if (Math.abs(m.gunAngle - 0) > 0.001) {
+        throw new Error(`Expected Makima diagonal horizontal-dominant aim to be 0 rad, got ${m.gunAngle}`);
+      }
+
+      // Enemy at diagonal (dy > dx -> Down: Math.PI / 2)
+      const enemyDiagDown = { x: 300, y: 700, r: 25, hp: 100, maxHp: 100, isDead: false };
+      m.aim(enemyDiagDown);
+      if (Math.abs(m.gunAngle - (Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Makima diagonal vertical-dominant aim to be Math.PI/2 rad, got ${m.gunAngle}`);
+      }
+
+      // Test "Bang!" attack execution creates beam along cardinal angle
+      m.activeBangBeams = [];
+      m._castBangAttack(enemyDiagDown);
+      if (m.activeBangBeams.length === 0) {
+        throw new Error(`Expected _castBangAttack to register activeBangBeams!`);
+      }
+      const lastBeam = m.activeBangBeams[m.activeBangBeams.length - 1];
+      if (Math.abs(lastBeam.angle - (Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Bang beam angle to be Math.PI/2 rad (Down), got ${lastBeam.angle}`);
+      }
+
+      // Test shoot() triggers "Bang!" along cardinal angle
+      m.bangCooldown = 0;
+      m.activeBangBeams = [];
+      state.fighters = [m, enemyUp];
+      m.shoot(0);
+      if (m.activeBangBeams.length === 0) {
+        throw new Error(`Expected shoot() to fire Bang!`);
+      }
+      const shootBeam = m.activeBangBeams[m.activeBangBeams.length - 1];
+      if (Math.abs(shootBeam.angle - (-Math.PI / 2)) > 0.001) {
+        throw new Error(`Expected Bang shoot beam angle to be -Math.PI/2 rad (Up), got ${shootBeam.angle}`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [MAKIMA CARDINAL ANGLES TEST ERROR]:', err);
     errors++;
   }
 

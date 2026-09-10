@@ -116,10 +116,29 @@ export function fireDivineFlame(fighter, ownerIndex) {
   const baseDamage = CONFIG.sukuna?.divineFlameDamage || 250;
   const damage = isDomainFuga ? Math.round(baseDamage * 1.5) : baseDamage;
 
-  if (fighter.divineFlameCastAngle !== undefined) {
-    fighter.gunAngle = fighter.divineFlameCastAngle;
-    fighter.angle = fighter.divineFlameCastAngle;
+  // Lock release angle strictly to cardinal direction (0, Math.PI, Math.PI / 2, -Math.PI / 2)
+  let cardinalAngle = 0;
+  if (fighter.divineFlameCastAngle !== undefined && !Number.isNaN(fighter.divineFlameCastAngle)) {
+    const c = Math.cos(fighter.divineFlameCastAngle);
+    const s = Math.sin(fighter.divineFlameCastAngle);
+    if (Math.abs(c) >= Math.abs(s)) {
+      cardinalAngle = c >= 0 ? 0 : Math.PI;
+    } else {
+      cardinalAngle = s >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+  } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+    const c = Math.cos(fighter.gunAngle);
+    const s = Math.sin(fighter.gunAngle);
+    if (Math.abs(c) >= Math.abs(s)) {
+      cardinalAngle = c >= 0 ? 0 : Math.PI;
+    } else {
+      cardinalAngle = s >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
   }
+
+  fighter.divineFlameCastAngle = cardinalAngle;
+  fighter.gunAngle = cardinalAngle;
+  fighter.angle = cardinalAngle;
 
   if (projectileSystem && projectileSystem.fireSukunaDivineFlame) {
     projectileSystem.fireSukunaDivineFlame(fighter, ownerIndex, damage);
