@@ -1,4 +1,4 @@
-import { goToTitle, startGame, startFaceOffScreen } from '../../core/gameFlow.js';
+import { goToTitle, startGame, startFaceOffScreen, randomizeTagMatchFighters } from '../../core/gameFlow.js';
 import { state, saveFighterSelections } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
@@ -790,6 +790,7 @@ function drawSelectScreen() {
   const isTactical = state.gameCategory === 'tactical' || mode === 'Tactical 2v2' || mode === 'Tactical FFA' || mode === 'Tactical 4v4' || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1;
   const isTac1v1 = isTactical && (mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === '1v1');
   const isTacFFA = isTactical && (mode === 'Tactical FFA' || mode === GAME_MODES.TACTICAL_FFA);
+  const isTag = mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH';
 
   // Screen Title: FIGHT OF LARPERS 101
   ctx.save();
@@ -797,7 +798,7 @@ function drawSelectScreen() {
     ? '[ 1 VS 1 DUEL ]'
     : (isTacFFA
       ? '[ 4-PLAYER FFA ]'
-      : (isTactical ? '[ 2 VS 2 FIREFIGHT ]' : '[ FIGHT OF LARPERS 101 ]'));
+      : (isTactical ? '[ 2 VS 2 FIREFIGHT ]' : (isTag ? '[ 3 VS 3 TAG MATCH ]' : '[ FIGHT OF LARPERS 101 ]')));
   
   ctx.fillStyle = '#21050c';
   ctx.font = '700 12px "Press Start 2P", monospace';
@@ -982,6 +983,61 @@ function drawSelectScreen() {
     }
 
     drawBottomCommandDeck(isTactical ? 'START TACTICAL 2V2' : (mode === '2v2' ? 'START 2V2 DUO' : 'START BATTLE'), () => startGame(), () => randomizeFfaFighters());
+
+  } else if (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH') {
+    const leftX = margin;
+    const rightX = margin + cardW + cardGap;
+    const stackedH = Math.floor((fullCardH - cardGap * 2) / 3);
+    const slotGap = cardGap;
+    const y0 = topY;
+    const y1 = topY + stackedH + slotGap;
+    const y2 = topY + (stackedH + slotGap) * 2;
+
+    // Team 1 / Red Squad (Slots 1, 2, 3 -> p1, p3, p5)
+    drawPlayerCard('p1Index', 'RED // SQUAD 1', leftX, y0, cardW, stackedH, '#cc2b4d', true);
+    drawPlayerCard('p3Index', 'RED // SQUAD 2', leftX, y1, cardW, stackedH, '#cc2b4d', true);
+    drawPlayerCard('p5Index', 'RED // SQUAD 3', leftX, y2, cardW, stackedH, '#cc2b4d', true);
+
+    // Team 2 / Blue Squad (Slots 1, 2, 3 -> p2, p4, p6)
+    drawPlayerCard('p2Index', 'BLUE // SQUAD 1', rightX, y0, cardW, stackedH, '#38bdf8', true);
+    drawPlayerCard('p4Index', 'BLUE // SQUAD 2', rightX, y1, cardW, stackedH, '#38bdf8', true);
+    drawPlayerCard('p6Index', 'BLUE // SQUAD 3', rightX, y2, cardW, stackedH, '#38bdf8', true);
+
+    // Center Retro Pixel VS Crest
+    const vsX = canvas.width / 2;
+    const vsY = topY + fullCardH / 2 - 10;
+    
+    ctx.save();
+    // 3D Shadow
+    ctx.fillStyle = '#5e0d1f';
+    ctx.beginPath();
+    ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center berry badge
+    ctx.fillStyle = '#b81c3b';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Inset highlight
+    ctx.strokeStyle = '#ffaec0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 9.5px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('VS', vsX, vsY + 0.5);
+    ctx.restore();
+
+    drawBottomCommandDeck('START TAG MATCH', () => startGame(), () => randomizeTagMatchFighters());
 
   } else if (mode === 'TLFS') {
     const leftX = margin;
@@ -1401,6 +1457,79 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     drawButton('CHANGE FIGHTER (ROSTER)', x + w / 2, btnY + btnH / 2, () => {
       openFighterSelectModal(slotProp, fighterIndex);
     }, btnW, btnH, null, 4);
+
+  } else if (h < 260) {
+    // ── COMPACT STACKED CARD (Tag Match 3-Stack: H ~ 218px) ──
+    const avatarX = x + 30;
+    const avatarY = y + 54;
+    const avatarSize = 44;
+
+    if (previewImage) {
+      ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+    }
+
+    const detailX = x + 58;
+    const detailW = w - 68;
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '700 7.5px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 28);
+
+    ctx.fillStyle = '#8b1524';
+    ctx.font = '700 6px "Silkscreen", monospace';
+    ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 40);
+
+    drawStatBar(ctx, 'HP', def.hp, 150, detailX, y + 50, detailW, '#cc2b4d');
+    drawStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 64, detailW, '#f59e0b');
+    drawStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, y + 78, detailW, '#7c2d37');
+
+    // Mini Live Weapon preview sub-box
+    const weaponBoxY = y + 96;
+    const weaponBoxH = h - (weaponBoxY - y) - 34;
+    const boxW = w - 16;
+
+    ctx.save();
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.4;
+    drawChamferedRect(ctx, x + 8, weaponBoxY, boxW, weaponBoxH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '700 6px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, boxW - 50), x + 12, weaponBoxY + 5);
+
+    // Mini Live Weapon render on right
+    const miniWX = x + boxW - 24;
+    const miniWY = weaponBoxY + weaponBoxH / 2 + 3;
+    ctx.save();
+    ctx.translate(miniWX, miniWY);
+    ctx.scale(0.55, 0.55);
+    drawWeaponPreview(ctx, def.type, def.color);
+    ctx.restore();
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '700 6px "Silkscreen", monospace';
+    ctx.textAlign = 'left';
+    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 12, weaponBoxY + 15, boxW - 55, 9.5, 3);
+
+    // Quick cycle arrows + Change Fighter Button
+    const arrowW = 24;
+    const changeBtnW = w - 16 - arrowW * 2 - 6;
+    const btnH = 22;
+    const btnY = y + h - btnH - 6;
+
+    drawButton('◄', x + 8 + arrowW / 2, btnY + btnH / 2, () => cycleFighter(-1), arrowW, btnH, null, 3);
+    drawButton('CHANGE', x + 8 + arrowW + 3 + changeBtnW / 2, btnY + btnH / 2, () => {
+      openFighterSelectModal(slotProp, fighterIndex);
+    }, changeBtnW, btnH, null, 3);
+    drawButton('►', x + w - 8 - arrowW / 2, btnY + btnH / 2, () => cycleFighter(1), arrowW, btnH, null, 3);
 
   } else {
     // ── MEDIUM CARD (2v2 / 1v2 Duo Stacked / FFA: H ~ 334px) ──

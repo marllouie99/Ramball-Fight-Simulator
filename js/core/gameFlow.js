@@ -6,7 +6,7 @@ import { stopAllSounds, stopAllLoopingSounds, preloadSound, stopSound, unlockAud
 // ─────────────────────────────────────────────
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from './config.js';
 import { GAME_MODES, MODE_SETTINGS } from './modeConfig.js';
-import { state, createFighterInstance, clearProjectiles } from './state.js';
+import { state, createFighterInstance, clearProjectiles, spawnFloatingText, saveFighterSelections } from './state.js';
 import { STARTER_MAP, MONOLITH_MAP } from '../../Tactical Force/maps/index.js';
 import { updateFighters, updateProjectiles, spawnFuelPickup } from '../systems/physics.js';
 import { audioSystem } from '../systems/audioSystem.js';
@@ -244,7 +244,22 @@ export function reinitFighters(isNewMatch = false) {
   state.fighters.forEach((f) => { if (f) f.lastKilledDef = null; });
  
   let fighterIndexes = [state.p1Index, state.p2Index];
-  if (state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA') {
+  if (state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match') {
+    if (isNewMatch || !state.tagMatch || !state.tagMatch.team0Roster || state.tagMatch.team0Roster.length === 0) {
+      state.tagMatch = {
+        team0Roster: [state.p1Index ?? 0, state.p3Index ?? 2, state.p5Index ?? 4],
+        team1Roster: [state.p2Index ?? 1, state.p4Index ?? 3, state.p6Index ?? 5],
+        team0ActiveSlot: 0,
+        team1ActiveSlot: 0,
+        team0Eliminations: 0,
+        team1Eliminations: 0,
+        tagInTransition: null,
+      };
+    }
+    const idx0 = state.tagMatch.team0Roster[state.tagMatch.team0ActiveSlot] ?? state.p1Index ?? 0;
+    const idx1 = state.tagMatch.team1Roster[state.tagMatch.team1ActiveSlot] ?? state.p2Index ?? 1;
+    fighterIndexes = [idx0, idx1];
+  } else if (state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA') {
     fighterIndexes.push(state.p3Index, state.p4Index);
   } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4) {
     // Arrange fighters to match the team spawn ordering.
@@ -629,6 +644,126 @@ export function startRandomFfaBattle() {
   startFaceOffScreen(false);
 }
 
+export function randomizeTagMatchFighters() {
+  const currentDefs = getActiveFighterDefs();
+  if (currentDefs.length < 6) return;
+  const indices = currentDefs.map((_, idx) => idx);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  state.p1Index = indices[0];
+  state.p3Index = indices[1];
+  state.p5Index = indices[2];
+  state.p2Index = indices[3];
+  state.p4Index = indices[4];
+  state.p6Index = indices[5];
+  saveFighterSelections();
+}
+
+export function resetMatchWithRandomTagMatchFighters() {
+  randomizeTagMatchFighters();
+  resetMatch();
+}
+
+export function startRandomTagMatchBattle() {
+  state.mode = 'Tag Match';
+  randomizeTagMatchFighters();
+  state.isRandomRollShowoff = true;
+  state.faceOffTimer = 0;
+  state.faceOffExiting = false;
+  state.faceOffExitTimer = 0;
+  state.faceOffAutoStart = true;
+  state.faceOffFromSelect = false;
+  state.faceOffCleanMode = false;
+  resetMatch();
+  startFaceOffScreen(false);
+}
+
+export function spawnTagInFighter(teamIndex) {
+  if (!state.tagMatch) return false;
+  const teamKey = 'team' + teamIndex;
+  state.tagMatch[teamKey + 'Eliminations']++;
+  state.tagMatch[teamKey + 'ActiveSlot']++;
+  const nextSlot = state.tagMatch[teamKey + 'ActiveSlot'];
+  const roster = state.tagMatch[teamKey + 'Roster'];
+  if (!roster || nextSlot >= roster.length) {
+    return false; // All 3 fighters in this team are eliminated!
+  }
+
+  const nextFighterIndex = roster[nextSlot];
+  const currentDefs = getActiveFighterDefs();
+  const def = currentDefs[nextFighterIndex] || FIGHTER_DEFS[nextFighterIndex] || currentDefs[0];
+  const newFighter = createFighterInstance(def, nextFighterIndex);
+  newFighter.reset();
+
+  const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
+  const isMakima = (newFighter.characterId === 'makima' || newFighter.type === 'makima');
+  const hp = isMakima ? Math.round(fixedHp * 0.50) : fixedHp;
+  newFighter.maxHp = hp;
+  newFighter.hp = hp;
+
+  const arena = state.arena || CONFIG.arena;
+  const centerY = arena.y + arena.height * 0.5;
+  const leftX = arena.x + arena.width * 0.25;
+  const rightX = arena.x + arena.width * 0.75;
+
+  if (teamIndex === 0) {
+    newFighter.x = leftX;
+    newFighter.y = centerY;
+    newFighter.angle = 0;
+    newFighter.gunAngle = 0;
+    newFighter.rightGunAngle = 0;
+    newFighter.leftGunAngle = 0;
+    const angle0 = Math.random() * Math.PI * 2;
+    newFighter.vx = Math.cos(angle0) * newFighter.speed;
+    newFighter.vy = Math.sin(angle0) * newFighter.speed;
+  } else {
+    newFighter.x = rightX;
+    newFighter.y = centerY;
+    newFighter.angle = Math.PI;
+    newFighter.gunAngle = Math.PI;
+    newFighter.rightGunAngle = Math.PI;
+    newFighter.leftGunAngle = Math.PI;
+    const angle1 = Math.random() * Math.PI * 2;
+    newFighter.vx = Math.cos(angle1) * newFighter.speed;
+    newFighter.vy = Math.sin(angle1) * newFighter.speed;
+  }
+
+  // Tag-in invulnerability (60 frames ~ 1 sec)
+  newFighter.invulnerableTimer = 60;
+  newFighter._tagInGlowTimer = 60;
+
+  // Aim towards current active opponent
+  const oppIndex = 1 - teamIndex;
+  const oppFighter = state.fighters[oppIndex];
+  if (oppFighter && typeof newFighter.aim === 'function') {
+    newFighter.aim(oppFighter);
+  }
+
+  // Replace dead fighter in state.fighters array at index teamIndex
+  state.fighters[teamIndex] = newFighter;
+
+  // Clear HUD cache so the new fighter's stats and skill bars build cleanly
+  clearHealthHud();
+
+  // Floating text announcement
+  const teamColor = teamIndex === 0 ? '#ff4d4d' : '#4da3ff';
+  const teamName = teamIndex === 0 ? 'TEAM RED' : 'TEAM BLUE';
+  if (typeof spawnFloatingText === 'function') {
+    spawnFloatingText(newFighter.x, newFighter.y - 40, `TAG IN: ${def.name.toUpperCase()}!`, teamColor, 24);
+  }
+
+  // Audio SFX
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash1', 0.5);
+  }
+
+  return true;
+}
+
+state.spawnTagInFighter = spawnTagInFighter;
+
 export function startFaceOffScreen(isThumbnailOnly = false) {
   if (!isThumbnailOnly) {
     // Skip showoff screen, launch in-arena countdown directly!
@@ -858,6 +993,16 @@ export function resetMatch(showFaceOff = true) {
     if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
       state.p2Index = state.tlfsAllowedEnemies[Math.floor(Math.random() * state.tlfsAllowedEnemies.length)];
     }
+  } else if (state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match') {
+    state.tagMatch = {
+      team0Roster: [state.p1Index ?? 0, state.p3Index ?? 2, state.p5Index ?? 4],
+      team1Roster: [state.p2Index ?? 1, state.p4Index ?? 3, state.p6Index ?? 5],
+      team0ActiveSlot: 0,
+      team1ActiveSlot: 0,
+      team0Eliminations: 0,
+      team1Eliminations: 0,
+      tagInTransition: null,
+    };
   }
   state.scores = [0, 0, 0, 0];
   state.teamScores = [0, 0]; // Reset 2v2 team scores

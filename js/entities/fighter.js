@@ -2089,11 +2089,53 @@ export class Fighter {
     const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
     const realAttackerIndex = state.fighters.indexOf(realAttacker);
 
+    const isTagMatch = (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH || state.mode === 'TAG_MATCH');
     const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
     const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
     const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2);
 
-    if (is2v2 || is1v2) {
+    if (isTagMatch) {
+      const deadIdx = state.fighters.indexOf(this);
+      if (deadIdx >= 0) {
+        const deadTeam = deadIdx; // 0 (Red) or 1 (Blue)
+        const teamKey = 'team' + deadTeam;
+        const currentSlot = state.tagMatch ? state.tagMatch[teamKey + 'ActiveSlot'] : 0;
+        const roster = state.tagMatch ? state.tagMatch[teamKey + 'Roster'] : [];
+        const hasNext = (currentSlot + 1) < (roster ? roster.length : 3);
+
+        if (hasNext) {
+          // Tag in the next fighter for this team!
+          if (typeof state.spawnTagInFighter === 'function') {
+            state.spawnTagInFighter(deadTeam);
+          }
+          return;
+        } else {
+          // Team is completely eliminated! The other team wins!
+          const winningTeam = deadTeam === 0 ? 1 : 0;
+          const winningFighter = state.fighters[winningTeam];
+          state.winningTeam = winningTeam;
+          state.roundWinner = winningFighter;
+          state.matchWinner = winningFighter;
+          state.gameState = 'matchEnd';
+          state.matchEndTimer = 0;
+          stopArenaBgm(true);
+          stopAllSounds(true, 2000, 500);
+          stopAllLoopingSounds();
+
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          if (typeof spawnFloatingText === 'function' && arena) {
+            const winTeamName = winningTeam === 0 ? 'TEAM RED WINS!' : 'TEAM BLUE WINS!';
+            const winColor = winningTeam === 0 ? '#ff4d4d' : '#4da3ff';
+            spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, winTeamName, winColor, 36);
+          }
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            const bell = getAnnouncerSound('bell');
+            if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
+          }
+          return;
+        }
+      }
+    } else if (is2v2 || is1v2) {
       let team0Alive = false;
       let team1Alive = false;
 

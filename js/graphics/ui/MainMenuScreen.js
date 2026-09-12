@@ -365,10 +365,11 @@ function drawModeSelection(cx, cy) {
     { id: '1v2 Stand Off', label: '1V2 SHOW' },
     { id: '2v2', label: '2V2 DUO' },
     { id: 'FFA', label: 'FFA' },
+    { id: 'Tag Match', label: 'TAG' },
     { id: 'TLFS', label: 'TLFS' }
   ];
 
-  const buttonWidth = isTactical ? 120 : Math.min(76, Math.max(60, (canvas.width - 40) / modes.length - 4));
+  const buttonWidth = isTactical ? 120 : Math.min(68, Math.max(52, Math.floor((canvas.width - 32) / modes.length - 4)));
   const buttonHeight = 24;
   const gap = 4;
   const totalWidth = modes.length * buttonWidth + (modes.length - 1) * gap;
@@ -442,6 +443,12 @@ function drawModeSelection(cx, cy) {
         if (state.mode === 'FFA' || state.mode === '2v2' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.TACTICAL_FFA) {
           state.p3Index = state.p3Index ?? 2;
           state.p4Index = state.p4Index ?? 3;
+        }
+        if (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH) {
+          state.p3Index = state.p3Index ?? 2;
+          state.p4Index = state.p4Index ?? 3;
+          state.p5Index = state.p5Index ?? 4;
+          state.p6Index = state.p6Index ?? 5;
         }
         if (state.mode === 'TLFS') {
           if (!state.tlfsAllowedEnemies || state.tlfsAllowedEnemies.length === 0) {

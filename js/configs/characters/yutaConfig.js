@@ -14,7 +14,7 @@ export const yutaConfig = {
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  damage: 15,
+  damage: 4,
   cooldown: 50,
   projectileSpeedMultiplier: 3.0,
   ability: 'Copy & Rika',

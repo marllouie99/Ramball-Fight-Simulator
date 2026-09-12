@@ -408,13 +408,14 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const winnerIndex = effectiveWinner ? (state.fighters ? state.fighters.indexOf(effectiveWinner) : -1) : -1;
   const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
-  const isTeamMode = is1v2 || is2v2;
+  const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
+  const isTeamMode = is1v2 || is2v2 || isTagMatch;
 
   let winCount = 0;
   if (isTeamMode) {
     const winningTeam = (winnerIndex >= 0 && typeof state.getFighterTeam === 'function')
       ? state.getFighterTeam(winnerIndex)
-      : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
+      : (state.winningTeam !== undefined ? state.winningTeam : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1));
     winCount = (winningTeam !== null && state.teamScores) ? (state.teamScores[winningTeam] || 0) : 0;
   } else if (winnerIndex >= 0 && state.scores) {
     winCount = state.scores[winnerIndex] || 0;
@@ -444,7 +445,10 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   let winText = 'ROUND DRAW!';
   let themeColor = '#ffffff';
 
-  if (effectiveWinner) {
+  if (isTagMatch && state.winningTeam !== undefined) {
+    winText = state.winningTeam === 0 ? 'TEAM RED WINS!' : 'TEAM BLUE WINS!';
+    themeColor = state.winningTeam === 0 ? '#ff4d4d' : '#4da3ff';
+  } else if (effectiveWinner) {
     const rawName = (effectiveWinner.name || effectiveWinner._def?.name || 'OPERATIVE').toUpperCase();
     winText = `${rawName} WINS!`;
     themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#ffffff';
@@ -606,13 +610,14 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
   const winnerIndex = winner ? (state.fighters ? state.fighters.indexOf(winner) : -1) : -1;
   const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
-  const isTeamMode = is1v2 || is2v2;
+  const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
+  const isTeamMode = is1v2 || is2v2 || isTagMatch;
 
   let winCount = 0;
   if (isTeamMode) {
     const winningTeam = (winnerIndex >= 0 && typeof state.getFighterTeam === 'function')
       ? state.getFighterTeam(winnerIndex)
-      : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
+      : (state.winningTeam !== undefined ? state.winningTeam : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1));
     winCount = (winningTeam !== null && state.teamScores) ? (state.teamScores[winningTeam] || 0) : 0;
   } else if (winnerIndex >= 0 && state.scores) {
     winCount = state.scores[winnerIndex] || 0;
@@ -743,11 +748,12 @@ function drawRoundEndScreen() {
   // Check if winner has 2 victories (match win condition)
   const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
-  const isTeamMode = is1v2 || is2v2;
+  const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
+  const isTeamMode = is1v2 || is2v2 || isTagMatch;
   const isFFA = (mode === 'FFA' || mode === 'Tactical FFA' || mode === GAME_MODES.FFA || mode === GAME_MODES.TACTICAL_FFA);
 
   const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
-  const winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : (state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
+  const winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : (state.winningTeam !== undefined ? state.winningTeam : (state.teamScores[0] >= state.teamScores[1] ? 0 : 1));
   const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
   const winThresholdForReveal = modeRounds === 1 ? 1 : 2;
 

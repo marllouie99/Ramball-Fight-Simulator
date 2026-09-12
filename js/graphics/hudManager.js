@@ -1,8 +1,9 @@
-import { CONFIG, FIGHTER_DEFS } from '../core/config.js';
+import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../core/config.js';
 import { state } from '../core/state.js';
 import { GAME_MODES, MODE_SETTINGS, MODE_SPEED_MULTIPLIER } from '../core/modeConfig.js';
 import { drawBlueAimbotGun } from './weaponVisuals.js';
 import { drawPanel } from './ui.js';
+import { getFighterPreview } from './ui/FighterPreviewCache.js';
 
 import { syncHudPosition, initHudSync } from './ui/hudLayout.js';
 import { getSkillDataForFighter } from './ui/hudSkillProviders.js';
@@ -265,9 +266,169 @@ export function drawHUD() {
     ctx.save();
     ctx.globalAlpha = hudOpacity;
 
+    // Draw Tag Match Roster HUD banner across top of arena
+    drawTagMatchRosterHUD(ctx);
+
     // Draw authentic GTA San Andreas "Cheat activated" top-left arena slide banner
     drawCheatNotification(ctx);
 
+    ctx.restore();
+  }
+}
+
+/**
+ * Draws the Tag Match 3v3 active/bench roster strip across the top of the arena.
+ */
+export function drawTagMatchRosterHUD(ctx) {
+  if (!state.tagMatch || (state.mode !== 'Tag Match' && state.mode !== GAME_MODES.TAG_MATCH && state.mode !== 'TAG_MATCH')) return;
+  const currentDefs = getActiveFighterDefs();
+  const arena = state.arena || CONFIG.arena;
+  const cx = arena.x + arena.width / 2;
+  const topY = arena.y + 10;
+
+  const { team0Roster, team1Roster, team0ActiveSlot, team1ActiveSlot } = state.tagMatch;
+  if (!team0Roster || !team1Roster || team0Roster.length < 3 || team1Roster.length < 3) return;
+
+  const slotSize = 28;
+  const slotGap = 6;
+  const teamBlockWidth = 3 * slotSize + 2 * slotGap;
+  const centerGap = 90;
+
+  // ── Team 0 (Red) Roster: 3 circles on the left ──
+  const team0StartX = cx - (centerGap / 2) - teamBlockWidth;
+  for (let i = 0; i < 3; i++) {
+    const fIdx = team0Roster[i];
+    const def = currentDefs[fIdx] || FIGHTER_DEFS[fIdx];
+    const sx = team0StartX + i * (slotSize + slotGap) + slotSize / 2;
+    const sy = topY + slotSize / 2;
+    const isActive = i === team0ActiveSlot;
+    const isDefeated = i < team0ActiveSlot;
+
+    ctx.save();
+    // Circle background
+    ctx.beginPath();
+    ctx.arc(sx, sy, slotSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = isDefeated ? 'rgba(30, 10, 15, 0.75)' : (isActive ? 'rgba(204, 43, 77, 0.4)' : 'rgba(20, 20, 30, 0.7)');
+    ctx.fill();
+
+    // Border
+    ctx.lineWidth = isActive ? 2.5 : 1.5;
+    ctx.strokeStyle = isDefeated ? '#551520' : (isActive ? '#ff4d4d' : '#883344');
+    ctx.stroke();
+
+    // Avatar preview
+    const img = getFighterPreview(fIdx);
+    if (img) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(sx, sy, slotSize / 2 - 2, 0, Math.PI * 2);
+      ctx.clip();
+      if (isDefeated) {
+        ctx.globalAlpha = 0.35;
+      }
+      ctx.drawImage(img, sx - slotSize / 2, sy - slotSize / 2, slotSize, slotSize);
+      ctx.restore();
+    }
+
+    // Status Overlay
+    if (isDefeated) {
+      // Red X mark
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(sx - 7, sy - 7);
+      ctx.lineTo(sx + 7, sy + 7);
+      ctx.moveTo(sx + 7, sy - 7);
+      ctx.lineTo(sx - 7, sy + 7);
+      ctx.stroke();
+    } else if (isActive) {
+      // "ACTIVE" badge below
+      ctx.fillStyle = '#ff4d4d';
+      ctx.font = '700 6px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('ACTIVE', sx, sy + slotSize / 2 + 3);
+    }
+    ctx.restore();
+  }
+
+  // ── Center VS Banner ──
+  ctx.save();
+  const pillW = 74;
+  const pillH = 20;
+  const pillX = cx - pillW / 2;
+  const pillY = topY + (slotSize - pillH) / 2;
+
+  ctx.fillStyle = '#1e050c';
+  ctx.strokeStyle = '#cc2b4d';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.rect(pillX, pillY, pillW, pillH);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 7px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('TAG 3v3', cx, pillY + pillH / 2 + 0.5);
+  ctx.restore();
+
+  // ── Team 1 (Blue) Roster: 3 circles on the right ──
+  const team1StartX = cx + (centerGap / 2);
+  for (let i = 0; i < 3; i++) {
+    const fIdx = team1Roster[i];
+    const def = currentDefs[fIdx] || FIGHTER_DEFS[fIdx];
+    const sx = team1StartX + i * (slotSize + slotGap) + slotSize / 2;
+    const sy = topY + slotSize / 2;
+    const isActive = i === team1ActiveSlot;
+    const isDefeated = i < team1ActiveSlot;
+
+    ctx.save();
+    // Circle background
+    ctx.beginPath();
+    ctx.arc(sx, sy, slotSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = isDefeated ? 'rgba(10, 20, 35, 0.75)' : (isActive ? 'rgba(56, 189, 248, 0.4)' : 'rgba(20, 20, 30, 0.7)');
+    ctx.fill();
+
+    // Border
+    ctx.lineWidth = isActive ? 2.5 : 1.5;
+    ctx.strokeStyle = isDefeated ? '#153055' : (isActive ? '#38bdf8' : '#335588');
+    ctx.stroke();
+
+    // Avatar preview
+    const img = getFighterPreview(fIdx);
+    if (img) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(sx, sy, slotSize / 2 - 2, 0, Math.PI * 2);
+      ctx.clip();
+      if (isDefeated) {
+        ctx.globalAlpha = 0.35;
+      }
+      ctx.drawImage(img, sx - slotSize / 2, sy - slotSize / 2, slotSize, slotSize);
+      ctx.restore();
+    }
+
+    // Status Overlay
+    if (isDefeated) {
+      // Red X mark
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(sx - 7, sy - 7);
+      ctx.lineTo(sx + 7, sy + 7);
+      ctx.moveTo(sx + 7, sy - 7);
+      ctx.lineTo(sx - 7, sy + 7);
+      ctx.stroke();
+    } else if (isActive) {
+      // "ACTIVE" badge below
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '700 6px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('ACTIVE', sx, sy + slotSize / 2 + 3);
+    }
     ctx.restore();
   }
 }

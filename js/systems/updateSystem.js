@@ -1,7 +1,7 @@
 import { state } from '../core/state.js';
 import { updateFighters, updateProjectiles } from './physics.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
-import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatch, startCountdown, startMatchDirectlyFromFaceOff } from '../core/gameFlow.js';
+import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatchWithRandomTagMatchFighters, resetMatch, startCountdown, startMatchDirectlyFromFaceOff } from '../core/gameFlow.js';
 import { triggerFaceOffSFX } from '../graphics/ui/ThumbnailFaceOffScreen.js';
 import { updateDeathEffects } from '../graphics/particles/deathShatterEffect.js';
 import { updateIllusionDeathEffects } from '../graphics/particles/illusionDeathEffect.js';
@@ -185,6 +185,8 @@ export function updateGame() {
       if (state.matchEndTimer >= matchEndAutoDelay) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();
+        } else if (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH) {
+          resetMatchWithRandomTagMatchFighters();
         } else if (state.mode === '1v1' || state.mode === 'Stand Off') {
           resetMatchWithRandom1v1Fighters();
         } else {

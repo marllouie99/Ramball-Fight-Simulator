@@ -261,14 +261,26 @@ export const state = {
   tlfsAllowedEnemies: [], // Will be populated with all fighter indices
   tlfsDefeatedEnemies: 0,
 
+  // Tag Match gamemode state (3v3 relay)
+  tagMatch: {
+    team0Roster: [], // Array of 3 fighter indices [p1, p3, p5]
+    team1Roster: [], // Array of 3 fighter indices [p2, p4, p6]
+    team0ActiveSlot: 0, // 0, 1, 2
+    team1ActiveSlot: 0, // 0, 1, 2
+    team0Eliminations: 0,
+    team1Eliminations: 0,
+    tagInTransition: null,
+  },
+
   // Leaderboard for 1v1 mode - tracks wins and losses per fighter
   leaderboard: {}, // { fighterIndex: { wins: 0, losses: 0 } }
 
-  // Team assignment: for 4v4 CT vs T, 2v2 duo, and 1v2 standoff
+  // Team assignment: for 4v4 CT vs T, 2v2 duo, 1v2 standoff, and Tag Match
   getFighterTeam(fighterIndex) {
     const is4v4 = state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4';
     const is2v2 = state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2';
     const is1v2 = state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2';
+    const isTagMatch = state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match' || state.mode === 'TAG_MATCH';
     if (is4v4) {
       if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
       const half = Math.max(1, Math.ceil(state.fighters.length / 2));
@@ -279,16 +291,21 @@ export const state = {
     } else if (is1v2) {
       if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
       return fighterIndex === 0 ? 0 : 1;
+    } else if (isTagMatch) {
+      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
+      return fighterIndex === 0 ? 0 : 1;
     }
     return null;
   },
 
   // Fighters
   fighters: [],
-  p1Index: 0, // Default Red
-  p2Index: 1, // Default Blue
-  p3Index: 2,
-  p4Index: 3,
+  p1Index: 0, // Default Red Slot 1
+  p2Index: 1, // Default Blue Slot 1
+  p3Index: 2, // Red Slot 2
+  p4Index: 3, // Blue Slot 2
+  p5Index: 4, // Red Slot 3
+  p6Index: 5, // Blue Slot 3
 
   // Floating text labels
   floatingTexts: [],
@@ -630,7 +647,9 @@ export function saveFighterSelections() {
       p1Index: state.p1Index ?? 0,
       p2Index: state.p2Index ?? 1,
       p3Index: state.p3Index ?? 2,
-      p4Index: state.p4Index ?? 3
+      p4Index: state.p4Index ?? 3,
+      p5Index: state.p5Index ?? 4,
+      p6Index: state.p6Index ?? 5
     };
     const allSavedStr = localStorage.getItem('circleMiniBattleFighterSelections');
     const allSaved = allSavedStr ? JSON.parse(allSavedStr) : {};
@@ -654,6 +673,8 @@ export function loadFighterSelections(targetCat = null) {
         if (typeof sel.p2Index === 'number') state.p2Index = sel.p2Index;
         if (typeof sel.p3Index === 'number') state.p3Index = sel.p3Index;
         if (typeof sel.p4Index === 'number') state.p4Index = sel.p4Index;
+        if (typeof sel.p5Index === 'number') state.p5Index = sel.p5Index;
+        if (typeof sel.p6Index === 'number') state.p6Index = sel.p6Index;
       }
     }
   } catch (e) {

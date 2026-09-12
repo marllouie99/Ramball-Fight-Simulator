@@ -168,9 +168,10 @@ async function verifyAll() {
     const { execSync } = require('child_process');
     try {
       execSync('node scripts/testAllFighters.mjs', { stdio: 'inherit' });
+      execSync('node scripts/testTagMatch.mjs', { stdio: 'inherit' });
       process.exit(0);
     } catch (err) {
-      console.error('🚨 Fighter Runtime Simulation failed!');
+      console.error('🚨 Simulation tests failed!');
       process.exit(1);
     }
   }

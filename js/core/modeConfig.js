@@ -17,6 +17,7 @@ export const GAME_MODES = {
   TWO_VS_TWO: '2v2',
   FFA: 'FFA',
   TLFS: 'TLFS',
+  TAG_MATCH: 'Tag Match',
   TACTICAL_4V4: 'Tactical 4v4',
   TACTICAL_1V1: 'Tactical 1v1',
   TACTICAL_STANDOFF: 'Tactical Stand Off',
@@ -102,6 +103,20 @@ export const MODE_SETTINGS = {
     maxAfterimages: 6,
     afterimageDecayMultiplier: 1.6,
   },
+  [GAME_MODES.TAG_MATCH]: {
+    label: 'Tag Match',
+    rounds: 1,
+    fixedHp: 1000,
+    speedMultiplier: 1.20,
+    initialFuelPickups: 2,
+    supportFourFighters: false,
+    maxAfterimages: 6,
+    afterimageDecayMultiplier: 1.2,
+    teamColors: {
+      team0: '#ff4d4d', // Red Team
+      team1: '#4da3ff', // Blue Team
+    },
+  },
   // Seamlessly integrate all Tactical Force game mode settings directly from tacticalModeConfig.js
   ...TACTICAL_MODE_SETTINGS
 };
@@ -125,6 +140,7 @@ export const MODE_MAX_AFTERIMAGES = Object.fromEntries(
 export const MODE_TEAM_COLORS = {
   [GAME_MODES.TWO_VS_TWO]: MODE_SETTINGS[GAME_MODES.TWO_VS_TWO]?.teamColors,
   [GAME_MODES.STAND_OFF_1V2]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,
+  [GAME_MODES.TAG_MATCH]: MODE_SETTINGS[GAME_MODES.TAG_MATCH]?.teamColors,
   [GAME_MODES.TACTICAL_4V4]: TACTICAL_MODE_SETTINGS[TACTICAL_GAME_MODES.TACTICAL_4V4]?.teamColors,
   [GAME_MODES.TACTICAL_2V2]: TACTICAL_MODE_SETTINGS[TACTICAL_GAME_MODES.TACTICAL_2V2]?.teamColors,
 };
