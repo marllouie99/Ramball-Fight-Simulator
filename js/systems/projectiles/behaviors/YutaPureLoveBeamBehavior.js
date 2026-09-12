@@ -166,8 +166,18 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
               ent.y = Math.max(minY, Math.min(maxY, ent.y));
             }
           } else if (!ent.isBaguvixActive && !ent.isGodModeActive) {
+            const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
             const isIchigo = ent.characterId === 'ichigo' || ent.type === 'ichigo' || (ent._def && (ent._def.id === 'ichigo' || ent._def.type === 'ichigo'));
-            if (!isIchigo) {
+            if (isMakimaShatter) {
+              ent.vx = 0;
+              ent.vy = 0;
+              ent.knockbackVx = 0;
+              ent.knockbackVy = 0;
+              if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
+                ent.x = ent._shatterLockedX;
+                ent.y = ent._shatterLockedY;
+              }
+            } else if (!isIchigo) {
               const pushForce = p.knockback || 6;
               const pushAngle = p.angle;
               if (typeof ent.applyKnockback === 'function') {

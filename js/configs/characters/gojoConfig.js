@@ -14,7 +14,7 @@ export const gojoConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 0.9,
-  damage: 12,
+  damage: 6,
   cooldown: 80,
   projectileSpeedMultiplier: 6.0,
   ability: 'Limitless',
@@ -29,21 +29,22 @@ export const gojoConfig = {
   infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
   infinityMeleePushForce: 0,               // No pushback impulse on barrier contact; slows movement instead
   infinitySlowDuration: 20,                // Duration in frames (~0.33s) of movement slow on barrier contact
-  infinitySlowMultiplier: 0.35,            // Movement speed multiplier while slowed by Infinity barrier (35% speed)
+  infinitySlowMultiplier: 0.10,            // Movement speed multiplier while slowed by Infinity barrier (35% speed)
   infinitySlowRange: 100,                  // Proximity distance (pixels) beyond barrier where approaching enemies get slowed
-  infinitySlowMinMultiplier: 0.20,         // Maximum slow strength (20% speed / 80% slow) reached right against the barrier
+  infinitySlowMinMultiplier: 0.05,         // Maximum slow strength (20% speed / 80% slow) reached right against the barrier
   infinityMaxFrozenProjectiles: 2,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
   infinityShockwaveCooldownFrames: 6,      // Minimum frames (~100ms) between barrier rebound shockwave ring spawns to prevent FPS drops
   infinityMaxActiveShockwaves: 2,          // Max limit of concurrent active barrier shockwave rings
-
+  infinityBounceForce: 5,                 // Knockback velocity force applied to enemies on Infinity barrier collision (higher = stronger rebound push)
+  
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
-  blueCooldown: 200,         // Fire rate for basic attack (Blue orb) - Lower is faster
+  blueCooldown: 300,         // Fire rate for basic attack (Blue orb) - Lower is faster
   blueSpeed: 10.5,          // Speed of Blue orb projectile
-  blueRadius: 100,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
+  blueRadius: 50,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
   blueProjectileRadius: 15,  // Base visual & collision radius of Blue projectile orb (at default blueRadius: 50)
   blueScale: 1.5,           // Explicit scale multiplier for Blue projectile visual size and hitbox
-  bluePullForce: 0.2,       // Pull strength of Blue
-  blueDPS: 30,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
+  bluePullForce: 0.1,       // Pull strength of Blue
+  blueDPS: 10,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
   blueDPSInterval: 10,      // Frames between DPS ticks (~6 ticks/sec)
   blueParalyzeDuration: 15,  // Duration in frames of Paralyze debuff applied while caught in Blue's gravitational field
   blueWallLingerDuration: 50, // Frames (~1.5s) Blue orb stays pinned on the wall after colliding, pulling & grinding enemies
@@ -51,16 +52,19 @@ export const gojoConfig = {
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
-  redCooldown: 700,         // Cooldown of Red (frames)
+  redCooldown: 1000,         // Cooldown of Red (frames)
   redDamage: 100,           // Base damage dealt by Reversal Red blast
   redKnockback: 10,         // Supersonic knockback force of Red
   redRange: 650,            // Base range
   redFrontalReach: 650,     // Long frontal reach corridor in pixels
-  redFrontalArc: Math.PI * 0.45, // ~80-degree frontal cone
+  redFrontalArc: 0.40,      // Frontal cone angle in radians (~44 degrees, halfArc = 0.38) matching visual cone width
   redTriggerRange: 350,     // Range in pixels to trigger Red against enemies
-  redBlastRadius: 650,      // Frontal blast reach
+  redBlastRadius: 650,      // Frontal blast reach in pixels
   redVerticalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from vertical Up/Down for straight alignment
   redVerticalCorridorHalfWidth: 40, // Strict horizontal corridor half-width (40px) within which enemies trigger vertical Red
+  redHorizontalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from horizontal Left/Right for straight alignment
+  redHorizontalCorridorHalfHeight: 40, // Strict vertical corridor half-height (40px) within which enemies trigger horizontal Red
+  redDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) for cardinal alignment (Right/Left/Up/Down)
   redTotalFrames: 125,      // Total frames for full Red animation (~2s at 60fps)
   redBuildupFrames: 100,    // Frames of orb manifestation before detonation
   redSlowDuration: 120,     // Frames the post-detonation slow lasts (~2s at 60fps)
@@ -69,23 +73,23 @@ export const gojoConfig = {
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
-  purpleCooldown: 1200,      // Cooldown of Hollow Purple
-  purpleChargeMax: 120,     // Frames required to mix Red and Blue into Purple (channeling duration)
+  purpleCooldown: 2000,      // Cooldown of Hollow Purple
+  purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
-  purpleDamage: 70,         // Continuous piercing damage per tick
+  purpleDamage: 15,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
   purpleRadius: 50,         // Radius of Purple orb
   purpleLife: 250,         // How long Purple orb stays in arena (frames)
   purpleTravelTime: 20,    // Frames the orb travels before stopping
-  purpleDPS: 150,            // Damage per second dealt to enemies inside the orb
+  purpleDPS: 15,            // Damage per second dealt to enemies inside the orb
   purpleDPSInterval: 10,   // Frames between DPS ticks
   purpleSlowDuration: 60,  // Frames the slow effect lasts
-  purpleSlowMultiplier: 0.5, // Speed multiplier while slowed
+  purpleSlowMultiplier: 0.20, // Speed multiplier while slowed (0.20 = 20% speed, very heavy slow)
   purplePullRadius: 150,   // Radius in pixels for gravitational pull field around Hollow Purple
-  purplePullForce: 9.5,    // How strongly enemies and illusions are dragged toward orb center
+  purplePullForce: 20.5,    // How strongly enemies and illusions are dragged toward orb center
   purpleShakeIntensity: 4, // Screen shake intensity when purple orb fires
   purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
-  purpleExplosionDamage: 120, // Blast explosion damage when Hollow Purple detonates upon expiring
+  purpleExplosionDamage: 20, // Blast explosion damage when Hollow Purple detonates upon expiring
   purpleExplosionRadius: 280, // Blast explosion radius in pixels
   purpleExplosionKnockback: 10, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
@@ -96,14 +100,14 @@ export const gojoConfig = {
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
   purpleSecondCastDamageMultiplier: 1.5,   // Damage multiplier for 2nd cast (2.0 = 200%)
-  purpleSecondCastChargeMax: 160,           // Channeling duration in frames for 200% Hollow Purple (~3.0s at 60fps)
+  purpleSecondCastChargeMax: 120,           // Channeling duration in frames for 200% Hollow Purple (~3.0s at 60fps)
   purpleSecondCastTextBanner: '200% HOLLOW PURPLE!', // Floating text displayed on 2nd cast release
   purpleSecondCastTextHeader100: 'PURPLE 100%',     // Skill HUD bar label for 100% cast
   purpleSecondCastTextHeader200: 'PURPLE 200%',     // Skill HUD bar label for 200% cast
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
-  domainCooldown: 1500,     // 20s Ultimate cooldown
-  domainChargeMax: 130,     // 2s Channeling duration before domain opens
+  domainCooldown: 3000,     // 20s Ultimate cooldown
+  domainChargeMax: 100,     // 2s Channeling duration before domain opens
   domainDuration: 400,      // Domain lasts ~6.6 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
   domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
@@ -114,7 +118,7 @@ export const gojoConfig = {
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 25% or below
-  reverseCursedTechniqueHealAmount: 500,   // Flat HP healed per RCT trigger
+  reverseCursedTechniqueHealPercent: 1.00, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
   reverseCursedTechniqueCooldown: 1500,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
@@ -126,8 +130,8 @@ export const gojoConfig = {
   initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
   meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
   comboDisengageDistance: 0,      // Distance (pixels) teleported away when disengaging after clash
-  meleePunchDamage: 14,             // Damage dealt per martial arts punch strike
-  meleePunchCooldown: 10,           // Frames between consecutive punches (~0.16s at 60fps)
+  meleePunchDamage: 3,             // Damage dealt per martial arts punch strike
+  meleePunchCooldown: 16,           // Frames between consecutive punches (~0.16s at 60fps)
   meleePunchAnimDuration: 15,       // Punch extension and retraction animation frame duration
   teleportSpeed: 15,                // Teleport movement slide speed
 
@@ -171,17 +175,17 @@ export const gojoConfig = {
     meleePunch: 0.90,
     teleportDash: 0.45,
     infinityCollide: 0.55,
-    redChanneling: 0.00,
-    redCharging: 0.00,
-    redDeploy: 0.00,
+    redChanneling: 2.50,
+    redCharging: 2.50,
+    redDeploy: 2.50,
     redBlast: 0.80,
-    purpleCharge: 0.00,
+    purpleCharge: 2.50,
     purpleFlare: 0.45,
-    purpleDeploy: 1.00,
+    purpleDeploy: 2.50,
     purpleFire: 0.55,
-    domainChannel: 0.70,
-    domainExpansion: 0.70,
-    domainActivate: 0.70,
+    domainChannel: 2.70,
+    domainExpansion: 2.70,
+    domainActivate: 2.70,
     reverseCursedTechnique: 0.55
   },
   soundDelays: {

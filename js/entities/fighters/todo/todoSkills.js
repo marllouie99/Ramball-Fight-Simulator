@@ -583,7 +583,7 @@ export function modExecutePendingSwap() {
         const isClose = distToEnemy <= (this.r || 25) + (targetEnemy.r || 25) + 60;
 
         if (isClose) {
-          const isGojoInfinity = (targetEnemy.characterId === 'gojo' || targetEnemy.type === 'gojo') && (targetEnemy.infinityCooldown <= 0 || targetEnemy.infinityActive) && !targetEnemy.isMeleeMode;
+          const isGojoInfinity = (targetEnemy.characterId === 'gojo' || targetEnemy.type === 'gojo') && (targetEnemy.infinityCooldown <= 0 || targetEnemy.infinityActive) && !targetEnemy.isMeleeMode && !targetEnemy.isChainedByMakima;
 
           const totalHits = CONFIG.todo?.rockCounterComboHits || 4;
           const interval = CONFIG.todo?.rockCounterComboInterval || 12;

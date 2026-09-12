@@ -1,11 +1,11 @@
 import { Fighter, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { state } from '../../core/state.js';
+import { state, spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { drawIchigoSkin, updateZangetsuRibbonPhysics, updateTensaZangetsuChainPhysics } from '../../graphics/fighters/ichigoSkin.js';
 import { fastCleanArray } from '../../graphics/particles/visualTrailSystem.js';
 import { drawIchigoSlashArc } from '../../graphics/weapons/ichigoWeaponGraphics.js';
-
+import { spawnHollowMaskShatter } from '../../graphics/particles/deathShatterEffect.js';
 import {
   activateHollowMask,
   applyHollowLifesteal,
@@ -120,6 +120,85 @@ export class IchigoFighter extends Fighter {
     this.bankaiShards = [];
     this.bankaiClothStreamers = [];
     this.damageNumberColor = (typeof CONFIG !== 'undefined' && (CONFIG.ichigo?.damageNumberColor || CONFIG.ichigo?.themeColor)) || '#FF5500';
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'sword',
+        name: 'Zangetsu Slash',
+        type: 'active',
+        cooldownKey: 'swordCooldown',
+        cooldownMax: () => CONFIG.ichigo?.swordCooldown || 22
+      },
+      {
+        id: 'getsuga',
+        name: 'Getsuga Tensho',
+        type: 'active',
+        cooldownKey: 'getsugaCooldown',
+        cooldownMax: () => CONFIG.ichigo?.getsugaCooldown || 450,
+        channelingKey: 'isChannelingGetsuga',
+        channelTimerKey: 'getsugaChargeTimer'
+      },
+      {
+        id: 'shunpo',
+        name: 'Flash Step',
+        type: 'active',
+        cooldownKey: 'shunpoCooldown',
+        cooldownMax: () => CONFIG.ichigo?.shunpoCooldown || 300
+      },
+      {
+        id: 'hollow_mask',
+        name: 'Hollow Mask',
+        type: 'buff',
+        durationKey: 'hollowMaskTimer',
+        durationMax: () => CONFIG.ichigo?.hollowMaskDuration || 700,
+        activeKey: 'hollowMaskActive',
+        channelingKey: 'hollowMaskFormationTimer',
+        onExpire: (fighter) => {
+          fighter.hollowMaskActive = false;
+          if (typeof spawnHollowMaskShatter === 'function') spawnHollowMaskShatter(fighter);
+          if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "MASK SHATTERED!", "#FFFFFF");
+        }
+      },
+      {
+        id: 'bankai',
+        name: 'Tensa Zangetsu',
+        type: 'transformation',
+        cooldownKey: 'ultimateCooldown',
+        cooldownMax: 1200,
+        durationKey: 'bankaiTimer',
+        durationMax: () => CONFIG.ichigo?.bankaiDuration || 1200,
+        activeKey: 'bankaiActive',
+        channelingKey: 'isChannelingBankai',
+        channelTimerKey: 'bankaiChargeTimer',
+        onExpire: (fighter) => {
+          fighter.bankaiActive = false;
+          fighter.bankaiUsed = true;
+          if (typeof fighter._stopFinalGetsugaVoiceline === 'function') fighter._stopFinalGetsugaVoiceline();
+          fighter.bankaiRechargeHpBaseline = fighter.hp;
+          fighter._maxBankaiPct = 0;
+          fighter.ultimateCooldown = 0;
+          fighter.isGetsugaSlash = false;
+          fighter.isFinalMassiveGetsuga = false;
+          fighter.isFinalGetsugaRecovery = false;
+          fighter.isChannelingGetsuga = false;
+          fighter.getsugaChargeTimer = 0;
+          fighter.getsugaSlideTimer = 0;
+          fighter.getsugaRecoveryTimer = 0;
+          fighter.getsugaTarget = null;
+          fighter.isShunpoDashing = false;
+          fighter.shunpoDashTimer = 0;
+          fighter.shunpoComboActive = false;
+          fighter.shunpoComboStep = 0;
+          fighter.shunpoComboDelayTimer = 0;
+          fighter.shunpoTarget = null;
+          fighter.afterImages = [];
+          fighter._lastBankaiTrailX = undefined;
+          fighter._lastBankaiTrailY = undefined;
+          if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "BANKAI EXPIRED", "#FF1E00");
+        }
+      }
+    ]);
   }
 
   isStationarySkillActive() {
@@ -460,8 +539,6 @@ export class IchigoFighter extends Fighter {
       (this.electricStunTimer && this.electricStunTimer > 0) ||
       (this.hitStunTimer && this.hitStunTimer > 0) ||
       (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
-      this.isCaughtInPurple ||
-      (this.purpleHitTimer && this.purpleHitTimer > 0) ||
       this.caughtInPureLoveBeam ||
       (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
       (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0)
@@ -891,4 +968,50 @@ export class IchigoFighter extends Fighter {
 
     super.draw(ctx);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    // 1. Hollow Mask expiration while frozen
+    if (this.hollowMaskActive && this.hollowMaskTimer <= 0) {
+      this.hollowMaskActive = false;
+      if (typeof spawnHollowMaskShatter === 'function') {
+        spawnHollowMaskShatter(this);
+      }
+      if (typeof spawnFloatingText === 'function') {
+        spawnFloatingText(this.x, this.y - this.r - 28, "MASK SHATTERED!", "#FFFFFF");
+      }
+    }
+
+    // 2. Bankai expiration while frozen
+    if (this.bankaiActive && this.bankaiTimer <= 0) {
+      this.bankaiActive = false;
+      this.bankaiUsed = true;
+      if (typeof this._stopFinalGetsugaVoiceline === 'function') {
+        this._stopFinalGetsugaVoiceline();
+      }
+      this.bankaiRechargeHpBaseline = this.hp;
+      this._maxBankaiPct = 0;
+      this.ultimateCooldown = 0;
+      this.isGetsugaSlash = false;
+      this.isFinalMassiveGetsuga = false;
+      this.isFinalGetsugaRecovery = false;
+      this.isChannelingGetsuga = false;
+      this.getsugaChargeTimer = 0;
+      this.getsugaSlideTimer = 0;
+      this.getsugaRecoveryTimer = 0;
+      this.getsugaTarget = null;
+      this.isShunpoDashing = false;
+      this.shunpoDashTimer = 0;
+      this.shunpoComboActive = false;
+      this.shunpoComboStep = 0;
+      this.shunpoComboDelayTimer = 0;
+      this.shunpoTarget = null;
+      this.afterImages = [];
+      this._lastBankaiTrailX = undefined;
+      this._lastBankaiTrailY = undefined;
+      if (typeof spawnFloatingText === 'function') {
+        spawnFloatingText(this.x, this.y - this.r - 28, "BANKAI EXPIRED", "#FF1E00");
+      }
+    }
+  }
 }
+

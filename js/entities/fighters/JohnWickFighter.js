@@ -1191,7 +1191,7 @@ export class JohnWickFighter extends Fighter {
       ) || (
         typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()
       ) || (
-        this.caughtInGenosBeam || this.caughtInPureLoveBeam || this.caughtInLaserBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.purpleHitTimer && this.purpleHitTimer > 0)
+        this.caughtInGenosBeam || this.caughtInPureLoveBeam || this.caughtInLaserBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0)
       ) || (
         attacker && (attacker.isFiringUlt || attacker.isFiringPureLoveBeam || attacker.isFiringBeam || attacker.isChannelingPureLoveBeam || attacker.isLaserFiring)
       )

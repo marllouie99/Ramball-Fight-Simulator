@@ -324,7 +324,7 @@ export const SKILL_SOUNDS = {
     get rct() { return this.reverse_cursed_technique; },
     get blue_orb() {
       return {
-        src: CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/plasma_drone.mp3',
+        src: CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/spaceshot.mp3',
         volume: CONFIG.gojo?.soundVolumes?.blueOrb !== undefined ? CONFIG.gojo.soundVolumes.blueOrb : 0.35,
         delay: CONFIG.gojo?.soundDelays?.blueOrb || 0
       };

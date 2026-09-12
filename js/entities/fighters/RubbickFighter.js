@@ -82,6 +82,29 @@ export class RubbickFighter extends Fighter {
         zSpeed: 0.02 + prng(i * 10.1) * 0.03
       });
     }
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (CONFIG.rubbick || CONFIG.trickster || {});
+    this.skillManager.registerSkills([
+      {
+        id: 'spellsteal',
+        name: 'SPELL STEAL',
+        type: 'utility',
+        cooldownKey: 'spellStealCooldown',
+        cooldownMax: cfg.spellStealCooldown || 600,
+        durationKey: 'stolenTimer'
+      },
+      {
+        id: 'telekinesis',
+        name: 'TELEKINESIS',
+        type: 'cc',
+        cooldownKey: 'telekinesisCooldown',
+        cooldownMax: cfg.telekinesisCooldown || 300,
+        durationKey: 'tkTimer'
+      }
+    ]);
   }
 
   reset() {
@@ -1823,8 +1846,8 @@ export class RubbickFighter extends Fighter {
         const redKnockback = CONFIG.gojo?.redKnockback || 40;
         const pushAngle = verticalAngle;
         const frontalReach = CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650;
-        const frontalArc = CONFIG.gojo?.redFrontalArc || (Math.PI * 0.45);
-        const halfArc = frontalArc / 2;
+        const frontalArc = CONFIG.gojo?.redFrontalArc || 0.76;
+        const halfArc = frontalArc / 2; // 0.38 (~21.8 deg, ~43.5 deg total cone)
         const slowDuration = CONFIG.gojo?.redSlowDuration || 120;
         const slowMultiplier = CONFIG.gojo?.redSlowMultiplier || 0.35;
         this.stolenSkillCooldown = (CONFIG.gojo?.redCooldown || 1000) * getStolenMultiplier('gojo_red', 'cooldownMultiplier');
@@ -1879,16 +1902,22 @@ export class RubbickFighter extends Fighter {
         }
 
         for (const f of validTargets) {
-          const dist = Math.hypot(f.x - this.x, f.y - this.y);
-          const effectiveReach = frontalReach + (f.r || 20);
+          const dx = f.x - this.x;
+          const dy = f.y - this.y;
+          const targetR = f.r || 20;
 
-          if (dist <= effectiveReach) {
-            const angleToEnemy = Math.atan2(f.y - this.y, f.x - this.x);
-            let angleDiff = angleToEnemy - pushAngle;
-            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          // Project target into blast coordinate frame (forward along pushAngle, lateral perpendicular)
+          const forwardDist = dx * Math.cos(pushAngle) + dy * Math.sin(pushAngle);
+          const lateralDist = Math.abs(-dx * Math.sin(pushAngle) + dy * Math.cos(pushAngle));
 
-            if (Math.abs(angleDiff) <= halfArc || dist <= (this.r + (f.r || 20) + 20)) {
+          // Forward reach check: Must be in front of Rubbick and within frontalReach (+ target radius)
+          if (forwardDist >= -targetR * 0.25 && forwardDist <= frontalReach + targetR) {
+            // Clamped forward distance to calculate visual cone width at target position
+            const clampedX = Math.max(0, Math.min(frontalReach, forwardDist));
+            // Visual half-width exactly matches drawGojoRedFrontalBlast and _drawReversalRedEffect
+            const visualHalfW = Math.max(16, clampedX * Math.tan(halfArc) + 8);
+
+            if (lateralDist <= visualHalfW + targetR) {
               f.timeStopTimer = 0;
               f.isFrozenByInfinity = false;
               f.infinityFreezeTimer = 0;

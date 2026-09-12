@@ -104,7 +104,7 @@ export function drawGojoBody(ctx, fighter) {
        f.isCountering)
     );
     const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0);
-    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight);
+    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima);
     const fadeOpacity = isBarrierSuppressed ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();

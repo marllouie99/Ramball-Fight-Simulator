@@ -227,7 +227,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // ── Gojo (ID 21) ─────────────────────
   21: {
     get src() {
-      return CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/plasma_drone.mp3';
+      return CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/spaceshot.mp3';
     },
     get volume() {
       return CONFIG.gojo?.soundVolumes?.blueOrb !== undefined ? CONFIG.gojo.soundVolumes.blueOrb : 0.35;
@@ -363,7 +363,7 @@ export const BASIC_ATTACK_SOUNDS = {
 
   // ── Circe / Grenadier (ID 4) ──────────
   4: {
-    src: 'Assets/Sound Effects/Attacks/grenade.mp3',
+    src: 'Assets/Sound Effects/Attacks/explosion.mp3',
     volume: 0.6,
     delay: 0,
   },
@@ -377,7 +377,7 @@ export const BASIC_ATTACK_SOUNDS = {
 
   // ── Hydra (ID 20) ─────────────────────
   20: {
-    src: 'Assets/Sound Effects/Attacks/plasma_drone.mp3',
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
     volume: 0.6,
     delay: 0,
   }
@@ -449,7 +449,7 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   // Gojo — Blue Orbs & Melee punches
   'gojo': {
     get src() {
-      return CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/plasma_drone.mp3';
+      return CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/spaceshot.mp3';
     },
     get volume() {
       return CONFIG.gojo?.soundVolumes?.blueOrb !== undefined ? CONFIG.gojo.soundVolumes.blueOrb : 0.35;
@@ -715,12 +715,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
 
   // Circe / Grenadier — Potion / Grenade Throw
   'circe': {
-    src: 'Assets/Sound Effects/Attacks/grenade.mp3',
+    src: 'Assets/Sound Effects/Attacks/explosion.mp3',
     volume: 0.6,
     delay: 0,
   },
   'grenadier': {
-    src: 'Assets/Sound Effects/Attacks/grenade.mp3',
+    src: 'Assets/Sound Effects/Attacks/explosion.mp3',
     volume: 0.6,
     delay: 0,
   },
@@ -734,7 +734,7 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
 
   // Hydra — Toxic Spit
   'hydra': {
-    src: 'Assets/Sound Effects/Attacks/plasma_drone.mp3',
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
     volume: 0.6,
     delay: 0,
   }

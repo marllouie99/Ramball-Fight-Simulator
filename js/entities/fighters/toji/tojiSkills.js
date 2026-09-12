@@ -41,7 +41,7 @@ function getTojiTarget(fighter, opponent) {
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateChannelSense(fighter, opponent) {
-  if (fighter.isChainedByMakima || fighter.isCaughtInPurple || (fighter.purpleHitTimer && fighter.purpleHitTimer > 0)) return false;
+  if (fighter.isChainedByMakima) return false;
   if (fighter._channelInterruptCooldown > 0) fighter._channelInterruptCooldown--;
 
   const target = getTojiTarget(fighter, opponent);
@@ -132,8 +132,6 @@ export function modUpdateStealth(fighter, opponent) {
     fighter.isFrozen ||
     fighter.isTargetOfAmbush ||
     fighter.isChainedByMakima ||
-    fighter.isCaughtInPurple ||
-    (fighter.purpleHitTimer && fighter.purpleHitTimer > 0) ||
     fighter.isParalyzed ||
     (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
     (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||

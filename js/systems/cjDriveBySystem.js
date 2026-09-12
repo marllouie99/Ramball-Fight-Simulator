@@ -484,8 +484,6 @@ export function updateDriveBys() {
         car.frozenByCronos ||
         car.isTargetOfAmbush ||
         car.caughtInSaitamaFlurry ||
-        car.isCaughtInPurple ||
-        (car.purpleHitTimer && car.purpleHitTimer > 0) ||
         car.caughtInPureLoveBeam ||
         (car.pureLoveBeamTimer && car.pureLoveBeamTimer > 0)
       );

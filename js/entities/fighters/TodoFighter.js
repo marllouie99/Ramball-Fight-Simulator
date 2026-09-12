@@ -60,6 +60,53 @@ export class TodoFighter extends Fighter {
     // Teammate Rescue Tracker
     this.recentTeammateDamage = 0;
     this.teammateDamageResetTimer = 0;
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'boogie_woogie',
+        name: 'Boogie Woogie',
+        type: 'active',
+        cooldownKey: 'swapCooldown',
+        cooldownMaxKey: 'swapCooldownMax'
+      },
+      {
+        id: 'rock_throw',
+        name: 'Cursed Rock Infusion',
+        type: 'active',
+        cooldownKey: 'rockThrowCooldown',
+        cooldownMaxKey: 'rockThrowCooldownMax'
+      },
+      {
+        id: 'takada_ult',
+        name: 'Idol Motivation',
+        type: 'ultimate',
+        cooldownKey: 'takadaUltCooldown',
+        cooldownMaxKey: 'takadaUltCooldownMax',
+        durationKey: 'takadaUltTimer',
+        activeKey: 'isTakadaUltActive',
+        channelingKey: 'isTakadaChanneling',
+        channelTimerKey: 'takadaChannelTimer',
+        onFrozenTick: (fighter, skill) => {
+          if (fighter.isTakadaUltActive) {
+            if (fighter.takadaUltTimer <= 120 && !fighter.takadaSongFadedOut) {
+              fighter.takadaSongFadedOut = true;
+              const fadeOutMs = CONFIG.todo?.takadaSongFadeOutMs ?? 2500;
+              const loopKey = `todo_takada_bg_${fighter.id || 'todo'}`;
+              if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopLoop === 'function') {
+                audioSystem.stopLoop(loopKey, fadeOutMs);
+              }
+            }
+          }
+        },
+        onExpire: (fighter) => {
+          fighter.isTakadaUltActive = false;
+          fighter.isTakadaBackgroundPlaying = false;
+          fighter.takadaSongStarted = false;
+          fighter.takadaSongFadedOut = false;
+        }
+      }
+    ]);
   }
 
   isStationarySkillActive() {
@@ -130,18 +177,16 @@ export class TodoFighter extends Fighter {
 
     // TimeStop & Freeze Guards (Rule 1)
     const isFrozen = this._handleTimeStop();
-    const isBeamOrPurpleTrapped = (
+    const isBeamTrapped = (
       this.caughtInPureLoveBeam ||
-      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
-      this.isCaughtInPurple ||
-      (this.purpleHitTimer && this.purpleHitTimer > 0)
+      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0)
     );
 
     const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
 
-    if (isFrozen || this.isTargetOfAmbush || this.isParalyzed || isBeamOrPurpleTrapped) {
+    if (isFrozen || this.isTargetOfAmbush || this.isParalyzed || isBeamTrapped) {
       if (typeof this._handleFrozenSkillCooldowns === 'function') {
         this._handleFrozenSkillCooldowns();
       }
@@ -511,4 +556,24 @@ export class TodoFighter extends Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.isTakadaUltActive) {
+      if (this.takadaUltTimer <= 120 && !this.takadaSongFadedOut) {
+        this.takadaSongFadedOut = true;
+        const fadeOutMs = CONFIG.todo?.takadaSongFadeOutMs ?? 2500;
+        const loopKey = `todo_takada_bg_${this.id || 'todo'}`;
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopLoop === 'function') {
+          audioSystem.stopLoop(loopKey, fadeOutMs);
+        }
+      }
+      if (this.takadaUltTimer <= 0) {
+        this.isTakadaUltActive = false;
+        this.isTakadaBackgroundPlaying = false;
+        this.takadaSongStarted = false;
+        this.takadaSongFadedOut = false;
+      }
+    }
+  }
 }
+

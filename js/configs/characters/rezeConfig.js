@@ -31,12 +31,12 @@ export const rezeConfig = {
   // ──────────────────────────────────────────
   enableMeleeCombo: true,           // Master toggle for Basic Attack: Explosive Martial Arts
   enableSparkFlechette: true,       // Master toggle for Primary Skill: Spark Flechette Barrage
-  enableDecoyBomb: true,            // Master toggle for Secondary Skill: Decapitation Decoy
-  enableRocketLunge: true,          // Master toggle for Mobility Skill: Supersonic Rocket Lunge
-  enableMegatonNuke: true,          // Master toggle for Ultimate: Megaton Tsar Nuke
-  enableCollarPinRevive: true,      // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
-  enableBlastPropulsion: true,      // Master toggle for Passive 2: Rocket Jet Blast Dash
-  enableGunpowderResidue: true,     // Master toggle for Passive 3: Gunpowder Stacks
+  enableDecoyBomb: 0,            // Master toggle for Secondary Skill: Decapitation Decoy
+  enableRocketLunge: 0,          // Master toggle for Mobility Skill: Supersonic Rocket Lunge
+  enableMegatonNuke: 0,          // Master toggle for Ultimate: Megaton Tsar Nuke
+  enableCollarPinRevive: 0,      // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
+  enableBlastPropulsion: 0,      // Master toggle for Passive 2: Rocket Jet Blast Dash
+  enableGunpowderResidue: 0,     // Master toggle for Passive 3: Gunpowder Stacks
 
   // Passive 1: Collar Pin Hybrid Physiology (Explosive Revive)
   maxReviveStocks: 1,               // 1 pin-pull revive per round

@@ -14,6 +14,7 @@ import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { StatusEffectsManager } from './components/StatusEffectsManager.js';
+import { SkillManager, Skill } from './components/SkillManager.js';
 import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
@@ -415,6 +416,11 @@ export class Fighter {
     this.knockbackVy = 0;
 
     this.statusEffects = new StatusEffectsManager(this);
+    if (!this.skillManager) {
+      this.skillManager = new SkillManager(this);
+    } else {
+      this.skillManager.reset();
+    }
 
     this.rctVisualTimer = 0;
     this.rctVisualMaxTimer = 60;
@@ -717,6 +723,7 @@ export class Fighter {
     this.hideFrontHand = false;
     this.hideBackHand = false;
     this._stationaryStallFrames = 0;
+    this.skillManager?.interruptAll();
   }
 
   /**
@@ -756,7 +763,7 @@ export class Fighter {
     return false;
   }
 
-  /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Yuta's Pure Love Beam, Laser Beam, Hollow Purple, Layla Beam). */
+  /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Yuta's Pure Love Beam, Laser Beam, Layla Beam). */
   isCaughtInBeam() {
     return !!(
       this.isDraggedByGetsuga ||
@@ -767,9 +774,7 @@ export class Fighter {
       this.caughtInGenosFlurry ||
       this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
-      (this.caughtInLaylaBeamTimer || 0) > 0 ||
-      this.isCaughtInPurple ||
-      (this.purpleHitTimer || 0) > 0
+      (this.caughtInLaylaBeamTimer || 0) > 0
     );
   }
 
@@ -1053,6 +1058,18 @@ export class Fighter {
 
   applyKnockback(vx, vy, stunFrames = 0) {
     if (this.isTurret || this.isDispenser || this.isAmbushing) return;
+    const isMakimaShattering = Boolean(this.isRevivingFromContract || this.isShatterReviving || (this.shatteredPieces && this.shatteredPieces.length > 0) || (this.characterId === 'makima' && (this.isDead || this.dead || this.hp <= 0)));
+    if (isMakimaShattering) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+      if (typeof this._shatterLockedX === 'number' && typeof this._shatterLockedY === 'number') {
+        this.x = this._shatterLockedX;
+        this.y = this._shatterLockedY;
+      }
+      return;
+    }
     if (this.isCountering || (this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0)) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
@@ -1111,26 +1128,56 @@ export class Fighter {
     );
   }
 
+  _getFrameId() {
+    if (typeof state !== 'undefined' && typeof state.frameCount === 'number') {
+      return state.frameCount;
+    }
+    return this._currentUpdateId || 0;
+  }
+
   _handleFrozenSkillCooldowns() {
-    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
-    if (this._lastSkillCdTickFrame === currentFrame && currentFrame > 0) return;
+    const currentFrame = this._getFrameId();
+    if (this._lastSkillCdTickFrame === currentFrame && currentFrame !== undefined) return;
     this._lastSkillCdTickFrame = currentFrame;
 
-    // Dodge cooldowns and passive reflexes must ALWAYS tick down even while time-stopped
-    if (this.dodgeCooldown > 0) this.dodgeCooldown--;
-
-    // Check if trapped inside Gojo's Unlimited Void Domain Expansion (Rule 17: Closed barrier cognitive stasis freezes cooldowns)
     const isInsideGojoDomain = !this.gojoDomainAdapted && !this.gojoAdapted?.domain && typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
 
-    // Global Paralyze / Stasis Rule: If the fighter has an active paralyze debuff or is trapped inside Gojo's domain, all skill & ultimate cooldowns are PAUSED!
-    if (!isInsideGojoDomain && !this.isParalyzedDebuffActive()) {
-      this._decrementSkillCooldowns();
+    if (this.skillManager) {
+      this.skillManager.update(true, isInsideGojoDomain);
+    } else {
+      if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+      if (!this.isParalyzedDebuffActive()) {
+        this._decrementSkillCooldowns();
+      }
+      this._tickActiveSkillDurations(isInsideGojoDomain);
+    }
+  }
+
+  _tickActiveSkillDurations(isInsideGojoDomain = false) {
+    if (this.skillManager) {
+      this.skillManager.tickDurations(true, isInsideGojoDomain);
+      return;
+    }
+
+    const durationKeys = SkillManager._KNOWN_LEGACY_DURATION_KEYS;
+    for (const key of durationKeys) {
+      if (typeof this[key] === 'number' && this[key] > 0) {
+        this[key]--;
+      }
+    }
+
+    if (typeof this.onFrozenSkillDurationTick === 'function') {
+      this.onFrozenSkillDurationTick(isInsideGojoDomain);
     }
   }
 
   _handleTimeStop() {
+    if (!this._inSuperUpdate) {
+      this._currentUpdateId = (this._currentUpdateId || 0) + 1;
+      this._handledTimeStopThisUpdate = true;
+    }
     this._tickCooldowns();
     this._processKnockbackPhysics();
 
@@ -1216,9 +1263,6 @@ export class Fighter {
       return true;
     }
     const isFrozen = this.statusEffects.handleTimeStop();
-    if (isFrozen) {
-      this._handleFrozenSkillCooldowns();
-    }
     return isFrozen;
   }
 
@@ -1280,14 +1324,17 @@ export class Fighter {
   }
 
   _decrementSkillCooldowns() {
+    if (this.skillManager) {
+      this.skillManager.tickCooldowns(false, false);
+      return;
+    }
+
     if (this.isEvading || this.isPreSplitting || (this.owner && (this.owner.isEvading || this.owner.isPreSplitting))) {
       return; // Freeze ALL skill cooldowns during Evasion state!
     }
     if (this.isParalyzedDebuffActive()) {
       return; // Global Paralyze Rule: Freeze ALL skill cooldowns while afflicted with any paralyze debuff!
     }
-    // Universal helper to ensure skill and ultimate cooldowns continue counting down
-    // when not paralyzed or in cognitive domain
     for (const key in this) {
       if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer') || key.endsWith('CD') || key === 'shootCooldown' || key === 'attackCooldown') {
         if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer' || key === 'crimsonElectrifiedTimer' || key === 'purpleHitTimer') continue;
@@ -1300,9 +1347,16 @@ export class Fighter {
 
   /** Per-frame housekeeping for cooldowns. */
   _tickCooldowns() {
-    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
-    if (this._lastCooldownTickFrame === currentFrame && currentFrame > 0) return;
+    const currentFrame = this._getFrameId();
+    if (this._lastCooldownTickFrame === currentFrame && currentFrame !== undefined) return;
     this._lastCooldownTickFrame = currentFrame;
+
+    if (this.skillManager) {
+      const isFrozen = Boolean(this.timeStopTimer > 0 || this.isTimeStopped || (this.statusEffects && this.statusEffects.isTimeStopped));
+      if (!isFrozen) {
+        this.skillManager.update(false);
+      }
+    }
 
     if (this.purpleHitTimer > 0) {
       this.purpleHitTimer--;
@@ -1553,6 +1607,19 @@ export class Fighter {
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
     this._lastKnockbackFrame = currentFrame;
 
+    const isMakimaShattering = Boolean(this.isRevivingFromContract || this.isShatterReviving || (this.shatteredPieces && this.shatteredPieces.length > 0) || (this.characterId === 'makima' && (this.isDead || this.dead || this.hp <= 0)));
+    if (isMakimaShattering) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+      if (typeof this._shatterLockedX === 'number' && typeof this._shatterLockedY === 'number') {
+        this.x = this._shatterLockedX;
+        this.y = this._shatterLockedY;
+      }
+      return;
+    }
+
     if (!this.isTargetOfAmbush && !this.isChainedByMakima && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
@@ -1575,9 +1642,8 @@ export class Fighter {
         // Silky Smooth Kinetic Ricochet Wall Bounce (0.82 smooth velocity reflection)
         let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
         const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
-        const isGojoPurpleCaught = (this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0);
         const isGenosFlurryCaught = Boolean(this.caughtInGenosFlurry);
-        const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosFlurryCaught || isPureLoveBeamCaught || isGojoPurpleCaught;
+        const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosFlurryCaught || isPureLoveBeamCaught;
         if (this.preventKnockbackBounce || this.isDraggedByGetsuga || isBeamTrapped) bounceMult = 0; // Stick to the wall instead of bouncing
 
         const minX = arena.x + this.r;
@@ -2009,7 +2075,8 @@ export class Fighter {
           spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
         }
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+          const bell = getAnnouncerSound('bell');
+          if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
         }
       }
       return;
@@ -2055,7 +2122,8 @@ export class Fighter {
             spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
           }
           if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+            const bell = getAnnouncerSound('bell');
+            if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
           }
           return;
         }
@@ -2152,7 +2220,8 @@ export class Fighter {
           spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
         }
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+          const bell = getAnnouncerSound('bell');
+          if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
         }
         return;
       }
@@ -2619,6 +2688,11 @@ export class Fighter {
 
   /** Standard per-frame update tick for basic movement, shooting, and physics. */
   update(opponent, ownerIndex, arena) {
+    if (!this._handledTimeStopThisUpdate) {
+      this._currentUpdateId = (this._currentUpdateId || 0) + 1;
+    }
+    this._handledTimeStopThisUpdate = false;
+    this._inSuperUpdate = true;
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
@@ -2654,8 +2728,18 @@ export class Fighter {
       this.caughtInGenosBeam = false;
     }
 
+    // Cinematic pause during Mahoraga's 3D Wheel Adaptation Game Pause
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      this._inSuperUpdate = false;
+      return;
+    }
+
     // Time stop - freeze movement if time stopped
     if (this._handleTimeStop()) {
+      this._inSuperUpdate = false;
       return;
     }
 
@@ -2709,6 +2793,7 @@ export class Fighter {
       this.aim(opponent);
     }
     this.resolveWallBounce(arena, opponent);
+    this._inSuperUpdate = false;
   }
 
   /** Draws the basic circle body. Subclasses can override for custom rendering. */

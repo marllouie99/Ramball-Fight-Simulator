@@ -28,6 +28,27 @@ export class GojoBlueBehavior extends ProjectileBehavior {
     const ownerIndex = (typeof p.owner === 'number') ? p.owner : (state.fighters ? state.fighters.indexOf(p.owner) : -1);
     const ownerFighter = (typeof p.owner === 'number' && fighters) ? fighters[p.owner] : (p.ownerFighter || p.owner);
 
+    const isMatchOver = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd'));
+
+    // If the round or match has ended (enemy died from Blue or other attack), let Blue continue active trajectory/wall-linger
+    if (isMatchOver) {
+      p.life -= 1;
+      if (p.life <= 0) return true;
+
+      if (!p.isWallLingering) {
+        p.x += p.vx;
+        p.y += p.vy;
+      }
+
+      if (!p.history) p.history = [];
+      p.history.push({ x: p.x, y: p.y });
+      if (p.history.length > (p.historyMax || 10)) {
+        p.history.shift();
+      }
+
+      return this.checkExpire(p, system);
+    }
+
     const allTargets = [
       ...(state.fighters || []),
       ...(state.illusions || []),
@@ -47,18 +68,36 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       const fi = state.fighters ? state.fighters.indexOf(checkFighter) : -1;
       if (ownerIndex !== -1 && fi !== -1 && areOnSameTeam(ownerIndex, fi)) continue;
 
-      const isChanneling = typeof f.isChannelingSkill === 'function' ? f.isChannelingSkill() : false;
-      const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
-      if ((!isChanneling || isSaitamaCounter) && !f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
+      const isChanneling = Boolean(
+        (typeof f.isChannelingSkill === 'function' && f.isChannelingSkill()) ||
+        (typeof f.isPerformingSkill === 'function' && f.isPerformingSkill()) ||
+        (typeof f.isStationarySkillActive === 'function' && f.isStationarySkillActive()) ||
+        f.isChannelingDivineFlame || f.isChannelingFuga || (f.fugaChargeTimer && f.fugaChargeTimer > 0) ||
+        f.isChannelingPurple || (f.purpleChargeTimer && f.purpleChargeTimer > 0) ||
+        f.redBuildupPhase || (f.redEffectTimer && f.redEffectTimer > 0) ||
+        f.isChannelingDomain || f.isChannelingDomainExpansion || (f.domainChargeTimer && f.domainChargeTimer > 0) ||
+        f.isChannelingRCT || f.isChannelingBankai || f.isChannelingGetsuga ||
+        f.isChannelingIncinerate || f.isChannelingSelfDestruct || f.isChannelingPureLoveBeam ||
+        f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) ||
+        (f._counterWindupTimer && f._counterWindupTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)
+      );
+
+      const isMakimaShatter = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving || (f.shatteredPieces && f.shatteredPieces.length > 0) || (f.characterId === 'makima' && (f.isDead || f.dead || f.hp <= 0))));
+      if (isMakimaShatter) {
+        f.vx = 0; f.vy = 0; f.knockbackVx = 0; f.knockbackVy = 0;
+        if (typeof f._shatterLockedX === 'number' && typeof f._shatterLockedY === 'number') {
+          f.x = f._shatterLockedX; f.y = f._shatterLockedY;
+        }
+        continue;
+      }
+
+      if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
         const dx = p.x - f.x;
         const dy = p.y - f.y;
         const dist = Math.hypot(dx, dy);
         if (dist < pullRadius) {
-          if (isSaitamaCounter && typeof f.interruptAttacks === 'function') {
-            f.interruptAttacks(true);
-          }
           const isWallLingering = p.isWallLingering;
-          if (dist > 0) {
+          if (dist > 0 && !isChanneling) {
             const pullStrength = isWallLingering ? 4.8 : 3.5;
             const force = (pullRadius - dist) / pullRadius * pullStrength;
             f.x += (dx / dist) * force;
@@ -73,32 +112,24 @@ export class GojoBlueBehavior extends ProjectileBehavior {
             f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, 0.45);
           }
 
-          // Apply Paralyze debuff to targets trapped in Blue's gravitational vortex
-          const paralyzeFrames = CONFIG.gojo?.blueParalyzeDuration || 15;
-          if (typeof f.applyParalyze === 'function') {
-            f.applyParalyze(paralyzeFrames, { isBlue: true });
-          } else {
-            f.paralyzeTimer = Math.max(f.paralyzeTimer || 0, paralyzeFrames);
-            if (f.statusEffects && typeof f.statusEffects.applyParalyze === 'function') {
-              f.statusEffects.applyParalyze(paralyzeFrames, { isBlue: true });
+          // Interrupt attacks ONLY if target is NOT actively channeling a skill
+          if (!isChanneling) {
+            if (typeof f.interruptAttacks === 'function') {
+              f.interruptAttacks();
             }
-          }
 
-          if (typeof f.interruptAttacks === 'function') {
-            f.interruptAttacks();
-          }
-
-          if (isWallLingering) {
-            // Drag toward stationary vortex on wall
-            const dirX = dist > 0 ? dx / dist : 0;
-            const dirY = dist > 0 ? dy / dist : 0;
-            f.vx = (f.vx || 0) * 0.35 + dirX * 2.5;
-            f.vy = (f.vy || 0) * 0.35 + dirY * 2.5;
-          } else {
-            // Drag along traveling projectile
-            const dragSpeed = 0.55;
-            f.vx = (f.vx || 0) * 0.4 + p.vx * dragSpeed;
-            f.vy = (f.vy || 0) * 0.4 + p.vy * dragSpeed;
+            if (isWallLingering) {
+              // Drag toward stationary vortex on wall
+              const dirX = dist > 0 ? dx / dist : 0;
+              const dirY = dist > 0 ? dy / dist : 0;
+              f.vx = (f.vx || 0) * 0.35 + dirX * 2.5;
+              f.vy = (f.vy || 0) * 0.35 + dirY * 2.5;
+            } else {
+              // Drag along traveling projectile
+              const dragSpeed = 0.55;
+              f.vx = (f.vx || 0) * 0.4 + p.vx * dragSpeed;
+              f.vy = (f.vy || 0) * 0.4 + p.vy * dragSpeed;
+            }
           }
 
           // Boundary clamp to ensure dragged entities never clip through arena walls
@@ -157,18 +188,22 @@ export class GojoBlueBehavior extends ProjectileBehavior {
     if (attacker && typeof attacker.isTeammate === 'function' && attacker.isTeammate(target)) {
       return false;
     }
-    if (target && !target.isBaguvixActive && !target.isGodModeActive) {
-      const paralyzeFrames = CONFIG.gojo?.blueParalyzeDuration || 20;
-      if (typeof target.applyParalyze === 'function') {
-        target.applyParalyze(paralyzeFrames, { isBlue: true });
-      } else {
-        target.paralyzeTimer = Math.max(target.paralyzeTimer || 0, paralyzeFrames);
-        if (target.statusEffects && typeof target.statusEffects.applyParalyze === 'function') {
-          target.statusEffects.applyParalyze(paralyzeFrames, { isBlue: true });
-        }
-      }
-    }
-    return HitImpactSystem.processProjectileHit(target, projectile, attacker, fighters);
+    const isChanneling = Boolean(
+      (typeof target.isChannelingSkill === 'function' && target.isChannelingSkill()) ||
+      (typeof target.isPerformingSkill === 'function' && target.isPerformingSkill()) ||
+      (typeof target.isStationarySkillActive === 'function' && target.isStationarySkillActive()) ||
+      target.isChannelingDivineFlame || target.isChannelingFuga || (target.fugaChargeTimer && target.fugaChargeTimer > 0) ||
+      target.isChannelingPurple || (target.purpleChargeTimer && target.purpleChargeTimer > 0) ||
+      target.redBuildupPhase || (target.redEffectTimer && target.redEffectTimer > 0) ||
+      target.isChannelingDomain || target.isChannelingDomainExpansion || (target.domainChargeTimer && target.domainChargeTimer > 0) ||
+      target.isChannelingRCT || target.isChannelingBankai || target.isChannelingGetsuga ||
+      target.isChannelingIncinerate || target.isChannelingSelfDestruct || target.isChannelingPureLoveBeam ||
+      target.isCountering || (target._counterPunchTimer && target._counterPunchTimer > 0) ||
+      (target._counterWindupTimer && target._counterWindupTimer > 0) || (target._postCounterRecoveryTimer && target._postCounterRecoveryTimer > 0)
+    );
+
+
+    return HitImpactSystem.processProjectileHit(target, projectile, attacker, fighters, { skipInterrupt: isChanneling, isBlue: true });
   }
 
   checkExpire(projectile, system) {

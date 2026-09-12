@@ -91,12 +91,8 @@ export function preloadActiveMatchSounds(fighters) {
     'Assets/Sound Effects/Attacks/groundSmash.mp3',
     'Assets/Sound Effects/Attacks/explosion.mp3',
     'Assets/Sound Effects/Attacks/spaceshot.mp3',
-    // In-arena countdown & announcer
-    'Assets/Sound Effects/Announcer/timertick.mp3',
-    'Assets/Sound Effects/Announcer/fight.mp3',
-    'Assets/Sound Effects/Announcer/ring-bell.mp3',
-    'Assets/Sound Effects/Announcer/bell.mp3',
-    'Assets/Sound Effects/Announcer/faah.mp3'
+    // Dynamic In-arena countdown & announcer sound configs
+    ...getAnnouncerSoundPaths()
   ];
 
   // Active match Arena BGM (only the chosen track, not all 7 tracks!)
@@ -187,104 +183,6 @@ export function resetFighter(fighter) {
 }
 
 export function reinitFighters(isNewMatch = false) {
-  // Save progressive properties of the current fighters if it's 1v1 mode
-  const savedStates = [];
-  const is1v1 = !isNewMatch && (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE);
-  if (is1v1 && state.fighters && state.fighters.length > 0) {
-    state.fighters.forEach((f, idx) => {
-      if (f) {
-        savedStates[idx] = {
-          // Cooldowns
-          shootCooldown: f.shootCooldown,
-          skillCooldown: f.skillCooldown,
-          cooldownTimer: f.cooldownTimer,
-          stolenSkillCooldown: f.stolenSkillCooldown,
-          boogieWoogieCooldown: f.boogieWoogieCooldown,
-          boogieWoogieCharges: f.boogieWoogieCharges,
-          comboRushCooldown: f.comboRushCooldown,
-          rockThrowCooldown: f.rockThrowCooldown,
-          divineFlameCooldown: f.divineFlameCooldown,
-          cleaveCooldown: f.cleaveCooldown,
-          shoutCooldown: f.shoutCooldown,
-          destructionBarrageCooldown: f.destructionBarrageCooldown,
-          voidDashCooldown: f.voidDashCooldown,
-          maleficBombCooldown: f.maleficBombCooldown,
-          ultimateCooldown: f.ultimateCooldown,
-          aegisCooldown: f.aegisCooldown,
-          stormCooldown: f.stormCooldown,
-          sphereCooldown: f.sphereCooldown,
-          flurryCooldown: f.flurryCooldown,
-          swordCooldown: f.swordCooldown,
-          c4Cooldown: f.c4Cooldown,
-          telekinesisCooldown: f.telekinesisCooldown,
-          spellStealCooldown: f.spellStealCooldown,
-          hirenkyakuCooldown: f.hirenkyakuCooldown,
-          sprengerCooldown: f.sprengerCooldown,
-          seeleCooldown: f.seeleCooldown,
-          ransotengaiCooldown: f.ransotengaiCooldown,
-
-          // Progressive/Passive stats
-          stunChance: f.stunChance,
-          baseStunChance: f.baseStunChance,
-          critChance: f.critChance,
-          critMultiplier: f.critMultiplier,
-          powerStacks: f.powerStacks,
-          blackFlashCharge: f.blackFlashCharge,
-          blackFlashThreshold: f.blackFlashThreshold,
-          hasSummonedAt50Hp: f.hasSummonedAt50Hp,
-          gojoInfinityImmune: f.gojoInfinityImmune,
-          parryCount: f.parryCount,
-          soulSwapActive: f.soulSwapActive,
-          hasSoulSwapped: f.hasSoulSwapped,
-          
-          // Mahoraga adaptation wheel rules
-          adapted: f.adapted ? { ...f.adapted } : undefined,
-          adaptedTypes: f.adaptedTypes ? new Set(f.adaptedTypes) : undefined,
-          adaptationProgress: f.adaptationProgress ? { ...f.adaptationProgress } : undefined,
-          adaptationStages: f.adaptationStages ? { ...f.adaptationStages } : undefined,
-          wheelRotations: f.wheelRotations,
-
-          // Active transformations/states/timers
-          isInUltimate: f.isInUltimate,
-          soulSwapTimer: f.soulSwapTimer,
-          domainActive: f.domainActive,
-          domainTimer: f.domainTimer,
-          isChannelingDomain: f.isChannelingDomain,
-          isChannelingDomainExpansion: f.isChannelingDomainExpansion,
-          stealthActive: f.stealthActive,
-          stealthTimer: f.stealthTimer,
-          ultimateActive: f.ultimateActive,
-          ultimateTimer: f.ultimateTimer,
-          combatAuraOpacity: f.combatAuraOpacity,
-          
-          // Uryu Ishida progressive state
-          reishiGauge: f.reishiGauge,
-          isPiercingLightActive: f.isPiercingLightActive,
-          piercingLightTimer: f.piercingLightTimer,
-          ransotengaiActive: f.ransotengaiActive,
-          ransotengaiTimer: f.ransotengaiTimer,
-          vollstandigActive: f.vollstandigActive,
-          antithesisUsed: f.antithesisUsed,
-          
-          // Rika state for Yuta
-          rikaActiveState: (f.rika && f.rika.active) ? {
-            active: f.rika.active,
-            timer: f.rika.timer,
-            cooldownTimer: f.rika.cooldownTimer,
-            hasSummonedAt50Hp: f.rika.hasSummonedAt50Hp,
-            killedInDomain: f.rika.killedInDomain
-          } : null,
-          
-          // Rubbick stolen spell info
-          stolenType: f.stolenType,
-          stolenDef: f.stolenDef,
-          hasStolen: f.hasStolen,
-          spellStealTimer: f.spellStealTimer
-        };
-      }
-    });
-  }
-
   // Proper cleanup of PixiJS Sprites before resetting lengths
   ParticleSystem.clearAll();
   burnEffectSystem.clear();
@@ -370,98 +268,8 @@ export function reinitFighters(isNewMatch = false) {
     state.fighters.push(createFighterInstance(def, idx));
   }
  
-  state.fighters.forEach((fighter, idx) => {
+  state.fighters.forEach((fighter) => {
     fighter.reset();
-
-    // Restore states for 1v1 mode
-    if (is1v1 && savedStates[idx]) {
-      const saved = savedStates[idx];
-      
-      // Cooldowns
-      if (saved.shootCooldown !== undefined) fighter.shootCooldown = saved.shootCooldown;
-      if (saved.skillCooldown !== undefined) fighter.skillCooldown = saved.skillCooldown;
-      if (saved.cooldownTimer !== undefined) fighter.cooldownTimer = saved.cooldownTimer;
-      if (saved.stolenSkillCooldown !== undefined) fighter.stolenSkillCooldown = saved.stolenSkillCooldown;
-      if (saved.boogieWoogieCooldown !== undefined) fighter.boogieWoogieCooldown = saved.boogieWoogieCooldown;
-      if (saved.boogieWoogieCharges !== undefined) fighter.boogieWoogieCharges = saved.boogieWoogieCharges;
-      if (saved.comboRushCooldown !== undefined) fighter.comboRushCooldown = saved.comboRushCooldown;
-      if (saved.rockThrowCooldown !== undefined) fighter.rockThrowCooldown = saved.rockThrowCooldown;
-      if (saved.divineFlameCooldown !== undefined) fighter.divineFlameCooldown = saved.divineFlameCooldown;
-      if (saved.cleaveCooldown !== undefined) fighter.cleaveCooldown = saved.cleaveCooldown;
-      if (saved.shoutCooldown !== undefined) fighter.shoutCooldown = saved.shoutCooldown;
-      if (saved.destructionBarrageCooldown !== undefined) fighter.destructionBarrageCooldown = saved.destructionBarrageCooldown;
-      if (saved.voidDashCooldown !== undefined) fighter.voidDashCooldown = saved.voidDashCooldown;
-      if (saved.maleficBombCooldown !== undefined) fighter.maleficBombCooldown = saved.maleficBombCooldown;
-      if (saved.ultimateCooldown !== undefined) fighter.ultimateCooldown = saved.ultimateCooldown;
-      if (saved.aegisCooldown !== undefined) fighter.aegisCooldown = saved.aegisCooldown;
-      if (saved.stormCooldown !== undefined) fighter.stormCooldown = saved.stormCooldown;
-      if (saved.sphereCooldown !== undefined) fighter.sphereCooldown = saved.sphereCooldown;
-      if (saved.flurryCooldown !== undefined) fighter.flurryCooldown = saved.flurryCooldown;
-      if (saved.swordCooldown !== undefined) fighter.swordCooldown = saved.swordCooldown;
-      if (saved.c4Cooldown !== undefined) fighter.c4Cooldown = saved.c4Cooldown;
-      if (saved.telekinesisCooldown !== undefined) fighter.telekinesisCooldown = saved.telekinesisCooldown;
-      if (saved.spellStealCooldown !== undefined) fighter.spellStealCooldown = saved.spellStealCooldown;
-      if (saved.hirenkyakuCooldown !== undefined) fighter.hirenkyakuCooldown = saved.hirenkyakuCooldown;
-      if (saved.sprengerCooldown !== undefined) fighter.sprengerCooldown = saved.sprengerCooldown;
-      if (saved.seeleCooldown !== undefined) fighter.seeleCooldown = saved.seeleCooldown;
-      if (saved.ransotengaiCooldown !== undefined) fighter.ransotengaiCooldown = saved.ransotengaiCooldown;
-
-      // Passives & Stacks
-      if (saved.stunChance !== undefined) fighter.stunChance = saved.stunChance;
-      if (saved.baseStunChance !== undefined) fighter.baseStunChance = saved.baseStunChance;
-      if (saved.critChance !== undefined) fighter.critChance = saved.critChance;
-      if (saved.critMultiplier !== undefined) fighter.critMultiplier = saved.critMultiplier;
-      if (saved.powerStacks !== undefined) fighter.powerStacks = saved.powerStacks;
-      if (saved.blackFlashCharge !== undefined) fighter.blackFlashCharge = saved.blackFlashCharge;
-      if (saved.blackFlashThreshold !== undefined) fighter.blackFlashThreshold = saved.blackFlashThreshold;
-      if (saved.hasSummonedAt50Hp !== undefined) fighter.hasSummonedAt50Hp = saved.hasSummonedAt50Hp;
-      if (saved.gojoInfinityImmune !== undefined) fighter.gojoInfinityImmune = saved.gojoInfinityImmune;
-      if (saved.parryCount !== undefined) fighter.parryCount = saved.parryCount;
-      if (saved.soulSwapActive !== undefined) fighter.soulSwapActive = saved.soulSwapActive;
-      if (saved.hasSoulSwapped !== undefined) fighter.hasSoulSwapped = saved.hasSoulSwapped;
-
-      // Mahoraga adaptation wheel rules
-      if (saved.adapted !== undefined) fighter.adapted = saved.adapted;
-      if (saved.adaptedTypes !== undefined) fighter.adaptedTypes = saved.adaptedTypes;
-      if (saved.adaptationProgress !== undefined) fighter.adaptationProgress = saved.adaptationProgress;
-      if (saved.adaptationStages !== undefined) fighter.adaptationStages = saved.adaptationStages;
-      if (saved.wheelRotations !== undefined) fighter.wheelRotations = saved.wheelRotations;
-
-      // Active transformations/states/timers
-      if (saved.isInUltimate !== undefined) fighter.isInUltimate = saved.isInUltimate;
-      if (saved.soulSwapTimer !== undefined) fighter.soulSwapTimer = saved.soulSwapTimer;
-      if (saved.domainActive !== undefined) fighter.domainActive = saved.domainActive;
-      if (saved.domainTimer !== undefined) fighter.domainTimer = saved.domainTimer;
-      if (saved.isChannelingDomain !== undefined) fighter.isChannelingDomain = saved.isChannelingDomain;
-      if (saved.isChannelingDomainExpansion !== undefined) fighter.isChannelingDomainExpansion = saved.isChannelingDomainExpansion;
-      if (saved.stealthActive !== undefined) fighter.stealthActive = saved.stealthActive;
-      if (saved.stealthTimer !== undefined) fighter.stealthTimer = saved.stealthTimer;
-      if (saved.ultimateActive !== undefined) fighter.ultimateActive = saved.ultimateActive;
-      if (saved.ultimateTimer !== undefined) fighter.ultimateTimer = saved.ultimateTimer;
-      if (saved.combatAuraOpacity !== undefined) fighter.combatAuraOpacity = saved.combatAuraOpacity;
-      if (saved.reishiGauge !== undefined) fighter.reishiGauge = saved.reishiGauge;
-      if (saved.isPiercingLightActive !== undefined) fighter.isPiercingLightActive = saved.isPiercingLightActive;
-      if (saved.piercingLightTimer !== undefined) fighter.piercingLightTimer = saved.piercingLightTimer;
-      if (saved.ransotengaiActive !== undefined) fighter.ransotengaiActive = saved.ransotengaiActive;
-      if (saved.ransotengaiTimer !== undefined) fighter.ransotengaiTimer = saved.ransotengaiTimer;
-      if (saved.vollstandigActive !== undefined) fighter.vollstandigActive = saved.vollstandigActive;
-      if (saved.antithesisUsed !== undefined) fighter.antithesisUsed = saved.antithesisUsed;
-
-      // Rika state for Yuta
-      if (saved.rikaActiveState && fighter.rika) {
-        fighter.rika.active = saved.rikaActiveState.active;
-        fighter.rika.timer = saved.rikaActiveState.timer;
-        fighter.rika.cooldownTimer = saved.rikaActiveState.cooldownTimer;
-        fighter.rika.hasSummonedAt50Hp = saved.rikaActiveState.hasSummonedAt50Hp;
-        fighter.rika.killedInDomain = saved.rikaActiveState.killedInDomain;
-      }
-
-      // Rubbick stolen spell info
-      if (saved.stolenType !== undefined) fighter.stolenType = saved.stolenType;
-      if (saved.stolenDef !== undefined) fighter.stolenDef = saved.stolenDef;
-      if (saved.hasStolen !== undefined) fighter.hasStolen = saved.hasStolen;
-      if (saved.spellStealTimer !== undefined) fighter.spellStealTimer = saved.spellStealTimer;
-    }
   });
 
   if (state.mode === 'TLFS' && state.fighters[0]) {

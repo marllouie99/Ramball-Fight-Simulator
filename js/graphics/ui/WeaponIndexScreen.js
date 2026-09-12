@@ -489,7 +489,7 @@ function triggerReviewSkill(skillType, def, fighter, dummy) {
     if (def.type === 'gojo') {
       fighter.redCooldown = 0;
       spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'REVERSAL RED!', '#ff3b30');
-      try { audioSystem.playSFX('Assets/Sound Effects/Skills/red.mp3', 0.9); } catch (e) {}
+      try { audioSystem.playSFX('Assets/Sound Effects/Skills/redblast.mp3', 0.9); } catch (e) {}
       _reviewProjectiles.push({
         x: fighter.x + dirX * 30,
         y: fighter.y + dirY * 30,
@@ -502,7 +502,7 @@ function triggerReviewSkill(skillType, def, fighter, dummy) {
       });
     } else if (def.type === 'sukuna') {
       spawnReviewDamageText(fighter.x, fighter.y - fighter.r - 12, 'DISMANTLE!', '#ef4444');
-      try { audioSystem.playSFX('Assets/Sound Effects/Skills/sukuna-slash.mp3', 0.9); } catch (e) {}
+      try { audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9); } catch (e) {}
       for (let i = -1; i <= 1; i++) {
         _reviewProjectiles.push({
           x: fighter.x + dirX * 25,

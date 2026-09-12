@@ -19,7 +19,7 @@ export const makimaConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 1.0,
-  damage: 100,
+  damage: 20,
   cooldown: 100,
   projectileSpeedMultiplier: 1.0,
   ability: 'Control Devil & "Bang!"',
@@ -43,7 +43,7 @@ export const makimaConfig = {
   citizenShockwaveKnockback: 24,    // Repel force
 
   // Primary Attack: "Bang!" (Lightning-Fast Full-Screen Invisible Beam)
-  bangDamage: 100,                   // Direct hit damage
+  bangDamage: 20,                   // Direct hit damage
   bangWallBounceDamage: 22,         // Bonus damage when slammed into arena walls
   bangKnockbackForce: 46,           // Massive directional knockback
   bangRange: 1600,                  // Full-screen lightning-fast beam reach
@@ -64,13 +64,13 @@ export const makimaConfig = {
   chainsThrowSpeed: 0.40,           // Chain throw projectile speed (0.10 = 10% speed / ~1.55s slow throw, 1.0 or 45 = default fast throw)
   // chainsLaunchFrames: 9,         // Optional: explicit throw animation duration in frames (overridden by chainsThrowSpeed if set)
   chainsMinDistance: 175,           // Minimum leash distance to prevent enemies getting too close to Makima
-  chainsDamage: 10,                 // Initial latch damage
+  chainsDamage: 2,                 // Initial latch damage
   chainsBleedDps: 0,                // Internal bleeding DPS
-  chainsDuration: 240,              // 4.0s (240 frames) tether & stasis duration for enemy fighters
+  chainsDuration: 500,              // 4.0s (240 frames) tether & stasis duration for enemy fighters
   chainsDurationFrames: 500,        // Alias duration in frames for fighters
   chainsStasisFrames: 240,          // Alias duration in frames for fighters
   chainsPullSpeed: 7.5,            // Speed targets are reeled toward Makima
-  chainsBreakDistance: 400,         // Distance in pixels at which the chain snaps and breaks when enemy is knocked back
+  chainsBreakDistance: 550,         // Distance in pixels at which the chain snaps and breaks when enemy is knocked back
   chainsMinionHijackDuration: 360,  // 6.0s duration when hijacking enemy clones/minions
 
   // Skill 2: Angel's Armory (100-Year Halberds & 1000-Year Spear)

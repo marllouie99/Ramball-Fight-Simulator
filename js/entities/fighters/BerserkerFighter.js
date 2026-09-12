@@ -35,6 +35,28 @@ export class BerserkerFighter extends Fighter {
     this.axeHitShakeX = 0;
     this.axeHitShakeY = 0;
     this.axeHitShakeTimer = 0;
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'axe_slash',
+        name: 'Dual Axe Cleave',
+        type: 'active',
+        cooldownKey: 'axeCooldown',
+        cooldownMax: () => CONFIG.berserker.axeCooldown
+      },
+      {
+        id: 'rage',
+        name: 'Blood Rage',
+        type: 'buff',
+        durationKey: 'rageTimer',
+        durationMax: () => CONFIG.berserker.rageDuration,
+        activeKey: 'isInRage',
+        onExpire: (fighter) => {
+          fighter.deactivateRage();
+        }
+      }
+    ]);
   }
 
   reset() {
@@ -621,4 +643,11 @@ export class BerserkerFighter extends Fighter {
     
     ctx.restore();
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.isInRage && this.rageTimer <= 0) {
+      this.deactivateRage();
+    }
+  }
 }
+

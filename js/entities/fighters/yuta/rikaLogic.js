@@ -1037,7 +1037,8 @@ export function updateRika(fighter, arena) {
     const isGojoInfinity =
       (rk.target.characterId === 'gojo' || rk.target.type === 'gojo') &&
       !rk.target.isMeleeMode &&
-      ((rk.target.infinityCooldown || 0) <= 0 || rk.target.infinityActive);
+      ((rk.target.infinityCooldown || 0) <= 0 || rk.target.infinityActive) &&
+      !rk.target.isChainedByMakima;
 
     if (!isGojoInfinity) {
       const dx = rk.target.x - rk.x;

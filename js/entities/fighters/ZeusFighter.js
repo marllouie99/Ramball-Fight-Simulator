@@ -32,6 +32,24 @@ export class ZeusFighter extends Fighter {
     
     // Thunder cloud sound flag (play once when throwing thunderbolt to sky)
     this._thunderCloudSoundPlayed = false;
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'storm',
+        name: 'Thunder Storm',
+        type: 'ultimate',
+        cooldownKey: 'stormCooldown',
+        cooldownMax: () => CONFIG.zeus.stormCooldown,
+        durationKey: 'stormTimer',
+        durationMax: () => CONFIG.zeus.stormDuration,
+        activeKey: 'stormActive',
+        onExpire: (fighter) => {
+          fighter.stormActive = false;
+          fighter.isChargingStorm = false;
+        }
+      }
+    ]);
   }
 
   reset() {
@@ -601,4 +619,12 @@ export class ZeusFighter extends Fighter {
     // Because draw() already shifted this.x and this.y, we just draw at this.x, this.y
     drawZeusWeapon(ctx, this.x, this.y, this.gunAngle, this.r, this.auraPhase, this.getAttackProgress(), this.color, isChanneling, chargeProgress);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.stormActive && this.stormTimer <= 0) {
+      this.stormActive = false;
+      this.isChargingStorm = false;
+    }
+  }
 }
+

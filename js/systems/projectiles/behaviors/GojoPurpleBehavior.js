@@ -173,6 +173,15 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         ((ent.goldAdaptationStage?.skill || 0) >= 2)
       );
       // Toji's Heavenly Restriction immuneToCC does NOT protect him from Hollow Purple's gravitational pull and debuffs. Mahoraga is also pulled even when adapted.
+      const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
+      if (isMakimaShatter) {
+        ent.vx = 0; ent.vy = 0; ent.knockbackVx = 0; ent.knockbackVy = 0;
+        if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
+          ent.x = ent._shatterLockedX; ent.y = ent._shatterLockedY;
+        }
+        continue;
+      }
+
       const isImmune = ent.isBaguvixActive || ent.isGodModeActive || (ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji');
       if (!isImmune) {
         const dx = projectile.x - ent.x;
@@ -181,58 +190,56 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         
         const isChanneling = typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill();
         const isSaitamaCounter = Boolean(ent && (ent.characterId === 'saitama' || ent.type === 'saitama') && (ent.isCountering || (ent._counterPunchTimer && ent._counterPunchTimer > 0) || (ent._postCounterRecoveryTimer && ent._postCounterRecoveryTimer > 0)));
-        if (dist > 0 && dist < trapRadius) {
-          ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
-          ent.isCaughtInPurple = true;
-          // Complete paralysis debuff for non-channeling entities while caught in Hollow Purple gravitational vortex
-          if (!isChanneling || isSaitamaCounter) {
-            if (typeof ent.interruptAttacks === 'function') {
-              ent.interruptAttacks(true);
-            }
-            if (typeof ent.applyTimeStop === 'function') {
-              ent.applyTimeStop(12, { isSkill: true, isUltimate: true, isPurple: true });
-            } else {
-              ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
-            }
-            if (typeof ent.applyHitStun === 'function') {
-              ent.applyHitStun(12);
-            }
-          }
-          
-          const pullStrength = purplePullForce * (1 - dist / trapRadius);
-          ent.vx = (ent.vx || 0) * 0.1;
-          ent.vy = (ent.vy || 0) * 0.1;
-          
-          // Suppress existing knockback so they don't fling out of the orb
-          if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
-          if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
+        if (dist < trapRadius) {
+          ent.isCaughtInPurple = false; // No paralyzing stasis
 
-          ent.x += (dx / dist) * pullStrength;
-          ent.y += (dy / dist) * pullStrength;
+          // Apply heavy movement slow debuff
+          const slowDuration = CONFIG.gojo?.purpleSlowDuration || 30;
+          const slowMult = CONFIG.gojo?.purpleSlowMultiplier || 0.40;
+          if (typeof ent.applySlow === 'function') {
+            ent.applySlow(slowDuration, slowMult, { isPurple: true });
+          } else {
+            ent.slowTimer = Math.max(ent.slowTimer || 0, slowDuration);
+            ent.slowMultiplier = Math.min(ent.slowMultiplier || 1.0, slowMult);
+          }
+
+          // Strong gravitational drag toward orb center — enemies are completely sucked in
+          if (dist > 1) {
+            const pullStrength = purplePullForce * 0.6;
+            ent.x += (dx / dist) * pullStrength;
+            ent.y += (dy / dist) * pullStrength;
+            // Override velocity toward center to prevent escape
+            ent.vx = (dx / dist) * purplePullForce * 0.4;
+            ent.vy = (dy / dist) * purplePullForce * 0.4;
+          } else {
+            // Already at center — lock position and kill velocity
+            ent.x = projectile.x;
+            ent.y = projectile.y;
+            ent.vx = 0;
+            ent.vy = 0;
+          }
         } else if (dist >= trapRadius && dist < purplePullRadius) {
-          // Outer gravitational vortex pull field (irresistible suction towards Purple core)
+          // Outer gravitational vortex pull field — strong suction toward orb
           const falloff = 1 - (dist - trapRadius) / (purplePullRadius - trapRadius);
-          const outerPullSpeed = Math.max(1.8, (purplePullForce * 0.75) * Math.pow(falloff, 1.2));
+          const outerPullSpeed = purplePullForce * 0.5 * Math.pow(falloff, 0.8);
           const dirX = dx / dist;
           const dirY = dy / dist;
 
-          // Apply heavy slow so enemy cannot walk away against the gravitational vortex
+          // Apply movement slow
+          const outerSlowMult = Math.min(0.65, (CONFIG.gojo?.purpleSlowMultiplier || 0.40) + 0.20);
           if (typeof ent.applySlow === 'function') {
-            ent.applySlow(10, 0.40, { isPurple: true });
+            ent.applySlow(15, outerSlowMult, { isPurple: true });
           } else {
-            ent.slowTimer = Math.max(ent.slowTimer || 0, 10);
-            ent.slowMultiplier = 0.40;
+            ent.slowTimer = Math.max(ent.slowTimer || 0, 15);
+            ent.slowMultiplier = Math.min(ent.slowMultiplier || 1.0, outerSlowMult);
           }
 
-          // Direct positional suction displacement towards orb center
+          // Strong suction drift toward orb center
           ent.x += dirX * outerPullSpeed;
           ent.y += dirY * outerPullSpeed;
-
-          // Dampen existing velocity and pull velocity impulse towards core
-          ent.vx = (ent.vx || 0) * 0.65 + dirX * (outerPullSpeed * 0.4);
-          ent.vy = (ent.vy || 0) * 0.65 + dirY * (outerPullSpeed * 0.4);
-          if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.6;
-          if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.6;
+          // Dampen existing velocity and redirect toward center
+          ent.vx = (ent.vx || 0) * 0.3 + dirX * outerPullSpeed * 0.5;
+          ent.vy = (ent.vy || 0) * 0.3 + dirY * outerPullSpeed * 0.5;
         }
 
         // Clamp entity strictly within arena bounds after all Purple displacement to prevent wall clipping
@@ -282,11 +289,6 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
               isGuaranteedHit: true,
               undodgeable: true
             });
-          }
-          
-          if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC) {
-            ent.vx *= 0.8;
-            ent.vy *= 0.8;
           }
           
           const isGreen = Boolean(projectile.isRubbick || projectile.isTrickster || projectile.colorTheme === 'green' || projectile.color === '#00FF64');
@@ -423,15 +425,23 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         }
 
         // Outward explosive knockback push
-        const dirX = dist > 0 ? dx / dist : (Math.random() - 0.5) * 2;
-        const dirY = dist > 0 ? dy / dist : (Math.random() - 0.5) * 2;
-        const push = knockbackForce * falloff;
+        const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
+        if (isMakimaShatter) {
+          ent.vx = 0; ent.vy = 0; ent.knockbackVx = 0; ent.knockbackVy = 0;
+          if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
+            ent.x = ent._shatterLockedX; ent.y = ent._shatterLockedY;
+          }
+        } else {
+          const dirX = dist > 0 ? dx / dist : (Math.random() - 0.5) * 2;
+          const dirY = dist > 0 ? dy / dist : (Math.random() - 0.5) * 2;
+          const push = knockbackForce * falloff;
 
-        ent.vx = (ent.vx || 0) * 0.2 + dirX * push;
-        ent.vy = (ent.vy || 0) * 0.2 + dirY * push;
+          ent.vx = (ent.vx || 0) * 0.2 + dirX * push;
+          ent.vy = (ent.vy || 0) * 0.2 + dirY * push;
 
-        if (ent.knockbackVx !== undefined) ent.knockbackVx = dirX * push;
-        if (ent.knockbackVy !== undefined) ent.knockbackVy = dirY * push;
+          if (ent.knockbackVx !== undefined) ent.knockbackVx = dirX * push;
+          if (ent.knockbackVy !== undefined) ent.knockbackVy = dirY * push;
+        }
 
         // Release time-stop / stasis timers so target is blasted backward dynamically
         if (ent.timeStopTimer > 0) ent.timeStopTimer = 0;

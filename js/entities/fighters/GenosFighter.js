@@ -1286,6 +1286,22 @@ export class GenosFighter extends Fighter {
       this.ultCooldown--;
     }
 
+    // Hold Genos in stasis during Mahoraga's 3D Wheel Adaptation Game Pause without cancelling skills
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      if (this.afterImages && this.afterImages.length > 0) {
+        for (let i = this.afterImages.length - 1; i >= 0; i--) {
+          this.afterImages[i].timer--;
+          if (this.afterImages[i].timer <= 0) {
+            this.afterImages.splice(i, 1);
+          }
+        }
+      }
+      return;
+    }
+
     // Mandatory Rule #1: TimeStop & Freeze Guard at top of update loop
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {

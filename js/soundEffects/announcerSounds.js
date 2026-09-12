@@ -7,7 +7,7 @@
 export const ANNOUNCER_SOUNDS = {
     round1: {
         src: 'Assets/Sound Effects/Announcer/round1.mp3',
-        volume: 1.0,
+        volume: 2.0,
         speed: 1.1,
         offset: 0,
         duration: 2.5,
@@ -15,7 +15,7 @@ export const ANNOUNCER_SOUNDS = {
     round2: {
         src: 'Assets/Sound Effects/Announcer/round2.mp3',
         volume: 1.0,
-        speed: 1.5,
+        speed: 1.7,
         offset: 0,
         duration: 3.0,
     },
@@ -56,7 +56,7 @@ export const ANNOUNCER_SOUNDS = {
     },
     bell: {
         src: 'Assets/Sound Effects/Announcer/bell.mp3',
-        volume: 1.0,
+        volume: 0.00,
         speed: 1.0,
         offset: 0.0,
         duration: 2.0,

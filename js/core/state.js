@@ -110,6 +110,18 @@ if (hasPixi) {
   canvas.parentNode.insertBefore(pixiApp.view, canvas);
   canvas.style.display = 'none'; // Hide the old 2D canvas (used for offscreen rendering only)
 
+  // Handle GPU process crashes and WebGL context restoration gracefully
+  if (pixiApp.view && typeof pixiApp.view.addEventListener === 'function') {
+    pixiApp.view.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('⚠️ WebGL context lost (GPU reset). Attempting context restoration...');
+    }, false);
+
+    pixiApp.view.addEventListener('webglcontextrestored', () => {
+      console.info('✅ WebGL context restored successfully.');
+    }, false);
+  }
+
   // --- GENERATE GLOBAL PIXI TEXTURES FOR PARTICLES ---
   const gCircle = new window.PIXI.Graphics();
   gCircle.beginFill(0xFFFFFF);

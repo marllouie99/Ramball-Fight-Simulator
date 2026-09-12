@@ -590,7 +590,7 @@ export class MusashiFighter extends Fighter {
 
     if (bounced) {
       this.playWallBounceSound();
-      const isTargetGojoInfinity = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo') && !opponent.isMeleeMode && ((opponent.infinityCooldown || 0) <= 0 || opponent.infinityActive);
+      const isTargetGojoInfinity = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo') && !opponent.isMeleeMode && ((opponent.infinityCooldown || 0) <= 0 || opponent.infinityActive) && !opponent.isChainedByMakima;
 
       if (!isTargetGojoInfinity) {
         // Aggressive bounce towards the opponent

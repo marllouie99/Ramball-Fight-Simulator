@@ -412,8 +412,17 @@ export class GetsugaBehavior extends ProjectileBehavior {
           f.y >= arena.y + arena.height - pad - 2
         );
 
-        // Apply knockback in wave direction ONLY if target is in the open arena (not pinned at wall)
-        if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
+        const isMakimaShatter = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving || (f.shatteredPieces && f.shatteredPieces.length > 0) || (f.characterId === 'makima' && (f.isDead || f.dead || f.hp <= 0))));
+        if (isMakimaShatter) {
+          f.vx = 0;
+          f.vy = 0;
+          f.knockbackVx = 0;
+          f.knockbackVy = 0;
+          if (typeof f._shatterLockedX === 'number' && typeof f._shatterLockedY === 'number') {
+            f.x = f._shatterLockedX;
+            f.y = f._shatterLockedY;
+          }
+        } else if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
           const angle = Math.atan2(projectile.vy, projectile.vx);
           const kbForce = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 30)

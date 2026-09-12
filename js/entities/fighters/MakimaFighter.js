@@ -113,6 +113,60 @@ export class MakimaFighter extends Fighter {
     this.ritualMaxTimer = cfg.shrineChannelFrames || 110;
     this.ritualTarget = null;
     this.ritualStage = 0;
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'bang',
+        name: 'Bang!',
+        type: 'active',
+        cooldownKey: 'bangCooldown',
+        cooldownMaxKey: 'bangCooldownMax'
+      },
+      {
+        id: 'chains',
+        name: 'Chains of Domination',
+        type: 'active',
+        cooldownKey: 'chainsCooldown',
+        cooldownMaxKey: 'chainsCooldownMax',
+        durationKey: 'chainTimer',
+        durationMaxKey: 'chainMaxTimer',
+        activeKey: 'isChainingActive',
+        channelingKey: 'isPreparingChain',
+        onExpire: (fighter) => {
+          fighter.isChainingActive = false;
+          fighter.chainsCooldown = fighter.chainsCooldownMax;
+          for (let t of fighter.chainedTargets) {
+            if (t) {
+              fighter._releaseChainedTarget(t);
+              if (!t.isDead && (t.hp === undefined || t.hp > 0)) {
+                if (typeof spawnSparks === 'function') spawnSparks(t.x, t.y, 8, '#F59E0B');
+                if (typeof spawnImpactFlash === 'function') spawnImpactFlash(t.x, t.y, '#FFFFFF', 18);
+              }
+            }
+          }
+          fighter.chainedTargets = [];
+        }
+      },
+      {
+        id: 'angel_spear',
+        name: "1000-Year Holy Spear",
+        type: 'active',
+        cooldownKey: 'angelCooldown',
+        cooldownMaxKey: 'angelCooldownMax',
+        channelingKey: 'isSummoningSpear',
+        channelTimerKey: 'spearTimer'
+      },
+      {
+        id: 'shrine_ritual',
+        name: 'Kyoto Shrine Ritual',
+        type: 'ultimate',
+        cooldownKey: 'shrineCooldown',
+        cooldownMaxKey: 'shrineCooldownMax',
+        channelingKey: 'isExecutingRitual',
+        channelTimerKey: 'ritualTimer'
+      }
+    ]);
   }
 
   reset() {
@@ -129,6 +183,8 @@ export class MakimaFighter extends Fighter {
     this.citizenLives = this.citizenLivesMax || 3;
     this.isRevivingFromContract = false;
     this.isShatterReviving = false;
+    delete this._shatterLockedX;
+    delete this._shatterLockedY;
     this.reviveStasisTimer = 0;
     this.shatteredPieces = null;
     this.bloodParticles = null;
@@ -312,6 +368,11 @@ export class MakimaFighter extends Fighter {
       return super.aim(target);
     }
 
+    // Free-angle aiming when Makima has an enemy chained — Bang can fire at any angle
+    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
+      return super.aim(target);
+    }
+
     const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
     const cardinalAngle = this._getCardinalAngle(aimTarget);
     this.gunAngle = cardinalAngle;
@@ -357,6 +418,16 @@ export class MakimaFighter extends Fighter {
 
     // ── 1. CITIZEN CONTRACT SHATTER & REASSEMBLY STASIS HANDLING ──
     if (this.isRevivingFromContract || this.isShatterReviving) {
+      // Rigidly enforce immovable coordinates and zero velocities during death shatter stasis
+      if (typeof this._shatterLockedX === 'number' && typeof this._shatterLockedY === 'number') {
+        this.x = this._shatterLockedX;
+        this.y = this._shatterLockedY;
+      }
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+
       // Clear external CC locks so resurrection animation plays smoothly without pausing
       this.isTargetOfAmbush = false;
       this.timeStopTimer = 0;
@@ -406,6 +477,8 @@ export class MakimaFighter extends Fighter {
         this.isShatterReviving = false;
         this.shatteredPieces = null;
         this.bloodParticles = null;
+        delete this._shatterLockedX;
+        delete this._shatterLockedY;
         this.hp = targetHp;
         this.isDead = false;
         this.dead = false;
@@ -486,12 +559,20 @@ export class MakimaFighter extends Fighter {
       this.gunAngle = this.chainLockedAimAngle;
       this.angle = this.chainLockedAimAngle;
     }
-    if (this.bangCooldown > 0) this.bangCooldown--;
-    if (!this.isChainingActive && !this.isPreparingChain && !this.isThrowingChain && this.chainsCooldown > 0) {
-      this.chainsCooldown--;
+    if (!this.skillManager || !this.skillManager.hasSkill('bang')) {
+      if (this.bangCooldown > 0) this.bangCooldown--;
     }
-    if (!this.isSummoningSpear && this.angelCooldown > 0) this.angelCooldown--;
-    if (!this.isExecutingRitual && this.shrineCooldown > 0) this.shrineCooldown--;
+    if (!this.skillManager || !this.skillManager.hasSkill('chains')) {
+      if (!this.isChainingActive && !this.isPreparingChain && !this.isThrowingChain && this.chainsCooldown > 0) {
+        this.chainsCooldown--;
+      }
+    }
+    if (!this.skillManager || !this.skillManager.hasSkill('angel_spear')) {
+      if (!this.isSummoningSpear && this.angelCooldown > 0) this.angelCooldown--;
+    }
+    if (!this.skillManager || !this.skillManager.hasSkill('shrine_ritual')) {
+      if (!this.isExecutingRitual && this.shrineCooldown > 0) this.shrineCooldown--;
+    }
 
     // Update active visual beams
     for (let i = this.activeBangBeams.length - 1; i >= 0; i--) {
@@ -626,7 +707,17 @@ export class MakimaFighter extends Fighter {
    * Intercepts fatal blows, shatters body, consumes 1 citizen stock, and magnetically reassembles with 50% HP.
    */
   takeDamage(amount, attacker, opts = {}) {
-    if (this.isRevivingFromContract || this.isShatterReviving) return false;
+    if (this.isRevivingFromContract || this.isShatterReviving) {
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      if (typeof this._shatterLockedX === 'number' && typeof this._shatterLockedY === 'number') {
+        this.x = this._shatterLockedX;
+        this.y = this._shatterLockedY;
+      }
+      return false;
+    }
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     const enablePassive = cfg.enableCitizenContract ?? cfg.enablePassive ?? cfg.citizenContractEnabled ?? true;
@@ -640,6 +731,8 @@ export class MakimaFighter extends Fighter {
         // ── 1. CONSUME 1 CITIZEN LIFE & ENTER DEATH SHATTER STATE ──
         this.citizenLives--;
         this.hp = 0; // Empty HP bar at the moment of shattering!
+        this._shatterLockedX = this.x;
+        this._shatterLockedY = this.y;
         this.isRevivingFromContract = true;
         this.isShatterReviving = true;
         this.reviveStasisMax = (typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenReviveDurationFrames) ? CONFIG.makima.citizenReviveDurationFrames : 75;
@@ -704,6 +797,12 @@ export class MakimaFighter extends Fighter {
         return true;
       } else {
         // No citizen lives left: Makima dies normally with natural angle blood shatter
+        this._shatterLockedX = this.x;
+        this._shatterLockedY = this.y;
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
         const impactAngle = (attacker && typeof attacker.x === 'number')
           ? Math.atan2(this.y - attacker.y, this.x - attacker.x)
           : (opts && opts.angle !== undefined ? opts.angle : null);
@@ -713,6 +812,25 @@ export class MakimaFighter extends Fighter {
     }
 
     return super.takeDamage(effectiveAmount, attacker, opts);
+  }
+
+  /**
+   * Universal knockback handler override.
+   * Completely ignores knockback impulses during citizen contract death shatter or death.
+   */
+  applyKnockback(vx, vy, stunFrames = 0) {
+    if (this.isRevivingFromContract || this.isShatterReviving || (this.shatteredPieces && this.shatteredPieces.length > 0) || this.isDead || this.dead || this.hp <= 0) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+      if (typeof this._shatterLockedX === 'number' && typeof this._shatterLockedY === 'number') {
+        this.x = this._shatterLockedX;
+        this.y = this._shatterLockedY;
+      }
+      return;
+    }
+    super.applyKnockback(vx, vy, stunFrames);
   }
 
   /**
@@ -728,12 +846,18 @@ export class MakimaFighter extends Fighter {
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this.isShooting = true;
 
-    // Determine strict cardinal angle (Up, Down, Left, Right)
+    // When chaining an enemy, use free-angle aim; otherwise strict cardinal (Up, Down, Left, Right)
     const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
-    const cardinalAngle = this._getCardinalAngle(aimTarget);
-    this.gunAngle = cardinalAngle;
-    this.angle = cardinalAngle;
-    const angle = cardinalAngle;
+    let angle;
+    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
+      // Free-angle: use current gunAngle which was set by aim() tracking the target
+      angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    } else {
+      const cardinalAngle = this._getCardinalAngle(aimTarget);
+      angle = cardinalAngle;
+    }
+    this.gunAngle = angle;
+    this.angle = angle;
     const range = cfg.bangRange || 1600;
     const beamW = cfg.bangBeamWidth || 32;
 
@@ -932,6 +1056,12 @@ export class MakimaFighter extends Fighter {
     delete target._timeStopFrozenAngle;
     delete target._timeStopFrozenGunAngle;
 
+    if (target.characterId === 'gojo' || target.type === 'gojo') {
+      target.infinityActive = true;
+      target.infinityCooldown = 0;
+      target.infinityFadeOpacity = 1.0;
+    }
+
     if (Object.prototype.hasOwnProperty.call(target, '_makimaOriginalOwner')) {
       target.owner = target._makimaOriginalOwner;
       delete target._makimaOriginalOwner;
@@ -1015,6 +1145,17 @@ export class MakimaFighter extends Fighter {
         t._makimaChainer = this;
         t.suppressFreezeOverlay = true;
         t._suppressFreezeTimer = true;
+
+        if (t.characterId === 'gojo' || t.type === 'gojo') {
+          t.infinityActive = false;
+          t.infinityFadeOpacity = 0;
+          t.infinityBlockTimer = 0;
+        }
+
+        // Force-cancel any active channeling / skill the target was doing
+        if (typeof t.interruptAttacks === 'function') {
+          t.interruptAttacks(true);
+        }
 
         const hasAllies = this._targetHasAlliesOrMinions(t);
         if (hasAllies) {
@@ -1136,7 +1277,6 @@ export class MakimaFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     const pullSpeed = cfg.chainsPullSpeed || 11.5;
     const minDistance = cfg.chainsMinDistance || cfg.chainsTetherDistance || 100;
-    const bleedDmg = cfg.chainsBleedDps ? Math.max(2, Math.round(cfg.chainsBleedDps / 2)) : 4;
 
     // Pull tethered enemies toward Makima (stopping at minDistance so they don't get too close)
     for (let i = this.chainedTargets.length - 1; i >= 0; i--) {
@@ -1153,6 +1293,12 @@ export class MakimaFighter extends Fighter {
       t._makimaChainer = this;
       t.suppressFreezeOverlay = true;
       t._suppressFreezeTimer = true;
+
+      if (t.characterId === 'gojo' || t.type === 'gojo') {
+        t.infinityActive = false;
+        t.infinityFadeOpacity = 0;
+        t.infinityBlockTimer = 0;
+      }
 
       // Dynamic Mind-Control Transition: If summons/minions/allies emerge mid-chain, release stasis
       const hasAllies = this._targetHasAlliesOrMinions(t);
@@ -1228,16 +1374,6 @@ export class MakimaFighter extends Fighter {
         const tr = t.r || 25;
         t.x = Math.max(state.arena.x + tr, Math.min(state.arena.x + state.arena.width - tr, t.x));
         t.y = Math.max(state.arena.y + tr, Math.min(state.arena.y + state.arena.height - tr, t.y));
-      }
-
-      // Bleed tick every 15 frames
-      if (this.chainTimer % 15 === 0) {
-        applyDamageToTarget(t, bleedDmg, this, 'bleed');
-        spawnBloodEffect(t, bleedDmg, null, { color: '#8B0000' });
-        spawnSparks(t.x, t.y, 4, '#F59E0B');
-        const bleedSnd = cfg.sounds?.chainsBleed || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
-        const bleedVol = cfg.soundVolumes?.chainsBleed ?? 0.55;
-        audioSystem.playSFX(bleedSnd, bleedVol);
       }
     }
 
@@ -1820,4 +1956,22 @@ export class MakimaFighter extends Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.isChainingActive && this.chainTimer <= 0) {
+      this.isChainingActive = false;
+      this.chainsCooldown = this.chainsCooldownMax;
+      for (let t of this.chainedTargets) {
+        if (t) {
+          this._releaseChainedTarget(t);
+          if (!t.isDead && (t.hp === undefined || t.hp > 0)) {
+            if (typeof spawnSparks === 'function') spawnSparks(t.x, t.y, 8, '#F59E0B');
+            if (typeof spawnImpactFlash === 'function') spawnImpactFlash(t.x, t.y, '#FFFFFF', 18);
+          }
+        }
+      }
+      this.chainedTargets = [];
+    }
+  }
 }
+

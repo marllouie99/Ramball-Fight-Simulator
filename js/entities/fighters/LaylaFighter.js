@@ -40,6 +40,37 @@ export class LaylaFighter extends Fighter {
     this.dashTrail = [];
     this.isDashing = false;
     this.dashTimer = 0;
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    this.skillManager.registerSkills([
+      {
+        id: 'bomb',
+        name: 'MALEFIC BOMB',
+        type: 'offensive',
+        cooldownKey: 'maleficBombCooldown',
+        cooldownMax: CONFIG.layla?.maleficBombCooldown || 180
+      },
+      {
+        id: 'dash',
+        name: 'VOID DASH',
+        type: 'mobility',
+        cooldownKey: 'voidDashCooldown',
+        cooldownMax: CONFIG.layla?.voidDashCooldown || 180,
+        activeKey: 'isDashing'
+      },
+      {
+        id: 'barrage',
+        name: 'DESTRUCTION BARRAGE',
+        type: 'ultimate',
+        cooldownKey: 'destructionBarrageCooldown',
+        cooldownMax: CONFIG.layla?.destructionBarrageCooldown || 600,
+        durationKey: 'ultimateFireTimer',
+        durationMax: CONFIG.layla?.ultimateFireDuration || 180,
+        activeKey: 'isUltimateFiring'
+      }
+    ]);
   }
 
   reset() {

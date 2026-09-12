@@ -559,6 +559,7 @@ let _cachedDimEls = null;
 let _lastDimmedState = null;
 let _lastDarkThemeState = null;
 let _lastSaitamaImpactState = null;
+let _cachedRoundBanner = null;
 
 function _getDimElements() {
   if (!_cachedDimEls || !_cachedDimEls[0] || (typeof document !== 'undefined' && !document.body.contains(_cachedDimEls[0]))) {
@@ -590,6 +591,7 @@ export function clearHealthHud() {
   _lastDarkThemeState = null;
   _lastSaitamaImpactState = null;
   _cachedDimEls = null;
+  _cachedRoundBanner = null;
 
   if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
   if (!_cachedContainerLeft) _cachedContainerLeft = document.getElementById('healthHudLeft');
@@ -875,7 +877,7 @@ function updateHealthHud() {
       const dimEls = _getDimElements();
       for (let i = 0; i < dimEls.length; i++) {
         const el = dimEls[i];
-        if (!el) continue;
+        if (!el || !el.classList) continue;
 
         if (isDimmedNow) el.classList.add('hud-dimmed');
         else el.classList.remove('hud-dimmed');
@@ -2218,8 +2220,16 @@ function updateHealthHud() {
 
     const isCardCj = !isDarkTheme && targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
     const cjStackHTML = '';
-    const winsBullets = '';
-    const winsHTML = '';
+    const winsBullets = (maxBullets > 0) ? Array.from({ length: maxBullets }, (_, i) => {
+      const filled = i < wins;
+      const bulletBg = filled ? (fighterColor || '#ffd700') : (isDarkTheme ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.20)');
+      const bulletBorder = filled ? (fighterColor || '#ffd700') : (isDarkTheme ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.40)');
+      const bulletGlow = filled ? 'box-shadow: 0 0 6px rgba(255,215,0,0.65);' : '';
+      return `<span class="health-card__win-bullet${filled ? ' filled' : ''}" style="background: ${bulletBg}; border-color: ${bulletBorder}; ${bulletGlow}"></span>`;
+    }).join('') : '';
+
+    const winsAlign = titleAlign === 'right' ? 'flex-end' : 'flex-start';
+    const winsHTML = (maxBullets > 0) ? `<div class="health-card__wins" style="display: flex; gap: 6px; align-items: center; justify-content: ${winsAlign}; margin: 2px 0 6px;">${winsBullets}</div>` : '';
 
     const rightHeaderHTML = '';
 
@@ -2230,6 +2240,7 @@ function updateHealthHud() {
       <div class="health-card ${extraClass}" style="${winnerStyle} ${cardBgStyle}">
         ${headerRowHTML}
         ${cjStackHTML}
+        ${winsHTML}
         ${barsHTML}
       </div>
     `;
@@ -2479,8 +2490,8 @@ function updateHealthHud() {
         } else {
           extraClassStr = isFfa ? 'ffa-card' : (isSingleColumnMode ? 'single-column' : '');
         }
-
-        const maxBulletsCount = 0;
+        const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE);
+        const maxBulletsCount = is1v1Mode ? 2 : 0;
 
         const cardHTML = buildCard({
           title: fighterName,
@@ -2951,6 +2962,40 @@ function updateHealthHud() {
         }
       }
     });
+  }
+
+  // 7. 1v1 Mode: Single Round Badge (R1, R2, or F) centered in the middle between P1 and P2 cards
+  const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE);
+  if (is1v1Mode && containerBottom) {
+    let roundBanner = _cachedRoundBanner;
+    if (!roundBanner || !roundBanner.parentNode) {
+      roundBanner = containerBottom.querySelector('.hud-round-banner');
+      if (!roundBanner) {
+        roundBanner = document.createElement('div');
+        roundBanner.className = 'hud-round-banner';
+        roundBanner.id = 'hudRoundBanner';
+        containerBottom.appendChild(roundBanner);
+      }
+      _cachedRoundBanner = roundBanner;
+    }
+    const roundNum = state.roundNum || 1;
+    let roundText = 'ROUND 1';
+    let roundClass = 'hud-round-r1';
+    if (roundNum === 2) {
+      roundText = 'ROUND 2';
+      roundClass = 'hud-round-r2';
+    } else if (roundNum >= 3) {
+      roundText = 'FINAL ROUND';
+      roundClass = 'hud-round-rf';
+    }
+    const bannerHTML = `<span class="hud-round-item ${roundClass} active">${roundText}</span>`;
+    if (roundBanner._lastHTML !== bannerHTML) {
+      roundBanner.innerHTML = bannerHTML;
+      roundBanner._lastHTML = bannerHTML;
+    }
+    roundBanner.style.display = 'flex';
+  } else if (_cachedRoundBanner) {
+    _cachedRoundBanner.style.display = 'none';
   }
 }
 

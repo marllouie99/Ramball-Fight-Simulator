@@ -350,7 +350,7 @@ export class StatusEffectsManager {
         }
       }
 
-      // Continuously decrement skill & ultimate cooldowns while frozen (EXCEPT inside Gojo's Unlimited Void Domain)
+      // Continuously decrement skill & ultimate cooldowns and active skill durations while frozen
       if (typeof fighter._handleFrozenSkillCooldowns === 'function') {
         fighter._handleFrozenSkillCooldowns();
       }

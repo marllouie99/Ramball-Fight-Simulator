@@ -25,7 +25,7 @@ export const saitamaConfig = {
   desc: 'Hero for fun. Ignores basic hit flinches. Basic hits deal massive damage. Serious Punch ultimate obliterates anything across the arena.',
 
   // Basic Attack: Normal Punch
-  normalPunchEnabled: 1,        // Set to false to disable Normal Punch basic attack
+  normalPunchEnabled: 0,        // Set to false to disable Normal Punch basic attack
   punchEnabled: true,              // Alias toggle
   disableNormalPunch: false,       // If true, disables Normal Punch basic attack
   punchDamage: 500, // Massive basic attack damage
@@ -54,7 +54,7 @@ export const saitamaConfig = {
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
 
   // Skill 1: Consecutive Normal Punches
-  consecutivePunchesEnabled: 1, // Set to false to disable Consecutive Normal Punches (Skill 1)
+  consecutivePunchesEnabled: 0, // Set to false to disable Consecutive Normal Punches (Skill 1)
   flurryEnabled: true,             // Alias toggle
   disableConsecutivePunches: false, // If true, disables Consecutive Normal Punches
   flurryDamage: 50,                 // Damage per rapid punch hit
@@ -103,7 +103,7 @@ export const saitamaConfig = {
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
   counterPunchDamageMultiplier: 5.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
   counterFrontalReach: 1000,        // Long frontal shockwave blast reach (px)
-  counterFrontalArc: (120 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
+  counterFrontalArc: (50 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
   counterFrontalCollateralDamage: 2000, // Damage dealt to collateral enemies caught in the wide long frontal blast
   counterWindupFrames: 50,        // Frames Saitama waits before teleporting (reaction delay)
   counterTeleportIdleFrames: 10,  // Frames Saitama stands completely still (staring) after teleporting before starting the charge
@@ -115,8 +115,8 @@ export const saitamaConfig = {
   counterPunchSlowMultiplier: 0.35, // Slow debuff strength (35% speed — staggering)
   counterPunchRecoveryFrames: 65, // Frames Saitama stands still after landing (post-punch stall)
   counterDodgeLockFrames: 20,      // Dodge cooldown after counter execution
-  skillPunishCooldown: 1500,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
-  initialSkillPunishCooldown: 1500, // Cooldown at the start of the round before first counter is available (2000 frames)
+  skillPunishCooldown: 1000,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
+  initialSkillPunishCooldown: 1000, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
   counterPunchVoiceEnabled: true,

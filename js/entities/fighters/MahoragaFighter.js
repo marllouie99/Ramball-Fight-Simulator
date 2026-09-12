@@ -294,8 +294,7 @@ export class MahoragaFighter extends Fighter {
 
     const isBeamDamage = (
       (!this.adaptedPureLoveBeam && (opts.isPureLoveBeam || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
-      (opts.isPurple || opts.isPurpleDPS || this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0) ||
-      this.caughtInGenosFlurry
+      (opts.isPurple || opts.isPurpleDPS || this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0)
     );
 
     if (isBeamDamage) {
@@ -599,7 +598,7 @@ export class MahoragaFighter extends Fighter {
         this.wallBounceCount = 0;
 
         const target = this._findClosestEnemy(opponent || this._bounceTarget);
-        const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !this.gojoInfinityImmune;
+        const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !this.gojoInfinityImmune && !target.isChainedByMakima;
 
         if (target && !target.isDead && target.hp > 0 && !isTargetGojoInfinity) {
           const dx = target.x - this.x;
@@ -836,9 +835,7 @@ export class MahoragaFighter extends Fighter {
     const isFrozen = this._handleTimeStop();
     const isInfinityFrozen = handleInfinityFreeze(this);
     const isBeamParalyzed = (
-      (!this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
-      this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
-      this.caughtInGenosFlurry
+      !this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)
     );
 
     // Rule #1 Early Exit Guard: Freeze / Unadapted Gojo Domain / Ambush / Infinity / Beam Paralysis completely freezes Mahoraga!
@@ -893,7 +890,6 @@ export class MahoragaFighter extends Fighter {
     }
 
     const isCaughtInUltimateBeam = (
-      this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
       (!this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
       this.caughtInGenosFlurry
     );
@@ -1224,9 +1220,7 @@ export class MahoragaFighter extends Fighter {
       this.vy = 0;
 
       if (opponent && opponent !== this && opponent.hp > 0) {
-        if (typeof opponent.applyTimeStop === 'function') opponent.applyTimeStop(2);
-        if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(2);
-        opponent.mahoragaAdaptationFreezeTimer = 2;
+        opponent.mahoragaAdaptationFreezeTimer = Math.max(opponent.mahoragaAdaptationFreezeTimer || 0, this.adaptationPauseTimer);
         opponent.vx = 0;
         opponent.vy = 0;
       }

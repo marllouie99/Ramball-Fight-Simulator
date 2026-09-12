@@ -17,7 +17,9 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { updateDriveBys } from './cjDriveBySystem.js';
 import { FRAME_TIME } from './gameLoop.js';
 import { updateArenaBgm, startArenaBgm, stopArenaBgm } from './arenaBgmSystem.js';
-import { GAME_MODES } from '../core/modeConfig.js';
+import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
+import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
+import { audioSystem } from './audioSystem.js';
 
 export function updateGame() {
     // Increment global frame count on EVERY frame across all game states
@@ -46,13 +48,46 @@ export function updateGame() {
     if (state.gameState === 'countdown') {
       state.countdownTimer = (state.countdownTimer || 0) + 1;
 
-      // In-Arena Arcade Countdown Audio (3 -> 2 -> 1 -> FIGHT!)
-      if (state.countdownTimer === 1) triggerFaceOffSFX('timertick', 0.90); // Countdown "3"
-      if (state.countdownTimer === 30) triggerFaceOffSFX('timertick', 0.90); // Countdown "2"
-      if (state.countdownTimer === 60) triggerFaceOffSFX('timertick', 0.90); // Countdown "1"
-      if (state.countdownTimer === 90) {
-        triggerFaceOffSFX('fight', 1.0); // "FIGHT!" voice
-        triggerFaceOffSFX('ringbell', 0.85); // Ring Bell gong
+      const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE);
+      let requiredCountdownFrames = 120;
+
+      if (is1v1Mode) {
+        // 1v1 Mode: Round Announcer only ("Round 1, Fight!", "Round 2, Fight!", "Final Round, Fight!")
+        let roundKey = 'round1';
+        if (state.roundNum === 1) {
+          roundKey = 'round1';
+        } else if (state.roundNum === 2) {
+          roundKey = 'round2';
+        } else {
+          roundKey = 'finalround';
+        }
+        const snd = getAnnouncerSound(roundKey);
+        if (state.countdownTimer === 1) {
+          if (snd && typeof audioSystem !== 'undefined') {
+            audioSystem.playSFX(snd.src, snd.volume, snd.speed, snd.offset || 0);
+          }
+        }
+        // Calculate audio duration in frames + small breathing delay (~25 frames / 0.42s)
+        const audioDurationSec = (snd && snd.duration) ? (snd.duration / (snd.speed || 1.0)) : 2.2;
+        const delayFrames = 25;
+        requiredCountdownFrames = Math.round(audioDurationSec * 60) + delayFrames;
+      } else {
+        // All Other Modes: Standard Arcade Countdown (3 -> 2 -> 1 -> FIGHT! + Gong Bell)
+        const tickSnd = getAnnouncerSound('timertick');
+        if (state.countdownTimer === 1 && tickSnd) audioSystem.playSFX(tickSnd.src, tickSnd.volume, tickSnd.speed, tickSnd.offset || 0);
+        if (state.countdownTimer === 30 && tickSnd) audioSystem.playSFX(tickSnd.src, tickSnd.volume, tickSnd.speed, tickSnd.offset || 0);
+        if (state.countdownTimer === 60 && tickSnd) audioSystem.playSFX(tickSnd.src, tickSnd.volume, tickSnd.speed, tickSnd.offset || 0);
+        if (state.countdownTimer === 90) {
+          const fightSnd = getAnnouncerSound('fight');
+          const bellSnd = getAnnouncerSound('ringbell');
+          if (fightSnd && typeof audioSystem !== 'undefined') {
+            audioSystem.playSFX(fightSnd.src, fightSnd.volume, fightSnd.speed, fightSnd.offset || 0);
+          }
+          if (bellSnd && typeof audioSystem !== 'undefined') {
+            audioSystem.playSFX(bellSnd.src, bellSnd.volume, bellSnd.speed, bellSnd.offset || 0);
+          }
+        }
+        requiredCountdownFrames = 135;
       }
 
       // Update fighters during countdown to aim guns/weapons at opponents
@@ -60,7 +95,7 @@ export function updateGame() {
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);
 
-      if (state.countdownTimer >= 120) {
+      if (state.countdownTimer >= requiredCountdownFrames) {
         state.gameState = 'playing';
         state._isChampionLayoutActive = false;
         state.battleStartDelayTimer = 0;

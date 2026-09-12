@@ -96,6 +96,83 @@ export class MahitoFighter extends Fighter {
     this.evasionBounceTimer = 0;
     this.cloneNoiseTimer = 0;
     this.originalRadius = this.r;
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'soul_phase_slip',
+        name: 'Phantom Soul Slip',
+        type: 'active',
+        cooldownKey: 'soulPhaseDashCooldown',
+        cooldownMax: () => CONFIG.mahito?.soulPhaseSlip?.cooldown || 100
+      },
+      {
+        id: 'flesh_surge',
+        name: 'Subterranean Flesh Surge',
+        type: 'active',
+        cooldownKey: 'fleshSurgeCooldown',
+        cooldownMax: () => CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.fleshSurge?.cooldown || 300
+      },
+      {
+        id: 'mace_cannon',
+        name: 'Mutated Mace Cannon',
+        type: 'active',
+        cooldownKey: 'maceCannonCooldown',
+        cooldownMax: () => CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.maceCannon?.cooldown || 300
+      },
+      {
+        id: 'twin_scissor',
+        name: 'Dual Scythe Guillotine',
+        type: 'active',
+        cooldownKey: 'twinScissorCooldown',
+        cooldownMax: () => CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.twinScissor?.cooldown || 300
+      },
+      {
+        id: 'soul_multiplicity',
+        name: 'Soul Multiplicity',
+        type: 'active',
+        cooldownKey: 'soulMultiplicityCooldown',
+        cooldownMax: () => CONFIG.mahito?.soulMultiplicity?.cooldown || 1000
+      },
+      {
+        id: 'isbodk',
+        name: 'Distorted Killing',
+        type: 'transformation',
+        cooldownKey: 'transformCooldown',
+        cooldownMax: () => CONFIG.mahito?.transformation?.cooldown || 1200,
+        durationKey: 'transformDuration',
+        durationMax: () => CONFIG.mahito?.transformation?.duration || 600,
+        activeKey: 'isTransformed',
+        onExpire: (fighter) => {
+          fighter.revertTransformation();
+        }
+      },
+      {
+        id: 'domain',
+        name: 'Self-Embodiment of Perfection',
+        type: 'domain',
+        cooldownKey: 'domainCooldown',
+        cooldownMax: () => CONFIG.mahito?.domainExpansion?.cooldown || 2000,
+        durationKey: 'domainTimer',
+        durationMax: () => CONFIG.mahito?.domainExpansion?.duration || 450,
+        activeKey: 'domainActive',
+        channelingKey: 'domainChargeTimer',
+        onExpire: (fighter) => {
+          fighter.domainActive = false;
+        }
+      },
+      {
+        id: 'evasion',
+        name: 'Soul Split Evasion',
+        type: 'buff',
+        durationKey: 'evasionTimer',
+        durationMax: () => CONFIG.mahito?.evasion?.duration || 300,
+        activeKey: 'isEvading',
+        onExpire: (fighter) => {
+          fighter.endEvasion();
+        }
+      }
+    ]);
   }
 
   get _dashAfterimages() {
@@ -1406,4 +1483,17 @@ export class MahitoFighter extends Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.isTransformed && this.transformDuration <= 0) {
+      this.revertTransformation();
+    }
+    if (this.domainActive && this.domainTimer <= 0) {
+      this.domainActive = false;
+    }
+    if (this.isEvading && this.evasionTimer <= 0) {
+      this.endEvasion();
+    }
+  }
 }
+

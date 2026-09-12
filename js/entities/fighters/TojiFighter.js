@@ -68,9 +68,36 @@ export class TojiFighter extends Fighter {
     this.immuneToCC = true;
     this.domainImmunity = true;
     this.isDomainImmune = true;
-    this.isKnockbackStunImmune = true;
     this.postUltimateRecoveryTimer = 0;
     this._initChainPhysics();
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    this.skillManager.registerSkills([
+      {
+        id: 'ambush',
+        name: 'STEALTH AMBUSH',
+        type: 'buff',
+        cooldownKey: 'stealthCooldown',
+        cooldownMax: CONFIG.toji?.stealthCooldown || 500,
+        durationKey: 'stealthTimer',
+        durationMax: CONFIG.toji?.stealthDuration || 240,
+        activeKey: 'isStealthed',
+        allowsFrozenCooldownTick: true
+      },
+      {
+        id: 'ult',
+        name: 'CURSE INVENTORY',
+        type: 'ultimate',
+        cooldownKey: 'ultimateCooldown',
+        cooldownMax: CONFIG.toji?.ultimateCooldown || 1500,
+        durationKey: 'ultimateTotalTimer',
+        durationMax: CONFIG.toji?.ultimateSwarmDuration || 500,
+        activeKey: 'ultimateActive',
+        allowsFrozenCooldownTick: true
+      }
+    ]);
   }
 
   _initChainPhysics() {
@@ -1315,9 +1342,7 @@ export class TojiFighter extends Fighter {
       (this.stunTimer && this.stunTimer > 0) ||
       (this.knockbackStunTimer && this.knockbackStunTimer > 0) ||
       this.isParalyzedByMahoraga ||
-      this.isParalyzedByMahito ||
-      this.isCaughtInPurple ||
-      (this.purpleHitTimer && this.purpleHitTimer > 0)
+      this.isParalyzedByMahito
     );
   }
 
@@ -1397,7 +1422,7 @@ export class TojiFighter extends Fighter {
 
     // 2. Top-of-loop Freeze / Status Effect Guard (Rule 1 Compliant: decrements timers & returns if frozen/paralyzed)
     const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0)) {
+    if (isFrozen || this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
       this.vx = 0;
       this.vy = 0;
       this.interruptAttacks();
@@ -1440,9 +1465,6 @@ export class TojiFighter extends Fighter {
     } else if ((this.mahoragaShoutSlowTimer || 0) > 0) {
       this.mahoragaShoutSlowTimer--;
       this.slowTimer = Math.max(this.slowTimer || 0, 2);
-    } else if (this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0)) {
-      this.slowTimer = Math.max(this.slowTimer || 0, 2);
-      this.slowMultiplier = 0.40;
     } else if (this.slowTimer > 0) {
       this.slowTimer--;
     } else {
@@ -1466,8 +1488,8 @@ export class TojiFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Purple/Chains/WallPins)
-    if (!this.isCaughtInPurple && (!this.purpleHitTimer || this.purpleHitTimer <= 0) && !this.isChainedByMakima && !this.isCurrentlyWallPinnedByMakima && (!this.makimaWallPinTimer || this.makimaWallPinTimer <= 0)) {
+    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Chains/WallPins)
+    if (!this.isChainedByMakima && !this.isCurrentlyWallPinnedByMakima && (!this.makimaWallPinTimer || this.makimaWallPinTimer <= 0)) {
       this.timeStopTimer = 0;
       if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
       this.hitStunTimer = 0;

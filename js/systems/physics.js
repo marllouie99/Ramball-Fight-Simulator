@@ -360,6 +360,36 @@ export function resolveFighterCollision(a, b) {
     return;
   }
 
+  // Makima during citizen contract death shatter / revival stasis cannot be pushed by any fighter
+  const aIsMakimaShatter = Boolean(a && (a.isRevivingFromContract || a.isShatterReviving || (a.shatteredPieces && a.shatteredPieces.length > 0) || (a.characterId === 'makima' && (a.isDead || a.dead || a.hp <= 0))));
+  const bIsMakimaShatter = Boolean(b && (b.isRevivingFromContract || b.isShatterReviving || (b.shatteredPieces && b.shatteredPieces.length > 0) || (b.characterId === 'makima' && (b.isDead || b.dead || b.hp <= 0))));
+
+  if (aIsMakimaShatter && bIsMakimaShatter) {
+    a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0;
+    b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0;
+    return;
+  }
+  if (aIsMakimaShatter) {
+    a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0;
+    if (typeof a._shatterLockedX === 'number' && typeof a._shatterLockedY === 'number') {
+      a.x = a._shatterLockedX; a.y = a._shatterLockedY;
+    }
+    b.x += nx * effectiveOverlap * 2;
+    b.y += ny * effectiveOverlap * 2;
+    if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
+    return;
+  }
+  if (bIsMakimaShatter) {
+    b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0;
+    if (typeof b._shatterLockedX === 'number' && typeof b._shatterLockedY === 'number') {
+      b.x = b._shatterLockedX; b.y = b._shatterLockedY;
+    }
+    a.x -= nx * effectiveOverlap * 2;
+    a.y -= ny * effectiveOverlap * 2;
+    if (state && state.arena && typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
+    return;
+  }
+
   const aIsWallSlam = a.isWallSlamActive || a.isWallSlamBlitz || a.isGrabbedByMahoraga || a.isParalyzedByMahoraga || (a.wallSlamPinnedX !== undefined);
   const bIsWallSlam = b.isWallSlamActive || b.isWallSlamBlitz || b.isGrabbedByMahoraga || b.isParalyzedByMahoraga || (b.wallSlamPinnedX !== undefined);
 
@@ -380,8 +410,11 @@ export function resolveFighterCollision(a, b) {
     return; // Neither moves or bounces during counter execution
   }
 
-  const aIsGojoInfinity = isEnemy && !a.isTargetOfAmbush && !isInsideRubbickStolenVoid(a) && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.infinityActive || (!a.isMeleeMode && (a.infinityCooldown || 0) <= 0) || (a.infinityBlockTimer || 0) > 0);
-  const bIsGojoInfinity = isEnemy && !b.isTargetOfAmbush && !isInsideRubbickStolenVoid(b) && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.infinityActive || (!b.isMeleeMode && (b.infinityCooldown || 0) <= 0) || (b.infinityBlockTimer || 0) > 0);
+  const aIsGojoChanneling = (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.redBuildupPhase || (a.redEffectTimer || 0) > 0 || a.isDomainPreSlide || a.isChannelingDomainExpansion || (a.domainChargeTimer || 0) > 0);
+  const bIsGojoChanneling = (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.redBuildupPhase || (b.redEffectTimer || 0) > 0 || b.isDomainPreSlide || b.isChannelingDomainExpansion || (b.domainChargeTimer || 0) > 0);
+
+  const aIsGojoInfinity = isEnemy && !aIsGojoChanneling && !a.isTargetOfAmbush && !isInsideRubbickStolenVoid(a) && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.infinityActive || (!a.isMeleeMode && (a.infinityCooldown || 0) <= 0) || (a.infinityBlockTimer || 0) > 0);
+  const bIsGojoInfinity = isEnemy && !bIsGojoChanneling && !b.isTargetOfAmbush && !isInsideRubbickStolenVoid(b) && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.infinityActive || (!b.isMeleeMode && (b.infinityCooldown || 0) <= 0) || (b.infinityBlockTimer || 0) > 0);
 
   // Apply Limitless Infinity movement slow on physical collision instead of pushing enemies back
   if (aIsGojoInfinity && !b.gojoInfinityImmune) {
@@ -1018,7 +1051,24 @@ export function updateFighters() {
             if (typeof entity.applySlow === 'function') entity.applySlow(20, 0.35, { isInfinitySlow: true });
             else { entity.slowTimer = Math.max(entity.slowTimer || 0, 20); entity.slowMultiplier = Math.min(entity.slowMultiplier || 1.0, 0.35); }
           }
-          if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
+          const fighterIsMakimaShatter = Boolean(fighter && (fighter.isRevivingFromContract || fighter.isShatterReviving || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0) || (fighter.characterId === 'makima' && (fighter.isDead || fighter.dead || fighter.hp <= 0))));
+          const entityIsMakimaShatter = Boolean(entity && (entity.isRevivingFromContract || entity.isShatterReviving || (entity.shatteredPieces && entity.shatteredPieces.length > 0) || (entity.characterId === 'makima' && (entity.isDead || entity.dead || entity.hp <= 0))));
+
+          if (fighterIsMakimaShatter) {
+            fighter.vx = 0; fighter.vy = 0; fighter.knockbackVx = 0; fighter.knockbackVy = 0;
+            if (typeof fighter._shatterLockedX === 'number' && typeof fighter._shatterLockedY === 'number') {
+              fighter.x = fighter._shatterLockedX; fighter.y = fighter._shatterLockedY;
+            }
+            entity.x += nx * overlap * 2;
+            entity.y += ny * overlap * 2;
+          } else if (entityIsMakimaShatter) {
+            entity.vx = 0; entity.vy = 0; entity.knockbackVx = 0; entity.knockbackVy = 0;
+            if (typeof entity._shatterLockedX === 'number' && typeof entity._shatterLockedY === 'number') {
+              entity.x = entity._shatterLockedX; entity.y = entity._shatterLockedY;
+            }
+            fighter.x -= nx * overlap * 2;
+            fighter.y -= ny * overlap * 2;
+          } else if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
             entity.x += nx * overlap;
             entity.y += ny * overlap;
           } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai || (entity.bankaiBurstTimer && entity.bankaiBurstTimer > 0) || (entity.isChannelingGetsuga && entity.isFinalMassiveGetsuga) || (entity.hollowMaskFormationTimer && entity.hollowMaskFormationTimer > 0) || (entity.hollowBurstTimer && entity.hollowBurstTimer > 0)) {

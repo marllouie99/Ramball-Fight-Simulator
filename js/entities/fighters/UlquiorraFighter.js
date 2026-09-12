@@ -81,8 +81,38 @@ export class UlquiorraFighter extends Fighter {
     this.regenInterval = cfg.regenInterval || 60;
     this.regenAmount = cfg.regenAmount || 6;
 
-    this.combatAuraOpacity = 0.35;
     this.damageNumberColor = '#00FF88';
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : {};
+    this.skillManager.registerSkills([
+      {
+        id: 'sonido',
+        name: 'SONÍDO',
+        type: 'mobility',
+        cooldownKey: 'sonidoCooldown',
+        cooldownMax: cfg.sonidoCooldown || 300,
+        activeKey: 'isSonidoDashing'
+      },
+      {
+        id: 'cero',
+        name: 'CERO',
+        type: 'offensive',
+        cooldownKey: 'ceroCooldown',
+        cooldownMax: cfg.ceroCooldown || 420,
+        channelingKey: 'isChannelingCero'
+      },
+      {
+        id: 'bala',
+        name: 'BALA',
+        type: 'offensive',
+        cooldownKey: 'balaCooldown',
+        cooldownMax: cfg.balaCooldown || 150,
+        activeKey: 'isFiringBala'
+      }
+    ]);
   }
 
   isStationarySkillActive() {

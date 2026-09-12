@@ -25,8 +25,10 @@ export function syncHudPosition() {
   _cachedGameBox.style.maxWidth = `${canvasWidth}px`;
   
   const isDark = (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || state.arenaTheme === 'dark'));
-  const outerBgColor = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#ffffff');
-  _cachedGameBox.style.backgroundColor = outerBgColor.replace(/ff$/, '');
+  const outerBgColor = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+  _cachedGameBox.style.backgroundColor = (typeof outerBgColor === 'string' && outerBgColor.startsWith('#') && outerBgColor.length === 9 && outerBgColor.endsWith('ff'))
+    ? outerBgColor.substring(0, 7)
+    : outerBgColor;
 
   const boxRect = _cachedGameBox.getBoundingClientRect();
   const canvasRect = _cachedPixiView.getBoundingClientRect();

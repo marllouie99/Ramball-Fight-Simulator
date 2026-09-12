@@ -30,8 +30,8 @@ export const MODE_SETTINGS = {
     label: '1v1',
     rounds: 3,
     hpMultiplier: 1.0,
-    fixedHp: 500,
-    speedMultiplier: 1.5,
+    fixedHp: 100,
+    speedMultiplier: 1.20,
     initialFuelPickups: 2,
     supportFourFighters: false,
     maxAfterimages: 25, // Max afterimages in normal 1v1 mode
@@ -41,8 +41,8 @@ export const MODE_SETTINGS = {
     label: 'Stand Off',
     rounds: 1, // Only 1 round in Stand Off
     hpMultiplier: 1.0,
-    fixedHp: 2000, // 1000 HP for both fighters
-    speedMultiplier: 1.00,
+    fixedHp: 10000, // 1000 HP for both fighters
+    speedMultiplier: 1.30,
     initialFuelPickups: 2,
     supportFourFighters: false,
     maxAfterimages: 3, // Configurable limit for afterimages in 1v1 Stand Off mode

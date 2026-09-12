@@ -363,7 +363,7 @@ export function updateBankai(fighter, opponent, isMatchEnded) {
     if (!isMatchEnded) {
       // If Hollow Mask formation or burst is running, pause Bankai timer decay
       const isHollowTransforming = (fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0);
-      if (!isHollowTransforming && !fighter.isParalyzedDebuffActive()) {
+      if (!isHollowTransforming) {
         fighter.bankaiTimer--;
       }
 

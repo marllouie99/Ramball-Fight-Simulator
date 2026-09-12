@@ -65,12 +65,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     // RCT Progress based on Cooldown Recovery
     const rctMax = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;
     const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
-    let rctPct;
-    if (f.isChannelingRCT || (f.healingAuraTimer || 0) > 0) {
-      rctPct = 100;
-    } else {
-      rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
-    }
+    const rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
 
     const label100 = CONFIG.gojo?.purpleSecondCastTextHeader100 || 'PURPLE';
     const label200 = CONFIG.gojo?.purpleSecondCastTextHeader200 || 'PURPLE';
@@ -156,12 +151,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     // RCT Progress based on Cooldown Recovery
     const sukunaRctMax = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700;
     const sukunaRctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
-    let rctPct;
-    if ((f.rctVisualTimer || 0) > 0) {
-      rctPct = 100;
-    } else {
-      rctPct = Math.max(0, Math.min(100, (1 - (sukunaRctTimer / sukunaRctMax)) * 100));
-    }
+    const rctPct = Math.max(0, Math.min(100, (1 - (sukunaRctTimer / sukunaRctMax)) * 100));
 
     return [
       { id: 'ms',     pct: domainPct,  ready: domainPct >= 99,  color: themeColor, label: 'MALEVOLENT SHRINE' },
@@ -1635,6 +1625,16 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return [];
   }
 
+  const def = f.fighterIndex !== undefined ? FIGHTER_DEFS[f.fighterIndex] : null;
+  const color = f.color || (def && def.color) || '#a491d3';
+
+  if (f.skillManager && typeof f.skillManager.hasSkills === 'function' && f.skillManager.hasSkills()) {
+    const dynamicData = f.skillManager.getHudSkillData(color, getProjectiles);
+    if (dynamicData && dynamicData.length > 0) {
+      return dynamicData;
+    }
+  }
+
   let current = 0;
   let max = 1;
   if (f.skillCooldown !== undefined) {
@@ -1646,8 +1646,6 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
   const skillPct = Math.max(0, Math.min(100, (1 - (current / max)) * 100));
   
-  const color = f.color || '#a491d3';
-  const def = f.fighterIndex !== undefined ? FIGHTER_DEFS[f.fighterIndex] : null;
   const label = (def && def.name) ? def.name.toUpperCase() : (f.type ? f.type.toUpperCase() : 'SKILL');
 
   return [

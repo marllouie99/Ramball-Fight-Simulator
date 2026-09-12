@@ -96,30 +96,42 @@ export class BlackHoleBehavior extends ProjectileBehavior {
       const dist = Math.hypot(dx, dy);
 
       if (dist < effectiveRadius) {
-        const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
-        if (isSaitamaCounter && typeof f.interruptAttacks === 'function') {
-          f.interruptAttacks(true);
-        }
-        if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
-          const nx = dist > 0 ? dx / dist : 0;
-          const ny = dist > 0 ? dy / dist : 0;
-          const speedFactor = Math.max(1, f.speed / (f.baseSpeed || f.speed || 1));
-          const pullStrength = CONFIG.black.blackHolePullStrength * speedFactor * (1 - dist / effectiveRadius);
-
-          const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
-          const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
-          if (f.visualScaleTarget === undefined || targetScale < f.visualScaleTarget) {
-            f.visualScaleTarget = targetScale;
+        const isMakimaShatter = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving || (f.shatteredPieces && f.shatteredPieces.length > 0) || (f.characterId === 'makima' && (f.isDead || f.dead || f.hp <= 0))));
+        if (isMakimaShatter) {
+          f.vx = 0;
+          f.vy = 0;
+          f.knockbackVx = 0;
+          f.knockbackVy = 0;
+          if (typeof f._shatterLockedX === 'number' && typeof f._shatterLockedY === 'number') {
+            f.x = f._shatterLockedX;
+            f.y = f._shatterLockedY;
           }
-
-          const radialVelocity = f.vx * nx + f.vy * ny;
-          if (radialVelocity < 0) {
-            const correction = -radialVelocity * 1.2;
-            f.vx += nx * correction;
-            f.vy += ny * correction;
+        } else {
+          const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
+          if (isSaitamaCounter && typeof f.interruptAttacks === 'function') {
+            f.interruptAttacks(true);
           }
-          f.vx += nx * pullStrength;
-          f.vy += ny * pullStrength;
+          if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
+            const nx = dist > 0 ? dx / dist : 0;
+            const ny = dist > 0 ? dy / dist : 0;
+            const speedFactor = Math.max(1, f.speed / (f.baseSpeed || f.speed || 1));
+            const pullStrength = CONFIG.black.blackHolePullStrength * speedFactor * (1 - dist / effectiveRadius);
+
+            const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
+            const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
+            if (f.visualScaleTarget === undefined || targetScale < f.visualScaleTarget) {
+              f.visualScaleTarget = targetScale;
+            }
+
+            const radialVelocity = f.vx * nx + f.vy * ny;
+            if (radialVelocity < 0) {
+              const correction = -radialVelocity * 1.2;
+              f.vx += nx * correction;
+              f.vy += ny * correction;
+            }
+            f.vx += nx * pullStrength;
+            f.vy += ny * pullStrength;
+          }
         }
 
         if (ownerHasEnemyInHole) ownerHasEnemyInHole[ownerIndex] = true;
@@ -151,26 +163,38 @@ export class BlackHoleBehavior extends ProjectileBehavior {
         const dist = Math.hypot(dx, dy);
 
         if (dist < effectiveRadius) {
-          const nx = dist > 0 ? dx / dist : 0;
-          const ny = dist > 0 ? dy / dist : 0;
-          const speedFactor = Math.max(1, (illusion.speed || illusion.moveSpeed || 1) / (illusion.baseSpeed || illusion.moveSpeed || 1));
-          const pullStrength = CONFIG.black.blackHolePullStrength * speedFactor * (1 - dist / effectiveRadius);
+          const isIllusionMakimaShatter = Boolean(illusion && (illusion.isRevivingFromContract || illusion.isShatterReviving || (illusion.shatteredPieces && illusion.shatteredPieces.length > 0) || (illusion.characterId === 'makima' && (illusion.isDead || illusion.dead || illusion.hp <= 0))));
+          if (isIllusionMakimaShatter) {
+            illusion.vx = 0;
+            illusion.vy = 0;
+            illusion.knockbackVx = 0;
+            illusion.knockbackVy = 0;
+            if (typeof illusion._shatterLockedX === 'number' && typeof illusion._shatterLockedY === 'number') {
+              illusion.x = illusion._shatterLockedX;
+              illusion.y = illusion._shatterLockedY;
+            }
+          } else {
+            const nx = dist > 0 ? dx / dist : 0;
+            const ny = dist > 0 ? dy / dist : 0;
+            const speedFactor = Math.max(1, (illusion.speed || illusion.moveSpeed || 1) / (illusion.baseSpeed || illusion.moveSpeed || 1));
+            const pullStrength = CONFIG.black.blackHolePullStrength * speedFactor * (1 - dist / effectiveRadius);
 
-          const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
-          const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
-          if (illusion.visualScaleTarget === undefined || targetScale < illusion.visualScaleTarget) {
-            illusion.visualScaleTarget = targetScale;
+            const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
+            const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
+            if (illusion.visualScaleTarget === undefined || targetScale < illusion.visualScaleTarget) {
+              illusion.visualScaleTarget = targetScale;
+            }
+
+            const radialVelocity = (illusion.vx || 0) * nx + (illusion.vy || 0) * ny;
+            if (radialVelocity < 0) {
+              const correction = -radialVelocity * 1.2;
+              illusion.vx = (illusion.vx || 0) + nx * correction;
+              illusion.vy = (illusion.vy || 0) + ny * correction;
+            }
+
+            illusion.vx = (illusion.vx || 0) + nx * pullStrength;
+            illusion.vy = (illusion.vy || 0) + ny * pullStrength;
           }
-
-          const radialVelocity = (illusion.vx || 0) * nx + (illusion.vy || 0) * ny;
-          if (radialVelocity < 0) {
-            const correction = -radialVelocity * 1.2;
-            illusion.vx = (illusion.vx || 0) + nx * correction;
-            illusion.vy = (illusion.vy || 0) + ny * correction;
-          }
-
-          illusion.vx = (illusion.vx || 0) + nx * pullStrength;
-          illusion.vy = (illusion.vy || 0) + ny * pullStrength;
 
           if (ownerHasEnemyInHole) ownerHasEnemyInHole[ownerIndex] = true;
 

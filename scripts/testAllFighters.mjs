@@ -80,13 +80,17 @@ globalThis.document = {
   removeEventListener: () => {},
   getElementById: (id) => {
     if (id === 'arena') return mockCanvas;
-    return { style: {}, classList: { add: () => {}, remove: () => {}, contains: () => false }, textContent: '', innerHTML: '', addEventListener: () => {} };
+    const el = { style: {}, classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false }, textContent: '', innerHTML: '', addEventListener: () => {}, appendChild: () => ({}), removeChild: () => ({}), children: [], querySelector: () => null, querySelectorAll: () => [] };
+    el.firstElementChild = el;
+    return el;
   },
   querySelector: () => null,
   querySelectorAll: () => [],
   createElement: (tag) => {
     if (tag === 'canvas') return mockCanvas;
-    return { style: {}, classList: { add: () => {}, remove: () => {} } };
+    const el = { style: {}, classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false }, textContent: '', innerHTML: '', addEventListener: () => {}, appendChild: () => ({}), removeChild: () => ({}), children: [], querySelector: () => null, querySelectorAll: () => [] };
+    el.firstElementChild = el;
+    return el;
   },
   body: { style: {} }
 };
@@ -135,11 +139,14 @@ async function main() {
   const { drawSelectScreen } = await import('../js/graphics/ui/CharacterSelectScreen.js');
   const { drawTitleScreen } = await import('../js/graphics/ui/MainMenuScreen.js');
   const { drawIndexScreen } = await import('../js/graphics/ui/FighterIndexScreen.js');
+  const { drawRoundEndScreen, drawMatchEndScreen } = await import('../js/graphics/ui/GameOverScreen.js');
   const { drawRubbickDomainDimScreen, drawBankaiImpactDimScreen } = await import('../js/graphics/renderers/arenaRenderer.js');
   const { drawCjBaguvixDimScreen } = await import('../js/graphics/renderers/environmentalRenderer.js');
   const { drawFighters } = await import('../js/graphics/renderers/EntityRenderer.js');
   const { audioSystem } = await import('../js/systems/audioSystem.js');
   const { updateGame } = await import('../js/systems/updateSystem.js');
+  const { resolveFighterCollision } = await import('../js/systems/physics.js');
+  const { reinitFighters } = await import('../js/core/gameFlow.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -1517,10 +1524,10 @@ async function main() {
         // 3.5.4 Test Knockback on Chained Target & Chain Break Distance Snapping
         fighter.reset();
         dummyOpponent.reset();
-        fighter.x = 80;
-        fighter.y = 200;
-        dummyOpponent.x = 220;
-        dummyOpponent.y = 200;
+        fighter.x = 200;
+        fighter.y = 80;
+        dummyOpponent.x = 200;
+        dummyOpponent.y = 220;
         dummyOpponent.hp = 100;
         dummyOpponent.isDead = false;
         dummyOpponent.isChainedByMakima = false;
@@ -1530,18 +1537,21 @@ async function main() {
         dummyOpponent.bangCooldown = 999;
         state.fighters = [fighter, dummyOpponent];
 
+        fighter.gunAngle = Math.PI / 2;
+        fighter.angle = Math.PI / 2;
         fighter._castChainsOfDomination(dummyOpponent);
         if (!fighter.isChainingActive || !dummyOpponent.isChainedByMakima) {
           throw new Error("Failed to latch Chains of Domination onto enemy for knockback test!");
         }
 
-        // Fire "Bang!" directly at the chained enemy
-        fighter.gunAngle = 0;
-        fighter.angle = 0;
+        // Fire "Bang!" directly at the chained enemy downwards
+        fighter.gunAngle = Math.PI / 2;
+        fighter.angle = Math.PI / 2;
         fighter._castBangAttack(dummyOpponent);
 
-        if (dummyOpponent.knockbackVx === undefined || Math.abs(dummyOpponent.knockbackVx) < 10) {
-          throw new Error(`Chained enemy did NOT receive knockback from "Bang!" attack! Got knockbackVx=${dummyOpponent.knockbackVx}`);
+        const kbMag = Math.hypot(dummyOpponent.knockbackVx || 0, dummyOpponent.knockbackVy || 0);
+        if (kbMag < 10) {
+          throw new Error(`Chained enemy did NOT receive knockback from "Bang!" attack! Got knockback magnitude=${kbMag}`);
         }
 
         // Step simulation frames as enemy gets propelled backward and breaks the chain
@@ -1673,9 +1683,45 @@ async function main() {
         }
 
         // 4. Citizen Contract Shatter & Magnetic Reassembly
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        state.fighters = [fighter, dummyOpponent];
+
         fighter.takeDamage(999, dummyOpponent);
         if (!fighter.isRevivingFromContract && !fighter.isShatterReviving) {
           throw new Error("Makima did not enter Citizen Contract revive on fatal damage!");
+        }
+
+        // Test position locking & immovability during death shatter
+        const lockedX = fighter.x;
+        const lockedY = fighter.y;
+        if (fighter._shatterLockedX !== lockedX || fighter._shatterLockedY !== lockedY) {
+          throw new Error(`Expected Makima _shatterLockedX/Y to be (${lockedX}, ${lockedY}), got (${fighter._shatterLockedX}, ${fighter._shatterLockedY})`);
+        }
+
+        // Test direct knockback impulse during shatter
+        fighter.applyKnockback(50, -30, 20);
+        if (fighter.vx !== 0 || fighter.vy !== 0 || fighter.knockbackVx !== 0 || fighter.knockbackVy !== 0 || fighter.x !== lockedX || fighter.y !== lockedY) {
+          throw new Error(`Makima position or velocity moved during death shatter knockback! Pos: (${fighter.x}, ${fighter.y}), Vel: (${fighter.vx}, ${fighter.vy})`);
+        }
+
+        // Test fighter-fighter collision against shattering Makima
+        dummyOpponent.x = lockedX + 10;
+        dummyOpponent.y = lockedY;
+        dummyOpponent.vx = -5;
+        dummyOpponent.vy = 0;
+        resolveFighterCollision(fighter, dummyOpponent);
+        if (fighter.x !== lockedX || fighter.y !== lockedY || fighter.vx !== 0 || fighter.vy !== 0) {
+          throw new Error(`Makima was pushed by a colliding fighter during death shatter! Pos: (${fighter.x}, ${fighter.y})`);
+        }
+        if (dummyOpponent.x <= lockedX + 10) {
+          throw new Error("Colliding fighter was not pushed away from shattering Makima!");
         }
 
         // Draw during reassembly stasis
@@ -1686,10 +1732,16 @@ async function main() {
         // Fast-forward to reassembly completion
         while (fighter.reviveStasisTimer > 0) {
           fighter.update(dummyOpponent, 0, state.arena);
+          if (fighter.x !== lockedX || fighter.y !== lockedY) {
+            throw new Error(`Makima drifted during revive stasis update! Pos: (${fighter.x}, ${fighter.y}) vs locked (${lockedX}, ${lockedY})`);
+          }
         }
 
         if (fighter.hp <= 0 || fighter.isRevivingFromContract) {
           throw new Error("Makima failed to revive with 50% HP after Citizen Contract reassembly!");
+        }
+        if (fighter.x !== lockedX || fighter.y !== lockedY) {
+          throw new Error(`Makima did not reassemble at locked coordinates (${lockedX}, ${lockedY})! Got (${fighter.x}, ${fighter.y})`);
         }
         if (!fighter._lastHealAmount || fighter._lastHealAmount <= 0) {
           throw new Error("Makima Citizen Contract reassembly failed to set _lastHealAmount for HUD floating heal text!");
@@ -1772,6 +1824,185 @@ async function main() {
             throw new Error(`Makima skill '${skill.id}' label '${skill.label}' violates Rule 22 (contains parenthetical status suffix)`);
           }
         }
+
+        // 6. Test: When Gojo is chained by Makima, Gojo's Infinity is disabled until the chain expires
+        console.log("   Testing Gojo Infinity disabled when chained by Makima...");
+        const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+        const mockGojo = new GojoClass(allDefs.find(d => d.type === 'gojo') || { type: 'gojo' });
+        mockGojo.reset();
+        mockGojo.x = 350;
+        mockGojo.y = 200;
+        mockGojo.hp = 200;
+        mockGojo.infinityActive = true;
+        mockGojo.infinityCooldown = 0;
+        mockGojo.isMeleeMode = false;
+
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        fighter.gunAngle = 0;
+        fighter.angle = 0;
+        fighter.chainLockedAimAngle = 0;
+        state.fighters = [fighter, mockGojo];
+
+        fighter._castChainsOfDomination(mockGojo);
+
+        if (!mockGojo.isChainedByMakima) {
+          throw new Error("Gojo was not marked as isChainedByMakima when hit by Chains of Domination!");
+        }
+        if (mockGojo.infinityActive) {
+          throw new Error("Gojo's infinityActive was NOT disabled when chained by Makima!");
+        }
+        if (mockGojo.infinityFadeOpacity !== 0) {
+          throw new Error(`Gojo's infinityFadeOpacity should be 0 when chained, got ${mockGojo.infinityFadeOpacity}`);
+        }
+
+        // Test Gojo takes damage while chained without Infinity blocking
+        const hpBefore = mockGojo.hp;
+        mockGojo.takeDamage(25, fighter, { isMelee: true });
+        if (mockGojo.hp >= hpBefore) {
+          throw new Error("Gojo blocked damage with Infinity while chained by Makima!");
+        }
+
+        // Test Gojo's update while chained does NOT re-enable Infinity
+        mockGojo.update(fighter, 1, state.arena);
+        if (mockGojo.infinityActive) {
+          throw new Error("Gojo's update re-enabled infinityActive while chained by Makima!");
+        }
+
+        // Test triggerInfinityBlock returns false while chained
+        const blocked = mockGojo.triggerInfinityBlock(mockGojo.x + 10, mockGojo.y, fighter);
+        if (blocked) {
+          throw new Error("Gojo triggerInfinityBlock returned true while chained by Makima!");
+        }
+
+        // Advance until the chain expires and verify zero tick damage is dealt by the chain
+        fighter.bangCooldown = 9999;
+        fighter.angelCooldown = 9999;
+        fighter.shrineCooldown = 9999;
+        const hpBeforeTicks = mockGojo.hp;
+        while (fighter.chainTimer > 0) {
+          fighter.update(mockGojo, 0, state.arena);
+        }
+        if (mockGojo.hp < hpBeforeTicks) {
+          throw new Error(`Target took tick damage while chained by Makima! hpBefore=${hpBeforeTicks}, hpAfter=${mockGojo.hp}`);
+        }
+
+        if (mockGojo.isChainedByMakima) {
+          throw new Error("Gojo remained isChainedByMakima after chain expired!");
+        }
+        if (!mockGojo.infinityActive) {
+          throw new Error("Gojo's infinityActive was NOT restored after chain expired!");
+        }
+
+        // 7. Test Gojo punch reach and hand extension against Makima inside domain
+        console.log("   Testing Gojo punch reach and hand extension against Makima inside domain...");
+        mockGojo.domainActive = true;
+        mockGojo.isMeleeMode = true;
+        mockGojo.x = 200;
+        mockGojo.y = 200;
+        fighter.x = 264;
+        fighter.y = 200;
+        mockGojo.aim(fighter);
+        state.fighters = [mockGojo, fighter];
+
+        // Verify idle hand position
+        let hands = mockGojo._getHandPositions();
+        let idleDist = Math.hypot(hands.frontHandX - mockGojo.x, hands.frontHandY - mockGojo.y);
+        if (idleDist > mockGojo.r * 1.1) {
+          throw new Error(`Idle hand is detached from Gojo body! Dist=${idleDist}`);
+        }
+
+        // Trigger punch
+        mockGojo._meleePunch(fighter);
+        for (let frame = 0; frame < 15; frame++) {
+          hands = mockGojo._getHandPositions();
+          const handDistFromGojo = Math.hypot(hands.frontHandX - mockGojo.x, hands.frontHandY - mockGojo.y);
+          const makimaDist = Math.hypot(fighter.x - mockGojo.x, fighter.y - mockGojo.y);
+          if (handDistFromGojo > makimaDist) {
+            throw new Error(`Gojo hand overextended past target! handDist=${handDistFromGojo.toFixed(1)}, makimaDist=${makimaDist.toFixed(1)}`);
+          }
+          if (handDistFromGojo > mockGojo.r * 2.2) {
+            throw new Error(`Gojo hand extended too far in the air! handDist=${handDistFromGojo.toFixed(1)}`);
+          }
+          if (mockGojo.punchAnimTimer > 0) mockGojo.punchAnimTimer--;
+        }
+
+        // Verify post-punch returns to body edge
+        hands = mockGojo._getHandPositions();
+        const postDist = Math.hypot(hands.frontHandX - mockGojo.x, hands.frontHandY - mockGojo.y);
+        if (postDist > mockGojo.r * 1.1) {
+          throw new Error(`Post-punch hand remained floating in air! Dist=${postDist}`);
+        }
+
+        // 8. Test Gojo RCT heal amount as percentage of maxHp
+        const expectedHeal = Math.round(mockGojo.maxHp * (CONFIG.gojo?.reverseCursedTechniqueHealPercent ?? 0.50));
+        const actualHeal = mockGojo._getRCTHealAmount();
+        if (actualHeal !== expectedHeal) {
+          throw new Error(`Expected Gojo RCT heal amount to be ${expectedHeal} (${(CONFIG.gojo?.reverseCursedTechniqueHealPercent ?? 0.50) * 100}%), got ${actualHeal}`);
+        }
+
+        // 9. Test Gojo Domain Expansion Snap Aim
+        console.log("   Testing Gojo domain snap aim in all 4 cardinal directions...");
+        mockGojo.domainActive = true;
+        mockGojo.isMeleeMode = true;
+        mockGojo.x = 200;
+        mockGojo.y = 200;
+
+        // Enemy to the Right (+X) -> aim should snap to 0 (Right)
+        fighter.x = 300; fighter.y = 200;
+        mockGojo.aim(fighter);
+        if (Math.abs(mockGojo.gunAngle - 0) > 0.001) {
+          throw new Error(`Expected Gojo domain aim Right to snap to 0, got ${mockGojo.gunAngle}`);
+        }
+
+        // Enemy to the Left (-X) -> aim should snap to Math.PI (Left)
+        fighter.x = 100; fighter.y = 200;
+        mockGojo.aim(fighter);
+        if (Math.abs(Math.abs(mockGojo.gunAngle) - Math.PI) > 0.001) {
+          throw new Error(`Expected Gojo domain aim Left to snap to Math.PI, got ${mockGojo.gunAngle}`);
+        }
+
+        // Enemy Below (+Y) -> aim should snap to Math.PI / 2 (Down)
+        fighter.x = 200; fighter.y = 300;
+        mockGojo.aim(fighter);
+        if (Math.abs(mockGojo.gunAngle - Math.PI / 2) > 0.001) {
+          throw new Error(`Expected Gojo domain aim Down to snap to Math.PI/2, got ${mockGojo.gunAngle}`);
+        }
+
+        // Enemy Above (-Y) -> aim should snap to -Math.PI / 2 (Up)
+        fighter.x = 200; fighter.y = 100;
+        mockGojo.aim(fighter);
+        if (Math.abs(mockGojo.gunAngle - (-Math.PI / 2)) > 0.001) {
+          throw new Error(`Expected Gojo domain aim Up to snap to -Math.PI/2, got ${mockGojo.gunAngle}`);
+        }
+
+        // Enemy Diagonal (+X, +Y) -> aim should snap to Math.PI / 4
+        fighter.x = 300; fighter.y = 300;
+        mockGojo.aim(fighter);
+        if (Math.abs(mockGojo.gunAngle - Math.PI / 4) > 0.001) {
+          throw new Error(`Expected Gojo domain aim Diagonal to snap to Math.PI/4, got ${mockGojo.gunAngle}`);
+        }
+
+        // Verify punch snaps gunAngle directly to enemy
+        mockGojo._meleePunch(fighter);
+        if (Math.abs(mockGojo.gunAngle - Math.PI / 4) > 0.001) {
+          throw new Error(`Expected Gojo domain punch to snap gunAngle to Math.PI/4, got ${mockGojo.gunAngle}`);
+        }
+
+        // Test Domain opening snap auto-aim
+        mockGojo.gunAngle = -Math.PI / 2;
+        mockGojo.angle = -Math.PI / 2;
+        mockGojo._activateDomain({ x: 0, y: 0, width: 800, height: 600 });
+        const expectedOpeningAngle = Math.atan2(fighter.y - mockGojo.y, fighter.x - mockGojo.x);
+        let openAngleDiff = Math.abs(mockGojo.gunAngle - expectedOpeningAngle);
+        while (openAngleDiff > Math.PI) openAngleDiff = Math.abs(openAngleDiff - Math.PI * 2);
+        if (openAngleDiff > 0.001) {
+          throw new Error(`Expected Gojo domain opening to snap aim to enemy (${expectedOpeningAngle}), got ${mockGojo.gunAngle}`);
+        }
+
+        fighter.reset();
+        state.fighters = [];
       }
 
       // CJ BAGUVIX God Mode Emerald Green Overlay & Cheat Typing Immobility Test
@@ -1921,17 +2152,24 @@ async function main() {
 
       // 9. CJ specific non-chase movement tests
       if (fType === 'cj') {
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 200;
+        fighter.y = 200;
         // Activate Jetpack mode and verify natural velocity orientation
         fighter.isJetpackActive = true;
+        fighter.jetpackTimer = 300;
+        fighter.baguvixCooldown = 1000;
+        fighter.driveByCooldown = 1000;
         fighter.speed = 8.4;
         fighter.vx = 8.4;
         fighter.vy = 0;
         dummyOpponent.x = fighter.x;
         dummyOpponent.y = fighter.y + 300; // Opponent is directly below
         fighter.update(dummyOpponent, 0, state.arena);
-        // After update in Jetpack mode, velocity should remain primarily horizontal (not forced straight down to follow opponent)
-        if (Math.abs(fighter.vx) < 5.0) {
-          throw new Error('CJ Jetpack velocity was artificially steered to chase the opponent');
+        // After update in Jetpack mode, velocity should remain horizontal (not forced straight down to follow opponent)
+        if (Math.abs(fighter.vx) < 3.0 || Math.abs(fighter.vy) > 0.5) {
+          throw new Error(`CJ Jetpack velocity was artificially steered: vx=${fighter.vx}, vy=${fighter.vy}`);
         }
         fighter.isJetpackActive = false;
       }
@@ -2196,12 +2434,25 @@ async function main() {
 
         // ── Gojo Reversal Red Straight Vertical Up and Down Constraint Tests ──
         // Test Red Case 1: Enemy straight Above Gojo (255, 100) -> Triggers Red with locked Up angle (-Math.PI / 2)
+        state.gameState = 'playing';
         fighter.reset();
         dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
         fighter.x = 250;
         fighter.y = 250;
         dummyOpponent.x = 255;
         dummyOpponent.y = 100;
+        fighter.domainCooldown = 1000;
+        fighter.domainUseCount = 2;
+        fighter.purpleCooldown = 1000;
         fighter.redCooldown = 0;
         fighter.redEffectTimer = 0;
         fighter.update(dummyOpponent, 0, state.arena);
@@ -2223,12 +2474,25 @@ async function main() {
         }
 
         // Test Red Case 2: Enemy straight Below Gojo (245, 400) -> Triggers Red with locked Down angle (Math.PI / 2)
+        state.gameState = 'playing';
         fighter.reset();
         dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
         fighter.x = 250;
         fighter.y = 250;
         dummyOpponent.x = 245;
         dummyOpponent.y = 400;
+        fighter.domainCooldown = 1000;
+        fighter.domainUseCount = 2;
+        fighter.purpleCooldown = 1000;
         fighter.redCooldown = 0;
         fighter.redEffectTimer = 0;
         fighter.update(dummyOpponent, 0, state.arena);
@@ -2243,32 +2507,130 @@ async function main() {
           throw new Error(`Expected target to be knocked DOWNWARD (vy > 0, vx = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
         }
 
-        // Test Red Case 3: Enemy diagonal / off-axis (400, 100) -> Must NOT trigger Red
+        // Test Red Case 3: Enemy straight Right of Gojo (400, 248) -> Triggers Red with locked Right angle (0)
+        state.gameState = 'playing';
         fighter.reset();
         dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 400;
+        dummyOpponent.y = 248;
+        fighter.domainCooldown = 1000;
+        fighter.domainUseCount = 2;
+        fighter.purpleCooldown = 1000;
+        fighter.redCooldown = 0;
+        fighter.redEffectTimer = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.redEffectTimer <= 0) {
+          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight to the Right');
+        }
+        if (Math.abs(fighter.redTargetAngle) > 0.001 || Math.abs(fighter.gunAngle) > 0.001) {
+          throw new Error(`Expected Red target and gun angle to be strictly RIGHT (0), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
+        }
+        fighter._detonateRed();
+        if (dummyOpponent.vx <= 0 || Math.abs(dummyOpponent.vy) > 0.001) {
+          throw new Error(`Expected target to be knocked RIGHTWARD (vx > 0, vy = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
+        }
+
+        // Test Red Case 4: Enemy straight Left of Gojo (100, 252) -> Triggers Red with locked Left angle (Math.PI)
+        state.gameState = 'playing';
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 100;
+        dummyOpponent.y = 252;
+        fighter.domainCooldown = 1000;
+        fighter.domainUseCount = 2;
+        fighter.purpleCooldown = 1000;
+        fighter.redCooldown = 0;
+        fighter.redEffectTimer = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (fighter.redEffectTimer <= 0) {
+          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight to the Left');
+        }
+        if (Math.abs(Math.abs(fighter.redTargetAngle) - Math.PI) > 0.001 || Math.abs(Math.abs(fighter.gunAngle) - Math.PI) > 0.001) {
+          throw new Error(`Expected Red target and gun angle to be strictly LEFT (Math.PI), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
+        }
+        fighter._detonateRed();
+        if (dummyOpponent.vx >= 0 || Math.abs(dummyOpponent.vy) > 0.001) {
+          throw new Error(`Expected target to be knocked LEFTWARD (vx < 0, vy = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
+        }
+
+        // Test Red Case 5: Enemy diagonal / off-axis (400, 100) -> Must NOT trigger Red
+        state.gameState = 'playing';
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
         fighter.x = 250;
         fighter.y = 250;
         dummyOpponent.x = 400;
         dummyOpponent.y = 100;
+        fighter.domainCooldown = 1000;
+        fighter.domainUseCount = 2;
+        fighter.purpleCooldown = 1000;
         fighter.redCooldown = 0;
         fighter.redEffectTimer = 0;
         fighter.update(dummyOpponent, 0, state.arena);
         if (fighter.redEffectTimer > 0) {
-          throw new Error('Gojo should NOT initiate Reversal Red when enemy is diagonal/off-axis (not aligned straight vertically)');
+          throw new Error('Gojo should NOT initiate Reversal Red when enemy is diagonal/off-axis (not aligned straight cardinally)');
         }
 
-        // Test Red Case 4: Enemy strictly horizontal (450, 250) -> Must NOT trigger Red
+        // Test Red Case 5: Gojo Red Reversal Cancellation & Audio Termination Test
         fighter.reset();
         dummyOpponent.reset();
         fighter.x = 250;
         fighter.y = 250;
-        dummyOpponent.x = 450;
-        dummyOpponent.y = 250;
+        dummyOpponent.x = 250;
+        dummyOpponent.y = 100;
         fighter.redCooldown = 0;
         fighter.redEffectTimer = 0;
-        fighter.update(dummyOpponent, 0, state.arena);
-        if (fighter.redEffectTimer > 0) {
-          throw new Error('Gojo should NOT initiate Reversal Red when enemy is strictly horizontal');
+        fighter._activateRed();
+        if (!fighter.redBuildupPhase || fighter.redEffectTimer <= 0) {
+          throw new Error('Expected Gojo to be in Red buildup phase after _activateRed()');
+        }
+        if (!fighter._hasPlayedRedChannelingSound) {
+          throw new Error('Expected _hasPlayedRedChannelingSound to be true during Red buildup');
+        }
+        // Force interrupt Red channeling
+        fighter.interruptAttacks(true);
+        if (fighter.redBuildupPhase || fighter.redEffectTimer !== 0) {
+          throw new Error('Expected redBuildupPhase and redEffectTimer to be reset on hard interrupt');
+        }
+        if (fighter._hasPlayedRedChannelingSound) {
+          throw new Error('Expected _hasPlayedRedChannelingSound to be reset to false on Red cancellation');
+        }
+        if (fighter._redChannelingSoundHandle !== null || fighter._redChargingSoundHandle !== null) {
+          throw new Error('Expected Red sound handles to be nullified and faded out on Red cancellation');
+        }
+        if (fighter.redCooldown < 270) {
+          throw new Error(`Expected penalty cooldown on interrupted Red, got ${fighter.redCooldown}`);
         }
 
         // ── Gojo Basic Attack (Lapse: Blue) Cardinal 4-Way Direction Tests ──
@@ -2842,7 +3204,8 @@ async function main() {
     }
 
     // Test Yuji Soul Swap continuous teleport-slash loop & duration persistence
-    testYuji.hp = testYuji.maxHp * 0.25; // Trigger Soul Swap
+    testYuji.maxHp = 300;
+    testYuji.hp = 75; // Trigger Soul Swap (75 <= 30% of 300)
     testYuji.hasSoulSwapped = false;
     testYuji.soulSwapActive = false;
     dummyTarget3.hp = 10000;
@@ -3281,6 +3644,10 @@ async function main() {
       testToji.hitStunTimer = 0;
       testToji.paralyzeTimer = 0;
       testToji.isGetsugaSuppressed = false;
+      testToji.makimaWallPinTimer = 0;
+      testToji.isCurrentlyWallPinnedByMakima = false;
+      testToji.isWallPinnedByMakima = false;
+      testToji._hitByGetsugaTimer = 0;
       // Fast-forward cooldown to 50 (ambushTrigger) to launch Ambush
       testToji.stealthCooldown = 50;
       testToji.update(testMakima, 0, state.arena);
@@ -3447,12 +3814,12 @@ async function main() {
 
       state.fighters = [f1, f2];
       state.gameState = 'countdown';
-      state.countdownTimer = 120; // Reaches countdown end
+      state.countdownTimer = 200; // Reaches countdown end
 
       updateGame();
 
       if (state.gameState !== 'playing') {
-        throw new Error(`Expected gameState to be 'playing' after countdownTimer reached 120, got '${state.gameState}'`);
+        throw new Error(`Expected gameState to be 'playing' after countdownTimer reached completion, got '${state.gameState}'`);
       }
 
       const spd1 = Math.hypot(f1.vx, f1.vy);
@@ -3691,6 +4058,390 @@ async function main() {
     errors++;
   }
 
+  // 6.4. Yuta Pure Love Beam Cardinal Angles & Non-Snap Aiming Test
+  console.log('💍 [Yuta Pure Love Beam Cardinal Angles Test] Verifying Pure Love Beam strictly fires along 4 cardinal directions without snap auto-aim...');
+  try {
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const yutaDef = FIGHTER_DEFS.find(d => d.id === 'yuta');
+    if (YutaClass && yutaDef) {
+      const y = new YutaClass(yutaDef);
+      y.x = 270;
+      y.y = 480;
+      state.fighters = [y];
+      state.illusions = [];
+
+      // Test 1: Cardinal calculation in 4 directions
+      const enemyRight = { x: 450, y: 480, r: 25, hp: 100, isDead: false };
+      const enemyLeft  = { x: 90,  y: 480, r: 25, hp: 100, isDead: false };
+      const enemyDown  = { x: 270, y: 700, r: 25, hp: 100, isDead: false };
+      const enemyUp    = { x: 270, y: 200, r: 25, hp: 100, isDead: false };
+
+      if (Math.abs(y._getCardinalAngle(enemyRight) - 0) > 0.001) throw new Error(`Expected Yuta cardinal Right to be 0 rad`);
+      if (Math.abs(Math.abs(y._getCardinalAngle(enemyLeft)) - Math.PI) > 0.001) throw new Error(`Expected Yuta cardinal Left to be Math.PI rad`);
+      if (Math.abs(y._getCardinalAngle(enemyDown) - (Math.PI / 2)) > 0.001) throw new Error(`Expected Yuta cardinal Down to be Math.PI/2 rad`);
+      if (Math.abs(y._getCardinalAngle(enemyUp) - (-Math.PI / 2)) > 0.001) throw new Error(`Expected Yuta cardinal Up to be -Math.PI/2 rad`);
+
+      // Test 2: Channeling locks cardinal angle and does not rotate when enemy moves
+      y.pureLoveBeamLockedAngle = 0;
+      y.gunAngle = 0;
+      y.angle = 0;
+      y.isChannelingPureLoveBeam = true;
+      y.pureLoveBeamChargeTimer = 10;
+      y.aim(enemyUp); // Attempt to aim up during channel
+      if (Math.abs(y.gunAngle - 0) > 0.001) {
+        throw new Error(`Expected Yuta gunAngle to remain locked at 0 during channel, got ${y.gunAngle}`);
+      }
+
+      // Test 3: Firing launches beam strictly along cardinal angle with no auto-aim snap
+      projectileSystem.projectiles = [];
+      y.pureLoveBeamChargeTimer = 150;
+      y.activatePureLoveBeam();
+      const beam = projectileSystem.projectiles.find(p => p && p.isPureLoveBeam);
+      if (!beam) throw new Error(`Expected Pure Love Beam projectile to spawn!`);
+      if (Math.abs(beam.angle - 0) > 0.001) throw new Error(`Expected Pure Love Beam angle to be 0 rad (Right), got ${beam.angle}`);
+      if (beam.vx <= 0 || Math.abs(beam.vy) > 0.001) throw new Error(`Expected Pure Love Beam velocity along +X axis`);
+      if (y.vx >= 0 || Math.abs(y.vy) > 0.001) throw new Error(`Expected Yuta recoil along -X axis`);
+    }
+  } catch (err) {
+    console.error('❌ [YUTA PURE LOVE BEAM CARDINAL ANGLES TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Mahoraga Adaptation vs Genos Skill Preservation Test
+  console.log('🤖 [Mahoraga vs Genos Adaptation Skills Test] Verifying wheel click adaptation does not cancel Genos skills...');
+  try {
+    const GenosClass = FIGHTER_CLASS_MAP['genos'];
+    const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
+    if (GenosClass && MahoragaClass) {
+      const genosDef = FIGHTER_DEFS.find(d => d.type === 'genos') || { type: 'genos', name: 'Genos' };
+      const mahoragaDef = FIGHTER_DEFS.find(d => d.type === 'mahoraga') || { type: 'mahoraga', name: 'Mahoraga' };
+
+      // ── Test 1: Machine Gun Blows (Flurry) Preservation During Wheel Click ──
+      const genos = new GenosClass(genosDef);
+      const mahoraga = new MahoragaClass(mahoragaDef);
+      genos.x = 200;
+      genos.y = 200;
+      mahoraga.x = 220;
+      mahoraga.y = 200;
+      state.fighters = [genos, mahoraga];
+
+      // Genos starts Machine Gun Blows
+      genos.flurryCooldown = 0;
+      genos.executeMachineGunBlows(mahoraga);
+      if (!genos.isFlurrying || genos.flurryHitsLeft <= 0) {
+        throw new Error('Genos failed to initiate Machine Gun Blows');
+      }
+
+      // Step frames and deal damage until Mahoraga adapts
+      let adaptedDuringFlurry = false;
+      for (let frame = 0; frame < 30; frame++) {
+        // Genos punches mahoraga
+        mahoraga.takeDamage(30, genos, {
+          isSkill: true,
+          isRanged: true,
+          isMachineGunBlow: true,
+          isGenosMachineBlow: true,
+          isGenosFlurry: true
+        });
+
+        if (mahoraga.adaptationPauseTimer > 0) {
+          adaptedDuringFlurry = true;
+          // While wheel adaptation is active and pause is ticking:
+          genos.update(mahoraga, 0, state.arena);
+          mahoraga.update(genos, 1, state.arena);
+
+          // Genos skills MUST NOT be cancelled!
+          if (!genos.isFlurrying) {
+            throw new Error('Genos Machine Gun Blows (isFlurrying) was cancelled during Mahoraga wheel click pause!');
+          }
+          if (genos.flurryHitsLeft <= 0) {
+            throw new Error('Genos flurryHitsLeft was reset to 0 during Mahoraga wheel click pause!');
+          }
+
+          // Step through remainder of pause
+          while (mahoraga.adaptationPauseTimer > 0) {
+            genos.update(mahoraga, 0, state.arena);
+            mahoraga.update(genos, 1, state.arena);
+          }
+
+          if (!genos.isFlurrying) {
+            throw new Error('Genos isFlurrying was cancelled after wheel pause finished!');
+          }
+          break;
+        }
+      }
+
+      if (!adaptedDuringFlurry) {
+        throw new Error('Mahoraga did not trigger adaptation during Machine Gun Blows test');
+      }
+
+      if (!mahoraga.adaptedGenosFlurry) {
+        throw new Error('Mahoraga failed to acquire adaptedGenosFlurry flag');
+      }
+
+      // Verify 50% damage reduction on adapted flurry hit
+      const testFlurryHpBefore = mahoraga.hp;
+      mahoraga.takeDamage(20, genos, {
+        isSkill: true,
+        isRanged: true,
+        isMachineGunBlow: true,
+        isGenosMachineBlow: true,
+        isGenosFlurry: true
+      });
+      const flurryDamageTaken = testFlurryHpBefore - mahoraga.hp;
+      if (flurryDamageTaken > 11) { // ~10 damage with 50% reduction + defense
+        throw new Error(`Expected ~10 damage from adapted flurry, but took ${flurryDamageTaken}`);
+      }
+
+      // ── Test 2: Spiral Incineration Cannon (Ultimate) Preservation During Wheel Click ──
+      const genos2 = new GenosClass(genosDef);
+      const mahoraga2 = new MahoragaClass(mahoragaDef);
+      genos2.x = 200;
+      genos2.y = 200;
+      mahoraga2.x = 350;
+      mahoraga2.y = 200;
+      state.fighters = [genos2, mahoraga2];
+
+      // Genos starts Ultimate charging
+      genos2.ultCooldown = 0;
+      genos2.executeSpiralIncinerationCannon(mahoraga2);
+      if (!genos2.isChargingUlt) {
+        throw new Error('Genos failed to start charging Spiral Incineration Cannon');
+      }
+
+      // Step frames and deal beam damage until Mahoraga adapts
+      let adaptedDuringBeamCharge = false;
+      for (let frame = 0; frame < 30; frame++) {
+        mahoraga2.takeDamage(30, genos2, {
+          isSkill: true,
+          isUltimate: true,
+          isGenosBeam: true,
+          isIncinerationCannon: true
+        });
+
+        if (mahoraga2.adaptationPauseTimer > 0) {
+          adaptedDuringBeamCharge = true;
+          // Run update during pause
+          genos2.update(mahoraga2, 0, state.arena);
+          mahoraga2.update(genos2, 1, state.arena);
+
+          // Ultimate MUST NOT be cancelled!
+          if (!genos2.isChargingUlt && !genos2.isFiringUlt) {
+            throw new Error('Genos Spiral Incineration Cannon was cancelled during Mahoraga wheel click pause!');
+          }
+
+          // Drain pause
+          while (mahoraga2.adaptationPauseTimer > 0) {
+            genos2.update(mahoraga2, 0, state.arena);
+            mahoraga2.update(genos2, 1, state.arena);
+          }
+
+          if (!genos2.isChargingUlt && !genos2.isFiringUlt) {
+            throw new Error('Genos Spiral Incineration Cannon was cancelled after wheel pause finished!');
+          }
+          break;
+        }
+      }
+
+      if (!adaptedDuringBeamCharge) {
+        throw new Error('Mahoraga did not trigger adaptation during Beam test');
+      }
+
+      if (!mahoraga2.adaptedGenosBeam) {
+        throw new Error('Mahoraga failed to acquire adaptedGenosBeam flag');
+      }
+
+      // Verify 50% damage reduction on adapted beam hit
+      const testBeamHpBefore = mahoraga2.hp;
+      mahoraga2.takeDamage(20, genos2, {
+        isSkill: true,
+        isUltimate: true,
+        isGenosBeam: true,
+        isIncinerationCannon: true
+      });
+      const beamDamageTaken = testBeamHpBefore - mahoraga2.hp;
+      if (beamDamageTaken > 11) {
+        throw new Error(`Expected ~10 damage from adapted beam, but took ${beamDamageTaken}`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [MAHORAGA VS GENOS ADAPTATION TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Round Skill Reset Test
+  console.log('🔄 [Round Skill Reset Test] Verifying all fighter skills and cooldowns reset cleanly on new round...');
+  try {
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'gojo');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    reinitFighters(false);
+
+    const gojo = state.fighters[0];
+    const sukuna = state.fighters[1];
+
+    // Simulate fighters expending skills & having dirty cooldowns
+    gojo.purpleCooldown = 99999;
+    gojo.redCooldown = 99999;
+    gojo.domainActive = true;
+    gojo.domainTimer = 400;
+
+    sukuna.divineFlameCooldown = 99999;
+    sukuna.cleaveCooldown = 99999;
+    sukuna.domainActive = true;
+    sukuna.domainTimer = 350;
+
+    // Trigger next round reinit
+    reinitFighters(false);
+
+    const freshGojo = state.fighters[0];
+    const freshSukuna = state.fighters[1];
+
+    if (freshGojo.purpleCooldown === 99999 || freshGojo.redCooldown === 99999 || freshGojo.domainActive) {
+      throw new Error(`Gojo skills were not reset on new round! purpleCooldown=${freshGojo.purpleCooldown}, redCooldown=${freshGojo.redCooldown}, domainActive=${freshGojo.domainActive}`);
+    }
+    if (freshSukuna.divineFlameCooldown === 99999 || freshSukuna.cleaveCooldown === 99999 || freshSukuna.domainActive) {
+      throw new Error(`Sukuna skills were not reset on new round! divineFlameCooldown=${freshSukuna.divineFlameCooldown}, cleaveCooldown=${freshSukuna.cleaveCooldown}, domainActive=${freshSukuna.domainActive}`);
+    }
+  } catch (err) {
+    console.error('❌ [ROUND SKILL RESET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // You Win Audio Tests Across All Modes
+  console.log('🏆 [You Win Audio Tests Across All Modes] Verifying youwin audio triggers properly across all game modes...');
+  try {
+    let playedSounds = [];
+    const origPlaySFX = audioSystem.playSFX;
+    audioSystem.playSFX = (src) => {
+      playedSounds.push(src);
+    };
+
+    // 1. 1v1 Mode: requires 2 wins
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'gojo');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    reinitFighters(true);
+
+    state.gameState = 'roundEnd';
+    state.matchWinner = null;
+    state.roundNum = 1;
+    state.scores = [1, 0];
+    state.roundWinner = state.fighters[0];
+    state.roundEndTimer = 10;
+    state._hasPlayedChampionYouWinVoice = false;
+
+    // Round 1 end: 1 win in 1v1 -> should NOT play youwin audio
+    playedSounds = [];
+    drawRoundEndScreen();
+    if (playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
+      throw new Error(`Played 'youwin' audio on 1 win in 1v1 mode!`);
+    }
+
+    // Round 2 end: 2 wins in 1v1 -> MUST play youwin audio
+    state.gameState = 'matchEnd';
+    state.matchWinner = state.fighters[0];
+    state.roundNum = 2;
+    state.scores = [2, 0];
+    state.roundEndTimer = 10;
+    state._hasPlayedChampionYouWinVoice = false;
+    playedSounds = [];
+    drawRoundEndScreen();
+    if (!playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
+      throw new Error(`Failed to play 'youwin' audio when fighter won 2 times in 1v1 mode!`);
+    }
+
+    // 2. Stand Off Mode: 1 round -> MUST play youwin audio on 1st win
+    state.mode = 'Stand Off';
+    state.roundNum = 1;
+    state.scores = [1, 0];
+    state.roundEndTimer = 10;
+    state.matchEndTimer = 10;
+    state.matchWinner = state.fighters[0];
+    state.roundWinner = state.fighters[0];
+    state.gameState = 'matchEnd';
+    state._hasPlayedChampionYouWinVoice = false;
+    playedSounds = [];
+    drawMatchEndScreen();
+    if (!playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
+      throw new Error(`Failed to play 'youwin' audio on match end in Stand Off mode!`);
+    }
+
+    // 3. 1v2 Stand Off Mode: 1 round -> MUST play youwin audio on match win
+    state.mode = '1v2 Stand Off';
+    state.roundNum = 1;
+    state.teamScores = [1, 0];
+    state.roundEndTimer = 10;
+    state.matchEndTimer = 10;
+    state.matchWinner = state.fighters[0];
+    state.roundWinner = state.fighters[0];
+    state.gameState = 'matchEnd';
+    state._hasPlayedChampionYouWinVoice = false;
+    playedSounds = [];
+    drawMatchEndScreen();
+    if (!playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
+      throw new Error(`Failed to play 'youwin' audio on match end in 1v2 Stand Off mode!`);
+    }
+
+    // 4. FFA Mode: 1 round -> MUST play youwin audio on match win
+    state.mode = 'FFA';
+    state.roundNum = 1;
+    state.scores = [1, 0, 0, 0];
+    state.roundEndTimer = 10;
+    state.matchEndTimer = 10;
+    state.matchWinner = state.fighters[0];
+    state.roundWinner = state.fighters[0];
+    state.ffaMatchComplete = true;
+    state.gameState = 'matchEnd';
+    state._hasPlayedChampionYouWinVoice = false;
+    playedSounds = [];
+    drawMatchEndScreen();
+    if (!playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
+      throw new Error(`Failed to play 'youwin' audio on match end in FFA mode!`);
+    }
+
+    audioSystem.playSFX = origPlaySFX;
+    reinitFighters(true);
+  } catch (err) {
+    console.error('❌ [YOU WIN AUDIO TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Gojo RCT No Sudden Teleport Test
+  console.log('⚡ [Gojo RCT Teleport Test] Verifying Gojo does not teleport when activating RCT...');
+  try {
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'gojo');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    reinitFighters(true);
+
+    const gojo = state.fighters[0];
+    const opponent = state.fighters[1];
+
+    gojo.x = 200;
+    gojo.y = 300;
+    opponent.x = 250;
+    opponent.y = 300;
+
+    gojo.reverseCursedTechniqueCooldown = 0;
+    gojo.hp = gojo.maxHp * 0.20; // Trigger threshold
+
+    gojo._activateReverseCursedTechnique(opponent, state.arena);
+
+    if (gojo.x !== 200 || gojo.y !== 300) {
+      throw new Error(`Gojo suddenly teleported on RCT! Old pos (200, 300), new pos (${gojo.x}, ${gojo.y})`);
+    }
+
+    const skills = getSkillDataForFighter(gojo);
+    const rctSkill = skills.find(s => s.id === 'rct');
+    if (!rctSkill || rctSkill.pct !== 0 || rctSkill.ready) {
+      throw new Error(`Gojo RCT skill bar did not immediately empty upon healing! pct=${rctSkill?.pct}, ready=${rctSkill?.ready}`);
+    }
+  } catch (err) {
+    console.error('❌ [GOJO RCT TELEPORT TEST ERROR]:', err);
+    errors++;
+  }
+
   // 7. Weapon Previews Canvas Stack Balance Check
   console.log('⚔️ [Weapon Preview Stack Test] Verifying all weapon graphics transform balance...');
   for (const def of allDefs) {
@@ -3710,7 +4461,19 @@ async function main() {
     { name: 'drawTitleScreen', fn: drawTitleScreen },
     { name: 'drawSelectScreen', fn: drawSelectScreen },
     { name: 'drawWeaponMenu', fn: drawWeaponMenu },
-    { name: 'drawIndexScreen', fn: drawIndexScreen }
+    { name: 'drawIndexScreen', fn: drawIndexScreen },
+    { name: 'drawRoundEndScreen', fn: () => {
+      state.roundEndTimer = 100;
+      state.roundWinner = state.fighters[0];
+      state.mode = '1v1';
+      drawRoundEndScreen();
+    }},
+    { name: 'drawMatchEndScreen', fn: () => {
+      state.matchOver = true;
+      state.matchEndTimer = 100;
+      state.mode = '1v1';
+      drawMatchEndScreen();
+    }}
   ];
 
   for (const sc of uiScreens) {

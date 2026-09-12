@@ -179,8 +179,9 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   const arena = state.arena;
   if (!arena) return;
 
-  const ax = arena.x;
-  const ay = arena.y;
+  const isLocal = Boolean(options.isLocal || (ctx.canvas && Math.abs(ctx.canvas.width - arena.width) < 2));
+  const ax = isLocal ? 0 : arena.x;
+  const ay = isLocal ? 0 : arena.y;
   const aw = arena.width;
   const ah = arena.height;
   const ww = arena.wallWidth || 4;
@@ -190,9 +191,9 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   // 1. Clip strictly inside the arena bounds
   ctx.beginPath();
   if (arena.shape === 'circle') {
-    const acx = arena.x + arena.width / 2;
-    const acy = arena.y + arena.height / 2;
-    const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+    const acx = ax + aw / 2;
+    const acy = ay + ah / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (aw / 2)) - ww;
     ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
   } else {
     ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
@@ -254,7 +255,7 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
 /**
  * Dedicated visual renderer for Rubbick's stolen Unlimited Void domain (Arcane Emerald Green)
  */
-export function renderRubbickDomainBackground(fighter, ctx, isClashSecondary = false) {
-  return renderGojoDomainBackground(fighter, ctx, isClashSecondary, { isRubbick: true, colorTheme: 'green' });
+export function renderRubbickDomainBackground(fighter, ctx, isClashSecondary = false, options = {}) {
+  return renderGojoDomainBackground(fighter, ctx, isClashSecondary, { ...options, isRubbick: true, colorTheme: 'green' });
 }
 

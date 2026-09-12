@@ -128,7 +128,7 @@ export const CONFIG = {
   arenaYOverride: null,              // Absolute Y override (px) - set to a number (e.g. 120) to skip centering
   arenaTheme: 'light',               // Arena visual theme: 'light' | 'dark'
   canvasBgColor: '#ffffffff',        // Canvas background color (hex string or hex number)
-  arenaOuterBgColor: '#fffdf1ff',    // Background color of the container area outside the arena (under HUD and sides)
+  arenaOuterBgColor: '#ffffffff',    // Background color of the container area outside the arena (under HUD and sides)
   arenaInnerBgColor: '#ffffffff',    // Background color inside the arena boundaries
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 22,              // Font size for fighter name in HUD (px)

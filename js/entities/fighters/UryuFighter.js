@@ -139,8 +139,39 @@ export class UryuFighter extends Fighter {
 
     this.combatAuraOpacity = 0.35;
     this.hideFrontHand = false;
-    this.hideBackHand = false;
     this.damageNumberColor = '#00E5FF';
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : {};
+    this.skillManager.registerSkills([
+      {
+        id: 'hirenkyaku',
+        name: 'HIRENKYAKU',
+        type: 'mobility',
+        cooldownKey: 'hirenkyakuCooldown',
+        cooldownMax: cfg.hirenkyakuCooldown || 360,
+        activeKey: 'isLichtRegenActive'
+      },
+      {
+        id: 'sprenger',
+        name: 'GINTO SPRENGER',
+        type: 'offensive',
+        cooldownKey: 'sprengerCooldown',
+        cooldownMax: cfg.sprengerCooldown || 480,
+        activeKey: 'isDeployingSprenger'
+      },
+      {
+        id: 'vollstandig',
+        name: 'VOLLSTÄNDIG',
+        type: 'ultimate',
+        cooldownKey: 'ultimateCooldown',
+        cooldownMax: cfg.ultimateCooldown || 1200,
+        activeKey: 'vollstandigActive',
+        durationKey: 'vollstandigTimer'
+      }
+    ]);
   }
 
   isStationarySkillActive() {

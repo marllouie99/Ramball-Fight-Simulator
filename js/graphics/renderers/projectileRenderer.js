@@ -1157,34 +1157,7 @@ export function drawGojoPurpleOrb(ctx, p) {
     ctx.arc(p.x, p.y, orbR * 5.5 * pulse, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Expanding/contracting energy rings (2 rings counter-rotating)
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    for (let i = 0; i < 2; i++) {
-      const ringR = orbR * (2.8 + i * 1.2) * (1.0 + Math.sin(t * 0.006 + i * Math.PI) * 0.08);
-      const rotDir = i === 0 ? 1 : -1;
-      ctx.save();
-      ctx.rotate((t * 0.003 * rotDir) + i * 1.2);
-      ctx.strokeStyle = isGreen 
-        ? `rgba(100, 255, 150, ${0.35 - i * 0.1})`
-        : `rgba(200, 100, 255, ${0.35 - i * 0.1})`;
-      ctx.beginPath();
-      ctx.arc(0, 0, ringR, 0, Math.PI * 1.4);
-      ctx.stroke();
-      ctx.strokeStyle = isGreen 
-        ? `rgba(180, 255, 200, ${0.25 - i * 0.08})`
-        : `rgba(255, 180, 255, ${0.25 - i * 0.08})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, ringR * 0.92, Math.PI * 0.3, Math.PI * 1.7);
-      ctx.stroke();
-      ctx.restore();
-    }
-    ctx.restore();
-
-    // 3. Electric lightning arcs (6 bolts radiating from orb center)
+    // 2. Electric lightning arcs (6 bolts radiating from orb center)
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.lineWidth = 1.8;

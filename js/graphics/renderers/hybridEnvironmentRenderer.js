@@ -312,18 +312,35 @@ function syncDomainHybridDataSize(data) {
   }
 }
 
+function syncGojoDomainHybridDataSize(data) {
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  const aw = Math.max(1, Math.round(arena.width || 450));
+  const ah = Math.max(1, Math.round(arena.height || 450));
+  if (data.canvas.width !== aw || data.canvas.height !== ah) {
+    data.canvas.width = aw;
+    data.canvas.height = ah;
+    if (data.texture && data.texture.baseTexture) {
+      data.texture.baseTexture.setSize(aw, ah);
+    }
+    data.texture.update();
+  }
+}
+
 let gojoDomainHybridData = null;
 function getGojoDomainHybridData() {
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  const aw = Math.max(1, Math.round(arena.width || 450));
+  const ah = Math.max(1, Math.round(arena.height || 450));
   if (!gojoDomainHybridData) {
     const canvas = document.createElement('canvas');
-    canvas.width = state.canvas ? state.canvas.width : 1920;
-    canvas.height = state.canvas ? state.canvas.height : 1080;
+    canvas.width = aw;
+    canvas.height = ah;
     const ctx = canvas.getContext('2d');
     const texture = window.PIXI.Texture.from(canvas);
     const sprite = new window.PIXI.Sprite(texture);
     gojoDomainHybridData = { canvas, ctx, texture, sprite };
   }
-  syncDomainHybridDataSize(gojoDomainHybridData);
+  syncGojoDomainHybridDataSize(gojoDomainHybridData);
   return gojoDomainHybridData;
 }
 
@@ -377,16 +394,19 @@ function getMahitoDomainHybridData() {
 let rubbickDomainHybridData = null;
 let rubbickArenaMask = null;
 function getRubbickDomainHybridData() {
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  const aw = Math.max(1, Math.round(arena.width || 450));
+  const ah = Math.max(1, Math.round(arena.height || 450));
   if (!rubbickDomainHybridData) {
     const canvas = document.createElement('canvas');
-    canvas.width = state.canvas ? state.canvas.width : 1920;
-    canvas.height = state.canvas ? state.canvas.height : 1080;
+    canvas.width = aw;
+    canvas.height = ah;
     const ctx = canvas.getContext('2d');
     const texture = window.PIXI.Texture.from(canvas);
     const sprite = new window.PIXI.Sprite(texture);
     rubbickDomainHybridData = { canvas, ctx, texture, sprite };
   }
-  syncDomainHybridDataSize(rubbickDomainHybridData);
+  syncGojoDomainHybridDataSize(rubbickDomainHybridData);
   return rubbickDomainHybridData;
 }
 
@@ -488,37 +508,22 @@ export function updateHybridEnvironment() {
   if (gojo) {
     const data = getGojoDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
-    data.sprite.x = 0;
-    data.sprite.y = 0;
-    data.sprite.width = state.canvas.width;
-    data.sprite.height = state.canvas.height;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    data.sprite.x = arena.x;
+    data.sprite.y = arena.y;
+    data.sprite.width = arena.width;
+    data.sprite.height = arena.height;
 
-    if (state.arena) {
-      if (!gojoArenaMask) {
-        gojoArenaMask = new window.PIXI.Graphics();
-        layer.addChild(gojoArenaMask);
-      }
-      gojoArenaMask.clear();
-      gojoArenaMask.beginFill(0xFFFFFF);
-      const arena = state.arena;
-      const ww = arena.wallWidth || 0;
-      if (arena.shape === 'circle') {
-        const acx = arena.x + arena.width / 2;
-        const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
-        gojoArenaMask.drawCircle(acx, acy, Math.max(0, ar));
-      } else {
-        gojoArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
-      }
-      gojoArenaMask.endFill();
-      data.sprite.mask = gojoArenaMask;
-    } else if (data.sprite.mask) {
-      data.sprite.mask = null;
+    if (gojoArenaMask && gojoArenaMask.parent) {
+      gojoArenaMask.parent.removeChild(gojoArenaMask);
+      gojoArenaMask = null;
     }
+    data.sprite.mask = null;
 
-    if (updateGojo) {
+    if (updateGojo || !gojo._gojoDomainHybridReady) {
+      gojo._gojoDomainHybridReady = true;
       data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-      renderGojoDomainBackground(gojo, data.ctx, isMultiDomain && gojo !== state.fighters.find(f => f.domainActive));
+      renderGojoDomainBackground(gojo, data.ctx, isMultiDomain && gojo !== state.fighters.find(f => f.domainActive), { isLocal: true });
       data.texture.update();
     }
   } else if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent) {
@@ -528,43 +533,34 @@ export function updateHybridEnvironment() {
     }
     gojoDomainHybridData.sprite.mask = null;
     gojoDomainHybridData.sprite.parent.removeChild(gojoDomainHybridData.sprite);
+    if (state.fighters) {
+      for (const f of state.fighters) {
+        if (f && (f.characterId === 'gojo' || f.type === 'gojo')) {
+          f._gojoDomainHybridReady = false;
+        }
+      }
+    }
   }
 
   if (rubbick) {
     const data = getRubbickDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
-    data.sprite.x = 0;
-    data.sprite.y = 0;
-    data.sprite.width = state.canvas.width;
-    data.sprite.height = state.canvas.height;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    data.sprite.x = arena.x;
+    data.sprite.y = arena.y;
+    data.sprite.width = arena.width;
+    data.sprite.height = arena.height;
 
-    if (state.arena) {
-      if (!rubbickArenaMask) {
-        rubbickArenaMask = new window.PIXI.Graphics();
-        layer.addChild(rubbickArenaMask);
-      }
-      rubbickArenaMask.clear();
-      rubbickArenaMask.beginFill(0xFFFFFF);
-      const arena = state.arena;
-      const ww = arena.wallWidth || 0;
-      if (arena.shape === 'circle') {
-        const acx = arena.x + arena.width / 2;
-        const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
-        rubbickArenaMask.drawCircle(acx, acy, Math.max(0, ar));
-      } else {
-        rubbickArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
-      }
-      rubbickArenaMask.endFill();
-      data.sprite.mask = rubbickArenaMask;
-    } else if (data.sprite.mask) {
-      data.sprite.mask = null;
+    if (rubbickArenaMask && rubbickArenaMask.parent) {
+      rubbickArenaMask.parent.removeChild(rubbickArenaMask);
+      rubbickArenaMask = null;
     }
+    data.sprite.mask = null;
 
     if (updateRubbick || !rubbick._rubbickDomainHybridReady) {
       rubbick._rubbickDomainHybridReady = true;
       data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-      renderRubbickDomainBackground(rubbick, data.ctx, isMultiDomain && rubbick !== state.fighters.find(f => f.domainActive || f.stolenDomainActive));
+      renderRubbickDomainBackground(rubbick, data.ctx, isMultiDomain && rubbick !== state.fighters.find(f => f.domainActive || f.stolenDomainActive), { isLocal: true });
       data.texture.update();
     }
   } else if (rubbickDomainHybridData && rubbickDomainHybridData.sprite.parent) {

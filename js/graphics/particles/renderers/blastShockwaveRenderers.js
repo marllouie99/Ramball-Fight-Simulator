@@ -855,7 +855,7 @@ export function drawSaitamaCounterFrontalBlast(ctx, effect) {
   const startX = effect.x;
   const startY = effect.y;
   const angle = effect.angle || 0;
-  const reach = effect.reach || 750;
+  const reach = effect.reach || (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterFrontalReach) || 1000;
   const progress = 1.0 - effect.life;
   const alpha = Math.sin(effect.life * Math.PI);
 
@@ -869,7 +869,8 @@ export function drawSaitamaCounterFrontalBlast(ctx, effect) {
   const snap = (v) => Math.round(v / P) * P;
 
   const currentReach = reach * Math.min(1.0, progress * 4.5);
-  const halfArc = 0.48;
+  const arcAngle = effect.arcAngle || (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterFrontalArc) || ((120 * Math.PI) / 180);
+  const halfArc = arcAngle / 2;
   const stepSize = P * 2;
   const numSteps = Math.ceil(currentReach / stepSize);
 
@@ -980,8 +981,8 @@ export function drawGojoRedFrontalBlast(ctx, effect) {
   const startX = effect.x;
   const startY = effect.y;
   const angle = effect.angle || 0;
-  const reach = effect.reach || 650;
-  const halfArc = 0.38;
+  const reach = effect.reach || (typeof CONFIG !== 'undefined' && (CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange)) || 650;
+  const halfArc = effect.arcAngle ? (effect.arcAngle / 2) : ((typeof CONFIG !== 'undefined' && CONFIG.gojo?.redFrontalArc) ? (CONFIG.gojo.redFrontalArc / 2) : 0.38);
   const progress = 1.0 - effect.life;
   const alpha = Math.sin(effect.life * Math.PI);
   const isGreen = effect.colorTheme === 'green' || effect.isRubbick;

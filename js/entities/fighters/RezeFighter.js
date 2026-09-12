@@ -88,6 +88,51 @@ export class RezeFighter extends Fighter {
     // Visual effect tracking
     this.activePalmBlasts = [];
     this.activeNukeBlasts = [];
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'spark_flechette',
+        name: 'Spark Flechette',
+        type: 'active',
+        cooldownKey: 'sparkCooldown',
+        cooldownMaxKey: 'sparkCooldownMax'
+      },
+      {
+        id: 'decoy_bomb',
+        name: 'Decoy Bomb',
+        type: 'active',
+        cooldownKey: 'decoyCooldown',
+        cooldownMaxKey: 'decoyCooldownMax'
+      },
+      {
+        id: 'rocket_lunge',
+        name: 'Rocket Lunge',
+        type: 'active',
+        cooldownKey: 'rocketCooldown',
+        cooldownMaxKey: 'rocketCooldownMax'
+      },
+      {
+        id: 'hybrid_mode',
+        name: 'Bomb Devil Form',
+        type: 'transformation',
+        durationKey: 'hybridModeTimer',
+        durationMaxKey: 'hybridModeMaxTimer',
+        activeKey: 'isHybridModeActive',
+        onExpire: (fighter) => {
+          fighter.isHybridModeActive = false;
+        }
+      },
+      {
+        id: 'tsar_nuke',
+        name: 'Megaton Tsar Nuke',
+        type: 'ultimate',
+        cooldownKey: 'nukeCooldown',
+        cooldownMaxKey: 'nukeCooldownMax',
+        channelingKey: 'isExecutingNuke',
+        channelTimerKey: 'nukeTimer'
+      }
+    ]);
   }
 
   reset() {
@@ -756,4 +801,11 @@ export class RezeFighter extends Fighter {
       drawRezeMegatonNuke(ctx, n);
     }
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.isHybridModeActive && this.hybridModeTimer <= 0) {
+      this.isHybridModeActive = false;
+    }
+  }
 }
+

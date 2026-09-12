@@ -560,23 +560,15 @@ export class GojoRenderer {
       };
     }
 
-    // Calculate dynamic punch reach distance directly toward enemy target
-    let reachDist = 95;
-    const target = fighter.target || (typeof fighter._findNearestEnemy === 'function' ? fighter._findNearestEnemy() : null);
-    if (target && !target.isDead) {
-      const targetDist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
-      reachDist = Math.max(55, Math.min(130, targetDist - r * 0.45));
-    }
-
     // Single front hand brawler punch stance (other hand completely removed)
     let frontHandX, frontHandY, backHandX = 0, backHandY = 0;
     hideBackHand = true; // Other hand completely removed
     hideFrontHand = false;
 
+    const baseHandX = r * 0.88;
     const isPunching = fighter.punchAnimTimer > 0;
     const idleBob = Math.sin(Date.now() * 0.007) * (r * 0.05);
 
-    let targetLunge = 0;
     if (isPunching) {
       const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || (CONFIG.gojo?.meleePunchAnimDuration || 10);
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
@@ -589,17 +581,56 @@ export class GojoRenderer {
         easePunch = Math.cos(retractT * (Math.PI / 2));
       }
 
-      targetLunge = easePunch * reachDist;
+      // Full anime brawler punch extension (matching Sukuna, Saitama, Todo: ~50px default)
+      const defaultLunge = r * 2.0;
+      let maxLunge = defaultLunge;
+
+      const target = (fighter.target && !fighter.target.isDead) 
+        ? fighter.target 
+        : (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
+
+      if (target && !target.isDead) {
+        const targetY = target.y - (target.z || 0);
+        const fighterY = fighter.y - (fighter.z || 0);
+        const dx = target.x - fighter.x;
+        const dy = targetY - fighterY;
+        const targetDist = Math.hypot(dx, dy);
+
+        // Check if target is in frontal hemisphere relative to Gojo's aim angle
+        const angleToTarget = Math.atan2(dy, dx);
+        let angleDiff = angleToTarget - angle;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+        if (Math.abs(angleDiff) < Math.PI * 0.5) {
+          const forwardDist = targetDist * Math.cos(angleDiff);
+          const targetR = target.r || r;
+          const targetNearEdge = forwardDist - targetR;
+          const gapToTarget = targetNearEdge - baseHandX;
+
+          // Deep solid punch impact into the opponent's body (+12px depth)
+          const desiredImpactReach = gapToTarget + Math.min(targetR * 0.55, 12);
+          // Ensure fist never punches out the back of the enemy
+          const maxBeforeBackExit = (forwardDist + targetR * 0.40) - baseHandX;
+          const clampedTargetReach = Math.min(maxBeforeBackExit, desiredImpactReach);
+
+          // Allow punch to dynamically extend up to r * 2.4 (~60px) to connect with target,
+          // while maintaining at least r * 1.15 (~28.75px) extension for close-quarters hits
+          maxLunge = Math.max(r * 1.15, Math.min(r * 2.4, clampedTargetReach));
+        }
+      }
+
+      const currentLunge = easePunch * maxLunge;
+      frontHandX = baseHandX + currentLunge;
+      // Slight vertical alternating punch variance based on which hand is striking
+      frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.12) * (fighter.punchAnimHand === 1 ? -1 : 1);
+    } else {
+      // Idle brawler guard stance: hand rests stably at body edge with subtle breathing bob
+      frontHandX = baseHandX + idleBob;
+      frontHandY = 0;
     }
 
-    // Continuous smooth exponential interpolation for fluid punching
-    if (fighter._smoothPunchLunge === undefined) fighter._smoothPunchLunge = 0;
-    fighter._smoothPunchLunge += (targetLunge - fighter._smoothPunchLunge) * 0.50;
-    if (Math.abs(targetLunge - fighter._smoothPunchLunge) < 0.15) fighter._smoothPunchLunge = targetLunge;
-
-    // Single Front Punch Hand: Forward edge base (r * 0.85) + dynamic punch reach
-    frontHandX = r * 0.85 + fighter._smoothPunchLunge + (isPunching ? 0 : idleBob);
-    frontHandY = 0;
+    fighter._smoothPunchLunge = 0; // Clear any residual smoothing so offset never persists into idle or teleports
 
     const fHand = toGlobal(frontHandX, frontHandY);
     const bHand = toGlobal(backHandX, backHandY);
@@ -1196,7 +1227,7 @@ export class GojoRenderer {
       ctx.globalAlpha = alpha;
 
       const coneReach = maxRange * Math.min(1.0, 0.35 + blastProg * 1.10);
-      const halfArc = 0.38; // ~44 deg total cone angle
+      const halfArc = CONFIG.gojo?.redFrontalArc ? (CONFIG.gojo.redFrontalArc / 2) : 0.38; // ~44 deg total cone angle
 
       // Pixel art grid scale
       const P = 4.0;

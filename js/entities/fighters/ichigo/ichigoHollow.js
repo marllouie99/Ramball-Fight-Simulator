@@ -189,9 +189,7 @@ export function updateHollowMask(fighter, opponent, isMatchEnded) {
 
   // 3. Hollow Mask active duration decay & shatter
   if (fighter.hollowMaskActive && !isMatchEnded) {
-    if (!fighter.isParalyzedDebuffActive()) {
-      fighter.hollowMaskTimer--;
-    }
+    fighter.hollowMaskTimer--;
 
     // Micro-spark emission during the final cracking phase
     if (fighter.hollowMaskTimer < 60 && Math.random() < 0.28) {

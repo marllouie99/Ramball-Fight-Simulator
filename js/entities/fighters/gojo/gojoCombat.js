@@ -85,9 +85,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     return false;
   }
 
-  // If Gojo is trapped inside Rubbick's stolen Unlimited Void or Purple is in flight, Limitless Infinity is disabled
+  // If Gojo is trapped inside Rubbick's stolen Unlimited Void or Purple is in flight or chained by Makima, Limitless Infinity is disabled
   const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0);
-  if (isInsideRubbickStolenVoid(fighter) || isPurpleInFlight) {
+  if (isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima) {
     fighter.infinityActive = false;
     fighter.infinityFadeOpacity = 0;
     fighter.infinityBlockTimer = 0;
@@ -116,14 +116,14 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
 
   const isDomainChanneling = fighter.isDomainPreSlide || fighter.isChannelingDomainExpansion;
   const isBreatherState = (fighter.purpleRetreatTimer || 0) > 0;
-  if (!isPurpleInFlight && (isBreatherState || isDomainChanneling)) {
+  if (!isPurpleInFlight && !fighter.isChainedByMakima && (isBreatherState || isDomainChanneling)) {
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;
     fighter.isMeleeMode = false;
   }
 
   const isInsideEnemyDomain = !fighter.domainActive && state.fighters && state.fighters.some(f => f && f !== fighter && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
-  if (isInsideEnemyDomain && !fighter.isMeleeMode && !isPurpleInFlight) {
+  if (isInsideEnemyDomain && !fighter.isMeleeMode && !isPurpleInFlight && !fighter.isChainedByMakima) {
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;
   }
@@ -171,18 +171,20 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
   fighter.infinityBlockAngle = contactAngle;
 
   // Frame rate check & shockwave cooldown guard: Prevent multiple barrier rebound rings from spamming during rapid multi-hits
+  // Track cooldown PER ATTACKER to prevent wall-pin spam (enemy pushed into wall, clamped back, re-triggers every frame)
   const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : ((typeof state !== 'undefined' && state.matchTimer !== undefined) ? state.matchTimer : Date.now());
-  const shockwaveCooldown = CONFIG.gojo?.infinityShockwaveCooldownFrames ?? 6;
+  const shockwaveCooldown = CONFIG.gojo?.infinityShockwaveCooldownFrames ?? 30;
 
   // Skip visual/audio spam inside Gojo's own domain (Unlimited Void uses paralysis, not barrier bounces) or during continuous proximity holding
-  if (!fighter.domainActive && spawnEffects) {
-    if (!fighter._lastInfinityRingFrame || (currentFrame - fighter._lastInfinityRingFrame) >= shockwaveCooldown) {
-      fighter._lastInfinityRingFrame = currentFrame;
+  if (!fighter.domainActive && spawnEffects && attacker) {
+    const lastFrame = attacker._lastInfinityRingFrame || 0;
+    if ((currentFrame - lastFrame) >= shockwaveCooldown) {
+      attacker._lastInfinityRingFrame = currentFrame;
       triggerGlobalScreenShake(3, 6);
 
       const nowSound = Date.now();
-      if (!fighter._lastInfinityCollideSoundTime || nowSound - fighter._lastInfinityCollideSoundTime >= 250) {
-        fighter._lastInfinityCollideSoundTime = nowSound;
+      if (!attacker._lastInfinityCollideSoundTime || nowSound - attacker._lastInfinityCollideSoundTime >= 500) {
+        attacker._lastInfinityCollideSoundTime = nowSound;
         const infSnd = CONFIG.gojo?.sounds?.infinityCollide || 'effect_infinity_collide';
         const infVol = CONFIG.gojo?.soundVolumes?.infinityCollide ?? 1.0;
         audioSystem.playSFX(infSnd, infVol);
@@ -202,6 +204,12 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
   }
 
   if (attacker && attacker !== fighter) {
+    // If Gojo is channeling Red or Domain Expansion, do NOT apply CC, slow, attack interruption, or velocity dampening to enemies
+    const isGojoChanneling = fighter.isDomainPreSlide || fighter.isChannelingDomainExpansion || (fighter.domainChargeTimer > 0) || fighter.redBuildupPhase || (fighter.redEffectTimer || 0) > 0;
+    if (isGojoChanneling) {
+      return false;
+    }
+
     // Attackers actively channeling Telekinesis have supreme hyper-armor — bypasses Infinity block & interrupts completely
     if (attacker.tkTimer > 0 || attacker.tkTarget) {
       return false;
@@ -287,12 +295,11 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     
     const nx = dx / dist;
     const ny = dy / dist;
-    const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
 
     // Inside Gojo's own domain: no physical pushback (Unlimited Void uses time-stop paralysis instead)
     if (!fighter.domainActive) {
-      // Apply movement slow on Limitless Infinity barrier collision without pushing the enemy back
+      // Apply movement slow on Limitless Infinity barrier collision
       const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 20;
       const slowMult = CONFIG.gojo?.infinitySlowMinMultiplier ?? CONFIG.gojo?.infinitySlowMultiplier ?? 0.35;
       if (typeof attacker.applySlow === 'function') {
@@ -302,10 +309,41 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
         attacker.slowMultiplier = Math.min(attacker.slowMultiplier || 1.0, slowMult);
       }
 
-      // Smoothly dampen attacker's velocity so they slow to a crawl on the barrier instead of being flung back
-      if (attacker.vx !== 0 || attacker.vy !== 0) {
-        attacker.vx *= 0.70;
-        attacker.vy *= 0.70;
+      // Rebound bounce: push attacker outward away from Gojo's Infinity barrier
+      const attR = attacker.hitRadius || attacker.r || 25;
+      const pushDist = barrierRadius + attR + 2;
+      const newX = fighter.x + nx * pushDist;
+      const newY = (fighter.y - (fighter.z || 0)) + ny * pushDist;
+
+      // Detect wall-pin: if arena clamp would move the attacker back inside the barrier, they're pinned
+      let clampedX = newX;
+      let clampedY = newY;
+      if (arena) {
+        const er = attacker.r || 25;
+        clampedX = Math.max(arena.x + er, Math.min(arena.x + arena.width - er, newX));
+        clampedY = Math.max(arena.y + er, Math.min(arena.y + arena.height - er, newY));
+      }
+      attacker.x = clampedX;
+      attacker.y = clampedY;
+
+      // Only apply full bounce velocity if NOT wall-pinned; if pinned, just zero velocity to prevent jitter
+      const wasClamped = (clampedX !== newX || clampedY !== newY);
+      if (wasClamped) {
+        // Wall-pinned: kill velocity to prevent jitter, slow holds them in place
+        attacker.vx = 0;
+        attacker.vy = 0;
+        if (attacker.knockbackVx !== undefined) {
+          attacker.knockbackVx = 0;
+          attacker.knockbackVy = 0;
+        }
+      } else {
+        const bounceForce = CONFIG.gojo?.infinityBounceForce ?? 12;
+        attacker.vx = nx * bounceForce;
+        attacker.vy = ny * bounceForce;
+        if (attacker.knockbackVx !== undefined) {
+          attacker.knockbackVx = nx * bounceForce;
+          attacker.knockbackVy = ny * bounceForce;
+        }
       }
     }
   }

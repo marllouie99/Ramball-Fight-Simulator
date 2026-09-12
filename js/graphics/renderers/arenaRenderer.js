@@ -455,9 +455,9 @@ export function drawArena() {
     };
 
     const isDark = (state.arenaTheme === 'dark');
-    const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#000000'));
-    const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
-    const innerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff'));
+    const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#ffffffff'));
+    const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff'));
+    const innerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff'));
 
     g.beginFill(canvasBg.color, canvasBg.alpha);
     g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
@@ -530,7 +530,7 @@ export function drawArena() {
     if (!hasActiveDomain) {
       ctx.save();
       applyCameraToCtx(ctx);
-      ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff');
+      ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff');
       if (arena.shape === 'circle') {
         const cx = arena.x + arena.width / 2;
         const cy = arena.y + arena.height / 2;

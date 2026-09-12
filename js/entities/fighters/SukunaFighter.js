@@ -81,6 +81,47 @@ export class SukunaFighter extends Fighter {
     this.critChance = CONFIG.sukuna?.baseCritChance || 0.25;
     this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 0.25;
     this.damageNumberColor = '#ff4455';
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    this.skillManager.registerSkills([
+      {
+        id: 'ms',
+        name: 'MALEVOLENT SHRINE',
+        type: 'domain',
+        cooldownKey: 'domainCooldown',
+        cooldownMax: CONFIG.sukuna?.domainCooldown ?? 1000,
+        durationKey: 'domainTimer',
+        durationMax: CONFIG.sukuna?.domainDuration || 500,
+        activeKey: 'domainActive',
+        channelingKey: 'isChannelingDomainExpansion',
+        isDomain: true,
+        allowFrozenTick: true,
+        allowsFrozenCooldownTick: true,
+        onExpire: () => {
+          clearDomainSlashLines();
+        }
+      },
+      {
+        id: 'fuga',
+        name: 'FUGA (FURNACE)',
+        type: 'offensive',
+        cooldownKey: 'divineFlameCooldown',
+        cooldownMax: CONFIG.sukuna?.divineFlameCooldown || 1500,
+        channelingKey: 'isChannelingDivineFlame',
+        channelTimerKey: 'divineFlameChargeTimer',
+        channelMaxKey: 'divineFlameChargeMax'
+      },
+      {
+        id: 'rct',
+        name: 'RCT',
+        type: 'healing',
+        cooldownKey: 'reverseCursedTechniqueCooldown',
+        cooldownMax: CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700,
+        allowsFrozenCooldownTick: true
+      }
+    ]);
   }
 
   isStationarySkillActive() {
@@ -323,7 +364,9 @@ export class SukunaFighter extends Fighter {
 
     // If getting meleed or hit up close, force switch into Melee Mode to punch back (only when not channeling skills)
     const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 85;
-    if (!isChannelingSkill && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
+    const isAttackerChannelingGojo = attacker && (attacker.characterId === 'gojo' || attacker.type === 'gojo' || attacker._def?.id === 'gojo' || attacker._def?.type === 'gojo') &&
+      (attacker.redBuildupPhase || (attacker.redEffectTimer || 0) > 0 || attacker.isDomainPreSlide || attacker.isChannelingDomainExpansion || (attacker.domainChargeTimer || 0) > 0);
+    if (!isChannelingSkill && !isAttackerChannelingGojo && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
       if (!this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0) {
         this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
         this.isMeleeMode = true;
@@ -443,7 +486,9 @@ export class SukunaFighter extends Fighter {
     // Malevolent Shrine continues to progress its duration timer and tick slashes/damage
     // even if Sukuna is afflicted with a paralyze debuff effect (Purple, Pure Love Beam, Getsuga Tensho, etc.), electric stun, or is in stasis!
     if (this.domainActive) {
-      this.domainTimer--;
+      if (!this.skillManager || (!this.skillManager.hasSkill('ms') && !this.skillManager.hasSkill('domain'))) {
+        this.domainTimer--;
+      }
       if (this.domainTimer <= 0) {
         this.domainActive = false;
         clearDomainSlashLines();
@@ -869,7 +914,10 @@ export class SukunaFighter extends Fighter {
         const d = Math.hypot(f.x - this.x, f.y - this.y);
         if (d < closestEnemyDist) closestEnemyDist = d;
 
-        if (d <= closeRangeRadius) {
+        const isGojoChanneling = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') &&
+          (f.redBuildupPhase || (f.redEffectTimer || 0) > 0 || f.isDomainPreSlide || f.isChannelingDomainExpansion || (f.domainChargeTimer || 0) > 0);
+
+        if (d <= closeRangeRadius && !isGojoChanneling) {
           isBeingMeleed = true;
         }
       }

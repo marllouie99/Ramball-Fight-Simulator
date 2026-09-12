@@ -73,6 +73,36 @@ export class SaitamaFighter extends Fighter {
     this.isChargingSeriousPunch = false;
     this.seriousPunchChargeTimer = 0;
     this.seriousPunchWindupMax = CONFIG.saitama?.seriousPunchWindupFrames || 90;
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    this.skillManager.registerSkills([
+      {
+        id: 'serious_punch',
+        name: 'SERIOUS PUNCH',
+        type: 'ultimate',
+        cooldownKey: 'seriousPunchCooldown',
+        cooldownMax: CONFIG.saitama?.seriousPunchCooldown || 1800,
+        channelingKey: 'isChargingSeriousPunch'
+      },
+      {
+        id: 'flurry',
+        name: 'CONSECUTIVE NORMAL PUNCHES',
+        type: 'offensive',
+        cooldownKey: 'flurryCooldown',
+        cooldownMax: CONFIG.saitama?.flurryCooldown || 540,
+        activeKey: 'isFlurrying'
+      },
+      {
+        id: 'side_hops',
+        name: 'OMNI-DIRECTIONAL SIDE HOPS',
+        type: 'mobility',
+        cooldownKey: 'sideHopsCooldown',
+        cooldownMax: CONFIG.saitama?.sideHopsCooldown || 600,
+        activeKey: 'isSideHopping'
+      }
+    ]);
   }
 
   /**
@@ -307,12 +337,7 @@ export class SaitamaFighter extends Fighter {
       return true;
     }
 
-    // 3. Caught in or within suction field of Gojo's Hollow Purple
-    if (this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0)) {
-      return true;
-    }
-
-    // 4. Check active projectiles for gravitational / suction / pull fields
+    // 3. Check active projectiles for gravitational / suction / pull fields
     if (typeof state !== 'undefined' && state.projectiles) {
       const myTeam = (typeof state.getFighterTeam === 'function' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
 
@@ -670,8 +695,8 @@ export class SaitamaFighter extends Fighter {
     if (this.skillPunishCooldown > 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
     const isNanamiPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
-    if (this.timeStopTimer > 0 || isNanamiPausing || isGetsugaSuppressed || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
+    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this)));
+    if (this.timeStopTimer > 0 || isNanamiPausing || isGetsugaSuppressed || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
 
     // Check team alignment in 2v2/team modes ONLY.
     // getFighterTeam returns null in 1v1/FFA — null===null would falsely match as teammates, so guard with myTeam !== null.
@@ -936,8 +961,8 @@ export class SaitamaFighter extends Fighter {
       const fistX = this.x + Math.cos(pushAngle) * (this.r + 15);
       const fistY = this.y + Math.sin(pushAngle) * (this.r + 15);
 
-      const frontalReach = CONFIG.saitama?.counterFrontalReach || 750;
-      const frontalArc = CONFIG.saitama?.counterFrontalArc || (Math.PI * 0.75); // 135-degree wide frontal cone
+      const frontalReach = CONFIG.saitama?.counterFrontalReach ?? 1000;
+      const frontalArc = CONFIG.saitama?.counterFrontalArc ?? ((120 * Math.PI) / 180); // 120-degree wide frontal cone
       const halfArc = frontalArc / 2;
       const punchReach = this.r + (target?.r || 20) + (CONFIG.saitama?.punchReach || 90);
       const knockbackForce = CONFIG.saitama?.counterPunchKnockback || 55;
@@ -1097,7 +1122,7 @@ export class SaitamaFighter extends Fighter {
 
       // Visual: Spawn Wide Long Frontal Supersonic Shockwave Blast (Death Punch Canyon)
       if (typeof spawnSaitamaCounterFrontalBlast === 'function') {
-        spawnSaitamaCounterFrontalBlast(fistX, fistY, pushAngle, frontalReach, frontalArc);
+        spawnSaitamaCounterFrontalBlast(this.x, this.y, pushAngle, frontalReach, frontalArc);
       }
 
       // Screen Shake & Sakuga Impact FX
@@ -1147,8 +1172,8 @@ export class SaitamaFighter extends Fighter {
     if (!this.isConsecutivePunchesEnabled()) return false;
     if (this.hp <= 0 || this.flurryCooldown > 0 || !opponent || opponent.hp <= 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
-    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
-    if (this.timeStopTimer > 0 || isGetsugaSuppressed || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
+    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this)));
+    if (this.timeStopTimer > 0 || isGetsugaSuppressed || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
 
     // Check team alignment
     if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
@@ -1254,10 +1279,6 @@ export class SaitamaFighter extends Fighter {
 
   _decrementSkillCooldowns() {
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
-
-    const isInsideGojoDomain = this._isInsideGojoDomain();
-    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
-    if (isInsideGojoDomain || isGetsugaSuppressed || (typeof this.isParalyzedDebuffActive === 'function' && this.isParalyzedDebuffActive())) return; // Offensive skills frozen while paralyzed, inside Unlimited Void, or caught in Getsuga Tensho!
 
     if (this.skillPunishCooldown > 0) this.skillPunishCooldown--;
     if (this.flurryCooldown > 0) this.flurryCooldown--;
@@ -1759,7 +1780,7 @@ export class SaitamaFighter extends Fighter {
       this.interruptAttacks(true);
     }
 
-    if ((isFrozen || isGetsugaSuppressed || this.isTargetOfAmbush || isNanamiRatioPausing || (this.purpleHitTimer && this.purpleHitTimer > 0) || isBeingPulled || isInsideGojoDomain) && !this.isCountering) {
+    if ((isFrozen || isGetsugaSuppressed || this.isTargetOfAmbush || isNanamiRatioPausing || isBeingPulled || isInsideGojoDomain) && !this.isCountering) {
       this.interruptAttacks();
       return; // MANDATORY: Stop update execution so fighter is completely frozen/paused/pulled!
     }

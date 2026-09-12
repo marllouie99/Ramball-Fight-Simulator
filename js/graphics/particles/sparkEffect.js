@@ -1564,10 +1564,10 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
  * @param {number} x - Origin X (fist position)
  * @param {number} y - Origin Y (fist position)
  * @param {number} angle - Facing/Punch trajectory angle in radians
- * @param {number} reach - Length of the frontal shockwave (default 750px)
- * @param {number} arcAngle - Wide frontal cone angle in radians (default 135 deg)
+ * @param {number} reach - Length of the frontal shockwave (default 1000px)
+ * @param {number} arcAngle - Wide frontal cone angle in radians (default 120 deg)
  */
-export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 750, arcAngle = Math.PI * 0.75) {
+export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 1000, arcAngle = (120 * Math.PI) / 180) {
   const blast = ParticleSystem.getParticle();
   blast.x = x;
   blast.y = y;
@@ -1622,19 +1622,21 @@ export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 750, ar
  * @param {number} y - Origin Y
  * @param {number} angle - Facing/Blast trajectory angle in radians
  * @param {number} reach - Length of the frontal corridor (default 650px)
- * @param {number} arcAngle - Frontal cone angle in radians (default ~80 deg)
+ * @param {number} arcAngle - Frontal cone angle in radians (default 0.76 rad / ~44 deg)
  */
-export function spawnGojoRedFrontalBlast(x, y, angle = 0, reach = 650, arcAngle = Math.PI * 0.45, opts = {}) {
+export function spawnGojoRedFrontalBlast(x, y, angle = 0, reach = 650, arcAngle = 0.76, opts = {}) {
+  const finalReach = reach || (typeof CONFIG !== 'undefined' && (CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange)) || 650;
+  const finalArc = arcAngle || (typeof CONFIG !== 'undefined' && CONFIG.gojo?.redFrontalArc) || 0.76;
   const blast = ParticleSystem.getParticle();
   blast.x = x;
   blast.y = y;
   blast.vx = 0;
   blast.vy = 0;
-  blast.size = reach;
-  blast.targetSize = reach;
+  blast.size = finalReach;
+  blast.targetSize = finalReach;
   blast.angle = angle;
-  blast.reach = reach;
-  blast.arcAngle = arcAngle;
+  blast.reach = finalReach;
+  blast.arcAngle = finalArc;
   blast.life = 1.0;
   blast.decay = 0.040; // ~25 frames duration
   blast.friction = 1.0;

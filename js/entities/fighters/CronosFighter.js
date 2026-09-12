@@ -92,6 +92,43 @@ export class CronosFighter extends Fighter {
     this.meleeSwingDirection = -1; // -1 so first strike flips to 1 (top-to-bottom downward slash)
     this.doubleStrikeTimer = 0;
     this.attackSlashEffects = [];
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'time_sphere',
+        name: 'Time Stop Sphere',
+        type: 'mode',
+        cooldownKey: 'sphereCooldown',
+        cooldownMax: () => CONFIG.cronos.sphereCooldown,
+        durationKey: 'sphereTimer',
+        durationMax: () => CONFIG.cronos.sphereDuration,
+        activeKey: 'sphereActive',
+        onExpire: (fighter) => {
+          if (typeof state !== 'undefined' && state.fighters) {
+            for (const other of state.fighters) {
+              if (other && other !== fighter && other.hp > 0 && other.timeStopTimer > 0) {
+                if (other._frozenByCronosSphere) {
+                  other.timeStopTimer = 0;
+                  if (typeof other._resumeVx === 'number') other.vx = other._resumeVx;
+                  if (typeof other._resumeVy === 'number') other.vy = other._resumeVy;
+                  delete other._resumeVx;
+                  delete other._resumeVy;
+                  delete other._frozenByCronosSphere;
+                }
+                delete other._suppressFreezeTimer;
+              }
+            }
+          }
+          if (typeof projectileSystem !== 'undefined' && typeof projectileSystem.restoreFrozenProjectiles === 'function') {
+            const ownerIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(fighter) : -1;
+            projectileSystem.restoreFrozenProjectiles(ownerIndex);
+          }
+          fighter.sphereActive = false;
+          fighter.speed = fighter.baseSpeed;
+        }
+      }
+    ]);
   }
 
   reset() {
@@ -1324,4 +1361,32 @@ export class CronosFighter extends Fighter {
 
     super.draw(ctx);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.sphereActive && this.sphereTimer <= 0) {
+      if (typeof state !== 'undefined' && state.fighters) {
+        for (const fighter of state.fighters) {
+          if (fighter && fighter !== this && fighter.hp > 0 && fighter.timeStopTimer > 0) {
+            if (fighter._frozenByCronosSphere) {
+              fighter.timeStopTimer = 0;
+              if (typeof fighter._resumeVx === 'number') fighter.vx = fighter._resumeVx;
+              if (typeof fighter._resumeVy === 'number') fighter.vy = fighter._resumeVy;
+              delete fighter._resumeVx;
+              delete fighter._resumeVy;
+              delete fighter._frozenByCronosSphere;
+            }
+            delete fighter._suppressFreezeTimer;
+          }
+        }
+      }
+
+      if (typeof projectileSystem !== 'undefined' && typeof projectileSystem.restoreFrozenProjectiles === 'function') {
+        const ownerIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+        projectileSystem.restoreFrozenProjectiles(ownerIndex);
+      }
+      this.sphereActive = false;
+      this.speed = this.baseSpeed;
+    }
+  }
 }
+

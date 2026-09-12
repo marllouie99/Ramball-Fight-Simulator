@@ -11,8 +11,9 @@ import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { startNextRound, restartCurrentRound, resetMatch, randomize1v1Fighters, randomize1v2Fighters, goToTitle } from '../../core/gameFlow.js';
-import { MODE_SETTINGS, GAME_MODES } from '../../core/modeConfig.js';
 import { stopArenaBgm } from '../../systems/arenaBgmSystem.js';
+import { getAnnouncerSound } from '../../soundEffects/announcerSounds.js';
+import { GAME_MODES, MODE_SETTINGS } from '../../core/modeConfig.js';
 
 // ──────────────────────────────────────────
 // COLOR & MATH UTILITIES
@@ -359,8 +360,9 @@ function drawFollowForMoreBanner(ctx, cx, cy, timer) {
   // Play Announcer bell sound when text pops out (frame 122)
   if (!state._hasPlayedFollowForMoreSfx) {
     state._hasPlayedFollowForMoreSfx = true;
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+    const bell = getAnnouncerSound('bell');
+    if (bell && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
     }
   }
 
@@ -391,15 +393,36 @@ function drawFollowForMoreBanner(ctx, cx, cy, timer) {
 
 // ─────────────────────────────────────────────
 // SIMPLE IN-ARENA TACTICAL WINNER OVERLAY
-// (Clean In-Arena Text: e.g. "M4A1 Wins!")
+// (Clean In-Arena Text: e.g. "M4A1 WINS!")
 // ─────────────────────────────────────────────
 
-function drawTacticalWinnerOverlay(ctx, winner, timer, mode) {
+function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const arena = state.arena || { x: 50, y: 150, width: 440, height: 680 };
   const arenaX = arena ? arena.x : 0;
   const arenaY = arena ? arena.y : 0;
   const arenaW = arena ? arena.width : state.canvas.width;
   const arenaH = arena ? arena.height : state.canvas.height;
+
+  // Resolve winner entity or team
+  const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
+  const winnerIndex = effectiveWinner ? (state.fighters ? state.fighters.indexOf(effectiveWinner) : -1) : -1;
+  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
+  const isTeamMode = is1v2 || is2v2;
+
+  let winCount = 0;
+  if (isTeamMode) {
+    const winningTeam = (winnerIndex >= 0 && typeof state.getFighterTeam === 'function')
+      ? state.getFighterTeam(winnerIndex)
+      : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
+    winCount = (winningTeam !== null && state.teamScores) ? (state.teamScores[winningTeam] || 0) : 0;
+  } else if (winnerIndex >= 0 && state.scores) {
+    winCount = state.scores[winnerIndex] || 0;
+  }
+
+  const modeRounds = MODE_SETTINGS[mode]?.rounds || (mode === '1v1' ? 3 : 1);
+  const winThreshold = modeRounds === 1 ? 1 : (mode === '1v1' ? 2 : Math.ceil(modeRounds / 2));
+  const isFinalMatchWin = Boolean(isMatchEnd || (winCount >= winThreshold) || state.gameState === 'matchEnd' || state.matchWinner);
 
   // 0. Snap Cut Arena BGM & Play Winner Announcer Audio (Frame 1)
   if (timer > 0) {
@@ -407,23 +430,23 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode) {
   }
   if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
     state._hasPlayedChampionYouWinVoice = true;
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3', 1.0);
+    if (isFinalMatchWin && effectiveWinner) {
+      const youwin = getAnnouncerSound('youwin');
+      if (youwin && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX(youwin.src, youwin.volume, youwin.speed, youwin.offset || 0);
+      }
     }
   }
 
   const centerX = arenaX + arenaW / 2;
-  const centerY = arenaY + arenaH * 0.48;
+  const centerY = arenaY + arenaH * 0.46;
 
-  // Resolve winner entity or team
-  const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
-  
-  let winText = 'Round Draw!';
+  let winText = 'ROUND DRAW!';
   let themeColor = '#ffffff';
 
   if (effectiveWinner) {
-    const rawName = effectiveWinner.name || effectiveWinner._def?.name || 'Operative';
-    winText = `${rawName} Wins!`;
+    const rawName = (effectiveWinner.name || effectiveWinner._def?.name || 'OPERATIVE').toUpperCase();
+    winText = `${rawName} WINS!`;
     themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#ffffff';
   }
 
@@ -440,17 +463,118 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  const isDarkTac = (state.arenaTheme === 'dark');
-  ctx.font = isDarkTac ? '700 24px "Silkscreen", "Press Start 2P", monospace' : '900 36px "Outfit", "Segoe UI", Arial, sans-serif';
+  const retroFontFamily = '"Silkscreen", "Press Start 2P", monospace, sans-serif';
+  const maxAllowedWidth = Math.min(arenaW * 0.88, 440);
+  let baseFontSize = 26;
+
+  ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
+  let textWidth = ctx.measureText(winText).width;
+  if (textWidth > maxAllowedWidth) {
+    baseFontSize = Math.max(15, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
+    ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
+  }
 
   // Thick dark stroke for high readability against map floor
   ctx.lineWidth = 6;
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+  ctx.strokeStyle = '#000000';
+  ctx.lineJoin = 'round';
   ctx.strokeText(winText, 0, 0);
 
   // Vibrant theme fill
   ctx.fillStyle = themeColor;
   ctx.fillText(winText, 0, 0);
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+// SIMPLE IN-ARENA WINNER OVERLAY
+// (Clean In-Arena Text: e.g. "GOJO WINS!" / "ROUND 1" in 1v1 mode, "FIGHTER WINS!" only in other modes)
+// ─────────────────────────────────────────────
+
+function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
+  const arena = state.arena || { x: 50, y: 150, width: 440, height: 680 };
+  const arenaX = arena ? arena.x : 0;
+  const arenaY = arena ? arena.y : 0;
+  const arenaW = arena ? arena.width : state.canvas.width;
+  const arenaH = arena ? arena.height : state.canvas.height;
+
+  const centerX = arenaX + arenaW / 2;
+  const centerY = arenaY + arenaH * 0.46;
+
+  const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
+  const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
+
+  const is1v1 = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || !mode);
+  const showSubText = is1v1;
+
+  const roundNum = state.roundNum || 1;
+
+  let mainText = 'ROUND DRAW!';
+  let subText = isMatchEnd ? 'FINAL ROUND' : (roundNum === 2 ? 'ROUND 2' : (roundNum >= 3 ? 'FINAL ROUND' : 'ROUND 1'));
+  let themeColor = '#FFD700';
+
+  if (!isDraw && effectiveWinner) {
+    const rawName = (effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase();
+    mainText = `${rawName} WINS!`;
+    themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#00E5FF';
+  }
+
+  // Smooth entrance scale & alpha
+  const animProgress = Math.min(1.0, timer / 14);
+  const alpha = animProgress;
+  const scale = 0.90 + 0.10 * easeOutBack(animProgress);
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.scale(scale, scale);
+  ctx.globalAlpha = alpha;
+
+  const isDark = (state.arenaTheme === 'dark');
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Dynamic font sizing
+  const maxAllowedWidth = Math.min(arenaW * 0.88, 440);
+  let baseFontSize = 26;
+  const retroFontFamily = '"Silkscreen", "Press Start 2P", monospace, sans-serif';
+
+  ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
+  let textWidth = ctx.measureText(mainText).width;
+  if (textWidth > maxAllowedWidth) {
+    baseFontSize = Math.max(15, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
+    ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
+  }
+
+  const mainY = showSubText ? -12 : 0;
+  const subY = 22;
+
+  // Main winner text - Heavy black outline for maximum contrast
+  ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(mainText, 0, mainY);
+
+  // Vibrant fill
+  ctx.fillStyle = themeColor;
+  ctx.fillText(mainText, 0, mainY);
+
+  // Subtitle / Round tag text - only in 1v1 multi-round mode
+  if (showSubText) {
+    const subFontSize = 13;
+    ctx.font = `700 ${subFontSize}px ${retroFontFamily}`;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(subText, 0, subY);
+
+    const isFinal = isMatchEnd || roundNum >= 3;
+    const subColor = isFinal ? '#FF4D4D' : (isDark ? '#E2E8F0' : '#FFFFFF');
+    ctx.fillStyle = subColor;
+    ctx.fillText(subText, 0, subY);
+  }
 
   ctx.restore();
 }
@@ -470,7 +594,7 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
   // Tactical Mode Override: simple in-arena overlay text without champion layout
   const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
   if (isTactical) {
-    drawTacticalWinnerOverlay(ctx, winner, timer, mode);
+    drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd);
     return;
   }
 
@@ -479,12 +603,39 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     stopArenaBgm(true);
   }
   const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
+  const winnerIndex = winner ? (state.fighters ? state.fighters.indexOf(winner) : -1) : -1;
+  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
+  const isTeamMode = is1v2 || is2v2;
+
+  let winCount = 0;
+  if (isTeamMode) {
+    const winningTeam = (winnerIndex >= 0 && typeof state.getFighterTeam === 'function')
+      ? state.getFighterTeam(winnerIndex)
+      : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
+    winCount = (winningTeam !== null && state.teamScores) ? (state.teamScores[winningTeam] || 0) : 0;
+  } else if (winnerIndex >= 0 && state.scores) {
+    winCount = state.scores[winnerIndex] || 0;
+  }
+
+  const modeRounds = MODE_SETTINGS[mode]?.rounds || (mode === '1v1' ? 3 : 1);
+  const winThreshold = modeRounds === 1 ? 1 : (mode === '1v1' ? 2 : Math.ceil(modeRounds / 2));
+  const isFinalMatchWin = Boolean(isMatchEnd || (winCount >= winThreshold) || state.gameState === 'matchEnd' || state.matchWinner);
+
   if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
     state._hasPlayedChampionYouWinVoice = true;
-    if (!isDraw && winner && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3', 1.0);
-    } else if (isDraw && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+    if (!isDraw && winner) {
+      if (isFinalMatchWin) {
+        const youwin = getAnnouncerSound('youwin');
+        if (youwin && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX(youwin.src, youwin.volume, youwin.speed, youwin.offset || 0);
+        }
+      }
+    } else if (isDraw) {
+      const bell = getAnnouncerSound('bell');
+      if (bell && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
+      }
     }
   }
 
@@ -529,8 +680,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     return;
   }
 
-  // 0b. Play Champion Victory Voiceline of the winning fighter strictly AFTER the SF2 "YOU WIN!" announcer finishes (Frame 68)
-  if (!state._hasPlayedChampionVictoryVoice && timer >= 68) {
+  // 0b. Play Champion Victory Voiceline strictly when match is won AFTER announcer finishes (Frame 68)
+  if (!state._hasPlayedChampionVictoryVoice && timer >= 68 && isFinalMatchWin) {
     state._hasPlayedChampionVictoryVoice = true;
 
     const isTodo = winner && (winner.characterId === 'todo' || winner.type === 'todo' || winner._def?.id === 'todo');
@@ -563,181 +714,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     }
   }
 
-  // Champion layout visuals are completely removed in all modes; only the announcer & victory audio play!
-  return;
-
-  // 1. Smoothly Darken the Arena & Full Canvas (Deep Dark Victory Backdrop)
-  const fadeAlpha = Math.min(1.0, timer / 30);
-  ctx.save();
-  ctx.fillStyle = `rgba(3, 4, 6, ${0.90 * fadeAlpha})`;
-  ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
-  ctx.restore();
-
-  // Detect winning team members for team modes (1v2 Stand Off or 2v2)
-  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
-  const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO);
-  const isTeamMode = is1v2 || is2v2;
-
-  const winnerIndex = state.fighters ? state.fighters.indexOf(winner) : -1;
-  let winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : null;
-  if (winningTeam === null && isTeamMode) {
-    winningTeam = state.teamScores[0] >= state.teamScores[1] ? 0 : 1;
-  }
-  let winningFighters = winner ? [winner] : [];
-
-  if (winningTeam !== null && isTeamMode) {
-    const teamMembers = state.fighters.filter((f, idx) => f && state.getFighterTeam(idx) === winningTeam);
-    if (teamMembers.length > 0) {
-      winningFighters = teamMembers;
-    }
-  }
-
-  const isMultiWinner = winningFighters.length > 1;
-  const primaryThemeColor = winner?.color || winningFighters[0]?.color || '#38bdf8';
-
-  // 2. Left Hero Zone (Fighter Glides Smoothly into Left Side)
-  const targetHeroX = arenaX + arenaW * 0.22;
-  const targetHeroY = arenaY + arenaH * 0.50;
-  const targetScale = isMultiWinner ? 1.05 : 1.35;
-
-  // Store start positions snapshot at the moment of death
-  if (!state._winnerStartPositions || state._winnerStartPositionsTimerReset !== isMatchEnd) {
-    state._winnerStartPositions = winningFighters.map(f => ({
-      x: f.x || targetHeroX,
-      y: f.y || targetHeroY,
-      gunAngle: f.gunAngle || 0
-    }));
-    state._winnerStartPositionsTimerReset = isMatchEnd;
-  }
-
-  // Smooth Glide Animation Curve (easeOutCubic)
-  const glideProgress = Math.min(1.0, timer / 42);
-  const glideEase = 1 - Math.pow(1 - glideProgress, 3);
-  const glowProgress = Math.min(1.0, Math.max(0.0, (timer - 8) / 30));
-
-  winningFighters.forEach((wFighter, idx) => {
-    const def = wFighter._def || FIGHTER_DEFS.find(d => d.id === wFighter._def?.id || d.id === wFighter.characterId || d.type === wFighter.type || d.id === wFighter.id || d.name === wFighter.name) || wFighter;
-    if (!def) return;
-
-    const startPos = state._winnerStartPositions[idx] || { x: wFighter.x, y: wFighter.y, gunAngle: 0 };
-    const heroYOffset = isMultiWinner ? (idx === 0 ? -70 : 70) : 0;
-    const finalHeroY = targetHeroY + heroYOffset;
-
-    const currX = startPos.x + (targetHeroX - startPos.x) * glideEase;
-    const currY = startPos.y + (finalHeroY - startPos.y) * glideEase;
-    const currScale = 1.0 + (targetScale - 1.0) * glideEase;
-
-    const fType = def.type || def.characterId || wFighter.type || wFighter.characterId || 'default';
-    const previewKey = fType + '_' + idx;
-    if (!state._winnerFightersCache) state._winnerFightersCache = {};
-    if (!state._winnerFightersCache[previewKey]) {
-      const FighterClass = FIGHTER_CLASS_MAP[fType] || Fighter;
-      state._winnerFightersCache[previewKey] = new FighterClass({
-        ...def,
-        startX: 0,
-        startY: 0,
-        startVx: 0,
-        startVy: 0,
-      });
-    }
-
-    const preview = state._winnerFightersCache[previewKey];
-    preview.x = 0;
-    preview.y = 0;
-    preview.vx = 0;
-    preview.vy = 0;
-    preview.angle = 0;
-    preview.gunAngle = 0; // Upright frontal victory stance
-    preview.shootCooldown = 0;
-    preview._isWinnerReveal = true;
-    if (preview.rika) {
-      preview.rika.active = false;
-      preview.rikaAlpha = 0;
-    }
-    if (def.type === 'gojo' || def.type === 'yuta') {
-      preview.combatAuraOpacity = 1;
-    }
-    if (def.type === 'gojo') {
-      preview.isMeleeMode = false;
-      preview.orbTransition = 1;
-    }
-
-    // Sync active transformations & skins from the winning fighter entity (e.g. Ichigo Bankai/Hollow Mask)
-    // Snapshot active forms once so they are permanently preserved on the champion podium without decaying
-    if (wFighter.skin) preview.skin = wFighter.skin;
-    if (fType === 'ichigo' || wFighter.characterId === 'ichigo' || wFighter.type === 'ichigo') {
-      if (wFighter._winnerBankaiActive === undefined) {
-        wFighter._winnerBankaiActive = Boolean(wFighter.bankaiActive || wFighter.skin === 'bankai' || wFighter.skin === 'bankai_mask');
-      }
-      if (wFighter._winnerHollowMaskActive === undefined) {
-        wFighter._winnerHollowMaskActive = Boolean(wFighter.hollowMaskActive || wFighter.skin === 'bankai_mask' || wFighter.skin === 'shikai_mask');
-      }
-      preview.bankaiActive = wFighter._winnerBankaiActive;
-      preview.hollowMaskActive = wFighter._winnerHollowMaskActive;
-      preview.skin = (preview.bankaiActive ? (preview.hollowMaskActive ? 'bankai_mask' : 'bankai') : (preview.hollowMaskActive ? 'shikai_mask' : (wFighter.skin || 'shikai')));
-      preview.combatAuraOpacity = wFighter.combatAuraOpacity !== undefined ? wFighter.combatAuraOpacity : (preview.bankaiActive ? 1 : 0.5);
-    }
-    if (wFighter.isHeianEra !== undefined) preview.isHeianEra = wFighter.isHeianEra;
-    if (wFighter.isFourArms !== undefined) preview.isFourArms = wFighter.isFourArms;
-    if (wFighter.mode !== undefined) preview.mode = wFighter.mode;
-
-    const fColor = def.color || wFighter.color || '#38bdf8';
-
-    ctx.save();
-    // Engineer Hero Glow (Blooms underneath fighter on the left)
-    drawEngineerStyleHeroGlow(ctx, currX, currY, (wFighter.r || 24) * currScale, fColor, glowProgress);
-
-    ctx.translate(currX, currY);
-    ctx.scale(currScale, currScale);
-    preview.draw(ctx, null);
-    ctx.restore();
-  });
-
-  // 3. Right Stats Zone (Stats Slide Smoothly into Right Side)
-  const targetStatsX = arenaX + arenaW * 0.72;
-  const targetStatsY = arenaY + arenaH * 0.50;
-
-  const statsProgress = Math.min(1.0, Math.max(0.0, (timer - 12) / 32));
-  if (statsProgress > 0) {
-    const statsEase = easeOutBack(statsProgress);
-    const slideOffset = (1 - statsProgress) * 45;
-    const statsX = targetStatsX + slideOffset;
-
-    ctx.save();
-    ctx.globalAlpha = statsProgress;
-
-    if (isMultiWinner && winningFighters.length >= 2) {
-      // Top Title ("CHAMPION" / "ROUND WINNER")
-      drawChampionTitle(ctx, statsX, targetStatsY - 145, titleText, primaryThemeColor, arenaW * 0.44);
-
-      // Teammate 1 (Top Hero individual block)
-      const t1 = winningFighters[0];
-      const t1Y = targetStatsY - 70;
-      drawChampionNameplate(ctx, statsX, t1Y - 18, t1.name.toUpperCase(), t1.color || primaryThemeColor, 0.88, arenaW * 0.42);
-      drawChampionStats(ctx, statsX, t1Y + 12, t1, t1.color || primaryThemeColor, timer, 12, 0.90);
-
-      // Teammate 2 (Bottom Hero individual block)
-      const t2 = winningFighters[1];
-      const t2Y = targetStatsY + 70;
-      drawChampionNameplate(ctx, statsX, t2Y - 18, t2.name.toUpperCase(), t2.color || primaryThemeColor, 0.88, arenaW * 0.42);
-      drawChampionStats(ctx, statsX, t2Y + 12, t2, t2.color || primaryThemeColor, timer, 16, 0.90);
-    } else {
-      // Top Title ("CHAMPION" / "ROUND WINNER")
-      drawChampionTitle(ctx, statsX, targetStatsY - 58, titleText, primaryThemeColor, arenaW * 0.44);
-
-      // Solo Fighter Nameplate & Individual Stats
-      if (winner) {
-        drawChampionNameplate(ctx, statsX, targetStatsY - 14, winner.name.toUpperCase(), primaryThemeColor, 1.0, arenaW * 0.42);
-        drawChampionStats(ctx, statsX, targetStatsY + 22, winner, primaryThemeColor, timer, 14, 1.0);
-      }
-    }
-
-    ctx.restore();
-  }
-
-  // 4. Pop-out "Follow for more :)" banner in the bottom center of the arena
-  const bannerY = arenaY + arenaH - 34;
-  drawFollowForMoreBanner(ctx, arenaX + arenaW / 2, bannerY, timer, primaryThemeColor);
+  // Simple In-Arena Winner Overlay
+  draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd);
 }
 
 // ─────────────────────────────────────────────

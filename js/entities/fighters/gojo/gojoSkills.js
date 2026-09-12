@@ -1,4 +1,4 @@
-import { fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
+import { stopSound, stopSoundBySrc, fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // SATORU GOJO LIMITLESS SKILLS MODULE
 // Encapsulates Reversal Red, Hollow Purple, and skill utilities
@@ -9,6 +9,22 @@ import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash, spawnGojoRedFrontalBlast } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
+
+export function snapAngleToCardinal(angle) {
+  if (angle === undefined || Number.isNaN(angle)) return 0;
+  let norm = angle;
+  while (norm > Math.PI) norm -= Math.PI * 2;
+  while (norm < -Math.PI) norm += Math.PI * 2;
+  if (norm >= -Math.PI / 4 && norm <= Math.PI / 4) {
+    return 0; // Right
+  } else if (norm > Math.PI / 4 && norm < 3 * Math.PI / 4) {
+    return Math.PI / 2; // Down
+  } else if (norm < -Math.PI / 4 && norm > -3 * Math.PI / 4) {
+    return -Math.PI / 2; // Up
+  } else {
+    return Math.PI; // Left
+  }
+}
 
 export function activateRed(fighter) {
   if ((fighter.redEffectTimer || 0) > 0 || fighter.redBuildupPhase || (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive())) return;
@@ -34,15 +50,17 @@ export function activateRed(fighter) {
   fighter.vx = 0;
   fighter.vy = 0;
 
-  // Find and lock target angle strictly to vertical Up (-Math.PI / 2) or Down (Math.PI / 2) without snapping
+  // Find and lock target angle strictly to 4 cardinal directions (Right: 0, Left: PI, Up: -PI/2, Down: PI/2)
   const fighterY = fighter.y - (fighter.z || 0);
-  let verticalAngle;
+  let cardinalAngle;
   if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
-    verticalAngle = (Math.sin(fighter.redTargetAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+    cardinalAngle = snapAngleToCardinal(fighter.redTargetAngle);
   } else {
-    let targetF = (typeof fighter._findVerticallyAlignedEnemy === 'function')
-      ? (fighter._findVerticallyAlignedEnemy() || fighter._redTargetRef)
-      : fighter._redTargetRef;
+    let targetF = (typeof fighter._findAlignedEnemyForRed === 'function')
+      ? (fighter._findAlignedEnemyForRed() || fighter._redTargetRef)
+      : ((typeof fighter._findVerticallyAlignedEnemy === 'function')
+        ? (fighter._findVerticallyAlignedEnemy() || fighter._redTargetRef)
+        : fighter._redTargetRef);
 
     if (!targetF && state.fighters) {
       const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
@@ -62,19 +80,22 @@ export function activateRed(fighter) {
     }
     
     fighter._redTargetRef = targetF;
-    if (targetF && typeof targetF.y === 'number') {
+    if (targetF && typeof targetF.x === 'number' && typeof targetF.y === 'number') {
       const targetY = targetF.y - (targetF.z || 0);
-      verticalAngle = (targetY < fighterY) ? -Math.PI / 2 : Math.PI / 2;
+      const dx = targetF.x - fighter.x;
+      const dy = targetY - fighterY;
+      const targetAngle = Math.atan2(dy, dx);
+      cardinalAngle = snapAngleToCardinal(targetAngle);
     } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
-      verticalAngle = (Math.sin(fighter.gunAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+      cardinalAngle = snapAngleToCardinal(fighter.gunAngle);
     } else {
-      verticalAngle = -Math.PI / 2;
+      cardinalAngle = 0;
     }
   }
 
-  fighter.redTargetAngle = verticalAngle;
-  fighter.gunAngle = verticalAngle;
-  fighter.angle = verticalAngle;
+  fighter.redTargetAngle = cardinalAngle;
+  fighter.gunAngle = cardinalAngle;
+  fighter.angle = cardinalAngle;
 
   // Light buildup sparks
   spawnSparks(fighter.x, fighter.y, 12, 'crimsonSniper');
@@ -88,13 +109,49 @@ export function activateRed(fighter) {
     const sVoice = getSkillSound(fId, 'red_channeling');
     const redChanSnd = sVoice?.src || CONFIG.gojo?.sounds?.redChanneling || 'Assets/Sound Effects/Skills/redchanneling.mp3';
     const redChanVol = sVoice?.volume ?? (CONFIG.gojo?.soundVolumes?.redChanneling ?? 1.8);
-    audioSystem.playSFX(redChanSnd, redChanVol);
+    fighter._redChannelingSoundHandle = audioSystem.playSFX(redChanSnd, redChanVol);
 
     const sCharging = getSkillSound(fId, 'red_charging');
     const redChargeSnd = sCharging?.src || CONFIG.gojo?.sounds?.redCharging || 'Assets/Sound Effects/Skills/redcharging.mp3';
     const redChargeVol = sCharging?.volume ?? (CONFIG.gojo?.soundVolumes?.redCharging ?? 2.0);
-    audioSystem.playSFX(redChargeSnd, redChargeVol);
+    fighter._redChargingSoundHandle = audioSystem.playSFX(redChargeSnd, redChargeVol);
   }
+}
+
+export function stopGojoRedAudio(fighter) {
+  if (!fighter) return;
+  fighter._hasPlayedRedChannelingSound = false;
+  fighter._hasPlayedRedFlareSound = false;
+
+  // Immediately cut and stop all Red audio handles
+  if (fighter._redChannelingSoundHandle) {
+    stopSound(fighter._redChannelingSoundHandle);
+    fighter._redChannelingSoundHandle = null;
+  }
+  if (fighter._redChargingSoundHandle) {
+    stopSound(fighter._redChargingSoundHandle);
+    fighter._redChargingSoundHandle = null;
+  }
+  if (fighter._redBlastSoundHandle) {
+    stopSound(fighter._redBlastSoundHandle);
+    fighter._redBlastSoundHandle = null;
+  }
+
+  // Immediately cut all active Red audio instances across sources
+  stopSoundBySrc('redchanneling');
+  stopSoundBySrc('redcharging');
+  stopSoundBySrc('reddeploy');
+  stopSoundBySrc('redblast');
+  stopSoundBySrc('red_channeling');
+  stopSoundBySrc('red_charging');
+  stopSoundBySrc('red_deploy');
+  stopSoundBySrc('red_blast');
+
+  // Fallback fast fade-out for any scheduled instances
+  fadeOutSoundBySrc('redchanneling', 50);
+  fadeOutSoundBySrc('redcharging', 50);
+  fadeOutSoundBySrc('reddeploy', 50);
+  fadeOutSoundBySrc('redblast', 50);
 }
 
 export function detonateRed(fighter) {
@@ -104,21 +161,35 @@ export function detonateRed(fighter) {
   fighter._hasFiredRedAtLeastOnce = true;
   fighter.lastCastSkill = 'red';
 
+  // Stop channeling/charging audio immediately when detonating into blast
+  if (fighter._redChannelingSoundHandle) {
+    stopSound(fighter._redChannelingSoundHandle);
+    fighter._redChannelingSoundHandle = null;
+  }
+  if (fighter._redChargingSoundHandle) {
+    stopSound(fighter._redChargingSoundHandle);
+    fighter._redChargingSoundHandle = null;
+  }
+  stopSoundBySrc('redchanneling');
+  stopSoundBySrc('redcharging');
+  fadeOutSoundBySrc('redchanneling', 50);
+  fadeOutSoundBySrc('redcharging', 50);
+
   let pushAngle;
   if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
-    pushAngle = (Math.sin(fighter.redTargetAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+    pushAngle = snapAngleToCardinal(fighter.redTargetAngle);
   } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
-    pushAngle = (Math.sin(fighter.gunAngle) < 0) ? -Math.PI / 2 : Math.PI / 2;
+    pushAngle = snapAngleToCardinal(fighter.gunAngle);
   } else {
-    pushAngle = -Math.PI / 2;
+    pushAngle = 0;
   }
   fighter.redTargetAngle = pushAngle;
   fighter.gunAngle = pushAngle;
   fighter.angle = pushAngle;
 
   const frontalReach = CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650;
-  const frontalArc = CONFIG.gojo?.redFrontalArc || (Math.PI * 0.45); // ~80-degree frontal cone
-  const halfArc = frontalArc / 2;
+  const frontalArc = CONFIG.gojo?.redFrontalArc || 0.76;
+  const halfArc = frontalArc / 2; // 0.38 (~21.8 deg, ~43.5 deg total cone)
   const redDamage = CONFIG.gojo?.redDamage || 100;
   const redKnockback = CONFIG.gojo?.redKnockback || 40;
   const slowDuration = CONFIG.gojo?.redSlowDuration || 120;
@@ -132,7 +203,7 @@ export function detonateRed(fighter) {
   const sBlast = getSkillSound(fId, 'red_blast');
   const blastSnd = sBlast?.src || CONFIG.gojo?.sounds?.redBlast || 'Assets/Sound Effects/Skills/redblast.mp3';
   const blastVol = sBlast?.volume ?? (CONFIG.gojo?.soundVolumes?.redBlast ?? 2.5);
-  audioSystem.playSFX(blastSnd, blastVol);
+  fighter._redBlastSoundHandle = audioSystem.playSFX(blastSnd, blastVol);
 
   const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
 
@@ -171,17 +242,23 @@ export function detonateRed(fighter) {
   }
 
   for (const f of validTargets) {
-    const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
-    const effectiveReach = frontalReach + (f.r || 20);
+    const dx = f.x - fighter.x;
+    const dy = f.y - fighter.y;
+    const targetR = f.r || 20;
 
-    if (dist <= effectiveReach) {
-      const angleToEnemy = Math.atan2(f.y - fighter.y, f.x - fighter.x);
-      let angleDiff = angleToEnemy - pushAngle;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    // Project target into blast coordinate frame (forward along pushAngle, lateral perpendicular)
+    const forwardDist = dx * Math.cos(pushAngle) + dy * Math.sin(pushAngle);
+    const lateralDist = Math.abs(-dx * Math.sin(pushAngle) + dy * Math.cos(pushAngle));
 
-      // Check frontal corridor cone or close contact
-      if (Math.abs(angleDiff) <= halfArc || dist <= (fighter.r + (f.r || 20) + 20)) {
+    // Forward reach check: Must be in front of Gojo and within frontalReach (+ target radius)
+    if (forwardDist >= -targetR * 0.25 && forwardDist <= frontalReach + targetR) {
+      // Clamped forward distance to calculate visual cone width at target position
+      const clampedX = Math.max(0, Math.min(frontalReach, forwardDist));
+      // Visual half-width exactly matches drawGojoRedFrontalBlast and _drawReversalRedEffect
+      // (base width 8px + atmospheric glow 8px = 16px min, expanding by clampedX * tan(halfArc))
+      const visualHalfW = Math.max(16, clampedX * Math.tan(halfArc) + 8);
+
+      if (lateralDist <= visualHalfW + targetR) {
         // Clear time-stop & infinity freeze so Red knockback actually launches target away
         f.timeStopTimer = 0;
         f.isFrozenByInfinity = false;

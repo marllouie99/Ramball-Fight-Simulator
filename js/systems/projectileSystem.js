@@ -2402,11 +2402,35 @@ class ProjectileSystem {
         const knockback = cfg.baseKnockback * (1 - Math.pow(distRatio, cfg.falloffExponent));
         const angle = Math.atan2(fighter.y - y, fighter.x - x);
         const strength = Math.max(0, knockback);
-        fighter.knockbackVx = (fighter.knockbackVx || 0) + Math.cos(angle) * strength;
-        fighter.knockbackVy = (fighter.knockbackVy || 0) + Math.sin(angle) * strength + cfg.verticalKnockback * strength;
+        const kbVx = Math.cos(angle) * strength;
+        const kbVy = Math.sin(angle) * strength + cfg.verticalKnockback * strength;
 
-        if (distRatio < cfg.minKnockbackRadius && Math.random() < cfg.stunChance) {
-          fighter.stunTimer = Math.max(fighter.stunTimer || 0, cfg.stunDuration);
+        const isMakimaShatter = (fighter.characterId === 'makima' || fighter.type === 'makima') && (
+          fighter.isRevivingFromContract ||
+          fighter.isShatterReviving ||
+          (fighter.shatteredPieces && fighter.shatteredPieces.length > 0) ||
+          fighter.hp <= 0 ||
+          fighter.isDead ||
+          fighter.dead
+        );
+
+        if (isMakimaShatter) {
+          fighter.vx = 0;
+          fighter.vy = 0;
+          fighter.knockbackVx = 0;
+          fighter.knockbackVy = 0;
+          if (fighter._shatterLockedX !== undefined && fighter._shatterLockedY !== undefined) {
+            fighter.x = fighter._shatterLockedX;
+            fighter.y = fighter._shatterLockedY;
+          }
+        } else if (typeof fighter.applyKnockback === 'function') {
+          fighter.applyKnockback(kbVx, kbVy, (distRatio < cfg.minKnockbackRadius && Math.random() < cfg.stunChance) ? cfg.stunDuration : 0);
+        } else {
+          fighter.knockbackVx = (fighter.knockbackVx || 0) + kbVx;
+          fighter.knockbackVy = (fighter.knockbackVy || 0) + kbVy;
+          if (distRatio < cfg.minKnockbackRadius && Math.random() < cfg.stunChance) {
+            fighter.stunTimer = Math.max(fighter.stunTimer || 0, cfg.stunDuration);
+          }
         }
       }
     }
@@ -2431,8 +2455,36 @@ class ProjectileSystem {
         const knockback = cfg.baseKnockback * (1 - Math.pow(distRatio, cfg.falloffExponent));
         const angle = Math.atan2(illusion.y - y, illusion.x - x);
         const strength = Math.max(0, knockback);
-        illusion.knockbackVx = (illusion.knockbackVx || 0) + Math.cos(angle) * strength;
-        illusion.knockbackVy = (illusion.knockbackVy || 0) + Math.sin(angle) * strength + cfg.verticalKnockback * strength;
+        const kbVx = Math.cos(angle) * strength;
+        const kbVy = Math.sin(angle) * strength + cfg.verticalKnockback * strength;
+
+        const isMakimaShatter = (illusion.characterId === 'makima' || illusion.type === 'makima') && (
+          illusion.isRevivingFromContract ||
+          illusion.isShatterReviving ||
+          (illusion.shatteredPieces && illusion.shatteredPieces.length > 0) ||
+          illusion.hp <= 0 ||
+          illusion.isDead ||
+          illusion.dead
+        );
+
+        if (isMakimaShatter) {
+          illusion.vx = 0;
+          illusion.vy = 0;
+          illusion.knockbackVx = 0;
+          illusion.knockbackVy = 0;
+          if (illusion._shatterLockedX !== undefined && illusion._shatterLockedY !== undefined) {
+            illusion.x = illusion._shatterLockedX;
+            illusion.y = illusion._shatterLockedY;
+          }
+        } else if (typeof illusion.applyKnockback === 'function') {
+          illusion.applyKnockback(kbVx, kbVy, (distRatio < cfg.minKnockbackRadius && Math.random() < cfg.stunChance) ? cfg.stunDuration : 0);
+        } else {
+          illusion.knockbackVx = (illusion.knockbackVx || 0) + kbVx;
+          illusion.knockbackVy = (illusion.knockbackVy || 0) + kbVy;
+          if (distRatio < cfg.minKnockbackRadius && Math.random() < cfg.stunChance) {
+            illusion.stunTimer = Math.max(illusion.stunTimer || 0, cfg.stunDuration);
+          }
+        }
       }
     }
   }

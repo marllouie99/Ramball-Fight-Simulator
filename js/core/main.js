@@ -244,6 +244,12 @@ startGameLoop();
 // HTML UI DOM LISTENERS: DOOM ETERNAL TACTICAL TERMINAL
 // ─────────────────────────────────────────────
 
+// Capture initial light mode colors from CONFIG so custom user configuration is preserved
+const _initialLightCanvasBg = CONFIG.canvasBgColor || '#ffffffff';
+const _initialLightArenaOuterBg = CONFIG.arenaOuterBgColor || '#fff8ceff';
+const _initialLightArenaInnerBg = CONFIG.arenaInnerBgColor || '#ffffffff';
+const _initialLightHudTextColor = CONFIG.hudTextColor || '#131313ff';
+
 // Function to apply Arena Theme (Dark / Light)
 export function applyArenaTheme(theme) {
   const effectiveTheme = (state.gameCategory === 'tactical') ? 'dark' : theme;
@@ -254,10 +260,10 @@ export function applyArenaTheme(theme) {
   }
 
   const isDark = (effectiveTheme === 'dark');
-  CONFIG.canvasBgColor = isDark ? '#000000' : '#ffffffff';
-  CONFIG.arenaOuterBgColor = isDark ? '#000000' : '#fffdf1ff';
-  CONFIG.arenaInnerBgColor = isDark ? '#000000' : '#ffffffff';
-  CONFIG.hudTextColor = isDark ? '#f0f2f5' : '#131313ff';
+  CONFIG.canvasBgColor = isDark ? '#000000' : (CONFIG.lightCanvasBgColor || _initialLightCanvasBg);
+  CONFIG.arenaOuterBgColor = isDark ? '#000000' : (CONFIG.lightArenaOuterBgColor || _initialLightArenaOuterBg);
+  CONFIG.arenaInnerBgColor = isDark ? '#000000' : (CONFIG.lightArenaInnerBgColor || _initialLightArenaInnerBg);
+  CONFIG.hudTextColor = isDark ? '#f0f2f5' : (CONFIG.lightHudTextColor || _initialLightHudTextColor);
 
   // Invalidate cached canvases
   state._arenaBorderCanvas = null;

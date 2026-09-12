@@ -106,6 +106,55 @@ export class CJFighter extends Fighter {
     this.minigunFlashTimer = 0;
     this.minigunHeat = 0;
     this.riotShockwaveTimer = 0;
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'jetpack',
+        name: 'ROCKETMAN',
+        type: 'mode',
+        cooldownKey: 'jetpackCooldown',
+        cooldownMaxKey: 'jetpackCooldownMax',
+        durationKey: 'jetpackTimer',
+        durationMaxKey: 'jetpackMaxTimer',
+        activeKey: 'isJetpackActive',
+        onExpire: (fighter) => {
+          fighter.isJetpackActive = false;
+          fighter.z = 0;
+          fighter.evadeBuffTimer = 0;
+          fighter.evadeChance = 0;
+          const groundMult = fighter._getGroundSpeedMultiplier ? fighter._getGroundSpeedMultiplier() : 1.0;
+          fighter.speedMultiplier = 1.0;
+          fighter.speed = fighter._resolveSpeed ? fighter._resolveSpeed(groundMult) : fighter.baseSpeed;
+          fighter.jetpackCooldown = fighter.jetpackCooldownMax || 800;
+        }
+      },
+      {
+        id: 'drive_by',
+        name: 'GREENWOOOD',
+        type: 'mode',
+        cooldownKey: 'driveByCooldown',
+        cooldownMaxKey: 'driveByCooldownMax',
+        durationKey: 'driveByTimer',
+        durationMaxKey: 'driveByMaxTimer',
+        activeKey: 'isDriveByActive'
+      },
+      {
+        id: 'baguvix',
+        name: 'BAGUVIX',
+        type: 'ultimate',
+        cooldownKey: 'baguvixCooldown',
+        cooldownMaxKey: 'baguvixCooldownMax',
+        durationKey: 'baguvixTimer',
+        durationMaxKey: 'baguvixMaxTimer',
+        activeKey: 'isBaguvixActive',
+        onExpire: (fighter) => {
+          fighter.isBaguvixActive = false;
+          fighter.isGodModeActive = false;
+          fighter.baguvixCooldown = fighter.baguvixCooldownMax || 2500;
+        }
+      }
+    ]);
   }
 
   reset() {
@@ -1930,4 +1979,26 @@ export class CJFighter extends Fighter {
     drawCjSkin(ctx, this);
     this.drawHealth(ctx);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    // 1. Jetpack flight expiration while frozen
+    if (this.isJetpackActive && this.jetpackTimer <= 0) {
+      this.isJetpackActive = false;
+      this.z = 0;
+      this.evadeBuffTimer = 0;
+      this.evadeChance = 0;
+      const groundMult = this._getGroundSpeedMultiplier ? this._getGroundSpeedMultiplier() : 1.0;
+      this.speedMultiplier = 1.0;
+      this.speed = this._resolveSpeed ? this._resolveSpeed(groundMult) : this.baseSpeed;
+      this.jetpackCooldown = this.jetpackCooldownMax || 800;
+    }
+
+    // 2. BAGUVIX God Mode expiration while frozen
+    if (this.isBaguvixActive && this.baguvixTimer <= 0) {
+      this.isBaguvixActive = false;
+      this.isGodModeActive = false;
+      this.baguvixCooldown = this.baguvixCooldownMax || 2500;
+    }
+  }
 }
+

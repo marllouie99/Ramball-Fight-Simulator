@@ -62,7 +62,8 @@ function clampOutsideGojoInfinity(x, y, target, pad = 0) {
 
   const isGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo') &&
     !target.isMeleeMode &&
-    ((target.infinityCooldown || 0) <= 0 || target.infinityActive);
+    ((target.infinityCooldown || 0) <= 0 || target.infinityActive) &&
+    !target.isChainedByMakima;
 
   if (!isGojoInfinity) return { x, y };
 
@@ -778,7 +779,8 @@ export function updateMahitoFleshSurge(fighter) {
 
           const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
             !ent.isMeleeMode && 
-            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
+            !ent.isChainedByMakima;
 
           const dist = Math.hypot(ent.x - lp.peakX, ent.y - lp.peakY);
           if (dist <= explosionR + (ent.r || 25)) {
@@ -1400,7 +1402,8 @@ export function updateMahitoMaceCannon(fighter) {
 
           const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
             !ent.isMeleeMode && 
-            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
+            !ent.isChainedByMakima;
 
           const dToSpike = Math.hypot(ent.x - spk.x, ent.y - spk.y);
           if (isGojoInfinity && dToSpike <= ent.r + 38) {
@@ -1481,7 +1484,8 @@ export function updateMahitoMaceCannon(fighter) {
 
       const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
         !ent.isMeleeMode && 
-        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
+        !ent.isChainedByMakima;
 
       if (isGojoInfinity) {
         const distToTip = Math.hypot(ent.x - data.currentTipX, ent.y - data.currentTipY);
@@ -1613,7 +1617,8 @@ export function updateMahitoMaceCannon(fighter) {
 
         const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
           !ent.isMeleeMode && 
-          ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+          ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
+          !ent.isChainedByMakima;
 
         const distToExplosion = Math.hypot(ent.x - impactX, ent.y - impactY);
         if (distToExplosion <= ent.r + blastRadius) {
@@ -1946,7 +1951,8 @@ export function updateMahitoTwinScissor(fighter) {
 
       const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
         !ent.isMeleeMode && 
-        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
+        !ent.isChainedByMakima;
 
       if (isGojoInfinity) {
         const barrierR = (ent.r || 25) + 38;
@@ -2130,7 +2136,8 @@ export function updateMahitoTwinScissor(fighter) {
 
           const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
             !ent.isMeleeMode && 
-            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
+            !ent.isChainedByMakima;
 
           const distToCut = Math.hypot(ent.x - strikeCenterX, ent.y - strikeCenterY);
           if (distToCut <= ent.r + strikeRadius) {
@@ -2637,7 +2644,9 @@ export function updateMahitoDomainExpansion(fighter) {
 
   // Active Phase
   if (fighter.domainActive) {
-    fighter.domainTimer--;
+    if (!fighter.skillManager || !fighter.skillManager.hasSkill('domain')) {
+      fighter.domainTimer--;
+    }
     if (fighter.domainTimer <= 0) {
       fighter.domainActive = false;
       // When domain expires naturally, unfreeze targets

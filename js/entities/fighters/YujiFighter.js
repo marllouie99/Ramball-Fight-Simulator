@@ -62,6 +62,37 @@ export class YujiFighter extends Fighter {
     this.rctCooldown = 0;
     this.isChannelingRCT = false;
     this.rctChannelTimer = 0;
+
+    // Declarative Skill Registration
+    this.skillManager.registerSkills([
+      {
+        id: 'divergent_fist',
+        name: 'Divergent Fist',
+        type: 'active',
+        cooldownKey: 'divergentDashCooldown',
+        cooldownMax: () => CONFIG.yuji?.divergentDashCooldown || 180
+      },
+      {
+        id: 'rct',
+        name: 'Reverse Cursed Technique',
+        type: 'active',
+        cooldownKey: 'rctCooldown',
+        cooldownMax: () => CONFIG.yuji?.rctCooldown || 800,
+        channelingKey: 'isChannelingRCT'
+      },
+      {
+        id: 'soul_swap',
+        name: 'Sukuna Takeover',
+        type: 'transformation',
+        durationKey: 'soulSwapTimer',
+        durationMax: () => CONFIG.yuji?.soulSwapDuration || 800,
+        activeKey: 'soulSwapActive',
+        channelTimerKey: 'soulSwapTransitionTimer',
+        onExpire: (fighter) => {
+          fighter._triggerSoulSwapRevert();
+        }
+      }
+    ]);
   }
 
   reset() {
@@ -173,7 +204,7 @@ export class YujiFighter extends Fighter {
     this.rapidSlashPhase = 'IDLE';
     this.flurryTarget = null;
 
-    if (this.soulSwapActive) {
+    if (this.soulSwapActive || this.revertTransitionTimer <= 0) {
       // === STOP MOVE, REVERT TRANSFORMATION ANIMATION & PASSIVE RCT HEAL YUJI ===
       this.soulSwapActive = false;
       this.revertTransitionTimer = 45; // 0.75s revert transformation freeze!
@@ -312,7 +343,9 @@ export class YujiFighter extends Fighter {
     // Continues until the entire Soul Swap duration expires!
     // Flow: Teleport -> Land & Aim (Landing Delay) -> Slash (Cleave) -> Recovery Pause -> Repeat
     if (this.soulSwapActive && this.soulSwapTimer > 0) {
-      this.soulSwapTimer--;
+      if (!this.skillManager || !this.skillManager.hasSkill('soul_swap')) {
+        this.soulSwapTimer--;
+      }
 
       // Duration completed: Revert back to Yuji with stagger & passive RCT heal!
       if (this.soulSwapTimer <= 0) {
@@ -746,4 +779,11 @@ export class YujiFighter extends Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
   }
+
+  onFrozenSkillDurationTick(isInsideGojoDomain) {
+    if (this.soulSwapActive && this.soulSwapTimer <= 0) {
+      this._triggerSoulSwapRevert();
+    }
+  }
 }
+
