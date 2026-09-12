@@ -1173,6 +1173,14 @@ export function getFighterWeaponInfo(def) {
       return { name: 'TWIN CHAINSAWS & POCHITA RIPCORD', category: 'DEVIL // BERSERKER', desc: 'Mechanical forearm and forehead chainsaws with high-RPM shredding, 25% lifesteal, engine lunges, and Pochita ripcord revive.' };
     case 'power':
       return { name: 'GIGANTIC BLOOD HAMMER & SCYTHE', category: 'DEVIL // BLOOD MANIPULATION', desc: 'Solidified crystalline blood warhammer with 140° ground shockwave stuns, 360° blood scythe whirlwinds, and Thousand Blood Daggers.' };
+    case 'tanjiro':
+      return { name: 'NICHIRIN KATANA & HINOKAMI KAGURA', category: 'BREATHING // WATER & SUN', desc: 'Obsidian-black Nichirin blade channeling Water Surface Slashes, Constant Flux dragon lunges, Clear Blue Sky projectile deflections, and Dragon Sun Halo Head Dance.' };
+    case 'nezuko':
+      return { name: 'DEMON CLAWS & BAKKETSU FLAMES', category: 'DEMON // PYROKINESIS', desc: 'Demonic claw flurries, 120° Demonic Axe Kicks, supersonic Flying Dropkicks, and Exploding Blood (Bakketsu) anti-demon pyrokinesis.' };
+    case 'zenitsu':
+      return { name: 'LIGHTNING NICHIRIN KATANA', category: 'BREATHING // THUNDER IAI', desc: 'Golden lightning-hamon blade unleashing First Form: Thunderclap and Flash godspeed teleport slashes, Sixfold wall bounces, and Flaming Thunder God.' };
+    case 'inosuke':
+      return { name: 'DUAL SERRATED NICHIRIN KATANAS', category: 'BREATHING // BEAST KENJUTSU', desc: 'Twin chipped serrated blades with 160° Dual Hacks, 360° Crazy Cutting whirlwind shredding, Explosive Rush boar charges, and Spatial Awareness.' };
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:

@@ -1621,6 +1621,110 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
+  // ─────────────────────────────────────────────
+  // TANJIRO KAMADO (Water & Sun Breathing)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'tanjiro' || f.type === 'tanjiro') {
+    const themeColor = f.color || '#10B981';
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : {};
+
+    const ultMax = f.dragonDanceCooldownMax || cfg.ultimateCooldown || 1440;
+    const ultTimer = f.dragonDanceCooldown !== undefined ? f.dragonDanceCooldown : 0;
+    const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
+    const fluxMax = f.fluxCooldownMax || cfg.fluxCooldown || 270;
+    const fluxTimer = f.fluxCooldown !== undefined ? f.fluxCooldown : 0;
+    const fluxPct = Math.max(0, Math.min(100, (1 - (fluxTimer / fluxMax)) * 100));
+
+    const sunMax = f.sunCooldownMax || cfg.sunCooldown || 360;
+    const sunTimer = f.sunCooldown !== undefined ? f.sunCooldown : 0;
+    const sunPct = Math.max(0, Math.min(100, (1 - (sunTimer / sunMax)) * 100));
+
+    return [
+      { id: 'dragon_dance', pct: ultPct, ready: ultPct >= 99, color: themeColor, label: 'DRAGON SUN DANCE' },
+      { id: 'constant_flux', pct: fluxPct, ready: fluxPct >= 99, color: themeColor, label: 'CONSTANT FLUX' },
+      { id: 'clear_blue_sky', pct: sunPct, ready: sunPct >= 99, color: themeColor, label: 'CLEAR BLUE SKY' }
+    ];
+  }
+
+  // ─────────────────────────────────────────────
+  // NEZUKO KAMADO (Awakened Demon & Bakketsu)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'nezuko' || f.type === 'nezuko') {
+    const themeColor = f.color || '#EC4899';
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nezuko) ? CONFIG.nezuko : {};
+
+    const ultMax = f.awakeningCooldownMax || cfg.ultimateCooldown || 1500;
+    const ultTimer = f.awakeningCooldown !== undefined ? f.awakeningCooldown : 0;
+    const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
+    const bakketsuMax = f.bakketsuCooldownMax || cfg.bakketsuCooldown || 330;
+    const bakketsuTimer = f.bakketsuCooldown !== undefined ? f.bakketsuCooldown : 0;
+    const bakketsuPct = Math.max(0, Math.min(100, (1 - (bakketsuTimer / bakketsuMax)) * 100));
+
+    const dropkickMax = f.dropkickCooldownMax || cfg.dropkickCooldown || 240;
+    const dropkickTimer = f.dropkickCooldown !== undefined ? f.dropkickCooldown : 0;
+    const dropkickPct = Math.max(0, Math.min(100, (1 - (dropkickTimer / dropkickMax)) * 100));
+
+    return [
+      { id: 'demon_awakening', pct: ultPct, ready: ultPct >= 99, color: themeColor, label: 'DEMON AWAKENING' },
+      { id: 'bakketsu', pct: bakketsuPct, ready: bakketsuPct >= 99, color: themeColor, label: 'EXPLODING BLOOD' },
+      { id: 'dropkick', pct: dropkickPct, ready: dropkickPct >= 99, color: themeColor, label: 'FLYING DROPKICK' }
+    ];
+  }
+
+  // ─────────────────────────────────────────────
+  // ZENITSU AGATSUMA (Thunder Breathing)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'zenitsu' || f.type === 'zenitsu') {
+    const themeColor = f.color || '#F59E0B';
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : {};
+
+    const ultMax = f.flamingGodCooldownMax || cfg.ultimateCooldown || 1440;
+    const ultTimer = f.flamingGodCooldown !== undefined ? f.flamingGodCooldown : 0;
+    const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
+    const thunderMax = f.thunderclapCooldownMax || cfg.thunderclapCooldown || 228;
+    const thunderTimer = f.thunderclapCooldown !== undefined ? f.thunderclapCooldown : 0;
+    const thunderPct = Math.max(0, Math.min(100, (1 - (thunderTimer / thunderMax)) * 100));
+
+    const rokurenMax = f.rokurenCooldownMax || cfg.rokurenCooldown || 420;
+    const rokurenTimer = f.rokurenCooldown !== undefined ? f.rokurenCooldown : 0;
+    const rokurenPct = Math.max(0, Math.min(100, (1 - (rokurenTimer / rokurenMax)) * 100));
+
+    return [
+      { id: 'flaming_thunder_god', pct: ultPct, ready: ultPct >= 99, color: themeColor, label: 'FLAMING THUNDER GOD' },
+      { id: 'thunderclap', pct: thunderPct, ready: thunderPct >= 99, color: themeColor, label: 'THUNDERCLAP & FLASH' },
+      { id: 'rokuren', pct: rokurenPct, ready: rokurenPct >= 99, color: themeColor, label: 'SIXFOLD (ROKUREN)' }
+    ];
+  }
+
+  // ─────────────────────────────────────────────
+  // INOSUKE HASHIBIRA (Beast Breathing)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'inosuke' || f.type === 'inosuke') {
+    const themeColor = f.color || '#3B82F6';
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.inosuke) ? CONFIG.inosuke : {};
+
+    const ultMax = f.kingOfMountainCooldownMax || cfg.ultimateCooldown || 1440;
+    const ultTimer = f.kingOfMountainCooldown !== undefined ? f.kingOfMountainCooldown : 0;
+    const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
+    const crazyMax = f.crazyCuttingCooldownMax || cfg.crazyCuttingCooldown || 252;
+    const crazyTimer = f.crazyCuttingCooldown !== undefined ? f.crazyCuttingCooldown : 0;
+    const crazyPct = Math.max(0, Math.min(100, (1 - (crazyTimer / crazyMax)) * 100));
+
+    const rushMax = f.explosiveRushCooldownMax || cfg.explosiveRushCooldown || 330;
+    const rushTimer = f.explosiveRushCooldown !== undefined ? f.explosiveRushCooldown : 0;
+    const rushPct = Math.max(0, Math.min(100, (1 - (rushTimer / rushMax)) * 100));
+
+    return [
+      { id: 'king_of_mountain', pct: ultPct, ready: ultPct >= 99, color: themeColor, label: 'KING OF MOUNTAINS' },
+      { id: 'crazy_cutting', pct: crazyPct, ready: crazyPct >= 99, color: themeColor, label: 'CRAZY CUTTING' },
+      { id: 'explosive_rush', pct: rushPct, ready: rushPct >= 99, color: themeColor, label: 'EXPLOSIVE RUSH' }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }

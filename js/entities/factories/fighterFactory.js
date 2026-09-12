@@ -44,6 +44,10 @@ import { MakimaFighter } from '../fighters/MakimaFighter.js';
 import { RezeFighter } from '../fighters/RezeFighter.js';
 import { DenjiFighter } from '../fighters/DenjiFighter.js';
 import { PowerFighter } from '../fighters/PowerFighter.js';
+import { TanjiroFighter } from '../fighters/TanjiroFighter.js';
+import { NezukoFighter } from '../fighters/NezukoFighter.js';
+import { ZenitsuFighter } from '../fighters/ZenitsuFighter.js';
+import { InosukeFighter } from '../fighters/InosukeFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -95,6 +99,10 @@ export const FIGHTER_CLASS_MAP = {
   'reze':      RezeFighter,
   'denji':     DenjiFighter,
   'power':     PowerFighter,
+  'tanjiro':   TanjiroFighter,
+  'nezuko':    NezukoFighter,
+  'zenitsu':   ZenitsuFighter,
+  'inosuke':   InosukeFighter,
   'rifle':     RifleFighter,
   'm4a1':      RifleFighter,
   'shotgun':   ShotgunFighter,

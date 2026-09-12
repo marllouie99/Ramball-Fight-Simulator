@@ -32,6 +32,7 @@ import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun
 import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
 import { drawDenjiWeaponPreview } from '../weapons/denjiWeaponGraphics.js';
 import { drawPowerWeaponPreview } from '../weapons/powerWeaponGraphics.js';
+import { drawTanjiroNichirinKatana, drawNezukoDemonClaws, drawZenitsuLightningKatana, drawInosukeDualSerratedKatanas } from '../weapons/demonSlayerWeaponGraphics.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -1870,7 +1871,8 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
   else if (type === 'cronos') offsetX = -55;
   else if (type === 'ruby') offsetX = -75;
-  else if (type === 'toji' || type === 'denji' || type === 'power') offsetX = -40;
+  else if (type === 'toji' || type === 'denji' || type === 'power' || type === 'tanjiro' || type === 'zenitsu' || type === 'inosuke') offsetX = -40;
+  else if (type === 'nezuko') offsetX = -35;
   else if (type === 'yuta') offsetX = -40;
   else if (type === 'megumi') offsetX = -45;
   else if (type === 'layla') offsetX = -30;
@@ -2164,6 +2166,22 @@ function drawWeaponPreview(ctx, type, color) {
         drawPowerWeaponPreview(ctx, 0, 0, gunAngle, r, { isScythe });
         return;
       }
+
+      case 'tanjiro':
+        drawTanjiroNichirinKatana(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        return;
+
+      case 'nezuko':
+        drawNezukoDemonClaws(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        return;
+
+      case 'zenitsu':
+        drawZenitsuLightningKatana(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        return;
+
+      case 'inosuke':
+        drawInosukeDualSerratedKatanas(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        return;
 
       default:
         ctx.save();

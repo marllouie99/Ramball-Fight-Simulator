@@ -51,6 +51,10 @@ export { drawUlquiorraMurcielago, drawLanzaDelRelampago, drawUlquiorraSlashArc }
 export { drawYutaSkin, drawYutaGhostSkin } from './fighters/yutaSkin.js';
 export { drawSukunaBody, drawSukunaPixelBody } from './fighters/sukunaSkin.js';
 export { drawEngineerSkin } from './fighters/engineerSkin.js';
+export { drawTanjiroSkin } from './fighters/tanjiroSkin.js';
+export { drawNezukoSkin } from './fighters/nezukoSkin.js';
+export { drawZenitsuSkin } from './fighters/zenitsuSkin.js';
+export { drawInosukeSkin } from './fighters/inosukeSkin.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
 export { spawnTojiCleaveHitEffect, drawTojiImpactEffects, updateTojiImpactEffects } from './particles/tojiImpactEffect.js';
 
