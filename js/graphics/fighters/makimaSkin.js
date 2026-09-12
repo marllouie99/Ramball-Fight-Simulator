@@ -16,15 +16,38 @@ function snap(v) {
   return Math.round(v / P) * P;
 }
 
-/**
- * Optional aura hook for Makima (surrounding rings and circles removed for clean aesthetic).
- */
-export function drawMakimaControlAura(ctx, fighter) {
-  // Surrounding halo rings and orbiting particles removed per user design request
+let _makimaSkinImage = null;
+let _makimaSkinImageLoading = false;
+
+export function _getMakimaSkinImage() {
+  if (_makimaSkinImage && _makimaSkinImage.complete && _makimaSkinImage.naturalWidth > 0) {
+    return _makimaSkinImage;
+  }
+  if (!_makimaSkinImageLoading && typeof Image !== 'undefined') {
+    _makimaSkinImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _makimaSkinImage = img;
+      _makimaSkinImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Makima pixel skin image at Assets/model/Makima-model-skin.png', e);
+      _makimaSkinImageLoading = false;
+    };
+    img.src = 'Assets/model/Makima-model-skin.png?v=1';
+    _makimaSkinImage = img;
+  }
+  return _makimaSkinImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getMakimaSkinImage();
 }
 
 /**
  * Main Skin Renderer for Makima (The Control Devil)
+ * Prioritizes the authentic pixel art model from Assets/model/Makima-model-skin.png,
+ * with procedural canvas fallback.
  * Adheres strictly to Rule 19, 20, 11 (Authentic Pixel Art Style)
  */
 export function drawMakimaSkin(ctx, fighter) {
@@ -135,12 +158,25 @@ export function drawMakimaSkin(ctx, fighter) {
 
   const skinBase = '#FEE5D6';
   const skinShadow = '#EDB8A2';
+  // ── LAYER 1 & 2: MAIN BODY (Makima-model-skin.png or procedural fallback) ──
+  const makimaImg = _getMakimaSkinImage();
+  if (makimaImg && makimaImg.complete && makimaImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    // Scale factor to map 500x500 sprite content (328px diameter core body) flush with fighter radius r
+    const drawW = r * (1000 / 328);
+    const drawH = drawW;
+    const shiftX = r * (503 / 328);
+    const shiftY = r * (465 / 328);
+    ctx.drawImage(makimaImg, -shiftX, -shiftY, drawW, drawH);
+    ctx.restore();
+  } else {
+    // LAYER 1: PIXEL SIDE BRAID (Behind Body Circle)
+    _drawMakimaPixelBraid(ctx, r);
 
-  // ── LAYER 1: PIXEL SIDE BRAID (Behind Body Circle) ──
-  _drawMakimaPixelBraid(ctx, r);
-
-  // ── LAYER 2: PROCEDURAL PIXEL ART BODY CIRCLE ──
-  drawMakimaPixelBody(ctx, r);
+    // LAYER 2: PROCEDURAL PIXEL ART BODY CIRCLE
+    drawMakimaPixelBody(ctx, r);
+  }
 
   // Status Overlays (freeze, stun, time-stop)
   if (typeof fighter.drawStatusOverlays === 'function') {

@@ -29,14 +29,16 @@ export const rezeConfig = {
   // ──────────────────────────────────────────
   // ABILITY MASTER TOGGLE SWITCHES (1/true = Enabled, 0/false = Disabled)
   // ──────────────────────────────────────────
-  enableMeleeCombo: true,           // Master toggle for Basic Attack: Explosive Martial Arts
+  enableMeleeCombo: true,           // Master toggle for Basic Attack: Explosive Martial Arts (Hybrid)
+  enableHiddenKnifeCombo: true,     // Master toggle for Light Attack String: Hidden Knife Combo (Human)
+  enableDiveBomb: true,             // Master toggle for Aerial Attack: Dive Bomb (Human)
   enableSparkFlechette: true,       // Master toggle for Primary Skill: Spark Flechette Barrage
-  enableDecoyBomb: 0,            // Master toggle for Secondary Skill: Decapitation Decoy
-  enableRocketLunge: 0,          // Master toggle for Mobility Skill: Supersonic Rocket Lunge
-  enableMegatonNuke: 0,          // Master toggle for Ultimate: Megaton Tsar Nuke
-  enableCollarPinRevive: 0,      // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
-  enableBlastPropulsion: 0,      // Master toggle for Passive 2: Rocket Jet Blast Dash
-  enableGunpowderResidue: 0,     // Master toggle for Passive 3: Gunpowder Stacks
+  enableDecoyBomb: true,            // Master toggle for Secondary Skill: Decapitation Decoy
+  enableRocketLunge: true,          // Master toggle for Mobility Skill: Supersonic Rocket Lunge
+  enableMegatonNuke: true,          // Master toggle for Ultimate: Megaton Tsar Nuke
+  enableCollarPinRevive: true,      // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
+  enableBlastPropulsion: true,      // Master toggle for Passive 2: Rocket Jet Blast Dash
+  enableGunpowderResidue: true,     // Master toggle for Passive 3: Gunpowder Stacks
 
   // Passive 1: Collar Pin Hybrid Physiology (Explosive Revive)
   maxReviveStocks: 1,               // 1 pin-pull revive per round
@@ -50,13 +52,30 @@ export const rezeConfig = {
   propulsionBurnDamage: 6,          // Scorch flame damage to enemies caught in jet trail
   propulsionTrailDecay: 0.04,
 
-  // Basic Attack: Explosive Martial Arts (120° Frontal Arc)
-  punchReach: 65,                   // Normal punch reach (75px in Bomb Form)
+  // Human Form — Light Attack String: Hidden Knife Combo (Fast Interrupts)
+  knifeDamage: 10,                  // Hits 1 & 2 low damage
+  knifeFinisherDamage: 16,          // Hit 3 sleeve blade thrust damage
+  knifeReach: 52,                   // Quick knife slice reach
+  knifeFinisherReach: 58,           // Finisher thrust reach
+  knifeCooldown: 10,                // Incredibly fast 10-frame startup/cooldown
+  knifeHitStun: 6,                  // Micro hit-stun duration to interrupt heavier opponents
+  knifeFinisherHitStun: 10,         // Finisher hit-stun duration
+
+  // Human Form — Aerial Attack: Dive Bomb (Shoulder Vault Stun)
+  diveBombCooldown: 220,            // ~3.6s cooldown
+  diveBombDamage: 22,               // Knife dive impact damage
+  diveBombSpeed: 22.0,              // High-speed aerial descent velocity
+  diveBombStunDuration: 22,         // Opponent shoulder vault stun frames
+  diveBombMinRange: 70,             // Minimum range to trigger aerial leap
+  diveBombMaxRange: 240,            // Maximum aerial dive target acquisition range
+
+  // Hybrid Form — Basic Attack: Explosive Martial Arts (120° Frontal Arc)
+  punchReach: 75,                   // Punch reach in Bomb Form (65px human fallback)
   punchArcAngle: (120 * Math.PI) / 180, // 120° frontal arc
   punchDamage: 16,                  // Hits 1 & 2 damage
   punchFinisherDamage: 28,          // Hit 3 (Spark Slap) palm blast damage
   punchFinisherKnockback: 32,       // Palm blast physical knockback force
-  punchAnimDuration: 14,            // Punch swing animation frames
+  punchAnimDuration: 16,            // Punch swing animation frames
 
   // Primary Skill: Spark Flechette Barrage (Finger Grenades)
   sparkCooldown: 180,               // 3.0s cooldown

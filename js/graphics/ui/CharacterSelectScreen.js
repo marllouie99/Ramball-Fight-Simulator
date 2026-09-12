@@ -1167,6 +1167,12 @@ export function getFighterWeaponInfo(def) {
       return { name: 'KNUCKLES, JETPACK, TEC-9 & MINIGUN', category: 'STREET BRAWLER // CHEAT ARSENAL', desc: 'Vintage cast-brass knuckles for CQC boxing, Area 69 Jetpack flight, Skill 3 Tec-9 drive-bys, and M134 Minigun.' };
     case 'makima':
       return { name: 'CONTROL DEVIL // "BANG!"', category: 'DEVIL // DOMINATION', desc: 'Instantaneous hitscan kinetic shockwaves with heavy knockback, Chains of Domination, 1000-Year Holy Spear, and Kyoto Shrine compression.' };
+    case 'reze':
+      return { name: 'BOMB DEVIL & CONCEALED BLADE', category: 'DEVIL // EXPLOSIVE RUSHDOWN', desc: 'Sleeve-concealed knife strings, 120° blast martial punches, Spark Flechette projectile spreads, Decoy Bombs, and Megaton Tsar Nuke.' };
+    case 'denji':
+      return { name: 'TWIN CHAINSAWS & POCHITA RIPCORD', category: 'DEVIL // BERSERKER', desc: 'Mechanical forearm and forehead chainsaws with high-RPM shredding, 25% lifesteal, engine lunges, and Pochita ripcord revive.' };
+    case 'power':
+      return { name: 'GIGANTIC BLOOD HAMMER & SCYTHE', category: 'DEVIL // BLOOD MANIPULATION', desc: 'Solidified crystalline blood warhammer with 140° ground shockwave stuns, 360° blood scythe whirlwinds, and Thousand Blood Daggers.' };
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:

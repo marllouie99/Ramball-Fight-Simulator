@@ -22,6 +22,8 @@ import { uryuConfig } from '../configs/characters/uryuConfig.js';
 import { ulquiorraConfig } from '../configs/characters/ulquiorraConfig.js';
 import { makimaConfig } from '../configs/characters/makimaConfig.js';
 import { rezeConfig } from '../configs/characters/rezeConfig.js';
+import { denjiConfig } from '../configs/characters/denjiConfig.js';
+import { powerConfig } from '../configs/characters/powerConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
 import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
@@ -53,6 +55,8 @@ export const CONFIG = {
   ulquiorra: ulquiorraConfig,
   makima: makimaConfig,
   reze: rezeConfig,
+  denji: denjiConfig,
+  power: powerConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1469,6 +1473,52 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: rezeConfig.projectileSpeedMultiplier || 1.0,
     ability: rezeConfig.ability || 'Bomb Devil & "Megaton Tsar Nuke"',
     desc: rezeConfig.desc || 'The Bomb Devil Hybrid. High-speed explosive brawler and Soviet assassin. Pulls collar pin to trigger an explosive revive and Bomb Devil transformation. Attacks with 120° blast punches, Spark Flechette projectile spreads, Decoy Bombs, Rocket Lunges, and the apocalyptic Megaton Tsar Nuke.',
+  },
+  {
+    id: 40,
+    name: 'DENJI',
+    category: 'Anime',
+    color: denjiConfig.color || '#EAB308', // Chainsaw Amber Gold
+    themeColor: denjiConfig.themeColor || '#EAB308',
+    secondaryColor: denjiConfig.secondaryColor || '#DC2626',
+    startX: denjiConfig.startX || 300,
+    startY: denjiConfig.startY || 250,
+    startVx: denjiConfig.startVx || 1.1,
+    startVy: denjiConfig.startVy || 1.0,
+    radius: denjiConfig.radius || denjiConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'denji',
+    hp: denjiConfig.hp || 360,
+    damage: denjiConfig.damage || 24,
+    cooldown: denjiConfig.cooldown || 24,
+    moveSpeed: denjiConfig.moveSpeed || denjiConfig.speed || 5.8,
+    projectileSpeedMultiplier: denjiConfig.projectileSpeedMultiplier || 1.0,
+    ability: denjiConfig.ability || 'Chainsaw Devil & "Massacre Engine"',
+    desc: denjiConfig.desc || 'The Chainsaw Devil. Relentless high-speed berserker entering the arena already fully transformed into his Chainsaw Devil form. Wields 140° Twin Forearm Chainsaw Shreds with 25% lifesteal, Engine Rev Lunges, Extended Chain Cleaves, Pochita Heart Revive, and the Massacre Engine ultimate.',
+  },
+  {
+    id: 41,
+    name: 'POWER',
+    category: 'Anime',
+    color: powerConfig.color || '#EF4444', // Crimson Blood Red
+    themeColor: powerConfig.themeColor || '#EF4444',
+    secondaryColor: powerConfig.secondaryColor || '#FDE047',
+    startX: powerConfig.startX || 300,
+    startY: powerConfig.startY || 250,
+    startVx: powerConfig.startVx || 1.1,
+    startVy: powerConfig.startVy || 1.0,
+    radius: powerConfig.radius || powerConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'power',
+    hp: powerConfig.hp || 330,
+    damage: powerConfig.damage || 26,
+    cooldown: powerConfig.cooldown || 30,
+    moveSpeed: powerConfig.moveSpeed || powerConfig.speed || 5.9,
+    projectileSpeedMultiplier: powerConfig.projectileSpeedMultiplier || 1.0,
+    ability: powerConfig.ability || 'Blood Fiend & "Blood Rain Cataclysm"',
+    desc: powerConfig.desc || 'The Blood Fiend. Chaotic blood manipulation tactician. Generates and absorbs Blood Orbs to empower her blood arsenal. Wields 140° Gigantic Blood Hammer smashes with shockwave stuns, 360° Blood Scythe whirlwinds, Thousand Blood Daggers homing barrages, and the Blood Rain Cataclysm ultimate.',
   }
 ];
 

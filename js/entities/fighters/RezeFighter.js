@@ -18,7 +18,7 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawRezeSkin } from '../../graphics/fighters/rezeSkin.js';
-import { drawRezeSpeedLines, drawSparkFlechette, drawRezeDecoy, drawRezePalmBlast, drawRezeMegatonNuke } from '../../graphics/weapons/rezeWeaponGraphics.js';
+import { drawRezeSpeedLines, drawSparkFlechette, drawRezeDecoy, drawRezePalmBlast, drawRezeMegatonNuke, drawRezePixelMartialArc, drawRezeKnifeSlash } from '../../graphics/weapons/rezeWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -44,12 +44,26 @@ export class RezeFighter extends Fighter {
 
     // Animation & Hands
     this.punchAnimTimer = 0;
-    this.punchMaxTime = cfg.punchAnimDuration || 14;
+    this.punchMaxTime = cfg.punchAnimDuration || 16;
     this.slashSwingTimer = 0;
     this.slashSwingMaxTimer = 14;
     this.hideFrontHand = false;
     this.hideBackHand = false;
     this.punchComboCount = 0;
+
+    // Human Form: Hidden Knife & Aerial Dive Bomb
+    this.activeKnifeSlashes = [];
+    this.isDiveBombing = false;
+    this.diveBombTimer = 0;
+    this.diveBombMaxTimer = 18;
+    this.diveBombCooldown = 0;
+    this.diveBombCooldownMax = cfg.diveBombCooldown || 220;
+    this.diveBombVx = 0;
+    this.diveBombVy = 0;
+    this.diveBombTarget = null;
+    this.isVaulting = false;
+    this.vaultTimer = 0;
+    this.vaultMaxTimer = 16;
 
     // Passive 1: Hybrid Physiology (Collar Pin Revive)
     this.reviveStocksMax = cfg.maxReviveStocks || 1;
@@ -86,6 +100,7 @@ export class RezeFighter extends Fighter {
     this.nukeTarget = null;
 
     // Visual effect tracking
+    this.activeMartialArcs = [];
     this.activePalmBlasts = [];
     this.activeNukeBlasts = [];
 
@@ -160,6 +175,14 @@ export class RezeFighter extends Fighter {
     this.nukePhase = 'IDLE';
     this.activeFlechettes = [];
     this.activeDecoys = [];
+    this.activeKnifeSlashes = [];
+    this.isDiveBombing = false;
+    this.diveBombTimer = 0;
+    this.diveBombCooldown = 0;
+    this.isVaulting = false;
+    this.vaultTimer = 0;
+    this.z = 0;
+    this.activeMartialArcs = [];
     this.activePalmBlasts = [];
     this.activeNukeBlasts = [];
   }
@@ -171,6 +194,9 @@ export class RezeFighter extends Fighter {
   interruptAttacks(forceCancelAll = false) {
     super.interruptAttacks(forceCancelAll);
     this.isRocketLunging = false;
+    this.isDiveBombing = false;
+    this.isVaulting = false;
+    this.z = 0;
     if (forceCancelAll) {
       this.isExecutingNuke = false;
       this.nukePhase = 'IDLE';
@@ -200,6 +226,7 @@ export class RezeFighter extends Fighter {
     if (this.decoyCooldown > 0) this.decoyCooldown--;
     if (this.rocketCooldown > 0) this.rocketCooldown--;
     if (this.nukeCooldown > 0) this.nukeCooldown--;
+    if (this.diveBombCooldown > 0) this.diveBombCooldown--;
 
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
@@ -216,10 +243,12 @@ export class RezeFighter extends Fighter {
     this._updateDecoys();
     this._updateRocketLunge();
     this._updateMegatonNuke();
+    this._updateDiveBomb();
+    this._updateVault();
     this._updateVisualExplosions();
 
-    // 5. If busy with stationary ultimate or rocket lunge, skip standard steering
-    if (this.isExecutingNuke || this.isRocketLunging) {
+    // 5. If busy with stationary ultimate, rocket lunge, dive bomb, or vault, skip standard steering
+    if (this.isExecutingNuke || this.isRocketLunging || this.isDiveBombing || this.isVaulting) {
       return;
     }
 
@@ -306,10 +335,228 @@ export class RezeFighter extends Fighter {
       return;
     }
 
-    // 5. Basic Attack: Explosive Martial Arts (120° Frontal Arc Melee)
-    const punchReach = (this.isHybridModeActive ? 75 : 65);
-    if (dist <= punchReach && this.shootCooldown <= 0) {
-      this._performExplosivePunch(target);
+    // 5. Basic Attacks (Human vs Bomb Devil Hybrid Form)
+    if (!this.isHybridModeActive) {
+      // A. Aerial Attack: Dive Bomb (Target at mid-range 70px - 240px)
+      const minDive = cfg.diveBombMinRange || 70;
+      const maxDive = cfg.diveBombMaxRange || 240;
+      if (this.diveBombCooldown <= 0 && (cfg.enableDiveBomb ?? true) && dist >= minDive && dist <= maxDive) {
+        this._performDiveBomb(target);
+        return;
+      }
+
+      // B. Light Attack String: Hidden Knife Combo (Close-quarters, fast 10-frame interrupts)
+      const knifeReach = cfg.knifeReach || 52;
+      if (dist <= knifeReach + (target.r || 25) && this.shootCooldown <= 0 && (cfg.enableHiddenKnifeCombo ?? true)) {
+        this._performHiddenKnifeCombo(target);
+        return;
+      }
+    } else {
+      // Hybrid Form — Basic Attack: Explosive Martial Arts (120° Frontal Arc Melee)
+      const punchReach = cfg.punchReach || 75;
+      if (dist <= punchReach + (target.r || 25) && this.shootCooldown <= 0 && (cfg.enableMeleeCombo ?? true)) {
+        this._performExplosivePunch(target);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Human Form: Light Attack String (Hidden Knife Combo)
+   * A rapid, 3-hit combo pulling a concealed tactical knife from her sleeve.
+   * Low damage (10, 10, 16), incredibly fast 10-frame startup, easily interrupts heavier opponents with micro hit-stuns.
+   */
+  _performHiddenKnifeCombo(primaryTarget) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+    this.punchComboCount = (this.punchComboCount + 1) % 3;
+    const isFinisher = (this.punchComboCount === 0);
+
+    const animDuration = isFinisher ? 12 : (cfg.knifeCooldown || 10);
+    this.punchAnimTimer = animDuration;
+    this.punchMaxTime = animDuration;
+    this.shootCooldown = animDuration;
+
+    const reach = isFinisher ? (cfg.knifeFinisherReach || 58) : (cfg.knifeReach || 52);
+    const arcAngle = isFinisher ? ((75 * Math.PI) / 180) : ((100 * Math.PI) / 180);
+    const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+
+    const dmg = isFinisher ? (cfg.knifeFinisherDamage || 16) : (cfg.knifeDamage || 10);
+    const kbForce = isFinisher ? 14 : 4;
+    const stunDuration = isFinisher ? (cfg.knifeFinisherHitStun || 10) : (cfg.knifeHitStun || 6);
+
+    const targets = this._getEntitiesInFrontalArc(aimAngle, arcAngle, reach);
+
+    if (targets.length > 0) {
+      if (isFinisher) {
+        audioSystem.playSFX('Assets/Sound Effects/Attacks/sword3.mp3', 0.65);
+      } else if (this.punchComboCount === 1) {
+        audioSystem.playSFX('Assets/Sound Effects/Attacks/sword1.mp3', 0.50);
+      } else {
+        audioSystem.playSFX('Assets/Sound Effects/Attacks/sword2.mp3', 0.50);
+      }
+    }
+
+    for (let target of targets) {
+      applyDamageToTarget(target, dmg, this, true);
+      spawnBloodEffect(target.x, target.y);
+      spawnSparks(target.x, target.y, isFinisher ? 8 : 4, '#E2E8F0');
+
+      const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
+      target.knockbackVx = Math.cos(kbAngle) * kbForce;
+      target.knockbackVy = Math.sin(kbAngle) * kbForce;
+
+      // Micro hit-stun for fast interrupts (Rule 5: hit-stop exclusively on target)
+      if (typeof target.applyTimeStop === 'function') {
+        target.applyTimeStop(stunDuration);
+      }
+    }
+
+    if (isFinisher) {
+      spawnFloatingText(this.x, this.y - 25, 'SLEEVE BLADE!', '#E2E8F0');
+    }
+
+    // Spawn surgical steel knife slash visual
+    const sweepDir = (this.punchComboCount === 2 ? -1 : 1);
+    this.activeKnifeSlashes.push({
+      x: this.x,
+      y: this.y,
+      angle: aimAngle,
+      arc: arcAngle,
+      radius: reach,
+      timer: animDuration + 4,
+      maxTimer: animDuration + 4,
+      sweepDir: sweepDir,
+      isThrust: isFinisher
+    });
+  }
+
+  /**
+   * Human Form: Aerial Attack (Dive Bomb)
+   * Leaps airborne and dives diagonally downward with knife.
+   * On contact: stuns opponent and vaults acrobatically off their shoulder with reverse recoil.
+   */
+  _performDiveBomb(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+    this.diveBombCooldown = this.diveBombCooldownMax;
+    this.isDiveBombing = true;
+    this.diveBombTimer = this.diveBombMaxTimer;
+    this.diveBombTarget = target;
+    this.z = 24; // Airborne leap height
+
+    const angle = Math.atan2(target.y - this.y, target.x - this.x);
+    const speed = cfg.diveBombSpeed || 22.0;
+    this.diveBombVx = Math.cos(angle) * speed;
+    this.diveBombVy = Math.sin(angle) * speed;
+    this.gunAngle = angle;
+
+    audioSystem.playSFX('Assets/Sound Effects/Skills/dash2.mp3', 0.80);
+    spawnFloatingText(this.x, this.y - 25, 'DIVE BOMB!', '#E2E8F0');
+  }
+
+  _updateDiveBomb() {
+    if (!this.isDiveBombing) return;
+
+    this.diveBombTimer--;
+    this.x += this.diveBombVx;
+    this.y += this.diveBombVy;
+
+    const descentProgress = 1.0 - (this.diveBombTimer / this.diveBombMaxTimer);
+    this.z = Math.max(0, 24 * (1.0 - descentProgress * 0.85));
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+    let hitTarget = null;
+
+    for (let t of allTargets) {
+      if (!t || t === this || t.isDead || (t.hp || 0) <= 0 || t.isInvulnerable) continue;
+      const d = Math.hypot(t.x - this.x, t.y - this.y);
+      if (d <= (this.r || 25) + (t.r || 25) + 12) {
+        hitTarget = t;
+        break;
+      }
+    }
+
+    if (hitTarget) {
+      const dmg = cfg.diveBombDamage || 22;
+      const stunFrames = cfg.diveBombStunDuration || 22;
+
+      applyDamageToTarget(hitTarget, dmg, this, true);
+      spawnBloodEffect(hitTarget.x, hitTarget.y);
+      spawnSparks(hitTarget.x, hitTarget.y, 14, '#FFFFFF');
+
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/sword3.mp3', 0.75);
+      audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.65);
+      triggerGlobalScreenShake(3.0, 10);
+
+      if (typeof hitTarget.applyTimeStop === 'function') {
+        hitTarget.applyTimeStop(stunFrames);
+      }
+      hitTarget.hitStunTimer = Math.max(hitTarget.hitStunTimer || 0, stunFrames);
+
+      const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      this.activeKnifeSlashes.push({
+        x: hitTarget.x,
+        y: hitTarget.y,
+        angle: aimAngle,
+        arc: (120 * Math.PI) / 180,
+        radius: 60,
+        timer: 16,
+        maxTimer: 16,
+        sweepDir: 1,
+        isThrust: true
+      });
+
+      // Acrobatic Shoulder Vault Off Opponent
+      this.isDiveBombing = false;
+      this.isVaulting = true;
+      this.vaultTimer = this.vaultMaxTimer;
+      this.z = 28;
+
+      const recoilAngle = aimAngle + Math.PI;
+      const vaultRecoilForce = 9.5;
+      this.knockbackVx = Math.cos(recoilAngle) * vaultRecoilForce;
+      this.knockbackVy = Math.sin(recoilAngle) * vaultRecoilForce;
+
+      spawnFloatingText(this.x, this.y - 30, 'VAULT!', '#FFE600');
+      return;
+    }
+
+    const arena = CONFIG.arena;
+    if (arena) {
+      if (this.x < arena.x + this.r || this.x > arena.x + arena.width - this.r ||
+          this.y < arena.y + this.r || this.y > arena.y + arena.height - this.r) {
+        this.isDiveBombing = false;
+        this.z = 0;
+      }
+    }
+
+    if (this.diveBombTimer <= 0) {
+      this.isDiveBombing = false;
+      this.z = 0;
+    }
+  }
+
+  _updateVault() {
+    if (!this.isVaulting) return;
+
+    this.vaultTimer--;
+    const p = 1.0 - (this.vaultTimer / this.vaultMaxTimer);
+    this.z = Math.max(0, Math.sin((1.0 - p) * Math.PI) * 28);
+
+    this.knockbackVx *= 0.88;
+    this.knockbackVy *= 0.88;
+    this.x += this.knockbackVx;
+    this.y += this.knockbackVy;
+
+    const arena = CONFIG.arena;
+    if (arena) {
+      this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
+      this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
+    }
+
+    if (this.vaultTimer <= 0) {
+      this.isVaulting = false;
+      this.z = 0;
     }
   }
 
@@ -358,19 +605,24 @@ export class RezeFighter extends Fighter {
     }
 
     if (isFinisher) {
-      // Spawn visual palm blast cone
-      this.activePalmBlasts.push({
-        x: this.x,
-        y: this.y,
-        angle: aimAngle,
-        arc: arcAngle,
-        radius: punchReach * 1.3,
-        timer: 16,
-        maxTimer: 16
-      });
       triggerGlobalScreenShake(3.5, 10);
       spawnFloatingText(this.x, this.y - 30, 'SPARK SLAP!', '#FF6B1A');
     }
+
+    // Spawn 120° Frontal Pixel Martial Arc / Detonation Visuals
+    const sweepDir = (this.punchComboCount === 2 ? -1 : 1);
+    this.activeMartialArcs.push({
+      x: this.x,
+      y: this.y,
+      angle: aimAngle,
+      arc: arcAngle,
+      radius: isFinisher ? punchReach * 1.35 : punchReach * 1.15,
+      timer: isFinisher ? 26 : 18,
+      maxTimer: isFinisher ? 26 : 18,
+      isFinisher: isFinisher,
+      isHybrid: this.isHybridModeActive,
+      sweepDir: sweepDir
+    });
   }
 
   /**
@@ -720,6 +972,16 @@ export class RezeFighter extends Fighter {
   }
 
   _updateVisualExplosions() {
+    for (let i = this.activeKnifeSlashes.length - 1; i >= 0; i--) {
+      const k = this.activeKnifeSlashes[i];
+      k.timer--;
+      if (k.timer <= 0) this.activeKnifeSlashes.splice(i, 1);
+    }
+    for (let i = this.activeMartialArcs.length - 1; i >= 0; i--) {
+      const a = this.activeMartialArcs[i];
+      a.timer--;
+      if (a.timer <= 0) this.activeMartialArcs.splice(i, 1);
+    }
     for (let i = this.activePalmBlasts.length - 1; i >= 0; i--) {
       const b = this.activePalmBlasts[i];
       b.timer--;
@@ -793,7 +1055,15 @@ export class RezeFighter extends Fighter {
     // 4. Main Skin Body & Hands
     drawRezeSkin(ctx, this);
 
-    // 5. Active Blast Overlays
+    // 5. Active Concealed Knife Slashes (Human Form)
+    for (let s of this.activeKnifeSlashes) {
+      drawRezeKnifeSlash(ctx, s);
+    }
+
+    // 6. Active Pixel Martial Arcs & Blast Overlays (Hybrid Form)
+    for (let a of this.activeMartialArcs) {
+      drawRezePixelMartialArc(ctx, a);
+    }
     for (let b of this.activePalmBlasts) {
       drawRezePalmBlast(ctx, b);
     }

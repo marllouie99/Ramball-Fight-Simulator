@@ -35,6 +35,10 @@ export function initGraphicsCache() {
     'Assets/model/Nanami-weapon.png',
     'Assets/model/MAHITO-CLAWS-WEAPON.png',
     'Assets/model/UlquiorraCifer-weapon.png',
+    'Assets/model/POWER-MODEL-SKIN.png',
+    'Assets/model/Makima-model-skin.png',
+    'Assets/model/REZE-MODEL-SKIN.png',
+    'Assets/model/denji-devilform-model-skin.png',
     'Assets/Overlays/mahitos-de.png'
   ];
   models.forEach(preloadImage);

@@ -737,6 +737,27 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
     volume: 0.6,
     delay: 0,
+  },
+
+  // Reze — The Bomb Devil
+  'reze': {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // Denji — The Chainsaw Devil
+  'denji': {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
+
+  // Power — The Blood Fiend
+  'power': {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.75,
+    delay: 0,
   }
 };
 

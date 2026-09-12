@@ -17,6 +17,46 @@ function snap(v) {
   return Math.round(v / P) * P;
 }
 
+let _rezeSkinImage = null;
+let _rezeSkinImageLoading = false;
+
+export function _getRezeSkinImage() {
+  if (_rezeSkinImage && _rezeSkinImage.complete && _rezeSkinImage.naturalWidth > 0) {
+    return _rezeSkinImage;
+  }
+  if (!_rezeSkinImageLoading && typeof Image !== 'undefined') {
+    _rezeSkinImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _rezeSkinImage = img;
+      _rezeSkinImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Reze pixel skin image at Assets/model/REZE-MODEL-SKIN.png', e);
+      _rezeSkinImageLoading = false;
+    };
+    img.src = 'Assets/model/REZE-MODEL-SKIN.png?v=1';
+    _rezeSkinImage = img;
+  }
+  return _rezeSkinImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getRezeSkinImage();
+}
+
+function _getMartialLungeCurve(p) {
+  if (p <= 0) return 0;
+  if (p >= 1) return 0;
+  if (p < 0.25) {
+    return Math.sin((p / 0.25) * (Math.PI * 0.5));
+  } else if (p < 0.60) {
+    return 1.0;
+  } else {
+    return Math.cos(((p - 0.60) / 0.40) * (Math.PI * 0.5));
+  }
+}
+
 /**
  * Main Skin Renderer for Reze (Human Form & Bomb Devil Hybrid Form)
  */
@@ -44,30 +84,43 @@ export function drawRezeSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // 2. Punch & Lunge States
+  // 2. Punch & Lunge & Dive Bomb States
   const isPunching = !isPodiumPreview && !isSuppressed && (fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
-  const isLunge = !isPodiumPreview && !isSuppressed && (fighter.isRocketLunging);
+  const isLunge = !isPodiumPreview && !isSuppressed && Boolean(fighter.isRocketLunging);
+  const isDiveBomb = !isPodiumPreview && !isSuppressed && Boolean(fighter.isDiveBombing);
   const punchPhase = isPunching ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14))) : 0;
   const punchCycle = fighter.punchComboCount || 0;
 
   // 3. LAYER 1: BACK HAND (Behind Body Circle Layer)
   // Hidden during podium preview & model inspection to show clean character details (Rule 20)
-  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && (isPunching || isLunge);
+  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && (isPunching || isLunge || isDiveBomb);
   if (showBackHand) {
-    _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, now);
+    _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now);
   }
 
   // 4. LAYER 2: MAIN BODY CIRCLE (Middle Layer)
   if (isHybrid) {
     drawRezeBombHybridBody(ctx, r, now);
   } else {
-    drawRezeHumanPixelBody(ctx, r, now);
+    const rezeImg = _getRezeSkinImage();
+    if (rezeImg && rezeImg.complete && rezeImg.naturalWidth > 0) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      const drawW = r * (1016 / 437);
+      const drawH = r * (984 / 437);
+      const shiftX = r * (480 / 437);
+      const shiftY = r * (500 / 437);
+      ctx.drawImage(rezeImg, -shiftX, -shiftY, drawW, drawH);
+      ctx.restore();
+    } else {
+      drawRezeHumanPixelBody(ctx, r, now);
+    }
   }
 
   // 5. LAYER 3: FRONT HAND (Front Layer — On Top of Body)
-  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand && (isPunching || isLunge);
+  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand && (isPunching || isLunge || isDiveBomb);
   if (showFrontHand) {
-    _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, now);
+    _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now);
   }
 
   ctx.restore();
@@ -669,45 +722,202 @@ export function drawRezeBombHybridBody(ctx, r, now) {
 }
 
 /**
+ * Draws Reze's Concealed Tactical Knife (Pulled from sleeve in Human Form)
+ */
+function _drawRezeConcealedKnife(ctx, hx, hy, handSize, bladeAngle = 0, isReverseGrip = false) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(bladeAngle);
+  if (isReverseGrip) {
+    ctx.rotate(Math.PI * 0.65);
+  }
+
+  // 1. Charcoal Tactical Grip Handle
+  ctx.fillStyle = '#1A1D24';
+  ctx.fillRect(-P * 2.5, -P, P * 2.5, P * 2);
+
+  // 2. Metallic Crossguard Bolster
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillRect(0, -P * 1.5, P, P * 3);
+
+  // 3. Double-Edged Drop-Point Surgical Steel Blade
+  const bladeLen = P * 7; // 14px blade length
+  for (let x = P; x <= bladeLen; x += P) {
+    const norm = (x - P) / (bladeLen - P);
+    const halfW = (norm > 0.65) ? (1.0 - (norm - 0.65) / 0.35) * P : P;
+
+    ctx.fillStyle = '#0F172A'; // Dark outline
+    ctx.fillRect(x, snap(-halfW - P), P, snap(halfW * 2 + P * 2));
+
+    ctx.fillStyle = (x >= bladeLen - P) ? '#FFFFFF' : '#E2E8F0'; // Silver blade body
+    ctx.fillRect(x, snap(-halfW), P, snap(halfW * 2));
+
+    ctx.fillStyle = '#FFFFFF'; // Top cutting edge glint
+    ctx.fillRect(x, snap(-halfW), P, P * 0.6);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws discrete pixel-art combustion sparks and flame halo at the striking fist/palm (Hybrid Form)
+ */
+function _drawRezeHandPixelCombustion(ctx, hx, hy, handSize, isFinisher, punchPhase, now) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const intensity = _getMartialLungeCurve(punchPhase);
+
+  ctx.save();
+  ctx.translate(hx, hy);
+
+  // 1. Incandescent Core Pixel Cross
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-P, -P, P * 2, P * 2);
+
+  // 2. Bright Spark Gold Collar
+  ctx.fillStyle = '#FFE600';
+  ctx.fillRect(-P * 2, -P, P, P * 2);
+  ctx.fillRect(P, -P, P, P * 2);
+  ctx.fillRect(-P, -P * 2, P * 2, P);
+  ctx.fillRect(-P, P, P * 2, P);
+
+  // 3. Tangerine / Molten Flame Envelope
+  ctx.fillStyle = '#FF2E00';
+  ctx.fillRect(-P * 3, -P * 0.5, P, P);
+  ctx.fillRect(P * 2, -P * 0.5, P, P);
+  ctx.fillRect(-P * 0.5, -P * 3, P, P);
+  ctx.fillRect(-P * 0.5, P * 2, P, P);
+
+  // 4. Finisher "Spark Slap" Multi-Pixel Flare & Flying Embers
+  if (isFinisher) {
+    const flareR = snap(handSize * (1.2 + intensity * 0.8));
+    ctx.fillStyle = '#FFE600';
+    ctx.fillRect(flareR, -P, P * 1.5, P * 2);
+    ctx.fillRect(-flareR, -P, P * 1.5, P * 2);
+    ctx.fillRect(-P, flareR, P * 2, P * 1.5);
+    ctx.fillRect(-P, -flareR, P * 2, P * 1.5);
+
+    // Flying spark pixels
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2 + (now * 0.01);
+      const dist = snap(handSize * 1.8 + Math.sin(now * 0.02 + i) * 6);
+      const sx = snap(Math.cos(ang) * dist);
+      const sy = snap(Math.sin(ang) * dist);
+      ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : '#FF6B1A';
+      ctx.fillRect(sx, sy, P, P);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
  * Renders Reze's Back Hand (Layer 1 - Behind Body Circle) during active combat
  */
-function _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, now) {
+function _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now) {
   const handSize = getHandSize(r * 0.22);
   const skinColor = isHybrid ? '#23212C' : '#FFE6D8';
   const outlineColor = '#14101A';
 
   let hx = r * 0.90;
   let hy = r * 0.35;
+  let activeCombustion = false;
+  let drawKnife = false;
+  let knifeAngle = 0;
+  const isFinisher = isPunching && (punchCycle === 0);
+  const lungeProgress = isPunching ? _getMartialLungeCurve(punchPhase) : 0;
 
-  if (isPunching && (punchCycle % 2 === 1)) {
-    const lunge = Math.sin(punchPhase * Math.PI) * (r * 1.35);
-    hx += lunge;
-    hy = 0;
-  } else if (isLunge) {
+  if (isPunching) {
+    if (punchCycle === 2) {
+      // Hit 2: Right Cross Chop lunge from the back hand with knife
+      hx += lungeProgress * (r * 1.55);
+      hy = r * 0.15;
+      activeCombustion = isHybrid && (punchPhase > 0.08 && punchPhase < 0.88);
+      drawKnife = !isHybrid && (punchPhase > 0.05 && punchPhase < 0.95);
+      knifeAngle = 0.25;
+    } else if (punchCycle === 0) {
+      // Hit 3 (Finisher): Step-in tactical support hand
+      hx += lungeProgress * (r * 1.40);
+      hy = r * 0.20;
+      activeCombustion = isHybrid && (punchPhase > 0.05 && punchPhase < 0.92);
+    } else {
+      // Hit 1: Tight back-guard absorbing recoil
+      hx -= lungeProgress * (r * 0.20);
+      hy = r * 0.30;
+    }
+  } else if (isLunge || isDiveBomb) {
     hx += r * 0.40;
   }
 
   drawPixelHand(ctx, hx, hy, handSize, skinColor, outlineColor);
+
+  if (drawKnife) {
+    _drawRezeConcealedKnife(ctx, hx + handSize * 0.5, hy, handSize, knifeAngle, false);
+  }
+
+  if (activeCombustion) {
+    _drawRezeHandPixelCombustion(ctx, hx + handSize * 0.6, hy, handSize, isFinisher, punchPhase, now);
+  }
 }
 
 /**
  * Renders Reze's Front Hand (Layer 3 - On Top of Body Circle) during active combat
  */
-function _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, now) {
+function _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now) {
   const handSize = getHandSize(r * 0.22);
   const skinColor = isHybrid ? '#23212C' : '#FFE6D8';
   const outlineColor = '#14101A';
 
   let hx = r * 0.20;
   let hy = r * 0.40;
+  let activeCombustion = false;
+  let drawKnife = false;
+  let knifeAngle = 0;
+  let reverseGrip = false;
+  const isFinisher = isPunching && (punchCycle === 0);
+  const lungeProgress = isPunching ? _getMartialLungeCurve(punchPhase) : 0;
 
-  if (isPunching && (punchCycle % 2 === 0)) {
-    const lunge = Math.sin(punchPhase * Math.PI) * (r * 1.45);
-    hx += lunge;
-    hy = 0;
+  if (isDiveBomb) {
+    // Aerial Attack: Dive Bomb knife held in downward reverse grip
+    hx = r * 1.10;
+    hy = r * 0.20;
+    drawKnife = !isHybrid;
+    knifeAngle = 0.45;
+    reverseGrip = true;
+  } else if (isPunching) {
+    if (punchCycle === 1) {
+      // Hit 1: Quick knife forehand draw & slash from sleeve
+      hx += lungeProgress * (r * 1.60);
+      hy = -r * 0.05;
+      activeCombustion = isHybrid && (punchPhase > 0.08 && punchPhase < 0.88);
+      drawKnife = !isHybrid && (punchPhase > 0.05 && punchPhase < 0.95);
+      knifeAngle = -0.20;
+    } else if (punchCycle === 0) {
+      // Hit 3: Concealed Knife Thrust / Cleave Finisher
+      hx += lungeProgress * (r * 1.75);
+      hy = 0;
+      activeCombustion = isHybrid && (punchPhase > 0.05 && punchPhase < 0.92);
+      drawKnife = !isHybrid && (punchPhase > 0.05 && punchPhase < 0.95);
+      knifeAngle = 0;
+    } else {
+      // Hit 2: Front hand pulls back into recoil guard
+      hx -= lungeProgress * (r * 0.15);
+      hy = r * 0.35;
+    }
   } else if (isLunge) {
     hx += r * 0.60;
   }
 
   drawPixelHand(ctx, hx, hy, handSize, skinColor, outlineColor);
+
+  if (drawKnife) {
+    _drawRezeConcealedKnife(ctx, hx + handSize * 0.6, hy, handSize, knifeAngle, reverseGrip);
+  }
+
+  if (activeCombustion) {
+    _drawRezeHandPixelCombustion(ctx, hx + handSize * 0.8, hy, handSize, isFinisher, punchPhase, now);
+  }
 }

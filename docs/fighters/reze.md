@@ -77,12 +77,35 @@ When Reze's HP drops to 0 for the first time in a round:
 
 ## ⚔️ Active Skills & Moveset
 
-### 👊 Basic Attack: Explosive Martial Arts (120° Frontal Arc Blast Punches)
-* **Type**: Close-Quarters Brawler Multi-Strike (Rule 7/8 Multi-Target Arc)
-* **Arc / Reach**: `120° frontal cone`, `65px reach`
+### 🗡️ Basic Attack (Human Form): Light Attack String — Concealed Knife Combo
+* **Type**: Ultra-Fast Melee Assassin String (Rule 7/8 Multi-Target Arc)
+* **Visual Style**: Surgical steel blade crescents rasterized in solid 2D Cartesian pixel art (`#FFFFFF` razor cutting edge, `#F1F5F9` silver core, `#CBD5E1` midtone, `#64748B` spine, `#0F172A` ink outline, and apex metallic glint).
+* **Mechanics**: A rapid 3-hit combo where Reze pulls a concealed tactical knife from her sleeve. Deals low base damage but features an incredibly fast 10-frame startup/cooldown, allowing her to easily interrupt heavier opponents with micro hit-stuns.
 * **Combo Pattern**:
-  * **Hit 1 & 2**: Rapid spark-infused chops dealing `16` physical damage + `1` Gunpowder stack.
-  * **Hit 3 (Finisher - Spark Slap)**: Reze steps in and detonates a palm explosion dealing `28` damage, knocking targets back across the arena, and detonating all active Gunpowder stacks.
+  * **Hit 1 (Forehand Quick Slash)**: Instantaneous sleeve-draw slash dealing `10` damage and applying a `6-frame` micro hit-stun interrupt.
+  * **Hit 2 (Backhand Cross Slash)**: Rapid reverse-angle slash dealing `10` damage and applying a `6-frame` micro hit-stun interrupt.
+  * **Hit 3 (Finisher — Sleeve Blade Thrust)**: Precise drop-point thrust dealing `16` damage + `14` knockback with a `10-frame` hit-stun.
+
+---
+
+### 🦅 Aerial Attack (Human Form): Dive Bomb & Shoulder Vault Stun
+* **Type**: High-Speed Aerial Plunge & Acrobatic Vault
+* **Cooldown**: `220 frames` (~3.6s)
+* **Range**: `70px – 240px` mid-range acquisition
+* **Mechanics**:
+  * Reze leaps airborne (`z = 24`) and dives diagonally downward at supersonic velocity (`22 px/frame`) striking with her knife held in reverse grip.
+  * **Contact & Vault**: If the dive connects with an opponent, it deals `22` damage and leaves them stunned for `22 frames`. Reze instantly uses the opponent's shoulder to vault high into the air (`z = 28`), springing backward with controlled recoil to create safe spacing or set up follow-up attacks.
+
+---
+
+### 👊 Basic Attack (Bomb Devil Hybrid Form): Explosive Martial Arts (120° Frontal Arc)
+* **Type**: Heavy Explosive Brawler Multi-Strike (Rule 7/8 Multi-Target Arc)
+* **Visual Style**: Discrete retro pixel art (`P = 2.0`) with stepped shockwave boundaries, jagged flame teeth, and flying ember debris.
+* **Arc / Reach**: `120° frontal cone`, `75px reach`
+* **Combo Pattern**:
+  * **Hit 1 (Left Palm Snap)**: Left-handed forward snap strike spawning a sweeping 120° pixelated combustion crescent arc (`#FF6B1A` / `#FFE600` / `#FFFFFF` core with `#14101A` ink outline) and knuckle spark flare, dealing `16` damage + `1` Gunpowder stack.
+  * **Hit 2 (Right Cross Chop)**: Right-handed counter-chop spawning an opposing sweep 120° pixel arc with dispersing pixel embers, dealing `16` damage + `1` Gunpowder stack.
+  * **Hit 3 (Finisher — "Spark Slap" Palm Detonation)**: Step-in explosive two-handed palm thrust triggering a massive 120° multi-layered pixel blast cone with jagged flame teeth, gunpowder smoke cloud fringes, supersonic compression shock arc, and flying shrapnel pixels dealing `28` damage + `32` knockback.
 
 ---
 

@@ -20,7 +20,7 @@ function renderPreviewForDef(def, cacheKey) {
     startX: previewSize / 2,
     startY: previewSize / 2,
   });
-  const isUpright = def.type === 'uryu' || def.type === 'ulquiorra' || def.type === 'reze' || def.type === 'makima' || def.type === 'toji' || def.type === 'nanami' || def.type === 'yuji' || def.type === 'yuta' || def.type === 'gojo' || def.type === 'sukuna' || def.type === 'saitama' || def.type === 'genos' || def.type === 'ichigo' || def.type === 'mahito' || def.type === 'megumi' || def.type === 'nobara' || def.category === 'Anime';
+  const isUpright = def.type === 'denji' || def.type === 'power' || def.type === 'uryu' || def.type === 'ulquiorra' || def.type === 'reze' || def.type === 'makima' || def.type === 'toji' || def.type === 'nanami' || def.type === 'yuji' || def.type === 'yuta' || def.type === 'gojo' || def.type === 'sukuna' || def.type === 'saitama' || def.type === 'genos' || def.type === 'ichigo' || def.type === 'mahito' || def.type === 'megumi' || def.type === 'nobara' || def.category === 'Anime';
   previewFighter.angle = 0; // Static angle for consistent previews
   previewFighter.gunAngle = isUpright ? 0 : Math.PI / 4; // Upright fighters aim forward
   if (def.type === 'uryu') {
@@ -28,6 +28,9 @@ function renderPreviewForDef(def, cacheKey) {
   }
   if (def.type === 'reze') {
     previewFighter.isHybridModeActive = Boolean(state.showRezeTransformation);
+  }
+  if (def.type === 'denji') {
+    previewFighter.isHybridModeActive = true; // Permanently devil form
   }
   
   try {
@@ -61,8 +64,13 @@ function getFighterPreview(index, category = null) {
   const cat = category || (typeof state !== 'undefined' ? state.gameCategory : 'foc');
   const defs = getActiveFighterDefs(cat);
   const def = defs[index] || FIGHTER_DEFS[index];
-  const rezeSuffix = (def && def.type === 'reze') ? (state.showRezeTransformation ? '_bomb' : '_human') : '';
-  const cacheKey = `${cat}_${index}${rezeSuffix}`;
+  let toggleSuffix = '';
+  if (def && def.type === 'reze') {
+    toggleSuffix = state.showRezeTransformation ? '_bomb' : '_human';
+  } else if (def && def.type === 'denji') {
+    toggleSuffix = (state.showDenjiTransformation === false) ? '_human' : '_chainsaw';
+  }
+  const cacheKey = `${cat}_${index}${toggleSuffix}`;
   if (!fighterPreviewCache[cacheKey]) {
     renderPreviewForDef(def, cacheKey);
   }

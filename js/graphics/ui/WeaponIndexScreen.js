@@ -30,6 +30,8 @@ import { drawUryuBow } from '../weapons/uryuWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
 import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
+import { drawDenjiWeaponPreview } from '../weapons/denjiWeaponGraphics.js';
+import { drawPowerWeaponPreview } from '../weapons/powerWeaponGraphics.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -319,6 +321,7 @@ function drawWeaponMenu() {
       state.showWeaponModel = true;
       state.showSummonModel = false;
       state.showSkinOnly = false;
+      state.hideDenjiChainsaws = false;
       state.skillDemoSpeed = 1.0;
       state.skillDemoPaused = false;
       _reviewDummy.reset();
@@ -897,6 +900,44 @@ function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, curre
         } catch (e) {}
       }
     });
+  } else if (def.type === 'denji') {
+    // Denji is permanently in Chainsaw Devil form — no human form toggle
+    const isChainsawHidden = Boolean(state.hideDenjiChainsaws);
+    buttons.push({
+      text: isChainsawHidden ? '🪚 SHOW CHAINSAW' : '🚫 HIDE CHAINSAW',
+      active: isChainsawHidden,
+      width: 140,
+      action: () => {
+        state.hideDenjiChainsaws = !state.hideDenjiChainsaws;
+        if (state.previewFighter) {
+          state.previewFighter.hideChainsaws = state.hideDenjiChainsaws;
+          state.previewFighter.hideHands = state.hideDenjiChainsaws;
+          state.previewFighter.hideFrontHand = state.hideDenjiChainsaws;
+          state.previewFighter.hideBackHand = state.hideDenjiChainsaws;
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+  } else if (def.type === 'power') {
+    state.powerWeaponIndex = state.powerWeaponIndex || 0;
+    buttons.push({
+      text: '🔨 BLOOD HAMMER',
+      active: state.powerWeaponIndex === 0,
+      width: 135,
+      action: () => {
+        state.powerWeaponIndex = 0;
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '🗡️ BLOOD SCYTHE',
+      active: state.powerWeaponIndex === 1,
+      width: 135,
+      action: () => {
+        state.powerWeaponIndex = 1;
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
   }
 
   if (buttons.length === 0) return;
@@ -1297,6 +1338,12 @@ function drawWeaponDetailScreen() {
       previewFighter.previewWeaponIndex = cjIdx;
     } else if (def.type === 'reze') {
       previewFighter.isHybridModeActive = Boolean(state.showRezeTransformation);
+    } else if (def.type === 'denji') {
+      previewFighter.isHybridModeActive = true; // Permanently devil form
+      previewFighter.hideChainsaws = Boolean(state.hideDenjiChainsaws);
+      previewFighter.hideHands = Boolean(state.hideDenjiChainsaws);
+      previewFighter.hideFrontHand = Boolean(state.hideDenjiChainsaws);
+      previewFighter.hideBackHand = Boolean(state.hideDenjiChainsaws);
     }
 
     try {
@@ -1823,7 +1870,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
   else if (type === 'cronos') offsetX = -55;
   else if (type === 'ruby') offsetX = -75;
-  else if (type === 'toji') offsetX = -40;
+  else if (type === 'toji' || type === 'denji' || type === 'power') offsetX = -40;
   else if (type === 'yuta') offsetX = -40;
   else if (type === 'megumi') offsetX = -45;
   else if (type === 'layla') offsetX = -30;
@@ -2105,6 +2152,16 @@ function drawWeaponPreview(ctx, type, color) {
         } else {
           drawCjTec9(ctx, 0, 0, 1.35, 0, 0);
         }
+        return;
+      }
+
+      case 'denji':
+        drawDenjiWeaponPreview(ctx, 0, 0, gunAngle, r);
+        return;
+
+      case 'power': {
+        const isScythe = (state.powerWeaponIndex === 1);
+        drawPowerWeaponPreview(ctx, 0, 0, gunAngle, r, { isScythe });
         return;
       }
 
