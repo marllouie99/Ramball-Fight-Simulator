@@ -476,6 +476,11 @@ export class Fighter {
     this.isWallPinnedByMakima = false;
     this.isCurrentlyWallPinnedByMakima = false;
     this.makimaWallPinTimer = 0;
+    this.isWallPinnedByEscanor = false;
+    this.isCurrentlyWallPinnedByEscanor = false;
+    this.escanorWallPinTimer = 0;
+    this._knockedBackByEscanorBasicAttack = false;
+    this._escanorAttacker = null;
     this.isChainedByMakima = false;
     this.isMindControlledByMakima = false;
     this._makimaChainer = null;
@@ -535,7 +540,7 @@ export class Fighter {
     if (this.basicAttackHitPauseTimer && this.basicAttackHitPauseTimer > 0) return true;
     if (this.hitStunTimer && this.hitStunTimer > 0) return true;
     if (this.isParalyzed || this.isFrozen || this.isFrozenByInfinity || this.isParalyzedByMahito || this.isParalyzedByMahoraga) return true;
-    if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || (this.makimaWallPinTimer && this.makimaWallPinTimer > 0)) return true;
+    if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || (this.makimaWallPinTimer && this.makimaWallPinTimer > 0) || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || (this.escanorWallPinTimer && this.escanorWallPinTimer > 0)) return true;
     if (this.isGrabbedByMahoraga) return true;
     if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
     if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
@@ -884,6 +889,14 @@ export class Fighter {
           this.isChannelingPureLoveBeam ||
           (this.rikaEmergingForBeamTimer || 0) > 0 ||
           (this.beamRetreatSlideTimer || 0) > 0) {
+        return true;
+      }
+    }
+
+    // Escanor: Divine Axe Rhitta Basic Attack (overhead lift, hold, strike, hit-pause, recovery) or Divine Sword Finisher
+    const isEscanor = this.characterId === 'escanor' || this.type === 'escanor' || this._def?.id === 'escanor';
+    if (isEscanor) {
+      if ((this.slashSwingTimer && this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) {
         return true;
       }
     }
@@ -1269,6 +1282,22 @@ export class Fighter {
       this._handleFrozenSkillCooldowns();
       return true;
     }
+    if (this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0)) {
+      if (this.escanorWallPinTimer > 0) {
+        this.escanorWallPinTimer--;
+        if (this.escanorWallPinTimer <= 0) {
+          this.isCurrentlyWallPinnedByEscanor = false;
+          this.preventKnockbackBounce = false;
+          this.suppressFreezeOverlay = false;
+        }
+      }
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
     if (this.isTargetOfAmbush) {
       this.vx = 0;
       this.vy = 0;
@@ -1316,9 +1345,12 @@ export class Fighter {
       this._handleFrozenSkillCooldowns();
       return true;
     }
-    // Global pause during Nanami's 7:3 Ratio Critical Hit-Pause mechanic
-    const isNanamiRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== this && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-    if (isNanamiRatioPausing) {
+    // Global pause during Nanami's 7:3 Ratio or Escanor's Divine Axe Rhitta Hit-Pause mechanic
+    const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== this && (
+      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+    ));
+    if (isGlobalHitPausing) {
       this.vx = 0;
       this.vy = 0;
       this._handleFrozenSkillCooldowns();
@@ -1669,6 +1701,71 @@ export class Fighter {
     }
   }
 
+  _triggerEscanorWallPinAndCrack(arena) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
+    if (!arena) return;
+
+    this._knockedBackByEscanorBasicAttack = false;
+    this.isWallPinnedByEscanor = false;
+    this.isCurrentlyWallPinnedByEscanor = true;
+    this.preventKnockbackBounce = true;
+
+    // Apply slow debuff after unpinning
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const slowFrames = cfg.wallBounceSlowFrames ?? 90;
+    const slowMult = cfg.wallBounceSlowMultiplier ?? 0.40;
+    if (this.statusEffects && typeof this.statusEffects.applySlow === 'function') {
+      this.statusEffects.applySlow(slowFrames, slowMult);
+    } else {
+      this.slowTimer = Math.max(this.slowTimer || 0, slowFrames);
+      this.slowMultiplier = slowMult;
+    }
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - (this.r || 25) - 14, 'WALL PINNED!', '#F59E0B');
+    }
+
+    // Stick target to the wall for ~1 second (55 frames)
+    const pinDuration = cfg.wallPinDurationFrames ?? 55;
+    this.escanorWallPinTimer = pinDuration;
+    this.suppressFreezeOverlay = true;
+
+    if (typeof this.applyTimeStop === 'function') {
+      this.applyTimeStop(pinDuration);
+    } else {
+      this.hitStunTimer = pinDuration;
+    }
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.vx = 0;
+    this.vy = 0;
+
+    // Forcefully interrupt any ongoing dashes, teleports, or abilities
+    if (typeof this.interruptAttacks === 'function') {
+      this.interruptAttacks(true);
+    }
+
+    // Heavy concussive wall smash screen shake, SFX & visual effects
+    const wallPinShakeIntensity = cfg.wallPinScreenShakeIntensity ?? 14.0;
+    const wallPinShakeDuration = cfg.wallPinScreenShakeDuration ?? 16;
+    if (typeof triggerGlobalScreenShake === 'function') {
+      triggerGlobalScreenShake(wallPinShakeIntensity, wallPinShakeDuration);
+    }
+    try {
+      audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/heavypunch1.mp3', this.x, this.y, 1.0);
+    } catch (e) {}
+
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, '#F59E0B', 70);
+    }
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(this.x, this.y, '#FEF08A', 20);
+      spawnSparks(this.x, this.y, '#F59E0B', 15);
+    }
+    if (typeof spawnBloodEffect === 'function') {
+      spawnBloodEffect(this.x, this.y, 10);
+    }
+  }
+
   _processKnockbackPhysics() {
     const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
     if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
@@ -1733,10 +1830,13 @@ export class Fighter {
 
           const wasSaitamaPin = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
           const wasMakimaPin = Boolean(this.isWallPinnedByMakima);
+          const wasEscanorPin = Boolean(this._knockedBackByEscanorBasicAttack || this.isWallPinnedByEscanor);
           if (wasSaitamaPin) {
             this._triggerSaitamaWallPinAndCrack(arena);
           } else if (wasMakimaPin) {
             this._triggerMakimaWallPin(arena);
+          } else if (wasEscanorPin) {
+            this._triggerEscanorWallPinAndCrack(arena);
           } else if (this.preventKnockbackBounce) {
             this.preventKnockbackBounce = false;
             // Non-Saitama wall contact (e.g. Getsuga drag) - cleanly stop knockback without spawning wall crack decals
@@ -1765,6 +1865,8 @@ export class Fighter {
         this._knockedBackBySaitamaBasicPunch = false;
         this.isWallPinnedBySaitama = false;
         this.isWallPinnedByMakima = false;
+        this.isWallPinnedByEscanor = false;
+        this._knockedBackByEscanorBasicAttack = false;
         this.preventKnockbackBounce = false;
         if (this.timeStopTimer <= 0) {
           this.suppressFreezeOverlay = false;
@@ -1776,6 +1878,8 @@ export class Fighter {
       this._knockedBackBySaitamaBasicPunch = false;
       this.isWallPinnedBySaitama = false;
       this.isWallPinnedByMakima = false;
+      this.isWallPinnedByEscanor = false;
+      this._knockedBackByEscanorBasicAttack = false;
       if (this.timeStopTimer <= 0) {
         this.suppressFreezeOverlay = false;
       }
@@ -2441,9 +2545,11 @@ export class Fighter {
     if (!arena) return false;
 
     const isSaitamaHit = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
+    const isEscanorHit = Boolean(this._knockedBackByEscanorBasicAttack || this.isWallPinnedByEscanor);
     const isGenosTrapped = Boolean(this.caughtInGenosFlurry);
     const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned;
+    const isEscanorPinned = Boolean(this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0));
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
@@ -2481,6 +2587,8 @@ export class Fighter {
         this._triggerSaitamaWallPinAndCrack(arena);
       } else if (clamped && this.isWallPinnedByMakima) {
         this._triggerMakimaWallPin(arena);
+      } else if (clamped && (isEscanorHit || this.isWallPinnedByEscanor)) {
+        this._triggerEscanorWallPinAndCrack(arena);
       }
       return clamped;
     }
@@ -2764,7 +2872,9 @@ export class Fighter {
                               ((this.rockCounterComboLeft || 0) > 0) ||
                               (this.isChainedByMakima && !this.isMindControlledByMakima) ||
                               this.isCurrentlyWallPinnedByMakima ||
-                              ((this.makimaWallPinTimer || 0) > 0);
+                              ((this.makimaWallPinTimer || 0) > 0) ||
+                              this.isCurrentlyWallPinnedByEscanor ||
+                              ((this.escanorWallPinTimer || 0) > 0);
 
     // Auto-recover from zero velocity immediately when the fighter is supposed to be moving
     if (!isStationaryState && targetSpeed > 0 && currentSpeed < 0.2) {
@@ -2785,6 +2895,8 @@ export class Fighter {
                           (this.isTargetOfAmbush) ||
                           this.isCurrentlyWallPinnedByMakima ||
                           ((this.makimaWallPinTimer || 0) > 0) ||
+                          this.isCurrentlyWallPinnedByEscanor ||
+                          ((this.escanorWallPinTimer || 0) > 0) ||
                           (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
 
     if (isGamePlaying && this.hp > 0 && !this.isDead && !isUnderHardCC && currentSpeed < 0.2) {

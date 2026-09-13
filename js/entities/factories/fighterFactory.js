@@ -48,6 +48,7 @@ import { TanjiroFighter } from '../fighters/TanjiroFighter.js';
 import { NezukoFighter } from '../fighters/NezukoFighter.js';
 import { ZenitsuFighter } from '../fighters/ZenitsuFighter.js';
 import { InosukeFighter } from '../fighters/InosukeFighter.js';
+import { EscanorFighter } from '../fighters/EscanorFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -103,6 +104,7 @@ export const FIGHTER_CLASS_MAP = {
   'nezuko':    NezukoFighter,
   'zenitsu':   ZenitsuFighter,
   'inosuke':   InosukeFighter,
+  'escanor':   EscanorFighter,
   'rifle':     RifleFighter,
   'm4a1':      RifleFighter,
   'shotgun':   ShotgunFighter,

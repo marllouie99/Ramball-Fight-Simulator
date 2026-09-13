@@ -1011,7 +1011,7 @@ export class CJFighter extends Fighter {
   resolveWallBounce(arena, opponent) {
     const ar = arena || (typeof state !== 'undefined' ? state.arena : null);
     if (!ar) return false;
-    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
       return super.resolveWallBounce(ar, opponent);
     }
 

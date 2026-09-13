@@ -102,7 +102,7 @@ export function renderGame() {
       state.screenShake.intensity = 0;
     }
     if (state.screenShake && state.screenShake.timer > 0) {
-      const maxTimer = state.screenShake.maxTimer || state.screenShake.timer;
+      const maxTimer = (state.screenShake.maxTimer && state.screenShake.maxTimer > 0) ? state.screenShake.maxTimer : state.screenShake.timer;
       const dampRatio = maxTimer > 0 ? (state.screenShake.timer / maxTimer) : 1.0;
       const is1v2OrFFA = (typeof state !== 'undefined') && (
         state.mode === GAME_MODES.STAND_OFF_1V2 || 
@@ -112,8 +112,8 @@ export function renderGame() {
         state.mode === 'FFA'
       );
 
-      const clampLimit = is1v2OrFFA ? 3.5 : 12.0;
-      let effectiveIntensity = Math.min(clampLimit, state.screenShake.intensity);
+      const clampLimit = is1v2OrFFA ? 6.0 : 16.0;
+      let effectiveIntensity = Math.min(clampLimit, state.screenShake.intensity || 0);
 
       // dampRatio smoothly decays intensity to zero as timer counts down
       const currentIntensity = effectiveIntensity * dampRatio;
@@ -133,6 +133,10 @@ export function renderGame() {
 
     state.shakeX = shakeX;
     state.shakeY = shakeY;
+    if (state.camera) {
+      state.camera.shakeX = shakeX;
+      state.camera.shakeY = shakeY;
+    }
 
     if (state.thinIceBreakerDimTimer && state.thinIceBreakerDimTimer > 0) {
       state.thinIceBreakerDimTimer--;
@@ -302,6 +306,7 @@ export function renderGame() {
                   (f.characterId === 'ichigo' && (f.isChannelingBankai || (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) || (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0))) ||
                   (f.characterId === 'saitama' && f._counterPunchTimer > 0) ||
                   (f.characterId === 'nanami' && f.ratioHitPauseTimer > 0) ||
+                  (f.characterId === 'escanor' && f.chopHitPauseTimer > 0) ||
                   (f.characterId === 'todo' && (f.isTakadaUltActive || f.isTakadaChanneling))
                 )
               )

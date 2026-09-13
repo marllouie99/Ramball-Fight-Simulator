@@ -19,8 +19,11 @@ const ILLUSION_SPLIT_MIN_HP = 2;
  */
 export function updateIllusions() {
   if (state.gameState !== 'playing' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
-  const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-  if (isNanamiPausing) return;
+  const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
+    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+  ));
+  if (isGlobalHitPausing) return;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
 
   for (let i = state.illusions.length - 1; i >= 0; i--) {
@@ -631,7 +634,7 @@ export function updateIllusions() {
 
     // If bounded, steer directly towards the nearest target (unless target is Gojo with active Infinity)
     if (bounced) {
-      if (illusion.isCurrentlyWallPinnedByMakima || ((illusion.makimaWallPinTimer || 0) > 0)) {
+      if (illusion.isCurrentlyWallPinnedByMakima || ((illusion.makimaWallPinTimer || 0) > 0) || illusion.isCurrentlyWallPinnedByEscanor || ((illusion.escanorWallPinTimer || 0) > 0)) {
         illusion.vx = 0;
         illusion.vy = 0;
         return;
@@ -666,6 +669,18 @@ export function updateIllusions() {
             thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
           });
         }
+      }
+
+      if (illusion._knockedBackByEscanorBasicAttack || illusion.isWallPinnedByEscanor) {
+        illusion._knockedBackByEscanorBasicAttack = false;
+        illusion.isWallPinnedByEscanor = false;
+        illusion.preventKnockbackBounce = false;
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+        const pinDuration = cfg.wallPinDurationFrames ?? 55;
+        illusion.escanorWallPinTimer = pinDuration;
+        illusion.isCurrentlyWallPinnedByEscanor = true;
+        illusion.vx = 0;
+        illusion.vy = 0;
       }
 
       const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null) || illusion.moveSpeed || 1.5;

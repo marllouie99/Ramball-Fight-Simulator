@@ -43,7 +43,8 @@ function initCustomizations() {
       nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       megumi: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-      cj: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+      cj: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      escanor: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
@@ -62,6 +63,9 @@ function initCustomizations() {
   }
   if (!state.weaponCustomizations.cj) {
     state.weaponCustomizations.cj = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+  }
+  if (!state.weaponCustomizations.escanor) {
+    state.weaponCustomizations.escanor = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
   // Ensure drawOrder exists (migration for older saves)
   if (!state.weaponCustomizations.mahito.drawOrder) {
@@ -123,7 +127,8 @@ export function drawWeaponStudioScreen() {
     { key: 'nanami', label: 'NANAMI' },
     { key: 'megumi', label: 'MEGUMI' },
     { key: 'john_wick', label: 'JOHN WICK' },
-    { key: 'cj', label: 'CJ' }
+    { key: 'cj', label: 'CJ' },
+    { key: 'escanor', label: 'ESCANOR' }
   ];
 
   // Row 1: First 6 weapons, Row 2: Remaining 6 weapons

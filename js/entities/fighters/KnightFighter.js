@@ -365,7 +365,7 @@ export class KnightFighter extends Fighter {
 
   // â”€â”€ Smart Bounce â”€â”€
   resolveWallBounce(arena, opponent) {
-    if (!opponent || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+    if (!opponent || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
       return super.resolveWallBounce(arena, opponent);
     }
 

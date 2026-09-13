@@ -131,15 +131,18 @@ export function updateGame() {
     }
     
     if (state.gameState === 'playing') {
-      const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-      if (!isNanamiPausing) {
+      const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
+        ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+        ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+      ));
+      if (!isGlobalHitPausing) {
         state.matchTimer = (state.matchTimer || 0) + 1;
       }
       updateArenaBgm();
       updateFighters();
       updateProjectiles();
       updateDriveBys();
-      if (!isNanamiPausing) {
+      if (!isGlobalHitPausing) {
         // Update flame particle system
         const dt = Math.min(FRAME_TIME / 1000, 0.1); // Convert to seconds, cap at 100ms
         flamewardenFlameSystem.update(dt);

@@ -168,8 +168,11 @@ export function spawnFuelPickup() {
  */
 export function updateFuelPickups() {
   if (state.gameState !== 'playing') return;
-  const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-  if (isNanamiPausing) return;
+  const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
+    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+  ));
+  if (isGlobalHitPausing) return;
 
   // Spawn new fuel pickups periodically
   state.fuelPickupSpawnTimer++;
@@ -315,9 +318,12 @@ export function resolveFighterCollision(a, b) {
   const isBrawlerCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0) || ((a.comboHitsLeft || 0) > 0) || ((b.comboHitsLeft || 0) > 0);
   const effectiveOverlap = isBrawlerCombo ? overlap * 0.1 : overlap;
   
-  // Pause circle-circle physical push response during Nanami's 7:3 Ratio Hit-Pause
-  const isNanamiRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-  if (isNanamiRatioPausing) {
+  // Pause circle-circle physical push response during Nanami or Escanor Hit-Pause
+  const isGlobalRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
+    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+  ));
+  if (isGlobalRatioPausing) {
     return;
   }
 
@@ -426,8 +432,11 @@ export function resolveFighterCollision(a, b) {
     else { a.slowTimer = Math.max(a.slowTimer || 0, 20); a.slowMultiplier = Math.min(a.slowMultiplier || 1.0, 0.35); }
   }
 
-  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
-  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
+  const aIsEscanorLifting = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor') && typeof a.isLiftingWeapon === 'function' && a.isLiftingWeapon());
+  const bIsEscanorLifting = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor') && typeof b.isLiftingWeapon === 'function' && b.isLiftingWeapon());
+
+  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanorLifting;
+  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanorLifting;
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -519,9 +528,12 @@ export { isTacticalFighter, resolveTacticalGunCollisions };
 // ─────────────────────────────────────────────
 
 export function updateProjectiles() {
-  const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-  if (isNanamiPausing) {
-    return; // Freeze all projectiles mid-air during Nanami's 7:3 Ratio pause
+  const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
+    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+  ));
+  if (isGlobalHitPausing) {
+    return; // Freeze all projectiles mid-air during hit pause
   }
   if (projectileSystem) {
     projectileSystem.update(state.fighters);

@@ -53,7 +53,7 @@ export class DopplegangerFighter extends Fighter {
 
   // Auto-lock toward enemy upon wall bounce
   resolveWallBounce(arena, opponent) {
-    if (!opponent || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+    if (!opponent || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
       return super.resolveWallBounce(arena, opponent);
     }
 

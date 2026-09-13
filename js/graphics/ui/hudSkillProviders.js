@@ -1725,6 +1725,34 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
+  // ─────────────────────────────────────────────
+  // ESCANOR (Lion's Sin of Pride — Sunshine)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'escanor' || f.type === 'escanor') {
+    const themeColor = f.color || '#F59E0B';
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+
+    const theOneMax = f.theOneCooldownMax || cfg.theOneCooldown || 1560;
+    const theOneTimer = f.theOneCooldown !== undefined ? f.theOneCooldown : 0;
+    const theOnePct = f.isTheOneActive
+      ? Math.max(0, Math.min(100, (f.theOneTimer / (f.theOneMaxTimer || 480)) * 100))
+      : Math.max(0, Math.min(100, (1 - (theOneTimer / theOneMax)) * 100));
+
+    const cruelMax = f.cruelSunCooldownMax || cfg.cruelSunCooldown || 510;
+    const cruelTimer = f.cruelSunCooldown !== undefined ? f.cruelSunCooldown : 0;
+    const cruelPct = Math.max(0, Math.min(100, (1 - (cruelTimer / cruelMax)) * 100));
+
+    const prideMax = f.prideFlareCooldownMax || cfg.prideFlareCooldown || 660;
+    const prideTimer = f.prideFlareCooldown !== undefined ? f.prideFlareCooldown : 0;
+    const pridePct = Math.max(0, Math.min(100, (1 - (prideTimer / prideMax)) * 100));
+
+    return [
+      { id: 'the_one', pct: theOnePct, ready: theOnePct >= 99 || f.isTheOneActive, color: themeColor, label: f.isTheOneActive ? 'THE ONE (ACTIVE)' : '"THE ONE"' },
+      { id: 'cruel_sun', pct: cruelPct, ready: cruelPct >= 99, color: themeColor, label: 'CRUEL SUN' },
+      { id: 'pride_flare', pct: pridePct, ready: pridePct >= 99, color: themeColor, label: 'PRIDE FLARE' }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }

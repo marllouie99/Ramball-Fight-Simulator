@@ -28,6 +28,7 @@ import { tanjiroConfig } from '../configs/characters/tanjiroConfig.js';
 import { nezukoConfig } from '../configs/characters/nezukoConfig.js';
 import { zenitsuConfig } from '../configs/characters/zenitsuConfig.js';
 import { inosukeConfig } from '../configs/characters/inosukeConfig.js';
+import { escanorConfig } from '../configs/characters/escanorConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
 import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
@@ -65,6 +66,7 @@ export const CONFIG = {
   nezuko: nezukoConfig,
   zenitsu: zenitsuConfig,
   inosuke: inosukeConfig,
+  escanor: escanorConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1629,6 +1631,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: inosukeConfig.projectileSpeedMultiplier || 1.0,
     ability: inosukeConfig.ability || 'Beast Breathing ("King of the Mountain")',
     desc: inosukeConfig.desc || 'Wild dual-serrated katana berserker with Spatial Awareness radar and dislocated joint reach. Wields 160° Dual Serrated Hacks, 360° Crazy Cutting whirlwind shredding, Explosive Rush boar charges, and King of the Mountain Cataclysm ultimate.',
+  },
+  {
+    id: 46,
+    name: 'ESCANOR',
+    category: 'Anime',
+    color: escanorConfig.color || '#F59E0B',
+    themeColor: escanorConfig.themeColor || '#F59E0B',
+    secondaryColor: escanorConfig.secondaryColor || '#DC2626',
+    startX: escanorConfig.startX || 300,
+    startY: escanorConfig.startY || 250,
+    startVx: escanorConfig.startVx || 1.1,
+    startVy: escanorConfig.startVy || 1.0,
+    radius: escanorConfig.radius || escanorConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'escanor',
+    hp: escanorConfig.hp || 390,
+    damage: escanorConfig.damage || 28,
+    cooldown: escanorConfig.cooldown || 28,
+    moveSpeed: escanorConfig.moveSpeed || escanorConfig.speed || 5.7,
+    projectileSpeedMultiplier: escanorConfig.projectileSpeedMultiplier || 1.0,
+    ability: escanorConfig.ability || 'Grace "Sunshine" & "The One"',
+    desc: escanorConfig.desc || 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta. Radiates intense solar heat, gaining Solar Pride power escalation. Wields 140° Divine Slashes, Cruel Sun blazing stars, Pride Flare solar novas, and the invincible high noon ultimate: "The One" with Divine Sword Escanor.',
   }
 ];
 

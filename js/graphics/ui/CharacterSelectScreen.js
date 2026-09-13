@@ -1237,6 +1237,8 @@ export function getFighterWeaponInfo(def) {
       return { name: 'LIGHTNING NICHIRIN KATANA', category: 'BREATHING // THUNDER IAI', desc: 'Golden lightning-hamon blade unleashing First Form: Thunderclap and Flash godspeed teleport slashes, Sixfold wall bounces, and Flaming Thunder God.' };
     case 'inosuke':
       return { name: 'DUAL SERRATED NICHIRIN KATANAS', category: 'BREATHING // BEAST KENJUTSU', desc: 'Twin chipped serrated blades with 160° Dual Hacks, 360° Crazy Cutting whirlwind shredding, Explosive Rush boar charges, and Spatial Awareness.' };
+    case 'escanor':
+      return { name: 'DIVINE AXE RHITTA', category: 'SACRED TREASURE // SOLAR HEAT', desc: 'Legendary giant golden battleaxe capable of storing and releasing Escanor\'s boundless solar heat. Channels 140° Divine Slashes, Cruel Sun blazing orbs, Pride Flare solar bursts, and the invincible "The One" form.' };
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:

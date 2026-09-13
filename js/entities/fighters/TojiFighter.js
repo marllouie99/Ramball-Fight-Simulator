@@ -1487,7 +1487,7 @@ export class TojiFighter extends Fighter {
     this._tickAttackSound();
 
     // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Chains/WallPins)
-    if (!this.isChainedByMakima && !this.isCurrentlyWallPinnedByMakima && (!this.makimaWallPinTimer || this.makimaWallPinTimer <= 0)) {
+    if (!this.isChainedByMakima && !this.isCurrentlyWallPinnedByMakima && (!this.makimaWallPinTimer || this.makimaWallPinTimer <= 0) && !this.isCurrentlyWallPinnedByEscanor && (!this.escanorWallPinTimer || this.escanorWallPinTimer <= 0) && !this.isWallPinnedBySaitama) {
       this.timeStopTimer = 0;
       if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
       this.hitStunTimer = 0;

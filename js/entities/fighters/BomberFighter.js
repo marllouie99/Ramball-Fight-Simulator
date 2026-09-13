@@ -51,7 +51,7 @@ export class BomberFighter extends Fighter {
     const bounced = (this.x !== px || this.y !== py);
 
     // After bouncing, steer toward optimal distance from opponent
-    const isStasis = this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama;
+    const isStasis = this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor;
     if (opponent && bounced && !isStasis) {
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;

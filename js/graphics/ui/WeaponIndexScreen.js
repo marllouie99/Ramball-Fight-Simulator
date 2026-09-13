@@ -33,6 +33,7 @@ import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolW
 import { drawDenjiWeaponPreview } from '../weapons/denjiWeaponGraphics.js';
 import { drawPowerWeaponPreview } from '../weapons/powerWeaponGraphics.js';
 import { drawTanjiroNichirinKatana, drawNezukoDemonClaws, drawZenitsuLightningKatana, drawInosukeDualSerratedKatanas } from '../weapons/demonSlayerWeaponGraphics.js';
+import { drawDivineAxeRhitta } from '../weapons/escanorWeaponGraphics.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -2181,6 +2182,10 @@ function drawWeaponPreview(ctx, type, color) {
 
       case 'inosuke':
         drawInosukeDualSerratedKatanas(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        return;
+
+      case 'escanor':
+        drawDivineAxeRhitta(ctx, 0, 0, gunAngle, r, { isPreview: true });
         return;
 
       default:

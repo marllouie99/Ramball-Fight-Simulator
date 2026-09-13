@@ -476,10 +476,13 @@ export class SaitamaFighter extends Fighter {
       (this.isCountering && (this._counterPunchTimer > 0 || this._postCounterRecoveryTimer > 0))
     );
 
-    // Check if Nanami is currently executing his 7:3 Ratio hit-pause
-    const isNanamiPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+    // Check if Nanami or Escanor is currently executing a hit-pause
+    const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
+      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+    ));
 
-    if ((this.dodgeCooldown > 0 && !isBeamOrTickDodge) || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isNanamiPausing) {
+    if ((this.dodgeCooldown > 0 && !isBeamOrTickDodge) || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isGlobalHitPausing) {
       return false;
     }
     // Block dodge if time-stopped by non-domain effects (unless dodging beam/purple tick)
@@ -694,9 +697,12 @@ export class SaitamaFighter extends Fighter {
     if (this.hp <= 0 || !target || target.hp <= 0 || target === this) return false;
     if (this.skillPunishCooldown > 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
-    const isNanamiPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+    const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
+      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+    ));
     const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this)));
-    if (this.timeStopTimer > 0 || isNanamiPausing || isGetsugaSuppressed || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
+    if (this.timeStopTimer > 0 || isGlobalHitPausing || isGetsugaSuppressed || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
 
     // Check team alignment in 2v2/team modes ONLY.
     // getFighterTeam returns null in 1v1/FFA — null===null would falsely match as teammates, so guard with myTeam !== null.
@@ -1382,7 +1388,7 @@ export class SaitamaFighter extends Fighter {
     const isDomainFreeze = isInsideDomain;
     const isBeamOrTickAttack = Boolean(opts.isPurpleDPS || opts.isPureLoveBeam || opts.isBeam || opts.isLaserBeam || opts.isLaylaBeam || opts.isGenosBeam || this.isCaughtInPurple || this.caughtInPureLoveBeam);
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
-    const isNanamiPausing = Boolean((attacker && (attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0)));
+    const isGlobalHitPausing = Boolean((attacker && ((attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0 || (attacker.characterId === 'escanor' || attacker.type === 'escanor') && (attacker.chopHitPauseTimer || 0) > 0)) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) || ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)))));
 
     const isGetsugaHit = Boolean(
       opts.isGetsuga ||
@@ -1396,7 +1402,7 @@ export class SaitamaFighter extends Fighter {
     // Saitama's Caped Baldy Reflexes: Sukuna's Malevolent Shrine domain slashes are physical spatial cuts — Saitama can dodge them!
     const isSukunaDomainSlash = Boolean((opts.isDomainSlash && opts.isSukunaSlash) || opts.isSukunaDomainSliceLine);
 
-    if ((isGetsugaHit || (isGuaranteedHit && !isSukunaDomainSlash) || isNanamiPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack))) {
+    if ((isGetsugaHit || (isGuaranteedHit && !isSukunaDomainSlash) || isGlobalHitPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack))) {
       return super.takeDamage(amount, attacker, opts);
     }
 
@@ -1765,8 +1771,11 @@ export class SaitamaFighter extends Fighter {
     this._decrementSkillCooldowns();
     this._tickCooldowns();
 
-    // Check if Nanami is currently executing his cinematic 7:3 Ratio hit-pause mechanic
-    const isNanamiRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0 && (f.ratioHitPauseTarget === this || f._chopTarget === this || !f.ratioHitPauseTarget));
+    // Check if Nanami or Escanor is currently executing a cinematic hit-pause mechanic
+    const isGlobalHitPausingFighter = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
+      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0 && (f.ratioHitPauseTarget === this || f._chopTarget === this || !f.ratioHitPauseTarget)) ||
+      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0 && (f.chopHitPauseTarget === this || !f.chopHitPauseTarget))
+    ));
 
     // Mandatory Rule #1: Freeze / TimeStop guard at the top of update loop (bypassed only during active Serious Counter execution unless inside Gojo domain or being pulled)
     const isFrozen = this._handleTimeStop();
@@ -1780,7 +1789,7 @@ export class SaitamaFighter extends Fighter {
       this.interruptAttacks(true);
     }
 
-    if ((isFrozen || isGetsugaSuppressed || this.isTargetOfAmbush || isNanamiRatioPausing || isBeingPulled || isInsideGojoDomain) && !this.isCountering) {
+    if ((isFrozen || isGetsugaSuppressed || this.isTargetOfAmbush || isGlobalHitPausingFighter || isBeingPulled || isInsideGojoDomain) && !this.isCountering) {
       this.interruptAttacks();
       return; // MANDATORY: Stop update execution so fighter is completely frozen/paused/pulled!
     }

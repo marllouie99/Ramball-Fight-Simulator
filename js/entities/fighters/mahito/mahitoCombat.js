@@ -235,7 +235,7 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
 
   // Audio Dispatcher
   if (hitAny) {
-    triggerGlobalScreenShake(isTransformed ? 6 : 3);
+    triggerGlobalScreenShake(isTransformed ? 6 : 3, 8);
     if (fighter.morphType === 'mace') {
       audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/groundsmash.mp3', 1.8);
     } else {
@@ -313,7 +313,7 @@ export function triggerMahitoParalyzeExplosion(entity) {
     entity.applyHitStun(10);
   }
 
-  triggerGlobalScreenShake(soulCfg.ruptureScreenShake || 10);
+  triggerGlobalScreenShake(soulCfg.ruptureScreenShake || 10, 16);
   const expVol = cfg.soundVolumes?.bodyExplode !== undefined ? cfg.soundVolumes.bodyExplode : (cfg.sounds?.bodyExplodeVolume ?? 2.0);
   audioSystem.playSFX(cfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', expVol);
 
@@ -473,7 +473,7 @@ export function applySoulDisfigurementStack(ent, fighter) {
       );
     }
 
-    triggerGlobalScreenShake(soulCfg.burstScreenShake || 8);
+    triggerGlobalScreenShake(soulCfg.burstScreenShake || 8, 12);
     if (cfg.sounds?.soulDetonate) {
       const detVol = cfg.soundVolumes?.soulDetonate !== undefined ? cfg.soundVolumes.soulDetonate : (cfg.sounds?.soulDetonateVolume ?? 1.8);
       audioSystem.playSFX(cfg.sounds.soulDetonate, detVol);
@@ -698,7 +698,7 @@ export function updateMahitoFleshSurge(fighter) {
       audioSystem.playSFX(cfg.sounds?.whiff || 'Assets/Sound Effects/Skills/woosh.mp3', 1.8);
       spawnMeleeClashShockwave(fighter.x, fighter.y, 40, '#D946EF');
       spawnSparks(fighter.x, fighter.y, '#D946EF', 15);
-      triggerGlobalScreenShake(surgeCfg.screenShake || 6);
+      triggerGlobalScreenShake(surgeCfg.screenShake || 6, 10);
     }
   }
 
@@ -754,7 +754,7 @@ export function updateMahitoFleshSurge(fighter) {
         spawnMeleeClashShockwave(lp.peakX, lp.peakY, 20, '#FAF5FF');
         spawnSparks(lp.peakX, lp.peakY, '#D946EF', 16);
         spawnSparks(lp.peakX, lp.peakY, '#F5D0FE', 10);
-        triggerGlobalScreenShake(surgeCfg.screenShake || 5);
+        triggerGlobalScreenShake(surgeCfg.screenShake || 5, 8);
         audioSystem.playSFX(cfg.sounds?.subterraneanHumpSound || 'Assets/Sound Effects/Attacks/heavypunch1.mp3', cfg.sounds?.subterraneanSurgeVolume ?? 1.8);
 
         // AOE Hit Evaluation around this hump's eruption center

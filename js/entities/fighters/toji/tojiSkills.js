@@ -137,6 +137,8 @@ export function modUpdateStealth(fighter, opponent) {
     (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
     fighter.isCurrentlyWallPinnedByMakima ||
     (fighter.makimaWallPinTimer && fighter.makimaWallPinTimer > 0) ||
+    fighter.isCurrentlyWallPinnedByEscanor ||
+    (fighter.escanorWallPinTimer && fighter.escanorWallPinTimer > 0) ||
     fighter.isWallPinnedBySaitama ||
     (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
     (fighter.redKnockbackTimer && fighter.redKnockbackTimer > 0)

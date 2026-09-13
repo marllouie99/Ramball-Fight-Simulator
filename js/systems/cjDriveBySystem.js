@@ -381,8 +381,11 @@ export function spawnGroveStreetDriveBy(cjFighter) {
  */
 export function updateDriveBys() {
   if (typeof state === 'undefined') return;
-  const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-  if (isNanamiPausing) return;
+  const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
+    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
+    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
+  ));
+  if (isGlobalHitPausing) return;
 
   const cfg = CONFIG.cj || {};
   const arena = (CONFIG && CONFIG.arena) ? CONFIG.arena : { x: 40, y: 240, width: 450, height: 450 };

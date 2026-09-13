@@ -480,21 +480,13 @@ export function triggerGlobalScreenShake(intensity, duration) {
     state.mode === 'FFA'
   );
 
-  let targetIntensity = intensity;
-  let targetDuration = duration;
+  let targetIntensity = Number(intensity) || 0;
+  if (targetIntensity <= 0) return;
 
-  const modeKey = is1v2 ? GAME_MODES.STAND_OFF_1V2 : (isFFA ? GAME_MODES.FFA : state.mode);
-  const modeSettings = (typeof MODE_SETTINGS !== 'undefined' && modeKey) ? MODE_SETTINGS[modeKey] : null;
-
-  if (is1v2 || isFFA) {
-    targetIntensity = modeSettings?.arenaShakeIntensity ?? 3.5;
-    targetDuration = modeSettings?.arenaShakeDuration ?? 6;
-  } else if (modeSettings && modeSettings.arenaShakeIntensity !== undefined) {
-    targetIntensity = modeSettings.arenaShakeIntensity;
-    if (modeSettings.arenaShakeDuration !== undefined) {
-      targetDuration = modeSettings.arenaShakeDuration;
-    }
-  }
+  // Safe fallback for duration if not provided or invalid
+  let targetDuration = (typeof duration === 'number' && duration > 0) 
+    ? Math.round(duration) 
+    : Math.max(6, Math.min(24, Math.round(targetIntensity * 1.5)));
 
   const mult = (typeof CONFIG !== 'undefined' && CONFIG.globalScreenShakeIntensityMultiplier !== undefined) 
     ? CONFIG.globalScreenShakeIntensityMultiplier 
@@ -505,11 +497,16 @@ export function triggerGlobalScreenShake(intensity, duration) {
   let scaledIntensity = targetIntensity * mult;
 
   // Hard clamp limit so multiple rapid combat explosions never tear the screen apart
-  const maxAllowedShake = (is1v2 || isFFA) ? 3.5 : 12.0;
+  const maxAllowedShake = (is1v2 || isFFA) ? 6.0 : 16.0;
   scaledIntensity = Math.min(maxAllowedShake, scaledIntensity);
 
+  // Ensure state.screenShake is initialized
+  if (!state.screenShake) {
+    state.screenShake = { timer: 0, maxTimer: 0, intensity: 0 };
+  }
+
   // If no shake is currently active, initialize cleanly
-  if (!state.screenShake || state.screenShake.timer <= 0) {
+  if (state.screenShake.timer <= 0) {
     state.screenShake.intensity = scaledIntensity;
     state.screenShake.timer = targetDuration;
     state.screenShake.maxTimer = targetDuration;
@@ -517,20 +514,21 @@ export function triggerGlobalScreenShake(intensity, duration) {
   }
 
   // Calculate current instantaneous remaining shake power (decayed over time)
-  const currentMax = state.screenShake.maxTimer || state.screenShake.timer || 1;
-  const currentRemainingPower = state.screenShake.intensity * Math.max(0, state.screenShake.timer / currentMax);
+  const currentMax = (state.screenShake.maxTimer && state.screenShake.maxTimer > 0) ? state.screenShake.maxTimer : (state.screenShake.timer || 1);
+  const currentRemainingPower = (state.screenShake.intensity || 0) * Math.max(0, state.screenShake.timer / currentMax);
 
   // Multiple shake effects: NEVER multiply or additively stack!
-  if (scaledIntensity > currentRemainingPower) {
-    // New shake is stronger than what remains of the old shake: replace with new shake cleanly
+  if (scaledIntensity >= currentRemainingPower) {
+    // New shake is equal or stronger than what remains of the old shake: replace with new shake cleanly
     state.screenShake.intensity = scaledIntensity;
     state.screenShake.timer = targetDuration;
     state.screenShake.maxTimer = targetDuration;
   } else {
     // Existing shake is currently stronger than the new one.
-    // If the new shake's duration is longer, gently extend from currentRemainingPower without jumping to the old peak!
+    // If the new shake wants to last longer than the current remaining timer, extend the timer
+    // while keeping peak intensity capped at currentRemainingPower.
     if (targetDuration > state.screenShake.timer) {
-      state.screenShake.intensity = currentRemainingPower;
+      state.screenShake.intensity = Math.max(scaledIntensity, currentRemainingPower);
       state.screenShake.timer = targetDuration;
       state.screenShake.maxTimer = targetDuration;
     }

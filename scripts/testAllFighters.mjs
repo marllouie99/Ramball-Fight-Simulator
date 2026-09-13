@@ -129,7 +129,8 @@ function assertCanvasStackBalance(locationTag) {
 async function main() {
   const { CONFIG, FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS } = await import('../js/core/config.js');
   const { FIGHTER_CLASS_MAP } = await import('../js/entities/factories/fighterFactory.js');
-  const { state } = await import('../js/core/state.js');
+  const { state, triggerGlobalScreenShake } = await import('../js/core/state.js');
+  const { renderGame } = await import('../js/systems/renderSystem.js');
   const { projectileSystem } = await import('../js/systems/projectileSystem.js');
   const { drawGetsugaSlash } = await import('../js/graphics/weapons/ichigoWeaponGraphics.js');
   const { drawTodoTakadaIdolScreenOverlay } = await import('../js/graphics/renderers/effectsRenderer.js');
@@ -4856,6 +4857,242 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ [GOJO RCT TELEPORT TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Escanor Finishing Ability & Animation Preservation on Lethal Victory Test
+  console.log('☀️ [Escanor Finishing Ability Test] Verifying Escanor does not cut off basic attack animation on lethal win...');
+  try {
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'escanor');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    reinitFighters(true);
+
+    const escanor = state.fighters[0];
+    const dummySukuna = state.fighters[1];
+
+    escanor.x = 200;
+    escanor.y = 300;
+    dummySukuna.x = 240;
+    dummySukuna.y = 300;
+    dummySukuna.hp = 1; // 1 HP -> lethal hit incoming
+
+    // Start Escanor basic attack chop
+    escanor._startRhittaChop(dummySukuna);
+    if (!escanor.hasActiveFinishingAbility()) {
+      throw new Error(`Escanor hasActiveFinishingAbility() returned false during weapon lift/windup!`);
+    }
+
+    // Advance to impact frame and deliver lethal hit
+    escanor.slashSwingTimer = escanor.slashSwingImpactTimer;
+    escanor._executeRhittaChopHit();
+
+    if (dummySukuna.hp > 0) {
+      throw new Error(`Expected dummy opponent to die from Rhitta chop hit! HP=${dummySukuna.hp}`);
+    }
+
+    // Verify hit pause is active and hasActiveFinishingAbility holds victory
+    if (escanor.chopHitPauseTimer <= 0) {
+      throw new Error(`Expected chopHitPauseTimer > 0 on basic attack hit! Got ${escanor.chopHitPauseTimer}`);
+    }
+    if (!escanor.hasActiveFinishingAbility()) {
+      throw new Error(`Escanor hasActiveFinishingAbility() returned false during chop hit-pause!`);
+    }
+
+    // Step through hit-pause frames
+    while (escanor.chopHitPauseTimer > 0) {
+      escanor.update(dummySukuna, 0, state.arena);
+      if (escanor.chopHitPauseTimer > 0 && !escanor.hasActiveFinishingAbility()) {
+        throw new Error(`Escanor hasActiveFinishingAbility() prematurely returned false during hit-pause countdown!`);
+      }
+    }
+
+    // Verify after hit-pause unpause, downward strike & recovery frames play out with finishing ability active
+    if (escanor.slashSwingTimer <= 0) {
+      throw new Error(`Expected slashSwingTimer > 0 after hit-pause unpause for downward chop follow-through!`);
+    }
+    if (!escanor.hasActiveFinishingAbility()) {
+      throw new Error(`Escanor hasActiveFinishingAbility() returned false during downward chop recovery follow-through!`);
+    }
+
+    // Step through remaining swing & recovery frames
+    while (escanor.slashSwingTimer > 0) {
+      escanor.update(dummySukuna, 0, state.arena);
+    }
+
+    // Animation 100% finished -> hasActiveFinishingAbility returns false to allow round/match end
+    if (escanor.hasActiveFinishingAbility()) {
+      throw new Error(`Escanor hasActiveFinishingAbility() returned true after swing & recovery completed!`);
+    }
+  } catch (err) {
+    console.error('❌ [ESCANOR FINISHING ABILITY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Escanor Wall Pin & Wall Crack Decal Test
+  console.log('🧱 [Escanor Wall Pin & Wall Crack Test] Verifying Escanor knockback pins opponent to wall in stasis with solar crack decal...');
+  try {
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'escanor');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    reinitFighters(true);
+
+    const escanor = state.fighters[0];
+    const dummyTarget = state.fighters[1];
+
+    state.wallCracks = [];
+    const arena = state.arena || { x: 50, y: 50, width: 800, height: 600 };
+    state.arena = arena;
+
+    // Position Escanor and target near the right wall (x: 850 - 25 = 825 max)
+    escanor.x = 760;
+    escanor.y = 300;
+    escanor.introReboundActive = false;
+    dummyTarget.x = 800;
+    dummyTarget.y = 300;
+    dummyTarget.hp = 200; // Survives hit
+    dummyTarget.introReboundActive = false;
+
+    // Escanor faces target toward right wall
+    escanor.aim(dummyTarget);
+
+    // Trigger basic attack chop
+    escanor._startRhittaChop(dummyTarget);
+    escanor.slashSwingTimer = escanor.slashSwingImpactTimer || 12;
+    escanor._executeRhittaChopHit();
+
+    if (escanor.chopHitPauseTimer <= 0) {
+      throw new Error(`Expected chopHitPauseTimer > 0 on Rhitta chop hit!`);
+    }
+
+    // Step through hit-pause to reach the unpause release
+    while (escanor.chopHitPauseTimer > 0) {
+      escanor.update(dummyTarget, 0, arena);
+    }
+
+    // Target is tagged for wall pin
+    if (!dummyTarget.isWallPinnedByEscanor && !dummyTarget._knockedBackByEscanorBasicAttack) {
+      throw new Error(`Target was not tagged with isWallPinnedByEscanor / _knockedBackByEscanorBasicAttack!`);
+    }
+
+    // Update target physics so knockback pushes target into right wall
+    dummyTarget.update(escanor, 1, arena);
+
+    // Verify wall pin activated
+    if (!dummyTarget.isCurrentlyWallPinnedByEscanor && dummyTarget.escanorWallPinTimer <= 0) {
+      throw new Error(`Target failed to trigger wall pin upon colliding with arena wall! isCurrentlyWallPinnedByEscanor=${dummyTarget.isCurrentlyWallPinnedByEscanor}, timer=${dummyTarget.escanorWallPinTimer}`);
+    }
+
+    const expectedInitialTimer = (CONFIG.escanor?.wallPinDurationFrames || 55) - 1; // 1 frame ticked during the update that triggered wall contact
+    if (dummyTarget.escanorWallPinTimer !== expectedInitialTimer) {
+      throw new Error(`Unexpected escanorWallPinTimer value! Expected ${expectedInitialTimer}, got ${dummyTarget.escanorWallPinTimer}`);
+    }
+
+    // Verify NO wall cracks are spawned for Escanor
+    if (state.wallCracks && state.wallCracks.length > 0) {
+      throw new Error(`Expected NO wall cracks to be spawned for Escanor! Found ${state.wallCracks.length}`);
+    }
+
+    // Verify target remains pinned in stasis during countdown
+    const initialPinTimer = dummyTarget.escanorWallPinTimer;
+    for (let frame = 0; frame < initialPinTimer - 1; frame++) {
+      const isFrozen = dummyTarget._handleTimeStop();
+      if (!isFrozen) {
+        throw new Error(`Target update loop was not frozen during active wall pin stasis at frame ${frame}!`);
+      }
+      if (dummyTarget.vx !== 0 || dummyTarget.vy !== 0 || dummyTarget.knockbackVx !== 0 || dummyTarget.knockbackVy !== 0) {
+        throw new Error(`Target moved while pinned to wall at frame ${frame}! vx=${dummyTarget.vx}, vy=${dummyTarget.vy}`);
+      }
+    }
+
+    // Final frame ticks pin timer to 0 -> pin released!
+    dummyTarget._handleTimeStop();
+    if (dummyTarget.isCurrentlyWallPinnedByEscanor) {
+      throw new Error(`Target remained wall pinned after pin duration fully expired!`);
+    }
+    if (dummyTarget.slowTimer <= 0 || dummyTarget.slowMultiplier !== (CONFIG.escanor?.wallBounceSlowMultiplier || 0.40)) {
+      throw new Error(`Post-pin slow debuff was not correctly applied! slowTimer=${dummyTarget.slowTimer}, slowMult=${dummyTarget.slowMultiplier}`);
+    }
+
+    // Test Configurable Pinned Duration (e.g. user changes wallPinDurationFrames to 90)
+    const originalDuration = CONFIG.escanor.wallPinDurationFrames;
+    CONFIG.escanor.wallPinDurationFrames = 90;
+    dummyTarget._lastKnockbackFrame = -1;
+    dummyTarget.timeStopTimer = 0;
+    if (dummyTarget.statusEffects) dummyTarget.statusEffects.timeStopTimer = 0;
+    dummyTarget.isWallPinnedByEscanor = true;
+    dummyTarget._knockedBackByEscanorBasicAttack = true;
+    dummyTarget.knockbackVx = 30;
+    dummyTarget.x = 840;
+    dummyTarget._processKnockbackPhysics();
+    if (dummyTarget.escanorWallPinTimer !== 90) {
+      throw new Error(`Configurable wallPinDurationFrames failed! Expected 90, got ${dummyTarget.escanorWallPinTimer}`);
+    }
+    CONFIG.escanor.wallPinDurationFrames = originalDuration; // Restore original config
+  } catch (err) {
+    console.error('❌ [ESCANOR WALL PIN TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Screen Shake Lifecycle & Persistence Test
+  console.log('📳 [Screen Shake Lifecycle & Persistence Test] Verifying screen shake activates, decays, and persists across multiple consecutive hits...');
+  try {
+    state.screenShake = { timer: 0, maxTimer: 0, intensity: 0 };
+    state.shakeX = 0;
+    state.shakeY = 0;
+
+    // Test 1: Single-argument triggerGlobalScreenShake (missing duration)
+    triggerGlobalScreenShake(10);
+    if (!state.screenShake || state.screenShake.timer <= 0 || state.screenShake.intensity <= 0) {
+      throw new Error(`Single argument triggerGlobalScreenShake(10) failed to set timer/intensity! Got: timer=${state.screenShake?.timer}, intensity=${state.screenShake?.intensity}`);
+    }
+    if (isNaN(state.screenShake.timer) || isNaN(state.screenShake.intensity)) {
+      throw new Error(`Single argument triggerGlobalScreenShake(10) resulted in NaN values!`);
+    }
+
+    // Step frames to drain shake
+    while (state.screenShake.timer > 0) {
+      renderGame();
+    }
+    if (state.screenShake.timer !== 0 || state.screenShake.intensity !== 0) {
+      throw new Error(`Screen shake did not cleanly zero out after timer expired! Got: timer=${state.screenShake.timer}, intensity=${state.screenShake.intensity}`);
+    }
+
+    // Test 2: Consecutive combat hits reactivate shake repeatedly
+    for (let hit = 1; hit <= 5; hit++) {
+      triggerGlobalScreenShake(8.0, 12);
+      if (state.screenShake.timer <= 0 || state.screenShake.intensity <= 0) {
+        throw new Error(`Failed to activate screen shake on hit #${hit}! timer=${state.screenShake.timer}, intensity=${state.screenShake.intensity}`);
+      }
+      renderGame();
+      if (state.camera && (state.camera.shakeX === undefined || state.camera.shakeY === undefined)) {
+        throw new Error(`state.camera.shakeX/Y was undefined during active screen shake on hit #${hit}!`);
+      }
+      // Step to completion
+      while (state.screenShake.timer > 0) {
+        renderGame();
+      }
+    }
+
+    // Test 3: Overlapping shakes (Escanor impact -> unpause -> enemy counter-attack)
+    triggerGlobalScreenShake(7.0, 12); // Initial impact
+    renderGame();
+    renderGame();
+    // Mid-decay unpause blast
+    triggerGlobalScreenShake(10.0, 18);
+    if (state.screenShake.intensity <= 0 || state.screenShake.timer !== 18) {
+      throw new Error(`Failed to adopt unpause shake: timer=${state.screenShake.timer}, intensity=${state.screenShake.intensity}`);
+    }
+    // Enemy counters with quick jab
+    triggerGlobalScreenShake(4.0, 6);
+    if (state.screenShake.intensity <= 0 || state.screenShake.timer <= 0) {
+      throw new Error(`Enemy counter-attack corrupted active screen shake! timer=${state.screenShake.timer}, intensity=${state.screenShake.intensity}`);
+    }
+    while (state.screenShake.timer > 0) {
+      renderGame();
+    }
+  } catch (err) {
+    console.error('❌ [SCREEN SHAKE LIFECYCLE TEST ERROR]:', err);
     errors++;
   }
 

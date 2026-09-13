@@ -758,6 +758,13 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
     volume: 0.75,
     delay: 0,
+  },
+
+  // Escanor — The Lion's Sin of Pride
+  'escanor': {
+    src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    volume: 0.85,
+    delay: 0,
   }
 };
 

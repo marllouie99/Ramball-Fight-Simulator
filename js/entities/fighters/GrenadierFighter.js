@@ -58,7 +58,7 @@ export class GrenadierFighter extends Fighter {
   }
 
   resolveWallBounce(arena, opponent) {
-    if (!opponent || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+    if (!opponent || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
       return super.resolveWallBounce(arena, opponent);
     }
 
