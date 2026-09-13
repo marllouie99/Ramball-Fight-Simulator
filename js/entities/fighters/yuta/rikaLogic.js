@@ -1,10 +1,172 @@
-import { fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
+import { stopSound, stopSoundBySrc, fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake, isChampionScreenActive } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash, spawnRikaRoarShockwave } from '../../../graphics/particles/sparkEffect.js';
+import { spawnDeathShatter } from '../../../graphics/particles/deathShatterEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
+
+export function triggerRikaDeathShatter(rk, fighter) {
+  if (!rk) return;
+  const owner = fighter || rk.owner;
+
+  // 1. Immediately cut off all Rika audio
+  stopRikaAudio(owner, rk);
+
+  // 2. Play shatter breaking audio
+  const deathSnd = CONFIG.yuta?.rikaDeathSound || 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3';
+  const deathVol = CONFIG.yuta?.rikaDeathVolume ?? 1.0;
+  const deathDelay = CONFIG.yuta?.rikaDeathDelay ?? 0;
+  if (deathSnd && typeof audioSystem !== 'undefined') {
+    audioSystem.playSFX(deathSnd, deathVol, 1.0, 0, deathDelay);
+  }
+
+  // 3. Spawn physical death shatter particle shards (bone white, cursed pink, dark abyss)
+  if (typeof spawnDeathShatter === 'function') {
+    spawnDeathShatter(rk);
+  }
+
+  // 4. Vengeful Death Dispersion Damage & Knockback
+  if (typeof state !== 'undefined' && state.fighters && owner) {
+    const myTeam = state.getFighterTeam(state.fighters.indexOf(owner));
+    const damageGain = Math.max(0, (owner.damage || 0) - (CONFIG.yuta?.damage || 15));
+    const dispersionRadius = CONFIG.yuta?.rikaDeathExplosionRadius || 280;
+    const dispersionDamage = (CONFIG.yuta?.rikaDeathExplosionDamage || 35) + damageGain;
+    const dispersionKnockback = CONFIG.yuta?.rikaDeathExplosionKnockback || 10;
+    const dispersionHitStun = CONFIG.yuta?.rikaDeathExplosionHitStun || 20;
+
+    state.fighters.forEach((enemy, idx) => {
+      if (enemy && enemy !== owner && enemy.hp > 0) {
+        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+        if (isEnemy) {
+          const dx = enemy.x - rk.x;
+          const dy = enemy.y - rk.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          if (dist <= dispersionRadius) {
+            enemy.takeDamage(dispersionDamage, owner, { isPhysical: true, isExplosion: true, isRikaAttack: true });
+            if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(dispersionHitStun);
+            enemy.vx += (dx / dist) * dispersionKnockback;
+            enemy.vy += (dy / dist) * dispersionKnockback;
+            if (typeof spawnFloatingText === 'function') spawnFloatingText(enemy.x, enemy.y - 30, 'CURSED DISPERSION!', '#FF0055');
+          }
+        }
+      }
+    });
+  }
+
+  // 5. Impact flashes, shockwave, sparks, and screen shake
+  if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(12, 20);
+  if (typeof spawnImpactFlash === 'function') {
+    spawnImpactFlash(rk.x, rk.y, 50, 'dark');
+    spawnImpactFlash(rk.x, rk.y, 30, 'crimsonSniper');
+  }
+  if (typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(rk.x, rk.y, 280);
+
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+  const dispelSparks = isLowQuality ? 8 : 40;
+  for (let i = 0; i < dispelSparks; i++) {
+    spawnSparks(rk.x, rk.y, 1, 'rikaCurse');
+    spawnSparks(rk.x, rk.y, 1, 'blood');
+  }
+
+  if (typeof spawnFloatingText === 'function') spawnFloatingText(rk.x, rk.y - 20, 'DISPELLED!', '#ff1a1a');
+
+  // 6. Clean state and despawn instantly
+  rk.active = false;
+  rk.isDying = false;
+  rk.disappearing = false;
+  rk.deathTimer = 0;
+  rk.hp = 0;
+  rk.cooldownTimer = 0;
+  rk.spawnScale = 0.05;
+  rk.r = CONFIG.yuta.rikaRadius || 30;
+  if (owner) {
+    owner.rikaAlpha = 0;
+    owner.rikaRechargeHpBaseline = owner.hp;
+    if (owner.domainActive) {
+      rk.killedInDomain = true;
+    }
+  }
+
+  // Remove from global target arrays so AI immediately retargets
+  if (typeof state !== 'undefined' && state.illusions) {
+    const idx = state.illusions.indexOf(rk);
+    if (idx >= 0) state.illusions.splice(idx, 1);
+  }
+}
+
+export function stopRikaAudio(fighter, rk) {
+  if (!fighter) return;
+  const targetRk = rk || fighter.rika;
+
+  // 1. Stop all specific audio handles on Yuta
+  if (fighter.comeRikaSoundHandle) {
+    stopSound(fighter.comeRikaSoundHandle);
+    fighter.comeRikaSoundHandle = null;
+  }
+  if (fighter._pureLoveBeamChargeSoundHandle) {
+    stopSound(fighter._pureLoveBeamChargeSoundHandle);
+    fighter._pureLoveBeamChargeSoundHandle = null;
+  }
+  if (fighter.pureLoveBeamBgSoundHandle) {
+    stopSound(fighter.pureLoveBeamBgSoundHandle);
+    fighter.pureLoveBeamBgSoundHandle = null;
+  }
+  if (fighter.pureLoveBeamAudioHandle) {
+    stopSound(fighter.pureLoveBeamAudioHandle);
+    fighter.pureLoveBeamAudioHandle = null;
+  }
+  if (fighter.pureLoveBeamSoundHandle) {
+    stopSound(fighter.pureLoveBeamSoundHandle);
+    fighter.pureLoveBeamSoundHandle = null;
+  }
+
+  // 2. Stop audio handles on Rika
+  if (targetRk) {
+    if (targetRk.activeTrembleSound) {
+      stopSound(targetRk.activeTrembleSound);
+      targetRk.activeTrembleSound = null;
+    }
+    if (targetRk.activeRoarSound) {
+      stopSound(targetRk.activeRoarSound);
+      targetRk.activeRoarSound = null;
+    }
+    targetRk.trembleStopTimer = 0;
+    targetRk.spawnTimer = 0;
+    targetRk.chargeTimer = 0;
+    targetRk.deathTimer = 0;
+    targetRk.disappearTimer = 0;
+    targetRk.attackTimer = 0;
+    targetRk.rightArmTimer = 0;
+    targetRk.leftArmTimer = 0;
+  }
+
+  // 3. Cut off all Rika and summon audio by source/name
+  stopSoundBySrc('comerika');
+  stopSoundBySrc('rikaappearance');
+  stopSoundBySrc('rikaAppearance1');
+  stopSoundBySrc('rikaAppearance');
+  stopSoundBySrc('groundtremble');
+  stopSoundBySrc('groundTremble');
+  stopSoundBySrc('rikanoise1');
+  stopSoundBySrc('rikanoise2');
+  stopSoundBySrc('rikanoise3');
+  stopSoundBySrc('rikanoise');
+  stopSoundBySrc('groundsmash');
+  stopSoundBySrc('groundSmash');
+  stopSoundBySrc('yuta-lovebeam-background');
+  stopSoundBySrc('yuta-lovebeam-fires');
+
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.yuta) ? CONFIG.yuta : {};
+  if (cfg.comeRikaSound) stopSoundBySrc(cfg.comeRikaSound);
+  if (cfg.rikaAppearanceSound) stopSoundBySrc(cfg.rikaAppearanceSound);
+  if (cfg.pureLoveBeamChargeSound) stopSoundBySrc(cfg.pureLoveBeamChargeSound);
+  if (cfg.rikaGroundTrembleSound) stopSoundBySrc(cfg.rikaGroundTrembleSound);
+  if (cfg.rikaGroundSmashSound) stopSoundBySrc(cfg.rikaGroundSmashSound);
+  if (cfg.pureLoveBeamBackgroundSound) stopSoundBySrc(cfg.pureLoveBeamBackgroundSound);
+  if (cfg.pureLoveBeamFireSound) stopSoundBySrc(cfg.pureLoveBeamFireSound);
+}
 
 export function initRika(fighter) {
   fighter.rika = {
@@ -73,19 +235,26 @@ export function initRika(fighter) {
       this.hp = Math.max(0, this.hp - (amount || 0));
       this.hitFlashTimer = 12;
 
-      if (opts && (opts.isWallSlam || opts.isParalyzed)) {
-        const stunDur = CONFIG.mahoraga?.wallSlamParalyzeDuration ?? 150;
-        this.hitStunTimer = Math.max(this.hitStunTimer || 0, stunDur);
-        this.paralyzeTimer = stunDur;
-        this.isParalyzedByMahoraga = true;
-      }
-      
       // Floating text
       if (typeof spawnFloatingText === 'function' && amount > 0) {
         const text = opts.isCrit ? `CRIT! ${Math.floor(amount)}` : Math.floor(amount);
         const color = opts.isCrit ? '#ff0000' : '#ffffff';
         spawnFloatingText(this.x, this.y - this.r - 10, text, color);
       }
+
+      if (opts && (opts.isWallSlam || opts.isParalyzed)) {
+        const stunDur = CONFIG.mahoraga?.wallSlamParalyzeDuration ?? 150;
+        this.hitStunTimer = Math.max(this.hitStunTimer || 0, stunDur);
+        this.paralyzeTimer = stunDur;
+        this.isParalyzedByMahoraga = true;
+      }
+
+      // If Rika lost all HP, trigger instant death shatter!
+      if (this.hp <= 0) {
+        triggerRikaDeathShatter(this, this.owner);
+        return true;
+      }
+
       return true;
     }
   };
@@ -160,6 +329,23 @@ export function updateRika(fighter, arena) {
 
   const rk = fighter.rika;
   const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+
+  // If Yuta is dead or dying, immediately cut off all Rika audio and despawn Rika
+  if (fighter.hp <= 0 || fighter.isDead || fighter.dead) {
+    stopRikaAudio(fighter, rk);
+    rk.active = false;
+    rk.hp = 0;
+    rk.isDying = false;
+    rk.disappearing = false;
+    rk.spawnTimer = 0;
+    rk.chargeTimer = 0;
+    if (typeof state !== 'undefined' && state.illusions) {
+      const idx = state.illusions.indexOf(rk);
+      if (idx >= 0) state.illusions.splice(idx, 1);
+    }
+    return;
+  }
+
   clampRikaToArena(rk, currentArena);
 
   // If Yuta or Rika is chained or mind-controlled by Makima, ensure Rika is NOT in time-stop stasis so she can act!
@@ -172,24 +358,19 @@ export function updateRika(fighter, arena) {
                    (fighter.crimsonElectrifiedTimer > 0) || (fighter.isFrozenByInfinity);
                    
   const isRikaDominated = Boolean(rk.isChainedByMakima || rk.isMindControlledByMakima);
-  if (!isRikaDominated && (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || fighter.pureLoveBeamBreatherTimer > 0)) {
-    // Glue Rika behind Yuta's back with a smooth orbital follow delay so her position lags naturally when Yuta aims
-    if (rk.beamFollowAngle === undefined) {
-      rk.beamFollowAngle = fighter.gunAngle || 0;
-    }
-    let diff = (fighter.gunAngle || 0) - rk.beamFollowAngle;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    rk.beamFollowAngle += diff * 0.085; // Organic lag factor (~12 frames delay)
+  if (!isRikaDominated && (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || (fighter.beamRetreatSlideTimer > 0) || fighter.pureLoveBeamBreatherTimer > 0)) {
+    // Lock Rika aim rotation strictly to the straight beam firing angle
+    const beamAngle = (fighter.pureLoveBeamLockedAngle !== undefined ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0));
+    rk.beamFollowAngle = beamAngle;
 
-    const backAngle = rk.beamFollowAngle + Math.PI;
+    const backAngle = beamAngle + Math.PI;
     const backDist = (fighter.r || 22) + 24;
     rk.x = fighter.x + Math.cos(backAngle) * backDist;
     rk.y = fighter.y + Math.sin(backAngle) * backDist;
 
     // Strict clamping within arena boundaries so Rika never clips out
     clampRikaToArena(rk, currentArena);
-    rk.angle = rk.beamFollowAngle;
+    rk.angle = beamAngle;
     rk.vx = 0;
     rk.vy = 0;
     rk.knockbackVx = 0;
@@ -353,7 +534,8 @@ export function updateRika(fighter, arena) {
       // Play Rika arise audio (rikaAppearance1.mp3 & groundTremble.mp3) as she arises into physical reality!
       if (!rk.playedAriseRoarSound) {
         rk.playedAriseRoarSound = true;
-        if (CONFIG.yuta?.rikaAppearanceSound) {
+        const appearanceChance = CONFIG.yuta?.rikaAppearanceChance ?? 0.35;
+        if (Math.random() < appearanceChance && CONFIG.yuta?.rikaAppearanceSound) {
           audioSystem.playSFX(
             CONFIG.yuta.rikaAppearanceSound,
             CONFIG.yuta.rikaAppearanceVolume ?? 2.5,
@@ -523,80 +705,6 @@ export function updateRika(fighter, arena) {
       rk.spawnScale = 1.0;
     }
 
-    if (rk.isDying) {
-      rk.deathTimer--;
-      rk.vx = 0;
-      rk.vy = 0;
-      
-      // Death animation visuals (continuous sparks leaking)
-      if (rk.deathTimer % 4 === 0) {
-        spawnSparks(rk.x + (Math.random() - 0.5) * 30, rk.y + (Math.random() - 0.5) * 30, 2, 'rikaCurse');
-      }
-
-      if (rk.deathTimer <= 0) {
-        // --- Vengeful Death Dispersion Damage & Knockback (#8) ---
-        if (typeof state !== 'undefined' && state.fighters) {
-          const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 15));
-          const dispersionRadius = CONFIG.yuta?.rikaDeathExplosionRadius || 280;
-          const dispersionDamage = (CONFIG.yuta?.rikaDeathExplosionDamage || 35) + damageGain;
-          const dispersionKnockback = CONFIG.yuta?.rikaDeathExplosionKnockback || 10;
-          const dispersionHitStun = CONFIG.yuta?.rikaDeathExplosionHitStun || 20;
-
-          state.fighters.forEach((enemy, idx) => {
-            if (enemy && enemy !== fighter && enemy.hp > 0) {
-              const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-              if (isEnemy) {
-                const dx = enemy.x - rk.x;
-                const dy = enemy.y - rk.y;
-                const dist = Math.hypot(dx, dy) || 1;
-                if (dist <= dispersionRadius) {
-                  enemy.takeDamage(dispersionDamage, fighter, { isPhysical: true, isExplosion: true, isRikaAttack: true });
-                  if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(dispersionHitStun);
-                  enemy.vx += (dx / dist) * dispersionKnockback;
-                  enemy.vy += (dy / dist) * dispersionKnockback;
-                  if (typeof spawnFloatingText === 'function') spawnFloatingText(enemy.x, enemy.y - 30, 'CURSED DISPERSION!', '#FF0055');
-                }
-              }
-            }
-          });
-        }
-
-        // Final explosive scatter
-        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(12, 20);
-        if (typeof spawnImpactFlash === 'function') spawnImpactFlash(rk.x, rk.y, 50, 'dark');
-        if (typeof spawnImpactFlash === 'function') spawnImpactFlash(rk.x, rk.y, 30, 'crimsonSniper');
-        if (typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(rk.x, rk.y, 280);
-        
-        const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-        const dispelSparks = isLowQuality ? 5 : 40;
-        for (let i = 0; i < dispelSparks; i++) {
-          spawnSparks(rk.x, rk.y, 1, 'rikaCurse');
-          spawnSparks(rk.x, rk.y, 1, 'blood'); 
-        }
-        
-        if (typeof spawnFloatingText === 'function') spawnFloatingText(rk.x, rk.y - 20, 'DISPELLED!', '#ff1a1a');
-
-        if (rk.activeTrembleSound) {
-          fadeOutSound(rk.activeTrembleSound, 300);
-          rk.activeTrembleSound = null;
-        }
-        fadeOutSoundBySrc('groundTremble', 300);
-
-        rk.active = false;
-        rk.isDying = false;
-        rk.disappearing = false;
-        rk.cooldownTimer = 0;
-        rk.r = CONFIG.yuta.rikaRadius || 30;
-        fighter.rikaRechargeHpBaseline = fighter.hp;
-
-        if (fighter.domainActive) {
-          rk.killedInDomain = true;
-        }
-      }
-      return; // Skip normal update logic while dying
-    }
-
     if (rk.disappearing) {
       rk.disappearTimer--;
       
@@ -627,41 +735,8 @@ export function updateRika(fighter, arena) {
     } else {
       // Rika stays active indefinitely as long as her HP > 0 (no duration timer limit)
       if (rk.hp <= 0) {
-        // Remove from global target arrays so AI instantly stops attacking her
-        if (state.illusions) {
-          const idx = state.illusions.indexOf(rk);
-          if (idx >= 0) state.illusions.splice(idx, 1);
-        }
-
-        const isGojoDomain = fighter.domainActive || fighter.isChannelingDomain || (typeof state !== 'undefined' && (state.domainActive || state.activeDomain));
-        if (isGojoDomain) {
-          // Instant particle puff when Rika dies inside Gojo's domain (no white corpse visual)
-          rk.active = false;
-          rk.isDying = false;
-          rk.disappearing = false;
-          rk.deathTimer = 0;
-          rk.cooldownTimer = 0;
-          rk.hasSummonedAt50Hp = true;
-          rk.killedInDomain = true;
-          fighter.rikaRechargeHpBaseline = fighter.hp;
-
-          if (typeof spawnSparks === 'function') {
-            for (let i = 0; i < 25; i++) {
-              spawnSparks(rk.x, rk.y, 1, 'rikaCurse');
-            }
-          }
-          if (typeof spawnImpactFlash === 'function') {
-            spawnImpactFlash(rk.x, rk.y, 35, 'dark');
-          }
-          if (typeof spawnFloatingText === 'function') {
-            spawnFloatingText(rk.x, rk.y - 20, 'DISPELLED!', '#ff1a1a');
-          }
-          return;
-        }
-
-        // ENTER DYING STATE (outside domain)
-        rk.isDying = true;
-        rk.deathTimer = 10; // Fast dying animation before explosion
+        triggerRikaDeathShatter(rk, fighter);
+        return;
       }
     }
   }
@@ -685,7 +760,8 @@ export function updateRika(fighter, arena) {
       rk.isDomainSpawn = true; // Supress shockwaves for channeling/domain spawns
       
       // Play Rika Appearance sound (rikaAppearance.mp3) when Rika manifests!
-      if (CONFIG.yuta?.rikaAppearanceSound) {
+      const appearanceChance = CONFIG.yuta?.rikaAppearanceChance ?? 0.35;
+      if (Math.random() < appearanceChance && CONFIG.yuta?.rikaAppearanceSound) {
         audioSystem.playSFX(
           CONFIG.yuta.rikaAppearanceSound,
           CONFIG.yuta.rikaAppearanceVolume ?? 2.5,

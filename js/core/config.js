@@ -131,6 +131,16 @@ export const CONFIG = {
   darkModeShowHudStats: 0,      // Toggle on/off to display HUD fighter stats info (DMG, SPD, ATK, etc.) across Light and Dark mode (1 = show, 0 = hide)
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
   globalScreenShakeIntensityMultiplier: 0.7, // Global multiplier for all hit effect & arena screen shake intensity (1.0 = normal, 0.5 = half shake, 0.0 = disable shake completely)
+  camera: {
+    minZoom: 1.0,
+    maxZoom: 1.04,                     // Gentle, wide zoom cap to prevent camera from zooming in too much (was 1.15)
+    winnerZoom: 1.02,                  // Subtle victory focus zoom (was 1.08)
+    maxPanRatio: 0.18,                 // Maximum pan offset relative to arena radius (was 0.35)
+    smoothing: 0.08,                   // Position tracking smoothing
+    zoomSmoothing: 0.05,               // Zoom interpolation smoothing
+    minDist: 80,                       // Combat distance for maxZoom
+    maxDist: 420,                      // Combat distance for minZoom
+  },
   canvasWidth: 540,                 // Logical width of the game screen
   canvasHeight: 1080,                // Logical height of the game screen
   internalScale: 0.95,               // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container

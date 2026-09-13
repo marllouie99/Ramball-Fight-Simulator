@@ -1337,8 +1337,6 @@ export class TojiFighter extends Fighter {
       this.isCronosStasis ||
       this.caughtInGenosFlurry ||
       this.caughtInJohnWickCombo ||
-      this.caughtInPureLoveBeam ||
-      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
       (this.stunTimer && this.stunTimer > 0) ||
       (this.knockbackStunTimer && this.knockbackStunTimer > 0) ||
       this.isParalyzedByMahoraga ||
@@ -1422,7 +1420,7 @@ export class TojiFighter extends Fighter {
 
     // 2. Top-of-loop Freeze / Status Effect Guard (Rule 1 Compliant: decrements timers & returns if frozen/paralyzed)
     const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
+    if (isFrozen) {
       this.vx = 0;
       this.vy = 0;
       this.interruptAttacks();

@@ -9,6 +9,7 @@ import { projectileSystem } from '../systems/projectileSystem.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
+import { spawnDroppedMahoragaWheel } from '../graphics/particles/mahoragaDroppedWheel.js';
 import { spawnBloodEffect, spawnFatalBloodSplash } from '../graphics/particles/bloodEffect.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
@@ -211,7 +212,7 @@ export class Fighter {
 
   set hp(value) {
     const oldHp = this._hp;
-    if (oldHp !== undefined && value > oldHp) {
+    if (oldHp !== undefined && value > oldHp && !this._bypassHealDebuff) {
       if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0) {
         value = oldHp; // Disable all healing while caught inside Yuta's Pure Love Beam
       } else if (this.tojiRegenDebuffTimer > 0) {
@@ -763,14 +764,11 @@ export class Fighter {
     return false;
   }
 
-  /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Yuta's Pure Love Beam, Laser Beam, Layla Beam). */
+  /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Laser Beam, Layla Beam). */
   isCaughtInBeam() {
     return !!(
       this.isDraggedByGetsuga ||
       (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
-      this.caughtInPureLoveBeam ||
-      this.wasCaughtInPureLoveBeam ||
-      (this.pureLoveBeamTimer || 0) > 0 ||
       this.caughtInGenosFlurry ||
       this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
@@ -860,6 +858,37 @@ export class Fighter {
   /** Alias / compatibility wrapper pointing to authoritative isStationarySkillActive. */
   isChannelingSkill() {
     return this.isStationarySkillActive();
+  }
+
+  /**
+   * Universal check for active multi-hit or channeled finishing abilities
+   * that must complete their full visual and animation duration before the
+   * round or match can officially transition to roundEnd/matchEnd.
+   * @returns {boolean}
+   */
+  hasActiveFinishingAbility() {
+    if (this.hp <= 0 || this.dead) return false;
+
+    // Mahoraga: Debris Throw Barrage (isThrowing active with shots or interval timer remaining)
+    const isMahoraga = this.characterId === 'mahoraga' || this.type === 'mahoraga' || this._def?.id === 'mahoraga';
+    if (isMahoraga) {
+      if (this.isThrowing && ((this.throwBarrageShotsLeft || 0) > 0 || (this.throwBarrageTimer || 0) > 0)) {
+        return true;
+      }
+    }
+
+    // Yuta: Pure Love Beam (isFiringPureLoveBeam active with remaining duration, channeling, emergence, or retreat)
+    const isYuta = this.characterId === 'yuta' || this.type === 'yuta' || this._def?.id === 'yuta';
+    if (isYuta) {
+      if ((this.isFiringPureLoveBeam && (this.pureLoveBeamActiveTimer || 0) > 0) ||
+          this.isChannelingPureLoveBeam ||
+          (this.rikaEmergingForBeamTimer || 0) > 0 ||
+          (this.beamRetreatSlideTimer || 0) > 0) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -1012,6 +1041,7 @@ export class Fighter {
     this.clapAnimTimer = 0;
 
     // Ichigo / Uryu
+    this.isChannelingGetsuga = false;
     this.getsugaChargeTimer = 0;
     this.getsugaRecoveryTimer = 0;
     this.arrowDrawTimer = 0;
@@ -1119,8 +1149,6 @@ export class Fighter {
       this.isFrozenByInfinity ||
       this.isGrabbedByMahoraga ||
       this.isWallSlammed ||
-      this.caughtInPureLoveBeam ||
-      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
       this.isTargetOfAmbush ||
       (this.statusEffects && (
         (this.statusEffects.electricStunTimer && this.statusEffects.electricStunTimer > 0)
@@ -1247,6 +1275,40 @@ export class Fighter {
       this._handleFrozenSkillCooldowns();
       return true;
     }
+    if (this.isFrozenByInfinity) {
+      this.vx = 0;
+      this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.isChainedByMakima && !this.isMindControlledByMakima) {
+      this.vx = 0;
+      this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.caughtInSaitamaCounter) {
+      this.vx = 0;
+      this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo) {
+      this.vx = 0;
+      this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.frozenByCronos || this.isCronosStasis) {
+      this.vx = 0;
+      this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.isDraggedByGetsuga) {
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
     if (this.basicAttackHitPauseTimer > 0) {
       this.basicAttackHitPauseTimer--;
       this.vx = 0;
@@ -1298,6 +1360,11 @@ export class Fighter {
     // Death shatter shard explosion (body physically shatters into pieces)
     if (typeof spawnDeathShatter === 'function' && !this.isTurret && !this.isDispenser) {
       spawnDeathShatter(this);
+    }
+
+    // Mahoraga wheel drop physics on death
+    if ((this.characterId === 'mahoraga' || this.type === 'mahoraga') && typeof spawnDroppedMahoragaWheel === 'function') {
+      spawnDroppedMahoragaWheel(this);
     }
   }
 
@@ -1641,9 +1708,8 @@ export class Fighter {
 
         // Silky Smooth Kinetic Ricochet Wall Bounce (0.82 smooth velocity reflection)
         let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
-        const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
         const isGenosFlurryCaught = Boolean(this.caughtInGenosFlurry);
-        const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosFlurryCaught || isPureLoveBeamCaught;
+        const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosFlurryCaught;
         if (this.preventKnockbackBounce || this.isDraggedByGetsuga || isBeamTrapped) bounceMult = 0; // Stick to the wall instead of bouncing
 
         const minX = arena.x + this.r;
@@ -1751,7 +1817,7 @@ export class Fighter {
     if (isHeal) {
       if (this.hp <= 0) return false;
     } else {
-      if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain && !isGuaranteedHit) || (this.vanishTimer && this.vanishTimer > 0 && !isGuaranteedHit) || (this.invincibilityTimer && this.invincibilityTimer > 0 && !isGuaranteedHit)) return false;
+      if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain && !isGuaranteedHit) || (this.vanishTimer && this.vanishTimer > 0 && !isGuaranteedHit) || (this.invincibilityTimer && this.invincibilityTimer > 0 && !isGuaranteedHit && !opts.isDomain)) return false;
     }
 
     // Base fighter doesn't block; sanitize inputs before applying damage.
@@ -2084,7 +2150,7 @@ export class Fighter {
 
     if (state.gameState !== 'playing') return;
 
-    const aliveFighters = state.fighters.filter((f) => f && _isEffectivelyAlive(f) && f !== this);
+    const aliveFighters = state.fighters.filter((f) => f && _isEffectivelyAlive(f));
     const aliveCount = aliveFighters.length;
     const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
     const realAttackerIndex = state.fighters.indexOf(realAttacker);
@@ -2095,7 +2161,9 @@ export class Fighter {
     const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2);
 
     if (isTagMatch) {
-      const deadIdx = state.fighters.indexOf(this);
+      const deadFighter = state.fighters.find(f => f && !_isEffectivelyAlive(f));
+      if (!deadFighter) return; // Both fighters on field are still alive!
+      const deadIdx = state.fighters.indexOf(deadFighter);
       if (deadIdx >= 0) {
         const deadTeam = deadIdx; // 0 (Red) or 1 (Blue)
         const teamKey = 'team' + deadTeam;
@@ -2113,6 +2181,9 @@ export class Fighter {
           // Team is completely eliminated! The other team wins!
           const winningTeam = deadTeam === 0 ? 1 : 0;
           const winningFighter = state.fighters[winningTeam];
+          if (winningFighter && typeof winningFighter.hasActiveFinishingAbility === 'function' && winningFighter.hasActiveFinishingAbility()) {
+            return;
+          }
           state.winningTeam = winningTeam;
           state.roundWinner = winningFighter;
           state.matchWinner = winningFighter;
@@ -2148,8 +2219,8 @@ export class Fighter {
       }
       
       if (!team0Alive || !team1Alive) {
-        stopArenaBgm(true);
         if (!team0Alive && !team1Alive) {
+          stopArenaBgm(true);
           // Double KO in Team Mode -> DRAW
           state.roundWinner = null;
           state.matchWinner = null;
@@ -2171,6 +2242,15 @@ export class Fighter {
         }
 
         const winningTeam = team0Alive ? 0 : 1;
+        const hasFinishingAbility = state.fighters.some((f, idx) => 
+          f && _isEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam && 
+          typeof f.hasActiveFinishingAbility === 'function' && f.hasActiveFinishingAbility()
+        );
+        if (hasFinishingAbility) {
+          return;
+        }
+
+        stopArenaBgm(true);
         state.winningTeam = winningTeam;
         state.teamScores[winningTeam]++;
 
@@ -2199,9 +2279,9 @@ export class Fighter {
     } else if (isFFA) {
       // FFA: Continue fight until only ONE fighter survives!
       if (aliveCount <= 1) {
-        stopArenaBgm(true);
         const soleSurvivor = aliveFighters[0] || state.fighters.find(f => f && _isEffectivelyAlive(f)) || null;
         if (!soleSurvivor) {
+          stopArenaBgm(true);
           // All dead in FFA -> DRAW
           state.roundWinner = null;
           state.matchWinner = null;
@@ -2218,6 +2298,11 @@ export class Fighter {
           return;
         }
 
+        if (soleSurvivor && typeof soleSurvivor.hasActiveFinishingAbility === 'function' && soleSurvivor.hasActiveFinishingAbility()) {
+          return;
+        }
+
+        stopArenaBgm(true);
         const winnerIndex = soleSurvivor ? state.fighters.indexOf(soleSurvivor) : -1;
 
         if (winnerIndex >= 0) {
@@ -2243,11 +2328,14 @@ export class Fighter {
       }
     } else {
       // 1v1 / Stand Off / Tactical 1v1 / Tactical Standoff / TLFS
-      stopArenaBgm(true);
-      const survivor = state.fighters.find(f => f && f !== this && _isEffectivelyAlive(f));
-      const winnerFighter = survivor || ((realAttacker && realAttacker !== this && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
+      // If more than 1 fighter is alive, the round is still actively underway!
+      if (aliveCount > 1) return;
+
+      const survivor = state.fighters.find(f => f && _isEffectivelyAlive(f));
+      const winnerFighter = survivor || ((realAttacker && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
       
       if (!winnerFighter) {
+        stopArenaBgm(true);
         // Both fighters dead at same moment -> DRAW
         state.roundWinner = null;
         state.matchWinner = null;
@@ -2268,6 +2356,11 @@ export class Fighter {
         return;
       }
 
+      if (winnerFighter && typeof winnerFighter.hasActiveFinishingAbility === 'function' && winnerFighter.hasActiveFinishingAbility()) {
+        return;
+      }
+
+      stopArenaBgm(true);
       const winnerIndex = winnerFighter ? state.fighters.indexOf(winnerFighter) : -1;
 
       if (winnerIndex >= 0) {
@@ -2350,7 +2443,7 @@ export class Fighter {
     const isSaitamaHit = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
     const isGenosTrapped = Boolean(this.caughtInGenosFlurry);
     const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
@@ -2641,9 +2734,9 @@ export class Fighter {
       this.hitStunTimer--;
       targetSpeed *= this.hitStunMultiplier;
     }
-    // Pure Love Beam post-beam recovery slow
-    if (this.pureLoveBeamRecoveryTimer > 0) {
-      const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.40;
+    // Pure Love Beam slow (both during beam hit and recovery phase)
+    if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.pureLoveBeamRecoveryTimer > 0)) {
+      const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.35;
       targetSpeed *= slowMult;
     }
     // Crimson electrified visual timer

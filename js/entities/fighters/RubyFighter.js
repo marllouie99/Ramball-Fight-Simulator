@@ -443,8 +443,7 @@ export class RubyFighter extends Fighter {
 
       this.vx = this.dashVector.x * targetSpeed;
       this.vy = this.dashVector.y * targetSpeed;
-      this.x += this.vx;
-      this.y += this.vy;
+      this.applyMovementPhysics(cfg.dashSpeedMultiplier || 3.0);
     } else {
       this.applyMovementPhysics();
     }

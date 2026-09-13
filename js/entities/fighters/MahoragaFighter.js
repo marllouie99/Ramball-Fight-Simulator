@@ -9,6 +9,7 @@ import { drawMahoragaSword } from '../../graphics/weapons/mahoragaWeaponGraphics
 import { drawMahoragaSkin } from '../../graphics/fighters/mahoragaSkin.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
+import { spawnDroppedMahoragaWheel } from '../../graphics/particles/mahoragaDroppedWheel.js';
 
 // ── Refactored Mahoraga Modules ──
 import { handleAdaptationDamage, triggerAdaptation, handleInfinityFreeze, adaptToPureLoveBeam, adaptToYutaFlurry, adaptToThinIceBreaker, adaptToSoulDisfigurement, adaptToSaitamaCounter } from './mahoraga/mahoragaAdaptation.js';
@@ -159,9 +160,6 @@ export class MahoragaFighter extends Fighter {
     this.skillDodgeReady = {};
     this._lastSkillShotId = null;
     this._lastSkillShotColor = null;
-    this.pendingGetsugaAdaptation = false;
-    this.pendingGetsugaAttacker = null;
-    this.pendingGetsugaProj = null;
     this.getsugaExposureCount = 0;
     this._lastGetsugaExposureProjId = null;
     this.adaptedGetsuga = false;
@@ -236,8 +234,7 @@ export class MahoragaFighter extends Fighter {
                      (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
                      (this.electricStunTimer && this.electricStunTimer > 0) ||
                      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
-                     (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
-                     (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0);
+                     (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
     if (isHardCC) return false;
 
     // If Mahoraga has adapted to Gojo's domain, auto-aim and rotation are explicitly enabled!
@@ -318,26 +315,42 @@ export class MahoragaFighter extends Fighter {
       this.defensePoseTimer = 0;
     }
 
-    if (opts.isYutaFlurry && !this.adaptedYutaFlurry) {
-      this._yutaFlurryHitCount = (this._yutaFlurryHitCount || 0) + 1;
-      if (this._yutaFlurryHitCount >= 3) {
-        adaptToYutaFlurry(this);
+    this._inMahoragaTakeDamage = true;
+    let finalDmg = amount;
+    let dmgType = 'melee';
+    let pendingAdaptation = null;
+    try {
+      const adaptRes = handleAdaptationDamage(this, amount, attacker, opts);
+      finalDmg = adaptRes.finalAmount;
+      dmgType = adaptRes.type;
+      pendingAdaptation = adaptRes.pendingAdaptation;
+    } finally {
+      this._inMahoragaTakeDamage = false;
+    }
+
+    // CRITICAL: If adaptation is triggered by this hit (fatal hit or accumulated damage threshold reached),
+    // cap finalDmg so it does not drop Mahoraga's HP to 0 or trigger onDeath() / roundEnd before he adapts & heals!
+    if (pendingAdaptation) {
+      finalDmg = Math.min(finalDmg, Math.max(0, this.hp - 1));
+    }
+
+    const result = super.takeDamage(finalDmg, attacker, opts);
+
+    if (pendingAdaptation) {
+      if (this.hp <= 0) {
+        this.dead = false;
+        this.isDead = false;
+        this._hasDied = false;
+        this._hp = 1;
+      }
+      if (pendingAdaptation.isPureLoveBeam) {
+        adaptToPureLoveBeam(this);
+      } else if (pendingAdaptation.isSaitamaCounter) {
+        adaptToSaitamaCounter(this, attacker);
+      } else {
+        triggerAdaptation(this, pendingAdaptation.type || dmgType, attacker);
       }
     }
-
-    if (opts.isThinIceBreaker && !this.adaptedThinIceBreaker) {
-      adaptToThinIceBreaker(this);
-    }
-
-    if ((opts.isSaitamaCounter || (opts.isCounter && attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama'))) && !this.adaptedSaitamaCounter) {
-      // Wheel clicks immediately after the punch lands (tiny beat for impact to register)
-      const adaptDelay = CONFIG.mahoraga?.saitamaCounterAdaptDelay ?? 8; // ~0.13s — near-instant
-      this.saitamaCounterDebuffTimer = adaptDelay;
-      this.saitamaCounterAttacker = attacker;
-    }
-
-    const { finalAmount, type } = handleAdaptationDamage(this, amount, attacker, opts);
-    const result = super.takeDamage(finalAmount, attacker, opts);
 
     // Cancel Level 8 Wall Slam sequence (impale, throw, dash, strike flurry) if hit by Gojo's Red or caught in Gojo's Purple
     const shouldCancel = (opts.isRed || opts.isPurpleDPS) && this.isWallSlamActive;
@@ -360,6 +373,12 @@ export class MahoragaFighter extends Fighter {
     }
 
     return result;
+  }
+
+  isEffectivelyAlive() {
+    if (this.hp > 0 && !this.isDead) return true;
+    if (this._inMahoragaTakeDamage || this.adaptationPauseTimer > 0 || this.wheelClickTimer > 0) return true;
+    return super.isEffectivelyAlive();
   }
 
   // Delegating to module functions via thin wrappers
@@ -532,7 +551,7 @@ export class MahoragaFighter extends Fighter {
    */
   resolveWallBounce(arena, opponent = null) {
     if (!arena) return false;
-    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
     if (isBeamTrapped) {
       this.wallBounceCount = 0;
       let clamped = false;
@@ -714,74 +733,6 @@ export class MahoragaFighter extends Fighter {
 
     const threshold = this.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
 
-    if (this.pendingPurpleAdaptation) {
-      const livePurpleOrb = (projectileSystem && projectileSystem.projectiles)
-        ? projectileSystem.projectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') && (p.life || 0) > 0)
-        : null;
-
-      if (!livePurpleOrb) {
-        // Purple orb has expired / despawned — trigger adaptation only if accumulated damage filled WOA bar
-        this.pendingPurpleAdaptation = false;
-        const purpleAttacker = this.pendingPurpleAttacker;
-        const purpleType = this.pendingPurpleType || 'skill';
-        this.pendingPurpleAttacker = null;
-        this.pendingPurpleType = null;
-        if ((this.totalAccumDamage || 0) >= threshold) {
-          this._triggerAdaptation(purpleType, purpleAttacker);
-        }
-      }
-    }
-
-    if (this.pendingRedAdaptation) {
-      const isKnockbackActive = (this.knockbackVx && Math.abs(this.knockbackVx) > 1.5) || 
-                                (this.knockbackVy && Math.abs(this.knockbackVy) > 1.5) || 
-                                (Math.hypot(this.vx, this.vy) > 3.0);
-
-      if (!isKnockbackActive) {
-        // Red blast knockback slide finished — trigger adaptation only if accumulated damage filled WOA bar
-        this.pendingRedAdaptation = false;
-        const redAttacker = this.pendingRedAttacker;
-        const redType = this.pendingRedType || 'skill';
-        this.pendingRedAttacker = null;
-        this.pendingRedType = null;
-        if ((this.totalAccumDamage || 0) >= threshold) {
-          this._triggerAdaptation(redType, redAttacker);
-        }
-      }
-    }
-
-    // ── PENDING GETSUGA TENSHO ADAPTATION RELEASE TICK ──
-    if (this.pendingGetsugaAdaptation) {
-      const proj = this.pendingGetsugaProj;
-      const isProjActive = proj && typeof projectileSystem !== 'undefined' && projectileSystem.projectiles && projectileSystem.projectiles.includes(proj) && (proj.life || 0) > 0;
-      const isDragged = Boolean(this.isDraggedByGetsuga);
-
-      if (!isProjActive && !isDragged) {
-        this.pendingGetsugaAdaptation = false;
-        const getsugaAttacker = this.pendingGetsugaAttacker;
-        this.pendingGetsugaAttacker = null;
-        this.pendingGetsugaProj = null;
-
-        if ((this.totalAccumDamage || 0) >= threshold) {
-          this.adaptedGetsuga = true;
-          if (!this.adaptedSkills) this.adaptedSkills = {};
-          this.adaptedSkills['getsugaTensho'] = true;
-          this.adaptedSkills['getsuga'] = true;
-          this.skillDodgeReady['getsugaTensho'] = false;
-          this.skillDodgeReady['getsuga'] = false;
-          this.isParalyzed = false;
-          this.paralyzeTimer = 0;
-          if (this.statusEffects) {
-            this.statusEffects.paralyzeTimer = 0;
-          }
-
-          this._lastSkillShotId = 'getsugaTensho';
-          this._lastSkillShotColor = '#FF1E00';
-          this._triggerAdaptation('skill', getsugaAttacker);
-        }
-      }
-    }
-
     // ── GOJO DOMAIN EXPOSURE & ADAPTATION RELEASE TICK ──
     const isInsideGojoDomain = !this.gojoDomainAdapted && !this.gojoAdapted?.domain && typeof state !== 'undefined' && (
       state.activeDomain === 'unlimited_void' || 
@@ -805,17 +756,6 @@ export class MahoragaFighter extends Fighter {
       this._triggerAdaptation('skill', gojoAttacker);
     }
 
-    // Saitama Serious Counter adaptation: wheel clicks only when accumulated damage filled WOA bar
-    if (this.saitamaCounterDebuffTimer > 0) {
-      this.saitamaCounterDebuffTimer--;
-      if (this.saitamaCounterDebuffTimer <= 0 && this.hp > 0 && !this.isDead && !this.adaptedSaitamaCounter) {
-        if ((this.totalAccumDamage || 0) >= threshold) {
-          adaptToSaitamaCounter(this, this.saitamaCounterAttacker);
-        }
-        this.saitamaCounterAttacker = null;
-      }
-    }
-
     // ── WHEEL OF ADAPTATION (WOA) TIMERS TICKING (Unstoppable celestial passive progress under all CC/paralyze) ──
     if (this.fatalAdaptCooldown > 0) {
       this.fatalAdaptCooldown--;
@@ -833,13 +773,9 @@ export class MahoragaFighter extends Fighter {
     }
 
     const isFrozen = this._handleTimeStop();
-    const isInfinityFrozen = handleInfinityFreeze(this);
-    const isBeamParalyzed = (
-      !this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)
-    );
 
-    // Rule #1 Early Exit Guard: Freeze / Unadapted Gojo Domain / Ambush / Infinity / Beam Paralysis completely freezes Mahoraga!
-    if (this.isTargetOfAmbush || isInsideGojoDomain || isFrozen || isInfinityFrozen || isBeamParalyzed) {
+    // Rule #1 Early Exit Guard: Freeze / Unadapted Gojo Domain completely freezes Mahoraga!
+    if (isInsideGojoDomain || isFrozen) {
       this.interruptAttacks(true);
       this.isCleaving = false;
       this.isShouting = false;
@@ -848,6 +784,7 @@ export class MahoragaFighter extends Fighter {
       this.isInfinityBlitz = false;
       this.adaptationPauseTimer = 0;
       this.adaptationDashTimer = 0;
+      this.wallBounceCount = 0;
       this._pendingCounterTarget = null;
       this.neutralStanceTimer = 0;
       this.vx = 0;
@@ -1328,6 +1265,10 @@ export class MahoragaFighter extends Fighter {
           this.isThrowing = false;
           this.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 1000;
           this.resumeMovement(opponent);
+          const livingCount = state.fighters ? state.fighters.filter(f => f && (typeof f.isEffectivelyAlive === 'function' ? f.isEffectivelyAlive() : (f.hp > 0 && !f.dead))).length : 0;
+          if (livingCount <= 1 && typeof this.checkRoundOrMatchEnd === 'function') {
+            this.checkRoundOrMatchEnd();
+          }
         }
       }
       return;
@@ -1854,6 +1795,11 @@ export class MahoragaFighter extends Fighter {
   // Store reference to super.draw for the visuals module to call
   _superDraw(ctx, opponent) {
     super.draw(ctx, opponent);
+  }
+
+  onDeath() {
+    spawnDroppedMahoragaWheel(this);
+    super.onDeath();
   }
 
   draw(ctx, opponent) {

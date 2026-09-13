@@ -15,7 +15,7 @@ export const mahoragaConfig = {
     startY: 250,
     startVx: 1.1,
     startVy: 1.1,
-    damage: 15,
+    damage: 4,
     cooldown: 60,
     projectileSpeedMultiplier: 1.0,
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
@@ -39,7 +39,7 @@ export const mahoragaConfig = {
     throwBarrageInterval: 5,
     throwAimRotationSpeed: 0.06,
     blitzHitsCount: 6,
-    blitzHitDamage: 16,
+    blitzHitDamage: 3,
     blitzFinisherDamage: 35,
     blitzFinisherKnockback: 35.0,
 
@@ -49,14 +49,14 @@ export const mahoragaConfig = {
     adaptationSpeedBoostPerStage: 0.05, // +15% movement speed multiplier per gold adaptation stage
     movementSpeedMultiplierPerAdaptation: 0.01, // Movement speed multiplier per wheel adaptation stage
     rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
-    enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique flat healing on wheel click
-    rctHealFlatAmount: 500,          // Heals a flat 100 HP on each wheel rotation click
+    enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique healing on wheel click
+    rctHealPercent: 0.60,            // Percentage of max HP healed on each wheel rotation click (0.15 = 15% max HP)
     defBuffPerClickPercent: 0.02,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,         // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,      // Maximum speed/KB resistance factor under stasis (60% max)
     fatalAdaptWindowFrames: 400,     // Rolling damage accumulator window (~6.6 seconds at 60fps)
-    fatalDamageThresholdPct: 0.25,   // 15% max HP damage threshold within window triggers wheel adaptation click
+    fatalDamageThresholdPct: 0.80,   // 15% max HP damage threshold within window triggers wheel adaptation click
     fatalAdaptCooldownFrames: 30,    // Cooldown frames between wheel clicks (30 frames = 0.5s)
 
     // ── Visuals, Screen Dim & Afterimages ──
@@ -70,7 +70,7 @@ export const mahoragaConfig = {
     // ── Sword of Extermination & Basic Melee Attacks ──
     swordRange: 30,                // Melee reach (110px frontal arc) for Sword of Extermination
     swordCooldown: 25,              // Frames between sword strikes (0.5s at 60fps)
-    swordDamage: 15,                // True damage dealt by Sword of Extermination
+    swordDamage: 4,                // True damage dealt by Sword of Extermination
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
     swordAnimFrames: 18,            // Duration (frames) of sword chop swing animation
     punchAnimFrames: 18,            // Duration (frames) of off-hand heavy punch animation
@@ -105,7 +105,7 @@ export const mahoragaConfig = {
     // ── Divine Shout (AoE Shockwave Roar) ──
     shoutCooldown: 1000,             // Cooldown (frames) between divine shouts (~16.6s)
     shoutRadius: 180,                // Shockwave blast radius
-    shoutDamage: 30,                 // Damage dealt to enemies caught in shockwave
+    shoutDamage: 10,                 // Damage dealt to enemies caught in shockwave
     shoutKnockback: 18,              // Knockback force applied to caught enemies
     shoutSlowDurationFrames: 120,    // Slow duration in frames applied to caught enemies (120 = 2.0s)
     shoutSlowMultiplier: 0.50,       // Slow speed multiplier (0.50 = 50% slow movement)
@@ -115,7 +115,7 @@ export const mahoragaConfig = {
     throwMinDistance: 240,           // Minimum distance required to trigger rapid throw skill
     throwBarrageCount: 10,           // Number of rapid projectiles hurled in a single barrage
     throwBarrageInterval: 10,        // Frames between each rapid throw in the barrage (~0.16s)
-    throwDamage: 20,                 // Damage per thrown projectile in barrage
+    throwDamage: 6,                 // Damage per thrown projectile in barrage
     throwSpeed: 20,                  // Projectile velocity
     throwKnockback: 7.0,             // Physical pushback force per projectile impact
     throwAimRotationSpeed: 0.06,     // Aim tracking rotation speed during throw barrage
@@ -127,7 +127,7 @@ export const mahoragaConfig = {
     blitzHitsCount: 10,              // Total number of rapid melee hits in H2H flurry
     blitzHitInterval: 15,            // Frame interval between each rapid melee hit
     blitzAttackAnimDuration: 7,      // Frame duration for each punch/chop stroke animation
-    blitzHitDamage: 15,              // Damage per rapid martial arts strike
+    blitzHitDamage: 4,              // Damage per rapid martial arts strike
     blitzHitPushbackForce: 4.5,      // Slow pushback distance per rapid hit
     blitzTeleportDistanceThreshold: 200, // Distance threshold to trigger on-demand teleport chase
     blitzFinisherDamage: 35,         // Damage for final finisher cleave
@@ -147,10 +147,10 @@ export const mahoragaConfig = {
     wallSlamImpaleHoldFrames: 50,     // Duration (frames) opponent is held in the air on the sword
     wallSlamPunchHitpause: 16,        // Frames of freeze/hitpause when the punch lands before wall launch
     wallSlamThrowSpeed: 45.0,         // Supersonic velocity at which opponent is hurled to the wall
-    wallSlamImpactDamage: 20,         // Damage taken upon slamming into the wall
+    wallSlamImpactDamage: 10,         // Damage taken upon slamming into the wall
     wallSlamParalyzeDuration: 150,     // Duration (frames) opponent is paralyzed on wall contact
     wallSlamMenacingStandoff: 20,     // Delay (frames) Mahoraga pauses menacingly before dashing to the wall-pinned target (snappy ~0.33s)
-    wallSlamFollowupDamage: 25,       // Damage dealt on the initial execution strike upon reaching target
+    wallSlamFollowupDamage: 15,       // Damage dealt on the initial execution strike upon reaching target
     wallSlamBlitzHitsCount: 10,       // Total rapid hits in the Wall Slam execution flurry
     wallSlamBlitzHitInterval: 10,      // Frame interval between each rapid hit during Wall Slam flurry
     wallSlamBlitzDuration: 120,       // Total duration (frames) of the Wall Slam execution flurry
@@ -159,7 +159,7 @@ export const mahoragaConfig = {
     infinityBlitzDurationFrames: 300,  // Active duration (frames) for Level 8 Speed-Blitz stance (5 seconds at 60fps)
     infinityBlitzInterval: 20,         // Frame interval between continuous strikes
     infinityBlitzAttacksPerTeleport: 5,// Number of attacks executed before teleporting to a new angle
-    infinityBlitzDamage: 15,           // Damage per strike during Level 8 speed-blitz
+    infinityBlitzDamage: 4,           // Damage per strike during Level 8 speed-blitz
     infinityBlitzTeleportDistance: 18, // Teleport offset distance around opponent
     infinityBlitzCooldownFrames: 800,  // Cooldown (frames) before Speed-Blitz can re-trigger (~13.3s)
     infinityBlitzTeleportSpeedMultiplier: 0.05, // Speed multiplier for instant position snaps during blitz
@@ -167,7 +167,7 @@ export const mahoragaConfig = {
     infinityBlitzStrikeSlowMultiplier: 0.40,    // Slow movement multiplier (0.40 = 60% slow)
 
     // ── Counter & Melee Knockback Physics ──
-    teleportCounterDamage: 22,         // Damage dealt by Stage 2+ Teleport Adaptation counter strike
+    teleportCounterDamage: 10,         // Damage dealt by Stage 2+ Teleport Adaptation counter strike
     heavyPunchKnockbackForce: 18.0,    // Knockback force for heavy off-hand punch impacts
     adaptationStrikeKnockbackForce: 42.0, // Knockback launch force for Adaptation Strike counter
     blitzKineticKnockbackForce: 16.0,  // Knockback force for random kinetic punch procs during blitz

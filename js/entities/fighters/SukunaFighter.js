@@ -145,9 +145,10 @@ export class SukunaFighter extends Fighter {
     const savedDomainCharge = this.domainChargeTimer;
     const savedDomainAudio = this._hasPlayedDomainChannelSound;
 
-    // Preserve Fuga channeling state when inside Malevolent Shrine OR when time-stopped by Gojo's domain (unless forceCancelAll is true)!
+    // Preserve Fuga channeling state when inside Malevolent Shrine OR when time-stopped by Gojo's domain (unless forceCancelAll is true or caught in Pure Love Beam)!
     const isDomainTimeStop = (this.timeStopTimer > 0);
-    const preserveFuga = !forceCancelAll && (this.domainActive || isDomainTimeStop) && this.isChannelingDivineFlame;
+    const isBeamTrapped = this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0);
+    const preserveFuga = !forceCancelAll && !isBeamTrapped && (this.domainActive || isDomainTimeStop) && this.isChannelingDivineFlame;
     const savedChargeTimer = this.divineFlameChargeTimer;
     const savedFugaKey = this.fugaSoundKey;
 
@@ -161,7 +162,7 @@ export class SukunaFighter extends Fighter {
     if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
 
 
-    if (forceCancelAll) {
+    if (forceCancelAll || isBeamTrapped) {
       if (this.fugaSoundKey) {
         stopLoopingSound(this.fugaSoundKey);
         this.fugaSoundKey = null;
@@ -578,8 +579,25 @@ export class SukunaFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    if ((this.isChannelingDomainExpansion || this.isChannelingDivineFlame) && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0) {
-      // Unstoppable Skill/Domain Channeling Hyper-Armor: Clear all hitStun & paralyze freezes (Purple, Pure Love Beam, Getsuga, etc.) so non-Toji attacks cannot interrupt!
+    if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0) {
+      if (this.isChannelingDomainExpansion) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+        this._hasPlayedDomainChannelSound = false;
+      }
+      if (this.isChannelingDivineFlame) {
+        this.isChannelingDivineFlame = false;
+        this.divineFlameChargeTimer = 0;
+        if (this.fugaSoundKey) {
+          stopLoopingSound(this.fugaSoundKey);
+          this.fugaSoundKey = null;
+        }
+      }
+      this.interruptAttacks(true);
+    }
+
+    if ((this.isChannelingDomainExpansion || this.isChannelingDivineFlame) && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0 && !this.caughtInPureLoveBeam && (this.pureLoveBeamTimer || 0) <= 0) {
+      // Unstoppable Skill/Domain Channeling Hyper-Armor: Clear all hitStun & paralyze freezes (Purple, Getsuga, etc.) so non-Toji attacks cannot interrupt!
       this.hitStunTimer = 0;
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
@@ -587,8 +605,6 @@ export class SukunaFighter extends Fighter {
       this.timeStopTimer = 0;
       this.purpleHitTimer = 0;
       this.isCaughtInPurple = false;
-      this.caughtInPureLoveBeam = false;
-      this.pureLoveBeamTimer = 0;
       this._hitByGetsugaTimer = 0;
       this.paralyzeTimer = 0;
       this.isParalyzedByMahito = false;

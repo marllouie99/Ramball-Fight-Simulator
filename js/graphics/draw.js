@@ -5,6 +5,7 @@ export { drawDriveBys, drawDriveByGroundEffects } from '../systems/cjDriveBySyst
 export { drawBamEffects, spawnBamEffect, updateBamEffects, clearBamEffects } from './particles/bamImpactEffect.js';
 export { drawFloatingJetpacks, spawnDroppedJetpack, updateFloatingJetpacks, clearFloatingJetpacks } from './particles/cjFloatingJetpack.js';
 export { drawDroppedMiniguns, spawnDroppedMinigun, updateDroppedMiniguns, clearDroppedMiniguns } from './particles/cjDroppedMinigun.js';
+export { drawDroppedMahoragaWheels, spawnDroppedMahoragaWheel, updateDroppedMahoragaWheels, clearDroppedMahoragaWheels } from './particles/mahoragaDroppedWheel.js';
 export { drawCarExplosions, drawCarScorchMarks, spawnCarExplosion, updateCarExplosions, clearCarExplosions } from './particles/cjCarExplosion.js';
 // ——————————————————————————————————————————————————————
 // DRAW — ARENA

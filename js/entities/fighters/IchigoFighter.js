@@ -538,10 +538,7 @@ export class IchigoFighter extends Fighter {
       (this.statusEffects && this.statusEffects.timeStopTimer > 0) ||
       (this.electricStunTimer && this.electricStunTimer > 0) ||
       (this.hitStunTimer && this.hitStunTimer > 0) ||
-      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
-      this.caughtInPureLoveBeam ||
-      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
-      (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0)
+      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam())
     );
   }
 

@@ -474,9 +474,12 @@ export class DarkSlateGrayFighter extends Fighter {
   }
 
   resolveWallBounce(arena, opponent) {
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+      return super.resolveWallBounce(arena, opponent);
+    }
     const stealthActive = (this.invincibilityTimer > 0 || this.flashStepTimer > 0) && opponent;
     if (!stealthActive) {
-      super.resolveWallBounce(arena);
+      super.resolveWallBounce(arena, opponent);
       return;
     }
 

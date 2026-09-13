@@ -18,8 +18,7 @@ function isTeleportDisabled(fighter) {
   );
   if (isInsideDomain || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0 || fighter.isFrozenByInfinity) return true;
   if (fighter.isDraggedByGetsuga) return true; // Strictly disable all teleports/dashes while carried by Getsuga Tensho wave even if adapted
-  const caughtInBeam = fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0;
-  return caughtInBeam && !fighter.adaptedPureLoveBeam;
+  return false;
 }
 
 /**

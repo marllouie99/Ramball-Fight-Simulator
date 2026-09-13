@@ -867,7 +867,33 @@ export class GojoFighter extends Fighter {
       this.timeStopTimer = 0; 
     }
 
-    if ((this.isChannelingPurple || this.isChannelingDomainExpansion || this.redEffectTimer > 0 || this.redBuildupPhase) && !this.isTargetOfAmbush && !isInsideRubbickStolenVoid(this) && (this.silenceTimer || 0) <= 0) {
+    if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0) {
+      if (this.isDomainPreSlide) {
+        this.isDomainPreSlide = false;
+        this.domainPreSlideTimer = 0;
+      }
+      if (this.isChannelingDomainExpansion) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+        this._hasPlayedDomainChannelSound = false;
+      }
+      if (this.isChannelingPurple) {
+        this.isChannelingPurple = false;
+        this.purpleChargeTimer = 0;
+        this._hasPlayedPurpleChannelSound = false;
+        if (this._purpleChargeSoundHandle) {
+          fadeOutSound(this._purpleChargeSoundHandle, 200);
+          this._purpleChargeSoundHandle = null;
+        }
+        fadeOutSoundBySrc('mixing', 200);
+      }
+      if (this.redBuildupPhase || (this.redEffectTimer || 0) > 0) {
+        this.cancelRed(true);
+      }
+      this.interruptAttacks(true);
+    }
+
+    if ((this.isChannelingPurple || this.isChannelingDomainExpansion || this.redEffectTimer > 0 || this.redBuildupPhase) && !this.isTargetOfAmbush && !isInsideRubbickStolenVoid(this) && (this.silenceTimer || 0) <= 0 && !this.caughtInPureLoveBeam && (this.pureLoveBeamTimer || 0) <= 0) {
       // Unstoppable Hyper-Armor during Purple Channeling, Domain Channeling & Red Buildup: Clear hitStun & status freezes so non-Toji attacks cannot interrupt!
       this.hitStunTimer = 0;
       this.electricStunTimer = 0;
@@ -876,8 +902,6 @@ export class GojoFighter extends Fighter {
       this.timeStopTimer = 0;
       this.purpleHitTimer = 0;
       this.isCaughtInPurple = false;
-      this.caughtInPureLoveBeam = false;
-      this.pureLoveBeamTimer = 0;
       this._hitByGetsugaTimer = 0;
       this.paralyzeTimer = 0;
       this.isParalyzed = false;
@@ -886,8 +910,7 @@ export class GojoFighter extends Fighter {
       this.isWallSlammed = false;
     }
 
-    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
-    const isFrozen = this._handleTimeStop() || this.isTargetOfAmbush || this.isFrozenByInfinity || isGetsugaSuppressed || this.isChainedByMakima || this.caughtInSaitamaCounter;
+    const isFrozen = this._handleTimeStop();
     if (isFrozen) {
       if (!this.isCaughtInTelekinesis) this.z = 0;
       if (this.isDomainPreSlide) {
@@ -926,6 +949,7 @@ export class GojoFighter extends Fighter {
         this.infinityCooldown = 0;
         this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05);
       }
+      const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this)));
       if (isGetsugaSuppressed) {
         // Rule #3: Keep facing direction tracking target while dragged
         if (opponent && !opponent.isDead) {
@@ -2030,7 +2054,13 @@ export class GojoFighter extends Fighter {
 
     for (const target of validTargets) {
       // Pass isSkill: true to bypass the basic attack hit-pause (which locks target updates)
-      target.takeDamage(punchDamage, this, { isMelee: true, isDomain: this.domainActive, isSkill: true });
+      target.takeDamage(punchDamage, this, {
+        isMelee: true,
+        isDomain: this.domainActive,
+        isSkill: true,
+        bypassShield: this.domainActive,
+        undodgeable: this.domainActive
+      });
       if (target && !target.isDead && typeof target.aim === 'function' && !target.isTargetOfAmbush) {
         target.aim(this);
       }
@@ -2282,7 +2312,10 @@ export class GojoFighter extends Fighter {
 
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
         if (true) { // Freeze EVERYONE (including teammates)
-          // If the target is channeling any skill or active counter (e.g. Saitama Serious Skill Counter), force cancel it immediately!
+          // If the target is channeling any skill, Pure Love Beam, or active counter, force cancel it immediately!
+          if (typeof f.cancelPureLoveBeam === 'function') {
+            f.cancelPureLoveBeam();
+          }
           if (typeof f.interruptAttacks === 'function') {
             f.interruptAttacks(true);
           }

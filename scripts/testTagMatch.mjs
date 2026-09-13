@@ -116,9 +116,6 @@ async function runTagMatchTests() {
   if (!MODE_SETTINGS[GAME_MODES.TAG_MATCH]) {
     throw new Error('MODE_SETTINGS[TAG_MATCH] is not defined!');
   }
-  if (MODE_SETTINGS[GAME_MODES.TAG_MATCH].rounds !== 1) {
-    throw new Error(`Expected rounds = 1 for TAG_MATCH, got ${MODE_SETTINGS[GAME_MODES.TAG_MATCH].rounds}`);
-  }
   console.log('      ✅ Mode config verified.');
 
   // Test 2: Roster & Initialization

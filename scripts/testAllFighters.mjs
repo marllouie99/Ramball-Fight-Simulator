@@ -278,10 +278,10 @@ async function main() {
         fighter.y = 200;
         fighter.vx = 0;
         fighter.vy = 0;
-        fighter.hp = 25; // Trigger <= 70% HP Hollow Awakening (after Bankai)
+        fighter.hp = fighter.maxHp * Math.min(0.25, ((CONFIG.ichigo?.hollowMaskHpThreshold ?? 0.70) - 0.05)); // Trigger <= threshold HP Hollow Awakening (after Bankai)
         fighter.update(dummyOpponent, 0, state.arena);
         if (!fighter.hollowMaskActive || fighter.hollowMaskFormationTimer <= 0) {
-          throw new Error(`Ichigo did not activate Hollow Mask formation upon <= 70% HP in Bankai`);
+          throw new Error(`Ichigo did not activate Hollow Mask formation upon <= threshold HP in Bankai`);
         }
         const posX = fighter.x;
         const posY = fighter.y;
@@ -472,8 +472,9 @@ async function main() {
         if (!hudSkills || hudSkills.length !== 4) {
           throw new Error(`Reze HUD skill bars expected 4 skills, got ${hudSkills?.length}`);
         }
+        const expectedColor = fighter.color || CONFIG.reze?.color || '#FF6B1A';
         for (let s of hudSkills) {
-          if (s.color !== '#FF6B1A') {
+          if (s.color !== expectedColor) {
             throw new Error(`Reze HUD skill '${s.label}' violated Rule 18 with mismatched color ${s.color}`);
           }
         }
@@ -624,7 +625,7 @@ async function main() {
         fighter.y = 200;
         // Seed some lingering afterimages at distant coordinates
         fighter.afterImages.push({ x: 50, y: 50, r: 25, timer: 16, maxTimer: 16 });
-        fighter.hp = fighter.maxHp * 0.85; // Satisfies Bankai threshold (<= 0.90) without triggering Hollow Mask (<= 0.70)
+        fighter.hp = fighter.maxHp * Math.min(0.85, ((CONFIG.ichigo?.bankaiHpThreshold ?? 0.90) - 0.05)); // Satisfies Bankai threshold without triggering Hollow Mask
         fighter.hollowMaskUsed = true; // Prevent Hollow Mask awakening during Bankai afterimage tests
         dummyOpponent.x = 50;
         dummyOpponent.y = 50;
@@ -2053,7 +2054,8 @@ async function main() {
           fighter.rika.isDying = true;
         }
         fighter.domainUseCount = 0;
-        fighter.hp = fighter.maxHp * 0.50; // Dropped below 60% threshold
+        const thresh = (CONFIG.yuta?.domainHpThreshold ?? 0.60);
+        fighter.hp = fighter.maxHp * Math.max(0.05, thresh * 0.8); // Dropped below domain threshold
 
         const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
         const mockSukuna = new SukunaClass(allDefs.find(d => d.type === 'sukuna') || { type: 'sukuna' });
@@ -2997,7 +2999,169 @@ async function main() {
       throw new Error(`Expected fatal blow to trigger RCT Revival survival at 1 HP, got HP=${testYuta.hp}, used=${testYuta.hasUsedRCTRevival}, timer=${testYuta.rctRevivalTimer}`);
     }
 
+    // Test Yuta Mortality Inside Gojo's Unlimited Void Domain
+    const testGojoDomain = new GojoFighter({ startX: 200, startY: 200, type: 'gojo', color: '#00F0FF' });
+    const testYutaInDomain = new YutaFighter({ startX: 250, startY: 250, type: 'yuta', color: '#D946EF' });
+    state.fighters = [testGojoDomain, testYutaInDomain];
+    state.gameState = 'playing';
+    testGojoDomain.domainActive = true;
+    testGojoDomain.domainTimer = 300;
+    testYutaInDomain.reset();
+    testYutaInDomain.hasUsedRCTRevival = false;
+    testYutaInDomain.hp = 100;
+    testYutaInDomain.maxHp = 100;
+
+    // Gojo punches Yuta in domain with fatal damage
+    testYutaInDomain.takeDamage(150, testGojoDomain, { isMelee: true, isDomain: true, isSkill: true, bypassShield: true, undodgeable: true });
+    if (testYutaInDomain.hp > 0 || !testYutaInDomain.dead) {
+      throw new Error(`Expected Yuta to die immediately from fatal domain damage inside Gojo domain, got HP=${testYutaInDomain.hp}, dead=${testYutaInDomain.dead}`);
+    }
+    if (testYutaInDomain.isEffectivelyAlive()) {
+      throw new Error('Expected isEffectivelyAlive() to return false for Yuta when killed inside Gojo domain');
+    }
+    testGojoDomain.domainActive = false;
+
+    // Test Yuta Pure Love Beam cancellation when Gojo opens Unlimited Void domain
+    const testYutaBeam = new YutaFighter({ startX: 250, startY: 250, type: 'yuta', color: '#D946EF' });
+    const testGojoBeamCancel = new GojoFighter({ startX: 350, startY: 250, type: 'gojo', color: '#00F0FF' });
+    state.fighters = [testYutaBeam, testGojoBeamCancel];
+
+    // Case 1: Channeling Pure Love Beam
+    testYutaBeam.reset();
+    testYutaBeam.isChannelingPureLoveBeam = true;
+    testYutaBeam.pureLoveBeamChargeTimer = 50;
+    testGojoBeamCancel._activateDomain(state.arena);
+
+    if (testYutaBeam.isChannelingPureLoveBeam || testYutaBeam.pureLoveBeamChargeTimer > 0) {
+      throw new Error('Expected Yuta Pure Love Beam channeling to be cancelled when Gojo opened domain!');
+    }
+
+    // Case 2: Firing Pure Love Beam with active projectile
+    testYutaBeam.reset();
+    testGojoBeamCancel.domainActive = false;
+    testYutaBeam.activatePureLoveBeam();
+    if (!testYutaBeam.isFiringPureLoveBeam) {
+      throw new Error('Expected Yuta to be firing Pure Love Beam');
+    }
+    const hasBeamProjBefore = projectileSystem.projectiles.some(p => p.visual === 'yuta_pure_love_beam' || p.behaviorType === 'yuta_pure_love_beam');
+    if (!hasBeamProjBefore) {
+      throw new Error('Expected projectileSystem to contain Pure Love Beam projectile');
+    }
+
+    // Gojo opens domain
+    testGojoBeamCancel._activateDomain(state.arena);
+    testYutaBeam.update(testGojoBeamCancel, 0, state.arena);
+
+    if (testYutaBeam.isFiringPureLoveBeam || testYutaBeam.pureLoveBeamActiveTimer > 0) {
+      throw new Error('Expected Yuta Pure Love Beam firing state to be cancelled when Gojo opened domain!');
+    }
+    const hasBeamProjAfter = projectileSystem.projectiles.some(p => p.visual === 'yuta_pure_love_beam' || p.behaviorType === 'yuta_pure_love_beam');
+    if (hasBeamProjAfter) {
+      throw new Error('Expected Pure Love Beam projectile to be destroyed when Gojo opened domain!');
+    }
+    testGojoBeamCancel.domainActive = false;
+
+    // Test Yuta Pure Love Beam cancelling enemy skill channeling when beam hits first
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const TodoClass = FIGHTER_CLASS_MAP['todo'];
+    const testSukunaTarget = new SukunaClass(allDefs.find(d => d.type === 'sukuna') || { type: 'sukuna' });
+    const testTodoTarget = new TodoClass(allDefs.find(d => d.type === 'todo') || { type: 'todo' });
+
+    // 1. Gojo channeling Hollow Purple cancelled when hit by Yuta Pure Love Beam
+    testYutaBeam.reset();
+    testGojoBeamCancel.reset();
+    testGojoBeamCancel.x = 350;
+    testGojoBeamCancel.y = 250;
+    testGojoBeamCancel.isChannelingPurple = true;
+    testGojoBeamCancel.purpleChargeTimer = 60;
+    state.fighters = [testYutaBeam, testGojoBeamCancel];
+
+    testYutaBeam.activatePureLoveBeam();
+    projectileSystem.update(state.fighters);
+    testGojoBeamCancel.update(testYutaBeam, 0, state.arena);
+
+    if (testGojoBeamCancel.isChannelingPurple || testGojoBeamCancel.purpleChargeTimer > 0) {
+      throw new Error('Expected Gojo Hollow Purple channeling to be cancelled when hit by Yuta Pure Love Beam!');
+    }
+
+    // 2. Gojo channeling Domain Expansion cancelled when hit by Yuta Pure Love Beam
+    testYutaBeam.reset();
+    testGojoBeamCancel.reset();
+    testGojoBeamCancel.x = 350;
+    testGojoBeamCancel.y = 250;
+    testGojoBeamCancel.isChannelingDomainExpansion = true;
+    testGojoBeamCancel.domainChargeTimer = 40;
+    state.fighters = [testYutaBeam, testGojoBeamCancel];
+
+    testYutaBeam.activatePureLoveBeam();
+    projectileSystem.update(state.fighters);
+    testGojoBeamCancel.update(testYutaBeam, 0, state.arena);
+
+    if (testGojoBeamCancel.isChannelingDomainExpansion || testGojoBeamCancel.domainChargeTimer > 0) {
+      throw new Error('Expected Gojo Domain Expansion channeling to be cancelled when hit by Yuta Pure Love Beam!');
+    }
+
+    // 3. Sukuna channeling Fuga (Divine Flame) cancelled when hit by Yuta Pure Love Beam
+    testYutaBeam.reset();
+    testSukunaTarget.reset();
+    testSukunaTarget.x = 350;
+    testSukunaTarget.y = 250;
+    testSukunaTarget.isChannelingDivineFlame = true;
+    testSukunaTarget.divineFlameChargeTimer = 45;
+    state.fighters = [testYutaBeam, testSukunaTarget];
+
+    testYutaBeam.activatePureLoveBeam();
+    projectileSystem.update(state.fighters);
+    testSukunaTarget.update(testYutaBeam, 0, state.arena);
+
+    if (testSukunaTarget.isChannelingDivineFlame || testSukunaTarget.divineFlameChargeTimer > 0) {
+      throw new Error('Expected Sukuna Fuga channeling to be cancelled when hit by Yuta Pure Love Beam!');
+    }
+
+    // 4. Todo channeling Takada cancelled when hit by Yuta Pure Love Beam
+    testYutaBeam.reset();
+    testTodoTarget.reset();
+    testTodoTarget.x = 350;
+    testTodoTarget.y = 250;
+    testTodoTarget.isTakadaChanneling = true;
+    testTodoTarget.takadaChannelTimer = 60;
+    state.fighters = [testYutaBeam, testTodoTarget];
+
+    testYutaBeam.activatePureLoveBeam();
+    projectileSystem.update(state.fighters);
+    testTodoTarget.update(testYutaBeam, 0, state.arena);
+
+    if (testTodoTarget.isTakadaChanneling || testTodoTarget.takadaChannelTimer > 0) {
+      throw new Error('Expected Todo Takada channeling to be cancelled when hit by Yuta Pure Love Beam!');
+    }
+
+    // 5. Test that enemies hit by Yuta Pure Love Beam are NOT paralyzed and CAN move slowly
+    testYutaBeam.reset();
+    testGojoBeamCancel.reset();
+    testGojoBeamCancel.x = 350;
+    testGojoBeamCancel.y = 250;
+    testGojoBeamCancel.vx = 2.0;
+    testGojoBeamCancel.vy = 0;
+    state.fighters = [testYutaBeam, testGojoBeamCancel];
+
+    testYutaBeam.activatePureLoveBeam();
+    projectileSystem.update(state.fighters);
+
+    if (testGojoBeamCancel.isParalyzedDebuffActive()) {
+      throw new Error('Expected Gojo to NOT have paralyze debuff active when hit by Yuta Pure Love Beam!');
+    }
+    if (testGojoBeamCancel._handleTimeStop()) {
+      throw new Error('Expected Gojo _handleTimeStop() to return false (not frozen) when hit by Yuta Pure Love Beam!');
+    }
+    if ((testGojoBeamCancel.slowTimer || 0) <= 0 && (testGojoBeamCancel.pureLoveBeamRecoveryTimer || 0) <= 0 && (testGojoBeamCancel.statusEffects?.slowTimer || 0) <= 0) {
+      throw new Error('Expected Gojo to have a slow effect applied when hit by Yuta Pure Love Beam!');
+    }
+
+    // Cleanup projectiles after beam tests
+    projectileSystem.projectiles.length = 0;
+
     // Test Yuta Flurry -> Thin Ice Breaker seamless transition
+    state.fighters = [testYuta, dummyTarget, dummyTarget2];
     testYuta.reset();
     dummyTarget.reset();
     dummyTarget.x = 290;
@@ -3205,15 +3369,17 @@ async function main() {
 
     // Test Yuji Soul Swap continuous teleport-slash loop & duration persistence
     testYuji.maxHp = 300;
-    testYuji.hp = 75; // Trigger Soul Swap (75 <= 30% of 300)
+    const yujiThreshold = CONFIG.yuji?.soulSwapHpThreshold ?? 0.30;
+    testYuji.hp = testYuji.maxHp * Math.min(0.25, yujiThreshold - 0.05); // Trigger Soul Swap below threshold
     testYuji.hasSoulSwapped = false;
     testYuji.soulSwapActive = false;
     dummyTarget3.hp = 10000;
     dummyTarget3.isDead = false;
     testYuji.update(dummyTarget3, 0, state.arena); // Trigger takeover
 
-    if (!testYuji.soulSwapActive || testYuji.soulSwapTimer !== 800) {
-      throw new Error(`Expected Soul Swap to activate with duration 800, got active=${testYuji.soulSwapActive}, timer=${testYuji.soulSwapTimer}`);
+    const expectedSoulSwapDuration = CONFIG.yuji?.soulSwapDurationFrames ?? 800;
+    if (!testYuji.soulSwapActive || testYuji.soulSwapTimer !== expectedSoulSwapDuration) {
+      throw new Error(`Expected Soul Swap to activate with duration ${expectedSoulSwapDuration}, got active=${testYuji.soulSwapActive}, timer=${testYuji.soulSwapTimer}`);
     }
 
     // Step through 100 frames of combat and verify continuous teleport-slashes continue without cancellation
@@ -3703,10 +3869,11 @@ async function main() {
     const YujiClass = FIGHTER_CLASS_MAP['yuji'];
     if (YujiClass) {
       const yuji = new YujiClass({ startX: 200, startY: 200, hp: 1000, maxHp: 1000 });
-      // Damage below 30% threshold (to 200 HP) -> triggers Soul Swap
-      yuji.takeDamage(800, null);
+      // Damage below threshold -> triggers Soul Swap
+      const swapThreshold = CONFIG.yuji?.soulSwapHpThreshold ?? 0.30;
+      yuji.takeDamage(yuji.maxHp * (1 - swapThreshold + 0.1), null);
       if (!yuji.soulSwapActive) {
-        throw new Error('Expected Yuji to activate Soul Swap below 30% HP');
+        throw new Error('Expected Yuji to activate Soul Swap below threshold HP');
       }
       const hpBefore = yuji.hp;
       // Deal 50 damage during active Soul Swap -> HP must reduce
@@ -4104,6 +4271,256 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ [YUTA PURE LOVE BEAM CARDINAL ANGLES TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.5. Yuta Pure Love Beam Inside Domain & Full Duration Stability Test
+  console.log('💍 [Yuta Pure Love Beam Inside Domain & Duration Stability Test] Verifying beam can trigger/fire inside domain and full duration is preserved...');
+  try {
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    if (YutaClass) {
+      const yutaDef = FIGHTER_DEFS.find(d => d.type === 'yuta') || { type: 'yuta', name: 'Yuta' };
+      const y = new YutaClass(yutaDef);
+      const enemy = new YutaClass(yutaDef);
+      enemy.x = 400;
+      enemy.y = 250;
+      state.fighters = [y, enemy];
+      state.getFighterTeam = (idx) => idx;
+      state.arena = { x: 0, y: 0, width: 800, height: 600, radius: 400, shape: 'circle' };
+      projectileSystem.projectiles = [];
+
+      // Setup Yuta inside his Domain Expansion
+      y.x = 300;
+      y.y = 250;
+      y.hp = y.maxHp;
+      y.domainActive = true;
+      y.domainX = 300;
+      y.domainY = 250;
+      y.domainTimer = 400;
+      if (y.rika) {
+        y.rika.active = true;
+        y.rika.hp = y.rika.maxHp;
+      }
+
+      // Drop HP to 5% to trigger Pure Love Beam while domain is active
+      y.hp = y.maxHp * 0.05;
+      y.update(enemy, 0, state.arena);
+
+      // Verify retreat slide initiated inside domain
+      if (y.beamRetreatSlideTimer <= 0) {
+        throw new Error('Expected Yuta to initiate Pure Love Beam retreat slide inside domain!');
+      }
+
+      // Verify retreat destination is clamped within domain radius
+      const domRadius = CONFIG.yuta?.domainRadius || 350;
+      const distFromCenter = Math.hypot(y.beamRetreatTargetX - y.domainX, y.beamRetreatTargetY - y.domainY);
+      if (distFromCenter > domRadius) {
+        throw new Error(`Expected retreat target to remain inside domain radius (${domRadius}), got dist ${distFromCenter}`);
+      }
+
+      // Fast-forward retreat slide (16 frames)
+      while (y.beamRetreatSlideTimer > 0) {
+        y.update(enemy, 0, state.arena);
+      }
+
+      // Fast-forward Rika emergence phase (25 frames)
+      while (y.rikaEmergingForBeamTimer > 0) {
+        y.update(enemy, 0, state.arena);
+      }
+
+      // Fast-forward channeling phase (150 frames) while verifying Rika aim rotation is strictly locked straight to beam angle
+      while (y.isChannelingPureLoveBeam) {
+        // Move enemy to varied positions to ensure Rika does NOT rotate toward enemy
+        enemy.x = y.x + (Math.random() - 0.5) * 400;
+        enemy.y = y.y + (Math.random() - 0.5) * 400;
+        y.update(enemy, 0, state.arena);
+
+        if (y.rika && y.isChannelingPureLoveBeam) {
+          if (y.rika.angle !== y.pureLoveBeamLockedAngle) {
+            throw new Error(`Expected Rika angle (${y.rika.angle}) to be locked straight to beam angle (${y.pureLoveBeamLockedAngle}) during channeling!`);
+          }
+        }
+      }
+
+      // Verify beam is now FIRING inside domain!
+      if (!y.isFiringPureLoveBeam) {
+        throw new Error('Expected Yuta to be firing Pure Love Beam inside his active domain!');
+      }
+      if (!y.domainActive) {
+        throw new Error('Expected domain to remain active while beam is firing!');
+      }
+
+      const beamProj = projectileSystem.projectiles.find(p => p && (p.isPureLoveBeam || p.visual === 'yuta_pure_love_beam'));
+      if (!beamProj) {
+        throw new Error('Expected Pure Love Beam projectile to exist in projectileSystem!');
+      }
+
+      // Verify beam projectile life matches Yuta active timer
+      const initialTimer = y.pureLoveBeamActiveTimer;
+      if (initialTimer <= 0) {
+        throw new Error(`Expected pureLoveBeamActiveTimer > 0, got ${initialTimer}`);
+      }
+      if (beamProj.life !== initialTimer) {
+        throw new Error(`Expected beamProj.life (${beamProj.life}) to match yuta.pureLoveBeamActiveTimer (${initialTimer})`);
+      }
+
+      // Test Hyper-Armor: Attacks with bypassShield or clearAllAttackEffects MUST NOT terminate the beam!
+      y.applyHitStun(60, { bypassShield: true, isDomain: true });
+      if (!y.isFiringPureLoveBeam || y.pureLoveBeamActiveTimer <= 0) {
+        throw new Error('Expected Pure Love Beam to survive applyHitStun with bypassShield!');
+      }
+
+      y.clearAllAttackEffects();
+      if (!y.isFiringPureLoveBeam || y.pureLoveBeamActiveTimer <= 0) {
+        throw new Error('Expected Pure Love Beam to survive clearAllAttackEffects()!');
+      }
+
+      // Update for 50 frames and verify timer and projectile life decay smoothly together
+      for (let f = 0; f < 50; f++) {
+        y.update(enemy, 0, state.arena);
+        projectileSystem.update(state.fighters);
+      }
+
+      if (!y.isFiringPureLoveBeam) {
+        throw new Error('Expected Pure Love Beam to still be firing after 50 frames!');
+      }
+      if (beamProj.life !== y.pureLoveBeamActiveTimer) {
+        throw new Error(`Expected beamProj.life (${beamProj.life}) to remain strictly synced with y.pureLoveBeamActiveTimer (${y.pureLoveBeamActiveTimer})!`);
+      }
+
+      // 6.5.1 Test: Yuta Beam Completion Win/Loss Integrity (Never lose when alive!)
+      // Scenario A: Yuta is Fighter 1 (P2), Enemy is Fighter 0 (P1), Enemy has HP > 0.
+      state.mode = '1v1';
+      state.gameState = 'playing';
+      state.scores = [0, 0];
+      state.roundWinner = null;
+      state.matchWinner = null;
+
+      enemy.hp = 500;
+      enemy.dead = false;
+      enemy.isDead = false;
+      enemy.fighterIndex = 0;
+
+      y.hp = 1000;
+      y.dead = false;
+      y.isDead = false;
+      y.fighterIndex = 1;
+      y.isFiringPureLoveBeam = true;
+      y.pureLoveBeamActiveTimer = 1; // 1 frame left before beam finishes
+
+      state.fighters = [enemy, y];
+
+      // Update to complete the beam
+      y.update(enemy, 1, state.arena);
+
+      if (state.gameState !== 'playing') {
+        throw new Error(`Regression: Yuta (P2) lost or round ended (${state.gameState}) after beam ended when both fighters are alive! Winner was: ${state.roundWinner === enemy ? 'Enemy' : 'Yuta'}`);
+      }
+      if (state.roundWinner !== null) {
+        throw new Error(`Expected roundWinner to remain null when both fighters are alive, got ${state.roundWinner}`);
+      }
+
+      // Scenario B: Enemy died during the beam -> When beam finishes, Yuta wins!
+      enemy.hp = 0;
+      enemy.dead = true;
+      enemy.isDead = true;
+      y.isFiringPureLoveBeam = true;
+      y.pureLoveBeamActiveTimer = 1;
+
+      y.update(enemy, 1, state.arena);
+
+      if (state.roundWinner !== y) {
+        throw new Error(`Expected Yuta to win after killing enemy with beam, got roundWinner: ${state.roundWinner}`);
+      }
+
+      // 6.5.2 Test: Yuta Death Audio Cutoff for Rika
+      // When Yuta dies while summoning or while Rika is active/roaring/channeling, all Rika audio MUST be cut off immediately!
+      y.reset();
+      y.hp = 100;
+      y.comeRikaSoundHandle = { src: 'Assets/Sound Effects/Skills/comerika.mp3', stop: () => {}, pause: () => {} };
+      y._pureLoveBeamChargeSoundHandle = { src: 'Assets/Sound Effects/Skills/rikaAppearance.mp3', stop: () => {}, pause: () => {} };
+      y.pureLoveBeamBgSoundHandle = { src: 'Assets/Sound Effects/Skills/yuta-lovebeam-background.mp3', stop: () => {}, pause: () => {} };
+      if (y.rika) {
+        y.rika.active = true;
+        y.rika.hp = 500;
+        y.rika.activeTrembleSound = { src: 'groundTremble.mp3', stop: () => {}, pause: () => {} };
+        y.rika.activeRoarSound = { src: 'Assets/Sound Effects/Attacks/rikanoise1.mp3', stop: () => {}, pause: () => {} };
+      }
+
+      // Trigger death
+      y.hp = 0;
+      y.dead = true;
+      y.isDead = true;
+      y.onDeath();
+
+      if (y.comeRikaSoundHandle !== null) {
+        throw new Error('Expected comeRikaSoundHandle to be cleared on Yuta death!');
+      }
+      if (y._pureLoveBeamChargeSoundHandle !== null) {
+        throw new Error('Expected _pureLoveBeamChargeSoundHandle to be cleared on Yuta death!');
+      }
+      if (y.pureLoveBeamBgSoundHandle !== null) {
+        throw new Error('Expected pureLoveBeamBgSoundHandle to be cleared on Yuta death!');
+      }
+      if (y.rika) {
+        if (y.rika.active !== false || y.rika.hp !== 0) {
+          throw new Error('Expected Rika to be fully deactivated with hp=0 on Yuta death!');
+        }
+        if (y.rika.activeTrembleSound !== null || y.rika.activeRoarSound !== null) {
+          throw new Error('Expected Rika tremble and roar sounds to be cleared on Yuta death!');
+        }
+      }
+    }
+  } catch (err) {
+    console.error('❌ [YUTA PURE LOVE BEAM INSIDE DOMAIN & DURATION TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.6. Rika Instant Death Shatter Test
+  console.log('💀 [Rika Instant Death Shatter Test] Verifying Rika shatters instantly upon losing all HP...');
+  try {
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    if (YutaClass) {
+      const yutaDef = FIGHTER_DEFS.find(d => d.type === 'yuta') || { type: 'yuta', name: 'Yuta' };
+      const yuta = new YutaClass(yutaDef);
+      const dummy = new YutaClass(yutaDef);
+      yuta.x = 200; yuta.y = 200;
+      dummy.x = 250; dummy.y = 200;
+      state.fighters = [yuta, dummy];
+      state.deathEffects = [];
+
+      // Force-activate Rika
+      yuta.hp = 100;
+      yuta.rika.active = true;
+      yuta.rika.hp = yuta.rika.maxHp;
+      yuta.rika.x = 240;
+      yuta.rika.y = 200;
+      state.illusions = [yuta.rika];
+
+      const initialDeathEffectsCount = state.deathEffects.length;
+      const initialDummyHp = dummy.hp;
+
+      // Deal lethal damage to Rika
+      yuta.rika.takeDamage(9999, dummy);
+
+      if (yuta.rika.active !== false) {
+        throw new Error('Expected Rika active to be false immediately upon losing all HP!');
+      }
+      if (yuta.rika.hp !== 0) {
+        throw new Error(`Expected Rika HP to be 0, got ${yuta.rika.hp}`);
+      }
+      if (state.deathEffects.length <= initialDeathEffectsCount) {
+        throw new Error('Expected deathEffects to spawn shatter shards when Rika dies!');
+      }
+      if (state.illusions.includes(yuta.rika)) {
+        throw new Error('Expected Rika to be removed from state.illusions immediately!');
+      }
+      if (dummy.hp >= initialDummyHp) {
+        throw new Error('Expected nearby enemy to receive cursed dispersion damage upon Rika shatter!');
+      }
+    }
+  } catch (err) {
+    console.error('❌ [RIKA INSTANT DEATH SHATTER TEST ERROR]:', err);
     errors++;
   }
 

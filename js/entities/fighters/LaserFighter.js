@@ -312,9 +312,7 @@ export class LaserFighter extends Fighter {
       this.shootCooldown--;
     }
 
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
+    this.applyMovementPhysics();
 
     this.aim(opponent);
     this.resolveWallBounce(arena);

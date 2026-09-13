@@ -17,7 +17,8 @@ import {
   drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
-  drawDroppedMiniguns, updateDroppedMiniguns
+  drawDroppedMiniguns, updateDroppedMiniguns,
+  drawDroppedMahoragaWheels, updateDroppedMahoragaWheels
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -431,6 +432,8 @@ export function renderGame() {
         drawFloatingJetpacks(state.ctx); // Draw CJ dropped 360 rotating floating Jetpack pickups on the arena floor
         updateDroppedMiniguns();
         drawDroppedMiniguns(state.ctx); // Draw CJ dropped overheated Minigun on the arena floor
+        updateDroppedMahoragaWheels();
+        drawDroppedMahoragaWheels(state.ctx); // Draw Mahoraga dropped Eight-Handled Sword Wheel on the arena floor
         drawSparkEffects(); // Draw spark effects on top of everything
         drawBamEffects(state.ctx); // Draw comic BAM! impact effects on top of collisions
         drawBlackFlashEffects(state.ctx); // Draw Black Flash cursed energy impact

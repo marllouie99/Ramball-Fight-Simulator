@@ -2,14 +2,14 @@ import { YutaRenderer } from '../../graphics/fighters/yutaRenderer.js';
 import { drawYutaSkin, drawYutaFist } from '../../graphics/fighters/yutaSkin.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
-import { fadeOutSound, fadeOutSoundBySrc, pauseSound, resumeSound, pauseSoundBySrc, resumeSoundBySrc } from '../../systems/soundSystem.js';
+import { stopSound, stopSoundBySrc, fadeOutSound, fadeOutSoundBySrc, pauseSound, resumeSound, pauseSoundBySrc, resumeSoundBySrc } from '../../systems/soundSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnParrySparksEffect, spawnYutaBeamLingeringParticles } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
-import { initRika, updateRika } from './yuta/rikaLogic.js';
+import { initRika, updateRika, stopRikaAudio } from './yuta/rikaLogic.js';
 import { renderYutaDomainBackground } from './yuta/yutaDomainVisuals.js';
 import { modExecuteKatanaMelee, modGetKatanaTipPositions } from './yuta/yutaKatana.js';
 import { getNextCopiedTechnique, executeCopiedTechnique, executeThinIceBreaker } from './yuta/yutaCopyLogic.js';
@@ -35,7 +35,7 @@ export class YutaFighter extends Fighter {
     this.domainActive = false;
     this.domainTimer = 0;
     this.domainChargeTimer = 0;
-    this.domainChargeMax = CONFIG.yuta.domainChargeMax || 90;
+    this.domainChargeMax = CONFIG.yuta.domainChargeMax || 50;
     this.isChannelingDomain = false;
     this.hasActivatedDomainAt25Hp = false;
     this.domainUseCount = 0;
@@ -113,7 +113,7 @@ export class YutaFighter extends Fighter {
         cooldownKey: 'pureLoveBeamCooldownTimer',
         cooldownMax: CONFIG.yuta?.pureLoveBeamCooldown || 1200,
         durationKey: 'pureLoveBeamActiveTimer',
-        durationMax: CONFIG.yuta?.pureLoveBeamActiveDuration || 180,
+        durationMax: CONFIG.yuta?.pureLoveBeamDuration || CONFIG.yuta?.pureLoveBeamActiveDuration || 280,
         channelingKey: 'isChannelingPureLoveBeam'
       },
       {
@@ -258,7 +258,7 @@ export class YutaFighter extends Fighter {
     this.rikaEmergingForBeamTimer = 0;
     this.pureLoveBeamBonusDamage = 0;
     this.domain2HpBaseline = undefined;
-    this._stopBeamAudio();
+    this.stopAllRikaAudio();
     this.pureLoveBeamBgSoundHandle = null;
     this._pureLoveBeamChargeSoundHandle = null;
     this.comeRikaSoundHandle = null;
@@ -354,8 +354,13 @@ export class YutaFighter extends Fighter {
       return isEnemy && isParalyzingDomain;
     });
 
-    if (!this.isGrabbedByMahoraga && (this.isChannelingDomain || this.isChannelingPureLoveBeam || (this.rikaEmergingForBeamTimer > 0))) {
-      // Hyper-Armor: Yuta has hyper-armor while channeling Domain Expansion or Pure Love Beam
+    // If Gojo opened his domain, Yuta's Pure Love Beam must be IMMEDIATELY cancelled
+    if (isEnemyDomainActive && (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.rikaEmergingForBeamTimer > 0) || (this.beamRetreatSlideTimer > 0))) {
+      this.cancelPureLoveBeam();
+    }
+
+    if (!this.isGrabbedByMahoraga && (this.isChannelingDomain || (!isEnemyDomainActive && (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.rikaEmergingForBeamTimer > 0) || (this.beamRetreatSlideTimer > 0))))) {
+      // Hyper-Armor: Yuta has hyper-armor while channeling Domain Expansion or Pure Love Beam (when no enemy domain is active)
       if (this.isChannelingDomain || !isEnemyDomainActive) {
         this.timeStopTimer = 0;
         this.isFrozenByInfinity = false;
@@ -377,10 +382,69 @@ export class YutaFighter extends Fighter {
       this.knockbackVy = 0;
     }
 
-    const isFrozen = (!this.isChannelingDomain && !this.domainActive && this._handleTimeStop()) || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
+    const isFrozen = (!this.isChannelingDomain && !this.domainActive && !this.isFiringPureLoveBeam && !this.isChannelingPureLoveBeam && this._handleTimeStop()) || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
+
+    if (this.rctCooldown > 0) this.rctCooldown--;
+
+    // Non-fatal RCT Heal: Smooth HP regeneration over time
+    if (this.rctHealTimer > 0) {
+      this.rctHealTimer--;
+      const targetHp = this.maxHp * (CONFIG.yuta.rctRevivalHealPercent || 0.15);
+      const healAmount = targetHp / 120;
+      this.hp = Math.min(this.maxHp, this.hp + healAmount);
+
+      if (this.rctHealTimer % 8 === 0) {
+        spawnSparks(this.x, this.y, 3, '#88FF88', '#00FF00');
+        if (this.rctHealTimer % 30 === 0) {
+          spawnFloatingText(this.x, this.y - 20, '+RCT', '#00FF00');
+        }
+      }
+    }
+
+    // Fatal RCT Revival progress: ticks down every frame even during time-stop/domain stasis
+    if (this.rctRevivalTimer > 0) {
+      this.rctRevivalTimer--;
+      if (this.invincibilityTimer > 0) this.invincibilityTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      const targetHp = this.maxHp * (CONFIG.yuta.rctRevivalHealPercent || 0.15);
+      const healAmount = targetHp / (CONFIG.yuta.rctRevivalDuration || 150);
+      this.hp = Math.min(this.maxHp, this.hp + healAmount);
+
+      if (this.rctRevivalTimer % 5 === 0) {
+        spawnSparks(this.x, this.y, 3, '#88FF88', '#00FF00');
+        if (this.rctRevivalTimer % 30 === 0) {
+          spawnFloatingText(this.x, this.y - 20, '+RCT', '#00FF00');
+        }
+      }
+
+      if (this.rctRevivalTimer === 0) {
+        spawnFloatingText(this.x, this.y - 40, 'RCT COMPLETE', '#88FF88');
+        triggerGlobalScreenShake(5, 10);
+        spawnImpactFlash(this.x, this.y, 50, 'silver');
+        if (!isFrozen) {
+          this.resumeMovement(opponent);
+        }
+      }
+
+      // Bound to arena
+      if (arena) {
+        if (this.x < arena.x) this.x = arena.x;
+        if (this.x > arena.x + arena.width) this.x = arena.x + arena.width;
+        if (this.y < arena.y) this.y = arena.y;
+        if (this.y > arena.y + arena.height) this.y = arena.y + arena.height;
+      }
+
+      if (isFrozen) {
+        return;
+      }
+    }
+
     if (isFrozen || this.isTargetOfAmbush) {
-      // Pause active beam audio handles while frozen in domain stasis
-      if (this.isChannelingPureLoveBeam || this.rikaEmergingForBeamTimer > 0 || this.isFiringPureLoveBeam) {
+      if (isEnemyDomainActive) {
+        this.cancelPureLoveBeam();
+      } else if (this.isChannelingPureLoveBeam || this.rikaEmergingForBeamTimer > 0 || this.isFiringPureLoveBeam) {
         this._pauseBeamAudio();
       }
 
@@ -391,9 +455,13 @@ export class YutaFighter extends Fighter {
       return;
     }
 
-    // Freeze resolved -> Resume beam audio if it was previously paused
+    // Freeze resolved -> Resume beam audio if it was previously paused and beam is still actively running
     if (this._beamAudioPaused) {
-      this._resumeBeamAudio();
+      if (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.rikaEmergingForBeamTimer > 0)) {
+        this._resumeBeamAudio();
+      } else {
+        this._stopBeamAudio();
+      }
     }
 
     if (this.mahoragaAdaptationFreezeTimer > 0) {
@@ -419,62 +487,6 @@ export class YutaFighter extends Fighter {
       if (this.rikaCallTimer % 5 === 0) {
         spawnImpactFlash(this.x, this.y, 35 + Math.random() * 15, 'rgba(255, 20, 147, 0.4)');
       }
-    }
-
-    if (this.rctCooldown > 0) this.rctCooldown--;
-
-    // Non-fatal RCT Heal: Smooth HP regeneration over time without freezing movement or attacks
-    if (this.rctHealTimer > 0) {
-      this.rctHealTimer--;
-      const targetHp = this.maxHp * (CONFIG.yuta.rctRevivalHealPercent || 0.15);
-      const healAmount = targetHp / 120;
-      this.hp = Math.min(this.maxHp, this.hp + healAmount);
-
-      if (this.rctHealTimer % 8 === 0) {
-        spawnSparks(this.x, this.y, 3, '#88FF88', '#00FF00');
-        if (this.rctHealTimer % 30 === 0) {
-          spawnFloatingText(this.x, this.y - 20, '+RCT', '#00FF00');
-        }
-      }
-    }
-
-    // If reviving via fatal RCT Revival, handle revival pose and skip normal logic
-    if (this.rctRevivalTimer > 0) {
-      this.rctRevivalTimer--;
-      if (this.invincibilityTimer > 0) this.invincibilityTimer--;
-      this.vx = 0;
-      this.vy = 0;
-
-      const targetHp = this.maxHp * (CONFIG.yuta.rctRevivalHealPercent || 0.15);
-      const healAmount = targetHp / (CONFIG.yuta.rctRevivalDuration || 150);
-      this.hp = Math.min(this.maxHp, this.hp + healAmount);
-
-      if (this.rctRevivalTimer % 5 === 0) {
-        spawnSparks(this.x, this.y, 3, '#88FF88', '#00FF00'); // Hex colors
-        if (this.rctRevivalTimer % 30 === 0) {
-          spawnFloatingText(this.x, this.y - 20, '+RCT', '#00FF00'); // Pop up healing text
-        }
-      }
-
-      if (this.rctRevivalTimer === 0) {
-        spawnFloatingText(this.x, this.y - 40, 'RCT COMPLETE', '#88FF88');
-        triggerGlobalScreenShake(5, 10);
-        spawnImpactFlash(this.x, this.y, 50, 'silver'); // Safe flash color
-        this.resumeMovement(opponent);
-      }
-
-      // Update pos manually since we skip super.update()
-      this.x += this.vx;
-      this.y += this.vy;
-
-      // Bound to arena
-      if (arena) {
-        if (this.x < arena.x) this.x = arena.x;
-        if (this.x > arena.x + arena.width) this.x = arena.x + arena.width;
-        if (this.y < arena.y) this.y = arena.y;
-        if (this.y > arena.y + arena.height) this.y = arena.y + arena.height;
-      }
-      return;
     }
     const originalSpeed = this.speed;
     const shouldFreezeMove = this.isFiringPureLoveBeam || 
@@ -629,6 +641,7 @@ export class YutaFighter extends Fighter {
             spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
           } else {
             this.flurryTarget = null; // Clear if not transitioning
+            this.resumeMovement(target || opponent);
           }
           return; // Flurry finished
         }
@@ -674,29 +687,33 @@ export class YutaFighter extends Fighter {
           const bonusDmg = this.pureLoveBeamBonusDamage || 0;
           const dmgMult = this.getRikaDamageMultiplier();
           const flurryDmg = ((CONFIG.yuta.flurryDamage || 15) + bonusDmg) * dmgMult;
+          const targetX = this.flurryTarget.x;
+          const targetY = this.flurryTarget.y;
 
           this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSkill: true, isYutaFlurry: true });
-          spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
-          spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
+          spawnFloatingText(targetX, targetY - 10, 'SLASH!', '#FF1493');
+          spawnSparks(targetX, targetY, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
 
           triggerGlobalScreenShake(6, 6);
 
-          const flurryAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+          const flurryAngle = Math.atan2(targetY - this.y, targetX - this.x);
           const pushForce = (this.flurryHitsLeft === 1) ? 18 : 11;
           const pushVx = Math.cos(flurryAngle) * pushForce;
           const pushVy = Math.sin(flurryAngle) * pushForce;
 
-          if (typeof this.flurryTarget.applyKnockback === 'function') {
-            this.flurryTarget.applyKnockback(pushVx, pushVy);
-            // Ensure knockbackStunTimer is NOT set so the enemy's aim rotation never freezes!
-            this.flurryTarget.knockbackStunTimer = 0;
-          } else {
-            this.flurryTarget.vx += pushVx;
-            this.flurryTarget.vy += pushVy;
-          }
+          if (this.flurryTarget) {
+            if (typeof this.flurryTarget.applyKnockback === 'function') {
+              this.flurryTarget.applyKnockback(pushVx, pushVy);
+              // Ensure knockbackStunTimer is NOT set so the enemy's aim rotation never freezes!
+              this.flurryTarget.knockbackStunTimer = 0;
+            } else {
+              this.flurryTarget.vx = (this.flurryTarget.vx || 0) + pushVx;
+              this.flurryTarget.vy = (this.flurryTarget.vy || 0) + pushVy;
+            }
 
-          if (typeof this.flurryTarget.applySlow === 'function') {
-            this.flurryTarget.applySlow(90, 0.30);
+            if (typeof this.flurryTarget.applySlow === 'function') {
+              this.flurryTarget.applySlow(90, 0.30);
+            }
           }
 
           // Teleport around target
@@ -831,9 +848,24 @@ export class YutaFighter extends Fighter {
       }
 
       // Lock cardinal firing stance fixed in place; do not continuously auto-aim or rotate while channeling
-      if (this.pureLoveBeamLockedAngle !== undefined) {
-        this.gunAngle = this.pureLoveBeamLockedAngle;
-        this.angle = this.pureLoveBeamLockedAngle;
+      const beamAngle = (this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0));
+      this.gunAngle = beamAngle;
+      this.angle = beamAngle;
+
+      if (this.rika) {
+        this.rika.beamFollowAngle = beamAngle;
+        this.rika.angle = beamAngle;
+        const backAngle = beamAngle + Math.PI;
+        const backDist = (this.r || 22) + 24;
+        this.rika.x = this.x + Math.cos(backAngle) * backDist;
+        this.rika.y = this.y + Math.sin(backAngle) * backDist;
+        this.rika.vx = 0;
+        this.rika.vy = 0;
+        this.rika.knockbackVx = 0;
+        this.rika.knockbackVy = 0;
+        this.rika.rightArmTimer = 0;
+        this.rika.leftArmTimer = 0;
+        this.rika.attackTimer = 0;
       }
       this.pureLoveBeamChargeTimer++;
 
@@ -868,9 +900,24 @@ export class YutaFighter extends Fighter {
       this.knockbackVy = 0;
       this.hitStunTimer = 0; // Lock movement and hyper-armor until beam expires
       
-      if (this.pureLoveBeamLockedAngle !== undefined) {
-        this.gunAngle = this.pureLoveBeamLockedAngle;
-        this.angle = this.pureLoveBeamLockedAngle;
+      const beamAngle = (this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0));
+      this.gunAngle = beamAngle;
+      this.angle = beamAngle;
+
+      if (this.rika) {
+        this.rika.beamFollowAngle = beamAngle;
+        this.rika.angle = beamAngle;
+        const backAngle = beamAngle + Math.PI;
+        const backDist = (this.r || 22) + 24;
+        this.rika.x = this.x + Math.cos(backAngle) * backDist;
+        this.rika.y = this.y + Math.sin(backAngle) * backDist;
+        this.rika.vx = 0;
+        this.rika.vy = 0;
+        this.rika.knockbackVx = 0;
+        this.rika.knockbackVy = 0;
+        this.rika.rightArmTimer = 0;
+        this.rika.leftArmTimer = 0;
+        this.rika.attackTimer = 0;
       }
 
       // Continuous arena shake while beam is active — decays during final collapse
@@ -908,6 +955,7 @@ export class YutaFighter extends Fighter {
         this.isFiringPureLoveBeam = false;
         this.pureLoveBeamChargeTimer = 0; // Reset charge timer
         this.pureLoveBeamBreatherTimer = 60; // 1-second post-beam breather recovery pause!
+        this.pureLoveBeamLockedAngle = undefined; // Cleanly clear locked angle on beam finish
 
         // Dense burst of lingering pink-whitecore particles along the beam path upon expiration!
         spawnYutaBeamLingeringParticles(startX, startY, angle, beamLength, beamWidth, 80);
@@ -964,7 +1012,7 @@ export class YutaFighter extends Fighter {
           this.rika.hasSummonedAt50Hp = true;
           this.rika.chargeTimer = 0; // Cancel any pending summons
           this.rika.spawnTimer = 0;
-          this.rika.killedInDomain = false;
+          this.rika.killedInDomain = this.domainActive ? true : false;
           
           // Reset the Rika summon skill bar so it starts filling from 0% again
           this.rikaRechargeHpBaseline = this.hp;
@@ -977,6 +1025,12 @@ export class YutaFighter extends Fighter {
               state.illusions.splice(idx, 1);
             }
           }
+        }
+
+        // Trigger deferred round/match end now that the beam duration has officially ended, but ONLY if an opponent died!
+        const livingCount = state.fighters ? state.fighters.filter(f => f && (typeof f.isEffectivelyAlive === 'function' ? f.isEffectivelyAlive() : (f.hp > 0 && !f.dead))).length : 0;
+        if (livingCount <= 1 && typeof this.checkRoundOrMatchEnd === 'function') {
+          this.checkRoundOrMatchEnd();
         }
       }
       return; // Stop movement & attacks while firing beam
@@ -999,11 +1053,9 @@ export class YutaFighter extends Fighter {
 
       if (this.pureLoveBeamBreatherTimer === 0) {
         this.pureLoveBeamChargeTimer = 0;
+        this.pureLoveBeamLockedAngle = undefined;
         const opp = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
-        const chaseAngle = opp ? Math.atan2(opp.y - this.y, opp.x - this.x) : (this.gunAngle || this.angle || 0);
-        const spd = this.speed || 3.0;
-        this.vx = Math.cos(chaseAngle) * (spd * 0.8);
-        this.vy = Math.sin(chaseAngle) * (spd * 0.8);
+        this.resumeMovement(opp, 1.0);
       }
       return; // Pause actions during post-beam breather recovery
     }
@@ -1034,7 +1086,7 @@ export class YutaFighter extends Fighter {
       }
 
       // Play domain_activate audio before deploying
-      const deployAudioFrame = CONFIG.yuta.domainDeployAudioFrame ?? (isClashingInsideDomain ? Math.max(1, this.domainChargeMax - 30) : this.domainChargeMax);
+      const deployAudioFrame = CONFIG.yuta.domainDeployAudioFrame ?? (isClashingInsideDomain ? Math.max(1, this.domainChargeMax - 15) : Math.max(1, this.domainChargeMax - 10));
       if (this.domainChargeTimer >= deployAudioFrame && !this._playedDeployAudio) {
         this._playedDeployAudio = true;
         if (CONFIG.yuta?.domainDeploySound) {
@@ -1078,7 +1130,7 @@ export class YutaFighter extends Fighter {
     const hpDamageNeededFor2ndDomain = (this.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.75);
     const hpLostSince1stDomain = this.domain2DamageTaken || 0;
 
-    const canActivate = (!this.domainActive && !this.isChannelingDomain && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0 && this.rika);
+    const canActivate = (!this.domainActive && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.rikaEmergingForBeamTimer || 0) <= 0 && (this.beamRetreatSlideTimer || 0) <= 0 && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0 && this.rika);
     const isFirstTrigger = (this.domainUseCount === 0 && hpRatio <= domainHpThreshold1);
     const isSecondTrigger = (this.domainUseCount === 1 && hpLostSince1stDomain >= hpDamageNeededFor2ndDomain);
 
@@ -1183,20 +1235,15 @@ export class YutaFighter extends Fighter {
         this.rika.spawnScale = Math.min(1.0, 0.1 + prog * 0.9);
         this.rikaAlpha = Math.min(1.0, prog);
 
-        // Glue Rika directly behind Yuta's back while she manifests (using smooth orbital follow delay)
-        if (this.rika.beamFollowAngle === undefined) {
-          this.rika.beamFollowAngle = (this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0));
-        }
-        let diff = (this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0)) - this.rika.beamFollowAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        this.rika.beamFollowAngle += diff * 0.085;
+        // Glue Rika directly behind Yuta's back pointing straight in beam firing direction
+        const beamAngle = (this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0));
+        this.rika.beamFollowAngle = beamAngle;
 
-        const backAngle = this.rika.beamFollowAngle + Math.PI;
+        const backAngle = beamAngle + Math.PI;
         const backDist = (this.r || 22) + 24;
         this.rika.x = this.x + Math.cos(backAngle) * backDist;
         this.rika.y = this.y + Math.sin(backAngle) * backDist;
-        this.rika.angle = this.rika.beamFollowAngle;
+        this.rika.angle = beamAngle;
         this.rika.vx = 0;
         this.rika.vy = 0;
       }
@@ -1219,7 +1266,7 @@ export class YutaFighter extends Fighter {
     const isRikaActive = (this.isRikaAliveInDomain() || (this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0));
     const isControlledRika = this.isMakimaControlledRikaTarget(this.rika);
 
-    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive && !isControlledRika) {
+    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !isEnemyDomainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive && !isControlledRika) {
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
       const hasEnemies = state.fighters.some((f, idx) => {
         if (!f || f.hp <= 0 || f === this) return false;
@@ -1253,6 +1300,17 @@ export class YutaFighter extends Fighter {
           const margin = (this.r || 22) + 25;
           destX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, destX));
           destY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, destY));
+        }
+
+        // If inside domain, keep retreat position inside domain radius
+        if (this.domainActive && this.domainX !== undefined && this.domainY !== undefined) {
+          const domR = Math.max(100, (CONFIG.yuta?.domainRadius || 350) - (this.r || 22) - 25);
+          const dCenter = Math.hypot(destX - this.domainX, destY - this.domainY);
+          if (dCenter > domR && dCenter > 0) {
+            const clampAng = Math.atan2(destY - this.domainY, destX - this.domainX);
+            destX = this.domainX + Math.cos(clampAng) * domR;
+            destY = this.domainY + Math.sin(clampAng) * domR;
+          }
         }
 
         // Initiate 16-frame smooth retreat slide away from enemy!
@@ -1437,9 +1495,22 @@ export class YutaFighter extends Fighter {
     const maxCd = this.meleeCooldownMax;
     const isSwinging = (this.meleeCooldown > maxCd - 15);
 
-    // Ignore unblockable damage types (including Gojo's purple orb, Nanami 7:3 Ratio Crit, and Saitama punches)
+    const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+    const isEnemyParalyzingDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some((f, idx) => {
+      if (!f || f === this || f.hp <= 0) return false;
+      const isEnemy = myTeam === null || (state.getFighterTeam && state.getFighterTeam(idx) !== myTeam);
+      const isParalyzingDomain = (f.domainActive && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo')) || (f.stolenDomainActive && f.stolenType === 'gojo_domain');
+      return isEnemy && isParalyzingDomain;
+    });
+
+    const isInsideGojoDomain = Boolean(
+      opts.isDomain || opts.isGojoDomain || isEnemyParalyzingDomain ||
+      (attacker && (attacker.characterId === 'gojo' || attacker.type === 'gojo' || attacker._def?.id === 'gojo') && (attacker.domainActive || (attacker.stolenDomainActive && attacker.stolenType === 'gojo_domain')))
+    );
+
+    // Ignore unblockable damage types (including Gojo's purple orb, Nanami 7:3 Ratio Crit, domain attacks, and Saitama punches)
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isSaitamaPunch || opts.isSeriousPunch || opts.bypassShield || opts.isDivineFlame || opts.isFuga || (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')));
-    const unblockable = isGuaranteedHit || opts.isPoison || opts.isBurn || opts.isFlame || opts.isDivineFlame || opts.isFuga || opts.isExplosion || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
+    const unblockable = isGuaranteedHit || isInsideGojoDomain || opts.isDomain || opts.isPoison || opts.isBurn || opts.isFlame || opts.isDivineFlame || opts.isFuga || opts.isExplosion || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
 
     const isGuarding = this.blockPoseTimer > 0;
     const blockChance = this.getParryChance();
@@ -1563,8 +1634,8 @@ export class YutaFighter extends Fighter {
     // Otherwise, take damage normally
     this.blockPoseTimer = 0; // Guard is broken/dropped on hit!
 
-    // Check for fatal blow to trigger RCT Revival
-    if (!this.hasUsedRCTRevival && this.invincibilityTimer <= 0 && amount > 0 && !opts.isSaitamaCounter && !opts.isSeriousPunch && !opts.isStorm && !opts.isHeal) {
+    // Check for fatal blow to trigger RCT Revival (disabled inside Gojo's paralyzing Unlimited Void domain)
+    if (!this.hasUsedRCTRevival && this.invincibilityTimer <= 0 && amount > 0 && !opts.isSaitamaCounter && !opts.isSeriousPunch && !opts.isStorm && !opts.isHeal && !isInsideGojoDomain) {
       if (this.hp - amount <= 0 && this.hp > 0) {
         this.hasUsedRCTRevival = true;
         const duration = CONFIG.yuta.rctRevivalDuration || 150; // 2.5 seconds by default
@@ -1618,15 +1689,9 @@ export class YutaFighter extends Fighter {
 
   resolveWallBounce(arena, opponent) {
     if (!arena || this.hp <= 0 || this.isDead) return false;
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || this.caughtInGenosFlurry || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || this.caughtInGenosFlurry || this.preventKnockbackBounce || this.isDraggedByGetsuga;
     if (isBeamTrapped) {
-      this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
-      this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
-      this.vx = 0;
-      this.vy = 0;
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      return false;
+      return super.resolveWallBounce(arena, opponent);
     }
     let bounced = false;
     let bouncedX = false;
@@ -1737,6 +1802,7 @@ export class YutaFighter extends Fighter {
     const offsetDist = (this.r || 22) + 14;
     const p = projectileSystem._getProjectile();
     p.owner = state.fighters.indexOf(this);
+    p.ownerFighter = this;
     p.x = this.x + Math.cos(cardinal) * offsetDist;
     p.y = this.y + Math.sin(cardinal) * offsetDist;
     p.vx = Math.cos(cardinal) * 20; // Used for logical bounding box extension, actual velocity can be faster or instant
@@ -1986,20 +2052,110 @@ export class YutaFighter extends Fighter {
   }
 
 
-  applyKnockback(vx, vy) {
-    // Hyper-Armor Immunity: Ignore physical pushback velocity during Rika summon channeling, beam casting, or domain expansion
-    if ((this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0 || this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam) {
+  applyKnockback(vx, vy, opts = {}) {
+    // Hyper-Armor Immunity: Ignore physical pushback velocity during beam retreat, emergence, channeling, or firing, and during domain channeling
+    if ((this.beamRetreatSlideTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0 || this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam) {
       return;
     }
-    super.applyKnockback(vx, vy);
+    if (opts && (opts.isDomain || opts.bypassShield)) {
+      super.applyKnockback(vx, vy, opts);
+      return;
+    }
+    if ((this.rikaCallTimer || 0) > 0) {
+      return;
+    }
+    super.applyKnockback(vx, vy, opts);
   }
 
-  applyHitStun(duration) {
-    // Hyper-Armor Immunity: Ignore hit stun during Rika summon channeling, beam casting, or domain expansion
-    if ((this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0 || this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam) {
+  applyHitStun(duration, opts = {}) {
+    // Hyper-Armor Immunity: Ignore hit stun during beam retreat, emergence, channeling, or firing, and during domain channeling
+    if ((this.beamRetreatSlideTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0 || this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam) {
       return;
     }
-    super.applyHitStun(duration);
+    if (opts && (opts.isDomain || opts.bypassShield)) {
+      super.applyHitStun(duration, opts);
+      return;
+    }
+    if ((this.rikaCallTimer || 0) > 0) {
+      return;
+    }
+    super.applyHitStun(duration, opts);
+  }
+
+  clearAllAttackEffects() {
+    const wasFiringBeam = this.isFiringPureLoveBeam;
+    const currentBeamActive = this.pureLoveBeamActiveTimer;
+    const wasChannelingBeam = this.isChannelingPureLoveBeam;
+    const currentBeamCharge = this.pureLoveBeamChargeTimer;
+    const wasEmergingRika = (this.rikaEmergingForBeamTimer > 0);
+    const currentEmergingRika = this.rikaEmergingForBeamTimer;
+    const wasRetreating = (this.beamRetreatSlideTimer > 0);
+    const currentRetreat = this.beamRetreatSlideTimer;
+
+    super.clearAllAttackEffects();
+
+    // Preserve Pure Love Beam hyper-armor unless Yuta is truly dead or silenced
+    const isHardCancelled = this.hp <= 0 || this.isDead || this.isTargetOfAmbush || (this.silenceTimer || 0) > 0;
+    if (!isHardCancelled) {
+      if (wasFiringBeam) {
+        this.isFiringPureLoveBeam = true;
+        this.pureLoveBeamActiveTimer = currentBeamActive;
+      }
+      if (wasChannelingBeam) {
+        this.isChannelingPureLoveBeam = true;
+        this.pureLoveBeamChargeTimer = currentBeamCharge;
+      }
+      if (wasEmergingRika) {
+        this.rikaEmergingForBeamTimer = currentEmergingRika;
+      }
+      if (wasRetreating) {
+        this.beamRetreatSlideTimer = currentRetreat;
+      }
+    }
+  }
+
+  cancelPureLoveBeam() {
+    this._stopBeamAudio();
+    this.isChannelingPureLoveBeam = false;
+    this.isFiringPureLoveBeam = false;
+    this.pureLoveBeamChargeTimer = 0;
+    this.pureLoveBeamActiveTimer = 0;
+    this.pureLoveBeamBreatherTimer = 0;
+    this.rikaEmergingForBeamTimer = 0;
+    this.beamRetreatSlideTimer = 0;
+    this.pureLoveBeamLockedAngle = undefined;
+
+    // Immediately extinguish and remove active Pure Love Beam projectile from projectileSystem
+    if (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) {
+      const myIdx = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+      for (let i = projectileSystem.projectiles.length - 1; i >= 0; i--) {
+        const p = projectileSystem.projectiles[i];
+        if (p && (p.visual === 'yuta_pure_love_beam' || p.behaviorType === 'yuta_pure_love_beam' || p.isPureLoveBeam) && (p.owner === myIdx || p.owner === undefined || myIdx === -1)) {
+          projectileSystem.projectiles.splice(i, 1);
+        }
+      }
+    }
+
+    // Release any entities trapped in Pure Love Beam
+    const allTargets = [
+      ...(state?.fighters || []),
+      ...(state?.illusions || []),
+      ...(state?.cjDriveBys || [])
+    ];
+    for (const ent of allTargets) {
+      if (ent && (ent.caughtInPureLoveBeam || ent.wasCaughtInPureLoveBeam)) {
+        ent.caughtInPureLoveBeam = false;
+        ent.wasCaughtInPureLoveBeam = false;
+        ent.pureLoveBeamTimer = 0;
+      }
+    }
+
+    if (this.rika) {
+      this.rika.isSacrificingForBeam = false;
+      if (this.rika.beamFollowAngle !== undefined) {
+        this.rika.beamFollowAngle = undefined;
+      }
+    }
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -2015,6 +2171,9 @@ export class YutaFighter extends Fighter {
     const wasEmergingRika = (this.rikaEmergingForBeamTimer > 0);
     const currentEmergingRika = this.rikaEmergingForBeamTimer;
 
+    const wasRetreating = (this.beamRetreatSlideTimer > 0);
+    const currentRetreat = this.beamRetreatSlideTimer;
+
     const wasRikaCalling = (this.rikaCallTimer > 0);
     const currentRikaCall = this.rikaCallTimer;
 
@@ -2023,20 +2182,28 @@ export class YutaFighter extends Fighter {
 
     super.interruptAttacks(forceCancelAll);
 
-    // ONLY death, Toji ISOH ambush, or explicit silence can hard-cancel Yuta's ultimate hyper-armor
+    const myTeam = (typeof state !== 'undefined' && state.fighters && typeof state.getFighterTeam === 'function') 
+      ? state.getFighterTeam(state.fighters.indexOf(this)) 
+      : this.team;
+    const isEnemyDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some((f, idx) => {
+      if (!f || f === this || f.hp <= 0) return false;
+      const isEnemy = myTeam === null || (state.getFighterTeam && state.getFighterTeam(idx) !== myTeam);
+      const isParalyzingDomain = f.domainActive && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
+      return isEnemy && isParalyzingDomain;
+    });
+
+    if (isEnemyDomainActive) {
+      this.cancelPureLoveBeam();
+    }
+
+    // ONLY death, Toji ISOH ambush, or explicit silence can hard-cancel Yuta's domain hyper-armor
     const isHardCancelled = this.hp <= 0 || this.isDead || this.isTargetOfAmbush || (this.silenceTimer || 0) > 0;
 
     if (isHardCancelled) {
-      this._stopBeamAudio();
+      this.cancelPureLoveBeam();
       this.beamRetreatSlideTimer = 0;
       this.isChannelingDomain = false;
       this.domainChargeTimer = 0;
-      this.isChannelingPureLoveBeam = false;
-      this.pureLoveBeamLockedAngle = undefined;
-      this.pureLoveBeamChargeTimer = 0;
-      this.isFiringPureLoveBeam = false;
-      this.pureLoveBeamActiveTimer = 0;
-      this.rikaEmergingForBeamTimer = 0;
       this.rikaCallTimer = 0;
       this.isChannelingThinIceBreaker = false;
       this.thinIceBreakerChargeTimer = 0;
@@ -2046,22 +2213,27 @@ export class YutaFighter extends Fighter {
       return;
     }
 
-    // Hyper-Armor Protection: Preserve Yuta's channeling states against normal hitstun/slashes/blasts!
+    // Hyper-Armor Protection: Preserve Yuta's domain channeling against normal hitstun/slashes/blasts!
     if (wasChannelingDomain) {
       this.isChannelingDomain = true;
       this.domainChargeTimer = currentDomainCharge;
       this.domainCooldown = 0;
     }
-    if (wasChannelingBeam) {
-      this.isChannelingPureLoveBeam = true;
-      this.pureLoveBeamChargeTimer = currentBeamCharge;
-    }
-    if (wasFiringBeam) {
-      this.isFiringPureLoveBeam = true;
-      this.pureLoveBeamActiveTimer = currentBeamActive;
-    }
-    if (wasEmergingRika) {
-      this.rikaEmergingForBeamTimer = currentEmergingRika;
+    if (!isEnemyDomainActive) {
+      if (wasChannelingBeam) {
+        this.isChannelingPureLoveBeam = true;
+        this.pureLoveBeamChargeTimer = currentBeamCharge;
+      }
+      if (wasFiringBeam) {
+        this.isFiringPureLoveBeam = true;
+        this.pureLoveBeamActiveTimer = currentBeamActive;
+      }
+      if (wasEmergingRika) {
+        this.rikaEmergingForBeamTimer = currentEmergingRika;
+      }
+      if (wasRetreating) {
+        this.beamRetreatSlideTimer = currentRetreat;
+      }
     }
     if (wasRikaCalling) {
       this.rikaCallTimer = currentRikaCall;
@@ -2072,30 +2244,18 @@ export class YutaFighter extends Fighter {
     }
   }
 
+  stopAllRikaAudio() {
+    stopRikaAudio(this, this.rika);
+  }
+
   onDeath() {
-    this._stopBeamAudio();
-    this.isFiringPureLoveBeam = false;
-    this.pureLoveBeamActiveTimer = 0;
-    this.isChannelingPureLoveBeam = false;
-    this.pureLoveBeamLockedAngle = undefined;
-    this.pureLoveBeamChargeTimer = 0;
-    this.rikaEmergingForBeamTimer = 0;
+    this.stopAllRikaAudio();
+    this.cancelPureLoveBeam();
     this.rikaCallTimer = 0;
     this.isChannelingDomain = false;
     this.domainChargeTimer = 0;
     this.isChannelingThinIceBreaker = false;
     this.thinIceBreakerChargeTimer = 0;
-
-    // Immediately extinguish and remove active Pure Love Beam projectile from projectileSystem
-    if (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) {
-      const myIdx = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
-      for (let i = projectileSystem.projectiles.length - 1; i >= 0; i--) {
-        const p = projectileSystem.projectiles[i];
-        if (p && (p.visual === 'yuta_pure_love_beam' || p.behaviorType === 'yuta_pure_love_beam') && (p.owner === myIdx || p.owner === undefined)) {
-          projectileSystem.projectiles.splice(i, 1);
-        }
-      }
-    }
 
     // Immediately despawn Rika cleanly
     if (this.rika) {
@@ -2104,6 +2264,8 @@ export class YutaFighter extends Fighter {
       this.rika.isSacrificingForBeam = false;
       this.rika.isDying = false;
       this.rika.disappearing = false;
+      this.rika.spawnTimer = 0;
+      this.rika.chargeTimer = 0;
       if (typeof state !== 'undefined' && state.illusions) {
         const idx = state.illusions.indexOf(this.rika);
         if (idx >= 0) state.illusions.splice(idx, 1);
@@ -2691,219 +2853,6 @@ export class YutaFighter extends Fighter {
       ctx.rotate(custom.angleOffset);
     }
 
-    // === Cursed Energy Katana Aura (Rendered BEHIND the blade) ===
-    // Glows pink when swinging, when blocking, or when Rika/Domain is active
-    let auraOpacity = this.swordGlowAlpha || 0;
-    if (this._isWinnerReveal || (this.combatAuraOpacity && this.combatAuraOpacity > 0)) {
-      auraOpacity = 1.0;
-    }
-
-    if (auraOpacity > 0.01) {
-      ctx.save();
-
-      const fillColor = `rgba(255, 105, 180, 0.7)`; // Fixed alpha so it doesn't double-multiply
-      const coreColor = `rgba(255, 192, 203, 0.8)`;
-      const strokeColor = `rgba(0, 0, 0, 0.75)`;
-
-      if (isGamePlay) {
-        // === Volumetric Katana Backlight (Optimized solid glow during gameplay) ===
-        ctx.globalCompositeOperation = 'screen';
-        ctx.strokeStyle = `rgba(255, 20, 147, ${0.25 * auraOpacity})`;
-        ctx.beginPath();
-        ctx.moveTo(-15, 0);
-        ctx.quadraticCurveTo(35, 1.5, 85, -4);
-        ctx.lineWidth = 35;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        ctx.globalCompositeOperation = 'source-over';
-
-        // Fast simplified outer aura shape
-        ctx.fillStyle = fillColor;
-        ctx.beginPath();
-        ctx.moveTo(-15, -6 * auraOpacity);
-        ctx.lineTo(35, -7 * auraOpacity);
-        ctx.lineTo(85, -12 * auraOpacity);
-        ctx.lineTo(85, 8 * auraOpacity);
-        ctx.lineTo(35, 3 * auraOpacity);
-        ctx.lineTo(-15, 2 * auraOpacity);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Fast simplified inner core shape
-        ctx.fillStyle = coreColor;
-        ctx.beginPath();
-        ctx.moveTo(-12, -2 * auraOpacity);
-        ctx.lineTo(35, -3 * auraOpacity);
-        ctx.lineTo(80, -5 * auraOpacity);
-        ctx.lineTo(80, 3 * auraOpacity);
-        ctx.lineTo(35, 1 * auraOpacity);
-        ctx.lineTo(-12, 1 * auraOpacity);
-        ctx.closePath();
-        ctx.fill();
-
-        // Thin black border around the aura shape
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(-15, -6 * auraOpacity);
-        ctx.lineTo(35, -7 * auraOpacity);
-        ctx.lineTo(85, -12 * auraOpacity);
-        ctx.lineTo(85, 8 * auraOpacity);
-        ctx.lineTo(35, 3 * auraOpacity);
-        ctx.lineTo(-15, 2 * auraOpacity);
-        ctx.closePath();
-        ctx.stroke();
-      } else {
-        const frameRate = 30;
-        // Infinite stepped frames (no modulus snapping)
-        const frameIndex = Math.floor(Date.now() / (1000 / frameRate));
-        const time = frameIndex * 120;
-        // Add velocity/position influence so the flames react naturally as he moves
-        const moveOffset = (this.x + this.y) * 0.015;
-
-        // === Volumetric Katana Backlight (Replicating Champion Screen) ===
-        ctx.globalCompositeOperation = 'screen';
-        const katanaGlow = ctx.createLinearGradient(-15, 0, 85, 0);
-        katanaGlow.addColorStop(0, `rgba(255, 255, 255, ${0.4 * auraOpacity})`);
-        katanaGlow.addColorStop(0.6, `rgba(255, 105, 180, ${0.2 * auraOpacity})`);
-        katanaGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
-
-        ctx.beginPath();
-        ctx.moveTo(-15, 0);
-        ctx.quadraticCurveTo(35, 1.5, 85, -4); // Follows the blade curve
-        ctx.lineWidth = 35;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = katanaGlow;
-        ctx.stroke();
-
-        ctx.globalCompositeOperation = 'source-over';
-
-        // Generate outer flame points (Viscous Liquid Fire Silhouette)
-        let allPoints = [];
-
-        // Top edge (left to right) - Localized flame tongues (flicker instead of slide)
-        for (let x = -15; x <= 85; x += 5) {
-          let cy = (x > 19) ? (x - 19) * -0.09 : 0;
-
-          // Slow base shape evolution (how tongues grow/morph)
-          let baseShape = Math.pow(Math.sin(x * 0.05 + time * 0.0008) * 0.5 + 0.5, 3.0) * 18;
-
-          // Gentle, localized height flicker (smoothed frequency and amplitude)
-          let flicker = Math.sin(time * 0.002 + x * 0.2 - moveOffset) * 0.15 + 0.85;
-
-          let topWave = (baseShape * flicker + 3) * auraOpacity;
-          allPoints.push({ x: x, y: cy - 4 - topWave });
-        }
-
-        // Bottom edge (right to left) - Localized flame tongues
-        for (let x = 85; x >= -15; x -= 5) {
-          let cy = (x > 19) ? (x - 19) * -0.09 : 0;
-
-          let baseShape = Math.pow(Math.cos(x * 0.06 - time * 0.0006) * 0.5 + 0.5, 2.5) * 18;
-          let flicker = Math.cos(time * 0.0025 - x * 0.25 + moveOffset) * 0.15 + 0.85;
-
-          let botWave = (baseShape * flicker + 3) * auraOpacity;
-          allPoints.push({ x: x, y: cy + 4 + botWave });
-        }
-
-        // Outer flame fill
-        ctx.beginPath();
-        let mx = (allPoints[allPoints.length - 1].x + allPoints[0].x) / 2;
-        let my = (allPoints[allPoints.length - 1].y + allPoints[0].y) / 2;
-        ctx.moveTo(mx, my);
-        for (let i = 0; i < allPoints.length; i++) {
-          let p = allPoints[i];
-          let next = allPoints[(i + 1) % allPoints.length];
-          let xc = (p.x + next.x) / 2;
-          let yc = (p.y + next.y) / 2;
-          ctx.quadraticCurveTo(p.x, p.y, xc, yc);
-        }
-        ctx.closePath();
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-
-        // Inner glowing core (shrunk vertically towards the blade)
-        ctx.beginPath();
-        ctx.moveTo(mx, my * 0.4);
-        for (let i = 0; i < allPoints.length; i++) {
-          let p = allPoints[i];
-          let next = allPoints[(i + 1) % allPoints.length];
-          let xc = (p.x + next.x) / 2;
-          let yc = (p.y + next.y) / 2;
-          // Shrink the y-coordinates tightly around the blade
-          ctx.quadraticCurveTo(p.x, p.y * 0.4, xc, yc * 0.4);
-        }
-        ctx.closePath();
-        ctx.fillStyle = coreColor;
-        ctx.fill();
-
-        // Primary Ink brush stroke outline (varying thickness like calligraphy brush)
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = strokeColor;
-        ctx.globalAlpha = auraOpacity;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        let mxS = (allPoints[allPoints.length - 1].x + allPoints[0].x) / 2;
-        let myS = (allPoints[allPoints.length - 1].y + allPoints[0].y) / 2;
-        ctx.moveTo(mxS, myS);
-        for (let i = 0; i < allPoints.length; i++) {
-          const p = allPoints[i];
-          const next = allPoints[(i + 1) % allPoints.length];
-          ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-        }
-        ctx.closePath();
-        ctx.stroke();
-
-        // Chaotic, broken JJK black ink brush cuts & hatches inside the katana aura
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = strokeColor;
-        ctx.lineCap = 'butt';
-
-        const insetScales = [0.65, 0.8, 0.92]; // Scaled closer to the blade center (inside the pink)
-        for (let layer = 0; layer < insetScales.length; layer++) {
-          const scale = insetScales[layer];
-          const speedDir = (layer % 2 === 0 ? 1 : -1);
-          const flowTime = time * 0.003 * speedDir;
-
-          for (let i = 0; i < allPoints.length; i++) {
-            // Slow wave (for long strokes) + fast wave (for short details) = variety of longevity
-            const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
-            const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
-            const cutSeed = longWave + shortWave;
-            if (cutSeed < 0.15) continue; // Higher threshold to reduce density and clutter
-
-            const p = allPoints[i];
-            const next = allPoints[(i + 1) % allPoints.length];
-
-            // Find blade center line for both points to curve correctly
-            let pCy = (p.x > 19) ? (p.x - 19) * -0.09 : 0;
-            let nextCy = (next.x > 19) ? (next.x - 19) * -0.09 : 0;
-
-            // Scale Y relative to the blade center line so cuts sit inside the pink aura
-            let yStart = pCy + (p.y - pCy) * scale;
-            let yEnd = nextCy + (next.y - nextCy) * scale;
-
-            ctx.lineWidth = 0.4 + (cutSeed * 1.2);
-            ctx.beginPath();
-            ctx.moveTo(p.x, yStart);
-
-            // Add a slight jaggedness to the cut
-            const jagX = Math.cos(i * 43) * 1.5;
-            const jagY = Math.sin(i * 43) * 1.5;
-
-            ctx.lineTo(next.x + jagX, yEnd + jagY);
-            ctx.stroke();
-          }
-        }
-      }
-
-      ctx.restore();
-    }
-
       // 1. Kashira (Gold Pommel)
       ctx.fillStyle = '#D4AF37';
       ctx.fillRect(-18, -3, 3, 6);
@@ -2987,10 +2936,6 @@ export class YutaFighter extends Fighter {
       ctx.closePath();
       ctx.fillStyle = '#E5E8E8';                        // Polished silver steel
       ctx.fill();
-      if (auraOpacity > 0.05) {
-        ctx.fillStyle = `rgba(255, 20, 147, ${auraOpacity * 0.4})`; // Hot pink cursed glow overlay
-        ctx.fill();
-      }
 
       // Second, overlay the dark spine (Shinogi-ji) ending at the Yokote line (tip division)
       ctx.beginPath();
@@ -3001,10 +2946,6 @@ export class YutaFighter extends Fighter {
       ctx.closePath();
       ctx.fillStyle = '#2F3538';                        // Dark spine steel
       ctx.fill();
-      if (auraOpacity > 0.05) {
-        ctx.fillStyle = `rgba(255, 105, 180, ${auraOpacity * 0.35})`; // Pink spine glow tint
-        ctx.fill();
-      }
 
       // Hamon line (temper line) — complex wavy boundary line
       ctx.beginPath();
@@ -3013,7 +2954,7 @@ export class YutaFighter extends Fighter {
         const waveY = 0.2 - 4.4 * ((x - 19) / 56) + Math.sin(x * 0.75) * 0.45;
         ctx.lineTo(x, waveY);
       }
-      ctx.strokeStyle = auraOpacity > 0.05 ? `rgba(255, 240, 245, ${0.65 + auraOpacity * 0.35})` : 'rgba(255, 255, 255, 0.65)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.lineWidth = 0.5;
       ctx.stroke();
 

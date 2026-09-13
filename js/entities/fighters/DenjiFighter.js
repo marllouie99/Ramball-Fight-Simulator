@@ -169,7 +169,7 @@ export class DenjiFighter extends Fighter {
     return targets;
   }
 
-  update(allFighters) {
+  update(opponent, ownerIndex, arena) {
     // 1. Mandatory Rule 1 Freeze Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -203,7 +203,7 @@ export class DenjiFighter extends Fighter {
     }
 
     // 4. Regular Combat AI
-    const target = this._findBestTarget();
+    const target = this._findBestTarget() || opponent;
     if (target) {
       this.aim(target);
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -232,7 +232,7 @@ export class DenjiFighter extends Fighter {
       }
     }
 
-    super.update(allFighters);
+    super.update(target || opponent, ownerIndex, arena);
   }
 
   _findBestTarget() {

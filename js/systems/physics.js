@@ -667,6 +667,7 @@ function endRoundIfFFAEnded() {
   }
 
   if (aliveCount > 1) return;
+  if (winner && typeof winner.hasActiveFinishingAbility === 'function' && winner.hasActiveFinishingAbility()) return;
 
   if (aliveCount === 0) winner = null;
   stopArenaBgm(true);
@@ -718,8 +719,14 @@ function endRoundIf2v2Ended() {
   // Round ends when one team is eliminated (including all illusions)
   if (team0Alive && team1Alive) return;
 
-  stopArenaBgm(true);
   const winningTeam = team0Alive ? 0 : 1;
+  const hasFinishingAbility = state.fighters.some((f, idx) => 
+    f && isFighterEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam && 
+    typeof f.hasActiveFinishingAbility === 'function' && f.hasActiveFinishingAbility()
+  );
+  if (hasFinishingAbility) return;
+
+  stopArenaBgm(true);
   state.teamScores[winningTeam]++;
   
   // Find effective winning fighter (alive fighter or fallback)
@@ -766,6 +773,7 @@ function endRoundIf1v1Ended() {
   }
 
   if (aliveCount > 1) return;
+  if (winner && typeof winner.hasActiveFinishingAbility === 'function' && winner.hasActiveFinishingAbility()) return;
 
   stopArenaBgm(true);
   if (aliveCount === 0) winner = null;
@@ -837,6 +845,7 @@ function endRoundIfTlfsEnded() {
 
   // Check if enemy died
   if (enemy && !isFighterEffectivelyAlive(enemy)) {
+    if (player && typeof player.hasActiveFinishingAbility === 'function' && player.hasActiveFinishingAbility()) return;
     // Enemy died - increment defeated count
     state.tlfsDefeatedEnemies = (state.tlfsDefeatedEnemies || 0) + 1;
 
@@ -932,7 +941,7 @@ export function updateFighters() {
           fighter.paralyzeTimer--;
           if (fighter.paralyzeTimer <= 0) {
             fighter.isParalyzedByMahito = false;
-            if (typeof fighter.checkRoundOrMatchEnd === 'function') {
+            if (fighter.hp <= 0 && typeof fighter.checkRoundOrMatchEnd === 'function') {
               fighter.checkRoundOrMatchEnd();
             }
           }
@@ -944,8 +953,9 @@ export function updateFighters() {
 
       // Post-Kill / Round End / Match End Continuous Movement:
       // If the round or match has ended (or all opponents are dead), ensure the living winner smoothly coasts!
+      const isFinishingAbility = Boolean(fighter && typeof fighter.hasActiveFinishingAbility === 'function' && fighter.hasActiveFinishingAbility());
       const isRoundOrMatchOver = (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || !opponent);
-      if (isRoundOrMatchOver && fighter.hp > 0 && !state._isChampionLayoutActive) {
+      if (isRoundOrMatchOver && fighter.hp > 0 && !state._isChampionLayoutActive && !isFinishingAbility) {
         // Clear stationary strike locks / melee stasis / channel freezes
         fighter.isMeleeMode = false;
         fighter.meleePunchCooldown = 0;

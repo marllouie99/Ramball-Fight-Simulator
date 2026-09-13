@@ -431,9 +431,7 @@ export class EngineerFighter extends Fighter {
       this.vy = Math.sin(recoverAngle) * this.speed;
     }
 
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate || 0.05);
+    this.applyMovementPhysics();
 
     // Bouncing off walls
     this.resolveWallBounce(arena, opponent);

@@ -627,7 +627,7 @@ export function drawYutaDomainDimScreen() {
     if (yutaFighter.domainActive) {
       targetOpacity = 0.75;
     } else if (yutaFighter.isChannelingDomain) {
-      const chargeMax = yutaFighter.domainChargeMax || 180;
+      const chargeMax = yutaFighter.domainChargeMax || 50;
       const progress = Math.min(1.0, (yutaFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
       targetOpacity = 0.25 + progress * 0.45;
     }

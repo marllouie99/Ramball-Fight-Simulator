@@ -5,7 +5,7 @@ import { spawnImpactFlash, spawnSparks } from '../../../graphics/particles/spark
 
 export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
   update(p, fighters, system) {
-    const ownerFighter = fighters[p.owner];
+    const ownerFighter = (fighters && p.owner !== undefined) ? (fighters[p.owner] || p.ownerFighter) : p.ownerFighter;
     if (!ownerFighter || ownerFighter.hp <= 0 || ownerFighter.isDead || (!ownerFighter.isFiringPureLoveBeam && !ownerFighter.isChannelingPureLoveBeam)) {
       // Clear trapped status from all entities when beam terminates
       const allTargets = [
@@ -133,12 +133,68 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
               ent.isBlitzActive = false;
               ent.isWallSlamActive = false;
             }
-            
-            if (typeof ent.interruptAttacks === 'function') {
-              ent.interruptAttacks();
+
+            // Force cancel all skill channeling / charging / active counters across all fighters hit by Pure Love Beam
+            if (ent.isChannelingPurple) {
+              ent.isChannelingPurple = false;
+              ent.purpleChargeTimer = 0;
+              ent._hasPlayedPurpleChannelSound = false;
+              if (ent._purpleChargeSoundHandle) {
+                if (typeof fadeOutSound === 'function') fadeOutSound(ent._purpleChargeSoundHandle, 200);
+                ent._purpleChargeSoundHandle = null;
+              }
+              if (typeof fadeOutSoundBySrc === 'function') fadeOutSoundBySrc('mixing', 200);
             }
-            if (typeof ent.applyHitStun === 'function') {
-              ent.applyHitStun(8);
+            if (ent.isChannelingDomainExpansion) {
+              ent.isChannelingDomainExpansion = false;
+              ent.domainChargeTimer = 0;
+              ent._hasPlayedDomainChannelSound = false;
+            }
+            if (ent.isChannelingDomain) {
+              ent.isChannelingDomain = false;
+              ent.domainChargeTimer = 0;
+            }
+            if (ent.isChannelingDivineFlame) {
+              ent.isChannelingDivineFlame = false;
+              ent.divineFlameChargeTimer = 0;
+              if (ent.fugaSoundKey && typeof stopLoopingSound === 'function') {
+                stopLoopingSound(ent.fugaSoundKey);
+                ent.fugaSoundKey = null;
+              }
+            }
+            if (ent.isChannelingGetsuga || ent.getsugaChargeTimer > 0) {
+              ent.isChannelingGetsuga = false;
+              ent.getsugaChargeTimer = 0;
+              ent.getsugaSlideTimer = 0;
+            }
+            if (ent.isTakadaChanneling) {
+              ent.isTakadaChanneling = false;
+              ent.takadaChannelTimer = 0;
+            }
+            if (ent.isCountering || ent._counterPunchTimer > 0 || ent._counterWindupTimer > 0) {
+              ent.isCountering = false;
+              ent._counterPunchTimer = 0;
+              ent._counterWindupTimer = 0;
+              ent._postCounterRecoveryTimer = 0;
+            }
+            if (typeof ent.cancelRed === 'function') {
+              ent.cancelRed(true);
+            }
+            if (typeof ent.interruptAttacks === 'function') {
+              ent.interruptAttacks(true);
+            }
+            const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.35;
+            if (typeof ent.applySlow === 'function') {
+              if (ent.isCJDriveBy) {
+                ent.applySlow(slowMult, 15);
+              } else {
+                ent.applySlow(15, slowMult, { isPureLoveBeam: true });
+              }
+            } else if (ent.statusEffects && typeof ent.statusEffects.applySlow === 'function') {
+              ent.statusEffects.applySlow(15, slowMult, { isPureLoveBeam: true });
+            } else {
+              ent.slowTimer = Math.max(ent.slowTimer || 0, 15);
+              ent.slowMultiplier = Math.min(ent.slowMultiplier || 1.0, slowMult);
             }
           }
           
@@ -149,23 +205,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
           const minY = arena ? (arena.y + r) : -Infinity;
           const maxY = arena ? (arena.y + arena.height - r) : Infinity;
 
-          const isTouchingWall = arena && (
-            (ent.x <= minX + 2) ||
-            (ent.x >= maxX - 2) ||
-            (ent.y <= minY + 2) ||
-            (ent.y >= maxY - 2)
-          );
-
-          if (isTouchingWall) {
-            ent.vx = 0;
-            ent.vy = 0;
-            ent.knockbackVx = 0;
-            ent.knockbackVy = 0;
-            if (arena) {
-              ent.x = Math.max(minX, Math.min(maxX, ent.x));
-              ent.y = Math.max(minY, Math.min(maxY, ent.y));
-            }
-          } else if (!ent.isBaguvixActive && !ent.isGodModeActive) {
+          if (!ent.isBaguvixActive && !ent.isGodModeActive) {
             const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
             const isIchigo = ent.characterId === 'ichigo' || ent.type === 'ichigo' || (ent._def && (ent._def.id === 'ichigo' || ent._def.type === 'ichigo'));
             if (isMakimaShatter) {
@@ -190,11 +230,6 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
                 ent.x = Math.max(minX, Math.min(maxX, ent.x));
                 ent.y = Math.max(minY, Math.min(maxY, ent.y));
               }
-            } else {
-              ent.vx = 0;
-              ent.vy = 0;
-              ent.knockbackVx = 0;
-              ent.knockbackVy = 0;
             }
           }
           
@@ -208,9 +243,6 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
           if (typeof ent.interruptAttacks === 'function') {
             ent.interruptAttacks();
           }
-          if (typeof ent.applyHitStun === 'function') {
-            ent.applyHitStun(15);
-          }
 
           if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
             if (typeof ent.adaptToPureLoveBeam === 'function') {
@@ -221,9 +253,13 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
       }
     }
     
-    // Beam lifetime logic
-    p.life -= 1;
-    if (p.life <= 0) {
+    // Beam lifetime logic - strictly synced with owner fighter's active timer
+    if (ownerFighter && ownerFighter.isFiringPureLoveBeam) {
+      p.life = ownerFighter.pureLoveBeamActiveTimer;
+      p.maxLife = CONFIG.yuta?.pureLoveBeamDuration || 280;
+    }
+
+    if (!ownerFighter || ownerFighter.hp <= 0 || ownerFighter.isDead || !ownerFighter.isFiringPureLoveBeam || ownerFighter.pureLoveBeamActiveTimer <= 0) {
       const allTargets = [
         ...(state.fighters || []),
         ...(state.illusions || []),
@@ -249,7 +285,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
       return true; // Destroy beam
     }
 
-    return false; // Beam remains active while life > 0
+    return false; // Beam remains active while ownerFighter is firing
   }
 
   onHit(projectile, target, attacker, fighters, system) {
@@ -258,7 +294,17 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
   }
 
   checkExpire(projectile, system) {
+    if (projectile.ownerFighter && (!projectile.ownerFighter.isFiringPureLoveBeam || projectile.ownerFighter.hp <= 0 || projectile.ownerFighter.isDead)) {
+      return true;
+    }
+    if (projectile.owner !== undefined && typeof state !== 'undefined' && state.fighters) {
+      const ownerFighter = state.fighters[projectile.owner] || projectile.ownerFighter;
+      if (!ownerFighter || ownerFighter.hp <= 0 || ownerFighter.isDead || !ownerFighter.isFiringPureLoveBeam) {
+        return true;
+      }
+      return false;
+    }
     if (projectile.life <= 0) return true;
-    return false; // Beam lifetime is controlled by life property, not arena boundaries
+    return false; // Beam lifetime is controlled by owner fighter timer, not arena boundaries
   }
 }

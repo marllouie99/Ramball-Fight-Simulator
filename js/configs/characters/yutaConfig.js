@@ -38,9 +38,9 @@ export const yutaConfig = {
   // Basic Attack: Katana Melee
   meleeCooldown: 36,                       // Frames between katana strikes
   meleeRange: 50,                          // Katana blade length reach distance in pixels
-  meleeDamage: 15,                         // Base damage per katana swing
+  meleeDamage: 4,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
-  meleeKnockback: 6.5,                     // Outward push force on katana melee strike
+  meleeKnockback: 1.5,                     // Outward push force on katana melee strike
   meleeHitStun: 12,                        // Hit stun frames on katana melee strike
 
   // Defensive / Counter Mechanic: Parry & Guard Stance
@@ -57,31 +57,31 @@ export const yutaConfig = {
   flurryParryMin: 5,                       // Minimum successful parries required to activate Flurry
   flurryParryMax: 5,                       // Maximum random target threshold for Flurry activation
   flurryHits: 7,                           // Number of rapid teleport slashes in Flurry execution
-  flurryDamage: 15,                         // Damage per slash during Flurry
+  flurryDamage: 4,                         // Damage per slash during Flurry
   flurryHitInterval: 7,                    // Frames delay between each Flurry slash
 
   // Copied Techniques (Ranged Skill Cycle)
   cursedSpeechRadius: 150,                 // Impact shockwave radius in pixels for "DON'T MOVE!"
   cursedSpeechFreezeTime: 45,              // Frames enemies are frozen in place (0.75 seconds)
-  thinIceBreakerDamage: 25,                // Damage dealt by Thin Ice Breaker spatial distortion
+  thinIceBreakerDamage: 5,                // Damage dealt by Thin Ice Breaker spatial distortion
   thinIceBreakerSpeed: 25,                 // Speed of Thin Ice Breaker projectile
   thinIceBreakerRange: 250,                // Effective range of Thin Ice Breaker spatial blast
   thinIceBreakerKnockback: 35,             // Extreme knockback blast force applied on Thin Ice Breaker hit
 
   // Summon Companion: Rika Orimoto
-  rikaMaxHp: 500,                          // Maximum health pool when summoned
+  rikaMaxHp: 100,                          // Maximum health pool when summoned
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
   rikaSummonHpThreshold: 0.70,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
   rikaRechargeHpRatio: 0.20,               // HP ratio in damage required to re-summon Rika (20% of max HP)
   rikaSummonChargeDuration: 30,            // Channeling/pause duration when Yuta calls Rika (frames)
   rikaAriseDuration: 45,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
   rikaDuration: 999999,                    // Rika stays active indefinitely as long as she is alive (HP > 0)
-  rikaSpeedMultiplier: 1.8,                // Movement speed multiplier relative to Yuta's base speed
-  rikaDamage: 20,                          // Physical damage dealt per attack tick by Rika
+  rikaSpeedMultiplier: 1.0,                // Movement speed multiplier relative to Yuta's base speed
+  rikaDamage: 6,                          // Physical damage dealt per attack tick by Rika
   rikaAttackRate: 30,                      // Frames between Rika's attacks (90 frames = 1.5s at 60fps)
 
   // Rika Full Emergence (#1) & Vengeful Death Dispersion (#8) Config Tuning
-  rikaEmergenceDamage: 25,                 // AOE damage dealt when Rika completes full emergence (#1)
+  rikaEmergenceDamage: 10,                 // AOE damage dealt when Rika completes full emergence (#1)
   rikaEmergenceRadius: 400,                // AOE blast radius in pixels for Full Emergence (#1)
   rikaEmergenceKnockback: 8,               // Outward radial knockback force on Full Emergence (#1)
   rikaEmergenceHitStun: 15,                // Hitstun duration (frames) applied by Full Emergence (#1)
@@ -97,27 +97,28 @@ export const yutaConfig = {
 
   // Ultimate Skill: Domain Expansion — Authentic Mutual Love
   domainCooldown: 0,                        // Domain is based on HP lost (no cooldown timer!)
-  domainHpThreshold: 0.60,                 // 1st Domain Expansion trigger threshold (80% HP)
+  domainHpThreshold: 0.20,                 // 1st Domain Expansion trigger threshold (60% HP)
   domain2HpDamageRequired: 0.75,           // 2nd Domain requirement: Yuta MUST take 20% max HP damage AFTER 1st domain ends!
   domainMaxUses: 2,                        // Max number of Domain Expansion activations per round (allows 2 uses)
-  domainChargeMax: 90,                     // Channeling duration before domain opens (1.5 seconds)
-  domainClashChargeSpeed: 2,               // 2x charge acceleration when clashing inside another domain (~45 frames / 0.75s deploy)
+  domainChargeMax: 50,                     // Fast snappy channeling duration before domain opens (~0.83s at 60fps)
+  domainClashChargeSpeed: 2,               // 2x charge acceleration when clashing inside another domain (~25 frames / 0.41s deploy)
   domainDuration: 800,                     // Frames domain stays active (~6.67 seconds at 60fps)
   domainRadius: 350,                       // Radius of the domain boundary in pixels
   domainCooldownReduction: 0.8,            // Technique cooldown reduction ratio inside domain (80% faster)
   domainRctHealRate: 0.90,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
-  domainRegenMultiplier: 2.0,              // Domain expansion baseline RCT regen multiplier (when Rika is absent)
-  domainRikaRegenMultiplier: 3.0,          // Total RCT regen multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
-  domainRikaDamageMultiplier: 3.0,         // Total damage dealt multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
+  domainRegenMultiplier: 0.2,              // Domain expansion baseline RCT regen multiplier (when Rika is absent)
+  domainRikaRegenMultiplier: 0.2,          // Total RCT regen multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
+  domainRikaDamageMultiplier: 0.2,         // Total damage dealt multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
   domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
 
   // Ultimate Skill: Pure Love Beam (Sacrificial Nuke)
-  pureLoveBeamHpThreshold: 0.60,           // HP ratio required to trigger beam (15%)
+  pureLoveBeamHpThreshold: 0.10,           // HP ratio required to trigger beam (15%)
   pureLoveBeamCooldown: 1200,              // Cooldown frames (20 seconds) before beam can be used again
-  pureLoveBeamChargeFrames: 150,            // Channeling duration before firing (1.5 seconds)
-  pureLoveBeamDuration: 280,               // Frames the beam stays active (3 seconds)
-  pureLoveBeamDamagePerTick: 10,           // Rapid multi-hit damage
+  pureLoveBeamChargeFrames: 120,            // Channeling duration before firing (1.5 seconds)
+  pureLoveBeamDuration: 350,               // Frames the beam stays active (3 seconds)
+  pureLoveBeamActiveDuration: 350,         // Alias matching pureLoveBeamDuration for skill and HUD consistency
+  pureLoveBeamDamagePerTick: 2,           // Rapid multi-hit damage
   pureLoveBeamWidth: 200,                  // Massive beam radius/width
   pureLoveBeamLength: 2500,                // Screen spanning length
   pureLoveBeamKnockback: 2,                // Outward push per tick
@@ -125,8 +126,8 @@ export const yutaConfig = {
   pureLoveBeamStunDuration: 120,           // Recovery stun duration frames after beam exposure
   pureLoveBeamShakeIntensity: 6,            // Arena shake intensity while beam is active (decays in final 30%)
   pureLoveBeamRegenDebuffDuration: 1500,      // Duration (600 frames = 10s) of reduced healing/regen after beam exposure
-  pureLoveBeamRegenDebuffMultiplier: 0.50,  // Healing received multiplier (0.25 = 75% reduction) during the debuff
-  pureLoveBeamDamageStackPerTick: 0.5,      // Permanent base damage increase for Yuta per beam hit tick
+  pureLoveBeamRegenDebuffMultiplier: 1.00,  // Healing received multiplier (0.25 = 75% reduction) during the debuff
+  pureLoveBeamDamageStackPerTick: 0.1,      // Permanent base damage increase for Yuta per beam hit tick
   pureLoveBeamLifestealPct: 0.5,            // Lifesteal percentage (0.1 = 10% of damage dealt) recovered as HP per beam hit tick
 
 
@@ -139,13 +140,14 @@ export const yutaConfig = {
 
   // Summon Companion: Rika Orimoto
   comeRikaSound: 'Assets/Sound Effects/Skills/comerika.mp3',
-  comeRikaVolume: 2.5,
+  comeRikaVolume: 0.0,
   comeRikaDelay: 0,
   comeRikaLeadTime: 90,                  // Frames before Rika emerges to play "Come, Rika!"
 
   rikaAppearanceSound: 'Assets/Sound Effects/Skills/rikaAppearance1.mp3',
   rikaAppearanceVolume: 2.5,
   rikaAppearanceDelay: 0,
+  rikaAppearanceChance: 0.55, // Probability (0.35 = 35%) of Rika playing emergence roar audio when she emerges
 
   rikaAttackSound: 'Assets/Sound Effects/Skills/backstab.mp3',
   rikaAttackVolume: 0.8,
@@ -159,12 +161,16 @@ export const yutaConfig = {
   rikaGroundTrembleVolume: 1.8,
   rikaGroundTrembleDelay: 0,
 
+  rikaDeathSound: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3', // Shatter sound played when Rika loses all HP and dispels
+  rikaDeathVolume: 0.0,
+  rikaDeathDelay: 0,
+
   rikaNoises: [
     'Assets/Sound Effects/Attacks/rikanoise1.mp3',
     'Assets/Sound Effects/Attacks/rikanoise2.mp3',
     'Assets/Sound Effects/Attacks/rikanoise3.mp3'
   ],
-  rikaNoiseVolume: 1.5,
+  rikaNoiseVolume: 0.80,
   rikaNoiseDelay: 0,
   rikaNoiseCooldown: 25,                 // Cooldown in frames between Rika attack roars
   rikaNoiseChance: 0.35,
@@ -176,7 +182,7 @@ export const yutaConfig = {
   thinIceBreakerMaxDuration: 1200, // Stop playback after 1000ms
 
   thinIceBreakerNoiseSound: 'Assets/Sound Effects/Skills/yuta-thin-ice-breaker-noise.mp3',
-  thinIceBreakerNoiseVolume: 1.5,
+  thinIceBreakerNoiseVolume: 0.0,
   thinIceBreakerNoiseDelay: 0,
   thinIceBreakerNoiseChance: 0.35,
   thinIceBreakerNoiseMaxDuration: 750, // Stop voice line after 750ms

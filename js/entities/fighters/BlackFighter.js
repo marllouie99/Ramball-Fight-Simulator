@@ -58,8 +58,7 @@ export class BlackFighter extends Fighter {
       this.aim(opponent);
 
       // Allow knockback and other velocity changes to move the fighter
-      this.x += this.vx;
-      this.y += this.vy;
+      this.applyMovementPhysics(0);
       this.resolveWallBounce(arena);
 
       // When charging completes, summon the black hole

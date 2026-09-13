@@ -26,6 +26,7 @@ import { clearDriveBys } from '../systems/cjDriveBySystem.js';
 import { clearFloatingJetpacks } from '../graphics/particles/cjFloatingJetpack.js';
 import { startArenaBgm, stopArenaBgm, ARENA_BGM_TRACKS, getSavedArenaBgmId } from '../systems/arenaBgmSystem.js';
 import { clearDroppedMiniguns } from '../graphics/particles/cjDroppedMinigun.js';
+import { clearDroppedMahoragaWheels } from '../graphics/particles/mahoragaDroppedWheel.js';
 import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
 import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
@@ -192,6 +193,7 @@ export function reinitFighters(isNewMatch = false) {
   clearDriveBys();
   clearFloatingJetpacks();
   clearDroppedMiniguns();
+  clearDroppedMahoragaWheels();
   clearCarExplosions();
   clearBamEffects();
   clearHybridProjectiles();
@@ -883,6 +885,7 @@ export function startNextRound() {
   clearDriveBys();
   clearFloatingJetpacks();
   clearDroppedMiniguns();
+  clearDroppedMahoragaWheels();
   clearCarExplosions();
   clearBamEffects();
   clearHybridProjectiles();
@@ -919,6 +922,7 @@ export function restartCurrentRound() {
   clearDriveBys();
   clearFloatingJetpacks();
   clearDroppedMiniguns();
+  clearDroppedMahoragaWheels();
   clearCarExplosions();
   clearBamEffects();
   clearHybridProjectiles();
@@ -1046,6 +1050,7 @@ export function resetMatch(showFaceOff = true) {
   clearDriveBys(); // Clear all Grove Street drive-by vehicles and effects
   clearFloatingJetpacks();
   clearDroppedMiniguns();
+  clearDroppedMahoragaWheels();
   clearCarExplosions();
   clearBamEffects();
   clearHybridProjectiles();
@@ -1078,6 +1083,7 @@ export function goToTitle() {
   clearDriveBys();
   clearFloatingJetpacks();
   clearDroppedMiniguns();
+  clearDroppedMahoragaWheels();
   clearCarExplosions();
   clearBamEffects();
   clearHybridProjectiles();

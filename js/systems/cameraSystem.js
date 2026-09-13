@@ -25,10 +25,10 @@ export function initCameraState() {
     targetZoom: 1.0,
     shakeX: 0,
     shakeY: 0,
-    smoothing: 0.09,
-    zoomSmoothing: 0.07,
-    minZoom: 1.0,
-    maxZoom: 1.15,
+    smoothing: CONFIG.camera?.smoothing ?? 0.08,
+    zoomSmoothing: CONFIG.camera?.zoomSmoothing ?? 0.05,
+    minZoom: CONFIG.camera?.minZoom ?? 1.0,
+    maxZoom: CONFIG.camera?.maxZoom ?? 1.04,
     toastText: '',
     toastTimer: 0
   };
@@ -171,20 +171,21 @@ export function updateCamera() {
       const dist = Math.hypot(spanX, spanY);
 
       // Distance-to-zoom mapping (Smooth Hermite / Smoothstep)
-      // Closer than 100px: subtle & cinematic maxZoom (1.15x) without over-zooming
-      // Farther than 360px: standard arena minZoom (1.0x)
-      const minD = 100;
-      const maxD = 360;
+      // Gentle, wide zoom range (1.0x to 1.04x max) keeping full arena in view
+      const camCfg = CONFIG.camera || {};
+      const minD = camCfg.minDist ?? 80;
+      const maxD = camCfg.maxDist ?? 420;
       const normDist = Math.max(0, Math.min(1, (dist - minD) / (maxD - minD)));
       const smoothT = normDist * normDist * (3 - 2 * normDist);
-      const minZ = camera.minZoom ?? 1.0;
-      const maxZ = camera.maxZoom ?? 1.15;
+      const minZ = camera.minZoom ?? camCfg.minZoom ?? 1.0;
+      const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.04;
       camera.targetZoom = maxZ - smoothT * (maxZ - minZ);
 
       // Soft clamp target position relative to arena center
-      // Keeps the arena well-framed on mobile screen (max offset ~35% of arena size)
-      const maxPanX = (arena.width / 2) * 0.35;
-      const maxPanY = (arena.height / 2) * 0.35;
+      // Keeps the arena well-framed on mobile screen (max offset ~18% of arena size)
+      const maxPanRatio = camCfg.maxPanRatio ?? 0.18;
+      const maxPanX = (arena.width / 2) * maxPanRatio;
+      const maxPanY = (arena.height / 2) * maxPanRatio;
       const relX = midX - arenaCenterX;
       const relY = midY - arenaCenterY;
 
@@ -193,15 +194,17 @@ export function updateCamera() {
 
     } else if (aliveFighters.length === 1) {
       // Winner focus during victory or solo stance
+      const camCfg = CONFIG.camera || {};
       const winner = aliveFighters[0];
-      const maxPanX = (arena.width / 2) * 0.35;
-      const maxPanY = (arena.height / 2) * 0.35;
+      const maxPanRatio = camCfg.maxPanRatio ?? 0.18;
+      const maxPanX = (arena.width / 2) * maxPanRatio;
+      const maxPanY = (arena.height / 2) * maxPanRatio;
       const relX = winner.x - arenaCenterX;
       const relY = winner.y - arenaCenterY;
 
       camera.targetX = arenaCenterX + Math.max(-maxPanX, Math.min(maxPanX, relX));
       camera.targetY = arenaCenterY + Math.max(-maxPanY, Math.min(maxPanY, relY));
-      camera.targetZoom = 1.08;
+      camera.targetZoom = camCfg.winnerZoom ?? 1.02;
     } else {
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;

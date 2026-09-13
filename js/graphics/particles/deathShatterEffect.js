@@ -18,16 +18,19 @@ export function spawnDeathShatter(fighter) {
   
   // OPTIMIZED: Reduce shard count based on quality level
   const baseShardCount = isMulti ? 8 : 14;
-  const shardCount = Math.max(4, Math.floor(baseShardCount * qualityMultiplier));
-  const baseSpeed = 4.5;    // Outward explosive velocity
   const isYuta = fighter.characterId === 'yuta' || fighter.type === 'yuta';
+  const isRika = Boolean(fighter.isRika || fighter.type === 'rika' || fighter.characterId === 'rika');
+  const shardCount = isRika ? Math.max(12, Math.floor(20 * qualityMultiplier)) : Math.max(4, Math.floor(baseShardCount * qualityMultiplier));
+  const baseSpeed = isRika ? 5.5 : 4.5;    // Outward explosive velocity
   let primaryColor = fighter.color || '#ff4444';
-  if (isYuta) {
+  if (isRika) {
+    primaryColor = '#FFFFFF';
+  } else if (isYuta) {
     primaryColor = '#FFFFFF';
   } else if (primaryColor === '#ffffff' || primaryColor === '#fff' || primaryColor === '#FFFFFF') {
     primaryColor = fighter.secondaryColor || '#64748b';
   }
-  const secondaryColor = isYuta ? '#1E293B' : (fighter.secondaryColor || '#881337');
+  const secondaryColor = isRika ? '#FF1493' : (isYuta ? '#1E293B' : (fighter.secondaryColor || '#881337'));
   
   for (let i = 0; i < shardCount; i++) {
     // If we reached the global limit, remove the oldest death effect using swap-and-pop
@@ -41,9 +44,12 @@ export function spawnDeathShatter(fighter) {
     const speed = baseSpeed + Math.random() * 4.0;
     
     // Random size for each shard
-    const size = fighter.r * (0.18 + Math.random() * 0.28);
+    const size = (fighter.r || 30) * (0.18 + Math.random() * 0.28);
     let shardColor;
-    if (isYuta) {
+    if (isRika) {
+      const roll = i % 4;
+      shardColor = (roll === 0) ? '#FFFFFF' : ((roll === 1) ? '#E4E0EC' : ((roll === 2) ? '#FF1493' : '#111114'));
+    } else if (isYuta) {
       const roll = i % 3;
       shardColor = (roll === 0) ? '#FFFFFF' : ((roll === 1) ? '#1E293B' : '#FF1493');
     } else {

@@ -918,6 +918,10 @@ export function updateHybridEnvironment() {
     rikaCy = yutaFighter.y;
     if (yutaFighter.isChannelingPureLoveBeam || yutaFighter.isFiringPureLoveBeam) {
       targetRikaOpacity = 0.95; // Deep pitch dark black dim during Pure Love Beam
+    } else if (yutaFighter.isChannelingDomain) {
+      const chargeMax = yutaFighter.domainChargeMax || 50;
+      const progress = Math.min(1.0, (yutaFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
+      targetRikaOpacity = 0.35 + progress * 0.40;
     } else if (yutaFighter.rikaCallTimer > 0) {
       const maxCharge = CONFIG.yuta?.rikaSummonChargeDuration || 30;
       const progress = 1.0 - (yutaFighter.rikaCallTimer / maxCharge);

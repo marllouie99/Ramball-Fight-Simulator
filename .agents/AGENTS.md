@@ -11,6 +11,31 @@
   }
   ```
 - NEVER allow movement, AI steering, or melee combat logic (`_updateMeleeCombat`) to execute after a freeze/stun check evaluates to true.
+- Base `this._handleTimeStop()` universally evaluates all global CCs (time stops, Infinity freeze, domain stasis, paralyze debuffs, ambush target, Makima chains, Saitama counter, Genos flurries, Getsuga drag, Cronos stasis, Nanami ratio pause). Subclasses do NOT need compound boolean checks.
+
+## 1.1 Centralized Movement & Physics Standard for Upcoming Fighters
+- Upcoming fighters MUST NOT manually integrate position using `this.x += this.vx; this.y += this.vy;`.
+- At the end of `update()`, upcoming fighters MUST either:
+  1. Call `super.update(opponent, ownerIndex, arena)` (recommended for standard mobile fighters), OR
+  2. Call `this.applyMovementPhysics(speedMultiplier)` followed by `this.resolveWallBounce(arena, opponent)` if executing custom sub-actions.
+- This ensures all upcoming fighters automatically inherit:
+  - Universal slow debuffs (`applySlow(duration, multiplier)`)
+  - Hit-stun velocity dampening (`applyHitStun(duration)`)
+  - Knockback physics and smooth decay
+  - Fail-safe movement stall detection & unsticking
+  - Arena wall clamping and stasis pinning (beam / Getsuga / wall pin)
+  - Rotational body spin integration
+
+## 1.2 Custom Wall Bounce Delegation Standard
+- If an upcoming fighter implements a custom `resolveWallBounce(arena, opponent)` method (e.g. for unique bounces, flight, or targeting), they MUST guard against beam/stasis at the top:
+  ```javascript
+  resolveWallBounce(arena, opponent) {
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+      return super.resolveWallBounce(arena, opponent);
+    }
+    // Custom bounce behavior...
+  }
+  ```
 
 ## 2. Animation & Visual State Separation
 - **Melee Punches (`punchAnimTimer`)**: Used ONLY for close-quarters 2-handed martial arts punches. Keep both hands visible (`hideFrontHand = false`, `hideBackHand = false`).

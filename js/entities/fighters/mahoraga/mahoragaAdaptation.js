@@ -72,6 +72,21 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   } else if (opts.isMachineGunBlow || opts.isGenosMachineBlow || opts.isGenosFlurry) {
     skillShotId = 'genosMachineBlow';
     skillShotColor = '#FF5500';
+  } else if (opts.isPureLoveBeam || opts.isLoveBeam || (opts.projectile && opts.projectile.isPureLoveBeam)) {
+    skillShotId = 'pureLoveBeam';
+    skillShotColor = '#FF1493';
+  } else if (opts.isThinIceBreaker || opts.isThinIce) {
+    skillShotId = 'thinIceBreaker';
+    skillShotColor = '#00FFFF';
+  } else if (opts.isYutaFlurry) {
+    skillShotId = 'yutaFlurry';
+    skillShotColor = '#FFD700';
+  } else if (opts.isSaitamaCounter || (opts.isCounter && attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama'))) {
+    skillShotId = 'saitamaCounter';
+    skillShotColor = '#FF3300';
+  } else if (opts.isSoulDisfigurement) {
+    skillShotId = 'soulDisfigurement';
+    skillShotColor = '#C026D3';
   }
 
   let finalAmount = amount;
@@ -94,12 +109,13 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
         fighter.getsugaExposureCount = (fighter.getsugaExposureCount || 0) + 1;
 
         if (fighter.getsugaExposureCount >= 2) {
-          // 2nd Getsuga hit: queue adaptation to trigger wheel click after the duration of this Getsuga is done!
-          fighter.pendingGetsugaAdaptation = true;
-          fighter.pendingGetsugaAttacker = attacker;
-          fighter.pendingGetsugaProj = opts.projectile || null;
+          fighter.adaptedGetsuga = true;
+          if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
+          fighter.adaptedSkills['getsugaTensho'] = true;
+          fighter.adaptedSkills['getsuga'] = true;
           fighter._lastSkillShotId = 'getsugaTensho';
           fighter._lastSkillShotColor = '#FF1E00';
+          triggerAdaptation(fighter, 'skill', attacker);
         }
       }
     }
@@ -269,16 +285,31 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     }
 
     // ── FATAL DAMAGE THRESHOLD EVALUATION ──
-    // The Wheel of Adaptation ONLY clicks when accumulated damage fills the WOA skill bar (meets or exceeds fatalDamageThresholdPct)
-    if (!opts.isPureLoveBeam) {
-      const threshold = fighter.maxHp * thresholdPct;
-      if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
-        triggerAdaptation(fighter, type, attacker);
+    // The Wheel of Adaptation clicks IMMEDIATELY as soon as accumulated damage meets or exceeds fatalDamageThresholdPct!
+    const threshold = fighter.maxHp * thresholdPct;
+    let pendingAdaptation = null;
+    if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
+      pendingAdaptation = {
+        type,
+        attacker,
+        isPureLoveBeam: Boolean(isPureLoveBeamHit && !fighter.adaptedPureLoveBeam),
+        isSaitamaCounter: Boolean(isSaitamaCounterHit && !fighter.adaptedSaitamaCounter)
+      };
+      if (!fighter._inMahoragaTakeDamage) {
+        if (pendingAdaptation.isPureLoveBeam) {
+          adaptToPureLoveBeam(fighter);
+        } else if (pendingAdaptation.isSaitamaCounter) {
+          adaptToSaitamaCounter(fighter, attacker);
+        } else {
+          triggerAdaptation(fighter, type, attacker);
+        }
       }
     }
+
+    return { finalAmount, type, pendingAdaptation };
   }
 
-  return { finalAmount, type };
+  return { finalAmount, type, pendingAdaptation: null };
 }
 
 /**
@@ -287,12 +318,13 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
  * freezes enemies, heals via RCT, and checks for Level 8 awakening.
  */
 export function triggerAdaptation(fighter, type, attacker) {
-  // Block any general adaptation wheel clicks while caught in beam paralysis
-  const isCaughtInBeam = fighter.caughtInPureLoveBeam || 
-                         (fighter.pureLoveBeamTimer || 0) > 0 || 
-                         (fighter.pureLoveBeamRecoveryTimer || 0) > 0;
-  if (isCaughtInBeam) {
-    return;
+  // If caught in Pure Love Beam or beam stasis, unfreeze immediately upon adaptation click!
+  if (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0) {
+    fighter.caughtInPureLoveBeam = false;
+    fighter.pureLoveBeamTimer = 0;
+    fighter.pureLoveBeamRecoveryTimer = 0;
+    fighter.hitStunTimer = 0;
+    fighter.knockbackStunTimer = 0;
   }
 
   // Strictly enforce WOA fatalDamageThresholdPct (15% max HP): Do NOT click wheel unless accumulated damage filled WOA bar!
@@ -302,6 +334,9 @@ export function triggerAdaptation(fighter, type, attacker) {
   const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
 
   if (!isInfinityAdaptation && !isDomainAdaptation && (fighter.totalAccumDamage || 0) < threshold) {
+    return;
+  }
+  if (!isInfinityAdaptation && !isDomainAdaptation && (fighter.fatalAdaptCooldown || 0) > 0) {
     return;
   }
 
@@ -715,6 +750,47 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   } else if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: GETSUGA TENSHO!', color || '#FF1E32');
     spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Damage Reduction & Paralyze Immune!', '#FFFFFF');
+  } else if (skillShotId === 'pureLoveBeam') {
+    fighter.adaptedPureLoveBeam = true;
+    fighter.caughtInPureLoveBeam = false;
+    fighter.pureLoveBeamTimer = 0;
+    fighter.pureLoveBeamRecoveryTimer = 0;
+    fighter.hitStunTimer = 0;
+    fighter.knockbackStunTimer = 0;
+    if (!fighter.adapted) fighter.adapted = {};
+    fighter.adapted.skill = true;
+    fighter.skillDodgeReady['pureLoveBeam'] = false;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: PURE LOVE BEAM!', color || '#FF1493');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Beam Damage Reduction & Stun Immune!', '#FFFFFF');
+  } else if (skillShotId === 'saitamaCounter') {
+    fighter.adaptedSaitamaCounter = true;
+    if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
+    fighter.adaptedSkills['saitamaCounter'] = true;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: SERIOUS COUNTER!', color || '#FF3300');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Adapted to Saitama\'s Serious Strike!', '#FFFFFF');
+  } else if (skillShotId === 'thinIceBreaker') {
+    fighter.adaptedThinIceBreaker = true;
+    if (!fighter.adapted) fighter.adapted = {};
+    fighter.adapted.skill = true;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: THIN ICE BREAKER!', color || '#00FFFF');
+  } else if (skillShotId === 'yutaFlurry') {
+    fighter.adaptedYutaFlurry = true;
+    if (!fighter.adapted) fighter.adapted = {};
+    fighter.adapted.melee = true;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: YUTA FLURRY!', color || '#FFD700');
+  } else if (skillShotId === 'soulDisfigurement') {
+    fighter.adaptedSoulDisfigurement = true;
+    fighter._soulDisfigurementStacks = 0;
+    fighter._soulDisfigurementTimer = 0;
+    fighter.isParalyzedByMahito = false;
+    fighter.paralyzeTimer = 0;
+    fighter.hitStunTimer = 0;
+    if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
+    fighter.adaptedSkills['soulDisfigurement'] = true;
+    if (!fighter.adapted) fighter.adapted = {};
+    fighter.adapted.skill = true;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: SOUL DISFIGUREMENT!', color || '#C026D3');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Immune to Soul Disfigurement debuffs!', '#FFFFFF');
   } else {
     const displayName = skillShotId.toUpperCase().replace('_', ' ');
     spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} DODGE!`, color);
@@ -738,6 +814,7 @@ export function adaptToPureLoveBeam(fighter) {
 
   const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
   if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+  if ((fighter.fatalAdaptCooldown || 0) > 0) return;
 
   fighter.adaptedPureLoveBeam = true;
   fighter.caughtInPureLoveBeam = false;
@@ -781,6 +858,11 @@ export function adaptToPureLoveBeam(fighter) {
 
   playSkillEffectSound('mahoraga', 'wheelclick');
   triggerGlobalScreenShake(6, 18);
+
+  // Global Cooldown and Accumulation Resets
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.totalAccumDamage = 0;
+  fighter.accumTimer = 0;
 
   const wheelY = fighter.y - fighter.r - 28;
 
@@ -843,6 +925,7 @@ export function adaptToYutaFlurry(fighter) {
 
   const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
   if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+  if ((fighter.fatalAdaptCooldown || 0) > 0) return;
 
   fighter.adaptedYutaFlurry = true;
   if (!fighter.adapted) fighter.adapted = {};
@@ -882,6 +965,11 @@ export function adaptToYutaFlurry(fighter) {
   playSkillEffectSound('mahoraga', 'wheelclick');
   triggerGlobalScreenShake(6, 18);
 
+  // Global Cooldown and Accumulation Resets
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.totalAccumDamage = 0;
+  fighter.accumTimer = 0;
+
   const wheelY = fighter.y - fighter.r - 28;
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
@@ -901,6 +989,7 @@ export function adaptToThinIceBreaker(fighter) {
 
   const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
   if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+  if ((fighter.fatalAdaptCooldown || 0) > 0) return;
 
   fighter.adaptedThinIceBreaker = true;
   if (!fighter.adapted) fighter.adapted = {};
@@ -940,6 +1029,11 @@ export function adaptToThinIceBreaker(fighter) {
   playSkillEffectSound('mahoraga', 'wheelclick');
   triggerGlobalScreenShake(6, 18);
 
+  // Global Cooldown and Accumulation Resets
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.totalAccumDamage = 0;
+  fighter.accumTimer = 0;
+
   const wheelY = fighter.y - fighter.r - 28;
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
@@ -959,6 +1053,7 @@ export function adaptToSoulDisfigurement(fighter) {
 
   const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
   if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+  if ((fighter.fatalAdaptCooldown || 0) > 0) return;
 
   fighter.adaptedSoulDisfigurement = true;
   fighter._soulDisfigurementStacks = 0;
@@ -1004,6 +1099,11 @@ export function adaptToSoulDisfigurement(fighter) {
   playSkillEffectSound('mahoraga', 'wheelclick');
   triggerGlobalScreenShake(6, 18);
 
+  // Global Cooldown and Accumulation Resets
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.totalAccumDamage = 0;
+  fighter.accumTimer = 0;
+
   const wheelY = fighter.y - fighter.r - 28;
   spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: SOUL DISFIGUREMENT!', adaptColor);
   spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Immune to Soul Disfigurement debuffs!', '#FFFFFF');
@@ -1021,11 +1121,17 @@ export function adaptToSoulDisfigurement(fighter) {
  * - Wheel sphere glows fiery crimson red (#FF3300).
  */
 export function adaptToSaitamaCounter(fighter, attacker) {
-  if (!fighter || fighter.hp <= 0 || fighter.isDead) return;
+  if (!fighter) return;
   if (fighter.adaptedSaitamaCounter) return; // Already adapted
 
   const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
   if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
+  if ((fighter.fatalAdaptCooldown || 0) > 0) return;
+
+  fighter.dead = false;
+  fighter.isDead = false;
+  fighter._hasDied = false;
+  if (fighter.hp <= 0) fighter._hp = 1;
 
   fighter.adaptedSaitamaCounter = true;
   if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
@@ -1068,6 +1174,11 @@ export function adaptToSaitamaCounter(fighter, attacker) {
   playSkillEffectSound('mahoraga', 'wheelclick');
   triggerGlobalScreenShake(6, 18);
 
+  // Global Cooldown and Accumulation Resets
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.totalAccumDamage = 0;
+  fighter.accumTimer = 0;
+
   const wheelY = fighter.y - fighter.r - 28;
   spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: SERIOUS COUNTER!', adaptColor);
   spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Adapted to Saitama\'s Serious Strike!', '#FFFFFF');
@@ -1078,19 +1189,44 @@ export function adaptToSaitamaCounter(fighter, attacker) {
   applyRCTHeal(fighter);
 }
 
-function applyRCTHeal(fighter) {
+export function applyRCTHeal(fighter) {
   const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
-  if (enableRCT && fighter.hp > 0 && !fighter.isDead) {
-    const flatHeal = CONFIG.mahoraga?.rctHealFlatAmount ?? 100;
-    const healAmount = Math.max(1, Math.round(flatHeal));
-    fighter.takeDamage(-healAmount, fighter, { isHeal: true });
+  if (!enableRCT || !fighter) return;
 
-    fighter._healthBarHealTimer = 14;
-    spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
-    spawnSparks(fighter.x, fighter.y, 30, 'arcane');
-    spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
-    const enhSnd = CONFIG.mahoraga?.sounds?.wheelEnhance || 'skill_enhance';
-    const enhVol = CONFIG.mahoraga?.soundVolumes?.wheelEnhance ?? 0.85;
-    audioSystem.playSFX(enhSnd, enhVol);
+  fighter.dead = false;
+  fighter.isDead = false;
+  fighter._hasDied = false;
+  if (fighter.hp <= 0) {
+    fighter._hp = 1;
   }
+  const maxHp = fighter.maxHp || 100;
+  let healAmount = 0;
+  if (CONFIG.mahoraga?.rctHealPercent !== undefined) {
+    const pct = Number(CONFIG.mahoraga.rctHealPercent);
+    healAmount = pct > 1.0 ? (maxHp * (pct / 100)) : (maxHp * pct);
+  } else if (CONFIG.mahoraga?.rctHealPerClickPercent !== undefined) {
+    const pct = Number(CONFIG.mahoraga.rctHealPerClickPercent);
+    healAmount = pct > 1.0 ? (maxHp * (pct / 100)) : (maxHp * pct);
+  } else if (CONFIG.mahoraga?.rctHealPct !== undefined) {
+    const pct = Number(CONFIG.mahoraga.rctHealPct);
+    healAmount = pct > 1.0 ? (maxHp * (pct / 100)) : (maxHp * pct);
+  } else if (CONFIG.mahoraga?.rctHealFlatAmount !== undefined) {
+    const val = Number(CONFIG.mahoraga.rctHealFlatAmount);
+    healAmount = (val <= 1.0 && val > 0) ? (maxHp * val) : val;
+  } else {
+    healAmount = maxHp * 0.15;
+  }
+  healAmount = Math.max(1, Math.round(healAmount));
+
+  fighter._bypassHealDebuff = true;
+  fighter.takeDamage(-healAmount, fighter, { isHeal: true, bypassRegenDebuff: true });
+  fighter._bypassHealDebuff = false;
+
+  fighter._healthBarHealTimer = 14;
+  spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
+  spawnSparks(fighter.x, fighter.y, 30, 'arcane');
+  spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
+  const enhSnd = CONFIG.mahoraga?.sounds?.wheelEnhance || 'skill_enhance';
+  const enhVol = CONFIG.mahoraga?.soundVolumes?.wheelEnhance ?? 0.85;
+  audioSystem.playSFX(enhSnd, enhVol);
 }

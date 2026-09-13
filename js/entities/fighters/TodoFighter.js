@@ -177,16 +177,12 @@ export class TodoFighter extends Fighter {
 
     // TimeStop & Freeze Guards (Rule 1)
     const isFrozen = this._handleTimeStop();
-    const isBeamTrapped = (
-      this.caughtInPureLoveBeam ||
-      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0)
-    );
 
     const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
     );
 
-    if (isFrozen || this.isTargetOfAmbush || this.isParalyzed || isBeamTrapped) {
+    if (isFrozen || this.isTargetOfAmbush || this.isParalyzed) {
       if (typeof this._handleFrozenSkillCooldowns === 'function') {
         this._handleFrozenSkillCooldowns();
       }
@@ -473,9 +469,23 @@ export class TodoFighter extends Fighter {
 
   interruptAttacks(forceCancelAll = false) {
     const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
-    if (forceCancelAll || (!isMatchEnded && (this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush))) {
+    const wasChannelingTakada = this.isTakadaChanneling;
+    const currentTakadaTimer = this.takadaChannelTimer;
+    const isFrozen = (typeof this.isFrozen === 'function') ? this.isFrozen() : Boolean(this.timeStopTimer > 0 || this.paralyzeTimer > 0);
+    
+    super.interruptAttacks(forceCancelAll);
+
+    const shouldCancelTakada = forceCancelAll || (!isMatchEnded && (this.hp <= 0 || isFrozen || this.isTargetOfAmbush || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0)));
+
+    if (shouldCancelTakada) {
       this.punchAnimTimer = 0;
+      this.isTakadaChanneling = false;
+      this.takadaChannelTimer = 0;
+    } else if (wasChannelingTakada) {
+      this.isTakadaChanneling = true;
+      this.takadaChannelTimer = currentTakadaTimer;
     }
+
     this.clapAnimTimer = 0;
     this.clapWindupTimer = 0;
     this.clapHoldTimer = 0;

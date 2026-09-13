@@ -1154,17 +1154,9 @@ export class UryuFighter extends Fighter {
     const isParalyzed = typeof this.isParalyzedDebuffActive === 'function'
       ? this.isParalyzedDebuffActive()
       : Boolean((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.electricStunTimer && this.electricStunTimer > 0));
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || this.caughtInGenosFlurry || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || this.caughtInGenosFlurry || this.preventKnockbackBounce || this.isDraggedByGetsuga;
     if (isParalyzed || this.isTargetOfAmbush || this.isFrozen || isBeamTrapped) {
-      if (isBeamTrapped && arena) {
-        this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
-        this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
-        this.vx = 0;
-        this.vy = 0;
-        this.knockbackVx = 0;
-        this.knockbackVy = 0;
-      }
-      return false;
+      return super.resolveWallBounce(arena, opponent);
     }
     let bounced = false;
 

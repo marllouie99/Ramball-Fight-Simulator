@@ -52,7 +52,7 @@ export const gojoConfig = {
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
-  redCooldown: 1000,         // Cooldown of Red (frames)
+  redCooldown: 2000,         // Cooldown of Red (frames)
   redDamage: 100,           // Base damage dealt by Reversal Red blast
   redKnockback: 10,         // Supersonic knockback force of Red
   redRange: 650,            // Base range
@@ -73,7 +73,7 @@ export const gojoConfig = {
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
-  purpleCooldown: 2000,      // Cooldown of Hollow Purple
+  purpleCooldown: 4000,      // Cooldown of Hollow Purple
   purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
   purpleDamage: 15,         // Continuous piercing damage per tick
@@ -106,7 +106,7 @@ export const gojoConfig = {
   purpleSecondCastTextHeader200: 'PURPLE 200%',     // Skill HUD bar label for 200% cast
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
-  domainCooldown: 3000,     // 20s Ultimate cooldown
+  domainCooldown: 5000,     // 20s Ultimate cooldown
   domainChargeMax: 100,     // 2s Channeling duration before domain opens
   domainDuration: 400,      // Domain lasts ~6.6 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
@@ -130,7 +130,7 @@ export const gojoConfig = {
   initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
   meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
   comboDisengageDistance: 0,      // Distance (pixels) teleported away when disengaging after clash
-  meleePunchDamage: 3,             // Damage dealt per martial arts punch strike
+  meleePunchDamage: 2,             // Damage dealt per martial arts punch strike
   meleePunchCooldown: 16,           // Frames between consecutive punches (~0.16s at 60fps)
   meleePunchAnimDuration: 15,       // Punch extension and retraction animation frame duration
   teleportSpeed: 15,                // Teleport movement slide speed

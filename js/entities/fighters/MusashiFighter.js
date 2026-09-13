@@ -559,8 +559,8 @@ export class MusashiFighter extends Fighter {
   }
 
   resolveWallBounce(arena, opponent) {
-    if (!opponent || opponent.isDead) {
-      super.resolveWallBounce(arena);
+    if (!opponent || opponent.isDead || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+      super.resolveWallBounce(arena, opponent);
       return;
     }
 

@@ -212,13 +212,7 @@ export class NormalFighter extends Fighter {
       }
     }
 
-    this.x += this.vx * moveMultiplier;
-    this.y += this.vy * moveMultiplier;
-    
-    if (!this.isSniper) {
-      // Normal spinning behavior
-      this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate) * spinMultiplier;
-    }
+    this.applyMovementPhysics(moveMultiplier);
 
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);

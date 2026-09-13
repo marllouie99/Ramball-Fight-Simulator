@@ -116,6 +116,9 @@ export class OrangeFighter extends Fighter {
   }
 
   resolveWallBounce(arena, opponent = null) {
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+      return super.resolveWallBounce(arena, opponent);
+    }
     // Find nearest active fuel pickup
     let nearestPickup = null;
     let nearestPickupDist = Infinity;

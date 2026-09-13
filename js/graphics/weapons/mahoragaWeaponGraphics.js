@@ -138,6 +138,68 @@ function _renderSphereHaloBuffer(sphereRadius, haloR, colorLightRgb, colorRgb) {
   return { canvas, center };
 }
 
+function _drawPixelLine(ctx, x0, y0, x1, y1, color, thickness = 2) {
+  if (!color) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = thickness;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function _drawPixelEllipse(ctx, cx, cy, rx, ry, strokeColor, fillColor) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, rx, 0, Math.PI * 2);
+  if (fillColor) {
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+  }
+  if (strokeColor) {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+  }
+}
+
+function _fillPixelCircle(ctx, cx, cy, radius, layers) {
+  if (!layers) return;
+  if (layers.border) {
+    const bWidth = (layers.borderWidth !== undefined) ? layers.borderWidth : 0.45;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius + bWidth, 0, Math.PI * 2);
+    ctx.fillStyle = layers.border;
+    ctx.fill();
+  }
+  if (layers.outer) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = layers.outer;
+    ctx.fill();
+  }
+  if (layers.mid) {
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.15, radius * 0.75, 0, Math.PI * 2);
+    ctx.fillStyle = layers.mid;
+    ctx.fill();
+  }
+  if (layers.inner) {
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.35, radius * 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = layers.inner;
+    ctx.fill();
+  }
+  if (layers.glint) {
+    ctx.beginPath();
+    ctx.arc(cx - radius * 0.25, cy - radius * 0.35, radius * 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = layers.glint;
+    ctx.fill();
+  }
+}
+
 export const MAHORAGA_WEAPON_GRAPHICS = {
   wheel: {
     scaleX: 1.25,
@@ -280,6 +342,10 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.restore(); // Restore root canvas context
   }
 
+  if (fighter.isDead || fighter.dead || fighter._wheelDropped) {
+    return;
+  }
+
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
@@ -293,22 +359,36 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   
   ctx.translate(0, wheelOffset);
 
-  const scaleX = MAHORAGA_WEAPON_GRAPHICS.wheel.scaleX;
-  const scaleY = MAHORAGA_WEAPON_GRAPHICS.wheel.scaleY;
-  const wheelRadius = MAHORAGA_WEAPON_GRAPHICS.wheel.wheelRadius;
-  const spokeRadius = MAHORAGA_WEAPON_GRAPHICS.wheel.spokeRadius;
-  const sphereRadius = MAHORAGA_WEAPON_GRAPHICS.wheel.sphereRadius;
-  const depthOffset = MAHORAGA_WEAPON_GRAPHICS.wheel.depthOffset;
+  drawMahoragaDharmaWheelCore(ctx, fighter);
+
+  ctx.restore(); // Restore from wheel translation
+}
+
+/**
+ * Draws the 3D Dharma Wheel of Adaptation core model (shared between living fighter and dropped physical entity).
+ * @param {CanvasRenderingContext2D} ctx Main 2D Canvas context
+ * @param {object} wheelData Object containing wheel rotation, scale, glow, and adaptation history
+ */
+export function drawMahoragaDharmaWheelCore(ctx, wheelData) {
+  if (!wheelData) return;
+
+  const scaleX = wheelData.scaleX || MAHORAGA_WEAPON_GRAPHICS.wheel.scaleX;
+  const scaleY = wheelData.scaleY || MAHORAGA_WEAPON_GRAPHICS.wheel.scaleY;
+  const wheelRadius = wheelData.wheelRadius || MAHORAGA_WEAPON_GRAPHICS.wheel.wheelRadius;
+  const spokeRadius = wheelData.spokeRadius || MAHORAGA_WEAPON_GRAPHICS.wheel.spokeRadius;
+  const sphereRadius = wheelData.sphereRadius || MAHORAGA_WEAPON_GRAPHICS.wheel.sphereRadius;
+  const depthOffset = wheelData.depthOffset || MAHORAGA_WEAPON_GRAPHICS.wheel.depthOffset;
+  const wheelRotation = wheelData.wheelRotation || 0;
 
   // Glow Effect when actively adapting (click timer) or when FULLY adapted (8 stages / max adapted)
-  const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
-  const isFullyAdapted = totalStages >= 8 || fighter.isMaxAdapted;
-  const isGlowing = (fighter.wheelGlowTimer > 0) || isFullyAdapted;
+  const totalStages = (wheelData.adaptationStage?.melee || 0) + (wheelData.adaptationStage?.ranged || 0) + (wheelData.adaptationStage?.skill || 0);
+  const isFullyAdapted = totalStages >= 8 || wheelData.isMaxAdapted;
+  const isGlowing = (wheelData.wheelGlowTimer > 0) || isFullyAdapted;
   if (isGlowing) {
     ctx.save();
     ctx.scale(scaleX, scaleY);
-    const glowAlpha = fighter.wheelGlowTimer > 0 ? Math.min(1.0, fighter.wheelGlowTimer / 45) : 0.45;
-    const glowColor = fighter.wheelGlowColor || '#FFD700';
+    const glowAlpha = (wheelData.wheelGlowTimer || 0) > 0 ? Math.min(1.0, wheelData.wheelGlowTimer / 45) : 0.45;
+    const glowColor = wheelData.wheelGlowColor || '#FFD700';
     const glowR = spokeRadius + 12;
 
     // Cache wheel glow stamp buffer
@@ -327,18 +407,18 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.restore();
   }
 
-  const isGojoDomainActive = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
+  const isGojoDomainActive = wheelData.isGojoDomainActive || (!wheelData.gojoDomainAdapted && !wheelData.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
-  );
+  ));
 
   // ----------------------------------------------------
   // RECOGNIZABLE ROTATION VISUAL EFFECT (PIXEL ART DIVINE SHOCKWAVE HALO & SUNBURST RAYS)
   // ----------------------------------------------------
-  if (fighter.wheelClickTimer > 0 && !isGojoDomainActive) {
+  if ((wheelData.wheelClickTimer || 0) > 0 && !isGojoDomainActive) {
     const clickMax = CONFIG.mahoraga?.wheelClickDuration || 25;
-    const clickProgress = 1.0 - (fighter.wheelClickTimer / clickMax); // 0.0 to 1.0
+    const clickProgress = 1.0 - (wheelData.wheelClickTimer / clickMax); // 0.0 to 1.0
     const haloAlpha = Math.max(0, 1.0 - clickProgress);
     const _P = 2.0;
     const _snap = (v) => Math.round(v / _P) * _P;
@@ -371,7 +451,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.globalAlpha = 1.0;
 
     // 2. 8 Radial Sunburst Laser Beams — stepped pixel lines
-    const currentRot = fighter.wheelRotation || 0;
+    const currentRot = wheelRotation;
     for (let i = 0; i < 8; i++) {
       const angle = currentRot + (i / 8) * Math.PI * 2;
       const innerDist = spokeRadius * 0.7;
@@ -404,7 +484,6 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     // 3. Central Starburst Core Flare — stepped pixel cross
     const flareR = 8 + (1 - clickProgress) * 10;
     ctx.globalAlpha = haloAlpha * 0.75;
-    // Horizontal + Vertical cross pixels
     const flareGridR = Math.ceil(flareR / _P);
     for (let g = -flareGridR; g <= flareGridR; g++) {
       const dist = Math.abs(g) * _P;
@@ -412,9 +491,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
       const brightness = 1 - dist / flareR;
       const alpha = brightness * haloAlpha * 0.75;
       ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-      // Horizontal
       ctx.fillRect(_snap(g * _P) - _P * 0.5, -_P * 0.5, _P, _P);
-      // Vertical
       ctx.fillRect(-_P * 0.5, _snap(g * _P) - _P * 0.5, _P, _P);
     }
     ctx.globalAlpha = 1.0;
@@ -426,83 +503,13 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
-  // Stepped pixel ellipse — draws filled pixel blocks tracing an ellipse
-  function _drawPixelEllipse(ctx, cx, cy, rx, ry, fillColor, borderColor) {
-    const steps = Math.max(24, Math.round(Math.max(rx, ry) * 2.5));
-    // Border layer first (slightly larger)
-    if (borderColor) {
-      for (let i = 0; i < steps; i++) {
-        const a = (i / steps) * Math.PI * 2;
-        const px = snap(cx + Math.cos(a) * (rx + P * 0.5));
-        const py = snap(cy + Math.sin(a) * (ry + P * 0.5));
-        ctx.fillStyle = borderColor;
-        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
-      }
-    }
-    // Fill layer
-    if (fillColor) {
-      for (let i = 0; i < steps; i++) {
-        const a = (i / steps) * Math.PI * 2;
-        const px = snap(cx + Math.cos(a) * rx);
-        const py = snap(cy + Math.sin(a) * ry);
-        ctx.fillStyle = fillColor;
-        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
-      }
-    }
-  }
-
-  // Stepped pixel line — draws filled pixel blocks along a line
-  function _drawPixelLine(ctx, x0, y0, x1, y1, color, thickness) {
-    const dx = x1 - x0;
-    const dy = y1 - y0;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const numSteps = Math.max(2, Math.ceil(len / P));
-    const halfT = Math.max(P * 0.5, thickness * 0.5);
-    for (let s = 0; s <= numSteps; s++) {
-      const t = s / numSteps;
-      const px = snap(x0 + dx * t);
-      const py = snap(y0 + dy * t);
-      ctx.fillStyle = color;
-      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
-    }
-  }
-
-  // Stepped pixel filled circle — fills interior with pixel blocks
-  function _fillPixelCircle(ctx, cx, cy, r, colors) {
-    // colors = { border, outer, mid, inner, glint }
-    const gridR = Math.ceil(r / P);
-    for (let gy = -gridR; gy <= gridR; gy++) {
-      for (let gx = -gridR; gx <= gridR; gx++) {
-        const dist = Math.sqrt(gx * gx + gy * gy) * P;
-        if (dist > r + P * 0.5) continue;
-        const norm = dist / r; // 0=center, 1=edge
-        let color;
-        if (norm > 0.92) {
-          color = colors.border || '#000000';
-        } else if (norm > 0.7) {
-          color = colors.outer || '#8B6508';
-        } else if (norm > 0.4) {
-          color = colors.mid || '#D4AF37';
-        } else {
-          color = colors.inner || '#FFF59D';
-        }
-        // Specular glint pixel in upper-left quadrant
-        if (colors.glint && gx <= -1 && gy <= -1 && norm < 0.35) {
-          color = colors.glint;
-        }
-        ctx.fillStyle = color;
-        ctx.fillRect(snap(cx + gx * P) - P * 0.5, snap(cy + gy * P) - P * 0.5, P, P);
-      }
-    }
-  }
-
   // ----------------------------------------------------
   // LAYER 1: 3D EXTRUSION / UNDERSIDE SHADOW (Pixel Art Depth)
   // ----------------------------------------------------
   ctx.save();
   ctx.translate(0, depthOffset);
   ctx.scale(scaleX, scaleY);
-  ctx.rotate(fighter.wheelRotation || 0);
+  ctx.rotate(wheelRotation);
 
   // Dark underside outer ring — stepped pixel ellipse
   _drawPixelEllipse(ctx, 0, 0, wheelRadius + P, wheelRadius + P, '#3D2B0F', '#000000');
@@ -513,12 +520,10 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     const angle = (i / 8) * Math.PI * 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
-    // Shadow spoke line
-    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#000000', P * 2);
-    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#2A1D0A', P);
-    // Shadow sphere base
-    _fillPixelCircle(ctx, cosA * spokeRadius, sinA * spokeRadius, sphereRadius + P * 0.5, {
-      border: '#000000', outer: '#000000', mid: '#1A0F00', inner: '#1A0F00'
+    _drawPixelLine(ctx, 0, 0, cosA * (spokeRadius - 2), sinA * (spokeRadius - 2), '#000000', P * 1.2);
+    _drawPixelLine(ctx, 0, 0, cosA * (spokeRadius - 2), sinA * (spokeRadius - 2), '#2A1D0A', P * 0.6);
+    _fillPixelCircle(ctx, cosA * spokeRadius, sinA * spokeRadius, sphereRadius * 0.85, {
+      border: null, outer: '#1A0F00', mid: '#100A00', inner: '#100A00'
     });
   }
   ctx.restore();
@@ -528,19 +533,19 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   // ----------------------------------------------------
   ctx.save();
   ctx.scale(scaleX, scaleY);
-  ctx.rotate(fighter.wheelRotation || 0);
+  ctx.rotate(wheelRotation);
 
-  // 1. 8 Spokes — triple-layer pixel lines (black border → gold → highlight)
+  // 1. 8 Spokes — triple-layer pixel lines
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
-    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#000000', P * 2.2);
-    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#DAA520', P * 1.2);
-    _drawPixelLine(ctx, 0, 0, cosA * (spokeRadius * 0.85), sinA * (spokeRadius * 0.85), '#FFE57F', P * 0.5);
+    _drawPixelLine(ctx, 0, 0, cosA * (spokeRadius - 1), sinA * (spokeRadius - 1), '#000000', P * 1.2);
+    _drawPixelLine(ctx, 0, 0, cosA * (spokeRadius - 1), sinA * (spokeRadius - 1), '#DAA520', P * 0.7);
+    _drawPixelLine(ctx, 0, 0, cosA * (spokeRadius * 0.85), sinA * (spokeRadius * 0.85), '#FFE57F', P * 0.35);
   }
 
-  // 2. Outer Ring Rim — stepped pixel ellipse (black border → gold → highlight)
+  // 2. Outer Ring Rim — stepped pixel ellipse
   _drawPixelEllipse(ctx, 0, 0, wheelRadius + P, wheelRadius + P, null, '#000000');
   _drawPixelEllipse(ctx, 0, 0, wheelRadius, wheelRadius, '#DAA520', '#000000');
   _drawPixelEllipse(ctx, 0, 0, wheelRadius - P * 0.5, wheelRadius - P * 0.5, '#FFE57F', null);
@@ -554,6 +559,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   // 4. Center Hub Dome — stepped pixel filled circle with specular glint
   _fillPixelCircle(ctx, 0, 0, 5.5, {
     border: '#000000',
+    borderWidth: 0.6,
     outer: '#8B6508',
     mid: '#D4AF37',
     inner: '#FFF59D',
@@ -562,20 +568,20 @@ export function drawMahoraga3DWheel(ctx, fighter) {
 
   // Calculate total adaptation levels reached across all damage types & color history
   let activeStages = 0;
-  const historyCount = fighter.gojoAdaptColorHistory ? fighter.gojoAdaptColorHistory.length : 0;
-  if (fighter.adaptationStage) {
-    const totalClicks = (fighter.adaptationStage.melee || 0) + (fighter.adaptationStage.ranged || 0) + (fighter.adaptationStage.skill || 0);
+  const historyCount = wheelData.gojoAdaptColorHistory ? wheelData.gojoAdaptColorHistory.length : 0;
+  if (wheelData.adaptationStage) {
+    const totalClicks = (wheelData.adaptationStage.melee || 0) + (wheelData.adaptationStage.ranged || 0) + (wheelData.adaptationStage.skill || 0);
     activeStages = Math.min(8, Math.max(totalClicks, historyCount));
-  } else if (fighter.adapted && (fighter.adapted.melee || fighter.adapted.ranged || fighter.adapted.skill)) {
+  } else if (wheelData.adapted && (wheelData.adapted.melee || wheelData.adapted.ranged || wheelData.adapted.skill)) {
     activeStages = Math.min(8, Math.max(1, historyCount));
   }
 
   // 5. 8 Handle Spheres — Pixel Art with Adaptation Color Support
-  const sphereGlowColor = fighter.wheelGlowColor || '#FFD700';
+  const sphereGlowColor = wheelData.wheelGlowColor || '#FFD700';
   const sphereGlowRgb = hexToRgb(sphereGlowColor);
-  const sphereGlowLight = fighter.wheelGlowColor ? lightenHex(sphereGlowColor, 0.5) : '#FFF9C4';
+  const sphereGlowLight = wheelData.wheelGlowColor ? lightenHex(sphereGlowColor, 0.5) : '#FFF9C4';
   const sphereGlowLightRgb = hexToRgb(sphereGlowLight);
-  const sphereGlowDark = fighter.wheelGlowColor ? darkenHex(sphereGlowColor, 0.4) : '#FF8C00';
+  const sphereGlowDark = wheelData.wheelGlowColor ? darkenHex(sphereGlowColor, 0.4) : '#FF8C00';
   const sphereGlowDarkRgb = hexToRgb(sphereGlowDark);
 
   for (let i = 0; i < 8; i++) {
@@ -584,15 +590,13 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     const sy = Math.sin(angle) * spokeRadius;
     const isLeveled = i < activeStages;
 
-    // Per-sphere color from adaptation history
-    const adaptColorHistory = fighter.gojoAdaptColorHistory;
+    const adaptColorHistory = wheelData.gojoAdaptColorHistory;
     const thisSphereColor      = (adaptColorHistory && adaptColorHistory[i]) ? adaptColorHistory[i] : '#FFD700';
     const thisSphereColorLight = lightenHex(thisSphereColor, 0.5);
     const thisSphereColorDark  = darkenHex(thisSphereColor, 0.4);
     const thisSphereRgb        = hexToRgb(thisSphereColor);
     const thisSphereRgbLight   = hexToRgb(thisSphereColorLight);
 
-    // Draw steady outer energy halo around leveled spheres — stepped pixel glow ring stamp
     if (isLeveled) {
       const haloR = sphereRadius * 3.0;
       const haloStampKey = `${thisSphereColor}_${sphereRadius}_${haloR}`;
@@ -606,23 +610,21 @@ export function drawMahoraga3DWheel(ctx, fighter) {
       }
     }
 
-    // Handle sphere — pixel filled circle
     if (isLeveled) {
       _fillPixelCircle(ctx, sx, sy, sphereRadius, {
         border: '#000000',
+        borderWidth: 0.45,
         outer: thisSphereColorDark,
         mid: thisSphereColor,
         inner: thisSphereColorLight,
         glint: '#FFFFFF'
       });
-      // White energy rim pixels on leveled spheres
-      _drawPixelEllipse(ctx, sx, sy, sphereRadius + P * 0.6, sphereRadius + P * 0.6, null, '#FFFFFF');
     } else {
-      // Standard golden dharma spheres
       _fillPixelCircle(ctx, sx, sy, sphereRadius, {
         border: '#000000',
-        outer: '#4A3319',
-        mid: '#C59B27',
+        borderWidth: 0.45,
+        outer: '#7A5518',
+        mid: '#D4AF37',
         inner: '#FFE082',
         glint: '#FFFFFF'
       });
@@ -630,12 +632,6 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   }
 
   ctx.restore();
-
-  // ----------------------------------------------------
-  // LAYER 3: (Removed spinning orbital sparkles for clean, steady glow)
-  // ----------------------------------------------------
-
-  ctx.restore(); // Restore from wheel translation
 }
 
 

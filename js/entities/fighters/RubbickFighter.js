@@ -2914,6 +2914,9 @@ export class RubbickFighter extends Fighter {
   }
 
   resolveWallBounce(arena, opponent) {
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+      return super.resolveWallBounce(arena, opponent);
+    }
     if (this.sphereActive) {
       resolveStolenCronosWallBounce(this, arena, opponent);
     } else if (this.stolenType === 'berserker' && opponent) {

@@ -12,7 +12,7 @@ import { updateRika } from '../../entities/fighters/yuta/rikaLogic.js';
 import { drawYutaGhostSkin } from './yutaSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 
-// Pre-seeded static data for Yuta Domain Channeling Pixel Art VFX (0 GC per Rule #12 & #16)
+// Pre-seeded static data for Yuta Domain Channeling VFX (0 GC per Rule #12 & #16)
 const _YUTA_DOMAIN_EMBERS = Array.from({ length: 32 }, (_, i) => ({
   angle: (i / 32) * Math.PI * 2 + (i * 0.47) % Math.PI,
   distMult: 0.20 + ((i * 17) % 80) / 100, // 0.20 to 1.0 of ringRadius
@@ -23,47 +23,6 @@ const _YUTA_DOMAIN_EMBERS = Array.from({ length: 32 }, (_, i) => ({
   wobbleSpeed: 0.003 + ((i * 3) % 5) * 0.001,
   wobbleAmp: 3 + (i % 4) * 2,
 }));
-
-
-function _drawPixelSteppedEllipse(ctx, cx, cy, rx, ry, P, color, thickness = 1) {
-  if (rx <= 0 || ry <= 0) return;
-  const snap = (v) => Math.round(v / P) * P;
-  const circum = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
-  const steps = Math.max(16, Math.ceil(circum / P));
-  const stepAngle = (Math.PI * 2) / steps;
-
-  ctx.fillStyle = color;
-  for (let i = 0; i < steps; i++) {
-    const a = i * stepAngle;
-    const px = snap(cx + Math.cos(a) * rx);
-    const py = snap(cy + Math.sin(a) * ry);
-    ctx.fillRect(px, py, P * thickness, P * thickness);
-  }
-}
-
-function _drawPixelDiamond(ctx, cx, cy, size, P, coreColor, outerColor) {
-  const snap = (v) => Math.round(v / P) * P;
-  const s = snap(size);
-  // Outer Diamond Shell (Pass 1)
-  ctx.fillStyle = outerColor || '#111114';
-  for (let dy = -s - P; dy <= s + P; dy += P) {
-    const span = Math.max(0, (s + P) - Math.abs(dy));
-    for (let dx = -span; dx <= span; dx += P) {
-      ctx.fillRect(cx + dx, cy + dy, P, P);
-    }
-  }
-  // Inner Core Fill (Pass 2)
-  ctx.fillStyle = coreColor;
-  for (let dy = -s; dy <= s; dy += P) {
-    const span = Math.max(0, s - Math.abs(dy));
-    for (let dx = -span; dx <= span; dx += P) {
-      ctx.fillRect(cx + dx, cy + dy, P, P);
-    }
-  }
-  // White Specular Center Pixel
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(cx, cy, P, P);
-}
 
 const _yutaAuraCanvasCache = new Map();
 
@@ -213,6 +172,9 @@ export class YutaRenderer {
       let targetAngle = 0;
       if (rk.timeStopTimer > 0 || rk.hitStunTimer > 0 || rk.isDying) {
         targetAngle = rk.angle || 0;
+      } else if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || (fighter.beamRetreatSlideTimer > 0) || (fighter.pureLoveBeamBreatherTimer > 0)) {
+        targetAngle = (fighter.pureLoveBeamLockedAngle !== undefined ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0));
+        rk.angle = targetAngle;
       } else {
         if (opponent && !opponent.isDead) {
           const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
@@ -260,97 +222,105 @@ export class YutaRenderer {
   }
 
   static _drawDomainChannelAura(ctx, fighter) {
-    const maxCharge = Math.max(1, fighter.domainChargeMax || 180);
+    const maxCharge = Math.max(1, fighter.domainChargeMax || 50);
     const progress = Math.min(1.0, Math.max(0, (fighter.domainChargeTimer || 0) / maxCharge));
     if (progress <= 0) return;
 
-    const P = 2.0; // Standard 2.0px pixel art scale
-    const snap = (v) => Math.round(v / P) * P;
     const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
     ctx.save();
-    ctx.translate(snap(fighter.x), snap(fighter.y - (fighter.z || 0)));
+    ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
     const maxRadius = 150;
     const currentR = Math.max(10, maxRadius * progress);
     const isoAspect = 0.46; // Clean isometric floor perspective
 
-    // ── 1. GROUND STEPPED PIXEL DROP SHADOW (Dark Obsidian Core) ──
+    // ── 1. GROUND DROP SHADOW (Dark Obsidian Core) ──
     const shadowR = (fighter.r || 25) * 1.35;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, shadowR, shadowR * isoAspect, 0, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(14, 15, 20, 0.75)';
-    for (let dy = -shadowR * isoAspect; dy <= shadowR * isoAspect; dy += P) {
-      const prog = Math.abs(dy) / (shadowR * isoAspect);
-      const halfW = snap(Math.sqrt(Math.max(0, 1 - prog * prog)) * shadowR);
-      ctx.fillRect(-halfW, snap(dy), halfW * 2, P);
-    }
+    ctx.fill();
 
-
-    // ── 3. EXPANDING STEPPED PIXEL ISOMETRIC CONCENTRIC RINGS ──
+    // ── 2. EXPANDING ISOMETRIC CONCENTRIC RINGS ──
     const outerRx = currentR;
     const outerRy = currentR * isoAspect;
 
     // Pass A: Outer Dark Manga Ink Shell
-    _drawPixelSteppedEllipse(ctx, 0, 0, outerRx + P, outerRy + P * isoAspect, P, `rgba(17, 17, 20, ${Math.min(1.0, progress * 1.2)})`, 2);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, outerRx + 2, (outerRx + 2) * isoAspect, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(17, 17, 20, ${Math.min(1.0, progress * 1.2)})`;
+    ctx.lineWidth = 4;
+    ctx.stroke();
 
     // Pass B: Radiant Primary Cursed Energy Ring (Magenta / Deep Pink)
-    _drawPixelSteppedEllipse(ctx, 0, 0, outerRx, outerRy, P, `rgba(255, 20, 147, ${progress})`, 1.5);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, outerRx, outerRy, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 20, 147, ${progress})`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
     // Pass C: Hot Pink Highlight Ring
-    _drawPixelSteppedEllipse(ctx, 0, 0, outerRx - P, (outerRx - P) * isoAspect, P, `rgba(255, 105, 180, ${progress * 0.9})`, 1);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, Math.max(1, outerRx - 2), Math.max(1, (outerRx - 2) * isoAspect), 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 105, 180, ${progress * 0.9})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-    // Pass D: White Specular Pixel Glint Accents along Outer Ring
-    const glintCount = 16;
+    // Pass D: White Specular Glint Accents along Outer Ring
+    const glintCount = 12;
     const glintRot = now * 0.0018;
     ctx.fillStyle = `rgba(255, 255, 255, ${progress * 0.95})`;
     for (let i = 0; i < glintCount; i++) {
       const a = (i * (Math.PI * 2 / glintCount)) + glintRot;
-      const gx = snap(Math.cos(a) * outerRx);
-      const gy = snap(Math.sin(a) * outerRy);
-      ctx.fillRect(gx, gy, P, P);
+      const gx = Math.cos(a) * outerRx;
+      const gy = Math.sin(a) * outerRy;
+      ctx.fillRect(gx - 1.5, gy - 1.5, 3, 3);
     }
 
-    // ── 4. SECONDARY INNER ROTATING STEPPED PIXEL RING ──
+    // ── 3. SECONDARY INNER ROTATING DASHED RING ──
     if (progress > 0.25) {
       const innerRx = outerRx * 0.72;
       const innerRy = innerRx * isoAspect;
-      const innerRot = -now * 0.0022;
-      const innerSteps = 32;
-
-      for (let i = 0; i < innerSteps; i++) {
-        // Dashed pixel pattern
-        if (i % 2 === 0) continue;
-        const a = (i * (Math.PI * 2 / innerSteps)) + innerRot;
-        const ix = snap(Math.cos(a) * innerRx);
-        const iy = snap(Math.sin(a) * innerRy);
-
-        // Dark ink backing
-        ctx.fillStyle = '#111114';
-        ctx.fillRect(ix - P * 0.5, iy - P * 0.5, P * 2, P * 2);
-
-        // Violet-pink cursed pixel
-        ctx.fillStyle = `rgba(217, 70, 239, ${progress})`;
-        ctx.fillRect(ix, iy, P, P);
-      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, innerRx, innerRy, 0, 0, Math.PI * 2);
+      ctx.setLineDash([8, 8]);
+      ctx.lineDashOffset = now * 0.03;
+      ctx.strokeStyle = `rgba(217, 70, 239, ${progress * 0.9})`;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.restore();
     }
 
-    // ── 5. 8-POINT STEPPED PIXEL CARDINAL / ORDINAL DIAMOND SEALS ──
+    // ── 4. 8-POINT CARDINAL / ORDINAL DIAMOND SEALS ──
     if (progress > 0.30) {
       const diamondScale = Math.min(1.0, (progress - 0.30) / 0.40);
-      const diamondSize = Math.max(P, snap(P * 2.5 * diamondScale));
+      const dSize = 5 * diamondScale;
       const sealRot = now * 0.0008;
 
       for (let i = 0; i < 8; i++) {
         const isCardinal = (i % 2 === 0);
         const a = (i * Math.PI / 4) + sealRot;
-        const dX = snap(Math.cos(a) * outerRx);
-        const dY = snap(Math.sin(a) * outerRy);
+        const dX = Math.cos(a) * outerRx;
+        const dY = Math.sin(a) * outerRy;
+        const sz = isCardinal ? dSize * 1.2 : dSize * 0.9;
 
-        const coreCol = isCardinal ? '#FF1493' : '#D946EF';
-        _drawPixelDiamond(ctx, dX, dY, isCardinal ? diamondSize : diamondSize * 0.8, P, coreCol, '#111114');
+        ctx.beginPath();
+        ctx.moveTo(dX, dY - sz * isoAspect * 1.6);
+        ctx.lineTo(dX + sz, dY);
+        ctx.lineTo(dX, dY + sz * isoAspect * 1.6);
+        ctx.lineTo(dX - sz, dY);
+        ctx.closePath();
+        ctx.fillStyle = isCardinal ? '#FF1493' : '#D946EF';
+        ctx.fill();
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
     }
 
-    // ── 6. RISING STEPPED PIXEL CURSED EMBERS / SOUL FLAME PARTICLES ──
+    // ── 5. RISING CURSED EMBERS / SOUL FLAME PARTICLES ──
     for (let i = 0; i < _YUTA_DOMAIN_EMBERS.length; i++) {
       const em = _YUTA_DOMAIN_EMBERS[i];
       const maxRiseH = 110;
@@ -361,8 +331,8 @@ export class YutaRenderer {
 
       const radialDist = outerRx * em.distMult * 0.90;
       const wobble = Math.sin(now * em.wobbleSpeed + em.phase) * em.wobbleAmp;
-      const emX = snap(Math.cos(em.angle) * radialDist + wobble);
-      const emY = snap(Math.sin(em.angle) * (radialDist * isoAspect) - travel);
+      const emX = Math.cos(em.angle) * radialDist + wobble;
+      const emY = Math.sin(em.angle) * (radialDist * isoAspect) - travel;
 
       // Color Palette Ramp: [White Glint, Hot Pink, Radiant Magenta, Dark Violet]
       let emColor;
@@ -371,22 +341,20 @@ export class YutaRenderer {
       else if (em.colorIdx === 2) emColor = `rgba(255, 20, 147, ${emberAlpha * 0.85})`;
       else emColor = `rgba(139, 0, 85, ${emberAlpha * 0.75})`;
 
-      // Dark ink outline for larger embers
-      if (em.size >= 3) {
-        ctx.fillStyle = `rgba(17, 17, 20, ${emberAlpha * 0.70})`;
-        ctx.fillRect(emX - P, emY - P, P * (em.size + 1), P * (em.size + 1));
-      }
-
       ctx.fillStyle = emColor;
-      ctx.fillRect(emX, emY, P * em.size, P * em.size);
+      ctx.fillRect(emX - em.size / 2, emY - em.size / 2, em.size, em.size);
     }
 
-    // ── 7. PERIODIC EXPANDING PIXEL SHOCKWAVE DIAMOND PULSE ──
+    // ── 6. PERIODIC EXPANDING SHOCKWAVE PULSE ──
     const pulseCycle = (now * 0.002) % 1.0;
-    const pulseR = snap(currentR * pulseCycle);
+    const pulseR = currentR * pulseCycle;
     const pulseAlpha = Math.max(0, (1.0 - pulseCycle) * 0.60 * progress);
     if (pulseR > 10 && pulseAlpha > 0.05) {
-      _drawPixelSteppedEllipse(ctx, 0, 0, pulseR, pulseR * isoAspect, P, `rgba(255, 105, 180, ${pulseAlpha})`, 1);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, pulseR, pulseR * isoAspect, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 105, 180, ${pulseAlpha})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
 
     ctx.restore();
@@ -431,6 +399,9 @@ export class YutaRenderer {
     if (!renderState) {
       if (rk.timeStopTimer > 0 || rk.hitStunTimer > 0 || rk.isDying) {
         targetAngle = rk.angle || 0;
+      } else if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || (fighter.beamRetreatSlideTimer > 0) || (fighter.pureLoveBeamBreatherTimer > 0)) {
+        targetAngle = (fighter.pureLoveBeamLockedAngle !== undefined ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0));
+        rk.angle = targetAngle;
       } else {
         if (opponent && !opponent.isDead) {
           const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
@@ -1104,107 +1075,8 @@ export class YutaRenderer {
   }
 
   static _drawRikaYutaTether(ctx, fighter, rk, renderState = null) {
-    if (!fighter || !rk || !rk.active) return;
-    if (rk.killedInDomain || rk.isDying || rk.hp <= 0 || rk.isChainedByMakima || rk.isMindControlledByMakima) return;
-
-    const yutaX = fighter.x;
-    const yutaY = fighter.y;
-    const rikaX = renderState ? renderState.drawX : rk.x;
-    const rikaY = renderState ? renderState.drawY : rk.y;
-    const rikaAngle = renderState ? renderState.targetAngle : (rk.angle || 0);
-    const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
-    const rikaR = ((rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30) * spawnScale;
-
-    // Anchor at Rika's rear body along her facing angle
-    const rikaAnchorX = rikaX - Math.cos(rikaAngle) * (rikaR * 0.45);
-    const rikaAnchorY = rikaY - Math.sin(rikaAngle) * (rikaR * 0.45);
-
-    const dist = Math.hypot(rikaAnchorX - yutaX, rikaAnchorY - yutaY);
-    if (dist < 5) return;
-
-    const P = 2.2;
-    const isRCT = Boolean(fighter.isChannelingRCT);
-
-    // Color definitions strictly matching Yuta's Cursed Energy
-    const mainCeColor = isRCT ? 'rgba(50, 205, 50, 0.75)' : 'rgba(255, 20, 147, 0.75)';
-    const coreCeColor = isRCT ? 'rgba(144, 238, 144, 0.85)' : 'rgba(255, 105, 180, 0.85)';
-    const innerLightColor = isRCT ? 'rgba(200, 255, 200, 0.95)' : 'rgba(255, 192, 203, 0.95)';
-    const whiteHotColor = 'rgba(255, 255, 255, 0.95)';
-
-    const numSteps = Math.max(16, Math.min(60, Math.ceil(dist / (P * 2.2))));
-
-    ctx.save();
-
-    // ── Layer 1: Dark Cursed Shadow Ink Outline (Static Non-Wiggling Vector) ──
-    ctx.fillStyle = '#111114';
-    for (let i = 0; i <= numSteps; i++) {
-      const t = i / numSteps;
-      const bx = yutaX + (rikaAnchorX - yutaX) * t;
-      const by = yutaY + (rikaAnchorY - yutaY) * t;
-
-      const halfW = (t * 0.65 + 0.35) * (rikaR * 0.30) + P * 0.8;
-      const px = Math.round(bx / P) * P;
-      const py = Math.round(by / P) * P;
-      const pw = Math.round((halfW * 2) / P) * P;
-
-      ctx.fillRect(px - pw / 2, py - pw / 2, pw, pw);
-    }
-
-    // ── Layer 2: Main Cursed Energy Flame Body (Identical Color to Yuta's CE) ──
-    ctx.fillStyle = mainCeColor;
-    for (let i = 0; i <= numSteps; i++) {
-      const t = i / numSteps;
-      const bx = yutaX + (rikaAnchorX - yutaX) * t;
-      const by = yutaY + (rikaAnchorY - yutaY) * t;
-
-      const halfW = (t * 0.65 + 0.35) * (rikaR * 0.25);
-      const px = Math.round(bx / P) * P;
-      const py = Math.round(by / P) * P;
-      const pw = Math.max(P, Math.round((halfW * 2) / P) * P);
-
-      ctx.fillRect(px - pw / 2, py - pw / 2, pw, pw);
-    }
-
-    // ── Layer 3: Inner Radiant Cursed Energy Core ──
-    ctx.fillStyle = coreCeColor;
-    for (let i = 0; i <= numSteps; i++) {
-      const t = i / numSteps;
-      const bx = yutaX + (rikaAnchorX - yutaX) * t;
-      const by = yutaY + (rikaAnchorY - yutaY) * t;
-
-      const halfW = (t * 0.50 + 0.30) * (rikaR * 0.15);
-      const px = Math.round(bx / P) * P;
-      const py = Math.round(by / P) * P;
-      const pw = Math.max(P, Math.round((halfW * 2) / P) * P);
-
-      ctx.fillRect(px - pw / 2, py - pw / 2, pw, pw);
-    }
-
-    // ── Layer 4: Soft Light Pink Core ──
-    ctx.fillStyle = innerLightColor;
-    for (let i = 0; i <= numSteps; i += 2) {
-      const t = i / numSteps;
-      const bx = yutaX + (rikaAnchorX - yutaX) * t;
-      const by = yutaY + (rikaAnchorY - yutaY) * t;
-
-      const px = Math.round(bx / P) * P;
-      const py = Math.round(by / P) * P;
-      ctx.fillRect(px - P / 2, py - P / 2, P, P);
-    }
-
-    // ── Layer 5: Pure White Specular Filament Core ──
-    ctx.fillStyle = whiteHotColor;
-    for (let i = 2; i < numSteps; i += 4) {
-      const t = i / numSteps;
-      const bx = yutaX + (rikaAnchorX - yutaX) * t;
-      const by = yutaY + (rikaAnchorY - yutaY) * t;
-
-      const px = Math.round(bx / P) * P;
-      const py = Math.round(by / P) * P;
-      ctx.fillRect(px, py, P, P);
-    }
-
-    ctx.restore();
+    // Removed CE tail/tether of Rika per user request
+    return;
   }
 
   static _renderYutaAuraFrameCanvas(frameIdx, isRCT) {

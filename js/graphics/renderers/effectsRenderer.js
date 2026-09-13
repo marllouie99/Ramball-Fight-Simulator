@@ -357,7 +357,7 @@ export function drawUltimateChannelingTexts() {
       const progress = Math.min(1.0, Math.max(0, (fighter.domainChargeTimer || 0) / maxTime));
       renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(220, 20, 60, ${progress})`, progress);
     } else if (isYuta && fighter.isChannelingDomain) {
-      const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 180));
+      const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 50));
       renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(255, 255, 255, ${progress})`, progress, `rgba(255, 20, 147, ${progress * 0.4})`);
     } else if (fighter.isChannelingDomainExpansion || fighter.isChannelingDomain) {
       const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 120));

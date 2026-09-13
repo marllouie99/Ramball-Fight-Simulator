@@ -213,7 +213,7 @@ export class RezeFighter extends Fighter {
   /**
    * Main Fighter Update Loop
    */
-  update() {
+  update(opponent, ownerIndex, arena) {
     // 1. Mandatory Rule 1 Freeze Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -253,13 +253,13 @@ export class RezeFighter extends Fighter {
     }
 
     // 6. Base AI & Combat Engine
-    const target = this._findBestTarget();
+    const target = this._findBestTarget() || opponent;
     if (target) {
       this.aim(target);
       this._updateRezeCombatAI(target);
     }
 
-    super.update();
+    super.update(target || opponent, ownerIndex, arena);
   }
 
   /**

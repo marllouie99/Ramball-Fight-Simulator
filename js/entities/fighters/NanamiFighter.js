@@ -279,6 +279,9 @@ export class NanamiFighter extends Fighter {
    */
   resolveWallBounce(arena, opponent) {
     if (!arena) return false;
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+      return super.resolveWallBounce(arena, opponent);
+    }
     let bounced = false;
     let bouncedX = false;
     let bouncedY = false;

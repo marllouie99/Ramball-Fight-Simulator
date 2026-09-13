@@ -92,7 +92,6 @@ export function performMeleeAttack(fighter, opponent) {
   );
 
   const isCaughtInBeam = (
-    (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
     fighter.caughtInGenosFlurry ||
     fighter.isDraggedByGetsuga
   );

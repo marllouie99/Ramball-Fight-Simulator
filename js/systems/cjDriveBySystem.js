@@ -256,9 +256,23 @@ export function spawnGroveStreetDriveBy(cjFighter) {
       this.knockbackVy = Number(ky) || 0;
     },
 
-    applySlow(multiplier, duration) {
-      this.slowMultiplier = Number(multiplier) || 0.5;
-      this.slowTimer = Number(duration) || 60;
+    applySlow(arg1, arg2) {
+      let mult = 0.5;
+      let dur = 60;
+      if (typeof arg1 === 'number' && typeof arg2 === 'number') {
+        if (arg1 <= 1.0 && arg2 > 1.0) {
+          mult = arg1;
+          dur = arg2;
+        } else {
+          dur = arg1;
+          mult = arg2;
+        }
+      } else if (typeof arg1 === 'number') {
+        if (arg1 <= 1.0) mult = arg1;
+        else dur = arg1;
+      }
+      this.slowMultiplier = Number(mult) || 0.5;
+      this.slowTimer = Number(dur) || 60;
     },
 
     interruptAttacks() {
@@ -483,9 +497,7 @@ export function updateDriveBys() {
         car.isFrozenByInfinity ||
         car.frozenByCronos ||
         car.isTargetOfAmbush ||
-        car.caughtInSaitamaFlurry ||
-        car.caughtInPureLoveBeam ||
-        (car.pureLoveBeamTimer && car.pureLoveBeamTimer > 0)
+        car.caughtInSaitamaFlurry
       );
 
       // Process residual knockback decay on car position
