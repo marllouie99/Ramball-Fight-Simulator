@@ -662,7 +662,7 @@ export function drawIchigoSkin(ctx, fighter) {
       if (!hideHandsAndWeapon) {
         if (!isBackSlungPose || isHollowChanneling) {
           // Back hand (for 2-handed grip on heavy chop or charging stance)
-          if ((isChanneling || isBankaiChanneling || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
+          if ((isChanneling || isBankaiChanneling || (fighter.isGetsugaSlash && rawSlashProg <= 0.85) || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
             _drawIchigoHand(ctx, hiltX + 7, 0, skinColor, true);
           }
           // Front hand (main grip near guard)
@@ -743,7 +743,7 @@ export function drawIchigoSkin(ctx, fighter) {
       // Hands gripping Bankai hilt during active combat, Bankai victory stance, or Hollow Channeling
       if ((!isBackSlungPose || isBankaiStance || isHollowChanneling) && !hideHandsAndWeapon) {
         // Back hand (during 2-handed power chop or charging stance)
-        if ((isChanneling || isBankaiChanneling || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
+        if ((isChanneling || isBankaiChanneling || (fighter.isGetsugaSlash && rawSlashProg <= 0.85) || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
           _drawIchigoHand(ctx, swordStartX - 22, 0, skinColor, false);
         }
         // Front hand (main grip on the hilt/holder part behind guard, positioned cleanly on the handle)

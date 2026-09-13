@@ -443,7 +443,9 @@ export function releaseGetsuga(fighter) {
   fighter.isGetsugaSlash = true;
   const slashDur = isFinal
     ? (CONFIG.ichigo?.bankaiFinalGetsugaSlashDuration || 30)
-    : (CONFIG.ichigo?.getsugaSlashDuration || 24);
+    : (isBankai 
+      ? (CONFIG.ichigo?.bankaiGetsugaSlashDuration || CONFIG.ichigo?.bankaiGetsugaRecoveryFrames || 20)
+      : (CONFIG.ichigo?.getsugaSlashDuration || 24));
   fighter.slashSwingTimer = slashDur;
   fighter.slashSwingMaxTimer = slashDur;
   let cdMult = 1.0;
@@ -543,11 +545,22 @@ export function updateGetsuga(fighter, opponent) {
       fighter.getsugaRecoveryTimer = Math.max(fighter.getsugaRecoveryTimer, 2);
     }
 
+    // Ensure sword slash animation timer ticks down smoothly during recovery
+    if (fighter.slashSwingTimer > 0) {
+      fighter.slashSwingTimer--;
+      if (fighter.slashSwingTimer <= 0) {
+        fighter.isGetsugaSlash = false;
+      }
+    }
+
     fighter.getsugaRecoveryTimer--;
     if (fighter.getsugaRecoveryTimer <= 0) {
       fighter.isFinalGetsugaRecovery = false;
       fighter._finalGetsugaVoicePlaying = false;
       fighter._finalGetsugaVoiceHandle = null;
+      if (fighter.slashSwingTimer <= 0) {
+        fighter.isGetsugaSlash = false;
+      }
       fighter.resumeMovement(opponent);
     }
     const damping = CONFIG.ichigo?.getsugaSlideDamping || 0.85;
