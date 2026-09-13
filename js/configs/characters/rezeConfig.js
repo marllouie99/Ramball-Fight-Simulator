@@ -11,11 +11,11 @@ export const rezeConfig = {
   moveSpeed: 5.8,
   r: 25,
   radius: 25,
-  color: '#FF6B1A',          // Tangerine Flame Orange
-  themeColor: '#FF6B1A',
-  secondaryColor: '#FFE600',  // Spark Gold
-  accentCrimson: '#FF2E00',   // Molten Blast Crimson
-  accentDark: '#1E1A24',      // Gunpowder Charcoal
+  color: '#430363ff',          // Imperial Plum / Deep Violet
+  themeColor: '#430363ff',
+  secondaryColor: '#FFE600',   // Spark Gold
+  accentCrimson: '#FF2E00',    // Molten Blast Crimson
+  accentDark: '#1E1A24',       // Gunpowder Charcoal
   startX: 300,
   startY: 250,
   startVx: 1.1,
@@ -29,16 +29,16 @@ export const rezeConfig = {
   // ──────────────────────────────────────────
   // ABILITY MASTER TOGGLE SWITCHES (1/true = Enabled, 0/false = Disabled)
   // ──────────────────────────────────────────
-  enableMeleeCombo: true,           // Master toggle for Basic Attack: Explosive Martial Arts (Hybrid)
-  enableHiddenKnifeCombo: true,     // Master toggle for Light Attack String: Hidden Knife Combo (Human)
-  enableDiveBomb: true,             // Master toggle for Aerial Attack: Dive Bomb (Human)
-  enableSparkFlechette: true,       // Master toggle for Primary Skill: Spark Flechette Barrage
-  enableDecoyBomb: true,            // Master toggle for Secondary Skill: Decapitation Decoy
-  enableRocketLunge: true,          // Master toggle for Mobility Skill: Supersonic Rocket Lunge
-  enableMegatonNuke: true,          // Master toggle for Ultimate: Megaton Tsar Nuke
-  enableCollarPinRevive: true,      // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
-  enableBlastPropulsion: true,      // Master toggle for Passive 2: Rocket Jet Blast Dash
-  enableGunpowderResidue: true,     // Master toggle for Passive 3: Gunpowder Stacks
+  enableMeleeCombo: 1,              // Master toggle for Basic Attack: Explosive Martial Arts (Hybrid)
+  enableHiddenKnifeCombo: 1,        // Master toggle for Basic Attack: Knife (Human)
+  enableDiveBomb: 0,                // Master toggle for Aerial Attack: Dive Bomb (Human)
+  enableSparkFlechette: 0,          // Master toggle for Primary Skill: Spark Flechette Barrage
+  enableDecoyBomb: 0,               // Master toggle for Secondary Skill: Decapitation Decoy
+  enableRocketLunge: 1,             // Master toggle for Mobility Skill: Supersonic Rocket Lunge
+  enableMegatonNuke: 1,             // Master toggle for Ultimate: Megaton Tsar Nuke
+  enableCollarPinRevive: 0,         // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
+  enableBlastPropulsion: 0,         // Master toggle for Passive 2: Rocket Jet Blast Dash
+  enableGunpowderResidue: 0,        // Master toggle for Passive 3: Gunpowder Stacks
 
   // Passive 1: Collar Pin Hybrid Physiology (Explosive Revive)
   maxReviveStocks: 1,               // 1 pin-pull revive per round
@@ -46,20 +46,19 @@ export const rezeConfig = {
   reviveShockwaveRadius: 140,       // Radial explosion blast radius on trigger
   reviveShockwaveDamage: 40,        // Radial blast damage
   reviveShockwaveKnockback: 28,     // Repel force
-  hybridModeDurationFrames: 600,    // 10.0s Bomb Devil Form duration upon revive / ultimate
+  hybridModeDurationFrames: Infinity, // Permanent Bomb Devil Form once activated (no duration timer)
 
   // Passive 2: Blast Propulsion
   propulsionBurnDamage: 6,          // Scorch flame damage to enemies caught in jet trail
   propulsionTrailDecay: 0.04,
 
-  // Human Form — Light Attack String: Hidden Knife Combo (Fast Interrupts)
-  knifeDamage: 10,                  // Hits 1 & 2 low damage
-  knifeFinisherDamage: 16,          // Hit 3 sleeve blade thrust damage
-  knifeReach: 52,                   // Quick knife slice reach
-  knifeFinisherReach: 58,           // Finisher thrust reach
-  knifeCooldown: 10,                // Incredibly fast 10-frame startup/cooldown
-  knifeHitStun: 6,                  // Micro hit-stun duration to interrupt heavier opponents
-  knifeFinisherHitStun: 10,         // Finisher hit-stun duration
+  // Human Form — Basic Attack: Tactical Knife Attack
+  knifeDamage: 4,                  // Tactical knife slash damage
+  knifeReach: 50,                   // Tactical knife slash reach
+  knifeCooldown: 14,                // Clean 14-frame cadence
+  knifeHitStun: 6,                  // Micro hit-stun duration
+  knifeKnockback: 6.5,              // Flinch knockback force
+  knifeArcAngle: (100 * Math.PI) / 180, // 100° frontal slash arc
 
   // Human Form — Aerial Attack: Dive Bomb (Shoulder Vault Stun)
   diveBombCooldown: 220,            // ~3.6s cooldown
@@ -69,12 +68,14 @@ export const rezeConfig = {
   diveBombMinRange: 70,             // Minimum range to trigger aerial leap
   diveBombMaxRange: 240,            // Maximum aerial dive target acquisition range
 
-  // Hybrid Form — Basic Attack: Explosive Martial Arts (120° Frontal Arc)
+  // Hybrid Form — Basic Attack: Explosive Martial Arts (120° Frontal Arc & AOE Punch Detonations)
   punchReach: 75,                   // Punch reach in Bomb Form (65px human fallback)
   punchArcAngle: (120 * Math.PI) / 180, // 120° frontal arc
-  punchDamage: 16,                  // Hits 1 & 2 damage
-  punchFinisherDamage: 28,          // Hit 3 (Spark Slap) palm blast damage
-  punchFinisherKnockback: 32,       // Palm blast physical knockback force
+  punchDamage: 18,                  // Hits 1 & 2 damage
+  punchExplosionRadius: 70,         // Hits 1 & 2 AOE explosion radius
+  punchFinisherDamage: 32,          // Hit 3 (Spark Slap) palm blast damage
+  punchFinisherRadius: 100,         // Hit 3 AOE explosion radius
+  punchFinisherKnockback: 34,       // Palm blast physical knockback force
   punchAnimDuration: 16,            // Punch swing animation frames
 
   // Primary Skill: Spark Flechette Barrage (Finger Grenades)
@@ -96,7 +97,7 @@ export const rezeConfig = {
   decoySmokeDurationFrames: 180,    // 3.0s blinding smoke cloud duration
 
   // Mobility Skill: Supersonic Rocket Lunge
-  rocketCooldown: 300,              // 5.0s cooldown
+  rocketCooldown: 800,              // 5.0s cooldown
   rocketLungeSpeed: 28.0,           // Rocket dash velocity (34.0 in Bomb Form)
   rocketDurationFrames: 24,         // Max dash frame duration
   rocketHitDamage: 35,              // Impact dropkick damage
@@ -104,7 +105,7 @@ export const rezeConfig = {
   rocketCraterRadius: 55,           // Floor crater scorch decal radius
 
   // Ultimate: Bomb Devil Unleashed — Megaton Tsar Nuke
-  nukeCooldown: 1500,               // 25.0s cooldown
+  nukeCooldown: 2000,               // 25.0s cooldown
   nukeTransformPauseFrames: 35,     // Transformation hit-stop on target (Rule 5 compliant)
   nukeAirborneBarrageFrames: 70,    // Carpet torpedo bombardment duration
   nukeRocketCount: 6,               // Number of raining torpedoes

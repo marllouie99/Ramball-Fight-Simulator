@@ -34,6 +34,7 @@ import { drawDenjiWeaponPreview } from '../weapons/denjiWeaponGraphics.js';
 import { drawPowerWeaponPreview } from '../weapons/powerWeaponGraphics.js';
 import { drawTanjiroNichirinKatana, drawNezukoDemonClaws, drawZenitsuLightningKatana, drawInosukeDualSerratedKatanas } from '../weapons/demonSlayerWeaponGraphics.js';
 import { drawDivineAxeRhitta } from '../weapons/escanorWeaponGraphics.js';
+import { drawRezeTacticalKnife, drawRezeWeaponPreview } from '../weapons/rezeWeaponGraphics.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -876,22 +877,24 @@ function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, curre
     });
   } else if (def.type === 'reze') {
     const isHybrid = Boolean(state.showRezeTransformation);
+    const humanLabel = (currentTab === 'weapon') ? '🗡️ CONCEALED KNIFE' : '🌸 HUMAN FORM';
+    const hybridLabel = (currentTab === 'weapon') ? '💣 BOMB DEVIL FORM' : '💣 BOMB DEVIL';
     buttons.push({
-      text: '🌸 HUMAN FORM',
+      text: humanLabel,
       active: !isHybrid,
-      width: 130,
+      width: (currentTab === 'weapon') ? 165 : 130,
       action: () => {
         state.showRezeTransformation = false;
         if (state.previewFighter) {
           state.previewFighter.isHybridModeActive = false;
         }
-        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+        try { audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.75); } catch (e) {}
       }
     });
     buttons.push({
-      text: '💣 BOMB DEVIL',
+      text: hybridLabel,
       active: isHybrid,
-      width: 130,
+      width: (currentTab === 'weapon') ? 165 : 130,
       action: () => {
         state.showRezeTransformation = true;
         if (state.previewFighter) {
@@ -1041,11 +1044,11 @@ function drawWeaponInfoCard(ctx, def) {
   if (def.type === 'reze') {
     const isHybrid = Boolean(state.showRezeTransformation);
     if (isHybrid) {
-      nameText = 'Reze (Bomb Devil Hybrid Form)';
-      descText = 'The Bomb Devil awakened! Reze pulls her collar pin, transforming her head into a living torpedo atomic warhead with dynamite bandoliers. Gains supersonic propulsion speed, increased blast punch radius, and unleashes the apocalyptic Megaton Tsar Nuke.';
+      nameText = 'Bomb Devil Hybrid Form (Torpedo Warhead & Apron)';
+      descText = 'The Bomb Devil awakened! Reze pulls her collar pin, transforming her head into a living torpedo atomic warhead with dynamite bandoliers. Gains supersonic propulsion speed, 120° blast punch martial arts, Spark Flechette spread shots, and unleashes the apocalyptic Megaton Tsar Nuke.';
     } else {
-      nameText = 'Reze (Soviet Assassin)';
-      descText = 'The charming Soviet assassin. Armed with detonating martial arts punches, high-velocity Spark Flechette spread shots, explosive Decoy Clones, and supersonic Rocket Lunges. Pulling her collar pin triggers an explosive radial revive into Bomb Devil form.';
+      nameText = 'Soviet Concealed Tactical Combat Knife';
+      descText = 'A high-grade surgical steel tactical combat knife concealed within Reze\'s sleeve. Features an oxidized dark-carbon clip-point spine, polished Damascus double-bevel cutting edge, recessed blood groove, textured midnight-charcoal micarta scales with brass retention pins, and skull-crusher pommel with pull-pin charm. Delivers lightning-fast 10-frame interrupts and aerial dive stuns.';
     }
   }
 
@@ -1872,7 +1875,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
   else if (type === 'cronos') offsetX = -55;
   else if (type === 'ruby') offsetX = -75;
-  else if (type === 'toji' || type === 'denji' || type === 'power' || type === 'tanjiro' || type === 'zenitsu' || type === 'inosuke') offsetX = -40;
+  else if (type === 'toji' || type === 'denji' || type === 'power' || type === 'tanjiro' || type === 'zenitsu' || type === 'inosuke' || type === 'reze') offsetX = -40;
   else if (type === 'nezuko') offsetX = -35;
   else if (type === 'yuta') offsetX = -40;
   else if (type === 'megumi') offsetX = -45;
@@ -2186,6 +2189,10 @@ function drawWeaponPreview(ctx, type, color) {
 
       case 'escanor':
         drawDivineAxeRhitta(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        return;
+
+      case 'reze':
+        drawRezeWeaponPreview(ctx, 0, 0, gunAngle, r, { isPreview: true });
         return;
 
       default:

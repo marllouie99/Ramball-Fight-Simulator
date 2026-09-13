@@ -396,7 +396,7 @@ function drawIndexDetailScreen() {
       },
       105,
       18,
-      isHybrid ? '#ff6b1a' : '#f59e0b',
+      isHybrid ? '#430363ff' : '#f59e0b',
       3
     );
   }

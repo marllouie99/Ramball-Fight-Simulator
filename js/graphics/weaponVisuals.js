@@ -40,6 +40,7 @@ export { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch, MAHORAGA
 export { drawMahoragaFaceWings, drawMahoragaChestNecklace, drawMahoragaSkin, drawMahoragaPixelBody } from './fighters/mahoragaSkin.js';
 export { drawMahitoClawWeapon, drawMahitoMaceCannon } from './weapons/mahitoWeaponGraphics.js';
 export { drawMakimaChainsOfDomination, drawMakimaMissedChains, getMakimaChainOrigin, resolveMakimaChainsSpeed, drawTargetChainsOverlay, drawMakimaAngelSpearSummon, drawMakimaAngelSpearFlight, drawMakimaHolyCrossExplosion } from './weapons/makimaWeaponGraphics.js';
+export { drawRezeTacticalKnife, drawRezeWeaponPreview } from './weapons/rezeWeaponGraphics.js';
 
 // ─────────────────────────────────────────────
 // GRAY KNIGHT WEAPONS (Shield & Sword)

@@ -2470,6 +2470,7 @@ function updateHealthHud() {
         const infoContainer = soloCardElement.querySelector('.health-card__info');
         const checkbox = soloCardElement.querySelector('input[type="checkbox"]');
 
+        const skillsContainer = soloCardElement.querySelector('.health-card__skills');
         const skillBars = new Map();
         soloCardElement.querySelectorAll('.hud-skill-box').forEach(box => {
           const id = box.getAttribute('data-skill-id');
@@ -2480,6 +2481,7 @@ function updateHealthHud() {
 
         _hudCache.fighters.set(soloFighter, {
           cardElement: soloCardElement,
+          skillsContainer,
           hpBar,
           hpBarFill,
           hpBarText,
@@ -2589,9 +2591,9 @@ function updateHealthHud() {
           const weaponAmmoEl = memberEl.querySelector('.hud-cj-weapon-ammo');
           const clockTextEl = memberEl.querySelector('.hud-cj-clock-text');
           const armorFillEl = memberEl.querySelector('.hud-cj-armor-fill');
-          const infoContainer = memberEl.querySelector('.health-card__info');
+          const skillsContainer = memberEl.querySelector('.health-card__skills');
           const skillBars = new Map();
-          cardElement.querySelectorAll('.hud-skill-box').forEach(box => {
+          memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
             const id = box.getAttribute('data-skill-id');
             const fillEl = box.querySelector('.hud-skill-box-fill');
             const textEl = box.querySelector('.hud-skill-box-text');
@@ -2600,7 +2602,7 @@ function updateHealthHud() {
           cachedMembers.push({
             fill, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
             lastMoneyText: '', lastStarCount: -1, lastWeaponIcon: '', lastWeaponAmmo: '', lastClockText: '',
-            infoContainer, skillBars, fighter: members[i], lastInfoHTML: ''
+            infoContainer, skillsContainer, skillBars, fighter: members[i], lastInfoHTML: ''
           });
         });
 
@@ -2700,6 +2702,7 @@ function updateHealthHud() {
         const infoContainer = cardElement.querySelector('.health-card__info');
         const checkbox = cardElement.querySelector('input[type="checkbox"]');
 
+        const skillsContainer = cardElement.querySelector('.health-card__skills');
         const skillBars = new Map();
         cardElement.querySelectorAll('.hud-skill-box').forEach(box => {
           const id = box.getAttribute('data-skill-id');
@@ -2710,6 +2713,7 @@ function updateHealthHud() {
 
         _hudCache.fighters.set(fighter, {
           cardElement,
+          skillsContainer,
           hpBar,
           hpBarFill,
           hpBarText,
@@ -2841,8 +2845,21 @@ function updateHealthHud() {
         }
 
         // Skill Bars Update for Team Member
-        if (m.skillBars && m.skillBars.size > 0) {
+        if (m.skillsContainer || (m.skillBars && m.skillBars.size > 0)) {
           const skills = getSkillDataForFighter(fighter);
+          if (m.skillsContainer && (skills.length !== m.skillBars.size || skills.some(s => !m.skillBars.has(s.id)))) {
+            const isRight = (cachedCard.cardElement.classList.contains('align-right') || cachedCard.cardElement.parentElement?.id === 'hud-top-right' || cachedCard.cardElement.parentElement?.id === 'hud-bottom-right');
+            const align = isRight ? 'right' : 'left';
+            const isSingleCol = Boolean(isTeamSingleColumn);
+            m.skillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol);
+            m.skillBars.clear();
+            m.skillsContainer.querySelectorAll('.hud-skill-box').forEach(box => {
+              const id = box.getAttribute('data-skill-id');
+              const fillEl = box.querySelector('.hud-skill-box-fill');
+              const textEl = box.querySelector('.hud-skill-box-text');
+              m.skillBars.set(id, { box, fill: fillEl, text: textEl });
+            });
+          }
           skills.forEach(s => {
             const cachedSkill = m.skillBars.get(s.id);
             if (cachedSkill) {
@@ -3040,8 +3057,21 @@ function updateHealthHud() {
       const isDummy = fighter.characterId === 'dummy' || fighter.type === 'dummy';
       const showDescription = CONFIG.hudShowFighterDescription || isDummy;
 
-      if (!showDescription && cachedCard.skillBars.size > 0) {
+      if (!showDescription && (cachedCard.skillsContainer || cachedCard.skillBars.size > 0)) {
         const skills = getSkillDataForFighter(fighter);
+        if (cachedCard.skillsContainer && (skills.length !== cachedCard.skillBars.size || skills.some(s => !cachedCard.skillBars.has(s.id)))) {
+          const isRight = (cachedCard.cardElement.classList.contains('align-right') || cachedCard.cardElement.parentElement?.id === 'hud-top-right' || cachedCard.cardElement.parentElement?.id === 'hud-bottom-right');
+          const align = isRight ? 'right' : 'left';
+          const isSingleCol = (isSingleColumnMode && mode !== GAME_MODES.FFA) || (is1v2 && index === 0);
+          cachedCard.skillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol);
+          cachedCard.skillBars.clear();
+          cachedCard.skillsContainer.querySelectorAll('.hud-skill-box').forEach(box => {
+            const id = box.getAttribute('data-skill-id');
+            const fill = box.querySelector('.hud-skill-box-fill');
+            const text = box.querySelector('.hud-skill-box-text');
+            cachedCard.skillBars.set(id, { box, fill, text });
+          });
+        }
         skills.forEach(s => {
           const cachedSkill = cachedCard.skillBars.get(s.id);
           if (cachedSkill) {

@@ -1578,7 +1578,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
 
   if (f.characterId === 'reze' || f.type === 'reze') {
-    const themeColor = f.color || '#FF6B1A';
+    const themeColor = f.color || '#430363ff';
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
 
     // 1. Ultimate: Megaton Tsar Nuke
@@ -1589,15 +1589,27 @@ export function getSkillDataForFighter(f, getProjectiles) {
     if (f.isExecutingNuke) {
       nukePct = 100;
       nukeLabel = 'NUKE (DIVING)';
-    } else if (f.isHybridModeActive) {
-      const hybridMax = f.hybridModeMaxTimer || cfg.hybridModeDurationFrames || 600;
-      const hybridCur = f.hybridModeTimer !== undefined ? f.hybridModeTimer : hybridMax;
-      nukePct = Math.max(0, Math.min(100, (hybridCur / hybridMax) * 100));
-      nukeLabel = 'BOMB HYBRID';
     } else {
       nukePct = Math.max(0, Math.min(100, (1 - (nukeTimer / nukeMax)) * 100));
     }
 
+    // Check if Reze is in Bomb Devil Hybrid Form / executing Ultimate
+    const isHybrid = Boolean((f.isHybridModeActive || (f.isExecutingNuke && !f.isPullingPin)) && !f.isPullingPin);
+
+    // When in Human Form: hide all HUD skill bars except her Ultimate
+    if (!isHybrid) {
+      let label = nukeLabel;
+      let pct = nukePct;
+      if (f.isPullingPin) {
+        label = 'PULLING PIN...';
+        pct = 100;
+      }
+      return [
+        { id: 'nuke', pct: pct, ready: pct >= 99, color: themeColor, label: label, fullWidth: true }
+      ];
+    }
+
+    // Once she activates her Ultimate / enters Bomb Devil Form: display all skill bars
     // 2. Primary: Spark Flechette
     const sparkMax = f.sparkCooldownMax || cfg.sparkCooldown || 180;
     const sparkTimer = f.sparkCooldown !== undefined ? f.sparkCooldown : 0;

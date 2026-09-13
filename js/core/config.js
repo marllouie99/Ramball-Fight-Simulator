@@ -1475,8 +1475,8 @@ export const FIGHTER_DEFS = [
     id: 39,
     name: 'REZE',
     category: 'Anime',
-    color: rezeConfig.color || '#FF6B1A', // Tangerine Flame Orange
-    themeColor: rezeConfig.themeColor || '#FF6B1A',
+    color: rezeConfig.color || '#430363ff',
+    themeColor: rezeConfig.themeColor || '#430363ff',
     secondaryColor: rezeConfig.secondaryColor || '#FFE600',
     startX: rezeConfig.startX || 300,
     startY: rezeConfig.startY || 250,

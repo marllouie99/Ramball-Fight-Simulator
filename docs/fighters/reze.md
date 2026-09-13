@@ -1,7 +1,7 @@
 # Reze — The Bomb Devil Hybrid
 
 **Category:** Anime & Chainsaw Man / Devils  
-**Theme Color:** Tangerine Flame Orange (`#FF6B1A` / `#FF2E00`) & Spark Gold (`#FFE600` / `#FFF59D`)  
+**Theme Color:** Imperial Plum Violet (`#430363ff`) & Spark Gold (`#FFE600` / `#FFF59D`)  
 **Role:** High-Speed Explosive Rushdown Brawler, Blast Assassin, Tactical Nuke Finisher  
 
 ---
@@ -35,7 +35,7 @@ Reze's body model, hair silhouette, and attire strictly adhere to the front-prof
 - **Spark Ignition**: Concentric transparent gradient circles simulating white-hot embers (`rgba(255, 230, 0, 0.8)`) and flame rims (`rgba(255, 107, 26, 0.5)`). Zero CPU `shadowBlur` is used.
 - **Manga Action Speed Lines (Rule 16 Standard)**:
   - 4-point filled needle polygons (`maxThick: 1.2px – 2.2px`) streaming strictly behind Reze during supersonic rocket lunges.
-  - **4-Slot Color Theme**: Tangerine Flame Orange (`#FF6B1A`), Molten Blast Crimson (`#FF2E00`), Pure White Kinetic Spark (`#FFFFFF`), and Manga Dark Gunpowder Ink (`#1A1622`).
+  - **4-Slot Color Theme**: Imperial Plum Violet (`#430363ff`), Molten Blast Crimson (`#FF2E00`), Pure White Kinetic Spark (`#FFFFFF`), and Manga Dark Gunpowder Ink (`#1A1622`).
 
 ---
 
@@ -58,7 +58,7 @@ Reze's body model, hair silhouette, and attire strictly adhere to the front-prof
 When Reze's HP drops to 0 for the first time in a round:
 * Reze does not immediately perish. Instead, she pulls her neck collar pin with an audible metallic *clink*.
 * An instantaneous radial explosion (`radius: 140px`, `damage: 40`, `knockback: 28`) detonates outward, knocking away attackers, clearing enemy projectiles, and restoring **50% Max HP** (`170 HP`).
-* Reze immediately activates **Bomb Devil Hybrid Form** for 10 seconds, gaining `+17% Movement Speed`, increased punch reach, and faster skill cooldown recovery.
+* Reze immediately activates **Bomb Devil Hybrid Form** permanently for the remainder of the round (no duration countdown to end it), gaining `+17% Movement Speed`, increased punch reach, and unlocking all Devil skill bars.
 
 ---
 
@@ -103,7 +103,7 @@ When Reze's HP drops to 0 for the first time in a round:
 * **Visual Style**: Discrete retro pixel art (`P = 2.0`) with stepped shockwave boundaries, jagged flame teeth, and flying ember debris.
 * **Arc / Reach**: `120° frontal cone`, `75px reach`
 * **Combo Pattern**:
-  * **Hit 1 (Left Palm Snap)**: Left-handed forward snap strike spawning a sweeping 120° pixelated combustion crescent arc (`#FF6B1A` / `#FFE600` / `#FFFFFF` core with `#14101A` ink outline) and knuckle spark flare, dealing `16` damage + `1` Gunpowder stack.
+  * **Hit 1 (Left Palm Snap)**: Left-handed forward snap strike spawning a sweeping 120° pixelated combustion crescent arc (`#430363ff` / `#FFE600` / `#FFFFFF` core with `#14101A` ink outline) and knuckle spark flare, dealing `16` damage + `1` Gunpowder stack.
   * **Hit 2 (Right Cross Chop)**: Right-handed counter-chop spawning an opposing sweep 120° pixel arc with dispersing pixel embers, dealing `16` damage + `1` Gunpowder stack.
   * **Hit 3 (Finisher — "Spark Slap" Palm Detonation)**: Step-in explosive two-handed palm thrust triggering a massive 120° multi-layered pixel blast cone with jagged flame teeth, gunpowder smoke cloud fringes, supersonic compression shock arc, and flying shrapnel pixels dealing `28` damage + `32` knockback.
 

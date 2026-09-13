@@ -468,19 +468,35 @@ async function main() {
         mockCtx.resetStackDepth();
         fighter.reset();
 
-        // 1. Verify HUD skill bars
-        const hudSkills = getSkillDataForFighter(fighter);
-        if (!hudSkills || hudSkills.length !== 4) {
-          throw new Error(`Reze HUD skill bars expected 4 skills, got ${hudSkills?.length}`);
+        // 1. Verify HUD skill bars:
+        // Human Form: only Ultimate is visible (1 skill bar)
+        fighter.isHybridModeActive = false;
+        fighter.isExecutingNuke = false;
+        const hudSkillsHuman = getSkillDataForFighter(fighter);
+        if (!hudSkillsHuman || hudSkillsHuman.length !== 1 || hudSkillsHuman[0].id !== 'nuke') {
+          throw new Error(`Reze Human Form expected 1 HUD skill bar (nuke), got ${hudSkillsHuman?.length}`);
         }
-        const expectedColor = fighter.color || CONFIG.reze?.color || '#FF6B1A';
-        for (let s of hudSkills) {
+        const expectedColor = fighter.color || CONFIG.reze?.color || '#430363ff';
+        if (hudSkillsHuman[0].color !== expectedColor) {
+          throw new Error(`Reze Human Form HUD skill violated Rule 18 with mismatched color ${hudSkillsHuman[0].color}`);
+        }
+
+        // Bomb Devil Hybrid Form (Ultimate activated): all 4 skill bars are displayed
+        fighter.isHybridModeActive = true;
+        const hudSkillsHybrid = getSkillDataForFighter(fighter);
+        if (!hudSkillsHybrid || hudSkillsHybrid.length !== 4) {
+          throw new Error(`Reze Bomb Devil Hybrid Form expected 4 HUD skill bars, got ${hudSkillsHybrid?.length}`);
+        }
+        for (let s of hudSkillsHybrid) {
           if (s.color !== expectedColor) {
             throw new Error(`Reze HUD skill '${s.label}' violated Rule 18 with mismatched color ${s.color}`);
           }
         }
+        fighter.isHybridModeActive = false;
 
         // 2. Test Collar Pin Revive on lethal damage
+        const origRevive = CONFIG.reze?.enableCollarPinRevive;
+        if (CONFIG.reze) CONFIG.reze.enableCollarPinRevive = true;
         fighter.hp = 10;
         fighter.reviveStocks = 1;
         fighter.isHybridModeActive = false;
@@ -495,6 +511,7 @@ async function main() {
         if (fighter.hp <= 0) {
           throw new Error(`Reze Collar Pin Revive failed to restore HP! HP: ${fighter.hp}`);
         }
+        if (CONFIG.reze) CONFIG.reze.enableCollarPinRevive = origRevive;
 
         // 3. Test Spark Flechette projectile barrage
         fighter.reset();
@@ -515,24 +532,170 @@ async function main() {
           throw new Error(`Reze failed to spawn Decoy Bomb! Count: ${fighter.activeDecoys.length}`);
         }
 
-        // 5. Test Rocket Lunge
+        // 5. Test Rocket Lunge (Only works during Bomb Devil form)
         fighter.rocketCooldown = 0;
+        fighter.isHybridModeActive = false;
         fighter._activateRocketLunge(dummyOpponent);
-        if (!fighter.isRocketLunging) {
-          throw new Error(`Reze failed to initiate Rocket Lunge!`);
+        if (fighter.isRocketLunging) {
+          throw new Error(`Reze Rocket Lunge should not activate in Human Form!`);
         }
 
-        // 6. Test Megaton Tsar Nuke Ultimate
+        fighter.isHybridModeActive = true;
+        fighter._activateRocketLunge(dummyOpponent);
+        if (!fighter.isRocketLunging) {
+          throw new Error(`Reze failed to initiate Rocket Lunge in Bomb Devil Form!`);
+        }
+        fighter.isRocketLunging = false;
+        fighter.isHybridModeActive = false;
+
+        // 6. Test Megaton Tsar Nuke Ultimate (Human Form triggers pin pull transformation; Devil Form triggers dive assault)
         fighter.nukeCooldown = 0;
         fighter._activateMegatonNuke(dummyOpponent);
-        if (!fighter.isExecutingNuke || fighter.nukePhase !== 'TRANSFORM') {
-          throw new Error(`Reze failed to initiate Megaton Tsar Nuke Ultimate!`);
+        if (!fighter.isPullingPin) {
+          throw new Error(`Reze failed to initiate Collar Pin Pull transformation in Human Form!`);
+        }
+        fighter.isPullingPin = false;
+        fighter.isHybridModeActive = true;
+        fighter.nukeCooldown = 0;
+        fighter._activateMegatonNuke(dummyOpponent);
+        if (!fighter.isExecutingNuke || fighter.nukePhase !== 'DIVE') {
+          throw new Error(`Reze failed to initiate Megaton Tsar Nuke Dive in Bomb Devil Form!`);
+        }
+
+        // 7. Test Bomb Devil Form: Punch AOE Explosions on every basic attack
+        fighter.reset();
+        fighter.isHybridModeActive = true;
+        fighter.x = 200;
+        fighter.y = 200;
+        fighter.gunAngle = 0; // facing right along +X
+        dummyOpponent.x = 250;
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+
+        const aoeDummy = {
+          x: 250,
+          y: 240,
+          r: 25,
+          hp: 100,
+          maxHp: 100,
+          isDead: false,
+          knockbackVx: 0,
+          knockbackVy: 0,
+          applyTimeStop: () => {}
+        };
+        const prevFighters = state.fighters;
+        state.fighters = [fighter, dummyOpponent, aoeDummy];
+
+        fighter._performExplosivePunch(dummyOpponent);
+
+        if (fighter.activePalmBlasts.length !== 1) {
+          throw new Error(`Reze expected 1 punch AOE explosion in activePalmBlasts, got ${fighter.activePalmBlasts.length}`);
+        }
+        if (!fighter.activePalmBlasts[0].isPunchExplosion) {
+          throw new Error(`Reze punch explosion missing isPunchExplosion flag!`);
+        }
+        if (dummyOpponent.hp >= 100) {
+          throw new Error(`Reze punch failed to deal damage to direct target!`);
+        }
+        if (aoeDummy.hp >= 100) {
+          throw new Error(`Reze punch failed to deal AOE explosion damage to nearby target in blast radius!`);
+        }
+        if (dummyOpponent.knockbackVx <= 0) {
+          throw new Error(`Reze punch explosion failed to apply directional knockback!`);
+        }
+
+        // Test Finisher (Hit 3)
+        fighter.shootCooldown = 0;
+        fighter._performExplosivePunch(dummyOpponent);
+        fighter.shootCooldown = 0;
+        fighter._performExplosivePunch(dummyOpponent);
+        if (fighter.punchComboCount !== 0) {
+          throw new Error(`Reze expected finisher combo count 0, got ${fighter.punchComboCount}`);
+        }
+
+        state.fighters = prevFighters;
+
+        // 8. Test Bomb Devil Form vs Human Form for Rocket Lunge
+        // Human form: must NOT trigger Rocket Lunge on wall collision or skill activation
+        fighter.reset();
+        fighter.isHybridModeActive = false;
+        fighter.rocketCooldown = 0;
+        fighter._activateRocketLunge(dummyOpponent);
+        if (fighter.isRocketLunging) {
+          throw new Error(`Reze Human Form must NOT activate Supersonic Rocket Lunge!`);
+        }
+
+        const testArena = { x: 50, y: 50, width: 800, height: 600 };
+        fighter.x = 55;
+        fighter.y = 300;
+        fighter.resolveWallBounce(testArena, dummyOpponent);
+        if (fighter.isRocketLunging) {
+          throw new Error(`Reze Human Form must NOT trigger Rocket Lunge on wall collision!`);
+        }
+
+        // Bomb Devil form: triggers Supersonic Rocket Lunge upon wall collision
+        fighter.reset();
+        fighter.isHybridModeActive = true;
+        fighter.x = 55; // right at left wall (x - r <= 50)
+        fighter.y = 300;
+        dummyOpponent.x = 400;
+        dummyOpponent.y = 300;
+        fighter.isRocketLunging = false;
+        fighter.rocketCooldown = 0;
+        fighter.wallLungeDebounceTimer = 0;
+
+        const didLunge = fighter.resolveWallBounce(testArena, dummyOpponent);
+        if (!didLunge || !fighter.isRocketLunging) {
+          throw new Error(`Reze Bomb Devil failed to trigger Supersonic Rocket Lunge upon wall collision!`);
+        }
+        if (fighter.rocketLungeVx <= 0) {
+          throw new Error(`Reze wall Rocket Lunge should launch rightwards into arena, got vx=${fighter.rocketLungeVx}`);
+        }
+        if (fighter.rocketCooldown !== fighter.rocketCooldownMax) {
+          throw new Error(`Reze wall Rocket Lunge failed to trigger skill cooldown!`);
         }
 
         fighter.draw(mockCtx, null);
-        assertCanvasStackBalance(`Reze Bomb Devil Ultimate and Combat Draw`);
+        assertCanvasStackBalance(`Reze Bomb Devil Wall Rocket Lunge Draw`);
+
+        // 9. Test Reze Basic Attack Distance Restraint & Cadence (No spam when out of range)
+        fighter.reset();
+        state.fighters = [fighter, dummyOpponent];
+        dummyOpponent.hp = 100;
+        dummyOpponent.x = 600; // Far out of melee range
+        dummyOpponent.y = 300;
+        fighter.x = 200;
+        fighter.y = 300;
+        fighter.shootCooldown = 0;
+        fighter.isHybridModeActive = false;
+
+        // In Human form, shooting when out of range must NOT attack
+        const humanFarShot = fighter.shoot(0);
+        if (humanFarShot !== false || fighter.punchAnimTimer > 0 || fighter.activeKnifeSlashes.length > 0) {
+          throw new Error(`Reze Human Form incorrectly attacked while opponent was out of range!`);
+        }
+
+        // In Bomb Devil form, shooting when out of range must NOT attack
+        fighter.isHybridModeActive = true;
+        fighter.shootCooldown = 0;
+        const devilFarShot = fighter.shoot(0);
+        if (devilFarShot !== false || fighter.punchAnimTimer > 0 || fighter.activeMartialArcs.length > 0) {
+          throw new Error(`Reze Devil Form incorrectly attacked while opponent was out of range!`);
+        }
+
+        // When opponent moves into melee range, shoot MUST trigger clean strike with recovery cooldown
+        dummyOpponent.x = 240; // 40px away, within punchReach (75 + 25)
+        fighter.shootCooldown = 0;
+        const devilCloseShot = fighter.shoot(0);
+        if (devilCloseShot !== true || fighter.punchAnimTimer === 0) {
+          throw new Error(`Reze Devil Form failed to attack opponent in melee range!`);
+        }
+        if (fighter.shootCooldown !== 20) {
+          throw new Error(`Reze expected 20 frame punch cadence on hit 1, got ${fighter.shootCooldown}`);
+        }
 
         fighter.reset();
+        state.fighters = prevFighters;
       }
       if (fType === 'mahito') {
         mockCtx.resetStackDepth();

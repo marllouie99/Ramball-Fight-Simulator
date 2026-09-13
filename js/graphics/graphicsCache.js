@@ -38,6 +38,7 @@ export function initGraphicsCache() {
     'Assets/model/POWER-MODEL-SKIN.png',
     'Assets/model/Makima-model-skin.png',
     'Assets/model/REZE-MODEL-SKIN.png',
+    'Assets/model/REZE-WEAPON.png?v=3',
     'Assets/model/denji-devilform-model-skin.png',
     'Assets/Overlays/mahitos-de.png'
   ];
