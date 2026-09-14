@@ -32,11 +32,7 @@ import { isInsideRubbickStolenVoid } from './fighters/rubbick/rubbickThemes.js';
  * Returns true if the entity is currently hit by, dragged by, or suppressed by Getsuga Tensho.
  */
 export function isSuppressedByGetsuga(fighter) {
-  if (!fighter) return false;
-  return Boolean(
-    fighter.isDraggedByGetsuga ||
-    (fighter._hitByGetsugaTimer && fighter._hitByGetsugaTimer > 0)
-  );
+  return false;
 }
 
 export function isSuppressedByFuga(fighter) {
@@ -48,18 +44,12 @@ export function isSuppressedByFuga(fighter) {
 }
 
 /**
- * Immediately cancels, hides, and clears all afterimages and active attack effects on a target hit by Getsuga Tensho.
+ * Clears afterimages on target.
  */
 export function suppressAfterimagesAndAttackEffects(target) {
   if (!target) return;
-  if (typeof target.suppressCombatAndVisuals === 'function') {
-    target.suppressCombatAndVisuals({ isGetsuga: true, timer: 24 });
-  } else {
-    if (typeof target.clearAllAfterimages === 'function') target.clearAllAfterimages();
-    else if (target.afterImages) target.afterImages.length = 0;
-    if (typeof target.clearAllAttackEffects === 'function') target.clearAllAttackEffects();
-    target._hitByGetsugaTimer = Math.max(target._hitByGetsugaTimer || 0, 24);
-  }
+  if (typeof target.clearAllAfterimages === 'function') target.clearAllAfterimages();
+  else if (target.afterImages) target.afterImages.length = 0;
 }
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
@@ -68,11 +58,6 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
     opts = { source: opts, isBleed: opts === 'bleed', isCurse: opts === 'curse' };
   } else if (!opts || typeof opts !== 'object') {
     opts = {};
-  }
-
-  // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects on any target
-  if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !target.isTurret && !target.isDispenser) {
-    suppressAfterimagesAndAttackEffects(target);
   }
 
   // Fuga / Divine Flame hit reaction: immediately suppress afterimages and active attack effects on any target
@@ -388,7 +373,7 @@ export class Fighter {
       d.characterId === 'makima' ||
       d.type === 'makima'
     );
-    const hpRatio = isMakima ? ((typeof CONFIG !== 'undefined' && CONFIG.makima?.maxHpRatio) ? CONFIG.makima.maxHpRatio : 0.50) : 1.0;
+    const hpRatio = isMakima ? ((typeof CONFIG !== 'undefined' && CONFIG.makima?.maxHpRatio !== undefined) ? CONFIG.makima.maxHpRatio : 1.0) : 1.0;
     const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || (isMakima ? (MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp) : null);
 
     if (!isTurretOrMinion && (MODE_SETTINGS[state.mode]?.fixedHp || (isMakima && modeFixed))) {
@@ -526,7 +511,6 @@ export class Fighter {
     if (this.hp <= 0 || this.isDead) return true;
     if (this.isTargetOfAmbush) return true;
     if (this.isCaughtInTelekinesis) return true;
-    if (this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0)) return true;
     if (this._hitByFugaTimer && this._hitByFugaTimer > 0) return true;
     if (this._hitByDivineFlameTimer && this._hitByDivineFlameTimer > 0) return true;
     if (this.timeStopTimer && this.timeStopTimer > 0) return true;
@@ -739,7 +723,7 @@ export class Fighter {
    */
   suppressCombatAndVisuals(options = {}) {
     if (options.isGetsuga) {
-      this._hitByGetsugaTimer = Math.max(this._hitByGetsugaTimer || 0, options.timer || 24);
+      this._hitByGetsugaTimer = 0;
     }
     if (options.isDivineFlame || options.isFuga) {
       this._hitByFugaTimer = Math.max(this._hitByFugaTimer || 0, options.timer || 45);
@@ -748,9 +732,11 @@ export class Fighter {
       this.paralyzeTimer = Math.max(this.paralyzeTimer || 0, options.paralyzeDuration);
     }
     this.clearAllAfterimages();
-    this.clearAllAttackEffects();
-    if (typeof this.interruptAttacks === 'function') {
-      this.interruptAttacks(true);
+    if (!options.isGetsuga) {
+      this.clearAllAttackEffects();
+      if (typeof this.interruptAttacks === 'function') {
+        this.interruptAttacks(true);
+      }
     }
     this.clearAllAfterimages();
   }
@@ -772,8 +758,6 @@ export class Fighter {
   /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Laser Beam, Layla Beam). */
   isCaughtInBeam() {
     return !!(
-      this.isDraggedByGetsuga ||
-      (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
       this.caughtInGenosFlurry ||
       this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
@@ -897,6 +881,34 @@ export class Fighter {
     const isEscanor = this.characterId === 'escanor' || this.type === 'escanor' || this._def?.id === 'escanor';
     if (isEscanor) {
       if ((this.slashSwingTimer && this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) {
+        return true;
+      }
+    }
+
+    // Ichigo: Basic sword swing, Getsuga release swing / recovery, Grand Finisher, Shunpo Combo, or Transformations
+    const isIchigo = this.characterId === 'ichigo' || this.type === 'ichigo' || this._def?.id === 'ichigo';
+    if (isIchigo) {
+      if (
+        (this.slashSwingTimer && this.slashSwingTimer > 0) ||
+        this.isGetsugaSlash ||
+        this.isChannelingGetsuga ||
+        (this.getsugaChargeTimer && this.getsugaChargeTimer > 0) ||
+        (this.getsugaSlideTimer && this.getsugaSlideTimer > 0) ||
+        (this.getsugaRecoveryTimer && this.getsugaRecoveryTimer > 0) ||
+        this.isFinalGetsugaRecovery ||
+        this.isFinalMassiveGetsuga ||
+        this.shunpoComboActive ||
+        this.isShunpoDashing ||
+        this.isShunpoDisengaging ||
+        (this.shunpoComboDelayTimer && this.shunpoComboDelayTimer > 0) ||
+        (this.shunpoDisengageDelayTimer && this.shunpoDisengageDelayTimer > 0) ||
+        this.isChannelingBankai ||
+        (this.bankaiBurstTimer && this.bankaiBurstTimer > 0) ||
+        (this.hollowMaskFormationTimer && this.hollowMaskFormationTimer > 0) ||
+        (this.hollowBurstTimer && this.hollowBurstTimer > 0) ||
+        (typeof this._isGetsugaVoicelinePlaying === 'function' && this._isGetsugaVoicelinePlaying()) ||
+        (typeof this._isFinalGetsugaVoicelinePlaying === 'function' && this._isFinalGetsugaVoicelinePlaying())
+      ) {
         return true;
       }
     }
@@ -1331,10 +1343,6 @@ export class Fighter {
     if (this.frozenByCronos || this.isCronosStasis) {
       this.vx = 0;
       this.vy = 0;
-      this._handleFrozenSkillCooldowns();
-      return true;
-    }
-    if (this.isDraggedByGetsuga) {
       this._handleFrozenSkillCooldowns();
       return true;
     }
@@ -1917,6 +1925,11 @@ export class Fighter {
       }
     }
 
+    // Damage cannot be applied when round or match has already concluded, or game is paused/countdown
+    if (typeof state !== 'undefined' && state && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.gameState === 'gameOver' || state.gameState === 'paused' || state.gameState === 'countdown')) {
+      return false;
+    }
+
     const isHeal = opts.isHeal || amount < 0;
     if (isHeal) {
       if (this.hp <= 0) return false;
@@ -2203,7 +2216,7 @@ export class Fighter {
    * Delays round/match end if any enemy is currently shivering in Mahito's Soul Disfigurement build-up.
    */
   checkRoundOrMatchEnd(attacker = null) {
-    if (!state) return;
+    if (!state || state.gameState !== 'playing') return;
 
     // Helper: an entity is "in play" if alive, a doppelganger with copies, evading Mahito, or shivering in Soul Disfigurement
     const _isEffectivelyAlive = (f) => {
@@ -2211,48 +2224,6 @@ export class Fighter {
       if (typeof f.isEffectivelyAlive === 'function') return f.isEffectivelyAlive();
       return f.hp > 0 && !f.dead;
     };
-
-    // ── POST-MORTEM SIMULTANEOUS KILL / DRAW MECHANIC ──
-    // If the round or match was already ending, but the last remaining fighter has now ALSO died (e.g. from Gojo's flying Purple, Fuga, Getsuga, burn, etc.)
-    if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
-      const anyLiving = state.fighters && state.fighters.some(f => f && _isEffectivelyAlive(f));
-      if (!anyLiving && !state.isRoundDraw && !state.isDraw) {
-        // Both fighters/teams are dead! Convert this round into a DRAW!
-        if (state.roundWinner) {
-          const prevWinnerIdx = state.fighters.indexOf(state.roundWinner);
-          if (prevWinnerIdx >= 0 && state.scores && state.scores[prevWinnerIdx] > 0) {
-            state.scores[prevWinnerIdx]--; // Revert the tentative round win score
-          }
-        }
-        if (state.teamScores && typeof state.winningTeam !== 'undefined') {
-          if (state.teamScores[state.winningTeam] > 0) {
-            state.teamScores[state.winningTeam]--;
-          }
-        }
-
-        state.roundWinner = null;
-        state.matchWinner = null;
-        state.isRoundDraw = true;
-        state.isDraw = true;
-        state.gameState = 'roundEnd';
-        state.roundEndTimer = 0; // Reset timer so the Double KO / Draw banner is shown cleanly
-        state._isChampionLayoutActive = false;
-        state._hasPlayedChampionYouWinVoice = true; // Suppress single-player "You Win"
-        state._hasPlayedChampionVictoryVoice = true;
-
-        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-        if (typeof spawnFloatingText === 'function' && arena) {
-          spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
-        }
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          const bell = getAnnouncerSound('bell');
-          if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
-        }
-      }
-      return;
-    }
-
-    if (state.gameState !== 'playing') return;
 
     const aliveFighters = state.fighters.filter((f) => f && _isEffectivelyAlive(f));
     const aliveCount = aliveFighters.length;
@@ -2334,10 +2305,6 @@ export class Fighter {
           state.gameState = 'roundEnd';
           stopAllSounds(true, 2000, 500);
           stopAllLoopingSounds();
-          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-          if (typeof spawnFloatingText === 'function' && arena) {
-            spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
-          }
           if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
             const bell = getAnnouncerSound('bell');
             if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
@@ -2395,10 +2362,6 @@ export class Fighter {
           state.gameState = 'roundEnd';
           stopAllSounds();
           stopAllLoopingSounds();
-          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-          if (typeof spawnFloatingText === 'function' && arena) {
-            spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
-          }
           return;
         }
 
@@ -2449,10 +2412,6 @@ export class Fighter {
         state.gameState = 'roundEnd';
         stopAllSounds();
         stopAllLoopingSounds();
-        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-        if (typeof spawnFloatingText === 'function' && arena) {
-          spawnFloatingText(arena.x + arena.width / 2, arena.y + arena.height / 2 - 30, 'DOUBLE K.O. - DRAW!', '#FFD700', 36);
-        }
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           const bell = getAnnouncerSound('bell');
           if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);

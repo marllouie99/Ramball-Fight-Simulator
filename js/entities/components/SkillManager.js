@@ -45,6 +45,7 @@ export class Skill {
     this.onExpire = def.onExpire || null;
     this.onFrozenTick = def.onFrozenTick || null;
     this.canCast = def.canCast || null;
+    this.canTickDuration = def.canTickDuration || null;
     this.getHudData = def.getHudData || null;
 
     this.customData = def.customData || {};
@@ -296,6 +297,7 @@ export class SkillManager {
       // Do not drain active duration if skill is in channeling / transition windup phase
       if (skill.channelTimerKey && (this.fighter[skill.channelTimerKey] || 0) > 0) continue;
       if (skill.channelingKey && typeof this.fighter[skill.channelingKey] === 'number' && this.fighter[skill.channelingKey] > 0) continue;
+      if (typeof skill.canTickDuration === 'function' && !skill.canTickDuration(this.fighter, skill)) continue;
 
       if (skill.durationKey) {
         let curDur = skill.getDuration();

@@ -828,3 +828,58 @@ Inside the shape body, calculate depth relative to the apex, leading edge, cente
 - **Diamond Flares & Reiatsu Motes**: Positioned strictly on snapped integer coordinates (`_drawPixelDiamond` or `ctx.fillRect(snap(x), snap(y), P, P)`).
 - **Vapor Condensation Rings**: Stepped perimeter loops calculating $(x, y)$ at discrete angle steps snapped to $P$.
 - **Micro-Lightning Bolts**: Stepped orthogonal/diagonal staircase lines (`while (curY > targetY || curX !== targetX)`), never smooth continuous strokes.
+
+## 24. Configuration File Preservation & Git Safety Standard
+- **NEVER** run `git checkout <file>`, `git restore <file>`, `git reset --hard`, or similar destructive commands on files under `js/configs/characters/` or `js/core/` (e.g., `ichigoConfig.js`, `modeConfig.js`, `settingsConfig.js`).
+- **Preserve User Balance & Config Edits**: Any uncommitted modifications inside `js/configs/` or `js/core/` represent deliberate user tuning (damage, HP, speeds, cooldowns, toggles) and MUST NEVER be reverted or overwritten as "test cleanup".
+- When running automated verification test scripts (like `scripts/testAllFighters.mjs`), test suites MUST accommodate custom config values without resetting the workspace.
+
+## 36. Continuous 360° Skill Aiming & Direction Commitment (Non-Snap Aim Lock Standard)
+
+### Overview & Core Mandate
+All active skills, charged special attacks, finishing moves, beams, projectile waves, and counter-strikes (e.g., Saitama's Counter Punch, Gojo's Red & Hollow Purple, Sukuna's Divine Flame / Fuga, Ichigo's Getsuga Tensho & Final Massive Getsuga, Yuta's Pure Love Beam, Genos's Spiral Incineration Cannon) **MUST support continuous 360° omnidirectional targeting upon initiation** while **strictly locking committed aim orientation without rotation or snap auto-aiming during channeling and active release**.
+
+### 1. Continuous 360° Aim Initiation
+- When an ability is triggered by AI or manual player input, calculate the target angle dynamically using continuous trigonometry:
+  ```javascript
+  const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+  const myY = this.y - (this.z || 0);
+  const dx = (target.x !== undefined ? target.x : this.x) - this.x;
+  const dy = targetY - myY;
+  const castAngle = Math.atan2(dy, dx);
+  ```
+- **NEVER** clamp or snap skill targeting to 4 cardinal directions unless the weapon is explicitly a discrete grid basic primary shoot.
+
+### 2. Committed Aim Lock (Zero Auto-Aim Tracking During Channeling & Firing)
+- Snapshot the computed angle into a dedicated state property upon skill initiation (e.g., `this.getsugaCastAngle`, `this.pureLoveBeamLockedAngle`, `this.divineFlameCastAngle`, `this.purpleCastAngle`, `this.redAimAngle`, `this._counterAimAngle`).
+- Throughout the entire wind-up, charge, slide, channeling, and active firing lifecycle:
+  - `aim(opponent)` and `canAim()` MUST disable auto-aim tracking and rotational steering.
+  - `this.gunAngle` and `this.angle` MUST remain strictly clamped to the committed cast angle:
+    ```javascript
+    if (this.isChannelingSkill || this.isFiringSkill) {
+      if (this.skillCastAngle !== undefined) {
+        this.gunAngle = this.skillCastAngle;
+        this.angle = this.skillCastAngle;
+      }
+      return; // Prevent auto-aim rotation while channeling/firing!
+    }
+    ```
+- The fighter MUST NOT rotate, track, or snap towards the opponent if the opponent moves, dodges, or teleports during the attack sequence.
+
+### 3. Projectile Launch & Kinetic Recoil Trigonometry
+- Spawning projectiles, beams, or shockwaves MUST inherit the exact locked cast angle:
+  ```javascript
+  proj.angle = lockAngle;
+  proj.vx = Math.cos(lockAngle) * speed;
+  proj.vy = Math.sin(lockAngle) * speed;
+  ```
+- Any physical recoil pushback applied to the attacker MUST kick backward directly opposite to the locked angle:
+  ```javascript
+  this.vx = -Math.cos(lockAngle) * recoil;
+  this.vy = -Math.sin(lockAngle) * recoil;
+  ```
+
+### 4. Companion & Minion Spatial Synchronization
+- Companion entities and summons active during the skill (e.g., Rika charging or firing Pure Love Beam) MUST align their angle, spawn offset, and beam follow direction strictly to the owner's locked cast angle (`rika.angle = lockAngle; rika.beamFollowAngle = lockAngle;`).
+
+

@@ -77,6 +77,12 @@ class AudioEventEmitter {
     fadeOutSound(handle, fadeMs);
   }
 
+  stopSFX(handle) {
+    if (handle) {
+      stopSound(handle);
+    }
+  }
+
   /**
    * Play a voiceline for a specific fighter, cutting off any previously playing voiceline
    * on that same fighter. This ensures only one voiceline plays per fighter at a time.

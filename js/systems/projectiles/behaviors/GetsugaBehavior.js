@@ -9,16 +9,6 @@ export class GetsugaBehavior extends ProjectileBehavior {
   update(projectile, fighters, system) {
     // 0. Gojo Limitless Infinity Stasis Guard: projectile frozen motionless in space
     if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0) {
-      if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
-        for (const [target] of projectile.draggedTargets.entries()) {
-          if (target) {
-            target.isDraggedByGetsuga = false;
-            target.preventKnockbackBounce = false;
-            target.z = 0;
-          }
-        }
-        projectile.draggedTargets.clear();
-      }
       return false;
     }
 
@@ -164,135 +154,6 @@ export class GetsugaBehavior extends ProjectileBehavior {
       }
     }
 
-    // 3. Process Dragged Targets (Carrying caught enemies forward along with the crescent wave)
-    if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
-      const waveSpeed = Math.hypot(projectile.vx, projectile.vy);
-      const dirX = waveSpeed > 0.001 ? projectile.vx / waveSpeed : 0;
-      const dirY = waveSpeed > 0.001 ? projectile.vy / waveSpeed : 0;
-      const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
-
-      for (const [target, dragFrames] of projectile.draggedTargets.entries()) {
-        const attackerFighter = (fighters && typeof projectile.owner === 'number') ? fighters[projectile.owner] : projectile.ownerFighter;
-        if (!target || target.hp <= 0 || target.isDead || target.dead || target.isRespawning || (attackerFighter && typeof attackerFighter.isTeammate === 'function' && attackerFighter.isTeammate(target))) {
-          if (target) {
-            target.isDraggedByGetsuga = false;
-            target.preventKnockbackBounce = false;
-          }
-          projectile.draggedTargets.delete(target);
-          continue;
-        }
-
-        target.isDraggedByGetsuga = true;
-        target.preventKnockbackBounce = true;
-        suppressAfterimagesAndAttackEffects(target);
-
-        // Getsuga Tensho maintains Paralyze debuff while carrying target
-        const isTargetAdapted = Boolean(target.adaptedGetsuga || (target.adaptedSkills && (target.adaptedSkills['getsugaTensho'] || target.adaptedSkills['getsuga'])));
-        if (!isTargetAdapted) {
-          const paralyzeDuration = projectile.getsugaForm === 'final_bankai'
-            ? (CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28)
-            : (projectile.getsugaForm === 'bankai_hollow'
-              ? (CONFIG.ichigo?.bankaiHollowGetsugaParalyzeDuration || 24)
-              : (projectile.getsugaForm === 'hollow'
-                ? (CONFIG.ichigo?.hollowGetsugaParalyzeDuration || 20)
-                : (projectile.getsugaForm === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaParalyzeDuration || 20) : (CONFIG.ichigo?.getsugaParalyzeDuration || 18))));
-          if (typeof target.applyParalyze === 'function') {
-            target.applyParalyze(paralyzeDuration);
-          } else {
-            target.paralyzeTimer = Math.max(target.paralyzeTimer || 0, paralyzeDuration);
-            if (target.statusEffects && typeof target.statusEffects.applyParalyze === 'function') {
-              target.statusEffects.applyParalyze(paralyzeDuration);
-            }
-          }
-          if (typeof target.interruptAttacks === 'function') {
-            target.interruptAttacks(true);
-          }
-        }
-
-        // Check if target has reached the arena wall boundary
-        let isAtWall = false;
-        if (arena) {
-          const pad = target.r || 25;
-          const minX = arena.x + pad;
-          const maxX = arena.x + arena.width - pad;
-          const minY = arena.y + pad;
-          const maxY = arena.y + arena.height - pad;
-
-          const nextX = target.x + dirX * (waveSpeed * 0.40);
-          const nextY = target.y + dirY * (waveSpeed * 0.40);
-          if (nextX <= minX || nextX >= maxX || nextY <= minY || nextY >= maxY ||
-              target.x <= minX + 1 || target.x >= maxX - 1 || target.y <= minY + 1 || target.y >= maxY - 1) {
-            isAtWall = true;
-            target.x = Math.max(minX, Math.min(maxX, nextX));
-            target.y = Math.max(minY, Math.min(maxY, nextY));
-          }
-        }
-
-        if (isAtWall) {
-          // Slammed into wall: Stop all velocities and pin target in place without sliding
-          target.vx = 0;
-          target.vy = 0;
-          target.knockbackVx = 0;
-          target.knockbackVy = 0;
-          target.preventKnockbackBounce = true;
-
-          // Single clean wall impact spark & flash (no ground/wall cracks)
-          if (!target._getsugaWallImpactTimer || target._getsugaWallImpactTimer <= 0) {
-            target._getsugaWallImpactTimer = 30; // Debounce so impact triggers once per slam
-            if (typeof spawnImpactFlash === 'function') {
-              spawnImpactFlash(target.x, target.y, 22, projectile.color || '#00E5FF');
-            }
-            if (typeof triggerGlobalScreenShake === 'function') {
-              triggerGlobalScreenShake(2.5, 5);
-            }
-            const hitSfx = CONFIG.ichigo?.sounds?.getsugaHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
-            const hitVol = (CONFIG.ichigo?.soundVolumes?.getsugaHit ?? 0.75) * 0.85;
-            audioSystem.playSFX(hitSfx, hitVol);
-          }
-
-          // Release from active wave dragging immediately upon hitting the wall so enemy stays firmly pinned in place
-          target.isDraggedByGetsuga = false;
-          target.preventKnockbackBounce = false;
-          target.z = 0;
-          if (typeof target.aim === 'function' && typeof attacker !== 'undefined' && attacker && !attacker.isDead) {
-            target.aim(attacker);
-          }
-          projectile.draggedTargets.delete(target);
-          continue;
-        }
-
-        // Apply physical drag impulse matching wave velocity (in open arena)
-        const dragSpeed = waveSpeed * 0.90;
-        target.vx = dirX * dragSpeed;
-        target.vy = dirY * dragSpeed;
-        target.knockbackVx = dirX * dragSpeed;
-        target.knockbackVy = dirY * dragSpeed;
-
-        // Position entity smoothly along the front of the crescent wave
-        target.x += dirX * (waveSpeed * 0.40);
-        target.y += dirY * (waveSpeed * 0.40);
-
-        // Clamp entity position within arena bounds
-        if (arena) {
-          const pad = target.r || 25;
-          target.x = Math.max(arena.x + pad, Math.min(arena.x + arena.width - pad, target.x));
-          target.y = Math.max(arena.y + pad, Math.min(arena.y + arena.height - pad, target.y));
-        }
-
-        if (dragFrames <= 1) {
-          target.isDraggedByGetsuga = false;
-          target.preventKnockbackBounce = false;
-          target.z = 0;
-          if (typeof target.aim === 'function' && typeof attacker !== 'undefined' && attacker && !attacker.isDead) {
-            target.aim(attacker);
-          }
-          projectile.draggedTargets.delete(target);
-        } else {
-          projectile.draggedTargets.set(target, dragFrames - 1);
-        }
-      }
-    }
-
     const allCandidates = [];
     if (fighters) allCandidates.push(...fighters);
     if (typeof state !== 'undefined' && state.illusions) allCandidates.push(...state.illusions);
@@ -373,34 +234,26 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
         // Apply skill damage (continuous multi-tick damage for ALL Getsuga waves)
         const tickDamage = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20)
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 5)
           : (form === 'bankai_hollow'
-            ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 24)
+            ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 6)
             : (form === 'hollow'
-              ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 16)
+              ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 3)
               : (isBankai
-                ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16)
-                : (CONFIG.ichigo?.getsugaTickDamage || 10))));
+                ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4)
+                : (CONFIG.ichigo?.getsugaTickDamage || 2))));
         applyDamageToTarget(f, tickDamage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, isFinalGetsugaTick: isFinal, isFinalMassiveGetsuga: isFinal, projectile });
 
         // If the projectile became frozen by Gojo's Infinity during damage application, immediately halt and return
         if (projectile.isFrozenByInfinity || projectile.damage === 0 || projectile.isVisual) {
-          if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
-            for (const [target] of projectile.draggedTargets.entries()) {
-              if (target) {
-                target.isDraggedByGetsuga = false;
-                target.preventKnockbackBounce = false;
-                target.z = 0;
-              }
-            }
-            projectile.draggedTargets.clear();
-          }
           return false;
         }
         if (attacker && typeof attacker.applyHollowLifesteal === 'function') {
           attacker.applyHollowLifesteal(tickDamage, f);
         }
-        suppressAfterimagesAndAttackEffects(f);
+        if (typeof f.clearAllAfterimages === 'function') {
+          f.clearAllAfterimages();
+        }
 
         const isGetsugaAdapted = Boolean(f.adaptedGetsuga || (f.adaptedSkills && (f.adaptedSkills['getsugaTensho'] || f.adaptedSkills['getsuga'])));
 
@@ -422,7 +275,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
             f.x = f._shatterLockedX;
             f.y = f._shatterLockedY;
           }
-        } else if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
+        } else if (projectile.vx !== 0 || projectile.vy !== 0) {
           const angle = Math.atan2(projectile.vy, projectile.vx);
           const kbForce = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 30)
@@ -432,53 +285,9 @@ export class GetsugaBehavior extends ProjectileBehavior {
           if (typeof f.applyKnockback === 'function') {
             f.applyKnockback(Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce), Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce));
           }
-        } else {
-          // Firmly lock velocities against wall to prevent lateral sliding along the edge
-          f.vx = 0;
-          f.vy = 0;
-          f.knockbackVx = 0;
-          f.knockbackVy = 0;
-          f.preventKnockbackBounce = true;
         }
 
-        // Apply Paralyze debuff & Hit Stun (Immune if Adapted!)
-        if (!isGetsugaAdapted) {
-          const paralyzeDuration = isFinal
-            ? (CONFIG.ichigo?.bankaiFinalGetsugaParalyzeDuration || 28)
-            : (form === 'bankai_hollow'
-              ? (CONFIG.ichigo?.bankaiHollowGetsugaParalyzeDuration || 24)
-              : (form === 'hollow'
-                ? (CONFIG.ichigo?.hollowGetsugaParalyzeDuration || 20)
-                : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaParalyzeDuration || 20) : (CONFIG.ichigo?.getsugaParalyzeDuration || 18))));
-          if (typeof f.applyParalyze === 'function') {
-            f.applyParalyze(paralyzeDuration);
-          } else {
-            f.paralyzeTimer = Math.max(f.paralyzeTimer || 0, paralyzeDuration);
-            if (f.statusEffects && typeof f.statusEffects.applyParalyze === 'function') {
-              f.statusEffects.applyParalyze(paralyzeDuration);
-            }
-          }
-          if (typeof f.interruptAttacks === 'function') {
-            f.interruptAttacks(true);
-          }
-          const stunDuration = isFinal
-            ? (CONFIG.ichigo?.bankaiFinalGetsugaHitStun || 28)
-            : (isMask
-              ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
-              : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18)));
-          if (typeof f.applyHitStun === 'function') {
-            f.applyHitStun(stunDuration);
-          }
-        } else {
-          const stunDuration = isMask
-            ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18));
-          if (typeof f.applyHitStun === 'function') {
-            f.applyHitStun(Math.round(stunDuration * 0.4));
-          }
-        }
-
-        // ── 5. Apply Movement Slow Debuff (Immune if Adapted!) ──
+        // ── Apply Movement Slow Debuff (Immune if Adapted!) ──
         if (!isGetsugaAdapted) {
           const slowDuration = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaSlowDuration || 140)
@@ -499,17 +308,6 @@ export class GetsugaBehavior extends ProjectileBehavior {
           }
           f.slowTimer = Math.max(f.slowTimer || 0, slowDuration);
           f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMultiplier);
-        }
-
-        // ── 6. Register for Active Wave Dragging (Pull along with wave only in open arena) ──
-        if (!isTargetAtWall && (projectile.vx !== 0 || projectile.vy !== 0) && !f.isBaguvixActive && !f.isGodModeActive) {
-          if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
-          const dragFrames = isFinal
-            ? (CONFIG.ichigo?.bankaiFinalGetsugaDragFrames || 24)
-            : (isMask
-              ? (CONFIG.ichigo?.hollowGetsugaDragFrames || 18)
-              : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDragFrames || 16) : (CONFIG.ichigo?.getsugaDragFrames || 14)));
-          projectile.draggedTargets.set(f, dragFrames);
         }
 
         // Ring shockwave hit effect (Theme color matches current Getsuga Tensho color!)

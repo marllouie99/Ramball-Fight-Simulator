@@ -1089,7 +1089,7 @@ function updateHealthHud() {
     const sId = String(skill.id || '').toLowerCase();
     const sLabel = String(skill.label || '').toUpperCase();
 
-    // 1. Ichigo exception: BANKAI (strictly sId === 'bankai' so 'HOLLOW (BANKAI REQ)' is hidden when darkModeShowHudSkillBars is off)
+    // 1. Ichigo exception: BANKAI (strictly sId === 'bankai' so 'HOLLOW MASK' is hidden when darkModeShowHudSkillBars is off)
     if (fId === 'ichigo') {
       if (sId === 'bankai') {
         return true;

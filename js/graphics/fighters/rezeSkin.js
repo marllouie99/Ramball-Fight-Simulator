@@ -18,32 +18,68 @@ function snap(v) {
   return Math.round(v / P) * P;
 }
 
-let _rezeSkinImage = null;
-let _rezeSkinImageLoading = false;
+let _rezeHairImage = null;
+let _rezeHairImageLoading = false;
 
-export function _getRezeSkinImage() {
-  if (_rezeSkinImage && _rezeSkinImage.complete && _rezeSkinImage.naturalWidth > 0) {
-    return _rezeSkinImage;
+export function _getRezeHairImage() {
+  if (_rezeHairImage && _rezeHairImage.complete && _rezeHairImage.naturalWidth > 0) {
+    return _rezeHairImage;
   }
-  if (!_rezeSkinImageLoading && typeof Image !== 'undefined') {
-    _rezeSkinImageLoading = true;
+  if (!_rezeHairImageLoading && typeof Image !== 'undefined') {
+    _rezeHairImageLoading = true;
     const img = new Image();
     img.onload = () => {
-      _rezeSkinImage = img;
-      _rezeSkinImageLoading = false;
+      _rezeHairImage = img;
+      _rezeHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Reze pixel skin image at Assets/model/REZE-MODEL-SKIN.png', e);
-      _rezeSkinImageLoading = false;
+      console.warn('Failed to load Reze hair image at Assets/model/Reze-hair.png', e);
+      _rezeHairImageLoading = false;
     };
-    img.src = 'Assets/model/REZE-MODEL-SKIN.png?v=1';
-    _rezeSkinImage = img;
+    img.src = 'Assets/model/Reze-hair.png?v=1';
+    _rezeHairImage = img;
   }
-  return _rezeSkinImage;
+  return _rezeHairImage;
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getRezeSkinImage();
+  _getRezeHairImage();
+}
+
+/**
+ * Draws Reze's authentic anime bob hair from Assets/model/Reze-hair.png.
+ * Features:
+ * - Rounded plum/auburn voluminous manga bob
+ * - Distinctive sweeping bangs framing the face
+ * - Symmetrical cheek locks
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawRezeHair(ctx, r, facingLeft = false) {
+  const hairImg = _getRezeHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    // Reze-hair.png (500x500)
+    // Visible bounding box:
+    // X: [116, 397] (skull dome width = 260px, skull dome center = 246px, right bun reaches 397px)
+    // Y: [80, 367] (visible height = 288px, crown apex = 80px, lock bottom = 367px)
+    // Proportional volumetric scaling matching Makima round circular standard (targetDomeWidth = r * 2.30)
+    const targetDomeWidth = r * 2.30;
+    const scaleX = targetDomeWidth / 260;
+    const scaleY = (r * 1.95) / 260; // Increased length size slightly for fuller hair volume
+    const drawW = 500 * scaleX;
+    const drawH = 500 * scaleY;
+    const drawX = -246 * scaleX;
+    const drawY = -r * 1.20 - 80 * scaleY; // Moved hair slightly down towards the bottom
+
+    // Horizontally flip hair so the side bun and bangs sweep naturally
+    ctx.scale(-1, 1);
+    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  }
 }
 
 function _getMartialLungeCurve(p) {
@@ -104,19 +140,14 @@ export function drawRezeSkin(ctx, fighter) {
   if (isHybrid) {
     drawRezeBombHybridBody(ctx, r, now);
   } else {
-    const rezeImg = _getRezeSkinImage();
-    if (rezeImg && rezeImg.complete && rezeImg.naturalWidth > 0) {
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      const drawW = r * (1016 / 437);
-      const drawH = r * (984 / 437);
-      const shiftX = r * (480 / 437);
-      const shiftY = r * (500 / 437);
-      ctx.drawImage(rezeImg, -shiftX, -shiftY, drawW, drawH);
-      ctx.restore();
-    } else {
-      drawRezeHumanPixelBody(ctx, r, now);
-    }
+    // Human Form: Procedural drawn pixel body base + Authentic pixel hair asset
+    drawRezeHumanPixelBody(ctx, r, now);
+    _drawRezeHair(ctx, r, facingLeft);
+  }
+
+  // Status Overlays (freeze, stun, time-stop)
+  if (typeof fighter.drawStatusOverlays === 'function') {
+    fighter.drawStatusOverlays(ctx, r);
   }
 
   // 5. LAYER 3: FRONT HAND (Front Layer — On Top of Body)
@@ -130,29 +161,21 @@ export function drawRezeSkin(ctx, fighter) {
   ctx.restore();
 }
 
-/**
- * Discrete Pixel-Art Hairline Grid for Reze's Authentic Manga Bob (1:1 with Reference Image 3)
- * gx ranges from -13 to +13 (index = gx + 13, 27 columns total)
- * Features:
- * - Left outer bob / cheek lock (gx = -13..-9: gy reaches 1)
- * - Left notch (gx = -6..-4: skin exposed up to gy = -4)
- * - Center-Left long sweeping bang (gx = 0..3: sweeps down to gy = 2 with glint)
- * - Right notch (gx = 4..6: skin exposed up to gy = -4)
- * - Right cheek framing lock (gx = 9..13: gy reaches 1)
- */
-const REZE_HAIRLINE_GY = [
-   2,  2,  1,  1,  0, -2, -4, -4, -3, -1,  0,  1,  2,  2,  1, -1, -4, -4, -3, -1,  0,  1,  1,  2,  2,  2,  2
-];
+// Offscreen canvas cache for Reze's procedural human pixel body model (avoids 1,200 fillRect calls per frame)
+let _cachedRezeCanvas = null;
+let _cachedRezeR = 0;
 
-/**
- * Draws Reze's Human Body Circle in Authentic Pixel Art (Matching Reference Images 2 & 3)
- */
-export function drawRezeHumanPixelBody(ctx, r, now) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+function _renderRezePixelBodyToCanvas(destCtx, r) {
+  destCtx.imageSmoothingEnabled = false;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
+
+  const cx = destCtx.canvas.width / 2;
+  const cy = destCtx.canvas.height / 2;
+
+  destCtx.save();
+  destCtx.translate(cx, cy);
 
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -166,204 +189,185 @@ export function drawRezeHumanPixelBody(ctx, r, now) {
 
       // 1. Pixelated Dark Ink Border Shell
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#14101A';
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = '#14101A';
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
-      const colIdx = Math.max(0, Math.min(26, gx + 13));
-      const hairLimitGy = REZE_HAIRLINE_GY[colIdx];
-      const isHair = (gy < hairLimitGy);
-
       // ──────────────────────────────────────────
-      // 2. SOFT DARK PURPLE-AUBURN HAIR (gy < hairLimitGy)
+      // 2. FAIR PORCELAIN FACE SKIN (ry < r * 0.26)
       // ──────────────────────────────────────────
-      if (isHair) {
-        let col = '#36283B'; // Soft dark auburn/plum base (Reference Image 3)
+      if (ry < r * 0.26) {
+        let col = '#FFE6D8'; // Warm porcelain skin base
 
-        const isCenterLongBang = (gx >= 0 && gx <= 2 && gy >= -2 && gy <= 2);
-        const isCreaseLine = (
-          (gx === -6 && gy >= -7 && gy <= -4) ||
-          (gx === -1 && gy >= -8 && gy <= 0) ||
-          (gx === 3  && gy >= -7 && gy <= 1) ||
-          (gx === 7  && gy >= -7 && gy <= -3)
-        );
-
-        if (isCreaseLine) {
-          col = '#1C1322'; // Deep manga crease shadow
-        } else if (isCenterLongBang) {
-          if (gx === 1 && gy >= 0) {
-            col = '#5A4663'; // Soft violet-plum specular glint on center lock
-          } else {
-            col = '#3F2F45';
-          }
-        } else if (gy < -9) {
-          col = '#4F3D56'; // Dome top hair highlight
-        } else if (gy === -8 && Math.abs(gx) <= 6) {
-          col = '#5E4968'; // Crown specular sheen
-        } else if (gy === hairLimitGy - 1) {
-          col = '#241929'; // Bang shadow edge
-        } else if (Math.abs(gx) >= 10) {
-          col = '#2A1E30'; // Outer flank depth shadow
+        if (Math.abs(gx) >= 8 || gy < -8) {
+          col = '#F5D0BC'; // Soft perimeter cheek & temple shading
+        } else if (gy >= 0) {
+          col = '#FFF0E8'; // Radiant lower jawline / cheek porcelain skin
         }
 
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
       // ──────────────────────────────────────────
-      // 3. FAIR PORCELAIN FACE SKIN (hairLimitGy <= gy < r * 0.14 / P)
-      // ──────────────────────────────────────────
-      if (ry < r * 0.14) {
-        let col = '#FFE6D8'; // Warm porcelain skin
-
-        if (gy === hairLimitGy) {
-          col = '#F2CAB4'; // Soft drop shadow under bangs
-        } else if (Math.abs(gx) >= 8) {
-          col = '#F5D0BC'; // Cheek perimeter shading
-        }
-
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
-
-      // ──────────────────────────────────────────
-      // 4. ATTIRE & NECK CHOKER (ry >= r * 0.14)
+      // 3. ATTIRE & NECK CHOKER (ry >= r * 0.26)
       // ──────────────────────────────────────────
 
-      // A. High Neck & Deep Navy Choker Collar (ry = r * 0.14 to r * 0.24)
-      const isChokerBand = (ry >= r * 0.14 && ry <= r * 0.22 && Math.abs(rx) <= r * 0.40);
-      const isNeckSkin = (ry >= r * 0.14 && ry <= r * 0.26 && Math.abs(rx) <= r * 0.50);
+      // A. High Neck & Deep Navy Choker Collar (ry = r * 0.26 to r * 0.34)
+      const isChokerBand = (ry >= r * 0.26 && ry <= r * 0.34 && Math.abs(rx) <= r * 0.40);
+      const isNeckSkin = (ry >= r * 0.26 && ry <= r * 0.38 && Math.abs(rx) <= r * 0.50);
 
-      // Metallic Grenade Pin Pull-Ring on left throat (rx: -r*0.34 to -r*0.18, ry: r*0.12 to r*0.24)
-      const pinDist = Math.hypot(rx - (-r * 0.26), ry - (r * 0.17));
+      // Metallic Grenade Pin Pull-Ring on left throat (rx: -r*0.34 to -r*0.18, ry: r*0.24 to r*0.36)
+      const pinDist = Math.hypot(rx - (-r * 0.26), ry - (r * 0.29));
       const isPinRing = (pinDist <= r * 0.11 && pinDist >= r * 0.05);
       const isPinHole = (pinDist < r * 0.05);
 
       if (isPinHole) {
         // Exposed skin inside the pull ring hole
-        ctx.fillStyle = '#ECC2AB';
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = '#ECC2AB';
+        destCtx.fillRect(px, py, P, P);
         continue;
       } else if (isPinRing) {
         // Silver Metallic Pull Ring with specular glint
-        if (rx < -r * 0.26 && ry < r * 0.17) {
-          ctx.fillStyle = '#FFFFFF'; // Shiny silver glint
+        if (rx < -r * 0.26 && ry < r * 0.29) {
+          destCtx.fillStyle = '#FFFFFF'; // Shiny silver glint
         } else {
-          ctx.fillStyle = '#C8D2E2'; // Metallic steel ring
+          destCtx.fillStyle = '#C8D2E2'; // Metallic steel ring
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
         continue;
       } else if (isChokerBand) {
         // Deep Navy Choker Strap
-        if (ry <= r * 0.16) {
-          ctx.fillStyle = '#34456C'; // Choker top highlight
+        if (ry <= r * 0.28) {
+          destCtx.fillStyle = '#34456C'; // Choker top highlight
         } else {
-          ctx.fillStyle = '#1F2942'; // Dark navy body
+          destCtx.fillStyle = '#1F2942'; // Dark navy body
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
         continue;
-      } else if (isNeckSkin && ry < r * 0.24) {
-        ctx.fillStyle = '#FFE6D8';
-        ctx.fillRect(px, py, P, P);
+      } else if (isNeckSkin && ry < r * 0.36) {
+        destCtx.fillStyle = '#FFE6D8';
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
       // B. Pointed Shirt Collar Wings (Triangular lapels folding down over chest)
-      // Left wing: rx from -r*0.40 to -r*0.06, ry from r*0.22 to r*0.42
+      // Left wing: rx from -r*0.40 to -r*0.06, ry from r*0.34 to r*0.52
       const isCollarWingLeft = (
         rx >= -r * 0.40 && rx <= -r * 0.06 &&
-        ry >= r * 0.22 && ry <= r * 0.42 &&
-        (rx - (-r * 0.40)) * 0.75 >= (ry - r * 0.22)
+        ry >= r * 0.34 && ry <= r * 0.52 &&
+        (rx - (-r * 0.40)) * 0.75 >= (ry - r * 0.34)
       );
-      // Right wing: rx from +r*0.06 to +r*0.40, ry from r*0.22 to r*0.42
+      // Right wing: rx from +r*0.06 to +r*0.40, ry from r*0.34 to r*0.52
       const isCollarWingRight = (
         rx >= r * 0.06 && rx <= r * 0.40 &&
-        ry >= r * 0.22 && ry <= r * 0.42 &&
-        (r * 0.40 - rx) * 0.75 >= (ry - r * 0.22)
+        ry >= r * 0.34 && ry <= r * 0.52 &&
+        (r * 0.40 - rx) * 0.75 >= (ry - r * 0.34)
       );
 
       // C. Exposed Throat V-Opening
       const isThroatV = (
-        ry >= r * 0.22 && ry <= r * 0.32 &&
-        Math.abs(rx) <= (1 - (ry - r * 0.22) / (r * 0.10)) * (r * 0.10)
+        ry >= r * 0.34 && ry <= r * 0.44 &&
+        Math.abs(rx) <= (1 - (ry - r * 0.34) / (r * 0.10)) * (r * 0.10)
       );
 
-      // D. Dark Navy Silk Ribbon / Bow Tie (Reference Image 2)
+      // D. Dark Navy Silk Ribbon / Bow Tie
       // Bow knot center
-      const isBowKnot = (ry >= r * 0.32 && ry <= r * 0.40 && Math.abs(rx) <= r * 0.08);
+      const isBowKnot = (ry >= r * 0.44 && ry <= r * 0.52 && Math.abs(rx) <= r * 0.08);
       // Bow loops
-      const isBowLoopLeft = (rx >= -r * 0.24 && rx <= -r * 0.06 && ry >= r * 0.30 && ry <= r * 0.38);
-      const isBowLoopRight = (rx >= r * 0.06 && rx <= r * 0.24 && ry >= r * 0.30 && ry <= r * 0.38);
+      const isBowLoopLeft = (rx >= -r * 0.24 && rx <= -r * 0.06 && ry >= r * 0.42 && ry <= r * 0.50);
+      const isBowLoopRight = (rx >= r * 0.06 && rx <= r * 0.24 && ry >= r * 0.42 && ry <= r * 0.50);
       // 4 Cascading Vertical Ribbon Tails
       const isRibbonTails = (
-        ry >= r * 0.38 && ry <= r * 0.72 &&
+        ry >= r * 0.50 && ry <= r * 0.84 &&
         (
-          (rx >= -r * 0.16 && rx <= -r * 0.10 && ry <= r * 0.65) || // Left outer
-          (rx >= -r * 0.08 && rx <= -r * 0.02 && ry <= r * 0.72) || // Left inner
-          (rx >= r * 0.02  && rx <= r * 0.08  && ry <= r * 0.72) || // Right inner
-          (rx >= r * 0.10  && rx <= r * 0.16  && ry <= r * 0.65)    // Right outer
+          (rx >= -r * 0.16 && rx <= -r * 0.10 && ry <= r * 0.78) || // Left outer
+          (rx >= -r * 0.08 && rx <= -r * 0.02 && ry <= r * 0.84) || // Left inner
+          (rx >= r * 0.02  && rx <= r * 0.08  && ry <= r * 0.84) || // Right inner
+          (rx >= r * 0.10  && rx <= r * 0.16  && ry <= r * 0.78)    // Right outer
         )
       );
 
       // E. High-Waisted Dark Slate-Indigo Shorts
-      const isShorts = (ry >= r * 0.72);
+      const isShorts = (ry >= r * 0.74);
 
       // ── COLOR RASTERIZATION ──
       if (isBowKnot || isBowLoopLeft || isBowLoopRight || isRibbonTails) {
         // Dark Navy Silk Ribbon Pixels
         if (isBowKnot && Math.abs(rx) <= P * 0.6) {
-          ctx.fillStyle = '#3A4C74'; // Center knot silk highlight
+          destCtx.fillStyle = '#3A4C74'; // Center knot silk highlight
         } else if ((isBowLoopLeft && rx < -r * 0.16) || (isBowLoopRight && rx > r * 0.16)) {
-          ctx.fillStyle = '#324268'; // Loop sheen
+          destCtx.fillStyle = '#324268'; // Loop sheen
         } else if (isRibbonTails && (Math.abs(rx) === Math.round(r * 0.05 / P) * P)) {
-          ctx.fillStyle = '#2C3A5C'; // Vertical ribbon specular edge
+          destCtx.fillStyle = '#2C3A5C'; // Vertical ribbon specular edge
         } else {
-          ctx.fillStyle = '#1A2134'; // Solid dark navy silk
+          destCtx.fillStyle = '#1A2134'; // Solid dark navy silk
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       } else if (isCollarWingLeft || isCollarWingRight) {
         // Crisp White Pointed Collar Lapels
-        if (ry < r * 0.28) {
-          ctx.fillStyle = '#FFFFFF'; // Bright crisp upper collar
-        } else if (ry > r * 0.38 || Math.abs(rx) > r * 0.32) {
-          ctx.fillStyle = '#D6D1C4'; // Collar lapel tip & edge shadow
+        if (ry < r * 0.40) {
+          destCtx.fillStyle = '#FFFFFF'; // Bright crisp upper collar
+        } else if (ry > r * 0.48 || Math.abs(rx) > r * 0.32) {
+          destCtx.fillStyle = '#D6D1C4'; // Collar lapel tip & edge shadow
         } else {
-          ctx.fillStyle = '#FAF9F5'; // Crisp ivory fabric
+          destCtx.fillStyle = '#FAF9F5'; // Crisp ivory fabric
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       } else if (isThroatV) {
         // Exposed Throat Skin in V-Neck Cutout
-        ctx.fillStyle = (ry > r * 0.28) ? '#ECC0A8' : '#FFE6D8';
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = (ry > r * 0.40) ? '#ECC0A8' : '#FFE6D8';
+        destCtx.fillRect(px, py, P, P);
       } else if (isShorts) {
         // High-Waisted Dark Slate-Indigo Shorts
-        if (ry <= r * 0.75) {
-          ctx.fillStyle = '#434764'; // Waistband top highlight line
+        if (ry <= r * 0.77) {
+          destCtx.fillStyle = '#434764'; // Waistband top highlight line
         } else if (Math.abs(rx) <= P * 0.6) {
-          ctx.fillStyle = '#161724'; // Center fly seam
+          destCtx.fillStyle = '#161724'; // Center fly seam
         } else if (Math.abs(Math.abs(rx) - r * 0.40) <= P * 0.6) {
-          ctx.fillStyle = '#1A1C28'; // Belt loops
+          destCtx.fillStyle = '#1A1C28'; // Belt loops
         } else {
-          ctx.fillStyle = '#2C2E42'; // Dark slate-indigo shorts base
+          destCtx.fillStyle = '#2C2E42'; // Dark slate-indigo shorts base
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       } else {
-        // White Sleeveless Blouse Fabric (ry = r * 0.24 to r * 0.72)
+        // White Sleeveless Blouse Fabric (ry = r * 0.34 to r * 0.74)
         if (Math.abs(rx) > r * 0.65) {
-          ctx.fillStyle = '#DDD8CB'; // Armhole fold shading
-        } else if (Math.abs(rx) <= r * 0.08 && ry > r * 0.42) {
-          ctx.fillStyle = '#FAF9F5'; // Center placket
+          destCtx.fillStyle = '#DDD8CB'; // Armhole fold shading
+        } else if (Math.abs(rx) <= r * 0.08 && ry > r * 0.52) {
+          destCtx.fillStyle = '#FAF9F5'; // Center placket
         } else {
-          ctx.fillStyle = '#F5F3ED'; // Crisp white body
+          destCtx.fillStyle = '#F5F3ED'; // Crisp white body
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
     }
   }
 
+  destCtx.restore();
+}
+
+/**
+ * Authentic 1:1 Procedural Pixel Art Body for Reze (High Performance Offscreen Cached)
+ */
+export function drawRezeHumanPixelBody(ctx, r, now) {
+  if (!_cachedRezeCanvas || _cachedRezeR !== r) {
+    _cachedRezeR = r;
+    const P = 2.0;
+    const steps = Math.ceil((r + P) / P);
+    const size = (steps + 2) * P * 2;
+    _cachedRezeCanvas = document.createElement('canvas');
+    _cachedRezeCanvas.width = size;
+    _cachedRezeCanvas.height = size;
+    const offCtx = _cachedRezeCanvas.getContext('2d');
+    _renderRezePixelBodyToCanvas(offCtx, r);
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(_cachedRezeCanvas, -_cachedRezeCanvas.width / 2, -_cachedRezeCanvas.height / 2);
   ctx.restore();
 }
 

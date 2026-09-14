@@ -332,12 +332,7 @@ export class SaitamaFighter extends Fighter {
     // 1. Caught in Telekinesis (Rubbick)
     if (this.isCaughtInTelekinesis) return true;
 
-    // 2. Caught in or dragged by Getsuga Tensho (Ichigo)
-    if (this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this))) {
-      return true;
-    }
-
-    // 3. Check active projectiles for gravitational / suction / pull fields
+    // 2. Check active projectiles for gravitational / suction / pull fields
     if (typeof state !== 'undefined' && state.projectiles) {
       const myTeam = (typeof state.getFighterTeam === 'function' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
 
@@ -456,25 +451,43 @@ export class SaitamaFighter extends Fighter {
       this.caughtInPureLoveBeam || 
       (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
       this.caughtInGenosFlurry ||
-      (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0)
-    );
-
-    // Disable dodge if Saitama is caught in, dragged by, or hit by Ichigo's Getsuga Tensho
-    const isGetsugaCaught = Boolean(
+      (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0) ||
+      this.caughtInLaserBeamTimer ||
+      this.caughtInLaylaBeamTimer ||
       this.isDraggedByGetsuga ||
       (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
       isSuppressedByGetsuga(this) ||
-      (attacker && (attacker.isGetsuga || attacker.behaviorType === 'getsuga_tensho'))
+      (attacker && (
+        attacker.isGetsuga ||
+        attacker.behaviorType === 'getsuga_tensho' ||
+        attacker.isBeam ||
+        attacker.isPureLoveBeam ||
+        attacker.isPurpleDPS ||
+        attacker.isHollowPurple ||
+        attacker.isBlueDPS ||
+        attacker.isLapseBlue ||
+        attacker.fromBlackHole ||
+        attacker.isLaserBeam ||
+        attacker.isLaylaBeam ||
+        attacker.isGenosBeam ||
+        attacker.isMachineGunBlow ||
+        attacker.isTickDamage ||
+        attacker.isMultiTick ||
+        attacker.isContinuous ||
+        attacker.isPeriodic ||
+        attacker.isDPS ||
+        attacker.isDomainDPS
+      ))
     );
-    if (isGetsugaCaught) {
+
+    // Disable dodge teleport completely against all tick damage / continuous beam attacks
+    if (isBeamOrTickDodge) {
       return false;
     }
 
-    const isExecutingSeriousCounter = Boolean(
-      (this._counterPunchTimer && this._counterPunchTimer > 0) || 
-      (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) ||
-      (this.isCountering && (this._counterPunchTimer > 0 || this._postCounterRecoveryTimer > 0))
-    );
+    const isCounterCharging = Boolean(this._counterPunchTimer && this._counterPunchTimer > 0);
+    const isPostCounterRecovery = Boolean(this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0);
+    const isExecutingSeriousCounter = isPostCounterRecovery; // Post-counter recovery blocks dodge
 
     // Check if Nanami or Escanor is currently executing a hit-pause
     const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
@@ -482,11 +495,11 @@ export class SaitamaFighter extends Fighter {
       ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
     ));
 
-    if ((this.dodgeCooldown > 0 && !isBeamOrTickDodge) || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isGlobalHitPausing) {
+    if (this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isGlobalHitPausing) {
       return false;
     }
-    // Block dodge if time-stopped by non-domain effects (unless dodging beam/purple tick)
-    if (this.timeStopTimer > 0 && !isDomainDodge && !isBeamOrTickDodge) {
+    // Block dodge if time-stopped by non-domain effects
+    if (this.timeStopTimer > 0 && !isDomainDodge) {
       return false;
     }
 
@@ -498,6 +511,88 @@ export class SaitamaFighter extends Fighter {
 
     const oldX = this.x;
     const oldY = this.y;
+
+    if (isCounterCharging) {
+      // During Serious Skill Counter charging state:
+      // Dodge mechanic is ENABLED (negates damage, shows "MISS!", plays SFX/grunt, spawns impact flash),
+      // but teleportation / sidestep is DISABLED (Saitama stays in place charging his counter punch).
+      
+      // Clear any hitStun, hit-pause, or beam/purple/flurry trap state on dodge so Saitama breaks free cleanly
+      const savedTimeStop = this.timeStopTimer;
+      this.hitStunTimer = 0;
+      this.basicAttackHitPauseTimer = 0;
+      this.timeStopTimer = 0;
+      this.isCaughtInPurple = false;
+      this.purpleHitTimer = 0;
+      this.caughtInPureLoveBeam = false;
+      this.wasCaughtInPureLoveBeam = false;
+      this.pureLoveBeamTimer = 0;
+      this.pureLoveBeamRecoveryTimer = 0;
+      this.caughtInGenosFlurry = false;
+      this.caughtInGenosBeamTimer = 0;
+      this.caughtInSaitamaFlurry = false;
+      this.caughtInLaserBeamTimer = 0;
+      this.caughtInLaylaBeamTimer = 0;
+      this.caughtInJohnWickCombo = false;
+      this.isDraggedByGetsuga = false;
+      this._hitByGetsugaTimer = 0;
+      this.paralyzeTimer = 0;
+      this.isParalyzed = false;
+      this.isParalyzedByMahito = false;
+      this.isParalyzedByMahoraga = false;
+      this.electricStunTimer = 0;
+      this.dubstepStunTimer = 0;
+
+      // If dodging inside a domain, re-apply the domain time-stop so Saitama stays immobilized between dodges
+      if (isDomainDodge && savedTimeStop > 0 && !isBeamOrTickDodge && !isSliceLineDodge) {
+        this.timeStopTimer = savedTimeStop;
+      }
+
+      // Maintain stationary position and locked counter aim direction
+      this.vx = 0;
+      this.vy = 0;
+      this.dodgeStallTimer = 0;
+      if (this._counterAimAngle !== undefined) {
+        this.gunAngle = this._counterAimAngle;
+        this.angle = this._counterAimAngle;
+      }
+
+      // Clean impact flash at current coordinates
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
+      }
+
+      // Spawn floating text "MISS!" on successful dodge
+      if (typeof spawnFloatingText === 'function') {
+        spawnFloatingText(this.x, this.y - this.r - 18, 'MISS!', '#A0AEC0');
+      }
+
+      // Crisp dash audio effect
+      const dashSFX = CONFIG.saitama?.sounds?.dodgeSFX || 'skill_dash3';
+      const dashVol = CONFIG.saitama?.soundVolumes?.dodgeSFX ?? 0.85;
+      audioSystem.playSFX(dashSFX, dashVol);
+
+      // Play Saitama Dodge Grunt / Noise with configurable chance & volume
+      const dodgeNoiseSounds = CONFIG.saitama?.sounds?.dodgeNoiseSounds || [
+        'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
+        'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
+        'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
+      ];
+      const dodgeNoiseChance = (typeof CONFIG.saitama?.soundChances?.dodgeNoise === 'number')
+        ? CONFIG.saitama.soundChances.dodgeNoise
+        : ((typeof CONFIG.saitama?.dodgeNoiseChance === 'number') ? CONFIG.saitama.dodgeNoiseChance : 0.35);
+
+      if (dodgeNoiseSounds && dodgeNoiseSounds.length > 0 && Math.random() < dodgeNoiseChance) {
+        const selectedDodgeNoise = dodgeNoiseSounds[Math.floor(Math.random() * dodgeNoiseSounds.length)];
+        const noiseVol = CONFIG.saitama?.soundVolumes?.dodgeNoise !== undefined 
+          ? CONFIG.saitama.soundVolumes.dodgeNoise 
+          : (CONFIG.saitama?.dodgeNoiseVolume !== undefined ? CONFIG.saitama.dodgeNoiseVolume : 2.5);
+        audioSystem.playSFX(selectedDodgeNoise, noiseVol);
+      }
+
+      this.dodgeCooldown = CONFIG.saitama?.dodgeCooldown ?? 1;
+      return true;
+    }
 
     const baseDist = CONFIG.saitama?.dodgeDistance || 100;
     let dist = baseDist;
@@ -581,6 +676,8 @@ export class SaitamaFighter extends Fighter {
     this.caughtInLaserBeamTimer = 0;
     this.caughtInLaylaBeamTimer = 0;
     this.caughtInJohnWickCombo = false;
+    this.isDraggedByGetsuga = false;
+    this._hitByGetsugaTimer = 0;
     this.paralyzeTimer = 0;
     this.isParalyzed = false;
     this.isParalyzedByMahito = false;
@@ -701,8 +798,7 @@ export class SaitamaFighter extends Fighter {
       ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
       ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
     ));
-    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this)));
-    if (this.timeStopTimer > 0 || isGlobalHitPausing || isGetsugaSuppressed || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
+    if (this.timeStopTimer > 0 || isGlobalHitPausing || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
 
     // Check team alignment in 2v2/team modes ONLY.
     // getFighterTeam returns null in 1v1/FFA — null===null would falsely match as teammates, so guard with myTeam !== null.
@@ -822,11 +918,13 @@ export class SaitamaFighter extends Fighter {
     this.paralyzeTimer = 0;
     this.isParalyzed = false;
 
-    // MANDATORY Rule #3: Immediately aim facing direction at the target's back along strict cardinal direction
-    const behindTargetAngle = this._getCardinalAngle(target);
-    this.gunAngle = behindTargetAngle;
-    this.angle = behindTargetAngle;
-    this._counterAimAngle = behindTargetAngle;
+    // Aim facing direction directly towards the target at any 360 angle upon teleport arrival
+    const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+    const myY = this.y - (this.z || 0);
+    const aimAngle = Math.atan2(targetY - myY, (target.x !== undefined ? target.x : this.x) - this.x);
+    this.gunAngle = aimAngle;
+    this.angle = aimAngle;
+    this._counterAimAngle = aimAngle;
 
     // Spawn subtle fading ghost model skin afterimages along teleport trajectory dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
@@ -886,7 +984,7 @@ export class SaitamaFighter extends Fighter {
     // Set cooldown now so the scan doesn't fire again mid-wind-up
     this.skillPunishCooldown = CONFIG.saitama?.skillPunishCooldown || 2000;
     this._hasExecutedCounterOnce = true;
-    this.dodgeCooldown = CONFIG.saitama?.counterDodgeLockFrames ?? 20;
+    this.dodgeCooldown = 0;
     return true;
   }
 
@@ -1178,8 +1276,7 @@ export class SaitamaFighter extends Fighter {
     if (!this.isConsecutivePunchesEnabled()) return false;
     if (this.hp <= 0 || this.flurryCooldown > 0 || !opponent || opponent.hp <= 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
-    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this)));
-    if (this.timeStopTimer > 0 || isGetsugaSuppressed || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
+    if (this.timeStopTimer > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain) return false;
 
     // Check team alignment
     if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
@@ -1386,29 +1483,56 @@ export class SaitamaFighter extends Fighter {
     // If paralyzed by Nanami's guaranteed 7:3 Ratio strike / hit-pause or explicit sure-kill attack, Saitama cannot dodge or counter!
     const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
     const isDomainFreeze = isInsideDomain;
-    const isBeamOrTickAttack = Boolean(opts.isPurpleDPS || opts.isPureLoveBeam || opts.isBeam || opts.isLaserBeam || opts.isLaylaBeam || opts.isGenosBeam || this.isCaughtInPurple || this.caughtInPureLoveBeam);
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
-    const isGlobalHitPausing = Boolean((attacker && ((attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0 || (attacker.characterId === 'escanor' || attacker.type === 'escanor') && (attacker.chopHitPauseTimer || 0) > 0)) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) || ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)))));
-
-    const isGetsugaHit = Boolean(
+    const isBeamOrTickAttack = Boolean(
+      opts.isPurpleDPS || 
+      opts.isHollowPurple ||
+      opts.isBlueDPS ||
+      opts.isLapseBlue ||
+      opts.fromBlackHole ||
+      opts.isPureLoveBeam || 
+      opts.isBeam || 
+      opts.isLaserBeam || 
+      opts.isLaylaBeam || 
+      opts.isGenosBeam || 
+      opts.isMachineGunBlow ||
       opts.isGetsuga ||
       opts.getsugaForm ||
-      (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho')) ||
+      opts.isFinalGetsugaTick ||
+      opts.isFinalMassiveGetsuga ||
+      opts.isDomainDPS ||
+      opts.isTickDamage ||
+      opts.isTick ||
+      opts.isMultiTick ||
+      opts.isContinuous ||
+      opts.isPeriodic ||
+      opts.isDPS ||
+      opts.isPoison ||
+      opts.isBurn ||
+      this.isCaughtInPurple || 
+      this.caughtInPureLoveBeam ||
       this.isDraggedByGetsuga ||
-      (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
-      isSuppressedByGetsuga(this)
+      isSuppressedByGetsuga(this) ||
+      (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho' || opts.projectile.isBeam || opts.projectile.isPureLoveBeam || opts.projectile.isTickDamage || opts.projectile.isMultiTick))
     );
+
+    // Disable dodge and counter completely against all tick damage / continuous beam attacks
+    if (isBeamOrTickAttack) {
+      return super.takeDamage(amount, attacker, opts);
+    }
+
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
+    const isGlobalHitPausing = Boolean((attacker && ((attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0 || (attacker.characterId === 'escanor' || attacker.type === 'escanor') && (attacker.chopHitPauseTimer || 0) > 0)) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) || ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)))));
 
     // Saitama's Caped Baldy Reflexes: Sukuna's Malevolent Shrine domain slashes are physical spatial cuts — Saitama can dodge them!
     const isSukunaDomainSlash = Boolean((opts.isDomainSlash && opts.isSukunaSlash) || opts.isSukunaDomainSliceLine);
 
-    if ((isGetsugaHit || (isGuaranteedHit && !isSukunaDomainSlash) || isGlobalHitPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack))) {
+    if ((isGuaranteedHit && !isSukunaDomainSlash) || isGlobalHitPausing || (this.timeStopTimer > 0 && !isDomainFreeze)) {
       return super.takeDamage(amount, attacker, opts);
     }
 
     // If incoming damage is from a skill/ultimate/channeling attack and counter is ready, execute counter punch!
-    const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isMachineGunBlow || opts.isChanneling;
-    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0 && !isBeamOrTickAttack && !isGetsugaHit) {
+    const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isChanneling;
+    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0) {
       const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
       const distToAttacker = Math.hypot(attacker.x - this.x, attacker.y - this.y);
       if (distToAttacker <= maxRange) {
@@ -1419,10 +1543,10 @@ export class SaitamaFighter extends Fighter {
       }
     }
 
-    // Ignore non-attack DOTs (poison, burn, domain environment ticks) — but Sukuna domain slashes ARE dodgeable direct attacks
-    const isDirectAttack = opts.isProjectile || opts.isMelee || opts.isRanged || opts.isMachineGunBlow || opts.isPhysical || opts.isBasic || opts.isSkill || opts.isUltimate || isBeamOrTickAttack || isSukunaDomainSlash || (attacker && attacker !== this && !opts.isPoison && !opts.isBurn && !opts.fromBlackHole && !opts.isDomainDPS);
+    // Direct attacks (projectiles, melee, physical hits, slashes) are dodgeable
+    const isDirectAttack = opts.isProjectile || opts.isMelee || opts.isRanged || opts.isPhysical || opts.isBasic || opts.isSkill || opts.isUltimate || isSukunaDomainSlash || (attacker && attacker !== this && !opts.isPoison && !opts.isBurn);
 
-    if (isDirectAttack && !isGetsugaHit && !opts.alreadyCheckedDodge) {
+    if (isDirectAttack && !opts.alreadyCheckedDodge) {
       let dodgeTarget = null;
       if (opts.projectile && typeof opts.projectile.x === 'number') {
         dodgeTarget = opts.projectile;
@@ -1454,9 +1578,7 @@ export class SaitamaFighter extends Fighter {
    */
   onProjectileApproach(projectile, attacker) {
     if (this._isInsideGojoDomain()) return;
-    if (projectile && (projectile.isGetsuga || projectile.behaviorType === 'getsuga_tensho')) {
-      return; // Do not auto-dodge when Getsuga Tensho approaches
-    }
+    if (this._counterPunchTimer && this._counterPunchTimer > 0) return; // Sidestep disabled while charging Serious Skill Counter
     const src = projectile || attacker;
     this.executeDodgeTeleport(src, true);
   }
@@ -1779,7 +1901,6 @@ export class SaitamaFighter extends Fighter {
 
     // Mandatory Rule #1: Freeze / TimeStop guard at the top of update loop (bypassed only during active Serious Counter execution unless inside Gojo domain or being pulled)
     const isFrozen = this._handleTimeStop();
-    const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
     const isBeingPulled = this._isBeingPulled();
     const isInsideGojoDomain = this._isInsideGojoDomain();
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
@@ -1789,7 +1910,7 @@ export class SaitamaFighter extends Fighter {
       this.interruptAttacks(true);
     }
 
-    if ((isFrozen || isGetsugaSuppressed || this.isTargetOfAmbush || isGlobalHitPausingFighter || isBeingPulled || isInsideGojoDomain) && !this.isCountering) {
+    if ((isFrozen || this.isTargetOfAmbush || isGlobalHitPausingFighter || isBeingPulled || isInsideGojoDomain) && !this.isCountering) {
       this.interruptAttacks();
       return; // MANDATORY: Stop update execution so fighter is completely frozen/paused/pulled!
     }
@@ -1813,7 +1934,7 @@ export class SaitamaFighter extends Fighter {
     this._tickCounterPunch();
 
     // Trigger Serious Counter (Teleport Behind Punch) when ability is ready
-    if (this.skillPunishCooldown <= 0 && this.hp > 0 && !isInsideGojoDomain && !this.isFrozenByInfinity && !this.isTargetOfAmbush && !isNanamiRatioPausing && !isGetsugaSuppressed && (!this._counterPunchTimer || this._counterPunchTimer <= 0) && !this.isFlurrying) {
+    if (this.skillPunishCooldown <= 0 && this.hp > 0 && !isInsideGojoDomain && !this.isFrozenByInfinity && !this.isTargetOfAmbush && !isGlobalHitPausingFighter && (!this._counterPunchTimer || this._counterPunchTimer <= 0) && !this.isFlurrying) {
       const targetsToScan = [];
       if (typeof state !== 'undefined') {
         if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0 && !f.isIllusion) targetsToScan.push(f); });

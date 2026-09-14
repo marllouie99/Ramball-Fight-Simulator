@@ -99,8 +99,12 @@ export class SukunaFighter extends Fighter {
         isDomain: true,
         allowFrozenTick: true,
         allowsFrozenCooldownTick: true,
-        onExpire: () => {
+        onExpire: (fighter) => {
           clearDomainSlashLines();
+          if (fighter) {
+            fighter._hasPlayedDomainChannelSound = false;
+            fighter._hasPlayedDomainActivateSound = false;
+          }
         }
       },
       {
@@ -172,6 +176,7 @@ export class SukunaFighter extends Fighter {
       this.isChannelingDomainExpansion = false;
       this.domainChargeTimer = 0;
       this._hasPlayedDomainChannelSound = false;
+      this._hasPlayedDomainActivateSound = false;
       return;
     }
 
@@ -181,10 +186,11 @@ export class SukunaFighter extends Fighter {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
         this._hasPlayedDomainChannelSound = false;
+        this._hasPlayedDomainActivateSound = false;
       } else {
         this.isChannelingDomainExpansion = true;
         this.domainChargeTimer = savedDomainCharge;
-        this._hasPlayedDomainChannelSound = savedDomainAudio || true;
+        this._hasPlayedDomainChannelSound = true;
       }
     }
 
@@ -234,11 +240,12 @@ export class SukunaFighter extends Fighter {
     this.divineFlameChargeTimer = 0;
     this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 100;
     this.divineFlameRecoveryTimer = 0;
-    this.divineFlameCastAngle = 0;
+    this.divineFlameCastAngle = null;
 
     this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
+    this._hasPlayedDomainActivateSound = false;
     this.domainChargeTimer = 0;
     this.domainActive = false;
     this.domainTimer = 0;
@@ -319,11 +326,12 @@ export class SukunaFighter extends Fighter {
       return false; // Disable auto-aim while channeling Domain Expansion!
     }
     if (this.isChannelingDivineFlame || (this.divineFlameRecoveryTimer || 0) > 0) {
-      const cardinal = (this.divineFlameCastAngle !== undefined && !Number.isNaN(this.divineFlameCastAngle))
+      const lockedAngle = (this.divineFlameCastAngle !== undefined && this.divineFlameCastAngle !== null && !Number.isNaN(this.divineFlameCastAngle))
         ? this.divineFlameCastAngle
-        : this._getCardinalAngle(target);
-      this.gunAngle = cardinal;
-      this.angle = cardinal;
+        : (this.gunAngle || 0);
+      this.divineFlameCastAngle = lockedAngle;
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
       return false;
     }
 
@@ -403,7 +411,8 @@ export class SukunaFighter extends Fighter {
 
       this.hasUsedRCTRevival = true;
       this.isDead = false;
-      const revivalAmount = CONFIG.sukuna?.rctRevivalHealAmount ?? (CONFIG.sukuna?.rctRevivalHealPercent ? this.maxHp * CONFIG.sukuna.rctRevivalHealPercent : (CONFIG.sukuna?.reverseCursedTechniqueHealAmount ?? 125));
+      const rawRevival = CONFIG.sukuna?.rctRevivalHealAmount ?? (CONFIG.sukuna?.rctRevivalHealPercent ?? (CONFIG.sukuna?.reverseCursedTechniqueHealAmount ?? 0.50));
+      const revivalAmount = (typeof rawRevival === 'number' && rawRevival <= 1.0) ? Math.round(this.maxHp * rawRevival) : Math.round(rawRevival);
       this.hp = Math.min(this.maxHp, Math.max(1, revivalAmount));
       this.invincibilityTimer = 60; // 1.0s invincibility during emergency revival
       this._activateReverseCursedTechnique(attacker);
@@ -620,6 +629,8 @@ export class SukunaFighter extends Fighter {
         if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
           this.isChannelingDomainExpansion = false;
           this.domainChargeTimer = 0;
+          this._hasPlayedDomainChannelSound = false;
+          this._hasPlayedDomainActivateSound = false;
         }
       }
       // Pause Fuga audio while frozen in Gojo's domain so audio stops until domain ends
@@ -759,11 +770,13 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Lock cardinal firing stance fixed in place; do not continuously auto-aim or rotate while channeling
-      if (this.divineFlameCastAngle !== undefined && !Number.isNaN(this.divineFlameCastAngle)) {
-        this.gunAngle = this.divineFlameCastAngle;
-        this.angle = this.divineFlameCastAngle;
-      }
+      // Lock firing stance fixed in place; do not continuously auto-aim or rotate while channeling
+      const lockedAngle = (this.divineFlameCastAngle !== undefined && this.divineFlameCastAngle !== null && !Number.isNaN(this.divineFlameCastAngle))
+        ? this.divineFlameCastAngle
+        : (this.gunAngle || 0);
+      this.divineFlameCastAngle = lockedAngle;
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
 
       if (this.divineFlameChargeTimer >= this.divineFlameChargeMax) {
         this.divineFlameChargeTimer = 0;
@@ -780,6 +793,8 @@ export class SukunaFighter extends Fighter {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
         this.domainCooldown = CONFIG.sukuna?.domainCooldown || 1000;
+        this._hasPlayedDomainChannelSound = false;
+        this._hasPlayedDomainActivateSound = false;
         return;
       }
       this.domainChargeTimer++;
@@ -787,14 +802,6 @@ export class SukunaFighter extends Fighter {
       // Immediately stop all movement while channeling domain expansion (holding Enma Ten hand seal)
       this.vx = 0;
       this.vy = 0;
-
-      // Lock stance fixed in place; do not continuously auto-aim while channeling
-      const audioTriggerFrame = Math.max(1, this.domainChargeMax - 50);
-      if (this.domainChargeTimer === audioTriggerFrame && !this._hasPlayedDomainActivateSound) {
-        this._hasPlayedDomainActivateSound = true;
-        const activateSound = getSkillSound(this._def.id, 'domain_activate');
-        if (activateSound) playSound(activateSound.src, activateSound.volume);
-      }
 
       if (this.domainChargeTimer >= this.domainChargeMax) {
         this.isChannelingDomainExpansion = false;
@@ -813,11 +820,12 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Lock cardinal firing stance fixed in place during post-fire recovery
-      if (this.divineFlameCastAngle !== undefined && !Number.isNaN(this.divineFlameCastAngle)) {
-        this.gunAngle = this.divineFlameCastAngle;
-        this.angle = this.divineFlameCastAngle;
-      }
+      // Lock firing stance fixed in place during post-fire recovery
+      const lockedAngle = (this.divineFlameCastAngle !== undefined && this.divineFlameCastAngle !== null && !Number.isNaN(this.divineFlameCastAngle))
+        ? this.divineFlameCastAngle
+        : (this.gunAngle || 0);
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
 
       this.resolveWallBounce(arena);
       return;
@@ -829,14 +837,21 @@ export class SukunaFighter extends Fighter {
 
       const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
 
-      // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine when enemy is cardinally aligned (Up, Down, Left, Straight/Right)!
+      // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine when enemy is in range!
       if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
-        const alignedResult = this._findCardinalAlignedEnemy(opponent);
+        const alignedResult = (typeof this._findAlignedEnemyForFuga === 'function')
+          ? this._findAlignedEnemyForFuga(opponent)
+          : this._findCardinalAlignedEnemy(opponent);
         if (alignedResult) {
-          const { target: alignedTarget, cardinalAngle } = alignedResult;
-          this.divineFlameCastAngle = cardinalAngle;
-          this.gunAngle = cardinalAngle;
-          this.angle = cardinalAngle;
+          const { target: alignedTarget } = alignedResult;
+          const targetY = alignedTarget.y - (alignedTarget.z || 0);
+          const sukunaY = this.y - (this.z || 0);
+          const dx = alignedTarget.x - this.x;
+          const dy = targetY - sukunaY;
+          const aimAngle = Math.atan2(dy, dx);
+          this.divineFlameCastAngle = aimAngle;
+          this.gunAngle = aimAngle;
+          this.angle = aimAngle;
           this.isChannelingDivineFlame = true;
           this.divineFlameChargeTimer = 0;
           this.punchAnimTimer = 0;
@@ -865,15 +880,22 @@ export class SukunaFighter extends Fighter {
 
     // Check for Divine Flame (Skill 2 - disabled in demo mode)
     if (!this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
-      const alignedResult = this._findCardinalAlignedEnemy(opponent);
+      const alignedResult = (typeof this._findAlignedEnemyForFuga === 'function')
+        ? this._findAlignedEnemyForFuga(opponent)
+        : this._findCardinalAlignedEnemy(opponent);
       if (alignedResult) {
-        const { target: alignedTarget, cardinalAngle } = alignedResult;
-        const distSq = (this.x - alignedTarget.x) ** 2 + (this.y - alignedTarget.y) ** 2;
+        const { target: alignedTarget } = alignedResult;
+        const targetY = alignedTarget.y - (alignedTarget.z || 0);
+        const sukunaY = this.y - (this.z || 0);
+        const dx = alignedTarget.x - this.x;
+        const dy = targetY - sukunaY;
+        const distSq = dx * dx + dy * dy;
         const safeDistance = 120;
         if (distSq > safeDistance ** 2) {
-          this.divineFlameCastAngle = cardinalAngle;
-          this.gunAngle = cardinalAngle;
-          this.angle = cardinalAngle;
+          const aimAngle = Math.atan2(dy, dx);
+          this.divineFlameCastAngle = aimAngle;
+          this.gunAngle = aimAngle;
+          this.angle = aimAngle;
           this.isChannelingDivineFlame = true;
           this.isChannelingDomainExpansion = false; // Explicit mutual exclusion
           this.divineFlameChargeTimer = 0;
@@ -901,15 +923,23 @@ export class SukunaFighter extends Fighter {
       this.isChannelingDomainExpansion = true;
       this.isChannelingDivineFlame = false; // Explicit mutual exclusion
       this.domainChargeTimer = 0;
-      this._hasPlayedDomainActivateSound = false;
       this.vx = 0; // Immediately lock movement when domain channeling starts
       this.vy = 0;
-      const now = Date.now();
-      if (!this._hasPlayedDomainChannelSound || !this._lastDomainChannelTime || (now - this._lastDomainChannelTime) > 2000) {
-        this._lastDomainChannelTime = now;
+      if (!this._hasPlayedDomainChannelSound) {
         this._hasPlayedDomainChannelSound = true;
-        const channelSound = getSkillSound(this._def.id, 'domain_channel');
-        if (channelSound) playSound(channelSound.src, channelSound.volume);
+        this._hasPlayedDomainActivateSound = false;
+        const channelSound = getSkillSound(this._def?.id, 'domain_channel');
+        const chanSrc = channelSound?.src || CONFIG.sukuna?.sounds?.domainChannel || 'Assets/Sound Effects/Skills/domainexpansion.mp3';
+        const chanVol = channelSound?.volume ?? (CONFIG.sukuna?.soundVolumes?.domainChannel ?? 2.75);
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.playFighterVoiceline === 'function') {
+          this._domainVoiceHandle = audioSystem.playFighterVoiceline(this, chanSrc, chanVol, 1.0, 0, 0, {
+            priority: 'domain',
+            isProtected: true,
+            durationMs: 3000
+          });
+        } else {
+          playSound(chanSrc, chanVol);
+        }
       }
       return; // Prevent melee/shoot in the same frame
     }
@@ -1041,7 +1071,6 @@ export class SukunaFighter extends Fighter {
 
   _activateDomain(arena) {
     this.isChannelingDomainExpansion = false;
-    this._hasPlayedDomainChannelSound = false;
     this.domainChargeTimer = 0;
     this.domainActive = true;
     this.domainActivationTime = Date.now();
@@ -1061,8 +1090,17 @@ export class SukunaFighter extends Fighter {
 
     spawnFloatingText(this.domainX, this.domainY + 50, 'MALEVOLENT SHRINE', '#8B0000');
 
-    const sound = getSkillSound(this._def?.id, 'domain');
-    if (sound) playSound(sound.src, sound.volume);
+    if (!this._hasPlayedDomainActivateSound) {
+      this._hasPlayedDomainActivateSound = true;
+      const sound = getSkillSound(this._def?.id, 'domain_activate') || getSkillSound(this._def?.id, 'domain');
+      const actSrc = sound?.src || CONFIG.sukuna?.sounds?.domainActivate || 'Assets/Sound Effects/Skills/shrine.mp3';
+      const actVol = sound?.volume ?? (CONFIG.sukuna?.soundVolumes?.domainActivate ?? 1.80);
+      if (typeof audioSystem !== 'undefined') {
+        audioSystem.playSFX(actSrc, actVol);
+      } else {
+        playSound(actSrc, actVol);
+      }
+    }
   }
 
   _doDomainRapidSlashes(opponent, arena, ownerIndex) {
@@ -2151,7 +2189,7 @@ export class SukunaFighter extends Fighter {
     return closest;
   }
 
-  _findCardinalAlignedEnemy(preferredOpponent = null) {
+  _findAlignedEnemyForFuga(preferredOpponent = null) {
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
     const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
 
@@ -2177,8 +2215,6 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    const maxCorridorHalfWidth = CONFIG.sukuna?.divineFlameCorridorHalfWidth ?? 45;
-    const maxDetectionAngle = CONFIG.sukuna?.divineFlameDetectionAngle ?? (Math.PI * 0.08);
     const maxRange = CONFIG.sukuna?.divineFlameTriggerRange || 850;
     const sukunaY = this.y - (this.z || 0);
 
@@ -2205,54 +2241,17 @@ export class SukunaFighter extends Fighter {
       if (dist < (this.r + 5)) continue;
 
       const angle = Math.atan2(dy, dx);
-      let isAligned = false;
-      let cardinal = 0;
-
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        // Horizontal dominance: Right (0) or Left (Math.PI)
-        if (dx >= 0) {
-          let diff = Math.abs(angle);
-          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
-          if (diff <= maxDetectionAngle && Math.abs(dy) <= maxCorridorHalfWidth) {
-            isAligned = true;
-            cardinal = 0;
-          }
-        } else {
-          let diff = Math.abs(Math.abs(angle) - Math.PI);
-          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
-          if (diff <= maxDetectionAngle && Math.abs(dy) <= maxCorridorHalfWidth) {
-            isAligned = true;
-            cardinal = Math.PI;
-          }
-        }
-      } else {
-        // Vertical dominance: Down (Math.PI / 2) or Up (-Math.PI / 2)
-        if (dy >= 0) {
-          let diff = Math.abs(angle - (Math.PI / 2));
-          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
-          if (diff <= maxDetectionAngle && Math.abs(dx) <= maxCorridorHalfWidth) {
-            isAligned = true;
-            cardinal = Math.PI / 2;
-          }
-        } else {
-          let diff = Math.abs(angle - (-Math.PI / 2));
-          while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
-          if (diff <= maxDetectionAngle && Math.abs(dx) <= maxCorridorHalfWidth) {
-            isAligned = true;
-            cardinal = -Math.PI / 2;
-          }
-        }
-      }
-
-      if (isAligned) {
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestTarget = ent;
-          bestAngle = cardinal;
-        }
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestTarget = ent;
+        bestAngle = angle;
       }
     }
 
-    return bestTarget ? { target: bestTarget, cardinalAngle: bestAngle } : null;
+    return bestTarget ? { target: bestTarget, cardinalAngle: bestAngle, aimAngle: bestAngle } : null;
+  }
+
+  _findCardinalAlignedEnemy(preferredOpponent = null) {
+    return this._findAlignedEnemyForFuga(preferredOpponent);
   }
 }

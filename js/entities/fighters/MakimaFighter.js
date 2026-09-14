@@ -31,8 +31,8 @@ export class MakimaFighter extends Fighter {
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
 
-    // In every game mode, Makima has 50% max HP based on the fixed HP in that game mode
-    const hpRatio = cfg.maxHpRatio ?? 0.50;
+    // In every game mode, Makima has 100% max HP based on the fixed HP in that game mode
+    const hpRatio = cfg.maxHpRatio ?? 1.00;
     const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
     if (modeFixed) {
       this.maxHp = Math.round(modeFixed * hpRatio);
@@ -65,6 +65,10 @@ export class MakimaFighter extends Fighter {
     this.shootCooldownMax = this.bangCooldownMax;
     this.shootCooldown = this.bangCooldownMax;
     this.activeBangBeams = [];
+    this.isPreparingBang = false;
+    this.bangWindupTimer = 0;
+    this.bangWindupMax = cfg.bangWindupFrames !== undefined ? cfg.bangWindupFrames : 8;
+    this.bangTarget = null;
 
     // Aiming & Turn Rate (Controlled Aim Rotation — No Instant Snap Auto-Aim)
     this.aimTurnRate = cfg.aimTurnRate || 0.055;
@@ -172,7 +176,7 @@ export class MakimaFighter extends Fighter {
   reset() {
     super.reset();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
-    const hpRatio = cfg.maxHpRatio ?? 0.50;
+    const hpRatio = cfg.maxHpRatio ?? 1.00;
     const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
     if (modeFixed) {
       this.maxHp = Math.round(modeFixed * hpRatio);
@@ -232,18 +236,26 @@ export class MakimaFighter extends Fighter {
     this.activeHalberds = [];
     this.isExecutingRitual = false;
     this.ritualTimer = 0;
+    this.isExecutingRitual = false;
+    this.ritualTimer = 0;
     this.ritualTarget = null;
     this.activeBangBeams = [];
+    this.isPreparingBang = false;
+    this.bangWindupTimer = 0;
+    this.bangTarget = null;
     this.aimTurnRate = cfg.aimTurnRate || 0.055;
     this.aimAlignmentThreshold = cfg.aimAlignmentThreshold || 0.18;
   }
 
   isStationarySkillActive() {
-    return Boolean(this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || (this.chainThrowAnimTimer && this.chainThrowAnimTimer > 0) || this.isRevivingFromContract || this.isShatterReviving || super.isStationarySkillActive?.());
+    return Boolean(this.isPreparingBang || this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || (this.chainThrowAnimTimer && this.chainThrowAnimTimer > 0) || this.isRevivingFromContract || this.isShatterReviving || super.isStationarySkillActive?.());
   }
 
   interruptAttacks(forceCancelAll = false) {
     super.interruptAttacks(forceCancelAll);
+    this.isPreparingBang = false;
+    this.bangWindupTimer = 0;
+    this.bangTarget = null;
     this.isPreparingChain = false;
     this.isThrowingChain = false;
     this.chainThrowAnimTimer = 0;
@@ -319,7 +331,7 @@ export class MakimaFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
     if (!enableBang) return false;
-    if (this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || this.isRevivingFromContract || this.isShatterReviving || this.isChainingActive) return false;
+    if (this.isPreparingBang || this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || this.isRevivingFromContract || this.isShatterReviving || this.isChainingActive) return false;
     return super.canPerformBasicAttack ? super.canPerformBasicAttack() : true;
   }
 
@@ -401,9 +413,9 @@ export class MakimaFighter extends Fighter {
   shoot(ownerIndex) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
-    if (enableBang && this.bangCooldown <= 0) {
+    if (enableBang && this.bangCooldown <= 0 && !this.isPreparingBang && !this.isPreparingChain && !this.isSummoningSpear && !this.isExecutingRitual) {
       const target = this._acquirePrimaryTarget();
-      this._castBangAttack(target);
+      this._startBangWindup(target);
       return true;
     }
     return false;
@@ -461,9 +473,9 @@ export class MakimaFighter extends Fighter {
       }
 
       const elapsed = this.reviveStasisMax - this.reviveStasisTimer;
-      const targetHp = Math.round(this.maxHp * ((typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenReviveHpPercent) ? CONFIG.makima.citizenReviveHpPercent : 0.50));
+      const targetHp = Math.round(this.maxHp * ((typeof CONFIG !== 'undefined' && CONFIG.makima?.citizenReviveHpPercent !== undefined) ? CONFIG.makima.citizenReviveHpPercent : 1.00));
 
-      // Revert Phase (frames 25 to 75): smoothly fill HP bar up to 50%
+      // Revert Phase (frames 25 to 75): smoothly fill HP bar up to targetHp
       if (elapsed >= 25) {
         const fillP = Math.max(0, Math.min(1.0, (elapsed - 25) / (this.reviveStasisMax - 25)));
         this.hp = Math.round(targetHp * fillP);
@@ -598,7 +610,11 @@ export class MakimaFighter extends Fighter {
     this._updateActiveSpears();
     this._updateActiveHolyExplosions();
 
-    // ── 4. SKILL CHANNEL EXECUTION ──
+    // ── 4. SKILL CHANNEL & WINDUP EXECUTION ──
+    if (this.isPreparingBang) {
+      this._updateBangWindup();
+      return;
+    }
     if (this.isExecutingRitual) {
       this._updateKyotoShrineRitual();
       return;
@@ -661,10 +677,10 @@ export class MakimaFighter extends Fighter {
         return;
       }
 
-      // D. Primary Attack: "Bang!" (Triggered immediately whenever CD is up along current aim direction)
+      // D. Primary Attack: "Bang!" (Initiates windup animation before projectile beam spawns)
       const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
-      if (enableBang && this.bangCooldown <= 0 && dist <= (cfg.bangRange || 1600)) {
-        this._castBangAttack(target);
+      if (enableBang && this.bangCooldown <= 0 && dist <= (cfg.bangRange || 1600) && !this.isPreparingBang && !this.isPreparingChain && !this.isThrowingChain && !this.isSummoningSpear && !this.isExecutingRitual) {
+        this._startBangWindup(target);
       }
     }
 
@@ -831,6 +847,81 @@ export class MakimaFighter extends Fighter {
       return;
     }
     super.applyKnockback(vx, vy, stunFrames);
+  }
+
+  /**
+   * Initiates the pre-shot Bang hand gun aiming and cocking windup.
+   * Plays the hand-gun pointing and hammer cocking animation before the projectile spawns.
+   */
+  _startBangWindup(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const windupFrames = cfg.bangWindupFrames !== undefined ? cfg.bangWindupFrames : 8;
+    this.bangCooldown = this.bangCooldownMax;
+    this.shootCooldown = this.shootCooldownMax || this.bangCooldownMax;
+
+    if (windupFrames <= 0) {
+      this._castBangAttack(target);
+      return;
+    }
+
+    this.isPreparingBang = true;
+    this.bangWindupMax = windupFrames;
+    this.bangWindupTimer = windupFrames;
+    this.bangTarget = target;
+    this.punchAnimTimer = 0;
+    this.slashSwingTimer = 0;
+    this.isShooting = false;
+    this.vx = 0;
+    this.vy = 0;
+
+    // Aim at target during windup
+    const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
+    let angle;
+    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
+      angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    } else {
+      angle = this._getCardinalAngle(aimTarget);
+    }
+    this.gunAngle = angle;
+    this.angle = angle;
+
+    // Subtle spark cue at index finger as hand is raised
+    const px = this.x + Math.cos(angle) * (this.r * 1.05);
+    const py = this.y + Math.sin(angle) * (this.r * 1.05);
+    spawnSparks(px, py, '#F59E0B', 4);
+  }
+
+  /**
+   * Updates pre-shot Bang windup state.
+   */
+  _updateBangWindup() {
+    this.bangWindupTimer--;
+    this.vx = 0;
+    this.vy = 0;
+
+    // Keep aim locked on target cardinal angle
+    const aimTarget = this.bangTarget || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
+    let angle;
+    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
+      angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    } else {
+      angle = this._getCardinalAngle(aimTarget);
+    }
+    this.gunAngle = angle;
+    this.angle = angle;
+
+    // Glinting cursed energy spark at fingertip during windup
+    if (this.bangWindupTimer % 3 === 0) {
+      const px = this.x + Math.cos(angle) * (this.r + 14);
+      const py = this.y + Math.sin(angle) * (this.r + 14);
+      spawnSparks(px, py, '#F59E0B', 3);
+    }
+
+    // Windup completed -> Unleash projectile, muzzle flash, gunshot SFX, and damage
+    if (this.bangWindupTimer <= 0) {
+      this.isPreparingBang = false;
+      this._castBangAttack(this.bangTarget);
+    }
   }
 
   /**
@@ -1955,6 +2046,14 @@ export class MakimaFighter extends Fighter {
     // 8. Draw Health HUD & Freeze Timers
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+  }
+
+  drawBody(ctx) {
+    drawMakimaSkin(ctx, this);
+  }
+
+  drawSkin(ctx) {
+    drawMakimaSkin(ctx, this);
   }
 
   onFrozenSkillDurationTick(isInsideGojoDomain) {

@@ -75,10 +75,35 @@ function _getIchigoShikaiImage() {
   return _ichigoShikaiImage;
 }
 
+let _ichigoHairImage = null;
+let _ichigoHairImageLoading = false;
+
+export function _getIchigoHairImage() {
+  if (_ichigoHairImage && _ichigoHairImage.complete && _ichigoHairImage.naturalWidth > 0) {
+    return _ichigoHairImage;
+  }
+  if (!_ichigoHairImageLoading && typeof Image !== 'undefined') {
+    _ichigoHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _ichigoHairImage = img;
+      _ichigoHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ichigo hair image at Assets/model/Ichigo-hair.png', e);
+      _ichigoHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Ichigo-hair.png?v=1';
+    _ichigoHairImage = img;
+  }
+  return _ichigoHairImage;
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getHollowMaskImage();
   _getIchigoBankaiImage();
   _getIchigoShikaiImage();
+  _getIchigoHairImage();
 }
 
 export function drawIchigoSkin(ctx, fighter) {
@@ -267,7 +292,7 @@ export function drawIchigoSkin(ctx, fighter) {
 
   const isSlashing = !isShikaiReverting && Boolean(fighter.slashSwingTimer > 0);
   let rawSlashProg = 0;
-  let swingAngle = -0.16;
+  let swingAngle = -0.12;
   let thrustDistance = 0;
   let bodyShiftX = 0;
   let bodyTilt = 0;
@@ -299,12 +324,12 @@ export function drawIchigoSkin(ctx, fighter) {
     bodyTilt = 0.02 * Math.sin(now * 0.07);
   } else if (isChanneling) {
     // Dynamic 2-Handed Overhead Sword Lift-Up Charging Animation:
-    // As chargeProg increases (0 -> 1), sword lifts upward from idle (-0.16 rad) high into the sky overhead (-1.85 rad / ~ -106°)
+    // As chargeProg increases (0 -> 1), sword lifts upward from idle (-0.12 rad) high into the sky overhead (-1.85 rad / ~ -106°)
     const liftEase = Math.min(1.0, chargeProg * 1.7);
     const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
     const chargeTremble = Math.sin(Date.now() * 0.045) * 0.03 * (0.3 + 0.7 * chargeProg);
 
-    swingAngle = -0.16 + (-1.85 - (-0.16)) * smoothLift + chargeTremble;
+    swingAngle = -0.12 + (-1.85 - (-0.12)) * smoothLift + chargeTremble;
     thrustDistance = -4.0 - 6.0 * smoothLift; // Pulls back close to shoulder/head
     bodyShiftX = -1.5 - 3.0 * smoothLift;     // Body coils back into powerful overhead stance
     bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.4;
@@ -323,10 +348,10 @@ export function drawIchigoSkin(ctx, fighter) {
         bodyShiftX = -4.5 + 9.5 * Math.sin(p * Math.PI * 0.5);  // lunges forward
         bodyTilt = -0.12 + 0.20 * Math.sin(p * Math.PI * 0.5);
       } else {
-        // Recovery phase: +1.25 rad eases smoothly back to idle -0.16 rad
+        // Recovery phase: +1.25 rad eases smoothly back to idle -0.12 rad
         const p = (rawSlashProg - slashPhase) / (1.0 - slashPhase);
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.16 + (1.25 - (-0.16)) * easeP;
+        swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
         thrustDistance = 16 * easeP;
         bodyShiftX = 5.0 * easeP;
         bodyTilt = 0.08 * easeP;
@@ -337,7 +362,7 @@ export function drawIchigoSkin(ctx, fighter) {
         // Phase 1: Rapid Windup snap (idle -> -1.35 rad / ~ -77°) with anticipation recoil
         const p = rawSlashProg / 0.10;
         const easeP = p * (2 - p);
-        swingAngle = -0.16 + (-1.35 - (-0.16)) * easeP;
+        swingAngle = -0.12 + (-1.35 - (-0.12)) * easeP;
         thrustDistance = -8 * easeP;
         bodyShiftX = -2.5 * easeP;
         bodyTilt = -0.05 * easeP;
@@ -350,10 +375,10 @@ export function drawIchigoSkin(ctx, fighter) {
         bodyShiftX = -2.5 + 6.5 * Math.sin(p * Math.PI * 0.5); // surges forward from -2.5px to +4.0px
         bodyTilt = -0.05 + 0.10 * Math.sin(p * Math.PI * 0.5);
       } else {
-        // Phase 3: Fluid Cosine Recovery (+1.20 rad -> idle -0.16 rad)
+        // Phase 3: Fluid Cosine Recovery (+1.20 rad -> idle -0.12 rad)
         const p = (rawSlashProg - 0.55) / 0.45;
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI); // 1 -> 0
-        swingAngle = -0.16 + (1.20 - (-0.16)) * easeP;
+        swingAngle = -0.12 + (1.20 - (-0.12)) * easeP;
         thrustDistance = 14 * easeP; // seamlessly eases +14px back to 0px
         bodyShiftX = 4.0 * easeP;
       }
@@ -395,7 +420,7 @@ export function drawIchigoSkin(ctx, fighter) {
     }
   } else {
     // Active combat pose: pointing sword forward at the enemy target
-    swingAngle = -0.16;
+    swingAngle = -0.12;
     thrustDistance = 0;
   }
 
@@ -409,7 +434,8 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.translate(r * 0.48, r * 0.52);
       ctx.rotate(swingAngle);
     } else {
-      ctx.translate(thrustDistance + bodyShiftX, 0);
+      const gripOffsetY = (!isBackSlungPose || isBankaiStance) ? (r * 0.52) : 0;
+      ctx.translate(thrustDistance + bodyShiftX, gripOffsetY);
       ctx.rotate(swingAngle);
     }
     if (isBankaiStance) {
@@ -861,7 +887,7 @@ export function drawIchigoSkin(ctx, fighter) {
     ctx.restore();
   }
 
-  // ── 5.5. Hollow Mask Formation Animation (Attached pieces clipped to body, flying shards and hand unclipped) ──
+  // ── 5.25. Hollow Mask Formation Animation (Attached pieces clipped to body, flying shards and hand unclipped) ──
   if (isMask && isForming) {
     const maskImg = _getHollowMaskImage();
     const destW = r * 2.15;
@@ -880,6 +906,10 @@ export function drawIchigoSkin(ctx, fighter) {
     // 2) Flying shards, snap flashes, and clutching hand in unclipped space
     _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
   }
+
+  // ── 5.3. Authentic Pixel-Art Orange Hair (Assets/model/Ichigo-hair.png) ──
+  // Render hair on top of face, static mask, and reforming mask pieces so hair is never overlaid
+  _drawIchigoHair(ctx, r, facingLeft);
 
   ctx.restore();
 
@@ -1698,47 +1728,7 @@ function _drawBankaiChargingAura(ctx, tipX, tipY, heelX, heelY, cutoutCenterX, c
 }
 
 function _drawBankaiTransformationVortex(ctx, r, bankaiProg, now, fighter) {
-  ctx.save();
-  const msPerFrame = 1000 / 30;
-  const qTime = Math.floor(now / msPerFrame) * msPerFrame;
-  const time = qTime * 0.001;
-  const pSize = 2.5;
-
-  const ringCount = 4;
-  for (let rc = 0; rc < ringCount; rc++) {
-    const ringProg = ((time * 1.5 + rc * (1.0 / ringCount)) % 1.0);
-    const ringDist = r * (0.6 + (1.0 - ringProg) * 2.2);
-    const segs = 16;
-
-    for (let seg = 0; seg < segs; seg++) {
-      if ((seg + rc) % 2 === 0) continue;
-      const segAngle = (seg / segs) * Math.PI * 2 + time * 6.0;
-      const rx = Math.cos(segAngle) * ringDist;
-      const ry = Math.sin(segAngle) * ringDist;
-
-      const gx = Math.round(rx / pSize) * pSize;
-      const gy = Math.round(ry / pSize) * pSize;
-
-      ctx.fillStyle = '#08080c';
-      ctx.fillRect(gx - pSize, gy - pSize, pSize * 3, pSize * 3);
-
-      ctx.fillStyle = (rc % 2 === 0) ? '#ff1e20' : '#dc143c';
-      ctx.fillRect(gx, gy, pSize, pSize);
-    }
-  }
-
-  const sparkCount = 8;
-  for (let s = 0; s < sparkCount; s++) {
-    const spProg = ((time * 2.0 + s * (1.0 / sparkCount)) % 1.0);
-    const spDist = r * (0.5 + (1.0 - spProg) * 2.4);
-    const spAngle = s * (Math.PI * 2 / sparkCount) + time * 4.5;
-    const sx = Math.cos(spAngle) * spDist;
-    const sy = Math.sin(spAngle) * spDist;
-
-    _drawPixelDiamond(ctx, sx, sy, 3.5, (s % 2 === 0) ? '#ff2030' : '#ffffff', '#ffffff', pSize);
-  }
-
-  ctx.restore();
+  // Pixel blocks removed for a clean Bankai transformation aesthetic
 }
 
 function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
@@ -1916,23 +1906,6 @@ function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
   ctx.save();
 
   _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now);
-
-  if (fighter.bankaiShards && fighter.bankaiShards.length > 0) {
-    const pSize = 2.0;
-    for (let s = 0; s < fighter.bankaiShards.length; s++) {
-      const shard = fighter.bankaiShards[s];
-      const relX = shard.x - fighter.x;
-      const relY = shard.y - fighter.y;
-      const shardAlpha = (shard.life || 1.0) * alpha;
-
-      if (shardAlpha > 0.02) {
-        const gx = Math.round(relX / pSize) * pSize;
-        const gy = Math.round(relY / pSize) * pSize;
-        ctx.fillStyle = shard.color || '#ff1e38';
-        ctx.fillRect(gx, gy, pSize, pSize);
-      }
-    }
-  }
 
   ctx.restore();
 }
@@ -2417,15 +2390,6 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
-  // Discrete Spiky Forehead Bangs calculation (7 iconic anime spikes)
-  function getHairlineY(rx) {
-    const nx = rx / r; // -1 to +1
-    const spikeWave = Math.abs(Math.sin(nx * Math.PI * 3.5));
-    const centralLength = (1.0 - Math.abs(nx) * 0.35);
-    const spikeExtension = r * 0.30 * centralLength * Math.pow(spikeWave, 1.15);
-    return -r * 0.36 + spikeExtension;
-  }
-
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -2443,75 +2407,56 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
         continue;
       }
 
-      const hairlineY = getHairlineY(rx);
-
       // ──────────────────────────────────────────
-      // ZONE 1: Spiky Orange Hair (ry < hairlineY)
+      // ZONE 1 & 2: Warm Peach Face Skin (ry < r * 0.35)
       // ──────────────────────────────────────────
-      if (ry < hairlineY) {
-        let col = '#FF7700'; // Base vibrant anime orange
-        if (ry < -r * 0.70) {
-          col = '#FFA534'; // Crown highlight
-        } else if (ry < -r * 0.50 && Math.abs(rx) < r * 0.45) {
-          col = '#FF8C1A'; // Mid hair shine
-        } else if (ry > hairlineY - P * 2.2) {
-          col = '#D95500'; // Bang tip shadow
-        } else if (Math.abs(rx) > r * 0.75) {
-          col = '#E66000'; // Side fringe shadow
-        }
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE 2: Warm Peach Face Skin (hairlineY <= ry < r * 0.10)
-      // ──────────────────────────────────────────
-      else if (ry < r * 0.10) {
-        let col = '#FFE0BD'; // Base warm peach
-        if (ry < hairlineY + P * 2.0) {
-          col = '#F2C8A4'; // Forehead hair shadow
-        } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.05) {
+      if (ry < r * 0.35) {
+        let col = '#FFE0BD'; // Base warm peach face skin
+        if (ry < -r * 0.50) {
+          col = '#F5D0AE'; // Subtle forehead top shadow under hair
+        } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.25) {
           col = '#F0C29E'; // Cheek / chin shadow
         }
         ctx.fillStyle = col;
         ctx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 3: SHIHAKUSHO ROBES (ry >= r * 0.10)
+      // ZONE 3: SHIHAKUSHO ROBES (ry >= r * 0.35)
       // ──────────────────────────────────────────
       else if (isShikai) {
         // ── SHIKAI ROBE LOGIC ──
         const strapSign = facingLeft ? -1 : 1;
 
         // A. Diagonal Red Ribbon / Chain Strap
-        const strapStartX = -r * 0.38 * strapSign;
-        const strapEndX   =  r * 0.28 * strapSign;
-        const strapProg = (ry - r * 0.10) / (r * 0.44);
+        const strapStartX = -r * 0.42 * strapSign;
+        const strapEndX   =  r * 0.32 * strapSign;
+        const strapProg = (ry - r * 0.35) / (r * 0.45);
         const strapCenterX = strapStartX + (strapEndX - strapStartX) * strapProg;
-        const isStrap = (ry >= r * 0.10 && ry <= r * 0.54 && Math.abs(rx - strapCenterX) <= r * 0.075);
+        const isStrap = (ry >= r * 0.35 && ry <= r * 0.80 && Math.abs(rx - strapCenterX) <= r * 0.075);
 
         // B. White Inner Collar V-Neck
-        const collarHalfW = (1 - (ry - r * 0.10) / (r * 0.32)) * (r * 0.28);
-        const isInsideCollarV = (ry <= r * 0.42 && Math.abs(rx) <= Math.max(0, collarHalfW));
-        const isCollarWhiteTrim = (ry <= r * 0.44 && Math.abs(Math.abs(rx) - collarHalfW) <= P * 1.5);
+        const collarHalfW = Math.max(0, (1 - (ry - r * 0.35) / (r * 0.28)) * (r * 0.28));
+        const isInsideCollarV = (ry <= r * 0.63 && Math.abs(rx) <= collarHalfW);
+        const isCollarWhiteTrim = (ry <= r * 0.65 && Math.abs(Math.abs(rx) - collarHalfW) <= P * 1.5);
 
         // C. White Obi Belt & Buckle
-        const isObiBelt = (ry >= r * 0.52 && ry <= r * 0.68 && Math.abs(rx) <= r * 0.78);
-        const isObiKnot = (ry >= r * 0.50 && ry <= r * 0.72 && Math.abs(rx) <= r * 0.10);
+        const isObiBelt = (ry >= r * 0.68 && ry <= r * 0.82 && Math.abs(rx) <= r * 0.78);
+        const isObiKnot = (ry >= r * 0.66 && ry <= r * 0.84 && Math.abs(rx) <= r * 0.10);
         // D. Hanging Sash Tails
-        const isSashTail = (ry >= r * 0.68 && ry <= r * 0.96 && Math.abs(rx) <= (r * 0.08 + (ry - r * 0.68) * 0.18));
+        const isSashTail = (ry >= r * 0.82 && ry <= r * 0.98 && Math.abs(rx) <= (r * 0.08 + (ry - r * 0.82) * 0.16));
 
         if (isObiKnot) {
-          ctx.fillStyle = (Math.abs(rx) < P && Math.abs(ry - r * 0.60) < P) ? '#FFFFFF' : '#E0E6EE';
+          ctx.fillStyle = (Math.abs(rx) < P && Math.abs(ry - r * 0.75) < P) ? '#FFFFFF' : '#E0E6EE';
         } else if (isSashTail) {
           if (Math.abs(rx) < P * 0.8) {
             ctx.fillStyle = '#C8D0DC'; // Split shadow
           } else {
-            ctx.fillStyle = (ry > r * 0.90) ? '#D8DEE8' : '#FFFFFF';
+            ctx.fillStyle = (ry > r * 0.92) ? '#D8DEE8' : '#FFFFFF';
           }
         } else if (isObiBelt) {
-          if (ry < r * 0.55) {
+          if (ry < r * 0.71) {
             ctx.fillStyle = '#FFFFFF'; // Top highlight
-          } else if (ry > r * 0.64) {
+          } else if (ry > r * 0.79) {
             ctx.fillStyle = '#CBD2DE'; // Bottom shadow
           } else {
             ctx.fillStyle = '#E8EDF4'; // Main obi
@@ -2520,23 +2465,23 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
           // Crimson ribbon with golden rivet studs
           if (Math.abs(rx - strapCenterX) > r * 0.055) {
             ctx.fillStyle = '#7A0C10';
-          } else if (Math.abs(ry - r * 0.22) < P || Math.abs(ry - r * 0.38) < P) {
+          } else if (Math.abs(ry - r * 0.46) < P || Math.abs(ry - r * 0.62) < P) {
             ctx.fillStyle = '#FFD700'; // Gold stud
           } else {
             ctx.fillStyle = (rx - strapCenterX < 0) ? '#FF2A40' : '#CC1025';
           }
         } else if (isCollarWhiteTrim || isInsideCollarV) {
-          if (isInsideCollarV && ry < r * 0.36 && Math.abs(rx) < collarHalfW - P * 1.5) {
+          if (isInsideCollarV && ry < r * 0.55 && Math.abs(rx) < collarHalfW - P * 1.5) {
             ctx.fillStyle = '#F5D2B8'; // Inner chest skin V
           } else {
-            ctx.fillStyle = (ry < r * 0.25) ? '#FFFFFF' : '#DDE3ED';
+            ctx.fillStyle = (ry < r * 0.45) ? '#FFFFFF' : '#DDE3ED';
           }
         } else {
           // Black Shihakusho robe
           let col = '#15161B';
-          if (Math.abs(rx) > r * 0.72 || ry > r * 0.84) {
+          if (Math.abs(rx) > r * 0.72 || ry > r * 0.88) {
             col = '#0C0D10';
-          } else if (ry < r * 0.25 && Math.abs(rx) < r * 0.50) {
+          } else if (ry < r * 0.48 && Math.abs(rx) < r * 0.50) {
             col = '#22242C';
           }
           ctx.fillStyle = col;
@@ -2545,23 +2490,23 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
       } else {
         // ── BANKAI ROBE LOGIC ──
         // Deep Double V-Neck Trenchcoat Collar + Split Coat
-        const outerVHalfW = (1 - (ry - r * 0.10) / (r * 0.40)) * (r * 0.36);
-        const innerVHalfW = (1 - (ry - r * 0.14) / (r * 0.34)) * (r * 0.26);
+        const outerVHalfW = Math.max(0, (1 - (ry - r * 0.35) / (r * 0.35)) * (r * 0.36));
+        const innerVHalfW = Math.max(0, (1 - (ry - r * 0.39) / (r * 0.30)) * (r * 0.26));
 
-        const isOuterVWhite = (ry >= r * 0.10 && ry <= r * 0.50 && Math.abs(Math.abs(rx) - outerVHalfW) <= P * 1.2);
-        const isInnerVWhite = (ry >= r * 0.14 && ry <= r * 0.48 && Math.abs(Math.abs(rx) - innerVHalfW) <= P * 1.2);
-        const isBetweenVBlack = (ry >= r * 0.12 && ry <= r * 0.46 && Math.abs(rx) < outerVHalfW && Math.abs(rx) > innerVHalfW);
-        const isChestSkinV = (ry >= r * 0.14 && ry <= r * 0.46 && Math.abs(rx) < innerVHalfW);
+        const isOuterVWhite = (ry >= r * 0.35 && ry <= r * 0.70 && Math.abs(Math.abs(rx) - outerVHalfW) <= P * 1.2);
+        const isInnerVWhite = (ry >= r * 0.39 && ry <= r * 0.68 && Math.abs(Math.abs(rx) - innerVHalfW) <= P * 1.2);
+        const isBetweenVBlack = (ry >= r * 0.37 && ry <= r * 0.67 && Math.abs(rx) < outerVHalfW && Math.abs(rx) > innerVHalfW);
+        const isChestSkinV = (ry >= r * 0.39 && ry <= r * 0.67 && Math.abs(rx) < innerVHalfW);
 
-        // Lower Split Obi Coat (ry >= r * 0.62)
-        const splitCoatWidth = (ry - r * 0.62) * 0.84;
-        const isCoatSplitWhite = (ry >= r * 0.62 && Math.abs(rx) <= splitCoatWidth);
-        const isCenterCoatSlit = (ry >= r * 0.68 && Math.abs(rx) <= r * 0.05);
+        // Lower Split Obi Coat (ry >= r * 0.75)
+        const splitCoatWidth = Math.max(0, (ry - r * 0.75) * 0.84);
+        const isCoatSplitWhite = (ry >= r * 0.75 && Math.abs(rx) <= splitCoatWidth);
+        const isCenterCoatSlit = (ry >= r * 0.78 && Math.abs(rx) <= r * 0.05);
 
         if (isChestSkinV) {
-          ctx.fillStyle = (ry < r * 0.24) ? '#FFE0BD' : '#F0C29E'; // Exposed chest skin
+          ctx.fillStyle = (ry < r * 0.48) ? '#FFE0BD' : '#F0C29E'; // Exposed chest skin
         } else if (isOuterVWhite || isInnerVWhite) {
-          ctx.fillStyle = (ry < r * 0.28) ? '#FFFFFF' : '#D5DDE8'; // Double white V trim
+          ctx.fillStyle = (ry < r * 0.50) ? '#FFFFFF' : '#D5DDE8'; // Double white V trim
         } else if (isBetweenVBlack) {
           ctx.fillStyle = '#111216'; // Black fold between double V
         } else if (isCenterCoatSlit) {
@@ -2570,14 +2515,14 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
           if (Math.abs(rx) > splitCoatWidth - P * 1.5) {
             ctx.fillStyle = '#FFFFFF'; // White split coat piping edge
           } else {
-            ctx.fillStyle = (ry > r * 0.88) ? '#CBD3E0' : '#E0E7F2'; // White undercoat lining
+            ctx.fillStyle = (ry > r * 0.90) ? '#CBD3E0' : '#E0E7F2'; // White undercoat lining
           }
         } else {
           // Bankai Jet-Black Trenchcoat
           let col = '#111216';
-          if (ry < r * 0.28 && Math.abs(rx) < r * 0.55) {
+          if (ry < r * 0.48 && Math.abs(rx) < r * 0.55) {
             col = '#1E2028'; // Shoulder fabric sheen
-          } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.85) {
+          } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.88) {
             col = '#0A0A0D'; // Deep outer fold shadow
           }
           ctx.fillStyle = col;
@@ -2588,6 +2533,36 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
   }
 
   ctx.restore();
+}
+
+/**
+ * Draws Ichigo's authentic pixel-art orange spiky hair from Assets/model/Ichigo-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawIchigoHair(ctx, r, facingLeft = false) {
+  const hairImg = _getIchigoHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    // Ichigo-hair.png (1254x1254). True visible hair bounding box:
+    // X: [191, 1063] (width 873, horizontal center at 627)
+    // Y: [227, 967] (height 741, top crown at 227)
+    // Scales to cover the upper head circle hemisphere seamlessly with crown spikes at -1.26r and extended length (1.88r)
+    const targetHairWidth = r * 2.58;
+    const targetHairHeight = r * 1.88;
+    const scaleX = targetHairWidth / 873;
+    const scaleY = targetHairHeight / 741;
+    const drawW = 1254 * scaleX;
+    const drawH = 1254 * scaleY;
+    const drawX = -627 * scaleX;
+    const drawY = -r * 1.26 - 227 * scaleY;
+
+    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  }
 }
 
 function _drawIchigoHand(ctx, hx, hy, skinColor, isShikai) {
@@ -2657,7 +2632,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   const maxT = fighter.slashSwingMaxTimer || 22;
   const rawSlashProg = isSlashing ? Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT))) : 0;
 
-  let swingAngle = -0.16;
+  let swingAngle = -0.12;
   let thrustDistance = 0;
   let bodyShiftX = 0;
   let bodyTilt = 0;
@@ -2688,7 +2663,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
     const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
     const chargeTremble = Math.sin(Date.now() * 0.045) * 0.03 * (0.3 + 0.7 * chargeProg);
 
-    swingAngle = -0.16 + (-1.85 - (-0.16)) * smoothLift + chargeTremble;
+    swingAngle = -0.12 + (-1.85 - (-0.12)) * smoothLift + chargeTremble;
     thrustDistance = -4.0 - 6.0 * smoothLift;
     bodyShiftX = -1.5 - 3.0 * smoothLift;
     bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.4;
@@ -2705,7 +2680,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
       } else {
         const p = (rawSlashProg - slashPhase) / (1.0 - slashPhase);
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.16 + (1.25 - (-0.16)) * easeP;
+        swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
         thrustDistance = 16 * easeP;
         bodyShiftX = 5.0 * easeP;
         bodyTilt = 0.08 * easeP;
@@ -2714,7 +2689,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
       if (rawSlashProg < 0.10) {
         const p = rawSlashProg / 0.10;
         const easeP = p * (2 - p);
-        swingAngle = -0.16 + (-1.35 - (-0.16)) * easeP;
+        swingAngle = -0.12 + (-1.35 - (-0.12)) * easeP;
         thrustDistance = -8 * easeP;
         bodyShiftX = -2.5 * easeP;
         bodyTilt = -0.05 * easeP;
@@ -2728,7 +2703,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
       } else {
         const p = (rawSlashProg - 0.55) / 0.45;
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.16 + (1.20 - (-0.16)) * easeP;
+        swingAngle = -0.12 + (1.20 - (-0.12)) * easeP;
         thrustDistance = 14 * easeP;
         bodyShiftX = 4.0 * easeP;
       }
@@ -2761,7 +2736,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
       bodyTilt = -0.03;
     }
   } else {
-    swingAngle = -0.16;
+    swingAngle = -0.12;
     thrustDistance = 0;
   }
 
@@ -2776,12 +2751,13 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
 
+  const gripOffsetY = (!isBackSlungPose || isBankaiStance) ? (r * 0.52) : 0;
   const localX = isHollowChanneling
     ? (r * 0.48 + innerX * cosT - innerY * sinT)
     : (innerX * cosT - innerY * sinT + (thrustDistance + bodyShiftX));
   let localY = isHollowChanneling
     ? (r * 0.52 + innerX * sinT + innerY * cosT)
-    : (innerX * sinT + innerY * cosT);
+    : (innerX * sinT + innerY * cosT + gripOffsetY);
 
   // Apply facing flip
   if (facingLeft) {
@@ -3257,11 +3233,18 @@ function _drawDynamicBankaiChain(ctx, nodes, isMask) {
   const len = nodes.length - 1;
   const strokeOuter = isMask ? '#5A1212' : '#0D0D12';
   const strokeGleam = isMask ? 'rgba(255, 60, 0, 0.70)' : 'rgba(150, 160, 185, 0.60)';
+  const ring = nodes[0];
+
+  // Sarute pommel ring loop at attachment point
+  ctx.beginPath();
+  ctx.arc(ring.x, ring.y, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#08080C';
+  ctx.fill();
+  ctx.strokeStyle = strokeOuter;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
 
   // 1. Batched outer iron links
-  ctx.strokeStyle = strokeOuter;
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
   for (let i = 0; i < len; i++) {
     const p1 = nodes[i];
     const p2 = nodes[i + 1];
@@ -3275,9 +3258,14 @@ function _drawDynamicBankaiChain(ctx, nodes, isMask) {
     const linkRx = Math.max(1.8, dist * 0.55);
     const linkRy = isOdd ? 1.0 : 1.7;
 
+    ctx.beginPath();
     ctx.ellipse(mx, my, linkRx, linkRy, ang, 0, Math.PI * 2);
+    ctx.fillStyle = isOdd ? '#060608' : '#0a0a0e';
+    ctx.fill();
+    ctx.strokeStyle = strokeOuter;
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
   }
-  ctx.stroke();
 
   // 2. Batched specular metallic gleam
   ctx.strokeStyle = strokeGleam;

@@ -1,258 +1,167 @@
 // ─────────────────────────────────────────────
-// Ichigo Kurosaki — Substitute Soul Reaper Config
+// Ichigo Kurosaki — Substitute Soul Reaper Config (Unified)
 // ─────────────────────────────────────────────
 export const ichigoConfig = {
-  // ── Base Attributes ──
+  // ── Base Attributes & Identity ──
   hp: 240,
   speed: 7.0,
-  moveSpeed: 7.0,
+  moveSpeed: 6.5,
   r: 25,
   radius: 25,
-  color: '#FF5500', // Orange details
+  color: '#FF5500', // Iconic orange hair / aura accents
   themeColor: '#FF5500',
-  damageNumberColor: '#FF5500', // Consistent Orange for all floating damage numbers
+  damageNumberColor: '#FF5500',
   hudNameColor: '#FF5500',
   hudSkillBarColor: '#FF5500',
   startX: 300,
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  damage: 16,
+  damage: 4,
   cooldown: 30,
   projectileSpeedMultiplier: 1.0,
   ability: 'Hollow Mask',
-  desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
+  desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 60% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
 
-  // Basic Attack: Zangetsu Cleave
-  swordDamage: 15,               // Base damage per melee slash
-  swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s)
-  swordRange: 50,                // Melee reach (140° frontal arc)
-  swordArc: 140,                 // Frontal cleave arc cone angle in degrees (Rule #7)
-  swordFreezeDuration: 8,        // Target hit-pause freeze frames on melee strike (Rule #5)
+  // ── Basic Attack: Zangetsu Melee Cleave ──
+  swordDamage: 4,               // Base damage per melee slash
+  swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s at 60fps)
+  swordRange: 50,                // Melee reach distance
+  swordArc: 140,                 // Frontal cleave arc cone in degrees
+  swordFreezeDuration: 8,        // Target hit-pause freeze frames on melee strike
   swordSwingDuration: 22,        // Melee slash swing animation duration in frames
-  swordHitScreenShake: 3.0,      // Arena screen shake intensity on basic melee hit
-  swordHitShakeDuration: 6,      // Shake duration in frames on basic melee hit
-  bankaiSwordHitScreenShake: 4.0,// Arena screen shake intensity on Bankai melee hit
-  hollowSwordHitScreenShake: 4.5,// Arena screen shake intensity on Hollow Mask melee hit
-  knockback: 6,                  // Knockback on hit
-  swordShockwaveSize: 35,        // Shockwave burst size on basic sword hit
+  knockback: 0,                  // Base melee knockback force
+  swordScreenShake: 3.0,         // Screen shake intensity on basic melee hit
+  swordShockwaveSize: 35,        // Shockwave burst size on sword hit
 
-  // ── Unified Skill Combo: Shunpo Getsuga Blitz (Flash Step Flurry -> Disengage Back-Step -> Getsuga Tensho) ──
-  enableFlashStep: true,         // Master toggle for Flash Step (Shunpo teleport). If false, fires standalone Getsuga without teleporting
-  enableShunpo: true,            // Alias toggle for Flash Step teleport
-  comboCooldown: 450,            // Base cooldown in frames between full combo activations (~7.5s)
-  flashStepCooldown: 360,        // Cooldown when flurry attack is disabled (~6.0s in Shikai)
-  comboDisengageDistance: 290,   // Increased distance flash-stepped backward away from target before firing Getsuga (px)
-  comboDisengageDashFrames: 3,   // Flash step duration frames for the backward disengage
-  comboDisengageDelayFrames: 7,  // Delay window frames after finisher before initiating back-step in Shikai
-  comboTriggerMinDist: 0,        // Minimum trigger distance (0 = point-blank / melee range)
-  comboTriggerMaxDist: 400,      // Maximum trigger distance (gap-closes with Flash Step)
-
-  // Phase 1: Flash Step Multi-Strike Flurry
-  enableFlurryAttack: 1,         // Toggle multi-strike flurry slashes. When false/0, Ichigo does a single Flash Step strike -> backstep -> Getsuga (no repeating slashes)
-  enableFlurry: true,            // Alias toggle for flurry attack
-  flurryEnabled: true,           // Alias toggle for flurry attack
-  enableShunpoCombo: true,       // Alias toggle for flurry attack
-  shunpoComboEnabled: true,      // Alias toggle for flurry attack
-  shunpoStrikes: 4,              // Base flurry strike count in Shikai form
+  // ── Skill Combo: Shunpo Blitz (Flash Step Flurry -> Disengage Back-Step -> Getsuga) ──
+  enableShunpo: true,            // Toggle Flash Step teleport skill
+  enableFlurry: true,            // Toggle multi-strike flurry slashes (if false, executes single strike -> backstep -> Getsuga)
+  initialShunpoCooldown: 100,    // Initial cooldown in frames after round start / countdown ends before first Shunpo Blitz (~3.0s at 60fps)
+  shunpoCooldown: 200,           // Cooldown in frames between combo activations (~7.5s in Shikai)
+  shunpoStrikes: 4,              // Number of intermediate flurry slashes in Shikai
   shunpoRange: 220,              // Distance dashed on initial flank step
-  shunpoDashDuration: 4,         // Flash step teleport duration frames
-  shunpoTargetOffset: 34,        // Distance offset from target center on teleport arrival
-  shunpoStrike1Damage: 15,       // Base damage for intermediate flank slashes
-  shunpoStrike1FreezeDuration: 0,  // Hit-pause frames on target during intermediate strikes (0 = allow enemy aiming and reactions)
-  shunpoStrike1SlashDuration: 14,// Swing animation duration frames for intermediate strikes
-  shunpoStrike1ScreenShake: 2.5, // Arena screen shake intensity on intermediate flurry strike hit
-  shunpoStrike1ShakeDuration: 6, // Shake duration in frames on intermediate strike hit
-  bankaiShunpoStrike1ScreenShake: 3.5, // Bankai intermediate flurry strike hit shake
-  shunpoStrike2Multiplier: 1.1, // Finisher damage multiplier for final flurry strike
-  shunpoStrike2StunDuration: 8,  // Stun frames applied on finisher hit
-  bankaiShunpoStunDuration: 8,   // Stun frames on Bankai finisher hit
-  shunpoStrike2SlashDuration: 16,// Swing animation duration frames for final finisher strike
-  shunpoStrike2Knockback: 7,     // Finisher knockback force pushing target back
-  shunpoShockwaveSize: 45,       // Shockwave burst size on finisher
-  shunpoScreenShake: 4.0,        // Screen shake intensity on finisher hit
-  shunpoFinisherShakeDuration: 10, // Finisher shake duration in frames
-  bankaiShunpoFinisherScreenShake: 5.5, // Screen shake intensity on Bankai finisher hit
-  hollowShunpoFinisherScreenShake: 5.0, // Screen shake intensity on Hollow Mask finisher hit
-  shunpoComboDelayFrames: 8,     // Delay window frames between intermediate strikes in Shikai
-  shunpoCooldown: 450,           // Fallback alias for comboCooldown
-  getsugaCooldown: 450,          // Fallback alias for comboCooldown
+  shunpoDashDuration: 4,         // Flash step dash duration in frames
+  shunpoTargetOffset: 34,        // Distance offset from target center on arrival
+  shunpoStrikeDamage: 4,         // Base damage for intermediate flurry slashes
+  shunpoStrike1Damage: 4,        // Backward-compatibility alias
+  shunpoStrikeDuration: 14,      // Intermediate swing animation duration in frames
+  shunpoFinisherMultiplier: 1.1, // Damage multiplier for final flurry strike
+  shunpoStrike2Multiplier: 1.1,  // Backward-compatibility alias
+  shunpoFinisherDuration: 16,    // Finisher swing animation duration in frames
+  shunpoFinisherKnockback: 7,    // Finisher knockback force
+  shunpoStrike2Knockback: 7,     // Backward-compatibility alias
+  shunpoScreenShake: 4.0,        // Screen shake intensity on flurry finisher hit
+  shunpoDisengageDistance: 290,  // Distance stepped back away from target before firing Getsuga (px)
+  shunpoDisengageDashFrames: 3,  // Dash duration for backward disengage
+  shunpoDisengageDelayFrames: 7, // Delay window after finisher before back-step initiates
+  comboTriggerMinDist: 0,        // Minimum trigger distance for AI
+  comboTriggerMaxDist: 400,      // Maximum trigger distance for AI
 
-  // Phase 2: Getsuga Tensho Wave (Released after Disengage Flash Step)
-  getsugaDamage: 10,             // Base tick damage for Getsuga Tensho wave
-  getsugaTickDamage: 10,         // Multi-tick shredding damage per hit
+  // ── Special Attack: Getsuga Tensho Wave ──
+  getsugaDamage: 4,              // Base damage / tick damage for Getsuga wave
+  getsugaTickDamage: 3,          // Multi-tick shredding damage per hit in Shikai
+  getsugaSpeed: 11,              // Base projectile travel speed (px/frame)
+  getsugaTravelSpeed: 11,        // Alias
+  getsugaRadius: 100,            // Base crescent projectile radius
   getsugaDuration: 90,           // Sustained duration frames pinned against arena walls (~1.5s)
-  getsugaTravelSpeed: 11,        // ⚡ Base travel speed of Getsuga projectile wave (pixels/frame)
-  getsugaSpeed: 11,              // Base projectile speed fallback
   getsugaKnockback: 6,           // Knockback force applied
   getsugaHitStun: 18,            // Hit stun frames applied on hit
-  getsugaParalyzeDuration: 18,   // Paralyze debuff frames applied on hit preventing actions during tick damage
-  getsugaSlowDuration: 90,       // Duration of movement slow debuff applied on hit (1.5s)
+  getsugaSlowDuration: 90,       // Duration of movement slow debuff on hit
   getsugaSlowMultiplier: 0.40,   // Movement speed multiplier during slow (60% slow)
-  getsugaDragFrames: 14,         // Number of frames the enemy is actively dragged with the wave
-  getsugaScreenShake: 3.5,       // Screen shake intensity on release
-  getsugaHitScreenShake: 3.5,    // Screen shake intensity on projectile hit
-  getsugaTravelShakeIntensity: 2.0, // Arena screen shake intensity as Getsuga wave travels
-  getsugaTravelShakeInterval: 6,    // Interval in frames between travel screen shake pulses
-  getsugaShockwaveSize: 40,      // Shockwave burst size on Getsuga hit
-  getsugaSlideFrames: 8,         // Number of frames for braking skid slide before charge
-  getsugaSlideDamping: 0.72,     // Velocity damping multiplier per frame during brake slide
-  getsugaChargeFrames: 64,       // Channeling duration frames for Getsuga Tensho wave matching voiceline (~1.07s)
-  channelTurnRate: 0.08,         // Smooth auto-aim tracking turn rate while channeling Getsuga Tensho
-  getsugaSlashDuration: 24,      // Slash swing animation duration frames upon Getsuga release
-  getsugaRecoveryFrames: 24,     // Breather/recovery frames held in follow-through pose after releasing Getsuga before moving
-  getsugaPierce: true,           // Pierces through enemies and destroys projectiles
-  getsugaHitCooldown: 4,         // Re-hit tick interval frames (ticks every 4 frames / ~15 hits/sec)
+  getsugaHitCooldown: 4,         // Re-hit tick interval in frames (~15 ticks/sec)
+  getsugaChargeFrames: 64,       // Channeling duration frames matching voiceline (~1.07s)
+  channelTurnRate: 0.08,         // Aim tracking turn rate while channeling
+  getsugaSlashDuration: 24,      // Slash animation duration on release
+  getsugaRecoveryFrames: 24,     // Recovery frames held in follow-through pose before moving
   getsugaRecoil: 3.5,            // Backward kinetic recoil impulse on release
-  getsugaTriggerMinDist: 0,      // Minimum distance from enemy for AI to fire Getsuga
-  getsugaTriggerMaxDist: 400,    // Maximum distance from enemy for AI to fire Getsuga
-  getsugaRadius: 100,             // Base projectile radius (increased scale)
+  getsugaScreenShake: 3.5,       // Screen shake intensity on Getsuga release/hit
+  getsugaHitScreenShake: 3.5,    // Alias
+  getsugaShockwaveSize: 40,      // Shockwave burst size on Getsuga hit
   getsugaColor: '#00D5FF',       // Shikai Getsuga theme color (Sky-Blue)
 
   // ── Passive: Hollow Mask Awakening ──
-  hollowMaskThreshold: 0.60,     // Automatically activates when HP <= 70%
+  hollowMaskThreshold: 0.60,     // Automatically activates when HP <= 60%
+  hollowRechargeHpRatio: 0.20,   // Damage required to reactivate Hollow Mask after mask shatters (20% of max HP)
+  hollowHpRecovery: 0.50,        // 50% HP recovery upon Hollow Mask transformation
   hollowMaskDuration: 800,       // Mask duration in frames (~13.3s)
-  hollowMaskFormationFrames: 325,// Animation duration frames for hand-to-face clutch and mask assembly (~5.4s, matching exact 5.35s audio duration of voiceline)
-  hollowBurstFrames: 36,         // Sky burst eruption duration frames upon Hollow transformation
-  hollowSpeedMultiplier: 1.4,    // Speed boost multiplier
-  hollowDamageMultiplier: 1.5,   // Damage multiplier boost
-  hollowDamageReduction: 0.10,   // 10% incoming damage mitigation (Hierro) during Hollow Mask
-  hollowLifesteal: 0.10,         // 10% vampiric lifesteal heal on damage dealt during Hollow Mask
-  hollowShunpoStrikesMultiplier: 1.1, // Multiplier to increase Shunpo flurry strikes during Hollow form
-  hollowSwordCooldownMultiplier: 0.65, // Multiplier reducing melee sword cooldown (e.g. 30 * 0.65 = ~19 frames for faster rapid slashing)
-  hollowComboCooldownMultiplier: 0.25, // Cooldown multiplier for Shunpo Getsuga Blitz combo during Hollow Mask
-  hollowShunpoCooldownMultiplier: 0.25,// Alias cooldown multiplier during Hollow Mask
-  hollowGetsugaCooldownMultiplier: 0.25,// Alias cooldown multiplier during Hollow Mask
-  hollowGetsugaChargeMultiplier: 0.70, // Reduction multiplier reducing Getsuga Tensho charging frames during Hollow form (50% faster charge)
-  hollowGetsugaVoice1ChargeFrames: 80,  // Charging frames dynamically synchronized to when "...TENSHO!" peaks & finishes in Voice 1 (~1.33s)
-  hollowGetsugaVoice2ChargeFrames: 34,  // Charging frames dynamically synchronized to when fast "TENSHO!" peaks & finishes in Voice 2 (~0.57s)
-  hollowGetsugaDamage: 16,        // Upgraded Black Getsuga tick damage while mask active
-  hollowGetsugaTickDamage: 16,    // Multi-tick shredding damage per hit in Hollow Mask
-  hollowGetsugaDuration: 85,      // Sustained duration frames (~1.4s)
-  hollowGetsugaHitCooldown: 4,    // Re-hit tick interval frames
-  hollowGetsugaSpeed: 15,        // Hollow Mask projectile travel speed
-  hollowGetsugaKnockback: 8,     // Knockback force applied
-  hollowGetsugaHitStun: 20,      // Hit stun frames applied on hit
-  hollowGetsugaParalyzeDuration: 20, // Paralyze debuff frames applied during Hollow Mask Getsuga
-  hollowGetsugaSlowDuration: 100,// Hollow Mask slow debuff duration (frames)
-  hollowGetsugaSlowMultiplier: 0.35, // Hollow Mask slow speed multiplier (65% slow)
-  hollowGetsugaDragFrames: 18,   // Hollow Mask drag frames
-  hollowGetsugaScreenShake: 5.0, // Screen shake intensity on release
-  hollowGetsugaHitScreenShake: 4.5, // Screen shake intensity on projectile hit
-  hollowGetsugaRadius: 100,       // Hollow Mask Getsuga projectile radius (increased scale)
-  hollowGetsugaColor: '#FFFFFF', // Hollow Mask Getsuga color (monochrome white-black theme)
+  hollowMaskFormationFrames: 200,// Animation frames for mask assembly (~3.3s matching audio)
+  hollowBurstFrames: 10,         // Eruption blast frames upon Hollow transformation
+  hollowSpeedMultiplier: 0.50,    // 40% movement speed boost
+  hollowDamageMultiplier: 0.50,   // 10% damage boost
+  hollowDamageReduction: 0.10,   // 10% incoming damage mitigation (Hierro)
+  hollowLifesteal: 0.10,         // 10% vampiric lifesteal heal on damage dealt
+  hollowComboCooldownMultiplier: 0.10, // 90% combo cooldown reduction during Hollow Mask
+  hollowGetsugaDamage: 3,        // Upgraded Black Getsuga damage
+  hollowGetsugaTickDamage: 3,    // Upgraded multi-tick damage per hit in Hollow form
+  hollowGetsugaSpeed: 15,        // Hollow Mask Getsuga travel speed
+  hollowGetsugaRadius: 100,      // Hollow Mask Getsuga radius
+  hollowGetsugaDuration: 85,     // Sustained wall duration in Hollow form
+  hollowGetsugaKnockback: 8,     // Knockback force in Hollow form
+  hollowGetsugaSlowDuration: 100,// Slow duration in Hollow form
+  hollowGetsugaSlowMultiplier: 0.35, // Slow multiplier in Hollow form (65% slow)
+  hollowGetsugaScreenShake: 5.0, // Screen shake intensity during Hollow form
+  hollowGetsugaColor: '#FFFFFF', // Hollow Mask Getsuga theme color (Monochrome white/black)
 
-  // ── Passive: Zanjutsu Parry & Defense Mechanics ──
+  // ── Passive: Zanjutsu Blade Parry & Defense ──
   parryChance: 0.15,             // Base parry chance in Shikai (15%)
   bankaiParryChance: 0.25,       // Parry chance during Bankai (25%)
   hollowParryChance: 0.30,       // Parry chance during Hollow Mask (30%)
   bankaiHollowParryChance: 0.35, // Parry chance during Bankai + Hollow (35%)
-  parryGuardDuration: 45,        // Frames held in defensive parry posture (~0.75s)
-  parryHitAnimDuration: 18,      // Frame duration for blade deflection impact jitter
+  parryGuardDuration: 45,        // Frames held in parry posture (~0.75s)
   parryDeflectionPush: 7.0,      // Physical deflection push impulse applied to attacker
 
-  // ─────────────────────────────────────────────
   // ── Ultimate: Bankai Awakening (Tensa Zangetsu) ──
-  // ─────────────────────────────────────────────
-
-  // 1. Activation & Transformation
-  ultimateThreshold: 0.90,       // Automatically activates when HP <= 90%
-  bankaiRechargeHpRatio: 0.20,   // Damage required after Bankai expires to reactivate Bankai (20% of max HP)
-  ultimateCooldown: 1500,        // Fallback cooldown frames (25s)
-  bankaiDuration: 800,           // Duration of Bankai form in frames (~13.3s)
-  bankaiSlideFrames: 10,         // Braking skid slide frames when initiating Bankai
-  bankaiSlideDamping: 0.70,      // Velocity damping per frame during brake slide
-  bankaiChargeFrames: 66,        // Channeling duration frames for epic Bankai transformation (~1.10s, exact audio duration of voiceline)
-  bankaiBurstFrames: 36,         // Post-release transformation explosion & shatter burst duration
-  shikaiReversionBurstFrames: 42,// Post-Bankai Shikai reversion sonic skyward blast duration (~0.70s)
-  shikaiReversionRecoveryFrames: 42, // Post-Bankai Shikai reversion breather / recovery frames before actions
-  bankaiRibbonDuration: 300,     // Total lifespan frames of the flowing 3D ribbon after Bankai release
-  bankaiAuraShockwaveSize: 95,   // Shockwave burst size on Bankai activation
-  bankaiScreenShake: 7,          // Screen shake intensity upon Bankai release
-
-  // 2. Stat Multipliers & Combat Buffs
-  bankaiSpeedMultiplier: 1.5,    // Movement speed multiplier during Bankai
-  bankaiDamageMultiplier: 1.2,   // Melee damage multiplier boost during Bankai
-
-  // 3. Bankai Combo Modifiers (Tensa Getsuga Blitz)
-  bankaiComboCooldownMultiplier: 0.50, // Cooldown multiplier during Bankai (0.50 = ~3.0s cooldown wait between combos)
-  bankaiShunpoCooldownMultiplier: 0.50,// Fallback alias
-  bankaiGetsugaCooldownMultiplier: 0.50,// Fallback alias
-  bankaiShunpoStrikes: 6,        // Flurry strike count increased from 2 to 6 during Bankai
-  bankaiShunpoDashDuration: 3,   // Supersonic flash step dash duration frames during Bankai
-  bankaiShunpoStrike1Duration: 10,// Faster intermediate flurry swing animation in Bankai
-  bankaiShunpoStrike2Duration: 14,// Faster finisher swing animation in Bankai
-  bankaiShunpoComboDelayFrames: 5,// Faster delay window between strikes in Bankai (supersonic blitz)
-  bankaiComboDisengageDistance: 350,   // Extended disengage flash step distance in Bankai form (px)
-  bankaiComboDisengageDashFrames: 3,   // Faster disengage flash step frames in Bankai
-  bankaiComboDisengageDelayFrames: 5,  // Faster disengage back-step trigger delay in Bankai
-
-  // 4. Kuroi Getsuga Tensho Wave (Bankai Combo Release)
-  bankaiGetsugaChargeFrames: 60, // Reduced faster Getsuga charging frames during Bankai form (frames)
-  bankaiGetsugaVoiceDurationMs: 2500, // Full protected voice duration of Bankai Getsuga Tensho voiceline (~2.5s)
-  bankaiGetsugaDamage: 16,       // Kuroi Getsuga tick damage during Bankai
-  bankaiGetsugaTickDamage: 16,   // Multi-tick shredding damage per hit in Bankai
-  bankaiHollowGetsugaDamage: 24,// Kuroi Getsuga tick damage during Bankai + Hollow Mask
-  bankaiHollowGetsugaTickDamage: 24, // Multi-tick shredding damage per hit in Bankai + Hollow Mask
-  bankaiGetsugaDuration: 75,     // Sustained duration frames (~1.25s) allowing rapid Bankai combos
-  bankaiHollowGetsugaDuration: 75, // Sustained duration frames (~1.25s)
-  bankaiGetsugaHitCooldown: 4,   // Re-hit tick interval frames (ticks every 4 frames / ~15 hits/sec)
-  bankaiGetsugaSpeed: 10,        // Kuroi Getsuga travel speed (pixels/frame)
-  bankaiGetsugaRadius: 110,       // Bankai Getsuga projectile radius (increased scale)
-  bankaiHollowGetsugaRadius: 100,// Bankai + Hollow Mask Getsuga projectile radius (matches Shikai Getsuga scale)
-  bankaiGetsugaKnockback: 8,     // Kuroi Getsuga knockback force
-  bankaiGetsugaHitStun: 20,      // Kuroi Getsuga hit stun duration
-  bankaiGetsugaParalyzeDuration: 20, // Paralyze debuff frames applied in Bankai Getsuga
-  bankaiHollowGetsugaParalyzeDuration: 24, // Paralyze debuff frames in Bankai + Hollow Mask Getsuga
-  bankaiGetsugaSlowDuration: 100,// Bankai slow debuff duration (frames)
+  ultimateThreshold: 0.80,       // Automatically activates when HP <= 90%
+  bankaiCooldown: 600,           // Cooldown in frames between Bankai activations after expiration (~10.0s at 60fps)
+  bankaiRechargeHpRatio: 0.20,   // Damage required to reactivate Bankai after it expires (20% of max HP)
+  bankaiDuration: 1000,           // Bankai form duration in frames (~13.3s)
+  bankaiChargeFrames: 66,        // Channeling duration frames for transformation (~1.10s)
+  bankaiBurstFrames: 36,         // Shatter burst duration frames
+  bankaiRibbonDuration: 300,     // Lifespan frames of flowing 3D ribbon
+  bankaiScreenShake: 7.0,        // Screen shake intensity upon Bankai release
+  bankaiSpeedMultiplier: 1.1,    // 50% movement speed boost during Bankai
+  bankaiDamageMultiplier: 1.1,   // 20% melee damage boost during Bankai
+  bankaiComboCooldownMultiplier: 0.50, // 50% combo cooldown reduction during Bankai (~3.7s cooldown)
+  bankaiShunpoStrikes: 8,        // Flurry strikes increased to 6 in Bankai
+  bankaiShunpoDashDuration: 3,   // Supersonic flash step duration in Bankai
+  bankaiComboDisengageDistance: 350, // Extended disengage back-step distance in Bankai
+  bankaiGetsugaDamage: 6,        // Kuroi Getsuga damage during Bankai
+  bankaiGetsugaTickDamage: 4,    // Multi-tick damage per hit in Bankai
+  bankaiHollowGetsugaTickDamage: 6, // Multi-tick damage during Bankai + Hollow Mask (6 dmg per tick)
+  bankaiGetsugaSpeed: 10,        // Bankai Getsuga travel speed
+  bankaiGetsugaRadius: 110,      // Bankai Getsuga projectile radius
+  bankaiGetsugaDuration: 75,     // Bankai Getsuga wall duration
+  bankaiGetsugaKnockback: 8,     // Bankai Getsuga knockback force
+  bankaiGetsugaSlowDuration: 100,// Bankai Getsuga slow duration
   bankaiGetsugaSlowMultiplier: 0.35, // Bankai slow speed multiplier (65% slow)
-  bankaiGetsugaDragFrames: 16,   // Number of frames enemy is actively dragged with Bankai wave
-  bankaiGetsugaShockwaveSize: 42,// Shockwave burst size on Bankai Getsuga hit
-  bankaiGetsugaScreenShake: 4.5, // Kuroi Getsuga screen shake intensity on release
-  bankaiGetsugaHitScreenShake: 4.5, // Kuroi Getsuga screen shake intensity on projectile hit
-  bankaiHollowGetsugaScreenShake: 5.5, // Screen shake on Bankai + Hollow Getsuga release
-  bankaiHollowGetsugaHitScreenShake: 5.5, // Screen shake on Bankai + Hollow Getsuga hit
-  bankaiGetsugaRecoveryFrames: 20,// Recovery breather frames after releasing Getsuga in Bankai
-  bankaiGetsugaColor: '#DC143C', // Bankai Getsuga color (Black-Crimson Red)
+  bankaiGetsugaScreenShake: 4.5, // Bankai Getsuga screen shake intensity
+  bankaiGetsugaColor: '#DC143C', // Bankai Getsuga theme color (Black-Crimson Red)
 
-  // 5. Frontal Supersonic Reiatsu Wind Blast (Release Impact)
-  bankaiWindDamage: 35,          // Frontal supersonic wind blast damage on Bankai release
+  // ── Bankai Frontal Reiatsu Wind Blast (Release Impact) ──
+  bankaiWindDamage: 10,          // Frontal supersonic wind blast damage on Bankai release
   bankaiWindReach: 240,          // Range of the frontal wind blast cone
   bankaiWindArc: 140,            // Angle cone of frontal wind blast in degrees
   bankaiWindKnockback: 14,       // Knockback force blowing enemies back
-  bankaiWindHitStun: 24,         // Hit stun duration applied to enemies hit by wind blast
-  bankaiWindFreezeDuration: 12,  // Hit pause stasis frames on enemies hit by wind blast
-  bankaiWindHitScreenShake: 6.0, // Arena screen shake intensity on wind blast hit
-  bankaiWindHitShakeDuration: 12,// Arena screen shake duration frames on wind blast hit
+  bankaiWindHitStun: 24,         // Hit stun duration from wind blast
+  bankaiWindFreezeDuration: 12,  // Hit pause stasis frames from wind blast
 
-  // 6. Grand Finisher: Final Massive Kuroi Getsuga (Unleashed before Bankai ends)
+  // ── Grand Finisher: Final Massive Kuroi Getsuga ──
   bankaiFinalGetsugaTriggerTimer: 160,  // Bankai duration threshold frames when Grand Finisher triggers
-  bankaiFinalGetsugaChargeFrames: 80,  // Epic gathering charge frames matching exact voiceline duration (~2.46s)
-  bankaiFinalGetsugaDamage: 100,        // Total Colossal Kuroi Getsuga damage potential
-  bankaiFinalGetsugaTickDamage: 20,     // Continuous shredding damage per tick (multi-hit tick damage)
-  bankaiFinalGetsugaHitCooldown: 4,     // Re-hit tick interval frames (ticks every 4 frames / ~15 hits/sec)
-  bankaiFinalGetsugaParalyzeDuration: 28, // Paralyze debuff frames applied on hit preventing actions during tick damage
-  bankaiFinalGetsugaRadius: 100,         // Huge projectile radius (increased scale)
-  bankaiFinalGetsugaDuration: 150,      // Sustained duration frames (unified with Phase 2 getsugaDuration)
-  bankaiFinalGetsugaSpeed: 7,          // Fast supersonic wave speed
+  bankaiFinalGetsugaChargeFrames: 80,  // Gathering charge frames matching voiceline (~2.46s)
+  bankaiFinalGetsugaDamage: 20,         // Final Getsuga damage
+  bankaiFinalGetsugaTickDamage: 10,      // Continuous multi-hit tick damage
+  bankaiFinalGetsugaSpeed: 7,           // Wave travel speed
+  bankaiFinalGetsugaRadius: 100,        // Huge crescent radius
+  bankaiFinalGetsugaDuration: 150,      // Wall pin duration
   bankaiFinalGetsugaKnockback: 30,      // Massive knockback blowing targets across arena
   bankaiFinalGetsugaHitStun: 28,        // Heavy hit stun
-  bankaiFinalGetsugaSlowDuration: 140,  // Heavy slow duration from Final Getsuga
+  bankaiFinalGetsugaSlowDuration: 140,  // Heavy slow duration
   bankaiFinalGetsugaSlowMultiplier: 0.20,// 80% movement speed reduction
-  bankaiFinalGetsugaDragFrames: 24,     // Extensive drag frames across the battlefield
-  bankaiFinalGetsugaRecoveryFrames: 48, // Breather / recovery frames held in follow-through pose after unleashing Grand Finisher (~0.8s)
-  bankaiFinalGetsugaSlashDuration: 30,  // Extended heavy cleave follow-through swing duration frames
-  bankaiFinalGetsugaScreenShake: 8.5,   // Intense screen shake on release
-  bankaiFinalGetsugaHitScreenShake: 8.5,// Intense screen shake on projectile hit
-  bankaiFinalGetsugaTravelShakeIntensity: 4.5, // Continuous arena screen shake intensity while Grand Finisher wave travels
-  bankaiFinalGetsugaTravelShakeDuration: 6,    // Screen shake duration per pulse during travel
-  bankaiFinalGetsugaTravelShakeInterval: 4,    // Interval in frames between travel screen shake pulses (shaking the entire arena)
-  bankaiFinalGetsugaShockwaveSize: 110, // Colossal shockwave on hit
-  bankaiFinalGetsugaColor: '#DC143C',   // Final Kuroi Getsuga color theme
+  bankaiFinalGetsugaScreenShake: 8.5,   // Intense screen shake on release & hit
+  bankaiFinalGetsugaColor: '#DC143C',   // Final Kuroi Getsuga theme color
 
-  // ─────────────────────────────────────────────
-  // ── Audio Configuration, Volumes, Chances & Delays ──
-  // ─────────────────────────────────────────────
+  // ── Audio Configuration ──
   sounds: {
     swordSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     fleshHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
@@ -312,40 +221,9 @@ export const ichigoConfig = {
     finalHollowGetsugaVoice: 3.0
   },
   soundChances: {
-    parry: 1.0,
-    swordSwing: 1.0,
-    shunpoDash: 1.0,
-    comboGetsugaVoice: 0.50, // 50% chance to play Flash Step Getsuga voiceline on Phase 2
-    hollowGetsugaVoice: 0.50, // 50% chance to play Hollow Getsuga voiceline on Phase 2
-    hollowFlurryNoise: 0.30,  // 50% chance to play Hollow attack noise during Flash Step flurry
-    hollowAwakenVoice: 1.0,
-    bankaiCharge: 1.0,
-    bankaiGetsugaVoice: 0.50, // 50% chance to play Bankai Getsuga Tensho voiceline in Bankai form
-    finalGetsugaVoice: 1.0,
-    finalHollowGetsugaVoice: 1.0
-  },
-  soundDelays: {
-    swordSwing: 0,
-    fleshHit: 0,
-    parry: 0,
-    shunpoDash: 0,
-    shunpoStrikeHit: 0,
-    shunpoFinisherSwing: 0,
-    shunpoFinisherHit: 0,
-    getsugaCharge: 0,
-    getsugaReleaseSwing: 0,
-    getsugaReleaseFlare: 0,
-    getsugaHit: 0,
-    hollowAwakenFlare: 0,
-    bankaiCharge: 0,
-    bankaiReleaseSwing: 0,
-    bankaiReleaseFlare: 0,
-    bankaiEnded: 0,
-    bankaiGetsugaVoice: 0,
-    finalGetsugaCharge: 0,
-    finalGetsugaVoice: 0,
-    finalHollowGetsugaVoice: 0
+    comboGetsugaVoice: 0.50, // 50% chance to play Flash Step Getsuga voiceline
+    hollowGetsugaVoice: 0.50, // 50% chance to play Hollow Getsuga voiceline
+    hollowFlurryNoise: 0.30,  // 30% chance for Hollow vocal noise during flurry
+    bankaiGetsugaVoice: 0.50  // 50% chance for Bankai Getsuga voiceline
   }
 };
-
-

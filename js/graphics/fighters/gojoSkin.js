@@ -85,11 +85,12 @@ export function drawGojoBody(ctx, fighter) {
     const isChannelingPurple = fighter.isChannelingPurple;
     const isChannelingDomain = fighter.isChannelingDomainExpansion;
 
+    let facingLeft = false;
     if (!isWinnerScreen && !isChannelingPurple && !isChannelingDomain) {
       const angle = fighter.gunAngle || 0;
       ctx.rotate(angle);
 
-      const facingLeft = Math.abs(angle) > Math.PI / 2;
+      facingLeft = Math.abs(angle) > Math.PI / 2;
       if (facingLeft) {
         ctx.scale(1, -1);
       }
@@ -167,12 +168,73 @@ export function drawGojoBody(ctx, fighter) {
     // ═══════════════════════════════════════════════════════════════════
     drawGojoPixelBody(ctx, fighter.r);
 
+    // 2. Authentic Pixel-Art Spiky White Hair (Assets/model/Gojo-hair.png)
+    _drawGojoHair(ctx, fighter.r, facingLeft);
+
     // Overlays (stun, poison, etc)
     if (typeof fighter.drawStatusOverlays === 'function') {
       fighter.drawStatusOverlays(ctx, fighter.r);
     }
 
     ctx.restore();
+}
+
+let _gojoHairImage = null;
+let _gojoHairImageLoading = false;
+
+export function _getGojoHairImage() {
+  if (_gojoHairImage && _gojoHairImage.complete && _gojoHairImage.naturalWidth > 0) {
+    return _gojoHairImage;
+  }
+  if (!_gojoHairImageLoading && typeof Image !== 'undefined') {
+    _gojoHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _gojoHairImage = img;
+      _gojoHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Gojo hair image at Assets/model/Gojo-hair.png', e);
+      _gojoHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Gojo-hair.png?v=1';
+    _gojoHairImage = img;
+  }
+  return _gojoHairImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getGojoHairImage();
+}
+
+/**
+ * Draws Gojo's authentic pixel-art spiky white hair from Assets/model/Gojo-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawGojoHair(ctx, r, facingLeft = false) {
+  const hairImg = _getGojoHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    // Gojo-hair.png (1254x1254). True visible hair bounding box:
+    // X: [136, 1103] (width 968, horizontal center at 620)
+    // Y: [203, 981] (height 779, top crown at 203)
+    // Scales to cover the upper head circle hemisphere seamlessly with crown spikes at -1.42r
+    const targetHairWidth = r * 3.10;
+    const targetHairHeight = r * 1.80;
+    const scaleX = targetHairWidth / 968;
+    const scaleY = targetHairHeight / 779;
+    const drawW = 1254 * scaleX;
+    const drawH = 1254 * scaleY;
+    const drawX = -620 * scaleX;
+    const drawY = -r * 1.42 - 203 * scaleY;
+
+    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  }
 }
 
 // Offscreen canvas cache for Gojo's pixel body model (avoids 1,200 fillRect calls per frame)
@@ -192,17 +254,8 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
     hairBlue: '#CAD6E8',       // Light ice-blue hair partition line
     hairShadow: '#8D9EB5',     // Corner hair shadow dither
 
-    blindfoldHighlight: '#4E5264', // Topmost highlight rim
-    blindfoldTop: '#434757',   // Blindfold top highlight band
-    blindfoldMid: '#252731',   // Blindfold main charcoal body
-    blindfoldTier1: '#383B4A', // Upper fabric band
-    blindfoldCrease1: '#181921', // Upper horizontal crease seam
-    blindfoldTier2: '#292B36', // Middle fabric band
-    blindfoldCrease2: '#12131A', // Lower dark shadow seam line
-    blindfoldTier3: '#323544', // Lower fabric shelf band
-    blindfoldCorner: '#4A4E62', // Temple corner dither
-
     skinBase: '#FEDBC0',       // Warm fair skin
+    skinHighlight: '#FFF0E2',  // Soft center forehead/face highlight
     skinShadow1: '#E9B796',    // Light cheek shadow dither
     skinShadow2: '#D89F7C',    // Deep cheek shadow dither
 
@@ -219,29 +272,29 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
   destCtx.save();
   destCtx.translate(cx, cy);
 
+  // 0. Stepped Dark Outer Ink Shell (Eliminates transparent diagonal corner gaps / white border bleeding)
+  destCtx.fillStyle = C.outline;
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
       const ry = gy * P;
       const dist = Math.hypot(rx, ry);
-      if (dist > r) continue;
+      if (dist <= r + P * 0.5) {
+        destCtx.fillRect(snap(rx), snap(ry), P, P);
+      }
+    }
+  }
+
+  // 1. Inner Body Fill
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r - P * 0.4) continue; // Keep the solid outer border shell clean
 
       const px = snap(rx);
       const py = snap(ry);
-
-      // ──────────────────────────────────────────
-      // 0. PIXELATED BLACK STROKE BORDER
-      // ──────────────────────────────────────────
-      if (
-        Math.hypot(rx + P, ry) > r ||
-        Math.hypot(rx - P, ry) > r ||
-        Math.hypot(rx, ry + P) > r ||
-        Math.hypot(rx, ry - P) > r
-      ) {
-        destCtx.fillStyle = C.outline;
-        destCtx.fillRect(px, py, P, P);
-        continue;
-      }
 
       // Normalized coordinates from -1.0 to +1.0
       const nx = rx / r;
@@ -249,119 +302,53 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // 1. SCULPTED CHARCOAL BLINDFOLD GEOMETRY (1:1 Anime Reference)
+      // ZONE A: WHITE HAIR & ICE-BLUE STRANDS (ny < -0.28)
       // ──────────────────────────────────────────
-      const getBlindfoldTopY = (ax) => {
-        return -0.28;
-      };
-
-      const getBlindfoldBottomY = (ax) => {
-        if (ax <= 0.82) {
-          return -0.02 + 0.12 * Math.sin(ax * (Math.PI / 0.82));
-        }
-        return -0.02 - (ax - 0.82) * 0.15;
-      };
-
-      const isInsideBlindfold = (x, y) => {
-        const ax = Math.abs(x);
-        return y >= getBlindfoldTopY(ax) && y < getBlindfoldBottomY(ax);
-      };
-
-      const blindfoldTopY = getBlindfoldTopY(absX);
-      const blindfoldBottomY = getBlindfoldBottomY(absX);
-
-      // ──────────────────────────────────────────
-      // ZONE A: WHITE HAIR & ICE-BLUE STRANDS (ny < blindfoldTopY)
-      // ──────────────────────────────────────────
-      if (ny < blindfoldTopY) {
-        if (isInsideBlindfold(nx, ny + P / r)) {
-          destCtx.fillStyle = C.outline;
-        } else {
-          let col = C.hairWhite;
-          if (absX >= 0.55) {
-            const dLevel = (absX - 0.55) / 0.45;
-            if (dLevel > 0.5) {
-              col = ((gx + gy) % 2 === 0) ? C.hairBlue : C.hairShadow;
-            } else if ((gx + gy) % 3 === 0) {
-              col = C.hairBlue;
-            }
-          } else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
+      if (ny < -0.28) {
+        let col = C.hairWhite;
+        if (absX >= 0.55) {
+          const dLevel = (absX - 0.55) / 0.45;
+          if (dLevel > 0.5) {
+            col = ((gx + gy) % 2 === 0) ? C.hairBlue : C.hairShadow;
+          } else if ((gx + gy) % 3 === 0) {
             col = C.hairBlue;
           }
-          destCtx.fillStyle = col;
+        } else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
+          col = C.hairBlue;
         }
+        destCtx.fillStyle = col;
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE B: SCULPTED CHARCOAL BLINDFOLD (isInsideBlindfold)
+      // ZONE B: WARM FAIR SKIN FACE & CHEEKS (UNMASKED / NO BLINDFOLD) (-0.28 <= ny < 0.30)
       // ──────────────────────────────────────────
-      else if (ny < blindfoldBottomY) {
-        const isBorder = !isInsideBlindfold(nx, ny - P / r) ||
-                         !isInsideBlindfold(nx, ny + P / r) ||
-                         !isInsideBlindfold(nx - P / r, ny) ||
-                         !isInsideBlindfold(nx + P / r, ny);
-
-        if (isBorder) {
-          destCtx.fillStyle = C.outline;
-        } else {
-          let col = C.blindfoldMid;
-
-          if (ny < blindfoldTopY + 0.05) {
-            col = C.blindfoldTop;
-          } else if (absX >= 0.18 && absX <= 0.60 && ny >= -0.20 && ny <= 0.04) {
-            const eyeCenterX = 0.39;
-            const eyeDist = Math.hypot((absX - eyeCenterX) * 1.5, ny - (-0.08));
-            if (eyeDist <= 0.10) {
-              col = '#484C5E';
-            } else if (eyeDist <= 0.18) {
-              col = '#383B4A';
-            } else if (Math.abs(ny - (-0.14)) <= P / r * 0.7) {
-              col = C.blindfoldCrease1;
-            }
-          } else if (absX <= 0.12 && Math.abs(ny - (-0.14)) <= P / r * 0.7) {
-            col = C.blindfoldCrease1;
-          } else if (ny >= blindfoldBottomY - 0.05) {
-            col = C.blindfoldCrease2;
+      else if (ny < 0.30) {
+        let col = C.skinBase;
+        if (absX >= 0.55) {
+          const dLevel = (absX - 0.55) / 0.45;
+          if (dLevel > 0.6) {
+            col = ((gx + gy) % 2 === 0) ? C.skinShadow2 : C.skinShadow1;
+          } else if ((gx + gy) % 2 === 0) {
+            col = C.skinShadow1;
           }
-
-          if (absX >= 0.62 && (gx + gy) % 2 === 0) {
-            col = C.blindfoldCorner;
+        } else if (absX < 0.35 && ny > -0.15 && ny < 0.10) {
+          if ((gx + gy) % 4 === 0) {
+            col = C.skinHighlight;
           }
-
-          destCtx.fillStyle = col;
         }
+        destCtx.fillStyle = col;
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE C: WARM FAIR SKIN & CHEEKS (blindfoldBottomY <= ny < 0.24)
-      // ──────────────────────────────────────────
-      else if (ny < 0.24) {
-        if (isInsideBlindfold(nx, ny - P / r)) {
-          destCtx.fillStyle = C.outline;
-        } else {
-          let col = C.skinBase;
-          if (absX >= 0.55) {
-            const dLevel = (absX - 0.55) / 0.45;
-            if (dLevel > 0.6) {
-              col = ((gx + gy) % 2 === 0) ? C.skinShadow2 : C.skinShadow1;
-            } else if ((gx + gy) % 2 === 0) {
-              col = C.skinShadow1;
-            }
-          }
-          destCtx.fillStyle = col;
-        }
-        destCtx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE D: JUJUTSU HIGH UNIFORM (ny >= 0.24)
+      // ZONE C: JUJUTSU HIGH UNIFORM (ny >= 0.30)
       // ──────────────────────────────────────────
       else {
         const isZipper = (absX <= 0.07);
         const isZipperSeam = (Math.abs(absX - 0.07) <= P / r * 0.6);
-        const isZipperHighlight = (nx >= -0.06 && nx <= -0.03 && ny >= 0.28);
+        const isZipperHighlight = (nx >= -0.06 && nx <= -0.03 && ny >= 0.34);
 
-        const isCollarRim = (ny <= 0.27 && absX <= 0.50);
-        const isCollarHighlight = (ny >= 0.27 && ny <= 0.30 && absX <= 0.50);
+        const isCollarRim = (ny <= 0.33 && absX <= 0.50);
+        const isCollarHighlight = (ny >= 0.33 && ny <= 0.36 && absX <= 0.50);
 
         const isCrease1 = (Math.abs(ny - 0.35) <= P / r * 0.7 && absX <= 0.55);
         const isCrease1Hi = (Math.abs(ny - 0.32) <= P / r * 0.7 && absX <= 0.55);
@@ -403,7 +390,9 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
 export function drawGojoPixelBody(ctx, r) {
   if (!_cachedGojoCanvas || _cachedGojoR !== r) {
     _cachedGojoR = r;
-    const size = Math.ceil((r + 4) * 2);
+    const P = 2.0;
+    const steps = Math.ceil((r + P) / P);
+    const size = (steps + 2) * P * 2;
     _cachedGojoCanvas = document.createElement('canvas');
     _cachedGojoCanvas.width = size;
     _cachedGojoCanvas.height = size;

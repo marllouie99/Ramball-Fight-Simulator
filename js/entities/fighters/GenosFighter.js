@@ -151,15 +151,15 @@ export class GenosFighter extends Fighter {
   }
 
   canAim() {
-    if (this.isChargingUlt || this.isFiringUlt || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating || this.machineGunFlurryTimer > 0 || this.machineGunBlowTimer > 0) {
+    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating || this.machineGunFlurryTimer > 0 || this.machineGunBlowTimer > 0) {
       return false; // Disable auto-aim while channeling ultimate beam or stationary skills!
     }
     return super.canAim();
   }
 
   aim(target) {
-    if (this.isChargingUlt || this.isFiringUlt) {
-      // Strictly preserve locked ult angle without snapping auto-aim to moving targets
+    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering) {
+      // Strictly preserve locked ult angle without snapping auto-aim to moving targets (Rule #36)
       if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
         this.gunAngle = this.ultAngle;
         this.angle = this.ultAngle;
@@ -1045,10 +1045,22 @@ export class GenosFighter extends Fighter {
     this.isChargingUlt = true;
     this.ultTimer = CONFIG.genos?.ultWindupFrames || 60;
     this.ultCooldown = CONFIG.genos?.ultCooldown || 1680;
-    const cardinalAngle = this._getCardinalAngle(target);
-    this.ultAngle = cardinalAngle;
-    this.gunAngle = cardinalAngle;
-    this.angle = cardinalAngle;
+
+    // Rule 36: Continuous 360° omnidirectional targeting upon initiation with committed angle lock
+    let castAngle = 0;
+    if (target) {
+      const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+      const myY = this.y - (this.z || 0);
+      const dx = (target.x !== undefined ? target.x : this.x) - this.x;
+      const dy = targetY - myY;
+      castAngle = Math.atan2(dy, dx);
+    } else {
+      castAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : 0;
+    }
+
+    this.ultAngle = castAngle;
+    this.gunAngle = castAngle;
+    this.angle = castAngle;
 
     spawnFloatingText(this.x, this.y - this.r - 28, "SPIRAL INCINERATION CANNON!", "#FF3300");
     const windupShake = CONFIG.genos?.ultWindupShakeIntensity || 0;

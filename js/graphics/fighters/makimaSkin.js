@@ -16,38 +16,71 @@ function snap(v) {
   return Math.round(v / P) * P;
 }
 
-let _makimaSkinImage = null;
-let _makimaSkinImageLoading = false;
+let _makimaHairImage = null;
+let _makimaHairImageLoading = false;
 
-export function _getMakimaSkinImage() {
-  if (_makimaSkinImage && _makimaSkinImage.complete && _makimaSkinImage.naturalWidth > 0) {
-    return _makimaSkinImage;
+export function _getMakimaHairImage() {
+  if (_makimaHairImage && _makimaHairImage.complete && _makimaHairImage.naturalWidth > 0) {
+    return _makimaHairImage;
   }
-  if (!_makimaSkinImageLoading && typeof Image !== 'undefined') {
-    _makimaSkinImageLoading = true;
+  if (!_makimaHairImageLoading && typeof Image !== 'undefined') {
+    _makimaHairImageLoading = true;
     const img = new Image();
     img.onload = () => {
-      _makimaSkinImage = img;
-      _makimaSkinImageLoading = false;
+      _makimaHairImage = img;
+      _makimaHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Makima pixel skin image at Assets/model/Makima-model-skin.png', e);
-      _makimaSkinImageLoading = false;
+      console.warn('Failed to load Makima hair image at Assets/model/Makima-hair.png', e);
+      _makimaHairImageLoading = false;
     };
-    img.src = 'Assets/model/Makima-model-skin.png?v=1';
-    _makimaSkinImage = img;
+    img.src = 'Assets/model/Makima-hair.png?v=1';
+    _makimaHairImage = img;
   }
-  return _makimaSkinImage;
+  return _makimaHairImage;
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getMakimaSkinImage();
+  _getMakimaHairImage();
+}
+
+/**
+ * Draws Makima's authentic pixel-art hair from Assets/model/Makima-hair.png.
+ * Features:
+ * - Salmon-red parted bangs with center forehead peak
+ * - Long face-framing cheek locks
+ * - Flowing side braid trailing over her shoulder
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawMakimaHair(ctx, r, facingLeft = false) {
+  const hairImg = _getMakimaHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    // Makima-hair.png (522x478).
+    // True visible hair bounding box:
+    // X: [89, 410] (visible width 322, symmetrical horizontal center at 249.5)
+    // Y: [43, 450] (visible height 408, crown top at 43, bang bottom at 234)
+    // Proportional volumetric scaling for round circular dome without flatness
+    const targetHairWidth = r * 2.30;
+    const scaleX = targetHairWidth / 322;
+    const scaleY = scaleX * 0.98; // Balanced vertical ratio to prevent flatness and maintain rounded crown
+    const drawW = 522 * scaleX;
+    const drawH = 478 * scaleY;
+    const drawX = -249.5 * scaleX;
+    const drawY = -r * 1.28 - 43 * scaleY; // Rounded natural crown curve
+
+    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  }
 }
 
 /**
  * Main Skin Renderer for Makima (The Control Devil)
- * Prioritizes the authentic pixel art model from Assets/model/Makima-model-skin.png,
- * with procedural canvas fallback.
+ * Uses procedural drawn pixel body + authentic pixel hair asset from Assets/model/Makima-hair.png.
  * Adheres strictly to Rule 19, 20, 11 (Authentic Pixel Art Style)
  */
 export function drawMakimaSkin(ctx, fighter) {
@@ -107,7 +140,8 @@ export function drawMakimaSkin(ctx, fighter) {
   const isPreparingChain = !isPodiumPreview && !isSummoning && !isSuppressed && Boolean(fighter.isPreparingChain || (fighter.chainWindupTimer && fighter.chainWindupTimer > 0));
   const isThrowingChain = !isPodiumPreview && !isSummoning && !isSuppressed && Boolean(fighter.isThrowingChain || (fighter.chainThrowAnimTimer && fighter.chainThrowAnimTimer > 0) || hasMissedChains);
   const isTetheringChain = !isPodiumPreview && !isSummoning && !isPreparingChain && !isThrowingChain && !isSuppressed && Boolean(fighter.isChainingActive);
-  const isShooting = !isPodiumPreview && !isSummoning && !isPreparingChain && !isThrowingChain && !isTetheringChain && !isSuppressed && ((fighter.slashSwingTimer && fighter.slashSwingTimer > 0) || (fighter.punchAnimTimer && fighter.punchAnimTimer > 0));
+  const isPreparingBang = !isPodiumPreview && !isSummoning && !isPreparingChain && !isThrowingChain && !isSuppressed && Boolean(fighter.isPreparingBang || (fighter.bangWindupTimer && fighter.bangWindupTimer > 0));
+  const isShooting = !isPodiumPreview && !isSummoning && !isPreparingChain && !isThrowingChain && !isTetheringChain && !isSuppressed && !isPreparingBang && ((fighter.slashSwingTimer && fighter.slashSwingTimer > 0) || (fighter.punchAnimTimer && fighter.punchAnimTimer > 0));
 
   let throwProgress = 0;
   if (isThrowingChain) {
@@ -122,6 +156,18 @@ export function drawMakimaSkin(ctx, fighter) {
     }
   }
 
+  let windupProgress = 0;
+  let windupExtendX = 0;
+  if (isPreparingBang) {
+    const maxWindup = fighter.bangWindupMax || 8;
+    const curWindup = fighter.bangWindupTimer || 0;
+    windupProgress = Math.min(1.0, Math.max(0.0, 1.0 - (curWindup / maxWindup)));
+    // Hand points and extends smoothly forward during windup
+    windupExtendX = Math.sin(windupProgress * Math.PI * 0.5) * 2.2;
+    // Slight resolute posture forward lean during aiming
+    ctx.translate(Math.sin(windupProgress * Math.PI * 0.5) * 0.8, 0);
+  }
+
   let rawProgress = 0;
   let recoilKickX = 0;
   let recoilRiseY = 0;
@@ -131,23 +177,23 @@ export function drawMakimaSkin(ctx, fighter) {
     const curTimer = fighter.slashSwingTimer > 0 ? fighter.slashSwingTimer : fighter.punchAnimTimer;
     rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (curTimer / maxT)));
 
-    // Smooth continuous recoil curve: rises smoothly in frames 0-4, cushions at apex, returns smoothly in frames 5-16
+    // Smooth continuous recoil curve: smooth elastic rise, cushioned apex, and seamless damped recovery
     let recoilCurve = 0;
-    if (rawProgress < 0.25) {
-      const t = rawProgress / 0.25;
-      recoilCurve = Math.pow(Math.sin(t * Math.PI * 0.5), 1.6);
+    if (rawProgress < 0.20) {
+      const t = rawProgress / 0.20;
+      recoilCurve = Math.sin(t * Math.PI * 0.5);
     } else {
-      const t = (rawProgress - 0.25) / 0.75;
-      recoilCurve = Math.pow(Math.cos(t * Math.PI * 0.5), 2.0);
+      const pRec = (rawProgress - 0.20) / 0.80;
+      recoilCurve = Math.cos(pRec * Math.PI * 0.5) * Math.pow(1.0 - pRec, 0.75);
     }
 
-    recoilKickX = -7.5 * recoilCurve;
-    recoilRiseY = -3.8 * recoilCurve;
+    recoilKickX = -4.5 * recoilCurve;
+    recoilRiseY = -1.8 * recoilCurve;
   }
 
-  // Hand Coordinates (Rest position at r * 0.95, kicks back sharply on fire)
-  const frontX = r * 0.95 + recoilKickX;
-  const frontY = r * 0.04 + recoilRiseY;
+  // Hand Coordinates (Rest position at r * 0.95, extends during windup, kicks back sharply on fire)
+  const frontX = r * 0.95 + windupExtendX + recoilKickX;
+  const frontY = r * 0.28 + recoilRiseY; // Lowered to align naturally with lowered chest / shoulder level
   const backX = -r * 0.24;
   const backY = -r * 0.45;
 
@@ -158,25 +204,13 @@ export function drawMakimaSkin(ctx, fighter) {
 
   const skinBase = '#FEE5D6';
   const skinShadow = '#EDB8A2';
-  // ── LAYER 1 & 2: MAIN BODY (Makima-model-skin.png or procedural fallback) ──
-  const makimaImg = _getMakimaSkinImage();
-  if (makimaImg && makimaImg.complete && makimaImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    // Scale factor to map 500x500 sprite content (328px diameter core body) flush with fighter radius r
-    const drawW = r * (1000 / 328);
-    const drawH = drawW;
-    const shiftX = r * (503 / 328);
-    const shiftY = r * (465 / 328);
-    ctx.drawImage(makimaImg, -shiftX, -shiftY, drawW, drawH);
-    ctx.restore();
-  } else {
-    // LAYER 1: PIXEL SIDE BRAID (Behind Body Circle)
-    _drawMakimaPixelBraid(ctx, r);
 
-    // LAYER 2: PROCEDURAL PIXEL ART BODY CIRCLE
-    drawMakimaPixelBody(ctx, r);
-  }
+  // ── LAYER 1 & 2: MAIN BODY (Procedural Drawn Pixel Body + Authentic Hair Asset) ──
+  // LAYER 1: PROCEDURAL PIXEL ART BODY CIRCLE
+  drawMakimaPixelBody(ctx, r);
+
+  // LAYER 2: AUTHENTIC PIXEL-ART HAIR ASSET (Assets/model/Makima-hair.png)
+  _drawMakimaHair(ctx, r, facingLeft);
 
   // Status Overlays (freeze, stun, time-stop)
   if (typeof fighter.drawStatusOverlays === 'function') {
@@ -200,30 +234,28 @@ export function drawMakimaSkin(ctx, fighter) {
       _drawMakimaRaisedCommandHand(ctx, r, chargePct, now, skinBase, skinShadow);
     } else {
       // Front hand always maintains her iconic finger-gun sign ("Bang!")
-      drawMakimaPixelFingerGun(ctx, frontX, frontY, rawProgress, r, isShooting);
+      drawMakimaPixelFingerGun(ctx, frontX, frontY, rawProgress, r, isShooting, isPreparingBang, windupProgress);
     }
   }
 
   ctx.restore();
 }
 
-/**
- * Draws Makima's entire body circle model in authentic Pixel Art Style.
- * Uses discrete stepped pixel grid rasterization matching Nanami, Saitama, and Yuji.
- * Features:
- * - Salmon-red parted bangs with center forehead peak & cheek locks
- * - Fair porcelain anime face skin (Rule 19 compliant faceless circle)
- * - Public Safety white collared dress shirt with fabric shading & pearl buttons
- * - Sharp pointed shirt collar wings & throat V-cut
- * - Slim solid matte black silk necktie (no clip)
- * - High-waisted dark charcoal trousers with waistband highlight & fly seam
- */
-export function drawMakimaPixelBody(ctx, r) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+// Offscreen canvas cache for Makima's procedural pixel body model (avoids 1,200 fillRect calls per frame)
+let _cachedMakimaCanvas = null;
+let _cachedMakimaR = 0;
+
+function _renderMakimaPixelBodyToCanvas(destCtx, r) {
+  destCtx.imageSmoothingEnabled = false;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
+
+  const cx = destCtx.canvas.width / 2;
+  const cy = destCtx.canvas.height / 2;
+
+  destCtx.save();
+  destCtx.translate(cx, cy);
 
   // Discrete Hairline Grid Mapping (1:1 Exact Match with Reference Pixel Art Image 1)
   // Index = gx + 13 (gx ranges from -13 to +13)
@@ -244,140 +276,127 @@ export function drawMakimaPixelBody(ctx, r) {
 
       // 1. Pixelated Black Border Shell
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#0E0F14';
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = '#0E0F14';
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
-      const colIdx = Math.max(0, Math.min(26, gx + 13));
-      const hairLimitGy = HAIRLINE_GY[colIdx];
-      const isHair = (gy < hairLimitGy);
-
-      // Vertical Manga Crease Line columns (matching Image 1 at gx = -7, -3, 2, 6)
-      const isCreaseLine = (
-        (gx === -7 && gy >= -7 && gy <= -3) ||
-        (gx === -3 && gy >= -7 && gy <= -1) ||
-        (gx === 2  && gy >= -9 && gy <= 0) ||
-        (gx === 6  && gy >= -7 && gy <= 0)
-      );
-
       // ──────────────────────────────────────────
-      // 2. SALMON-RED HAIR (gy < hairLimitGy)
+      // 2. FAIR PORCELAIN FACE SKIN (ry < r * 0.32)
       // ──────────────────────────────────────────
-      if (isHair) {
-        let col = '#D84845'; // Warm Crimson-Salmon Base (Exact Image 1 match)
+      else if (ry < r * 0.32) {
+        let col = '#FEE5D6'; // Fair Ivory / Porcelain Base Skin
 
-        if (isCreaseLine) {
-          col = '#7A1E16'; // Dark Vertical Manga Crease Accents
-        } else if (gy < -9) {
-          col = '#F0847C'; // Top Dome Hair Highlight
-        } else if (gy === -8 && Math.abs(gx) <= 6) {
-          col = '#F8928A'; // Crown Specular Highlight
-        } else if (gy === hairLimitGy - 1) {
-          col = '#781D16'; // Bang Bottom Shadow Edge Pixels
-        } else if (Math.abs(gx) >= 9) {
-          col = '#B33E3B'; // Outer Cheek Lock Depth Shading
-        }
-
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // 3. FAIR PORCELAIN FACE SKIN (hairLimitGy <= gy < r * 0.24 / P)
-      // ──────────────────────────────────────────
-      else if (ry < r * 0.24) {
-        let col = '#FEE5D6'; // Fair Ivory / Porcelain Base Skin (Exact Image 1 match)
-
-        if (hairLimitGy < 0 && (gy === hairLimitGy || (gy === hairLimitGy + 1 && Math.abs(gx) >= 5))) {
-          col = '#EDB8A2'; // Soft Warm Peach Notch Edge Shadow
-        } else if (gy === hairLimitGy && gx >= -3 && gx <= 2) {
-          col = '#ECB7A1'; // Subtle Center Bang Drop Shadow
+        if (Math.abs(gx) >= 8 || gy < -8) {
+          col = '#EDB8A2'; // Soft Warm Peach Cheek & Perimeter Shadow
         } else if (gy >= 2) {
           col = '#FDEFE6'; // Radiant Lower Face / Jawline Porcelain Skin
         }
 
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // 4. PUBLIC SAFETY ATTIRE (ry >= r * 0.24)
+      // 4. PUBLIC SAFETY ATTIRE (ry >= r * 0.32)
       // ──────────────────────────────────────────
       else {
         // A. Exposed Throat Skin & V-Cut
-        const isThroat = (ry <= r * 0.32 && Math.abs(rx) <= (1 - (ry - r * 0.24) / (r * 0.08)) * (r * 0.14));
+        const isThroat = (ry <= r * 0.40 && Math.abs(rx) <= (1 - (ry - r * 0.32) / (r * 0.08)) * (r * 0.14));
 
         // B. Shirt Pointed Collar Wings
-        const isCollarLeft = (rx >= -r * 0.32 && rx <= -r * 0.06 && ry >= r * 0.24 && ry <= r * 0.38 && (rx - (-r * 0.32)) * 0.85 > (ry - r * 0.24));
-        const isCollarRight = (rx >= r * 0.06 && rx <= r * 0.32 && ry >= r * 0.24 && ry <= r * 0.38 && (r * 0.32 - rx) * 0.85 > (ry - r * 0.24));
+        const isCollarLeft = (rx >= -r * 0.32 && rx <= -r * 0.06 && ry >= r * 0.32 && ry <= r * 0.46 && (rx - (-r * 0.32)) * 0.85 > (ry - r * 0.32));
+        const isCollarRight = (rx >= r * 0.06 && rx <= r * 0.32 && ry >= r * 0.32 && ry <= r * 0.46 && (r * 0.32 - rx) * 0.85 > (ry - r * 0.32));
 
         // C. Slim Solid Matte Black Necktie (NO Gold Clip)
-        const isTieKnot = (ry >= r * 0.28 && ry <= r * 0.36 && Math.abs(rx) <= r * 0.09);
-        const tieBladeHalfW = (r * 0.07 + (ry - r * 0.36) * 0.04);
-        const isTieBlade = (ry >= r * 0.36 && ry <= r * 0.74 && Math.abs(rx) <= tieBladeHalfW);
+        const isTieKnot = (ry >= r * 0.36 && ry <= r * 0.44 && Math.abs(rx) <= r * 0.09);
+        const tieBladeHalfW = (r * 0.07 + (ry - r * 0.44) * 0.04);
+        const isTieBlade = (ry >= r * 0.44 && ry <= r * 0.74 && Math.abs(rx) <= tieBladeHalfW);
 
         // D. High-Waisted Dark Charcoal Trousers
-        const isTrousers = (ry >= r * 0.70);
+        const isTrousers = (ry >= r * 0.72);
 
         if (isTieKnot || isTieBlade) {
           // Matte Black Necktie Pixels
-          if (rx < -tieBladeHalfW * 0.4 && ry > r * 0.36) {
-            ctx.fillStyle = '#2C303E'; // Left-edge silk gleam
+          if (rx < -tieBladeHalfW * 0.4 && ry > r * 0.44) {
+            destCtx.fillStyle = '#2C303E'; // Left-edge silk gleam
           } else if (Math.abs(rx) >= tieBladeHalfW - P * 0.8 || ry >= r * 0.72) {
-            ctx.fillStyle = '#0E0F14'; // Dark edge outline
+            destCtx.fillStyle = '#0E0F14'; // Dark edge outline
           } else {
-            ctx.fillStyle = '#181A22'; // Solid matte black body
+            destCtx.fillStyle = '#181A22'; // Solid matte black body
           }
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillRect(px, py, P, P);
         } else if (isCollarLeft || isCollarRight) {
           // Crisp White Pointed Collar
-          if (ry < r * 0.28) {
-            ctx.fillStyle = '#FFFFFF';
-          } else if (ry > r * 0.34 || Math.abs(rx) > r * 0.26) {
-            ctx.fillStyle = '#D4D8CB'; // Collar edge shadow
+          if (ry < r * 0.36) {
+            destCtx.fillStyle = '#FFFFFF';
+          } else if (ry > r * 0.42 || Math.abs(rx) > r * 0.26) {
+            destCtx.fillStyle = '#D4D8CB'; // Collar edge shadow
           } else {
-            ctx.fillStyle = '#FAFBF6';
+            destCtx.fillStyle = '#FAFBF6';
           }
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillRect(px, py, P, P);
         } else if (isThroat) {
           // Throat Skin
-          ctx.fillStyle = (ry > r * 0.28) ? '#ECB7A1' : '#FEE5D6';
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillStyle = (ry > r * 0.36) ? '#ECB7A1' : '#FEE5D6';
+          destCtx.fillRect(px, py, P, P);
         } else if (isTrousers) {
           // High-Waisted Dark Trousers Pixels
-          if (ry <= r * 0.73) {
-            ctx.fillStyle = '#2E3642'; // Waistband top highlight
-          } else if (Math.abs(rx) <= P * 0.7 && ry >= r * 0.74) {
-            ctx.fillStyle = '#0D0F13'; // Center fly seam
-          } else if (Math.abs(Math.abs(rx) - r * 0.45) <= P * 0.7 && ry >= r * 0.76) {
-            ctx.fillStyle = '#101317'; // Side pleats
+          if (ry <= r * 0.75) {
+            destCtx.fillStyle = '#2E3642'; // Waistband top highlight
+          } else if (Math.abs(rx) <= P * 0.7 && ry >= r * 0.76) {
+            destCtx.fillStyle = '#0D0F13'; // Center fly seam
+          } else if (Math.abs(Math.abs(rx) - r * 0.45) <= P * 0.7 && ry >= r * 0.78) {
+            destCtx.fillStyle = '#101317'; // Side pleats
           } else {
-            ctx.fillStyle = '#1B2026'; // Charcoal trousers base
+            destCtx.fillStyle = '#1B2026'; // Charcoal trousers base
           }
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillRect(px, py, P, P);
         } else {
-          // White Button-Up Dress Shirt (ry = r * 0.24 to r * 0.70)
+          // White Button-Up Dress Shirt (ry = r * 0.32 to r * 0.72)
           // Center Button Placket
           const isPlacket = (Math.abs(rx) <= r * 0.08);
           // Pearl Button Pixels
-          const isButton = (isPlacket && (Math.abs(ry - r * 0.42) < P || Math.abs(ry - r * 0.54) < P || Math.abs(ry - r * 0.66) < P));
+          const isButton = (isPlacket && (Math.abs(ry - r * 0.48) < P || Math.abs(ry - r * 0.58) < P || Math.abs(ry - r * 0.68) < P));
 
           if (isButton) {
-            ctx.fillStyle = '#E8ECE0';
+            destCtx.fillStyle = '#E8ECE0';
           } else if (isPlacket) {
-            ctx.fillStyle = '#FAFBF6';
+            destCtx.fillStyle = '#FAFBF6';
           } else if (Math.abs(rx) > r * 0.52 || (ry > r * 0.64 && Math.abs(rx) > r * 0.30)) {
-            ctx.fillStyle = '#D4D8CB'; // Sleeve & ribcage cloth shading
+            destCtx.fillStyle = '#D4D8CB'; // Sleeve & ribcage cloth shading
           } else if (Math.abs(rx) > r * 0.70) {
-            ctx.fillStyle = '#B9BEAE'; // Outer sleeve deep crease
+            destCtx.fillStyle = '#B9BEAE'; // Outer sleeve deep crease
           } else {
-            ctx.fillStyle = '#F3F4ED'; // Ivory white shirt core
+            destCtx.fillStyle = '#F3F4ED'; // Ivory white shirt core
           }
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillRect(px, py, P, P);
         }
       }
     }
   }
 
+  destCtx.restore();
+}
+
+/**
+ * Authentic 1:1 Procedural Pixel Art Body for Makima (High Performance Offscreen Cached)
+ */
+export function drawMakimaPixelBody(ctx, r) {
+  if (!_cachedMakimaCanvas || _cachedMakimaR !== r) {
+    _cachedMakimaR = r;
+    const P = 2.0;
+    const steps = Math.ceil((r + P) / P);
+    const size = (steps + 2) * P * 2;
+    _cachedMakimaCanvas = document.createElement('canvas');
+    _cachedMakimaCanvas.width = size;
+    _cachedMakimaCanvas.height = size;
+    const offCtx = _cachedMakimaCanvas.getContext('2d');
+    _renderMakimaPixelBodyToCanvas(offCtx, r);
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(_cachedMakimaCanvas, -_cachedMakimaCanvas.width / 2, -_cachedMakimaCanvas.height / 2);
   ctx.restore();
 }
 
@@ -448,7 +467,7 @@ function _drawMakimaPixelBraid(ctx, r) {
  * Renders Makima's signature Finger-Gun ("Bang!") Hand Stance in Enhanced Stepped Pixel Art Style.
  * Pointing index finger along +X (gun barrel) with cocked thumb (hammer), curled fingers, and suit shirt cuff.
  */
-export function drawMakimaPixelFingerGun(ctx, x, y, progress, r, isShooting) {
+export function drawMakimaPixelFingerGun(ctx, x, y, progress, r, isShooting, isPreparingBang = false, windupProgress = 0) {
   ctx.save();
   ctx.translate(x, y);
   ctx.imageSmoothingEnabled = false;
@@ -462,23 +481,41 @@ export function drawMakimaPixelFingerGun(ctx, x, y, progress, r, isShooting) {
   const skinOutline = '#0E0F14';
   const skinHighlight = '#FFFFFF';
 
-  // Recoil upward pitch angle & hammer dynamic snap during shot (Synchronized Smooth C1 Curve)
+  // Recoil upward pitch angle & hammer dynamic snap during windup & shot (Smooth Damped Spring Curve)
   let recoilPitch = 0;
   let hammerSnap = 0;
-  if (isShooting) {
+  if (isPreparingBang) {
+    // Smoothly cock the thumb hammer backward during aiming windup
+    hammerSnap = -Math.sin(windupProgress * Math.PI * 0.5) * 0.22;
+  } else if (isShooting) {
     let recoilCurve = 0;
-    if (progress < 0.25) {
-      const t = progress / 0.25;
-      recoilCurve = Math.pow(Math.sin(t * Math.PI * 0.5), 1.6);
-      hammerSnap = Math.sin(t * Math.PI) * 0.12;
+    if (progress < 0.20) {
+      const t = progress / 0.20;
+      recoilCurve = Math.sin(t * Math.PI * 0.5);
+      hammerSnap = Math.sin(t * Math.PI * 0.5) * 0.10;
     } else {
-      const t = (progress - 0.25) / 0.75;
-      recoilCurve = Math.pow(Math.cos(t * Math.PI * 0.5), 2.0);
-      hammerSnap = 0;
+      const pRec = (progress - 0.20) / 0.80;
+      recoilCurve = Math.cos(pRec * Math.PI * 0.5) * Math.pow(1.0 - pRec, 0.75);
+      hammerSnap = Math.cos(pRec * Math.PI * 0.5) * Math.pow(1.0 - pRec, 0.75) * 0.10;
     }
-    recoilPitch = -0.28 * recoilCurve; // ~16° smooth muzzle climb
+    recoilPitch = -0.14 * recoilCurve; // ~8° smooth cinematic muzzle climb
   }
   ctx.rotate(recoilPitch);
+
+  // Pre-firing cursed energy glint & charge spark at index fingertip during windup
+  if (isPreparingBang && windupProgress > 0.15) {
+    const muzzleTipX = 24.0;
+    const glintAlpha = Math.min(1.0, (windupProgress - 0.15) / 0.85);
+    ctx.fillStyle = `rgba(245, 158, 11, ${(glintAlpha * 0.90).toFixed(3)})`;
+    ctx.fillRect(snap(muzzleTipX), snap(-1.0), P, P);
+    if (windupProgress > 0.5) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${(glintAlpha * 0.95).toFixed(3)})`;
+      ctx.fillRect(snap(muzzleTipX + P), snap(-1.0), P, P);
+      ctx.fillStyle = `rgba(251, 191, 36, ${(glintAlpha * 0.80).toFixed(3)})`;
+      ctx.fillRect(snap(muzzleTipX), snap(-1.0 - P), P, P);
+      ctx.fillRect(snap(muzzleTipX), snap(-1.0 + P), P, P);
+    }
+  }
 
   // 1. Kinetic Muzzle Flash, Supersonic Shockwave & Gunsmoke (Rule 11 Zero shadowBlur)
   if (isShooting) {
@@ -1232,8 +1269,8 @@ function _getOrCreateBodyCanvas(r) {
       if (bCtx) {
         bCtx.save();
         bCtx.translate(size * 0.5, size * 0.5);
-        _drawMakimaPixelBraid(bCtx, r);
         drawMakimaPixelBody(bCtx, r);
+        _drawMakimaHair(bCtx, r);
         _drawMakimaLeftHand(bCtx, r, 0, false, false, false, 0, '#FEE5D6', '#EDB8A2', null);
         drawMakimaPixelFingerGun(bCtx, r * 0.95, r * 0.04, 0, r, false);
         bCtx.restore();

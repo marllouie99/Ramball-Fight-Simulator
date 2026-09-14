@@ -343,6 +343,7 @@ export class RubbickFighter extends Fighter {
     }
     if (typeof target._stopBeamAudio === 'function') target._stopBeamAudio();
     if (typeof target._stopChannelAudio === 'function') target._stopChannelAudio();
+    if (typeof target.stopAllSkillAudios === 'function') target.stopAllSkillAudios(true);
     if (typeof target._stopFinalGetsugaVoiceline === 'function') target._stopFinalGetsugaVoiceline(true);
     if (typeof target._stopAllSounds === 'function') target._stopAllSounds();
 

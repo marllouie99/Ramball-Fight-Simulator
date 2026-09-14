@@ -52,7 +52,7 @@ export const gojoConfig = {
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
-  redCooldown: 2000,         // Cooldown of Red (frames)
+  redCooldown: 1000,         // Cooldown of Red (frames)
   redDamage: 100,           // Base damage dealt by Reversal Red blast
   redKnockback: 10,         // Supersonic knockback force of Red
   redRange: 650,            // Base range
@@ -73,7 +73,7 @@ export const gojoConfig = {
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
-  purpleCooldown: 4000,      // Cooldown of Hollow Purple
+  purpleCooldown: 1500,      // Cooldown of Hollow Purple
   purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
   purpleDamage: 15,         // Continuous piercing damage per tick
@@ -89,7 +89,7 @@ export const gojoConfig = {
   purplePullForce: 20.5,    // How strongly enemies and illusions are dragged toward orb center
   purpleShakeIntensity: 4, // Screen shake intensity when purple orb fires
   purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
-  purpleExplosionDamage: 20, // Blast explosion damage when Hollow Purple detonates upon expiring
+  purpleExplosionDamage: 50, // Blast explosion damage when Hollow Purple detonates upon expiring
   purpleExplosionRadius: 280, // Blast explosion radius in pixels
   purpleExplosionKnockback: 10, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
@@ -99,16 +99,16 @@ export const gojoConfig = {
   purpleHorizontalCorridorHalfHeight: 40, // Strict vertical corridor half-height (40px) within which enemies trigger horizontal Purple
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
-  purpleSecondCastDamageMultiplier: 1.5,   // Damage multiplier for 2nd cast (2.0 = 200%)
+  purpleSecondCastDamageMultiplier: 2.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
   purpleSecondCastChargeMax: 120,           // Channeling duration in frames for 200% Hollow Purple (~3.0s at 60fps)
   purpleSecondCastTextBanner: '200% HOLLOW PURPLE!', // Floating text displayed on 2nd cast release
   purpleSecondCastTextHeader100: 'PURPLE 100%',     // Skill HUD bar label for 100% cast
   purpleSecondCastTextHeader200: 'PURPLE 200%',     // Skill HUD bar label for 200% cast
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
-  domainCooldown: 5000,     // 20s Ultimate cooldown
+  domainCooldown: 2000,     // 20s Ultimate cooldown
   domainChargeMax: 100,     // 2s Channeling duration before domain opens
-  domainDuration: 400,      // Domain lasts ~6.6 seconds (paralyzes enemies)
+  domainDuration: 500,      // Domain lasts ~6.6 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
   domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
   domainPostSlowDuration: 180, // 3.0s slow movement debuff after domain expires
@@ -118,8 +118,8 @@ export const gojoConfig = {
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 25% or below
-  reverseCursedTechniqueHealPercent: 1.00, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
-  reverseCursedTechniqueCooldown: 1500,     // 15 second cooldown between RCT heals
+  reverseCursedTechniqueHealPercent: 0.80, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
+  reverseCursedTechniqueCooldown: 2000,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
   passiveRctHealRate: 0,                   // Disabled

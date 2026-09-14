@@ -17,11 +17,11 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     angle = 0;
   }
   const owner = state.fighters && state.fighters[p.owner];
-  const form = p.getsugaForm || (isBlack ? (owner && owner.hollowMaskActive ? (owner.bankaiActive ? 'bankai_hollow' : 'hollow') : 'bankai') : 'shikai');
+  const form = p.getsugaForm || (isBlack ? 'bankai' : 'shikai');
   
   const isFinal = form === 'final_bankai';
-  const isBankaiHollow = form === 'bankai_hollow' || (owner && owner.bankaiActive && owner.hollowMaskActive);
-  const isShikaiHollow = (form === 'hollow' || (owner && !owner.bankaiActive && owner.hollowMaskActive)) && !isBankaiHollow;
+  const isBankaiHollow = form === 'bankai_hollow';
+  const isShikaiHollow = form === 'hollow';
   const isBankai = form === 'bankai' || isBankaiHollow || isFinal;
   const isShikai = form === 'shikai' && !isBankai && !isShikaiHollow;
 
@@ -656,9 +656,24 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
       const ringX = hiltStartX - 4.2;
       const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
       const breathe = Math.sin(now * 0.0025) * 0.8;
+
+      // Iron Sarute ring loop at pommel end
+      ctx.beginPath();
+      ctx.arc(ringX, 0, 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#08080C';
+      ctx.fill();
+      ctx.strokeStyle = isMask ? '#5A1212' : '#14141A';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(ringX, 0, 1.4, -Math.PI * 0.75, -Math.PI * 0.25);
+      ctx.strokeStyle = isMask ? 'rgba(255, 60, 0, 0.65)' : 'rgba(135, 140, 165, 0.55)';
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
       
       const chainLinks = [];
-      const linkCount = 13;
+      const linkCount = 15;
       const isBankaiStance = Boolean(opts.isBankaiStance || opts.isChampionScreen);
 
       if (isBankaiStance) {
@@ -669,7 +684,7 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
 
         for (let i = 0; i < linkCount; i++) {
           const t = i / (linkCount - 1);
-          const hangLen = 28.0;
+          const hangLen = 32.0;
           const catenarySway = Math.sin(t * Math.PI) * (2.2 + breathe);
           const cx = ringX + t * hangLen * downX + catenarySway * perpDownX;
           const cy = 0 + t * hangLen * downY + catenarySway * perpDownY;
@@ -680,9 +695,9 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
       } else {
         for (let i = 0; i < linkCount; i++) {
           const t = i / (linkCount - 1);
-          const cx = ringX - t * 30.0;
-          const cy = Math.sin(t * Math.PI) * (14.0 + breathe) + t * 4.0;
-          const ang = Math.cos(t * Math.PI) * 0.85 - 0.25;
+          const cx = ringX - t * 34.0;
+          const cy = Math.sin(t * Math.PI * 0.85) * (14.0 + breathe) + t * 4.0;
+          const ang = Math.cos(t * Math.PI * 0.85) * 0.80 - 0.20;
           chainLinks.push({ x: cx, y: cy, ang: ang });
         }
       }
@@ -695,14 +710,23 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
         ctx.rotate(cl.ang);
 
         const isOdd = (c % 2 === 1);
-        const linkRx = 2.7;
-        const linkRy = isOdd ? 1.0 : 1.6;
+        const linkRx = 2.8;
+        const linkRy = isOdd ? 1.1 : 1.7;
 
-        ctx.fillStyle = '#0a0a0e';
-        ctx.strokeStyle = '#2d3342';
-        ctx.lineWidth = 1.0;
-        ctx.fillRect(-linkRx, -linkRy, linkRx * 2, linkRy * 2);
-        ctx.strokeRect(-linkRx, -linkRy, linkRx * 2, linkRy * 2);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, linkRx, linkRy, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isOdd ? '#060608' : '#0a0a0e';
+        ctx.fill();
+        ctx.strokeStyle = isMask ? '#5A1212' : '#0D0D12';
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+
+        // Specular metallic gleam
+        ctx.beginPath();
+        ctx.ellipse(-0.3, -0.3, linkRx * 0.65, linkRy * 0.5, 0, -Math.PI * 0.75, -Math.PI * 0.15);
+        ctx.strokeStyle = isMask ? 'rgba(255, 60, 0, 0.65)' : 'rgba(135, 140, 165, 0.55)';
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
 
         ctx.restore();
       }
@@ -818,7 +842,7 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
     
     // Natural hanging catenary drape under gravity with subtle breathing sway
     const chainLinks = [];
-    const linkCount = 13;
+    const linkCount = 15;
     const isBankaiStance = Boolean(opts.isBankaiStance || opts.isChampionScreen);
 
     if (isBankaiStance) {
@@ -830,7 +854,7 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
 
       for (let i = 0; i < linkCount; i++) {
         const t = i / (linkCount - 1);
-        const hangLen = 28.0;
+        const hangLen = 32.0;
         const catenarySway = Math.sin(t * Math.PI) * (2.2 + breathe);
         const cx = ringX + t * hangLen * downX + catenarySway * perpDownX;
         const cy = 0 + t * hangLen * downY + catenarySway * perpDownY;
@@ -841,9 +865,9 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
     } else {
       for (let i = 0; i < linkCount; i++) {
         const t = i / (linkCount - 1);
-        const cx = ringX - t * 30.0;
-        const cy = Math.sin(t * Math.PI) * (14.0 + breathe) + t * 4.0;
-        const ang = Math.cos(t * Math.PI) * 0.85 - 0.25;
+        const cx = ringX - t * 34.0;
+        const cy = Math.sin(t * Math.PI * 0.85) * (14.0 + breathe) + t * 4.0;
+        const ang = Math.cos(t * Math.PI * 0.85) * 0.80 - 0.20;
         chainLinks.push({ x: cx, y: cy, ang: ang });
       }
     }
@@ -857,11 +881,13 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
 
       // Chain link outer loop
       const isOdd = (c % 2 === 1);
-      const linkRx = 2.7;
-      const linkRy = isOdd ? 1.0 : 1.6;
+      const linkRx = 2.8;
+      const linkRy = isOdd ? 1.1 : 1.7;
 
       ctx.beginPath();
       ctx.ellipse(0, 0, linkRx, linkRy, 0, 0, Math.PI * 2);
+      ctx.fillStyle = isOdd ? '#060608' : '#0a0a0e';
+      ctx.fill();
       ctx.strokeStyle = isMask ? '#5A1212' : '#0D0D12';
       ctx.lineWidth = 1.3;
       ctx.stroke();
@@ -1050,18 +1076,6 @@ export function drawTensaZangetsu(ctx, x, y, angle, r, opts = {}) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-
-  const img = _getBankaiSwordImage();
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    const s = 0.18;
-    ctx.scale(s, s);
-    ctx.drawImage(img, -410, -78.5);
-    ctx.restore();
-    ctx.restore();
-    return;
-  }
 
   const scale = opts.scale || 1.15;
   ctx.scale(scale, scale);

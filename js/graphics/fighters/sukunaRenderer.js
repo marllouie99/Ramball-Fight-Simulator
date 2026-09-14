@@ -268,7 +268,7 @@ export class SukunaRenderer {
 
     // 5. Idle Brawler Guard Stance when in Melee Mode (Front hand at right edge of body circle)
     else if (fighter.isMeleeMode) {
-      frontHandX_loc = r * 0.95; frontHandY_loc = 0;
+      frontHandX_loc = r * 0.95; frontHandY_loc = r * 0.20;
       backHandX_loc  = 0;        backHandY_loc  = 0;
       hideFrontHand = false;
       hideBackHand  = true;
@@ -276,7 +276,7 @@ export class SukunaRenderer {
 
     // Default rest: Single-Hand Slash Stance
     else {
-      frontHandX_loc = r * 0.95; frontHandY_loc = 0;
+      frontHandX_loc = r * 0.95; frontHandY_loc = r * 0.20;
       backHandX_loc  = 0;        backHandY_loc  = 0;
       hideBackHand   = true;
       hideFrontHand  = false;
@@ -290,27 +290,9 @@ export class SukunaRenderer {
     let backHandX = bHand.x;
     let backHandY = bHand.y;
 
-    // 1. Draw Cursed Energy Aura BEHIND physical hands (skip in melee mode, RCT, and Fuga channeling)
-    const isRCT = (fighter.rctVisualTimer > 0);
-    const isFuga = (fighter.isChannelingDivineFlame);
-    const isFrozenByDomain = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0);
-    const isMeleeMode = fighter.isMeleeMode || (fighter.punchAnimTimer > 0);
-    const isActive = !isMeleeMode && !isRCT && !isFuga && !isFrozenByDomain && (typeof state === 'undefined' || state.gameState !== 'countdown') && ((fighter.combatAuraOpacity > 0.05) || (fighter.slashGlowTimer > 0) || (fighter.domainActive));
-
-    if (isActive) {
-      let theme = 'red';
-      if (fighter.isChannelingDomainExpansion && !fighter.domainActive) {
-        theme = 'domain';
-      }
-      const blobRadius = (fighter.punchAnimTimer > 0 || fighter.slashGlowTimer > 0) ? 15.0 : 12.0;
-
-      if ((layer === 'all' || layer === 'front') && !hideFrontHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
-      if ((layer === 'all' || layer === 'back') && !hideBackHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
-    }
-
-    // 2. Draw Stepped Pixel-Art Hands (High-Performance Offscreen Cached)
+    // Draw Stepped Pixel-Art Hands (High-Performance Offscreen Cached)
     const handRadius = getHandSize(7.5, fighter);
-    const skinColor = fighter.color || '#8B0000';
+    const skinColor = '#FEDBC0'; // Warm fair skin (matches Gojo)
 
     const canvas = SukunaRenderer._getSukunaHandCanvas(handRadius, skinColor);
     const _drawPixelFist = (hx, hy) => {
@@ -1618,8 +1600,8 @@ export class SukunaRenderer {
         }
       }
 
-      // Deep Crimson Knuckle / Edge Shading
-      offCtx.fillStyle = '#5B0610';
+      // Deep Knuckle / Edge Shading
+      offCtx.fillStyle = '#D89F7C';
       for (let gy = 0; gy <= steps; gy++) {
         for (let gx = -steps; gx <= steps; gx++) {
           const dist = Math.hypot(gx * P, gy * P);
@@ -1630,13 +1612,20 @@ export class SukunaRenderer {
       }
 
       // Knuckle Specular Highlight
-      offCtx.fillStyle = '#B21E35';
+      offCtx.fillStyle = '#FFF0E2';
       offCtx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
       offCtx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
 
-      // Wrist Cursed Band Tattoo
+      // Wrist Cursed Stripe Bands (thin dark wrapping bands)
       offCtx.fillStyle = '#0E0F14';
-      offCtx.fillRect(Math.round(hx - innerR * 0.7), Math.round(hy - P * 0.5), P * 1.5, P * 2);
+      for (const bandGy of [-1, 1]) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, bandGy * P);
+          if (dist <= innerR) {
+            offCtx.fillRect(Math.round(hx + gx * P), Math.round(hy + bandGy * P), P, P);
+          }
+        }
+      }
     }
     return SukunaRenderer._handCanvas;
   }

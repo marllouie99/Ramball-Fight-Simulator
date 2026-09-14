@@ -4,6 +4,40 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { stopSound } from '../../../systems/soundSystem.js';
+import { isHollowTransformationVoicelinePlaying } from './ichigoHollow.js';
+
+/**
+ * Snaps any angle to the nearest strict cardinal direction (UP / DOWN / LEFT / RIGHT).
+ * @param {number} angle
+ * @returns {number} 0 (Right), Math.PI / 2 (Down), Math.PI (Left), or -Math.PI / 2 (Up)
+ */
+export function snapToCardinalAngle(angle) {
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  if (Math.abs(cosA) >= Math.abs(sinA)) {
+    return cosA >= 0 ? 0 : Math.PI;
+  } else {
+    return sinA >= 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+}
+
+/**
+ * Calculates strict cardinal angle (UP / DOWN / LEFT / RIGHT) from (fromX, fromY) to (toX, toY).
+ * @param {number} fromX
+ * @param {number} fromY
+ * @param {number} toX
+ * @param {number} toY
+ * @returns {number}
+ */
+export function getCardinalAimAngle(fromX, fromY, toX, toY) {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 0 : Math.PI;
+  } else {
+    return dy >= 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+}
 
 /**
  * Returns true if a Getsuga Tensho projectile launched by this Ichigo is currently active in the arena.
@@ -66,16 +100,32 @@ export function stopFinalGetsugaVoiceline(fighter, force = false) {
   }
   if (fighter._finalGetsugaVoiceHandle) {
     stopSound(fighter._finalGetsugaVoiceHandle);
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+      audioSystem.stopSFX(fighter._finalGetsugaVoiceHandle);
+    }
     fighter._finalGetsugaVoiceHandle = null;
   }
   if (fighter._getsugaVoiceHandle) {
     stopSound(fighter._getsugaVoiceHandle);
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+      audioSystem.stopSFX(fighter._getsugaVoiceHandle);
+    }
     fighter._getsugaVoiceHandle = null;
+  }
+  if (fighter._getsugaChargeHandle) {
+    stopSound(fighter._getsugaChargeHandle);
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+      audioSystem.stopSFX(fighter._getsugaChargeHandle);
+    }
+    fighter._getsugaChargeHandle = null;
   }
   if (fighter._activeVoicelineHandle) {
     const srcStr = String(fighter._activeVoicelineHandle.src || (fighter._activeVoicelineHandle.audio && fighter._activeVoicelineHandle.audio.src) || '').toLowerCase();
-    if (srcStr.includes('getsugatensho') || srcStr.includes('getsuga') || srcStr.includes('kuroi')) {
+    if (srcStr.includes('getsugatensho') || srcStr.includes('getsuga') || srcStr.includes('kuroi') || srcStr.includes('redcharging')) {
       stopSound(fighter._activeVoicelineHandle);
+      if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+        audioSystem.stopSFX(fighter._activeVoicelineHandle);
+      }
       fighter._activeVoicelineHandle = null;
     }
   }
@@ -92,7 +142,7 @@ export function stopFinalGetsugaVoiceline(fighter, force = false) {
  */
 export function isGetsugaVoicelinePlaying(fighter) {
   if (fighter.isDead || fighter.hp <= 0) {
-    stopFinalGetsugaVoiceline(fighter);
+    stopFinalGetsugaVoiceline(fighter, true);
     return false;
   }
   if (!fighter._getsugaVoicePlaying) return false;
@@ -121,7 +171,7 @@ export function isGetsugaVoicelinePlaying(fighter) {
  */
 export function isFinalGetsugaVoicelinePlaying(fighter) {
   if (fighter.isDead || fighter.hp <= 0) {
-    stopFinalGetsugaVoiceline(fighter);
+    stopFinalGetsugaVoiceline(fighter, true);
     return false;
   }
   if (!fighter._finalGetsugaVoicePlaying) return false;
@@ -149,17 +199,62 @@ export function isFinalGetsugaVoicelinePlaying(fighter) {
  * @param {Object} [target=null]
  */
 export function fireFinalMassiveGetsuga(fighter, target = null) {
-  if (fighter.isDead || fighter.hp <= 0) {
-    stopFinalGetsugaVoiceline(fighter);
-    return;
+  if (fighter.isDead || fighter.hp <= 0 || fighter.isParalyzedOrBeamTrapped() || fighter.wallSlamPinnedX !== undefined || fighter.isWallSlammed) return;
+  if (isGetsugaActive(fighter)) return;
+  if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isChannelingGetsuga || isFinalGetsugaVoicelinePlaying(fighter)) return;
+
+  // Aim at target (any continuous angle)
+  let castAngle;
+  if (target && target.hp > 0 && !target.isDead) {
+    fighter.getsugaTarget = target;
+    const targetY = (target.y !== undefined ? target.y : fighter.y) - (target.z || 0);
+    const fighterY = fighter.y - (fighter.z || 0);
+    castAngle = Math.atan2(targetY - fighterY, (target.x !== undefined ? target.x : fighter.x) - fighter.x);
+  } else if (fighter.isPlayerControlled) {
+    const opp = fighter.getNearestOpponent ? fighter.getNearestOpponent() : null;
+    if (opp && opp.hp > 0 && !opp.isDead) {
+      const targetY = (opp.y !== undefined ? opp.y : fighter.y) - (opp.z || 0);
+      const fighterY = fighter.y - (fighter.z || 0);
+      castAngle = Math.atan2(targetY - fighterY, (opp.x !== undefined ? opp.x : fighter.x) - fighter.x);
+    } else {
+      castAngle = (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0);
+    }
+  } else {
+    fighter.getsugaTarget = (typeof fighter._getClosestEnemy === 'function') ? fighter._getClosestEnemy() : null;
+    if (fighter.getsugaTarget && fighter.getsugaTarget.hp > 0 && !fighter.getsugaTarget.isDead) {
+      const targetY = (fighter.getsugaTarget.y !== undefined ? fighter.getsugaTarget.y : fighter.y) - (fighter.getsugaTarget.z || 0);
+      const fighterY = fighter.y - (fighter.z || 0);
+      castAngle = Math.atan2(targetY - fighterY, (fighter.getsugaTarget.x !== undefined ? fighter.getsugaTarget.x : fighter.x) - fighter.x);
+    } else {
+      castAngle = (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0);
+    }
   }
-  if (isGetsugaActive(fighter)) {
-    return;
-  }
-  if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0) {
-    stopFinalGetsugaVoiceline(fighter);
-    return;
-  }
+  fighter.getsugaCastAngle = castAngle;
+  fighter.gunAngle = castAngle;
+  fighter.angle = castAngle;
+
+  fighter.bankaiFinalGetsugaTriggered = true;
+  fighter.slashSwingTimer = 0;
+  fighter.isGetsugaSlash = false;
+  castBankaiFinalGetsuga(fighter);
+}
+
+/**
+ * Executes the Grand Finisher channeling state.
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ */
+export function castBankaiFinalGetsuga(fighter) {
+  const isMask = Boolean(fighter.hollowMaskActive || fighter.skin === 'bankai_mask' || fighter.skin === 'shikai_mask');
+  const chargeFrames = CONFIG.ichigo?.bankaiFinalGetsugaChargeFrames || 80;
+  const voiceSrc = isMask
+    ? (CONFIG.ichigo?.sounds?.finalHollowGetsugaVoice || 'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3')
+    : (CONFIG.ichigo?.sounds?.finalGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3');
+  const voiceVol = isMask
+    ? (CONFIG.ichigo?.soundVolumes?.finalHollowGetsugaVoice ?? CONFIG.ichigo?.soundVolumes?.hollowGetsugaVoice ?? 3.0)
+    : (CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice ?? 3.0);
+  const voiceDurMs = isMask ? 2015 : 2460;
+  const chargeText = isMask ? "FINAL KUROI HOLLOW GETSUGA..." : "FINAL KUROI GETSUGA...";
+  const chargeColor = isMask ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00') : (CONFIG.ichigo?.bankaiFinalGetsugaColor || '#DC143C');
 
   // Supreme Poise: clear any incoming hit stun or pushback displacement
   fighter.hitStunTimer = 0;
@@ -178,34 +273,6 @@ export function fireFinalMassiveGetsuga(fighter, target = null) {
   fighter.slashSwingTimer = 0;
   fighter.isGetsugaSlash = false;
 
-  if (target && target.hp > 0 && !target.isDead) {
-    fighter.getsugaTarget = target;
-    const dx = target.x - fighter.x;
-    const dy = target.y - fighter.y;
-    fighter.gunAngle = Math.atan2(dy, dx);
-    fighter.angle = fighter.gunAngle;
-  } else {
-    fighter.getsugaTarget = fighter._getClosestEnemy();
-    if (fighter.getsugaTarget) {
-      const dx = fighter.getsugaTarget.x - fighter.x;
-      const dy = fighter.getsugaTarget.y - fighter.y;
-      fighter.gunAngle = Math.atan2(dy, dx);
-      fighter.angle = fighter.gunAngle;
-    }
-  }
-
-  const isMask = Boolean(fighter.hollowMaskActive || fighter.skin === 'bankai_mask' || fighter.skin === 'shikai_mask');
-  const chargeFrames = CONFIG.ichigo?.bankaiFinalGetsugaChargeFrames || 80;
-  const voiceSrc = isMask
-    ? (CONFIG.ichigo?.sounds?.finalHollowGetsugaVoice || 'Assets/Sound Effects/Skills/Ichigo-getsugatensho-hollow-voiceline.mp3')
-    : (CONFIG.ichigo?.sounds?.finalGetsugaVoice || 'Assets/Sound Effects/Skills/ichigo-getsugatensho-bankai.mp3');
-  const voiceVol = isMask
-    ? (CONFIG.ichigo?.soundVolumes?.finalHollowGetsugaVoice ?? CONFIG.ichigo?.soundVolumes?.hollowGetsugaVoice ?? 3.0)
-    : (CONFIG.ichigo?.soundVolumes?.finalGetsugaVoice ?? 3.0);
-  const voiceDurMs = isMask ? 2015 : 2460;
-  const chargeText = isMask ? "FINAL KUROI HOLLOW GETSUGA..." : "FINAL KUROI GETSUGA...";
-  const chargeColor = isMask ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00') : (CONFIG.ichigo?.bankaiFinalGetsugaColor || '#DC143C');
-
   fighter.isChannelingGetsuga = true;
   fighter.isFinalMassiveGetsuga = true;
   fighter.isFinalGetsugaRecovery = false;
@@ -218,14 +285,16 @@ export function fireFinalMassiveGetsuga(fighter, target = null) {
   fighter._finalGetsugaVoiceEndTime = now + voiceDurMs;
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, chargeText, chargeColor);
-  if (typeof audioSystem !== 'undefined' && typeof audioSystem.playFighterVoiceline === 'function') {
-    fighter._finalGetsugaVoiceHandle = audioSystem.playFighterVoiceline(fighter, voiceSrc, voiceVol, 1.0, 0, 0, {
-      priority: 'domain',
-      isProtected: true,
-      durationMs: voiceDurMs
-    });
-  } else {
-    fighter._finalGetsugaVoiceHandle = fighter._playSound(isMask ? 'finalHollowGetsugaVoice' : 'finalGetsugaVoice', voiceSrc, voiceVol);
+  if (!isHollowTransformationVoicelinePlaying(fighter)) {
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playFighterVoiceline === 'function') {
+      fighter._finalGetsugaVoiceHandle = audioSystem.playFighterVoiceline(fighter, voiceSrc, voiceVol, 1.0, 0, 0, {
+        priority: 'domain',
+        isProtected: true,
+        durationMs: voiceDurMs
+      });
+    } else {
+      fighter._finalGetsugaVoiceHandle = fighter._playSound(isMask ? 'finalHollowGetsugaVoice' : 'finalGetsugaVoice', voiceSrc, voiceVol);
+    }
   }
   if (typeof triggerGlobalScreenShake === 'function') {
     triggerGlobalScreenShake(isMask ? 5.5 : 4.5, 22);
@@ -239,10 +308,40 @@ export function fireFinalMassiveGetsuga(fighter, target = null) {
  * @param {boolean} [isCombo=false]
  */
 export function fireGetsuga(fighter, target = null, isCombo = false) {
-  if (fighter.isDead || fighter.hp <= 0) return;
+  if (fighter.isDead || fighter.hp <= 0 || fighter.isParalyzedOrBeamTrapped() || fighter.wallSlamPinnedX !== undefined || fighter.isWallSlammed) return;
   if (!isCombo && isGetsugaActive(fighter)) return;
   if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isChannelingGetsuga || fighter.getsugaRecoveryTimer > 0 || isFinalGetsugaVoicelinePlaying(fighter)) return;
   if (!isCombo && (fighter.isTargetOfAmbush || fighter.isParalyzedOrBeamTrapped() || fighter.isShunpoDashing)) return;
+
+  // 1. Aim at target (any continuous angle)
+  let castAngle;
+  if (target && target.hp > 0 && !target.isDead) {
+    fighter.getsugaTarget = target;
+    const targetY = (target.y !== undefined ? target.y : fighter.y) - (target.z || 0);
+    const fighterY = fighter.y - (fighter.z || 0);
+    castAngle = Math.atan2(targetY - fighterY, (target.x !== undefined ? target.x : fighter.x) - fighter.x);
+  } else if (fighter.isPlayerControlled) {
+    const opp = fighter.getNearestOpponent ? fighter.getNearestOpponent() : null;
+    if (opp && opp.hp > 0 && !opp.isDead) {
+      const targetY = (opp.y !== undefined ? opp.y : fighter.y) - (opp.z || 0);
+      const fighterY = fighter.y - (fighter.z || 0);
+      castAngle = Math.atan2(targetY - fighterY, (opp.x !== undefined ? opp.x : fighter.x) - fighter.x);
+    } else {
+      castAngle = (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0);
+    }
+  } else {
+    fighter.getsugaTarget = (typeof fighter._getClosestEnemy === 'function') ? fighter._getClosestEnemy() : null;
+    if (fighter.getsugaTarget && fighter.getsugaTarget.hp > 0 && !fighter.getsugaTarget.isDead) {
+      const targetY = (fighter.getsugaTarget.y !== undefined ? fighter.getsugaTarget.y : fighter.y) - (fighter.getsugaTarget.z || 0);
+      const fighterY = fighter.y - (fighter.z || 0);
+      castAngle = Math.atan2(targetY - fighterY, (fighter.getsugaTarget.x !== undefined ? fighter.getsugaTarget.x : fighter.x) - fighter.x);
+    } else {
+      castAngle = (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0);
+    }
+  }
+  fighter.getsugaCastAngle = castAngle;
+  fighter.gunAngle = castAngle;
+  fighter.angle = castAngle;
 
   fighter._isComboGetsuga = Boolean(isCombo);
   if (isCombo) {
@@ -256,22 +355,6 @@ export function fireGetsuga(fighter, target = null, isCombo = false) {
   fighter.slashSwingTimer = 0;
   fighter.isGetsugaSlash = false;
 
-  if (target && target.hp > 0 && !target.isDead) {
-    fighter.getsugaTarget = target;
-    const dx = target.x - fighter.x;
-    const dy = target.y - fighter.y;
-    fighter.gunAngle = Math.atan2(dy, dx);
-    fighter.angle = fighter.gunAngle;
-  } else {
-    fighter.getsugaTarget = fighter._getClosestEnemy();
-    if (fighter.getsugaTarget) {
-      const dx = fighter.getsugaTarget.x - fighter.x;
-      const dy = fighter.getsugaTarget.y - fighter.y;
-      fighter.gunAngle = Math.atan2(dy, dx);
-      fighter.angle = fighter.gunAngle;
-    }
-  }
-
   const isBankai = fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask';
   const isMask = Boolean(fighter.hollowMaskActive || fighter.skin === 'bankai_mask' || fighter.skin === 'shikai_mask');
 
@@ -280,7 +363,9 @@ export function fireGetsuga(fighter, target = null, isCombo = false) {
     : (isBankai 
       ? (CONFIG.ichigo?.soundChances?.bankaiGetsugaVoice ?? 0.50)
       : (CONFIG.ichigo?.soundChances?.comboGetsugaVoice ?? 0.50));
-  const shouldPlayVoiceline = Math.random() < voiceChance;
+  const shouldPlayVoiceline = !isFinalGetsugaVoicelinePlaying(fighter) && 
+                              !isHollowTransformationVoicelinePlaying(fighter) && 
+                              (Math.random() < voiceChance);
 
   let voiceSrc = null;
   let chargeFrames = 24;
@@ -364,19 +449,21 @@ export function fireGetsuga(fighter, target = null, isCombo = false) {
         : (CONFIG.ichigo?.soundVolumes?.comboGetsugaVoice ?? 2.8));
     if (typeof audioSystem !== 'undefined' && typeof audioSystem.playFighterVoiceline === 'function') {
       fighter._getsugaVoiceHandle = audioSystem.playFighterVoiceline(fighter, voiceSrc, voiceVol, 1.0, 0, 0, {
-        priority: isBankai ? 'domain' : 'protected',
+        priority: 'protected',
         isProtected: true,
         durationMs: durationMs
       });
       fighter._getsugaVoicePlaying = true;
       fighter._getsugaVoiceEndTime = Date.now() + durationMs;
     } else {
-      fighter._playSound(isMask ? 'hollowGetsugaVoice' : (isBankai ? 'bankaiGetsugaVoice' : 'comboGetsugaVoice'), voiceSrc, voiceVol);
+      fighter._getsugaVoiceHandle = fighter._playSound(isMask ? 'hollowGetsugaVoice' : (isBankai ? 'bankaiGetsugaVoice' : 'comboGetsugaVoice'), voiceSrc, voiceVol);
+      fighter._getsugaVoicePlaying = true;
+      fighter._getsugaVoiceEndTime = Date.now() + durationMs;
     }
   } else {
     const sfx = CONFIG.ichigo?.sounds?.getsugaCharge || 'Assets/Sound Effects/Skills/redcharging.mp3';
     const vol = CONFIG.ichigo?.soundVolumes?.getsugaCharge ?? 0.85;
-    fighter._playSound('getsugaCharge', sfx, vol);
+    fighter._getsugaChargeHandle = fighter._playSound('getsugaCharge', sfx, vol);
   }
 }
 
@@ -388,6 +475,14 @@ export function releaseGetsuga(fighter) {
   fighter.isChannelingGetsuga = false;
   fighter.getsugaChargeTimer = 0;
   fighter.getsugaSlideTimer = 0;
+
+  if (fighter._getsugaChargeHandle) {
+    stopSound(fighter._getsugaChargeHandle);
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+      audioSystem.stopSFX(fighter._getsugaChargeHandle);
+    }
+    fighter._getsugaChargeHandle = null;
+  }
 
   const isFinal = Boolean(fighter.isFinalMassiveGetsuga);
   fighter.isFinalMassiveGetsuga = false;
@@ -423,12 +518,12 @@ export function releaseGetsuga(fighter) {
   }
 
   const baseDmg = isFinal
-    ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20) * (isMask ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.5) : 1.0)
+    ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 5) * (isMask ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.1) : 1.0)
     : (isBankai && isMask
-      ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 24)
+      ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 6)
       : (isMask
-        ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 16)
-        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16) : (CONFIG.ichigo?.getsugaTickDamage || 10))));
+        ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 3)
+        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4) : (CONFIG.ichigo?.getsugaTickDamage || 2))));
   const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 11;
   const speed = isFinal
     ? (CONFIG.ichigo?.bankaiFinalGetsugaSpeed ?? 24)
@@ -472,11 +567,17 @@ export function releaseGetsuga(fighter) {
   fighter.getsugaRecoveryTimer = recoveryFrames;
   fighter.isFinalGetsugaRecovery = isFinal;
 
-  // Small kinetic recoil kick
-  const aimAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  // Small kinetic recoil kick strictly along committed cast angle
+  const lockAngle = (fighter.getsugaCastAngle !== undefined && !Number.isNaN(fighter.getsugaCastAngle))
+    ? fighter.getsugaCastAngle
+    : ((fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0));
+  fighter.getsugaCastAngle = lockAngle;
+  fighter.gunAngle = lockAngle;
+  fighter.angle = lockAngle;
+
   const recoil = CONFIG.ichigo?.getsugaRecoil || 3.5;
-  fighter.vx = -Math.cos(aimAngle) * recoil;
-  fighter.vy = -Math.sin(aimAngle) * recoil;
+  fighter.vx = -Math.cos(lockAngle) * recoil;
+  fighter.vy = -Math.sin(lockAngle) * recoil;
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, text, textColor);
   fighter._playSound('getsugaReleaseSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
@@ -519,13 +620,13 @@ export function updateGetsuga(fighter, opponent) {
         fighter.vy = 0;
       }
 
-      // Smooth aim rotation while channeling Getsuga Tensho
-      const aimTarget = (fighter.getsugaTarget && !fighter.getsugaTarget.isDead && fighter.getsugaTarget.hp > 0) 
-        ? fighter.getsugaTarget 
-        : ((opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof fighter._getClosestEnemy === 'function' ? fighter._getClosestEnemy() : null));
-      if (aimTarget && aimTarget.hp > 0) {
-        fighter.aim(aimTarget);
-      }
+      // Commit 100% to the locked initial cast angle (strictly NO snap auto-aim tracking!)
+      const lockAngle = (fighter.getsugaCastAngle !== undefined && !Number.isNaN(fighter.getsugaCastAngle))
+        ? fighter.getsugaCastAngle
+        : ((fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0));
+      fighter.getsugaCastAngle = lockAngle;
+      fighter.gunAngle = lockAngle;
+      fighter.angle = lockAngle;
 
       fighter.getsugaChargeTimer--;
       if (fighter.getsugaChargeTimer <= 0) {
@@ -541,6 +642,10 @@ export function updateGetsuga(fighter, opponent) {
 
   // 2. Post-Getsuga Breather Recovery Lock
   if (fighter.getsugaRecoveryTimer > 0) {
+    if (fighter.getsugaCastAngle !== undefined) {
+      fighter.gunAngle = fighter.getsugaCastAngle;
+      fighter.angle = fighter.getsugaCastAngle;
+    }
     if (fighter.isFinalGetsugaRecovery && isFinalGetsugaVoicelinePlaying(fighter)) {
       fighter.getsugaRecoveryTimer = Math.max(fighter.getsugaRecoveryTimer, 2);
     }
@@ -555,13 +660,26 @@ export function updateGetsuga(fighter, opponent) {
 
     fighter.getsugaRecoveryTimer--;
     if (fighter.getsugaRecoveryTimer <= 0) {
+      const castAngle = fighter.getsugaCastAngle;
+      fighter.getsugaCastAngle = undefined;
       fighter.isFinalGetsugaRecovery = false;
       fighter._finalGetsugaVoicePlaying = false;
       fighter._finalGetsugaVoiceHandle = null;
       if (fighter.slashSwingTimer <= 0) {
         fighter.isGetsugaSlash = false;
       }
-      fighter.resumeMovement(opponent);
+      
+      // Move backward away from the enemy / cast direction instead of charging forward into the enemy
+      const target = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof fighter._getClosestEnemy === 'function' ? fighter._getClosestEnemy() : null);
+      let backwardAngle;
+      if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+        backwardAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
+      } else if (castAngle !== undefined) {
+        backwardAngle = castAngle + Math.PI;
+      } else {
+        backwardAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)) + Math.PI;
+      }
+      fighter.resumeMovement(null, 1.0, backwardAngle);
     }
     const damping = CONFIG.ichigo?.getsugaSlideDamping || 0.85;
     fighter.vx *= damping;

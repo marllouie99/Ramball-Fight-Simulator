@@ -50,52 +50,50 @@ export function activateRed(fighter) {
   fighter.vx = 0;
   fighter.vy = 0;
 
-  // Find and lock target angle strictly to 4 cardinal directions (Right: 0, Left: PI, Up: -PI/2, Down: PI/2)
+  // Find and lock target angle towards target at any continuous 360 angle upon initiation
   const fighterY = fighter.y - (fighter.z || 0);
-  let cardinalAngle;
-  if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
-    cardinalAngle = snapAngleToCardinal(fighter.redTargetAngle);
-  } else {
-    let targetF = (typeof fighter._findAlignedEnemyForRed === 'function')
-      ? (fighter._findAlignedEnemyForRed() || fighter._redTargetRef)
-      : ((typeof fighter._findVerticallyAlignedEnemy === 'function')
-        ? (fighter._findVerticallyAlignedEnemy() || fighter._redTargetRef)
-        : fighter._redTargetRef);
+  let aimAngle = null;
 
-    if (!targetF && state.fighters) {
-      const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
-      let closestDist = Infinity;
-      state.fighters.forEach((f, idx) => {
-        if (f && f !== fighter && f.hp > 0) {
-          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-          if (isEnemy) {
-            const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
-            if (dist < closestDist) {
-              closestDist = dist;
-              targetF = f;
-            }
+  let targetF = (typeof fighter._findAlignedEnemyForRed === 'function')
+    ? (fighter._findAlignedEnemyForRed() || fighter._redTargetRef)
+    : ((typeof fighter._findVerticallyAlignedEnemy === 'function')
+      ? (fighter._findVerticallyAlignedEnemy() || fighter._redTargetRef)
+      : fighter._redTargetRef);
+
+  if (!targetF && typeof state !== 'undefined' && state.fighters) {
+    const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
+    let closestDist = Infinity;
+    state.fighters.forEach((f, idx) => {
+      if (f && f !== fighter && f.hp > 0 && !f.isDead && !f.dead) {
+        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+        if (isEnemy) {
+          const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
+          if (dist < closestDist) {
+            closestDist = dist;
+            targetF = f;
           }
         }
-      });
-    }
-    
-    fighter._redTargetRef = targetF;
-    if (targetF && typeof targetF.x === 'number' && typeof targetF.y === 'number') {
-      const targetY = targetF.y - (targetF.z || 0);
-      const dx = targetF.x - fighter.x;
-      const dy = targetY - fighterY;
-      const targetAngle = Math.atan2(dy, dx);
-      cardinalAngle = snapAngleToCardinal(targetAngle);
-    } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
-      cardinalAngle = snapAngleToCardinal(fighter.gunAngle);
-    } else {
-      cardinalAngle = 0;
-    }
+      }
+    });
   }
 
-  fighter.redTargetAngle = cardinalAngle;
-  fighter.gunAngle = cardinalAngle;
-  fighter.angle = cardinalAngle;
+  fighter._redTargetRef = targetF;
+  if (targetF && typeof targetF.x === 'number' && typeof targetF.y === 'number') {
+    const targetY = targetF.y - (targetF.z || 0);
+    const dx = targetF.x - fighter.x;
+    const dy = targetY - fighterY;
+    aimAngle = Math.atan2(dy, dx);
+  } else if (fighter.redTargetAngle !== undefined && fighter.redTargetAngle !== null && !Number.isNaN(fighter.redTargetAngle)) {
+    aimAngle = fighter.redTargetAngle;
+  } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+    aimAngle = fighter.gunAngle;
+  } else {
+    aimAngle = 0;
+  }
+
+  fighter.redTargetAngle = aimAngle;
+  fighter.gunAngle = aimAngle;
+  fighter.angle = aimAngle;
 
   // Light buildup sparks
   spawnSparks(fighter.x, fighter.y, 12, 'crimsonSniper');
@@ -177,9 +175,9 @@ export function detonateRed(fighter) {
 
   let pushAngle;
   if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
-    pushAngle = snapAngleToCardinal(fighter.redTargetAngle);
+    pushAngle = fighter.redTargetAngle;
   } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
-    pushAngle = snapAngleToCardinal(fighter.gunAngle);
+    pushAngle = fighter.gunAngle;
   } else {
     pushAngle = 0;
   }
@@ -345,18 +343,18 @@ export function firePurple(fighter, ownerIndex) {
   let purpleLife = CONFIG.gojo?.purpleLife || 250;
 
   // Lock release angle strictly to committed cast angle (no snapping auto-aim upon firing)
-  let horizontalAngle;
-  if (fighter.purpleCastAngle !== undefined && !Number.isNaN(fighter.purpleCastAngle)) {
-    horizontalAngle = (Math.cos(fighter.purpleCastAngle) < 0) ? Math.PI : 0;
+  let releaseAngle;
+  if (fighter.purpleCastAngle !== undefined && fighter.purpleCastAngle !== null && !Number.isNaN(fighter.purpleCastAngle)) {
+    releaseAngle = fighter.purpleCastAngle;
   } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
-    horizontalAngle = (Math.cos(fighter.gunAngle) < 0) ? Math.PI : 0;
+    releaseAngle = fighter.gunAngle;
   } else {
-    horizontalAngle = 0;
+    releaseAngle = 0;
   }
 
-  fighter.purpleCastAngle = horizontalAngle;
-  fighter.gunAngle = horizontalAngle;
-  fighter.angle = horizontalAngle;
+  fighter.purpleCastAngle = releaseAngle;
+  fighter.gunAngle = releaseAngle;
+  fighter.angle = releaseAngle;
 
   if (projectileSystem && projectileSystem.fireGojoPurple) {
     const proj = projectileSystem.fireGojoPurple(

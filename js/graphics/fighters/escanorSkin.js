@@ -58,7 +58,7 @@ export function drawEscanorSkin(ctx, fighter) {
   // 3. Attack & Swing States
   const chopState = (!isPodiumPreview && !isSuppressed)
     ? _getEscanorChopAnimationState(fighter)
-    : { isSwinging: false, phase: 'idle', axeAngle: 0.46, handX: -r * 0.75, handY: r * 0.28, backHandX: r * 0.55, backHandY: -r * 0.15, strikeP: 0 };
+    : { isSwinging: false, phase: 'idle', axeAngle: 0.42, handX: -r * 0.45, handY: r * 0.28, backHandX: r * 0.55, backHandY: -r * 0.15, strikeP: 0 };
   const isPunching = !isPodiumPreview && !isSuppressed && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
   const punchPhase = isPunching ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14))) : 0;
 
@@ -470,16 +470,23 @@ function _drawEscanorGoldenGauntlet(ctx, cx, cy, radius, isTheOne = false) {
  * Directly honors chopLiftFrames, chopLiftHoldFrames, chopStrikeFrames, chopRecoveryFrames.
  */
 export function _getEscanorChopAnimationState(fighter) {
+  const r = (fighter.r || 25) + (fighter.isTheOneActive ? 3 : 0);
+  // Frame 1: Resting stance (hand at bottom-left, weapon angled down-right towards front)
+  const idleAxeAngle = 0.42;
+  const idleHandX = -r * 0.45;
+  const idleHandY = r * 0.28;
+  const idleBackHandX = r * 0.55;
+  const idleBackHandY = -r * 0.15;
+
   if (!fighter.slashSwingTimer || fighter.slashSwingTimer <= 0) {
-    const r = (fighter.r || 25) + (fighter.isTheOneActive ? 3 : 0);
     return {
       isSwinging: false,
       phase: 'idle',
-      axeAngle: 0.46,
-      handX: -r * 0.75,
-      handY: r * 0.28,
-      backHandX: r * 0.55,
-      backHandY: -r * 0.15,
+      axeAngle: idleAxeAngle,
+      handX: idleHandX,
+      handY: idleHandY,
+      backHandX: idleBackHandX,
+      backHandY: idleBackHandY,
       strikeP: 0
     };
   }
@@ -492,59 +499,71 @@ export function _getEscanorChopAnimationState(fighter) {
   const totalFrames = fighter.slashSwingMaxTimer || (liftFrames + holdFrames + strikeFrames + recFrames);
 
   const elapsed = Math.max(0, totalFrames - fighter.slashSwingTimer);
-  const r = (fighter.r || 25) + (fighter.isTheOneActive ? 3 : 0);
 
-  let axeAngle = 0.46;
-  let handX = -r * 0.75;
-  let handY = r * 0.28;
-  let backHandX = r * 0.55;
-  let backHandY = -r * 0.15;
+  // Frame 2: Lift stance (hand at upper-right / top-center, weapon shaft pointing up-left over back shoulder)
+  const overheadAngle = -2.45; // ~-140° pointing up-left
+  const overheadHandX = r * 0.15; // Upper forward/center
+  const overheadHandY = -r * 0.28; // Upper area
+  const overheadBackHandX = r * 0.35;
+  const overheadBackHandY = -r * 0.42;
+
+  const strikeEndAngle = 1.18; // Ground cleave follow-through angle
+  const strikeEndHandX = r * 0.48;
+  const strikeEndHandY = r * 0.38;
+  const strikeEndBackHandX = r * 0.60;
+  const strikeEndBackHandY = -r * 0.15;
+
+  let axeAngle = idleAxeAngle;
+  let handX = idleHandX;
+  let handY = idleHandY;
+  let backHandX = idleBackHandX;
+  let backHandY = idleBackHandY;
   let strikeP = 0;
   let phase = 'lift';
 
   if (elapsed < liftFrames) {
-    // 1. LIFT: Raise weapon up from resting pose (+0.46) to high overhead stance (-1.35)
+    // 1. LIFT: Raise weapon up from Frame 1 resting pose to Frame 2 overhead stance
     phase = 'lift';
     const p = Math.min(1.0, elapsed / Math.max(1, liftFrames));
     // Smooth sine ease-in-out: starts slow (heavy weapon), flows through, decelerates at top
     const ease = 0.5 - 0.5 * Math.cos(p * Math.PI);
-    axeAngle = 0.46 + (-1.35 - 0.46) * ease;
-    handX = -r * 0.75 + ease * (r * 0.35);
-    handY = r * 0.28 - ease * (r * 0.65);
-    backHandX = r * 0.55 - ease * (r * 0.30);
-    backHandY = -r * 0.15 - ease * (r * 0.35);
+    axeAngle = idleAxeAngle + (overheadAngle - idleAxeAngle) * ease;
+    handX = idleHandX + ease * (overheadHandX - idleHandX);
+    handY = idleHandY + ease * (overheadHandY - idleHandY);
+    backHandX = idleBackHandX + ease * (overheadBackHandX - idleBackHandX);
+    backHandY = idleBackHandY + ease * (overheadBackHandY - idleBackHandY);
   } else if (elapsed < liftFrames + holdFrames) {
     // 2. POISED OVERHEAD HOLD: STAYS POISED IN HIGH OVERHEAD CHOP POSITION FOR EXACT chopLiftHoldFrames!
     phase = 'hold';
     const holdElapsed = elapsed - liftFrames;
     const tensionTremor = Math.sin(holdElapsed * 0.8) * 0.02; // Muscular tension tremor
-    axeAngle = -1.35 + tensionTremor;
-    handX = -r * 0.40;
-    handY = -r * 0.37 + Math.sin(holdElapsed * 0.3) * 0.8;
-    backHandX = r * 0.25;
-    backHandY = -r * 0.50;
+    axeAngle = overheadAngle + tensionTremor;
+    handX = overheadHandX;
+    handY = overheadHandY + Math.sin(holdElapsed * 0.3) * 0.8;
+    backHandX = overheadBackHandX;
+    backHandY = overheadBackHandY + Math.sin(holdElapsed * 0.3) * 0.8;
   } else if (elapsed < liftFrames + holdFrames + strikeFrames) {
-    // 3. EXPLOSIVE DOWNWARD CHOP STRIKE: Snaps from -1.35 rad down to +1.15 rad
+    // 3. EXPLOSIVE DOWNWARD CHOP STRIKE: Snaps from overheadAngle down to strikeEndAngle
     phase = 'strike';
     const strikeElapsed = elapsed - (liftFrames + holdFrames);
     strikeP = Math.min(1.0, strikeElapsed / Math.max(1, strikeFrames));
     const ease = 1 - Math.pow(1 - strikeP, 3); // Cubic explosive snap
-    axeAngle = -1.35 + (1.15 - (-1.35)) * ease;
-    handX = -r * 0.40 + ease * (r * 0.85);
-    handY = -r * 0.37 + ease * (r * 0.75);
-    backHandX = r * 0.25 + ease * (r * 0.35);
-    backHandY = -r * 0.50 + ease * (r * 0.35);
+    axeAngle = overheadAngle + (strikeEndAngle - overheadAngle) * ease;
+    handX = overheadHandX + ease * (strikeEndHandX - overheadHandX);
+    handY = overheadHandY + ease * (strikeEndHandY - overheadHandY);
+    backHandX = overheadBackHandX + ease * (strikeEndBackHandX - overheadBackHandX);
+    backHandY = overheadBackHandY + ease * (strikeEndBackHandY - overheadBackHandY);
   } else {
-    // 4. RECOVERY: Smoothly return from +1.15 rad to resting pose (+0.46)
+    // 4. RECOVERY: Smoothly return from ground cleave follow-through to resting pose
     phase = 'recovery';
     const recElapsed = elapsed - (liftFrames + holdFrames + strikeFrames);
     const recP = Math.min(1.0, recElapsed / Math.max(1, recFrames));
     const ease = recP * (2 - recP);
-    axeAngle = 1.15 + (0.46 - 1.15) * ease;
-    handX = (r * 0.45) + (-r * 0.75 - (r * 0.45)) * ease;
-    handY = (r * 0.38) + (r * 0.28 - (r * 0.38)) * ease;
-    backHandX = (r * 0.60) + (r * 0.55 - (r * 0.60)) * ease;
-    backHandY = -r * 0.15;
+    axeAngle = strikeEndAngle + (idleAxeAngle - strikeEndAngle) * ease;
+    handX = strikeEndHandX + (idleHandX - strikeEndHandX) * ease;
+    handY = strikeEndHandY + (idleHandY - strikeEndHandY) * ease;
+    backHandX = strikeEndBackHandX + (idleBackHandX - strikeEndBackHandX) * ease;
+    backHandY = strikeEndBackHandY + (idleBackHandY - strikeEndBackHandY) * ease;
   }
 
   return { isSwinging: true, phase, axeAngle, handX, handY, backHandX, backHandY, strikeP };
@@ -575,9 +594,9 @@ function _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase
  */
 function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhase) {
   const handR = Math.max(r * 0.24, getHandSize(5.6));
-  let handX = -r * 0.75;
+  let handX = -r * 0.45;
   let handY = r * 0.28;
-  let axeAngle = 0.46; // Canonical resting pose: held at far left flank angled down-forward
+  let axeAngle = 0.42; // Frame 1 resting pose: held at bottom-left angled down-right
 
   if (chopState.isSwinging) {
     handX = chopState.handX;

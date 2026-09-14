@@ -1,10 +1,66 @@
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
+import { stopSound } from '../../../systems/soundSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { applyDamageToTarget } from '../../fighter.js';
-import { applyHollowLifesteal } from './ichigoHollow.js';
+import { applyHollowLifesteal, activateHollowMask } from './ichigoHollow.js';
+
+/**
+ * Stops Bankai transformation voiceline audio immediately (e.g. fighter death).
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ * @param {boolean} [force=false]
+ */
+export function stopBankaiVoiceline(fighter, force = false) {
+  if (!fighter) return;
+  if (!force && fighter.hp > 0 && !fighter.isDead) return;
+
+  if (fighter._bankaiVoiceHandle) {
+    stopSound(fighter._bankaiVoiceHandle);
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+      audioSystem.stopSFX(fighter._bankaiVoiceHandle);
+    }
+    fighter._bankaiVoiceHandle = null;
+  }
+  if (fighter._activeVoicelineHandle) {
+    const srcStr = String(fighter._activeVoicelineHandle.src || (fighter._activeVoicelineHandle.audio && fighter._activeVoicelineHandle.audio.src) || '').toLowerCase();
+    if (srcStr.includes('bankai') || srcStr.includes('charging')) {
+      stopSound(fighter._activeVoicelineHandle);
+      if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+        audioSystem.stopSFX(fighter._activeVoicelineHandle);
+      }
+      fighter._activeVoicelineHandle = null;
+    }
+  }
+  fighter._bankaiVoicePlaying = false;
+  fighter._bankaiVoiceEndTime = 0;
+}
+
+/**
+ * Checks whether Bankai transformation voiceline audio is currently playing.
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ * @returns {boolean}
+ */
+export function isBankaiVoicelinePlaying(fighter) {
+  if (!fighter) return false;
+  if (fighter.isDead || fighter.hp <= 0) {
+    stopBankaiVoiceline(fighter, true);
+    return false;
+  }
+  if (!fighter._bankaiVoicePlaying) return false;
+  const now = Date.now();
+  if (fighter._bankaiVoiceEndTime && now < fighter._bankaiVoiceEndTime) {
+    return true;
+  }
+  const handle = fighter._bankaiVoiceHandle || fighter._activeVoicelineHandle;
+  if (handle && typeof handle.isPlaying === 'function' && handle.isPlaying()) {
+    return true;
+  }
+  fighter._bankaiVoicePlaying = false;
+  fighter._bankaiVoiceHandle = null;
+  return false;
+}
 
 /**
  * Activates Ichigo's Bankai transformation.
@@ -15,7 +71,6 @@ export function activateBankai(fighter) {
   if (
     fighter.isChannelingBankai || 
     fighter.bankaiActive || 
-    fighter.hollowMaskActive || // Cannot activate Bankai if in Hollow state first
     fighter.hollowMaskFormationTimer > 0 || 
     fighter.hollowBurstTimer > 0 || 
     fighter.shikaiReversionBurstTimer > 0 ||
@@ -28,18 +83,25 @@ export function activateBankai(fighter) {
     fighter.shunpoComboActive
   ) return;
 
-  // Strict validation: Ensure Bankai condition is genuinely met (HP <= 90% on 1st use, or HP lost >= 20% on subsequent use)
-  const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.90;
+  // Strict validation: Ensure Bankai condition is met (HP <= threshold on 1st use, or cooldown elapsed / HP damage on subsequent use)
+  const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.80;
+  const cd = fighter.ultimateCooldown || 0;
+  const hpRatio = fighter.hp / (fighter.maxHp || 240);
   const reqDamage = (fighter.maxHp || 240) * (CONFIG.ichigo?.bankaiRechargeHpRatio ?? 0.20);
   const baseline = fighter.bankaiRechargeHpBaseline !== undefined ? fighter.bankaiRechargeHpBaseline : fighter.hp;
   const damageTaken = Math.max(0, baseline - fighter.hp);
-  const isReady = !fighter.bankaiUsed ? (fighter.hp / fighter.maxHp <= ultThreshold) : (damageTaken >= reqDamage);
+  const isReady = !fighter.bankaiUsed 
+    ? (hpRatio <= ultThreshold) 
+    : ((cd <= 0 && hpRatio <= ultThreshold) || (damageTaken >= reqDamage) || (cd <= 0));
   if (!isReady) return;
 
   fighter.bankaiUsed = true;
   fighter.bankaiRechargeHpBaseline = undefined;
   fighter._maxBankaiPct = 0;
   fighter.ultimateCooldown = 0;
+  fighter.bankaiFinalGetsugaTriggered = false;
+  fighter.isFinalMassiveGetsuga = false;
+  fighter.isFinalGetsugaRecovery = false;
 
   fighter.slashSwingTimer = 0;
   fighter.isGetsugaSlash = false;
@@ -80,14 +142,16 @@ export function activateBankai(fighter) {
 
   const voiceSrc = CONFIG.ichigo?.sounds?.bankaiCharge || 'Assets/Sound Effects/Skills/Ichigo-bankai-charging-voiceline.mp3';
   const voiceVol = CONFIG.ichigo?.soundVolumes?.bankaiCharge ?? 2.8;
+  fighter._bankaiVoicePlaying = true;
+  fighter._bankaiVoiceEndTime = Date.now() + 1150;
   if (typeof audioSystem !== 'undefined' && typeof audioSystem.playFighterVoiceline === 'function') {
-    audioSystem.playFighterVoiceline(fighter, voiceSrc, voiceVol, 1.0, 0, 0, {
+    fighter._bankaiVoiceHandle = audioSystem.playFighterVoiceline(fighter, voiceSrc, voiceVol, 1.0, 0, 0, {
       priority: 'domain',
       isProtected: true,
       durationMs: 1150
     });
   } else {
-    fighter._playSound('bankaiCharge', voiceSrc, voiceVol);
+    fighter._bankaiVoiceHandle = fighter._playSound('bankaiCharge', voiceSrc, voiceVol);
   }
 }
 
@@ -105,6 +169,9 @@ export function releaseBankai(fighter) {
   fighter.bankaiFinalGetsugaTriggered = false;
   fighter.isFinalMassiveGetsuga = false;
   fighter.ultimateCooldown = 0;
+  fighter.hollowMaskUsed = false; // Reset so Hollow Mask awakens at the end of this Bankai cycle
+  fighter.hollowRechargeHpBaseline = fighter.hp; // Start Hollow progress tracking from HP when Bankai begins
+  fighter._maxHollowPct = 0;
 
   fighter.bankaiBurstMax = CONFIG.ichigo?.bankaiBurstFrames || 36;
   fighter.bankaiBurstTimer = fighter.bankaiBurstMax;
@@ -363,7 +430,7 @@ export function updateBankai(fighter, opponent, isMatchEnded) {
     if (!isMatchEnded) {
       // If Hollow Mask formation or burst is running, pause Bankai timer decay
       const isHollowTransforming = (fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0);
-      if (!isHollowTransforming) {
+      if (!isHollowTransforming && !fighter.hollowMaskActive) {
         fighter.bankaiTimer--;
       }
 
@@ -388,13 +455,33 @@ export function updateBankai(fighter, opponent, isMatchEnded) {
       if (fighter.bankaiTimer <= 0) {
         if (isAboutToUnleashNormalGetsugaWave || fighter.isChannelingGetsuga || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.getsugaRecoveryTimer > 0 && fighter.isFinalGetsugaRecovery) || fighter._isFinalGetsugaVoicelinePlaying() || isHollowTransforming || !fighter.bankaiFinalGetsugaTriggered) {
           fighter.bankaiTimer = 1;
+        } else if (!fighter.hollowMaskActive && !fighter.hollowMaskUsed) {
+          // ── COMBO TRANSITION: Bankai Duration Ended -> Awaken Visored Hollow Mask in Bankai Form! ──
+          if (typeof fighter.activateHollowMask === 'function') {
+            fighter.activateHollowMask();
+          } else if (typeof activateHollowMask === 'function') {
+            activateHollowMask(fighter);
+          }
+          fighter.bankaiTimer = 1; // Hold Bankai active throughout the Hollow Mask duration
+          return true; // Locked in Hollow Mask transformation
+        } else if (fighter.hollowMaskActive || isHollowTransforming) {
+          // Hollow Mask is currently active / forming in Bankai: keep Bankai active
+          fighter.bankaiTimer = 1;
         } else {
+          // Hollow Mask has finished/shattered (or was already consumed): Conclude Bankai and revert to Shikai!
           fighter.bankaiActive = false;
           fighter.bankaiUsed = true;
+          fighter.bankaiFinalGetsugaTriggered = false;
+          fighter.isFinalMassiveGetsuga = false;
+          fighter.isFinalGetsugaRecovery = false;
           fighter._stopFinalGetsugaVoiceline();
           fighter.bankaiRechargeHpBaseline = fighter.hp; // Snapshot HP baseline upon Bankai expiration
+          fighter.hollowRechargeHpBaseline = fighter.hp;
           fighter._maxBankaiPct = 0;
-          fighter.ultimateCooldown = 0;
+          fighter._maxHollowPct = 0;
+          const cd = CONFIG.ichigo?.bankaiCooldown ?? CONFIG.ichigo?.ultimateCooldown ?? 600;
+          fighter.ultimateCooldown = cd;
+          fighter.bankaiCooldownMax = cd;
           fighter.shikaiReversionBurstTimer = CONFIG.ichigo?.shikaiReversionRecoveryFrames || CONFIG.ichigo?.shikaiReversionBurstFrames || 42;
           fighter.shikaiReversionBurstMax = fighter.shikaiReversionBurstTimer;
 

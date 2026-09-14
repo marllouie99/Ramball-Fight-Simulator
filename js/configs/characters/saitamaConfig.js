@@ -25,14 +25,14 @@ export const saitamaConfig = {
   desc: 'Hero for fun. Ignores basic hit flinches. Basic hits deal massive damage. Serious Punch ultimate obliterates anything across the arena.',
 
   // Basic Attack: Normal Punch
-  normalPunchEnabled: 0,        // Set to false to disable Normal Punch basic attack
+  normalPunchEnabled: 1,        // Set to false to disable Normal Punch basic attack
   punchEnabled: true,              // Alias toggle
   disableNormalPunch: false,       // If true, disables Normal Punch basic attack
-  punchDamage: 500, // Massive basic attack damage
+  punchDamage: 150, // Massive basic attack damage
   punchKnockback: 100, // Massive knockback force
   punchReach: 50,
   punchArcAngle: Math.PI * 0.5, // 90 degree arc angle
-  punchCooldown: 1000, // ~0.6s cooldown at 60fps
+  punchCooldown: 2000, // ~0.6s cooldown at 60fps
   punchWindup: 0,
   punchWindupFrames: 0,
   punchMaxTime: 22,                // Smooth punch animation frames
@@ -47,8 +47,8 @@ export const saitamaConfig = {
   punchScreenShakeIntensity: 12,   // Arena screen shake intensity on basic attack punch hit
   punchScreenShakeDuration: 10,    // Arena screen shake duration (frames) on basic attack punch hit
   punchFrontalReach: 420,          // Frontal supersonic shockwave blast reach (px) on normal punch
-  punchFrontalArc: Math.PI * 0.65, // Frontal shockwave blast cone angle on normal punch
-  punchFrontalDamage: 500,         // Damage dealt across the long frontal supersonic shockwave blast cone
+  punchFrontalArc: Math.PI * 0.35, // Frontal shockwave blast cone angle on normal punch
+  punchFrontalDamage: 150,         // Damage dealt across the long frontal supersonic shockwave blast cone
   punchTriggerDistance: 50,       // AI trigger distance threshold for initiating Normal Punch (px)
   wallPinScreenShakeIntensity: 30,  // Arena screen shake intensity on wall pin impact
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact

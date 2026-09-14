@@ -1695,7 +1695,9 @@ export function drawBankaiImpactDimScreen() {
       f.isChannelingBankai || 
       (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) ||
       (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0) ||
-      (f.hollowBurstTimer && f.hollowBurstTimer > 0)
+      (f.hollowBurstTimer && f.hollowBurstTimer > 0) ||
+      f.hollowMaskActive ||
+      (f.hollowMaskTimer && f.hollowMaskTimer > 0)
     )
   );
 
@@ -1711,20 +1713,32 @@ export function drawBankaiImpactDimScreen() {
     currentHollowMaskOpacity = 0;
   }
 
-  const isHollowChanneling = !isBankaiChannelingOrBursting && Boolean(
-    ichigo && ((ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) || ichigo._hollowVoicelineWait)
+  const isHollowActive = !isBankaiChannelingOrBursting && Boolean(
+    ichigo && (
+      ichigo.hollowMaskActive ||
+      (ichigo.hollowMaskTimer && ichigo.hollowMaskTimer > 0) ||
+      (ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) ||
+      (ichigo.hollowBurstTimer && ichigo.hollowBurstTimer > 0)
+    )
   );
 
-  if (isHollowChanneling) {
+  if (isHollowActive) {
     if (!hollowMaskOverlayImg && !hollowMaskOverlayImgLoading) {
       loadHollowMaskOverlayImage();
     }
-    const maxH = ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
-    const formProg = Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH)));
-    const targetAlpha = Math.min(0.20, formProg * 0.35);
-    currentHollowMaskOpacity += (targetAlpha - currentHollowMaskOpacity) * 0.08;
+    const isForming = Boolean(ichigo && ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0);
+    if (isForming) {
+      const maxH = ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
+      const formProg = Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH)));
+      const targetAlpha = Math.min(0.20, formProg * 0.35);
+      currentHollowMaskOpacity += (targetAlpha - currentHollowMaskOpacity) * 0.08;
+    } else {
+      // Keep overlay active across the arena until the hollow mask state expires!
+      const targetAlpha = 0.20;
+      currentHollowMaskOpacity += (targetAlpha - currentHollowMaskOpacity) * 0.08;
+    }
   } else {
-    currentHollowMaskOpacity = Math.max(0, currentHollowMaskOpacity - 0.045);
+    currentHollowMaskOpacity = Math.max(0, currentHollowMaskOpacity - 0.035);
   }
 
   if (!ichigo && currentHollowMaskOpacity <= 0.01) return;
@@ -1757,10 +1771,9 @@ export function drawBankaiImpactDimScreen() {
 
   let isChanneling = Boolean(ichigo && ichigo.isChannelingBankai && ichigo.bankaiChargeTimer > 0);
   let isBursting = Boolean(ichigo && ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0);
-  let isHollow = !isChanneling && !isBursting && Boolean(
+  let isHollowForming = !isChanneling && !isBursting && Boolean(
     (ichigo && ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) ||
-    (ichigo && ichigo.hollowBurstTimer && ichigo.hollowBurstTimer > 0) ||
-    currentHollowMaskOpacity > 0.01
+    (ichigo && ichigo.hollowBurstTimer && ichigo.hollowBurstTimer > 0)
   );
 
   let opacity = 0;
@@ -1782,7 +1795,7 @@ export function drawBankaiImpactDimScreen() {
     const burstMax = ichigo.bankaiBurstMax || CONFIG.ichigo?.bankaiBurstFrames || 36;
     burstProg = 1.0 - (ichigo.bankaiBurstTimer / burstMax);
     opacity = Math.pow(1.0 - burstProg, 1.3) * 0.92;
-  } else if (isHollow) {
+  } else if (isHollowForming) {
     if (ichigo && ichigo.hollowMaskFormationTimer !== undefined && ichigo.hollowMaskFormationTimer > 0) {
       const maxH = ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
       const formProg = Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH)));
@@ -1791,8 +1804,6 @@ export function drawBankaiImpactDimScreen() {
       const maxB = ichigo.hollowBurstMax || CONFIG.ichigo?.hollowBurstFrames || 36;
       burstProg = Math.min(1.0, Math.max(0.0, 1.0 - ((ichigo.hollowBurstTimer || 0) / maxB)));
       opacity = Math.pow(1.0 - burstProg, 1.3) * 0.90;
-    } else {
-      opacity = currentHollowMaskOpacity;
     }
   }
 
@@ -1807,31 +1818,31 @@ export function drawBankaiImpactDimScreen() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  const maxR = Math.max(canvas.width, canvas.height) * 0.95;
-  const grad = ctx.createRadialGradient(cx, cy, r * 1.2, cx, cy, maxR);
-  if (isHollow) {
-    grad.addColorStop(0.0, 'rgba(15, 0, 3, 0.0)');
-    grad.addColorStop(0.25, `rgba(20, 2, 5, ${(opacity * 0.45).toFixed(3)})`);
-    grad.addColorStop(0.65, `rgba(8, 1, 3, ${(opacity * 0.75).toFixed(3)})`);
-    grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.92).toFixed(3)})`);
-  } else {
-    grad.addColorStop(0.0, `rgba(40, 6, 15, ${(opacity * 0.35).toFixed(3)})`);
-    grad.addColorStop(0.25, `rgba(16, 3, 8, ${(opacity * 0.75).toFixed(3)})`);
-    grad.addColorStop(0.65, `rgba(4, 1, 6, ${(opacity * 0.94).toFixed(3)})`);
-    grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.98).toFixed(3)})`);
-  }
+  if (opacity > 0.01) {
+    const maxR = Math.max(canvas.width, canvas.height) * 0.95;
+    const grad = ctx.createRadialGradient(cx, cy, r * 1.2, cx, cy, maxR);
+    if (isHollowForming) {
+      grad.addColorStop(0.0, 'rgba(15, 0, 3, 0.0)');
+      grad.addColorStop(0.25, `rgba(20, 2, 5, ${(opacity * 0.45).toFixed(3)})`);
+      grad.addColorStop(0.65, `rgba(8, 1, 3, ${(opacity * 0.75).toFixed(3)})`);
+      grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.92).toFixed(3)})`);
+    } else {
+      grad.addColorStop(0.0, `rgba(40, 6, 15, ${(opacity * 0.35).toFixed(3)})`);
+      grad.addColorStop(0.25, `rgba(16, 3, 8, ${(opacity * 0.75).toFixed(3)})`);
+      grad.addColorStop(0.65, `rgba(4, 1, 6, ${(opacity * 0.94).toFixed(3)})`);
+      grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.98).toFixed(3)})`);
+    }
 
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  if (isChanneling || isHollow) {
     const ringCount = 3;
     for (let i = 0; i < ringCount; i++) {
       const ringP = ((now * 0.0022 + i * (1.0 / ringCount)) % 1.0);
       const ringR = r * 1.5 + ringP * 280;
       const ringAlpha = (1.0 - ringP) * Math.sin(ringP * Math.PI) * opacity * 0.70;
       if (ringAlpha > 0.01) {
-        const ringColor = isHollow
+        const ringColor = isHollowForming
           ? ((i % 2 === 0)
             ? `rgba(255, 255, 255, ${ringAlpha.toFixed(3)})`
             : `rgba(10, 10, 15, ${ringAlpha.toFixed(3)})`)
@@ -1891,7 +1902,7 @@ export function drawBankaiImpactDimScreen() {
     const destW = maskW;
     const destH = maskH;
 
-    const isForming = Boolean(ichigo && ((ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) || ichigo._hollowVoicelineWait));
+    const isForming = Boolean(ichigo && ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0);
     const maxH = (ichigo && ichigo.hollowMaskFormationMax) || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
     const currentFormProg = (ichigo && ichigo.hollowMaskFormationTimer > 0) 
       ? Math.min(1.0, Math.max(0.0, 1.0 - (ichigo.hollowMaskFormationTimer / maxH))) 
@@ -1912,7 +1923,7 @@ export function drawBankaiImpactDimScreen() {
       ctx.restore();
     }
 
-    const whiteDimAlpha = Math.min(0.65, (currentFormProg || 1.0) * 0.65);
+    const whiteDimAlpha = isForming ? Math.min(0.65, (currentFormProg || 1.0) * 0.65) : 0;
     if (whiteDimAlpha > 0.01) {
       ctx.fillStyle = `rgba(255, 255, 255, ${(whiteDimAlpha * 0.32).toFixed(3)})`;
       ctx.fillRect(arenaX, arenaY, arenaW, arenaH);

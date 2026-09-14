@@ -1185,10 +1185,14 @@ export class YutaFighter extends Fighter {
       this.vy = ((this.beamRetreatTargetY - this.beamRetreatStartY) / slideTotalFrames) * deriv;
 
       if (this.beamRetreatTargetEnemy && !this.beamRetreatTargetEnemy.isDead) {
-        const cardinal = this._getCardinalAngle(this.beamRetreatTargetEnemy);
-        this.pureLoveBeamLockedAngle = cardinal;
-        this.gunAngle = cardinal;
-        this.angle = cardinal;
+        const targetY = (this.beamRetreatTargetEnemy.y !== undefined ? this.beamRetreatTargetEnemy.y : this.y) - (this.beamRetreatTargetEnemy.z || 0);
+        const yutaY = this.y - (this.z || 0);
+        const dx = (this.beamRetreatTargetEnemy.x !== undefined ? this.beamRetreatTargetEnemy.x : this.x) - this.x;
+        const dy = targetY - yutaY;
+        const aimAngle = Math.atan2(dy, dx);
+        this.pureLoveBeamLockedAngle = aimAngle;
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
       }
 
       // Spawn slide dust particles and pink afterimages every 2 frames
@@ -1206,10 +1210,22 @@ export class YutaFighter extends Fighter {
         this.knockbackVx = 0;
         this.knockbackVy = 0;
 
-        const cardinal = this._getCardinalAngle(this.beamRetreatTargetEnemy);
-        this.pureLoveBeamLockedAngle = cardinal;
-        this.gunAngle = cardinal;
-        this.angle = cardinal;
+        const targetEnemy = this.beamRetreatTargetEnemy;
+        if (targetEnemy && !targetEnemy.isDead) {
+          const targetY = (targetEnemy.y !== undefined ? targetEnemy.y : this.y) - (targetEnemy.z || 0);
+          const yutaY = this.y - (this.z || 0);
+          const dx = (targetEnemy.x !== undefined ? targetEnemy.x : this.x) - this.x;
+          const dy = targetY - yutaY;
+          const aimAngle = Math.atan2(dy, dx);
+          this.pureLoveBeamLockedAngle = aimAngle;
+          this.gunAngle = aimAngle;
+          this.angle = aimAngle;
+        } else {
+          const fallback = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+          this.pureLoveBeamLockedAngle = fallback;
+          this.gunAngle = fallback;
+          this.angle = fallback;
+        }
 
         // Trigger pre-beam Rika emergence phase once retreat slide has fully stopped!
         this.rikaEmergingForBeamTimer = 25;
@@ -1251,7 +1267,16 @@ export class YutaFighter extends Fighter {
       // Transition to actual beam channeling once the emergence delay finishes
       if (this.rikaEmergingForBeamTimer === 0) {
         if (this.pureLoveBeamLockedAngle === undefined) {
-          this.pureLoveBeamLockedAngle = this._getCardinalAngle(opponent || this.beamRetreatTargetEnemy);
+          const target = opponent || this.beamRetreatTargetEnemy;
+          if (target && !target.isDead) {
+            const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+            const yutaY = this.y - (this.z || 0);
+            const dx = (target.x !== undefined ? target.x : this.x) - this.x;
+            const dy = targetY - yutaY;
+            this.pureLoveBeamLockedAngle = Math.atan2(dy, dx);
+          } else {
+            this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+          }
         }
         this.gunAngle = this.pureLoveBeamLockedAngle;
         this.angle = this.pureLoveBeamLockedAngle;
@@ -1321,10 +1346,21 @@ export class YutaFighter extends Fighter {
         this.beamRetreatTargetY = destY;
         this.beamRetreatTargetEnemy = targetEnemy;
 
-        const cardinal = this._getCardinalAngle(targetEnemy);
-        this.pureLoveBeamLockedAngle = cardinal;
-        this.gunAngle = cardinal;
-        this.angle = cardinal;
+        if (targetEnemy && !targetEnemy.isDead) {
+          const targetY = (targetEnemy.y !== undefined ? targetEnemy.y : this.y) - (targetEnemy.z || 0);
+          const yutaY = this.y - (this.z || 0);
+          const dx = (targetEnemy.x !== undefined ? targetEnemy.x : this.x) - this.x;
+          const dy = targetY - yutaY;
+          const aimAngle = Math.atan2(dy, dx);
+          this.pureLoveBeamLockedAngle = aimAngle;
+          this.gunAngle = aimAngle;
+          this.angle = aimAngle;
+        } else {
+          const fallback = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+          this.pureLoveBeamLockedAngle = fallback;
+          this.gunAngle = fallback;
+          this.angle = fallback;
+        }
 
         // Play "Come, Rika!" summon sound effect
         if (this._rikaSummonedForBeam) {
@@ -1352,8 +1388,8 @@ export class YutaFighter extends Fighter {
           this.rika.isDying = false;
           this.rika.disappearing = false;
           this.rika.hp = this.rika.maxHp;
-          this.rika.beamFollowAngle = cardinal;
-          this.rika.angle = cardinal;
+          this.rika.beamFollowAngle = this.pureLoveBeamLockedAngle;
+          this.rika.angle = this.pureLoveBeamLockedAngle;
           
           if (state.illusions && !state.illusions.includes(this.rika)) {
             state.illusions.push(this.rika);
@@ -1763,13 +1799,13 @@ export class YutaFighter extends Fighter {
     this.pureLoveBeamActiveTimer = CONFIG.yuta?.pureLoveBeamDuration || 280;
     this.pureLoveBeamCooldownTimer = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
 
-    // Strict cardinal angle (Up, Down, Left, Right) with NO snap auto-aim to enemy at fire time
+    // Lock release angle strictly to committed cast angle (no snapping auto-aim to enemy at fire time)
     if (this.pureLoveBeamLockedAngle === undefined) {
-      this.pureLoveBeamLockedAngle = this._snapToCardinal(this.gunAngle || 0);
+      this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
     }
-    const cardinal = this.pureLoveBeamLockedAngle;
-    this.gunAngle = cardinal;
-    this.angle = cardinal;
+    const beamAngle = this.pureLoveBeamLockedAngle;
+    this.gunAngle = beamAngle;
+    this.angle = beamAngle;
 
     if (CONFIG.yuta?.pureLoveBeamFireSound) {
       this.pureLoveBeamAudioHandle = audioSystem.playSFX(CONFIG.yuta.pureLoveBeamFireSound, CONFIG.yuta.pureLoveBeamFireVolume ?? 3.5, 1.0, CONFIG.yuta.pureLoveBeamFireOffset ?? 0);
@@ -1785,8 +1821,8 @@ export class YutaFighter extends Fighter {
       this.rika.spawnTimer = 0;
       this.rika.isDying = false;
       this.rika.disappearing = false;
-      this.rika.beamFollowAngle = cardinal;
-      this.rika.angle = cardinal;
+      this.rika.beamFollowAngle = beamAngle;
+      this.rika.angle = beamAngle;
       // Rika's HP already drained to 0 during charge — don't reset it
       
       // Ensure she is in state.illusions
@@ -1798,16 +1834,16 @@ export class YutaFighter extends Fighter {
       }
     }
 
-    // Fire massive beam projectile strictly along cardinal direction
+    // Fire massive beam projectile strictly along locked angle
     const offsetDist = (this.r || 22) + 14;
     const p = projectileSystem._getProjectile();
     p.owner = state.fighters.indexOf(this);
     p.ownerFighter = this;
-    p.x = this.x + Math.cos(cardinal) * offsetDist;
-    p.y = this.y + Math.sin(cardinal) * offsetDist;
-    p.vx = Math.cos(cardinal) * 20; // Used for logical bounding box extension, actual velocity can be faster or instant
-    p.vy = Math.sin(cardinal) * 20;
-    p.angle = cardinal;
+    p.x = this.x + Math.cos(beamAngle) * offsetDist;
+    p.y = this.y + Math.sin(beamAngle) * offsetDist;
+    p.vx = Math.cos(beamAngle) * 20; // Used for logical bounding box extension, actual velocity can be faster or instant
+    p.vy = Math.sin(beamAngle) * 20;
+    p.angle = beamAngle;
     p.r = CONFIG.yuta.pureLoveBeamWidth || 200; // Beam thickness (Increased size)
     p.length = CONFIG.yuta.pureLoveBeamLength || 2500; // Screen spanning
     p.damage = CONFIG.yuta?.pureLoveBeamDamagePerTick ?? 10; // per tick
@@ -1821,10 +1857,10 @@ export class YutaFighter extends Fighter {
     p.hitTargets = new Set();
     projectileSystem.projectiles.push(p);
 
-    // Massive screen shake and recoil along cardinal axis
+    // Massive screen shake and recoil along beam axis
     triggerGlobalScreenShake(15, 60);
-    this.vx = -Math.cos(cardinal) * 8; // Heavy recoil pushback
-    this.vy = -Math.sin(cardinal) * 8;
+    this.vx = -Math.cos(beamAngle) * 8; // Heavy recoil pushback
+    this.vy = -Math.sin(beamAngle) * 8;
   }
 
   activateDomain() {

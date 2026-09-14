@@ -442,10 +442,14 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const centerX = arenaX + arenaW / 2;
   const centerY = arenaY + arenaH * 0.46;
 
-  let winText = 'ROUND DRAW!';
-  let themeColor = '#ffffff';
+  const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
+  let winText = 'DOUBLE K.O.';
+  let themeColor = '#FF3366';
 
-  if (isTagMatch && state.winningTeam !== undefined) {
+  if (isDraw) {
+    winText = 'DOUBLE K.O.';
+    themeColor = '#FF3366';
+  } else if (isTagMatch && state.winningTeam !== undefined) {
     winText = state.winningTeam === 0 ? 'TEAM RED WINS!' : 'TEAM BLUE WINS!';
     themeColor = state.winningTeam === 0 ? '#ff4d4d' : '#4da3ff';
   } else if (effectiveWinner) {
@@ -510,13 +514,15 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
 
   const is1v1 = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || !mode);
-  const showSubText = is1v1;
+  const showSubText = is1v1 || isDraw;
 
   const roundNum = state.roundNum || 1;
 
-  let mainText = 'ROUND DRAW!';
-  let subText = isMatchEnd ? 'FINAL ROUND' : (roundNum === 2 ? 'ROUND 2' : (roundNum >= 3 ? 'FINAL ROUND' : 'ROUND 1'));
-  let themeColor = '#FFD700';
+  let mainText = 'DOUBLE K.O.';
+  let subText = isDraw
+    ? (is1v1 ? (isMatchEnd ? 'ROUND DRAW' : (roundNum === 2 ? 'ROUND 2' : (roundNum >= 3 ? 'FINAL ROUND' : 'ROUND 1'))) : 'ROUND DRAW')
+    : (isMatchEnd ? 'FINAL ROUND' : (roundNum === 2 ? 'ROUND 2' : (roundNum >= 3 ? 'FINAL ROUND' : 'ROUND 1')));
+  let themeColor = '#FF3366';
 
   if (!isDraw && effectiveWinner) {
     const rawName = (effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase();
@@ -565,7 +571,7 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   ctx.fillStyle = themeColor;
   ctx.fillText(mainText, 0, mainY);
 
-  // Subtitle / Round tag text - only in 1v1 multi-round mode
+  // Subtitle / Round tag text - only in 1v1 multi-round mode or draw
   if (showSubText) {
     const subFontSize = 13;
     ctx.font = `700 ${subFontSize}px ${retroFontFamily}`;
@@ -575,7 +581,7 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
     ctx.strokeText(subText, 0, subY);
 
     const isFinal = isMatchEnd || roundNum >= 3;
-    const subColor = isFinal ? '#FF4D4D' : (isDark ? '#E2E8F0' : '#FFFFFF');
+    const subColor = isDraw ? '#FFD700' : (isFinal ? '#FF4D4D' : (isDark ? '#E2E8F0' : '#FFFFFF'));
     ctx.fillStyle = subColor;
     ctx.fillText(subText, 0, subY);
   }
@@ -642,47 +648,6 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
         audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
       }
     }
-  }
-
-  // If Draw: render in-arena Double KO / Round Draw visual
-  if (isDraw) {
-    const centerX = arenaX + arenaW / 2;
-    const centerY = arenaY + arenaH * 0.48;
-    const popProgress = Math.min(1.0, timer / 16);
-    const popScale = 1.0 + Math.sin(popProgress * Math.PI * 0.5) * 0.12;
-
-    ctx.save();
-    ctx.translate(centerX, centerY);
-    ctx.scale(popScale, popScale);
-
-    ctx.fillStyle = 'rgba(8, 8, 14, 0.88)';
-    ctx.strokeStyle = '#FFD700';
-    ctx.lineWidth = 3;
-    const boxW = 280;
-    const boxH = 68;
-    ctx.beginPath();
-    ctx.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, 12);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '900 24px "Outfit", "Rajdhani", sans-serif';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 4;
-    ctx.strokeText('DOUBLE K.O.', 0, -10);
-    ctx.fillStyle = '#FF3366';
-    ctx.fillText('DOUBLE K.O.', 0, -10);
-
-    ctx.font = '800 15px "Outfit", "Rajdhani", sans-serif';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
-    ctx.strokeText('ROUND DRAW', 0, 16);
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText('ROUND DRAW', 0, 16);
-
-    ctx.restore();
-    return;
   }
 
   // 0b. Play Champion Victory Voiceline strictly when match is won AFTER announcer finishes (Frame 68)

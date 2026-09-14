@@ -50,7 +50,7 @@ export const escanorConfig = {
   rhittaReach: 100,
   chopLiftFrames: 80,              // Frames to lift axe up from guard to high overhead (~0.33s)
   chopLiftHoldFrames: 100,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
-  chopStrikeFrames: 20,             // Frames for the explosive downward chop stroke (~0.13s)
+  chopStrikeFrames: 15,             // Frames for the explosive downward chop stroke (~0.13s)
   chopRecoveryFrames: 50,          // Frames to recover back to resting pose (~0.20s)
   chopHitPauseFrames: 14,          // Cinematic hit-pause frame freeze upon axe impact (like Nanami's ratio impact)
   basicImpactShake: 7.0,           // Concussive arena shake on initial weapon contact

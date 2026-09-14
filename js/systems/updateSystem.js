@@ -91,6 +91,7 @@ export function updateGame() {
       }
 
       // Update fighters during countdown to aim guns/weapons at opponents
+      updateArenaBgm();
       updateFighters();
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);
@@ -100,7 +101,7 @@ export function updateGame() {
         state._isChampionLayoutActive = false;
         state.battleStartDelayTimer = 0;
         state.countdownTimer = state.countdownDuration || 180;
-        startArenaBgm(true);
+        startArenaBgm(false);
         // Instant Battle Start Readiness: Clear initial spawn cooldowns so fighters attack & engage immediately
         if (state.fighters) {
           state.fighters.forEach(f => {

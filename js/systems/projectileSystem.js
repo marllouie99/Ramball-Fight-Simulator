@@ -808,10 +808,13 @@ class ProjectileSystem {
           : baseSpeed));
     const speed = speedOverride ?? defaultSpeed;
 
-    const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+    // Lock launch angle strictly to committed cast angle (continuous 360 degree support, no snap auto-aim upon firing)
+    const angle = (fighter.getsugaCastAngle !== undefined && !Number.isNaN(fighter.getsugaCastAngle))
+      ? fighter.getsugaCastAngle
+      : ((fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0));
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
     const tipDist = GUN_TIP_DIST(fighter.r) + 12;
-    const dirX = Math.cos(angle);
-    const dirY = Math.sin(angle);
 
     const projRadius = isFinal
       ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 120)
@@ -829,15 +832,15 @@ class ProjectileSystem {
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDuration || 75) : (CONFIG.ichigo?.getsugaDuration || 90))));
 
     const proj = this._getProjectile();
-    proj.x = fighter.x + dirX * tipDist;
-    proj.y = fighter.y + dirY * tipDist;
-    proj.vx = dirX * speed;
-    proj.vy = dirY * speed;
+    proj.x = fighter.x + cosA * tipDist;
+    proj.y = fighter.y + sinA * tipDist;
+    proj.vx = cosA * speed;
+    proj.vy = sinA * speed;
     proj.angle = angle;
     proj.launchAngle = angle;
     proj.originalAngle = angle;
-    proj._resumeVx = dirX * speed;
-    proj._resumeVy = dirY * speed;
+    proj._resumeVx = cosA * speed;
+    proj._resumeVy = sinA * speed;
     proj.r = projRadius;
     proj.life = maxLife;
     proj.maxLife = maxLife;
@@ -853,12 +856,12 @@ class ProjectileSystem {
     proj.damage = Number.isFinite(Number(damage)) 
       ? Number(damage) 
       : (isFinal 
-        ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20) 
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 5) 
         : (form === 'bankai_hollow'
-          ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 24)
+          ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 6)
           : (form === 'hollow'
-            ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 16) 
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 16) : (CONFIG.ichigo?.getsugaTickDamage || 10)))));
+            ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 3) 
+            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4) : (CONFIG.ichigo?.getsugaTickDamage || 2)))));
     proj.isGetsuga = true;
     proj.getsugaForm = form;
     proj.visual = (isMask || isBankai) ? 'blackGetsuga' : 'getsuga';

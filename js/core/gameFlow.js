@@ -294,7 +294,7 @@ export function reinitFighters(isNewMatch = false) {
     if (!state.fighters[0].isTurret && !state.fighters[0].isMinion) {
       const f = state.fighters[0];
       const isMakima = (f.characterId === 'makima' || f.type === 'makima');
-      const hp = isMakima ? Math.round(fixedHp * 0.50) : fixedHp;
+      const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
       f.maxHp = hp;
       f.hp = hp;
     }
@@ -305,7 +305,7 @@ export function reinitFighters(isNewMatch = false) {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
         const baseHp = idx === 0 ? soloFixedHp : fixedHp;
         const isMakima = (f.characterId === 'makima' || f.type === 'makima');
-        const hp = isMakima ? Math.round(baseHp * 0.50) : baseHp;
+        const hp = isMakima ? Math.round(baseHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : baseHp;
         f.maxHp = hp;
         f.hp = hp;
       }
@@ -315,7 +315,7 @@ export function reinitFighters(isNewMatch = false) {
     state.fighters.forEach((f) => {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
         const isMakima = (f.characterId === 'makima' || f.type === 'makima');
-        const hp = isMakima ? Math.round(fixedHp * 0.50) : fixedHp;
+        const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
         f.maxHp = hp;
         f.hp = hp;
       }
@@ -701,7 +701,7 @@ export function spawnTagInFighter(teamIndex) {
 
   const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
   const isMakima = (newFighter.characterId === 'makima' || newFighter.type === 'makima');
-  const hp = isMakima ? Math.round(fixedHp * 0.50) : fixedHp;
+  const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
   newFighter.maxHp = hp;
   newFighter.hp = hp;
 
@@ -976,6 +976,12 @@ export function startCountdown() {
   }
   state.announcerTimeoutIds.forEach(id => clearTimeout(id));
   state.announcerTimeoutIds = [];
+
+  // 1v1 Game Mode: Start background music immediately during countdown
+  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
+  if (is1v1Mode) {
+    startArenaBgm(true);
+  }
 
   // Reset Cursed Energy combat aura for JJK fighters during countdown
   if (state.fighters) {

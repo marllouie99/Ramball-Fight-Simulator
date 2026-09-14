@@ -299,8 +299,8 @@ export function drawRhittaSlashArc(ctx, x, y, angle, r = 25, strikeP = 0, isTheO
   ctx.translate(x, y);
   ctx.rotate(angle);
 
-  const startA = -1.25; // Overhead start angle
-  const endA = 1.15; // Ground cleave end angle
+  const startA = -2.45; // Overhead start angle (~-140° lifted high back to top-left)
+  const endA = 1.18; // Ground cleave end angle
   const currentEndA = startA + (endA - startA) * strikeP;
   const currentStartA = Math.max(startA, currentEndA - Math.PI * 0.85 * (1.0 - strikeP * 0.35));
   const outerR = r + 115;

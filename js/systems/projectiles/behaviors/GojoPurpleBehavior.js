@@ -485,20 +485,17 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           projectile.vy = 0;
         }
       } else {
-        if (projectile.x - halfR < arena.x) {
-          projectile.x = arena.x + halfR;
+        const hitLeft = projectile.x - halfR <= arena.x;
+        const hitRight = projectile.x + halfR >= arena.x + arena.width;
+        const hitTop = projectile.y - halfR <= arena.y;
+        const hitBottom = projectile.y + halfR >= arena.y + arena.height;
+
+        if (hitLeft || hitRight || hitTop || hitBottom) {
+          if (hitLeft) projectile.x = arena.x + halfR;
+          if (hitRight) projectile.x = arena.x + arena.width - halfR;
+          if (hitTop) projectile.y = arena.y + halfR;
+          if (hitBottom) projectile.y = arena.y + arena.height - halfR;
           projectile.vx = 0;
-        }
-        if (projectile.x + halfR > arena.x + arena.width) {
-          projectile.x = arena.x + arena.width - halfR;
-          projectile.vx = 0;
-        }
-        if (projectile.y - halfR < arena.y) {
-          projectile.y = arena.y + halfR;
-          projectile.vy = 0;
-        }
-        if (projectile.y + halfR > arena.y + arena.height) {
-          projectile.y = arena.y + arena.height - halfR;
           projectile.vy = 0;
         }
       }

@@ -1260,7 +1260,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 29,
-    name: 'ICHIGOAT',
+    name: 'ICHIGO',
     category: 'Anime',
     color: ichigoConfig.color || '#FF5500', // Orange details
     startX: ichigoConfig.startX || 300,

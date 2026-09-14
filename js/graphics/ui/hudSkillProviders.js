@@ -996,32 +996,41 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const hpRatio = Math.max(0, Math.min(1, curHp / maxHp));
 
     // ── Passive: Hollow Mask Awakening ──
-    const hollowThreshold = CONFIG.ichigo?.hollowMaskThreshold ?? 0.70;
+    const hollowThreshold = CONFIG.ichigo?.hollowMaskThreshold ?? 0.60;
     const hollowMaxDuration = CONFIG.ichigo?.hollowMaskDuration ?? 800;
     let hollowPct = 0;
     let hollowReady = false;
     let hollowLabel = 'HOLLOW MASK';
 
-    const hasPoppedBankai = Boolean(f.bankaiActive || f.bankaiUsed);
+    const isBankaiActive = Boolean(f.bankaiActive);
 
     if (f.hollowMaskActive) {
       const remainingTime = f.hollowMaskTimer !== undefined ? f.hollowMaskTimer : hollowMaxDuration;
       hollowPct = Math.max(0, Math.min(100, (remainingTime / hollowMaxDuration) * 100));
       hollowReady = true;
-      hollowLabel = 'HOLLOW AWAKENED';
-    } else if (f.hollowMaskUsed) {
+      hollowLabel = (f.hollowMaskFormationTimer > 0 || f.hollowBurstTimer > 0) ? 'AWAKENING HOLLOW...' : 'HOLLOW AWAKENED';
+      f._maxHollowPct = 0;
+    } else if (!isBankaiActive) {
+      // Hollow Mask does not progress/tick until Ichigo is in Bankai form!
       hollowPct = 0;
       hollowReady = false;
       hollowLabel = 'HOLLOW MASK';
-    } else if (!hasPoppedBankai) {
-      // Hollow Mask does not progress/tick until Bankai is popped!
-      hollowPct = 0;
-      hollowReady = false;
-      hollowLabel = 'HOLLOW (BANKAI REQ)';
+      f._maxHollowPct = 0;
     } else {
-      const hollowProg = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / Math.max(0.01, (1.0 - hollowThreshold))));
-      hollowPct = hollowProg * 100;
-      hollowReady = hpRatio <= hollowThreshold;
+      // In Bankai form: progress fills smoothly (0% -> 100%) as Bankai duration elapses towards completion or through damage taken
+      const bankaiDuration = CONFIG.ichigo?.bankaiDuration || 1000;
+      const bankaiRemaining = f.bankaiTimer !== undefined ? f.bankaiTimer : bankaiDuration;
+      const timeProg = Math.max(0, Math.min(1.0, 1.0 - (bankaiRemaining / bankaiDuration)));
+
+      const baseline = f.hollowRechargeHpBaseline !== undefined ? f.hollowRechargeHpBaseline : f.hp;
+      const reqDamage = (f.maxHp || 240) * (CONFIG.ichigo?.hollowRechargeHpRatio ?? 0.20);
+      const damageTaken = Math.max(0, baseline - f.hp);
+      const dmgProg = Math.max(0, Math.min(1.0, damageTaken / reqDamage));
+
+      const rawPct = Math.max(0, Math.min(100, Math.max(timeProg, dmgProg) * 100));
+      f._maxHollowPct = Math.max(f._maxHollowPct || 0, rawPct);
+      hollowPct = f._maxHollowPct;
+      hollowReady = hollowPct >= 99 || damageTaken >= reqDamage || bankaiRemaining <= 0;
       hollowLabel = 'HOLLOW MASK';
     }
 
@@ -1034,23 +1043,31 @@ export function getSkillDataForFighter(f, getProjectiles) {
       ultReady = true;
     } else if (f.bankaiActive) {
       // Smoothly drain based on remaining active Bankai duration (100% -> 0%)
-      const bankaiDuration = CONFIG.ichigo?.bankaiDuration || 800;
+      const bankaiDuration = CONFIG.ichigo?.bankaiDuration || 1000;
       const remaining = f.bankaiTimer !== undefined ? f.bankaiTimer : bankaiDuration;
       ultPct = Math.max(0, Math.min(100, (remaining / bankaiDuration) * 100));
       ultReady = true;
       f._maxBankaiPct = 0;
     } else if (f.bankaiUsed) {
-      // Subsequent activation: fills monotonically based on HP lost after previous Bankai expired!
+      // Subsequent activation: fills smoothly based on cooldown recovery & damage taken!
+      const cdMax = f.bankaiCooldownMax || CONFIG.ichigo?.bankaiCooldown || CONFIG.ichigo?.ultimateCooldown || 600;
+      const cdTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : 0;
+      const cdPct = Math.max(0, Math.min(100, (1 - (cdTimer / cdMax)) * 100));
+
       const baseline = f.bankaiRechargeHpBaseline !== undefined ? f.bankaiRechargeHpBaseline : f.hp;
       const reqDamage = (f.maxHp || 240) * (CONFIG.ichigo?.bankaiRechargeHpRatio ?? 0.20);
       const damageTaken = Math.max(0, baseline - f.hp);
-      const rawPct = Math.max(0, Math.min(100, (damageTaken / reqDamage) * 100));
-      f._maxBankaiPct = Math.max(f._maxBankaiPct || 0, rawPct);
-      ultPct = f._maxBankaiPct;
-      ultReady = ultPct >= 99;
+      const dmgPct = Math.max(0, Math.min(100, (damageTaken / reqDamage) * 100));
+
+      const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.80;
+      ultPct = Math.max(cdPct, dmgPct);
+      if (cdTimer <= 0 && (hpRatio <= ultThreshold || damageTaken >= reqDamage)) {
+        ultPct = 100;
+      }
+      ultReady = (ultPct >= 99 && cdTimer <= 0) || (damageTaken >= reqDamage);
     } else {
-      // Pre-first activation: fills steadily as HP drops towards threshold (<= 90%)
-      const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.90;
+      // Pre-first activation: fills steadily as HP drops towards threshold (<= 80%)
+      const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.80;
       const rawPct = Math.max(0, Math.min(100, ((1.0 - hpRatio) / Math.max(0.01, (1.0 - ultThreshold))) * 100));
       f._maxBankaiPct = Math.max(f._maxBankaiPct || 0, rawPct);
       ultPct = f._maxBankaiPct;

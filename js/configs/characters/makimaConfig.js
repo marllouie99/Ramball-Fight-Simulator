@@ -6,7 +6,7 @@
 export const makimaConfig = {
   // Baseline Attributes
   hp: 360,
-  maxHpRatio: 0.50,         // Makima has 50% max HP based on the fixed HP in the game mode
+  maxHpRatio: 1.00,         // Makima has 100% max HP based on the fixed HP in the game mode
   speed: 5.5,
   moveSpeed: 5.5,
   r: 25,
@@ -19,7 +19,7 @@ export const makimaConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 1.0,
-  damage: 20,
+  damage: 40,
   cooldown: 100,
   projectileSpeedMultiplier: 1.0,
   ability: 'Control Devil & "Bang!"',
@@ -36,14 +36,14 @@ export const makimaConfig = {
 
   // Passive 1: Prime Minister Contract (Citizen Redirection)
   maxCitizenLives: 3,               // 5 citizen sacrifice stocks
-  citizenReviveHpPercent: 1.00,     // Revives with 50% Max HP
+  citizenReviveHpPercent: 1.00,     // Revives with 100% Max HP
   citizenReviveDurationFrames: 75,  // 1.25s death shatter & magnetic reassembly duration
   citizenDamageReduction: 0.20,     // 20% passive damage reduction while stocks remain
   citizenShockwaveRadius: 150,      // Repel shockwave radius on revive
   citizenShockwaveKnockback: 24,    // Repel force
 
   // Primary Attack: "Bang!" (Lightning-Fast Full-Screen Invisible Beam)
-  bangDamage: 20,                   // Direct hit damage
+  bangDamage: 40,                   // Direct hit damage
   bangWallBounceDamage: 22,         // Bonus damage when slammed into arena walls
   bangKnockbackForce: 46,           // Massive directional knockback
   bangRange: 1600,                  // Full-screen lightning-fast beam reach
@@ -66,8 +66,8 @@ export const makimaConfig = {
   chainsMinDistance: 175,           // Minimum leash distance to prevent enemies getting too close to Makima
   chainsDamage: 2,                 // Initial latch damage
   chainsBleedDps: 0,                // Internal bleeding DPS
-  chainsDuration: 500,              // 4.0s (240 frames) tether & stasis duration for enemy fighters
-  chainsDurationFrames: 500,        // Alias duration in frames for fighters
+  chainsDuration: 300,              // 4.0s (240 frames) tether & stasis duration for enemy fighters
+  chainsDurationFrames: 300,        // Alias duration in frames for fighters
   chainsStasisFrames: 240,          // Alias duration in frames for fighters
   chainsPullSpeed: 7.5,            // Speed targets are reeled toward Makima
   chainsBreakDistance: 550,         // Distance in pixels at which the chain snaps and breaks when enemy is knocked back

@@ -148,6 +148,9 @@ async function main() {
   const { updateGame } = await import('../js/systems/updateSystem.js');
   const { resolveFighterCollision } = await import('../js/systems/physics.js');
   const { reinitFighters } = await import('../js/core/gameFlow.js');
+  const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+  const { _getRezeHairImage, _drawRezeHair, drawRezeHumanPixelBody, drawRezeBombHybridBody, drawRezeSkin } = await import('../js/graphics/fighters/rezeSkin.js');
+  const { _getIchigoHairImage, _drawIchigoHair, drawIchigoSkin } = await import('../js/graphics/fighters/ichigoSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -275,14 +278,15 @@ async function main() {
         fighter.reset();
         fighter.bankaiActive = true;
         fighter.bankaiTimer = 800;
+        fighter.hollowRechargeHpBaseline = fighter.maxHp;
         fighter.x = 200;
         fighter.y = 200;
         fighter.vx = 0;
         fighter.vy = 0;
-        fighter.hp = fighter.maxHp * Math.min(0.25, ((CONFIG.ichigo?.hollowMaskHpThreshold ?? 0.70) - 0.05)); // Trigger <= threshold HP Hollow Awakening (after Bankai)
+        fighter.hp = fighter.maxHp * 0.70; // 30% damage taken in Bankai to trigger Hollow Awakening
         fighter.update(dummyOpponent, 0, state.arena);
         if (!fighter.hollowMaskActive || fighter.hollowMaskFormationTimer <= 0) {
-          throw new Error(`Ichigo did not activate Hollow Mask formation upon <= threshold HP in Bankai`);
+          throw new Error(`Ichigo did not activate Hollow Mask formation upon taking damage in Bankai`);
         }
         const posX = fighter.x;
         const posY = fighter.y;
@@ -383,6 +387,8 @@ async function main() {
         // 1. Test with Flash Step ON, Flurry Attack OFF (Flash Step to enemy with single strike, then backstep into Getsuga)
         CONFIG.ichigo.enableFlashStep = true;
         CONFIG.ichigo.enableFlurryAttack = false;
+        fighter.shunpoCooldown = 0;
+        fighter.getsugaCooldown = 0;
         fighter.performShunpoGetsugaCombo(dummyOpponent);
         if (!fighter.isShunpoDashing || !fighter.shunpoComboActive) {
           throw new Error(`Ichigo failed to initiate Flash Step when enableFlurryAttack is false!`);
@@ -467,6 +473,37 @@ async function main() {
       if (fType === 'reze') {
         mockCtx.resetStackDepth();
         fighter.reset();
+
+        // 0. Verify Reze Hair Asset & Procedural Drawn Body rendering
+        const rezeHairImg = _getRezeHairImage();
+        if (!rezeHairImg) {
+          throw new Error(`Reze hair image failed to instantiate via _getRezeHairImage()!`);
+        }
+        mockCtx.resetStackDepth();
+        _drawRezeHair(mockCtx, 25, false);
+        assertCanvasStackBalance(`_drawRezeHair(facingRight)`);
+
+        mockCtx.resetStackDepth();
+        _drawRezeHair(mockCtx, 25, true);
+        assertCanvasStackBalance(`_drawRezeHair(facingLeft)`);
+
+        mockCtx.resetStackDepth();
+        drawRezeHumanPixelBody(mockCtx, 25, Date.now());
+        assertCanvasStackBalance(`drawRezeHumanPixelBody`);
+
+        mockCtx.resetStackDepth();
+        drawRezeBombHybridBody(mockCtx, 25, Date.now());
+        assertCanvasStackBalance(`drawRezeBombHybridBody`);
+
+        mockCtx.resetStackDepth();
+        drawRezeSkin(mockCtx, fighter);
+        assertCanvasStackBalance(`drawRezeSkin(HumanForm)`);
+
+        mockCtx.resetStackDepth();
+        fighter.isHybridModeActive = true;
+        drawRezeSkin(mockCtx, fighter);
+        assertCanvasStackBalance(`drawRezeSkin(BombDevilForm)`);
+        fighter.isHybridModeActive = false;
 
         // 1. Verify HUD skill bars:
         // Human Form: only Ultimate is visible (1 skill bar)
@@ -730,6 +767,33 @@ async function main() {
         fighter.draw(mockCtx, null);
         assertCanvasStackBalance(`Sukuna Heian 4-arms form`);
       }
+      if (fType === 'saitama') {
+        mockCtx.resetStackDepth();
+        // Test: Saitama update during Nanami and Escanor hit pauses
+        const prevFighters = state.fighters;
+        const mockNanami = { characterId: 'nanami', type: 'nanami', ratioHitPauseTimer: 30, ratioHitPauseTarget: fighter, hp: 100 };
+        const mockEscanor = { characterId: 'escanor', type: 'escanor', chopHitPauseTimer: 0, chopHitPauseTarget: null, hp: 100 };
+        state.fighters = [fighter, mockNanami, mockEscanor];
+        fighter.skillPunishCooldown = 0;
+        fighter.hp = 100;
+
+        // Nanami hit pause active
+        fighter.update(dummyOpponent, 0, state.arena);
+
+        // Escanor hit pause active
+        mockNanami.ratioHitPauseTimer = 0;
+        mockEscanor.chopHitPauseTimer = 30;
+        mockEscanor.chopHitPauseTarget = fighter;
+        fighter.update(dummyOpponent, 0, state.arena);
+
+        // Clear hit pauses and verify normal update with Serious Counter scan
+        mockEscanor.chopHitPauseTimer = 0;
+        fighter.update(dummyOpponent, 0, state.arena);
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Saitama hit pause & Serious counter test`);
+
+        state.fighters = prevFighters;
+      }
       if (fType === 'ichigo') {
         mockCtx.resetStackDepth();
         // Test: When about to unleash normal Getsuga Tensho, skills that are UP must wait
@@ -783,13 +847,15 @@ async function main() {
 
         // Test 6: Bankai transformation afterimage suppression & distance snap prevention
         state.gameState = 'playing';
+        state.projectiles = [];
+        dummyOpponent.reset();
         dummyOpponent.hp = 100;
         fighter.reset();
         fighter.x = 200;
         fighter.y = 200;
         // Seed some lingering afterimages at distant coordinates
         fighter.afterImages.push({ x: 50, y: 50, r: 25, timer: 16, maxTimer: 16 });
-        fighter.hp = fighter.maxHp * Math.min(0.85, ((CONFIG.ichigo?.bankaiHpThreshold ?? 0.90) - 0.05)); // Satisfies Bankai threshold without triggering Hollow Mask
+        fighter.hp = fighter.maxHp * Math.min(0.75, ((CONFIG.ichigo?.ultimateThreshold ?? CONFIG.ichigo?.bankaiHpThreshold ?? 0.80) - 0.05)); // Satisfies Bankai threshold without triggering Hollow Mask
         fighter.hollowMaskUsed = true; // Prevent Hollow Mask awakening during Bankai afterimage tests
         dummyOpponent.x = 50;
         dummyOpponent.y = 50;
@@ -2480,91 +2546,105 @@ async function main() {
           throw new Error('Expected Limitless Infinity barrier to restore after Purple expired');
         }
 
-        // ── Gojo Hollow Purple Straight Horizontal Left/Right Constraint Tests ──
-        // Case A: Enemy straight to the Right (450, 255) -> Triggers Purple locked to Right (0)
+        // ── Gojo Hollow Purple Any-Angle Aiming & Locked Orientation Tests ──
+        // Case A: Enemy at diagonal angle (+X, +Y) -> Triggers Purple locked to diagonal angle (Math.PI / 4)
         fighter.reset();
         dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
         fighter.x = 250;
         fighter.y = 250;
-        dummyOpponent.x = 450;
-        dummyOpponent.y = 255;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 350; // 45-degree diagonal angle (Math.PI / 4)
         fighter.purpleCooldown = 0;
         fighter.isChannelingPurple = false;
         fighter.update(dummyOpponent, 0, state.arena); // Initiates Purple channeling
         if (!fighter.isChannelingPurple) {
-          throw new Error('Expected Gojo to trigger Hollow Purple when enemy is aligned straight to his Right');
+          throw new Error('Expected Gojo to trigger Hollow Purple when enemy is within trigger range at diagonal angle');
         }
-        if (fighter.purpleCastAngle !== 0 || fighter.gunAngle !== 0) {
-          throw new Error(`Expected Purple cast angle to be locked to 0 (Right), got ${fighter.purpleCastAngle}`);
+        const expectedPurpleAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        if (Math.abs(fighter.purpleCastAngle - expectedPurpleAngle) > 0.05 || Math.abs(fighter.gunAngle - expectedPurpleAngle) > 0.05) {
+          throw new Error(`Expected Purple cast angle to be locked to diagonal (${expectedPurpleAngle.toFixed(2)}), got ${fighter.purpleCastAngle}`);
         }
-        // Enemy moves vertically during channel - verify aim does NOT snap auto-aim
+        const lockedPurpleAngle = fighter.gunAngle;
+
+        // Enemy moves during channel - verify aim does NOT snap auto-aim or rotate
+        dummyOpponent.x = 100;
         dummyOpponent.y = 50;
         fighter.update(dummyOpponent, 0, state.arena);
-        if (fighter.gunAngle !== 0 || fighter.purpleCastAngle !== 0) {
-          throw new Error('Expected Gojo aim NOT to snap auto-aim during Purple channeling');
+        if (Math.abs(fighter.gunAngle - lockedPurpleAngle) > 0.001 || Math.abs(fighter.purpleCastAngle - lockedPurpleAngle) > 0.001) {
+          throw new Error('Expected Gojo aim NOT to snap auto-aim or rotate during Purple channeling');
         }
         fighter._firePurple(0);
-        const rightProj = fighter.activePurpleProjectile;
-        if (!rightProj || rightProj.vx <= 0 || Math.abs(rightProj.vy) > 0.001) {
-          throw new Error(`Expected Purple projectile to fly purely Right (vx > 0, vy = 0), got vx=${rightProj?.vx}, vy=${rightProj?.vy}`);
+        const diagProj = fighter.activePurpleProjectile;
+        if (!diagProj) {
+          throw new Error('Expected Hollow Purple projectile to spawn on fire');
         }
-        if (rightProj) {
-          rightProj.life = 0;
+        const expectedVx = Math.cos(lockedPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
+        const expectedVy = Math.sin(lockedPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
+        if (Math.abs(diagProj.vx - expectedVx) > 0.1 || Math.abs(diagProj.vy - expectedVy) > 0.1) {
+          throw new Error(`Expected Purple projectile to fly along diagonal vector (${expectedVx.toFixed(2)}, ${expectedVy.toFixed(2)}), got vx=${diagProj.vx}, vy=${diagProj.vy}`);
+        }
+        if (diagProj) {
+          diagProj.life = 0;
           fighter.activePurpleProjectile = null;
         }
 
-        // Case B: Enemy straight to the Left (100, 245) -> Triggers Purple locked to Left (Math.PI)
+        // Case B: Enemy vertically above Gojo (250, 100) -> Triggers Purple locked to Up angle (-Math.PI / 2)
         fighter.reset();
         dummyOpponent.reset();
-        fighter.x = 250;
-        fighter.y = 250;
-        dummyOpponent.x = 100;
-        dummyOpponent.y = 245;
-        fighter.purpleCooldown = 0;
-        fighter.isChannelingPurple = false;
-        fighter.update(dummyOpponent, 0, state.arena); // Initiates Purple channeling
-        if (!fighter.isChannelingPurple) {
-          throw new Error('Expected Gojo to trigger Hollow Purple when enemy is aligned straight to his Left');
-        }
-        if (fighter.purpleCastAngle !== Math.PI || fighter.gunAngle !== Math.PI) {
-          throw new Error(`Expected Purple cast angle to be locked to Math.PI (Left), got ${fighter.purpleCastAngle}`);
-        }
-        fighter._firePurple(0);
-        const leftProj = fighter.activePurpleProjectile;
-        if (!leftProj || leftProj.vx >= 0 || Math.abs(leftProj.vy) > 0.001) {
-          throw new Error(`Expected Purple projectile to fly purely Left (vx < 0, vy = 0), got vx=${leftProj?.vx}, vy=${leftProj?.vy}`);
-        }
-        if (leftProj) {
-          leftProj.life = 0;
-          fighter.activePurpleProjectile = null;
-        }
-
-        // Case C: Enemy diagonal / off-axis (400, 100) -> Must NOT trigger Purple
-        fighter.reset();
-        dummyOpponent.reset();
-        fighter.x = 250;
-        fighter.y = 250;
-        dummyOpponent.x = 400;
-        dummyOpponent.y = 100;
-        fighter.purpleCooldown = 0;
-        fighter.isChannelingPurple = false;
-        fighter.update(dummyOpponent, 0, state.arena);
-        if (fighter.isChannelingPurple) {
-          throw new Error('Gojo should NOT initiate Hollow Purple when enemy is diagonal/off-axis (not aligned straight horizontally)');
-        }
-
-        // Case D: Enemy vertically above Gojo (250, 50) -> Must NOT trigger Purple
-        fighter.reset();
-        dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
         fighter.x = 250;
         fighter.y = 250;
         dummyOpponent.x = 250;
-        dummyOpponent.y = 50;
+        dummyOpponent.y = 100;
+        fighter.purpleCooldown = 0;
+        fighter.isChannelingPurple = false;
+        fighter.update(dummyOpponent, 0, state.arena); // Initiates Purple channeling
+        if (!fighter.isChannelingPurple) {
+          throw new Error('Expected Gojo to trigger Hollow Purple when enemy is vertically above him');
+        }
+        const expectedUpAngle = -Math.PI / 2;
+        if (Math.abs(fighter.purpleCastAngle - expectedUpAngle) > 0.05 || Math.abs(fighter.gunAngle - expectedUpAngle) > 0.05) {
+          throw new Error(`Expected Purple cast angle to be locked to -Math.PI/2 (Up), got ${fighter.purpleCastAngle}`);
+        }
+        fighter._firePurple(0);
+        const upProj = fighter.activePurpleProjectile;
+        if (!upProj || upProj.vy >= 0 || Math.abs(upProj.vx) > 0.001) {
+          throw new Error(`Expected Purple projectile to fly purely Up (vy < 0, vx = 0), got vx=${upProj?.vx}, vy=${upProj?.vy}`);
+        }
+        if (upProj) {
+          upProj.life = 0;
+          fighter.activePurpleProjectile = null;
+        }
+
+        // Case C: Enemy out of trigger range (1500, 1500) -> Must NOT trigger Purple
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 1500;
+        dummyOpponent.y = 1500;
         fighter.purpleCooldown = 0;
         fighter.isChannelingPurple = false;
         fighter.update(dummyOpponent, 0, state.arena);
         if (fighter.isChannelingPurple) {
-          throw new Error('Gojo should NOT initiate Hollow Purple when enemy is strictly vertical');
+          throw new Error('Gojo should NOT initiate Hollow Purple when enemy is out of trigger range');
         }
 
         // Case E: Purple projectile persistence and flight when NO enemy is hit across non-standard arena dimensions
@@ -2614,8 +2694,8 @@ async function main() {
         state.fighters = [fighter, dummyOpponent];
         fighter.x = 250;
         fighter.y = 250;
-        dummyOpponent.x = 255;
-        dummyOpponent.y = 100;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 150; // Diagonal position (dx=100, dy=-100) -> -45 degrees (-Math.PI / 4)
         fighter.domainCooldown = 1000;
         fighter.domainUseCount = 2;
         fighter.purpleCooldown = 1000;
@@ -2623,23 +2703,27 @@ async function main() {
         fighter.redEffectTimer = 0;
         fighter.update(dummyOpponent, 0, state.arena);
         if (fighter.redEffectTimer <= 0) {
-          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight Above him');
+          throw new Error('Expected Gojo to trigger Reversal Red when enemy is within range');
         }
-        if (Math.abs(fighter.redTargetAngle - (-Math.PI / 2)) > 0.001 || Math.abs(fighter.gunAngle - (-Math.PI / 2)) > 0.001) {
-          throw new Error(`Expected Red target and gun angle to be strictly UP (-Math.PI / 2), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
+        const expectedAngle1 = Math.atan2(150 - 250, 350 - 250);
+        if (Math.abs(fighter.redTargetAngle - expectedAngle1) > 0.05 || Math.abs(fighter.gunAngle - expectedAngle1) > 0.05) {
+          throw new Error(`Expected Red target and gun angle to be diagonal (${expectedAngle1.toFixed(2)}), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
         }
-        // Enemy moves vertically during buildup - verify aim does NOT snap auto-aim
+        const lockedRedAngle = fighter.gunAngle;
+
+        // Enemy moves during buildup - verify aim does NOT rotate or snap auto-aim
+        dummyOpponent.x = 100;
         dummyOpponent.y = 80;
         fighter.update(dummyOpponent, 0, state.arena);
-        if (Math.abs(fighter.redTargetAngle - (-Math.PI / 2)) > 0.001 || Math.abs(fighter.gunAngle - (-Math.PI / 2)) > 0.001) {
-          throw new Error('Expected Gojo aim NOT to snap auto-aim during Red buildup');
+        if (Math.abs(fighter.redTargetAngle - lockedRedAngle) > 0.001 || Math.abs(fighter.gunAngle - lockedRedAngle) > 0.001) {
+          throw new Error('Expected Gojo aim NOT to rotate or snap auto-aim during Red buildup');
         }
         fighter._detonateRed();
-        if (dummyOpponent.vy >= 0 || Math.abs(dummyOpponent.vx) > 0.001) {
-          throw new Error(`Expected target to be knocked UPWARD (vy < 0, vx = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
+        if (Math.abs(fighter.gunAngle - lockedRedAngle) > 0.001) {
+          throw new Error('Expected Gojo aim NOT to snap auto-aim on Red detonation');
         }
 
-        // Test Red Case 2: Enemy straight Below Gojo (245, 400) -> Triggers Red with locked Down angle (Math.PI / 2)
+        // Test Red Case 2: Enemy out of trigger range (600, 600) -> Must NOT trigger Red
         state.gameState = 'playing';
         fighter.reset();
         dummyOpponent.reset();
@@ -2654,110 +2738,8 @@ async function main() {
         state.fighters = [fighter, dummyOpponent];
         fighter.x = 250;
         fighter.y = 250;
-        dummyOpponent.x = 245;
-        dummyOpponent.y = 400;
-        fighter.domainCooldown = 1000;
-        fighter.domainUseCount = 2;
-        fighter.purpleCooldown = 1000;
-        fighter.redCooldown = 0;
-        fighter.redEffectTimer = 0;
-        fighter.update(dummyOpponent, 0, state.arena);
-        if (fighter.redEffectTimer <= 0) {
-          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight Below him');
-        }
-        if (Math.abs(fighter.redTargetAngle - (Math.PI / 2)) > 0.001 || Math.abs(fighter.gunAngle - (Math.PI / 2)) > 0.001) {
-          throw new Error(`Expected Red target and gun angle to be strictly DOWN (Math.PI / 2), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
-        }
-        fighter._detonateRed();
-        if (dummyOpponent.vy <= 0 || Math.abs(dummyOpponent.vx) > 0.001) {
-          throw new Error(`Expected target to be knocked DOWNWARD (vy > 0, vx = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
-        }
-
-        // Test Red Case 3: Enemy straight Right of Gojo (400, 248) -> Triggers Red with locked Right angle (0)
-        state.gameState = 'playing';
-        fighter.reset();
-        dummyOpponent.reset();
-        fighter.hp = fighter.maxHp;
-        fighter.isDead = false;
-        fighter.dead = false;
-        fighter.team = 0;
-        dummyOpponent.hp = 100;
-        dummyOpponent.isDead = false;
-        dummyOpponent.dead = false;
-        dummyOpponent.team = 1;
-        state.fighters = [fighter, dummyOpponent];
-        fighter.x = 250;
-        fighter.y = 250;
-        dummyOpponent.x = 400;
-        dummyOpponent.y = 248;
-        fighter.domainCooldown = 1000;
-        fighter.domainUseCount = 2;
-        fighter.purpleCooldown = 1000;
-        fighter.redCooldown = 0;
-        fighter.redEffectTimer = 0;
-        fighter.update(dummyOpponent, 0, state.arena);
-        if (fighter.redEffectTimer <= 0) {
-          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight to the Right');
-        }
-        if (Math.abs(fighter.redTargetAngle) > 0.001 || Math.abs(fighter.gunAngle) > 0.001) {
-          throw new Error(`Expected Red target and gun angle to be strictly RIGHT (0), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
-        }
-        fighter._detonateRed();
-        if (dummyOpponent.vx <= 0 || Math.abs(dummyOpponent.vy) > 0.001) {
-          throw new Error(`Expected target to be knocked RIGHTWARD (vx > 0, vy = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
-        }
-
-        // Test Red Case 4: Enemy straight Left of Gojo (100, 252) -> Triggers Red with locked Left angle (Math.PI)
-        state.gameState = 'playing';
-        fighter.reset();
-        dummyOpponent.reset();
-        fighter.hp = fighter.maxHp;
-        fighter.isDead = false;
-        fighter.dead = false;
-        fighter.team = 0;
-        dummyOpponent.hp = 100;
-        dummyOpponent.isDead = false;
-        dummyOpponent.dead = false;
-        dummyOpponent.team = 1;
-        state.fighters = [fighter, dummyOpponent];
-        fighter.x = 250;
-        fighter.y = 250;
-        dummyOpponent.x = 100;
-        dummyOpponent.y = 252;
-        fighter.domainCooldown = 1000;
-        fighter.domainUseCount = 2;
-        fighter.purpleCooldown = 1000;
-        fighter.redCooldown = 0;
-        fighter.redEffectTimer = 0;
-        fighter.update(dummyOpponent, 0, state.arena);
-        if (fighter.redEffectTimer <= 0) {
-          throw new Error('Expected Gojo to trigger Reversal Red when enemy is aligned straight to the Left');
-        }
-        if (Math.abs(Math.abs(fighter.redTargetAngle) - Math.PI) > 0.001 || Math.abs(Math.abs(fighter.gunAngle) - Math.PI) > 0.001) {
-          throw new Error(`Expected Red target and gun angle to be strictly LEFT (Math.PI), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
-        }
-        fighter._detonateRed();
-        if (dummyOpponent.vx >= 0 || Math.abs(dummyOpponent.vy) > 0.001) {
-          throw new Error(`Expected target to be knocked LEFTWARD (vx < 0, vy = 0), got vx=${dummyOpponent.vx}, vy=${dummyOpponent.vy}`);
-        }
-
-        // Test Red Case 5: Enemy diagonal / off-axis (400, 100) -> Must NOT trigger Red
-        state.gameState = 'playing';
-        fighter.reset();
-        dummyOpponent.reset();
-        fighter.hp = fighter.maxHp;
-        fighter.isDead = false;
-        fighter.dead = false;
-        fighter.team = 0;
-        dummyOpponent.hp = 100;
-        dummyOpponent.isDead = false;
-        dummyOpponent.dead = false;
-        dummyOpponent.team = 1;
-        state.fighters = [fighter, dummyOpponent];
-        fighter.x = 250;
-        fighter.y = 250;
-        dummyOpponent.x = 400;
-        dummyOpponent.y = 100;
+        dummyOpponent.x = 650;
+        dummyOpponent.y = 650;
         fighter.domainCooldown = 1000;
         fighter.domainUseCount = 2;
         fighter.purpleCooldown = 1000;
@@ -2765,7 +2747,7 @@ async function main() {
         fighter.redEffectTimer = 0;
         fighter.update(dummyOpponent, 0, state.arena);
         if (fighter.redEffectTimer > 0) {
-          throw new Error('Gojo should NOT initiate Reversal Red when enemy is diagonal/off-axis (not aligned straight cardinally)');
+          throw new Error('Gojo should NOT initiate Reversal Red when enemy is out of trigger range');
         }
 
         // Test Red Case 5: Gojo Red Reversal Cancellation & Audio Termination Test
@@ -2798,6 +2780,52 @@ async function main() {
         if (fighter.redCooldown < 270) {
           throw new Error(`Expected penalty cooldown on interrupted Red, got ${fighter.redCooldown}`);
         }
+
+        // Test Gojo Reversal Red any-angle aim and locked aim without auto-aim rotation
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.hp = fighter.maxHp;
+        fighter.isDead = false;
+        fighter.dead = false;
+        fighter.team = 0;
+        dummyOpponent.hp = 100;
+        dummyOpponent.isDead = false;
+        dummyOpponent.dead = false;
+        dummyOpponent.team = 1;
+        state.fighters = [fighter, dummyOpponent];
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 350;
+        dummyOpponent.y = 350; // 45-degree diagonal angle (Math.PI / 4)
+        fighter.redCooldown = 0;
+        fighter.redEffectTimer = 0;
+        fighter._activateRed();
+
+        const expectedRedAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        if (Math.abs(fighter.gunAngle - expectedRedAngle) > 0.05) {
+          throw new Error(`Expected Gojo Red to aim at diagonal angle ${expectedRedAngle.toFixed(2)}, got ${fighter.gunAngle.toFixed(2)}`);
+        }
+        const lockedRedAngle2 = fighter.gunAngle;
+
+        // Move opponent during Red buildup and verify Gojo does NOT rotate or auto-aim
+        dummyOpponent.x = 100;
+        dummyOpponent.y = 400;
+        fighter.aim(dummyOpponent);
+        if (Math.abs(fighter.gunAngle - lockedRedAngle2) > 0.001) {
+          throw new Error(`Gojo rotated towards target during Red buildup! Expected ${lockedRedAngle2}, got ${fighter.gunAngle}`);
+        }
+
+        // Fast-forward to detonation
+        while (fighter.redEffectTimer > 0 && !fighter.redDetonated) {
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+        if (!fighter.redDetonated) {
+          throw new Error('Expected Gojo to detonate Red');
+        }
+        if (Math.abs(fighter.gunAngle - lockedRedAngle2) > 0.001) {
+          throw new Error(`Gojo snapped auto-aim on Red detonation! Expected ${lockedRedAngle2}, got ${fighter.gunAngle}`);
+        }
+
 
         // ── Gojo Basic Attack (Lapse: Blue) Cardinal 4-Way Direction Tests ──
         // Helper to clear projectiles
@@ -3381,13 +3409,49 @@ async function main() {
       throw new Error('Expected Saitama flurry completion to cleanly clear caughtInSaitamaFlurry and hold pause across all targets');
     }
 
-    // Test Saitama Serious Skill Counter completion and dodge recovery
+    // Test Saitama Serious Skill Counter charging state: Dodge enabled, Teleport/Sidestep disabled
     testSaitama.skillPunishCooldown = 0;
     testSaitama.dodgeCooldown = 0;
-    dummyTarget2.hp = 1000;
+    dummyTarget2.hp = 10000;
+    dummyTarget2.x = 300;
+    dummyTarget2.y = 200;
     testSaitama.executeSkillCounterPunish(dummyTarget2);
     if (!testSaitama.isCountering || testSaitama._counterPunchTimer <= 0) {
-      throw new Error('Expected Serious Skill Counter to be active after executeSkillCounterPunish');
+      throw new Error('Expected Serious Skill Counter to be active and charging');
+    }
+    const chargingX = testSaitama.x;
+    const chargingY = testSaitama.y;
+    const chargingAngle = testSaitama.gunAngle;
+    const chargingHp = testSaitama.hp;
+    const initialChargeTimer = testSaitama._counterPunchTimer;
+
+    // Force dodge to succeed by setting dodgeCooldown to 0 and executing takeDamage
+    testSaitama.dodgeCooldown = 0;
+    // Execute incoming attack while charging
+    const originalRandom = Math.random;
+    Math.random = () => 0.1; // Force 100% dodge success
+    try {
+      const takeDamageResult = testSaitama.takeDamage(50, dummyTarget2, { isDirect: true, isMelee: true });
+      if (takeDamageResult !== false) {
+        throw new Error('Expected takeDamage to return false on successful dodge during Serious Skill Counter charge');
+      }
+      if (testSaitama.hp !== chargingHp) {
+        throw new Error('Expected Saitama HP to remain full after dodging during Serious Skill Counter charge');
+      }
+      if (testSaitama.x !== chargingX || testSaitama.y !== chargingY) {
+        throw new Error(`Expected Saitama position to NOT change on dodge during counter charge (was ${testSaitama.x},${testSaitama.y}, expected ${chargingX},${chargingY})`);
+      }
+      if (testSaitama.vx !== 0 || testSaitama.vy !== 0) {
+        throw new Error('Expected Saitama velocity to remain 0 on dodge during counter charge');
+      }
+      if (testSaitama.gunAngle !== chargingAngle) {
+        throw new Error('Expected Saitama gunAngle to remain locked on counter target on dodge during counter charge');
+      }
+      if (testSaitama._counterPunchTimer <= 0) {
+        throw new Error('Expected counter punch timer to remain active and charging after dodging');
+      }
+    } finally {
+      Math.random = originalRandom;
     }
     // Fast-forward through counter windup and post-counter recovery
     for (let frame = 0; frame < 300; frame++) {
@@ -3471,6 +3535,40 @@ async function main() {
     }
     state.projectiles = [];
 
+    // Test Saitama Serious Skill Counter any-angle aim and locked aim angle without auto-aim rotation
+    testSaitama.skillPunishCooldown = 0;
+    testSaitama.dodgeCooldown = 0;
+    dummyTarget2.hp = 1000;
+    dummyTarget2.x = 300;
+    dummyTarget2.y = 250;
+    dummyTarget2.gunAngle = 0.52; // Target facing ~30 degrees diagonally
+    dummyTarget2.angle = 0.52;
+    state.fighters = [testSaitama, dummyTarget2];
+    testSaitama.executeSkillCounterPunish(dummyTarget2);
+    
+    // Verify aim is along the true diagonal vector towards target, not cardinal
+    const expectedAngle = Math.atan2(dummyTarget2.y - testSaitama.y, dummyTarget2.x - testSaitama.x);
+    if (Math.abs(testSaitama.gunAngle - expectedAngle) > 0.05) {
+      throw new Error(`Expected Saitama counter to aim at any diagonal angle ${expectedAngle.toFixed(2)}, got ${testSaitama.gunAngle.toFixed(2)}`);
+    }
+    const lockedAimAngle = testSaitama.gunAngle;
+
+    // Move target elsewhere during windup to verify Saitama does NOT rotate or snap auto-aim
+    dummyTarget2.x = 100;
+    dummyTarget2.y = 500;
+    testSaitama.aim(dummyTarget2);
+    if (Math.abs(testSaitama.gunAngle - lockedAimAngle) > 0.001) {
+      throw new Error(`Saitama rotated towards target during counter windup! Expected ${lockedAimAngle}, got ${testSaitama.gunAngle}`);
+    }
+
+    // Fast-forward to punch land
+    while (testSaitama._counterPunchTimer > 0) {
+      testSaitama.update(dummyTarget2, 0, state.arena);
+    }
+    if (Math.abs(testSaitama.gunAngle - lockedAimAngle) > 0.001) {
+      throw new Error(`Saitama snapped auto-aim to target on punch release! Expected ${lockedAimAngle}, got ${testSaitama.gunAngle}`);
+    }
+
     // Test Serious Counter cancellation when Gojo deploys domain (Unlimited Void) in time
     state.gameState = 'playing';
     testGojo.hp = 1000;
@@ -3498,6 +3596,7 @@ async function main() {
     if (testSaitama.isCountering || testSaitama._counterPunchTimer > 0 || testSaitama._counterPunchTarget !== null) {
       throw new Error('Expected Saitama Serious Skill Counter to get cancelled when Gojo deploys domain in time');
     }
+
     if (testSaitama.timeStopTimer <= 0 && testSaitama.hitStunTimer <= 0) {
       throw new Error('Expected Saitama to be frozen by Gojo domain after counter cancellation');
     }
@@ -4082,6 +4181,11 @@ async function main() {
       target.knockbackVx = 0;
       target.knockbackVy = 0;
       target.hp = 1000;
+      target.invincibilityTimer = 0;
+      target.infinityCooldown = 1000;
+      target.infinityActive = false;
+      target.isMeleeMode = true;
+      target.infinityBlockTimer = 0;
       sukuna.x = 100;
       sukuna.y = 200;
       sukuna.gunAngle = 0; // pointing right towards target at (200, 200)
@@ -4258,22 +4362,7 @@ async function main() {
         throw new Error(`Expected Dismantle projectile angle to be Math.PI/2 rad, got ${proj.angle}`);
       }
 
-      // Test 3: Fuga alignment trigger - should trigger when enemy is cardinally aligned
-      s.reset();
-      s.x = 270;
-      s.y = 480;
-      s.divineFlameCooldown = 0;
-      const alignedEnemy = { x: 270, y: 200, r: 25, hp: 100, maxHp: 100, isDead: false };
-      state.fighters = [s, alignedEnemy];
-      s.update(alignedEnemy, 0, state.arena);
-      if (!s.isChannelingDivineFlame) {
-        throw new Error(`Expected Sukuna to trigger Fuga when enemy is cardinally aligned straight Up!`);
-      }
-      if (Math.abs(s.divineFlameCastAngle - (-Math.PI / 2)) > 0.001) {
-        throw new Error(`Expected Sukuna Fuga cast angle to be locked to -Math.PI/2, got ${s.divineFlameCastAngle}`);
-      }
-
-      // Test 4: Fuga alignment trigger - should NOT trigger when enemy is purely diagonal
+      // Test 3: Fuga any-angle aiming and initiation
       s.reset();
       s.x = 270;
       s.y = 480;
@@ -4281,15 +4370,24 @@ async function main() {
       const diagonalEnemy = { x: 450, y: 650, r: 25, hp: 100, maxHp: 100, isDead: false };
       state.fighters = [s, diagonalEnemy];
       s.update(diagonalEnemy, 0, state.arena);
-      if (s.isChannelingDivineFlame) {
-        throw new Error(`Expected Sukuna to NOT trigger Fuga when enemy is at a diagonal (outside corridor tolerance)!`);
+      if (!s.isChannelingDivineFlame) {
+        throw new Error(`Expected Sukuna to trigger Fuga when enemy is at diagonal within trigger range!`);
+      }
+      const expectedFugaAngle = Math.atan2(650 - 480, 450 - 270);
+      if (Math.abs(s.divineFlameCastAngle - expectedFugaAngle) > 0.05 || Math.abs(s.gunAngle - expectedFugaAngle) > 0.05) {
+        throw new Error(`Expected Sukuna Fuga cast angle to be locked to diagonal (${expectedFugaAngle.toFixed(2)}), got ${s.divineFlameCastAngle}`);
+      }
+      const lockedFugaAngle = s.gunAngle;
+
+      // Test 4: Enemy moves during Fuga charge - verify aim does NOT rotate or snap auto-aim
+      diagonalEnemy.x = 100;
+      diagonalEnemy.y = 200;
+      s.update(diagonalEnemy, 0, state.arena);
+      if (Math.abs(s.gunAngle - lockedFugaAngle) > 0.001 || Math.abs(s.divineFlameCastAngle - lockedFugaAngle) > 0.001) {
+        throw new Error(`Expected Sukuna aim NOT to rotate or snap auto-aim during Fuga channeling!`);
       }
 
-      // Test 5: Fuga firing launches arrow along locked cardinal angle
-      s.reset();
-      s.x = 270;
-      s.y = 480;
-      s.divineFlameCastAngle = Math.PI; // Locked to Left
+      // Test 5: Fuga firing launches arrow along locked angle
       projectileSystem.projectiles = [];
       s._fireDivineFlame(0);
       const fugaProj = projectileSystem.projectiles.find(p => p.isSukunaFurnace || p.behaviorType === 'sukuna_furnace');
@@ -4297,8 +4395,20 @@ async function main() {
         throw new Error(`Expected _fireDivineFlame to spawn sukuna_furnace projectile!`);
       }
       const fugaVelocityAngle = Math.atan2(fugaProj.vy, fugaProj.vx);
-      if (Math.abs(Math.abs(fugaVelocityAngle) - Math.PI) > 0.001) {
-        throw new Error(`Expected Fuga arrow velocity angle to be Math.PI rad (Left), got ${fugaVelocityAngle}`);
+      if (Math.abs(fugaVelocityAngle - lockedFugaAngle) > 0.05) {
+        throw new Error(`Expected Fuga arrow velocity angle to match locked angle (${lockedFugaAngle.toFixed(2)}), got ${fugaVelocityAngle}`);
+      }
+
+      // Test 6: Enemy out of trigger range (1500, 1500) -> should NOT trigger Fuga
+      s.reset();
+      s.x = 270;
+      s.y = 480;
+      s.divineFlameCooldown = 0;
+      const farEnemy = { x: 1500, y: 1500, r: 25, hp: 100, maxHp: 100, isDead: false };
+      state.fighters = [s, farEnemy];
+      s.update(farEnemy, 0, state.arena);
+      if (s.isChannelingDivineFlame) {
+        throw new Error(`Expected Sukuna to NOT trigger Fuga when enemy is out of trigger range!`);
       }
     }
   } catch (err) {
@@ -4376,6 +4486,12 @@ async function main() {
       m.activeBangBeams = [];
       state.fighters = [m, enemyUp];
       m.shoot(0);
+      if (m.isPreparingBang) {
+        const windup = m.bangWindupMax || 8;
+        for (let w = 0; w < windup; w++) {
+          m.update(enemyUp, 0, null);
+        }
+      }
       if (m.activeBangBeams.length === 0) {
         throw new Error(`Expected shoot() to fire Bang!`);
       }
@@ -4389,8 +4505,8 @@ async function main() {
     errors++;
   }
 
-  // 6.4. Yuta Pure Love Beam Cardinal Angles & Non-Snap Aiming Test
-  console.log('💍 [Yuta Pure Love Beam Cardinal Angles Test] Verifying Pure Love Beam strictly fires along 4 cardinal directions without snap auto-aim...');
+  // 6.4. Yuta Pure Love Beam 360° Any-Angle & Non-Snap Aiming Test
+  console.log('💍 [Yuta Pure Love Beam Test] Verifying Pure Love Beam supports continuous 360° aiming without snap auto-aim...');
   try {
     const YutaClass = FIGHTER_CLASS_MAP['yuta'];
     const yutaDef = FIGHTER_DEFS.find(d => d.id === 'yuta');
@@ -4401,7 +4517,7 @@ async function main() {
       state.fighters = [y];
       state.illusions = [];
 
-      // Test 1: Cardinal calculation in 4 directions
+      // Test 1: Cardinal helper calculation in 4 directions
       const enemyRight = { x: 450, y: 480, r: 25, hp: 100, isDead: false };
       const enemyLeft  = { x: 90,  y: 480, r: 25, hp: 100, isDead: false };
       const enemyDown  = { x: 270, y: 700, r: 25, hp: 100, isDead: false };
@@ -4412,29 +4528,284 @@ async function main() {
       if (Math.abs(y._getCardinalAngle(enemyDown) - (Math.PI / 2)) > 0.001) throw new Error(`Expected Yuta cardinal Down to be Math.PI/2 rad`);
       if (Math.abs(y._getCardinalAngle(enemyUp) - (-Math.PI / 2)) > 0.001) throw new Error(`Expected Yuta cardinal Up to be -Math.PI/2 rad`);
 
-      // Test 2: Channeling locks cardinal angle and does not rotate when enemy moves
-      y.pureLoveBeamLockedAngle = 0;
-      y.gunAngle = 0;
-      y.angle = 0;
-      y.isChannelingPureLoveBeam = true;
-      y.pureLoveBeamChargeTimer = 10;
-      y.aim(enemyUp); // Attempt to aim up during channel
-      if (Math.abs(y.gunAngle - 0) > 0.001) {
-        throw new Error(`Expected Yuta gunAngle to remain locked at 0 during channel, got ${y.gunAngle}`);
+      // Test 2: Any-angle aiming (Diagonal)
+      const diagonalEnemy = { x: 450, y: 660, r: 25, hp: 100, isDead: false };
+      const expectedDiagAngle = Math.atan2(660 - 480, 450 - 270);
+      y.reset();
+      y.x = 270;
+      y.y = 480;
+      y.hp = y.maxHp * 0.5; // Below threshold
+      y.rika = { active: true, hp: 500, maxHp: 500, isDying: false, disappearing: false, x: 270, y: 480, r: 25 };
+      state.fighters = [y, diagonalEnemy];
+      y.update(diagonalEnemy, 0, state.arena);
+
+      if (Math.abs(y.pureLoveBeamLockedAngle - expectedDiagAngle) > 0.05) {
+        throw new Error(`Expected Yuta Pure Love Beam locked angle to be diagonal ${expectedDiagAngle.toFixed(2)}, got ${y.pureLoveBeamLockedAngle}`);
       }
 
-      // Test 3: Firing launches beam strictly along cardinal angle with no auto-aim snap
+      // Test 3: Channeling locks angle and does not rotate when enemy moves
+      const lockedAngle = y.pureLoveBeamLockedAngle;
+      y.aim(enemyUp); // Attempt to aim up during retreat / channel
+      if (Math.abs(y.gunAngle - lockedAngle) > 0.001 || Math.abs(y.angle - lockedAngle) > 0.001) {
+        throw new Error(`Expected Yuta gunAngle to remain locked at ${lockedAngle} during retreat/channel, got ${y.gunAngle}`);
+      }
+
+      // Test 4: Firing launches beam strictly along locked diagonal angle with no auto-aim snap
       projectileSystem.projectiles = [];
-      y.pureLoveBeamChargeTimer = 150;
       y.activatePureLoveBeam();
       const beam = projectileSystem.projectiles.find(p => p && p.isPureLoveBeam);
       if (!beam) throw new Error(`Expected Pure Love Beam projectile to spawn!`);
-      if (Math.abs(beam.angle - 0) > 0.001) throw new Error(`Expected Pure Love Beam angle to be 0 rad (Right), got ${beam.angle}`);
-      if (beam.vx <= 0 || Math.abs(beam.vy) > 0.001) throw new Error(`Expected Pure Love Beam velocity along +X axis`);
-      if (y.vx >= 0 || Math.abs(y.vy) > 0.001) throw new Error(`Expected Yuta recoil along -X axis`);
+      if (Math.abs(beam.angle - lockedAngle) > 0.001) throw new Error(`Expected Pure Love Beam angle to match locked angle (${lockedAngle}), got ${beam.angle}`);
+      
+      const expectedVx = Math.cos(lockedAngle);
+      const expectedVy = Math.sin(lockedAngle);
+      if (Math.sign(beam.vx) !== Math.sign(expectedVx) || Math.sign(beam.vy) !== Math.sign(expectedVy)) {
+        throw new Error(`Expected Pure Love Beam velocity vectors to match angle`);
+      }
+      if (Math.sign(y.vx) !== -Math.sign(expectedVx) || Math.sign(y.vy) !== -Math.sign(expectedVy)) {
+        throw new Error(`Expected Yuta recoil vectors opposite to beam angle`);
+      }
     }
   } catch (err) {
-    console.error('❌ [YUTA PURE LOVE BEAM CARDINAL ANGLES TEST ERROR]:', err);
+    console.error('❌ [YUTA PURE LOVE BEAM TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.4b. Ichigo Getsuga Tensho 360° Any-Angle & Non-Snap Aiming Test
+  console.log('🗡️ [Ichigo Getsuga Tensho Test] Verifying Getsuga Tensho and Final Massive Getsuga support continuous 360° aiming without snap auto-aim...');
+  try {
+    const IchigoClass = FIGHTER_CLASS_MAP['ichigo'];
+    const ichigoDef = FIGHTER_DEFS.find(d => d.id === 'ichigo' || d.type === 'ichigo');
+    if (IchigoClass && ichigoDef) {
+      const ichigo = new IchigoClass(ichigoDef);
+      ichigo.x = 270;
+      ichigo.y = 480;
+      state.fighters = [ichigo];
+      state.illusions = [];
+
+      // Test 1: Cardinal helper calculation in 4 directions
+      const enemyRight = { x: 450, y: 480, r: 25, hp: 100, maxHp: 100, isDead: false };
+      const enemyLeft  = { x: 90,  y: 480, r: 25, hp: 100, maxHp: 100, isDead: false };
+      const enemyDown  = { x: 270, y: 700, r: 25, hp: 100, maxHp: 100, isDead: false };
+      const enemyUp    = { x: 270, y: 200, r: 25, hp: 100, maxHp: 100, isDead: false };
+
+      if (Math.abs(ichigo._getCardinalAngle(enemyRight) - 0) > 0.001) throw new Error(`Expected Ichigo cardinal Right to be 0 rad`);
+      if (Math.abs(Math.abs(ichigo._getCardinalAngle(enemyLeft)) - Math.PI) > 0.001) throw new Error(`Expected Ichigo cardinal Left to be Math.PI rad`);
+      if (Math.abs(ichigo._getCardinalAngle(enemyDown) - (Math.PI / 2)) > 0.001) throw new Error(`Expected Ichigo cardinal Down to be Math.PI/2 rad`);
+      if (Math.abs(ichigo._getCardinalAngle(enemyUp) - (-Math.PI / 2)) > 0.001) throw new Error(`Expected Ichigo cardinal Up to be -Math.PI/2 rad`);
+
+      // Test 2: Standard Getsuga Tensho firing along any angle (including diagonals)
+      const testAngles = [
+        { target: enemyRight, expectedAngle: 0 },
+        { target: enemyLeft, expectedAngle: Math.PI },
+        { target: enemyDown, expectedAngle: Math.PI / 2 },
+        { target: enemyUp, expectedAngle: -Math.PI / 2 },
+        { target: { x: 450, y: 660, r: 25, hp: 100, maxHp: 100, isDead: false }, expectedAngle: Math.atan2(660 - 480, 450 - 270) },
+        { target: { x: 90, y: 300, r: 25, hp: 100, maxHp: 100, isDead: false }, expectedAngle: Math.atan2(300 - 480, 90 - 270) }
+      ];
+
+      for (const d of testAngles) {
+        ichigo.reset();
+        ichigo.x = 270;
+        ichigo.y = 480;
+        projectileSystem.projectiles = [];
+        ichigo.fireGetsuga(d.target, false);
+
+        if (Math.abs(Math.abs(d.expectedAngle) - Math.PI) < 0.001) {
+          if (Math.abs(Math.abs(ichigo.gunAngle) - Math.PI) > 0.001) throw new Error(`Expected Ichigo gunAngle to be Math.PI for Left`);
+        } else {
+          if (Math.abs(ichigo.gunAngle - d.expectedAngle) > 0.001) throw new Error(`Expected Ichigo gunAngle to be ${d.expectedAngle}, got ${ichigo.gunAngle}`);
+        }
+
+        // Release Getsuga
+        ichigo._releaseGetsuga();
+        const getsugaProj = projectileSystem.projectiles.find(p => p && (p.isGetsuga || p.behaviorType === 'getsuga_tensho'));
+        if (!getsugaProj) throw new Error('Expected Getsuga Tensho projectile to spawn on release!');
+
+        if (Math.abs(Math.abs(d.expectedAngle) - Math.PI) < 0.001) {
+          if (Math.abs(Math.abs(getsugaProj.angle) - Math.PI) > 0.001) throw new Error(`Expected Getsuga projectile angle Math.PI`);
+        } else {
+          if (Math.abs(getsugaProj.angle - d.expectedAngle) > 0.001) throw new Error(`Expected Getsuga projectile angle ${d.expectedAngle}, got ${getsugaProj.angle}`);
+        }
+
+        const expectedVx = Math.cos(d.expectedAngle);
+        const expectedVy = Math.sin(d.expectedAngle);
+        if (Math.abs(expectedVx) > 0.05 && Math.sign(getsugaProj.vx) !== Math.sign(expectedVx)) {
+          throw new Error(`Expected Getsuga vx sign to match angle`);
+        }
+        if (Math.abs(expectedVy) > 0.05 && Math.sign(getsugaProj.vy) !== Math.sign(expectedVy)) {
+          throw new Error(`Expected Getsuga vy sign to match angle`);
+        }
+      }
+
+      // Test 3: Final Massive Kuroi Getsuga Tensho firing along diagonal angle
+      ichigo.reset();
+      ichigo.x = 270;
+      ichigo.y = 480;
+      projectileSystem.projectiles = [];
+      const diagonalTarget = { x: 450, y: 660, r: 25, hp: 100, maxHp: 100, isDead: false };
+      const expectedFinalAngle = Math.atan2(660 - 480, 450 - 270);
+      ichigo.fireFinalMassiveGetsuga(diagonalTarget);
+
+      if (Math.abs(ichigo.gunAngle - expectedFinalAngle) > 0.001) {
+        throw new Error(`Expected Final Getsuga gunAngle to be diagonal ${expectedFinalAngle}, got ${ichigo.gunAngle}`);
+      }
+
+      ichigo._releaseGetsuga();
+      const finalProj = projectileSystem.projectiles.find(p => p && p.isFinalMassiveGetsuga);
+      if (!finalProj) throw new Error('Expected Final Massive Getsuga projectile to spawn!');
+      if (Math.abs(finalProj.angle - expectedFinalAngle) > 0.001) {
+        throw new Error(`Expected Final Getsuga angle to be ${expectedFinalAngle}, got ${finalProj.angle}`);
+      }
+
+      // Test 4: Direction Commitment (No snap auto-aim during charge/channeling)
+      ichigo.reset();
+      ichigo.x = 270;
+      ichigo.y = 480;
+      projectileSystem.projectiles = [];
+      // Initiate Getsuga aimed at enemy on Right (0 rad)
+      ichigo.fireGetsuga(enemyRight, false);
+      if (Math.abs(ichigo.gunAngle - 0) > 0.001) throw new Error('Expected initial aim 0 rad (Right)');
+
+      // Enemy dashes to Up (-Math.PI/2) while Ichigo is channeling
+      ichigo.aim(enemyUp);
+      ichigo.update(enemyUp, 0, state.arena);
+      if (Math.abs(ichigo.gunAngle - 0) > 0.001 || Math.abs(ichigo.angle - 0) > 0.001) {
+        throw new Error(`Expected Ichigo to stay 100% committed to Right (0 rad) without snapping to enemy, got gunAngle=${ichigo.gunAngle}`);
+      }
+
+      // Releasing Getsuga fires strictly in the committed Right direction
+      ichigo._releaseGetsuga();
+      const committedProj = projectileSystem.projectiles.find(p => p && (p.isGetsuga || p.behaviorType === 'getsuga_tensho'));
+      if (!committedProj) throw new Error('Expected Getsuga projectile to spawn on release!');
+      if (Math.abs(committedProj.angle - 0) > 0.001) {
+        throw new Error(`Expected Getsuga projectile to fire along committed Right angle (0 rad), got ${committedProj.angle}`);
+      }
+      if (committedProj.vx <= 0 || Math.abs(committedProj.vy) > 0.001) {
+        throw new Error('Expected committed Getsuga projectile velocity along +X axis (vx > 0, vy = 0)');
+      }
+
+      // Test 5: Post-Getsuga Backward Movement (Move back instead of forward toward enemy)
+      ichigo.reset();
+      ichigo.x = 270;
+      ichigo.y = 480;
+      projectileSystem.projectiles = [];
+      ichigo.fireGetsuga(enemyRight, false);
+      ichigo._releaseGetsuga();
+
+      // Step through recovery frames until recovery timer expires
+      while (ichigo.getsugaRecoveryTimer > 0) {
+        ichigo.update(enemyRight, 0, state.arena);
+      }
+      // On the frame recovery ends, Ichigo's velocity must move BACKWARD (-X / away from enemyRight at +X)
+      if (ichigo.vx >= 0) {
+        throw new Error(`Expected Ichigo to move backward away from enemy (vx < 0), got vx=${ichigo.vx}`);
+      }
+
+      // Test 6: Getsuga Tensho Hit Slows Enemy Movement (Does Not Stop/Freeze Enemy)
+      const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+      const victim = new NormalFighter({ startX: 320, startY: 480, hp: 500, maxHp: 500, speed: 5 });
+      victim.vx = 5;
+      victim.vy = 0;
+      state.fighters = [ichigo, victim];
+      state.getFighterTeam = (idx) => idx;
+
+      ichigo.reset();
+      ichigo.x = 270;
+      ichigo.y = 480;
+      projectileSystem.projectiles = [];
+      ichigo.fireGetsuga(victim, false);
+      ichigo._releaseGetsuga();
+
+      // Update projectile system so Getsuga hits victim
+      projectileSystem.update(state.fighters);
+
+      // Verify victim is slowed down
+      if ((victim.slowTimer || 0) <= 0) {
+        throw new Error('Expected victim to receive slowTimer > 0 upon being hit by Getsuga Tensho');
+      }
+      if (victim.slowMultiplier > 0.45) {
+        throw new Error(`Expected victim slowMultiplier <= 0.40 upon Getsuga hit, got ${victim.slowMultiplier}`);
+      }
+
+      // Verify victim is NOT stopped/frozen (no paralyze, no timestop freeze)
+      if (victim.paralyzeTimer > 0 || victim.isParalyzed) {
+        throw new Error('Expected victim to NOT be paralyzed by Getsuga Tensho');
+      }
+      if (victim._handleTimeStop()) {
+        throw new Error('Expected victim _handleTimeStop() to return false (not frozen) when hit by Getsuga Tensho');
+      }
+
+      // Verify victim can actively move at slowed speed
+      victim.applyMovementPhysics();
+      const victimSpeed = Math.hypot(victim.vx, victim.vy);
+      if (victimSpeed <= 0.1) {
+        throw new Error('Expected victim to maintain active movement at slowed speed, but velocity was 0');
+      }
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO CARDINAL ANGLES TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.4b. Ichigo Active Getsuga Form & Color Persistence Across Transformations Test
+  console.log('🗡️ [Ichigo Active Getsuga Form Persistence Test] Verifying active Getsuga Tensho retains its original form/color when Ichigo transforms...');
+  try {
+    const IchigoClass = FIGHTER_CLASS_MAP['ichigo'];
+    if (IchigoClass) {
+      const ichigoDef = FIGHTER_DEFS.find(d => d.type === 'ichigo') || { type: 'ichigo', name: 'Ichigo' };
+      const ichigo = new IchigoClass(ichigoDef);
+      const enemy = new IchigoClass(ichigoDef);
+      state.fighters = [ichigo, enemy];
+      state.getFighterTeam = (idx) => idx;
+      state.arena = { x: 0, y: 0, width: 800, height: 600, radius: 400, shape: 'circle' };
+      projectileSystem.projectiles = [];
+
+      // Fire a Shikai Getsuga Tensho
+      ichigo.gunAngle = 0;
+      ichigo.bankaiActive = false;
+      ichigo.hollowMaskActive = false;
+      const shikaiProj = projectileSystem.fireGetsugaTensho(ichigo, 0, 2, 11, 'shikai');
+
+      if (shikaiProj.getsugaForm !== 'shikai') {
+        throw new Error(`Expected shikai projectile to have getsugaForm='shikai', got ${shikaiProj.getsugaForm}`);
+      }
+      if (shikaiProj.visual !== 'getsuga') {
+        throw new Error(`Expected shikai projectile to have visual='getsuga', got ${shikaiProj.visual}`);
+      }
+
+      // Transform Ichigo into Bankai + Hollow Mask
+      ichigo.bankaiActive = true;
+      ichigo.hollowMaskActive = true;
+
+      // Ensure projectile still maintains its original 'shikai' form
+      if (shikaiProj.getsugaForm !== 'shikai') {
+        throw new Error(`Expected active getsugaForm to remain 'shikai' after transformation, got ${shikaiProj.getsugaForm}`);
+      }
+
+      // Render Getsuga using mock ctx to verify no errors and form remains shikai
+      const { drawGetsugaSlash } = await import('../js/graphics/weapons/ichigoWeaponGraphics.js');
+      const mockCtx = {
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        fillRect() {},
+        beginPath() {},
+        arc() {},
+        fill() {},
+        stroke() {},
+        closePath() {},
+        fillStyle: '',
+        strokeStyle: '',
+        lineWidth: 1,
+        imageSmoothingEnabled: true
+      };
+      drawGetsugaSlash(mockCtx, shikaiProj, false);
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO GETSUGA FORM PERSISTENCE TEST ERROR]:', err);
     errors++;
   }
 
@@ -4652,6 +5023,7 @@ async function main() {
       dummy.x = 250; dummy.y = 200;
       state.fighters = [yuta, dummy];
       state.deathEffects = [];
+      state.gameState = 'playing';
 
       // Force-activate Rika
       yuta.hp = 100;
@@ -4850,6 +5222,89 @@ async function main() {
     errors++;
   }
 
+  // Genos Spiral Incineration Cannon Continuous 360° Aiming Test (Rule #36)
+  console.log('🔥 [Genos Spiral Incineration Cannon 360° Aiming Test] Verifying Spiral Incineration Cannon supports continuous 360° aiming without snap auto-aim...');
+  try {
+    const GenosClass = FIGHTER_CLASS_MAP['genos'];
+    if (GenosClass) {
+      const genosDef = FIGHTER_DEFS.find(d => d.type === 'genos') || { type: 'genos', name: 'Genos' };
+      const genos = new GenosClass(genosDef);
+      genos.x = 300;
+      genos.y = 300;
+
+      // 1. Test continuous 360° omnidirectional aiming along multiple diagonal/arbitrary angles
+      const testAngles = [
+        { name: 'Up-Right (36.87°)', targetX: 300 + 400, targetY: 300 - 300, expectedAngle: Math.atan2(-300, 400) },
+        { name: 'Down-Left (-143.13°)', targetX: 300 - 400, targetY: 300 + 300, expectedAngle: Math.atan2(300, -400) },
+        { name: 'Down-Right (53.13°)', targetX: 300 + 300, targetY: 300 + 400, expectedAngle: Math.atan2(400, 300) },
+        { name: 'Up-Left (-126.87°)', targetX: 300 - 300, targetY: 300 - 400, expectedAngle: Math.atan2(-400, -300) }
+      ];
+
+      for (const t of testAngles) {
+        genos.isChargingUlt = false;
+        genos.isFiringUlt = false;
+        genos.ultCooldown = 0;
+        const dummy = { x: t.targetX, y: t.targetY, r: 25, hp: 100, maxHp: 100, isDead: false };
+
+        genos.executeSpiralIncinerationCannon(dummy);
+
+        if (!genos.isChargingUlt) {
+          throw new Error(`Genos failed to initiate Spiral Incineration Cannon for ${t.name}!`);
+        }
+        if (Math.abs(genos.ultAngle - t.expectedAngle) > 0.001) {
+          throw new Error(`Expected Genos ultAngle for ${t.name} to be ${t.expectedAngle}, got ${genos.ultAngle} (snapped or incorrect)`);
+        }
+        if (Math.abs(genos.gunAngle - t.expectedAngle) > 0.001 || Math.abs(genos.angle - t.expectedAngle) > 0.001) {
+          throw new Error(`Expected Genos gunAngle/angle for ${t.name} to match ${t.expectedAngle}, got gunAngle=${genos.gunAngle}`);
+        }
+      }
+
+      // 2. Test Direction Commitment (No snap auto-aim during wind-up charging or active firing)
+      genos.isChargingUlt = false;
+      genos.isFiringUlt = false;
+      genos.ultCooldown = 0;
+      const initialTarget = { x: 300 + 300, y: 300 + 300, r: 25, hp: 100, maxHp: 100, isDead: false };
+      const initialAngle = Math.atan2(300, 300); // 45° (PI / 4)
+      genos.executeSpiralIncinerationCannon(initialTarget);
+
+      // Opponent moves/teleports to top-left (-135°) during windup
+      const movedTarget = { x: 300 - 300, y: 300 - 300, r: 25, hp: 100, maxHp: 100, isDead: false };
+      genos.aim(movedTarget);
+      genos.update(movedTarget, 0, state.arena);
+
+      if (Math.abs(genos.ultAngle - initialAngle) > 0.001 || Math.abs(genos.gunAngle - initialAngle) > 0.001) {
+        throw new Error(`Genos auto-aim snapped or rotated during ultimate windup! Expected ${initialAngle}, got gunAngle=${genos.gunAngle}`);
+      }
+      if (genos.canAim()) {
+        throw new Error(`Genos canAim() should return false during ultimate windup!`);
+      }
+
+      // Transition to active firing
+      genos.ultTimer = 0;
+      genos.update(movedTarget, 0, state.arena);
+      if (!genos.isFiringUlt) {
+        throw new Error(`Genos failed to transition from windup to active beam firing!`);
+      }
+
+      // Opponent teleports directly behind Genos during beam fire
+      const behindTarget = { x: 300 - 200, y: 300, r: 25, hp: 100, maxHp: 100, isDead: false };
+      genos.aim(behindTarget);
+      genos.update(behindTarget, 0, state.arena);
+
+      if (Math.abs(genos.ultAngle - initialAngle) > 0.001 || Math.abs(genos.gunAngle - initialAngle) > 0.001) {
+        throw new Error(`Genos auto-aim snapped or rotated during active beam firing! Expected ${initialAngle}, got gunAngle=${genos.gunAngle}`);
+      }
+
+      // Draw beam overlay to verify Canvas 2D transform stack balance
+      mockCtx.resetStackDepth();
+      genos.drawBeamOverlay(mockCtx);
+      assertCanvasStackBalance('Genos Spiral Incineration Cannon Beam Draw');
+    }
+  } catch (err) {
+    console.error('❌ [GENOS SPIRAL INCINERATION CANNON 360 TEST ERROR]:', err);
+    errors++;
+  }
+
   // Round Skill Reset Test
   console.log('🔄 [Round Skill Reset Test] Verifying all fighter skills and cooldowns reset cleanly on new round...');
   try {
@@ -4992,6 +5447,7 @@ async function main() {
   console.log('⚡ [Gojo RCT Teleport Test] Verifying Gojo does not teleport when activating RCT...');
   try {
     state.mode = '1v1';
+    state.gameState = 'playing';
     state.p1Index = allDefs.findIndex(d => d.type === 'gojo');
     state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
     reinitFighters(true);
@@ -5027,6 +5483,7 @@ async function main() {
   console.log('☀️ [Escanor Finishing Ability Test] Verifying Escanor does not cut off basic attack animation on lethal win...');
   try {
     state.mode = '1v1';
+    state.gameState = 'playing';
     state.p1Index = allDefs.findIndex(d => d.type === 'escanor');
     state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
     reinitFighters(true);
@@ -5194,6 +5651,1041 @@ async function main() {
     CONFIG.escanor.wallPinDurationFrames = originalDuration; // Restore original config
   } catch (err) {
     console.error('❌ [ESCANOR WALL PIN TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Ichigo Hollow Transformation Animation Preservation Under Fuga & Attacks Test
+  console.log('💀 [Ichigo Hollow Transformation Animation Preservation Test] Verifying transformation animation is not skipped or wiped by Fuga or attacks...');
+  try {
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'ichigo');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    reinitFighters(true);
+
+    const ichigo = state.fighters[0];
+    const sukuna = state.fighters[1];
+
+    ichigo.x = 200;
+    ichigo.y = 300;
+    sukuna.x = 250;
+    sukuna.y = 300;
+
+    // Pop Bankai first
+    ichigo.activateBankai();
+    ichigo.isChannelingBankai = false;
+    ichigo.bankaiActive = true;
+    ichigo.bankaiUsed = true;
+    ichigo.bankaiTimer = 1000;
+
+    // Trigger Hollow Awakening at 40% HP to test 50% recovery
+    const preHollowHp = Math.round(ichigo.maxHp * 0.40);
+    ichigo.hp = preHollowHp;
+    ichigo.activateHollowMask();
+
+    const expectedHealedHp = Math.min(ichigo.maxHp, preHollowHp + Math.round(ichigo.maxHp * 0.50));
+    if (ichigo.hp !== expectedHealedHp) {
+      throw new Error(`Expected Ichigo HP to recover to ${expectedHealedHp}, got ${ichigo.hp}`);
+    }
+
+    if (ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`Hollow Mask did not start formation timer!`);
+    }
+
+    const expectedMaxDuration = CONFIG.ichigo?.hollowMaskDuration ?? 800;
+    if (ichigo.hollowMaskTimer !== expectedMaxDuration) {
+      throw new Error(`Expected hollowMaskTimer to start at ${expectedMaxDuration}, got ${ichigo.hollowMaskTimer}`);
+    }
+
+    const startFormationFrames = ichigo.hollowMaskFormationTimer;
+
+    // 1. Hit Ichigo with Fuga suppressCombatAndVisuals
+    if (typeof ichigo.suppressCombatAndVisuals === 'function') {
+      ichigo.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+    }
+    if (ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`Fuga suppressCombatAndVisuals wiped hollowMaskFormationTimer to 0!`);
+    }
+
+    // 2. Hit Ichigo with direct Fuga damage via takeDamage
+    ichigo.takeDamage(50, sukuna, { isDivineFlame: true, isFuga: true });
+    if (ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`takeDamage with Fuga wiped hollowMaskFormationTimer to 0!`);
+    }
+
+    // 3. Hit Ichigo with CCs and interrupts
+    ichigo.applyHitStun(60);
+    ichigo.applyParalysis(60);
+    ichigo.applyElectricStun(60);
+    ichigo.applyTimeStop(60);
+    ichigo.interruptAttacks(true);
+
+    if (ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`CC methods or interruptAttacks(true) on live fighter wiped hollowMaskFormationTimer to 0!`);
+    }
+
+    // 4. Tick simulation frames and verify smooth completion of formation and burst, with duration not draining
+    let framesTicked = 0;
+    while (ichigo.hollowMaskFormationTimer > 0) {
+      ichigo.update(sukuna, 0, state.arena);
+      if (ichigo.hollowMaskTimer !== expectedMaxDuration) {
+        throw new Error(`hollowMaskTimer drained during formation! Expected ${expectedMaxDuration}, got ${ichigo.hollowMaskTimer}`);
+      }
+      framesTicked++;
+      if (framesTicked > 450) {
+        throw new Error(`Hollow formation exceeded 450 frames without completing!`);
+      }
+    }
+
+    if (ichigo.hollowBurstTimer <= 0 && !ichigo._hollowVoicelineWait) {
+      throw new Error(`Hollow Burst timer was not triggered upon formation completion!`);
+    }
+
+    while (ichigo.hollowBurstTimer > 0) {
+      ichigo.update(sukuna, 0, state.arena);
+      if (ichigo.hollowMaskTimer !== expectedMaxDuration) {
+        throw new Error(`hollowMaskTimer drained during burst! Expected ${expectedMaxDuration}, got ${ichigo.hollowMaskTimer}`);
+      }
+    }
+
+    if (!ichigo.hollowMaskActive) {
+      throw new Error(`hollowMaskActive is false after transformation completed!`);
+    }
+
+    // After animation finishes, duration should now start draining on normal update ticks
+    ichigo.update(sukuna, 0, state.arena);
+    if (ichigo.hollowMaskTimer >= expectedMaxDuration) {
+      throw new Error(`Expected hollowMaskTimer to start draining after animation finished, got ${ichigo.hollowMaskTimer}`);
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO HOLLOW TRANSFORMATION TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Ichigo Multiple Hollow Mask Awakenings Test
+  console.log('💀 [Ichigo Multiple Hollow Mask Awakenings Test] Verifying Ichigo can transform into Hollow Mask multiple times in the same round...');
+  try {
+    reinitFighters(true);
+    const ichigo = state.fighters[0];
+    const sukuna = state.fighters[1];
+
+    // 0. Verify in Shikai form, dropping HP does NOT progress or trigger Hollow Mask
+    ichigo.hp = Math.round(ichigo.maxHp * 0.50);
+    ichigo.update(sukuna, 0, state.arena);
+    if (ichigo.hollowMaskActive || ichigo.hollowMaskFormationTimer > 0) {
+      throw new Error(`Ichigo activated Hollow Mask while still in Shikai (Bankai not active)!`);
+    }
+    let preBankaiSkills = getSkillDataForFighter(ichigo);
+    let preBankaiHollow = preBankaiSkills.find(s => s.id === 'hollow');
+    if (preBankaiHollow && preBankaiHollow.pct > 0) {
+      throw new Error(`Hollow Mask HUD bar progressed in Shikai! pct=${preBankaiHollow.pct}`);
+    }
+
+    // 1. Pop Bankai
+    ichigo.hp = Math.round(ichigo.maxHp * 0.70);
+    ichigo.activateBankai();
+    ichigo.isChannelingBankai = false;
+    ichigo.bankaiActive = true;
+    ichigo.bankaiUsed = true;
+    ichigo.bankaiTimer = 2000;
+    ichigo.hollowRechargeHpBaseline = ichigo.hp;
+
+    // Verify Hollow bar starts at 0% right after entering Bankai
+    let initialBankaiSkills = getSkillDataForFighter(ichigo);
+    let initialBankaiHollow = initialBankaiSkills.find(s => s.id === 'hollow');
+    if (initialBankaiHollow && initialBankaiHollow.pct > 0) {
+      throw new Error(`Hollow Mask HUD bar was not at 0% on Bankai activation! pct=${initialBankaiHollow.pct}`);
+    }
+
+    // First Hollow Transformation: Deal damage in Bankai >= 20% max HP
+    const reqDmg = Math.round(ichigo.maxHp * 0.22);
+    ichigo.takeDamage(reqDmg, sukuna, { damage: reqDmg, bypassShield: true });
+    ichigo.update(sukuna, 0, state.arena); // triggers activateHollowMask via damage in Bankai
+    if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`Ichigo failed to activate 1st Hollow Mask transformation after taking damage in Bankai!`);
+    }
+
+    // Complete 1st transformation animation
+    ichigo.hollowMaskFormationTimer = 0;
+    ichigo.hollowBurstTimer = 0;
+    ichigo.hollowMaskActive = true;
+    ichigo.hollowMaskTimer = 10;
+
+    // Check HUD skill provider during active Hollow Mask
+    let hudSkills = getSkillDataForFighter(ichigo);
+    let hollowSkill = hudSkills.find(s => s.id === 'hollow');
+    if (!hollowSkill || !hollowSkill.ready || hollowSkill.label !== 'HOLLOW AWAKENED') {
+      throw new Error(`HUD Hollow Skill during 1st active form failed! Got: ${JSON.stringify(hollowSkill)}`);
+    }
+
+    // Drain 1st Hollow Mask to shatter
+    while (ichigo.hollowMaskActive) {
+      ichigo.update(sukuna, 0, state.arena);
+    }
+    if (ichigo.hollowMaskActive) {
+      throw new Error(`1st Hollow Mask failed to deactivate on timer expire!`);
+    }
+    if (!ichigo.hollowMaskUsed || ichigo.hollowRechargeHpBaseline === undefined) {
+      throw new Error(`1st Hollow Mask shatter did not set hollowMaskUsed or baseline! baseline=${ichigo.hollowRechargeHpBaseline}`);
+    }
+
+    // Check HUD skill provider during recharge
+    hudSkills = getSkillDataForFighter(ichigo);
+    hollowSkill = hudSkills.find(s => s.id === 'hollow');
+    if (!hollowSkill || hollowSkill.label !== 'HOLLOW MASK') {
+      throw new Error(`HUD Hollow Skill during recharge failed! Got: ${JSON.stringify(hollowSkill)}`);
+    }
+
+    // Clear any post-shatter reversion timers so Ichigo is ready for next awakening
+    ichigo.shikaiReversionBurstTimer = 0;
+
+    // Deal damage >= 20% of max HP to trigger 2nd Hollow Awakening (bypass parry)
+    ichigo.takeDamage(reqDmg, sukuna, { damage: reqDmg, bypassShield: true });
+    ichigo.update(sukuna, 0, state.arena);
+
+    if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`Ichigo failed to activate 2nd Hollow Mask transformation after taking damage!`);
+    }
+
+    // Complete 2nd transformation animation
+    ichigo.hollowMaskFormationTimer = 0;
+    ichigo.hollowBurstTimer = 0;
+    ichigo.hollowMaskActive = true;
+    ichigo.hollowMaskTimer = 5;
+
+    // Drain 2nd Hollow Mask to shatter
+    while (ichigo.hollowMaskActive) {
+      ichigo.update(sukuna, 0, state.arena);
+    }
+    if (ichigo.hollowMaskActive) {
+      throw new Error(`2nd Hollow Mask failed to deactivate on timer expire!`);
+    }
+    ichigo.shikaiReversionBurstTimer = 0;
+
+    // Deal damage again to trigger 3rd Hollow Awakening (bypass parry)
+    ichigo.takeDamage(reqDmg, sukuna, { damage: reqDmg, bypassShield: true });
+    ichigo.update(sukuna, 0, state.arena);
+
+    if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`Ichigo failed to activate 3rd Hollow Mask transformation after taking damage!`);
+    }
+
+    // Test Round Reset cleans up hollow baseline
+    ichigo.reset();
+    if (ichigo.hollowMaskActive || ichigo.hollowMaskUsed || ichigo.hollowRechargeHpBaseline !== undefined || ichigo._maxHollowPct !== 0) {
+      throw new Error(`Ichigo reset() did not clear hollow mask states!`);
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO MULTIPLE HOLLOW AWAKENINGS TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Ichigo Multiple Bankai Awakenings Test
+  console.log('🗡️ [Ichigo Multiple Bankai Awakenings Test] Verifying Ichigo can activate and use Bankai multiple times in the same round...');
+  try {
+    reinitFighters(true);
+    const ichigo = state.fighters[0];
+    const sukuna = state.fighters[1];
+
+    // 1. Initial State: Shikai
+    if (ichigo.bankaiActive || ichigo.bankaiUsed || ichigo.ultimateCooldown > 0) {
+      throw new Error(`Ichigo did not initialize in fresh Shikai state! bankaiActive=${ichigo.bankaiActive}, bankaiUsed=${ichigo.bankaiUsed}, cd=${ichigo.ultimateCooldown}`);
+    }
+
+    // Check HUD skill provider before 1st Bankai
+    let hudSkills = getSkillDataForFighter(ichigo);
+    let bankaiSkill = hudSkills.find(s => s.id === 'bankai');
+    if (!bankaiSkill || bankaiSkill.label !== 'BANKAI') {
+      throw new Error(`HUD Bankai Skill initial display failed! Got: ${JSON.stringify(bankaiSkill)}`);
+    }
+
+    // 2. First Bankai Trigger at 75% HP (under 80% threshold)
+    ichigo.hp = Math.round(ichigo.maxHp * 0.75);
+    ichigo.update(sukuna, 0, state.arena); // triggers activateBankai via AI/threshold
+    if (!ichigo.isChannelingBankai && !ichigo.bankaiActive) {
+      throw new Error(`Ichigo failed to initiate 1st Bankai activation at 75% HP!`);
+    }
+
+    // Complete 1st Bankai channeling and release
+    ichigo.isChannelingBankai = false;
+    ichigo.bankaiChargeTimer = 0;
+    ichigo._releaseBankai();
+    ichigo.bankaiBurstTimer = 0;
+
+    if (!ichigo.bankaiActive || ichigo.bankaiTimer <= 0) {
+      throw new Error(`1st Bankai failed to become active! bankaiActive=${ichigo.bankaiActive}, timer=${ichigo.bankaiTimer}`);
+    }
+
+    // Verify HUD reflects active Bankai
+    hudSkills = getSkillDataForFighter(ichigo);
+    bankaiSkill = hudSkills.find(s => s.id === 'bankai');
+    if (!bankaiSkill || !bankaiSkill.ready) {
+      throw new Error(`HUD Bankai Skill during active Bankai failed! Got: ${JSON.stringify(bankaiSkill)}`);
+    }
+
+    // Drain 1st Bankai to expiration -> Triggers Bankai + Hollow Mask combo transition!
+    ichigo.bankaiTimer = 1;
+    ichigo.bankaiFinalGetsugaTriggered = true; // allow final getsuga to complete
+    ichigo.isChannelingGetsuga = false;
+    ichigo.isGetsugaSlash = false;
+    ichigo.getsugaRecoveryTimer = 0;
+    ichigo.shunpoComboActive = false;
+    ichigo._stopFinalGetsugaVoiceline(true);
+    ichigo.update(sukuna, 0, state.arena);
+
+    // Verify Bankai duration ending triggers Hollow Mask activation while remaining in Bankai
+    if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
+      throw new Error(`Bankai duration end failed to trigger Hollow Mask activation combo!`);
+    }
+    if (!ichigo.bankaiActive) {
+      throw new Error(`Bankai did not remain active when transitioning to Hollow Mask combo!`);
+    }
+
+    // Complete Hollow Mask formation and drain mask duration to test full combo conclusion
+    ichigo.hollowMaskFormationTimer = 0;
+    ichigo.hollowBurstTimer = 0;
+    ichigo.hollowMaskActive = true;
+    ichigo.hollowMaskTimer = 1;
+    ichigo.update(sukuna, 0, state.arena); // drains hollowMaskTimer to 0 -> mask shatters and Bankai expires
+
+    if (ichigo.bankaiActive) {
+      throw new Error(`Bankai failed to expire when Hollow Mask finished its duration!`);
+    }
+    if (!ichigo.bankaiUsed || ichigo.ultimateCooldown <= 0) {
+      throw new Error(`1st Bankai combo expiration failed to set bankaiUsed or ultimateCooldown! cd=${ichigo.ultimateCooldown}`);
+    }
+
+    // Clear post-expiration burst lockout for testing
+    ichigo.shikaiReversionBurstTimer = 0;
+
+    // 3. Verify HUD reflects Bankai recharge cooldown
+    hudSkills = getSkillDataForFighter(ichigo);
+    bankaiSkill = hudSkills.find(s => s.id === 'bankai');
+    if (!bankaiSkill || bankaiSkill.ready) {
+      throw new Error(`HUD Bankai Skill should be recharging on cooldown, but marked ready! Got: ${JSON.stringify(bankaiSkill)}`);
+    }
+
+    // 4. Tick Cooldown to 0 -> 2nd Bankai must become READY!
+    ichigo.ultimateCooldown = 0;
+    hudSkills = getSkillDataForFighter(ichigo);
+    bankaiSkill = hudSkills.find(s => s.id === 'bankai');
+    if (!bankaiSkill || !bankaiSkill.ready || bankaiSkill.pct < 99) {
+      throw new Error(`HUD Bankai Skill failed to show 100% ready after cooldown expired! Got: ${JSON.stringify(bankaiSkill)}`);
+    }
+
+    // 5. Trigger 2nd Bankai Activation
+    ichigo.update(sukuna, 0, state.arena);
+    if (!ichigo.isChannelingBankai && !ichigo.bankaiActive) {
+      throw new Error(`Ichigo failed to activate 2nd Bankai after cooldown completed!`);
+    }
+
+    // Complete 2nd Bankai channeling
+    ichigo.isChannelingBankai = false;
+    ichigo.bankaiChargeTimer = 0;
+    ichigo._releaseBankai();
+    ichigo.bankaiBurstTimer = 0;
+
+    if (!ichigo.bankaiActive) {
+      throw new Error(`2nd Bankai failed to become active upon release!`);
+    }
+
+    // Drain 2nd Bankai to expiration -> Triggers 2nd Hollow combo
+    ichigo.bankaiTimer = 1;
+    ichigo.bankaiFinalGetsugaTriggered = true;
+    ichigo.isChannelingGetsuga = false;
+    ichigo.isGetsugaSlash = false;
+    ichigo.getsugaRecoveryTimer = 0;
+    ichigo.shunpoComboActive = false;
+    ichigo._stopFinalGetsugaVoiceline(true);
+    ichigo.update(sukuna, 0, state.arena);
+
+    ichigo.hollowMaskFormationTimer = 0;
+    ichigo.hollowBurstTimer = 0;
+    ichigo.hollowMaskActive = true;
+    ichigo.hollowMaskTimer = 1;
+    ichigo.update(sukuna, 0, state.arena);
+
+    if (ichigo.bankaiActive) {
+      throw new Error(`2nd Bankai failed to expire on timer 0!`);
+    }
+    ichigo.shikaiReversionBurstTimer = 0;
+
+    // 6. Test 3rd Bankai Activation (e.g. Bankai + Hollow Mask combination)
+    ichigo.hollowMaskFormationTimer = 0;
+    ichigo.hollowBurstTimer = 0;
+    ichigo.ultimateCooldown = 0;
+    ichigo.update(sukuna, 0, state.arena);
+
+    if (!ichigo.isChannelingBankai && !ichigo.bankaiActive) {
+      throw new Error(`Ichigo failed to activate 3rd Bankai! isChannelingBankai=${ichigo.isChannelingBankai}, bankaiActive=${ichigo.bankaiActive}, hollowActive=${ichigo.hollowMaskActive}, hollowTimer=${ichigo.hollowMaskFormationTimer}`);
+    }
+
+    // 7. Verify reset() restores pristine initial state
+    ichigo.reset();
+    if (ichigo.bankaiActive || ichigo.bankaiUsed || ichigo.ultimateCooldown !== 0 || ichigo.bankaiFinalGetsugaTriggered) {
+      throw new Error(`Ichigo reset() did not clear Bankai states! bankaiActive=${ichigo.bankaiActive}, bankaiUsed=${ichigo.bankaiUsed}, cd=${ichigo.ultimateCooldown}`);
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO MULTIPLE BANKAI AWAKENINGS TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Ichigo Bankai to Hollow Form Combo Progression Test
+  console.log('🗡️ [Ichigo Bankai to Hollow Form Combo Progression Test] Verifying Ichigo activates Hollow Form upon Bankai duration end while maintaining Bankai form...');
+  try {
+    reinitFighters(true);
+    const ichigo = state.fighters[0];
+    const sukuna = state.fighters[1];
+
+    // 1. Enter Bankai
+    ichigo.hp = Math.round(ichigo.maxHp * 0.70);
+    ichigo.activateBankai();
+    ichigo.isChannelingBankai = false;
+    ichigo.bankaiChargeTimer = 0;
+    ichigo._releaseBankai();
+    ichigo.bankaiBurstTimer = 0;
+
+    if (!ichigo.bankaiActive || ichigo.hollowMaskActive) {
+      throw new Error(`Expected Bankai active=true, Hollow active=false upon Bankai release!`);
+    }
+
+    // 2. Set Bankai timer to 1 and complete final getsuga wave
+    ichigo.bankaiTimer = 1;
+    ichigo.bankaiFinalGetsugaTriggered = true;
+    ichigo.isChannelingGetsuga = false;
+    ichigo.isGetsugaSlash = false;
+    ichigo.getsugaRecoveryTimer = 0;
+    ichigo.shunpoComboActive = false;
+    ichigo._stopFinalGetsugaVoiceline(true);
+
+    // 3. Update Ichigo -> Bankai duration ends (reaches 0) -> activates Hollow Mask while staying in Bankai!
+    ichigo.update(sukuna, 0, state.arena);
+
+    if (ichigo.hollowMaskFormationTimer <= 0 && !ichigo.hollowMaskActive) {
+      throw new Error(`Hollow Mask failed to trigger upon Bankai duration ending!`);
+    }
+    if (!ichigo.bankaiActive) {
+      throw new Error(`Bankai form was disabled when Hollow Mask activated! bankaiActive must remain true for bankai_hollow combo.`);
+    }
+
+    // 4. Complete Hollow formation & burst
+    ichigo.hollowMaskFormationTimer = 0;
+    ichigo.hollowBurstTimer = 0;
+    ichigo.hollowMaskActive = true;
+    ichigo.hollowMaskTimer = 500;
+
+    // Verify speedMultiplier combines both Bankai and Hollow Mask
+    ichigo.update(sukuna, 0, state.arena);
+    const expectedBankaiMult = CONFIG.ichigo?.bankaiSpeedMultiplier || 1.1;
+    const expectedHollowMult = CONFIG.ichigo?.hollowSpeedMultiplier || 0.50;
+    const expectedCombined = expectedBankaiMult * expectedHollowMult;
+    if (Math.abs(ichigo.speedMultiplier - expectedCombined) > 0.01) {
+      throw new Error(`Expected combined speed multiplier ${expectedCombined}, got ${ichigo.speedMultiplier}`);
+    }
+
+    // 5. Drain Hollow Mask timer to 0 -> conclude full combo
+    ichigo.hollowMaskTimer = 1;
+    ichigo.update(sukuna, 0, state.arena); // mask shatters, bankai expires, reverts to Shikai
+
+    if (ichigo.bankaiActive) {
+      throw new Error(`Bankai active=true after Hollow Mask shattered at end of combo!`);
+    }
+    if (ichigo.hollowMaskActive) {
+      throw new Error(`Hollow Mask active=true after timer 0!`);
+    }
+    if (ichigo.ultimateCooldown <= 0 || !ichigo.bankaiUsed) {
+      throw new Error(`Bankai combo conclusion did not set ultimateCooldown or bankaiUsed! cd=${ichigo.ultimateCooldown}`);
+    }
+    if (ichigo.shikaiReversionBurstTimer <= 0) {
+      throw new Error(`Shikai reversion burst timer was not triggered upon combo conclusion!`);
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO BANKAI TO HOLLOW COMBO TEST ERROR]:', err);
+    errors++;
+  }
+
+  console.log('💀 [Ichigo Audio Cutoff On Death Mid-Channeling Test] Verifying all audio cuts off when dying during skill channeling...');
+  try {
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'ichigo');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+
+    // 1. Bankai Channeling Death Test
+    {
+      reinitFighters(true);
+      const ichigo = state.fighters[0];
+      const sukuna = state.fighters[1];
+      ichigo.hp = ichigo.maxHp * 0.5; // low enough to pop Bankai
+      ichigo.activateBankai();
+      if (!ichigo.isChannelingBankai && ichigo.bankaiChargeTimer <= 0) {
+        throw new Error(`Ichigo failed to start Bankai channeling!`);
+      }
+      // Kill Ichigo mid-channeling
+      ichigo.hp = 0;
+      ichigo.isDead = true;
+      ichigo.onDeath();
+      if (ichigo._bankaiVoiceHandle !== null || ichigo._bankaiVoicePlaying || ichigo._isBankaiVoicelinePlaying()) {
+        throw new Error(`Bankai voice handle or playing state remained active on death!`);
+      }
+    }
+
+    // 2. Hollow Mask Formation Death Test
+    {
+      reinitFighters(true);
+      const ichigo = state.fighters[0];
+      const sukuna = state.fighters[1];
+      ichigo.bankaiActive = true;
+      ichigo.bankaiTimer = 1000;
+      ichigo.activateHollowMask();
+      if (ichigo.hollowMaskFormationTimer <= 0) {
+        throw new Error(`Ichigo failed to start Hollow Mask formation!`);
+      }
+      // Kill Ichigo mid-channeling
+      ichigo.hp = 0;
+      ichigo.isDead = true;
+      ichigo.onDeath();
+      if (ichigo._hollowVoiceHandle !== null || ichigo._hollowFlareHandle !== null || ichigo._hollowVoicePlaying || ichigo._isHollowTransformationVoicelinePlaying()) {
+        throw new Error(`Hollow voice/flare handle or playing state remained active on death!`);
+      }
+    }
+
+    // 3. Normal Getsuga Channeling Death Test
+    {
+      reinitFighters(true);
+      const ichigo = state.fighters[0];
+      const sukuna = state.fighters[1];
+      ichigo.fireGetsuga(sukuna, false);
+      if (!ichigo.isChannelingGetsuga) {
+        throw new Error(`Ichigo failed to start Getsuga Tensho channeling!`);
+      }
+      // Kill Ichigo mid-channeling
+      ichigo.hp = 0;
+      ichigo.isDead = true;
+      ichigo.onDeath();
+      if (ichigo._getsugaVoiceHandle !== null || ichigo._getsugaChargeHandle !== null || ichigo._getsugaVoicePlaying || ichigo._isGetsugaVoicelinePlaying()) {
+        throw new Error(`Getsuga voice/charge handle or playing state remained active on death!`);
+      }
+    }
+
+    // 4. Final Massive Getsuga Channeling Death Test
+    {
+      reinitFighters(true);
+      const ichigo = state.fighters[0];
+      const sukuna = state.fighters[1];
+      ichigo.bankaiActive = true;
+      ichigo.fireFinalMassiveGetsuga(sukuna);
+      if (!ichigo.isChannelingGetsuga || !ichigo.isFinalMassiveGetsuga) {
+        throw new Error(`Ichigo failed to start Final Massive Getsuga channeling!`);
+      }
+      // Kill Ichigo mid-channeling
+      ichigo.hp = 0;
+      ichigo.isDead = true;
+      ichigo.onDeath();
+      if (ichigo._finalGetsugaVoiceHandle !== null || ichigo._finalGetsugaVoicePlaying || ichigo._isFinalGetsugaVoicelinePlaying()) {
+        throw new Error(`Final Getsuga voice handle or playing state remained active on death!`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO AUDIO CUTOFF ON DEATH TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Ichigo Shunpo Blitz Initial Cooldown Test
+  console.log('⚡ [Ichigo Shunpo Initial Cooldown Test] Verifying Shunpo Blitz starts on initial cooldown after countdown and resets per round...');
+  try {
+    const IchigoClass = FIGHTER_CLASS_MAP['ichigo'];
+    const dummyOpponent = new (FIGHTER_CLASS_MAP['ichigo'])({ startX: 200, startY: 200 });
+    const ichigo = new IchigoClass({ startX: 300, startY: 250 });
+    const expectedInitCD = CONFIG.ichigo?.initialShunpoCooldown ?? 180;
+
+    // 1. Verify constructor sets initial cooldown
+    if (ichigo.shunpoCooldown !== expectedInitCD) {
+      throw new Error(`Ichigo constructor did not set initial shunpoCooldown! Expected: ${expectedInitCD}, Got: ${ichigo.shunpoCooldown}`);
+    }
+
+    // 2. Verify AI cannot trigger Shunpo on frame 1 of battle
+    state.fighters = [ichigo, dummyOpponent];
+    state.illusions = [];
+    ichigo.update(dummyOpponent, 0, state.arena);
+    if (ichigo.shunpoComboActive || ichigo.isShunpoDashing) {
+      throw new Error(`Ichigo triggered Shunpo Blitz on frame 1 of battle despite initial cooldown!`);
+    }
+
+    // 3. Verify reset() restores initial cooldown between rounds
+    ichigo.shunpoCooldown = 0;
+    ichigo.reset();
+    if (ichigo.shunpoCooldown !== expectedInitCD) {
+      throw new Error(`Ichigo reset() did not restore initial shunpoCooldown! Expected: ${expectedInitCD}, Got: ${ichigo.shunpoCooldown}`);
+    }
+
+    // 4. Verify cooldown decays during active gameplay and triggers Shunpo when reaching 0
+    let framesTicked = 0;
+    while (ichigo.shunpoCooldown > 0 && !ichigo.shunpoComboActive && !ichigo.isShunpoDashing && framesTicked < 300) {
+      state.frameCount = (state.frameCount || 0) + 1;
+      dummyOpponent.x = ichigo.x + 80;
+      dummyOpponent.y = ichigo.y + 80;
+      ichigo.update(dummyOpponent, 0, state.arena);
+      framesTicked++;
+    }
+    if (framesTicked !== expectedInitCD) {
+      throw new Error(`Expected initial cooldown to last ${expectedInitCD} frames, but combo triggered after ${framesTicked} frames!`);
+    }
+    if (!ichigo.shunpoComboActive && !ichigo.isShunpoDashing) {
+      throw new Error(`Ichigo failed to trigger Shunpo Blitz once initial cooldown expired!`);
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO SHUNPO INITIAL COOLDOWN TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Ichigo Finishing Ability & Attack Animation Preservation Test
+  console.log('🗡️ [Ichigo Finishing Ability & Attack Animation Preservation Test] Verifying Ichigo does not cut off basic attack animation, Getsuga release swing, recovery, or Shunpo combo on lethal win...');
+  try {
+    const IchigoClass = FIGHTER_CLASS_MAP['ichigo'];
+    state.mode = '1v1';
+    state.gameState = 'playing';
+
+    // 1. Basic Sword Cleave Attack Animation Preservation
+    const ichigo1 = new IchigoClass({ startX: 200, startY: 200 });
+    const dummy1 = new (FIGHTER_CLASS_MAP['sukuna'])({ startX: 240, startY: 200 });
+    dummy1.hp = 1; // 1 HP -> lethal hit incoming
+    state.fighters = [ichigo1, dummy1];
+    state.illusions = [];
+
+    ichigo1.performMeleeCleave(dummy1);
+    if (dummy1.hp > 0) {
+      throw new Error(`Expected dummy opponent to die from basic melee cleave! HP=${dummy1.hp}`);
+    }
+    if (ichigo1.slashSwingTimer <= 0) {
+      throw new Error(`Expected slashSwingTimer > 0 during basic sword swing follow-through! Got ${ichigo1.slashSwingTimer}`);
+    }
+    if (!ichigo1.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned false during basic sword swing follow-through!`);
+    }
+
+    // Step through remaining swing frames
+    while (ichigo1.slashSwingTimer > 0) {
+      ichigo1.update(dummy1, 0, state.arena);
+    }
+    if (ichigo1.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned true after basic sword swing completed!`);
+    }
+
+    // 2. Getsuga Tensho Release Swing & Recovery Preservation
+    const ichigo2 = new IchigoClass({ startX: 200, startY: 200 });
+    const dummy2 = new (FIGHTER_CLASS_MAP['sukuna'])({ startX: 350, startY: 200 });
+    dummy2.hp = 0; // Dummy dead
+    state.fighters = [ichigo2, dummy2];
+
+    ichigo2.isChannelingGetsuga = true;
+    ichigo2.getsugaChargeTimer = 1;
+    if (!ichigo2.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned false during Getsuga channeling!`);
+    }
+
+    // Trigger release
+    ichigo2._releaseGetsuga();
+    if (ichigo2.slashSwingTimer <= 0 || ichigo2.getsugaRecoveryTimer <= 0) {
+      throw new Error(`Expected slashSwingTimer > 0 and getsugaRecoveryTimer > 0 on Getsuga release!`);
+    }
+    if (!ichigo2.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned false during Getsuga release swing/recovery!`);
+    }
+
+    // Step through recovery frames
+    while (ichigo2.getsugaRecoveryTimer > 0 || ichigo2.slashSwingTimer > 0) {
+      ichigo2.update(dummy2, 0, state.arena);
+    }
+    if (ichigo2.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned true after Getsuga release swing and recovery completed!`);
+    }
+
+    // 3. Final Massive Getsuga Release & Recovery Preservation
+    const ichigo3 = new IchigoClass({ startX: 200, startY: 200 });
+    const dummy3 = new (FIGHTER_CLASS_MAP['sukuna'])({ startX: 350, startY: 200 });
+    dummy3.hp = 0;
+    state.fighters = [ichigo3, dummy3];
+
+    ichigo3.isFinalMassiveGetsuga = true;
+    ichigo3._releaseGetsuga();
+    if (!ichigo3.isFinalGetsugaRecovery || ichigo3.getsugaRecoveryTimer <= 0) {
+      throw new Error(`Expected isFinalGetsugaRecovery = true and getsugaRecoveryTimer > 0 on Final Massive Getsuga release!`);
+    }
+    if (!ichigo3.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned false during Final Massive Getsuga recovery!`);
+    }
+
+    // Step through final recovery frames
+    while (ichigo3.getsugaRecoveryTimer > 0 || ichigo3.slashSwingTimer > 0) {
+      ichigo3.update(dummy3, 0, state.arena);
+    }
+    if (ichigo3.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned true after Final Massive Getsuga recovery completed!`);
+    }
+
+    // 4. Shunpo Multi-Strike Combo Preservation
+    const ichigo4 = new IchigoClass({ startX: 200, startY: 200 });
+    const dummy4 = new (FIGHTER_CLASS_MAP['sukuna'])({ startX: 280, startY: 200 });
+    state.fighters = [ichigo4, dummy4];
+    ichigo4.shunpoCooldown = 0;
+
+    ichigo4.performShunpoGetsugaCombo(dummy4);
+    if (!ichigo4.shunpoComboActive && !ichigo4.isShunpoDashing) {
+      throw new Error(`Expected shunpoComboActive or isShunpoDashing = true!`);
+    }
+    if (!ichigo4.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned false during Shunpo combo initiation!`);
+    }
+
+    // Step through Shunpo combo until fully finished
+    let comboStepLimit = 500;
+    while ((ichigo4.shunpoComboActive || ichigo4.isShunpoDashing || ichigo4.isChannelingGetsuga || ichigo4.getsugaRecoveryTimer > 0 || ichigo4.slashSwingTimer > 0) && comboStepLimit > 0) {
+      ichigo4.update(dummy4, 0, state.arena);
+      comboStepLimit--;
+    }
+    ichigo4._getsugaVoicePlaying = false;
+    ichigo4._getsugaVoiceEndTime = 0;
+    ichigo4._finalGetsugaVoicePlaying = false;
+    ichigo4._finalGetsugaVoiceEndTime = 0;
+    if (ichigo4.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned true after full Shunpo combo completed!`);
+    }
+  } catch (err) {
+    console.error('❌ [ICHIGO FINISHING ABILITY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Saitama Caped Baldy Reflexes Tick Damage Disabled Test
+  console.log('🥋 [Saitama Caped Baldy Reflexes Tick Damage Disabled Test] Verifying Saitama cannot dodge any tick damage skills...');
+  try {
+    const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+    const saitama = new SaitamaClass({ startX: 250, startY: 250 });
+    const ichigo = new (FIGHTER_CLASS_MAP['ichigo'])({ startX: 100, startY: 250 });
+    state.fighters = [saitama, ichigo];
+    state.illusions = [];
+
+    // Force 100% dodge chance for deterministic test
+    CONFIG.saitama = CONFIG.saitama || {};
+    const origDodgeChance = CONFIG.saitama.dodgeChance;
+    CONFIG.saitama.dodgeChance = 1.0;
+
+    // 1. Verify Getsuga Tensho tick damage CANNOT be dodged
+    saitama.hp = 100;
+    const preGetsugaHp = saitama.hp;
+    const getsugaResult = saitama.takeDamage(10, ichigo, { isSkill: true, isGetsuga: true, getsugaForm: 'bankai', isTickDamage: true });
+    if (saitama.hp >= preGetsugaHp) {
+      throw new Error(`Saitama should NOT dodge Getsuga tick damage, but HP did not decrease!`);
+    }
+
+    // 2. Verify Hollow Purple continuous DPS CANNOT be dodged
+    saitama.hp = 100;
+    const prePurpleHp = saitama.hp;
+    saitama.takeDamage(15, ichigo, { isPurpleDPS: true, isHollowPurple: true });
+    if (saitama.hp >= prePurpleHp) {
+      throw new Error(`Saitama should NOT dodge Hollow Purple DPS tick damage!`);
+    }
+
+    // 3. Verify Pure Love Beam CANNOT be dodged
+    saitama.hp = 100;
+    const preBeamHp = saitama.hp;
+    saitama.takeDamage(12, ichigo, { isPureLoveBeam: true, isBeam: true });
+    if (saitama.hp >= preBeamHp) {
+      throw new Error(`Saitama should NOT dodge Pure Love Beam tick damage!`);
+    }
+
+    // 4. Verify Genos Beam / Flurry CANNOT be dodged
+    saitama.hp = 100;
+    const preGenosHp = saitama.hp;
+    saitama.takeDamage(8, ichigo, { isGenosBeam: true, isMachineGunBlow: true, isTickDamage: true });
+    if (saitama.hp >= preGenosHp) {
+      throw new Error(`Saitama should NOT dodge Genos Beam / Flurry tick damage!`);
+    }
+
+    // 5. Verify direct attacks / projectiles CAN still be dodged
+    saitama.hp = 100;
+    saitama.dodgeCooldown = 0;
+    const preDirectHp = saitama.hp;
+    saitama.takeDamage(20, ichigo, { isProjectile: true, isBasic: true });
+    if (saitama.hp < preDirectHp) {
+      throw new Error(`Saitama should be able to dodge direct projectile attacks when dodgeChance=1.0!`);
+    }
+
+    // Restore original dodge chance
+    CONFIG.saitama.dodgeChance = origDodgeChance;
+  } catch (err) {
+    console.error('❌ [SAITAMA TICK DAMAGE DODGE TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Sukuna Model Hair Asset Test
+  console.log('💇 [Sukuna Model Hair Asset Test] Verifying Sukuna hair asset image loader and drawSukunaBody rendering...');
+  try {
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const sukuna = new SukunaClass({ startX: 300, startY: 300 });
+    
+    mockCtx.resetStackDepth();
+    sukuna.drawBody(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Sukuna drawBody resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    sukuna.drawSkin(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Sukuna drawSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+  } catch (err) {
+    console.error('❌ [SUKUNA HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Gojo Model Hair Asset Test
+  console.log('💇 [Gojo Model Hair Asset Test] Verifying Gojo hair asset image loader, facing directions, and drawGojoBody rendering...');
+  try {
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const gojo = new GojoClass({ startX: 300, startY: 300 });
+    
+    mockCtx.resetStackDepth();
+    gojo.drawBody(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Gojo drawBody resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    gojo.drawSkin(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Gojo drawSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test facing left mirroring
+    gojo.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    gojo.drawBody(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Gojo drawBody (facing left) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+  } catch (err) {
+    console.error('❌ [GOJO HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Makima Model Hair Asset Test
+  console.log('💇 [Makima Model Hair Asset Test] Verifying Makima hair asset image loader, drawn pixel body, facing directions, and drawMakimaSkin rendering...');
+  try {
+    const MakimaClass = FIGHTER_CLASS_MAP['makima'];
+    const makima = new MakimaClass({ startX: 300, startY: 300 });
+    
+    mockCtx.resetStackDepth();
+    makima.drawBody(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Makima drawBody resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    makima.drawSkin(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Makima drawSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test facing left mirroring
+    makima.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    makima.drawSkin(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Makima drawSkin (facing left) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+  } catch (err) {
+    console.error('❌ [MAKIMA HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Reze Model Hair Asset Test
+  console.log('💇 [Reze Model Hair Asset Test] Verifying Reze hair asset image loader, drawn pixel body, facing directions, and drawRezeSkin rendering...');
+  try {
+    const RezeClass = FIGHTER_CLASS_MAP['reze'];
+    const reze = new RezeClass({ startX: 300, startY: 300 });
+    
+    mockCtx.resetStackDepth();
+    drawRezeHumanPixelBody(mockCtx, reze.r || 25, Date.now());
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawRezeHumanPixelBody resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawRezeSkin(mockCtx, reze);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawRezeSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    reze.draw(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Reze draw resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test facing left mirroring
+    reze.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawRezeSkin(mockCtx, reze);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawRezeSkin (facing left) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test Hybrid Bomb Devil Form drawSkin
+    reze.isHybridModeActive = true;
+    mockCtx.resetStackDepth();
+    drawRezeSkin(mockCtx, reze);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawRezeSkin (Bomb Devil form) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+    reze.isHybridModeActive = false;
+  } catch (err) {
+    console.error('❌ [REZE HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Ichigo Model Hair Asset Test
+  console.log('💇 [Ichigo Model Hair Asset Test] Verifying Ichigo hair asset image loader, facing directions, and drawIchigoSkin rendering...');
+  try {
+    const IchigoClass = FIGHTER_CLASS_MAP['ichigo'];
+    const ichigo = new IchigoClass({ startX: 300, startY: 300 });
+
+    mockCtx.resetStackDepth();
+    _drawIchigoHair(mockCtx, ichigo.r || 25, false);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`_drawIchigoHair resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawIchigoSkin(mockCtx, ichigo);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawIchigoSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    ichigo.draw(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Ichigo draw resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test facing left mirroring
+    ichigo.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawIchigoSkin(mockCtx, ichigo);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawIchigoSkin (facing left) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test Bankai Form drawSkin
+    ichigo.bankaiActive = true;
+    mockCtx.resetStackDepth();
+    drawIchigoSkin(mockCtx, ichigo);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawIchigoSkin (Bankai form) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+    ichigo.bankaiActive = false;
+  } catch (err) {
+    console.error('❌ [ICHIGO HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Gojo Hollow Purple Wall Collision Test
+  console.log('🔮 [Gojo Hollow Purple Wall Collision Test] Verifying Purple stops completely on wall contact without sliding...');
+  try {
+    const purpleBehavior = new GojoPurpleBehavior();
+    const testArena = { x: 50, y: 50, width: 800, height: 600, shape: 'rect' };
+    const halfR = 25;
+
+    // Test 1: Diagonal collision with left wall (vx < 0, vy > 0)
+    const projLeft = {
+      x: testArena.x + 10,
+      y: testArena.y + 150,
+      r: 50,
+      vx: -8,
+      vy: 6,
+      life: 200,
+      behaviorType: 'gojo_purple'
+    };
+    state.arena = testArena;
+    const expiredLeft = purpleBehavior.checkExpire(projLeft, projectileSystem);
+    if (expiredLeft) {
+      throw new Error(`Purple expired on wall collision instead of staying pinned!`);
+    }
+    if (projLeft.x !== testArena.x + halfR) {
+      throw new Error(`Purple x-coordinate not clamped properly on left wall! Expected ${testArena.x + halfR}, got ${projLeft.x}`);
+    }
+    if (projLeft.vx !== 0 || projLeft.vy !== 0) {
+      throw new Error(`Purple failed to stop on left wall collision! Slid with vx=${projLeft.vx}, vy=${projLeft.vy}`);
+    }
+
+    // Test 2: Diagonal collision with right wall (vx > 0, vy > 0)
+    const projRight = {
+      x: testArena.x + testArena.width - 10,
+      y: testArena.y + 200,
+      r: 50,
+      vx: 8,
+      vy: 6,
+      life: 200,
+      behaviorType: 'gojo_purple'
+    };
+    purpleBehavior.checkExpire(projRight, projectileSystem);
+    if (projRight.x !== testArena.x + testArena.width - halfR) {
+      throw new Error(`Purple x-coordinate not clamped properly on right wall! Expected ${testArena.x + testArena.width - halfR}, got ${projRight.x}`);
+    }
+    if (projRight.vx !== 0 || projRight.vy !== 0) {
+      throw new Error(`Purple failed to stop on right wall collision! Slid with vx=${projRight.vx}, vy=${projRight.vy}`);
+    }
+
+    // Test 3: Diagonal collision with top wall (vx > 0, vy < 0)
+    const projTop = {
+      x: testArena.x + 250,
+      y: testArena.y + 10,
+      r: 50,
+      vx: 8,
+      vy: -6,
+      life: 200,
+      behaviorType: 'gojo_purple'
+    };
+    purpleBehavior.checkExpire(projTop, projectileSystem);
+    if (projTop.y !== testArena.y + halfR) {
+      throw new Error(`Purple y-coordinate not clamped properly on top wall! Expected ${testArena.y + halfR}, got ${projTop.y}`);
+    }
+    if (projTop.vx !== 0 || projTop.vy !== 0) {
+      throw new Error(`Purple failed to stop on top wall collision! Slid with vx=${projTop.vx}, vy=${projTop.vy}`);
+    }
+
+    // Test 4: Diagonal collision with bottom wall (vx < 0, vy > 0)
+    const projBottom = {
+      x: testArena.x + 250,
+      y: testArena.y + testArena.height - 10,
+      r: 50,
+      vx: -8,
+      vy: 6,
+      life: 200,
+      behaviorType: 'gojo_purple'
+    };
+    purpleBehavior.checkExpire(projBottom, projectileSystem);
+    if (projBottom.y !== testArena.y + testArena.height - halfR) {
+      throw new Error(`Purple y-coordinate not clamped properly on bottom wall! Expected ${testArena.y + testArena.height - halfR}, got ${projBottom.y}`);
+    }
+    if (projBottom.vx !== 0 || projBottom.vy !== 0) {
+      throw new Error(`Purple failed to stop on bottom wall collision! Slid with vx=${projBottom.vx}, vy=${projBottom.vy}`);
+    }
+
+    // Test 5: Circular arena perimeter collision
+    const circleArena = { x: 50, y: 50, width: 800, height: 800, radius: 400, shape: 'circle' };
+    state.arena = circleArena;
+    const projCircle = {
+      x: circleArena.x + circleArena.width / 2 + 390,
+      y: circleArena.y + circleArena.height / 2 + 100,
+      r: 50,
+      vx: 8,
+      vy: 8,
+      life: 200,
+      behaviorType: 'gojo_purple'
+    };
+    purpleBehavior.checkExpire(projCircle, projectileSystem);
+    if (projCircle.vx !== 0 || projCircle.vy !== 0) {
+      throw new Error(`Purple failed to stop on circular arena wall collision! Slid with vx=${projCircle.vx}, vy=${projCircle.vy}`);
+    }
+  } catch (err) {
+    console.error('❌ [GOJO PURPLE WALL COLLISION TEST ERROR]:', err);
     errors++;
   }
 

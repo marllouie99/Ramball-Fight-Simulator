@@ -539,10 +539,19 @@ export function shouldDuckArenaBgm() {
   return false;
 }
 
+export function isArenaBgmPlaying() {
+  return _isArenaBgmPlaying;
+}
+
 export function startArenaBgm(forceNew = false) {
   const trackId = getSavedArenaBgmId();
   if (trackId === 'off') {
     stopArenaBgm(true);
+    return;
+  }
+
+  // If already playing and forceNew is false, keep playing seamlessly without restarting
+  if (!forceNew && _isArenaBgmPlaying && _currentTrackSrc) {
     return;
   }
 

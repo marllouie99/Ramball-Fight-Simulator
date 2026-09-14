@@ -4,8 +4,9 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks, spawnParrySparksEffect } from '../../../graphics/particles/sparkEffect.js';
 import { applyDamageToTarget } from '../../fighter.js';
-import { applyHollowLifesteal, activateHollowMask } from './ichigoHollow.js';
-import { fireGetsuga, isAboutToUnleashNormalGetsuga, isGetsugaActive, isGetsugaVoicelinePlaying, isFinalGetsugaVoicelinePlaying, stopFinalGetsugaVoiceline } from './ichigoGetsuga.js';
+import { applyHollowLifesteal, activateHollowMask, isHollowTransformationVoicelinePlaying, stopHollowTransformationVoiceline } from './ichigoHollow.js';
+import { stopBankaiVoiceline } from './ichigoBankai.js';
+import { fireGetsuga, isAboutToUnleashNormalGetsuga, isGetsugaActive, isGetsugaVoicelinePlaying, isFinalGetsugaVoicelinePlaying, stopFinalGetsugaVoiceline, getCardinalAimAngle, snapToCardinalAngle } from './ichigoGetsuga.js';
 
 /**
  * Clamps coordinates strictly inside the arena bounds to prevent flash stepping outside arena walls.
@@ -208,7 +209,7 @@ export function performShunpoGetsugaCombo(fighter, target) {
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, isBankai ? 'TENSA SHUNPO!' : 'SHUNPO!', isBankai ? '#DC143C' : '#FFFFFF');
   fighter._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
 
-  if (isMask) {
+  if (isMask && !isHollowTransformationVoicelinePlaying(fighter)) {
     const noiseChance = CONFIG.ichigo?.soundChances?.hollowFlurryNoise ?? 0.50;
     if (Math.random() < noiseChance) {
       const hollowNoise = CONFIG.ichigo?.sounds?.hollowFlurryNoise || 'Assets/Sound Effects/Attacks/ichigo-attack-hollow-noise.mp3';
@@ -388,7 +389,10 @@ export function handleIchigoTakeDamage(fighter, amount, attacker, opts, superTak
   const isAboutToUnleashNormal = isAboutToUnleashNormalGetsuga(fighter);
   const isBusyWithFinalGetsuga = (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.getsugaRecoveryTimer > 0 && fighter.isFinalGetsugaRecovery) || isFinalGetsugaVoicelinePlaying(fighter);
   const isComboActive = isShunpoComboActive(fighter);
-  if (!isAboutToUnleashNormal && !isBusyWithFinalGetsuga && !isComboActive && (opts.isWallSlam || fighter.isGrabbedByMahoraga || fighter.isParalyzedByMahoraga || fighter.isTargetOfAmbush)) {
+  const isChannelingHollow = Boolean(fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter._hollowVoicelineWait);
+  const isChannelingBankai = Boolean(fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0);
+
+  if (!isAboutToUnleashNormal && !isBusyWithFinalGetsuga && !isComboActive && !isChannelingHollow && !isChannelingBankai && (opts.isWallSlam || fighter.isGrabbedByMahoraga || fighter.isParalyzedByMahoraga || fighter.isTargetOfAmbush)) {
     stopFinalGetsugaVoiceline(fighter);
     fighter.interruptAttacks(true);
   }
@@ -464,18 +468,30 @@ export function handleIchigoTakeDamage(fighter, amount, attacker, opts, superTak
   const res = superTakeDamage(finalAmount, attacker, opts);
 
   if (fighter.isDead || fighter.hp <= 0) {
-    stopFinalGetsugaVoiceline(fighter);
+    if (typeof fighter.stopAllSkillAudios === 'function') {
+      fighter.stopAllSkillAudios(true);
+    } else {
+      stopFinalGetsugaVoiceline(fighter, true);
+      stopHollowTransformationVoiceline(fighter, true);
+      stopBankaiVoiceline(fighter, true);
+    }
     fighter.interruptAttacks(true);
-  } else if (isBusyWithFinalGetsuga || isAboutToUnleashNormal || isComboActive) {
-    fighter.hitStunTimer = 0; // Supreme Poise: immune to flinch / hit-stun during Grand Finisher, Shunpo Combo & Normal Getsuga unleash
+  } else if (isBusyWithFinalGetsuga || isAboutToUnleashNormal || isComboActive || isChannelingHollow || isChannelingBankai) {
+    fighter.hitStunTimer = 0; // Supreme Poise: immune to flinch / hit-stun during Grand Finisher, Shunpo Combo, Normal Getsuga, Hollow Awakening, & Bankai
   }
 
-  // Immediate Hollow Mask trigger upon taking critical damage below 70% HP
+  // Immediate Hollow Mask trigger upon taking critical damage
   const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
   const isPendingFinalGetsuga = fighter.bankaiActive && !fighter.bankaiFinalGetsugaTriggered && fighter.bankaiTimer > 0 && fighter.bankaiTimer <= finalThreshold;
-  const canHollowAwaken = Boolean(fighter.bankaiActive || fighter.bankaiUsed);
+  const canHollowAwaken = Boolean(fighter.bankaiActive);
   const isBusyWithGetsuga = isAboutToUnleashNormal || fighter.isChannelingGetsuga || isBusyWithFinalGetsuga || isGetsugaVoicelinePlaying(fighter);
-  if (canHollowAwaken && !fighter.hollowMaskUsed && !fighter.isTargetOfAmbush && !isBusyWithGetsuga && !isPendingFinalGetsuga && !fighter.isChannelingBankai && !fighter.isParalyzedOrBeamTrapped() && fighter.hp > 0 && fighter.hp / fighter.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold ?? 0.70)) {
+
+  const reqDamage = (fighter.maxHp || 240) * (CONFIG.ichigo?.hollowRechargeHpRatio ?? 0.20);
+  const baseline = fighter.hollowRechargeHpBaseline !== undefined ? fighter.hollowRechargeHpBaseline : fighter.hp;
+  const damageTaken = Math.max(0, baseline - fighter.hp);
+  const isHollowReady = damageTaken >= reqDamage;
+
+  if (canHollowAwaken && !fighter.hollowMaskActive && !fighter.hollowMaskFormationTimer && !fighter.hollowBurstTimer && !fighter.isTargetOfAmbush && !isBusyWithGetsuga && !isPendingFinalGetsuga && !fighter.isChannelingBankai && !fighter.isParalyzedOrBeamTrapped() && fighter.hp > 0 && isHollowReady) {
     activateHollowMask(fighter);
   }
 
@@ -555,15 +571,25 @@ export function updateShunpoCombat(fighter, opponent) {
       const target = fighter.shunpoTarget;
 
       if (fighter.isShunpoDisengaging) {
-        // Disengage Flash Step Completed: Unleash Getsuga Tensho
+        // Disengage Flash Step Completed: Unleash Getsuga Tensho toward target
         fighter.isShunpoDisengaging = false;
         fighter.shunpoComboActive = false;
         if (target && target.hp > 0 && !target.isDead) {
-          fighter.aim(target);
+          const targetY = (target.y !== undefined ? target.y : fighter.y) - (target.z || 0);
+          const ichigoY = fighter.y - (fighter.z || 0);
+          const dx = (target.x !== undefined ? target.x : fighter.x) - fighter.x;
+          const dy = targetY - ichigoY;
+          const castAngle = Math.atan2(dy, dx);
+          fighter.gunAngle = castAngle;
+          fighter.angle = castAngle;
           fireGetsuga(fighter, target, true);
         } else {
           fighter.shunpoTarget = null;
-          fighter.resumeMovement(opponent);
+          let backwardAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)) + Math.PI;
+          if (opponent && opponent.hp > 0) {
+            backwardAngle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x);
+          }
+          fighter.resumeMovement(null, 1.0, backwardAngle);
         }
         return true;
       }
@@ -678,7 +704,14 @@ export function updateShunpoCombat(fighter, opponent) {
       if (fighter.shunpoDisengageDelayTimer <= 0) {
         const target = fighter.shunpoTarget;
         if (target && target.hp > 0 && !target.isDead) {
-          const backAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
+          const dx = fighter.x - target.x;
+          const dy = fighter.y - target.y;
+          let cardinalBackAngle;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            cardinalBackAngle = dx >= 0 ? 0 : Math.PI;
+          } else {
+            cardinalBackAngle = dy >= 0 ? (Math.PI / 2) : (-Math.PI / 2);
+          }
           const disengageDist = isBankai 
             ? (CONFIG.ichigo?.bankaiComboDisengageDistance || CONFIG.ichigo?.comboDisengageDistance || 350) 
             : (CONFIG.ichigo?.comboDisengageDistance || 290);
@@ -686,8 +719,8 @@ export function updateShunpoCombat(fighter, opponent) {
           const startClamped = clampToArena(fighter, fighter.x, fighter.y);
           fighter.shunpoStartX = startClamped.x;
           fighter.shunpoStartY = startClamped.y;
-          const rawTx = target.x + Math.cos(backAngle) * disengageDist;
-          const rawTy = target.y + Math.sin(backAngle) * disengageDist;
+          const rawTx = target.x + Math.cos(cardinalBackAngle) * disengageDist;
+          const rawTy = target.y + Math.sin(cardinalBackAngle) * disengageDist;
           const targetClamped = clampToArena(fighter, rawTx, rawTy);
 
           fighter.shunpoTargetX = targetClamped.x;
@@ -716,7 +749,11 @@ export function updateShunpoCombat(fighter, opponent) {
         } else {
           fighter.shunpoComboActive = false;
           fighter.shunpoTarget = null;
-          fighter.resumeMovement(opponent);
+          let backwardAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)) + Math.PI;
+          if (opponent && opponent.hp > 0) {
+            backwardAngle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x);
+          }
+          fighter.resumeMovement(null, 1.0, backwardAngle);
         }
       }
     } else if (fighter.shunpoComboStep < maxSteps && fighter.shunpoComboDelayTimer > 0) {

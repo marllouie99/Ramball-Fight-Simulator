@@ -198,9 +198,12 @@ export class GojoFighter extends Fighter {
     this.combatAuraOpacity = 0;
     this.purpleRecoveryTimer = 0;
     this.purpleRetreatTimer = 0;
+    this.purpleCastAngle = null;
     this.redEffectTimer = 0;
     this.redBuildupPhase = false;
     this.redDetonated = false;
+    this.redTargetAngle = null;
+    this._redTargetRef = null;
     this.infinityBlockTimer = 0;
     this.teleportSlideTimer = 0;
     this.domainSlideTimer = 0;
@@ -284,14 +287,12 @@ export class GojoFighter extends Fighter {
 
     const penaltyCD = CONFIG.gojo?.interruptCooldown ?? 270; // 4.5s penalty CD on cancellation
 
-    const isHitByGetsuga = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || isSuppressedByGetsuga(this));
     const isHardCC = Boolean(
       forceCancelAll ||
       this.isTargetOfAmbush ||
       (this.timeStopTimer || 0) > 0 ||
       this.isFrozenByInfinity ||
       (this.silenceTimer || 0) > 0 ||
-      isHitByGetsuga ||
       this.isChainedByMakima ||
       this.caughtInSaitamaCounter ||
       (this.hp <= 0) ||
@@ -949,26 +950,17 @@ export class GojoFighter extends Fighter {
         this.infinityCooldown = 0;
         this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05);
       }
-      const isGetsugaSuppressed = Boolean(this.isDraggedByGetsuga || (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) || (typeof isSuppressedByGetsuga === 'function' && isSuppressedByGetsuga(this)));
-      if (isGetsugaSuppressed) {
-        // Rule #3: Keep facing direction tracking target while dragged
-        if (opponent && !opponent.isDead) {
-          const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-          this.gunAngle = targetAngle;
-          this.angle = targetAngle;
-        }
-      }
       return; // MANDATORY: Stop update execution so fighter is frozen/carried!
     }
 
     if (this.redEffectTimer > 0) {
-      // Keep aim strictly locked to the initial cardinal angle; no auto-aim snapping
-      const cardinalAngle = (this.redTargetAngle !== undefined && !Number.isNaN(this.redTargetAngle))
-        ? snapAngleToCardinal(this.redTargetAngle)
+      // Keep aim strictly locked to the initial committed angle; no auto-aim snapping or aim rotation
+      const lockedAngle = (this.redTargetAngle !== undefined && !Number.isNaN(this.redTargetAngle))
+        ? this.redTargetAngle
         : 0;
-      this.redTargetAngle = cardinalAngle;
-      this.gunAngle = cardinalAngle;
-      this.angle = cardinalAngle;
+      this.redTargetAngle = lockedAngle;
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
 
       // Detonation threshold — trigger exactly once when buildup window ends
       const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 100;
@@ -1303,15 +1295,20 @@ export class GojoFighter extends Fighter {
 
     // Check for Hollow Purple (Skill)
     // Don't cast if Sukuna is already channeling Fuga to prevent simultaneous freezes
-    // Gojo unleashes Hollow Purple only when an enemy is detected to his Left or Right angle
+    // Gojo unleashes Hollow Purple at any angle towards an aligned enemy within range
     if (!this.isChannelingAnySkill() && !this.isPurpleActive() && this.purpleCooldown <= 0 && this.forcedMeleeTimer <= 0 && (!opponent || !opponent.isChannelingDivineFlame)) {
-      const horizontalTarget = this._findHorizontallyAlignedEnemy(opponent);
-      if (horizontalTarget) {
-        const isTargetLeft = horizontalTarget.x < this.x;
-        const horizontalAngle = isTargetLeft ? Math.PI : 0;
-        this.gunAngle = horizontalAngle;
-        this.angle = horizontalAngle;
-        this.purpleCastAngle = horizontalAngle;
+      const purpleTarget = (typeof this._findAlignedEnemyForPurple === 'function')
+        ? this._findAlignedEnemyForPurple(opponent)
+        : this._findHorizontallyAlignedEnemy(opponent);
+      if (purpleTarget) {
+        const targetY = purpleTarget.y - (purpleTarget.z || 0);
+        const gojoY = this.y - (this.z || 0);
+        const dx = purpleTarget.x - this.x;
+        const dy = targetY - gojoY;
+        const targetAngle = Math.atan2(dy, dx);
+        this.gunAngle = targetAngle;
+        this.angle = targetAngle;
+        this.purpleCastAngle = targetAngle;
         this.isChannelingPurple = true;
         this.is200PercentChannel = (this.purpleUseCount === 1);
         const baseCharge = CONFIG.gojo?.purpleChargeMax || 120;
@@ -1373,12 +1370,12 @@ export class GojoFighter extends Fighter {
       this.z = Math.sin(levitateProgress * Math.PI * 0.5) * maxLevitationHeight;
 
       // Keep aim strictly locked to the committed purpleCastAngle; no auto-aim snapping
-      const horizontalAngle = (this.purpleCastAngle !== undefined && !Number.isNaN(this.purpleCastAngle))
+      const lockedAngle = (this.purpleCastAngle !== undefined && this.purpleCastAngle !== null && !Number.isNaN(this.purpleCastAngle))
         ? this.purpleCastAngle
-        : ((Math.cos(this.gunAngle || 0) < 0) ? Math.PI : 0);
-      this.purpleCastAngle = horizontalAngle;
-      this.gunAngle = horizontalAngle;
-      this.angle = horizontalAngle;
+        : ((opponent) ? Math.atan2((opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0)), opponent.x - this.x) : 0);
+      this.purpleCastAngle = lockedAngle;
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
 
       if (opponent && !opponent.isDead) {
         // Lapse Blue Gravitational Distortion: Slows opponent movement while mixing Red & Blue into Purple!
@@ -1409,11 +1406,11 @@ export class GojoFighter extends Fighter {
         this.z = Math.max(0, this.z - 0.5);
       }
       // Keep facing orientation locked to cast angle during recovery stasis
-      const horizontalAngle = (this.purpleCastAngle !== undefined && !Number.isNaN(this.purpleCastAngle))
+      const lockedAngle = (this.purpleCastAngle !== undefined && this.purpleCastAngle !== null && !Number.isNaN(this.purpleCastAngle))
         ? this.purpleCastAngle
-        : ((Math.cos(this.gunAngle || 0) < 0) ? Math.PI : 0);
-      this.gunAngle = horizontalAngle;
-      this.angle = horizontalAngle;
+        : (this.gunAngle || 0);
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
       if (this.purpleRecoveryTimer % 12 === 0) {
         spawnSparks(this.x, this.y, 2, '#A855F7');
       }
@@ -1481,7 +1478,7 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    // Check for Red (Close-range repel: triggers when an enemy is detected in cardinal Right/Left/Up/Down corridor)
+    // Check for Red (Close-range repel: triggers when an enemy is detected within trigger range)
     if (!this.isChannelingAnySkill() && !this.isPurpleActive() && this.redCooldown <= 0 && this.forcedMeleeTimer <= 0) {
       const redTarget = (typeof this._findAlignedEnemyForRed === 'function')
         ? this._findAlignedEnemyForRed(opponent)
@@ -1492,10 +1489,9 @@ export class GojoFighter extends Fighter {
         const dx = redTarget.x - this.x;
         const dy = targetY - gojoY;
         const targetAngle = Math.atan2(dy, dx);
-        const cardinalAngle = snapAngleToCardinal(targetAngle);
-        this.redTargetAngle = cardinalAngle;
-        this.gunAngle = cardinalAngle;
-        this.angle = cardinalAngle;
+        this.redTargetAngle = targetAngle;
+        this.gunAngle = targetAngle;
+        this.angle = targetAngle;
         this._redTargetRef = redTarget;
         this._activateRed();
       }
@@ -1506,12 +1502,12 @@ export class GojoFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       this.applyMovementPhysics(0);
-      const cardinalAngle = (this.redTargetAngle !== undefined && !Number.isNaN(this.redTargetAngle))
-        ? snapAngleToCardinal(this.redTargetAngle)
-        : ((opponent) ? snapAngleToCardinal(Math.atan2((opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0)), opponent.x - this.x)) : 0);
-      this.redTargetAngle = cardinalAngle;
-      this.gunAngle = cardinalAngle;
-      this.angle = cardinalAngle;
+      const lockedAngle = (this.redTargetAngle !== undefined && !Number.isNaN(this.redTargetAngle))
+        ? this.redTargetAngle
+        : ((opponent) ? Math.atan2((opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0)), opponent.x - this.x) : 0);
+      this.redTargetAngle = lockedAngle;
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
       this.resolveWallBounce(arena);
       return; // Stop basic attacks, melee punches, and mode switches until Red finishes!
     }
@@ -1938,20 +1934,21 @@ export class GojoFighter extends Fighter {
       return false;
     }
     if (this.isChannelingPurple || (this.purpleRecoveryTimer || 0) > 0) {
-      const horizontalAngle = (this.purpleCastAngle !== undefined && !Number.isNaN(this.purpleCastAngle))
+      const lockedAngle = (this.purpleCastAngle !== undefined && this.purpleCastAngle !== null && !Number.isNaN(this.purpleCastAngle))
         ? this.purpleCastAngle
-        : ((Math.cos(this.gunAngle || 0) < 0) ? Math.PI : 0);
-      this.gunAngle = horizontalAngle;
-      this.angle = horizontalAngle;
+        : (this.gunAngle || 0);
+      this.purpleCastAngle = lockedAngle;
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
       return false;
     }
     if ((this.redEffectTimer || 0) > 0 || this.redBuildupPhase) {
-      const verticalAngle = (this.redTargetAngle !== undefined && !Number.isNaN(this.redTargetAngle))
+      const lockedAngle = (this.redTargetAngle !== undefined && this.redTargetAngle !== null && !Number.isNaN(this.redTargetAngle))
         ? this.redTargetAngle
-        : -Math.PI / 2;
-      this.redTargetAngle = verticalAngle;
-      this.gunAngle = verticalAngle;
-      this.angle = verticalAngle;
+        : (this.gunAngle || 0);
+      this.redTargetAngle = lockedAngle;
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
       return false;
     }
 
@@ -2517,6 +2514,8 @@ export class GojoFighter extends Fighter {
     } catch (e) {}
   }
   draw(ctx) { GojoRenderer.draw(ctx, this); }
+  drawBody(ctx) { drawGojoBody(ctx, this); }
+  drawSkin(ctx) { drawGojoBody(ctx, this); }
   _getHandPositions() { return GojoRenderer._getHandPositions(this); }
   _drawHandCursedEnergyAura(ctx) { GojoRenderer._drawHandCursedEnergyAura(ctx, this); }
   _drawHandCursedEnergy(ctx, layer = 'all') { GojoRenderer._drawHandCursedEnergy(ctx, this, layer); }
@@ -2563,7 +2562,7 @@ export class GojoFighter extends Fighter {
     return closest;
   }
 
-  _findHorizontallyAlignedEnemy(preferredOpponent = null) {
+  _findAlignedEnemyForPurple(preferredOpponent = null) {
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
     const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
 
@@ -2589,8 +2588,6 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    const maxCorridorY = CONFIG.gojo?.purpleHorizontalCorridorHalfHeight ?? 40;
-    const maxDetectionAngle = CONFIG.gojo?.purpleHorizontalDetectionAngle ?? (Math.PI * 0.08);
     const maxRange = CONFIG.gojo?.purpleTriggerRange || 850;
     const gojoY = this.y - (this.z || 0);
 
@@ -2613,31 +2610,19 @@ export class GojoFighter extends Fighter {
       const dist = Math.hypot(dx, dy);
 
       if (dist > maxRange) continue;
-      if (Math.abs(dx) < (this.r + 5)) continue;
+      if (dist < (this.r + 5)) continue;
 
-      // Must be horizontally dominant (left/right, not vertical)
-      if (Math.abs(dx) <= Math.abs(dy)) continue;
-
-      const angle = Math.atan2(dy, dx);
-      let angleDiffRight = Math.abs(angle);
-      while (angleDiffRight > Math.PI) angleDiffRight = Math.abs(angleDiffRight - Math.PI * 2);
-
-      let angleDiffLeft = Math.abs(Math.abs(angle) - Math.PI);
-      while (angleDiffLeft > Math.PI) angleDiffLeft = Math.abs(angleDiffLeft - Math.PI * 2);
-
-      const isWithinAngle = (angleDiffRight <= maxDetectionAngle) || (angleDiffLeft <= maxDetectionAngle);
-      const isWithinCorridor = Math.abs(dy) <= maxCorridorY;
-
-      // Strict straight alignment: MUST satisfy both angle and corridor
-      if (isWithinAngle && isWithinCorridor) {
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestTarget = ent;
-        }
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestTarget = ent;
       }
     }
 
     return bestTarget;
+  }
+
+  _findHorizontallyAlignedEnemy(preferredOpponent = null) {
+    return this._findAlignedEnemyForPurple(preferredOpponent);
   }
 
   _findAlignedEnemyForRed(preferredOpponent = null) {
@@ -2666,9 +2651,6 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    const maxCorridorX = CONFIG.gojo?.redVerticalCorridorHalfWidth ?? 40;
-    const maxCorridorY = CONFIG.gojo?.redHorizontalCorridorHalfHeight ?? CONFIG.gojo?.redVerticalCorridorHalfWidth ?? 40;
-    const maxDetectionAngle = CONFIG.gojo?.redDetectionAngle ?? CONFIG.gojo?.redVerticalDetectionAngle ?? (Math.PI * 0.08);
     const maxRange = CONFIG.gojo?.redTriggerRange || 350;
     const gojoY = this.y - (this.z || 0);
 
@@ -2693,36 +2675,9 @@ export class GojoFighter extends Fighter {
       if (dist > maxRange) continue;
       if (dist < (this.r + 5)) continue;
 
-      const angle = Math.atan2(dy, dx);
-
-      // Check Horizontal Alignment (Right: 0, Left: PI / -PI)
-      let angleDiffRight = Math.abs(angle);
-      while (angleDiffRight > Math.PI) angleDiffRight = Math.abs(angleDiffRight - Math.PI * 2);
-
-      let angleDiffLeft = Math.abs(Math.abs(angle) - Math.PI);
-      while (angleDiffLeft > Math.PI) angleDiffLeft = Math.abs(angleDiffLeft - Math.PI * 2);
-
-      const isHorizAngle = (angleDiffRight <= maxDetectionAngle) || (angleDiffLeft <= maxDetectionAngle);
-      const isHorizCorridor = Math.abs(dy) <= maxCorridorY;
-      const isHorizontallyAligned = isHorizAngle && isHorizCorridor && (Math.abs(dx) >= Math.abs(dy));
-
-      // Check Vertical Alignment (Up: -Math.PI / 2, Down: Math.PI / 2)
-      let angleDiffUp = Math.abs(angle - (-Math.PI / 2));
-      while (angleDiffUp > Math.PI) angleDiffUp = Math.abs(angleDiffUp - Math.PI * 2);
-
-      let angleDiffDown = Math.abs(angle - (Math.PI / 2));
-      while (angleDiffDown > Math.PI) angleDiffDown = Math.abs(angleDiffDown - Math.PI * 2);
-
-      const isVertAngle = (angleDiffUp <= maxDetectionAngle) || (angleDiffDown <= maxDetectionAngle);
-      const isVertCorridor = Math.abs(dx) <= maxCorridorX;
-      const isVerticallyAligned = isVertAngle && isVertCorridor && (Math.abs(dy) > Math.abs(dx));
-
-      // Strict straight alignment: MUST satisfy both angle and corridor
-      if (isHorizontallyAligned || isVerticallyAligned) {
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestTarget = ent;
-        }
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestTarget = ent;
       }
     }
 

@@ -14,7 +14,7 @@ export const sukunaConfig = {
     startY: 250,
     startVx: 1.2,
     startVy: 1.0,
-    damage: 15,
+    damage: 10,
     cooldown: 80,
     projectileSpeedMultiplier: 3.0,
     ability: 'King of Curses',
@@ -22,8 +22,8 @@ export const sukunaConfig = {
 
     // Basic Attack: Dismantle / Cleave Ranged Slashes
     slashSpeed: 40,                   // Supersonic travel speed of Dismantle and Cleave slashes (px/frame)
-    slashDamage: 40,                  // Base damage per slash
-    slashCooldown: 100,                // Frames between ranged basic slash attacks
+    slashDamage: 10,                  // Base damage per slash
+    slashCooldown: 70,                // Frames between ranged basic slash attacks
 
     // Stacking Slash Crit Passive
     baseCritChance: 0.25,             // 10% base crit chance
@@ -35,17 +35,17 @@ export const sukunaConfig = {
 
     // Reverse Cursed Technique (Passive)
     reverseCursedTechniqueHpThreshold: 0.25,  // Triggers when HP drops to 25% or below
-    reverseCursedTechniqueHealAmount: 125,    // Flat HP healed per RCT trigger
-    reverseCursedTechniqueCooldown: 700,      // 20 second cooldown before it can trigger again
-    rctRevivalHealAmount: 125,                // Flat HP restored on emergency revival
+    reverseCursedTechniqueHealAmount: 0.80,   // % of Max HP healed per RCT trigger (0.50 = 50% Max HP)
+    reverseCursedTechniqueCooldown: 2000,      // 20 second cooldown before it can trigger again
+    rctRevivalHealAmount: 0.50,               // % of Max HP restored on emergency revival (0.50 = 50% Max HP)
 
     // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
     closeRangeRadius: 85,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
     initialMeleeDuration: 50,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
     meleeModeCooldown: 500,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
     comboDisengageDistance: 0,      // Distance (pixels) teleported away when disengaging after clash
-    meleePunchDamage: 15,             // Damage dealt per martial arts punch strike
-    meleePunchCooldown: 9,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
+    meleePunchDamage: 3,             // Damage dealt per martial arts punch strike
+    meleePunchCooldown: 15,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
     meleePunchAnimDuration: 9,        // Punch extension and retraction animation frame duration
     teleportSpeed: 15,                // Teleport movement slide speed
 
@@ -71,7 +71,7 @@ export const sukunaConfig = {
     spiderwebMinEnemies: 2,   // Minimum surrounding enemies required to trigger Spiderweb
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
-    divineFlameCooldown: 700,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
+    divineFlameCooldown: 1500,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
     divineFlameChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Furnace / Fuga
     divineFlameCorridorHalfWidth: 45, // Straight corridor half-width for cardinal alignment detection (Up, Down, Left, Straight/Right)
     divineFlameDetectionAngle: Math.PI * 0.08, // Maximum angular deviation from cardinal angle (~14.4 deg)
@@ -81,9 +81,9 @@ export const sukunaConfig = {
     divineFlameDomainCooldown: 210, // Cooldown between Fuga uses inside Domain (~3.5 seconds at 60fps)
     domainFugaCooldownTickRate: 0.2,  // Rate multiplier for cooldown ticks inside Domain (4x faster recharge)
     divineFlameChargeMax: 80,      // Charge up duration (1.5 seconds)
-    divineFlameDamage: 1000,         // Primary direct hit nuke damage
+    divineFlameDamage: 50,         // Primary direct hit nuke damage
     divineFlameExplosionRadius: 200, // Thermobaric nuke explosion AOE blast radius in pixels
-    divineFlameExplosionDamage: 800, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
+    divineFlameExplosionDamage: 10, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
     thermobaricSplashRadius: 220,  // Thermobaric explosion splash damage radius
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
     divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
@@ -96,11 +96,11 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
-    domainCooldown: 1500,         // Cooldown before domain can trigger (~16.6s at 60 fps)
+    domainCooldown: 2000,         // Cooldown before domain can trigger (~16.6s at 60 fps)
     domainChargeMax: 120,         // Channeling duration before domain opens (2.0s at 60 fps)
-    domainDuration: 800,          // Domain active duration (~8.33s at 60 fps)
-    domainDamage: 10,             // Base damage per slash line hit (legacy fallback)
-    domainSlashDamage: 10,        // Base damage dealt by each individual spatial cut line hit
+    domainDuration: 500,          // Domain active duration (~8.33s at 60 fps)
+    domainDamage: 6,             // Base damage per slash line hit (legacy fallback)
+    domainSlashDamage: 6,        // Base damage dealt by each individual spatial cut line hit
     domainDamageInterval: 8,     // Frames between slash barrages (~3.3 waves per second)
     domainSlashesPerTick: 3,      // Number of spatial cut lines spawned per barrage
     domainSlashShakeIntensity: 1.8, // Small arena screen shake when Malevolent Shrine cut lines slash
@@ -138,16 +138,16 @@ export const sukunaConfig = {
       fleshSlice: 0.40,
       teleportDash: 0.45,
       ricochetHit: 0.0,
-      fugaChant: 0.0,
+      fugaChant: 2.0,
       fugaIgnite: 1.00,
       fugaTravel: 0.80,
       fugaFireball: 0.45,
       fugaExplosion: 0.80,
       thermobaricExplosion: 0.55,
-      domainChannel: 0.75,
-      domainActivate: 0.80,
-      domainExpansion: 0.75,
-      domainDeploy: 0.55,
+      domainChannel: 2.75,
+      domainActivate: 1.80,
+      domainExpansion: 2.75,
+      domainDeploy: 2.55,
       spiderweb: 0.40,
       reverseCursedTechnique: 0.55,
       rapidSlashVoiceline: 0.0,
