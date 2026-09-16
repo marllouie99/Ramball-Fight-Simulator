@@ -163,7 +163,16 @@ export function teleportToMeleeAngle(fighter, opponent, arena) {
     const currentAngle = (fighter.x !== opponent.x || fighter.y !== opponent.y)
       ? Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x)
       : (fighter.gunAngle !== undefined ? fighter.gunAngle + Math.PI : 0);
-    const angleOffsets = [-0.50, 0.0, 0.50, -0.25, 0.25]; // 5 distinct melee attack angles (Left, Center, Right, Left-Center, Right-Center)
+    const angleOffsets = [
+      -Math.PI * 0.85, // Deep Left Rear (~153°)
+      -Math.PI * 0.55, // Left Flank (~99°)
+      -Math.PI * 0.25, // Left-Center (~45°)
+      0.0,             // Direct Front (0°)
+      Math.PI * 0.25,  // Right-Center (~45°)
+      Math.PI * 0.55,  // Right Flank (~99°)
+      Math.PI * 0.85,  // Deep Right Rear (~153°)
+      Math.PI          // Direct Behind (180°)
+    ];
     if (fighter._meleeAnglePatternIndex === undefined) {
       fighter._meleeAnglePatternIndex = Math.floor(Math.random() * angleOffsets.length);
     } else {

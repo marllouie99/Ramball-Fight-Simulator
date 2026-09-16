@@ -1721,12 +1721,16 @@ export class GojoFighter extends Fighter {
 
     let baseAngle;
     if (this.domainActive) {
-      // Inside Unlimited Void: High-angle omnidirectional flash-teleports (high cardinal / 360° shifts around trapped target)
+      // Inside Unlimited Void: High-angle omnidirectional flash-teleports (8-point cardinal & diagonal 360° shifts around trapped target)
       const angles = [
         0,                  // 3 o'clock (Right)
         Math.PI,            // 9 o'clock (Left)
         -Math.PI * 0.5,     // 12 o'clock (Top)
-        Math.PI * 0.5       // 6 o'clock (Bottom)
+        Math.PI * 0.5,      // 6 o'clock (Bottom)
+        -Math.PI * 0.25,    // Top-Right
+        -Math.PI * 0.75,    // Top-Left
+        Math.PI * 0.25,     // Bottom-Right
+        Math.PI * 0.75      // Bottom-Left
       ];
 
       if (this._domainAngleIndex === undefined) {
@@ -1737,11 +1741,20 @@ export class GojoFighter extends Fighter {
       }
       baseAngle = angles[this._domainAngleIndex];
     } else {
-      // Outside Domain (Standard Melee Mode): Multi-angle tight flank angles (5 distinct angles: Left, Center, Right, Left-Center, Right-Center)
+      // Outside Domain (Standard Melee Mode): Wide-angle surround flash-teleports (8 distinct surround angles)
       const currentAngle = (this.x !== opponent.x || this.y !== opponent.y)
         ? Math.atan2(this.y - opponent.y, this.x - opponent.x)
         : (this.gunAngle !== undefined ? this.gunAngle + Math.PI : 0);
-      const angleOffsets = [-0.50, 0.0, 0.50, -0.25, 0.25];
+      const angleOffsets = [
+        -Math.PI * 0.85, // Deep Left Rear (~153°)
+        -Math.PI * 0.55, // Left Flank (~99°)
+        -Math.PI * 0.25, // Left-Center (~45°)
+        0.0,             // Direct Front (0°)
+        Math.PI * 0.25,  // Right-Center (~45°)
+        Math.PI * 0.55,  // Right Flank (~99°)
+        Math.PI * 0.85,  // Deep Right Rear (~153°)
+        Math.PI          // Direct Behind (180°)
+      ];
       if (this._meleeAnglePatternIndex === undefined) {
         this._meleeAnglePatternIndex = Math.floor(Math.random() * angleOffsets.length);
       } else {

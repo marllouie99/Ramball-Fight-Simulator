@@ -49,7 +49,7 @@ export const sukunaConfig = {
     meleePunchDamage: 5,             // Damage dealt per martial arts punch strike
     meleePunchCooldown: 20,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
     meleePunchAnimDuration: 9,        // Punch extension and retraction animation frame duration
-    meleeTeleportAngle: 0.48,         // Decreased tight flank angle (~27.5 degrees) for melee combo teleportation
+    meleeTeleportAngle: 1.75,         // Wide surround / flank angles for melee combo teleportation
     teleportSpeed: 15,                // Teleport movement slide speed
 
     // Teleport Dodge / Evade Mechanic
