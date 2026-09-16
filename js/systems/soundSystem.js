@@ -534,11 +534,13 @@ export function setLoopingSoundVolume(key, targetVolume, rampMs = 0) {
  * Stop all looping sounds with optional delay and smooth fade-out.
  * @param {number} [fadeDelayMs=2000] - Delay in ms before starting fade-out (default 2 seconds).
  * @param {number} [fadeDurationMs=500] - Fade duration in ms.
+ * @param {boolean} [keepBgm=false] - If true, preserves arena BGM looping sound.
  */
-export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500) {
+export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500, keepBgm = false) {
   const keys = Array.from(_loopingSounds.keys());
   if (fadeDelayMs > 0) {
     keys.forEach((key) => {
+      if (keepBgm && (key === 'arena_bgm_loop' || key === 'arena_bgm_preview')) return;
       const timerId = setTimeout(() => {
         _pendingSoundTimeouts.delete(timerId);
         fadeOutLoopingSound(key, fadeDurationMs);
@@ -547,9 +549,12 @@ export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500) {
     });
   } else {
     keys.forEach((key) => {
+      if (keepBgm && (key === 'arena_bgm_loop' || key === 'arena_bgm_preview')) return;
       stopLoopingSound(key);
     });
-    _loopingSounds.clear();
+    if (!keepBgm) {
+      _loopingSounds.clear();
+    }
   }
 }
 

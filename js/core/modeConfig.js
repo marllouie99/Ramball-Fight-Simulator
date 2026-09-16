@@ -42,11 +42,11 @@ export const MODE_SETTINGS = {
     label: 'Stand Off',
     rounds: 1, // Only 1 round in Stand Off
     hpMultiplier: 1.0,
-    fixedHp: 200, // 1000 HP for both fighters
+    fixedHp: 500, // 1000 HP for both fighters
     speedMultiplier: 1.10,
     initialFuelPickups: 2,
     supportFourFighters: false,
-    maxAfterimages: 3, // Configurable limit for afterimages in 1v1 Stand Off mode
+    maxAfterimages: 6, // Configurable limit for afterimages in 1v1 Stand Off mode
     afterimageDecayMultiplier: 1.2,
   },
   [GAME_MODES.STAND_OFF_1V2]: {
@@ -57,7 +57,7 @@ export const MODE_SETTINGS = {
     soloFixedHp: 500, // For the alone fighter
     speedMultiplier: 1.00,
     initialFuelPickups: 2,
-    arenaShakeIntensity: 3.5, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)
+    arenaShakeIntensity: 3.0, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)
     arenaShakeDuration: 3,    // Configurable arena shake duration (in frames) for 1v2 mode
     supportFourFighters: false, // We will manually handle 3 fighters
     maxAfterimages: 2, // Configurable limit for afterimages in 1v2 Stand Off mode

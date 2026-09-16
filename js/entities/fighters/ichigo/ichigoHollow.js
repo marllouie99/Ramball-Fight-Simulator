@@ -153,8 +153,23 @@ export function applyHollowLifesteal(fighter, damageDealt, target) {
   );
   if (!isMask || fighter.isDead || fighter.hp <= 0 || !damageDealt || damageDealt <= 0) return;
 
-  const healPercent = CONFIG.ichigo?.hollowLifesteal ?? 0.10;
-  const healAmount = Math.max(1, Math.round(damageDealt * healPercent));
+  // Defensive validation for target (e.g. if target blocked with Gojo Limitless Infinity, is invulnerable, or dead)
+  if (target) {
+    const isGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo') &&
+      !target.isMeleeMode &&
+      (target.infinityActive || (target.infinityCooldown || 0) <= 0) &&
+      !target.isChainedByMakima &&
+      !(fighter.gojoInfinityImmune || fighter.isMaxAdapted);
+    if (isGojoInfinity) return;
+
+    if (target.isInvulnerable || (target.invulnerabilityTimer && target.invulnerabilityTimer > 0)) return;
+    if (target.isDead && (target.hp <= 0)) return;
+  }
+
+  const healPercent = CONFIG.ichigo?.hollowLifesteal ?? 0;
+  if (!healPercent || healPercent <= 0) return;
+
+  const healAmount = Math.round(damageDealt * healPercent);
   if (healAmount > 0 && fighter.hp < fighter.maxHp) {
     fighter.hp = Math.min(fighter.maxHp, fighter.hp + healAmount);
     fighter._lastHealAmount = (fighter._lastHealAmount || 0) + healAmount;

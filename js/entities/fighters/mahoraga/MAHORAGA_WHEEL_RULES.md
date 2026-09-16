@@ -61,10 +61,20 @@
 - **ALL fighters and future fighters** MUST pass accurate `opts` flags (`isMelee`, `isSkill`, etc.) so Mahoraga's damage type classification works correctly.
 - **NEVER** modify or reset Mahoraga's `adaptationStage`, `adapted`, `hitsTaken`, or `gojoAdapted` from outside `MahoragaFighter.js` except during a full game reset.
 
-## 10. Getsuga Tensho Wave Drag Stasis Rule
-- When Mahoraga is carried or dragged along by Ichigo's Getsuga Tensho (`isDraggedByGetsuga === true`):
-  - **ALL forward dashes, teleports, and rebound blitzes toward Ichigo are strictly disabled**, even if Mahoraga has fully adapted to Getsuga Tensho (`adaptedGetsuga === true`).
-  - Active `adaptationDashTimer`, `isBlitzActive`, `isInfinityBlitz`, and `neutralStanceTimer` are immediately aborted and cleared.
-  - Wall impacts during wave drag clamp Mahoraga smoothly against the arena wall boundary without accumulating wall bounces (`wallBounceCount = 0`), preventing any Wall Rebound Dash or blitz triggers.
-  - `isTeleportDisabled(fighter)` unconditionally returns `true` while `isDraggedByGetsuga` is active.
+## 10. Universal Pulling and Dragging Attacks Stasis Rule
+- When Mahoraga is caught in, pulled by, or dragged along by any dragging/pulling attack (`fighter.isPulledOrDragged()` returns `true`):
+  - Covered pulling/dragging effects include:
+    - Ichigo's Getsuga Tensho wave drag (`isDraggedByGetsuga`)
+    - Gojo's Hollow Purple suction vortex (`isCaughtInPurpleVortex` or proximity to moving Purple projectile)
+    - Gojo's Lapse Blue gravitational pull (`isCaughtInBluePull` or proximity to active Blue orb)
+    - Black Hole gravitational vortex / event horizon suction
+    - Continuous beam pins (Genos Incineration Cannon, Layla laser beam, Yuta Pure Love beam, Laser turret beams)
+    - Wall pins / pin locks (Makima boundary pin, Saitama consecutive wall pin, Escanor wall pin, Reze pin pull)
+    - Ruby Rose scythe hook pull
+    - Cronos time stasis sphere trap
+  - **ALL forward dashes, teleports, wall rebound blitzes, flash-dash counters, and Level 8 wall slams are strictly disabled**, even if Mahoraga has fully adapted to the attacker's skill/projectile type.
+  - Active `adaptationDashTimer`, `isBlitzActive`, `isInfinityBlitz`, `isWallSlamActive`, and `neutralStanceTimer` are immediately aborted, interrupted, and cleared.
+  - Wall impacts during drag/pull clamp Mahoraga smoothly against the arena wall boundary without accumulating wall bounces (`wallBounceCount = 0`, `knockbackVx = 0`, `knockbackVy = 0`), preventing any Wall Rebound Dash (`WALL REBOUND DASH!`) or blitz triggers.
+  - `isTeleportDisabled(fighter)` unconditionally returns `true` while `isPulledOrDragged()` evaluates to `true`.
+
 

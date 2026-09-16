@@ -257,20 +257,33 @@ export function _drawSukunaHair(ctx, r, facingLeft = false) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.sukuna) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
     // Sukuna-hair.png (1254x1254). True visible hair bounding box:
     // X: [164, 1088] (width 925, horizontal center at 626)
     // Y: [226, 974] (height 749, top crown at 226)
     // Scales with increased volume and length to match Gojo's spiky hair scale size
-    const targetHairWidth = r * 2.90;
-    const targetHairHeight = r * 2.25;
+    const targetHairWidth = r * 2.90 * wMult;
+    const targetHairHeight = r * 2.25 * hMult;
     const scaleX = targetHairWidth / 925;
     const scaleY = targetHairHeight / 749;
     const drawW = 1254 * scaleX;
     const drawH = 1254 * scaleY;
-    const drawX = -626 * scaleX;
-    const drawY = -r * 1.70 - 226 * scaleY;
+    const drawX = -626 * scaleX + offX;
+    const drawY = -r * 1.70 - 226 * scaleY + offY;
 
-    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
     ctx.restore();
   }
 }

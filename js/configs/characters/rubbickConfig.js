@@ -25,13 +25,13 @@ export const rubbickConfig = {
   boltDamage: 12,
   boltSpeed: 8,
   bounceCount: 4,
-  bounceDamageMultiplier: 0.7, // Damage multiplier on each bounce
+  bounceDamageMultiplier: 0.1, // Damage multiplier on each bounce
   attackCooldown: 100,
   flurryDamage: 10,
 
   // ── Skill 1: Telekinesis ──
-  telekinesisCooldown: 400,
-  telekinesisDuration: 90, // Frames target is held in air
+  telekinesisCooldown: 1000,
+  telekinesisDuration: 200, // Frames target is held in air
   telekinesisStunRadius: 100, // AoE stun on landing
   telekinesisStunDuration: 60, // Frames enemies are stunned on landing
   telekinesisRange: 250,

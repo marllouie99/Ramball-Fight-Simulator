@@ -390,6 +390,27 @@ export const state = {
   announcerPlayingSequence: false,
   announcerTimeoutIds: [],
   announcerSubtitle: '',
+  // Skin & Asset Studio State
+  studioSelectedSkinFighter: 'ichigo',
+  studioSkinPreviewScale: 2.4,
+  studioSkinFacing: 'right',
+  studioSkinForm: 'default',
+  studioSkinBg: 'white',
+  studioSkinShowBody: true,
+  studioSkinShowGuides: true,
+  studioSkinTab: 'transform',
+  skinCustomizations: {
+    ichigo: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    gojo: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    makima: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    reze: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    sukuna: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    yuta: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    tanjiro: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    zenitsu: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    nezuko: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    power: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false }
+  },
   matchTimer: 0,
 };
 
@@ -637,6 +658,30 @@ export function loadWeaponCustomizations() {
   }
 }
 
+// Save skin asset customizations to localStorage
+export function saveSkinCustomizations() {
+  try {
+    localStorage.setItem('circleMiniBattleSkinCustomizations', JSON.stringify(state.skinCustomizations));
+    if (typeof window !== 'undefined' && typeof window.__clearFighterPreviewCache === 'function') {
+      window.__clearFighterPreviewCache();
+    }
+  } catch (e) {
+    console.warn('Could not save skin customizations:', e);
+  }
+}
+
+// Load skin asset customizations from localStorage
+export function loadSkinCustomizations() {
+  try {
+    const saved = localStorage.getItem('circleMiniBattleSkinCustomizations');
+    if (saved) {
+      state.skinCustomizations = Object.assign({}, state.skinCustomizations, JSON.parse(saved));
+    }
+  } catch (e) {
+    console.warn('Could not load skin customizations:', e);
+  }
+}
+
 // Save fighter selections per category (foc / tactical) to localStorage
 export function saveFighterSelections() {
   try {
@@ -683,6 +728,7 @@ export function loadFighterSelections(targetCat = null) {
 // Initialize on load
 loadLeaderboard();
 loadWeaponCustomizations();
+loadSkinCustomizations();
 loadFighterSelections();
 
 // Debug hook: expose internal state for browser inspection

@@ -77,4 +77,14 @@ function getFighterPreview(index, category = null) {
   return fighterPreviewCache[cacheKey] || fighterPreviewCache[index];
 }
 
+export function clearFighterPreviewCache() {
+  for (const key in fighterPreviewCache) {
+    delete fighterPreviewCache[key];
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__clearFighterPreviewCache = clearFighterPreviewCache;
+}
+
 export { fighterPreviewCache, preRenderFighterPreviews, getFighterPreview };

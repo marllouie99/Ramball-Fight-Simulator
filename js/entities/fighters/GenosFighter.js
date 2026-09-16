@@ -1149,11 +1149,12 @@ export class GenosFighter extends Fighter {
       spawnGenosSelfDestructExplosion(this.x, this.y, radius);
     }
 
-    // Delete enemy projectiles caught in blast
+    // Delete enemy projectiles caught in blast (protect sovereign skillshots)
     if (state.projectiles) {
       for (let i = state.projectiles.length - 1; i >= 0; i--) {
         const p = state.projectiles[i];
         if (p && Math.hypot(p.x - this.x, p.y - this.y) <= radius) {
+          if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.visual === 'gojoPurple' || p.isGetsuga || p.behaviorType === 'getsuga_tensho' || p.isSukunaFurnace || p.behaviorType === 'sukuna_furnace' || p.behaviorType === 'yuta_pure_love_beam' || p.visual === 'yuta_pure_love_beam' || p.isPureLoveBeam) continue;
           state.projectiles.splice(i, 1);
         }
       }
@@ -1563,11 +1564,12 @@ export class GenosFighter extends Fighter {
         }
       }
 
-        // Clear projectiles in beam path
+        // Clear projectiles in beam path (protect sovereign skillshots)
         if (state.projectiles) {
           for (let i = state.projectiles.length - 1; i >= 0; i--) {
             const p = state.projectiles[i];
             if (!p) continue;
+            if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.visual === 'gojoPurple' || p.isGetsuga || p.behaviorType === 'getsuga_tensho' || p.isSukunaFurnace || p.behaviorType === 'sukuna_furnace' || p.behaviorType === 'yuta_pure_love_beam' || p.visual === 'yuta_pure_love_beam' || p.isPureLoveBeam) continue;
             const dx = p.x - this.x;
             const dy = p.y - this.y;
             const projDist = dx * Math.cos(this.ultAngle) + dy * Math.sin(this.ultAngle);

@@ -11,7 +11,7 @@ import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTra
 import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
 import { renderSukunaDomainBackground, renderSukunaDomainForeground, renderSukunaDomainSlashLines, clearDomainSlashLines } from './sukuna/sukunaDomainVisuals.js';
 import { checkSpiderwebTrigger as modCheckSpiderweb, activateSpiderweb as modActivateSpiderweb, fireDivineFlame as modFireDivineFlame, activateReverseCursedTechnique as modActivateRCT, doDomainRapidSlashes as modDomainRapidSlashes, applyDomainEffect as modApplyDomainEffect } from './sukuna/sukunaSkills.js';
-import { spawnTeleportAfterimages as modSpawnTeleportAfterimages, executeTeleportDodge as modExecuteTeleportDodge, teleportAwayFrom as modTeleportAwayFrom, updateMeleeCombat as modUpdateMeleeCombat } from './sukuna/sukunaCombat.js';
+import { spawnTeleportAfterimages as modSpawnTeleportAfterimages, executeTeleportDodge as modExecuteTeleportDodge, teleportAwayFrom as modTeleportAwayFrom, updateMeleeCombat as modUpdateMeleeCombat, teleportToMeleeAngle as modTeleportToMeleeAngle } from './sukuna/sukunaCombat.js';
 import { drawSukunaBody } from '../../graphics/fighters/sukunaSkin.js';
 import { SukunaRenderer } from '../../graphics/fighters/sukunaRenderer.js';
 
@@ -131,10 +131,7 @@ export class SukunaFighter extends Fighter {
   isStationarySkillActive() {
     return Boolean(
       this.isChannelingDivineFlame ||
-      this.isChargingFuga ||
-      this.isFiringFuga ||
       (this.divineFlameChargeTimer > 0) ||
-      (this.divineFlameRecoveryTimer > 0) ||
       this.isChannelingDomainExpansion ||
       this.isChannelingDomain ||
       (this.domainChargeTimer > 0) ||
@@ -335,16 +332,8 @@ export class SukunaFighter extends Fighter {
       return false;
     }
 
-    if (!this.isMeleeMode) {
-      // In Ranged Mode (Basic Attack Dismantle): Aim strictly in 4 cardinal directions (Up, Down, Left, Right)
-      const aimTarget = target || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
-      const cardinalAngle = this._getCardinalAngle(aimTarget);
-      this.gunAngle = cardinalAngle;
-      this.angle = cardinalAngle;
-      return true;
-    }
-
-    super.aim(target);
+    const aimTarget = target || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+    super.aim(aimTarget);
 
     // When stationary, body facing matches gunAngle (target aim direction).
     // When moving, body rotates dynamically via movement physics (spinRate).
@@ -370,22 +359,32 @@ export class SukunaFighter extends Fighter {
 
   takeDamage(amount, attacker, opts = {}) {
     const isChannelingSkill = typeof this.isChannelingSkill === 'function' && this.isChannelingSkill();
+    const isDraggedOrTrapped = Boolean(
+      this.isDraggedByGetsuga ||
+      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
+      (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) ||
+      this.isWallPinnedByMakima ||
+      this.isWallPinnedBySaitama ||
+      this.isWallPinnedByEscanor ||
+      this.isCurrentlyWallPinnedByEscanor
+    );
 
-    // If getting meleed or hit up close, force switch into Melee Mode to punch back (only when not channeling skills)
+    // If getting meleed or hit up close, force switch into Melee Mode to punch back (only when not channeling skills and not dragged/trapped)
     const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 85;
     const isAttackerChannelingGojo = attacker && (attacker.characterId === 'gojo' || attacker.type === 'gojo' || attacker._def?.id === 'gojo' || attacker._def?.type === 'gojo') &&
       (attacker.redBuildupPhase || (attacker.redEffectTimer || 0) > 0 || attacker.isDomainPreSlide || attacker.isChannelingDomainExpansion || (attacker.domainChargeTimer || 0) > 0);
-    if (!isChannelingSkill && !isAttackerChannelingGojo && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
-      if (!this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0) {
+    if (!isChannelingSkill && !isAttackerChannelingGojo && !isDraggedOrTrapped && !opts.isGetsuga && !(opts.projectile && opts.projectile.isGetsuga) && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius))) {
+      if (!this.isMeleeMode || (this.forcedMeleeTimer || 0) <= 0) {
         this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
         this.isMeleeMode = true;
+        this.meleeModeCooldown = 0;
       }
     }
 
-    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready, disabled on guaranteed hits / Nanami 7:3 Ratio crit)
+    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready, disabled on guaranteed hits / Nanami 7:3 Ratio crit / Getsuga drag / Beam traps)
     if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
-    const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga || opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga) || isDraggedOrTrapped);
+    const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere()) || isDraggedOrTrapped;
     if (!this.isTargetOfAmbush && !isChannelingSkill && !isGuaranteedHit && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.sukuna.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
@@ -444,6 +443,12 @@ export class SukunaFighter extends Fighter {
     return modExecuteTeleportDodge(this, attacker, arena);
   }
 
+  canPerformBasicAttack() {
+    if (this.isChannelingDivineFlame || this.isChannelingDomainExpansion || (this.divineFlameRecoveryTimer || 0) > 0) return false;
+    if (this.isMeleeMode) return false;
+    return super.canPerformBasicAttack();
+  }
+
   shoot(ownerIndex) {
     if (!this.canPerformBasicAttack()) return false;
     if (!projectileSystem) return;
@@ -458,10 +463,15 @@ export class SukunaFighter extends Fighter {
     const slashDamage = CONFIG.sukuna?.slashDamage ?? this.damage;
     const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
 
-    // Determine strict cardinal angle (Up, Down, Left, Right)
-    const cardinalAngle = this._getCardinalAngle(closestEnemy);
-    this.gunAngle = cardinalAngle;
-    this.angle = cardinalAngle;
+    // Determine direct aim angle at enemy target
+    let aimAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+    if (closestEnemy && !closestEnemy.isDead && closestEnemy.hp > 0) {
+      const targetZ = closestEnemy.z || 0;
+      const myZ = this.z || 0;
+      aimAngle = Math.atan2((closestEnemy.y - targetZ) - (this.y - myZ), closestEnemy.x - this.x);
+    }
+    this.gunAngle = aimAngle;
+    this.angle = aimAngle;
 
     // Trigger single-hand slicing chop animation with off-hand strictly hidden
     this.punchAnimTimer = 0;
@@ -470,7 +480,7 @@ export class SukunaFighter extends Fighter {
     this.slashGlowTimer = 20;
     this.slashHand = (this.slashHand === 1 ? 0 : 1); // Strict toggle: 0 = Right hand, 1 = Left hand
 
-    // Ranged Attack: Dismantle Slash (firing strictly in cardinal direction)
+    // Ranged Attack: Dismantle Slash (firing in any continuous angle)
     projectileSystem.fireProjectile(
       this,
       ownerIndex,
@@ -481,7 +491,7 @@ export class SukunaFighter extends Fighter {
       'ghostBlade',
       undefined,
       undefined,
-      cardinalAngle
+      aimAngle
     );
     spawnFloatingText(this.x, this.y - this.r - 20, 'DISMANTLE!', '#E0E8FF');
     if (this._slashSoundCooldown <= 0) {
@@ -697,14 +707,6 @@ export class SukunaFighter extends Fighter {
     if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
     if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
 
-    // Update afterimages (fades afterimages during melee, dodge & flurry)
-    if (this.afterImages && this.afterImages.length > 0) {
-      fastCleanArray(this.afterImages, (img) => {
-        img.timer--;
-        return img.timer > 0;
-      });
-    }
-
     // Smooth fade IN & fade OUT for Cursed Energy aura in hand-to-hand combat mode & flurry
     let inMeleeCombatMode = false;
     if (this.isMeleeMode || this.domainActive) {
@@ -816,8 +818,6 @@ export class SukunaFighter extends Fighter {
     // Handle Divine Flame Post-Fire Recovery
     if (this.divineFlameRecoveryTimer > 0) {
       this.divineFlameRecoveryTimer--;
-      this.vx = 0;
-      this.vy = 0;
       this.applyMovementPhysics(0);
 
       // Lock firing stance fixed in place during post-fire recovery
@@ -951,6 +951,16 @@ export class SukunaFighter extends Fighter {
     const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 85;
     const leaveMeleeRadius = closeRangeRadius + 30;
 
+    if (opponent && !opponent.isDead && !opponent.dead && opponent.hp > 0 && (!opponent.isStealthed || this.domainActive)) {
+      const d = Math.hypot(this.x - opponent.x, this.y - opponent.y);
+      if (d < closestEnemyDist) closestEnemyDist = d;
+      const isOpponentGojoChanneling = (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.id === 'gojo' || opponent._def?.type === 'gojo') &&
+        (opponent.redBuildupPhase || (opponent.redEffectTimer || 0) > 0 || opponent.isDomainPreSlide || opponent.isChannelingDomainExpansion || (opponent.domainChargeTimer || 0) > 0);
+      if (d <= closeRangeRadius && !isOpponentGojoChanneling) {
+        isBeingMeleed = true;
+      }
+    }
+
     if (state.fighters && state.fighters.length > 0) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
@@ -969,9 +979,25 @@ export class SukunaFighter extends Fighter {
       }
     }
 
+    const isDraggedOrTrapped = Boolean(
+      this.isDraggedByGetsuga ||
+      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
+      (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) ||
+      this.isWallPinnedByMakima ||
+      this.isWallPinnedBySaitama ||
+      this.isWallPinnedByEscanor ||
+      this.isCurrentlyWallPinnedByEscanor
+    );
+
     // Switch modes based on distance & melee engagement (only when not in special states)
     if (!this.isTeleporting && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion) {
-      if (opponent && (opponent.isStealthed || opponent.isAmbushing) && !this.domainActive) {
+      if (isDraggedOrTrapped) {
+        if (this.isMeleeMode) {
+          this.isMeleeMode = false;
+          this.forcedMeleeTimer = 0;
+          this.punchAnimTimer = 0;
+        }
+      } else if (opponent && (opponent.isStealthed || opponent.isAmbushing) && !this.domainActive) {
         // Disengage from melee combat while opponent is in stealth or ambush mode so Sukuna moves and can dodge
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
@@ -982,42 +1008,37 @@ export class SukunaFighter extends Fighter {
           this.forcedMeleeTimer = 0;
         }
       } else if (this.isMeleeMode) {
-        // Sukuna is currently in Melee Mode: Check if duration expired or enemy moved far away
-        if (this.forcedMeleeTimer <= 0) {
-          // DURATION EXPIRED: Disengage to Ranged Mode and start separation cooldown!
-          this.isMeleeMode = false;
-          this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
-        } else if (closestEnemyDist > leaveMeleeRadius) {
-          // Enemy left melee range early: Disengage to Ranged Mode
+        // Sukuna is currently in Melee Mode: Check if duration expired or if knocked back / distanced from enemy
+        const isDistanced = !opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 130;
+        const isKnockedBack = Math.hypot(this.knockbackVx || 0, this.knockbackVy || 0) > 0.5;
+        if (isDistanced || isKnockedBack || ((this.forcedMeleeTimer || 0) <= 0 && this.meleeComboCount === 0)) {
+          // DURATION EXPIRED & COMBO COMPLETE OR KNOCKED AWAY: Disengage to Ranged Mode and start separation cooldown!
           this.isMeleeMode = false;
           this.forcedMeleeTimer = 0;
-          this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
+          this.punchAnimTimer = 0;
+          if (!isKnockedBack && (this.forcedMeleeTimer || 0) <= 0) {
+            this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
+            if (opponent && !opponent.isDead) {
+              this._teleportAwayFrom(opponent, arena);
+            }
+          }
         }
       } else if (isBeingMeleed && this.meleeModeCooldown <= 0) {
         // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
         this.isMeleeMode = true;
         this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
+        this.meleeComboCount = 0;
       }
     }
 
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0) && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion && (this.divineFlameRecoveryTimer || 0) <= 0;
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0) && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion && (this.divineFlameRecoveryTimer || 0) <= 0 && !isDraggedOrTrapped;
 
     // Handle Melee Combat Mode vs Ranged Mode
-    if (this.isMeleeMode) {
-      this.vx = 0; // In Melee Mode, stand ground without walking/chasing
+    if (this.isMeleeMode && !isDraggedOrTrapped) {
+      this.vx = 0;
       this.vy = 0;
       if (opponent && !opponent.isDead) {
-        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-        const minDistance = this.r + opponent.r + 2;
-
-        if (dist < minDistance) {
-          // Contact Repulsion Buffer: Push Sukuna back slightly ONLY if he physically clips inside target circle
-          const pushX = (this.x - opponent.x) / (dist || 1);
-          const pushY = (this.y - opponent.y) / (dist || 1);
-          this.vx = pushX * 2.0;
-          this.vy = pushY * 2.0;
-        }
-        if (canAct) {
+        if (canAct && Math.hypot(this.knockbackVx || 0, this.knockbackVy || 0) <= 0.5) {
           this._updateMeleeCombat(opponent, arena, ownerIndex);
         }
       }
@@ -1031,12 +1052,13 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    this.applyMovementPhysics(this.isMeleeMode ? 0 : 1);
+    const speedMult = this.isMeleeMode ? 0 : 1.0;
+    this.applyMovementPhysics(speedMult);
 
     if (opponent && !opponent.isDead) {
       this.aim(opponent);
     } else {
-      this.aim(opponent);
+      this.turnToNormalPosition(0.035);
     }
 
     this.resolveWallBounce(arena);
@@ -1047,6 +1069,10 @@ export class SukunaFighter extends Fighter {
    */
   _updateMeleeCombat(opponent, arena, ownerIndex) {
     return modUpdateMeleeCombat(this, opponent, arena, ownerIndex);
+  }
+
+  _teleportToMeleeAngle(opponent, arena) {
+    return modTeleportToMeleeAngle(this, opponent, arena);
   }
 
   _teleportAwayFrom(opponent, arena) {
@@ -1383,46 +1409,9 @@ export class SukunaFighter extends Fighter {
     ctx.restore();
   }
 
-  // Helper method to render the Malevolent Shrine structure (Standard Vector in Light Mode, Saitama Pixel Art in Dark Mode)
+  // Helper method to render the Malevolent Shrine structure (Using authentic pixel-art model from Assets/model/Sukuna-shrine.png)
   _drawShrineBody(ctx) {
-    const isDark = Boolean(
-      typeof state !== 'undefined' && (
-        state.arenaTheme === 'dark' ||
-        state.darkMode ||
-        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-      )
-    );
-
-    if (isDark) {
-      if (!this._shrinePixelCacheCanvas) {
-        if (!this._shrineCacheCanvas) {
-          this._shrineCacheCanvas = document.createElement('canvas');
-          this._shrineCacheCanvas.width = 360;
-          this._shrineCacheCanvas.height = 420;
-          const offCtx = this._shrineCacheCanvas.getContext('2d');
-          offCtx.translate(180, 230);
-          this._renderFullShrineToContext(offCtx);
-        }
-
-        this._shrinePixelCacheCanvas = this._createSaitamaPixelShrineCanvas(this._shrineCacheCanvas);
-      }
-
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(this._shrinePixelCacheCanvas, -180, -230);
-      ctx.restore();
-    } else {
-      if (!this._shrineCacheCanvas) {
-        this._shrineCacheCanvas = document.createElement('canvas');
-        this._shrineCacheCanvas.width = 360;
-        this._shrineCacheCanvas.height = 420;
-        const offCtx = this._shrineCacheCanvas.getContext('2d');
-        offCtx.translate(180, 230);
-        this._renderFullShrineToContext(offCtx);
-      }
-
-      ctx.drawImage(this._shrineCacheCanvas, -180, -230);
-    }
+    SukunaRenderer._drawShrineBody(ctx, this);
   }
 
   // Exact Saitama-style Discrete Pixel Art Generator for Malevolent Shrine (Rule 19 / Saitama Tech)

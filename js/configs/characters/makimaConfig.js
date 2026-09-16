@@ -47,7 +47,7 @@ export const makimaConfig = {
   bangWallBounceDamage: 22,         // Bonus damage when slammed into arena walls
   bangKnockbackForce: 46,           // Massive directional knockback
   bangRange: 1600,                  // Full-screen lightning-fast beam reach
-  bangCooldown: 200,                 // ~0.73s cooldown between shots
+  bangCooldown: 300,                 // ~0.73s cooldown between shots
   bangBeamWidth: 32,                // Kinetic shockwave cylinder width
   bangPierceProjectiles: true,      // Pierces and destroys incoming enemy projectiles
   wallPinDurationFrames: 20,        // 1.5 seconds (90 frames) wall-stick duration on collision

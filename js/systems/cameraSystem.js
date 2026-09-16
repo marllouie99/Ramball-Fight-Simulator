@@ -27,8 +27,8 @@ export function initCameraState() {
     shakeY: 0,
     smoothing: CONFIG.camera?.smoothing ?? 0.08,
     zoomSmoothing: CONFIG.camera?.zoomSmoothing ?? 0.05,
-    minZoom: CONFIG.camera?.minZoom ?? 1.0,
-    maxZoom: CONFIG.camera?.maxZoom ?? 1.04,
+    minZoom: CONFIG.camera?.minZoom ?? 1.04,
+    maxZoom: CONFIG.camera?.maxZoom ?? 1.14,
     toastText: '',
     toastTimer: 0
   };
@@ -177,13 +177,13 @@ export function updateCamera() {
       const maxD = camCfg.maxDist ?? 420;
       const normDist = Math.max(0, Math.min(1, (dist - minD) / (maxD - minD)));
       const smoothT = normDist * normDist * (3 - 2 * normDist);
-      const minZ = camera.minZoom ?? camCfg.minZoom ?? 1.0;
-      const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.04;
+      const minZ = camera.minZoom ?? camCfg.minZoom ?? 1.04;
+      const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.14;
       camera.targetZoom = maxZ - smoothT * (maxZ - minZ);
 
       // Soft clamp target position relative to arena center
-      // Keeps the arena well-framed on mobile screen (max offset ~18% of arena size)
-      const maxPanRatio = camCfg.maxPanRatio ?? 0.18;
+      // Keeps the arena well-framed on mobile screen (max offset ~22% of arena size)
+      const maxPanRatio = camCfg.maxPanRatio ?? 0.22;
       const maxPanX = (arena.width / 2) * maxPanRatio;
       const maxPanY = (arena.height / 2) * maxPanRatio;
       const relX = midX - arenaCenterX;
@@ -196,7 +196,7 @@ export function updateCamera() {
       // Winner focus during victory or solo stance
       const camCfg = CONFIG.camera || {};
       const winner = aliveFighters[0];
-      const maxPanRatio = camCfg.maxPanRatio ?? 0.18;
+      const maxPanRatio = camCfg.maxPanRatio ?? 0.22;
       const maxPanX = (arena.width / 2) * maxPanRatio;
       const maxPanY = (arena.height / 2) * maxPanRatio;
       const relX = winner.x - arenaCenterX;
@@ -204,7 +204,7 @@ export function updateCamera() {
 
       camera.targetX = arenaCenterX + Math.max(-maxPanX, Math.min(maxPanX, relX));
       camera.targetY = arenaCenterY + Math.max(-maxPanY, Math.min(maxPanY, relY));
-      camera.targetZoom = camCfg.winnerZoom ?? 1.02;
+      camera.targetZoom = camCfg.winnerZoom ?? 1.08;
     } else {
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;

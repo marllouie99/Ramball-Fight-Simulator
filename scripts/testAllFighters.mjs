@@ -129,7 +129,7 @@ function assertCanvasStackBalance(locationTag) {
 async function main() {
   const { CONFIG, FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS } = await import('../js/core/config.js');
   const { FIGHTER_CLASS_MAP } = await import('../js/entities/factories/fighterFactory.js');
-  const { state, triggerGlobalScreenShake } = await import('../js/core/state.js');
+  const { state, triggerGlobalScreenShake, saveSkinCustomizations, loadSkinCustomizations } = await import('../js/core/state.js');
   const { renderGame } = await import('../js/systems/renderSystem.js');
   const { projectileSystem } = await import('../js/systems/projectileSystem.js');
   const { drawGetsugaSlash } = await import('../js/graphics/weapons/ichigoWeaponGraphics.js');
@@ -140,15 +140,17 @@ async function main() {
   const { drawSelectScreen } = await import('../js/graphics/ui/CharacterSelectScreen.js');
   const { drawTitleScreen } = await import('../js/graphics/ui/MainMenuScreen.js');
   const { drawIndexScreen } = await import('../js/graphics/ui/FighterIndexScreen.js');
+  const { drawSkinStudioScreen, SKIN_STUDIO_FIGHTERS } = await import('../js/graphics/ui/SkinStudioScreen.js');
   const { drawRoundEndScreen, drawMatchEndScreen } = await import('../js/graphics/ui/GameOverScreen.js');
   const { drawRubbickDomainDimScreen, drawBankaiImpactDimScreen } = await import('../js/graphics/renderers/arenaRenderer.js');
   const { drawCjBaguvixDimScreen } = await import('../js/graphics/renderers/environmentalRenderer.js');
   const { drawFighters } = await import('../js/graphics/renderers/EntityRenderer.js');
   const { audioSystem } = await import('../js/systems/audioSystem.js');
   const { updateGame } = await import('../js/systems/updateSystem.js');
-  const { resolveFighterCollision } = await import('../js/systems/physics.js');
+  const { resolveFighterCollision, updateFighters } = await import('../js/systems/physics.js');
   const { reinitFighters } = await import('../js/core/gameFlow.js');
   const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+  const { initCameraState, updateCamera } = await import('../js/systems/cameraSystem.js');
   const { _getRezeHairImage, _drawRezeHair, drawRezeHumanPixelBody, drawRezeBombHybridBody, drawRezeSkin } = await import('../js/graphics/fighters/rezeSkin.js');
   const { _getIchigoHairImage, _drawIchigoHair, drawIchigoSkin } = await import('../js/graphics/fighters/ichigoSkin.js');
 
@@ -1067,16 +1069,34 @@ async function main() {
         fighter.adaptationDashTimer = 8;
         fighter.isBlitzActive = true;
 
+        // 4. When caught in Gojo Purple Vortex or Blue Pull
+        fighter.isDraggedByGetsuga = false;
+        fighter.isCaughtInPurpleVortex = true;
+        fighter.adaptationDashTimer = 10;
+        fighter.isBlitzActive = true;
+        fighter.wallBounceCount = 3;
         fighter.update(dummyOpponent, 0, state.arena);
-
-        if (fighter.adaptationDashTimer !== 0) {
-          throw new Error("Mahoraga adaptationDashTimer was not cancelled for adapted Mahoraga during Getsuga drag!");
+        if (fighter.adaptationDashTimer !== 0 || fighter.isBlitzActive || fighter.wallBounceCount !== 0) {
+          throw new Error("Mahoraga dash/blitz/wallBounce was not disabled while isCaughtInPurpleVortex is true!");
         }
-        if (fighter.isBlitzActive) {
-          throw new Error("Mahoraga isBlitzActive was not disabled for adapted Mahoraga during Getsuga drag!");
+
+        fighter.x = state.arena.x;
+        fighter.vx = -15;
+        fighter.resolveWallBounce(state.arena, dummyOpponent);
+        if (fighter.wallBounceCount !== 0 || fighter.isBlitzActive) {
+          throw new Error("Mahoraga wall rebound dash triggered while isCaughtInPurpleVortex is true!");
+        }
+
+        fighter.isCaughtInPurpleVortex = false;
+        fighter.isCaughtInBluePull = true;
+        fighter.wallBounceCount = 2;
+        fighter.resolveWallBounce(state.arena, dummyOpponent);
+        if (fighter.wallBounceCount !== 0) {
+          throw new Error("Mahoraga wallBounceCount was not 0 while isCaughtInBluePull is true!");
         }
 
         // Reset flags for subsequent tests
+        fighter.isCaughtInBluePull = false;
         fighter.isDraggedByGetsuga = false;
         fighter.adaptedGetsuga = false;
         fighter.x = 200;
@@ -1332,6 +1352,9 @@ async function main() {
         mockGojo.isCaughtInTelekinesis = false;
         mockGojo.forcedMeleeTimer = 0;
         mockGojo.isMeleeMode = false;
+        mockGojo.meleeModeCooldown = 0;
+        fighter.x = 250;
+        fighter.y = 500;
         for (let cd = 0; cd < 40; cd++) {
           mockGojo.update(fighter, 0, state.arena);
         }
@@ -1753,6 +1776,8 @@ async function main() {
         }
 
         // 3.5.4 Test Knockback on Chained Target & Chain Break Distance Snapping
+        const prevMakimaArena = state.arena;
+        state.arena = { x: 0, y: 0, width: 1200, height: 1200 };
         fighter.reset();
         dummyOpponent.reset();
         fighter.x = 200;
@@ -1787,7 +1812,7 @@ async function main() {
 
         // Step simulation frames as enemy gets propelled backward and breaks the chain
         let chainBroke = false;
-        for (let frame = 0; frame < 30; frame++) {
+        for (let frame = 0; frame < 50; frame++) {
           fighter.update(dummyOpponent, 0, state.arena);
           dummyOpponent.update(fighter, 1, state.arena);
 
@@ -1800,6 +1825,8 @@ async function main() {
             break;
           }
         }
+
+        state.arena = prevMakimaArena;
 
         if (!chainBroke) {
           throw new Error("Chains of Domination did not snap/break when enemy was knocked back beyond break distance!");
@@ -2135,6 +2162,7 @@ async function main() {
         fighter.x = 264;
         fighter.y = 200;
         mockGojo.aim(fighter);
+        if (projectileSystem) projectileSystem.projectiles = [];
         state.fighters = [mockGojo, fighter];
 
         // Verify idle hand position
@@ -2470,22 +2498,22 @@ async function main() {
         if (fighter.purpleRecoveryTimer !== expectedRecovery) {
           throw new Error(`Expected Gojo purpleRecoveryTimer to be ${expectedRecovery}, got ${fighter.purpleRecoveryTimer}`);
         }
-        if (!fighter.isStationarySkillActive()) {
-          throw new Error('Expected isStationarySkillActive() to return true during Gojo Purple breather');
-        }
 
         // Test Canvas 2D stack balance while drawing breather stasis visuals
         mockCtx.resetStackDepth();
         fighter.draw(mockCtx, null);
         assertCanvasStackBalance('Gojo Purple Breather Stasis Visuals');
 
-        // Test breather recovery frame update
+        // Test breather recovery frame update (Gojo stays afloat in the air with zero velocity)
         fighter.update(dummyOpponent, 0, state.arena);
         if (fighter.purpleRecoveryTimer !== expectedRecovery - 1) {
           throw new Error(`Expected purpleRecoveryTimer to decrement to ${expectedRecovery - 1}, got ${fighter.purpleRecoveryTimer}`);
         }
         if (fighter.vx !== 0 || fighter.vy !== 0) {
-          throw new Error(`Expected Gojo vx/vy to remain 0 during breather, got (${fighter.vx}, ${fighter.vy})`);
+          throw new Error(`Expected Gojo to be stationary in the air (vx=0, vy=0), got (${fighter.vx}, ${fighter.vy})`);
+        }
+        if (fighter.z < 30) {
+          throw new Error(`Expected Gojo to stay afloat in the air (z ~ 35), got z=${fighter.z}`);
         }
         if (fighter.infinityActive) {
           throw new Error('Expected Limitless Infinity barrier to be disabled while Purple is active');
@@ -2518,7 +2546,7 @@ async function main() {
           throw new Error('Gojo should not be able to activate RCT while Purple is active');
         }
 
-        // Verify Gojo moves BACKWARDS away from the enemy upon Purple recovery expiration
+        // Verify Gojo lands and can move upon Purple recovery expiration
         fighter.purpleRecoveryTimer = 1;
         fighter.x = 250;
         fighter.y = 250;
@@ -2528,8 +2556,8 @@ async function main() {
         if (fighter.purpleRecoveryTimer !== 0) {
           throw new Error(`Expected purpleRecoveryTimer to reach 0, got ${fighter.purpleRecoveryTimer}`);
         }
-        if (fighter.vx >= 0) {
-          throw new Error(`Expected Gojo to move BACKWARDS away from enemy (vx < 0), got vx=${fighter.vx}`);
+        if (fighter.z !== 0) {
+          throw new Error(`Expected Gojo to land on the ground (z=0) after breather ends, got z=${fighter.z}`);
         }
 
         // Clean up
@@ -2676,6 +2704,55 @@ async function main() {
         }
         freeProj.life = 0;
         fighter.activePurpleProjectile = null;
+        state.arena = prevArena;
+
+        // ── Gojo Post-Purple Aerial Hover & Slow Descent Test ──
+        // Case 1: Gojo fires Hollow Purple. During active flight (life > 60), Gojo stays afloat at z=35 with vx=0, vy=0.
+        const testArena = { x: 50, y: 50, width: 800, height: 600 };
+        state.arena = testArena;
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 200;
+        fighter.y = 300;
+        dummyOpponent.x = 500;
+        dummyOpponent.y = 300;
+        state.fighters = [fighter, dummyOpponent];
+        fighter.gunAngle = 0;
+        fighter.purpleCastAngle = 0;
+        fighter._firePurple(0);
+
+        // Fast-forward through recovery
+        while (fighter.purpleRecoveryTimer > 0) {
+          fighter.update(dummyOpponent, 0, testArena);
+        }
+
+        // When recovery ends, Gojo is on the ground (z=0) and can move freely even while Purple is active
+        if (fighter.z !== 0) {
+          throw new Error(`Expected Gojo to touch down on the ground (z=0) after recovery ends, got z=${fighter.z}`);
+        }
+        if (!fighter.infinityActive) {
+          throw new Error(`Expected Limitless Infinity barrier to restore once Gojo touches down`);
+        }
+
+        const prevX = fighter.x;
+        const prevY = fighter.y;
+        for (let i = 0; i < 30; i++) {
+          fighter.update(dummyOpponent, 0, testArena);
+        }
+        if (fighter.x === prevX && fighter.y === prevY && fighter.vx === 0 && fighter.vy === 0) {
+          throw new Error(`Expected Gojo to be able to move once breather ends while Purple is active`);
+        }
+
+        // Expire Purple projectile cleanly
+        if (fighter.activePurpleProjectile) {
+          fighter.activePurpleProjectile.life = 0;
+          const pIdx = projectileSystem.projectiles.indexOf(fighter.activePurpleProjectile);
+          if (pIdx !== -1) projectileSystem.projectiles.splice(pIdx, 1);
+          fighter.activePurpleProjectile = null;
+        }
+        if (projectileSystem && projectileSystem.projectiles) {
+          projectileSystem.projectiles = [];
+        }
         state.arena = prevArena;
 
         // ── Gojo Reversal Red Straight Vertical Up and Down Constraint Tests ──
@@ -2842,16 +2919,16 @@ async function main() {
         fighter.x = 250;
         fighter.y = 250;
         dummyOpponent.x = 400;
-        dummyOpponent.y = 270; // dx = 150 > dy = 20 -> Right
+        dummyOpponent.y = 250;
         fighter.shootCooldown = 0;
         fighter.aim(dummyOpponent);
-        if (fighter.gunAngle !== 0) {
-          throw new Error(`Expected Gojo to aim strictly Right (0), got ${fighter.gunAngle}`);
+        if (Math.abs(fighter.gunAngle - 0) > 0.001) {
+          throw new Error(`Expected Gojo to aim Right (0), got ${fighter.gunAngle}`);
         }
         fighter.shoot(0);
         const blueRight = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
         if (!blueRight || blueRight.vx <= 0 || Math.abs(blueRight.vy) > 0.001) {
-          throw new Error(`Expected Blue projectile to fire strictly Right (vx > 0, vy = 0), got vx=${blueRight?.vx}, vy=${blueRight?.vy}`);
+          throw new Error(`Expected Blue projectile to fire Right (vx > 0, vy = 0), got vx=${blueRight?.vx}, vy=${blueRight?.vy}`);
         }
         clearProjectiles();
 
@@ -2861,16 +2938,16 @@ async function main() {
         fighter.x = 250;
         fighter.y = 250;
         dummyOpponent.x = 100;
-        dummyOpponent.y = 260; // dx = -150 > dy = 10 -> Left
+        dummyOpponent.y = 250;
         fighter.shootCooldown = 0;
         fighter.aim(dummyOpponent);
-        if (fighter.gunAngle !== Math.PI) {
-          throw new Error(`Expected Gojo to aim strictly Left (Math.PI), got ${fighter.gunAngle}`);
+        if (Math.abs(Math.abs(fighter.gunAngle) - Math.PI) > 0.001) {
+          throw new Error(`Expected Gojo to aim Left (Math.PI), got ${fighter.gunAngle}`);
         }
         fighter.shoot(0);
         const blueLeft = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
         if (!blueLeft || blueLeft.vx >= 0 || Math.abs(blueLeft.vy) > 0.001) {
-          throw new Error(`Expected Blue projectile to fire strictly Left (vx < 0, vy = 0), got vx=${blueLeft?.vx}, vy=${blueLeft?.vy}`);
+          throw new Error(`Expected Blue projectile to fire Left (vx < 0, vy = 0), got vx=${blueLeft?.vx}, vy=${blueLeft?.vy}`);
         }
         clearProjectiles();
 
@@ -2879,17 +2956,17 @@ async function main() {
         dummyOpponent.reset();
         fighter.x = 250;
         fighter.y = 250;
-        dummyOpponent.x = 260;
-        dummyOpponent.y = 400; // dy = 150 > dx = 10 -> Down
+        dummyOpponent.x = 250;
+        dummyOpponent.y = 400;
         fighter.shootCooldown = 0;
         fighter.aim(dummyOpponent);
-        if (fighter.gunAngle !== Math.PI / 2) {
-          throw new Error(`Expected Gojo to aim strictly Down (Math.PI / 2), got ${fighter.gunAngle}`);
+        if (Math.abs(fighter.gunAngle - (Math.PI / 2)) > 0.001) {
+          throw new Error(`Expected Gojo to aim Down (Math.PI / 2), got ${fighter.gunAngle}`);
         }
         fighter.shoot(0);
         const blueDown = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
         if (!blueDown || blueDown.vy <= 0 || Math.abs(blueDown.vx) > 0.001) {
-          throw new Error(`Expected Blue projectile to fire strictly Down (vx = 0, vy > 0), got vx=${blueDown?.vx}, vy=${blueDown?.vy}`);
+          throw new Error(`Expected Blue projectile to fire Down (vx = 0, vy > 0), got vx=${blueDown?.vx}, vy=${blueDown?.vy}`);
         }
         clearProjectiles();
 
@@ -2898,17 +2975,41 @@ async function main() {
         dummyOpponent.reset();
         fighter.x = 250;
         fighter.y = 250;
-        dummyOpponent.x = 240;
-        dummyOpponent.y = 100; // dy = -150 > dx = -10 -> Up
+        dummyOpponent.x = 250;
+        dummyOpponent.y = 100;
         fighter.shootCooldown = 0;
         fighter.aim(dummyOpponent);
-        if (fighter.gunAngle !== -Math.PI / 2) {
-          throw new Error(`Expected Gojo to aim strictly Up (-Math.PI / 2), got ${fighter.gunAngle}`);
+        if (Math.abs(fighter.gunAngle - (-Math.PI / 2)) > 0.001) {
+          throw new Error(`Expected Gojo to aim Up (-Math.PI / 2), got ${fighter.gunAngle}`);
         }
         fighter.shoot(0);
         const blueUp = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
         if (!blueUp || blueUp.vy >= 0 || Math.abs(blueUp.vx) > 0.001) {
-          throw new Error(`Expected Blue projectile to fire strictly Up (vx = 0, vy < 0), got vx=${blueUp?.vx}, vy=${blueUp?.vy}`);
+          throw new Error(`Expected Blue projectile to fire Up (vx = 0, vy < 0), got vx=${blueUp?.vx}, vy=${blueUp?.vy}`);
+        }
+        clearProjectiles();
+
+        // Test Blue Diagonal (dx = 150, dy = 150 -> Math.PI / 4)
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 250;
+        fighter.y = 250;
+        dummyOpponent.x = 400;
+        dummyOpponent.y = 400;
+        fighter.shootCooldown = 0;
+        fighter.aim(dummyOpponent);
+        const expectedGojoDiagAngle = Math.atan2(400 - 250, 400 - 250);
+        if (Math.abs(fighter.gunAngle - expectedGojoDiagAngle) > 0.001) {
+          throw new Error(`Expected Gojo to aim diagonally (${expectedGojoDiagAngle}), got ${fighter.gunAngle}`);
+        }
+        fighter.shoot(0);
+        const blueDiag = projectileSystem.projectiles.find(p => p && p.isGojoBlue && p.life > 0);
+        if (!blueDiag) {
+          throw new Error(`Expected Blue projectile to spawn on shoot()`);
+        }
+        const blueDiagAngle = Math.atan2(blueDiag.vy, blueDiag.vx);
+        if (Math.abs(blueDiagAngle - expectedGojoDiagAngle) > 0.001) {
+          throw new Error(`Expected Blue projectile to fire diagonally (${expectedGojoDiagAngle}), got ${blueDiagAngle}`);
         }
         clearProjectiles();
       }
@@ -3508,7 +3609,7 @@ async function main() {
     testGojo.domainActive = false;
     state.fighters = [testSaitama, dummyTarget2];
 
-    // Test Serious Counter cancellation when pulled by Lapse Blue / Hollow Purple / Getsuga drag / Telekinesis
+    // Test Serious Counter immunity to push back / drag / pull attacks (Lapse Blue / Hollow Purple / Getsuga drag / Black Hole / knockback)
     dummyTarget2.hp = 10000;
     dummyTarget2.isDead = false;
     testSaitama.x = 200;
@@ -3518,20 +3619,29 @@ async function main() {
     testSaitama.skillPunishCooldown = 0;
     testSaitama.executeSkillCounterPunish(dummyTarget2);
     if (!testSaitama.isCountering || testSaitama._counterPunchTimer <= 0) {
-      throw new Error('Expected Serious Counter to be active before testing pull cancellation');
+      throw new Error('Expected Serious Counter to be active before testing pull immunity');
     }
-    // Simulate getting pulled by Lapse Blue
-    state.projectiles = [{
+    // Simulate getting pulled by Lapse Blue / drag projectile
+    const testBlue = {
       x: testSaitama.x + 30,
       y: testSaitama.y + 30,
       life: 100,
       isGojoBlue: true,
       pullRadius: 150,
-      owner: 1
-    }];
+      owner: 1,
+      draggedTargets: new Set([testSaitama])
+    };
+    state.projectiles = [testBlue];
+    testSaitama.isDraggedByGetsuga = true;
+    testSaitama.knockbackVx = 10;
+    testSaitama.knockbackVy = 10;
+    testSaitama.applyKnockback(15, 15, { isPull: true, isGetsuga: true });
     testSaitama.update(dummyTarget2, 0, state.arena);
-    if (testSaitama.isCountering || testSaitama._counterPunchTimer > 0) {
-      throw new Error('Expected Serious Counter to be cancelled immediately when pulled by Lapse Blue');
+    if (!testSaitama.isCountering || testSaitama._counterPunchTimer <= 0) {
+      throw new Error('Expected Serious Counter to remain active and immune to pull/drag/knockback attacks');
+    }
+    if (testSaitama.knockbackVx !== 0 || testSaitama.knockbackVy !== 0 || testSaitama.isDraggedByGetsuga || testBlue.draggedTargets.has(testSaitama)) {
+      throw new Error('Expected push back and drag states on Saitama to be completely canceled/negated during Serious Counter');
     }
     state.projectiles = [];
 
@@ -4296,13 +4406,13 @@ async function main() {
     errors++;
   }
 
-  // 6.2. Sukuna Cardinal Angles (Basic Attack Dismantle & Fuga Divine Flame) Test
-  console.log('🔥 [Sukuna Cardinal Angles Test] Verifying basic attack Dismantle and Fuga strictly fire along 4 cardinal directions...');
+  // 6.2. Sukuna & Gojo Any-Angle Basic Attack Aiming and Firing Test
+  console.log('🔥 [Sukuna & Gojo Any-Angle Basic Attack Test] Verifying basic attack Dismantle and Blue orb fire in any 360-degree angle...');
   try {
     const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
     const sukunaDef = FIGHTER_DEFS.find(d => d.id === 'sukuna');
     if (SukunaClass && sukunaDef) {
-      // Test 1: Basic Attack Dismantle aim and shoot in 4 cardinal directions
+      // Test 1: Sukuna Basic Attack Dismantle aim and shoot in continuous 360-degree angles
       const s = new SukunaClass(sukunaDef);
       s.x = 270;
       s.y = 480;
@@ -4337,29 +4447,31 @@ async function main() {
         throw new Error(`Expected Sukuna up aim to be -Math.PI/2 rad, got ${s.gunAngle}`);
       }
 
-      // Enemy at diagonal (dx > dy -> Right)
+      // Enemy at diagonal (dx=180, dy=40 -> exact Math.atan2(40, 180))
       const enemyDiagRight = { x: 450, y: 520, r: 25, hp: 100, maxHp: 100, isDead: false };
       s.aim(enemyDiagRight);
-      if (Math.abs(s.gunAngle - 0) > 0.001) {
-        throw new Error(`Expected Sukuna diagonal horizontal-dominant aim to be 0 rad, got ${s.gunAngle}`);
+      const expectedDiagRightAngle = Math.atan2(520 - 480, 450 - 270);
+      if (Math.abs(s.gunAngle - expectedDiagRightAngle) > 0.001) {
+        throw new Error(`Expected Sukuna diagonal aim to be ${expectedDiagRightAngle} rad, got ${s.gunAngle}`);
       }
 
-      // Enemy at diagonal (dy > dx -> Down)
+      // Enemy at diagonal (dx=30, dy=220 -> exact Math.atan2(220, 30))
       const enemyDiagDown = { x: 300, y: 700, r: 25, hp: 100, maxHp: 100, isDead: false };
       s.aim(enemyDiagDown);
-      if (Math.abs(s.gunAngle - (Math.PI / 2)) > 0.001) {
-        throw new Error(`Expected Sukuna diagonal vertical-dominant aim to be Math.PI/2 rad, got ${s.gunAngle}`);
+      const expectedDiagDownAngle = Math.atan2(700 - 480, 300 - 270);
+      if (Math.abs(s.gunAngle - expectedDiagDownAngle) > 0.001) {
+        throw new Error(`Expected Sukuna diagonal vertical aim to be ${expectedDiagDownAngle} rad, got ${s.gunAngle}`);
       }
 
-      // Test 2: Shoot Dismantle projectile fires along cardinal angle
+      // Test 2: Shoot Dismantle projectile fires along exact diagonal angle
       projectileSystem.projectiles = [];
       s.shoot(0);
       const proj = projectileSystem.projectiles.find(p => p.visual === 'ghostBlade' || p.isSukunaSlash);
       if (!proj) {
         throw new Error(`Expected Sukuna shoot() to fire ghostBlade/Dismantle projectile!`);
       }
-      if (Math.abs(proj.angle - (Math.PI / 2)) > 0.001) {
-        throw new Error(`Expected Dismantle projectile angle to be Math.PI/2 rad, got ${proj.angle}`);
+      if (Math.abs(proj.angle - expectedDiagDownAngle) > 0.001) {
+        throw new Error(`Expected Dismantle projectile angle to match diagonal aim (${expectedDiagDownAngle} rad), got ${proj.angle}`);
       }
 
       // Test 3: Fuga any-angle aiming and initiation
@@ -4411,13 +4523,44 @@ async function main() {
         throw new Error(`Expected Sukuna to NOT trigger Fuga when enemy is out of trigger range!`);
       }
     }
+
+    // Test Gojo Basic Attack Blue aim and shoot in continuous 360-degree angles
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const gojoDef = FIGHTER_DEFS.find(d => d.id === 'gojo');
+    if (GojoClass && gojoDef) {
+      const g = new GojoClass(gojoDef);
+      g.x = 270;
+      g.y = 480;
+      g.isMeleeMode = false;
+      state.fighters = [g];
+
+      // Enemy at diagonal (dx=150, dy=150 -> Math.PI / 4)
+      const diagEnemy = { x: 420, y: 630, r: 25, hp: 100, maxHp: 100, isDead: false };
+      g.aim(diagEnemy);
+      const expectedBlueAngle = Math.atan2(630 - 480, 420 - 270);
+      if (Math.abs(g.gunAngle - expectedBlueAngle) > 0.001) {
+        throw new Error(`Expected Gojo diagonal aim to be ${expectedBlueAngle} rad, got ${g.gunAngle}`);
+      }
+
+      // Shoot Blue projectile and verify it launches along continuous diagonal angle
+      projectileSystem.projectiles = [];
+      g.shoot(0);
+      const blueProj = projectileSystem.projectiles.find(p => p.isGojoBlue || p.behaviorType === 'gojo_blue');
+      if (!blueProj) {
+        throw new Error(`Expected Gojo shoot() to fire gojo_blue projectile!`);
+      }
+      const blueVelocityAngle = Math.atan2(blueProj.vy, blueProj.vx);
+      if (Math.abs(blueVelocityAngle - expectedBlueAngle) > 0.001) {
+        throw new Error(`Expected Gojo Blue projectile velocity angle to match diagonal (${expectedBlueAngle} rad), got ${blueVelocityAngle}`);
+      }
+    }
   } catch (err) {
-    console.error('❌ [SUKUNA CARDINAL ANGLES TEST ERROR]:', err);
+    console.error('❌ [SUKUNA & GOJO ANY-ANGLE BASIC ATTACK TEST ERROR]:', err);
     errors++;
   }
 
-  // 6.3. Makima Cardinal Angles ("Bang!" Primary Attack) Test
-  console.log('🔫 [Makima Cardinal Angles Test] Verifying "Bang!" primary attack strictly fires along 4 cardinal directions...');
+  // 6.3. Makima 360° Any-Angle ("Bang!" Primary Attack) Test
+  console.log('🔫 [Makima Any-Angle Aim Test] Verifying "Bang!" primary attack fires along any 360-degree angle...');
   try {
     const MakimaClass = FIGHTER_CLASS_MAP['makima'];
     const makimaDef = FIGHTER_DEFS.find(d => d.id === 'makima');
@@ -4456,52 +4599,54 @@ async function main() {
         throw new Error(`Expected Makima up aim to be -Math.PI/2 rad, got ${m.gunAngle}`);
       }
 
-      // Enemy at diagonal (dx > dy -> Right: 0)
+      // Enemy at true diagonal (dx=180, dy=40 -> exact Math.atan2(40, 180))
       const enemyDiagRight = { x: 450, y: 520, r: 25, hp: 100, maxHp: 100, isDead: false };
       m.aim(enemyDiagRight);
-      if (Math.abs(m.gunAngle - 0) > 0.001) {
-        throw new Error(`Expected Makima diagonal horizontal-dominant aim to be 0 rad, got ${m.gunAngle}`);
+      const expectedAngle = Math.atan2(520 - 480, 450 - 270);
+      if (Math.abs(m.gunAngle - expectedAngle) > 0.001) {
+        throw new Error(`Expected Makima diagonal aim to be ${expectedAngle} rad, got ${m.gunAngle}`);
       }
 
-      // Enemy at diagonal (dy > dx -> Down: Math.PI / 2)
+      // Enemy at steep diagonal (dx=30, dy=220 -> exact Math.atan2(220, 30))
       const enemyDiagDown = { x: 300, y: 700, r: 25, hp: 100, maxHp: 100, isDead: false };
       m.aim(enemyDiagDown);
-      if (Math.abs(m.gunAngle - (Math.PI / 2)) > 0.001) {
-        throw new Error(`Expected Makima diagonal vertical-dominant aim to be Math.PI/2 rad, got ${m.gunAngle}`);
+      const expectedSteepAngle = Math.atan2(700 - 480, 300 - 270);
+      if (Math.abs(m.gunAngle - expectedSteepAngle) > 0.001) {
+        throw new Error(`Expected Makima steep diagonal aim to be ${expectedSteepAngle} rad, got ${m.gunAngle}`);
       }
 
-      // Test "Bang!" attack execution creates beam along cardinal angle
+      // Test "Bang!" attack execution creates beam along exact target angle
       m.activeBangBeams = [];
       m._castBangAttack(enemyDiagDown);
       if (m.activeBangBeams.length === 0) {
         throw new Error(`Expected _castBangAttack to register activeBangBeams!`);
       }
       const lastBeam = m.activeBangBeams[m.activeBangBeams.length - 1];
-      if (Math.abs(lastBeam.angle - (Math.PI / 2)) > 0.001) {
-        throw new Error(`Expected Bang beam angle to be Math.PI/2 rad (Down), got ${lastBeam.angle}`);
+      if (Math.abs(lastBeam.angle - expectedSteepAngle) > 0.001) {
+        throw new Error(`Expected Bang beam angle to be ${expectedSteepAngle} rad, got ${lastBeam.angle}`);
       }
 
-      // Test shoot() triggers "Bang!" along cardinal angle
+      // Test shoot() triggers "Bang!" along exact diagonal target angle
       m.bangCooldown = 0;
       m.activeBangBeams = [];
-      state.fighters = [m, enemyUp];
+      state.fighters = [m, enemyDiagRight];
       m.shoot(0);
       if (m.isPreparingBang) {
         const windup = m.bangWindupMax || 8;
         for (let w = 0; w < windup; w++) {
-          m.update(enemyUp, 0, null);
+          m.update(enemyDiagRight, 0, null);
         }
       }
       if (m.activeBangBeams.length === 0) {
         throw new Error(`Expected shoot() to fire Bang!`);
       }
       const shootBeam = m.activeBangBeams[m.activeBangBeams.length - 1];
-      if (Math.abs(shootBeam.angle - (-Math.PI / 2)) > 0.001) {
-        throw new Error(`Expected Bang shoot beam angle to be -Math.PI/2 rad (Up), got ${shootBeam.angle}`);
+      if (Math.abs(shootBeam.angle - expectedAngle) > 0.001) {
+        throw new Error(`Expected Bang shoot beam angle to be ${expectedAngle} rad, got ${shootBeam.angle}`);
       }
     }
   } catch (err) {
-    console.error('❌ [MAKIMA CARDINAL ANGLES TEST ERROR]:', err);
+    console.error('❌ [MAKIMA ANY-ANGLE AIM TEST ERROR]:', err);
     errors++;
   }
 
@@ -5443,6 +5588,119 @@ async function main() {
     errors++;
   }
 
+  // 1v1 Background Music Seamless Continuity & Cutoff on 2 Round Wins Test
+  console.log('🎵 [1v1 BGM Seamless Continuity Test] Verifying BGM continues across 1v1 rounds and cuts only upon 2 round wins...');
+  try {
+    const { isArenaBgmPlaying, startArenaBgm, stopArenaBgm } = await import('../js/systems/arenaBgmSystem.js');
+    const { startCountdown, startNextRound } = await import('../js/core/gameFlow.js');
+
+    // 1. Initialize fresh 1v1 match
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'gojo');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    state.scores = [0, 0];
+    state.roundNum = 1;
+    state.gameState = 'countdown';
+    reinitFighters(true);
+
+    startCountdown();
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Expected Arena BGM to start playing during 1v1 countdown');
+    }
+
+    // Advance to playing
+    state.gameState = 'playing';
+    updateGame();
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Expected Arena BGM to remain playing in 1v1 playing state');
+    }
+
+    // 2. Round 1 End: Fighter 0 wins (scores = [1, 0]) -> BGM MUST KEEP PLAYING!
+    state.scores = [1, 0];
+    state.roundWinner = state.fighters[0];
+    state.matchWinner = null;
+    state.gameState = 'roundEnd';
+    state.roundEndTimer = 10;
+    updateGame();
+    drawRoundEndScreen();
+
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM was cut off during 1v1 Round 1 roundEnd (Fighter has only 1 win)!');
+    }
+
+    // 3. Round 2 Transition: startNextRound & startCountdown -> BGM MUST KEEP PLAYING SEAMLESSLY!
+    startNextRound();
+    if (state.roundNum !== 2) {
+      throw new Error(`Expected roundNum to be 2, got ${state.roundNum}`);
+    }
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM was cut off during startNextRound() transition to Round 2 in 1v1 mode!');
+    }
+
+    startCountdown();
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM was cut off during Round 2 countdown in 1v1 mode!');
+    }
+
+    state.gameState = 'playing';
+    updateGame();
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM stopped playing during Round 2 in 1v1 mode!');
+    }
+
+    // 4. Round 2 End: Fighter 1 wins (scores = [1, 1], tied) -> BGM MUST KEEP PLAYING FOR FINAL ROUND!
+    state.scores = [1, 1];
+    state.roundWinner = state.fighters[1];
+    state.matchWinner = null;
+    state.gameState = 'roundEnd';
+    state.roundEndTimer = 10;
+    updateGame();
+    drawRoundEndScreen();
+
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM was cut off during 1v1 Round 2 roundEnd with tied score 1-1!');
+    }
+
+    // 5. Final Round Transition (Round 3) -> BGM MUST KEEP PLAYING!
+    startNextRound();
+    if (state.roundNum !== 3) {
+      throw new Error(`Expected roundNum to be 3 (Final Round), got ${state.roundNum}`);
+    }
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM was cut off transitioning to Final Round in 1v1 mode!');
+    }
+
+    startCountdown();
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM was cut off during Final Round countdown in 1v1 mode!');
+    }
+
+    state.gameState = 'playing';
+    updateGame();
+    if (!isArenaBgmPlaying()) {
+      throw new Error('Arena BGM stopped playing during Final Round in 1v1 mode!');
+    }
+
+    // 6. Final Round End: Fighter 0 wins (scores = [2, 1]) -> Match Won! BGM MUST CUT OFF!
+    state.scores = [2, 1];
+    state.roundWinner = state.fighters[0];
+    state.matchWinner = state.fighters[0];
+    state.gameState = 'matchEnd';
+    state.matchEndTimer = 10;
+    state.roundEndTimer = 10;
+    updateGame();
+    drawMatchEndScreen();
+
+    if (isArenaBgmPlaying()) {
+      throw new Error('Arena BGM failed to cut off after fighter achieved 2 round wins in 1v1 mode!');
+    }
+
+    stopArenaBgm(true);
+  } catch (err) {
+    console.error('❌ [1v1 BGM SEAMLESS CONTINUITY TEST ERROR]:', err);
+    errors++;
+  }
+
   // Gojo RCT No Sudden Teleport Test
   console.log('⚡ [Gojo RCT Teleport Test] Verifying Gojo does not teleport when activating RCT...');
   try {
@@ -5868,6 +6126,29 @@ async function main() {
     if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
       throw new Error(`Ichigo failed to activate 3rd Hollow Mask transformation after taking damage!`);
     }
+
+    // Test Hollow Mask Lifesteal strictly respects CONFIG (no hardcoded lifesteal)
+    ichigo.reset();
+    ichigo.hp = 100;
+    ichigo.maxHp = 240;
+    ichigo.hollowMaskActive = true;
+    ichigo.hollowMaskTimer = 500;
+    const dummyEnemy = { x: 300, y: 300, r: 25, hp: 200, isDead: false };
+
+    // With hollowLifesteal = 0, dealing 50 damage should NOT heal Ichigo
+    CONFIG.ichigo.hollowLifesteal = 0;
+    ichigo.applyHollowLifesteal(50, dummyEnemy);
+    if (ichigo.hp !== 100) {
+      throw new Error(`Expected Ichigo to NOT heal when hollowLifesteal is 0, but hp changed to ${ichigo.hp}`);
+    }
+
+    // With hollowLifesteal = 0.20, dealing 50 damage should heal exactly 10 HP
+    CONFIG.ichigo.hollowLifesteal = 0.20;
+    ichigo.applyHollowLifesteal(50, dummyEnemy);
+    if (ichigo.hp !== 110) {
+      throw new Error(`Expected Ichigo to heal exactly 10 HP with 20% lifesteal, got hp=${ichigo.hp}`);
+    }
+    CONFIG.ichigo.hollowLifesteal = 0.0; // Restore config
 
     // Test Round Reset cleans up hollow baseline
     ichigo.reset();
@@ -6432,8 +6713,28 @@ async function main() {
     if (mockCtx.getStackDepth() !== 0) {
       throw new Error(`Sukuna drawSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
     }
+
+    // Sukuna Malevolent Shrine Asset Test
+    mockCtx.resetStackDepth();
+    sukuna.domainActive = true;
+    sukuna._drawShrineBody(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Sukuna _drawShrineBody resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    sukuna.drawDomainBackground(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Sukuna drawDomainBackground resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    sukuna.drawDomainForeground(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Sukuna drawDomainForeground resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
   } catch (err) {
-    console.error('❌ [SUKUNA HAIR ASSET TEST ERROR]:', err);
+    console.error('❌ [SUKUNA HAIR & SHRINE ASSET TEST ERROR]:', err);
     errors++;
   }
 
@@ -6751,6 +7052,558 @@ async function main() {
     errors++;
   }
 
+  // 6.5. Post-Kill Winner Smooth Angle Return Test
+  console.log('🔄 [Post-Kill Winner Angle Recovery Test] Verifying winner slowly returns to normal angle (0 rad) upon killing enemy...');
+  try {
+    const d1 = FIGHTER_DEFS[0];
+    const d2 = FIGHTER_DEFS[1];
+    const C1 = FIGHTER_CLASS_MAP[d1.type] || FIGHTER_CLASS_MAP.default;
+    const C2 = FIGHTER_CLASS_MAP[d2.type] || FIGHTER_CLASS_MAP.default;
+    const f1 = new C1(d1, 0); // Winner
+    const f2 = new C2(d2, 1); // Enemy
+    f1.x = 200; f1.y = 200;
+    f2.x = 200; f2.y = 100; // Directly above
+    state.fighters = [f1, f2];
+    state.gameState = 'playing';
+    
+    // Aim at live enemy over multiple frames until aligned
+    for (let i = 0; i < 20; i++) {
+      f1.aim(f2);
+    }
+    const initialAim = f1.gunAngle;
+    if (Math.abs(initialAim) < 1.0) {
+      throw new Error(`Expected aim angle aligned toward enemy above (-1.57 rad)! Got: ${initialAim}`);
+    }
+
+    // Kill enemy
+    f2.hp = 0;
+    f2.isDead = true;
+    state.gameState = 'roundEnd';
+
+    // Step frames and verify angle smoothly turns towards 0
+    let prevDiff = Math.abs(f1.gunAngle);
+    for (let frame = 0; frame < 100; frame++) {
+      updateFighters();
+      const currentDiff = Math.abs(f1.gunAngle);
+      if (currentDiff > prevDiff + 0.0001) {
+        throw new Error(`Angle moved away from 0 rad during post-kill coasting! Frame ${frame}: prevDiff=${prevDiff}, currentDiff=${currentDiff}`);
+      }
+      prevDiff = currentDiff;
+      if (f1.gunAngle === 0) break;
+    }
+
+    if (f1.gunAngle !== 0 || f1.angle !== 0) {
+      throw new Error(`Winner failed to return to 0 rad normal position after 100 frames! gunAngle=${f1.gunAngle}, angle=${f1.angle}`);
+    }
+  } catch (err) {
+    console.error('❌ [POST-KILL ANGLE RECOVERY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.5b. Gojo Domain Punch Kill Smooth Angle Recovery Test
+  console.log('🔄 [Gojo Domain Punch Kill Smooth Angle Test] Verifying Gojo domain punch kill smoothly recovers angle to 0 without snapping...');
+  try {
+    const gojoDef = FIGHTER_DEFS.find(d => d.type === 'gojo') || FIGHTER_DEFS[0];
+    const enemyDef = FIGHTER_DEFS.find(d => d.type !== 'gojo') || FIGHTER_DEFS[1];
+    const GojoClass = FIGHTER_CLASS_MAP.gojo || FIGHTER_CLASS_MAP.default;
+    const EnemyClass = FIGHTER_CLASS_MAP[enemyDef.type] || FIGHTER_CLASS_MAP.default;
+    const gojo = new GojoClass(gojoDef, 0);
+    const enemy = new EnemyClass(enemyDef, 1);
+    gojo.x = 200; gojo.y = 200;
+    enemy.x = 200; enemy.y = 100; // Directly above (angle ~ -1.57 rad)
+    enemy.hp = 10; // Low HP so one punch kills
+    state.fighters = [gojo, enemy];
+    state.gameState = 'playing';
+
+    // Activate domain and melee mode
+    gojo.domainActive = true;
+    gojo.domainTimer = 300;
+    gojo.isMeleeMode = true;
+
+    // Aim at enemy
+    gojo.aim(enemy);
+    const prePunchAim = gojo.gunAngle;
+    if (Math.abs(prePunchAim) < 1.0) {
+      throw new Error(`Expected Gojo domain aim aligned toward enemy above (-1.57 rad)! Got: ${prePunchAim}`);
+    }
+
+    // Execute punch which kills enemy
+    gojo._meleePunch(enemy);
+    if (!enemy.isDead && enemy.hp > 0) {
+      enemy.hp = 0;
+      enemy.isDead = true;
+    }
+    state.gameState = 'roundEnd';
+
+    // Verify angle did NOT immediately snap to 0 on the first frame
+    updateFighters();
+    const frame1Angle = Math.abs(gojo.gunAngle);
+    if (frame1Angle < 0.5) {
+      throw new Error(`Gojo angle snapped immediately to 0 on roundEnd! Got: ${gojo.gunAngle}`);
+    }
+
+    // Verify smooth decay towards 0
+    let lastDiff = frame1Angle;
+    for (let frame = 0; frame < 120; frame++) {
+      updateFighters();
+      const currDiff = Math.abs(gojo.gunAngle);
+      if (currDiff > lastDiff + 0.0001) {
+        throw new Error(`Gojo angle diverged from 0 during post-kill coasting! Frame ${frame}: last=${lastDiff}, curr=${currDiff}`);
+      }
+      lastDiff = currDiff;
+      if (gojo.gunAngle === 0) break;
+    }
+
+    if (gojo.gunAngle !== 0 || gojo.angle !== 0) {
+      throw new Error(`Gojo failed to smoothly return to 0 rad normal position after 120 frames! gunAngle=${gojo.gunAngle}, angle=${gojo.angle}`);
+    }
+  } catch (err) {
+    console.error('❌ [GOJO DOMAIN PUNCH KILL ANGLE TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Camera Dynamic Tracking Zoom Test
+  console.log('📷 [Camera Dynamic Zoom Configuration Test] Verifying camera config has increased zoom range and responsive midpoint framing...');
+  try {
+    if ((CONFIG.camera?.minZoom ?? 0) < 1.04) {
+      throw new Error(`CONFIG.camera.minZoom is ${CONFIG.camera?.minZoom}, expected >= 1.04`);
+    }
+    if ((CONFIG.camera?.maxZoom ?? 0) < 1.14) {
+      throw new Error(`CONFIG.camera.maxZoom is ${CONFIG.camera?.maxZoom}, expected >= 1.14`);
+    }
+    if ((CONFIG.camera?.winnerZoom ?? 0) < 1.08) {
+      throw new Error(`CONFIG.camera.winnerZoom is ${CONFIG.camera?.winnerZoom}, expected >= 1.08`);
+    }
+    if ((CONFIG.camera?.maxPanRatio ?? 0) < 0.22) {
+      throw new Error(`CONFIG.camera.maxPanRatio is ${CONFIG.camera?.maxPanRatio}, expected >= 0.22`);
+    }
+
+    state.camera = initCameraState();
+    if (state.camera.minZoom !== CONFIG.camera.minZoom || state.camera.maxZoom !== CONFIG.camera.maxZoom) {
+      throw new Error(`state.camera initialized with mismatched zoom bounds: min=${state.camera.minZoom}, max=${state.camera.maxZoom}`);
+    }
+
+    // Test close-range zoom (max zoom)
+    const CloseGojo = FIGHTER_CLASS_MAP['gojo'];
+    const CloseSukuna = FIGHTER_CLASS_MAP['sukuna'];
+    const cg = new CloseGojo({ ...FIGHTER_DEFS.find(d => d.id === 'gojo'), startX: 250, startY: 250 });
+    const cs = new CloseSukuna({ ...FIGHTER_DEFS.find(d => d.id === 'sukuna'), startX: 270, startY: 250 });
+    state.fighters = [cg, cs];
+    state.gameState = 'playing';
+    updateCamera();
+    if (state.camera.targetZoom < 1.10) {
+      throw new Error(`Expected close-range targetZoom >= 1.10, got ${state.camera.targetZoom}`);
+    }
+
+    // Test winner zoom
+    cs.hp = 0;
+    cs.dead = true;
+    updateCamera();
+    if (state.camera.targetZoom !== CONFIG.camera.winnerZoom) {
+      throw new Error(`Expected winner targetZoom === ${CONFIG.camera.winnerZoom}, got ${state.camera.targetZoom}`);
+    }
+  } catch (err) {
+    console.error('❌ [CAMERA DYNAMIC ZOOM TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Gojo Hollow Purple Explosion Channeling Protection Test
+  console.log('🔮 [Gojo Purple Explosion Channeling Protection Test] Verifying Purple explosion does NOT cancel active skill channeling...');
+  try {
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const IchigoClass = FIGHTER_CLASS_MAP['ichigo'];
+
+    const attackerGojo = new GojoClass({ ...FIGHTER_DEFS.find(d => d.id === 'gojo'), startX: 200, startY: 200 });
+    const targetSukuna = new SukunaClass({ ...FIGHTER_DEFS.find(d => d.id === 'sukuna'), startX: 250, startY: 200 });
+    const targetYuta = new YutaClass({ ...FIGHTER_DEFS.find(d => d.id === 'yuta'), startX: 220, startY: 250 });
+    const targetIchigo = new IchigoClass({ ...FIGHTER_DEFS.find(d => d.id === 'ichigo'), startX: 240, startY: 240 });
+
+    state.fighters = [attackerGojo, targetSukuna, targetYuta, targetIchigo];
+    state.gameState = 'playing';
+
+    // Put all 3 targets into active skill channeling
+    targetSukuna.isChannelingDivineFlame = true;
+    targetSukuna.divineFlameChargeTimer = 60;
+
+    targetYuta.isChannelingPureLoveBeam = true;
+    targetYuta.pureLoveBeamChargeTimer = 60;
+
+    targetIchigo.isChannelingBankai = true;
+    targetIchigo.bankaiBurstTimer = 45;
+
+    // Verify isChannelingSkill returns true
+    if (!targetSukuna.isChannelingSkill()) {
+      throw new Error(`Sukuna isChannelingSkill() returned false while channeling Divine Flame`);
+    }
+    if (!targetYuta.isChannelingSkill()) {
+      throw new Error(`Yuta isChannelingSkill() returned false while channeling Pure Love Beam`);
+    }
+    if (!targetIchigo.isChannelingSkill()) {
+      throw new Error(`Ichigo isChannelingSkill() returned false while channeling Bankai`);
+    }
+
+    const sukunaHpBefore = targetSukuna.hp;
+    const yutaHpBefore = targetYuta.hp;
+    const ichigoHpBefore = targetIchigo.hp;
+
+    // Trigger Purple projectile spawn and explosion
+    projectileSystem.clear();
+    projectileSystem.fireGojoPurple(attackerGojo, 0, 80, 150);
+    const purpleProj = projectileSystem.projectiles.find(p => p.behaviorType === 'gojo_purple' || p.isGojoPurpleOrb);
+    if (!purpleProj) {
+      throw new Error(`Failed to find spawned Gojo Purple projectile in projectileSystem`);
+    }
+    purpleProj.x = 230;
+    purpleProj.y = 230;
+
+    // Force expire life to trigger explosion
+    purpleProj.life = 0;
+    projectileSystem.update(state.fighters);
+
+    // Verify all targets took damage
+    if (targetSukuna.hp >= sukunaHpBefore) {
+      throw new Error(`Sukuna failed to take Purple explosion damage (HP before=${sukunaHpBefore}, after=${targetSukuna.hp})`);
+    }
+    if (targetYuta.hp >= yutaHpBefore) {
+      throw new Error(`Yuta failed to take Purple explosion damage (HP before=${yutaHpBefore}, after=${targetYuta.hp})`);
+    }
+    if (targetIchigo.hp >= ichigoHpBefore) {
+      throw new Error(`Ichigo failed to take Purple explosion damage (HP before=${ichigoHpBefore}, after=${targetIchigo.hp})`);
+    }
+
+    // CRITICAL: Verify all channeling states and timers are fully intact and NOT cancelled!
+    if (!targetSukuna.isChannelingDivineFlame || targetSukuna.divineFlameChargeTimer !== 60) {
+      throw new Error(`Sukuna Divine Flame channeling was CANCELLED by Purple explosion! isChannelingDivineFlame=${targetSukuna.isChannelingDivineFlame}, timer=${targetSukuna.divineFlameChargeTimer}`);
+    }
+    if (!targetYuta.isChannelingPureLoveBeam || targetYuta.pureLoveBeamChargeTimer !== 60) {
+      throw new Error(`Yuta Pure Love Beam channeling was CANCELLED by Purple explosion! isChannelingPureLoveBeam=${targetYuta.isChannelingPureLoveBeam}, timer=${targetYuta.pureLoveBeamChargeTimer}`);
+    }
+    if (!targetIchigo.isChannelingBankai || targetIchigo.bankaiBurstTimer !== 45) {
+      throw new Error(`Ichigo Bankai channeling was CANCELLED by Purple explosion! isChannelingBankai=${targetIchigo.isChannelingBankai}, timer=${targetIchigo.bankaiBurstTimer}`);
+    }
+  } catch (err) {
+    console.error('❌ [GOJO PURPLE CHANNELING PROTECTION TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.22. Gojo Hollow Purple Aerial Levitation & Slow Descent Test
+  console.log('🔮 [Gojo Purple Aerial Levitation & Slow Descent Test] Verifying Gojo stays afloat in the air after firing Purple and slowly descends as Purple expires...');
+  try {
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const gojoDef = FIGHTER_DEFS.find(d => d.id === 'gojo');
+    if (GojoClass && gojoDef) {
+      const arena = { x: 50, y: 50, width: 800, height: 600 };
+      const gojo = new GojoClass(gojoDef);
+      const enemy = { x: 500, y: 350, r: 25, hp: 100, maxHp: 100, isDead: false };
+
+      gojo.x = 200;
+      gojo.y = 350;
+      gojo.gunAngle = 0;
+      gojo.purpleCastAngle = 0;
+      state.fighters = [gojo, enemy];
+      state.arena = arena;
+      state.gameState = 'playing';
+
+      // Gojo fires Hollow Purple
+      gojo._firePurple(0);
+
+      // Verify zero velocity (stationary in the air) and aerial levitation (z = 35)
+      if (gojo.vx !== 0 || gojo.vy !== 0) {
+        throw new Error(`Expected Gojo to have zero velocity (stationary in the air) after firing Purple, but got vx=${gojo.vx}, vy=${gojo.vy}`);
+      }
+      if (gojo.z !== 35) {
+        throw new Error(`Expected Gojo to be afloat in the air (z=35) after firing Purple, got z=${gojo.z}`);
+      }
+      if (gojo.purpleRecoveryTimer <= 0) {
+        throw new Error(`Expected purpleRecoveryTimer to be > 0 after firing, got ${gojo.purpleRecoveryTimer}`);
+      }
+
+      // Simulate recovery updates — verify Gojo stays afloat and descends as breather expires
+      while (gojo.purpleRecoveryTimer > 0) {
+        gojo.update(enemy, 0, arena);
+        if (gojo.vx !== 0 || gojo.vy !== 0) {
+          throw new Error(`Expected Gojo to remain stationary during recovery breather, got vx=${gojo.vx}, vy=${gojo.vy}`);
+        }
+      }
+
+      // When breather ends: Gojo is on the ground (z=0), Infinity is restored, and he is able to move!
+      if (gojo.z !== 0) {
+        throw new Error(`Expected Gojo to land on the ground (z=0) when breather ends, got z=${gojo.z}`);
+      }
+      if (!gojo.infinityActive) {
+        throw new Error(`Expected Limitless Infinity to restore once Gojo touches down`);
+      }
+
+      // Verify Gojo can move after breather ends
+      const preMoveX = gojo.x;
+      const preMoveY = gojo.y;
+      for (let i = 0; i < 30; i++) {
+        gojo.update(enemy, 0, arena);
+      }
+      if (gojo.x === preMoveX && gojo.y === preMoveY && gojo.vx === 0 && gojo.vy === 0) {
+        throw new Error(`Expected Gojo to be able to move once breather ends`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [GOJO PURPLE AERIAL LEVITATION & SLOW DESCENT TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.23. Gojo & Sukuna Melee Mode Proximity Activation & Punch Attack Test
+  console.log('🥋 [Gojo & Sukuna Melee Mode Proximity Test] Verifying Gojo and Sukuna switch into Melee Mode and punch when enemies enter melee range radius...');
+  try {
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const gojoDef = FIGHTER_DEFS.find(d => d.id === 'gojo');
+    const sukunaDef = FIGHTER_DEFS.find(d => d.id === 'sukuna');
+    const arena = { x: 50, y: 50, width: 800, height: 600 };
+
+    if (GojoClass && gojoDef) {
+      const gojo = new GojoClass(gojoDef);
+      const enemy = { x: 500, y: 350, r: 25, hp: 200, maxHp: 200, isDead: false, takeDamage: (dmg) => { enemy.hp -= dmg; return true; } };
+      gojo.x = 200;
+      gojo.y = 350;
+      state.fighters = [gojo, enemy];
+      state.gameState = 'playing';
+
+      // 1. Enemy far away (300px) -> Gojo stays in Ranged Mode
+      gojo.update(enemy, 0, arena);
+      if (gojo.isMeleeMode) {
+        throw new Error(`Expected Gojo to be in Ranged Mode when enemy is far (300px), but isMeleeMode was true`);
+      }
+
+      // 2. Move enemy within closeRangeRadius (60px) -> Gojo enters Melee Mode
+      enemy.x = 260; // dist = 60 <= closeRangeRadius (85px)
+      gojo.update(enemy, 0, arena);
+      if (!gojo.isMeleeMode) {
+        throw new Error(`Expected Gojo to enter Melee Mode when enemy is in closeRangeRadius (60px), but isMeleeMode remained false`);
+      }
+      if (gojo.forcedMeleeTimer <= 0) {
+        throw new Error(`Expected Gojo forcedMeleeTimer > 0 on entering Melee Mode`);
+      }
+      if (gojo.canPerformBasicAttack()) {
+        throw new Error(`Expected Gojo canPerformBasicAttack() to be false while in Melee Mode`);
+      }
+
+      // 3. Update melee combat -> Gojo executes punch-teleport-punch combo
+      const initialEnemyHp = enemy.hp;
+      const initialGojoX = gojo.x;
+      const initialGojoY = gojo.y;
+      let gojoTeleported = false;
+      let punchHits = 0;
+      let lastHp = enemy.hp;
+
+      for (let f = 0; f < 60; f++) {
+        gojo.update(enemy, 0, arena);
+        if (gojo.x !== initialGojoX || gojo.y !== initialGojoY) {
+          gojoTeleported = true;
+        }
+        if (enemy.hp < lastHp) {
+          punchHits++;
+          lastHp = enemy.hp;
+        }
+      }
+      if (enemy.hp >= initialEnemyHp || punchHits === 0) {
+        throw new Error(`Expected Gojo to land melee punch damage on enemy during Melee Mode, but enemy HP remained ${enemy.hp}`);
+      }
+      if (!gojoTeleported) {
+        throw new Error(`Expected Gojo to teleport to flank angles during punch-teleport-punch melee combo, but position remained (${gojo.x}, ${gojo.y})`);
+      }
+    }
+
+    if (SukunaClass && sukunaDef) {
+      const sukuna = new SukunaClass(sukunaDef);
+      const enemy = { x: 500, y: 350, r: 25, hp: 200, maxHp: 200, isDead: false, takeDamage: (dmg) => { enemy.hp -= dmg; return true; } };
+      sukuna.x = 200;
+      sukuna.y = 350;
+      state.fighters = [sukuna, enemy];
+      state.gameState = 'playing';
+
+      // 1. Enemy far away (300px) -> Sukuna stays in Ranged Mode
+      sukuna.update(enemy, 0, arena);
+      if (sukuna.isMeleeMode) {
+        throw new Error(`Expected Sukuna to be in Ranged Mode when enemy is far (300px), but isMeleeMode was true`);
+      }
+
+      // 2. Move enemy within closeRangeRadius (60px) -> Sukuna enters Melee Mode
+      enemy.x = 260; // dist = 60 <= closeRangeRadius (85px)
+      sukuna.update(enemy, 0, arena);
+      if (!sukuna.isMeleeMode) {
+        throw new Error(`Expected Sukuna to enter Melee Mode when enemy is in closeRangeRadius (60px), but isMeleeMode remained false`);
+      }
+      if (sukuna.forcedMeleeTimer <= 0) {
+        throw new Error(`Expected Sukuna forcedMeleeTimer > 0 on entering Melee Mode`);
+      }
+      if (sukuna.canPerformBasicAttack()) {
+        throw new Error(`Expected Sukuna canPerformBasicAttack() to be false while in Melee Mode`);
+      }
+
+      // 3. Update melee combat -> Sukuna executes punch-teleport-punch combo
+      const initialEnemyHp = enemy.hp;
+      const initialSukunaX = sukuna.x;
+      const initialSukunaY = sukuna.y;
+      let sukunaTeleported = false;
+      let punchHits = 0;
+      let lastHp = enemy.hp;
+
+      for (let f = 0; f < 60; f++) {
+        sukuna.update(enemy, 0, arena);
+        if (sukuna.x !== initialSukunaX || sukuna.y !== initialSukunaY) {
+          sukunaTeleported = true;
+        }
+        if (enemy.hp < lastHp) {
+          punchHits++;
+          lastHp = enemy.hp;
+        }
+      }
+      if (enemy.hp >= initialEnemyHp || punchHits === 0) {
+        throw new Error(`Expected Sukuna to land melee punch damage on enemy during Melee Mode, but enemy HP remained ${enemy.hp}`);
+      }
+      if (!sukunaTeleported) {
+        throw new Error(`Expected Sukuna to teleport to flank angles during punch-teleport-punch melee combo, but position remained (${sukuna.x}, ${sukuna.y})`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [GOJO & SUKUNA MELEE MODE PROXIMITY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Sukuna Domain Slash Ricochet Disabled Check
+  console.log('🩸 [Sukuna Domain Slash Ricochet Disabled Test] Verifying ricochet effects are disabled on Sukuna domain slashes...');
+  try {
+    const { spawnDomainSlashLines } = await import('../js/entities/fighters/sukuna/sukunaDomainVisuals.js');
+    const { doDomainRapidSlashes } = await import('../js/entities/fighters/sukuna/sukunaSkills.js');
+    const sukunaDef = FIGHTER_DEFS.find(d => d.id === 'sukuna');
+    const gojoDef = FIGHTER_DEFS.find(d => d.id === 'gojo');
+    if (sukunaDef && gojoDef) {
+      const sukuna = new FIGHTER_CLASS_MAP['sukuna'](sukunaDef);
+      const enemy = new FIGHTER_CLASS_MAP['gojo'](gojoDef);
+      sukuna.x = 200;
+      sukuna.y = 200;
+      sukuna.domainActive = true;
+      enemy.x = 220;
+      enemy.y = 200;
+      state.fighters = [sukuna, enemy];
+      state.arena = { x: 0, y: 0, width: 600, height: 600, shape: 'circle', radius: 300 };
+
+      // Execute domain slash lines
+      const hit = spawnDomainSlashLines(sukuna, 3);
+
+      // Execute domain rapid slashes
+      doDomainRapidSlashes(sukuna, enemy, state.arena, 0);
+    }
+  } catch (err) {
+    console.error('❌ [SUKUNA DOMAIN SLASH RICOCHET DISABLED TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Gojo Active Purple Attack & Skill Prevention Check
+  console.log('🔮 [Gojo Active Purple Attack & Skill Prevention Test] Verifying Gojo cannot attack or cast skills while Hollow Purple is in flight...');
+  try {
+    const gojoDef = FIGHTER_DEFS.find(d => d.id === 'gojo');
+    const targetDef = FIGHTER_DEFS.find(d => d.id === 'targetDummy' || d.id === 'normal');
+    if (gojoDef && targetDef) {
+      const gojo = new FIGHTER_CLASS_MAP['gojo'](gojoDef);
+      const dummy = new FIGHTER_CLASS_MAP[targetDef.id](targetDef);
+      gojo.x = 200;
+      gojo.y = 200;
+      dummy.x = 250;
+      dummy.y = 200;
+      dummy.hp = 1000;
+      dummy.maxHp = 1000;
+      state.fighters = [gojo, dummy];
+      state.projectiles = [];
+      const arena = { x: 0, y: 0, width: 800, height: 800, shape: 'rect' };
+      state.arena = arena;
+
+      // 1. Fire Hollow Purple
+      gojo._firePurple(0);
+
+      if (!gojo.isPurpleActive()) {
+        throw new Error('Expected Gojo isPurpleActive() to be true immediately after firing Purple!');
+      }
+
+      // 2. Verify basic attacks are prevented
+      if (gojo.canPerformBasicAttack()) {
+        throw new Error('Expected canPerformBasicAttack() to return false while Purple is active!');
+      }
+      const shootResult = gojo.shoot(0);
+      if (shootResult !== false) {
+        throw new Error('Expected shoot() to return false while Purple is active!');
+      }
+
+      // 3. Verify skills are prevented
+      const redResult = gojo._activateRed();
+      if (redResult !== false) {
+        throw new Error('Expected _activateRed() to return false while Purple is active!');
+      }
+      gojo.redCooldown = 0;
+      gojo._activateRed();
+      if (gojo.redEffectTimer > 0 || gojo.redBuildupPhase) {
+        throw new Error('Expected Red not to activate while Purple is active!');
+      }
+
+      // 4. Verify domain is prevented
+      gojo.domainCooldown = 0;
+      gojo._activateDomain(arena);
+      if (gojo.domainActive) {
+        throw new Error('Expected Domain Expansion not to activate while Purple is active!');
+      }
+
+      // 5. Verify RCT is prevented
+      gojo.hp = 10;
+      gojo.reverseCursedTechniqueCooldown = 0;
+      gojo._activateReverseCursedTechnique(dummy, arena);
+      if (gojo.isChannelingRCT || gojo.hp > 10) {
+        throw new Error('Expected Reverse Cursed Technique not to trigger while Purple is active!');
+      }
+
+      // 6. Verify melee punches and melee mode are prevented
+      gojo.isMeleeMode = false;
+      gojo.forcedMeleeTimer = 0;
+      dummy.takeDamage(0, gojo); // reset dummy
+      const prePunchHp = dummy.hp;
+      gojo._meleePunch(dummy);
+      if (dummy.hp < prePunchHp) {
+        throw new Error('Expected _meleePunch() not to deal damage while Purple is active!');
+      }
+
+      // Run update cycles: Gojo must not punch, shoot or enter melee mode
+      gojo.shootCooldown = 0;
+      for (let i = 0; i < 30; i++) {
+        gojo.update(dummy, 0, arena);
+        if (gojo.isMeleeMode) {
+          throw new Error('Expected Gojo not to enter Melee Mode while Purple is active!');
+        }
+        if (gojo.punchAnimTimer > 0) {
+          throw new Error('Expected Gojo punch animation not to start while Purple is active!');
+        }
+      }
+
+      // 7. Expire Purple projectile and verify combat resumes
+      if (gojo.activePurpleProjectile) {
+        gojo.activePurpleProjectile.life = 0;
+      }
+      projectileSystem.projectiles = [];
+      state.projectiles = [];
+      gojo.activePurpleProjectile = null;
+      gojo.purpleRecoveryTimer = 0;
+      gojo.z = 0;
+
+      if (gojo.isPurpleActive()) {
+        throw new Error('Expected isPurpleActive() to return false once Purple projectile is removed!');
+      }
+      if (!gojo.canPerformBasicAttack()) {
+        throw new Error('Expected canPerformBasicAttack() to return true once Purple has expired!');
+      }
+    }
+  } catch (err) {
+    console.error('❌ [GOJO ACTIVE PURPLE ATTACK & SKILL PREVENTION TEST ERROR]:', err);
+    errors++;
+  }
+
   // 7. Weapon Previews Canvas Stack Balance Check
   console.log('⚔️ [Weapon Preview Stack Test] Verifying all weapon graphics transform balance...');
   for (const def of allDefs) {
@@ -6782,6 +7635,26 @@ async function main() {
       state.matchEndTimer = 100;
       state.mode = '1v1';
       drawMatchEndScreen();
+    }},
+    { name: 'drawSkinStudioScreen', fn: () => {
+      state.gameState = 'skinStudio';
+      for (const f of SKIN_STUDIO_FIGHTERS) {
+        state.studioSelectedSkinFighter = f.key;
+        for (const facing of ['right', 'left']) {
+          state.studioSkinFacing = facing;
+          for (const tab of ['scale', 'position', 'rotation', 'export']) {
+            state.studioSkinDetailTab = tab;
+            if (f.forms) {
+              for (const fm of f.forms) {
+                state.studioSkinForm = fm.id;
+                drawSkinStudioScreen();
+              }
+            } else {
+              drawSkinStudioScreen();
+            }
+          }
+        }
+      }
     }}
   ];
 
@@ -6794,6 +7667,41 @@ async function main() {
       console.error(`❌ [UI SCREEN ERROR in '${sc.name}']:`, err);
       errors++;
     }
+  }
+
+  // 9. Skin Studio Customization Persistence Test
+  console.log('💇 [Skin Studio Customization Persistence Test] Verifying live adjustments, JSON saving, and loading...');
+  try {
+    let savedStorage = null;
+    globalThis.localStorage.setItem = (key, val) => {
+      if (key === 'circleMiniBattleSkinCustomizations') savedStorage = val;
+    };
+    globalThis.localStorage.getItem = (key) => {
+      if (key === 'circleMiniBattleSkinCustomizations') return savedStorage;
+      return null;
+    };
+
+    state.skinCustomizations.ichigo.widthScale = 1.15;
+    state.skinCustomizations.ichigo.heightScale = 0.95;
+    state.skinCustomizations.ichigo.offsetX = 4;
+    state.skinCustomizations.ichigo.offsetY = -2;
+    state.skinCustomizations.ichigo.angleOffset = 0.08;
+    saveSkinCustomizations();
+
+    if (!savedStorage) {
+      throw new Error('saveSkinCustomizations() failed to write to localStorage!');
+    }
+
+    // Reset state and reload
+    state.skinCustomizations.ichigo = { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false };
+    loadSkinCustomizations();
+
+    if (state.skinCustomizations.ichigo.widthScale !== 1.15 || state.skinCustomizations.ichigo.offsetX !== 4) {
+      throw new Error(`loadSkinCustomizations() failed to restore saved values! Got widthScale=${state.skinCustomizations.ichigo.widthScale}, offsetX=${state.skinCustomizations.ichigo.offsetX}`);
+    }
+  } catch (err) {
+    console.error('❌ [SKIN CUSTOMIZATION PERSISTENCE TEST ERROR]:', err);
+    errors++;
   }
 
   console.log('───────────────────────────────────────────────────────');

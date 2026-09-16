@@ -248,9 +248,6 @@ export class GetsugaBehavior extends ProjectileBehavior {
         if (projectile.isFrozenByInfinity || projectile.damage === 0 || projectile.isVisual) {
           return false;
         }
-        if (attacker && typeof attacker.applyHollowLifesteal === 'function') {
-          attacker.applyHollowLifesteal(tickDamage, f);
-        }
         if (typeof f.clearAllAfterimages === 'function') {
           f.clearAllAfterimages();
         }
@@ -265,6 +262,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
           f.y >= arena.y + arena.height - pad - 2
         );
 
+        const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
         const isMakimaShatter = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving || (f.shatteredPieces && f.shatteredPieces.length > 0) || (f.characterId === 'makima' && (f.isDead || f.dead || f.hp <= 0))));
         if (isMakimaShatter) {
           f.vx = 0;
@@ -275,7 +273,19 @@ export class GetsugaBehavior extends ProjectileBehavior {
             f.x = f._shatterLockedX;
             f.y = f._shatterLockedY;
           }
+        } else if (isSaitamaCounter) {
+          f.isDraggedByGetsuga = false;
+          f.knockbackVx = 0;
+          f.knockbackVy = 0;
+          f.vx = 0;
+          f.vy = 0;
+          if (projectile.draggedTargets && projectile.draggedTargets.has(f)) {
+            projectile.draggedTargets.delete(f);
+          }
         } else if (projectile.vx !== 0 || projectile.vy !== 0) {
+          f.isDraggedByGetsuga = true;
+          if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
+          projectile.draggedTargets.set(f, true);
           const angle = Math.atan2(projectile.vy, projectile.vx);
           const kbForce = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 30)
@@ -287,8 +297,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
           }
         }
 
-        // ── Apply Movement Slow Debuff (Immune if Adapted!) ──
-        if (!isGetsugaAdapted) {
+        // ── Apply Movement Slow Debuff (Immune if Adapted or Saitama Counter!) ──
+        if (!isGetsugaAdapted && !isSaitamaCounter) {
           const slowDuration = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaSlowDuration || 140)
             : (isMask
@@ -345,7 +355,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
     if (system && system.projectiles) {
       for (let j = 0; j < system.projectiles.length; j++) {
         const other = system.projectiles[j];
-        if (!other || other === projectile || other.owner === ownerIdx || other.isGetsuga || other.isGojoPurple || other.isSukunaFurnace || other.behaviorType === 'yuta_pure_love_beam' || other.visual === 'yuta_pure_love_beam' || other.isPureLoveBeam) continue;
+        if (!other || other === projectile || other.owner === ownerIdx || other.isGetsuga || other.isGojoPurple || other.isGojoPurpleOrb || other.behaviorType === 'gojo_purple' || other.visual === 'gojoPurple' || other.isSukunaFurnace || other.behaviorType === 'sukuna_furnace' || other.behaviorType === 'yuta_pure_love_beam' || other.visual === 'yuta_pure_love_beam' || other.isPureLoveBeam) continue;
         const d = Math.hypot(other.x - projectile.x, other.y - projectile.y);
         if (d <= hitRadius + (other.r || 6)) {
           other.life = 0;
@@ -382,6 +392,16 @@ export class GetsugaBehavior extends ProjectileBehavior {
     // ── All Getsuga Tensho Waves Stay Pinned to the Wall Until Lifespan Ends (Does not clip out of arena) ──
     if (arena) {
       if (projectile.life <= 0) {
+        if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
+          for (const [target] of projectile.draggedTargets.entries()) {
+            if (target) {
+              target.isDraggedByGetsuga = false;
+              target.preventKnockbackBounce = false;
+              target.z = 0;
+            }
+          }
+          projectile.draggedTargets.clear();
+        }
         if (typeof spawnSparks === 'function') {
           spawnSparks(projectile.x, projectile.y, 16, projectile.color || '#00E5FF');
         }
@@ -437,6 +457,16 @@ export class GetsugaBehavior extends ProjectileBehavior {
     );
 
     if (projectile.life <= 0 || isOutsideWindow) {
+      if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
+        for (const [target] of projectile.draggedTargets.entries()) {
+          if (target) {
+            target.isDraggedByGetsuga = false;
+            target.preventKnockbackBounce = false;
+            target.z = 0;
+          }
+        }
+        projectile.draggedTargets.clear();
+      }
       if (typeof spawnSparks === 'function') {
         spawnSparks(projectile.x, projectile.y, 8, projectile.color || '#00E5FF');
       }

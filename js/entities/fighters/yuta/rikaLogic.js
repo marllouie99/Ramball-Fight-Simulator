@@ -900,7 +900,8 @@ export function updateRika(fighter, arena) {
     const dist = Math.hypot(dx, dy);
 
     // Steer: blend current heading toward target direction
-    const steerStrength = rk.target.isStealthed ? (CONFIG.toji?.stealthTurnRate || 0.035) * 0.5 : 0.08; // How aggressively she turns
+    const baseSteer = rk.target.isStealthed ? (CONFIG.toji?.stealthTurnRate || 0.035) * 0.5 : (dist < 140 ? 0.14 : 0.08);
+    const steerStrength = (rk.teleportChaseDelayTimer && rk.teleportChaseDelayTimer > 0) ? baseSteer * 0.35 : baseSteer;
     rk.vx += (dx / (dist || 1)) * speed * steerStrength;
     rk.vy += (dy / (dist || 1)) * speed * steerStrength;
 
@@ -967,8 +968,12 @@ export function updateRika(fighter, arena) {
       const hitStunDuration = CONFIG.yuta?.rikaHitStun || 12;
       const attackOwner = isRikaDominated ? (rk._makimaChainer || rk.owner) : (fighter._makimaChainer || fighter);
 
+      let anyHit = false;
       for (const target of aoeTargets) {
-        target.takeDamage(rikaDmg, attackOwner, { isPhysical: true, isRikaAttack: true });
+        const hitResult = target.takeDamage(rikaDmg, attackOwner, { isPhysical: true, isRikaAttack: true, rika: rk });
+        if (hitResult !== false) {
+          anyHit = true;
+        }
 
         const pushAngle = Math.atan2(target.y - rk.y, target.x - rk.x);
         const smashVx = Math.cos(pushAngle) * knockbackForce;
@@ -993,10 +998,12 @@ export function updateRika(fighter, arena) {
         if (typeof spawnSparks === 'function') spawnSparks(target.x, target.y, 8, 'rikaCurse');
       }
 
-      // 2. Rika Equal-and-Opposite Physical Recoil (Rika bounces back off target on impact)
-      const pushAngle = Math.atan2(dy, dx);
-      rk.vx = -Math.cos(pushAngle) * recoilForce;
-      rk.vy = -Math.sin(pushAngle) * recoilForce;
+      // 2. Controlled Physical Recoil (applied gently only on solid connected hits)
+      if (anyHit) {
+        const pushAngle = Math.atan2(dy, dx);
+        rk.vx = rk.vx * 0.25 - Math.cos(pushAngle) * (recoilForce * 0.45);
+        rk.vy = rk.vy * 0.25 - Math.sin(pushAngle) * (recoilForce * 0.45);
+      }
 
       // 3. Heavy Impact Screen Shake, Flash & Sparks
       if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(8, 10);
@@ -1106,6 +1113,28 @@ export function updateRika(fighter, arena) {
   
   if (rk.leftArmTimer > 0) {
     rk.leftArmTimer--;
+  }
+
+  if (rk.teleportChaseDelayTimer > 0) {
+    rk.teleportChaseDelayTimer--;
+  }
+
+  // Smooth angle orientation integration
+  if (rk.target && !rk.target.isDead && rk.target.hp > 0) {
+    const desiredAngle = Math.atan2(rk.target.y - rk.y, rk.target.x - rk.x);
+    const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
+    let diff = desiredAngle - currentAngle;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    const turnRate = rk.target.isStealthed ? (CONFIG.toji?.stealthTurnRate || 0.035) : (rk.attackTimer > 0 ? 0.35 : 0.22);
+    rk.angle = currentAngle + diff * turnRate;
+  } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
+    const moveAngle = Math.atan2(rk.vy, rk.vx);
+    const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : moveAngle;
+    let diff = moveAngle - currentAngle;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    rk.angle = currentAngle + diff * 0.18;
   }
 
   // Wall bounce & arena boundary clamping — same as arena fighters / illusions

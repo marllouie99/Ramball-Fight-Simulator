@@ -9,6 +9,7 @@ import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash, spawnGojoRedFrontalBlast } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
+import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 export function snapAngleToCardinal(angle) {
   if (angle === undefined || Number.isNaN(angle)) return 0;
@@ -340,7 +341,7 @@ export function firePurple(fighter, ownerIndex) {
     fighter.purpleUseCount = 0;
   }
 
-  let purpleLife = CONFIG.gojo?.purpleLife || 250;
+  let purpleLife = CONFIG.gojo?.purpleLife ?? 480;
 
   // Lock release angle strictly to committed cast angle (no snapping auto-aim upon firing)
   let releaseAngle;
@@ -355,6 +356,8 @@ export function firePurple(fighter, ownerIndex) {
   fighter.purpleCastAngle = releaseAngle;
   fighter.gunAngle = releaseAngle;
   fighter.angle = releaseAngle;
+
+  const recoveryDuration = fighter.purpleRecoveryDuration ?? CONFIG.gojo?.purpleRecoveryDuration ?? 50;
 
   if (projectileSystem && projectileSystem.fireGojoPurple) {
     const proj = projectileSystem.fireGojoPurple(
@@ -372,34 +375,25 @@ export function firePurple(fighter, ownerIndex) {
       if (proj.life !== undefined) {
         purpleLife = proj.life;
       }
+      console.log(`[Hollow Purple Fired] Projectile spawned (id: ${proj.id}) | Initial life: ${proj.life} frames (${(proj.life / 60).toFixed(2)}s) | Config purpleLife: ${CONFIG.gojo?.purpleLife} | Gojo recovery duration: ${recoveryDuration} frames (${(recoveryDuration / 60).toFixed(2)}s)`);
     }
   }
 
-  // Post-fire Purple Breather Recovery Stasis (Gojo pauses to catch his breath based on purpleRecoveryDuration config)
-  const recoveryDuration = CONFIG.gojo?.purpleRecoveryDuration ?? 50;
+  // 1. Teleport away to safe distance immediately after firing Hollow Purple
+  executePurpleRetreat(fighter, releaseAngle);
+
+  // 2. Post-fire Purple Breather Recovery (Gojo stays afloat in the air during breather stasis)
   fighter.purpleRecoveryTimer = recoveryDuration;
   fighter.purpleRecoveryMaxTimer = recoveryDuration;
   fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1200;
   fighter.shootCooldown = fighter.shootCooldownMax ?? 60; // Reset basic attack cooldown so it resumes cleanly once purple expires
-  if (recoveryDuration > 0) {
-    fighter.vx = 0;
-    fighter.vy = 0;
-  } else {
-    // If no recovery timer configured, immediately move backwards away from target / purple cast angle
-    let backwardAngle;
-    if (fighter.purpleCastAngle !== undefined && !Number.isNaN(fighter.purpleCastAngle)) {
-      backwardAngle = fighter.purpleCastAngle + Math.PI;
-    } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
-      backwardAngle = fighter.gunAngle + Math.PI;
-    } else {
-      backwardAngle = (fighter.angle || 0) + Math.PI;
-    }
-    if (typeof fighter.resumeMovement === 'function') {
-      fighter.resumeMovement(null, 1.0, backwardAngle);
-    }
-  }
 
-  // When Gojo fires Purple, disable his Limitless Infinity barrier until the Purple life expires
+  // Maintain aerial levitation height and zero velocity (no continuous move-back / backward drift)
+  fighter.z = 35;
+  fighter.vx = 0;
+  fighter.vy = 0;
+
+  // When Gojo fires Purple, disable his Limitless Infinity barrier until the Purple life expires and Gojo lands
   fighter.infinityActive = false;
   fighter.infinityCooldown = 0;
   fighter.infinityActiveTimer = 0;
@@ -410,8 +404,86 @@ export function firePurple(fighter, ownerIndex) {
   fighter.purpleRetreatTimer = 0;
 }
 
-export function executePurpleRetreat(fighter) {
-  // Gojo remains stationary in breather stasis until Purple expires; no sudden teleport
+export function executePurpleRetreat(fighter, releaseAngle) {
+  if (!fighter || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0) return;
+
+  const oldX = fighter.x;
+  const oldY = fighter.y;
+
+  const retreatAngle = (releaseAngle !== undefined && !Number.isNaN(releaseAngle))
+    ? releaseAngle + Math.PI
+    : ((fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle))
+      ? fighter.gunAngle + Math.PI
+      : ((fighter.angle || 0) + Math.PI));
+
+  const retreatDist = CONFIG.gojo?.purpleRetreatDistance ?? 260;
+  let targetX = fighter.x + Math.cos(retreatAngle) * retreatDist;
+  let targetY = fighter.y + Math.sin(retreatAngle) * retreatDist;
+
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  if (arena) {
+    if (arena.shape === 'circle') {
+      const acx = arena.x + arena.width / 2;
+      const acy = arena.y + arena.height / 2;
+      const ar = Math.max(10, (arena.radius || (arena.width / 2)) - fighter.r);
+      const cdx = targetX - acx;
+      const cdy = targetY - acy;
+      const cdist = Math.hypot(cdx, cdy);
+      if (cdist > ar && cdist > 0) {
+        targetX = acx + (cdx / cdist) * ar;
+        targetY = acy + (cdy / cdist) * ar;
+      }
+    } else {
+      targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
+      targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+    }
+  }
+
+  fighter.x = targetX;
+  fighter.y = targetY;
+  fighter.vx = 0;
+  fighter.vy = 0;
+  fighter.z = 35; // Maintain levitation height in the air after teleporting away
+
+  if (!fighter.afterImages) fighter.afterImages = [];
+  const dx = targetX - oldX;
+  const dy = targetY - oldY;
+  const distT = Math.hypot(dx, dy);
+  if (distT >= 1) {
+    const pathAngle = Math.atan2(dy, dx);
+    const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : pathAngle;
+    const steps = Math.max(4, Math.floor(distT / 12));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const maxTimer = 24 - Math.floor(t * 6);
+      pushTrailCap(fighter.afterImages, {
+        x: oldX + dx * t,
+        y: oldY + dy * t,
+        angle: facingAngle,
+        timer: maxTimer,
+        maxTimer: maxTimer,
+        fromX: oldX,
+        fromY: oldY,
+        toX: targetX,
+        toY: targetY
+      }, 30);
+    }
+  }
+
+  spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
+  spawnImpactFlash(targetX, targetY, 25, 'lightningTrail');
+  spawnSparks(oldX, oldY, 6, '#A855F7');
+  spawnSparks(targetX, targetY, 8, '#A855F7');
+
+  const sTeleport = getSkillSound(fighter._def?.id || 'gojo', 'teleport');
+  const teleportSrc = sTeleport?.src || 'Assets/Sound Effects/Skills/dash3.mp3';
+  const teleportVol = sTeleport?.volume ?? 0.65;
+  audioSystem.playSFX(teleportSrc, teleportVol);
+
+  const target = (typeof fighter._findClosestEnemy === 'function') ? fighter._findClosestEnemy() : null;
+  if (target && !target.isDead && typeof fighter.aim === 'function' && !fighter.isTargetOfAmbush && (fighter.timeStopTimer || 0) <= 0) {
+    fighter.aim(target);
+  }
 }
 
 export function deleteEnemyProjectilesInPurple(fighter) {
@@ -422,12 +494,13 @@ export function deleteEnemyProjectilesInPurple(fighter) {
     if (p.isGojoPurple && (p.owner === state.fighters.indexOf(fighter) || state.getFighterTeam(p.owner) === myTeam)) {
       for (let ep of projectileSystem.projectiles) {
         if (ep !== p && ep.owner !== p.owner) {
+          if (ep.isGojoPurple || ep.isGojoPurpleOrb || ep.behaviorType === 'gojo_purple' || ep.visual === 'gojoPurple' || ep.isGetsuga || ep.behaviorType === 'getsuga_tensho' || ep.isSukunaFurnace || ep.behaviorType === 'sukuna_furnace' || ep.behaviorType === 'yuta_pure_love_beam' || ep.visual === 'yuta_pure_love_beam' || ep.isPureLoveBeam) continue;
           const isEnemy = myTeam === null || state.getFighterTeam(ep.owner) !== myTeam;
           if (isEnemy && !ep.isVisual) {
             const dist = Math.hypot(p.x - ep.x, p.y - ep.y);
             const suctionRange = (CONFIG.gojo?.purpleRadius || 50) + 180;
             if (dist < suctionRange) {
-              ep.toRemove = true;
+              ep.life = 0;
               spawnSparks(ep.x, ep.y, 4, '#A020F0');
             }
           }

@@ -315,7 +315,7 @@ export function resolveFighterCollision(a, b) {
   const ty = nx;
 
   const overlap = (minDist - distance) / 2;
-  const isBrawlerCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0) || ((a.comboHitsLeft || 0) > 0) || ((b.comboHitsLeft || 0) > 0);
+  const isBrawlerCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0) || ((a.comboHitsLeft || 0) > 0) || ((b.comboHitsLeft || 0) > 0) || a.isMeleeMode || b.isMeleeMode;
   const effectiveOverlap = isBrawlerCombo ? overlap * 0.1 : overlap;
   
   // Pause circle-circle physical push response during Nanami or Escanor Hit-Pause
@@ -419,8 +419,8 @@ export function resolveFighterCollision(a, b) {
   const aIsGojoChanneling = (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.redBuildupPhase || (a.redEffectTimer || 0) > 0 || a.isDomainPreSlide || a.isChannelingDomainExpansion || (a.domainChargeTimer || 0) > 0);
   const bIsGojoChanneling = (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.redBuildupPhase || (b.redEffectTimer || 0) > 0 || b.isDomainPreSlide || b.isChannelingDomainExpansion || (b.domainChargeTimer || 0) > 0);
 
-  const aIsGojoInfinity = isEnemy && !aIsGojoChanneling && !a.isTargetOfAmbush && !isInsideRubbickStolenVoid(a) && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.infinityActive || (!a.isMeleeMode && (a.infinityCooldown || 0) <= 0) || (a.infinityBlockTimer || 0) > 0);
-  const bIsGojoInfinity = isEnemy && !bIsGojoChanneling && !b.isTargetOfAmbush && !isInsideRubbickStolenVoid(b) && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.infinityActive || (!b.isMeleeMode && (b.infinityCooldown || 0) <= 0) || (b.infinityBlockTimer || 0) > 0);
+  const aIsGojoInfinity = isEnemy && !aIsGojoChanneling && !a.isTargetOfAmbush && !isInsideRubbickStolenVoid(a) && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && !a.isMeleeMode && !b.isMeleeMode && (a.infinityActive || (a.infinityCooldown || 0) <= 0);
+  const bIsGojoInfinity = isEnemy && !bIsGojoChanneling && !b.isTargetOfAmbush && !isInsideRubbickStolenVoid(b) && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && !b.isMeleeMode && !a.isMeleeMode && (b.infinityActive || (b.infinityCooldown || 0) <= 0);
 
   // Apply Limitless Infinity movement slow on physical collision instead of pushing enemies back
   if (aIsGojoInfinity && !b.gojoInfinityImmune) {
@@ -490,13 +490,17 @@ export function resolveFighterCollision(a, b) {
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
   if (!a.isTurret && !a.isDispenser) {
-    // Fighters in rage, active Infinity, or counter-lock ignore the bounce impulse so they hold their ground
+    // Fighters in melee mode, rage, active Infinity, or counter-lock ignore the bounce impulse so they hold their ground
     // When bouncing off an immovable entity (e.g. counter lock or turret), the mobile entity does not damp the bounce
-    if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked) {
-      const meleeDamp = (a.isMeleeMode && !bIsImmovable) ? 0.35 : 1.0;
+    if (a.isMeleeMode) {
+      a.vx = 0;
+      a.vy = 0;
+      a.knockbackVx = 0;
+      a.knockbackVy = 0;
+    } else if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked) {
       const mult = bIsImmovable ? 2.0 : 1.0;
-      a.vx -= (impulse * mult * nx + randA * impulse * tx) * meleeDamp;
-      a.vy -= (impulse * mult * ny + randA * impulse * ty) * meleeDamp;
+      a.vx -= (impulse * mult * nx + randA * impulse * tx);
+      a.vy -= (impulse * mult * ny + randA * impulse * ty);
       a.normalizeSpeed();
     } else if (aIsCounterLocked) {
       a.vx = 0;
@@ -505,11 +509,15 @@ export function resolveFighterCollision(a, b) {
   }
   
   if (!b.isTurret && !b.isDispenser) {
-    if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked) {
-      const meleeDamp = (b.isMeleeMode && !aIsImmovable) ? 0.35 : 1.0;
+    if (b.isMeleeMode) {
+      b.vx = 0;
+      b.vy = 0;
+      b.knockbackVx = 0;
+      b.knockbackVy = 0;
+    } else if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked) {
       const mult = aIsImmovable ? 2.0 : 1.0;
-      b.vx += (impulse * mult * nx + randB * impulse * tx) * meleeDamp;
-      b.vy += (impulse * mult * ny + randB * impulse * ty) * meleeDamp;
+      b.vx += (impulse * mult * nx + randB * impulse * tx);
+      b.vy += (impulse * mult * ny + randB * impulse * ty);
       b.normalizeSpeed();
     } else if (bIsCounterLocked) {
       b.vx = 0;
@@ -787,27 +795,34 @@ function endRoundIf1v1Ended() {
   if (aliveCount > 1) return;
   if (winner && typeof winner.hasActiveFinishingAbility === 'function' && winner.hasActiveFinishingAbility()) return;
 
-  stopArenaBgm(true);
   if (aliveCount === 0) winner = null;
   state.roundWinner = winner;
   state.roundEndTimer = 0;
+
+  const isMultiRound1v1 = (state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1');
+  const winThreshold = MODE_SETTINGS[state.mode]?.rounds === 1 ? 1 : 2;
 
   let isMatchEnd = false;
   if (winner) {
     checkCjVictoryOverlay(winner);
     const winnerIndex = state.fighters.indexOf(winner);
     if (winnerIndex >= 0) {
-      const winThreshold = MODE_SETTINGS[state.mode]?.rounds === 1 ? 1 : 2;
       if (state.scores[winnerIndex] + 1 >= winThreshold) {
         isMatchEnd = true;
       }
     }
   }
 
+  if (isMatchEnd) {
+    stopArenaBgm(true);
+  } else if (!isMultiRound1v1) {
+    stopArenaBgm(true);
+  }
+
   // Stop all sounds when round ends, unless it is a match end (champion screen)
   if (!isMatchEnd) {
     stopAllSounds();
-    stopAllLoopingSounds();
+    stopAllLoopingSounds(0, 0, isMultiRound1v1);
   }
 
   if (winner) {
@@ -977,10 +992,23 @@ export function updateFighters() {
         fighter.isFlurrying = false;
         fighter.punchAnimTimer = 0;
         fighter.slashSwingTimer = 0;
+        fighter.spearSwingTimer = 0;
+        fighter.katanaSlashTimer = 0;
+        fighter.cleaveSwingTimer = 0;
+        fighter.meleeSwingTimer = 0;
+        fighter.attackSwingTimer = 0;
+        fighter.scytheSwingTimer = 0;
+        fighter.swipeTimer = 0;
+        fighter.recoilTimer = 0;
         fighter.modeSwitchBreatherTimer = 0;
         fighter.purpleRecoveryTimer = 0;
         fighter.soulSwapTransitionTimer = 0;
         fighter.revertTransitionTimer = 0;
+
+        // Smoothly and gradually turn angle to normal position (0 radians) as fighter moves
+        if (typeof fighter.turnToNormalPosition === 'function') {
+          fighter.turnToNormalPosition(0.035);
+        }
 
         const cruiseSpeed = fighter.speed || 3.0;
         const currentSpeed = Math.hypot(fighter.vx || 0, fighter.vy || 0);
@@ -1067,7 +1095,7 @@ export function updateFighters() {
           const nx = dx / dist;
           const ny = dy / dist;
           const overlap = minDist - dist;
-          const fighterIsGojoInfinity = !fighter.isTargetOfAmbush && !isInsideRubbickStolenVoid(fighter) && (fighter.characterId === 'gojo' || fighter.type === 'gojo' || fighter._def?.id === 'gojo') && (fighter.infinityActive || (!fighter.isMeleeMode && (fighter.infinityCooldown || 0) <= 0) || (fighter.infinityBlockTimer || 0) > 0);
+          const fighterIsGojoInfinity = !fighter.isTargetOfAmbush && !isInsideRubbickStolenVoid(fighter) && (fighter.characterId === 'gojo' || fighter.type === 'gojo' || fighter._def?.id === 'gojo') && !fighter.isMeleeMode && !entity.isMeleeMode && (fighter.infinityActive || (fighter.infinityCooldown || 0) <= 0);
           // Gojo Infinity slows colliding entities instead of pushing them back
           if (fighterIsGojoInfinity && !entity.gojoInfinityImmune) {
             if (typeof entity.applySlow === 'function') entity.applySlow(20, 0.35, { isInfinitySlow: true });

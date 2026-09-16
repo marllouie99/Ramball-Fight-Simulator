@@ -2547,20 +2547,33 @@ export function _drawIchigoHair(ctx, r, facingLeft = false) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
-    // Ichigo-hair.png (1254x1254). True visible hair bounding box:
-    // X: [191, 1063] (width 873, horizontal center at 627)
-    // Y: [227, 967] (height 741, top crown at 227)
-    // Scales to cover the upper head circle hemisphere seamlessly with crown spikes at -1.26r and extended length (1.88r)
-    const targetHairWidth = r * 2.58;
-    const targetHairHeight = r * 1.88;
-    const scaleX = targetHairWidth / 873;
-    const scaleY = targetHairHeight / 741;
-    const drawW = 1254 * scaleX;
-    const drawH = 1254 * scaleY;
-    const drawX = -627 * scaleX;
-    const drawY = -r * 1.26 - 227 * scaleY;
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.ichigo) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
 
-    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    // Ichigo-hair.png (1448x1086). True visible hair bounding box:
+    // X: [230, 1180] (width 951, horizontal center at 705)
+    // Y: [105, 923] (height 819, top crown at 105)
+    // Scales to sit naturally on upper head circle with increased length and lowered position (crown at -1.30r, width 2.92r, height 1.76r)
+    const targetHairWidth = r * 2.92 * wMult;
+    const targetHairHeight = r * 1.76 * hMult;
+    const scaleX = targetHairWidth / 951;
+    const scaleY = targetHairHeight / 819;
+    const drawW = 1448 * scaleX;
+    const drawH = 1086 * scaleY;
+    const drawX = -705 * scaleX + offX;
+    const drawY = -r * 1.30 - 105 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
     ctx.restore();
   }
 }

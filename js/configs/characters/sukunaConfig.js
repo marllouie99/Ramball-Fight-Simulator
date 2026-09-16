@@ -19,6 +19,8 @@ export const sukunaConfig = {
     projectileSpeedMultiplier: 3.0,
     ability: 'King of Curses',
     desc: 'Deploys Malevolent Shrine domain deals unblockable damage.',
+    shrineWidth: 380,                 // Authentic Malevolent Shrine pixel-art model width in px
+    shrineGlowRadius: 210,            // Atmospheric crimson ambient glow radius behind shrine
 
     // Basic Attack: Dismantle / Cleave Ranged Slashes
     slashSpeed: 40,                   // Supersonic travel speed of Dismantle and Cleave slashes (px/frame)
@@ -28,25 +30,26 @@ export const sukunaConfig = {
     // Stacking Slash Crit Passive
     baseCritChance: 0.25,             // 10% base crit chance
     baseCritMultiplier: 0.25,         // 1.50x base crit damage multiplier
-    critChancePerSlashHit: 0.02 ,      // +2% crit chance per landed slash hit
-    critMultiplierPerSlashHit: 0.02,  // +0.05x crit multiplier per landed slash hit
-    maxCritChance: 1.50,              // 80% max crit chance cap
-    maxCritMultiplier: 1.50,          // 3.50x max crit damage multiplier cap
+    critChancePerSlashHit: 0.01 ,      // +2% crit chance per landed slash hit
+    critMultiplierPerSlashHit: 0.01,  // +0.05x crit multiplier per landed slash hit
+    maxCritChance: 1.0,              // 80% max crit chance cap
+    maxCritMultiplier: 1.0,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
-    reverseCursedTechniqueHpThreshold: 0.25,  // Triggers when HP drops to 25% or below
-    reverseCursedTechniqueHealAmount: 0.80,   // % of Max HP healed per RCT trigger (0.50 = 50% Max HP)
-    reverseCursedTechniqueCooldown: 2000,      // 20 second cooldown before it can trigger again
+    reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 25% or below
+    reverseCursedTechniqueHealAmount: 0.50,   // % of Max HP healed per RCT trigger (0.50 = 50% Max HP)
+    reverseCursedTechniqueCooldown: 1500,      // 20 second cooldown before it can trigger again
     rctRevivalHealAmount: 0.50,               // % of Max HP restored on emergency revival (0.50 = 50% Max HP)
 
     // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
-    closeRangeRadius: 85,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
-    initialMeleeDuration: 50,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
-    meleeModeCooldown: 500,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
+    closeRangeRadius: 110,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
+    initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
+    meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
     comboDisengageDistance: 0,      // Distance (pixels) teleported away when disengaging after clash
-    meleePunchDamage: 3,             // Damage dealt per martial arts punch strike
-    meleePunchCooldown: 15,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
+    meleePunchDamage: 5,             // Damage dealt per martial arts punch strike
+    meleePunchCooldown: 20,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
     meleePunchAnimDuration: 9,        // Punch extension and retraction animation frame duration
+    meleeTeleportAngle: 0.48,         // Decreased tight flank angle (~27.5 degrees) for melee combo teleportation
     teleportSpeed: 15,                // Teleport movement slide speed
 
     // Teleport Dodge / Evade Mechanic
@@ -81,9 +84,9 @@ export const sukunaConfig = {
     divineFlameDomainCooldown: 210, // Cooldown between Fuga uses inside Domain (~3.5 seconds at 60fps)
     domainFugaCooldownTickRate: 0.2,  // Rate multiplier for cooldown ticks inside Domain (4x faster recharge)
     divineFlameChargeMax: 80,      // Charge up duration (1.5 seconds)
-    divineFlameDamage: 50,         // Primary direct hit nuke damage
+    divineFlameDamage: 100,         // Primary direct hit nuke damage
     divineFlameExplosionRadius: 200, // Thermobaric nuke explosion AOE blast radius in pixels
-    divineFlameExplosionDamage: 10, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
+    divineFlameExplosionDamage: 50, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
     thermobaricSplashRadius: 220,  // Thermobaric explosion splash damage radius
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
     divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
@@ -97,10 +100,10 @@ export const sukunaConfig = {
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
     domainCooldown: 2000,         // Cooldown before domain can trigger (~16.6s at 60 fps)
-    domainChargeMax: 120,         // Channeling duration before domain opens (2.0s at 60 fps)
+    domainChargeMax: 100,         // Channeling duration before domain opens (2.0s at 60 fps)
     domainDuration: 500,          // Domain active duration (~8.33s at 60 fps)
-    domainDamage: 6,             // Base damage per slash line hit (legacy fallback)
-    domainSlashDamage: 6,        // Base damage dealt by each individual spatial cut line hit
+    domainDamage: 3,             // Base damage per slash line hit (legacy fallback)
+    domainSlashDamage: 3,        // Base damage dealt by each individual spatial cut line hit
     domainDamageInterval: 8,     // Frames between slash barrages (~3.3 waves per second)
     domainSlashesPerTick: 3,      // Number of spatial cut lines spawned per barrage
     domainSlashShakeIntensity: 1.8, // Small arena screen shake when Malevolent Shrine cut lines slash

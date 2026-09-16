@@ -50,7 +50,7 @@ export const mahoragaConfig = {
     movementSpeedMultiplierPerAdaptation: 0.01, // Movement speed multiplier per wheel adaptation stage
     rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
     enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique healing on wheel click
-    rctHealPercent: 0.60,            // Percentage of max HP healed on each wheel rotation click (0.15 = 15% max HP)
+    rctHealPercent: 0.50,            // Percentage of max HP healed on each wheel rotation click (0.15 = 15% max HP)
     defBuffPerClickPercent: 0.02,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,         // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
@@ -68,8 +68,8 @@ export const mahoragaConfig = {
     adaptationDashSpeedFrames: 10,   // Supersonic flash-dash travel frame duration (smaller = faster)
 
     // ── Sword of Extermination & Basic Melee Attacks ──
-    swordRange: 30,                // Melee reach (110px frontal arc) for Sword of Extermination
-    swordCooldown: 25,              // Frames between sword strikes (0.5s at 60fps)
+    swordRange: 50,               // Melee reach (110px frontal arc) for Sword of Extermination
+    swordCooldown: 50,              // Frames between sword strikes (0.5s at 60fps)
     swordDamage: 4,                // True damage dealt by Sword of Extermination
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
     swordAnimFrames: 18,            // Duration (frames) of sword chop swing animation

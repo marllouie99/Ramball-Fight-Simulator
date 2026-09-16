@@ -80,14 +80,14 @@ export function drawGojoBody(ctx, fighter) {
     ctx.translate(fighter.x, fighter.y - z);
 
     // === ANIME CHARACTER ROTATION LOGIC (Rule 19 Standard) ===
-    const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
-    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+    const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+    const isIndexScreen = typeof state !== 'undefined' && (state.gameState === 'indexDetail' || state.gameState === 'index');
     const isChannelingPurple = fighter.isChannelingPurple;
     const isChannelingDomain = fighter.isChannelingDomainExpansion;
 
     let facingLeft = false;
-    if (!isWinnerScreen && !isChannelingPurple && !isChannelingDomain) {
-      const angle = fighter.gunAngle || 0;
+    if (!isPodiumPreview && !isIndexScreen && !isChannelingPurple && !isChannelingDomain) {
+      const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
       ctx.rotate(angle);
 
       facingLeft = Math.abs(angle) > Math.PI / 2;
@@ -105,7 +105,7 @@ export function drawGojoBody(ctx, fighter) {
        f.isCountering)
     );
     const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0);
-    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima);
+    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode);
     const fadeOpacity = isBarrierSuppressed ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();
@@ -219,20 +219,33 @@ export function _drawGojoHair(ctx, r, facingLeft = false) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.gojo) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
     // Gojo-hair.png (1254x1254). True visible hair bounding box:
     // X: [136, 1103] (width 968, horizontal center at 620)
     // Y: [203, 981] (height 779, top crown at 203)
     // Scales to cover the upper head circle hemisphere seamlessly with crown spikes at -1.42r
-    const targetHairWidth = r * 3.10;
-    const targetHairHeight = r * 1.80;
+    const targetHairWidth = r * 3.10 * wMult;
+    const targetHairHeight = r * 1.80 * hMult;
     const scaleX = targetHairWidth / 968;
     const scaleY = targetHairHeight / 779;
     const drawW = 1254 * scaleX;
     const drawH = 1254 * scaleY;
-    const drawX = -620 * scaleX;
-    const drawY = -r * 1.42 - 203 * scaleY;
+    const drawX = -620 * scaleX + offX;
+    const drawY = -r * 1.42 - 203 * scaleY + offY;
 
-    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
     ctx.restore();
   }
 }

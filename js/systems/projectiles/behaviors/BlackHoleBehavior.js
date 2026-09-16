@@ -108,10 +108,16 @@ export class BlackHoleBehavior extends ProjectileBehavior {
           }
         } else {
           const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
-          if (isSaitamaCounter && typeof f.interruptAttacks === 'function') {
-            f.interruptAttacks(true);
-          }
-          if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
+          if (isSaitamaCounter) {
+            // Saitama is immune to push back / drag / pull during Serious Skill Counter charging state
+            f.knockbackVx = 0;
+            f.knockbackVy = 0;
+            f.vx = 0;
+            f.vy = 0;
+          } else if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
+            f.isCaughtInBlackHole = true;
+            if (!p.pulledFighters) p.pulledFighters = new Set();
+            p.pulledFighters.add(f);
             const nx = dist > 0 ? dx / dist : 0;
             const ny = dist > 0 ? dy / dist : 0;
             const speedFactor = Math.max(1, f.speed / (f.baseSpeed || f.speed || 1));
@@ -143,6 +149,9 @@ export class BlackHoleBehavior extends ProjectileBehavior {
             }
           } catch (e) { console.error('Black hole damage error', e); }
         }
+      } else if (p.pulledFighters && p.pulledFighters.has(f)) {
+        p.pulledFighters.delete(f);
+        f.isCaughtInBlackHole = false;
       }
     }
 
@@ -210,7 +219,7 @@ export class BlackHoleBehavior extends ProjectileBehavior {
     // Apply pull to other projectiles (skip teammates' projectiles)
     for (let j = 0; j < system.projectiles.length; j++) {
       const otherProj = system.projectiles[j];
-      if (otherProj === p || otherProj.isVisual || otherProj.isExplosion || otherProj.isPoisonSpill || otherProj.isBlackHole || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
+      if (otherProj === p || otherProj.isVisual || otherProj.isExplosion || otherProj.isPoisonSpill || otherProj.isBlackHole || otherProj.isGojoPurple || otherProj.isGojoPurpleOrb || otherProj.behaviorType === 'gojo_purple' || otherProj.visual === 'gojoPurple' || otherProj.isGetsuga || otherProj.behaviorType === 'getsuga_tensho' || otherProj.isSukunaFurnace || otherProj.behaviorType === 'sukuna_furnace' || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
       if (p.owner !== null && otherProj.owner !== null && otherProj.owner !== undefined && (p.owner === otherProj.owner || areOnSameTeam(p.owner, otherProj.owner))) continue;
       
       const otherProjOwner = fighters[otherProj.owner];
@@ -262,6 +271,14 @@ export class BlackHoleBehavior extends ProjectileBehavior {
     }
 
     if (p.life <= 0) {
+      // Release pulled fighters
+      if (p.pulledFighters) {
+        for (const ent of p.pulledFighters) {
+          if (ent) ent.isCaughtInBlackHole = false;
+        }
+        p.pulledFighters.clear();
+      }
+
       // Release captured projectiles
       for (let k = 0; k < system.projectiles.length; k++) {
         const capturedProj = system.projectiles[k];

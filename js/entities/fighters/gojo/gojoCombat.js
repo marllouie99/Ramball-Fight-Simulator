@@ -86,8 +86,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
   }
 
   // If Gojo is trapped inside Rubbick's stolen Unlimited Void or Purple is in flight or chained by Makima, Limitless Infinity is disabled
-  const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0);
-  if (isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima) {
+  const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0) || ((fighter.z || 0) > 0 && !fighter.isChannelingPurple);
+  if (isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode) {
     fighter.infinityActive = false;
     fighter.infinityFadeOpacity = 0;
     fighter.infinityBlockTimer = 0;
@@ -127,7 +127,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;
   }
-  if (fighter.isChannelingPurple || isPurpleInFlight || fighter.domainActive || (fighter.isMeleeMode && !isBreatherState && !isDomainChanneling)) return false;
+  if (fighter.isMeleeMode || fighter.isChannelingPurple || isPurpleInFlight || fighter.domainActive) return false;
+  if (attacker && (attacker.isMeleeMode || (typeof attacker.isMeleeMode === 'boolean' && attacker.isMeleeMode))) return false;
 
   const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
   const gojoY = fighter.y - (fighter.z || 0);
@@ -222,7 +223,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     }
     const attRadius = attacker.hitRadius || attacker.r || 25;
     const distToGojo = Math.hypot(attacker.x - fighter.x, (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0)));
-    const isPhysicalContact = distToGojo <= (barrierRadius + attRadius + 15);
+    const reachOffset = (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') ? (CONFIG.mahoraga?.swordRange || 110) + 20 : 15;
+    const isPhysicalContact = distToGojo <= (barrierRadius + attRadius + reachOffset);
 
     // Remote attackers (such as projectile casters standing across the arena) MUST NOT be pushed
     if (!isPhysicalContact) {
@@ -240,9 +242,15 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
       }
 
       // Increment Limitless barrier collision counter on every contact
+      const currentFrame = (typeof state !== 'undefined' && typeof state.frameCount === 'number') ? state.frameCount : null;
       const now = Date.now();
-      if (!attacker._lastInfinityCollisionTime || now - attacker._lastInfinityCollisionTime >= 350) {
+      const lastTime = attacker._lastInfinityCollisionTime || 0;
+      const lastFrame = attacker._lastInfinityCollisionFrame || 0;
+      const isCooldownElapsed = (currentFrame !== null) ? (currentFrame - lastFrame >= 20) : (now - lastTime >= 350);
+
+      if (!attacker._lastInfinityCollisionTime || isCooldownElapsed) {
         attacker._lastInfinityCollisionTime = now;
+        if (currentFrame !== null) attacker._lastInfinityCollisionFrame = currentFrame;
         attacker.infinityCollisionCount = (attacker.infinityCollisionCount || 0) + 1;
         const collisionsNeeded = 2; // Rule 9 standard: 2 Infinity exposures
 

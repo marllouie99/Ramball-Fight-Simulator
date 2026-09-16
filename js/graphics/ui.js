@@ -30,6 +30,9 @@ import {
   drawWeaponStudioScreen 
 } from './ui/WeaponStudioScreen.js';
 import { 
+  drawSkinStudioScreen 
+} from './ui/SkinStudioScreen.js';
+import { 
   drawSelectScreen 
 } from './ui/CharacterSelectScreen.js';
 import { 
@@ -63,6 +66,7 @@ export {
   triggerWeaponDemoAttack,
   drawWeaponDetailScreen,
   drawWeaponStudioScreen,
+  drawSkinStudioScreen,
   drawYutaKatana,
   drawIndexDetailScreen,
   drawSelectScreen,

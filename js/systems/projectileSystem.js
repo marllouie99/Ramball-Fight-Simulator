@@ -250,11 +250,21 @@ class ProjectileSystem {
   }
 
   /**
-   * Get a projectile from pool or create new one (fallback if pool exhausted).
+   * Get a projectile from pool or create new one (fallback if pool exhausted or in-use).
    */
   _getProjectile() {
-    const p = this.pool[this.poolIndex];
-    this.poolIndex = (this.poolIndex + 1) % this.poolSize;
+    let p = this.pool[this.poolIndex];
+    let attempts = 0;
+    while (p && p.life > 0 && attempts < this.poolSize) {
+      this.poolIndex = (this.poolIndex + 1) % this.poolSize;
+      p = this.pool[this.poolIndex];
+      attempts++;
+    }
+    if (!p || (p.life > 0 && attempts >= this.poolSize)) {
+      p = { id: `proj_dyn_${Date.now()}_${Math.random()}` };
+    } else {
+      this.poolIndex = (this.poolIndex + 1) % this.poolSize;
+    }
     this._resetProjectileProperties(p);
     return p;
   }
@@ -560,14 +570,8 @@ class ProjectileSystem {
     const cosA = Math.cos(rawAngle);
     const sinA = Math.sin(rawAngle);
 
-    // Snap Blue projectile strictly to 4 cardinal directions: Up (0, -1), Down (0, 1), Left (-1, 0), Right (1, 0)
-    if (Math.abs(cosA) >= Math.abs(sinA)) {
-      dirX = cosA >= 0 ? 1 : -1;
-      dirY = 0;
-    } else {
-      dirX = 0;
-      dirY = sinA >= 0 ? 1 : -1;
-    }
+    dirX = cosA;
+    dirY = sinA;
 
     if (customSpawnX != null && customSpawnY != null) {
       spawnX = customSpawnX;
@@ -586,6 +590,7 @@ class ProjectileSystem {
     proj.r = radius;
     proj.pullRadius = pullRadius;
     proj.blueScale = scaleMultiplier;
+    proj.angle = rawAngle;
     proj.life = 180; // Extended lifetime to reach arena walls
     proj.maxLife = 180;
     proj.color = '#00FFFF'; // Cyan
@@ -633,13 +638,14 @@ class ProjectileSystem {
       spawnY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, spawnY));
     }
 
-    const proj = this._getProjectile();
+    const proj = { id: `gojo_purple_${Date.now()}_${Math.random()}` };
+    this._resetProjectileProperties(proj);
     proj.x = spawnX;
     proj.y = spawnY;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
     proj.r = CONFIG.gojo.purpleRadius || 50;
-    proj.life = CONFIG.gojo?.purpleLife || 250;
+    proj.life = CONFIG.gojo?.purpleLife ?? 480;
     proj.maxLife = proj.life;
     
     const isRubbick = Boolean(opts.isRubbick || opts.isTrickster || fighter.characterId === 'rubbick' || fighter.type === 'rubbick' || fighter.characterId === 'trickster' || fighter.type === 'trickster' || (fighter._def && (fighter._def.type === 'rubbick' || fighter._def.type === 'trickster')));
@@ -2627,7 +2633,14 @@ class ProjectileSystem {
               p.visual === 'gunslingerBullet' ||
               p.visual === 'tacticalBullet' ||
               p.isGojoPurple ||
-              p.isSukunaFurnace
+              p.isGojoPurpleOrb ||
+              p.behaviorType === 'gojo_purple' ||
+              p.visual === 'gojoPurple' ||
+              p.isSukunaFurnace ||
+              p.behaviorType === 'sukuna_furnace' ||
+              p.behaviorType === 'yuta_pure_love_beam' ||
+              p.visual === 'yuta_pure_love_beam' ||
+              p.isPureLoveBeam
             );
             if (p && !isCriticalSlash) {
               this._returnProjectile(p);
@@ -2673,7 +2686,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
         }
         continue;
       }
@@ -2714,7 +2726,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
         }
         continue;
       }
@@ -2725,7 +2736,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
           continue;
         }
         if (p.behaviorType === 'gojo_purple' || p.behaviorType === 'yuta_pure_love_beam' || p.behaviorType === 'black_hole') {
@@ -2753,7 +2763,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
         }
         continue;
       }
@@ -2778,7 +2787,6 @@ class ProjectileSystem {
               this._returnProjectile(p);
               this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
               this.projectiles.pop();
-              i--;
               continue;
             }
           } else {
@@ -2787,7 +2795,6 @@ class ProjectileSystem {
             this._returnProjectile(p);
             this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
             this.projectiles.pop();
-            i--;
             continue;
           }
         } else {
@@ -2827,7 +2834,6 @@ class ProjectileSystem {
             this._returnProjectile(p);
             this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
             this.projectiles.pop();
-            i--;
             continue;
           }
         }
@@ -2866,7 +2872,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
           continue;
         }
         continue;
@@ -2905,7 +2910,6 @@ class ProjectileSystem {
             this._returnProjectile(p);
             this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
             this.projectiles.pop();
-            i--;
           }
           continue;
         }
@@ -3107,7 +3111,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
         }
 
         continue;
@@ -3307,32 +3310,35 @@ class ProjectileSystem {
 
 
       if (p.fadingOut) {
-        // Trail shrinks from the tail toward the impact point
-        // Just consume old tail positions — do NOT move p.x/p.y
-        if (p.history && p.history.length > 0) {
-          // Remove 1 point per frame so it shrinks slower and smoother
-          p.history.shift();
-        }
+        if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
+          p.fadingOut = false;
+        } else {
+          // Trail shrinks from the tail toward the impact point
+          // Just consume old tail positions — do NOT move p.x/p.y
+          if (p.history && p.history.length > 0) {
+            // Remove 1 point per frame so it shrinks slower and smoother
+            p.history.shift();
+          }
 
-        // Dissolve into magical sparks while fading
-        if (p.isArcaneBolt && Math.random() < 0.8) {
-          spawnSparks(p.x, p.y, 2, 'arcane');
+          // Dissolve into magical sparks while fading
+          if (p.isArcaneBolt && Math.random() < 0.8) {
+            spawnSparks(p.x, p.y, 2, 'arcane');
+          }
+          
+          // Smoothly fade out the opacity
+          if (p.fadingAlpha === undefined) p.fadingAlpha = 1.0;
+          p.fadingAlpha -= 0.06; // About ~16 frames to fully fade to invisible
+          
+          const isLaylaBullet = p.visual === 'layla_basic_bullet' || p.visual === 'layla_ultimate_bullet';
+          const shouldRemove = isLaylaBullet ? (p.fadingAlpha <= 0) : (p.fadingAlpha <= 0 || (!p.history || p.history.length <= 1));
+          
+          if (shouldRemove) {
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+          }
+          continue;
         }
-        
-        // Smoothly fade out the opacity
-        if (p.fadingAlpha === undefined) p.fadingAlpha = 1.0;
-        p.fadingAlpha -= 0.06; // About ~16 frames to fully fade to invisible
-        
-        const isLaylaBullet = p.visual === 'layla_basic_bullet' || p.visual === 'layla_ultimate_bullet';
-        const shouldRemove = isLaylaBullet ? (p.fadingAlpha <= 0) : (p.fadingAlpha <= 0 || (!p.history || p.history.length <= 1));
-        
-        if (shouldRemove) {
-          this._returnProjectile(p);
-          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
-          this.projectiles.pop();
-          i--;
-        }
-        continue;
       }
 
       // --- Gojo Limitless (Infinity) Spatial Projectile Interception (Checked at new position before collision) ---
@@ -3350,7 +3356,7 @@ class ProjectileSystem {
           const dx = p.x - f.x;
           const dy = p.y - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
-          const isLimitlessActive = !isInsideRubbickStolenVoid(f) && (f.domainActive || (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0 || p.targetIsGojoLimitless));
+          const isLimitlessActive = !isInsideRubbickStolenVoid(f) && !f.isMeleeMode && !f.isChainedByMakima && (f.domainActive || f.infinityActive || (f.infinityCooldown || 0) <= 0);
           if (distSq <= effectiveInfinityRadius * effectiveInfinityRadius && isLimitlessActive) {
             // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
             if (p.infinityEvaluated === undefined) {
@@ -3392,7 +3398,6 @@ class ProjectileSystem {
                   this._returnProjectile(p);
                   this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
                   this.projectiles.pop();
-                  i--;
                   continue;
                 } else if (oldestFrozenProj) {
                   const oldestIdx = this.projectiles.indexOf(oldestFrozenProj);
@@ -3456,7 +3461,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
           continue;
         }
 
@@ -3465,7 +3469,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
           continue;
         }
         if (p.visual === 'layla_bomb') {
@@ -3569,7 +3572,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
           continue;
         }
 
@@ -3620,7 +3622,6 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
           continue;
         }
 
@@ -3651,7 +3652,10 @@ class ProjectileSystem {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--;
+          continue;
+        }
+
+        if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
           continue;
         }
 
@@ -3668,7 +3672,6 @@ class ProjectileSystem {
           // Swap with last element and pop for O(1) removal
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
-          i--; // Adjust index since we swapped
         }
       }
     }

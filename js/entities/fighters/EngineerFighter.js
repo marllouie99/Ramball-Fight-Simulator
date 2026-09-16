@@ -474,7 +474,9 @@ export class EngineerFighter extends Fighter {
         if (Math.abs(diff) <= arc / 2) {
           // Gojo Limitless Infinity Barrier Check
           const isTargetGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo' || target._def?.id === 'gojo') &&
-            (target.infinityCooldown <= 0 || target.domainActive || !target.isMeleeMode);
+            !target.isMeleeMode &&
+            ((target.infinityCooldown || 0) <= 0 || target.infinityActive) &&
+            !target.isChainedByMakima;
 
           if (isTargetGojoInfinity) {
             const barrierR = CONFIG.gojo?.infinityRadius ?? (target.r + 30);

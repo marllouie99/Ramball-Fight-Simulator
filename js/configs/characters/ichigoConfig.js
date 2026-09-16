@@ -24,7 +24,7 @@ export const ichigoConfig = {
   desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 60% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
 
   // ── Basic Attack: Zangetsu Melee Cleave ──
-  swordDamage: 4,               // Base damage per melee slash
+  swordDamage: 8,               // Base damage per melee slash
   swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s at 60fps)
   swordRange: 50,                // Melee reach distance
   swordArc: 140,                 // Frontal cleave arc cone in degrees
@@ -43,8 +43,8 @@ export const ichigoConfig = {
   shunpoRange: 220,              // Distance dashed on initial flank step
   shunpoDashDuration: 4,         // Flash step dash duration in frames
   shunpoTargetOffset: 34,        // Distance offset from target center on arrival
-  shunpoStrikeDamage: 4,         // Base damage for intermediate flurry slashes
-  shunpoStrike1Damage: 4,        // Backward-compatibility alias
+  shunpoStrikeDamage: 8,         // Base damage for intermediate flurry slashes
+  shunpoStrike1Damage: 8,        // Backward-compatibility alias
   shunpoStrikeDuration: 14,      // Intermediate swing animation duration in frames
   shunpoFinisherMultiplier: 1.1, // Damage multiplier for final flurry strike
   shunpoStrike2Multiplier: 1.1,  // Backward-compatibility alias
@@ -90,7 +90,7 @@ export const ichigoConfig = {
   hollowSpeedMultiplier: 0.50,    // 40% movement speed boost
   hollowDamageMultiplier: 0.50,   // 10% damage boost
   hollowDamageReduction: 0.10,   // 10% incoming damage mitigation (Hierro)
-  hollowLifesteal: 0.10,         // 10% vampiric lifesteal heal on damage dealt
+  hollowLifesteal: 0.2,         // 10% vampiric lifesteal heal on damage dealt
   hollowComboCooldownMultiplier: 0.10, // 90% combo cooldown reduction during Hollow Mask
   hollowGetsugaDamage: 3,        // Upgraded Black Getsuga damage
   hollowGetsugaTickDamage: 3,    // Upgraded multi-tick damage per hit in Hollow form

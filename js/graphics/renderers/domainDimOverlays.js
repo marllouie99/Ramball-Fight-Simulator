@@ -20,9 +20,9 @@ export function excludeGojoInfinityFromDim(ctx) {
     if (!f || f.hp <= 0) continue;
     const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
     if (!isGojo) continue;
-    const isBarrierSuppressed = Boolean(f.isTargetOfAmbush || f.caughtInSaitamaCounter || isSaitamaCounterActive || (f.infinityFadeOpacity !== undefined && f.infinityFadeOpacity <= 0.005) || isInsideRubbickStolenVoid(f) || f.isChainedByMakima);
+    const isBarrierSuppressed = Boolean(f.isTargetOfAmbush || f.caughtInSaitamaCounter || isSaitamaCounterActive || (f.infinityFadeOpacity !== undefined && f.infinityFadeOpacity <= 0.005) || isInsideRubbickStolenVoid(f) || f.isChainedByMakima || f.isMeleeMode);
     if (isBarrierSuppressed) continue;
-    const isLimitlessActive = (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0);
+    const isLimitlessActive = !f.isMeleeMode && (f.infinityActive || (f.infinityBlockTimer || 0) > 0);
     if (!isLimitlessActive) continue;
     
     const infinityR = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
@@ -172,6 +172,93 @@ export function applyDomainArenaVignetteCutout(ctx) {
   ctx.restore();
 }
 
+let currentRedDimOpacity = 0;
+
+/**
+ * Draws a deep crimson radial dim screen overlay when Gojo (or Rubbick) channels or fires Reversal Red.
+ * Features smooth exponential opacity interpolation so the dim never flickers or drops when taking hits.
+ */
+export function drawRedDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  // Find Gojo or Rubbick channeling or detonating Reversal Red
+  const redFighter = state.fighters?.find(f => {
+    if (!f || f.hp <= 0) return false;
+    const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
+    if (isGojo && (f.redBuildupPhase || (f.redEffectTimer && f.redEffectTimer > 0))) return true;
+    const isRubbick = (f.characterId === 'rubbick' || f.type === 'rubbick' || f.characterId === 'trickster' || f.type === 'trickster' || f._def?.id === 'rubbick');
+    if (isRubbick && f.stolenType === 'gojo_red' && f.stolenWindUpTimer > 0) return true;
+    return false;
+  });
+
+  let targetOpacity = 0;
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+
+  if (redFighter) {
+    cx = redFighter.x;
+    cy = redFighter.y - (redFighter.z || 0);
+
+    const isGojo = (redFighter.characterId === 'gojo' || redFighter.type === 'gojo' || redFighter._def?.id === 'gojo' || redFighter._def?.type === 'gojo');
+    if (isGojo) {
+      const totalFrames = redFighter.redEffectMaxTimer || 75;
+      const remaining = redFighter.redEffectTimer || 0;
+      const elapsed = totalFrames - remaining;
+      const buildupEnd = CONFIG.gojo?.redBuildupFrames || 100;
+
+      if (elapsed <= buildupEnd) {
+        const buildProg = Math.min(1.0, elapsed / Math.max(1, buildupEnd));
+        targetOpacity = Math.sin(buildProg * Math.PI * 0.5) * 0.65;
+      } else {
+        const blastProg = (elapsed - buildupEnd) / Math.max(1, totalFrames - buildupEnd);
+        targetOpacity = Math.max(0, (1 - blastProg) * 0.65);
+      }
+    } else {
+      const windupMax = 35;
+      const progress = Math.min(1.0, Math.max(0, 1.0 - ((redFighter.stolenWindUpTimer || 0) / windupMax)));
+      targetOpacity = Math.sin(progress * Math.PI * 0.5) * 0.65;
+    }
+  }
+
+  // Smoothly interpolate dim opacity for seamless fade-in and gradual fade-out
+  if (targetOpacity > currentRedDimOpacity) {
+    currentRedDimOpacity += (targetOpacity - currentRedDimOpacity) * 0.18;
+  } else {
+    currentRedDimOpacity += (targetOpacity - currentRedDimOpacity) * 0.15;
+  }
+
+  if (currentRedDimOpacity < 0.005) {
+    currentRedDimOpacity = 0;
+    return;
+  }
+
+  ctx.save();
+  // Reset transform to identity screen space so full-screen dim rect is static and un-shaken
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const opacity = currentRedDimOpacity;
+  const screenPos = worldToScreen(cx, cy);
+  const drawCx = screenPos.x;
+  const drawCy = screenPos.y;
+  const maxR = Math.max(canvas.width, canvas.height) * 1.1;
+
+  const redGrad = ctx.createRadialGradient(drawCx, drawCy, 20, drawCx, drawCy, maxR);
+  redGrad.addColorStop(0, `rgba(140, 0, 25, ${opacity * 0.25})`);
+  redGrad.addColorStop(0.30, `rgba(70, 0, 12, ${opacity * 0.60})`);
+  redGrad.addColorStop(0.65, `rgba(25, 0, 5, ${opacity * 0.85})`);
+  redGrad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.95})`);
+
+  ctx.fillStyle = redGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Exclude Gojo's Limitless Infinity Barrier from screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
+  ctx.restore();
+}
+
 let currentPurpleDimOpacity = 0;
 
 /**
@@ -210,7 +297,8 @@ export function drawPurpleDimScreen() {
   } else if (gojoFighter && gojoFighter.purpleRecoveryTimer > 0) {
     cx = gojoFighter.x;
     cy = gojoFighter.y - (gojoFighter.z || 0);
-    const recProgress = gojoFighter.purpleRecoveryTimer / 30;
+    const maxRec = (gojoFighter.purpleRecoveryMaxTimer || CONFIG.gojo?.purpleRecoveryDuration || 50);
+    const recProgress = Math.max(0, Math.min(1, gojoFighter.purpleRecoveryTimer / maxRec));
     targetOpacity = 0.45 * recProgress;
   }
 

@@ -504,6 +504,8 @@ export function executeTacticalAction(action) {
     state.gameState = 'index';
   } else if (action === 'screen-weaponstudio') {
     state.gameState = 'weaponStudio';
+  } else if (action === 'screen-skinstudio') {
+    state.gameState = 'skinStudio';
   } else if (action === 'screen-weapons') {
     state.weaponSelectedFighter = null;
     state.weaponPage = 0;
@@ -593,6 +595,7 @@ export function switchGameHub(hub, playAudio = true) {
   const cardArsenalTitle = document.getElementById('card-arsenal-title');
   const cardArsenalSubtitle = document.getElementById('card-arsenal-subtitle');
   const cardStudioWrap = document.getElementById('card-studio-wrap');
+  const cardSkinStudioWrap = document.getElementById('card-skinstudio-wrap');
   const titleScreen = document.getElementById('title-screen');
   const badge = document.querySelector('.retro-badge-title');
 
@@ -623,6 +626,7 @@ export function switchGameHub(hub, playAudio = true) {
     if (cardArsenalTitle) cardArsenalTitle.innerText = 'FIREARMS ARMORY';
     if (cardArsenalSubtitle) cardArsenalSubtitle.innerText = 'BALLISTICS & SKINS';
     if (cardStudioWrap) cardStudioWrap.style.display = 'none';
+    if (cardSkinStudioWrap) cardSkinStudioWrap.style.display = 'none';
     applyArenaTheme('dark');
   } else {
     state.mode = GAME_MODES.ONE_VS_ONE || '1v1';
@@ -651,6 +655,7 @@ export function switchGameHub(hub, playAudio = true) {
     if (cardArsenalTitle) cardArsenalTitle.innerText = 'WEAPON ARSENAL';
     if (cardArsenalSubtitle) cardArsenalSubtitle.innerText = 'WEAPON PREVIEW & SKINS';
     if (cardStudioWrap) cardStudioWrap.style.display = 'flex';
+    if (cardSkinStudioWrap) cardSkinStudioWrap.style.display = 'flex';
     applyArenaTheme(localStorage.getItem('arenaTheme') || 'light');
   }
 

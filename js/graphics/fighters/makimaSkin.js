@@ -60,20 +60,33 @@ export function _drawMakimaHair(ctx, r, facingLeft = false) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.makima) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
     // Makima-hair.png (522x478).
     // True visible hair bounding box:
     // X: [89, 410] (visible width 322, symmetrical horizontal center at 249.5)
     // Y: [43, 450] (visible height 408, crown top at 43, bang bottom at 234)
     // Proportional volumetric scaling for round circular dome without flatness
-    const targetHairWidth = r * 2.30;
+    const targetHairWidth = r * 2.30 * wMult;
     const scaleX = targetHairWidth / 322;
-    const scaleY = scaleX * 0.98; // Balanced vertical ratio to prevent flatness and maintain rounded crown
+    const scaleY = scaleX * 0.98 * hMult; // Balanced vertical ratio to prevent flatness and maintain rounded crown
     const drawW = 522 * scaleX;
     const drawH = 478 * scaleY;
-    const drawX = -249.5 * scaleX;
-    const drawY = -r * 1.28 - 43 * scaleY; // Rounded natural crown curve
+    const drawX = -249.5 * scaleX + offX;
+    const drawY = -r * 1.28 - 43 * scaleY + offY; // Rounded natural crown curve
 
-    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
     ctx.restore();
   }
 }

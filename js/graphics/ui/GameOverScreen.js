@@ -426,7 +426,7 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const isFinalMatchWin = Boolean(isMatchEnd || (winCount >= winThreshold) || state.gameState === 'matchEnd' || state.matchWinner);
 
   // 0. Snap Cut Arena BGM & Play Winner Announcer Audio (Frame 1)
-  if (timer > 0) {
+  if (timer > 0 && isFinalMatchWin) {
     stopArenaBgm(true);
   }
   if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
@@ -608,10 +608,6 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     return;
   }
 
-  // 0. Snap Cut Arena BGM & Play Winner / Draw Announcer Audio (Frame 1)
-  if (timer > 0) {
-    stopArenaBgm(true);
-  }
   const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
   const winnerIndex = winner ? (state.fighters ? state.fighters.indexOf(winner) : -1) : -1;
   const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
@@ -632,6 +628,11 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
   const modeRounds = MODE_SETTINGS[mode]?.rounds || (mode === '1v1' ? 3 : 1);
   const winThreshold = modeRounds === 1 ? 1 : (mode === '1v1' ? 2 : Math.ceil(modeRounds / 2));
   const isFinalMatchWin = Boolean(isMatchEnd || (winCount >= winThreshold) || state.gameState === 'matchEnd' || state.matchWinner);
+
+  // 0. Snap Cut Arena BGM & Play Winner / Draw Announcer Audio (Frame 1)
+  if (timer > 0 && isFinalMatchWin) {
+    stopArenaBgm(true);
+  }
 
   if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
     state._hasPlayedChampionYouWinVoice = true;

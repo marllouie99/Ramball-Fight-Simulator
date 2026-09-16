@@ -786,7 +786,8 @@ export function updateHybridEnvironment() {
     tOpPurple = 0.30 + Math.sin(Math.max(0, Math.min(1, (purpleOrb.life || 0) / (purpleOrb.maxLife || 300))) * Math.PI) * 0.15;
   } else if (gojoPurple && gojoPurple.purpleRecoveryTimer > 0) {
     cxPurple = gojoPurple.x; cyPurple = gojoPurple.y - (gojoPurple.z || 0);
-    tOpPurple = 0.25 * (gojoPurple.purpleRecoveryTimer / 30);
+    const maxRec = (gojoPurple.purpleRecoveryMaxTimer || CONFIG.gojo?.purpleRecoveryDuration || 50);
+    tOpPurple = 0.25 * Math.max(0, Math.min(1, gojoPurple.purpleRecoveryTimer / maxRec));
   }
   currentPurpleDimOpacity += (tOpPurple > currentPurpleDimOpacity) ? (tOpPurple - currentPurpleDimOpacity) * 0.15 : (tOpPurple - currentPurpleDimOpacity) * 0.18;
   

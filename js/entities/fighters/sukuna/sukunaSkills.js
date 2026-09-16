@@ -223,8 +223,6 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
 
     spawnFloatingText(fighter.x, fighter.y - 30, 'CLEAVE!', '#E0E8FF');
     spawnSparks(target.x, target.y, 16, 'crimsonSniper', '#8B0000');
-    spawnSparks(target.x, target.y, 8, 'slashRicochet');
-    spawnSparks(target.x, target.y, 4, 'parrySpark');
     triggerGlobalScreenShake(5, 6);
 
     fighter.punchAnimTimer = 0;
@@ -244,11 +242,8 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
       const swingVol = CONFIG.sukuna?.soundVolumes?.swordSwing ?? 0.9;
       const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3';
       const sliceVol = CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7;
-      const ricoSnd = CONFIG.sukuna?.sounds?.ricochetHit || 'Assets/Sound Effects/Skills/parry.mp3';
-      const ricoVol = CONFIG.sukuna?.soundVolumes?.ricochetHit ?? 0.75;
       audioSystem.playSFX(swingSnd, swingVol);
       audioSystem.playSFX(sliceSnd, sliceVol);
-      audioSystem.playSFX(ricoSnd, ricoVol);
       fighter._slashSoundCooldown = 10;
     }
 

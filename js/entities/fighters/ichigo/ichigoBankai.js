@@ -5,7 +5,7 @@ import { stopSound } from '../../../systems/soundSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { applyDamageToTarget } from '../../fighter.js';
-import { applyHollowLifesteal, activateHollowMask } from './ichigoHollow.js';
+import { activateHollowMask } from './ichigoHollow.js';
 
 /**
  * Stops Bankai transformation voiceline audio immediately (e.g. fighter death).
@@ -299,7 +299,6 @@ export function releaseBankai(fighter) {
 
         // Apply frontal wind blast damage and massive knockback push
         applyDamageToTarget(enemy, windDmg, fighter, { isSkill: true });
-        applyHollowLifesteal(fighter, windDmg, enemy);
 
         if (typeof enemy.applyKnockback === 'function') {
           enemy.applyKnockback(Math.cos(aimAngle) * kbForce, Math.sin(aimAngle) * kbForce);

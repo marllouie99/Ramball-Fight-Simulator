@@ -364,8 +364,7 @@ export class MakimaFighter extends Fighter {
 
   /**
    * Master aim override: locks gunAngle and angle during chain throw.
-   * In normal combat (and when doing Bang!), aims strictly in 4 cardinal directions (Up, Down, Left, Right).
-   * During chain windup / skill prep, tracks enemy directly.
+   * In normal combat and when firing Bang!, tracks enemy directly at any 360-degree angle.
    */
   aim(target) {
     if (!this.canAim()) {
@@ -376,20 +375,8 @@ export class MakimaFighter extends Fighter {
       return false;
     }
 
-    if (this.isPreparingChain || (this.chainWindupTimer && this.chainWindupTimer > 0) || this.isSummoningSpear || this.isExecutingRitual) {
-      return super.aim(target);
-    }
-
-    // Free-angle aiming when Makima has an enemy chained — Bang can fire at any angle
-    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
-      return super.aim(target);
-    }
-
     const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
-    const cardinalAngle = this._getCardinalAngle(aimTarget);
-    this.gunAngle = cardinalAngle;
-    this.angle = cardinalAngle;
-    return true;
+    return super.aim(aimTarget);
   }
 
   /**
@@ -874,14 +861,12 @@ export class MakimaFighter extends Fighter {
     this.vx = 0;
     this.vy = 0;
 
-    // Aim at target during windup
+    // Aim at target during windup (any 360-degree angle)
     const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
-    let angle;
-    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
-      angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    } else {
-      angle = this._getCardinalAngle(aimTarget);
+    if (aimTarget) {
+      this.aim(aimTarget);
     }
+    const angle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
     this.gunAngle = angle;
     this.angle = angle;
 
@@ -899,14 +884,12 @@ export class MakimaFighter extends Fighter {
     this.vx = 0;
     this.vy = 0;
 
-    // Keep aim locked on target cardinal angle
+    // Keep aim tracked on target in full 360 degrees
     const aimTarget = this.bangTarget || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
-    let angle;
-    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
-      angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    } else {
-      angle = this._getCardinalAngle(aimTarget);
+    if (aimTarget) {
+      this.aim(aimTarget);
     }
+    const angle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
     this.gunAngle = angle;
     this.angle = angle;
 
@@ -937,16 +920,12 @@ export class MakimaFighter extends Fighter {
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this.isShooting = true;
 
-    // When chaining an enemy, use free-angle aim; otherwise strict cardinal (Up, Down, Left, Right)
+    // Free 360-degree angle aim towards target (any angle)
     const aimTarget = target || (typeof this._acquirePrimaryTarget === 'function' ? this._acquirePrimaryTarget() : null);
-    let angle;
-    if (this.isChainingActive && this.chainedTargets && this.chainedTargets.length > 0) {
-      // Free-angle: use current gunAngle which was set by aim() tracking the target
-      angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    } else {
-      const cardinalAngle = this._getCardinalAngle(aimTarget);
-      angle = cardinalAngle;
+    if (aimTarget) {
+      this.aim(aimTarget);
     }
+    const angle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
     this.gunAngle = angle;
     this.angle = angle;
     const range = cfg.bangRange || 1600;
@@ -989,6 +968,8 @@ export class MakimaFighter extends Fighter {
         const projTeam = state.getFighterTeam(p.owner);
         if (myTeam !== null && myTeam !== undefined && projTeam !== null && projTeam !== undefined && myTeam === projTeam) continue;
       }
+
+      if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.visual === 'gojoPurple' || p.isGetsuga || p.behaviorType === 'getsuga_tensho' || p.isSukunaFurnace || p.behaviorType === 'sukuna_furnace' || p.behaviorType === 'yuta_pure_love_beam' || p.visual === 'yuta_pure_love_beam' || p.isPureLoveBeam) continue;
 
       const projRadius = p.r || p.radius || 8;
       if (this._isPointNearLineSegment(p.x, p.y, startX, startY, endX, endY, projRadius + beamW * 0.5)) {

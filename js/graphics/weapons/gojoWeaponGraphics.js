@@ -166,13 +166,16 @@ export function drawGojoWeapon(ctx, fighter) {
         const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
         const isFaceOff = fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff');
         const recoveryTimer = fighter.purpleRecoveryTimer || 0;
-        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal || isCountdown || isFaceOff || recoveryTimer > 30) {
+        const maxRecovery = fighter.purpleRecoveryMaxTimer || CONFIG.gojo?.purpleRecoveryDuration || 50;
+        const fadeThreshold = Math.min(30, maxRecovery);
+        const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive());
+        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal || isCountdown || isFaceOff || recoveryTimer > fadeThreshold || isPurpleInFlight) {
             ctx.restore();
             return;
         }
 
-        // Smoothly fade blue orb back in when Purple is about to expire (final 30 frames of recovery)
-        const recoveryFade = (recoveryTimer > 0 && recoveryTimer <= 30) ? (1.0 - (recoveryTimer / 30)) : 1.0;
+        // Smoothly fade blue orb back in when Purple recovery is completing
+        const recoveryFade = (recoveryTimer > 0 && recoveryTimer <= fadeThreshold) ? (1.0 - (recoveryTimer / fadeThreshold)) : 1.0;
 
         // Dynamic cooldown manifestation & fade logic:
         // Hide Gojo's blue projectile/orb while on cooldown, and smoothly fade it in as Blue CD is about to be ready
@@ -181,7 +184,7 @@ export function drawGojoWeapon(ctx, fighter) {
         const readyThreshold = Math.max(22, Math.round(maxCd * 0.55)); // Start smooth manifestation in the last 55% of cooldown (~33 frames before shot)
 
         let targetAlpha = 0.0;
-        if (!fighter.isMeleeMode && transition > 0) {
+        if (!fighter.isMeleeMode && transition > 0 && !isPurpleInFlight) {
             if (currentCd <= 0) {
                 targetAlpha = 1.0;
             } else if (currentCd <= readyThreshold) {

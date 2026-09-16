@@ -288,20 +288,45 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     // The Wheel of Adaptation clicks IMMEDIATELY as soon as accumulated damage meets or exceeds fatalDamageThresholdPct!
     const threshold = fighter.maxHp * thresholdPct;
     let pendingAdaptation = null;
+    const isInsideGojoDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
+      state.activeDomain === 'unlimited_void' || 
+      state.domainActive === 'unlimited_void' || 
+      (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
+    );
+
     if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
-      pendingAdaptation = {
-        type,
-        attacker,
-        isPureLoveBeam: Boolean(isPureLoveBeamHit && !fighter.adaptedPureLoveBeam),
-        isSaitamaCounter: Boolean(isSaitamaCounterHit && !fighter.adaptedSaitamaCounter)
-      };
-      if (!fighter._inMahoragaTakeDamage) {
-        if (pendingAdaptation.isPureLoveBeam) {
-          adaptToPureLoveBeam(fighter);
-        } else if (pendingAdaptation.isSaitamaCounter) {
-          adaptToSaitamaCounter(fighter, attacker);
-        } else {
-          triggerAdaptation(fighter, type, attacker);
+      if (isInsideGojoDomain) {
+        // Inside Gojo's Unlimited Void, active adaptation and RCT healing are frozen/held!
+        // Queue pending domain adaptation for release if Mahoraga survives when domain ends.
+        if (!fighter.pendingDomainAdaptation) {
+          fighter.pendingDomainAdaptation = {
+            type: type || 'skill',
+            attacker: attacker || null,
+            lastGojoHitType: fighter._lastGojoHitType || 'domain',
+            lastSukunaHitType: fighter._lastSukunaHitType,
+            lastSkillShotId: fighter._lastSkillShotId,
+            lastSkillShotColor: fighter._lastSkillShotColor
+          };
+          spawnFloatingText(fighter.x, (fighter.y - (fighter.z || 0)) - fighter.r - 25, '⚙️ ADAPTATION HELD (DOMAIN)', '#A0C8FF');
+        }
+        fighter.totalAccumDamage = 0;
+        fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+        // pendingAdaptation remains null so Mahoraga does NOT get fatal damage immunity or 1 HP revival inside the domain!
+      } else {
+        pendingAdaptation = {
+          type,
+          attacker,
+          isPureLoveBeam: Boolean(isPureLoveBeamHit && !fighter.adaptedPureLoveBeam),
+          isSaitamaCounter: Boolean(isSaitamaCounterHit && !fighter.adaptedSaitamaCounter)
+        };
+        if (!fighter._inMahoragaTakeDamage) {
+          if (pendingAdaptation.isPureLoveBeam) {
+            adaptToPureLoveBeam(fighter);
+          } else if (pendingAdaptation.isSaitamaCounter) {
+            adaptToSaitamaCounter(fighter, attacker);
+          } else {
+            triggerAdaptation(fighter, type, attacker);
+          }
         }
       }
     }
@@ -359,6 +384,8 @@ export function triggerAdaptation(fighter, type, attacker) {
       };
       spawnFloatingText(fighter.x, (fighter.y - (fighter.z || 0)) - fighter.r - 25, '⚙️ ADAPTATION HELD (DOMAIN)', '#A0C8FF');
     }
+    fighter.totalAccumDamage = 0;
+    fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
     return;
   }
 
@@ -487,8 +514,8 @@ export function triggerAdaptation(fighter, type, attacker) {
     }
   }
 
-  // Save attacker for smooth divine flash-dash counter (strictly disabled when dragged by Getsuga)
-  if (!fighter.isDraggedByGetsuga) {
+  // Save attacker for smooth divine flash-dash counter (strictly disabled when dragged or pulled by any attack)
+  if (!fighter.isDraggedByGetsuga && !(typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) {
     if (attacker && !attacker.isDead && attacker !== fighter) {
       fighter._pendingCounterTarget = attacker;
     } else if (typeof state !== 'undefined' && state.fighters) {
@@ -544,7 +571,9 @@ export function applyGojoAdaptation(fighter, gojoType) {
       break;
     case 'blue':
       adaptColor = '#00FFFF';
-      fighter.gojoBlueDragImmune = false;
+      fighter.gojoBlueDragImmune = true;
+      fighter.isCaughtInBlue = false;
+      fighter.isCaughtInBluePull = false;
       spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: BLUE RESISTANCE!', '#00FFFF');
       break;
     case 'infinity':
@@ -878,7 +907,7 @@ export function adaptToPureLoveBeam(fighter) {
     opponent.isChannelingDomain || opponent.domainActive
   );
 
-  if (opponent && !isEnemyFiringBeam && !fighter.isDraggedByGetsuga) {
+  if (opponent && !isEnemyFiringBeam && !fighter.isDraggedByGetsuga && !(typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) {
     const oldX = fighter.x;
     const oldY = fighter.y;
     const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);

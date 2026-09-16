@@ -874,8 +874,9 @@ export function startNextRound() {
     state.announcerSoundHandle = null;
   }
   state.announcerSubtitle = '';
+  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
   stopAllSounds(false, 0, 0);
-  stopAllLoopingSounds(0, 0); // Stop any lingering audio loops from previous round
+  stopAllLoopingSounds(0, 0, is1v1Mode); // Stop any lingering audio loops from previous round (preserve BGM in 1v1)
   clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
   reinitFighters();
   clearProjectiles();
@@ -911,8 +912,9 @@ export function restartCurrentRound() {
     state.announcerSoundHandle = null;
   }
   state.announcerSubtitle = '';
+  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
   stopAllSounds(false, 0, 0);
-  stopAllLoopingSounds(0, 0);
+  stopAllLoopingSounds(0, 0, is1v1Mode);
   clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
   reinitFighters();
   clearProjectiles();
@@ -962,8 +964,9 @@ function playAnnouncerSoundWithFallback(soundKey, onEndedCallback) {
 }
 
 export function startCountdown() {
+  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
   stopAllSounds(false, 0, 0);
-  stopAllLoopingSounds(0, 0);
+  stopAllLoopingSounds(0, 0, is1v1Mode);
   state.countdownTimer = 0;
   state.gameState = 'countdown';
   state.announcerSoundHandle = null;
@@ -977,10 +980,9 @@ export function startCountdown() {
   state.announcerTimeoutIds.forEach(id => clearTimeout(id));
   state.announcerTimeoutIds = [];
 
-  // 1v1 Game Mode: Start background music immediately during countdown
-  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
+  // 1v1 Game Mode: Start background music if not already playing (forceNew = false ensures continuous playback across rounds)
   if (is1v1Mode) {
-    startArenaBgm(true);
+    startArenaBgm(false);
   }
 
   // Reset Cursed Energy combat aura for JJK fighters during countdown

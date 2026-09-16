@@ -407,7 +407,7 @@ export function drawMahoragaDharmaWheelCore(ctx, wheelData) {
     ctx.restore();
   }
 
-  const isGojoDomainActive = wheelData.isGojoDomainActive || (!wheelData.gojoDomainAdapted && !wheelData.gojoAdapted?.domain && typeof state !== 'undefined' && (
+  const isGojoDomainActive = wheelData.isGojoDomainActive || (!wheelData.gojoDomainAdapted && !wheelData.gojoAdapted?.domain && !wheelData.domainImmunity && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
@@ -660,7 +660,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   }
 
   // --- DRAW DYNAMIC RULE 15 CRESCENT SWORD SLASH ARC ---
-  const isGojoDomainActive = typeof state !== 'undefined' && (
+  const isGojoDomainActive = (!fighterObj?.gojoDomainAdapted && !fighterObj?.gojoAdapted?.domain && !fighterObj?.domainImmunity) && typeof state !== 'undefined' && (
     state.domainActive || state.activeDomain ||
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
   );
@@ -1287,7 +1287,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
 
 
   // 3. ANIME HIGH-IMPACT PUNCH VISUAL: Distinguishable Conical Air Pressure Blast & Starburst Impact!
-  const isGojoDomainActive = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
+  const isGojoDomainActive = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && !fighter.domainImmunity && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))

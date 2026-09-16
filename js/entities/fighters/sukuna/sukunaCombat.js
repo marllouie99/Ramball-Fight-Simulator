@@ -8,25 +8,33 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunc
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
+import { projectileSystem } from '../../../systems/projectileSystem.js';
 
 export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) {
   if (!fighter.afterImages) fighter.afterImages = [];
   const dx = targetX - oldX;
   const dy = targetY - oldY;
   const dist = Math.hypot(dx, dy);
-  if (dist < 1) return;
+  const fighterR = fighter.r || 25;
+  if (dist < fighterR * 0.8) return;
 
   const pathAngle = Math.atan2(dy, dx);
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : pathAngle;
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-  const steps = isLowQuality ? Math.max(2, Math.floor(dist / 36)) : Math.max(4, Math.floor(dist / 12));
+  const maxSteps = isLowQuality ? 3 : 5;
+  const steps = Math.max(2, Math.min(maxSteps, Math.floor(dist / 36)));
+
+  // Maximum progress along the trajectory so the afterimage stays strictly behind the arriving fighter body
+  const maxT = Math.max(0, Math.min(0.78, 1 - (fighterR * 1.1) / dist));
+
   for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const maxTimer = 24 - Math.floor(t * 6);
+    const norm = steps > 0 ? (i / steps) : 0;
+    const t = norm * maxT;
+    const maxTimer = 18 - Math.floor(norm * 6);
     pushTrailCap(fighter.afterImages, {
       x: oldX + dx * t,
       y: oldY + dy * t,
-      r: fighter.r || 25,
+      r: fighterR,
       angle: facingAngle,
       timer: maxTimer,
       maxTimer: maxTimer,
@@ -34,12 +42,21 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) 
       fromY: oldY,
       toX: targetX,
       toY: targetY
-    }, 30);
+    }, 10);
   }
 }
 
 export function executeTeleportDodge(fighter, attacker, arena) {
-  if (fighter.isDead || fighter.isTargetOfAmbush) return;
+  const isDraggedOrTrapped = Boolean(
+    fighter.isDraggedByGetsuga ||
+    (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) ||
+    (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged()) ||
+    fighter.isWallPinnedByMakima ||
+    fighter.isWallPinnedBySaitama ||
+    fighter.isWallPinnedByEscanor ||
+    fighter.isCurrentlyWallPinnedByEscanor
+  );
+  if (fighter.isDead || fighter.isTargetOfAmbush || isDraggedOrTrapped) return;
   const oldX = fighter.x;
   const oldY = fighter.y;
 
@@ -85,7 +102,16 @@ export function executeTeleportDodge(fighter, attacker, arena) {
 }
 
 export function teleportAwayFrom(fighter, opponent, arena) {
-  if (!opponent || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0) return;
+  const isDraggedOrTrapped = Boolean(
+    fighter.isDraggedByGetsuga ||
+    (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) ||
+    (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged()) ||
+    fighter.isWallPinnedByMakima ||
+    fighter.isWallPinnedBySaitama ||
+    fighter.isWallPinnedByEscanor ||
+    fighter.isCurrentlyWallPinnedByEscanor
+  );
+  if (!opponent || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0 || isDraggedOrTrapped) return;
   const oldX = fighter.x;
   const oldY = fighter.y;
 
@@ -119,12 +145,91 @@ export function teleportAwayFrom(fighter, opponent, arena) {
   audioSystem.playSFX(disengageSnd, disengageVol);
 }
 
+export function teleportToMeleeAngle(fighter, opponent, arena) {
+  const isDraggedOrTrapped = Boolean(
+    fighter.isDraggedByGetsuga ||
+    (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) ||
+    (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged()) ||
+    fighter.isWallPinnedByMakima ||
+    fighter.isWallPinnedBySaitama ||
+    fighter.isWallPinnedByEscanor ||
+    fighter.isCurrentlyWallPinnedByEscanor
+  );
+  if (!opponent || opponent.isDead || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0 || isDraggedOrTrapped || Math.hypot(fighter.knockbackVx || 0, fighter.knockbackVy || 0) > 0.5) return;
+
+  const oldX = fighter.x;
+  const oldY = fighter.y;
+
+    const currentAngle = (fighter.x !== opponent.x || fighter.y !== opponent.y)
+      ? Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x)
+      : (fighter.gunAngle !== undefined ? fighter.gunAngle + Math.PI : 0);
+    const angleOffsets = [-0.50, 0.0, 0.50, -0.25, 0.25]; // 5 distinct melee attack angles (Left, Center, Right, Left-Center, Right-Center)
+    if (fighter._meleeAnglePatternIndex === undefined) {
+      fighter._meleeAnglePatternIndex = Math.floor(Math.random() * angleOffsets.length);
+    } else {
+      fighter._meleeAnglePatternIndex = (fighter._meleeAnglePatternIndex + 1 + Math.floor(Math.random() * (angleOffsets.length - 1))) % angleOffsets.length;
+    }
+    const angleOffset = angleOffsets[fighter._meleeAnglePatternIndex];
+    const jitter = (Math.random() - 0.5) * 0.05;
+    const baseAngle = currentAngle + angleOffset + jitter;
+    const offsetDist = (opponent.r || 25) + fighter.r + 14;
+
+    let targetX = opponent.x + Math.cos(baseAngle) * offsetDist;
+    let targetY = opponent.y + Math.sin(baseAngle) * offsetDist;
+
+  if (arena) {
+    if (arena.shape === 'circle') {
+      const acx = arena.x + arena.width / 2;
+      const acy = arena.y + arena.height / 2;
+      const ar = Math.max(10, (arena.radius || (arena.width / 2)) - fighter.r);
+      const cdx = targetX - acx;
+      const cdy = targetY - acy;
+      const cdist = Math.hypot(cdx, cdy);
+      if (cdist > ar && cdist > 0) {
+        targetX = acx + (cdx / cdist) * ar;
+        targetY = acy + (cdy / cdist) * ar;
+      }
+    } else {
+      targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
+      targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+    }
+  }
+
+  fighter.x = targetX;
+  fighter.y = targetY;
+  fighter.vx = 0;
+  fighter.vy = 0;
+  if (typeof fighter.aim === 'function') fighter.aim(opponent);
+  if (opponent && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush && (opponent.timeStopTimer || 0) <= 0) {
+    opponent.aim(fighter);
+  }
+
+  spawnImpactFlash(oldX, oldY, 22, 'crimsonSniper');
+  spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
+  spawnSparks(fighter.x, fighter.y, 10, 'crimsonSniper', '#8B0000');
+  const dashSnd = CONFIG.sukuna?.sounds?.teleportDash || 'Assets/Sound Effects/Skills/dash3.mp3';
+  const dashVol = CONFIG.sukuna?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(dashSnd, dashVol);
+
+  spawnTeleportAfterimages(fighter, oldX, oldY, fighter.x, fighter.y);
+}
+
 export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
-  if (fighter.isChannelingDivineFlame || fighter.isChannelingDomainExpansion || (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam())) {
+  const isDraggedOrTrapped = Boolean(
+    fighter.isDraggedByGetsuga ||
+    (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) ||
+    (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged()) ||
+    fighter.isWallPinnedByMakima ||
+    fighter.isWallPinnedBySaitama ||
+    fighter.isWallPinnedByEscanor ||
+    fighter.isCurrentlyWallPinnedByEscanor
+  );
+  if (isDraggedOrTrapped || fighter.isChannelingDivineFlame || fighter.isChannelingDomainExpansion) {
     fighter.vx = 0;
     fighter.vy = 0;
     fighter.punchAnimTimer = 0;
     fighter.punchActiveMaxTime = 0;
+    fighter.isMeleeMode = false;
     return;
   }
 
@@ -150,14 +255,17 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   }
 
   opponent = activeTarget;
+  fighter.vx = 0;
+  fighter.vy = 0;
 
-  const punchCooldown = CONFIG.sukuna?.meleePunchCooldown || 9;
+  const punchCooldown = CONFIG.sukuna?.meleePunchCooldown || 10;
 
-  // Handle punch cooldown — zero velocity so Sukuna stands completely still when punching
+  // Handle punch cooldown
   if (fighter.meleePunchCooldown > 0) {
     fighter.meleePunchCooldown--;
-    fighter.vx = 0;
-    fighter.vy = 0;
+    if (opponent && !opponent.isDead && typeof fighter.aim === 'function') {
+      fighter.aim(opponent);
+    }
     return;
   }
 
@@ -168,16 +276,8 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   if (fighter.meleeComboCount === undefined) fighter.meleeComboCount = 0;
   if (!fighter.meleeComboTarget) fighter.meleeComboTarget = Math.random() < 0.5 ? 6 : 3;
 
-  const distToOpponent = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
-  const punchReach = fighter.r + opponent.r + 45;
-  const isOutOfReach = distToOpponent > punchReach;
-
-  // If out of reach, do NOT chase or follow the enemy in melee mode
-  if (isOutOfReach) {
-    fighter.vx = 0;
-    fighter.vy = 0;
-    return; // Do NOT chase or follow when the enemy is out of melee range!
-  }
+  // Punch-Teleport-Punch: Flash-teleport to a new angle around the opponent for each punch in the combo!
+  teleportToMeleeAngle(fighter, opponent, arena);
 
   // Always aim directly at the opponent when punching
   if (typeof fighter.aim === 'function') fighter.aim(opponent);
@@ -241,8 +341,8 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
       finalDmg = res.finalDamage;
       isCrit = res.isCrit;
     }
-    // Pass isSkill: true (matching Gojo) to bypass basic attack flinch lock and allow dynamic target tracking
-    const didDamage = target.takeDamage(finalDmg, fighter, { isMelee: true, isCrit, isSkill: true });
+    // Pass isSkill: true and skipKnockback: true (matching Gojo) to bypass flinch lock and avoid pushing targets out of melee range
+    const didDamage = target.takeDamage(finalDmg, fighter, { isMelee: true, isCrit, isSkill: true, skipKnockback: true });
     if (target && typeof target.aim === 'function' && !target.isTargetOfAmbush) {
       target.aim(fighter);
     }
@@ -262,7 +362,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     if (fighter.meleeClashCooldown <= 0) {
       const midX = (fighter.x + opponent.x) / 2;
       const midY = (fighter.y + opponent.y) / 2;
-      spawnMeleeClashShockwave(midX, midY, 100, 'gojo');
+      spawnMeleeClashShockwave(midX, midY, 100, 'sukuna');
       triggerGlobalScreenShake(8, 10);
       fighter.meleeClashCooldown = 30;
     }
@@ -283,6 +383,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     if (!fighter.domainActive && (fighter.forcedMeleeTimer || 0) <= 0) {
       fighter.isMeleeMode = false;
       fighter.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120; // Mandatory ranged separation!
+      teleportAwayFrom(fighter, opponent, arena);
     }
   }
 

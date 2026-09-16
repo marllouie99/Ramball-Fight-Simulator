@@ -50,7 +50,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       const chargeTimer = f.purpleChargeTimer || 0;
       purplePct = Math.max(0, Math.min(100, (1 - chargeTimer / chargeMax) * 100));
     } else if (purpleOrb) {
-      const orbMaxLife = CONFIG.gojo?.purpleLife || 250;
+      const orbMaxLife = CONFIG.gojo?.purpleLife ?? 480;
       purplePct = Math.max(0, Math.min(100, (purpleOrb.life / orbMaxLife) * 100));
     } else if ((f.purpleRecoveryTimer || 0) > 0) {
       purplePct = 0;
@@ -1537,7 +1537,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
         stealLabel = baseName;
       } else if (purpleOrb) {
         // Gojo Hollow Purple orb traveling through arena (drains from 100% down to 0%)
-        const orbMaxLife = CONFIG.gojo?.purpleLife || 250;
+        const orbMaxLife = CONFIG.gojo?.purpleLife ?? 480;
         stealPct = Math.max(0, Math.min(100, (purpleOrb.life / orbMaxLife) * 100));
         stealReady = false;
         stealLabel = baseName;

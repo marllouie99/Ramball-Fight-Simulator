@@ -11,6 +11,7 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 function isTeleportDisabled(fighter) {
   if (!fighter) return false;
+  if (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged()) return true;
   const isInsideDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
@@ -183,9 +184,13 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
  * Start adaptation flash-dash toward the attacker after wheel click cinematic pause.
  */
 export function startAdaptationFlashDash(fighter, attacker) {
-  if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga) return;
+  if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
   if (!attacker || attacker.isDead || attacker === fighter) return;
-  const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
+  const isInsideDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && !fighter.domainImmunity && typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
+  );
   if (isInsideDomain) return;
 
   fighter.adaptationPauseTimer = 0;
@@ -333,7 +338,7 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
  * and Mahoraga has adapted to it, Mahoraga instantly teleports away.
  */
 export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
-  if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga) return;
+  if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
   if (projectile && (projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
   const fromX = fighter.x;
   const fromY = fighter.y;

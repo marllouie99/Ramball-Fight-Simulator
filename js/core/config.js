@@ -134,10 +134,10 @@ export const CONFIG = {
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
   globalScreenShakeIntensityMultiplier: 0.7, // Global multiplier for all hit effect & arena screen shake intensity (1.0 = normal, 0.5 = half shake, 0.0 = disable shake completely)
   camera: {
-    minZoom: 1.0,
-    maxZoom: 1.04,                     // Gentle, wide zoom cap to prevent camera from zooming in too much (was 1.15)
-    winnerZoom: 1.02,                  // Subtle victory focus zoom (was 1.08)
-    maxPanRatio: 0.18,                 // Maximum pan offset relative to arena radius (was 0.35)
+    minZoom: 1.04,
+    maxZoom: 1.14,                     // Dynamic zoom cap for closer, cinematic combat tracking
+    winnerZoom: 1.08,                  // Victory focus zoom
+    maxPanRatio: 0.22,                 // Maximum pan offset relative to arena radius
     smoothing: 0.08,                   // Position tracking smoothing
     zoomSmoothing: 0.05,               // Zoom interpolation smoothing
     minDist: 80,                       // Combat distance for maxZoom

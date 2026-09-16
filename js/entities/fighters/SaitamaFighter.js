@@ -212,18 +212,17 @@ export class SaitamaFighter extends Fighter {
 
   /**
    * Passive: No Sell — Ignores basic hit-pause timeStops and grants total immunity during Serious Skill Counter,
-   * UNLESS being pulled/dragged by a pulling mechanic (Gojo Blue, Hollow Purple suction, Black Hole, Getsuga drag, Telekinesis)
-   * or trapped inside Gojo's deployed Unlimited Void domain.
+   * UNLESS trapped inside Gojo's deployed Unlimited Void domain.
    */
   applyTimeStop(duration, opts = {}) {
     const isInsideGojo = this._isInsideGojoDomain() || Boolean(opts.isDomain || opts.isGojoDomain);
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
     if (isCounteringState) {
-      if (opts.isPurple || opts.isBlue || opts.isGetsuga || opts.isPull || opts.isGravity || isInsideGojo || this._isBeingPulled()) {
+      if (isInsideGojo) {
         this.interruptAttacks(true);
-      } else {
-        return; // IMMUNITY: Serious Skill Counter cannot be frozen or time-stopped by standard attacks!
+        super.applyTimeStop(duration, opts);
       }
+      return; // IMMUNITY: Serious Skill Counter cannot be frozen or time-stopped by standard attacks or drag/pull mechanics!
     }
     // If it's a basic attack hit-pause without skill/ultimate flags, Saitama ignores it!
     if (!opts.isSkill && !opts.isUltimate && !opts.isInfinity && !opts.isDomain && !opts.isPurple && !opts.isBlue && !isInsideGojo) {
@@ -236,11 +235,11 @@ export class SaitamaFighter extends Fighter {
     const isInsideGojo = this._isInsideGojoDomain() || Boolean(opts.isDomain || opts.isGojoDomain);
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
     if (isCounteringState) {
-      if (opts.isPurple || opts.isBlue || opts.isGetsuga || opts.isPull || opts.isGravity || isInsideGojo || this._isBeingPulled()) {
+      if (isInsideGojo) {
         this.interruptAttacks(true);
-      } else {
-        return;
+        super.applyHitStun(frames, opts);
       }
+      return; // IMMUNITY: Serious Skill Counter cannot be stunned by standard attacks or drag/pull mechanics!
     }
     super.applyHitStun(frames, opts);
   }
@@ -249,11 +248,11 @@ export class SaitamaFighter extends Fighter {
     const isInsideGojo = this._isInsideGojoDomain() || Boolean(opts.isDomain || opts.isGojoDomain);
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
     if (isCounteringState) {
-      if (opts.isPurple || opts.isBlue || opts.isGetsuga || opts.isPull || opts.isGravity || isInsideGojo || this._isBeingPulled()) {
+      if (isInsideGojo) {
         this.interruptAttacks(true);
-      } else {
-        return;
+        super.applyParalyze(frames, opts);
       }
+      return; // IMMUNITY: Serious Skill Counter cannot be paralyzed by standard attacks or drag/pull mechanics!
     }
     super.applyParalyze(frames, opts);
   }
@@ -262,11 +261,11 @@ export class SaitamaFighter extends Fighter {
     const isInsideGojo = this._isInsideGojoDomain() || Boolean(opts.isDomain || opts.isGojoDomain);
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
     if (isCounteringState) {
-      if (opts.isPurple || opts.isBlue || opts.isBlueSlow || opts.isGetsuga || opts.isPull || opts.isGravity || isInsideGojo || this._isBeingPulled()) {
+      if (isInsideGojo) {
         this.interruptAttacks(true);
-      } else {
-        return;
+        super.applySlow(frames, multiplier, opts);
       }
+      return; // IMMUNITY: Serious Skill Counter cannot be slowed by standard attacks or drag/pull mechanics!
     }
     super.applySlow(frames, multiplier, opts);
   }
@@ -275,14 +274,20 @@ export class SaitamaFighter extends Fighter {
     const isInsideGojo = this._isInsideGojoDomain() || Boolean(options.isDomain || options.isGojoDomain);
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
     if (isCounteringState) {
-      if (options.isPull || options.isGravity || options.isBlue || options.isPurple || options.isBlackHole || options.isGetsuga || isInsideGojo || this._isBeingPulled()) {
+      if (isInsideGojo) {
         this.interruptAttacks(true);
+        super.applyKnockback(vx, vy, options);
       } else {
-        // Saitama is completely immovable during Serious Skill Counter against regular knockback
+        // Saitama is completely immovable & immune to any push back / drag / pull during Serious Skill Counter charging state
         this.knockbackVx = 0;
         this.knockbackVy = 0;
-        return;
+        this.vx = 0;
+        this.vy = 0;
+        this.isDraggedByGetsuga = false;
+        this.isCaughtInPurple = false;
+        this.isCaughtInTelekinesis = false;
       }
+      return;
     }
     super.applyKnockback(vx, vy, options);
   }
@@ -312,8 +317,8 @@ export class SaitamaFighter extends Fighter {
   suppressCombatAndVisuals(options = {}) {
     const isInsideGojo = this._isInsideGojoDomain() || Boolean(options.isDomain || options.isGojoDomain);
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
-    if (isCounteringState && this.hp > 0 && !this._isBeingPulled() && !isInsideGojo) {
-      return; // Cannot be suppressed during Serious Skill Counter unless pulled or inside Gojo domain
+    if (isCounteringState && this.hp > 0 && !isInsideGojo) {
+      return; // Cannot be suppressed during Serious Skill Counter unless inside Gojo domain
     }
     if (isInsideGojo && isCounteringState) {
       this.interruptAttacks(true);
@@ -328,6 +333,10 @@ export class SaitamaFighter extends Fighter {
    */
   _isBeingPulled() {
     if (this.hp <= 0) return false;
+    const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
+    if (isCounteringState) {
+      return false; // IMMUNITY: Cannot be pulled or dragged during Serious Skill Counter charging state
+    }
 
     // 1. Caught in Telekinesis (Rubbick)
     if (this.isCaughtInTelekinesis) return true;
@@ -1550,6 +1559,8 @@ export class SaitamaFighter extends Fighter {
       let dodgeTarget = null;
       if (opts.projectile && typeof opts.projectile.x === 'number') {
         dodgeTarget = opts.projectile;
+      } else if (opts.isRikaAttack && (opts.rika || (attacker && attacker.rika && attacker.rika.active))) {
+        dodgeTarget = opts.rika || attacker.rika;
       } else if (opts.isSukunaDomainSliceLine || opts.isDomainSlash) {
         dodgeTarget = {
           isSliceLine: true,
@@ -1899,35 +1910,52 @@ export class SaitamaFighter extends Fighter {
       ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0 && (f.chopHitPauseTarget === this || !f.chopHitPauseTarget))
     ));
 
-    // Mandatory Rule #1: Freeze / TimeStop guard at the top of update loop (bypassed only during active Serious Counter execution unless inside Gojo domain or being pulled)
+    // Mandatory Rule #1: Freeze / TimeStop guard at the top of update loop (bypassed only during active Serious Counter execution unless inside Gojo domain)
     const isFrozen = this._handleTimeStop();
-    const isBeingPulled = this._isBeingPulled();
     const isInsideGojoDomain = this._isInsideGojoDomain();
     const isCounteringState = Boolean((this._counterPunchTimer && this._counterPunchTimer > 0) || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) || this.isCountering);
 
-    // Cancel Serious Skill Counter immediately upon being pulled by any pulling mechanic or caught in Gojo's deployed domain
-    if ((isBeingPulled || isInsideGojoDomain) && isCounteringState) {
+    // Cancel Serious Skill Counter immediately if caught in Gojo's deployed domain
+    if (isInsideGojoDomain && isCounteringState) {
       this.interruptAttacks(true);
     }
+
+    const isBeingPulled = this._isBeingPulled();
 
     if ((isFrozen || this.isTargetOfAmbush || isGlobalHitPausingFighter || isBeingPulled || isInsideGojoDomain) && !this.isCountering) {
       this.interruptAttacks();
       return; // MANDATORY: Stop update execution so fighter is completely frozen/paused/pulled!
     }
 
-    // While Serious Skill Counter is active and NOT being pulled or inside Gojo domain, maintain clean stasis immunity
-    if (this.isCountering && !isBeingPulled && !isInsideGojoDomain) {
+    // While Serious Skill Counter is active and NOT inside Gojo domain, maintain clean stasis and push/drag immunity and cancel any active drag/pull states
+    if (isCounteringState && !isInsideGojoDomain) {
       this.isTargetOfAmbush = false;
       this.isCaughtInPurple = false;
       this.caughtInPureLoveBeam = false;
       this.caughtInGenosFlurry = false;
       this.caughtInGenosBeam = false;
       this.isFrozenByInfinity = false;
+      this.isDraggedByGetsuga = false;
+      this.isCaughtInTelekinesis = false;
       this.timeStopTimer = 0;
       this.hitStunTimer = 0;
       this.paralyzeTimer = 0;
+      this.slowTimer = 0;
+      this.slowMultiplier = 1.0;
       this.knockbackVx = 0;
       this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Cancel any projectile drag tracking referencing Saitama
+      if (typeof state !== 'undefined' && state.projectiles) {
+        for (const p of state.projectiles) {
+          if (!p) continue;
+          if (p.draggedTargets && p.draggedTargets.has(this)) {
+            p.draggedTargets.delete(this);
+          }
+        }
+      }
     }
 
     // Phase 2: count down punch wind-up and land the blow when timer expires
@@ -2403,6 +2431,8 @@ export class SaitamaFighter extends Fighter {
         if (typeof this.aim === 'function') {
           this.aim(target);
         }
+      } else {
+        this.turnToNormalPosition(0.035);
       }
       this.resolveWallBounce(arena, target || opponent);
     } else {

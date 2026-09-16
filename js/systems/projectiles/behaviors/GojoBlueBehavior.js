@@ -33,7 +33,10 @@ export class GojoBlueBehavior extends ProjectileBehavior {
     // If the round or match has ended (enemy died from Blue or other attack), let Blue continue active trajectory/wall-linger
     if (isMatchOver) {
       p.life -= 1;
-      if (p.life <= 0) return true;
+      if (p.life <= 0) {
+        this._releasePulledTargets(p);
+        return true;
+      }
 
       if (!p.isWallLingering) {
         p.x += p.vx;
@@ -91,11 +94,15 @@ export class GojoBlueBehavior extends ProjectileBehavior {
         continue;
       }
 
-      if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive) {
+      if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive && !f.gojoBlueDragImmune) {
         const dx = p.x - f.x;
         const dy = p.y - f.y;
         const dist = Math.hypot(dx, dy);
         if (dist < pullRadius) {
+          f.isCaughtInBlue = true;
+          f.isCaughtInBluePull = true;
+          if (!p.pulledTargets) p.pulledTargets = new Set();
+          p.pulledTargets.add(f);
           const isWallLingering = p.isWallLingering;
           if (dist > 0 && !isChanneling) {
             const pullStrength = isWallLingering ? 4.8 : 3.5;
@@ -139,7 +146,15 @@ export class GojoBlueBehavior extends ProjectileBehavior {
             f.x = Math.max(arena.x + er, Math.min(arena.x + arena.width - er, f.x));
             f.y = Math.max(arena.y + er, Math.min(arena.y + arena.height - er, f.y));
           }
+        } else if (p.pulledTargets && p.pulledTargets.has(f)) {
+          p.pulledTargets.delete(f);
+          f.isCaughtInBlue = false;
+          f.isCaughtInBluePull = false;
         }
+      } else if (p.pulledTargets && p.pulledTargets.has(f)) {
+        p.pulledTargets.delete(f);
+        f.isCaughtInBlue = false;
+        f.isCaughtInBluePull = false;
       }
     }
 
@@ -206,11 +221,32 @@ export class GojoBlueBehavior extends ProjectileBehavior {
     return HitImpactSystem.processProjectileHit(target, projectile, attacker, fighters, { skipInterrupt: isChanneling, isBlue: true });
   }
 
+  _releasePulledTargets(projectile) {
+    if (projectile.pulledTargets) {
+      for (const ent of projectile.pulledTargets) {
+        if (ent) {
+          ent.isCaughtInBlue = false;
+          ent.isCaughtInBluePull = false;
+        }
+      }
+      projectile.pulledTargets.clear();
+    }
+  }
+
   checkExpire(projectile, system) {
-    if (projectile.life <= 0) return true;
+    if (projectile.life <= 0) {
+      this._releasePulledTargets(projectile);
+      return true;
+    }
 
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    if (!arena) return projectile.life <= 0;
+    if (!arena) {
+      if (projectile.life <= 0) {
+        this._releasePulledTargets(projectile);
+        return true;
+      }
+      return false;
+    }
 
     const pr = projectile.r || 15;
     const hitLeft   = projectile.x - pr <= arena.x;
@@ -242,6 +278,7 @@ export class GojoBlueBehavior extends ProjectileBehavior {
 
       projectile.wallLingerTimer -= 1;
       if (projectile.wallLingerTimer <= 0) {
+        this._releasePulledTargets(projectile);
         return true; // Expire after lingering on the wall
       }
       return false; // Stay active on the wall!

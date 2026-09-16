@@ -93,7 +93,8 @@ export function performMeleeAttack(fighter, opponent) {
 
   const isCaughtInBeam = (
     fighter.caughtInGenosFlurry ||
-    fighter.isDraggedByGetsuga
+    fighter.isDraggedByGetsuga ||
+    (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())
   );
 
   const isInHitReaction = (fighter.knockbackStunTimer || 0) > 0 || (fighter.hitStunTimer || 0) > 0 || (fighter.electricStunTimer || 0) > 0 || (fighter.dubstepStunTimer || 0) > 0;
@@ -335,7 +336,7 @@ export function shootBladeBarrage(fighter, ownerIndex) {
  */
 export function initiateLevel8WallSlam(fighter, opponent) {
   if (!opponent || opponent.hp <= 0 || opponent.isDead) return;
-  if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0 || fighter.isDraggedByGetsuga) return;
+  if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0 || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
 
   // Block initiation if Mahoraga is caught inside Gojo's active Hollow Purple
   const activeOrbs = (projectileSystem && projectileSystem.projectiles)
@@ -382,7 +383,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   const isInterrupted = (
     (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
     fighter.caughtInGenosFlurry ||
-    fighter.isDraggedByGetsuga
+    fighter.isDraggedByGetsuga ||
+    (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())
   );
 
   if (isInterrupted || !target || target.hp <= 0 || target.isDead) {
@@ -428,12 +430,12 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       const lungeVol = CONFIG.mahoraga?.soundVolumes?.wallSlamLunge ?? 0.9;
       audioSystem.playSFX(lungeSnd, lungeVol);
 
-      // Clear target's active projectiles (like Gojo's Blue, Red, Purple) to hide all active attack visual effects
+      // Clear target's active projectiles (like Gojo's Blue, Red) to hide all active attack visual effects
       if (state.projectiles) {
         const targetIndex = state.fighters ? state.fighters.indexOf(target) : -1;
         for (let i = state.projectiles.length - 1; i >= 0; i--) {
           const p = state.projectiles[i];
-          if (p && p.ownerIndex === targetIndex && (p.isGojoBlue || p.isGojoRed || p.isGojoPurple || p.isGojoPurpleOrb)) {
+          if (p && p.ownerIndex === targetIndex && (p.isGojoBlue || p.isGojoRed)) {
             if (p.pixiSprite && p.pixiSprite.parent) {
               p.pixiSprite.parent.removeChild(p.pixiSprite);
             }
@@ -665,7 +667,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
         const targetIndex = state.fighters ? state.fighters.indexOf(target) : -1;
         for (let i = state.projectiles.length - 1; i >= 0; i--) {
           const p = state.projectiles[i];
-          if (p && p.ownerIndex === targetIndex && (p.isGojoBlue || p.isGojoRed || p.isGojoPurple || p.isGojoPurpleOrb)) {
+          if (p && p.ownerIndex === targetIndex && (p.isGojoBlue || p.isGojoRed)) {
             if (p.pixiSprite && p.pixiSprite.parent) {
               p.pixiSprite.parent.removeChild(p.pixiSprite);
             }

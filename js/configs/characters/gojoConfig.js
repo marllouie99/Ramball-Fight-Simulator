@@ -79,7 +79,7 @@ export const gojoConfig = {
   purpleDamage: 15,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
   purpleRadius: 50,         // Radius of Purple orb
-  purpleLife: 250,         // How long Purple orb stays in arena (frames)
+  purpleLife: 200,         // How long Purple orb stays in arena (frames - 8.0s)
   purpleTravelTime: 20,    // Frames the orb travels before stopping
   purpleDPS: 15,            // Damage per second dealt to enemies inside the orb
   purpleDPSInterval: 10,   // Frames between DPS ticks
@@ -94,7 +94,8 @@ export const gojoConfig = {
   purpleExplosionKnockback: 10, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
   purpleExplosionShakeDuration: 30, // Duration of screen shake on explosion
-  purpleRecoveryDuration: 50,      // Breather recovery pause duration in frames after firing Hollow Purple (50 frames = ~0.83s)
+  purpleRecoveryDuration: 100,      // Breather recovery pause duration in frames after firing Hollow Purple (50 frames = ~0.83s)
+  purpleRetreatDistance: 260,       // Distance in pixels Gojo teleports backwards/away after firing Purple
   purpleHorizontalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from horizontal Left/Right for straight alignment
   purpleHorizontalCorridorHalfHeight: 40, // Strict vertical corridor half-height (40px) within which enemies trigger horizontal Purple
   // 200% Empowered Second Cast Mechanics
@@ -108,7 +109,7 @@ export const gojoConfig = {
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
   domainCooldown: 2000,     // 20s Ultimate cooldown
   domainChargeMax: 100,     // 2s Channeling duration before domain opens
-  domainDuration: 500,      // Domain lasts ~6.6 seconds (paralyzes enemies)
+  domainDuration: 300,      // Domain lasts ~6.6 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
   domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
   domainPostSlowDuration: 180, // 3.0s slow movement debuff after domain expires
@@ -117,22 +118,23 @@ export const gojoConfig = {
 
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
-  reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 25% or below
-  reverseCursedTechniqueHealPercent: 0.80, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
-  reverseCursedTechniqueCooldown: 2000,     // 15 second cooldown between RCT heals
+  reverseCursedTechniqueHpThreshold: 0.10, // Triggers RCT when HP drops to 25% or below
+  reverseCursedTechniqueHealPercent: 0.50, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
+  reverseCursedTechniqueCooldown: 1500,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
   passiveRctHealRate: 0,                   // Disabled
   rctRevivalHealAmount: 150,               // Flat HP restored on emergency revival
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
-  closeRangeRadius: 85,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
-  initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
+  closeRangeRadius: 110,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
+  initialMeleeDuration: 150,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
   meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
   comboDisengageDistance: 0,      // Distance (pixels) teleported away when disengaging after clash
-  meleePunchDamage: 2,             // Damage dealt per martial arts punch strike
+  meleePunchDamage: 6,             // Damage dealt per martial arts punch strike
   meleePunchCooldown: 16,           // Frames between consecutive punches (~0.16s at 60fps)
   meleePunchAnimDuration: 15,       // Punch extension and retraction animation frame duration
+  meleeTeleportAngle: 0.48,         // Decreased tight flank angle (~27.5 degrees) for melee combo teleportation
   teleportSpeed: 15,                // Teleport movement slide speed
 
   // ── 8. Teleport Dodge & Evasion Mechanics (Disabled) ──

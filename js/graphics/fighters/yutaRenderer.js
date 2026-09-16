@@ -176,18 +176,25 @@ export class YutaRenderer {
         targetAngle = (fighter.pureLoveBeamLockedAngle !== undefined ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0));
         rk.angle = targetAngle;
       } else {
-        if (opponent && !opponent.isDead) {
-          const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
-          if (opponent.isStealthed) {
-            let diff = desiredAngle - (rk.angle || 0);
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            targetAngle = (rk.angle || 0) + diff * (CONFIG.toji?.stealthTurnRate || 0.035);
-          } else {
-            targetAngle = desiredAngle;
-          }
+        const activeTarget = rk.target || opponent;
+        if (activeTarget && !activeTarget.isDead && activeTarget.hp > 0) {
+          const desiredAngle = Math.atan2(activeTarget.y - rk.y, activeTarget.x - rk.x);
+          const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
+          let diff = desiredAngle - currentAngle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+
+          const turnRate = activeTarget.isStealthed
+            ? (CONFIG.toji?.stealthTurnRate || 0.035)
+            : (rk.attackTimer > 0 ? 0.35 : 0.22);
+          targetAngle = currentAngle + diff * turnRate;
         } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
-          targetAngle = Math.atan2(rk.vy, rk.vx);
+          const moveAngle = Math.atan2(rk.vy, rk.vx);
+          const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : moveAngle;
+          let diff = moveAngle - currentAngle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          targetAngle = currentAngle + diff * 0.18;
         } else {
           targetAngle = rk.angle || 0;
         }
@@ -403,18 +410,25 @@ export class YutaRenderer {
         targetAngle = (fighter.pureLoveBeamLockedAngle !== undefined ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0));
         rk.angle = targetAngle;
       } else {
-        if (opponent && !opponent.isDead) {
-          const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
-          if (opponent.isStealthed) {
-            let diff = desiredAngle - (rk.angle || 0);
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            targetAngle = (rk.angle || 0) + diff * (CONFIG.toji?.stealthTurnRate || 0.035);
-          } else {
-            targetAngle = desiredAngle;
-          }
+        const activeTarget = rk.target || opponent;
+        if (activeTarget && !activeTarget.isDead && activeTarget.hp > 0) {
+          const desiredAngle = Math.atan2(activeTarget.y - rk.y, activeTarget.x - rk.x);
+          const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
+          let diff = desiredAngle - currentAngle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+
+          const turnRate = activeTarget.isStealthed
+            ? (CONFIG.toji?.stealthTurnRate || 0.035)
+            : (rk.attackTimer > 0 ? 0.35 : 0.22);
+          targetAngle = currentAngle + diff * turnRate;
         } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
-          targetAngle = Math.atan2(rk.vy, rk.vx);
+          const moveAngle = Math.atan2(rk.vy, rk.vx);
+          const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : moveAngle;
+          let diff = moveAngle - currentAngle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          targetAngle = currentAngle + diff * 0.18;
         } else {
           targetAngle = rk.angle || 0;
         }

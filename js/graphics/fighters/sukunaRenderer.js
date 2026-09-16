@@ -9,8 +9,147 @@ import { renderSukunaDomainBackground, renderSukunaDomainForeground } from '../.
 import { drawSukunaBody } from './sukunaSkin.js';
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
 
+let _sukunaShrineImage = null;
+let _sukunaShrineImageLoading = false;
+
+export function _getSukunaShrineImage() {
+  if (_sukunaShrineImage && _sukunaShrineImage.complete && _sukunaShrineImage.naturalWidth > 0) {
+    return _sukunaShrineImage;
+  }
+  if (!_sukunaShrineImageLoading && typeof Image !== 'undefined') {
+    _sukunaShrineImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _sukunaShrineImage = img;
+      _sukunaShrineImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Sukuna shrine image at Assets/model/Sukuna-shrine.png', e);
+      _sukunaShrineImageLoading = false;
+    };
+    img.src = 'Assets/model/Sukuna-shrine.png';
+    _sukunaShrineImage = img;
+  }
+  return _sukunaShrineImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getSukunaShrineImage();
+}
+
 export class SukunaRenderer {
   static draw(ctx, fighter) {
+    const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+    );
+    const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : Boolean(isGojoDomainActive || isSuppressedByGetsuga(fighter) || fighter.isTargetOfAmbush);
+
+    // 0. Draw afterimages during flurry, dodge & melee teleports BEHIND body and aura
+    if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
+
+      // A. Draw subtle Dash Motion Trajectory Line (crimson + white core) cleanly once per recent teleport
+      let lastDrawnFromKey = null;
+      for (let i = 0; i < fighter.afterImages.length; i++) {
+        const img = fighter.afterImages[i];
+        if (!img || img.timer <= 0 || img.fromX === undefined || img.toX === undefined) continue;
+        const key = `${Math.round(img.fromX)}_${Math.round(img.fromY)}_${Math.round(img.toX)}_${Math.round(img.toY)}`;
+        if (key === lastDrawnFromKey) continue;
+        lastDrawnFromKey = key;
+
+        const maxT = img.maxTimer || 18;
+        const progress = Math.max(0, Math.min(1, img.timer / maxT));
+        const lineAlpha = Math.pow(progress, 0.8) * 0.45;
+
+        // Compute end of line stopping just before destination body circle
+        const ldx = img.toX - img.fromX;
+        const ldy = img.toY - img.fromY;
+        const ldist = Math.hypot(ldx, ldy);
+        const cutoff = (fighter.r || 25) * 0.9;
+        const endX = ldist > cutoff ? (img.toX - (ldx / ldist) * cutoff) : img.fromX;
+        const endY = ldist > cutoff ? (img.toY - (ldy / ldist) * cutoff) : img.fromY;
+
+        ctx.save();
+        ctx.globalAlpha = lineAlpha;
+        ctx.strokeStyle = '#FF2400';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(img.fromX, img.fromY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(img.fromX, img.fromY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // B. Draw individual ghost afterimage silhouettes along the trail
+      for (let i = 0; i < fighter.afterImages.length; i++) {
+        if (skipAlternate && i % 2 === 0) continue;
+        const img = fighter.afterImages[i];
+        if (img && img.timer > 0) {
+          const maxT = img.maxTimer || 18;
+          const progress = Math.max(0, Math.min(1, img.timer / maxT));
+          const alpha = Math.pow(progress, 0.75) * 0.38; // Clean, visible, non-opaque ghost fade
+          const imgR = img.r || fighter.r || 25;
+
+          ctx.save();
+          ctx.translate(img.x, img.y);
+          const angle = img.angle || 0;
+          ctx.rotate(angle);
+
+          // Facing flip
+          if (Math.abs(angle) > Math.PI / 2) {
+            ctx.scale(1, -1);
+          }
+
+          // 1. Malevolent Crimson Cursed Energy Outer Glow Bloom
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(0, 0, imgR * 1.35, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(139, 0, 0, ${(alpha * 0.25).toFixed(3)})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, imgR * 1.10, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 36, 0, ${(alpha * 0.35).toFixed(3)})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, imgR * 0.75, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 120, 100, ${(alpha * 0.45).toFixed(3)})`;
+          ctx.fill();
+          ctx.restore();
+
+          // 2. Crisp Ghost Body Circle Silhouette
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(0, 0, imgR, 0, Math.PI * 2);
+          ctx.fillStyle = '#660000'; // Deep crimson body fill
+          ctx.fill();
+
+          ctx.strokeStyle = '#FF4444'; // Clean crimson outline
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+
+          // 3. Subtle Cursed Eyes Glint Accents
+          ctx.fillStyle = '#FFD700'; // Gold cursed eyes glint
+          ctx.beginPath();
+          ctx.arc(imgR * 0.45, -imgR * 0.2, 1.8, 0, Math.PI * 2);
+          ctx.arc(imgR * 0.45, imgR * 0.2, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.restore();
+        }
+      }
+    }
+
     // Render Cursed Energy Aura BEHIND body and weapon constructs
     // Also show during countdown for dramatic effect
     const isParalyzed = (fighter.timeStopTimer > 0) || (fighter.electricStunTimer > 0) || (fighter.crimsonElectrifiedTimer > 0);
@@ -34,60 +173,9 @@ export class SukunaRenderer {
     // 2. Draw Front Hand ON TOP of body
     fighter._drawHandCursedEnergy(ctx, 'front');
 
-    const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-      f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
-    );
-    const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : Boolean(isGojoDomainActive || isSuppressedByGetsuga(fighter) || fighter.isTargetOfAmbush);
-
     // Draw Sakuga Anime Impact Frame (red/black ink impact)
     if (fighter.sakugaImpactTimer > 0 && !isSuppressed) {
       fighter._drawSakugaImpactFrame(ctx);
-    }
-
-    // Draw afterimages during flurry, dodge & melee teleports
-    if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
-      const skipAlternate = (typeof state !== 'undefined' && state.performanceMode);
-      for (let i = 0; i < fighter.afterImages.length; i++) {
-        if (skipAlternate && i % 2 === 0) continue;
-        const img = fighter.afterImages[i];
-        if (img && img.timer > 0) {
-          const maxT = img.maxTimer || 20;
-          const progress = Math.max(0, Math.min(1, img.timer / maxT));
-          const alpha = Math.pow(progress, 0.7) * 0.2;
-
-          ctx.save();
-
-          // 1. Dash Trajectory Line (Faint White Motion Line)
-          if (img.fromX !== undefined && img.toX !== undefined) {
-            ctx.save();
-            ctx.globalAlpha = alpha * 0.45;
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(img.fromX, img.fromY);
-            ctx.lineTo(img.toX, img.toY);
-            ctx.stroke();
-            ctx.restore();
-          }
-
-          ctx.translate(img.x, img.y);
-          ctx.rotate(img.angle || 0);
-
-          // 2. Flat Transparent Color Silhouette (Soft Red/Crimson)
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(0, 0, fighter.r * 1.05, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 30, 0, ${alpha * 0.55})`;
-          ctx.fill();
-
-          ctx.strokeStyle = `rgba(255, 220, 220, ${alpha * 0.85})`;
-          ctx.lineWidth = 2.0;
-          ctx.stroke();
-          ctx.restore();
-
-          ctx.restore();
-        }
-      }
     }
 
 
@@ -813,46 +901,46 @@ export class SukunaRenderer {
     ctx.restore();
   }
 
-  // Helper method to render the Malevolent Shrine structure (Standard Vector in Light Mode, Saitama Pixel Art in Dark Mode)
+  // Helper method to render the Malevolent Shrine structure (Using authentic pixel-art model from Assets/model/Sukuna-shrine.png)
   static _drawShrineBody(ctx, fighter) {
-    const isDark = Boolean(
-      typeof state !== 'undefined' && (
-        state.arenaTheme === 'dark' ||
-        state.darkMode ||
-        (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
-      )
-    );
+    const drawW = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineWidth) || 380;
+    const glowRadius = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineGlowRadius) || 210;
 
-    if (isDark) {
-      if (!fighter._shrinePixelCacheCanvas) {
-        if (!fighter._shrineCacheCanvas) {
-          fighter._shrineCacheCanvas = document.createElement('canvas');
-          fighter._shrineCacheCanvas.width = 360;
-          fighter._shrineCacheCanvas.height = 420;
-          const offCtx = fighter._shrineCacheCanvas.getContext('2d');
-          offCtx.translate(180, 230);
-          fighter._renderFullShrineToContext ? fighter._renderFullShrineToContext(offCtx) : SukunaRenderer._renderFullShrineToContext(offCtx, fighter);
-        }
+    // 1. Ambient crimson glow behind shrine
+    ctx.save();
+    const bgGlow = ctx.createRadialGradient(0, -65, 18, 0, -65, glowRadius);
+    bgGlow.addColorStop(0, 'rgba(255, 30, 0, 0.55)');
+    bgGlow.addColorStop(0.4, 'rgba(160, 0, 0, 0.30)');
+    bgGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = bgGlow;
+    ctx.beginPath();
+    ctx.arc(0, -65, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-        fighter._shrinePixelCacheCanvas = SukunaRenderer._createSaitamaPixelShrineCanvas(fighter._shrineCacheCanvas);
-      }
-
+    const shrineImg = _getSukunaShrineImage();
+    if (shrineImg && shrineImg.complete && shrineImg.naturalWidth > 0) {
       ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(fighter._shrinePixelCacheCanvas, -180, -230);
+      ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity
+      const drawH = drawW * (shrineImg.naturalHeight / shrineImg.naturalWidth); // ~253.3px
+      const drawX = -drawW / 2;
+      const drawY = -195; // Positioned proportionally with crown at -195 and skull base at +58
+      ctx.drawImage(shrineImg, drawX, drawY, drawW, drawH);
       ctx.restore();
-    } else {
-      if (!fighter._shrineCacheCanvas) {
-        fighter._shrineCacheCanvas = document.createElement('canvas');
-        fighter._shrineCacheCanvas.width = 360;
-        fighter._shrineCacheCanvas.height = 420;
-        const offCtx = fighter._shrineCacheCanvas.getContext('2d');
-        offCtx.translate(180, 230);
-        fighter._renderFullShrineToContext ? fighter._renderFullShrineToContext(offCtx) : SukunaRenderer._renderFullShrineToContext(offCtx, fighter);
-      }
-
-      ctx.drawImage(fighter._shrineCacheCanvas, -180, -230);
+      return;
     }
+
+    // Procedural Fallback if image asset is not yet ready
+    if (!fighter._shrineCacheCanvas) {
+      fighter._shrineCacheCanvas = document.createElement('canvas');
+      fighter._shrineCacheCanvas.width = 360;
+      fighter._shrineCacheCanvas.height = 420;
+      const offCtx = fighter._shrineCacheCanvas.getContext('2d');
+      offCtx.translate(180, 230);
+      fighter._renderFullShrineToContext ? fighter._renderFullShrineToContext(offCtx) : SukunaRenderer._renderFullShrineToContext(offCtx, fighter);
+    }
+
+    ctx.drawImage(fighter._shrineCacheCanvas, -180, -230);
   }
 
   // Exact Saitama-style Discrete Pixel Art Generator for Malevolent Shrine (Rule 19 / Saitama Tech)

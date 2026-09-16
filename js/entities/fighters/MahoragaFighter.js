@@ -137,11 +137,14 @@ export class MahoragaFighter extends Fighter {
     this.adapted = { melee: false, ranged: false, skill: false };
     
     // Gojo-Specific Adaptation Reset
-    this.gojoAdapted = { purple: false, red: false, blue: false };
+    this.gojoAdapted = { purple: false, red: false, blue: false, domain: false };
     this._lastGojoHitType = null;
     this.gojoBlueDragImmune = false;
     this.gojoPurpleDodgeReady = false;
     this.gojoRedDodgeReady = false;
+    this.gojoDomainAdapted = false;
+    this.domainExposureCount = 0;
+    this.pendingDomainAdaptation = null;
     this.totalAccumDamage = 0;
     this.accumTimer = 0;
     this.fatalAdaptCooldown = 0;
@@ -328,15 +331,22 @@ export class MahoragaFighter extends Fighter {
       this._inMahoragaTakeDamage = false;
     }
 
+    const isInsideGojoDomain = !this.gojoDomainAdapted && !this.gojoAdapted?.domain && typeof state !== 'undefined' && (
+      state.activeDomain === 'unlimited_void' || 
+      state.domainActive === 'unlimited_void' || 
+      (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
+    );
+
     // CRITICAL: If adaptation is triggered by this hit (fatal hit or accumulated damage threshold reached),
     // cap finalDmg so it does not drop Mahoraga's HP to 0 or trigger onDeath() / roundEnd before he adapts & heals!
-    if (pendingAdaptation) {
+    // EXCEPTION: Inside Gojo's Domain, adaptation and RCT healing are frozen/held, so Mahoraga can take fatal damage and die.
+    if (pendingAdaptation && !isInsideGojoDomain) {
       finalDmg = Math.min(finalDmg, Math.max(0, this.hp - 1));
     }
 
     const result = super.takeDamage(finalDmg, attacker, opts);
 
-    if (pendingAdaptation) {
+    if (pendingAdaptation && !isInsideGojoDomain) {
       if (this.hp <= 0) {
         this.dead = false;
         this.isDead = false;
@@ -376,8 +386,7 @@ export class MahoragaFighter extends Fighter {
   }
 
   isEffectivelyAlive() {
-    if (this.hp > 0 && !this.isDead) return true;
-    if (this._inMahoragaTakeDamage || this.adaptationPauseTimer > 0 || this.wheelClickTimer > 0) return true;
+    if (this.hp <= 0 || this.isDead || this.dead) return false;
     return super.isEffectivelyAlive();
   }
 
@@ -545,15 +554,109 @@ export class MahoragaFighter extends Fighter {
   }
 
   /**
+   * Returns true if Mahoraga is currently being pulled, dragged, trapped in a beam/vortex,
+   * or pinned to a wall by any attack with a pulling or dragging effect.
+   */
+  isPulledOrDragged() {
+    // 1. Direct flags & status timers
+    if (this.isDraggedByGetsuga) return true;
+    if (this.caughtInGenosFlurry) return true;
+    if ((this.caughtInGenosBeamTimer || 0) > 0) return true;
+    if ((this.caughtInLaserBeamTimer || 0) > 0) return true;
+    if ((this.caughtInLaylaBeamTimer || 0) > 0) return true;
+    if (this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || ((this.pureLoveBeamRecoveryTimer || 0) > 0)) return true;
+    if (this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0)) return true;
+    if (this.isWallPinnedBySaitama || this._knockedBackBySaitamaBasicPunch || this.caughtInSaitamaFlurry) return true;
+    if (this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0) || this._knockedBackByEscanorBasicAttack) return true;
+    if (this.preventKnockbackBounce) return true;
+    if (this._frozenByCronosSphere) return true;
+    if (this.isCaughtInPurple || this.isPulledByPurple || this.isCaughtInPurpleVortex || this.isCaughtInHollowPurple) return true;
+    if (!this.gojoBlueDragImmune && (this.isCaughtInBlue || this.isPulledByBlue || this.isCaughtInBluePull || this.isCaughtInLapseBlue)) return true;
+    if (this.isCaughtInBlackHole || this.capturedByBlackHole || this._insideBlackHole) return true;
+    if (this.isHookedByRuby || this.caughtInRubyHook || this.isPulledByHook) return true;
+    if (this.isPinPulledByReze || ((this.rezePinPullTimer || 0) > 0)) return true;
+    if (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) return true;
+
+    // 2. Spatial proximity to active pulling projectiles
+    if (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) {
+      for (let i = 0; i < projectileSystem.projectiles.length; i++) {
+        const p = projectileSystem.projectiles[i];
+        if (!p || (p.life || 0) <= 0) continue;
+
+        // Gojo Hollow Purple suction / gravitational vortex
+        if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') {
+          const purplePullRadius = CONFIG.gojo?.purplePullRadius || 280;
+          const distSq = (this.x - p.x) ** 2 + (this.y - p.y) ** 2;
+          if (distSq <= (purplePullRadius + this.r) ** 2) {
+            return true;
+          }
+        }
+
+        // Gojo Lapse Blue gravitational pull
+        if (p.isGojoBlue || p.behaviorType === 'gojo_blue' || p.skillShotId === 'blue') {
+          if (this.gojoBlueDragImmune) continue;
+          const bluePullRadius = p.pullRadius || CONFIG.gojo?.blueRadius || 100;
+          const distSq = (this.x - p.x) ** 2 + (this.y - p.y) ** 2;
+          if (distSq <= (bluePullRadius + this.r) ** 2) {
+            return true;
+          }
+        }
+
+        // Black Hole suction vortex
+        if (p.isBlackHole || p.behaviorType === 'black_hole') {
+          const bhRadius = Math.max((p.r || 50) * 2.5, (p.r || 50) + this.r + 20);
+          const distSq = (this.x - p.x) ** 2 + (this.y - p.y) ** 2;
+          if (distSq <= bhRadius ** 2) {
+            return true;
+          }
+        }
+      }
+    }
+
+    // 3. Active fighter pull / hook / pin skills
+    if (typeof state !== 'undefined' && state.fighters) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0 || f.dead) continue;
+
+        // Ruby / Rubbick active scythe hook pull
+        if (f.activePullActive && ((f.pullTargets && f.pullTargets.includes(this)) || f.primaryHookTarget === this)) {
+          return true;
+        }
+
+        // Reze active pin pull
+        if (f.pinPullTarget === this && (f.pinPullTimer || 0) > 0) {
+          return true;
+        }
+
+        // Cronos / Rubbick time-stop sphere
+        if (f.sphereActive && (f.sphereTimer || 0) > 0) {
+          const sphereR = CONFIG.cronos?.sphereRadius || 180;
+          const distSq = (this.x - f.sphereX) ** 2 + (this.y - f.sphereY) ** 2;
+          if (distSq <= (sphereR + this.r) ** 2) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Resolves arena boundary collisions.
    * When Mahoraga collides with any arena wall, he triggers a divine flash-dash / teleport
-   * directly towards the enemy with high-speed afterimages and forward momentum.
+   * directly towards the enemy with high-speed afterimages and forward momentum,
+   * UNLESS he is being pulled, dragged, or pinned by any pulling attack.
    */
   resolveWallBounce(arena, opponent = null) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
     if (!arena) return false;
-    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
+    const isBeamTrapped = this.isPulledOrDragged();
     if (isBeamTrapped) {
       this.wallBounceCount = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
       let clamped = false;
       if (this.x - this.r < arena.x) {
         this.x = arena.x + this.r;
@@ -608,7 +711,7 @@ export class MahoragaFighter extends Fighter {
       bounced = true;
     }
 
-    if (bounced && !this.isDraggedByGetsuga) {
+    if (bounced && !this.isPulledOrDragged()) {
       const now = performance.now();
       const canReboundDash = !this._lastWallReboundTime || (now - this._lastWallReboundTime > 180);
 
@@ -617,9 +720,8 @@ export class MahoragaFighter extends Fighter {
         this.wallBounceCount = 0;
 
         const target = this._findClosestEnemy(opponent || this._bounceTarget);
-        const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !this.gojoInfinityImmune && !target.isChainedByMakima;
 
-        if (target && !target.isDead && target.hp > 0 && !isTargetGojoInfinity) {
+        if (target && !target.isDead && target.hp > 0) {
           const dx = target.x - this.x;
           const dy = target.y - this.y;
           const dist = Math.hypot(dx, dy) || 1;
@@ -659,7 +761,7 @@ export class MahoragaFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
-    if (!this.canPerformBasicAttack() || this.isDraggedByGetsuga) return false;
+    if (!this.canPerformBasicAttack() || this.isPulledOrDragged()) return false;
     const opponent = (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
     if (opponent && !opponent.isDead) {
       this.aim(opponent);
@@ -686,7 +788,7 @@ export class MahoragaFighter extends Fighter {
     if (!opponent || opponent.isDead || opponent.hp <= 0) return;
     if (this.isTeammate(opponent)) return;
     if (!this.canPerformBasicAttack()) return;
-    if (this.isWallSlamActive || this.isThrowing || this.isTargetOfAmbush || this.isBlitzActive || this.isInfinityBlitz || this.isDraggedByGetsuga) return;
+    if (this.isWallSlamActive || this.isThrowing || this.isTargetOfAmbush || this.isBlitzActive || this.isInfinityBlitz || this.isPulledOrDragged()) return;
 
     this.aim(opponent);
     if ((this.swordCooldown || 0) <= 0) {
@@ -720,6 +822,7 @@ export class MahoragaFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
     if (this.swordCooldown > 0) this.swordCooldown--;
+    if (this.shootCooldown > 0) this.shootCooldown--;
 
     // Wheel Rotation Tick (runs even if frozen by domains for lore accuracy!)
     if (this.wheelClickTimer > 0) {
@@ -740,20 +843,22 @@ export class MahoragaFighter extends Fighter {
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
     );
 
-    if (isInsideGojoDomain) {
-      this.domainExposureCount = (this.domainExposureCount || 0) + 1;
-    } else if (this.pendingDomainAdaptation || (this.domainExposureCount && this.domainExposureCount > 0 && !this.gojoDomainAdapted)) {
-      // Gojo's domain has ended! Release held adaptation & adapt to Unlimited Void
-      const queued = this.pendingDomainAdaptation;
-      this.pendingDomainAdaptation = null;
-      this.domainExposureCount = 0;
-      this.gojoDomainAdapted = true;
-      if (!this.gojoAdapted) this.gojoAdapted = {};
-      this.gojoAdapted.domain = true;
-      this._lastGojoHitType = 'domain';
+    if (this.hp > 0 && !this.dead && !this.isDead) {
+      if (isInsideGojoDomain) {
+        this.domainExposureCount = (this.domainExposureCount || 0) + 1;
+      } else if (this.pendingDomainAdaptation || (this.domainExposureCount && this.domainExposureCount > 0 && !this.gojoDomainAdapted)) {
+        // Gojo's domain has ended! Release held adaptation & adapt to Unlimited Void
+        const queued = this.pendingDomainAdaptation;
+        this.pendingDomainAdaptation = null;
+        this.domainExposureCount = 0;
+        this.gojoDomainAdapted = true;
+        if (!this.gojoAdapted) this.gojoAdapted = {};
+        this.gojoAdapted.domain = true;
+        this._lastGojoHitType = 'domain';
 
-      const gojoAttacker = queued?.attacker || (state.fighters ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo')) : null);
-      this._triggerAdaptation('skill', gojoAttacker);
+        const gojoAttacker = queued?.attacker || (state.fighters ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo')) : null);
+        this._triggerAdaptation('skill', gojoAttacker);
+      }
     }
 
     // ── WHEEL OF ADAPTATION (WOA) TIMERS TICKING (Unstoppable celestial passive progress under all CC/paralyze) ──
@@ -772,7 +877,8 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
-    const isFrozen = this._handleTimeStop();
+    const isInfinityFrozen = handleInfinityFreeze(this);
+    const isFrozen = this._handleTimeStop() || isInfinityFrozen;
 
     // Rule #1 Early Exit Guard: Freeze / Unadapted Gojo Domain completely freezes Mahoraga!
     if (isInsideGojoDomain || isFrozen) {
@@ -794,9 +900,9 @@ export class MahoragaFighter extends Fighter {
       return; // MANDATORY: Complete paralyzing freeze so fighter is frozen and DOES NOT SLIDE during domain/time-stop/infinity!
     }
 
-    // ── MID-ACTION INTERRUPT FROM GETSUGA TENSHO DRAG, HOLLOW PURPLE, PURE LOVE BEAM, OR GENOS ULTIMATE ──
-    const isDraggedByGetsuga = Boolean(this.isDraggedByGetsuga);
-    if (isDraggedByGetsuga) {
+    // ── MID-ACTION INTERRUPT FROM GETSUGA TENSHO DRAG, HOLLOW PURPLE, LAPSE BLUE, BLACK HOLE, BEAMS, OR WALL PINS ──
+    const isDragged = this.isPulledOrDragged();
+    if (isDragged) {
       this.interruptAttacks();
       this.neutralStanceTimer = 0;
       this.adaptationDashTimer = 0;
@@ -1000,7 +1106,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // ── HIGH-SPEED DIVINE FLASH-DASH TICK ──
-    if (this.adaptationDashTimer > 0 && !isCaughtInUltimateBeam && !this.isDraggedByGetsuga) {
+    if (this.adaptationDashTimer > 0 && !isCaughtInUltimateBeam && !this.isPulledOrDragged()) {
       this.adaptationDashTimer--;
       const maxDash = this.adaptationDashMaxTimer || (CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10);
       const progress = Math.min(1.0, Math.max(0.0, 1.0 - (this.adaptationDashTimer / maxDash)));
@@ -1276,7 +1382,7 @@ export class MahoragaFighter extends Fighter {
 
     // ── HAND-TO-HAND BLITZ SEQUENCE ──
     if (this.isBlitzActive) {
-      if (this.isDraggedByGetsuga) {
+      if (this.isDraggedByGetsuga || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged())) {
         this.isBlitzActive = false;
         this.isInfinityBlitz = false;
         this.isWallSlamBlitz = false;
@@ -1565,7 +1671,7 @@ export class MahoragaFighter extends Fighter {
       const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
       const frontTargetsForAttack = this._getFrontRadiusTargets(swordRange, swordArc);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
-      const canActSkills = !isInHitReaction && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isDraggedByGetsuga;
+      const canActSkills = !isInHitReaction && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isPulledOrDragged();
 
       if (canActSkills) {
         const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;
@@ -1605,6 +1711,11 @@ export class MahoragaFighter extends Fighter {
         // Priority 4: Active Close-Quarters Attack-Teleport Stance
         else if (this.neutralStanceTimer > 0 && this.swordCooldown <= 0 && isAnyTargetInRange) {
           this._performMeleeAttack(target);
+        }
+        // Priority 5: Basic Ranged Attack (Debris Throw / Blade Barrage when at range)
+        else if (this.shootCooldown <= 0 && !isAnyTargetInRange && target && !target.isDead && !target.isSubmerged && !target.isErupting) {
+          this.shoot(ownerIndex);
+          this.shootCooldown = this.shootCooldownMax || 60;
         }
       }
     } else {
@@ -1798,6 +1909,12 @@ export class MahoragaFighter extends Fighter {
   }
 
   onDeath() {
+    this.wheelClickTimer = 0;
+    this.adaptationPauseTimer = 0;
+    this.pendingDomainAdaptation = null;
+    this.domainExposureCount = 0;
+    this.totalAccumDamage = 0;
+    this.fatalAdaptCooldown = 0;
     spawnDroppedMahoragaWheel(this);
     super.onDeath();
   }

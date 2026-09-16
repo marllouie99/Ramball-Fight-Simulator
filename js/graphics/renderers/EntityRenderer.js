@@ -507,7 +507,8 @@ export function drawFighters() {
 
   fighters.forEach((fighter) => {
     if (!fighter || fighter.hp <= 0 || typeof fighter._drawAttackSlashEffects !== 'function') return;
-    if (isGojoDomainActive && fighter.characterId !== 'gojo') return; // Hide enemy slash effects in Gojo's domain
+    const isImmune = fighter.domainImmunity || fighter.isDomainImmune || fighter.gojoDomainAdapted || (fighter.gojoAdapted && fighter.gojoAdapted.domain) || fighter.characterId === 'toji' || fighter.type === 'toji';
+    if (isGojoDomainActive && fighter.characterId !== 'gojo' && !isImmune) return; // Hide enemy slash effects in Gojo's domain
     try {
       fighter._drawAttackSlashEffects(ctx);
     } catch (e) {
@@ -518,7 +519,8 @@ export function drawFighters() {
   // Draw beam overlays (LaserFighter / Rubbick laser beams) on top of fighters
   fighters.forEach((fighter) => {
     if (!fighter || fighter.hp <= 0 || typeof fighter.drawBeamOverlay !== 'function') return;
-    if (isGojoDomainActive && fighter.characterId !== 'gojo') return; // Hide enemy beam overlays in Gojo's domain
+    const isImmune = fighter.domainImmunity || fighter.isDomainImmune || fighter.gojoDomainAdapted || (fighter.gojoAdapted && fighter.gojoAdapted.domain) || fighter.characterId === 'toji' || fighter.type === 'toji';
+    if (isGojoDomainActive && fighter.characterId !== 'gojo' && !isImmune) return; // Hide enemy beam overlays in Gojo's domain
     try {
       fighter.drawBeamOverlay(ctx);
     } catch (e) {

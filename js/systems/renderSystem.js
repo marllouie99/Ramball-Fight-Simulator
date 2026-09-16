@@ -3,14 +3,14 @@ import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
-  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawFaceOffThumbnailScreen, drawHUD, 
+  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawSkinStudioScreen, drawFaceOffThumbnailScreen, drawHUD, 
   drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay, drawKillFeed
 } from '../graphics/ui.js';
 import {
   drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
-  drawSparkEffects, drawPurpleDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
+  drawSparkEffects, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
@@ -56,7 +56,7 @@ export function renderGame() {
 
     // Toggle WebGL layers visibility based on game state to prevent leftover battle visuals
     // and dim effects from glitching behind/above panels on menu/select/index screens.
-    const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail', 'weaponStudio', 'faceoff'].includes(state.gameState);
+    const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail', 'weaponStudio', 'skinStudio', 'faceoff'].includes(state.gameState);
     if (state.pixiLayers) {
       if (state.pixiLayers.background) state.pixiLayers.background.visible = isBattleState;
       if (state.pixiLayers.arena) state.pixiLayers.arena.visible = isBattleState;
@@ -169,6 +169,8 @@ export function renderGame() {
       drawWeaponDetailScreen();
     } else if (state.gameState === 'weaponStudio') {
       drawWeaponStudioScreen();
+    } else if (state.gameState === 'skinStudio') {
+      drawSkinStudioScreen();
     } else if (state.gameState === 'faceoff') {
       // Hide gameplay WebGL layers and DOM HUD elements so they never linger on the showoff screen
       if (state.floatingTextSprite) state.floatingTextSprite.visible = false;
@@ -323,6 +325,7 @@ export function renderGame() {
           drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
           updateHybridEnvironment(); // WebGL & 2D full-screen dim effects (Gojo Purple, Sukuna Fuga, Mahoraga adaptation)
           drawPurpleDimScreen(); // 2D Gojo Hollow Purple radial dim overlay
+          drawRedDimScreen(); // 2D Gojo Reversal Red deep crimson radial dim overlay
           drawFurnaceDimScreen(); // 2D Sukuna Fuga Furnace radial dim overlay
           drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
           drawCjBaguvixDimScreen(); // 2D CJ BAGUVIX God Mode dark Grove Street emerald green radial dim overlay

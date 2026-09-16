@@ -4,7 +4,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks, spawnParrySparksEffect } from '../../../graphics/particles/sparkEffect.js';
 import { applyDamageToTarget } from '../../fighter.js';
-import { applyHollowLifesteal, activateHollowMask, isHollowTransformationVoicelinePlaying, stopHollowTransformationVoiceline } from './ichigoHollow.js';
+import { activateHollowMask, isHollowTransformationVoicelinePlaying, stopHollowTransformationVoiceline } from './ichigoHollow.js';
 import { stopBankaiVoiceline } from './ichigoBankai.js';
 import { fireGetsuga, isAboutToUnleashNormalGetsuga, isGetsugaActive, isGetsugaVoicelinePlaying, isFinalGetsugaVoicelinePlaying, stopFinalGetsugaVoiceline, getCardinalAimAngle, snapToCardinalAngle } from './ichigoGetsuga.js';
 
@@ -308,7 +308,6 @@ export function performMeleeCleave(fighter, target) {
 
         // Deal damage and knockback
         applyDamageToTarget(enemy, finalDamage, fighter, { isMelee: true });
-        applyHollowLifesteal(fighter, finalDamage, enemy);
         
         const kbForce = CONFIG.ichigo?.knockback || 6;
         enemy.applyKnockback(Math.cos(angleToEnemy) * kbForce, Math.sin(angleToEnemy) * kbForce);
@@ -625,7 +624,6 @@ export function updateShunpoCombat(fighter, opponent) {
           }
 
           applyDamageToTarget(target, baseSlashDmg * damageMult, fighter, { isSkill: true });
-          applyHollowLifesteal(fighter, baseSlashDmg * damageMult, target);
           spawnImpactFlash(target.x, target.y, (isBankai || isMask) ? 'sukuna' : 'gojo');
           fighter._playSound('shunpoStrikeHit', 'Assets/Sound Effects/Attacks/fleshhit.mp3', 0.75);
           if (typeof triggerGlobalScreenShake === 'function') {
@@ -649,7 +647,6 @@ export function updateShunpoCombat(fighter, opponent) {
           const strike2Mult = CONFIG.ichigo?.shunpoStrike2Multiplier || 1.35;
           const finisherDmg = baseSlashDmg * strike2Mult * damageMult;
           applyDamageToTarget(target, finisherDmg, fighter, { isSkill: true });
-          applyHollowLifesteal(fighter, finisherDmg, target);
           const finStun = isBankai ? (CONFIG.ichigo?.bankaiShunpoStunDuration || 8) : (CONFIG.ichigo?.shunpoStrike2StunDuration || 8);
           target.applyHitStun(finStun);
 

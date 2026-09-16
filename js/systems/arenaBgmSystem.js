@@ -4,6 +4,7 @@
 
 import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
+import { GAME_MODES } from '../core/modeConfig.js';
 import { playLoopingSound, stopLoopingSound, setLoopingSoundVolume } from './soundSystem.js';
 import { _registerButton, drawChamferedRect, drawPanel, drawButton, fitSingleLineText } from '../graphics/ui/uiFramework.js';
 
@@ -590,10 +591,19 @@ export function stopArenaBgm(instant = true) {
 export function updateArenaBgm() {
   if (typeof state === 'undefined') return;
 
-  if (state.gameState === 'matchEnd' || state.gameState === 'roundEnd') {
+  if (state.gameState === 'matchEnd') {
     if (_isArenaBgmPlaying) {
       stopArenaBgm(true);
       return;
+    }
+  } else if (state.gameState === 'roundEnd') {
+    const is1v1Mode = (state.mode === '1v1' || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.ONE_VS_ONE);
+    const maxWins = (state.scores && state.scores.length) ? Math.max(...state.scores) : 0;
+    if (!is1v1Mode || maxWins >= 2) {
+      if (_isArenaBgmPlaying) {
+        stopArenaBgm(true);
+        return;
+      }
     }
   }
 

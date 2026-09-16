@@ -519,10 +519,23 @@ export class Fighter {
     if (this.crimsonElectrifiedTimer && this.crimsonElectrifiedTimer > 0) return true;
     if (this.dubstepStunTimer && this.dubstepStunTimer > 0) return true;
     if (this.freezeTimer && this.freezeTimer > 0) return true;
-    if (this.stunTimer && this.stunTimer > 0) return true;
-    if (this.knockbackStunTimer && this.knockbackStunTimer > 0) return true;
-    if (this.basicAttackHitPauseTimer && this.basicAttackHitPauseTimer > 0) return true;
-    if (this.hitStunTimer && this.hitStunTimer > 0) return true;
+    
+    // Unstoppable hyper-armored channeling abilities (e.g. Gojo Red/Purple/Domain) are exempt from minor hit flinches
+    const isHyperArmoredChannel = Boolean(
+      this.redBuildupPhase ||
+      (this.redEffectTimer && this.redEffectTimer > 0) ||
+      this.isChannelingPurple ||
+      this.isChannelingDomainExpansion
+    );
+
+    if (!isHyperArmoredChannel) {
+      if (this.stunTimer && this.stunTimer > 0) return true;
+      if (this.knockbackStunTimer && this.knockbackStunTimer > 0) return true;
+      if (this.basicAttackHitPauseTimer && this.basicAttackHitPauseTimer > 0) return true;
+      if (this.hitStunTimer && this.hitStunTimer > 0) return true;
+      if (this.statusEffects && this.statusEffects.hitStunTimer > 0) return true;
+    }
+
     if (this.isParalyzed || this.isFrozen || this.isFrozenByInfinity || this.isParalyzedByMahito || this.isParalyzedByMahoraga) return true;
     if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || (this.makimaWallPinTimer && this.makimaWallPinTimer > 0) || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || (this.escanorWallPinTimer && this.escanorWallPinTimer > 0)) return true;
     if (this.isGrabbedByMahoraga) return true;
@@ -530,14 +543,14 @@ export class Fighter {
     if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
     if (this.isRevivingFromContract || this.isShatterReviving || (this.reviveStasisTimer && this.reviveStasisTimer > 0)) return true;
     if (this.isCaughtInBlackHole || this._insideBlackHole || (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam())) return true;
-    if (this.statusEffects && (this.statusEffects.timeStopTimer > 0 || this.statusEffects.paralyzeTimer > 0 || this.statusEffects.isParalyzed || (this.statusEffects.hitStunTimer && this.statusEffects.hitStunTimer > 0))) return true;
+    if (this.statusEffects && (this.statusEffects.timeStopTimer > 0 || this.statusEffects.paralyzeTimer > 0 || this.statusEffects.isParalyzed)) return true;
 
     // Trapped in cognitive stasis of enemy domain (e.g. Gojo's Unlimited Void)
     if (typeof state !== 'undefined' && state.fighters) {
       const isInsideGojoDomain = state.fighters.some(f => 
         f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
       );
-      const isImmune = this.domainImmunity || this.isDomainImmune || this.isParalyzeImmune || this.characterId === 'toji' || this.type === 'toji';
+      const isImmune = this.domainImmunity || this.isDomainImmune || this.isParalyzeImmune || this.gojoDomainAdapted || (this.gojoAdapted && this.gojoAdapted.domain) || this.characterId === 'toji' || this.type === 'toji';
       if (isInsideGojoDomain && !isImmune) return true;
     }
 
@@ -808,7 +821,33 @@ export class Fighter {
       (this.domainChargeTimer && this.domainChargeTimer > 0) ||
       (this.domainChannelTimer && this.domainChannelTimer > 0) ||
       this.isChannelingRCT ||
-      (this.rctChannelTimer && this.rctChannelTimer > 0)
+      (this.rctChannelTimer && this.rctChannelTimer > 0) ||
+      this.isChannelingDivineFlame ||
+      (this.divineFlameChargeTimer && this.divineFlameChargeTimer > 0) ||
+      this.isChannelingPureLoveBeam ||
+      (this.pureLoveBeamChargeTimer && this.pureLoveBeamChargeTimer > 0) ||
+      this.isChannelingPurple ||
+      (this.purpleChargeTimer && this.purpleChargeTimer > 0) ||
+      this.redBuildupPhase ||
+      (this.redEffectTimer && this.redEffectTimer > 0) ||
+      this.isChannelingBankai ||
+      this.isChannelingGetsuga ||
+      (this.getsugaChargeTimer && this.getsugaChargeTimer > 0) ||
+      (this.hollowMaskFormationTimer && this.hollowMaskFormationTimer > 0) ||
+      this.isTakadaChanneling ||
+      (this.takadaChannelTimer && this.takadaChannelTimer > 0) ||
+      this.isChannelingThinIceBreaker ||
+      (this.thinIceBreakerChargeTimer && this.thinIceBreakerChargeTimer > 0) ||
+      this.isChannelingCruelSun ||
+      (this.cruelSunChargeTimer && this.cruelSunChargeTimer > 0) ||
+      (this.seriousPunchChargeTimer && this.seriousPunchChargeTimer > 0) ||
+      (this.basicPunchChargeTimer && this.basicPunchChargeTimer > 0) ||
+      this.isChargingUlt ||
+      this.isFiringUlt ||
+      this.isDrawingBow ||
+      (this.arrowDrawTimer && this.arrowDrawTimer > 0) ||
+      this.isChannelingBlackFlash ||
+      (this.blackFlashChannelTimer && this.blackFlashChannelTimer > 0)
     );
   }
 
@@ -2093,17 +2132,18 @@ export class Fighter {
             : (typeof opts.projectile?.knockbackForce === 'number'
               ? opts.projectile.knockbackForce
               : (attackerConfig.knockbackForce || (opts.isMelee ? 2.5 : (opts.isProjectile ? 1.5 : 1.0))));
-          if (baseKb > 0) {
+          if (baseKb > 0 && !opts.skipKnockback && (!this.isMeleeMode || opts.isKnockback || opts.isHeavy || opts.isExplosion)) {
             const kbVx = Math.cos(kbAngle) * baseKb;
             const kbVy = Math.sin(kbAngle) * baseKb;
-            const stunFrames = opts.isHeavy ? 15 : (opts.isKnockback || opts.isExplosion ? 10 : 0);
+            const stunFrames = opts.isHeavy ? 15 : ((opts.isKnockback || (opts.isExplosion && !opts.skipHitStun)) ? 10 : 0);
             this.applyKnockback(kbVx, kbVy, stunFrames);
           }
         }
       }
 
       // Global blast / knockback / explosion skill interruption & penalty cooldown
-      const isBlastOrKnockback = opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2);
+      const isChanneling = (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) || (typeof this.isStationarySkillActive === 'function' && this.isStationarySkillActive());
+      const isBlastOrKnockback = (opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2)) && !opts.skipInterrupt && !(opts.isPurpleExplosion && isChanneling);
       if (isBlastOrKnockback && !this.isTurret && !this.isDispenser) {
         this.interruptAttacks(true);
       }
@@ -2401,8 +2441,12 @@ export class Fighter {
       const survivor = state.fighters.find(f => f && _isEffectivelyAlive(f));
       const winnerFighter = survivor || ((realAttacker && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
       
+      const isMultiRound1v1 = (state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1');
+
       if (!winnerFighter) {
-        stopArenaBgm(true);
+        if (!isMultiRound1v1) {
+          stopArenaBgm(true);
+        }
         // Both fighters dead at same moment -> DRAW
         state.roundWinner = null;
         state.matchWinner = null;
@@ -2411,7 +2455,7 @@ export class Fighter {
         state.roundEndTimer = 0;
         state.gameState = 'roundEnd';
         stopAllSounds();
-        stopAllLoopingSounds();
+        stopAllLoopingSounds(0, 0, isMultiRound1v1);
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           const bell = getAnnouncerSound('bell');
           if (bell) audioSystem.playSFX(bell.src, bell.volume, bell.speed, bell.offset || 0);
@@ -2423,8 +2467,16 @@ export class Fighter {
         return;
       }
 
-      stopArenaBgm(true);
       const winnerIndex = winnerFighter ? state.fighters.indexOf(winnerFighter) : -1;
+      const modeRounds = MODE_SETTINGS[state.mode]?.rounds || CONFIG.rounds.max;
+      const winThreshold = modeRounds === 1 ? 1 : Math.ceil(CONFIG.rounds.max / 2);
+      const isMatchEnd = winnerIndex >= 0 && (state.scores[winnerIndex] + 1 >= winThreshold);
+
+      if (isMatchEnd) {
+        stopArenaBgm(true);
+      } else if (!isMultiRound1v1) {
+        stopArenaBgm(true);
+      }
 
       if (winnerIndex >= 0) {
         state.scores[winnerIndex]++;
@@ -2432,13 +2484,9 @@ export class Fighter {
       state.roundWinner = winnerFighter;
       state.roundEndTimer = 0;
 
-      const modeRounds = MODE_SETTINGS[state.mode]?.rounds || CONFIG.rounds.max;
-      const winThreshold = modeRounds === 1 ? 1 : Math.ceil(CONFIG.rounds.max / 2);
-      const isMatchEnd = winnerIndex >= 0 && state.scores[winnerIndex] >= winThreshold;
-
       if (!isMatchEnd) {
         stopAllSounds();
-        stopAllLoopingSounds();
+        stopAllLoopingSounds(0, 0, isMultiRound1v1);
       }
 
       if (isMatchEnd && winnerFighter) {
@@ -2508,7 +2556,8 @@ export class Fighter {
     const isGenosTrapped = Boolean(this.caughtInGenosFlurry);
     const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));
     const isEscanorPinned = Boolean(this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0));
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned;
+    const isStationaryHover = ((this.purpleRecoveryTimer || 0) > 0) || this.isChannelingPurple || this.isChannelingDomainExpansion;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned || isStationaryHover;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
@@ -2553,6 +2602,10 @@ export class Fighter {
     }
 
     let bounced = false;
+    let bouncedLeft = false;
+    let bouncedRight = false;
+    let bouncedTop = false;
+    let bouncedBottom = false;
     const restitution = CONFIG.collision?.restitution ?? 0.95;
     const angleJitter = 3.5;  // Increased for more random bounce angles
 
@@ -2561,11 +2614,13 @@ export class Fighter {
       this.vx = Math.abs(this.vx) * restitution;
       this.vy += (Math.random() - 0.5) * angleJitter;
       bounced = true;
+      bouncedLeft = true;
     } else if (this.x + this.r > arena.x + arena.width) {
       this.x = arena.x + arena.width - this.r;
       this.vx = -Math.abs(this.vx) * restitution;
       this.vy += (Math.random() - 0.5) * angleJitter;
       bounced = true;
+      bouncedRight = true;
     }
 
     if (this.y - this.r < arena.y) {
@@ -2573,11 +2628,13 @@ export class Fighter {
       this.vy = Math.abs(this.vy) * restitution;
       this.vx += (Math.random() - 0.5) * angleJitter;
       bounced = true;
+      bouncedTop = true;
     } else if (this.y + this.r > arena.y + arena.height) {
       this.y = arena.y + arena.height - this.r;
       this.vy = -Math.abs(this.vy) * restitution;
       this.vx += (Math.random() - 0.5) * angleJitter;
       bounced = true;
+      bouncedBottom = true;
     }
 
     if (bounced) {
@@ -2595,6 +2652,12 @@ export class Fighter {
       const randomDirectionBoostOrthogonal = (Math.random() - 0.5) * 1.5;
       this.vx += randomDirectionBoost;
       this.vy += randomDirectionBoostOrthogonal;
+
+      // Enforce strictly inward velocity directed away from bounced walls into the arena
+      if (bouncedLeft && this.vx <= 0.2) this.vx = Math.max(1.0, Math.abs(this.vx));
+      if (bouncedRight && this.vx >= -0.2) this.vx = -Math.max(1.0, Math.abs(this.vx));
+      if (bouncedTop && this.vy <= 0.2) this.vy = Math.max(1.0, Math.abs(this.vy));
+      if (bouncedBottom && this.vy >= -0.2) this.vy = -Math.max(1.0, Math.abs(this.vy));
       
       this.normalizeSpeed();
     }
@@ -2720,6 +2783,39 @@ export class Fighter {
     while (normAngle < -Math.PI) normAngle += Math.PI * 2;
     this.gunAngle = normAngle;
     this.angle = normAngle;
+  }
+
+  /**
+   * Smoothly and gradually turns the fighter's aim / facing angle back to the normal resting position (0 radians).
+   * Called when enemies are dead or match/round has ended while the fighter continues moving.
+   * Uses shortest-path angular interpolation to avoid awkward 360-degree wrapping.
+   */
+  turnToNormalPosition(turnRate = 0.035) {
+    let currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    if (Number.isNaN(currentAngle)) currentAngle = 0;
+    while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
+    while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
+
+    const targetAngle = 0;
+    let diff = targetAngle - currentAngle;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+
+    if (Math.abs(diff) <= turnRate) {
+      this.gunAngle = 0;
+      this.angle = 0;
+      if (this.rightGunAngle !== undefined) this.rightGunAngle = 0;
+      if (this.leftGunAngle !== undefined) this.leftGunAngle = 0;
+    } else {
+      const step = Math.sign(diff) * turnRate;
+      let newAngle = currentAngle + step;
+      while (newAngle > Math.PI) newAngle -= Math.PI * 2;
+      while (newAngle < -Math.PI) newAngle += Math.PI * 2;
+      this.gunAngle = newAngle;
+      this.angle = newAngle;
+      if (this.rightGunAngle !== undefined) this.rightGunAngle = newAngle;
+      if (this.leftGunAngle !== undefined) this.leftGunAngle = newAngle;
+    }
   }
 
   /** Collision hook to trigger custom logic. Override in subclasses. */
@@ -2969,10 +3065,15 @@ export class Fighter {
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
     const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
 
+    if (!isGamePlaying || !isTargetAlive) {
+      this.turnToNormalPosition(0.035);
+    }
+
     if (!isGamePlaying) {
       this.shootCooldown = 60;
       this.applyMovementPhysics();
       this.resolveWallBounce(arena, opponent);
+      this._inSuperUpdate = false;
       return;
     }
 

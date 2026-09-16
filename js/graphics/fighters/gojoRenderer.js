@@ -61,7 +61,7 @@ export class GojoRenderer {
       const pulse = 1 + Math.sin(time * 0.008) * 0.08;
       const ringRadius = (fighter.r + 12) * pulse;
       const P = 2.5; // Stepped pixel grid size
-      const maxRecovery = fighter.purpleRecoveryMaxTimer || 120;
+      const maxRecovery = fighter.purpleRecoveryMaxTimer || CONFIG.gojo?.purpleRecoveryDuration || 50;
       const ratio = Math.max(0, Math.min(1, fighter.purpleRecoveryTimer / maxRecovery));
 
       const cx = fighter.x;
@@ -422,7 +422,7 @@ export class GojoRenderer {
       ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0)
     )) || ((fighter.mahoragaAdaptationFreezeTimer || 0) > 0);
 
-    if (fighter.redEffectTimer > 0 && !isMahoAdapting && !isSuppressed) {
+    if (fighter.redEffectTimer > 0 && !isMahoAdapting) {
       fighter._drawReversalRedEffect(ctx);
     }
 
@@ -477,8 +477,9 @@ export class GojoRenderer {
     // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown / Showoff (FaceOff): Hide hands completely
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
     const isFaceOff = fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff');
-    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || isFaceOff || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
-    if (isWinnerScreen || fighter.hideHands) {
+    const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+    const isIndexScreen = typeof state !== 'undefined' && (state.gameState === 'indexDetail' || state.gameState === 'index');
+    if (isPodiumPreview || isCountdown || isFaceOff || isIndexScreen || fighter.hideHands) {
       return null;
     }
 
@@ -654,8 +655,9 @@ export class GojoRenderer {
 
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
     const isFaceOff = fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff');
-    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || isFaceOff || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
-    if (isWinnerScreen || fighter.isTargetOfAmbush) return;
+    const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+    const isIndexScreen = typeof state !== 'undefined' && (state.gameState === 'indexDetail' || state.gameState === 'index');
+    if (isPodiumPreview || isCountdown || isFaceOff || isIndexScreen || fighter.isTargetOfAmbush) return;
 
     const hands = fighter._getHandPositions();
     if (!hands) return;
@@ -1155,34 +1157,6 @@ export class GojoRenderer {
     const fingerDist   = fighter.r + 14;
     const time         = Date.now();
     const maxRange     = (CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650);
-
-    // Smooth screen dimming with deep crimson vignette overlay as Gojo charges Red
-    let screenDimAlpha = 0;
-    if (elapsed <= buildupEnd) {
-      const buildProg = elapsed / buildupEnd; // 0 to 1
-      screenDimAlpha = Math.sin(buildProg * Math.PI * 0.5) * 0.65; // Smooth ramp up to 0.65
-    } else {
-      const blastProg = (elapsed - buildupEnd) / Math.max(1, totalFrames - buildupEnd); // 0 to 1
-      screenDimAlpha = (1 - blastProg) * 0.65; // Smooth fade out after blast
-    }
-
-    if (screenDimAlpha > 0.01) {
-      ctx.save();
-      const canvas = (typeof state !== 'undefined' && state.canvas) ? state.canvas : null;
-      const cw = canvas ? canvas.width : 2000;
-      const ch = canvas ? canvas.height : 2000;
-      const maxR = Math.max(cw, ch) * 1.5;
-
-      const redGrad = ctx.createRadialGradient(fighter.x, fighter.y - (fighter.z || 0), 20, fighter.x, fighter.y - (fighter.z || 0), maxR);
-      redGrad.addColorStop(0, `rgba(140, 0, 25, ${screenDimAlpha * 0.25})`);
-      redGrad.addColorStop(0.3, `rgba(70, 0, 12, ${screenDimAlpha * 0.60})`);
-      redGrad.addColorStop(0.65, `rgba(25, 0, 5, ${screenDimAlpha * 0.85})`);
-      redGrad.addColorStop(1, `rgba(0, 0, 0, ${screenDimAlpha * 0.95})`);
-
-      ctx.fillStyle = redGrad;
-      ctx.fillRect(-600, -600, cw + 1200, ch + 1200);
-      ctx.restore();
-    }
 
     ctx.save();
     ctx.translate(fighter.x, fighter.y - (fighter.z || 0));

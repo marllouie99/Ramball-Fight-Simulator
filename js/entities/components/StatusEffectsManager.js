@@ -402,6 +402,12 @@ export class StatusEffectsManager {
     }
     this._lastStatusTickFrame = currentFrame;
 
+    if (this.fighter) {
+      this.fighter.isCaughtInBlue = false;
+      this.fighter.isCaughtInBluePull = false;
+      this.fighter.isCaughtInBlackHole = false;
+    }
+
     this.handlePoison();
     this.handleBurn();
     this.handleBleed();

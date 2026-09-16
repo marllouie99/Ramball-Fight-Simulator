@@ -67,7 +67,7 @@ export function drawProjectiles() {
         (ownerFighter._def && (ownerFighter._def.id === 'rubbick' || ownerFighter._def.id === 'trickster'))
       ))
     );
-    const isImmuneFromDomainCull = p.isFrozenByInfinity || p.isArcaneBolt || p.isDomainEmpowered || isSukunaSlash || isOwnerGojo || isOwnerRubbick || (ownerFighter && (ownerFighter.stolenDomainActive || ownerFighter.domainActive || ownerFighter.domainImmunity));
+    const isImmuneFromDomainCull = p.isFrozenByInfinity || p.isArcaneBolt || p.isDomainEmpowered || isSukunaSlash || isOwnerGojo || isOwnerRubbick || (ownerFighter && (ownerFighter.stolenDomainActive || ownerFighter.domainActive || ownerFighter.domainImmunity || ownerFighter.gojoDomainAdapted || (ownerFighter.gojoAdapted && ownerFighter.gojoAdapted.domain) || ownerFighter.characterId === 'toji' || ownerFighter.type === 'toji'));
     if (isGojoDomainActive && ownerFighter && !isImmuneFromDomainCull) {
       return;
     }
@@ -108,31 +108,6 @@ export function drawProjectiles() {
 }
 
 function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
-    // === GOJO LIMITLESS INFINITY: Spatial Distortion Barrier Ring for Frozen Projectiles ===
-    if (p.isFrozenByInfinity) {
-      const fadeAlpha = (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer < 30) ? Math.max(0, p.infinityFreezeTimer / 30) : 1.0;
-      ctx.save();
-      ctx.globalAlpha = (ctx.globalAlpha || 1.0) * fadeAlpha;
-      ctx.globalCompositeOperation = 'lighter';
-      const time = Date.now();
-
-      // Concentric Refraction Rings around frozen projectile (No solid filled cyan balls!)
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, (p.r || 12) + 6 + Math.sin(time * 0.01) * 2, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Inner White Core Ring
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, (p.r || 12) + 2, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
     // ── Layla Cosmic Blast: check BEFORE generic isExplosion so the correct draw fn is always used ──
     if (p.visual === 'layla_cosmic_blast') {
       ctx.save();
@@ -1135,8 +1110,8 @@ export function drawGojoPurpleOrb(ctx, p) {
   
   if (p.isGojoPurple) {
     const lifeRatio = p.life / p.maxLife;
-    if (lifeRatio < 0.3) {
-      const fadeAlpha = lifeRatio / 0.3;
+    if (lifeRatio < 0.08) {
+      const fadeAlpha = lifeRatio / 0.08;
       ctx.globalAlpha = fadeAlpha;
     }
   }

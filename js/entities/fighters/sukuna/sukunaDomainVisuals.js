@@ -345,26 +345,9 @@ export function spawnDomainSlashLines(fighter, count) {
           hitTargetsThisWave.add(target);
           hitAny = true;
 
-          // ── Physical Ricochet Deflection Impulse (pushes & ricochets target off cut lines) ──
-          const pushDir = ((target.x - cx) * normalX + (target.y - cy) * normalY) >= 0 ? 1 : -1;
-          const ricoForce = CONFIG.sukuna?.domainSlashRicochetForce ?? 6.5;
-          target.knockbackDecay = 0.88;
-          if (target.knockbackVx !== undefined) target.knockbackVx = normalX * pushDir * ricoForce;
-          if (target.knockbackVy !== undefined) target.knockbackVy = normalY * pushDir * ricoForce;
-
-          // ── Ricochet Hit Effect & Sparks ──
-          spawnSparks(target.x, target.y, 10, 'slashRicochet');
-          spawnSparks(target.x, target.y, 6, 'parrySpark');
-          spawnSparks(target.x, target.y, 4, 'parryEmberStar');
-          spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
-
-          // Play crisp slicing ricochet audio
-          const ricoChance = CONFIG.sukuna?.soundChances?.ricochetHit ?? 1.0;
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX && Math.random() <= ricoChance) {
-            const ricoSnd = CONFIG.sukuna?.sounds?.ricochetHit || 'Assets/Sound Effects/Skills/parry.mp3';
-            const ricoVol = CONFIG.sukuna?.soundVolumes?.ricochetHit ?? 0.75;
-            audioSystem.playSFX(ricoSnd, ricoVol);
-          }
+          // Standard crimson slash hit sparks & impact flash (no ricochet / parry effect)
+          spawnSparks(target.x, target.y, 8, 'crimsonSniper', '#8B0000');
+          spawnImpactFlash(target.x, target.y, 20, 'crimsonSniper');
         } else {
           hitTargetsThisWave.add(target);
         }

@@ -40,6 +40,7 @@ export function initGraphicsCache() {
     'Assets/model/Reze-hair.png',
     'Assets/model/REZE-WEAPON.png?v=3',
     'Assets/model/denji-devilform-model-skin.png',
+    'Assets/model/Sukuna-shrine.png',
     'Assets/Overlays/mahitos-de.png'
   ];
   models.forEach(preloadImage);

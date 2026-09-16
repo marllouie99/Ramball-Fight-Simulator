@@ -27,13 +27,16 @@ import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 
 export class GojoPurpleBehavior extends ProjectileBehavior {
   static spawn(system, x, y, vx, vy, damage, ownerIndex, dps, opts = {}) {
-    const proj = system._getProjectile();
+    const proj = { id: `gojo_purple_${Date.now()}_${Math.random()}` };
+    if (typeof system._resetProjectileProperties === 'function') {
+      system._resetProjectileProperties(proj);
+    }
     proj.x = x;
     proj.y = y;
     proj.vx = vx;
     proj.vy = vy;
     proj.r = 45;
-    proj.life = CONFIG.gojo?.purpleLife || 250;
+    proj.life = CONFIG.gojo?.purpleLife ?? 480;
     proj.maxLife = proj.life;
     const isGreen = Boolean(opts.colorTheme === 'green' || opts.isRubbick || opts.isTrickster);
     proj.color = isGreen ? '#00FF64' : '#8A2BE2'; // Purple or Green
@@ -115,7 +118,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       return false; // Continue traveling during victory screen
     }
 
-    if (typeof state !== 'undefined' && state.gameState && state.gameState !== 'playing' && state.gameState !== 'countdown' && !isMatchOver) {
+    if (typeof state !== 'undefined' && state.gameState && (state.gameState === 'title' || state.gameState === 'select' || state.gameState === 'weapons' || state.gameState === 'index')) {
+      console.log(`[Hollow Purple Destroyed] Cleaned up due to menu/screen state transition: ${state.gameState}`);
       projectile.life = 0;
       return true;
     }
@@ -129,7 +133,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const otherProj = system.projectiles[j];
         if (otherProj === projectile || otherProj.isVisual || otherProj.life <= 0) continue;
         if (projectile.owner !== null && otherProj.owner !== null && otherProj.owner !== undefined && (projectile.owner === otherProj.owner || areOnSameTeam(projectile.owner, otherProj.owner))) continue;
-        if (otherProj.isSukunaFurnace || otherProj.behaviorType === 'sukuna_furnace' || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
+        if (otherProj.isGojoPurple || otherProj.isGojoPurpleOrb || otherProj.behaviorType === 'gojo_purple' || otherProj.visual === 'gojoPurple' || otherProj.isGetsuga || otherProj.behaviorType === 'getsuga_tensho' || otherProj.isSukunaFurnace || otherProj.behaviorType === 'sukuna_furnace' || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
         
         const dx = projectile.x - otherProj.x;
         const dy = projectile.y - otherProj.y;
@@ -188,9 +192,16 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const dy = projectile.y - ent.y;
         const dist = Math.hypot(dx, dy);
         
-        const isChanneling = typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill();
+        const isChanneling = (typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill()) || (typeof ent.isStationarySkillActive === 'function' && ent.isStationarySkillActive());
         const isSaitamaCounter = Boolean(ent && (ent.characterId === 'saitama' || ent.type === 'saitama') && (ent.isCountering || (ent._counterPunchTimer && ent._counterPunchTimer > 0) || (ent._postCounterRecoveryTimer && ent._postCounterRecoveryTimer > 0)));
-        if (dist < trapRadius) {
+        if (isSaitamaCounter || isChanneling) {
+          // Saitama Serious Counter and skill channeling stances have hyper-armor and are immune to suction / displacement / pull
+          ent.isCaughtInPurple = false;
+          ent.knockbackVx = 0;
+          ent.knockbackVy = 0;
+          ent.vx = 0;
+          ent.vy = 0;
+        } else if (dist < trapRadius) {
           ent.isCaughtInPurple = false; // No paralyzing stasis
 
           // Apply heavy movement slow debuff
@@ -299,6 +310,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     
     projectile.life -= 1;
     if (projectile.life <= 0) {
+      console.log(`[Hollow Purple Expired] Orb reached life = 0 (Total lifespan: ${projectile.maxLife} frames / ${(projectile.maxLife / 60).toFixed(2)}s) -> Triggering detonation & removing from arena.`);
       this.triggerPurpleExplosion(projectile, fighters, system);
       return true;
     }
@@ -325,6 +337,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
   triggerPurpleExplosion(projectile, fighters, system) {
     if (projectile._hasExploded) return;
     projectile._hasExploded = true;
+    console.log(`[Hollow Purple Detonation] Exploding at (${projectile.x?.toFixed(1)}, ${projectile.y?.toFixed(1)}) | Remaining life: ${projectile.life} frames | Total maxLife: ${projectile.maxLife} frames (${(projectile.maxLife / 60).toFixed(2)}s)`);
 
     const actualFighters = fighters || (typeof state !== 'undefined' ? state.fighters : null) || [];
     const ownerFighter = actualFighters[projectile.owner] || projectile.ownerFighter || null;
@@ -333,11 +346,26 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       if (ownerFighter.purpleRecoveryTimer > 0) {
         ownerFighter.purpleRecoveryTimer = 0;
         ownerFighter.z = 0;
-        let backwardAngle;
+        const currentArena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
         const target = (typeof ownerFighter._findClosestEnemy === 'function')
           ? ownerFighter._findClosestEnemy()
           : (actualFighters?.find(f => f && f !== ownerFighter && f.hp > 0) || null);
-        if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+        const nearLeft = currentArena && (ownerFighter.x - ownerFighter.r <= currentArena.x + 15);
+        const nearRight = currentArena && (ownerFighter.x + ownerFighter.r >= currentArena.x + currentArena.width - 15);
+        const nearTop = currentArena && (ownerFighter.y - ownerFighter.r <= currentArena.y + 15);
+        const nearBottom = currentArena && (ownerFighter.y + ownerFighter.r >= currentArena.y + currentArena.height - 15);
+        const isNearWall = nearLeft || nearRight || nearTop || nearBottom;
+
+        let backwardAngle;
+        if (isNearWall) {
+          let steerX = 0;
+          let steerY = 0;
+          if (nearLeft) steerX += 1;
+          if (nearRight) steerX -= 1;
+          if (nearTop) steerY += 1;
+          if (nearBottom) steerY -= 1;
+          backwardAngle = Math.atan2(steerY, steerX);
+        } else if (target && typeof target.x === 'number' && typeof target.y === 'number') {
           backwardAngle = Math.atan2(ownerFighter.y - target.y, ownerFighter.x - target.x);
         } else if (ownerFighter.purpleCastAngle !== undefined && !Number.isNaN(ownerFighter.purpleCastAngle)) {
           backwardAngle = ownerFighter.purpleCastAngle + Math.PI;
@@ -411,6 +439,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const dist = Math.sqrt(distSq);
         const falloff = 1 - (dist / explosionRadius) * 0.35; // 65% min to 100% max damage at center
         const finalDamage = explosionDamage * falloff;
+        const isChanneling = (typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill()) || (typeof ent.isStationarySkillActive === 'function' && ent.isStationarySkillActive());
 
         if (typeof ent.takeDamage === 'function') {
           ent.takeDamage(finalDamage, ownerFighter, { 
@@ -420,7 +449,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             projectile: projectile,
             bypassShield: true,
             isGuaranteedHit: true,
-            undodgeable: true
+            undodgeable: true,
+            skipInterrupt: isChanneling,
+            skipHitStun: isChanneling,
+            skipKnockback: isChanneling
           });
         }
 
@@ -431,6 +463,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
             ent.x = ent._shatterLockedX; ent.y = ent._shatterLockedY;
           }
+        } else if (isChanneling) {
+          // Channeling entities have hyper-armor and should not have their channeling stance displaced or interrupted!
         } else {
           const dirX = dist > 0 ? dx / dist : (Math.random() - 0.5) * 2;
           const dirY = dist > 0 ? dy / dist : (Math.random() - 0.5) * 2;
@@ -444,7 +478,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         }
 
         // Release time-stop / stasis timers so target is blasted backward dynamically
-        if (ent.timeStopTimer > 0) ent.timeStopTimer = 0;
+        if (!isChanneling && ent.timeStopTimer > 0) ent.timeStopTimer = 0;
         ent.isCaughtInPurple = false;
 
         // Clamp inside arena bounds

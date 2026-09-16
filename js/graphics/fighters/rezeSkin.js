@@ -62,22 +62,35 @@ export function _drawRezeHair(ctx, r, facingLeft = false) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.reze) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
     // Reze-hair.png (500x500)
     // Visible bounding box:
     // X: [116, 397] (skull dome width = 260px, skull dome center = 246px, right bun reaches 397px)
     // Y: [80, 367] (visible height = 288px, crown apex = 80px, lock bottom = 367px)
     // Proportional volumetric scaling matching Makima round circular standard (targetDomeWidth = r * 2.30)
-    const targetDomeWidth = r * 2.30;
+    const targetDomeWidth = r * 2.30 * wMult;
     const scaleX = targetDomeWidth / 260;
-    const scaleY = (r * 1.95) / 260; // Increased length size slightly for fuller hair volume
+    const scaleY = ((r * 1.95) / 260) * hMult; // Increased length size slightly for fuller hair volume
     const drawW = 500 * scaleX;
     const drawH = 500 * scaleY;
-    const drawX = -246 * scaleX;
-    const drawY = -r * 1.20 - 80 * scaleY; // Moved hair slightly down towards the bottom
+    const drawX = -246 * scaleX + offX;
+    const drawY = -r * 1.20 - 80 * scaleY + offY; // Moved hair slightly down towards the bottom
 
     // Horizontally flip hair so the side bun and bangs sweep naturally
     ctx.scale(-1, 1);
-    ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
     ctx.restore();
   }
 }
