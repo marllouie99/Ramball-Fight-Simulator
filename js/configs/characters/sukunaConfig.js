@@ -45,7 +45,7 @@ export const sukunaConfig = {
     closeRangeRadius: 110,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
     initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
     meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
-    comboDisengageDistance: 0,      // Distance (pixels) teleported away when disengaging after clash
+    comboDisengageDistance: 280,      // Distance (pixels) teleported away when disengaging after clash (ensures clean separation beyond closeRangeRadius: 110)
     meleePunchDamage: 5,             // Damage dealt per martial arts punch strike
     meleePunchCooldown: 20,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
     meleePunchAnimDuration: 9,        // Punch extension and retraction animation frame duration

@@ -1597,8 +1597,12 @@ export class GojoFighter extends Fighter {
           this.forcedMeleeTimer--;
           if (this.forcedMeleeTimer <= 0) {
             this.isMeleeMode = false;
+            this.meleeComboCount = 0;
+            this.punchAnimTimer = 0;
             this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown || 180;
-            this._teleportAwayFrom(opponent, arena);
+            if (opponent && !opponent.isDead) {
+              this._teleportAwayFrom(opponent, arena);
+            }
           }
         }
       } else if (isBeingMeleed && this.meleeModeCooldown <= 0) {
@@ -1921,16 +1925,19 @@ export class GojoFighter extends Fighter {
     // Set cooldown for next punch
     this.meleePunchCooldown = punchCooldown;
 
-    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
-    if (this.meleeComboCount >= this.meleeComboTarget) {
+    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached or forcedMeleeTimer expires
+    if (this.meleeComboCount >= this.meleeComboTarget || (this.forcedMeleeTimer || 0) <= 0) {
       this.meleeComboCount = 0;
       this.meleeComboTarget = this.domainActive ? 999 : (Math.random() < 0.5 ? 6 : 3);
       this.meleeFlankAngle = undefined; // Clear flank angle so next combo picks a fresh angle
 
       if (!this.domainActive && (this.forcedMeleeTimer || 0) <= 0) {
         this.isMeleeMode = false;
+        this.punchAnimTimer = 0;
         this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Mandatory ranged separation!
-        this._teleportAwayFrom(opponent, arena);
+        if (opponent && !opponent.isDead) {
+          this._teleportAwayFrom(opponent, arena);
+        }
       }
     }
 
@@ -1945,8 +1952,8 @@ export class GojoFighter extends Fighter {
     const oldX = this.x;
     const oldY = this.y;
 
-    const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5);
-    const dist = CONFIG.gojo.comboDisengageDistance ?? 300;
+    const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5) * 0.35;
+    const dist = CONFIG.gojo?.comboDisengageDistance ?? 280;
     let targetX = opponent.x + Math.cos(angle) * dist;
     let targetY = opponent.y + Math.sin(angle) * dist;
 

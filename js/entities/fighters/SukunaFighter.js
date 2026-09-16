@@ -1011,12 +1011,15 @@ export class SukunaFighter extends Fighter {
         // Sukuna is currently in Melee Mode: Check if duration expired or if knocked back / distanced from enemy
         const isDistanced = !opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 130;
         const isKnockedBack = Math.hypot(this.knockbackVx || 0, this.knockbackVy || 0) > 0.5;
-        if (isDistanced || isKnockedBack || ((this.forcedMeleeTimer || 0) <= 0 && this.meleeComboCount === 0)) {
-          // DURATION EXPIRED & COMBO COMPLETE OR KNOCKED AWAY: Disengage to Ranged Mode and start separation cooldown!
+        const isDurationExpired = (this.forcedMeleeTimer || 0) <= 0;
+
+        if (isDurationExpired || isDistanced || isKnockedBack) {
+          // DURATION EXPIRED OR KNOCKED AWAY: Disengage to Ranged Mode, set separation cooldown, and teleport away!
           this.isMeleeMode = false;
           this.forcedMeleeTimer = 0;
           this.punchAnimTimer = 0;
-          if (!isKnockedBack && (this.forcedMeleeTimer || 0) <= 0) {
+          this.meleeComboCount = 0;
+          if (!isKnockedBack && !this.domainActive) {
             this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
             if (opponent && !opponent.isDead) {
               this._teleportAwayFrom(opponent, arena);

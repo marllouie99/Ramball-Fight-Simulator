@@ -384,15 +384,18 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     fighter._slashSoundCooldown = 8;
   }
 
-  // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
-  if (fighter.meleeComboCount >= fighter.meleeComboTarget) {
+  // Reset combo counter and DISENGAGE to ranged mode when combo target is reached or forcedMeleeTimer expires
+  if (fighter.meleeComboCount >= fighter.meleeComboTarget || (fighter.forcedMeleeTimer || 0) <= 0) {
     fighter.meleeComboCount = 0;
     fighter.meleeComboTarget = Math.random() < 0.5 ? 6 : 3;
 
     if (!fighter.domainActive && (fighter.forcedMeleeTimer || 0) <= 0) {
       fighter.isMeleeMode = false;
+      fighter.punchAnimTimer = 0;
       fighter.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120; // Mandatory ranged separation!
-      teleportAwayFrom(fighter, opponent, arena);
+      if (opponent && !opponent.isDead) {
+        teleportAwayFrom(fighter, opponent, arena);
+      }
     }
   }
 
