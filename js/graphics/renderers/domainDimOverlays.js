@@ -626,7 +626,10 @@ export function drawRubbickDomainDimScreen() {
 let currentSukunaDomainDimOpacity = 0;
 
 /**
- * Draws a dark crimson/blood-red dim screen overlay when Sukuna's Domain Expansion (Malevolent Shrine) is active.
+ * Draws a gradient dim screen overlay when Sukuna's Domain Expansion (Malevolent Shrine) is active.
+ * Top half: dark crimson/blood-red cursed sky atmosphere.
+ * Bottom half: dark teal/cyan abyssal water atmosphere.
+ * Matches the anime Innate Domain split-tone visual.
  */
 export function drawSukunaDomainDimScreen() {
   if (typeof state !== 'undefined' && state.disableDimEffects) return;
@@ -660,29 +663,42 @@ export function drawSukunaDomainDimScreen() {
   }
 
   const opacity = currentSukunaDomainDimOpacity;
+  const w = canvas.width;
+  const h = canvas.height;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Base pitch-black cursed atmosphere overlay
-  ctx.fillStyle = `rgba(2, 0, 1, ${opacity * 0.95})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 1. Vertical gradient dim: Crimson Red (top) → Dark transition → Teal Cyan (bottom)
+  const dimGrad = ctx.createLinearGradient(0, 0, 0, h);
+  dimGrad.addColorStop(0.0, `rgba(8, 0, 2, ${(opacity * 0.96).toFixed(3)})`);      // Pitch black-red void (top)
+  dimGrad.addColorStop(0.15, `rgba(50, 3, 8, ${(opacity * 0.92).toFixed(3)})`);     // Deep dark crimson
+  dimGrad.addColorStop(0.30, `rgba(80, 5, 14, ${(opacity * 0.88).toFixed(3)})`);    // Sinister crimson cloud band
+  dimGrad.addColorStop(0.42, `rgba(35, 2, 6, ${(opacity * 0.93).toFixed(3)})`);     // Dark maroon transition
+  dimGrad.addColorStop(0.50, `rgba(4, 4, 8, ${(opacity * 0.95).toFixed(3)})`);      // Dark neutral crossover
+  dimGrad.addColorStop(0.58, `rgba(2, 12, 20, ${(opacity * 0.94).toFixed(3)})`);    // Dark teal transition
+  dimGrad.addColorStop(0.72, `rgba(2, 22, 35, ${(opacity * 0.92).toFixed(3)})`);    // Deep dark teal
+  dimGrad.addColorStop(0.88, `rgba(1, 16, 28, ${(opacity * 0.94).toFixed(3)})`);    // Abyssal dark cyan
+  dimGrad.addColorStop(1.0, `rgba(1, 6, 12, ${(opacity * 0.97).toFixed(3)})`);      // Pitch dark cyan floor (bottom)
 
-  // 2. Deep malevolent dark-crimson radial aura centered on Sukuna
-  const screenPos = sukunaFighter ? worldToScreen(sukunaFighter.x, sukunaFighter.y - (sukunaFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  ctx.fillStyle = dimGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. Subtle radial lighter pocket centered on Sukuna (so the action area isn't completely crushed)
+  const screenPos = sukunaFighter ? worldToScreen(sukunaFighter.x, sukunaFighter.y - (sukunaFighter.z || 0)) : { x: w / 2, y: h / 2 };
   const cx = screenPos.x;
   const cy = screenPos.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.95;
+  const maxDim = Math.max(w, h) * 0.85;
 
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, `rgba(160, 12, 20, ${opacity * 0.50})`);        // Deep malevolent crimson core
-  grad.addColorStop(0.18, `rgba(90, 6, 12, ${opacity * 0.45})`);       // Dark blood red halo
-  grad.addColorStop(0.40, `rgba(40, 2, 6, ${opacity * 0.35})`);        // Sinister maroon ring
-  grad.addColorStop(0.70, `rgba(10, 1, 3, ${opacity * 0.25})`);        // Pitch-dark cursed fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = 'destination-out';
+  const clearGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  clearGrad.addColorStop(0.0, `rgba(0, 0, 0, ${(opacity * 0.12).toFixed(3)})`);
+  clearGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(opacity * 0.06).toFixed(3)})`);
+  clearGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+  clearGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = clearGrad;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = 'source-over';
 
   // 3. Clear arena interior with subtle edge vignette so Malevolent Shrine artwork is 100% visible
   if (sukunaFighter && sukunaFighter.domainActive) {
@@ -693,7 +709,7 @@ export function drawSukunaDomainDimScreen() {
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(2, 0, 1, ${opacity * 0.98})`;
+  state.globalDimEdgeColor = `rgba(2, 0, 1, ${(opacity * 0.98).toFixed(3)})`;
 }
 
 let currentYutaDomainDimOpacity = 0;
