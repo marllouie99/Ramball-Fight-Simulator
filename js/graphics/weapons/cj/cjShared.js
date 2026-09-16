@@ -13,3 +13,5 @@ export function isDarkMode() {
     )
   );
 }
+
+export const _isDarkMode = isDarkMode;

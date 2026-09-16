@@ -4,7 +4,7 @@
 
 import { getHandSize } from '../../../core/config.js';
 import { state } from '../../../core/state.js';
-import { isDarkMode } from './cjShared.js';
+import { isDarkMode, _isDarkMode } from './cjShared.js';
 
 export function drawCjPixelTec9(ctx, x = 0, y = 0, scale = 1.0, recoil = 0, flashTimer = 0) {
   ctx.save();

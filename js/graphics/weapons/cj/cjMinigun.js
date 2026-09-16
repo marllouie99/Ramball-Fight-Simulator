@@ -4,7 +4,7 @@
 
 import { getHandSize } from '../../../core/config.js';
 import { state } from '../../../core/state.js';
-import { isDarkMode } from './cjShared.js';
+import { isDarkMode, _isDarkMode } from './cjShared.js';
 
 export function drawCjPixelMinigun(ctx, x = 0, y = 0, gunAngle = 0, r = 25, opts = {}) {
   ctx.save();
