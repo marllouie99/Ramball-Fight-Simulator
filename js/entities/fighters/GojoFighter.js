@@ -1469,8 +1469,6 @@ export class GojoFighter extends Fighter {
       if (this.purpleRecoveryTimer <= 0) {
         this.purpleRecoveryTimer = 0;
         this.z = 0;
-        const activeProj = this.activePurpleProjectile || (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles?.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && (p.ownerFighter === this || p.owner === (state.fighters ? state.fighters.indexOf(this) : -1))));
-        console.log(`[Gojo Descended] Gojo finished breather recovery and landed at z=0 | Purple active in arena: ${Boolean(activeProj && activeProj.life > 0)} | Purple remaining life: ${activeProj ? activeProj.life : 0} frames (${activeProj ? (activeProj.life / 60).toFixed(2) : '0.00'}s remaining out of ${activeProj ? activeProj.maxLife : 0} total frames)`);
         // Re-enable Limitless Infinity upon landing and resuming movement
         if (!this.isMeleeMode && !this.isTargetOfAmbush && !isInsideRubbickStolenVoid(this) && this.hp > 0 && !this.isChainedByMakima) {
           this.infinityActive = true;

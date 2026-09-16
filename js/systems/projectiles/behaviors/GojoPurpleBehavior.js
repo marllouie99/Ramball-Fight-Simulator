@@ -119,7 +119,6 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     }
 
     if (typeof state !== 'undefined' && state.gameState && (state.gameState === 'title' || state.gameState === 'select' || state.gameState === 'weapons' || state.gameState === 'index')) {
-      console.log(`[Hollow Purple Destroyed] Cleaned up due to menu/screen state transition: ${state.gameState}`);
       projectile.life = 0;
       return true;
     }
@@ -310,7 +309,6 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     
     projectile.life -= 1;
     if (projectile.life <= 0) {
-      console.log(`[Hollow Purple Expired] Orb reached life = 0 (Total lifespan: ${projectile.maxLife} frames / ${(projectile.maxLife / 60).toFixed(2)}s) -> Triggering detonation & removing from arena.`);
       this.triggerPurpleExplosion(projectile, fighters, system);
       return true;
     }
@@ -337,7 +335,6 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
   triggerPurpleExplosion(projectile, fighters, system) {
     if (projectile._hasExploded) return;
     projectile._hasExploded = true;
-    console.log(`[Hollow Purple Detonation] Exploding at (${projectile.x?.toFixed(1)}, ${projectile.y?.toFixed(1)}) | Remaining life: ${projectile.life} frames | Total maxLife: ${projectile.maxLife} frames (${(projectile.maxLife / 60).toFixed(2)}s)`);
 
     const actualFighters = fighters || (typeof state !== 'undefined' ? state.fighters : null) || [];
     const ownerFighter = actualFighters[projectile.owner] || projectile.ownerFighter || null;

@@ -375,7 +375,6 @@ export function firePurple(fighter, ownerIndex) {
       if (proj.life !== undefined) {
         purpleLife = proj.life;
       }
-      console.log(`[Hollow Purple Fired] Projectile spawned (id: ${proj.id}) | Initial life: ${proj.life} frames (${(proj.life / 60).toFixed(2)}s) | Config purpleLife: ${CONFIG.gojo?.purpleLife} | Gojo recovery duration: ${recoveryDuration} frames (${(recoveryDuration / 60).toFixed(2)}s)`);
     }
   }
 
