@@ -142,29 +142,7 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   ctx.fillRect(0, waterLineY - mistH, screenW, mistH * 2);
   ctx.restore();
 
-  // ── 5. HORIZONTAL LIQUID CYAN WATER WAVE SHEEN & CAUSTICS ──
-  const waveCount = isLowQuality ? 3 : (isMultiDomain ? 5 : 9);
-  ctx.lineWidth = 1.2;
-  ctx.strokeStyle = 'rgba(0, 229, 255, 0.28)';
-  ctx.beginPath();
-  for (let w = 0; w < waveCount; w++) {
-    const wy = waterLineY + 25 + w * 40 + Math.sin(time * 0.002 + w) * 6;
-    ctx.moveTo(sx - 1200, wy);
-    ctx.quadraticCurveTo(sx, wy + Math.sin(time * 0.004 + w * 2) * 10, sx + 1200, wy);
-  }
-  ctx.stroke();
 
-  // Secondary subtle aqua wave highlight
-  if (!isLowQuality) {
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.16)';
-    ctx.beginPath();
-    for (let w = 0; w < waveCount - 1; w++) {
-      const wy = waterLineY + 45 + w * 40 + Math.cos(time * 0.0025 + w * 1.3) * 7;
-      ctx.moveTo(sx - 1200, wy);
-      ctx.quadraticCurveTo(sx, wy - Math.sin(time * 0.0035 + w * 2) * 8, sx + 1200, wy);
-    }
-    ctx.stroke();
-  }
 
   // ── 6. FLOATING BIOLUMINESCENT AQUATIC MOTES / PARTICLES ──
   if (!isLowQuality) {
