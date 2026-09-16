@@ -49,15 +49,16 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   const screenH = state.canvas ? state.canvas.height : 1080;
   const waterLineY = sy - 85;
 
-  // 1a. Upper Dark Crimson Cursed Sky
+  // 1a. Upper Dark Crimson Cursed Sky (Pitch Black with Sinister Dark-Crimson Cloud Formations)
   if (!fighter._cachedSkyGrad || fighter._cachedSkyGradH !== waterLineY || fighter._cachedSkyGradScreenH !== screenH) {
     fighter._cachedSkyGradH = waterLineY;
     fighter._cachedSkyGradScreenH = screenH;
     fighter._cachedSkyGrad = ctx.createLinearGradient(0, 0, 0, Math.max(1, waterLineY));
-    fighter._cachedSkyGrad.addColorStop(0, 'rgba(10, 1, 3, 0.98)');
-    fighter._cachedSkyGrad.addColorStop(0.35, 'rgba(48, 4, 10, 0.94)');
-    fighter._cachedSkyGrad.addColorStop(0.75, 'rgba(80, 8, 18, 0.90)');
-    fighter._cachedSkyGrad.addColorStop(1.0, 'rgba(18, 10, 18, 0.96)');
+    fighter._cachedSkyGrad.addColorStop(0.0, 'rgba(1, 0, 1, 0.99)');     // Pitch black void crown
+    fighter._cachedSkyGrad.addColorStop(0.25, 'rgba(6, 1, 3, 0.98)');    // Deep dark void
+    fighter._cachedSkyGrad.addColorStop(0.55, 'rgba(38, 2, 8, 0.95)');   // Dark cursed burgundy
+    fighter._cachedSkyGrad.addColorStop(0.80, 'rgba(68, 4, 14, 0.92)');  // Sinister crimson clouds
+    fighter._cachedSkyGrad.addColorStop(1.0, 'rgba(8, 2, 10, 0.98)');    // Dark horizon haze
   }
 
   // 1b. Lower Luminous Teal-Cyan Abyssal Water Floor (Authentic Innate Domain Scene)
@@ -75,6 +76,32 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   // Draw Sky & Water Floor
   ctx.fillStyle = fighter._cachedSkyGrad;
   ctx.fillRect(0, 0, screenW, Math.max(0, waterLineY));
+
+  // Sinister rolling dark cursed clouds in upper sky
+  if (!isLowQuality && waterLineY > 20) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+    const cloudCount = isMultiDomain ? 3 : 6;
+    for (let c = 0; c < cloudCount; c++) {
+      const ccx = (sx - 450 + (c * 170) + Math.sin(time * 0.0008 + c) * 20);
+      const ccy = (waterLineY * 0.45) + Math.sin(time * 0.0012 + c * 1.5) * 12;
+      const rx = 135 + (c % 3) * 28;
+      const ry = 36 + (c % 2) * 14;
+      ctx.beginPath();
+      ctx.ellipse(ccx, ccy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Ominous deep crimson cloud rim highlights
+    ctx.fillStyle = 'rgba(120, 8, 18, 0.15)';
+    for (let c = 0; c < cloudCount; c += 2) {
+      const ccx = (sx - 380 + (c * 170) + Math.sin(time * 0.0008 + c) * 20);
+      const ccy = (waterLineY * 0.52) + Math.sin(time * 0.0012 + c * 1.5) * 12;
+      ctx.beginPath();
+      ctx.ellipse(ccx, ccy, 110, 28, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 
   ctx.fillStyle = fighter._cachedWaterGrad;
   ctx.fillRect(0, Math.max(0, waterLineY), screenW, Math.max(0, screenH - waterLineY));

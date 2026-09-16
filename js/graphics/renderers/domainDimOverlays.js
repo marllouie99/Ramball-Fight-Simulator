@@ -640,11 +640,11 @@ export function drawSukunaDomainDimScreen() {
   let targetOpacity = 0;
   if (sukunaFighter) {
     if (sukunaFighter.domainActive) {
-      targetOpacity = 0.75;
+      targetOpacity = 0.92;
     } else if (sukunaFighter.isChannelingDomainExpansion) {
       const chargeMax = CONFIG.sukuna?.domainChargeMax || 120;
       const progress = Math.min(1.0, (sukunaFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
-      targetOpacity = 0.25 + progress * 0.45;
+      targetOpacity = 0.35 + progress * 0.55;
     }
   }
 
@@ -664,21 +664,21 @@ export function drawSukunaDomainDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Base dark crimson atmosphere overlay
-  ctx.fillStyle = `rgba(32, 4, 8, ${opacity * 0.85})`;
+  // 1. Base pitch-black cursed atmosphere overlay
+  ctx.fillStyle = `rgba(2, 0, 1, ${opacity * 0.95})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Deep crimson/blood-red radial gradient centered on Sukuna
+  // 2. Deep malevolent dark-crimson radial aura centered on Sukuna
   const screenPos = sukunaFighter ? worldToScreen(sukunaFighter.x, sukunaFighter.y - (sukunaFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
   const cx = screenPos.x;
   const cy = screenPos.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.95;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, `rgba(180, 20, 25, ${opacity * 0.55})`);        // Deep malevolent crimson core
-  grad.addColorStop(0.18, `rgba(120, 12, 18, ${opacity * 0.45})`);     // Blood red halo
-  grad.addColorStop(0.40, `rgba(60, 6, 12, ${opacity * 0.30})`);       // Dark crimson ring
-  grad.addColorStop(0.70, `rgba(35, 4, 8, ${opacity * 0.15})`);        // Deep maroon fade
+  grad.addColorStop(0, `rgba(160, 12, 20, ${opacity * 0.50})`);        // Deep malevolent crimson core
+  grad.addColorStop(0.18, `rgba(90, 6, 12, ${opacity * 0.45})`);       // Dark blood red halo
+  grad.addColorStop(0.40, `rgba(40, 2, 6, ${opacity * 0.35})`);        // Sinister maroon ring
+  grad.addColorStop(0.70, `rgba(10, 1, 3, ${opacity * 0.25})`);        // Pitch-dark cursed fade
   grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
 
   ctx.fillStyle = grad;
@@ -693,7 +693,7 @@ export function drawSukunaDomainDimScreen() {
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(32, 4, 8, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(2, 0, 1, ${opacity * 0.98})`;
 }
 
 let currentYutaDomainDimOpacity = 0;
