@@ -44,6 +44,18 @@ export function isSuppressedByFuga(fighter) {
 }
 
 /**
+ * Universal helper: returns true if the given entity currently has an active
+ * Limitless Infinity barrier.
+ */
+export function hasActiveInfinity(entity) {
+  if (!entity) return false;
+  if (typeof entity.hasActiveInfinity === 'function') {
+    return entity.hasActiveInfinity();
+  }
+  return false;
+}
+
+/**
  * Clears afterimages on target.
  */
 export function suppressAfterimagesAndAttackEffects(target) {
@@ -568,6 +580,14 @@ export class Fighter {
     if (this._afterImages && this._afterImages !== this.afterImages) this._afterImages.length = 0;
     if (this.shadowClones) this.shadowClones.length = 0;
     if (this.shunpoAfterimages) this.shunpoAfterimages.length = 0;
+  }
+
+  /**
+   * Returns true if this fighter has an active Limitless Infinity barrier (Gojo Satoru).
+   * Base class returns false.
+   */
+  hasActiveInfinity() {
+    return false;
   }
 
   /**

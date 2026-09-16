@@ -370,7 +370,7 @@ export class IchigoFighter extends Fighter {
     if (!isTrulyDead) {
       if (isChannelingHollow) return;
       if (isChannelingBankai) return;
-      if (isChannelingGrandFinisher) return;
+      if (isChannelingGrandFinisher && !forceCancelAll) return;
       if (!forceCancelAll) {
         if (this.isAboutToUnleashNormalGetsuga() || this.isChannelingGetsuga || this._isGetsugaVoicelinePlaying()) return;
         if (this._isShunpoComboActive()) return;
@@ -727,10 +727,6 @@ export class IchigoFighter extends Fighter {
 
   activateBankai() {
     activateBankai(this);
-  }
-
-  activateHollowMask() {
-    activateHollowMask(this);
   }
 
   _releaseBankai() {

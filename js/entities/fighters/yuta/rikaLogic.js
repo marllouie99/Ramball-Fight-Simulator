@@ -29,7 +29,8 @@ export function triggerRikaDeathShatter(rk, fighter) {
 
   // 4. Vengeful Death Dispersion Damage & Knockback
   if (typeof state !== 'undefined' && state.fighters && owner) {
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(owner));
+    const ownerIdx = state.fighters.indexOf(owner);
+    const myTeam = (typeof state.getFighterTeam === 'function' && ownerIdx !== -1) ? state.getFighterTeam(ownerIdx) : (owner.team ?? null);
     const damageGain = Math.max(0, (owner.damage || 0) - (CONFIG.yuta?.damage || 15));
     const dispersionRadius = CONFIG.yuta?.rikaDeathExplosionRadius || 280;
     const dispersionDamage = (CONFIG.yuta?.rikaDeathExplosionDamage || 35) + damageGain;
@@ -38,7 +39,7 @@ export function triggerRikaDeathShatter(rk, fighter) {
 
     state.fighters.forEach((enemy, idx) => {
       if (enemy && enemy !== owner && enemy.hp > 0) {
-        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+        const isEnemy = myTeam === null || (typeof state.getFighterTeam === 'function' ? state.getFighterTeam(idx) !== myTeam : (enemy.team !== myTeam));
         if (isEnemy) {
           const dx = enemy.x - rk.x;
           const dy = enemy.y - rk.y;
@@ -1142,11 +1143,7 @@ export function updateRika(fighter, arena) {
 
   // On bounce — re-lock toward target (unless target is Gojo with active Infinity)
   if (bounced && rk.target) {
-    const isGojoInfinity =
-      (rk.target.characterId === 'gojo' || rk.target.type === 'gojo') &&
-      !rk.target.isMeleeMode &&
-      ((rk.target.infinityCooldown || 0) <= 0 || rk.target.infinityActive) &&
-      !rk.target.isChainedByMakima;
+    const isGojoInfinity = (typeof rk.target.hasActiveInfinity === 'function') && rk.target.hasActiveInfinity();
 
     if (!isGojoInfinity) {
       const dx = rk.target.x - rk.x;

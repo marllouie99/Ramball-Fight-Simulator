@@ -60,11 +60,7 @@ function clampToArena(x, y, pad = 0) {
 function clampOutsideGojoInfinity(x, y, target, pad = 0) {
   if (!target) return { x, y };
 
-  const isGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo') &&
-    !target.isMeleeMode &&
-    ((target.infinityCooldown || 0) <= 0 || target.infinityActive) &&
-    !target.isChainedByMakima;
-
+  const isGojoInfinity = (typeof target.hasActiveInfinity === 'function') && target.hasActiveInfinity();
   if (!isGojoInfinity) return { x, y };
 
   const barrierR = (target.r || 25) + 35 + pad;
@@ -777,10 +773,7 @@ export function updateMahitoFleshSurge(fighter) {
             continue;
           }
 
-          const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
-            !ent.isMeleeMode && 
-            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
-            !ent.isChainedByMakima;
+          const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
           const dist = Math.hypot(ent.x - lp.peakX, ent.y - lp.peakY);
           if (dist <= explosionR + (ent.r || 25)) {
@@ -1400,10 +1393,7 @@ export function updateMahitoMaceCannon(fighter) {
             if (myTeam !== null && ownerTeam === myTeam) continue;
           }
 
-          const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
-            !ent.isMeleeMode && 
-            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
-            !ent.isChainedByMakima;
+          const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
           const dToSpike = Math.hypot(ent.x - spk.x, ent.y - spk.y);
           if (isGojoInfinity && dToSpike <= ent.r + 38) {
@@ -1482,10 +1472,7 @@ export function updateMahitoMaceCannon(fighter) {
         if (myTeam !== null && ownerTeam === myTeam) continue;
       }
 
-      const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
-        !ent.isMeleeMode && 
-        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
-        !ent.isChainedByMakima;
+      const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
       if (isGojoInfinity) {
         const distToTip = Math.hypot(ent.x - data.currentTipX, ent.y - data.currentTipY);
@@ -1615,10 +1602,7 @@ export function updateMahitoMaceCannon(fighter) {
           if (myTeam !== null && ownerTeam === myTeam) continue;
         }
 
-        const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
-          !ent.isMeleeMode && 
-          ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
-          !ent.isChainedByMakima;
+        const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
         const distToExplosion = Math.hypot(ent.x - impactX, ent.y - impactY);
         if (distToExplosion <= ent.r + blastRadius) {
@@ -1949,10 +1933,7 @@ export function updateMahitoTwinScissor(fighter) {
         if (myTeam !== null && ownerTeam === myTeam) continue;
       }
 
-      const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
-        !ent.isMeleeMode && 
-        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
-        !ent.isChainedByMakima;
+      const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
       if (isGojoInfinity) {
         const barrierR = (ent.r || 25) + 38;
@@ -2134,10 +2115,7 @@ export function updateMahitoTwinScissor(fighter) {
             if (myTeam !== null && ownerTeam === myTeam) continue;
           }
 
-          const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
-            !ent.isMeleeMode && 
-            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) &&
-            !ent.isChainedByMakima;
+          const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
           const distToCut = Math.hypot(ent.x - strikeCenterX, ent.y - strikeCenterY);
           if (distToCut <= ent.r + strikeRadius) {

@@ -416,11 +416,8 @@ export function resolveFighterCollision(a, b) {
     return; // Neither moves or bounces during counter execution
   }
 
-  const aIsGojoChanneling = (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && (a.redBuildupPhase || (a.redEffectTimer || 0) > 0 || a.isDomainPreSlide || a.isChannelingDomainExpansion || (a.domainChargeTimer || 0) > 0);
-  const bIsGojoChanneling = (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && (b.redBuildupPhase || (b.redEffectTimer || 0) > 0 || b.isDomainPreSlide || b.isChannelingDomainExpansion || (b.domainChargeTimer || 0) > 0);
-
-  const aIsGojoInfinity = isEnemy && !aIsGojoChanneling && !a.isTargetOfAmbush && !isInsideRubbickStolenVoid(a) && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo') && !a.isMeleeMode && !b.isMeleeMode && (a.infinityActive || (a.infinityCooldown || 0) <= 0);
-  const bIsGojoInfinity = isEnemy && !bIsGojoChanneling && !b.isTargetOfAmbush && !isInsideRubbickStolenVoid(b) && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo') && !b.isMeleeMode && !a.isMeleeMode && (b.infinityActive || (b.infinityCooldown || 0) <= 0);
+  const aIsGojoInfinity = isEnemy && (typeof a.hasActiveInfinity === 'function') && a.hasActiveInfinity() && !b.isMeleeMode;
+  const bIsGojoInfinity = isEnemy && (typeof b.hasActiveInfinity === 'function') && b.hasActiveInfinity() && !a.isMeleeMode;
 
   // Apply Limitless Infinity movement slow on physical collision instead of pushing enemies back
   if (aIsGojoInfinity && !b.gojoInfinityImmune) {
@@ -1094,8 +1091,7 @@ export function updateFighters() {
           // Push them apart
           const nx = dx / dist;
           const ny = dy / dist;
-          const overlap = minDist - dist;
-          const fighterIsGojoInfinity = !fighter.isTargetOfAmbush && !isInsideRubbickStolenVoid(fighter) && (fighter.characterId === 'gojo' || fighter.type === 'gojo' || fighter._def?.id === 'gojo') && !fighter.isMeleeMode && !entity.isMeleeMode && (fighter.infinityActive || (fighter.infinityCooldown || 0) <= 0);
+          const fighterIsGojoInfinity = (typeof fighter.hasActiveInfinity === 'function') && fighter.hasActiveInfinity() && !entity.isMeleeMode;
           // Gojo Infinity slows colliding entities instead of pushing them back
           if (fighterIsGojoInfinity && !entity.gojoInfinityImmune) {
             if (typeof entity.applySlow === 'function') entity.applySlow(20, 0.35, { isInfinitySlow: true });

@@ -165,12 +165,12 @@ export function releaseBankai(fighter) {
   fighter.bankaiSlideTimer = 0;
 
   fighter.bankaiActive = true;
-  fighter.bankaiTimer = CONFIG.ichigo?.bankaiDuration || 800;
+  fighter.bankaiDurationMax = CONFIG.ichigo?.bankaiDuration || 1000;
+  fighter.bankaiTimer = fighter.bankaiDurationMax;
   fighter.bankaiFinalGetsugaTriggered = false;
   fighter.isFinalMassiveGetsuga = false;
   fighter.ultimateCooldown = 0;
   fighter.hollowMaskUsed = false; // Reset so Hollow Mask awakens at the end of this Bankai cycle
-  fighter.hollowRechargeHpBaseline = fighter.hp; // Start Hollow progress tracking from HP when Bankai begins
   fighter._maxHollowPct = 0;
 
   fighter.bankaiBurstMax = CONFIG.ichigo?.bankaiBurstFrames || 36;
@@ -452,7 +452,7 @@ export function updateBankai(fighter, opponent, isMatchEnded) {
       }
 
       if (fighter.bankaiTimer <= 0) {
-        if (isAboutToUnleashNormalGetsugaWave || fighter.isChannelingGetsuga || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.getsugaRecoveryTimer > 0 && fighter.isFinalGetsugaRecovery) || fighter._isFinalGetsugaVoicelinePlaying() || isHollowTransforming || !fighter.bankaiFinalGetsugaTriggered) {
+        if (isAboutToUnleashNormalGetsugaWave || fighter.isChannelingGetsuga || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.slashSwingTimer > 0 && fighter.isGetsugaSlash) || isHollowTransforming || !fighter.bankaiFinalGetsugaTriggered) {
           fighter.bankaiTimer = 1;
         } else if (!fighter.hollowMaskActive && !fighter.hollowMaskUsed) {
           // ── COMBO TRANSITION: Bankai Duration Ended -> Awaken Visored Hollow Mask in Bankai Form! ──

@@ -115,7 +115,7 @@ export const ichigoConfig = {
   ultimateThreshold: 0.80,       // Automatically activates when HP <= 90%
   bankaiCooldown: 600,           // Cooldown in frames between Bankai activations after expiration (~10.0s at 60fps)
   bankaiRechargeHpRatio: 0.20,   // Damage required to reactivate Bankai after it expires (20% of max HP)
-  bankaiDuration: 1000,           // Bankai form duration in frames (~13.3s)
+  bankaiDuration: 500,           // Bankai form duration in frames (~13.3s)
   bankaiChargeFrames: 66,        // Channeling duration frames for transformation (~1.10s)
   bankaiBurstFrames: 36,         // Shatter burst duration frames
   bankaiRibbonDuration: 300,     // Lifespan frames of flowing 3D ribbon
@@ -147,8 +147,9 @@ export const ichigoConfig = {
   bankaiWindFreezeDuration: 12,  // Hit pause stasis frames from wind blast
 
   // ── Grand Finisher: Final Massive Kuroi Getsuga ──
-  bankaiFinalGetsugaTriggerTimer: 160,  // Bankai duration threshold frames when Grand Finisher triggers
-  bankaiFinalGetsugaChargeFrames: 80,  // Gathering charge frames matching voiceline (~2.46s)
+  bankaiFinalGetsugaTriggerTimer: 108,  // Bankai duration threshold frames when Grand Finisher triggers (80 frames charge + 28 frames slash wave release -> seamlessly awakens Hollow Mask)
+  bankaiFinalGetsugaChargeFrames: 80,  // Gathering charge frames matching voiceline (~1.33s)
+  bankaiFinalGetsugaRecoveryFrames: 24, // Post-release slash follow-through frames
   bankaiFinalGetsugaDamage: 20,         // Final Getsuga damage
   bankaiFinalGetsugaTickDamage: 10,      // Continuous multi-hit tick damage
   bankaiFinalGetsugaSpeed: 7,           // Wave travel speed

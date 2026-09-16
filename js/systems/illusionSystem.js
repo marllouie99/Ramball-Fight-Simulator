@@ -684,10 +684,7 @@ export function updateIllusions() {
       }
 
       const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null) || illusion.moveSpeed || 1.5;
-      const isGojoInfinity = nearestTarget &&
-        (nearestTarget.characterId === 'gojo' || nearestTarget.type === 'gojo') &&
-        !nearestTarget.isMeleeMode &&
-        ((nearestTarget.infinityCooldown || 0) <= 0 || nearestTarget.infinityActive);
+      const isGojoInfinity = (typeof nearestTarget?.hasActiveInfinity === 'function') && nearestTarget.hasActiveInfinity();
 
       if (illusion.isEvasionMinion) {
         // Pure natural wall bounce — reverse velocity along hit axis

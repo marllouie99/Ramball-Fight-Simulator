@@ -155,11 +155,8 @@ export function spawnCarExplosion(x, y, carAngle = 0, owner = null) {
     const dx = ent.x - posX;
     const dy = ent.y - posY;
     const dist = Math.hypot(dx, dy);
-
     if (dist <= aoeRadius + (ent.r || 20)) {
-      const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') &&
-        !ent.isMeleeMode &&
-        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+      const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
       if (isGojoInfinity) {
         if (typeof ent.triggerInfinityBlock === 'function') {

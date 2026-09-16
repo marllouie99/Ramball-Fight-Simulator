@@ -3346,8 +3346,8 @@ class ProjectileSystem {
         for (let fi = 0; fi < fighters.length; fi++) {
           const f = fighters[fi];
           if (!f || f.hp <= 0) continue;
-          const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
-          if (!isGojo) continue;
+          const isLimitlessActive = (typeof f.hasActiveInfinity === 'function') ? f.hasActiveInfinity() : false;
+          if (!isLimitlessActive) continue;
           if (areOnSameTeam(p.owner, fi)) continue;
 
           const infinityRadius = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
@@ -3356,8 +3356,7 @@ class ProjectileSystem {
           const dx = p.x - f.x;
           const dy = p.y - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
-          const isLimitlessActive = !isInsideRubbickStolenVoid(f) && !f.isMeleeMode && !f.isChainedByMakima && (f.domainActive || f.infinityActive || (f.infinityCooldown || 0) <= 0);
-          if (distSq <= effectiveInfinityRadius * effectiveInfinityRadius && isLimitlessActive) {
+          if (distSq <= effectiveInfinityRadius * effectiveInfinityRadius) {
             // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
             if (p.infinityEvaluated === undefined) {
               p.infinityEvaluated = true;

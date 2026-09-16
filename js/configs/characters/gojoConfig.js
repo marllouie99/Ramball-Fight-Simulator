@@ -76,12 +76,12 @@ export const gojoConfig = {
   purpleCooldown: 1500,      // Cooldown of Hollow Purple
   purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
-  purpleDamage: 15,         // Continuous piercing damage per tick
+  purpleDamage: 25,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
   purpleRadius: 50,         // Radius of Purple orb
   purpleLife: 200,         // How long Purple orb stays in arena (frames - 8.0s)
   purpleTravelTime: 20,    // Frames the orb travels before stopping
-  purpleDPS: 15,            // Damage per second dealt to enemies inside the orb
+  purpleDPS: 25,            // Damage per second dealt to enemies inside the orb
   purpleDPSInterval: 10,   // Frames between DPS ticks
   purpleSlowDuration: 60,  // Frames the slow effect lasts
   purpleSlowMultiplier: 0.20, // Speed multiplier while slowed (0.20 = 20% speed, very heavy slow)
@@ -89,7 +89,7 @@ export const gojoConfig = {
   purplePullForce: 20.5,    // How strongly enemies and illusions are dragged toward orb center
   purpleShakeIntensity: 4, // Screen shake intensity when purple orb fires
   purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
-  purpleExplosionDamage: 50, // Blast explosion damage when Hollow Purple detonates upon expiring
+  purpleExplosionDamage: 100, // Blast explosion damage when Hollow Purple detonates upon expiring
   purpleExplosionRadius: 280, // Blast explosion radius in pixels
   purpleExplosionKnockback: 10, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
@@ -108,7 +108,7 @@ export const gojoConfig = {
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
   domainCooldown: 2000,     // 20s Ultimate cooldown
-  domainChargeMax: 100,     // 2s Channeling duration before domain opens
+  domainChargeMax: 130,     // 2s Channeling duration before domain opens
   domainDuration: 300,      // Domain lasts ~6.6 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
   domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
@@ -128,7 +128,7 @@ export const gojoConfig = {
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
   closeRangeRadius: 110,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
-  initialMeleeDuration: 150,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
+  initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
   meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
   comboDisengageDistance: 100,      // Distance (pixels) teleported away when disengaging after clash
   meleePunchDamage: 6,             // Damage dealt per martial arts punch strike

@@ -1017,20 +1017,13 @@ export function getSkillDataForFighter(f, getProjectiles) {
       hollowLabel = 'HOLLOW MASK';
       f._maxHollowPct = 0;
     } else {
-      // In Bankai form: progress fills smoothly (0% -> 100%) as Bankai duration elapses towards completion or through damage taken
-      const bankaiDuration = CONFIG.ichigo?.bankaiDuration || 1000;
+      // In Bankai form: progress fills smoothly (0% -> 100%) strictly as Bankai duration elapses towards expiration
+      const bankaiDuration = f.bankaiDurationMax || CONFIG.ichigo?.bankaiDuration || 1000;
       const bankaiRemaining = f.bankaiTimer !== undefined ? f.bankaiTimer : bankaiDuration;
       const timeProg = Math.max(0, Math.min(1.0, 1.0 - (bankaiRemaining / bankaiDuration)));
 
-      const baseline = f.hollowRechargeHpBaseline !== undefined ? f.hollowRechargeHpBaseline : f.hp;
-      const reqDamage = (f.maxHp || 240) * (CONFIG.ichigo?.hollowRechargeHpRatio ?? 0.20);
-      const damageTaken = Math.max(0, baseline - f.hp);
-      const dmgProg = Math.max(0, Math.min(1.0, damageTaken / reqDamage));
-
-      const rawPct = Math.max(0, Math.min(100, Math.max(timeProg, dmgProg) * 100));
-      f._maxHollowPct = Math.max(f._maxHollowPct || 0, rawPct);
-      hollowPct = f._maxHollowPct;
-      hollowReady = hollowPct >= 99 || damageTaken >= reqDamage || bankaiRemaining <= 0;
+      hollowPct = Math.max(0, Math.min(100, timeProg * 100));
+      hollowReady = (bankaiRemaining <= 0 || hollowPct >= 99);
       hollowLabel = 'HOLLOW MASK';
     }
 

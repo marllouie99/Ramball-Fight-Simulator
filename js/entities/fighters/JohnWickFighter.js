@@ -280,10 +280,7 @@ export class JohnWickFighter extends Fighter {
         this.aim(target);
 
         // ── GOJO LIMITLESS INFINITY BARRIER CHECK ──
-        const isTargetGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo' || target._def?.id === 'gojo') &&
-          !target.isMeleeMode &&
-          ((target.infinityCooldown || 0) <= 0 || target.infinityActive) &&
-          !target.isChainedByMakima;
+        const isTargetGojoInfinity = (typeof target.hasActiveInfinity === 'function') && target.hasActiveInfinity();
         const barrierDist = isTargetGojoInfinity ? (CONFIG.gojo?.infinityRadius ?? (target.r + 30)) : (target.r + 6);
 
         if (isTargetGojoInfinity && dist <= this.r + barrierDist) {
@@ -754,10 +751,7 @@ export class JohnWickFighter extends Fighter {
 
         if (Math.abs(diff) <= arc / 2) {
           // Gojo Limitless Infinity Barrier Check
-          const isTargetGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo' || target._def?.id === 'gojo') &&
-            !target.isMeleeMode &&
-            ((target.infinityCooldown || 0) <= 0 || target.infinityActive) &&
-            !target.isChainedByMakima;
+          const isTargetGojoInfinity = (typeof target.hasActiveInfinity === 'function') && target.hasActiveInfinity();
 
           if (isTargetGojoInfinity) {
             const barrierR = CONFIG.gojo?.infinityRadius ?? (target.r + 30);
@@ -1391,10 +1385,7 @@ export class JohnWickFighter extends Fighter {
       if (!this.isRollingBack && state.fighters) {
         for (const f of state.fighters) {
           if (f && f !== this && f.hp > 0 && !this.isTeammate(f)) {
-            const isGojoInfinity = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') &&
-              !f.isMeleeMode &&
-              ((f.infinityCooldown || 0) <= 0 || f.infinityActive) &&
-              !f.isChainedByMakima;
+            const isGojoInfinity = (typeof f.hasActiveInfinity === 'function') && f.hasActiveInfinity();
             if (isGojoInfinity) {
               const dx = f.x - this.x;
               const dy = f.y - this.y;

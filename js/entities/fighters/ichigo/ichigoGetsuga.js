@@ -646,9 +646,6 @@ export function updateGetsuga(fighter, opponent) {
       fighter.gunAngle = fighter.getsugaCastAngle;
       fighter.angle = fighter.getsugaCastAngle;
     }
-    if (fighter.isFinalGetsugaRecovery && isFinalGetsugaVoicelinePlaying(fighter)) {
-      fighter.getsugaRecoveryTimer = Math.max(fighter.getsugaRecoveryTimer, 2);
-    }
 
     // Ensure sword slash animation timer ticks down smoothly during recovery
     if (fighter.slashSwingTimer > 0) {
@@ -665,9 +662,9 @@ export function updateGetsuga(fighter, opponent) {
       fighter.isFinalGetsugaRecovery = false;
       fighter._finalGetsugaVoicePlaying = false;
       fighter._finalGetsugaVoiceHandle = null;
-      if (fighter.slashSwingTimer <= 0) {
-        fighter.isGetsugaSlash = false;
-      }
+      fighter._finalGetsugaVoiceEndTime = 0;
+      fighter.slashSwingTimer = 0;
+      fighter.isGetsugaSlash = false;
       
       // Move backward away from the enemy / cast direction instead of charging forward into the enemy
       const target = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof fighter._getClosestEnemy === 'function' ? fighter._getClosestEnemy() : null);

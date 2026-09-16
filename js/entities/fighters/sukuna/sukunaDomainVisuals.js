@@ -47,7 +47,10 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
 
   const screenW = state.canvas ? state.canvas.width : 1920;
   const screenH = state.canvas ? state.canvas.height : 1080;
-  const waterLineY = sy - 85;
+  const drawW = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineWidth) || 380;
+  const drawH = drawW * (408 / 612);
+  const localSkullBaseY = -195 + (389 / 408) * drawH; // ~46.54px (exact bottom of non-transparent skulls)
+  const waterLineY = (sy - 120) + localSkullBaseY;   // ~sy - 73.46px (exact contact line)
 
   // 1a. Upper Dark Crimson Cursed Sky (Pitch Black with Sinister Dark-Crimson Cloud Formations)
   if (!fighter._cachedSkyGrad || fighter._cachedSkyGradH !== waterLineY || fighter._cachedSkyGradScreenH !== screenH) {
@@ -221,25 +224,7 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
     ctx.restore();
   }
 
-  // ── 6. INVERTED SHRINE REFLECTION IN DARK WATER (STRONGER & MORE VISIBLE) ──
-  if (!isLowQuality) {
-    ctx.save();
-    ctx.translate(sx, waterLineY + 10);
-    ctx.scale(1, -0.6);
-    ctx.globalAlpha = 0.45;
-    fighter._drawShrineBody(ctx);
-
-    // Dark teal wash over the inverted reflection (keeps it moody)
-    ctx.fillStyle = 'rgba(1, 16, 24, 0.40)';
-    ctx.fillRect(-240, -200, 480, 400);
-
-    // Subtle cyan caustic shimmer on reflection
-    ctx.fillStyle = 'rgba(0, 229, 255, 0.08)';
-    ctx.fillRect(-240, -200, 480, 400);
-    ctx.restore();
-  }
-
-  // ── 7. FIGHTER WATER SHADOWS ──
+  // ── 6. FIGHTER WATER SHADOWS ──
   if (!isLowQuality && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f.hp > 0) {
@@ -267,6 +252,12 @@ export function renderSukunaDomainForeground(fighter, ctx) {
   const time = Date.now();
   const sx = fighter.domainX !== undefined ? fighter.domainX : fighter.x;
   const sy = fighter.domainY !== undefined ? fighter.domainY : fighter.y;
+  const screenW = state.canvas ? state.canvas.width : (ctx.canvas ? ctx.canvas.width : 1920);
+  const screenH = state.canvas ? state.canvas.height : (ctx.canvas ? ctx.canvas.height : 1080);
+  const drawW = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineWidth) || 380;
+  const drawH = drawW * (408 / 612);
+  const localSkullBaseY = -195 + (389 / 408) * drawH; // ~46.54px (exact bottom of non-transparent skulls)
+  const waterLineY = (sy - 120) + localSkullBaseY;   // ~sy - 73.46px (exact contact line)
 
   // Detect low quality / low FPS mode
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
@@ -278,7 +269,27 @@ export function renderSukunaDomainForeground(fighter, ctx) {
 
   ctx.save();
 
-  // ── REAL SHRINE STRUCTURE (Above Water Level - Shifted higher toward top) ──
+  // ── 1. INVERTED SHRINE REFLECTION IN DARK WATER (SPRITE ONLY — NEVER OVERLAYS EFFECTS) ──
+  if (!isLowQuality) {
+    ctx.save();
+    // Clip strictly to water surface below horizon so reflection never bleeds upward into sky
+    ctx.beginPath();
+    ctx.rect(0, waterLineY, screenW, Math.max(0, screenH - waterLineY));
+    ctx.clip();
+
+    // Inverted reflection anchored seamlessly at skull base on water line (0px gap)
+    ctx.save();
+    ctx.translate(sx, waterLineY);
+    ctx.scale(1, -0.85); // 85% natural perspective reflection
+    ctx.translate(0, -localSkullBaseY);
+    ctx.globalAlpha = 0.38; // Clean translucent water reflection
+    fighter._drawShrineBody(ctx);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // ── 2. REAL SHRINE STRUCTURE (Above Water Level - Shifted higher toward top) ──
   ctx.save();
   ctx.translate(sx, sy - 120);
   fighter._drawShrineBody(ctx);

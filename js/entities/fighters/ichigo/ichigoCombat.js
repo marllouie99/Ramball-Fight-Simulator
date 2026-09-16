@@ -4,7 +4,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks, spawnParrySparksEffect } from '../../../graphics/particles/sparkEffect.js';
 import { applyDamageToTarget } from '../../fighter.js';
-import { activateHollowMask, isHollowTransformationVoicelinePlaying, stopHollowTransformationVoiceline } from './ichigoHollow.js';
+import { isHollowTransformationVoicelinePlaying, stopHollowTransformationVoiceline } from './ichigoHollow.js';
 import { stopBankaiVoiceline } from './ichigoBankai.js';
 import { fireGetsuga, isAboutToUnleashNormalGetsuga, isGetsugaActive, isGetsugaVoicelinePlaying, isFinalGetsugaVoicelinePlaying, stopFinalGetsugaVoiceline, getCardinalAimAngle, snapToCardinalAngle } from './ichigoGetsuga.js';
 
@@ -477,21 +477,6 @@ export function handleIchigoTakeDamage(fighter, amount, attacker, opts, superTak
     fighter.interruptAttacks(true);
   } else if (isBusyWithFinalGetsuga || isAboutToUnleashNormal || isComboActive || isChannelingHollow || isChannelingBankai) {
     fighter.hitStunTimer = 0; // Supreme Poise: immune to flinch / hit-stun during Grand Finisher, Shunpo Combo, Normal Getsuga, Hollow Awakening, & Bankai
-  }
-
-  // Immediate Hollow Mask trigger upon taking critical damage
-  const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
-  const isPendingFinalGetsuga = fighter.bankaiActive && !fighter.bankaiFinalGetsugaTriggered && fighter.bankaiTimer > 0 && fighter.bankaiTimer <= finalThreshold;
-  const canHollowAwaken = Boolean(fighter.bankaiActive);
-  const isBusyWithGetsuga = isAboutToUnleashNormal || fighter.isChannelingGetsuga || isBusyWithFinalGetsuga || isGetsugaVoicelinePlaying(fighter);
-
-  const reqDamage = (fighter.maxHp || 240) * (CONFIG.ichigo?.hollowRechargeHpRatio ?? 0.20);
-  const baseline = fighter.hollowRechargeHpBaseline !== undefined ? fighter.hollowRechargeHpBaseline : fighter.hp;
-  const damageTaken = Math.max(0, baseline - fighter.hp);
-  const isHollowReady = damageTaken >= reqDamage;
-
-  if (canHollowAwaken && !fighter.hollowMaskActive && !fighter.hollowMaskFormationTimer && !fighter.hollowBurstTimer && !fighter.isTargetOfAmbush && !isBusyWithGetsuga && !isPendingFinalGetsuga && !fighter.isChannelingBankai && !fighter.isParalyzedOrBeamTrapped() && fighter.hp > 0 && isHollowReady) {
-    activateHollowMask(fighter);
   }
 
   return res;

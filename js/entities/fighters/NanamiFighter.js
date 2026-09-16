@@ -311,7 +311,7 @@ export class NanamiFighter extends Fighter {
 
     if (bounced) {
       const target = this._findClosestEnemy() || opponent;
-      const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !this.gojoInfinityImmune && !target.isChainedByMakima;
+      const isTargetGojoInfinity = target && (typeof target.hasActiveInfinity === 'function') && target.hasActiveInfinity() && !this.gojoInfinityImmune;
 
       const currentSpeed = Math.max(Math.hypot(this.vx, this.vy), this.speed || 8);
 
@@ -1078,7 +1078,7 @@ export class NanamiFighter extends Fighter {
 
       if (dist <= maxR) {
         // Gojo Limitless Infinity Guard (Rule 9)
-        const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && !ent.isMeleeMode && ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) && !ent.isChainedByMakima;
+        const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
         if (isGojoInfinity) {
           spawnSparks(ent.x, ent.y, 8, '#00E5FF', '#FFFFFF');
           continue;
@@ -1223,7 +1223,7 @@ export class NanamiFighter extends Fighter {
         this.lungeHitEntities.add(ent);
 
         // Gojo Limitless Infinity Guard
-        const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && !ent.isMeleeMode && ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive) && !ent.isChainedByMakima;
+        const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
         if (isGojoInfinity) {
           const barrierR = CONFIG.gojo?.infinityRadius ?? (ent.r + 30);
           const contactAngle = Math.atan2(this.y - ent.y, this.x - ent.x);

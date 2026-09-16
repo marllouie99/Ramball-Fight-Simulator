@@ -279,16 +279,15 @@ async function main() {
         // Test Hollow Mask awakening and channeling immobility
         fighter.reset();
         fighter.bankaiActive = true;
-        fighter.bankaiTimer = 800;
-        fighter.hollowRechargeHpBaseline = fighter.maxHp;
+        fighter.bankaiTimer = 1;
+        fighter.bankaiFinalGetsugaTriggered = true;
         fighter.x = 200;
         fighter.y = 200;
         fighter.vx = 0;
         fighter.vy = 0;
-        fighter.hp = fighter.maxHp * 0.70; // 30% damage taken in Bankai to trigger Hollow Awakening
         fighter.update(dummyOpponent, 0, state.arena);
         if (!fighter.hollowMaskActive || fighter.hollowMaskFormationTimer <= 0) {
-          throw new Error(`Ichigo did not activate Hollow Mask formation upon taking damage in Bankai`);
+          throw new Error(`Ichigo did not activate Hollow Mask formation upon Bankai expiration`);
         }
         const posX = fighter.x;
         const posY = fighter.y;
@@ -6044,8 +6043,8 @@ async function main() {
     ichigo.isChannelingBankai = false;
     ichigo.bankaiActive = true;
     ichigo.bankaiUsed = true;
-    ichigo.bankaiTimer = 2000;
-    ichigo.hollowRechargeHpBaseline = ichigo.hp;
+    ichigo.bankaiDurationMax = 1000;
+    ichigo.bankaiTimer = 1000;
 
     // Verify Hollow bar starts at 0% right after entering Bankai
     let initialBankaiSkills = getSkillDataForFighter(ichigo);
@@ -6054,12 +6053,34 @@ async function main() {
       throw new Error(`Hollow Mask HUD bar was not at 0% on Bankai activation! pct=${initialBankaiHollow.pct}`);
     }
 
-    // First Hollow Transformation: Deal damage in Bankai >= 20% max HP
+    // Verify taking damage in Bankai does NOT activate Hollow Mask or prematurely fill Hollow bar
     const reqDmg = Math.round(ichigo.maxHp * 0.22);
     ichigo.takeDamage(reqDmg, sukuna, { damage: reqDmg, bypassShield: true });
-    ichigo.update(sukuna, 0, state.arena); // triggers activateHollowMask via damage in Bankai
+    ichigo.update(sukuna, 0, state.arena);
+    if (ichigo.hollowMaskActive || ichigo.hollowMaskFormationTimer > 0) {
+      throw new Error(`Ichigo activated Hollow Mask prematurely upon taking damage in Bankai!`);
+    }
+
+    // Verify Hollow bar progresses strictly with Bankai timer (e.g. 50% through Bankai -> 50% bar)
+    ichigo.bankaiTimer = 500;
+    let midBankaiSkills = getSkillDataForFighter(ichigo);
+    let midBankaiHollow = midBankaiSkills.find(s => s.id === 'hollow');
+    if (!midBankaiHollow || Math.abs(midBankaiHollow.pct - 50) > 1) {
+      throw new Error(`Hollow Mask HUD bar did not strictly track Bankai timer progression! pct=${midBankaiHollow?.pct}`);
+    }
+
+    // Expiration of Bankai duration triggers Hollow Mask Awakening
+    ichigo.bankaiTimer = 1;
+    ichigo.bankaiFinalGetsugaTriggered = true;
+    ichigo.isChannelingGetsuga = false;
+    ichigo.isGetsugaSlash = false;
+    ichigo.getsugaRecoveryTimer = 0;
+    ichigo.shunpoComboActive = false;
+    ichigo._stopFinalGetsugaVoiceline(true);
+    ichigo.update(sukuna, 0, state.arena);
+
     if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
-      throw new Error(`Ichigo failed to activate 1st Hollow Mask transformation after taking damage in Bankai!`);
+      throw new Error(`Ichigo failed to activate 1st Hollow Mask transformation upon Bankai expiration!`);
     }
 
     // Complete 1st transformation animation
@@ -6082,26 +6103,32 @@ async function main() {
     if (ichigo.hollowMaskActive) {
       throw new Error(`1st Hollow Mask failed to deactivate on timer expire!`);
     }
-    if (!ichigo.hollowMaskUsed || ichigo.hollowRechargeHpBaseline === undefined) {
-      throw new Error(`1st Hollow Mask shatter did not set hollowMaskUsed or baseline! baseline=${ichigo.hollowRechargeHpBaseline}`);
+    if (!ichigo.hollowMaskUsed) {
+      throw new Error(`1st Hollow Mask shatter did not set hollowMaskUsed!`);
     }
 
-    // Check HUD skill provider during recharge
-    hudSkills = getSkillDataForFighter(ichigo);
-    hollowSkill = hudSkills.find(s => s.id === 'hollow');
-    if (!hollowSkill || hollowSkill.label !== 'HOLLOW MASK') {
-      throw new Error(`HUD Hollow Skill during recharge failed! Got: ${JSON.stringify(hollowSkill)}`);
-    }
-
-    // Clear any post-shatter reversion timers so Ichigo is ready for next awakening
+    // Clear any post-shatter reversion timers so Ichigo is ready for next awakening cycle
     ichigo.shikaiReversionBurstTimer = 0;
+    ichigo.ultimateCooldown = 0; // ready for 2nd Bankai
 
-    // Deal damage >= 20% of max HP to trigger 2nd Hollow Awakening (bypass parry)
-    ichigo.takeDamage(reqDmg, sukuna, { damage: reqDmg, bypassShield: true });
+    // Enter 2nd Bankai
+    ichigo._releaseBankai();
+    ichigo.bankaiDurationMax = 1000;
+    ichigo.bankaiTimer = 1000;
+    ichigo.bankaiBurstTimer = 0;
+
+    // Drain 2nd Bankai to trigger 2nd Hollow Awakening upon expiration
+    ichigo.bankaiTimer = 1;
+    ichigo.bankaiFinalGetsugaTriggered = true;
+    ichigo.isChannelingGetsuga = false;
+    ichigo.isGetsugaSlash = false;
+    ichigo.getsugaRecoveryTimer = 0;
+    ichigo.shunpoComboActive = false;
+    ichigo._stopFinalGetsugaVoiceline(true);
     ichigo.update(sukuna, 0, state.arena);
 
     if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
-      throw new Error(`Ichigo failed to activate 2nd Hollow Mask transformation after taking damage!`);
+      throw new Error(`Ichigo failed to activate 2nd Hollow Mask transformation upon 2nd Bankai expiration!`);
     }
 
     // Complete 2nd transformation animation
@@ -6118,14 +6145,6 @@ async function main() {
       throw new Error(`2nd Hollow Mask failed to deactivate on timer expire!`);
     }
     ichigo.shikaiReversionBurstTimer = 0;
-
-    // Deal damage again to trigger 3rd Hollow Awakening (bypass parry)
-    ichigo.takeDamage(reqDmg, sukuna, { damage: reqDmg, bypassShield: true });
-    ichigo.update(sukuna, 0, state.arena);
-
-    if (!ichigo.hollowMaskActive && ichigo.hollowMaskFormationTimer <= 0) {
-      throw new Error(`Ichigo failed to activate 3rd Hollow Mask transformation after taking damage!`);
-    }
 
     // Test Hollow Mask Lifesteal strictly respects CONFIG (no hardcoded lifesteal)
     ichigo.reset();

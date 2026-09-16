@@ -1774,7 +1774,7 @@ export class YutaFighter extends Fighter {
         target = nearest;
       }
 
-      const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !target.isChainedByMakima;
+      const isTargetGojoInfinity = target && (typeof target.hasActiveInfinity === 'function') && target.hasActiveInfinity();
 
       const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed || 8;
 

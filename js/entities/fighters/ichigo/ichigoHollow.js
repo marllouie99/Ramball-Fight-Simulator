@@ -4,6 +4,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { stopSound } from '../../../systems/soundSystem.js';
 import { spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { spawnHollowMaskShatter } from '../../../graphics/particles/deathShatterEffect.js';
+import { stopFinalGetsugaVoiceline } from './ichigoGetsuga.js';
 
 /**
  * Activates Ichigo's Hollow Mask transformation state.
@@ -15,16 +16,20 @@ export function activateHollowMask(fighter) {
   if (fighter.hollowMaskActive || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0) return;
   // Hollow Mask strictly requires Bankai form to be actively running!
   if (!fighter.bankaiActive) return;
-  // Do not interrupt Bankai Transformation or Bankai Grand Finisher (Final Massive Kuroi Getsuga)
+  // Do not interrupt Bankai Transformation
   if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0) return;
-  // When Ichigo is about to unleash any normal Getsuga Tensho, let him unleash it before activating Hollow Mask!
-  if (fighter.isAboutToUnleashNormalGetsuga() || fighter.isChannelingGetsuga || fighter._isGetsugaVoicelinePlaying()) return;
-  if (fighter.isFinalMassiveGetsuga || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || fighter._isFinalGetsugaVoicelinePlaying()) return;
-  if (fighter.getsugaRecoveryTimer > 0 && fighter.isFinalGetsugaRecovery) return;
-  const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
+  // When Ichigo is actively gathering / channeling a Getsuga Tensho wave, let the wave release before activating Hollow Mask!
+  if (fighter.isChannelingGetsuga || fighter.isAboutToUnleashNormalGetsuga()) return;
+  const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 108;
   if (fighter.bankaiActive && !fighter.bankaiFinalGetsugaTriggered && fighter.bankaiTimer <= finalThreshold) return;
 
   fighter.interruptAttacks(true); // Cancel any ongoing attack/dash to lock in place
+  fighter.getsugaRecoveryTimer = 0;
+  fighter.isFinalGetsugaRecovery = false;
+  fighter.slashSwingTimer = 0;
+  fighter.isGetsugaSlash = false;
+  fighter.isFinalMassiveGetsuga = false;
+  stopFinalGetsugaVoiceline(fighter, true);
   fighter.hollowMaskUsed = true;
   fighter.hollowMaskActive = true;
   fighter.hollowRechargeHpBaseline = undefined;
@@ -155,10 +160,8 @@ export function applyHollowLifesteal(fighter, damageDealt, target) {
 
   // Defensive validation for target (e.g. if target blocked with Gojo Limitless Infinity, is invulnerable, or dead)
   if (target) {
-    const isGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo') &&
-      !target.isMeleeMode &&
-      (target.infinityActive || (target.infinityCooldown || 0) <= 0) &&
-      !target.isChainedByMakima &&
+    const isGojoInfinity = (typeof target.hasActiveInfinity === 'function') &&
+      target.hasActiveInfinity() &&
       !(fighter.gojoInfinityImmune || fighter.isMaxAdapted);
     if (isGojoInfinity) return;
 
@@ -197,24 +200,7 @@ export function updateHollowMask(fighter, opponent, isMatchEnded) {
     return false;
   }
 
-  // 1. Passive threshold check
-  const finalThreshold = CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160;
-  const isBusyWithFinalGetsuga = (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.getsugaRecoveryTimer > 0 && fighter.isGetsugaSlash && fighter.isFinalGetsugaRecovery);
-  const isAboutToUnleashNormal = fighter.isAboutToUnleashNormalGetsuga();
-  const isBusyWithGetsuga = isAboutToUnleashNormal || fighter.isChannelingGetsuga || isBusyWithFinalGetsuga;
-  const isPendingFinalGetsuga = fighter.bankaiActive && !fighter.bankaiFinalGetsugaTriggered && fighter.bankaiTimer > 0 && fighter.bankaiTimer <= finalThreshold;
-  const canHollowAwaken = Boolean(fighter.bankaiActive);
-
-  const reqDamage = (fighter.maxHp || 240) * (CONFIG.ichigo?.hollowRechargeHpRatio ?? 0.20);
-  const baseline = fighter.hollowRechargeHpBaseline !== undefined ? fighter.hollowRechargeHpBaseline : fighter.hp;
-  const damageTaken = Math.max(0, baseline - fighter.hp);
-  const isHollowReady = damageTaken >= reqDamage;
-
-  if (canHollowAwaken && !fighter.hollowMaskActive && !fighter.hollowMaskFormationTimer && !fighter.hollowBurstTimer && !fighter.isTargetOfAmbush && !isBusyWithGetsuga && !isPendingFinalGetsuga && !fighter.isChannelingBankai && !fighter.isParalyzedOrBeamTrapped() && fighter.hp > 0 && isHollowReady) {
-    activateHollowMask(fighter);
-  }
-
-  // 2. Formation & Sky Burst Immobility Lock
+  // Formation & Sky Burst Immobility Lock
   if (fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0) {
     fighter.vx = 0;
     fighter.vy = 0;

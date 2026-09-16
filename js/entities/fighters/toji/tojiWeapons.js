@@ -221,8 +221,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
       skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null
     });
 
-    const isTargetGojo = target && (target.characterId === 'gojo' || target.type === 'gojo' || target._def?.id === 'gojo');
-    const isBlockedByInfinity = !fighter.isAmbushing && didDamage === false && isTargetGojo && target.infinityActive && (target.infinityCooldown || 0) <= 0 && !target.isChainedByMakima && !target.isMeleeMode;
+    const isBlockedByInfinity = !fighter.isAmbushing && didDamage === false && (typeof target.hasActiveInfinity === 'function') && target.hasActiveInfinity();
 
     if (isBlockedByInfinity) {
       // Split Soul Katana does NOT possess ISOH curse nullification in neutral — blocked 100% by Limitless Infinity!

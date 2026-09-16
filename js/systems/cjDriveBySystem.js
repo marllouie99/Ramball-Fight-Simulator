@@ -469,7 +469,7 @@ export function updateDriveBys() {
 
       if (car.isFrozenByInfinity) {
         if (car.timeStopTimer > 0) car.timeStopTimer--;
-        const hasActiveInfinity = state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && (f.infinityCooldown <= 0 || f.domainActive) && !f.isMeleeMode);
+        const hasActiveInfinity = state.fighters && state.fighters.some(f => f && (typeof f.hasActiveInfinity === 'function') && f.hasActiveInfinity());
         if (!hasActiveInfinity && (!car.timeStopTimer || car.timeStopTimer <= 0)) {
           car.isFrozenByInfinity = false;
         }
@@ -861,9 +861,7 @@ export function updateDriveBys() {
 
           if (distSq < entRadius * entRadius) {
             // Collision detected!
-            const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') &&
-              !ent.isMeleeMode &&
-              ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+            const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
 
             if (isGojoInfinity) {
               if (typeof ent.triggerInfinityBlock === 'function') {

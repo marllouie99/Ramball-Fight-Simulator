@@ -85,8 +85,11 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     return false;
   }
 
-  // If Gojo is trapped inside Rubbick's stolen Unlimited Void or Purple is in flight or chained by Makima, Limitless Infinity is disabled
-  const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0) || ((fighter.z || 0) > 0 && !fighter.isChannelingPurple);
+  // If Gojo is trapped inside Rubbick's stolen Unlimited Void, Purple is active/in flight/in breather, or chained by Makima, Limitless Infinity is disabled
+  const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || 
+    ((fighter.purpleRecoveryTimer || 0) > 0) || 
+    ((fighter.purpleRetreatTimer || 0) > 0) || 
+    ((fighter.z || 0) > 0 && !fighter.isChannelingPurple);
   if (isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode) {
     fighter.infinityActive = false;
     fighter.infinityFadeOpacity = 0;
@@ -115,8 +118,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
   }
 
   const isDomainChanneling = fighter.isDomainPreSlide || fighter.isChannelingDomainExpansion;
-  const isBreatherState = (fighter.purpleRetreatTimer || 0) > 0;
-  if (!isPurpleInFlight && !fighter.isChainedByMakima && (isBreatherState || isDomainChanneling)) {
+  if (!isPurpleInFlight && !fighter.isChainedByMakima && isDomainChanneling) {
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;
     fighter.isMeleeMode = false;
