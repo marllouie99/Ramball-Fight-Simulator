@@ -39,7 +39,7 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   const yutaClashFighter = isMultiDomain ? state.fighters.find(f => f && f.domainActive && (f.type === 'yuta' || (f._def && f._def.id === 'yuta'))) : null;
   const isYutaClash = !!yutaClashFighter;
 
-  // ── 1. DARK LIQUID WATER FLOOR & SPECULAR SHEEN ──
+  // ── 1. INNATE DOMAIN: UPPER CRIMSON VOID SKY & LOWER LUMINOUS CYAN ABYSSAL WATER ──
   ctx.save();
   if (isClashSecondary) {
     ctx.globalAlpha = 0.70; // Blends on top of existing domain during domain clash
@@ -47,34 +47,152 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
 
   const screenW = state.canvas ? state.canvas.width : 1920;
   const screenH = state.canvas ? state.canvas.height : 1080;
+  const waterLineY = sy - 85;
 
-  if (!fighter._cachedLiquidGrad || fighter._cachedLiquidGradH !== screenH) {
-    fighter._cachedLiquidGradH = screenH;
-    fighter._cachedLiquidGrad = ctx.createLinearGradient(0, 0, 0, screenH);
-    fighter._cachedLiquidGrad.addColorStop(0, 'rgba(42, 4, 10, 0.92)');
-    fighter._cachedLiquidGrad.addColorStop(0.3, 'rgba(78, 8, 18, 0.88)');
-    fighter._cachedLiquidGrad.addColorStop(0.7, 'rgba(52, 6, 14, 0.90)');
-    fighter._cachedLiquidGrad.addColorStop(1, 'rgba(28, 3, 8, 0.95)');
+  // 1a. Upper Dark Crimson Cursed Sky
+  if (!fighter._cachedSkyGrad || fighter._cachedSkyGradH !== waterLineY || fighter._cachedSkyGradScreenH !== screenH) {
+    fighter._cachedSkyGradH = waterLineY;
+    fighter._cachedSkyGradScreenH = screenH;
+    fighter._cachedSkyGrad = ctx.createLinearGradient(0, 0, 0, Math.max(1, waterLineY));
+    fighter._cachedSkyGrad.addColorStop(0, 'rgba(10, 1, 3, 0.98)');
+    fighter._cachedSkyGrad.addColorStop(0.35, 'rgba(48, 4, 10, 0.94)');
+    fighter._cachedSkyGrad.addColorStop(0.75, 'rgba(80, 8, 18, 0.90)');
+    fighter._cachedSkyGrad.addColorStop(1.0, 'rgba(18, 10, 18, 0.96)');
   }
 
-  ctx.fillStyle = fighter._cachedLiquidGrad;
-  // Fill inside clipped arena
-  ctx.fillRect(0, 0, screenW, screenH);
+  // 1b. Lower Luminous Teal-Cyan Abyssal Water Floor (Authentic Innate Domain Scene)
+  if (!fighter._cachedWaterGrad || fighter._cachedWaterGradH !== screenH || fighter._cachedWaterGradY !== waterLineY) {
+    fighter._cachedWaterGradY = waterLineY;
+    fighter._cachedWaterGradH = screenH;
+    fighter._cachedWaterGrad = ctx.createLinearGradient(0, waterLineY, 0, screenH);
+    fighter._cachedWaterGrad.addColorStop(0.0, 'rgba(3, 32, 44, 0.95)');    // Deep teal water surface
+    fighter._cachedWaterGrad.addColorStop(0.20, 'rgba(5, 58, 76, 0.92)');   // Illuminated turquoise depth
+    fighter._cachedWaterGrad.addColorStop(0.55, 'rgba(3, 38, 54, 0.94)');   // Dark aquatic depth
+    fighter._cachedWaterGrad.addColorStop(0.85, 'rgba(2, 22, 32, 0.96)');   // Abyssal teal-black
+    fighter._cachedWaterGrad.addColorStop(1.0, 'rgba(1, 10, 16, 0.98)');    // Deep ocean abyss floor
+  }
+
+  // Draw Sky & Water Floor
+  ctx.fillStyle = fighter._cachedSkyGrad;
+  ctx.fillRect(0, 0, screenW, Math.max(0, waterLineY));
+
+  ctx.fillStyle = fighter._cachedWaterGrad;
+  ctx.fillRect(0, Math.max(0, waterLineY), screenW, Math.max(0, screenH - waterLineY));
   ctx.restore();
 
-  // Horizontal liquid water wave sheen lines across the floor (batched single-stroke for 60 FPS performance)
-  const waveCount = isLowQuality ? 3 : (isMultiDomain ? 5 : 10);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(255, 90, 90, 0.24)';
+  // ── 2. BACKGROUND MASONRY GRID / CYLINDRICAL CHAMBER WALL (AUTHENTIC INNATE DOMAIN) ──
+  if (!isLowQuality) {
+    ctx.save();
+    // Vertical panel seams
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const panelSpacing = 85;
+    const startX = (sx % panelSpacing) - panelSpacing;
+    for (let px = startX; px < screenW + panelSpacing; px += panelSpacing) {
+      ctx.moveTo(px, waterLineY);
+      ctx.lineTo(px, screenH);
+    }
+    // Horizontal mortar rows
+    for (let py = waterLineY + 45; py < screenH; py += 65) {
+      ctx.moveTo(0, py);
+      ctx.lineTo(screenW, py);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── 3. LUMINOUS GLOWING CYAN WATER PILLARS / VERTICAL LIGHT COLUMNS ──
+  const pillarOffsets = isLowQuality ? [-360, 360] : [-560, -320, 320, 560];
+  const pillarW = isLowQuality ? 70 : 85;
+  const halfPW = pillarW / 2;
+  const pillarWaterTop = Math.max(0, waterLineY);
+  const pillarWaterH = Math.max(0, screenH - pillarWaterTop);
+
+  for (let i = 0; i < pillarOffsets.length; i++) {
+    const colX = sx + pillarOffsets[i];
+    if (colX + halfPW < 0 || colX - halfPW > screenW) continue;
+
+    ctx.save();
+    const colGrad = ctx.createLinearGradient(colX - halfPW, 0, colX + halfPW, 0);
+    colGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
+    colGrad.addColorStop(0.25, 'rgba(8, 145, 178, 0.10)');
+    colGrad.addColorStop(0.50, 'rgba(0, 229, 255, 0.28)'); // Vibrant glowing cyan beam core
+    colGrad.addColorStop(0.75, 'rgba(8, 145, 178, 0.10)');
+    colGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+
+    ctx.fillStyle = colGrad;
+    ctx.fillRect(colX - halfPW, pillarWaterTop, pillarW, pillarWaterH);
+
+    // Sharp white-cyan center vertical highlight filament
+    ctx.strokeStyle = 'rgba(180, 250, 255, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(colX, pillarWaterTop);
+    ctx.lineTo(colX, screenH);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ── 4. WATER SURFACE HORIZON MENISCUS & GLOWING CYAN MIST ──
+  ctx.save();
+  const mistH = 30;
+  const mistGrad = ctx.createLinearGradient(0, waterLineY - mistH, 0, waterLineY + mistH);
+  mistGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
+  mistGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.26)');
+  mistGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+  ctx.fillStyle = mistGrad;
+  ctx.fillRect(0, waterLineY - mistH, screenW, mistH * 2);
+
+  // Surface water meniscus line
+  ctx.strokeStyle = 'rgba(190, 250, 255, 0.55)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(0, waterLineY);
+  ctx.lineTo(screenW, waterLineY);
+  ctx.stroke();
+  ctx.restore();
+
+  // ── 5. HORIZONTAL LIQUID CYAN WATER WAVE SHEEN & CAUSTICS ──
+  const waveCount = isLowQuality ? 3 : (isMultiDomain ? 5 : 9);
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.28)';
   ctx.beginPath();
   for (let w = 0; w < waveCount; w++) {
-    const wy = sy - 150 + w * 45 + Math.sin(time * 0.002 + w) * 8;
+    const wy = waterLineY + 25 + w * 40 + Math.sin(time * 0.002 + w) * 6;
     ctx.moveTo(sx - 1200, wy);
-    ctx.quadraticCurveTo(sx, wy + Math.sin(time * 0.004 + w * 2) * 12, sx + 1200, wy);
+    ctx.quadraticCurveTo(sx, wy + Math.sin(time * 0.004 + w * 2) * 10, sx + 1200, wy);
   }
   ctx.stroke();
 
-  // ── DOMAIN CLASH: Blood-water crimson ripples radiating toward Yuta's domain side ──
+  // Secondary subtle aqua wave highlight
+  if (!isLowQuality) {
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.16)';
+    ctx.beginPath();
+    for (let w = 0; w < waveCount - 1; w++) {
+      const wy = waterLineY + 45 + w * 40 + Math.cos(time * 0.0025 + w * 1.3) * 7;
+      ctx.moveTo(sx - 1200, wy);
+      ctx.quadraticCurveTo(sx, wy - Math.sin(time * 0.0035 + w * 2) * 8, sx + 1200, wy);
+    }
+    ctx.stroke();
+  }
+
+  // ── 6. FLOATING BIOLUMINESCENT AQUATIC MOTES / PARTICLES ──
+  if (!isLowQuality) {
+    const moteCount = isMultiDomain ? 8 : 16;
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.38)';
+    for (let m = 0; m < moteCount; m++) {
+      const seedX = (sx - 500 + (m * 83) % 1000);
+      const seedY = waterLineY + 30 + ((m * 67 + time * 0.03) % Math.max(100, screenH - waterLineY));
+      const moteR = 1.2 + (m % 3) * 0.6;
+      ctx.beginPath();
+      ctx.arc(seedX + Math.sin(time * 0.002 + m) * 12, seedY, moteR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ── DOMAIN CLASH: Cyan/crimson water ripples radiating toward opponent domain ──
   if (isYutaClash) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -82,9 +200,8 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
     const yDomY = yutaClashFighter.domainY !== undefined ? yutaClashFighter.domainY : yutaClashFighter.y;
     const dirAngle = Math.atan2(yDomY - sy, yDomX - sx);
 
-    // Radiate fewer ripples in low quality (2 instead of 5)
     const rippleCount = isLowQuality ? 2 : 5;
-    ctx.strokeStyle = 'rgba(180, 20, 20, 0.22)';
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.32)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let r = 0; r < rippleCount; r++) {
@@ -96,29 +213,48 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
     ctx.restore();
   }
 
-  // ── 2. WATER REFLECTION OF THE SHRINE STRUCTURE (completely skipped in low quality to save CPU drawImage)
+  // ── 7. INVERTED SHRINE REFLECTION IN GLOWING CYAN WATER ──
   if (!isLowQuality) {
     ctx.save();
-    ctx.translate(sx, sy - 40);
-    ctx.scale(1, -0.45);
-    ctx.globalAlpha = 0.32;
+    ctx.translate(sx, waterLineY);
+    ctx.scale(1, -0.55);
+    ctx.globalAlpha = 0.38;
     fighter._drawShrineBody(ctx);
-    ctx.fillStyle = 'rgba(20, 2, 6, 0.45)';
-    ctx.fillRect(-150, -150, 300, 300);
+
+    // Aquatic teal wash over the inverted reflection
+    ctx.fillStyle = 'rgba(2, 28, 40, 0.52)';
+    ctx.fillRect(-220, -180, 440, 360);
+
+    // Subtle cyan caustics glow on reflection
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.15)';
+    ctx.fillRect(-220, -180, 440, 360);
     ctx.restore();
   }
 
-  // ── 3. FIGHTER WATER REFLECTIONS (completely skipped in low quality)
+  // ── 8. FIGHTER WATER RIPPLES & REFLECTIONS ──
   if (!isLowQuality && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f.hp > 0) {
         ctx.save();
-        ctx.translate(f.x, f.y + f.r * 1.6);
-        ctx.scale(1, 0.3);
-        ctx.fillStyle = 'rgba(255, 30, 30, 0.25)';
+        ctx.translate(f.x, f.y + f.r * 1.5);
+        ctx.scale(1, 0.32);
+
+        // Dark cyan water shadow
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.22)';
         ctx.beginPath();
         ctx.arc(0, 0, f.r * 1.3, 0, Math.PI * 2);
         ctx.fill();
+
+        // Expanding concentric cyan ripples
+        const ripPhase = (time * 0.003 + (f.x + f.y) * 0.01) % 1;
+        const ripR = (f.r * 0.8) + ripPhase * (f.r * 1.6);
+        const ripAlpha = (1 - ripPhase) * 0.35;
+        ctx.strokeStyle = `rgba(0, 229, 255, ${ripAlpha.toFixed(2)})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, ripR, 0, Math.PI * 2);
+        ctx.stroke();
+
         ctx.restore();
       }
     });
