@@ -107,31 +107,9 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   ctx.fillRect(0, Math.max(0, waterLineY), screenW, Math.max(0, screenH - waterLineY));
   ctx.restore();
 
-  // ── 2. BACKGROUND MASONRY GRID / CYLINDRICAL CHAMBER WALL (AUTHENTIC INNATE DOMAIN) ──
-  if (!isLowQuality) {
-    ctx.save();
-    // Vertical panel seams
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.05)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    const panelSpacing = 85;
-    const startX = (sx % panelSpacing) - panelSpacing;
-    for (let px = startX; px < screenW + panelSpacing; px += panelSpacing) {
-      ctx.moveTo(px, waterLineY);
-      ctx.lineTo(px, screenH);
-    }
-    // Horizontal mortar rows
-    for (let py = waterLineY + 45; py < screenH; py += 65) {
-      ctx.moveTo(0, py);
-      ctx.lineTo(screenW, py);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // ── 3. LUMINOUS GLOWING CYAN WATER PILLARS / VERTICAL LIGHT COLUMNS ──
-  const pillarOffsets = isLowQuality ? [-360, 360] : [-560, -320, 320, 560];
-  const pillarW = isLowQuality ? 70 : 85;
+  // ── 2. LUMINOUS GLOWING CYAN WATER LIGHT SHAFTS (SMOOTH ATMOSPHERIC GLOWS) ──
+  const pillarOffsets = isLowQuality ? [-380, 380] : [-520, -280, 280, 520];
+  const pillarW = isLowQuality ? 130 : 160;
   const halfPW = pillarW / 2;
   const pillarWaterTop = Math.max(0, waterLineY);
   const pillarWaterH = Math.max(0, screenH - pillarWaterTop);
@@ -143,42 +121,25 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
     ctx.save();
     const colGrad = ctx.createLinearGradient(colX - halfPW, 0, colX + halfPW, 0);
     colGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
-    colGrad.addColorStop(0.25, 'rgba(8, 145, 178, 0.10)');
-    colGrad.addColorStop(0.50, 'rgba(0, 229, 255, 0.28)'); // Vibrant glowing cyan beam core
-    colGrad.addColorStop(0.75, 'rgba(8, 145, 178, 0.10)');
+    colGrad.addColorStop(0.30, 'rgba(4, 120, 150, 0.06)');
+    colGrad.addColorStop(0.50, 'rgba(0, 229, 255, 0.18)'); // Soft seamless cyan light glow
+    colGrad.addColorStop(0.70, 'rgba(4, 120, 150, 0.06)');
     colGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
 
     ctx.fillStyle = colGrad;
     ctx.fillRect(colX - halfPW, pillarWaterTop, pillarW, pillarWaterH);
-
-    // Sharp white-cyan center vertical highlight filament
-    ctx.strokeStyle = 'rgba(180, 250, 255, 0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(colX, pillarWaterTop);
-    ctx.lineTo(colX, screenH);
-    ctx.stroke();
-
     ctx.restore();
   }
 
-  // ── 4. WATER SURFACE HORIZON MENISCUS & GLOWING CYAN MIST ──
+  // ── 3. WATER SURFACE HORIZON MENISCUS & GLOWING CYAN MIST ──
   ctx.save();
-  const mistH = 30;
+  const mistH = 35;
   const mistGrad = ctx.createLinearGradient(0, waterLineY - mistH, 0, waterLineY + mistH);
   mistGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
-  mistGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.26)');
+  mistGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.22)');
   mistGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
   ctx.fillStyle = mistGrad;
   ctx.fillRect(0, waterLineY - mistH, screenW, mistH * 2);
-
-  // Surface water meniscus line
-  ctx.strokeStyle = 'rgba(190, 250, 255, 0.55)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, waterLineY);
-  ctx.lineTo(screenW, waterLineY);
-  ctx.stroke();
   ctx.restore();
 
   // ── 5. HORIZONTAL LIQUID CYAN WATER WAVE SHEEN & CAUSTICS ──
