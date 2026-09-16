@@ -1,17 +1,11 @@
 // ─────────────────────────────────────────────
 // YUTA OKKOTSU FIGHTER SKIN & BODY MODEL
 // Special Grade Jujutsu Sorcerer (Jujutsu Kaisen)
-// Supports High-Definition Pixel-Art Model from:
-// Assets/model/Yuta-SKIN.png
-// With procedural canvas fallback matching the model sheet:
-// 1. Signature Jet-Black Swept Bangs & Curved Side Locks
-// 2. Fair Ivory-Peach Skin Tone with Subtle Weary Eye Shadow Nuance
-// 3. High Standing Wrap Collar with Upper Gold Swirl Button #1
-// 4. Stepped Asymmetrical Chest Lapel Line with Gold Swirl Button #2
-// 5. Vertical Side Seam Line Dropping Straight Down the White Jacket
-// 6. Cinched White Jacket Bottom Hem & Dark Charcoal Uniform Trousers
-// 7. Iconic White Hanging Ribbon / Drawstring Bow at Front Waistband
-// 8. Dark Charcoal Sword Case Shoulder Strap & Silver Engagement Ring
+// Features Authentic Pixel-Art Model Matching Reference:
+// 1. High Standing White Wrap Collar with Gold Swirl Button & Dark Strap
+// 2. Fair Ivory-Peach Skin Tone (Rule 19 Compliant, Faceless)
+// 3. Midnight Charcoal Pants with Center White Cinch/Zipper Line
+// 4. Authentic Pixel-Art Jet-Black Swept Hair (Assets/model/Yuta-hair.png)
 // Rule 19 (Upright Front POV), Rule 20 (Hand Visibility), and Rule 11 Compliant
 // ─────────────────────────────────────────────
 
@@ -19,71 +13,82 @@ import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { FighterRenderer, drawPixelHand } from '../renderers/fighterRenderer.js';
 
-let _yutaSkinImage = null;
-let _yutaSkinImageLoading = false;
+let _yutaHairImage = null;
+let _yutaHairImageLoading = false;
 
-export function _getYutaSkinImage() {
-  if (_yutaSkinImage && _yutaSkinImage.complete && _yutaSkinImage.naturalWidth > 0) {
-    return _yutaSkinImage;
+export function _getYutaHairImage() {
+  if (_yutaHairImage && _yutaHairImage.complete && _yutaHairImage.naturalWidth > 0) {
+    return _yutaHairImage;
   }
-  if (!_yutaSkinImageLoading && typeof Image !== 'undefined') {
-    _yutaSkinImageLoading = true;
+  if (!_yutaHairImageLoading && typeof Image !== 'undefined') {
+    _yutaHairImageLoading = true;
     const img = new Image();
     img.onload = () => {
-      _yutaSkinImage = img;
-      _yutaSkinImageLoading = false;
+      _yutaHairImage = img;
+      _yutaHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Yuta pixel skin image at Assets/model/Yuta-PIXEL-SKIN.png', e);
-      _yutaSkinImageLoading = false;
+      console.warn('Failed to load Yuta hair image at Assets/model/Yuta-hair.png', e);
+      _yutaHairImageLoading = false;
     };
-    img.src = 'Assets/model/Yuta-PIXEL-SKIN.png?v=1';
-    _yutaSkinImage = img;
+    img.src = 'Assets/model/Yuta-hair.png?v=1';
+    _yutaHairImage = img;
   }
-  return _yutaSkinImage;
+  return _yutaHairImage;
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getYutaSkinImage();
+  _getYutaHairImage();
 }
 
 /**
- * Draws Yuta's iconic golden Jujutsu High swirl buttons
+ * Draws Yuta's authentic anime spiky hair from Assets/model/Yuta-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
  */
-function drawGoldSwirlButton(ctx, cx, cy, radius) {
-  ctx.save();
-  ctx.translate(cx, cy);
+export function _drawYutaHair(ctx, r, facingLeft = false) {
+  const hairImg = _getYutaHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
-  // Outer gold button circle
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fillStyle = '#D4AF37'; // Rich antique gold
-  ctx.fill();
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.yuta) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
 
-  // Subtle metallic highlight crescent
-  ctx.beginPath();
-  ctx.arc(-radius * 0.25, -radius * 0.25, radius * 0.50, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255, 248, 190, 0.65)';
-  ctx.fill();
+    // Yuta-hair.png (577x433). True visible hair bounding box:
+    // X: [72, 492] (width 421, horizontal center at 282)
+    // Y: [82, 408] (height 327, top crown at 82)
+    // Scales to seamlessly cover the upper circle with spiky crown at -1.25r
+    const targetHairWidth = r * 2.40 * wMult;
+    const targetHairHeight = r * 1.80 * hMult;
+    const scaleX = targetHairWidth / 421;
+    const scaleY = targetHairHeight / 327;
+    const drawW = 577 * scaleX;
+    const drawH = 433 * scaleY;
+    const drawX = -282 * scaleX + offX;
+    const drawY = -r * 1.25 - 82 * scaleY + offY;
 
-  // Inner black swirl / emblem
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 0.85;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 1.5);
-  ctx.stroke();
-
-  ctx.restore();
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
 }
 
 /**
  * Draws Yuta's hand with white uniform sleeve cuff, skin tone, and signature silver engagement ring.
  * Fully compliant with Rule 20 (Hand Visibility & Skin Only).
  */
-export function drawYutaFist(ctx, x, y, radius, skinColor = '#FABC95', fighter = null, isLeft = false) {
+export function drawYutaFist(ctx, x, y, radius, skinColor = '#F7C4A5', fighter = null, isLeft = false) {
   ctx.save();
   ctx.translate(x, y);
 
@@ -134,6 +139,140 @@ export function drawYutaFist(ctx, x, y, radius, skinColor = '#FABC95', fighter =
   ctx.restore();
 }
 
+let _cachedYutaBodyCanvas = null;
+let _cachedYutaBodyR = 0;
+
+/**
+ * Procedural Pixel Art Render Function (Renders once to offscreen cache).
+ * Matches the reference image:
+ * - Stepped dark outer circle stroke
+ * - Warm fair peach face skin (no procedural hair)
+ * - White wrap collar / jacket with dark left notch, gold swirl button, dark shoulder strap
+ * - Midnight charcoal pants with center white cinch / zipper line
+ */
+function _renderYutaPixelBodyToCanvas(destCtx, r) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
+  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
+  const P = 2.0;
+  const steps = Math.ceil((r + P) / P);
+
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = rx - P / 2;
+      const py = ry - P / 2;
+
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = '#0E0F14';
+        destCtx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // ZONE 1: Face Skin (ry < r * 0.14)
+      // ──────────────────────────────────────────
+      if (ry < r * 0.14) {
+        let col = '#F7C4A5'; // Fair warm peach
+        if (Math.abs(rx) > r * 0.70) {
+          col = '#E8B496'; // Subtle cheek contour
+        }
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2: White Jujutsu High Jacket & Wrap Collar (r * 0.14 <= ry < r * 0.64)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.64) {
+        // Gold Button #1: cx = r * 0.38, cy = r * 0.38, btnR = r * 0.10
+        const btnX = r * 0.38, btnY = r * 0.38, btnR = r * 0.10;
+        const bDist = Math.hypot(rx - btnX, ry - btnY);
+
+        if (bDist <= btnR) {
+          if (bDist >= btnR - P * 0.8) {
+            destCtx.fillStyle = '#1C1917'; // Dark bronze rim
+          } else if (Math.hypot(rx - (btnX - btnR * 0.35), ry - (btnY - btnR * 0.35)) <= P * 0.9) {
+            destCtx.fillStyle = '#FCD34D'; // Soft golden highlight
+          } else if (bDist <= btnR * 0.35) {
+            destCtx.fillStyle = '#78350F'; // Inner swirl dot
+          } else {
+            destCtx.fillStyle = '#D4AF37'; // Rich Antique Gold
+          }
+        } else if (rx >= r * 0.44 && rx <= r * 0.54 && ry >= r * 0.30) {
+          // Subtle shoulder fold crease on right
+          destCtx.fillStyle = '#D0D8E2';
+        } else if (rx <= -r * 0.52 && ry >= r * 0.14 && ry <= r * 0.22) {
+          // Left collar notch
+          destCtx.fillStyle = '#333B48';
+        } else if (ry > r * 0.54) {
+          // Lower fold shadow band
+          destCtx.fillStyle = '#D0D8E2';
+        } else {
+          // Pure white jacket
+          destCtx.fillStyle = '#FAFAFC';
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 3: Dark Uniform Pants (ry >= r * 0.64)
+      // ──────────────────────────────────────────
+      else {
+        // Subtle center dark inseam crease (zero white wrapper lines)
+        if (Math.abs(rx) <= P * 0.6 && ry >= r * 0.64 && ry <= r * 0.94) {
+          destCtx.fillStyle = '#0E1014'; // Subtle center inseam
+        } else {
+          destCtx.fillStyle = '#16181E'; // Midnight charcoal navy
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  destCtx.restore();
+}
+
+/**
+ * Draws Yuta Okkotsu's entire body circle model in authentic Pixel Art Style (Offscreen Cached).
+ * Uses discrete stepped pixel grid rasterization matching the reference image.
+ * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
+ */
+export function drawYutaPixelBody(ctx, r) {
+  if (typeof document === 'undefined') return;
+
+  if (!_cachedYutaBodyCanvas || _cachedYutaBodyR !== r) {
+    _cachedYutaBodyR = r;
+    const P = 2.0;
+    const steps = Math.ceil((r + P) / P);
+    const size = (steps * 2 + 1) * P;
+
+    _cachedYutaBodyCanvas = document.createElement('canvas');
+    _cachedYutaBodyCanvas.width = size;
+    _cachedYutaBodyCanvas.height = size;
+    const offCtx = _cachedYutaBodyCanvas.getContext('2d');
+    _renderYutaPixelBodyToCanvas(offCtx, r);
+  }
+
+  if (_cachedYutaBodyCanvas) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(_cachedYutaBodyCanvas, -_cachedYutaBodyCanvas.width / 2, -_cachedYutaBodyCanvas.height / 2);
+    ctx.restore();
+  }
+}
+
 /**
  * Main entry point — Draws Yuta Okkotsu's stylized anime character body circle.
  */
@@ -154,261 +293,13 @@ export function drawYutaSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // ── 1. CLIPPED BODY CIRCLE ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
+  // ── 1. BODY CIRCLE (Authentic Procedural Pixel Art) ──
+  drawYutaPixelBody(ctx, r);
 
-  const yutaImg = _getYutaSkinImage();
-  if (yutaImg && yutaImg.complete && yutaImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
-    // Scale factor 1.22 expands the art so its boundary fits flush with the outer circle, matching other fighters
-    const modelScale = 1.22;
-    const drawR = r * modelScale;
-    ctx.drawImage(yutaImg, -drawR, -drawR, drawR * 2, drawR * 2);
-    ctx.restore();
-  } else {
-    // Base Skin Fill — Warm Peach (#FABC95) matching Yuta face model
-    ctx.fillStyle = '#FABC95';
-    ctx.fillRect(-r * 1.05, -r * 1.05, r * 2.1, r * 2.1);
+  // ── 2. AUTHENTIC PIXEL-ART HAIR MODEL (Assets/model/Yuta-hair.png) ──
+  _drawYutaHair(ctx, r, facingLeft);
 
-    // Subtle warm skin cheek/side contour shading
-    const cheekGrad = ctx.createRadialGradient(0, -r * 0.1, r * 0.3, 0, 0, r);
-    cheekGrad.addColorStop(0, 'rgba(255, 245, 240, 0.25)');
-    cheekGrad.addColorStop(0.7, 'rgba(238, 208, 190, 0.25)');
-    cheekGrad.addColorStop(1, 'rgba(215, 175, 155, 0.45)');
-    ctx.fillStyle = cheekGrad;
-    ctx.fillRect(-r * 1.05, -r * 1.05, r * 2.1, r * 2.1);
-
-    // Signature Weary Under-Brow Eye Shadow (Tired dark circles nuance - Rule 19 compliant, NO eyes/pupils)
-    ctx.fillStyle = 'rgba(175, 135, 120, 0.22)';
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.30, -r * 0.04, r * 0.22, r * 0.07, 0.08, 0, Math.PI * 2);
-    ctx.ellipse( r * 0.30, -r * 0.04, r * 0.22, r * 0.07, -0.08, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ── 2. SPECIAL GRADE WHITE JUJUTSU HIGH UNIFORM JACKET ──
-
-    // A. Main White Uniform Jacket Body (+Y)
-    ctx.fillStyle = '#FAFAFC';
-    ctx.beginPath();
-    ctx.moveTo(-r * 1.05, r * 0.08);
-    ctx.lineTo( r * 1.05, r * 0.08);
-    ctx.lineTo( r * 1.05, r * 0.72);
-    ctx.lineTo(-r * 1.05, r * 0.72);
-    ctx.closePath();
-    ctx.fill();
-
-    // Soft Silver-Slate Fabric Crease & Fold Shading (Anime Reference Shading)
-    ctx.fillStyle = 'rgba(205, 214, 226, 0.38)';
-    // Left side fold shadow
-    ctx.beginPath();
-    ctx.moveTo(-r * 1.05, r * 0.18);
-    ctx.lineTo(-r * 0.45, r * 0.28);
-    ctx.lineTo(-r * 0.55, r * 0.68);
-    ctx.lineTo(-r * 1.05, r * 0.72);
-    ctx.closePath();
-    ctx.fill();
-
-    // Right side fold shadow
-    ctx.beginPath();
-    ctx.moveTo( r * 1.05, r * 0.18);
-    ctx.lineTo( r * 0.55, r * 0.28);
-    ctx.lineTo( r * 0.65, r * 0.68);
-    ctx.lineTo( r * 1.05, r * 0.72);
-    ctx.closePath();
-    ctx.fill();
-
-    // B. High Standing Wrap Collar
-    // Neck Throat Shadow (Inside the top collar cavity)
-    ctx.fillStyle = '#DFB79E';
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.04, r * 0.22, r * 0.06, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Standing White Collar Structure (Curving naturally around the neck)
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.30, r * 0.02);
-    ctx.quadraticCurveTo(0, r * 0.06, r * 0.28, r * 0.02); // Top rim of collar
-    ctx.lineTo(r * 0.26, r * 0.20);
-    ctx.quadraticCurveTo(0, r * 0.24, -r * 0.28, r * 0.20); // Bottom rim of collar
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Collar Flap Overlap Line (Vertical seam on the right side of collar)
-    ctx.beginPath();
-    ctx.moveTo(r * 0.12, r * 0.03);
-    ctx.lineTo(r * 0.14, r * 0.20);
-    ctx.stroke();
-
-    // Upper Gold Button #1 on the High Collar (Character's left / Viewer's right)
-    const buttonRadius = Math.max(1.8, r * 0.055);
-    drawGoldSwirlButton(ctx, r * 0.20, r * 0.11, buttonRadius);
-
-    // C. Stepped Asymmetrical Chest Lapel Line & Outer Gold Button #2
-    // Soft shadow along the overlapping flap
-    ctx.fillStyle = 'rgba(195, 206, 220, 0.45)';
-    ctx.beginPath();
-    ctx.moveTo( r * 0.14, r * 0.20);
-    ctx.lineTo( r * 0.48, r * 0.22);
-    ctx.lineTo( r * 0.42, r * 0.72);
-    ctx.lineTo( r * 0.36, r * 0.72);
-    ctx.lineTo( r * 0.42, r * 0.26);
-    ctx.lineTo( r * 0.14, r * 0.24);
-    ctx.closePath();
-    ctx.fill();
-
-    // Single Crisp Seam Line: Horizontal along upper chest, then dropping straight down
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(r * 0.14, r * 0.20);
-    ctx.lineTo(r * 0.48, r * 0.22); // Horizontal flap top edge
-    ctx.lineTo(r * 0.42, r * 0.72); // Vertical seam line down to bottom hem
-    ctx.stroke();
-
-    // Outer Gold Button #2 on the Chest Flap Corner
-    drawGoldSwirlButton(ctx, r * 0.46, r * 0.22, buttonRadius);
-
-    // D. White Jacket Cinched Bottom Hem Band
-    ctx.fillStyle = '#F2F4F7';
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.rect(-r * 1.05, r * 0.66, r * 2.1, r * 0.06);
-    ctx.fill();
-    ctx.stroke();
-
-    // ── 3. DARK CHARCOAL TROUSERS & HANGING WHITE DRAWSTRING RIBBON ──
-    // Dark uniform pants at bottom rim
-    ctx.fillStyle = '#23242B';
-    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.38);
-
-    // Pants Center Vertical Inseam
-    ctx.strokeStyle = '#14151A';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.moveTo(0, r * 0.72);
-    ctx.lineTo(0, r * 1.05);
-    ctx.stroke();
-
-    // Iconic White Hanging Ribbon / Drawstring Bow (Anime Reference Center Waistband)
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 1.1;
-
-    // Dual hanging ribbon loops / tails
-    ctx.beginPath();
-    // Left ribbon tail
-    ctx.moveTo(-r * 0.06, r * 0.70);
-    ctx.lineTo(-r * 0.08, r * 0.95);
-    ctx.lineTo(-r * 0.02, r * 0.92);
-    ctx.lineTo(-r * 0.01, r * 0.70);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    // Right ribbon tail
-    ctx.moveTo( r * 0.01, r * 0.70);
-    ctx.lineTo( r * 0.02, r * 0.92);
-    ctx.lineTo( r * 0.08, r * 0.95);
-    ctx.lineTo( r * 0.06, r * 0.70);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Center knot of the ribbon
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(0, r * 0.71, Math.max(1.4, r * 0.04), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // ── 4. DARK CHARCOAL SWORD CASE SHOULDER STRAP ──
-    // Dark charcoal fabric strap passing smoothly over right shoulder (Viewer's left)
-    ctx.strokeStyle = '#23242B';
-    ctx.lineWidth = Math.max(2.2, r * 0.09);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.65, -r * 0.22);
-    ctx.quadraticCurveTo(-r * 0.58, r * 0.15, -r * 0.52, r * 0.66);
-    ctx.stroke();
-
-    // Strap subtle edge highlight
-    ctx.strokeStyle = '#383B46';
-    ctx.lineWidth = Math.max(0.7, r * 0.025);
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.63, -r * 0.22);
-    ctx.quadraticCurveTo(-r * 0.56, r * 0.15, -r * 0.50, r * 0.64);
-    ctx.stroke();
-
-    // ── 5. YUTA'S SIGNATURE JET-BLACK SWEPT HAIR (SMOOTH ANIME BANGS) ──
-    // Base Black Hair Mass (-Y Top Region)
-    ctx.fillStyle = '#121318';
-    ctx.beginPath();
-    ctx.moveTo(-r * 1.05, -r * 1.05);
-    ctx.lineTo( r * 1.05, -r * 1.05);
-    ctx.lineTo( r * 1.05, -r * 0.30);
-
-    // Smooth, organic anime bangs sweeping from left to right:
-    ctx.quadraticCurveTo(r * 0.92, -r * 0.15, r * 0.82, -r * 0.18);
-    ctx.quadraticCurveTo(r * 0.70, -r * 0.26, r * 0.55, -r * 0.12);
-    ctx.quadraticCurveTo(r * 0.38, -r * 0.22, r * 0.18, -r * 0.05);
-    ctx.quadraticCurveTo(r * 0.08, -r * 0.24, -r * 0.04, -r * 0.26);
-    ctx.quadraticCurveTo(-r * 0.10, -r * 0.18, -r * 0.22, -r * 0.08);
-    ctx.quadraticCurveTo(-r * 0.38, -r * 0.24, -r * 0.55, -r * 0.14);
-    ctx.quadraticCurveTo(-r * 0.72, -r * 0.28, -r * 0.82, -r * 0.18);
-    ctx.quadraticCurveTo(-r * 0.95, -r * 0.14, -r * 1.05, -r * 0.30);
-
-    ctx.closePath();
-    ctx.fill();
-
-    // Deep Slate/Violet-Tinted Hair Sheen / Highlight Polygon (Volumetric Top-Light)
-    ctx.fillStyle = '#262734';
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.75, -r * 0.90);
-    ctx.quadraticCurveTo(0, -r * 0.65, r * 0.75, -r * 0.90);
-    ctx.quadraticCurveTo(r * 0.45, -r * 0.52, 0, -r * 0.48);
-    ctx.quadraticCurveTo(-r * 0.45, -r * 0.52, -r * 0.75, -r * 0.90);
-    ctx.closePath();
-    ctx.fill();
-
-    // Subtle Specular Hair Streak
-    ctx.strokeStyle = 'rgba(80, 82, 105, 0.70)';
-    ctx.lineWidth = Math.max(1.1, r * 0.04);
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.55, -r * 0.70);
-    ctx.quadraticCurveTo(-r * 0.10, -r * 0.56, r * 0.45, -r * 0.68);
-    ctx.stroke();
-
-    // Crisp Manga Hairline Outlines (Bottom edge of bangs)
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = Math.max(1.6, r * 0.055);
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-r * 1.05, -r * 0.30);
-    ctx.quadraticCurveTo(-r * 0.95, -r * 0.14, -r * 0.82, -r * 0.18);
-    ctx.quadraticCurveTo(-r * 0.72, -r * 0.28, -r * 0.55, -r * 0.14);
-    ctx.quadraticCurveTo(-r * 0.38, -r * 0.24, -r * 0.22, -r * 0.08);
-    ctx.quadraticCurveTo(-r * 0.10, -r * 0.18, -r * 0.04, -r * 0.26);
-    ctx.quadraticCurveTo(r * 0.08, -r * 0.24, r * 0.18, -r * 0.05);
-    ctx.quadraticCurveTo(r * 0.38, -r * 0.22, r * 0.55, -r * 0.12);
-    ctx.quadraticCurveTo(r * 0.70, -r * 0.26, r * 0.82, -r * 0.18);
-    ctx.quadraticCurveTo(r * 0.92, -r * 0.15, r * 1.05, -r * 0.30);
-    ctx.stroke();
-  }
-
-  ctx.restore(); // Undo Body Circle Clip
-
-  // ── 7. STATUS OVERLAYS (Freeze, Paralyze, Stun, RCT) ──
+  // ── 3. STATUS OVERLAYS (Freeze, Paralyze, Stun, RCT) ──
   FighterRenderer.drawStatusOverlays(ctx, fighter);
 
   ctx.restore();
@@ -436,58 +327,15 @@ export function drawYutaGhostSkin(ctx, x, y, angle = 0, r = 25, alpha = 0.5) {
   ctx.fillStyle = 'rgba(255, 20, 147, 0.25)';
   ctx.fill();
 
-  // 2. Clipped Body
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
+  // 2. Pixel Body & Hair
+  drawYutaPixelBody(ctx, r);
+  _drawYutaHair(ctx, r, facingLeft);
 
-  const yutaImg = _getYutaSkinImage();
-  if (yutaImg && yutaImg.complete && yutaImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    const modelScale = 1.22;
-    const drawR = r * modelScale;
-    ctx.drawImage(yutaImg, -drawR, -drawR, drawR * 2, drawR * 2);
-    ctx.restore();
-  } else {
-    // Skin
-    ctx.fillStyle = '#FABC95';
-    ctx.fillRect(-r * 1.05, -r * 1.05, r * 2.1, r * 2.1);
-
-    // White Uniform Jacket
-    ctx.fillStyle = '#FAFAFC';
-    ctx.fillRect(-r * 1.05, r * 0.08, r * 2.1, r * 0.64);
-
-    // Dark Pants
-    ctx.fillStyle = '#23242B';
-    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.38);
-
-    // Black Hair Mass
-    ctx.fillStyle = '#121318';
-    ctx.beginPath();
-    ctx.moveTo(-r * 1.05, -r * 1.05);
-    ctx.lineTo( r * 1.05, -r * 1.05);
-    ctx.lineTo( r * 1.05, -r * 0.30);
-    ctx.quadraticCurveTo(r * 0.92, -r * 0.15, r * 0.82, -r * 0.18);
-    ctx.quadraticCurveTo(r * 0.70, -r * 0.26, r * 0.55, -r * 0.12);
-    ctx.quadraticCurveTo(r * 0.38, -r * 0.22, r * 0.18, -r * 0.05);
-    ctx.quadraticCurveTo(r * 0.08, -r * 0.24, -r * 0.04, -r * 0.26);
-    ctx.quadraticCurveTo(-r * 0.10, -r * 0.18, -r * 0.22, -r * 0.08);
-    ctx.quadraticCurveTo(-r * 0.38, -r * 0.24, -r * 0.55, -r * 0.14);
-    ctx.quadraticCurveTo(-r * 0.72, -r * 0.28, -r * 0.82, -r * 0.18);
-    ctx.quadraticCurveTo(-r * 0.95, -r * 0.14, -r * 1.05, -r * 0.30);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.restore(); // Undo clip
-
-  // Ghost outline
+  // 3. Ghost outline
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 2.0;
+  ctx.lineWidth = 1.8;
   ctx.stroke();
 
   ctx.restore();

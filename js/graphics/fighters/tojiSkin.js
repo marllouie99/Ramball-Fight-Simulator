@@ -1,74 +1,228 @@
 // ─────────────────────────────────────────────
 // TOJI FUSHIGURO FIGHTER SKIN & BODY MODEL
 // The Sorcerer Killer (Jujutsu Kaisen)
-// Supports High-Definition Pixel-Art Model from:
-// Assets/model/Toji-skin.png
-// With procedural canvas fallback matching the model sheet:
-// 1. Signature Jet-Black Bangs & Spiky Side Locks
-// 2. Warm Tan Skin Face with Corner Lip Scar
-// 3. Black Crewneck Compression Shirt
-// 4. White Hakama Pants with Centered Black Ribbon Bow
-// Adhering to Rule 19 (Upright Front POV),
-// Rule 20 (Hand Visibility), and Rule 11 (Zero shadowBlur)
+// Features Authentic Procedural Pixel-Art Body Matching Reference:
+// 1. Warm Athletic Tan Skin Face with Signature Lip Scar (Rule 19 Compliant, Faceless)
+// 2. Charcoal Compression Crewneck Shirt
+// 3. Dark Hakama Pants & Sash with White Ribbon Loops
+// 4. Authentic Pixel-Art Jet-Black Hair Asset (Assets/model/toji-hair.png)
+// Rule 19 (Upright Front POV), Rule 20 (Hand Visibility), and Rule 11 Compliant
 // ─────────────────────────────────────────────
 
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
-let _tojiSkinImage = null;
-let _tojiSkinImageLoading = false;
+let _tojiHairImage = null;
+let _tojiHairImageLoading = false;
 
-export function _getTojiSkinImage() {
-  if (_tojiSkinImage && _tojiSkinImage.complete && _tojiSkinImage.naturalWidth > 0) {
-    return _tojiSkinImage;
+export function _getTojiHairImage() {
+  if (_tojiHairImage && _tojiHairImage.complete && _tojiHairImage.naturalWidth > 0) {
+    return _tojiHairImage;
   }
-  if (!_tojiSkinImageLoading && typeof Image !== 'undefined') {
-    _tojiSkinImageLoading = true;
+  if (!_tojiHairImageLoading && typeof Image !== 'undefined') {
+    _tojiHairImageLoading = true;
     const img = new Image();
     img.onload = () => {
-      _tojiSkinImage = img;
-      _tojiSkinImageLoading = false;
+      _tojiHairImage = img;
+      _tojiHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Toji pixel skin image at Assets/model/Toji-skin.png', e);
-      _tojiSkinImageLoading = false;
+      console.warn('Failed to load Toji hair image at Assets/model/toji-hair.png', e);
+      _tojiHairImageLoading = false;
     };
-    img.src = 'Assets/model/Toji-skin.png?v=1';
-    _tojiSkinImage = img;
+    img.src = 'Assets/model/toji-hair.png?v=1';
+    _tojiHairImage = img;
   }
-  return _tojiSkinImage;
+  return _tojiHairImage;
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getTojiSkinImage();
+  _getTojiHairImage();
 }
 
-// Pre-computed normalized anime bangs coordinates with clean stylized fringe strands
-const _TOJI_BANGS = [
-  { nx:  0.88, ny: -0.32 },
-  { nx:  0.72, ny: -0.22 }, // Right outer fringe
-  { nx:  0.58, ny: -0.30 },
-  { nx:  0.44, ny: -0.20 }, // Right mid strand
-  { nx:  0.32, ny: -0.32 },
-  { nx:  0.18, ny: -0.10 }, // Signature Center-Right Long Spike
-  { nx:  0.06, ny: -0.30 },
-  { nx: -0.08, ny: -0.16 }, // Center-Left strand
-  { nx: -0.22, ny: -0.28 },
-  { nx: -0.36, ny: -0.18 }, // Left mid strand
-  { nx: -0.50, ny: -0.30 },
-  { nx: -0.66, ny: -0.18 }, // Left long side lock
-  { nx: -0.78, ny: -0.26 },
-  { nx: -0.88, ny: -0.32 }
-];
+/**
+ * Draws Toji's authentic anime spiky hair from Assets/model/toji-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawTojiHair(ctx, r, facingLeft = false) {
+  const hairImg = _getTojiHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.toji) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // toji-hair.png (1345x1170). True visible hair bounding box:
+    // X: [125, 1247] (width 1123, horizontal center at 686)
+    // Y: [136, 1043] (height 908, top crown at 136)
+    // Calibrated to seamlessly cover the upper circle with spiky crown at -1.45r
+    const targetHairWidth = r * 2.85 * wMult;
+    const targetHairHeight = r * 2.10 * hMult;
+    const scaleX = targetHairWidth / 1123;
+    const scaleY = targetHairHeight / 908;
+    const drawW = 1345 * scaleX;
+    const drawH = 1170 * scaleY;
+    const drawX = -686 * scaleX + offX;
+    const drawY = -r * 1.45 - 136 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
+}
 
 /**
  * Draws Toji's hand/fist in clean pixel art style with warm athletic tan skin tone.
  */
-function _drawTojiFist(ctx, x, y, radius, skinColor, fighter, isBack = false) {
+export function drawTojiFist(ctx, x, y, radius, skinColor = '#D4A373', fighter = null, isBack = false) {
   ctx.save();
   ctx.translate(x, y);
-  drawPixelHand(ctx, 0, 0, radius, skinColor || '#D4A373');
+  drawPixelHand(ctx, 0, 0, radius, skinColor);
+  ctx.restore();
+}
+
+let _cachedTojiBodyCanvas = null;
+let _cachedTojiBodyR = 0;
+
+/**
+ * Procedural Pixel Art Render Function (Renders once to offscreen cache).
+ * Matches the reference image:
+ * - Stepped dark outer circle stroke
+ * - Warm tan athletic skin face with signature corner lip scar (no procedural hair)
+ * - Charcoal compression crewneck shirt
+ * - Dark hakama pants & waist sash with white ribbon loop tabs
+ */
+function _renderTojiPixelBodyToCanvas(destCtx, r) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
+  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
+  const P = 2.0;
+  const steps = Math.ceil((r + P) / P);
+
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = rx - P / 2;
+      const py = ry - P / 2;
+
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = '#0E0F14';
+        destCtx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // ZONE 1: Face & Cheeks Tan Skin (ry < r * 0.22)
+      // ──────────────────────────────────────────
+      if (ry < r * 0.22) {
+        let col = '#E8BD9B'; // Warm athletic tan skin
+
+        // Cheek / side contour
+        if (Math.abs(rx) > r * 0.72) {
+          col = '#D4A373';
+        }
+
+        // Signature Corner Lip Scar on lower-right cheek
+        // Diagonal slash: rx in [r * 0.20, r * 0.40], ry in [r * 0.04, r * 0.16]
+        const scarRelX = (rx - r * 0.20) / (r * 0.20);
+        const expectedY = r * 0.04 + scarRelX * (r * 0.10);
+        if (rx >= r * 0.20 && rx <= r * 0.40 && Math.abs(ry - expectedY) <= P * 0.9) {
+          col = '#7D3224'; // Rich scar crimson-brown
+        }
+
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2: Dark Compression Crewneck Shirt (r * 0.22 <= ry < r * 0.65)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.65) {
+        // Crewneck collar rim along the neck border (ry ~ 0.22r to 0.29r in center)
+        if (ry < r * 0.29 && Math.abs(rx) <= r * 0.45) {
+          destCtx.fillStyle = '#0C0D10'; // Darker collar rim
+        } else if (ry > r * 0.58) {
+          destCtx.fillStyle = '#101115'; // Lower shirt seam shadow
+        } else {
+          destCtx.fillStyle = '#1C1D24'; // Charcoal compression shirt fabric
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 3: Dark Hakama Pants & Waist Sash (ry >= r * 0.65)
+      // ──────────────────────────────────────────
+      else {
+        if (ry < r * 0.74) {
+          destCtx.fillStyle = '#0A0B0E'; // Dark waist sash band
+        } else if (Math.abs(rx) <= r * 0.08 && ry >= r * 0.74 && ry <= r * 0.86) {
+          destCtx.fillStyle = '#050608'; // Center knot tie
+        } else if (Math.abs(rx) <= P * 0.6 && ry > r * 0.86) {
+          destCtx.fillStyle = '#08090C'; // Inseam crease
+        } else {
+          destCtx.fillStyle = '#121318'; // Dark hakama fabric
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  destCtx.restore();
+}
+
+/**
+ * Draws Toji's procedural pixel-art body with offscreen caching.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Fighter radius
+ */
+export function drawTojiPixelBody(ctx, r) {
+  if (typeof document === 'undefined') {
+    // Node environment fallback
+    _renderTojiPixelBodyToCanvas(ctx, r);
+    return;
+  }
+
+  const intR = Math.round(r);
+  if (!_cachedTojiBodyCanvas || _cachedTojiBodyR !== intR) {
+    const P = 2.0;
+    const steps = Math.ceil((intR + P) / P);
+    const size = (steps * 2 + 1) * P;
+    _cachedTojiBodyCanvas = document.createElement('canvas');
+    _cachedTojiBodyCanvas.width = size;
+    _cachedTojiBodyCanvas.height = size;
+    const cctx = _cachedTojiBodyCanvas.getContext('2d');
+    _renderTojiPixelBodyToCanvas(cctx, intR);
+    _cachedTojiBodyR = intR;
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const size = _cachedTojiBodyCanvas.width;
+  ctx.drawImage(_cachedTojiBodyCanvas, -size / 2, -size / 2);
   ctx.restore();
 }
 
@@ -77,7 +231,6 @@ function _drawTojiFist(ctx, x, y, radius, skinColor, fighter, isBack = false) {
  */
 export function drawTojiSkin(ctx, fighter) {
   const r = fighter.r || 25;
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
@@ -92,240 +245,13 @@ export function drawTojiSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // Color Palette Definitions
-  const skinTan       = '#E8BD9B';
-  const shirtBlack    = '#15161B';
-  const shirtCollar   = '#0C0D10';
-  const hakamaWhite   = '#E4E7EB';
-  const hakamaShadow  = '#C2C8D2';
-  const sashBlack     = '#101115';
-  const hairBlack     = '#0E0F14';
+  // 2. Procedural Pixel-Art Body
+  drawTojiPixelBody(ctx, r);
 
-  // ── CLIPPED BODY CIRCLE MESH ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
+  // 3. Hair Asset Overlay
+  _drawTojiHair(ctx, r, facingLeft);
 
-  const tojiImg = _getTojiSkinImage();
-  if (tojiImg && tojiImg.complete && tojiImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
-    // Toji-skin.png has transparent padding around the character art (399px art inside 500px canvas)
-    // Scale factor 1.265 expands the art so its boundary fits flush with the outer circle stroke
-    const modelScale = 1.265;
-    const drawR = r * modelScale;
-    const shiftX = (253 - 250) / 500 * (drawR * 2);
-    const shiftY = (251.5 - 250) / 500 * (drawR * 2);
-    ctx.drawImage(tojiImg, -drawR - shiftX, -drawR - shiftY, drawR * 2, drawR * 2);
-    ctx.restore();
-  } else {
-    // A. BASE LAYER: Warm Tan Skin
-    ctx.fillStyle = skinTan;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Subtle 3D skin shading
-    if (!isLowQuality) {
-      const skinGrad = ctx.createRadialGradient(-r * 0.20, -r * 0.15, r * 0.20, 0, 0, r * 1.05);
-      skinGrad.addColorStop(0, 'rgba(255, 238, 225, 0.25)');
-      skinGrad.addColorStop(0.70, 'rgba(198, 138, 101, 0.12)');
-      skinGrad.addColorStop(1.0, 'rgba(140, 80, 50, 0.35)');
-      ctx.fillStyle = skinGrad;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // B. CLEAN SOLID BLACK CREWNECK SHIRT TEXTURE (+Y Mid Torso: y = +0.20*r to +0.72*r, fully spanning edge-to-edge)
-    ctx.fillStyle = shirtBlack;
-    ctx.fillRect(-r * 1.05, r * 0.20, r * 2.1, r * 0.52);
-
-    // Clean Curved Crewneck Collar (Framing the throat/neck)
-    ctx.fillStyle = shirtCollar;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.38, r * 0.20);
-    ctx.quadraticCurveTo(0, r * 0.32, r * 0.38, r * 0.20);
-    ctx.lineTo(r * 0.33, r * 0.17);
-    ctx.quadraticCurveTo(0, r * 0.28, -r * 0.33, r * 0.17);
-    ctx.closePath();
-    ctx.fill();
-
-    // Crewneck Collar Rim Stroke
-    ctx.strokeStyle = '#08090C';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.38, r * 0.20);
-    ctx.quadraticCurveTo(0, r * 0.32, r * 0.38, r * 0.20);
-    ctx.stroke();
-
-    // C. CLEAN WHITE HAKAMA PANTS TEXTURE (+Y Bottom: y = +0.72*r to +1.0*r, only at the bottom hem)
-    ctx.fillStyle = hakamaWhite;
-    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.35);
-
-    // Hakama Vertical Pleat Shadows
-    ctx.strokeStyle = hakamaShadow;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    // Center pleat
-    ctx.moveTo(0, r * 0.78);
-    ctx.lineTo(0, r);
-    // Left pleats
-    ctx.moveTo(-r * 0.38, r * 0.76);
-    ctx.lineTo(-r * 0.42, r);
-    ctx.moveTo(-r * 0.70, r * 0.76);
-    ctx.lineTo(-r * 0.74, r);
-    // Right pleats
-    ctx.moveTo(r * 0.38, r * 0.76);
-    ctx.lineTo(r * 0.42, r);
-    ctx.moveTo(r * 0.70, r * 0.76);
-    ctx.lineTo(r * 0.74, r);
-    ctx.stroke();
-
-    // Hakama Waistband Top Seam
-    ctx.strokeStyle = '#0E0E12';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(-r, r * 0.72);
-    ctx.lineTo(r, r * 0.72);
-    ctx.stroke();
-
-    // Black Cord Sash Band across waist (Edge-to-edge)
-    ctx.fillStyle = sashBlack;
-    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.06);
-
-    // White Belt Loops
-    ctx.fillStyle = hakamaWhite;
-    ctx.strokeStyle = '#0E0E12';
-    ctx.lineWidth = 1.0;
-    ctx.strokeRect(-r * 0.42, r * 0.71, r * 0.08, r * 0.08);
-    ctx.fillRect(-r * 0.42, r * 0.71, r * 0.08, r * 0.08);
-    ctx.strokeRect(r * 0.34, r * 0.71, r * 0.08, r * 0.08);
-    ctx.fillRect(r * 0.34, r * 0.71, r * 0.08, r * 0.08);
-
-    // Centered Black Ribbon Bow Knot
-    ctx.fillStyle = '#060709';
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.76, r * 0.09, r * 0.05, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Left Ribbon Loop
-    ctx.fillStyle = sashBlack;
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.12, r * 0.75, r * 0.09, r * 0.04, -0.25, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Right Ribbon Loop
-    ctx.fillStyle = sashBlack;
-    ctx.beginPath();
-    ctx.ellipse(r * 0.12, r * 0.75, r * 0.09, r * 0.04, 0.25, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Two Dangling Ribbon Tails Trailing Down
-    ctx.strokeStyle = '#060709';
-    ctx.lineWidth = 0.8;
-    // Left Tail
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.04, r * 0.77);
-    ctx.lineTo(-r * 0.12, r * 0.94);
-    ctx.lineTo(-r * 0.05, r * 0.96);
-    ctx.lineTo(0, r * 0.78);
-    ctx.closePath();
-    ctx.fillStyle = sashBlack;
-    ctx.fill();
-    ctx.stroke();
-
-    // Right Tail
-    ctx.beginPath();
-    ctx.moveTo(0, r * 0.78);
-    ctx.lineTo(r * 0.05, r * 0.96);
-    ctx.lineTo(r * 0.12, r * 0.94);
-    ctx.lineTo(r * 0.04, r * 0.77);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // D. SIGNATURE CORNER LIP SCAR (Positioned neatly on lower-right face above shirt collar)
-    ctx.save();
-    ctx.strokeStyle = '#7D3224';
-    ctx.lineWidth = 1.8;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(r * 0.20, r * 0.08);
-    ctx.lineTo(r * 0.36, r * 0.17);
-    ctx.stroke();
-
-    // Deep cut inner crease
-    ctx.strokeStyle = '#4A160E';
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    ctx.moveTo(r * 0.21, r * 0.085);
-    ctx.lineTo(r * 0.35, r * 0.165);
-    ctx.stroke();
-
-    // Subtle upper highlight
-    ctx.strokeStyle = 'rgba(255, 220, 205, 0.55)';
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.moveTo(r * 0.20, r * 0.06);
-    ctx.lineTo(r * 0.34, r * 0.15);
-    ctx.stroke();
-    ctx.restore();
-
-    // E. SIGNATURE JET-BLACK ANIME HAIR (-Y Top Hemisphere - Pure solid black, NO white lines)
-    ctx.fillStyle = hairBlack;
-    ctx.beginPath();
-    ctx.moveTo(-r * 1.05, -r * 1.05);
-    ctx.lineTo(r * 1.05, -r * 1.05);
-    ctx.lineTo(r * 1.05, -r * 0.32);
-
-    // Trace the stylized layered bangs
-    for (let i = 0; i < _TOJI_BANGS.length; i++) {
-      const pt = _TOJI_BANGS[i];
-      ctx.lineTo(r * pt.nx, r * pt.ny);
-    }
-    ctx.lineTo(-r * 1.05, -r * 0.32);
-    ctx.closePath();
-    ctx.fill();
-
-    // Spiky Outer Crown Tufts
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.65, -r * 0.75);
-    ctx.lineTo(-r * 0.82, -r * 0.95);
-    ctx.lineTo(-r * 0.45, -r * 0.88);
-    ctx.moveTo(-r * 0.25, -r * 0.90);
-    ctx.lineTo(0, -r * 1.05);
-    ctx.lineTo(r * 0.20, -r * 0.92);
-    ctx.moveTo(r * 0.45, -r * 0.85);
-    ctx.lineTo(r * 0.80, -r * 0.96);
-    ctx.lineTo(r * 0.68, -r * 0.70);
-    ctx.fill();
-
-    // Crisp Manga Hairline Ink Outline
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.8;
-    ctx.lineJoin = 'miter';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(r * _TOJI_BANGS[0].nx, r * _TOJI_BANGS[0].ny);
-    for (let i = 1; i < _TOJI_BANGS.length; i++) {
-      const pt = _TOJI_BANGS[i];
-      ctx.lineTo(r * pt.nx, r * pt.ny);
-    }
-    ctx.stroke();
-  }
-
-  ctx.restore(); // End clipped body circle
-
-  // Outer Crisp Pixel Silhouette Outline (ensures fighter body never vanishes into arena floor)
-  ctx.strokeStyle = '#0E0F14';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Status Overlays (Stun, Freeze, etc.)
+  // 4. Status Overlays (Stun, Freeze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
     fighter.drawStatusOverlays(ctx, r);
   }
@@ -357,102 +283,13 @@ export function drawTojiGhostSkin(ctx, x, y, angle = 0, r = 25, alpha = 0.5, isD
     ctx.fill();
   }
 
-  // 2. Clipped Body Circle with Toji's actual skin model
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
+  // 2. Procedural Pixel-Art Body
+  drawTojiPixelBody(ctx, r);
 
-  const tojiImg = _getTojiSkinImage();
-  if (tojiImg && tojiImg.complete && tojiImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    const modelScale = 1.265;
-    const drawR = r * modelScale;
-    const shiftX = (253 - 250) / 500 * (drawR * 2);
-    const shiftY = (251.5 - 250) / 500 * (drawR * 2);
-    ctx.drawImage(tojiImg, -drawR - shiftX, -drawR - shiftY, drawR * 2, drawR * 2);
-    ctx.restore();
-  } else {
-    // A. Tan Athletic Skin
-    ctx.fillStyle = '#E8BD9B';
-    ctx.fillRect(-r * 1.05, -r * 1.05, r * 2.1, r * 2.1);
+  // 3. Hair Asset Overlay
+  _drawTojiHair(ctx, r, facingLeft);
 
-    // B. Black Shirt Texture
-    ctx.fillStyle = '#15161B';
-    ctx.fillRect(-r * 1.05, r * 0.20, r * 2.1, r * 0.52);
-
-    // Shirt Collar
-    ctx.strokeStyle = '#0C0D10';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.arc(0, r * 0.12, r * 0.38, 0.2, Math.PI - 0.2);
-    ctx.stroke();
-
-    // C. White Hakama Pants Texture
-    ctx.fillStyle = '#E4E7EB';
-    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.35);
-
-    // Black Sash Band
-    ctx.fillStyle = '#101115';
-    ctx.fillRect(-r * 1.05, r * 0.72, r * 2.1, r * 0.06);
-
-    // Ribbon knot
-    ctx.fillStyle = '#060709';
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.76, r * 0.09, r * 0.05, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // D. Lip Scar
-    ctx.strokeStyle = '#7D3224';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(r * 0.20, r * 0.08);
-    ctx.lineTo(r * 0.36, r * 0.17);
-    ctx.stroke();
-
-    // E. Solid Jet-Black Anime Hair
-    ctx.fillStyle = '#0E0F14';
-    ctx.beginPath();
-    ctx.moveTo(-r * 1.05, -r * 1.05);
-    ctx.lineTo(r * 1.05, -r * 1.05);
-    ctx.lineTo(r * 1.05, -r * 0.32);
-    for (let i = 0; i < _TOJI_BANGS.length; i++) {
-      const pt = _TOJI_BANGS[i];
-      ctx.lineTo(r * pt.nx, r * pt.ny);
-    }
-    ctx.lineTo(-r * 1.05, -r * 0.32);
-    ctx.closePath();
-    ctx.fill();
-
-    // Spiky Outer Crown Tufts
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.65, -r * 0.75);
-    ctx.lineTo(-r * 0.82, -r * 0.95);
-    ctx.lineTo(-r * 0.45, -r * 0.88);
-    ctx.moveTo(-r * 0.25, -r * 0.90);
-    ctx.lineTo(0, -r * 1.05);
-    ctx.lineTo(r * 0.20, -r * 0.92);
-    ctx.moveTo(r * 0.45, -r * 0.85);
-    ctx.lineTo(r * 0.80, -r * 0.96);
-    ctx.lineTo(r * 0.68, -r * 0.70);
-    ctx.fill();
-
-    // Crisp Manga Hairline Ink Outline
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(r * _TOJI_BANGS[0].nx, r * _TOJI_BANGS[0].ny);
-    for (let i = 1; i < _TOJI_BANGS.length; i++) {
-      const pt = _TOJI_BANGS[i];
-      ctx.lineTo(r * pt.nx, r * pt.ny);
-    }
-    ctx.stroke();
-  }
-
-  ctx.restore(); // End clipped body circle
-
-  // 3. Spectral Body Outline
+  // 4. Spectral Body Outline
   ctx.strokeStyle = isDomain ? 'rgba(180, 100, 255, 0.90)' : 'rgba(255, 255, 255, 0.85)';
   ctx.lineWidth = 2.4;
   ctx.beginPath();

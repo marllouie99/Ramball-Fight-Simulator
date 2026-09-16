@@ -277,46 +277,41 @@ function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
 
   const P = 2.0;
   const gridR = Math.max(P * 2, handRadius);
-  const steps = Math.ceil(gridR / P);
+  const steps = Math.ceil((gridR + P) / P);
 
-  // 1. Dark Manga Ink Outline Shell
-  ctx.fillStyle = '#0E0F14';
+  // 100% 4-Way Symmetrical Glove Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= gridR + P * 0.75) {
-        ctx.fillRect(Math.round(handX + gx * P), Math.round(handY + gy * P), P, P);
-      }
-    }
-  }
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > gridR) continue;
 
-  // 2. Base Red Glove Body (#C80000)
-  ctx.fillStyle = '#C80000';
-  const innerR = gridR - P * 0.4;
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR) {
-        ctx.fillRect(Math.round(handX + gx * P), Math.round(handY + gy * P), P, P);
-      }
-    }
-  }
+      const px = handX + rx - P / 2;
+      const py = handY + ry - P / 2;
 
-  // 3. Dark Crimson Shading Blocks on bottom/heel
-  ctx.fillStyle = '#8A0000';
-  for (let gy = 0; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
-        ctx.fillRect(Math.round(handX + gx * P), Math.round(handY + gy * P), P, P);
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > gridR ||
+        Math.hypot((gx - 1) * P, gy * P) > gridR ||
+        Math.hypot(gx * P, (gy + 1) * P) > gridR ||
+        Math.hypot(gx * P, (gy - 1) * P) > gridR
+      );
+
+      if (isBorder) {
+        ctx.fillStyle = '#0E0F14';
+      } else if (gy * P > gridR * 0.35 || gx * P < -gridR * 0.45) {
+        ctx.fillStyle = '#8A0000';
+      } else {
+        ctx.fillStyle = '#C80000';
       }
+      ctx.fillRect(px, py, P, P);
     }
   }
 
   // 4. Specular Knuckle Highlight Pixels
   ctx.fillStyle = '#FF9999';
-  const hx = Math.round(handX + P * 0.5);
-  const hy = Math.round(handY - innerR * 0.45);
+  const hx = handX - P / 2;
+  const hy = handY - gridR * 0.45 - P / 2;
   ctx.fillRect(hx, hy, P, P);
   ctx.fillRect(hx + P, hy, P, P);
 
@@ -515,10 +510,9 @@ function quadBezierPt(p0, p1, p2, t) {
 function drawSaitamaPixelBody(ctx, r, isGhost = false) {
   ctx.save();
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
-  // Stepped Pixel Fill by Zone
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -526,11 +520,18 @@ function drawSaitamaPixelBody(ctx, r, isGhost = false) {
       const dist = Math.hypot(rx, ry);
       if (dist > r) continue;
 
-      const px = snap(rx);
-      const py = snap(ry);
+      const px = rx - P / 2;
+      const py = ry - P / 2;
 
       // Pixelated Black Stroke Border
-      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
         ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;

@@ -7,7 +7,9 @@ import { drawGojoBody, _drawGojoHair, _getGojoHairImage } from '../fighters/gojo
 import { drawMakimaSkin, _drawMakimaHair, _getMakimaHairImage } from '../fighters/makimaSkin.js';
 import { drawRezeSkin, _drawRezeHair, _getRezeHairImage } from '../fighters/rezeSkin.js';
 import { drawSukunaBody, _drawSukunaHair, _getSukunaHairImage } from '../fighters/sukunaSkin.js';
-import { drawYutaSkin } from '../fighters/yutaSkin.js';
+import { drawYujiSkin, _drawYujiHair, _getYujiHairImage } from '../fighters/yujiSkin.js';
+import { drawYutaSkin, _drawYutaHair, _getYutaHairImage } from '../fighters/yutaSkin.js';
+import { drawTojiSkin, _drawTojiHair, _getTojiHairImage } from '../fighters/tojiSkin.js';
 import { drawTanjiroSkin } from '../fighters/tanjiroSkin.js';
 import { drawZenitsuSkin } from '../fighters/zenitsuSkin.js';
 import { drawNezukoSkin } from '../fighters/nezukoSkin.js';
@@ -129,14 +131,53 @@ export const SKIN_STUDIO_FIGHTERS = [
     ]
   },
   {
+    key: 'yuji',
+    label: 'YUJI',
+    asset: 'Yuji-hair.png',
+    assetDims: '1345 x 1170',
+    baseW: 2.85,
+    baseH: 2.05,
+    baseCrownY: -1.45,
+    visW: 1042,
+    visH: 860,
+    centerX: 668.5,
+    topY: 140,
+    themeColor: '#d95c7e',
+    forms: [
+      { id: 'normal', label: 'STANDARD' },
+      { id: 'sukuna', label: 'SOUL SWAP' }
+    ]
+  },
+  {
     key: 'yuta',
     label: 'YUTA',
     asset: 'Yuta-hair.png',
-    assetDims: 'Procedural / PNG',
+    assetDims: '577 x 433',
     baseW: 2.40,
     baseH: 1.80,
     baseCrownY: -1.25,
+    visW: 421,
+    visH: 327,
+    centerX: 282,
+    topY: 82,
     themeColor: '#ec4899',
+    forms: [
+      { id: 'default', label: 'STANDARD' }
+    ]
+  },
+  {
+    key: 'toji',
+    label: 'TOJI',
+    asset: 'toji-hair.png',
+    assetDims: '1345 x 1170',
+    baseW: 2.85,
+    baseH: 2.10,
+    baseCrownY: -1.45,
+    visW: 1123,
+    visH: 908,
+    centerX: 686,
+    topY: 136,
+    themeColor: '#7D3224',
     forms: [
       { id: 'default', label: 'STANDARD' }
     ]
@@ -272,6 +313,36 @@ function generateJsCode(fDef, custom) {
            `const drawH = 1254 * scaleY;\n` +
            `const drawX = -626 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 226 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'yuji') {
+    return `// Calibrated Hair for Yuji (Assets/model/Yuji-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 1042;\n` +
+           `const scaleY = targetHairHeight / 860;\n` +
+           `const drawW = 1345 * scaleX;\n` +
+           `const drawH = 1170 * scaleY;\n` +
+           `const drawX = -668.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 140 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'yuta') {
+    return `// Calibrated Hair for Yuta (Assets/model/Yuta-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 421;\n` +
+           `const scaleY = targetHairHeight / 327;\n` +
+           `const drawW = 577 * scaleX;\n` +
+           `const drawH = 433 * scaleY;\n` +
+           `const drawX = -282 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 82 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'toji') {
+    return `// Calibrated Hair for Toji (Assets/model/toji-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 1123;\n` +
+           `const scaleY = targetHairHeight / 908;\n` +
+           `const drawW = 1345 * scaleX;\n` +
+           `const drawH = 1170 * scaleY;\n` +
+           `const drawX = -686 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 136 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
@@ -468,8 +539,15 @@ export function drawSkinStudioScreen() {
         drawRezeSkin(ctx, dummyFighter);
       } else if (fDef.key === 'sukuna') {
         drawSukunaBody(ctx, dummyFighter);
+      } else if (fDef.key === 'yuji') {
+        const origSoulSwap = dummyFighter.soulSwapActive;
+        dummyFighter.soulSwapActive = (state.studioSkinForm === 'sukuna');
+        drawYujiSkin(ctx, dummyFighter);
+        dummyFighter.soulSwapActive = origSoulSwap;
       } else if (fDef.key === 'yuta') {
         drawYutaSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'toji') {
+        drawTojiSkin(ctx, dummyFighter);
       } else if (fDef.key === 'tanjiro') {
         drawTanjiroSkin(ctx, dummyFighter);
       } else if (fDef.key === 'zenitsu') {
@@ -491,6 +569,17 @@ export function drawSkinStudioScreen() {
     else if (fDef.key === 'makima') _drawMakimaHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'reze') _drawRezeHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'sukuna') _drawSukunaHair(ctx, baseRadius, isFacingLeft);
+    else if (fDef.key === 'yuji') {
+      if (state.studioSkinForm === 'sukuna') {
+        _drawSukunaHair(ctx, baseRadius, isFacingLeft);
+      } else {
+        _drawYujiHair(ctx, baseRadius, isFacingLeft);
+      }
+    } else if (fDef.key === 'yuta') {
+      _drawYutaHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'toji') {
+      _drawTojiHair(ctx, baseRadius, isFacingLeft);
+    }
     ctx.restore();
   }
 

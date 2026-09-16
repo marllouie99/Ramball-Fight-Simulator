@@ -7,6 +7,7 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { isSuppressedByGetsuga } from '../../entities/fighter.js';
+import { _drawSukunaHair } from './sukunaSkin.js';
 
 let _yujiSkinImage = null;
 let _yujiSkinImageLoading = false;
@@ -32,8 +33,76 @@ export function _getYujiSkinImage() {
   return _yujiSkinImage;
 }
 
+let _yujiHairImage = null;
+let _yujiHairImageLoading = false;
+
+export function _getYujiHairImage() {
+  if (_yujiHairImage && _yujiHairImage.complete && _yujiHairImage.naturalWidth > 0) {
+    return _yujiHairImage;
+  }
+  if (!_yujiHairImageLoading && typeof Image !== 'undefined') {
+    _yujiHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _yujiHairImage = img;
+      _yujiHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Yuji hair image at Assets/model/Yuji-hair.png', e);
+      _yujiHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Yuji-hair.png?v=1';
+    _yujiHairImage = img;
+  }
+  return _yujiHairImage;
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getYujiSkinImage();
+  _getYujiHairImage();
+}
+
+/**
+ * Draws Yuji's authentic anime spiky hair from Assets/model/Yuji-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawYujiHair(ctx, r, facingLeft = false) {
+  const hairImg = _getYujiHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.yuji) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // Yuji-hair.png (1345x1170). True visible hair bounding box:
+    // X: [148, 1189] (width 1042, horizontal center at 668.5)
+    // Y: [140, 999] (height 860, top crown at 140)
+    // Scales to seamlessly cover the upper circle with spiky crown at -1.45r
+    const targetHairWidth = r * 2.85 * wMult;
+    const targetHairHeight = r * 2.05 * hMult;
+    const scaleX = targetHairWidth / 1042;
+    const scaleY = targetHairHeight / 860;
+    const drawW = 1345 * scaleX;
+    const drawH = 1170 * scaleY;
+    const drawX = -668.5 * scaleX + offX;
+    const drawY = -r * 1.45 - 140 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
 }
 
 /**
@@ -211,6 +280,13 @@ export function drawYujiSkin(ctx, fighter) {
   // ── 2. Body Circle (Authentic Procedural Pixel Art) ──
   drawYujiPixelBody(ctx, r, isSukunaForm);
 
+  // ── 2.1 Authentic Hair Model (Assets/model/Yuji-hair.png or Sukuna-hair.png) ──
+  if (isSukunaForm) {
+    _drawSukunaHair(ctx, r, facingLeft);
+  } else {
+    _drawYujiHair(ctx, r, facingLeft);
+  }
+
   // Status overlays (stun, freeze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
     fighter.drawStatusOverlays(ctx, r);
@@ -288,47 +364,41 @@ function _renderFistToCanvas(destCtx, radius, skinColor) {
   destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
   const P = 2.0;
   const gridR = Math.max(P * 2, radius);
-  const steps = Math.ceil(gridR / P);
+  const steps = Math.ceil((gridR + P) / P);
   const shadowColor = '#C99478';
 
-  // Outer Dark Pixel Border Shell
-  destCtx.fillStyle = '#0E0F14';
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= gridR + P * 0.75) {
-        destCtx.fillRect(gx * P, gy * P, P, P);
-      }
-    }
-  }
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > gridR) continue;
 
-  // Inner Base Skin Tone
-  destCtx.fillStyle = skinColor;
-  const innerR = gridR - P * 0.4;
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR) {
-        destCtx.fillRect(gx * P, gy * P, P, P);
-      }
-    }
-  }
+      const px = rx - P / 2;
+      const py = ry - P / 2;
 
-  // Knuckle Depth Shading
-  destCtx.fillStyle = shadowColor;
-  for (let gy = 0; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
-        destCtx.fillRect(gx * P, gy * P, P, P);
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > gridR ||
+        Math.hypot((gx - 1) * P, gy * P) > gridR ||
+        Math.hypot(gx * P, (gy + 1) * P) > gridR ||
+        Math.hypot(gx * P, (gy - 1) * P) > gridR
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = '#0E0F14';
+      } else if (gy * P > gridR * 0.35 || gx * P < -gridR * 0.45) {
+        destCtx.fillStyle = shadowColor;
+      } else {
+        destCtx.fillStyle = skinColor;
       }
+      destCtx.fillRect(px, py, P, P);
     }
   }
 
   // Knuckle Specular Glint Pixels
   destCtx.fillStyle = '#FFF2EB';
-  const hx = Math.round(P * 0.5);
-  const hy = Math.round(-innerR * 0.45);
+  const hx = Math.round(-P / 2);
+  const hy = Math.round(-gridR * 0.45 - P / 2);
   destCtx.fillRect(hx, hy, P, P);
   destCtx.fillRect(hx + P, hy, P, P);
 
@@ -363,7 +433,9 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter) {
   if (typeof document !== 'undefined') {
     if (!_cachedFistNormalCanvas || !_cachedFistSukunaCanvas || _cachedFistRadius !== radius) {
       _cachedFistRadius = radius;
-      const size = Math.ceil((radius + 6) * 2);
+      const P = 2.0;
+      const steps = Math.ceil((radius + P) / P);
+      const size = (steps * 2 + 1) * P;
 
       _cachedFistNormalCanvas = document.createElement('canvas');
       _cachedFistNormalCanvas.width = size;
@@ -397,7 +469,6 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
   destCtx.imageSmoothingEnabled = false;
   destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
   // Hairline shape calculation: spiky jagged dusty pink-salmon fringe
@@ -410,6 +481,7 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
     return -r * 0.38 + spikeDepth;
   }
 
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -417,11 +489,18 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
       const dist = Math.hypot(rx, ry);
       if (dist > r) continue;
 
-      const px = snap(rx);
-      const py = snap(ry);
+      const px = rx - P / 2;
+      const py = ry - P / 2;
 
-      // Pixelated Black Stroke Border
-      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
         destCtx.fillStyle = '#0E0F14';
         destCtx.fillRect(px, py, P, P);
         continue;
@@ -501,44 +580,36 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
       // ZONE 3: DETAILED RED HOODIE COWL & UNIFORM (ry >= r * 0.08)
       // ──────────────────────────────────────────
       else {
-        // Button helper function: Circular metallic gold button with dark outer rim, inner swirl, and white specular glint
+        // Button helper function: Subtle antique gold Jujutsu High button (clean, zero wrapper look)
         function getButtonPixel(bx, by, btnCenterX, btnCenterY, btnRadius) {
           const dist = Math.hypot(bx - btnCenterX, by - btnCenterY);
           if (dist > btnRadius) return null;
 
-          // Dark outer bronze/black rim
+          // Dark bronze rim
           if (dist >= btnRadius - P * 0.8) {
-            return '#261204';
+            return '#1C1917';
           }
-          // Specular glint (1-2px bright white dot on upper-left)
-          const glintDist = Math.hypot(bx - (btnCenterX - btnRadius * 0.38), by - (btnCenterY - btnRadius * 0.38));
-          if (glintDist <= P * 1.1) {
-            return '#FFFFFF';
+          // Soft golden highlight
+          const glintDist = Math.hypot(bx - (btnCenterX - btnRadius * 0.35), by - (btnCenterY - btnRadius * 0.35));
+          if (glintDist <= P * 0.9) {
+            return '#FCD34D';
           }
-          // Inner swirl / emblem in center
+          // Inner swirl
           const innerDist = Math.hypot(bx - btnCenterX, by - btnCenterY);
-          if (innerDist <= btnRadius * 0.42 && innerDist >= btnRadius * 0.18) {
-            return '#6B340A';
+          if (innerDist <= btnRadius * 0.40 && innerDist >= btnRadius * 0.18) {
+            return '#78350F';
           }
-          // Center dot of swirl
           if (innerDist < btnRadius * 0.18) {
-            return '#261204';
+            return '#1C1917';
           }
-          // Upper-left golden highlight body
-          if ((bx - btnCenterX) + (by - btnCenterY) <= 0) {
-            return '#F59E0B'; // Bright Amber Gold
-          }
-          // Lower-right shaded gold body
-          return '#B45309'; // Rich Golden Bronze
+          // Base antique gold
+          return '#D4AF37';
         }
 
-        // Button positions matching Reference Picture 1:
-        // Button 1: Upper button on left vertical placket
-        const b1X = -r * 0.14, b1Y = r * 0.24, b1R = r * 0.125;
-        // Button 2: Lower button on left vertical placket
-        const b2X = -r * 0.14, b2Y = r * 0.42, b2R = r * 0.125;
-        // Button 3: Lower right button on navy jacket
-        const b3X = r * 0.52, b3Y = r * 0.65, b3R = r * 0.125;
+        // Button positions:
+        const b1X = -r * 0.14, b1Y = r * 0.24, b1R = r * 0.10;
+        const b2X = -r * 0.14, b2Y = r * 0.42, b2R = r * 0.10;
+        const b3X = r * 0.52, b3Y = r * 0.65, b3R = r * 0.10;
 
         // Priority 1: Check buttons
         const btn1Col = getButtonPixel(rx, ry, b1X, b1Y, b1R);
@@ -568,10 +639,9 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
         // Red Cowl Region: from cowlTopY down to r * 0.54
         const isRedCowl = (!isThroatSkin && ry <= r * 0.54);
 
-        // Left Overlapping Placket Flap: rx from -r * 0.28 to 0.0, ry from r * 0.14 to r * 0.55
-        const isCowlPlacket = (rx >= -r * 0.28 && rx <= 0.0 && ry >= r * 0.14 && ry <= r * 0.55);
-        const isCowlPlacketBorderL = (Math.abs(rx - (-r * 0.28)) <= P * 0.8 && ry >= r * 0.14 && ry <= r * 0.55);
-        const isCowlPlacketBorderR = (Math.abs(rx - 0.0) <= P * 0.8 && ry >= r * 0.14 && ry <= r * 0.55);
+        // Left Placket Flap: rx from -r * 0.28 to 0.0, ry from r * 0.14 to r * 0.54
+        const isCowlPlacket = (rx >= -r * 0.28 && rx <= 0.0 && ry >= r * 0.14 && ry <= r * 0.54);
+        const isCowlPlacketSeam = (Math.abs(rx - 0.0) <= P * 0.8 && ry >= r * 0.14 && ry <= r * 0.54);
 
         // Horizontal fold crease across red cowl at ry ~ r * 0.32
         const isCowlMiddleCrease = (Math.abs(ry - r * 0.32) <= P * 0.8 && !isCowlPlacket);
@@ -579,7 +649,6 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
         const isCowlBottomSeam = (Math.abs(ry - r * 0.54) <= P * 0.8);
 
         // Navy Uniform Region (ry > r * 0.54)
-        // Curved fold lines across navy torso
         const isNavyFold1 = (Math.abs(ry - (r * 0.65 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
         const isNavyFold1Hi = (Math.abs(ry - (r * 0.63 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
         const isNavyFold2 = (Math.abs(ry - (r * 0.77 + rx * 0.06)) <= P * 0.8 && rx <= r * 0.42);
@@ -588,19 +657,17 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
         if (isThroatSkin) {
           destCtx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
         } else if (isRedCowl) {
-          if (isCowlPlacketBorderL || isCowlPlacketBorderR || isCowlTopRim || isCowlBottomSeam) {
-            destCtx.fillStyle = '#1A0406'; // Dark black-crimson outline
+          if (isCowlTopRim || isCowlBottomSeam || isCowlPlacketSeam) {
+            destCtx.fillStyle = '#6E0E14'; // Subtle dark red fold crease
           } else if (isCowlMiddleCrease) {
-            destCtx.fillStyle = '#6E0E14'; // Dark red middle fold crease
+            destCtx.fillStyle = '#8A1018'; // Middle fold shadow
           } else if (isCowlPlacket) {
             destCtx.fillStyle = '#C81E2B'; // Rich vertical flap red
           } else if (ry < r * 0.32) {
-            // Upper Cowl Fold: Bright vivid red with top specular highlight
             let col = '#E52B38';
             if (ry < cowlTopY + P * 2.5) col = '#F44336';
             destCtx.fillStyle = col;
           } else {
-            // Lower Cowl Fold: Deep rich crimson
             let col = '#B71C1C';
             if (absX > r * 0.70 || ry > r * 0.46) col = '#8A1018';
             destCtx.fillStyle = col;
@@ -639,7 +706,9 @@ export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
 
   if (!_cachedYujiNormalCanvas || !_cachedYujiSukunaCanvas || _cachedYujiR !== r) {
     _cachedYujiR = r;
-    const size = Math.ceil((r + 4) * 2);
+    const P = 2.0;
+    const steps = Math.ceil((r + P) / P);
+    const size = (steps * 2 + 1) * P;
 
     _cachedYujiNormalCanvas = document.createElement('canvas');
     _cachedYujiNormalCanvas.width = size;

@@ -257,7 +257,6 @@ let _cachedGojoR = 0;
 function _renderGojoPixelBodyToCanvas(destCtx, r) {
   destCtx.imageSmoothingEnabled = false;
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
   // Palette Colors matching 1:1 Reference
@@ -285,29 +284,30 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
   destCtx.save();
   destCtx.translate(cx, cy);
 
-  // 0. Stepped Dark Outer Ink Shell (Eliminates transparent diagonal corner gaps / white border bleeding)
-  destCtx.fillStyle = C.outline;
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
       const ry = gy * P;
       const dist = Math.hypot(rx, ry);
-      if (dist <= r + P * 0.5) {
-        destCtx.fillRect(snap(rx), snap(ry), P, P);
+      if (dist > r) continue;
+
+      const px = rx - P / 2;
+      const py = ry - P / 2;
+
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = C.outline;
+        destCtx.fillRect(px, py, P, P);
+        continue;
       }
-    }
-  }
-
-  // 1. Inner Body Fill
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const rx = gx * P;
-      const ry = gy * P;
-      const dist = Math.hypot(rx, ry);
-      if (dist > r - P * 0.4) continue; // Keep the solid outer border shell clean
-
-      const px = snap(rx);
-      const py = snap(ry);
 
       // Normalized coordinates from -1.0 to +1.0
       const nx = rx / r;
@@ -405,7 +405,7 @@ export function drawGojoPixelBody(ctx, r) {
     _cachedGojoR = r;
     const P = 2.0;
     const steps = Math.ceil((r + P) / P);
-    const size = (steps + 2) * P * 2;
+    const size = (steps * 2 + 1) * P;
     _cachedGojoCanvas = document.createElement('canvas');
     _cachedGojoCanvas.width = size;
     _cachedGojoCanvas.height = size;

@@ -6,7 +6,6 @@ let _cachedSukunaColor = '';
 function _renderSukunaPixelBodyToCanvas(destCtx, r, crimsonBase) {
   destCtx.imageSmoothingEnabled = false;
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
   // Palette Colors for Ryomen Sukuna (Crimson Face + Traditional Kimono)
@@ -39,30 +38,31 @@ function _renderSukunaPixelBodyToCanvas(destCtx, r, crimsonBase) {
   destCtx.save();
   destCtx.translate(cx, cy);
 
-  // 0. Stepped Dark Outer Ink Shell (Eliminates transparent diagonal corner gaps / white border bleeding)
-  destCtx.fillStyle = C.outline;
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
       const ry = gy * P;
       const dist = Math.hypot(rx, ry);
-      if (dist <= r + P * 0.5) {
-        destCtx.fillRect(snap(rx), snap(ry), P, P);
-      }
-    }
-  }
+      if (dist > r) continue;
 
-  // 1. Inner Body Fill: Clean Zonal Tones (NO noisy checkerboard dithering stripes) & Cursed Ink Tattoos
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const rx = gx * P;
-      const ry = gy * P;
-      const dist = Math.hypot(rx, ry);
-      if (dist > r - P * 0.4) continue; // Keep the solid outer border shell clean
-
-      const px = snap(rx);
-      const py = snap(ry);
+      const px = rx - P / 2;
+      const py = ry - P / 2;
       const absGx = Math.abs(gx);
+
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = C.outline;
+        destCtx.fillRect(px, py, P, P);
+        continue;
+      }
 
       // ──────────────────────────────────────────
       // EXACT CANONICAL SUKUNA TATTOO MARKINGS (DISCRETE PIXEL GRID)
@@ -203,7 +203,7 @@ export function drawSukunaPixelBody(ctx, r, fighter = null) {
     _cachedSukunaColor = crimsonBase;
     const P = 2.0;
     const steps = Math.ceil((r + P) / P);
-    const size = (steps + 2) * P * 2;
+    const size = (steps * 2 + 1) * P;
     _cachedSukunaCanvas = document.createElement('canvas');
     _cachedSukunaCanvas.width = size;
     _cachedSukunaCanvas.height = size;

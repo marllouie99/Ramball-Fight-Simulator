@@ -1018,7 +1018,6 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
   if (isTransformed) {
@@ -1032,11 +1031,18 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
         const dist = Math.hypot(rx, ry);
         if (dist > r) continue;
 
-        const px = snap(rx);
-        const py = snap(ry);
+        const px = rx - P / 2;
+        const py = ry - P / 2;
 
         // Pixelated Black Stroke Border
-        if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+        const isBorder = (
+          Math.hypot((gx + 1) * P, gy * P) > r ||
+          Math.hypot((gx - 1) * P, gy * P) > r ||
+          Math.hypot(gx * P, (gy + 1) * P) > r ||
+          Math.hypot(gx * P, (gy - 1) * P) > r
+        );
+
+        if (isBorder) {
           ctx.fillStyle = '#0E0F14';
           ctx.fillRect(px, py, P, P);
           continue;
@@ -1090,6 +1096,7 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
       }
     }
 
+    // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
     for (let gy = -steps; gy <= steps; gy++) {
       for (let gx = -steps; gx <= steps; gx++) {
         const rx = gx * P;
@@ -1097,11 +1104,18 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
         const dist = Math.hypot(rx, ry);
         if (dist > r) continue;
 
-        const px = snap(rx);
-        const py = snap(ry);
+        const px = rx - P / 2;
+        const py = ry - P / 2;
 
         // Pixelated Black Stroke Border
-        if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+        const isBorder = (
+          Math.hypot((gx + 1) * P, gy * P) > r ||
+          Math.hypot((gx - 1) * P, gy * P) > r ||
+          Math.hypot(gx * P, (gy + 1) * P) > r ||
+          Math.hypot(gx * P, (gy - 1) * P) > r
+        );
+
+        if (isBorder) {
           ctx.fillStyle = '#0E0F14';
           ctx.fillRect(px, py, P, P);
           continue;

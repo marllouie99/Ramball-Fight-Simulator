@@ -153,6 +153,9 @@ async function main() {
   const { initCameraState, updateCamera } = await import('../js/systems/cameraSystem.js');
   const { _getRezeHairImage, _drawRezeHair, drawRezeHumanPixelBody, drawRezeBombHybridBody, drawRezeSkin } = await import('../js/graphics/fighters/rezeSkin.js');
   const { _getIchigoHairImage, _drawIchigoHair, drawIchigoSkin } = await import('../js/graphics/fighters/ichigoSkin.js');
+  const { _getYujiHairImage, _drawYujiHair, drawYujiSkin } = await import('../js/graphics/fighters/yujiSkin.js');
+  const { _getYutaHairImage, _drawYutaHair, drawYutaPixelBody, drawYutaSkin } = await import('../js/graphics/fighters/yutaSkin.js');
+  const { _getTojiHairImage, _drawTojiHair, drawTojiPixelBody, drawTojiSkin, drawTojiGhostSkin } = await import('../js/graphics/fighters/tojiSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -6905,6 +6908,93 @@ async function main() {
     errors++;
   }
 
+  // Yuji Model Hair Asset Test
+  console.log('💇 [Yuji Model Hair Asset Test] Verifying Yuji hair asset image loader, facing directions, Soul Swap, and drawYujiSkin rendering...');
+  try {
+    const YujiClass = FIGHTER_CLASS_MAP['yuji'];
+    const yuji = new YujiClass({ startX: 300, startY: 300 });
+
+    mockCtx.resetStackDepth();
+    _drawYujiHair(mockCtx, yuji.r || 25, false);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`_drawYujiHair resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawYujiSkin(mockCtx, yuji);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawYujiSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    yuji.draw(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Yuji draw resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test facing left mirroring
+    yuji.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawYujiSkin(mockCtx, yuji);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawYujiSkin (facing left) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test Soul Swap (Sukuna Form) drawSkin
+    yuji.soulSwapActive = true;
+    mockCtx.resetStackDepth();
+    drawYujiSkin(mockCtx, yuji);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawYujiSkin (Soul Swap form) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+    yuji.soulSwapActive = false;
+  } catch (err) {
+    console.error('❌ [YUJI HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Yuta Model Hair Asset Test
+  console.log('💇 [Yuta Model Hair Asset Test] Verifying Yuta hair asset image loader, pixel body, facing directions, and drawYutaSkin rendering...');
+  try {
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const yuta = new YutaClass({ startX: 300, startY: 300 });
+
+    mockCtx.resetStackDepth();
+    _drawYutaHair(mockCtx, yuta.r || 25, false);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`_drawYutaHair resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawYutaPixelBody(mockCtx, yuta.r || 25);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawYutaPixelBody resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawYutaSkin(mockCtx, yuta);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawYutaSkin resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    mockCtx.resetStackDepth();
+    yuta.draw(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`Yuta draw resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+
+    // Test facing left mirroring
+    yuta.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawYutaSkin(mockCtx, yuta);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`drawYutaSkin (facing left) resulted in corrupted canvas stack: depth=${mockCtx.getStackDepth()}`);
+    }
+  } catch (err) {
+    console.error('❌ [YUTA HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
   // Gojo Hollow Purple Wall Collision Test
   console.log('🔮 [Gojo Hollow Purple Wall Collision Test] Verifying Purple stops completely on wall contact without sliding...');
   try {
@@ -7756,6 +7846,40 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ [SUKUNA FUGA PULL TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 11. Toji Model Hair Asset & Procedural Body Canvas Stack Test
+  console.log('🗡️ [Toji Model Hair & Pixel Body Test] Verifying toji-hair.png overlay and procedural pixel body stack balance...');
+  try {
+    const tojiImg = _getTojiHairImage();
+    if (!tojiImg) {
+      throw new Error('_getTojiHairImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    drawTojiPixelBody(mockCtx, 25);
+    assertCanvasStackBalance('drawTojiPixelBody(mockCtx, 25)');
+
+    mockCtx.resetStackDepth();
+    _drawTojiHair(mockCtx, 25, false);
+    assertCanvasStackBalance('_drawTojiHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawTojiHair(mockCtx, 25, true);
+    assertCanvasStackBalance('_drawTojiHair(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawTojiGhostSkin(mockCtx, 200, 200, 0.5, 25, 0.5, false);
+    assertCanvasStackBalance('drawTojiGhostSkin(mockCtx, 200, 200, ...)');
+
+    const TojiClass = FIGHTER_CLASS_MAP.toji;
+    const toji = new TojiClass({ x: 300, y: 300, color: '#1a1a24', controls: {} });
+    mockCtx.resetStackDepth();
+    drawTojiSkin(mockCtx, toji);
+    assertCanvasStackBalance('drawTojiSkin(mockCtx, toji)');
+  } catch (err) {
+    console.error('❌ [TOJI MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
     errors++;
   }
 

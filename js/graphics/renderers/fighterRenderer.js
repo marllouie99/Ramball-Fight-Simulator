@@ -70,22 +70,10 @@ export function drawSketchyCircle(ctx, cx, cy, r, seed, color = '#000000', width
 export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0BD', outlineColor = '#000000') {
   if (radius <= 0) return;
   const P = 2.0; // 2.0px pixel art grid
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((radius + P) / P);
 
   ctx.save();
-  // 1. Stepped Dark Outer Ink Shell
-  ctx.fillStyle = outlineColor || '#000000';
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const d = Math.hypot(gx * P, gy * P);
-      if (d <= radius + P * 0.85) {
-        ctx.fillRect(snap(cx + gx * P), snap(cy + gy * P), P, P);
-      }
-    }
-  }
-
-  // 2. Stepped Color Fill with Volumetric Highlight & Shadow
+  // 100% 4-Way Symmetrical Glove/Hand Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -93,28 +81,34 @@ export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0B
       const d = Math.hypot(rx, ry);
       if (d > radius) continue;
 
-      const px = snap(cx + rx);
-      const py = snap(cy + ry);
+      const px = cx + rx - P / 2;
+      const py = cy + ry - P / 2;
 
-      // Top-forward highlight glint
-      if (ry < -radius * 0.35 && rx > -radius * 0.3) {
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > radius ||
+        Math.hypot((gx - 1) * P, gy * P) > radius ||
+        Math.hypot(gx * P, (gy + 1) * P) > radius ||
+        Math.hypot(gx * P, (gy - 1) * P) > radius
+      );
+
+      if (isBorder) {
+        ctx.fillStyle = outlineColor || '#000000';
+      } else if (ry < -radius * 0.35 && rx > -radius * 0.3) {
         ctx.fillStyle = '#FFFFFF';
         ctx.globalAlpha = 0.45;
         ctx.fillRect(px, py, P, P);
         ctx.globalAlpha = 1.0;
-      }
-      // Bottom/back heel shadow
-      else if (ry > radius * 0.35 || rx < -radius * 0.45) {
+        continue;
+      } else if (ry > radius * 0.35 || rx < -radius * 0.45) {
         ctx.fillStyle = '#000000';
         ctx.globalAlpha = 0.30;
         ctx.fillRect(px, py, P, P);
         ctx.globalAlpha = 1.0;
-      }
-      // Main hand skin/glove tone
-      else {
+        continue;
+      } else {
         ctx.fillStyle = color || '#FFE0BD';
-        ctx.fillRect(px, py, P, P);
       }
+      ctx.fillRect(px, py, P, P);
     }
   }
   ctx.restore();

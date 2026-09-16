@@ -154,51 +154,45 @@ function _renderFistToCanvas(destCtx, radius, inBFState) {
   destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
   const P = 2.0;
   const gridR = Math.max(P * 2, radius);
-  const steps = Math.ceil(gridR / P);
+  const steps = Math.ceil((gridR + P) / P);
 
   const outlineCol = inBFState ? '#1A0A0E' : '#0E0F14';
   const baseSkin   = inBFState ? '#D88A75' : '#EBBF9E';
   const shadowCol  = inBFState ? '#A85D4B' : '#C49677';
   const glintCol   = inBFState ? '#FFEAE5' : '#FFF3E8';
 
-  // 1. Dark Manga Ink Outline Shell
-  destCtx.fillStyle = outlineCol;
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= gridR + P * 0.75) {
-        destCtx.fillRect(gx * P, gy * P, P, P);
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > gridR) continue;
+
+      const px = rx - P / 2;
+      const py = ry - P / 2;
+
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > gridR ||
+        Math.hypot((gx - 1) * P, gy * P) > gridR ||
+        Math.hypot(gx * P, (gy + 1) * P) > gridR ||
+        Math.hypot(gx * P, (gy - 1) * P) > gridR
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = outlineCol;
+      } else if (gy * P > gridR * 0.35 || gx * P < -gridR * 0.45) {
+        destCtx.fillStyle = shadowCol;
+      } else {
+        destCtx.fillStyle = baseSkin;
       }
+      destCtx.fillRect(px, py, P, P);
     }
   }
 
-  // 2. Inner Base Skin Tone
-  destCtx.fillStyle = baseSkin;
-  const innerR = gridR - P * 0.4;
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR) {
-        destCtx.fillRect(gx * P, gy * P, P, P);
-      }
-    }
-  }
-
-  // 3. Knuckle Depth Shading
-  destCtx.fillStyle = shadowCol;
-  for (let gy = 0; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
-        destCtx.fillRect(gx * P, gy * P, P, P);
-      }
-    }
-  }
-
-  // 4. Knuckle Specular Glint Pixels
+  // Knuckle Specular Glint Pixels
   destCtx.fillStyle = glintCol;
-  const hx = Math.round(P * 0.5);
-  const hy = Math.round(-innerR * 0.45);
+  const hx = Math.round(-P / 2);
+  const hy = Math.round(-gridR * 0.45 - P / 2);
   destCtx.fillRect(hx, hy, P, P);
   destCtx.fillRect(hx + P, hy, P, P);
 
@@ -237,7 +231,9 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   if (typeof document !== 'undefined') {
     if (!_cachedFistNormalCanvas || !_cachedFistZoneCanvas || _cachedFistRadius !== radius) {
       _cachedFistRadius = radius;
-      const size = Math.ceil((radius + 6) * 2);
+      const P = 2.0;
+      const steps = Math.ceil((radius + P) / P);
+      const size = (steps * 2 + 1) * P;
 
       _cachedFistNormalCanvas = document.createElement('canvas');
       _cachedFistNormalCanvas.width = size;
@@ -266,7 +262,7 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
 /**
  * Procedural Pixel Art Render Function for Aoi Todo's body model.
  * Upright Front POV, Faceless (Rule #19 compliant), with signature left burn scar,
- * combed black hair, topknot man-bun, purple compression shirt, white obi sash, and hakama pants.
+ * combed black hair, topknot man-bun, purple compression shirt, dark martial arts obi sash, and hakama pants.
  */
 function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
   destCtx.save();
@@ -274,7 +270,6 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
   destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
 
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
   // Hairline shape calculation: smooth combed-back widow's peak
@@ -291,57 +286,36 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
   const bunRadius  = r * 0.35;
   const bunSteps   = Math.ceil((bunRadius + P) / P);
 
-  // Bun Outer Outline Shell
-  destCtx.fillStyle = '#0A0A0E';
+  // Bun Outer Outline Shell & Fill
   for (let gy = -bunSteps; gy <= bunSteps; gy++) {
     for (let gx = -bunSteps; gx <= bunSteps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= bunRadius + P * 0.75) {
-        destCtx.fillRect(snap(bunCenterX + gx * P), snap(bunCenterY + gy * P), P, P);
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > bunRadius) continue;
+
+      const px = bunCenterX + rx - P / 2;
+      const py = bunCenterY + ry - P / 2;
+
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > bunRadius ||
+        Math.hypot((gx - 1) * P, gy * P) > bunRadius ||
+        Math.hypot(gx * P, (gy + 1) * P) > bunRadius ||
+        Math.hypot(gx * P, (gy - 1) * P) > bunRadius
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = '#0A0A0E';
+      } else if (ry < -bunRadius * 0.35 && Math.abs(rx) < bunRadius * 0.55) {
+        destCtx.fillStyle = '#242432'; // Topknot crown highlight
+      } else {
+        destCtx.fillStyle = '#0E0E14';
       }
+      destCtx.fillRect(px, py, P, P);
     }
   }
 
-  // Bun Black Hair Fill & Texture
-  for (let gy = -bunSteps; gy <= bunSteps; gy++) {
-    for (let gx = -bunSteps; gx <= bunSteps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= bunRadius) {
-        const px = snap(bunCenterX + gx * P);
-        const py = snap(bunCenterY + gy * P);
-        let col = '#0E0E14';
-        if (gy * P < -bunRadius * 0.35 && Math.abs(gx * P) < bunRadius * 0.55) {
-          col = '#242432'; // Topknot crown highlight
-        } else if (dist > bunRadius - P * 0.8) {
-          col = '#08080C'; // Bun inner contour
-        }
-        destCtx.fillStyle = col;
-        destCtx.fillRect(px, py, P, P);
-      }
-    }
-  }
-
-  // White Hair Tie Band across base of Topknot
-  const tieW = r * 0.38;
-  const tieH = P * 2;
-  const tieY = -r * 0.74;
-  for (let gx = -Math.ceil(tieW / (2 * P)); gx <= Math.ceil(tieW / (2 * P)); gx++) {
-    const px = snap(gx * P);
-    if (Math.abs(px) <= tieW / 2) {
-      destCtx.fillStyle = '#0E0F14';
-      destCtx.fillRect(px, snap(tieY - P), P, P);
-      destCtx.fillRect(px, snap(tieY + tieH), P, P);
-
-      destCtx.fillStyle = (Math.abs(px) < P * 1.5) ? '#FFFFFF' : '#E0E8F2';
-      destCtx.fillRect(px, snap(tieY), P, P);
-      destCtx.fillStyle = '#BAC5D6';
-      destCtx.fillRect(px, snap(tieY + P), P, P);
-    }
-  }
-
-  // ─────────────────────────────────────────────
-  // 2. MAIN BODY CIRCLE (Upright Front POV)
-  // ─────────────────────────────────────────────
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -349,11 +323,18 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
       const dist = Math.hypot(rx, ry);
       if (dist > r) continue;
 
-      const px = snap(rx);
-      const py = snap(ry);
+      const px = rx - P / 2;
+      const py = ry - P / 2;
 
-      // Pixelated Black Stroke Border Shell
-      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
         destCtx.fillStyle = inBFState ? '#1A0A0E' : '#0E0F14';
         destCtx.fillRect(px, py, P, P);
         continue;
@@ -476,7 +457,7 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 4: Thick White Belt Sash / Obi (r * 0.50 <= ry < r * 0.68)
+      // ZONE 4: Dark Martial Arts Waist Sash (r * 0.50 <= ry < r * 0.68)
       // ──────────────────────────────────────────
       else if (ry < r * 0.68) {
         // Obi Horizontal Fold Crease Line
@@ -486,18 +467,18 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
 
         if (isCenterKnot) {
           if (absX >= 0.12 || Math.abs(ry - r * 0.59) >= r * 0.07) {
-            destCtx.fillStyle = '#788698'; // Knot tie contour
+            destCtx.fillStyle = '#14101A'; // Dark knot tie contour
           } else {
-            destCtx.fillStyle = '#D4DCE8'; // Knot center plate
+            destCtx.fillStyle = '#2D2538'; // Knot center fold
           }
         } else if (ry <= r * 0.52) {
-          destCtx.fillStyle = '#FFFFFF'; // Top obi rim highlight
+          destCtx.fillStyle = '#332B3F'; // Top rim highlight
         } else if (isCrease) {
-          destCtx.fillStyle = '#BAC5D6'; // Crease fold line
+          destCtx.fillStyle = '#181320'; // Crease fold line
         } else if (ry >= r * 0.65) {
-          destCtx.fillStyle = '#A0ACB8'; // Bottom obi shadow
+          destCtx.fillStyle = '#100D16'; // Bottom sash shadow
         } else {
-          destCtx.fillStyle = '#F0F4F8'; // Base White Obi
+          destCtx.fillStyle = '#221C2B'; // Base Dark Kyoto High Sash
         }
 
         destCtx.fillRect(px, py, P, P);
@@ -795,7 +776,10 @@ export function drawTodoSkin(ctx, fighter) {
   if (typeof document !== 'undefined') {
     if (!_cachedTodoNormalCanvas || !_cachedTodoZoneCanvas || _cachedTodoR !== r) {
       _cachedTodoR = r;
-      const size = Math.ceil((r + 14) * 2);
+      const P = 2.0;
+      const maxExt = Math.max(r, r * 0.94 + r * 0.35 + P);
+      const steps = Math.ceil((maxExt + P) / P);
+      const size = (steps * 2 + 1) * P;
 
       _cachedTodoNormalCanvas = document.createElement('canvas');
       _cachedTodoNormalCanvas.width = size;
