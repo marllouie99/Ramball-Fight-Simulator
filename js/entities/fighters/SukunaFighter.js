@@ -918,8 +918,11 @@ export class SukunaFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate - disabled in demo mode)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && this.domainUseCount < 2 && opponent && !opponent.isDead) {
+    if (!this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && opponent && !opponent.isDead) {
       this.aim(opponent);
+      this.isMeleeMode = false;
+      this.forcedMeleeTimer = 0;
+      this.punchAnimTimer = 0;
       this.isChannelingDomainExpansion = true;
       this.isChannelingDivineFlame = false; // Explicit mutual exclusion
       this.domainChargeTimer = 0;
@@ -1011,15 +1014,12 @@ export class SukunaFighter extends Fighter {
         // Sukuna is currently in Melee Mode: Check if duration expired or if knocked back / distanced from enemy
         const isDistanced = !opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 130;
         const isKnockedBack = Math.hypot(this.knockbackVx || 0, this.knockbackVy || 0) > 0.5;
-        const isDurationExpired = (this.forcedMeleeTimer || 0) <= 0;
-
-        if (isDurationExpired || isDistanced || isKnockedBack) {
-          // DURATION EXPIRED OR KNOCKED AWAY: Disengage to Ranged Mode, set separation cooldown, and teleport away!
+        if (isDistanced || isKnockedBack || ((this.forcedMeleeTimer || 0) <= 0 && this.meleeComboCount === 0)) {
+          // DURATION EXPIRED & COMBO COMPLETE OR KNOCKED AWAY: Disengage to Ranged Mode and start separation cooldown!
           this.isMeleeMode = false;
           this.forcedMeleeTimer = 0;
           this.punchAnimTimer = 0;
-          this.meleeComboCount = 0;
-          if (!isKnockedBack && !this.domainActive) {
+          if (!isKnockedBack && (this.forcedMeleeTimer || 0) <= 0) {
             this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
             if (opponent && !opponent.isDead) {
               this._teleportAwayFrom(opponent, arena);

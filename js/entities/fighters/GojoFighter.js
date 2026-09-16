@@ -1286,7 +1286,11 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (!this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+    if (!this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && opponent && !opponent.isDead) {
+      this.isMeleeMode = false;
+      this.forcedMeleeTimer = 0;
+      this.punchAnimTimer = 0;
+
       // Initiate smooth Pre-Domain Slide Phase before stopping to channel
       this.isDomainPreSlide = true;
       this.domainPreSlideTimer = 18; // ~18 frames smooth glide deceleration
@@ -1597,12 +1601,8 @@ export class GojoFighter extends Fighter {
           this.forcedMeleeTimer--;
           if (this.forcedMeleeTimer <= 0) {
             this.isMeleeMode = false;
-            this.meleeComboCount = 0;
-            this.punchAnimTimer = 0;
             this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown || 180;
-            if (opponent && !opponent.isDead) {
-              this._teleportAwayFrom(opponent, arena);
-            }
+            this._teleportAwayFrom(opponent, arena);
           }
         }
       } else if (isBeingMeleed && this.meleeModeCooldown <= 0) {
@@ -1925,19 +1925,16 @@ export class GojoFighter extends Fighter {
     // Set cooldown for next punch
     this.meleePunchCooldown = punchCooldown;
 
-    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached or forcedMeleeTimer expires
-    if (this.meleeComboCount >= this.meleeComboTarget || (this.forcedMeleeTimer || 0) <= 0) {
+    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
+    if (this.meleeComboCount >= this.meleeComboTarget) {
       this.meleeComboCount = 0;
       this.meleeComboTarget = this.domainActive ? 999 : (Math.random() < 0.5 ? 6 : 3);
       this.meleeFlankAngle = undefined; // Clear flank angle so next combo picks a fresh angle
 
       if (!this.domainActive && (this.forcedMeleeTimer || 0) <= 0) {
         this.isMeleeMode = false;
-        this.punchAnimTimer = 0;
         this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Mandatory ranged separation!
-        if (opponent && !opponent.isDead) {
-          this._teleportAwayFrom(opponent, arena);
-        }
+        this._teleportAwayFrom(opponent, arena);
       }
     }
 
@@ -1952,8 +1949,8 @@ export class GojoFighter extends Fighter {
     const oldX = this.x;
     const oldY = this.y;
 
-    const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5) * 0.35;
-    const dist = CONFIG.gojo?.comboDisengageDistance ?? 280;
+    const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5);
+    const dist = CONFIG.gojo.comboDisengageDistance ?? 300;
     let targetX = opponent.x + Math.cos(angle) * dist;
     let targetY = opponent.y + Math.sin(angle) * dist;
 

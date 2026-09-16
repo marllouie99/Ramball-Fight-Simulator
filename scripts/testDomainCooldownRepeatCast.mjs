@@ -113,66 +113,60 @@ async function runTests() {
   const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
   const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
 
-  state.arena = { x: 0, y: 0, width: 1200, height: 1200 };
+  state.arena = { x: 0, y: 0, width: 600, height: 600 };
   state.gameState = 'playing';
 
-  console.log("Testing Gojo & Sukuna comboDisengageDistance on melee duration expiry...");
+  console.log("Testing Gojo & Sukuna Domain Cooldown Multi-Cast (No 2-use limit)...");
 
-  // 1. Test Sukuna Disengage Distance
+  // TEST 1: Sukuna 3rd and 4th Domain Casts
   {
-    const sukuna = new SukunaFighter({ id: 'sukuna', name: 'Sukuna', color: '#ff2244', x: 600, y: 600 });
-    const dummy = new NormalFighter({ id: 'normal', name: 'Dummy', color: '#ffffff', x: 630, y: 600 });
+    const sukuna = new SukunaFighter({ id: 'sukuna', name: 'Sukuna', color: '#ff2244', x: 300, y: 300 });
+    const dummy = new NormalFighter({ id: 'dummy', name: 'Dummy', color: '#00ff00', x: 200, y: 300 });
     state.fighters = [sukuna, dummy];
 
+    // Simulate Sukuna has already cast domain 2 times previously
+    sukuna.domainUseCount = 2;
+    sukuna.domainActive = false;
+    sukuna.domainCooldown = 0; // Cooldown ready!
+    sukuna.forcedMeleeTimer = 60;
     sukuna.isMeleeMode = true;
-    sukuna.forcedMeleeTimer = 1; // Expiring on next tick
-    sukuna.meleeComboCount = 2;
-
-    const initialDist = Math.hypot(sukuna.x - dummy.x, sukuna.y - dummy.y);
-    console.log(`Sukuna before expiry: dist = ${initialDist.toFixed(1)}px, isMeleeMode = ${sukuna.isMeleeMode}`);
 
     sukuna.update(dummy, 0, state.arena);
 
-    const afterDist = Math.hypot(sukuna.x - dummy.x, sukuna.y - dummy.y);
-    console.log(`Sukuna after expiry: dist = ${afterDist.toFixed(1)}px, isMeleeMode = ${sukuna.isMeleeMode}`);
-
+    if (!sukuna.isChannelingDomainExpansion) {
+      throw new Error(`Sukuna failed to initiate Domain Expansion on 3rd cast when cooldown ready! (isChannelingDomainExpansion: ${sukuna.isChannelingDomainExpansion})`);
+    }
     if (sukuna.isMeleeMode) {
-      throw new Error("Sukuna failed to exit isMeleeMode on forcedMeleeTimer expiry!");
+      throw new Error(`Sukuna is still in melee mode while channeling domain!`);
     }
-    if (afterDist < (CONFIG.sukuna.comboDisengageDistance - 50)) {
-      throw new Error(`Sukuna failed to teleport away by comboDisengageDistance! (dist: ${afterDist} vs expected >= ${CONFIG.sukuna.comboDisengageDistance - 50})`);
-    }
-    console.log("✔ Sukuna successfully disengaged and teleported away by comboDisengageDistance!");
+
+    console.log("✅ Verified: Sukuna successfully initiates Domain Expansion beyond 2 uses when cooldown is ready.");
   }
 
-  // 2. Test Gojo Disengage Distance
+  // TEST 2: Gojo 3rd and 4th Domain Casts
   {
-    const gojo = new GojoFighter({ id: 'gojo', name: 'Gojo', color: '#00ffff', x: 600, y: 600 });
-    const dummy = new NormalFighter({ id: 'normal', name: 'Dummy', color: '#ffffff', x: 630, y: 600 });
+    const gojo = new GojoFighter({ id: 'gojo', name: 'Gojo', color: '#00ffff', x: 300, y: 300 });
+    const dummy = new NormalFighter({ id: 'dummy', name: 'Dummy', color: '#00ff00', x: 200, y: 300 });
     state.fighters = [gojo, dummy];
 
+    // Simulate Gojo has already cast domain 2 times previously
+    gojo.domainUseCount = 2;
+    gojo.domainActive = false;
+    gojo.domainCooldown = 0; // Cooldown ready!
+    gojo.forcedMeleeTimer = 60;
     gojo.isMeleeMode = true;
-    gojo.forcedMeleeTimer = 1; // Expiring on next tick
-    gojo.meleeComboCount = 2;
-
-    const initialDist = Math.hypot(gojo.x - dummy.x, gojo.y - dummy.y);
-    console.log(`Gojo before expiry: dist = ${initialDist.toFixed(1)}px, isMeleeMode = ${gojo.isMeleeMode}`);
 
     gojo.update(dummy, 0, state.arena);
 
-    const afterDist = Math.hypot(gojo.x - dummy.x, gojo.y - dummy.y);
-    console.log(`Gojo after expiry: dist = ${afterDist.toFixed(1)}px, isMeleeMode = ${gojo.isMeleeMode}`);
-
+    if (!gojo.isDomainPreSlide && !gojo.isChannelingDomainExpansion) {
+      throw new Error(`Gojo failed to initiate Domain Pre-Slide / Expansion on 3rd cast when cooldown ready! (isDomainPreSlide: ${gojo.isDomainPreSlide})`);
+    }
     if (gojo.isMeleeMode) {
-      throw new Error("Gojo failed to exit isMeleeMode on forcedMeleeTimer expiry!");
+      throw new Error(`Gojo is still in melee mode while initiating domain!`);
     }
-    if (afterDist < (CONFIG.gojo.comboDisengageDistance - 50)) {
-      throw new Error(`Gojo failed to teleport away by comboDisengageDistance! (dist: ${afterDist} vs expected >= ${CONFIG.gojo.comboDisengageDistance - 50})`);
-    }
-    console.log("✔ Gojo successfully disengaged and teleported away by comboDisengageDistance!");
-  }
 
-  console.log("\n✅ All comboDisengageDistance tests passed!");
+    console.log("✅ Verified: Gojo successfully initiates Domain Expansion beyond 2 uses when cooldown is ready.");
+  }
 }
 
 runTests().catch(err => {
