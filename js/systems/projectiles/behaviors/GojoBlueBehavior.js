@@ -104,7 +104,8 @@ export class GojoBlueBehavior extends ProjectileBehavior {
           if (!p.pulledTargets) p.pulledTargets = new Set();
           p.pulledTargets.add(f);
           const isWallLingering = p.isWallLingering;
-          if (dist > 0 && !isChanneling) {
+          const isFugaChanneling = Boolean(f.isChannelingDivineFlame || f.isChannelingFuga || (f.fugaChargeTimer && f.fugaChargeTimer > 0));
+          if (dist > 0 && (!isChanneling || isFugaChanneling)) {
             const pullStrength = isWallLingering ? 4.8 : 3.5;
             const force = (pullRadius - dist) / pullRadius * pullStrength;
             f.x += (dx / dist) * force;

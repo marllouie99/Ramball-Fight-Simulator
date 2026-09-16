@@ -234,8 +234,10 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     fighter.isCurrentlyWallPinnedByEscanor
   );
   if (isDraggedOrTrapped || fighter.isChannelingDivineFlame || fighter.isChannelingDomainExpansion) {
-    fighter.vx = 0;
-    fighter.vy = 0;
+    if (!isDraggedOrTrapped && !fighter.isChannelingDivineFlame) {
+      fighter.vx = 0;
+      fighter.vy = 0;
+    }
     fighter.punchAnimTimer = 0;
     fighter.punchActiveMaxTime = 0;
     fighter.isMeleeMode = false;

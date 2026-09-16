@@ -7704,6 +7704,42 @@ async function main() {
     errors++;
   }
 
+  // 10. Sukuna Fuga Channeling Pull & Hyper-Armor Test
+  console.log('🔥 [Sukuna Fuga Channeling Pull Test] Verifying Sukuna gets pulled by attacks without cancelling Fuga...');
+  try {
+    const SukunaClass = FIGHTER_CLASS_MAP.sukuna;
+    const IchigoClass = FIGHTER_CLASS_MAP.ichigo;
+    const sukuna = new SukunaClass({ x: 300, y: 300, color: '#ff0000', controls: {} });
+    const ichigo = new IchigoClass({ x: 100, y: 300, color: '#ff8800', controls: {} });
+    sukuna.introReboundActive = false;
+    ichigo.introReboundActive = false;
+    state.fighters = [sukuna, ichigo];
+    state.arena = { x: 50, y: 50, width: 800, height: 600 };
+    state.gameState = 'playing';
+
+    sukuna.isChannelingDivineFlame = true;
+    sukuna.divineFlameChargeTimer = 10;
+    sukuna.divineFlameChargeMax = 50;
+    sukuna.divineFlameCastAngle = 0;
+
+    const initialX = sukuna.x;
+    sukuna.applyKnockback(15, 0, 0);
+    sukuna.update(ichigo, 0, state.arena);
+
+    if (sukuna.x <= initialX) {
+      throw new Error(`Expected Sukuna to be displaced by knockback (x: ${sukuna.x}, initialX: ${initialX})`);
+    }
+    if (!sukuna.isChannelingDivineFlame) {
+      throw new Error('Expected Sukuna to still be channeling Fuga after knockback displacement');
+    }
+    if (sukuna.divineFlameChargeTimer !== 11) {
+      throw new Error(`Expected divineFlameChargeTimer to advance to 11, got ${sukuna.divineFlameChargeTimer}`);
+    }
+  } catch (err) {
+    console.error('❌ [SUKUNA FUGA PULL TEST ERROR]:', err);
+    errors++;
+  }
+
   console.log('───────────────────────────────────────────────────────');
   if (errors === 0) {
     console.log(`✅ Successfully tested all ${totalTested} fighter classes, skins, weapon previews, and UI screens with ZERO runtime errors and 100% BALANCED Canvas 2D stacks!`);

@@ -146,10 +146,13 @@ export class SukunaFighter extends Fighter {
     const savedDomainCharge = this.domainChargeTimer;
     const savedDomainAudio = this._hasPlayedDomainChannelSound;
 
-    // Preserve Fuga channeling state when inside Malevolent Shrine OR when time-stopped by Gojo's domain (unless forceCancelAll is true or caught in Pure Love Beam)!
-    const isDomainTimeStop = (this.timeStopTimer > 0);
+    // Fuga Hyper-Armor: ONLY death, Toji ISOH ambush/silence, or Pure Love Beam can cancel Fuga channeling!
+    // Getting hit, taking knockback, or getting pulled/dragged by any attack MUST NOT cancel Fuga.
+    const isAmbushOrSilence = this.isTargetOfAmbush || ((this.silenceTimer || 0) > 0);
     const isBeamTrapped = this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0);
-    const preserveFuga = !forceCancelAll && !isBeamTrapped && (this.domainActive || isDomainTimeStop) && this.isChannelingDivineFlame;
+    const isDead = (this.hp !== undefined && this.hp <= 0) || this.isDead || this.dead;
+    const shouldCancelFuga = isDead || isAmbushOrSilence || isBeamTrapped;
+    const preserveFuga = !shouldCancelFuga && this.isChannelingDivineFlame;
     const savedChargeTimer = this.divineFlameChargeTimer;
     const savedFugaKey = this.fugaSoundKey;
 
@@ -163,7 +166,7 @@ export class SukunaFighter extends Fighter {
     if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
 
 
-    if (forceCancelAll || isBeamTrapped) {
+    if (shouldCancelFuga) {
       if (this.fugaSoundKey) {
         stopLoopingSound(this.fugaSoundKey);
         this.fugaSoundKey = null;
@@ -196,6 +199,7 @@ export class SukunaFighter extends Fighter {
       this.isChannelingDivineFlame = true;
       this.divineFlameChargeTimer = savedChargeTimer;
       this.fugaSoundKey = savedFugaKey;
+      const isDomainTimeStop = (this.timeStopTimer > 0);
       if (isDomainTimeStop && this.fugaSoundKey) {
         pauseLoopingSound(this.fugaSoundKey);
       }
@@ -732,24 +736,6 @@ export class SukunaFighter extends Fighter {
     if (!this.isChannelingDomainExpansion && !this.domainActive && (this.domainChargeTimer || 0) <= 0) this._hasPlayedDomainChannelSound = false;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
 
-    // Stop attacking if round/match has ended or if target/opponent is dead!
-    // IMPORTANT: Never interrupt mid-channel (Divine Flame / Fuga) as it would silence the looping Fuga audio.
-    const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
-    const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
-
-    if (!isGamePlaying || !isTargetAlive) {
-      if (!this.isChannelingAnySkill()) {
-        this.interruptAttacks(false);
-      }
-      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
-      if (this.slashSwingTimer > 0) this.slashSwingTimer--;
-      if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
-      this.shootCooldown = 60;
-      this.applyMovementPhysics();
-      this.resolveWallBounce(arena);
-      return;
-    }
-
     // Handle Divine Flame Channeling
     if (this.isChannelingDivineFlame) {
       this.divineFlameChargeTimer++;
@@ -767,9 +753,8 @@ export class SukunaFighter extends Fighter {
         if (sound) playSound(sound.src, sound.volume);
       }
 
-      // Stop all movement while channeling
-      this.vx = 0;
-      this.vy = 0;
+      // Allow external pulls/pushes (knockback, Getsuga drag, Blue suction, Purple suction, Black Hole pull) to move Sukuna while channeling Fuga!
+      // Apply physics with 0 self-speed multiplier so external velocities move him and decay smoothly without self-walking
       this.applyMovementPhysics(0);
 
       // Lock firing stance fixed in place; do not continuously auto-aim or rotate while channeling
@@ -785,6 +770,24 @@ export class SukunaFighter extends Fighter {
         this._fireDivineFlame(ownerIndex);
       }
 
+      this.resolveWallBounce(arena);
+      return;
+    }
+
+    // Stop attacking if round/match has ended or if target/opponent is dead!
+    // IMPORTANT: Never interrupt mid-channel (Divine Flame / Fuga) as it would silence the looping Fuga audio.
+    const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
+    const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
+
+    if (!isGamePlaying || !isTargetAlive) {
+      if (!this.isChannelingAnySkill()) {
+        this.interruptAttacks(false);
+      }
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+      if (this.slashSwingTimer > 0) this.slashSwingTimer--;
+      if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
+      this.shootCooldown = 60;
+      this.applyMovementPhysics();
       this.resolveWallBounce(arena);
       return;
     }

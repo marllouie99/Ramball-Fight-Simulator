@@ -192,8 +192,9 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const dist = Math.hypot(dx, dy);
         
         const isChanneling = (typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill()) || (typeof ent.isStationarySkillActive === 'function' && ent.isStationarySkillActive());
+        const isFugaChanneling = Boolean(ent.isChannelingDivineFlame || ent.isChannelingFuga || (ent.fugaChargeTimer && ent.fugaChargeTimer > 0));
         const isSaitamaCounter = Boolean(ent && (ent.characterId === 'saitama' || ent.type === 'saitama') && (ent.isCountering || (ent._counterPunchTimer && ent._counterPunchTimer > 0) || (ent._postCounterRecoveryTimer && ent._postCounterRecoveryTimer > 0)));
-        if (isSaitamaCounter || isChanneling) {
+        if (isSaitamaCounter || (isChanneling && !isFugaChanneling)) {
           // Saitama Serious Counter and skill channeling stances have hyper-armor and are immune to suction / displacement / pull
           ent.isCaughtInPurple = false;
           ent.knockbackVx = 0;
@@ -437,6 +438,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const falloff = 1 - (dist / explosionRadius) * 0.35; // 65% min to 100% max damage at center
         const finalDamage = explosionDamage * falloff;
         const isChanneling = (typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill()) || (typeof ent.isStationarySkillActive === 'function' && ent.isStationarySkillActive());
+        const isFugaChanneling = Boolean(ent.isChannelingDivineFlame || ent.isChannelingFuga || (ent.fugaChargeTimer && ent.fugaChargeTimer > 0));
 
         if (typeof ent.takeDamage === 'function') {
           ent.takeDamage(finalDamage, ownerFighter, { 
@@ -460,7 +462,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
             ent.x = ent._shatterLockedX; ent.y = ent._shatterLockedY;
           }
-        } else if (isChanneling) {
+        } else if (isChanneling && !isFugaChanneling) {
           // Channeling entities have hyper-armor and should not have their channeling stance displaced or interrupted!
         } else {
           const dirX = dist > 0 ? dx / dist : (Math.random() - 0.5) * 2;
