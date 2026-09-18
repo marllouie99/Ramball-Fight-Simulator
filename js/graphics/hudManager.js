@@ -212,6 +212,11 @@ export function drawHUD() {
       hudOpacity = 0;
     }
 
+    // Global HUD Master Toggle (hides completely when CONFIG.hudHideAll is true)
+    if (CONFIG.hudHideAll) {
+      hudOpacity = 0;
+    }
+
     const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
     containerBottom.classList.toggle('ffa-hud', isFfaMode && !isTactical);
     containerBottom.classList.toggle('tactical-hud', isTactical);
@@ -980,12 +985,24 @@ function updateHealthHud() {
   const currentCameraMode = state.camera ? state.camera.mode : 'dynamic';
   const hudModeChanged = state._lastHudShowFighterDescription !== CONFIG.hudShowFighterDescription ||
                          state._lastDarkModeShowHudSkillBars !== CONFIG.darkModeShowHudSkillBars ||
-                         state._lastDarkModeShowHudStats !== CONFIG.darkModeShowHudStats;
+                         state._lastDarkModeShowHudStats !== CONFIG.darkModeShowHudStats ||
+                         state._lastHudHideAll !== CONFIG.hudHideAll ||
+                         state._lastHudHideHealthBars !== CONFIG.hudHideHealthBars ||
+                         state._lastHudHideSkillBars !== CONFIG.hudHideSkillBars ||
+                         state._lastHudHideStats !== CONFIG.hudHideStats ||
+                         state._lastHudSkillBarsMode !== CONFIG.hudSkillBarsMode ||
+                         state._lastHudHideOverheadHp !== CONFIG.hudHideOverheadHp;
   const themeChanged = state._lastArenaTheme !== (state.arenaTheme || 'light');
   const cameraModeChanged = state._lastCameraMode !== currentCameraMode;
   state._lastHudShowFighterDescription = CONFIG.hudShowFighterDescription;
   state._lastDarkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars;
   state._lastDarkModeShowHudStats = CONFIG.darkModeShowHudStats;
+  state._lastHudHideAll = CONFIG.hudHideAll;
+  state._lastHudHideHealthBars = CONFIG.hudHideHealthBars;
+  state._lastHudHideSkillBars = CONFIG.hudHideSkillBars;
+  state._lastHudHideStats = CONFIG.hudHideStats;
+  state._lastHudSkillBarsMode = CONFIG.hudSkillBarsMode;
+  state._lastHudHideOverheadHp = CONFIG.hudHideOverheadHp;
   state._lastArenaTheme = state.arenaTheme || 'light';
   state._lastCameraMode = currentCameraMode;
   if (hudModeChanged || themeChanged || cameraModeChanged) {
@@ -1205,6 +1222,15 @@ function updateHealthHud() {
   };
 
   const shouldShowFighterSkill = (fighter, skill) => {
+    if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+      return false; // 100% hide all skill bars, with zero exceptions!
+    }
+    if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
+      return isSkillExceptionInDarkMode(fighter, skill);
+    }
+    if (CONFIG.hudSkillBarsMode === 'all' || CONFIG.darkModeShowHudSkillBars === 1) {
+      return true;
+    }
     const showAll = (CONFIG.darkModeShowHudSkillBars !== undefined)
       ? Boolean(CONFIG.darkModeShowHudSkillBars)
       : ((CONFIG.darkModeShowSkillBars !== undefined) ? Boolean(CONFIG.darkModeShowSkillBars) : true);
@@ -1216,12 +1242,21 @@ function updateHealthHud() {
   };
 
   const shouldShowHudSkillBars = () => {
+    if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+      return false;
+    }
+    if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
+      return true;
+    }
     if (CONFIG.darkModeShowHudSkillBars !== undefined) return Boolean(CONFIG.darkModeShowHudSkillBars);
     if (CONFIG.darkModeShowSkillBars !== undefined) return Boolean(CONFIG.darkModeShowSkillBars);
     return true;
   };
 
   const shouldShowHudStats = () => {
+    if (CONFIG.hudHideAll || CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0) {
+      return false;
+    }
     if (CONFIG.darkModeShowHudStats !== undefined) return Boolean(CONFIG.darkModeShowHudStats);
     if (CONFIG.darkModeShowStats !== undefined) return Boolean(CONFIG.darkModeShowStats);
     return true;
@@ -1581,8 +1616,8 @@ function updateHealthHud() {
           return myTeam === null || enemyTeam === null || myTeam !== enemyTeam;
         });
         const currentDodgeRate = isEnemyDomain 
-          ? Math.round((CONFIG.toji?.domainDodgeChance ?? 1.0) * 100)
-          : Math.round((CONFIG.toji?.stealthDodgeChance ?? 0.25) * 100);
+          ? Math.round((CONFIG.toji?.domainDodgeChance ?? 0.95) * 100)
+          : Math.round((CONFIG.toji?.stealthDodgeChance ?? 0.10) * 100);
         info.push(`<b>Dodge:</b> ${currentDodgeRate}%${isEnemyDomain ? ' <span style="color: #c084fc; font-size: 10px;">(DOMAIN)</span>' : ''}`);
       } else if (f.characterId === 'cronos' || f.type === 'cronos') {
         const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
@@ -2039,12 +2074,12 @@ function updateHealthHud() {
             </div>
 
             <!-- White Stamina / Sprint Bar (GTA Fatigue & Movement Speed Mechanic) -->
-            <div class="hud-cj-armor-bar">
+            <div class="hud-cj-armor-bar" style="${(CONFIG.hudHideHealthBars || CONFIG.hudHideAll) ? 'display: none;' : ''}">
               <div class="hud-cj-armor-fill" style="width: ${staminaPercent}%; background: ${targetFighter.isExhausted ? '#94A3B8' : '#FFFFFF'};"></div>
             </div>
 
             <!-- Red Health Bar (HP) -->
-            <div class="health-card__bar hud-bar-cj">
+            <div class="health-card__bar hud-bar-cj" style="${(CONFIG.hudHideHealthBars || CONFIG.hudHideAll) ? 'display: none;' : ''}">
               <div class="health-card__fill" style="width: ${hpPercent}%; background: #DC2626;"></div>
               <span class="health-card__bar-text" style="display: none;">${metaValue}</span>
             </div>
@@ -2052,12 +2087,12 @@ function updateHealthHud() {
         </div>
 
         <!-- Middle: GTA Cash Money ($00000000) -->
-        <div class="hud-cj-money-row">
+        <div class="hud-cj-money-row" style="${(CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0 || CONFIG.hudHideAll) ? 'display: none;' : ''}">
           <span class="hud-cj-money-text">${moneyText}</span>
         </div>
 
         <!-- Bottom of Widget: 6 Wanted Stars (Filling Right to Left) -->
-        <div class="hud-cj-stars" data-cj-stars="true">
+        <div class="hud-cj-stars" data-cj-stars="true" style="${(CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0 || CONFIG.hudHideAll) ? 'display: none;' : ''}">
           ${generateCjStarsSVGs(starCount)}
         </div>
       </div>
@@ -2069,6 +2104,9 @@ function updateHealthHud() {
   };
 
   const generateFighterSkillsHTML = (f, align, singleColumn = false) => {
+    if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+      return '';
+    }
     const isTac = isTacticalFighter(f) || isTacticalMatch(state);
     if (isTac) return ''; // Simple HUD mode: Only Name & Healthbar
 
@@ -2140,7 +2178,7 @@ function updateHealthHud() {
   };
 
   const generateFighterInfoHTML = (f, singleColumn = false, isTeam = false) => {
-    if (!shouldShowHudStats()) return '';
+    if (CONFIG.hudHideAll || CONFIG.hudHideStats || !shouldShowHudStats()) return '';
     if (!f) return '';
     const isTacFighter = isTacticalFighter(f) || isTacticalMatch(state);
     if (isTacFighter) return ''; // Simple HUD mode: Only Name & Healthbar
@@ -2319,10 +2357,11 @@ function updateHealthHud() {
           `;
         }
 
+        const hideHb = Boolean(CONFIG.hudHideHealthBars || CONFIG.hudHideAll);
         return `
           <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '18px'};">
             ${memberStackHTML}
-            <div class="health-card__bar${cjBarClass}" style="${memberShakeStyle}">
+            <div class="health-card__bar${cjBarClass}" style="${memberShakeStyle} ${hideHb ? 'display: none;' : ''}">
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
             </div>
@@ -2350,6 +2389,8 @@ function updateHealthHud() {
       const skillsGridStyle = singleColumn ? 'grid-template-columns: 1fr;' : '';
       const infoGridStyle = singleColumn ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; grid-template-columns: 1fr;` : `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;`;
 
+      const hideHb = Boolean(CONFIG.hudHideHealthBars || CONFIG.hudHideAll);
+
       if (isTargetCj) {
         barsHTML = `
           ${generateCjGtaHudWidgetHTML(targetFighter, titleAlign, metaValue, barShakeStyle)}
@@ -2360,13 +2401,13 @@ function updateHealthHud() {
         `;
       } else {
         barsHTML = `
-          <div class="health-card__bar${cjBarClass}" style="${barShakeStyle}">
+          <div class="health-card__bar${cjBarClass}" style="${barShakeStyle} ${hideHb ? 'display: none;' : ''}">
             <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
             <span class="health-card__bar-text">${metaValue}</span>
           </div>
           ${showDescription ? `
             ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
-            <div class="health-card__desc" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudDescFontSize || 16}px; line-height: 1.4; margin-top: 8px;">
+            <div class="health-card__desc" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudDescFontSize || 16}px; line-height: 1.4; margin-top: 8px; ${(CONFIG.hudHideAll) ? 'display: none;' : ''}">
               ${description.replace(/(\d+(?:\.\d+)?%?)/g, '<span class="hud-number">$1</span>')}
             </div>
           ` : `

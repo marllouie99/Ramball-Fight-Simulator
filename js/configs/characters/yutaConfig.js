@@ -14,7 +14,7 @@ export const yutaConfig = {
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  damage: 4,
+  damage: 8,
   cooldown: 50,
   projectileSpeedMultiplier: 3.0,
   ability: 'Copy & Rika',
@@ -38,7 +38,7 @@ export const yutaConfig = {
   // Basic Attack: Katana Melee
   meleeCooldown: 36,                       // Frames between katana strikes
   meleeRange: 50,                          // Katana blade length reach distance in pixels
-  meleeDamage: 4,                         // Base damage per katana swing
+  meleeDamage: 8,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
   meleeKnockback: 1.5,                     // Outward push force on katana melee strike
   meleeHitStun: 12,                        // Hit stun frames on katana melee strike
@@ -53,11 +53,12 @@ export const yutaConfig = {
   parryChancePerStack: 0.05,               // +5% bonus parry probability per triggered Flurry / Thin Ice Breaker counter-attack stack
   maxParryStacks: 5,                        // Maximum parry mastery stacks (+25% bonus parry chance cap)
 
-  // Special Mechanic: Phantom Flurry (Parry Counterattack)
-  flurryParryMin: 5,                       // Minimum successful parries required to activate Flurry
-  flurryParryMax: 5,                       // Maximum random target threshold for Flurry activation
+  // Special Mechanic: Phantom Flurry (Parry Counterattack & Basic Attack Combo)
+  flurryParryMin: 3,                       // Minimum successful parries required to activate Flurry
+  flurryParryMax: 3,                       // Maximum random target threshold for Flurry activation
+  flurryBasicHitsRequired: 10,              // Number of successful basic attack hits required to activate Flurry
   flurryHits: 7,                           // Number of rapid teleport slashes in Flurry execution
-  flurryDamage: 4,                         // Damage per slash during Flurry
+  flurryDamage: 15,                         // Damage per slash during Flurry
   flurryHitInterval: 7,                    // Frames delay between each Flurry slash
 
   // Copied Techniques (Ranged Skill Cycle)
@@ -76,7 +77,7 @@ export const yutaConfig = {
   rikaSummonChargeDuration: 30,            // Channeling/pause duration when Yuta calls Rika (frames)
   rikaAriseDuration: 45,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
   rikaDuration: 999999,                    // Rika stays active indefinitely as long as she is alive (HP > 0)
-  rikaSpeedMultiplier: 1.0,                // Movement speed multiplier relative to Yuta's base speed
+  rikaSpeedMultiplier: 1.3,                // Movement speed multiplier relative to Yuta's base speed
   rikaDamage: 6,                          // Physical damage dealt per attack tick by Rika
   rikaAttackRate: 30,                      // Frames between Rika's attacks (90 frames = 1.5s at 60fps)
 
@@ -140,14 +141,14 @@ export const yutaConfig = {
 
   // Summon Companion: Rika Orimoto
   comeRikaSound: 'Assets/Sound Effects/Skills/comerika.mp3',
-  comeRikaVolume: 0.0,
+  comeRikaVolume: 2.0,
   comeRikaDelay: 0,
   comeRikaLeadTime: 90,                  // Frames before Rika emerges to play "Come, Rika!"
 
   rikaAppearanceSound: 'Assets/Sound Effects/Skills/rikaAppearance1.mp3',
   rikaAppearanceVolume: 2.5,
   rikaAppearanceDelay: 0,
-  rikaAppearanceChance: 0.55, // Probability (0.35 = 35%) of Rika playing emergence roar audio when she emerges
+  rikaAppearanceChance: 0.95, // Probability (0.35 = 35%) of Rika playing emergence roar audio when she emerges
 
   rikaAttackSound: 'Assets/Sound Effects/Skills/backstab.mp3',
   rikaAttackVolume: 0.8,

@@ -204,6 +204,7 @@ export class FighterRenderer {
 
   static drawHealth(ctx, fighter) {
     if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
+    if (CONFIG.hudHideAll || CONFIG.hudHideHealthBars || CONFIG.hudHideOverheadHp) return;
     if (fighter.hp <= 0 || fighter._isWinnerReveal || fighter._isFaceOff || fighter.hideHpText) return;
 
     ctx.save();

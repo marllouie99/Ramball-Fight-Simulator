@@ -1,7 +1,7 @@
 // Setup global browser mock environment before loading game modules
 function createMockCtx() {
   const noop = () => {};
-  return {
+  const ctx = {
     save: noop,
     restore: noop,
     beginPath: noop,
@@ -29,6 +29,8 @@ function createMockCtx() {
     createLinearGradient: () => ({ addColorStop: noop }),
     createRadialGradient: () => ({ addColorStop: noop })
   };
+  ctx.canvas = { width: 1200, height: 800, getContext: () => ctx };
+  return ctx;
 }
 
 globalThis.window = globalThis;
@@ -86,7 +88,7 @@ const { CONFIG } = await import('../js/core/config.js');
 const { updateRika } = await import('../js/entities/fighters/yuta/rikaLogic.js');
 const { YutaRenderer } = await import('../js/graphics/fighters/yutaRenderer.js');
 
-console.log('🧪 Testing Rika vs Saitama Combat & Smooth Dodge Tracking...');
+console.log('🧪 Testing Rika vs Saitama Combat & Snap Dodge Aim Rotation...');
 
 // Setup test arena and state
 state.arena = { x: 50, y: 50, width: 800, height: 600 };
@@ -125,26 +127,30 @@ saitama.dodgeCooldown = 0;
 const initialAngle = yuta.rika.angle;
 console.log(`   [Initial] Rika Angle: ${initialAngle}, Rika Pos: (${yuta.rika.x}, ${yuta.rika.y}), Saitama Pos: (${saitama.x}, ${saitama.y})`);
 
-// Step 1: Run Rika update into Saitama melee contact
+// Step 1: Run Rika update into Saitama melee contact (Saitama will dodge)
 updateRika(yuta, state.arena);
 
 console.log(`   [Post-Dodge] Rika Angle: ${yuta.rika.angle}, Rika Pos: (${yuta.rika.x}, ${yuta.rika.y}), Saitama Pos: (${saitama.x}, ${saitama.y})`);
 
-// Verify Rika did NOT snap 180 degrees (Math.PI) on single frame
-const angleDelta = Math.abs(yuta.rika.angle - initialAngle);
-if (angleDelta > Math.PI * 0.75) {
-  throw new Error(`Rika snapped angle too abruptly upon dodge: delta was ${angleDelta} radians!`);
-}
-console.log(`   ✅ Rika angle smooth change verified: delta = ${angleDelta.toFixed(3)} rad (no 180° snap)`);
+// Verify Rika DOES snap aim directly to Saitama's new dodge position
+const expectedAngle = Math.atan2(saitama.y - yuta.rika.y, saitama.x - yuta.rika.x);
+let angleDiff = Math.abs(yuta.rika.angle - expectedAngle);
+while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+angleDiff = Math.abs(angleDiff);
 
-// 3. Run renderer pass to verify render angle interpolation
+if (angleDiff > 0.01) {
+  throw new Error(`Expected Rika to snap aim rotation to dodging Saitama! Expected ${expectedAngle.toFixed(3)} rad, got ${yuta.rika.angle.toFixed(3)} rad (diff: ${angleDiff.toFixed(3)})`);
+}
+console.log(`   ✅ Rika snap aim rotation verified: angle = ${yuta.rika.angle.toFixed(3)} rad (matches Saitama pos)`);
+
+// 3. Run renderer pass to verify render angle
 const mockCtx = createMockCtx();
 YutaRenderer.draw(mockCtx, yuta, saitama);
 
 const renderedAngle = yuta.rika.angle;
-console.log(`   ✅ Render pass verified smooth angle: ${renderedAngle.toFixed(3)} rad`);
+console.log(`   ✅ Render pass verified snap angle: ${renderedAngle.toFixed(3)} rad`);
 
-// 4. Run multiple frames to ensure Rika smoothly tracks Saitama around
+// 4. Run multiple frames to ensure Rika continuously snap tracks Saitama across dodges
 for (let f = 0; f < 30; f++) {
   saitama.update(yuta, 1, state.arena);
   updateRika(yuta, state.arena);
@@ -152,4 +158,4 @@ for (let f = 0; f < 30; f++) {
 }
 
 console.log(`   [Frame 30] Rika Pos: (${yuta.rika.x.toFixed(1)}, ${yuta.rika.y.toFixed(1)}), Rika Angle: ${yuta.rika.angle.toFixed(3)} rad`);
-console.log('🎉 ALL RIKA VS SAITAMA DODGE TRACKING TESTS PASSED!');
+console.log('🎉 ALL RIKA VS SAITAMA DODGE SNAP AIM TESTS PASSED!');

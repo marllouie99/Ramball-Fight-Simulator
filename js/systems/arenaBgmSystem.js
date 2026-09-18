@@ -5,7 +5,7 @@
 import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
-import { playLoopingSound, stopLoopingSound, setLoopingSoundVolume } from './soundSystem.js';
+import { playLoopingSound, stopLoopingSound, setLoopingSoundVolume, isLoopingSoundPlaying } from './soundSystem.js';
 import { _registerButton, drawChamferedRect, drawPanel, drawButton, fitSingleLineText } from '../graphics/ui/uiFramework.js';
 
 export const ARENA_BGM_LOOP_KEY = 'arena_bgm_loop';
@@ -518,7 +518,7 @@ export function getCurrentPlayingBgmTitle() {
 export function shouldDuckArenaBgm() {
   if (typeof state === 'undefined' || !state.fighters) return false;
 
-  if (Boolean(state.missionPassedOverlay && state.missionPassedOverlay.active && state.missionPassedOverlay.timer > 0) ||
+  if (Boolean(state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active && state.missionPassedOverlay.timer > 0)) ||
       Boolean(state.wastedOverlay && state.wastedOverlay.active && state.wastedOverlay.timer > 0)) {
     return true;
   }
@@ -541,7 +541,7 @@ export function shouldDuckArenaBgm() {
 }
 
 export function isArenaBgmPlaying() {
-  return _isArenaBgmPlaying;
+  return _isArenaBgmPlaying && isLoopingSoundPlaying(ARENA_BGM_LOOP_KEY);
 }
 
 export function startArenaBgm(forceNew = false) {
@@ -552,20 +552,26 @@ export function startArenaBgm(forceNew = false) {
   }
 
   // If already playing and forceNew is false, keep playing seamlessly without restarting
-  if (!forceNew && _isArenaBgmPlaying && _currentTrackSrc) {
+  if (!forceNew && _isArenaBgmPlaying && _currentTrackSrc && isLoopingSoundPlaying(ARENA_BGM_LOOP_KEY)) {
     return;
   }
 
-  let chosenSrc = state.activeMatchBgmSrc || null;
+  let chosenSrc = (!forceNew ? state.activeMatchBgmSrc : null) || null;
   if (!chosenSrc) {
     if (trackId === 'random') {
       const validTracks = ARENA_BGM_TRACKS.filter(t => t.src !== null);
-      const randTrack = validTracks[Math.floor(Math.random() * validTracks.length)];
-      chosenSrc = randTrack?.src;
+      if (validTracks.length > 0) {
+        const randTrack = validTracks[Math.floor(Math.random() * validTracks.length)];
+        chosenSrc = randTrack?.src || null;
+      }
     } else {
       const track = ARENA_BGM_TRACKS.find(t => t.id === trackId);
       chosenSrc = track ? track.src : null;
     }
+  }
+
+  if (chosenSrc) {
+    state.activeMatchBgmSrc = chosenSrc;
   }
 
   stopPreview();
@@ -597,9 +603,11 @@ export function updateArenaBgm() {
       return;
     }
   } else if (state.gameState === 'roundEnd') {
-    const is1v1Mode = (state.mode === '1v1' || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.ONE_VS_ONE);
-    const maxWins = (state.scores && state.scores.length) ? Math.max(...state.scores) : 0;
-    if (!is1v1Mode || maxWins >= 2) {
+    const isMultiRound = (state.mode === '1v1' || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO);
+    const maxWins = (state.scores && state.scores.length) ? Math.max(...state.scores) : (state.teamScores && state.teamScores.length ? Math.max(...state.teamScores) : 0);
+    const modeRounds = (typeof MODE_SETTINGS !== 'undefined' && MODE_SETTINGS[state.mode]?.rounds) || 3;
+    const winThreshold = modeRounds === 1 ? 1 : Math.ceil(modeRounds / 2);
+    if (!isMultiRound || maxWins >= winThreshold) {
       if (_isArenaBgmPlaying) {
         stopArenaBgm(true);
         return;

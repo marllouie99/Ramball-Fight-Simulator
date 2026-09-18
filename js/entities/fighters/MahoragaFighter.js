@@ -214,6 +214,8 @@ export class MahoragaFighter extends Fighter {
 
     this.adaptationDashTimer = 0;
     this.adaptationDashIsCounter = false;
+    this.postDashPauseTimer = 0;
+    this.isWallReboundDashing = false;
     this.teleportCounterPending = false;
     this.adaptationAfterimages = [];
     this.hasAnnouncedLevel2 = false;
@@ -224,6 +226,12 @@ export class MahoragaFighter extends Fighter {
     this.throwBarrageShotsLeft = 0;
     this.throwBarrageTimer = 0;
     this.wallBounceCount = 0;
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
+    this.postDashPauseTimer = 0;
+    this.isWallReboundDashing = false;
   }
 
   /**
@@ -494,6 +502,9 @@ export class MahoragaFighter extends Fighter {
       this.meleeSwingTimer = backupMeleeSwingTimer;
       this.punchAnimTimer = backupPunchAnimTimer;
       this.leftPunchTimer = backupLeftPunchTimer;
+      this.isThrowing = false;
+      this.throwBarrageShotsLeft = 0;
+      this.throwBarrageTimer = 0;
     } else {
       super.interruptAttacks(forceCancelAll);
       this.isCleaving = false;
@@ -519,7 +530,8 @@ export class MahoragaFighter extends Fighter {
   }
 
   _findClosestEnemy(preferredOpponent = null) {
-    if (preferredOpponent && preferredOpponent !== this && preferredOpponent.hp > 0 && !preferredOpponent.isDead) {
+    const isPreferredAlive = preferredOpponent && preferredOpponent !== this && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
+    if (isPreferredAlive) {
       return preferredOpponent;
     }
     let closest = null;
@@ -534,7 +546,9 @@ export class MahoragaFighter extends Fighter {
     }
 
     for (const ent of allTargets) {
-      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.isInvulnerable) continue;
+      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
+      if (!ent || ent === this) continue;
+      if (!isEntReforming && (ent.hp <= 0 || ent.isDead || ent.isInvulnerable)) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {
@@ -741,6 +755,7 @@ export class MahoragaFighter extends Fighter {
           const dashSpeed = Math.max(currentSpeed * 1.5, (this.speed || 6.5) * 2.2, 16.0);
           this.vx = (dx / dist) * dashSpeed;
           this.vy = (dy / dist) * dashSpeed;
+          this.isWallReboundDashing = true;
 
           // Visual dash burst: impact sparks, flash at wall rebound point, and motion trail afterimages
           spawnImpactFlash(this.x, this.y, 35, '#FFD700');
@@ -762,26 +777,25 @@ export class MahoragaFighter extends Fighter {
 
   shoot(ownerIndex) {
     if (!this.canPerformBasicAttack() || this.isPulledOrDragged()) return false;
-    const opponent = (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+    const opponent = this._findClosestEnemy();
     if (opponent && !opponent.isDead) {
       this.aim(opponent);
     }
-    if (this.isCaughtInBeam() && !this.adaptedPureLoveBeam && !this.adaptedGenosBeam) {
-      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110));
-      if (!inMeleeRange) {
-        this.interruptAttacks();
-        return;
+    const distToOpponent = opponent ? Math.hypot(this.x - opponent.x, this.y - opponent.y) : Infinity;
+    const swordRange = CONFIG.mahoraga?.swordRange ?? 110;
+    const meleeDist = this.r + (opponent ? opponent.r : 25) + swordRange;
+
+    if (distToOpponent <= meleeDist && this.swordCooldown <= 0) {
+      if (this.isWallReboundDashing) {
+        this.isWallReboundDashing = false;
+        this.vx = 0;
+        this.vy = 0;
+        this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
       }
+      this._performMeleeAttack(opponent);
+      return true;
     }
-    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
-    const isLevel8 = totalStages >= 8 || this.isMaxAdapted || this.isInfinityBlitz || (this.goldStages >= 8);
-    if (isLevel8 && !this.isWallSlamActive && (this.throwCooldown || 0) <= 0) {
-      if (opponent) {
-        this.initiateLevel8WallSlam(opponent);
-        return;
-      }
-    }
-    shootBladeBarrage(this, ownerIndex);
+    return false;
   }
 
   onCollide(opponent) {
@@ -789,6 +803,13 @@ export class MahoragaFighter extends Fighter {
     if (this.isTeammate(opponent)) return;
     if (!this.canPerformBasicAttack()) return;
     if (this.isWallSlamActive || this.isThrowing || this.isTargetOfAmbush || this.isBlitzActive || this.isInfinityBlitz || this.isPulledOrDragged()) return;
+
+    if (this.isWallReboundDashing) {
+      this.isWallReboundDashing = false;
+      this.vx = 0;
+      this.vy = 0;
+      this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+    }
 
     this.aim(opponent);
     if ((this.swordCooldown || 0) <= 0) {
@@ -890,6 +911,8 @@ export class MahoragaFighter extends Fighter {
       this.isInfinityBlitz = false;
       this.adaptationPauseTimer = 0;
       this.adaptationDashTimer = 0;
+      this.postDashPauseTimer = 0;
+      this.isWallReboundDashing = false;
       this.wallBounceCount = 0;
       this._pendingCounterTarget = null;
       this.neutralStanceTimer = 0;
@@ -909,6 +932,8 @@ export class MahoragaFighter extends Fighter {
       this.adaptationDashTarget = null;
       this.adaptationDashIsCounter = false;
       this.adaptationPauseTimer = 0;
+      this.postDashPauseTimer = 0;
+      this.isWallReboundDashing = false;
       this.isInfinityBlitz = false;
       this.isBlitzActive = false;
       this.blitzHitsLeft = 0;
@@ -949,6 +974,8 @@ export class MahoragaFighter extends Fighter {
         this.neutralStanceTimer = 0;
         this.adaptationDashTimer = 0;
         this.adaptationPauseTimer = 0;
+        this.postDashPauseTimer = 0;
+        this.isWallReboundDashing = false;
         this.isInfinityBlitz = false;
         this.isBlitzActive = false;
       }
@@ -1157,10 +1184,10 @@ export class MahoragaFighter extends Fighter {
           this.aim(target);
         }
 
-        // Natural movement velocity continuation: Mahoraga never stops mid-air, moving naturally according to arena rules
-        const aimAngle = this.gunAngle !== undefined ? this.gunAngle : Math.atan2(dashDy, dashDx);
-        this.vx = Math.cos(aimAngle) * moveSpeed;
-        this.vy = Math.sin(aimAngle) * moveSpeed;
+        // Zero out dash velocity and pause movement for ~1 second upon arriving at the enemy before moving naturally
+        this.vx = 0;
+        this.vy = 0;
+        this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
 
         if (this.adaptationDashIsCounter && target && !target.isDead) {
           const damage = CONFIG.mahoraga?.swordDamage ?? 15;
@@ -1246,11 +1273,8 @@ export class MahoragaFighter extends Fighter {
           this.adaptationDashIsCounter = false;
         }
 
-        // Apply arena movement and physics immediately on arrival frame
-        this.applyMovementPhysics();
-        if (activeArena) {
-          this.resolveWallBounce(activeArena, target);
-        }
+        // Apply stationary physics on arrival frame so Mahoraga halts cleanly in place
+        this.applyMovementPhysics(0);
       }
       return;
     }
@@ -1301,6 +1325,15 @@ export class MahoragaFighter extends Fighter {
     } else if (this.neutralStanceCooldownTimer > 0) {
       this.neutralStanceCooldownTimer--;
     }
+    if (this.postDashPauseTimer > 0) {
+      this.postDashPauseTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      if (this.postDashPauseTimer === 0) {
+        // Pause finished: resume natural arena movement toward the opponent
+        this.resumeMovement(opponent);
+      }
+    }
     if (this.rctHealCooldownTimer > 0) this.rctHealCooldownTimer--;
     if (this.channelingPunishTeleportTimer > 0) this.channelingPunishTeleportTimer--;
     if (this.swordCooldown > 0) this.swordCooldown--;
@@ -1338,14 +1371,26 @@ export class MahoragaFighter extends Fighter {
 
     // ── Conditional Rapid Barrage Throw ──
     if (this.isThrowing) {
+      const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
+                              (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 ||
+                              this.isPulledOrDragged();
+      if (isInHitReaction) {
+        this.isThrowing = false;
+        this.throwBarrageShotsLeft = 0;
+        this.throwBarrageTimer = 0;
+        this.throwCooldown = Math.max(this.throwCooldown || 0, 180);
+        return;
+      }
+
       if ((this.knockbackStunTimer || 0) <= 0) {
         this.vx = 0;
         this.vy = 0;
       }
       this.applyMovementPhysics(0);
 
-      if (opponent && !opponent.isDead) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      const target = this._findClosestEnemy(opponent);
+      if (target && !target.isDead) {
+        const targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
         const turnSpeed = CONFIG.mahoraga?.throwAimRotationSpeed ?? 0.06;
         
         let diff = targetAngle - (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0));
@@ -1361,7 +1406,7 @@ export class MahoragaFighter extends Fighter {
 
       if (this.throwBarrageTimer >= interval) {
         this.throwBarrageTimer = 0;
-        this.shoot(ownerIndex);
+        shootBladeBarrage(this, ownerIndex);
         this.throwBarrageShotsLeft--;
 
         spawnImpactFlash(this.x, this.y, 25, 'silver');
@@ -1370,7 +1415,7 @@ export class MahoragaFighter extends Fighter {
         if (this.throwBarrageShotsLeft <= 0) {
           this.isThrowing = false;
           this.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 1000;
-          this.resumeMovement(opponent);
+          this.resumeMovement(target || opponent);
           const livingCount = state.fighters ? state.fighters.filter(f => f && (typeof f.isEffectivelyAlive === 'function' ? f.isEffectivelyAlive() : (f.hp > 0 && !f.dead))).length : 0;
           if (livingCount <= 1 && typeof this.checkRoundOrMatchEnd === 'function') {
             this.checkRoundOrMatchEnd();
@@ -1639,9 +1684,15 @@ export class MahoragaFighter extends Fighter {
     const target = this._findClosestEnemy(opponent);
     this.isMeleeMode = false;
 
-    this.applyMovementPhysics();
+    if (this.postDashPauseTimer > 0) {
+      this.vx = 0;
+      this.vy = 0;
+      this.applyMovementPhysics(0);
+    } else {
+      this.applyMovementPhysics();
+    }
 
-    if (target && !target.isDead) {
+    if (target && (!target.isDead || target.isRevivingFromContract || target.isShatterReviving)) {
       // Only update facing when NOT in hit stun or knockback — prevents erratic mid-air direction flipping
       const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
                               (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0;
@@ -1653,6 +1704,14 @@ export class MahoragaFighter extends Fighter {
       const swordArc = CONFIG.mahoraga?.swordArcRadians ?? (Math.PI * 1.3);
       const meleeDist = this.r + target.r + swordRange;
       this.isMeleeMode = false;
+
+      // When arriving at target during a Wall Rebound Dash, stop movement for ~1s before moving naturally
+      if (this.isWallReboundDashing && distToOpponent <= meleeDist) {
+        this.isWallReboundDashing = false;
+        this.vx = 0;
+        this.vy = 0;
+        this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+      }
 
       const isEnemyChanneling = (
         target.isChanneling ||
@@ -1671,7 +1730,8 @@ export class MahoragaFighter extends Fighter {
       const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
       const frontTargetsForAttack = this._getFrontRadiusTargets(swordRange, swordArc);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
-      const canActSkills = !isInHitReaction && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isPulledOrDragged();
+      const isTargetReforming = Boolean(target && (target.isRevivingFromContract || target.isShatterReviving));
+      const canActSkills = !isInHitReaction && !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isPulledOrDragged();
 
       if (canActSkills) {
         const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;
@@ -1712,17 +1772,14 @@ export class MahoragaFighter extends Fighter {
         else if (this.neutralStanceTimer > 0 && this.swordCooldown <= 0 && isAnyTargetInRange) {
           this._performMeleeAttack(target);
         }
-        // Priority 5: Basic Ranged Attack (Debris Throw / Blade Barrage when at range)
-        else if (this.shootCooldown <= 0 && !isAnyTargetInRange && target && !target.isDead && !target.isSubmerged && !target.isErupting) {
-          this.shoot(ownerIndex);
-          this.shootCooldown = this.shootCooldownMax || 60;
-        }
       }
     } else {
       this.isMeleeMode = false;
     }
     this._bounceTarget = target || opponent; // Store for resolveWallBounce override
-    if (arena) this.resolveWallBounce(arena, target || opponent);
+    if (arena && (this.postDashPauseTimer || 0) <= 0) {
+      this.resolveWallBounce(arena, target || opponent);
+    }
   }
 
   triggerDemoAttack() {

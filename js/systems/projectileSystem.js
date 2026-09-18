@@ -187,6 +187,7 @@ class ProjectileSystem {
     p.purpleDamagedFighters = null;
     p.purpleShakeCounter = undefined;
     p._hasExploded = false;
+    p.isMahoragaThrow = false;
     p.isAdaptableSkillShot = false;
     p.skillShotId = undefined;
     p.gridIndex = undefined;
@@ -3495,11 +3496,11 @@ class ProjectileSystem {
         }
 
         const isMahoragaRuinDebris = p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble';
-        if (isMahoragaRuinDebris) {
+        if (isMahoragaRuinDebris && expired && !hit) {
           // Shatter / break animation on wall impact or expiration!
           spawnSparks(p.x, p.y, 22, 'paleStoneShatter');
           spawnImpactFlash(p.x, p.y, 42, '#E2E8F0');
-          playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.5);
+          audioSystem.playSFX('attack_groundsmash', 0.5);
         }
 
         const isCrimson = p.visual === 'crimsonSniperBullet';

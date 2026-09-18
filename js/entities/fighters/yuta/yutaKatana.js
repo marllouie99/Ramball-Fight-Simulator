@@ -98,8 +98,14 @@ export function modExecuteKatanaMelee(fighter, angle) {
   const finalDamage = damage * dmgMult;
 
   for (const enemy of validTargets) {
-    enemy.takeDamage(finalDamage, fighter, { isPhysical: true });
+    const prevEnemyHp = enemy.hp;
+    const dmgResult = enemy.takeDamage(finalDamage, fighter, { isPhysical: true, isMelee: true });
     hitSomeone = true;
+
+    const didDamage = (enemy.hp < prevEnemyHp) || (dmgResult !== false && dmgResult > 0);
+    if (didDamage && typeof fighter.registerBasicAttackHit === 'function') {
+      fighter.registerBasicAttackHit(enemy);
+    }
 
     if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(4, 6);
 

@@ -21,7 +21,7 @@ export const cjConfig = {
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  damage: 24,
+  damage: 3,
   cooldown: 18,
   projectileSpeedMultiplier: 1.0,
   ability: 'Brass Knuckles & Cheats',
@@ -47,9 +47,9 @@ export const cjConfig = {
   cheatActivationPostDelay: 4,  // 4 frames (~0.06s) post-activation pose delay before resuming action
 
   // ── 3. BASIC ATTACK: BRASS KNUCKLES STREET BOXING ──
-  meleePunchReach: 50,         // 50px punch reach
+  meleePunchReach: 30,         // 50px punch reach
   meleePunchArc: (120 * Math.PI) / 180, // 120° wide multi-target frontal arc (Rule 8)
-  meleePunchDamage: 10,        // Punch damage
+  meleePunchDamage: 4,        // Punch damage
   meleePunchCooldown: 18,      // 18 frames (~0.30s) fast boxing cadence
   meleeKnockback: 18.0,        // Physical pushback impulse
   meleeHitShakeIntensity: 2.2, // Screen shake on brass knuckle connection
@@ -60,7 +60,7 @@ export const cjConfig = {
   hesoyamHealPercent: 0.50,    // Instantly restores 50% of Max HP (permanent)
   hesoyamShieldAmount: 75,     // Equips 75 HP Bulletproof Kevlar Shield (permanent until broken by damage)
   hesoyamShockwaveRadius: 160, // 160px AOE explosion of green cash & coins
-  hesoyamShockwaveDamage: 35,  // Shockwave damage
+  hesoyamShockwaveDamage: 15,  // Shockwave damage
   hesoyamKnockback: 22.0,      // Blast pushback
   hesoyamRespectGain: 15,      // Respect gained on successful activation
 
@@ -72,7 +72,7 @@ export const cjConfig = {
   jetpackThrusterBurnDamage: 2,// Burning damage per frame in thruster fire
   jetpackDiveDashSpeed: 5.0,   // Controlled knuckle dive boost speed
   jetpackUziFireInterval: 5,   // Rapid dual alternating fire cadence (every 5 frames = 12 bullets/sec)
-  jetpackUziBulletDamage: 8,   // 8 damage per 9mm full metal jacket round
+  jetpackUziBulletDamage: 5,   // 8 damage per 9mm full metal jacket round
   jetpackUziBulletSpeed: 23.0, // High velocity strafe bullet speed
   jetpackUziSpread: 0.07,      // Natural Micro-SMG bullet spray spread
   jetpackUziRange: 320,        // Effective firing range while hovering
@@ -88,11 +88,11 @@ export const cjConfig = {
   driveByPasses: 2,            // 2 repeated drive-by sweeps per Skill 3 activation
   driveByReenterDelay: 60,     // 1.0s (60 frames) pause between passes
   driveByBulletCount: 16,      // 16 rounds per pass (32 total across both passes)
-  driveByBulletDamage: 8,      // 8 damage per bullet
+  driveByBulletDamage: 5,      // 8 damage per bullet
   driveByBulletSpeed: 30.0,    // High-velocity supersonic tracer bullet speed (~28 px/frame)
   driveByBurstInterval: 22,    // Paced rhythmic fire cadence (~2.7 shots/sec alternating between homies)
   driveByCarSpeed: 6.5,        // Cinematic lowrider cruise & drift speed
-  driveByRamDamage: 22,        // 22 impact damage when running over/ramming enemies
+  driveByRamDamage: 10,        // 22 impact damage when running over/ramming enemies
   driveByRamKnockback: 18.0,   // Physical vehicular knockback impulse
   driveByRamRespectGain: 4,    // Respect gained when ramming enemies
   driveByBulletRespectGain: 1, // Respect gained when drive-by barrage fires
@@ -106,14 +106,14 @@ export const cjConfig = {
   baguvixDuration: 800,        // 5.0s (300 frames) invulnerability
   baguvixSpeedMultiplier: 0.28,// Significantly reduced slow walking speed (~1.54 px/frame) while wielding heavy minigun
   minigunFireRate: 5,          // Ultra-fast fire (every 2 frames = 30-45 rounds/sec)
-  minigunBulletDamage: 12,     // 12 damage per armor-piercing round
+  minigunBulletDamage: 1,     // 12 damage per armor-piercing round
   minigunBulletSpeed: 26.0,    // Supersonic armor-piercing projectile speed
   minigunKnockback: 6.5,       // Physical bullet pushback impulse
   minigunSpread: 0.05,         // Tight high-velocity spread
   minigunSpinSpeed: 0.45,      // Barrel cluster rotation speed
   riotShockwaveInterval: 60,   // Every 1.0s (60 frames) trigger riot shockwave
   riotShockwaveRadius: 220,    // 220px expanding fiery pressure wave
-  riotShockwaveDamage: 25,     // Shockwave explosion damage
+  riotShockwaveDamage: 15,     // Shockwave explosion damage
   riotShockwaveKnockback: 22.0,// Heavy radial pushback towards arena walls
   droppedMinigunDuration: 240, // 4.0s (240 frames) duration of overheated smoking minigun on the floor
   enableBaguvixDimScreen: true, // Dark Grove Street emerald green radial dim overlay

@@ -326,7 +326,8 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
     preloadSound(src).catch(() => {});
   }
   // Fallback: standard Audio element
-  const audio = /** @type {HTMLAudioElement} */ ((cached && typeof cached.cloneNode === 'function') ? cached.cloneNode() : new Audio(src));
+  const audio = new Audio(src);
+  audio.preload = 'auto';
   const targetVol = Math.max(0, Math.min(1, volume));
   audio.loop = true;
   audio.playbackRate = Math.max(0.1, speed);
@@ -347,6 +348,23 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
   }
   _loopingSounds.set(key, audio);
   return audio;
+}
+
+/**
+ * Check if a looping sound is currently registered and actively playing.
+ * @param {string} key - Identifier passed to playLoopingSound
+ * @returns {boolean}
+ */
+export function isLoopingSoundPlaying(key) {
+  const soundObj = _loopingSounds.get(key);
+  if (!soundObj) return false;
+  if (soundObj.gainNode && soundObj.buffer) {
+    return true;
+  }
+  if (typeof soundObj.paused === 'boolean') {
+    if (soundObj.paused && soundObj.currentTime > 0) return false;
+  }
+  return true;
 }
 
 /**
@@ -809,12 +827,13 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
  * Stop a played sound instance immediately.
  * Works for both Web Audio API handle objects and HTMLAudioElements.
  * @param {object|HTMLAudioElement} soundHandle
+ * @param {boolean} [force=false] - Force stop even if sound is protected
  */
-export function stopSound(soundHandle) {
+export function stopSound(soundHandle, force = false) {
   if (!soundHandle) return;
   const srcStr = String(soundHandle.src || (soundHandle.audio && soundHandle.audio.src) || '').toLowerCase();
-  if (srcStr.includes('faah') || srcStr.includes('announcer/faah')) {
-    return; // PROTECTED: Never cut faah.mp3 death audio!
+  if (!force && (srcStr.includes('faah') || srcStr.includes('announcer/faah') || srcStr.includes('respect') || srcStr.includes('cj-respectoverlay-bgmusic'))) {
+    return; // PROTECTED: Never cut faah.mp3 death audio or CJ Respect overlay bgmusic!
   }
   if (soundHandle.safetyTimeout) {
     clearTimeout(soundHandle.safetyTimeout);
@@ -875,12 +894,13 @@ export function stopSound(soundHandle) {
  * Works for both Web Audio API handle objects and HTMLAudioElements.
  * @param {object|HTMLAudioElement} soundHandle
  * @param {number} [fadeMs=350] - Fade duration in milliseconds
+ * @param {boolean} [force=false] - Force fade out even if protected
  */
-export function fadeOutSound(soundHandle, fadeMs = 350) {
+export function fadeOutSound(soundHandle, fadeMs = 350, force = false) {
   if (!soundHandle) return;
   const srcStr = String(soundHandle.src || (soundHandle.audio && soundHandle.audio.src) || '').toLowerCase();
-  if (srcStr.includes('faah') || srcStr.includes('announcer/faah')) {
-    return; // PROTECTED: Never cut or fade out faah.mp3!
+  if (!force && (srcStr.includes('faah') || srcStr.includes('announcer/faah') || srcStr.includes('respect') || srcStr.includes('cj-respectoverlay-bgmusic'))) {
+    return; // PROTECTED: Never cut or fade out faah.mp3 or CJ Respect overlay bgmusic!
   }
 
   // Web Audio API instance (gainNode)
@@ -1070,14 +1090,15 @@ export function fadeOutSoundBySrc(src, fadeMs = 350) {
 /**
  * Stop all active non-looping sound instances playing a matching sound file src.
  * @param {string} src - Path or partial substring of sound file (e.g. 'groundTremble')
+ * @param {boolean} [force=false]
  */
-export function stopSoundBySrc(src) {
+export function stopSoundBySrc(src, force = false) {
   if (!src) return;
   const target = String(src).toLowerCase();
-  if (target.includes('faah')) return; // PROTECTED: Never cut faah.mp3!
+  if (!force && (target.includes('faah') || target.includes('respect') || target.includes('cj-respectoverlay-bgmusic'))) return; // PROTECTED!
   for (const handle of Array.from(_activeSoundHandles)) {
     if (handle && handle.src && String(handle.src).toLowerCase().includes(target)) {
-      stopSound(handle);
+      stopSound(handle, force);
     }
   }
 }
@@ -1087,8 +1108,9 @@ export function stopSoundBySrc(src) {
  * @param {boolean} [keepAnnouncer=true] - If true, preserves announcer and death sounds like faah.mp3.
  * @param {number} [fadeDelayMs=2000] - Delay in ms before starting fade-out (default 2 seconds).
  * @param {number} [fadeDurationMs=500] - Fade-out duration in ms.
+ * @param {boolean} [forceStopAll=false] - Force stop even protected sounds (e.g. exiting to title menu).
  */
-export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDurationMs = 500) {
+export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDurationMs = 500, forceStopAll = false) {
   // 1. Clear all pending delayed sound timers
   _pendingSoundTimeouts.forEach((timerId) => clearTimeout(timerId));
   _pendingSoundTimeouts.clear();
@@ -1096,23 +1118,33 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 2. Stop/fade active Web Audio API & HTML Audio handles
   const handles = Array.from(_activeSoundHandles);
   for (const handle of handles) {
+    const src = String(handle?.src || (handle?.audio && handle.audio.src) || '').toLowerCase();
+    const isRespect = src.includes('respect') || src.includes('cj-respectoverlay-bgmusic');
+    if (!forceStopAll && isRespect) {
+      continue; // CJ Respect music ALWAYS plays until it ends naturally!
+    }
     if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(handle.src)) {
       continue;
     }
     if (fadeDelayMs > 0) {
       const timerId = setTimeout(() => {
         _pendingSoundTimeouts.delete(timerId);
-        fadeOutSound(handle, fadeDurationMs);
+        fadeOutSound(handle, fadeDurationMs, forceStopAll);
       }, fadeDelayMs);
       _pendingSoundTimeouts.add(timerId);
     } else {
-      stopSound(handle);
+      stopSound(handle, forceStopAll);
     }
   }
 
   // 3. Stop any fallback HTML Audio elements
   _activeSounds.forEach((audio) => {
     if (audio) {
+      const src = String(audio.src || '').toLowerCase();
+      const isRespect = src.includes('respect') || src.includes('cj-respectoverlay-bgmusic');
+      if (!forceStopAll && isRespect) {
+        return; // CJ Respect music ALWAYS plays until it ends naturally!
+      }
       if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(audio.src)) {
         return;
       }
@@ -1138,9 +1170,10 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
  * @param {boolean} [keepAnnouncer=false]
  * @param {number} [fadeDelayMs=0]
  * @param {number} [fadeDurationMs=350]
+ * @param {boolean} [forceStopAll=false]
  */
-export function stopAllAudio(keepAnnouncer = false, fadeDelayMs = 0, fadeDurationMs = 350) {
-  stopAllSounds(keepAnnouncer, fadeDelayMs, fadeDurationMs);
+export function stopAllAudio(keepAnnouncer = false, fadeDelayMs = 0, fadeDurationMs = 350, forceStopAll = false) {
+  stopAllSounds(keepAnnouncer, fadeDelayMs, fadeDurationMs, forceStopAll);
   stopAllLoopingSounds(fadeDelayMs, fadeDurationMs);
 }
 

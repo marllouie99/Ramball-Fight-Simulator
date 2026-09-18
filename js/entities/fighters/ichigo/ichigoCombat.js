@@ -418,7 +418,7 @@ export function handleIchigoTakeDamage(fighter, amount, attacker, opts, superTak
     return true;
   });
 
-  const isBusy = fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isShunpoDashing || fighter.isFrozen || fighter.isParalyzed || fighter.isTargetOfAmbush || isInsideEnemyGojoDomain || opts.isIsoh || opts.isSoulSplit;
+  const isBusy = fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isShunpoDashing || fighter.isFrozen || fighter.isParalyzed || fighter.isTargetOfAmbush || fighter.isChainedByMakima || isInsideEnemyGojoDomain || opts.isIsoh || opts.isSoulSplit;
   if (!isBusy && !opts.bypassShield && Math.random() < getParryChance(fighter)) {
     // Successful Parry & Deflection!
     const isBankai = fighter.bankaiActive || fighter.skin === 'bankai';

@@ -109,7 +109,8 @@ export class GenosFighter extends Fighter {
    * Finds the closest valid enemy target in the arena.
    */
   _findClosestEnemy(preferredOpponent) {
-    if (preferredOpponent && preferredOpponent !== this && preferredOpponent.hp > 0 && !preferredOpponent.isDead) {
+    const isPreferredAlive = preferredOpponent && preferredOpponent !== this && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
+    if (isPreferredAlive) {
       return preferredOpponent;
     }
     let bestTarget = null;
@@ -120,7 +121,9 @@ export class GenosFighter extends Fighter {
       if (state.illusions) allEntities.push(...state.illusions);
     }
     for (const e of allEntities) {
-      if (!e || e === this || e.isDead || e.hp <= 0) continue;
+      const isEntReforming = Boolean(e && (e.isRevivingFromContract || e.isShatterReviving));
+      if (!e || e === this) continue;
+      if (!isEntReforming && (e.isDead || e.hp <= 0)) continue;
       if (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') {
         const rootEntity = e.owner || e;
         const myTeam = state.getFighterTeam(state.fighters?.indexOf(this));
@@ -1952,8 +1955,12 @@ export class GenosFighter extends Fighter {
       this.rebootAccelTimer--;
     }
 
+    const canActAim = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0) && !this.isTargetOfAmbush && !this.isParalyzed && !this.isCaughtInBeam();
+    const isTargetReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+    const isOpponentTargetable = opponent && (!opponent.isDead || isTargetReforming) && (opponent.hp > 0 || isTargetReforming);
+
     // AI & Combat Target Aiming: Continuously track target angle every frame with smooth easing post-reassembly
-    if (canAct && opponent && opponent.hp > 0 && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
+    if (canActAim && isOpponentTargetable && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
       if (this.rebootAccelTimer > 0) {
         const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
         let currentAngle = this.gunAngle || this.angle || 0;
@@ -1969,7 +1976,7 @@ export class GenosFighter extends Fighter {
       }
     }
 
-    if (canAct && opponent && opponent.hp > 0 && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
+    if (canActAim && opponent && opponent.hp > 0 && !isTargetReforming && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
 
       // Skill 1 Priority: Machine Gun Blows (FIRST priority when available!)

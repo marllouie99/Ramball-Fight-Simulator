@@ -538,6 +538,7 @@ export class TurretEntity extends Fighter {
   }
 
   drawHealth(ctx) {
+    if (CONFIG.hudHideAll || CONFIG.hudHideHealthBars || CONFIG.hudHideOverheadHp) return;
     if (this.hp <= 0 || this.isBuilding) return;
     const floatY = (this.y - (this.z || 0)) - this.r - 18;
     drawMinionHealthBar(ctx, this.x, floatY, 36, 6, this.hp, this.maxHp);

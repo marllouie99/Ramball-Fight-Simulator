@@ -423,16 +423,26 @@ export function applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, a
 }
 
 export function executeTeleportDodge(fighter, attacker, arena) {
-  if (fighter.isDead || fighter.isTargetOfAmbush) return;
+  if (fighter.isDead || fighter.isTargetOfAmbush || fighter.isChainedByMakima) return;
   const oldX = fighter.x;
   const oldY = fighter.y;
 
-  // Evasion angle: smooth backward flash-step away from attacker (no rapid zigzag)
-  const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
-  const dist = (CONFIG.gojo?.teleportDodgeDistance ?? 85) + Math.random() * 15;
-
-  let targetX = fighter.x + Math.cos(angle) * dist;
-  let targetY = fighter.y + Math.sin(angle) * dist;
+  let targetX, targetY;
+  if (fighter.isMeleeMode && attacker && !attacker.isDead) {
+    // In Melee Mode: Flash-step flank pivot to the side/behind attacker (stays inside melee reach!)
+    const angleToAttacker = Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x);
+    const flankSign = Math.random() < 0.5 ? 1 : -1;
+    const angle = angleToAttacker + flankSign * (Math.PI * 0.45);
+    const dist = (attacker.r || 25) + fighter.r + 14;
+    targetX = attacker.x + Math.cos(angle) * dist;
+    targetY = attacker.y + Math.sin(angle) * dist;
+  } else {
+    // Evasion angle: smooth backward flash-step away from attacker (no rapid zigzag)
+    const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
+    const dist = (CONFIG.gojo?.teleportDodgeDistance ?? 85) + Math.random() * 15;
+    targetX = fighter.x + Math.cos(angle) * dist;
+    targetY = fighter.y + Math.sin(angle) * dist;
+  }
 
   if (arena) {
     if (arena.shape === 'circle') {

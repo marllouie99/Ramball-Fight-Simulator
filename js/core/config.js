@@ -97,6 +97,7 @@ export const CONFIG = {
   spawn: { leftXRatio: 0.25, rightXRatio: 0.75, yRatio: 0.5, verticalOffset: 32 },
   hpBar: { height: 6, yOffset: 16 },
   rounds: { max: 3 },                          // default max rounds for match (used in Fighter.takeDamage)
+  postKillAngleHoldFrames: 40,                 // frames to hold aim/strike facing angle after killing an enemy (~0.67s at 60fps) before returning to 0 rad
   globalFighter: {
     sizeMultiplier: 1.2,                       // scale the size of all fighters globally (1.0 = default)
     _defaultFocSizeMultiplier: 1.2,            // reference base size for FOC modes
@@ -129,8 +130,14 @@ export const CONFIG = {
   },
   blackFlash: blackFlashConfig,
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
-  darkModeShowHudSkillBars: 0,  // Toggle on/off to display HUD skill progress bars across Light and Dark mode (1 = show all, 0 = signature skills only)
+  darkModeShowHudSkillBars: 0,  // Toggle on/off to display HUD skill progress bars across Light and Dark mode (1 = show all, 0 = signature skills only, -1/hide = hide all)
   darkModeShowHudStats: 0,      // Toggle on/off to display HUD fighter stats info (DMG, SPD, ATK, etc.) across Light and Dark mode (1 = show, 0 = hide)
+  hudHideAll: false,            // Master toggle: completely hide all HUD elements (health bars, skill bars, stats, descriptions)
+  hudHideHealthBars: false,     // Toggle to completely hide all HUD health bars and overhead health numbers
+  hudHideSkillBars: false,      // Toggle to completely hide all HUD skill progress bars with zero exceptions
+  hudHideStats: false,          // Toggle to completely hide all fighter HUD stats lines
+  hudHideOverheadHp: false,      // Toggle to hide overhead canvas health numbers
+  hudSkillBarsMode: 'all',      // 'all' = show all skill bars, 'signature' = signature only, 'none' = completely hide all skill bars
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
   globalScreenShakeIntensityMultiplier: 0.7, // Global multiplier for all hit effect & arena screen shake intensity (1.0 = normal, 0.5 = half shake, 0.0 = disable shake completely)
   camera: {

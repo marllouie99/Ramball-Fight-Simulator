@@ -8,7 +8,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../g
 import { spawnBloodEffect } from '../particles/bloodEffect.js';
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
 import { renderYutaDomainBackground } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
-import { updateRika } from '../../entities/fighters/yuta/rikaLogic.js';
+import { updateRika, hasDodgingMechanic } from '../../entities/fighters/yuta/rikaLogic.js';
 import { drawYutaGhostSkin } from './yutaSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 
@@ -175,19 +175,30 @@ export class YutaRenderer {
       } else if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || (fighter.beamRetreatSlideTimer > 0) || (fighter.pureLoveBeamBreatherTimer > 0)) {
         targetAngle = (fighter.pureLoveBeamLockedAngle !== undefined ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0));
         rk.angle = targetAngle;
+        rk.gunAngle = targetAngle;
       } else {
         const activeTarget = rk.target || opponent;
         if (activeTarget && !activeTarget.isDead && activeTarget.hp > 0) {
           const desiredAngle = Math.atan2(activeTarget.y - rk.y, activeTarget.x - rk.x);
-          const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
-          let diff = desiredAngle - currentAngle;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          while (diff > Math.PI) diff -= Math.PI * 2;
+          const isDodgeEnemy = hasDodgingMechanic(activeTarget);
 
-          const turnRate = activeTarget.isStealthed
-            ? (CONFIG.toji?.stealthTurnRate || 0.035)
-            : (rk.attackTimer > 0 ? 0.35 : 0.22);
-          targetAngle = currentAngle + diff * turnRate;
+          if (isDodgeEnemy && !activeTarget.isStealthed) {
+            targetAngle = desiredAngle;
+            rk.angle = desiredAngle;
+            rk.gunAngle = desiredAngle;
+          } else {
+            const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
+            let diff = desiredAngle - currentAngle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+
+            const turnRate = activeTarget.isStealthed
+              ? (CONFIG.toji?.stealthTurnRate || 0.035)
+              : (rk.attackTimer > 0 ? 0.35 : 0.22);
+            targetAngle = currentAngle + diff * turnRate;
+            rk.angle = targetAngle;
+            rk.gunAngle = targetAngle;
+          }
         } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
           const moveAngle = Math.atan2(rk.vy, rk.vx);
           const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : moveAngle;
@@ -195,10 +206,14 @@ export class YutaRenderer {
           while (diff < -Math.PI) diff += Math.PI * 2;
           while (diff > Math.PI) diff -= Math.PI * 2;
           targetAngle = currentAngle + diff * 0.18;
+          rk.angle = targetAngle;
+          rk.gunAngle = targetAngle;
         } else {
           targetAngle = rk.angle || 0;
+          rk.gunAngle = targetAngle;
         }
         rk.angle = targetAngle;
+        rk.gunAngle = targetAngle;
       }
 
       const renderState = { drawX, drawY, targetAngle, spawnScale };
@@ -409,19 +424,30 @@ export class YutaRenderer {
       } else if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || (fighter.beamRetreatSlideTimer > 0) || (fighter.pureLoveBeamBreatherTimer > 0)) {
         targetAngle = (fighter.pureLoveBeamLockedAngle !== undefined ? fighter.pureLoveBeamLockedAngle : (fighter.gunAngle || 0));
         rk.angle = targetAngle;
+        rk.gunAngle = targetAngle;
       } else {
         const activeTarget = rk.target || opponent;
         if (activeTarget && !activeTarget.isDead && activeTarget.hp > 0) {
           const desiredAngle = Math.atan2(activeTarget.y - rk.y, activeTarget.x - rk.x);
-          const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
-          let diff = desiredAngle - currentAngle;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          while (diff > Math.PI) diff -= Math.PI * 2;
+          const isDodgeEnemy = hasDodgingMechanic(activeTarget);
 
-          const turnRate = activeTarget.isStealthed
-            ? (CONFIG.toji?.stealthTurnRate || 0.035)
-            : (rk.attackTimer > 0 ? 0.35 : 0.22);
-          targetAngle = currentAngle + diff * turnRate;
+          if (isDodgeEnemy && !activeTarget.isStealthed) {
+            targetAngle = desiredAngle;
+            rk.angle = desiredAngle;
+            rk.gunAngle = desiredAngle;
+          } else {
+            const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
+            let diff = desiredAngle - currentAngle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+
+            const turnRate = activeTarget.isStealthed
+              ? (CONFIG.toji?.stealthTurnRate || 0.035)
+              : (rk.attackTimer > 0 ? 0.35 : 0.22);
+            targetAngle = currentAngle + diff * turnRate;
+            rk.angle = targetAngle;
+            rk.gunAngle = targetAngle;
+          }
         } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
           const moveAngle = Math.atan2(rk.vy, rk.vx);
           const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : moveAngle;
@@ -429,10 +455,14 @@ export class YutaRenderer {
           while (diff < -Math.PI) diff += Math.PI * 2;
           while (diff > Math.PI) diff -= Math.PI * 2;
           targetAngle = currentAngle + diff * 0.18;
+          rk.angle = targetAngle;
+          rk.gunAngle = targetAngle;
         } else {
           targetAngle = rk.angle || 0;
+          rk.gunAngle = targetAngle;
         }
         rk.angle = targetAngle;
+        rk.gunAngle = targetAngle;
       }
     }
 

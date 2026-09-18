@@ -46,7 +46,7 @@ export function modUpdateChannelSense(fighter, opponent) {
 
   const target = getTojiTarget(fighter, opponent);
 
-  if (!fighter.isAmbushing && !tojiIsTargetDeadOrRemoved(fighter, target)) {
+  if (!fighter.isAmbushing && (fighter.postUltimateRecoveryTimer || 0) <= 0 && !tojiIsTargetDeadOrRemoved(fighter, target)) {
     const isTargetChanneling = !!(
       target.isChargingUlt ||
       target.isFiringUlt ||
@@ -64,8 +64,6 @@ export function modUpdateChannelSense(fighter, opponent) {
       (target.purpleChargeTimer || 0) > 0 ||
       (target.basicPunchChargeTimer || 0) > 0 ||
       (target._counterPunchTimer || 0) > 0 ||
-      (target.flurryHitsLeft || 0) > 0 ||
-      target.isFlurrying ||
       target.isCastingRed ||
       target.isCastingBlue ||
       target.isPreparingChain ||
@@ -143,7 +141,7 @@ export function modUpdateStealth(fighter, opponent) {
     (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
     (fighter.redKnockbackTimer && fighter.redKnockbackTimer > 0)
   );
-  const canAmbush = !fighter.isAmbushing && !isStunnedOrPinned;
+  const canAmbush = !fighter.isAmbushing && !isStunnedOrPinned && (fighter.postUltimateRecoveryTimer || 0) <= 0;
 
   // If Ambush is ready and target is valid, launch Ambush sequence immediately!
   if (isAmbushReady && canAmbush && !tojiIsTargetDeadOrRemoved(fighter, target)) {

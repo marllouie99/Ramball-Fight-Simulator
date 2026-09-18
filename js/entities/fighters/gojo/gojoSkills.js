@@ -174,8 +174,18 @@ export function detonateRed(fighter) {
   fadeOutSoundBySrc('redchanneling', 50);
   fadeOutSoundBySrc('redcharging', 50);
 
+  const target = (fighter._redTargetRef && fighter._redTargetRef.hp > 0 && !fighter._redTargetRef.isDead && !fighter._redTargetRef.dead)
+    ? fighter._redTargetRef
+    : (fighter.target && fighter.target.hp > 0 && !fighter.target.isDead && !fighter.target.dead ? fighter.target : (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null));
+
   let pushAngle;
-  if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
+  if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+    const targetY = target.y - (target.z || 0);
+    const fighterY = fighter.y - (fighter.z || 0);
+    const dx = target.x - fighter.x;
+    const dy = targetY - fighterY;
+    pushAngle = Math.atan2(dy, dx);
+  } else if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
     pushAngle = fighter.redTargetAngle;
   } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
     pushAngle = fighter.gunAngle;
@@ -343,9 +353,18 @@ export function firePurple(fighter, ownerIndex) {
 
   let purpleLife = CONFIG.gojo?.purpleLife ?? 480;
 
-  // Lock release angle strictly to committed cast angle (no snapping auto-aim upon firing)
+  const target = (fighter.target && fighter.target.hp > 0 && !fighter.target.isDead && !fighter.target.dead)
+    ? fighter.target
+    : (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
+
   let releaseAngle;
-  if (fighter.purpleCastAngle !== undefined && fighter.purpleCastAngle !== null && !Number.isNaN(fighter.purpleCastAngle)) {
+  if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+    const targetY = target.y - (target.z || 0);
+    const fighterY = fighter.y - (fighter.z || 0);
+    const dx = target.x - fighter.x;
+    const dy = targetY - fighterY;
+    releaseAngle = Math.atan2(dy, dx);
+  } else if (fighter.purpleCastAngle !== undefined && fighter.purpleCastAngle !== null && !Number.isNaN(fighter.purpleCastAngle)) {
     releaseAngle = fighter.purpleCastAngle;
   } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
     releaseAngle = fighter.gunAngle;

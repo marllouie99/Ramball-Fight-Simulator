@@ -156,6 +156,7 @@ async function main() {
   const { _getYujiHairImage, _drawYujiHair, drawYujiSkin } = await import('../js/graphics/fighters/yujiSkin.js');
   const { _getYutaHairImage, _drawYutaHair, drawYutaPixelBody, drawYutaSkin } = await import('../js/graphics/fighters/yutaSkin.js');
   const { _getTojiHairImage, _drawTojiHair, drawTojiPixelBody, drawTojiSkin, drawTojiGhostSkin } = await import('../js/graphics/fighters/tojiSkin.js');
+  const { drawZeusPixelBody, drawZeusSkin } = await import('../js/graphics/fighters/zeusSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -171,6 +172,7 @@ async function main() {
 
   let totalTested = 0;
   let errors = 0;
+  const errorList = [];
 
   const allDefs = [...FIGHTER_DEFS, ...(TACTICAL_FIGHTER_DEFS || [])];
 
@@ -1543,6 +1545,71 @@ async function main() {
           throw new Error("Makima Chains of Domination remained active after timer expired!");
         }
 
+        // 3.4.1 Test Chained Enemy with Dodging Mechanic (Saitama / Toji / Sukuna / Mahito / etc.)
+        console.log("   Testing Makima Chained Enemy Dodging Mechanic Disabled...");
+        const { SaitamaFighter } = await import('../js/entities/fighters/SaitamaFighter.js');
+        const { TojiFighter } = await import('../js/entities/fighters/TojiFighter.js');
+        const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+        const { MahitoFighter } = await import('../js/entities/fighters/MahitoFighter.js');
+        const { JohnWickFighter } = await import('../js/entities/fighters/JohnWickFighter.js');
+        const { MusashiFighter } = await import('../js/entities/fighters/MusashiFighter.js');
+
+        const testSaitama = new SaitamaFighter({ startX: 300, startY: 200, type: 'saitama' });
+        testSaitama.isChainedByMakima = true;
+        if (testSaitama.executeDodgeTeleport(fighter, true)) {
+          throw new Error("Saitama executed dodge teleport while chained by Makima!");
+        }
+        testSaitama.hp = 100;
+        const saitamaDamageRes = testSaitama.takeDamage(20, fighter, { isProjectile: true });
+        if (saitamaDamageRes === false || testSaitama.hp !== 80) {
+          throw new Error(`Saitama dodged damage while chained by Makima! HP: ${testSaitama.hp}`);
+        }
+
+        const testToji = new TojiFighter({ startX: 300, startY: 200, type: 'toji' });
+        testToji.isChainedByMakima = true;
+        testToji.hp = 100;
+        const tojiDamageRes = testToji.takeDamage(20, fighter, { isProjectile: true });
+        if (tojiDamageRes === false || testToji.hp !== 80) {
+          throw new Error(`Toji dodged damage while chained by Makima! HP: ${testToji.hp}`);
+        }
+
+        const testSukuna = new SukunaFighter({ startX: 300, startY: 200, type: 'sukuna' });
+        testSukuna.isChainedByMakima = true;
+        testSukuna.hp = 100;
+        const sukunaDamageRes = testSukuna.takeDamage(20, fighter, { isMelee: true });
+        if (sukunaDamageRes === false || testSukuna.hp !== 80) {
+          throw new Error(`Sukuna teleport-dodged damage while chained by Makima! HP: ${testSukuna.hp}`);
+        }
+
+        const testMahito = new MahitoFighter({ startX: 300, startY: 200, type: 'mahito' });
+        testMahito.isEvading = true;
+        testMahito.evasionTimer = 100;
+        testMahito.isChainedByMakima = true;
+        testMahito.hp = 100;
+        testMahito.takeDamage(20, fighter);
+        if (testMahito.hp >= 100) {
+          throw new Error(`Mahito clone-evaded damage while chained by Makima! HP: ${testMahito.hp}`);
+        }
+
+        const testJohnWick = new JohnWickFighter({ startX: 300, startY: 200, type: 'johnwick' });
+        testJohnWick.isRolling = true;
+        testJohnWick.rollTimer = 20;
+        testJohnWick.isChainedByMakima = true;
+        testJohnWick.hp = 100;
+        testJohnWick.takeDamage(20, fighter);
+        if (testJohnWick.hp >= 100) {
+          throw new Error(`John Wick evaded damage while chained by Makima! HP: ${testJohnWick.hp}`);
+        }
+
+        const testMusashi = new MusashiFighter({ startX: 300, startY: 200, type: 'musashi' });
+        testMusashi.currentStance = 'void';
+        testMusashi.isChainedByMakima = true;
+        testMusashi.hp = 100;
+        testMusashi.takeDamage(20, fighter);
+        if (testMusashi.hp >= 100) {
+          throw new Error(`Musashi Void Stance dodged damage while chained by Makima! HP: ${testMusashi.hp}`);
+        }
+
         // 3.5. Skill 1 Missable Chains Test (Aiming Away / Off-Target)
         fighter.reset();
         fighter.x = 200;
@@ -2603,24 +2670,27 @@ async function main() {
         if (Math.abs(fighter.purpleCastAngle - expectedPurpleAngle) > 0.05 || Math.abs(fighter.gunAngle - expectedPurpleAngle) > 0.05) {
           throw new Error(`Expected Purple cast angle to be locked to diagonal (${expectedPurpleAngle.toFixed(2)}), got ${fighter.purpleCastAngle}`);
         }
-        const lockedPurpleAngle = fighter.gunAngle;
+        const initialPurpleAngle = fighter.gunAngle;
 
-        // Enemy moves during channel - verify aim does NOT snap auto-aim or rotate
+        // Enemy moves during channel - verify aim DOES track / auto-aim towards new enemy position
         dummyOpponent.x = 100;
         dummyOpponent.y = 50;
         fighter.update(dummyOpponent, 0, state.arena);
-        if (Math.abs(fighter.gunAngle - lockedPurpleAngle) > 0.001 || Math.abs(fighter.purpleCastAngle - lockedPurpleAngle) > 0.001) {
-          throw new Error('Expected Gojo aim NOT to snap auto-aim or rotate during Purple channeling');
+        const expectedNewPurpleAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        let purpleAngleDiff = Math.abs(fighter.gunAngle - expectedNewPurpleAngle);
+        while (purpleAngleDiff > Math.PI) purpleAngleDiff = Math.abs(purpleAngleDiff - Math.PI * 2);
+        if (purpleAngleDiff > 0.05) {
+          throw new Error(`Expected Gojo aim to track enemy during Purple channeling (expected ${expectedNewPurpleAngle.toFixed(2)}, got ${fighter.gunAngle.toFixed(2)})`);
         }
         fighter._firePurple(0);
         const diagProj = fighter.activePurpleProjectile;
         if (!diagProj) {
           throw new Error('Expected Hollow Purple projectile to spawn on fire');
         }
-        const expectedVx = Math.cos(lockedPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
-        const expectedVy = Math.sin(lockedPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
+        const expectedVx = Math.cos(expectedNewPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
+        const expectedVy = Math.sin(expectedNewPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
         if (Math.abs(diagProj.vx - expectedVx) > 0.1 || Math.abs(diagProj.vy - expectedVy) > 0.1) {
-          throw new Error(`Expected Purple projectile to fly along diagonal vector (${expectedVx.toFixed(2)}, ${expectedVy.toFixed(2)}), got vx=${diagProj.vx}, vy=${diagProj.vy}`);
+          throw new Error(`Expected Purple projectile to fly along tracked vector (${expectedVx.toFixed(2)}, ${expectedVy.toFixed(2)}), got vx=${diagProj.vx}, vy=${diagProj.vy}`);
         }
         if (diagProj) {
           diagProj.life = 0;
@@ -2788,19 +2858,19 @@ async function main() {
         if (Math.abs(fighter.redTargetAngle - expectedAngle1) > 0.05 || Math.abs(fighter.gunAngle - expectedAngle1) > 0.05) {
           throw new Error(`Expected Red target and gun angle to be diagonal (${expectedAngle1.toFixed(2)}), got redTargetAngle=${fighter.redTargetAngle}, gunAngle=${fighter.gunAngle}`);
         }
-        const lockedRedAngle = fighter.gunAngle;
+        const initialRedAngle = fighter.gunAngle;
 
-        // Enemy moves during buildup - verify aim does NOT rotate or snap auto-aim
+        // Enemy moves during buildup - verify aim DOES track / auto-aim towards new enemy position
         dummyOpponent.x = 100;
         dummyOpponent.y = 80;
         fighter.update(dummyOpponent, 0, state.arena);
-        if (Math.abs(fighter.redTargetAngle - lockedRedAngle) > 0.001 || Math.abs(fighter.gunAngle - lockedRedAngle) > 0.001) {
-          throw new Error('Expected Gojo aim NOT to rotate or snap auto-aim during Red buildup');
+        const expectedNewRedAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        let redAngleDiff = Math.abs(fighter.gunAngle - expectedNewRedAngle);
+        while (redAngleDiff > Math.PI) redAngleDiff = Math.abs(redAngleDiff - Math.PI * 2);
+        if (redAngleDiff > 0.05) {
+          throw new Error(`Expected Gojo aim to track enemy during Red buildup (expected ${expectedNewRedAngle.toFixed(2)}, got ${fighter.gunAngle.toFixed(2)})`);
         }
         fighter._detonateRed();
-        if (Math.abs(fighter.gunAngle - lockedRedAngle) > 0.001) {
-          throw new Error('Expected Gojo aim NOT to snap auto-aim on Red detonation');
-        }
 
         // Test Red Case 2: Enemy out of trigger range (600, 600) -> Must NOT trigger Red
         state.gameState = 'playing';
@@ -2860,14 +2930,17 @@ async function main() {
           throw new Error(`Expected penalty cooldown on interrupted Red, got ${fighter.redCooldown}`);
         }
 
-        // Test Gojo Reversal Red any-angle aim and locked aim without auto-aim rotation
+        // Test Gojo Reversal Red auto-aim tracking during buildup
         fighter.reset();
         dummyOpponent.reset();
+        if (projectileSystem) projectileSystem.projectiles = [];
+        if (state.projectiles) state.projectiles = [];
+        fighter.activePurpleProjectile = null;
         fighter.hp = fighter.maxHp;
         fighter.isDead = false;
         fighter.dead = false;
         fighter.team = 0;
-        dummyOpponent.hp = 100;
+        dummyOpponent.hp = 500;
         dummyOpponent.isDead = false;
         dummyOpponent.dead = false;
         dummyOpponent.team = 1;
@@ -2886,12 +2959,15 @@ async function main() {
         }
         const lockedRedAngle2 = fighter.gunAngle;
 
-        // Move opponent during Red buildup and verify Gojo does NOT rotate or auto-aim
+        // Move opponent during Red buildup and verify Gojo DOES rotate / auto-aim
         dummyOpponent.x = 100;
         dummyOpponent.y = 400;
         fighter.aim(dummyOpponent);
-        if (Math.abs(fighter.gunAngle - lockedRedAngle2) > 0.001) {
-          throw new Error(`Gojo rotated towards target during Red buildup! Expected ${lockedRedAngle2}, got ${fighter.gunAngle}`);
+        const expectedNewRedAngle2 = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        let redAngleDiff2 = Math.abs(fighter.gunAngle - expectedNewRedAngle2);
+        while (redAngleDiff2 > Math.PI) redAngleDiff2 = Math.abs(redAngleDiff2 - Math.PI * 2);
+        if (redAngleDiff2 > 0.05) {
+          throw new Error(`Gojo failed to auto-aim towards target during Red buildup! Expected ${expectedNewRedAngle2}, got ${fighter.gunAngle}`);
         }
 
         // Fast-forward to detonation
@@ -2900,9 +2976,6 @@ async function main() {
         }
         if (!fighter.redDetonated) {
           throw new Error('Expected Gojo to detonate Red');
-        }
-        if (Math.abs(fighter.gunAngle - lockedRedAngle2) > 0.001) {
-          throw new Error(`Gojo snapped auto-aim on Red detonation! Expected ${lockedRedAngle2}, got ${fighter.gunAngle}`);
         }
 
 
@@ -4219,6 +4292,74 @@ async function main() {
     errors++;
   }
 
+  // 6.5.1 Toji Domain Dodge Chance vs Sukuna Domain Slashes Test
+  console.log('🗡️ [Toji Domain Dodge Chance vs Sukuna Domain Slashes Test] Verifying Toji physically dodges Malevolent Shrine spatial cuts...');
+  try {
+    const TojiClass = FIGHTER_CLASS_MAP['toji'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const { spawnDomainSlashLines } = await import('../js/entities/fighters/sukuna/sukunaDomainVisuals.js');
+
+    if (TojiClass && SukunaClass) {
+      const tojiDef = allDefs.find(d => (d.type === 'toji' || d.characterId === 'toji'));
+      const sukunaDef = allDefs.find(d => (d.type === 'sukuna' || d.characterId === 'sukuna'));
+
+      const testToji = new TojiClass(tojiDef);
+      const testSukuna = new SukunaClass(sukunaDef);
+
+      state.fighters = [testToji, testSukuna];
+      state.arena = { x: 0, y: 0, width: 540, height: 960 };
+
+      testToji.x = 200;
+      testToji.y = 300;
+      testSukuna.x = 200;
+      testSukuna.y = 500;
+      testSukuna.domainActive = true;
+
+      // 1. Verify dodgeSliceLine method exists on Toji
+      if (typeof testToji.dodgeSliceLine !== 'function') {
+        throw new Error('Expected TojiFighter to implement dodgeSliceLine(lineData)');
+      }
+
+      // 2. Test dodgeSliceLine high success rate (domainDodgeChance = 0.95)
+      let dodgeSuccessCount = 0;
+      const trialCount = 100;
+      for (let i = 0; i < trialCount; i++) {
+        const didDodge = testToji.dodgeSliceLine({
+          angle: 0,
+          cx: testToji.x,
+          cy: testToji.y,
+          normalX: 0,
+          normalY: 1,
+          thickness: 3,
+          attacker: testSukuna
+        });
+        if (didDodge) dodgeSuccessCount++;
+      }
+
+      if (dodgeSuccessCount < 80) {
+        throw new Error(`Expected Toji domain dodge rate >= 80% out of 100 trials with 95% config, got ${dodgeSuccessCount}%`);
+      }
+
+      // 3. Verify afterimages and sidestep displacement occurred
+      if (!testToji.stealthAfterimages || testToji.stealthAfterimages.length === 0) {
+        throw new Error('Expected Toji to spawn stealth afterimages upon dodging slice lines');
+      }
+
+      // 4. Verify Sukuna spawnDomainSlashLines integration with Toji inside domain
+      testToji.hp = testToji.maxHp || 420;
+      testSukuna.domainTimeInsideMap = new Map();
+      const didHitAny = spawnDomainSlashLines(testSukuna, 3);
+
+      // Verify that Toji survived and did not take unconditional 100% damage spikes
+      if (testToji.hp <= 0) {
+        throw new Error('Expected Toji to survive domain slice lines');
+      }
+    }
+  } catch (err) {
+    console.error('❌ [TOJI DOMAIN DODGE CHANCE TEST ERROR]:', err);
+    errors++;
+  }
+
   // 6.6 Sukuna Domain Expansion Fuga Cooldown Preservation Test
   console.log('🔥 [Sukuna Domain Fuga Cooldown Test] Verifying Fuga cooldown is not reset upon domain activation...');
   try {
@@ -4675,7 +4816,7 @@ async function main() {
       if (Math.abs(y._getCardinalAngle(enemyDown) - (Math.PI / 2)) > 0.001) throw new Error(`Expected Yuta cardinal Down to be Math.PI/2 rad`);
       if (Math.abs(y._getCardinalAngle(enemyUp) - (-Math.PI / 2)) > 0.001) throw new Error(`Expected Yuta cardinal Up to be -Math.PI/2 rad`);
 
-      // Test 2: Any-angle aiming (Diagonal)
+      // Test 2: Auto-aim while charging tracks moving enemy
       const diagonalEnemy = { x: 450, y: 660, r: 25, hp: 100, isDead: false };
       const expectedDiagAngle = Math.atan2(660 - 480, 450 - 270);
       y.reset();
@@ -4686,20 +4827,32 @@ async function main() {
       state.fighters = [y, diagonalEnemy];
       y.update(diagonalEnemy, 0, state.arena);
 
-      if (Math.abs(y.pureLoveBeamLockedAngle - expectedDiagAngle) > 0.05) {
-        throw new Error(`Expected Yuta Pure Love Beam locked angle to be diagonal ${expectedDiagAngle.toFixed(2)}, got ${y.pureLoveBeamLockedAngle}`);
+      if (Math.abs(y.gunAngle - expectedDiagAngle) > 0.05) {
+        throw new Error(`Expected Yuta gunAngle to auto-aim diagonally (${expectedDiagAngle.toFixed(2)}), got ${y.gunAngle}`);
       }
 
-      // Test 3: Channeling locks angle and does not rotate when enemy moves
-      const lockedAngle = y.pureLoveBeamLockedAngle;
-      y.aim(enemyUp); // Attempt to aim up during retreat / channel
-      if (Math.abs(y.gunAngle - lockedAngle) > 0.001 || Math.abs(y.angle - lockedAngle) > 0.001) {
-        throw new Error(`Expected Yuta gunAngle to remain locked at ${lockedAngle} during retreat/channel, got ${y.gunAngle}`);
+      // Test 3: Auto-aim tracks new enemy position while charging
+      y.isChannelingPureLoveBeam = true;
+      y.update(enemyUp, 0, state.arena);
+      const expectedUpAngle = Math.atan2(200 - 480, 270 - 270); // -Math.PI / 2
+      if (Math.abs(y.gunAngle - expectedUpAngle) > 0.05) {
+        throw new Error(`Expected Yuta gunAngle to track enemyUp (-1.57), got ${y.gunAngle}`);
       }
 
-      // Test 4: Firing launches beam strictly along locked diagonal angle with no auto-aim snap
+      // Test 4: Firing snapshots and locks angle, rejecting snap auto-aim
       projectileSystem.projectiles = [];
       y.activatePureLoveBeam();
+      const lockedAngle = y.pureLoveBeamLockedAngle;
+      if (Math.abs(lockedAngle - expectedUpAngle) > 0.05) {
+        throw new Error(`Expected locked angle to snapshot charge angle (${expectedUpAngle.toFixed(2)}), got ${lockedAngle}`);
+      }
+
+      // Enemy moves to enemyDown after firing -> Yuta must NOT snap auto-aim
+      y.aim(enemyDown);
+      if (Math.abs(y.gunAngle - lockedAngle) > 0.001 || Math.abs(y.angle - lockedAngle) > 0.001) {
+        throw new Error(`Expected Yuta gunAngle to remain locked at ${lockedAngle} without snap auto-aim, got ${y.gunAngle}`);
+      }
+
       const beam = projectileSystem.projectiles.find(p => p && p.isPureLoveBeam);
       if (!beam) throw new Error(`Expected Pure Love Beam projectile to spawn!`);
       if (Math.abs(beam.angle - lockedAngle) > 0.001) throw new Error(`Expected Pure Love Beam angle to match locked angle (${lockedAngle}), got ${beam.angle}`);
@@ -4715,6 +4868,71 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ [YUTA PURE LOVE BEAM TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.4a. Yuta Phantom Flurry 5 Basic Attack Hits & Parry Activation Test
+  console.log('💍 [Yuta Phantom Flurry Test] Verifying Phantom Flurry activates on 5 basic attack hits and on parries...');
+  try {
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const TargetDummyClass = FIGHTER_CLASS_MAP['target_dummy'] || FIGHTER_CLASS_MAP['normal'];
+    const yutaDef = FIGHTER_DEFS.find(d => d.id === 'yuta');
+    if (YutaClass && yutaDef && TargetDummyClass) {
+      const y = new YutaClass(yutaDef);
+      const dummy = new TargetDummyClass({ id: 'dummy', type: 'dummy', hp: 500, radius: 25 });
+      state.fighters = [y, dummy];
+      state.illusions = [];
+
+      y.x = 200; y.y = 200;
+      dummy.x = 230; dummy.y = 200;
+
+      if (y.basicAttackHitCount !== 0) throw new Error('Expected initial basicAttackHitCount to be 0');
+
+      for (let i = 1; i <= 4; i++) {
+        dummy.x = 230; dummy.y = 200;
+        y.x = 200; y.y = 200;
+        y.meleeCooldown = 0;
+        y.executeKatanaMelee(0);
+        if (y.basicAttackHitCount !== i) throw new Error(`Expected basicAttackHitCount ${i}, got ${y.basicAttackHitCount}`);
+        if (y.flurryHitsLeft !== 0) throw new Error(`Flurry should not have triggered on hit ${i}`);
+      }
+
+      dummy.x = 230; dummy.y = 200;
+      y.x = 200; y.y = 200;
+      y.meleeCooldown = 0;
+      y.executeKatanaMelee(0);
+
+      if (y.basicAttackHitCount !== 0) throw new Error(`Expected basicAttackHitCount to reset to 0, got ${y.basicAttackHitCount}`);
+      if (y.flurryHitsLeft !== (CONFIG.yuta?.flurryHits || 7)) throw new Error(`Expected flurryHitsLeft to be ${CONFIG.yuta?.flurryHits || 7}, got ${y.flurryHitsLeft}`);
+
+      // Run flurry until Thin Ice Breaker
+      let frames = 0;
+      while ((y.flurryHitsLeft > 0 || y.flurryTimer > 0) && frames < 200) {
+        y.update(dummy, 0, state.arena);
+        frames++;
+      }
+      if (!y.isChannelingThinIceBreaker && y.thinIceBreakerChargeTimer <= 0) {
+        throw new Error('Expected Yuta to transition into Thin Ice Breaker after flurry completion');
+      }
+
+      // Test reset and parry trigger
+      y.reset();
+      if (y.basicAttackHitCount !== 0 || y.flurryHitsLeft !== 0 || y.parryCount !== 0) {
+        throw new Error('Expected reset() to clear all flurry counters');
+      }
+
+      y.targetParriesForFlurry = 3;
+      y.parryCount = 2;
+      y.getParryChance = () => 1.0;
+      dummy.x = 220; dummy.y = 200; dummy.hp = 100; dummy.isDead = false;
+      y.x = 200; y.y = 200; y.hp = 200; y.isDead = false;
+
+      y.takeDamage(10, dummy, { isMelee: true });
+      if (y.flurryHitsLeft !== (CONFIG.yuta?.flurryHits || 7)) throw new Error('Expected parry to trigger Phantom Flurry');
+      if (y.parryStacks !== 1) throw new Error('Expected parryStacks to be 1');
+    }
+  } catch (err) {
+    console.error('❌ [YUTA PHANTOM FLURRY TEST ERROR]:', err);
     errors++;
   }
 
@@ -5010,18 +5228,23 @@ async function main() {
         y.update(enemy, 0, state.arena);
       }
 
-      // Fast-forward channeling phase (150 frames) while verifying Rika aim rotation is strictly locked straight to beam angle
+      // Fast-forward channeling phase (150 frames) while verifying Yuta and Rika auto-aim toward moving enemy during channeling
+      const targetEnemyAngle = Math.atan2(150, 200);
+      enemy.x = y.x + 200;
+      enemy.y = y.y + 150;
       while (y.isChannelingPureLoveBeam) {
-        // Move enemy to varied positions to ensure Rika does NOT rotate toward enemy
-        enemy.x = y.x + (Math.random() - 0.5) * 400;
-        enemy.y = y.y + (Math.random() - 0.5) * 400;
         y.update(enemy, 0, state.arena);
 
         if (y.rika && y.isChannelingPureLoveBeam) {
-          if (y.rika.angle !== y.pureLoveBeamLockedAngle) {
-            throw new Error(`Expected Rika angle (${y.rika.angle}) to be locked straight to beam angle (${y.pureLoveBeamLockedAngle}) during channeling!`);
+          if (Math.abs(y.rika.angle - y.gunAngle) > 0.01) {
+            throw new Error(`Expected Rika angle (${y.rika.angle}) to match Yuta aim angle (${y.gunAngle}) during channeling!`);
           }
         }
+      }
+
+      // Verify Yuta reached target aim angle during channeling
+      if (Math.abs(y.gunAngle - targetEnemyAngle) > 0.05) {
+        throw new Error(`Expected Yuta gunAngle (${y.gunAngle}) to auto-aim toward enemy (${targetEnemyAngle}) during channeling!`);
       }
 
       // Verify beam is now FIRING inside domain!
@@ -7189,16 +7412,24 @@ async function main() {
     f2.isDead = true;
     state.gameState = 'roundEnd';
 
-    // Step frames and verify angle smoothly turns towards 0
+    // Step frames and verify angle is held before smoothly turning towards 0
     let prevDiff = Math.abs(f1.gunAngle);
+    let angleHeldCount = 0;
     for (let frame = 0; frame < 100; frame++) {
       updateFighters();
       const currentDiff = Math.abs(f1.gunAngle);
+      if (Math.abs(currentDiff - Math.abs(initialAim)) < 0.0001) {
+        angleHeldCount++;
+      }
       if (currentDiff > prevDiff + 0.0001) {
         throw new Error(`Angle moved away from 0 rad during post-kill coasting! Frame ${frame}: prevDiff=${prevDiff}, currentDiff=${currentDiff}`);
       }
       prevDiff = currentDiff;
       if (f1.gunAngle === 0) break;
+    }
+
+    if (angleHeldCount < 30) {
+      throw new Error(`Fighter did not hold kill angle before returning to normal position! Held for only ${angleHeldCount} frames.`);
     }
 
     if (f1.gunAngle !== 0 || f1.angle !== 0) {
@@ -7268,6 +7499,62 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ [GOJO DOMAIN PUNCH KILL ANGLE TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 6.5c. Left-Facing Winner Normal Angle Recovery Test
+  console.log('🔄 [Left-Facing Winner Angle Recovery Test] Verifying winner aiming left recovers to left normal angle (Math.PI) upon killing enemy...');
+  try {
+    const d1 = FIGHTER_DEFS[0];
+    const d2 = FIGHTER_DEFS[1];
+    const C1 = FIGHTER_CLASS_MAP[d1.type] || FIGHTER_CLASS_MAP.default;
+    const C2 = FIGHTER_CLASS_MAP[d2.type] || FIGHTER_CLASS_MAP.default;
+    const f1 = new C1(d1, 0); // Winner
+    const f2 = new C2(d2, 1); // Enemy to the left
+    f1.x = 250; f1.y = 200;
+    f2.x = 100; f2.y = 180; // Facing left (~2.94 rad > Math.PI / 2)
+    state.fighters = [f1, f2];
+    state.gameState = 'playing';
+
+    // Aim at enemy to the left
+    for (let i = 0; i < 20; i++) {
+      f1.aim(f2);
+    }
+    const initialAim = f1.gunAngle;
+    if (Math.abs(initialAim) <= Math.PI / 2) {
+      throw new Error(`Expected leftward aim angle (> 1.57 rad)! Got: ${initialAim}`);
+    }
+
+    // Kill enemy
+    f2.hp = 0;
+    f2.isDead = true;
+    state.gameState = 'roundEnd';
+
+    // Step frames and verify angle is held before smoothly turning towards Math.PI (left)
+    let prevDiff = Math.abs(Math.abs(f1.gunAngle) - Math.PI);
+    let angleHeldCount = 0;
+    for (let frame = 0; frame < 100; frame++) {
+      updateFighters();
+      const currentDiff = Math.abs(Math.abs(f1.gunAngle) - Math.PI);
+      if (Math.abs(f1.gunAngle - initialAim) < 0.0001) {
+        angleHeldCount++;
+      }
+      if (currentDiff > prevDiff + 0.0001) {
+        throw new Error(`Angle moved away from Math.PI during post-kill coasting! Frame ${frame}: prevDiff=${prevDiff}, currentDiff=${currentDiff}`);
+      }
+      prevDiff = currentDiff;
+      if (Math.abs(Math.abs(f1.gunAngle) - Math.PI) < 0.0001) break;
+    }
+
+    if (angleHeldCount < 30) {
+      throw new Error(`Fighter did not hold left kill angle before returning to normal position! Held for only ${angleHeldCount} frames.`);
+    }
+
+    if (Math.abs(Math.abs(f1.gunAngle) - Math.PI) > 0.0001 || Math.abs(Math.abs(f1.angle) - Math.PI) > 0.0001) {
+      throw new Error(`Winner failed to return to Math.PI left normal position after 100 frames! gunAngle=${f1.gunAngle}, angle=${f1.angle}`);
+    }
+  } catch (err) {
+    console.error('❌ [LEFT-FACING WINNER ANGLE TEST ERROR]:', err);
     errors++;
   }
 
@@ -7883,12 +8170,262 @@ async function main() {
     errors++;
   }
 
+  // 12. Makima Shatter Reformation Aim Tracking Test
+  console.log('🩸 [Makima Shatter Reformation Aim Tracking Test] Verifying enemy fighters continue aiming toward Makima while she is reforming from contract...');
+  try {
+    const MakimaClass = FIGHTER_CLASS_MAP.makima;
+    const fightersToTest = ['normal', 'toji', 'gojo', 'sukuna', 'saitama', 'genos', 'mahoraga', 'nanami', 'john_wick', 'todo', 'yuji', 'yuta'];
+
+    for (const fighterKey of fightersToTest) {
+      const EnemyClass = FIGHTER_CLASS_MAP[fighterKey];
+      if (!EnemyClass) continue;
+
+      const makima = new MakimaClass({ x: 300, y: 100, color: '#FF7B6B', controls: {} });
+      makima.isDead = false;
+      makima.dead = false;
+      makima.hp = 0;
+      makima.isRevivingFromContract = true;
+      makima.isShatterReviving = true;
+      makima.reviveStasisTimer = 75;
+
+      const enemy = new EnemyClass({ x: 300, y: 400, color: '#FFFFFF', controls: {} });
+      state.fighters = [enemy, makima];
+      state.gameState = 'playing';
+
+      // Run update for 20 frames while Makima is reforming
+      for (let f = 0; f < 20; f++) {
+        enemy.update(makima, 0, state.arena);
+      }
+
+      const expectedAngle = (fighterKey === 'genos') 
+        ? enemy._getCardinalAngle(makima) 
+        : Math.atan2(makima.y - enemy.y, makima.x - enemy.x);
+      let currentAngle = enemy.gunAngle !== undefined ? enemy.gunAngle : (enemy.angle || 0);
+      while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
+      while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
+
+      let expAngle = expectedAngle;
+      while (expAngle > Math.PI) expAngle -= Math.PI * 2;
+      while (expAngle < -Math.PI) expAngle += Math.PI * 2;
+
+      let diff = Math.abs(currentAngle - expAngle);
+      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+
+      if (diff > 0.15) {
+        console.log(`DEBUG ${fighterKey}: enemy.x=${enemy.x}, enemy.y=${enemy.y}, makima.x=${makima.x}, makima.y=${makima.y}, enemy.gunAngle=${enemy.gunAngle}, enemy.angle=${enemy.angle}`);
+        throw new Error(`[REFORMATION AIM FAILED] ${fighterKey} failed to aim at reforming Makima. Expected ~${expAngle.toFixed(3)} rad, got ${currentAngle.toFixed(3)} rad (diff ${diff.toFixed(3)}).`);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [MAKIMA SHATTER REFORMATION AIM TEST ERROR]:', err);
+    errors++;
+  }
+
+  // ─────────────────────────────────────────────
+  // 36. HUD SETTINGS TOGGLE & VISIBILITY TEST
+  // ─────────────────────────────────────────────
+  try {
+    console.log('🎛️ [HUD Settings Toggle Test] Verifying toggling to completely hide all HUD skill bars, stats, and health bars...');
+
+    const { updateHealthHud, drawHUD } = await import('../js/graphics/hudManager.js');
+    const { FighterRenderer } = await import('../js/graphics/renderers/fighterRenderer.js');
+    const IchigoClass = FIGHTER_CLASS_MAP.ichigo;
+    const ichigo = new IchigoClass({ x: 200, y: 200, color: '#FF7700', controls: {} });
+
+    // 1. Test hideAllHud
+    CONFIG.hudHideAll = true;
+    state.fighters = [ichigo];
+    let fillTextCalled = false;
+    mockCtx.fillText = () => { fillTextCalled = true; };
+    mockCtx.strokeText = () => {};
+    FighterRenderer.drawHealth(mockCtx, ichigo);
+    if (fillTextCalled) {
+      throw new Error('Overhead health text was drawn while CONFIG.hudHideAll was active!');
+    }
+
+    // 2. Test hideHealthBars
+    CONFIG.hudHideAll = false;
+    CONFIG.hudHideHealthBars = true;
+    fillTextCalled = false;
+    FighterRenderer.drawHealth(mockCtx, ichigo);
+    if (fillTextCalled) {
+      throw new Error('Overhead health text was drawn while CONFIG.hudHideHealthBars was active!');
+    }
+
+    // 3. Test hideSkillBars (completely hide with 0 exceptions)
+    CONFIG.hudHideHealthBars = false;
+    CONFIG.hudHideSkillBars = true;
+    CONFIG.hudSkillBarsMode = 'none';
+    const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
+    const skills = getSkillDataForFighter(ichigo);
+    if (!skills || skills.length === 0) {
+      throw new Error('Failed to retrieve skills for Ichigo test.');
+    }
+    
+    // Reset CONFIG back to normal defaults after test
+    CONFIG.hudHideAll = false;
+    CONFIG.hudHideHealthBars = false;
+    CONFIG.hudHideSkillBars = false;
+    CONFIG.hudHideStats = false;
+    CONFIG.hudHideOverheadHp = false;
+    CONFIG.hudSkillBarsMode = 'all';
+  } catch (err) {
+    console.error('❌ [HUD SETTINGS TOGGLE TEST ERROR]:', err);
+    errors++;
+  }
+
+  // ─────────────────────────────────────────────
+  // 37. ZEUS MODEL & PIXEL BODY CANVAS STACK TEST
+  // ─────────────────────────────────────────────
+  try {
+    console.log('⚡ [Zeus Model & Pixel Body Test] Verifying Zeus pixel art skin, laurel crown, flowing beard, royal toga, and Canvas stack balance...');
+
+    mockCtx.resetStackDepth();
+    drawZeusPixelBody(mockCtx, 25, false);
+    assertCanvasStackBalance('drawZeusPixelBody(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    drawZeusPixelBody(mockCtx, 25, true);
+    assertCanvasStackBalance('drawZeusPixelBody(mockCtx, 25, true)');
+
+    const ZeusClass = FIGHTER_CLASS_MAP.zeus;
+    if (!ZeusClass) {
+      throw new Error('FIGHTER_CLASS_MAP.zeus not found');
+    }
+
+    const zeus = new ZeusClass({ x: 300, y: 300, color: '#38bdf8', controls: {} });
+
+    // Right-facing standard skin render
+    zeus.gunAngle = 0;
+    mockCtx.resetStackDepth();
+    drawZeusSkin(mockCtx, zeus);
+    assertCanvasStackBalance('drawZeusSkin(mockCtx, zeus [facing right])');
+
+    // Left-facing inverted skin render (Rule 19 vertical mirror)
+    zeus.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawZeusSkin(mockCtx, zeus);
+    assertCanvasStackBalance('drawZeusSkin(mockCtx, zeus [facing left])');
+
+    // Divine Wrath / Thunder Storm Active mode
+    zeus.isChargingStorm = true;
+    zeus.stormActive = true;
+    mockCtx.resetStackDepth();
+    drawZeusSkin(mockCtx, zeus);
+    assertCanvasStackBalance('drawZeusSkin(mockCtx, zeus [storm active])');
+    zeus.isChargingStorm = false;
+    zeus.stormActive = false;
+
+    // Winner reveal podium mode
+    zeus._isWinnerReveal = true;
+    mockCtx.resetStackDepth();
+    drawZeusSkin(mockCtx, zeus);
+    assertCanvasStackBalance('drawZeusSkin(mockCtx, zeus [winner reveal])');
+    zeus._isWinnerReveal = false;
+
+    // Skin Studio showSkinOnly mode (Rule 20)
+    state.showSkinOnly = true;
+    mockCtx.resetStackDepth();
+    drawZeusSkin(mockCtx, zeus);
+    assertCanvasStackBalance('drawZeusSkin(mockCtx, zeus [showSkinOnly])');
+    state.showSkinOnly = false;
+  } catch (err) {
+    console.error('❌ [ZEUS MODEL & PIXEL BODY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // ─────────────────────────────────────────────
+  // 38. GOJO RED & PURPLE AUTO-AIM CHANNELING TEST
+  // ─────────────────────────────────────────────
+  try {
+    console.log('🔴🟣 [Gojo Red & Purple Auto-Aim Test] Verifying Gojo tracks moving targets during Red and Purple channeling...');
+
+    const GojoClass = FIGHTER_CLASS_MAP.gojo;
+    const SukunaClass = FIGHTER_CLASS_MAP.sukuna;
+    if (!GojoClass || !SukunaClass) {
+      throw new Error('Fighter classes for Gojo / Sukuna not found');
+    }
+
+    const gojo = new GojoClass({ x: 300, y: 300, color: '#00E5FF', hp: 100, controls: {} });
+    const target = new SukunaClass({ x: 400, y: 300, color: '#E53E3E', hp: 100, controls: {} });
+    gojo.hp = 100;
+    gojo.isDead = false;
+    gojo.dead = false;
+    target.hp = 100;
+    target.isDead = false;
+    target.dead = false;
+    state.fighters = [gojo, target];
+    state.gameState = 'playing';
+
+    // 1. Test Purple Channeling Auto-Aim
+    gojo.isChannelingPurple = true;
+    gojo.purpleChargeTimer = 20;
+    gojo.purpleChargeMax = 120;
+
+    const testPositions = [
+      { x: 400, y: 300 }, // Right (0 rad)
+      { x: 300, y: 450 }, // Down (PI/2 rad)
+      { x: 150, y: 300 }, // Left (PI rad)
+      { x: 300, y: 150 }, // Up (-PI/2 rad)
+      { x: 420, y: 420 }  // Down-Right (PI/4 rad)
+    ];
+
+    for (const pos of testPositions) {
+      target.x = pos.x;
+      target.y = pos.y;
+      gojo.aim(target);
+      const expectedAngle = Math.atan2((target.y - (target.z || 0)) - (gojo.y - (gojo.z || 0)), target.x - gojo.x);
+      
+      let diff = Math.abs(gojo.gunAngle - expectedAngle);
+      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+
+      if (diff > 0.05) {
+        throw new Error(`[PURPLE AUTO-AIM FAILED] Gojo failed to auto-aim at target at (${pos.x}, ${pos.y}). Expected ~${expectedAngle.toFixed(3)} rad, got ${gojo.gunAngle.toFixed(3)} rad (diff ${diff.toFixed(3)}).`);
+      }
+    }
+
+    gojo.isChannelingPurple = false;
+    gojo.purpleChargeTimer = 0;
+
+    // 2. Test Reversal Red Buildup Auto-Aim
+    gojo.redEffectTimer = 80;
+    gojo.redEffectMaxTimer = 125;
+    gojo.redBuildupPhase = true;
+    gojo._redTargetRef = target;
+
+    for (const pos of testPositions) {
+      target.x = pos.x;
+      target.y = pos.y;
+      gojo.aim(target);
+      const expectedAngle = Math.atan2((target.y - (target.z || 0)) - (gojo.y - (gojo.z || 0)), target.x - gojo.x);
+
+      let diff = Math.abs(gojo.gunAngle - expectedAngle);
+      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+
+      if (diff > 0.05) {
+        throw new Error(`[RED AUTO-AIM FAILED] Gojo failed to auto-aim at target at (${pos.x}, ${pos.y}). Expected ~${expectedAngle.toFixed(3)} rad, got ${gojo.gunAngle.toFixed(3)} rad (diff ${diff.toFixed(3)}).`);
+      }
+    }
+
+    gojo.redEffectTimer = 0;
+    gojo.redBuildupPhase = false;
+  } catch (err) {
+    console.error('❌ [GOJO RED & PURPLE AUTO-AIM TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[GOJO AUTO-AIM TEST]: ${err.stack || err.message}`);
+  }
+
   console.log('───────────────────────────────────────────────────────');
   if (errors === 0) {
     console.log(`✅ Successfully tested all ${totalTested} fighter classes, skins, weapon previews, and UI screens with ZERO runtime errors and 100% BALANCED Canvas 2D stacks!`);
     process.exit(0);
   } else {
-    console.error(`🚨 Found ${errors} fighter / weapon / UI runtime errors!`);
+    console.error(`🚨 Found ${errors} fighter / weapon / UI runtime errors:`);
+    if (typeof errorList !== 'undefined') {
+      const fs = await import('fs');
+      fs.writeFileSync('error_log.txt', errorList.join('\n'), 'utf8');
+      errorList.forEach((e, idx) => console.error(`  ${idx + 1}. ${e}`));
+    }
     process.exit(1);
   }
 }

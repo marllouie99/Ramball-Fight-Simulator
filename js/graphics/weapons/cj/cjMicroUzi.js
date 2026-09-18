@@ -4,7 +4,9 @@
 
 import { getHandSize } from '../../../core/config.js';
 import { state } from '../../../core/state.js';
-import { isDarkMode, _isDarkMode } from './cjShared.js';
+import { isDarkMode, _isDarkMode, drawCjPixelMuzzleFlash } from './cjShared.js';
+
+export { drawCjPixelMuzzleFlash };
 
 let _cachedBulletTrailGrad = null;
 
@@ -143,30 +145,6 @@ export function drawCjUziBullet(ctx, p) {
   ctx.restore();
 }
 
-/**
- * Draws Pixel Art Starburst Muzzle Flash
- */
-export function drawCjPixelMuzzleFlash(ctx, x, y, scale = 1.0) {
-  ctx.save();
-  ctx.translate(Math.round(x), Math.round(y));
-  const P = 2.0 * scale;
-
-  // Stepped Pixel Diamond Starburst
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(-P * 3, -P * 3, P * 6, P * 6);
-
-  ctx.fillStyle = '#F97316'; // Fiery orange outer cross
-  ctx.fillRect(-P * 4, -P, P * 8, P * 2);
-  ctx.fillRect(-P, -P * 4, P * 2, P * 8);
-
-  ctx.fillStyle = '#FBBF24'; // Golden core
-  ctx.fillRect(-P * 2.5, -P * 2.5, P * 5, P * 5);
-
-  ctx.fillStyle = '#FFFFFF'; // White-hot center
-  ctx.fillRect(-P, -P, P * 2, P * 2);
-
-  ctx.restore();
-}
 
 /**
  * Draws sharp, vibrant Micro-Uzi Muzzle Flash

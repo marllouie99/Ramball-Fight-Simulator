@@ -7,7 +7,6 @@ import { CONFIG } from '../../../core/config.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnGroundScorch } from '../../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../../graphics/particles/bloodEffect.js';
-import { spawnTojiCleaveHitEffect } from '../../../graphics/particles/tojiImpactEffect.js';
 import { TOJI_WEAPON_CONFIG } from '../../../graphics/weapons/tojiWeaponGraphics.js';
 import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
@@ -190,8 +189,14 @@ export function updateChainPhysics(fighter) {
 
 export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) {
   if (!fighter._secondSeqAudioPlayed) {
-    const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
-    audioSystem.playSFX(secondSeqSound);
+    const s2Chance = typeof CONFIG.toji?.soundChances?.secondWeaponAttack === 'number'
+      ? CONFIG.toji.soundChances.secondWeaponAttack
+      : 1.0;
+    const isAllowed = fighter._ambushVoicelineAllowed !== undefined ? fighter._ambushVoicelineAllowed : true;
+    if (isAllowed && Math.random() < s2Chance) {
+      const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
+      if (secondSeqSound) audioSystem.playSFX(secondSeqSound);
+    }
   }
   fighter._secondSeqAudioPlayed = false;
   audioSystem.playSFX('attack_swordswing', 1.25);
@@ -275,7 +280,6 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
       target.knockbackDecay = 0.92;
     }
 
-    spawnTojiCleaveHitEffect(target.x, target.y, attackAngle);
     if (typeof spawnGroundScorch === 'function') {
       spawnGroundScorch(target.x, target.y, 65, 90, 'crimson');
     }

@@ -254,7 +254,9 @@ export class NanamiFighter extends Fighter {
     }
 
     for (const ent of allTargets) {
-      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.isInvulnerable) continue;
+      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
+      if (!ent || ent === this) continue;
+      if (!isEntReforming && (ent.hp <= 0 || ent.isDead || ent.isInvulnerable)) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {
@@ -673,7 +675,8 @@ export class NanamiFighter extends Fighter {
 
   _updateNanamiCombat(opponent, arena, cfg) {
     const target = this._findClosestEnemy() || opponent;
-    if (!target || target.isDead || target.hp <= 0) return;
+    const isTargetReforming = Boolean(target && (target.isRevivingFromContract || target.isShatterReviving));
+    if (!target || (!isTargetReforming && (target.isDead || target.hp <= 0))) return;
 
     const dx = target.x - this.x;
     const dy = target.y - this.y;
@@ -681,6 +684,11 @@ export class NanamiFighter extends Fighter {
 
     // Aim toward the target
     this.aim(target);
+
+    // If target is reforming (e.g. Makima reviving from contract), aim at her but do not attack invulnerable state
+    if (isTargetReforming) {
+      return;
+    }
 
     // Overtime Speech Phase: Stand composed in place while delivering speech (no chasing)
     if (this.overtimeSpeechTimer > 0) {

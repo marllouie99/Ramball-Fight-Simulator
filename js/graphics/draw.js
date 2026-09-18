@@ -59,6 +59,7 @@ export { drawNezukoSkin } from './fighters/nezukoSkin.js';
 export { drawZenitsuSkin } from './fighters/zenitsuSkin.js';
 export { drawInosukeSkin } from './fighters/inosukeSkin.js';
 export { drawEscanorSkin } from './fighters/escanorSkin.js';
+export { drawZeusSkin, drawZeusPixelBody } from './fighters/zeusSkin.js';
 export { drawDivineAxeRhitta, drawRhittaSlashArc, drawCruelSunOrb, drawPrideFlareShockwave } from './weapons/escanorWeaponGraphics.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
 export { spawnTojiCleaveHitEffect, drawTojiImpactEffects, updateTojiImpactEffects } from './particles/tojiImpactEffect.js';

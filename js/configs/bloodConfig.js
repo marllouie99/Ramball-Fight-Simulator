@@ -20,16 +20,16 @@ export const bloodConfig = {
 
   // Standard Damage Hit Blood Splash (Basic attacks, skills, punches, bullets)
   hit: {
-    minDroplets: 1,             // Minimum blood droplets spawned on hit
-    maxDroplets: 3,             // Maximum blood droplets spawned on normal hit
-    damageDivisor: 12.0,        // Damage divisor to scale droplet count (higher = fewer particles)
-    minSize: 5.0,               // Minimum pixel square droplet size (px) — ADJUST HIT PARTICLE SIZE HERE
-    maxSize: 5.4,               // Maximum pixel square droplet size (px) — ADJUST HIT PARTICLE SIZE HERE
-    baseSpeed: 4.0,             // Base ejection velocity
+    minDroplets: 2,             // Minimum blood droplets spawned on hit
+    maxDroplets: 5,             // Maximum blood droplets spawned on normal hit
+    damageDivisor: 10.0,        // Damage divisor to scale droplet count (higher = fewer particles)
+    minSize: 4.6,               // Minimum pixel square droplet size (px) — ADJUST HIT PARTICLE SIZE HERE
+    maxSize: 5.6,               // Maximum pixel square droplet size (px) — ADJUST HIT PARTICLE SIZE HERE
+    baseSpeed: 7.0,             // Base ejection velocity (strong directional burst)
     speedVariance: 8.0,         // Random speed variance added to base speed
-    spreadAngle: 0.5,           // Spread cone angle in radians (relative to damage vector)
-    upwardImpulse: 0.5,         // Slight vertical pop arc (px/frame)
-    upwardImpulseVariance: 1.5, // Random variance in upward pop
+    spreadAngle: 0.22,          // Spread cone angle multiplier in radians (tight ~40° forward cone along impact vector)
+    upwardImpulse: 0.15,        // Minimal vertical pop (keeps horizontal hits horizontal)
+    upwardImpulseVariance: 0.35, // Controlled variance in upward pop
   },
 
   // Fatal Blood Splash Explosion (When a fighter dies / is splashed to death)
@@ -41,8 +41,8 @@ export const bloodConfig = {
     countMulti: 18,             // Droplet count for 2v2 / Multi modes
     minSize: 3.0,               // Minimum pixel square size for fatal droplets (px) — ADJUST FATAL PARTICLE SIZE HERE
     maxSize: 5.0,               // Maximum pixel square size for fatal droplets (px) — ADJUST FATAL PARTICLE SIZE HERE
-    baseSpeed: 6.0,             // Base radial explosion speed
-    speedVariance: 12.0,        // Random speed variance added to base speed
+    baseSpeed: 8.0,             // Base radial explosion speed (visceral burst)
+    speedVariance: 10.0,        // Random speed variance added to base speed
     maxActiveLimit1v1: 65,      // Max active particles ceiling during fatal burst (1v1)
     maxActiveLimitStandOff: 45, // Max active particles ceiling during fatal burst (Stand Off)
     maxActiveLimit1v2: 45,      // Max active particles ceiling during fatal burst (1v2)
@@ -52,8 +52,8 @@ export const bloodConfig = {
 
   // Physics & Arena Floor Landing Dynamics
   physics: {
-    gravity: 0.38,              // Downward gravity pull towards the bottom arena border
-    airResistance: 0.95,        // Velocity damping in air per frame
+    gravity: 0.18,              // Light gravity — blood travels far sideways before arcing down
+    airResistance: 0.982,       // Very low drag — horizontal velocity persists across the arena
     floorFriction: 0.85,        // Horizontal friction once landed on arena floor
     floorDecayRate1v1: 0.010,   // Fade rate on floor for 1v1 (~1.5s linger)
     floorDecayRateStandOff: 0.014, // Fade rate on floor for Stand Off (~1.0s linger)

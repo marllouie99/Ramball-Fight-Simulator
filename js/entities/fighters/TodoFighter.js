@@ -150,7 +150,7 @@ export class TodoFighter extends Fighter {
     } else if (opponent) {
        targets = [opponent];
     } else if (typeof state !== 'undefined' && state.fighters) {
-       targets = state.fighters.filter(f => f && f !== this && !f.isDead && f.hp > 0);
+       targets = state.fighters.filter(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving));
     }
 
     // ALWAYS update active cursed rocks FIRST so rocks continue traveling regardless of freezes, time-stops, stuns, or channelings!
@@ -400,8 +400,9 @@ export class TodoFighter extends Fighter {
         }
 
         // Melee Combat (Basic Attack Punch if naturally in range)
+        const isTargetReforming = Boolean(target && (target.isRevivingFromContract || target.isShatterReviving));
         const punchMaxRange = (this.r || 25) + (target.r || 25) + (CONFIG.todo?.punchRange || 60);
-        if (dist <= punchMaxRange && (this.cooldownTimer || 0) <= 0 && (this.rockCounterComboLeft || 0) <= 0) {
+        if (dist <= punchMaxRange && !isTargetReforming && (this.cooldownTimer || 0) <= 0 && (this.rockCounterComboLeft || 0) <= 0) {
           this.aim(target);
           modUpdateMeleeCombat.call(this, target, false);
         }

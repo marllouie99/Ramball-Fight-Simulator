@@ -329,6 +329,7 @@ export class DispenserEntity extends Fighter {
   }
 
   drawHealth(ctx) {
+    if (CONFIG.hudHideAll || CONFIG.hudHideHealthBars || CONFIG.hudHideOverheadHp) return;
     if (this.hp <= 0 || this.isBuilding) return;
     const floatY = (this.y - (this.z || 0)) - this.r - 20;
     drawMinionHealthBar(ctx, this.x, floatY, 38, 6, this.hp, this.maxHp);

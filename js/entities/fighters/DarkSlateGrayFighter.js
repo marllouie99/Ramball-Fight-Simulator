@@ -150,8 +150,8 @@ export class DarkSlateGrayFighter extends Fighter {
       // stealth mode to build up naturally over time.
       dodgeChance = flameDodgeChance;
     }
-    // Don't trigger dodge/flash-step while inside Cronos's sphere
-    if (isDodgeable && !insideCronosSphere && this.dodgeCooldown === 0 && Math.random() < dodgeChance) {
+    // Don't trigger dodge/flash-step while inside Cronos's sphere or chained by Makima
+    if (isDodgeable && !insideCronosSphere && !this.isChainedByMakima && this.dodgeCooldown === 0 && Math.random() < dodgeChance) {
       // Successful dodge - create multiple flash-step afterimages
       const moveAngle = Math.hypot(this.vx, this.vy) > 0.1 ? Math.atan2(this.vy, this.vx) : this.angle;
       const perpAngle = moveAngle + Math.PI / 2;
@@ -210,8 +210,8 @@ export class DarkSlateGrayFighter extends Fighter {
     // with a tiny chance instead.
     if (projectile && projectile.isFlame) return;
 
-    // Don't trigger near-miss dodge while inside Cronos's sphere
-    if (this._isInsideCronosSphere()) return;
+    // Don't trigger near-miss dodge while inside Cronos's sphere or chained by Makima
+    if (this._isInsideCronosSphere() || this.isChainedByMakima) return;
 
     if (this.invincibilityTimer > 0 || this.flashStepTimer > 0 || this.dodgeCooldown > 0) return;
     if (Math.random() >= CONFIG.darkslategray.dodgeChance) return;

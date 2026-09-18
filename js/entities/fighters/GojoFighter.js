@@ -991,8 +991,8 @@ export class GojoFighter extends Fighter {
       }
       // Rule #1: Cancel active channeling/skills
       this.interruptAttacks(true);
-      // Ensure Gojo resets to Ranged mode with Infinity active when knocked back or distanced from enemy
-      if (this.isMeleeMode && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 120 || this.knockbackVx !== 0 || this.knockbackVy !== 0 || this.paralyzeTimer > 0)) {
+      // Ensure Gojo resets to Ranged mode with Infinity active when knocked back or distanced from enemy (only after forced melee duration ends)
+      if (this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0 && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 120 || this.knockbackVx !== 0 || this.knockbackVy !== 0 || this.paralyzeTimer > 0)) {
         this.isMeleeMode = false;
       }
       if (this.isChainedByMakima) {
@@ -1008,14 +1008,6 @@ export class GojoFighter extends Fighter {
     }
 
     if (this.redEffectTimer > 0) {
-      // Keep aim strictly locked to the initial committed angle; no auto-aim snapping or aim rotation
-      const lockedAngle = (this.redTargetAngle !== undefined && !Number.isNaN(this.redTargetAngle))
-        ? this.redTargetAngle
-        : 0;
-      this.redTargetAngle = lockedAngle;
-      this.gunAngle = lockedAngle;
-      this.angle = lockedAngle;
-
       // Detonation threshold — trigger exactly once when buildup window ends
       const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 100;
       const redRemaining = this.redEffectTimer;
@@ -1200,11 +1192,11 @@ export class GojoFighter extends Fighter {
 
     // Stop attacking if round/match has ended or if all enemies are dead!
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
-    let hasLivingEnemies = opponent && !opponent.isDead && opponent.hp > 0;
+    let hasLivingEnemies = opponent && !opponent.isDead && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving);
     if (!hasLivingEnemies && state.fighters) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
-        if (f && f !== this && f.hp > 0) {
+        if (f && f !== this && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving)) {
           const isEnemy = myTeam === null || (state.getFighterTeam ? state.getFighterTeam(i) !== myTeam : f.team !== this.team);
           if (isEnemy) {
             hasLivingEnemies = true;
@@ -1426,13 +1418,21 @@ export class GojoFighter extends Fighter {
       const maxLevitationHeight = 35;
       this.z = Math.sin(levitateProgress * Math.PI * 0.5) * maxLevitationHeight;
 
-      // Keep aim strictly locked to the committed purpleCastAngle; no auto-aim snapping
-      const lockedAngle = (this.purpleCastAngle !== undefined && this.purpleCastAngle !== null && !Number.isNaN(this.purpleCastAngle))
-        ? this.purpleCastAngle
-        : ((opponent) ? Math.atan2((opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0)), opponent.x - this.x) : 0);
-      this.purpleCastAngle = lockedAngle;
-      this.gunAngle = lockedAngle;
-      this.angle = lockedAngle;
+      // Auto-aim tracking towards opponent / target while mixing Red & Blue into Purple
+      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+      const purpleTarget = (opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
+        ? opponent
+        : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
+          ? this.target
+          : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null));
+      if (purpleTarget && typeof purpleTarget.x === 'number' && typeof purpleTarget.y === 'number') {
+        const targetZ = purpleTarget.z || 0;
+        const myZ = this.z || 0;
+        const aimAngle = Math.atan2((purpleTarget.y - targetZ) - (this.y - myZ), purpleTarget.x - this.x);
+        this.purpleCastAngle = aimAngle;
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
+      }
 
       if (opponent && !opponent.isDead) {
         // Lapse Blue Gravitational Distortion: Slows opponent movement while mixing Red & Blue into Purple!
@@ -1555,17 +1555,28 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    // Handle Reversal Red Channeling & Buildup (Gojo stops completely to cast Red)
+    // Handle Reversal Red Channeling & Buildup (Gojo stops completely to cast Red, auto-aims continuously at target)
     if (this.redEffectTimer > 0) {
       this.vx = 0;
       this.vy = 0;
       this.applyMovementPhysics(0);
-      const lockedAngle = (this.redTargetAngle !== undefined && !Number.isNaN(this.redTargetAngle))
-        ? this.redTargetAngle
-        : ((opponent) ? Math.atan2((opponent.y - (opponent.z || 0)) - (this.y - (this.z || 0)), opponent.x - this.x) : 0);
-      this.redTargetAngle = lockedAngle;
-      this.gunAngle = lockedAngle;
-      this.angle = lockedAngle;
+      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+      const redTarget = (this._redTargetRef && this._redTargetRef.hp > 0 && !this._redTargetRef.isDead && !this._redTargetRef.dead)
+        ? this._redTargetRef
+        : ((opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
+          ? opponent
+          : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
+            ? this.target
+            : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null)));
+      if (redTarget && typeof redTarget.x === 'number' && typeof redTarget.y === 'number') {
+        const targetZ = redTarget.z || 0;
+        const myZ = this.z || 0;
+        const aimAngle = Math.atan2((redTarget.y - targetZ) - (this.y - myZ), redTarget.x - this.x);
+        this.redTargetAngle = aimAngle;
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
+        this._redTargetRef = redTarget;
+      }
       this.resolveWallBounce(arena);
       return; // Stop basic attacks, melee punches, and mode switches until Red finishes!
     }
@@ -1697,7 +1708,7 @@ export class GojoFighter extends Fighter {
     }
     this.applyMovementPhysics(speedMult);
 
-    if (opponent && !opponent.isDead && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
+    if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
       this.aim(opponent);
     } else {
       this.turnToNormalPosition(0.035);
@@ -2040,7 +2051,25 @@ export class GojoFighter extends Fighter {
       this.angle = Math.PI / 2;
       return false;
     }
-    if (this.isChannelingPurple || (this.purpleRecoveryTimer || 0) > 0) {
+    if (this.isChannelingPurple) {
+      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+      const target = (opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
+        ? opponent
+        : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
+          ? this.target
+          : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null));
+      if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+        const targetZ = target.z || 0;
+        const myZ = this.z || 0;
+        const aimAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
+        this.purpleCastAngle = aimAngle;
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
+        return true;
+      }
+      return false;
+    }
+    if ((this.purpleRecoveryTimer || 0) > 0) {
       const lockedAngle = (this.purpleCastAngle !== undefined && this.purpleCastAngle !== null && !Number.isNaN(this.purpleCastAngle))
         ? this.purpleCastAngle
         : (this.gunAngle || 0);
@@ -2050,12 +2079,24 @@ export class GojoFighter extends Fighter {
       return false;
     }
     if ((this.redEffectTimer || 0) > 0 || this.redBuildupPhase) {
-      const lockedAngle = (this.redTargetAngle !== undefined && this.redTargetAngle !== null && !Number.isNaN(this.redTargetAngle))
-        ? this.redTargetAngle
-        : (this.gunAngle || 0);
-      this.redTargetAngle = lockedAngle;
-      this.gunAngle = lockedAngle;
-      this.angle = lockedAngle;
+      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+      const target = (this._redTargetRef && this._redTargetRef.hp > 0 && !this._redTargetRef.isDead && !this._redTargetRef.dead)
+        ? this._redTargetRef
+        : ((opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
+          ? opponent
+          : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
+            ? this.target
+            : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null)));
+      if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+        const targetZ = target.z || 0;
+        const myZ = this.z || 0;
+        const aimAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
+        this.redTargetAngle = aimAngle;
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
+        this._redTargetRef = target;
+        return true;
+      }
       return false;
     }
 
@@ -2063,12 +2104,13 @@ export class GojoFighter extends Fighter {
     // Inside Unlimited Void, Gojo possesses absolute spatial omniscience (Six Eyes + sure-hit domain).
     // Auto-aim snaps instantaneously directly to the enemy target at any angle (0-frame snap, bypasses turn rate delays, stealth penalties, and channel inertia).
     if (this.domainActive) {
-      const target = (opponent && !opponent.isDead && opponent.hp > 0)
+      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+      const target = (opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
         ? opponent
-        : ((this.target && !this.target.isDead && this.target.hp > 0)
+        : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
           ? this.target
           : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null));
-      if (target && !target.isDead && target.hp > 0) {
+      if (target && (!target.isDead || target.isRevivingFromContract || target.isShatterReviving) && (target.hp > 0 || target.isRevivingFromContract || target.isShatterReviving)) {
         this.target = target;
         const targetZ = target.z || 0;
         const myZ = this.z || 0;
@@ -2633,7 +2675,8 @@ export class GojoFighter extends Fighter {
   _drawRedSlowRing(ctx, target) { GojoRenderer._drawRedSlowRing(ctx, this, target); }
 
   _findClosestEnemy(preferredOpponent = null) {
-    if (preferredOpponent && !preferredOpponent.isDead && preferredOpponent.hp > 0) {
+    const isPreferredAlive = preferredOpponent && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
+    if (isPreferredAlive) {
       return preferredOpponent;
     }
     let closest = null;
@@ -2649,7 +2692,9 @@ export class GojoFighter extends Fighter {
     }
 
     for (const ent of allTargets) {
-      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable) continue;
+      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
+      if (!ent || ent === this) continue;
+      if (!isEntReforming && (ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable)) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {

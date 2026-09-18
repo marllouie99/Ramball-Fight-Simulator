@@ -320,26 +320,100 @@ applyArenaTheme(savedTheme);
 if (localStorage.getItem('hudShowFighterDescription') !== null) {
   CONFIG.hudShowFighterDescription = localStorage.getItem('hudShowFighterDescription') === 'true';
 }
-const hudModeBtn = document.getElementById('btn-hudmode');
-if (hudModeBtn) {
-  hudModeBtn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
-}
 
 if (localStorage.getItem('darkModeShowHudSkillBars') !== null) {
   CONFIG.darkModeShowHudSkillBars = parseInt(localStorage.getItem('darkModeShowHudSkillBars'), 10);
-}
-const darkSkillsBtn = document.getElementById('btn-darkskills');
-if (darkSkillsBtn) {
-  darkSkillsBtn.innerText = Boolean(CONFIG.darkModeShowHudSkillBars) ? 'ON' : 'OFF';
 }
 
 if (localStorage.getItem('darkModeShowHudStats') !== null) {
   CONFIG.darkModeShowHudStats = parseInt(localStorage.getItem('darkModeShowHudStats'), 10);
 }
-const darkStatsBtn = document.getElementById('btn-darkstats');
-if (darkStatsBtn) {
-  darkStatsBtn.innerText = Boolean(CONFIG.darkModeShowHudStats) ? 'ON' : 'OFF';
+
+if (localStorage.getItem('hudHideAll') !== null) {
+  CONFIG.hudHideAll = localStorage.getItem('hudHideAll') === 'true';
 }
+
+if (localStorage.getItem('hudHideHealthBars') !== null) {
+  CONFIG.hudHideHealthBars = localStorage.getItem('hudHideHealthBars') === 'true';
+}
+
+if (localStorage.getItem('hudHideSkillBars') !== null) {
+  CONFIG.hudHideSkillBars = localStorage.getItem('hudHideSkillBars') === 'true';
+}
+
+if (localStorage.getItem('hudHideStats') !== null) {
+  CONFIG.hudHideStats = localStorage.getItem('hudHideStats') === 'true';
+}
+
+if (localStorage.getItem('hudHideOverheadHp') !== null) {
+  CONFIG.hudHideOverheadHp = localStorage.getItem('hudHideOverheadHp') === 'true';
+}
+
+if (localStorage.getItem('hudSkillBarsMode') !== null) {
+  CONFIG.hudSkillBarsMode = localStorage.getItem('hudSkillBarsMode');
+} else {
+  CONFIG.hudSkillBarsMode = CONFIG.darkModeShowHudSkillBars === 1 ? 'all' : (CONFIG.darkModeShowHudSkillBars === -1 ? 'none' : 'signature');
+}
+
+export function syncHudButtons() {
+  const masterBtn = document.getElementById('btn-hud-master');
+  if (masterBtn) {
+    masterBtn.innerText = CONFIG.hudHideAll ? 'HIDDEN' : 'VISIBLE';
+  }
+
+  const healthBarsBtn = document.getElementById('btn-hud-healthbars');
+  if (healthBarsBtn) {
+    healthBarsBtn.innerText = CONFIG.hudHideHealthBars ? 'HIDE' : 'SHOW';
+  }
+
+  const skillBarsBtn = document.getElementById('btn-hud-skillbars');
+  if (skillBarsBtn) {
+    if (CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+      skillBarsBtn.innerText = 'HIDE ALL';
+    } else if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
+      skillBarsBtn.innerText = 'SIGNATURE';
+    } else {
+      skillBarsBtn.innerText = 'SHOW ALL';
+    }
+  }
+
+  const darkSkillsBtn = document.getElementById('btn-darkskills');
+  if (darkSkillsBtn) {
+    if (CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+      darkSkillsBtn.innerText = 'OFF';
+    } else if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
+      darkSkillsBtn.innerText = 'SIGNATURE';
+    } else {
+      darkSkillsBtn.innerText = 'ON';
+    }
+  }
+
+  const statsBtn = document.getElementById('btn-hud-stats');
+  if (statsBtn) {
+    statsBtn.innerText = (CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0) ? 'HIDE' : 'SHOW';
+  }
+
+  const darkStatsBtn = document.getElementById('btn-darkstats');
+  if (darkStatsBtn) {
+    darkStatsBtn.innerText = (CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0) ? 'OFF' : 'ON';
+  }
+
+  const displayModeBtn = document.getElementById('btn-hud-displaymode');
+  if (displayModeBtn) {
+    displayModeBtn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+  }
+  const hudModeBtn = document.getElementById('btn-hudmode');
+  if (hudModeBtn) {
+    hudModeBtn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+  }
+
+  const overheadHpBtn = document.getElementById('btn-hud-overheadhp');
+  if (overheadHpBtn) {
+    overheadHpBtn.innerText = CONFIG.hudHideOverheadHp ? 'HIDE' : 'SHOW';
+  }
+}
+
+syncHudButtons();
 
 if (localStorage.getItem('showArenaTitle') !== null) {
   CONFIG.showArenaTitle = localStorage.getItem('showArenaTitle') === 'true';
@@ -412,6 +486,8 @@ export function showMenuView(paneId, playAudio = true) {
       badge.innerText = 'Arsenal & Studio';
     } else if (paneId === 'menu-view-settings') {
       badge.innerText = 'Settings';
+    } else if (paneId === 'menu-view-hud-settings') {
+      badge.innerText = 'HUD Settings';
     }
   }
 
@@ -519,21 +595,72 @@ export function executeTacticalAction(action) {
   else if (action === 'toggle-theme') {
     const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
     applyArenaTheme(nextTheme);
-  } else if (action === 'toggle-hud') {
+  } else if (action === 'open-hud-settings') {
+    showMenuView('menu-view-hud-settings');
+  } else if (action === 'toggle-hud-master') {
+    CONFIG.hudHideAll = !CONFIG.hudHideAll;
+    localStorage.setItem('hudHideAll', CONFIG.hudHideAll);
+    syncHudButtons();
+  } else if (action === 'toggle-hud-healthbars') {
+    CONFIG.hudHideHealthBars = !CONFIG.hudHideHealthBars;
+    localStorage.setItem('hudHideHealthBars', CONFIG.hudHideHealthBars);
+    syncHudButtons();
+  } else if (action === 'toggle-hud-skillbars') {
+    if (CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+      CONFIG.hudSkillBarsMode = 'all';
+      CONFIG.hudHideSkillBars = false;
+      CONFIG.darkModeShowHudSkillBars = 1;
+    } else if (CONFIG.hudSkillBarsMode === 'all' || CONFIG.darkModeShowHudSkillBars === 1) {
+      CONFIG.hudSkillBarsMode = 'signature';
+      CONFIG.hudHideSkillBars = false;
+      CONFIG.darkModeShowHudSkillBars = 0;
+    } else {
+      CONFIG.hudSkillBarsMode = 'none';
+      CONFIG.hudHideSkillBars = true;
+      CONFIG.darkModeShowHudSkillBars = -1;
+    }
+    localStorage.setItem('hudSkillBarsMode', CONFIG.hudSkillBarsMode);
+    localStorage.setItem('hudHideSkillBars', CONFIG.hudHideSkillBars);
+    localStorage.setItem('darkModeShowHudSkillBars', CONFIG.darkModeShowHudSkillBars);
+    syncHudButtons();
+  } else if (action === 'toggle-hud-stats') {
+    CONFIG.hudHideStats = !CONFIG.hudHideStats;
+    CONFIG.darkModeShowHudStats = CONFIG.hudHideStats ? 0 : 1;
+    localStorage.setItem('hudHideStats', CONFIG.hudHideStats);
+    localStorage.setItem('darkModeShowHudStats', CONFIG.darkModeShowHudStats);
+    syncHudButtons();
+  } else if (action === 'toggle-hud-displaymode' || action === 'toggle-hud') {
     CONFIG.hudShowFighterDescription = !CONFIG.hudShowFighterDescription;
     localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
-    const btn = document.getElementById('btn-hudmode');
-    if (btn) btn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+    syncHudButtons();
+  } else if (action === 'toggle-hud-overheadhp') {
+    CONFIG.hudHideOverheadHp = !CONFIG.hudHideOverheadHp;
+    localStorage.setItem('hudHideOverheadHp', CONFIG.hudHideOverheadHp);
+    syncHudButtons();
   } else if (action === 'toggle-darkskills') {
-    CONFIG.darkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars ? 0 : 1;
+    if (CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+      CONFIG.hudSkillBarsMode = 'all';
+      CONFIG.hudHideSkillBars = false;
+      CONFIG.darkModeShowHudSkillBars = 1;
+    } else if (CONFIG.hudSkillBarsMode === 'all' || CONFIG.darkModeShowHudSkillBars === 1) {
+      CONFIG.hudSkillBarsMode = 'signature';
+      CONFIG.hudHideSkillBars = false;
+      CONFIG.darkModeShowHudSkillBars = 0;
+    } else {
+      CONFIG.hudSkillBarsMode = 'none';
+      CONFIG.hudHideSkillBars = true;
+      CONFIG.darkModeShowHudSkillBars = -1;
+    }
+    localStorage.setItem('hudSkillBarsMode', CONFIG.hudSkillBarsMode);
+    localStorage.setItem('hudHideSkillBars', CONFIG.hudHideSkillBars);
     localStorage.setItem('darkModeShowHudSkillBars', CONFIG.darkModeShowHudSkillBars);
-    const btn = document.getElementById('btn-darkskills');
-    if (btn) btn.innerText = CONFIG.darkModeShowHudSkillBars ? 'ON' : 'OFF';
+    syncHudButtons();
   } else if (action === 'toggle-darkstats') {
-    CONFIG.darkModeShowHudStats = CONFIG.darkModeShowHudStats ? 0 : 1;
+    CONFIG.hudHideStats = !CONFIG.hudHideStats;
+    CONFIG.darkModeShowHudStats = CONFIG.hudHideStats ? 0 : 1;
+    localStorage.setItem('hudHideStats', CONFIG.hudHideStats);
     localStorage.setItem('darkModeShowHudStats', CONFIG.darkModeShowHudStats);
-    const btn = document.getElementById('btn-darkstats');
-    if (btn) btn.innerText = CONFIG.darkModeShowHudStats ? 'ON' : 'OFF';
+    syncHudButtons();
   } else if (action === 'toggle-cinefilm') {
     state.cinefilmFilter = !state.cinefilmFilter;
     localStorage.setItem('cinefilmFilter', state.cinefilmFilter);
@@ -692,8 +819,14 @@ document.querySelectorAll('.tactical-card, .menu-tile-3d').forEach(card => {
 
 // Sub-view Back Buttons
 document.querySelectorAll('.menu-back-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    showMenuView('menu-view-main');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const backTarget = btn.getAttribute('data-back');
+    if (backTarget === 'settings') {
+      showMenuView('menu-view-settings');
+    } else {
+      showMenuView('menu-view-main');
+    }
   });
 });
 
@@ -716,25 +849,50 @@ document.getElementById('quick-toggle-theme')?.addEventListener('click', () => {
   applyArenaTheme(nextTheme);
 });
 
+// HUD Setting Buttons
+document.getElementById('btn-hud-master')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-hud-master');
+});
+
+document.getElementById('btn-hud-healthbars')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-hud-healthbars');
+});
+
+document.getElementById('btn-hud-skillbars')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-hud-skillbars');
+});
+
+document.getElementById('btn-hud-stats')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-hud-stats');
+});
+
+document.getElementById('btn-hud-displaymode')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-hud-displaymode');
+});
+
+document.getElementById('btn-hud-overheadhp')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-hud-overheadhp');
+});
+
 document.getElementById('btn-hudmode')?.addEventListener('click', (e) => {
   e.stopPropagation();
-  CONFIG.hudShowFighterDescription = !CONFIG.hudShowFighterDescription;
-  localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
-  e.target.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+  executeTacticalAction('toggle-hud-displaymode');
 });
 
 document.getElementById('btn-darkskills')?.addEventListener('click', (e) => {
   e.stopPropagation();
-  CONFIG.darkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars ? 0 : 1;
-  localStorage.setItem('darkModeShowHudSkillBars', CONFIG.darkModeShowHudSkillBars);
-  e.target.innerText = CONFIG.darkModeShowHudSkillBars ? 'ON' : 'OFF';
+  executeTacticalAction('toggle-darkskills');
 });
 
 document.getElementById('btn-darkstats')?.addEventListener('click', (e) => {
   e.stopPropagation();
-  CONFIG.darkModeShowHudStats = CONFIG.darkModeShowHudStats ? 0 : 1;
-  localStorage.setItem('darkModeShowHudStats', CONFIG.darkModeShowHudStats);
-  e.target.innerText = CONFIG.darkModeShowHudStats ? 'ON' : 'OFF';
+  executeTacticalAction('toggle-darkstats');
 });
 
 document.getElementById('btn-cinefilm')?.addEventListener('click', (e) => {

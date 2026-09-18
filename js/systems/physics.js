@@ -577,7 +577,7 @@ export function getClosestOpponent(fighter) {
   // Check regular fighters (Pure FOC targeting without obstacle overhead)
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
-    const isOtherAlive = other && (other.hp > 0 || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(other)));
+    const isOtherAlive = other && (other.hp > 0 || other.isRevivingFromContract || other.isShatterReviving || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(other)));
     if (!other || other === fighter || !isOtherAlive) continue;
     if (fighter.isTeammate(other)) continue;
     if (!fighter.isChainedByMakima && !other.isChainedByMakima && isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;

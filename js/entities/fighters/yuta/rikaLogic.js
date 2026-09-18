@@ -169,6 +169,37 @@ export function stopRikaAudio(fighter, rk) {
   if (cfg.pureLoveBeamFireSound) stopSoundBySrc(cfg.pureLoveBeamFireSound);
 }
 
+/**
+ * Universal helper: returns true if the target entity has an active or passive dodging / evasion mechanic.
+ */
+export function hasDodgingMechanic(target) {
+  if (!target || target.isChainedByMakima) return false;
+  const t = target;
+  const id = (t.characterId || t.type || t._def?.id || '').toString().toLowerCase();
+  if (id === 'saitama' || id === 'toji' || id === 'sukuna' || id === 'mahito' || id === 'johnwick') {
+    return true;
+  }
+  if (typeof t.executeDodgeTeleport === 'function' ||
+      typeof t._executeTeleportDodge === 'function' ||
+      typeof t.dodgeSliceLine === 'function' ||
+      typeof t.executeDodge === 'function') {
+    return true;
+  }
+  if ((typeof t.dodgeChance === 'number' && t.dodgeChance > 0) ||
+      (t.dodgeCooldown !== undefined && t.dodgeCooldown !== null) ||
+      (typeof t.teleportDodgeChance === 'number' && t.teleportDodgeChance > 0) ||
+      (typeof t.stealthDodgeChance === 'number' && t.stealthDodgeChance > 0) ||
+      (typeof t.evadeChance === 'number' && t.evadeChance > 0) ||
+      t.isDodging || t.isEvading ||
+      (t.dodgeStallTimer && t.dodgeStallTimer > 0)) {
+    return true;
+  }
+  if (t.owner && t.owner !== t) {
+    return hasDodgingMechanic(t.owner);
+  }
+  return false;
+}
+
 export function initRika(fighter) {
   fighter.rika = {
     active: false,
@@ -179,6 +210,8 @@ export function initRika(fighter) {
     vx: 0,
     vy: 0,
     r: CONFIG.yuta.rikaRadius || 30,
+    angle: 0,
+    gunAngle: 0,
     target: null,
     attackTimer: 0,       // Overall attack cooldown state
     rightArmTimer: 0,     // Right arm swing timer
@@ -1120,15 +1153,24 @@ export function updateRika(fighter, arena) {
     rk.teleportChaseDelayTimer--;
   }
 
-  // Smooth angle orientation integration
+  // Angle orientation integration
   if (rk.target && !rk.target.isDead && rk.target.hp > 0) {
     const desiredAngle = Math.atan2(rk.target.y - rk.y, rk.target.x - rk.x);
-    const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
-    let diff = desiredAngle - currentAngle;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    const turnRate = rk.target.isStealthed ? (CONFIG.toji?.stealthTurnRate || 0.035) : (rk.attackTimer > 0 ? 0.35 : 0.22);
-    rk.angle = currentAngle + diff * turnRate;
+    const isDodgeEnemy = hasDodgingMechanic(rk.target);
+
+    if (isDodgeEnemy && !rk.target.isStealthed) {
+      // Instant snap aim to the enemy when enemy has a dodging mechanic
+      rk.angle = desiredAngle;
+      rk.gunAngle = desiredAngle;
+    } else {
+      const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : desiredAngle;
+      let diff = desiredAngle - currentAngle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      const turnRate = rk.target.isStealthed ? (CONFIG.toji?.stealthTurnRate || 0.035) : (rk.attackTimer > 0 ? 0.35 : 0.22);
+      rk.angle = currentAngle + diff * turnRate;
+      rk.gunAngle = rk.angle;
+    }
   } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
     const moveAngle = Math.atan2(rk.vy, rk.vx);
     const currentAngle = (rk.angle !== undefined && !Number.isNaN(rk.angle)) ? rk.angle : moveAngle;
@@ -1136,6 +1178,7 @@ export function updateRika(fighter, arena) {
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
     rk.angle = currentAngle + diff * 0.18;
+    rk.gunAngle = rk.angle;
   }
 
   // Wall bounce & arena boundary clamping — same as arena fighters / illusions
@@ -1151,6 +1194,10 @@ export function updateRika(fighter, arena) {
       const d = Math.hypot(dx, dy) || 1;
       rk.vx = (dx / d) * speed;
       rk.vy = (dy / d) * speed;
+      if (hasDodgingMechanic(rk.target) && !rk.target.isStealthed) {
+        rk.angle = Math.atan2(dy, dx);
+        rk.gunAngle = rk.angle;
+      }
     }
     // else: keep the natural reflected velocity (already set by the wall clamp above)
   }

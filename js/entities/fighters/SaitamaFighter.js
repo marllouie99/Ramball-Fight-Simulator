@@ -444,7 +444,7 @@ export class SaitamaFighter extends Fighter {
    * Sidesteps a short distance left or right upon detecting incoming attacks or projectiles.
    */
   executeDodgeTeleport(attacker, isProjectile = false) {
-    if (this.hp <= 0) return false;
+    if (this.hp <= 0 || this.isChainedByMakima) return false;
 
     // DISABLE DODGING COMPLETELY INSIDE GOJO'S DOMAIN (Unlimited Void)
     if (this._isInsideGojoDomain()) {
@@ -504,7 +504,7 @@ export class SaitamaFighter extends Fighter {
       ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
     ));
 
-    if (this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isGlobalHitPausing) {
+    if (this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isGlobalHitPausing) {
       return false;
     }
     // Block dodge if time-stopped by non-domain effects
@@ -807,7 +807,7 @@ export class SaitamaFighter extends Fighter {
       ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
       ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
     ));
-    if (this.timeStopTimer > 0 || isGlobalHitPausing || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
+    if (this.timeStopTimer > 0 || this.isChainedByMakima || isGlobalHitPausing || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
 
     // Check team alignment in 2v2/team modes ONLY.
     // getFighterTeam returns null in 1v1/FFA — null===null would falsely match as teammates, so guard with myTeam !== null.
@@ -1483,9 +1483,9 @@ export class SaitamaFighter extends Fighter {
    * Intercepts incoming attack damage to execute dodge teleport (0 damage).
    */
   takeDamage(amount, attacker, opts = {}) {
-    // If inside Gojo's domain (Unlimited Void), dodging and counter punishes are completely disabled!
+    // If chained by Makima or inside Gojo's domain (Unlimited Void), dodging and counter punishes are completely disabled!
     const isInsideGojoDomain = this._isInsideGojoDomain();
-    if (isInsideGojoDomain) {
+    if (isInsideGojoDomain || this.isChainedByMakima) {
       return super.takeDamage(amount, attacker, opts);
     }
 
@@ -1535,7 +1535,7 @@ export class SaitamaFighter extends Fighter {
     // Saitama's Caped Baldy Reflexes: Sukuna's Malevolent Shrine domain slashes are physical spatial cuts — Saitama can dodge them!
     const isSukunaDomainSlash = Boolean((opts.isDomainSlash && opts.isSukunaSlash) || opts.isSukunaDomainSliceLine);
 
-    if ((isGuaranteedHit && !isSukunaDomainSlash) || isGlobalHitPausing || (this.timeStopTimer > 0 && !isDomainFreeze)) {
+    if ((isGuaranteedHit && !isSukunaDomainSlash) || isGlobalHitPausing || this.isChainedByMakima || (this.timeStopTimer > 0 && !isDomainFreeze)) {
       return super.takeDamage(amount, attacker, opts);
     }
 
@@ -1588,7 +1588,7 @@ export class SaitamaFighter extends Fighter {
    * Triggers dodge sidestep as projectiles approach near-miss radius
    */
   onProjectileApproach(projectile, attacker) {
-    if (this._isInsideGojoDomain()) return;
+    if (this._isInsideGojoDomain() || this.isChainedByMakima) return;
     if (this._counterPunchTimer && this._counterPunchTimer > 0) return; // Sidestep disabled while charging Serious Skill Counter
     const src = projectile || attacker;
     this.executeDodgeTeleport(src, true);
@@ -2027,7 +2027,7 @@ export class SaitamaFighter extends Fighter {
           });
         }
         // Give Saitama movement momentum towards the opponent so he immediately walks and fights
-        const opp = (opponent && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+        const opp = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving)) : null);
         const chaseAngle = opp ? Math.atan2(opp.y - this.y, opp.x - this.x) : (this.gunAngle || this.angle || 0);
         const spd = this.moveSpeed || this.speed || 6.0;
         this.vx = Math.cos(chaseAngle) * (spd * 0.75);
@@ -2405,7 +2405,7 @@ export class SaitamaFighter extends Fighter {
           this._flurryAimAngle = undefined;
 
           // Give Saitama immediate movement velocity after the final punch
-          const opp = (opponent && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+          const opp = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving)) : null);
           const chaseAngle = opp ? Math.atan2(opp.y - this.y, opp.x - this.x) : aimAngle;
           const spd = this.moveSpeed || this.speed || 6.0;
           this.vx = Math.cos(chaseAngle) * (spd * 0.75);
@@ -2423,8 +2423,8 @@ export class SaitamaFighter extends Fighter {
       this.vy *= 0.85;
       this.x += this.vx;
       this.y += this.vy;
-      const target = (opponent && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
-      if (target && target.hp > 0) {
+      const target = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving)) : null);
+      if (target && (!target.isDead || target.isRevivingFromContract || target.isShatterReviving) && (target.hp > 0 || target.isRevivingFromContract || target.isShatterReviving)) {
         const aimAngle = Math.atan2(target.y - this.y, target.x - this.x);
         this.gunAngle = aimAngle;
         this.angle = aimAngle;

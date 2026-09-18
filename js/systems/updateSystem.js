@@ -165,10 +165,11 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.roundEndTimer++;
 
-      // Auto next round / match (allow full duration for SF2 Announcer -> Fighter Voiceline)
-      const hasOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-      const autoDelay = hasOverlay ? 480 : 180;
-      if (state.roundEndTimer >= autoDelay) {
+      // Auto next round / match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Full Respect BGM playback)
+      const isRespectPlaying = Boolean(state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active));
+      const hasOverlay = Boolean(state._hadMissionOverlay || isRespectPlaying || (state.wastedOverlay && state.wastedOverlay.active));
+      const autoDelay = isRespectPlaying ? 620 : (hasOverlay ? 480 : 180);
+      if (state.roundEndTimer >= autoDelay && !state._isRespectMusicPlaying) {
         startNextRound();
       }
     } else if (state.gameState === 'matchEnd') {
@@ -183,15 +184,16 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.matchEndTimer++;
 
-      const hasOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+      const isRespectPlaying = Boolean(state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active));
+      const hasOverlay = Boolean(state._hadMissionOverlay || isRespectPlaying || (state.wastedOverlay && state.wastedOverlay.active));
       const blackoutFrame = hasOverlay ? 160 : 60;
       if (state.matchEndTimer === blackoutFrame) {
         clearAllBattleEffects();
       }
 
-      // Auto next match (allow full duration for SF2 Announcer -> Fighter Voiceline)
-      const matchEndAutoDelay = hasOverlay ? 540 : 210;
-      if (state.matchEndTimer >= matchEndAutoDelay) {
+      // Auto next match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Full Respect BGM playback)
+      const matchEndAutoDelay = isRespectPlaying ? 640 : (hasOverlay ? 600 : 210);
+      if (state.matchEndTimer >= matchEndAutoDelay && !state._isRespectMusicPlaying) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();
         } else if (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH) {

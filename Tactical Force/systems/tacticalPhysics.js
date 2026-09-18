@@ -245,7 +245,8 @@ export function getTacticalClosestOpponent(fighter) {
   // Check regular fighters
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
-    if (!other || other === fighter || other.hp <= 0) continue;
+    const isOtherReforming = Boolean(other && (other.isRevivingFromContract || other.isShatterReviving));
+    if (!other || other === fighter || (other.hp <= 0 && !isOtherReforming)) continue;
     if (isTeamMode && fighterTeam !== null && state.getFighterTeam(i) === fighterTeam) continue;
     if (other.owner === fighter || fighter.owner === other) continue;
     if (other.owner && other.owner === fighter.owner) continue;

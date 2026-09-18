@@ -707,7 +707,7 @@ function drawRoundEndScreen() {
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
   // Announcer audio & voicelines start immediately (0 frames delay) without pausing!
-  const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+  const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
   const displayDelay = hasMissionOverlay ? 180 : 0;
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
@@ -777,7 +777,7 @@ function drawMatchEndScreen() {
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
   // Announcer audio & voicelines start immediately (0 frames delay) without pausing!
-  const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+  const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
   const displayDelay = hasMissionOverlay ? 180 : 0;
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 

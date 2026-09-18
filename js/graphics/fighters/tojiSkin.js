@@ -61,17 +61,17 @@ export function _drawTojiHair(ctx, r, facingLeft = false) {
     const rot = custom.angleOffset ?? 0;
 
     // toji-hair.png (1345x1170). True visible hair bounding box:
-    // X: [125, 1247] (width 1123, horizontal center at 686)
-    // Y: [136, 1043] (height 908, top crown at 136)
-    // Calibrated to seamlessly cover the upper circle with spiky crown at -1.45r
-    const targetHairWidth = r * 2.85 * wMult;
-    const targetHairHeight = r * 2.10 * hMult;
-    const scaleX = targetHairWidth / 1123;
-    const scaleY = targetHairHeight / 908;
+    // X: [41, 1314] (width 1274, horizontal center at 677.5)
+    // Y: [86, 1045] (height 960, top crown at 86)
+    // Calibrated to seamlessly frame the upper circle with spiky crown at -1.30r
+    const targetHairWidth = r * 2.45 * wMult;
+    const targetHairHeight = r * 1.85 * hMult;
+    const scaleX = targetHairWidth / 1274;
+    const scaleY = targetHairHeight / 960;
     const drawW = 1345 * scaleX;
     const drawH = 1170 * scaleY;
-    const drawX = -686 * scaleX + offX;
-    const drawY = -r * 1.45 - 136 * scaleY + offY;
+    const drawX = -677.5 * scaleX + offX;
+    const drawY = -r * 1.30 - 86 * scaleY + offY;
 
     if (rot !== 0) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
@@ -138,9 +138,9 @@ function _renderTojiPixelBodyToCanvas(destCtx, r) {
       }
 
       // ──────────────────────────────────────────
-      // ZONE 1: Face & Cheeks Tan Skin (ry < r * 0.22)
+      // ZONE 1: Face & Cheeks Tan Skin (ry < r * 0.28)
       // ──────────────────────────────────────────
-      if (ry < r * 0.22) {
+      if (ry < r * 0.28) {
         let col = '#E8BD9B'; // Warm athletic tan skin
 
         // Cheek / side contour
@@ -149,7 +149,7 @@ function _renderTojiPixelBodyToCanvas(destCtx, r) {
         }
 
         // Signature Corner Lip Scar on lower-right cheek
-        // Diagonal slash: rx in [r * 0.20, r * 0.40], ry in [r * 0.04, r * 0.16]
+        // Diagonal slash: rx in [r * 0.20, r * 0.40], ry in [r * 0.04, r * 0.18]
         const scarRelX = (rx - r * 0.20) / (r * 0.20);
         const expectedY = r * 0.04 + scarRelX * (r * 0.10);
         if (rx >= r * 0.20 && rx <= r * 0.40 && Math.abs(ry - expectedY) <= P * 0.9) {
@@ -160,31 +160,51 @@ function _renderTojiPixelBodyToCanvas(destCtx, r) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 2: Dark Compression Crewneck Shirt (r * 0.22 <= ry < r * 0.65)
+      // ZONE 2: Dark Compression Crewneck Shirt (Upper Clothe: r * 0.28 <= ry < r * 0.64)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.65) {
-        // Crewneck collar rim along the neck border (ry ~ 0.22r to 0.29r in center)
-        if (ry < r * 0.29 && Math.abs(rx) <= r * 0.45) {
+      else if (ry < r * 0.64) {
+        // Crewneck collar rim along the neck border (ry ~ 0.28r to 0.34r in center)
+        if (ry < r * 0.34 && Math.abs(rx) <= r * 0.45) {
           destCtx.fillStyle = '#0C0D10'; // Darker collar rim
         } else if (ry > r * 0.58) {
-          destCtx.fillStyle = '#101115'; // Lower shirt seam shadow
+          destCtx.fillStyle = '#16171B'; // Lower shirt seam shadow
+        } else if (Math.abs(rx) < r * 0.35 && ry > r * 0.38 && ry < r * 0.50) {
+          destCtx.fillStyle = '#3A3C44'; // Pectoral muscle highlight
         } else {
-          destCtx.fillStyle = '#1C1D24'; // Charcoal compression shirt fabric
+          destCtx.fillStyle = '#2A2C32'; // Charcoal compression shirt fabric
         }
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 3: Dark Hakama Pants & Waist Sash (ry >= r * 0.65)
+      // ZONE 3: Center Hanging Dark Slate-Navy Sash Knot (r * 0.64 <= ry <= r * 0.82, |rx| <= r * 0.15)
+      // ──────────────────────────────────────────
+      else if (Math.abs(rx) <= r * 0.15 && ry <= r * 0.82) {
+        if (ry <= r * 0.68) {
+          destCtx.fillStyle = '#141720'; // Center knot loop
+        } else if (Math.abs(rx) <= P * 0.6) {
+          destCtx.fillStyle = '#0E0F14'; // Center ribbon split
+        } else if (Math.abs(rx) < r * 0.10 && ry > r * 0.72) {
+          destCtx.fillStyle = '#3E4A66'; // Ribbon fold highlight
+        } else {
+          destCtx.fillStyle = '#2A3245'; // Dark slate-navy ribbon body
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 4: Baggy Light Grey Hakama Pants (Lower Clothe: ry >= r * 0.64)
       // ──────────────────────────────────────────
       else {
-        if (ry < r * 0.74) {
-          destCtx.fillStyle = '#0A0B0E'; // Dark waist sash band
-        } else if (Math.abs(rx) <= r * 0.08 && ry >= r * 0.74 && ry <= r * 0.86) {
-          destCtx.fillStyle = '#050608'; // Center knot tie
-        } else if (Math.abs(rx) <= P * 0.6 && ry > r * 0.86) {
-          destCtx.fillStyle = '#08090C'; // Inseam crease
+        if (ry < r * 0.70) {
+          // High-waisted belt band (sides)
+          destCtx.fillStyle = (Math.abs(rx) >= r * 0.35) ? '#B8B8C0' : '#D0D0D4';
+        } else if (Math.abs(rx) <= P * 0.6 && ry > r * 0.82) {
+          destCtx.fillStyle = '#0E0F14'; // Center inseam crease
+        } else if ((Math.abs(rx) >= r * 0.32 && Math.abs(rx) <= r * 0.40) || (Math.abs(rx) >= r * 0.65)) {
+          destCtx.fillStyle = '#8E8E99'; // Deep fold pleat shadow
+        } else if (ry < r * 0.80 && Math.abs(rx) < r * 0.50) {
+          destCtx.fillStyle = '#E4E4E8'; // Upper front fold highlight
         } else {
-          destCtx.fillStyle = '#121318'; // Dark hakama fabric
+          destCtx.fillStyle = '#CDCDCF'; // Light anime slate-grey hakama pants
         }
         destCtx.fillRect(px, py, P, P);
       }

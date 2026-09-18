@@ -157,8 +157,8 @@ export class MegumiFighter extends Fighter {
     if (this.hp <= 0 || this.isDead) return 0;
     if (this.isSubmerged || this.isInvulnerable) return 0;
 
-    // 50% Evade Buff active during Shadow Eruption & Ambush Strike
-    if (this.hasShadowEvadeBuff) {
+    // 50% Evade Buff active during Shadow Eruption & Ambush Strike (disabled if chained by Makima)
+    if (this.hasShadowEvadeBuff && !this.isChainedByMakima) {
       const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit));
       const evadeChance = this.shadowEvadeChance ?? 0.50;
       if (!isGuaranteedHit && Math.random() < evadeChance) {

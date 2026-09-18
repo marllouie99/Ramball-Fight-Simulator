@@ -365,6 +365,7 @@ export class SukunaFighter extends Fighter {
     const isChannelingSkill = typeof this.isChannelingSkill === 'function' && this.isChannelingSkill();
     const isDraggedOrTrapped = Boolean(
       this.isDraggedByGetsuga ||
+      this.isChainedByMakima ||
       (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
       (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) ||
       this.isWallPinnedByMakima ||
@@ -389,7 +390,7 @@ export class SukunaFighter extends Fighter {
     if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga || opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga) || isDraggedOrTrapped);
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere()) || isDraggedOrTrapped;
-    if (!this.isTargetOfAmbush && !isChannelingSkill && !isGuaranteedHit && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
+    if (!this.isTargetOfAmbush && !this.isChainedByMakima && !isChannelingSkill && !isGuaranteedHit && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.sukuna.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
       return false; // Negate damage
@@ -777,7 +778,7 @@ export class SukunaFighter extends Fighter {
     // Stop attacking if round/match has ended or if target/opponent is dead!
     // IMPORTANT: Never interrupt mid-channel (Divine Flame / Fuga) as it would silence the looping Fuga audio.
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
-    const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
+    const isTargetAlive = opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving);
 
     if (!isGamePlaying || !isTargetAlive) {
       if (!this.isChannelingAnySkill()) {
@@ -957,7 +958,7 @@ export class SukunaFighter extends Fighter {
     const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 85;
     const leaveMeleeRadius = closeRangeRadius + 30;
 
-    if (opponent && !opponent.isDead && !opponent.dead && opponent.hp > 0 && (!opponent.isStealthed || this.domainActive)) {
+    if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && !opponent.dead && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving) && (!opponent.isStealthed || this.domainActive)) {
       const d = Math.hypot(this.x - opponent.x, this.y - opponent.y);
       if (d < closestEnemyDist) closestEnemyDist = d;
       const isOpponentGojoChanneling = (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.id === 'gojo' || opponent._def?.type === 'gojo') &&
@@ -970,16 +971,14 @@ export class SukunaFighter extends Fighter {
     if (state.fighters && state.fighters.length > 0) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
-        if (!f || f === this || f.hp <= 0 || (f.isStealthed && !this.domainActive)) continue;
+        if (!f || f === this || (f.hp <= 0 && !f.isRevivingFromContract && !f.isShatterReviving) || (f.isStealthed && !this.domainActive)) continue;
         const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
-        if (myTeam !== null && myTeam === targetTeam) continue;
-        const d = Math.hypot(f.x - this.x, f.y - this.y);
+        if (targetTeam !== null && targetTeam === myTeam) continue;
+        const d = Math.hypot(this.x - f.x, this.y - f.y);
         if (d < closestEnemyDist) closestEnemyDist = d;
-
-        const isGojoChanneling = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') &&
+        const isFGojoChanneling = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') &&
           (f.redBuildupPhase || (f.redEffectTimer || 0) > 0 || f.isDomainPreSlide || f.isChannelingDomainExpansion || (f.domainChargeTimer || 0) > 0);
-
-        if (d <= closeRangeRadius && !isGojoChanneling) {
+        if (d <= closeRangeRadius && !isFGojoChanneling) {
           isBeingMeleed = true;
         }
       }
@@ -995,7 +994,7 @@ export class SukunaFighter extends Fighter {
       this.isCurrentlyWallPinnedByEscanor
     );
 
-    // Switch modes based on distance & melee engagement (only when not in special states)
+    // Dynamic Melee vs Ranged Mode Switch
     if (!this.isTeleporting && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion) {
       if (isDraggedOrTrapped) {
         if (this.isMeleeMode) {
@@ -1007,24 +1006,18 @@ export class SukunaFighter extends Fighter {
         // Disengage from melee combat while opponent is in stealth or ambush mode so Sukuna moves and can dodge
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
-      } else if (this.meleeModeCooldown > 0) {
-        // MANDATORY RANGED SEPARATION: strictly stay in Ranged Mode until cooldown expires!
-        if (this.isMeleeMode) {
-          this.isMeleeMode = false;
-          this.forcedMeleeTimer = 0;
-        }
       } else if (this.isMeleeMode) {
-        // Sukuna is currently in Melee Mode: Check if duration expired or if knocked back / distanced from enemy
-        const isDistanced = !opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 130;
-        const isKnockedBack = Math.hypot(this.knockbackVx || 0, this.knockbackVy || 0) > 0.5;
-        if (isDistanced || isKnockedBack || (this.forcedMeleeTimer || 0) <= 0) {
-          // DURATION EXPIRED OR KNOCKED AWAY: Disengage to Ranged Mode and start separation cooldown!
+        if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
+        if (this.forcedMeleeTimer > 0) {
+          this.forcedMeleeTimer--;
+        } else if (closestEnemyDist > leaveMeleeRadius) {
+          // DURATION EXPIRED: Disengage to Ranged Mode and start separation cooldown!
           this.isMeleeMode = false;
           this.forcedMeleeTimer = 0;
           this.punchAnimTimer = 0;
           this.meleeComboCount = 0;
           this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
-          if (!isKnockedBack && opponent && !opponent.isDead) {
+          if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving)) {
             this._teleportAwayFrom(opponent, arena);
           }
         }
@@ -1037,13 +1030,14 @@ export class SukunaFighter extends Fighter {
     }
 
     const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0) && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion && (this.divineFlameRecoveryTimer || 0) <= 0 && !isDraggedOrTrapped;
+    const isTargetReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
 
     // Handle Melee Combat Mode vs Ranged Mode
     if (this.isMeleeMode && !isDraggedOrTrapped) {
       this.vx = 0;
       this.vy = 0;
-      if (opponent && !opponent.isDead) {
-        if (canAct && Math.hypot(this.knockbackVx || 0, this.knockbackVy || 0) <= 0.5) {
+      if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving)) {
+        if (canAct && !isTargetReforming && Math.hypot(this.knockbackVx || 0, this.knockbackVy || 0) <= 0.5) {
           this._updateMeleeCombat(opponent, arena, ownerIndex);
         }
       }
@@ -1051,7 +1045,7 @@ export class SukunaFighter extends Fighter {
       // Ranged Mode - Basic attack (Dismantle)
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
-      } else if (canAct) {
+      } else if (canAct && !isTargetReforming) {
         this.shoot(ownerIndex);
         this.shootCooldown = this.shootCooldownMax;
       }
@@ -1060,7 +1054,7 @@ export class SukunaFighter extends Fighter {
     const speedMult = this.isMeleeMode ? 0 : 1.0;
     this.applyMovementPhysics(speedMult);
 
-    if (opponent && !opponent.isDead) {
+    if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving)) {
       this.aim(opponent);
     } else {
       this.turnToNormalPosition(0.035);
@@ -2149,7 +2143,8 @@ export class SukunaFighter extends Fighter {
   }
 
   _findClosestEnemy(preferredOpponent = null) {
-    if (preferredOpponent && !preferredOpponent.isDead && preferredOpponent.hp > 0) {
+    const isPreferredAlive = preferredOpponent && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
+    if (isPreferredAlive) {
       return preferredOpponent;
     }
     let closest = null;
@@ -2165,7 +2160,9 @@ export class SukunaFighter extends Fighter {
     }
 
     for (const ent of allTargets) {
-      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable) continue;
+      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
+      if (!ent || ent === this) continue;
+      if (!isEntReforming && (ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable)) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {

@@ -49,6 +49,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) 
 export function executeTeleportDodge(fighter, attacker, arena) {
   const isDraggedOrTrapped = Boolean(
     fighter.isDraggedByGetsuga ||
+    fighter.isChainedByMakima ||
     (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) ||
     (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged()) ||
     fighter.isWallPinnedByMakima ||
@@ -104,6 +105,7 @@ export function executeTeleportDodge(fighter, attacker, arena) {
 export function teleportAwayFrom(fighter, opponent, arena) {
   const isDraggedOrTrapped = Boolean(
     fighter.isDraggedByGetsuga ||
+    fighter.isChainedByMakima ||
     (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) ||
     (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged()) ||
     fighter.isWallPinnedByMakima ||

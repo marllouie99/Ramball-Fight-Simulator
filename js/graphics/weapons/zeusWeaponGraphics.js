@@ -2,6 +2,7 @@
 // A double-pointed, jagged crystal spear of pure lightning energy.
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 
 export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
@@ -258,37 +259,8 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
         ctx.restore();
     }
     
-    // 2. Draw two hands raised "on top of head" (in front of him)
-    ctx.rotate(gunAngle);
-    
-    // Hands raise up and shake powerfully over the top edge of his body
-    const shakeAmount = chargeProgress * 3;
-    const shakeX = (Math.random() * shakeAmount - shakeAmount/2);
-    const shakeY = (Math.random() * shakeAmount - shakeAmount/2);
-    
-    // Position arms outstretched (one in front, one behind for side-view)
-    const handRadiusOffset = r - 2; // Slightly inside the edge so they anchor
-    const leftX = handRadiusOffset * Math.cos(Math.PI) + shakeX; // Back hand
-    const leftY = handRadiusOffset * Math.sin(Math.PI) + shakeY;
-    const rightX = handRadiusOffset * Math.cos(0) + shakeX;      // Front hand
-    const rightY = handRadiusOffset * Math.sin(0) + shakeY;
-    
-    ctx.fillStyle = fighterColor;
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1.5;
-    
-    // Left hand
-    ctx.beginPath();
-    ctx.arc(leftX, leftY, getHandSize(6.5), 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
-    
-    // Right hand
-    ctx.beginPath();
-    ctx.arc(rightX, rightY, getHandSize(6.5), 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
-    
     ctx.restore();
-    return; // Skip normal weapon drawing
+    return; // Skip normal weapon drawing; hands are handled by drawZeusSkin
   }
 
   ctx.rotate(gunAngle);
@@ -355,19 +327,11 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
   ctx.restore();
 
   // ═══════════════════════════════════════════════
-  // GRIP HAND (drawn on top of bolt)
+  // GRIP HAND (drawn on top of bolt in pixel art style)
   // ═══════════════════════════════════════════════
   ctx.save();
   ctx.rotate(Math.PI / 4); // Undo the diagonal rotation
-  ctx.fillStyle = fighterColor; // Match fighter color
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 1.5;
-  
-  // Main grip hand
-  ctx.beginPath();
-  ctx.arc(0, 0, getHandSize(7), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  drawPixelHand(ctx, 0, 0, getHandSize(6.8), '#FCD34D', '#0B1220');
   ctx.restore();
 
   ctx.restore();

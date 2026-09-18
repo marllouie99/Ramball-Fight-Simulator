@@ -6,6 +6,7 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { drawZeusWeapon } from '../../graphics/weapons/zeusWeaponGraphics.js';
+import { drawZeusSkin } from '../../graphics/fighters/zeusSkin.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state } from '../../core/state.js';
@@ -13,6 +14,9 @@ import { state } from '../../core/state.js';
 export class ZeusFighter extends Fighter {
   constructor(def) {
     super(def);
+    this.characterId = 'zeus';
+    this.type = 'zeus';
+    this.damageNumberColor = '#38bdf8';
     this.aegisCooldown = 0;
     this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormActive = false;
@@ -587,22 +591,12 @@ export class ZeusFighter extends Fighter {
     ctx.restore();
   }
 
+  drawBody(ctx) {
+    drawZeusSkin(ctx, this);
+  }
+
   drawOutline(ctx) {
-    // Basic fighter outline overlay
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r * 1.3, 0, Math.PI * 2);
-    const bodyGlow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r * 1.3);
-    bodyGlow.addColorStop(0, 'rgba(0, 191, 255, 0.45)');
-    bodyGlow.addColorStop(1, 'rgba(0, 191, 255, 0)');
-    ctx.fillStyle = bodyGlow;
-    ctx.globalCompositeOperation = 'screen';
-    ctx.fill();
-    ctx.restore();
-    
-    // Main fighter outline
-    // Main fighter outline (Sketchy stroke)
-    super.drawOutline(ctx);
+    // Replaced with authentic stepped pixel art outline in drawZeusSkin
   }
 
   drawGun(ctx) {

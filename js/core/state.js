@@ -187,6 +187,8 @@ export const state = {
 
   // GTA San Andreas "MISSION PASSED! RESPECT +" Arena Overlay
   missionPassedOverlay: null,
+  _isRespectMusicPlaying: false,
+  _respectMusicHandle: null,
 
   // GTA San Andreas "WASTED" Death Overlay
   wastedOverlay: null,
@@ -355,6 +357,8 @@ export const state = {
   weaponPage: 0,
   selectedWeapon: null,
   missionPassedOverlay: null,
+  _isRespectMusicPlaying: false,
+  _respectMusicHandle: null,
   cheatNotification: null,
 
   // FPS tracking
@@ -1000,22 +1004,29 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
  * Triggers the GTA San Andreas "mission passed! RESPECT +" center screen overlay.
  */
 export function triggerMissionPassedOverlay(opts = {}) {
-  // Always play the respect bgmusic immediately (even if overlay already active,
-  // because stopAllSounds in round transitions may have killed the previous instance)
+  // Always play the respect bgmusic immediately and let it play to natural completion
   const _playRespectMusic = () => {
     try {
+      if (state._isRespectMusicPlaying) return; // Audio is already playing smoothly to its natural conclusion
       const winMusic = (typeof CONFIG !== 'undefined' && CONFIG.cj?.sounds?.respectOverlayBgMusic) || 'Assets/Sound Effects/Skills/cj-respectoverlay-bgmusic.mp3';
       const winVol = (typeof CONFIG !== 'undefined' && CONFIG.cj?.soundVolumes?.respectOverlayBgMusic) ?? 0.8;
       const sys = (typeof audioSystem !== 'undefined' && audioSystem) || (typeof window !== 'undefined' && window.audioSystem);
       if (sys && typeof sys.playSFX === 'function') {
-        sys.playSFX(winMusic, winVol);
+        state._isRespectMusicPlaying = true;
+        const handle = sys.playSFX(winMusic, winVol, 1.0, 0, 0, () => {
+          state._isRespectMusicPlaying = false;
+          state._respectMusicHandle = null;
+        });
+        state._respectMusicHandle = handle;
       }
     } catch (e) {}
   };
 
-  // If overlay is already active, just re-play the audio (don't reset timer)
+  // If overlay is already active, ensure audio is playing without resetting visual timer
   if (state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0)) {
-    _playRespectMusic();
+    if (!state._isRespectMusicPlaying) {
+      _playRespectMusic();
+    }
     return;
   }
   state._hadMissionOverlay = true;

@@ -36,7 +36,7 @@ export const makimaConfig = {
 
   // Passive 1: Prime Minister Contract (Citizen Redirection)
   maxCitizenLives: 3,               // 5 citizen sacrifice stocks
-  citizenReviveHpPercent: 1.00,     // Revives with 100% Max HP
+  citizenReviveHpPercent: 0.50,     // Revives with 100% Max HP
   citizenReviveDurationFrames: 75,  // 1.25s death shatter & magnetic reassembly duration
   citizenDamageReduction: 0.20,     // 20% passive damage reduction while stocks remain
   citizenShockwaveRadius: 150,      // Repel shockwave radius on revive

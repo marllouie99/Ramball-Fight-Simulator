@@ -181,30 +181,108 @@ export function isStandOffMode() {
 
 /**
  * Spawns a standard blood effect at the fighter's position upon taking damage.
+ * High-velocity directional blood droplets erupt along the strike/damage vector,
+ * flying away from the attacker in a natural, impactful ballistic cone.
  */
-export function spawnBloodEffect(fighter, amount = 10, damageAngle = null, customOpts = null) {
-  // Support both spawnBloodEffect(entity, amount, damageAngle, customOpts)
-  // and legacy/direct coordinate format spawnBloodEffect(x, y, amount, colorOrOpts, damageAngle)
-  let entity = fighter;
-  let dmgAmount = amount;
-  let angle = damageAngle;
-  let opts = customOpts;
+export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4 = null) {
+  let entity = null;
+  let dmgAmount = 10;
+  let angle = null;
+  let opts = null;
 
-  if (typeof fighter === 'number' && typeof amount === 'number') {
-    entity = { x: fighter, y: amount, r: 25 };
-    dmgAmount = typeof damageAngle === 'number' ? damageAngle : 10;
-    if (typeof customOpts === 'string') {
-      opts = { color: customOpts };
-    } else if (typeof customOpts === 'object' && customOpts !== null) {
-      opts = customOpts;
-    } else {
-      opts = null;
+  // Pattern 1: Coordinate call spawnBloodEffect(x, y, ...)
+  if (typeof arg0 === 'number' && typeof arg1 === 'number') {
+    entity = { x: arg0, y: arg1, r: 25 };
+    if (typeof arg2 === 'number') {
+      dmgAmount = arg2;
+      if (typeof arg3 === 'string') {
+        opts = { color: arg3 };
+        if (typeof arg4 === 'number') angle = arg4;
+        else if (typeof arg4 === 'object' && arg4 !== null) opts = Object.assign({ color: arg3 }, arg4);
+      } else if (typeof arg3 === 'object' && arg3 !== null) {
+        opts = arg3;
+        if (typeof arg4 === 'number') angle = arg4;
+      } else if (typeof arg3 === 'number') {
+        angle = arg3;
+        if (typeof arg4 === 'object' && arg4 !== null) opts = arg4;
+        else if (typeof arg4 === 'string') opts = { color: arg4 };
+      }
+    } else if (typeof arg2 === 'string') {
+      opts = { color: arg2 };
+      if (typeof arg3 === 'number') {
+        if (typeof arg4 === 'number') {
+          dmgAmount = arg3;
+          angle = arg4;
+        } else {
+          dmgAmount = arg3;
+        }
+      }
+    } else if (typeof arg2 === 'object' && arg2 !== null) {
+      opts = arg2;
+      if (typeof arg3 === 'number') {
+        if (typeof arg4 === 'number') {
+          dmgAmount = arg3;
+          angle = arg4;
+        } else {
+          dmgAmount = arg3;
+        }
+      }
     }
-    angle = null;
+  } else if (arg0 && typeof arg0 === 'object') {
+    // Pattern 2: Entity call spawnBloodEffect(entity, amount, damageAngle, customOpts)
+    entity = arg0;
+    dmgAmount = typeof arg1 === 'number' ? arg1 : 10;
+    if (typeof arg2 === 'number') {
+      angle = arg2;
+      if (typeof arg3 === 'object' && arg3 !== null) opts = arg3;
+      else if (typeof arg3 === 'string') opts = { color: arg3 };
+    } else if (typeof arg2 === 'object' && arg2 !== null) {
+      opts = arg2;
+      if (typeof arg3 === 'number') angle = arg3;
+    } else if (typeof arg2 === 'string') {
+      opts = { color: arg2 };
+      if (typeof arg3 === 'number') angle = arg3;
+    } else {
+      if (typeof arg3 === 'object' && arg3 !== null) opts = arg3;
+      else if (typeof arg3 === 'string') opts = { color: arg3 };
+    }
   }
 
-  if (dmgAmount <= 0 || !entity) return;
+  if (!entity || dmgAmount <= 0) return;
   if (!state.bloodEffects) state.bloodEffects = [];
+
+  // Infer impact angle if still not provided
+  if (angle === null || angle === undefined || isNaN(angle)) {
+    if (opts) {
+      if (typeof opts.damageAngle === 'number') angle = opts.damageAngle;
+      else if (typeof opts.angle === 'number') angle = opts.angle;
+      else if (typeof opts.hitAngle === 'number') angle = opts.hitAngle;
+      else if (typeof opts.attackAngle === 'number') angle = opts.attackAngle;
+      else if (opts.projectile) {
+        if (typeof opts.projectile.vy === 'number' && typeof opts.projectile.vx === 'number' && (opts.projectile.vx !== 0 || opts.projectile.vy !== 0)) {
+          angle = Math.atan2(opts.projectile.vy, opts.projectile.vx);
+        } else if (typeof opts.projectile.angle === 'number') {
+          angle = opts.projectile.angle;
+        }
+      } else if (opts.attacker && typeof opts.attacker.x === 'number' && typeof opts.attacker.y === 'number') {
+        angle = Math.atan2(entity.y - opts.attacker.y, entity.x - opts.attacker.x);
+      }
+    }
+  }
+  if (angle === null || angle === undefined || isNaN(angle)) {
+    if (entity) {
+      if (typeof entity.lastHitAngle === 'number') {
+        angle = entity.lastHitAngle;
+      } else if (typeof entity.knockbackVx === 'number' && typeof entity.knockbackVy === 'number' && Math.hypot(entity.knockbackVx, entity.knockbackVy) > 0.05) {
+        angle = Math.atan2(entity.knockbackVy, entity.knockbackVx);
+      } else if (entity.lastAttacker && typeof entity.lastAttacker.x === 'number' && typeof entity.lastAttacker.y === 'number') {
+        angle = Math.atan2(entity.y - entity.lastAttacker.y, entity.x - entity.lastAttacker.x);
+      } else if (entity.attacker && typeof entity.attacker.x === 'number' && typeof entity.attacker.y === 'number') {
+        angle = Math.atan2(entity.y - entity.attacker.y, entity.x - entity.attacker.x);
+      }
+    }
+  }
+
   const isStandOff = isStandOffMode();
   const isFFA = state && state.mode === GAME_MODES.FFA;
   const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
@@ -259,40 +337,73 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null, custo
   const baseDecay = isStandOff ? (physCfg.floorDecayRateStandOff ?? 0.008) : (physCfg.floorDecayRate1v1 ?? 0.006);
   const decayRate = baseDecay + Math.random() * (baseDecay * 0.5);
 
-  const baseSpeed = hitCfg.baseSpeed ?? 3.5;
-  const speedVar = hitCfg.speedVariance ?? 6.5;
-  const spreadRad = (hitCfg.spreadAngle ?? 0.5) * Math.PI;
-  const minSize = (customOpts && customOpts.minSize !== undefined) ? customOpts.minSize : (hitCfg.minSize ?? 2.2);
-  const maxSize = (customOpts && customOpts.maxSize !== undefined) ? customOpts.maxSize : (hitCfg.maxSize ?? 3.8);
-  const upImpulse = hitCfg.upwardImpulse ?? 0.6;
-  const upImpulseVar = hitCfg.upwardImpulseVariance ?? 1.8;
+  const baseSpeed = hitCfg.baseSpeed ?? 7.0;
+  const speedVar = hitCfg.speedVariance ?? 8.0;
+  const spreadRad = (hitCfg.spreadAngle ?? 0.22) * Math.PI;
+  const minSize = (opts && opts.minSize !== undefined) ? opts.minSize : (hitCfg.minSize ?? 4.6);
+  const maxSize = (opts && opts.maxSize !== undefined) ? opts.maxSize : (hitCfg.maxSize ?? 5.6);
+  const upImpulse = hitCfg.upwardImpulse ?? 0.15;
+  const upImpulseVar = hitCfg.upwardImpulseVariance ?? 0.35;
+
+  const hasDirection = (angle !== null && angle !== undefined && !isNaN(angle));
+  const baseAngle = hasDirection ? angle : 0;
+  const cosA = Math.cos(baseAngle);
+  const sinA = Math.sin(baseAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
 
   for (let i = 0; i < particleCount; i++) {
-    let angle = Math.random() * Math.PI * 2;
-    const speed = baseSpeed + Math.random() * speedVar;
-
-    if (damageAngle !== null) {
-      const spreadAngle = (Math.random() - 0.5) * spreadRad;
-      angle = damageAngle + spreadAngle;
-    }
+    let pAngle;
+    let speed;
+    let startX;
+    let startY;
 
     const globalMultiplier = bloodCfg.globalSizeMultiplier ?? 1.0;
     const size = (minSize + Math.random() * (maxSize - minSize)) * globalMultiplier;
     const numericColor = bloodPalette[i % bloodPalette.length];
 
-    const startX = Math.max(arenaLeft + size / 2, Math.min(arenaRight - size / 2, clampFx + (Math.random() - 0.5) * fr * 0.4));
-    const startY = Math.max(arenaTop + size / 2, Math.min(arenaBottom - size / 2, clampFy + (Math.random() - 0.5) * fr * 0.4));
+    if (hasDirection) {
+      const isPrimaryForward = (i % 5 !== 4); // 80% primary forward jet, 20% lateral/mist droplets
+      if (isPrimaryForward) {
+        // High-velocity forward jet within tight cone — blood ERUPTS along the hit direction
+        pAngle = baseAngle + (Math.random() - 0.5) * spreadRad;
+        speed = baseSpeed + Math.random() * speedVar;
+        const exitOffset = fr * (0.3 + Math.random() * 0.4);
+        const lateralJitter = (Math.random() - 0.5) * fr * 0.3;
+        startX = clampFx + cosA * exitOffset + perpX * lateralJitter;
+        startY = clampFy + sinA * exitOffset + perpY * lateralJitter;
+      } else {
+        // Secondary wider-angle splatter mist
+        pAngle = baseAngle + (Math.random() - 0.5) * (Math.PI * 0.55);
+        speed = baseSpeed * 0.55 + Math.random() * (speedVar * 0.4);
+        startX = clampFx + cosA * (fr * 0.15) + (Math.random() - 0.5) * fr * 0.4;
+        startY = clampFy + sinA * (fr * 0.15) + (Math.random() - 0.5) * fr * 0.4;
+      }
+    } else {
+      // Full 360-degree radial fallback (no direction info)
+      pAngle = Math.random() * Math.PI * 2;
+      speed = baseSpeed + Math.random() * speedVar;
+      startX = clampFx + (Math.random() - 0.5) * fr * 0.5;
+      startY = clampFy + (Math.random() - 0.5) * fr * 0.5;
+    }
+
+    startX = Math.max(arenaLeft + size / 2, Math.min(arenaRight - size / 2, startX));
+    startY = Math.max(arenaTop + size / 2, Math.min(arenaBottom - size / 2, startY));
+
+    // Pure directional velocity — blood flies in the hit direction, gravity handles the arc
+    const vx = Math.cos(pAngle) * speed;
+    const vy = Math.sin(pAngle) * speed - (upImpulse + Math.random() * upImpulseVar);
 
     addOrOverwriteBloodParticle({
       x: startX,
       y: startY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - (upImpulse + Math.random() * upImpulseVar), // Natural upward burst arc before falling down
+      vx: vx,
+      vy: vy,
       size: size,
       numericColor: numericColor,
-      life: 1.0,           
-      decay: decayRate, 
-      airResistance: physCfg.airResistance ?? 0.96,
+      life: 1.0,
+      decay: decayRate,
+      airResistance: physCfg.airResistance ?? 0.982,
       friction: physCfg.floorFriction ?? 0.85,
       onGround: false
     }, MAX_BLOOD_PARTICLES);
@@ -301,7 +412,8 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null, custo
 
 /**
  * Spawns a visceral blood splash explosion when a fighter is killed / splashed to death.
- * Erupts with high-velocity blood droplets and outward splatter arcs across the arena floor.
+ * Erupts with high-velocity blood droplets, directional arterial exit jets along the kill vector,
+ * and outward splatter arcs across the arena floor.
  */
 export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
   if (fighterOrX === null || fighterOrX === undefined) return;
@@ -319,23 +431,44 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
   let fy = 0;
   let fr = 25;
   let opts = {};
+  let targetFighter = null;
 
   if (typeof fighterOrX === 'number') {
     fx = fighterOrX;
     fy = typeof optsOrY === 'number' ? optsOrY : 0;
     fr = typeof maybeR === 'number' ? maybeR : 25;
   } else if (fighterOrX && typeof fighterOrX === 'object') {
+    targetFighter = fighterOrX;
     fx = typeof fighterOrX.x === 'number' ? fighterOrX.x : 0;
     fy = typeof fighterOrX.y === 'number' ? fighterOrX.y : 0;
     fr = typeof fighterOrX.r === 'number' ? fighterOrX.r : 25;
-    opts = optsOrY || {};
+    opts = (typeof optsOrY === 'object' && optsOrY !== null) ? optsOrY : {};
   } else {
     return;
   }
 
+  // Infer fatal impact angle if present
+  let fatalAngle = null;
+  if (opts) {
+    if (typeof opts.damageAngle === 'number') fatalAngle = opts.damageAngle;
+    else if (typeof opts.angle === 'number') fatalAngle = opts.angle;
+    else if (typeof opts.hitAngle === 'number') fatalAngle = opts.hitAngle;
+    else if (opts.attacker && typeof opts.attacker.x === 'number' && typeof opts.attacker.y === 'number') {
+      fatalAngle = Math.atan2(fy - opts.attacker.y, fx - opts.attacker.x);
+    }
+  }
+  if (fatalAngle === null && targetFighter) {
+    if (typeof targetFighter.lastHitAngle === 'number') fatalAngle = targetFighter.lastHitAngle;
+    else if (typeof targetFighter.knockbackVx === 'number' && typeof targetFighter.knockbackVy === 'number' && Math.hypot(targetFighter.knockbackVx, targetFighter.knockbackVy) > 0.05) {
+      fatalAngle = Math.atan2(targetFighter.knockbackVy, targetFighter.knockbackVx);
+    } else if (targetFighter.lastAttacker && typeof targetFighter.lastAttacker.x === 'number' && typeof targetFighter.lastAttacker.y === 'number') {
+      fatalAngle = Math.atan2(fy - targetFighter.lastAttacker.y, fx - targetFighter.lastAttacker.x);
+    }
+  }
+
   const isTactical = (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().includes('tactical')));
   const tacticalEnabled = (CONFIG && CONFIG.tactical && CONFIG.tactical.enableThemeColoredBlood !== false);
-  const targetColor = (opts && opts.color) || (fighterOrX && typeof fighterOrX === 'object' && (fighterOrX.color || fighterOrX.themeColor || (fighterOrX._def && fighterOrX._def.color)));
+  const targetColor = (opts && opts.color) || (targetFighter && (targetFighter.color || targetFighter.themeColor || (targetFighter._def && targetFighter._def.color)));
 
   let bloodColors;
   if (opts && Array.isArray(opts.palette)) {
@@ -391,11 +524,20 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
   const maxSize = fatalCfg.maxSize ?? 5.0;
 
   for (let i = 0; i < splashCount; i++) {
-    const angle = (Math.PI * 2 * i) / splashCount + (Math.random() - 0.5) * 0.45;
-    const speed = baseSpeed + Math.random() * speedVar;
+    let angle;
+    let speed;
+    if (fatalAngle !== null && !isNaN(fatalAngle) && (i % 2 === 0)) {
+      // 50% arterial exit jet along fatal impact angle
+      angle = fatalAngle + (Math.random() - 0.5) * (Math.PI * 0.45);
+      speed = baseSpeed * 1.1 + Math.random() * (speedVar * 1.2);
+    } else {
+      // 50% 360-degree visceral explosive radial blast
+      angle = (Math.PI * 2 * i) / splashCount + (Math.random() - 0.5) * 0.45;
+      speed = baseSpeed + Math.random() * speedVar;
+    }
+
     const globalMultiplier = bloodCfg.globalSizeMultiplier ?? 1.0;
     const size = (minSize + Math.random() * (maxSize - minSize)) * globalMultiplier;
-
     const color = bloodColors[i % bloodColors.length];
 
     const startX = Math.max(arenaLeft + size / 2, Math.min(arenaRight - size / 2, clampFx + (Math.random() - 0.5) * fr * 0.7));
@@ -405,12 +547,12 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
       x: startX,
       y: startY,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed * 0.85 - (2 + Math.random() * 4), // Visceral radial burst arc
+      vy: Math.sin(angle) * speed * 0.85 - (1.5 + Math.random() * 3.0),
       size: size,
       numericColor: color,
       life: 1.0,
       decay: decayRate,
-      airResistance: physCfg.airResistance ?? 0.96,
+      airResistance: physCfg.airResistance ?? 0.95,
       friction: physCfg.floorFriction ?? 0.85,
       onGround: false
     }, 300);
@@ -579,30 +721,36 @@ export function updateBloodEffects() {
   const arenaBottom = arena.y + arena.height - wallW;
   const arenaLeft = arena.x + wallW;
   const arenaRight = arena.x + arena.width - wallW;
-  const gravity = 0.85;
+
+  const bloodCfg = (CONFIG && CONFIG.blood) || {};
+  const physCfg = bloodCfg.physics || {};
+  const gravity = physCfg.gravity ?? 0.18;
+  const airRes = physCfg.airResistance ?? 0.982;
 
   fastCleanArray(state.bloodEffects, (effect) => {
     if (!effect.onGround) {
-      // 1. Natural fluid gravity arc in the air
-      effect.vx *= effect.airResistance;
-      // Weighted gravity falling directly down towards bottom floor of arena
-      effect.vy = Math.min(22, effect.vy * 0.98 + gravity);
+      // 1. Natural fluid gravity arc in the air — preserve horizontal momentum
+      const drag = effect.airResistance ?? airRes;
+      effect.vx *= drag;
+      effect.vy *= drag;
+      // Gravity pulls downward, creating a natural parabolic blood arc
+      effect.vy = Math.min(22, effect.vy + gravity);
       effect.x += effect.vx;
       effect.y += effect.vy;
 
       // Left / right arena wall bounces
       if (effect.x <= arenaLeft + effect.size / 2) {
         effect.x = arenaLeft + effect.size / 2;
-        effect.vx = Math.abs(effect.vx) * 0.3;
+        effect.vx = Math.abs(effect.vx) * 0.35;
       } else if (effect.x >= arenaRight - effect.size / 2) {
         effect.x = arenaRight - effect.size / 2;
-        effect.vx = -Math.abs(effect.vx) * 0.3;
+        effect.vx = -Math.abs(effect.vx) * 0.35;
       }
 
       // Top ceiling arena wall bounce (STRICTLY PREVENTS PARTICLES ESCAPING TOP OF ARENA)
       if (effect.y <= arenaTop + effect.size / 2) {
         effect.y = arenaTop + effect.size / 2;
-        effect.vy = Math.abs(effect.vy) * 0.3; // Deflect downward into the arena
+        effect.vy = Math.abs(effect.vy) * 0.35; // Deflect downward into the arena
       }
 
       // Check collision with the bottom border of the arena
@@ -625,13 +773,17 @@ export function updateBloodEffects() {
       return true;
     } else {
       // 2. Resting on the bottom border of the arena (splatter puddle stain)
-      effect.vx *= effect.friction;
+      effect.vx *= (effect.friction ?? (physCfg.floorFriction ?? 0.85));
       effect.x += effect.vx;
       effect.x = Math.max(arenaLeft + effect.size / 2, Math.min(arenaRight - effect.size / 2, effect.x));
       effect.y = arenaBottom - effect.size / 3;
 
       // Decays ONLY after it has dropped to the bottom floor
-      effect.life -= effect.decay;
+      // STOP decaying once the round winner is declared — blood stays as battle scars
+      const roundOver = !!(state.roundWinner || state.matchEndTimer > 0);
+      if (!roundOver) {
+        effect.life -= effect.decay;
+      }
 
       if (effect.life > 0) {
         // Flatten into a floor blood puddle stain
@@ -653,10 +805,27 @@ export function updateBloodEffects() {
 }
 
 /**
- * Deprecated: PixiJS automatically renders the sprites in the background scene graph.
+ * Renders blood effects in Canvas 2D fallback mode when PixiJS is unavailable or in test environments.
  */
-export function drawBloodEffects() {
-  // Empty - kept so `renderSystem.js` doesn't crash before being updated
+export function drawBloodEffects(ctx) {
+  if (!ctx || !state.bloodEffects || state.bloodEffects.length === 0) return;
+  // If PixiJS is actively rendering these sprites, skip 2D canvas drawing to prevent double-draw
+  if (state.pixiLayers && state.pixiLayers.particles && state.bloodSquareTexture) return;
+
+  for (let i = 0; i < state.bloodEffects.length; i++) {
+    const e = state.bloodEffects[i];
+    if (!e || e.life <= 0) continue;
+    const r = (e.numericColor >> 16) & 0xFF;
+    const g = (e.numericColor >> 8) & 0xFF;
+    const b = e.numericColor & 0xFF;
+    const alpha = e.onGround ? Math.max(0, Math.min(1, e.life)) : 1.0;
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+    if (e.onGround) {
+      ctx.fillRect(e.x - e.size * 0.75, e.y - e.size * 0.325, e.size * 1.5, e.size * 0.65);
+    } else {
+      ctx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+    }
+  }
 }
 
 /**

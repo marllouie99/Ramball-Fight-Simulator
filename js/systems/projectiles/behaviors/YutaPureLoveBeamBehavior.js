@@ -103,7 +103,13 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             p.hitTargets.add(ent);
             
             if (typeof ent.takeDamage === 'function') {
-              ent.takeDamage(solidDamage, ownerFighter, { isPureLoveBeam: true, bypassShield: true });
+              ent.takeDamage(solidDamage, ownerFighter, {
+                isPureLoveBeam: true,
+                bypassShield: true,
+                bypassEvade: true,
+                undodgeable: true,
+                isGuaranteedHit: true
+              });
 
               const dmgGain = CONFIG.yuta?.pureLoveBeamDamageStackPerTick ?? 0.5;
               if (dmgGain > 0 && ownerFighter) {

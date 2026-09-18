@@ -284,7 +284,7 @@ export class MahitoFighter extends Fighter {
     // Dodge chance ONLY works while actively in small clone evasion state!
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts?.bypassEvade);
     const isActivelyInCloneState = Boolean(this.isEvading && (this.evasionTimer || 0) > 0);
-    if (isActivelyInCloneState && !isGuaranteedHit) {
+    if (isActivelyInCloneState && !isGuaranteedHit && !this.isChainedByMakima) {
       const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
       if (Math.random() < dodgeChance) {
         const now = Date.now();
@@ -326,7 +326,8 @@ export class MahitoFighter extends Fighter {
   }
 
   _findClosestEnemy(preferredOpponent = null) {
-    if (preferredOpponent && !preferredOpponent.isDead && preferredOpponent.hp > 0) {
+    const isPreferredAlive = preferredOpponent && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
+    if (isPreferredAlive) {
       return preferredOpponent;
     }
     if (typeof state === 'undefined' || !state.fighters) return null;
@@ -337,7 +338,9 @@ export class MahitoFighter extends Fighter {
     const candidates = [...state.fighters, ...(state.illusions || [])];
     for (let i = 0; i < candidates.length; i++) {
       const ent = candidates[i];
-      if (!ent || ent === this || ent.isDead || ent.hp <= 0) continue;
+      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
+      if (!ent || ent === this) continue;
+      if (!isEntReforming && (ent.isDead || ent.hp <= 0)) continue;
       const entIdx = state.fighters.indexOf(ent);
       if (entIdx !== -1) {
         const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(entIdx) : ent.team;
@@ -1268,7 +1271,7 @@ export class MahitoFighter extends Fighter {
         takeDamage(amount, attacker, opts = {}) {
           // Dodge chance ONLY applies while active in small clone state
           const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts?.bypassEvade);
-          if (this.isEvasionMinion && !this.isDying && !isGuaranteedHit) {
+          if (this.isEvasionMinion && !this.isDying && !isGuaranteedHit && !this.isChainedByMakima) {
             const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
             if (Math.random() < dodgeChance) {
               const now = Date.now();

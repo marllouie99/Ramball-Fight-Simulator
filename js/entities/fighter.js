@@ -199,6 +199,7 @@ export class Fighter {
     this.damage = def.damage || 10;
     this.shootCooldownMax = def.cooldown || CONFIG.shoot.cooldown;
     this.lastKilledDef = null;
+    this.postKillAngleHoldTimer = (typeof CONFIG !== 'undefined' && CONFIG.postKillAngleHoldFrames) || 40;
     
     this.reset();
   }
@@ -406,6 +407,7 @@ export class Fighter {
     this.gunAngle = 0;
     this.lastKilledDef = null;
     this.roundKilledDefs = [];
+    this.postKillAngleHoldTimer = (typeof CONFIG !== 'undefined' && CONFIG.postKillAngleHoldFrames) || 40;
     this.shootCooldown = 0;
     this.speed = moveSpeed;
     this.baseSpeed = originalBaseSpeed; // Original speed for spin rate calculations (not affected by mode multiplier)
@@ -2025,8 +2027,8 @@ export class Fighter {
       }
     }
 
-    // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks (e.g. Boogie Woogie swap buff)
-    if (this.evadeBuffTimer > 0 && amount > 0 && !isGuaranteedHit) {
+    // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks (e.g. Boogie Woogie swap buff, disabled when chained by Makima)
+    if (this.evadeBuffTimer > 0 && amount > 0 && !isGuaranteedHit && !this.isChainedByMakima) {
       const isTickOrBeam = Boolean(
         opts && (
           opts.isPureLoveBeam ||
@@ -2127,15 +2129,29 @@ export class Fighter {
 
       // Calculate damage direction (from attacker to this fighter)
       let damageAngle = null;
-      if (attacker) {
+      if (typeof opts.damageAngle === 'number') {
+        damageAngle = opts.damageAngle;
+      } else if (typeof opts.angle === 'number') {
+        damageAngle = opts.angle;
+      } else if (typeof opts.hitAngle === 'number') {
+        damageAngle = opts.hitAngle;
+      } else if (opts.projectile) {
+        damageAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
+      } else if (attacker) {
         damageAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
+      } else if (this.knockbackVx !== undefined && this.knockbackVy !== undefined && Math.hypot(this.knockbackVx, this.knockbackVy) > 0.1) {
+        damageAngle = Math.atan2(this.knockbackVy, this.knockbackVx);
       }
+      if (damageAngle !== null) {
+        this.lastHitAngle = damageAngle;
+      }
+
       const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
       const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isRatioPauseActive;
       if (!this.isTurret && !isExplosionOrFlame && !isSecondTurretHit) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
         if (typeof spawnBloodEffect === 'function') {
-          spawnBloodEffect(this, bloodAmount, damageAngle);
+          spawnBloodEffect(this, bloodAmount, damageAngle, opts);
         }
       }
       // Apply physical directional knockback whenever taking hit damage
@@ -2233,6 +2249,7 @@ export class Fighter {
         if (realAttacker && realAttacker !== this) {
           const victimDef = this._def || { name: this.name, color: this.color, type: this.type };
           realAttacker.lastKilledDef = victimDef;
+          realAttacker.postKillAngleHoldTimer = (typeof CONFIG !== 'undefined' && CONFIG.postKillAngleHoldFrames) || 40;
           if (!realAttacker.killedDefs) realAttacker.killedDefs = [];
           if (!realAttacker.killedDefs.some(d => d && (d.name === victimDef.name || (victimDef.id && d.id === victimDef.id)))) {
             realAttacker.killedDefs.push(victimDef);
@@ -2695,7 +2712,9 @@ export class Fighter {
    */
   isValidAimTarget(target) {
     if (!target || target === this) return false;
-    if (target.hp <= 0 || target.isDead || target._hasDied) return false;
+    const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
+    const isAlive = (target.hp > 0 && !target.isDead && !target._hasDied) || isReforming || (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive());
+    if (!isAlive) return false;
     if (target.vanishTimer > 0 || target.isSubmerged || target.isErupting) return false;
     return true;
   }
@@ -2766,6 +2785,7 @@ export class Fighter {
    * - Standard active state: tracks target angle cleanly.
    */
   applyAim(opponent, targetAngle) {
+    this.postKillAngleHoldTimer = (typeof CONFIG !== 'undefined' && CONFIG.postKillAngleHoldFrames) || 40;
     const isChanneling = typeof this.isChannelingSkill === 'function' && this.isChannelingSkill();
 
     // Determine effective angular turn rate
@@ -2811,21 +2831,34 @@ export class Fighter {
    * Uses shortest-path angular interpolation to avoid awkward 360-degree wrapping.
    */
   turnToNormalPosition(turnRate = 0.035) {
+    // Hold facing angle on enemy kill / round end for a short duration before returning to normal angle
+    if (this.postKillAngleHoldTimer === undefined) {
+      this.postKillAngleHoldTimer = (typeof CONFIG !== 'undefined' && CONFIG.postKillAngleHoldFrames) || 40;
+    }
+    if (this.postKillAngleHoldTimer > 0) {
+      this.postKillAngleHoldTimer--;
+      return;
+    }
+
     let currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
     if (Number.isNaN(currentAngle)) currentAngle = 0;
     while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
     while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
 
-    const targetAngle = 0;
+    // Normal horizontal resting angle: 0 rad (facing right) or Math.PI / -Math.PI (facing left) based on current facing direction
+    const isFacingLeft = Math.abs(currentAngle) > Math.PI / 2;
+    const targetAngle = isFacingLeft ? (currentAngle >= 0 ? Math.PI : -Math.PI) : 0;
+
     let diff = targetAngle - currentAngle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
 
     if (Math.abs(diff) <= turnRate) {
-      this.gunAngle = 0;
-      this.angle = 0;
-      if (this.rightGunAngle !== undefined) this.rightGunAngle = 0;
-      if (this.leftGunAngle !== undefined) this.leftGunAngle = 0;
+      const finalAngle = isFacingLeft ? (currentAngle < 0 ? -Math.PI : Math.PI) : 0;
+      this.gunAngle = finalAngle;
+      this.angle = finalAngle;
+      if (this.rightGunAngle !== undefined) this.rightGunAngle = finalAngle;
+      if (this.leftGunAngle !== undefined) this.leftGunAngle = finalAngle;
     } else {
       const step = Math.sign(diff) * turnRate;
       let newAngle = currentAngle + step;
@@ -3083,7 +3116,8 @@ export class Fighter {
 
     // Stop initiating NEW attacks if round/match has ended
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
-    const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
+    const isTargetReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+    const isTargetAlive = Boolean(opponent && ((!opponent.isDead && opponent.hp > 0) || isTargetReforming || (typeof opponent.isEffectivelyAlive === 'function' && opponent.isEffectivelyAlive())));
 
     if (!isGamePlaying || !isTargetAlive) {
       this.turnToNormalPosition(0.035);
@@ -3108,7 +3142,7 @@ export class Fighter {
     // Shooting
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
-    } else if (this._def.type !== 'orange' && canAct && isTargetAlive && !opponent.isSubmerged && !opponent.isErupting) { // Prevent shooting at submerged/erupting targets
+    } else if (this._def.type !== 'orange' && canAct && isTargetAlive && !opponent.isSubmerged && !opponent.isErupting && !isTargetReforming) { // Prevent shooting at submerged/erupting/reforming targets
       this.shoot(ownerIndex);
       this.shootCooldown = this.shootCooldownMax;
     }

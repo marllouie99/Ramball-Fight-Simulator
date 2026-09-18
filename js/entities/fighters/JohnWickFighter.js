@@ -693,7 +693,8 @@ export class JohnWickFighter extends Fighter {
 
     if (state.fighters) {
       for (const f of state.fighters) {
-        if (f && f !== this && f.hp > 0 && !this.isTeammate(f)) {
+        const isFReforming = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving));
+        if (f && f !== this && (f.hp > 0 || isFReforming) && !this.isTeammate(f)) {
           const d = Math.hypot(f.x - this.x, f.y - this.y);
           if (d <= closestDist) {
             closest = f;
@@ -1004,7 +1005,7 @@ export class JohnWickFighter extends Fighter {
    * Grants active intangibility / evade buff where incoming attacks and projectiles pass harmlessly through
    */
   performCombatRoll(opponent) {
-    if (this.isRolling || (this.hitStunTimer && this.hitStunTimer > 0) || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.hp <= 0) return;
+    if (this.isRolling || this.isChainedByMakima || (this.hitStunTimer && this.hitStunTimer > 0) || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.hp <= 0) return;
     const cfg = CONFIG.john_wick || {};
     this.isRolling = true;
     this.isRollingBack = false;
@@ -1047,7 +1048,7 @@ export class JohnWickFighter extends Fighter {
    * Eliminates random rolling while simply moving across empty space.
    */
   _checkTacticalEvadeRoll(opponent, arena) {
-    if (this.isRolling || this.cqcComboPhase || this.hp <= 0) return;
+    if (this.isRolling || this.isChainedByMakima || this.cqcComboPhase || this.hp <= 0) return;
     if ((this.hitStunTimer && this.hitStunTimer > 0) || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isTargetOfAmbush) return;
     if (typeof state === 'undefined' || state.gameState !== 'playing') return;
 
@@ -1198,7 +1199,7 @@ export class JohnWickFighter extends Fighter {
     // ── 1. PASSIVE EVADE / INTANGIBILITY (Excommunicado Multiplier / Guaranteed Dodge) ──
     const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit));
     const isEvadeActive = Boolean(this.isEvadeAlwaysActive || isExcommunicado || (this.isRolling && this.rollTimer > 0) || (this.evadeBuffTimer && this.evadeBuffTimer > 0));
-    if (isEvadeActive && !isTickOrBeamDamage && !isGuaranteedHit) {
+    if (isEvadeActive && !isTickOrBeamDamage && !isGuaranteedHit && !this.isChainedByMakima) {
       const baseEvade = this.evadeChance !== undefined ? this.evadeChance : (cfg.evadeChance ?? 1.0);
       const chance = isExcommunicado ? (cfg.excommunicadoEvadeChance ?? Math.min(1.0, baseEvade * (cfg.excommunicadoEvadeMultiplier || 1.50))) : baseEvade;
       if (Math.random() <= chance) {
@@ -1424,7 +1425,7 @@ export class JohnWickFighter extends Fighter {
         this.hideGun = false;
       }
 
-      if (opponent && opponent.hp > 0) this.aim(opponent);
+      if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) this.aim(opponent);
       this._updateMeleeCombat();
       return;
     }
@@ -1448,9 +1449,9 @@ export class JohnWickFighter extends Fighter {
     if (this.outOfAmmoRollDelayTimer > 0) {
       this.outOfAmmoRollDelayTimer--;
       if (this.outOfAmmoRollDelayTimer <= 0 && this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading && !this.isRolling) {
-        const target = (this.pendingAssassinationTarget && this.pendingAssassinationTarget.hp > 0 && !this.pendingAssassinationTarget.isDying)
+        const target = (this.pendingAssassinationTarget && (this.pendingAssassinationTarget.hp > 0 || this.pendingAssassinationTarget.isRevivingFromContract || this.pendingAssassinationTarget.isShatterReviving) && !this.pendingAssassinationTarget.isDying)
           ? this.pendingAssassinationTarget
-          : (this._findCloseEnemyTarget(Infinity) || (opponent && opponent.hp > 0 ? opponent : null));
+          : (this._findCloseEnemyTarget(Infinity) || (opponent && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving) ? opponent : null));
         this.pendingAssassinationTarget = null;
         if (target) {
           this.startAssassinationCombo(target);
@@ -1472,7 +1473,7 @@ export class JohnWickFighter extends Fighter {
         }
       }
     } else if (this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading && !this.isRolling && typeof state !== 'undefined' && state.gameState === 'playing') {
-      const targetEnemy = this._findCloseEnemyTarget(Infinity) || (opponent && opponent.hp > 0 ? opponent : null) || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !this.isTeammate(f)) : null);
+      const targetEnemy = this._findCloseEnemyTarget(Infinity) || (opponent && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving) ? opponent : null) || (state.fighters ? state.fighters.find(f => f && f !== this && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving) && !this.isTeammate(f)) : null);
       if (targetEnemy) {
         this.pendingAssassinationTarget = targetEnemy;
         this.outOfAmmoRollDelayTimer = cfg.outOfAmmoRollDelayFrames || 18;

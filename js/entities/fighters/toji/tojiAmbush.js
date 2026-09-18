@@ -93,7 +93,7 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 }
 
 export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
-  if (fighter.isChainedByMakima || tojiIsTargetDeadOrRemoved(fighter, opponent)) return;
+  if (fighter.isChainedByMakima || (fighter.postUltimateRecoveryTimer || 0) > 0 || tojiIsTargetDeadOrRemoved(fighter, opponent)) return;
 
   fighter.isAmbushing = true;
   fighter.ambushTarget = opponent;
@@ -177,12 +177,22 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
 
   modSpawnTeleportAfterimages(fighter, oldX, oldY, clampedFront.x, clampedFront.y, startAngle, fighter.gunAngle);
 
-  spawnImpactFlash(oldX, oldY, 25, '#A040FF');
-  spawnImpactFlash(fighter.x, fighter.y, 30, '#A040FF'); 
-  const tpSound = getSkillEffectSound('toji', 'firstseqteleport');
-  const tpVol = tpSound?.volume ?? CONFIG.toji?.soundVolumes?.firstSeqTeleport ?? 3.0;
-  const tpDelay = tpSound?.delay ?? CONFIG.toji?.soundDelays?.firstSeqTeleport ?? -0.10;
-  audioSystem.playSFX(tpSound?.src || CONFIG.toji?.sounds?.firstSeqTeleport || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpVol, tpSound?.speed || 1.0, 0, tpDelay);
+  const ambushVoiceChance = (typeof CONFIG.toji?.soundChances?.ambushVoiceline === 'number')
+    ? CONFIG.toji.soundChances.ambushVoiceline
+    : ((typeof CONFIG.toji?.ambushVoiceChance === 'number')
+      ? CONFIG.toji.ambushVoiceChance
+      : 0.50);
+  fighter._ambushVoicelineAllowed = Math.random() < ambushVoiceChance;
+
+  const tpChance = typeof CONFIG.toji?.soundChances?.firstSeqTeleport === 'number'
+    ? CONFIG.toji.soundChances.firstSeqTeleport
+    : 1.0;
+  if (fighter._ambushVoicelineAllowed && Math.random() < tpChance) {
+    const tpSound = getSkillEffectSound('toji', 'firstseqteleport');
+    const tpVol = tpSound?.volume ?? CONFIG.toji?.soundVolumes?.firstSeqTeleport ?? 3.0;
+    const tpDelay = tpSound?.delay ?? CONFIG.toji?.soundDelays?.firstSeqTeleport ?? -0.10;
+    audioSystem.playSFX(tpSound?.src || CONFIG.toji?.sounds?.firstSeqTeleport || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpVol, tpSound?.speed || 1.0, 0, tpDelay);
+  }
 }
 
 export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
@@ -261,6 +271,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.vx = Math.cos(angle) * (fighter.speed || 3);
     fighter.vy = Math.sin(angle) * (fighter.speed || 3);
     fighter.normalizeSpeed();
+    if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving)) {
+      fighter.aim(opponent);
+    }
     return;
   }
 
@@ -475,10 +488,15 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       spawnSparks(fighter.x, fighter.y, 25, 'crimsonSniper');
       spawnSparks(fighter.x, fighter.y, 20, 'crimson');
 
-      const backthrustSound = getSkillEffectSound('toji', 'backthrust');
-      const btVol = backthrustSound?.volume ?? CONFIG.toji?.soundVolumes?.backThrust ?? 2.2;
-      const btDelay = backthrustSound?.delay ?? CONFIG.toji?.soundDelays?.backThrust ?? -0.20;
-      audioSystem.playSFX(backthrustSound?.src || CONFIG.toji?.sounds?.backThrust || 'Assets/Sound Effects/Skills/toji-backthrust.mp3', btVol, backthrustSound?.speed || 1.0, 0, btDelay);
+      const btChance = typeof CONFIG.toji?.soundChances?.backThrust === 'number'
+        ? CONFIG.toji.soundChances.backThrust
+        : 1.0;
+      if (fighter._ambushVoicelineAllowed && Math.random() < btChance) {
+        const backthrustSound = getSkillEffectSound('toji', 'backthrust');
+        const btVol = backthrustSound?.volume ?? CONFIG.toji?.soundVolumes?.backThrust ?? 2.2;
+        const btDelay = backthrustSound?.delay ?? CONFIG.toji?.soundDelays?.backThrust ?? -0.20;
+        audioSystem.playSFX(backthrustSound?.src || CONFIG.toji?.sounds?.backThrust || 'Assets/Sound Effects/Skills/toji-backthrust.mp3', btVol, backthrustSound?.speed || 1.0, 0, btDelay);
+      }
       audioSystem.playSFX('attack_swordswing', CONFIG.toji?.soundVolumes?.spearSwing ?? 0.85);
       audioSystem.playSFX('attack_fleshhit', 0.8);
 
@@ -608,6 +626,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     if (fighter.ambushTimer <= 0) {
       fighter.ambushPhase = 'KATANA_CHARGE';
       fighter.ambushTimer = CONFIG.toji?.ambushKatanaChargeDuration || 30;
+      fighter._secondSeqAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+      fighter.gunAngle = fighter._secondSeqAngle;
+      fighter.angle = fighter._secondSeqAngle;
 
       const strikeSound = getSkillEffectSound('toji', 'strike');
       if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume);
@@ -616,10 +637,11 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   } else if (fighter.ambushPhase === 'KATANA_CHARGE') {
     fighter.vx = 0;
     fighter.vy = 0;
-    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-    fighter.gunAngle = aimAngle;
-    fighter.angle = aimAngle;
-    fighter.aim(opponent);
+    if (fighter._secondSeqAngle === undefined) {
+      fighter._secondSeqAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    }
+    fighter.gunAngle = fighter._secondSeqAngle;
+    fighter.angle = fighter._secondSeqAngle;
 
     opponent.vx = 0;
     opponent.vy = 0;
@@ -630,8 +652,13 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       const advanceFrames = Math.round(Math.abs(soundDelay < -10 ? soundDelay / 1000 : soundDelay) * 60);
       if (fighter.ambushTimer <= advanceFrames) {
         fighter._secondSeqAudioPlayed = true;
-        const s2Vol = secondSeqSound?.volume ?? CONFIG.toji?.soundVolumes?.secondWeaponAttack ?? 2.2;
-        audioSystem.playSFX(secondSeqSound?.src || CONFIG.toji?.sounds?.secondWeaponAttack || 'Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3', s2Vol);
+        const s2Chance = typeof CONFIG.toji?.soundChances?.secondWeaponAttack === 'number'
+          ? CONFIG.toji.soundChances.secondWeaponAttack
+          : 1.0;
+        if (fighter._ambushVoicelineAllowed && Math.random() < s2Chance) {
+          const s2Vol = secondSeqSound?.volume ?? CONFIG.toji?.soundVolumes?.secondWeaponAttack ?? 2.2;
+          audioSystem.playSFX(secondSeqSound?.src || CONFIG.toji?.sounds?.secondWeaponAttack || 'Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3', s2Vol);
+        }
       }
     }
 
@@ -653,17 +680,19 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       fighter._katanaHitApplied = false;
       fighter._slashOriginX = fighter.x;
       fighter._slashOriginY = fighter.y;
-      fighter._slashStartAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+      fighter._slashStartAngle = (fighter._secondSeqAngle !== undefined ? fighter._secondSeqAngle : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)));
       const normAngle = Math.atan2(Math.sin(fighter._slashStartAngle), Math.cos(fighter._slashStartAngle));
       fighter._slashStartFlipSign = Math.abs(normAngle) > Math.PI / 2 ? -1 : 1;
+      fighter.gunAngle = fighter._slashStartAngle;
+      fighter.angle = fighter._slashStartAngle;
     }
   } else if (fighter.ambushPhase === 'KATANA_SLASH') {
     fighter.vx = 0;
     fighter.vy = 0;
-    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-    fighter.gunAngle = aimAngle;
-    fighter.angle = aimAngle;
-    fighter.aim(opponent);
+    // Commit to the fixed slash attack trajectory — do NOT snap auto-aim to the enemy!
+    const slashAngle = (fighter._slashStartAngle !== undefined ? fighter._slashStartAngle : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)));
+    fighter.gunAngle = slashAngle;
+    fighter.angle = slashAngle;
 
     // Keep target locked in position strictly before the blade connects (frames 1-5) so the chop lands dead center!
     if (!fighter._katanaHitApplied && opponent && opponent.isTargetOfAmbush) {
@@ -703,6 +732,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     if (fighter.katanaSlashTimer <= 0) {
       fighter.katanaSlashTimer = 0;
       fighter.katanaSlashFadeTimer = 12;
+      fighter._secondSeqAngle = undefined;
       if (!fighter._katanaHitApplied) {
         fighter._katanaHitApplied = true;
         fighter.performSplitSoulKatanaSlash(opponent, ownerIndex);
@@ -717,6 +747,16 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       fighter.phantomStrikeCount = 0;
       fighter.phantomMaxStrikes = CONFIG.toji?.ambushPhantomFlurryStrikes || 10;
       fighter.phantomStrikeTimer = 3; 
+
+      const pfChance = typeof CONFIG.toji?.soundChances?.phantomFlurry === 'number'
+        ? CONFIG.toji.soundChances.phantomFlurry
+        : 1.0;
+      if (fighter._ambushVoicelineAllowed && Math.random() < pfChance) {
+        const pfSound = getSkillEffectSound('toji', 'phantomflurry');
+        const pfVol = pfSound?.volume ?? CONFIG.toji?.soundVolumes?.phantomFlurry ?? 3.0;
+        const pfDelay = pfSound?.delay ?? CONFIG.toji?.soundDelays?.phantomFlurry ?? 0;
+        audioSystem.playSFX(pfSound?.src || CONFIG.toji?.sounds?.phantomFlurry || 'Assets/Sound Effects/Skills/toji-3rdseq-phantomflurry.mp3', pfVol, pfSound?.speed || 1.0, 0, pfDelay);
+      } 
 
 
       fighter.phantomAngles = [

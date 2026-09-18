@@ -110,6 +110,13 @@ export function performMeleeAttack(fighter, opponent) {
     fighter.aim(opponent);
   }
 
+  if (fighter.isWallReboundDashing) {
+    fighter.isWallReboundDashing = false;
+    fighter.vx = 0;
+    fighter.vy = 0;
+    fighter.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+  }
+
   if (opponent && fighter.neutralStanceTimer > 0) {
     const dx = opponent.x - fighter.x;
     const dy = opponent.y - fighter.y;
@@ -301,10 +308,42 @@ export function shootBladeBarrage(fighter, ownerIndex) {
   const throwSpeed = CONFIG.mahoraga?.throwSpeed ?? 20;
 
   const spreadAngle = (Math.random() - 0.5) * (CONFIG.mahoraga?.throwSpreadAngle || 0.28);
-  const customAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : 0) + spreadAngle;
+  const gunAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const customAngle = gunAngle + spreadAngle;
 
   const throwVisuals = ['mahoragaBasaltMonolith', 'mahoragaRuinConcrete', 'mahoragaLavaRubble'];
   const visual = throwVisuals[Math.floor(Math.random() * throwVisuals.length)];
+
+  // Calculate accurate spawn coordinates from the actively lunging throw hand
+  const r = fighter.r || 30;
+  const bodyAngle = fighter.angle || 0;
+  const shotsLeft = fighter.throwBarrageShotsLeft !== undefined ? fighter.throwBarrageShotsLeft : 0;
+  const isRightArmTurn = (shotsLeft % 2 === 0);
+
+  let spawnX, spawnY;
+  if (isRightArmTurn) {
+    // Right hand gauntlet
+    const shoulderX = r * 0.55;
+    const shoulderY = 0;
+    const rotatedShoulderX = shoulderX * Math.cos(bodyAngle) - shoulderY * Math.sin(bodyAngle);
+    const rotatedShoulderY = shoulderX * Math.sin(bodyAngle) + shoulderY * Math.cos(bodyAngle);
+    const handDist = r * 0.3 + 48;
+    spawnX = fighter.x + rotatedShoulderX + Math.cos(gunAngle) * handDist;
+    spawnY = fighter.y + rotatedShoulderY + Math.sin(gunAngle) * handDist;
+  } else {
+    // Left hand fist
+    const leftShoulderX = -r * 0.55;
+    const leftShoulderY = 0;
+    const rotatedShoulderX = leftShoulderX * Math.cos(bodyAngle) - leftShoulderY * Math.sin(bodyAngle);
+    const rotatedShoulderY = leftShoulderX * Math.sin(bodyAngle) + leftShoulderY * Math.cos(bodyAngle);
+    let reachDist = 95;
+    if (fighter.target) {
+      const targetDist = Math.hypot(fighter.target.x - fighter.x, fighter.target.y - fighter.y);
+      reachDist = Math.max(55, Math.min(125, targetDist - r * 0.45));
+    }
+    spawnX = fighter.x + rotatedShoulderX + Math.cos(gunAngle) * reachDist;
+    spawnY = fighter.y + rotatedShoulderY + Math.sin(gunAngle) * reachDist;
+  }
 
   const proj = projectileSystem.fireProjectile(
     fighter,
@@ -314,8 +353,8 @@ export function shootBladeBarrage(fighter, ownerIndex) {
     throwSpeed,
     false,
     visual,
-    undefined,
-    undefined,
+    spawnX,
+    spawnY,
     customAngle
   );
 
@@ -326,9 +365,9 @@ export function shootBladeBarrage(fighter, ownerIndex) {
     proj.skillShotColor = '#8B4513';
   }
 
-  const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
-  const swordVol = (CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0) * 0.35;
-  audioSystem.playSFX(swordSnd, swordVol);
+  const throwSnd = CONFIG.mahoraga?.sounds?.throwSound || 'Assets/Sound Effects/Attacks/shurikenthrow.mp3';
+  const throwVol = (CONFIG.mahoraga?.soundVolumes?.throwSound ?? 0.65);
+  audioSystem.playSFX(throwSnd, throwVol);
 }
 
 /**

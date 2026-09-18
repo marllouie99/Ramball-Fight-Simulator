@@ -431,6 +431,22 @@
                   <span class="subview-heading">SETTINGS</span>
                 </div>
                 <div class="subview-cards-list">
+                  <div class="tactical-card system-card" data-action="open-hud-settings">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 2h12v9H2V2z M5 12h6v2H5v-2z M4 14h8v1H4v-1z" fill="#ffffff"/>
+                        <path d="M3 3h10v7H3V3z" fill="#21050c"/>
+                        <path d="M5 5h4v1H5V5z M5 7h6v1H5V7z" fill="#ffb8cb"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">HUD SETTINGS</span>
+                        <button class="tactical-chip-btn">CONFIGURE ▶</button>
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="tactical-card system-card" data-action="toggle-theme">
                     <div class="card-left-emblem">
                       <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
@@ -625,6 +641,112 @@
                       <div class="card-title-row">
                         <span class="card-title">ARENA TITLE</span>
                         <button id="btn-arenatitle" class="tactical-chip-btn">OFF</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 6: HUD SETTINGS SUB-VIEW -->
+              <div id="menu-view-hud-settings" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="settings">◀ BACK</button>
+                  <span class="subview-heading">HUD SETTINGS</span>
+                </div>
+                <div class="subview-cards-list">
+                  <!-- 1. Master HUD Visibility -->
+                  <div class="tactical-card system-card" data-action="toggle-hud-master">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 2h14v12H1V2z" fill="#ffffff"/>
+                        <path d="M2 3h12v10H2V3z" fill="#21050c"/>
+                        <path d="M4 5h8v6H4V5z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">ALL HUD ELEMENTS</span>
+                        <button id="btn-hud-master" class="tactical-chip-btn">VISIBLE</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 2. Health Bars (Bottom Cards & Overhead) -->
+                  <div class="tactical-card system-card" data-action="toggle-hud-healthbars">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 5h12v6H2V5z" fill="#ffffff"/>
+                        <path d="M3 6h10v4H3V6z" fill="#21050c"/>
+                        <path d="M4 7h6v2H4V7z" fill="#22c55e"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">HEALTH BARS</span>
+                        <button id="btn-hud-healthbars" class="tactical-chip-btn">SHOW</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 3. HUD Skill Progress Bars -->
+                  <div class="tactical-card system-card" data-action="toggle-hud-skillbars">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 10h3v4H2v-4z M6 6h3v8H6V6z M10 2h3v12h-3V2z" fill="#ffffff"/>
+                        <path d="M3 11h1v2H3v-2z M7 7h1v6H7V7z M11 3h1v10h-1V3z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">HUD SKILL BARS</span>
+                        <button id="btn-hud-skillbars" class="tactical-chip-btn">SHOW ALL</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 4. HUD Fighter Stats -->
+                  <div class="tactical-card system-card" data-action="toggle-hud-stats">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 14h14v1H1v-1z M2 11l3-4 3 3 5-7v3h2V2h-4v2h2L9 9 6 6 2 11z" fill="#ffffff"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">HUD STATS</span>
+                        <button id="btn-hud-stats" class="tactical-chip-btn">SHOW</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 5. HUD Display Mode (Skill Bars vs Description) -->
+                  <div class="tactical-card system-card" data-action="toggle-hud-displaymode">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 2h12v9H2V2z M5 12h6v2H5v-2z M4 14h8v1H4v-1z" fill="#ffffff"/>
+                        <path d="M3 3h10v7H3V3z" fill="#21050c"/>
+                        <path d="M5 5h4v1H5V5z M5 7h6v1H5V7z" fill="#ffb8cb"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">CARD CONTENT</span>
+                        <button id="btn-hud-displaymode" class="tactical-chip-btn">SKILL BARS</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 6. Overhead Floating HP Numbers -->
+                  <div class="tactical-card system-card" data-action="toggle-hud-overheadhp">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M4 3h8v2H4V3z M6 6h4v2H6V6z M7 9h2v4H7V9z" fill="#ffffff"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">OVERHEAD HP NUMBERS</span>
+                        <button id="btn-hud-overheadhp" class="tactical-chip-btn">SHOW</button>
                       </div>
                     </div>
                   </div>

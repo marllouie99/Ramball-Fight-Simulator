@@ -373,8 +373,8 @@ export class CJFighter extends Fighter {
       return false; // Total damage immunity!
     }
 
-    // 2. JETPACK AIRBORNE EVASION MECHANIC
-    if (this.isJetpackActive && !isHeal && amount > 0 && !isGuaranteedHit) {
+    // 2. JETPACK AIRBORNE EVASION MECHANIC (disabled if chained by Makima)
+    if (this.isJetpackActive && !this.isChainedByMakima && !isHeal && amount > 0 && !isGuaranteedHit) {
       const isTickOrBeam = Boolean(
         opts && (
           opts.isPureLoveBeam ||
@@ -1933,6 +1933,7 @@ export class CJFighter extends Fighter {
    */
   drawHealth(ctx) {
     if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
+    if (CONFIG.hudHideAll || CONFIG.hudHideHealthBars || CONFIG.hudHideOverheadHp) return;
     if (this.hp <= 0 || this._isWinnerReveal || this._isFaceOff || (this.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
 
     const z = this.z || 0;

@@ -110,7 +110,7 @@ export class MusashiFighter extends Fighter {
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
 
     // Preemptive Strike counter (teleport behind attacker when hit)
-    if (this.preemptiveActiveTimer > 0 && attacker && !opts.isCounter && !isGuaranteedHit) {
+    if (this.preemptiveActiveTimer > 0 && attacker && !opts.isCounter && !isGuaranteedHit && !this.isChainedByMakima) {
       this.preemptiveActiveTimer = 0;
       spawnFloatingText(this.x, this.y - this.r - 10, 'PREEMPTIVE STRIKE!', '#ff00ff');
       
@@ -151,8 +151,8 @@ export class MusashiFighter extends Fighter {
       return false; 
     }
 
-    // Void Stance: 100% dodge chance (unless guaranteed hit, time stopped or stunned)
-    if (this.currentStance === 'void' && !isGuaranteedHit && !(this.timeStopTimer > 0) && !(this.electricStunTimer > 0)) {
+    // Void Stance: 100% dodge chance (unless guaranteed hit, time stopped, stunned, or chained by Makima)
+    if (this.currentStance === 'void' && !isGuaranteedHit && !this.isChainedByMakima && !(this.timeStopTimer > 0) && !(this.electricStunTimer > 0)) {
       if (Math.random() < CONFIG.musashi.voidDodgeChance) {
         spawnFloatingText(this.x, this.y - this.r - 5, 'DODGE', '#8a2be2');
         return false;

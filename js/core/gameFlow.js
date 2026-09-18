@@ -876,7 +876,7 @@ export function startNextRound() {
   state.announcerSubtitle = '';
   const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
   stopAllSounds(false, 0, 0);
-  stopAllLoopingSounds(0, 0, is1v1Mode); // Stop any lingering audio loops from previous round (preserve BGM in 1v1)
+  stopAllLoopingSounds(0, 0, true); // Stop any lingering audio loops from previous round (preserve BGM)
   clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
   reinitFighters();
   clearProjectiles();
@@ -914,7 +914,7 @@ export function restartCurrentRound() {
   state.announcerSubtitle = '';
   const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
   stopAllSounds(false, 0, 0);
-  stopAllLoopingSounds(0, 0, is1v1Mode);
+  stopAllLoopingSounds(0, 0, true); // Preserve BGM across round restarts
   clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
   reinitFighters();
   clearProjectiles();
@@ -964,9 +964,8 @@ function playAnnouncerSoundWithFallback(soundKey, onEndedCallback) {
 }
 
 export function startCountdown() {
-  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
   stopAllSounds(false, 0, 0);
-  stopAllLoopingSounds(0, 0, is1v1Mode);
+  stopAllLoopingSounds(0, 0, true);
   state.countdownTimer = 0;
   state.gameState = 'countdown';
   state.announcerSoundHandle = null;
@@ -980,10 +979,8 @@ export function startCountdown() {
   state.announcerTimeoutIds.forEach(id => clearTimeout(id));
   state.announcerTimeoutIds = [];
 
-  // 1v1 Game Mode: Start background music if not already playing (forceNew = false ensures continuous playback across rounds)
-  if (is1v1Mode) {
-    startArenaBgm(false);
-  }
+  // Start background music if not already playing (forceNew = false ensures continuous playback across rounds for all modes)
+  startArenaBgm(false);
 
   // Reset Cursed Energy combat aura for JJK fighters during countdown
   if (state.fighters) {
@@ -1048,6 +1045,8 @@ export function resetMatch(showFaceOff = true) {
   // Stop all sounds immediately when resetting match (no fade delay)
   stopAllSounds(false, 0, 0);
   stopAllLoopingSounds(0, 0);
+  stopArenaBgm(true);
+  state.activeMatchBgmSrc = null;
 
   clearHealthHud(); // Flush DOM and Map cache
   reinitFighters(true); // Reinit with new match flag to clear cooldowns/stacks
@@ -1079,9 +1078,13 @@ export function goToTitle() {
   state.announcerSubtitle = '';
 
   // Stop all sounds immediately when returning to title (no fade delay)
-  stopAllSounds(false, 0, 0);
+  stopAllSounds(false, 0, 0, true);
   stopAllLoopingSounds(0, 0);
+  stopArenaBgm(true);
+  state.activeMatchBgmSrc = null;
   
+  state._isRespectMusicPlaying = false;
+  state._respectMusicHandle = null;
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
   state.cheatNotification = null;

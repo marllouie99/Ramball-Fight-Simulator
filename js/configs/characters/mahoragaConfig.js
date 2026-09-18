@@ -48,10 +48,10 @@ export const mahoragaConfig = {
     wheelAdaptationSpeedMultiplier: 0.05, // Movement speed multiplier gained per wheel rotation / adaptation stage (+15% per stage)
     adaptationSpeedBoostPerStage: 0.05, // +15% movement speed multiplier per gold adaptation stage
     movementSpeedMultiplierPerAdaptation: 0.01, // Movement speed multiplier per wheel adaptation stage
-    rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
+    rctRegenPerStage: 0.10,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
     enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique healing on wheel click
     rctHealPercent: 0.50,            // Percentage of max HP healed on each wheel rotation click (0.15 = 15% max HP)
-    defBuffPerClickPercent: 0.02,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
+    defBuffPerClickPercent: 0.05,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,         // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,      // Maximum speed/KB resistance factor under stasis (60% max)
@@ -66,10 +66,11 @@ export const mahoragaConfig = {
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 to 1.0)
     afterimageLifetimeFrames: 12,    // Lifetime frames for teleport afterimage ghosts (12 frames = ~0.20s)
     adaptationDashSpeedFrames: 10,   // Supersonic flash-dash travel frame duration (smaller = faster)
+    postDashPauseFrames: 20,         // Duration (frames) Mahoraga pauses in place after dashing forward to enemy before moving naturally (~1.0s @ 60fps)
 
     // ── Sword of Extermination & Basic Melee Attacks ──
     swordRange: 50,               // Melee reach (110px frontal arc) for Sword of Extermination
-    swordCooldown: 50,              // Frames between sword strikes (0.5s at 60fps)
+    swordCooldown: 20,              // Frames between sword strikes (0.5s at 60fps)
     swordDamage: 4,                // True damage dealt by Sword of Extermination
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
     swordAnimFrames: 18,            // Duration (frames) of sword chop swing animation
@@ -189,6 +190,10 @@ export const mahoragaConfig = {
         parry: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
         shieldBlock: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
 
+        // Debris Throw Skill
+        throwSound: 'Assets/Sound Effects/Attacks/shurikenthrow.mp3',
+        throwImpact: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+
         // Movement, Teleport & Flash Blitz
         dash: 'Assets/Sound Effects/Skills/dash5.mp3',
         teleportDash: 'Assets/Sound Effects/Skills/dash3.mp3',
@@ -207,6 +212,8 @@ export const mahoragaConfig = {
         wheelClick: 0.50,
         wheelEnhance: 0.50,
         swordSwing: 0.50,
+        throwSound: 0.65,
+        throwImpact: 0.50,
         fleshHit: 0.50,
         punch: 0.20,
         parry: 0.50,
@@ -224,6 +231,8 @@ export const mahoragaConfig = {
         wheelClick: 0,
         wheelEnhance: 0,
         swordSwing: 0,
+        throwSound: 0,
+        throwImpact: 0,
         fleshHit: 0,
         punch: 0,
         parry: 0,

@@ -73,13 +73,18 @@ export class YutaFighter extends Fighter {
     this.rctCooldown = 0;
     this.damageWindow = [];
 
-    // Phantom Flurry
+    // Phantom Flurry & Thin Ice Breaker
     this.parryCount = 0;
     this.parryStacks = 0;
     this.targetParriesForFlurry = this._getRandomParryThreshold();
+    this.basicAttackHitCount = 0;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
+    this.flurrySlashTimer = 0;
+    this.isChannelingThinIceBreaker = false;
+    this.thinIceBreakerChargeTimer = 0;
+    this.thinIceBreakerPunchTimer = 0;
     this.afterImages = [];
     this.lastParryCounterType = null;
     this.posHistory = [];
@@ -181,7 +186,7 @@ export class YutaFighter extends Fighter {
                      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
                      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
     if (isHardCC) return false;
-    if (this.isFiringPureLoveBeam || this.isChannelingPureLoveBeam || (this.rikaEmergingForBeamTimer > 0) || (this.pureLoveBeamBreatherTimer > 0)) return false; // Disable aim rotation while channeling, emerging, or firing the beam!
+    if (this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return false; // Disable aim rotation ONLY while firing the beam or during post-beam breather!
     return true;
   }
 
@@ -210,7 +215,7 @@ export class YutaFighter extends Fighter {
   }
 
   aim(target) {
-    if (this.isFiringPureLoveBeam || this.isChannelingPureLoveBeam || (this.rikaEmergingForBeamTimer > 0)) {
+    if (this.isFiringPureLoveBeam) {
       if (this.pureLoveBeamLockedAngle !== undefined) {
         this.gunAngle = this.pureLoveBeamLockedAngle;
         this.angle = this.pureLoveBeamLockedAngle;
@@ -222,8 +227,8 @@ export class YutaFighter extends Fighter {
   }
 
   _getRandomParryThreshold() {
-    const min = CONFIG.yuta.flurryParryMin || 5;
-    const max = CONFIG.yuta.flurryParryMax || 5;
+    const min = CONFIG.yuta?.flurryParryMin || 3;
+    const max = CONFIG.yuta?.flurryParryMax || 3;
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
@@ -237,9 +242,16 @@ export class YutaFighter extends Fighter {
     this.parryCount = 0;
     this.parryStacks = 0;
     this.targetParriesForFlurry = this._getRandomParryThreshold();
+    this.basicAttackHitCount = 0;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
+    this.flurrySlashTimer = 0;
+    this.meleeCooldown = 0;
+    this.blockPoseTimer = 0;
+    this.isChannelingThinIceBreaker = false;
+    this.thinIceBreakerChargeTimer = 0;
+    this.thinIceBreakerPunchTimer = 0;
     this.afterImages = [];
     this.lastParryCounterType = null;
     this.posHistory = [];
@@ -649,31 +661,29 @@ export class YutaFighter extends Fighter {
         this.flurryHitsLeft--;
         this.flurryTimer = CONFIG.yuta.flurryHitInterval || 7;
 
-        // Query nearby valid enemy targets (fighters & illusions/minions) within 450px
-        const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-        let possibleTargets = state.fighters.filter((f, idx) => {
-          if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0 || (f.vanishTimer && f.vanishTimer > 0)) return false;
-          const enemyTeam = state.getFighterTeam(idx);
-          if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) return false;
-          return Math.hypot(f.x - this.x, f.y - this.y) < 450;
-        });
-
-        if (state.illusions) {
-          state.illusions.forEach(ill => {
-            const isControlledRika = this.isMakimaControlledRikaTarget(ill);
-            if (!ill || ill.hp <= 0 || (!isControlledRika && (ill.owner === this || ill.isRika)) || (ill.vanishTimer && ill.vanishTimer > 0)) return;
-            if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
-            if (Math.hypot(ill.x - this.x, ill.y - this.y) < 450) {
-              possibleTargets.push(ill);
-            }
+        // Ensure flurryTarget is valid; if dead or missing, acquire best available target
+        if (!this.flurryTarget || this.flurryTarget.isDead || (this.flurryTarget.hp || 0) <= 0) {
+          const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
+          let possibleTargets = (state.fighters || []).filter((f, idx) => {
+            if (!f || f === this || f.hp <= 0 || f.isDead) return false;
+            const enemyTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
+            if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) return false;
+            return true;
           });
-        }
 
-        if (possibleTargets.length > 0) {
-          if (this.flurryTarget && this.flurryTarget.hp > 0 && Math.random() < 0.6 && possibleTargets.includes(this.flurryTarget)) {
-            // Keep primary target
-          } else {
-            this.flurryTarget = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+          if (state.illusions) {
+            state.illusions.forEach(ill => {
+              const isControlledRika = this.isMakimaControlledRikaTarget(ill);
+              if (!ill || ill.hp <= 0 || ill.isDead || (!isControlledRika && (ill.owner === this || ill.isRika))) return;
+              if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
+              possibleTargets.push(ill);
+            });
+          }
+
+          if (possibleTargets.length > 0) {
+            this.flurryTarget = possibleTargets[0];
+          } else if (opponent && !opponent.isDead && (opponent.hp || 0) > 0) {
+            this.flurryTarget = opponent;
           }
         }
 
@@ -690,7 +700,14 @@ export class YutaFighter extends Fighter {
           const targetX = this.flurryTarget.x;
           const targetY = this.flurryTarget.y;
 
-          this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSkill: true, isYutaFlurry: true });
+          this.flurryTarget.takeDamage(flurryDmg, this, {
+            isMelee: true,
+            isSkill: true,
+            isYutaFlurry: true,
+            isGuaranteedHit: true,
+            bypassEvade: true,
+            undodgeable: true
+          });
           spawnFloatingText(targetX, targetY - 10, 'SLASH!', '#FF1493');
           spawnSparks(targetX, targetY, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
 
@@ -847,8 +864,21 @@ export class YutaFighter extends Fighter {
         this.rika.hp = Math.max(0, this.rika.hp - drainPerFrame);
       }
 
-      // Lock cardinal firing stance fixed in place; do not continuously auto-aim or rotate while channeling
-      const beamAngle = (this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0));
+      // Auto-aim continuously at enemy target while charging Pure Love Beam
+      let targetEnemy = opponent;
+      if (!targetEnemy || targetEnemy.isDead || (targetEnemy.hp || 0) <= 0) {
+        const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
+        targetEnemy = (state && state.fighters) ? state.fighters.find((f, idx) => {
+          if (!f || f.hp <= 0 || f === this || f.isDead) return false;
+          const eTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
+          return myTeam === null || eTeam === null || myTeam !== eTeam;
+        }) : null;
+      }
+      if (targetEnemy && !targetEnemy.isDead) {
+        this.aim(targetEnemy);
+      }
+
+      const beamAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
       this.gunAngle = beamAngle;
       this.angle = beamAngle;
 
@@ -1054,7 +1084,7 @@ export class YutaFighter extends Fighter {
       if (this.pureLoveBeamBreatherTimer === 0) {
         this.pureLoveBeamChargeTimer = 0;
         this.pureLoveBeamLockedAngle = undefined;
-        const opp = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+        const opp = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving)) : null);
         this.resumeMovement(opp, 1.0);
       }
       return; // Pause actions during post-beam breather recovery
@@ -1185,14 +1215,7 @@ export class YutaFighter extends Fighter {
       this.vy = ((this.beamRetreatTargetY - this.beamRetreatStartY) / slideTotalFrames) * deriv;
 
       if (this.beamRetreatTargetEnemy && !this.beamRetreatTargetEnemy.isDead) {
-        const targetY = (this.beamRetreatTargetEnemy.y !== undefined ? this.beamRetreatTargetEnemy.y : this.y) - (this.beamRetreatTargetEnemy.z || 0);
-        const yutaY = this.y - (this.z || 0);
-        const dx = (this.beamRetreatTargetEnemy.x !== undefined ? this.beamRetreatTargetEnemy.x : this.x) - this.x;
-        const dy = targetY - yutaY;
-        const aimAngle = Math.atan2(dy, dx);
-        this.pureLoveBeamLockedAngle = aimAngle;
-        this.gunAngle = aimAngle;
-        this.angle = aimAngle;
+        this.aim(this.beamRetreatTargetEnemy);
       }
 
       // Spawn slide dust particles and pink afterimages every 2 frames
@@ -1212,19 +1235,7 @@ export class YutaFighter extends Fighter {
 
         const targetEnemy = this.beamRetreatTargetEnemy;
         if (targetEnemy && !targetEnemy.isDead) {
-          const targetY = (targetEnemy.y !== undefined ? targetEnemy.y : this.y) - (targetEnemy.z || 0);
-          const yutaY = this.y - (this.z || 0);
-          const dx = (targetEnemy.x !== undefined ? targetEnemy.x : this.x) - this.x;
-          const dy = targetY - yutaY;
-          const aimAngle = Math.atan2(dy, dx);
-          this.pureLoveBeamLockedAngle = aimAngle;
-          this.gunAngle = aimAngle;
-          this.angle = aimAngle;
-        } else {
-          const fallback = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
-          this.pureLoveBeamLockedAngle = fallback;
-          this.gunAngle = fallback;
-          this.angle = fallback;
+          this.aim(targetEnemy);
         }
 
         // Trigger pre-beam Rika emergence phase once retreat slide has fully stopped!
@@ -1241,10 +1252,22 @@ export class YutaFighter extends Fighter {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
 
-      if (this.pureLoveBeamLockedAngle !== undefined) {
-        this.gunAngle = this.pureLoveBeamLockedAngle;
-        this.angle = this.pureLoveBeamLockedAngle;
+      let targetEnemy = opponent || this.beamRetreatTargetEnemy;
+      if (!targetEnemy || targetEnemy.isDead || (targetEnemy.hp || 0) <= 0) {
+        const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
+        targetEnemy = (state && state.fighters) ? state.fighters.find((f, idx) => {
+          if (!f || f.hp <= 0 || f === this || f.isDead) return false;
+          const eTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
+          return myTeam === null || eTeam === null || myTeam !== eTeam;
+        }) : null;
       }
+      if (targetEnemy && !targetEnemy.isDead) {
+        this.aim(targetEnemy);
+      }
+
+      const beamAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+      this.gunAngle = beamAngle;
+      this.angle = beamAngle;
 
       if (this.rika) {
         const prog = (25 - this.rikaEmergingForBeamTimer) / 25;
@@ -1252,7 +1275,6 @@ export class YutaFighter extends Fighter {
         this.rikaAlpha = Math.min(1.0, prog);
 
         // Glue Rika directly behind Yuta's back pointing straight in beam firing direction
-        const beamAngle = (this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0));
         this.rika.beamFollowAngle = beamAngle;
 
         const backAngle = beamAngle + Math.PI;
@@ -1266,20 +1288,6 @@ export class YutaFighter extends Fighter {
 
       // Transition to actual beam channeling once the emergence delay finishes
       if (this.rikaEmergingForBeamTimer === 0) {
-        if (this.pureLoveBeamLockedAngle === undefined) {
-          const target = opponent || this.beamRetreatTargetEnemy;
-          if (target && !target.isDead) {
-            const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
-            const yutaY = this.y - (this.z || 0);
-            const dx = (target.x !== undefined ? target.x : this.x) - this.x;
-            const dy = targetY - yutaY;
-            this.pureLoveBeamLockedAngle = Math.atan2(dy, dx);
-          } else {
-            this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
-          }
-        }
-        this.gunAngle = this.pureLoveBeamLockedAngle;
-        this.angle = this.pureLoveBeamLockedAngle;
         this.isChannelingPureLoveBeam = true;
         this.pureLoveBeamChargeTimer = 0;
       }
@@ -1347,19 +1355,7 @@ export class YutaFighter extends Fighter {
         this.beamRetreatTargetEnemy = targetEnemy;
 
         if (targetEnemy && !targetEnemy.isDead) {
-          const targetY = (targetEnemy.y !== undefined ? targetEnemy.y : this.y) - (targetEnemy.z || 0);
-          const yutaY = this.y - (this.z || 0);
-          const dx = (targetEnemy.x !== undefined ? targetEnemy.x : this.x) - this.x;
-          const dy = targetY - yutaY;
-          const aimAngle = Math.atan2(dy, dx);
-          this.pureLoveBeamLockedAngle = aimAngle;
-          this.gunAngle = aimAngle;
-          this.angle = aimAngle;
-        } else {
-          const fallback = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
-          this.pureLoveBeamLockedAngle = fallback;
-          this.gunAngle = fallback;
-          this.angle = fallback;
+          this.aim(targetEnemy);
         }
 
         // Play "Come, Rika!" summon sound effect
@@ -1522,8 +1518,81 @@ export class YutaFighter extends Fighter {
     // Phantom flurry trigger logic is now handled in takeDamage() when he parries
   }
 
+  triggerPhantomFlurry(targetEntity, isParry = false) {
+    if (!targetEntity || targetEntity.isDead || (targetEntity.hp || 0) <= 0) return false;
+    if (this.isChannelingDomain || this.domainActive) return false;
+
+    if (isParry) {
+      this.parryCount = 0;
+      this.targetParriesForFlurry = this._getRandomParryThreshold();
+      
+      // Grant +1 Parry Mastery Stack (+5% parry chance bonus)
+      const maxParryStacks = CONFIG.yuta?.maxParryStacks ?? 5;
+      if ((this.parryStacks || 0) < maxParryStacks) {
+        this.parryStacks = (this.parryStacks || 0) + 1;
+      }
+    }
+
+    const dx = targetEntity.x - this.x;
+    const dy = targetEntity.y - this.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const oldX = this.x;
+    const oldY = this.y;
+
+    this.flurryGhost = { x: oldX, y: oldY };
+    this.x = targetEntity.x + (dx / dist) * (this.r + targetEntity.r + 5);
+    this.y = targetEntity.y + (dy / dist) * (this.r + targetEntity.r + 5);
+    if (targetEntity && !targetEntity.isDead) this.aim(targetEntity);
+    this.swordTrail = []; // Reset trail so it doesn't streak across the screen
+
+    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
+
+    spawnImpactFlash(oldX, oldY, 25, 'silver');
+    spawnImpactFlash(this.x, this.y, 30, 'silver');
+    audioSystem.playSFX('skill_dash3', 0.8);
+    triggerGlobalScreenShake(8, 10);
+
+    // Trigger Phantom Flurry counter/combo (which automatically completes into Thin Ice Breaker!)
+    this.blockPoseTimer = 0; // Clear block pose so he swings!
+    this.flurryHitsLeft = CONFIG.yuta?.flurryHits || 7;
+    this.flurryTimer = 0;
+    this.flurryTarget = targetEntity;
+    const attackSound = getBasicAttackSound('musashi');
+    if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
+    const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 0.35;
+    if (CONFIG.yuta?.phantomFlurryNoiseSound && Math.random() < flurryNoiseChance) {
+      audioSystem.playSFX(
+        CONFIG.yuta.phantomFlurryNoiseSound,
+        CONFIG.yuta.phantomFlurryNoiseVolume ?? 2.0,
+        1.0, 0,
+        CONFIG.yuta.phantomFlurryNoiseDelay ?? 0
+      );
+    }
+
+    return true;
+  }
+
+  registerBasicAttackHit(target) {
+    if (this.domainActive || this.isChannelingDomain) return;
+    const isAlreadyCountering = (this.flurryHitsLeft > 0) || (this.flurryTimer > 0) || this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0) || (this.flurrySlashTimer > 0);
+    if (isAlreadyCountering) return;
+
+    this.basicAttackHitCount = (this.basicAttackHitCount || 0) + 1;
+    const requiredHits = CONFIG.yuta?.flurryBasicHitsRequired ?? 5;
+
+    if (this.basicAttackHitCount >= requiredHits) {
+      this.basicAttackHitCount = 0;
+      const validTarget = (target && (!target.isDead || target.isRevivingFromContract || target.isShatterReviving) && ((target.hp || 0) > 0 || target.isRevivingFromContract || target.isShatterReviving))
+        ? target
+        : ((state.fighters && state.fighters.find(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving))) || null);
+      if (validTarget) {
+        this.triggerPhantomFlurry(validTarget, false);
+      }
+    }
+  }
+
   takeDamage(amount, attacker, opts = {}) {
-    if (this.isTargetOfAmbush) {
+    if (this.isTargetOfAmbush || this.isChainedByMakima) {
       return super.takeDamage(amount, attacker, opts);
     }
 
@@ -1545,7 +1614,7 @@ export class YutaFighter extends Fighter {
     );
 
     // Ignore unblockable damage types (including Gojo's purple orb, Nanami 7:3 Ratio Crit, domain attacks, and Saitama punches)
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isSaitamaPunch || opts.isSeriousPunch || opts.bypassShield || opts.isDivineFlame || opts.isFuga || (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')));
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isSaitamaPunch || opts.isSeriousPunch || opts.isGuaranteedHit || opts.isAmbushThrust || opts.isAmbushKatana || opts.isAmbushFlurry || opts.isTojiUltimateAssault || opts.isTojiUltimateFinalBlow || opts.isDivineFlame || opts.isFuga || (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')));
     const unblockable = isGuaranteedHit || isInsideGojoDomain || opts.isDomain || opts.isPoison || opts.isBurn || opts.isFlame || opts.isDivineFlame || opts.isFuga || opts.isExplosion || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
 
     const isGuarding = this.blockPoseTimer > 0;
@@ -1565,52 +1634,13 @@ export class YutaFighter extends Fighter {
       if (this.parryCount < this.targetParriesForFlurry) {
         this.parryCount++;
       }
-      if (this.parryCount >= this.targetParriesForFlurry && attacker && !attacker.isDead && !this.isChannelingDomain) {
-        this.parryCount = 0;
-        this.targetParriesForFlurry = this._getRandomParryThreshold();
-        
-        // Grant +1 Parry Mastery Stack (+5% parry chance bonus)
-        const maxParryStacks = CONFIG.yuta?.maxParryStacks ?? 5;
-        if ((this.parryStacks || 0) < maxParryStacks) {
-          this.parryStacks = (this.parryStacks || 0) + 1;
-        }
+      
+      const validCounterTarget = (attacker && !attacker.isDead && (attacker.hp > 0)) 
+        ? attacker 
+        : ((state.fighters && state.fighters.find(f => f && f !== this && f.hp > 0)) || null);
 
-        const dx = attacker.x - this.x;
-        const dy = attacker.y - this.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        const oldX = this.x;
-        const oldY = this.y;
-
-        this.flurryGhost = { x: oldX, y: oldY };
-        this.x = attacker.x + (dx / dist) * (this.r + attacker.r + 5);
-        this.y = attacker.y + (dy / dist) * (this.r + attacker.r + 5);
-        if (attacker && !attacker.isDead) this.aim(attacker);
-        this.swordTrail = []; // Reset trail so it doesn't streak across the screen
-
-        this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
-
-        spawnImpactFlash(oldX, oldY, 25, 'silver');
-        spawnImpactFlash(this.x, this.y, 30, 'silver');
-        audioSystem.playSFX('skill_dash3', 0.8);
-        triggerGlobalScreenShake(8, 10);
-
-        // Trigger Phantom Flurry counter (which automatically completes into Thin Ice Breaker!)
-        this.blockPoseTimer = 0; // Clear block pose so he swings!
-        this.flurryHitsLeft = CONFIG.yuta.flurryHits || 7;
-        this.flurryTimer = 0;
-        this.flurryTarget = attacker;
-        const attackSound = getBasicAttackSound('musashi');
-        if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
-        const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 0.35;
-        if (CONFIG.yuta?.phantomFlurryNoiseSound && Math.random() < flurryNoiseChance) {
-          audioSystem.playSFX(
-            CONFIG.yuta.phantomFlurryNoiseSound,
-            CONFIG.yuta.phantomFlurryNoiseVolume ?? 2.0,
-            1.0, 0,
-            CONFIG.yuta.phantomFlurryNoiseDelay ?? 0
-          );
-        }
-
+      if (this.parryCount >= this.targetParriesForFlurry && validCounterTarget && !validCounterTarget.isDead && !this.isChannelingDomain) {
+        this.triggerPhantomFlurry(validCounterTarget, true);
         return 0; // Return early, damage blocked, flurry + thin ice breaker combo started
       }
 
@@ -1799,10 +1829,8 @@ export class YutaFighter extends Fighter {
     this.pureLoveBeamActiveTimer = CONFIG.yuta?.pureLoveBeamDuration || 280;
     this.pureLoveBeamCooldownTimer = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
 
-    // Lock release angle strictly to committed cast angle (no snapping auto-aim to enemy at fire time)
-    if (this.pureLoveBeamLockedAngle === undefined) {
-      this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
-    }
+    // Lock release angle strictly to whatever angle Yuta was facing at the end of charge (NO snap auto-aim on fire!)
+    this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
     const beamAngle = this.pureLoveBeamLockedAngle;
     this.gunAngle = beamAngle;
     this.angle = beamAngle;
@@ -2216,6 +2244,12 @@ export class YutaFighter extends Fighter {
     const wasChannelingIce = this.isChannelingThinIceBreaker;
     const currentIceCharge = this.thinIceBreakerChargeTimer;
 
+    const wasFlurrying = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0);
+    const currentFlurryHits = this.flurryHitsLeft;
+    const currentFlurryTimer = this.flurryTimer;
+    const currentFlurryTarget = this.flurryTarget;
+    const currentFlurryGhost = this.flurryGhost;
+
     super.interruptAttacks(forceCancelAll);
 
     const myTeam = (typeof state !== 'undefined' && state.fighters && typeof state.getFighterTeam === 'function') 
@@ -2247,6 +2281,13 @@ export class YutaFighter extends Fighter {
       this.flurryTimer = 0;
       this.flurryTarget = null;
       return;
+    }
+
+    if (wasFlurrying) {
+      this.flurryHitsLeft = currentFlurryHits;
+      this.flurryTimer = currentFlurryTimer;
+      this.flurryTarget = currentFlurryTarget;
+      this.flurryGhost = currentFlurryGhost;
     }
 
     // Hyper-Armor Protection: Preserve Yuta's domain channeling against normal hitstun/slashes/blasts!

@@ -14,6 +14,7 @@ import { drawTanjiroSkin } from '../fighters/tanjiroSkin.js';
 import { drawZenitsuSkin } from '../fighters/zenitsuSkin.js';
 import { drawNezukoSkin } from '../fighters/nezukoSkin.js';
 import { drawPowerSkin } from '../fighters/powerSkin.js';
+import { drawZeusSkin } from '../fighters/zeusSkin.js';
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -170,13 +171,13 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'TOJI',
     asset: 'toji-hair.png',
     assetDims: '1345 x 1170',
-    baseW: 2.85,
-    baseH: 2.10,
-    baseCrownY: -1.45,
-    visW: 1123,
-    visH: 908,
-    centerX: 686,
-    topY: 136,
+    baseW: 2.45,
+    baseH: 1.85,
+    baseCrownY: -1.30,
+    visW: 1274,
+    visH: 960,
+    centerX: 677.5,
+    topY: 86,
     themeColor: '#7D3224',
     forms: [
       { id: 'default', label: 'STANDARD' }
@@ -232,6 +233,20 @@ export const SKIN_STUDIO_FIGHTERS = [
     themeColor: '#fb923c',
     forms: [
       { id: 'default', label: 'STANDARD' }
+    ]
+  },
+  {
+    key: 'zeus',
+    label: 'ZEUS',
+    asset: 'Procedural Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.30,
+    baseH: 2.00,
+    baseCrownY: -1.20,
+    themeColor: '#00bfff',
+    forms: [
+      { id: 'default', label: 'OLYMPIAN' },
+      { id: 'storm', label: 'DIVINE WRATH' }
     ]
   }
 ];
@@ -556,6 +571,11 @@ export function drawSkinStudioScreen() {
         drawNezukoSkin(ctx, dummyFighter);
       } else if (fDef.key === 'power') {
         drawPowerSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'zeus') {
+        const origStorm = dummyFighter.stormActive;
+        dummyFighter.stormActive = (state.studioSkinForm === 'storm');
+        drawZeusSkin(ctx, dummyFighter);
+        dummyFighter.stormActive = origStorm;
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);

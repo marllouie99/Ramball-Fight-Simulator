@@ -232,10 +232,14 @@ export class YujiFighter extends Fighter {
     if (opponent) {
       if (Array.isArray(opponent)) {
         for (const op of opponent) {
-          if (op && !op.isDead && op.hp > 0 && !this.isTeammate(op)) enemies.push(op);
+          const isOpReforming = Boolean(op && (op.isRevivingFromContract || op.isShatterReviving));
+          if (op && (!op.isDead || isOpReforming) && (op.hp > 0 || isOpReforming) && !this.isTeammate(op)) enemies.push(op);
         }
-      } else if (!opponent.isDead && opponent.hp > 0 && !this.isTeammate(opponent)) {
-        enemies.push(opponent);
+      } else {
+        const isOpReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
+        if (opponent && (!opponent.isDead || isOpReforming) && (opponent.hp > 0 || isOpReforming) && !this.isTeammate(opponent)) {
+          enemies.push(opponent);
+        }
       }
     }
 
@@ -243,7 +247,9 @@ export class YujiFighter extends Fighter {
       if (state.fighters) {
         for (let i = 0; i < state.fighters.length; i++) {
           const f = state.fighters[i];
-          if (!f || f === this || f.hp <= 0 || f.isDead) continue;
+          const isFReforming = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving));
+          if (!f || f === this) continue;
+          if (!isFReforming && (f.hp <= 0 || f.isDead)) continue;
           if (this.isTeammate(f)) continue;
           if (!enemies.includes(f)) enemies.push(f);
         }

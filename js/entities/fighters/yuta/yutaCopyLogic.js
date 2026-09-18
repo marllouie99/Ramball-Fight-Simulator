@@ -153,8 +153,14 @@ export function executeThinIceBreaker(fighter, angle) {
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
       
       if (Math.abs(angleDiff) < coneArc / 2) {
-        // Unblockable hit via 'fromBlackHole' trick which ignores parries, plus isThinIceBreaker flag
-        target.takeDamage(damage, fighter, { fromBlackHole: true, isThinIceBreaker: true }); 
+        // Unblockable hit via 'fromBlackHole' trick which ignores parries, plus isThinIceBreaker flag and evasion bypass
+        target.takeDamage(damage, fighter, {
+          fromBlackHole: true,
+          isThinIceBreaker: true,
+          isGuaranteedHit: true,
+          bypassEvade: true,
+          undodgeable: true
+        }); 
         state.thinIceBreakerDimTimer = 18; // Trigger quick screen dim effect
         
         // Apply massive knockback
