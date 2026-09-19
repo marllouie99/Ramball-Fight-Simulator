@@ -21,6 +21,7 @@ import { drawVoidmasterPixelBody } from '../fighters/voidmasterSkin.js';
 import { drawKnightPixelBody } from '../fighters/knightSkin.js';
 import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighters/nanamiSkin.js';
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
+import { drawGenosSkin, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -49,11 +50,11 @@ let _copyToastTimer = 0;
 
 // Fighter Category Tabs in Skin Studio Modal
 export const SKIN_STUDIO_CATEGORIES = [
-  { id: 'ALL', label: 'ALL (19)', filter: () => true },
+  { id: 'ALL', label: 'ALL (20)', filter: () => true },
   { id: 'JJK', label: 'JJK (8)', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM (3)', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER (3)', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE (5)', filter: (f) => ['zeus', 'cronus', 'bomber', 'black', 'knight'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE (6)', filter: (f) => ['genos', 'zeus', 'cronus', 'bomber', 'black', 'knight'].includes(f.key) }
 ];
 
 // Fighter Definitions in Skin Studio
@@ -353,6 +354,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     forms: [
       { id: 'default', label: 'STANDARD' },
       { id: 'distorted', label: 'ISBODK CARAPACE' }
+    ]
+  },
+  {
+    key: 'genos',
+    label: 'GENOS',
+    asset: 'Genos-hair.png',
+    assetDims: '500 x 500',
+    baseW: 2.80,
+    baseH: 2.10,
+    baseCrownY: -1.35,
+    visW: 405,
+    visH: 328,
+    centerX: 253,
+    topY: 81,
+    themeColor: '#ff7700',
+    forms: [
+      { id: 'default', label: 'DEMON CYBORG' }
     ]
   }
 ];
@@ -723,6 +741,8 @@ export function drawSkinStudioScreen() {
       } else if (fDef.key === 'mahito') {
         dummyFighter.isTransformed = (state.studioSkinForm === 'distorted');
         drawMahitoSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'genos') {
+        drawGenosSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -750,6 +770,8 @@ export function drawSkinStudioScreen() {
       _drawNanamiHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'mahito') {
       _drawMahitoHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'genos') {
+      _drawGenosHair(ctx, baseRadius, isFacingLeft);
     }
     ctx.restore();
   }

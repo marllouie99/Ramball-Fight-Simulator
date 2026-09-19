@@ -205,6 +205,8 @@ export class GojoFighter extends Fighter {
     this.redBuildupPhase = false;
     this.redDetonated = false;
     this.redTargetAngle = null;
+    this.redInitialAngle = null;
+    this.redCommittedSide = null;
     this._redTargetRef = null;
     this.infinityBlockTimer = 0;
     this.teleportSlideTimer = 0;
@@ -250,6 +252,10 @@ export class GojoFighter extends Fighter {
       this.redEffectTimer = 0;
       this.redBuildupPhase = false;
       this.redDetonated = false;
+      this.redTargetAngle = null;
+      this.redInitialAngle = null;
+      this.redCommittedSide = null;
+      this._redTargetRef = null;
       this._hasPlayedRedChannelingSound = false;
       if (applyPenalty) {
         const penaltyCD = CONFIG.gojo?.interruptCooldown ?? 270;
@@ -268,6 +274,89 @@ export class GojoFighter extends Fighter {
       (this.redEffectTimer || 0) > 0 ||
       this.isChannelingRCT
     );
+  }
+
+  get channelTurnRate() {
+    if (this.isChannelingPurple) {
+      return CONFIG.gojo?.purpleChannelTurnRate ?? 0.045;
+    }
+    if (this.redBuildupPhase || (this.redEffectTimer && this.redEffectTimer > 0)) {
+      return CONFIG.gojo?.redChannelTurnRate ?? 0.045;
+    }
+    return 0.045;
+  }
+
+  applyAim(opponent, targetAngle) {
+    if (this.redEffectTimer > 0) {
+      if (this.redDetonated) {
+        // Detonated blast already committed to blast angle
+        const lockedAngle = (this.redTargetAngle !== undefined && this.redTargetAngle !== null && !Number.isNaN(this.redTargetAngle))
+          ? this.redTargetAngle
+          : (this.gunAngle || 0);
+        this.gunAngle = lockedAngle;
+        this.angle = lockedAngle;
+        return;
+      }
+
+      // Reversal Red Side-Committed Aim:
+      // Auto-aim tracks the target smoothly to ANY vertical / diagonal / forward angle on the current side,
+      // but MUST NOT rotate to the other side (cannot turn around to face behind him).
+      const currentRefAngle = (this.redInitialAngle !== undefined && this.redInitialAngle !== null && !Number.isNaN(this.redInitialAngle))
+        ? this.redInitialAngle
+        : ((this.redTargetAngle !== undefined && this.redTargetAngle !== null && !Number.isNaN(this.redTargetAngle))
+          ? this.redTargetAngle
+          : ((this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : 0));
+
+      const committedSide = this.redCommittedSide || (Math.abs(currentRefAngle) > Math.PI / 2 ? 'left' : 'right');
+      this.redCommittedSide = committedSide;
+
+      let clampedTargetAngle = targetAngle;
+      if (committedSide === 'right') {
+        // Committed to Right Side (Math.cos >= 0: [-PI/2, +PI/2])
+        if (Math.cos(targetAngle) < 0) {
+          // Target is on the other side (left hemisphere) — clamp to upper/lower vertical boundary of right side
+          clampedTargetAngle = (targetAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
+        }
+      } else {
+        // Committed to Left Side (Math.cos <= 0: Math.abs(angle) >= PI/2)
+        if (Math.cos(targetAngle) > 0) {
+          // Target is on the other side (right hemisphere) — clamp to upper/lower vertical boundary of left side
+          clampedTargetAngle = (targetAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
+        }
+      }
+
+      // Smooth tracking using redChannelTurnRate
+      const turnRate = CONFIG.gojo?.redChannelTurnRate ?? 0.045;
+      let currentAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+      while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
+      while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
+
+      let diff = clampedTargetAngle - currentAngle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+
+      let newAngle = currentAngle + diff * turnRate;
+      while (newAngle > Math.PI) newAngle -= Math.PI * 2;
+      while (newAngle < -Math.PI) newAngle += Math.PI * 2;
+
+      // Strict enforcement that newAngle does not cross to the other side
+      if (committedSide === 'right') {
+        if (Math.cos(newAngle) < 0) {
+          newAngle = (newAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
+        }
+      } else {
+        if (Math.cos(newAngle) > 0) {
+          newAngle = (newAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
+        }
+      }
+
+      this.gunAngle = newAngle;
+      this.angle = newAngle;
+      this.redTargetAngle = newAngle;
+      return;
+    }
+
+    super.applyAim(opponent, targetAngle);
   }
 
   isStationarySkillActive() {
@@ -345,6 +434,10 @@ export class GojoFighter extends Fighter {
       this.redEffectTimer = 0;
       this.redBuildupPhase = false;
       this.redDetonated = false;
+      this.redTargetAngle = null;
+      this.redInitialAngle = null;
+      this.redCommittedSide = null;
+      this._redTargetRef = null;
       this._stopRedAudio();
       if (wasChannelingRed) {
         this.redCooldown = Math.max(this.redCooldown || 0, penaltyCD);
@@ -559,24 +652,15 @@ export class GojoFighter extends Fighter {
       this.infinityActive = true;
       this.infinityCooldown = 0;
     }
-
-    // If getting meleed or hit up close, enter Melee Mode to punch back (only when not channeling skills or active purple)
+    // NOTE: Melee mode activation is deferred until AFTER the Infinity interception check below,
+    // so that Infinity has a chance to block incoming melee attacks first.
     const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 85;
     const isGojoSkillOrPurpleActive = this.isChannelingPurple || this.isChannelingDomainExpansion || this.redBuildupPhase || (this.redEffectTimer || 0) > 0 || this.isChannelingRCT || (typeof this.isPurpleActive === 'function' && this.isPurpleActive());
-    if (!isGojoSkillOrPurpleActive && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius))) {
-      if (!this.isMeleeMode && (this.meleeModeCooldown || 0) <= 0) {
-        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
-        this.isMeleeMode = true;
-        this.meleeComboCount = 0;
-        this.infinityActive = false;
-        this.infinityFadeOpacity = 0;
-        this.infinityBlockTimer = 0;
-      }
-    }
 
     // --- GOJO LIMITLESS INFINITY INTERCEPTION ---
-    // If Infinity is active (and Gojo is not in Melee Mode), Gojo intercepts incoming melee and projectile attacks, completely blocking 100% of damage!
-    const isInfinityBarrierReady = !inRubbickVoid && !this.isMeleeMode && !(attacker && (attacker.isMeleeMode || opts.isMelee)) && !this.isChainedByMakima && !isPurple && !isPurpleInFlight && !this.isTargetOfAmbush && !isTojiUltimateAssault && this.infinityActive && (this.infinityCooldown || 0) <= 0 && !this.isChannelingPurple && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && !(attacker.isAmbushing) && !(attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')) && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !opts.isBang && !opts?.projectile?.infinityBypassed;
+    // If Infinity is active, Gojo intercepts ALL incoming attacks (melee AND projectile), completely blocking 100% of damage!
+    // Melee attacks are NOT excluded — Infinity blocks everything except explicit lore bypass exceptions (Toji ISOH, Saitama Counter, adapted Mahoraga, domains, etc.)
+    const isInfinityBarrierReady = !inRubbickVoid && !this.isMeleeMode && !this.isChainedByMakima && !isPurple && !isPurpleInFlight && !this.isTargetOfAmbush && !isTojiUltimateAssault && this.infinityActive && (this.infinityCooldown || 0) <= 0 && !this.isChannelingPurple && !isSaitamaCountering && !isAttackerChannelingDomain && attacker && attacker !== this && !(attacker.isAmbushing) && !(attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')) && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !opts.isBang && !opts?.projectile?.infinityBypassed && !opts.isRatioCrit && !opts.isNanamiPause && !opts.isSureKill && !opts.isSaitamaCounter && !opts.isDomainSlash && !opts.isRed && !opts.isDivineFlame && !opts.isFuga;
     if (isInfinityBarrierReady) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
@@ -638,6 +722,7 @@ export class GojoFighter extends Fighter {
       }
     }
 
+    // Melee mode activation: Now that Infinity has had its chance to intercept, enter Melee Mode if hit by close-range melee
     const isSpatialOrRanged = Boolean(opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.isProjectile || opts.isGetsuga || opts.isFlame || opts.isDivineFlame || opts.fromDomain || opts.isTick || opts.isTickDamage || opts.isContinuous || opts.isRed);
     const isAttackerAmbushing = attacker && (attacker.isAmbushing || (attacker.isStealthed && !this.domainActive) || (attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')));
     if (!isGojoSkillOrPurpleActive && !isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
@@ -645,6 +730,9 @@ export class GojoFighter extends Fighter {
         this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
         this.isMeleeMode = true;
         this.meleeComboCount = 0;
+        this.infinityActive = false;
+        this.infinityFadeOpacity = 0;
+        this.infinityBlockTimer = 0;
       }
     }
 
@@ -905,6 +993,12 @@ export class GojoFighter extends Fighter {
     if (this.redEffectTimer > 0) {
       this.redEffectTimer--;
       if (this.redEffectTimer <= 0) {
+        this.redDetonated = false;
+        this.redBuildupPhase = false;
+        this.redTargetAngle = null;
+        this.redInitialAngle = null;
+        this.redCommittedSide = null;
+        this._redTargetRef = null;
         this.orbTransition = 0; // Trigger smooth fade in of blue orb / hollow on hands
       }
     }
@@ -1372,7 +1466,6 @@ export class GojoFighter extends Fighter {
         this.purpleChargeMax = this.is200PercentChannel ? secondCastCharge : baseCharge;
         this.isMeleeMode = false; // Disengage melee mode while channeling Hollow Purple!
         this.purpleChargeTimer = 0;
-        spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'HOLLOW PURPLE', '#8A2BE2');
 
         if (!this._hasPlayedPurpleChannelSound) {
           this._hasPlayedPurpleChannelSound = true;
@@ -1425,20 +1518,12 @@ export class GojoFighter extends Fighter {
       const maxLevitationHeight = 35;
       this.z = Math.sin(levitateProgress * Math.PI * 0.5) * maxLevitationHeight;
 
-      // Auto-aim tracking towards opponent / target while mixing Red & Blue into Purple
-      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
-      const purpleTarget = (opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
+      // Smooth auto-aim tracking while channeling Purple (no sudden snap on firing)
+      const purpleAimTarget = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving))
         ? opponent
-        : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
-          ? this.target
-          : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null));
-      if (purpleTarget && typeof purpleTarget.x === 'number' && typeof purpleTarget.y === 'number') {
-        const targetZ = purpleTarget.z || 0;
-        const myZ = this.z || 0;
-        const aimAngle = Math.atan2((purpleTarget.y - targetZ) - (this.y - myZ), purpleTarget.x - this.x);
-        this.purpleCastAngle = aimAngle;
-        this.gunAngle = aimAngle;
-        this.angle = aimAngle;
+        : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+      if (purpleAimTarget && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
+        this.aim(purpleAimTarget);
       }
 
       if (opponent && !opponent.isDead) {
@@ -1553,6 +1638,8 @@ export class GojoFighter extends Fighter {
         const dy = targetY - gojoY;
         const targetAngle = Math.atan2(dy, dx);
         this.redTargetAngle = targetAngle;
+        this.redInitialAngle = targetAngle;
+        this.redCommittedSide = Math.abs(targetAngle) > Math.PI / 2 ? 'left' : 'right';
         this.gunAngle = targetAngle;
         this.angle = targetAngle;
         this._redTargetRef = redTarget;
@@ -1562,28 +1649,24 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    // Handle Reversal Red Channeling & Buildup (Gojo stops completely to cast Red, auto-aims continuously at target)
+    // Handle Reversal Red Channeling & Buildup (auto-aim enabled on committed side, locked strictly to current side)
     if (this.redEffectTimer > 0) {
       this.vx = 0;
       this.vy = 0;
       this.applyMovementPhysics(0);
-      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
-      const redTarget = (this._redTargetRef && this._redTargetRef.hp > 0 && !this._redTargetRef.isDead && !this._redTargetRef.dead)
-        ? this._redTargetRef
-        : ((opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
+
+      // Auto-aim tracking while channeling Red (smoothly tracks on committed side)
+      if (this.redBuildupPhase && !this.redDetonated && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
+        const redAimTarget = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && opponent.hp > 0)
           ? opponent
-          : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
-            ? this.target
-            : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null)));
-      if (redTarget && typeof redTarget.x === 'number' && typeof redTarget.y === 'number') {
-        const targetZ = redTarget.z || 0;
-        const myZ = this.z || 0;
-        const aimAngle = Math.atan2((redTarget.y - targetZ) - (this.y - myZ), redTarget.x - this.x);
-        this.redTargetAngle = aimAngle;
-        this.gunAngle = aimAngle;
-        this.angle = aimAngle;
-        this._redTargetRef = redTarget;
+          : (this._redTargetRef && !this._redTargetRef.isDead && this._redTargetRef.hp > 0
+            ? this._redTargetRef
+            : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
+        if (redAimTarget) {
+          this.aim(redAimTarget);
+        }
       }
+
       this.resolveWallBounce(arena);
       return; // Stop basic attacks, melee punches, and mode switches until Red finishes!
     }
@@ -2048,6 +2131,10 @@ export class GojoFighter extends Fighter {
     if (this.isChannelingDomainExpansion) {
       return false; // Disable auto-aim while channeling Domain Expansion!
     }
+    if (this.redDetonated && (this.redEffectTimer || 0) > 0) {
+      return false; // Locked to blast angle once detonated
+    }
+    if ((this.purpleRecoveryTimer || 0) > 0) return false;
     return super.canAim();
   }
 
@@ -2058,22 +2145,12 @@ export class GojoFighter extends Fighter {
       this.angle = Math.PI / 2;
       return false;
     }
-    if (this.isChannelingPurple) {
-      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
-      const target = (opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
-        ? opponent
-        : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
-          ? this.target
-          : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null));
-      if (target && typeof target.x === 'number' && typeof target.y === 'number') {
-        const targetZ = target.z || 0;
-        const myZ = this.z || 0;
-        const aimAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
-        this.purpleCastAngle = aimAngle;
-        this.gunAngle = aimAngle;
-        this.angle = aimAngle;
-        return true;
-      }
+    if (this.redDetonated && (this.redEffectTimer || 0) > 0) {
+      const lockedAngle = (this.redTargetAngle !== undefined && this.redTargetAngle !== null && !Number.isNaN(this.redTargetAngle))
+        ? this.redTargetAngle
+        : (this.gunAngle || 0);
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
       return false;
     }
     if ((this.purpleRecoveryTimer || 0) > 0) {
@@ -2083,27 +2160,6 @@ export class GojoFighter extends Fighter {
       this.purpleCastAngle = lockedAngle;
       this.gunAngle = lockedAngle;
       this.angle = lockedAngle;
-      return false;
-    }
-    if ((this.redEffectTimer || 0) > 0 || this.redBuildupPhase) {
-      const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
-      const target = (this._redTargetRef && this._redTargetRef.hp > 0 && !this._redTargetRef.isDead && !this._redTargetRef.dead)
-        ? this._redTargetRef
-        : ((opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
-          ? opponent
-          : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
-            ? this.target
-            : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null)));
-      if (target && typeof target.x === 'number' && typeof target.y === 'number') {
-        const targetZ = target.z || 0;
-        const myZ = this.z || 0;
-        const aimAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
-        this.redTargetAngle = aimAngle;
-        this.gunAngle = aimAngle;
-        this.angle = aimAngle;
-        this._redTargetRef = target;
-        return true;
-      }
       return false;
     }
 
@@ -2309,7 +2365,7 @@ export class GojoFighter extends Fighter {
     ];
 
     for (const entity of allTargets) {
-      if (entity.owner === this || entity.isMeleeMode) continue;
+      if (entity.owner === this) continue;
       const myIdx = (state.fighters) ? state.fighters.indexOf(this) : -1;
       const entIdx = (state.fighters) ? state.fighters.indexOf(entity) : -1;
       const myTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : (this.team !== undefined ? this.team : null);
@@ -2319,8 +2375,8 @@ export class GojoFighter extends Fighter {
       // Don't interrupt or block an entity currently channeling Telekinesis
       if (entity.tkTimer > 0 || (entity.tkTarget && entity.tkTarget.hp > 0)) continue;
 
-      const isChanneling = typeof entity.isChannelingSkill === 'function' ? entity.isChannelingSkill() : false;
-      if (isChanneling || entity.isChannelingDomain || entity.isChannelingDomainExpansion) continue;
+      // Domain channeling has supreme hyper-armor and bypasses Infinity proximity collision
+      if (entity.isChannelingDomain || entity.isChannelingDomainExpansion) continue;
 
       // Saitama during Serious Skill Counter explicitly bypasses Infinity
       const isSaitamaCountering = (entity.type === 'saitama' || entity.characterId === 'saitama') &&

@@ -116,14 +116,16 @@ export function modExecuteKatanaMelee(fighter, angle) {
     spawnImpactFlash(enemy.x, enemy.y, 25);
     spawnBloodEffect(enemy, 10, fighter.targetAngle);
 
-    const pushForce = CONFIG.yuta?.meleeKnockback || 6.5;
-    const kbX = Math.cos(fighter.targetAngle) * pushForce;
-    const kbY = Math.sin(fighter.targetAngle) * pushForce;
-    if (typeof enemy.applyKnockback === 'function') {
-      enemy.applyKnockback(kbX, kbY);
-    } else {
-      enemy.vx += kbX;
-      enemy.vy += kbY;
+    const pushForce = CONFIG.yuta?.meleeKnockback ?? 0.0;
+    if (pushForce > 0) {
+      const kbX = Math.cos(fighter.targetAngle) * pushForce;
+      const kbY = Math.sin(fighter.targetAngle) * pushForce;
+      if (typeof enemy.applyKnockback === 'function') {
+        enemy.applyKnockback(kbX, kbY);
+      } else {
+        enemy.vx += kbX;
+        enemy.vy += kbY;
+      }
     }
 
     // Check for clash with Gojo or Sukuna

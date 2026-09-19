@@ -242,8 +242,8 @@ export function resolveFighterCollision(a, b) {
   if (!a || !b) return;
 
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
-  const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive);
-  const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive);
+  const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
+  const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive || b._wasFinalBlowSpin || (b.postUltimateRecoveryTimer && b.postUltimateRecoveryTimer > 0));
   if (a.isTargetOfAmbush || b.isTargetOfAmbush || aIsTojiAssault || bIsTojiAssault) return;
 
   // Telekinesis: lifted entity is in 3D air stasis and moved directly by Rubbick; skip ground circle collision push
@@ -264,8 +264,8 @@ export function resolveFighterCollision(a, b) {
   }
 
   // Toji phases through fighters during his Ultimate sequence (ethereal assassin)
-  if (a.ultimateActive && (a.characterId === 'toji' || a.type === 'toji' || a.name === 'Toji' || a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
-  if (b.ultimateActive && (b.characterId === 'toji' || b.type === 'toji' || b.name === 'Toji' || b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
+  if ((a.ultimateActive || a._wasFinalBlowSpin) && (a.characterId === 'toji' || a.type === 'toji' || a.name === 'Toji' || a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
+  if ((b.ultimateActive || b._wasFinalBlowSpin) && (b.characterId === 'toji' || b.type === 'toji' || b.name === 'Toji' || b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
 
   // Megumi phases through fighters while submerged in liquid shadow or erupting (Kage no Utsuwa)
   if (a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting) return;

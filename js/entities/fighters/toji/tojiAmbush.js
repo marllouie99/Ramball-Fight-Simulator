@@ -513,7 +513,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
           if (typeof opponent.interruptAttacks === 'function') {
             opponent.interruptAttacks(true);
           }
-          if (opponent.isFiringPureLoveBeam || opponent.isChannelingPureLoveBeam) {
+          if (opponent.isFiringPureLoveBeam || opponent.isChannelingPureLoveBeam || (opponent.rikaEmergingForBeamTimer && opponent.rikaEmergingForBeamTimer > 0)) {
             opponent.isFiringPureLoveBeam = false;
             opponent.isChannelingPureLoveBeam = false;
             opponent.pureLoveBeamActiveTimer = 0;

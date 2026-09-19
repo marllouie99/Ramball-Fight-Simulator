@@ -69,19 +69,22 @@ export const gojoConfig = {
   redBuildupFrames: 100,    // Frames of orb manifestation before detonation
   redSlowDuration: 120,     // Frames the post-detonation slow lasts (~2s at 60fps)
   redSlowMultiplier: 0.35,  // Speed multiplier while slowed by Red (35% of normal)
+  redChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Reversal Red
   redShakeIntensity: 14,    // Heavy screen shake intensity on Red detonation
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
+  redDimOpacity: 0.94,      // Opacity of the full-screen Reversal Red dim effect
+  redDimColor: '#060002',   // Deep obsidian-crimson tone of the Red dim backdrop
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
   purpleCooldown: 1500,      // Cooldown of Hollow Purple
   purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
-  purpleDamage: 25,         // Continuous piercing damage per tick
+  purpleDamage: 35,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
   purpleRadius: 50,         // Radius of Purple orb
   purpleLife: 200,         // How long Purple orb stays in arena (frames - 8.0s)
   purpleTravelTime: 20,    // Frames the orb travels before stopping
-  purpleDPS: 25,            // Damage per second dealt to enemies inside the orb
+  purpleDPS: 35,            // Damage per second dealt to enemies inside the orb
   purpleDPSInterval: 10,   // Frames between DPS ticks
   purpleSlowDuration: 60,  // Frames the slow effect lasts
   purpleSlowMultiplier: 0.20, // Speed multiplier while slowed (0.20 = 20% speed, very heavy slow)
@@ -98,6 +101,9 @@ export const gojoConfig = {
   purpleRetreatDistance: 260,       // Distance in pixels Gojo teleports backwards/away after firing Purple
   purpleHorizontalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from horizontal Left/Right for straight alignment
   purpleHorizontalCorridorHalfHeight: 40, // Strict vertical corridor half-height (40px) within which enemies trigger horizontal Purple
+  purpleDimOpacity: 0.95,           // Opacity of the full-screen Hollow Purple dim effect
+  purpleDimColor: '#04000a',        // Deep obsidian-violet tone of the Purple dim backdrop
+  purple200DimOpacity: 0.98,        // Opacity of the full-screen dim effect during 200% Hollow Purple
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
   purpleSecondCastDamageMultiplier: 5.0,   // Damage multiplier for 2nd cast (2.0 = 200%)

@@ -1,6 +1,6 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
-import { excludeGojoInfinityFromDim } from './arenaRenderer.js';
+import { excludeGojoInfinityFromDim, applyDomainArenaVignetteCutout } from './arenaRenderer.js';
 import { worldToScreen } from '../../systems/cameraSystem.js';
 
 /**
@@ -381,29 +381,199 @@ export function drawCjBaguvixDimScreen() {
 
   const cjFighter = (state.fighters?.find(f =>
     f && (f.characterId === 'cj' || f.type === 'cj' || f._def?.id === 'cj' || f._def?.type === 'cj') &&
-    (f.isBaguvixActive || f.isGodModeActive || (f.isTypingCheat && f.cheatCodeString === 'BAGUVIX'))
+    (f.isBaguvixActive || f.isGodModeActive)
   )) || (state.previewFighter && (state.previewFighter.isBaguvixActive || state.previewFighter.isGodModeActive) ? state.previewFighter : null);
 
   if (!cjFighter) return;
 
   let opacity = 0;
-  if (cjFighter.isTypingCheat && cjFighter.cheatCodeString === 'BAGUVIX') {
-    const maxTyping = (cjFighter.cheatTypingMaxTimer || 60);
-    const progress = Math.min(1.0, 1.0 - ((cjFighter.cheatTypingTimer || 0) / Math.max(1, maxTyping)));
-    opacity = 0.25 + progress * 0.45;
-  } else if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
-    opacity = CONFIG.cj?.baguvixDimOpacity || 0.75;
+  if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
+    opacity = CONFIG.cj?.baguvixDimOpacity || 0.985;
   }
 
   if (opacity < 0.01) return;
 
+  const w = canvas.width;
+  const h = canvas.height;
+
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = `rgba(6, 44, 20, ${opacity * 0.90})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 1. Deep Abyssal Obsidian / Dark Grove Street Turf Linear Gradient across full screen
+  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
+  linearGrad.addColorStop(0.0, `rgba(0, 0, 0, ${(opacity * 0.99).toFixed(3)})`);      // Pitch obsidian black top
+  linearGrad.addColorStop(0.20, `rgba(0, 4, 1, ${(opacity * 0.98).toFixed(3)})`);     // Deep dark matrix emerald shadow
+  linearGrad.addColorStop(0.50, `rgba(1, 8, 3, ${(opacity * 0.96).toFixed(3)})`);     // Grove Street dark turf void center
+  linearGrad.addColorStop(0.80, `rgba(0, 4, 1, ${(opacity * 0.98).toFixed(3)})`);     // Deep dark matrix emerald shadow
+  linearGrad.addColorStop(1.0, `rgba(0, 0, 0, ${(opacity * 0.99).toFixed(3)})`);      // Pitch obsidian black bottom
+  ctx.fillStyle = linearGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. High-contrast electric emerald / neon lime lightning aura radial gradient centered on CJ
+  const screenPos = cjFighter ? worldToScreen(cjFighter.x, cjFighter.y - (cjFighter.z || 0)) : { x: w / 2, y: h / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(w, h) * 0.92;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0.00, `rgba(0, 255, 100, ${(opacity * 0.55).toFixed(3)})`);       // Intense electric neon emerald core
+  grad.addColorStop(0.10, `rgba(34, 197, 94, ${(opacity * 0.38).toFixed(3)})`);       // Grove Street emerald energy halo
+  grad.addColorStop(0.25, `rgba(22, 101, 52, ${(opacity * 0.22).toFixed(3)})`);       // Deep forest jade ring
+  grad.addColorStop(0.48, `rgba(5, 46, 22, ${(opacity * 0.12).toFixed(3)})`);         // Dark emerald matrix void
+  grad.addColorStop(0.72, `rgba(1, 15, 6, ${(opacity * 0.05).toFixed(3)})`);          // Deep turf shadow transition
+  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 3. Dark Outer Edge Screen Corner Vignette (Deepens outer perimeter to pure pitch black)
+  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.85);
+  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+  cornerGrad.addColorStop(0.50, `rgba(0, 2, 1, ${(opacity * 0.75).toFixed(3)})`);
+  cornerGrad.addColorStop(1.0, `rgba(0, 0, 0, ${(opacity * 0.99).toFixed(3)})`);
+  ctx.fillStyle = cornerGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 4. Clear arena interior with subtle edge vignette so CJ BAGUVIX artwork is 100% visible
+  if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
+
+  // 5. Exclude Gojo Limitless Infinity Barrier from dimming
   excludeGojoInfinityFromDim(ctx);
+
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(6, 44, 20, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(0, 0, 0, ${(opacity * 0.99).toFixed(3)})`;
+}
+
+let _cjBaguvixOverlayImg = null;
+let _cjBaguvixOverlayImgLoading = false;
+
+/**
+ * Preload and retrieve CJ's BAGUVIX God Mode overlay image (Assets/Overlays/CJ-baguvix-overlay.png).
+ */
+export function getCjBaguvixOverlayImage() {
+  if (_cjBaguvixOverlayImg && _cjBaguvixOverlayImg.complete && _cjBaguvixOverlayImg.naturalWidth > 0) {
+    return _cjBaguvixOverlayImg;
+  }
+  if (!_cjBaguvixOverlayImgLoading && typeof Image !== 'undefined') {
+    _cjBaguvixOverlayImgLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _cjBaguvixOverlayImg = img;
+      _cjBaguvixOverlayImgLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn("Failed to load CJ BAGUVIX overlay image at Assets/Overlays/CJ-baguvix-overlay.png:", e);
+      _cjBaguvixOverlayImgLoading = false;
+    };
+    img.src = 'Assets/Overlays/CJ-baguvix-overlay.png';
+    _cjBaguvixOverlayImg = img;
+  }
+  return _cjBaguvixOverlayImg;
+}
+
+// Preload immediately if running in browser
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  getCjBaguvixOverlayImage();
+}
+
+/**
+ * Draws CJ's BAGUVIX God Mode Arena Overlay background.
+ * Overlays the entire arena with Assets/Overlays/CJ-baguvix-overlay.png, clipped inside arena bounds.
+ * @param {object} fighter - The CJ fighter instance
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {boolean} isClashSecondary - Whether secondary in domain clash
+ * @param {object} [options={}] - Options (e.g. { isLocal: true })
+ */
+export function renderCjBaguvixBackground(fighter, ctx, isClashSecondary = false, options = {}) {
+  if (typeof state === 'undefined' || !state || !ctx) return;
+  if (!fighter || (!fighter.isBaguvixActive && !fighter.isGodModeActive)) return;
+
+  const arena = state.arena || CONFIG.arena;
+  if (!arena) return;
+
+  const isLocal = Boolean(options.isLocal || (ctx.canvas && Math.abs(ctx.canvas.width - arena.width) < 2));
+  const ax = isLocal ? 0 : arena.x;
+  const ay = isLocal ? 0 : arena.y;
+  const aw = arena.width;
+  const ah = arena.height;
+  const ww = arena.wallWidth || 4;
+
+  ctx.save();
+
+  // 1. Clip strictly inside the arena bounds
+  ctx.beginPath();
+  if (arena.shape === 'circle') {
+    const acx = ax + aw / 2;
+    const acy = ay + ah / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (aw / 2)) - ww;
+    ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
+  } else {
+    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
+  }
+  ctx.clip();
+
+  if (isClashSecondary) {
+    ctx.globalAlpha = 0.75;
+  }
+
+  // 2. Base Pitch Abyss / Pure Black Background
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(ax, ay, aw, ah);
+
+  const cx = ax + aw / 2;
+  const cy = ay + ah / 2;
+  const maxR = Math.max(aw, ah) * 0.75;
+
+  // 3. Draw CJ BAGUVIX Arena Overlay Image (Assets/Overlays/CJ-baguvix-overlay.png) occupying the arena
+  const img = getCjBaguvixOverlayImage();
+  if (img && (img.complete || img.width > 0) && img.naturalWidth > 0) {
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling preserves crisp pixel art
+    const innerX = ax + ww;
+    const innerY = ay + ww;
+    const innerW = aw - ww * 2;
+    const innerH = ah - ww * 2;
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.cj_baguvix_overlay) || {};
+    const zoom = custom.zoom ?? ((typeof CONFIG !== 'undefined' && CONFIG.cj?.baguvixOverlayZoom !== undefined) ? CONFIG.cj.baguvixOverlayZoom : 1.0);
+    const cfgOffY = (typeof CONFIG !== 'undefined' && CONFIG.cj?.baguvixOverlayOffsetY !== undefined) ? (CONFIG.cj.baguvixOverlayOffsetY * innerH) : 0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? cfgOffY;
+    const drawW = innerW * zoom;
+    const drawH = innerH * zoom;
+    const drawX = innerX + (innerW - drawW) / 2 + offX;
+    const drawY = innerY + (innerH - drawH) / 2 + offY;
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  } else {
+    // Procedural glowing Grove Street emerald nebula fallback while asset initializes
+    const nebulaGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxR);
+    nebulaGrad.addColorStop(0, 'rgba(0, 255, 100, 0.65)');
+    nebulaGrad.addColorStop(0.20, 'rgba(34, 197, 94, 0.45)');
+    nebulaGrad.addColorStop(0.50, 'rgba(20, 83, 45, 0.28)');
+    nebulaGrad.addColorStop(0.80, 'rgba(4, 30, 12, 0.15)');
+    nebulaGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = nebulaGrad;
+    ctx.fillRect(ax, ay, aw, ah);
+  }
+
+  // 4. Dark Atmospheric Overlay & Perimeter Vignette (Heightens combat contrast)
+  const darkness = (typeof CONFIG !== 'undefined' && CONFIG.cj?.baguvixOverlayDarkness !== undefined) ? CONFIG.cj.baguvixOverlayDarkness : 0.38;
+  ctx.fillStyle = `rgba(0, 0, 0, ${darkness.toFixed(3)})`;
+  ctx.fillRect(ax, ay, aw, ah);
+
+  const vignetteGrad = ctx.createRadialGradient(cx, cy, Math.min(aw, ah) * 0.20, cx, cy, maxR);
+  vignetteGrad.addColorStop(0.00, 'rgba(0, 0, 0, 0.0)');
+  vignetteGrad.addColorStop(0.40, 'rgba(0, 0, 0, 0.0)');
+  vignetteGrad.addColorStop(0.65, 'rgba(0, 5, 2, 0.45)');
+  vignetteGrad.addColorStop(0.85, 'rgba(0, 2, 1, 0.80)');
+  vignetteGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0.98)');
+  ctx.fillStyle = vignetteGrad;
+  ctx.fillRect(ax, ay, aw, ah);
+
+  // 5. Exclude Gojo Limitless Infinity Barrier from dark overlay (Rule #9)
+  excludeGojoInfinityFromDim(ctx);
+
+  ctx.restore();
 }
 

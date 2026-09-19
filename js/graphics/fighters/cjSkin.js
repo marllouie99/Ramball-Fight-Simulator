@@ -939,11 +939,177 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
   ctx.restore();
 }
 
+let _cjBaguvixAuraFrames = [null, null, null];
+let _cjBaguvixAuraFramesLoading = false;
+
+/**
+ * Preload and retrieve the frame-by-frame PNG animation frames for CJ's BAGUVIX God Mode Aura.
+ */
+export function getCjBaguvixAuraFrames() {
+  if (_cjBaguvixAuraFrames[0] && _cjBaguvixAuraFrames[0].complete &&
+      _cjBaguvixAuraFrames[1] && _cjBaguvixAuraFrames[1].complete &&
+      _cjBaguvixAuraFrames[2] && _cjBaguvixAuraFrames[2].complete) {
+    return _cjBaguvixAuraFrames;
+  }
+  if (!_cjBaguvixAuraFramesLoading && typeof Image !== 'undefined') {
+    _cjBaguvixAuraFramesLoading = true;
+    const framePaths = [
+      'Assets/model/AnimationFrames/CJ-baguvix-aura_frame_1.png',
+      'Assets/model/AnimationFrames/CJ-baguvix-aura_frame_2.png',
+      'Assets/model/AnimationFrames/CJ-baguvix-aura_frame_3.png'
+    ];
+    framePaths.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _cjBaguvixAuraFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load CJ BAGUVIX aura frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _cjBaguvixAuraFrames[idx] = img;
+    });
+  }
+  return _cjBaguvixAuraFrames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  getCjBaguvixAuraFrames();
+}
+
+/**
+ * Draws CJ's authentic animated frame-by-frame BAGUVIX Ki Flame Aura
+ * using Assets/model/AnimationFrames/CJ-baguvix-aura_frame_[1-3].png.
+ */
+function _drawCjBaguvixAnimatedAura(ctx, r) {
+  const frames = getCjBaguvixAuraFrames();
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const frameIdx = Math.floor(now / 85) % 3;
+  const img = frames[frameIdx] || frames[0];
+
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.cj_baguvix_aura) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+
+    // The 724x724 frame has a body cutout height of ~265px centered at (355, 542.5)
+    // Scale so character diameter 2r fits the hollow cavity:
+    const scale = (r * 2.0) / 265;
+    const drawW = 724 * scale * wMult;
+    const drawH = 724 * scale * hMult;
+    const drawX = -355 * scale * wMult + offX;
+    const drawY = -542.5 * scale * hMult + offY;
+
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  }
+}
+
+/**
+ * Draws subtle upward-rising 2D pixel sparks (#22C55E / #EAB308) matching the flame frame color theme.
+ * Dynamically accentuates high-speed movement when CJ flies or sprints with BAGUVIX active.
+ * Rule 11 (Zero shadowBlur), Rule 19 (Upright Front POV), and discrete P = 2.0px compliant.
+ */
+function _drawCjBaguvixPixelSparks(ctx, r, fighter) {
+  const custom = (typeof state !== 'undefined' && state.skinCustomizations?.cj_baguvix_aura) || {};
+  if (custom.hideSparks) return;
+
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  const vx = (fighter && typeof fighter.vx === 'number') ? fighter.vx : 0;
+  const vy = (fighter && typeof fighter.vy === 'number') ? fighter.vy : 0;
+  const speedMag = Math.hypot(vx, vy);
+  const isFlying = Boolean(
+    (fighter && fighter.isJetpackActive) ||
+    (fighter && fighter.z && fighter.z > 0)
+  );
+
+  // Speed multiplier: faster upward rush and higher spark density when flying or sprinting
+  const speedBoost = isFlying ? 1.75 : (1.0 + Math.min(1.25, speedMag * 0.20));
+  const sparkCount = isFlying || speedMag > 2.0 ? 18 : 12;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const sparkPalette = [
+    { core: '#FFFFFF', outer: '#22C55E' }, // Emerald Green with White Core
+    { core: '#FEF08A', outer: '#EAB308' }, // Golden Yellow with Light Core
+    { core: '#FFFFFF', outer: '#4ADE80' }, // Mint Neon Green
+    { core: '#FDE047', outer: '#F59E0B' }, // Warm Amber Gold
+    { core: '#FFFFFF', outer: '#16A34A' }, // Deep Grove Emerald
+  ];
+
+  for (let i = 0; i < sparkCount; i++) {
+    // Unique deterministic seed per spark (zero runtime allocation)
+    const seed = i * 79.19 + (i % 3) * 31.7;
+    const period = (1100 + (i % 7) * 160) / speedBoost;
+    const progress = ((now * 0.9 + seed * 12) % period) / period; // 0.0 -> 1.0 rising
+
+    // Upward vertical span from feet (+Y) to flame tip / crown (-Y)
+    const startY = r * 1.05;
+    const endY = -r * 3.4;
+    const curY = snap(startY + (endY - startY) * progress);
+
+    // Natural swaying width that narrows towards flame apex
+    const spreadW = (r * 1.35) * (1.15 - progress * 0.55);
+    const baseX = Math.sin(seed * 3.7) * spreadW;
+    const swayX = Math.sin((now * 0.006) + i * 1.4) * (r * 0.22);
+    const curX = snap(baseX + swayX);
+
+    // Fade-in at ground and smooth fade-out near top
+    let alpha = 1.0;
+    if (progress < 0.12) {
+      alpha = progress / 0.12;
+    } else if (progress > 0.65) {
+      alpha = Math.max(0, (1.0 - progress) / 0.35);
+    }
+
+    if (alpha <= 0.02) continue;
+
+    ctx.globalAlpha = alpha;
+    const col = sparkPalette[i % sparkPalette.length];
+
+    // High-speed vertical elongation: 2x2 px when hovering, 2x4 px when flying/sprinting
+    const isElongated = (isFlying || speedMag > 2.5) && (i % 2 === 0);
+    const sparkH = isElongated ? P * 2 : P;
+    const sparkW = P;
+
+    // 1. Dark Manga Ink Outline shell (1px border)
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(curX - P, curY - P, sparkW + P * 2, sparkH + P * 2);
+
+    // 2. Thematic Emerald / Gold Outer Glow pixel
+    ctx.fillStyle = col.outer;
+    ctx.fillRect(curX, curY, sparkW, sparkH);
+
+    // 3. Specular White / Light Core Center
+    ctx.fillStyle = col.core;
+    ctx.fillRect(curX, curY, P, P);
+
+    // 4. Subtle Speed Trail Tail when flying/sprinting fast
+    if ((isFlying || speedMag > 3.0) && progress > 0.2 && progress < 0.8) {
+      const trailY = snap(curY + P * 2);
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.fillStyle = col.outer;
+      ctx.fillRect(curX, trailY, P, P);
+    }
+  }
+
+  ctx.restore();
+}
+
 /**
  * Draws Stepped Pixel Art Matrix Barrier & Floating Cash Dollar Glyph ($) Aura in Dark Mode (Saitama Tech)
  */
-function _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = false) {
-  if (!isGodMode && !isHesoyamActive && !isRespectAura) return;
+function _drawCjPixelCheatAura(ctx, r, isHesoyamActive, isRespectAura = false) {
+  if (!isHesoyamActive && !isRespectAura) return;
 
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const time = now * 0.0035;
@@ -953,8 +1119,8 @@ function _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura
   const snap = (v) => Math.round(v / P) * P;
 
   // 1. Stepped Pixel Matrix Barrier Rings
-  const ringCount = isGodMode ? 3 : 2;
-  const ringColor = (isGodMode || isRespectAura) ? '#F59E0B' : '#22C55E';
+  const ringCount = 2;
+  const ringColor = isRespectAura ? '#F59E0B' : '#22C55E';
 
   for (let i = 0; i < ringCount; i++) {
     const waveProgress = ((time * 0.45 + i * (1.0 / ringCount)) % 1.0);
@@ -972,7 +1138,7 @@ function _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura
   }
 
   // 2. Stepped Pixel Cash Dollar Signs ($)
-  const particleCount = isGodMode ? 8 : 5;
+  const particleCount = 5;
   for (let p = 0; p < particleCount; p++) {
     const pAngle = time * 1.8 + (p * (Math.PI * 2 / particleCount));
     const pDist = snap(r * (1.35 + Math.sin(time * 2.5 + p) * 0.25));
@@ -981,7 +1147,7 @@ function _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura
 
     ctx.fillStyle = '#0E0F14';
     ctx.fillRect(px - 4, py - 6, 8, 12);
-    ctx.fillStyle = isGodMode ? '#FDE047' : '#4ADE80';
+    ctx.fillStyle = '#4ADE80';
     // Pixel 8-bit Dollar symbol ($)
     ctx.fillRect(px - 2, py - 4, 4, 1);
     ctx.fillRect(px - 3, py - 3, 2, 2);
@@ -999,14 +1165,14 @@ let _cachedGodModeShieldGrad = null;
 let _cachedHesoyamShieldGrad = null;
 
 /**
- * Draws BAGUVIX God-Mode & Cheat Code Matrix Aura
+ * Draws Cheat Code Matrix Aura (HESOYAM and Respect)
  * Rule 11 & Rule 12 Compliant: Zero shadowBlur, zero per-frame text measurements, cached gradients.
  */
-function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = false) {
-  if (!isGodMode && !isHesoyamActive && !isRespectAura) return;
+function _drawCjCheatAura(ctx, r, isHesoyamActive, isRespectAura = false) {
+  if (!isHesoyamActive && !isRespectAura) return;
 
   if (_isDarkMode()) {
-    _drawCjPixelCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura);
+    _drawCjPixelCheatAura(ctx, r, isHesoyamActive, isRespectAura);
     return;
   }
 
@@ -1016,9 +1182,9 @@ function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = fa
   ctx.save();
 
   // ── 1. Expanding Golden / Emerald God Mode Barrier Rings ──
-  const isGolden = (isGodMode || isRespectAura);
+  const isGolden = isRespectAura;
   const primaryColor = isGolden ? 'rgba(245, 158, 11, ' : 'rgba(34, 197, 94, ';
-  const ringCount = isGodMode ? 3 : 2;
+  const ringCount = 2;
 
   for (let i = 0; i < ringCount; i++) {
     const waveProgress = ((time * 0.45 + i * (1.0 / ringCount)) % 1.0);
@@ -1035,8 +1201,8 @@ function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = fa
   ctx.setLineDash([]);
 
   // ── 2. Floating Cash Dollar Signs ($) & Binary Cheat Particles (Rule 12: Geometric rendering) ──
-  const particleCount = isGodMode ? 8 : 5;
-  const dollarColor = isGodMode ? '#FDE047' : '#4ADE80';
+  const particleCount = 5;
+  const dollarColor = '#4ADE80';
   for (let p = 0; p < particleCount; p++) {
     const pAngle = time * 1.8 + (p * (Math.PI * 2 / particleCount));
     const pDist = r * (1.35 + Math.sin(time * 2.5 + p) * 0.25);
@@ -1056,23 +1222,13 @@ function _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura = fa
   }
 
   // ── 3. Subtle Radial Shield Glow Fills (Cached Gradients - Rule 11) ──
-  if (isGolden) {
-    if (!_cachedGodModeShieldGrad) {
-      _cachedGodModeShieldGrad = ctx.createRadialGradient(0, 0, r * 0.80, 0, 0, r * 1.55);
-      _cachedGodModeShieldGrad.addColorStop(0, 'rgba(245, 158, 11, 0.10)');
-      _cachedGodModeShieldGrad.addColorStop(0.70, 'rgba(245, 158, 11, 0.25)');
-      _cachedGodModeShieldGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-    }
-    ctx.fillStyle = _cachedGodModeShieldGrad;
-  } else {
-    if (!_cachedHesoyamShieldGrad) {
-      _cachedHesoyamShieldGrad = ctx.createRadialGradient(0, 0, r * 0.80, 0, 0, r * 1.55);
-      _cachedHesoyamShieldGrad.addColorStop(0, 'rgba(34, 197, 94, 0.10)');
-      _cachedHesoyamShieldGrad.addColorStop(0.70, 'rgba(34, 197, 94, 0.25)');
-      _cachedHesoyamShieldGrad.addColorStop(1, 'rgba(34, 197, 94, 0)');
-    }
-    ctx.fillStyle = _cachedHesoyamShieldGrad;
+  if (!_cachedHesoyamShieldGrad) {
+    _cachedHesoyamShieldGrad = ctx.createRadialGradient(0, 0, r * 0.80, 0, 0, r * 1.55);
+    _cachedHesoyamShieldGrad.addColorStop(0, 'rgba(34, 197, 94, 0.10)');
+    _cachedHesoyamShieldGrad.addColorStop(0.70, 'rgba(34, 197, 94, 0.25)');
+    _cachedHesoyamShieldGrad.addColorStop(1, 'rgba(34, 197, 94, 0)');
   }
+  ctx.fillStyle = _cachedHesoyamShieldGrad;
   ctx.beginPath();
   ctx.arc(0, 0, r * 1.55, 0, Math.PI * 2);
   ctx.fill();
@@ -1192,9 +1348,13 @@ export function drawCjSkin(ctx, fighter) {
   const easePunch = isPunching ? Math.sin(rawProgress * Math.PI) : 0;
   const lungeExtension = easePunch * (r * 1.35);
 
-  // Hand Position Coordinates
-  let frontX = r * 0.95, frontY = 0;
-  let backX = 0, backY = 0;
+  // Hand Position Coordinates (positioned in the lower torso/waist area)
+  const customHand = (typeof state !== 'undefined' && state.skinCustomizations?.cj_hand) || {};
+  const baseHandY = customHand.offsetY !== undefined ? customHand.offsetY : (r * 0.35);
+  const baseHandX = customHand.offsetX !== undefined ? (r * 0.95 + customHand.offsetX) : (r * 0.95);
+
+  let frontX = baseHandX, frontY = baseHandY;
+  let backX = 0, backY = baseHandY;
   let hideFrontHand = false;
   let hideBackHand = true;
 
@@ -1216,14 +1376,14 @@ export function drawCjSkin(ctx, fighter) {
     frontY = r * 0.38;
   } else if (isJetpackActive && !isUziActive) {
     hideBackHand = true;
-    frontX = r * 0.95;
-    frontY = 0;
+    frontX = baseHandX;
+    frontY = baseHandY;
   } else if (isPunching) {
-    frontX = r * 0.95 + lungeExtension * 1.40;
-    frontY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
+    frontX = baseHandX + lungeExtension * 1.40;
+    frontY = baseHandY + Math.sin(rawProgress * Math.PI) * (r * 0.15);
   } else {
-    frontX = r * 0.95;
-    frontY = 0;
+    frontX = baseHandX;
+    frontY = baseHandY;
   }
 
   const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
@@ -1234,7 +1394,7 @@ export function drawCjSkin(ctx, fighter) {
   const skinColor = '#8D5538'; // Authentic warm brown skin tone
 
   // Status checks for Jetpack & Cheats
-  const isGodMode = Boolean(fighter.isBaguvixActive || fighter.isGodModeActive);
+  const isGodMode = Boolean(fighter.isBaguvixActive || fighter.isGodModeActive || previewIdx === 3);
   const isHesoyamActive = Boolean(fighter.hesoyamShield && fighter.hesoyamShield > 0);
   const isRespectAura = Boolean(
     fighter.isGroveStreetOg ||
@@ -1242,8 +1402,12 @@ export function drawCjSkin(ctx, fighter) {
     (fighter.respect && fighter.respect >= 50)
   );
 
-  // ── LAYER 0: JETPACK & CHEAT AURA (Background Layer) ──
-  _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura);
+  // ── LAYER 0: JETPACK, CHEAT AURA & BAGUVIX ANIMATED KI AURA (Background Layer) ──
+  if (isGodMode) {
+    _drawCjBaguvixAnimatedAura(ctx, r);
+    _drawCjBaguvixPixelSparks(ctx, r, fighter);
+  }
+  _drawCjCheatAura(ctx, r, isHesoyamActive, isRespectAura);
   _drawCjJetpack(ctx, r, isJetpackActive);
 
   // ── LAYER 1: BACK HAND (Behind Body Layer — Left Micro-Uzi / Minigun Forward Grip / Fist) ──

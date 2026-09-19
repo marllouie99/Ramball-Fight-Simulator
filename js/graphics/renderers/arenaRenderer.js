@@ -432,7 +432,7 @@ export function drawArena() {
     return;
   }
 
-  const hasActiveDomain = state.fighters && state.fighters.some(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive) && typeof f.drawDomainBackground === 'function');
+  const hasActiveDomain = state.fighters && state.fighters.some(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
 
   // 1. Draw outer background container (Original Colors)
   if (typeof window !== 'undefined' && window.PIXI && pixiApp && pixiLayers?.arena) {
@@ -544,7 +544,7 @@ export function drawArena() {
       ctx.restore();
     } else if (hasActiveDomain && !state.pixiApp) {
       // In native Canvas 2D mode, render active domain background under camera transform
-      const activeDomainFighter = state.fighters?.find(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive) && typeof f.drawDomainBackground === 'function');
+      const activeDomainFighter = state.fighters?.find(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
       if (activeDomainFighter) {
         ctx.save();
         applyCameraToCtx(ctx);
@@ -588,232 +588,6 @@ export function drawArena() {
   }
 
   // 5. Watermark removed for clean arena floor
-
-  const centerX = arena.x + arena.width / 2;
-
-  // 5b. Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA")
-  if (state.fighters && state.fighters.length > 0 && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-    const isPrimaryFighter = (f) => Boolean(
-      f &&
-      !f.isTurret &&
-      !f.isMinion &&
-      !f.isDeployable &&
-      !f.isIceWall &&
-      !f.isIllusion &&
-      !f.isRika &&
-      !f.isEvasionMinion &&
-      !f.isTransfiguredHuman &&
-      !f.isClone &&
-      !f.owner &&
-      f.type !== 'Turret' &&
-      f.type !== 'turret' &&
-      f.type !== 'Dispenser' &&
-      f.type !== 'dispenser' &&
-      !f._def?.isTurret &&
-      !f._def?.isMinion
-    );
-
-    const mainFighters = state.fighters.filter(isPrimaryFighter);
-    if (mainFighters.length > 0) {
-      const textY = arena.y - 12;
-      ctx.save();
-      applyCameraToCtx(ctx);
-      const nameFont = '700 42px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-      const vsFont = '700 24px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
-      const accentFont = vsFont;
-      const ampFont = vsFont;
-
-      ctx.font = nameFont;
-      ctx.textBaseline = 'bottom';
-      if ('letterSpacing' in ctx) {
-        ctx.letterSpacing = '2px';
-      }
-
-      const getFighterThemeColor = (f, fallbackColor = '#38BDF8') => {
-        if (!f) return fallbackColor;
-        const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
-        if (isYuta) return '#FF1493';
-        return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
-      };
-
-      const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
-      const is2v2 = (state.mode === '2v2' || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES?.TWO_VS_TWO || state.mode === GAME_MODES?.TACTICAL_2V2);
-      const is4v4 = (state.mode === '4v4' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES?.TACTICAL_4V4);
-
-      let team0 = [];
-      let team1 = [];
-
-      if (typeof state.getFighterTeam === 'function') {
-        mainFighters.forEach(f => {
-          const origIdx = state.fighters.indexOf(f);
-          const t = state.getFighterTeam(origIdx);
-          if (t === 0) team0.push(f);
-          else if (t === 1) team1.push(f);
-        });
-      }
-
-      if (team0.length === 0 && team1.length === 0) {
-        if (is1v2 && mainFighters.length >= 3) {
-          team0 = [mainFighters[0]];
-          team1 = [mainFighters[1], mainFighters[2]];
-        } else if (is2v2 && mainFighters.length >= 4) {
-          team0 = [mainFighters[0], mainFighters[1]];
-          team1 = [mainFighters[2], mainFighters[3]];
-        } else if (mainFighters.length === 2) {
-          team0 = [mainFighters[0]];
-          team1 = [mainFighters[1]];
-        }
-      }
-
-      const isTeamMatch = (team0.length > 0 && team1.length > 0 && (team0.length + team1.length === mainFighters.length));
-
-      if (isTeamMatch) {
-        const team0Data = team0.map(f => ({
-          name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-          color: getFighterThemeColor(f, '#38BDF8')
-        }));
-
-        const team1Data = team1.map(f => ({
-          name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-          color: getFighterThemeColor(f, '#F87171')
-        }));
-
-        const hasStackedTeam = team0.length > 1 || team1.length > 1;
-        const nameFontSize = hasStackedTeam ? 34 : 42;
-        const customNameFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-        const vsFontSize = hasStackedTeam ? 22 : 24;
-        const customVsFont = `700 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-
-        ctx.font = customNameFont;
-        if ('letterSpacing' in ctx) {
-          ctx.letterSpacing = '2px';
-        }
-
-        let wTeam0 = 0;
-        team0Data.forEach(td => {
-          wTeam0 = Math.max(wTeam0, ctx.measureText(td.name).width);
-        });
-
-        let wTeam1 = 0;
-        team1Data.forEach(td => {
-          wTeam1 = Math.max(wTeam1, ctx.measureText(td.name).width);
-        });
-
-        ctx.font = customVsFont;
-        if ('letterSpacing' in ctx) {
-          ctx.letterSpacing = '1.5px';
-        }
-        const vsText = 'vs';
-        const wVs = ctx.measureText(vsText).width;
-
-        const pad = 14;
-        const totalW = wTeam0 + pad + wVs + pad + wTeam1;
-        const maxW = arena.width - 16;
-        const scale = totalW > maxW ? maxW / totalW : 1.0;
-
-        const bottomY = arena.y - 12;
-        const lineSpacing = hasStackedTeam ? 34 : 0;
-        const topY = bottomY - lineSpacing;
-        const midY = (topY + bottomY) / 2;
-
-        ctx.save();
-        if (scale < 1.0) {
-          const scaleAnchorY = hasStackedTeam ? midY : bottomY;
-          ctx.translate(centerX, scaleAnchorY);
-          ctx.scale(scale, scale);
-          ctx.translate(-centerX, -scaleAnchorY);
-        }
-
-        const startX = centerX - totalW / 2;
-        const vsX = startX + wTeam0 + pad;
-        const team1X = vsX + wVs + pad;
-
-        ctx.textAlign = 'left';
-
-        // Render Team 0 (Left Side)
-        ctx.font = customNameFont;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
-        if (team0Data.length === 1) {
-          ctx.fillStyle = team0Data[0].color;
-          ctx.fillText(team0Data[0].name, startX, hasStackedTeam ? midY : bottomY);
-        } else {
-          ctx.fillStyle = team0Data[0].color;
-          ctx.fillText(team0Data[0].name, startX, topY);
-          ctx.fillStyle = team0Data[1].color;
-          ctx.fillText(team0Data[1].name, startX, bottomY);
-        }
-
-        // Render Center "vs"
-        ctx.font = customVsFont;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
-        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-        ctx.fillText(vsText, vsX, (hasStackedTeam ? midY : bottomY) - 1.5);
-
-        // Render Team 1 (Right Side)
-        ctx.font = customNameFont;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
-        if (team1Data.length === 1) {
-          ctx.fillStyle = team1Data[0].color;
-          ctx.fillText(team1Data[0].name, team1X, hasStackedTeam ? midY : bottomY);
-        } else {
-          ctx.fillStyle = team1Data[0].color;
-          ctx.fillText(team1Data[0].name, team1X, topY);
-          ctx.fillStyle = team1Data[1].color;
-          ctx.fillText(team1Data[1].name, team1X, bottomY);
-        }
-
-        ctx.restore();
-      } else {
-        // Multi-fighter FFA fallback: horizontal row joined with "vs"
-        const pad = 10;
-        const vsText = 'vs';
-        const fighterData = mainFighters.map(f => ({
-          name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-          color: getFighterThemeColor(f, '#F8FAFC')
-        }));
-
-        let totalW = 0;
-        ctx.font = nameFont;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
-        fighterData.forEach((fd, i) => {
-          totalW += ctx.measureText(fd.name).width;
-          if (i < fighterData.length - 1) {
-            ctx.font = vsFont;
-            totalW += pad + ctx.measureText(vsText).width + pad;
-            ctx.font = nameFont;
-          }
-        });
-
-        const maxW = arena.width - 16;
-        const scale = totalW > maxW ? maxW / totalW : 1.0;
-        ctx.translate(centerX, textY);
-        ctx.scale(scale, 1.0);
-        ctx.translate(-centerX, -textY);
-
-        let startX = centerX - totalW / 2;
-        ctx.textAlign = 'left';
-
-        fighterData.forEach((fd, i) => {
-          ctx.font = nameFont;
-          if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
-          ctx.fillStyle = fd.color;
-          ctx.fillText(fd.name, startX, textY);
-          startX += ctx.measureText(fd.name).width;
-
-          if (i < fighterData.length - 1) {
-            startX += pad;
-            ctx.font = vsFont;
-            if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
-            ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-            ctx.fillText(vsText, startX, textY - 1.5);
-            startX += ctx.measureText(vsText).width + pad;
-          }
-        });
-      }
-
-      ctx.restore();
-    }
-  }
 
   // 6. Cached Title Header (text only)
   const showTitle = (typeof CONFIG !== 'undefined' && CONFIG.showArenaTitle !== undefined) ? CONFIG.showArenaTitle : false;
@@ -1012,9 +786,252 @@ function roundedRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x + w, y + h - r);
   ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
   ctx.lineTo(x + r, y + h);
-  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.arcTo(x, y, x + h - r, r);
   ctx.lineTo(x, y + r);
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
 }
+
+/**
+ * Draws the Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA" / "SAITAMA VS GOJO").
+ * Rendered on top of dim screens and domain barriers to ensure 100% visibility during ultimates & counters.
+ * @param {CanvasRenderingContext2D} ctx - Target canvas context
+ * @param {boolean} [alreadyInCameraSpace=false] - Whether camera transform is already applied to ctx
+ */
+export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
+  if (typeof state === 'undefined' || !state || !state.fighters || state.fighters.length === 0) return;
+  if (!ctx) return;
+  if (state.gameState !== 'playing' && state.gameState !== 'countdown' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
+
+  const arena = state.arena || CONFIG.arena;
+  if (!arena) return;
+
+  const isPrimaryFighter = (f) => Boolean(
+    f &&
+    !f.isTurret &&
+    !f.isMinion &&
+    !f.isDeployable &&
+    !f.isIceWall &&
+    !f.isIllusion &&
+    !f.isRika &&
+    !f.isEvasionMinion &&
+    !f.isTransfiguredHuman &&
+    !f.isClone &&
+    !f.owner &&
+    f.type !== 'Turret' &&
+    f.type !== 'turret' &&
+    f.type !== 'Dispenser' &&
+    f.type !== 'dispenser' &&
+    !f._def?.isTurret &&
+    !f._def?.isMinion
+  );
+
+  const mainFighters = state.fighters.filter(isPrimaryFighter);
+  if (mainFighters.length === 0) return;
+
+  const centerX = arena.x + arena.width / 2;
+  const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
+
+  ctx.save();
+  if (!alreadyInCameraSpace) {
+    applyCameraToCtx(ctx);
+  }
+
+  const nameFont = '700 42px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+  const vsFont = '700 24px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+
+  ctx.font = nameFont;
+  ctx.textBaseline = 'bottom';
+  if ('letterSpacing' in ctx) {
+    ctx.letterSpacing = '2px';
+  }
+
+  const getFighterThemeColor = (f, fallbackColor = '#38BDF8') => {
+    if (!f) return fallbackColor;
+    const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
+    if (isYuta) return '#FF1493';
+    return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
+  };
+
+  const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
+  const is2v2 = (state.mode === '2v2' || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES?.TWO_VS_TWO || state.mode === GAME_MODES?.TACTICAL_2V2);
+  const is4v4 = (state.mode === '4v4' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES?.TACTICAL_4V4);
+
+  let team0 = [];
+  let team1 = [];
+
+  if (typeof state.getFighterTeam === 'function') {
+    mainFighters.forEach(f => {
+      const origIdx = state.fighters.indexOf(f);
+      const t = state.getFighterTeam(origIdx);
+      if (t === 0) team0.push(f);
+      else if (t === 1) team1.push(f);
+    });
+  }
+
+  if (team0.length === 0 && team1.length === 0) {
+    if (is1v2 && mainFighters.length >= 3) {
+      team0 = [mainFighters[0]];
+      team1 = [mainFighters[1], mainFighters[2]];
+    } else if (is2v2 && mainFighters.length >= 4) {
+      team0 = [mainFighters[0], mainFighters[1]];
+      team1 = [mainFighters[2], mainFighters[3]];
+    } else if (mainFighters.length === 2) {
+      team0 = [mainFighters[0]];
+      team1 = [mainFighters[1]];
+    }
+  }
+
+  const isTeamMatch = (team0.length > 0 && team1.length > 0 && (team0.length + team1.length === mainFighters.length));
+
+  if (isTeamMatch) {
+    const team0Data = team0.map(f => ({
+      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      color: getFighterThemeColor(f, '#38BDF8')
+    }));
+
+    const team1Data = team1.map(f => ({
+      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      color: getFighterThemeColor(f, '#F87171')
+    }));
+
+    const hasStackedTeam = team0.length > 1 || team1.length > 1;
+    const nameFontSize = hasStackedTeam ? 34 : 42;
+    const customNameFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+    const vsFontSize = hasStackedTeam ? 22 : 24;
+    const customVsFont = `700 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+
+    ctx.font = customNameFont;
+    if ('letterSpacing' in ctx) {
+      ctx.letterSpacing = '2px';
+    }
+
+    let wTeam0 = 0;
+    team0Data.forEach(td => {
+      wTeam0 = Math.max(wTeam0, ctx.measureText(td.name).width);
+    });
+
+    let wTeam1 = 0;
+    team1Data.forEach(td => {
+      wTeam1 = Math.max(wTeam1, ctx.measureText(td.name).width);
+    });
+
+    ctx.font = customVsFont;
+    if ('letterSpacing' in ctx) {
+      ctx.letterSpacing = '1.5px';
+    }
+    const vsText = 'vs';
+    const wVs = ctx.measureText(vsText).width;
+
+    const pad = 14;
+    const totalW = wTeam0 + pad + wVs + pad + wTeam1;
+    const maxW = arena.width - 16;
+    const scale = totalW > maxW ? maxW / totalW : 1.0;
+
+    const bottomY = arena.y - 12;
+    const lineSpacing = hasStackedTeam ? 34 : 0;
+    const topY = bottomY - lineSpacing;
+    const midY = (topY + bottomY) / 2;
+
+    ctx.save();
+    if (scale < 1.0) {
+      const scaleAnchorY = hasStackedTeam ? midY : bottomY;
+      ctx.translate(centerX, scaleAnchorY);
+      ctx.scale(scale, scale);
+      ctx.translate(-centerX, -scaleAnchorY);
+    }
+
+    const startX = centerX - totalW / 2;
+    const vsX = startX + wTeam0 + pad;
+    const team1X = vsX + wVs + pad;
+
+    ctx.textAlign = 'left';
+
+    // Render Team 0 (Left Side)
+    ctx.font = customNameFont;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+    if (team0Data.length === 1) {
+      ctx.fillStyle = team0Data[0].color;
+      ctx.fillText(team0Data[0].name, startX, hasStackedTeam ? midY : bottomY);
+    } else {
+      ctx.fillStyle = team0Data[0].color;
+      ctx.fillText(team0Data[0].name, startX, topY);
+      ctx.fillStyle = team0Data[1].color;
+      ctx.fillText(team0Data[1].name, startX, bottomY);
+    }
+
+    // Render Center "vs"
+    ctx.font = customVsFont;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
+    ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
+    ctx.fillText(vsText, vsX, (hasStackedTeam ? midY : bottomY) - 1.5);
+
+    // Render Team 1 (Right Side)
+    ctx.font = customNameFont;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+    if (team1Data.length === 1) {
+      ctx.fillStyle = team1Data[0].color;
+      ctx.fillText(team1Data[0].name, team1X, hasStackedTeam ? midY : bottomY);
+    } else {
+      ctx.fillStyle = team1Data[0].color;
+      ctx.fillText(team1Data[0].name, team1X, topY);
+      ctx.fillStyle = team1Data[1].color;
+      ctx.fillText(team1Data[1].name, team1X, bottomY);
+    }
+
+    ctx.restore();
+  } else {
+    // Multi-fighter FFA fallback: horizontal row joined with "vs"
+    const pad = 10;
+    const vsText = 'vs';
+    const textY = arena.y - 12;
+    const fighterData = mainFighters.map(f => ({
+      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      color: getFighterThemeColor(f, '#F8FAFC')
+    }));
+
+    let totalW = 0;
+    ctx.font = nameFont;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+    fighterData.forEach((fd, i) => {
+      totalW += ctx.measureText(fd.name).width;
+      if (i < fighterData.length - 1) {
+        ctx.font = vsFont;
+        totalW += pad + ctx.measureText(vsText).width + pad;
+        ctx.font = nameFont;
+      }
+    });
+
+    const maxW = arena.width - 16;
+    const scale = totalW > maxW ? maxW / totalW : 1.0;
+    ctx.save();
+    ctx.translate(centerX, textY);
+    ctx.scale(scale, 1.0);
+    ctx.translate(-centerX, -textY);
+
+    let startX = centerX - totalW / 2;
+    ctx.textAlign = 'left';
+
+    fighterData.forEach((fd, i) => {
+      ctx.font = nameFont;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+      ctx.fillStyle = fd.color;
+      ctx.fillText(fd.name, startX, textY);
+      startX += ctx.measureText(fd.name).width;
+
+      if (i < fighterData.length - 1) {
+        startX += pad;
+        ctx.font = vsFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
+        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
+        ctx.fillText(vsText, startX, textY - 1.5);
+        startX += ctx.measureText(vsText).width + pad;
+      }
+    });
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
 

@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { renderGojoDomainBackground, renderRubbickDomainBackground } from '../../entities/fighters/gojo/gojoDomainVisuals.js';
 import { renderSukunaDomainBackground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { renderYutaDomainBackground, renderYutaSukunaDomainClashRift } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
-import { renderMahitoDomainBackground } from './environmentalRenderer.js';
+import { renderMahitoDomainBackground, renderCjBaguvixBackground } from './environmentalRenderer.js';
 import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
 import { drawCronosSphereVisual } from '../draw.js';
 import { isTodoTakadaOverlayActive } from './specialOverlayRenderer.js';
@@ -48,11 +48,22 @@ function getRikaSummonDimSprite() {
 let rikaRingSprite = null;
 
 let baguvixDimSprite = null;
+let baguvixBackdropSprite = null;
 let currentBaguvixDimOpacity = 0;
+
+function getBaguvixBackdropSprite() {
+  if (!baguvixBackdropSprite && state.pixiApp) {
+    baguvixBackdropSprite = new window.PIXI.Sprite(state.baseCircleTexture || window.PIXI.Texture.WHITE);
+    baguvixBackdropSprite.tint = 0x000000; // Deep pitch black background
+    baguvixBackdropSprite.anchor.set(0.5);
+    baguvixBackdropSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+  }
+  return baguvixBackdropSprite;
+}
 
 function getBaguvixDimSprite() {
   if (!baguvixDimSprite) {
-    const size = 512;
+    const size = 1024;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -61,13 +72,14 @@ function getBaguvixDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     
-    // High-contrast Grove Street emerald green radial gradient centered on CJ
+    // High-contrast Grove Street electric emerald green radial lightning gradient centered on CJ
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-    grad.addColorStop(0, 'rgba(34, 197, 94, 0.70)');    // Vibrant neon lime-green core
-    grad.addColorStop(0.12, 'rgba(22, 163, 74, 0.60)'); // Grove Street rich emerald
-    grad.addColorStop(0.35, 'rgba(20, 83, 45, 0.50)');  // Deep emerald matrix green
-    grad.addColorStop(0.70, 'rgba(6, 44, 20, 0.35)');   // Rich dark turf green
-    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');       // Fully transparent perimeter
+    grad.addColorStop(0, 'rgba(0, 255, 120, 0.60)');     // Intense electric neon lime-green core
+    grad.addColorStop(0.10, 'rgba(34, 197, 94, 0.42)');  // Grove Street rich emerald
+    grad.addColorStop(0.25, 'rgba(22, 101, 52, 0.26)');  // Deep emerald matrix green
+    grad.addColorStop(0.48, 'rgba(5, 46, 22, 0.12)');    // Dark forest emerald shadow
+    grad.addColorStop(0.72, 'rgba(1, 15, 6, 0.04)');     // Deep turf shadow transition
+    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');        // Fully transparent perimeter
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -410,6 +422,25 @@ function getRubbickDomainHybridData() {
   return rubbickDomainHybridData;
 }
 
+let cjBaguvixDomainHybridData = null;
+let cjBaguvixArenaMask = null;
+function getCjBaguvixDomainHybridData() {
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  const aw = Math.max(1, Math.round(arena.width || 450));
+  const ah = Math.max(1, Math.round(arena.height || 450));
+  if (!cjBaguvixDomainHybridData) {
+    const canvas = document.createElement('canvas');
+    canvas.width = aw;
+    canvas.height = ah;
+    const ctx = canvas.getContext('2d');
+    const texture = window.PIXI.Texture.from(canvas);
+    const sprite = new window.PIXI.Sprite(texture);
+    cjBaguvixDomainHybridData = { canvas, ctx, texture, sprite };
+  }
+  syncGojoDomainHybridDataSize(cjBaguvixDomainHybridData);
+  return cjBaguvixDomainHybridData;
+}
+
 export function updateHybridEnvironment() {
   if (!state.pixiApp || !state.pixiLayers?.environment || !state.pixiLayers?.effects) return;
 
@@ -444,6 +475,12 @@ export function updateHybridEnvironment() {
       mahitoDomainHybridData.sprite.mask = null;
       mahitoDomainHybridData.sprite.parent.removeChild(mahitoDomainHybridData.sprite);
     }
+    if (cjBaguvixDomainHybridData?.sprite?.parent) {
+      if (cjBaguvixArenaMask?.parent) cjBaguvixArenaMask.parent.removeChild(cjBaguvixArenaMask);
+      cjBaguvixArenaMask = null;
+      cjBaguvixDomainHybridData.sprite.mask = null;
+      cjBaguvixDomainHybridData.sprite.parent.removeChild(cjBaguvixDomainHybridData.sprite);
+    }
     if (furnaceDimSprite?.parent) furnaceDimSprite.parent.removeChild(furnaceDimSprite);
     if (purpleDimSprite?.parent) purpleDimSprite.parent.removeChild(purpleDimSprite);
     if (greenDimSprite?.parent) greenDimSprite.parent.removeChild(greenDimSprite);
@@ -462,6 +499,7 @@ export function updateHybridEnvironment() {
     }
     if (rikaSummonDimSprite?.parent) rikaSummonDimSprite.parent.removeChild(rikaSummonDimSprite);
     if (rikaRingSprite?.parent) rikaRingSprite.parent.removeChild(rikaRingSprite);
+    if (baguvixBackdropSprite?.parent) baguvixBackdropSprite.parent.removeChild(baguvixBackdropSprite);
     if (baguvixDimSprite?.parent) baguvixDimSprite.parent.removeChild(baguvixDimSprite);
     if (baguvixRingSprite?.parent) baguvixRingSprite.parent.removeChild(baguvixRingSprite);
 
@@ -737,12 +775,78 @@ export function updateHybridEnvironment() {
     }
   }
 
+  // 0.6 CJ BAGUVIX God Mode Arena Overlay (Assets/Overlays/CJ-baguvix-overlay.png)
+  const cjBaguvix = state.fighters?.find(f => f && 
+    (f.characterId === 'cj' || f.type === 'cj' || f._def?.id === 'cj' || f._def?.type === 'cj') && 
+    (f.isBaguvixActive || f.isGodModeActive) && 
+    f.hp > 0
+  ) || (state.previewFighter && (state.previewFighter.isBaguvixActive || state.previewFighter.isGodModeActive) ? state.previewFighter : null);
+
+  const updateCjBaguvix = (domainUpdateTick % updateInterval === 0);
+
+  if (cjBaguvix && CONFIG.cj?.baguvixOverlayEnabled !== false) {
+    const data = getCjBaguvixDomainHybridData();
+    if (!data.sprite.parent) layer.addChild(data.sprite);
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    data.sprite.x = arena.x;
+    data.sprite.y = arena.y;
+    data.sprite.width = arena.width;
+    data.sprite.height = arena.height;
+
+    if (state.arena) {
+      if (!cjBaguvixArenaMask) {
+        cjBaguvixArenaMask = new window.PIXI.Graphics();
+        layer.addChild(cjBaguvixArenaMask);
+      }
+      cjBaguvixArenaMask.clear();
+      cjBaguvixArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      const ww = arena.wallWidth || 0;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        cjBaguvixArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        cjBaguvixArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+      }
+      cjBaguvixArenaMask.endFill();
+      data.sprite.mask = cjBaguvixArenaMask;
+    } else if (data.sprite.mask) {
+      data.sprite.mask = null;
+    }
+
+    if (updateCjBaguvix || !cjBaguvix._cjBaguvixHybridReady) {
+      cjBaguvix._cjBaguvixHybridReady = true;
+      data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
+      renderCjBaguvixBackground(cjBaguvix, data.ctx, isMultiDomain && cjBaguvix !== state.fighters.find(f => f.domainActive || f.isBaguvixActive), { isLocal: true });
+      data.texture.update();
+    }
+  } else {
+    if (cjBaguvixArenaMask && cjBaguvixArenaMask.parent) {
+      cjBaguvixArenaMask.parent.removeChild(cjBaguvixArenaMask);
+      cjBaguvixArenaMask = null;
+    }
+    if (cjBaguvixDomainHybridData && cjBaguvixDomainHybridData.sprite.parent) {
+      cjBaguvixDomainHybridData.sprite.mask = null;
+      cjBaguvixDomainHybridData.sprite.parent.removeChild(cjBaguvixDomainHybridData.sprite);
+    }
+    if (state.fighters) {
+      for (const f of state.fighters) {
+        if (f && (f.characterId === 'cj' || f.type === 'cj')) {
+          f._cjBaguvixHybridReady = false;
+        }
+      }
+    }
+  }
+
   // Enforce deterministic domain Z-order sorting:
-  // Sukuna Background Dim/Floor (bottom) -> Gojo Background (middle) -> Rubbick Emerald Void -> Mahito Background/Hands (overlays Sukuna Dim, underneath Shrine) -> Yuta Background/Crosses (top)
+  // Sukuna Background Dim/Floor (bottom) -> Gojo Background (middle) -> Rubbick Emerald Void -> Mahito Background/Hands (overlays Sukuna Dim, underneath Shrine) -> CJ BAGUVIX Overlay -> Yuta Background/Crosses (top)
   if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent === layer) layer.addChild(sukunaDomainHybridData.sprite);
   if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent === layer) layer.addChild(gojoDomainHybridData.sprite);
   if (rubbickDomainHybridData && rubbickDomainHybridData.sprite.parent === layer) layer.addChild(rubbickDomainHybridData.sprite);
   if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent === layer) layer.addChild(mahitoDomainHybridData.sprite);
+  if (cjBaguvixDomainHybridData && cjBaguvixDomainHybridData.sprite.parent === layer) layer.addChild(cjBaguvixDomainHybridData.sprite);
   if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent === layer) layer.addChild(yutaDomainHybridData.sprite);
   
   // 1. Sukuna Furnace
@@ -966,7 +1070,7 @@ export function updateHybridEnvironment() {
   // 6. CJ BAGUVIX God Mode & Minigun Overdrive (100% WebGL Hybrid Acceleration - Rule 10)
   const cjFighter = (state.fighters?.find(f =>
     f && (f.characterId === 'cj' || f.type === 'cj' || f._def?.id === 'cj' || f._def?.type === 'cj') &&
-    (f.isBaguvixActive || f.isGodModeActive || (f.isTypingCheat && f.cheatCodeString === 'BAGUVIX'))
+    (f.isBaguvixActive || f.isGodModeActive)
   )) || (state.previewFighter && (state.previewFighter.isBaguvixActive || state.previewFighter.isGodModeActive) ? state.previewFighter : null);
 
   let targetBaguvixOpacity = 0;
@@ -977,13 +1081,9 @@ export function updateHybridEnvironment() {
     cjCx = cjFighter.x;
     cjCy = cjFighter.y - (cjFighter.z || 0);
 
-    if (cjFighter.isTypingCheat && cjFighter.cheatCodeString === 'BAGUVIX') {
-      const maxTyping = (cjFighter.cheatTypingMaxTimer || 60);
-      const progress = Math.min(1.0, 1.0 - ((cjFighter.cheatTypingTimer || 0) / Math.max(1, maxTyping)));
-      targetBaguvixOpacity = 0.25 + progress * 0.45;
-    } else if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
-      const baseMax = CONFIG.cj?.baguvixDimOpacity || 0.75;
-      const pulse = Math.sin(Date.now() * 0.005) * 0.04;
+    if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
+      const baseMax = CONFIG.cj?.baguvixDimOpacity || 0.985;
+      const pulse = Math.sin(Date.now() * 0.005) * 0.015;
       targetBaguvixOpacity = baseMax + pulse;
     }
   }
@@ -994,14 +1094,24 @@ export function updateHybridEnvironment() {
     currentBaguvixDimOpacity += (targetBaguvixOpacity - currentBaguvixDimOpacity) * 0.10;
   }
 
+  const baguvixBackdrop = getBaguvixBackdropSprite();
   const baguvixDim = getBaguvixDimSprite();
   const baguvixRing = getBaguvixRingSprite();
 
   if (currentBaguvixDimOpacity < 0.01) {
     currentBaguvixDimOpacity = 0;
+    if (baguvixBackdrop && baguvixBackdrop.parent) baguvixBackdrop.parent.removeChild(baguvixBackdrop);
     if (baguvixDim && baguvixDim.parent) baguvixDim.parent.removeChild(baguvixDim);
     if (baguvixRing && baguvixRing.parent) baguvixRing.parent.removeChild(baguvixRing);
   } else {
+    if (baguvixBackdrop) {
+      if (!baguvixBackdrop.parent) layer.addChildAt(baguvixBackdrop, 0);
+      baguvixBackdrop.x = state.canvas.width / 2;
+      baguvixBackdrop.y = state.canvas.height / 2;
+      baguvixBackdrop.width = state.canvas.width * 2.5;
+      baguvixBackdrop.height = state.canvas.height * 2.5;
+      baguvixBackdrop.alpha = currentBaguvixDimOpacity * 0.985;
+    }
     if (baguvixDim) {
       if (!baguvixDim.parent) layer.addChild(baguvixDim);
       baguvixDim.alpha = currentBaguvixDimOpacity;
@@ -1018,7 +1128,7 @@ export function updateHybridEnvironment() {
       baguvixRing.scale.set(rScale);
       baguvixRing.alpha = currentBaguvixDimOpacity * 0.55;
     }
-    state.globalDimEdgeColor = `rgba(6, 44, 20, ${currentBaguvixDimOpacity * 0.95})`;
+    state.globalDimEdgeColor = `rgba(0, 4, 1, ${(currentBaguvixDimOpacity * 0.99).toFixed(3)})`;
   }
 
   // Calculate and store the maximum dim opacity to allow HTML DOM overlays to dim synchronously

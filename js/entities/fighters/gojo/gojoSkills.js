@@ -93,6 +93,8 @@ export function activateRed(fighter) {
   }
 
   fighter.redTargetAngle = aimAngle;
+  fighter.redInitialAngle = aimAngle;
+  fighter.redCommittedSide = Math.abs(aimAngle) > Math.PI / 2 ? 'left' : 'right';
   fighter.gunAngle = aimAngle;
   fighter.angle = aimAngle;
 
@@ -174,21 +176,12 @@ export function detonateRed(fighter) {
   fadeOutSoundBySrc('redchanneling', 50);
   fadeOutSoundBySrc('redcharging', 50);
 
-  const target = (fighter._redTargetRef && fighter._redTargetRef.hp > 0 && !fighter._redTargetRef.isDead && !fighter._redTargetRef.dead)
-    ? fighter._redTargetRef
-    : (fighter.target && fighter.target.hp > 0 && !fighter.target.isDead && !fighter.target.dead ? fighter.target : (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null));
-
+  // Detonate Red strictly at current facing gunAngle, no instant snapping recalculation to target
   let pushAngle;
-  if (target && typeof target.x === 'number' && typeof target.y === 'number') {
-    const targetY = target.y - (target.z || 0);
-    const fighterY = fighter.y - (fighter.z || 0);
-    const dx = target.x - fighter.x;
-    const dy = targetY - fighterY;
-    pushAngle = Math.atan2(dy, dx);
-  } else if (fighter.redTargetAngle !== undefined && !Number.isNaN(fighter.redTargetAngle)) {
-    pushAngle = fighter.redTargetAngle;
-  } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+  if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
     pushAngle = fighter.gunAngle;
+  } else if (fighter.redTargetAngle !== undefined && fighter.redTargetAngle !== null && !Number.isNaN(fighter.redTargetAngle)) {
+    pushAngle = fighter.redTargetAngle;
   } else {
     pushAngle = 0;
   }
@@ -277,7 +270,7 @@ export function detonateRed(fighter) {
 
         // Damage target
         if (typeof f.takeDamage === 'function') {
-          f.takeDamage(redDamage, fighter, { isRed: true, isSkill: true, isAdaptableSkillShot: true, skillShotId: 'red' });
+          f.takeDamage(redDamage, fighter, { isRed: true, isSkill: true, isAdaptableSkillShot: true, skillShotId: 'red', bypassEvade: true, isGuaranteedHit: true });
         }
 
         // Heavy directional knockback pushing enemies away along the repulsion blast vector
@@ -316,6 +309,11 @@ export function detonateRed(fighter) {
     }
   }
 
+  // Strictly enforce Gojo's gunAngle and facing angle remain on the committed blast vector
+  fighter.redTargetAngle = pushAngle;
+  fighter.gunAngle = pushAngle;
+  fighter.angle = pushAngle;
+
   // Visual: Spawn Blazing Frontal Supersonic Red Shockwave Laser Corridor
   if (typeof spawnGojoRedFrontalBlast === 'function') {
     spawnGojoRedFrontalBlast(fighter.x, fighter.y, pushAngle, frontalReach, frontalArc);
@@ -353,21 +351,12 @@ export function firePurple(fighter, ownerIndex) {
 
   let purpleLife = CONFIG.gojo?.purpleLife ?? 480;
 
-  const target = (fighter.target && fighter.target.hp > 0 && !fighter.target.isDead && !fighter.target.dead)
-    ? fighter.target
-    : (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
-
+  // Fire Purple strictly at current facing gunAngle, no instant snapping recalculation to target
   let releaseAngle;
-  if (target && typeof target.x === 'number' && typeof target.y === 'number') {
-    const targetY = target.y - (target.z || 0);
-    const fighterY = fighter.y - (fighter.z || 0);
-    const dx = target.x - fighter.x;
-    const dy = targetY - fighterY;
-    releaseAngle = Math.atan2(dy, dx);
+  if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+    releaseAngle = fighter.gunAngle;
   } else if (fighter.purpleCastAngle !== undefined && fighter.purpleCastAngle !== null && !Number.isNaN(fighter.purpleCastAngle)) {
     releaseAngle = fighter.purpleCastAngle;
-  } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
-    releaseAngle = fighter.gunAngle;
   } else {
     releaseAngle = 0;
   }
@@ -498,9 +487,11 @@ export function executePurpleRetreat(fighter, releaseAngle) {
   const teleportVol = sTeleport?.volume ?? 0.65;
   audioSystem.playSFX(teleportSrc, teleportVol);
 
-  const target = (typeof fighter._findClosestEnemy === 'function') ? fighter._findClosestEnemy() : null;
-  if (target && !target.isDead && typeof fighter.aim === 'function' && !fighter.isTargetOfAmbush && (fighter.timeStopTimer || 0) <= 0) {
-    fighter.aim(target);
+  // Keep facing the direction of the fired Hollow Purple during retreat & breather recovery
+  if (releaseAngle !== undefined && !Number.isNaN(releaseAngle)) {
+    fighter.gunAngle = releaseAngle;
+    fighter.angle = releaseAngle;
+    fighter.purpleCastAngle = releaseAngle;
   }
 }
 

@@ -11,30 +11,30 @@ export const genosConfig = {
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  damage: 14,
+  damage: 6,
   cooldown: 27,
   projectileSpeedMultiplier: 1.4,
   ability: 'Incinerate',
   desc: 'Demon Cyborg. Zones with explosive basic blasts, Rocket Stomps to close in, and uses a devastating continuous fire beam. Explodes upon defeat.',
 
   // Basic Attack: Incineration Palms (Ranged Fire Blasts)
-  blastDamage: 14,
+  blastDamage: 6,
   blastRange: 350,
-  blastSpeed: 10,
+  blastSpeed: 15,
   blastAoeRadius: 35,
-  blastCooldown: 27, // ~0.45s at 60fps
+  blastCooldown: 40, // ~0.45s at 60fps
 
   // Basic Attack Ammo & Stance System (Ranged Incineration Fireballs -> Melee Punches)
   maxHeatAmmo: 20,          // Maximum ranged fireball capacity before switching to melee mode
   ammoReloadFrames: 500,    // Reload cooldown duration (300 frames = 5.0 seconds at 60fps)
   maxMeleeDashes: 10,        // Maximum thruster dashes allowed during Melee Mode
-  meleePunchDamage: 16,    // Base damage per melee punch in Melee Mode
-  meleePunchReach: 65,     // Melee punch reach distance (px)
+  meleePunchDamage: 6,    // Base damage per melee punch in Melee Mode
+  meleePunchReach: 40,     // Melee punch reach distance (px)
   meleePunchCooldown: 15,  // Cooldown between melee punches (~0.3s)
 
   // Skill 1: Machine Gun Blows (Flurry)
   initialFlurryCooldown: 1200,  // Starts on cooldown at match start (~8.0s at 60fps)
-  flurryDamage: 10,
+  flurryDamage: 7,
   flurryHitCount: 15,
   flurryReach: 65,
   flurryArcAngle: Math.PI * 0.5, // 90 degree arc
@@ -47,9 +47,9 @@ export const genosConfig = {
     rocketDash: {
       cooldown: 360,     // 6 seconds at 60fps
       distance: 200,     // Distance of the dash (px)
-      duration: 18,      // 0.3s dash duration (frames)
-      speed: 0.25,       // Easing interpolation step per frame (0.25 = 25% smooth step)
-      stompDamage: 30,   // Ground stomp damage on landing
+      duration: 100,      // 0.3s dash duration (frames)
+      speed: 0.55,       // Easing interpolation step per frame (0.25 = 25% smooth step)
+      stompDamage: 10,   // Ground stomp damage on landing
       stompRadius: 75,   // Ground stomp radius (px)
       stompKnockback: 14, // Push velocity applied to targets caught in stomp
       triggerRange: 120, // AI distance threshold (px) to trigger Rocket Stomp
@@ -71,18 +71,18 @@ export const genosConfig = {
   dashDistance: 200,
   dashDuration: 18,
   dashSpeed: 0.25,
-  stompDamage: 30,
+  stompDamage: 10,
   stompRadius: 75,
   stompKnockback: 14,
   meleePunchKnockback: 9.0,
   blastProjectileRadius: 9,
 
   // Ultimate: Spiral Incineration Cannon
-  initialUltCooldown: 800, // Initial cooldown at match start (28s at 60fps)
+  initialUltCooldown: 1000, // Initial cooldown at match start (28s at 60fps)
   ultCooldown: 800, // 28 seconds at 60fps
   ultWindupFrames: 60, // 1.0s windup
   ultDurationFrames: 120, // 2.0s beam duration
-  ultDamagePerTick: 15,
+  ultDamagePerTick: 4,
   ultTickInterval: 6, // 10 ticks per second (300 total damage)
   ultBeamWidth: 60,
   ultBeamRange: 1200, // 1200px beam range across full arena (matches Hyperion's beam length)
@@ -108,7 +108,7 @@ export const genosConfig = {
   selfDestructCountdownFrames: 150, // 2.5 seconds
   selfDestructDamageReduction: 0.50, // 75% Damage Reduction (DEF) while charging core overload self-destruct
   selfDestructRadius: 200,
-  selfDestructDamage: 250, // True damage explosion
+  selfDestructDamage: 200, // True damage explosion
   selfDestructKnockback: 20, // Push velocity applied to targets caught in blast
   selfDestructSurvivalHpPercent: 0.01, // Percentage of max HP Genos retains immediately after explosion (1%)
   selfDestructHpRecoveryPercent: 0.15, // Percentage of max HP Genos recovers upon completing cybernetic reboot reassembly (30% = +96 HP)

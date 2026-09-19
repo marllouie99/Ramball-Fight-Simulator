@@ -61,6 +61,8 @@ export function drawGenosSpeedLines() {
     if (!f || f.hp <= 0 || (f.characterId !== 'genos' && f.type !== 'genos')) return false;
     const isSuppressed = typeof f.areAttackEffectsSuppressed === 'function' ? f.areAttackEffectsSuppressed() : isSuppressedByGetsuga(f);
     if (isSuppressed) return false;
+    // Suppress speed lines on Genos when charging, firing, or recovering from ultimate beam
+    if (f.isChargingUlt || f.isFiringUlt || f.isUltRecovering) return false;
     const isDashing = (f.speedBoostTimer && f.speedBoostTimer > 0) || f.isDashing;
     return f.isFlurrying || isDashing;
   });

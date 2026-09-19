@@ -55,6 +55,7 @@ export class YutaFighter extends Fighter {
     this.hasUsedPureLoveBeam = false;
     this.isChannelingPureLoveBeam = false;
     this.isFiringPureLoveBeam = false;
+    this.pureLoveBeamLockedAngle = undefined;
     this.pureLoveBeamChargeTimer = 0;
     this.pureLoveBeamActiveTimer = 0;
     this.pureLoveBeamCooldownTimer = 0;
@@ -166,7 +167,33 @@ export class YutaFighter extends Fighter {
   }
 
   isChannelingSkill() {
-    return this.isStationarySkillActive();
+    // Flurry is a physical melee combo, NOT a supreme hyper-armor channeling skill.
+    // It must NOT be included here so Gojo's Infinity collision check doesn't skip Yuta during flurry.
+    return Boolean(
+      this.isChannelingPureLoveBeam ||
+      this.isFiringPureLoveBeam ||
+      (this.pureLoveBeamChargeTimer > 0) ||
+      (this.pureLoveBeamBreatherTimer > 0) ||
+      (this.rikaEmergingForBeamTimer > 0) ||
+      (this.beamRetreatSlideTimer > 0) ||
+      this.isChannelingDomain ||
+      (this.domainChargeTimer > 0) ||
+      this.isChannelingThinIceBreaker ||
+      (this.rctRevivalTimer > 0)
+    );
+  }
+
+  hasActiveFinishingAbility() {
+    if (this.hp <= 0 || this.isDead || this.dead) return false;
+    if (
+      (this.isFiringPureLoveBeam && (this.pureLoveBeamActiveTimer || 0) > 0) ||
+      this.isChannelingPureLoveBeam ||
+      (this.rikaEmergingForBeamTimer || 0) > 0 ||
+      (this.beamRetreatSlideTimer || 0) > 0
+    ) {
+      return true;
+    }
+    return super.hasActiveFinishingAbility ? super.hasActiveFinishingAbility() : false;
   }
 
   getParryChance() {
@@ -186,7 +213,7 @@ export class YutaFighter extends Fighter {
                      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
                      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
     if (isHardCC) return false;
-    if (this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return false; // Disable aim rotation ONLY while firing the beam or during post-beam breather!
+    if (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return false; // Disable aim rotation while channeling/firing beam or during post-beam breather!
     return true;
   }
 
@@ -215,7 +242,7 @@ export class YutaFighter extends Fighter {
   }
 
   aim(target) {
-    if (this.isFiringPureLoveBeam) {
+    if (this.isFiringPureLoveBeam || this.isChannelingPureLoveBeam) {
       if (this.pureLoveBeamLockedAngle !== undefined) {
         this.gunAngle = this.pureLoveBeamLockedAngle;
         this.angle = this.pureLoveBeamLockedAngle;
@@ -704,10 +731,7 @@ export class YutaFighter extends Fighter {
           this.flurryTarget.takeDamage(flurryDmg, this, {
             isMelee: true,
             isSkill: true,
-            isYutaFlurry: true,
-            isGuaranteedHit: true,
-            bypassEvade: true,
-            undodgeable: true
+            isYutaFlurry: true
           });
           spawnFloatingText(targetX, targetY - 10, 'SLASH!', '#FF1493');
           spawnSparks(targetX, targetY, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
@@ -865,21 +889,11 @@ export class YutaFighter extends Fighter {
         this.rika.hp = Math.max(0, this.rika.hp - drainPerFrame);
       }
 
-      // Auto-aim continuously at enemy target while charging Pure Love Beam
-      let targetEnemy = opponent;
-      if (!targetEnemy || targetEnemy.isDead || (targetEnemy.hp || 0) <= 0) {
-        const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
-        targetEnemy = (state && state.fighters) ? state.fighters.find((f, idx) => {
-          if (!f || f.hp <= 0 || f === this || f.isDead) return false;
-          const eTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
-          return myTeam === null || eTeam === null || myTeam !== eTeam;
-        }) : null;
-      }
-      if (targetEnemy && !targetEnemy.isDead) {
-        this.aim(targetEnemy);
+      if (this.pureLoveBeamLockedAngle === undefined) {
+        this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
       }
 
-      const beamAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+      const beamAngle = this.pureLoveBeamLockedAngle;
       this.gunAngle = beamAngle;
       this.angle = beamAngle;
 
@@ -913,7 +927,12 @@ export class YutaFighter extends Fighter {
       if (this.pureLoveBeamChargeTimer === 1) {
         const soundSrc = CONFIG.yuta?.pureLoveBeamChargeSound || 'Assets/Sound Effects/Skills/rikaAppearance.mp3';
         const soundVol = CONFIG.yuta?.pureLoveBeamChargeVolume ?? 3.0;
-        this._pureLoveBeamChargeSoundHandle = audioSystem.playSFX(soundSrc, soundVol, 1.0, CONFIG.yuta?.pureLoveBeamChargeOffset ?? 0);
+        this._pureLoveBeamChargeSoundHandle = this.playFinisherAudio({
+          src: soundSrc,
+          volume: soundVol,
+          offset: CONFIG.yuta?.pureLoveBeamChargeOffset ?? 0,
+          role: 'charge'
+        });
       }
 
       const chargeMax = CONFIG.yuta.pureLoveBeamChargeFrames || 150;
@@ -1016,18 +1035,17 @@ export class YutaFighter extends Fighter {
         }
         
         // Smoothly fade out the beam blast sound over 350ms when the beam expires
-        if (this.pureLoveBeamSoundHandle) {
-          fadeOutSound(this.pureLoveBeamSoundHandle, 350);
-          this.pureLoveBeamSoundHandle = null;
-        } else if (CONFIG.yuta?.pureLoveBeamFireSound) {
+        this.stopFinisherAudio('release', 350);
+        this.pureLoveBeamAudioHandle = null;
+        this.pureLoveBeamSoundHandle = null;
+        if (CONFIG.yuta?.pureLoveBeamFireSound) {
           fadeOutSoundBySrc(CONFIG.yuta.pureLoveBeamFireSound, 350);
         }
 
         // Smoothly fade out the background charging sound
-        if (this.pureLoveBeamBgSoundHandle) {
-          fadeOutSound(this.pureLoveBeamBgSoundHandle, 350);
-          this.pureLoveBeamBgSoundHandle = null;
-        } else if (CONFIG.yuta?.pureLoveBeamBackgroundSound) {
+        this.stopFinisherAudio('bg', 350);
+        this.pureLoveBeamBgSoundHandle = null;
+        if (CONFIG.yuta?.pureLoveBeamBackgroundSound) {
           fadeOutSoundBySrc(CONFIG.yuta.pureLoveBeamBackgroundSound, 350);
         }
         
@@ -1291,6 +1309,7 @@ export class YutaFighter extends Fighter {
       if (this.rikaEmergingForBeamTimer === 0) {
         this.isChannelingPureLoveBeam = true;
         this.pureLoveBeamChargeTimer = 0;
+        this.pureLoveBeamLockedAngle = beamAngle;
       }
       return; // Hold Yuta in emergence pose until Rika is fully manifested!
     }
@@ -1359,22 +1378,29 @@ export class YutaFighter extends Fighter {
           this.aim(targetEnemy);
         }
 
-        // Play "Come, Rika!" summon sound effect
+        // Play "Come, Rika!" summon sound effect only if not recently played
+        const nowFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : 0;
+        const lastPlayed = this._lastComeRikaPlayTime || 0;
         if (this._rikaSummonedForBeam) {
           this._rikaSummonedForBeam = false;
-        } else {
-          if (CONFIG.yuta?.comeRikaSound) {
-            this.comeRikaSoundHandle = audioSystem.playSFX(CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5);
-            this._lastComeRikaPlayTime = (typeof state !== 'undefined' ? state.frameCount : 0);
-          }
+        } else if (CONFIG.yuta?.comeRikaSound && (nowFrame - lastPlayed > 150 || lastPlayed === 0)) {
+          stopSoundBySrc('comerika');
+          stopSoundBySrc('comeRika');
+          this.comeRikaSoundHandle = this.playFinisherAudio({
+            src: CONFIG.yuta.comeRikaSound,
+            volume: CONFIG.yuta.comeRikaVolume ?? 2.5,
+            role: 'voice'
+          });
+          this._lastComeRikaPlayTime = nowFrame;
         }
 
         // Play Pure Love Beam background music
         if (CONFIG.yuta?.pureLoveBeamBackgroundSound) {
-          this.pureLoveBeamBgSoundHandle = audioSystem.playSFX(
-            CONFIG.yuta.pureLoveBeamBackgroundSound, 
-            CONFIG.yuta.pureLoveBeamBackgroundVolume ?? 2.0
-          );
+          this.pureLoveBeamBgSoundHandle = this.playFinisherAudio({
+            src: CONFIG.yuta.pureLoveBeamBackgroundSound,
+            volume: CONFIG.yuta.pureLoveBeamBackgroundVolume ?? 2.0,
+            role: 'bg'
+          });
         }
 
         // Force Rika active so she manifests as Yuta slides
@@ -1830,16 +1856,27 @@ export class YutaFighter extends Fighter {
     this.pureLoveBeamActiveTimer = CONFIG.yuta?.pureLoveBeamDuration || 280;
     this.pureLoveBeamCooldownTimer = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
 
-    // Lock release angle strictly to whatever angle Yuta was facing at the end of charge (NO snap auto-aim on fire!)
-    this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+    // Lock release angle strictly to whatever angle was committed during channeling (NO snap auto-aim on fire!)
+    if (this.pureLoveBeamLockedAngle === undefined) {
+      this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+    }
     const beamAngle = this.pureLoveBeamLockedAngle;
     this.gunAngle = beamAngle;
     this.angle = beamAngle;
 
     if (CONFIG.yuta?.pureLoveBeamFireSound) {
-      this.pureLoveBeamAudioHandle = audioSystem.playSFX(CONFIG.yuta.pureLoveBeamFireSound, CONFIG.yuta.pureLoveBeamFireVolume ?? 3.5, 1.0, CONFIG.yuta.pureLoveBeamFireOffset ?? 0);
+      this.pureLoveBeamAudioHandle = this.playFinisherAudio({
+        src: CONFIG.yuta.pureLoveBeamFireSound,
+        volume: CONFIG.yuta.pureLoveBeamFireVolume ?? 3.5,
+        offset: CONFIG.yuta.pureLoveBeamFireOffset ?? 0,
+        role: 'release'
+      });
     } else {
-      this.pureLoveBeamAudioHandle = audioSystem.playSFX('skill_finalflash', 2.5); // Epic massive beam sound
+      this.pureLoveBeamAudioHandle = this.playFinisherAudio({
+        src: 'skill_finalflash',
+        volume: 2.5,
+        role: 'release'
+      });
     }
 
     // Keep Rika active during beam firing (she will fade out as the beam expires)
@@ -1948,14 +1985,20 @@ export class YutaFighter extends Fighter {
 
         // We'll let rikaLogic.js play the normal arise roar sounds so it perfectly matches a normal summon.
         // We only manually play Yuta's "Come, Rika!" line.
-        if (CONFIG.yuta?.comeRikaSound) {
-          audioSystem.playSFX(
-            CONFIG.yuta.comeRikaSound,
-            CONFIG.yuta.comeRikaVolume ?? 2.5,
-            1.0, 0,
-            CONFIG.yuta.comeRikaDelay ?? 0
-          );
-          this._lastComeRikaPlayTime = (typeof state !== 'undefined' ? state.frameCount : 0);
+        const nowFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : 0;
+        const lastPlayed = this._lastComeRikaPlayTime || 0;
+        if (CONFIG.yuta?.comeRikaSound && (nowFrame - lastPlayed > 150 || lastPlayed === 0)) {
+          stopSoundBySrc('comerika');
+          stopSoundBySrc('comeRika');
+          this.comeRikaSoundHandle = (audioSystem && typeof audioSystem.playFighterVoiceline === 'function')
+            ? audioSystem.playFighterVoiceline(this, CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5, 1.0, 0, CONFIG.yuta.comeRikaDelay ?? 0, { priority: 'protected', durationMs: 2200 })
+            : audioSystem.playSFX(
+                CONFIG.yuta.comeRikaSound,
+                CONFIG.yuta.comeRikaVolume ?? 2.5,
+                1.0, 0,
+                CONFIG.yuta.comeRikaDelay ?? 0
+              );
+          this._lastComeRikaPlayTime = nowFrame;
         }
 
       } else {
@@ -2180,7 +2223,7 @@ export class YutaFighter extends Fighter {
   }
 
   cancelPureLoveBeam() {
-    this._stopBeamAudio();
+    this._stopBeamAudio(true);
     this.isChannelingPureLoveBeam = false;
     this.isFiringPureLoveBeam = false;
     this.pureLoveBeamChargeTimer = 0;
@@ -2284,11 +2327,20 @@ export class YutaFighter extends Fighter {
       return;
     }
 
-    if (wasFlurrying) {
+    // Flurry does NOT have hyper-armor — Infinity freeze, time-stop, and standard interruptAttacks must cancel it.
+    // Only preserve flurry if Yuta is NOT frozen by Infinity and NOT in time-stop stasis.
+    const isFrozenByInfinityOrTimeStop = this.isFrozenByInfinity || (this.timeStopTimer > 0);
+    if (wasFlurrying && !isFrozenByInfinityOrTimeStop && !forceCancelAll) {
       this.flurryHitsLeft = currentFlurryHits;
       this.flurryTimer = currentFlurryTimer;
       this.flurryTarget = currentFlurryTarget;
       this.flurryGhost = currentFlurryGhost;
+    } else if (wasFlurrying) {
+      // Flurry interrupted — clean up
+      this.flurryHitsLeft = 0;
+      this.flurryTimer = 0;
+      this.flurryTarget = null;
+      this.flurryGhost = null;
     }
 
     // Hyper-Armor Protection: Preserve Yuta's domain channeling against normal hitstun/slashes/blasts!
@@ -2327,6 +2379,7 @@ export class YutaFighter extends Fighter {
   }
 
   onDeath() {
+    this._stopBeamAudio(true);
     this.stopAllRikaAudio();
     this.cancelPureLoveBeam();
     this.rikaCallTimer = 0;
@@ -2357,14 +2410,13 @@ export class YutaFighter extends Fighter {
     if (this._beamAudioPaused) return;
     this._beamAudioPaused = true;
     
+    this.pauseFinisherAudio();
+
     pauseSound(this.pureLoveBeamBgSoundHandle);
     pauseSound(this._pureLoveBeamChargeSoundHandle);
-    pauseSound(this.comeRikaSoundHandle);
     pauseSound(this.pureLoveBeamAudioHandle);
 
     pauseSoundBySrc('yuta-lovebeam-background');
-    pauseSoundBySrc('rikaAppearance');
-    pauseSoundBySrc('comeRika');
     pauseSoundBySrc('pureLoveBeam');
   }
 
@@ -2372,30 +2424,45 @@ export class YutaFighter extends Fighter {
     if (!this._beamAudioPaused) return;
     this._beamAudioPaused = false;
 
+    this.resumeFinisherAudio();
+
     resumeSound(this.pureLoveBeamBgSoundHandle);
     resumeSound(this._pureLoveBeamChargeSoundHandle);
-    resumeSound(this.comeRikaSoundHandle);
     resumeSound(this.pureLoveBeamAudioHandle);
 
     resumeSoundBySrc('yuta-lovebeam-background');
-    resumeSoundBySrc('rikaAppearance');
-    resumeSoundBySrc('comeRika');
     resumeSoundBySrc('pureLoveBeam');
   }
 
-  _stopBeamAudio() {
+  _stopBeamAudio(force = false) {
+    if (!force && (this.isFiringPureLoveBeam || this.isChannelingPureLoveBeam) && this.hp > 0 && !this.isDead && !this.dead) {
+      return; // PROTECTED: Never stop beam audio during active hyper-armored channeling/firing!
+    }
     this._beamAudioPaused = false;
+    this.stopFinisherAudio(null, 200);
+
     if (this.pureLoveBeamBgSoundHandle) {
       fadeOutSound(this.pureLoveBeamBgSoundHandle, 200);
       this.pureLoveBeamBgSoundHandle = null;
     }
-    // Allow Rika's appearance roar SFX to play out completely without fade-out truncation
-    this._pureLoveBeamChargeSoundHandle = null;
-    this.comeRikaSoundHandle = null;
+    if (this._pureLoveBeamChargeSoundHandle) {
+      stopSound(this._pureLoveBeamChargeSoundHandle);
+      this._pureLoveBeamChargeSoundHandle = null;
+    }
+    if (this.comeRikaSoundHandle) {
+      stopSound(this.comeRikaSoundHandle);
+      this.comeRikaSoundHandle = null;
+    }
+    stopSoundBySrc('comerika');
+    stopSoundBySrc('comeRika');
 
     if (this.pureLoveBeamAudioHandle) {
       fadeOutSound(this.pureLoveBeamAudioHandle, 200);
       this.pureLoveBeamAudioHandle = null;
+    }
+    if (this.pureLoveBeamSoundHandle) {
+      fadeOutSound(this.pureLoveBeamSoundHandle, 200);
+      this.pureLoveBeamSoundHandle = null;
     }
     fadeOutSoundBySrc('yuta-lovebeam-background', 200);
   }
@@ -2430,8 +2497,9 @@ export class YutaFighter extends Fighter {
     }
     
     // Hand circle position (extended forward)
+    const defaultOffsetY = CONFIG.yuta?.weaponOffsetY ?? 4.5;
     const handX = (this.r || 22) + 4 + pVal * 6;
-    const handY = 10;
+    const handY = 10 + defaultOffsetY;
     
     // Hand circle (matching face skin tone)
     ctx.fillStyle = this.skinColor || '#FABC95';
@@ -2874,34 +2942,34 @@ export class YutaFighter extends Fighter {
         strikeFactor = hitTimer / 16;
       }
 
-      // Base stance position and angle for each of the 4 positions
+      const defaultOffsetY = CONFIG.yuta?.weaponOffsetY ?? 4.5;
       let baseOffsetX = this.r - 12;
-      let baseOffsetY = 0;
+      let baseOffsetY = defaultOffsetY;
       let stanceAngle = Math.PI / 2;
       let strikeAngleOffset = 0;
 
       if (stanceIndex === 0) {
         // Stance 0: High Slash Deflect (Upper diagonal riposte)
         baseOffsetX = this.r - 10;
-        baseOffsetY = -10;
+        baseOffsetY = -10 + defaultOffsetY;
         stanceAngle = -Math.PI * 0.42;
         strikeAngleOffset = Math.PI * 0.35 * strikeFactor;
       } else if (stanceIndex === 1) {
         // Stance 1: Low Sweep Deflect (Bottom diagonal parry)
         baseOffsetX = this.r - 8;
-        baseOffsetY = 12;
+        baseOffsetY = 12 + defaultOffsetY;
         stanceAngle = Math.PI * 0.68;
         strikeAngleOffset = -Math.PI * 0.38 * strikeFactor;
       } else if (stanceIndex === 2) {
         // Stance 2: Center Vertical Shield Guard
         baseOffsetX = this.r - 18;
-        baseOffsetY = 0;
+        baseOffsetY = defaultOffsetY;
         stanceAngle = Math.PI / 2;
         strikeAngleOffset = (Math.sin(strikeFactor * Math.PI) * 0.28);
       } else if (stanceIndex === 3) {
         // Stance 3: Backhand Reverse Deflect
         baseOffsetX = this.r - 14;
-        baseOffsetY = -12;
+        baseOffsetY = -12 + defaultOffsetY;
         stanceAngle = -Math.PI * 0.75;
         strikeAngleOffset = Math.PI * 0.45 * strikeFactor;
       }
@@ -2914,12 +2982,14 @@ export class YutaFighter extends Fighter {
       ctx.rotate(stanceAngle + strikeAngleOffset);
     } else if (this.rikaCallTimer > 0) {
       // Rika Summoning Channeling Pose: Raise Katana upward with ritual micro-vibration
+      const defaultOffsetY = CONFIG.yuta?.weaponOffsetY ?? 4.5;
       const humAngle = Math.sin(Date.now() * 0.08) * 0.08;
       const humShift = Math.cos(Date.now() * 0.1) * 2;
-      ctx.translate(this.r - 8 + humShift, -4);
+      ctx.translate(this.r - 8 + humShift, -4 + defaultOffsetY);
       ctx.rotate(-Math.PI * 0.35 + humAngle);
     } else {
-      ctx.translate(this.r - 10, 0);
+      const defaultOffsetY = CONFIG.yuta?.weaponOffsetY ?? 4.5;
+      ctx.translate(this.r - 10, defaultOffsetY);
     }
 
     ctx.scale(1.2, 1.2);           // scale up the entire weapon by 20%

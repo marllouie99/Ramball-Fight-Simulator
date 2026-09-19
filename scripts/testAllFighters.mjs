@@ -157,6 +157,7 @@ async function main() {
   const { _getYutaHairImage, _drawYutaHair, drawYutaPixelBody, drawYutaSkin } = await import('../js/graphics/fighters/yutaSkin.js');
   const { _getTojiHairImage, _drawTojiHair, drawTojiPixelBody, drawTojiSkin, drawTojiGhostSkin } = await import('../js/graphics/fighters/tojiSkin.js');
   const { _getMahitoHairImage, _drawMahitoHair, drawMahitoPixelBody, drawMahitoSkin } = await import('../js/graphics/fighters/mahitoSkin.js');
+  const { _getGenosHairImage, _drawGenosHair, drawGenosPixelBody, drawGenosSkin } = await import('../js/graphics/fighters/genosSkin.js');
   const { drawNanamiPixelBody, drawNanamiSkin } = await import('../js/graphics/fighters/nanamiSkin.js');
   const { drawZeusPixelBody, drawZeusSkin } = await import('../js/graphics/fighters/zeusSkin.js');
 
@@ -2474,6 +2475,39 @@ async function main() {
           throw new Error('Saitama disable flags failed');
         }
 
+        // Test: Percentage-based punchDamage calculation against game mode fixed HP
+        const origPunch = CONFIG.saitama.punchDamage;
+        const origMode = state.mode;
+
+        // Test with 0.90 (90% of mode fixed HP)
+        CONFIG.saitama.punchDamage = 0.90;
+        state.mode = '1v1';
+        if (fighter.getBasePunchDamage() !== 180) {
+          throw new Error(`Expected Saitama 1v1 mode punchDamage to be 180 (90% of 200 HP), got ${fighter.getBasePunchDamage()}`);
+        }
+        state.mode = 'Stand Off';
+        if (fighter.getBasePunchDamage() !== 450) {
+          throw new Error(`Expected Saitama Stand Off mode punchDamage to be 450 (90% of 500 HP), got ${fighter.getBasePunchDamage()}`);
+        }
+        state.mode = '2v2';
+        if (fighter.getBasePunchDamage() !== 2700) {
+          throw new Error(`Expected Saitama 2v2 mode punchDamage to be 2700 (90% of 3000 HP), got ${fighter.getBasePunchDamage()}`);
+        }
+        state.mode = 'FFA';
+        if (fighter.getBasePunchDamage() !== 900) {
+          throw new Error(`Expected Saitama FFA mode punchDamage to be 900 (90% of 1000 HP), got ${fighter.getBasePunchDamage()}`);
+        }
+
+        // Test with 0.15 (15% of mode fixed HP)
+        CONFIG.saitama.punchDamage = 0.15;
+        state.mode = 'Stand Off';
+        if (fighter.getBasePunchDamage() !== 75) {
+          throw new Error(`Expected Saitama Stand Off mode punchDamage at 0.15 to be 75 (15% of 500 HP), got ${fighter.getBasePunchDamage()}`);
+        }
+
+        state.mode = origMode;
+        CONFIG.saitama.punchDamage = origPunch;
+
         // Restore user's actual configured settings
         CONFIG.saitama.disableNormalPunch = origDisNormal;
         CONFIG.saitama.disableConsecutivePunches = origDisConsecutive;
@@ -2674,25 +2708,35 @@ async function main() {
         }
         const initialPurpleAngle = fighter.gunAngle;
 
-        // Enemy moves during channel - verify aim DOES track / auto-aim towards new enemy position
+        // Enemy moves during channel - verify aim smoothly rotates toward enemy's new angle using channelTurnRate without snapping
         dummyOpponent.x = 100;
         dummyOpponent.y = 50;
         fighter.update(dummyOpponent, 0, state.arena);
-        const expectedNewPurpleAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
-        let purpleAngleDiff = Math.abs(fighter.gunAngle - expectedNewPurpleAngle);
-        while (purpleAngleDiff > Math.PI) purpleAngleDiff = Math.abs(purpleAngleDiff - Math.PI * 2);
-        if (purpleAngleDiff > 0.05) {
-          throw new Error(`Expected Gojo aim to track enemy during Purple channeling (expected ${expectedNewPurpleAngle.toFixed(2)}, got ${fighter.gunAngle.toFixed(2)})`);
+        const targetAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        let turnedDiff = Math.abs(fighter.gunAngle - initialPurpleAngle);
+        while (turnedDiff > Math.PI) turnedDiff = Math.abs(turnedDiff - Math.PI * 2);
+        // Should rotate towards enemy with channelTurnRate (~0.045 rad/frame)
+        if (turnedDiff <= 0.01) {
+          throw new Error(`Expected Gojo to smoothly track enemy during Purple channeling (initial: ${initialPurpleAngle.toFixed(2)}, current: ${fighter.gunAngle.toFixed(2)})`);
         }
+        // Should NOT snap instantly to target angle
+        let snapDiff = Math.abs(fighter.gunAngle - targetAngle);
+        while (snapDiff > Math.PI) snapDiff = Math.abs(snapDiff - Math.PI * 2);
+        if (snapDiff <= 0.1) {
+          throw new Error(`Expected Gojo to NOT snap instantly to target angle during Purple channeling`);
+        }
+
+        const firedAngle = fighter.gunAngle;
         fighter._firePurple(0);
         const diagProj = fighter.activePurpleProjectile;
         if (!diagProj) {
           throw new Error('Expected Hollow Purple projectile to spawn on fire');
         }
-        const expectedVx = Math.cos(expectedNewPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
-        const expectedVy = Math.sin(expectedNewPurpleAngle) * (CONFIG.gojo.purpleSpeed || 6);
+        // Purple fires along Gojo's current gunAngle upon firing (no snap on release)
+        const expectedVx = Math.cos(firedAngle) * (CONFIG.gojo.purpleSpeed || 6);
+        const expectedVy = Math.sin(firedAngle) * (CONFIG.gojo.purpleSpeed || 6);
         if (Math.abs(diagProj.vx - expectedVx) > 0.1 || Math.abs(diagProj.vy - expectedVy) > 0.1) {
-          throw new Error(`Expected Purple projectile to fly along tracked vector (${expectedVx.toFixed(2)}, ${expectedVy.toFixed(2)}), got vx=${diagProj.vx}, vy=${diagProj.vy}`);
+          throw new Error(`Expected Purple projectile to fly along current gunAngle (${expectedVx.toFixed(2)}, ${expectedVy.toFixed(2)}), got vx=${diagProj.vx}, vy=${diagProj.vy}`);
         }
         if (diagProj) {
           diagProj.life = 0;
@@ -2862,17 +2906,20 @@ async function main() {
         }
         const initialRedAngle = fighter.gunAngle;
 
-        // Enemy moves during buildup - verify aim DOES track / auto-aim towards new enemy position
+        // Enemy moves behind Gojo during buildup - verify aim tracks smoothly on committed side and NEVER rotates to the opposite side
         dummyOpponent.x = 100;
         dummyOpponent.y = 80;
-        fighter.update(dummyOpponent, 0, state.arena);
-        const expectedNewRedAngle = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
-        let redAngleDiff = Math.abs(fighter.gunAngle - expectedNewRedAngle);
-        while (redAngleDiff > Math.PI) redAngleDiff = Math.abs(redAngleDiff - Math.PI * 2);
-        if (redAngleDiff > 0.05) {
-          throw new Error(`Expected Gojo aim to track enemy during Red buildup (expected ${expectedNewRedAngle.toFixed(2)}, got ${fighter.gunAngle.toFixed(2)})`);
+        for (let i = 0; i < 20; i++) {
+          fighter.update(dummyOpponent, 0, state.arena);
         }
+        if (Math.cos(fighter.gunAngle) < -0.001 || Math.abs(fighter.gunAngle) > (Math.PI / 2 + 0.001)) {
+          throw new Error(`Expected Gojo to stay committed to right side without turning around (angle: ${fighter.gunAngle.toFixed(2)})`);
+        }
+        const firedRedAngle = fighter.gunAngle;
         fighter._detonateRed();
+        if (Math.abs(fighter.gunAngle - firedRedAngle) > 0.001) {
+          throw new Error(`Expected Gojo to detonate Red strictly along gunAngle (${firedRedAngle.toFixed(2)}), got ${fighter.gunAngle.toFixed(2)}`);
+        }
 
         // Test Red Case 2: Enemy out of trigger range (600, 600) -> Must NOT trigger Red
         state.gameState = 'playing';
@@ -2961,15 +3008,14 @@ async function main() {
         }
         const lockedRedAngle2 = fighter.gunAngle;
 
-        // Move opponent during Red buildup and verify Gojo DOES rotate / auto-aim
+        // Move opponent behind Gojo during Red buildup and verify Gojo aim tracks smoothly on committed side without turning around
         dummyOpponent.x = 100;
         dummyOpponent.y = 400;
-        fighter.aim(dummyOpponent);
-        const expectedNewRedAngle2 = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
-        let redAngleDiff2 = Math.abs(fighter.gunAngle - expectedNewRedAngle2);
-        while (redAngleDiff2 > Math.PI) redAngleDiff2 = Math.abs(redAngleDiff2 - Math.PI * 2);
-        if (redAngleDiff2 > 0.05) {
-          throw new Error(`Gojo failed to auto-aim towards target during Red buildup! Expected ${expectedNewRedAngle2}, got ${fighter.gunAngle}`);
+        for (let i = 0; i < 20; i++) {
+          fighter.aim(dummyOpponent);
+        }
+        if (Math.cos(fighter.gunAngle) < -0.001 || Math.abs(fighter.gunAngle) > (Math.PI / 2 + 0.001)) {
+          throw new Error(`Expected Gojo to stay committed to right side without turning around (angle: ${fighter.gunAngle.toFixed(2)})`);
         }
 
         // Fast-forward to detonation
@@ -3243,8 +3289,9 @@ async function main() {
       }
 
     } catch (err) {
-      console.error(`❌ [RUNTIME ERROR in fighter '${fType}'] during simulation:`, err);
+      console.log(`❌ [RUNTIME ERROR in fighter '${fType}'] during simulation:`, err.stack || err.message || err);
       errors++;
+      errorList.push(`[RUNTIME ERROR in fighter '${fType}']: ${err.stack || err.message || err}`);
     }
   }
 
@@ -3756,6 +3803,55 @@ async function main() {
       throw new Error(`Saitama snapped auto-aim to target on punch release! Expected ${lockedAimAngle}, got ${testSaitama.gunAngle}`);
     }
 
+    // Test Serious Counter directional frontal-only hit detection (no side/back hit even when close)
+    state.mode = '1v1';
+    state.gameState = 'playing';
+    testSaitama.skillPunishCooldown = 0;
+    testSaitama.dodgeCooldown = 0;
+    testSaitama._postCounterRecoveryTimer = 0;
+    testSaitama.isCountering = false;
+    testSaitama.x = 300;
+    testSaitama.y = 300;
+
+    const frontEnemy = new Fighter({ startX: 370, startY: 300, type: 'default', color: '#555555' }); // directly in front (along aim angle 0)
+    const backEnemy = new Fighter({ startX: 250, startY: 300, type: 'default', color: '#666666' });  // 50px directly behind
+    const sideEnemy = new Fighter({ startX: 300, startY: 350, type: 'default', color: '#777777' });  // 50px directly to side (90 deg)
+    frontEnemy.maxHp = 5000;
+    frontEnemy.hp = 5000;
+    frontEnemy.isDead = false;
+    backEnemy.maxHp = 5000;
+    backEnemy.hp = 5000;
+    backEnemy.isDead = false;
+    sideEnemy.maxHp = 5000;
+    sideEnemy.hp = 5000;
+    sideEnemy.isDead = false;
+
+    state.fighters = [testSaitama, frontEnemy, backEnemy, sideEnemy];
+    testSaitama.executeSkillCounterPunish(frontEnemy);
+
+    // Fast-forward counter wind-up to punch impact
+    while (testSaitama._counterPunchTimer > 0) {
+      testSaitama.update(frontEnemy, 0, state.arena);
+    }
+
+    if (frontEnemy.hp >= 5000) {
+      throw new Error(`Expected front enemy in frontal arc to take counter punch damage, got hp=${frontEnemy.hp}`);
+    }
+    if (backEnemy.hp < 5000) {
+      throw new Error(`Expected enemy directly behind Saitama to take 0 damage, but took ${5000 - backEnemy.hp} damage!`);
+    }
+    if (sideEnemy.hp < 5000) {
+      throw new Error(`Expected enemy to the side of Saitama to take 0 damage, but took ${5000 - sideEnemy.hp} damage!`);
+    }
+
+    while (testSaitama._postCounterRecoveryTimer > 0) {
+      testSaitama.update(frontEnemy, 0, state.arena);
+    }
+    testSaitama.isCountering = false;
+    testSaitama._counterPunchTarget = null;
+    testSaitama._counterPunchTimer = 0;
+    testSaitama._postCounterRecoveryTimer = 0;
+
     // Test Serious Counter cancellation when Gojo deploys domain (Unlimited Void) in time
     state.gameState = 'playing';
     testGojo.hp = 1000;
@@ -3859,6 +3955,7 @@ async function main() {
   } catch (err) {
     console.error('❌ [DOMAIN DEATH CLEANUP TEST ERROR]:', err);
     errors++;
+    errorList.push(`[DOMAIN DEATH CLEANUP TEST]: ${err.stack || err.message}`);
   }
 
   // 6.5. Makima Chains of Domination & Mind Control Puppetry Test
@@ -4338,8 +4435,9 @@ async function main() {
         if (didDodge) dodgeSuccessCount++;
       }
 
-      if (dodgeSuccessCount < 80) {
-        throw new Error(`Expected Toji domain dodge rate >= 80% out of 100 trials with 95% config, got ${dodgeSuccessCount}%`);
+      const minExpected = Math.max(15, Math.floor((CONFIG.toji?.domainDodgeChance ?? 0.50) * trialCount) - 25);
+      if (dodgeSuccessCount < minExpected) {
+        throw new Error(`Expected Toji domain dodge rate >= ${minExpected}% out of 100 trials with config ${(CONFIG.toji?.domainDodgeChance ?? 0.50) * 100}%, got ${dodgeSuccessCount}%`);
       }
 
       // 3. Verify afterimages and sidestep displacement occurred
@@ -4833,20 +4931,20 @@ async function main() {
         throw new Error(`Expected Yuta gunAngle to auto-aim diagonally (${expectedDiagAngle.toFixed(2)}), got ${y.gunAngle}`);
       }
 
-      // Test 3: Auto-aim tracks new enemy position while charging
+      // Test 3: Channeling locks aim and does NOT rotate/track new enemy positions
       y.isChannelingPureLoveBeam = true;
+      y.pureLoveBeamLockedAngle = expectedDiagAngle;
       y.update(enemyUp, 0, state.arena);
-      const expectedUpAngle = Math.atan2(200 - 480, 270 - 270); // -Math.PI / 2
-      if (Math.abs(y.gunAngle - expectedUpAngle) > 0.05) {
-        throw new Error(`Expected Yuta gunAngle to track enemyUp (-1.57), got ${y.gunAngle}`);
+      if (Math.abs(y.gunAngle - expectedDiagAngle) > 0.001 || Math.abs(y.angle - expectedDiagAngle) > 0.001) {
+        throw new Error(`Expected Yuta gunAngle to remain locked at diagonal angle (${expectedDiagAngle.toFixed(2)}) without aim tracking during channeling, got ${y.gunAngle}`);
       }
 
       // Test 4: Firing snapshots and locks angle, rejecting snap auto-aim
       projectileSystem.projectiles = [];
       y.activatePureLoveBeam();
       const lockedAngle = y.pureLoveBeamLockedAngle;
-      if (Math.abs(lockedAngle - expectedUpAngle) > 0.05) {
-        throw new Error(`Expected locked angle to snapshot charge angle (${expectedUpAngle.toFixed(2)}), got ${lockedAngle}`);
+      if (Math.abs(lockedAngle - expectedDiagAngle) > 0.05) {
+        throw new Error(`Expected locked angle to snapshot charge angle (${expectedDiagAngle.toFixed(2)}), got ${lockedAngle}`);
       }
 
       // Enemy moves to enemyDown after firing -> Yuta must NOT snap auto-aim
@@ -5230,8 +5328,8 @@ async function main() {
         y.update(enemy, 0, state.arena);
       }
 
-      // Fast-forward channeling phase (150 frames) while verifying Yuta and Rika auto-aim toward moving enemy during channeling
-      const targetEnemyAngle = Math.atan2(150, 200);
+      // Fast-forward channeling phase (150 frames) while verifying Yuta and Rika maintain locked committed aim angle
+      const lockedEmergenceAngle = y.pureLoveBeamLockedAngle;
       enemy.x = y.x + 200;
       enemy.y = y.y + 150;
       while (y.isChannelingPureLoveBeam) {
@@ -5244,9 +5342,9 @@ async function main() {
         }
       }
 
-      // Verify Yuta reached target aim angle during channeling
-      if (Math.abs(y.gunAngle - targetEnemyAngle) > 0.05) {
-        throw new Error(`Expected Yuta gunAngle (${y.gunAngle}) to auto-aim toward enemy (${targetEnemyAngle}) during channeling!`);
+      // Verify Yuta kept committed locked angle during channeling without rotating to moving enemy
+      if (Math.abs(y.gunAngle - lockedEmergenceAngle) > 0.001) {
+        throw new Error(`Expected Yuta gunAngle (${y.gunAngle}) to remain locked at initial angle (${lockedEmergenceAngle}) during channeling without aim rotation!`);
       }
 
       // Verify beam is now FIRING inside domain!
@@ -7272,6 +7370,47 @@ async function main() {
     errors++;
   }
 
+  // Genos Model Hair Asset Test
+  console.log('💇 [Genos Model Hair Asset Test] Verifying Genos hair asset image loader, pixel body, facing directions, and drawGenosSkin rendering...');
+  try {
+    const GenosClass = FIGHTER_CLASS_MAP['genos'];
+    const genos = new GenosClass({ startX: 300, startY: 300 });
+
+    const hairImg = _getGenosHairImage();
+    if (!hairImg) {
+      throw new Error('_getGenosHairImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    _drawGenosHair(mockCtx, genos.r || 25, false);
+    assertCanvasStackBalance('_drawGenosHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawGenosHair(mockCtx, genos.r || 25, true);
+    assertCanvasStackBalance('_drawGenosHair(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawGenosPixelBody(mockCtx, genos.r || 25);
+    assertCanvasStackBalance('drawGenosPixelBody(mockCtx, 25)');
+
+    mockCtx.resetStackDepth();
+    drawGenosSkin(mockCtx, genos);
+    assertCanvasStackBalance('drawGenosSkin(mockCtx, genos)');
+
+    mockCtx.resetStackDepth();
+    genos.draw(mockCtx);
+    assertCanvasStackBalance('genos.draw(mockCtx)');
+
+    // Test facing left mirroring
+    genos.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawGenosSkin(mockCtx, genos);
+    assertCanvasStackBalance('drawGenosSkin (facing left)');
+  } catch (err) {
+    console.error('❌ [GENOS HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
   // Nanami Model & Bald Pixel Body Test
   console.log('🥋 [Nanami Model & Bald Pixel Body Test] Verifying Nanami bald pixel body, goggles, facing directions, and drawNanamiSkin rendering...');
   try {
@@ -8505,9 +8644,7 @@ async function main() {
         enemy.update(makima, 0, state.arena);
       }
 
-      const expectedAngle = (fighterKey === 'genos') 
-        ? enemy._getCardinalAngle(makima) 
-        : Math.atan2(makima.y - enemy.y, makima.x - enemy.x);
+      const expectedAngle = Math.atan2(makima.y - enemy.y, makima.x - enemy.x);
       let currentAngle = enemy.gunAngle !== undefined ? enemy.gunAngle : (enemy.angle || 0);
       while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
       while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
@@ -8540,28 +8677,29 @@ async function main() {
     const IchigoClass = FIGHTER_CLASS_MAP.ichigo;
     const ichigo = new IchigoClass({ x: 200, y: 200, color: '#FF7700', controls: {} });
 
-    // 1. Test hideAllHud
+    // 1. Test hideAllHud (hides screen HUD elements, but PRESERVES overhead fighter HP overlay!)
     CONFIG.hudHideAll = true;
+    CONFIG.hudHideOverheadHp = false;
     state.fighters = [ichigo];
     let fillTextCalled = false;
     mockCtx.fillText = () => { fillTextCalled = true; };
     mockCtx.strokeText = () => {};
     FighterRenderer.drawHealth(mockCtx, ichigo);
-    if (fillTextCalled) {
-      throw new Error('Overhead health text was drawn while CONFIG.hudHideAll was active!');
+    if (!fillTextCalled) {
+      throw new Error('Overhead health text was NOT drawn while CONFIG.hudHideAll was active (overhead HP should remain visible)!');
     }
 
-    // 2. Test hideHealthBars
+    // 2. Test hideOverheadHp (hides overhead fighter HP overlay when explicitly toggled)
     CONFIG.hudHideAll = false;
-    CONFIG.hudHideHealthBars = true;
+    CONFIG.hudHideOverheadHp = true;
     fillTextCalled = false;
     FighterRenderer.drawHealth(mockCtx, ichigo);
     if (fillTextCalled) {
-      throw new Error('Overhead health text was drawn while CONFIG.hudHideHealthBars was active!');
+      throw new Error('Overhead health text was drawn while CONFIG.hudHideOverheadHp was active!');
     }
 
     // 3. Test hideSkillBars (completely hide with 0 exceptions)
-    CONFIG.hudHideHealthBars = false;
+    CONFIG.hudHideOverheadHp = false;
     CONFIG.hudHideSkillBars = true;
     CONFIG.hudSkillBarsMode = 'none';
     const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
@@ -8648,15 +8786,16 @@ async function main() {
     assertCanvasStackBalance('drawZeusSkin(mockCtx, zeus [showSkinOnly])');
     state.showSkinOnly = false;
   } catch (err) {
-    console.error('❌ [ZEUS MODEL & PIXEL BODY TEST ERROR]:', err);
+    console.log('❌ [ZEUS MODEL & PIXEL BODY TEST ERROR]:', err.stack || err.message || err);
     errors++;
+    errorList.push(`[ZEUS MODEL & PIXEL BODY TEST]: ${err.stack || err.message || err}`);
   }
 
   // ─────────────────────────────────────────────
   // 38. GOJO RED & PURPLE AUTO-AIM CHANNELING TEST
   // ─────────────────────────────────────────────
   try {
-    console.log('🔴🟣 [Gojo Red & Purple Auto-Aim Test] Verifying Gojo tracks moving targets during Red and Purple channeling...');
+    console.log('🔴🟣 [Gojo Red & Purple Smooth Aim Tracking & No Firing Snap Test] Verifying Gojo tracks smoothly during channeling and does not snap on firing...');
 
     const GojoClass = FIGHTER_CLASS_MAP.gojo;
     const SukunaClass = FIGHTER_CLASS_MAP.sukuna;
@@ -8675,62 +8814,290 @@ async function main() {
     state.fighters = [gojo, target];
     state.gameState = 'playing';
 
-    // 1. Test Purple Channeling Auto-Aim
+    // 1. Test Purple Channeling Smooth Aim Tracking & No Firing Snap
     gojo.isChannelingPurple = true;
     gojo.purpleChargeTimer = 20;
     gojo.purpleChargeMax = 120;
+    gojo.gunAngle = 0; // facing right
+    gojo.angle = 0;
 
-    const testPositions = [
-      { x: 400, y: 300 }, // Right (0 rad)
-      { x: 300, y: 450 }, // Down (PI/2 rad)
-      { x: 150, y: 300 }, // Left (PI rad)
-      { x: 300, y: 150 }, // Up (-PI/2 rad)
-      { x: 420, y: 420 }  // Down-Right (PI/4 rad)
-    ];
+    // Target moves down (angle = PI/2)
+    target.x = 300;
+    target.y = 400;
 
-    for (const pos of testPositions) {
-      target.x = pos.x;
-      target.y = pos.y;
-      gojo.aim(target);
-      const expectedAngle = Math.atan2((target.y - (target.z || 0)) - (gojo.y - (gojo.z || 0)), target.x - gojo.x);
-      
-      let diff = Math.abs(gojo.gunAngle - expectedAngle);
-      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+    const angleBefore = gojo.gunAngle;
+    gojo.aim(target);
+    const angleAfter = gojo.gunAngle;
 
-      if (diff > 0.05) {
-        throw new Error(`[PURPLE AUTO-AIM FAILED] Gojo failed to auto-aim at target at (${pos.x}, ${pos.y}). Expected ~${expectedAngle.toFixed(3)} rad, got ${gojo.gunAngle.toFixed(3)} rad (diff ${diff.toFixed(3)}).`);
-      }
+    // Must have turned smoothly toward target (angleAfter > angleBefore) but NOT snapped instantly to PI/2 (~1.57)
+    if (angleAfter <= angleBefore) {
+      throw new Error(`[PURPLE AIM TRACKING FAILED] Gojo did not rotate toward target during Purple channeling. Before: ${angleBefore}, After: ${angleAfter}`);
+    }
+    if (angleAfter >= Math.PI / 2 - 0.1) {
+      throw new Error(`[PURPLE AIM SNAPPING FAILED] Gojo snapped instantly to target angle during Purple channeling. Expected smooth turn, got: ${angleAfter}`);
+    }
+
+    // Now test firePurple releases at current gunAngle without snapping to a newly relocated target
+    target.x = 100; // suddenly moved to opposite side
+    target.y = 300;
+    const savedGunAngle = gojo.gunAngle;
+    gojo.purpleChargeTimer = gojo.purpleChargeMax;
+    gojo._firePurple(0);
+
+    if (Math.abs(gojo.gunAngle - savedGunAngle) > 0.001) {
+      throw new Error(`[PURPLE FIRING SNAP FAILED] Gojo snapped aim upon firing Purple. Expected ${savedGunAngle}, got ${gojo.gunAngle}`);
     }
 
     gojo.isChannelingPurple = false;
     gojo.purpleChargeTimer = 0;
+    gojo.purpleRecoveryTimer = 0;
+    gojo.activePurpleProjectile = null;
+    if (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) {
+      projectileSystem.projectiles.length = 0;
+    }
+    state.projectiles = [];
 
-    // 2. Test Reversal Red Buildup Auto-Aim
+    // 2. Test Reversal Red Side-Committed Auto-Aim During Channeling & No Turnaround
+    gojo.x = 300;
+    gojo.y = 250;
+    gojo.z = 0;
+    gojo.gunAngle = 0;
+    gojo.angle = 0;
+    gojo.redTargetAngle = 0;
+    gojo.redInitialAngle = 0;
+    gojo.redCommittedSide = 'right';
     gojo.redEffectTimer = 80;
     gojo.redEffectMaxTimer = 125;
     gojo.redBuildupPhase = true;
     gojo._redTargetRef = target;
 
-    for (const pos of testPositions) {
-      target.x = pos.x;
-      target.y = pos.y;
+    target.x = 400; // to the right and up
+    target.y = 150;
+    target.hp = 100;
+    target.isDead = false;
+    target.dead = false;
+
+    const redAngleBefore = gojo.gunAngle;
+    const aimResult = gojo.aim(target);
+    const redAngleAfter = gojo.gunAngle;
+
+    // Gojo's aim MUST track smoothly toward the target on the current side
+    if (redAngleAfter >= redAngleBefore) {
+      throw new Error(`[RED AUTO-AIM TRACKING FAILED] Gojo aim did not rotate upward toward target. Before: ${redAngleBefore}, After: ${redAngleAfter}`);
+    }
+
+    // Target moves BEHIND Gojo to the left hemisphere (target.x = 100, target.y = 300)
+    target.x = 100;
+    target.y = 300;
+    for (let i = 0; i < 30; i++) {
       gojo.aim(target);
-      const expectedAngle = Math.atan2((target.y - (target.z || 0)) - (gojo.y - (gojo.z || 0)), target.x - gojo.x);
+    }
 
-      let diff = Math.abs(gojo.gunAngle - expectedAngle);
-      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+    // Gojo MUST NOT rotate to the other side (left hemisphere) — gunAngle must remain on right hemisphere (Math.cos >= 0)
+    if (Math.cos(gojo.gunAngle) < -0.001 || Math.abs(gojo.gunAngle) > (Math.PI / 2 + 0.001)) {
+      throw new Error(`[RED NO-TURNAROUND FAILED] Gojo rotated to the opposite side while channeling Red! Angle: ${gojo.gunAngle}`);
+    }
 
-      if (diff > 0.05) {
-        throw new Error(`[RED AUTO-AIM FAILED] Gojo failed to auto-aim at target at (${pos.x}, ${pos.y}). Expected ~${expectedAngle.toFixed(3)} rad, got ${gojo.gunAngle.toFixed(3)} rad (diff ${diff.toFixed(3)}).`);
-      }
+    // Test detonateRed releases at current gunAngle without snapping to a newly relocated target
+    target.x = 500;
+    target.y = 300;
+    const savedRedGunAngle = gojo.gunAngle;
+    gojo._detonateRed();
+
+    if (Math.abs(gojo.gunAngle - savedRedGunAngle) > 0.001) {
+      throw new Error(`[RED DETONATION SNAP FAILED] Gojo snapped aim upon detonating Red. Expected ${savedRedGunAngle}, got ${gojo.gunAngle}`);
     }
 
     gojo.redEffectTimer = 0;
     gojo.redBuildupPhase = false;
   } catch (err) {
-    console.error('❌ [GOJO RED & PURPLE AUTO-AIM TEST ERROR]:', err.message || err);
+    console.error('❌ [GOJO RED & PURPLE AIM BEHAVIOR TEST ERROR]:', err.message || err);
     errors++;
-    errorList.push(`[GOJO AUTO-AIM TEST]: ${err.stack || err.message}`);
+    errorList.push(`[GOJO RED & PURPLE AIM BEHAVIOR TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Yuta Domain Expansion PNG Overlay & Stack Balance Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('💍 [Yuta Domain Overlay Test] Verifying Yuta Domain Expansion PNG overlay rendering and Canvas stack balance...');
+    const { renderYutaDomainBackground, getYutaDomainImage } = await import('../js/entities/fighters/yuta/yutaDomainVisuals.js');
+    const { YutaFighter } = await import('../js/entities/fighters/YutaFighter.js');
+    const yuta = new YutaFighter({ color: '#FF1493', name: 'Yuta' });
+    yuta.domainActive = true;
+    yuta.x = 400;
+    yuta.y = 300;
+
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    renderYutaDomainBackground(yuta, mockCtx);
+    assertCanvasStackBalance('renderYutaDomainBackground (rect arena)');
+
+    // Test circular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    renderYutaDomainBackground(yuta, mockCtx);
+    assertCanvasStackBalance('renderYutaDomainBackground (circular arena)');
+  } catch (err) {
+    console.error('❌ [YUTA DOMAIN OVERLAY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[YUTA DOMAIN OVERLAY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Toji Ultimate Arena PNG Overlay & Stack Balance Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🗡️ [Toji Ultimate Overlay Test] Verifying Toji Ultimate Arena PNG overlay rendering and Canvas stack balance...');
+    const { drawTojiUltimateOverlay, getTojiUltimateOverlayImage } = await import('../js/graphics/renderers/domainDimOverlays.js');
+    const { TojiFighter } = await import('../js/entities/fighters/TojiFighter.js');
+    const toji = new TojiFighter({ color: '#A040FF', name: 'Toji' });
+    toji.ultimateActive = true;
+    toji.ultimatePhase = 'STRIKING';
+    toji.x = 400;
+    toji.y = 300;
+
+    const dummyTarget = { x: 450, y: 300, r: 25, hp: 100, maxHp: 100, z: 0 };
+    toji.ultimateTarget = dummyTarget;
+    state.fighters = [toji, dummyTarget];
+
+    // Verify image loader
+    const tojiImg = getTojiUltimateOverlayImage();
+    if (!tojiImg) {
+      throw new Error('[TOJI OVERLAY IMAGE FAILED] getTojiUltimateOverlayImage() returned null/undefined');
+    }
+
+    // Test rectangular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawTojiUltimateOverlay();
+    assertCanvasStackBalance('drawTojiUltimateOverlay (rect arena)');
+
+    // Test circular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawTojiUltimateOverlay();
+    assertCanvasStackBalance('drawTojiUltimateOverlay (circular arena)');
+
+    // Test across all ultimate phases
+    const phases = ['CHANNELING', 'VANISHED', 'STRIKING', 'CRATER_FADEIN', 'CRATER', 'CRATER_DIVE'];
+    for (const ph of phases) {
+      toji.ultimatePhase = ph;
+      mockCtx.resetStackDepth();
+      drawTojiUltimateOverlay();
+      assertCanvasStackBalance(`drawTojiUltimateOverlay (phase: ${ph})`);
+    }
+
+    toji.ultimateActive = false;
+    toji.ultimatePhase = null;
+  } catch (err) {
+    console.error('❌ [TOJI ULTIMATE OVERLAY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[TOJI ULTIMATE OVERLAY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CJ BAGUVIX God Mode Arena PNG Overlay & Stack Balance Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🔫 [CJ BAGUVIX Overlay Test] Verifying CJ BAGUVIX Arena PNG overlay rendering and Canvas stack balance...');
+    const { renderCjBaguvixBackground, getCjBaguvixOverlayImage } = await import('../js/graphics/renderers/environmentalRenderer.js');
+    const { CJFighter } = await import('../js/entities/fighters/CJFighter.js');
+    const cj = new CJFighter({ color: '#16A34A', name: 'CJ' });
+    cj.isBaguvixActive = true;
+    cj.x = 400;
+    cj.y = 300;
+
+    const dummyEnemy = { x: 450, y: 300, r: 25, hp: 100, maxHp: 100, z: 0 };
+    state.fighters = [cj, dummyEnemy];
+
+    // Verify image loader
+    const cjImg = getCjBaguvixOverlayImage();
+    if (!cjImg) {
+      throw new Error('[CJ BAGUVIX OVERLAY IMAGE FAILED] getCjBaguvixOverlayImage() returned null/undefined');
+    }
+
+    // Test rectangular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    renderCjBaguvixBackground(cj, mockCtx);
+    assertCanvasStackBalance('renderCjBaguvixBackground (rect arena)');
+
+    // Test circular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    renderCjBaguvixBackground(cj, mockCtx);
+    assertCanvasStackBalance('renderCjBaguvixBackground (circular arena)');
+
+    // Test drawDomainBackground method on CJ fighter instance
+    mockCtx.resetStackDepth();
+    cj.drawDomainBackground(mockCtx);
+    assertCanvasStackBalance('cj.drawDomainBackground');
+
+    // ─────────────────────────────────────────────────────────────
+    // CJ BAGUVIX Animated Ki Flame Aura Frame Loader & Stack Balance Test
+    // ─────────────────────────────────────────────────────────────
+    console.log('🔥 [CJ BAGUVIX Animated Aura Test] Verifying CJ BAGUVIX animated frame loader and drawCjSkin stack balance...');
+    const { getCjBaguvixAuraFrames, drawCjSkin } = await import('../js/graphics/fighters/cjSkin.js');
+    const auraFrames = getCjBaguvixAuraFrames();
+    if (!auraFrames || auraFrames.length !== 3) {
+      throw new Error(`[CJ BAGUVIX AURA FRAMES FAILED] getCjBaguvixAuraFrames() expected 3 frames, got ${auraFrames ? auraFrames.length : 'null'}`);
+    }
+    mockCtx.resetStackDepth();
+    drawCjSkin(mockCtx, cj);
+    assertCanvasStackBalance('drawCjSkin with animated BAGUVIX aura');
+
+    cj.isBaguvixActive = false;
+
+    // ─────────────────────────────────────────────────────────────
+    // CJ Rocketman Jetpack Mode Skill Lockout Test
+    // ─────────────────────────────────────────────────────────────
+    console.log('🚀 [CJ Rocketman Skill Lockout Test] Verifying CJ cannot cast other skills while in Jetpack mode...');
+    cj.reset();
+    cj.isJetpackActive = true;
+    cj.jetpackTimer = 300;
+    cj.hp = 100; // Low HP (< 50%)
+    cj.maxHp = 440;
+    cj.hasUsedHesoyam = false;
+    cj.driveByCooldown = 0;
+    cj.baguvixCooldown = 0;
+
+    // 1. Attempt Hesoyam while in jetpack mode
+    cj.activateHesoyam();
+    if (cj.hasUsedHesoyam || cj.isTypingCheat) {
+      throw new Error('[CJ ROCKETMAN SKILL LOCKOUT FAILED] activateHesoyam was not blocked during Jetpack mode!');
+    }
+
+    // 2. Attempt Drive-By while in jetpack mode
+    cj.activateDriveBy();
+    if (cj.isDriveByActive || cj.isTypingCheat) {
+      throw new Error('[CJ ROCKETMAN SKILL LOCKOUT FAILED] activateDriveBy was not blocked during Jetpack mode!');
+    }
+
+    // 3. Attempt Baguvix while in jetpack mode
+    cj.activateBaguvix();
+    if (cj.isBaguvixActive || cj.isTypingCheat) {
+      throw new Error('[CJ ROCKETMAN SKILL LOCKOUT FAILED] activateBaguvix was not blocked during Jetpack mode!');
+    }
+
+    // 4. Update loop check while in jetpack mode
+    cj.update(dummyEnemy, 0, state.arena);
+    if (cj.hasUsedHesoyam || cj.isDriveByActive || cj.isBaguvixActive || cj.isTypingCheat) {
+      throw new Error('[CJ ROCKETMAN SKILL LOCKOUT FAILED] Skill was triggered in update() during Jetpack mode!');
+    }
+
+    // 5. Expire jetpack mode and verify skills can be cast
+    cj.isJetpackActive = false;
+    cj.jetpackTimer = 0;
+    cj.activateHesoyam();
+    if (!cj.hasUsedHesoyam || !cj.isTypingCheat) {
+      throw new Error('[CJ ROCKETMAN SKILL LOCKOUT FAILED] activateHesoyam failed to trigger after Jetpack mode ended!');
+    }
+    cj.isTypingCheat = false;
+  } catch (err) {
+    console.error('❌ [CJ BAGUVIX OVERLAY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[CJ BAGUVIX OVERLAY TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');
@@ -8738,11 +9105,11 @@ async function main() {
     console.log(`✅ Successfully tested all ${totalTested} fighter classes, skins, weapon previews, and UI screens with ZERO runtime errors and 100% BALANCED Canvas 2D stacks!`);
     process.exit(0);
   } else {
-    console.error(`🚨 Found ${errors} fighter / weapon / UI runtime errors:`);
+    console.log(`🚨 Found ${errors} fighter / weapon / UI runtime errors:`);
     if (typeof errorList !== 'undefined') {
       const fs = await import('fs');
       fs.writeFileSync('error_log.txt', errorList.join('\n'), 'utf8');
-      errorList.forEach((e, idx) => console.error(`  ${idx + 1}. ${e}`));
+      errorList.forEach((e, idx) => console.log(`  ${idx + 1}. ${e}`));
     }
     process.exit(1);
   }

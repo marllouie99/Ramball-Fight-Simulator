@@ -64,6 +64,21 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('bell') ||
          s.includes('timertick') ||
          s.includes('machinegunblow') ||
+         s.includes('purelovebeam') ||
+         s.includes('purelove') ||
+         s.includes('lovebeam') ||
+         s.includes('yuta-lovebeam') ||
+         s.includes('lovebeam-fires') ||
+         s.includes('lovebeam-background') ||
+         s.includes('finalflash') ||
+         s.includes('hollowpurple') ||
+         s.includes('purpledeploy') ||
+         s.includes('redblast') ||
+         s.includes('fuga') ||
+         s.includes('comerika') ||
+         s.includes('rikaappearance') ||
+         s.includes('toji-ultimate') ||
+         s.includes('finalblow') ||
          s.includes('ui');
 }
 
@@ -584,11 +599,11 @@ export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500, k
 function _evictOldestSound() {
   if (_activeSoundHandles.size === 0) return false;
 
-  // Find the oldest NON-PROTECTED handle (never evict announcer, faah, death sounds, voicelines, or homie noises)
+  // Find the oldest NON-PROTECTED handle (never evict announcer, faah, death sounds, voicelines, finisher channels, or homie noises)
   let candidate = null;
   for (const handle of _activeSoundHandles) {
     if (!handle) continue;
-    if (isProtectedVoiceOrAnnouncerSound(handle.src)) {
+    if (isProtectedVoiceOrAnnouncerSound(handle.src) || handle.isFinisher) {
       continue; // Protected from eviction!
     }
     candidate = handle;
@@ -1125,6 +1140,9 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
     }
     if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(handle.src)) {
       continue;
+    }
+    if (!forceStopAll && handle.isFinisher && handle.fighter && !handle.fighter.isDead && !handle.fighter.dead && handle.fighter.hp > 0) {
+      continue; // Active finisher sound belonging to living caster is preserved!
     }
     if (fadeDelayMs > 0) {
       const timerId = setTimeout(() => {

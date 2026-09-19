@@ -22,6 +22,77 @@ function _drawRocketThrusterFlames(ctx, x, y, vx, vy, r, isBoosting, fadeMult = 
   return; // Rocket flame visual removed on dash
 }
 
+let _genosHairImage = null;
+let _genosHairImageLoading = false;
+
+export function _getGenosHairImage() {
+  if (_genosHairImage && _genosHairImage.complete && _genosHairImage.naturalWidth > 0) {
+    return _genosHairImage;
+  }
+  if (!_genosHairImageLoading && typeof Image !== 'undefined') {
+    _genosHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _genosHairImage = img;
+      _genosHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Genos hair image at Assets/model/Genos-hair.png', e);
+      _genosHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Genos-hair.png?v=1';
+    _genosHairImage = img;
+  }
+  return _genosHairImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getGenosHairImage();
+}
+
+/**
+ * Draws Genos's authentic anime spiky blonde hair from Assets/model/Genos-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawGenosHair(ctx, r, facingLeft = false) {
+  const hairImg = _getGenosHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.genos) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // Genos-hair.png (500x500). True visible hair bounding box:
+    // X: [51, 455] (width 405, horizontal center at 253)
+    // Y: [81, 408] (height 328, top crown at 81)
+    // Calibrated to seamlessly frame the upper circle with spiky crown at -1.35r
+    const targetHairWidth = r * 2.80 * wMult;
+    const targetHairHeight = r * 2.10 * hMult;
+    const scaleX = targetHairWidth / 405;
+    const scaleY = targetHairHeight / 328;
+    const drawW = 500 * scaleX;
+    const drawH = 500 * scaleY;
+    const drawX = -253 * scaleX + offX;
+    const drawY = -r * 1.35 - 81 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
+}
+
 export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   if (!fighter._isAfterImage) {
     drawGenosAfterImages(ctx, fighter);
@@ -43,14 +114,14 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   const isMoving = Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5;
 
   ctx.save();
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+
   if (!isPreTranslated) {
     ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
     // Rotate entire body circle based on movement or aiming direction
-    const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
-
     ctx.rotate(angle);
-    const facingLeft = Math.abs(angle) > Math.PI / 2;
     if (facingLeft) ctx.scale(1, -1);
   }
 
@@ -89,6 +160,11 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   // ─────────────────────────────────────────────
   drawGenosPixelBody(ctx, r, false, isChargingUlt, isSelfDestructing, fighter.isMeleeStance, now);
 
+  // ─────────────────────────────────────────────
+  // 2b. AUTHENTIC HAIR OVERLAY (Assets/model/Genos-hair.png)
+  // ─────────────────────────────────────────────
+  _drawGenosHair(ctx, r, facingLeft);
+
   ctx.restore();
 }
 
@@ -103,11 +179,11 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
-  // Core pulse parameters
+  // Core pulse parameters (lowered to chest center)
   const pulseFreq = isSelfDestructing ? 0.03 : 0.008;
   const cyanPulse = 0.5 + Math.sin(now * pulseFreq) * 0.5;
-  const coreY = -r * 0.02;
-  const activeCoreR = isSelfDestructing ? r * 0.22 : r * 0.16;
+  const coreY = r * 0.40;
+  const activeCoreR = isSelfDestructing ? r * 0.20 : r * 0.15;
 
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -126,26 +202,32 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
         continue;
       }
 
-      // Zone A: Golden Wheat Spiky Hair & Bangs (ry < -r * 0.22)
-      if (ry < -r * 0.22) {
-        // Spiky layered bangs profile
-        const isBang = (
-          (ry > -r * 0.35 && Math.abs(rx) > r * 0.65) ||
-          (ry > -r * 0.30 && Math.abs(rx) > r * 0.38 && Math.abs(rx) < r * 0.55) ||
-          (ry > -r * 0.26 && Math.abs(rx) < r * 0.22)
-        );
-
-        if (isBang) {
-          ctx.fillStyle = '#D4B964'; // Bangs shadow / lower tier
-        } else if (ry < -r * 0.55 && (Math.abs(rx - r * 0.35) < r * 0.12 || Math.abs(rx + r * 0.35) < r * 0.12)) {
-          ctx.fillStyle = '#FAF0BE'; // Hair sheen highlights
-        } else {
-          ctx.fillStyle = '#E5CC82'; // Golden wheat main hair
+      // Zone 1: Face, Neck & Under-Hair Base (ry < r * 0.20)
+      if (ry < r * 0.20) {
+        // Crown under-hair base (in case hair asset is loading/transparent)
+        if (ry < -r * 0.35) {
+          if (ry < -r * 0.55 && (Math.abs(rx - r * 0.35) < r * 0.12 || Math.abs(rx + r * 0.35) < r * 0.12)) {
+            ctx.fillStyle = '#FAF0BE';
+          } else {
+            ctx.fillStyle = '#E5CC82';
+          }
+        }
+        // Forehead, Face & Neck Skin Zone
+        else {
+          let skinCol = '#FEDBC0'; // Anime fair skin base
+          if (Math.abs(rx) > r * 0.65) {
+            skinCol = '#E9B796'; // Side cheek / jaw shadow
+          } else if (ry > r * 0.08) {
+            skinCol = '#F2C6A7'; // Lower neck shadow
+          } else if (Math.abs(rx) < r * 0.30 && ry < 0) {
+            skinCol = '#FFF0E2'; // Center face / forehead highlight
+          }
+          ctx.fillStyle = skinCol;
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone B: Tactical Vest, Shoulders, Collar, & Chest Core (-r * 0.22 <= ry < r * 0.38)
-      else if (ry < r * 0.38) {
+      // Zone 2: Tactical Vest, Shoulders, Collar, & Chest Core (r * 0.20 <= ry < r * 0.62)
+      else if (ry < r * 0.62) {
         const coreDist = Math.hypot(rx, ry - coreY);
 
         // B1. Central Glowing Energy Core
@@ -159,45 +241,45 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
           }
         }
         // B2. Metallic Silver Cybernetic Shoulders (left & right)
-        else if (Math.abs(rx) > r * 0.58 && Math.abs(ry - (-r * 0.02)) < r * 0.36) {
+        else if (Math.abs(rx) > r * 0.54 && Math.abs(ry - (r * 0.34)) < r * 0.28) {
           const shoulderCX = rx > 0 ? r * 0.72 : -r * 0.72;
-          const sDist = Math.hypot((rx - shoulderCX) * 1.2, ry - (-r * 0.02));
+          const sDist = Math.hypot((rx - shoulderCX) * 1.2, ry - (r * 0.34));
           if (sDist <= r * 0.08) {
             ctx.fillStyle = '#E6ECF2'; // Joint bolt glint
           } else if (sDist <= r * 0.16) {
             ctx.fillStyle = '#22262E'; // Bolt core
           } else {
-            ctx.fillStyle = (ry < -r * 0.08) ? '#D8E2EC' : '#A8B4C0'; // Metallic shoulder plate
+            ctx.fillStyle = (ry < r * 0.30) ? '#D8E2EC' : '#A8B4C0'; // Metallic shoulder plate
           }
         }
         // B3. V-Neck Metallic Collar Trim
-        else if (Math.abs(ry - (-r * 0.12 + Math.abs(rx) * 0.45)) < P * 0.9 && Math.abs(rx) <= r * 0.30 && ry <= -r * 0.02) {
+        else if (Math.abs(ry - (r * 0.20 + Math.abs(rx) * 0.28)) < P * 0.9 && Math.abs(rx) <= r * 0.32 && ry <= r * 0.30) {
           ctx.fillStyle = '#B0B8C2'; // Metallic collar trim
         }
         // B4. Armor Panel Seam Lines
-        else if (Math.abs(Math.abs(rx) - r * 0.42) < P * 0.6) {
+        else if (Math.abs(Math.abs(rx) - r * 0.40) < P * 0.6 && ry >= r * 0.28) {
           ctx.fillStyle = '#101217'; // Seam line
         }
         // B5. Tactical Vest Body
         else {
           let vestCol = '#1A1D24';
-          if (Math.abs(rx) < r * 0.35 && ry < r * 0.15) {
+          if (Math.abs(rx) < r * 0.35 && ry < r * 0.38) {
             vestCol = '#22262F'; // Chest fabric highlight
-          } else if (Math.abs(rx) > r * 0.50 || ry > r * 0.28) {
+          } else if (Math.abs(rx) > r * 0.50 || ry > r * 0.52) {
             vestCol = '#13151A'; // Vest shadow
           }
           ctx.fillStyle = vestCol;
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone C: Tactical Belt & Gold Buckle (r * 0.38 <= ry < r * 0.51)
-      else if (ry < r * 0.51) {
+      // Zone 3: Tactical Belt & Gold Buckle (r * 0.62 <= ry < r * 0.76)
+      else if (ry < r * 0.76) {
         // Golden Buckle at center
-        const isBuckle = (Math.abs(rx) <= r * 0.28);
+        const isBuckle = (Math.abs(rx) <= r * 0.26);
         if (isBuckle) {
-          if (Math.abs(rx) <= r * 0.12 && Math.abs(ry - r * 0.44) <= r * 0.04) {
+          if (Math.abs(rx) <= r * 0.10 && Math.abs(ry - r * 0.69) <= r * 0.04) {
             ctx.fillStyle = '#241D09'; // Buckle inner slot notch
-          } else if (rx < -P && ry < r * 0.44) {
+          } else if (rx < -P && ry < r * 0.69) {
             ctx.fillStyle = '#FFF2A8'; // Metallic buckle glint
           } else {
             ctx.fillStyle = '#D4AF37'; // Gold buckle plate
@@ -205,16 +287,16 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
         } else if (Math.abs(Math.abs(rx) - r * 0.37) < P * 0.8) {
           ctx.fillStyle = '#A0AAB5'; // Silver belt loop
         } else {
-          ctx.fillStyle = (ry < r * 0.44) ? '#1A1D24' : '#101216'; // Belt strap
+          ctx.fillStyle = (ry < r * 0.69) ? '#1A1D24' : '#101216'; // Belt strap
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone D: Black Combat Pants (ry >= r * 0.51)
+      // Zone 4: Black Combat Pants (ry >= r * 0.76)
       else {
         // Center fly seam line
-        if (Math.abs(rx) < P * 0.6 && ry <= r * 0.88) {
+        if (Math.abs(rx) < P * 0.6 && ry <= r * 0.92) {
           ctx.fillStyle = '#2A2E38'; // Pants seam line
-        } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.82) {
+        } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.88) {
           ctx.fillStyle = '#0E1013'; // Pants shadow
         } else {
           ctx.fillStyle = '#16181C'; // Black combat pants body
@@ -295,16 +377,16 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   const isUltRecovering = fighter.isUltRecovering;
 
   if (isChargingUlt) {
-    frontHandX = r * 1.15; frontHandY = -r * 0.12;
-    backHandX  = r * 1.15; backHandY  =  r * 0.12;
+    frontHandX = r * 1.15; frontHandY =  r * 0.20;
+    backHandX  = r * 1.15; backHandY  =  r * 0.44;
   } else if (isUltRecovering) {
-    // Smoothly ease hands from extended blast position (r * 1.15) back to idle fighting stance
+    // Smoothly ease hands from extended blast position back to idle fighting stance
     const recProgress = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.ultRecoveryTimer || 0) / 45)));
     const ease = Math.sin(recProgress * Math.PI * 0.5); // Smooth ease-out curve
-    frontHandX = r * 1.15 - (r * 0.30) * ease;
-    frontHandY = -r * 0.12 + (r * 0.27) * ease;
+    frontHandX = r * 1.15 - (r * 0.20) * ease;
+    frontHandY =  r * 0.20 + (r * 0.05) * ease;
     backHandX  = r * 1.15 - (r * 1.15) * ease;
-    backHandY  =  r * 0.12 - (r * 0.27) * ease;
+    backHandY  =  r * 0.44 - (r * 0.44) * ease;
   } else if (isPunching) {
     if (fighter.isFlurrying) {
       // Machine Gun Blows (Skill 1): Continuous high-speed alternating Gatling cybernetic fists
@@ -315,14 +397,14 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
       const leftReach  = Math.max(0, -wave); // 0 -> 1 when Left arm punches
 
       backHandX  = r * 0.30 + rightReach * (r * 1.85);
-      backHandY  = -r * 0.18;
+      backHandY  = r * 0.12;
 
       frontHandX = r * 0.30 + leftReach  * (r * 1.85);
-      frontHandY = r * 0.18;
+      frontHandY = r * 0.40;
     } else {
       // Melee Punches: Single cybernetic front hand punch from right edge
       frontHandX = r * 0.95 + lungeExtension * 1.5;
-      frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.15);
+      frontHandY = r * 0.25 + Math.sin(rawProgress * Math.PI) * (r * 0.15);
       backHandX  = 0;
       backHandY  = 0;
       hideBack   = true;
@@ -334,14 +416,14 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
     const primaryLunge = Math.sin(blastProgress * Math.PI) * (r * 0.95);
 
     frontHandX = r * 0.95 + primaryLunge;
-    frontHandY = 0;
+    frontHandY = r * 0.25;
     backHandX  = 0;
     backHandY  = 0;
     hideBack   = true;
   } else {
-    // Mode B: Side Profile (Idle) - Front hand at right edge of body
+    // Mode B: Side Profile (Idle) - Front hand at right edge of body lowered to chest level
     frontHandX = r * 0.95;
-    frontHandY = 0;
+    frontHandY = r * 0.25;
     backHandX  = 0;
     backHandY  = 0;
     hideBack   = true;
@@ -623,7 +705,7 @@ function _drawShatteredGenosSkin(ctx, fighter, r, now) {
   }
 
   // 2. Draw Inner Exposed Power Chassis Core
-  const coreY = -r * 0.02;
+  const coreY = r * 0.40;
   const pulseFreq = 0.03;
   const cyanPulse = 0.5 + Math.sin(now * pulseFreq) * 0.5;
 

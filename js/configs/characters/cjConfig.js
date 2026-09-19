@@ -82,7 +82,7 @@ export const cjConfig = {
   gunHitShakeIntensity: 1.2,   // Subtle punchy screen shake on direct bullet impact
 
   // ── 6. SKILL 3: GROVESTREET4LIFE (Drive-By Backup) ──
-  driveByCooldown: 600,        // 10.0s (600 frames)
+  driveByCooldown: 1000,        // 10.0s (600 frames)
   driveByStayDuration: 300,    // 5.0s (300 frames) staying & drifting in arena per pass
   driveByCarHp: 100,           // Max HP minion health bar (can be targeted and damaged by enemies)
   driveByPasses: 2,            // 2 repeated drive-by sweeps per Skill 3 activation
@@ -117,7 +117,13 @@ export const cjConfig = {
   riotShockwaveKnockback: 22.0,// Heavy radial pushback towards arena walls
   droppedMinigunDuration: 240, // 4.0s (240 frames) duration of overheated smoking minigun on the floor
   enableBaguvixDimScreen: true, // Dark Grove Street emerald green radial dim overlay
-  baguvixDimOpacity: 0.68,      // Max dim opacity during BAGUVIX God Mode
+  baguvixDimOpacity: 0.985,     // Max deep dark dim opacity during BAGUVIX God Mode (Rule 10 & 4.1)
+  baguvixDimColor: '#000000',   // Deep obsidian pitch-black atmosphere color
+  baguvixOverlayDarkness: 0.45, // Atmospheric darkness tint over the arena image to heighten contrast
+  baguvixAuraColor: '#00FF64',  // Electric neon emerald lightning aura accent
+  baguvixOverlayEnabled: true,  // Overlays the entire arena with Assets/Overlays/CJ-baguvix-overlay.png during BAGUVIX God Mode
+  baguvixOverlayZoom: 1.0,      // Zoom scale multiplier for the arena PNG overlay image (1.0 = 100% full arena fit)
+  baguvixOverlayOffsetY: 0.0,   // Vertical offset ratio (0.0 = centered)
 
   // ── 8. AUDIO ASSETS, VOLUMES & TIMING DELAYS ──
   sounds: {

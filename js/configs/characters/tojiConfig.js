@@ -23,7 +23,7 @@ export const tojiConfig = {
 
   // Passive: Heavenly Restriction (Tenyo Jubaku)
   stealthDodgeChance: 0.10,          // Base chance (25%) to physically dodge incoming melee attacks, strikes & projectiles outside domains (displays "MISS!")
-  domainDodgeChance: 0.95,           // Increased chance (100%) to physically dodge when inside an enemy Domain Expansion (Heavenly Restriction 0 Cursed Energy stealth!)
+  domainDodgeChance: 0.50,           // Increased chance (100%) to physically dodge when inside an enemy Domain Expansion (Heavenly Restriction 0 Cursed Energy stealth!)
   domainDodgeBonus: 0.50,           // Bonus dodge rate added when inside an enemy domain
   parryChance: 0.10,                 // 10% chance to parry incoming strikes/projectiles with Inverted Spear
   parryAmbushCooldownFrames: 360,   // Cooldown (frames) before a parry triggers a 3-Stage Ambush inside enemy domains (360 frames = 6.0s)
@@ -43,7 +43,7 @@ export const tojiConfig = {
 
   // Primary Melee: Inverted Spear of Heaven (Amanosakahoko)
   spearRange: 50,                    // Distance required to land melee hit (50px)
-  spearCooldown: 45,                 // Spaced frames between basic melee strikes (0.92s swing)
+  spearCooldown: 75,                 // Spaced frames between basic melee strikes (0.92s swing)
   spearDamage: 8,                   // Base damage per swing
   spearKnockback: 2.5,               // Physical push velocity impulse on basic attack hit
   spearHitStun: 0,                   // Hit stun frames on basic attack hit (0 = no freeze/hit-stun on basic attacks)
@@ -91,20 +91,27 @@ export const tojiConfig = {
   ultimateMaxStrikes: 8,             // Number of flash-step strikes before the final crater slam
   ultimateAssaultDamage: 15,         // True Damage per flash-step strike
   ultimateAssaultRicochetForce: 10,  // Kinetic ricochet knockback force launching enemy across arena into wall bounces
-  ultimateCraterDamage: 30,          // Massive crater slam True Damage
+  ultimateCraterDamage: 100,          // Massive crater slam True Damage
   ultimateCraterRadius: 180,         // Blast radius of the final crater slam
   ultimateCraterReach: 185,          // Frontal reach distance (px) for multi-target 360 final blow sweep
-  ultimateCraterArc: Math.PI * 1.35, // 243° wide frontal sweeping arc angle
+  ultimateCraterArc: Math.PI * 2,    // 360° full omnidirectional sweeping arc angle
   ultimateCraterDistance: 320,       // Distance (px) Toji slides away from target into aerial vantage position before final crater slam
   ultimateVanishDuration: 5,         // Frames spent invisible in the shadows between strikes
-  ultimateStrikeDuration: 20,        // Total frames he is visible during a strike (smooth & readable swing)
-  ultimateSlideDistance: 100,        // Spawning offset distance (px) before sliding in
-  ultimateSlideSpeed: 50,            // Inward slide speed
+  ultimateStrikeDuration: 22,        // Total frames he is visible during a strike (smooth & readable swing)
+  ultimateSlideDistance: 240,        // Spawning offset distance (px) before sliding in (balanced cinematic runway)
+  ultimateSlideSpeed: 42,            // Inward slide speed
   ultimateCraterChargeTime: 90,      // Frames spent hovering in the air winding up the katana
   ultimateCraterDiveTime: 16,        // Frames spent diving straight towards the enemy
   ultimateCraterSpinTime: 14,        // Frames spent executing the 360 final blow rotation at the enemy
   ultimateCraterFadeInFrames: 35,    // Frames spent sliding away to the distant vantage position
   ultimateDodgeMultiplier: 3.0,      // Dodge chance multiplier during ultimate
+  ultimateDimOpacity: 1.0,           // Opacity of the full-screen solid black dim effect (1.0 = 100% solid black)
+  ultimateDimColor: '#000000',       // Color tone of the dim effect (pure solid black)
+  ultimateOverlayZoom: 1.80,         // Zoom scale multiplier for the arena PNG overlay image (Assets/Overlays/Toji-ultimate-overlay.png)
+  ultimateOverlayOffsetX: 0,         // Horizontal pixel offset adjustment for Toji ultimate overlay image
+  ultimateOverlayOffsetY: -45,       // Vertical pixel offset adjustment for Toji ultimate overlay image (negative = up)
+  ultimateOverlayDarkness: 0.00,      // Opacity of the dark/black overlay on top layer of the arena image (0.0 to 1.0)
+  ultimateOverlayAlpha: 0.75,        // Semi-transparent opacity for Toji ultimate overlay image (0.75 = 75% opacity)
 
   // Audio Configuration, Volume & Timing Delay Adjustments
   sounds: {

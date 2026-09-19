@@ -65,7 +65,7 @@ function createWindow () {
   const win = new BrowserWindow({
     width: 540,
     height: 960,
-    useContentSize: false, // Disabling this forces the absolute physical window size to 540x960
+    useContentSize: true, // Ensures web content viewport is exactly 540x960px
     resizable: false,
     webPreferences: {
       nodeIntegration: false,

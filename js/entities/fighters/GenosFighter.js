@@ -4,7 +4,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { audioSystem } from '../../systems/audioSystem.js';
 import { stopSound, stopSoundBySrc } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnGenosThrusterDashVisual, spawnLaserSmoke, spawnGroundScorch, spawnGenosSelfDestructExplosion } from '../../graphics/particles/sparkEffect.js';
+import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnGenosThrusterDashVisual, spawnLaserSmoke, spawnGenosSelfDestructExplosion } from '../../graphics/particles/sparkEffect.js';
 import { drawGenosSkin, drawGenosHands } from '../../graphics/fighters/genosSkin.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
@@ -181,12 +181,17 @@ export class GenosFighter extends Fighter {
 
     if (!this.canAim()) return false;
 
-    // In Ranged Mode (Incineration Palm Blast) & Melee: Aim strictly in 4 cardinal directions (Up, Down, Left, Right)
+    // Continuous 360° omnidirectional aiming towards target at any angle
     const aimTarget = target || this._findClosestEnemy();
-    const cardinalAngle = this._getCardinalAngle(aimTarget);
-    this.gunAngle = cardinalAngle;
-    this.angle = cardinalAngle;
-    return true;
+    if (aimTarget && typeof aimTarget.x === 'number' && typeof aimTarget.y === 'number') {
+      const targetY = (aimTarget.y !== undefined ? aimTarget.y : this.y) - (aimTarget.z || 0);
+      const genosY = this.y - (this.z || 0);
+      const aimAngle = Math.atan2(targetY - genosY, aimTarget.x - this.x);
+      this.gunAngle = aimAngle;
+      this.angle = aimAngle;
+      return true;
+    }
+    return super.aim(aimTarget);
   }
 
   isEffectivelyAlive() {
@@ -515,19 +520,6 @@ export class GenosFighter extends Fighter {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, -P, range, P * 2);
 
-    // H. Stepped Sawtooth Pixel Edge Detail along Outer Perimeter (Deep Crimson & Fiery Orange)
-    const sawStep = P * 4;
-    for (let u = 0; u <= range; u += sawStep) {
-      const offsetTop = ((u / sawStep) % 2 === 0) ? P : 0;
-      const offsetBot = ((u / sawStep) % 2 === 1) ? P : 0;
-      ctx.fillStyle = '#800A00';
-      ctx.fillRect(u, -tier4Half - P - offsetTop, sawStep, P);
-      ctx.fillRect(u, tier4Half + offsetBot, sawStep, P);
-      ctx.fillStyle = '#FF5500';
-      ctx.fillRect(u, -tier4Half - offsetTop, sawStep, P);
-      ctx.fillRect(u, tier4Half - P + offsetBot, sawStep, P);
-    }
-
     // ── 3. Longitudinal High-Energy Stepped Plasma Wave Pulses (Superheated White & Solar Gold) ──
     const pulseCount = 6;
     for (let pl = 0; pl < pulseCount; pl++) {
@@ -677,12 +669,16 @@ export class GenosFighter extends Fighter {
       return;
     }
 
-    // Determine target and lock to strict cardinal angle (UP / DOWN / LEFT / RIGHT STRAIGHT)
+    // Determine target and aim to any continuous 360° angle
     const target = this._findClosestEnemy();
-    const cardinalAngle = this._getCardinalAngle(target);
-    this.gunAngle = cardinalAngle;
-    this.angle = cardinalAngle;
-    const angle = cardinalAngle;
+    let angle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+    if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+      const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+      const genosY = this.y - (this.z || 0);
+      angle = Math.atan2(targetY - genosY, target.x - this.x);
+      this.gunAngle = angle;
+      this.angle = angle;
+    }
 
     // ── MELEE MODE (PUNCH ATTACK) ──
     if (this.isMeleeStance || this.heatAmmo <= 0) {
@@ -848,9 +844,13 @@ export class GenosFighter extends Fighter {
 
   executeBasicBlast(opponent) {
     const target = opponent || this._findClosestEnemy();
-    const cardinalAngle = this._getCardinalAngle(target);
-    this.gunAngle = cardinalAngle;
-    this.angle = cardinalAngle;
+    if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+      const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+      const genosY = this.y - (this.z || 0);
+      const angle = Math.atan2(targetY - genosY, target.x - this.x);
+      this.gunAngle = angle;
+      this.angle = angle;
+    }
     const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
     this.shoot(ownerIndex >= 0 ? ownerIndex : 0);
   }
@@ -1045,6 +1045,8 @@ export class GenosFighter extends Fighter {
     const target = opponent || this._findClosestEnemy();
     if (!target && (!this.gunAngle || Number.isNaN(this.gunAngle))) return;
 
+    this.isDashing = false;
+    this.speedBoostTimer = 0;
     this.isChargingUlt = true;
     this.ultTimer = CONFIG.genos?.ultWindupFrames || 60;
     this.ultCooldown = CONFIG.genos?.ultCooldown || 1680;
@@ -1562,9 +1564,6 @@ export class GenosFighter extends Fighter {
             if (typeof spawnSparks === 'function') {
               spawnSparks(target.x, target.y, 8, 'orange');
               spawnSparks(target.x, target.y, 5, 'laserHit');
-            }
-            if (typeof spawnGroundScorch === 'function') {
-              spawnGroundScorch(target.x, target.y, (target.r || 25) * 1.3);
             }
           }
         }

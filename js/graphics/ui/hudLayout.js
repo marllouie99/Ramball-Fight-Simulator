@@ -19,7 +19,7 @@ export function syncHudPosition() {
   if (!_cachedGameBox || !_cachedPixiView) return;
 
   const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
-  const canvasHeight = (typeof state !== 'undefined' && state.canvas && state.canvas.height) || CONFIG.canvasHeight || 1080;
+  const canvasHeight = (typeof state !== 'undefined' && state.canvas && state.canvas.height) || CONFIG.canvasHeight || 960;
 
   _cachedGameBox.style.aspectRatio = '540 / 960';
   _cachedGameBox.style.maxWidth = `${canvasWidth}px`;

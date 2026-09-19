@@ -100,27 +100,31 @@ export function triggerRikaDeathShatter(rk, fighter) {
 export function stopRikaAudio(fighter, rk) {
   if (!fighter) return;
   const targetRk = rk || fighter.rika;
+  const isYutaFiringBeam = Boolean(fighter.isFiringPureLoveBeam || fighter.isChannelingPureLoveBeam || (fighter.pureLoveBeamActiveTimer > 0));
+  const isYutaAlive = Boolean(fighter.hp > 0 && !fighter.isDead && !fighter.dead);
 
-  // 1. Stop all specific audio handles on Yuta
+  // 1. Stop all specific audio handles on Yuta (preserve Pure Love Beam audio if Yuta is actively firing/channeling)
   if (fighter.comeRikaSoundHandle) {
     stopSound(fighter.comeRikaSoundHandle);
     fighter.comeRikaSoundHandle = null;
   }
-  if (fighter._pureLoveBeamChargeSoundHandle) {
-    stopSound(fighter._pureLoveBeamChargeSoundHandle);
-    fighter._pureLoveBeamChargeSoundHandle = null;
-  }
-  if (fighter.pureLoveBeamBgSoundHandle) {
-    stopSound(fighter.pureLoveBeamBgSoundHandle);
-    fighter.pureLoveBeamBgSoundHandle = null;
-  }
-  if (fighter.pureLoveBeamAudioHandle) {
-    stopSound(fighter.pureLoveBeamAudioHandle);
-    fighter.pureLoveBeamAudioHandle = null;
-  }
-  if (fighter.pureLoveBeamSoundHandle) {
-    stopSound(fighter.pureLoveBeamSoundHandle);
-    fighter.pureLoveBeamSoundHandle = null;
+  if (!isYutaFiringBeam || !isYutaAlive) {
+    if (fighter._pureLoveBeamChargeSoundHandle) {
+      stopSound(fighter._pureLoveBeamChargeSoundHandle);
+      fighter._pureLoveBeamChargeSoundHandle = null;
+    }
+    if (fighter.pureLoveBeamBgSoundHandle) {
+      stopSound(fighter.pureLoveBeamBgSoundHandle);
+      fighter.pureLoveBeamBgSoundHandle = null;
+    }
+    if (fighter.pureLoveBeamAudioHandle) {
+      stopSound(fighter.pureLoveBeamAudioHandle);
+      fighter.pureLoveBeamAudioHandle = null;
+    }
+    if (fighter.pureLoveBeamSoundHandle) {
+      stopSound(fighter.pureLoveBeamSoundHandle);
+      fighter.pureLoveBeamSoundHandle = null;
+    }
   }
 
   // 2. Stop audio handles on Rika
@@ -156,17 +160,22 @@ export function stopRikaAudio(fighter, rk) {
   stopSoundBySrc('rikanoise');
   stopSoundBySrc('groundsmash');
   stopSoundBySrc('groundSmash');
-  stopSoundBySrc('yuta-lovebeam-background');
-  stopSoundBySrc('yuta-lovebeam-fires');
+
+  if (!isYutaFiringBeam || !isYutaAlive) {
+    stopSoundBySrc('yuta-lovebeam-background');
+    stopSoundBySrc('yuta-lovebeam-fires');
+  }
 
   const cfg = (typeof CONFIG !== 'undefined' && CONFIG.yuta) ? CONFIG.yuta : {};
   if (cfg.comeRikaSound) stopSoundBySrc(cfg.comeRikaSound);
   if (cfg.rikaAppearanceSound) stopSoundBySrc(cfg.rikaAppearanceSound);
-  if (cfg.pureLoveBeamChargeSound) stopSoundBySrc(cfg.pureLoveBeamChargeSound);
   if (cfg.rikaGroundTrembleSound) stopSoundBySrc(cfg.rikaGroundTrembleSound);
   if (cfg.rikaGroundSmashSound) stopSoundBySrc(cfg.rikaGroundSmashSound);
-  if (cfg.pureLoveBeamBackgroundSound) stopSoundBySrc(cfg.pureLoveBeamBackgroundSound);
-  if (cfg.pureLoveBeamFireSound) stopSoundBySrc(cfg.pureLoveBeamFireSound);
+  if (!isYutaFiringBeam || !isYutaAlive) {
+    if (cfg.pureLoveBeamChargeSound) stopSoundBySrc(cfg.pureLoveBeamChargeSound);
+    if (cfg.pureLoveBeamBackgroundSound) stopSoundBySrc(cfg.pureLoveBeamBackgroundSound);
+    if (cfg.pureLoveBeamFireSound) stopSoundBySrc(cfg.pureLoveBeamFireSound);
+  }
 }
 
 /**
@@ -438,7 +447,7 @@ export function updateRika(fighter, arena) {
   const hpThreshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.60;
   const isInsideDomain = fighter.domainActive || fighter.isChannelingDomain;
 
-  if (!rk.active && !rk.hasSummonedAt50Hp && hpRatio <= hpThreshold && !fighter.isDying && fighter.hp > 0 && !isInsideDomain) {
+  if (!rk.active && !rk.isDying && !rk.disappearing && !rk.hasSummonedAt50Hp && hpRatio <= hpThreshold && !fighter.isDying && fighter.hp > 0 && !isInsideDomain) {
     rk.hasSummonedAt50Hp = true; // Lockout further HP-threshold summons
     fighter.rikaRechargeHpBaseline = undefined;
     const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 30;
@@ -455,16 +464,17 @@ export function updateRika(fighter, arena) {
     if (typeof spawnImpactFlash === 'function') spawnImpactFlash(fighter.x, fighter.y, 45, 'rgba(255, 20, 147, 0.4)');
     if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1, 6);
 
-    if (CONFIG.yuta?.comeRikaSound) {
-      audioSystem.playSFX(
-        CONFIG.yuta.comeRikaSound,
-        CONFIG.yuta.comeRikaVolume ?? 2.5,
-        1.0, 0,
-        CONFIG.yuta.comeRikaDelay ?? 0
-      );
-      fighter._lastComeRikaPlayTime = state.frameCount;
+    const nowFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : 0;
+    const lastPlayed = fighter._lastComeRikaPlayTime || 0;
+    if (CONFIG.yuta?.comeRikaSound && (nowFrame - lastPlayed > 150 || lastPlayed === 0)) {
+      stopSoundBySrc('comerika');
+      stopSoundBySrc('comeRika');
+      fighter.comeRikaSoundHandle = (audioSystem && typeof audioSystem.playFighterVoiceline === 'function')
+        ? audioSystem.playFighterVoiceline(fighter, CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5, 1.0, 0, CONFIG.yuta.comeRikaDelay ?? 0, { priority: 'protected', durationMs: 2200 })
+        : audioSystem.playSFX(CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5, 1.0, 0, CONFIG.yuta.comeRikaDelay ?? 0);
+      fighter._lastComeRikaPlayTime = nowFrame;
     }
-  } else if (!rk.active && rk.hasSummonedAt50Hp && !fighter.isDying && fighter.hp > 0 && (rk.chargeTimer || 0) <= 0) {
+  } else if (!rk.active && !rk.isDying && !rk.disappearing && rk.hasSummonedAt50Hp && !fighter.isDying && fighter.hp > 0 && (rk.chargeTimer || 0) <= 0 && (rk.spawnTimer || 0) <= 0) {
     // Re-summon Trigger: Fills up as Yuta takes damage (inside OR outside domain) after Rika died!
     if (fighter.rikaRechargeHpBaseline === undefined) {
       fighter.rikaRechargeHpBaseline = fighter.hp;
@@ -487,14 +497,15 @@ export function updateRika(fighter, arena) {
       if (typeof spawnImpactFlash === 'function') spawnImpactFlash(fighter.x, fighter.y, 45, 'rgba(255, 20, 147, 0.4)');
       if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1, 6);
 
-      if (CONFIG.yuta?.comeRikaSound) {
-        audioSystem.playSFX(
-          CONFIG.yuta.comeRikaSound,
-          CONFIG.yuta.comeRikaVolume ?? 2.5,
-          1.0, 0,
-          CONFIG.yuta.comeRikaDelay ?? 0
-        );
-        fighter._lastComeRikaPlayTime = state.frameCount;
+      const nowFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : 0;
+      const lastPlayed = fighter._lastComeRikaPlayTime || 0;
+      if (CONFIG.yuta?.comeRikaSound && (nowFrame - lastPlayed > 150 || lastPlayed === 0)) {
+        stopSoundBySrc('comerika');
+        stopSoundBySrc('comeRika');
+        fighter.comeRikaSoundHandle = (audioSystem && typeof audioSystem.playFighterVoiceline === 'function')
+          ? audioSystem.playFighterVoiceline(fighter, CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5, 1.0, 0, CONFIG.yuta.comeRikaDelay ?? 0, { priority: 'protected', durationMs: 2200 })
+          : audioSystem.playSFX(CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5, 1.0, 0, CONFIG.yuta.comeRikaDelay ?? 0);
+        fighter._lastComeRikaPlayTime = nowFrame;
       }
     }
   }
@@ -570,6 +581,9 @@ export function updateRika(fighter, arena) {
         rk.playedAriseRoarSound = true;
         const appearanceChance = CONFIG.yuta?.rikaAppearanceChance ?? 0.35;
         if (Math.random() < appearanceChance && CONFIG.yuta?.rikaAppearanceSound) {
+          stopSoundBySrc('rikaappearance');
+          stopSoundBySrc('rikaAppearance1');
+          stopSoundBySrc('rikaAppearance');
           audioSystem.playSFX(
             CONFIG.yuta.rikaAppearanceSound,
             CONFIG.yuta.rikaAppearanceVolume ?? 2.5,
@@ -578,7 +592,9 @@ export function updateRika(fighter, arena) {
           );
         }
 
-        if (CONFIG.yuta?.rikaGroundTrembleSound) {
+        if (CONFIG.yuta?.rikaGroundTrembleSound && !rk.activeTrembleSound) {
+          stopSoundBySrc('groundtremble');
+          stopSoundBySrc('groundTremble');
           rk.activeTrembleSound = audioSystem.playSFX(
             CONFIG.yuta.rikaGroundTrembleSound,
             CONFIG.yuta.rikaGroundTrembleVolume ?? 1.8,
@@ -687,7 +703,7 @@ export function updateRika(fighter, arena) {
           const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 15));
           const emergenceRadius = CONFIG.yuta?.rikaEmergenceRadius || 400;
           const emergenceDamage = (CONFIG.yuta?.rikaEmergenceDamage || 25) + damageGain;
-          const emergenceKnockback = CONFIG.yuta?.rikaEmergenceKnockback || 8;
+          const emergenceKnockback = CONFIG.yuta?.rikaEmergenceKnockback ?? 0;
           const emergenceHitStun = CONFIG.yuta?.rikaEmergenceHitStun || 15;
 
           if (state.fighters) {
@@ -701,11 +717,13 @@ export function updateRika(fighter, arena) {
                   if (dist <= emergenceRadius + enemy.r) {
                     enemy.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true, isRikaAttack: true });
                     if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(emergenceHitStun);
-                    const pushVx = (dx / dist) * emergenceKnockback;
-                    const pushVy = (dy / dist) * emergenceKnockback;
-                    enemy.vx += pushVx;
-                    enemy.vy += pushVy;
-                    if (typeof enemy.applyKnockback === 'function') enemy.applyKnockback(pushVx * 0.5, pushVy * 0.5);
+                    if (emergenceKnockback > 0) {
+                      const pushVx = (dx / dist) * emergenceKnockback;
+                      const pushVy = (dy / dist) * emergenceKnockback;
+                      enemy.vx += pushVx;
+                      enemy.vy += pushVy;
+                      if (typeof enemy.applyKnockback === 'function') enemy.applyKnockback(pushVx * 0.5, pushVy * 0.5);
+                    }
                     if (typeof spawnFloatingText === 'function') spawnFloatingText(enemy.x, enemy.y - 30, 'EMERGENCE BLAST!', '#FF1493');
                   }
                 }
@@ -723,11 +741,13 @@ export function updateRika(fighter, arena) {
                 if (dist <= emergenceRadius + (ill.r || 20)) {
                   ill.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true, isRikaAttack: true });
                   if (typeof ill.applyHitStun === 'function') ill.applyHitStun(emergenceHitStun);
-                  const pushVx = (dx / dist) * emergenceKnockback;
-                  const pushVy = (dy / dist) * emergenceKnockback;
-                  ill.vx += pushVx;
-                  ill.vy += pushVy;
-                  if (typeof ill.applyKnockback === 'function') ill.applyKnockback(pushVx * 0.5, pushVy * 0.5);
+                  if (emergenceKnockback > 0) {
+                    const pushVx = (dx / dist) * emergenceKnockback;
+                    const pushVy = (dy / dist) * emergenceKnockback;
+                    ill.vx += pushVx;
+                    ill.vy += pushVy;
+                    if (typeof ill.applyKnockback === 'function') ill.applyKnockback(pushVx * 0.5, pushVy * 0.5);
+                  }
                   if (typeof spawnFloatingText === 'function') spawnFloatingText(ill.x, ill.y - 30, 'EMERGENCE BLAST!', '#FF1493');
                 }
               }
@@ -786,8 +806,8 @@ export function updateRika(fighter, arena) {
       rk.x = fighter.x;
       rk.y = fighter.y;
       rk.hp = rk.maxHp; // Reset HP upon manifestation
-      rk.playedComeRikaSound = false;
-      rk.playedAriseRoarSound = false;
+      rk.playedComeRikaSound = true;
+      rk.playedAriseRoarSound = true;
       const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       rk.spawnTimer = ariseMax;
       rk.spawnScale = 0.05;
@@ -796,6 +816,9 @@ export function updateRika(fighter, arena) {
       // Play Rika Appearance sound (rikaAppearance.mp3) when Rika manifests!
       const appearanceChance = CONFIG.yuta?.rikaAppearanceChance ?? 0.35;
       if (Math.random() < appearanceChance && CONFIG.yuta?.rikaAppearanceSound) {
+        stopSoundBySrc('rikaappearance');
+        stopSoundBySrc('rikaAppearance1');
+        stopSoundBySrc('rikaAppearance');
         audioSystem.playSFX(
           CONFIG.yuta.rikaAppearanceSound,
           CONFIG.yuta.rikaAppearanceVolume ?? 2.5,
@@ -993,8 +1016,8 @@ export function updateRika(fighter, arena) {
 
       const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 15));
       const rikaDmg = (CONFIG.yuta.rikaDamage || 20) + damageGain;
-      const knockbackForce = CONFIG.yuta?.rikaHitKnockback || 16;
-      const recoilForce = CONFIG.yuta?.rikaHitRecoil || 6;
+      const knockbackForce = CONFIG.yuta?.rikaHitKnockback ?? 0;
+      const recoilForce = CONFIG.yuta?.rikaHitRecoil ?? 0;
       const hitStunDuration = CONFIG.yuta?.rikaHitStun || 12;
       const attackOwner = isRikaDominated ? (rk._makimaChainer || rk.owner) : (fighter._makimaChainer || fighter);
 
@@ -1005,31 +1028,33 @@ export function updateRika(fighter, arena) {
           anyHit = true;
         }
 
-        const pushAngle = Math.atan2(target.y - rk.y, target.x - rk.x);
-        const smashVx = Math.cos(pushAngle) * knockbackForce;
-        const smashVy = Math.sin(pushAngle) * knockbackForce;
+        if (knockbackForce > 0) {
+          const pushAngle = Math.atan2(target.y - rk.y, target.x - rk.x);
+          const smashVx = Math.cos(pushAngle) * knockbackForce;
+          const smashVy = Math.sin(pushAngle) * knockbackForce;
 
-        const isTojiTarget = target.characterId === 'toji' || target.type === 'toji' || target.domainImmunity;
-        if (isTojiTarget) {
-          target.vx = (target.vx || 0) + smashVx * 0.4;
-          target.vy = (target.vy || 0) + smashVy * 0.4;
-        } else {
-          target.vx = (target.vx || 0) + smashVx;
-          target.vy = (target.vy || 0) + smashVy;
-          if (typeof target.applyKnockback === 'function') {
-            target.applyKnockback(smashVx * 0.5, smashVy * 0.5);
+          const isTojiTarget = target.characterId === 'toji' || target.type === 'toji' || target.domainImmunity;
+          if (isTojiTarget) {
+            target.vx = (target.vx || 0) + smashVx * 0.4;
+            target.vy = (target.vy || 0) + smashVy * 0.4;
+          } else {
+            target.vx = (target.vx || 0) + smashVx;
+            target.vy = (target.vy || 0) + smashVy;
+            if (typeof target.applyKnockback === 'function') {
+              target.applyKnockback(smashVx * 0.5, smashVy * 0.5);
+            }
           }
-          if (typeof target.applyHitStun === 'function') {
-            target.applyHitStun(hitStunDuration);
-          }
+        }
+        if (typeof target.applyHitStun === 'function') {
+          target.applyHitStun(hitStunDuration);
         }
 
         if (typeof spawnImpactFlash === 'function') spawnImpactFlash(target.x, target.y, 50, 'rgba(255, 20, 147, 0.7)');
         if (typeof spawnSparks === 'function') spawnSparks(target.x, target.y, 8, 'rikaCurse');
       }
 
-      // 2. Controlled Physical Recoil (applied gently only on solid connected hits)
-      if (anyHit) {
+      // 2. Controlled Physical Recoil (applied only if recoilForce > 0)
+      if (anyHit && recoilForce > 0) {
         const pushAngle = Math.atan2(dy, dx);
         rk.vx = rk.vx * 0.25 - Math.cos(pushAngle) * (recoilForce * 0.45);
         rk.vy = rk.vy * 0.25 - Math.sin(pushAngle) * (recoilForce * 0.45);

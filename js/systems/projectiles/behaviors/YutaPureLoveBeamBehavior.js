@@ -186,6 +186,16 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             if (typeof ent.cancelRed === 'function') {
               ent.cancelRed(true);
             }
+            if (ent.isSpinning || ent.isAmbushing || ent.ultimateActive) {
+              ent.isSpinning = false;
+              ent.isAmbushing = false;
+              ent.ambushPhase = null;
+              ent.ultimateActive = false;
+              ent.ultimatePhase = null;
+              ent.katanaSlashTimer = 0;
+              ent.katanaSlashFadeTimer = 0;
+              ent._wasFinalBlowSpin = false;
+            }
             if (typeof ent.interruptAttacks === 'function') {
               ent.interruptAttacks(true);
             }

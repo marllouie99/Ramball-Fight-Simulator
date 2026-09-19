@@ -36,12 +36,13 @@ export const yutaConfig = {
   teleportDodgeDistance: 85,               // Distance teleported on dodge
 
   // Basic Attack: Katana Melee
-  meleeCooldown: 36,                       // Frames between katana strikes
+  meleeCooldown: 50,                       // Frames between katana strikes
   meleeRange: 50,                          // Katana blade length reach distance in pixels
   meleeDamage: 8,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
-  meleeKnockback: 1.5,                     // Outward push force on katana melee strike
+  meleeKnockback: 0.0,                     // Outward push force on katana melee strike
   meleeHitStun: 12,                        // Hit stun frames on katana melee strike
+  weaponOffsetY: 4.5,                      // Y-offset shift positioning hands & katana lower on Yuta's body/chest
 
   // Defensive / Counter Mechanic: Parry & Guard Stance
   parryThreatRadius: 180,                  // Detection radius in pixels for incoming projectile threats
@@ -54,11 +55,11 @@ export const yutaConfig = {
   maxParryStacks: 5,                        // Maximum parry mastery stacks (+25% bonus parry chance cap)
 
   // Special Mechanic: Phantom Flurry (Parry Counterattack & Basic Attack Combo)
-  flurryParryMin: 3,                       // Minimum successful parries required to activate Flurry
-  flurryParryMax: 3,                       // Maximum random target threshold for Flurry activation
+  flurryParryMin: 5,                       // Minimum successful parries required to activate Flurry
+  flurryParryMax: 5,                       // Maximum random target threshold for Flurry activation
   flurryBasicHitsRequired: 10,              // Number of successful basic attack hits required to activate Flurry
   flurryHits: 7,                           // Number of rapid teleport slashes in Flurry execution
-  flurryDamage: 15,                         // Damage per slash during Flurry
+  flurryDamage: 8,                         // Damage per slash during Flurry
   flurryHitInterval: 7,                    // Frames delay between each Flurry slash
 
   // Copied Techniques (Ranged Skill Cycle)
@@ -84,21 +85,21 @@ export const yutaConfig = {
   // Rika Full Emergence (#1) & Vengeful Death Dispersion (#8) Config Tuning
   rikaEmergenceDamage: 10,                 // AOE damage dealt when Rika completes full emergence (#1)
   rikaEmergenceRadius: 400,                // AOE blast radius in pixels for Full Emergence (#1)
-  rikaEmergenceKnockback: 8,               // Outward radial knockback force on Full Emergence (#1)
+  rikaEmergenceKnockback: 0,               // Outward radial knockback force on Full Emergence (#1)
   rikaEmergenceHitStun: 15,                // Hitstun duration (frames) applied by Full Emergence (#1)
 
-  rikaHitKnockback: 16,                    // Physical smash bounce impulse applied to enemy targets hit by Rika
-  rikaHitRecoil: 6,                        // Equal-and-opposite physical bounce force applied back onto Rika
+  rikaHitKnockback: 0,                    // Physical smash bounce impulse applied to enemy targets hit by Rika
+  rikaHitRecoil: 0,                        // Equal-and-opposite physical bounce force applied back onto Rika (0 = no recoil push)
   rikaHitStun: 12,                         // Hitstun duration (frames) applied to targets smashed by Rika
 
   rikaDeathExplosionDamage: 35,            // AOE damage dealt when Rika's shell shatters on death (#8)
   rikaDeathExplosionRadius: 280,           // AOE blast radius in pixels for Vengeful Death Dispersion (#8)
-  rikaDeathExplosionKnockback: 10,          // Outward radial knockback force on Death Dispersion (#8)
+  rikaDeathExplosionKnockback: 0,          // Outward radial knockback force on Death Dispersion (#8)
   rikaDeathExplosionHitStun: 20,           // Hitstun duration (frames) applied by Death Dispersion (#8)
 
   // Ultimate Skill: Domain Expansion — Authentic Mutual Love
   domainCooldown: 0,                        // Domain is based on HP lost (no cooldown timer!)
-  domainHpThreshold: 0.20,                 // 1st Domain Expansion trigger threshold (60% HP)
+  domainHpThreshold: 0.50,                 // 1st Domain Expansion trigger threshold (60% HP)
   domain2HpDamageRequired: 0.75,           // 2nd Domain requirement: Yuta MUST take 20% max HP damage AFTER 1st domain ends!
   domainMaxUses: 2,                        // Max number of Domain Expansion activations per round (allows 2 uses)
   domainChargeMax: 50,                     // Fast snappy channeling duration before domain opens (~0.83s at 60fps)
@@ -112,12 +113,13 @@ export const yutaConfig = {
   domainRikaDamageMultiplier: 0.2,         // Total damage dealt multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
   domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
+  domainOverlayAlpha: 0.75,                // Semi-transparent opacity for Yuta domain overlay image (0.75 = 75% opacity)
 
   // Ultimate Skill: Pure Love Beam (Sacrificial Nuke)
-  pureLoveBeamHpThreshold: 0.10,           // HP ratio required to trigger beam (15%)
+  pureLoveBeamHpThreshold: 0.45,           // HP ratio required to trigger beam (15%)
   pureLoveBeamCooldown: 1200,              // Cooldown frames (20 seconds) before beam can be used again
   pureLoveBeamChargeFrames: 120,            // Channeling duration before firing (1.5 seconds)
-  pureLoveBeamDuration: 350,               // Frames the beam stays active (3 seconds)
+  pureLoveBeamDuration: 550,               // Frames the beam stays active (3 seconds)
   pureLoveBeamActiveDuration: 350,         // Alias matching pureLoveBeamDuration for skill and HUD consistency
   pureLoveBeamDamagePerTick: 2,           // Rapid multi-hit damage
   pureLoveBeamWidth: 200,                  // Massive beam radius/width

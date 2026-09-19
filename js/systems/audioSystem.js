@@ -1,4 +1,4 @@
-import { playSound, stopSound, stopLoopingSound, stopSoundBySrc, stopAllSounds, stopAllLoopingSounds, playLoopingSound, fadeOutSound, fadeOutLoopingSound, fadeInSound } from './soundSystem.js';
+import { playSound, stopSound, stopLoopingSound, stopSoundBySrc, stopAllSounds, stopAllLoopingSounds, playLoopingSound, fadeOutSound, fadeOutLoopingSound, fadeInSound, pauseSound, resumeSound } from './soundSystem.js';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 
 class AudioEventEmitter {
@@ -81,6 +81,151 @@ class AudioEventEmitter {
     if (handle) {
       stopSound(handle);
     }
+  }
+
+  /**
+   * Play a dedicated finisher/ultimate audio layer (voice, charge, bg, release) for a fighter.
+   * Finisher sounds are marked with handle.isFinisher = true to prevent eviction and premature cutoffs.
+   * Automatically manages channel roles on the fighter instance.
+   *
+   * @param {object} fighter - The fighter casting the finisher
+   * @param {object|string} config - Sound source string or config object { src, role, volume, speed, offset, delay, fadeMs, onEnded }
+   * @returns {object|null} The sound handle
+   */
+  playFinisherAudio(fighter, config) {
+    if (!fighter) return null;
+    let src = config;
+    let role = 'release';
+    let volume = 1.0;
+    let speed = 1.0;
+    let offset = 0;
+    let delay = 0;
+    let onEnded = null;
+
+    if (typeof config === 'object' && config !== null && !Array.isArray(config)) {
+      src = config.src;
+      if (config.role) role = config.role;
+      if (config.volume !== undefined) volume = config.volume;
+      if (config.speed !== undefined) speed = config.speed;
+      if (config.offset !== undefined) offset = config.offset;
+      if (config.delay !== undefined) delay = config.delay;
+      if (config.onEnded !== undefined) onEnded = config.onEnded;
+    }
+
+    if (!src) return null;
+
+    if (!fighter._finisherAudioHandles) {
+      fighter._finisherAudioHandles = new Map();
+    }
+
+    // If a sound with this specific role is already playing on this fighter, stop it cleanly
+    if (fighter._finisherAudioHandles.has(role)) {
+      const existing = fighter._finisherAudioHandles.get(role);
+      if (existing) {
+        stopSound(existing);
+      }
+      fighter._finisherAudioHandles.delete(role);
+    }
+
+    let handle = null;
+    const wrappedOnEnded = () => {
+      if (fighter && fighter._finisherAudioHandles && fighter._finisherAudioHandles.get(role) === handle) {
+        fighter._finisherAudioHandles.delete(role);
+      }
+      if (typeof onEnded === 'function') {
+        onEnded();
+      }
+    };
+
+    handle = this.playSFX(src, volume, speed, offset, delay, wrappedOnEnded);
+    if (handle) {
+      handle.isFinisher = true;
+      handle.finisherRole = role;
+      handle.fighter = fighter;
+      fighter._finisherAudioHandles.set(role, handle);
+    }
+    return handle;
+  }
+
+  /**
+   * Gracefully stop finisher audio for a fighter.
+   * @param {object} fighter
+   * @param {string|null} [role=null] - Specific role ('voice', 'charge', 'bg', 'release') or null for all roles
+   * @param {number} [fadeMs=0] - Optional fade duration in milliseconds
+   */
+  stopFinisherAudio(fighter, role = null, fadeMs = 0) {
+    if (!fighter || !fighter._finisherAudioHandles) return;
+    if (role) {
+      const handle = fighter._finisherAudioHandles.get(role);
+      if (handle) {
+        if (fadeMs > 0) fadeOutSound(handle, fadeMs);
+        else stopSound(handle);
+        fighter._finisherAudioHandles.delete(role);
+      }
+    } else {
+      for (const [r, handle] of Array.from(fighter._finisherAudioHandles.entries())) {
+        if (handle) {
+          if (fadeMs > 0) fadeOutSound(handle, fadeMs);
+          else stopSound(handle);
+        }
+      }
+      fighter._finisherAudioHandles.clear();
+    }
+  }
+
+  /**
+   * Pause finisher audio for a fighter.
+   * @param {object} fighter
+   * @param {string|null} [role=null]
+   */
+  pauseFinisherAudio(fighter, role = null) {
+    if (!fighter || !fighter._finisherAudioHandles) return;
+    if (role) {
+      const handle = fighter._finisherAudioHandles.get(role);
+      if (handle) pauseSound(handle);
+    } else {
+      for (const handle of fighter._finisherAudioHandles.values()) {
+        if (handle) pauseSound(handle);
+      }
+    }
+  }
+
+  /**
+   * Resume paused finisher audio for a fighter.
+   * @param {object} fighter
+   * @param {string|null} [role=null]
+   */
+  resumeFinisherAudio(fighter, role = null) {
+    if (!fighter || !fighter._finisherAudioHandles) return;
+    if (role) {
+      const handle = fighter._finisherAudioHandles.get(role);
+      if (handle) resumeSound(handle);
+    } else {
+      for (const handle of fighter._finisherAudioHandles.values()) {
+        if (handle) resumeSound(handle);
+      }
+    }
+  }
+
+  /**
+   * Check if any finisher audio (or a specific channel role) is actively playing on this fighter.
+   * @param {object} fighter
+   * @param {string|null} [role=null]
+   * @returns {boolean}
+   */
+  isFinisherAudioActive(fighter, role = null) {
+    if (!fighter || !fighter._finisherAudioHandles || fighter._finisherAudioHandles.size === 0) return false;
+    if (role) {
+      const handle = fighter._finisherAudioHandles.get(role);
+      if (!handle) return false;
+      return typeof handle.isPlaying === 'function' ? handle.isPlaying() : true;
+    }
+    for (const handle of fighter._finisherAudioHandles.values()) {
+      if (handle && (typeof handle.isPlaying !== 'function' || handle.isPlaying())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

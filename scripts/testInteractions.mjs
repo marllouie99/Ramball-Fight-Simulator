@@ -270,6 +270,93 @@ async function runInteractionTests() {
     console.log('      ✅ Fighter-illusion collision push and overlap separation verified.');
   }
 
+  // ── TEST 8: Gojo Hollow Purple Suction on Yuta & Rika during Active Domain ──
+  console.log('   8. Testing Gojo Hollow Purple Gravitational Suction on Yuta & Rika during Domain...');
+  {
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+    const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+
+    const gojo = new GojoClass({ x: 100, y: 300, color: '#00F3FF', controls: {} });
+    const yuta = new YutaClass({ x: 300, y: 300, color: '#FFFFFF', controls: {} });
+    gojo.domainActive = true;
+    gojo.domainTimer = 200;
+
+    // Activate Rika
+    yuta.rika.active = true;
+    yuta.rika.x = 280;
+    yuta.rika.y = 300;
+    yuta.rika.hp = 100;
+    yuta.rika.spawnTimer = 0;
+
+    state.fighters = [gojo, yuta];
+    state.illusions = [yuta.rika];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    projectileSystem.projectiles = [];
+
+    // Fire Purple at x=200, y=300
+    GojoPurpleBehavior.spawn(projectileSystem, 200, 300, 0, 0, 70, 0, 150, { fighter: gojo });
+    const purple = projectileSystem.projectiles[0];
+
+    const initialYutaX = yuta.x;
+    const initialRikaX = yuta.rika.x;
+
+    // Run behavior update
+    new GojoPurpleBehavior().update(purple, state.fighters, projectileSystem);
+
+    assert(yuta.x < initialYutaX, `Yuta must be pulled toward Purple (x changed from ${initialYutaX} to ${yuta.x})`);
+    assert(yuta.rika.x < initialRikaX, `Rika must be pulled toward Purple (x changed from ${initialRikaX} to ${yuta.rika.x})`);
+
+    // Clean up
+    projectileSystem.projectiles = [];
+    state.illusions = [];
+    console.log('      ✅ Gojo Purple pull on Yuta and Rika during active domain verified.');
+  }
+
+  // ── TEST 9: Gojo Lapse: Blue Gravitational Pull & Attack Interruption ──
+  console.log('   9. Testing Gojo Lapse: Blue Gravitational Pull & Attack Interruption...');
+  {
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+    const { GojoBlueBehavior } = await import('../js/systems/projectiles/behaviors/GojoBlueBehavior.js');
+
+    const gojo = new GojoClass({ x: 100, y: 300, color: '#00F3FF', controls: {} });
+    const sukuna = new SukunaClass({ x: 230, y: 300, color: '#E53E3E', controls: {} });
+
+    state.fighters = [gojo, sukuna];
+    state.illusions = [];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    projectileSystem.projectiles = [];
+
+    // Fire Blue at x=200, y=300
+    projectileSystem.fireGojoBlue(gojo, 0, 20, 200, 300, 0);
+    const blue = projectileSystem.projectiles[0];
+
+    const initialSukunaX = sukuna.x;
+
+    // Run behavior update
+    let blueError = null;
+    try {
+      new GojoBlueBehavior().update(blue, state.fighters, projectileSystem);
+    } catch (err) {
+      blueError = err;
+    }
+
+    assert(!blueError, `GojoBlueBehavior.update must execute without errors: ${blueError?.stack || blueError?.message}`);
+    assert(sukuna.x < initialSukunaX, `Sukuna must be pulled toward Blue vortex (x changed from ${initialSukunaX} to ${sukuna.x})`);
+    assert(sukuna.isCaughtInBlue === true, 'Sukuna should have isCaughtInBlue set to true');
+
+    // Clean up
+    projectileSystem.projectiles = [];
+    console.log('      ✅ Gojo Blue gravitational pull and attack interrupt verified without errors.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

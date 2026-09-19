@@ -18,17 +18,17 @@ export const saitamaConfig = {
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  damage: 500,
+  damage: 1,
   cooldown: 200,
   projectileSpeedMultiplier: 1.0,
   ability: 'One Punch',
   desc: 'Hero for fun. Ignores basic hit flinches. Basic hits deal massive damage. Serious Punch ultimate obliterates anything across the arena.',
 
   // Basic Attack: Normal Punch
-  normalPunchEnabled: 1,        // Set to false to disable Normal Punch basic attack
+  normalPunchEnabled: 0,        // Set to false to disable Normal Punch basic attack
   punchEnabled: true,              // Alias toggle
   disableNormalPunch: false,       // If true, disables Normal Punch basic attack
-  punchDamage: 150, // Massive basic attack damage
+  punchDamage: 0.50,               // Punch damage as % ratio of game mode fixed HP (0.90 = 90% of fixed HP)
   punchKnockback: 100, // Massive knockback force
   punchReach: 50,
   punchArcAngle: Math.PI * 0.5, // 90 degree arc angle
@@ -48,7 +48,7 @@ export const saitamaConfig = {
   punchScreenShakeDuration: 10,    // Arena screen shake duration (frames) on basic attack punch hit
   punchFrontalReach: 420,          // Frontal supersonic shockwave blast reach (px) on normal punch
   punchFrontalArc: Math.PI * 0.35, // Frontal shockwave blast cone angle on normal punch
-  punchFrontalDamage: 150,         // Damage dealt across the long frontal supersonic shockwave blast cone
+  punchFrontalDamage: 0.95,        // Damage dealt across the long frontal supersonic shockwave blast cone (% of mode fixed HP)
   punchTriggerDistance: 50,       // AI trigger distance threshold for initiating Normal Punch (px)
   wallPinScreenShakeIntensity: 30,  // Arena screen shake intensity on wall pin impact
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
@@ -119,6 +119,7 @@ export const saitamaConfig = {
   initialSkillPunishCooldown: 1000, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
+  counterOverlayZoomMax: 0.08,           // Subtle expansion factor (1.0 -> 1.08) for Serious Punch overlay
   counterPunchVoiceEnabled: true,
   counterPunchChargingEnabled: true,
   counterPunchImpactEnabled: true,

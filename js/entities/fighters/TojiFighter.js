@@ -135,6 +135,11 @@ export class TojiFighter extends Fighter {
   }
 
   applySlow(frames, multiplier, options = {}) {
+    if (this.ultimateActive || (this._wasFinalBlowSpin && ((this.katanaSlashFadeTimer && this.katanaSlashFadeTimer > 0) || (this.postUltimateRecoveryTimer && this.postUltimateRecoveryTimer > 0)))) {
+      this.slowTimer = 0;
+      this.slowMultiplier = 1.0;
+      return;
+    }
     // Gojo's Reversal Red spatial repulsion slow bypasses Heavenly Restriction slow immunity!
     if (options && options.isRed) {
       this.slowTimer = Math.max(this.slowTimer || 0, frames);
@@ -157,6 +162,9 @@ export class TojiFighter extends Fighter {
   }
 
   applyRedKnockback(vx, vy) {
+    if (this.ultimateActive || this.isAmbushing || (this._wasFinalBlowSpin && ((this.katanaSlashFadeTimer && this.katanaSlashFadeTimer > 0) || (this.postUltimateRecoveryTimer && this.postUltimateRecoveryTimer > 0)))) {
+      return; // Immune to Red knockback during ultimate / final blow
+    }
     this.redKnockbackTimer = 24; // slightly longer to ensure smooth slide
     this.redKnockbackVx = vx * 1.1; // boost slightly for visual impact
     this.redKnockbackVy = vy * 1.1;
@@ -173,11 +181,22 @@ export class TojiFighter extends Fighter {
   }
 
   applyKnockback(vx, vy, options = {}) {
+    // Complete pushback & knockback hit effect immunity during ultimate, final blow, and ambush states
+    if (this.ultimateActive || this.isAmbushing || (this._wasFinalBlowSpin && ((this.katanaSlashFadeTimer && this.katanaSlashFadeTimer > 0) || (this.postUltimateRecoveryTimer && this.postUltimateRecoveryTimer > 0)))) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
     if (options && options.isRed) {
       this.applyRedKnockback(vx, vy);
       return;
     }
-    super.applyKnockback(vx, vy);
+    const stunDuration = typeof options === 'number' ? options : (options?.stunDuration || 0);
+    super.applyKnockback(vx, vy, stunDuration);
+    if (this.stealthTimer > 0) {
+      this.isStealthed = true;
+      this.stealthActive = true;
+    }
   }
 
   reset() {
@@ -298,7 +317,7 @@ export class TojiFighter extends Fighter {
   }
 
   applyTimeStop(frames) {
-    if (this.ultimateActive) return;
+    if (this.ultimateActive || (this._wasFinalBlowSpin && ((this.katanaSlashFadeTimer && this.katanaSlashFadeTimer > 0) || (this.postUltimateRecoveryTimer && this.postUltimateRecoveryTimer > 0)))) return;
     super.applyTimeStop(frames);
     if (this.stealthTimer > 0) {
       this.isStealthed = true;
@@ -307,7 +326,7 @@ export class TojiFighter extends Fighter {
   }
 
   applyHitStun(frames) {
-    if (this.ultimateActive) return;
+    if (this.ultimateActive || (this._wasFinalBlowSpin && ((this.katanaSlashFadeTimer && this.katanaSlashFadeTimer > 0) || (this.postUltimateRecoveryTimer && this.postUltimateRecoveryTimer > 0)))) return;
     super.applyHitStun(frames);
     if (this.stealthTimer > 0) {
       this.isStealthed = true;
@@ -316,7 +335,7 @@ export class TojiFighter extends Fighter {
   }
 
   applyParalyze(frames) {
-    if (this.ultimateActive) return;
+    if (this.ultimateActive || (this._wasFinalBlowSpin && ((this.katanaSlashFadeTimer && this.katanaSlashFadeTimer > 0) || (this.postUltimateRecoveryTimer && this.postUltimateRecoveryTimer > 0)))) return;
     if (typeof super.applyParalyze === 'function') super.applyParalyze(frames);
     if (this.stealthTimer > 0) {
       this.isStealthed = true;
@@ -324,15 +343,8 @@ export class TojiFighter extends Fighter {
     }
   }
 
-  applyKnockback(vx, vy, stunDuration) {
-    super.applyKnockback(vx, vy, stunDuration);
-    if (this.stealthTimer > 0) {
-      this.isStealthed = true;
-      this.stealthActive = true;
-    }
-  }
-
   suppressCombatAndVisuals(options = {}) {
+    if (this.ultimateActive || (this._wasFinalBlowSpin && ((this.katanaSlashFadeTimer && this.katanaSlashFadeTimer > 0) || (this.postUltimateRecoveryTimer && this.postUltimateRecoveryTimer > 0)))) return;
     super.suppressCombatAndVisuals(options);
     if (this.stealthTimer > 0) {
       this.isStealthed = true;
@@ -965,8 +977,8 @@ export class TojiFighter extends Fighter {
         const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]; // E, S, W, N
         const angle = angles[this.ultimateAssaultCount % 4];
         
-        // Spawn him further away for a dramatic high-speed slide-in
-        const spawnDist = CONFIG.toji?.ultimateSlideDistance ?? 280;
+        // Spawn him at a balanced distance for a dramatic high-speed slide-in
+        const spawnDist = CONFIG.toji?.ultimateSlideDistance ?? 240;
         const clampedSlide = this._clampToArena(
           this.ultimateTarget.x + Math.cos(angle) * spawnDist,
           this.ultimateTarget.y + Math.sin(angle) * spawnDist
@@ -985,12 +997,11 @@ export class TojiFighter extends Fighter {
         this.gunAngle = targetAngle;
         this.angle = targetAngle;
         this._slashStartAngle = targetAngle;
-        this.aim(this.ultimateTarget);
         
-        // Huge velocity towards target to slide in quickly
-        const dashSpeed = CONFIG.toji?.ultimateSlideSpeed ?? 40;
-        this.vx = -Math.cos(angle) * dashSpeed;
-        this.vy = -Math.sin(angle) * dashSpeed;
+        // Velocity directly forward towards target
+        const dashSpeed = CONFIG.toji?.ultimateSlideSpeed ?? 42;
+        this.vx = Math.cos(targetAngle) * dashSpeed;
+        this.vy = Math.sin(targetAngle) * dashSpeed;
         
         this.ultimatePhase = 'STRIKING';
         this.ultimateCycleTimer = CONFIG.toji?.ultimateStrikeDuration ?? 22;
@@ -1017,14 +1028,10 @@ export class TojiFighter extends Fighter {
       this.vx *= 0.82;
       this.vy *= 0.82;
 
-      if (this.ultimateTarget && !tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
-        const dx = this.ultimateTarget.x - this.x;
-        const dy = this.ultimateTarget.y - this.y;
-        if (Math.hypot(dx, dy) > 10) {
-          const aimAngle = Math.atan2(dy, dx);
-          this.gunAngle = aimAngle;
-          this.angle = aimAngle;
-        }
+      // Lock facing angle committed strictly forward along rush strike direction (prevents 180° backward aim flips)
+      if (this._slashStartAngle !== undefined) {
+        this.gunAngle = this._slashStartAngle;
+        this.angle = this._slashStartAngle;
       }
       
       // Tick down animation timers so the weapon swing actually animates
@@ -1055,7 +1062,7 @@ export class TojiFighter extends Fighter {
         const color = colors[this.ultimateAssaultCount % 4];
         
         spawnImpactFlash(this.ultimateTarget.x, this.ultimateTarget.y, 45, color);
-        const hitAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+        const hitAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
         spawnBloodEffect(this.ultimateTarget.x, this.ultimateTarget.y, 16, '#B30000', hitAngle);
         audioSystem.playSFX('attack_swordswing', 0.9);
         audioSystem.playSFX('attack_fleshhit', 0.9);
@@ -1085,7 +1092,7 @@ export class TojiFighter extends Fighter {
         // 3. Apply kinetic ricochet knockback launch bouncing target across arena walls
         if (!this.ultimateTarget.isTurret && !this.ultimateTarget.cannotBeKnockbacked) {
           this.ultimateTarget.isFirstHitKnockback = false; // Enable ricochet wall bouncing!
-          const angleToTarget = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+          const angleToTarget = this._slashStartAngle !== undefined ? this._slashStartAngle : Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
           const kbForce = CONFIG.toji?.ultimateAssaultRicochetForce || 28;
           const kbVx = Math.cos(angleToTarget) * kbForce;
           const kbVy = Math.sin(angleToTarget) * kbForce;
@@ -1294,12 +1301,12 @@ export class TojiFighter extends Fighter {
         }
         audioSystem.playSFX('attack_groundsmash', 1.2);
         
-        // Multi-target Frontal Arc AOE on 360 Spin Dive Final Blow (Rule 7 & Rule 6 compliant)
+        // Multi-target 360° Omnidirectional AOE on 360 Spin Dive Final Blow (Rule 1.4 & Rule 1.6 compliant)
         const impactAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle))
           ? this.gunAngle
           : (this.angle || 0);
         const finalReach = CONFIG.toji?.ultimateCraterReach || CONFIG.toji?.ultimateCraterRadius || 185;
-        const finalArc = CONFIG.toji?.ultimateCraterArc || (Math.PI * 1.35); // 243° wide frontal sweeping cone
+        const finalArc = (typeof CONFIG !== 'undefined' && CONFIG.toji?.ultimateCraterArc !== undefined) ? CONFIG.toji.ultimateCraterArc : (Math.PI * 2); // Full 360° omnidirectional sweeping cone
         const finalTargets = tojiGetTargetsInFrontalArc(this, this.ultimateTarget, impactAngle, finalReach, finalArc);
         const craterDamage = CONFIG.toji?.ultimateCraterDamage || 65;
 
@@ -1731,6 +1738,8 @@ export class TojiFighter extends Fighter {
     if (isHardCC) return false;
     // Sequence 2 (KATANA_SLASH / KATANA_CHARGE) commits to its locked swing trajectory in normal ambush and must NOT auto-aim
     if (!this.ultimateActive && (this.ambushPhase === 'KATANA_SLASH' || this.ambushPhase === 'KATANA_CHARGE')) return false;
+    // Ultimate slide strikes and crater slam commit strictly to their forward rush angles (prevents reverse aim flips)
+    if (this.ultimateActive && (this.ultimatePhase === 'STRIKING' || this.ultimatePhase === 'CRATER' || this.ultimatePhase === 'CRATER_DIVE')) return false;
     if (this.isAmbushing || this.ultimateActive) return true; // Rule 3: Toji ALWAYS aims strictly at his target throughout ambush/ultimate phases!
     return true;
   }

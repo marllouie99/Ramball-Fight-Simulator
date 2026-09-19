@@ -4,6 +4,7 @@ import { CONFIG } from '../../../core/config.js';
 import { spawnPurpleShockwaveRings, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { triggerGlobalScreenShake } from '../../../core/state.js';
 import { GAME_MODES } from '../../../core/modeConfig.js';
+import { isEntityImmuneToGravitationalPull } from '../../../entities/fighter.js';
 
 // Re-implement areOnSameTeam locally or export it from a shared utils
 function areOnSameTeam(ownerIndex, targetIndex) {
@@ -73,7 +74,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.historyMax = 20;
     
     // Setup sound (suppressed for Rubbick)
-    const isRubbick = Boolean(opts?.isRubbick || opts?.isTrickster || proj.isRubbick || fighter?.characterId === 'rubbick' || fighter?.type === 'rubbick' || fighter?.characterId === 'trickster' || fighter?.type === 'trickster');
+    const isRubbick = Boolean(opts?.isRubbick || opts?.isTrickster || proj.isRubbick || opts?.fighter?.characterId === 'rubbick' || opts?.fighter?.type === 'rubbick' || opts?.fighter?.characterId === 'trickster' || opts?.fighter?.type === 'trickster');
     if (!isRubbick && !opts?.suppressVoice) {
       const sfx = getSkillSound('gojo', 'hollowpurple');
       if (sfx) {
@@ -175,33 +176,12 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         (ent.gojoAdaptColorHistory && ent.gojoAdaptColorHistory.includes('#8A2BE2')) ||
         ((ent.goldAdaptationStage?.skill || 0) >= 2)
       );
-      // Toji's Heavenly Restriction immuneToCC does NOT protect him from Hollow Purple's gravitational pull and debuffs. Mahoraga is also pulled even when adapted.
-      const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
-      if (isMakimaShatter) {
-        ent.vx = 0; ent.vy = 0; ent.knockbackVx = 0; ent.knockbackVy = 0;
-        if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
-          ent.x = ent._shatterLockedX; ent.y = ent._shatterLockedY;
-        }
-        continue;
-      }
-
-      const isImmune = ent.isBaguvixActive || ent.isGodModeActive || (ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji');
-      if (!isImmune) {
+      if (!isEntityImmuneToGravitationalPull(ent, 'purple')) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;
         const dist = Math.hypot(dx, dy);
         
-        const isChanneling = (typeof ent.isChannelingSkill === 'function' && ent.isChannelingSkill()) || (typeof ent.isStationarySkillActive === 'function' && ent.isStationarySkillActive());
-        const isFugaChanneling = Boolean(ent.isChannelingDivineFlame || ent.isChannelingFuga || (ent.fugaChargeTimer && ent.fugaChargeTimer > 0));
-        const isSaitamaCounter = Boolean(ent && (ent.characterId === 'saitama' || ent.type === 'saitama') && (ent.isCountering || (ent._counterPunchTimer && ent._counterPunchTimer > 0) || (ent._postCounterRecoveryTimer && ent._postCounterRecoveryTimer > 0)));
-        if (isSaitamaCounter || (isChanneling && !isFugaChanneling)) {
-          // Saitama Serious Counter and skill channeling stances have hyper-armor and are immune to suction / displacement / pull
-          ent.isCaughtInPurple = false;
-          ent.knockbackVx = 0;
-          ent.knockbackVy = 0;
-          ent.vx = 0;
-          ent.vy = 0;
-        } else if (dist < trapRadius) {
+        if (dist < trapRadius) {
           ent.isCaughtInPurple = false; // No paralyzing stasis
 
           // Apply heavy movement slow debuff

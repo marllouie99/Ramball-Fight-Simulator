@@ -1312,7 +1312,7 @@ export function drawEmbeddedMahitoSpikes(ctx, baseRadius, entity) {
  * Renders a sleek floating pill health bar above a minion/illusion's head (Rika style).
  */
 export function drawMinionHealthBar(ctx, x, y, width = 38, height = 7, hp = 100, maxHp = 100) {
-  if (typeof CONFIG !== 'undefined' && (CONFIG.hudHideAll || CONFIG.hudHideHealthBars || CONFIG.hudHideOverheadHp)) return;
+  if (typeof CONFIG !== 'undefined' && CONFIG.hudHideOverheadHp) return;
   if (hp <= 0) return;
   const pct = Math.max(0, Math.min(1.0, hp / (maxHp || 1)));
   const w = width || 38;

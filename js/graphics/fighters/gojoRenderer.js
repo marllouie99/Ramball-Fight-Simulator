@@ -1153,7 +1153,7 @@ export class GojoRenderer {
     const remaining    = fighter.redEffectTimer;              // counts down from totalFrames → 0
     const elapsed      = totalFrames - remaining;          // 0 → totalFrames
     const buildupEnd   = CONFIG.gojo?.redBuildupFrames || 100; // first 100 frames = Phase 1
-    const angle        = fighter.redTargetAngle !== undefined ? fighter.redTargetAngle : (fighter.gunAngle || 0);
+    const angle        = (fighter.redBuildupPhase ? (fighter.gunAngle || fighter.angle || 0) : (fighter.redTargetAngle !== undefined && fighter.redTargetAngle !== null ? fighter.redTargetAngle : (fighter.gunAngle || 0))) || 0;
     const fingerDist   = fighter.r + 14;
     const time         = Date.now();
     const maxRange     = (CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650);

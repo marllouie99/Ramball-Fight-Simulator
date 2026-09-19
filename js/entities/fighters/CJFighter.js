@@ -15,6 +15,7 @@ import { spawnDroppedJetpack, clearFloatingJetpacks } from '../../graphics/parti
 import { spawnDroppedMinigun, clearDroppedMiniguns } from '../../graphics/particles/cjDroppedMinigun.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnSpentCasing } from '../../graphics/particles/johnWickDroppedMagazine.js';
+import { renderCjBaguvixBackground } from '../../graphics/renderers/environmentalRenderer.js';
 
 export class CJFighter extends Fighter {
   constructor(def) {
@@ -137,7 +138,8 @@ export class CJFighter extends Fighter {
         cooldownMaxKey: 'driveByCooldownMax',
         durationKey: 'driveByTimer',
         durationMaxKey: 'driveByMaxTimer',
-        activeKey: 'isDriveByActive'
+        activeKey: 'isDriveByActive',
+        canCast: (fighter) => !fighter.isJetpackActive && !fighter.isBaguvixActive && !fighter.isTypingCheat
       },
       {
         id: 'baguvix',
@@ -148,6 +150,7 @@ export class CJFighter extends Fighter {
         durationKey: 'baguvixTimer',
         durationMaxKey: 'baguvixMaxTimer',
         activeKey: 'isBaguvixActive',
+        canCast: (fighter) => !fighter.isJetpackActive && !fighter.isTypingCheat,
         onExpire: (fighter) => {
           fighter.isBaguvixActive = false;
           fighter.isGodModeActive = false;
@@ -465,7 +468,7 @@ export class CJFighter extends Fighter {
 
     // 5. HESOYAM 50% HP Lost Trigger (Triggers strictly when HP drops to <= 50%)
     const hesoThreshold = cfg.hesoyamHpThreshold ?? 0.50;
-    if (this.hp > 0 && !this.dead && !this.isTypingCheat && !this.isBaguvixActive && !this.hasUsedHesoyam) {
+    if (this.hp > 0 && !this.dead && !this.isTypingCheat && !this.isBaguvixActive && !this.isJetpackActive && !this.hasUsedHesoyam) {
       if ((this.hp / (this.maxHp || 100)) <= hesoThreshold) {
         this.activateHesoyam();
       }
@@ -913,7 +916,7 @@ export class CJFighter extends Fighter {
     }
 
     // ── Ultimate: BAGUVIX Activation Condition (Cooldown Based) ──
-    if (!this.isBaguvixActive && this.baguvixCooldown <= 0 && !this.dead && !this.isTypingCheat) {
+    if (!this.isBaguvixActive && !this.isJetpackActive && this.baguvixCooldown <= 0 && !this.dead && !this.isTypingCheat) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         this.activateBaguvix();
       }
@@ -922,7 +925,7 @@ export class CJFighter extends Fighter {
     // ── Skill 1: HESOYAM Activation Condition (Triggers when HP drops <= 50%) ──
     const hpRatio = (this.hp || 0) / (this.maxHp || 100);
     const hesoThreshold = cfg.hesoyamHpThreshold ?? 0.50;
-    if (hpRatio <= hesoThreshold && !this.hasUsedHesoyam && !this.dead && !this.isTypingCheat && !this.isBaguvixActive) {
+    if (hpRatio <= hesoThreshold && !this.hasUsedHesoyam && !this.dead && !this.isTypingCheat && !this.isBaguvixActive && !this.isJetpackActive) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         this.activateHesoyam();
       }
@@ -939,7 +942,7 @@ export class CJFighter extends Fighter {
     }
 
     // ── Skill 3: GROVESTREET4LIFE Drive-By Activation Condition ──
-    if (!this.isDriveByActive && this.driveByCooldown <= 0 && !this.dead && !this.isTypingCheat && !this.isBaguvixActive) {
+    if (!this.isDriveByActive && !this.isJetpackActive && this.driveByCooldown <= 0 && !this.dead && !this.isTypingCheat && !this.isBaguvixActive) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         this.activateDriveBy();
       }
@@ -1094,7 +1097,7 @@ export class CJFighter extends Fighter {
    * CJ stands firmly in place while dynamically spelling out the cheat string above his model.
    */
   startCheatTyping(codeString, onComplete) {
-    if (this.dead) return;
+    if (this.dead || this.isJetpackActive) return;
     const cfg = CONFIG.cj || {};
     const framesPerChar = cfg.cheatTypingFramesPerChar || 3;
     const holdDelay = cfg.cheatTypingHoldDelay || 6;
@@ -1130,7 +1133,7 @@ export class CJFighter extends Fighter {
     const hesoThreshold = cfg.hesoyamHpThreshold ?? 0.50;
     const hpRatio = (this.hp || 0) / (this.maxHp || 100);
 
-    if (this.dead || this.isTypingCheat || this.hasUsedHesoyam || hpRatio > hesoThreshold) return;
+    if (this.dead || this.isTypingCheat || this.hasUsedHesoyam || hpRatio > hesoThreshold || this.isJetpackActive) return;
 
     // Mark used immediately to prevent multiple triggers
     this.hasUsedHesoyam = true;
@@ -1322,7 +1325,7 @@ export class CJFighter extends Fighter {
    * Skill 3: GROVESTREET4LIFE (Gang Drive-By Backup)
    */
   activateDriveBy() {
-    if (this.dead || this.isTypingCheat || this.isDriveByActive || this.driveByCooldown > 0) return;
+    if (this.dead || this.isTypingCheat || this.isDriveByActive || this.driveByCooldown > 0 || this.isJetpackActive) return;
 
     // Immediately discharge cooldown on activation start
     this.driveByCooldown = this.driveByCooldownMax;
@@ -1366,22 +1369,10 @@ export class CJFighter extends Fighter {
    * Ultimate: BAGUVIX (God Mode & Minigun Riot Overdrive - Cooldown Based)
    */
   activateBaguvix() {
-    if (this.dead || this.isTypingCheat || this.isBaguvixActive || this.baguvixCooldown > 0) return;
+    if (this.dead || this.isTypingCheat || this.isBaguvixActive || this.baguvixCooldown > 0 || this.isJetpackActive) return;
 
     // Immediately discharge cooldown on activation start
     this.baguvixCooldown = this.baguvixCooldownMax;
-
-    // Gracefully exit Jetpack flight if airborne so CJ plants his feet
-    if (this.isJetpackActive) {
-      this.isJetpackActive = false;
-      this.z = 0;
-      this.jetpackTimer = 0;
-      this.evadeBuffTimer = 0;
-      this.evadeChance = 0;
-      const groundMult = this._getGroundSpeedMultiplier();
-      this.speedMultiplier = groundMult;
-      this.speed = (this.baseSpeed || 6.0) * groundMult;
-    }
 
     this.startCheatTyping('BAGUVIX', () => {
       this._executeBaguvix();
@@ -1933,7 +1924,7 @@ export class CJFighter extends Fighter {
    */
   drawHealth(ctx) {
     if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
-    if (CONFIG.hudHideAll || CONFIG.hudHideHealthBars || CONFIG.hudHideOverheadHp) return;
+    if (CONFIG.hudHideOverheadHp) return;
     if (this.hp <= 0 || this._isWinnerReveal || this._isFaceOff || (this.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
 
     const z = this.z || 0;
@@ -1982,6 +1973,13 @@ export class CJFighter extends Fighter {
   draw(ctx, opponent) {
     drawCjSkin(ctx, this);
     this.drawHealth(ctx);
+  }
+
+  /**
+   * Draw BAGUVIX God Mode Arena Overlay
+   */
+  drawDomainBackground(ctx, isClashSecondary = false) {
+    renderCjBaguvixBackground(this, ctx, isClashSecondary);
   }
 
   onFrozenSkillDurationTick(isInsideGojoDomain) {

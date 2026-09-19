@@ -2039,6 +2039,8 @@ export class RubbickFighter extends Fighter {
               target.purpleChargeTimer = 0;
               target.redEffectTimer = 0;
               target.redBuildupPhase = false;
+              target.redDetonated = false;
+              target.redTargetAngle = null;
               target.forcedMeleeTimer = 0;
               target.isMeleeMode = false;
               target.infinityActive = false;
@@ -2163,6 +2165,8 @@ export class RubbickFighter extends Fighter {
           f.purpleChargeTimer = 0;
           f.redEffectTimer = 0;
           f.redBuildupPhase = false;
+          f.redDetonated = false;
+          f.redTargetAngle = null;
           f.forcedMeleeTimer = 0;
           f.isMeleeMode = false;
         }
@@ -2202,6 +2206,8 @@ export class RubbickFighter extends Fighter {
           opponent.purpleChargeTimer = 0;
           opponent.redEffectTimer = 0;
           opponent.redBuildupPhase = false;
+          opponent.redDetonated = false;
+          opponent.redTargetAngle = null;
           opponent.forcedMeleeTimer = 0;
           opponent.isMeleeMode = false;
         }

@@ -36,9 +36,9 @@ import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelganger
 import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
-import { drawArena } from './renderers/arenaRenderer.js';
+import { drawArena, drawArenaMatchNames } from './renderers/arenaRenderer.js';
 import { drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen, applyDomainArenaVignetteCutout } from './renderers/domainDimOverlays.js';
-import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen } from './renderers/environmentalRenderer.js';
+import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen, renderCjBaguvixBackground, getCjBaguvixOverlayImage } from './renderers/environmentalRenderer.js';
 import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
@@ -94,8 +94,8 @@ export function getNow() {
 }
 
 export { drawDivineFlameArrowConstruct };
-export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen };
-export { drawArena, applyDomainArenaVignetteCutout, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen };
+export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen, renderCjBaguvixBackground, getCjBaguvixOverlayImage };
+export { drawArena, drawArenaMatchNames, applyDomainArenaVignetteCutout, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawDroppedMagazines, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 export { drawGenosSelfDestructDimScreen };
 export { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter } from './statusEffects.js';

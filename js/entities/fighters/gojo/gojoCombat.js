@@ -130,7 +130,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     fighter.infinityCooldown = 0;
   }
   if (fighter.isMeleeMode || fighter.isChannelingPurple || isPurpleInFlight || fighter.domainActive) return false;
-  if (attacker && (attacker.isMeleeMode || (typeof attacker.isMeleeMode === 'boolean' && attacker.isMeleeMode))) return false;
 
   const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
   const gojoY = fighter.y - (fighter.z || 0);
@@ -218,9 +217,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
       return false;
     }
 
-    const isChanneling = (typeof attacker.isChannelingSkill === 'function' && attacker.isChannelingSkill()) || (attacker.tkTimer > 0);
-    if (isChanneling || attacker.isChannelingDomain || attacker.isChannelingDomainExpansion) {
-      // Skill & Domain Channeling has supreme hyper-armor — bypasses Infinity block & interrupts completely!
+    // Domain Channeling has supreme hyper-armor — bypasses Infinity block & interrupts completely!
+    if (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion) {
       return false;
     }
     const attRadius = attacker.hitRadius || attacker.r || 25;
@@ -279,8 +277,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
       }
     }
 
-    // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling a skill or telekinesis)
-    if (!isChanneling && !attacker.tkTimer && typeof attacker.interruptAttacks === 'function') {
+    // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling domain or telekinesis)
+    const isAttackerDomainChanneling = attacker.isChannelingDomain || attacker.isChannelingDomainExpansion;
+    if (!isAttackerDomainChanneling && !attacker.tkTimer && typeof attacker.interruptAttacks === 'function') {
       attacker.interruptAttacks();
     }
 

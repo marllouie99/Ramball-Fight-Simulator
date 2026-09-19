@@ -88,7 +88,7 @@ export const CONFIG = {
   barrett: barrettConfig,
   Barrett: barrettConfig,
   barrett50cal: barrettConfig,
-  arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
+  arena: { x: 40, y: 170, width: 460, height: 460, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
   spin: { rate: 0.06 },                        // angle increment per frame (├ù fighter.speed)
@@ -132,11 +132,11 @@ export const CONFIG = {
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
   darkModeShowHudSkillBars: 0,  // Toggle on/off to display HUD skill progress bars across Light and Dark mode (1 = show all, 0 = signature skills only, -1/hide = hide all)
   darkModeShowHudStats: 0,      // Toggle on/off to display HUD fighter stats info (DMG, SPD, ATK, etc.) across Light and Dark mode (1 = show, 0 = hide)
-  hudHideAll: false,            // Master toggle: completely hide all HUD elements (health bars, skill bars, stats, descriptions)
-  hudHideHealthBars: false,     // Toggle to completely hide all HUD health bars and overhead health numbers
+  hudHideAll: false,            // Master toggle: completely hide all top screen HUD cards/elements (health cards, skill bars, stats, descriptions)
+  hudHideHealthBars: false,     // Toggle to completely hide top screen HUD health bars
   hudHideSkillBars: false,      // Toggle to completely hide all HUD skill progress bars with zero exceptions
   hudHideStats: false,          // Toggle to completely hide all fighter HUD stats lines
-  hudHideOverheadHp: false,      // Toggle to hide overhead canvas health numbers
+  hudHideOverheadHp: false,      // Toggle to hide overhead canvas health numbers and bars on fighters
   hudSkillBarsMode: 'all',      // 'all' = show all skill bars, 'signature' = signature only, 'none' = completely hide all skill bars
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
   globalScreenShakeIntensityMultiplier: 0.7, // Global multiplier for all hit effect & arena screen shake intensity (1.0 = normal, 0.5 = half shake, 0.0 = disable shake completely)
@@ -151,10 +151,10 @@ export const CONFIG = {
     maxDist: 420,                      // Combat distance for minZoom
   },
   canvasWidth: 540,                 // Logical width of the game screen
-  canvasHeight: 1080,                // Logical height of the game screen
-  internalScale: 0.95,               // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container
+  canvasHeight: 960,                 // Logical height of the game screen (standard 9:16 portrait)
+  internalScale: 1.0,                // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container
   arenaXOffset: 0,                   // Horizontal offset shift (px) from center (negative = left, positive = right)
-  arenaYOffset: -110,                // Vertical offset shift (px) from center (negative = up, positive = down)
+  arenaYOffset: -70,                 // Vertical offset shift (px) from center (negative = up, positive = down)
   arenaXOverride: null,              // Absolute X override (px) - set to a number (e.g. 50) to skip centering
   arenaYOverride: null,              // Absolute Y override (px) - set to a number (e.g. 120) to skip centering
   arenaTheme: 'light',               // Arena visual theme: 'light' | 'dark'

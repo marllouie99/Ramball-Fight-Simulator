@@ -4,6 +4,7 @@ import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { HitImpactSystem } from '../../hitImpactSystem.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
 import { GAME_MODES } from '../../../core/modeConfig.js';
+import { isEntityImmuneToGravitationalPull } from '../../../entities/fighter.js';
 
 function areOnSameTeam(ownerIndex, targetIndex) {
   if (ownerIndex === targetIndex && ownerIndex !== undefined && ownerIndex !== null && ownerIndex !== -1) return true;
@@ -71,30 +72,7 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       const fi = state.fighters ? state.fighters.indexOf(checkFighter) : -1;
       if (ownerIndex !== -1 && fi !== -1 && areOnSameTeam(ownerIndex, fi)) continue;
 
-      const isChanneling = Boolean(
-        (typeof f.isChannelingSkill === 'function' && f.isChannelingSkill()) ||
-        (typeof f.isPerformingSkill === 'function' && f.isPerformingSkill()) ||
-        (typeof f.isStationarySkillActive === 'function' && f.isStationarySkillActive()) ||
-        f.isChannelingDivineFlame || f.isChannelingFuga || (f.fugaChargeTimer && f.fugaChargeTimer > 0) ||
-        f.isChannelingPurple || (f.purpleChargeTimer && f.purpleChargeTimer > 0) ||
-        f.redBuildupPhase || (f.redEffectTimer && f.redEffectTimer > 0) ||
-        f.isChannelingDomain || f.isChannelingDomainExpansion || (f.domainChargeTimer && f.domainChargeTimer > 0) ||
-        f.isChannelingRCT || f.isChannelingBankai || f.isChannelingGetsuga ||
-        f.isChannelingIncinerate || f.isChannelingSelfDestruct || f.isChannelingPureLoveBeam ||
-        f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) ||
-        (f._counterWindupTimer && f._counterWindupTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)
-      );
-
-      const isMakimaShatter = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving || (f.shatteredPieces && f.shatteredPieces.length > 0) || (f.characterId === 'makima' && (f.isDead || f.dead || f.hp <= 0))));
-      if (isMakimaShatter) {
-        f.vx = 0; f.vy = 0; f.knockbackVx = 0; f.knockbackVy = 0;
-        if (typeof f._shatterLockedX === 'number' && typeof f._shatterLockedY === 'number') {
-          f.x = f._shatterLockedX; f.y = f._shatterLockedY;
-        }
-        continue;
-      }
-
-      if (!f.immuneToCC && !f.isBaguvixActive && !f.isGodModeActive && !f.gojoBlueDragImmune) {
+      if (!isEntityImmuneToGravitationalPull(f, 'blue')) {
         const dx = p.x - f.x;
         const dy = p.y - f.y;
         const dist = Math.hypot(dx, dy);
@@ -104,8 +82,7 @@ export class GojoBlueBehavior extends ProjectileBehavior {
           if (!p.pulledTargets) p.pulledTargets = new Set();
           p.pulledTargets.add(f);
           const isWallLingering = p.isWallLingering;
-          const isFugaChanneling = Boolean(f.isChannelingDivineFlame || f.isChannelingFuga || (f.fugaChargeTimer && f.fugaChargeTimer > 0));
-          if (dist > 0 && (!isChanneling || isFugaChanneling)) {
+          if (dist > 0) {
             const pullStrength = isWallLingering ? 4.8 : 3.5;
             const force = (pullRadius - dist) / pullRadius * pullStrength;
             f.x += (dx / dist) * force;
@@ -121,6 +98,16 @@ export class GojoBlueBehavior extends ProjectileBehavior {
           }
 
           // Interrupt attacks ONLY if target is NOT actively channeling a skill
+          const isChanneling = Boolean(
+            (typeof f.isChannelingSkill === 'function' && f.isChannelingSkill()) ||
+            (typeof f.isStationarySkillActive === 'function' && f.isStationarySkillActive()) ||
+            f.isChannelingDivineFlame || f.isChannelingFuga || (f.fugaChargeTimer && f.fugaChargeTimer > 0) ||
+            f.isChannelingPurple || (f.purpleChargeTimer && f.purpleChargeTimer > 0) ||
+            f.isChannelingDomain || f.isChannelingDomainExpansion || (f.domainChargeTimer && f.domainChargeTimer > 0) ||
+            f.isChannelingRCT || f.isChannelingBankai || f.isChannelingGetsuga ||
+            f.isChannelingIncinerate || f.isChannelingSelfDestruct || f.isChannelingPureLoveBeam
+          );
+
           if (!isChanneling) {
             if (typeof f.interruptAttacks === 'function') {
               f.interruptAttacks();

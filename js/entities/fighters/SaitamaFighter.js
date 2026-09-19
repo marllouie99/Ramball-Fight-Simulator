@@ -1,6 +1,7 @@
 import { Fighter, applyDamageToTarget, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { MODE_SETTINGS } from '../../core/modeConfig.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnPunchWindSpeedLines, spawnSaitamaCounterFrontalBlast } from '../../graphics/particles/sparkEffect.js';
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
@@ -24,7 +25,10 @@ export class SaitamaFighter extends Fighter {
     const internalScale = CONFIG.internalScale ?? 1.0;
     const baseRadius = def.radius || CONFIG.saitama?.radius || 25;
     this.r = baseRadius * sizeMult * internalScale;
-    this.hp = CONFIG.saitama?.hp || 420;
+    const modeFixed = (typeof state !== 'undefined' && state && state.mode && typeof MODE_SETTINGS !== 'undefined' && MODE_SETTINGS[state.mode])
+      ? (MODE_SETTINGS[state.mode].fixedHp || MODE_SETTINGS[state.mode].playerFixedHp || MODE_SETTINGS[state.mode].soloFixedHp)
+      : null;
+    this.hp = modeFixed || CONFIG.saitama?.hp || 420;
     this.maxHp = this.hp;
     this.moveSpeed = CONFIG.saitama?.moveSpeed || 6.0;
 
@@ -141,6 +145,41 @@ export class SaitamaFighter extends Fighter {
     // Render standard UI components (HP bar, freeze overlay)
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+  }
+
+  /**
+   * Calculates Saitama's base Normal Punch damage as a percentage of the current game mode's fixed HP.
+   * @returns {number}
+   */
+  getBasePunchDamage() {
+    let modeFixed = 1000;
+    if (typeof state !== 'undefined' && state && state.mode && typeof MODE_SETTINGS !== 'undefined' && MODE_SETTINGS[state.mode]) {
+      const setting = MODE_SETTINGS[state.mode];
+      modeFixed = setting.fixedHp || setting.playerFixedHp || setting.soloFixedHp || 1000;
+    } else if (this.maxHp && this.maxHp > 0) {
+      modeFixed = this.maxHp;
+    }
+
+    const rawPunch = CONFIG.saitama?.punchDamage !== undefined
+      ? CONFIG.saitama.punchDamage
+      : (CONFIG.saitama?.punchDamagePercent !== undefined
+          ? CONFIG.saitama.punchDamagePercent
+          : (CONFIG.saitama?.punchFrontalDamage !== undefined
+              ? CONFIG.saitama.punchFrontalDamage
+              : (CONFIG.saitama?.punchDamageRatio ?? 0.15)));
+
+    let ratio = 0.15;
+    if (typeof rawPunch === 'number') {
+      if (rawPunch <= 1.0) {
+        ratio = rawPunch;
+      } else if (rawPunch <= 100) {
+        ratio = rawPunch / 100;
+      } else {
+        ratio = rawPunch / 1000;
+      }
+    }
+
+    return Math.max(1, Math.round(modeFixed * ratio));
   }
 
   /**
@@ -901,6 +940,7 @@ export class SaitamaFighter extends Fighter {
 
     // Set counter state and clear any Infinity freeze/stasis/beam/flurry locks
     this.isCountering = true;
+    this._postCounterRecoveryTimer = 0;
     this.isFrozenByInfinity = false;
     this.infinityFreezeTimer = 0;
     this.hitStunTimer = 0;
@@ -1095,8 +1135,8 @@ export class SaitamaFighter extends Fighter {
           }
 
           // Massive Counter Punch Damage (calculated directly from basic attack Normal Punch * counterPunchDamageMultiplier)
-          const basePunchDamage = CONFIG.saitama?.punchDamage || 100;
-          const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? 20.0;
+          const basePunchDamage = this.getBasePunchDamage();
+          const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? 5.0;
           const massiveDamage = Math.round(basePunchDamage * damageMult);
           applyDamageToTarget(target, massiveDamage, this, { 
             isSkill: true, 
@@ -1182,7 +1222,7 @@ export class SaitamaFighter extends Fighter {
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-          if (Math.abs(angleDiff) <= halfArc || dist <= (this.r + (enemy.r || 20) + 15)) {
+          if (Math.abs(angleDiff) <= halfArc) {
             // Collateral enemy caught in the supersonic shockwave canyon (full base damage regardless of distance)
             const baseCollateralDmg = CONFIG.saitama?.counterFrontalCollateralDamage || 650;
             const collateralDmg = Math.round(baseCollateralDmg);
@@ -1771,7 +1811,7 @@ export class SaitamaFighter extends Fighter {
     for (const { target, angleToTarget } of validHits) {
       // Boredom passive damage bonus (+15% per stack)
       const boredomMult = 1 + (this.boredomStacks || 0) * (CONFIG.saitama?.boredomDamagePerStack || 0.15);
-      const baseDmg = CONFIG.saitama?.punchFrontalDamage || CONFIG.saitama?.punchDamage || 500;
+      const baseDmg = this.getBasePunchDamage();
       const finalDamage = Math.round(baseDmg * boredomMult);
 
       // Deal damage (Rule #6 compliant) - pass isMelee: true, isSkill: true to skip hit-pause

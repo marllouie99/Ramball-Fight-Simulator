@@ -7,7 +7,7 @@ import {
   drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay, drawKillFeed
 } from '../graphics/ui.js';
 import {
-  drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
+  drawArena, drawArenaMatchNames, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
@@ -462,6 +462,10 @@ export function renderGame() {
         if (state.floatingTextSprite) state.floatingTextSprite.visible = true;
         drawFloatingTexts(); 
         drawUltimateChannelingTexts();
+
+        // ── Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA") ──
+        // Rendered on top of dim screens, shockwaves & particles so top names remain 100% visible at all times
+        drawArenaMatchNames(state.ctx, true);
 
         // Draw FPS display and logs (if not hidden by user pressing H)
         if (!state.hideFpsLogs) {

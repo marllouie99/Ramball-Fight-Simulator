@@ -45,6 +45,42 @@ export function isSuppressedByFuga(fighter) {
 }
 
 /**
+ * Universal evaluation of whether an entity (fighter, companion, or illusion) is immune to gravitational/vortex suction.
+ * @param {Object} entity
+ * @param {string} [vortexType='purple'] - 'purple' | 'blue' | 'black_hole'
+ * @returns {boolean}
+ */
+export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple') {
+  if (!entity) return true;
+  if (entity.isBaguvixActive || entity.isGodModeActive) return true;
+
+  // Makima contract reformation stasis
+  if (entity.isRevivingFromContract || entity.isShatterReviving || (entity.shatteredPieces && entity.shatteredPieces.length > 0) || (entity.characterId === 'makima' && (entity.isDead || entity.dead || entity.hp <= 0))) {
+    return true;
+  }
+
+  // Saitama Serious Skill Counter charging/striking hyper-armor
+  const isSaitama = (entity.characterId === 'saitama' || entity.type === 'saitama');
+  if (isSaitama && (entity.isCountering || (entity._counterPunchTimer && entity._counterPunchTimer > 0) || (entity._counterWindupTimer && entity._counterWindupTimer > 0) || (entity._postCounterRecoveryTimer && entity._postCounterRecoveryTimer > 0))) {
+    return true;
+  }
+
+  // Specific vortex type checks:
+  if (vortexType === 'blue' && entity.gojoBlueDragImmune) {
+    return true;
+  }
+
+  // Toji's Heavenly Restriction (immuneToCC) does NOT protect him from Hollow Purple or Blue or Black Hole gravity unless specifically configured
+  if (entity.immuneToCC && entity.characterId !== 'toji' && entity.type !== 'toji') {
+    if (vortexType === 'black_hole' || vortexType === 'blue') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Universal helper: returns true if the given entity currently has an active
  * Limitless Infinity barrier.
  */
@@ -496,6 +532,8 @@ export class Fighter {
     this.isDead = false;
     this._hasDied = false;
 
+    this._finisherAudioHandles = new Map();
+
     this.damageDealt = 0;
     this.damageReceived = 0;
   }
@@ -599,6 +637,15 @@ export class Fighter {
    */
   hasActiveInfinity() {
     return false;
+  }
+
+  /**
+   * Returns true if this fighter is immune to gravitational/vortex suction.
+   * @param {string} [vortexType='purple']
+   * @returns {boolean}
+   */
+  isImmuneToGravitationalPull(vortexType = 'purple') {
+    return isEntityImmuneToGravitationalPull(this, vortexType);
   }
 
   /**
@@ -758,6 +805,58 @@ export class Fighter {
     this.hideBackHand = false;
     this._stationaryStallFrames = 0;
     this.skillManager?.interruptAll();
+  }
+
+  /**
+   * Plays a dedicated finisher audio layer (voice, charge, bg, release) for this fighter.
+   * Finisher sounds are marked handle.isFinisher = true to prevent eviction and premature cutoffs.
+   */
+  playFinisherAudio(config) {
+    return audioSystem.playFinisherAudio(this, config);
+  }
+
+  /**
+   * Gracefully stops finisher audio on this fighter.
+   * @param {string|null} [role=null] - Channel role or null for all
+   * @param {number} [fadeMs=0] - Fade duration in ms
+   */
+  stopFinisherAudio(role = null, fadeMs = 0) {
+    return audioSystem.stopFinisherAudio(this, role, fadeMs);
+  }
+
+  /** Pauses finisher audio on this fighter. */
+  pauseFinisherAudio(role = null) {
+    return audioSystem.pauseFinisherAudio(this, role);
+  }
+
+  /** Resumes paused finisher audio on this fighter. */
+  resumeFinisherAudio(role = null) {
+    return audioSystem.resumeFinisherAudio(this, role);
+  }
+
+  /** Returns true if any finisher audio channel (or specific role) is currently active. */
+  isFinisherAudioActive(role = null) {
+    return audioSystem.isFinisherAudioActive(this, role);
+  }
+
+  /**
+   * Universal check if this fighter is actively executing or channeling an ultimate/finisher.
+   * Used across combat, round end checks, and audio systems to guarantee un-interrupted finishers and voice lines.
+   * @returns {boolean}
+   */
+  hasActiveFinishingAbility() {
+    if (this.hp <= 0 || this.isDead || this.dead) return false;
+    return Boolean(
+      this.isFiringPureLoveBeam ||
+      this.isChannelingPureLoveBeam ||
+      this.isCountering ||
+      this.isChannelingPurple ||
+      this.isChannelingDivineFlame ||
+      this.isFiringUlt ||
+      this.isChargingUlt ||
+      this.isAmbushing ||
+      this.isFinisherAudioActive()
+    );
   }
 
   /**
@@ -1462,6 +1561,7 @@ export class Fighter {
     this.dead = true;
     this.isDead = true;
     this._hasDied = true;
+    this.stopFinisherAudio(null, 200);
     clearFighterDomain(this, typeof state !== 'undefined' ? state : null);
     this.interruptAttacks(true);
     this.hitFlashTimer = 0; // Clear residual white hit-flash so corpses don't render white

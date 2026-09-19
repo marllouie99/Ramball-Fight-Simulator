@@ -44,7 +44,12 @@ export function initGraphicsCache() {
     'Assets/model/REZE-WEAPON.png?v=3',
     'Assets/model/denji-devilform-model-skin.png',
     'Assets/model/Sukuna-shrine.png',
-    'Assets/Overlays/mahitos-de.png'
+    'Assets/model/Genos-hair.png',
+    'Assets/Overlays/mahitos-de.png',
+    'Assets/Overlays/gojo-domainexpansion.png',
+    'Assets/Overlays/Yuta-domain-overlay.png',
+    'Assets/Overlays/Toji-ultimate-overlay.png',
+    'Assets/Overlays/CJ-baguvix-overlay.png'
   ];
   models.forEach(preloadImage);
 }

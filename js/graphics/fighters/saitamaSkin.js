@@ -106,21 +106,21 @@ export function drawSaitamaSkin(ctx, fighter) {
     // Back Hand (Right Arm): Smoothly cycles between fully retracted (-r * 0.20) and fully extended forward (+r * 2.35)
     const stroke1 = (Math.sin(t * cycleFreq) + 1) / 2; // 0.0 -> 1.0 -> 0.0
     backHandX = -r * 0.20 + stroke1 * (r * 2.45);
-    backHandY = -r * 0.28 + Math.cos(t * cycleFreq) * (r * 0.06);
+    backHandY = r * 0.12 + Math.cos(t * cycleFreq) * (r * 0.06);
 
     // Front Hand (Left Arm): In exact opposite anti-phase (+ PI)
     const stroke2 = (Math.sin(t * cycleFreq + Math.PI) + 1) / 2; // 1.0 -> 0.0 -> 1.0
     frontHandX = -r * 0.20 + stroke2 * (r * 2.45);
-    frontHandY =  r * 0.28 - Math.cos(t * cycleFreq) * (r * 0.06);
+    frontHandY = r * 0.40 - Math.cos(t * cycleFreq) * (r * 0.06);
   } else if (isPunching) {
     // All punches executed with the front hand extending forward from right edge
     frontHandX = r * 0.95 + lungeExtension * 1.40;
-    frontHandY = isPostCounter ? 0 : Math.sin(rawProgress * Math.PI) * (r * 0.20);
+    frontHandY = r * 0.25 + (isPostCounter ? 0 : Math.sin(rawProgress * Math.PI) * (r * 0.15));
     backHandX  = 0; backHandY  = 0;
   } else {
-    // Idle brawler guard stance: front hand at the right edge of body circle
+    // Idle brawler guard stance: front hand at the right edge of body circle lowered to chest level
     frontHandX = r * 0.95;
-    frontHandY = 0;
+    frontHandY = r * 0.25;
     backHandX  = 0; backHandY  = 0;
   }
 
@@ -154,7 +154,7 @@ export function drawSaitamaSkin(ctx, fighter) {
     
     // Target position: drawn back to the core
     const targetX = -r * 0.4;
-    const targetY = 0;
+    const targetY = r * 0.25;
     
     frontHandX = frontHandX + (targetX - frontHandX) * easePullback;
     frontHandY = frontHandY + (targetY - frontHandY) * easePullback;
@@ -221,7 +221,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   // ── Render Back Hand (Back Layer - Active during Consecutive Normal Punches Flurry) ──
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isPodiumPreview;
   if (!shouldHideHands && !fighter.hideBackHand && isFlurrying) {
-    drawSaitamaArm(ctx, r, backHandX, backHandY, handRadius, -r * 0.28, false);
+    drawSaitamaArm(ctx, r, backHandX, backHandY, handRadius, r * 0.12, false);
   }
 
   // ─────────────────────────────────────────────
@@ -236,7 +236,7 @@ export function drawSaitamaSkin(ctx, fighter) {
       drawSeriousChargeGlow(ctx, frontHandX, frontHandY, handRadius, chargeScale);
     }
     if (isFlurrying) {
-      drawSaitamaArm(ctx, r, frontHandX, frontHandY, handRadius, r * 0.28, true);
+      drawSaitamaArm(ctx, r, frontHandX, frontHandY, handRadius, r * 0.40, true);
     } else {
       // Crisp stepped pixel-art brawler glove
       drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
@@ -387,12 +387,12 @@ function drawSaitamaArm(ctx, r, handX, handY, handRadius, shoulderY, isFront = f
  */
 function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer) {
   const lanes = [
-    { y: -r * 0.55, phase: 0 },
-    { y: -r * 0.33, phase: Math.PI * 0.66 },
-    { y: -r * 0.11, phase: Math.PI * 1.33 },
-    { y:  r * 0.11, phase: Math.PI * 0.33 },
-    { y:  r * 0.33, phase: Math.PI * 1.0 },
-    { y:  r * 0.55, phase: Math.PI * 1.66 }
+    { y: -r * 0.30, phase: 0 },
+    { y: -r * 0.10, phase: Math.PI * 0.66 },
+    { y:  r * 0.10, phase: Math.PI * 1.33 },
+    { y:  r * 0.30, phase: Math.PI * 0.33 },
+    { y:  r * 0.50, phase: Math.PI * 1.0 },
+    { y:  r * 0.65, phase: Math.PI * 1.66 }
   ];
 
   const cycleFreq = (Math.PI * 2) / 5; // ~5 frames per full forward/backward cycle
@@ -419,10 +419,10 @@ function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer) {
     const snap = (v) => Math.round(v / P) * P;
     const perpY = handRadius * 0.55;
     const sleevePts = [
-      { x: r * 0.25, y: fistY * 0.5 - perpY * 0.6 },
+      { x: r * 0.25, y: r * 0.20 + fistY * 0.4 - perpY * 0.6 },
       { x: fistX - fRadius * 0.4, y: fistY - perpY },
       { x: fistX - fRadius * 0.4, y: fistY + perpY },
-      { x: r * 0.25, y: fistY * 0.5 + perpY * 0.6 }
+      { x: r * 0.25, y: r * 0.20 + fistY * 0.4 + perpY * 0.6 }
     ];
 
     // Stepped pixel outline
@@ -537,61 +537,63 @@ function drawSaitamaPixelBody(ctx, r, isGhost = false) {
         continue;
       }
 
-      // Zone A: Top Bald Head Skin Section (ry < -r * 0.35)
-      if (ry < -r * 0.35) {
+      // Zone A: Head & Face Skin Section (ry < r * 0.20)
+      if (ry < r * 0.20) {
         let col = '#FFE0BD';
-        if (ry < -r * 0.70 && Math.abs(rx) < r * 0.45) {
+        if (ry < -r * 0.45 && Math.abs(rx) < r * 0.45) {
           col = '#FFF2E0'; // Top bald shine highlight
-        } else if (ry > -r * 0.45 || Math.abs(rx) > r * 0.75) {
-          col = '#F2C8A4'; // Chin / cheek shadow
+        } else if (Math.abs(rx) > r * 0.70) {
+          col = '#F2C8A4'; // Side cheek / jaw shadow
+        } else if (ry > r * 0.08) {
+          col = '#E5B892'; // Lower neck shadow
         }
         ctx.fillStyle = col;
         ctx.fillRect(px, py, P, P);
       }
-      // Zone B: Yellow Hero Suit Upper & Lower (-r * 0.35 <= ry < r * 0.25)
-      else if (ry < r * 0.25) {
+      // Zone B: Yellow Hero Suit (r * 0.20 <= ry < r * 0.62)
+      else if (ry < r * 0.62) {
         // Golden zipper pull tab at center
-        if (Math.abs(rx) < P * 0.8 && ry >= -r * 0.35 && ry <= -r * 0.05) {
-          if (ry <= -r * 0.25) {
+        if (Math.abs(rx) < P * 0.8 && ry >= r * 0.20 && ry <= r * 0.42) {
+          if (ry <= r * 0.26) {
             ctx.fillStyle = '#C88A00'; // Zipper ring
           } else {
             ctx.fillStyle = '#FFFFFF'; // White zipper line
           }
         } else {
           let col = '#FFEB94';
-          if (ry < -r * 0.10 && Math.abs(rx) < r * 0.50) {
+          if (ry < r * 0.38 && Math.abs(rx) < r * 0.45) {
             col = '#FFF5B8'; // Chest highlight
-          } else if (Math.abs(rx) > r * 0.75 || ry > r * 0.16) {
+          } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.54) {
             col = '#E8CA65'; // Suit shadow / wrinkle
           }
           ctx.fillStyle = col;
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone C: Horizontal Black Hero Belt & Buckle (r * 0.25 <= ry < r * 0.55)
-      else if (ry < r * 0.55) {
+      // Zone C: Horizontal Black Hero Belt & Golden Buckle (r * 0.62 <= ry < r * 0.76)
+      else if (ry < r * 0.76) {
         // Center Golden Buckle
-        const isBuckle = (Math.abs(rx) <= r * 0.28 && Math.abs(ry - r * 0.38) <= r * 0.12);
+        const isBuckle = (Math.abs(rx) <= r * 0.26);
         if (isBuckle) {
-          if (Math.abs(rx) >= r * 0.24 || Math.abs(ry - r * 0.38) >= r * 0.10) {
+          if (Math.abs(rx) >= r * 0.22 || Math.abs(ry - r * 0.69) >= r * 0.05) {
             ctx.fillStyle = '#111114'; // Buckle border
-          } else if (rx < -P && ry < r * 0.38) {
+          } else if (rx < -P && ry < r * 0.69) {
             ctx.fillStyle = '#FFF5A0'; // Metallic buckle glint
           } else {
             ctx.fillStyle = '#F5C400'; // Golden buckle plate
           }
         } else {
           // Belt leather
-          ctx.fillStyle = (ry < r * 0.30) ? '#282832' : '#111114';
+          ctx.fillStyle = (ry < r * 0.69) ? '#282832' : '#111114';
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone D: Crimson Red Boots / Lower Suit (ry >= r * 0.55)
+      // Zone D: Crimson Red Boots / Lower Suit (ry >= r * 0.76)
       else {
         let col = '#C80000';
-        if (ry < r * 0.65 && Math.abs(rx) < r * 0.45) {
+        if (ry < r * 0.84 && Math.abs(rx) < r * 0.45) {
           col = '#E52E2E'; // Top boot rim highlight
-        } else if (ry > r * 0.82 || Math.abs(rx) > r * 0.70) {
+        } else if (ry > r * 0.90 || Math.abs(rx) > r * 0.70) {
           col = '#8A0000'; // Boot heel / edge shadow
         }
         ctx.fillStyle = col;
@@ -612,21 +614,21 @@ function drawSaitamaPixelCape(ctx, r, inertiaX = 0, inertiaY = 0, gentleSway1 = 
   const snap = (v) => Math.round(v / P) * P;
 
   // Cape Attachment / Collar Button Positions (Back of shoulders)
-  const topAttach = { x: -r * 0.35, y: -r * 0.35 };
-  const botAttach = { x: -r * 0.35, y: -r * 0.05 };
+  const topAttach = { x: -r * 0.35, y: r * 0.05 };
+  const botAttach = { x: -r * 0.35, y: r * 0.35 };
 
   // Outer Cape Boundary Points (Flowing backwards into -X)
   const topCapeTip = {
     x: -r * 1.85 + inertiaX * 0.8 + gentleSway1,
-    y: -r * 0.85 + inertiaY * 0.6 - gentleSway2
+    y: -r * 0.65 + inertiaY * 0.6 - gentleSway2
   };
   const midCapeFold = {
     x: -r * 2.10 + inertiaX * 1.0 + gentleSway2,
-    y: 0 + inertiaY * 0.8 + waveRipple
+    y: r * 0.15 + inertiaY * 0.8 + waveRipple
   };
   const botCapeTip = {
     x: -r * 1.75 + inertiaX * 0.8 - gentleSway1,
-    y: r * 0.75 + inertiaY * 0.6 + gentleSway2
+    y: r * 0.85 + inertiaY * 0.6 + gentleSway2
   };
 
   // Sample boundary perimeter vertices into stepped pixel points
@@ -634,15 +636,15 @@ function drawSaitamaPixelCape(ctx, r, inertiaX = 0, inertiaY = 0, gentleSway1 = 
   const N = 20;
 
   // 1. Top curve: topAttach -> topCapeTip
-  const c1Top = { x: -r * 0.95 + inertiaX * 0.4, y: -r * 0.65 + inertiaY * 0.3 + gentleSway1 };
-  const c2Top = { x: -r * 1.45 + inertiaX * 0.7 + gentleSway2, y: -r * 0.90 + inertiaY * 0.5 + waveRipple };
+  const c1Top = { x: -r * 0.95 + inertiaX * 0.4, y: -r * 0.35 + inertiaY * 0.3 + gentleSway1 };
+  const c2Top = { x: -r * 1.45 + inertiaX * 0.7 + gentleSway2, y: -r * 0.65 + inertiaY * 0.5 + waveRipple };
   for (let i = 0; i <= N; i++) {
     poly.push(cubicBezierPt(topAttach, c1Top, c2Top, topCapeTip, i / N));
   }
 
   // 2. Trailing edge: topCapeTip -> midCapeFold -> botCapeTip
-  const cMid1 = { x: -r * 1.95 + inertiaX * 0.9 + gentleSway2, y: -r * 0.40 + inertiaY * 0.7 };
-  const cMid2 = { x: -r * 1.90 + inertiaX * 0.8 - gentleSway1, y: r * 0.40 + inertiaY * 0.7 };
+  const cMid1 = { x: -r * 1.95 + inertiaX * 0.9 + gentleSway2, y: -r * 0.20 + inertiaY * 0.7 };
+  const cMid2 = { x: -r * 1.90 + inertiaX * 0.8 - gentleSway1, y: r * 0.50 + inertiaY * 0.7 };
   for (let i = 1; i <= N; i++) {
     const t = i / N;
     if (t <= 0.5) {
@@ -653,8 +655,8 @@ function drawSaitamaPixelCape(ctx, r, inertiaX = 0, inertiaY = 0, gentleSway1 = 
   }
 
   // 3. Bottom curve: botCapeTip -> botAttach
-  const c1Bot = { x: -r * 1.35 + inertiaX * 0.6 - gentleSway2, y: r * 0.55 + inertiaY * 0.4 - waveRipple };
-  const c2Bot = { x: -r * 0.75 + inertiaX * 0.3, y: r * 0.20 + inertiaY * 0.2 };
+  const c1Bot = { x: -r * 1.35 + inertiaX * 0.6 - gentleSway2, y: r * 0.70 + inertiaY * 0.4 - waveRipple };
+  const c2Bot = { x: -r * 0.75 + inertiaX * 0.3, y: r * 0.45 + inertiaY * 0.2 };
   for (let i = 1; i <= N; i++) {
     poly.push(cubicBezierPt(botCapeTip, c1Bot, c2Bot, botAttach, i / N));
   }
@@ -694,7 +696,7 @@ function drawSaitamaPixelCape(ctx, r, inertiaX = 0, inertiaY = 0, gentleSway1 = 
   for (let k = shadowStartIdx; k <= shadowEndIdx; k++) {
     ctx.lineTo(snap(poly[k].x), snap(poly[k].y));
   }
-  ctx.lineTo(snap(-r * 0.95), snap(r * 0.15));
+  ctx.lineTo(snap(-r * 0.95), snap(r * 0.35));
   ctx.closePath();
   ctx.fill();
 
@@ -712,16 +714,16 @@ function drawSaitamaPixelCape(ctx, r, inertiaX = 0, inertiaY = 0, gentleSway1 = 
   // Upper fold crease
   drawPixelCrease(
     topAttach,
-    { x: -r * 0.80 + inertiaX * 0.3, y: -r * 0.45 + gentleSway1 },
-    { x: -r * 1.30 + inertiaX * 0.6, y: -r * 0.30 + waveRipple },
+    { x: -r * 0.80 + inertiaX * 0.3, y: -r * 0.10 + gentleSway1 },
+    { x: -r * 1.30 + inertiaX * 0.6, y: -r * 0.05 + waveRipple },
     { x: midCapeFold.x + r * 0.20, y: midCapeFold.y - r * 0.20 },
     foldCol
   );
   // Lower fold crease
   drawPixelCrease(
     botAttach,
-    { x: -r * 0.70 + inertiaX * 0.3, y: r * 0.10 - gentleSway2 },
-    { x: -r * 1.20 + inertiaX * 0.5, y: r * 0.30 + waveRipple },
+    { x: -r * 0.70 + inertiaX * 0.3, y: r * 0.40 - gentleSway2 },
+    { x: -r * 1.20 + inertiaX * 0.5, y: r * 0.55 + waveRipple },
     { x: botCapeTip.x + r * 0.20, y: botCapeTip.y - r * 0.10 },
     foldCol
   );
@@ -771,7 +773,7 @@ function drawSaitamaGhostModel(ctx, r) {
 
   // 2. Hands (Back & Front - Pixel Art)
   const handRadius = Math.max(r * 0.38, 8.5);
-  const backHandX = 0, backHandY = -r * 0.15;
+  const backHandX = 0, backHandY = r * 0.10;
 
   // Back Hand
   drawSaitamaPixelGlove(ctx, backHandX, backHandY, handRadius);
@@ -780,7 +782,7 @@ function drawSaitamaGhostModel(ctx, r) {
   drawSaitamaPixelBody(ctx, r, true);
 
   // Front Hand (Pixel Art)
-  const frontHandX = r * 0.95, frontHandY = 0;
+  const frontHandX = r * 0.95, frontHandY = r * 0.25;
   drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
 
   // Golden Speed Aura Overlay Ring

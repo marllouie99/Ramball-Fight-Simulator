@@ -1038,19 +1038,11 @@ function updateHealthHud() {
   // ── INSTANT Dim Class Toggle (runs ONLY on state transition, before throttle) ──
   {
     const isDimmedNow = isScreenDimmedActive();
-
-    // Detect Saitama's counter punch impact flash (HUD text snaps to black during bright white screen flash)
-    const isSaitamaPunchImpactFlash = Boolean(state.fighters && state.fighters.some(f =>
-      f && (f.characterId === 'saitama' || f.type === 'saitama') &&
-      f._counterPunchImpactFlashTimer && f._counterPunchImpactFlashTimer > 0
-    ));
-
     const isDarkTheme = (state.arenaTheme === 'dark');
 
-    if (isDimmedNow !== _lastDimmedState || isDarkTheme !== _lastDarkThemeState || isSaitamaPunchImpactFlash !== _lastSaitamaImpactState) {
+    if (isDimmedNow !== _lastDimmedState || isDarkTheme !== _lastDarkThemeState) {
       _lastDimmedState = isDimmedNow;
       _lastDarkThemeState = isDarkTheme;
-      _lastSaitamaImpactState = isSaitamaPunchImpactFlash;
 
       const dimEls = _getDimElements();
       for (let i = 0; i < dimEls.length; i++) {
@@ -1062,10 +1054,6 @@ function updateHealthHud() {
 
         if (isDarkTheme) el.classList.add('arena-dark-mode');
         else el.classList.remove('arena-dark-mode');
-
-        // Snap HUD text to black during punch impact white flash
-        if (isSaitamaPunchImpactFlash) el.classList.add('hud-punch-impact');
-        else el.classList.remove('hud-punch-impact');
       }
     }
   }
