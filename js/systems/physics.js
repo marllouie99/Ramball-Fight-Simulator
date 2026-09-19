@@ -4,7 +4,7 @@
 import { CONFIG, FIGHTER_DEFS } from '../core/config.js';
 import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { projectileSystem } from './projectileSystem.js';
-import { state, spawnFloatingText, recordWin, recordLoss, createFighterInstance, triggerMissionPassedOverlay } from '../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, recordWin, recordLoss, createFighterInstance, triggerMissionPassedOverlay } from '../core/state.js';
 import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
 import { stopArenaBgm } from './arenaBgmSystem.js';
 import { audioSystem } from './audioSystem.js';
@@ -168,11 +168,7 @@ export function spawnFuelPickup() {
  */
 export function updateFuelPickups() {
   if (state.gameState !== 'playing') return;
-  const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
-    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-  ));
-  if (isGlobalHitPausing) return;
+  if (isGlobalHitPauseActive(state)) return;
 
   // Spawn new fuel pickups periodically
   state.fuelPickupSpawnTimer++;
@@ -319,11 +315,7 @@ export function resolveFighterCollision(a, b) {
   const effectiveOverlap = isBrawlerCombo ? overlap * 0.1 : overlap;
   
   // Pause circle-circle physical push response during Nanami or Escanor Hit-Pause
-  const isGlobalRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
-    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-  ));
-  if (isGlobalRatioPausing) {
+  if (isGlobalHitPauseActive(state)) {
     return;
   }
 
@@ -533,11 +525,7 @@ export { isTacticalFighter, resolveTacticalGunCollisions };
 // ─────────────────────────────────────────────
 
 export function updateProjectiles() {
-  const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
-    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-  ));
-  if (isGlobalHitPausing) {
+  if (isGlobalHitPauseActive(state)) {
     return; // Freeze all projectiles mid-air during hit pause
   }
   if (projectileSystem) {
@@ -1091,6 +1079,7 @@ export function updateFighters() {
           // Push them apart
           const nx = dx / dist;
           const ny = dy / dist;
+          const overlap = minDist - dist;
           const fighterIsGojoInfinity = (typeof fighter.hasActiveInfinity === 'function') && fighter.hasActiveInfinity() && !entity.isMeleeMode;
           // Gojo Infinity slows colliding entities instead of pushing them back
           if (fighterIsGojoInfinity && !entity.gojoInfinityImmune) {

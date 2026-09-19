@@ -688,10 +688,18 @@ export function updateSparkEffects(frozen = false) {
         }
       }
 
-      effect.x += effect.vx;
-      effect.y += effect.vy;
-      effect.vx *= effect.friction;
-      effect.vy *= effect.friction;
+      if (typeof effect.vx === 'number' && Number.isFinite(effect.vx)) {
+        effect.x += effect.vx;
+        if (typeof effect.friction === 'number' && Number.isFinite(effect.friction)) {
+          effect.vx *= effect.friction;
+        }
+      }
+      if (typeof effect.vy === 'number' && Number.isFinite(effect.vy)) {
+        effect.y += effect.vy;
+        if (typeof effect.friction === 'number' && Number.isFinite(effect.friction)) {
+          effect.vy *= effect.friction;
+        }
+      }
       
       // Make telekinesis debris continuously bob and drift after stopping
       if (effect.type === 'telekinesisDebris') {
@@ -2047,32 +2055,38 @@ export function spawnBiteAttackEffect(x, y, angle = 0, color = '#D946EF') {
  * Spawns Mahito's Domain Expansion Long-Range Sure-Hit Soul Tendril Strike.
  * Stretches a high-speed transfigured fleshy stitched arm directly from Mahito to the distant target.
  */
-export function spawnMahitoDomainSoulTendrilStrike(startX, startY, targetX, targetY, isTransformed = false) {
+export function spawnMahitoDomainSoulTendrilStrike(startX, startY, targetX, targetY, isTransformed = false, sourceRef = null, targetRef = null) {
   if (!state || !state.sparkEffects) return;
 
   const tendril = ParticleSystem.getParticle();
   tendril.x = (startX + targetX) / 2;
   tendril.y = (startY + targetY) / 2;
+  tendril.vx = 0;
+  tendril.vy = 0;
+  tendril.friction = 1.0;
+  tendril.isProtected = true;
   tendril.startX = startX;
   tendril.startY = startY;
   tendril.targetX = targetX;
   tendril.targetY = targetY;
+  tendril.sourceRef = sourceRef;
+  tendril.targetRef = targetRef;
   tendril.isTransformed = isTransformed;
   tendril.wobblePhase = Math.random() * Math.PI * 2;
-  tendril.size = 20;
+  tendril.size = 28;
   tendril.life = 1.0;
-  tendril.decay = 0.065; // ~15 frames duration
+  tendril.decay = 0.035; // ~28 frames duration
   tendril.type = 'mahitoDomainSoulTendrilStrike';
-  tendril.isFlash = true;
+  tendril.isFlash = false;
   tendril.isPixi = false;
   state.sparkEffects.push(tendril);
 
   // Burst of soul sparks & bubbles at point of origin
   spawnSparks(startX, startY, 4, 'basic', {
     color: isTransformed ? '#C026D3' : '#D946EF',
-    speed: 4.0,
+    speed: 3.5,
     size: 2.0,
-    decay: 0.08
+    decay: 0.06
   });
 
   // Spawn claw scratch impact burst at target position
@@ -2083,12 +2097,16 @@ export function spawnMahitoDomainSoulTendrilStrike(startX, startY, targetX, targ
   const sw = ParticleSystem.getParticle();
   sw.x = targetX;
   sw.y = targetY;
-  sw.size = 8;
-  sw.targetSize = 48;
+  sw.vx = 0;
+  sw.vy = 0;
+  sw.friction = 1.0;
+  sw.isProtected = true;
+  sw.size = 10;
+  sw.targetSize = 52;
   sw.life = 1.0;
-  sw.decay = 0.06;
+  sw.decay = 0.045;
   sw.type = 'mahitoSoulShockwave';
-  sw.isFlash = true;
+  sw.isFlash = false;
   sw.isPixi = false;
   sw.color = 'magenta';
   state.sparkEffects.push(sw);

@@ -20,13 +20,14 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
-import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay, pushKillFeed } from '../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay, pushKillFeed } from '../core/state.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahitoSoulExplosion, spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
 import { clearFighterDomain } from '../systems/domainSystem.js';
 import { isInsideRubbickStolenVoid } from './fighters/rubbick/rubbickThemes.js';
+import { BalanceManager } from '../configs/balanceManager.js';
 
 /**
  * Returns true if the entity is currently hit by, dragged by, or suppressed by Getsuga Tensho.
@@ -85,6 +86,13 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
 
   if (typeof attacker === 'number' && typeof state !== 'undefined' && state.fighters) {
     attacker = state.fighters[attacker] || null;
+  }
+
+  const globalDamageScale = (typeof BalanceManager !== 'undefined' && BalanceManager.getGlobalMultipliers)
+    ? (BalanceManager.getGlobalMultipliers().damageScale || 1.0)
+    : 1.0;
+  if (!opts.isPureUnscaled) {
+    amount = (Number(amount) || 0) * globalDamageScale;
   }
 
   if (target.isIllusion) {
@@ -555,6 +563,7 @@ export class Fighter {
     if (this.isGrabbedByMahoraga) return true;
     if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
     if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
+    if (this.chopHitPauseTimer && this.chopHitPauseTimer > 0) return true;
     if (this.isRevivingFromContract || this.isShatterReviving || (this.reviveStasisTimer && this.reviveStasisTimer > 0)) return true;
     if (this.isCaughtInBlackHole || this._insideBlackHole || (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam())) return true;
     if (this.statusEffects && (this.statusEffects.timeStopTimer > 0 || this.statusEffects.paralyzeTimer > 0 || this.statusEffects.isParalyzed)) return true;
@@ -1038,6 +1047,13 @@ export class Fighter {
       }
     }
 
+    // If the fighter is alive and currently in a global hit-pause (e.g. Nanami's 7:3 Ratio Hit-Pause),
+    // DO NOT cancel skill channeling! Channeling pauses and continues after the hit-pause.
+    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+    if (isNanamiPausing && this.hp > 0) {
+      return;
+    }
+
     // Stop active skill sound handles
     if (this.soundHandle) { stopSound(this.soundHandle); this.soundHandle = null; }
     if (this._purpleChargeSoundHandle) { fadeOutSound(this._purpleChargeSoundHandle, 150); this._purpleChargeSoundHandle = null; }
@@ -1090,13 +1106,19 @@ export class Fighter {
     this.recoilTimer = 0;
     this.cleaveSwingTimer = 0;
     this.basicAttackHitPauseTimer = 0;
-    this.isChannelingDivineFlame = false;
-    this.divineFlameChargeTimer = 0;
-    this.isChannelingDomainExpansion = false;
-    this.isChannelingDomain = false;
-    this.isChannelingPurple = false;
-    this.purpleChargeTimer = 0;
-    this.redEffectTimer = 0;
+    const isTojiAmbushOrSilence = Boolean(this.isTargetOfAmbush || (this.silenceTimer || 0) > 0);
+    const isFatalOrEnd = Boolean(this.hp <= 0 || this.dead || this.isDead || isMatchEnded);
+    if (isFatalOrEnd || isTojiAmbushOrSilence) {
+      this.isChannelingDivineFlame = false;
+      this.divineFlameChargeTimer = 0;
+      this.isChannelingDomainExpansion = false;
+      this.isChannelingDomain = false;
+      this.domainChargeTimer = 0;
+      this.domainChannelTimer = 0;
+      this.isChannelingPurple = false;
+      this.purpleChargeTimer = 0;
+      this.redEffectTimer = 0;
+    }
     // Saitama
     this.seriousPunchChargeTimer = 0;
     this.basicPunchChargeTimer = 0;
@@ -1253,6 +1275,12 @@ export class Fighter {
     const currentFrame = this._getFrameId();
     if (this._lastSkillCdTickFrame === currentFrame && currentFrame !== undefined) return;
     this._lastSkillCdTickFrame = currentFrame;
+
+    // During global hit-pause (e.g. Nanami's 7:3 Ratio Hit-Pause), freeze/pause skill channeling and durations without decay
+    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+    if (isNanamiPausing) {
+      return;
+    }
 
     const isInsideGojoDomain = !this.gojoDomainAdapted && !this.gojoAdapted?.domain && typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
@@ -1415,10 +1443,7 @@ export class Fighter {
       return true;
     }
     // Global pause during Nanami's 7:3 Ratio or Escanor's Divine Axe Rhitta Hit-Pause mechanic
-    const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== this && (
-      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-    ));
+    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
     if (isGlobalHitPausing) {
       this.vx = 0;
       this.vy = 0;
@@ -1967,25 +1992,11 @@ export class Fighter {
   /** Centralized damage dealer and death/game over check.
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
-  takeDamage(amount, attacker, opts = {}) {
-    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isSaitamaPunch || opts.isSeriousPunch || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga));
-
-    // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
-    if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {
-      suppressAfterimagesAndAttackEffects(this);
-    }
-
-    // Fuga / Divine Flame hit reaction: immediately suppress afterimages and active attack effects
-    if ((opts.isDivineFlame || opts.isFuga || (opts.projectile && (opts.projectile.isSukunaFurnace || opts.projectile.behaviorType === 'sukuna_furnace'))) && !this.isTurret && !this.isDispenser) {
-      if (typeof this.suppressCombatAndVisuals === 'function') {
-        this.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
-      } else {
-        if (typeof this.clearAllAfterimages === 'function') this.clearAllAfterimages();
-        if (typeof this.clearAllAttackEffects === 'function') this.clearAllAttackEffects();
-        this._hitByFugaTimer = Math.max(this._hitByFugaTimer || 0, 45);
-      }
-    }
-
+  /**
+   * Filters out invalid damage calls, team fire, invulnerabilities, and evasion buffs.
+   * Returns true if damage should proceed, false if it should be completely blocked/ignored.
+   */
+  _filterDamageImmunityAndEvade(amount, attacker, opts, isGuaranteedHit) {
     // Damage cannot be applied when round or match has already concluded, or game is paused/countdown
     if (typeof state !== 'undefined' && state && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.gameState === 'gameOver' || state.gameState === 'paused' || state.gameState === 'countdown')) {
       return false;
@@ -1998,36 +2009,26 @@ export class Fighter {
       if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain && !isGuaranteedHit) || (this.vanishTimer && this.vanishTimer > 0 && !isGuaranteedHit) || (this.invincibilityTimer && this.invincibilityTimer > 0 && !isGuaranteedHit && !opts.isDomain)) return false;
     }
 
-    // Base fighter doesn't block; sanitize inputs before applying damage.
-    let currentHp = Number(this.hp);
-    if (!Number.isFinite(currentHp)) {
-      console.warn('Invalid fighter HP detected, resetting to 0', this, this.hp);
-      currentHp = 0;
-    }
-
-    amount = Number(amount);
-    if (!Number.isFinite(amount)) {
-      console.warn('Invalid damage amount detected, treating as 0', amount, attacker, opts);
-      amount = 0;
-    }
-
-    const attackerIndex = state.fighters.indexOf(attacker);
-    const targetIndex = state.fighters.indexOf(this);
-    if (
-      (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) &&
-      attackerIndex >= 0 &&
-      targetIndex >= 0 &&
-      attackerIndex !== targetIndex &&
-      state.getFighterTeam(attackerIndex) === state.getFighterTeam(targetIndex)
-    ) {
-      const attackerIsChained = Boolean(attacker && (attacker.isChainedByMakima || attacker.isMindControlledByMakima));
-      const targetIsChained = Boolean(this.isChainedByMakima || this.isMindControlledByMakima);
-      if (!attackerIsChained && !targetIsChained) {
-        return false;
+    // Friendly fire check in team modes
+    if (typeof state !== 'undefined' && state.fighters && attacker) {
+      const attackerIndex = state.fighters.indexOf(attacker);
+      const targetIndex = state.fighters.indexOf(this);
+      if (
+        (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) &&
+        attackerIndex >= 0 &&
+        targetIndex >= 0 &&
+        attackerIndex !== targetIndex &&
+        state.getFighterTeam(attackerIndex) === state.getFighterTeam(targetIndex)
+      ) {
+        const attackerIsChained = Boolean(attacker.isChainedByMakima || attacker.isMindControlledByMakima);
+        const targetIsChained = Boolean(this.isChainedByMakima || this.isMindControlledByMakima);
+        if (!attackerIsChained && !targetIsChained) {
+          return false;
+        }
       }
     }
 
-    // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks (e.g. Boogie Woogie swap buff, disabled when chained by Makima)
+    // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks
     if (this.evadeBuffTimer > 0 && amount > 0 && !isGuaranteedHit && !this.isChainedByMakima) {
       const isTickOrBeam = Boolean(
         opts && (
@@ -2064,32 +2065,20 @@ export class Fighter {
       }
     }
 
-    const prevHp = currentHp;
-    this.hp = Math.max(0, Math.min(this.maxHp || 200, Number((currentHp - amount).toFixed(2))));
-    const actualDamage = prevHp - this.hp;
-    if (actualDamage > 0) {
-      this.damageReceived = (this.damageReceived || 0) + actualDamage;
-      if (attacker && typeof attacker === 'object') {
-        let actualAttacker = attacker;
-        if (attacker.isIllusion && attacker.owner && typeof attacker.owner === 'object') {
-          actualAttacker = attacker.owner;
-        }
-        if (actualAttacker && typeof actualAttacker === 'object') {
-          actualAttacker.damageDealt = (actualAttacker.damageDealt || 0) + actualDamage;
-        }
-      }
-    }
-    const isTurretPair = Boolean(opts.projectile && opts.projectile.shotPairId);
-    const isSecondTurretHit = Boolean(isTurretPair && this._lastTurretPairHitId === opts.projectile.shotPairId);
-    if (isTurretPair) {
-      this._lastTurretPairHitId = opts.projectile.shotPairId;
-    }
+    return true;
+  }
+
+  /**
+   * Applies all floating combat texts, audio effects, blood/sparks, knockback impulse, and hit reactions.
+   */
+  _applyDamageHitEffects(amount, attacker, opts, prevHp, isSecondTurretHit) {
+    const isHeal = opts.isHeal || amount < 0;
 
     // Spawn floating damage number when actual HP was reduced
     if (this.hp < prevHp && amount > 0 && !opts.skipStandardDamageText && !isSecondTurretHit) {
       let color = this.color || '#ff4444';
       if (opts.isPurpleDPS) {
-        color = '#bf5af2'; // Bright electric purple for Hollow Purple DPS
+        color = '#bf5af2';
       } else if (attacker) {
         if (typeof attacker.getDamageNumberColor === 'function') {
           color = attacker.getDamageNumberColor(opts);
@@ -2127,163 +2116,227 @@ export class Fighter {
       }
     }
 
-      // Calculate damage direction (from attacker to this fighter)
-      let damageAngle = null;
-      if (typeof opts.damageAngle === 'number') {
-        damageAngle = opts.damageAngle;
-      } else if (typeof opts.angle === 'number') {
-        damageAngle = opts.angle;
-      } else if (typeof opts.hitAngle === 'number') {
-        damageAngle = opts.hitAngle;
-      } else if (opts.projectile) {
-        damageAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
-      } else if (attacker) {
-        damageAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
-      } else if (this.knockbackVx !== undefined && this.knockbackVy !== undefined && Math.hypot(this.knockbackVx, this.knockbackVy) > 0.1) {
-        damageAngle = Math.atan2(this.knockbackVy, this.knockbackVx);
-      }
-      if (damageAngle !== null) {
-        this.lastHitAngle = damageAngle;
-      }
+    // Calculate damage direction (from attacker to this fighter)
+    let damageAngle = null;
+    if (typeof opts.damageAngle === 'number') {
+      damageAngle = opts.damageAngle;
+    } else if (typeof opts.angle === 'number') {
+      damageAngle = opts.angle;
+    } else if (typeof opts.hitAngle === 'number') {
+      damageAngle = opts.hitAngle;
+    } else if (opts.projectile) {
+      damageAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
+    } else if (attacker) {
+      damageAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
+    } else if (this.knockbackVx !== undefined && this.knockbackVy !== undefined && Math.hypot(this.knockbackVx, this.knockbackVy) > 0.1) {
+      damageAngle = Math.atan2(this.knockbackVy, this.knockbackVx);
+    }
+    if (damageAngle !== null) {
+      this.lastHitAngle = damageAngle;
+    }
 
-      const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
-      const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isRatioPauseActive;
-      if (!this.isTurret && !isExplosionOrFlame && !isSecondTurretHit) {
-        const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
-        if (typeof spawnBloodEffect === 'function') {
-          spawnBloodEffect(this, bloodAmount, damageAngle, opts);
+    const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
+    const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isRatioPauseActive;
+    if (!this.isTurret && !isExplosionOrFlame && !isSecondTurretHit) {
+      const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
+      if (typeof spawnBloodEffect === 'function') {
+        spawnBloodEffect(this, bloodAmount, damageAngle, opts);
+      }
+    }
+
+    // Apply physical directional knockback whenever taking hit damage
+    const isDomainHazard = opts.isDomainDPS || opts.isDomain || opts.isDomainSlash || opts.fromDomain || opts.isDomainEmpowered || (opts.projectile && (opts.projectile.isDomainDPS || opts.projectile.fromDomain || opts.projectile.isDomainEmpowered));
+    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isDivineFlame && !opts.isContinuous && !isDomainHazard && !opts.fromBlackHole && !this.isTurret && !this.isDispenser && !isInsideRubbickStolenVoid(this)) {
+      let kbAngle = damageAngle;
+      if (opts.projectile) {
+        kbAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
+      }
+      if (kbAngle !== null) {
+        const attackerConfig = (attacker?.characterId && CONFIG[attacker.characterId]) || attacker?.customConfig || {};
+        const baseKb = typeof opts.knockbackForce === 'number'
+          ? opts.knockbackForce
+          : (typeof opts.projectile?.knockbackForce === 'number'
+            ? opts.projectile.knockbackForce
+            : (attackerConfig.knockbackForce || (opts.isMelee ? 2.5 : (opts.isProjectile ? 1.5 : 1.0))));
+        if (baseKb > 0 && !opts.skipKnockback && (!this.isMeleeMode || opts.isKnockback || opts.isHeavy || opts.isExplosion)) {
+          const kbVx = Math.cos(kbAngle) * baseKb;
+          const kbVy = Math.sin(kbAngle) * baseKb;
+          const stunFrames = opts.isHeavy ? 15 : ((opts.isKnockback || (opts.isExplosion && !opts.skipHitStun)) ? 10 : 0);
+          this.applyKnockback(kbVx, kbVy, stunFrames);
         }
       }
-      // Apply physical directional knockback whenever taking hit damage
-      const isDomainHazard = opts.isDomainDPS || opts.isDomain || opts.isDomainSlash || opts.fromDomain || opts.isDomainEmpowered || (opts.projectile && (opts.projectile.isDomainDPS || opts.projectile.fromDomain || opts.projectile.isDomainEmpowered));
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isDivineFlame && !opts.isContinuous && !isDomainHazard && !opts.fromBlackHole && !this.isTurret && !this.isDispenser && !isInsideRubbickStolenVoid(this)) {
-        let kbAngle = damageAngle;
-        if (opts.projectile) {
-          kbAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
-        }
-        if (kbAngle !== null) {
-          const attackerConfig = (attacker?.characterId && CONFIG[attacker.characterId]) || attacker?.customConfig || {};
-          const baseKb = typeof opts.knockbackForce === 'number'
-            ? opts.knockbackForce
-            : (typeof opts.projectile?.knockbackForce === 'number'
-              ? opts.projectile.knockbackForce
-              : (attackerConfig.knockbackForce || (opts.isMelee ? 2.5 : (opts.isProjectile ? 1.5 : 1.0))));
-          if (baseKb > 0 && !opts.skipKnockback && (!this.isMeleeMode || opts.isKnockback || opts.isHeavy || opts.isExplosion)) {
-            const kbVx = Math.cos(kbAngle) * baseKb;
-            const kbVy = Math.sin(kbAngle) * baseKb;
-            const stunFrames = opts.isHeavy ? 15 : ((opts.isKnockback || (opts.isExplosion && !opts.skipHitStun)) ? 10 : 0);
-            this.applyKnockback(kbVx, kbVy, stunFrames);
-          }
-        }
-      }
+    }
 
-      // Global blast / knockback / explosion skill interruption & penalty cooldown
-      const isChanneling = (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) || (typeof this.isStationarySkillActive === 'function' && this.isStationarySkillActive());
-      const isBlastOrKnockback = (opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2)) && !opts.skipInterrupt && !(opts.isPurpleExplosion && isChanneling);
-      if (isBlastOrKnockback && !this.isTurret && !this.isDispenser) {
-        this.interruptAttacks(true);
-      }
+    // Global blast / knockback / explosion skill interruption & penalty cooldown
+    const isDomainChanneling = Boolean(this.isChannelingDomainExpansion || this.isChannelingDomain);
+    const isChanneling = isDomainChanneling || (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) || (typeof this.isStationarySkillActive === 'function' && this.isStationarySkillActive());
+    const isNanamiHitPause = Boolean(opts.isNanamiPause || opts.isRatioCrit);
+    const isBlastOrKnockback = (opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2)) && !opts.skipInterrupt && !isNanamiHitPause && !(opts.isPurpleExplosion && isChanneling) && !isDomainChanneling;
+    if (isBlastOrKnockback && !this.isTurret && !this.isDispenser) {
+      this.interruptAttacks(true);
+    }
 
-      // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
-      if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {
-        suppressAfterimagesAndAttackEffects(this);
-      }
+    // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
+    if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {
+      suppressAfterimagesAndAttackEffects(this);
+    }
 
-      // Apply global basic attack hit-pause if configured
-      const isBasicAttack = !opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && 
-                            !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
-                            !opts.isSkill && !opts.isUltimate && !opts.isRikaAttack && 
-                            !opts.isExplosion && !opts.isAOE && !opts.isBleed && opts.source !== 'bleed' && 
-                            !opts.isCurse && opts.source !== 'curse';
-      if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0 && !this.isTurret && !this.isDispenser && !isSecondTurretHit) {
-        if (!this.isPerformingSkill()) {
-          this.basicAttackHitPauseTimer = CONFIG.basicAttackHitPauseDuration;
+    // Apply global basic attack hit-pause if configured
+    const isBasicAttack = !opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && 
+                          !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
+                          !opts.isSkill && !opts.isUltimate && !opts.isRikaAttack && 
+                          !opts.isExplosion && !opts.isAOE && !opts.isBleed && opts.source !== 'bleed' && 
+                          !opts.isCurse && opts.source !== 'curse';
+    if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0 && !this.isTurret && !this.isDispenser && !isSecondTurretHit) {
+      if (!this.isPerformingSkill()) {
+        this.basicAttackHitPauseTimer = CONFIG.basicAttackHitPauseDuration;
+      }
+    }
+
+    // Play hit sound and trigger hit flash (exclude DoT ticks)
+    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse') {
+      if (!this.isTurret && !this.isDispenser) {
+        if (!isSecondTurretHit) {
+          audioSystem.playSFX('attack_fleshhit', 0.6);
         }
+        this.hitFlashTimer = 8;
       }
-
-      // Play hit sound and trigger hit flash (exclude DoT ticks like poison, burn, flame, bleed, curse)
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse') {
-        if (!this.isTurret && !this.isDispenser) {
-          if (!isSecondTurretHit) {
-            audioSystem.playSFX('attack_fleshhit', 0.6);
-          }
-          this.hitFlashTimer = 8;
-        }
-      } else if (opts.isPurpleDPS || opts.isDomainDPS) {
-        if (!this.isTurret && !this.isDispenser) {
-          this.hitFlashTimer = 6;
-          const now = Date.now();
-          if (!this._lastPurpleHitSoundTime || (now - this._lastPurpleHitSoundTime > 130)) {
-            this._lastPurpleHitSoundTime = now;
-            audioSystem.playSFX('attack_fleshhit', 0.5);
-          }
+    } else if (opts.isPurpleDPS || opts.isDomainDPS) {
+      if (!this.isTurret && !this.isDispenser) {
+        this.hitFlashTimer = 6;
+        const now = Date.now();
+        if (!this._lastPurpleHitSoundTime || (now - this._lastPurpleHitSoundTime > 130)) {
+          this._lastPurpleHitSoundTime = now;
+          audioSystem.playSFX('attack_fleshhit', 0.5);
         }
       }
-    if (this.hp === 0 && !this._hasDied) {
-      this._hasDied = true;
-      this.dead = true;
-      this.isDead = true;
-      // Clear flame particles if the dying fighter is the Flamewarden
-      if (this._def && this._def.type === 'orange') {
-        flamewardenFlameSystem.clear();
-      }
-      this.onDeath();
-      
-      if (this.isTurret || this.isDispenser) {
-        return true;
-      }
+    }
+  }
 
-      // Play death sound
-      const faah = getAnnouncerSound('faah');
-      if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
+  /**
+   * Handles entity death callback, announcer sounds, match kill logs, and round-end checks.
+   */
+  _processFighterDeath(attacker, opts) {
+    this._hasDied = true;
+    this.dead = true;
+    this.isDead = true;
 
-      // Helper: an entity is in play if alive, a Doppelganger with illusions, evading Mahito, or Genos in Overdrive/Recovery
-      const _isEffectivelyAlive = (f) => {
-        if (!f || f.isTurret || f.isDispenser) return false;
-        if (typeof f.isEffectivelyAlive === 'function') return f.isEffectivelyAlive();
-        return f.hp > 0 && !f.dead;
-      };
+    // Clear flame particles if the dying fighter is the Flamewarden
+    if (this._def && this._def.type === 'orange') {
+      flamewardenFlameSystem.clear();
+    }
+    this.onDeath();
+    
+    if (this.isTurret || this.isDispenser) {
+      return;
+    }
 
-      const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
-      const recordKill = () => {
-        if (realAttacker && realAttacker !== this) {
-          const victimDef = this._def || { name: this.name, color: this.color, type: this.type };
-          realAttacker.lastKilledDef = victimDef;
-          realAttacker.postKillAngleHoldTimer = (typeof CONFIG !== 'undefined' && CONFIG.postKillAngleHoldFrames) || 40;
-          if (!realAttacker.killedDefs) realAttacker.killedDefs = [];
-          if (!realAttacker.killedDefs.some(d => d && (d.name === victimDef.name || (victimDef.id && d.id === victimDef.id)))) {
-            realAttacker.killedDefs.push(victimDef);
-          }
-          if (!realAttacker.roundKilledDefs) realAttacker.roundKilledDefs = [];
-          if (!realAttacker.roundKilledDefs.some(d => d && (d.name === victimDef.name || (victimDef.id && d.id === victimDef.id)))) {
-            realAttacker.roundKilledDefs.push(victimDef);
-          }
-          const realIdx = state.fighters.indexOf(realAttacker);
-          if (realIdx >= 0 && state.matchKills && state.matchKills[realIdx]) {
-            state.matchKills[realIdx].push(victimDef);
-          }
+    // Play death sound
+    const faah = getAnnouncerSound('faah');
+    if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
 
-          // Push to Counter-Strike Style Kill Feed (Tactical mode only)
-          const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
-          if (isTactical) {
-            const weapon = realAttacker.characterId || realAttacker._def?.name || realAttacker.name || 'FIREARM';
-            const isHeadshot = Boolean(this._lastHitWasHeadshot || realAttacker.lastShotWasHeadshot);
-            pushKillFeed(realAttacker, this, weapon, isHeadshot);
-          }
+    const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
+    const recordKill = () => {
+      if (realAttacker && realAttacker !== this) {
+        const victimDef = this._def || { name: this.name, color: this.color, type: this.type };
+        realAttacker.lastKilledDef = victimDef;
+        realAttacker.postKillAngleHoldTimer = (typeof CONFIG !== 'undefined' && CONFIG.postKillAngleHoldFrames) || 40;
+        if (!realAttacker.killedDefs) realAttacker.killedDefs = [];
+        if (!realAttacker.killedDefs.some(d => d && (d.name === victimDef.name || (victimDef.id && d.id === victimDef.id)))) {
+          realAttacker.killedDefs.push(victimDef);
         }
-      };
+        if (!realAttacker.roundKilledDefs) realAttacker.roundKilledDefs = [];
+        if (!realAttacker.roundKilledDefs.some(d => d && (d.name === victimDef.name || (victimDef.id && d.id === victimDef.id)))) {
+          realAttacker.roundKilledDefs.push(victimDef);
+        }
+        const realIdx = state.fighters.indexOf(realAttacker);
+        if (realIdx >= 0 && state.matchKills && state.matchKills[realIdx]) {
+          state.matchKills[realIdx].push(victimDef);
+        }
 
-      // If the dying fighter is still effectively active (e.g. Doppelganger illusions, Mahito evasion, Genos overdrive), defer round end
-      if (this.isEffectivelyAlive()) {
-        // Round continues until explosion/reboot/clones complete!
-        recordKill();
-        return true;
+        // Push to Counter-Strike Style Kill Feed (Tactical mode only)
+        const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+        if (isTactical) {
+          const weapon = realAttacker.characterId || realAttacker._def?.name || realAttacker.name || 'FIREARM';
+          const isHeadshot = Boolean(this._lastHitWasHeadshot || realAttacker.lastShotWasHeadshot);
+          pushKillFeed(realAttacker, this, weapon, isHeadshot);
+        }
       }
+    };
 
+    if (this.isEffectivelyAlive()) {
       recordKill();
+      return;
+    }
 
-      // Check for round/match transitions (stopAllSounds may fire inside)
-      this.checkRoundOrMatchEnd(realAttacker);
+    recordKill();
+    this.checkRoundOrMatchEnd(realAttacker);
+  }
+
+  /** Centralized damage dealer and death/game over check.
+   *  Returns true if damage was applied, false if it was blocked or ignored.
+   */
+  takeDamage(amount, attacker, opts = {}) {
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.isSaitamaPunch || opts.isSeriousPunch || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga));
+
+    // Getsuga Tensho hit reaction: immediately suppress afterimages and active attack effects
+    if ((opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) && !this.isTurret && !this.isDispenser) {
+      suppressAfterimagesAndAttackEffects(this);
+    }
+
+    // Fuga / Divine Flame hit reaction: immediately suppress afterimages and active attack effects
+    if ((opts.isDivineFlame || opts.isFuga || (opts.projectile && (opts.projectile.isSukunaFurnace || opts.projectile.behaviorType === 'sukuna_furnace'))) && !this.isTurret && !this.isDispenser) {
+      if (typeof this.suppressCombatAndVisuals === 'function') {
+        this.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+      } else {
+        if (typeof this.clearAllAfterimages === 'function') this.clearAllAfterimages();
+        if (typeof this.clearAllAttackEffects === 'function') this.clearAllAttackEffects();
+        this._hitByFugaTimer = Math.max(this._hitByFugaTimer || 0, 45);
+      }
+    }
+
+    if (!this._filterDamageImmunityAndEvade(amount, attacker, opts, isGuaranteedHit)) {
+      return false;
+    }
+
+    let currentHp = Number(this.hp);
+    if (!Number.isFinite(currentHp)) {
+      console.warn('Invalid fighter HP detected, resetting to 0', this, this.hp);
+      currentHp = 0;
+    }
+
+    amount = Number(amount);
+    if (!Number.isFinite(amount)) {
+      console.warn('Invalid damage amount detected, treating as 0', amount, attacker, opts);
+      amount = 0;
+    }
+
+    const prevHp = currentHp;
+    this.hp = Math.max(0, Math.min(this.maxHp || 200, Number((currentHp - amount).toFixed(2))));
+    const actualDamage = prevHp - this.hp;
+    if (actualDamage > 0) {
+      this.damageReceived = (this.damageReceived || 0) + actualDamage;
+      if (attacker && typeof attacker === 'object') {
+        let actualAttacker = attacker;
+        if (attacker.isIllusion && attacker.owner && typeof attacker.owner === 'object') {
+          actualAttacker = attacker.owner;
+        }
+        if (actualAttacker && typeof actualAttacker === 'object') {
+          actualAttacker.damageDealt = (actualAttacker.damageDealt || 0) + actualDamage;
+        }
+      }
+    }
+
+    const isTurretPair = Boolean(opts.projectile && opts.projectile.shotPairId);
+    const isSecondTurretHit = Boolean(isTurretPair && this._lastTurretPairHitId === opts.projectile.shotPairId);
+    if (isTurretPair) {
+      this._lastTurretPairHitId = opts.projectile.shotPairId;
+    }
+
+    this._applyDamageHitEffects(amount, attacker, opts, prevHp, isSecondTurretHit);
+
+    if (this.hp === 0 && !this._hasDied) {
+      this._processFighterDeath(attacker, opts);
     }
     return true;
   }

@@ -6,6 +6,8 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawVoidmasterWeapon } from '../../graphics/weapons/voidmasterWeaponGraphics.js';
+import { drawVoidmasterPixelBody, drawVoidmasterSkin } from '../../graphics/fighters/voidmasterSkin.js';
+import { drawPixelHand } from '../../graphics/draw.js';
 
 /**
  * Black Fighter (Black Hole)
@@ -160,28 +162,38 @@ export class BlackFighter extends Fighter {
     this.resumeMovement(opponent);
   }
 
+  drawSkin(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    const angle = this._isWinnerReveal ? 0 : (this.gunAngle || this.angle || 0);
+    ctx.rotate(angle);
+
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+
+    drawVoidmasterPixelBody(ctx, this.r, false);
+    this.drawStatusOverlays(ctx, this.r);
+    ctx.restore();
+  }
+
+  drawBody(ctx) {
+    this.drawSkin(ctx);
+  }
+
   drawOutline(ctx) {
     super.drawOutline(ctx);
   }
 
   drawGun(ctx) {
-    // Draw hands holding the void orbs (orbiting below the orbs)
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.fillStyle = this.color;
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000';
-    
-    // Left hand
-    ctx.beginPath();
-    ctx.arc(-this.r - 8, 0, 6, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
-    
-    // Right hand
-    ctx.beginPath();
-    ctx.arc(this.r + 8, 0, 6, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
+    const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || this.hideHands;
+    if (!shouldHideHands) {
+      const orbOffset = this.r + 8;
+      // Draw pixel hands on sides of voidmaster body
+      drawPixelHand(ctx, this.x - orbOffset, this.y, 4.5, '#7E22CE', '#0B0418');
+      drawPixelHand(ctx, this.x + orbOffset, this.y, 4.5, '#7E22CE', '#0B0418');
+    }
 
     drawVoidmasterWeapon(ctx, this.x, this.y, this.r);
   }

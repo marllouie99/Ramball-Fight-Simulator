@@ -46,8 +46,13 @@ body {
   width: 100vw;
   height: 100vh;
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   overflow: hidden;
   box-sizing: border-box;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ─────────────────────────────────────────────
@@ -63,13 +68,15 @@ body {
   margin: auto;
   box-sizing: border-box;
   flex-shrink: 0;
+  transform-origin: center center;
+  touch-action: none;
 }
 
 .game-box {
   position: relative;
   text-align: center;
-  width: 550px;
-  height: 1080px;
+  width: 540px;
+  height: 960px;
   background: #000000;
   display: flex;
   flex-direction: column;
@@ -78,6 +85,64 @@ body {
   margin: auto;
   box-sizing: border-box;
   overflow: hidden;
+  touch-action: none;
+}
+
+/* ─────────────────────────────────────────────
+   Mobile & Multi-Device Floating Quick Bar
+───────────────────────────────────────────── */
+.mobile-quick-bar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(18, 18, 24, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 22px;
+  padding: 4px 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: auto;
+}
+
+.quick-btn {
+  background: transparent;
+  border: none;
+  color: #e5e7eb;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0;
+  margin: 0;
+  transition: background 0.15s ease, transform 0.1s ease, color 0.15s ease;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.quick-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.quick-btn:active {
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(0.90);
+}
+
+.quick-icon {
+  pointer-events: none;
+  line-height: 1;
 }
 
 .health-hud-side {
@@ -2186,4 +2251,144 @@ canvas {
 .hud-dimmed .hud-cj-star.filled polygon {
   fill: #EAB308 !important;
   stroke: #000000 !important;
+}
+
+/* ─────────────────────────────────────────────
+   Live Combat Balance & Debug Floating Overlay
+───────────────────────────────────────────── */
+.balance-debug-overlay {
+  position: absolute;
+  top: 70px;
+  right: 14px;
+  width: 220px;
+  background: rgba(15, 15, 22, 0.92);
+  border: 2px solid #ff99af;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-family: 'Rajdhani', sans-serif;
+  z-index: 9999;
+  padding: 10px;
+  box-sizing: border-box;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  user-select: none;
+}
+
+.debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.debug-title {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #ffd1dc;
+}
+
+.debug-close-btn {
+  background: transparent;
+  border: none;
+  color: #ff99af;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.debug-close-btn:hover {
+  color: #ffffff;
+}
+
+.debug-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.debug-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.debug-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-step-btn {
+  width: 22px;
+  height: 22px;
+  background: #21050c;
+  border: 1px solid #ff99af;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.debug-step-btn:hover {
+  background: #cf3355;
+}
+
+.debug-val {
+  font-size: 13px;
+  font-weight: 900;
+  color: #ffd1dc;
+  min-width: 38px;
+  text-align: center;
+}
+
+.debug-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 8px;
+}
+
+.debug-action-btn {
+  width: 100%;
+  padding: 4px 8px;
+  background: #21050c;
+  border: 1px solid #ff99af;
+  border-radius: 4px;
+  color: #ffd1dc;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.debug-action-btn:hover {
+  background: #cf3355;
+  color: #ffffff;
+}
+
+.debug-hint {
+  font-size: 10px;
+  color: #888888;
+  letter-spacing: 0.5px;
 }

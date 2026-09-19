@@ -1,6 +1,6 @@
 import { Fighter, applyDamageToTarget, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnPunchWindSpeedLines, spawnSaitamaCounterFrontalBlast } from '../../graphics/particles/sparkEffect.js';
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
@@ -499,10 +499,7 @@ export class SaitamaFighter extends Fighter {
     const isExecutingSeriousCounter = isPostCounterRecovery; // Post-counter recovery blocks dodge
 
     // Check if Nanami or Escanor is currently executing a hit-pause
-    const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
-      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-    ));
+    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
 
     if (this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isGlobalHitPausing) {
       return false;
@@ -803,10 +800,7 @@ export class SaitamaFighter extends Fighter {
     if (this.hp <= 0 || !target || target.hp <= 0 || target === this) return false;
     if (this.skillPunishCooldown > 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
-    const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
-      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-    ));
+    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
     if (this.timeStopTimer > 0 || this.isChainedByMakima || isGlobalHitPausing || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
 
     // Check team alignment in 2v2/team modes ONLY.
@@ -1530,7 +1524,7 @@ export class SaitamaFighter extends Fighter {
     }
 
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga);
-    const isGlobalHitPausing = Boolean((attacker && ((attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0 || (attacker.characterId === 'escanor' || attacker.type === 'escanor') && (attacker.chopHitPauseTimer || 0) > 0)) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) || ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)))));
+    const isGlobalHitPausing = Boolean((attacker && ((attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0 || (attacker.characterId === 'escanor' || attacker.type === 'escanor') && (attacker.chopHitPauseTimer || 0) > 0)) || isGlobalHitPauseActive(state, this));
 
     // Saitama's Caped Baldy Reflexes: Sukuna's Malevolent Shrine domain slashes are physical spatial cuts — Saitama can dodge them!
     const isSukunaDomainSlash = Boolean((opts.isDomainSlash && opts.isSukunaSlash) || opts.isSukunaDomainSliceLine);
@@ -1905,10 +1899,7 @@ export class SaitamaFighter extends Fighter {
     this._tickCooldowns();
 
     // Check if Nanami or Escanor is currently executing a cinematic hit-pause mechanic
-    const isGlobalHitPausingFighter = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
-      ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0 && (f.ratioHitPauseTarget === this || f._chopTarget === this || !f.ratioHitPauseTarget)) ||
-      ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0 && (f.chopHitPauseTarget === this || !f.chopHitPauseTarget))
-    ));
+    const isGlobalHitPausingFighter = isGlobalHitPauseActive(state, this);
 
     // Mandatory Rule #1: Freeze / TimeStop guard at the top of update loop (bypassed only during active Serious Counter execution unless inside Gojo domain)
     const isFrozen = this._handleTimeStop();

@@ -3,6 +3,8 @@ import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
 import { drawBomberGrenade } from '../../graphics/weapons/bomberWeaponGraphics.js';
+import { drawBomberPixelBody, drawBomberSkin } from '../../graphics/fighters/bomberSkin.js';
+import { drawPixelHand } from '../../graphics/draw.js';
 
 /**
  * Bomber Fighter (Brown)
@@ -203,46 +205,24 @@ export class BomberFighter extends Fighter {
     ctx.setLineDash([]);
   }
 
-  drawBody(ctx) {
+  drawSkin(ctx) {
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
+    const angle = this._isWinnerReveal ? 0 : (this.gunAngle || this.angle || 0);
+    ctx.rotate(angle);
 
-    // Base body with custom skin color
-    ctx.beginPath();
-    ctx.arc(0, 0, this.r, 0, Math.PI * 2);
-    ctx.fillStyle = this.skinColor;
-    ctx.fill();
-
-    // TNT texture pattern
-    ctx.fillStyle = '#FF0000';
-    ctx.font = 'bold 10px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Draw "TNT" text on the body
-    ctx.save();
-    ctx.rotate(-this.angle); // Counter-rotate to keep text upright
-    ctx.fillText('TNT', 0, 0);
-    ctx.restore();
-
-    // Add explosive warning stripes
-    ctx.strokeStyle = this.skinAccentColor;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 4; i++) {
-      ctx.save();
-      ctx.rotate((Math.PI / 2) * i);
-      ctx.beginPath();
-      ctx.moveTo(this.r - 5, -3);
-      ctx.lineTo(this.r - 5, 3);
-      ctx.stroke();
-      ctx.restore();
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
     }
 
-    // Apply status effects
+    drawBomberPixelBody(ctx, this.r, false);
     this.drawStatusOverlays(ctx, this.r);
-
     ctx.restore();
+  }
+
+  drawBody(ctx) {
+    this.drawSkin(ctx);
   }
 
   drawGun(ctx) {
@@ -254,7 +234,7 @@ export class BomberFighter extends Fighter {
 
     // Draw C4 cooldown indicator
     if (this.c4Cooldown > 0) {
-      const cooldownPercent = this.c4Cooldown / CONFIG.bomber.c4Cooldown;
+      const cooldownPercent = this.c4Cooldown / (CONFIG.bomber?.c4Cooldown || 300);
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.beginPath();
@@ -271,23 +251,24 @@ export class BomberFighter extends Fighter {
 
   // Draw a grenade being held in the fighter's hand
   drawHeldGrenade(ctx) {
-    // Hand position is near the base of the grenade launcher, not at the muzzle tip.
-    const handOffset = this.r + CONFIG.gun.baseOffset + 4;
+    const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || this.hideHands;
+    if (shouldHideHands) return;
+
+    const handOffset = this.r + (CONFIG.gun?.baseOffset || 6) + 4;
     const handX = this.x + Math.cos(this.gunAngle) * handOffset;
     const handY = this.y + Math.sin(this.gunAngle) * handOffset;
 
-    // Offset the grenade slightly to the side of the launcher so it looks held, not pointed.
     const perpX = -Math.sin(this.gunAngle);
     const perpY = Math.cos(this.gunAngle);
-    const grenadeRadius = Math.max(4, this.r * 0.35);
-    const sideOffset = grenadeRadius * 0.7;
-    const forwardOffset = -6;
+    const grenadeRadius = Math.max(5, this.r * 0.38);
+    const sideOffset = grenadeRadius * 0.75;
+    const forwardOffset = -4;
     const gx = handX + Math.cos(this.gunAngle) * forwardOffset + perpX * sideOffset;
     const gy = handY + Math.sin(this.gunAngle) * forwardOffset + perpY * sideOffset;
 
-    // Draw the grenade with a fixed top-facing orientation.
+    // Draw the stepped pixel grenade
     drawBomberGrenade(ctx, gx, gy, grenadeRadius, {
-      rotation: 0,
+      rotation: this.gunAngle,
       isSticky: false,
       sparkPhase: Date.now() / 100,
       trailPoints: [],
@@ -296,16 +277,7 @@ export class BomberFighter extends Fighter {
       isHeld: true,
     });
 
-    // Draw hand holding the grenade
-    ctx.save();
-    ctx.translate(handX, handY);
-    ctx.beginPath();
-    ctx.arc(0, 0, 6, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
-    ctx.restore();
+    // Draw holding hand with pixel hand engine
+    drawPixelHand(ctx, handX, handY, 4.5, '#D4A373', '#111114');
   }
 }

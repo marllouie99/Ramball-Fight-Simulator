@@ -1,885 +1,237 @@
-# Repository Coding Rules & Regression Prevention Standards
+# Repository Coding Rules & Global Development Standards
 
-## 1. Fighter Update Loop Early Exits (TimeStop & Freeze Guards)
+## 0. Mandatory Session Workflow, Hygiene & Response Output Standards
+These rules apply to **EVERY** agent conversation and turn without exception:
+
+### 0.1 Never Leave Scratch/Temporary Files
+- Any temporary scripts, test harnesses, or debug probes created in `scripts/`, `scratch/`, or workspace root (e.g. `scripts/test*Temp.mjs`, `temp*.js`) **MUST be deleted immediately after testing is complete**.
+- ONLY permanent test harnesses configured in `package.json` (`scripts/testAllFighters.mjs`, `scripts/testTagMatch.mjs`, `scripts/testInteractions.mjs`, `scripts/verifyCodebase.js`, `scripts/scaffoldFighter.mjs`) are permitted in `scripts/`.
+- Temporary scratch data during debugging should be stored in the ephemeral artifacts scratch folder (`<appDataDir>/brain/<conversation-id>/scratch/`).
+
+### 0.2 Mandatory Post-Work Verification (`npm run verify`)
+- ALWAYS run `npm run verify` (which runs `verifyCodebase.js` and `testAllFighters.mjs`) before completing any task.
+- Never conclude a task with failing tests or broken Canvas 2D stack depths.
+
+### 0.3 Anti-Spaghetti & Clean Architecture
+- Keep functions focused and under 50–60 lines. Extract modular helper functions early.
+- Never nest conditionals more than 2–3 levels deep. Use early return guard clauses at the top of methods.
+- Strict Separation of Concerns: Physics/update loops in `*Combat.js` / entity classes; Canvas 2D/WebGL drawing in `*Graphics.js` / renderer modules; Audio in `soundSystem.js`.
+
+### 0.4 Zero Duplicate Top-Level Identifiers
+- NEVER declare duplicate top-level functions, classes, `const`, `let`, or `var` variables within the same module file. This causes fatal syntax errors crashing the game loop.
+
+### 0.5 Configuration File Preservation & Git Safety
+- NEVER run `git checkout`, `git restore`, or `git reset --hard` on files under `js/configs/` or `js/core/`.
+- Preserve all user custom tuning (damage, HP, speeds, cooldowns, toggles) across test executions.
+
+### 0.6 Mandatory Core Changes Risk Assessment
+Whenever modifying or refactoring any core engine or shared systems file (`js/entities/fighter.js`, `js/core/state.js`, `js/systems/projectileSystem.js`, `js/systems/physics.js`, `js/systems/renderSystem.js`, `js/graphics/hudManager.js`, `js/core/main.js`, `gameLoop.js`), the agent MUST append a **⚠️ Risk Assessment** section before the suggestions:
+```markdown
+---
+
+⚠️ **Risk Assessment:**
+- **Blast Radius**: [High / Medium / Low] — [List affected subsystems, game modes, or fighter classes]
+- **Potential Collateral Impact**: [Identify specific regression risks, e.g., CC time-stop leaks, collision stasis, DOM reflows, WebGL texture desyncs]
+- **Mitigation & Verification**: [Specific automated tests or manual test scenarios executed to guarantee zero regressions]
+```
+
+### 0.7 Mandatory Post-Change Suggestions (Why, Pros, Cons, Don't)
+After completing ANY code modification, update, or fix in the project, the agent MUST ALWAYS conclude the final response with a **"💡 Suggestions"** section containing 2–4 specific, actionable follow-up improvements formatted strictly as:
+```markdown
+---
+
+### 💡 Suggestions
+
+1. **[Actionable Suggestion Title]**
+   - **Why**: [Clear technical, gameplay, or performance rationale explaining the core problem it solves]
+   - **Pros**: [Key benefits, capabilities unlocked, developer or gameplay improvements]
+   - **Cons**: [Trade-offs, limitations, added complexity, or maintenance considerations]
+   - **Don't**: [Specific anti-pattern, common trap, or breaking mistake to strictly avoid when implementing this]
+
+2. **[Another Suggestion Title]**
+   - **Why**: ...
+   - **Pros**: ...
+   - **Cons**: ...
+   - **Don't**: ...
+```
+
+---
+
+## 1. Fighter Update Loop & Combat Engine Standards
+
+### 1.1 Freeze & TimeStop Early Exits
 - At the top of EVERY fighter `update()` method, the freeze/time-stop guard MUST return immediately if active:
   ```javascript
   const isFrozen = this._handleTimeStop();
   if (isFrozen || this.isTargetOfAmbush) {
-    // Cancel active skill channeling audio/timers
     this.interruptAttacks();
     return; // MANDATORY: Stop update execution so fighter is frozen!
   }
   ```
-- NEVER allow movement, AI steering, or melee combat logic (`_updateMeleeCombat`) to execute after a freeze/stun check evaluates to true.
-- Base `this._handleTimeStop()` universally evaluates all global CCs (time stops, Infinity freeze, domain stasis, paralyze debuffs, ambush target, Makima chains, Saitama counter, Genos flurries, Getsuga drag, Cronos stasis, Nanami ratio pause). Subclasses do NOT need compound boolean checks.
+- Base `this._handleTimeStop()` universally evaluates all global CCs (time stops, Infinity freeze, domain stasis, paralyze debuffs, ambush target, Makima chains, Saitama counter, Genos flurries, Getsuga drag, Cronos stasis, Nanami ratio pause).
 
-## 1.1 Centralized Movement & Physics Standard for Upcoming Fighters
+### 1.2 Centralized Movement & Physics Standard
 - Upcoming fighters MUST NOT manually integrate position using `this.x += this.vx; this.y += this.vy;`.
 - At the end of `update()`, upcoming fighters MUST either:
-  1. Call `super.update(opponent, ownerIndex, arena)` (recommended for standard mobile fighters), OR
-  2. Call `this.applyMovementPhysics(speedMultiplier)` followed by `this.resolveWallBounce(arena, opponent)` if executing custom sub-actions.
-- This ensures all upcoming fighters automatically inherit:
-  - Universal slow debuffs (`applySlow(duration, multiplier)`)
-  - Hit-stun velocity dampening (`applyHitStun(duration)`)
-  - Knockback physics and smooth decay
-  - Fail-safe movement stall detection & unsticking
-  - Arena wall clamping and stasis pinning (beam / Getsuga / wall pin)
-  - Rotational body spin integration
-
-## 1.2 Custom Wall Bounce Delegation Standard
-- If an upcoming fighter implements a custom `resolveWallBounce(arena, opponent)` method (e.g. for unique bounces, flight, or targeting), they MUST guard against beam/stasis at the top:
+  1. Call `super.update(opponent, ownerIndex, arena)`, OR
+  2. Call `this.applyMovementPhysics(speedMultiplier)` followed by `this.resolveWallBounce(arena, opponent)`.
+- If implementing custom `resolveWallBounce(arena, opponent)`, guard against beam/stasis at the top:
   ```javascript
-  resolveWallBounce(arena, opponent) {
-    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
-      return super.resolveWallBounce(arena, opponent);
-    }
-    // Custom bounce behavior...
+  if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
+    return super.resolveWallBounce(arena, opponent);
   }
   ```
 
-## 2. Animation & Visual State Separation
-- **Melee Punches (`punchAnimTimer`)**: Used ONLY for close-quarters 2-handed martial arts punches. Keep both hands visible (`hideFrontHand = false`, `hideBackHand = false`).
-- **Slash Swing Chops (`slashSwingTimer`)**: Used ONLY for ranged blade swipes & Cleave finishers (`rapidSlashHitsLeft > 0` or ranged `shoot()`).
-- Never allow a timer condition from one state to silently override or block another state's animation without checking explicit state priority.
-
-## 3. Position & Target Aim Alignment
-- Whenever a fighter teleports or changes position (e.g., `this.x = targetX; this.y = targetY;`), ALWAYS update `this.aim(target)` immediately afterward so facing direction (`gunAngle`) matches the new position relative to the target.
-
-## 4. Visual Particle Cleanliness
-- Avoid spawning dense persistent particles (`hitFlameWisps`, heavy radial glows, dense afterimages) on high-frequency recurring events like basic punches. Keep punch visuals clean and sharp.
-
-## 5. Multi-Strike & Flurry Ability Rules (Attacker vs Target Freeze)
-- **NEVER** invoke `this.applyTimeStop(...)` on `this` (the attacker) during an active multi-strike or flurry combo. Calling `applyTimeStop` on the attacker sets `this.timeStopTimer > 0`, causing `this._handleTimeStop()` to return `true` and freeze the attacker's own `update()` loop.
-- **ALWAYS** apply hit-pause or time-stop exclusively to the target: `if (typeof target.applyTimeStop === 'function') target.applyTimeStop(duration);`.
-
-## 6. Unified Target Queries (Fighters & Illusions)
-- When querying targets for skill attacks, AOE hits, or flurries, **ALWAYS** check both `state.fighters` AND `state.illusions` (excluding teammates, self, and invulnerable entities).
-
-## 7. Frontal Arc Radius AOE for Melee Weapon Users
-- **ALWAYS** implement a multi-target frontal arc cone (e.g. 120°–160° arc angle based on weapon blade length reach) for all melee weapon fighters (Katana, Scythe, Spears, Knives).
-- Melee swings MUST NOT single-target just one enemy when multiple enemies or illusions stand in front of the blade arc. All valid enemy targets (fighters & illusions) within the blade reach distance and frontal arc angle (`Math.abs(angleDiff) <= arc / 2`) MUST take hit damage, blood impact, hit stun, and physical knockback push.
-
-## 8. Frontal Arc Radius AOE for Martial Arts & Brawler Punch Users
-- **ALWAYS** implement a multi-target frontal arc cone (e.g. 90° arc angle, 65px punch reach) for martial arts brawler punches (Gojo, Sukuna, Todo, Mahoraga).
-## 9. Gojo Limitless Infinity Barrier & Target Freeze Standards
-- ALL existing and future fighters, summoned minions, illusions, Doppelganger clones, turrets, and entities MUST be affected by Gojo's **Limitless Infinity barrier** when striking or approaching Gojo while Infinity is active (`infinityCooldown <= 0`).
-- The ONLY explicit lore exception is **Toji Fushiguro** (`characterId === 'toji'` or `type === 'toji'`), who wields the Inverted Spear of Heaven (ISOH) to bypass Limitless Infinity.
-- **Mahoraga** is blocked and frozen initially, but after 2 Infinity freeze exposures, Mahoraga's Eight-Handled Sword Wheel clicks to adapt (`gojoInfinityImmune = true` & `adapted.melee = true`), granting total immunity to Infinity freeze thereafter.
-- Stunned, paralyzed, or time-stopped entities (fighters & illusions) render the 3D orbiting golden rings and stars stun visual (`drawParalyzeEffect`), avoiding full-body cyan paint overlays.
-
-## 10. WebGL / PixiJS Rendering & Performance Guidelines (Hybrid Rendering)
-- High-frequency or persistent heavy visual effects (such as Sukuna's Fuga fire arrow trail, Gojo's Hollow Purple/Lapse Blue moving orbs, and full-screen dim overlays) MUST be migrated to WebGL/PixiJS to maintain 60 FPS performance (especially during screen recording).
-- To preserve complex Canvas 2D designs exactly as originally drawn (preventing visual regressions), implement the **Hybrid Container Pattern**:
-  - Draw the effect onto an off-screen canvas.
-  - Bind that canvas as a WebGL texture to a `PIXI.Sprite` in the `state.pixiLayers.projectiles` or `state.pixiLayers.environment` container.
-  - **For relative/floating effects** (like Toji's ultimate or projectiles): Scale or position the sprite in WebGL coordinates (adjusting for camera offsets) rather than resizing the off-screen canvas.
-  - **For absolute/full-screen coordinate effects** (like Domain Expansions that rely on exact `state.canvas` coordinates like `fighter.x` / `fighter.y`): You MUST use a strict 1:1 pixel mapping. The off-screen canvas MUST dynamically sync its width/height to exactly match `state.canvas.width/height`. Do NOT scale the PixiJS Sprite, as scaling will desync the visual positions from the game's coordinate system. When resizing the offscreen canvas, call `texture.update()` to refresh the GPU mapping.
-- Set correct WebGL blend modes dynamically: `window.PIXI.BLEND_MODES.ADD` for glowing elements (like Fuga flames) and `window.PIXI.BLEND_MODES.NORMAL` for elements with dark outlines or cores (like Gojo's Blue and Purple orbs).
-- Short-burst, transient visual effects (such as the 30-frame Black Flash impact, sparks, and blood splatters) SHOULD remain on the Canvas 2D layer. Re-rendering transient bursts in 2D maintains exact artistic pixel fidelity without requiring complex WebGL pooling or incurring GPU texture-upload bottlenecks.
-
-## 11. Prohibition of shadowBlur CPU Filters (Performance Preservation)
-- **NEVER** use HTML5 Canvas `ctx.shadowBlur` or `ctx.shadowColor` inside any rendering or drawing methods (such as projectiles, weapons, or fighter visuals) during gameplay.
-- Using `shadowBlur` forces the browser to calculate CPU-intensive Gaussian blurs, causing severe FPS drops during match gameplay.
-- **ALWAYS** simulate glowing effects by drawing slightly larger concentric shapes with transparent gradient colors or semi-transparent flat fills instead.
-
-## 12. Prohibition of High-Frequency PIXI.Text Instantiation (VRAM/GC Optimization)
-- **NEVER** instantiate new `PIXI.Text` objects on a per-frame or high-frequency basis (such as for floating damage numbers or combo counters).
-- Each `PIXI.Text` internally allocates a hidden 2D canvas, renders text to it, uploads the result to a GPU texture, and forces garbage collection. This causes massive FPS drops and GC stuttering during rapid combat events.
-- **ALWAYS** route high-frequency dynamic texts to draw directly on the main 2D Canvas context (`state.ctx.fillText` / `strokeText`).
-
-## 13. UI & DOM Query Caching Requirement
-- **NEVER** query the DOM using `document.getElementById` or `document.querySelector` inside per-frame or frequent update loops (e.g., `updateHealthHud`).
-- **ALWAYS** cache these DOM references at the file level (e.g., `let _cachedTopLeft = null;`) and reuse the references to avoid extreme layout reflow lags and CPU stalling.
-
-## 14. Global Dim Effects & Screen Letterboxing Constraint
-- **NEVER** apply global dim effects (such as Hollow Purple or Domain Expansions) by modifying the `document.body.style.backgroundColor`.
-- All dim overlays, flashes, and visual effects MUST be drawn exclusively on the canvas or within a strict `div.game-box` overlay so they remain physically clipped to the game container boundaries.
-- The outer HTML `body` background MUST remain completely untouched and hardcoded (e.g., `#000000`) so that letterbox margins during screen recording are never affected by in-game combat effects.
-
-## 15. Toji Fighter Weapon Swing & Slash Rendering Standards
-- **Chop-Down Animation (Basic Attack — Inverted Spear of Heaven):**
-  - **Motion Path:** The weapon must swing in a single, fluid downward arc with no back-swing or pre-swing. It snaps to the upper-right (`-1.15` rad / ~11 o'clock), sweeps downward through horizontal (`0`) to lower-right (`+1.05` rad / ~5 o'clock), then recovers back to the idle guard angle (`+0.42` rad).
-  - **Thrust Behavior:** Keep the weapon extension distance (`thrustDistance`) steady. Avoid any mid-swing in-and-out pulsing thrust curves during a rotational swing, as they distort the motion.
-- **Dynamic Trail Eraser Transformation:**
-  - **Suspended Crescent:** During the active swing, the crescent grows dynamically and remains fully drawn in the air.
-  - **Recovery Phase Wipe:** During the recovery phase (after the active swing), the crescent tip must remain locked in world space at the final swing offset angle (`+1.05` or `+1.25`), and the trailing tail edge must chase the tip angle (trail length decays to `0` using a power curve like `Math.pow(1 - recP, 1.4)`), erasing the crescent from start to finish.
-  - **Orientation-Specific Mirroring:** The Inverted Spear basic attack always sweeps clockwise in coordinate space, so its slash visual must **never** undergo Y-scale mirroring when facing left. The Split Soul Katana's basic attack and ambush slash *do* mirror sweep directions and *must* apply Y-scale mirroring (`ctx.scale(1, -1)`) when facing left.
-- **Sharp Needle-Thin Tapering:**
-  - Never use an offset power less than `1.0` (like `t^0.75`) to taper thickness, as it creates blunt or cut-off ends due to an infinite derivative at the boundaries.
-  - Always taper both tips of the crescent slash cleanly to zero using a smooth double-tapering function:
-    ```javascript
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-    const thick = maxThick * taper;
-    ```
-- **Ultimate Final Blow (360 Spin Dive):**
-  - **Locked Orientation during Charge:** To prevent the weapon from snappily flipping sides as the target moves during `CRATER_FADEIN` and `CRATER` charge phases, snapshot the initial facing angle and flip sign once at transition start (`_ultimateChargeAngle` and `_ultimateChargeFlipSign`) and hold them locked. Clear active weapon slash timers (`katanaSlashTimer = 0`) on transition to prevent leftover charging-phase purple outlines.
-  - **Clockwise Spin & Cutting Edge Alignment:** Always rotate Toji clockwise (`+ Math.PI * 2 * spinProgress`) so he spins downwards/rightwards towards the target. Disable vertical scale flipping for both Toji's body and weapon during the dive (`isSpinning = true`, `baseAngle = 0`, `_katanaFlipSign = 1`) to let the Katana draw in its default orientation, ensuring the cutting edge naturally leads the clockwise rotation.
-  - **Stretched Trail:** Set the crescent slash radius to match the weapon tip (`outerR = this.r + thrustDistance + 146`) and let the trail trailing-stretch counter-clockwise behind the clockwise spin up to a grand `3.8` radians, fading out in the final 30% of the dive.
-- **3-Stage Stealth Ambush Knockback & Target Displacement Engine:**
-  - **Direct Physics Driver:** Targets caught in Toji's stealth ambush (`opponent.isTargetOfAmbush = true`) are in action/AI stasis, meaning their regular `update()` loop early-returns. Therefore, `modUpdateAmbushSequence` in `tojiAmbush.js` MUST directly drive their physical displacement (`opponent.x += opponent.knockbackVx; opponent.y += opponent.knockbackVy;`), apply boundary clamping, and compute arena wall ricochets (`0.45` – `0.85` bounce multiplier).
-  - **Sequence 1 (Inverted Spear Thrust):** Directly sets `target.knockbackVx = kbVx; target.knockbackVy = kbVy;` with controlled `8.5` force and `0.85` decay for a crisp flinch displacement without blasting the target out of combo range.
-  - **Sequence 2 (Split Soul Katana Cleave):** Directly sets `target.knockbackVx = kbVx; target.knockbackVy = kbVy;` with `52` force and `0.92` decay to launch the target spinning and ricocheting across the arena.
-  - **Sequence 3 (Phantom Flurry Ping-Pong):** Slashes 1–11 apply tight, crisp flinch impulses (`6.5 + Math.random() * 2.5` force, `0.78` decay) that ping-pong the target back and forth across alternating angles within Toji's teleport pocket (~25px per strike). The 12th finisher blast delivers a massive `38` force impulse with `0.90` decay and releases all target stasis timers so the target launches across the arena into the far wall.
-  - **Collision System Guard:** Never include `isTargetOfAmbush` inside the `isImmovable` check in `physics.js`, as treating an ambush target as immovable causes the circle collision solver to push the attacker away and freeze the target in place.
-
-## 16. Manga Action Speed Line Effects — Construction & Angle Standards
-
-### Overview
-Manga action speed lines (motion lines) are compact clusters of razor-sharp, tapered needle streaks that stream **behind** a fighter during high-speed flurries, lunges, or rapid strike abilities. They visually convey supersonic momentum and strike direction. These standards apply to all existing and future fighters.
-
-### Architecture & Pipeline
-- Implement as a dedicated canvas 2D draw function in `effectsRenderer.js` (e.g., `draw<FighterName>SpeedLines()`).
-- Export via `draw.js` and call from `renderSystem.js` **before** `drawFighters()` so lines render underneath the fighter body.
-- Maintain a **pre-seeded static array** (e.g., `_speedLineSeeds`) initialized once and reset when the ability re-activates to eliminate per-frame GC allocations.
-
-### Needle Polygon Geometry (NOT strokes)
-- **ALWAYS** draw speed lines as **4-point filled needle polygons** — NEVER use uniform `ctx.stroke()` lines:
-  ```javascript
-  // 4 points forming a sharp double-tapered needle polygon
-  ctx.moveTo(startX, startY);     // sharp trailing tip (far behind fighter)
-  ctx.lineTo(topMidX, topMidY);  // top edge of needle body
-  ctx.lineTo(endX, endY);        // sharp leading tip (near fighter back)
-  ctx.lineTo(botMidX, botMidY); // bottom edge of needle body
-  ctx.closePath();
-  ctx.fill();
-  ```
-- Keep max thickness (`maxThick`) subtle: **1.0px – 2.5px max** for crisp ink fidelity.
-- Offset the bulge midpoint toward the leading edge (`midOff = halfLen * 0.15`) for sharp tapering.
-
-### Cluster Proportions & Scaling
-- Scale perpendicular cluster width to match the fighter's body radius: `±(fighter.r * 1.4)` (e.g., `±35px` for `r=25`).
-- Use a **parabolic length distribution** across the cluster (`normDist = 1 - Math.abs(norm)`), where center lines are longest (~90px) and edge lines are shortest (~35px).
-- Use a compact cluster density of **20–25 lines** total.
-
-### Trajectory Alignment & Direction (CRITICAL)
-- **Angle Alignment**: Speed lines MUST align strictly with the fighter's facing/aim angle (`aimAngle = fighter.gunAngle || fighter.angle || 0`).
-- **Backward Streaming**: Speed lines MUST trail **BEHIND** the fighter's body, opposite to the strike direction:
-  ```javascript
-  const backOffset = fighter.r * 1.2; // Offset behind fighter body
-  const cosA = Math.cos(aimAngle);
-  const sinA = Math.sin(aimAngle);
-  const perpX = -sinA;
-  const perpY =  cosA;
-
-  // NEGATIVE cosA/sinA positions cluster behind the fighter along the attack vector
-  const lineCenterX = fighter.x - cosA * (backOffset + travel) + perpX * seed.perpOffset;
-  const lineCenterY = fighter.y - sinA * (backOffset + travel) + perpY * seed.perpOffset;
-  ```
-- Keep travel range compact (e.g., `travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 100)`), keeping lines tightly anchored behind the fighter without flying off-screen.
-
-### Character Theme Palette Standard
-Structure color palettes using a 4-slot alternating pattern tailored to the fighter's lore theme:
-```javascript
-// Example 4-slot theme structure: [Primary Theme, Secondary Accent, White Core, Dark Ink Line]
-if (i % 4 === 0) color = primaryThemeColor;    // e.g. Fiery Orange (Genos), Cursed Pink (Yuta), Crimson (Sukuna)
-else if (i % 4 === 1) color = secondaryColor; // e.g. Hot Gold (Genos), Deep Purple (Yuta), Black Flame (Sukuna)
-else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White-hot core
-else color = 'rgba(15, 15, 22, 0.90)';        // Dark manga ink line
-```
-
-### Seed Memory & Re-activation Management
-- Cache seed arrays at module level.
-- Track ability state (e.g., `fighter._lastFlurryState`) and reset seed cache to `null` whenever a new activation begins so random offsets refresh cleanly.
-
-## 17. Domain Expansion Classification & High-Frequency Hazard Hit-Stun Standards
-
-### Domain Expansion Category Separation
-- **Paralyzing / Time-Stop Domains (Closed Barriers):** Domains that induce stasis/information overload (e.g. Gojo's *Unlimited Void*) explicitly apply `timeStopTimer` or paralyzing status effects to trapped targets.
-- **Damaging / Open-Barrier Domains:** Domains that unleash continuous spatial slashes or elemental hazard attacks (e.g. Sukuna's *Malevolent Shrine*) deal area-of-effect damage, physical push, and hit sparks over time, but MUST NOT freeze enemy update loops or trap entities in time-stop stasis.
-- **NEVER** use a generic `isEnemyDomainActive = f.domainActive` boolean check to freeze a fighter's update loop. Always verify if the active domain is explicitly a paralyzing domain (e.g. `f.characterId === 'gojo'`).
-
-### High-Frequency Hazard CC Prohibition
-- Recurring environmental or domain hazards that tick on rapid intervals (e.g. domain slashes every 8 frames) MUST NOT invoke `applyHitStun(duration)` on trapped fighters or illusions.
-- Applying multi-frame `hitStun` on rapid tick intervals refreshes the hit-stun timer faster than it decays, causing an unintended perma-freeze. High-frequency hazards must deal damage and impulse without applying CC hit-stun.
-
-### Minion / Companion AI Decoupling Standard
-- Companion entities, minions, and illusions (such as Rika, Doppelganger clones, or summons) MUST evaluate their own status effects (`rk.timeStopTimer`, `rk.electricStunTimer`) independently of their owner's transient `hitStunTimer`. An owner taking basic flinch hit-stun must never paralyze a companion's AI update loop.
-
-## 18. HUD Skill Bar Color Theme Consistency Standard
-- **Unified Character Palette**: All HUD skill progress bars for a given fighter (e.g. Basic Skill, Secondary Skill, Ultimate/Domain) MUST use the **exact same consistent color theme** (`themeColor = f.color || ...`).
-- **NEVER** assign mismatched, ad-hoc, or hardcoded accent colors to individual skill bars in `hudManager.js` (such as setting one bar to yellow and another to pink). Every skill bar returned in a fighter's HUD array MUST reference `themeColor` to preserve visual elegance and character identity.
-
-## 19. Fighter Skin & Face Orientation Standards (Always Facing Camera / Viewer POV)
-
-### Upright Coordinate Layout (Front Profile POV)
-Fighter body models, heads, hair, and uniforms MUST ALWAYS be drawn oriented upright facing directly towards the player/camera (front POV):
-- **`-Y` (Top)**: Hair, bangs, horns/crest, forehead, head accessories, top of head.
-- **`Y ~ 0` (Center)**: Headwear/eyewear (blindfolds, goggles, masks, eye patches), iconic markings/scars/stitches, stubble/beard shadow silhouettes.
-- **`+Y` (Bottom)**: Collar, neck opening, torso, jacket/tunic/uniform, belt, clothing folds.
-- **`-X` / `+X` (Left / Right)**: Symmetrical ears, side hair locks, shoulders, arms.
-- **NEVER** draw faces or clothing oriented sideways along the X-axis (e.g. placing hair at `-X` and torso at `+X`). The character must never appear lying horizontally.
-
-### Facial Features Standard: Prohibition of Eyes, Mouth, and Nose (Minimalist Aesthetic)
-- **STRICT PROHIBITION**: **NEVER** draw eyes, pupils, sclera, irises, eyelashes, mouths, lips, or nose bridges on fighter skins.
-- Character identity and expressiveness MUST be conveyed exclusively through:
-  - Distinctive hair silhouettes, bangs, and side locks.
-  - Signature eyewear or headwear (e.g., Gojo's blindfold, Nanami's 7:3 goggles).
-  - Iconic thematic markings, scars, and stitches (e.g., Sukuna's cursed marks, Mahito's face stitches, Toji's lip scar silhouette).
-  - Beard, mustache, or stubble shadow silhouettes / tonal gradients.
-  - Tailored clothing, collars, ties, robes, and armor.
-- Maintaining clean, faceless circle bodies preserves the stylized 2D minimalist Ramball aesthetic and eliminates visual clutter during high-speed arena combat.
-
-### Local Space Transform & Vertical Mirroring
-All skin renderers must apply the standard transform so that facing direction aligns with `gunAngle` while keeping the character upright:
-```javascript
-const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
-ctx.rotate(angle);
-
-// Mirror Y-axis vertically so hair stays on top (-Y) and body on bottom (+Y) when moving/aiming left
-const facingLeft = Math.abs(angle) > Math.PI / 2;
-if (facingLeft) {
-  ctx.scale(1, -1);
-}
-```
-
-### Brawler Hand Positioning & Layering
-Inside this local coordinate frame:
-- **`+X`** points directly toward the opponent target.
-- **Back Hand (Behind Body Circle Layer)**: Positioned on the forward/aim side at `(r * 1.05, 0)` in idle stance.
-- **Body Circle (Middle Layer)**: Drawn at `(0, 0)` with upright head (`-Y`) and torso (`+Y`).
-- **Front Hand (Front Layer — On Top of Body)**: Positioned at guard center `(0, 0)` in idle stance.
-- During punches, hands alternate lunging forward along `+X` (`r * 0.85 + lungeExtension * 1.40`) with opposite recoil (`oppositeRecoil = -Math.sin(...)`).
-
-### 19.1 Hair & Pixel-Art Silhouette Standards (Anti-Blob & Proportion Rules)
-
-#### Vertical Proportion Bands (Mandatory Coordinate Ranges)
-When rendering a fighter body circle (radius `r`), vertical space along the Y-axis must adhere strictly to these proportional bands to prevent crushing facial or uniform details:
-- **`-r * 1.15` to `-r * 0.35` (Crown Spikes & Outer Hair Volume)**: Top-most hair layer. Hair crown spikes must extend slightly beyond the body circle radius (`-r * 1.05` to `-r * 1.15`) to break the circle silhouette and prevent the character from looking like a flat "bowling ball".
-- **`-r * 0.35` to `-r * 0.18` (Bang Tips & Hairline Termination)**: Bangs, fringes, and hair locks terminate here. **NEVER** allow bangs to extend past `y = -r * 0.12`.
-- **`-r * 0.18` to `+r * 0.15` (Face / Forehead Zone)**: Reserved strictly for face skin, eye accessories (blindfolds, goggles), scars, and thematic markings. Never obscure this zone with hair strands.
-- **`+r * 0.15` to `+r * 0.60` (Neck, Collar, Upper Chest)**: Crewneck rim, hoodie cowl, shirt collar, ties, ribbons, robes.
-- **`+r * 0.60` to `+r * 1.00` (Lower Torso, Belt, Pants/Hakama)**: Waistband, pleats, sash, coat skirts.
-
-#### Prohibition of Sine-Wave Procedural Hair
-- **STRICT PROHIBITION**: **NEVER** generate hair using continuous trigonometric sine/cosine wave formulas (e.g. `Math.sin(nx * freq) * amplitude`). Sine wave generation produces unnatural, repetitive corrugated ridges resembling a pleated curtain or comb teeth rather than anime hair.
-- **MANDATORY PATTERN: Discrete Lock Arrays**:
-  Procedural hair must always be defined as an array of discrete, normalized lock coordinates with staggered strand lengths, variable widths, and sharp triangular/trapezoidal tips (refer to `_TOJI_BANGS` in `tojiSkin.js`):
-  ```javascript
-  const _BANGS = [
-    { nx:  0.88, ny: -0.32 },
-    { nx:  0.72, ny: -0.22 }, // Right outer fringe
-    { nx:  0.44, ny: -0.20 }, // Right mid strand
-    { nx:  0.18, ny: -0.10 }, // Signature Center-Right Long Spike
-    { nx: -0.08, ny: -0.16 }, // Center-Left strand
-    { nx: -0.36, ny: -0.18 }, // Left mid strand
-    { nx: -0.66, ny: -0.18 }, // Left long side lock
-    { nx: -0.88, ny: -0.32 }
-  ];
-  ```
-
-#### 4-Tone Hair Color Palette Standard
-Hair rendering must not be flat or rely on random continuous gradients. Structure pixel hair using a 4-tier palette:
-1. **Tier 1: Root / Undercut Tone**: Deep charcoal/black undertone (`#0A0A0E` or deeply saturated dark shadow) placed along the temples, undercuts, and under-bang drop shadows.
-2. **Tier 2: Base Tone**: The signature anime hair color (e.g. Jet Black `#0E0F14` for Toji, Salmon Pink `#D9847A` for Yuji, Snow White `#F8F9FA` for Gojo).
-3. **Tier 3: Mid-Lock Shadow / Dimension**: A 15–20% darker or warmer tone defining the crevices between lock clumps.
-4. **Tier 4: Crown / Specular Glint**: Highlights near the upper crown (`-r * 0.70` to `-r * 0.90`), giving dimension under overhead lighting.
-
-#### High-Definition Pixel-Art Model Precedence (PNG Models)
-- Whenever possible, prioritize high-definition pixel-art PNG models stored in `Assets/model/<Character>-SKIN.png` (matching the Toji and Yuji implementations).
-- When drawing pixel-art image models onto Canvas 2D:
-  - **ALWAYS** set `ctx.imageSmoothingEnabled = false` before calling `drawImage()` to preserve crisp, authentic nearest-neighbor pixel edges.
-  - Apply procedural canvas fallback drawing only when the image asset is not yet loaded or missing.
-
-#### Mandatory Visual Verification (Playwright Verification)
-- Whenever an agent modifies, refactors, or creates a fighter skin model, the agent **MUST** visually verify the skin using Playwright (e.g. taking a screenshot of the Fighter Index Screen or Character Select screen) to inspect hair silhouette, proportions, and facing-direction mirroring before declaring the task complete.
-
-## 20. Fighter Hand Visibility & Skin Only Guard Standard
-- All fighter skin renderers, custom brawler hand rendering methods, and weapon graphics MUST evaluate `fighter.hideFrontHand` / `fighter.hideBackHand` OR the global `state.showSkinOnly` state before rendering any hands, fists, or weapon grips.
-- Standard hand draw pattern across all existing and future fighter skin renderers:
-  ```javascript
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
-  if (!shouldHideHands && !fighter.hideFrontHand) {
-    // Draw front hand
-  }
-  ```
-- **Skin Only Button (`state.showSkinOnly`)**: When enabled in the weapon menu or preview, `state.showSkinOnly` MUST hide BOTH weapons and hands across ALL fighters automatically without exception.
-
-## 21. Weapon Studio System — Customization Architecture & Standards
-
-### Overview
-The **Weapon Studio** (`js/graphics/ui/WeaponStudioScreen.js`) is a dedicated interactive screen accessible from the main menu that allows users to visually customize weapon geometry, positioning, scale, and render layering. All customizations persist via `localStorage` through the `saveWeaponCustomizations()` / `loadWeaponCustomizations()` functions in `state.js`.
-
-### State Structure (`state.weaponCustomizations`)
-The unified customization object lives at `state.weaponCustomizations` and is initialized by `initCustomizations()` in `WeaponStudioScreen.js`:
-```javascript
-state.weaponCustomizations = {
-  mahito: {
-    blades: [
-      { idx: 0, knuckleX, knuckleY, fanAngle, length, heelWidth, topArchY, tipY },
-      { idx: 1, ... }, { idx: 2, ... }, { idx: 3, ... }
-    ],
-    drawOrder: [0, 1, 2, 3],  // Z-layer ordering (index 0 = backmost drawn first)
-    weaponScale: 1.0           // Global scale multiplier for entire claw weapon
-  },
-  yuta:   { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-  toji:   { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-  cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-  ruby:   { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
-};
-```
-
-### Mahito Claw Adjustable Properties
-Mahito's claw weapon has **per-finger** and **global** adjustable properties:
-
-#### Per-Finger (4 blades: Finger 1–3 + Thumb)
-| Property | Description | Adjusted Via |
-|----------|-------------|--------------|
-| `knuckleX`, `knuckleY` | Knuckle joint position relative to hand | Drag the **teal handle** on the preview canvas |
-| `fanAngle` | Blade fan rotation angle | Drag the **crimson tip handle** (derived from angle to knuckle) |
-| `length` | Blade length from knuckle to tip | Drag the **crimson tip handle** (derived from distance) |
-| `topArchY` | Curvature arch of the blade spine | `+`/`-` buttons in the **Arch** control when finger is selected |
-| `tipY` | Vertical tip offset (blade curvature endpoint) | `+`/`-` buttons in the **Tip** control when finger is selected |
-
-#### Global Mahito Properties
-| Property | Description | Range |
-|----------|-------------|-------|
-| `drawOrder` | Array controlling which finger renders in front/behind. ▲/▼ arrows on each finger card swap layer positions. | `[0,1,2,3]` permutation |
-| `weaponScale` | Uniform scale multiplier applied to the entire claw (hand + all blades). | `0.30x` – `3.00x`, step `0.05` |
-
-### Non-Mahito Weapon Adjustable Properties (Yuta, Toji, Cronos, Ruby)
-These weapons share a common transform customization interface:
-
-| Property | Description | Detail Card | Range |
-|----------|-------------|-------------|-------|
-| `offsetX` | Horizontal position offset | 📍 POSITION (X, Y) | Unlimited, step `2.0` |
-| `offsetY` | Vertical position offset | 📍 POSITION (X, Y) | Unlimited, step `2.0` |
-| `scale` | Uniform scale multiplier | 📐 SCALE & ANGLE | `0.30x` – `3.00x`, step `0.05` |
-| `angleOffset` | Rotation angle offset (radians) | 📐 SCALE & ANGLE | Unlimited, step `0.08 rad` (~4.6°) |
-
-### Studio UI Components
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| **Left Panel** | Left sidebar | Weapon selector (Mahito, Yuta, Toji, Cronos, Ruby) |
-| **Right Panel** | Right sidebar | Detail cards (finger selection / position / scale-angle), layer ordering ▲▼ buttons, scale controls |
-| **Preview Area** | Center canvas | Live weapon preview with interactive drag handles |
-| **Zoom Controls** | Below preview | `−`/`+` buttons, progress bar, `%` label, `⟲` reset. Mouse wheel zoom supported. Range: `0.8x`–`6.0x` |
-| **Drag Handles** | On preview (conditional) | **Teal circle**: grip/knuckle position. **Crimson circle**: tip/scale-angle endpoint. Only visible when a detail card is selected. |
-| **Reset Button** | Bottom center | Resets ALL properties for the selected weapon to defaults (including `drawOrder`, `weaponScale`) |
-
-### Rendering Integration Standards
-- **Mahito Claws (`mahitoWeaponGraphics.js`)**: Both `drawClawMorphArm()` (in-game) and `drawMahitoClawWeapon()` (preview) MUST:
-  1. Read `state.weaponCustomizations.mahito.weaponScale` and multiply it into `clawScale` and `handRadius`.
-  2. Read `state.weaponCustomizations.mahito.drawOrder` and sort blades by this order before iterating to draw: `const orderedBlades = drawOrder.map(i => blades[i]).filter(Boolean);`
-- **Non-Mahito Weapons** (Toji, Yuta, Cronos, Ruby): Each weapon's drawing function reads `state.weaponCustomizations[type]` and applies `ctx.translate(custom.offsetX, custom.offsetY)`, `ctx.scale(custom.scale, custom.scale)`, and `ctx.rotate(custom.angleOffset)` after standard weapon transforms.
-- **Persistence**: `saveWeaponCustomizations()` writes to `localStorage('ramball_weaponCustomizations')`. `loadWeaponCustomizations()` reads and hydrates `state.weaponCustomizations` on startup. Always call `saveWeaponCustomizations()` after any mutation (button clicks, drag mouseup events).
-
-### Adding New Weapons to the Studio
-To support a new weapon in the Weapon Studio:
-1. Add the weapon key and label to the `weapons` array in `WeaponStudioScreen.js`.
-2. Add a default customization entry in `initCustomizations()` under `state.weaponCustomizations` (use the standard `{ offsetX, offsetY, scale, angleOffset }` template for single-piece weapons).
-3. Add a `case` in `drawWeaponPreview()` in `WeaponIndexScreen.js` to call the weapon's drawing function.
-4. In the weapon's drawing function, read `state.weaponCustomizations[key]` and apply the transform offsets.
-5. Add a centering `offsetX` in the switch at the top of `drawWeaponPreview()` if the weapon needs horizontal offset adjustment for proper preview centering.
-
-## 22. Dynamic Screen Dimming & Entity Healing Visual Standards
-
-### Screen Dimmed Mode HUD Font Standards
-- **Automatic White Color Shift**: Whenever full-screen dimming is active (Domain Expansions, Hollow Purple firing, Furnace blast, Serious Punch, etc.), all HUD font elements (Fighter Names, Skill Bar Labels, Info Stats) MUST automatically transition to crisp white (`#FFFFFF`) with a high-contrast dark drop-shadow (`0 0 5px rgba(0, 0, 0, 0.90)`).
-- **Non-Bold Constraint**: Font text MUST enforce `font-weight: normal !important;` during dimmed mode to prevent text from appearing overly heavy or bolded against the dark overlay.
-- **Exclusion of Skill Channeling Windups**: `isScreenDimmedActive()` MUST return `false` during skill channeling/windup states (`isChannelingDomain`, `domainChargeTimer > 0`, `isChannelingPurple`) so HUD fonts remain in their standard default state during windups.
-- **Automatic Restoration**: When full-screen dimming finishes, the `.hud-dimmed` CSS class is removed, instantly reverting all HUD fonts back to their character theme colors (`#D946EF`, `#00E5FF`, `#FFD700`, etc.).
-
-### Floating Heal Text Standard (Mahoraga Format)
-- **Unified Text & Palette Format**: All HP regeneration, RCT healing, and clone reconsolidation heal text MUST follow the Mahoraga standard format: `+<amount>` in bright neon emerald green (`#00FF66`) with subtle horizontal position jitter (`(Math.random() - 0.5) * 16`) rendered directly over the entity's body. Avoid appending unnecessary suffix strings like `HP`.
-- **HUD Bar Glow Pulse**: Any major heal event MUST set `this._healthBarHealTimer = 16` (or `14`) to trigger the green pulsing box-shadow glow animation on the fighter's top HUD health card fill bar.
-
-### Clean HUD Skill Bar Label Standard
-- **No Parenthetical Suffixes or Countdown Timers**: All HUD skill bar labels returned in `hudSkillProviders.js` MUST contain ONLY the clean skill title (e.g., `SOUL EVASION`, `IDLE TRANSFIGURATION`, `SOUL MULTIPLICITY`).
-- **NEVER** append status suffixes (such as `(USED)`, `(ACTIVE)`, `(READY)`) or countdown timer strings (such as `(1.9s)`) onto skill bar labels. The fill progress percentage (`pct`) and ready state (`ready`) handle all visual feedback automatically.
-
-## 23. Configuration-Driven Architecture & Prohibition of Hardcoded Combat Values
-
-### Strict Config Derivation Requirement
-- **ALL** character attributes, core stats, skill cooldowns, channeling timers, animation durations, damage numbers, damage multipliers, hit-stun frames, reach/range limits, knockback impulses, projectile velocities/radii, evasion thresholds, and minion/illusion stats MUST strictly derive from their corresponding character configuration file in `js/configs/characters/` (e.g., `mahitoConfig.js`, `gojoConfig.js`, `sukunaConfig.js`, `tojiConfig.js`, `nanamiConfig.js`, `mahoragaConfig.js`, `yutaConfig.js`, `genosConfig.js`, etc.) accessible through `CONFIG.<characterId>`.
-
-### Prohibition of Arbitrary In-Code Constants
-- **NEVER** hardcode arbitrary magic numbers (such as `cd = 400`, `damage = 25`, `reach = 360`, `minionHp = 25`, `hitStun = 14`, `threshold = 0.35`) inside:
-  - Fighter class definitions (`*Fighter.js`)
-  - Combat execution modules (`*Combat.js`)
-  - Projectile system handlers (`projectileSystem.js`)
-  - Minion and illusion managers (`illusionSystem.js`)
-  - Status effect & entity renderers (`statusEffects.js`, `EntityRenderer.js`)
-  - HUD skill providers (`hudSkillProviders.js`)
-  - UI stat sheets and index screens (`FighterIndexScreen.js`, `WeaponIndexScreen.js`)
-
-### Defensive Fallback Value Alignment
-- Whenever using fallback expressions (such as `CONFIG.mahito?.soulMultiplicity?.cooldown || 1000` or `CONFIG.mahito?.evasion?.threshold ?? 0.75`), the fallback value **MUST EXACTLY MATCH** the default constant value defined in the fighter's config file.
-- **NEVER** provide an arbitrary, stale, or guessed value as a fallback.
-
-### Full UI & HUD Gauge Synchronization
-- HUD skill progress bars (`hudSkillProviders.js`), cooldown clocks, and stat displays MUST read from the exact same configuration keys as the combat logic so that visual meters and physical gameplay timers remain 100% synchronized at all times.
-
-## 24. HUD Health Bar Green Heal Pop-Out Pulse & Cheat Heal Standards
-
-### Health Bar Pop-Out Heal Glow & DOM Heal Bubble (`_lastHealAmount` & `_healthBarHealTimer`)
-- Whenever a fighter triggers an instant HP restoration, cheat code heal (such as CJ's `HESOYAM`), Reverse Cursed Technique (RCT), or life-drain effect:
-  - The executing fighter MUST set:
-    ```javascript
-    this._lastHealAmount = actualHealed; // Triggers DOM .hud-heal-bubble pop-out floating text directly over the top HUD health card bar!
-    this._healthBarHealTimer = 30;       // Triggers vibrant neon emerald green (.heal-glow) box-shadow pulse on the health bar
-    this._healthBarShakeTimer = 8;       // Triggers subtle physical punchy pop-out shake on the health card
-    ```
-  - In `hudManager.js`, `triggerHudHealBubble(cachedCard.hpBar, fighter._lastHealAmount)` automatically attaches a floating `.hud-heal-bubble` (`+<amount>`) styled with neon green shadow (`#00FF66`) and floating animation above the health bar.
-  - This provides an immediate, punchy pop-out visual confirmation directly on the health bar (matching Mahoraga / Mahito heal standards).
-
-### Floating In-World Text & Cheat Notification Separation
-- In addition to the HUD health bar pop-out bubble, the in-world floating text over the fighter's body MUST follow Rule 22 format (`+<amount>` in `#00FF66`).
-- Cheat currency, shields, or titles (e.g. `+$250,000` in `#22C55E` and `+75 KEVLAR SHIELD` in `#38BDF8`) MUST spawn as dedicated separate floating text elements to prevent visual clutter or overlapping.
-
-## 25. Tactical Force — Engineering & Visual Standards
-
-### 1. Unified Neon Theme Weapon Graphics Standard
-- **Unified Visual Identity**: ALL firearms in Tactical Force (M4A1, SPAS-12, Desert Eagle, AWP, and all future firearms) MUST strictly adhere to the unified **Neon Tactical Cyberpunk Theme**:
-  - **Base Chassis / Receiver**: Deep obsidian and cyber-slate matte body (`#0b0f19`, `#0f172a`, `#1e293b`).
-  - **Luminous Neon Contours**: Razor-sharp glowing neon outline borders and energy conduit inlays (`lineWidth: 1.2px – 1.4px`) with high contrast against dark backdrops.
-  - **Thematic Character & Weapon Neon Color Matrix**:
-    - **M4A1 (Tactical Rifle)**: **Neon Electric Cyan** (`#00e5ff` / `#38bdf8`)
-    - **SPAS-12 (Tactical Shotgun)**: **Neon Emerald / Matrix Mint** (`#10b981` / `#00ff88`)
-    - **Desert Eagle (Magnum Pistol)**: **Neon Cyber Amber / Solar Gold** (`#f59e0b` / `#ffb703`)
-    - **AWP (Bolt-Action Sniper)**: **Neon Hyper Plasma Blue / Cyan** (`#00f0ff` / `#38bdf8`)
-  - **Holographic Optics & Sights**: Semi-transparent neon tinted glass (`rgba(neon, 0.65)`) with bright white center reticle dot.
-  - **Muzzle Flashes**: Directional multi-spike flash polygons with white-hot core (`#ffffff`) and theme-matching neon outer petals.
-  - **Prohibition of `shadowBlur`**: NEVER use `ctx.shadowBlur` or `ctx.shadowColor` for neon weapon glows (Rule 11). Simulate luminescence with concentric shapes and high-contrast neon vector fills.
-
-### 2. Fighter Update Loop & Combat Method Signatures
-- **Argument Propagation in `update()`**: Subclasses (`RifleFighter`, `ShotgunFighter`, `PistolFighter`, `SniperFighter`) MUST pass all parameters to `super.update(opponent, ownerIndex, arena)`. Failing to pass `opponent` causes base physics to drop target tracking and halt movement.
-- **Top Freeze Guard (Rule 1)**: Must return immediately when `this._handleTimeStop()` evaluates to true.
-- **Overloaded `shoot()` Signature Support**: Handle overloaded calls where `typeof target === 'number'` to prevent `undefined` ownerIndex.
-
-### 3. Obstacle Physics & Collision Standards
-- **Obstacle Penetration Resolution**: Rectangular cover barriers must resolve both perimeter and interior overlaps, reflecting velocity with restitution (`0.85 – 0.90`).
-- **Natural Tangent Deflection & Normalization**: Always apply a subtle tangential deflection jitter on bounce and invoke `entity.normalizeSpeed()` so fighters immediately recover standard patrol velocity.
-
-### 4. Ultra-Simple Persistent Tactical HUD Architecture
-- **In-Place DOM Mutation**: NEVER re-assign `innerHTML = ...` inside recurring update ticks. Cache card element references (`_tacticalCards = { top: [], bottom: [] }`) and update properties in-place.
-- **Ultra-Simple Minimalist Layout**:
-  - Top HUD (Team 1 CT): 2 compact side-by-side cards.
-  - Bottom HUD (Team 2 T): 2 compact side-by-side cards.
-  - Minimal elements: Operative name on the left, current HP / `KIA` on the right, and a clean 6px solid health bar underneath.
-  - Zero bloated paddings, zero drop-shadow blur filters, zero nested sub-bars or clutter.
-
-### 5. Tactical Map Geometry & Arena Dark Mode Standards
-- **Clean Minimalist Geometry**: Solid slate walls (`#1e293b` fill, `#475569` border) and solid dark arena floor (`#0d1117`).
-- **Pitch Black Canvas Background**: Outer canvas space MUST be deep pure black (`#000000`) for high-contrast neon readability.
-
-### 6. Unified Tactical Projectiles Standard (Dynamic Character Color Theme)
-- **Unified Streamlined Geometry**: All tactical projectiles share a sleek, aerodynamic tracer capsule (`drawTacticalBullet`) with a brilliant white-hot kinetic core and a tapered trailing speed streak.
-- **Dynamic Character Theme Color**: The outer neon tracer glow and motion streak MUST dynamically reflect the firing character's color theme (`p.color || shooter.color || shooter.themeColor`), ensuring visual harmony across all operatives (M4A1 Cyan, SPAS-12 Emerald, Desert Eagle Amber, AWP Plasma Blue).
-- **Proportional Caliber Scaling**: Caliber differences (shotgun pellets vs. magnum pistol slugs vs. sniper match rounds) are represented via `bulletLength`, `bulletWidth`, and `tacticalCaliberScale` while strictly preserving the unified capsule geometry.
-
-### 7. Tactical AI Line-of-Sight (LOS) & Wall Occlusion Standards
-- **Line-of-Sight Raycasting**: All tactical AI fighters MUST evaluate `hasLineOfSight(x1, y1, x2, y2, obstacles)` before aiming and shooting.
-- **No Wall Auto-Aim Lock**: When an opponent is occluded behind a wall (`hasLineOfSight === false`), AI fighters MUST NOT lock their guns through the wall. Instead, they aim forward in the direction of their movement velocity, slicing corners naturally.
-- **Hold Fire on Blocked Sightlines**: AI fighters MUST NOT discharge weapons into solid cover obstacles (`if (!hasLineOfSight) return;`), saving ammunition until clear line-of-sight is established.
-- **LOS Target Prioritization**: `getClosestOpponent()` prioritizes engaging enemies with unobstructed sightlines over occluded targets.
-- **Obstacle-Clipped Laser Sight**: Sniper laser aimlines must raycast against obstacles (`raycastToObstacles()`) and terminate directly on the wall surface with a laser point.
-
-### 8. Tactical Game Mode Configuration Standards
-- **Centralized Mode Config**: All Tactical Shooter match rules, team structures, rounds, health pools, and HUD layouts are defined in `Tactical Force/tacticalModeConfig.js` (`TACTICAL_GAME_MODES`, `TACTICAL_MODE_SETTINGS`, `TACTICAL_SYSTEM_CONFIG`).
-- **Standardized Modes**:
-  - `Tactical 2v2`: 2v2 CT (M4A1, SPAS-12) vs T (Desert Eagle, AWP), 3 rounds, 500 HP, Sector 01 map.
-  - `Tactical 1v1`: 1v1 duel, 3 rounds, 500 HP.
-  - `Tactical Stand Off`: 1 round sudden death, 1500 HP.
-  - `Tactical FFA`: 4-player deathmatch, 3 rounds, 500 HP.
-  - `Tactical 4v4`: 4v4 full squad encounter, 5 rounds, 500 HP.
-  - `Tactical Random`: Random firearm loadout round rotations.
-- **System Rules**: Always enforce dark arena theme, 2D line of sight, and unified projectile visuals across all tactical modes.
-
-## 22. Unified Fighter Aim Pipeline & Target Validation Standards
-
-### Overview
-To eliminate scattered, ad-hoc angle calculations and prevent stealth/submerged targeting regressions, all current and future fighters MUST adhere to the centralized **Template Method Pattern** defined on base `Fighter.js`.
-
-### Architecture & Hooks
-1. **Master Aim Pipeline (`Fighter.prototype.aim(opponent)`)**:
-   - `aim(opponent)` is the **single universal entry point** called by `physics.js` and AI steering loops.
-   - It automatically verifies `canAim()` and `isValidAimTarget(opponent)`, resolves Musashi ghost decoys, calculates `targetAngle`, and delegates angle application to `this.applyAim(opponent, targetAngle)`.
-   - **NEVER** override `aim(opponent)` in a subclass unless calling `super.aim(opponent)`.
-
-2. **Centralized Target Eligibility (`Fighter.prototype.isValidAimTarget(target)`)**:
-   - Evaluates if a target is alive, non-vanished (`vanishTimer <= 0`), and non-submerged (`!target.isSubmerged`).
-   - Subclasses with additional target validation (e.g. Toji's `tojiIsTargetDeadOrRemoved`) extend `isValidAimTarget(target)` via `if (!super.isValidAimTarget(target)) return false;`.
-
-3. **Fighter Aim Capability (`Fighter.prototype.canAim()`)**:
-   - Evaluates hard CC status effects (time-stop, paralysis, electric stun, dubstep stun, beam capture, ambush targets).
-   - Subclasses requiring skill channeling locks (e.g., Mahoraga, Gojo, Mahito, Hydra) extend `canAim()`:
-     ```javascript
-     canAim() {
-       if (!super.canAim()) return false;
-       if (this.isChannelingSkill) return false;
-       return true;
-     }
-     ```
-
-4. **Modular Angle Application (`Fighter.prototype.applyAim(opponent, targetAngle)`)**:
-   - By default sets `this.gunAngle = targetAngle; this.angle = targetAngle;` and handles Toji Heavenly Restriction stealth turn delays.
-   - Subclasses requiring specialized rotational inertia (e.g., Laser beam rotation speed limits) override `applyAim(opponent, targetAngle)` exclusively without having to duplicate any validation guards.
-
-## 24. Zero Duplicate Identifier & Codebase Integrity Standard (`npm run verify`)
-- **Prohibition of Duplicate Top-Level Identifiers**:
-  - NEVER declare duplicate top-level functions, classes, `const`, `let`, or `var` variables within the same module file.
-  - Doing so causes immediate fatal runtime errors (`Uncaught SyntaxError: Identifier '...' has already been declared`) that crash the game loop during startup or fighter rendering.
-- **Mandatory Verification Workflow**:
-  - After modifying any JavaScript files, ALWAYS execute the automated codebase integrity checker:
-    ```bash
-    npm run verify
-    ```
-    (or `node scripts/verifyCodebase.js`).
-  - The script scans all 240+ project files in under 2 seconds, checking syntax validity and ensuring 0 duplicate declarations exist across the entire repository.
-
-## 25. Pixel Art Visual Style Standards (Weapons & Skill VFX)
-
-### 1. Aesthetic Philosophy & Fine Pixel Grid Engine
-- All weapon graphics, firearms, melee weapons, and skill visual effects (VFX) adhere to an authentic, high-density **Pixel Art Aesthetic** (inspired by classic arcade masterworks like *Street Fighter 3, Metal Slug, Katana Zero, Enter the Gungeon*).
-- **Prohibition of Giant Boxy Minecraft Blocks**: Weapons and effects MUST NOT be constructed out of oversized, clunky 8x8 squares or floating disconnected wireframe lines.
-- **Fine Pixel Density**: Rendering uses high-precision pixel block scaling ($P \approx 1.0 \times s$) to achieve sharp, high-resolution pixel art silhouettes (~150x60 grid resolution).
-
-### 2. 5-Tone Volumetric Shading Ramps & Surface Texturing
-- **Multi-Tone Palette Ramps**: Every structural component MUST employ a 4–5 tone volumetric shading ramp:
-  - `whiteShine` / `metalGlint`: Pure white `#ffffff` or light-tint specular highlights and diagonal glint cuts (`///`).
-  - `whiteLight` / `metalLight`: Primary surface color.
-  - `whiteMid` / `metalMid`: Midtone bevels and cylindrical edge transitions.
-  - `whiteDark` / `metalDark`: Deep structural shadow panels.
-  - `whiteDeep` / `metalBlack`: Deepest crease lines and recessed chassis slots.
-- **Micro-Pixel Texturing (Carbon-Fiber / Honeycomb Mesh)**:
-  - Textured grip panels, cheek pads, and handguards must use micro-pixel dithered patterns (`pxMesh`) with alternating weave highlight dots (`#2f374a`, `#45506b` on `#1b1f2b`).
-- **Flush Glowing Energy Nodes & Conduits**:
-  - Power cells, ammo count nodes, and circuit traces must be cleanly embedded flush within the chassis/barrel using 3-tone glowing ramps (white-hot core `#ffffff` $\rightarrow$ neon gold/crimson `#ffe033` $\rightarrow$ deep trench `#d9480f`).
-
-### 3. Skill Visual Effects (VFX) Pixel Art Standards
-- **Stepped Pixel Atmosphere & Cones**:
-  - Supersonic shockwaves, energy blasts, and pressure cones (such as Saitama's Frontal Attack) MUST be rendered using **stepped concentric pixel bands and rows** rather than smooth Gaussian blur radial gradients.
-- **Stepped Air Needles & Beam Fissures**:
-  - Supersonic speed streaks and air displacement needles MUST be drawn as razor-sharp **4-point stepped pixel polygons** with white leading tip blocks.
-  - Centerline shockwave fissures MUST be drawn as crisp, high-contrast segmented white pixel beams with glowing outer pixel fringes.
-- **Concentric Pixel Diamond Shockwaves**:
-  - Expanding shockwave ripples along blast corridors MUST use concentric **4-point and 8-point stepped pixel diamonds** with white center glints.
-- **Preservation of Gameplay Mechanics**:
-  - Pixel art transformations MUST NEVER alter the underlying gameplay logic, animation durations, collision hitboxes, reach distances, cone angles, or dynamic combat feedback (recoil kickback, reload drops, laser sight tracking, and ammo LED counters).
-
-## 26. Canvas 2D Transform Stack Integrity & `ctx.save()` / `ctx.restore()` Balance Standard
-
-### Overview & Regression Prevention
-An unbalanced Canvas 2D state stack (calling `ctx.save()` more times than `ctx.restore()` or failing to restore before an early `return`) leaves unpopped translations, scales, rotations, and clip paths active on the global context. This causes severe rendering bugs: **doubled/ghost UI overlays, displaced menus, skewed fighter positions, and cascading scale corruption**.
-
-### Mandatory Rules for All Rendering Functions:
-1. **Strict 1:1 Save/Restore Balance**:
-   - In ANY rendering function (weapon graphics, fighter skins, skill VFX, projectiles, UI screens, or modals), every `ctx.save()` MUST be matched by exactly one `ctx.restore()`.
-2. **Early Return Guard Pattern**:
-   - When branching inside a render function (e.g. modular PNG image path vs procedural fallback path), **ALWAYS** ensure all active `ctx.save()` calls are fully restored before any `return` statement:
-     ```javascript
-     export function drawWeapon(ctx, x, y, r, ...) {
-       ctx.save();
-       ctx.translate(x, y);
-
-       if (hasModularImage) {
-         ctx.save();
-         ctx.drawImage(...);
-         ctx.restore(); // Pop inner image save
-
-         ctx.restore(); // MANDATORY: Pop outer weapon save before returning!
-         return;
-       }
-
-       // Procedural fallback path
-       ...
-       ctx.restore(); // MANDATORY: Pop outer weapon save at function exit!
-     }
-     ```
-3. **Automated Continuous Verification**:
-   - `npm run verify` (`scripts/verifyCodebase.js` $\rightarrow$ `scripts/testAllFighters.mjs`) automatically executes a mock Canvas stack inspector across all 43+ fighters, weapon graphics, and UI screens to verify that stack depth returns to strictly `0` after every render call.
+### 1.3 Position & Target Aim Alignment (Teleport & Aim Pipeline)
+- Whenever a fighter teleports or changes position (`this.x = targetX; this.y = targetY;`), ALWAYS update `this.aim(target)` immediately afterward so facing direction (`gunAngle`) matches the new position.
+- Base `aim(opponent)` uses the Template Method Pattern: checks `canAim()` and `isValidAimTarget(target)`, calculates angle, and delegates to `applyAim(opponent, targetAngle)`.
+
+### 1.4 Continuous 360° Skill Aiming & Committed Aim Lock
+- All active skills, charged special attacks, finishing moves, beams, and projectile waves (Saitama Counter, Gojo Red/Purple, Sukuna Fuga, Ichigo Getsuga, Yuta Pure Love Beam, Genos Incineration Cannon) MUST support continuous 360° omnidirectional targeting upon initiation via trigonometry (`Math.atan2(dy, dx)`).
+- Snapshot the computed angle upon cast (e.g. `this.skillCastAngle = angle`). Throughout wind-up, channeling, and active firing:
+  - `aim(opponent)` and `canAim()` MUST disable auto-aim tracking.
+  - `this.gunAngle` and `this.angle` MUST remain strictly clamped to the committed cast angle.
+  - Spawning projectiles inherit `lockAngle`, and physical recoil pushes directly opposite (`-Math.cos(lockAngle) * recoil`).
+
+### 1.5 Multi-Strike & Flurry Rules (Attacker vs Target Freeze)
+- NEVER invoke `this.applyTimeStop(...)` on `this` (the attacker) during an active combo.
+- ALWAYS apply hit-pause or time-stop exclusively to the target: `if (typeof target.applyTimeStop === 'function') target.applyTimeStop(duration);`.
+
+### 1.6 Frontal Arc Radius AOE
+- **Melee Weapon Users (Katana, Scythe, Spears, Knives)**: Implement a multi-target frontal arc cone (120°–160° arc angle based on blade reach).
+- **Martial Arts Brawlers (Gojo, Sukuna, Todo, Mahoraga)**: Implement a multi-target frontal arc cone (90° arc angle, 65px punch reach).
+- All valid enemy targets (fighters & illusions) within reach and angle (`Math.abs(angleDiff) <= arc / 2`) take damage, blood, hit stun, and knockback push.
+
+### 1.7 Gojo Limitless Infinity Barrier Standards
+- ALL entities (fighters, summons, illusions, clones, turrets) are affected by Gojo's Limitless Infinity barrier when striking or approaching while Infinity is active (`infinityCooldown <= 0`).
+- The ONLY explicit lore exception is **Toji Fushiguro** (`characterId === 'toji'`), who wields the Inverted Spear of Heaven (ISOH) to bypass Infinity.
+- **Mahoraga** is blocked initially, but after 2 exposures adapts (`gojoInfinityImmune = true`), granting total immunity thereafter.
 
 ---
 
-## 27. Fighter Skin Pixel Art Conversion & Rendering Standards
+## 2. Rendering, Performance & WebGL Standards
 
-### 1. Aesthetic Philosophy & Fine Pixel Grid Engine
-- All fighter skin models, character costumes, dynamic cloth (capes/robes/coats), brawler gloves, and global outlines adhere to an authentic **Retro Arcade Pixel Art Style** (`P = 2.0px` standard grid unit).
-- **Faceless Minimalist Aesthetic (Rule #19 Compliance)**: Character models MUST remain faceless circle brawlers (no eyes, mouth, or nose). Identity and lore expression are conveyed strictly through iconic hair silhouettes, headgear, tailored clothing zones, collars, belts, and signature markings.
+### 2.1 WebGL / PixiJS Hybrid Container Pattern
+- High-frequency or persistent heavy visual effects (Fuga fire trail, Hollow Purple/Blue moving orbs, full-screen dim overlays) use WebGL/PixiJS to maintain 60 FPS.
+- To preserve 2D canvas designs: draw onto an off-screen canvas and bind as WebGL texture to a `PIXI.Sprite` in `state.pixiLayers.projectiles` or `state.pixiLayers.environment`.
+- Short-burst transient visual effects (Black Flash 30-frame impact, sparks, blood splatters) remain on Canvas 2D layer.
 
-### 2. The Dual-Pass Grid Quantization Pattern (Body Circle Models)
-Fighter circular body models MUST be rendered using the **Dual-Pass Grid Pattern** with coordinate snapping:
+### 2.2 Prohibition of `shadowBlur` CPU Filters (Rule 11)
+- **STRICT PROHIBITION**: NEVER use HTML5 Canvas `ctx.shadowBlur` or `ctx.shadowColor` inside any rendering methods during gameplay.
+- Simulating glowing effects MUST be done by drawing slightly larger concentric shapes with transparent gradient colors or semi-transparent flat fills.
 
-```javascript
-export function drawPixelBody(ctx, r, isGhost = false) {
-  ctx.save();
-  const P = 2.0; // Standard 2.0px pixel art grid scale
-  const snap = (v) => Math.round(v / P) * P;
-  const steps = Math.ceil((r + P) / P);
+### 2.3 Prohibition of High-Frequency `PIXI.Text` Instantiation
+- NEVER instantiate new `PIXI.Text` objects on a per-frame or high-frequency basis (floating damage numbers, combo counters).
+- Route dynamic combat floating text directly to the 2D Canvas context (`state.ctx.fillText` / `strokeText`).
 
-  // ── PASS 1: Outer Dark Manga Ink Outline Shell (#111114 / #0E0F14) ──
-  ctx.fillStyle = isGhost ? '#111114' : '#0E0F14';
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= r + P * 0.85) {
-        ctx.fillRect(snap(gx * P), snap(gy * P), P, P);
-      }
-    }
+### 2.4 Canvas 2D Transform Stack Integrity (`ctx.save()` / `ctx.restore()`)
+- In ANY rendering function, every `ctx.save()` MUST be matched by exactly one `ctx.restore()`.
+- When branching or returning early, ALWAYS restore all active saves before `return`.
+- Stack depth must strictly return to `0` after every render call.
+
+### 2.5 Manga Action Speed Lines Standard (Rule 16)
+- Draw speed lines as **4-point filled needle polygons** (NEVER uniform `ctx.stroke()` lines):
+  ```javascript
+  ctx.moveTo(startX, startY);    // sharp trailing tip
+  ctx.lineTo(topMidX, topMidY); // top edge of needle body
+  ctx.lineTo(endX, endY);       // sharp leading tip
+  ctx.lineTo(botMidX, botMidY);
+  ctx.closePath();
+  ctx.fill();
+  ```
+- Max thickness `1.0px – 2.5px max`. Scale perpendicular cluster width to fighter radius (`±(fighter.r * 1.4)`).
+- Align speed lines strictly with aim angle (`aimAngle = fighter.gunAngle || fighter.angle || 0`) and trail **BEHIND** the fighter body (`fighter.x - cosA * (backOffset + travel)`).
+- Use a 4-slot theme palette (Primary Theme, Secondary Accent, White Core, Dark Ink Line) and cache pre-seeded arrays.
+
+### 2.6 Crescent Blade Slash & Dynamic Eraser Wipe Standard (Rule 15)
+- **Double-Tapered Crescent**: Taper both tips cleanly using a smooth sinusoidal power function:
+  ```javascript
+  const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+  const thick = maxThick * taper;
+  ```
+- **Recovery Phase Eraser Wipe**: During recovery, the crescent tip stays locked in world space while the trailing tail chases the tip angle (`Math.pow(1 - recP, 1.4)`), erasing the crescent from tail to tip.
+
+### 2.7 Domain Expansions & High-Frequency Hazard Hit-Stun (Rule 17)
+- **Closed Barriers (Time-Stop/Stasis)**: Explicitly apply `timeStopTimer` (e.g. Gojo's Unlimited Void).
+- **Open Barriers (Damaging Slashes)**: Deal AOE damage and push, but MUST NOT freeze enemy update loops or trap entities in time-stop stasis.
+- Recurring environmental/domain hazards that tick rapidly (e.g. slashes every 8 frames) MUST NOT invoke `applyHitStun(duration)` to prevent unintended perma-freeze.
+- Companion entities (Rika, clones, summons) evaluate status effects independently of their owner's transient `hitStunTimer`.
+
+### 2.8 UI, DOM Caching & HUD Palette Consistency
+- NEVER query DOM (`document.getElementById`) inside per-frame update loops. Cache references at file level.
+- All HUD skill progress bars for a fighter MUST use the **exact same consistent color theme** (`themeColor = f.color || ...`).
+- Floating Heal Text: Unified format `+<amount>` in neon emerald green (`#00FF66`) with `this._healthBarHealTimer = 16` for top health card pulse.
+
+---
+
+## 3. Upright Faceless Pixel Art & Character Model Standards
+
+### 3.1 Upright Front POV Orientation (Rule 19)
+- Fighter body models, heads, hair, and uniforms MUST ALWAYS be drawn oriented upright facing directly towards the player/camera (Front POV):
+  - `-Y` (Top): Hair, bangs, crest, headwear.
+  - `Y ~ 0` (Center): Eyewear, iconic scars/stitches/markings.
+  - `+Y` (Bottom): Collar, torso, belt, pants, boots.
+  - `-X` / `+X` (Left / Right): Symmetrical side locks, shoulders, arms.
+- Standard coordinate transform and vertical scale mirroring:
+  ```javascript
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  ctx.rotate(angle);
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) {
+    ctx.scale(1, -1); // Hair stays on -Y and boots on +Y when facing left!
   }
-
-  // ── PASS 2: Stepped Pixel Fill by Character Costume Zones ──
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const rx = gx * P;
-      const ry = gy * P;
-      const dist = Math.hypot(rx, ry);
-      if (dist > r) continue;
-
-      const px = snap(rx);
-      const py = snap(ry);
-
-      // Zone 1: Head / Hair / Headgear (-Y upper region: ry < -r * 0.35)
-      if (ry < -r * 0.35) {
-        let col = skinOrHairBaseColor;
-        if (ry < -r * 0.70 && Math.abs(rx) < r * 0.45) col = highlightShineColor;
-        else if (ry > -r * 0.45 || Math.abs(rx) > r * 0.75) col = shadowColor;
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
-      }
-      // Zone 2: Torso / Uniform / Jacket (-r * 0.35 <= ry < r * 0.25)
-      else if (ry < r * 0.25) {
-        // Accents (e.g. Zippers, Ties, Buttons, Scarf, Collar Opening)
-        if (isCenterAccessory(rx, ry)) {
-          ctx.fillStyle = accessoryColor;
-        } else {
-          let col = primarySuitColor;
-          if (ry < -r * 0.10 && Math.abs(rx) < r * 0.50) col = suitHighlightColor;
-          else if (Math.abs(rx) > r * 0.75 || ry > r * 0.16) col = suitShadowColor;
-          ctx.fillStyle = col;
-        }
-        ctx.fillRect(px, py, P, P);
-      }
-      // Zone 3: Belt / Sash / Waistband (r * 0.25 <= ry < r * 0.55)
-      else if (ry < r * 0.55) {
-        if (isBuckleOrEmblem(rx, ry)) {
-          ctx.fillStyle = buckleColor; // With metallic glint pixel at top-left
-        } else {
-          ctx.fillStyle = beltColor;
-        }
-        ctx.fillRect(px, py, P, P);
-      }
-      // Zone 4: Legs / Pants / Boots (+Y lower region: ry >= r * 0.55)
-      else {
-        let col = bootOrPantColor;
-        if (ry < r * 0.65 && Math.abs(rx) < r * 0.45) col = bootHighlightColor;
-        else if (ry > r * 0.82 || Math.abs(rx) > r * 0.70) col = bootShadowColor;
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
-      }
-    }
-  }
-
-  ctx.restore();
-}
-```
-
-### 3. Dynamic Physics Cloth & Cape Mesh Standards
-Dynamic flowing capes, trench coats, haori, and robes MUST be transformed into **Stepped Pixel Cloth Polygons**:
-- **Bézier Vertex Sampling**: Compute top curve, trailing wing tips, ripples, and bottom curve based on velocity inertia (`localVx`, `localVy`), swaying sines, and wave ripples into a sampled polygon `poly = []`.
-- **Pass 1 (Ink Outline)**: Trace all edges with stepped pixel blocks: `ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2)` in `#111114`.
-- **Pass 2 (Body Fill)**: Fill the polygon using snapped vertices `(snap(pt.x), snap(pt.y))`.
-- **Pass 3 (3D Underfold Shadow)**: Fill the lower wing / recessed fold region with a deeper shade (`#DCD8E6`).
-- **Pass 4 (Stepped Crease Lines)**: Trace internal fold curves with stepped pixel dots (`#C8C2D4`).
-- **Pass 5 (Pixel Collar Pins / Buckles)**: Render stepped circular buttons with dark ink perimeter, charcoal core, and top-left metallic specular highlight pixels (`#AAAAAA`).
-
-### 4. Stepped Brawler Gloves, Sleeves & Universal Pixel Art Hand Engine (`drawPixelHand`)
-- **Universal Hand / Fist Engine (`drawPixelHand`)**: All fighter hands, fists, and weapon grips use `drawPixelHand(ctx, cx, cy, radius, color, outlineColor)`.
-  - Step 1: `#0E0F14` dark ink pixel shell perimeter (`d <= radius + P * 0.85`).
-  - Step 2: Volumetric character skin / glove fill with top-forward specular glint pixels (`#FFFFFF`, `0.45` alpha) and heel shadow pixels (`#000000`, `0.30` alpha).
-- **Universal Hand Arc Interception (`wrapFighterDraw`)**: In `fighterFactory.js`, full-circle arcs with radius between $3.5\text{px}$ and $12\text{px}$ are automatically intercepted during `ctx.fill()` to render with `drawPixelHand`, ensuring 100% of weapon grips and hands across all 43+ fighters are rendered in pixel art style.
-- **Arm Sleeves**: Connect the body circle to the fist via a 4-point sleeve polygon outlined with stepped `#111114` pixels and filled with uniform suit pixels.
-- **Flurry Barrage Illusions**: Multi-lane staggered phase fists with stepped motion needles and concussive pixel shockwave rings.
-
-### 5. Fighter Body Circle Outline (`drawSketchyCircle`)
-- The global fighter outline decorator (`fighterFactory.js` $\rightarrow$ `wrapFighterDraw` and `fighterRenderer.js` $\rightarrow$ `drawSketchyCircle`) uses the signature **sketchy hand-drawn outline** with pre-computed paths.
-- Fighter body strokes are NOT pixelated — they retain the distinct hand-drawn sketchy aesthetic across all fighters.
-
-### 6. Universal Blueprint for Other Fighter Skins
-When converting any existing or future fighter skin to pixel art style:
-1. **Partition Character into Y-Axis Zones**:
-   - `ry < -r * 0.35`: Hair / Headwear / Headband (Gojo blindfold, Sukuna marks, Nanami 7:3 hair).
-   - `-r * 0.35 <= ry < r * 0.25`: Uniform / Kimono / Jacket (Yuta white collar + katana strap, Toji compression tee, Megumi high uniform).
-   - `r * 0.25 <= ry < r * 0.55`: Belt / Sash / Obi / Weapon Holster.
-   - `ry >= r * 0.55`: Pants / Boots / Hakama.
-2. **Apply 4-Tier Shading Hierarchy**:
-   - Level 1 (Shell): `#111114` / `#0E0F14` Dark Manga Ink.
-   - Level 2 (Base): Character primary costume tone.
-   - Level 3 (Highlight): Specular glint pixels on top curves / knuckles / buckles.
-   - Level 4 (Shadow): Ambient occlusion shadow on lower rims / folds / seams.
-3. **Synchronize Ghost Models**:
-   - Always update the fighter's `draw<Character>GhostModel` afterimage function to call `draw<Character>PixelBody(ctx, r, true)`, guaranteeing visual consistency during dodges and teleports.
-4. **Preserve Combat Transforms & Hand Visibility Guards**:
-   - Evaluate `shouldHideHands` (`state.showSkinOnly || fighter.hideHands`) before drawing hands/sleeves (Rule #20).
-   - Respect vertical scale flip (`facingLeft ? ctx.scale(1, -1) : null`) to ensure hair stays on top (`-Y`) and boots on bottom (`+Y`) (Rule #19).
-
-### 7. PNG Character Model Pixel Art Conversion Pipeline
-For fighters that utilize external PNG character models (such as Yuta, Gojo, John Wick, Nanami, Mahito, Ishida, Ichigo), follow this 3-step pipeline to convert and render them in authentic pixel art style:
-
-#### A. Dedicated Pixel Art Sprite Generation (`Assets/model/<Name>-PIXEL-SKIN.png`)
-1. Pre-render the high-res model into a $48 \times 48$ or $64 \times 64$ pixel art PNG asset saved to `Assets/model/<Name>-PIXEL-SKIN.png`.
-2. Apply **16-bit Color Quantization & Binary Alpha** during generation:
-   ```javascript
-   // Quantize colors into crisp arcade palette steps (step of 6-8)
-   r = Math.min(255, Math.round(r / 6) * 6);
-   g = Math.min(255, Math.round(g / 6) * 6);
-   b = Math.min(255, Math.round(b / 6) * 6);
-   a = a > 128 ? 255 : 0; // Binary hard alpha cut (no semi-transparent border blur)
-   ```
-
-#### B. Nearest-Neighbor Canvas 2D Rendering
-Inside the fighter skin renderer (e.g. `drawGojoBody`, `drawYutaSkin`):
-1. **Disable Image Smoothing**: ALWAYS set `ctx.imageSmoothingEnabled = false;` inside a `ctx.save()` / `ctx.restore()` block to force the browser to scale the pixel sprite using crisp nearest-neighbor sampling.
-2. **Align Scale & Centering**: Scale the $48 \times 48$ sprite directly to the fighter's radius (`drawR = r * 1.04`):
-   ```javascript
-   const img = _getPixelSkinImage();
-   if (img && img.complete && img.naturalWidth > 0) {
-     ctx.save();
-     ctx.imageSmoothingEnabled = false; // MANDATORY: Nearest-neighbor scaling for sharp pixel blocks
-     const modelScale = 1.04;
-     const drawR = r * modelScale;
-     ctx.drawImage(img, -drawR, -drawR, drawR * 2, drawR * 2);
-     ctx.restore();
-     return;
-   }
-   ```
-
-#### C. Real-Time Dynamic In-Memory Pixelation (Dynamic Fallback Pattern)
-If a pre-rendered pixel PNG is not available at load time, dynamically quantize the high-res PNG into an in-memory offscreen canvas:
-```javascript
-let _pixelCanvasCache = new Map();
-
-function getPixelatedCanvas(img, cropX, cropY, cropW, cropH, targetSize = 48) {
-  const key = `${img.src}_${targetSize}`;
-  if (_pixelCanvasCache.has(key)) return _pixelCanvasCache.get(key);
-
-  const offscreen = document.createElement('canvas');
-  offscreen.width = targetSize;
-  offscreen.height = targetSize;
-  const offCtx = offscreen.getContext('2d');
-  offCtx.imageSmoothingEnabled = false;
-  offCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, targetSize, targetSize);
-
-  _pixelCanvasCache.set(key, offscreen);
-  return offscreen;
-}
-```
-
-#### D. Outer Stroke Cohesion
-- When using PNG pixel skins, the global sketchy stroke (`drawSketchyCircle` via `wrapFighterDraw`) wraps seamlessly around the fighter, maintaining the signature hand-drawn style outline.
-
-## 35. Universal Pixel Art Rasterization Standards (Saitama Skin & Getsuga Tensho Technique)
-
-### Overview & Core Mandate
-Whenever converting ANY visual element — including fighter skins (e.g. Saitama, Ulquiorra, Ichigo), weapon slashes, combat attack effects, projectiles (e.g. Getsuga Tensho wave), impact scars, sonic burst pillars, or atmospheric overlays — into **Pixel Art Style**, developers **MUST strictly adhere to the authentic 2D discrete grid-scan rasterization technique** established in Saitama's skin model (`js/graphics/fighters/saitamaSkin.js`) and Ichigo's Getsuga Tensho (`js/graphics/weapons/ichigoWeaponGraphics.js`).
-
-### 1. Mandatory Technical Fundamentals
-- **`ctx.imageSmoothingEnabled = false;`**: ALWAYS disable canvas image smoothing inside a `ctx.save()` / `ctx.restore()` block to force crisp, razor-sharp nearest-neighbor pixel blocks without browser blur.
-- **Fixed Discrete Grid Unit ($P = 2.0\text{px}$)**: Use a fixed integer pixel block size ($P = 2.0\text{px}$ standard). Snap all coordinate calculations to integer pixel multiples:
-  ```javascript
-  const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
-  ```
-- **Prohibition of Canvas Geometric Curves & Smooth Strokes**: **NEVER** use `ctx.arc()`, `ctx.ellipse()`, `ctx.beginPath() ... ctx.stroke()`, or canvas gradient fills (`createLinearGradient` / `createRadialGradient`) to draw pixel-art shapes. All shapes MUST be rendered as discrete stepped rectangles (`ctx.fillRect(px, py, P, P)`).
-
-### 2. True 2D Grid-Scan Bounding Rasterization Engine
-All geometric shapes (circles, crescents, polygons, slashes, wings, tails, horns, beams) MUST be rasterized by iterating over a 2D integer bounding grid with continuous inside-shape geometric testing:
-```javascript
-const minX = Math.floor(bounds.minX / P) * P;
-const maxX = Math.ceil(bounds.maxX / P) * P;
-const minY = Math.floor(bounds.minY / P) * P;
-const maxY = Math.ceil(bounds.maxY / P) * P;
-
-for (let gy = minY; gy <= maxY; gy += P) {
-  for (let gx = minX; gx <= maxX; gx += P) {
-    if (!isInsideShape(gx, gy)) continue;
-
-    const pxX = snap(gx);
-    const pyY = snap(gy);
-    // Render pixel...
-  }
-}
-```
-
-### 3. 4-Neighbor Attached Boundary Shell (Zero Floating Crumbs)
-To guarantee a solid, contiguous outer outline with **zero disconnected checkerboard crumbs, gaps, or anti-aliased artifacts**, EVERY pixel art renderer MUST perform a 4-neighbor boundary adjacency test:
-```javascript
-const isBorder = !isInsideShape(gx + P, gy) ||
-                 !isInsideShape(gx - P, gy) ||
-                 !isInsideShape(gx, gy + P) ||
-                 !isInsideShape(gx, gy - P);
-
-if (isBorder) {
-  ctx.fillStyle = cBorder; // Solid dark manga ink / outline shell
-  ctx.fillRect(pxX, pyY, P, P);
-  continue;
-}
-```
-
-### 4. 4-Tier Stepped Shading & Depth Hierarchy
-Inside the shape body, calculate depth relative to the apex, leading edge, center spine, or surface normal and assign stepped discrete palette tiers:
-- **Tier 1 — Leading Cutting Edge / Glint Core**: Razor pure white-hot core (`#FFFFFF` at depth $< 1.5 P$).
-- **Tier 2 — Saturated Energy Rim / Base Tone**: Vibrant primary character theme color (e.g. `#FF0033` electric blood crimson, `#00E5FF` cyan, `#F5C400` yellow).
-- **Tier 3 — Transitional Shadow / Burning Depth**: Deep secondary tone (e.g. `#8B0014` burning crimson).
-- **Tier 4 — Void Core / Ambient Occlusion**: Abyssal black void or darkest shadow tone (`#080003` / `#0E0F14`).
-- **Tier 5 — Outer Outline Shell**: Deep attached border (`#1A0006` / `#111114`).
-
-### 5. Snapped Auxiliary Elements (Flares, Sparkles, Motes, Lightning)
-- **Diamond Flares & Reiatsu Motes**: Positioned strictly on snapped integer coordinates (`_drawPixelDiamond` or `ctx.fillRect(snap(x), snap(y), P, P)`).
-- **Vapor Condensation Rings**: Stepped perimeter loops calculating $(x, y)$ at discrete angle steps snapped to $P$.
-- **Micro-Lightning Bolts**: Stepped orthogonal/diagonal staircase lines (`while (curY > targetY || curX !== targetX)`), never smooth continuous strokes.
-
-## 24. Configuration File Preservation & Git Safety Standard
-- **NEVER** run `git checkout <file>`, `git restore <file>`, `git reset --hard`, or similar destructive commands on files under `js/configs/characters/` or `js/core/` (e.g., `ichigoConfig.js`, `modeConfig.js`, `settingsConfig.js`).
-- **Preserve User Balance & Config Edits**: Any uncommitted modifications inside `js/configs/` or `js/core/` represent deliberate user tuning (damage, HP, speeds, cooldowns, toggles) and MUST NEVER be reverted or overwritten as "test cleanup".
-- When running automated verification test scripts (like `scripts/testAllFighters.mjs`), test suites MUST accommodate custom config values without resetting the workspace.
-
-## 36. Continuous 360° Skill Aiming & Direction Commitment (Non-Snap Aim Lock Standard)
-
-### Overview & Core Mandate
-All active skills, charged special attacks, finishing moves, beams, projectile waves, and counter-strikes (e.g., Saitama's Counter Punch, Gojo's Red & Hollow Purple, Sukuna's Divine Flame / Fuga, Ichigo's Getsuga Tensho & Final Massive Getsuga, Yuta's Pure Love Beam, Genos's Spiral Incineration Cannon) **MUST support continuous 360° omnidirectional targeting upon initiation** while **strictly locking committed aim orientation without rotation or snap auto-aiming during channeling and active release**.
-
-### 1. Continuous 360° Aim Initiation
-- When an ability is triggered by AI or manual player input, calculate the target angle dynamically using continuous trigonometry:
-  ```javascript
-  const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
-  const myY = this.y - (this.z || 0);
-  const dx = (target.x !== undefined ? target.x : this.x) - this.x;
-  const dy = targetY - myY;
-  const castAngle = Math.atan2(dy, dx);
-  ```
-- **NEVER** clamp or snap skill targeting to 4 cardinal directions unless the weapon is explicitly a discrete grid basic primary shoot.
-
-### 2. Committed Aim Lock (Zero Auto-Aim Tracking During Channeling & Firing)
-- Snapshot the computed angle into a dedicated state property upon skill initiation (e.g., `this.getsugaCastAngle`, `this.pureLoveBeamLockedAngle`, `this.divineFlameCastAngle`, `this.purpleCastAngle`, `this.redAimAngle`, `this._counterAimAngle`).
-- Throughout the entire wind-up, charge, slide, channeling, and active firing lifecycle:
-  - `aim(opponent)` and `canAim()` MUST disable auto-aim tracking and rotational steering.
-  - `this.gunAngle` and `this.angle` MUST remain strictly clamped to the committed cast angle:
-    ```javascript
-    if (this.isChannelingSkill || this.isFiringSkill) {
-      if (this.skillCastAngle !== undefined) {
-        this.gunAngle = this.skillCastAngle;
-        this.angle = this.skillCastAngle;
-      }
-      return; // Prevent auto-aim rotation while channeling/firing!
-    }
-    ```
-- The fighter MUST NOT rotate, track, or snap towards the opponent if the opponent moves, dodges, or teleports during the attack sequence.
-
-### 3. Projectile Launch & Kinetic Recoil Trigonometry
-- Spawning projectiles, beams, or shockwaves MUST inherit the exact locked cast angle:
-  ```javascript
-  proj.angle = lockAngle;
-  proj.vx = Math.cos(lockAngle) * speed;
-  proj.vy = Math.sin(lockAngle) * speed;
-  ```
-- Any physical recoil pushback applied to the attacker MUST kick backward directly opposite to the locked angle:
-  ```javascript
-  this.vx = -Math.cos(lockAngle) * recoil;
-  this.vy = -Math.sin(lockAngle) * recoil;
   ```
 
-### 4. Companion & Minion Spatial Synchronization
-- Companion entities and summons active during the skill (e.g., Rika charging or firing Pure Love Beam) MUST align their angle, spawn offset, and beam follow direction strictly to the owner's locked cast angle (`rika.angle = lockAngle; rika.beamFollowAngle = lockAngle;`).
+### 3.2 Facial Features Prohibition: Faceless Minimalist Aesthetic
+- **STRICT PROHIBITION**: NEVER draw eyes, pupils, sclera, irises, eyelashes, mouths, lips, or nose bridges on fighter skins.
+- Identity is conveyed exclusively through distinctive hair silhouettes, headgear/eyewear (blindfolds, goggles), thematic markings/scars, beard shadows, and tailored clothing.
 
+### 3.3 Vertical Proportion Bands
+- `-r * 1.15` to `-r * 0.35`: Crown Spikes & Outer Hair Volume (crown spikes extend to `-r * 1.05` to `-r * 1.15`).
+- `-r * 0.35` to `-r * 0.18`: Bang Tips & Hairline Termination. Bangs never extend past `y = -r * 0.12`.
+- `-r * 0.18` to `+r * 0.15`: Face / Forehead Zone (reserved for skin, eyewear, markings).
+- `+r * 0.15` to `+r * 0.60`: Collar, Neck, Upper Chest.
+- `+r * 0.60` to `+r * 1.00`: Lower Torso, Belt, Pants/Hakama.
 
+### 3.4 Discrete Lock Arrays for Hair (No Sine Waves)
+- **PROHIBITION**: NEVER generate hair using continuous trigonometric sine waves (`Math.sin(nx * freq)`).
+- Procedural hair must be defined as discrete lock coordinate arrays with staggered strand lengths and sharp triangular tips.
+- Hair uses a 4-tier palette: Tier 1 Undercut/Root, Tier 2 Base Tone, Tier 3 Mid-Lock Shadow, Tier 4 Specular Crown Glint.
+
+### 3.5 Authentic 2D Discrete Grid Rasterization Engine ($P = 2.0\text{px}$)
+- When converting skins, weapon slashes, or VFX to pixel art style:
+  1. `ctx.imageSmoothingEnabled = false;` in save/restore blocks.
+  2. Fixed discrete grid unit ($P = 2.0\text{px}$) with coordinate snapping (`snap = (v) => Math.round(v / P) * P`).
+  3. Iterate over a 2D integer bounding grid with continuous inside-shape testing (`ctx.fillRect(px, py, P, P)`).
+  4. 4-neighbor attached boundary shell test (`!isInsideShape(gx + P, gy) ...`) to render solid dark manga ink outline (`#111114` / `#0E0F14`) with zero floating crumbs.
+  5. 4-tier stepped shading hierarchy (Leading Glint Core `#FFFFFF`, Base Energy Rim, Burning Shadow, Void Ambient Occlusion).
+
+### 3.6 Hand Layering & `drawPixelHand` Engine (Rule 20)
+- Guard with `const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;`.
+- **Back Hand**: Positioned on forward side at `(r * 1.05, 0)` behind body circle.
+- **Body Circle**: Drawn at `(0, 0)` with upright head (`-Y`) and torso (`+Y`).
+- **Front Hand**: Positioned at guard center `(0, 0)` on top of body.
+- All hands render via `drawPixelHand(ctx, cx, cy, radius, color, outlineColor)` with stepped dark ink outline and volumetric glint.
+
+### 3.7 PNG Character Model Pixel Art Pipeline
+- When using PNG skins (`Assets/model/<Name>-PIXEL-SKIN.png`):
+  - Pre-render into 48x48 or 64x64 pixel art with 16-bit color quantization and binary alpha cut.
+  - Scale with `ctx.imageSmoothingEnabled = false;` directly to `drawR = r * 1.04`.
+  - Dynamic in-memory fallback uses offscreen canvas quantization if image is missing.
+
+---
+
+## 4. Systems Architecture (Weapon Studio, Tactical Force, Configs)
+
+### 4.1 Config-Driven Architecture (No Magic Numbers)
+- ALL character attributes, stats, cooldowns, channeling timers, damage multipliers, hit-stun frames, reach limits, knockback impulses, projectile velocities, and minion stats derive from `js/configs/characters/<name>Config.js` (`CONFIG.<characterId>`).
+- Fallback expressions MUST exactly match the default constant in the character config.
+
+### 4.2 Weapon Studio System
+- State lives in `state.weaponCustomizations` and persists via `localStorage('ramball_weaponCustomizations')`.
+- Weapons support `offsetX`, `offsetY`, `scale` (`0.30x – 3.00x`), and `angleOffset`. Mahito claws support per-finger knuckle/tip positions, fan angles, arch curves, `drawOrder`, and global `weaponScale`.
+
+### 4.3 Tactical Force Engineering
+- All firearms follow the Unified Neon Cyberpunk Theme (Deep obsidian receiver `#0b0f19`, glowing neon contours `1.2px – 1.4px`, dynamic character theme colors: M4A1 Cyan, SPAS-12 Mint, Desert Eagle Amber, AWP Plasma Blue).
+- Obstacle physics resolves perimeter and interior overlaps with 0.85–0.90 restitution.
+- Tactical AI evaluates line-of-sight raycasting (`hasLineOfSight`) before shooting, avoids locking aim through solid walls, and holds fire on blocked sightlines.

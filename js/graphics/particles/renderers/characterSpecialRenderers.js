@@ -230,122 +230,287 @@ export function drawMahitoClawScratchBurst(ctx, effect) {
 }
 
 export function drawMahitoDomainSoulTendrilStrike(ctx, effect) {
-  const startX = effect.startX !== undefined ? effect.startX : effect.x;
-  const startY = effect.startY !== undefined ? effect.startY : effect.y;
-  const targetX = effect.targetX !== undefined ? effect.targetX : effect.x;
-  const targetY = effect.targetY !== undefined ? effect.targetY : effect.y;
+  const startX = (effect.sourceRef && Number.isFinite(effect.sourceRef.x)) ? effect.sourceRef.x : (effect.startX !== undefined ? effect.startX : effect.x);
+  const startY = (effect.sourceRef && Number.isFinite(effect.sourceRef.y)) ? effect.sourceRef.y : (effect.startY !== undefined ? effect.startY : effect.y);
+  const targetX = (effect.targetRef && Number.isFinite(effect.targetRef.x)) ? effect.targetRef.x : (effect.targetX !== undefined ? effect.targetX : effect.x);
+  const targetY = (effect.targetRef && Number.isFinite(effect.targetRef.y)) ? effect.targetRef.y : (effect.targetY !== undefined ? effect.targetY : effect.y);
+  
   const dx = targetX - startX;
   const dy = targetY - startY;
   const totalDist = Math.hypot(dx, dy) || 1;
   const baseAngle = Math.atan2(dy, dx);
-  const cosA = Math.cos(baseAngle);
   const sinA = Math.sin(baseAngle);
+  const cosA = Math.cos(baseAngle);
   const perpX = -sinA;
   const perpY = cosA;
 
-  const progress = 1.0 - effect.life;
-  const reachRatio = Math.min(1.0, progress / 0.20);
-  const easeReach = Math.sin(reachRatio * (Math.PI / 2));
-  const currentDist = totalDist * easeReach;
-  const currentEndX = startX + cosA * currentDist;
-  const currentEndY = startY + sinA * currentDist;
+  const life = Math.max(0, Math.min(1.0, effect.life || 0));
+  if (life <= 0.01) return;
+  const alpha = Math.min(1.0, Math.pow(life, 0.70));
 
-  const alpha = Math.sin(effect.life * Math.PI);
-  if (alpha <= 0.01) return;
+  const isTransformed = Boolean(effect.isTransformed);
+  const numPts = Math.max(16, Math.floor(totalDist / 12));
+  const wobble = effect.wobblePhase || 0;
 
   ctx.save();
+  ctx.globalAlpha = 1.0;
 
-  ctx.strokeStyle = effect.isTransformed
-    ? `rgba(217, 70, 239, ${(0.65 * alpha).toFixed(3)})`
-    : `rgba(192, 38, 211, ${(0.60 * alpha).toFixed(3)})`;
-  ctx.lineWidth = 14.0 * alpha;
+  // 1. Build organic undulating muscular spine and boundary hulls
+  const leftHull = [];
+  const rightHull = [];
+  const spinePts = [];
+
+  const baseThick = isTransformed ? 22 : 16;
+  const tipThick = isTransformed ? 12 : 9;
+
+  for (let s = 0; s <= numPts; s++) {
+    const t = s / numPts;
+    const px = startX + dx * t;
+    const py = startY + dy * t;
+
+    // Organic sinusoidal flesh wave (pinned at ends)
+    const waveFactor = Math.sin(t * Math.PI);
+    const wave = Math.sin(t * Math.PI * 2.2 + wobble * 0.7) * (14.0 * waveFactor);
+    const sx = px + perpX * wave;
+    const sy = py + perpY * wave;
+    spinePts.push({ x: sx, y: sy, t });
+
+    // Muscle bulge profile along the stretched limb
+    const muscleBulge = 1.0 + 0.28 * Math.sin(t * Math.PI * 3.0) * waveFactor;
+    const currentThick = (tipThick + (baseThick - tipThick) * (1.0 - t * 0.75)) * muscleBulge * alpha;
+    const halfThick = Math.max(1.5, currentThick * 0.5);
+
+    leftHull.push({ x: sx - perpX * halfThick, y: sy - perpY * halfThick });
+    rightHull.push({ x: sx + perpX * halfThick, y: sy + perpY * halfThick });
+  }
+
+  // ── A. Outer Translucent Cursed Energy Aura (Violet / Magenta) ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(leftHull[0].x - perpX * 4 * alpha, leftHull[0].y - perpY * 4 * alpha);
+  for (let i = 1; i <= numPts; i++) {
+    ctx.lineTo(leftHull[i].x - perpX * 4 * alpha, leftHull[i].y - perpY * 4 * alpha);
+  }
+  ctx.arc(targetX, targetY, (tipThick * 0.8 + 6) * alpha, baseAngle - Math.PI / 2, baseAngle + Math.PI / 2);
+  for (let i = numPts; i >= 0; i--) {
+    ctx.lineTo(rightHull[i].x + perpX * 4 * alpha, rightHull[i].y + perpY * 4 * alpha);
+  }
+  ctx.closePath();
+  ctx.fillStyle = isTransformed
+    ? `rgba(217, 70, 239, ${(0.32 * alpha).toFixed(3)})`
+    : `rgba(168, 85, 247, ${(0.35 * alpha).toFixed(3)})`;
+  ctx.fill();
+  ctx.restore();
+
+  // ── B. Solid Dark Manga Ink Outline ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(leftHull[0].x, leftHull[0].y);
+  for (let i = 1; i <= numPts; i++) {
+    ctx.lineTo(leftHull[i].x, leftHull[i].y);
+  }
+  ctx.arc(targetX, targetY, (tipThick * 0.5) * alpha, baseAngle - Math.PI / 2, baseAngle + Math.PI / 2);
+  for (let i = numPts; i >= 0; i--) {
+    ctx.lineTo(rightHull[i].x, rightHull[i].y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = isTransformed ? '#0E1322' : '#0E0F14';
+  ctx.fill();
+  ctx.strokeStyle = isTransformed ? '#2A1B3D' : '#0E0F14';
+  ctx.lineWidth = Math.max(1, 2.5 * alpha);
+  ctx.stroke();
+  ctx.restore();
+
+  // ── C. Transfigured Porcelain Flesh Body ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(leftHull[0].x + perpX * 1.5, leftHull[0].y + perpY * 1.5);
+  for (let i = 1; i <= numPts; i++) {
+    ctx.lineTo(leftHull[i].x + perpX * 1.5, leftHull[i].y + perpY * 1.5);
+  }
+  for (let i = numPts; i >= 0; i--) {
+    ctx.lineTo(rightHull[i].x - perpX * 1.5, rightHull[i].y - perpY * 1.5);
+  }
+  ctx.closePath();
+  ctx.fillStyle = isTransformed ? '#1E142B' : '#EEF3F7';
+  ctx.fill();
+  ctx.restore();
+
+  // ── D. Lower Underside Muscle Shadow Band (Volumetric 3D Depth) ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(spinePts[0].x, spinePts[0].y);
+  for (let i = 1; i <= numPts; i++) {
+    ctx.lineTo(spinePts[i].x, spinePts[i].y);
+  }
+  for (let i = numPts; i >= 0; i--) {
+    ctx.lineTo(rightHull[i].x - perpX * 1.2, rightHull[i].y - perpY * 1.2);
+  }
+  ctx.closePath();
+  ctx.fillStyle = isTransformed ? '#3B0764' : '#CBD5E1';
+  ctx.fill();
+  ctx.restore();
+
+  // ── E. Central Cursed Energy Soul Flow Vein ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(spinePts[0].x, spinePts[0].y);
+  for (let i = 1; i <= numPts; i++) {
+    ctx.lineTo(spinePts[i].x, spinePts[i].y);
+  }
+  ctx.strokeStyle = isTransformed ? '#F5D0FE' : '#D946EF';
+  ctx.lineWidth = Math.max(1, 3.2 * alpha);
   ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
-  const segments = Math.max(6, Math.floor(currentDist / 22));
-  for (let s = 1; s <= segments; s++) {
-    const t = s / segments;
-    const px = startX + (currentEndX - startX) * t;
-    const py = startY + (currentEndY - startY) * t;
-    const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (6.0 * (1 - t * 0.4));
-    ctx.lineTo(px + perpX * wave, py + perpY * wave);
-  }
+  ctx.lineJoin = 'round';
   ctx.stroke();
 
-  ctx.strokeStyle = effect.isTransformed ? '#4A044E' : '#3B0764';
-  ctx.lineWidth = 7.5 * alpha;
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
-  for (let s = 1; s <= segments; s++) {
-    const t = s / segments;
-    const px = startX + (currentEndX - startX) * t;
-    const py = startY + (currentEndY - startY) * t;
-    const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (5.0 * (1 - t * 0.4));
-    ctx.lineTo(px + perpX * wave, py + perpY * wave);
-  }
+  // Fine white core glint along the cursed vein
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = Math.max(0.6, 1.1 * alpha);
   ctx.stroke();
+  ctx.restore();
 
-  ctx.strokeStyle = `rgba(245, 208, 254, ${(0.92 * alpha).toFixed(3)})`;
-  ctx.lineWidth = 2.2 * alpha;
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
-  for (let s = 1; s <= segments; s++) {
-    const t = s / segments;
-    const px = startX + (currentEndX - startX) * t;
-    const py = startY + (currentEndY - startY) * t;
-    const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (3.5 * (1 - t * 0.4));
-    ctx.lineTo(px + perpX * wave, py + perpY * wave);
-  }
-  ctx.stroke();
+  // ── F. Transfigured Surgical Sutures & Cross-Stitches (Mui Tenpen Stitches) ──
+  const sutureStations = [0.18, 0.36, 0.54, 0.72, 0.88];
+  ctx.save();
+  sutureStations.forEach((stT, k) => {
+    const idx = Math.min(numPts - 1, Math.max(1, Math.floor(stT * numPts)));
+    const pt = spinePts[idx];
+    const lPt = leftHull[idx];
+    const rPt = rightHull[idx];
+    if (!pt || !lPt || !rPt) return;
 
-  ctx.strokeStyle = `rgba(15, 15, 20, ${(0.95 * alpha).toFixed(3)})`;
-  ctx.lineWidth = 1.8 * alpha;
-  for (let s = 1; s < segments; s++) {
-    if (s % 2 === 0) {
-      const t = s / segments;
-      const px = startX + (currentEndX - startX) * t;
-      const py = startY + (currentEndY - startY) * t;
-      const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (4.0 * (1 - t * 0.4));
-      const cx = px + perpX * wave;
-      const cy = py + perpY * wave;
-      ctx.beginPath();
-      ctx.moveTo(cx - perpX * 5.0, cy - perpY * 5.0);
-      ctx.lineTo(cx + perpX * 5.0, cy + perpY * 5.0);
-      ctx.stroke();
-    }
-  }
+    // 1. Perpendicular dark incision line across flesh
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = Math.max(0.8, 1.8 * alpha);
+    ctx.beginPath();
+    ctx.moveTo(lPt.x, lPt.y);
+    ctx.lineTo(rPt.x, rPt.y);
+    ctx.stroke();
 
-  if (reachRatio >= 0.5) {
-    ctx.save();
-    ctx.translate(currentEndX, currentEndY);
-    ctx.rotate(baseAngle);
-
-    const clawTalons = [-10, -3.5, 3.5, 10];
-    clawTalons.forEach((offY, cIdx) => {
-      const talonLen = (cIdx === 1 || cIdx === 2) ? 26 : 19;
-      ctx.fillStyle = effect.isTransformed ? '#C026D3' : '#F5D0FE';
-      ctx.beginPath();
-      ctx.moveTo(-4, offY);
-      ctx.lineTo(talonLen, offY * 0.6);
-      ctx.lineTo(-4, offY + (offY >= 0 ? 2.5 : -2.5));
-      ctx.closePath();
-      ctx.fill();
+    // 2. Surgical staple crossbars
+    const stapleHalf = (isTransformed ? 4.5 : 3.8) * alpha;
+    const stitchOffsets = [-0.4, 0.4];
+    stitchOffsets.forEach(off => {
+      const sx = pt.x + perpX * (off * 10 * alpha);
+      const sy = pt.y + perpY * (off * 10 * alpha);
+      const parX = cosA * stapleHalf;
+      const parY = sinA * stapleHalf;
 
       ctx.strokeStyle = '#181C26';
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = Math.max(0.8, 2.0 * alpha);
+      ctx.beginPath();
+      ctx.moveTo(sx - parX, sy - parY);
+      ctx.lineTo(sx + parX, sy + parY);
       ctx.stroke();
-    });
 
-    ctx.fillStyle = effect.isTransformed ? '#3B0764' : '#581C87';
+      // Knot dot
+      ctx.fillStyle = (k % 2 === 0) ? '#D946EF' : '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(0.5, 1.3 * alpha), 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+  ctx.restore();
+
+  // ── G. Outstretched 4-Blade Needle Claw Morph at Target (Grasping Strike) ──
+  ctx.save();
+  ctx.translate(targetX, targetY);
+  ctx.rotate(baseAngle);
+
+  // 4 Razor Needle Claw Blades fanning outward toward target
+  const clawAngles = [-0.34, -0.12, 0.12, 0.34];
+  const clawLengths = [26, 32, 32, 26];
+
+  clawAngles.forEach((cAng, cIdx) => {
+    const cLen = clawLengths[cIdx] * alpha;
+    const halfHw = (isTransformed ? 4.2 : 3.4) * alpha;
+
+    ctx.save();
+    ctx.rotate(cAng);
+
+    // Blade path (needle tapered)
     ctx.beginPath();
-    ctx.arc(-2, 0, 9, 0, Math.PI * 2);
+    ctx.moveTo(0, -halfHw * 0.4);
+    ctx.lineTo(cLen * 0.35, -halfHw * 0.7);
+    ctx.quadraticCurveTo(cLen * 0.65, -halfHw * 0.4, cLen, 0);
+    ctx.quadraticCurveTo(cLen * 0.65, halfHw * 0.5, cLen * 0.45, halfHw * 0.8);
+    ctx.lineTo(0, halfHw * 0.4);
+    ctx.closePath();
+
+    // Dark ink outline
+    ctx.fillStyle = isTransformed ? '#0E1322' : '#0E0F14';
     ctx.fill();
-    ctx.strokeStyle = '#F5D0FE';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = isTransformed ? '#D946EF' : '#0E0F14';
+    ctx.lineWidth = Math.max(0.8, 1.8 * alpha);
+    ctx.stroke();
+
+    // Porcelain blade body
+    ctx.beginPath();
+    ctx.moveTo(1.5, -halfHw * 0.3);
+    ctx.lineTo(cLen * 0.35, -halfHw * 0.55);
+    ctx.quadraticCurveTo(cLen * 0.65, -halfHw * 0.3, cLen - 1.5, 0);
+    ctx.quadraticCurveTo(cLen * 0.65, halfHw * 0.35, cLen * 0.45, halfHw * 0.6);
+    ctx.lineTo(1.5, halfHw * 0.3);
+    ctx.closePath();
+    ctx.fillStyle = isTransformed ? '#2A1B3D' : '#EEF3F7';
+    ctx.fill();
+
+    // Razor cutting edge line
+    ctx.beginPath();
+    ctx.moveTo(cLen * 0.35, -halfHw * 0.55);
+    ctx.lineTo(cLen, 0);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = Math.max(0.5, 1.0 * alpha);
     ctx.stroke();
 
     ctx.restore();
-  }
+  });
+
+  // Knuckle socket cluster
+  ctx.fillStyle = isTransformed ? '#2A1B3D' : '#64748B';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 7 * alpha, 9 * alpha, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = Math.max(0.8, 1.8 * alpha);
+  ctx.stroke();
+
+  // Central magenta soul core
+  ctx.fillStyle = '#D946EF';
+  ctx.beginPath();
+  ctx.arc(0, 0, 4.5 * alpha, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.2 * alpha, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // ── H. Muscular Anchor Socket at Mahito's Origin ──
+  ctx.save();
+  ctx.translate(startX, startY);
+  ctx.rotate(baseAngle);
+
+  // Muscular root collar
+  ctx.fillStyle = isTransformed ? '#0E1322' : '#CBD5E1';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 6 * alpha, (baseThick * 0.6) * alpha, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = Math.max(0.8, 2.0 * alpha);
+  ctx.stroke();
+
+  // Suture on base collar
+  ctx.strokeStyle = '#181C26';
+  ctx.lineWidth = 1.6 * alpha;
+  ctx.beginPath();
+  ctx.moveTo(0, -baseThick * 0.45 * alpha);
+  ctx.lineTo(0, baseThick * 0.45 * alpha);
+  ctx.stroke();
+
+  ctx.restore();
 
   ctx.restore();
 }

@@ -1,5 +1,6 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
 
 function getAllJsFiles(dir) {
   let results = [];
@@ -165,10 +166,10 @@ async function verifyAll() {
     
     // 3. Run Fighter Runtime & Simulation Suite
     console.log('\n🚀 Running Fighter Simulation & Runtime Test Suite...');
-    const { execSync } = require('child_process');
     try {
       execSync('node scripts/testAllFighters.mjs', { stdio: 'inherit' });
       execSync('node scripts/testTagMatch.mjs', { stdio: 'inherit' });
+      execSync('node scripts/testInteractions.mjs', { stdio: 'inherit' });
       process.exit(0);
     } catch (err) {
       console.error('🚨 Simulation tests failed!');

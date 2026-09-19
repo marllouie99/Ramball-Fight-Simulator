@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
-import { state, registerProjectileSystem, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
+import { state, isGlobalHitPauseActive, registerProjectileSystem, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound, fadeOutSound, fadeOutSoundBySrc } from './soundSystem.js';
 import { audioSystem } from './audioSystem.js';
@@ -2574,8 +2574,7 @@ class ProjectileSystem {
    * Updates all projectiles in the system.
    */
   update(fighters) {
-    const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
-    if (isNanamiPausing) return;
+    if (isGlobalHitPauseActive(state)) return;
 
     // OPTIMIZED: Update dynamic limits based on current entity count
     this._updateDynamicLimits();

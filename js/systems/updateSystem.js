@@ -1,4 +1,4 @@
-import { state } from '../core/state.js';
+import { state, isGlobalHitPauseActive } from '../core/state.js';
 import { updateFighters, updateProjectiles } from './physics.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatchWithRandomTagMatchFighters, resetMatch, startCountdown, startMatchDirectlyFromFaceOff } from '../core/gameFlow.js';
@@ -132,10 +132,7 @@ export function updateGame() {
     }
     
     if (state.gameState === 'playing') {
-      const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
-        ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-        ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-      ));
+      const isGlobalHitPausing = isGlobalHitPauseActive(state);
       if (!isGlobalHitPausing) {
         state.matchTimer = (state.matchTimer || 0) + 1;
       }

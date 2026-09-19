@@ -1,4 +1,4 @@
-import { state, spawnFloatingText, isChampionScreenActive, triggerGlobalScreenShake } from '../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, isChampionScreenActive, triggerGlobalScreenShake } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { spawnIllusionSpawn } from '../graphics/particles/illusionSpawnEffect.js';
@@ -19,11 +19,7 @@ const ILLUSION_SPLIT_MIN_HP = 2;
  */
 export function updateIllusions() {
   if (state.gameState !== 'playing' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
-  const isGlobalHitPausing = state.fighters && state.fighters.some(f => f && (
-    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-  ));
-  if (isGlobalHitPausing) return;
+  if (isGlobalHitPauseActive(state)) return;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
 
   for (let i = state.illusions.length - 1; i >= 0; i--) {
@@ -81,7 +77,7 @@ export function updateIllusions() {
 
         // Apply AOE damage and knockback to all valid enemies (Rule #6 compliant)
         const explosionRadius = multCfg.minionExplosionRadius || 100;
-        const explosionDamage = multCfg.minionExplosionDamage || 50;
+        const explosionDamage = multCfg.minionExplosionDamage || 24;
         const explosionKnockback = multCfg.minionExplosionKnockback || 12;
         const owner = illusion.owner;
         const ownerStateIdx = owner ? state.fighters.indexOf(owner) : -1;

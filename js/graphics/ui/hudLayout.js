@@ -21,7 +21,7 @@ export function syncHudPosition() {
   const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
   const canvasHeight = (typeof state !== 'undefined' && state.canvas && state.canvas.height) || CONFIG.canvasHeight || 1080;
 
-  _cachedGameBox.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
+  _cachedGameBox.style.aspectRatio = '540 / 960';
   _cachedGameBox.style.maxWidth = `${canvasWidth}px`;
   
   const isDark = (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || state.arenaTheme === 'dark'));

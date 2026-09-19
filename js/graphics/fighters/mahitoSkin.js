@@ -53,6 +53,77 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getMahitoSkinImage();
 }
 
+let _mahitoHairImage = null;
+let _mahitoHairImageLoading = false;
+
+export function _getMahitoHairImage() {
+  if (_mahitoHairImage && _mahitoHairImage.complete && _mahitoHairImage.naturalWidth > 0) {
+    return _mahitoHairImage;
+  }
+  if (!_mahitoHairImageLoading && typeof Image !== 'undefined') {
+    _mahitoHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _mahitoHairImage = img;
+      _mahitoHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Mahito hair image at Assets/model/Mahito-hair.png', e);
+      _mahitoHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Mahito-hair.png?v=1';
+    _mahitoHairImage = img;
+  }
+  return _mahitoHairImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getMahitoHairImage();
+}
+
+/**
+ * Draws Mahito's signature long steel-blue hair from Assets/model/Mahito-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawMahitoHair(ctx, r, facingLeft = false) {
+  const hairImg = _getMahitoHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.mahito) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // Mahito-hair.png (536x466). True visible hair bounding box:
+    // X: [64, 471] (width 408, horizontal center at 267.5)
+    // Y: [6, 463] (height 458, top crown at 6)
+    // Calibrated to seamlessly frame the upper circle with crown at -1.25r
+    const targetHairWidth = r * 2.35 * wMult;
+    const targetHairHeight = r * 2.64 * hMult;
+    const scaleX = targetHairWidth / 408;
+    const scaleY = targetHairHeight / 458;
+    const drawW = 536 * scaleX;
+    const drawH = 466 * scaleY;
+    const drawX = -267.5 * scaleX + offX;
+    const drawY = -r * 1.25 - 6 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
+}
+
 /**
  * Renders JJK-authentic Cursed Energy Flame Aura engulfing Mahito.
  * Uses the exact same Sakuga JJK Cursed Energy engine as Gojo, Yuji, and Todo (recolored to Mahito's magenta/violet theme).
@@ -521,81 +592,17 @@ function drawTransformedCarapace(ctx, r, hideElbowBlades = false) {
 }
 
 /**
- * Draws Mahito's Base Form in Upright Orientation matching the reference anime design.
+ * Draws Mahito's Base Form in Upright Orientation (Clean Bald Stitched Spirit).
  * Features:
- * - Flowing steel-blue hair with tied hair bundles & dark bands
- * - Sickly pale skin with iconic facial and neck surgical stitches (NO eyes)
+ * - Sickly pale bald skin with iconic facial and neck surgical stitches (NO eyes)
  * - Detailed dark patchwork poncho tunic with stitched square grid pattern
  */
-function drawBaseMahito(ctx, r, fighter) {
-
-  // ── 1. BACK HAIR VOLUME & TIED HAIR BUNDLES (Drawn behind body circle) ──
-  ctx.save();
-  ctx.fillStyle = '#9EB7C6';
-  ctx.strokeStyle = '#678696';
-  ctx.lineWidth = 1.4;
-
-  // A. Top-Right High Ponytail (Holding hair bundle up/back as in reference)
-  ctx.beginPath();
-  ctx.moveTo(r * 0.35, -r * 0.55);
-  ctx.quadraticCurveTo(r * 0.85, -r * 0.95, r * 1.15, -r * 0.80);
-  ctx.lineTo(r * 1.30, -r * 0.95);
-  ctx.lineTo(r * 1.20, -r * 0.70);
-  ctx.lineTo(r * 1.35, -r * 0.65);
-  ctx.lineTo(r * 1.10, -r * 0.50);
-  ctx.quadraticCurveTo(r * 0.75, -r * 0.50, r * 0.45, -r * 0.35);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Dark hair tie band for top-right ponytail
-  ctx.fillStyle = '#1A1E29';
-  ctx.beginPath();
-  ctx.ellipse(r * 0.85, -r * 0.70, r * 0.12, r * 0.22, Math.PI * 0.25, 0, Math.PI * 2);
-  ctx.fill();
-
-  // B. Left-Front Tied Hair Bundle (Draping down to lower shoulder/chest)
-  ctx.fillStyle = '#9EB7C6';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.35, -r * 0.10);
-  ctx.quadraticCurveTo(-r * 0.85, r * 0.20, -r * 0.65, r * 0.70);
-  ctx.lineTo(-r * 0.75, r * 0.85);
-  ctx.lineTo(-r * 0.55, r * 0.80);
-  ctx.lineTo(-r * 0.60, r * 0.95);
-  ctx.lineTo(-r * 0.40, r * 0.80);
-  ctx.quadraticCurveTo(-r * 0.45, r * 0.40, -r * 0.25, r * 0.15);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Dark hair tie band for left-front bundle
-  ctx.fillStyle = '#1A1E29';
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.52, r * 0.42, r * 0.14, r * 0.20, -Math.PI * 0.30, 0, Math.PI * 2);
-  ctx.fill();
-
-  // C. Lower-Left and Lower-Right Back Hair Volume
-  ctx.fillStyle = '#7E9BAA';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.65, r * 0.25);
-  ctx.quadraticCurveTo(-r * 1.05, r * 0.60, -r * 0.85, r * 0.95);
-  ctx.quadraticCurveTo(-r * 0.55, r * 0.80, -r * 0.35, r * 0.65);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(r * 0.65, r * 0.25);
-  ctx.quadraticCurveTo(r * 1.05, r * 0.60, r * 0.85, r * 0.95);
-  ctx.quadraticCurveTo(r * 0.55, r * 0.80, r * 0.35, r * 0.65);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.restore();
-
-  // ── 2. PALE CURSED SPIRIT SKIN & PROCEDURAL PIXEL ART BODY ──
+function drawBaseMahito(ctx, r, fighter, facingLeft = false) {
+  // 1. PALE CURSED SPIRIT PIXEL ART BODY
   drawMahitoPixelBody(ctx, r, false);
+
+  // 2. LONG STEEL-BLUE HAIR (Assets/model/Mahito-hair.png)
+  _drawMahitoHair(ctx, r, facingLeft);
 }
 
 /**
@@ -637,6 +644,151 @@ function drawMahitoDashAfterimages(ctx, fighter) {
 }
 
 /**
+ * Renders the multi-layered isometric Cursed Transfiguration ritual seal
+ * on the arena floor beneath Mahito during Domain Expansion channeling.
+ */
+function drawMahitoDomainSummoningCircle(ctx, fighter, progress) {
+  if (progress <= 0.001) return;
+
+  const ringRadius = 175 * progress;
+  const now = Date.now();
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+  ctx.scale(1, 0.42); // Isometric 2.5D perspective
+
+  // 1. Cursed Soul Floor Energy Wash
+  const floorGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, ringRadius * 1.15);
+  floorGrad.addColorStop(0.0, `rgba(217, 70, 239, ${(progress * 0.32).toFixed(3)})`);
+  floorGrad.addColorStop(0.35, `rgba(147, 51, 234, ${(progress * 0.24).toFixed(3)})`);
+  floorGrad.addColorStop(0.70, `rgba(59, 7, 100, ${(progress * 0.16).toFixed(3)})`);
+  floorGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = floorGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, ringRadius * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Concentric Expanding Cursed Distortion Waves
+  const waveCount = 2;
+  for (let w = 0; w < waveCount; w++) {
+    const waveP = ((now / 650 + w * 0.50) % 1.0);
+    const waveR = ringRadius * waveP;
+    const waveAlpha = Math.sin(waveP * Math.PI) * (progress * 0.45);
+    if (waveR > 5 && waveAlpha > 0.01) {
+      ctx.beginPath();
+      ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = `rgba(245, 208, 254, ${waveAlpha.toFixed(3)})`;
+      ctx.stroke();
+    }
+  }
+
+  // 3. Creeping Transfigured Woven Hand Tendril Shadows
+  const handTendrilCount = 6;
+  ctx.save();
+  for (let h = 0; h < handTendrilCount; h++) {
+    const baseTheta = (h / handTendrilCount) * Math.PI * 2 + (now * 0.0003);
+    const tendrilP = Math.min(1.0, progress * 1.25);
+    const outerX = Math.cos(baseTheta) * ringRadius;
+    const outerY = Math.sin(baseTheta) * ringRadius;
+    const innerDist = ringRadius * (1.0 - tendrilP * 0.70);
+    const innerX = Math.cos(baseTheta + Math.sin(now * 0.003 + h) * 0.25) * innerDist;
+    const innerY = Math.sin(baseTheta + Math.sin(now * 0.003 + h) * 0.25) * innerDist;
+
+    // Shadow tendril body
+    ctx.beginPath();
+    ctx.moveTo(outerX, outerY);
+    const midX = (outerX + innerX) / 2 + Math.sin(h * 1.7) * (ringRadius * 0.15);
+    const midY = (outerY + innerY) / 2 + Math.cos(h * 1.7) * (ringRadius * 0.15);
+    ctx.quadraticCurveTo(midX, midY, innerX, innerY);
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = `rgba(18, 3, 28, ${(progress * 0.75).toFixed(3)})`;
+    ctx.stroke();
+
+    // Magenta glowing fingertip claw
+    ctx.fillStyle = `rgba(217, 70, 239, ${(progress * 0.90).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(innerX, innerY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 4. Outer Transfigured Ink Boundary & Suture Nodes
+  ctx.beginPath();
+  ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+  ctx.lineWidth = 5.5;
+  ctx.strokeStyle = `rgba(12, 4, 18, ${(progress * 0.95).toFixed(3)})`;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = `rgba(217, 70, 239, ${progress.toFixed(3)})`;
+  ctx.stroke();
+
+  // 8 Cardinal & Diagonal Surgical Suture Nodes (Ritual Spikes / Staples)
+  const nodeCount = 8;
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = `rgba(245, 208, 254, ${(progress * 0.95).toFixed(3)})`;
+  for (let n = 0; n < nodeCount; n++) {
+    const nodeTheta = (n / nodeCount) * Math.PI * 2;
+    const nx = Math.cos(nodeTheta) * ringRadius;
+    const ny = Math.sin(nodeTheta) * ringRadius;
+    const spikeLen = 10 * progress;
+    const sx = Math.cos(nodeTheta) * (ringRadius + spikeLen);
+    const sy = Math.sin(nodeTheta) * (ringRadius + spikeLen);
+
+    ctx.beginPath();
+    ctx.moveTo(nx, ny);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+
+    // Knot dot
+    ctx.fillStyle = `rgba(217, 70, 239, ${(progress * 0.95).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 5. Mid Rotating Surgical Suture Band (Clockwise)
+  ctx.save();
+  ctx.rotate(now / 420);
+  ctx.beginPath();
+  ctx.arc(0, 0, ringRadius * 0.84, 0, Math.PI * 2);
+  ctx.setLineDash([14, 8]);
+  ctx.lineWidth = 3.0;
+  ctx.strokeStyle = `rgba(158, 183, 198, ${(progress * 0.85).toFixed(3)})`;
+  ctx.stroke();
+  ctx.restore();
+
+  // 6. Inner Counter-Rotating Cursed Soul Glyph Band (Counter-Clockwise)
+  ctx.save();
+  ctx.rotate(-now / 320);
+  ctx.beginPath();
+  ctx.arc(0, 0, ringRadius * 0.62, 0, Math.PI * 2);
+  ctx.setLineDash([8, 12]);
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = `rgba(217, 70, 239, ${(progress * 0.90).toFixed(3)})`;
+  ctx.stroke();
+
+  // 6-petal transfiguration glyph arcs
+  const glyphPetals = 6;
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = `rgba(168, 85, 247, ${(progress * 0.70).toFixed(3)})`;
+  for (let p = 0; p < glyphPetals; p++) {
+    const pTheta = (p / glyphPetals) * Math.PI * 2;
+    const px = Math.cos(pTheta) * (ringRadius * 0.62);
+    const py = Math.sin(pTheta) * (ringRadius * 0.62);
+    ctx.beginPath();
+    ctx.arc(px, py, ringRadius * 0.22, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
  * Main Skin Drawing Entry Point for Mahito.
  * Adheres strictly to docs/fighter_hand_positioning_guide.md and Rule #2.
  */
@@ -647,30 +799,7 @@ export function drawMahitoSkin(ctx, fighter) {
   if (isChannelingDomain && (fighter.timeStopTimer || 0) <= 0) {
     const maxCharge = fighter.domainChargeMax || CONFIG.mahito?.domainExpansion?.chargeMax || 120;
     const progress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.domainChargeTimer / maxCharge)));
-
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-    ctx.scale(1, 0.4); // Isometric perspective
-    const ringRadius = 160 * progress;
-
-    // Outer glowing deep lavender/purple ring
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = `rgba(192, 38, 211, ${progress})`; // Deep Magenta/Lavender
-    ctx.stroke();
-
-    // Inner rotating dashed light greyish-blue stitch-like ring
-    ctx.rotate(Date.now() / 300);
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
-    ctx.setLineDash([15, 10]);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = `rgba(158, 183, 198, ${progress * 1.2})`; // Light greyish blue
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.restore();
+    drawMahitoDomainSummoningCircle(ctx, fighter, progress);
   }
 
   // 1. Render Phantom Soul Slip afterimages in world space
@@ -825,13 +954,21 @@ export function drawMahitoSkin(ctx, fighter) {
     frontHandX = currentSpreadX;
     frontHandY = handY;
   } else if (isPunching) {
-    // All punches executed with the front hand extending forward from right edge
-    frontHandX = r * 0.95 + lungeExtension * 1.40;
-    frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
-    backHandX  = 0;
-    backHandY  = 0;
+    if (fighter.isRightPunch) {
+      // Right punch (Front Hand lunges forward, Back Hand tucked in guard)
+      frontHandX = r * 0.95 + lungeExtension * 1.40;
+      frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
+      backHandX  = -r * 0.35 + oppositeRecoil;
+      backHandY  = r * 0.15;
+    } else {
+      // Left punch (Back Hand lunges forward, Front Hand tucked in guard)
+      backHandX  = r * 0.95 + lungeExtension * 1.40;
+      backHandY  = -Math.sin(rawProgress * Math.PI) * (r * 0.20);
+      frontHandX = r * 0.35 + oppositeRecoil;
+      frontHandY = -r * 0.15;
+    }
   } else {
-    // Idle brawler guard stance: front hand at the right edge of body circle
+    // Idle brawler guard stance: front hand at the right edge of body circle, back hand tucked
     frontHandX = r * 0.95;
     frontHandY = 0;
     backHandX  = 0;
@@ -844,12 +981,12 @@ export function drawMahitoSkin(ctx, fighter) {
 
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isEvading || isEvasionMinion || isPreSplitting;
 
-  // 5. Render Back Hand Layer (Behind Body Circle) - Hidden for single front hand stance
+  // 5. Render Back Hand Layer (Behind Body Circle)
   // During Domain Expansion channeling, both hands render on the front layer (on top of body)
-  if (!fighter._isWinnerReveal && !fighter.hideBackHand && isChannelingDomain && !shouldHideHands) {
-    if (isPunching) {
+  if (!fighter._isWinnerReveal && !shouldHideHands && !isChannelingDomain) {
+    if (isPunching && !fighter.isRightPunch) {
       drawMahitoArmMorph(ctx, fighter, isTransformed, false, morphType, rawProgress, backHandX, backHandY);
-    } else if (fighter.clawRevertTimer > 0) {
+    } else if (fighter.clawRevertTimer > 0 && !fighter.isRightPunch) {
       const maxRevert = 18;
       const revertProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.clawRevertTimer / maxRevert)));
       const shiverAmp = (1.0 - revertProgress) * 5.5;
@@ -874,7 +1011,7 @@ export function drawMahitoSkin(ctx, fighter) {
 
       drawHandFist(ctx, 0, 0, handRadius, drawTransformedHands, fighter);
       ctx.restore();
-    } else {
+    } else if (!fighter.hideBackHand && backHandX !== 0) {
       drawHandFist(ctx, backHandX, backHandY, handRadius, drawTransformedHands, fighter);
     }
   }
@@ -883,7 +1020,7 @@ export function drawMahitoSkin(ctx, fighter) {
   if (isTransformed) {
     drawTransformedCarapace(ctx, r, isChannelingDomain);
   } else {
-    drawBaseMahito(ctx, r, fighter);
+    drawBaseMahito(ctx, r, fighter, facingLeft);
   }
 
   // 7. Render Front Hand Layer (On Top of Body Circle) - Rule #2 & #20
@@ -899,10 +1036,57 @@ export function drawMahitoSkin(ctx, fighter) {
       ctx.scale(-1, 1);
       drawHandFist(ctx, 0, 0, handRadius, drawTransformedHands, fighter);
       ctx.restore();
+
+      // Cursed Soul Singularity Core between palms at chest center
+      const coreProgress = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.domainChargeTimer || 0) / (fighter.domainChargeMax || 120))));
+      const coreY = backHandY;
+      const coreRadius = (3.5 + Math.sin(Date.now() * 0.015) * 1.5) * (0.6 + coreProgress * 0.8);
+
+      ctx.save();
+      // Outer violet flare
+      const coreGrad = ctx.createRadialGradient(0, coreY, 0, 0, coreY, coreRadius * 2.8);
+      coreGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(coreProgress * 0.95).toFixed(3)})`);
+      coreGrad.addColorStop(0.3, `rgba(245, 208, 254, ${(coreProgress * 0.85).toFixed(3)})`);
+      coreGrad.addColorStop(0.65, `rgba(217, 70, 239, ${(coreProgress * 0.70).toFixed(3)})`);
+      coreGrad.addColorStop(1.0, 'rgba(147, 51, 234, 0)');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(0, coreY, coreRadius * 2.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner intense core
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(0, coreY, Math.max(1, coreRadius * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+
+      // Smooth crackling cursed lightning arcs around core (Zero 1-frame flickering)
+      if (coreProgress > 0.30) {
+        const arcT = Date.now() * 0.006;
+        const arcCount = 3;
+        const arcRadius = coreRadius * 1.4;
+        ctx.lineWidth = 1.2;
+        for (let a = 0; a < arcCount; a++) {
+          const arcAngle = arcT + (a * Math.PI * 2 / arcCount);
+          const startX = Math.cos(arcAngle) * (arcRadius * 0.6);
+          const startY = coreY + Math.sin(arcAngle) * (arcRadius * 0.4);
+          const endX = Math.cos(arcAngle + 1.2) * arcRadius;
+          const endY = coreY + Math.sin(arcAngle + 1.2) * (arcRadius * 0.7);
+          const midX = (startX + endX) / 2 + Math.sin(arcT * 2 + a) * 2.5;
+          const midY = (startY + endY) / 2 + Math.cos(arcT * 2 + a) * 2.5;
+
+          ctx.strokeStyle = (a % 2 === 0) ? '#F5D0FE' : '#D946EF';
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.quadraticCurveTo(midX, midY, endX, endY);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
     } else if (!fighter.hideFrontHand) {
       if (isPunching && fighter.isRightPunch) {
         drawMahitoArmMorph(ctx, fighter, isTransformed, true, morphType, rawProgress, frontHandX, frontHandY);
-      } else if (fighter.clawRevertTimer > 0) {
+      } else if (fighter.clawRevertTimer > 0 && (fighter.isRightPunch || fighter.isRightPunch === undefined)) {
         const maxRevert = 18;
         const revertProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.clawRevertTimer / maxRevert)));
         const shiverAmp = (1.0 - revertProgress) * 5.5;
@@ -1078,24 +1262,8 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
     }
   } else {
     // ══════════════════════════════════════════════════════════════
-    // BASE FORM MAHITO (Steel-Blue Hair, Surgical Stitches & Patchwork Poncho)
+    // BASE FORM MAHITO (Pale Stitched Skin & Dark Patchwork Poncho)
     // ══════════════════════════════════════════════════════════════
-    function getHairlineY(rx) {
-      const nx = rx / r; // -1 to +1
-      const absX = Math.abs(nx);
-
-      if (absX < 0.09) {
-        return -r * 0.10 + (absX / 0.09) * r * 0.22;
-      } else if (absX > 0.68) {
-        return +r * 0.10 - (1 - (absX - 0.68) / 0.32) * r * 0.20;
-      } else if (nx < -0.20 && nx > -0.48) {
-        return -r * 0.50 + Math.abs(nx + 0.34) * r * 0.55;
-      } else {
-        const wave = Math.abs(Math.sin((nx + 0.1) * Math.PI * 3.2));
-        return -r * 0.36 + wave * r * 0.20;
-      }
-    }
-
     // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
     for (let gy = -steps; gy <= steps; gy++) {
       for (let gx = -steps; gx <= steps; gx++) {
@@ -1121,34 +1289,17 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
           continue;
         }
 
-        const hairlineY = getHairlineY(rx);
-
         // ──────────────────────────────────────────
-        // 1. FLOWING STEEL-BLUE HAIR (ry < hairlineY)
+        // 1. SICKLY PALE SKIN & SURGICAL STITCHES (ry < r * 0.26)
         // ──────────────────────────────────────────
-        if (ry < hairlineY) {
-          let col = '#9EB7C6';
-          if (ry < -r * 0.70) {
-            col = '#C7DEEC';
-          } else if (Math.abs(rx) < r * 0.06 && ry > -r * 0.50) {
-            col = '#B6CEE0';
-          } else if (ry > hairlineY - P * 2.2) {
-            col = '#678696';
-          } else if (Math.abs(rx) > r * 0.75) {
-            col = '#7A99AA';
-          }
-          ctx.fillStyle = col;
-          ctx.fillRect(px, py, P, P);
-        }
-        // ──────────────────────────────────────────
-        // 2. SICKLY PALE SKIN & SURGICAL STITCHES (hairlineY <= ry < r * 0.26)
-        // ──────────────────────────────────────────
-        else if (ry < r * 0.26) {
+        if (ry < r * 0.26) {
           let col = '#EEF3F7';
-          if (ry < hairlineY + P * 2.0) {
-            col = '#D4DEE5';
+          if (ry < -r * 0.65) {
+            col = '#F8FAFC'; // Crown dome volumetric glint
+          } else if (ry < -r * 0.40) {
+            col = '#D4DEE5'; // Forehead contour shading
           } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.18) {
-            col = '#D6E2EB';
+            col = '#D6E2EB'; // Side temple / cheek depth shadow
           }
 
           // A. Center Horizontal Face Stitch Line
@@ -1173,7 +1324,7 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
           ctx.fillRect(px, py, P, P);
         }
         // ──────────────────────────────────────────
-        // 3. DARK PATCHWORK PONCHO TUNIC (ry >= r * 0.26)
+        // 2. DARK PATCHWORK PONCHO TUNIC (ry >= r * 0.26)
         // ──────────────────────────────────────────
         else {
           const neckHalfW = (1 - (ry - r * 0.26) / (r * 0.14)) * (r * 0.22);

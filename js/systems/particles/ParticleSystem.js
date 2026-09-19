@@ -14,6 +14,7 @@ for (let i = 0; i < SPARK_POOL_SIZE; i++) {
 export function isProtectedParticle(spark) {
   if (!spark) return false;
   if (spark.isProtected) return true;
+  if (spark.type === 'mahitoDomainSoulTendrilStrike' || spark.type === 'mahitoSoulShockwave') return true;
   if (spark.type === 'saitamaCounterFrontalBlast' || spark.type === 'gojoRedFrontalBlast') return true;
   if (spark.type === 'animeImpactFrame' || spark.type === 'animePunchImpactFrame') return true;
   if (spark.type === 'groundScorch' || spark.type === 'arcaneGroundScorch') return true;

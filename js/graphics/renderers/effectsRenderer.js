@@ -347,8 +347,9 @@ export function drawUltimateChannelingTexts() {
         renderChannelingText(fighter, 'CURSE INVENTORY', `rgba(160, 64, 255, ${progress})`, progress);
       }
     } else if (isMahito && fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
-      const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 120));
-      renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(217, 70, 239, ${progress})`, progress);
+      const maxCharge = fighter.domainChargeMax || 120;
+      const progress = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.domainChargeTimer || 0) / Math.max(1, maxCharge))));
+      renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(217, 70, 239, ${progress})`, progress, `rgba(168, 85, 247, ${progress * 0.6})`);
     } else if (isGojo && fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
       const progress = Math.min(1.0, fighter.domainChargeTimer / Math.max(1, fighter.domainChargeMax || 120));
       renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(0, 229, 255, ${progress})`, progress);

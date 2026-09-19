@@ -913,7 +913,8 @@ export class IchigoFighter extends Fighter {
       this.vy = 0;
       this.knockbackVx = 0;
       this.knockbackVy = 0;
-      if (!isChannelingHollow && !isChannelingGrandFinisher && !isAboutToUnleashNormal && !isChannelingCombo && !this.isChannelingBankai && this.bankaiBurstTimer <= 0) {
+      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+      if (!isNanamiPausing && !isChannelingHollow && !isChannelingGrandFinisher && !isAboutToUnleashNormal && !isChannelingCombo && !this.isChannelingBankai && this.bankaiBurstTimer <= 0) {
         this._stopFinalGetsugaVoiceline();
         this.interruptAttacks(true);
       }

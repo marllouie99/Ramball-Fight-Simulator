@@ -156,6 +156,8 @@ async function main() {
   const { _getYujiHairImage, _drawYujiHair, drawYujiSkin } = await import('../js/graphics/fighters/yujiSkin.js');
   const { _getYutaHairImage, _drawYutaHair, drawYutaPixelBody, drawYutaSkin } = await import('../js/graphics/fighters/yutaSkin.js');
   const { _getTojiHairImage, _drawTojiHair, drawTojiPixelBody, drawTojiSkin, drawTojiGhostSkin } = await import('../js/graphics/fighters/tojiSkin.js');
+  const { _getMahitoHairImage, _drawMahitoHair, drawMahitoPixelBody, drawMahitoSkin } = await import('../js/graphics/fighters/mahitoSkin.js');
+  const { drawNanamiPixelBody, drawNanamiSkin } = await import('../js/graphics/fighters/nanamiSkin.js');
   const { drawZeusPixelBody, drawZeusSkin } = await import('../js/graphics/fighters/zeusSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
@@ -7218,6 +7220,312 @@ async function main() {
     errors++;
   }
 
+  // Mahito Model Hair Asset Test
+  console.log('💇 [Mahito Model Hair Asset Test] Verifying Mahito hair asset image loader, pixel body, facing directions, and drawMahitoSkin rendering...');
+  try {
+    const MahitoClass = FIGHTER_CLASS_MAP['mahito'];
+    const mahito = new MahitoClass({ startX: 300, startY: 300 });
+
+    const hairImg = _getMahitoHairImage();
+    if (!hairImg) {
+      throw new Error('_getMahitoHairImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    _drawMahitoHair(mockCtx, mahito.r || 25, false);
+    assertCanvasStackBalance('_drawMahitoHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawMahitoHair(mockCtx, mahito.r || 25, true);
+    assertCanvasStackBalance('_drawMahitoHair(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawMahitoPixelBody(mockCtx, mahito.r || 25, false);
+    assertCanvasStackBalance('drawMahitoPixelBody(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    drawMahitoPixelBody(mockCtx, mahito.r || 25, true);
+    assertCanvasStackBalance('drawMahitoPixelBody(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawMahitoSkin(mockCtx, mahito);
+    assertCanvasStackBalance('drawMahitoSkin(mockCtx, mahito)');
+
+    mockCtx.resetStackDepth();
+    mahito.draw(mockCtx);
+    assertCanvasStackBalance('mahito.draw(mockCtx)');
+
+    // Test facing left mirroring
+    mahito.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawMahitoSkin(mockCtx, mahito);
+    assertCanvasStackBalance('drawMahitoSkin (facing left)');
+
+    // Test Transformed (ISBoDK) form
+    mahito.isTransformed = true;
+    mockCtx.resetStackDepth();
+    drawMahitoSkin(mockCtx, mahito);
+    assertCanvasStackBalance('drawMahitoSkin (transformed)');
+    mahito.isTransformed = false;
+  } catch (err) {
+    console.error('❌ [MAHITO HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Nanami Model & Bald Pixel Body Test
+  console.log('🥋 [Nanami Model & Bald Pixel Body Test] Verifying Nanami bald pixel body, goggles, facing directions, and drawNanamiSkin rendering...');
+  try {
+    const NanamiClass = FIGHTER_CLASS_MAP['nanami'];
+    const nanami = new NanamiClass({ startX: 300, startY: 300 });
+
+    mockCtx.resetStackDepth();
+    drawNanamiPixelBody(mockCtx, nanami.r || 25, false);
+    assertCanvasStackBalance('drawNanamiPixelBody(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    drawNanamiPixelBody(mockCtx, nanami.r || 25, true);
+    assertCanvasStackBalance('drawNanamiPixelBody(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawNanamiSkin(mockCtx, nanami);
+    assertCanvasStackBalance('drawNanamiSkin(mockCtx, nanami)');
+
+    mockCtx.resetStackDepth();
+    nanami.draw(mockCtx);
+    assertCanvasStackBalance('nanami.draw(mockCtx)');
+
+    // Test facing left mirroring
+    nanami.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawNanamiSkin(mockCtx, nanami);
+    assertCanvasStackBalance('drawNanamiSkin (facing left)');
+
+    // Test Overtime 120% form
+    nanami.isOvertimeActive = true;
+    mockCtx.resetStackDepth();
+    drawNanamiSkin(mockCtx, nanami);
+    assertCanvasStackBalance('drawNanamiSkin (overtime)');
+    nanami.isOvertimeActive = false;
+  } catch (err) {
+    console.error('❌ [NANAMI BALD PIXEL BODY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Nanami Ratio Hit-Pause Enemy Skill Channeling Preservation Test
+  console.log('🥋 [Nanami Ratio Hit-Pause Channeling Preservation Test] Verifying enemy skill channeling is preserved and continues after 7:3 Ratio hit-pause...');
+  try {
+    const NanamiClass = FIGHTER_CLASS_MAP['nanami'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const GenosClass = FIGHTER_CLASS_MAP['genos'];
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const MahitoClass = FIGHTER_CLASS_MAP['mahito'];
+
+    const nanami = new NanamiClass({ startX: 300, startY: 300, color: '#D4AF37' });
+    const gojo = new GojoClass({ startX: 340, startY: 300, color: '#00E5FF' });
+    const sukuna = new SukunaClass({ startX: 340, startY: 300, color: '#FF0055' });
+    const genos = new GenosClass({ startX: 340, startY: 300, color: '#FFA500' });
+    const yuta = new YutaClass({ startX: 340, startY: 300, color: '#FF1493' });
+    const mahito = new MahitoClass({ startX: 340, startY: 300, color: '#D946EF' });
+
+    state.fighters = [nanami, gojo];
+    const testArena = { x: 50, y: 50, width: 800, height: 600, shape: 'rect' };
+
+    // 1. Test Gojo Hollow Purple channeling preservation
+    gojo.isChannelingPurple = true;
+    gojo.purpleChargeTimer = 20;
+    gojo.purpleChargeMax = 180;
+    
+    // Nanami triggers 7:3 Ratio hit-pause on Gojo
+    nanami.ratioHitPauseTimer = 30;
+    nanami.ratioHitPauseMax = 30;
+    nanami.ratioHitPauseTarget = gojo;
+    gojo.applyTimeStop(30);
+
+    // Simulate 5 frames of hit-pause update
+    for (let i = 0; i < 5; i++) {
+      gojo.update(nanami, 1, testArena);
+    }
+
+    if (!gojo.isChannelingPurple) {
+      throw new Error('Gojo Hollow Purple channeling was cancelled during Nanami 7:3 Ratio Hit-Pause!');
+    }
+    if (gojo.purpleChargeTimer !== 20) {
+      throw new Error(`Gojo purpleChargeTimer changed during Nanami hit-pause! Expected 20, got ${gojo.purpleChargeTimer}`);
+    }
+
+    // Unpause Nanami
+    nanami.ratioHitPauseTimer = 0;
+    nanami.ratioHitPauseTarget = null;
+    gojo.timeStopTimer = 0;
+
+    // Simulate 10 frames of post-pause update
+    for (let i = 0; i < 10; i++) {
+      gojo.update(nanami, 1, testArena);
+    }
+    if (!gojo.isChannelingPurple) {
+      throw new Error('Gojo Hollow Purple channeling did not continue after Nanami 7:3 Ratio Hit-Pause!');
+    }
+    if (gojo.purpleChargeTimer <= 20) {
+      throw new Error('Gojo purpleChargeTimer did not increment after unpausing!');
+    }
+
+    // 2. Test Sukuna Fuga channeling preservation
+    state.fighters = [nanami, sukuna];
+    sukuna.isChannelingDivineFlame = true;
+    sukuna.divineFlameChargeTimer = 20;
+    sukuna.divineFlameChargeMax = 120;
+    nanami.ratioHitPauseTimer = 30;
+    nanami.ratioHitPauseTarget = sukuna;
+    sukuna.applyTimeStop(30);
+
+    for (let i = 0; i < 5; i++) {
+      sukuna.update(nanami, 1, testArena);
+    }
+    if (!sukuna.isChannelingDivineFlame) {
+      throw new Error('Sukuna Fuga channeling was cancelled during Nanami 7:3 Ratio Hit-Pause!');
+    }
+    if (sukuna.divineFlameChargeTimer !== 20) {
+      throw new Error(`Sukuna divineFlameChargeTimer changed during Nanami hit-pause! Expected 20, got ${sukuna.divineFlameChargeTimer}`);
+    }
+
+    nanami.ratioHitPauseTimer = 0;
+    nanami.ratioHitPauseTarget = null;
+    sukuna.timeStopTimer = 0;
+
+    for (let i = 0; i < 10; i++) {
+      sukuna.update(nanami, 1, testArena);
+    }
+    if (!sukuna.isChannelingDivineFlame) {
+      throw new Error('Sukuna Fuga channeling did not continue after Nanami 7:3 Ratio Hit-Pause!');
+    }
+    if (sukuna.divineFlameChargeTimer <= 20) {
+      throw new Error('Sukuna divineFlameChargeTimer did not increment after unpausing!');
+    }
+
+    // 3. Test Genos Incinerate channeling preservation
+    state.fighters = [nanami, genos];
+    genos.isChannelingIncinerate = true;
+    genos.incinerateChargeTimer = 20;
+    nanami.ratioHitPauseTimer = 30;
+    nanami.ratioHitPauseTarget = genos;
+    genos.applyTimeStop(30);
+
+    for (let i = 0; i < 5; i++) {
+      genos.update(nanami, 1, testArena);
+    }
+    if (!genos.isChannelingIncinerate) {
+      throw new Error('Genos Incinerate channeling was cancelled during Nanami 7:3 Ratio Hit-Pause!');
+    }
+
+    nanami.ratioHitPauseTimer = 0;
+    nanami.ratioHitPauseTarget = null;
+    genos.timeStopTimer = 0;
+
+    // 4. Test Yuta Pure Love Beam channeling preservation
+    state.fighters = [nanami, yuta];
+    yuta.isChannelingPureLoveBeam = true;
+    yuta.pureLoveBeamChargeTimer = 20;
+    nanami.ratioHitPauseTimer = 30;
+    nanami.ratioHitPauseTarget = yuta;
+    yuta.applyTimeStop(30);
+
+    for (let i = 0; i < 5; i++) {
+      yuta.update(nanami, 1, testArena);
+    }
+    if (!yuta.isChannelingPureLoveBeam) {
+      throw new Error('Yuta Pure Love Beam channeling was cancelled during Nanami 7:3 Ratio Hit-Pause!');
+    }
+
+    // 5. Test Mahito Domain Expansion (Self-Embodiment of Perfection) channeling preservation
+    state.fighters = [nanami, mahito];
+    mahito.isChannelingDomainExpansion = true;
+    mahito.domainChargeTimer = 60;
+    mahito.domainChargeMax = 120;
+    nanami.ratioHitPauseTimer = 30;
+    nanami.ratioHitPauseTarget = mahito;
+    mahito.applyTimeStop(30);
+
+    for (let i = 0; i < 5; i++) {
+      mahito.update(nanami, 1, testArena);
+    }
+    if (!mahito.isChannelingDomainExpansion) {
+      throw new Error('Mahito Self-Embodiment of Perfection Domain channeling was cancelled during Nanami 7:3 Ratio Hit-Pause!');
+    }
+    if (mahito.domainChargeTimer !== 60) {
+      throw new Error(`Mahito domainChargeTimer changed during Nanami hit-pause! Expected 60, got ${mahito.domainChargeTimer}`);
+    }
+
+    nanami.ratioHitPauseTimer = 0;
+    nanami.ratioHitPauseTarget = null;
+    mahito.timeStopTimer = 0;
+
+    for (let i = 0; i < 10; i++) {
+      mahito.update(nanami, 1, testArena);
+    }
+    if (!mahito.isChannelingDomainExpansion) {
+      throw new Error('Mahito Domain channeling did not continue after Nanami 7:3 Ratio Hit-Pause!');
+    }
+    if (mahito.domainChargeTimer >= 60) {
+      throw new Error(`Mahito domainChargeTimer did not decrement after unpausing! Expected < 60, got ${mahito.domainChargeTimer}`);
+    }
+
+    state.fighters = [];
+  } catch (err) {
+    console.error('❌ [NANAMI RATIO HIT-PAUSE CHANNELING PRESERVATION TEST ERROR]:', err);
+    errors++;
+  }
+
+  // Nanami 4-Fold Black Flash Blitz Execution & Reference Safety Test
+  console.log('⚡ [Nanami 4-Fold Black Flash Blitz Test] Verifying Black Flash Blitz channels, teleports, executes all 4 strikes without reference errors, and restores movement...');
+  try {
+    const NanamiClass = FIGHTER_CLASS_MAP['nanami'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const testArena = { x: 50, y: 50, width: 800, height: 600, shape: 'rect' };
+
+    const nanami = new NanamiClass({ x: 200, y: 300, color: '#D4AF37', controls: {} });
+    const target = new SukunaClass({ x: 350, y: 300, color: '#E53E3E', controls: {} });
+    target.hp = 300;
+    target.maxHp = 300;
+    state.fighters = [nanami, target];
+    state.arena = testArena;
+    state.gameState = 'playing';
+
+    // 1. Initiate Blitz
+    nanami.performBlitz(CONFIG.nanami, target);
+    if (!nanami.isChannelingBlackFlash) {
+      throw new Error('Expected nanami.isChannelingBlackFlash to be true after performBlitz()');
+    }
+
+    // 2. Step through channeling frames
+    while (nanami.isChannelingBlackFlash) {
+      nanami.update(target, 0, testArena);
+    }
+    if (!nanami.isBlitzing) {
+      throw new Error('Expected nanami.isBlitzing to be true after Black Flash channeling finished');
+    }
+
+    // 3. Step through all 4 strikes of the Blitz combo
+    let updateFrames = 0;
+    const initialTargetHp = target.hp;
+    while (nanami.isBlitzing && updateFrames < 200) {
+      nanami.update(target, 0, testArena);
+      updateFrames++;
+    }
+
+    if (nanami.isBlitzing) {
+      throw new Error('Expected nanami.isBlitzing to finish within 200 frames');
+    }
+    if (target.hp >= initialTargetHp) {
+      throw new Error(`Expected target to take damage from 4-Fold Black Flash Blitz! HP before: ${initialTargetHp}, HP after: ${target.hp}`);
+    }
+
+    state.fighters = [];
+  } catch (err) {
+    console.error('❌ [NANAMI 4-FOLD BLACK FLASH BLITZ TEST ERROR]:', err);
+    errors++;
+  }
+
   // Gojo Hollow Purple Wall Collision Test
   console.log('🔮 [Gojo Hollow Purple Wall Collision Test] Verifying Purple stops completely on wall contact without sliding...');
   try {
@@ -8260,6 +8568,16 @@ async function main() {
     const skills = getSkillDataForFighter(ichigo);
     if (!skills || skills.length === 0) {
       throw new Error('Failed to retrieve skills for Ichigo test.');
+    }
+
+    // 4. Test when all HUD elements are enabled (hudHideAll = false, hudHideHealthBars = false, hudHideOverheadHp = false), overhead HP text IS drawn!
+    CONFIG.hudHideAll = false;
+    CONFIG.hudHideHealthBars = false;
+    CONFIG.hudHideOverheadHp = false;
+    fillTextCalled = false;
+    FighterRenderer.drawHealth(mockCtx, ichigo);
+    if (!fillTextCalled) {
+      throw new Error('Overhead health text was NOT drawn when all HUD elements were enabled!');
     }
     
     // Reset CONFIG back to normal defaults after test

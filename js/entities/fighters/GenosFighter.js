@@ -1321,7 +1321,10 @@ export class GenosFighter extends Fighter {
     // Mandatory Rule #1: TimeStop & Freeze Guard at top of update loop
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
+      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+      if (!isNanamiPausing) {
+        this.interruptAttacks();
+      }
       return; // Stop update execution so fighter is frozen!
     }
 

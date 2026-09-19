@@ -235,6 +235,7 @@ export const state = {
   testMode: false, // Disables leaderboard recording
   cinefilmFilter: false, // Retro Cinefilm 35mm filter toggle
   disableDimEffects: (typeof localStorage !== 'undefined' && localStorage.getItem('disableDimEffects') === 'true') || false, // Global dim effects toggle
+  quickBarMode: (typeof localStorage !== 'undefined' && localStorage.getItem('quickBarMode')) || 'auto', // 'auto' | 'off' | 'on'
   dummyAggressive: false, // Whether target dummies fight back
   dummyEnabled: true, // Whether Target Dummy appears in fighter selection
   scores: [0, 0, 0, 0],
@@ -1076,8 +1077,31 @@ export function triggerWastedOverlay(opts = {}) {
 }
 
 state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+
+/**
+ * Universal helper: returns true if any fighter in the match is currently causing a global hit-pause stasis (e.g. Nanami ratio hit, Escanor chop).
+ * @param {Object} [stateObj=state] - The game state object
+ * @param {Object} [excludeFighter=null] - Optional fighter instance to exclude from check (e.g. self)
+ * @returns {boolean}
+ */
+export function isGlobalHitPauseActive(stateObj = state, excludeFighter = null) {
+  if (!stateObj || !stateObj.fighters) return false;
+  const fighters = stateObj.fighters;
+  for (let i = 0; i < fighters.length; i++) {
+    const f = fighters[i];
+    if (f && f !== excludeFighter && f.hp > 0) {
+      if ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) return true;
+      if ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0) return true;
+    }
+  }
+  return false;
+}
+
+state.isGlobalHitPauseActive = (excludeFighter = null) => isGlobalHitPauseActive(state, excludeFighter);
+
 window.state = state;
+window.isGlobalHitPauseActive = isGlobalHitPauseActive;
 window.triggerMissionPassedOverlay = triggerMissionPassedOverlay;
 window.triggerWastedOverlay = triggerWastedOverlay;
 
-export { pushKillFeed } from '../graphics/ui/killFeedRenderer.js';
+export { pushKillFeed } from '../graphics/ui/killFeedRenderer.js';

@@ -1,7 +1,11 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import path from 'path';
+import os from 'os';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Auto-sync & scan function for ARENA-BGMUSIC folder:
 function scanAndSyncBgmFolder() {
@@ -66,7 +70,7 @@ function createWindow () {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.cjs')
     },
     frame: false, // Removes the Windows title bar and borders for a perfect 9:16 capture
     autoHideMenuBar: true

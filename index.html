@@ -3,7 +3,13 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ramball Fight" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="manifest.json" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob: file:; font-src 'self' https: data: blob: file:; style-src 'self' 'unsafe-inline' https:; media-src 'self' data: blob: file:; img-src 'self' data: blob: file: https:;">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +18,7 @@
     rel="stylesheet">
   <link rel="stylesheet" href="css/style.css?v=37" />
   <style>
-    /* Optimize HTML & Body for Centered Canvas Preview */
+    /* Optimize HTML & Body for Centered Responsive Canvas Preview */
     html,
     body {
       margin: 0;
@@ -24,7 +30,12 @@
       align-items: center;
       width: 100vw;
       height: 100vh;
+      min-height: -webkit-fill-available;
       box-sizing: border-box;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .game-container {
@@ -37,6 +48,8 @@
       margin: auto;
       box-sizing: border-box;
       flex-shrink: 0;
+      transform-origin: center center;
+      touch-action: none;
     }
 
     #arena {
@@ -49,8 +62,8 @@
 </head>
 
 <body>
-  <!-- Invisible drag handle for frameless window -->
-  <div id="drag-region" style="position: absolute; top: 0; left: 0; width: 100%; height: 50px; -webkit-app-region: drag; z-index: 99999; cursor: grab;"></div>
+  <!-- Invisible drag handle for frameless window (Electron only) -->
+  <div id="drag-region" style="position: absolute; top: 0; left: 0; width: 100%; height: 50px; -webkit-app-region: drag; z-index: 99999; cursor: grab; display: none;"></div>
 
   <div class="game-container">
     <div id="healthHudLeft" class="health-hud-side" aria-live="polite" style="display: none;"></div>
@@ -68,6 +81,25 @@
       </div>
 
       <div id="healthHud" class="health-hud" aria-live="polite" style="display: none;"></div>
+
+      <!-- Mobile / Multi-Device Floating Quick Action Bar (Combat Controls) -->
+      <div id="mobileQuickBar" class="mobile-quick-bar" style="display: none;">
+        <button id="quickBtnPause" class="quick-btn" title="Pause / Resume" aria-label="Pause / Resume">
+          <span class="quick-icon" id="quickIconPause">⏸</span>
+        </button>
+        <button id="quickBtnRestart" class="quick-btn" title="Restart Round" aria-label="Restart Round">
+          <span class="quick-icon">🔄</span>
+        </button>
+        <button id="quickBtnFullscreen" class="quick-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
+          <span class="quick-icon" id="quickIconFullscreen">⛶</span>
+        </button>
+        <button id="quickBtnCamera" class="quick-btn" title="Toggle Camera" aria-label="Toggle Camera">
+          <span class="quick-icon">🎥</span>
+        </button>
+        <button id="quickBtnSound" class="quick-btn" title="Mute / Unmute" aria-label="Mute / Unmute">
+          <span class="quick-icon" id="quickIconSound">🔊</span>
+        </button>
+      </div>
 
       <!-- Phase 4: HTML UI Layer -->
       <div id="ui-layer">
@@ -302,6 +334,26 @@
                       </div>
                     </div>
                   </div>
+
+                  <div class="tactical-card system-card" data-action="mode-tagmatch">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 1h6v6H1V1z M9 1h6v6H9V1z M5 9h6v6H5V9z" fill="#21050c"/>
+                        <path d="M2 2h4v4H2V2z" fill="#ff4d4d"/>
+                        <path d="M10 2h4v4h-4V2z" fill="#4da3ff"/>
+                        <path d="M6 10h4v4H6v-4z" fill="#ffffff"/>
+                        <path d="M7 11h2v2H7v-2z" fill="#ffd1dc"/>
+                        <path d="M3 3h2v2H3V3z" fill="#ffd1dc"/>
+                        <path d="M11 3h2v2h-2V3z" fill="#d0e8ff"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">3VS3 TAG MATCH</span>
+                        <button class="tactical-chip-btn">PLAY</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -424,13 +476,30 @@
                 </div>
               </div>
 
-              <!-- PANE 5: SETTINGS & CONFIG SUB-VIEW -->
+              <!-- PANE 5: SETTINGS MAIN CATEGORY HUB -->
               <div id="menu-view-settings" class="menu-view-pane">
                 <div class="subview-header">
                   <button class="menu-back-btn" data-back="main">◀ BACK</button>
                   <span class="subview-heading">SETTINGS</span>
                 </div>
                 <div class="subview-cards-list">
+                  <!-- Category 1: Graphics & Visuals -->
+                  <div class="tactical-card system-card" data-action="open-graphics-settings">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M6 2h4v1h2v2h1v2h1v4h-1v2h-2v1H6v-1H4v-2H3V9H2V7h1V5h1V3h2V2z" fill="#ffffff"/>
+                        <path d="M8 3h2v1h1v2h1v4h-1v2h-1v1H8V3z" fill="#21050c"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">GRAPHICS & VISUALS</span>
+                        <button class="tactical-chip-btn">OPEN ▶</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Category 2: HUD & Interface -->
                   <div class="tactical-card system-card" data-action="open-hud-settings">
                     <div class="card-left-emblem">
                       <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
@@ -441,12 +510,69 @@
                     </div>
                     <div class="card-content">
                       <div class="card-title-row">
-                        <span class="card-title">HUD SETTINGS</span>
-                        <button class="tactical-chip-btn">CONFIGURE ▶</button>
+                        <span class="card-title">HUD & INTERFACE</span>
+                        <button class="tactical-chip-btn">OPEN ▶</button>
                       </div>
                     </div>
                   </div>
 
+                  <!-- Category 3: Audio & Soundtrack -->
+                  <div class="tactical-card system-card" data-action="open-audio-settings">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M4 4h7v2h2v6h-3v2H7v-3h4V6H4v6H1v2h3V4z" fill="#ffffff"/>
+                        <path d="M2 13h1v-1H2v1z M8 13h1v-1H8v1z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">AUDIO & SOUNDTRACK</span>
+                        <button class="tactical-chip-btn">OPEN ▶</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Category 4: Combat Balance & Multipliers -->
+                  <div class="tactical-card system-card" data-action="open-balance-settings">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 8h14v2H1V8z M3 4h4v8H3V4z M9 4h4v8H9V4z" fill="#ffffff"/>
+                        <path d="M4 5h2v6H4V5z M10 5h2v6h-2V5z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">COMBAT BALANCE & MULTIPLIERS</span>
+                        <button class="tactical-chip-btn">OPEN ▶</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Category 5: System & Performance -->
+                  <div class="tactical-card system-card" data-action="open-system-settings">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M9 1L3 9h5l-2 6 8-8H9l2-6H9z" fill="#ffffff"/>
+                        <path d="M8 3L5 9h3l-1 3 4-4H8l1-5z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">SYSTEM & PERFORMANCE</span>
+                        <button class="tactical-chip-btn">OPEN ▶</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 6: GRAPHICS & VISUALS SUB-VIEW -->
+              <div id="menu-view-graphics-settings" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="settings">◀ BACK</button>
+                  <span class="subview-heading">GRAPHICS & VISUALS</span>
+                </div>
+                <div class="subview-cards-list">
                   <div class="tactical-card system-card" data-action="toggle-theme">
                     <div class="card-left-emblem">
                       <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
@@ -458,51 +584,6 @@
                       <div class="card-title-row">
                         <span class="card-title">ARENA THEME</span>
                         <button id="btn-theme" class="tactical-chip-btn">LIGHT MODE</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="tactical-card system-card" data-action="toggle-hud">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M2 2h12v9H2V2z M5 12h6v2H5v-2z M4 14h8v1H4v-1z" fill="#ffffff"/>
-                        <path d="M3 3h10v7H3V3z" fill="#21050c"/>
-                        <path d="M5 5h4v1H5V5z M5 7h6v1H5V7z" fill="#ffb8cb"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">HUD DISPLAY MODE</span>
-                        <button id="btn-hudmode" class="tactical-chip-btn">SKILL BARS</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="tactical-card system-card" data-action="toggle-darkskills">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M2 10h3v4H2v-4z M6 6h3v8H6V6z M10 2h3v12h-3V2z" fill="#ffffff"/>
-                        <path d="M3 11h1v2H3v-2z M7 7h1v6H7V7z M11 3h1v10h-1V3z" fill="#ffd1dc"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">HUD SKILL BARS</span>
-                        <button id="btn-darkskills" class="tactical-chip-btn">OFF</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="tactical-card system-card" data-action="toggle-darkstats">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M1 14h14v1H1v-1z M2 11l3-4 3 3 5-7v3h2V2h-4v2h2L9 9 6 6 2 11z" fill="#ffffff"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">HUD STATS</span>
-                        <button id="btn-darkstats" class="tactical-chip-btn">OFF</button>
                       </div>
                     </div>
                   </div>
@@ -539,21 +620,6 @@
                     </div>
                   </div>
 
-                  <div class="tactical-card system-card" data-action="toggle-perf">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M9 1L3 9h5l-2 6 8-8H9l2-6H9z" fill="#ffffff"/>
-                        <path d="M8 3L5 9h3l-1 3 4-4H8l1-5z" fill="#ffd1dc"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">PERFORMANCE MODE</span>
-                        <button id="btn-performance" class="tactical-chip-btn">OFF</button>
-                      </div>
-                    </div>
-                  </div>
-
                   <div class="tactical-card system-card" data-action="toggle-camera">
                     <div class="card-left-emblem">
                       <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
@@ -565,67 +631,6 @@
                       <div class="card-title-row">
                         <span class="card-title">CAMERA TRACKING</span>
                         <button id="btn-camera" class="tactical-chip-btn">ON</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="tactical-card system-card" data-action="toggle-fps">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M5 2h6v2H5V2z M3 5h10v8H3V5z" fill="#ffffff"/>
-                        <path d="M4 6h8v6H4V6z" fill="#21050c"/>
-                        <path d="M7 7h2v3H7V7z" fill="#ffd1dc"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">FPS & METRICS</span>
-                        <button id="btn-fps" class="tactical-chip-btn">ON</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="tactical-card system-card" data-action="toggle-bgm">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M4 4h7v2h2v6h-3v2H7v-3h4V6H4v6H1v2h3V4z" fill="#ffffff"/>
-                        <path d="M2 13h1v-1H2v1z M8 13h1v-1H8v1z" fill="#ffd1dc"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">ARENA SOUNDTRACK</span>
-                        <button id="btn-bgm" class="tactical-chip-btn">RANDOM</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="tactical-card system-card" data-action="toggle-todobgm">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M4 2h7v2h2v6h-3v2H7v-3h4V4H4v6H1v2h3V2z" fill="#ffffff"/>
-                        <path d="M2 11h1v-1H2v1z M8 11h1v-1H8v1z" fill="#ffd1dc"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">TODO ULT MUSIC</span>
-                        <button id="btn-todobgm" class="tactical-chip-btn">ON</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="tactical-card system-card" data-action="toggle-testmode">
-                    <div class="card-left-emblem">
-                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
-                        <path d="M6 2h4v3l3 7v2H3v-2l3-7V2z" fill="#ffffff"/>
-                        <path d="M7 3h2v2H7V3z M5 10l-1 2h8l-1-2H5z" fill="#ffb8cb"/>
-                      </svg>
-                    </div>
-                    <div class="card-content">
-                      <div class="card-title-row">
-                        <span class="card-title">TEST MODE</span>
-                        <button id="btn-testmode" class="tactical-chip-btn">OFF</button>
                       </div>
                     </div>
                   </div>
@@ -647,11 +652,11 @@
                 </div>
               </div>
 
-              <!-- PANE 6: HUD SETTINGS SUB-VIEW -->
+              <!-- PANE 7: HUD SETTINGS SUB-VIEW -->
               <div id="menu-view-hud-settings" class="menu-view-pane">
                 <div class="subview-header">
                   <button class="menu-back-btn" data-back="settings">◀ BACK</button>
-                  <span class="subview-heading">HUD SETTINGS</span>
+                  <span class="subview-heading">HUD & INTERFACE</span>
                 </div>
                 <div class="subview-cards-list">
                   <!-- 1. Master HUD Visibility -->
@@ -704,7 +709,7 @@
                     </div>
                   </div>
 
-                  <!-- 4. HUD Fighter Stats -->
+                  <!-- 4. HUD Stats Display -->
                   <div class="tactical-card system-card" data-action="toggle-hud-stats">
                     <div class="card-left-emblem">
                       <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
@@ -719,7 +724,7 @@
                     </div>
                   </div>
 
-                  <!-- 5. HUD Display Mode (Skill Bars vs Description) -->
+                  <!-- 5. HUD Mode Toggle (Skill Bars vs Description) -->
                   <div class="tactical-card system-card" data-action="toggle-hud-displaymode">
                     <div class="card-left-emblem">
                       <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
@@ -750,9 +755,251 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- 7. Floating Quick Bar -->
+                  <div class="tactical-card system-card" data-action="toggle-quickbar">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 5h14v6H1V5z" fill="#ffffff"/>
+                        <path d="M2 6h12v4H2V6z" fill="#21050c"/>
+                        <path d="M4 7h2v2H4V7z M7 7h2v2H7V7z M10 7h2v2h-2V7z" fill="#ffb8cb"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">FLOATING QUICK BAR</span>
+                        <button id="btn-quickbar" class="tactical-chip-btn">AUTO</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 8. FPS & Metrics -->
+                  <div class="tactical-card system-card" data-action="toggle-fps">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M5 2h6v2H5V2z M3 5h10v8H3V5z" fill="#ffffff"/>
+                        <path d="M4 6h8v6H4V6z" fill="#21050c"/>
+                        <path d="M7 7h2v3H7V7z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">FPS & METRICS</span>
+                        <button id="btn-fps" class="tactical-chip-btn">ON</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 8: AUDIO & SOUNDTRACK SUB-VIEW -->
+              <div id="menu-view-audio-settings" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="settings">◀ BACK</button>
+                  <span class="subview-heading">AUDIO & SOUNDTRACK</span>
+                </div>
+                <div class="subview-cards-list">
+                  <div class="tactical-card system-card" data-action="toggle-bgm">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M4 4h7v2h2v6h-3v2H7v-3h4V6H4v6H1v2h3V4z" fill="#ffffff"/>
+                        <path d="M2 13h1v-1H2v1z M8 13h1v-1H8v1z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">ARENA SOUNDTRACK</span>
+                        <button id="btn-bgm" class="tactical-chip-btn">RANDOM</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tactical-card system-card" data-action="toggle-todobgm">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M4 2h7v2h2v6h-3v2H7v-3h4V4H4v6H1v2h3V2z" fill="#ffffff"/>
+                        <path d="M2 11h1v-1H2v1z M8 11h1v-1H8v1z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">TODO ULT MUSIC</span>
+                        <button id="btn-todobgm" class="tactical-chip-btn">ON</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 9: SYSTEM & PERFORMANCE SUB-VIEW -->
+              <div id="menu-view-system-settings" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="settings">◀ BACK</button>
+                  <span class="subview-heading">SYSTEM & PERFORMANCE</span>
+                </div>
+                <div class="subview-cards-list">
+                  <div class="tactical-card system-card" data-action="toggle-perf">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M9 1L3 9h5l-2 6 8-8H9l2-6H9z" fill="#ffffff"/>
+                        <path d="M8 3L5 9h3l-1 3 4-4H8l1-5z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">PERFORMANCE MODE</span>
+                        <button id="btn-performance" class="tactical-chip-btn">OFF</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tactical-card system-card" data-action="toggle-testmode">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M6 2h4v3l3 7v2H3v-2l3-7V2z" fill="#ffffff"/>
+                        <path d="M7 3h2v2H7V3z M5 10l-1 2h8l-1-2H5z" fill="#ffb8cb"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">TEST SANDBOX MODE</span>
+                        <button id="btn-testmode" class="tactical-chip-btn">OFF</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 7: COMBAT BALANCE & MULTIPLIERS SUB-VIEW -->
+              <div id="menu-view-balance-settings" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="settings">◀ BACK</button>
+                  <span class="subview-heading">COMBAT BALANCE & MULTIPLIERS</span>
+                </div>
+                <div class="subview-cards-list">
+                  <!-- 1. Global Damage Multiplier -->
+                  <div class="tactical-card system-card" data-action="cycle-balance-damage">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 1h3v1h1v1h1v1h1v1h1v1h1v1h1v2h1v1h2v1h1v3h-3v-1h-1v-2h-1v-1h-1V9H8V8H7V7H6V6H5V5H4V4H3V3H2V1z" fill="#ffffff"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">DAMAGE MULTIPLIER</span>
+                        <button id="btn-balance-damage" class="tactical-chip-btn">1.0X</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 2. Global Knockback Scale -->
+                  <div class="tactical-card system-card" data-action="cycle-balance-knockback">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 14h14v1H1v-1z M2 11l3-4 3 3 5-7v3h2V2h-4v2h2L9 9 6 6 2 11z" fill="#ffffff"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">KNOCKBACK SCALE</span>
+                        <button id="btn-balance-knockback" class="tactical-chip-btn">1.0X</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 3. Global Speed Scale -->
+                  <div class="tactical-card system-card" data-action="cycle-balance-speed">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M9 1L3 9h5l-2 6 8-8H9l2-6H9z" fill="#ffffff"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">GAME SPEED SCALE</span>
+                        <button id="btn-balance-speed" class="tactical-chip-btn">1.0X</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 4. Global Cooldown Scale -->
+                  <div class="tactical-card system-card" data-action="cycle-balance-cooldown">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M6 1h4v2h2v2h1v2h1v2h-1v2h-2v2H6v-2H4v-2H3V9H2V7h1V5h1V3h2V1z" fill="#ffffff"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">COOLDOWN SCALE</span>
+                        <button id="btn-balance-cooldown" class="tactical-chip-btn">1.0X</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 5. Reset All Multipliers -->
+                  <div class="tactical-card system-card" data-action="reset-balance-all">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 2h12v12H2V2z" fill="#cf3355"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">RESET ALL TO 1.0X</span>
+                        <button class="tactical-chip-btn">RESET</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Combat Balance & Live Debug HUD Overlay (Toggle with F2) -->
+      <div id="balanceDebugOverlay" class="balance-debug-overlay" style="display: none;">
+        <div class="debug-header">
+          <span class="debug-title">⚙️ LIVE COMBAT TUNER</span>
+          <button id="debugCloseBtn" class="debug-close-btn" title="Close Overlay (F2)">✕</button>
+        </div>
+        <div class="debug-body">
+          <div class="debug-row">
+            <span class="debug-label">Damage</span>
+            <div class="debug-stepper">
+              <button class="debug-step-btn" data-debug-step="damageScale" data-step="-0.25">-</button>
+              <span id="debugValDamage" class="debug-val">1.0x</span>
+              <button class="debug-step-btn" data-debug-step="damageScale" data-step="0.25">+</button>
+            </div>
+          </div>
+          <div class="debug-row">
+            <span class="debug-label">Knockback</span>
+            <div class="debug-stepper">
+              <button class="debug-step-btn" data-debug-step="knockbackScale" data-step="-0.25">-</button>
+              <span id="debugValKnockback" class="debug-val">1.0x</span>
+              <button class="debug-step-btn" data-debug-step="knockbackScale" data-step="0.25">+</button>
+            </div>
+          </div>
+          <div class="debug-row">
+            <span class="debug-label">Speed</span>
+            <div class="debug-stepper">
+              <button class="debug-step-btn" data-debug-step="speedScale" data-step="-0.25">-</button>
+              <span id="debugValSpeed" class="debug-val">1.0x</span>
+              <button class="debug-step-btn" data-debug-step="speedScale" data-step="0.25">+</button>
+            </div>
+          </div>
+          <div class="debug-row">
+            <span class="debug-label">Cooldown</span>
+            <div class="debug-stepper">
+              <button class="debug-step-btn" data-debug-step="cooldownScale" data-step="-0.25">-</button>
+              <span id="debugValCooldown" class="debug-val">1.0x</span>
+              <button class="debug-step-btn" data-debug-step="cooldownScale" data-step="0.25">+</button>
+            </div>
+          </div>
+          <div class="debug-footer">
+            <button id="debugResetBtn" class="debug-action-btn">Reset All (1.0x)</button>
+            <span class="debug-hint">Press [F2] anytime</span>
           </div>
         </div>
       </div>
@@ -789,6 +1036,13 @@
   <span style="font-family: 'Pricedown'; position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true">mission passed! RESPECT +</span>
 
   <script type="module" src="js/core/main.js?v=77"></script>
+  <script>
+    // Enable frameless drag handle only when running inside Electron
+    if (typeof window !== 'undefined' && (window.electronAPI || navigator.userAgent.toLowerCase().includes('electron'))) {
+      const dragRegion = document.getElementById('drag-region');
+      if (dragRegion) dragRegion.style.display = 'block';
+    }
+  </script>
 </body>
 
 </html>

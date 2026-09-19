@@ -313,9 +313,13 @@ export function renderMahitoDomainBackground(fighter, ctx, isClashSecondary = fa
     ctx.globalAlpha = 0.75;
   }
 
-  // 2. Base Dark Purple/Black Background
-  ctx.fillStyle = '#0a0310';
+  // 2. Base Pitch Abyss / Black-Violet Background
+  ctx.fillStyle = '#040008';
   ctx.fillRect(ax, ay, aw, ah);
+
+  const cx = ax + aw / 2;
+  const cy = ay + ah / 2;
+  const maxR = Math.max(aw, ah) * 0.75;
 
   // 3. Draw Mahito Domain Overlay Image (Assets/Overlays/mahitos-de.png) occupying the arena
   const img = getMahitoDomainImage();
@@ -324,20 +328,24 @@ export function renderMahitoDomainBackground(fighter, ctx, isClashSecondary = fa
     ctx.drawImage(img, ax, ay, aw, ah);
   } else {
     // Procedural Cursed Violet Nebula fallback while asset initializes
-    const cx = ax + aw / 2;
-    const cy = ay + ah / 2;
-    const maxR = Math.max(aw, ah) * 0.6;
     const nebulaGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxR);
-    nebulaGrad.addColorStop(0, 'rgba(192, 38, 211, 0.45)');
-    nebulaGrad.addColorStop(0.3, 'rgba(147, 51, 234, 0.30)');
-    nebulaGrad.addColorStop(0.65, 'rgba(88, 28, 135, 0.20)');
-    nebulaGrad.addColorStop(1, 'rgba(10, 3, 16, 0.0)');
+    nebulaGrad.addColorStop(0, 'rgba(217, 70, 239, 0.50)');
+    nebulaGrad.addColorStop(0.25, 'rgba(147, 51, 234, 0.35)');
+    nebulaGrad.addColorStop(0.55, 'rgba(88, 28, 135, 0.25)');
+    nebulaGrad.addColorStop(0.85, 'rgba(26, 3, 40, 0.15)');
+    nebulaGrad.addColorStop(1, 'rgba(4, 0, 8, 0.0)');
     ctx.fillStyle = nebulaGrad;
     ctx.fillRect(ax, ay, aw, ah);
   }
 
-  // 4. Subtle Cursed Vignette / Overlay on top of image
-  ctx.fillStyle = 'rgba(15, 3, 20, 0.35)';
+  // 4. Dark Multi-Stop Cursed Radial Vignette (keeps center hands clear while darkening perimeter)
+  const vignetteGrad = ctx.createRadialGradient(cx, cy, Math.min(aw, ah) * 0.15, cx, cy, maxR);
+  vignetteGrad.addColorStop(0.00, 'rgba(20, 2, 28, 0.08)');
+  vignetteGrad.addColorStop(0.35, 'rgba(14, 1, 22, 0.32)');
+  vignetteGrad.addColorStop(0.65, 'rgba(8, 0, 14, 0.62)');
+  vignetteGrad.addColorStop(0.85, 'rgba(4, 0, 8, 0.82)');
+  vignetteGrad.addColorStop(1.00, 'rgba(2, 0, 4, 0.94)');
+  ctx.fillStyle = vignetteGrad;
   ctx.fillRect(ax, ay, aw, ah);
 
   // 5. Exclude Gojo Limitless Infinity Barrier from dark overlay (Rule #9)

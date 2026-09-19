@@ -1,13 +1,19 @@
 {
   "name": "fight-of-larpers-101",
   "version": "1.0.0",
+  "type": "module",
   "description": "Fight of Larpers 101 - Mini-Battle arena designed for 9:16 OBS capture and Electron desktop app",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
     "start:electron": "electron .",
+    "start:web": "serve -l 8000 .",
+    "preview": "serve -l 8000 .",
     "verify": "node scripts/verifyCodebase.js",
     "test": "node scripts/testAllFighters.mjs",
+    "test:tag": "node scripts/testTagMatch.mjs",
+    "test:interactions": "node scripts/testInteractions.mjs",
+    "scaffold:fighter": "node scripts/scaffoldFighter.mjs",
     "build": "electron-builder --win"
   },
   "author": "",

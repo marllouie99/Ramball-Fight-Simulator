@@ -10,7 +10,7 @@ import { renderGame } from './renderSystem.js';
 import { getAudioCurrentTime } from './soundSystem.js';
 
 export const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-export const TARGET_FPS = isMobile ? 30 : 60; // Lower FPS on mobile to reduce heating
+export const TARGET_FPS = 60; // Standard 60 FPS across all devices for consistent combat physics
 export const FRAME_TIME = 1000 / TARGET_FPS;
 let lastFrameTime = 0;
 let isPageVisible = true;

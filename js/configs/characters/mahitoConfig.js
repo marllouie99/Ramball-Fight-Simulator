@@ -4,8 +4,8 @@
 
 export const mahitoConfig = {
   // ── 1. BASE ATTRIBUTES & CORE STATS ────────────────────────────────────────
-  hp: 230,
-  damage: 16,
+  hp: 200,
+  damage: 7,
   speed: 5.8,
   moveSpeed: 5.8,
   r: 25,
@@ -16,7 +16,7 @@ export const mahitoConfig = {
   startY: 250,
   startVx: 1.2,
   startVy: 1.0,
-  cooldown: 22,
+  cooldown: 55,
   projectileSpeedMultiplier: 1.0,
   ability: 'Soul Scalpel Claws',
   desc: 'Wields 4 curved scythe-talon claws. Passive: Phantom Soul Slip phases directly through enemies with a high-speed claw cross-slice. Secondary skill unleashes Subterranean Flesh Surge; transforms into Distorted Killing form.',
@@ -39,13 +39,13 @@ export const mahitoConfig = {
 
   // ── 2. PASSIVE: PHANTOM SOUL SLIP (Phase-Through Claw Dash) ────────────────
   soulPhaseSlip: {
-    cooldown: 100,                 // 3 seconds cooldown between passive dashes
+    cooldown: 500,                 // 3 seconds cooldown between passive dashes
     triggerRangeMin: 70,           // Minimum distance to target to trigger dash
     triggerRangeMax: 300,          // Maximum distance to target to trigger dash
     dashSpeed: 24.0,               // High supersonic dash speed
     dashDuration: 12,              // 12 frames of high-speed phase-through motion
     passThroughDistance: 100,      // Distance behind the enemy Mahito arrives at
-    slashDamage: 22,               // Damage dealt when slicing as he phases through
+    slashDamage: 12,               // Damage dealt when slicing as he phases through
     hitStunDuration: 14,           // Stagger stun applied to the phased target
     knockbackForce: 6,             // Push impulse
   },
@@ -63,7 +63,7 @@ export const mahitoConfig = {
     lingerDuration: 18,            // How long the humps stay fully visible/extended
     retractSpeed: 14.0,            // Retraction speed in px/frame for distance-based pullback
     explosionRadius: 48,           // Impact AOE radius per eruption point
-    damage: 24,                    // Base area damage
+    damage: 18,                    // Base area damage
     hitStun: 12,                   // Base hit-stun frames applied to targets
     knockbackForce: 8,             // Physical push impulse
     screenShake: 6,                // Impact screen shake intensity
@@ -78,11 +78,11 @@ export const mahitoConfig = {
     morphDuration: 45,             // Suspension duration (0.75s) while slowly morphing into spiked ball
     maceRadiusBase: 22,            // Size of the fully morphed spiked mace head
     maceRadiusTransformed: 29,     // Size of transformed chitin spiked head
-    impactDamage: 30,              // Primary impact strike damage
+    impactDamage: 22,              // Primary impact strike damage
     explosionRadius: 85,           // Shrapnel blast radius
     shrapnelCount: 10,             // Number of flying bone/flesh spikes
     shrapnelSpeed: 14.0,           // Velocity of flying spikes
-    shrapnelDamage: 12,            // Damage per shrapnel spike hit
+    shrapnelDamage: 6,             // Damage per shrapnel spike hit
     shrapnelHitStun: 14,           // Stagger stun per spike
     knockbackForce: 13,            // Heavy knockback from explosion
     screenShake: 8,                // Screen shake intensity
@@ -97,7 +97,7 @@ export const mahitoConfig = {
     stretchSpeed: 25.0,            // Outward flanking arc stretch speed in px/frame
     morphDuration: 24,             // Blade morph time at flanking points
     clampSpeed: 26.0,              // Inward scissor snap speed
-    damage: 34,                    // Scissor guillotine slice damage
+    damage: 24,                    // Scissor guillotine slice damage
     hitStun: 45,                   // Heavy stagger stun
     stunDuration: 45,              // Stun duration applied to enemy (45 frames / 0.75s)
     knockbackForce: 10,            // Hook pull-in force towards caster
@@ -110,17 +110,17 @@ export const mahitoConfig = {
     cooldown: 1000,                 // Cooldown in frames (approx. 8.3s)
     minDistanceAlt: 250,           // Below this: summon minions. Above this: fire Body Repel projectile.
     summonCount: 1,                // Summons Transfigured Humans
-    minionHp: 50,                  // HP per summoned Transfigured Human
-    minionDamage: 10,              // Base bite damage
+    minionHp: 35,                  // HP per summoned Transfigured Human
+    minionDamage: 6,               // Base bite damage
     minionSpeed: 1.8,              // Active homing chase speed
     minionBiteCooldown: 10,        // Frames cooldown between bite attacks
     minionSize: 30,                // Minion body circle radius
     minionDeathDuration: 50,       // Swelling/expansion animation duration in frames
     minionExpandMaxScale: 1.5,     // Maximum visual scale expansion before popping
     minionExplosionRadius: 100,    // AOE explosion radius
-    minionExplosionDamage: 50,     // AOE explosion damage
+    minionExplosionDamage: 24,     // AOE explosion damage
     minionExplosionKnockback: 12,  // AOE knockback push force
-    bodyRepelDamage: 50,           // Body Repel direct projectile damage
+    bodyRepelDamage: 30,           // Body Repel direct projectile damage
     bodyRepelSpeed: 10.0,          // Body Repel projectile movement speed
     bodyRepelRadius: 50,           // Body Repel collision check radius
     bodyRepelLife: 90,             // Projectile frame duration limit
@@ -131,12 +131,12 @@ export const mahitoConfig = {
   soulDisfigurement: {
     maxStacks: 5,                  // Stacks required for violent soul reshape detonation
     duration: 300,                 // Stacks linger for 300 frames (5s) before resetting
-    burstDamage: 100,               // True unmitigated soul damage at max stacks
+    burstDamage: 38,               // True unmitigated soul damage at max stacks
     burstHitStun: 300,             // Heavy stagger stun upon soul detonation
     paralyzeDuration: 20,          // Paralyze debuff duration in frames (0.75s) upon reaching max stacks
     burstKnockback: 20,            // Massive physical explosion push
     burstScreenShake: 8,           // Impact screen shake intensity
-    ruptureDamage: 24,             // Final soul rupture explosion damage right before paralyze expires
+    ruptureDamage: 16,             // Final soul rupture explosion damage right before paralyze expires
     ruptureKnockback: 14,          // Outward impulse from the expiration rupture
     ruptureScreenShake: 10,        // Screen shake on rupture
     shiverIntensity: 10,           // Intensity of shivering vibration applied to afflicted/paralyzed enemies (pixels)
@@ -152,7 +152,7 @@ export const mahitoConfig = {
   shiverIntensity: 4.2,
   
   // Soul / Defense Mechanics
-  soulDurabilityReduction: 0.02,   // Passive damage reduction vs regular attacks
+  soulDurabilityReduction: 0.05,   // Passive damage reduction vs regular attacks
 
   // ── 8. SURVIVAL & REGENERATION MECHANICS ───────────────────────────────────
   regen: {
@@ -176,11 +176,11 @@ export const mahitoConfig = {
     enabled: false,                 // Master toggle to enable or disable Distorted Killing transformation (set to false to disable)
     duration: 600,                 // 10 seconds active duration
     cooldown: 1200,                // 20 seconds cooldown
-    defenseMultiplier: 0.50,       // Takes 50% less damage (high armor)
-    damageMultiplier: 1.60,        // +60% attack power
+    defenseMultiplier: 0.80,       // Takes 20% less damage (high armor)
+    damageMultiplier: 1.25,        // +25% attack power
     moveSpeedMultiplier: 0.70,     // -30% movement speed penalty
     autoTransformThreshold: 0.10,  // Automatically transform when HP drops to 10% or less
-    healPercentage: 0.25,          // Recover 25% of max HP on transformation
+    healPercentage: 0.20,          // Recover 20% of max HP on transformation
     knockbackMultiplier: 1.75,     // Extra heavy knockback when transformed
     hitStunMultiplier: 1.5,        // +50% hit-stun duration
     
@@ -208,27 +208,27 @@ export const mahitoConfig = {
 
   // ── 11. ULTIMATE: DOMAIN EXPANSION ──────────────────────────────
   domainExpansion: {
-    cooldown: 1000,                // 33 seconds cooldown
+    cooldown: 2000,                // 33 seconds cooldown
     chargeMax: 120,                // 2 seconds channeling duration before domain opens
-    duration: 500,                 // 6.6 seconds of paralyzing stasis
+    duration: 600,                 // 5.0 seconds of paralyzing stasis
     radius: 9999,                  // Closed barrier - covers the whole screen
     executionDamageMultiplier: 0,// Execution strike deals 50% max HP true damage
     executionHitStun: 60,          // Massive hit stun on execution
     executionKnockback: 35,        // Massive knockback on execution
     executionScreenShake: 16,      // Massive screen shake
-    slowMultiplier: 0.15,          // Move speed multiplier for trapped targets inside domain (85% slow)
+    slowMultiplier: 0.55,          // Move speed multiplier for trapped targets inside domain (85% slow)
     velocityDampening: 0.85,       // Velocity damping rate per frame inside domain
     basicAttackCooldownMultiplier: 2.00, // Basic attack speed multiplier inside domain (1.50 = 1.5x faster hit & damage rate)
     attacksToTriggerDisfigurement: 5,    // Basic attack hits required inside domain to trigger Soul Disfigurement & Rupture
-    disfigurementDamageMultiplier: 1.50, // Damage multiplier for Soul Disfigurement burst damage inside domain (+50% damage)
-    ruptureDamageMultiplier: 5.0,        // Damage multiplier for Soul Rupture explosion damage inside domain
+    disfigurementDamageMultiplier: 1.20, // Damage multiplier for Soul Disfigurement burst damage inside domain (+20% damage)
+    ruptureDamageMultiplier: 1.2,       // Damage multiplier for Soul Rupture explosion damage inside domain
     anyDistanceBasicAttack: true,        // Inside domain, Idle Transfiguration basic attack triggers at ANY distance
     punchRangeMultiplier: 99999,         // Reach multiplier inside domain
     domainRangeBoost: 200,               // Displayed attack reach boost inside domain (+200px reach)
     
     // Domain Lifesteal Mechanics (Vampiric Soul Absorption inside Self-Embodiment of Perfection)
     enableDomainLifesteal: true,          // Master toggle for domain lifesteal heal
-    lifestealPercent: 0.70,               // HP recovered as percentage of damage dealt inside domain (0.50 = 50% lifesteal)
+    lifestealPercent: 0.10,               // HP recovered as percentage of damage dealt inside domain (0.30 = 30% lifesteal)
   },
 
   // ── 12. SOUND EFFECTS & AUDIO VOLUME ADJUSTMENTS ───────────────────────────

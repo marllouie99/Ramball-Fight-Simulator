@@ -1,6 +1,6 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
-import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound, playLoopingSound, fadeOutLoopingSound, stopLoopingSound, pauseLoopingSound, resumeLoopingSound } from '../../systems/soundSystem.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -620,13 +620,17 @@ export class SukunaFighter extends Fighter {
       this.interruptAttacks(true);
     }
 
+    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+
     if ((this.isChannelingDomainExpansion || this.isChannelingDivineFlame) && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0 && !this.caughtInPureLoveBeam && (this.pureLoveBeamTimer || 0) <= 0) {
       // Unstoppable Skill/Domain Channeling Hyper-Armor: Clear all hitStun & paralyze freezes (Purple, Getsuga, etc.) so non-Toji attacks cannot interrupt!
       this.hitStunTimer = 0;
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
-      this.timeStopTimer = 0;
+      if (!isNanamiPausing) {
+        this.timeStopTimer = 0;
+      }
       this.purpleHitTimer = 0;
       this.isCaughtInPurple = false;
       this._hitByGetsugaTimer = 0;
@@ -648,12 +652,12 @@ export class SukunaFighter extends Fighter {
           this._hasPlayedDomainActivateSound = false;
         }
       }
-      // Pause Fuga audio while frozen in Gojo's domain so audio stops until domain ends
+      // Pause Fuga audio while frozen in Gojo's domain or Nanami hit-pause so audio stops until domain ends
       if (this.isChannelingDivineFlame && this.fugaSoundKey && !this.isTargetOfAmbush) {
         pauseLoopingSound(this.fugaSoundKey);
       }
-      if (isFrozen && (!this.isChannelingDomainExpansion && !this.isChannelingDivineFlame || this.isTargetOfAmbush || (this.silenceTimer || 0) > 0)) {
-        return; // Freeze Sukuna completely while inside Gojo's Unlimited Void / time-stop unless channeling domain/fuga with hyper-armor
+      if (isNanamiPausing || (isFrozen && (!this.isChannelingDomainExpansion && !this.isChannelingDivineFlame || this.isTargetOfAmbush || (this.silenceTimer || 0) > 0))) {
+        return; // Freeze Sukuna completely while inside Gojo's Unlimited Void / time-stop / Nanami hit-pause
       }
     }
 

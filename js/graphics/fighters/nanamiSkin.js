@@ -10,32 +10,75 @@ import { drawNanamiCleaver, drawNanamiCollapseShockwaves, drawNanamiBlackFlashAc
 import { GojoRenderer } from './gojoRenderer.js';
 import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
-let _nanamiSkinImage = null;
-let _nanamiSkinImageLoading = false;
+let _nanamiHairImage = null;
+let _nanamiHairImageLoading = false;
 
-export function _getNanamiSkinImage() {
-  if (_nanamiSkinImage && _nanamiSkinImage.complete && _nanamiSkinImage.naturalWidth > 0) {
-    return _nanamiSkinImage;
+export function _getNanamiHairImage() {
+  if (_nanamiHairImage && _nanamiHairImage.complete && _nanamiHairImage.naturalWidth > 0) {
+    return _nanamiHairImage;
   }
-  if (!_nanamiSkinImageLoading && typeof Image !== 'undefined') {
-    _nanamiSkinImageLoading = true;
+  if (!_nanamiHairImageLoading && typeof Image !== 'undefined') {
+    _nanamiHairImageLoading = true;
     const img = new Image();
     img.onload = () => {
-      _nanamiSkinImage = img;
-      _nanamiSkinImageLoading = false;
+      _nanamiHairImage = img;
+      _nanamiHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Nanami pixel skin image at Assets/model/Nanami-PIXEL-SKIN.png', e);
-      _nanamiSkinImageLoading = false;
+      console.warn('Failed to load Nanami hair image at Assets/model/Nanami-hair.png', e);
+      _nanamiHairImageLoading = false;
     };
-    img.src = 'Assets/model/Nanami-PIXEL-SKIN.png?v=1';
-    _nanamiSkinImage = img;
+    img.src = 'Assets/model/Nanami-hair.png?v=1';
+    _nanamiHairImage = img;
   }
-  return _nanamiSkinImage;
+  return _nanamiHairImage;
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getNanamiSkinImage();
+  _getNanamiHairImage();
+}
+
+/**
+ * Draws Nanami's signature 7:3 blonde side-part hair from Assets/model/Nanami-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawNanamiHair(ctx, r, facingLeft = false) {
+  const hairImg = _getNanamiHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.nanami) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // Nanami-hair.png (1345x1170). True visible hair bounding box:
+    // X: [73, 1324] (width 1252, horizontal center at 698.5)
+    // Y: [250, 1046] (height 797, top crown at 250)
+    // Calibrated to seamlessly frame the upper circle with crown at -1.15r
+    const targetHairWidth = r * 2.45 * wMult;
+    const targetHairHeight = r * 1.55 * hMult;
+    const scaleX = targetHairWidth / 1252;
+    const scaleY = targetHairHeight / 797;
+    const drawW = 1345 * scaleX;
+    const drawH = 1170 * scaleY;
+    const drawX = -698.5 * scaleX + offX;
+    const drawY = -r * 1.15 - 250 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
 }
 
 // Pre-computed normalized constants to eliminate per-frame GC allocations
@@ -84,7 +127,7 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
   
   if (fighter && fighter._isWinnerReveal) return;
 
-  const auraAlpha = isOvertime ? 1.0 : (fighter.combatAuraOpacity || 0);
+  const auraAlpha = Math.min(1.0, Math.max(0.0, fighter.combatAuraOpacity || 0));
   if (auraAlpha <= 0.01) return;
 
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
@@ -279,11 +322,13 @@ export function drawNanamiAfterImages(ctx, fighter) {
     ctx.arc(0, 0, (ai.r || r) * 0.95, 0, Math.PI);
     ctx.fill();
 
-    // 3. Blonde 7:3 hair silhouette (-Y Top Hemisphere)
-    ctx.fillStyle = 'rgba(245, 224, 123, 0.65)';
+    // 3. Head silhouette (-Y Top Hemisphere)
+    ctx.fillStyle = 'rgba(243, 203, 176, 0.50)';
     ctx.beginPath();
     ctx.arc(0, 0, (ai.r || r) * 0.98, Math.PI, Math.PI * 2);
     ctx.fill();
+
+    _drawNanamiHair(ctx, ai.r || r, facingLeft);
 
     // 4. Ghost Cleaver Blade
     drawNanamiCleaver(ctx, 0, 0, 0, ai.r || r, false);
@@ -358,7 +403,7 @@ export function drawNanamiSkin(ctx, fighter) {
       const windupP = rawProgress / 0.45;
       const easeWindup = Math.sin(windupP * (Math.PI / 2));
       frontX = r * 0.50 - easeWindup * (r * 0.30);
-      frontY = -r * 0.45 * easeWindup;
+      frontY = r * 0.15 - easeWindup * (r * 0.45);
       backX = frontX - 13;
       backY = frontY + 3;
     } else {
@@ -366,7 +411,7 @@ export function drawNanamiSkin(ctx, fighter) {
       const slamP = (rawProgress - 0.45) / 0.55;
       const easeSlam = Math.pow(slamP, 1.8);
       frontX = r * 0.50 + easeSlam * (r * 0.85);
-      frontY = -r * 0.45 + easeSlam * (r * 0.80);
+      frontY = r * 0.15 - r * 0.45 + easeSlam * (r * 0.80);
       backX = frontX - 13;
       backY = frontY + 3;
     }
@@ -378,23 +423,23 @@ export function drawNanamiSkin(ctx, fighter) {
     const snapP = t * t * (3 - 2 * t);
     const extendBonus = isFinalBlitz ? 1.25 : 1.0;
     frontX = r * 0.95 + snapP * (r * 0.70 * extendBonus);
-    frontY = -r * 0.20 + snapP * (r * 0.38);
+    frontY = r * 0.10 + snapP * (r * 0.38);
     if (!hideBackHand) {
       backX = frontX - 13;
       backY = frontY + 3;
     }
   } else if (isPunching) {
     frontX = r * 0.95 + lungeExtension;
-    frontY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
+    frontY = r * 0.25 + Math.sin(rawProgress * Math.PI) * (r * 0.20);
   } else {
-    // Idle stance: Front hand at the right edge of his body circle
-    frontX = r * 0.95;
-    frontY = 0;
+    // Idle stance: Front hand lowered naturally to hip / lower guard side
+    frontX = r * 0.92;
+    frontY = r * 0.25;
   }
 
   const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand;
-  const handRadius = getHandSize(7.5);
+  const handRadius = getHandSize(5.2);
   const skinColor = '#F3CBB0';
 
   // ── LAYER 1: BACK HAND (Visible for 2-handed Collapse ground slam) ──
@@ -402,8 +447,11 @@ export function drawNanamiSkin(ctx, fighter) {
     _drawFist(ctx, backX, backY, handRadius * 0.95, skinColor, fighter, false);
   }
 
-  // ── LAYER 2: BODY CIRCLE (Authentic Procedural Pixel Art) ──
+  // ── LAYER 2: BODY CIRCLE ──
   drawNanamiPixelBody(ctx, r, isOvertime);
+
+  // ── LAYER 3: 7:3 SIDE-PART HAIR OVERLAY (Assets/model/Nanami-hair.png) ──
+  _drawNanamiHair(ctx, r, facingLeft);
 
   // Status overlays (stun, freeze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
@@ -451,14 +499,14 @@ export function drawNanamiPixelBody(ctx, r, isOvertime = false) {
     }
   }
 
-  // Predefined tie splotch coordinates
+  // Predefined tie splotch coordinates (calibrated for lowered tie blade)
   const tieSpots = [
-    { x: 0.0, y: 0.34, r: 0.035 },
-    { x: -0.04, y: 0.48, r: 0.04 },
-    { x: 0.03, y: 0.58, r: 0.045 },
-    { x: -0.05, y: 0.68, r: 0.04 },
-    { x: 0.04, y: 0.78, r: 0.045 },
-    { x: -0.03, y: 0.88, r: 0.04 }
+    { x: 0.0, y: 0.46, r: 0.035 },
+    { x: -0.04, y: 0.56, r: 0.04 },
+    { x: 0.03, y: 0.66, r: 0.045 },
+    { x: -0.05, y: 0.76, r: 0.04 },
+    { x: 0.04, y: 0.86, r: 0.045 },
+    { x: -0.03, y: 0.94, r: 0.04 }
   ];
 
   // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
@@ -538,54 +586,41 @@ export function drawNanamiPixelBody(ctx, r, isOvertime = false) {
         ctx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // 2. 7:3 BLONDE SIDE-PART HAIR (ry < hairlineY)
+      // 2. CLEAN BALD HEAD, FACE, JAW & FAIR SKIN (ry < r * 0.32)
       // ──────────────────────────────────────────
-      else if (ry < hairlineY) {
-        let col = '#E5B25D';
-        if (ry < -r * 0.70) {
-          col = '#FDE68A';
-        } else if (Math.abs(rx - r * 0.35) < P * 1.5 && ry < -r * 0.40) {
-          col = '#FFF3B8';
-        } else if (ry > hairlineY - P * 2.2) {
-          col = '#B47B2A';
-        } else if (Math.abs(rx) > r * 0.75) {
-          col = '#C99342';
-        }
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // 3. WARM FAIR FACE SKIN (hairlineY <= ry < r * 0.18)
-      // ──────────────────────────────────────────
-      else if (ry < r * 0.18) {
+      else if (ry < r * 0.32) {
         let col = '#F3CBB0';
-        if (ry < hairlineY + P * 2.0) {
-          col = '#DEAE90';
-        } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.10) {
-          col = '#E2B294';
+        if (ry < -r * 0.65) {
+          col = '#FFF0E4'; // Crown dome volumetric glint
+        } else if (ry < -r * 0.40) {
+          col = '#FBE2D0'; // Forehead highlight
+        } else if (Math.abs(rx) > r * 0.72) {
+          col = '#DEAE90'; // Side temple / cheek shadow
+        } else if (ry > r * 0.16) {
+          col = '#DEAE90'; // Chin & jawline shadow (clean separation from collar)
         }
         ctx.fillStyle = col;
         ctx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // 4. SHIRT, SUSPENDERS & NECKTIE (ry >= r * 0.18)
+      // 4. LOWERED SHIRT, SUSPENDERS & NECKTIE (ry >= r * 0.32)
       // ──────────────────────────────────────────
       else {
         // A. Neck Skin & Collar V-Opening
-        const isNeckV = (ry <= r * 0.38 && Math.abs(rx) <= (1 - (ry - r * 0.18) / (r * 0.20)) * (r * 0.18));
+        const isNeckV = (ry <= r * 0.50 && Math.abs(rx) <= (1 - (ry - r * 0.32) / (r * 0.18)) * (r * 0.18));
 
         // B. Loosened Olive Necktie
-        const isTieKnot = (ry >= r * 0.26 && ry <= r * 0.42 && Math.abs(rx) <= r * 0.10);
-        const tieBladeHalfW = (r * 0.08 + (ry - r * 0.42) * 0.12);
-        const isTieBlade = (ry >= r * 0.42 && ry <= r * 0.98 && Math.abs(rx) <= tieBladeHalfW);
+        const isTieKnot = (ry >= r * 0.38 && ry <= r * 0.52 && Math.abs(rx) <= r * 0.10);
+        const tieBladeHalfW = (r * 0.08 + (ry - r * 0.52) * 0.12);
+        const isTieBlade = (ry >= r * 0.52 && ry <= r * 0.98 && Math.abs(rx) <= tieBladeHalfW);
 
         // C. Reddish-Brown Leather Suspenders (Left & Right)
-        const isSuspenderLeft = (rx >= -r * 0.65 && rx <= -r * 0.46 && ry >= r * 0.18);
-        const isSuspenderRight = (rx >= r * 0.46 && rx <= r * 0.65 && ry >= r * 0.18);
+        const isSuspenderLeft = (rx >= -r * 0.65 && rx <= -r * 0.46 && ry >= r * 0.32);
+        const isSuspenderRight = (rx >= r * 0.46 && rx <= r * 0.65 && ry >= r * 0.32);
 
         // D. Shirt Collar Flaps & Buttons
-        const isCollarLeft = (rx >= -r * 0.32 && rx <= -r * 0.12 && ry >= r * 0.18 && ry <= r * 0.36 && (rx - (-r * 0.32)) * 0.9 > (ry - r * 0.18));
-        const isCollarRight = (rx >= r * 0.12 && rx <= r * 0.32 && ry >= r * 0.18 && ry <= r * 0.36 && (r * 0.32 - rx) * 0.9 > (ry - r * 0.18));
+        const isCollarLeft = (rx >= -r * 0.32 && rx <= -r * 0.10 && ry >= r * 0.32 && ry <= r * 0.48 && (rx - (-r * 0.32)) * 0.9 > (ry - r * 0.32));
+        const isCollarRight = (rx >= r * 0.10 && rx <= r * 0.32 && ry >= r * 0.32 && ry <= r * 0.48 && (r * 0.32 - rx) * 0.9 > (ry - r * 0.32));
 
         let isSpot = false;
         if (isTieKnot || isTieBlade) {
@@ -600,7 +635,7 @@ export function drawNanamiPixelBody(ctx, r, isOvertime = false) {
         if (isSpot) {
           ctx.fillStyle = '#141618';
         } else if (isTieKnot || isTieBlade) {
-          if (ry < r * 0.30) {
+          if (ry < r * 0.44) {
             ctx.fillStyle = '#BDB564';
           } else if (Math.abs(rx) > tieBladeHalfW - P * 1.2) {
             ctx.fillStyle = '#78702E';
@@ -608,13 +643,13 @@ export function drawNanamiPixelBody(ctx, r, isOvertime = false) {
             ctx.fillStyle = '#9A924D';
           }
         } else if (isCollarLeft || isCollarRight) {
-          if (Math.hypot(Math.abs(rx) - r * 0.22, ry - r * 0.26) <= P * 1.0) {
+          if (Math.hypot(Math.abs(rx) - r * 0.22, ry - r * 0.38) <= P * 1.0) {
             ctx.fillStyle = '#E8EEF5';
           } else {
             ctx.fillStyle = '#244B74';
           }
         } else if (isNeckV) {
-          ctx.fillStyle = (ry > r * 0.28) ? '#D49D7E' : '#E8BCA0';
+          ctx.fillStyle = (ry > r * 0.40) ? '#D49D7E' : '#E8BCA0';
         } else if (isSuspenderLeft || isSuspenderRight) {
           const suspX = isSuspenderLeft ? (rx - (-r * 0.55)) : (rx - (r * 0.55));
           if (Math.abs(suspX) < P * 0.8) {
@@ -629,7 +664,7 @@ export function drawNanamiPixelBody(ctx, r, isOvertime = false) {
           let col = '#2B5882';
           if (Math.abs(rx) > r * 0.72 || ry > r * 0.85) {
             col = '#1A3957';
-          } else if (ry < r * 0.45 && Math.abs(rx) < r * 0.45) {
+          } else if (ry < r * 0.55 && Math.abs(rx) < r * 0.45) {
             col = '#346594';
           }
           ctx.fillStyle = col;

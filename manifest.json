@@ -1,0 +1,25 @@
+{
+  "name": "Ramball Mini-Battle Fight Simulator",
+  "short_name": "Ramball Fight",
+  "description": "High-octane anime mini-battle arena fight simulator with custom combat arts and responsive physics",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "categories": ["games", "action", "entertainment"],
+  "icons": [
+    {
+      "src": "Assets/KnightSword.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "Assets/KnightSword.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

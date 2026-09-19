@@ -8,61 +8,75 @@ import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawCronosPreActivateBarrier, drawCronosSphereImpact, drawCronosSphereVisual } from '../../graphics/draw.js';
 import { drawCronosCrescentBlade } from '../../graphics/weapons/cronosWeaponGraphics.js';
+import { drawCronosSkin, drawCronosPixelBody } from '../../graphics/fighters/cronosSkin.js';
 import { spatialGrid } from '../../systems/physics.js';
 
-// ── Module-level cached hex vertex cos/sin (avoids recomputing every frame) ──
-const _HEX_ANG = Math.PI / 3;
-const _BODY_HEX_COS = [];
-const _BODY_HEX_SIN = [];
-for (let i = 0; i < 6; i++) {
-  const a = Math.PI / 6 + i * _HEX_ANG;
-  _BODY_HEX_COS.push(Math.cos(a));
-  _BODY_HEX_SIN.push(Math.sin(a));
-}
-// Slash honeycomb cos/sin (same angles, cached once)
-const _SLASH_COS = _BODY_HEX_COS;
-const _SLASH_SIN = _BODY_HEX_SIN;
-
-// Global cached pattern for Cronos honeycomb trail
-let _cronosHoneycombPattern = null;
-function getCronosHoneycombPattern(ctx) {
-  if (_cronosHoneycombPattern) return _cronosHoneycombPattern;
-  
-  const s = 18; // Hex size - made larger
-  const w = Math.round(s * Math.sqrt(3));
-  const h = Math.round(s * 3);
-  
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const pctx = canvas.getContext('2d');
-  
-  // Use solid white with high alpha so it contrasts against the bright cyan background
-  pctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; 
-  pctx.lineWidth = 2.0;
-  
-  function drawHex(x, y) {
-    pctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      // Draw slightly smaller to leave a gap
-      const px = x + _SLASH_COS[i] * (s * 0.9);
-      const py = y + _SLASH_SIN[i] * (s * 0.9);
-      if (i === 0) pctx.moveTo(px, py);
-      else pctx.lineTo(px, py);
+// Pre-seeded static array for Cronos manga action speed lines (Rule 16)
+let _cronosSpeedLineSeeds = null;
+function _getCronosSpeedLineSeeds() {
+  if (!_cronosSpeedLineSeeds) {
+    _cronosSpeedLineSeeds = [];
+    const count = 22;
+    for (let i = 0; i < count; i++) {
+      _cronosSpeedLineSeeds.push({
+        perpOffset: (Math.random() - 0.5) * 60, // Perpendicular spread ±30px
+        lengthRatio: 0.5 + Math.random() * 0.5,
+        speed: 1.2 + Math.random() * 0.8,
+        phase: Math.random() * 100,
+        thick: 1.2 + Math.random() * 1.0,
+      });
     }
-    pctx.closePath();
-    pctx.stroke();
   }
+  return _cronosSpeedLineSeeds;
+}
 
-  // Draw tiling centers for pointy-topped hexagons
-  drawHex(0, 0);
-  drawHex(w, 0);
-  drawHex(0, h);
-  drawHex(w, h);
-  drawHex(w/2, h/2);
-  
-  _cronosHoneycombPattern = ctx.createPattern(canvas, 'repeat');
-  return _cronosHoneycombPattern;
+function drawCronosSpeedLinesLocal(ctx, fighter) {
+  const seeds = _getCronosSpeedLineSeeds();
+  const aimAngle = fighter.meleeSwingActive ? fighter.meleeSwingAngle : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const now = Date.now();
+  const backOffset = fighter.r * 1.1;
+  const cosA = Math.cos(aimAngle);
+  const sinA = Math.sin(aimAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
+
+  ctx.save();
+  for (let i = 0; i < seeds.length; i++) {
+    const seed = seeds[i];
+    const travel = (now * 0.05 * seed.speed + seed.phase) % 75;
+    const norm = Math.abs(seed.perpOffset) / 30;
+    const len = (45 + (1 - norm) * 45) * seed.lengthRatio;
+    const halfLen = len * 0.5;
+
+    const lineCenterX = fighter.x - cosA * (backOffset + travel) + perpX * seed.perpOffset;
+    const lineCenterY = fighter.y - sinA * (backOffset + travel) + perpY * seed.perpOffset;
+
+    // Theme palette: 4-slot pattern [Primary Cyan, Gold Accent, White Core, Dark Ink Line]
+    let color;
+    if (i % 4 === 0) color = '#00F3FF';
+    else if (i % 4 === 1) color = '#FACC15';
+    else if (i % 4 === 2) color = '#FFFFFF';
+    else color = '#080F1E';
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    // 4-point filled double-tapered needle polygon
+    const startX = lineCenterX - cosA * halfLen;
+    const startY = lineCenterY - sinA * halfLen;
+    const endX = lineCenterX + cosA * halfLen;
+    const endY = lineCenterY + sinA * halfLen;
+    const midX = lineCenterX + cosA * (halfLen * 0.15);
+    const midY = lineCenterY + sinA * (halfLen * 0.15);
+    const maxT = seed.thick * 0.5;
+
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(midX + perpX * maxT, midY + perpY * maxT);
+    ctx.lineTo(endX, endY);
+    ctx.lineTo(midX - perpX * maxT, midY - perpY * maxT);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 /**
@@ -255,37 +269,32 @@ export class CronosFighter extends Fighter {
   }
 
   _spawnAttackSlashEffect() {
-    // OPTIMIZATION: More aggressive quality throttle for slash effects
-    const fps = state.fps || 60;
-    const qualityLevel = state.qualityLevel || 1.0;
-    if (qualityLevel < 0.5 || fps < 45) return; // Completely disable at low quality/fps
-    if (qualityLevel < 0.7 && fps < 55 && Math.random() > 0.5) return; // Throttle more aggressively at medium quality
-
-    const slashCount = 1; // Cap at 1 slash effect per swing to reduce draw calls
-    for (let i = 0; i < slashCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = this.r * (0.6 + Math.random() * 0.35);
-      const offsetX = Math.cos(angle) * radius;
-      const offsetY = Math.sin(angle) * radius;
-      const slashAngle = angle + (Math.random() - 0.5) * 0.85;
-      // OPTIMIZATION: Further reduce particle lifetime
-      const life = 3 + Math.floor(Math.random() * 2);
+    const angle = this.meleeSwingActive ? this.meleeSwingAngle : (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0));
+    const count = 4;
+    for (let i = 0; i < count; i++) {
+      const spread = (Math.random() - 0.5) * 0.9;
+      const dist = this.r + 25 + Math.random() * 45;
+      const life = 5 + Math.floor(Math.random() * 4);
       this.attackSlashEffects.push({
-        x: this.x + offsetX,
-        y: this.y + offsetY,
-        angle: slashAngle,
+        x: this.x + Math.cos(angle + spread) * dist,
+        y: this.y + Math.sin(angle + spread) * dist,
+        vx: Math.cos(angle + spread) * (2.5 + Math.random() * 3.5),
+        vy: Math.sin(angle + spread) * (2.5 + Math.random() * 3.5),
+        angle: angle + spread,
         life,
         maxLife: life,
-        size: 10 + Math.random() * 14,
-        alpha: 0.7 + Math.random() * 0.25,
+        size: 2.5 + Math.random() * 2.5,
+        color: (i % 2 === 0) ? '#00F3FF' : ((i % 3 === 0) ? '#FACC15' : '#FFFFFF'),
+        alpha: 0.9,
       });
     }
   }
 
   _updateAttackSlashEffects() {
-    // OPTIMIZATION: Use swap-and-pop instead of splice for O(1) removal
     for (let i = this.attackSlashEffects.length - 1; i >= 0; i--) {
       const effect = this.attackSlashEffects[i];
+      effect.x += effect.vx || 0;
+      effect.y += effect.vy || 0;
       effect.life--;
       if (effect.life <= 0) {
         this.attackSlashEffects[i] = this.attackSlashEffects[this.attackSlashEffects.length - 1];
@@ -296,151 +305,33 @@ export class CronosFighter extends Fighter {
 
   _drawAttackSlashEffects(ctx) {
     if (!this.attackSlashEffects.length) return;
-
-    const fps = state.fps || 60;
-    const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
-    const useUltraLOD = false;
-
+    ctx.save();
     for (const effect of this.attackSlashEffects) {
       const progress = 1 - effect.life / effect.maxLife;
       const alpha = effect.alpha * (1 - progress);
-
-      // Honeycomb effect completely removed.
-      
-      const scale = 0.5 + progress * 0.9;
+      const sz = effect.size * (1 - progress * 0.4);
 
       ctx.save();
       ctx.translate(effect.x, effect.y);
-      ctx.rotate(effect.angle + Math.sin(progress * Math.PI) * 0.18);
-      ctx.scale(scale, scale);
+      ctx.rotate(effect.angle);
       ctx.globalAlpha = alpha;
-      ctx.lineCap = 'butt';
-      ctx.lineJoin = 'miter';
-      // Removed 'screen' blending to prevent white blur on white background
+      ctx.fillStyle = effect.color;
 
-      // Main slash core - sharp angular blade slash with BOTH tips pointed
-      const slashGradient = ctx.createLinearGradient(-effect.size * 0.6, 0, effect.size * 0.6, 0);
-      slashGradient.addColorStop(0, `rgba(0, 180, 220, ${0.3 * alpha})`);
-      slashGradient.addColorStop(0.15, `rgba(0, 200, 240, ${0.7 * alpha})`);
-      slashGradient.addColorStop(0.5, `rgba(0, 240, 255, ${1.0 * alpha})`);
-      slashGradient.addColorStop(0.85, `rgba(0, 200, 240, ${0.7 * alpha})`);
-      slashGradient.addColorStop(1, `rgba(0, 180, 220, ${0.3 * alpha})`);
-
-      ctx.strokeStyle = slashGradient;
-      ctx.lineWidth = 2 + progress * 4;
-      // Removed shadowBlur to prevent blur
-
+      // Sharp Diamond Pixel Spark
       ctx.beginPath();
-      // Sharp slash with BOTH tips pointed (diamond blade shape)
-      ctx.moveTo(-effect.size * 0.55, -effect.size * 0.3);
-      ctx.lineTo(-effect.size * 0.15, -effect.size * 0.06);
-      ctx.lineTo(effect.size * 0.15, effect.size * 0.06);
-      ctx.lineTo(effect.size * 0.55, effect.size * 0.3);
-      ctx.stroke();
-
-      // OPTIMIZATION: Skip detailed edge highlights on Ultra LOD
-      if (!useUltraLOD) {
-        // Sharp BOTTOM edge highlight - dark cyan
-        ctx.strokeStyle = `rgba(0, 200, 240, ${0.95 * alpha})`;
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(-effect.size * 0.45, -effect.size * 0.22);
-        ctx.lineTo(-effect.size * 0.1, -effect.size * 0.03);
-        ctx.lineTo(effect.size * 0.1, effect.size * 0.03);
-        ctx.lineTo(effect.size * 0.45, effect.size * 0.22);
-        ctx.stroke();
-
-        // Sharp TOP edge highlight - dark cyan
-        ctx.strokeStyle = `rgba(0, 180, 220, ${0.85 * alpha})`;
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(-effect.size * 0.5, -effect.size * 0.28);
-        ctx.lineTo(-effect.size * 0.12, -effect.size * 0.05);
-        ctx.lineTo(effect.size * 0.12, effect.size * 0.05);
-        ctx.lineTo(effect.size * 0.5, effect.size * 0.28);
-        ctx.stroke();
-
-        // Sharp LEFT tip accent (starting point) - dark cyan
-        ctx.strokeStyle = `rgba(0, 220, 255, ${0.9 * alpha})`;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(-effect.size * 0.55, -effect.size * 0.3);
-        ctx.lineTo(-effect.size * 0.35, -effect.size * 0.18);
-        ctx.stroke();
-
-        // Sharp RIGHT tip accent (ending point) - dark cyan
-        ctx.strokeStyle = `rgba(0, 220, 255, ${0.95 * alpha})`;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(effect.size * 0.45, effect.size * 0.22);
-        ctx.lineTo(effect.size * 0.55, effect.size * 0.3);
-        ctx.stroke();
-      }
-
-      if (!useLOD) {
-        // Clear shadow effects before drawing complex shapes and particles to prevent severe FPS drops
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-      }
-
-      // Sharp diamond/blade glow fill - BOTH tips sharp
-      // Removed 'lighter' blending
-      ctx.fillStyle = `rgba(0, 200, 240, ${0.6 * alpha})`;
-      ctx.beginPath();
-      // Left sharp tip
-      ctx.moveTo(-effect.size * 0.55, -effect.size * 0.3);
-      ctx.lineTo(-effect.size * 0.2, -effect.size * 0.08);
-      ctx.lineTo(effect.size * 0.2, effect.size * 0.08);
-      // Right sharp tip
-      ctx.lineTo(effect.size * 0.55, effect.size * 0.3);
-      ctx.lineTo(effect.size * 0.2, effect.size * 0.08);
-      ctx.lineTo(-effect.size * 0.2, -effect.size * 0.08);
+      ctx.moveTo(0, -sz);
+      ctx.lineTo(sz * 0.65, 0);
+      ctx.lineTo(0, sz);
+      ctx.lineTo(-sz * 0.65, 0);
       ctx.closePath();
       ctx.fill();
 
-      // Sharp edge particles - small angular debris flying from both tips
-      // Removed 'screen' blending to prevent blur
-      
-      // Skip complex particle math if on low-quality/low-FPS - more aggressive
-      if (!useLOD && state.fps > 50) {
-        ctx.fillStyle = `rgba(0, 190, 230, ${0.85 * alpha})`; // Vibrant cyan instead of white
-        // OPTIMIZATION: Reduce particle count from 4 to 2 per tip
-        const leftParticleAngles = [-0.3, 0.1];
-        leftParticleAngles.forEach((pAngle, idx) => {
-          const pDist = effect.size * (0.25 + idx * 0.12);
-          const px = -effect.size * 0.5 + Math.cos(pAngle) * pDist;
-          const py = -effect.size * 0.25 + Math.sin(pAngle) * pDist;
-          const pSize = (1.2 + idx * 0.4) * (1 - progress * 0.5);
-          ctx.beginPath();
-          // Diamond shape for sharp particles
-          ctx.moveTo(px, py - pSize);
-          ctx.lineTo(px + pSize * 0.5, py);
-          ctx.lineTo(px, py + pSize);
-          ctx.lineTo(px - pSize * 0.5, py);
-          ctx.closePath();
-          ctx.fill();
-        });
-        // Particles from RIGHT tip
-        const rightParticleAngles = [2.8, 3.1];
-        rightParticleAngles.forEach((pAngle, idx) => {
-          const pDist = effect.size * (0.25 + idx * 0.12);
-          const px = effect.size * 0.5 + Math.cos(pAngle) * pDist;
-          const py = effect.size * 0.25 + Math.sin(pAngle) * pDist;
-          const pSize = (1.2 + idx * 0.4) * (1 - progress * 0.5);
-          ctx.beginPath();
-          // Diamond shape for sharp particles
-          ctx.moveTo(px, py - pSize);
-          ctx.lineTo(px + pSize * 0.5, py);
-          ctx.lineTo(px, py + pSize);
-          ctx.lineTo(px - pSize * 0.5, py);
-          ctx.closePath();
-          ctx.fill();
-        });
-      }
-
+      // Specular white center glint
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-sz * 0.25, -sz * 0.25, sz * 0.5, sz * 0.5);
       ctx.restore();
     }
+    ctx.restore();
   }
 
   /**
@@ -1138,17 +1029,160 @@ export class CronosFighter extends Fighter {
     drawCronosCrescentBlade(ctx, this.x, this.y, this.gunAngle, this.r, this.meleeSwingActive, this.meleeSwingTimer, this.meleeSwingAngle, CONFIG.cronos.meleeSwingDuration, this.meleeSwingDirection, this.color);
   }
 
-  // Override drawGun to prevent the base class weapon from being drawn
-  // Cronos uses the crescent blade visual instead
-  drawGun(ctx) {
-    // Empty - Cronos doesn't use a normal weapon
+  /**
+   * Draws Cronus's Sharp Anime Crescent Spatial Slash (Rule 15 & Rule 16 compliant)
+   */
+  _drawCronosSpatialSlashArc(ctx) {
+    const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
+    if (!this.meleeSwingActive && this.meleeSlashFadeTimer <= 0 && !editP) return;
+
+    let swingProgress = 1.0;
+    let fade = this.meleeSlashFadeTimer / 15;
+
+    if (this.meleeSwingActive || editP) {
+      swingProgress = editP ? 0.5 : (1 - (this.meleeSwingTimer / (CONFIG.cronos?.meleeSwingDuration || 20)));
+      fade = 1.0;
+    }
+
+    const isForward = this.meleeSwingDirection === 1;
+    const arcRadius = (this.r + 88) * (editP ? editP.scale : 1.0);
+    const innerRadius = (this.r + 32) * (editP ? editP.scale : 1.0);
+
+    const fullStartA = -Math.PI * 0.42;
+    const fullEndA = Math.PI * 0.42;
+    const totalArc = fullEndA - fullStartA;
+
+    // During active swing: tip advances from fullStartA to fullEndA
+    // During recovery fade: tip stays at fullEndA, tail chases tip (eraser wipe)
+    let tipA = fullStartA + totalArc * swingProgress;
+    let tailA = fullStartA;
+
+    if (!this.meleeSwingActive && this.meleeSlashFadeTimer > 0) {
+      tipA = fullEndA;
+      const tailP = 1 - Math.pow(this.meleeSlashFadeTimer / 15, 1.4);
+      tailA = fullStartA + totalArc * tailP;
+    }
+
+    if (tailA >= tipA - 0.02) return;
+
+    const currentArc = tipA - tailA;
+    const glowAlpha = Math.pow(fade, 0.8) * 0.95;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    if (editP) {
+      ctx.translate(editP.offsetX, editP.offsetY);
+    }
+    ctx.rotate(this.meleeSwingAngle);
+
+    // Mirror vertically for reverse swing
+    if (!isForward) {
+      ctx.scale(1, -1);
+    }
+
+    // Draw Double-Tapered Crescent Needle Polygon (Sinusoidal Tapering)
+    const segments = 28;
+    const outerPoints = [];
+    const innerPoints = [];
+
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const angle = tailA + currentArc * t;
+      const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.25 + 0.75 * t);
+      const curOuterR = arcRadius;
+      const curInnerR = arcRadius - (arcRadius - innerRadius) * taper;
+
+      outerPoints.push({
+        x: Math.cos(angle) * curOuterR,
+        y: Math.sin(angle) * curOuterR,
+      });
+      innerPoints.push({
+        x: Math.cos(angle) * curInnerR,
+        y: Math.sin(angle) * curInnerR,
+      });
+    }
+
+    // 1. Crescent Spatial Void & Radiant Cyan Gradient Fill
+    ctx.beginPath();
+    ctx.moveTo(outerPoints[0].x, outerPoints[0].y);
+    for (let i = 1; i <= segments; i++) {
+      ctx.lineTo(outerPoints[i].x, outerPoints[i].y);
+    }
+    for (let i = segments; i >= 0; i--) {
+      ctx.lineTo(innerPoints[i].x, innerPoints[i].y);
+    }
+    ctx.closePath();
+
+    const tipX = Math.cos(tipA) * arcRadius;
+    const tipY = Math.sin(tipA) * arcRadius;
+    const tailX = Math.cos(tailA) * arcRadius;
+    const tailY = Math.sin(tailA) * arcRadius;
+
+    const slashGrad = ctx.createLinearGradient(tailX, tailY, tipX, tipY);
+    slashGrad.addColorStop(0, 'rgba(15, 23, 42, 0.0)');
+    slashGrad.addColorStop(0.3, `rgba(15, 23, 42, ${0.75 * glowAlpha})`);
+    slashGrad.addColorStop(0.65, `rgba(0, 243, 255, ${0.85 * glowAlpha})`);
+    slashGrad.addColorStop(1, `rgba(224, 242, 254, ${1.0 * glowAlpha})`);
+
+    ctx.fillStyle = slashGrad;
+    ctx.fill();
+
+    // 2. Outer Radiant Cyan Cutting Edge
+    ctx.beginPath();
+    ctx.moveTo(outerPoints[0].x, outerPoints[0].y);
+    for (let i = 1; i <= segments; i++) {
+      ctx.lineTo(outerPoints[i].x, outerPoints[i].y);
+    }
+    ctx.strokeStyle = `rgba(0, 243, 255, ${glowAlpha})`;
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+
+    // 3. Razor-Thin White-Hot Core Blade Edge
+    ctx.beginPath();
+    const startIdx = Math.floor(segments * 0.2);
+    ctx.moveTo(outerPoints[startIdx].x, outerPoints[startIdx].y);
+    for (let i = startIdx + 1; i <= segments; i++) {
+      ctx.lineTo(outerPoints[i].x, outerPoints[i].y);
+    }
+    ctx.strokeStyle = `rgba(255, 255, 255, ${glowAlpha * 0.95})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // 4. Inner Secondary Glow Ring
+    ctx.beginPath();
+    ctx.moveTo(innerPoints[0].x, innerPoints[0].y);
+    for (let i = 1; i <= segments; i++) {
+      ctx.lineTo(innerPoints[i].x, innerPoints[i].y);
+    }
+    ctx.strokeStyle = `rgba(56, 189, 248, ${glowAlpha * 0.65})`;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // 5. Orbiting Gold Chrono Flecks along the cutting edge
+    const numFlecks = 4;
+    ctx.fillStyle = '#FACC15';
+    for (let i = 0; i < numFlecks; i++) {
+      const ft = 0.4 + (i / numFlecks) * 0.55;
+      const idx = Math.min(segments, Math.floor(ft * segments));
+      const pt = outerPoints[idx];
+      if (pt) {
+        ctx.fillRect(pt.x - 1, pt.y - 1, 2, 2);
+      }
+    }
+
+    ctx.restore();
   }
 
   draw(ctx) {
     const now = performance.now();
-    // Draw pre-activation barrier ONLY when ultimate/skill is about to be ready
-    const inPreWindow = this.sphereCooldown > 0 && this.sphereCooldown <= CONFIG.cronos.spherePreActivateFrames;
 
+    // 1. Action Speed Lines (Rendered underneath fighter body)
+    if (this.meleeSwingActive || (this.sphereActive && Math.hypot(this.vx, this.vy) > 3.0)) {
+      drawCronosSpeedLinesLocal(ctx, this);
+    }
+
+    // 2. Pre-activation barrier ONLY when ultimate/skill is about to be ready
+    const inPreWindow = this.sphereCooldown > 0 && this.sphereCooldown <= CONFIG.cronos.spherePreActivateFrames;
     if (inPreWindow) {
       const progress = 1.0 - (this.sphereCooldown / Math.max(1, CONFIG.cronos.spherePreActivateFrames));
       try {
@@ -1168,7 +1202,7 @@ export class CronosFighter extends Fighter {
       }
     }
 
-    // Draw sphere impact burst when sphere is first unleashed
+    // 3. Sphere impact burst when sphere is first unleashed
     if (this.sphereImpactTimer > 0) {
       try {
         const impactProgress = 1 - this.sphereImpactTimer / 25;
@@ -1187,7 +1221,7 @@ export class CronosFighter extends Fighter {
       }
     }
 
-    // Draw time stop sphere at deployment location
+    // 4. Time stop sphere at deployment location
     if (this.sphereActive) {
       try {
         const deployProgress = 1.0;
@@ -1208,159 +1242,43 @@ export class CronosFighter extends Fighter {
       }
     }
 
-    // Draw melee swing arc
-    const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
-    if (this.meleeSwingActive || this.meleeSlashFadeTimer > 0 || editP) {
-      let swingProgress = 1.0;
-      let fade = this.meleeSlashFadeTimer / 15;
+    // 5. Draw Anime Crescent Spatial Slash Arc
+    this._drawCronosSpatialSlashArc(ctx);
 
-      const qualityLevel = state.qualityLevel || 1.0;
-      const isMulti = state && state.mode && state.mode !== '1v1';
-      const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
+    // 6. Draw particle sparks
+    this._drawAttackSlashEffects(ctx);
 
-      if (this.meleeSwingActive || editP) {
-        swingProgress = editP ? 0.5 : (1 - (this.meleeSwingTimer / CONFIG.cronos.meleeSwingDuration));
-        fade = 1.0;
-      }
-
-      // Determine swing direction for correct visual arc rendering
-      const isForward = this.meleeSwingDirection === 1;
-
-      const arcRadius = (this.r + 80) * (editP ? editP.scale : 1.0);
-      const innerRadius = (this.r + 30) * (editP ? editP.scale : 1.0);
-
-      const fullStartA = -Math.PI * 0.4; // Matches start of sword swing
-      const fullEndA = Math.PI * 0.4;    // Matches end of sword swing
-
-      // ALWAYS calculate current angle as if swinging forward
-      const currentEndA = fullStartA + (fullEndA - fullStartA) * swingProgress;
-
-      const fullEndX = Math.cos(fullEndA) * arcRadius;
-      const fullStartX = Math.cos(fullStartA) * arcRadius;
-      const fullStartY = Math.sin(fullStartA) * arcRadius;
-      const fullEndY = Math.sin(fullEndA) * arcRadius;
-      const cx = 2 * (innerRadius - 0.25 * (fullStartX + fullEndX));
-
-      const glowAlpha = Math.pow(fade, 0.8) * 0.95;
-
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      if (editP) {
-        ctx.translate(editP.offsetX, editP.offsetY);
-      }
-      ctx.rotate(this.meleeSwingAngle);
-      
-      // Mirror the entire slash visual vertically if it's a reverse swing
-      // This automatically flips the crescent shape, clip mask, and gradient!
-      if (!isForward) {
-          ctx.scale(1, -1);
-      }
-
-      // Clip region so the slash "grows" trailing the sword
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, arcRadius + 20, fullStartA, currentEndA, false);
-      ctx.closePath();
-      ctx.clip();
-
-      // No shadow blur - keeps the slash crisp on white background
-
-      // Draw full shape (revealed by clip)
-      ctx.beginPath();
-      ctx.arc(0, 0, arcRadius, fullStartA, fullEndA);
-      ctx.quadraticCurveTo(cx, 0, fullStartX, fullStartY);
-      ctx.closePath();
-
-      // Dynamic gradient that anchors bright tip to current sword position
-      const currentY = Math.sin(currentEndA) * arcRadius;
-      const gradStartY = fullStartY;
-      const gradEndY = Math.max(fullStartY + 0.1, currentY);
-
-      const slashGrad = ctx.createLinearGradient(0, gradStartY, 0, gradEndY);
-      slashGrad.addColorStop(0, 'rgba(0, 180, 220, 0.0)');
-      slashGrad.addColorStop(0.3, 'rgba(0, 200, 235, 0.7)');
-      slashGrad.addColorStop(0.7, 'rgba(0, 220, 245, 0.9)');
-      slashGrad.addColorStop(1, 'rgba(0, 240, 255, 1.0)');
-
-      ctx.fillStyle = slashGrad;
-      ctx.globalAlpha = glowAlpha;
-      ctx.fill();
-
-      // Outer edge
-      ctx.beginPath();
-      ctx.arc(0, 0, arcRadius, fullStartA, fullEndA);
-      ctx.strokeStyle = 'rgba(0, 220, 240, 1.0)';
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = glowAlpha * 0.85;
-      ctx.stroke();
-
-      // Inner trail
-      ctx.beginPath();
-      ctx.arc(0, 0, arcRadius - 14, fullStartA * 0.8, fullEndA * 0.9);
-      ctx.strokeStyle = 'rgba(0, 200, 230, 0.9)';
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = glowAlpha * 0.6;
-      ctx.stroke();
-
-      // Honeycomb Texture Overlay - completely bypass under performance load or low quality levels
-      // OPTIMIZATION: More aggressive FPS check - only draw at high FPS
-      if (!useLOD && state.fps > 55) {
-        ctx.beginPath();
-        ctx.arc(0, 0, arcRadius, fullStartA, fullEndA);
-        ctx.quadraticCurveTo(cx, 0, fullStartX, fullStartY);
-        ctx.closePath();
-        ctx.clip();
-
-        // Removed 'screen' blending for white background
-        ctx.shadowBlur = 0;
-
-        // OPTIMIZATION: Use module-level cached cos/sin (was rebuilding 12 values per frame)
-        const cosA = _SLASH_COS;
-        const sinA = _SLASH_SIN;
-
-        const cellSize = 8;
-        const cellOffsetX = cellSize * 1.75;
-        const cellOffsetY = cellSize * 1.52;
-
-        const minX = -arcRadius;
-        const maxX = arcRadius;
-        const minY = -arcRadius;
-        const maxY = arcRadius;
-
-        const colStart = Math.floor(minX / cellOffsetX) - 1;
-        const colEnd = Math.ceil(maxX / cellOffsetX) + 1;
-        const rowStart = Math.floor(minY / cellOffsetY) - 1;
-        const rowEnd = Math.ceil(maxY / cellOffsetY) + 1;
-
-        ctx.beginPath();
-        for (let row = rowStart; row <= rowEnd; row++) {
-          for (let col = colStart; col <= colEnd; col++) {
-            const x = col * cellOffsetX + (row % 2 ? cellOffsetX * 0.5 : 0);
-            const y = row * cellOffsetY;
-            if (x < minX || x > maxX || y < minY || y > maxY) continue;
-
-            for (let i = 0; i < 6; i++) {
-              const px = x + cosA[i] * cellSize;
-              const py = y + sinA[i] * cellSize;
-              if (i === 0) ctx.moveTo(px, py);
-              else ctx.lineTo(px, py);
-            }
-            ctx.closePath();
-          }
-        }
-
-        // Use the exact same dynamic gradient as the slash body so the texture smoothly fades towards the tail
-        ctx.strokeStyle = slashGrad;
-        ctx.lineWidth = 1.5;
-        // glowAlpha already scales the overall transparency
-        ctx.globalAlpha = glowAlpha * 1.2;
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    }
-
+    // 7. Base Fighter draw pipeline (drawGun -> drawBody -> drawOutline -> drawHealth)
     super.draw(ctx);
+  }
+
+  drawBody(ctx) {
+    drawCronosSkin(ctx, this);
+  }
+
+  drawSkin(ctx) {
+    drawCronosSkin(ctx, this);
+  }
+
+  drawOutline(ctx) {
+    // Stepped pixel outline handled inside drawCronosPixelBody
+  }
+
+  drawGun(ctx) {
+    if (this.isTargetOfAmbush || (typeof state !== 'undefined' && state.showSkinOnly)) return;
+    drawCronosCrescentBlade(
+      ctx,
+      this.x,
+      this.y,
+      this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
+      this.r,
+      this.meleeSwingActive,
+      this.meleeSwingTimer,
+      this.meleeSwingAngle,
+      CONFIG.cronos?.meleeSwingDuration || 20,
+      this.meleeSwingDirection,
+      this.color
+    );
   }
 
   onFrozenSkillDurationTick(isInsideGojoDomain) {

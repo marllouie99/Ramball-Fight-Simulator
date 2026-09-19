@@ -4,7 +4,7 @@
 
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { drawMahitoSkin } from '../../graphics/fighters/mahitoSkin.js';
 import { spawnImpactFlash, spawnSparks, spawnMahitoSoulBubbles, spawnMahitoSoulExplosion } from '../../graphics/particles/sparkEffect.js';
 import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
@@ -251,7 +251,7 @@ export class MahitoFighter extends Fighter {
     this.transformDuration = CONFIG.mahito?.transformation?.duration || 600;
 
     // Recover HP immediately upon transformation
-    const healPct = CONFIG.mahito?.transformation?.healPercentage ?? 0.25;
+    const healPct = CONFIG.mahito?.transformation?.healPercentage ?? 0.20;
     const healAmount = Math.round(this.maxHp * healPct);
     this.hp = Math.min(this.maxHp, this.hp + healAmount);
 
@@ -300,12 +300,12 @@ export class MahitoFighter extends Fighter {
     let finalDamage = amount;
 
     if (this.isTransformed) {
-      // Transformed defense bonus (Takes 50% less damage)
-      const defenseMult = CONFIG.mahito?.transformation?.defenseMultiplier ?? 0.50;
+      // Transformed defense bonus (Takes 20% less damage)
+      const defenseMult = CONFIG.mahito?.transformation?.defenseMultiplier ?? 0.80;
       finalDamage *= defenseMult;
     } else {
-      // Base passive damage reduction (25% reduction vs all attacks)
-      const reduction = CONFIG.mahito?.soulDurabilityReduction ?? 0.25;
+      // Base passive damage reduction (5% reduction vs all attacks)
+      const reduction = CONFIG.mahito?.soulDurabilityReduction ?? 0.05;
       finalDamage *= (1 - reduction);
     }
 
@@ -521,6 +521,38 @@ export class MahitoFighter extends Fighter {
       return;
     }
 
+    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+
+    // Unstoppable Domain Expansion Hyper-Armor: clear all hitStuns / paralyzes while channeling domain unless targeted by Toji ambush / silence
+    if (this.isChannelingDomainExpansion && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0) {
+      this.hitStunTimer = 0;
+      this.knockbackStunTimer = 0;
+      this.electricStunTimer = 0;
+      this.dubstepStunTimer = 0;
+      this.crimsonElectrifiedTimer = 0;
+      if (!isNanamiPausing) {
+        this.timeStopTimer = 0;
+      }
+      this.purpleHitTimer = 0;
+      this.isCaughtInPurple = false;
+      this.paralyzeTimer = 0;
+      this.isFrozenByInfinity = false;
+      this.isWallSlammed = false;
+    }
+
+    // ── 1. RULE #1: Freeze / TimeStop Early Exit Guard ──
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+      }
+      if (!isNanamiPausing && !this.isChannelingDomainExpansion && !this.domainActive) {
+        this.interruptAttacks();
+      }
+      return;
+    }
+
     // Self-Embodiment of Perfection Domain Progression & Cooldown:
     // When Domain is active, domainTimer MUST tick down every frame and drain naturally even if Mahito is stunned, paralyzed, or frozen!
     updateMahitoDomainExpansion(this);
@@ -528,13 +560,6 @@ export class MahitoFighter extends Fighter {
     // Domain Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame when not active
     if (this.domainCooldown > 0 && !this.domainActive && (this.domainChargeTimer || 0) <= 0) {
       this.domainCooldown--;
-    }
-
-    // ── 1. RULE #1: Freeze / TimeStop Early Exit Guard ──
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks(true);
-      return;
     }
 
     // ── 2. Health Regeneration Mechanic ──
@@ -1108,7 +1133,7 @@ export class MahitoFighter extends Fighter {
     if (!this.domainActive || this.hp <= 0 || this.isDead || damageDealt <= 0) return;
     const domCfg = CONFIG.mahito?.domainExpansion || {};
     if (domCfg.enableDomainLifesteal === false) return;
-    const lifestealPercent = (domCfg.lifestealPercent !== undefined) ? domCfg.lifestealPercent : 0.50;
+    const lifestealPercent = (domCfg.lifestealPercent !== undefined) ? domCfg.lifestealPercent : 0.30;
     if (lifestealPercent <= 0) return;
 
     const healAmount = damageDealt * lifestealPercent;

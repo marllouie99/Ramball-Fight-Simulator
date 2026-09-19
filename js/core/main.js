@@ -16,6 +16,7 @@ import { getTacticalIcon } from '../graphics/ui/tacticalIcons.js';
 import { GAME_MODES } from './modeConfig.js';
 import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
 import { toggleCameraMode } from '../systems/cameraSystem.js';
+import { BalanceManager } from '../configs/balanceManager.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
@@ -45,14 +46,59 @@ if (typeof document !== 'undefined' && 'fonts' in document) {
   }
 }
 
-// Handle window resize for flame canvas
+// ─────────────────────────────────────────────
+// RESPONSIVE VIEWPORT ENGINE & AUTO-FITTING
+// ─────────────────────────────────────────────
+export function fitGameToViewport() {
+  const container = document.querySelector('.game-container');
+  if (!container) return;
+  const targetW = 540;
+  const targetH = 960;
+
+  container.style.width = `${targetW}px`;
+  container.style.height = `${targetH}px`;
+
+  const windowW = window.innerWidth;
+  const windowH = window.innerHeight;
+
+  // Scale uniformly to fit within viewport without clipping
+  const scale = Math.min(windowW / targetW, windowH / targetH);
+  if (Math.abs(scale - 1.0) < 0.005) {
+    container.style.transform = 'none';
+  } else {
+    container.style.transform = `scale(${scale})`;
+  }
+  container.style.transformOrigin = 'center center';
+}
+
+// Initial viewport auto-fit
+fitGameToViewport();
+
+// Handle window resize & orientation changes across all devices
 window.addEventListener('resize', () => {
   resizeFlameCanvas();
+  fitGameToViewport();
+});
+window.addEventListener('orientationchange', () => {
+  setTimeout(fitGameToViewport, 60);
+});
+if (typeof window !== 'undefined' && window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitGameToViewport);
+}
+
+// Universal one-shot audio unlock for mobile Safari / Android Chrome
+const _unlockAudioOnce = () => {
+  unlockAudio();
+};
+['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, _unlockAudioOnce, { passive: true, once: true });
 });
 
 // ─────────────────────────────────────────────
 // INPUT HANDLING
 // ─────────────────────────────────────────────
+
+let activeTacticalAction = 'mode-1v1';
 
 window.addEventListener('keydown', (e) => {
   unlockAudio();
@@ -78,7 +124,9 @@ window.addEventListener('keydown', (e) => {
       return;
     }
     if (state.gameState === 'title') {
-      executeTacticalAction(activeTacticalAction);
+      const targetAction = activeTacticalAction || ((state.gameCategory === 'tactical') ? 'tactical-ffa' : 'mode-1v1');
+      executeTacticalAction(targetAction);
+      return;
     }
     else if (state.gameState === 'select') startGame();
     else if (state.gameState === 'roundEnd') startNextRound();
@@ -188,8 +236,96 @@ window.addEventListener('mouseup', () => {
   state.isDraggingPauseMenu = false;
 });
 
+let _lastTouchTapTime = 0;
+let _touchStartX = 0;
+let _touchStartY = 0;
+let _touchStartTime = 0;
+
+inputTarget.addEventListener('touchstart', (e) => {
+  unlockAudio();
+  if (e.touches && e.touches.length === 1) {
+    _touchStartX = e.touches[0].clientX;
+    _touchStartY = e.touches[0].clientY;
+    _touchStartTime = Date.now();
+
+    if (state.gameState === 'paused') {
+      const rect = inputTarget.getBoundingClientRect();
+      const scaleX = state.canvas.width / rect.width;
+      const scaleY = state.canvas.height / rect.height;
+      const mx = (_touchStartX - rect.left) * scaleX;
+      const my = (_touchStartY - rect.top) * scaleY;
+      const cx = state.pauseMenuX !== undefined ? state.pauseMenuX : state.canvas.width / 2;
+      const cy = state.pauseMenuY !== undefined ? state.pauseMenuY : 180;
+      const panelW = 260;
+      const panelH = 280;
+      const px = cx - panelW / 2;
+      const py = cy - panelH / 2;
+
+      if (mx >= px && mx <= px + panelW && my >= py && my <= py + panelH) {
+        state.isDraggingPauseMenu = true;
+        state.pauseMenuDragOffset = { x: mx - cx, y: my - cy };
+      }
+    }
+  }
+}, { passive: true });
+
+inputTarget.addEventListener('touchmove', (e) => {
+  if (e.touches && e.touches.length === 1) {
+    const rect = inputTarget.getBoundingClientRect();
+    const scaleX = state.canvas.width / rect.width;
+    const scaleY = state.canvas.height / rect.height;
+    const mx = (e.touches[0].clientX - rect.left) * scaleX;
+    const my = (e.touches[0].clientY - rect.top) * scaleY;
+
+    if (state.isDraggingPauseMenu && state.gameState === 'paused') {
+      if (e.cancelable) e.preventDefault();
+      const offsetX = state.pauseMenuDragOffset ? state.pauseMenuDragOffset.x : 0;
+      const offsetY = state.pauseMenuDragOffset ? state.pauseMenuDragOffset.y : 0;
+      state.pauseMenuX = Math.max(130, Math.min(state.canvas.width - 130, mx - offsetX));
+      state.pauseMenuY = Math.max(140, Math.min(state.canvas.height - 140, my - offsetY));
+      return;
+    }
+  }
+}, { passive: false });
+
+inputTarget.addEventListener('touchend', (e) => {
+  if (state.isDraggingPauseMenu) {
+    state.isDraggingPauseMenu = false;
+    return;
+  }
+  if (e.changedTouches && e.changedTouches.length === 1) {
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - _touchStartX;
+    const dy = touch.clientY - _touchStartY;
+    const dist = Math.hypot(dx, dy);
+    const duration = Date.now() - _touchStartTime;
+
+    // Detect clean tap (finger moved less than 14px within 500ms)
+    if (dist < 14 && duration < 500) {
+      const rect = inputTarget.getBoundingClientRect();
+      const scaleX = state.canvas.width / rect.width;
+      const scaleY = state.canvas.height / rect.height;
+      const mx = (touch.clientX - rect.left) * scaleX;
+      const my = (touch.clientY - rect.top) * scaleY;
+
+      _lastTouchTapTime = Date.now();
+      const clickedButton = handleUIClick(mx, my);
+      if (!clickedButton && state.gameState === 'title') {
+        stopAllSounds(false, 0, 0);
+        stopAllLoopingSounds(0, 0);
+        state.gameState = 'select';
+      }
+    }
+  }
+}, { passive: true });
+
 inputTarget.addEventListener('click', (e) => {
   unlockAudio();
+
+  // Filter synthetic ghost clicks fired by browsers ~300ms after a touchend tap
+  if (Date.now() - _lastTouchTapTime < 450) {
+    return;
+  }
 
   const rect = inputTarget.getBoundingClientRect();
   // Handle scaling if CSS sizes canvas differently
@@ -205,10 +341,6 @@ inputTarget.addEventListener('click', (e) => {
     state.gameState = 'select';
   }
 });
-
-inputTarget.addEventListener('touchstart', () => {
-  unlockAudio();
-}, { passive: true });
 
 inputTarget.addEventListener('wheel', (e) => {
   if (state.gameState === 'weapons') {
@@ -466,6 +598,64 @@ if (dimEffectsBtn) {
   dimEffectsBtn.innerText = state.disableDimEffects ? 'OFF' : 'ON';
 }
 
+const quickBarBtn = document.getElementById('btn-quickbar');
+if (quickBarBtn) {
+  quickBarBtn.innerText = (state.quickBarMode || 'auto').toUpperCase();
+}
+
+// ─────────────────────────────────────────────
+// COMBAT BALANCE & DEBUG MULTIPLIERS ENGINE
+// ─────────────────────────────────────────────
+const DAMAGE_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+const KNOCKBACK_STEPS = [0.25, 0.5, 1.0, 1.5, 2.0];
+const SPEED_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5];
+const COOLDOWN_STEPS = [0.25, 0.5, 1.0, 1.5, 2.0];
+
+export function cycleMultiplier(current, steps) {
+  const idx = steps.findIndex(s => Math.abs(s - current) < 0.05);
+  if (idx === -1 || idx === steps.length - 1) return steps[0];
+  return steps[idx + 1];
+}
+
+export function syncBalanceButtons() {
+  const mults = BalanceManager.getGlobalMultipliers();
+  
+  const dmgBtn = document.getElementById('btn-balance-damage');
+  if (dmgBtn) dmgBtn.innerText = `${mults.damageScale.toFixed(2).replace(/\.?0+$/, '')}X`;
+  
+  const kbBtn = document.getElementById('btn-balance-knockback');
+  if (kbBtn) kbBtn.innerText = `${mults.knockbackScale.toFixed(2).replace(/\.?0+$/, '')}X`;
+  
+  const spdBtn = document.getElementById('btn-balance-speed');
+  if (spdBtn) spdBtn.innerText = `${mults.speedScale.toFixed(2).replace(/\.?0+$/, '')}X`;
+  
+  const cdBtn = document.getElementById('btn-balance-cooldown');
+  if (cdBtn) cdBtn.innerText = `${mults.cooldownScale.toFixed(2).replace(/\.?0+$/, '')}X`;
+
+  const debugDmg = document.getElementById('debugValDamage');
+  if (debugDmg) debugDmg.innerText = `${mults.damageScale.toFixed(2)}x`;
+
+  const debugKb = document.getElementById('debugValKnockback');
+  if (debugKb) debugKb.innerText = `${mults.knockbackScale.toFixed(2)}x`;
+
+  const debugSpd = document.getElementById('debugValSpeed');
+  if (debugSpd) debugSpd.innerText = `${mults.speedScale.toFixed(2)}x`;
+
+  const debugCd = document.getElementById('debugValCooldown');
+  if (debugCd) debugCd.innerText = `${mults.cooldownScale.toFixed(2)}x`;
+}
+
+BalanceManager.subscribe(syncBalanceButtons);
+syncBalanceButtons();
+
+export function toggleBalanceDebugOverlay() {
+  const overlay = document.getElementById('balanceDebugOverlay');
+  if (!overlay) return;
+  const isHidden = overlay.style.display === 'none' || !overlay.style.display;
+  overlay.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) syncBalanceButtons();
+}
+
 // Tactical Terminal & Menu Navigation State
 export function showMenuView(paneId, playAudio = true) {
   const panes = document.querySelectorAll('.menu-view-pane');
@@ -486,8 +676,16 @@ export function showMenuView(paneId, playAudio = true) {
       badge.innerText = 'Arsenal & Studio';
     } else if (paneId === 'menu-view-settings') {
       badge.innerText = 'Settings';
+    } else if (paneId === 'menu-view-graphics-settings') {
+      badge.innerText = 'Graphics & Visuals';
     } else if (paneId === 'menu-view-hud-settings') {
-      badge.innerText = 'HUD Settings';
+      badge.innerText = 'HUD & Interface';
+    } else if (paneId === 'menu-view-audio-settings') {
+      badge.innerText = 'Audio & Soundtrack';
+    } else if (paneId === 'menu-view-balance-settings') {
+      badge.innerText = 'Combat Tuner';
+    } else if (paneId === 'menu-view-system-settings') {
+      badge.innerText = 'System & Perf';
     }
   }
 
@@ -533,6 +731,15 @@ export function executeTacticalAction(action) {
   } else if (action === 'mode-standoff1v2') {
     state.gameCategory = 'foc';
     state.mode = GAME_MODES.STAND_OFF_1V2 || '1v2 Stand Off';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'mode-tagmatch' || action === 'mode-tag') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.TAG_MATCH || 'Tag Match';
+    state.p3Index = state.p3Index ?? 2;
+    state.p4Index = state.p4Index ?? 3;
+    state.p5Index = state.p5Index ?? 4;
+    state.p6Index = state.p6Index ?? 5;
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   }
@@ -592,17 +799,72 @@ export function executeTacticalAction(action) {
   }
 
   // System Configurations
-  else if (action === 'toggle-theme') {
+  else if (action === 'open-graphics-settings') {
+    showMenuView('menu-view-graphics-settings');
+  } else if (action === 'open-audio-settings') {
+    showMenuView('menu-view-audio-settings');
+  } else if (action === 'open-system-settings') {
+    showMenuView('menu-view-system-settings');
+  } else if (action === 'toggle-theme') {
     const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
     applyArenaTheme(nextTheme);
+  } else if (action === 'open-balance-settings') {
+    syncBalanceButtons();
+    showMenuView('menu-view-balance-settings');
+  } else if (action === 'cycle-balance-damage') {
+    const cur = BalanceManager.getGlobalMultipliers().damageScale;
+    BalanceManager.setGlobalMultiplier('damageScale', cycleMultiplier(cur, DAMAGE_STEPS));
+    syncBalanceButtons();
+  } else if (action === 'cycle-balance-knockback') {
+    const cur = BalanceManager.getGlobalMultipliers().knockbackScale;
+    BalanceManager.setGlobalMultiplier('knockbackScale', cycleMultiplier(cur, KNOCKBACK_STEPS));
+    syncBalanceButtons();
+  } else if (action === 'cycle-balance-speed') {
+    const cur = BalanceManager.getGlobalMultipliers().speedScale;
+    BalanceManager.setGlobalMultiplier('speedScale', cycleMultiplier(cur, SPEED_STEPS));
+    syncBalanceButtons();
+  } else if (action === 'cycle-balance-cooldown') {
+    const cur = BalanceManager.getGlobalMultipliers().cooldownScale;
+    BalanceManager.setGlobalMultiplier('cooldownScale', cycleMultiplier(cur, COOLDOWN_STEPS));
+    syncBalanceButtons();
+  } else if (action === 'reset-balance-all') {
+    BalanceManager.resetGlobalMultipliers();
+    syncBalanceButtons();
   } else if (action === 'open-hud-settings') {
     showMenuView('menu-view-hud-settings');
   } else if (action === 'toggle-hud-master') {
-    CONFIG.hudHideAll = !CONFIG.hudHideAll;
-    localStorage.setItem('hudHideAll', CONFIG.hudHideAll);
+    if (CONFIG.hudHideAll) {
+      // Switching from HIDDEN to VISIBLE (Enable all HUD elements)
+      CONFIG.hudHideAll = false;
+      CONFIG.hudHideHealthBars = false;
+      CONFIG.hudHideOverheadHp = false;
+      CONFIG.hudHideSkillBars = false;
+      CONFIG.hudHideStats = false;
+      CONFIG.darkModeShowHudStats = 1;
+      if (CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+        CONFIG.hudSkillBarsMode = 'all';
+        CONFIG.darkModeShowHudSkillBars = 1;
+      }
+      localStorage.setItem('hudHideAll', 'false');
+      localStorage.setItem('hudHideHealthBars', 'false');
+      localStorage.setItem('hudHideOverheadHp', 'false');
+      localStorage.setItem('hudHideSkillBars', 'false');
+      localStorage.setItem('hudHideStats', 'false');
+      localStorage.setItem('darkModeShowHudStats', '1');
+      localStorage.setItem('hudSkillBarsMode', CONFIG.hudSkillBarsMode);
+      localStorage.setItem('darkModeShowHudSkillBars', CONFIG.darkModeShowHudSkillBars);
+    } else {
+      // Switching from VISIBLE to HIDDEN
+      CONFIG.hudHideAll = true;
+      localStorage.setItem('hudHideAll', 'true');
+    }
     syncHudButtons();
   } else if (action === 'toggle-hud-healthbars') {
     CONFIG.hudHideHealthBars = !CONFIG.hudHideHealthBars;
+    if (!CONFIG.hudHideHealthBars) {
+      CONFIG.hudHideOverheadHp = false;
+      localStorage.setItem('hudHideOverheadHp', 'false');
+    }
     localStorage.setItem('hudHideHealthBars', CONFIG.hudHideHealthBars);
     syncHudButtons();
   } else if (action === 'toggle-hud-skillbars') {
@@ -684,6 +946,15 @@ export function executeTacticalAction(action) {
     toggleCameraMode();
     const btn = document.getElementById('btn-camera');
     if (btn) btn.innerText = (state.camera.mode === 'dynamic') ? 'ON' : 'OFF';
+  } else if (action === 'toggle-quickbar') {
+    const modes = ['auto', 'off', 'on'];
+    const curIdx = modes.indexOf(state.quickBarMode || 'auto');
+    const nextMode = modes[(curIdx + 1) % modes.length];
+    state.quickBarMode = nextMode;
+    localStorage.setItem('quickBarMode', nextMode);
+    const btn = document.getElementById('btn-quickbar');
+    if (btn) btn.innerText = nextMode.toUpperCase();
+    syncMobileQuickBar();
   } else if (action === 'toggle-testmode') {
     state.testMode = !state.testMode;
     const btn = document.getElementById('btn-testmode');
@@ -730,6 +1001,7 @@ export function switchGameHub(hub, playAudio = true) {
     state.mode = GAME_MODES.TACTICAL_FFA || 'Tactical FFA';
     state.arena = { ...STARTER_MAP.arena };
     loadFighterSelections('tactical');
+    activeTacticalAction = 'tactical-ffa';
     titleScreen?.classList.add('hub-tactical');
     if (badge) badge.innerText = 'Tactical Ops';
     if (tileBattleTitle) tileBattleTitle.innerText = 'FIREFIGHT';
@@ -759,6 +1031,7 @@ export function switchGameHub(hub, playAudio = true) {
     state.mode = GAME_MODES.ONE_VS_ONE || '1v1';
     state.arena = { ...CONFIG.arena };
     loadFighterSelections('foc');
+    activeTacticalAction = 'mode-1v1';
     titleScreen?.classList.remove('hub-tactical');
     if (badge) badge.innerText = 'Operations';
     if (tileBattleTitle) tileBattleTitle.innerText = 'BATTLE';
@@ -812,6 +1085,7 @@ document.querySelectorAll('.tactical-card, .menu-tile-3d').forEach(card => {
       const nextHub = (state.gameCategory === 'tactical') ? 'foc' : 'tactical';
       switchGameHub(nextHub);
     } else if (action) {
+      activeTacticalAction = action;
       executeTacticalAction(action);
     }
   });
@@ -929,6 +1203,11 @@ document.getElementById('btn-camera')?.addEventListener('click', (e) => {
   e.target.innerText = (state.camera.mode === 'dynamic') ? 'ON' : 'OFF';
 });
 
+document.getElementById('btn-quickbar')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-quickbar');
+});
+
 document.getElementById('btn-testmode')?.addEventListener('click', (e) => {
   e.stopPropagation();
   state.testMode = !state.testMode;
@@ -963,6 +1242,12 @@ showMenuView('menu-view-main', false);
 
 // Keyboard Navigation
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'F2') {
+    e.preventDefault();
+    toggleBalanceDebugOverlay();
+    return;
+  }
+
   if (state.gameState === 'title') {
     if (e.key === 'Escape' || e.key === 'Backspace') {
       showMenuView('menu-view-main');
@@ -973,3 +1258,147 @@ window.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// Live Combat Balance & Debug Floating Overlay Buttons
+document.getElementById('debugCloseBtn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleBalanceDebugOverlay();
+});
+
+document.getElementById('debugResetBtn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  BalanceManager.resetGlobalMultipliers();
+  syncBalanceButtons();
+});
+
+document.querySelectorAll('.debug-step-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const key = btn.getAttribute('data-debug-step');
+    const step = parseFloat(btn.getAttribute('data-step')) || 0.25;
+    if (key && BalanceManager.data.globalMultipliers) {
+      const cur = BalanceManager.getGlobalMultipliers()[key] || 1.0;
+      const next = Math.max(0.25, Math.min(3.0, Math.round((cur + step) * 100) / 100));
+      BalanceManager.setGlobalMultiplier(key, next);
+      syncBalanceButtons();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────
+// MOBILE & MULTI-DEVICE QUICK ACTION BAR CONTROLS
+// ─────────────────────────────────────────────
+const mobileQuickBar = document.getElementById('mobileQuickBar');
+const quickBtnPause = document.getElementById('quickBtnPause');
+const quickIconPause = document.getElementById('quickIconPause');
+const quickBtnRestart = document.getElementById('quickBtnRestart');
+const quickBtnFullscreen = document.getElementById('quickBtnFullscreen');
+const quickIconFullscreen = document.getElementById('quickIconFullscreen');
+const quickBtnCamera = document.getElementById('quickBtnCamera');
+const quickBtnSound = document.getElementById('quickBtnSound');
+const quickIconSound = document.getElementById('quickIconSound');
+
+let _isMuted = false;
+
+if (quickBtnPause) {
+  quickBtnPause.addEventListener('click', (e) => {
+    e.stopPropagation();
+    unlockAudio();
+    if (state.gameState === 'playing' || state.gameState === 'countdown') {
+      state.previousGameState = state.gameState;
+      state.gameState = 'paused';
+    } else if (state.gameState === 'paused') {
+      state.gameState = state.previousGameState || 'playing';
+    }
+    syncMobileQuickBar();
+  });
+}
+
+if (quickBtnRestart) {
+  quickBtnRestart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    unlockAudio();
+    if (state.gameState === 'playing' || state.gameState === 'roundEnd' || state.gameState === 'paused') {
+      restartCurrentRound();
+    } else if (state.gameState === 'matchEnd') {
+      resetMatch();
+    }
+    syncMobileQuickBar();
+  });
+}
+
+if (quickBtnFullscreen) {
+  quickBtnFullscreen.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+    setTimeout(syncMobileQuickBar, 100);
+  });
+}
+
+if (quickBtnCamera) {
+  quickBtnCamera.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCameraMode();
+  });
+}
+
+if (quickBtnSound) {
+  quickBtnSound.addEventListener('click', (e) => {
+    e.stopPropagation();
+    unlockAudio();
+    _isMuted = !_isMuted;
+    if (_isMuted) {
+      stopAllSounds(false, 0, 0);
+      stopAllLoopingSounds(0, 0);
+      if (quickIconSound) quickIconSound.textContent = '🔇';
+    } else {
+      if (quickIconSound) quickIconSound.textContent = '🔊';
+    }
+  });
+}
+
+export function shouldShowQuickBar() {
+  const mode = state.quickBarMode || 'auto';
+  if (mode === 'off') return false;
+  if (mode === 'on') return true;
+  // 'auto': Only show on mobile / touch devices where physical keyboard is missing
+  const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  return Boolean((isCoarse || isMobileUA) && isTouchDevice && !window.electronAPI);
+}
+
+let _lastQuickBarState = '';
+export function syncMobileQuickBar() {
+  if (!mobileQuickBar) return;
+  const inCombat = (
+    state.gameState === 'playing' ||
+    state.gameState === 'countdown' ||
+    state.gameState === 'paused' ||
+    state.gameState === 'roundEnd' ||
+    state.gameState === 'matchEnd'
+  );
+
+  const shouldShow = shouldShowQuickBar() && inCombat;
+  const curState = `${shouldShow ? '1' : '0'}_${state.gameState}_${Boolean(document.fullscreenElement)}_${_isMuted}`;
+  if (curState === _lastQuickBarState) return;
+  _lastQuickBarState = curState;
+
+  mobileQuickBar.style.display = shouldShow ? 'flex' : 'none';
+  if (quickIconPause) {
+    quickIconPause.textContent = (state.gameState === 'paused') ? '▶' : '⏸';
+  }
+  if (quickIconFullscreen) {
+    quickIconFullscreen.textContent = document.fullscreenElement ? '🗗' : '⛶';
+  }
+  if (quickIconSound) {
+    quickIconSound.textContent = _isMuted ? '🔇' : '🔊';
+  }
+}
+
+document.addEventListener('fullscreenchange', syncMobileQuickBar);
+setInterval(syncMobileQuickBar, 100);

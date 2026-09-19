@@ -1,63 +1,71 @@
+import { state } from '../../core/state.js';
+
+/**
+ * Voidmaster Weapon Graphics — Stepped Pixel Singularity Spheres & Orbiting Dark Matter Diamonds
+ * Strictly balanced Canvas 2D transforms (Rule 2.4) and zero shadowBlur (Rule 11)
+ */
 export function drawVoidmasterWeapon(ctx, x, y, r) {
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
 
+  ctx.save();
   ctx.translate(x, y);
-
-  // Note: purposely not rotating by the fighter's body angle 
-  // so the weapons do not spin with the character.
 
   const orbOffset = r + 8;
 
-  // Left orb
+  // Left Singularity Orb
+  ctx.save();
   ctx.translate(-orbOffset, 0);
-  drawVoidOrb(ctx, 0);
+  drawPixelVoidOrb(ctx, 0);
+  ctx.restore();
+
+  // Right Singularity Orb
+  ctx.save();
   ctx.translate(orbOffset, 0);
+  drawPixelVoidOrb(ctx, Math.PI);
+  ctx.restore();
 
-  // Right orb
-  ctx.translate(orbOffset, 0);
-  drawVoidOrb(ctx, Math.PI);
-  ctx.translate(-orbOffset, 0);
-
-  // Manual transform reset
-  ctx.translate(-x, -y);
-
-  // Manual state restore
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
+  ctx.restore();
 }
 
-function drawVoidOrb(ctx, phaseOffset) {
+/**
+ * Stepped Pixel Singularity Sphere with Orbiting Dark-Matter Diamonds
+ */
+function drawPixelVoidOrb(ctx, phaseOffset) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
   const t = Date.now();
-  const pulse = Math.sin(t / 200 + phaseOffset) * 0.2 + 1;
-  const baseRadius = 6;
-  const glowRadius = 12 * pulse;
+  const pulse = Math.sin(t / 220 + phaseOffset) * 0.15 + 1.0;
+  const baseR = 7 * pulse;
 
-  // Outer faint glow
-  ctx.beginPath();
-  ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-  const grad = ctx.createRadialGradient(0, 0, baseRadius, 0, 0, glowRadius);
-  grad.addColorStop(0, 'rgba(153, 0, 255, 0.5)');
-  grad.addColorStop(1, 'rgba(153, 0, 255, 0)');
-  ctx.fillStyle = grad;
-  ctx.fill();
+  // 1. Outer Translucent Dark-Matter Energy Rings (Simulated Glow without shadowBlur)
+  ctx.fillStyle = 'rgba(147, 51, 234, 0.22)';
+  ctx.fillRect(snap(-baseR * 1.5), snap(-baseR * 1.5), snap(baseR * 3), snap(baseR * 3));
 
-  // Black hole center (matching second image)
-  ctx.beginPath();
-  ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#111'; // black center
-  ctx.fill();
-  ctx.strokeStyle = '#9900ff'; // solid purple rim
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  ctx.fillStyle = 'rgba(192, 132, 252, 0.40)';
+  ctx.fillRect(snap(-baseR * 1.1), snap(-baseR * 1.1), snap(baseR * 2.2), snap(baseR * 2.2));
 
-  // Small orbiting dot (matching second image)
-  const orbitAngle = t / 150 + phaseOffset;
-  ctx.beginPath();
-  ctx.arc(Math.cos(orbitAngle) * (baseRadius + 2.5), Math.sin(orbitAngle) * (baseRadius + 2.5), 1.8, 0, Math.PI * 2);
-  ctx.fillStyle = '#df80ff';
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
-  ctx.fill();
+  // 2. Solid Stepped Void Core
+  ctx.fillStyle = '#090214'; // Abyssal black core
+  ctx.fillRect(snap(-baseR * 0.8), snap(-baseR * 0.8), snap(baseR * 1.6), snap(baseR * 1.6));
+
+  // 3. Violet Event Horizon Border Shell
+  ctx.strokeStyle = '#A855F7';
+  ctx.lineWidth = 1.8;
+  ctx.strokeRect(snap(-baseR * 0.8), snap(-baseR * 0.8), snap(baseR * 1.6), snap(baseR * 1.6));
+
+  // 4. White-Hot Central Singularity Spark
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(snap(-P), snap(-P), P * 2, P * 2);
+
+  // 5. Orbiting Dark-Matter Micro-Diamonds
+  const orbitAngle = t / 160 + phaseOffset;
+  const orbitDist = baseR + 5;
+  const dotX = snap(Math.cos(orbitAngle) * orbitDist);
+  const dotY = snap(Math.sin(orbitAngle) * orbitDist);
+
+  // Diamond shape: center + 4 cardinal pixel arms
+  ctx.fillStyle = '#E879F9';
+  ctx.fillRect(dotX - P, dotY - P, P * 2, P * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(dotX - P * 0.5, dotY - P * 0.5, P, P);
 }

@@ -10,6 +10,7 @@ import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { FighterStateMachine, FighterState } from '../../core/fighterStateMachine.js';
 import { drawGrayShield, drawGraySword, drawGrayBrokenSword } from '../../graphics/weaponVisuals.js';
+import { drawKnightPixelBody, drawKnightSkin } from '../../graphics/fighters/knightSkin.js';
 
 // ─────────────────────────────────────────────
 // KNIGHT FSM STATES
@@ -997,10 +998,24 @@ export class KnightFighter extends Fighter {
 
     super.draw(ctx);
   }
-}
 
-/**
- * Black Fighter (Black Hole)
- * Shoots black projectiles that can transform into black holes.
- * Skill: Summons a black hole near the opponent to drag them in.
- */
+  drawSkin(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    const angle = this._isWinnerReveal ? 0 : (this.gunAngle || this.angle || 0);
+    ctx.rotate(angle);
+
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+
+    drawKnightPixelBody(ctx, this.r, false);
+    this.drawStatusOverlays(ctx, this.r);
+    ctx.restore();
+  }
+
+  drawBody(ctx) {
+    this.drawSkin(ctx);
+  }
+}

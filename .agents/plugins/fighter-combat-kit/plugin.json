@@ -1,0 +1,5 @@
+{
+  "name": "fighter-combat-kit",
+  "version": "1.0.0",
+  "description": "Developer toolkit for fighter balance auditing, frame data tuning, combat regression checks, and character scaffolding in Ramball Fight Simulator."
+}

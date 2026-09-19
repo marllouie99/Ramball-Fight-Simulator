@@ -15,6 +15,12 @@ import { drawZenitsuSkin } from '../fighters/zenitsuSkin.js';
 import { drawNezukoSkin } from '../fighters/nezukoSkin.js';
 import { drawPowerSkin } from '../fighters/powerSkin.js';
 import { drawZeusSkin } from '../fighters/zeusSkin.js';
+import { drawCronosSkin } from '../fighters/cronosSkin.js';
+import { drawBomberPixelBody } from '../fighters/bomberSkin.js';
+import { drawVoidmasterPixelBody } from '../fighters/voidmasterSkin.js';
+import { drawKnightPixelBody } from '../fighters/knightSkin.js';
+import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighters/nanamiSkin.js';
+import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -26,6 +32,8 @@ if (state.studioSkinShowBody === undefined) state.studioSkinShowBody = true;
 if (state.studioSkinShowGuides === undefined) state.studioSkinShowGuides = true;
 if (state.studioSkinDetailTab === undefined) state.studioSkinDetailTab = 'scale';
 if (state.studioSkinModalOpen === undefined) state.studioSkinModalOpen = false;
+if (state.studioSkinModalPage === undefined) state.studioSkinModalPage = 0;
+if (state.studioSkinCategory === undefined) state.studioSkinCategory = 'ALL';
 
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 6.0;
@@ -38,6 +46,15 @@ let isDraggingHairScale = false;
 let isDraggingHairRotate = false;
 let _copyToastText = '';
 let _copyToastTimer = 0;
+
+// Fighter Category Tabs in Skin Studio Modal
+export const SKIN_STUDIO_CATEGORIES = [
+  { id: 'ALL', label: 'ALL (19)', filter: () => true },
+  { id: 'JJK', label: 'JJK (8)', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'nanami', 'mahito'].includes(f.key) },
+  { id: 'CHAINSAW', label: 'CSM (3)', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
+  { id: 'SLAYER', label: 'SLAYER (3)', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
+  { id: 'ARCADE', label: 'ARCADE (5)', filter: (f) => ['zeus', 'cronus', 'bomber', 'black', 'knight'].includes(f.key) }
+];
 
 // Fighter Definitions in Skin Studio
 export const SKIN_STUDIO_FIGHTERS = [
@@ -248,6 +265,95 @@ export const SKIN_STUDIO_FIGHTERS = [
       { id: 'default', label: 'OLYMPIAN' },
       { id: 'storm', label: 'DIVINE WRATH' }
     ]
+  },
+  {
+    key: 'cronos',
+    label: 'CRONUS',
+    asset: 'Procedural Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.30,
+    baseH: 2.00,
+    baseCrownY: -1.20,
+    themeColor: '#00F3FF',
+    forms: [
+      { id: 'default', label: 'TITAN KING' },
+      { id: 'sphere', label: 'TIME STOP' }
+    ]
+  },
+  {
+    key: 'bomber',
+    label: 'BOMBER',
+    asset: 'Procedural Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.30,
+    baseH: 2.00,
+    baseCrownY: -1.20,
+    themeColor: '#F59E0B',
+    forms: [
+      { id: 'default', label: 'DEMOLITIONIST' }
+    ]
+  },
+  {
+    key: 'black',
+    label: 'VOIDMASTER',
+    asset: 'Procedural Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.30,
+    baseH: 2.00,
+    baseCrownY: -1.20,
+    themeColor: '#9333EA',
+    forms: [
+      { id: 'default', label: 'ABYSSAL SOVEREIGN' }
+    ]
+  },
+  {
+    key: 'knight',
+    label: 'KNIGHT',
+    asset: 'Procedural Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.30,
+    baseH: 2.00,
+    baseCrownY: -1.20,
+    themeColor: '#94A3B8',
+    forms: [
+      { id: 'default', label: 'ROYAL PALADIN' }
+    ]
+  },
+  {
+    key: 'nanami',
+    label: 'NANAMI',
+    asset: 'Nanami-hair.png',
+    assetDims: '1345 x 1170',
+    baseW: 2.45,
+    baseH: 1.55,
+    baseCrownY: -1.15,
+    visW: 1252,
+    visH: 797,
+    centerX: 698.5,
+    topY: 250,
+    themeColor: '#eab308',
+    forms: [
+      { id: 'default', label: 'STANDARD' },
+      { id: 'overtime', label: 'OVERTIME (120%)' }
+    ]
+  },
+  {
+    key: 'mahito',
+    label: 'MAHITO',
+    asset: 'Mahito-hair.png',
+    assetDims: '536 x 466',
+    baseW: 2.35,
+    baseH: 2.64,
+    baseCrownY: -1.25,
+    visW: 408,
+    visH: 458,
+    centerX: 267.5,
+    topY: 6,
+    themeColor: '#d946ef',
+    forms: [
+      { id: 'default', label: 'STANDARD' },
+      { id: 'distorted', label: 'ISBODK CARAPACE' }
+    ]
   }
 ];
 
@@ -358,6 +464,26 @@ function generateJsCode(fDef, custom) {
            `const drawH = 1170 * scaleY;\n` +
            `const drawX = -686 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 136 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'nanami') {
+    return `// Calibrated Hair for Nanami (Assets/model/Nanami-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 1252;\n` +
+           `const scaleY = targetHairHeight / 797;\n` +
+           `const drawW = 1345 * scaleX;\n` +
+           `const drawH = 1170 * scaleY;\n` +
+           `const drawX = -698.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 250 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'mahito') {
+    return `// Calibrated Hair for Mahito (Assets/model/Mahito-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 408;\n` +
+           `const scaleY = targetHairHeight / 458;\n` +
+           `const drawW = 536 * scaleX;\n` +
+           `const drawH = 466 * scaleY;\n` +
+           `const drawX = -267.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 6 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
@@ -406,7 +532,7 @@ export function drawSkinStudioScreen() {
   ctx.restore();
 
   // Prominent Fighter Selector Pill Button (Click to open Fighter Modal)
-  const selBtnW = 330;
+  const selBtnW = 380;
   const selBtnH = 30;
   const selBtnX = (canvas.width - selBtnW) / 2;
   const selBtnY = 68;
@@ -433,10 +559,11 @@ export function drawSkinStudioScreen() {
   ctx.fillText(`EDITING: ${fDef.label}`, selBtnX + 28, selBtnY + selBtnH / 2);
 
   // Asset subtitle
+  const displayAsset = fDef.asset.length > 22 ? fDef.asset.slice(0, 20) + '…' : fDef.asset;
   ctx.fillStyle = '#94a3b8';
   ctx.font = '700 9px "Rajdhani", monospace';
   const nameW = ctx.measureText(`EDITING: ${fDef.label}`).width;
-  ctx.fillText(`(${fDef.asset})`, selBtnX + 28 + nameW + 8, selBtnY + selBtnH / 2);
+  ctx.fillText(`(${displayAsset})`, selBtnX + 28 + nameW + 8, selBtnY + selBtnH / 2);
 
   // Modal Open Prompt on right
   ctx.fillStyle = themeColor;
@@ -576,6 +703,26 @@ export function drawSkinStudioScreen() {
         dummyFighter.stormActive = (state.studioSkinForm === 'storm');
         drawZeusSkin(ctx, dummyFighter);
         dummyFighter.stormActive = origStorm;
+      } else if (fDef.key === 'cronos') {
+        const origSphere = dummyFighter.sphereActive;
+        const origTimer = dummyFighter.sphereTimer;
+        dummyFighter.sphereActive = (state.studioSkinForm === 'sphere');
+        dummyFighter.sphereTimer = (state.studioSkinForm === 'sphere') ? 300 : 0;
+        drawCronosSkin(ctx, dummyFighter);
+        dummyFighter.sphereActive = origSphere;
+        dummyFighter.sphereTimer = origTimer;
+      } else if (fDef.key === 'bomber') {
+        drawBomberPixelBody(ctx, baseRadius, false);
+      } else if (fDef.key === 'black') {
+        drawVoidmasterPixelBody(ctx, baseRadius, false);
+      } else if (fDef.key === 'knight') {
+        drawKnightPixelBody(ctx, baseRadius, false);
+      } else if (fDef.key === 'nanami') {
+        dummyFighter.isOvertimeActive = (state.studioSkinForm === 'overtime');
+        drawNanamiSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'mahito') {
+        dummyFighter.isTransformed = (state.studioSkinForm === 'distorted');
+        drawMahitoSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -599,6 +746,10 @@ export function drawSkinStudioScreen() {
       _drawYutaHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'toji') {
       _drawTojiHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'nanami') {
+      _drawNanamiHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'mahito') {
+      _drawMahitoHair(ctx, baseRadius, isFacingLeft);
     }
     ctx.restore();
   }
@@ -1233,9 +1384,20 @@ export function drawSkinStudioScreen() {
       state.studioSkinModalOpen = false;
     });
 
-    // 2. Modal Window Box
+    // 2. Filter and Pagination Calculations
+    const activeCategoryDef = SKIN_STUDIO_CATEGORIES.find(c => c.id === state.studioSkinCategory) || SKIN_STUDIO_CATEGORIES[0];
+    const filteredFighters = SKIN_STUDIO_FIGHTERS.filter(activeCategoryDef.filter);
+    const PAGE_SIZE = 6;
+    const totalPages = Math.max(1, Math.ceil(filteredFighters.length / PAGE_SIZE));
+    if (state.studioSkinModalPage >= totalPages) {
+      state.studioSkinModalPage = 0;
+    }
+    const currentPage = Math.max(0, Math.min(state.studioSkinModalPage, totalPages - 1));
+    const pageFighters = filteredFighters.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+    // 3. Modal Window Box (Framed cleanly on screen)
     const modalW = canvas.width - 32; // 508px
-    const modalH = 590;
+    const modalH = 428;
     const modalX = 16;
     const modalY = Math.max(16, Math.floor((canvas.height - modalH) / 2));
 
@@ -1250,32 +1412,71 @@ export function drawSkinStudioScreen() {
     ctx.font = '700 8px "Silkscreen", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText('ASSET CALIBRATION // FIGHTER SELECTION ROSTER', modalX + 16, modalY + 14);
+    ctx.fillText('ASSET CALIBRATION // FIGHTER SELECTION ROSTER', modalX + 16, modalY + 13);
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '900 16px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText('SELECT FIGHTER MODEL TO EDIT', modalX + 16, modalY + 26);
+    ctx.font = '900 15px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText('SELECT FIGHTER MODEL TO EDIT', modalX + 16, modalY + 24);
 
     // Header accent divider line
-    ctx.fillStyle = '#21050c';
-    ctx.fillRect(modalX + 16, modalY + 48, modalW - 32, 2);
+    ctx.fillStyle = 'rgba(45, 8, 12, 0.35)';
+    ctx.fillRect(modalX + 16, modalY + 44, modalW - 32, 1.5);
     ctx.restore();
 
     // Close Button [✕ CLOSE]
-    drawButton('✕ CLOSE', modalX + modalW - 44, modalY + 26, () => {
+    drawButton('✕ CLOSE', modalX + modalW - 44, modalY + 24, () => {
       state.studioSkinModalOpen = false;
     }, 66, 22, '#e11d48', 3);
 
-    // 3. Fighter Grid (2 Columns × 5 Rows)
+    // 4. Category Filter Tabs
+    const catY = modalY + 50;
+    const catBtnH = 20;
+    const catGap = 5;
+    const catBtnW = Math.floor((modalW - 32 - catGap * (SKIN_STUDIO_CATEGORIES.length - 1)) / SKIN_STUDIO_CATEGORIES.length);
+    const catStartX = modalX + 16;
+
+    SKIN_STUDIO_CATEGORIES.forEach((cat, cIdx) => {
+      const bx = catStartX + cIdx * (catBtnW + catGap);
+      const by = catY;
+      const isCatActive = (state.studioSkinCategory === cat.id);
+
+      ctx.save();
+      if (isCatActive) {
+        ctx.fillStyle = '#21050c';
+        ctx.strokeStyle = '#b81c3b';
+        ctx.lineWidth = 1.6;
+      } else {
+        ctx.fillStyle = 'rgba(45, 8, 12, 0.08)';
+        ctx.strokeStyle = 'rgba(45, 8, 12, 0.22)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, bx, by, catBtnW, catBtnH, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isCatActive ? '#ffffff' : '#4a121a';
+      ctx.font = isCatActive ? '900 9px "Rajdhani", sans-serif' : '700 8.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cat.label, bx + catBtnW / 2, by + catBtnH / 2);
+      ctx.restore();
+
+      _registerButton(bx, by, catBtnW, catBtnH, () => {
+        state.studioSkinCategory = cat.id;
+        state.studioSkinModalPage = 0;
+      });
+    });
+
+    // 5. Fighter Grid (2 Columns × 3 Rows = 6 Cards Max per Page)
     const gridCols = 2;
     const gridGapX = 10;
-    const gridGapY = 8;
+    const gridGapY = 7;
     const cardW = Math.floor((modalW - 32 - gridGapX) / gridCols); // 233px
-    const cardH = 86;
+    const cardH = 78;
     const gridStartX = modalX + 16;
-    const gridStartY = modalY + 58;
+    const gridStartY = modalY + 76;
 
-    SKIN_STUDIO_FIGHTERS.forEach((f, idx) => {
+    pageFighters.forEach((f, idx) => {
       const col = idx % gridCols;
       const row = Math.floor(idx / gridCols);
       const cx = gridStartX + col * (cardW + gridGapX);
@@ -1285,7 +1486,7 @@ export function drawSkinStudioScreen() {
       ctx.save();
       // Card Box Body
       if (isSelected) {
-        ctx.fillStyle = `${f.themeColor}24`;
+        ctx.fillStyle = `${f.themeColor}28`;
         ctx.strokeStyle = f.themeColor;
         ctx.lineWidth = 1.8;
       } else {
@@ -1298,8 +1499,8 @@ export function drawSkinStudioScreen() {
       ctx.stroke();
 
       // Mini Avatar Circle
-      const avatarR = 20;
-      const avatarX = cx + 28;
+      const avatarR = 19;
+      const avatarX = cx + 27;
       const avatarY = cy + cardH / 2;
 
       ctx.save();
@@ -1325,37 +1526,39 @@ export function drawSkinStudioScreen() {
       ctx.restore();
 
       // Fighter Info Text Block
-      const textX = cx + 56;
+      const textX = cx + 54;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
 
       // Fighter Name
       ctx.fillStyle = isSelected ? '#ffffff' : '#f1f5f9';
-      ctx.font = '900 12px "Rajdhani", sans-serif';
-      ctx.fillText(f.label, textX, cy + 12);
+      ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
+      ctx.fillText(f.label, textX, cy + 10);
 
-      // Asset Tag
+      // Asset Tag (truncated cleanly if needed)
+      const maxAssetLen = 22;
+      const cardAsset = f.asset.length > maxAssetLen ? f.asset.slice(0, 20) + '…' : f.asset;
       ctx.fillStyle = '#94a3b8';
       ctx.font = '700 8.5px "Rajdhani", monospace';
-      ctx.fillText(`ASSET: ${f.asset}`, textX, cy + 28);
+      ctx.fillText(`ASSET: ${cardAsset}`, textX, cy + 26);
 
       // Forms count tag
       const formCount = f.forms ? f.forms.length : 1;
       ctx.fillStyle = isSelected ? f.themeColor : '#64748b';
       ctx.font = '900 8.5px "Rajdhani", sans-serif';
-      ctx.fillText(`⚡ ${formCount} ${formCount > 1 ? 'FORMS' : 'FORM'}`, textX, cy + 44);
+      ctx.fillText(`⚡ ${formCount} ${formCount > 1 ? 'FORMS' : 'FORM'}`, textX, cy + 42);
 
       // Status Pill on bottom right
       if (isSelected) {
         ctx.fillStyle = f.themeColor;
         ctx.font = '900 8px "Rajdhani", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('● ACTIVE', cx + cardW - 10, cy + cardH - 14);
+        ctx.fillText('● ACTIVE', cx + cardW - 10, cy + cardH - 12);
       } else {
         ctx.fillStyle = '#64748b';
         ctx.font = '700 8px "Rajdhani", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('SELECT ➔', cx + cardW - 10, cy + cardH - 14);
+        ctx.fillText('SELECT ➔', cx + cardW - 10, cy + cardH - 12);
       }
 
       ctx.restore();
@@ -1370,13 +1573,89 @@ export function drawSkinStudioScreen() {
       });
     });
 
-    // Modal Footer Hint
+    // 6. Pagination Controls Bar
+    const pagY = modalY + 338;
+    const pagH = 24;
+
+    // Prev Button
+    const prevW = 68;
+    const prevH = 22;
+    const prevX = modalX + 16 + prevW / 2;
+    const prevY = pagY + pagH / 2;
+    if (currentPage > 0) {
+      drawButton('◀ PREV', prevX, prevY, () => {
+        state.studioSkinModalPage = Math.max(0, state.studioSkinModalPage - 1);
+      }, prevW, prevH, '#b81c3b', 3);
+    } else {
+      ctx.save();
+      ctx.fillStyle = 'rgba(45, 8, 12, 0.05)';
+      ctx.strokeStyle = 'rgba(45, 8, 12, 0.14)';
+      ctx.lineWidth = 1;
+      drawChamferedRect(ctx, prevX - prevW / 2, prevY - prevH / 2, prevW, prevH, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#a88990';
+      ctx.font = '700 9px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('◀ PREV', prevX, prevY);
+      ctx.restore();
+    }
+
+    // Next Button
+    const nextW = 68;
+    const nextH = 22;
+    const nextX = modalX + modalW - 16 - nextW / 2;
+    const nextY = pagY + pagH / 2;
+    if (currentPage < totalPages - 1) {
+      drawButton('NEXT ▶', nextX, nextY, () => {
+        state.studioSkinModalPage = Math.min(totalPages - 1, state.studioSkinModalPage + 1);
+      }, nextW, nextH, '#b81c3b', 3);
+    } else {
+      ctx.save();
+      ctx.fillStyle = 'rgba(45, 8, 12, 0.05)';
+      ctx.strokeStyle = 'rgba(45, 8, 12, 0.14)';
+      ctx.lineWidth = 1;
+      drawChamferedRect(ctx, nextX - nextW / 2, nextY - nextH / 2, nextW, nextH, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#a88990';
+      ctx.font = '700 9px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('NEXT ▶', nextX, nextY);
+      ctx.restore();
+    }
+
+    // Center Page Indicator
+    const centerX = modalX + modalW / 2;
     ctx.save();
+    ctx.fillStyle = '#21050c';
+    ctx.font = '900 10.5px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#64748b';
+    ctx.fillText(`PAGE ${currentPage + 1} OF ${totalPages}  (${filteredFighters.length} FIGHTERS)`, centerX, pagY + pagH / 2);
+    ctx.restore();
+
+    // 7. Modal Footer Hint Container
+    const footerY = modalY + 368;
+    const footerH = 24;
+    const footerW = modalW - 32;
+    const footerX = modalX + 16;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(45, 8, 12, 0.06)';
+    ctx.strokeStyle = 'rgba(45, 8, 12, 0.14)';
+    ctx.lineWidth = 1;
+    drawChamferedRect(ctx, footerX, footerY, footerW, footerH, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#4a121a';
     ctx.font = '700 9px "Rajdhani", sans-serif';
-    ctx.fillText('💡 Click any fighter card to live-edit hair scales, positions, and rotation angles.', modalX + modalW / 2, modalY + modalH - 16);
+    ctx.fillText('💡 Click any fighter card to live-edit hair scales, positions, and rotation angles.', footerX + footerW / 2, footerY + footerH / 2);
     ctx.restore();
   }
 }

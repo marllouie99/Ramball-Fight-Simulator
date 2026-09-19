@@ -728,7 +728,7 @@ let _lastSaitamaImpactState = null;
 let _cachedRoundBanner = null;
 
 function _getDimElements() {
-  if (!_cachedDimEls || !_cachedDimEls[0] || (typeof document !== 'undefined' && !document.body.contains(_cachedDimEls[0]))) {
+  if (!_cachedDimEls || !_cachedDimEls[0] || (typeof document !== 'undefined' && document.body && typeof document.body.contains === 'function' && !document.body.contains(_cachedDimEls[0]))) {
     if (typeof document === 'undefined') return [];
     _cachedDimEls = [
       document.querySelector('.game-container'),
@@ -1102,124 +1102,42 @@ function updateHealthHud() {
 
   const isSkillExceptionInDarkMode = (fighter, skill) => {
     if (!fighter || !skill) return false;
+    if (skill.isSignature || skill.isUltimate || skill.isDomain || skill.signature) {
+      return true;
+    }
     const fId = String(fighter.characterId || fighter.type || (fighter._def && fighter._def.type) || '').toLowerCase();
     const sId = String(skill.id || '').toLowerCase();
     const sLabel = String(skill.label || '').toUpperCase();
 
-    // 1. Ichigo exception: BANKAI (strictly sId === 'bankai' so 'HOLLOW MASK' is hidden when darkModeShowHudSkillBars is off)
-    if (fId === 'ichigo') {
-      if (sId === 'bankai') {
-        return true;
-      }
-    }
+    // Specific character signature skill mapping
+    const signatureMap = {
+      ichigo: ['bankai'],
+      toji: ['ult', 'ultimate', 'CURSE INVENTORY', 'INVENTORY'],
+      gojo: ['uv', 'domain', 'UNLIMITED VOID', 'VOID'],
+      sukuna: ['ms', 'domain', 'MALEVOLENT SHRINE', 'SHRINE'],
+      yuta: ['domain', 'AUTHENTIC MUTUAL LOVE', 'MUTUAL LOVE'],
+      mahito: ['domain_expansion', 'domain', 'SELF-EMBODIMENT', 'PERFECTION'],
+      saitama: ['punish', 'counter', 'SERIOUS PUNCH', 'SERIOUS'],
+      genos: ['ult', 'ultimate', 'INCINERATION CANNON', 'INCINERATION'],
+      yuji: ['bf_threshold', 'black_flash', 'BLACK FLASH'],
+      todo: ['clap', 'boogie', 'BOOGIE'],
+      nanami: ['lunge', 'decisive', 'DECISIVE'],
+      mahoraga: ['wheel', 'adaptation', 'WHEEL', 'ADAPTATION', 'WOA'],
+      cj: ['baguvix', 'godmode', 'BAGUVIX', 'GODMODE'],
+      engineer: ['turret', 'sentry', 'SENTRY', 'TURRET'],
+      john_wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
+      johnwick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
+      wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
+      makima: ['chains', 'shrine', 'contract', 'CHAINS', 'SHRINE', 'CONTRACT']
+    };
 
-    // 2. Toji exception: His Ultimate (Curse Inventory)
-    if (fId === 'toji') {
-      if (sId === 'ult' || sId === 'ultimate' || sLabel.includes('CURSE INVENTORY') || sLabel.includes('INVENTORY')) {
-        return true;
-      }
+    const keys = signatureMap[fId];
+    if (keys) {
+      return keys.some(k => sId === k.toLowerCase() || sLabel.includes(k.toUpperCase()));
     }
-
-    // 3. Gojo exception: Domain Expansion (Unlimited Void)
-    if (fId === 'gojo') {
-      if (sId === 'uv' || sId === 'domain' || sLabel.includes('UNLIMITED VOID') || sLabel.includes('VOID')) {
-        return true;
-      }
-    }
-
-    // 4. Sukuna exception: Domain Expansion (Malevolent Shrine)
-    if (fId === 'sukuna') {
-      if (sId === 'ms' || sId === 'domain' || sLabel.includes('MALEVOLENT SHRINE') || sLabel.includes('SHRINE')) {
-        return true;
-      }
-    }
-
-    // 5. Yuta exception: Domain Expansion (Authentic Mutual Love)
-    if (fId === 'yuta') {
-      if (sId === 'domain' || sLabel.includes('AUTHENTIC MUTUAL LOVE') || sLabel.includes('MUTUAL LOVE')) {
-        return true;
-      }
-    }
-
-    // 6. Mahito exception: Domain Expansion (Self-Embodiment of Perfection)
-    if (fId === 'mahito') {
-      if (sId === 'domain_expansion' || sId === 'domain' || sLabel.includes('SELF-EMBODIMENT') || sLabel.includes('PERFECTION')) {
-        return true;
-      }
-    }
-
-    // 7. Saitama exception: SERIOUS PUNCH (Serious Counter)
-    if (fId === 'saitama') {
-      if (sId === 'punish' || sId === 'counter' || sLabel.includes('SERIOUS PUNCH') || sLabel.includes('SERIOUS')) {
-        return true;
-      }
-    }
-
-    // 8. Genos exception: His Ultimate (Incineration Cannon)
-    if (fId === 'genos') {
-      if (sId === 'ult' || sId === 'ultimate' || sLabel.includes('INCINERATION CANNON') || sLabel.includes('INCINERATION')) {
-        return true;
-      }
-    }
-
-    // 9. Yuji exception: Black Flash charges
-    if (fId === 'yuji') {
-      if (sId === 'bf_threshold' || sId === 'black_flash' || sLabel.includes('BLACK FLASH')) {
-        return true;
-      }
-    }
-
-    // 10. Todo exception: Boogie (Boogie Woogie)
-    if (fId === 'todo') {
-      if (sId === 'clap' || sId === 'boogie' || sLabel.includes('BOOGIE')) {
-        return true;
-      }
-    }
-
-    // 11. Nanami exception: Decisive Strike (Ratio Lunge)
-    if (fId === 'nanami') {
-      if (sId === 'lunge' || sId === 'decisive' || sLabel.includes('DECISIVE')) {
-        return true;
-      }
-    }
-
-    // 12. Mahoraga exception: Wheel of Adaptation
-    if (fId === 'mahoraga') {
-      if (sId === 'wheel' || sId === 'adaptation' || sLabel.includes('WHEEL') || sLabel.includes('ADAPTATION') || sLabel.includes('WOA')) {
-        return true;
-      }
-    }
-
-    // 13. CJ exception: BAGUVIX (God Mode)
-    if (fId === 'cj') {
-      if (sId === 'baguvix' || sId === 'godmode' || sLabel.includes('BAGUVIX') || sLabel.includes('GODMODE')) {
-        return true;
-      }
-    }
-
-    // 14. Engineer exception: Sentry
-    if (fId === 'engineer') {
-      if (sId === 'turret' || sId === 'sentry' || sLabel.includes('SENTRY') || sLabel.includes('TURRET')) {
-        return true;
-      }
-    }
-
-    // 15. John Wick exception: EXCOMMUNICADO
-    if (fId === 'john_wick' || fId === 'johnwick' || fId === 'wick') {
-      if (sId === 'ultimate' || sId === 'excommunicado' || sLabel.includes('EXCOMMUNICADO')) {
-        return true;
-      }
-    }
-
-    // 16. Makima exception: Chains of Domination / Kyoto Shrine Ritual / Prime Minister Contract
-    if (fId === 'makima') {
-      if (sId === 'chains' || sId === 'shrine' || sId === 'contract' || sLabel.includes('CHAINS') || sLabel.includes('SHRINE') || sLabel.includes('CONTRACT')) {
-        return true;
-      }
-    }
-
     return false;
   };
+
 
   const shouldShowFighterSkill = (fighter, skill) => {
     if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {

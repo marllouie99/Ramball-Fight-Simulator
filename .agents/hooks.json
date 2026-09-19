@@ -1,0 +1,16 @@
+{
+  "auto-verify-reminder": {
+    "PostToolUse": [
+      {
+        "matcher": "replace_file_content|multi_replace_file_content|write_to_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -Command \"$input = $env:STDIN; $json = [System.Console]::In.ReadToEnd() | ConvertFrom-Json; $toolArgs = $json.toolCall.args; $file = ''; if ($toolArgs.TargetFile) { $file = $toolArgs.TargetFile } elseif ($toolArgs.targetFile) { $file = $toolArgs.targetFile }; if ($file -match '[\\\\/]scripts[\\\\/]' -or $file -match '[\\\\/]scratch[\\\\/]') { Write-Output '{\\\"injectSteps\\\":[{\\\"ephemeralMessage\\\":\\\"REMINDER: You modified/created a file in scripts/ or scratch/. Remember to DELETE all temporary scratch scripts and run npm run verify before concluding your task.\\\"}]}' } elseif ($file -match '[\\\\/]js[\\\\/]') { Write-Output '{\\\"injectSteps\\\":[{\\\"ephemeralMessage\\\":\\\"REMINDER: You edited a JS source file. Remember to run npm run verify before concluding this task to catch regressions.\\\"}]}' } else { Write-Output '{}' }\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

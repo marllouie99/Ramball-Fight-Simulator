@@ -4,7 +4,7 @@
 
 export const nanamiConfig = {
   // Base Attributes
-  hp: 420,
+  hp: 195,
   speed: 5.5,
   moveSpeed: 5.5,
   r: 25,
@@ -15,7 +15,7 @@ export const nanamiConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 1.0,
-  damage: 22,
+  damage: 7,
   cooldown: 55,
   projectileSpeedMultiplier: 1.0,
   ability: 'Ratio Technique (7:3)',
@@ -24,18 +24,22 @@ export const nanamiConfig = {
   // Passive: Overtime (Jigai)
   overtimeThresholdSeconds: 25,     // Activates after 25s elapsed in the round
   overtimeHpThreshold: 0.40,        // Or when HP drops below 40%
-  overtimeDamageMultiplier: 1.25,   // Balanced +25% damage boost
+  overtimeDamageMultiplier: 1.20,   // Balanced +20% damage boost
   overtimeSpeedMultiplier: 1.20,    // +20% move speed boost
   overtimeSpeechWalkDuration: 105,  // Duration (frames @ 60fps) to walk calmly towards enemy while finishing speech (~1.75s)
   overtimeSpeechWalkSpeed: 2.0,     // Calm steady walk speed during speech
   overtimeDamageReduction: 0.15,    // 15% incoming damage mitigation
   overtimeGuaranteedCritCooldown: 150, // 2.5s recharge between 100% auto-crits
-  overtimeBaseCritChance: 0.45,     // 45% ratio crit chance on standard swings while recharging
+  overtimeBaseCritChance: 0.25,     // 25% ratio crit chance on standard swings while recharging (balanced from frequent triggers)
+  overtimeCritInternalCooldown: 90, // 1.5s internal cooldown between ratio crits during Overtime
 
   // Passive: Ratio Technique (7:3 — Shichisan no Jutsu)
   ratioCritMultiplier: 2.0,         // 2.0x True Damage in Standard shift
   overtimeRatioCritMultiplier: 1.80,// 1.8x True Damage in Overtime (prevents multiplicative one-shots)
-  ratioBaseCritChance: 0.30,        // 30% base ratio critical rate in standard shift
+  ratioBaseCritChance: 0.15,        // 15% base ratio critical rate in standard shift (balanced from 30%)
+  ratioSweetSpotMaxBonus: 0.15,     // Up to +15% bonus critical chance when cleanly aligning strike on the sweet-spot center angle (15% -> 30% max)
+  ratioSweetSpotPrecisionThreshold: 0.75, // Alignment ratio (>= 75% center precision) for triggering the '7:3 SWEET SPOT!' visual surge
+  ratioCritInternalCooldown: 120,   // 2.0s (120 frames) internal cooldown between 7:3 Ratio Critical hits in Standard shift
   ratioAngleTolerance: 0.20,        // Angular window tolerance for hitting ratio sweet spot
   armorFractureDuration: 180,       // 3.0s duration (frames at 60fps)
   armorFractureBonusDamage: 0.20,   // +20% bonus incoming damage on fractured enemies
@@ -54,14 +58,14 @@ export const nanamiConfig = {
   // Primary Melee: Blunt Cleaver Chop (Frontal Arc — Rule 7)
   cleaverRange: 65,                 // 65px melee reach
   cleaverArc: (130 * Math.PI) / 180,// 130° frontal arc
-  cleaverDamage: 22,                // Base chop damage
-  cleaverCooldown: 40,              // Frames between swings (~0.92s)
+  cleaverDamage: 7,                 // Base chop damage
+  cleaverCooldown: 50,              // Frames between swings (~0.92s)
   cleaverKnockback: 16,             // Base physical knockback force
 
   // Skill 1: Decisive Strike / Ratio Lunge (Shichisan Issen)
-  lungeCooldown: 200,               // 7.0s (420 frames)
-  lungeDamage: 38,                  // Base path cleave damage
-  lungeCritDamage: 95,              // 95 True Damage on 7:3 Critical primary hit
+  lungeCooldown: 500,               // 7.0s (420 frames)
+  lungeDamage: 14,                  // Base path cleave damage
+  lungeCritDamage: 36,              // 36 True Damage on 7:3 Critical primary hit
   lungeDistance: 180,               // 180px dash travel distance
   lungeDuration: 16,                // 16 frames travel time
   lungeSpeed: 15.25,                // Dash travel speed (px per frame, e.g. 180 / 16 = 11.25)
@@ -75,13 +79,13 @@ export const nanamiConfig = {
   // Skill 2: Collapse (Tōka / Falling Rubble)
   collapseCooldown: 600,            // 10.0s (600 frames)
   collapseRadius: 200,              // 200px AOE shockwave
-  collapseDamage: 45,               // 45 AOE Damage
+  collapseDamage: 24,               // 24 AOE Damage
   collapseSlowDuration: 150,        // 2.5s slowdown (150 frames)
   collapseSlowAmount: 0.40,         // 40% movement speed reduction
   collapseWindupFrames: 14,         // Downward slam windup duration (frames)
   collapseKnockback: 30,            // Physical blast knockback force
   collapseMinRange: 0,              // AI trigger minimum distance
-  collapseMaxRange: 180,            // AI trigger maximum distance (guarantees target is inside 200px shockwave radius!)
+  collapseMaxRange: 50,            // AI trigger maximum distance (guarantees target is inside 200px shockwave radius!)
   collapseScreenShake: 6.0,         // Screen tremor intensity
   collapseShakeDuration: 18,        // Screen tremor duration (frames)
   collapseDebrisCount: 16,          // Number of concrete rubble fragments
@@ -92,8 +96,8 @@ export const nanamiConfig = {
   ultimateVoicelineChannelDuration: 75, // Voiceline channeling/windup duration (frames) before voiceline ends
   ultimatePostVoicelineDelay: 15,   // Delay frames after voiceline finishes before triggering the 1st Black Flash strike
   ultimateMaxStrikes: 4,            // 4 consecutive Black Flash strikes
-  ultimateStrikeDamage: 30,         // 30 True Damage x 3 initial strikes = 90
-  ultimateFinisherDamage: 60,       // 60 True Damage finisher = 150 total HP True Damage
+  ultimateStrikeDamage: 14,         // 14 True Damage x 3 initial strikes = 42
+  ultimateFinisherDamage: 34,       // 34 True Damage finisher = 76 total HP True Damage
   ultimateStrikeInterval: 18,       // Frames between blitz strikes
   ultimateMaxRange: 260,            // Execution range
   ultimateScreenShake: 7.5,         // Initial screen shake intensity

@@ -1,6 +1,6 @@
 import { stopSound, stopSoundBySrc, fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
 import { CONFIG } from '../../../core/config.js';
-import { state, spawnFloatingText, triggerGlobalScreenShake, isChampionScreenActive } from '../../../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake, isChampionScreenActive } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash, spawnRikaRoarShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { spawnDeathShatter } from '../../../graphics/particles/deathShatterEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
@@ -868,11 +868,7 @@ export function updateRika(fighter, arena) {
   }
 
   // Freeze Rika during Nanami or Escanor Hit-Pause
-  const isGlobalHitPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (
-    ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) ||
-    ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0)
-  ));
-  if (isGlobalHitPausing) {
+  if (isGlobalHitPauseActive(state)) {
     rk.vx = 0;
     rk.vy = 0;
     clampRikaToArena(rk, currentArena);

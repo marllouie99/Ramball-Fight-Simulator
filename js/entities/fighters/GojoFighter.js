@@ -954,7 +954,10 @@ export class GojoFighter extends Fighter {
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
-      this.timeStopTimer = 0;
+      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+      if (!isNanamiPausing) {
+        this.timeStopTimer = 0;
+      }
       this.purpleHitTimer = 0;
       this.isCaughtInPurple = false;
       this._hitByGetsugaTimer = 0;
@@ -967,6 +970,10 @@ export class GojoFighter extends Fighter {
 
     const isFrozen = this._handleTimeStop();
     if (isFrozen) {
+      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+      if (isNanamiPausing) {
+        return; // Retain all channeling states intact during Nanami 7:3 Ratio hit-pause!
+      }
       if (!this.isCaughtInTelekinesis) this.z = 0;
       if (this.isDomainPreSlide) {
         this.isDomainPreSlide = false;

@@ -14,8 +14,7 @@ import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
 import { applyDamageToTarget } from '../../fighter.js';
 import { spawnBloodEffect, spawnFatalBloodSplash } from '../../../graphics/particles/bloodEffect.js';
-import { spawnDeathShatter } from '../../../graphics/particles/deathShatterEffect.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnMahitoClawScratchImpact, spawnMahitoSoulExplosion, spawnMahitoDomainSoulTendrilStrike } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnMahitoClawScratchImpact, spawnMahitoSoulExplosion, spawnMahitoDomainSoulTendrilStrike, spawnMahitoSoulBubbles } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
@@ -174,9 +173,9 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
   const arcAngle = cfg.arcAngle || (135 * Math.PI / 180);
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
 
-  let baseDamage = cfg.damage || 16;
+  let baseDamage = cfg.damage || 7;
   if (isTransformed) {
-    const damageMult = cfg.transformation?.damageMultiplier ?? 1.60;
+    const damageMult = cfg.transformation?.damageMultiplier ?? 1.25;
     baseDamage *= damageMult;
   }
 
@@ -184,10 +183,14 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
   const validHits = getMahitoFrontRadiusTargets(fighter, reach, arcAngle);
   let hitAny = validHits.length > 0;
 
+  // Aim towards primary target if available
+  const primaryTarget = targetHint || (validHits.length > 0 ? validHits[0].entity : null) || (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
+  if (primaryTarget && typeof fighter.aim === 'function') {
+    fighter.aim(primaryTarget);
+  }
+
   for (let i = 0; i < validHits.length; i++) {
     const { entity: ent, angle: targetAngle } = validHits[i];
-
-
 
     // 1. Apply Base Damage
     applyDamageToTarget(ent, baseDamage, fighter, { isMelee: true, isBasicAttack: true });
@@ -216,7 +219,7 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
     spawnMahitoClawScratchImpact(impactX, impactY, targetAngle, isTransformed);
     if (fighter.domainActive) {
       // Long-range Domain Sure-Hit Tendril Strike: stretches a transfigured soul arm from Mahito to target
-      spawnMahitoDomainSoulTendrilStrike(fighter.x, fighter.y, ent.x, ent.y, isTransformed);
+      spawnMahitoDomainSoulTendrilStrike(fighter.x, fighter.y, ent.x, ent.y, isTransformed, fighter, ent);
       spawnImpactFlash(ent.x, ent.y, 45, '#D946EF');
     }
 
@@ -224,9 +227,10 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
     applySoulDisfigurementStack(ent, fighter);
   }
 
-  // If inside domain and no enemy was caught in frontal cone, still reach towards targetHint
-  if (fighter.domainActive && !hitAny && targetHint && targetHint.hp > 0 && !targetHint.isDead) {
-    spawnMahitoDomainSoulTendrilStrike(fighter.x, fighter.y, targetHint.x, targetHint.y, isTransformed);
+  // If inside domain and no enemy was caught in frontal cone, still reach towards primaryTarget
+  if (fighter.domainActive && !hitAny && primaryTarget && primaryTarget.hp > 0 && !primaryTarget.isDead) {
+    spawnMahitoDomainSoulTendrilStrike(fighter.x, fighter.y, primaryTarget.x, primaryTarget.y, isTransformed, fighter, primaryTarget);
+    spawnImpactFlash(primaryTarget.x, primaryTarget.y, 45, '#D946EF');
   }
 
   // Audio Dispatcher
@@ -256,7 +260,7 @@ export function triggerMahitoParalyzeExplosion(entity) {
 
   const cfg = CONFIG.mahito || {};
   const soulCfg = cfg.soulDisfigurement || {};
-  const ruptureDmg = soulCfg.ruptureDamage || 24;
+  const ruptureDmg = soulCfg.ruptureDamage || 16;
 
   // 1. Visceral Soul Explosion Visuals, Fatal Blood Splash, & Body Shatter
   spawnMahitoSoulExplosion(entity.x, entity.y, 120);
@@ -279,7 +283,7 @@ export function triggerMahitoParalyzeExplosion(entity) {
 
   let finalRuptureDmg = ruptureDmg;
   if (mahitoFighter && mahitoFighter.domainActive) {
-    const domainRuptureMult = cfg.domainExpansion?.ruptureDamageMultiplier ?? 1.50;
+    const domainRuptureMult = cfg.domainExpansion?.ruptureDamageMultiplier ?? 1.25;
     finalRuptureDmg *= domainRuptureMult;
   }
 
@@ -373,12 +377,12 @@ export function applySoulDisfigurementStack(ent, fighter) {
       '#FF007F'
     );
 
-    let burstDmg = soulCfg.burstDamage || 100;
+    let burstDmg = soulCfg.burstDamage || 38;
     if (isTransformed) {
-      burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+      burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.25);
     }
     if (fighter && fighter.domainActive) {
-      const domainDisfigurementMult = cfg.domainExpansion?.disfigurementDamageMultiplier ?? 1.50;
+      const domainDisfigurementMult = cfg.domainExpansion?.disfigurementDamageMultiplier ?? 1.20;
       burstDmg *= domainDisfigurementMult;
     }
 
@@ -436,9 +440,9 @@ export function applySoulDisfigurementStack(ent, fighter) {
     }
 
     // Calculate if this Soul Disfigurement & impending Rupture is a guaranteed / sure kill on the enemy
-    let ruptureDmg = soulCfg.ruptureDamage || 24;
+    let ruptureDmg = soulCfg.ruptureDamage || 16;
     if (fighter && fighter.domainActive) {
-      const domainRuptureMult = cfg.domainExpansion?.ruptureDamageMultiplier ?? 1.50;
+      const domainRuptureMult = cfg.domainExpansion?.ruptureDamageMultiplier ?? 1.25;
       ruptureDmg *= domainRuptureMult;
     }
     const isSureKill = Boolean(
@@ -668,9 +672,9 @@ export function updateMahitoFleshSurge(fighter) {
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
   const explosionR = surgeCfg.explosionRadius || 48;
-  let baseDamage = surgeCfg.damage || 24;
+  let baseDamage = surgeCfg.damage || 18;
   if (isTransformed) {
-    const damageMult = cfg.transformation?.damageMultiplier ?? 1.60;
+    const damageMult = cfg.transformation?.damageMultiplier ?? 1.25;
     baseDamage *= damageMult;
   }
 
@@ -1027,9 +1031,9 @@ export function updateMahitoSoulPhaseSlip(fighter) {
       fighter.soulPhaseDashHit = true;
 
       // 1. Slash Damage
-      let slashDmg = dashCfg.slashDamage || 22;
+      let slashDmg = dashCfg.slashDamage || 12;
       if (isTransformed) {
-        slashDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+        slashDmg *= (cfg.transformation?.damageMultiplier ?? 1.25);
       }
       applyDamageToTarget(target, slashDmg, fighter, { isMelee: true, isBasicAttack: true });
 
@@ -1407,8 +1411,8 @@ export function updateMahitoMaceCannon(fighter) {
             spk.hasHit = true;
             spk.life = 0; // Consume spike
 
-            let shrapnelDmg = cannonCfg.shrapnelDamage || 12;
-            if (isTransformed) shrapnelDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+            let shrapnelDmg = cannonCfg.shrapnelDamage || 6;
+            if (isTransformed) shrapnelDmg *= (cfg.transformation?.damageMultiplier ?? 1.25);
             applyDamageToTarget(ent, shrapnelDmg, fighter, { isSkill: true });
 
             if (typeof ent.applyHitStun === 'function') {
@@ -1608,8 +1612,8 @@ export function updateMahitoMaceCannon(fighter) {
         if (distToExplosion <= ent.r + blastRadius) {
           if (isGojoInfinity) continue;
           // Primary Target Damage & Heavy Impact
-          let impactDmg = cannonCfg.impactDamage || 30;
-          if (isTransformed) impactDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+          let impactDmg = cannonCfg.impactDamage || 22;
+          if (isTransformed) impactDmg *= (cfg.transformation?.damageMultiplier ?? 1.25);
           applyDamageToTarget(ent, impactDmg, fighter, { isMelee: true, isSkill: true });
 
           const hitAngle = Math.atan2(ent.y - impactY, ent.x - impactX) || data.angle;
@@ -2120,8 +2124,8 @@ export function updateMahitoTwinScissor(fighter) {
           const distToCut = Math.hypot(ent.x - strikeCenterX, ent.y - strikeCenterY);
           if (distToCut <= ent.r + strikeRadius) {
             if (isGojoInfinity) continue;
-            let dmg = scissorCfg.damage || 34;
-            if (isTransformed) dmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+            let dmg = scissorCfg.damage || 24;
+            if (isTransformed) dmg *= (cfg.transformation?.damageMultiplier ?? 1.25);
             applyDamageToTarget(ent, dmg, fighter, { isMelee: true, isSkill: true });
 
             // Inward Hook Pull: Pull the target towards Mahito (caster) instead of knocking them away
@@ -2469,7 +2473,7 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
     spawnImpactFlash(fighter.x, fighter.y, 60, '#C026D3');
     audioSystem.playFighterVoiceline(fighter, cfg.sounds?.minionsThrowVoiceline || 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3', cfg.sounds?.minionsThrowVoicelineVolume ?? 2.0);
 
-    const bodyRepelDamage = skillCfg.bodyRepelDamage || 50;
+    const bodyRepelDamage = skillCfg.bodyRepelDamage || 30;
     const bodyRepelSpeed = skillCfg.bodyRepelSpeed || 10.0;
     const bodyRepelRadius = skillCfg.bodyRepelRadius || 50;
     const bodyRepelLife = skillCfg.bodyRepelLife || 90;
@@ -2544,7 +2548,7 @@ export function executeMahitoDomainExpansion(fighter, targetHint = null) {
 
 export function updateMahitoDomainExpansion(fighter) {
   const cfg = CONFIG.mahito || {};
-  const domainDuration = cfg.domainExpansion?.duration || 600;
+  const domainDuration = cfg.domainExpansion?.duration || 300;
 
   // Channeling Phase
   if (fighter.domainChargeTimer > 0) {
@@ -2553,21 +2557,26 @@ export function updateMahitoDomainExpansion(fighter) {
     else if (fighter.afterImages) fighter.afterImages.length = 0;
 
     // Domain Expansion Hyper Armor: only Toji can interrupt (or death)
-    if (fighter.hp <= 0 || fighter.isDead) {
+    if (fighter.hp <= 0 || fighter.isDead || fighter.isTargetOfAmbush || (fighter.silenceTimer || 0) > 0) {
       fighter.domainChargeTimer = 0;
       fighter.isChannelingDomainExpansion = false;
       return;
     }
 
-    // Continuous Arena Screen Shake while Channeling (Rumbling build-up)
+    // Smooth Periodic Arena Rumble while Channeling (Builds up towards deployment)
     const chargeProgress = 1.0 - (fighter.domainChargeTimer / (fighter.domainChargeMax || 120));
-    const shakeIntensity = 3.0 + chargeProgress * 5.0; // Shakes arena from 3.0 up to 8.0 intensity
-    triggerGlobalScreenShake(shakeIntensity, 6);
+    if (fighter.domainChargeTimer % 16 === 0) {
+      const shakeIntensity = 2.0 + chargeProgress * 3.5;
+      triggerGlobalScreenShake(shakeIntensity, 8);
+    }
 
-    // Channeling Visuals
-    if (fighter.domainChargeTimer % 6 === 0) {
-      spawnImpactFlash(fighter.x, fighter.y, 100, 'rgba(217, 70, 239, 0.4)');
-      spawnSparks(fighter.x, fighter.y, '#D946EF', 8);
+    // Channeling Visuals: Smooth transfigured soul bubbles & soft cursed energy embers
+    if (fighter.domainChargeTimer % 4 === 0) {
+      spawnMahitoSoulBubbles(fighter.x, fighter.y, 1);
+    }
+    if (fighter.domainChargeTimer % 8 === 0) {
+      spawnSparks(fighter.x, fighter.y, 4, 'custom', '#D946EF');
+      spawnSparks(fighter.x, fighter.y, 2, 'custom', '#F5D0FE');
     }
 
     // Deployment moment

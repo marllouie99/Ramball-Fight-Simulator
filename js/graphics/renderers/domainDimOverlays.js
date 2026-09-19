@@ -802,11 +802,11 @@ export function drawMahitoDomainDimScreen() {
   let targetOpacity = 0;
   if (mahitoFighter) {
     if (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive) {
-      targetOpacity = 0.72;
+      targetOpacity = 0.92;
     } else if (mahitoFighter.isChannelingDomainExpansion) {
       const chargeMax = mahitoFighter.domainChargeMax || 120;
-      const progress = Math.min(1.0, (mahitoFighter.domainChargeTimer || 0) / Math.max(1, chargeMax));
-      targetOpacity = 0.25 + progress * 0.45;
+      const progress = Math.min(1.0, Math.max(0, 1.0 - (mahitoFighter.domainChargeTimer || 0) / Math.max(1, chargeMax)));
+      targetOpacity = 0.35 + progress * 0.55;
     }
   }
 
@@ -822,31 +822,49 @@ export function drawMahitoDomainDimScreen() {
   }
 
   const opacity = currentMahitoDomainDimOpacity;
+  const w = canvas.width;
+  const h = canvas.height;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Base dark cursed violet atmosphere overlay
-  ctx.fillStyle = `rgba(24, 3, 32, ${opacity * 0.85})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 1. Deep Abyssal Black-Violet Linear Gradient Across Screen
+  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
+  linearGrad.addColorStop(0.0, `rgba(4, 0, 6, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-violet void top
+  linearGrad.addColorStop(0.2, `rgba(18, 2, 24, ${(opacity * 0.94).toFixed(3)})`);    // Dark cursed plum
+  linearGrad.addColorStop(0.5, `rgba(28, 4, 36, ${(opacity * 0.90).toFixed(3)})`);    // Sinister transfigured violet mid
+  linearGrad.addColorStop(0.8, `rgba(14, 2, 20, ${(opacity * 0.95).toFixed(3)})`);    // Deep shadow blend
+  linearGrad.addColorStop(1.0, `rgba(3, 0, 5, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-violet void bottom
 
-  // 2. Cursed soul violet radial gradient centered on Mahito
-  const screenPos = mahitoFighter ? worldToScreen(mahitoFighter.x, mahitoFighter.y - (mahitoFighter.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  ctx.fillStyle = linearGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. High-contrast cursed soul / transfigured flesh radial gradient centered on Mahito
+  const screenPos = mahitoFighter ? worldToScreen(mahitoFighter.x, mahitoFighter.y - (mahitoFighter.z || 0)) : { x: w / 2, y: h / 2 };
   const cx = screenPos.x;
   const cy = screenPos.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+  const maxDim = Math.max(w, h) * 0.92;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, `rgba(175, 45, 210, ${opacity * 0.55})`);       // Radiant soul violet core
-  grad.addColorStop(0.18, `rgba(125, 30, 170, ${opacity * 0.45})`);    // Deep cursed purple halo
-  grad.addColorStop(0.40, `rgba(65, 10, 95, ${opacity * 0.30})`);      // Dark violet ring
-  grad.addColorStop(0.70, `rgba(28, 4, 40, ${opacity * 0.15})`);       // Deep soul fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');                           // Outer boundary
+  grad.addColorStop(0.00, `rgba(217, 70, 239, ${(opacity * 0.50).toFixed(3)})`);      // Radiant transfigured magenta-violet core
+  grad.addColorStop(0.12, `rgba(168, 85, 247, ${(opacity * 0.42).toFixed(3)})`);      // Cursed soul violet halo
+  grad.addColorStop(0.28, `rgba(107, 33, 168, ${(opacity * 0.35).toFixed(3)})`);      // Deep royal cursed purple
+  grad.addColorStop(0.50, `rgba(59, 7, 100, ${(opacity * 0.25).toFixed(3)})`);        // Dark plum shadow
+  grad.addColorStop(0.75, `rgba(20, 2, 32, ${(opacity * 0.15).toFixed(3)})`);         // Abyssal transition
+  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
 
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, w, h);
 
-  // 3. Clear arena interior with subtle edge vignette so woven hands artwork is 100% visible
+  // 3. Dark Outer Edge Screen Vignette
+  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85);
+  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+  cornerGrad.addColorStop(0.5, `rgba(6, 1, 10, ${(opacity * 0.35).toFixed(3)})`);
+  cornerGrad.addColorStop(1.0, `rgba(2, 0, 4, ${(opacity * 0.85).toFixed(3)})`);
+  ctx.fillStyle = cornerGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 4. Clear arena interior with smooth edge vignette so woven hands domain background stands out prominently
   if (mahitoFighter && (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive)) {
     applyDomainArenaVignetteCutout(ctx);
   }
@@ -855,7 +873,7 @@ export function drawMahitoDomainDimScreen() {
 
   ctx.restore();
 
-  state.globalDimEdgeColor = `rgba(24, 3, 32, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(3, 0, 5, ${(opacity * 0.98).toFixed(3)})`;
 }
 
 let currentTojiUltimateOpacity = 0;
