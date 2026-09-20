@@ -175,24 +175,27 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
-   * Rule 1.4 Aim Validation Guard:
-   * Disables auto-aim tracking during the entire Rhitta Chop sequence
-   * (overhead lift, poised hold, strike, impact hit-pause, and recovery).
+   * Aim Validation Guard:
+   * Allows smooth auto-aim tracking while lifting/holding Divine Axe Rhitta (isLiftingWeapon),
+   * but strictly locks aim during the downward chop strike, impact hit-pause, and recovery.
    */
   canAim() {
-    if (this.slashSwingTimer > 0 || (this.chopHitPauseTimer || 0) > 0) {
+    if (this.chopHitPauseTimer > 0) {
+      return false;
+    }
+    if (this.slashSwingTimer > 0 && !this.isLiftingWeapon()) {
       return false;
     }
     return super.canAim ? super.canAim() : true;
   }
 
   /**
-   * Rule 1.4 Continuous 360° Committed Aim Lock:
-   * Locks aim direction strictly to the initial committed cast angle for the entire chop sequence.
-   * Escanor commits to 1 direction upon lifting the weapon, with ZERO auto-aim snapping upon release.
+   * Smooth Auto-Aim & Committed Swing Execution:
+   * - While lifting weapon: smoothly tracks target using aimTurnRate (no angle snapping).
+   * - Downward strike & recovery: locks strictly to the committed chopCastAngle.
    */
   aim(target) {
-    if (this.slashSwingTimer > 0 || (this.chopHitPauseTimer || 0) > 0) {
+    if (this.chopHitPauseTimer > 0 || (this.slashSwingTimer > 0 && !this.isLiftingWeapon())) {
       if (this.chopCastAngle !== undefined) {
         this.gunAngle = this.chopCastAngle;
         this.angle = this.chopCastAngle;
@@ -200,7 +203,11 @@ export class EscanorFighter extends Fighter {
       return false;
     }
     if (!target) return false;
-    return super.aim(target);
+    const aimed = super.aim(target);
+    if (this.isLiftingWeapon()) {
+      this.chopCastAngle = this.gunAngle;
+    }
+    return aimed;
   }
 
   /**
@@ -208,7 +215,7 @@ export class EscanorFighter extends Fighter {
    */
   isLiftingWeapon() {
     if (this.slashSwingTimer <= 0) return false;
-    const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.escanor?.chopStrikeFrames || 20);
+    const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.escanor?.chopStrikeFrames || 15);
     const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 50);
     return this.slashSwingTimer > (strikeFrames + recFrames);
   }
@@ -506,9 +513,11 @@ export class EscanorFighter extends Fighter {
     // Centralized Movement & Physics (Rule 1.1)
     super.update(opponent, ownerIndex, arena);
 
-    // Rule 1.4: Lock facing direction strictly to committed chopCastAngle during weapon swing / recovery
+    // Lock facing direction strictly to committed chopCastAngle during downward strike, hit-pause, and recovery
     if (this.slashSwingTimer > 0 || (this.chopHitPauseTimer || 0) > 0) {
-      if (this.chopCastAngle !== undefined) {
+      if (this.isLiftingWeapon()) {
+        this.chopCastAngle = this.gunAngle;
+      } else if (this.chopCastAngle !== undefined) {
         this.gunAngle = this.chopCastAngle;
         this.angle = this.chopCastAngle;
       }
@@ -566,8 +575,9 @@ export class EscanorFighter extends Fighter {
     // AI & Combat Execution
     const target = this.getNearestTarget(opponent);
 
-    // Aim smoothly at target only when NOT swinging or hit-pausing (Rule 1.4)
-    if (target && this.slashSwingTimer <= 0 && (!this.chopHitPauseTimer || this.chopHitPauseTimer <= 0)) {
+    // Aim smoothly at target when in neutral/idle or while lifting weapon (locks during downward strike & hit-pause)
+    const isLockedInChop = (this.slashSwingTimer > 0 && !this.isLiftingWeapon()) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0);
+    if (target && !isLockedInChop) {
       this.aim(target);
     }
 
@@ -648,10 +658,10 @@ export class EscanorFighter extends Fighter {
    */
   _startRhittaChop(target) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
-    const liftFrames = (typeof cfg.chopLiftFrames === 'number') ? cfg.chopLiftFrames : 8;
-    const holdFrames = (typeof cfg.chopLiftHoldFrames === 'number') ? cfg.chopLiftHoldFrames : 20;
-    const strikeFrames = (typeof cfg.chopStrikeFrames === 'number') ? cfg.chopStrikeFrames : 8;
-    const recFrames = (typeof cfg.chopRecoveryFrames === 'number') ? cfg.chopRecoveryFrames : 12;
+    const liftFrames = (typeof cfg.chopLiftFrames === 'number') ? cfg.chopLiftFrames : 80;
+    const holdFrames = (typeof cfg.chopLiftHoldFrames === 'number') ? cfg.chopLiftHoldFrames : 100;
+    const strikeFrames = (typeof cfg.chopStrikeFrames === 'number') ? cfg.chopStrikeFrames : 15;
+    const recFrames = (typeof cfg.chopRecoveryFrames === 'number') ? cfg.chopRecoveryFrames : 50;
 
     this.chopLiftFrames = liftFrames;
     this.chopLiftHoldFrames = holdFrames;
@@ -662,21 +672,14 @@ export class EscanorFighter extends Fighter {
     this.slashSwingMaxTimer = totalFrames;
     this.slashSwingTimer = totalFrames;
 
-    // Snapshot and lock initial committed aim angle (Rule 1.4)
-    let castAngle;
-    if (target) {
-      const targetZ = target.z || 0;
-      const myZ = this.z || 0;
-      castAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
-    } else {
-      castAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    }
-    while (castAngle > Math.PI) castAngle -= Math.PI * 2;
-    while (castAngle < -Math.PI) castAngle += Math.PI * 2;
+    // Start with current angle (DO NOT snap angle to target on initiation)
+    const currentAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle))
+      ? this.gunAngle
+      : ((this.angle !== undefined && !Number.isNaN(this.angle)) ? this.angle : 0);
 
-    this.chopCastAngle = castAngle;
-    this.gunAngle = castAngle;
-    this.angle = castAngle;
+    this.chopCastAngle = currentAngle;
+    this.gunAngle = currentAngle;
+    this.angle = currentAngle;
 
     // Downward chop impact lands exactly upon strike completion at the transition to recovery:
     this.slashSwingImpactTimer = recFrames;

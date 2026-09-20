@@ -476,34 +476,45 @@ async function runInteractionTests() {
     assert(finisherReach === 186, `Divine Sword Escanor finisher reach should be 186px (scaled by size 36px) (got ${finisherReach})`);
     assert(sunshineHeatRadius > 0, `Sunshine heat aura radius must scale dynamically (got ${sunshineHeatRadius})`);
 
-    // ── Escanor Committed Aim Lock Test (Rule 1.4) ──
+    // ── Escanor Smooth Auto-Aim While Lifting & Committed Strike Lock Test ──
     escanor.reset();
+    escanor.gunAngle = 0;
+    escanor.angle = 0;
     const movingTarget = { x: escanor.x + 80, y: escanor.y, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, isDead: false, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
     escanor._startRhittaChop(movingTarget);
-    assert(escanor.chopCastAngle !== undefined, 'Escanor must snapshot chopCastAngle upon lifting weapon');
-    assert(Math.abs(escanor.chopCastAngle - 0) < 0.001, `Escanor chopCastAngle should be 0 (got ${escanor.chopCastAngle})`);
-    assert(escanor.canAim() === false, 'canAim() must be false during Rhitta chop windup/swing');
+    assert(escanor.chopCastAngle !== undefined, 'Escanor must set chopCastAngle upon starting chop');
+    assert(escanor.isLiftingWeapon() === true, 'isLiftingWeapon() must be true during initial lift/hold frames');
+    assert(escanor.canAim() === true, 'canAim() must be true while Escanor is lifting weapon');
 
-    // Target moves to the opposite side (behind Escanor)
+    // Target moves to diagonal position (angle: PI/2)
+    movingTarget.x = escanor.x;
+    movingTarget.y = escanor.y + 80;
+    const initialAngle = escanor.gunAngle;
+    escanor.aim(movingTarget);
+    // Should smoothly rotate without jumping to Math.PI/2 in 1 frame (no snap)
+    assert(escanor.gunAngle > initialAngle && escanor.gunAngle < Math.PI / 2, `Escanor gunAngle must smoothly track towards target without instant snap (got ${escanor.gunAngle})`);
+
+    // Advance to downward strike phase (slashSwingTimer <= strikeFrames + recFrames)
+    escanor.slashSwingTimer = (escanor.chopStrikeFrames || 15) + (escanor.chopRecoveryFrames || 50);
+    assert(escanor.isLiftingWeapon() === false, 'isLiftingWeapon() must be false during downward strike stroke');
+    assert(escanor.canAim() === false, 'canAim() must be false during downward strike stroke');
+
+    const committedAngle = escanor.gunAngle;
     movingTarget.x = escanor.x - 80;
     movingTarget.y = escanor.y;
     escanor.aim(movingTarget);
-    assert(Math.abs(escanor.gunAngle - 0) < 0.001, `Escanor gunAngle must remain locked to committed direction (0) during lift (got ${escanor.gunAngle})`);
-
-    // Advance through lift and hold frames
-    escanor.update(movingTarget, 1, state.arena);
-    assert(Math.abs(escanor.gunAngle - 0) < 0.001, `Escanor gunAngle must not snap or track target during update (got ${escanor.gunAngle})`);
+    assert(Math.abs(escanor.gunAngle - committedAngle) < 0.001, `Escanor gunAngle must remain locked to committed strike angle (got ${escanor.gunAngle}, expected ${committedAngle})`);
 
     // Hit-pause lock
     escanor.chopHitPauseTimer = 8;
     escanor.chopHitPauseMax = 10;
     assert(escanor.canAim() === false, 'canAim() must be false during chopHitPause');
     escanor.aim(movingTarget);
-    assert(Math.abs(escanor.gunAngle - 0) < 0.001, `Escanor gunAngle must remain locked during chopHitPause (got ${escanor.gunAngle})`);
+    assert(Math.abs(escanor.gunAngle - committedAngle) < 0.001, `Escanor gunAngle must remain locked during chopHitPause (got ${escanor.gunAngle})`);
 
     // Clean up
     projectileSystem.projectiles = [];
-    console.log('      ✅ Escanor complete immunity to pull/pushback, dynamic DEF, size growth, weapon reach, and Rule 1.4 committed aim lock verified.');
+    console.log('      ✅ Escanor complete immunity to pull/pushback, dynamic DEF, size growth, weapon reach, smooth lifting auto-aim, and committed strike lock verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');
