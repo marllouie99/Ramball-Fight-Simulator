@@ -12,8 +12,8 @@ export const escanorConfig = {
   aimTurnRate: 0.12,            // Dignified heavy turn rate (~6.9°/frame) when acquiring new targets
   r: 32,
   radius: 32,
-  theOneRadiusBonus: 8,         // Physical body size expansion during "THE ONE" (+8px radius -> 40px)
-  prideRadiusBonusPerStack: 1.2,// +1.2px body radius per Solar Pride stack (+6px at max stacks)
+  theOneRadiusBonus: 4,         // Physical body size expansion during "THE ONE" (+4px radius -> 36px)
+  prideRadiusBonusPerStack: 1.0,// +1.0px body radius per Solar Pride stack (+2px at max 2 stacks)
   color: '#F59E0B',            // Radiant Solar Amber
   themeColor: '#F59E0B',
   secondaryColor: '#DC2626',   // Solar Flare Crimson

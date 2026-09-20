@@ -460,8 +460,8 @@ async function runInteractionTests() {
     escanor.update(gojo, 1, state.arena);
     const prideReach = escanor.currentRhittaReach;
     const prideR = escanor.r;
-    assert(prideReach === 154, `Rhitta reach with 5 pride stacks should be 154px (scaled by size 38px) (got ${prideReach})`);
-    assert(prideR === 38, `Radius with 5 pride stacks should be 38px (+6px radius) (got ${prideR})`);
+    assert(prideReach === 150, `Rhitta reach with 5 pride stacks should be 150px (scaled by size 37px) (got ${prideReach})`);
+    assert(prideR === 37, `Radius with 5 pride stacks should be 37px (+5px radius) (got ${prideR})`);
 
     // Escanor grows to colossal size in "THE ONE"
     escanor.isTheOneActive = true;
@@ -471,9 +471,9 @@ async function runInteractionTests() {
     const theOneR = escanor.r;
     const finisherReach = escanor.currentFinisherReach;
     const sunshineHeatRadius = escanor.currentSunshineHeatRadius;
-    assert(theOneReach === 194, `Rhitta reach during "THE ONE" should be 194px (scaled by colossal size 40px) (got ${theOneReach})`);
-    assert(theOneR === 40, `Radius during "THE ONE" should be 40px (+8px radius) (got ${theOneR})`);
-    assert(finisherReach === 206, `Divine Sword Escanor finisher reach should be 206px (scaled by colossal size 40px) (got ${finisherReach})`);
+    assert(theOneReach === 174, `Rhitta reach during "THE ONE" should be 174px (scaled by size 36px) (got ${theOneReach})`);
+    assert(theOneR === 36, `Radius during "THE ONE" should be 36px (+4px radius) (got ${theOneR})`);
+    assert(finisherReach === 186, `Divine Sword Escanor finisher reach should be 186px (scaled by size 36px) (got ${finisherReach})`);
     assert(sunshineHeatRadius > 0, `Sunshine heat aura radius must scale dynamically (got ${sunshineHeatRadius})`);
 
     // ── Escanor Committed Aim Lock Test (Rule 1.4) ──

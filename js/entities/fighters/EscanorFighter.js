@@ -517,8 +517,8 @@ export class EscanorFighter extends Fighter {
     // Dynamically scale physical body radius as Escanor grows with Solar Pride & "THE ONE"
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const sizeGrowth = this.isTheOneActive
-      ? (cfg.theOneRadiusBonus ?? 8)
-      : ((this.prideStacks || 0) * (cfg.prideRadiusBonusPerStack ?? 1.2));
+      ? (cfg.theOneRadiusBonus ?? 4)
+      : ((this.prideStacks || 0) * (cfg.prideRadiusBonusPerStack ?? 1.0));
     this.r = (this.baseRadius || 32) + sizeGrowth;
 
     // Cleaver / Axe Swing Timer & Exact Downward Chop Impact Delivery
