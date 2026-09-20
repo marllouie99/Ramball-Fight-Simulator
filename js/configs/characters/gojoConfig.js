@@ -63,7 +63,7 @@ export const gojoConfig = {
   redVerticalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from vertical Up/Down for straight alignment
   redVerticalCorridorHalfWidth: 40, // Strict horizontal corridor half-width (40px) within which enemies trigger vertical Red
   redHorizontalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from horizontal Left/Right for straight alignment
-  redHorizontalCorridorHalfHeight: 40, // Strict vertical corridor half-height (40px) within which enemies trigger horizontal Red
+  redHorizontalCorridorHalfHeight: 100, // Strict vertical corridor half-height (40px) within which enemies trigger horizontal Red
   redDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) for cardinal alignment (Right/Left/Up/Down)
   redTotalFrames: 125,      // Total frames for full Red animation (~2s at 60fps)
   redBuildupFrames: 100,    // Frames of orb manifestation before detonation

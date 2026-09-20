@@ -463,6 +463,10 @@ export function drawRhittaSlashArc(ctx, x, y, angle, r = 25, animInput = 0, isTh
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
   ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
   ctx.imageSmoothingEnabled = false;
 

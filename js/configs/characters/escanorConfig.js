@@ -61,7 +61,7 @@ export const escanorConfig = {
   theOneReachMultiplier: 1.45,  // +45% weapon attack reach (232px reach) during "THE ONE"
   prideReachBonusPerStack: 0.06,// +6% weapon attack reach per Solar Pride stack (+30% reach at 5 stacks)
   chopLiftFrames: 80,              // Frames to lift axe up from guard to high overhead (~0.33s)
-  chopLiftHoldFrames: 100,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
+  chopLiftHoldFrames: 200,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
   chopStrikeFrames: 15,             // Frames for the explosive downward chop stroke (~0.13s)
   chopRecoveryFrames: 100,          // Frames to recover back to resting pose (~0.20s)
   chopHitPauseFrames: 10,          // Cinematic hit-pause frame freeze upon axe impact (like Nanami's ratio impact)

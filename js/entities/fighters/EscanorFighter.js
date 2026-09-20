@@ -16,8 +16,8 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
-import { drawEscanorSkin } from '../../graphics/fighters/escanorSkin.js';
-import { drawCruelSunOrb, drawPrideFlareShockwave, drawDivineSwordEscanorBlade } from '../../graphics/weapons/escanorWeaponGraphics.js';
+import { drawEscanorSkin, _getEscanorChopAnimationState } from '../../graphics/fighters/escanorSkin.js';
+import { drawCruelSunOrb, drawPrideFlareShockwave, drawDivineSwordEscanorBlade, drawRhittaSlashArc } from '../../graphics/weapons/escanorWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -62,6 +62,14 @@ export class EscanorFighter extends Fighter {
     this.punchMaxTime = 14;
     this.hideFrontHand = false;
     this.hideBackHand = false;
+
+    // Attack Release & World-Space Anchoring
+    this.slashOriginX = undefined;
+    this.slashOriginY = undefined;
+    this.slashOriginAngle = undefined;
+    this.slashOriginReach = undefined;
+    this.slashOriginRadius = undefined;
+    this.slashOriginTheOne = undefined;
 
     // Passive: Sunshine & Solar Pride Stacks
     this.prideStacks = 0;
@@ -165,6 +173,12 @@ export class EscanorFighter extends Fighter {
     this.theOneTimer = 0;
     this.theOneFinisherUsed = false;
     this.activeCruelSuns = [];
+    this.slashOriginX = undefined;
+    this.slashOriginY = undefined;
+    this.slashOriginAngle = undefined;
+    this.slashOriginReach = undefined;
+    this.slashOriginRadius = undefined;
+    this.slashOriginTheOne = undefined;
   }
 
   /**
@@ -536,6 +550,20 @@ export class EscanorFighter extends Fighter {
       const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 50);
       const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.escanor?.chopStrikeFrames || 15);
       
+      // When Escanor releases his attack, snapshot its world origin & cast angle so the effect stays anchored in the air
+      if (!this.isLiftingWeapon()) {
+        if (this.slashOriginX === undefined) {
+          this.slashOriginX = this.x;
+          this.slashOriginY = this.y - (this.z || 0);
+          this.slashOriginAngle = (this.chopCastAngle !== undefined)
+            ? this.chopCastAngle
+            : ((this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0));
+          this.slashOriginReach = this.currentRhittaReach;
+          this.slashOriginRadius = this.r;
+          this.slashOriginTheOne = Boolean(this.isTheOneActive);
+        }
+      }
+
       // Active downward strike window: continuously test weapon collision on every frame of the strike
       const isStrikingWindow = this.slashSwingTimer <= (strikeFrames + recFrames) && this.slashSwingTimer >= recFrames;
       if (isStrikingWindow && !this._chopHitDelivered) {
@@ -549,6 +577,13 @@ export class EscanorFighter extends Fighter {
       if (this.slashSwingTimer < recFrames && !this._chopHitDelivered) {
         this._chopHitDelivered = true;
       }
+    } else if (!this.chopHitPauseTimer || this.chopHitPauseTimer <= 0) {
+      this.slashOriginX = undefined;
+      this.slashOriginY = undefined;
+      this.slashOriginAngle = undefined;
+      this.slashOriginReach = undefined;
+      this.slashOriginRadius = undefined;
+      this.slashOriginTheOne = undefined;
     }
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.prideFlareActiveTimer > 0) this.prideFlareActiveTimer--;
@@ -691,6 +726,13 @@ export class EscanorFighter extends Fighter {
     this.chopCastAngle = currentAngle;
     this.gunAngle = currentAngle;
     this.angle = currentAngle;
+
+    this.slashOriginX = undefined;
+    this.slashOriginY = undefined;
+    this.slashOriginAngle = undefined;
+    this.slashOriginReach = undefined;
+    this.slashOriginRadius = undefined;
+    this.slashOriginTheOne = undefined;
 
     // Downward chop impact lands exactly upon strike completion at the transition to recovery:
     this.slashSwingImpactTimer = recFrames;
@@ -1142,6 +1184,12 @@ export class EscanorFighter extends Fighter {
     this.chopCastAngle = undefined;
     this._chopHitDelivered = true;
     this._chopHitConnected = false;
+    this.slashOriginX = undefined;
+    this.slashOriginY = undefined;
+    this.slashOriginAngle = undefined;
+    this.slashOriginReach = undefined;
+    this.slashOriginRadius = undefined;
+    this.slashOriginTheOne = undefined;
     if (this.chopHitPauseTarget) {
       this.chopHitPauseTarget.suppressFreezeOverlay = false;
       this.chopHitPauseTarget = null;
@@ -1168,7 +1216,30 @@ export class EscanorFighter extends Fighter {
       drawDivineSwordEscanorBlade(ctx, this.x, this.y, this.divineSwordAngle || 0, this.r || 28, this.divineSwordReach || 160, lifeRatio);
     }
 
-    // 4. Draw Escanor Main Skin Model
+    // 4. Draw Active Rhitta Slash Arc in World Space (Stays anchored in the air where released!)
+    const isPodiumPreview = Boolean(this._isWinnerReveal);
+    const isSuppressed = !isPodiumPreview && Boolean(
+      this.isTargetOfAmbush ||
+      (typeof this.areAttackEffectsSuppressed === 'function' && this.areAttackEffectsSuppressed())
+    );
+
+    if (!isPodiumPreview && !isSuppressed) {
+      const chopState = _getEscanorChopAnimationState(this);
+      if (chopState.isSwinging && (chopState.phase === 'strike' || chopState.phase === 'hitPause' || chopState.phase === 'recovery')) {
+        const slashX = (this.slashOriginX !== undefined) ? this.slashOriginX : this.x;
+        const slashY = (this.slashOriginY !== undefined) ? this.slashOriginY : (this.y - (this.z || 0));
+        const slashAngle = (this.slashOriginAngle !== undefined)
+          ? this.slashOriginAngle
+          : ((this.chopCastAngle !== undefined) ? this.chopCastAngle : ((this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0)));
+        const slashReach = (this.slashOriginReach !== undefined) ? this.slashOriginReach : this.currentRhittaReach;
+        const slashRadius = (this.slashOriginRadius !== undefined) ? this.slashOriginRadius : this.r;
+        const slashTheOne = (this.slashOriginTheOne !== undefined) ? this.slashOriginTheOne : Boolean(this.isTheOneActive);
+
+        drawRhittaSlashArc(ctx, slashX, slashY, slashAngle, slashRadius, chopState, slashTheOne, slashReach);
+      }
+    }
+
+    // 5. Draw Escanor Main Skin Model
     drawEscanorSkin(ctx, this);
   }
 }

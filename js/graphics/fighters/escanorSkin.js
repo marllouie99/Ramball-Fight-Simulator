@@ -214,10 +214,7 @@ export function drawEscanorSkin(ctx, fighter) {
   }
 
   // 9. Active Rhitta Slash Arc Trail (Rule 2.6 / 15 Compliant: Dynamic Eraser Wipe)
-  if (chopState.isSwinging && (chopState.phase === 'strike' || chopState.phase === 'hitPause' || chopState.phase === 'recovery') && !isSuppressed) {
-    const reach = (typeof fighter.currentRhittaReach === 'number') ? fighter.currentRhittaReach : (CONFIG.escanor?.rhittaReach || 100);
-    drawRhittaSlashArc(ctx, 0, 0, 0, r, chopState, fighter.isTheOneActive, reach);
-  }
+  // Handled in world coordinates in EscanorFighter.js draw() so the attack effect stays anchored in the air when released!
 
   // Status Overlays
   if (typeof fighter.drawStatusOverlays === 'function') {
