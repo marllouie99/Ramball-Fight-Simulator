@@ -10,7 +10,6 @@ import { spawnImpactFlash, spawnSparks, spawnMahitoSoulBubbles, spawnMahitoSoulE
 import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
 import { spawnIllusionDeath } from '../../graphics/particles/illusionDeathEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
-import { triggerHudHealBubble } from '../../graphics/hudManager.js';
 import { renderMahitoDomainBackground } from '../../graphics/renderers/environmentalRenderer.js';
 import { 
   executeIdleTransfigurationStrike, 
@@ -1145,11 +1144,6 @@ export class MahitoFighter extends Fighter {
       if (!this._lastDomainLifestealTextTime || now - this._lastDomainLifestealTextTime >= 180) {
         this._lastDomainLifestealTextTime = now;
         spawnFloatingText(this.x + (Math.random() - 0.5) * 16, (this.y - (this.z || 0)) - this.r - 22, `+${Math.round(healAmount)} SOUL HEAL`, '#D946EF');
-      }
-
-      if (typeof triggerHudHealBubble === 'function') {
-        const myIdx = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
-        if (myIdx >= 0) triggerHudHealBubble(myIdx, healAmount);
       }
 
       // Luminous cursed energy / soul absorption particles to Mahito

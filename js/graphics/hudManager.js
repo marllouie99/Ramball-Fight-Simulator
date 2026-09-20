@@ -51,8 +51,16 @@ export function isScreenDimmedActive() {
   return false;
 }
 
-export function triggerHudHealBubble(hpBarElement, healAmount) {
-  if (!hpBarElement) return;
+export function triggerHudHealBubble(target, healAmount) {
+  if (!target || !healAmount || typeof document === 'undefined') return;
+  let hpBarElement = target;
+  if (typeof target === 'number') {
+    const fighter = (typeof state !== 'undefined' && state.fighters) ? state.fighters[target] : null;
+    if (fighter && _hudCache.fighters.has(fighter)) {
+      hpBarElement = _hudCache.fighters.get(fighter)?.hpBar;
+    }
+  }
+  if (!hpBarElement || typeof hpBarElement.appendChild !== 'function') return;
   const bubble = document.createElement('div');
   bubble.className = 'hud-heal-bubble';
   bubble.textContent = `+${Math.round(healAmount)}`;

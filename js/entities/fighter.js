@@ -2758,6 +2758,7 @@ export class Fighter {
     const actualHealed = this.hp - prevHp;
     if (actualHealed > 0) {
       this._healthBarHealTimer = 14;
+      this._lastHealAmount = (this._lastHealAmount || 0) + actualHealed;
       if (!opts.silent) {
         const color = opts.color || '#39FF14';
         spawnFloatingText(this.x, this.y - this.r - 8, `+${Math.round(actualHealed)}`, color);
