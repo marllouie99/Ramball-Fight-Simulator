@@ -84,9 +84,10 @@ export function drawGojoBody(ctx, fighter) {
     const isIndexScreen = typeof state !== 'undefined' && (state.gameState === 'indexDetail' || state.gameState === 'index');
     const isChannelingPurple = fighter.isChannelingPurple;
     const isChannelingDomain = fighter.isChannelingDomainExpansion;
+    const isChannelingRed = Boolean(fighter.redBuildupPhase || (fighter.redEffectTimer && fighter.redEffectTimer > 0) || fighter.isCastingRed);
 
     let facingLeft = false;
-    if (!isPodiumPreview && !isIndexScreen && !isChannelingPurple && !isChannelingDomain) {
+    if (!isPodiumPreview && !isIndexScreen && !isChannelingPurple && !isChannelingDomain && !isChannelingRed) {
       const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
       ctx.rotate(angle);
 

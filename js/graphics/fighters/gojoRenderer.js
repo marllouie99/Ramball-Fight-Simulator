@@ -1171,6 +1171,14 @@ export class GojoRenderer {
       const pulse  = Math.sin(time / 120) * 0.08;
       const r2     = baseR * (1 + pulse);
 
+      // Draw Gojo's pointing hand extending along gun angle towards the red orb
+      const handRadius = getHandSize(7.0, fighter);
+      const skinColor = fighter.skinColor || '#FFE0BD';
+      const handCanvas = GojoRenderer._getGojoHandCanvas(handRadius, skinColor);
+      if (handCanvas) {
+        ctx.drawImage(handCanvas, Math.round((fighter.r * 0.88) - handCanvas.width / 2), Math.round(-handCanvas.height / 2));
+      }
+
       // Manifest red orb at Gojo's fingertip
       drawGojoOrb(ctx, fingerDist, 0, r2, time, 'red', 0);
 
