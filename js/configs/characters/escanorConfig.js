@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────
 // Escanor Character Config
 // The Seven Deadly Sins (Nanatsu no Taizai) — Lion's Sin of Pride
 // ─────────────────────────────────────────────
@@ -56,14 +56,14 @@ export const escanorConfig = {
   armorDeflectSparks: true,     // Golden armor deflection sparks and audio on absorbing hits
 
   // Basic Attack: Divine Axe Rhitta — Telegraphed Overhead Chop Strike (Missable)
-  rhittaArcAngle: Math.PI * 0.778, // ~140 degrees
-  rhittaReach: 100,             // Baseline reach in pixels at 0 pride stacks
-  theOneReachMultiplier: 1.55,  // +55% weapon attack reach (155px reach) during "THE ONE"
+  rhittaArcAngle: Math.PI * 1.15, // ~207 degrees (matches visual 208° slash sweep)
+  rhittaReach: 160,             // Baseline reach in pixels at 0 pride stacks (matches weapon model & slash arc length)
+  theOneReachMultiplier: 1.45,  // +45% weapon attack reach (232px reach) during "THE ONE"
   prideReachBonusPerStack: 0.06,// +6% weapon attack reach per Solar Pride stack (+30% reach at 5 stacks)
   chopLiftFrames: 80,              // Frames to lift axe up from guard to high overhead (~0.33s)
   chopLiftHoldFrames: 100,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
   chopStrikeFrames: 15,             // Frames for the explosive downward chop stroke (~0.13s)
-  chopRecoveryFrames: 50,          // Frames to recover back to resting pose (~0.20s)
+  chopRecoveryFrames: 100,          // Frames to recover back to resting pose (~0.20s)
   chopHitPauseFrames: 10,          // Cinematic hit-pause frame freeze upon axe impact (like Nanami's ratio impact)
   basicImpactShake: 7.0,           // Concussive arena shake on initial weapon contact
   basicImpactShakeDuration: 12,

@@ -280,13 +280,13 @@ export class EscanorFighter extends Fighter {
    */
   get currentRhittaReach() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
-    const baseReach = cfg.rhittaReach || 100;
+    const baseReach = cfg.rhittaReach || 160;
     const baseRadius = this.baseRadius || cfg.radius || 32;
     const currentRadius = this.r || baseRadius;
     const sizeScale = currentRadius / baseRadius;
 
     if (this.isTheOneActive) {
-      const theOneMult = cfg.theOneReachMultiplier || 1.55;
+      const theOneMult = cfg.theOneReachMultiplier || 1.45;
       return Math.round(baseReach * theOneMult * sizeScale);
     }
 
@@ -530,12 +530,23 @@ export class EscanorFighter extends Fighter {
       : ((this.prideStacks || 0) * (cfg.prideRadiusBonusPerStack ?? 1.0));
     this.r = (this.baseRadius || 32) + sizeGrowth;
 
-    // Cleaver / Axe Swing Timer & Exact Downward Chop Impact Delivery
+    // Cleaver / Axe Swing Timer & Downward Chop Hit Delivery
     if (this.slashSwingTimer > 0) {
       this.slashSwingTimer--;
-      // Deliver hit detection at frame 12/10 (exact midpoint / transition to downward strike)
-      if (this.slashSwingTimer <= (this.slashSwingImpactTimer || 12) && !this._chopHitDelivered) {
-        this._executeRhittaChopHit();
+      const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 50);
+      const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.escanor?.chopStrikeFrames || 15);
+      
+      // Active downward strike window: continuously test weapon collision on every frame of the strike
+      const isStrikingWindow = this.slashSwingTimer <= (strikeFrames + recFrames) && this.slashSwingTimer >= recFrames;
+      if (isStrikingWindow && !this._chopHitDelivered) {
+        const connected = this._executeRhittaChopHit();
+        if (connected) {
+          this._chopHitDelivered = true;
+        }
+      }
+
+      // If strike window passed without connecting, mark as delivered (miss)
+      if (this.slashSwingTimer < recFrames && !this._chopHitDelivered) {
         this._chopHitDelivered = true;
       }
     }
@@ -698,16 +709,17 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
-   * Resolves Hit Detection at the Downward Chop Impact Frame.
+   * Resolves Hit Detection during the Downward Chop Stroke.
    * Hit detection evaluates strictly along the committed chop angle (this.chopCastAngle).
-   * If opponent stepped away, dashed, or dodged out of the cone during windup, IT MISSES!
+   * Ensures that as long as Divine Axe Rhitta collides with any enemy target in range/arc, it connects.
    * On hit: applies instant hit-pause freeze, shockwave, and queues massive knockback for unpause.
+   * @returns {boolean} True if a target was hit
    */
   _executeRhittaChopHit() {
     const aimAngle = (this.chopCastAngle !== undefined)
       ? this.chopCastAngle
       : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
-    const arc = CONFIG.escanor?.rhittaArcAngle || (Math.PI * 0.778); // ~140 deg
+    const arc = CONFIG.escanor?.rhittaArcAngle || (Math.PI * 1.15); // ~207 deg wide sweep
     const reach = this.currentRhittaReach;
 
     const baseMin = CONFIG.escanor?.basicDamageMin || 30;
@@ -725,23 +737,30 @@ export class EscanorFighter extends Fighter {
       const targetRadius = tgt.r || 25;
       const totalBodyRadius = this.r + targetRadius;
 
-      // Close proximity & point-blank contact tolerances
-      const isDirectBodyContact = dist <= (totalBodyRadius + 14);
-      const isCloseProximity = dist <= (totalBodyRadius + 32);
+      // 1. Close proximity & point-blank contact tolerances (any touching enemy is guaranteed hit)
+      const isDirectBodyContact = dist <= (totalBodyRadius + 20);
+      const isCloseProximity = dist <= (totalBodyRadius + 44);
 
-      // Check current position in real-time at impact
-      if (dist <= (this.r + reach + targetRadius) || isCloseProximity) {
+      // 2. Maximum weapon attack reach distance check
+      const maxWeaponReach = this.r + reach + targetRadius;
+
+      if (dist <= maxWeaponReach || isCloseProximity) {
         const angleToTarget = Math.atan2(dy, dx);
         let angleDiff = angleToTarget - aimAngle;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-        // When the enemy is right in Escanor's face / touching range,
-        // the colossal overhead axe sweep and body cleave catches them anywhere in front/flank (up to 240° cone or direct body contact)
-        const effectiveArc = isCloseProximity ? Math.max(arc, Math.PI * 1.33) : arc;
+        // Frontal & lateral sweep arc:
+        // Divine Axe Rhitta sweeps in a massive 200°+ semi-circle from overhead back-left to ground-right.
+        // In close proximity: catches 288° all around him.
+        // At mid-to-max range: catches the full ~207° frontal weapon sweep.
+        const effectiveArc = isCloseProximity 
+          ? (Math.PI * 1.6) // 288° close body sweep
+          : arc;
 
         if (isDirectBodyContact || Math.abs(angleDiff) <= effectiveArc / 2) {
           hitTarget = tgt;
+          this._chopHitConnected = true;
           applyDamageToTarget(tgt, damage, this, { isMelee: true, isGuaranteedHit: true });
           if (typeof tgt.takeDamage === 'function') {
             tgt.takeDamage(CONFIG.escanor?.basicBurnDamage || 6, this, { isMelee: true, isGuaranteedHit: true, isBurn: true }); // Burn tick
@@ -755,8 +774,11 @@ export class EscanorFighter extends Fighter {
           }
 
           // Initial connection effects at the exact moment weapon connects
-          spawnImpactFlash(tgt.x, tgt.y, '#F59E0B', 50); // Golden shockwave ring
-          spawnSparks(tgt.x, tgt.y, '#F59E0B', 8);
+          spawnImpactFlash(tgt.x, tgt.y, '#F59E0B', 55); // Golden shockwave ring
+          spawnSparks(tgt.x, tgt.y, '#F59E0B', 12);
+          try {
+            audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/swordclash.mp3', this.x, this.y, 0.85);
+          } catch (e) {}
 
           // Cinematic Hit-Pause (just like Nanami's 7:3 Ratio impact)
           const pauseFrames = CONFIG.escanor?.chopHitPauseFrames || 10;
@@ -776,32 +798,21 @@ export class EscanorFighter extends Fighter {
           this.vx = 0;
           this.vy = 0;
 
-          break; // Primary target hit
+          const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+          const impactShake = (cfg.basicImpactShake || 7.0) * (this.isTheOneActive ? 1.5 : 1.0);
+          const impactDur = cfg.basicImpactShakeDuration || 12;
+          triggerGlobalScreenShake(impactShake, impactDur);
+
+          if (this.prideStacks < this.prideMaxStacks) {
+            this.prideStacks++;
+          }
+
+          break; // Primary target hit connected
         }
       }
     }
 
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
-    if (hitTarget) {
-      this._chopHitConnected = true;
-      const impactShake = (cfg.basicImpactShake || 7.0) * (this.isTheOneActive ? 1.5 : 1.0);
-      const impactDur = cfg.basicImpactShakeDuration || 12;
-      triggerGlobalScreenShake(impactShake, impactDur);
-
-      if (this.prideStacks < this.prideMaxStacks) {
-        this.prideStacks++;
-      }
-    } else {
-      this._chopHitConnected = false;
-      // Heavy downward axe chop slams the ground/air with concussive miss shake
-      const missShake = (cfg.basicMissShake || 4.5) * (this.isTheOneActive ? 1.5 : 1.0);
-      const missDur = cfg.basicMissShakeDuration || 8;
-      triggerGlobalScreenShake(missShake, missDur);
-
-      try {
-        audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/swordswing.mp3', this.x, this.y, 0.6);
-      } catch (e) {}
-    }
+    return Boolean(hitTarget);
   }
 
   /**
