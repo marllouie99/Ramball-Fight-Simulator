@@ -377,16 +377,16 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   const isUltRecovering = fighter.isUltRecovering;
 
   if (isChargingUlt) {
-    frontHandX = r * 1.15; frontHandY =  r * 0.20;
-    backHandX  = r * 1.15; backHandY  =  r * 0.44;
+    frontHandX = r * 1.10; frontHandY =  r * 0.18;
+    backHandX  = r * 1.10; backHandY  = -r * 0.18;
   } else if (isUltRecovering) {
-    // Smoothly ease hands from extended blast position back to idle fighting stance
+    // Smoothly ease hands from dual-palm nozzle position back to Mahoraga guard stance
     const recProgress = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.ultRecoveryTimer || 0) / 45)));
     const ease = Math.sin(recProgress * Math.PI * 0.5); // Smooth ease-out curve
-    frontHandX = r * 1.15 - (r * 0.20) * ease;
-    frontHandY =  r * 0.20 + (r * 0.05) * ease;
-    backHandX  = r * 1.15 - (r * 1.15) * ease;
-    backHandY  =  r * 0.44 - (r * 0.44) * ease;
+    frontHandX = r * 1.10 - (r * 0.15) * ease;
+    frontHandY =  r * 0.18 + (r * 0.07) * ease;
+    backHandX  = r * 1.10 - (r * 0.50) * ease;
+    backHandY  = -r * 0.18 - (r * 0.14) * ease;
   } else if (isPunching) {
     if (fighter.isFlurrying) {
       // Machine Gun Blows (Skill 1): Continuous high-speed alternating Gatling cybernetic fists
@@ -396,44 +396,57 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
       const rightReach = Math.max(0, wave);  // 0 -> 1 when Right arm punches
       const leftReach  = Math.max(0, -wave); // 0 -> 1 when Left arm punches
 
-      backHandX  = r * 0.30 + rightReach * (r * 1.85);
-      backHandY  = r * 0.12;
+      frontHandX = r * 0.80 + rightReach * (r * 1.60);
+      frontHandY = r * 0.25;
 
-      frontHandX = r * 0.30 + leftReach  * (r * 1.85);
-      frontHandY = r * 0.40;
+      backHandX  = r * 0.50 + leftReach  * (r * 1.60);
+      backHandY  = -r * 0.30;
     } else {
-      // Melee Punches: Single cybernetic front hand punch from right edge
-      frontHandX = r * 0.95 + lungeExtension * 1.5;
-      frontHandY = r * 0.25 + Math.sin(rawProgress * Math.PI) * (r * 0.15);
-      backHandX  = 0;
-      backHandY  = 0;
-      hideBack   = true;
+      // Melee Punches: Alternating cybernetic punches in Mahoraga stance
+      if (fighter.isRightPunch) {
+        frontHandX = r * 0.95 + lungeExtension * 1.5;
+        frontHandY = r * 0.25 + Math.sin(rawProgress * Math.PI) * (r * 0.10);
+        backHandX  = r * 0.55 - easePunch * (r * 0.15);
+        backHandY  = -r * 0.32;
+      } else {
+        frontHandX = r * 0.85 - easePunch * (r * 0.15);
+        frontHandY = r * 0.25;
+        backHandX  = r * 0.60 + lungeExtension * 1.5;
+        backHandY  = -r * 0.32 - Math.sin(rawProgress * Math.PI) * (r * 0.10);
+      }
     }
   } else if (isBasicAttacking) {
-    // Mode B: Side Profile (Basic Attack) - in pre-rotated local space
+    // Basic Attack: Alternating Incineration Palms (Mahoraga Stance)
     const blastMaxT = 30;
     const blastProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.basicBlastAnimTimer / blastMaxT)));
     const primaryLunge = Math.sin(blastProgress * Math.PI) * (r * 0.95);
 
-    frontHandX = r * 0.95 + primaryLunge;
-    frontHandY = r * 0.25;
-    backHandX  = 0;
-    backHandY  = 0;
-    hideBack   = true;
+    if (fighter.isRightBlast) {
+      frontHandX = r * 0.95 + primaryLunge;
+      frontHandY = r * 0.25;
+      backHandX  = r * 0.60;
+      backHandY  = -r * 0.32;
+    } else {
+      frontHandX = r * 0.95;
+      frontHandY = r * 0.25;
+      backHandX  = r * 0.60 + primaryLunge;
+      backHandY  = -r * 0.32;
+    }
   } else {
-    // Mode B: Side Profile (Idle) - Front hand at right edge of body lowered to chest level
+    // Idle / Moving: Both hands visible in Mahoraga martial arts fighting stance
+    const now = Date.now();
+    const idleBob = Math.sin(now * 0.005) * (r * 0.03);
     frontHandX = r * 0.95;
-    frontHandY = r * 0.25;
-    backHandX  = 0;
-    backHandY  = 0;
-    hideBack   = true;
+    frontHandY = r * 0.25 + idleBob;
+    backHandX  = r * 0.60;
+    backHandY  = -r * 0.32 - idleBob;
   }
 
   const palmColor = isSelfDestructing ? '#FF2200' : '#FF5500';
 
   const blastProgress = isBasicAttacking ? Math.min(1.0, Math.max(0.0, 1.0 - (fighter.basicBlastAnimTimer / 30))) : 0;
-  const isBackFiring  = isBasicAttacking &&  fighter.isRightBlast;
-  const isFrontFiring = isBasicAttacking && !fighter.isRightBlast;
+  const isBackFiring  = isBasicAttacking && !fighter.isRightBlast;
+  const isFrontFiring = isBasicAttacking &&  fighter.isRightBlast;
 
   // Punch glow intensity: peaks at sinusoidal mid-swing, active on punching arm ONLY when hitting an enemy target
   let punchGlowFront = 0;
@@ -444,14 +457,14 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
       if (isHitConnected) {
         const t = fighter.flurryTimer || 0;
         const wave = Math.sin(t * Math.PI / 2.5);
-        punchGlowBack  = Math.max(0, wave);
-        punchGlowFront = Math.max(0, -wave);
+        punchGlowFront = Math.max(0, wave);
+        punchGlowBack  = Math.max(0, -wave);
       }
     } else {
       const isHitConnected = (fighter._basicHitConnectedTimer && fighter._basicHitConnectedTimer > 0);
       if (isHitConnected) {
-        punchGlowFront = !fighter.isRightPunch ? easePunch : 0;
-        punchGlowBack  =  fighter.isRightPunch ? easePunch : 0;
+        punchGlowFront =  fighter.isRightPunch ? easePunch : 0;
+        punchGlowBack  = !fighter.isRightPunch ? easePunch : 0;
       }
     }
   }

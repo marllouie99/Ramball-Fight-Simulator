@@ -849,7 +849,7 @@ export class GenosFighter extends Fighter {
     // Calculate alternating spawn point at active firing hand
     let spawnX = this.x + Math.cos(angle) * (this.r + 15);
     let spawnY = this.y + Math.sin(angle) * (this.r + 15);
-    const sideOffset = this.isRightBlast ? -12 : 12;
+    const sideOffset = this.isRightBlast ? (this.r * 0.25) : (-this.r * 0.32);
     const perpAngle = angle + Math.PI / 2;
     spawnX += Math.cos(perpAngle) * sideOffset;
     spawnY += Math.sin(perpAngle) * sideOffset;
