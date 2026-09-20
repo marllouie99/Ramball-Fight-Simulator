@@ -453,15 +453,15 @@ async function runInteractionTests() {
     const baseReach = escanor.currentRhittaReach;
     const baseR = escanor.r;
     assert(baseReach === 100, `Base Rhitta reach should be 100px (got ${baseReach})`);
-    assert(baseR === 28, `Base radius should be 28px (got ${baseR})`);
+    assert(baseR === 32, `Base radius should be 32px (got ${baseR})`);
 
     // Escanor grows with Solar Pride stacks
     escanor.prideStacks = 5;
     escanor.update(gojo, 1, state.arena);
     const prideReach = escanor.currentRhittaReach;
     const prideR = escanor.r;
-    assert(prideReach === 153, `Rhitta reach with 5 pride stacks should be 153px (scaled by size 33px) (got ${prideReach})`);
-    assert(prideR === 33, `Radius with 5 pride stacks should be 33px (+5px radius) (got ${prideR})`);
+    assert(prideReach === 154, `Rhitta reach with 5 pride stacks should be 154px (scaled by size 38px) (got ${prideReach})`);
+    assert(prideR === 38, `Radius with 5 pride stacks should be 38px (+6px radius) (got ${prideR})`);
 
     // Escanor grows to colossal size in "THE ONE"
     escanor.isTheOneActive = true;
@@ -471,9 +471,9 @@ async function runInteractionTests() {
     const theOneR = escanor.r;
     const finisherReach = escanor.currentFinisherReach;
     const sunshineHeatRadius = escanor.currentSunshineHeatRadius;
-    assert(theOneReach === 188, `Rhitta reach during "THE ONE" should be 188px (scaled by colossal size 34px) (got ${theOneReach})`);
-    assert(theOneR === 34, `Radius during "THE ONE" should be 34px (+6px radius) (got ${theOneR})`);
-    assert(finisherReach === 200, `Divine Sword Escanor finisher reach should be 200px (scaled by colossal size 34px) (got ${finisherReach})`);
+    assert(theOneReach === 194, `Rhitta reach during "THE ONE" should be 194px (scaled by colossal size 40px) (got ${theOneReach})`);
+    assert(theOneR === 40, `Radius during "THE ONE" should be 40px (+8px radius) (got ${theOneR})`);
+    assert(finisherReach === 206, `Divine Sword Escanor finisher reach should be 206px (scaled by colossal size 40px) (got ${finisherReach})`);
     assert(sunshineHeatRadius > 0, `Sunshine heat aura radius must scale dynamically (got ${sunshineHeatRadius})`);
 
     // Clean up

@@ -9,10 +9,10 @@ export const escanorConfig = {
   maxHpRatio: 1.0,
   speed: 5.7,
   moveSpeed: 5.0,
-  r: 28,
-  radius: 28,
-  theOneRadiusBonus: 6,         // Physical body size expansion during "THE ONE" (+6px radius -> 34px)
-  prideRadiusBonusPerStack: 1.0,// +1.0px body radius per Solar Pride stack (+5px at max stacks)
+  r: 32,
+  radius: 32,
+  theOneRadiusBonus: 8,         // Physical body size expansion during "THE ONE" (+8px radius -> 40px)
+  prideRadiusBonusPerStack: 1.2,// +1.2px body radius per Solar Pride stack (+6px at max stacks)
   color: '#F59E0B',            // Radiant Solar Amber
   themeColor: '#F59E0B',
   secondaryColor: '#DC2626',   // Solar Flare Crimson

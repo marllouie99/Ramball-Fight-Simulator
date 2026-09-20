@@ -43,7 +43,7 @@ export class EscanorFighter extends Fighter {
     this.hp = this.maxHp;
 
     // Body size & growth scaling
-    this.baseRadius = def?.radius || cfg.radius || 28;
+    this.baseRadius = def?.radius || cfg.radius || 32;
     this.r = this.baseRadius;
 
     // Animation & State Timers
@@ -255,7 +255,7 @@ export class EscanorFighter extends Fighter {
   get currentRhittaReach() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const baseReach = cfg.rhittaReach || 100;
-    const baseRadius = this.baseRadius || cfg.radius || 28;
+    const baseRadius = this.baseRadius || cfg.radius || 32;
     const currentRadius = this.r || baseRadius;
     const sizeScale = currentRadius / baseRadius;
 
@@ -276,7 +276,7 @@ export class EscanorFighter extends Fighter {
   get currentFinisherReach() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const baseFinisherReach = cfg.theOneFinisherReach || 165;
-    const baseRadius = this.baseRadius || cfg.radius || 28;
+    const baseRadius = this.baseRadius || cfg.radius || 32;
     const currentRadius = this.r || baseRadius;
     const sizeScale = currentRadius / baseRadius;
     return Math.round(baseFinisherReach * sizeScale);
@@ -290,7 +290,7 @@ export class EscanorFighter extends Fighter {
   get currentSunshineHeatRadius() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const baseRadius = (typeof cfg.sunshineHeatRadius === 'number') ? cfg.sunshineHeatRadius : 200;
-    const bodyBaseRadius = this.baseRadius || cfg.radius || 28;
+    const bodyBaseRadius = this.baseRadius || cfg.radius || 32;
     const sizeScale = (this.r || bodyBaseRadius) / bodyBaseRadius;
     const theOneMult = this.isTheOneActive ? 1.35 : 1.0;
     return Math.round(baseRadius * sizeScale * theOneMult);
@@ -483,9 +483,9 @@ export class EscanorFighter extends Fighter {
     // Dynamically scale physical body radius as Escanor grows with Solar Pride & "THE ONE"
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const sizeGrowth = this.isTheOneActive
-      ? (cfg.theOneRadiusBonus ?? 6)
-      : ((this.prideStacks || 0) * (cfg.prideRadiusBonusPerStack ?? 1.0));
-    this.r = (this.baseRadius || 28) + sizeGrowth;
+      ? (cfg.theOneRadiusBonus ?? 8)
+      : ((this.prideStacks || 0) * (cfg.prideRadiusBonusPerStack ?? 1.2));
+    this.r = (this.baseRadius || 32) + sizeGrowth;
 
     // Cleaver / Axe Swing Timer & Exact Downward Chop Impact Delivery
     if (this.slashSwingTimer > 0) {

@@ -159,7 +159,7 @@ export function _drawEscanorMustache(ctx, r, facingLeft = false) {
  * Main Skin Renderer for Escanor (Pixel Art Edition)
  */
 export function drawEscanorSkin(ctx, fighter) {
-  const r = fighter.r || 28;
+  const r = fighter.r || 32;
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
   const now = Date.now();
 
