@@ -6,7 +6,7 @@ export const nanamiConfig = {
   // Base Attributes
   hp: 195,
   speed: 5.5,
-  moveSpeed: 5.5,
+  moveSpeed: 6.5,
   r: 25,
   radius: 25,
   color: '#D4AF37', // Refined Golden Sand / Warm Ochre
@@ -32,6 +32,14 @@ export const nanamiConfig = {
   overtimeGuaranteedCritCooldown: 150, // 2.5s recharge between 100% auto-crits
   overtimeBaseCritChance: 0.25,     // 25% ratio crit chance on standard swings while recharging (balanced from frequent triggers)
   overtimeCritInternalCooldown: 90, // 1.5s internal cooldown between ratio crits during Overtime
+  overtimeOverlayEnabled: true,     // Renders Assets/Overlays/Nanami-overtime-overlay.png in the arena during Overtime
+  overtimeOverlayOpacity: 0.92,     // Vibrant high-visibility overlay PNG opacity
+  overtimeOverlayZoom: 1.0,         // Arena overlay PNG scale zoom multiplier
+  overtimeOverlayOffsetX: 0,        // X position offset (px)
+  overtimeOverlayOffsetY: 0,        // Y position offset (px)
+  overtimeDimColor: '#FFD700',      // Radiant Pure Gold theme color
+  overtimeGoldenGlowColor: '#FFE150', // Brilliant Champagne Gold radiance theme
+  overtimeDimOpacity: 0.94,         // Cinematic radiant golden gradient dim theme opacity level
 
   // Passive: Ratio Technique (7:3 — Shichisan no Jutsu)
   ratioCritMultiplier: 2.0,         // 2.0x True Damage in Standard shift

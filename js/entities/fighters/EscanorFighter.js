@@ -819,7 +819,7 @@ export class EscanorFighter extends Fighter {
           spawnImpactFlash(tgt.x, tgt.y, '#F59E0B', 55); // Golden shockwave ring
           spawnSparks(tgt.x, tgt.y, '#F59E0B', 12);
           try {
-            audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/swordclash.mp3', this.x, this.y, 0.85);
+            audioSystem.playSpatialSound(CONFIG.escanor?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3', this.x, this.y, 0.85);
           } catch (e) {}
 
           // Cinematic Hit-Pause (just like Nanami's 7:3 Ratio impact)

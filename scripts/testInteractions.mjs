@@ -532,7 +532,12 @@ async function runInteractionTests() {
 
     // 2. Ultimate Charging State - Knockback & Push are completely ignored
     genos.ultCooldown = 0;
+    const preSlideY = genos.y;
     genos.executeSpiralIncinerationCannon(saitama);
+    while (genos.isUltSliding) {
+      genos.update(saitama, 0, state.arena);
+    }
+    assert(genos.y > preSlideY, 'Genos must physically slide forward during isUltSliding');
     assert(genos.isChargingUlt === true, 'Genos must be charging ultimate');
     assert(genos.immuneToPush === true, 'Genos must have immuneToPush=true while charging ult');
     assert(genos.immuneToKnockback === true, 'Genos must have immuneToKnockback=true while charging ult');
@@ -543,9 +548,11 @@ async function runInteractionTests() {
 
     // Test physics collision separation: Genos stays stationary, Saitama is pushed away
     const { resolveFighterCollision } = await import('../js/systems/physics.js');
+    genos.x = 270; genos.y = 480;
+    saitama.x = 270; saitama.y = 520;
     const initialX = genos.x;
     const initialY = genos.y;
-    resolveFighterCollision(genos, saitama, 10, 0, 1, -1, 0, true, false);
+    resolveFighterCollision(genos, saitama);
     assert(genos.x === initialX && genos.y === initialY, `Genos x/y must remain unchanged during collision (got ${genos.x}, ${genos.y}, expected ${initialX}, ${initialY})`);
     assert(saitama.y > 520, 'Colliding enemy must be pushed away while Genos remains immovable anchor');
 

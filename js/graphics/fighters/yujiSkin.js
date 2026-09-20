@@ -9,30 +9,6 @@ import { state } from '../../core/state.js';
 import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 import { _drawSukunaHair } from './sukunaSkin.js';
 
-let _yujiSkinImage = null;
-let _yujiSkinImageLoading = false;
-
-export function _getYujiSkinImage() {
-  if (_yujiSkinImage && _yujiSkinImage.complete && _yujiSkinImage.naturalWidth > 0) {
-    return _yujiSkinImage;
-  }
-  if (!_yujiSkinImageLoading && typeof Image !== 'undefined') {
-    _yujiSkinImageLoading = true;
-    const img = new Image();
-    img.onload = () => {
-      _yujiSkinImage = img;
-      _yujiSkinImageLoading = false;
-    };
-    img.onerror = (e) => {
-      console.warn('Failed to load Yuji pixel skin image at Assets/model/Yuji-PIXEL-SKIN.png', e);
-      _yujiSkinImageLoading = false;
-    };
-    img.src = 'Assets/model/Yuji-PIXEL-SKIN.png?v=1';
-    _yujiSkinImage = img;
-  }
-  return _yujiSkinImage;
-}
-
 let _yujiHairImage = null;
 let _yujiHairImageLoading = false;
 
@@ -58,7 +34,6 @@ export function _getYujiHairImage() {
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getYujiSkinImage();
   _getYujiHairImage();
 }
 

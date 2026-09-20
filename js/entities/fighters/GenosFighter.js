@@ -58,6 +58,8 @@ export class GenosFighter extends Fighter {
 
     // Ultimate: Spiral Incineration Cannon
     this.ultCooldown = CONFIG.genos?.initialUltCooldown !== undefined ? CONFIG.genos.initialUltCooldown : (CONFIG.genos?.ultCooldown || 800);
+    this.isUltSliding = false;
+    this.ultSlideTimer = 0;
     this.isChargingUlt = false;
     this.isFiringUlt = false;
     this.ultTimer = 0;
@@ -154,14 +156,14 @@ export class GenosFighter extends Fighter {
   }
 
   canAim() {
-    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating || this.machineGunFlurryTimer > 0 || this.machineGunBlowTimer > 0) {
+    if (this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating || this.machineGunFlurryTimer > 0 || this.machineGunBlowTimer > 0) {
       return false; // Disable auto-aim while channeling ultimate beam or stationary skills!
     }
     return super.canAim();
   }
 
   aim(target) {
-    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering) {
+    if (this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering) {
       // Strictly preserve locked ult angle without snapping auto-aim to moving targets (Rule #36)
       if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
         this.gunAngle = this.ultAngle;
@@ -203,6 +205,8 @@ export class GenosFighter extends Fighter {
     super.reset();
     const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 1200);
     this.flurryCooldown = initFlurryCD;
+    this.isUltSliding = false;
+    this.ultSlideTimer = 0;
     this.isMeleeStance = false;
     this.isMeleeWallDashing = false;
     this.heatAmmo = this.maxHeatAmmo;
@@ -236,7 +240,7 @@ export class GenosFighter extends Fighter {
     }
 
     const bounced = super.resolveWallBounce(arena, opponent);
-    if (bounced && (this.isMeleeStance || (this.heatAmmo !== undefined && this.heatAmmo <= 0)) && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering && !this.isFlurrying && !this.isSelfDestructing && !this.isSelfDestructRecovering) {
+    if (bounced && !this.isUltSliding && (this.isMeleeStance || (this.heatAmmo !== undefined && this.heatAmmo <= 0)) && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering && !this.isFlurrying && !this.isSelfDestructing && !this.isSelfDestructRecovering) {
       const target = opponent || this._findClosestEnemy();
       this.triggerMeleeWallDash(target);
     }
@@ -1083,6 +1087,8 @@ export class GenosFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    this.isUltSliding = false;
+    this.ultSlideTimer = 0;
     if (this.isChargingUlt || this.isFiringUlt) {
       this.isChargingUlt = false;
       this.isFiringUlt = false;
@@ -1146,15 +1152,11 @@ export class GenosFighter extends Fighter {
 
     this.isDashing = false;
     this.speedBoostTimer = 0;
-    this.isChargingUlt = true;
+    this.isUltSliding = true;
+    this.ultSlideTimer = CONFIG.genos?.ultSlideFrames || 22;
     this.immuneToPush = true;
     this.immuneToKnockback = true;
     this.immuneToPull = true;
-    this.vx = 0;
-    this.vy = 0;
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
-    this.ultTimer = CONFIG.genos?.ultWindupFrames || 60;
     this.ultCooldown = CONFIG.genos?.ultCooldown || 1680;
 
     // Rule 36: Continuous 360° omnidirectional targeting upon initiation with committed angle lock
@@ -1173,22 +1175,20 @@ export class GenosFighter extends Fighter {
     this.gunAngle = castAngle;
     this.angle = castAngle;
 
-    spawnFloatingText(this.x, this.y - this.r - 28, "SPIRAL INCINERATION CANNON!", "#FF3300");
-    const windupShake = CONFIG.genos?.ultWindupShakeIntensity || 0;
-    if (windupShake > 0) {
-      triggerGlobalScreenShake(windupShake, CONFIG.genos?.ultWindupShakeDuration || 6);
+    // Calculate initial slide velocity along current motion / facing vector
+    const slideSpeed = CONFIG.genos?.ultSlideSpeed || 8.5;
+    let slideAngle = castAngle;
+    const currentSpd = Math.hypot(this.vx, this.vy);
+    if (currentSpd > 1.5) {
+      slideAngle = Math.atan2(this.vy, this.vx);
     }
-    if (CONFIG.genos?.ultVoiceEnabled !== false) {
-      const ultVoiceSrc = CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3';
-      const ultVoiceVol = CONFIG.genos?.ultVoiceVolume ?? 3.5;
-      this.soundHandle = audioSystem.playSFX(ultVoiceSrc, ultVoiceVol);
-    }
+    this.vx = Math.cos(slideAngle) * slideSpeed;
+    this.vy = Math.sin(slideAngle) * slideSpeed;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
 
-    if (CONFIG.genos?.ultChargeEnabled !== false) {
-      const ultChargeSrc = CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3';
-      const ultChargeVol = CONFIG.genos?.ultChargeVolume ?? 2.0;
-      this._ultChargeSoundHandle = audioSystem.playSFX(ultChargeSrc, ultChargeVol);
-    }
+    // Play thruster friction dash SFX
+    audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
   }
 
   performSelfDestructExplosion() {
@@ -1537,6 +1537,101 @@ export class GenosFighter extends Fighter {
           this.rocketFlameTrail.splice(i, 1);
         }
       }
+    }
+
+    // 0. Pre-Ultimate Cybernetic Thruster Friction-Brake Slide
+    if (this.isUltSliding) {
+      this.ultSlideTimer--;
+
+      // Integrate physical slide movement & apply smooth ground friction deceleration
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vx *= 0.90;
+      this.vy *= 0.90;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.immuneToPush = true;
+      this.immuneToKnockback = true;
+      this.immuneToPull = true;
+
+      // Handle arena wall collisions during slide without triggering bounce counter-attacks
+      if (typeof this.resolveWallBounce === 'function') {
+        this.resolveWallBounce(arena, opponent);
+      }
+
+      // Smoothly lerp facing direction toward the target during slide
+      const currentTarget = opponent || this._findClosestEnemy();
+      if (currentTarget && typeof currentTarget.x === 'number') {
+        const targetY = (currentTarget.y !== undefined ? currentTarget.y : this.y) - (currentTarget.z || 0);
+        const myY = this.y - (this.z || 0);
+        const targetAngle = Math.atan2(targetY - myY, currentTarget.x - this.x);
+        let currentAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+        let diff = targetAngle - currentAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        const newAngle = currentAngle + diff * 0.22;
+        this.gunAngle = newAngle;
+        this.angle = newAngle;
+      }
+
+      // Emit boot friction sparks and smoke
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(this.x, this.y + this.r * 0.4, 3, '#FF8800');
+        spawnSparks(this.x - Math.cos(this.gunAngle || 0) * this.r * 0.4, this.y - Math.sin(this.gunAngle || 0) * this.r * 0.4, 2, '#FFAA00');
+      }
+      if (typeof spawnLaserSmoke === 'function' && this.ultSlideTimer % 2 === 0) {
+        spawnLaserSmoke(this.x, this.y + this.r * 0.4, -this.vx * 0.2, -this.vy * 0.2);
+      }
+
+      // Spawn afterimage ghost trail during slide
+      if (!this.afterImages) this.afterImages = [];
+      pushTrailCap(this.afterImages, {
+        x: this.x,
+        y: this.y,
+        r: this.r,
+        gunAngle: this.gunAngle || this.angle || 0,
+        timer: 12,
+        maxTimer: 12
+      });
+
+      if (this.ultSlideTimer <= 0) {
+        this.isUltSliding = false;
+        this.isChargingUlt = true;
+        this.vx = 0;
+        this.vy = 0;
+        this.ultTimer = CONFIG.genos?.ultWindupFrames || 60;
+        
+        const finalTarget = opponent || this._findClosestEnemy();
+        if (finalTarget && typeof finalTarget.x === 'number') {
+          const targetY = (finalTarget.y !== undefined ? finalTarget.y : this.y) - (finalTarget.z || 0);
+          const myY = this.y - (this.z || 0);
+          const committedAngle = Math.atan2(targetY - myY, finalTarget.x - this.x);
+          this.ultAngle = committedAngle;
+          this.gunAngle = committedAngle;
+          this.angle = committedAngle;
+        } else {
+          this.ultAngle = this.gunAngle || this.angle || 0;
+        }
+
+        if (typeof spawnFloatingText === 'function') {
+          spawnFloatingText(this.x, this.y - this.r - 28, "SPIRAL INCINERATION CANNON!", "#FF3300");
+        }
+        const windupShake = CONFIG.genos?.ultWindupShakeIntensity || 0;
+        if (windupShake > 0) {
+          triggerGlobalScreenShake(windupShake, CONFIG.genos?.ultWindupShakeDuration || 6);
+        }
+        if (CONFIG.genos?.ultVoiceEnabled !== false) {
+          const ultVoiceSrc = CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3';
+          const ultVoiceVol = CONFIG.genos?.ultVoiceVolume ?? 3.5;
+          this.soundHandle = audioSystem.playSFX(ultVoiceSrc, ultVoiceVol);
+        }
+        if (CONFIG.genos?.ultChargeEnabled !== false) {
+          const ultChargeSrc = CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3';
+          const ultChargeVol = CONFIG.genos?.ultChargeVolume ?? 2.0;
+          this._ultChargeSoundHandle = audioSystem.playSFX(ultChargeSrc, ultChargeVol);
+        }
+      }
+      return;
     }
 
     // 1. Ultimate Wind-up & Beam Tick Update
@@ -2012,7 +2107,7 @@ export class GenosFighter extends Fighter {
     const isOpponentTargetable = opponent && (!opponent.isDead || isTargetReforming) && (opponent.hp > 0 || isTargetReforming);
 
     // AI & Combat Target Aiming: Continuously track target angle every frame with smooth easing post-reassembly
-    if (canActAim && isOpponentTargetable && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
+    if (canActAim && isOpponentTargetable && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering && !this.isUltSliding) {
       if (this.rebootAccelTimer > 0) {
         const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
         let currentAngle = this.gunAngle || this.angle || 0;
@@ -2028,7 +2123,7 @@ export class GenosFighter extends Fighter {
       }
     }
 
-    if (canActAim && opponent && opponent.hp > 0 && !isTargetReforming && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
+    if (canActAim && opponent && opponent.hp > 0 && !isTargetReforming && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering && !this.isUltSliding) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
 
       // Skill 1 Priority: Machine Gun Blows (FIRST priority when available!)

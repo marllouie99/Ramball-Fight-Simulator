@@ -27,54 +27,6 @@ function _getHollowMaskImage() {
   return _hollowMaskImage;
 }
 
-let _ichigoBankaiImage = null;
-let _ichigoBankaiImageLoading = false;
-
-function _getIchigoBankaiImage() {
-  if (_ichigoBankaiImage && _ichigoBankaiImage.complete && _ichigoBankaiImage.naturalWidth > 0) {
-    return _ichigoBankaiImage;
-  }
-  if (!_ichigoBankaiImageLoading && typeof Image !== 'undefined') {
-    _ichigoBankaiImageLoading = true;
-    const img = new Image();
-    img.onload = () => {
-      _ichigoBankaiImage = img;
-      _ichigoBankaiImageLoading = false;
-    };
-    img.onerror = (e) => {
-      console.warn('Failed to load Ichigo Bankai pixel image at Assets/model/ichigo-bankai-skin.png', e);
-      _ichigoBankaiImageLoading = false;
-    };
-    img.src = 'Assets/model/ichigo-bankai-skin.png?v=1';
-    _ichigoBankaiImage = img;
-  }
-  return _ichigoBankaiImage;
-}
-
-let _ichigoShikaiImage = null;
-let _ichigoShikaiImageLoading = false;
-
-function _getIchigoShikaiImage() {
-  if (_ichigoShikaiImage && _ichigoShikaiImage.complete && _ichigoShikaiImage.naturalWidth > 0) {
-    return _ichigoShikaiImage;
-  }
-  if (!_ichigoShikaiImageLoading && typeof Image !== 'undefined') {
-    _ichigoShikaiImageLoading = true;
-    const img = new Image();
-    img.onload = () => {
-      _ichigoShikaiImage = img;
-      _ichigoShikaiImageLoading = false;
-    };
-    img.onerror = (e) => {
-      console.warn('Failed to load Ichigo Shikai pixel image at Assets/model/ichigo-shikai-skin.png', e);
-      _ichigoShikaiImageLoading = false;
-    };
-    img.src = 'Assets/model/ichigo-shikai-skin.png?v=1';
-    _ichigoShikaiImage = img;
-  }
-  return _ichigoShikaiImage;
-}
-
 let _ichigoHairImage = null;
 let _ichigoHairImageLoading = false;
 
@@ -101,8 +53,6 @@ export function _getIchigoHairImage() {
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getHollowMaskImage();
-  _getIchigoBankaiImage();
-  _getIchigoShikaiImage();
   _getIchigoHairImage();
 }
 

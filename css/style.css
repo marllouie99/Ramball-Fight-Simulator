@@ -505,7 +505,7 @@ canvas {
   opacity: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (pointer: coarse) {
   body {
     padding: 8px;
   }
@@ -532,6 +532,18 @@ canvas {
   canvas {
     border-width: 2px;
     border-radius: 8px;
+  }
+
+  /* ── Mobile Performance Optimizations: Disable GPU-heavy Backdrop Blur on Touch/Mobile ── */
+  .mobile-quick-bar,
+  .health-card,
+  .hud-top-card,
+  .debug-panel,
+  .champion-announcement-card,
+  .settings-modal,
+  .modal-overlay {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }
 

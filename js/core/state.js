@@ -68,14 +68,18 @@ let topLevelUiSprite = null;
 let baseCircleTexture = null;
 let bloodSquareTexture = null;
 
+const isMobileDevice = typeof navigator !== 'undefined' && (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024));
+const targetResolution = isMobileDevice ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2.0);
+
 if (hasPixi) {
   pixiApp = new window.PIXI.Application({
     width: CONFIG.canvasWidth || 540,
     height: CONFIG.canvasHeight || 960,
     backgroundColor: parsedBgColor,
-    resolution: window.devicePixelRatio || 1,
+    resolution: targetResolution,
     autoDensity: true,
-    antialias: true
+    antialias: !isMobileDevice,
+    powerPreference: 'high-performance'
   });
 
   pixiLayers = {

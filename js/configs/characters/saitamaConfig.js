@@ -25,7 +25,7 @@ export const saitamaConfig = {
   desc: 'Hero for fun. Ignores basic hit flinches. Basic hits deal massive damage. Serious Punch ultimate obliterates anything across the arena.',
 
   // Basic Attack: Normal Punch
-  normalPunchEnabled: 0,        // Set to false to disable Normal Punch basic attack
+  normalPunchEnabled: 1,        // Set to false to disable Normal Punch basic attack
   punchEnabled: true,              // Alias toggle
   disableNormalPunch: false,       // If true, disables Normal Punch basic attack
   punchDamage: 0.50,               // Punch damage as % ratio of game mode fixed HP (0.90 = 90% of fixed HP)

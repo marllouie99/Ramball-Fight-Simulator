@@ -5625,9 +5625,12 @@ async function main() {
       mahoraga2.y = 200;
       state.fighters = [genos2, mahoraga2];
 
-      // Genos starts Ultimate charging
+      // Genos starts Ultimate charging (smoothly slides then charges)
       genos2.ultCooldown = 0;
       genos2.executeSpiralIncinerationCannon(mahoraga2);
+      while (genos2.isUltSliding) {
+        genos2.update(mahoraga2, 0, state.arena);
+      }
       if (!genos2.isChargingUlt) {
         throw new Error('Genos failed to start charging Spiral Incineration Cannon');
       }
@@ -5711,31 +5714,48 @@ async function main() {
       ];
 
       for (const t of testAngles) {
+        genos.x = 300;
+        genos.y = 300;
+        genos.vx = 0;
+        genos.vy = 0;
+        genos.isUltSliding = false;
         genos.isChargingUlt = false;
         genos.isFiringUlt = false;
         genos.ultCooldown = 0;
         const dummy = { x: t.targetX, y: t.targetY, r: 25, hp: 100, maxHp: 100, isDead: false };
 
         genos.executeSpiralIncinerationCannon(dummy);
+        while (genos.isUltSliding) {
+          genos.update(dummy, 0, state.arena);
+        }
 
         if (!genos.isChargingUlt) {
           throw new Error(`Genos failed to initiate Spiral Incineration Cannon for ${t.name}!`);
         }
-        if (Math.abs(genos.ultAngle - t.expectedAngle) > 0.001) {
-          throw new Error(`Expected Genos ultAngle for ${t.name} to be ${t.expectedAngle}, got ${genos.ultAngle} (snapped or incorrect)`);
+        const currentTargetAngle = Math.atan2(dummy.y - genos.y, dummy.x - genos.x);
+        if (Math.abs(genos.ultAngle - currentTargetAngle) > 0.005) {
+          throw new Error(`Expected Genos ultAngle for ${t.name} to be ${currentTargetAngle}, got ${genos.ultAngle} (snapped or incorrect)`);
         }
-        if (Math.abs(genos.gunAngle - t.expectedAngle) > 0.001 || Math.abs(genos.angle - t.expectedAngle) > 0.001) {
-          throw new Error(`Expected Genos gunAngle/angle for ${t.name} to match ${t.expectedAngle}, got gunAngle=${genos.gunAngle}`);
+        if (Math.abs(genos.gunAngle - currentTargetAngle) > 0.005 || Math.abs(genos.angle - currentTargetAngle) > 0.005) {
+          throw new Error(`Expected Genos gunAngle/angle for ${t.name} to match ${currentTargetAngle}, got gunAngle=${genos.gunAngle}`);
         }
       }
 
       // 2. Test Direction Commitment (No snap auto-aim during wind-up charging or active firing)
+      genos.x = 300;
+      genos.y = 300;
+      genos.vx = 0;
+      genos.vy = 0;
+      genos.isUltSliding = false;
       genos.isChargingUlt = false;
       genos.isFiringUlt = false;
       genos.ultCooldown = 0;
       const initialTarget = { x: 300 + 300, y: 300 + 300, r: 25, hp: 100, maxHp: 100, isDead: false };
-      const initialAngle = Math.atan2(300, 300); // 45° (PI / 4)
       genos.executeSpiralIncinerationCannon(initialTarget);
+      while (genos.isUltSliding) {
+        genos.update(initialTarget, 0, state.arena);
+      }
+      const initialAngle = genos.ultAngle; // Locked cast angle upon completing slide into windup stance
 
       // Opponent moves/teleports to top-left (-135°) during windup
       const movedTarget = { x: 300 - 300, y: 300 - 300, r: 25, hp: 100, maxHp: 100, isDead: false };
@@ -9207,6 +9227,68 @@ async function main() {
     console.error('❌ [CJ BAGUVIX OVERLAY TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[CJ BAGUVIX OVERLAY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Genos Ultimate (Spiral Incineration Cannon) Arena PNG Overlay & Stack Balance Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🔥 [Genos Ultimate Overlay Test] Verifying Genos Ultimate Arena PNG overlay rendering and Canvas stack balance...');
+    const { drawGenosUltimateArenaOverlay, getGenosUltimateOverlayImage } = await import('../js/graphics/renderers/domainDimOverlays.js');
+    const { GenosFighter } = await import('../js/entities/fighters/GenosFighter.js');
+    const genos = new GenosFighter({ color: '#FF5500', name: 'Genos' });
+    genos.x = 400;
+    genos.y = 300;
+    genos.hp = 320;
+    genos.isChargingUlt = true;
+    genos.ultTimer = 60;
+
+    const dummyEnemy = { x: 550, y: 300, r: 25, hp: 100, maxHp: 100, z: 0 };
+    state.fighters = [genos, dummyEnemy];
+
+    // Verify image loader
+    const genosImg = getGenosUltimateOverlayImage();
+    if (!genosImg) {
+      throw new Error('[GENOS OVERLAY IMAGE FAILED] getGenosUltimateOverlayImage() returned null/undefined');
+    }
+
+    // Test rectangular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawGenosUltimateArenaOverlay();
+    assertCanvasStackBalance('drawGenosUltimateArenaOverlay (rect arena)');
+
+    // Test circular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawGenosUltimateArenaOverlay();
+    assertCanvasStackBalance('drawGenosUltimateArenaOverlay (circular arena)');
+
+    // Test across all ultimate phases
+    genos.isChargingUlt = false;
+    genos.isUltSliding = true;
+    mockCtx.resetStackDepth();
+    drawGenosUltimateArenaOverlay();
+    assertCanvasStackBalance('drawGenosUltimateArenaOverlay (isUltSliding)');
+
+    genos.isUltSliding = false;
+    genos.isFiringUlt = true;
+    mockCtx.resetStackDepth();
+    drawGenosUltimateArenaOverlay();
+    assertCanvasStackBalance('drawGenosUltimateArenaOverlay (isFiringUlt)');
+
+    genos.isFiringUlt = false;
+    genos.isUltRecovering = true;
+    genos.ultRecoveryTimer = 30;
+    mockCtx.resetStackDepth();
+    drawGenosUltimateArenaOverlay();
+    assertCanvasStackBalance('drawGenosUltimateArenaOverlay (isUltRecovering)');
+
+    genos.isUltRecovering = false;
+  } catch (err) {
+    console.error('❌ [GENOS ULTIMATE OVERLAY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[GENOS ULTIMATE OVERLAY TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

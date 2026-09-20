@@ -988,13 +988,70 @@ export function drawMahitoDomainDimScreen() {
 }
 
 let currentTojiUltimateOpacity = 0;
+let currentNanamiOvertimeOpacity = 0;
+let currentGenosUltimateOpacity = 0;
 let currentSaitamaSeriousPunchOpacity = 0;
 let currentHollowMaskOpacity = 0;
 let flyHeads = [];
+let nanamiGoldEmbers = [];
 let seriousPunchImg = null;
 let seriousPunchImgLoading = false;
 let hollowMaskOverlayImg = null;
 let hollowMaskOverlayImgLoading = false;
+let nanamiOvertimeOverlayImg = null;
+let nanamiOvertimeOverlayImgLoading = false;
+let genosUltimateOverlayImg = null;
+let genosUltimateOverlayImgLoading = false;
+
+export function loadGenosUltimateOverlayImage() {
+  if (genosUltimateOverlayImg || genosUltimateOverlayImgLoading) return;
+  genosUltimateOverlayImgLoading = true;
+  genosUltimateOverlayImg = new Image();
+  genosUltimateOverlayImg.onload = () => {
+    genosUltimateOverlayImgLoading = false;
+  };
+  genosUltimateOverlayImg.onerror = (e) => {
+    console.error("Failed to load Genos ultimate overlay image at Assets/Overlays/Genos-ultimate-overlay.png:", e);
+    genosUltimateOverlayImgLoading = false;
+    genosUltimateOverlayImg = null;
+  };
+  genosUltimateOverlayImg.src = 'Assets/Overlays/Genos-ultimate-overlay.png';
+}
+
+export function getGenosUltimateOverlayImage() {
+  if (genosUltimateOverlayImg && genosUltimateOverlayImg.complete && genosUltimateOverlayImg.naturalWidth > 0) {
+    return genosUltimateOverlayImg;
+  }
+  if (!genosUltimateOverlayImgLoading && typeof Image !== 'undefined') {
+    loadGenosUltimateOverlayImage();
+  }
+  return genosUltimateOverlayImg;
+}
+
+export function loadNanamiOvertimeOverlayImage() {
+  if (nanamiOvertimeOverlayImg || nanamiOvertimeOverlayImgLoading) return;
+  nanamiOvertimeOverlayImgLoading = true;
+  nanamiOvertimeOverlayImg = new Image();
+  nanamiOvertimeOverlayImg.onload = () => {
+    nanamiOvertimeOverlayImgLoading = false;
+  };
+  nanamiOvertimeOverlayImg.onerror = (e) => {
+    console.error("Failed to load Nanami overtime overlay image at Assets/Overlays/Nanami-overtime-overlay.png:", e);
+    nanamiOvertimeOverlayImgLoading = false;
+    nanamiOvertimeOverlayImg = null;
+  };
+  nanamiOvertimeOverlayImg.src = 'Assets/Overlays/Nanami-overtime-overlay.png';
+}
+
+export function getNanamiOvertimeOverlayImage() {
+  if (nanamiOvertimeOverlayImg && nanamiOvertimeOverlayImg.complete && nanamiOvertimeOverlayImg.naturalWidth > 0) {
+    return nanamiOvertimeOverlayImg;
+  }
+  if (!nanamiOvertimeOverlayImgLoading && typeof Image !== 'undefined') {
+    loadNanamiOvertimeOverlayImage();
+  }
+  return nanamiOvertimeOverlayImg;
+}
 
 function loadSeriousPunchImage() {
   if (seriousPunchImg || seriousPunchImgLoading) return;
@@ -1258,6 +1315,387 @@ export function drawTojiUltimateOverlay() {
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${currentTojiUltimateOpacity})`;
+}
+
+/**
+ * Draws Nanami's Overtime (Jigai) Arena Overlay.
+ * Renders Assets/Overlays/Nanami-overtime-overlay.png inside the arena with smooth fade transitions,
+ * custom zoom & offset tuning, edge vignette, and golden CE backlighting.
+ */
+export function drawNanamiOvertimeArenaOverlay() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
+  if (typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeOverlayEnabled === false) return;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  const nanami = state.fighters?.find(f => f && (f.characterId === 'nanami' || f.type === 'nanami' || f._def?.id === 'nanami') && f.isOvertimeActive && !f.isDead && f.hp > 0);
+
+  if (!nanamiOvertimeOverlayImg && !nanamiOvertimeOverlayImgLoading) {
+    loadNanamiOvertimeOverlayImage();
+  }
+
+  let targetOpacity = 0;
+  if (nanami) {
+    targetOpacity = (typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeDimOpacity !== undefined) ? CONFIG.nanami.overtimeDimOpacity : 0.92;
+  }
+
+  // Smooth fade in / out matching Mahito domain transition speeds
+  if (targetOpacity > currentNanamiOvertimeOpacity) {
+    currentNanamiOvertimeOpacity += (targetOpacity - currentNanamiOvertimeOpacity) * 0.08;
+  } else {
+    currentNanamiOvertimeOpacity += (targetOpacity - currentNanamiOvertimeOpacity) * 0.06;
+  }
+
+  if (currentNanamiOvertimeOpacity < 0.01) {
+    currentNanamiOvertimeOpacity = 0;
+    return;
+  }
+
+  const opacity = currentNanamiOvertimeOpacity;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Deep Abyssal Dark Golden-Amber Linear Gradient Across Full Screen (matching Mahito's multi-stop linear gradient)
+  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
+  linearGrad.addColorStop(0.0, `rgba(5, 3, 0, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-gold void top
+  linearGrad.addColorStop(0.2, `rgba(28, 18, 3, ${(opacity * 0.94).toFixed(3)})`);    // Dark cursed amber
+  linearGrad.addColorStop(0.5, `rgba(58, 38, 6, ${(opacity * 0.90).toFixed(3)})`);    // Sinister overtime golden amber mid
+  linearGrad.addColorStop(0.8, `rgba(22, 14, 2, ${(opacity * 0.95).toFixed(3)})`);    // Deep shadow blend
+  linearGrad.addColorStop(1.0, `rgba(4, 2, 0, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-gold void bottom
+
+  ctx.fillStyle = linearGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. High-contrast cursed overtime / 7:3 ratio radial gradient centered on Nanami (matching Mahito's character radial aura)
+  const screenPos = nanami ? worldToScreen(nanami.x, nanami.y - (nanami.z || 0)) : { x: w / 2, y: h / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(w, h) * 0.92;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0.00, `rgba(255, 215, 0, ${(opacity * 0.52).toFixed(3)})`);      // Radiant 24K pure gold core (#FFD700)
+  grad.addColorStop(0.12, `rgba(234, 179, 8, ${(opacity * 0.44).toFixed(3)})`);      // Cursed overtime amber halo (#EAB308)
+  grad.addColorStop(0.28, `rgba(180, 120, 10, ${(opacity * 0.35).toFixed(3)})`);     // Deep imperial gold (#B4780A)
+  grad.addColorStop(0.50, `rgba(100, 60, 5, ${(opacity * 0.25).toFixed(3)})`);       // Dark ochre shadow
+  grad.addColorStop(0.75, `rgba(32, 18, 2, ${(opacity * 0.15).toFixed(3)})`);        // Abyssal gold transition
+  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                        // Outer edge blend
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 3. Dark Outer Edge Screen Vignette (matching Mahito's cornerGrad)
+  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85);
+  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+  cornerGrad.addColorStop(0.5, `rgba(8, 5, 1, ${(opacity * 0.35).toFixed(3)})`);
+  cornerGrad.addColorStop(1.0, `rgba(3, 2, 0, ${(opacity * 0.85).toFixed(3)})`);
+  ctx.fillStyle = cornerGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 4. Clear arena interior with smooth edge vignette so Overtime arena overlay stands out prominently (exact Mahito cutout!)
+  if (nanami && nanami.isOvertimeActive) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
+
+  // 5. Draw Nanami Overtime Overlay Artwork (Assets/Overlays/Nanami-overtime-overlay.png) inside Arena
+  const zoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+  const worldArenaCenterX = (arena.x || 0) + (arena.width || 800) / 2;
+  const worldArenaCenterY = (arena.y || 0) + (arena.height || 600) / 2;
+  const arenaScreenCenter = worldToScreen(worldArenaCenterX, worldArenaCenterY);
+  const arenaW = (arena.width || 800) * zoom;
+  const arenaH = (arena.height || 600) * zoom;
+  const arenaX = arenaScreenCenter.x - arenaW / 2;
+  const arenaY = arenaScreenCenter.y - arenaH / 2;
+  const wallW = (arena.wallWidth || 4) * zoom;
+
+  ctx.save();
+  ctx.beginPath();
+  if (arena.shape === 'circle') {
+    const ar = (arena.radius || ((arena.width || 800) / 2)) * zoom - wallW;
+    ctx.arc(arenaScreenCenter.x, arenaScreenCenter.y, Math.max(0, ar), 0, Math.PI * 2);
+  } else {
+    ctx.rect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+  }
+  ctx.clip();
+
+  // Dark Golden Obsidian Base Tint inside arena
+  ctx.fillStyle = `rgba(16, 11, 2, ${(opacity * 0.88).toFixed(3)})`;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  // Ambient Golden Radiance inside Arena
+  const arenaInnerGold = ctx.createRadialGradient(arenaScreenCenter.x, arenaScreenCenter.y, 10, arenaScreenCenter.x, arenaScreenCenter.y, Math.max(arenaW, arenaH) * 0.60);
+  arenaInnerGold.addColorStop(0.00, `rgba(255, 215, 0, ${(opacity * 0.25).toFixed(3)})`);
+  arenaInnerGold.addColorStop(0.50, `rgba(184, 134, 11, ${(opacity * 0.15).toFixed(3)})`);
+  arenaInnerGold.addColorStop(1.00, `rgba(25, 16, 2, ${(opacity * 0.40).toFixed(3)})`);
+  ctx.fillStyle = arenaInnerGold;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  // Draw Nanami Overtime Art Image (Assets/Overlays/Nanami-overtime-overlay.png)
+  const img = getNanamiOvertimeOverlayImage();
+  const baseOverlayAlpha = (typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeOverlayOpacity !== undefined) ? CONFIG.nanami.overtimeOverlayOpacity : 0.90;
+  const overlayZoom = (typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeOverlayZoom !== undefined) ? CONFIG.nanami.overtimeOverlayZoom : 1.0;
+  const custom = (typeof state !== 'undefined' && state.skinCustomizations?.nanami_overtime_overlay) || {};
+  const effectiveZoom = custom.zoom ?? overlayZoom;
+  const offX = (custom.offsetX ?? ((typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeOverlayOffsetX !== undefined) ? CONFIG.nanami.overtimeOverlayOffsetX : 0)) * zoom;
+  const offY = (custom.offsetY ?? ((typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeOverlayOffsetY !== undefined) ? CONFIG.nanami.overtimeOverlayOffsetY : 0)) * zoom;
+
+  if (img && (img.complete || img.width > 0) && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const baseW = arenaW - wallW * 2;
+    const baseH = arenaH - wallW * 2;
+
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const arenaAspect = baseW / baseH;
+    let drawW, drawH;
+    if (arenaAspect > imgAspect) {
+      drawW = baseW * effectiveZoom;
+      drawH = (baseW / imgAspect) * effectiveZoom;
+    } else {
+      drawH = baseH * effectiveZoom;
+      drawW = (baseH * imgAspect) * effectiveZoom;
+    }
+
+    const drawX = arenaScreenCenter.x - drawW / 2 + offX;
+    const drawY = arenaScreenCenter.y - drawH / 2 + offY;
+
+    ctx.globalAlpha = opacity * baseOverlayAlpha;
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  }
+
+  // Atmospheric Rich Golden Radial Vignette framing the arena perimeter
+  const maxR = Math.max(arenaW, arenaH) * 0.75;
+  const vignetteGrad = ctx.createRadialGradient(arenaScreenCenter.x, arenaScreenCenter.y, Math.min(arenaW, arenaH) * 0.20, arenaScreenCenter.x, arenaScreenCenter.y, maxR);
+  vignetteGrad.addColorStop(0.00, 'rgba(0, 0, 0, 0.0)');
+  vignetteGrad.addColorStop(0.60, `rgba(100, 70, 10, ${(opacity * 0.40).toFixed(3)})`);
+  vignetteGrad.addColorStop(1.00, `rgba(18, 11, 1, ${(opacity * 0.90).toFixed(3)})`);
+  ctx.fillStyle = vignetteGrad;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  ctx.restore(); // Restores arena clip
+
+  // 6. Ethereal Warm Gold Cursed Energy Backlight / Spotlight for Nanami
+  if (nanami) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const nanamiZoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+    const nanamiScreen = worldToScreen(nanami.x, nanami.y - (nanami.z || 0));
+    const spotR = (nanami.r || 25) * 5.0 * nanamiZoom;
+    const spotGrad = ctx.createRadialGradient(nanamiScreen.x, nanamiScreen.y, 6 * nanamiZoom, nanamiScreen.x, nanamiScreen.y, spotR);
+    spotGrad.addColorStop(0,    'rgba(255, 240, 120, 0.80)'); // Brilliant Pure Gold Core
+    spotGrad.addColorStop(0.30, 'rgba(255, 215, 0, 0.50)');   // Pure Gold CE Radiance
+    spotGrad.addColorStop(0.65, 'rgba(195, 140, 15, 0.22)');
+    spotGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = spotGrad;
+    ctx.beginPath();
+    ctx.arc(nanamiScreen.x, nanamiScreen.y, spotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 7. Exclude Gojo's Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
+  ctx.restore(); // Restores fullscreen save
+
+  state.globalDimEdgeColor = `rgba(5, 3, 0, ${(opacity * 0.98).toFixed(3)})`;
+}
+
+/**
+ * Draws Genos's Spiral Incineration Cannon Ultimate Arena Overlay.
+ * Renders Assets/Overlays/Genos-ultimate-overlay.png inside the arena with smooth fade transitions,
+ * custom zoom & offset tuning, edge vignette, volcanic dark dim screen, and solar thermal backlighting.
+ */
+export function drawGenosUltimateArenaOverlay() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) return;
+  if (typeof CONFIG !== 'undefined' && CONFIG.genos?.ultOverlayEnabled === false) return;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  const genos = state.fighters?.find(f =>
+    f && (f.characterId === 'genos' || f.type === 'genos' || f._def?.id === 'genos') &&
+    !f.isDead && f.hp > 0 &&
+    (f.isUltSliding || f.isChargingUlt || f.isFiringUlt || (f.isUltRecovering && f.ultRecoveryTimer > 0))
+  );
+
+  if (!genosUltimateOverlayImg && !genosUltimateOverlayImgLoading) {
+    loadGenosUltimateOverlayImage();
+  }
+
+  let targetOpacity = 0;
+  if (genos) {
+    const baseDim = (typeof CONFIG !== 'undefined' && CONFIG.genos?.ultDimOpacity !== undefined) ? CONFIG.genos.ultDimOpacity : 0.92;
+    if (genos.isUltSliding) {
+      const maxSlide = CONFIG.genos?.ultSlideFrames || 18;
+      const progress = Math.min(1.0, Math.max(0, 1.0 - (genos.ultSlideTimer / maxSlide)));
+      targetOpacity = baseDim * (0.65 + 0.35 * progress);
+    } else if (genos.isChargingUlt || genos.isFiringUlt) {
+      targetOpacity = baseDim;
+    } else if (genos.isUltRecovering) {
+      const maxRec = CONFIG.genos?.ultRecoveryFrames || 45;
+      const progress = Math.max(0, Math.min(1.0, genos.ultRecoveryTimer / maxRec));
+      targetOpacity = baseDim * progress * 0.65;
+    }
+  }
+
+  // Smooth fade in / out matching Mahito domain transition speeds
+  if (targetOpacity > currentGenosUltimateOpacity) {
+    currentGenosUltimateOpacity += (targetOpacity - currentGenosUltimateOpacity) * 0.08;
+  } else {
+    currentGenosUltimateOpacity += (targetOpacity - currentGenosUltimateOpacity) * 0.06;
+  }
+
+  if (currentGenosUltimateOpacity < 0.01) {
+    currentGenosUltimateOpacity = 0;
+    return;
+  }
+
+  const opacity = currentGenosUltimateOpacity;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Deep Abyssal Dark Volcanic/Incinerator Linear Gradient Across Full Screen
+  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
+  linearGrad.addColorStop(0.0, `rgba(5, 1, 0, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-ember void top
+  linearGrad.addColorStop(0.2, `rgba(26, 8, 2, ${(opacity * 0.94).toFixed(3)})`);     // Dark volcanic ember
+  linearGrad.addColorStop(0.5, `rgba(55, 18, 4, ${(opacity * 0.90).toFixed(3)})`);    // Sinister thermal incineration mid
+  linearGrad.addColorStop(0.8, `rgba(22, 6, 1, ${(opacity * 0.95).toFixed(3)})`);     // Deep ember shadow blend
+  linearGrad.addColorStop(1.0, `rgba(4, 1, 0, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-ember void bottom
+
+  ctx.fillStyle = linearGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. High-contrast solar thermal / core plasma radial gradient centered on Genos
+  const screenPos = genos ? worldToScreen(genos.x, genos.y - (genos.z || 0)) : { x: w / 2, y: h / 2 };
+  const cx = screenPos.x;
+  const cy = screenPos.y;
+  const maxDim = Math.max(w, h) * 0.92;
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
+  grad.addColorStop(0.00, `rgba(255, 120, 0, ${(opacity * 0.52).toFixed(3)})`);      // Radiant incineration orange core (#FF7800)
+  grad.addColorStop(0.12, `rgba(255, 85, 0, ${(opacity * 0.44).toFixed(3)})`);       // Demon cyborg flame halo (#FF5500)
+  grad.addColorStop(0.28, `rgba(204, 42, 0, ${(opacity * 0.35).toFixed(3)})`);       // Deep magma crimson (#CC2A00)
+  grad.addColorStop(0.50, `rgba(110, 20, 0, ${(opacity * 0.25).toFixed(3)})`);       // Dark burnt ochre shadow
+  grad.addColorStop(0.75, `rgba(35, 6, 0, ${(opacity * 0.15).toFixed(3)})`);         // Abyssal thermal transition
+  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                        // Outer edge blend
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 3. Dark Outer Edge Screen Vignette
+  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85);
+  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+  cornerGrad.addColorStop(0.5, `rgba(8, 2, 0, ${(opacity * 0.35).toFixed(3)})`);
+  cornerGrad.addColorStop(1.0, `rgba(3, 1, 0, ${(opacity * 0.85).toFixed(3)})`);
+  ctx.fillStyle = cornerGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 4. Clear arena interior with smooth edge vignette so ultimate arena overlay stands out prominently
+  if (genos && (genos.isUltSliding || genos.isChargingUlt || genos.isFiringUlt || (genos.isUltRecovering && genos.ultRecoveryTimer > 0))) {
+    applyDomainArenaVignetteCutout(ctx);
+  }
+
+  // 5. Draw Genos Ultimate Overlay Artwork (Assets/Overlays/Genos-ultimate-overlay.png) inside Arena
+  const zoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+  const worldArenaCenterX = (arena.x || 0) + (arena.width || 800) / 2;
+  const worldArenaCenterY = (arena.y || 0) + (arena.height || 600) / 2;
+  const arenaScreenCenter = worldToScreen(worldArenaCenterX, worldArenaCenterY);
+  const arenaW = (arena.width || 800) * zoom;
+  const arenaH = (arena.height || 600) * zoom;
+  const arenaX = arenaScreenCenter.x - arenaW / 2;
+  const arenaY = arenaScreenCenter.y - arenaH / 2;
+  const wallW = (arena.wallWidth || 4) * zoom;
+
+  ctx.save();
+  ctx.beginPath();
+  if (arena.shape === 'circle') {
+    const ar = (arena.radius || ((arena.width || 800) / 2)) * zoom - wallW;
+    ctx.arc(arenaScreenCenter.x, arenaScreenCenter.y, Math.max(0, ar), 0, Math.PI * 2);
+  } else {
+    ctx.rect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+  }
+  ctx.clip();
+
+  // Dark Obsidian Ember Base Tint inside arena
+  ctx.fillStyle = `rgba(16, 5, 1, ${(opacity * 0.88).toFixed(3)})`;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  // Ambient Thermal Radiance inside Arena
+  const arenaInnerHeat = ctx.createRadialGradient(arenaScreenCenter.x, arenaScreenCenter.y, 10, arenaScreenCenter.x, arenaScreenCenter.y, Math.max(arenaW, arenaH) * 0.60);
+  arenaInnerHeat.addColorStop(0.00, `rgba(255, 100, 0, ${(opacity * 0.25).toFixed(3)})`);
+  arenaInnerHeat.addColorStop(0.50, `rgba(180, 50, 0, ${(opacity * 0.15).toFixed(3)})`);
+  arenaInnerHeat.addColorStop(1.00, `rgba(25, 6, 1, ${(opacity * 0.40).toFixed(3)})`);
+  ctx.fillStyle = arenaInnerHeat;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  // Draw Genos Ultimate Art Image (Assets/Overlays/Genos-ultimate-overlay.png)
+  const img = getGenosUltimateOverlayImage();
+  const baseOverlayAlpha = (typeof CONFIG !== 'undefined' && CONFIG.genos?.ultOverlayOpacity !== undefined) ? CONFIG.genos.ultOverlayOpacity : 0.90;
+  const overlayZoom = (typeof CONFIG !== 'undefined' && CONFIG.genos?.ultOverlayZoom !== undefined) ? CONFIG.genos.ultOverlayZoom : 1.0;
+  const custom = (typeof state !== 'undefined' && state.skinCustomizations?.genos_ultimate_overlay) || {};
+  const effectiveZoom = custom.zoom ?? overlayZoom;
+  const offX = (custom.offsetX ?? ((typeof CONFIG !== 'undefined' && CONFIG.genos?.ultOverlayOffsetX !== undefined) ? CONFIG.genos.ultOverlayOffsetX : 0)) * zoom;
+  const offY = (custom.offsetY ?? ((typeof CONFIG !== 'undefined' && CONFIG.genos?.ultOverlayOffsetY !== undefined) ? CONFIG.genos.ultOverlayOffsetY : 0)) * zoom;
+
+  if (img && (img.complete || img.width > 0) && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const baseW = arenaW - wallW * 2;
+    const baseH = arenaH - wallW * 2;
+
+    const drawW = baseW * effectiveZoom;
+    const drawH = baseH * effectiveZoom;
+
+    const drawX = arenaScreenCenter.x - drawW / 2 + offX;
+    const drawY = arenaScreenCenter.y - drawH / 2 + offY;
+
+    ctx.globalAlpha = opacity * baseOverlayAlpha;
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  }
+
+  // Atmospheric Rich Thermal Radial Vignette framing the arena perimeter
+  const maxR = Math.max(arenaW, arenaH) * 0.75;
+  const vignetteGrad = ctx.createRadialGradient(arenaScreenCenter.x, arenaScreenCenter.y, Math.min(arenaW, arenaH) * 0.20, arenaScreenCenter.x, arenaScreenCenter.y, maxR);
+  vignetteGrad.addColorStop(0.00, 'rgba(0, 0, 0, 0.0)');
+  vignetteGrad.addColorStop(0.60, `rgba(120, 30, 0, ${(opacity * 0.40).toFixed(3)})`);
+  vignetteGrad.addColorStop(1.00, `rgba(18, 4, 0, ${(opacity * 0.90).toFixed(3)})`);
+  ctx.fillStyle = vignetteGrad;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  ctx.restore(); // Restores arena clip
+
+  // 6. Ethereal Thermal Incineration Backlight / Spotlight for Genos
+  if (genos) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const genosZoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+    const genosScreen = worldToScreen(genos.x, genos.y - (genos.z || 0));
+    const spotR = (genos.r || 25) * 5.0 * genosZoom;
+    const spotGrad = ctx.createRadialGradient(genosScreen.x, genosScreen.y, 6 * genosZoom, genosScreen.x, genosScreen.y, spotR);
+    spotGrad.addColorStop(0,    'rgba(255, 220, 100, 0.80)'); // Brilliant Pure Solar Core
+    spotGrad.addColorStop(0.30, 'rgba(255, 120, 0, 0.50)');   // Incineration Plasma Radiance
+    spotGrad.addColorStop(0.65, 'rgba(200, 40, 0, 0.22)');
+    spotGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = spotGrad;
+    ctx.beginPath();
+    ctx.arc(genosScreen.x, genosScreen.y, spotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 7. Exclude Gojo's Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
+  ctx.restore(); // Restores fullscreen save
+
+  state.globalDimEdgeColor = `rgba(5, 1, 0, ${(opacity * 0.98).toFixed(3)})`;
 }
 
 /**

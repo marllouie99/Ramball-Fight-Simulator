@@ -823,6 +823,10 @@ export function drawNanamiCleaveShockwave(ctx, x, y, angle, radius = 95, timer =
  */
 export function drawNanamiCollapseShockwaves(ctx, fighter) {
   if (!fighter || !fighter.collapseShockwaves || fighter.collapseShockwaves.length === 0) return;
+  if (fighter.isDead || fighter.isRespawning || (fighter.hp <= 0 && !fighter._isWinnerReveal)) {
+    fighter.collapseShockwaves.length = 0;
+    return;
+  }
 
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;

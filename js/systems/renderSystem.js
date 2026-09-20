@@ -11,7 +11,7 @@ import {
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
-  drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
+  drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, drawGenosUltimateArenaOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
@@ -307,7 +307,7 @@ export function renderGame() {
                   (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive)) ||
                   (f.characterId === 'ichigo' && (f.isChannelingBankai || (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) || (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0))) ||
                   (f.characterId === 'saitama' && f._counterPunchTimer > 0) ||
-                  (f.characterId === 'nanami' && f.ratioHitPauseTimer > 0) ||
+                  (f.characterId === 'nanami' && (f.ratioHitPauseTimer > 0 || f.isOvertimeActive)) ||
                   (f.characterId === 'escanor' && f.chopHitPauseTimer > 0) ||
                   (f.characterId === 'todo' && (f.isTakadaUltActive || f.isTakadaChanneling))
                 )
@@ -338,6 +338,8 @@ export function renderGame() {
           drawMahoragaAdaptationDimScreen();
           drawMahoragaLevel8DimScreen();
           drawTojiUltimateOverlay();
+          drawNanamiOvertimeArenaOverlay(); // 2D Nanami Overtime (Jigai) golden arena overlay & dark background
+          drawGenosUltimateArenaOverlay(); // 2D Genos Spiral Incineration Cannon arena overlay & volcanic dark background
           drawSaitamaSeriousPunchDimScreen();
           drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
           drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
@@ -597,6 +599,18 @@ export function renderGame() {
       }
     }
     if (state.topLevelUiSprite && state.topLevelUiSprite.texture) {
-      state.topLevelUiSprite.texture.update();
+      const hasTopUi = Boolean(
+        (state.battleStartFadeTimer && state.battleStartFadeTimer > 0) ||
+        (state.countdownTimer !== undefined && state.countdownTimer < 14) ||
+        (state.missionPassedOverlay && state.missionPassedOverlay.active) ||
+        (state.wastedOverlay && state.wastedOverlay.active) ||
+        (state.killFeed && state.killFeed.length > 0) ||
+        (state.cameraToast && state.cameraToast.timer > 0) ||
+        ['countdown', 'paused', 'roundEnd', 'matchEnd'].includes(state.gameState)
+      );
+      state.topLevelUiSprite.visible = hasTopUi;
+      if (hasTopUi) {
+        state.topLevelUiSprite.texture.update();
+      }
     }
 }

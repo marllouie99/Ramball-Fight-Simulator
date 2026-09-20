@@ -313,11 +313,58 @@ export class NanamiFighter extends Fighter {
     return super.resolveWallBounce(arena, opponent);
   }
 
+  _updateVisualEffects() {
+    // 1. Dash Afterimages
+    if (this.afterImages && this.afterImages.length > 0) {
+      fastCleanArray(this.afterImages, (img) => {
+        img.timer--;
+        return img.timer > 0;
+      });
+    }
+
+    // 2. Ratio Visual Impact Effects
+    if (this.ratioImpactEffects && this.ratioImpactEffects.length > 0) {
+      fastCleanArray(this.ratioImpactEffects, (eff) => {
+        eff.timer--;
+        return eff.timer > 0;
+      });
+    }
+
+    // 3. Overtime Shockwaves
+    if (this.shockwaveEffects && this.shockwaveEffects.length > 0) {
+      fastCleanArray(this.shockwaveEffects, (sw) => {
+        sw.timer--;
+        return sw.timer > 0;
+      });
+    }
+
+    // 4. Collapse Ground Shockwaves & Debris (Always decays to prevent stuck ground effects)
+    if (this.collapseShockwaves && this.collapseShockwaves.length > 0) {
+      fastCleanArray(this.collapseShockwaves, (sw) => {
+        sw.timer--;
+        if (sw.debris && sw.debris.length > 0) {
+          for (let i = 0; i < sw.debris.length; i++) {
+            const deb = sw.debris[i];
+            deb.x += deb.vx;
+            deb.y += deb.vy;
+            deb.vx *= 0.93;
+            deb.vy *= 0.93;
+            deb.rotation += deb.rotSpeed;
+          }
+        }
+        return sw.timer > 0;
+      });
+    }
+  }
+
   update(opponent, ownerIndex, arena) {
     if (this.isDead || this.isRespawning || this.hp <= 0) {
       this.punchAnimTimer = 0;
       this.slashSwingTimer = 0;
       if (this.afterImages) this.afterImages.length = 0;
+      if (this.collapseShockwaves) this.collapseShockwaves.length = 0;
+      if (this.shockwaveEffects) this.shockwaveEffects.length = 0;
+      if (this.ratioImpactEffects) this.ratioImpactEffects.length = 0;
       return;
     }
 
@@ -329,13 +376,8 @@ export class NanamiFighter extends Fighter {
       this.hitFlashTimer = 0;
     }
 
-    // Update existing dash afterimages (placed before freeze guard so they fade even if frozen!)
-    if (this.afterImages && this.afterImages.length > 0) {
-      fastCleanArray(this.afterImages, (img) => {
-        img.timer--;
-        return img.timer > 0;
-      });
-    }
+    // Update existing visual effects & ground shockwaves (placed before freeze guard so they decay smoothly without freezing)
+    this._updateVisualEffects();
 
     // ── Rule 1: MANDATORY Freeze / TimeStop Early Exit Guard ──
     const isFrozen = this._handleTimeStop();
@@ -568,41 +610,7 @@ export class NanamiFighter extends Fighter {
     if (this.collapseCooldown > 0) this.collapseCooldown--;
     if (this.ultimateCooldown > 0) this.ultimateCooldown--;
 
-    // 4. Update Ratio Visual Impact Effects (Zero-GC fastCleanArray)
-    if (this.ratioImpactEffects && this.ratioImpactEffects.length > 0) {
-      fastCleanArray(this.ratioImpactEffects, (eff) => {
-        eff.timer--;
-        return eff.timer > 0;
-      });
-    }
-
-    // Update Overtime Cleave Shockwave Effects (Zero-GC fastCleanArray)
-    if (this.shockwaveEffects && this.shockwaveEffects.length > 0) {
-      fastCleanArray(this.shockwaveEffects, (sw) => {
-        sw.timer--;
-        return sw.timer > 0;
-      });
-    }
-
-    // Update Collapse Ground Shockwave Effects (Zero-GC fastCleanArray)
-    if (this.collapseShockwaves && this.collapseShockwaves.length > 0) {
-      fastCleanArray(this.collapseShockwaves, (sw) => {
-        sw.timer--;
-        if (sw.debris && sw.debris.length > 0) {
-          for (let i = 0; i < sw.debris.length; i++) {
-            const deb = sw.debris[i];
-            deb.x += deb.vx;
-            deb.y += deb.vy;
-            deb.vx *= 0.93;
-            deb.vy *= 0.93;
-            deb.rotation += deb.rotSpeed;
-          }
-        }
-        return sw.timer > 0;
-      });
-    }
-
-    // 4b. Overtime Ambient Cursed Energy Sparks & Dynamic Movement Afterimages
+    // 4. Overtime Ambient Cursed Energy Sparks & Dynamic Movement Afterimages
     if (this.isOvertimeActive && (this.combatAuraOpacity || 0) > 0.1) {
       if (this.roundElapsedFrames % 5 === 0) {
         const offsetX = (Math.random() - 0.5) * (this.r || 25) * 1.6;

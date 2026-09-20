@@ -2,7 +2,7 @@ export const genosConfig = {
   // Base Stats
   hp: 320,
   speed: 5.2,
-  moveSpeed: 5.2,
+  moveSpeed: 6.0,
   r: 25,
   radius: 25,
   color: '#FF5500', // Incineration Orange
@@ -80,6 +80,8 @@ export const genosConfig = {
   // Ultimate: Spiral Incineration Cannon
   initialUltCooldown: 1000, // Initial cooldown at match start (28s at 60fps)
   ultCooldown: 800, // 28 seconds at 60fps
+  ultSlideFrames: 22, // Pre-ultimate cybernetic thruster friction-brake slide duration in frames (~0.36s)
+  ultSlideSpeed: 8.5, // Initial slide velocity speed (px/frame)
   ultWindupFrames: 60, // 1.0s windup
   ultDurationFrames: 120, // 2.0s beam duration
   ultDamagePerTick: 4,
@@ -102,6 +104,14 @@ export const genosConfig = {
   ultRecoveryFrames: 45,        // Post-beam smoke cooling & recovery duration in frames (45 = 0.75s)
   postUltDashCooldown: 60,      // Grace period cooldown in frames (1.0s) before Genos can dash after recovery
   postUltFlurryCooldown: 60,    // Grace period cooldown in frames (1.0s) before Genos can flurry after recovery
+
+  // Ultimate Arena Overlay & Dim Tuning
+  ultOverlayEnabled: true,
+  ultDimOpacity: 0.92,
+  ultOverlayOpacity: 0.90,
+  ultOverlayZoom: 1.0,
+  ultOverlayOffsetX: 0,
+  ultOverlayOffsetY: 0,
 
   // Passive: Core Overdrive (Self-Destruct)
   selfDestructHpThreshold: 0.10,    // HP percentage threshold (0.10 = 10% HP) below which Genos initiates Core Overdrive Self-Destruct

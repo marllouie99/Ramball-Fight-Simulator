@@ -21,7 +21,7 @@ import { drawVoidmasterPixelBody } from '../fighters/voidmasterSkin.js';
 import { drawKnightPixelBody } from '../fighters/knightSkin.js';
 import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighters/nanamiSkin.js';
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
-import { drawGenosSkin, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
+import { drawGenosSkin, drawGenosHands, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
 import { drawEscanorSkin, _drawEscanorHair, _getEscanorHairImage } from '../fighters/escanorSkin.js';
 
 // Studio State Initializers
@@ -772,6 +772,7 @@ export function drawSkinStudioScreen() {
         drawMahitoSkin(ctx, dummyFighter);
       } else if (fDef.key === 'genos') {
         drawGenosSkin(ctx, dummyFighter);
+        drawGenosHands(ctx, dummyFighter);
       } else if (fDef.key === 'escanor') {
         dummyFighter.isTheOneActive = (state.studioSkinForm === 'theOne');
         drawEscanorSkin(ctx, dummyFighter);

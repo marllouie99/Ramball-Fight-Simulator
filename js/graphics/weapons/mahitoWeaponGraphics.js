@@ -1360,29 +1360,31 @@ function drawFleshLoop(ctx, points, isTransformed, fadeOutAlpha = 1.0, maxBands 
     ctx.fill();
     ctx.stroke();
   } else {
-    // Stepped pixel body fill
-    ctx.strokeStyle = '#0E0F14';
+    // 1. Draw continuous solid flesh arm polygon
+    ctx.beginPath();
+    ctx.moveTo(_fleshLoopLeft[0].x, _fleshLoopLeft[0].y);
+    for (let p = 1; p < _fleshLoopLeft.length; p++) ctx.lineTo(_fleshLoopLeft[p].x, _fleshLoopLeft[p].y);
+    for (let p = _fleshLoopRight.length - 1; p >= 0; p--) ctx.lineTo(_fleshLoopRight[p].x, _fleshLoopRight[p].y);
+    ctx.closePath();
+
+    ctx.fillStyle = isTransformed ? '#0E1322' : '#EEF3F7';
+    ctx.fill();
+
+    // 2. Dark manga ink outline around the entire outer perimeter only (no internal stripes)
+    ctx.strokeStyle = isTransformed ? '#2A1B3D' : '#0E0F14';
     ctx.lineWidth = 1.6;
-    for (let i = 0; i < pCount - 1; i++) {
-      const lp1 = _fleshLoopLeft[i];
-      const rp1 = _fleshLoopRight[i];
-      const lp2 = _fleshLoopLeft[i + 1];
-      const rp2 = _fleshLoopRight[i + 1];
+    ctx.stroke();
 
-      // Draw pixel quad segment
-      ctx.beginPath();
-      ctx.moveTo(lp1.x, lp1.y);
-      ctx.lineTo(lp2.x, lp2.y);
-      ctx.lineTo(rp2.x, rp2.y);
-      ctx.lineTo(rp1.x, rp1.y);
-      ctx.closePath();
+    // 3. Subtle shadow shading along the bottom/right flank
+    ctx.fillStyle = isTransformed ? 'rgba(88, 28, 135, 0.35)' : 'rgba(148, 163, 184, 0.35)';
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let p = 1; p < points.length; p++) ctx.lineTo(points[p].x, points[p].y);
+    for (let p = _fleshLoopRight.length - 1; p >= 0; p--) ctx.lineTo(_fleshLoopRight[p].x, _fleshLoopRight[p].y);
+    ctx.closePath();
+    ctx.fill();
 
-      ctx.fillStyle = isTransformed ? '#0E1322' : '#EEF3F7';
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    // Surgical cross-stitches across the stretched arm
+    // 4. Surgical cross-stitches across the stretched arm at designated intervals
     if (!isTransformed && pCount >= 4 && maxBands > 0) {
       for (let s = 1; s <= maxBands; s++) {
         const idx = Math.floor((pCount / (maxBands + 1)) * s);

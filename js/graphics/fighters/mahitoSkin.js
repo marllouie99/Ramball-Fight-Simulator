@@ -25,34 +25,6 @@ import {
 import { GojoRenderer } from './gojoRenderer.js';
 import { drawMinionHealthBar, drawMahitoFleshBubblyDeformLocal } from '../statusEffects.js';
 
-let _mahitoSkinImage = null;
-let _mahitoSkinImageLoading = false;
-
-export function _getMahitoSkinImage() {
-  if (_mahitoSkinImage && _mahitoSkinImage.complete && _mahitoSkinImage.naturalWidth > 0) {
-    return _mahitoSkinImage;
-  }
-  if (!_mahitoSkinImageLoading && typeof Image !== 'undefined') {
-    _mahitoSkinImageLoading = true;
-    const img = new Image();
-    img.onload = () => {
-      _mahitoSkinImage = img;
-      _mahitoSkinImageLoading = false;
-    };
-    img.onerror = (e) => {
-      console.warn('Failed to load Mahito pixel skin image at Assets/model/MAHITO-PIXEL-SKIN.png', e);
-      _mahitoSkinImageLoading = false;
-    };
-    img.src = 'Assets/model/MAHITO-PIXEL-SKIN.png?v=2';
-    _mahitoSkinImage = img;
-  }
-  return _mahitoSkinImage;
-}
-
-if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getMahitoSkinImage();
-}
-
 let _mahitoHairImage = null;
 let _mahitoHairImageLoading = false;
 

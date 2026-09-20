@@ -109,18 +109,19 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   // Movement & state flags
   const isPunching = (fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || fighter.isFlurrying;
   const isBasicAttacking = fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0;
+  const isUltSliding = Boolean(fighter.isUltSliding);
   const isChargingUlt = fighter.isChargingUlt || fighter.isFiringUlt;
-  const isAttacking = isPunching || isChargingUlt || isBasicAttacking;
+  const isAttacking = isPunching || isChargingUlt || isBasicAttacking || isUltSliding;
   const isMoving = Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5;
 
   ctx.save();
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.angle || 0);
   const facingLeft = Math.abs(angle) > Math.PI / 2;
 
   if (!isPreTranslated) {
     ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
-    // Rotate entire body circle based on movement or aiming direction
+    // Rotate body circle based on movement physics orientation (Rule #19 Front POV)
     ctx.rotate(angle);
     if (facingLeft) ctx.scale(1, -1);
   }
@@ -131,7 +132,7 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   const isDashing = fighter.isDashing;
   const isSelfDestructing = fighter.isSelfDestructing;
 
-  if ((isMoving || isDashing || isChargingUlt || isSelfDestructing) && !isLowQuality) {
+  if ((isMoving || isDashing || isChargingUlt || isSelfDestructing || isUltSliding) && !isLowQuality) {
     ctx.save();
     const auraColor = isSelfDestructing ? 'rgba(0, 229, 255, ' : 'rgba(255, 100, 0, ';
     const pulseR = r + 3 + Math.sin(now * 0.01) * 2.5;
@@ -164,6 +165,13 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   // 2b. AUTHENTIC HAIR OVERLAY (Assets/model/Genos-hair.png)
   // ─────────────────────────────────────────────
   _drawGenosHair(ctx, r, facingLeft);
+
+  // ─────────────────────────────────────────────
+  // 2c. STATUS OVERLAYS (HIT FLASH, BLEED, STUN, FREEZE, ETC.)
+  // ─────────────────────────────────────────────
+  if (typeof fighter.drawStatusOverlays === 'function') {
+    fighter.drawStatusOverlays(ctx, r);
+  }
 
   ctx.restore();
 }
@@ -328,163 +336,297 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
 /**
  * Hand Renderer for Genos — High-tech multi-layered mechanical arms with segmented armor,
  * panel lines, energy conduit grooves, joint bolts, and a glowing palm blast port cannon (Pixel Art).
+ * Implements the Mahoraga Kinematic Shoulder Anchor pattern (Rule #19 Front POV compliant).
+ */
+/**
+ * Hand Renderer for Genos — High-tech multi-layered mechanical arms with segmented armor,
+ * panel lines, energy conduit grooves, joint bolts, and a glowing palm blast port cannon (Pixel Art).
+ * Implements the Mahoraga Kinematic Shoulder Anchor pattern (Rule #19 Front POV compliant).
+ * Hands are anchored at the bottom sides of the tactical vest / clothes (y = +r * 0.45).
  */
 export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
-  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
-  if (isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands) return;
+  if ((typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands) return;
 
-  const isPunching = (fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || fighter.isFlurrying;
-  const isBasicAttacking = fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0;
-  const isChargingUlt = fighter.isChargingUlt || fighter.isFiringUlt;
-  const isSelfDestructing = fighter.isSelfDestructing;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const isFlurrying = !isPodiumPreview && Boolean(fighter.isFlurrying);
+  const isPunching = !isPodiumPreview && Boolean((fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || isFlurrying);
+  const isBasicAttacking = !isPodiumPreview && Boolean(fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0);
+  const isUltSliding = !isPodiumPreview && Boolean(fighter.isUltSliding);
+  const isChargingUlt = !isPodiumPreview && Boolean(fighter.isChargingUlt || fighter.isFiringUlt);
+  const isUltRecovering = !isPodiumPreview && Boolean(fighter.isUltRecovering);
+  const isSelfDestructing = !isPodiumPreview && Boolean(fighter.isSelfDestructing);
+
   const r = fighter.r || 25;
   const hr = Math.max(r * 0.32, getHandSize(7.5)); // hand radius
 
-  const isAttacking = isPunching || isChargingUlt || isBasicAttacking;
-  const isMoving = Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5;
+  const originX = isPreTranslated ? 0 : fighter.x;
+  const originY = isPreTranslated ? 0 : (fighter.y - (fighter.z || 0));
 
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const bodyAngle = isPodiumPreview ? 0 : (fighter.angle || 0);
+  const facingLeft = Math.abs(bodyAngle) > Math.PI / 2;
 
   ctx.save();
   if (!isPreTranslated) {
-    ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-    ctx.rotate(angle);
+    ctx.translate(originX, originY);
+    ctx.rotate(bodyAngle);
     if (facingLeft) ctx.scale(1, -1);
   }
 
-  // Butter-smooth punch animation using sinusoidal easing & arc curves
-  let rawProgress = 0;
-  if (isPunching) {
-    if (fighter.isFlurrying) {
-      // Flurry cycle is 5 frames. Use flurryTimer modulo 5.
-      const cycleFrame = (fighter.flurryTimer || 0) % 5;
-      rawProgress = cycleFrame / 5;
-    } else {
-      const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
-      rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-    }
-  }
-
-  // Butter-smooth sine-wave arc (0 -> 1 -> 0)
-  const easePunch = Math.sin(rawProgress * Math.PI);
-  const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
-
-  let leftHandX, leftHandY, rightHandX, rightHandY;
-  let hideLeft  = fighter.hideBackHand || fighter.hideLeftHand || (typeof state !== 'undefined' && state.showSkinOnly) || false;
-  let hideRight = fighter.hideFrontHand || fighter.hideRightHand || (typeof state !== 'undefined' && state.showSkinOnly) || false;
-
-  const isUltRecovering = fighter.isUltRecovering;
-
-  if (isChargingUlt) {
-    // Both palms brought forward together to form the dual-palm Incineration Cannon nozzle
-    leftHandX  = r * 0.95; leftHandY  = -r * 0.18;
-    rightHandX = r * 0.95; rightHandY =  r * 0.18;
-  } else if (isUltRecovering) {
-    // Smoothly ease hands from dual-palm nozzle position back to Mahoraga left/right guard stance
-    const recProgress = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.ultRecoveryTimer || 0) / 45)));
-    const ease = Math.sin(recProgress * Math.PI * 0.5); // Smooth ease-out curve
-    leftHandX  = (r * 0.95) - (r * 1.63) * ease; // smoothly eases from +0.95r back to -0.68r
-    leftHandY  = (-r * 0.18) + (r * 0.54) * ease; // smoothly eases from -0.18r back to +0.36r
-    rightHandX = (r * 0.95) - (r * 0.27) * ease; // smoothly eases from +0.95r back to +0.68r
-    rightHandY = (r * 0.18) + (r * 0.18) * ease; // smoothly settles at +0.36r
-  } else if (isPunching) {
-    if (fighter.isFlurrying) {
-      // Machine Gun Blows (Skill 1): Continuous high-speed alternating Gatling cybernetic fists from left and right flanks
-      const t = fighter.flurryTimer || 0;
-      const wave = Math.sin(t * Math.PI / 2.5); // Smooth 5-frame alternating cycle wave (-1 to +1)
-      
-      const rightReach = Math.max(0, wave);  // 0 -> 1 when Right arm punches
-      const leftReach  = Math.max(0, -wave); // 0 -> 1 when Left arm punches
-
-      leftHandX  = -r * 0.68 + leftReach * (r * 1.60);
-      leftHandY  = r * 0.36;
-
-      rightHandX = r * 0.68 + rightReach * (r * 1.60);
-      rightHandY = r * 0.36;
-    } else {
-      // Melee Punches: Alternating cybernetic punches in Mahoraga stance
-      if (fighter.isRightPunch) {
-        rightHandX = r * 0.68 + lungeExtension * 1.5;
-        rightHandY = r * 0.36 + Math.sin(rawProgress * Math.PI) * (r * 0.08);
-        leftHandX  = -r * 0.68 - easePunch * (r * 0.12);
-        leftHandY  = r * 0.36;
-      } else {
-        leftHandX  = -r * 0.68 + lungeExtension * 1.5;
-        leftHandY  = r * 0.36 - Math.sin(rawProgress * Math.PI) * (r * 0.08);
-        rightHandX = r * 0.68 - easePunch * (r * 0.12);
-        rightHandY = r * 0.36;
-      }
-    }
-  } else if (isBasicAttacking) {
-    // Basic Attack: Alternating Incineration Palms (Mahoraga Stance)
-    const blastMaxT = 30;
-    const blastProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.basicBlastAnimTimer / blastMaxT)));
-    const primaryLunge = Math.sin(blastProgress * Math.PI) * (r * 0.85);
-
-    if (fighter.isRightBlast) {
-      rightHandX = r * 0.68 + primaryLunge;
-      rightHandY = r * 0.36;
-      leftHandX  = -r * 0.68;
-      leftHandY  = r * 0.36;
-    } else {
-      leftHandX  = -r * 0.68 + primaryLunge;
-      leftHandY  = r * 0.36;
-      rightHandX = r * 0.68;
-      rightHandY = r * 0.36;
-    }
-  } else {
-    // Idle / Moving: Symmetrical Mahoraga martial arts fighting stance (Left hand on -X flank, Right hand on +X flank)
-    const now = Date.now();
-    const idleBob = Math.sin(now * 0.005) * (r * 0.03);
-    leftHandX  = -r * 0.68;
-    leftHandY  = r * 0.36 - idleBob;
-    rightHandX = r * 0.68;
-    rightHandY = r * 0.36 + idleBob;
-  }
+  // In upright Front POV, Left flank is at -X, Right flank is at +X
+  // Both hands are positioned at the bottom sides of his clothes/vest (y = +r * 0.45)
+  const customHands = (typeof state !== 'undefined' && state.skinCustomizations?.genos_hands) || {};
+  const handOffX = customHands.offsetX ?? 0;
+  const handOffY = customHands.offsetY ?? 0;
+  const baseLeftX  = -r * 0.75 + handOffX;
+  const baseRightX =  r * 0.75 + handOffX;
+  const baseHandY  =  r * 0.45 + handOffY; // POSITIVE Y = LOWER AT THE BOTTOM CLOTHES LEVEL
 
   const palmColor = isSelfDestructing ? '#FF2200' : '#FF5500';
 
-  const blastProgress = isBasicAttacking ? Math.min(1.0, Math.max(0.0, 1.0 - (fighter.basicBlastAnimTimer / 30))) : 0;
+  let hideLeft  = fighter.hideBackHand || fighter.hideLeftHand || false;
+  let hideRight = fighter.hideFrontHand || fighter.hideRightHand || false;
+
+  // Punch animation progress & sinusoidal easing matching Mahoraga / Saitama
+  let rawProgress = 0;
+  let easePunch = 0;
+  if (isPunching && !isFlurrying) {
+    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
+    rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+    if (rawProgress < 0.28) {
+      easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
+    } else {
+      const retractT = (rawProgress - 0.28) / 0.72;
+      easePunch = Math.cos(retractT * (Math.PI / 2));
+    }
+  }
+  const punchLunge = easePunch * (r * 1.25);
+
+  const blastMaxT = 30;
+  const blastProgress = isBasicAttacking ? Math.min(1.0, Math.max(0.0, 1.0 - (fighter.basicBlastAnimTimer / blastMaxT))) : 0;
+  const blastLunge = isBasicAttacking ? Math.sin(blastProgress * Math.PI) * (r * 0.85) : 0;
   const isLeftFiring  = isBasicAttacking && !fighter.isRightBlast;
   const isRightFiring = isBasicAttacking &&  fighter.isRightBlast;
 
-  // Punch glow intensity: peaks at sinusoidal mid-swing, active on punching arm ONLY when hitting an enemy target
-  let punchGlowRight = 0;
-  let punchGlowLeft  = 0;
-  if (isPunching) {
-    if (fighter.isFlurrying) {
-      const isHitConnected = (fighter._flurryHitConnectedTimer && fighter._flurryHitConnectedTimer > 0);
-      if (isHitConnected) {
-        const t = fighter.flurryTimer || 0;
-        const wave = Math.sin(t * Math.PI / 2.5);
-        punchGlowRight = Math.max(0, wave);
-        punchGlowLeft  = Math.max(0, -wave);
-      }
-    } else {
-      const isHitConnected = (fighter._basicHitConnectedTimer && fighter._basicHitConnectedTimer > 0);
-      if (isHitConnected) {
-        punchGlowRight =  fighter.isRightPunch ? easePunch : 0;
-        punchGlowLeft  = !fighter.isRightPunch ? easePunch : 0;
-      }
+  const isHitConnected = Boolean(fighter._basicHitConnectedTimer && fighter._basicHitConnectedTimer > 0);
+  const hitMult = isHitConnected ? 1.0 : 0.65;
+  const punchGlowRight = (isPunching && !isFlurrying && fighter.isRightPunch) ? easePunch * hitMult : 0;
+  const punchGlowLeft  = (isPunching && !isFlurrying && !fighter.isRightPunch) ? easePunch * hitMult : 0;
+
+  // ─────────────────────────────────────────────
+  // 1. ULTIMATE INCINERATION CANNON (DUAL-PALM NOZZLE)
+  // ─────────────────────────────────────────────
+  if (isChargingUlt || isUltSliding || isUltRecovering) {
+    // Bring both palms together in front at chest core height (y = r * 0.40)
+    const nozzleDist = r * 0.90;
+    const nozzleSep = r * 0.18;
+    const targetLeftX  = nozzleDist;
+    const targetLeftY  = r * 0.40 - nozzleSep;
+    const targetRightX = nozzleDist;
+    const targetRightY = r * 0.40 + nozzleSep;
+
+    let curLeftX = targetLeftX, curLeftY = targetLeftY;
+    let curRightX = targetRightX, curRightY = targetRightY;
+
+    if (isUltSliding) {
+      const slideMax = (typeof CONFIG !== 'undefined' && CONFIG.genos?.ultSlideFrames) || 22;
+      const slideProgress = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.ultSlideTimer || 0) / slideMax)));
+      const ease = Math.sin(slideProgress * Math.PI * 0.5);
+      curLeftX  = baseLeftX  + (targetLeftX  - baseLeftX)  * ease;
+      curLeftY  = baseHandY  + (targetLeftY  - baseHandY)  * ease;
+      curRightX = baseRightX + (targetRightX - baseRightX) * ease;
+      curRightY = baseHandY  + (targetRightY - baseHandY)  * ease;
+    } else if (isUltRecovering) {
+      const recProgress = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.ultRecoveryTimer || 0) / 45)));
+      const ease = Math.sin(recProgress * Math.PI * 0.5);
+      curLeftX  = targetLeftX  + (baseLeftX  - targetLeftX)  * ease;
+      curLeftY  = targetLeftY  + (baseHandY  - targetLeftY)  * ease;
+      curRightX = targetRightX + (baseRightX - targetRightX) * ease;
+      curRightY = targetRightY + (baseHandY  - targetRightY)  * ease;
     }
+
+    if (!hideLeft) {
+      _drawMechArm(ctx, curLeftX, curLeftY, hr, palmColor, true, isSelfDestructing, false, 0, 0, true);
+    }
+    if (!hideRight) {
+      _drawMechArm(ctx, curRightX, curRightY, hr, palmColor, true, isSelfDestructing, false, 0, 0, false);
+    }
+    ctx.restore();
+    return;
   }
 
-  if (!hideLeft)  _drawMechArm(ctx, leftHandX,  leftHandY,  hr, palmColor, isChargingUlt, isSelfDestructing, isLeftFiring,  blastProgress, punchGlowLeft, true);
-  if (!hideRight) _drawMechArm(ctx, rightHandX, rightHandY, hr, palmColor, isChargingUlt, isSelfDestructing, isRightFiring, blastProgress, punchGlowRight, false);
+  // ─────────────────────────────────────────────
+  // 2. MACHINE GUN BLOWS (DUAL-PISTON FLURRY)
+  // ─────────────────────────────────────────────
+  if (isFlurrying) {
+    const t = fighter.flurryTimer || 0;
+    const cycleFreq = (Math.PI * 2) / 6; // 6-frame harmonic cycle
+    const strokeLeft  = (1 - Math.cos(t * cycleFreq)) / 2;
+    const strokeRight = (1 + Math.cos(t * cycleFreq)) / 2;
+    const flurryLungeLeft  = strokeLeft  * (r * 1.35);
+    const flurryLungeRight = strokeRight * (r * 1.35);
 
-  if (typeof fighter.drawStatusOverlays === 'function') {
-    fighter.drawStatusOverlays(ctx, r);
+    const hitMultF = (fighter._flurryHitConnectedTimer && fighter._flurryHitConnectedTimer > 0) ? 1.0 : 0.65;
+    const glowL = strokeLeft  > 0.50 ? ((strokeLeft  - 0.50) / 0.50) * hitMultF : 0;
+    const glowR = strokeRight > 0.50 ? ((strokeRight - 0.50) / 0.50) * hitMultF : 0;
+
+    const curLeftX  = baseLeftX + flurryLungeLeft;
+    const curLeftY  = baseHandY;
+    const curRightX = baseRightX + flurryLungeRight;
+    const curRightY = baseHandY;
+
+    if (!hideLeft) {
+      _drawMechArm(ctx, curLeftX, curLeftY, hr, palmColor, false, isSelfDestructing, false, 0, glowL, true);
+    }
+    if (!hideRight) {
+      _drawMechArm(ctx, curRightX, curRightY, hr, palmColor, false, isSelfDestructing, false, 0, glowR, false);
+    }
+
+    // Ghost fist barrage (centered at chest height y = baseHandY)
+    if (!hideLeft && !hideRight) {
+      _drawGenosFlurryBarrage(ctx, r, hr, palmColor, t, baseHandY);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // ─────────────────────────────────────────────
+  // 3. MELEE PUNCH & BASIC BLAST & IDLE
+  // ─────────────────────────────────────────────
+  const now = Date.now();
+  const idleBob = isPodiumPreview ? 0 : Math.sin(now * 0.005) * (r * 0.03);
+
+  // Left Arm State
+  let leftLunge = 0;
+  let leftGlow = 0;
+  if (isPunching && !fighter.isRightPunch) {
+    leftLunge = punchLunge;
+    leftGlow = punchGlowLeft;
+  } else if (isBasicAttacking && !fighter.isRightBlast) {
+    leftLunge = blastLunge;
+  } else if (isPunching && fighter.isRightPunch) {
+    leftLunge = -easePunch * (r * 0.15); // Recoil back
+  }
+
+  // Right Arm State
+  let rightLunge = 0;
+  let rightGlow = 0;
+  if (isPunching && fighter.isRightPunch) {
+    rightLunge = punchLunge;
+    rightGlow = punchGlowRight;
+  } else if (isBasicAttacking && fighter.isRightBlast) {
+    rightLunge = blastLunge;
+  } else if (isPunching && !fighter.isRightPunch) {
+    rightLunge = -easePunch * (r * 0.15); // Recoil back
+  }
+
+  const curLeftX  = baseLeftX + leftLunge;
+  const curLeftY  = baseHandY - idleBob;
+  const curRightX = baseRightX + rightLunge;
+  const curRightY = baseHandY + idleBob;
+
+  if (!hideLeft) {
+    _drawMechArm(ctx, curLeftX, curLeftY, hr, palmColor, false, isSelfDestructing, isLeftFiring, blastProgress, leftGlow, true);
+  }
+  if (!hideRight) {
+    _drawMechArm(ctx, curRightX, curRightY, hr, palmColor, false, isSelfDestructing, isRightFiring, blastProgress, rightGlow, false);
   }
 
   ctx.restore();
 }
 
 /**
+ * Draws the optical illusion multi-fist barrage during Machine Gun Blows (Flurry).
+ */
+function _drawGenosFlurryBarrage(ctx, r, hr, palmColor, t, centerY = r * 0.45) {
+  const lanes = [
+    { y: centerY - r * 0.35, phase: 0.00, speedLineTheme: 'orange' },
+    { y: centerY - r * 0.12, phase: Math.PI * 0.65, speedLineTheme: 'solar' },
+    { y: centerY + r * 0.12, phase: Math.PI * 1.30, speedLineTheme: 'orange' },
+    { y: centerY + r * 0.35, phase: Math.PI * 1.95, speedLineTheme: 'solar' }
+  ];
+
+  const cycleFreq = (Math.PI * 2) / 6;
+
+  ctx.save();
+  for (let i = 0; i < lanes.length; i++) {
+    const lane = lanes[i];
+    const curPhase = t * cycleFreq + lane.phase;
+    const stroke = (1 - Math.cos(curPhase)) / 2; // 0.0 -> 1.0 -> 0.0
+    const forwardVel = Math.sin(curPhase); // > 0 moving forward
+
+    // Only render ghost fist when moving forward with high speed or near apex
+    if (stroke < 0.25 || forwardVel <= 0) continue;
+
+    const fistX = r * 0.25 + stroke * (r * 2.25);
+    const fistY = lane.y + Math.sin(curPhase * 0.5) * (r * 0.04);
+    const ghostAlpha = Math.min(0.60, Math.max(0.15, ((stroke - 0.25) / 0.75) * 0.60));
+
+    // 1. Draw supersonic 4-point needle speed lines behind ghost fist trailing along -X
+    const lineLen = r * 1.2 * stroke;
+    const startX = fistX - lineLen;
+    const halfW = hr * 0.35;
+    
+    ctx.fillStyle = lane.speedLineTheme === 'solar' ? 'rgba(255, 230, 0, 0.45)' : 'rgba(255, 85, 0, 0.45)';
+    ctx.beginPath();
+    ctx.moveTo(startX, fistY);
+    ctx.lineTo(fistX - hr * 0.4, fistY - halfW);
+    ctx.lineTo(fistX, fistY);
+    ctx.lineTo(fistX - hr * 0.4, fistY + halfW);
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Draw ghost mechanical arm fist in stepped pixel style
+    _drawGhostMechFist(ctx, fistX, fistY, hr * 0.88, ghostAlpha, palmColor);
+  }
+  ctx.restore();
+}
+
+/**
+ * Draws a single ghost cybernetic fist in authentic Pixel Art style for the flurry optical illusion.
+ */
+function _drawGhostMechFist(ctx, cx, cy, hr, alpha, palmColor) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const handX = snap(cx);
+  const handY = snap(cy);
+  const gridR = Math.max(P * 2, hr);
+  const steps = Math.ceil(gridR / P);
+
+  // Stepped Pixel Art Ghost Fist with fiery core
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > gridR) continue;
+
+      const px = snap(handX + rx);
+      const py = snap(handY + ry);
+
+      if (Math.hypot(rx + P, ry) > gridR || Math.hypot(rx - P, ry) > gridR || Math.hypot(rx, ry + P) > gridR || Math.hypot(rx, ry - P) > gridR) {
+        ctx.fillStyle = '#0D1117';
+      } else if (dist <= hr * 0.35) {
+        ctx.fillStyle = '#FFFFFF'; // Superheated core
+      } else if (dist <= hr * 0.65) {
+        ctx.fillStyle = '#FFE600'; // Solar yellow
+      } else {
+        ctx.fillStyle = '#FF5500'; // Incineration orange
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+  ctx.restore();
+}
+
+/**
  * Draws a single detailed high-tech mechanical arm / fist in authentic Pixel Art Style.
  * @param {number} punchGlow - 0..1 sinusoidal punch impact intensity for fire aura & speed lines
+ * @param {boolean} [isLeftHand=false] - Whether this is the left arm (framing the left flank)
  */
-function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructing, isFiringArm, blastProgress, punchGlow = 0) {
+function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructing, isFiringArm, blastProgress, punchGlow = 0, isLeftHand = false) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
@@ -522,10 +664,10 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
     }
   }
 
-  // ── 2. Directional Barrel Nozzle (Points towards +X aim target) ──
-  const nozzleW = snap(hr * 0.45);
-  const nozzleH = snap(hr * 0.60);
-  const nStartX = snap(handX + hr * 0.50);
+  // ── 2. Directional Barrel Nozzle (Forward Knuckle Guard facing +X) ──
+  const nozzleW = snap(hr * 0.40);
+  const nozzleH = snap(hr * 0.55);
+  const nStartX = snap(handX + hr * 0.40);
   const nStartY = snap(handY - nozzleH * 0.5);
 
   ctx.fillStyle = '#0D1117';
@@ -533,7 +675,8 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
   ctx.fillStyle = '#1C2530';
   ctx.fillRect(nStartX, nStartY, nozzleW, nozzleH);
   ctx.fillStyle = palmColor;
-  ctx.fillRect(nStartX + nozzleW, nStartY + P, P, nozzleH - P * 2);
+  const tipX = nStartX + nozzleW - P;
+  ctx.fillRect(tipX, nStartY + P, P, nozzleH - P * 2);
 
   // ── 3. Stepped 2D Cybernetic Fist Body ──
   for (let gy = -steps; gy <= steps; gy++) {
@@ -594,7 +737,7 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
   ctx.fillRect(snap(handX + hr * 0.35), snap(handY - hr * 0.30), P, P);
   ctx.fillRect(snap(handX), snap(handY + hr * 0.55), P, P);
 
-  // ── 5. Muzzle Flash Flare (When firing basic blast) ──
+  // ── 5. Muzzle Flash Flare (When firing basic blast forward along +X) ──
   if (isFiringArm && blastProgress > 0 && blastProgress < 0.6) {
     const flashScale = Math.sin((blastProgress / 0.6) * Math.PI);
     const flashR = snap(hr * 2.2 * flashScale);

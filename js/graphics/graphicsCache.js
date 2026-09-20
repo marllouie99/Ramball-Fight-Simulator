@@ -29,12 +29,10 @@ export function initGraphicsCache() {
     'Assets/model/Yuta-Pixel-Skin.png',
     'Assets/model/Yuta-hair.png',
     'Assets/model/Nanami-PIXEL-SKIN.png',
-    'Assets/model/MAHITO-PIXEL-SKIN.png',
-    'Assets/model/Yuji-PIXEL-SKIN.png',
+    'Assets/model/Mahito-hair.png',
     'Assets/model/Yuji-hair.png',
     'Assets/model/Uryu-ishida.png',
-    'Assets/model/ichigo-bankai-skin.png',
-    'Assets/model/ichigo-shikai-skin.png',
+    'Assets/model/ichigo-hair.png',
     'Assets/model/Nanami-weapon.png',
     'Assets/model/MAHITO-CLAWS-WEAPON.png',
     'Assets/model/UlquiorraCifer-weapon.png',
@@ -49,7 +47,8 @@ export function initGraphicsCache() {
     'Assets/Overlays/gojo-domainexpansion.png',
     'Assets/Overlays/Yuta-domain-overlay.png',
     'Assets/Overlays/Toji-ultimate-overlay.png',
-    'Assets/Overlays/CJ-baguvix-overlay.png'
+    'Assets/Overlays/CJ-baguvix-overlay.png',
+    'Assets/Overlays/Nanami-overtime-overlay.png'
   ];
   models.forEach(preloadImage);
 }
