@@ -74,11 +74,11 @@ export class GenosFighter extends Fighter {
     this.maxHeatAmmo = CONFIG.genos?.maxHeatAmmo || 20;
     this.heatAmmo = this.maxHeatAmmo;
     this.isMeleeStance = false;
+    this.isMeleeWallDashing = false;
     this.meleeDashCount = 0; // Track thruster dashes performed during Melee Mode
     this.ammoReloadMax = CONFIG.genos?.ammoReloadFrames || 500;
     this.ammoReloadTimer = 0;
     this.meleeDashDelayTimer = 0; // Delay frames between Melee Mode thruster dashes
-    this.isMeleeDashNext = true; // Alternating state machine: DASH -> REBOUNCE -> DASH -> REBOUNCE
     this._lastWallBounceFrame = 0;
     this.speedBoostTimer = 0; // High-speed thruster dash timer
     this.dashSoundCooldownTimer = 0; // Cooldown timer for genos-dash-noise.mp3
@@ -203,12 +203,92 @@ export class GenosFighter extends Fighter {
     super.reset();
     const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 1200);
     this.flurryCooldown = initFlurryCD;
+    this.isMeleeStance = false;
+    this.isMeleeWallDashing = false;
+    this.heatAmmo = this.maxHeatAmmo;
+    this.ammoReloadTimer = 0;
+    this.meleeDashCount = 0;
+    this.speedBoostTimer = 0;
     if (this.flurryTarget) {
       this.flurryTarget.caughtInGenosFlurry = false;
     }
     if (typeof state !== 'undefined') {
       if (state.fighters) state.fighters.forEach(f => { if (f) f.caughtInGenosFlurry = false; });
       if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.caughtInGenosFlurry = false; });
+    }
+  }
+
+  /**
+   * Resolves arena boundary collisions.
+   * During Melee Mode (heatAmmo <= 0 / isMeleeStance), Genos ignites his rocket thrusters
+   * upon colliding with any arena wall and dashes explosively towards his enemy!
+   */
+  resolveWallBounce(arena, opponent) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
+    if (!arena) return false;
+
+    // Rule 1.2: Mandatory stasis guards
+    if (this.isCaughtInBeam?.() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
+      return super.resolveWallBounce(arena, opponent);
+    }
+
+    const bounced = super.resolveWallBounce(arena, opponent);
+    if (bounced && (this.isMeleeStance || (this.heatAmmo !== undefined && this.heatAmmo <= 0)) && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering && !this.isFlurrying && !this.isSelfDestructing && !this.isSelfDestructRecovering) {
+      const target = opponent || this._findClosestEnemy();
+      this.triggerMeleeWallDash(target);
+    }
+    return bounced;
+  }
+
+  /**
+   * Triggers an explosive cybernetic rocket thruster dash towards the target on wall rebound.
+   */
+  triggerMeleeWallDash(target) {
+    let dirX, dirY, dashAngle;
+    if (target && target.hp > 0 && typeof target.x === 'number') {
+      const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+      const genosY = this.y - (this.z || 0);
+      const dx = target.x - this.x;
+      const dy = targetY - genosY;
+      const dist = Math.hypot(dx, dy) || 1;
+      dirX = dx / dist;
+      dirY = dy / dist;
+      dashAngle = Math.atan2(dy, dx);
+    } else {
+      dashAngle = Math.atan2(this.vy, this.vx);
+      dirX = Math.cos(dashAngle);
+      dirY = Math.sin(dashAngle);
+    }
+
+    this.meleeDashCount = (this.meleeDashCount || 0) + 1;
+    this.isMeleeWallDashing = true;
+
+    const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+    const baseSpd = this.baseSpeed || this.moveSpeed || 5.2;
+    const speedMult = CONFIG.genos?.dashes?.meleeThrusterDash?.speedMultiplier ?? 3.4;
+    this.speed = baseSpd * modeMult * speedMult;
+    this.speedBoostTimer = CONFIG.genos?.dashes?.meleeThrusterDash?.durationFrames ?? 18;
+
+    this.vx = dirX * this.speed;
+    this.vy = dirY * this.speed;
+    this.gunAngle = dashAngle;
+    this.angle = dashAngle;
+
+    if (CONFIG.genos?.dashSoundEnabled !== false && (this.dashSoundCooldownTimer || 0) <= 0) {
+      const dashSrc = CONFIG.genos?.dashSound || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3';
+      const dashVol = CONFIG.genos?.dashSoundVolume ?? 1.8;
+      audioSystem.playSFX(dashSrc, dashVol);
+      this.dashSoundCooldownTimer = CONFIG.genos?.dashSoundCooldownFrames ?? 180;
+    } else {
+      audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.9);
+    }
+
+    if (typeof spawnGenosThrusterDashVisual === 'function') {
+      spawnGenosThrusterDashVisual(this.x, this.y, dashAngle);
+    } else if (typeof spawnSparks === 'function') {
+      const backX = this.x - dirX * (this.r + 5);
+      const backY = this.y - dirY * (this.r + 5);
+      spawnSparks(backX, backY, 8, 'orange');
     }
   }
 
@@ -1350,6 +1430,7 @@ export class GenosFighter extends Fighter {
     if (this.speedBoostTimer > 0) {
       this.speedBoostTimer--;
       if (this.speedBoostTimer <= 0) {
+        this.isMeleeWallDashing = false;
         const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
         this.speed = (this.baseSpeed || 5.2) * modeMult;
       }
@@ -1645,7 +1726,7 @@ export class GenosFighter extends Fighter {
         this.isUltRecovering = false;
         this.isDashing = false;
         this.isMeleeStance = false;
-        this.isMeleeDashNext = false;
+        this.isMeleeWallDashing = false;
         this.meleeDashCount = 0;
         this.speedBoostTimer = 0;
         this._justEnteredMeleeStance = false;
@@ -1845,89 +1926,7 @@ export class GenosFighter extends Fighter {
       return;
     }
 
-    // ── MELEE MODE ALTERNATING CADENCE: DASH -- REBOUNCE -- DASH -- REBOUNCE ──
-    const canAct = !this.hitStunTimer || this.hitStunTimer <= 0;
-    if (canAct && opponent && opponent.hp > 0 && this.isMeleeStance && !this.isDashing && !this.isFlurrying && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
-      const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-      const meleeReach = this.r + (opponent.r || 25) + 30; // ~75-85px melee punch range
-
-      if (dist > meleeReach) {
-        const activeArena = arena || CONFIG.arena;
-        const eps = 6.0;
-        const wallBounced = activeArena ? (
-          (this.x - this.r <= activeArena.x + eps) ||
-          (this.x + this.r >= activeArena.x + activeArena.width - eps) ||
-          (this.y - this.r <= activeArena.y + eps) ||
-          (this.y + this.r >= activeArena.y + activeArena.height - eps)
-        ) : false;
-
-        const currentFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : Date.now();
-        const canTriggerWallBounce = (currentFrame - (this._lastWallBounceFrame || 0)) > 12;
-
-        if (this._justEnteredMeleeStance || (wallBounced && canTriggerWallBounce)) {
-          this._lastWallBounceFrame = currentFrame;
-
-          const maxDashes = CONFIG.genos?.maxMeleeDashes || 10;
-          if ((this._justEnteredMeleeStance || this.isMeleeDashNext) && (this.meleeDashCount || 0) < maxDashes) {
-            // ── DASH PHASE: Launch explosive high-speed thruster dash burst towards enemy ──
-            this.meleeDashCount = (this.meleeDashCount || 0) + 1;
-            this._justEnteredMeleeStance = false;
-            this.isMeleeDashNext = false; // Next wall impact will be a REBOUNCE!
-            this.isDashing = true;
-
-            const dirX = (opponent.x - this.x) / dist;
-            const dirY = (opponent.y - this.y) / dist;
-            
-            // Boost this.speed during melee thruster dash
-            const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
-            const baseSpd = this.baseSpeed || 5.2;
-            const speedMult = CONFIG.genos?.dashes?.meleeThrusterDash?.speedMultiplier ?? 3.4;
-            this.speed = baseSpd * modeMult * speedMult;
-            this.speedBoostTimer = CONFIG.genos?.dashes?.meleeThrusterDash?.durationFrames ?? 18;
-
-            this.vx = dirX * this.speed;
-            this.vy = dirY * this.speed;
-
-            if (CONFIG.genos?.dashSoundEnabled !== false && this.dashSoundCooldownTimer <= 0) {
-              const dashSrc = CONFIG.genos?.dashSound || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3';
-              const dashVol = CONFIG.genos?.dashSoundVolume ?? 1.8;
-              audioSystem.playSFX(dashSrc, dashVol);
-              this.dashSoundCooldownTimer = CONFIG.genos?.dashSoundCooldownFrames ?? 180;
-            } else {
-              audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.9);
-            }
-            if (typeof spawnGenosThrusterDashVisual === 'function') {
-              spawnGenosThrusterDashVisual(this.x, this.y, Math.atan2(dirY, dirX));
-            } else if (typeof spawnSparks === 'function') {
-              const backX = this.x - dirX * (this.r + 5);
-              const backY = this.y - dirY * (this.r + 5);
-              spawnSparks(backX, backY, 8, 'orange');
-            }
-          } else {
-            // ── REBOUNCE / MAX DASH LIMIT REACHED PHASE ──
-            if ((this.meleeDashCount || 0) < maxDashes) {
-              this.isMeleeDashNext = true; // Next wall impact will be a DASH!
-            } else {
-              this.isMeleeDashNext = false; // Cap of 5 dashes reached! No more thruster dashes in this Melee Mode instance.
-              this._justEnteredMeleeStance = false;
-            }
-            this.speedBoostTimer = 0;
-            this.isDashing = false;
-            const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
-            this.speed = (this.baseSpeed || 5.2) * modeMult;
-
-            if (typeof spawnImpactFlash === 'function') {
-              spawnImpactFlash(this.x, this.y, 25, '#FF8800');
-            }
-            if (typeof spawnSparks === 'function') {
-              spawnSparks(this.x, this.y, 6, 'orange');
-            }
-          }
-        }
-      }
-    }
-
-    // Call base physics & movement (handles position update & arena wall rebounce!)
+    // Call base physics & movement (handles position update & arena wall rebounce via resolveWallBounce!)
     super.update(opponent, ownerIndex, arena);
 
     // ── Movement-driven body rotation ──
@@ -1948,6 +1947,7 @@ export class GenosFighter extends Fighter {
         this.ammoReloadTimer--;
         if (this.ammoReloadTimer <= 0) {
           this.isMeleeStance = false;
+          this.isMeleeWallDashing = false;
           this.meleeDashCount = 0;
           this.heatAmmo = this.maxHeatAmmo;
           if (typeof spawnFloatingText === 'function') {
