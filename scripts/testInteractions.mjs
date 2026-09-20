@@ -476,9 +476,34 @@ async function runInteractionTests() {
     assert(finisherReach === 206, `Divine Sword Escanor finisher reach should be 206px (scaled by colossal size 40px) (got ${finisherReach})`);
     assert(sunshineHeatRadius > 0, `Sunshine heat aura radius must scale dynamically (got ${sunshineHeatRadius})`);
 
+    // ── Escanor Committed Aim Lock Test (Rule 1.4) ──
+    escanor.reset();
+    const movingTarget = { x: escanor.x + 80, y: escanor.y, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, isDead: false, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
+    escanor._startRhittaChop(movingTarget);
+    assert(escanor.chopCastAngle !== undefined, 'Escanor must snapshot chopCastAngle upon lifting weapon');
+    assert(Math.abs(escanor.chopCastAngle - 0) < 0.001, `Escanor chopCastAngle should be 0 (got ${escanor.chopCastAngle})`);
+    assert(escanor.canAim() === false, 'canAim() must be false during Rhitta chop windup/swing');
+
+    // Target moves to the opposite side (behind Escanor)
+    movingTarget.x = escanor.x - 80;
+    movingTarget.y = escanor.y;
+    escanor.aim(movingTarget);
+    assert(Math.abs(escanor.gunAngle - 0) < 0.001, `Escanor gunAngle must remain locked to committed direction (0) during lift (got ${escanor.gunAngle})`);
+
+    // Advance through lift and hold frames
+    escanor.update(movingTarget, 1, state.arena);
+    assert(Math.abs(escanor.gunAngle - 0) < 0.001, `Escanor gunAngle must not snap or track target during update (got ${escanor.gunAngle})`);
+
+    // Hit-pause lock
+    escanor.chopHitPauseTimer = 8;
+    escanor.chopHitPauseMax = 10;
+    assert(escanor.canAim() === false, 'canAim() must be false during chopHitPause');
+    escanor.aim(movingTarget);
+    assert(Math.abs(escanor.gunAngle - 0) < 0.001, `Escanor gunAngle must remain locked during chopHitPause (got ${escanor.gunAngle})`);
+
     // Clean up
     projectileSystem.projectiles = [];
-    console.log('      ✅ Escanor complete immunity to pull/pushback, dynamic DEF, size growth, and weapon reach scaling verified.');
+    console.log('      ✅ Escanor complete immunity to pull/pushback, dynamic DEF, size growth, weapon reach, and Rule 1.4 committed aim lock verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

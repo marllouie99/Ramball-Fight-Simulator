@@ -46,6 +46,10 @@ export class EscanorFighter extends Fighter {
     this.baseRadius = def?.radius || cfg.radius || 32;
     this.r = this.baseRadius;
 
+    // Rule 1.4 Committed Aim & Smooth Turn Rate
+    this.chopCastAngle = undefined;
+    this.aimTurnRate = (typeof cfg.aimTurnRate === 'number') ? cfg.aimTurnRate : 0.12;
+
     // Animation & State Timers
     this.slashSwingTimer = 0;
     this.slashSwingMaxTimer = 20;
@@ -135,8 +139,10 @@ export class EscanorFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     this.baseDefense = cfg.defense ?? 0.20;
     this.defense = this.baseDefense;
-    this.baseRadius = cfg.radius || 28;
+    this.baseRadius = cfg.radius || 32;
     this.r = this.baseRadius;
+    this.aimTurnRate = (typeof cfg.aimTurnRate === 'number') ? cfg.aimTurnRate : 0.12;
+    this.chopCastAngle = undefined;
     this.isImmuneToBurn = true;
     this.burnTimer = 0;
     this.burnDamageTimer = 0;
@@ -169,19 +175,32 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
-   * Locks aim direction only during the chop STRIKE & RECOVERY phases.
-   * During lift and hold, Escanor actively tracks the target.
-   * Once the axe comes down, he's committed — making the attack missable.
+   * Rule 1.4 Aim Validation Guard:
+   * Disables auto-aim tracking during the entire Rhitta Chop sequence
+   * (overhead lift, poised hold, strike, impact hit-pause, and recovery).
+   */
+  canAim() {
+    if (this.slashSwingTimer > 0 || (this.chopHitPauseTimer || 0) > 0) {
+      return false;
+    }
+    return super.canAim ? super.canAim() : true;
+  }
+
+  /**
+   * Rule 1.4 Continuous 360° Committed Aim Lock:
+   * Locks aim direction strictly to the initial committed cast angle for the entire chop sequence.
+   * Escanor commits to 1 direction upon lifting the weapon, with ZERO auto-aim snapping upon release.
    */
   aim(target) {
-    if (!target) return;
-    if (this.slashSwingTimer > 0) {
-      const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.escanor?.chopStrikeFrames || 20);
-      const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 50);
-      // Lock aim only once we're past the hold phase and actively striking down / recovering
-      if (this.slashSwingTimer <= strikeFrames + recFrames) return;
+    if (this.slashSwingTimer > 0 || (this.chopHitPauseTimer || 0) > 0) {
+      if (this.chopCastAngle !== undefined) {
+        this.gunAngle = this.chopCastAngle;
+        this.angle = this.chopCastAngle;
+      }
+      return false;
     }
-    super.aim(target);
+    if (!target) return false;
+    return super.aim(target);
   }
 
   /**
@@ -343,7 +362,7 @@ export class EscanorFighter extends Fighter {
   }
 
   canPerformBasicAttack() {
-    if ((this.chopHitPauseTimer || 0) > 0) return false;
+    if ((this.chopHitPauseTimer || 0) > 0 || (this.slashSwingTimer || 0) > 0) return false;
     return super.canPerformBasicAttack();
   }
 
@@ -366,7 +385,7 @@ export class EscanorFighter extends Fighter {
    * Strictly verifies melee range so Escanor never chops when out of range!
    */
   shoot(ownerIndex) {
-    if (!this.canPerformBasicAttack() || this.chopHitPauseTimer > 0) return false;
+    if (!this.canPerformBasicAttack() || this.chopHitPauseTimer > 0 || this.slashSwingTimer > 0) return false;
     const target = this.getNearestTarget(null);
     if (!target) return false;
 
@@ -374,7 +393,6 @@ export class EscanorFighter extends Fighter {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
     if (dist <= reach && this.shootCooldown <= 0 && this.slashSwingTimer <= 0) {
-      this.aim(target);
       this._startRhittaChop(target);
       return true;
     }
@@ -403,6 +421,12 @@ export class EscanorFighter extends Fighter {
       const impactFrame = this.slashSwingImpactTimer || 12;
       this.slashSwingTimer = impactFrame;
 
+      // Hold committed cast angle firmly during hit-pause
+      if (this.chopCastAngle !== undefined) {
+        this.gunAngle = this.chopCastAngle;
+        this.angle = this.chopCastAngle;
+      }
+
       // On pause completion (the unpause release moment): blast enemy backwards with knockback & screen shake!
       if (this.chopHitPauseTimer === 0) {
         const unpauseShake = (cfg.basicUnpauseShake || 10.0) * (this.isTheOneActive ? 1.5 : 1.0);
@@ -419,8 +443,10 @@ export class EscanorFighter extends Fighter {
           target._knockedBackByEscanorBasicAttack = true;
           target._escanorAttacker = this;
 
-          // Apply physical knockback push upon unpause
-          const knockbackAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
+          // Apply physical knockback push upon unpause along committed chop angle
+          const knockbackAngle = (this.chopCastAngle !== undefined)
+            ? this.chopCastAngle
+            : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
           const prideMult = 1.0 + (this.prideStacks * (cfg.prideStackDamageBonus || 0.08)) + (this.isTheOneActive ? 0.45 : 0);
           const baseKnockback = (cfg.basicKnockback || 24.0) * (this.isTheOneActive ? 1.6 : 1.0) * prideMult;
 
@@ -480,6 +506,14 @@ export class EscanorFighter extends Fighter {
     // Centralized Movement & Physics (Rule 1.1)
     super.update(opponent, ownerIndex, arena);
 
+    // Rule 1.4: Lock facing direction strictly to committed chopCastAngle during weapon swing / recovery
+    if (this.slashSwingTimer > 0 || (this.chopHitPauseTimer || 0) > 0) {
+      if (this.chopCastAngle !== undefined) {
+        this.gunAngle = this.chopCastAngle;
+        this.angle = this.chopCastAngle;
+      }
+    }
+
     // Dynamically scale physical body radius as Escanor grows with Solar Pride & "THE ONE"
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const sizeGrowth = this.isTheOneActive
@@ -532,8 +566,8 @@ export class EscanorFighter extends Fighter {
     // AI & Combat Execution
     const target = this.getNearestTarget(opponent);
 
-    // Actively track target facing direction while winding up/poised in overhead stance
-    if (target && this.slashSwingTimer > 0) {
+    // Aim smoothly at target only when NOT swinging or hit-pausing (Rule 1.4)
+    if (target && this.slashSwingTimer <= 0 && (!this.chopHitPauseTimer || this.chopHitPauseTimer <= 0)) {
       this.aim(target);
     }
 
@@ -608,7 +642,9 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
-   * Initiates the 4-Stage Divine Axe Rhitta Overhead Lift, Poised Hold & Chop (Missable)
+   * Initiates the 4-Stage Divine Axe Rhitta Overhead Lift, Poised Hold & Chop (Missable).
+   * Snapshots and commits to the initial 360° cast angle upon lifting the weapon (Rule 1.4).
+   * Guarantees zero auto-aim tracking or snapping throughout the entire lift, poised hold, strike, and recovery.
    */
   _startRhittaChop(target) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
@@ -626,6 +662,22 @@ export class EscanorFighter extends Fighter {
     this.slashSwingMaxTimer = totalFrames;
     this.slashSwingTimer = totalFrames;
 
+    // Snapshot and lock initial committed aim angle (Rule 1.4)
+    let castAngle;
+    if (target) {
+      const targetZ = target.z || 0;
+      const myZ = this.z || 0;
+      castAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
+    } else {
+      castAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    }
+    while (castAngle > Math.PI) castAngle -= Math.PI * 2;
+    while (castAngle < -Math.PI) castAngle += Math.PI * 2;
+
+    this.chopCastAngle = castAngle;
+    this.gunAngle = castAngle;
+    this.angle = castAngle;
+
     // Downward chop impact lands exactly upon strike completion at the transition to recovery:
     this.slashSwingImpactTimer = recFrames;
     this._chopHitDelivered = false;
@@ -637,22 +689,21 @@ export class EscanorFighter extends Fighter {
       this.applySlow(liftFrames + holdFrames, 0.3); // 30% speed while winding up
     }
 
-    if (target) {
-      this.aim(target);
-    }
-
     try {
       audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/swordswing.mp3', this.x, this.y, 0.85);
     } catch (e) {}
   }
 
   /**
-   * Resolves Hit Detection at the Downward Chop Impact Frame (Frame 10 of 20)
+   * Resolves Hit Detection at the Downward Chop Impact Frame.
+   * Hit detection evaluates strictly along the committed chop angle (this.chopCastAngle).
    * If opponent stepped away, dashed, or dodged out of the cone during windup, IT MISSES!
    * On hit: applies instant hit-pause freeze, shockwave, and queues massive knockback for unpause.
    */
   _executeRhittaChopHit() {
-    const aimAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
+    const aimAngle = (this.chopCastAngle !== undefined)
+      ? this.chopCastAngle
+      : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
     const arc = CONFIG.escanor?.rhittaArcAngle || (Math.PI * 0.778); // ~140 deg
     const reach = this.currentRhittaReach;
 
@@ -943,9 +994,23 @@ export class EscanorFighter extends Fighter {
     this.theOneFinisherUsed = true;
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this._chopHitDelivered = true;
-    this.aim(target);
 
-    const aimAngle = this.gunAngle || 0;
+    let castAngle;
+    if (target) {
+      const targetZ = target.z || 0;
+      const myZ = this.z || 0;
+      castAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
+    } else {
+      castAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    }
+    while (castAngle > Math.PI) castAngle -= Math.PI * 2;
+    while (castAngle < -Math.PI) castAngle += Math.PI * 2;
+
+    this.chopCastAngle = castAngle;
+    this.gunAngle = castAngle;
+    this.angle = castAngle;
+
+    const aimAngle = castAngle;
     const reach = this.currentFinisherReach;
     const dmg = CONFIG.escanor?.theOneFinisherDamage || 115;
     const kb = CONFIG.escanor?.theOneFinisherKnockback || 42.0;
@@ -1060,6 +1125,7 @@ export class EscanorFighter extends Fighter {
     super.interruptAttacks(forceCancelAll);
     this.slashSwingTimer = 0;
     this.punchAnimTimer = 0;
+    this.chopCastAngle = undefined;
     this._chopHitDelivered = true;
     this._chopHitConnected = false;
     if (this.chopHitPauseTarget) {

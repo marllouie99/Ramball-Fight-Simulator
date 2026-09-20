@@ -9,6 +9,7 @@ export const escanorConfig = {
   maxHpRatio: 1.0,
   speed: 5.7,
   moveSpeed: 5.0,
+  aimTurnRate: 0.12,            // Dignified heavy turn rate (~6.9°/frame) when acquiring new targets
   r: 32,
   radius: 32,
   theOneRadiusBonus: 8,         // Physical body size expansion during "THE ONE" (+8px radius -> 40px)
