@@ -64,6 +64,11 @@ export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple')
     return true;
   }
 
+  // Genos Ultimate Beam hyper-armor / immovable stance
+  if ((entity.characterId === 'genos' || entity.type === 'genos') && (entity.isChargingUlt || entity.isFiringUlt)) {
+    return true;
+  }
+
   // Saitama Serious Skill Counter charging/striking hyper-armor
   const isSaitama = (entity.characterId === 'saitama' || entity.type === 'saitama');
   if (isSaitama && (entity.isCountering || (entity._counterPunchTimer && entity._counterPunchTimer > 0) || (entity._counterWindupTimer && entity._counterWindupTimer > 0) || (entity._postCounterRecoveryTimer && entity._postCounterRecoveryTimer > 0))) {

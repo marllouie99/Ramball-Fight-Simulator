@@ -428,8 +428,11 @@ export function resolveFighterCollision(a, b) {
   const aIsEscanor = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor' || a.immuneToKnockback || a.immuneToPush));
   const bIsEscanor = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor' || b.immuneToKnockback || b.immuneToPush));
 
-  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor;
-  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor;
+  const aIsGenosBeam = Boolean(a && (a.characterId === 'genos' || a.type === 'genos') && (a.isFiringUlt || a.isChargingUlt));
+  const bIsGenosBeam = Boolean(b && (b.characterId === 'genos' || b.type === 'genos') && (b.isFiringUlt || b.isChargingUlt));
+
+  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor;
+  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor;
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -483,38 +486,42 @@ export function resolveFighterCollision(a, b) {
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
   if (!a.isTurret && !a.isDispenser) {
-    // Fighters in melee mode, rage, active Infinity, or counter-lock ignore the bounce impulse so they hold their ground
-    // When bouncing off an immovable entity (e.g. counter lock or turret), the mobile entity does not damp the bounce
-    if (a.isMeleeMode) {
+    // Fighters in melee mode, rage, active Infinity, counter-lock, or Genos ultimate beam ignore bounce impulse so they hold their ground
+    // When bouncing off an immovable entity (e.g. counter lock, Genos beam, or turret), the mobile entity does not damp the bounce
+    if (a.isMeleeMode || aIsGenosBeam) {
       a.vx = 0;
       a.vy = 0;
       a.knockbackVx = 0;
       a.knockbackVy = 0;
-    } else if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked) {
+    } else if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked && !aIsEscanor) {
       const mult = bIsImmovable ? 2.0 : 1.0;
       a.vx -= (impulse * mult * nx + randA * impulse * tx);
       a.vy -= (impulse * mult * ny + randA * impulse * ty);
       a.normalizeSpeed();
-    } else if (aIsCounterLocked) {
+    } else if (aIsCounterLocked || aIsEscanor) {
       a.vx = 0;
       a.vy = 0;
+      a.knockbackVx = 0;
+      a.knockbackVy = 0;
     }
   }
   
   if (!b.isTurret && !b.isDispenser) {
-    if (b.isMeleeMode) {
+    if (b.isMeleeMode || bIsGenosBeam) {
       b.vx = 0;
       b.vy = 0;
       b.knockbackVx = 0;
       b.knockbackVy = 0;
-    } else if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked) {
+    } else if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked && !bIsEscanor) {
       const mult = aIsImmovable ? 2.0 : 1.0;
       b.vx += (impulse * mult * nx + randB * impulse * tx);
       b.vy += (impulse * mult * ny + randB * impulse * ty);
       b.normalizeSpeed();
-    } else if (bIsCounterLocked) {
+    } else if (bIsCounterLocked || bIsEscanor) {
       b.vx = 0;
       b.vy = 0;
+      b.knockbackVx = 0;
+      b.knockbackVy = 0;
     }
   }
 }

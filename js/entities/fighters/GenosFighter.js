@@ -209,6 +209,9 @@ export class GenosFighter extends Fighter {
     this.ammoReloadTimer = 0;
     this.meleeDashCount = 0;
     this.speedBoostTimer = 0;
+    this.immuneToPush = false;
+    this.immuneToKnockback = false;
+    this.immuneToPull = false;
     if (this.flurryTarget) {
       this.flurryTarget.caughtInGenosFlurry = false;
     }
@@ -670,6 +673,15 @@ export class GenosFighter extends Fighter {
     ctx.restore();
   }
 
+  applyKnockback(vx, vy, opts = 0) {
+    if (this.isChargingUlt || this.isFiringUlt || this.immuneToKnockback || this.immuneToPush) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    super.applyKnockback(vx, vy, opts);
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     // 1. Invulnerable / Intangible during post-explosion piece reassembly
     if (this.isSelfDestructRecovering) {
@@ -1075,6 +1087,9 @@ export class GenosFighter extends Fighter {
       this.isChargingUlt = false;
       this.isFiringUlt = false;
       this.ultTimer = 0;
+      this.immuneToPush = false;
+      this.immuneToKnockback = false;
+      this.immuneToPull = false;
     }
     if (this.flurryTarget) {
       this.flurryTarget.caughtInGenosFlurry = false;
@@ -1132,6 +1147,13 @@ export class GenosFighter extends Fighter {
     this.isDashing = false;
     this.speedBoostTimer = 0;
     this.isChargingUlt = true;
+    this.immuneToPush = true;
+    this.immuneToKnockback = true;
+    this.immuneToPull = true;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
     this.ultTimer = CONFIG.genos?.ultWindupFrames || 60;
     this.ultCooldown = CONFIG.genos?.ultCooldown || 1680;
 
@@ -1522,6 +1544,11 @@ export class GenosFighter extends Fighter {
       this.ultTimer--;
       this.vx = 0;
       this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.immuneToPush = true;
+      this.immuneToKnockback = true;
+      this.immuneToPull = true;
 
       // Strictly lock aim to the committed ultAngle upon casting; NO auto-aim tracking or snapping to moving targets!
       if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
@@ -1538,6 +1565,13 @@ export class GenosFighter extends Fighter {
       if (this.ultTimer <= 0) {
         this.isChargingUlt = false;
         this.isFiringUlt = true;
+        this.immuneToPush = true;
+        this.immuneToKnockback = true;
+        this.immuneToPull = true;
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
         this.ultTimer = CONFIG.genos?.ultDurationFrames || 120;
         const blastShake = CONFIG.genos?.ultBlastShakeIntensity ?? 6.0;
         if (blastShake > 0) {
@@ -1556,6 +1590,11 @@ export class GenosFighter extends Fighter {
       this.ultTimer--;
       this.vx = 0;
       this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.immuneToPush = true;
+      this.immuneToKnockback = true;
+      this.immuneToPull = true;
       // Strictly lock facing angle during beam fire (no rotating, no auto-aim snapping)
       if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
         this.gunAngle = this.ultAngle;
@@ -1677,6 +1716,9 @@ export class GenosFighter extends Fighter {
       if (this.ultTimer <= 0) {
         this.isFiringUlt = false;
         this.isUltRecovering = true;
+        this.immuneToPush = false;
+        this.immuneToKnockback = false;
+        this.immuneToPull = false;
         this.ultRecoveryTimer = CONFIG.genos?.ultRecoveryFrames || 45; // ~0.75 seconds of recovery (repositioning hands & smoking)
         if (CONFIG.genos?.ultRecoveryEnabled !== false) {
           const recSrc = CONFIG.genos?.ultRecoverySound || 'Assets/Sound Effects/Skills/genos-recovery.mp3';

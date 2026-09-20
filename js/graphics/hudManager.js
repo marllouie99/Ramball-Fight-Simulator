@@ -2521,7 +2521,12 @@ function updateHealthHud() {
         const bar = memberEl.querySelector('.health-card__bar');
         const starsContainer = memberEl.querySelector('.hud-cj-stars');
         const moneyTextEl = memberEl.querySelector('.hud-cj-money-text');
-        const infoContainer = memberEl.querySelector('.health-card__info');
+        const weaponIconEl = memberEl.querySelector('.hud-cj-weapon-icon');
+        const weaponAmmoEl = memberEl.querySelector('.hud-cj-weapon-ammo');
+        const clockTextEl = memberEl.querySelector('.hud-cj-clock-text');
+        const armorFillEl = memberEl.querySelector('.hud-cj-armor-fill');
+        const skillsContainer = memberEl.querySelector('.health-card__skills');
+        const infoContainer = memberEl.querySelector('.health-card__info') || oppCardElement.querySelector('.health-card__info');
         const skillBars = new Map();
         memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
           const id = box.getAttribute('data-skill-id');
@@ -2529,7 +2534,11 @@ function updateHealthHud() {
           const textEl = box.querySelector('.hud-skill-box-text');
           skillBars.set(id, { box, fill: fillEl, text: textEl });
         });
-        cachedOppMembers.push({ fill, text, bar, starsContainer, moneyTextEl, lastMoneyText: '', lastStarCount: -1, infoContainer, skillBars, fighter: oppMembers[i], lastInfoHTML: '' });
+        cachedOppMembers.push({
+          fill, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
+          lastMoneyText: '', lastStarCount: -1, lastWeaponIcon: '', lastWeaponAmmo: '', lastClockText: '',
+          infoContainer, skillsContainer, skillBars, fighter: oppMembers[i], lastInfoHTML: ''
+        });
       });
 
       _hudCache.teams.set(1, {
@@ -2580,6 +2589,7 @@ function updateHealthHud() {
           const clockTextEl = memberEl.querySelector('.hud-cj-clock-text');
           const armorFillEl = memberEl.querySelector('.hud-cj-armor-fill');
           const skillsContainer = memberEl.querySelector('.health-card__skills');
+          const infoContainer = memberEl.querySelector('.health-card__info') || cardElement.querySelector('.health-card__info');
           const skillBars = new Map();
           memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
             const id = box.getAttribute('data-skill-id');

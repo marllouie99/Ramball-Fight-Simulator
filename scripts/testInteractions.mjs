@@ -517,6 +517,63 @@ async function runInteractionTests() {
     console.log('      ✅ Escanor complete immunity to pull/pushback, dynamic DEF, size growth, weapon reach, smooth lifting auto-aim, and committed strike lock verified.');
   }
 
+  // ── 11. Testing Genos Spiral Incineration Cannon Push Immunity ──
+  {
+    console.log('   11. Testing Genos Spiral Incineration Cannon: Physical Push & Collision Immunity...');
+    const genos = new FIGHTER_CLASS_MAP.genos({ radius: 25, x: 270, y: 480, hp: 320, color: '#FF5500' });
+    const saitama = new FIGHTER_CLASS_MAP.saitama({ radius: 25, x: 270, y: 520, hp: 350, color: '#FFD700' });
+    state.fighters = [genos, saitama];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+
+    // 1. Initial State - Normal knockback applies
+    genos.applyKnockback(10, -10);
+    assert(genos.knockbackVx === 10 && genos.knockbackVy === -10, 'Genos should take knockback in normal state');
+    genos.knockbackVx = 0; genos.knockbackVy = 0; genos.vx = 0; genos.vy = 0;
+
+    // 2. Ultimate Charging State - Knockback & Push are completely ignored
+    genos.ultCooldown = 0;
+    genos.executeSpiralIncinerationCannon(saitama);
+    assert(genos.isChargingUlt === true, 'Genos must be charging ultimate');
+    assert(genos.immuneToPush === true, 'Genos must have immuneToPush=true while charging ult');
+    assert(genos.immuneToKnockback === true, 'Genos must have immuneToKnockback=true while charging ult');
+
+    genos.applyKnockback(25, 25);
+    assert(genos.knockbackVx === 0 && genos.knockbackVy === 0, 'Genos must ignore applyKnockback while charging ult');
+    assert(genos.vx === 0 && genos.vy === 0, 'Genos vx and vy must stay 0 while charging ult');
+
+    // Test physics collision separation: Genos stays stationary, Saitama is pushed away
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+    const initialX = genos.x;
+    const initialY = genos.y;
+    resolveFighterCollision(genos, saitama, 10, 0, 1, -1, 0, true, false);
+    assert(genos.x === initialX && genos.y === initialY, `Genos x/y must remain unchanged during collision (got ${genos.x}, ${genos.y}, expected ${initialX}, ${initialY})`);
+    assert(saitama.y > 520, 'Colliding enemy must be pushed away while Genos remains immovable anchor');
+
+    // 3. Ultimate Firing State - Knockback & Push are completely ignored
+    genos.ultTimer = 1;
+    genos.update(saitama, 0, state.arena); // triggers transition to isFiringUlt
+    assert(genos.isFiringUlt === true, 'Genos must be firing ultimate');
+    assert(genos.immuneToPush === true, 'Genos must have immuneToPush=true while firing ult');
+    assert(genos.immuneToKnockback === true, 'Genos must have immuneToKnockback=true while firing ult');
+
+    genos.applyKnockback(-50, -50);
+    assert(genos.knockbackVx === 0 && genos.knockbackVy === 0, 'Genos must ignore applyKnockback while firing ult');
+    assert(genos.vx === 0 && genos.vy === 0, 'Genos vx/vy must remain 0 while firing ult');
+
+    const { isEntityImmuneToGravitationalPull } = await import('../js/entities/fighter.js');
+    assert(isEntityImmuneToGravitationalPull(genos, 'purple') === true, 'Genos must be immune to gravitational pull during ult beam');
+    assert(isEntityImmuneToGravitationalPull(genos, 'blue') === true, 'Genos must be immune to blue suction during ult beam');
+
+    // 4. Post-Ult Recovery - Immunity clears cleanly
+    genos.ultTimer = 0;
+    genos.update(saitama, 0, state.arena);
+    assert(genos.isFiringUlt === false, 'isFiringUlt must end');
+    assert(genos.immuneToPush === false, 'immuneToPush must reset after ult beam completes');
+    assert(genos.immuneToKnockback === false, 'immuneToKnockback must reset after ult beam completes');
+
+    console.log('      ✅ Genos physical push & knockback immunity during ultimate beam verified.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

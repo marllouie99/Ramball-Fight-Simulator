@@ -644,7 +644,7 @@ export const CONFIG = {
 
     // Ultimate: Storm
     stormCooldown: 900,    // 15 seconds
-    stormDuration: 130,    // 3 seconds
+    stormDuration: 300,    // 3 seconds
     stormStrikesPerSec: 3, // Per enemy
     stormStrikeDamage: 35,
 
