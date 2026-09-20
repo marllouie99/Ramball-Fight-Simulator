@@ -547,7 +547,7 @@ export class EscanorFighter extends Fighter {
     // Cleaver / Axe Swing Timer & Downward Chop Hit Delivery
     if (this.slashSwingTimer > 0) {
       this.slashSwingTimer--;
-      const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 50);
+      const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 24);
       const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.escanor?.chopStrikeFrames || 15);
       
       // When Escanor releases his attack, snapshot its world origin & cast angle so the effect stays anchored in the air
@@ -707,7 +707,7 @@ export class EscanorFighter extends Fighter {
     const liftFrames = (typeof cfg.chopLiftFrames === 'number') ? cfg.chopLiftFrames : 80;
     const holdFrames = (typeof cfg.chopLiftHoldFrames === 'number') ? cfg.chopLiftHoldFrames : 100;
     const strikeFrames = (typeof cfg.chopStrikeFrames === 'number') ? cfg.chopStrikeFrames : 15;
-    const recFrames = (typeof cfg.chopRecoveryFrames === 'number') ? cfg.chopRecoveryFrames : 50;
+    const recFrames = (typeof cfg.chopRecoveryFrames === 'number') ? cfg.chopRecoveryFrames : 24;
 
     this.chopLiftFrames = liftFrames;
     this.chopLiftHoldFrames = holdFrames;

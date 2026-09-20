@@ -720,7 +720,7 @@ export function _getEscanorChopAnimationState(fighter) {
   const liftFrames = (typeof fighter.chopLiftFrames === 'number') ? fighter.chopLiftFrames : ((typeof cfg.chopLiftFrames === 'number') ? cfg.chopLiftFrames : 8);
   const holdFrames = (typeof fighter.chopLiftHoldFrames === 'number') ? fighter.chopLiftHoldFrames : ((typeof cfg.chopLiftHoldFrames === 'number') ? cfg.chopLiftHoldFrames : 20);
   const strikeFrames = (typeof fighter.chopStrikeFrames === 'number') ? fighter.chopStrikeFrames : ((typeof cfg.chopStrikeFrames === 'number') ? cfg.chopStrikeFrames : 8);
-  const recFrames = (typeof fighter.chopRecoveryFrames === 'number') ? fighter.chopRecoveryFrames : ((typeof cfg.chopRecoveryFrames === 'number') ? cfg.chopRecoveryFrames : 12);
+  const recFrames = (typeof fighter.chopRecoveryFrames === 'number') ? fighter.chopRecoveryFrames : ((typeof cfg.chopRecoveryFrames === 'number') ? cfg.chopRecoveryFrames : 24);
   const totalFrames = fighter.slashSwingMaxTimer || (liftFrames + holdFrames + strikeFrames + recFrames);
 
   const elapsed = Math.max(0, totalFrames - fighter.slashSwingTimer);
