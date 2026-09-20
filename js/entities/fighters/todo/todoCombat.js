@@ -100,11 +100,11 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
 
   // Apply velocity pushback impulse & universal physics knockback only if attack wasn't blocked by Infinity
   if (didDamage !== false) {
-    target.vx += Math.cos(angle) * knockback;
-    target.vy += Math.sin(angle) * knockback;
-
     if (typeof target.applyKnockback === 'function') {
       target.applyKnockback(Math.cos(angle) * knockback, Math.sin(angle) * knockback);
+    } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+      target.vx += Math.cos(angle) * knockback;
+      target.vy += Math.sin(angle) * knockback;
     }
   }
 

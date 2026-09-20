@@ -1027,9 +1027,7 @@ class ProjectileSystem {
           
           // Apply burn effect to targets hit by Fuga
           if (typeof f.applyBurn === 'function') {
-            f.burnTimer = CONFIG.sukuna?.divineFlameBurnDuration || (CONFIG.orange && CONFIG.orange.burnDuration) || 180;
-            f.burnDamageTimer = 0;
-            f.lastBurnAttacker = attacker;
+            f.applyBurn(attacker, CONFIG.sukuna?.divineFlameBurnDuration || (CONFIG.orange && CONFIG.orange.burnDuration) || 180);
           }
           
           // 3. Blast off target with strong outward kinetic blast knockback

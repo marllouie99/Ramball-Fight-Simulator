@@ -357,6 +357,130 @@ async function runInteractionTests() {
     console.log('      ✅ Gojo Blue gravitational pull and attack interrupt verified without errors.');
   }
 
+  // ── TEST 10: Escanor Solar Poise & Pull / Pushback / Knockback Immunity ──
+  console.log('   10. Testing Escanor Solar Poise: Complete Immunity to Pull, Pushback & Vortex Suction...');
+  {
+    const EscanorClass = FIGHTER_CLASS_MAP['escanor'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+    const { GojoBlueBehavior } = await import('../js/systems/projectiles/behaviors/GojoBlueBehavior.js');
+    const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+    const { isEntityImmuneToGravitationalPull } = await import('../js/entities/fighter.js');
+
+    const escanor = new EscanorClass({ x: 230, y: 300, color: '#FFB800', controls: {} });
+    const gojo = new GojoClass({ x: 100, y: 300, color: '#00F3FF', controls: {} });
+    const saitama = new SaitamaClass({ x: 100, y: 300, color: '#FFD700', controls: {} });
+
+    state.fighters = [gojo, escanor];
+    state.illusions = [];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    projectileSystem.projectiles = [];
+
+    // 1. Universal Gravity Immunity Helper check
+    assert(isEntityImmuneToGravitationalPull(escanor, 'blue') === true, 'Escanor must be immune to Blue gravity');
+    assert(isEntityImmuneToGravitationalPull(escanor, 'purple') === true, 'Escanor must be immune to Purple gravity');
+    assert(isEntityImmuneToGravitationalPull(escanor, 'black_hole') === true, 'Escanor must be immune to Black Hole gravity');
+
+    // 2. Gojo Blue Vortex Pull
+    projectileSystem.fireGojoBlue(gojo, 0, 20, 200, 300, 0);
+    const blue = projectileSystem.projectiles[0];
+    const initialEscanorX = escanor.x;
+    new GojoBlueBehavior().update(blue, state.fighters, projectileSystem);
+    assert(escanor.x === initialEscanorX, `Escanor must NOT be pulled toward Blue vortex (x stayed ${escanor.x})`);
+
+    // 3. Gojo Purple Vortex Pull
+    projectileSystem.projectiles = [];
+    GojoPurpleBehavior.spawn(projectileSystem, 200, 300, 0, 0, 70, 0, 150, { fighter: gojo });
+    const purple = projectileSystem.projectiles[0];
+    new GojoPurpleBehavior().update(purple, state.fighters, projectileSystem);
+    assert(escanor.x === initialEscanorX, `Escanor must NOT be pulled toward Purple vortex (x stayed ${escanor.x})`);
+
+    // 4. Knockback & Red Knockback Immunity
+    escanor.applyKnockback(100, -50);
+    assert(escanor.knockbackVx === 0 && escanor.knockbackVy === 0, 'Escanor knockbackVx/Vy must remain 0 after applyKnockback');
+
+    escanor.applyRedKnockback(100, -50);
+    assert(escanor.knockbackVx === 0 && escanor.knockbackVy === 0, 'Escanor knockbackVx/Vy must remain 0 after applyRedKnockback');
+
+    // 5. Saitama Basic Punch Knockback & Wall Pin Immunity
+    saitama.shoot(0);
+    escanor.update(saitama, 1, state.arena);
+    assert(escanor.isWallPinnedBySaitama !== true, 'Escanor must not be wall pinned by Saitama');
+    assert(escanor.knockbackVx === 0 && escanor.knockbackVy === 0, 'Escanor knockback must be 0');
+
+    // 6. Solar Armor & Holy Knight DEF Damage Mitigation
+    escanor.reset();
+    escanor.hp = 390;
+    escanor.maxHp = 390;
+    escanor.prideStacks = 0;
+    escanor.isTheOneActive = false;
+
+    // Base DEF: 20% reduction (100 damage -> 80 damage taken)
+    const initialHp = escanor.hp;
+    escanor.takeDamage(100, gojo, {});
+    const damageTakenBase = initialHp - escanor.hp;
+    assert(Math.round(damageTakenBase) === 80, `Base DEF should mitigate 20% damage (expected 80 taken, got ${damageTakenBase})`);
+
+    // Solar Pride DEF: 5 stacks = +10% DEF (30% total reduction, 100 damage -> 70 taken)
+    escanor.hp = 390;
+    escanor.prideStacks = 5;
+    escanor.takeDamage(100, gojo, {});
+    const damageTakenPride = 390 - escanor.hp;
+    assert(Math.round(damageTakenPride) === 70, `5 Pride stacks should mitigate 30% damage (expected 70 taken, got ${damageTakenPride})`);
+
+    // "THE ONE" DEF: 5 stacks + The One (+25%) = 55% total reduction (100 damage -> 45 taken)
+    escanor.hp = 390;
+    escanor.prideStacks = 5;
+    escanor.isTheOneActive = true;
+    escanor.takeDamage(100, gojo, {});
+    const damageTakenTheOne = 390 - escanor.hp;
+    assert(Math.round(damageTakenTheOne) === 45, `"THE ONE" should mitigate 55% damage (expected 45 taken, got ${damageTakenTheOne})`);
+
+    // True Damage bypasses DEF
+    escanor.hp = 390;
+    escanor.takeDamage(100, gojo, { isTrueDamage: true });
+    const damageTakenTrue = 390 - escanor.hp;
+    assert(Math.round(damageTakenTrue) === 100, `True Damage must bypass DEF (expected 100 taken, got ${damageTakenTrue})`);
+
+    // ── Escanor Size Growth & Dynamic Weapon Attack Range Scaling Test ──
+    escanor.reset();
+    escanor.prideStacks = 0;
+    escanor.isTheOneActive = false;
+    escanor.update(gojo, 1, state.arena);
+    const baseReach = escanor.currentRhittaReach;
+    const baseR = escanor.r;
+    assert(baseReach === 100, `Base Rhitta reach should be 100px (got ${baseReach})`);
+    assert(baseR === 28, `Base radius should be 28px (got ${baseR})`);
+
+    // Escanor grows with Solar Pride stacks
+    escanor.prideStacks = 5;
+    escanor.update(gojo, 1, state.arena);
+    const prideReach = escanor.currentRhittaReach;
+    const prideR = escanor.r;
+    assert(prideReach === 153, `Rhitta reach with 5 pride stacks should be 153px (scaled by size 33px) (got ${prideReach})`);
+    assert(prideR === 33, `Radius with 5 pride stacks should be 33px (+5px radius) (got ${prideR})`);
+
+    // Escanor grows to colossal size in "THE ONE"
+    escanor.isTheOneActive = true;
+    escanor.theOneTimer = 480;
+    escanor.update(gojo, 1, state.arena);
+    const theOneReach = escanor.currentRhittaReach;
+    const theOneR = escanor.r;
+    const finisherReach = escanor.currentFinisherReach;
+    const sunshineHeatRadius = escanor.currentSunshineHeatRadius;
+    assert(theOneReach === 188, `Rhitta reach during "THE ONE" should be 188px (scaled by colossal size 34px) (got ${theOneReach})`);
+    assert(theOneR === 34, `Radius during "THE ONE" should be 34px (+6px radius) (got ${theOneR})`);
+    assert(finisherReach === 200, `Divine Sword Escanor finisher reach should be 200px (scaled by colossal size 34px) (got ${finisherReach})`);
+    assert(sunshineHeatRadius > 0, `Sunshine heat aura radius must scale dynamically (got ${sunshineHeatRadius})`);
+
+    // Clean up
+    projectileSystem.projectiles = [];
+    console.log('      ✅ Escanor complete immunity to pull/pushback, dynamic DEF, size growth, and weapon reach scaling verified.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

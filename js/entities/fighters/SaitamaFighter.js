@@ -1154,11 +1154,14 @@ export class SaitamaFighter extends Fighter {
           const kx = Math.cos(pushAngle) * knockbackForce;
           const ky = Math.sin(pushAngle) * knockbackForce;
           
-          target._knockedBackBySaitamaBasicPunch = true;
-          target.preventKnockbackBounce = true;
-          target.isWallPinnedBySaitama = true;
-          target.vx = kx;
-          target.vy = ky;
+          const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+          if (!isTargetImmune) {
+            target._knockedBackBySaitamaBasicPunch = true;
+            target.preventKnockbackBounce = true;
+            target.isWallPinnedBySaitama = true;
+            target.vx = kx;
+            target.vy = ky;
+          }
           if (typeof target.applyKnockback === 'function') {
             target.applyKnockback(kx, ky);
           }
@@ -1241,11 +1244,14 @@ export class SaitamaFighter extends Fighter {
             // Directional knockback push pinning them backward along punch trajectory
             const colKx = Math.cos(pushAngle) * (knockbackForce * 1.05);
             const colKy = Math.sin(pushAngle) * (knockbackForce * 1.05);
-            enemy._knockedBackBySaitamaBasicPunch = true;
-            enemy.preventKnockbackBounce = true;
-            enemy.isWallPinnedBySaitama = true;
-            enemy.vx = colKx;
-            enemy.vy = colKy;
+            const isEnemyImmune = Boolean(enemy && (enemy.characterId === 'escanor' || enemy.type === 'escanor' || enemy.immuneToKnockback || enemy.immuneToPush));
+            if (!isEnemyImmune) {
+              enemy._knockedBackBySaitamaBasicPunch = true;
+              enemy.preventKnockbackBounce = true;
+              enemy.isWallPinnedBySaitama = true;
+              enemy.vx = colKx;
+              enemy.vy = colKy;
+            }
             if (typeof enemy.applyKnockback === 'function') {
               enemy.applyKnockback(colKx, colKy);
             }
@@ -1828,12 +1834,15 @@ export class SaitamaFighter extends Fighter {
         const knockbackForce = CONFIG.saitama?.punchKnockback || 100;
         const kx = Math.cos(aimAngle) * knockbackForce;
         const ky = Math.sin(aimAngle) * knockbackForce;
-        target._knockedBackBySaitamaBasicPunch = true;
-        target.preventKnockbackBounce = true; // Pin and stick target to wall for 1 second on wall impact instead of bouncing!
-        target.isWallPinnedBySaitama = true;
+        const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+        if (!isTargetImmune) {
+          target._knockedBackBySaitamaBasicPunch = true;
+          target.preventKnockbackBounce = true; // Pin and stick target to wall for 1 second on wall impact instead of bouncing!
+          target.isWallPinnedBySaitama = true;
+        }
         if (typeof target.applyKnockback === 'function') {
           target.applyKnockback(kx, ky);
-        } else {
+        } else if (!isTargetImmune) {
           target.knockbackVx = kx;
           target.knockbackVy = ky;
           target.vx = kx;
@@ -2343,11 +2352,14 @@ export class SaitamaFighter extends Fighter {
                   const knockbackForce = CONFIG.saitama?.flurryFinalSlamKnockback || 65;
                   const kx = Math.cos(aimAngle) * knockbackForce;
                   const ky = Math.sin(aimAngle) * knockbackForce;
-                  target._knockedBackBySaitamaBasicPunch = true;
-                  target.preventKnockbackBounce = true;
-                  target.isWallPinnedBySaitama = true;
-                  target.vx = kx;
-                  target.vy = ky;
+                  const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+                  if (!isTargetImmune) {
+                    target._knockedBackBySaitamaBasicPunch = true;
+                    target.preventKnockbackBounce = true;
+                    target.isWallPinnedBySaitama = true;
+                    target.vx = kx;
+                    target.vy = ky;
+                  }
                   if (typeof target.applyKnockback === 'function') {
                     target.applyKnockback(kx, ky);
                   }
@@ -2378,9 +2390,12 @@ export class SaitamaFighter extends Fighter {
                   undodgeable: true
                 });
 
-                const pushPerHit = CONFIG.saitama?.flurryPushbackPerHit || 7.0;
-                target.x += Math.cos(aimAngle) * pushPerHit;
-                target.y += Math.sin(aimAngle) * pushPerHit;
+                const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+                if (!isTargetImmune) {
+                  const pushPerHit = CONFIG.saitama?.flurryPushbackPerHit || 7.0;
+                  target.x += Math.cos(aimAngle) * pushPerHit;
+                  target.y += Math.sin(aimAngle) * pushPerHit;
+                }
 
                 // Mandatory arena boundary clamp to strictly prevent enemies from clipping outside the arena
                 if (arena) {

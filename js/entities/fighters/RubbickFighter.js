@@ -687,7 +687,7 @@ export class RubbickFighter extends Fighter {
         }
 
         const startPush = Number(CONFIG.laser.initialKnockback) || 0;
-        if (startPush !== 0) {
+        if (startPush !== 0 && !target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
           target.vx += (dx / dist) * startPush;
           target.vy += (dy / dist) * startPush;
         }
@@ -707,7 +707,7 @@ export class RubbickFighter extends Fighter {
       const applied = target.takeDamage(CONFIG.laser.tickDamage * dmgMulti, this, { isProjectile: true, isLaser: true });
       if (applied) {
         const pushStrength = Number(CONFIG.laser.initialKnockback) || 0;
-        if (pushStrength !== 0) {
+        if (pushStrength !== 0 && !target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
           target.vx += (dx / dist) * pushStrength;
           target.vy += (dy / dist) * pushStrength;
         }
@@ -1160,8 +1160,10 @@ export class RubbickFighter extends Fighter {
       const dx = this.tkTargetLastX !== undefined ? nextX - this.tkTargetLastX : 0;
       const dy = this.tkTargetLastY !== undefined ? nextY - this.tkTargetLastY : 0;
 
-      this.tkTarget.x = nextX;
-      this.tkTarget.y = nextY;
+      if (!this.tkTarget.immuneToPull && !this.tkTarget.immuneToPush && this.tkTarget.characterId !== 'escanor') {
+        this.tkTarget.x = nextX;
+        this.tkTarget.y = nextY;
+      }
       
       this.tkTargetLastX = nextX;
       this.tkTargetLastY = nextY;

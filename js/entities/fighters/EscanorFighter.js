@@ -17,7 +17,7 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawEscanorSkin } from '../../graphics/fighters/escanorSkin.js';
-import { drawCruelSunOrb, drawPrideFlareShockwave } from '../../graphics/weapons/escanorWeaponGraphics.js';
+import { drawCruelSunOrb, drawPrideFlareShockwave, drawDivineSwordEscanorBlade } from '../../graphics/weapons/escanorWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -41,6 +41,10 @@ export class EscanorFighter extends Fighter {
       this.maxHp = Math.round((def?.hp || 390) * (MODE_HP_MULTIPLIER[state.mode] || 1));
     }
     this.hp = this.maxHp;
+
+    // Body size & growth scaling
+    this.baseRadius = def?.radius || cfg.radius || 28;
+    this.r = this.baseRadius;
 
     // Animation & State Timers
     this.slashSwingTimer = 0;
@@ -79,6 +83,26 @@ export class EscanorFighter extends Fighter {
     this.theOneTimer = 0;
     this.theOneMaxTimer = cfg.theOneDuration || 480;
     this.theOneFinisherUsed = false;
+    this.divineSwordActiveTimer = 0;
+    this.divineSwordMaxTimer = 24;
+    this.divineSwordAngle = 0;
+    this.divineSwordReach = 160;
+
+    // Unshakable Solar Poise: Immune to all pull / pushback / knockback mechanics from enemies
+    this.immuneToKnockback = true;
+    this.immuneToPush = true;
+    this.immuneToPull = true;
+    this.gojoBlueDragImmune = true;
+
+    // Solar Lord: Complete Burn Status & Fire Immunity
+    this.isImmuneToBurn = true;
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
+
+    // Solar Armor & Holy Knight DEF stats
+    this.baseDefense = cfg.defense ?? 0.20;
+    this.defense = this.baseDefense;
+    this._lastArmorDeflectTime = 0;
 
     // Declarative Skill Registration
     this.skillManager.registerSkills([
@@ -104,6 +128,37 @@ export class EscanorFighter extends Fighter {
         cooldownMaxKey: 'theOneCooldownMax'
       }
     ]);
+  }
+
+  reset() {
+    super.reset();
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    this.baseDefense = cfg.defense ?? 0.20;
+    this.defense = this.baseDefense;
+    this.baseRadius = cfg.radius || 28;
+    this.r = this.baseRadius;
+    this.isImmuneToBurn = true;
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
+    this.divineSwordActiveTimer = 0;
+    this._lastArmorDeflectTime = 0;
+    this.immuneToKnockback = true;
+    this.immuneToPush = true;
+    this.immuneToPull = true;
+    this.gojoBlueDragImmune = true;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.slashSwingTimer = 0;
+    this._chopHitDelivered = true;
+    this.chopHitPauseTimer = 0;
+    this.chopHitPauseMax = 0;
+    this.chopHitPauseTarget = null;
+    this.prideStacks = 0;
+    this.prideChargeTimer = 0;
+    this.isTheOneActive = false;
+    this.theOneTimer = 0;
+    this.theOneFinisherUsed = false;
+    this.activeCruelSuns = [];
   }
 
   /**
@@ -140,15 +195,22 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
-   * Super Armor: Immune to all pushback / knockback attacks while lifting Divine Axe Rhitta
+   * Super Armor / Solar Poise: Immune to all pushback / knockback attacks from enemies
    */
   applyKnockback(vx, vy, stunFrames = 0) {
-    if (this.isLiftingWeapon() || (this.chopHitPauseTimer || 0) > 0) {
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      return; // Completely immune to pushback while lifting weapon!
-    }
-    super.applyKnockback(vx, vy, stunFrames);
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    // Escanor is completely immune to any pull/push back mechanics coming from enemies
+    return;
+  }
+
+  /**
+   * Super Armor / Solar Poise: Immune to Gojo Red explosive knockback
+   */
+  applyRedKnockback(vx, vy) {
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    return;
   }
 
   /**
@@ -159,6 +221,125 @@ export class EscanorFighter extends Fighter {
       return; // Unwavering solar poise
     }
     super.applyHitStun(duration, opts);
+  }
+
+  /**
+   * Dynamic Defense (DEF) Calculation:
+   * Combines base Holy Armor DEF + Solar Pride escalation + "THE ONE" invincible state + Rhitta lifting poise.
+   * @returns {number} Fraction of damage mitigated (e.g. 0.20 = 20% DEF)
+   */
+  get currentDefense() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const baseDef = cfg.defense ?? 0.20;
+    const prideDef = (this.prideStacks || 0) * (cfg.prideDefBonusPerStack ?? 0.02);
+    const theOneDef = this.isTheOneActive ? (cfg.theOneDefenseBonus ?? 0.25) : 0;
+    const liftingDef = this.isLiftingWeapon() ? (cfg.liftingDefenseBonus ?? 0.15) : 0;
+
+    let totalDef = Math.min(0.85, baseDef + prideDef + theOneDef + liftingDef);
+
+    // Nanami's 7:3 Ratio armor fracture weakens active defense
+    if (this.nanamiArmorFractureTimer > 0) {
+      totalDef = Math.max(0, totalDef - (this.nanamiArmorFractureAmount || 0.20));
+    }
+
+    return totalDef;
+  }
+
+  /**
+   * Dynamic Weapon Attack Range / Reach Calculation:
+   * Scales dynamically as Escanor grows in size with Solar Pride escalation and "THE ONE" High Noon state.
+   * Directly incorporates physical size scaling (this.r / baseRadius) so that when Escanor gets big,
+   * his weapon attack range increases proportionally.
+   * @returns {number} Current reach in pixels
+   */
+  get currentRhittaReach() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const baseReach = cfg.rhittaReach || 100;
+    const baseRadius = this.baseRadius || cfg.radius || 28;
+    const currentRadius = this.r || baseRadius;
+    const sizeScale = currentRadius / baseRadius;
+
+    if (this.isTheOneActive) {
+      const theOneMult = cfg.theOneReachMultiplier || 1.55;
+      return Math.round(baseReach * theOneMult * sizeScale);
+    }
+
+    const prideBonus = (this.prideStacks || 0) * (cfg.prideReachBonusPerStack || 0.06);
+    return Math.round(baseReach * (1.0 + prideBonus) * sizeScale);
+  }
+
+  /**
+   * Dynamic Finisher Reach for Divine Sword Escanor during "THE ONE".
+   * Scales dynamically with Escanor's enlarged physical body radius.
+   * @returns {number}
+   */
+  get currentFinisherReach() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const baseFinisherReach = cfg.theOneFinisherReach || 165;
+    const baseRadius = this.baseRadius || cfg.radius || 28;
+    const currentRadius = this.r || baseRadius;
+    const sizeScale = currentRadius / baseRadius;
+    return Math.round(baseFinisherReach * sizeScale);
+  }
+
+  /**
+   * Dynamic Sunshine Heat Aura Radius:
+   * Driven by CONFIG.escanor.sunshineHeatRadius and scaled with body size and "THE ONE".
+   * @returns {number}
+   */
+  get currentSunshineHeatRadius() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const baseRadius = (typeof cfg.sunshineHeatRadius === 'number') ? cfg.sunshineHeatRadius : 200;
+    const bodyBaseRadius = this.baseRadius || cfg.radius || 28;
+    const sizeScale = (this.r || bodyBaseRadius) / bodyBaseRadius;
+    const theOneMult = this.isTheOneActive ? 1.35 : 1.0;
+    return Math.round(baseRadius * sizeScale * theOneMult);
+  }
+
+  /**
+   * Solar Armor & Holy Knight DEF Damage Mitigation
+   */
+  takeDamage(amount, attacker, opts = {}) {
+    // Escanor is the Master of the Sun / Grace "Sunshine" and is completely immune to burn/fire ticks
+    if (opts.isBurn) {
+      return 0;
+    }
+
+    if (opts.isHeal || amount < 0) {
+      return super.takeDamage(amount, attacker, opts);
+    }
+
+    const isTrueDamage = Boolean(opts && (opts.isTrueDamage || opts.isRatioCrit || opts.isPureUnscaled));
+    let finalAmount = amount;
+
+    // ── SOLAR ARMOR & HOLY KNIGHT DEFENSE (DEF STATS) ──
+    if (!isTrueDamage) {
+      const totalDef = this.currentDefense;
+      finalAmount = Math.max(1, amount * (1.0 - totalDef));
+
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+      if (cfg.armorDeflectSparks !== false && finalAmount < amount) {
+        const now = Date.now();
+        if (!this._lastArmorDeflectTime || now - this._lastArmorDeflectTime > 180) {
+          this._lastArmorDeflectTime = now;
+          spawnSparks(this.x, this.y - (this.z || 0), 6, 'gold', '#F59E0B');
+          spawnSparks(this.x, this.y - (this.z || 0), 4, 'silverStreak', '#FBBF24');
+          try {
+            audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.35);
+          } catch (e) {}
+        }
+      }
+    }
+
+    return super.takeDamage(finalAmount, attacker, opts);
+  }
+
+  /**
+   * Complete Burn Immunity: Escanor embodies the blazing solar heat of Grace "Sunshine"
+   */
+  applyBurn(attacker, duration) {
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
   }
 
   canPerformBasicAttack() {
@@ -189,7 +370,7 @@ export class EscanorFighter extends Fighter {
     const target = this.getNearestTarget(null);
     if (!target) return false;
 
-    const reach = (CONFIG.escanor?.rhittaReach || 100) + (target.r || 25);
+    const reach = (this.r || 25) + this.currentRhittaReach + (target.r || 25);
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
     if (dist <= reach && this.shootCooldown <= 0 && this.slashSwingTimer <= 0) {
@@ -279,14 +460,32 @@ export class EscanorFighter extends Fighter {
       return; // Freeze Escanor's actions during the hit-pause!
     }
 
-    // Super Armor: Zero out any incoming knockback velocity while lifting weapon
-    if (this.isLiftingWeapon()) {
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-    }
+    // Super Armor / Solar Poise: Zero out and negate any incoming knockback, pull, or wall-pin states
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.isWallPinnedByMakima = false;
+    this.isCurrentlyWallPinnedByMakima = false;
+    this.makimaWallPinTimer = 0;
+    this.isWallPinnedBySaitama = false;
+    this._knockedBackBySaitamaBasicPunch = false;
+    this.isDraggedByGetsuga = false;
+    this.isCaughtInBluePull = false;
+    this.isCaughtInBlackHole = false;
+    this.isCaughtInPurple = false;
+    this.caughtInGenosFlurry = false;
+    this.preventKnockbackBounce = false;
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
 
     // Centralized Movement & Physics (Rule 1.1)
     super.update(opponent, ownerIndex, arena);
+
+    // Dynamically scale physical body radius as Escanor grows with Solar Pride & "THE ONE"
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const sizeGrowth = this.isTheOneActive
+      ? (cfg.theOneRadiusBonus ?? 6)
+      : ((this.prideStacks || 0) * (cfg.prideRadiusBonusPerStack ?? 1.0));
+    this.r = (this.baseRadius || 28) + sizeGrowth;
 
     // Cleaver / Axe Swing Timer & Exact Downward Chop Impact Delivery
     if (this.slashSwingTimer > 0) {
@@ -299,6 +498,7 @@ export class EscanorFighter extends Fighter {
     }
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.prideFlareActiveTimer > 0) this.prideFlareActiveTimer--;
+    if (this.divineSwordActiveTimer > 0) this.divineSwordActiveTimer--;
 
     // Skill Cooldowns
     if (this.cruelSunCooldown > 0) this.cruelSunCooldown--;
@@ -317,17 +517,17 @@ export class EscanorFighter extends Fighter {
     // Update Cruel Sun Projectiles
     this._updateCruelSuns(arena);
 
-    // Passive 1: Solar Pride Escalation (Ticks over time)
-    this.prideChargeTimer++;
-    if (this.prideChargeTimer >= (CONFIG.escanor?.prideChargeIntervalFrames || 150)) {
-      this.prideChargeTimer = 0;
-      if (this.prideStacks < this.prideMaxStacks) {
-        this.prideStacks++;
+    // Passive 1 & 2: Grace "Sunshine" — Solar Pride Escalation & Heat Aura (Toggle: enableSunshine)
+    if (Boolean(cfg.enableSunshine ?? true)) {
+      this.prideChargeTimer++;
+      if (this.prideChargeTimer >= (cfg.prideChargeIntervalFrames || 150)) {
+        this.prideChargeTimer = 0;
+        if (this.prideStacks < this.prideMaxStacks) {
+          this.prideStacks++;
+        }
       }
+      this._updateSunshineHeat();
     }
-
-    // Passive 2: Sunshine Heat Aura (AoE burn to nearby foes)
-    this._updateSunshineHeat();
 
     // AI & Combat Execution
     const target = this.getNearestTarget(opponent);
@@ -341,53 +541,67 @@ export class EscanorFighter extends Fighter {
 
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
-    // 1. Try Ultimate: "THE ONE"
-    if (this.theOneCooldown <= 0 && !this.isTheOneActive && (dist < 180 || this.hp < this.maxHp * 0.65)) {
+    // 1. Try Ultimate: "THE ONE" (Toggle: enableTheOne)
+    if (Boolean(cfg.enableTheOne ?? true) && this.theOneCooldown <= 0 && !this.isTheOneActive && (dist < 180 || this.hp < this.maxHp * 0.65)) {
       this._activateTheOne();
       return;
     }
 
-    // 2. Try Divine Sword Escanor during "The One"
-    if (this.isTheOneActive && !this.theOneFinisherUsed && dist < 120) {
+    // 2. Try Divine Sword Escanor during "The One" (Toggle: enableTheOne)
+    const finisherReach = (this.r || 25) + this.currentFinisherReach;
+    if (Boolean(cfg.enableTheOne ?? true) && this.isTheOneActive && !this.theOneFinisherUsed && dist <= (finisherReach + (target.r || 25))) {
       this._executeDivineSwordEscanor(target);
       return;
     }
 
-    // 3. Try Skill 1: Cruel Sun
-    if (this.cruelSunCooldown <= 0 && dist > 70 && dist < 280) {
+    // 3. Try Skill 1: Cruel Sun (Toggle: enableCruelSun)
+    if (Boolean(cfg.enableCruelSun ?? true) && this.cruelSunCooldown <= 0 && dist > 70 && dist < 280) {
       this._castCruelSun(target);
       return;
     }
 
-    // 4. Try Skill 2: Pride Flare
-    if (this.prideFlareCooldown <= 0 && (dist < 110 || this.activeCruelSuns.length > 0)) {
+    // 4. Try Skill 2: Pride Flare (Toggle: enablePrideFlare)
+    if (Boolean(cfg.enablePrideFlare ?? true) && this.prideFlareCooldown <= 0 && (dist < 110 || this.activeCruelSuns.length > 0)) {
       this._castPrideFlare();
       return;
     }
 
     // 5. Basic Attack: Divine Axe Rhitta Chop (Windup overhead lift -> downward chop strike)
-    const reach = (CONFIG.escanor?.rhittaReach || 100) + (target.r || 25);
+    const reach = (this.r || 25) + this.currentRhittaReach + (target.r || 25);
     if (this.shootCooldown <= 0 && this.slashSwingTimer <= 0 && dist <= reach) {
       this._startRhittaChop(target);
     }
   }
 
   /**
-   * Passive: Radiates continuous solar heat burn
+   * Passive 1: Grace "Sunshine" & Thermal Updraft
+   * Radiates continuous solar heat burn and generates a rising thermal updraft slow field
    */
   _updateSunshineHeat() {
     this.sunshineHeatTimer++;
     if (this.sunshineHeatTimer % 30 !== 0) return; // Tick every half second
 
-    const heatRadius = (CONFIG.escanor?.sunshineHeatRadius || 65) + (this.isTheOneActive ? 30 : this.prideStacks * 5);
-    const heatDmg = (CONFIG.escanor?.sunshineHeatDps || 3) * (this.isTheOneActive ? 2.0 : 1.0);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const heatRadius = this.currentSunshineHeatRadius;
+    const heatDmg = (cfg.sunshineHeatDps || 3) * (this.isTheOneActive ? 2.0 : 1.0);
 
     const validTargets = this._getAllValidEnemyTargets();
     for (const tgt of validTargets) {
       const d = Math.hypot(tgt.x - this.x, tgt.y - this.y);
-      if (d <= heatRadius + (tgt.r || 25)) {
+      if (d <= heatRadius + (tgt.r || 28)) {
         if (typeof tgt.takeDamage === 'function') {
-          tgt.takeDamage(heatDmg, this);
+          tgt.takeDamage(heatDmg, this, { isBurn: true });
+        }
+        if (typeof tgt.applyBurn === 'function') {
+          tgt.applyBurn(this);
+        } else {
+          tgt.burnTimer = Math.max(tgt.burnTimer || 0, 60);
+          tgt.burnDamageTimer = 0;
+          tgt.lastBurnAttacker = this;
+        }
+        const slowAmount = cfg.thermalUpdraftSlow || 0.15;
+        if (slowAmount > 0 && typeof tgt.applySlow === 'function') {
+          tgt.applySlow(35, slowAmount);
         }
       }
     }
@@ -412,9 +626,10 @@ export class EscanorFighter extends Fighter {
     this.slashSwingMaxTimer = totalFrames;
     this.slashSwingTimer = totalFrames;
 
-    // Downward chop impact lands near the end of the strike stroke:
-    this.slashSwingImpactTimer = recFrames + Math.max(1, Math.floor(strikeFrames * 0.25));
+    // Downward chop impact lands exactly upon strike completion at the transition to recovery:
+    this.slashSwingImpactTimer = recFrames;
     this._chopHitDelivered = false;
+    this._chopHitConnected = false;
     this.shootCooldown = (typeof cfg.cooldown === 'number') ? cfg.cooldown : (totalFrames + 20);
 
     // Slow movement during lift + hold (heavy axe overhead windup)
@@ -439,7 +654,7 @@ export class EscanorFighter extends Fighter {
   _executeRhittaChopHit() {
     const aimAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
     const arc = CONFIG.escanor?.rhittaArcAngle || (Math.PI * 0.778); // ~140 deg
-    const reach = CONFIG.escanor?.rhittaReach || 100;
+    const reach = this.currentRhittaReach;
 
     const baseMin = CONFIG.escanor?.basicDamageMin || 30;
     const baseMax = CONFIG.escanor?.basicDamageMax || 38;
@@ -461,7 +676,7 @@ export class EscanorFighter extends Fighter {
       const isCloseProximity = dist <= (totalBodyRadius + 32);
 
       // Check current position in real-time at impact
-      if (dist <= reach + targetRadius || isCloseProximity) {
+      if (dist <= (this.r + reach + targetRadius) || isCloseProximity) {
         const angleToTarget = Math.atan2(dy, dx);
         let angleDiff = angleToTarget - aimAngle;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -475,7 +690,14 @@ export class EscanorFighter extends Fighter {
           hitTarget = tgt;
           applyDamageToTarget(tgt, damage, this, { isMelee: true, isGuaranteedHit: true });
           if (typeof tgt.takeDamage === 'function') {
-            tgt.takeDamage(CONFIG.escanor?.basicBurnDamage || 6, this, { isMelee: true, isGuaranteedHit: true }); // Burn tick
+            tgt.takeDamage(CONFIG.escanor?.basicBurnDamage || 6, this, { isMelee: true, isGuaranteedHit: true, isBurn: true }); // Burn tick
+          }
+          if (typeof tgt.applyBurn === 'function') {
+            tgt.applyBurn(this);
+          } else {
+            tgt.burnTimer = Math.max(tgt.burnTimer || 0, 120);
+            tgt.burnDamageTimer = 0;
+            tgt.lastBurnAttacker = this;
           }
 
           // Initial connection effects at the exact moment weapon connects
@@ -483,7 +705,7 @@ export class EscanorFighter extends Fighter {
           spawnSparks(tgt.x, tgt.y, '#F59E0B', 8);
 
           // Cinematic Hit-Pause (just like Nanami's 7:3 Ratio impact)
-          const pauseFrames = CONFIG.escanor?.chopHitPauseFrames || 14;
+          const pauseFrames = CONFIG.escanor?.chopHitPauseFrames || 10;
           this.chopHitPauseTimer = pauseFrames;
           this.chopHitPauseMax = pauseFrames;
           this.chopHitPauseTarget = tgt;
@@ -507,6 +729,7 @@ export class EscanorFighter extends Fighter {
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     if (hitTarget) {
+      this._chopHitConnected = true;
       const impactShake = (cfg.basicImpactShake || 7.0) * (this.isTheOneActive ? 1.5 : 1.0);
       const impactDur = cfg.basicImpactShakeDuration || 12;
       triggerGlobalScreenShake(impactShake, impactDur);
@@ -515,6 +738,7 @@ export class EscanorFighter extends Fighter {
         this.prideStacks++;
       }
     } else {
+      this._chopHitConnected = false;
       // Heavy downward axe chop slams the ground/air with concussive miss shake
       const missShake = (cfg.basicMissShake || 4.5) * (this.isTheOneActive ? 1.5 : 1.0);
       const missDur = cfg.basicMissShakeDuration || 8;
@@ -611,7 +835,14 @@ export class EscanorFighter extends Fighter {
         const isDirect = (d <= sun.r + (tgt.r || 25));
         const dmg = isDirect ? sun.damage : sun.aoeDamage;
 
-        applyDamageToTarget(tgt, dmg, this);
+        applyDamageToTarget(tgt, dmg, this, { isFlame: true, isBurn: true });
+        if (typeof tgt.applyBurn === 'function') {
+          tgt.applyBurn(this);
+        } else {
+          tgt.burnTimer = Math.max(tgt.burnTimer || 0, 180);
+          tgt.burnDamageTimer = 0;
+          tgt.lastBurnAttacker = this;
+        }
         if (typeof tgt.applyHitStun === 'function') {
           tgt.applyHitStun(16);
         }
@@ -657,7 +888,14 @@ export class EscanorFighter extends Fighter {
     for (const tgt of validTargets) {
       const d = Math.hypot(tgt.x - this.x, tgt.y - this.y);
       if (d <= radius + (tgt.r || 25)) {
-        applyDamageToTarget(tgt, dmg, this);
+        applyDamageToTarget(tgt, dmg, this, { isFlame: true, isBurn: true });
+        if (typeof tgt.applyBurn === 'function') {
+          tgt.applyBurn(this);
+        } else {
+          tgt.burnTimer = Math.max(tgt.burnTimer || 0, 240);
+          tgt.burnDamageTimer = 0;
+          tgt.lastBurnAttacker = this;
+        }
         if (typeof tgt.applyHitStun === 'function') {
           tgt.applyHitStun(CONFIG.escanor?.prideFlareStunDuration || 36);
         }
@@ -708,9 +946,14 @@ export class EscanorFighter extends Fighter {
     this.aim(target);
 
     const aimAngle = this.gunAngle || 0;
-    const reach = CONFIG.escanor?.theOneFinisherReach || 120;
+    const reach = this.currentFinisherReach;
     const dmg = CONFIG.escanor?.theOneFinisherDamage || 115;
     const kb = CONFIG.escanor?.theOneFinisherKnockback || 42.0;
+
+    this.divineSwordActiveTimer = 24;
+    this.divineSwordMaxTimer = 24;
+    this.divineSwordAngle = aimAngle;
+    this.divineSwordReach = reach;
 
     spawnFloatingText(this.x, this.y - 40, 'DIVINE SWORD ESCANOR!', '#FEF08A');
     triggerGlobalScreenShake(20, 24);
@@ -721,7 +964,7 @@ export class EscanorFighter extends Fighter {
       const dy = tgt.y - this.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist <= reach + (tgt.r || 25)) {
+      if (dist <= (this.r + reach + (tgt.r || 25))) {
         const angleToTarget = Math.atan2(dy, dx);
         let angleDiff = angleToTarget - aimAngle;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -729,7 +972,14 @@ export class EscanorFighter extends Fighter {
 
         // Frontal linear cone (80 degrees)
         if (Math.abs(angleDiff) <= (Math.PI * 0.44)) {
-          applyDamageToTarget(tgt, dmg, this);
+          applyDamageToTarget(tgt, dmg, this, { isFlame: true, isBurn: true });
+          if (typeof tgt.applyBurn === 'function') {
+            tgt.applyBurn(this);
+          } else {
+            tgt.burnTimer = Math.max(tgt.burnTimer || 0, 300);
+            tgt.burnDamageTimer = 0;
+            tgt.lastBurnAttacker = this;
+          }
           if (typeof tgt.applyHitStun === 'function') {
             tgt.applyHitStun(24);
           }
@@ -811,6 +1061,7 @@ export class EscanorFighter extends Fighter {
     this.slashSwingTimer = 0;
     this.punchAnimTimer = 0;
     this._chopHitDelivered = true;
+    this._chopHitConnected = false;
     if (this.chopHitPauseTarget) {
       this.chopHitPauseTarget.suppressFreezeOverlay = false;
       this.chopHitPauseTarget = null;
@@ -831,7 +1082,13 @@ export class EscanorFighter extends Fighter {
       drawPrideFlareShockwave(ctx, this.x, this.y, currentR, CONFIG.escanor?.prideFlareRadius || 110, 1.0 - p);
     }
 
-    // 3. Draw Escanor Main Skin Model
+    // 3. Draw Divine Sword Escanor Finisher Blade Wave
+    if (this.divineSwordActiveTimer > 0) {
+      const lifeRatio = this.divineSwordActiveTimer / (this.divineSwordMaxTimer || 24);
+      drawDivineSwordEscanorBlade(ctx, this.x, this.y, this.divineSwordAngle || 0, this.r || 28, this.divineSwordReach || 160, lifeRatio);
+    }
+
+    // 4. Draw Escanor Main Skin Model
     drawEscanorSkin(ctx, this);
   }
 }

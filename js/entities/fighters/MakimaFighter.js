@@ -996,15 +996,18 @@ export class MakimaFighter extends Fighter {
 
         // ONLY apply knockback, wall-pin, blood, and hit effects if the attack connected and was NOT dodged / parried!
         if (damageDealt) {
-          // Apply massive directional knockback (Rule 15 physics)
-          const kbForce = cfg.bangKnockbackForce || 46;
-          t.knockbackVx = Math.cos(angle) * kbForce;
-          t.knockbackVy = Math.sin(angle) * kbForce;
-          t.isWallPinnedByMakima = true;
-          t.isCurrentlyWallPinnedByMakima = false;
-          t.preventKnockbackBounce = true;
-          t.makimaKnockbackWindow = 35;
-          t._makimaAttacker = this;
+          const isTargetImmune = Boolean(t && (t.characterId === 'escanor' || t.type === 'escanor' || t.immuneToKnockback || t.immuneToPush));
+          if (!isTargetImmune) {
+            // Apply massive directional knockback (Rule 15 physics)
+            const kbForce = cfg.bangKnockbackForce || 46;
+            t.knockbackVx = Math.cos(angle) * kbForce;
+            t.knockbackVy = Math.sin(angle) * kbForce;
+            t.isWallPinnedByMakima = true;
+            t.isCurrentlyWallPinnedByMakima = false;
+            t.preventKnockbackBounce = true;
+            t.makimaKnockbackWindow = 35;
+            t._makimaAttacker = this;
+          }
 
           spawnBloodEffect(t, 18, angle, { color: '#880000' });
           spawnImpactFlash(t.x, t.y, '#F59E0B', 26);

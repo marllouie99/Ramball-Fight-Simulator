@@ -945,16 +945,20 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
           }
           target.gunAngle = target.angle;
 
-          if (!target.isTurret && !target.cannotBeKnockbacked) {
+          if (!target.isTurret && !target.cannotBeKnockbacked && !target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
             const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
             const recoilForce = isFinalStrike ? (CONFIG.toji?.ambushFlurryFinalRecoil || 38) : (6.5 + Math.random() * 2.5);
             const kbX = Math.cos(pushAngle) * recoilForce;
             const kbY = Math.sin(pushAngle) * recoilForce;
-            target.knockbackVx = kbX;
-            target.knockbackVy = kbY;
-            target.vx = kbX;
-            target.vy = kbY;
-            target.knockbackDecay = isFinalStrike ? 0.90 : 0.78;
+            if (typeof target.applyKnockback === 'function') {
+              target.applyKnockback(kbX, kbY);
+            } else {
+              target.knockbackVx = kbX;
+              target.knockbackVy = kbY;
+              target.vx = kbX;
+              target.vy = kbY;
+              target.knockbackDecay = isFinalStrike ? 0.90 : 0.78;
+            }
           }
         }
 

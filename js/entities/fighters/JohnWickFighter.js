@@ -779,10 +779,14 @@ export class JohnWickFighter extends Fighter {
 
           // 2. Physical Knockback Impulse & Attacker Lunge Step
           const pushForce = cfg.meleeKnockback || 15;
-          target.vx = (target.vx || 0) + Math.cos(facing) * (pushForce * 0.45);
-          target.vy = (target.vy || 0) + Math.sin(facing) * (pushForce * 0.45);
-          target.x += Math.cos(facing) * (pushForce * 0.35);
-          target.y += Math.sin(facing) * (pushForce * 0.35);
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(Math.cos(facing) * (pushForce * 0.45), Math.sin(facing) * (pushForce * 0.45));
+          } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+            target.vx = (target.vx || 0) + Math.cos(facing) * (pushForce * 0.45);
+            target.vy = (target.vy || 0) + Math.sin(facing) * (pushForce * 0.45);
+            target.x += Math.cos(facing) * (pushForce * 0.35);
+            target.y += Math.sin(facing) * (pushForce * 0.35);
+          }
 
           // Forward punch lunge impulse on John Wick
           this.vx += Math.cos(facing) * 2.8;

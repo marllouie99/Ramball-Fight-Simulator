@@ -357,28 +357,33 @@ export function drawIchigoSkin(ctx, fighter) {
         bodyTilt = 0.08 * easeP;
       }
     } else {
-      // Standard basic attack / Shunpo slash
       if (rawSlashProg < 0.10) {
-        // Phase 1: Rapid Windup snap (idle -> -1.35 rad / ~ -77°) with anticipation recoil
+        // Phase 1: Rapid Windup snap (idle -> -1.45 rad / ~ -83°) with anticipation recoil
         const p = rawSlashProg / 0.10;
         const easeP = p * (2 - p);
-        swingAngle = -0.12 + (-1.35 - (-0.12)) * easeP;
+        swingAngle = -0.12 + (-1.45 - (-0.12)) * easeP;
         thrustDistance = -8 * easeP;
         bodyShiftX = -2.5 * easeP;
         bodyTilt = -0.05 * easeP;
-      } else if (rawSlashProg < 0.55) {
-        // Phase 2: Downward cutting sweep (-1.35 rad -> +1.20 rad / ~ +69°) with kinetic power lunge
-        const p = (rawSlashProg - 0.10) / 0.45;
-        const sweepCurve = p * p * (3 - 2 * p); // smooth cubic ease
-        swingAngle = -1.35 + (1.20 - (-1.35)) * sweepCurve;
+      } else if (rawSlashProg < 0.38) {
+        // Phase 2: Downward cutting sweep (-1.45 rad -> +1.25 rad / ~ +72°) with kinetic power lunge
+        const p = (rawSlashProg - 0.10) / 0.28;
+        const sweepCurve = 1 - Math.pow(1 - p, 2.5); // Explosive forward snap matching Escanor
+        swingAngle = -1.45 + (1.25 - (-1.45)) * sweepCurve;
         thrustDistance = -8 + 22 * Math.sin(p * Math.PI * 0.5); // seamless -8px to +14px
         bodyShiftX = -2.5 + 6.5 * Math.sin(p * Math.PI * 0.5); // surges forward from -2.5px to +4.0px
         bodyTilt = -0.05 + 0.10 * Math.sin(p * Math.PI * 0.5);
+      } else if (rawSlashProg < 0.48) {
+        // Phase 3: Impact Apex Hold (+1.25 rad follow-through maintained across impact freeze)
+        swingAngle = 1.25;
+        thrustDistance = 14;
+        bodyShiftX = 4.0;
+        bodyTilt = 0.05;
       } else {
-        // Phase 3: Fluid Cosine Recovery (+1.20 rad -> idle -0.12 rad)
-        const p = (rawSlashProg - 0.55) / 0.45;
+        // Phase 4: Fluid Cosine Recovery (+1.25 rad -> idle -0.12 rad)
+        const p = (rawSlashProg - 0.48) / 0.52;
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI); // 1 -> 0
-        swingAngle = -0.12 + (1.20 - (-0.12)) * easeP;
+        swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
         thrustDistance = 14 * easeP; // seamlessly eases +14px back to 0px
         bodyShiftX = 4.0 * easeP;
       }
@@ -2699,24 +2704,29 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
         bodyTilt = 0.08 * easeP;
       }
     } else {
-      if (rawSlashProg < 0.10) {
-        const p = rawSlashProg / 0.10;
+      if (rawSlashProg < 0.05) {
+        const p = rawSlashProg / 0.05;
         const easeP = p * (2 - p);
-        swingAngle = -0.12 + (-1.35 - (-0.12)) * easeP;
+        swingAngle = -0.12 + (-1.45 - (-0.12)) * easeP;
         thrustDistance = -8 * easeP;
         bodyShiftX = -2.5 * easeP;
         bodyTilt = -0.05 * easeP;
-      } else if (rawSlashProg < 0.55) {
-        const p = (rawSlashProg - 0.10) / 0.45;
+      } else if (rawSlashProg < 0.32) {
+        const p = (rawSlashProg - 0.05) / 0.27;
         const sweepCurve = p * p * (3 - 2 * p);
-        swingAngle = -1.35 + (1.20 - (-1.35)) * sweepCurve;
+        swingAngle = -1.45 + (1.25 - (-1.45)) * sweepCurve;
         thrustDistance = -8 + 22 * Math.sin(p * Math.PI * 0.5);
         bodyShiftX = -2.5 + 6.5 * Math.sin(p * Math.PI * 0.5);
         bodyTilt = -0.05 + 0.10 * Math.sin(p * Math.PI * 0.5);
+      } else if (rawSlashProg < 0.65) {
+        swingAngle = 1.25;
+        thrustDistance = 14;
+        bodyShiftX = 4.0;
+        bodyTilt = 0.05;
       } else {
-        const p = (rawSlashProg - 0.55) / 0.45;
+        const p = (rawSlashProg - 0.65) / 0.35;
         const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.12 + (1.20 - (-0.12)) * easeP;
+        swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
         thrustDistance = 14 * easeP;
         bodyShiftX = 4.0 * easeP;
       }

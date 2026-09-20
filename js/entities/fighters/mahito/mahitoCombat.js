@@ -1045,8 +1045,12 @@ export function updateMahitoSoulPhaseSlip(fighter) {
 
       const kb = dashCfg.knockbackForce || 6;
       const passAngle = Math.atan2(vec.y, vec.x);
-      target.vx = (target.vx || 0) + Math.cos(passAngle) * kb;
-      target.vy = (target.vy || 0) + Math.sin(passAngle) * kb;
+      if (typeof target.applyKnockback === 'function') {
+        target.applyKnockback(Math.cos(passAngle) * kb, Math.sin(passAngle) * kb);
+      } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+        target.vx = (target.vx || 0) + Math.cos(passAngle) * kb;
+        target.vy = (target.vy || 0) + Math.sin(passAngle) * kb;
+      }
 
       // 3. Blood & 5-Blade Razor Claw Slash Laceration Impact Visuals
       if (typeof spawnBloodEffect === 'function') {

@@ -273,11 +273,15 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
 
       const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
       const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
-      target.knockbackVx = kbVx;
-      target.knockbackVy = kbVy;
-      target.vx = kbVx;
-      target.vy = kbVy;
       target.knockbackDecay = 0.92;
+      if (typeof target.applyKnockback === 'function') {
+        target.applyKnockback(kbVx, kbVy);
+      } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+        target.knockbackVx = kbVx;
+        target.knockbackVy = kbVy;
+        target.vx = kbVx;
+        target.vy = kbVy;
+      }
     }
 
     if (typeof spawnGroundScorch === 'function') {
@@ -418,12 +422,15 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       
       const kbVx = Math.cos(pushAngle) * knockbackSpeed;
       const kbVy = Math.sin(pushAngle) * knockbackSpeed;
-      target.knockbackVx = kbVx;
-      target.knockbackVy = kbVy;
-      target.vx = kbVx;
-      target.vy = kbVy;
       target.knockbackDecay = isAmbushThrust ? 0.85 : 0.84;
-      if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+      if (typeof target.applyKnockback === 'function') {
+        target.applyKnockback(kbVx, kbVy);
+      } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+        target.knockbackVx = kbVx;
+        target.knockbackVy = kbVy;
+        target.vx = kbVx;
+        target.vy = kbVy;
+      }
     }
 
     if (isAmbushThrust && target && target.hp > 0 && !target.isDead && !target.isRevivingFromContract && !target.isShatterReviving && typeof target.applyHitStun === 'function') {

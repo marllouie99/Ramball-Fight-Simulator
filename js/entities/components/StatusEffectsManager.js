@@ -124,9 +124,10 @@ export class StatusEffectsManager {
   }
 
   // --- Burn ---
-  applyBurn(attacker) {
-    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
-    this.fighter.burnTimer = CONFIG.orange?.burnDuration || 180;
+  applyBurn(attacker, duration) {
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isImmuneToBurn || this.fighter.characterId === 'escanor') return;
+    const finalDuration = duration ?? CONFIG.orange?.burnDuration ?? 180;
+    this.fighter.burnTimer = Math.max(this.fighter.burnTimer || 0, finalDuration);
     this.fighter.burnDamageTimer = 0;
     this.fighter.lastBurnAttacker = attacker;
   }

@@ -1033,15 +1033,16 @@ export function updateRika(fighter, arena) {
           const smashVx = Math.cos(pushAngle) * knockbackForce;
           const smashVy = Math.sin(pushAngle) * knockbackForce;
 
-          const isTojiTarget = target.characterId === 'toji' || target.type === 'toji' || target.domainImmunity;
-          if (isTojiTarget) {
-            target.vx = (target.vx || 0) + smashVx * 0.4;
-            target.vy = (target.vy || 0) + smashVy * 0.4;
-          } else {
-            target.vx = (target.vx || 0) + smashVx;
-            target.vy = (target.vy || 0) + smashVy;
-            if (typeof target.applyKnockback === 'function') {
-              target.applyKnockback(smashVx * 0.5, smashVy * 0.5);
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(smashVx, smashVy);
+          } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+            const isTojiTarget = target.characterId === 'toji' || target.type === 'toji' || target.domainImmunity;
+            if (isTojiTarget) {
+              target.vx = (target.vx || 0) + smashVx * 0.4;
+              target.vy = (target.vy || 0) + smashVy * 0.4;
+            } else {
+              target.vx = (target.vx || 0) + smashVx;
+              target.vy = (target.vy || 0) + smashVy;
             }
           }
         }

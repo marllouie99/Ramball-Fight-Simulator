@@ -182,8 +182,12 @@ export class NobaraFighter extends Fighter {
           triggerGlobalScreenShake(2.5, 6);
 
           const pushForce = cfg.hammerKnockback || 18;
-          target.vx = (target.vx || 0) + Math.cos(facing) * (pushForce * 0.4);
-          target.vy = (target.vy || 0) + Math.sin(facing) * (pushForce * 0.4);
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(Math.cos(facing) * (pushForce * 0.4), Math.sin(facing) * (pushForce * 0.4));
+          } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+            target.vx = (target.vx || 0) + Math.cos(facing) * (pushForce * 0.4);
+            target.vy = (target.vy || 0) + Math.sin(facing) * (pushForce * 0.4);
+          }
           break;
         }
       }

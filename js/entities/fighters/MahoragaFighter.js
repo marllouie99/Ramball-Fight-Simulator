@@ -1211,14 +1211,16 @@ export class MahoragaFighter extends Fighter {
           const kbVx = Math.cos(kbAngle) * kbForce;
           const kbVy = Math.sin(kbAngle) * kbForce;
 
-          target.vx = kbVx;
-          target.vy = kbVy;
+          const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+          if (!isTargetImmune) {
+            target.vx = kbVx;
+            target.vy = kbVy;
+            target.x += target.vx;
+            target.y += target.vy;
+          }
           if (typeof target.applyKnockback === 'function') {
             target.applyKnockback(kbVx, kbVy);
           }
-
-          target.x += target.vx;
-          target.y += target.vy;
 
           if (target && !target.isDead) {
             const dmg = CONFIG.mahoraga?.swordDamage ?? 15;
@@ -1578,21 +1580,26 @@ export class MahoragaFighter extends Fighter {
               target.x = target.wallSlamPinnedX;
               target.y = target.wallSlamPinnedY;
             }
-          } else if (rollBlitzKnockback) {
-            const kbForce = CONFIG.mahoraga?.blitzKineticKnockbackForce ?? 16.0;
-            target.vx = (target.vx || 0) + Math.cos(pushAngle) * kbForce;
-            target.vy = (target.vy || 0) + Math.sin(pushAngle) * kbForce;
-            target.x += Math.cos(pushAngle) * (kbForce * 0.35);
-            target.y += Math.sin(pushAngle) * (kbForce * 0.35);
+            const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+            if (!isTargetImmune) {
+              const kbForce = CONFIG.mahoraga?.blitzKineticKnockbackForce ?? 16.0;
+              target.vx = (target.vx || 0) + Math.cos(pushAngle) * kbForce;
+              target.vy = (target.vy || 0) + Math.sin(pushAngle) * kbForce;
+              target.x += Math.cos(pushAngle) * (kbForce * 0.35);
+              target.y += Math.sin(pushAngle) * (kbForce * 0.35);
+            }
             if (typeof target.applyHitStun === 'function') target.applyHitStun(4);
             spawnFloatingText(target.x, target.y - (target.r || 20) - 22, 'KINETIC KNOCKBACK!', '#FFD700');
             triggerGlobalScreenShake(8, 12);
           } else {
-            const pushForce = CONFIG.mahoraga?.blitzHitPushbackForce ?? 4.5;
-            target.vx = Math.cos(pushAngle) * pushForce;
-            target.vy = Math.sin(pushAngle) * pushForce;
-            target.x += target.vx;
-            target.y += target.vy;
+            const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+            if (!isTargetImmune) {
+              const pushForce = CONFIG.mahoraga?.blitzHitPushbackForce ?? 4.5;
+              target.vx = Math.cos(pushAngle) * pushForce;
+              target.vy = Math.sin(pushAngle) * pushForce;
+              target.x += target.vx;
+              target.y += target.vy;
+            }
           }
 
           if (typeof state !== 'undefined' && state.arena) {
@@ -1633,11 +1640,14 @@ export class MahoragaFighter extends Fighter {
 
           const kbAngle = this.gunAngle;
           const kbForce = CONFIG.mahoraga?.blitzFinisherKnockback ?? 35.0;
-          target.vx = Math.cos(kbAngle) * kbForce;
-          target.vy = Math.sin(kbAngle) * kbForce;
-          if (typeof target.applyKnockback === 'function') target.applyKnockback(target.vx, target.vy);
-          target.x += target.vx * 0.25;
-          target.y += target.vy * 0.25;
+          const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+          if (!isTargetImmune) {
+            target.vx = Math.cos(kbAngle) * kbForce;
+            target.vy = Math.sin(kbAngle) * kbForce;
+            target.x += target.vx * 0.25;
+            target.y += target.vy * 0.25;
+          }
+          if (typeof target.applyKnockback === 'function') target.applyKnockback(Math.cos(kbAngle) * kbForce, Math.sin(kbAngle) * kbForce);
 
           if (typeof state !== 'undefined' && state.arena) {
             const minX = state.arena.x + (target.r || 20);

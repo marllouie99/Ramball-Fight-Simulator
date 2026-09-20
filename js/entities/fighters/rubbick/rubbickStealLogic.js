@@ -87,18 +87,21 @@ export function updateStolenRubyHook(fighter) {
           spawnBloodEffect(target, 5);
         }
 
-        // Kill target's own velocity so they can't resist the pull
-        target.vx *= 0.3;
-        target.vy *= 0.3;
+        const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToPull || target.immuneToKnockback));
+        if (!isTargetImmune) {
+          // Kill target's own velocity so they can't resist the pull
+          target.vx *= 0.3;
+          target.vy *= 0.3;
 
-        // Smooth spring pull: lerp them towards the minimum distance
-        const pullLerp = 0.15; // 15% of the remaining distance per frame
-        const minDistance = fighter.r + target.r + 5; // leave a 5px buffer so models don't perfectly overlap
-        if (dist > minDistance) {
-          // Cap the maximum move distance per frame to 14 pixels to prevent "teleporting/warping"
-          const moveDist = Math.min((dist - minDistance) * pullLerp, 14.0);
-          target.x += (dx / dist) * moveDist;
-          target.y += (dy / dist) * moveDist;
+          // Smooth spring pull: lerp them towards the minimum distance
+          const pullLerp = 0.15; // 15% of the remaining distance per frame
+          const minDistance = fighter.r + target.r + 5; // leave a 5px buffer so models don't perfectly overlap
+          if (dist > minDistance) {
+            // Cap the maximum move distance per frame to 14 pixels to prevent "teleporting/warping"
+            const moveDist = Math.min((dist - minDistance) * pullLerp, 14.0);
+            target.x += (dx / dist) * moveDist;
+            target.y += (dy / dist) * moveDist;
+          }
         }
       }
     }

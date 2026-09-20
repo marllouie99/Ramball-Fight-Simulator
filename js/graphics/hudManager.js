@@ -1406,6 +1406,39 @@ function updateHealthHud() {
       } else {
         info.push(`<b>PARRY:</b> ${baseParry}%`);
       }
+    } else if (f.characterId === 'escanor' || f.type === 'escanor') {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+      const baseDmg = cfg.damage || 15;
+      const prideDmgMult = 1.0 + ((f.prideStacks || 0) * (cfg.prideStackDamageBonus || 0.08)) + (f.isTheOneActive ? ((cfg.theOneDamageMultiplier || 1.45) - 1.0) : 0);
+      const currentDmg = Math.round(baseDmg * prideDmgMult);
+      const boostDmg = currentDmg - baseDmg;
+
+      // 1. DMG: Base + Solar Escalation
+      if (boostDmg > 0) {
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
+
+      // 2. DEF: Base Holy Armor + Solar Pride & The One Escalation
+      const baseDef = Math.round((cfg.defense ?? 0.20) * 100);
+      const prideDef = Math.round(((f.prideStacks || 0) * (cfg.prideDefBonusPerStack ?? 0.02)) * 100);
+      const theOneDef = f.isTheOneActive ? Math.round((cfg.theOneDefenseBonus ?? 0.25) * 100) : 0;
+      const liftingDef = (typeof f.isLiftingWeapon === 'function' && f.isLiftingWeapon()) ? Math.round((cfg.liftingDefenseBonus ?? 0.15) * 100) : 0;
+      const totalBonusDef = prideDef + theOneDef + liftingDef;
+
+      if (totalBonusDef > 0) {
+        info.push(`<b>DEF:</b> ${baseDef}% + ${totalBonusDef}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DEF:</b> ${baseDef}%`);
+      }
+
+      // 3. Solar Pride / The One Stacks
+      if (f.isTheOneActive) {
+        info.push(`<b>PRIDE:</b> <span style="color: #F59E0B; font-weight: 700;">THE ONE</span>`);
+      } else {
+        info.push(`<b>PRIDE:</b> ${f.prideStacks || 0}/${f.prideMaxStacks || 5}`);
+      }
     } else {
       const isTacticalChar = ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType);
       if (!isTacticalChar) {

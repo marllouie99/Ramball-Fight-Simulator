@@ -264,6 +264,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
         const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
         const isMakimaShatter = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving || (f.shatteredPieces && f.shatteredPieces.length > 0) || (f.characterId === 'makima' && (f.isDead || f.dead || f.hp <= 0))));
+        const isEscanorImmune = Boolean(f && (f.characterId === 'escanor' || f.type === 'escanor' || f.immuneToKnockback || f.immuneToPull));
         if (isMakimaShatter) {
           f.vx = 0;
           f.vy = 0;
@@ -273,12 +274,10 @@ export class GetsugaBehavior extends ProjectileBehavior {
             f.x = f._shatterLockedX;
             f.y = f._shatterLockedY;
           }
-        } else if (isSaitamaCounter) {
+        } else if (isSaitamaCounter || isEscanorImmune) {
           f.isDraggedByGetsuga = false;
           f.knockbackVx = 0;
           f.knockbackVy = 0;
-          f.vx = 0;
-          f.vy = 0;
           if (projectile.draggedTargets && projectile.draggedTargets.has(f)) {
             projectile.draggedTargets.delete(f);
           }

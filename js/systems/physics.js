@@ -291,15 +291,19 @@ export function resolveFighterCollision(a, b) {
   const isEnemy = (typeof a.isTeammate === 'function') ? !a.isTeammate(b) : ((typeof b.isTeammate === 'function') ? !b.isTeammate(a) : (teamA === null || teamB === null || teamA !== teamB));
 
   // Burn spread: if one fighter is burning and the other is an enemy (and cooldown allows)
-  if (isEnemy && a.burnTimer > 0 && b.burnTimer === 0 && a.burnSpreadCooldown === 0) {
+  if (isEnemy && a.burnTimer > 0 && b.burnTimer === 0 && a.burnSpreadCooldown === 0 && !b.isImmuneToBurn && b.characterId !== 'escanor') {
     b.applyBurn(a);
     a.burnSpreadCooldown = CONFIG.orange.burnSpreadCooldown;
-    spawnFloatingText(b.x, b.y - b.r - 8, 'BURN SPREAD!', '#ff6600');
+    if (b.burnTimer > 0) {
+      spawnFloatingText(b.x, b.y - b.r - 8, 'BURN SPREAD!', '#ff6600');
+    }
   }
-  if (isEnemy && b.burnTimer > 0 && a.burnTimer === 0 && b.burnSpreadCooldown === 0) {
+  if (isEnemy && b.burnTimer > 0 && a.burnTimer === 0 && b.burnSpreadCooldown === 0 && !a.isImmuneToBurn && a.characterId !== 'escanor') {
     a.applyBurn(b);
     b.burnSpreadCooldown = CONFIG.orange.burnSpreadCooldown;
-    spawnFloatingText(a.x, a.y - a.r - 8, 'BURN SPREAD!', '#ff6600');
+    if (a.burnTimer > 0) {
+      spawnFloatingText(a.x, a.y - a.r - 8, 'BURN SPREAD!', '#ff6600');
+    }
   }
 
   // Collision normal (unit vector from a → b)
@@ -421,11 +425,11 @@ export function resolveFighterCollision(a, b) {
     else { a.slowTimer = Math.max(a.slowTimer || 0, 20); a.slowMultiplier = Math.min(a.slowMultiplier || 1.0, 0.35); }
   }
 
-  const aIsEscanorLifting = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor') && typeof a.isLiftingWeapon === 'function' && a.isLiftingWeapon());
-  const bIsEscanorLifting = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor') && typeof b.isLiftingWeapon === 'function' && b.isLiftingWeapon());
+  const aIsEscanor = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor' || a.immuneToKnockback || a.immuneToPush));
+  const bIsEscanor = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor' || b.immuneToKnockback || b.immuneToPush));
 
-  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanorLifting;
-  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanorLifting;
+  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor;
+  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor;
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {

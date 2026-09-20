@@ -423,11 +423,69 @@ export function _getBankaiSwordBladeImage() {
   return _bankaiSwordBladeImage;
 }
 
+let _ichigoBankaiFrame1 = null;
+let _ichigoBankaiFrame1Loading = false;
+let _ichigoBankaiFrame2 = null;
+let _ichigoBankaiFrame2Loading = false;
+// Calibrated geometry for Ichigo Bankai & Shikai attack effects
+export const ICHIGO_BANKAI_ATTACK_CONFIG = {
+  cx: 156.77,
+  cy: 732.07,
+  baseR: 688.66,
+  rotOffset: -0.027,
+  src: 'Assets/model/Attack-Effects/Ichigo-bankai-attack.png'
+};
+
+export const ICHIGO_SHIKAI_ATTACK_CONFIG = {
+  cx: 156.77,
+  cy: 732.07,
+  baseR: 688.66,
+  rotOffset: -0.027,
+  src: 'Assets/model/Attack-Effects/Ichigo-shikai-attack.png'
+};
+
+let _ichigoBankaiAttackImg = null;
+let _ichigoBankaiAttackImgLoading = false;
+let _ichigoShikaiAttackImg = null;
+let _ichigoShikaiAttackImgLoading = false;
+
+export function _getIchigoBankaiAttackImage() {
+  if (_ichigoBankaiAttackImg && _ichigoBankaiAttackImg.complete && _ichigoBankaiAttackImg.naturalWidth > 0) return _ichigoBankaiAttackImg;
+  if (!_ichigoBankaiAttackImgLoading && typeof Image !== 'undefined') {
+    _ichigoBankaiAttackImgLoading = true;
+    const img = new Image();
+    img.onload = () => { _ichigoBankaiAttackImg = img; _ichigoBankaiAttackImgLoading = false; };
+    img.onerror = () => { _ichigoBankaiAttackImgLoading = false; };
+    img.src = `${ICHIGO_BANKAI_ATTACK_CONFIG.src}?v=4`;
+    _ichigoBankaiAttackImg = img;
+  }
+  return _ichigoBankaiAttackImg;
+}
+
+export function _getIchigoShikaiAttackImage() {
+  if (_ichigoShikaiAttackImg && _ichigoShikaiAttackImg.complete && _ichigoShikaiAttackImg.naturalWidth > 0) return _ichigoShikaiAttackImg;
+  if (!_ichigoShikaiAttackImgLoading && typeof Image !== 'undefined') {
+    _ichigoShikaiAttackImgLoading = true;
+    const img = new Image();
+    img.onload = () => { _ichigoShikaiAttackImg = img; _ichigoShikaiAttackImgLoading = false; };
+    img.onerror = () => { _ichigoShikaiAttackImgLoading = false; };
+    img.src = `${ICHIGO_SHIKAI_ATTACK_CONFIG.src}?v=4`;
+    _ichigoShikaiAttackImg = img;
+  }
+  return _ichigoShikaiAttackImg;
+}
+
+export function _getIchigoBankaiAttackFrame(frameNumber = 2) {
+  return _getIchigoBankaiAttackImage();
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getShikaiSwordImage();
   _getShikaiSwordBladeImage();
   _getBankaiSwordImage();
   _getBankaiSwordBladeImage();
+  _getIchigoBankaiAttackImage();
+  _getIchigoShikaiAttackImage();
 }
 
 export function drawShikaiZangetsu(ctx, x, y, angle, r) {
@@ -1132,36 +1190,42 @@ export function drawIchigoSlashArc(ctx, fighter) {
   const isShikai = !isBankai;
 
   // Arc angles matching the exact sword rotation span (top-to-bottom downward power chop)
-  const startOffset = -1.35; // ~ -77 degrees (upper-left chamber)
-  const endOffset = 1.20;   // ~ +69 degrees (lower-right follow-through)
-
-  let currentTipOffset = startOffset;
-  let currentTailOffset = startOffset;
-  let trailAlpha = 1.0;
+  const startOffset = -1.56; // ~ -89.4 degrees (covers upper crescent tip)
+  const endOffset = 1.50;    // ~ +86.0 degrees (covers lower crescent tip)
 
   const windupCutoff = 0.10;
-  const cutCutoff = 0.55;
+  const strikeCutoff = 0.38;
+  const holdCutoff = 0.48;
+
+  let currentStartA = startOffset;
+  let currentEndA = endOffset;
+  let trailAlpha = 1.0;
 
   if (rawProgress < windupCutoff) {
-    // Brief windup anticipation (trail hidden)
+    // Phase 1: Brief windup anticipation (trail hidden)
     return;
-  } else if (rawProgress < cutCutoff) {
-    // Active Cutting Phase: crescent expands with buttery cubic Hermite ease
-    const t = (rawProgress - windupCutoff) / (cutCutoff - windupCutoff);
-    const eased = t * t * (3 - 2 * t);
-    currentTipOffset = startOffset + eased * (endOffset - startOffset);
-    currentTailOffset = startOffset;
-    trailAlpha = Math.sin(Math.min(1.0, t * 1.5) * (Math.PI / 2));
+  } else if (rawProgress < strikeCutoff) {
+    // Phase 2: Active Strike Phase: Sword sweeps forward carving the arc from startOffset towards endOffset
+    const strikeP = (rawProgress - windupCutoff) / (strikeCutoff - windupCutoff);
+    const easedP = 1 - Math.pow(1 - strikeP, 2.5);
+    currentStartA = startOffset;
+    currentEndA = startOffset + (endOffset - startOffset) * easedP;
+    trailAlpha = Math.min(1.0, 0.45 + 0.55 * strikeP);
+  } else if (rawProgress < holdCutoff) {
+    // Phase 3: Impact Apex Hold: Full glorious arc held firmly at full extension during the impact freeze!
+    currentStartA = startOffset;
+    currentEndA = endOffset;
+    trailAlpha = 1.0;
   } else {
-    // Recovery Phase: Tip stays locked at final follow-through angle while tail cleanly erases
-    const recP = (rawProgress - cutCutoff) / (1.0 - cutCutoff);
-    const easedRec = 0.5 + 0.5 * Math.cos(recP * Math.PI);
-    currentTipOffset = endOffset;
-    currentTailOffset = endOffset - (endOffset - startOffset) * easedRec;
-    trailAlpha = Math.sin((1.0 - recP) * (Math.PI / 2));
+    // Phase 4: Recovery Phase: Smooth continuous dynamic eraser wipe starting from startOffset to endOffset (Escanor Method)
+    const recP = (rawProgress - holdCutoff) / (1.0 - holdCutoff);
+    const eraserP = Math.pow(Math.min(1.0, Math.max(0, recP)), 1.15);
+    currentStartA = startOffset + (endOffset - startOffset) * eraserP;
+    currentEndA = endOffset;
+    trailAlpha = Math.max(0, (1.0 - recP) * 0.95);
   }
 
-  if (trailAlpha <= 0.01 || Math.abs(currentTipOffset - currentTailOffset) < 0.04) return;
+  if (trailAlpha <= 0.01 || currentStartA >= currentEndA - 0.02) return;
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
@@ -1176,91 +1240,121 @@ export function drawIchigoSlashArc(ctx, fighter) {
   const P = 2.0; // Exact discrete pixel art grid unit matching Saitama
   const snap = (v) => Math.round(v / P) * P;
 
-  const outerRadius = r + (isMask ? 76 : (isShikai ? 80 : 70));
-  const maxThick = isMask ? 25.0 : (isShikai ? 27.0 : 23.0);
-  const span = currentTipOffset - currentTailOffset;
+  const outerRadius = r + (isMask ? 58 : (isShikai ? 56 : 54));
+  const maxThick = isMask ? 20.0 : (isShikai ? 22.0 : 18.0);
+  const span = currentEndA - currentStartA;
 
-  // 1. Color Palette Setup
-  let outlineCol = `rgba(0, 20, 58, ${0.92 * trailAlpha})`;
-  if (isBankai || isMask) {
-    outlineCol = `rgba(26, 0, 6, ${0.98 * trailAlpha})`; // Deep Obsidian Crimson outline
-  }
+  // ── 2. Attack PNG Model Rendering or Procedural Fallback ──
+  const isBankaiOrMask = isBankai || isMask;
+  const attackCfg = isBankaiOrMask ? ICHIGO_BANKAI_ATTACK_CONFIG : ICHIGO_SHIKAI_ATTACK_CONFIG;
+  const targetImg = isBankaiOrMask ? _getIchigoBankaiAttackImage() : _getIchigoShikaiAttackImage();
 
-  const isInsideSlash = (rx, ry) => {
-    const dist = Math.hypot(rx, ry);
-    if (dist <= 0) return false;
-    let ang = Math.atan2(ry, rx);
-    // Align angle within swing interval
-    while (ang < currentTailOffset - Math.PI) ang += Math.PI * 2;
-    while (ang > currentTipOffset + Math.PI) ang -= Math.PI * 2;
+  if (targetImg && targetImg.complete && (targetImg.naturalWidth > 0 || targetImg.width > 0)) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, trailAlpha));
 
-    const t = (ang - currentTailOffset) / span;
-    if (t < 0 || t > 1.0) return false;
+    // Dynamic sector clip [currentStartA, currentEndA] for Rule 2.6 / 15 Eraser Wipe (Escanor Method)
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, outerRadius * 2.5, currentStartA, currentEndA, false);
+    ctx.closePath();
+    ctx.clip();
 
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-    const thick = maxThick * taper;
-    const outR = outerRadius + taper * 1.5;
-    const inR = outR - thick;
-    return dist >= inR && dist <= outR;
-  };
+    const bankaiScale = outerRadius / attackCfg.baseR;
+    ctx.rotate(attackCfg.rotOffset);
+    ctx.scale(bankaiScale, bankaiScale);
+    ctx.drawImage(
+      targetImg,
+      -attackCfg.cx,
+      -attackCfg.cy,
+      targetImg.naturalWidth || targetImg.width || 1093,
+      targetImg.naturalHeight || targetImg.height || 1438
+    );
 
-  const minX = Math.floor((-outerRadius - P * 2) / P) * P;
-  const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
-  const minY = Math.floor((-outerRadius - P * 2) / P) * P;
-  const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+    ctx.restore();
+  } else {
+    // 1. Color Palette Setup
+    let outlineCol = `rgba(0, 20, 58, ${0.92 * trailAlpha})`;
+    if (isBankai || isMask) {
+      outlineCol = `rgba(26, 0, 6, ${0.98 * trailAlpha})`; // Deep Obsidian Crimson outline
+    }
 
-  // ── 2. Discrete 2D Crescent Body Grid with 4-Neighbor Attached Border ──
-  for (let gy = minY; gy <= maxY; gy += P) {
-    for (let gx = minX; gx <= maxX; gx += P) {
-      if (!isInsideSlash(gx, gy)) continue;
+    const isInsideSlash = (rx, ry) => {
+      const dist = Math.hypot(rx, ry);
+      if (dist <= 0) return false;
+      let ang = Math.atan2(ry, rx);
+      // Align angle within swing interval
+      while (ang < currentStartA - Math.PI) ang += Math.PI * 2;
+      while (ang > currentEndA + Math.PI) ang -= Math.PI * 2;
 
-      const pxX = snap(gx);
-      const pyY = snap(gy);
+      const t = (ang - currentStartA) / span;
+      if (t < 0 || t > 1.0) return false;
 
-      // 4-neighbor attached border test matching Saitama skin technique
-      const isBorder = !isInsideSlash(gx + P, gy) ||
-                       !isInsideSlash(gx - P, gy) ||
-                       !isInsideSlash(gx, gy + P) ||
-                       !isInsideSlash(gx, gy - P);
-
-      if (isBorder) {
-        ctx.fillStyle = outlineCol;
-        ctx.fillRect(pxX, pyY, P, P);
-        continue;
-      }
-
-      const dist = Math.hypot(gx, gy);
-      let ang = Math.atan2(gy, gx);
-      while (ang < currentTailOffset - Math.PI) ang += Math.PI * 2;
-      while (ang > currentTipOffset + Math.PI) ang -= Math.PI * 2;
-      const t = (ang - currentTailOffset) / span;
       const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+      const thick = maxThick * taper;
       const outR = outerRadius + taper * 1.5;
-      const depthFromApex = outR - dist;
+      const inR = outR - thick;
+      return dist >= inR && dist <= outR;
+    };
 
-      let col;
-      if (depthFromApex < P * 1.5) {
-        col = '#FFFFFF'; // Razor-sharp white-hot cutting edge
-      } else if (isBankai || isMask) {
-        // Kuroi Getsuga Black-Red Crimson Theme
-        if (depthFromApex < P * 3.4) {
-          col = '#FF0033'; // Electric vivid blood-crimson rim
-        } else if (depthFromApex < P * 5.4) {
-          col = '#8B0014'; // Transition deep burning crimson layer
-        } else {
-          col = '#080003'; // Abyssal pitch-black obsidian void core
+    const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+    const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+    const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+    const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+
+    // ── Discrete 2D Crescent Body Grid with 4-Neighbor Attached Border ──
+    for (let gy = minY; gy <= maxY; gy += P) {
+      for (let gx = minX; gx <= maxX; gx += P) {
+        if (!isInsideSlash(gx, gy)) continue;
+
+        const pxX = snap(gx);
+        const pyY = snap(gy);
+
+        // 4-neighbor attached border test matching Saitama skin technique
+        const isBorder = !isInsideSlash(gx + P, gy) ||
+                         !isInsideSlash(gx - P, gy) ||
+                         !isInsideSlash(gx, gy + P) ||
+                         !isInsideSlash(gx, gy - P);
+
+        if (isBorder) {
+          ctx.fillStyle = outlineCol;
+          ctx.fillRect(pxX, pyY, P, P);
+          continue;
         }
-      } else {
-        // Shikai Azure
-        if (depthFromApex < P * 3.4) {
-          col = '#00E5FF';
+
+        const dist = Math.hypot(gx, gy);
+        let ang = Math.atan2(gy, gx);
+        while (ang < currentStartA - Math.PI) ang += Math.PI * 2;
+        while (ang > currentEndA + Math.PI) ang -= Math.PI * 2;
+        const t = (ang - currentStartA) / span;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+        const outR = outerRadius + taper * 1.5;
+        const depthFromApex = outR - dist;
+
+        let col;
+        if (depthFromApex < P * 1.5) {
+          col = '#FFFFFF'; // Razor-sharp white-hot cutting edge
+        } else if (isBankai || isMask) {
+          // Kuroi Getsuga Black-Red Crimson Theme
+          if (depthFromApex < P * 3.4) {
+            col = '#FF0033'; // Electric vivid blood-crimson rim
+          } else if (depthFromApex < P * 5.4) {
+            col = '#8B0014'; // Transition deep burning crimson layer
+          } else {
+            col = '#080003'; // Abyssal pitch-black obsidian void core
+          }
         } else {
-          col = '#0055DD';
+          // Shikai Azure
+          if (depthFromApex < P * 3.4) {
+            col = '#00E5FF';
+          } else {
+            col = '#0055DD';
+          }
         }
+
+        ctx.fillStyle = col;
+        ctx.fillRect(pxX, pyY, P, P);
       }
-
-      ctx.fillStyle = col;
-      ctx.fillRect(pxX, pyY, P, P);
     }
   }
 
@@ -1268,7 +1362,7 @@ export function drawIchigoSlashArc(ctx, fighter) {
   const numEmbers = 8;
   for (let eb = 0; eb < numEmbers; eb++) {
     const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-    const ebAng = currentTailOffset + ebT * span;
+    const ebAng = currentStartA + ebT * span;
     const ebDist = outerRadius - 10 - eb * 4;
     const ex = snap(Math.cos(ebAng) * ebDist);
     const ey = snap(Math.sin(ebAng) * ebDist);

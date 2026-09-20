@@ -271,18 +271,21 @@ export class RubyFighter extends Fighter {
             spawnBloodEffect(target, 5);
           }
 
-          // Kill target's own velocity so they can't resist the pull
-          target.vx *= 0.3;
-          target.vy *= 0.3;
+          const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToPull || target.immuneToKnockback));
+          if (!isTargetImmune) {
+            // Kill target's own velocity so they can't resist the pull
+            target.vx *= 0.3;
+            target.vy *= 0.3;
 
-          // Smooth spring pull: lerp them towards the minimum distance
-          const pullLerp = 0.15; // 15% of the remaining distance per frame
-          const minDistance = this.r + target.r + 5; // leave a 5px buffer so models don't perfectly overlap
-          if (dist > minDistance) {
-            // Cap the maximum move distance per frame to 14 pixels to prevent "teleporting/warping"
-            const moveDist = Math.min((dist - minDistance) * pullLerp, 14.0);
-            target.x += (dx / dist) * moveDist;
-            target.y += (dy / dist) * moveDist;
+            // Smooth spring pull: lerp them towards the minimum distance
+            const pullLerp = 0.15; // 15% of the remaining distance per frame
+            const minDistance = this.r + target.r + 5; // leave a 5px buffer so models don't perfectly overlap
+            if (dist > minDistance) {
+              // Cap the maximum move distance per frame to 14 pixels to prevent "teleporting/warping"
+              const moveDist = Math.min((dist - minDistance) * pullLerp, 14.0);
+              target.x += (dx / dist) * moveDist;
+              target.y += (dy / dist) * moveDist;
+            }
           }
         }
       }
@@ -351,16 +354,19 @@ export class RubyFighter extends Fighter {
           triggerGlobalScreenShake(8, 8);
           
           // Pull target closer
-          const dx = this.x - f.x;
-          const dy = this.y - f.y;
-          const dist = Math.hypot(dx, dy) || 1;
-          const minDistance = this.r + f.r;
-          if (dist > minDistance) {
-            // Pull them a fixed distance towards Ruby
-            const pullAmount = cfg.passiveSpinPullAmount || 30;
-            const moveDist = Math.min(pullAmount, dist - minDistance);
-            f.x += (dx / dist) * moveDist;
-            f.y += (dy / dist) * moveDist;
+          const isFImmune = Boolean(f && (f.characterId === 'escanor' || f.type === 'escanor' || f.immuneToPull || f.immuneToKnockback));
+          if (!isFImmune) {
+            const dx = this.x - f.x;
+            const dy = this.y - f.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const minDistance = this.r + f.r;
+            if (dist > minDistance) {
+              // Pull them a fixed distance towards Ruby
+              const pullAmount = cfg.passiveSpinPullAmount || 30;
+              const moveDist = Math.min(pullAmount, dist - minDistance);
+              f.x += (dx / dist) * moveDist;
+              f.y += (dy / dist) * moveDist;
+            }
           }
           
           // Apply 1-second slow

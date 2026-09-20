@@ -147,8 +147,12 @@ export function modUpdateMeleeCombat(customTarget = null) {
         const didDamage = applyDamageToTarget(target, damage, this);
         
         if (didDamage !== false) {
-          target.vx += Math.cos(angleToTarget) * knockback;
-          target.vy += Math.sin(angleToTarget) * knockback;
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(Math.cos(angleToTarget) * knockback, Math.sin(angleToTarget) * knockback);
+          } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+            target.vx += Math.cos(angleToTarget) * knockback;
+            target.vy += Math.sin(angleToTarget) * knockback;
+          }
         }
 
         // Visual effects (Suppress standard punch impact visual when Black Flash is triggered)

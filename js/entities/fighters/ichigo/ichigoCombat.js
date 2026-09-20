@@ -252,9 +252,10 @@ export function performMeleeCleave(fighter, target) {
     baseCooldown = Math.round(baseCooldown * maskCdMult);
   }
   fighter.swordCooldown = baseCooldown;
-  const swingDur = CONFIG.ichigo?.swordSwingDuration || 22;
+  const swingDur = CONFIG.ichigo?.swordSwingDuration || 26;
   fighter.slashSwingTimer = swingDur;
   fighter.slashSwingMaxTimer = swingDur;
+  fighter.slashSwingVariant = (fighter.slashSwingVariant === 1) ? 2 : 1;
 
   fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
 
@@ -599,9 +600,10 @@ export function updateShunpoCombat(fighter, opponent) {
 
         if (fighter.shunpoComboStep < maxSteps) {
           // Intermediate Flurry Strike
-          const s1Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike1Duration || 10) : (CONFIG.ichigo?.shunpoStrike1SlashDuration || 14);
+          const s1Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike1Duration || 14) : (CONFIG.ichigo?.shunpoStrike1SlashDuration || CONFIG.ichigo?.shunpoStrikeDuration || 16);
           fighter.slashSwingTimer = s1Duration;
           fighter.slashSwingMaxTimer = s1Duration;
+          fighter.slashSwingVariant = (fighter.shunpoComboStep % 2 === 0) ? 2 : 1;
           fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
 
           if (typeof target.applyHitStun === 'function') {
@@ -620,13 +622,14 @@ export function updateShunpoCombat(fighter, opponent) {
           }
 
           fighter.shunpoComboDelayTimer = isBankai 
-            ? (CONFIG.ichigo?.bankaiShunpoComboDelayFrames || 5) 
+            ? (CONFIG.ichigo?.bankaiShunpoComboDelayFrames || 6) 
             : (CONFIG.ichigo?.shunpoComboDelayFrames || 8);
         } else {
           // Final Finisher Strike
-          const s2Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike2Duration || 14) : (CONFIG.ichigo?.shunpoStrike2SlashDuration || 16);
+          const s2Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike2Duration || 18) : (CONFIG.ichigo?.shunpoStrike2SlashDuration || CONFIG.ichigo?.shunpoFinisherDuration || 20);
           fighter.slashSwingTimer = s2Duration;
           fighter.slashSwingMaxTimer = s2Duration;
+          fighter.slashSwingVariant = 2; // Grand fiery finisher
           fighter._playSound('shunpoFinisherSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
 
           const strike2Mult = CONFIG.ichigo?.shunpoStrike2Multiplier || 1.35;

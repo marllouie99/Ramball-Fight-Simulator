@@ -59,6 +59,11 @@ export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple')
     return true;
   }
 
+  // Escanor is completely immune to any gravitational/vortex suction & pull mechanics
+  if (entity.characterId === 'escanor' || entity.type === 'escanor' || entity.immuneToPull) {
+    return true;
+  }
+
   // Saitama Serious Skill Counter charging/striking hyper-armor
   const isSaitama = (entity.characterId === 'saitama' || entity.type === 'saitama');
   if (isSaitama && (entity.isCountering || (entity._counterPunchTimer && entity._counterPunchTimer > 0) || (entity._counterWindupTimer && entity._counterWindupTimer > 0) || (entity._postCounterRecoveryTimer && entity._postCounterRecoveryTimer > 0))) {
@@ -601,7 +606,10 @@ export class Fighter {
     if (this.isGrabbedByMahoraga) return true;
     if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
     if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
-    if (this.chopHitPauseTimer && this.chopHitPauseTimer > 0) return true;
+    // NOTE: chopHitPauseTimer is intentionally NOT checked here. It is an attacker-side timer
+    // (set only on Escanor during his cinematic hit-pause). The TARGET receives timeStopTimer
+    // via applyTimeStop() which is already checked above. Checking chopHitPauseTimer here was
+    // incorrectly suppressing the attacker's own slash arc visual effects during the freeze.
     if (this.isRevivingFromContract || this.isShatterReviving || (this.reviveStasisTimer && this.reviveStasisTimer > 0)) return true;
     if (this.isCaughtInBlackHole || this._insideBlackHole || (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam())) return true;
     if (this.statusEffects && (this.statusEffects.timeStopTimer > 0 || this.statusEffects.paralyzeTimer > 0 || this.statusEffects.isParalyzed)) return true;
@@ -646,6 +654,29 @@ export class Fighter {
    */
   isImmuneToGravitationalPull(vortexType = 'purple') {
     return isEntityImmuneToGravitationalPull(this, vortexType);
+  }
+
+  /**
+   * Universal knockback application method for fighters.
+   * Respected by all standard combat systems and easily overridden by immune entities.
+   * @param {number} vx
+   * @param {number} vy
+   * @param {number|object} [opts=0]
+   */
+  applyKnockback(vx, vy, opts = 0) {
+    if (this.immuneToKnockback || this.immuneToPush || this.characterId === 'escanor' || this.type === 'escanor') {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    const stunDuration = typeof opts === 'number' ? opts : (opts?.stunDuration || 0);
+    this.knockbackVx = (this.knockbackVx || 0) + (Number(vx) || 0);
+    this.knockbackVy = (this.knockbackVy || 0) + (Number(vy) || 0);
+    this.vx = (this.vx || 0) + (Number(vx) || 0);
+    this.vy = (this.vy || 0) + (Number(vy) || 0);
+    if (stunDuration > 0 && typeof this.applyHitStun === 'function') {
+      this.applyHitStun(stunDuration);
+    }
   }
 
   /**
@@ -1611,7 +1642,7 @@ export class Fighter {
   handleBleed() { this.handleStatusEffects(); }
 
   applyPoison(attacker) { this.statusEffects.applyPoison(attacker); }
-  applyBurn(attacker) { this.statusEffects.applyBurn(attacker); }
+  applyBurn(attacker, duration) { this.statusEffects.applyBurn(attacker, duration); }
   applyBleed(attacker, duration, damagePerTick, intervalFrames) {
     this.statusEffects.applyBleed(attacker, duration, damagePerTick, intervalFrames);
   }
@@ -3374,5 +3405,21 @@ export class Fighter {
     ctx.fill();
 
     ctx.restore();
+  }
+
+  /** Applies physical directional knockback and stun duration to this fighter. */
+  applyKnockback(vx, vy, stunFrames = 0) {
+    if (this.immuneToKnockback || this.immuneToPush || this.characterId === 'escanor' || this.type === 'escanor') {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    if (this.knockbackVx !== undefined) this.knockbackVx = (this.knockbackVx || 0) + vx;
+    if (this.knockbackVy !== undefined) this.knockbackVy = (this.knockbackVy || 0) + vy;
+    this.vx += vx;
+    this.vy += vy;
+    if (stunFrames > 0) {
+      this.knockbackStunTimer = Math.max(this.knockbackStunTimer || 0, stunFrames);
+    }
   }
 }

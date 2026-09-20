@@ -8792,6 +8792,115 @@ async function main() {
   }
 
   // ─────────────────────────────────────────────
+  // 37.1 ESCANOR MODEL & PIXEL BODY CANVAS STACK TEST
+  // ─────────────────────────────────────────────
+  try {
+    console.log('☀️ [Escanor Model & Pixel Body Test] Verifying Escanor pixel art skin, Escanor-hair.png overlay, Escanor-mustache.png overlay, lowered holy knight armor, and Canvas stack balance...');
+    const { drawEscanorPixelBody, drawEscanorSkin, _drawEscanorHair, _getEscanorHairImage, _drawEscanorMustache, _getEscanorMustacheImage } = await import('../js/graphics/fighters/escanorSkin.js');
+
+    const hairImg = _getEscanorHairImage();
+    if (!hairImg) {
+      throw new Error('_getEscanorHairImage() returned null or undefined');
+    }
+
+    const mustacheImg = _getEscanorMustacheImage();
+    if (!mustacheImg) {
+      throw new Error('_getEscanorMustacheImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    drawEscanorPixelBody(mockCtx, 25, false);
+    assertCanvasStackBalance('drawEscanorPixelBody(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    drawEscanorPixelBody(mockCtx, 25, true);
+    assertCanvasStackBalance('drawEscanorPixelBody(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    _drawEscanorHair(mockCtx, 25, false);
+    assertCanvasStackBalance('_drawEscanorHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawEscanorHair(mockCtx, 25, true);
+    assertCanvasStackBalance('_drawEscanorHair(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    _drawEscanorMustache(mockCtx, 25, false);
+    assertCanvasStackBalance('_drawEscanorMustache(mockCtx, 25, false)');
+
+    const { drawDivineAxeRhitta, drawRhittaSlashArc, _getEscanorSlashEffectImage, drawRhittaSolarFlash } = await import('../js/graphics/weapons/escanorWeaponGraphics.js');
+
+    const slashEffectImg = _getEscanorSlashEffectImage();
+    if (!slashEffectImg) {
+      throw new Error('_getEscanorSlashEffectImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    drawRhittaSlashArc(mockCtx, 0, 0, 0, 25, { phase: 'strike', strikeP: 0.5 }, false, 100);
+    assertCanvasStackBalance('drawRhittaSlashArc(strike phase)');
+
+    mockCtx.resetStackDepth();
+    drawRhittaSlashArc(mockCtx, 0, 0, 0, 25, { phase: 'hitPause', strikeP: 1.0, pauseP: 0.2 }, false, 100);
+    assertCanvasStackBalance('drawRhittaSlashArc(hitPause phase)');
+
+    mockCtx.resetStackDepth();
+    drawRhittaSlashArc(mockCtx, 0, 0, 0, 25, { phase: 'recovery', recP: 0.5 }, true, 120);
+    assertCanvasStackBalance('drawRhittaSlashArc(recovery phase)');
+
+    mockCtx.resetStackDepth();
+    drawRhittaSolarFlash(mockCtx, 50, 50, false, 0.8);
+    assertCanvasStackBalance('drawRhittaSolarFlash(false, 0.8)');
+
+    mockCtx.resetStackDepth();
+    drawRhittaSolarFlash(mockCtx, 50, 50, true, 1.0);
+    assertCanvasStackBalance('drawRhittaSolarFlash(true, 1.0)');
+
+    const EscanorClass = FIGHTER_CLASS_MAP.escanor;
+    if (!EscanorClass) {
+      throw new Error('FIGHTER_CLASS_MAP.escanor not found');
+    }
+
+    const escanor = new EscanorClass({ x: 300, y: 300, color: '#f59e0b', controls: {} });
+
+    // Right-facing standard skin render
+    escanor.gunAngle = 0;
+    mockCtx.resetStackDepth();
+    drawEscanorSkin(mockCtx, escanor);
+    assertCanvasStackBalance('drawEscanorSkin(mockCtx, escanor [facing right])');
+
+    // Left-facing inverted skin render (Rule 19 vertical mirror)
+    escanor.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawEscanorSkin(mockCtx, escanor);
+    assertCanvasStackBalance('drawEscanorSkin(mockCtx, escanor [facing left])');
+
+    // The One mode
+    escanor.isTheOneActive = true;
+    mockCtx.resetStackDepth();
+    drawEscanorSkin(mockCtx, escanor);
+    assertCanvasStackBalance('drawEscanorSkin(mockCtx, escanor [the one active])');
+    escanor.isTheOneActive = false;
+
+    // Winner reveal podium mode
+    escanor._isWinnerReveal = true;
+    mockCtx.resetStackDepth();
+    drawEscanorSkin(mockCtx, escanor);
+    assertCanvasStackBalance('drawEscanorSkin(mockCtx, escanor [winner reveal])');
+    escanor._isWinnerReveal = false;
+
+    // Skin Studio showSkinOnly mode (Rule 20)
+    state.showSkinOnly = true;
+    mockCtx.resetStackDepth();
+    drawEscanorSkin(mockCtx, escanor);
+    assertCanvasStackBalance('drawEscanorSkin(mockCtx, escanor [showSkinOnly])');
+    state.showSkinOnly = false;
+  } catch (err) {
+    console.log('❌ [ESCANOR MODEL & PIXEL BODY TEST ERROR]:', err.stack || err.message || err);
+    errors++;
+    errorList.push(`[ESCANOR MODEL & PIXEL BODY TEST]: ${err.stack || err.message || err}`);
+  }
+
+  // ─────────────────────────────────────────────
   // 38. GOJO RED & PURPLE AUTO-AIM CHANNELING TEST
   // ─────────────────────────────────────────────
   try {

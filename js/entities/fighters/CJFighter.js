@@ -1811,8 +1811,12 @@ export class CJFighter extends Fighter {
 
         // Kinetic Pushback
         const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        target.vx = (target.vx || 0) + Math.cos(kbAngle) * baseKb;
-        target.vy = (target.vy || 0) + Math.sin(kbAngle) * baseKb;
+        if (typeof target.applyKnockback === 'function') {
+          target.applyKnockback(Math.cos(kbAngle) * baseKb, Math.sin(kbAngle) * baseKb);
+        } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+          target.vx = (target.vx || 0) + Math.cos(kbAngle) * baseKb;
+          target.vy = (target.vy || 0) + Math.sin(kbAngle) * baseKb;
+        }
 
         // Visual Spark FX & Impact Flash
         if (typeof spawnImpactFlash === 'function') {

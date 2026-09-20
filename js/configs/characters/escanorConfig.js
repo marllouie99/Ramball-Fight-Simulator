@@ -9,8 +9,10 @@ export const escanorConfig = {
   maxHpRatio: 1.0,
   speed: 5.7,
   moveSpeed: 5.0,
-  r: 25,
-  radius: 25,
+  r: 28,
+  radius: 28,
+  theOneRadiusBonus: 6,         // Physical body size expansion during "THE ONE" (+6px radius -> 34px)
+  prideRadiusBonusPerStack: 1.0,// +1.0px body radius per Solar Pride stack (+5px at max stacks)
   color: '#F59E0B',            // Radiant Solar Amber
   themeColor: '#F59E0B',
   secondaryColor: '#DC2626',   // Solar Flare Crimson
@@ -30,29 +32,38 @@ export const escanorConfig = {
   // ──────────────────────────────────────────
   // ABILITY MASTER TOGGLE SWITCHES
   // ──────────────────────────────────────────
-  enableSunshine: 0,
-  enableCruelSun: 0,
-  enablePrideFlare: 0,
-  enableTheOne: 0,
+  enableSunshine: true,             // Master toggle for Passive: Grace "Sunshine" heat aura & Solar Pride escalation
+  enableCruelSun: true,             // Master toggle for Skill 1: Cruel Sun (無慈悲な太陽)
+  enablePrideFlare: true,           // Master toggle for Skill 2: Pride Flare (プライド・フレア)
+  enableTheOne: true,               // Master toggle for Ultimate: "THE ONE" — Divine Sword Escanor (天地無双)
 
   // Passive 1: Grace "Sunshine" & Thermal Updraft
-  sunshineHeatRadius: 65,
+  sunshineHeatRadius: 100,
   sunshineHeatDps: 3,
   thermalUpdraftSlow: 0.15,
 
   // Passive 2: Solar Pride Escalation
-  prideStackMax: 5,
+  prideStackMax: 2,
   prideStackDamageBonus: 0.08,  // +8% damage per stack (max +40%)
   prideChargeIntervalFrames: 150, // 1 stack every 2.5s passively
 
+  // Passive 3: Solar Armor & Holy Knight DEF (Damage Reduction)
+  defense: 0.20,                // Base 20% flat damage reduction / armor mitigation
+  prideDefBonusPerStack: 0.02,  // +2% DEF per Solar Pride stack (+10% at 5 stacks)
+  theOneDefenseBonus: 0.25,     // +25% DEF bonus during "THE ONE" (invincible noon state)
+  liftingDefenseBonus: 0.15,    // +15% DEF poise bonus while lifting/poised with Rhitta
+  armorDeflectSparks: true,     // Golden armor deflection sparks and audio on absorbing hits
+
   // Basic Attack: Divine Axe Rhitta — Telegraphed Overhead Chop Strike (Missable)
   rhittaArcAngle: Math.PI * 0.778, // ~140 degrees
-  rhittaReach: 100,
+  rhittaReach: 100,             // Baseline reach in pixels at 0 pride stacks
+  theOneReachMultiplier: 1.55,  // +55% weapon attack reach (155px reach) during "THE ONE"
+  prideReachBonusPerStack: 0.06,// +6% weapon attack reach per Solar Pride stack (+30% reach at 5 stacks)
   chopLiftFrames: 80,              // Frames to lift axe up from guard to high overhead (~0.33s)
   chopLiftHoldFrames: 100,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
   chopStrikeFrames: 15,             // Frames for the explosive downward chop stroke (~0.13s)
   chopRecoveryFrames: 50,          // Frames to recover back to resting pose (~0.20s)
-  chopHitPauseFrames: 14,          // Cinematic hit-pause frame freeze upon axe impact (like Nanami's ratio impact)
+  chopHitPauseFrames: 10,          // Cinematic hit-pause frame freeze upon axe impact (like Nanami's ratio impact)
   basicImpactShake: 7.0,           // Concussive arena shake on initial weapon contact
   basicImpactShakeDuration: 12,
   basicUnpauseShake: 10.0,         // Heavy explosive arena shake on knockback release
@@ -95,6 +106,6 @@ export const escanorConfig = {
   theOneDuration: 480,         // 8.0s
   theOneDamageMultiplier: 1.45,
   theOneFinisherDamage: 115,
-  theOneFinisherReach: 120,
+  theOneFinisherReach: 165,    // Expanded from 120 -> 165 to reflect his colossal giant reach during THE ONE
   theOneFinisherKnockback: 42.0,
 };

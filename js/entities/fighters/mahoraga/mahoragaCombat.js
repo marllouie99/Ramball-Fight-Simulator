@@ -292,9 +292,12 @@ export function executeCleave(fighter, opponent) {
   for (const target of frontTargets) {
     target.takeDamage(damage, fighter, { isMelee: true });
     if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
-    const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-    target.vx += Math.cos(pushAngle) * 20;
-    target.vy += Math.sin(pushAngle) * 20;
+    const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
+    if (!isTargetImmune) {
+      const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+      target.vx += Math.cos(pushAngle) * 20;
+      target.vy += Math.sin(pushAngle) * 20;
+    }
   }
 }
 
@@ -568,23 +571,17 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       targetPinnedX += (Math.random() - 0.5) * struggleJitter;
       targetPinnedY += (Math.random() - 0.5) * struggleJitter;
 
-      target.x = Math.max(minX, Math.min(maxX, targetPinnedX));
-      target.y = Math.max(minY, Math.min(maxY, targetPinnedY));
-
-      // Continuous golden and crimson cursed sparks dripping from the impale puncture wound
-      if (Math.random() < 0.65) {
-        spawnSparks(target.x, target.y - (target.z || 0), 2, 'gold', '#FFD700');
-        if (Math.random() < 0.35) {
-          spawnSparks(target.x, target.y - (target.z || 0), 1, 'crimson', '#FF2222');
-        }
+      const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush || target.immuneToPull));
+      if (!isTargetImmune) {
+        target.x = Math.max(minX, Math.min(maxX, targetPinnedX));
+        target.y = Math.max(minY, Math.min(maxY, targetPinnedY));
+        target.vx = 0;
+        target.vy = 0;
+        target.isGrabbedByMahoraga = true;
       }
+      if (typeof target.aim === 'function') target.aim(fighter);
+      if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
     }
-
-    target.vx = 0;
-    target.vy = 0;
-    target.isGrabbedByMahoraga = true;
-    if (typeof target.aim === 'function') target.aim(fighter);
-    if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
 
     if (fighter.wallSlamTimer >= holdFrames) { // Hold completed
       fighter.wallSlamPhase = 'punch'; 
@@ -620,13 +617,16 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     }
     
     // Keep target locked during the punch hitpause
-    const punchAngle = angle;
-    const punchHitOffset = 16;
-    target.x = Math.max(minX, Math.min(maxX, fighter.x + Math.cos(punchAngle) * (fighter.r + target.r + punchHitOffset)));
-    target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(punchAngle) * (fighter.r + target.r + punchHitOffset)));
-    target.vx = 0;
-    target.vy = 0;
-    target.isGrabbedByMahoraga = true;
+    const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush || target.immuneToPull));
+    if (!isTargetImmune) {
+      const punchAngle = angle;
+      const punchHitOffset = 16;
+      target.x = Math.max(minX, Math.min(maxX, fighter.x + Math.cos(punchAngle) * (fighter.r + target.r + punchHitOffset)));
+      target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(punchAngle) * (fighter.r + target.r + punchHitOffset)));
+      target.vx = 0;
+      target.vy = 0;
+      target.isGrabbedByMahoraga = true;
+    }
     if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
 
     const hitpause = CONFIG.mahoraga?.wallSlamPunchHitpause ?? 16;
@@ -654,10 +654,13 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   // ── PHASE 2: SUPERSONIC WALL THROW ──
   else if (fighter.wallSlamPhase === 'throw') {
     target.isGrabbedByMahoraga = false;
+    const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush || target.immuneToPull));
     
     // Launch target at supersonic velocity forward toward arena wall along punch trajectory
-    target.x += fighter.wallSlamTargetVelX;
-    target.y += fighter.wallSlamTargetVelY;
+    if (!isTargetImmune) {
+      target.x += fighter.wallSlamTargetVelX;
+      target.y += fighter.wallSlamTargetVelY;
+    }
 
     // Per-frame strict clamping to prevent target from ever clipping outside arena boundaries
     const hitLeft = (fighter.wallSlamTargetVelX < -0.1 && target.x <= minX);
@@ -669,8 +672,10 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     target.x = Math.max(minX, Math.min(maxX, target.x));
     target.y = Math.max(minY, Math.min(maxY, target.y));
 
-    target.vx = fighter.wallSlamTargetVelX;
-    target.vy = fighter.wallSlamTargetVelY;
+    if (!isTargetImmune) {
+      target.vx = fighter.wallSlamTargetVelX;
+      target.vy = fighter.wallSlamTargetVelY;
+    }
 
     if (hitWall || fighter.wallSlamTimer >= 30) {
       // Final clamp target within arena boundary at wall

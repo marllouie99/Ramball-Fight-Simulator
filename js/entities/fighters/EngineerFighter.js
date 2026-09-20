@@ -498,8 +498,12 @@ export class EngineerFighter extends Fighter {
 
           // 2. Physical Knockback Impulse & Hit-Stun
           const pushForce = cfg.wrenchPushForce || 12;
-          target.vx = (target.vx || 0) + Math.cos(facing) * (pushForce * 0.55);
-          target.vy = (target.vy || 0) + Math.sin(facing) * (pushForce * 0.55);
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(Math.cos(facing) * (pushForce * 0.55), Math.sin(facing) * (pushForce * 0.55));
+          } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+            target.vx = (target.vx || 0) + Math.cos(facing) * (pushForce * 0.55);
+            target.vy = (target.vy || 0) + Math.sin(facing) * (pushForce * 0.55);
+          }
           if (typeof target.applyHitStun === 'function') target.applyHitStun(cfg.wrenchHitStunDuration || 8);
 
           // 3. Audio & Visual Impact (Industrial Welding Sparks + Metallic Flash + Blood)

@@ -1753,26 +1753,38 @@ export function getSkillDataForFighter(f, getProjectiles) {
   if (f.characterId === 'escanor' || f.type === 'escanor') {
     const themeColor = f.color || '#F59E0B';
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const skills = [];
 
-    const theOneMax = f.theOneCooldownMax || cfg.theOneCooldown || 1560;
-    const theOneTimer = f.theOneCooldown !== undefined ? f.theOneCooldown : 0;
-    const theOnePct = f.isTheOneActive
-      ? Math.max(0, Math.min(100, (f.theOneTimer / (f.theOneMaxTimer || 480)) * 100))
-      : Math.max(0, Math.min(100, (1 - (theOneTimer / theOneMax)) * 100));
+    // 1. Ultimate: "THE ONE" — Divine Sword Escanor (Toggle: enableTheOne)
+    const enableTheOne = cfg.enableTheOne ?? true;
+    if (Boolean(enableTheOne)) {
+      const theOneMax = f.theOneCooldownMax || cfg.theOneCooldown || 1560;
+      const theOneTimer = f.theOneCooldown !== undefined ? f.theOneCooldown : 0;
+      const theOnePct = f.isTheOneActive
+        ? Math.max(0, Math.min(100, (f.theOneTimer / (f.theOneMaxTimer || 480)) * 100))
+        : Math.max(0, Math.min(100, (1 - (theOneTimer / theOneMax)) * 100));
+      skills.push({ id: 'the_one', pct: theOnePct, ready: theOnePct >= 99 || f.isTheOneActive, color: themeColor, label: f.isTheOneActive ? 'THE ONE (ACTIVE)' : '"THE ONE"' });
+    }
 
-    const cruelMax = f.cruelSunCooldownMax || cfg.cruelSunCooldown || 510;
-    const cruelTimer = f.cruelSunCooldown !== undefined ? f.cruelSunCooldown : 0;
-    const cruelPct = Math.max(0, Math.min(100, (1 - (cruelTimer / cruelMax)) * 100));
+    // 2. Skill 1: Cruel Sun (Toggle: enableCruelSun)
+    const enableCruelSun = cfg.enableCruelSun ?? true;
+    if (Boolean(enableCruelSun)) {
+      const cruelMax = f.cruelSunCooldownMax || cfg.cruelSunCooldown || 510;
+      const cruelTimer = f.cruelSunCooldown !== undefined ? f.cruelSunCooldown : 0;
+      const cruelPct = Math.max(0, Math.min(100, (1 - (cruelTimer / cruelMax)) * 100));
+      skills.push({ id: 'cruel_sun', pct: cruelPct, ready: cruelPct >= 99, color: themeColor, label: 'CRUEL SUN' });
+    }
 
-    const prideMax = f.prideFlareCooldownMax || cfg.prideFlareCooldown || 660;
-    const prideTimer = f.prideFlareCooldown !== undefined ? f.prideFlareCooldown : 0;
-    const pridePct = Math.max(0, Math.min(100, (1 - (prideTimer / prideMax)) * 100));
+    // 3. Skill 2: Pride Flare (Toggle: enablePrideFlare)
+    const enablePrideFlare = cfg.enablePrideFlare ?? true;
+    if (Boolean(enablePrideFlare)) {
+      const prideMax = f.prideFlareCooldownMax || cfg.prideFlareCooldown || 660;
+      const prideTimer = f.prideFlareCooldown !== undefined ? f.prideFlareCooldown : 0;
+      const pridePct = Math.max(0, Math.min(100, (1 - (prideTimer / prideMax)) * 100));
+      skills.push({ id: 'pride_flare', pct: pridePct, ready: pridePct >= 99, color: themeColor, label: 'PRIDE FLARE' });
+    }
 
-    return [
-      { id: 'the_one', pct: theOnePct, ready: theOnePct >= 99 || f.isTheOneActive, color: themeColor, label: f.isTheOneActive ? 'THE ONE (ACTIVE)' : '"THE ONE"' },
-      { id: 'cruel_sun', pct: cruelPct, ready: cruelPct >= 99, color: themeColor, label: 'CRUEL SUN' },
-      { id: 'pride_flare', pct: pridePct, ready: pridePct >= 99, color: themeColor, label: 'PRIDE FLARE' }
-    ];
+    return skills;
   }
 
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {

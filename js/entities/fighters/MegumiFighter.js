@@ -258,8 +258,12 @@ export class MegumiFighter extends Fighter {
           spawnSparks(target.x, target.y, 10, '#CBD5E1', '#F1F5F9');
 
           // Directional knockback push
-          target.vx = (target.vx || 0) + Math.cos(facing) * pushForce;
-          target.vy = (target.vy || 0) + Math.sin(facing) * pushForce;
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(Math.cos(facing) * pushForce, Math.sin(facing) * pushForce);
+          } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+            target.vx = (target.vx || 0) + Math.cos(facing) * pushForce;
+            target.vy = (target.vy || 0) + Math.sin(facing) * pushForce;
+          }
         }
 
         // Heavy screen shake on impact
@@ -487,11 +491,12 @@ export class MegumiFighter extends Fighter {
 
           if (typeof target.applyKnockback === 'function') {
             target.applyKnockback(kx, ky);
+          } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+            target.knockbackVx = (target.knockbackVx || 0) + kx;
+            target.knockbackVy = (target.knockbackVy || 0) + ky;
+            target.vx = (target.vx || 0) + kx;
+            target.vy = (target.vy || 0) + ky;
           }
-          target.knockbackVx = (target.knockbackVx || 0) + kx;
-          target.knockbackVy = (target.knockbackVy || 0) + ky;
-          target.vx = (target.vx || 0) + kx;
-          target.vy = (target.vy || 0) + ky;
 
           spawnBloodEffect(target.x, target.y, 12);
           spawnSparks(target.x, target.y, 16, '#2EE6A8', '#FFFFFF');

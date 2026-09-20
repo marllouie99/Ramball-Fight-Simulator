@@ -224,6 +224,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
           if (!ent.isBaguvixActive && !ent.isGodModeActive) {
             const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
             const isIchigo = ent.characterId === 'ichigo' || ent.type === 'ichigo' || (ent._def && (ent._def.id === 'ichigo' || ent._def.type === 'ichigo'));
+            const isEscanor = ent.characterId === 'escanor' || ent.type === 'escanor' || ent.immuneToKnockback || ent.immuneToPush;
             if (isMakimaShatter) {
               ent.vx = 0;
               ent.vy = 0;
@@ -233,7 +234,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
                 ent.x = ent._shatterLockedX;
                 ent.y = ent._shatterLockedY;
               }
-            } else if (!isIchigo) {
+            } else if (!isIchigo && !isEscanor) {
               const pushForce = p.knockback || 6;
               const pushAngle = p.angle;
               if (typeof ent.applyKnockback === 'function') {

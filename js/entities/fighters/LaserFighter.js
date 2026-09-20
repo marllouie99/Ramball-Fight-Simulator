@@ -140,7 +140,7 @@ export class LaserFighter extends Fighter {
 
         // Optional start push using existing config magnitude.
         const startPush = Number(CONFIG.laser.initialKnockback) || 0;
-        if (startPush !== 0) {
+        if (startPush !== 0 && !target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
           target.vx += (dx / dist) * startPush;
           target.vy += (dy / dist) * startPush;
         }
@@ -167,7 +167,7 @@ export class LaserFighter extends Fighter {
       if (applied) {
         // Continuous push direction (from beam owner -> target)
         const pushStrength = Number(CONFIG.laser.initialKnockback) || 0;
-        if (pushStrength !== 0) {
+        if (pushStrength !== 0 && !target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
           target.vx += (dx / dist) * pushStrength;
           target.vy += (dy / dist) * pushStrength;
         }
@@ -536,7 +536,7 @@ export class LaserFighter extends Fighter {
       spawnSparks(target.x, target.y, 3, 'laserHit');
 
       // Optional: pushback effect when laser hits
-      if (!this.initialHitDone) {
+      if (!this.initialHitDone && !target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
         const knockbackStrength = 1.0;
         const dx = target.x - this.x;
         const dy = target.y - this.y;

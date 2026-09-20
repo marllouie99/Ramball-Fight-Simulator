@@ -29,7 +29,7 @@ export const ichigoConfig = {
   swordRange: 50,                // Melee reach distance
   swordArc: 140,                 // Frontal cleave arc cone in degrees
   swordFreezeDuration: 8,        // Target hit-pause freeze frames on melee strike
-  swordSwingDuration: 22,        // Melee slash swing animation duration in frames
+  swordSwingDuration: 26,        // Melee slash swing animation duration in frames
   knockback: 0,                  // Base melee knockback force
   swordScreenShake: 3.0,         // Screen shake intensity on basic melee hit
   swordShockwaveSize: 35,        // Shockwave burst size on sword hit
@@ -45,10 +45,10 @@ export const ichigoConfig = {
   shunpoTargetOffset: 34,        // Distance offset from target center on arrival
   shunpoStrikeDamage: 8,         // Base damage for intermediate flurry slashes
   shunpoStrike1Damage: 8,        // Backward-compatibility alias
-  shunpoStrikeDuration: 14,      // Intermediate swing animation duration in frames
+  shunpoStrikeDuration: 16,      // Intermediate swing animation duration in frames
   shunpoFinisherMultiplier: 1.1, // Damage multiplier for final flurry strike
   shunpoStrike2Multiplier: 1.1,  // Backward-compatibility alias
-  shunpoFinisherDuration: 16,    // Finisher swing animation duration in frames
+  shunpoFinisherDuration: 20,    // Finisher swing animation duration in frames
   shunpoFinisherKnockback: 7,    // Finisher knockback force
   shunpoStrike2Knockback: 7,     // Backward-compatibility alias
   shunpoScreenShake: 4.0,        // Screen shake intensity on flurry finisher hit
@@ -124,6 +124,8 @@ export const ichigoConfig = {
   bankaiDamageMultiplier: 1.1,   // 20% melee damage boost during Bankai
   bankaiComboCooldownMultiplier: 0.50, // 50% combo cooldown reduction during Bankai (~3.7s cooldown)
   bankaiShunpoStrikes: 8,        // Flurry strikes increased to 6 in Bankai
+  bankaiShunpoStrike1Duration: 14, // Bankai intermediate flurry strike duration
+  bankaiShunpoStrike2Duration: 18, // Bankai finisher strike duration
   bankaiShunpoDashDuration: 3,   // Supersonic flash step duration in Bankai
   bankaiComboDisengageDistance: 350, // Extended disengage back-step distance in Bankai
   bankaiGetsugaDamage: 6,        // Kuroi Getsuga damage during Bankai
