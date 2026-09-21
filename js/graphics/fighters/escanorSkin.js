@@ -692,27 +692,42 @@ export function _getEscanorChopAnimationState(fighter) {
     }
   }
 
-  const strikeEndAngle = 1.18; // Ground cleave follow-through angle
-  const strikeEndHandX = r * 0.40;
-  const strikeEndHandY = r * 0.30;
-  const strikeEndBackHandX = r * 0.60;
-  const strikeEndBackHandY = -r * 0.15;
+  const strikeEndAngle = 1.05; // ~60° forward-down cleave follow-through angle
+  const strikeEndHandX = r * 1.15; // Front hand lunges forward with full body momentum
+  const strikeEndHandY = r * 0.42;
+  const strikeEndBackHandX = r * 1.35; // Back hand extends forward in two-handed grip
+  const strikeEndBackHandY = -r * 0.05;
 
-  // Cinematic Hit-Pause Impact Freeze: Axe locked in full cleave pose while shockwave / sparks hold
+  // Cinematic Hit-Pause Impact Freeze: Axe locked in exact collision pose while shockwave / sparks hold
   if (fighter.chopHitPauseTimer && fighter.chopHitPauseTimer > 0) {
-    const pauseMax = fighter.chopHitPauseMax || 10;
+    const pauseMax = fighter.chopHitPauseMax || 20;
     const pauseP = Math.max(0, Math.min(1.0, 1.0 - (fighter.chopHitPauseTimer / pauseMax)));
+
+    // Mid-pause: preserve the EXACT collision pose where the blade struck the enemy
+    const hitP = (typeof fighter.chopHitProgress === 'number') ? fighter.chopHitProgress : 1.0;
+    const axeAngle = (typeof fighter.chopHitAxeAngle === 'number') ? fighter.chopHitAxeAngle : strikeEndAngle;
+    const handX = (typeof fighter.chopHitHandX === 'number') ? fighter.chopHitHandX : strikeEndHandX;
+    const handY = (typeof fighter.chopHitHandY === 'number') ? fighter.chopHitHandY : strikeEndHandY;
+    const backHandX = (typeof fighter.chopHitBackHandX === 'number') ? fighter.chopHitBackHandX : strikeEndBackHandX;
+    const backHandY = (typeof fighter.chopHitBackHandY === 'number') ? fighter.chopHitBackHandY : strikeEndBackHandY;
+
+    // High-frequency kinetic micro-tremor during hit-pause (simulating massive weapon friction biting into enemy)
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const tremorAmp = (typeof cfg.chopHitTremorIntensity === 'number') ? cfg.chopHitTremorIntensity : 1.5;
+    const tremor = Math.sin((fighter.chopHitPauseTimer || 0) * 2.8) * tremorAmp;
+
     return {
       isSwinging: true,
       phase: 'hitPause',
-      axeAngle: strikeEndAngle,
-      handX: strikeEndHandX,
-      handY: strikeEndHandY,
-      backHandX: strikeEndBackHandX,
-      backHandY: strikeEndBackHandY,
-      strikeP: 1.0,
+      axeAngle: axeAngle + tremor * 0.02,
+      handX: handX + tremor * 0.4,
+      handY: handY + tremor * 0.8,
+      backHandX: backHandX + tremor * 0.4,
+      backHandY: backHandY + tremor * 0.8,
+      strikeP: hitP,
       pauseP,
-      recP: 0
+      recP: 0,
+      hitConnected: Boolean(fighter._chopHitConnected)
     };
   }
 
@@ -840,7 +855,7 @@ function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhas
   // Axe Head Solar Flash Sync at Full Arc Extension (Hit-Pause Impact Frame)
   if (chopState.isSwinging && chopState.phase === 'hitPause') {
     const prideScaleMult = 1.0 + (fighter.prideStacks || 0) * 0.04;
-    const hubDist = (r * 3.4) * (fighter.isTheOneActive ? 1.35 : prideScaleMult);
+    const hubDist = (r * 4.0) * (fighter.isTheOneActive ? 1.35 : prideScaleMult);
     const hubX = handX + Math.cos(axeAngle) * hubDist;
     const hubY = handY + Math.sin(axeAngle) * hubDist;
     const intensity = Math.sin(Math.max(0, 1.0 - (chopState.pauseP || 0)) * Math.PI * 0.5);

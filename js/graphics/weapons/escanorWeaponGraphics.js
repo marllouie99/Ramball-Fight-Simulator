@@ -292,7 +292,7 @@ export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
       );
     } else {
       // Wielded in Hand: Align Blue Hilt Grip Center at (0, 0)
-      const baseScale = ((r * 3.65) / WEAPON_SHAFT_LEN) * customScale;
+      const baseScale = ((r * 4.25) / WEAPON_SHAFT_LEN) * customScale;
       const prideScaleMult = 1.0 + (opts.prideStacks || 0) * 0.04;
       const wieldScale = baseScale * (isTheOne ? 1.35 : prideScaleMult);
       ctx.rotate(-WEAPON_ROT_ALIGN);
@@ -443,10 +443,11 @@ export function drawRhittaSlashArc(ctx, x, y, angle, r = 25, animInput = 0, isTh
     currentEndA = startA + (endA - startA) * strikeP;
     alpha = Math.min(1.0, 0.45 + 0.55 * strikeP) * maxOpacity;
   } else if (phase === 'hitPause') {
-    // Hit-Pause Impact: Full glorious arc held firmly at full extension during the impact freeze!
+    // Hit-Pause Impact: Arc holds firmly at the exact collision progress where the blade struck!
+    const hitP = (animInput && typeof animInput.strikeP === 'number') ? animInput.strikeP : 1.0;
     currentStartA = startA;
-    currentEndA = endA;
-    alpha = 1.0 * maxOpacity;
+    currentEndA = startA + (endA - startA) * hitP;
+    alpha = Math.min(1.0, 0.55 + 0.45 * hitP) * maxOpacity;
     pauseP = animInput.pauseP || 0;
   } else if (phase === 'recovery') {
     // Recovery Phase: Smooth continuous dynamic eraser wipe starting from startA to endA

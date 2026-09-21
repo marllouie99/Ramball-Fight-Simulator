@@ -6202,6 +6202,64 @@ async function main() {
     errors++;
   }
 
+  // Escanor Blade Physical Collision & Zero Phantom Hits Test
+  console.log('☀️ [Escanor Blade Physical Collision Test] Verifying zero phantom hits for targets behind or outside the blade path...');
+  try {
+    state.mode = '1v1';
+    state.p1Index = allDefs.findIndex(d => d.type === 'escanor');
+    state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
+    reinitFighters(true);
+
+    const escanor = state.fighters[0];
+    const dummySukuna = state.fighters[1];
+
+    escanor.x = 300;
+    escanor.y = 300;
+    escanor.gunAngle = 0; // Escanor faces directly right (along +X)
+    escanor.angle = 0;
+    escanor.chopCastAngle = 0;
+
+    // 1. Position dummySukuna BEHIND Escanor (at x: 240, 60px behind him)
+    dummySukuna.x = 240;
+    dummySukuna.y = 300;
+    dummySukuna.hp = 200;
+
+    // Execute forward chop strike
+    const connectedBehind = escanor._executeRhittaChopHit(0.5, 0.4);
+    if (connectedBehind || escanor.chopHitPauseTimer > 0) {
+      throw new Error(`Phantom hit detected! Escanor hit target standing behind him!`);
+    }
+    if (dummySukuna.hp < 200) {
+      throw new Error(`Dummy behind Escanor took damage from forward chop! HP=${dummySukuna.hp}`);
+    }
+
+    // 2. Position dummySukuna far to the side (at x: 300, y: 190, perpendicular to chop)
+    dummySukuna.x = 300;
+    dummySukuna.y = 190;
+    dummySukuna.hp = 200;
+
+    const connectedSide = escanor._executeRhittaChopHit(0.5, 0.4);
+    if (connectedSide || escanor.chopHitPauseTimer > 0) {
+      throw new Error(`Phantom hit detected! Escanor hit target outside the blade chop arc!`);
+    }
+
+    // 3. Position dummySukuna directly in front within blade reach (x: 400, y: 300)
+    dummySukuna.x = 400;
+    dummySukuna.y = 300;
+    dummySukuna.hp = 200;
+
+    const connectedInFront = escanor._executeRhittaChopHit(0.6, 0.2);
+    if (!connectedInFront || escanor.chopHitPauseTimer <= 0) {
+      throw new Error(`Expected direct blade collision in front of Escanor to connect! Got connected=${connectedInFront}`);
+    }
+    if (dummySukuna.hp >= 200) {
+      throw new Error(`Expected target in blade path to take damage! HP=${dummySukuna.hp}`);
+    }
+  } catch (err) {
+    console.error('❌ [ESCANOR BLADE COLLISION TEST ERROR]:', err);
+    errors++;
+  }
+
   // Escanor Wall Pin & Wall Crack Decal Test
   console.log('🧱 [Escanor Wall Pin & Wall Crack Test] Verifying Escanor knockback pins opponent to wall in stasis with solar crack decal...');
   try {
