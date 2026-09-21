@@ -315,18 +315,30 @@ export class SukunaFighter extends Fighter {
     }
   }
 
+  get channelTurnRate() {
+    if (this.isChannelingDivineFlame) {
+      return CONFIG.sukuna?.divineFlameChannelTurnRate ?? 0.045;
+    }
+    return 0.045;
+  }
+
   canAim() {
     if (this.isChannelingDomainExpansion) {
       return false; // Disable auto-aim while channeling Domain Expansion!
+    }
+    if ((this.divineFlameRecoveryTimer || 0) > 0) {
+      return false; // Lock aim during post-fire recoil/recovery
     }
     return super.canAim();
   }
 
   aim(target) {
     if (this.isChannelingDomainExpansion) {
-      return false; // Disable auto-aim while channeling Domain Expansion!
+      this.gunAngle = 0;
+      this.angle = 0;
+      return false; // Disable auto-aim and lock facing directly towards player/camera (0) while channeling Domain Expansion!
     }
-    if (this.isChannelingDivineFlame || (this.divineFlameRecoveryTimer || 0) > 0) {
+    if ((this.divineFlameRecoveryTimer || 0) > 0) {
       const lockedAngle = (this.divineFlameCastAngle !== undefined && this.divineFlameCastAngle !== null && !Number.isNaN(this.divineFlameCastAngle))
         ? this.divineFlameCastAngle
         : (this.gunAngle || 0);
@@ -337,7 +349,13 @@ export class SukunaFighter extends Fighter {
     }
 
     const aimTarget = target || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
-    super.aim(aimTarget);
+    const aimResult = super.aim(aimTarget);
+
+    if (this.isChannelingDivineFlame) {
+      this.divineFlameCastAngle = this.gunAngle;
+      this.angle = this.gunAngle;
+      return aimResult;
+    }
 
     // When stationary, body facing matches gunAngle (target aim direction).
     // When moving, body rotates dynamically via movement physics (spinRate).
@@ -345,7 +363,7 @@ export class SukunaFighter extends Fighter {
     if (speed <= 0.05) {
       this.angle = this.gunAngle;
     }
-    return true;
+    return aimResult;
   }
 
   /**
@@ -758,19 +776,19 @@ export class SukunaFighter extends Fighter {
         if (sound) playSound(sound.src, sound.volume);
       }
 
-      // Allow external pulls/pushes (knockback, Getsuga drag, Blue suction, Purple suction, Black Hole pull) to move Sukuna while channeling Fuga!
-      // Apply physics with 0 self-speed multiplier so external velocities move him and decay smoothly without self-walking
-      this.applyMovementPhysics(0);
+      if (this.divineFlameChargeTimer < this.divineFlameChargeMax) {
+        // Allow external pulls/pushes (knockback, Getsuga drag, Blue suction, Purple suction, Black Hole pull) to move Sukuna while channeling Fuga!
+        // Apply physics with 0 self-speed multiplier so external velocities move him and decay smoothly without self-walking
+        this.applyMovementPhysics(0);
 
-      // Lock firing stance fixed in place; do not continuously auto-aim or rotate while channeling
-      const lockedAngle = (this.divineFlameCastAngle !== undefined && this.divineFlameCastAngle !== null && !Number.isNaN(this.divineFlameCastAngle))
-        ? this.divineFlameCastAngle
-        : (this.gunAngle || 0);
-      this.divineFlameCastAngle = lockedAngle;
-      this.gunAngle = lockedAngle;
-      this.angle = lockedAngle;
-
-      if (this.divineFlameChargeTimer >= this.divineFlameChargeMax) {
+        // Smooth auto-aim tracking while channeling Fuga (no sudden snap on firing)
+        const fugaAimTarget = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving))
+          ? opponent
+          : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+        if (fugaAimTarget && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
+          this.aim(fugaAimTarget);
+        }
+      } else {
         this.divineFlameChargeTimer = 0;
         this._fireDivineFlame(ownerIndex);
       }
@@ -812,6 +830,8 @@ export class SukunaFighter extends Fighter {
       // Immediately stop all movement while channeling domain expansion (holding Enma Ten hand seal)
       this.vx = 0;
       this.vy = 0;
+      this.gunAngle = 0; // Lock angle facing directly towards player/camera (Front POV 0)
+      this.angle = 0;
 
       if (this.domainChargeTimer >= this.domainChargeMax) {
         this.isChannelingDomainExpansion = false;
@@ -927,7 +947,6 @@ export class SukunaFighter extends Fighter {
     // Check for Domain Expansion (Ultimate - disabled in demo mode)
     const isSilenced = (this.silenceTimer || 0) > 0;
     if (!this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && opponent && !opponent.isDead) {
-      this.aim(opponent);
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
@@ -936,6 +955,8 @@ export class SukunaFighter extends Fighter {
       this.domainChargeTimer = 0;
       this.vx = 0; // Immediately lock movement when domain channeling starts
       this.vy = 0;
+      this.gunAngle = 0; // Lock facing angle directly towards player/camera (0)
+      this.angle = 0;
       if (!this._hasPlayedDomainChannelSound) {
         this._hasPlayedDomainChannelSound = true;
         this._hasPlayedDomainActivateSound = false;

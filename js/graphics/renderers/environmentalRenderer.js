@@ -3,78 +3,111 @@ import { CONFIG } from '../../core/config.js';
 import { excludeGojoInfinityFromDim, applyDomainArenaVignetteCutout } from './arenaRenderer.js';
 import { worldToScreen } from '../../systems/cameraSystem.js';
 
+let currentZeusStormDimOpacity = 0;
+
 /**
- * Draws a dark dim screen overlay when Zeus is charging or casting his Storm ultimate.
- * The overlay opacity increases during charge, then stays at max while strikes are active.
+ * Draws a dark tempestuous dim screen overlay when Zeus is charging or casting his Storm ultimate.
+ * Structured with exponential ease-in / ease-out, full-screen abyssal tempest linear gradient,
+ * high-contrast electric cyan plasma core centered on Zeus, corner vignette, arena cutout,
+ * and ambient distant cloud lightning pulses matching Mahito's and the top-tier domain overlays.
  */
 export function drawStormDimScreen() {
   if (typeof state !== 'undefined' && state.disableDimEffects) return;
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
-  
-  // Find Zeus fighters that are charging or actively storming
-  const zeusStorming = state.fighters?.filter(f => 
-    f && f._def?.type === 'zeus' && (f.isChargingStorm || f.stormActive)
-  );
-  
-  // Also check if there are active storm strikes happening
-  const hasActiveStrikes = state.zeusStormStrikes && state.zeusStormStrikes.length > 0;
-  
-  // If no Zeus is storming and no strikes active, don't draw the overlay
-  if ((!zeusStorming || zeusStorming.length === 0) && !hasActiveStrikes) return;
-  
-  // Get the first Zeus fighter for reference
-  const zeus = zeusStorming ? zeusStorming[0] : null;
-  
-  // Calculate opacity
-  let opacity;
-  if (zeus && zeus.isChargingStorm) {
-    // During charge: opacity increases with charge progress
-    const chargeProgress = 1.0 - (zeus.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120));
-    const dimOpacity = CONFIG.zeus.stormDimOpacity || 0.7;
-    opacity = chargeProgress * dimOpacity;
-  } else {
-    // During active storm: always at max opacity
-    opacity = CONFIG.zeus.stormDimOpacity || 0.7;
+
+  // Find Zeus fighters that are charging or actively storming, including Rubbick stolen storm or preview
+  const zeusFighter = (state.fighters?.find(f => 
+    f && f.hp > 0 && (
+      ((f.characterId === 'zeus' || f.type === 'zeus' || f._def?.id === 'zeus' || f._def?.type === 'zeus') && (f.isChargingStorm || f.stormActive)) ||
+      (f.characterId === 'rubbick' && f.stormActive)
+    )
+  )) || (state.previewFighter && (state.previewFighter.isChargingStorm || state.previewFighter.stormActive) ? state.previewFighter : null);
+
+  const hasActiveStrikes = Boolean(state.zeusStormStrikes && state.zeusStormStrikes.length > 0);
+
+  let targetOpacity = 0;
+  if (zeusFighter) {
+    const maxDimOpacity = CONFIG.zeus?.stormDimOpacity ?? 0.92;
+    if (zeusFighter.stormActive) {
+      targetOpacity = maxDimOpacity;
+    } else if (zeusFighter.isChargingStorm) {
+      const telegraphMax = CONFIG.zeus?.stormTelegraphFrames || 120;
+      const chargeProgress = Math.min(1.0, Math.max(0, 1.0 - ((zeusFighter.stormCooldown || 0) / Math.max(1, telegraphMax))));
+      targetOpacity = 0.25 + chargeProgress * (maxDimOpacity - 0.25);
+    }
+  } else if (hasActiveStrikes) {
+    targetOpacity = CONFIG.zeus?.stormDimOpacity ?? 0.92;
   }
-  
-  // Don't draw if opacity is too low
-  if (opacity < 0.01) return;
-  
+
+  // Smooth exponential interpolation (ease-in on charge / storm, gradual ease-out on completion)
+  if (targetOpacity > currentZeusStormDimOpacity) {
+    currentZeusStormDimOpacity += (targetOpacity - currentZeusStormDimOpacity) * 0.08;
+  } else {
+    currentZeusStormDimOpacity += (targetOpacity - currentZeusStormDimOpacity) * 0.06;
+  }
+
+  if (currentZeusStormDimOpacity < 0.01) {
+    currentZeusStormDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentZeusStormDimOpacity;
+  const w = canvas.width;
+  const h = canvas.height;
+
   ctx.save();
   // Reset the transform temporarily so the dark overlay is perfectly glued to the screen
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Dark thunderstorm navy atmosphere overlay
-  ctx.fillStyle = `rgba(4, 12, 34, ${opacity * 0.85})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 1. Deep Abyssal Midnight Storm Linear Gradient Across Screen
+  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
+  linearGrad.addColorStop(0.0, `rgba(2, 6, 18, ${(opacity * 0.98).toFixed(3)})`);      // Pitch storm abyss top
+  linearGrad.addColorStop(0.18, `rgba(5, 14, 38, ${(opacity * 0.95).toFixed(3)})`);    // Dark tempest navy
+  linearGrad.addColorStop(0.50, `rgba(8, 22, 58, ${(opacity * 0.90).toFixed(3)})`);    // Divine Olympian storm ozone center
+  linearGrad.addColorStop(0.82, `rgba(4, 12, 34, ${(opacity * 0.95).toFixed(3)})`);    // Dark tempest navy
+  linearGrad.addColorStop(1.0, `rgba(2, 4, 14, ${(opacity * 0.98).toFixed(3)})`);      // Pitch storm abyss bottom
+  ctx.fillStyle = linearGrad;
+  ctx.fillRect(0, 0, w, h);
 
-  // 2. Electric cyan / lightning blue radial aura centered on Zeus
-  const screenPos = zeus ? worldToScreen(zeus.x, zeus.y - (zeus.z || 0)) : { x: canvas.width / 2, y: canvas.height / 2 };
+  // 2. High-contrast electric cyan / lightning blue radial aura centered on Zeus
+  const screenPos = zeusFighter ? worldToScreen(zeusFighter.x, zeusFighter.y - (zeusFighter.z || 0)) : { x: w / 2, y: h / 2 };
   const cx = screenPos.x;
   const cy = screenPos.y;
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.90;
+  const maxDim = Math.max(w, h) * 0.92;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0, 'rgba(0, 230, 255, 0.65)');       // Electric thunder cyan core
-  grad.addColorStop(0.18, 'rgba(40, 140, 250, 0.50)');   // Storm lightning halo
-  grad.addColorStop(0.40, 'rgba(18, 65, 170, 0.35)');    // Deep thunder blue ring
-  grad.addColorStop(0.70, 'rgba(6, 20, 75, 0.18)');      // Stormcloud fade
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  grad.addColorStop(0.00, `rgba(220, 250, 255, ${(opacity * 0.65).toFixed(3)})`);     // Luminous hyper-electric core
+  grad.addColorStop(0.10, `rgba(0, 225, 255, ${(opacity * 0.48).toFixed(3)})`);       // Radiant lightning cyan halo
+  grad.addColorStop(0.24, `rgba(30, 110, 245, ${(opacity * 0.35).toFixed(3)})`);      // Divine thunder sapphire
+  grad.addColorStop(0.48, `rgba(12, 45, 140, ${(opacity * 0.22).toFixed(3)})`);       // Deep stormcloud blue
+  grad.addColorStop(0.72, `rgba(4, 14, 50, ${(opacity * 0.12).toFixed(3)})`);         // Dark atmospheric transition
+  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
 
-  ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = 'screen';
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.restore();
+  ctx.fillRect(0, 0, w, h);
 
-  // Exclude Gojo's Limitless Infinity Barrier from screen dimming
+  // 3. Dark Outer Edge Screen Corner Vignette (Deepens outer perimeter to pitch black)
+  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.30, w / 2, h / 2, Math.max(w, h) * 0.85);
+  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+  cornerGrad.addColorStop(0.50, `rgba(2, 6, 20, ${(opacity * 0.45).toFixed(3)})`);
+  cornerGrad.addColorStop(1.0, `rgba(0, 2, 8, ${(opacity * 0.95).toFixed(3)})`);
+  ctx.fillStyle = cornerGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 4. Subtle Distant Cloud Lightning Ambient Pulses during strikes or charging crackle
+  if (hasActiveStrikes || (zeusFighter && zeusFighter.isChargingStorm && Math.random() < 0.22)) {
+    const flashIntensity = hasActiveStrikes ? 0.16 : 0.07;
+    ctx.fillStyle = `rgba(180, 240, 255, ${(opacity * flashIntensity).toFixed(3)})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // 5. Exclude Gojo Limitless Infinity Barrier from screen dimming (Rule 1.7)
   excludeGojoInfinityFromDim(ctx);
 
   ctx.restore();
-  
-  state.globalDimEdgeColor = `rgba(4, 12, 34, ${opacity})`;
+
+  state.globalDimEdgeColor = `rgba(2, 4, 14, ${(opacity * 0.98).toFixed(3)})`;
 }
 
 let currentFurnaceDimOpacity = 0;
@@ -87,9 +120,9 @@ export function drawFurnaceDimScreen() {
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
-  // Find Sukuna fighters channeling Furnace or in post-fire recovery
+  // Find Sukuna or Soul Swapped fighters channeling Furnace or in post-fire recovery
   const sukunaFuga = state.fighters?.find(f => 
-    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna' || f._def?.name === 'Sukuna' || f._def?.name === 'Ryomen Sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
+    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna' || f._def?.name === 'Sukuna' || f._def?.name === 'Ryomen Sukuna' || (f.characterId === 'yuji' && f.soulSwapActive)) && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
   );
   
   // Also check if Furnace fire arrow is actively flying

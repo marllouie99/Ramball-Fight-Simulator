@@ -7,7 +7,7 @@ export const mahitoConfig = {
   hp: 200,
   damage: 7,
   speed: 5.8,
-  moveSpeed: 5.8,
+  moveSpeed: 6.8,
   r: 25,
   radius: 25,
   color: '#C026D3', // Vivid Magenta-Violet / Cursed Energy

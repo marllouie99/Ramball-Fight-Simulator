@@ -118,6 +118,8 @@ export class MahoragaFighter extends Fighter {
     this.blitzTotalDuration = 0;
     this.swordTrail = [];
     this.wallBounceCount = 0;
+    this.rctRegenDamagePauseTimer = 0;
+    this.totalRctHealedThisMatch = 0;
   }
 
   get goldStages() {
@@ -197,6 +199,8 @@ export class MahoragaFighter extends Fighter {
     this.throwBarrageShotsLeft = 0;
     this.throwBarrageTimer = 0;
     this.bladeRetractProgress = 1.0;
+    this.rctRegenDamagePauseTimer = 0;
+    this.totalRctHealedThisMatch = 0;
 
     this.isBlitzActive = false;
     this.blitzHitsLeft = 0;
@@ -271,6 +275,11 @@ export class MahoragaFighter extends Fighter {
     }
 
     if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain)) return false;
+
+    // Pause passive RCT regeneration upon taking direct combat damage
+    if (amount > 0) {
+      this.rctRegenDamagePauseTimer = CONFIG.mahoraga?.rctCombatDamagePauseFrames ?? 45;
+    }
 
     // Add dodge i-frame invincibility check!
     if (this.dodgeIFrames > 0) return false;
@@ -1010,14 +1019,26 @@ export class MahoragaFighter extends Fighter {
     const speedBoost = CONFIG.mahoraga?.wheelAdaptationSpeedMultiplier ?? CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? CONFIG.mahoraga?.movementSpeedMultiplierPerAdaptation ?? 0.15;
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
 
-    // ── PASSIVE RCT REGEN (Scales continuously per adaptation level / wheel click without cap!) ──
-    const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage ?? 0.03;
-    const currentRegenRate = totalStages * rctPerStage;
+    // ── PASSIVE RCT REGEN (Scales per adaptation level with configurable caps & limits) ──
+    if (this.rctRegenDamagePauseTimer > 0) {
+      this.rctRegenDamagePauseTimer--;
+    }
 
-    if (currentRegenRate > 0 && this.hp > 0 && !this.isDead && this.hp < this.maxHp) {
+    const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage ?? 0.025;
+    const maxStages = CONFIG.mahoraga?.maxRctRegenStages ?? 6;
+    const effectiveStages = Math.min(totalStages, maxStages);
+    const maxRegenRate = CONFIG.mahoraga?.maxRctRegenRate ?? 0.12;
+    const currentRegenRate = Math.min(maxRegenRate, effectiveStages * rctPerStage);
+
+    const maxPool = CONFIG.mahoraga?.maxRctHealingPool ?? (this.maxHp * 1.5);
+    const poolRemaining = Math.max(0, maxPool - (this.totalRctHealedThisMatch || 0));
+
+    if (currentRegenRate > 0 && this.hp > 0 && !this.isDead && this.hp < this.maxHp && this.rctRegenDamagePauseTimer <= 0 && poolRemaining > 0) {
       const oldHp = this.hp;
-      this.hp = Math.min(this.maxHp, this.hp + currentRegenRate);
+      const desiredHeal = Math.min(currentRegenRate, poolRemaining);
+      this.hp = Math.min(this.maxHp, this.hp + desiredHeal);
       const actualHealed = this.hp - oldHp;
+      this.totalRctHealedThisMatch = (this.totalRctHealedThisMatch || 0) + actualHealed;
 
       this._rctRegenAccumulator = (this._rctRegenAccumulator || 0) + actualHealed;
       this._rctRegenAccumTimer = (this._rctRegenAccumTimer || 0) + 1;

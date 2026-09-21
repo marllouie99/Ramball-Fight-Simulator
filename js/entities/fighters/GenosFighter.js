@@ -207,12 +207,28 @@ export class GenosFighter extends Fighter {
     this.flurryCooldown = initFlurryCD;
     this.isUltSliding = false;
     this.ultSlideTimer = 0;
+    this.isChargingUlt = false;
+    this.isFiringUlt = false;
+    this.isUltRecovering = false;
+    this.ultRecoveryTimer = 0;
+    this.ultTimer = 0;
+    this.isFlurrying = false;
+    this.flurryHitsLeft = 0;
+    this.flurryTimer = 0;
+    this.flurryTarget = null;
+    this.flurryVoiceTimer = 0;
+    this.flurryAimAngle = undefined;
     this.isMeleeStance = false;
     this.isMeleeWallDashing = false;
+    this.isDashing = false;
+    this.dashTimer = 0;
     this.heatAmmo = this.maxHeatAmmo;
     this.ammoReloadTimer = 0;
     this.meleeDashCount = 0;
     this.speedBoostTimer = 0;
+    this.speedMultiplier = 1.0;
+    const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+    this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
     this.immuneToPush = false;
     this.immuneToKnockback = false;
     this.immuneToPull = false;
@@ -271,13 +287,15 @@ export class GenosFighter extends Fighter {
     this.isMeleeWallDashing = true;
 
     const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
-    const baseSpd = this.baseSpeed || this.moveSpeed || 5.2;
+    const baseSpd = this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2;
     const speedMult = CONFIG.genos?.dashes?.meleeThrusterDash?.speedMultiplier ?? 3.4;
-    this.speed = baseSpd * modeMult * speedMult;
+    this.speed = baseSpd * modeMult;
+    this.speedMultiplier = speedMult;
     this.speedBoostTimer = CONFIG.genos?.dashes?.meleeThrusterDash?.durationFrames ?? 18;
 
-    this.vx = dirX * this.speed;
-    this.vy = dirY * this.speed;
+    const dashSpeed = this.speed * speedMult;
+    this.vx = dirX * dashSpeed;
+    this.vy = dirY * dashSpeed;
     this.gunAngle = dashAngle;
     this.angle = dashAngle;
 
@@ -954,6 +972,16 @@ export class GenosFighter extends Fighter {
   executeMachineGunBlows(opponent) {
     if (this.flurryCooldown > 0 || !opponent) return;
 
+    this.isDashing = false;
+    this.dashTimer = 0;
+    this.speedBoostTimer = 0;
+    this.speedMultiplier = 1.0;
+    this.isMeleeWallDashing = false;
+    const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+    this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
+    this.vx = 0;
+    this.vy = 0;
+
     this.isFlurrying = true;
     this.flurryHitsLeft = CONFIG.genos?.flurryHitCount || 15;
     this.flurryTimer = 0;
@@ -1078,6 +1106,14 @@ export class GenosFighter extends Fighter {
   executeRocketStomp(opponent) {
     if (this.dashCooldown > 0) return;
 
+    this.isDashing = false;
+    this.dashTimer = 0;
+    this.speedBoostTimer = 0;
+    this.speedMultiplier = 1.0;
+    this.isMeleeWallDashing = false;
+    const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+    this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
+
     this.dashCooldown = CONFIG.genos?.dashes?.rocketDash?.cooldown ?? CONFIG.genos?.dashCooldown ?? 360;
     this.performStompExplosion();
   }
@@ -1089,9 +1125,11 @@ export class GenosFighter extends Fighter {
   interruptAttacks(forceCancelAll = false) {
     this.isUltSliding = false;
     this.ultSlideTimer = 0;
-    if (this.isChargingUlt || this.isFiringUlt) {
+    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering) {
       this.isChargingUlt = false;
       this.isFiringUlt = false;
+      this.isUltRecovering = false;
+      this.ultRecoveryTimer = 0;
       this.ultTimer = 0;
       this.immuneToPush = false;
       this.immuneToKnockback = false;
@@ -1106,8 +1144,26 @@ export class GenosFighter extends Fighter {
     }
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
+    this.flurryTimer = 0;
     this.flurryTarget = null;
     this.flurryVoiceTimer = 0;
+    this.flurryAimAngle = undefined;
+
+    this.isDashing = false;
+    this.dashTimer = 0;
+    this.isMeleeWallDashing = false;
+    this.speedBoostTimer = 0;
+    this.speedMultiplier = 1.0;
+
+    const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+    this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
+
+    // Immediately normalize any residual high burst/dash velocity so Genos does not gain super movement speed on cancel
+    const currentSpeed = Math.hypot(this.vx, this.vy);
+    if (currentSpeed > this.speed && (!this.knockbackVx && !this.knockbackVy)) {
+      this.vx = (this.vx / currentSpeed) * this.speed;
+      this.vy = (this.vy / currentSpeed) * this.speed;
+    }
 
     // Immediately stop ALL active audio handles & voice audio instances when interrupted
     if (this.soundHandle) {
@@ -1151,7 +1207,12 @@ export class GenosFighter extends Fighter {
     if (!target && (!this.gunAngle || Number.isNaN(this.gunAngle))) return;
 
     this.isDashing = false;
+    this.dashTimer = 0;
     this.speedBoostTimer = 0;
+    this.speedMultiplier = 1.0;
+    this.isMeleeWallDashing = false;
+    const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+    this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
     this.isUltSliding = true;
     this.ultSlideTimer = CONFIG.genos?.ultSlideFrames || 22;
     this.immuneToPush = true;
@@ -1349,7 +1410,11 @@ export class GenosFighter extends Fighter {
           this.isUltRecovering = false;
           this.ultTimer = 0;
           this.isSelfDestructing = false;
+          this.isMeleeWallDashing = false;
           this.speedBoostTimer = 0;
+          this.speedMultiplier = 1.0;
+          const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+          this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
 
           // Reset all skill & attack cooldowns to 0 so all skills are ready!
           this.shootCooldown = 0;
@@ -1453,8 +1518,9 @@ export class GenosFighter extends Fighter {
       this.speedBoostTimer--;
       if (this.speedBoostTimer <= 0) {
         this.isMeleeWallDashing = false;
+        this.speedMultiplier = 1.0;
         const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
-        this.speed = (this.baseSpeed || 5.2) * modeMult;
+        this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
       }
     }
 
@@ -1866,20 +1932,13 @@ export class GenosFighter extends Fighter {
         this.isMeleeWallDashing = false;
         this.meleeDashCount = 0;
         this.speedBoostTimer = 0;
+        this.speedMultiplier = 1.0;
         this._justEnteredMeleeStance = false;
         
         const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
-        this.speed = (this.baseSpeed || 5.2) * modeMult;
+        this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
 
-        if (opponent && opponent.hp > 0) {
-          const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y) || 1;
-          this.vx = ((opponent.x - this.x) / dist) * this.speed;
-          this.vy = ((opponent.y - this.y) / dist) * this.speed;
-        } else {
-          const moveAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-          this.vx = Math.cos(moveAngle) * this.speed;
-          this.vy = Math.sin(moveAngle) * this.speed;
-        }
+        this.resumeMovement(opponent);
 
         this._lastWallBounceFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : Date.now();
         this.dashCooldown = Math.max(this.dashCooldown || 0, CONFIG.genos?.postUltDashCooldown || 60);

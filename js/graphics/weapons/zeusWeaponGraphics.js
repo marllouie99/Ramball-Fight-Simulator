@@ -1,8 +1,6 @@
-// zeusWeaponGraphics.js — The Master Bolt
-// A double-pointed, jagged crystal spear of pure lightning energy.
-import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
-import { drawPixelHand } from '../renderers/fighterRenderer.js';
+import { getHandSize } from '../../core/config.js';
+import { drawZeusHand } from '../fighters/zeusSkin.js';
 
 
 export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
@@ -291,25 +289,24 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
   const holdDistX = r + 4 + weaponPullback;
   const holdDistY = weaponSideOffset;
 
-  ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-  const bodyGlow = ctx.createRadialGradient(holdDistX - 8, holdDistY, 0, 0, 0, r + 5);
-  bodyGlow.addColorStop(0, `rgba(50, 180, 255, ${0.3 * pulse})`);
-  bodyGlow.addColorStop(0.6, `rgba(0, 100, 200, ${0.1 * pulse})`);
-  bodyGlow.addColorStop(1, 'rgba(0, 50, 100, 0)');
-  ctx.fillStyle = bodyGlow;
-  ctx.beginPath();
-  ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
   ctx.translate(holdDistX, holdDistY);
   ctx.rotate(-Math.PI / 4 + weaponAngle);
 
   drawThunderboltShape(ctx, 1.0, pulse);
 
   // ═══════════════════════════════════════════════
-  // 4. CAST LIGHT onto Zeus's hand/body
+  // 4. OLYMPIAN HAND GRIPPING MASTER BOLT (Rule 20)
+  // ═══════════════════════════════════════════════
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly);
+  if (!shouldHideHands) {
+    const isStorm = Boolean(isChannelingStorm || chargeProgress >= 1.0);
+    const armAngle = Math.atan2(-holdDistY, -holdDistX) - (-Math.PI / 4 + weaponAngle);
+    const handRadius = getHandSize(6.0);
+    drawZeusHand(ctx, 0, 0, handRadius, '#FCD34D', isStorm, armAngle + Math.PI / 2);
+  }
+
+  // ═══════════════════════════════════════════════
+  // 5. CAST LIGHT onto Zeus's hand/body
   // ═══════════════════════════════════════════════
 
   // Glow on the grip area (simulating light cast onto his hand)
@@ -324,14 +321,6 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
   ctx.beginPath();
   ctx.arc(0, 0, 18, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
-
-  // ═══════════════════════════════════════════════
-  // GRIP HAND (drawn on top of bolt in pixel art style)
-  // ═══════════════════════════════════════════════
-  ctx.save();
-  ctx.rotate(Math.PI / 4); // Undo the diagonal rotation
-  drawPixelHand(ctx, 0, 0, getHandSize(6.8), '#FCD34D', '#0B1220');
   ctx.restore();
 
   ctx.restore();

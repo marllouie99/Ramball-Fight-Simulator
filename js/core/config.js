@@ -31,6 +31,7 @@ import { inosukeConfig } from '../configs/characters/inosukeConfig.js';
 import { escanorConfig } from '../configs/characters/escanorConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
 import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
+import { zeusConfig } from '../configs/characters/zeusConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
@@ -614,48 +615,7 @@ export const CONFIG = {
   Trickster: rubbickConfig,
 
   /** Zeus — Lightning Spell Caster */
-  zeus: {
-    // Basic Attack: Chain Lightning (fast projectile)
-    lightningDamage: 20,
-    lightningSpeed: 30,
-    chainCount: 6,         // How many times it bounces
-    chainRange: 250,       // Range to find next target
-    chainDamageMultiplier: 0.8, // Decay per bounce
-    attackCooldown: 150,
-
-    // Debuff & Stun Chance Progressive Mechanics (Tunable)
-    baseStunChance: 0.10,     // Starting stun chance (0.10 = 10%)
-    stunChanceIncrease: 0.10, // Stun chance added per landed basic attack hit (+0.10 = +10% per hit)
-    maxStunChance: 0.80,      // Maximum stun chance cap (0.80 = 80%)
-    stunChance: 0.50,         // Initial stun chance fallback
-    stunDuration: 30,         // Frames target is stunned on electric hit (18 frames = 0.3s)
-    paralyzeChance: 0.3,
-    paralyzeDuration: 60,
-    paralyzeSlowMultiplier: 0.5,
-    staticChance: 0.5,
-    staticDuration: 120,
-    staticDamageBonus: 1.5, // 50% extra damage to static targets
-
-    // Passive: Aegis Shield
-    aegisCooldown: 300,    // 5 seconds
-    aegisShockDamage: 15,
-    aegisParalyzeDuration: 90,
-    aegisTriggerRange: 200, // Increased range to trigger on more attacks
-
-    // Ultimate: Storm
-    stormCooldown: 900,    // 15 seconds
-    stormDuration: 300,    // 3 seconds
-    stormStrikesPerSec: 3, // Per enemy
-    stormStrikeDamage: 35,
-
-    // Storm Visuals & FX
-    stormTelegraphFrames: 120,       // Duration of the channeling wind-up
-    stormDimOpacity: 0.7,            // How dark the arena becomes
-    stormCastShakeIntensity: 8,      // Screen shake when storm activates
-    stormCastShakeFrames: 20,
-    stormStrikeShakeIntensity: 4,    // Screen shake on each lightning impact
-    stormStrikeShakeFrames: 10,
-  },
+  zeus: zeusConfig,
 
   /** Gojo Satoru — Limitless Fighter */
   gojo: gojoConfig,
@@ -1041,20 +1001,22 @@ export const FIGHTER_DEFS = [
     id: 19,
     name: 'Zeus',
     category: 'Greek Mythology',
-    color: '#00BFFF',
-    startX: 300, startY: 250,
-    startVx: 1.1, startVy: 0.9,
-    radius: 25,
+    color: zeusConfig.color || '#00BFFF',
+    startX: zeusConfig.startX || 300,
+    startY: zeusConfig.startY || 250,
+    startVx: zeusConfig.startVx || 1.1,
+    startVy: zeusConfig.startVy || 0.9,
+    radius: zeusConfig.radius || 25,
     aimbot: true,
     spinRate: 0,
     type: 'zeus',
-    hp: 150,
-    damage: 20,
-    cooldown: 100,
-    moveSpeed: 3.0,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Storm Bringer',
-    desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',
+    hp: zeusConfig.hp || 200,
+    damage: zeusConfig.damage || 10,
+    cooldown: zeusConfig.cooldown || 80,
+    moveSpeed: zeusConfig.moveSpeed || 5.2,
+    projectileSpeedMultiplier: zeusConfig.projectileSpeedMultiplier || 1.0,
+    ability: zeusConfig.ability || 'Storm Bringer',
+    desc: zeusConfig.desc || 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',
   },
   {
     id: 20,
@@ -1362,10 +1324,10 @@ export const FIGHTER_DEFS = [
     aimbot: false,
     spinRate: 0,
     type: 'john_wick',
-    hp: johnWickConfig.hp || 420,
-    damage: johnWickConfig.damage || 22,
-    cooldown: johnWickConfig.cooldown || 35,
-    moveSpeed: johnWickConfig.moveSpeed || johnWickConfig.speed || 6.4,
+    hp: johnWickConfig.hp || 220,
+    damage: johnWickConfig.damage || 6,
+    cooldown: johnWickConfig.cooldown || 26,
+    moveSpeed: johnWickConfig.moveSpeed || johnWickConfig.speed || 5.6,
     projectileSpeedMultiplier: johnWickConfig.projectileSpeedMultiplier || 6.2,
     ability: johnWickConfig.ability || 'C.A.R. Gun-Fu & The Pencil',
     desc: johnWickConfig.desc || 'The Baba Yaga. Master of Center Axis Relock Gun-Fu and ruthless CQC. Passive: Ballistic Tailored Suit resists ranged damage. Wields the custom TTI Pit Viper 9mm and the infamous No. 2 Pencil for armor-piercing assassination takedowns.',

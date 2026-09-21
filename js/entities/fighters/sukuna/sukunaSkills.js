@@ -116,12 +116,12 @@ export function fireDivineFlame(fighter, ownerIndex) {
   const baseDamage = CONFIG.sukuna?.divineFlameDamage || 250;
   const damage = isDomainFuga ? Math.round(baseDamage * 1.5) : baseDamage;
 
-  // Lock release angle strictly to committed cast angle (no snapping auto-aim upon firing)
+  // Lock release angle strictly to current gunAngle reached during channeling (no snapping auto-aim upon firing)
   let releaseAngle = 0;
-  if (fighter.divineFlameCastAngle !== undefined && fighter.divineFlameCastAngle !== null && !Number.isNaN(fighter.divineFlameCastAngle)) {
-    releaseAngle = fighter.divineFlameCastAngle;
-  } else if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
+  if (fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) {
     releaseAngle = fighter.gunAngle;
+  } else if (fighter.divineFlameCastAngle !== undefined && fighter.divineFlameCastAngle !== null && !Number.isNaN(fighter.divineFlameCastAngle)) {
+    releaseAngle = fighter.divineFlameCastAngle;
   }
 
   fighter.divineFlameCastAngle = releaseAngle;

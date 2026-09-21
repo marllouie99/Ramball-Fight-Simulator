@@ -25,14 +25,17 @@ export class ZeusFighter extends Fighter {
     // Progressive Stun Chance Mechanic
     this.baseStunChance = CONFIG.zeus?.baseStunChance ?? 0.10;
     this.stunChance = this.baseStunChance;
-    this.maxStunChance = CONFIG.zeus?.maxStunChance ?? 0.80;
-    this.stunChanceIncrease = CONFIG.zeus?.stunChanceIncrease ?? 0.10;
+    this.maxStunChance = CONFIG.zeus?.maxStunChance ?? 0.50;
+    this.stunChanceIncrease = CONFIG.zeus?.stunChanceIncrease ?? 0.05;
 
     // Initial hovering state so clouds are positioned correctly in menus before update()
     this.z = 25;
     
     // Aura animation state
     this.auraPhase = 0;
+
+    // Suppress ALL default pixel art hand rendering (Zeus skin handles its own body)
+    this.hideHands = true;
     
     // Thunder cloud sound flag (play once when throwing thunderbolt to sky)
     this._thunderCloudSoundPlayed = false;
@@ -62,6 +65,7 @@ export class ZeusFighter extends Fighter {
     this.aegisCooldown = 0;
     this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormActive = false;
+    this.isChargingStorm = false;
     this.stormTimer = 0;
     this.baseStunChance = CONFIG.zeus?.baseStunChance ?? 0.10;
     this.stunChance = this.baseStunChance;
@@ -95,11 +99,11 @@ export class ZeusFighter extends Fighter {
     }
     
     // Flash at the release point (bolt tip)
-    const releaseDist = this.r + 20; 
+    const releaseDist = this.r + (CONFIG.zeus?.boltReleaseOffset || 20); 
     const rx = this.x + Math.cos(this.gunAngle) * releaseDist;
     const ry = (this.y - (this.z || 0)) + Math.sin(this.gunAngle) * releaseDist;
-    spawnImpactFlash(rx, ry, 35, 'lightningTrail'); 
-    spawnSparks(rx, ry, 12, 'lightningTrail', '#FFFFFF');
+    spawnImpactFlash(rx, ry, CONFIG.zeus?.shootFlashRadius || 35, 'lightningTrail'); 
+    spawnSparks(rx, ry, CONFIG.zeus?.shootSparkCount || 12, 'lightningTrail', CONFIG.zeus?.color || '#00BFFF');
     
     // Play attack sound
     const sound = getBasicAttackSound(this._def?.id, this._def?.type);
@@ -113,7 +117,7 @@ export class ZeusFighter extends Fighter {
 
     // Aegis Shield Passive
     if (applied && attacker && this.hp > 0 && !this.isTurret && !opts.isSaitamaCounter && !opts.isCounter && !isGuaranteedHit) {
-      if (this.aegisCooldown <= 0) {
+      if (this.aegisCooldown <= 0 && this._isAttackerInRange(attacker, CONFIG.zeus?.aegisTriggerRange ?? 180)) {
         this._triggerAegisShield(attacker);
       }
     }
@@ -138,14 +142,15 @@ export class ZeusFighter extends Fighter {
     if (attacker.applySlow) {
       attacker.applySlow(CONFIG.zeus.aegisParalyzeDuration, CONFIG.zeus.paralyzeSlowMultiplier);
     }
-    attacker.electricStunTimer = Math.max(attacker.electricStunTimer || 0, 15);
+    attacker.electricStunTimer = Math.max(attacker.electricStunTimer || 0, CONFIG.zeus?.stunDuration || 24);
+    attacker.thunderRootsTimer = Math.max(attacker.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration || 45);
     
-    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'AEGIS!', '#00BFFF');
+    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'AEGIS!', CONFIG.zeus?.color || '#00BFFF');
     
     // Visuals
-    spawnImpactFlash(attacker.x, attacker.y, 40, 'lightningTrail');
-    spawnSparks(attacker.x, attacker.y, 15, 'thunderSpark');
-    triggerGlobalScreenShake(4, 5);
+    spawnImpactFlash(attacker.x, attacker.y, CONFIG.zeus?.aegisFlashRadius || 40, 'lightningTrail');
+    spawnSparks(attacker.x, attacker.y, CONFIG.zeus?.aegisSparkCount || 15, 'thunderSpark');
+    triggerGlobalScreenShake(CONFIG.zeus?.aegisShakeIntensity || 4, CONFIG.zeus?.aegisShakeFrames || 5);
     
     const sound = getSkillSound(this._def?.id, 'aegis');
     if (sound) audioSystem.playSFX(sound.src, sound.volume);
@@ -209,11 +214,13 @@ export class ZeusFighter extends Fighter {
       }
     }
 
-    // Immobilize and stop shooting during ultimate cast
+    // Immobilize, face front toward player/camera (0), and stop shooting during ultimate cast
     if (this.isChargingStorm || this.stormActive) {
       this.vx *= 0.5; // Rapidly halt movement
       this.vy *= 0.5;
       this.applyMovementPhysics(0); // Set target speed to 0 to prevent input override
+      this.gunAngle = 0;
+      this.angle = 0;
     } else {
       // Basic attack
       if (this.shootCooldown > 0) {
@@ -229,12 +236,25 @@ export class ZeusFighter extends Fighter {
     this.aim(opponent);
     
     this.resolveWallBounce(arena);
+
+    if (this.isChargingStorm || this.stormActive) {
+      this.gunAngle = 0;
+      this.angle = 0;
+    }
   }
 
   canAim() {
-    if (!super.canAim()) return false;
-    if (this.stormActive) return false;
-    return true;
+    if (this.isChargingStorm || this.stormActive) return false;
+    return super.canAim();
+  }
+
+  aim(opponent) {
+    if (this.isChargingStorm || this.stormActive) {
+      this.gunAngle = 0;
+      this.angle = 0;
+      return false; // Disable auto-aim and lock facing directly towards player/camera (0) while casting ultimate!
+    }
+    return super.aim(opponent);
   }
   
   _activateStorm() {
@@ -242,6 +262,8 @@ export class ZeusFighter extends Fighter {
     this.stormTimer = CONFIG.zeus.stormDuration;
     this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormLastStrikeTimer = 0;
+    this.gunAngle = 0;
+    this.angle = 0;
     
     spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'STORM!', '#FFFFFF');
     triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
@@ -303,12 +325,12 @@ export class ZeusFighter extends Fighter {
     }
     
     // Apply visual thunder roots effect
-    target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, 45);
+    target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration || 45);
     
     // Visuals
     triggerGlobalScreenShake(CONFIG.zeus.stormStrikeShakeIntensity || 4, CONFIG.zeus.stormStrikeShakeFrames || 10);
-    spawnImpactFlash(target.x, target.y, 50, 'lightningTrail');
-    spawnSparks(target.x, target.y, 10, 'lightningTrail', '#FFFFFF');
+    spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius || 50, 'lightningTrail');
+    spawnSparks(target.x, target.y, CONFIG.zeus?.stormStrikeSparkCount || 10, 'lightningTrail', CONFIG.zeus?.color || '#00BFFF');
     
     // Play storm strike sound for each hit (both stormstrike.mp3 & thunderstrike.mp3)
     const stormSound = getSkillSound(this._def?.id, 'storm');
@@ -319,11 +341,12 @@ export class ZeusFighter extends Fighter {
     
     // Register storm strike visual globally
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
+    const strikeLife = CONFIG.zeus?.stormStrikeVisualLife || 15;
     state.zeusStormStrikes.push({
       x: target.x,
       y: target.y,
-      life: 15,
-      maxLife: 15
+      life: strikeLife,
+      maxLife: strikeLife
     });
   }
 
@@ -372,13 +395,17 @@ export class ZeusFighter extends Fighter {
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cloudSize);
       
       if (isFlashing) {
-        // Bright internal lightning flash
-        grad.addColorStop(0, 'rgba(200, 240, 255, 0.95)');
-        grad.addColorStop(1, 'rgba(50, 100, 180, 0.3)');
+        // Bright radiant internal lightning flash
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        grad.addColorStop(0.35, 'rgba(240, 249, 255, 0.90)');
+        grad.addColorStop(0.70, 'rgba(56, 189, 248, 0.50)');
+        grad.addColorStop(1, 'rgba(2, 132, 199, 0)');
       } else {
-        // Dark moody thundercloud
-        grad.addColorStop(0, 'rgba(40, 45, 60, 0.95)');
-        grad.addColorStop(1, 'rgba(15, 20, 30, 0)');
+        // Smooth celestial cumulus storm cloud (luminous Olympian sky blue & white)
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+        grad.addColorStop(0.35, 'rgba(224, 242, 254, 0.65)');
+        grad.addColorStop(0.70, 'rgba(125, 211, 252, 0.28)');
+        grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
       }
       
       ctx.fillStyle = grad;

@@ -203,7 +203,7 @@ export function updateHybridSukunaFuga() {
   if (!state.pixiApp || !state.pixiLayers?.projectiles) return;
   const layer = state.pixiLayers.projectiles;
 
-  const sukuna = state.fighters?.find(f => f && (f.type === 'sukuna' || f.characterId === 'sukuna') && f.isChannelingDivineFlame);
+  const sukuna = state.fighters?.find(f => f && (f.type === 'sukuna' || f.characterId === 'sukuna' || (f.characterId === 'yuji' && f.soulSwapActive)) && f.isChannelingDivineFlame);
   if (!sukuna || sukuna.hp <= 0 || state.gameState === 'matchEnd') {
     if (fugaSprite) {
       fugaSprite.visible = false;

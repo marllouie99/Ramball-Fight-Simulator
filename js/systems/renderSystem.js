@@ -14,7 +14,8 @@ import {
   drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, drawGenosUltimateArenaOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
-  drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
+  drawTodoTakadaDimScreen, drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
+  drawYujiSoulSwapDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
   drawDroppedMiniguns, updateDroppedMiniguns,
@@ -309,7 +310,10 @@ export function renderGame() {
                   (f.characterId === 'saitama' && f._counterPunchTimer > 0) ||
                   (f.characterId === 'nanami' && (f.ratioHitPauseTimer > 0 || f.isOvertimeActive)) ||
                   (f.characterId === 'escanor' && f.chopHitPauseTimer > 0) ||
-                  (f.characterId === 'todo' && (f.isTakadaUltActive || f.isTakadaChanneling))
+                  ((f.characterId === 'todo' || f.type === 'todo' || f._def?.id === 'todo') && (f.isTakadaUltActive && !f.isTakadaChanneling)) ||
+                  ((f.characterId === 'yuji' || f.type === 'yuji' || f._def?.id === 'yuji') && (f.soulSwapActive || (f.soulSwapTransitionTimer && f.soulSwapTransitionTimer > 0))) ||
+                  ((f.characterId === 'zeus' || f.type === 'zeus' || f._def?.id === 'zeus') && (f.isChargingStorm || f.stormActive)) ||
+                  (f.characterId === 'rubbick' && f.stormActive)
                 )
               )
             );
@@ -343,6 +347,8 @@ export function renderGame() {
           drawSaitamaSeriousPunchDimScreen();
           drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
           drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
+          drawTodoTakadaDimScreen(); // 2D Takada-chan 530,000 IQ Idol Imagination dark magenta dim & romantic spotlight overlay
+          drawYujiSoulSwapDimScreen(); // 2D Yuji Soul Swap (Sukuna Takeover) arena overlay & cursed crimson dark background
         } else {
           updateHybridEnvironment(); // Cleans up and detaches any active WebGL dim sprites
         }
@@ -400,8 +406,6 @@ export function renderGame() {
             }
           }
         }
-
-        drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
 
         // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) on top of the arena border, floor & idol overlay, but behind fighters
         if (state.fighters) {

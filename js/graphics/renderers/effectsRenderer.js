@@ -20,7 +20,16 @@ export {
   triggerGenosSelfDestructFlash,
   drawGenosSelfDestructDimScreen,
   isTodoTakadaOverlayActive,
+  drawTodoTakadaDimScreen,
   drawTodoTakadaIdolScreenOverlay,
+  loadTodoUltimateOverlayImage,
+  getTodoUltimateOverlayImage,
+  drawTodoUltimateArenaOverlay,
+  loadYujiSoulSwapOverlayImage,
+  getYujiSoulSwapOverlayImage,
+  isYujiSoulSwapOverlayActive,
+  drawYujiSoulSwapArenaOverlay,
+  drawYujiSoulSwapDimScreen,
 } from './specialOverlayRenderer.js';
 
 export function drawBlackHoleEffects() {

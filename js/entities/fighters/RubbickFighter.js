@@ -753,12 +753,12 @@ export class RubbickFighter extends Fighter {
 
   _strikeEnemyWithStolenStorm(target) {
     const dmgMulti = getStolenMultiplier('zeus', 'damageMultiplier');
-    let damage = (CONFIG.zeus.stormStrikeDamage || 15) * dmgMulti;
+    let damage = (CONFIG.zeus.stormStrikeDamage || 6) * dmgMulti;
     
     target.takeDamage(damage, this, { isStorm: true });
     
     if (target.applySlow) {
-      target.applySlow(CONFIG.zeus.paralyzeDuration || 30, CONFIG.zeus.paralyzeSlowMultiplier || 0.5);
+      target.applySlow(CONFIG.zeus.paralyzeDuration || 50, CONFIG.zeus.paralyzeSlowMultiplier || 0.5);
     }
     
     triggerGlobalScreenShake(CONFIG.zeus.stormStrikeShakeIntensity || 4, CONFIG.zeus.stormStrikeShakeFrames || 10);

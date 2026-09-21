@@ -58,16 +58,21 @@ export function fitGameToViewport() {
   container.style.width = `${targetW}px`;
   container.style.height = `${targetH}px`;
 
-  const windowW = window.innerWidth;
-  const windowH = window.innerHeight;
+  // Determine actual available viewport dimensions across devices (iOS Safari visualViewport, Android, Desktop)
+  let windowW = window.innerWidth;
+  let windowH = window.innerHeight;
+
+  if (typeof window !== 'undefined' && window.visualViewport) {
+    if (window.visualViewport.width > 0) windowW = window.visualViewport.width;
+    if (window.visualViewport.height > 0) windowH = window.visualViewport.height;
+  } else if (typeof document !== 'undefined' && document.documentElement) {
+    if (document.documentElement.clientWidth > 0) windowW = document.documentElement.clientWidth;
+    if (document.documentElement.clientHeight > 0) windowH = document.documentElement.clientHeight;
+  }
 
   // Scale uniformly to fit within viewport without clipping
   const scale = Math.min(windowW / targetW, windowH / targetH);
-  if (Math.abs(scale - 1.0) < 0.005) {
-    container.style.transform = 'none';
-  } else {
-    container.style.transform = `scale(${scale})`;
-  }
+  container.style.transform = `translate(-50%, -50%) scale(${scale})`;
   container.style.transformOrigin = 'center center';
 }
 
@@ -81,9 +86,11 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('orientationchange', () => {
   setTimeout(fitGameToViewport, 60);
+  setTimeout(fitGameToViewport, 250);
 });
 if (typeof window !== 'undefined' && window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitGameToViewport);
+  window.visualViewport.addEventListener('scroll', fitGameToViewport);
 }
 
 // Universal one-shot audio unlock for mobile Safari / Android Chrome

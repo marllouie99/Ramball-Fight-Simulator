@@ -29,6 +29,7 @@ export function drawCjPixelUziBullet(ctx, p) {
   const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer > 0));
 
   // 1. Stepped Pixel Tracer Trail
   if (p.history && p.history.length > 1) {
@@ -37,7 +38,11 @@ export function drawCjPixelUziBullet(ctx, p) {
       const h = p.history[i];
       const alpha = (i / p.history.length) * 0.85;
       const size = (i > p.history.length - 3) ? 4.0 : 2.5;
-      ctx.fillStyle = (i % 2 === 0) ? `rgba(245, 158, 11, ${alpha})` : `rgba(254, 240, 138, ${alpha})`;
+      if (isFrozen) {
+        ctx.fillStyle = (i % 2 === 0) ? `rgba(0, 229, 255, ${alpha})` : `rgba(224, 255, 255, ${alpha})`;
+      } else {
+        ctx.fillStyle = (i % 2 === 0) ? `rgba(245, 158, 11, ${alpha})` : `rgba(254, 240, 138, ${alpha})`;
+      }
       ctx.fillRect(snap(h.x - size * 0.5), snap(h.y - size * 0.5), size, size);
     }
     ctx.restore();
@@ -48,9 +53,9 @@ export function drawCjPixelUziBullet(ctx, p) {
   ctx.rotate(angle);
 
   // 2. Trailing Pixel Flame / Exhaust Streak
-  ctx.fillStyle = '#F59E0B';
+  ctx.fillStyle = isFrozen ? '#00E5FF' : '#F59E0B';
   ctx.fillRect(-16, -1.5, 10, 3);
-  ctx.fillStyle = '#FEF08A';
+  ctx.fillStyle = isFrozen ? '#E0FFFF' : '#FEF08A';
   ctx.fillRect(-8, -1.0, 6, 2);
 
   // 3. Stepped 9mm Bullet Core with #0E0F14 Outline
@@ -58,17 +63,25 @@ export function drawCjPixelUziBullet(ctx, p) {
   ctx.fillRect(-6, -3, 13, 6);
 
   // Brass Casing Body
-  ctx.fillStyle = '#D97706';
+  ctx.fillStyle = isFrozen ? '#00B4D8' : '#D97706';
   ctx.fillRect(-5, -2, 7, 4);
 
   // Copper Pointed Tip
-  ctx.fillStyle = '#F59E0B';
+  ctx.fillStyle = isFrozen ? '#00E5FF' : '#F59E0B';
   ctx.fillRect(2, -2, 3, 4);
   ctx.fillRect(5, -1, 1, 2);
 
   // Specular Core Highlight
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(-2, -1, 4, 2);
+
+  // Gojo Limitless Infinity Stasis Aura Box
+  if (isFrozen) {
+    const pulse = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.75 + 0.25 * pulse})`;
+    ctx.lineWidth = 1.0;
+    ctx.strokeRect(-8, -5, 17, 10);
+  }
 
   ctx.restore();
 }
@@ -87,6 +100,7 @@ export function drawCjUziBullet(ctx, p) {
   const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const len = 12;
   const width = 3.0;
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer > 0));
 
   // 1. World-Space Tracer Trail
   if (p.history && p.history.length > 1) {
@@ -96,20 +110,20 @@ export function drawCjUziBullet(ctx, p) {
     for (let i = 1; i < p.history.length; i++) {
       ctx.lineTo(p.history[i].x, p.history[i].y);
     }
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.50)'; // Amber gold tracer
+    ctx.strokeStyle = isFrozen ? 'rgba(0, 229, 255, 0.65)' : 'rgba(245, 158, 11, 0.50)'; // Electric cyan or amber gold tracer
     ctx.lineWidth = 2.2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Hot-yellow tracer core
+    // Hot tracer core
     const sliceCount = Math.max(1, p.history.length - 3);
     ctx.beginPath();
     ctx.moveTo(p.history[sliceCount - 1].x, p.history[sliceCount - 1].y);
     for (let i = sliceCount; i < p.history.length; i++) {
       ctx.lineTo(p.history[i].x, p.history[i].y);
     }
-    ctx.strokeStyle = 'rgba(254, 240, 138, 0.90)';
+    ctx.strokeStyle = isFrozen ? 'rgba(224, 255, 255, 0.95)' : 'rgba(254, 240, 138, 0.90)';
     ctx.lineWidth = 1.2;
     ctx.stroke();
     ctx.restore();
@@ -120,7 +134,11 @@ export function drawCjUziBullet(ctx, p) {
   ctx.rotate(angle);
 
   // 2. Trailing speed streak
-  ctx.fillStyle = _getBulletTrailGrad(ctx);
+  if (isFrozen) {
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.35)';
+  } else {
+    ctx.fillStyle = _getBulletTrailGrad(ctx);
+  }
   ctx.beginPath();
   ctx.moveTo(0, -width * 0.5);
   ctx.lineTo(-24, 0);
@@ -129,11 +147,11 @@ export function drawCjUziBullet(ctx, p) {
   ctx.fill();
 
   // 3. 9mm Full Metal Jacket Bullet Core
-  ctx.fillStyle = '#D97706'; // Amber brass casing
+  ctx.fillStyle = isFrozen ? '#00B4D8' : '#D97706'; // Cyan stasis or amber brass casing
   ctx.fillRect(-len * 0.5, -width * 0.5, len * 0.65, width);
 
-  // Copper bullet tip
-  ctx.fillStyle = '#F59E0B';
+  // Bullet tip
+  ctx.fillStyle = isFrozen ? '#00E5FF' : '#F59E0B';
   ctx.beginPath();
   ctx.arc(len * 0.15, 0, width * 0.5, -Math.PI / 2, Math.PI / 2);
   ctx.fill();
@@ -141,6 +159,16 @@ export function drawCjUziBullet(ctx, p) {
   // White-hot center highlight
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(-len * 0.2, -width * 0.2, len * 0.35, width * 0.4);
+
+  // Stasis glow ring when frozen by Infinity
+  if (isFrozen) {
+    const pulse = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.75 + 0.25 * pulse})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 7 + pulse * 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }

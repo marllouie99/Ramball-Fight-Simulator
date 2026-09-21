@@ -79,6 +79,10 @@ export const ichigoConfig = {
   getsugaHitScreenShake: 3.5,    // Alias
   getsugaShockwaveSize: 40,      // Shockwave burst size on Getsuga hit
   getsugaColor: '#00D5FF',       // Shikai Getsuga theme color (Sky-Blue)
+  postGetsugaCooldown: 120,      // Minimum delay buffer (frames) after releasing Getsuga before next Flash Step teleport (~2.0s at 60fps)
+  bankaiPostGetsugaCooldown: 100,// Post-Getsuga delay buffer during Bankai (~1.67s at 60fps)
+  hollowPostGetsugaCooldown: 110,// Post-Getsuga delay buffer during Hollow Mask (~1.83s at 60fps)
+  bankaiHollowPostGetsugaCooldown: 120, // Post-Getsuga delay buffer during Bankai + Hollow Mask (~2.0s at 60fps)
 
   // ── Passive: Hollow Mask Awakening ──
   hollowMaskThreshold: 0.60,     // Automatically activates when HP <= 60%
@@ -91,7 +95,7 @@ export const ichigoConfig = {
   hollowDamageMultiplier: 0.50,   // 10% damage boost
   hollowDamageReduction: 0.10,   // 10% incoming damage mitigation (Hierro)
   hollowLifesteal: 0.2,         // 10% vampiric lifesteal heal on damage dealt
-  hollowComboCooldownMultiplier: 0.10, // 90% combo cooldown reduction during Hollow Mask
+  hollowComboCooldownMultiplier: 0.60, // 40% combo cooldown reduction during Hollow Mask
   hollowGetsugaDamage: 3,        // Upgraded Black Getsuga damage
   hollowGetsugaTickDamage: 3,    // Upgraded multi-tick damage per hit in Hollow form
   hollowGetsugaSpeed: 15,        // Hollow Mask Getsuga travel speed
@@ -122,7 +126,7 @@ export const ichigoConfig = {
   bankaiScreenShake: 7.0,        // Screen shake intensity upon Bankai release
   bankaiSpeedMultiplier: 1.1,    // 50% movement speed boost during Bankai
   bankaiDamageMultiplier: 1.1,   // 20% melee damage boost during Bankai
-  bankaiComboCooldownMultiplier: 0.50, // 50% combo cooldown reduction during Bankai (~3.7s cooldown)
+  bankaiComboCooldownMultiplier: 0.65, // 35% combo cooldown reduction during Bankai
   bankaiShunpoStrikes: 8,        // Flurry strikes increased to 6 in Bankai
   bankaiShunpoStrike1Duration: 14, // Bankai intermediate flurry strike duration
   bankaiShunpoStrike2Duration: 18, // Bankai finisher strike duration

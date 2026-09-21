@@ -313,9 +313,9 @@ export function drawNanamiCleaver(ctx, x, y, gunAngle, r, swingActive = false, s
   if (opts.isOvertime) {
     // Glowing Golden Edge Surge (Steady Crisp Outline)
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.65)';
-    ctx.lineWidth = 2.0;
-    ctx.setLineDash([8, 4]);
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.40)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([6, 4]);
     ctx.beginPath();
     ctx.moveTo(0, topY - 1);
     ctx.lineTo(bladeLength + 1, topY - 1);
@@ -338,8 +338,8 @@ export function drawNanamiCleaver(ctx, x, y, gunAngle, r, swingActive = false, s
     ctx.translate(glintX, glintY);
     ctx.rotate(glintTime);
 
-    const starSize = opts.isOvertime ? 6.5 : 5.0;
-    ctx.fillStyle = opts.isOvertime ? 'rgba(255, 245, 160, 0.98)' : 'rgba(255, 230, 100, 0.95)';
+    const starSize = opts.isOvertime ? 4.8 : 3.8;
+    ctx.fillStyle = opts.isOvertime ? 'rgba(255, 235, 140, 0.75)' : 'rgba(235, 210, 90, 0.70)';
     ctx.beginPath();
     ctx.moveTo(0, -starSize);
     ctx.lineTo(starSize * 0.35, -starSize * 0.35);

@@ -170,7 +170,7 @@ export function drawJohnWickPistol(ctx, x, y, gunAngle, r, opts = {}) {
 
   // Positioning relative to fighter body circle radius (adjusted for default scale)
   const barrelX = (r * 0.85 - recoilOffset) / defaultWeaponScale;
-  const barrelY = -3.5 / defaultWeaponScale;
+  const barrelY = 7.5 / defaultWeaponScale;
 
   // ─────────────────────────────────────────────────────────────
   // 1. 2011 LOWER FRAME, STIPPLED GRIP & CONTROLS (Matching Real Photo)
@@ -856,7 +856,7 @@ export function drawJohnWickPencil(ctx, x, y, gunAngle, r, opts = {}) {
 
   const stabTimer = opts.stabTimer || 0;
   let pencilX = r * 0.88;
-  let pencilY = -r * 0.08;
+  let pencilY = r * 0.22;
   let pencilAngleOffset = 0;
   let isThrusting = false;
 
@@ -867,7 +867,7 @@ export function drawJohnWickPencil(ctx, x, y, gunAngle, r, opts = {}) {
       const chamberT = stabProgress / windupRatio;
       const easeChamber = (1 - Math.cos(chamberT * Math.PI)) * 0.5; // Smooth ease-in-out
       pencilX = r * (0.88 - 0.45 * easeChamber); // Retracts to r * 0.43
-      pencilY = -r * (0.08 + 0.06 * easeChamber);
+      pencilY = r * (0.22 + 0.04 * easeChamber);
       pencilAngleOffset = -0.10 * easeChamber;
     } else if (stabProgress < thrustRatio) {
       // 2. Explosive Forward Stab Phase: Plunges pencil tip straight forward deep into target
@@ -875,14 +875,14 @@ export function drawJohnWickPencil(ctx, x, y, gunAngle, r, opts = {}) {
       const thrustT = (stabProgress - windupRatio) / (thrustRatio - windupRatio);
       const easeThrust = 1 - Math.pow(1 - thrustT, 3); // Snappy ease-out cubic
       pencilX = r * (0.43 + 1.42 * easeThrust); // Plunges forward to r * 1.85!
-      pencilY = -r * (0.14 - 0.08 * easeThrust);
+      pencilY = r * (0.24 - 0.02 * easeThrust);
       pencilAngleOffset = 0.05 * (1 - easeThrust);
     } else {
       // 3. Snappy Pullback Phase: Retracts pencil cleanly back to guard position
       const pullT = (stabProgress - thrustRatio) / (1.0 - thrustRatio);
       const easePull = (1 - Math.cos(pullT * Math.PI)) * 0.5; // Smooth ease-in-out
       pencilX = r * (1.85 - 0.97 * easePull); // Retracts back to r * 0.88
-      pencilY = -r * (0.06 + 0.02 * easePull);
+      pencilY = r * (0.22 + 0.02 * easePull);
       pencilAngleOffset = 0;
     }
   }
@@ -1243,7 +1243,7 @@ export function drawJohnWickShotgun(ctx, x, y, gunAngle, r, opts = {}) {
   ctx.translate(0, switchOffsetY);
 
   const barrelX = (r * 0.85 - recoilOffset) / defaultScale;
-  const barrelY = -3.0 / defaultScale;
+  const barrelY = 5.5 / defaultScale;
 
   // ─────────────────────────────────────────────────────────────
   // 1. SKELETONIZED COLLAPSIBLE STOCK & PISTOL GRIP
@@ -1935,7 +1935,7 @@ export function drawJohnWickRifle(ctx, x, y, gunAngle, r, opts = {}) {
   ctx.translate(0, switchOffsetY);
 
   const barrelX = (r * 0.85 - recoilOffset) / defaultScale;
-  const barrelY = -2.5 / defaultScale;
+  const barrelY = 6.0 / defaultScale;
 
   // ─────────────────────────────────────────────────────────────
   // 1. BUFFER TUBE & COLLAPSIBLE LE / CARBINE STOCK

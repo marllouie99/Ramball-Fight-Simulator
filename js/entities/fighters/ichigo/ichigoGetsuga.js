@@ -554,7 +554,15 @@ export function releaseGetsuga(fighter) {
   const baseCd = !isFlurry 
     ? (CONFIG.ichigo?.flashStepCooldown ?? CONFIG.ichigo?.singleShunpoCooldown ?? 320)
     : (CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.shunpoCooldown || CONFIG.ichigo?.getsugaCooldown || 450);
-  const finalCd = Math.round(baseCd * cdMult);
+  
+  // Guarantee a clean post-Getsuga breather buffer so Ichigo does not immediately flash step into enemy after wave release
+  const minPostGetsugaBuffer = (isBankai && isMask)
+    ? (CONFIG.ichigo?.bankaiHollowPostGetsugaCooldown ?? 120)
+    : (isMask
+      ? (CONFIG.ichigo?.hollowPostGetsugaCooldown ?? 110)
+      : (isBankai ? (CONFIG.ichigo?.bankaiPostGetsugaCooldown ?? 100) : (CONFIG.ichigo?.postGetsugaCooldown ?? 120)));
+
+  const finalCd = Math.max(minPostGetsugaBuffer, Math.round(baseCd * cdMult));
   fighter.getsugaCooldown = finalCd;
   fighter.shunpoCooldown = finalCd;
 

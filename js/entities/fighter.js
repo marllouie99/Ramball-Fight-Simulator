@@ -975,7 +975,7 @@ export class Fighter {
       this.isFlurrying ||
       (this.flurryHitsLeft && this.flurryHitsLeft > 0) ||
       (this.rapidSlashHitsLeft && this.rapidSlashHitsLeft > 0) ||
-      this.soulSwapActive ||
+      (this.soulSwapActive && this.rapidSlashPhase !== 'COMPLETE') ||
       (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0) ||
       (this.revertTransitionTimer && this.revertTransitionTimer > 0) ||
       this.isCountering ||
@@ -1000,8 +1000,6 @@ export class Fighter {
       this.isChannelingGetsuga ||
       (this.getsugaChargeTimer && this.getsugaChargeTimer > 0) ||
       (this.hollowMaskFormationTimer && this.hollowMaskFormationTimer > 0) ||
-      this.isTakadaChanneling ||
-      (this.takadaChannelTimer && this.takadaChannelTimer > 0) ||
       this.isChannelingThinIceBreaker ||
       (this.thinIceBreakerChargeTimer && this.thinIceBreakerChargeTimer > 0) ||
       this.isChannelingCruelSun ||
@@ -1323,6 +1321,18 @@ export class Fighter {
     if (this.hitFlameWisps) this.hitFlameWisps.length = 0;
     if (this.punchEffects) this.punchEffects.length = 0;
     if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
+
+    // Universal speed multiplier & dash/burst velocity normalization
+    if (!this.preserveSpeedMultiplierOnInterrupt) {
+      this.speedMultiplier = 1.0;
+    }
+    const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+    const normalSpeed = (this.baseSpeed ? this.baseSpeed * modeMult : (this.speed || 5.0));
+    const curSpeed = Math.hypot(this.vx, this.vy);
+    if (curSpeed > normalSpeed * 1.05 && (!this.knockbackVx && !this.knockbackVy)) {
+      this.vx = (this.vx / curSpeed) * normalSpeed;
+      this.vy = (this.vy / curSpeed) * normalSpeed;
+    }
   }
 
   applyTimeStop(frames) {
@@ -3257,6 +3267,10 @@ export class Fighter {
 
     if (this.thunderRootsTimer > 0) {
       this.thunderRootsTimer--;
+    }
+
+    if (this.staticDebuffTimer > 0) {
+      this.staticDebuffTimer--;
     }
 
     if (this.voidMarkTimer > 0) {

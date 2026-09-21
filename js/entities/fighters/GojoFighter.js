@@ -784,6 +784,27 @@ export class GojoFighter extends Fighter {
     return result;
   }
 
+  /**
+   * Gojo's physical knockback handler.
+   * While locked in hand-to-hand Melee Mode, Gojo holds his ground firmly and ignores kinetic sliding/pushes
+   * from basic melee hits or projectiles, only reacting to heavy explosions, ultimates, or domain forces.
+   */
+  applyKnockback(vx, vy, stunFrames = 0, opts = {}) {
+    const isOptionsObj = (typeof stunFrames === 'object' && stunFrames !== null);
+    const actualOpts = isOptionsObj ? stunFrames : (opts || {});
+    const actualStun = isOptionsObj ? (stunFrames.stunFrames || 0) : stunFrames;
+
+    const isHeavyForce = Math.hypot(vx, vy) >= 20;
+    if (this.isMeleeMode && !isHeavyForce && !actualOpts.isHeavy && !actualOpts.isExplosion && !actualOpts.isUltimate && !actualOpts.isDomain && !actualOpts.isKnockback) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+      return;
+    }
+    super.applyKnockback(vx, vy, actualStun);
+  }
+
   _applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena) {
     return modApplyTeleportSlideBrake(this, oldX, oldY, targetX, targetY, arena);
   }
@@ -1741,6 +1762,8 @@ export class GojoFighter extends Fighter {
     if (this.isMeleeMode) {
       this.vx = 0;
       this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
       speedMult = 0;
 
       if (this.domainActive) {
@@ -1754,6 +1777,8 @@ export class GojoFighter extends Fighter {
           this.target = domainOpponent;
           this.vx = 0;
           this.vy = 0;
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
           this.aim(domainOpponent);
 
           if (canAct) {
@@ -1963,6 +1988,8 @@ export class GojoFighter extends Fighter {
 
     this.vx = 0;
     this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
 
     // Dynamic target selection in 1v2 / multi-enemy mode: always prioritize the closest living enemy
     let activeTarget = opponent;

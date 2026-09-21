@@ -23,12 +23,12 @@ export class JohnWickFighter extends Fighter {
 
     // Primary Weapon & Gun-Fu stats from CONFIG.john_wick
     const cfg = CONFIG.john_wick || {};
-    this.hp = cfg.hp || this.hp || 420;
+    this.hp = cfg.hp || this.hp || 220;
     this.maxHp = this.hp;
-    this.damage = cfg.bulletDamage || this.damage || 22;
-    this.shootCooldownMax = cfg.fireCooldown || 20;
+    this.damage = cfg.bulletDamage || this.damage || 6;
+    this.shootCooldownMax = cfg.fireCooldown || 26;
     this.shootCooldown = 0;
-    this.speed = cfg.speed !== undefined ? cfg.speed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : (this.speed || 6.4));
+    this.speed = cfg.speed !== undefined ? cfg.speed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : (this.speed || 5.6));
     this.baseSpeed = this.speed;
 
     this.magazineBullets = cfg.magazineSize || 12;
@@ -87,9 +87,9 @@ export class JohnWickFighter extends Fighter {
     this.maxMagazine = cfg.magazineSize || 12;
     this.isReloading = false;
     this.reloadTimer = 0;
-    this.shootCooldownMax = cfg.fireCooldown || 20;
+    this.shootCooldownMax = cfg.fireCooldown || 26;
     this.shootCooldown = 0;
-    const baseSpeed = cfg.speed !== undefined ? cfg.speed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : 6.4);
+    const baseSpeed = cfg.speed !== undefined ? cfg.speed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : 5.6);
     this.speed = baseSpeed;
     this.baseSpeed = baseSpeed;
     this.focusGauge = 0;
@@ -343,7 +343,22 @@ export class JohnWickFighter extends Fighter {
           this.pencilMaxTime = pencilDur;
           this._pencilDamageDealt = false;
 
-          this.aim(target);
+          // Snapshot and commit locked 360° angle for the entire pencil stab (Rule 1.4: Committed Aim Lock)
+          const dx = (target && target.hp > 0) ? (target.x - this.x) : Math.cos(this.gunAngle || 0);
+          const dy = (target && target.hp > 0) ? (target.y - this.y) : Math.sin(this.gunAngle || 0);
+          const castAngle = (Math.hypot(dx, dy) > 0.001) ? Math.atan2(dy, dx) : (this.gunAngle || 0);
+          this.pencilCastAngle = castAngle;
+          this.gunAngle = castAngle;
+          this.angle = castAngle;
+
+          // Hold target velocity during grab initiation to prevent jitter/push
+          if (target && target.hp > 0) {
+            target.vx = 0;
+            target.vy = 0;
+            target.knockbackVx = 0;
+            target.knockbackVy = 0;
+            if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
+          }
         }
       } else {
         this.cqcComboPhase = 'BACKWARD_ROLL';
@@ -353,6 +368,10 @@ export class JohnWickFighter extends Fighter {
       this.pencilAttackTimer--;
       this.vx = 0;
       this.vy = 0;
+      if (this.pencilCastAngle !== undefined) {
+        this.gunAngle = this.pencilCastAngle;
+        this.angle = this.pencilCastAngle;
+      }
       const windupF = cfg.cqcPencilWindupFrames ?? 14;
       const thrustF = cfg.cqcPencilThrustFrames ?? 8;
       const pullbackF = cfg.cqcPencilPullbackFrames ?? 14;
@@ -361,7 +380,11 @@ export class JohnWickFighter extends Fighter {
       const thrustRatio = Math.min(0.95, (windupF + thrustF) / pencilDur);
 
       if (target && target.hp > 0) {
-        this.aim(target);
+        // Hold target steady during windup grab before impact
+        if (progress < thrustRatio) {
+          target.vx = 0;
+          target.vy = 0;
+        }
 
         // Forward thrust connects at full linear extension (tip impact instant — EXACT MOMENT HE STABS!)
         if (progress >= thrustRatio && !this._pencilDamageDealt) {
@@ -378,12 +401,12 @@ export class JohnWickFighter extends Fighter {
           }
 
           // Deal massive true damage & apply bleed + slow
-          const pencilDmg = cfg.pencilDamage || 65;
+          const pencilDmg = cfg.pencilDamage || 30;
           applyDamageToTarget(target, pencilDmg, this, { isMelee: true, isTrueDamage: true });
 
           if (target.hp > 0) {
             const bleedDur = cfg.pencilBleedDuration || 180;
-            const bleedDmg = cfg.pencilBleedDamagePerTick || 4;
+            const bleedDmg = cfg.pencilBleedDamagePerTick || 2;
             const bleedInterval = cfg.pencilBleedIntervalFrames || 30;
             if (typeof target.applyBleed === 'function') {
               target.applyBleed(this, bleedDur, bleedDmg, bleedInterval);
@@ -419,7 +442,7 @@ export class JohnWickFighter extends Fighter {
           triggerGlobalScreenShake(shakeInt, shakeDur);
 
           // APPLY IMMEDIATE POWERFUL KNOCKBACK IMPULSE ON ENEMY!
-          const facing = this.gunAngle || 0;
+          const facing = (this.pencilCastAngle !== undefined) ? this.pencilCastAngle : (this.gunAngle || 0);
           const knockback = cfg.cqcPencilKnockback || 22;
           if (typeof target.applyKnockback === 'function') {
             target.applyKnockback(Math.cos(facing) * knockback, Math.sin(facing) * knockback);
@@ -450,7 +473,7 @@ export class JohnWickFighter extends Fighter {
         this.isPencilEquipped = false;
         this.hideGun = true;
 
-        const facing = (target && target.hp > 0) ? Math.atan2(target.y - this.y, target.x - this.x) : (this.gunAngle || 0);
+        const facing = (this.pencilCastAngle !== undefined) ? this.pencilCastAngle : ((target && target.hp > 0) ? Math.atan2(target.y - this.y, target.x - this.x) : (this.gunAngle || 0));
         const backAngle = facing + Math.PI;
         const rollSpeed = cfg.cqcBackwardRollSpeed || 18;
         this.vx = Math.cos(backAngle) * rollSpeed;
@@ -522,6 +545,7 @@ export class JohnWickFighter extends Fighter {
         this.cqcComboPhase = null;
         this.weaponSwitchTimer = 0;
         this.shootCooldown = 10;
+        this.resumeMovement(target);
       }
     } else if (this.cqcComboPhase === 'STOP_RELOAD') {
       this.vx = 0;
@@ -539,6 +563,7 @@ export class JohnWickFighter extends Fighter {
         this.isReloading = false;
         this.reloadTimer = 0;
         this.shootCooldown = this.shootCooldownMax || 20;
+        this.resumeMovement(target);
         if (this.currentEquippedWeapon === 'shotgun') {
           const sgCrackSfx = cfg.sounds?.shotgunCrack || cfg.shotgunCrackSound || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3';
           const sgCrackVol = cfg.soundVolumes?.shotgunCrack ?? cfg.shotgunCrackVolume ?? 0.85;
@@ -576,17 +601,17 @@ export class JohnWickFighter extends Fighter {
     if (nextWeapon === 'shotgun') {
       this.maxMagazine = cfg.shotgunMagazineSize || 6;
       this.magazineBullets = this.maxMagazine;
-      this.shootCooldownMax = cfg.shotgunFireCooldown || 34;
+      this.shootCooldownMax = cfg.shotgunFireCooldown || 52;
       weaponName = 'BENELLI M4!';
       this._shotgunCrackSoundPlayed = false;
       this.isUltimateMode = false;
       this.isExcommunicado = false;
     } else if (nextWeapon === 'rifle') {
-      const baseRifleMag = cfg.rifleMagazineSize || 30;
-      const ammoMult = cfg.excommunicadoAmmoMultiplier || 1.50;
+      const baseRifleMag = cfg.rifleMagazineSize || 20;
+      const ammoMult = cfg.excommunicadoAmmoMultiplier || 1.20;
       this.maxMagazine = cfg.excommunicadoRifleMagazineSize || Math.round(baseRifleMag * ammoMult);
       this.magazineBullets = this.maxMagazine;
-      this.shootCooldownMax = cfg.rifleFireCooldown || 7;
+      this.shootCooldownMax = cfg.rifleFireCooldown || 11;
       weaponName = 'EXCOMMUNICADO (M4 RIFLE)!';
       this._rifleCrackSoundPlayed = false;
       this.isUltimateMode = true;
@@ -594,7 +619,7 @@ export class JohnWickFighter extends Fighter {
     } else {
       this.maxMagazine = cfg.magazineSize || 12;
       this.magazineBullets = this.maxMagazine;
-      this.shootCooldownMax = cfg.fireCooldown || 20;
+      this.shootCooldownMax = cfg.fireCooldown || 26;
       weaponName = 'TTI PIT VIPER!';
       this.isUltimateMode = false;
       this.isExcommunicado = false;
@@ -774,11 +799,11 @@ export class JohnWickFighter extends Fighter {
           }
 
           // 1. Deal Melee CQC Damage
-          const dmg = cfg.meleePunchDamage || 26;
+          const dmg = cfg.meleePunchDamage || 5;
           applyDamageToTarget(target, dmg, this, { isMelee: true, isBasicAttack: true });
 
           // 2. Physical Knockback Impulse & Attacker Lunge Step
-          const pushForce = cfg.meleeKnockback || 15;
+          const pushForce = cfg.meleeKnockback || 10;
           if (typeof target.applyKnockback === 'function') {
             target.applyKnockback(Math.cos(facing) * (pushForce * 0.45), Math.sin(facing) * (pushForce * 0.45));
           } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
@@ -812,7 +837,7 @@ export class JohnWickFighter extends Fighter {
           triggerGlobalScreenShake(2.0, 5);
 
           // 4. Focus Meter Gain on Melee Strike
-          this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerMeleeHit || 12));
+          this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerMeleeHit || 8));
 
           hitAny = true;
         }
@@ -821,7 +846,7 @@ export class JohnWickFighter extends Fighter {
 
     if (hitAny || primaryTarget) {
       this.punchAnimTimer = 16;
-      this.meleeCooldown = cfg.meleePunchCooldown || 22;
+      this.meleeCooldown = cfg.meleePunchCooldown || 20;
       this.isMeleeMode = true;
     }
   }
@@ -856,7 +881,7 @@ export class JohnWickFighter extends Fighter {
       // ── BENELLI M4 TACTICAL SHOTGUN BLAST (Multi-pellet buckshot cone) ──
       const defaultScale = 1.20;
       const localTipX = this.r * 0.85 + 48 * defaultScale;
-      const localTipY = (facingLeft ? 1.5 : -1.5);
+      const localTipY = (facingLeft ? -5.5 : 5.5);
       const spawnX = this.x + cosA * localTipX + perpX * localTipY;
       const spawnY = this.y + sinA * localTipX + perpY * localTipY;
 
@@ -864,7 +889,7 @@ export class JohnWickFighter extends Fighter {
         const pelletCount = cfg.shotgunPelletCount || 6;
         const spreadArc = cfg.shotgunSpreadAngle || 0.42; // ~24°
         const baseSpeed = cfg.shotgunPelletSpeed || 23.0;
-        const pelletDmg = cfg.shotgunPelletDamage || 12;
+        const pelletDmg = cfg.shotgunPelletDamage || 3;
 
         for (let k = 0; k < pelletCount; k++) {
           const pelletAngle = angle + (Math.random() - 0.5) * spreadArc;
@@ -886,27 +911,27 @@ export class JohnWickFighter extends Fighter {
 
       // Physical recoil impulse pushing John Wick backwards
       const backAngle = angle + Math.PI;
-      const selfPush = cfg.shotgunSelfPushback || 5.2;
+      const selfPush = cfg.shotgunSelfPushback || 4.0;
       this.vx += Math.cos(backAngle) * selfPush;
       this.vy += Math.sin(backAngle) * selfPush;
 
       this.recoilOffset = cfg.shotgunRecoilDistance || 20.0;
       this.flashTimer = cfg.shotgunFlashDuration || 6;
       this.casingTimer = cfg.shotgunCasingDuration || 24;
-      this.shootCooldown = cfg.shotgunFireCooldown || 34;
+      this.shootCooldown = cfg.shotgunFireCooldown || 52;
 
-      this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 8) * 1.5);
+      this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 6) * 1.5);
     } else if (this.currentEquippedWeapon === 'rifle') {
       // ── M4A1 CARBINE / M4 RIFLE RAPID 5.56 FIRE ──
       const defaultScale = 1.18;
       const localTipX = this.r * 0.85 + 50 * defaultScale;
-      const localTipY = (facingLeft ? 1.0 : -1.0);
+      const localTipY = (facingLeft ? -6.0 : 6.0);
       const spawnX = this.x + cosA * localTipX + perpX * localTipY;
       const spawnY = this.y + sinA * localTipX + perpY * localTipY;
 
       if (projectileSystem) {
         const speed = cfg.rifleBulletSpeed || 24.5;
-        const damage = cfg.rifleBulletDamage || 14;
+        const damage = cfg.rifleBulletDamage || 4;
         projectileSystem.fireProjectile(this, ownerIndex, damage, false, speed, false, 'johnWickRifleBullet', spawnX, spawnY, angle);
       }
 
@@ -920,27 +945,27 @@ export class JohnWickFighter extends Fighter {
 
       // Physical recoil impulse pushing John Wick slightly backwards
       const backAngle = angle + Math.PI;
-      const selfPush = cfg.rifleSelfPushback || 1.2;
+      const selfPush = cfg.rifleSelfPushback || 1.0;
       this.vx += Math.cos(backAngle) * selfPush;
       this.vy += Math.sin(backAngle) * selfPush;
 
-      this.recoilOffset = cfg.rifleRecoilDistance || 7.5;
+      this.recoilOffset = cfg.rifleRecoilDistance || 5.5;
       this.flashTimer = cfg.rifleFlashDuration || 4;
       this.casingTimer = cfg.rifleCasingDuration || 12;
-      this.shootCooldown = cfg.rifleFireCooldown || 7;
+      this.shootCooldown = cfg.rifleFireCooldown || 11;
 
-      this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 8) * 0.6);
+      this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 6) * 0.6);
     } else {
       // ── TTI PIT VIPER 9mm BULLET ──
       const defaultWeaponScale = 1.25;
       const localTipX = this.r * 0.85 + 28 * defaultWeaponScale;
-      const localTipY = (facingLeft ? 3.5 : -3.5);
+      const localTipY = (facingLeft ? -7.5 : 7.5);
       const spawnX = this.x + cosA * localTipX + perpX * localTipY;
       const spawnY = this.y + sinA * localTipX + perpY * localTipY;
 
       if (projectileSystem) {
-        const speed = cfg.bulletSpeed || 20.5;
-        const damage = cfg.bulletDamage || this.damage || 22;
+        const speed = cfg.bulletSpeed || 21.0;
+        const damage = cfg.bulletDamage || this.damage || 6;
         projectileSystem.fireProjectile(this, ownerIndex, damage, false, speed, false, 'johnWickBullet', spawnX, spawnY, angle);
       }
 
@@ -956,9 +981,9 @@ export class JohnWickFighter extends Fighter {
       this.recoilOffset = cfg.recoilDistance || 8.0;
       this.flashTimer = cfg.flashDuration || 4;
       this.casingTimer = cfg.casingDuration || 12;
-      this.shootCooldown = cfg.fireCooldown || 20;
+      this.shootCooldown = cfg.fireCooldown || 26;
 
-      this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 8));
+      this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 6));
     }
 
     // ── TRIGGER ASSASSINATION COMBO ON EMPTY MAGAZINE (WITH DELAY FRAMES) ──
@@ -1368,7 +1393,16 @@ export class JohnWickFighter extends Fighter {
     // 2. Update Assassination Combo State Machine
     if (this.cqcComboPhase) {
       this._updateAssassinationCombo(arena);
-      super.update(opponent, ownerIndex, arena);
+      if (this.cqcComboPhase === 'FORWARD_ROLL' || this.cqcComboPhase === 'BACKWARD_ROLL') {
+        this.x += this.vx;
+        this.y += this.vy;
+        const arenaObj = arena || state.arena || CONFIG.arena;
+        if (arenaObj) {
+          const tr = this.r || 25;
+          this.x = Math.max(arenaObj.x + tr, Math.min(arenaObj.x + arenaObj.width - tr, this.x));
+          this.y = Math.max(arenaObj.y + tr, Math.min(arenaObj.y + arenaObj.height - tr, this.y));
+        }
+      }
       return;
     }
 
@@ -1427,6 +1461,7 @@ export class JohnWickFighter extends Fighter {
         this.isRolling = false;
         this.isRollingBack = false;
         this.hideGun = false;
+        this.resumeMovement(opponent);
       }
 
       if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) this.aim(opponent);
@@ -1481,6 +1516,22 @@ export class JohnWickFighter extends Fighter {
       if (targetEnemy) {
         this.pendingAssassinationTarget = targetEnemy;
         this.outOfAmmoRollDelayTimer = cfg.outOfAmmoRollDelayFrames || 18;
+      } else {
+        // Fallback reload when no alive target exists
+        this.isReloading = true;
+        this._hasDroppedMag = false;
+        this._hasSlappedNewMag = false;
+        this._hasPlayedReloadSound = false;
+        let rTime = cfg.reloadTime || 75;
+        if (this.currentEquippedWeapon === 'shotgun') {
+          rTime = cfg.shotgunReloadTime || 96;
+          this.magazineBullets = 0;
+        } else if (this.currentEquippedWeapon === 'rifle') {
+          rTime = cfg.rifleReloadTime || 85;
+        }
+        this.reloadTimer = rTime;
+        this.reloadMaxTime = rTime;
+        this.shootCooldown = rTime;
       }
     }
 
@@ -1490,13 +1541,28 @@ export class JohnWickFighter extends Fighter {
     const isExcommunicado = (this.currentEquippedWeapon === 'rifle');
     this.isExcommunicado = isExcommunicado;
     this.isUltimateMode = isExcommunicado;
-    const baseSpeed = cfg.speed !== undefined ? cfg.speed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : 6.4);
-    this.speed = isExcommunicado ? (baseSpeed * (cfg.excommunicadoSpeedMultiplier || 1.40)) : baseSpeed;
+    const baseSpeed = cfg.speed !== undefined ? cfg.speed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : 5.6);
+    this.speed = isExcommunicado ? (baseSpeed * (cfg.excommunicadoSpeedMultiplier || 1.25)) : baseSpeed;
 
     super.update(opponent, ownerIndex, arena);
 
     // 4. Check Tactical Evasive Roll (Triggered when enemy approaches close)
     this._checkTacticalEvadeRoll(opponent, arena);
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      (this.cqcComboPhase && this.cqcComboPhase !== 'FORWARD_ROLL' && this.cqcComboPhase !== 'BACKWARD_ROLL') ||
+      (this.pencilAttackTimer && this.pencilAttackTimer > 0) ||
+      (this.weaponSwitchTimer && this.weaponSwitchTimer > 0) ||
+      (this.isReloading && this.cqcComboPhase === 'STOP_RELOAD') ||
+      super.isStationarySkillActive?.()
+    );
+  }
+
+  canAim() {
+    if (this.cqcComboPhase || this.isRolling || (this.weaponSwitchTimer && this.weaponSwitchTimer > 0)) return false;
+    return super.canAim();
   }
 
   drawGun(ctx) {

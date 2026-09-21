@@ -1,4 +1,5 @@
 import { Fighter } from '../fighter.js';
+import { state } from '../../core/state.js';
 import { drawSketchyCircle, drawPixelHand } from '../../graphics/renderers/fighterRenderer.js';
 import { NormalFighter } from '../fighters/NormalFighter.js';
 import { AimbotFighter } from '../fighters/AimbotFighter.js';
@@ -159,6 +160,8 @@ function wrapFighterDraw(FighterClass) {
       if (fighter.hitFlameWisps) fighter.hitFlameWisps.length = 0;
     }
 
+    const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || Boolean(fighter.hideHands) || fighter.characterId === 'zeus' || fighter.type === 'zeus';
+
     const originalArc = ctx.arc;
     const originalStroke = ctx.stroke;
     const originalBeginPath = ctx.beginPath;
@@ -178,11 +181,12 @@ function wrapFighterDraw(FighterClass) {
     };
     
     ctx.fill = function() {
-      if (handArcCalled) {
+      if (!shouldHideHands && handArcCalled) {
         drawPixelHand(ctx, handX, handY, handR, ctx.fillStyle || fighter.color);
         handArcCalled = false;
       } else {
         arcCalled = false;
+        handArcCalled = false;
         originalFill.call(ctx);
       }
     };
@@ -201,7 +205,7 @@ function wrapFighterDraw(FighterClass) {
         arcX = x;
         arcY = y;
         arcR = safeRadius;
-      } else if (safeRadius >= 3.5 && safeRadius <= 12 && (!fighter.r || Math.abs(safeRadius - fighter.r) >= 3)) {
+      } else if (!shouldHideHands && safeRadius >= 3.5 && safeRadius <= 12 && (!fighter.r || Math.abs(safeRadius - fighter.r) >= 3)) {
         const s = startAngle || 0;
         const e = endAngle !== undefined ? endAngle : Math.PI * 2;
         if (Math.abs(s) < 0.1 && Math.abs(e - Math.PI * 2) < 0.1) {
@@ -217,9 +221,10 @@ function wrapFighterDraw(FighterClass) {
       if (arcCalled) {
         // Global fighter body circle outline stroke removed
         arcCalled = false;
-      } else if (handArcCalled) {
+      } else if (!shouldHideHands && handArcCalled) {
         handArcCalled = false;
       } else {
+        handArcCalled = false;
         originalStroke.call(ctx);
       }
     };

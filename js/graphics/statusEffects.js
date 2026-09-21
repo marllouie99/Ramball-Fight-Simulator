@@ -307,157 +307,157 @@ export function drawBurnEffect(ctx, baseRadius, useAggressiveMode) {
   ctx.restore();
 }
 
-export function drawThunderRootsEffect(ctx, baseRadius) {
-  ctx.save();
-  
-  // 1. Light blue aura glow (very faint)
-  ctx.fillStyle = `rgba(0, 191, 255, ${0.1 + 0.05 * Math.sin(Date.now() / 40)})`;
+/**
+ * Renders outer electric corona glow and shockwave ring (Rule 11 compliant, zero shadowBlur).
+ */
+function _drawElectricCorona(ctx, baseRadius, alpha) {
+  // 1. Soft electric cyan corona glow
+  ctx.fillStyle = `rgba(0, 210, 255, ${0.24 * alpha})`;
   ctx.beginPath();
-  ctx.arc(0, 0, baseRadius * 1.1, 0, Math.PI * 2);
+  ctx.arc(0, 0, baseRadius * 1.25, 0, Math.PI * 2);
   ctx.fill();
 
+  // 2. Radiant electric ring
+  ctx.strokeStyle = `rgba(224, 242, 254, ${0.75 * alpha})`;
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius * 1.10, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/**
+ * Draws a multi-segmented jagged high-voltage lightning arc between two points.
+ */
+function _drawJaggedElectricArc(ctx, x1, y1, x2, y2, alpha, jitterAmt, now) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.hypot(dx, dy) || 1;
+  const steps = Math.max(4, Math.floor(dist / 8));
+  const nx = -dy / dist;
+  const ny = dx / dist;
+
+  const points = [{ x: x1, y: y1 }];
+  for (let s = 1; s < steps; s++) {
+    const t = s / steps;
+    const basePx = x1 + dx * t;
+    const basePy = y1 + dy * t;
+    const wave = Math.sin(now * 0.05 + s * 17.3);
+    const offset = wave * jitterAmt;
+    points.push({ x: basePx + nx * offset, y: basePy + ny * offset });
+  }
+  points.push({ x: x2, y: y2 });
+
+  // Outer electric cyan glow stroke
+  ctx.strokeStyle = `rgba(0, 235, 255, ${0.85 * alpha})`;
+  ctx.lineWidth = 3.6;
   ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  // Removed shadowBlur to fix massive FPS drops
-  
-  // Fast 3D traveling worms on the surface of a sphere
-  const time = Date.now() / 150; 
-  const numWorms = 3; // Reduced from 4 for performance
-  
-  for (let i = 0; i < numWorms; i++) {
-     const segments = 8; // Reduced from 12 for performance
-     let prevX = 0, prevY = 0;
-     
-     // Evaluate from tail (j=segments) to head (j=0)
-     for (let j = segments; j >= 0; j--) {
-        // Evaluate the continuous path function at a slightly delayed time to form the body
-        const t = time - j * 0.08; 
-        
-        // Random continuous 3D path using Lissajous curves with different frequencies per worm
-        const f1 = 1.3 + i * 0.5;
-        const f2 = 1.7 + i * 0.7;
-        const f3 = 2.1 + i * 0.3;
-        
-        let x = Math.sin(t * f1) + Math.cos(t * f2 * 0.8);
-        let y = Math.sin(t * f2) + Math.cos(t * f3 * 1.1);
-        let z = Math.sin(t * f3) + Math.cos(t * f1 * 0.9);
-        
-        // Normalize to force the worm onto the surface of the sphere
-        const len = Math.sqrt(x*x + y*y + z*z) || 1;
-        x /= len;
-        y /= len;
-        z /= len;
-        
-        // Add crackle (jaggedness) as a function of t so the tail exactly follows the head's jagged path!
-        const crackleX = Math.sin(t * 35 + i * 100) * 0.15;
-        const crackleY = Math.cos(t * 42 + i * 100) * 0.15;
-        x += crackleX;
-        y += crackleY;
-        
-        // Project to 2D
-        const px = x * baseRadius * 0.95;
-        const py = y * baseRadius * 0.95;
-        
-        if (j === segments) {
-           prevX = px;
-           prevY = py;
-        } else {
-           ctx.beginPath();
-           ctx.moveTo(prevX, prevY);
-           ctx.lineTo(px, py);
-           
-           const progress = 1 - (j / segments); // 0.0 at tail, 1.0 at head
-           
-           // If z < 0, the worm is on the BACK side of the 3D sphere. Draw it very faint!
-           const zAlpha = z > 0 ? 1.0 : 0.15;
-           const alpha = progress * zAlpha;
-           
-           const isWhite = i === 0 || i === 2;
-           ctx.strokeStyle = isWhite ? `rgba(255, 255, 255, ${alpha})` : `rgba(0, 230, 255, ${alpha})`;
-           ctx.lineWidth = 2.0 * progress;
-           ctx.stroke();
-           
-           // Draw spark at the head if it's on the front of the sphere
-           if (j === 0 && z > 0) {
-              ctx.beginPath();
-              ctx.arc(px, py, 1.5, 0, Math.PI*2);
-              ctx.fillStyle = isWhite ? '#FFFFFF' : '#00FFFF';
-              ctx.fill();
-           }
-           
-           prevX = px;
-           prevY = py;
-        }
-     }
+  ctx.lineJoin = 'bevel';
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.stroke();
+
+  // Inner brilliant white core stroke
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.stroke();
+}
+
+/**
+ * Renders high-voltage electric shock on enemy when struck by Zeus lightning.
+ */
+export function drawThunderRootsEffect(ctx, baseRadius, timer = 45) {
+  ctx.save();
+  const now = Date.now();
+  const alpha = Math.max(0.35, Math.min(1.0, (timer || 45) / 30));
+
+  _drawElectricCorona(ctx, baseRadius, alpha);
+
+  // Energetic lightning arcs wrapping across and around body circle
+  const numArcs = 5;
+  for (let a = 0; a < numArcs; a++) {
+    const startAngle = (now * 0.006 * (a % 2 === 0 ? 1 : -1)) + (a * (Math.PI * 2 / numArcs));
+    const endAngle = startAngle + Math.PI * (0.65 + (a % 3) * 0.25);
+    const r1 = baseRadius * (0.80 + (a % 2) * 0.25);
+    const r2 = baseRadius * (0.85 + ((a + 1) % 2) * 0.20);
+    const x1 = Math.cos(startAngle) * r1;
+    const y1 = Math.sin(startAngle) * r1;
+    const x2 = Math.cos(endAngle) * r2;
+    const y2 = Math.sin(endAngle) * r2;
+
+    _drawJaggedElectricArc(ctx, x1, y1, x2, y2, alpha, baseRadius * 0.35, now + a * 50);
   }
 
-  // Outer 3D orbiting electricity (sparks flying around the body)
-  const numOrbits = 2; // Reduced from 3 for performance
-  for (let k = 0; k < numOrbits; k++) {
-    const orbitTime = (Date.now() / 250) + k * 100;
-    const orbitRadius = baseRadius * (1.3 + k * 0.3); // Further out than the worms
-    
-    let prevPx = 0, prevPy = 0;
-    
-    // Draw a short arc/spark
-    const arcSegments = 6;
-    for (let j = arcSegments; j >= 0; j--) {
-        const t = orbitTime - j * 0.08;
-        
-        // Basic 3D circle
-        let x = Math.cos(t);
-        let y = Math.sin(t);
-        let z = 0;
-        
-        // Tilt the orbital plane so they orbit in true 3D randomly
-        const tiltX = k * 1.8 + 0.5;
-        let tempY = y * Math.cos(tiltX) - z * Math.sin(tiltX);
-        let tempZ = y * Math.sin(tiltX) + z * Math.cos(tiltX);
-        y = tempY; z = tempZ;
-        
-        const tiltY = k * 2.3 + 1.2;
-        let tempX = x * Math.cos(tiltY) - z * Math.sin(tiltY);
-        tempZ = x * Math.sin(tiltY) + z * Math.cos(tiltY);
-        x = tempX; z = tempZ;
-        
-        // Add a slight crackle
-        const crackle = Math.sin(t * 30 + k * 50) * 0.08;
-        
-        const px = x * orbitRadius * (1 + crackle);
-        const py = y * orbitRadius * (1 + crackle);
-        
-        if (j === arcSegments) {
-           prevPx = px;
-           prevPy = py;
-        } else {
-           ctx.beginPath();
-           ctx.moveTo(prevPx, prevPy);
-           ctx.lineTo(px, py);
-           
-           const progress = 1 - (j / arcSegments); 
-           // If z < 0, it orbits BEHIND the target
-           const zAlpha = z > 0 ? 0.9 : 0.05; 
-           const alpha = progress * zAlpha;
-           
-           const isWhite = (k % 2 === 0);
-           ctx.strokeStyle = isWhite ? `rgba(255, 255, 255, ${alpha})` : `rgba(0, 230, 255, ${alpha})`;
-           ctx.lineWidth = 1.2 * progress;
-           ctx.stroke();
-           
-           // Head spark
-           if (j === 0 && z > 0) {
-              ctx.beginPath();
-              ctx.arc(px, py, 1.0, 0, Math.PI*2);
-              ctx.fillStyle = isWhite ? '#FFFFFF' : '#00FFFF';
-              ctx.fill();
-           }
-           
-           prevPx = px;
-           prevPy = py;
-        }
-    }
+  // Snapping micro-sparks along rim
+  const numSparks = 4;
+  ctx.fillStyle = '#FFFFFF';
+  for (let i = 0; i < numSparks; i++) {
+    const sparkAngle = (now * 0.008 * (i % 2 === 0 ? -1 : 1)) + (i * Math.PI / 2);
+    const sr = baseRadius * 1.05 + Math.sin(now * 0.02 + i) * 3;
+    const sx = Math.cos(sparkAngle) * sr;
+    const sy = Math.sin(sparkAngle) * sr;
+    ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
   }
-  
+
+  ctx.restore();
+}
+
+/**
+ * Renders static electricity debuff visual when target is charged by Zeus lightning.
+ */
+export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 120) {
+  ctx.save();
+  const now = Date.now();
+  const pulse = Math.sin(now * 0.015) * 0.5 + 0.5;
+  const alpha = Math.max(0.3, Math.min(1.0, (timer || 120) / 40));
+
+  // 1. Faint buzzing electric halo
+  ctx.strokeStyle = `rgba(0, 235, 255, ${0.45 * alpha * (0.8 + pulse * 0.2)})`;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius * (1.06 + pulse * 0.06), 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 2. 3 crackling static micro-arcs skittering around the body
+  for (let i = 0; i < 3; i++) {
+    const angle = (now * 0.007 + i * 2.1);
+    const arcSpan = 0.5 + (i * 0.2);
+    const r = baseRadius * (0.95 + (Math.sin(now * 0.03 + i) * 0.15));
+    const x1 = Math.cos(angle) * r;
+    const y1 = Math.sin(angle) * r;
+    const x2 = Math.cos(angle + arcSpan) * r;
+    const y2 = Math.sin(angle + arcSpan) * r;
+    _drawJaggedElectricArc(ctx, x1, y1, x2, y2, alpha * 0.8, baseRadius * 0.18, now + i * 80);
+  }
+
+  // 3. Upright floating "⚡ STATIC" status badge above head
+  ctx.save();
+  if (typeof ctx.getTransform === 'function') {
+    const m = ctx.getTransform();
+    const currentAngle = Math.atan2(m.b, m.a);
+    const isFlipped = (m.a * m.d - m.b * m.c) < 0;
+    if (isFlipped) ctx.scale(1, -1);
+    ctx.rotate(-currentAngle);
+  }
+
+  const badgeY = -(baseRadius + 28 + Math.sin(now * 0.008) * 2);
+  ctx.font = '700 8.5px "Silkscreen", "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.lineWidth = 2.8;
+  ctx.strokeStyle = 'rgba(10, 20, 35, 0.90)';
+  ctx.strokeText('⚡ STATIC (+25%)', 0, badgeY);
+  ctx.fillStyle = '#00F3FF';
+  ctx.fillText('⚡ STATIC (+25%)', 0, badgeY);
+
+  ctx.restore();
   ctx.restore();
 }
 
@@ -1459,8 +1459,13 @@ export const STATUS_OVERLAY_REGISTRY = [
   },
   {
     id: 'thunderRoots',
-    isActive: (f) => f.thunderRootsTimer > 0,
-    render: (ctx, baseRadius, f) => drawThunderRootsEffect(ctx, baseRadius)
+    isActive: (f) => (f.thunderRootsTimer || 0) > 0,
+    render: (ctx, baseRadius, f) => drawThunderRootsEffect(ctx, baseRadius, f.thunderRootsTimer)
+  },
+  {
+    id: 'zeusStaticDebuff',
+    isActive: (f) => (f.staticDebuffTimer || 0) > 0,
+    render: (ctx, baseRadius, f) => drawZeusStaticDebuffEffect(ctx, baseRadius, f.staticDebuffTimer)
   },
   {
     id: 'nanamiArmorFracture',

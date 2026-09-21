@@ -158,8 +158,10 @@ async function main() {
   const { _getTojiHairImage, _drawTojiHair, drawTojiPixelBody, drawTojiSkin, drawTojiGhostSkin } = await import('../js/graphics/fighters/tojiSkin.js');
   const { _getMahitoHairImage, _drawMahitoHair, drawMahitoPixelBody, drawMahitoSkin } = await import('../js/graphics/fighters/mahitoSkin.js');
   const { _getGenosHairImage, _drawGenosHair, drawGenosPixelBody, drawGenosSkin } = await import('../js/graphics/fighters/genosSkin.js');
+  const { _getTodoHairImage, _drawTodoHair, drawTodoPixelBody, drawTodoSkin } = await import('../js/graphics/fighters/todoSkin.js');
   const { drawNanamiPixelBody, drawNanamiSkin } = await import('../js/graphics/fighters/nanamiSkin.js');
-  const { drawZeusPixelBody, drawZeusSkin } = await import('../js/graphics/fighters/zeusSkin.js');
+  const { drawZeusPixelBody, drawZeusSkin, _drawZeusHair, _getZeusHairImage, _drawZeusCrown, _getZeusCrownImage } = await import('../js/graphics/fighters/zeusSkin.js');
+  const { _getJohnWickHairImage, _drawJohnWickHair, drawJohnWickPixelBody, drawJohnWickSkin } = await import('../js/graphics/fighters/johnWickSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -3276,11 +3278,24 @@ async function main() {
         if (!fighter.isTakadaChanneling) {
           throw new Error('Todo failed to start Takada Channeling with BGM enabled');
         }
+        if (fighter.isTakadaBackgroundPlaying) {
+          throw new Error('Todo isTakadaBackgroundPlaying should be false during channeling');
+        }
+        if (shouldDuckArenaBgm()) {
+          throw new Error('shouldDuckArenaBgm() should return false during channeling (arena BGM must not cut off)');
+        }
+
+        // Fast forward channeling to activate ultimate
+        fighter.takadaChannelTimer = 1;
+        fighter.update(dummyOpponent, 0, state.arena);
+        if (!fighter.isTakadaUltActive) {
+          throw new Error('Todo failed to activate Takada Ultimate with BGM enabled');
+        }
         if (!fighter.isTakadaBackgroundPlaying) {
-          throw new Error('Todo isTakadaBackgroundPlaying should be true when enableTakadaBackgroundSong is true');
+          throw new Error('Todo isTakadaBackgroundPlaying should be true after channeling when BGM is enabled');
         }
         if (!shouldDuckArenaBgm()) {
-          throw new Error('shouldDuckArenaBgm() should return true when Todo BGM is active');
+          throw new Error('shouldDuckArenaBgm() should return true after channeling when Todo BGM is active');
         }
 
         // Cleanup and restore
@@ -3923,7 +3938,7 @@ async function main() {
     dummyTarget3.isDead = false;
     testYuji.update(dummyTarget3, 0, state.arena); // Trigger takeover
 
-    const expectedSoulSwapDuration = CONFIG.yuji?.soulSwapDurationFrames ?? 800;
+    const expectedSoulSwapDuration = CONFIG.yuji?.soulSwapDuration ?? CONFIG.yuji?.soulSwapDurationFrames ?? 800;
     if (!testYuji.soulSwapActive || testYuji.soulSwapTimer !== expectedSoulSwapDuration) {
       throw new Error(`Expected Soul Swap to activate with duration ${expectedSoulSwapDuration}, got active=${testYuji.soulSwapActive}, timer=${testYuji.soulSwapTimer}`);
     }
@@ -4484,10 +4499,25 @@ async function main() {
   try {
     const YujiClass = FIGHTER_CLASS_MAP['yuji'];
     if (YujiClass) {
+      // Test Yuji Base Passive Damage Reduction (DEF)
+      const baseDefYuji = new YujiClass({ startX: 200, startY: 200, hp: 500, maxHp: 500 });
+      const hpBeforeHit = baseDefYuji.hp;
+      const rawHit = 100;
+      baseDefYuji.takeDamage(rawHit, null);
+      const expectedReduction = CONFIG.yuji?.baseDamageReduction ?? 0.20;
+      const expectedDamage = rawHit * (1 - expectedReduction);
+      const actualDamage = hpBeforeHit - baseDefYuji.hp;
+      if (Math.abs(actualDamage - expectedDamage) > 0.01) {
+        throw new Error(`Expected Yuji to take ${expectedDamage} damage (with ${expectedReduction * 100}% DEF reduction), but took ${actualDamage}!`);
+      }
+
       const yuji = new YujiClass({ startX: 200, startY: 200, hp: 1000, maxHp: 1000 });
       // Damage below threshold -> triggers Soul Swap
       const swapThreshold = CONFIG.yuji?.soulSwapHpThreshold ?? 0.30;
-      yuji.takeDamage(yuji.maxHp * (1 - swapThreshold + 0.1), null);
+      const defReduction = CONFIG.yuji?.baseDamageReduction ?? 0;
+      // Account for passive DEF: divide by (1 - reduction) so effective post-DEF damage crosses threshold
+      const rawDamageNeeded = yuji.maxHp * (1 - swapThreshold + 0.1);
+      yuji.takeDamage(defReduction > 0 ? rawDamageNeeded / (1 - defReduction) : rawDamageNeeded, null);
       if (!yuji.soulSwapActive) {
         throw new Error('Expected Yuji to activate Soul Swap below threshold HP');
       }
@@ -4734,15 +4764,24 @@ async function main() {
       }
       const lockedFugaAngle = s.gunAngle;
 
-      // Test 4: Enemy moves during Fuga charge - verify aim does NOT rotate or snap auto-aim
+      // Test 4: Enemy moves during Fuga charge - verify aim smoothly rotates toward enemy without snapping
+      const angleBefore = s.gunAngle;
       diagonalEnemy.x = 100;
       diagonalEnemy.y = 200;
       s.update(diagonalEnemy, 0, state.arena);
-      if (Math.abs(s.gunAngle - lockedFugaAngle) > 0.001 || Math.abs(s.divineFlameCastAngle - lockedFugaAngle) > 0.001) {
-        throw new Error(`Expected Sukuna aim NOT to rotate or snap auto-aim during Fuga channeling!`);
+      const angleAfter = s.gunAngle;
+      if (angleAfter === angleBefore) {
+        throw new Error(`Expected Sukuna aim to rotate toward enemy during Fuga channeling! Before: ${angleBefore}, After: ${angleAfter}`);
       }
+      const directTargetAngle = Math.atan2(200 - s.y, 100 - s.x);
+      if (Math.abs(angleAfter - directTargetAngle) < 0.01) {
+        throw new Error(`Expected Sukuna aim to rotate smoothly without instant snapping during Fuga channeling! Got: ${angleAfter}, Target: ${directTargetAngle}`);
+      }
+      const updatedFugaAngle = s.gunAngle;
 
-      // Test 5: Fuga firing launches arrow along locked angle
+      // Test 5: Fuga firing launches arrow along current facing angle without snapping to a relocated enemy
+      diagonalEnemy.x = 800;
+      diagonalEnemy.y = 800;
       projectileSystem.projectiles = [];
       s._fireDivineFlame(0);
       const fugaProj = projectileSystem.projectiles.find(p => p.isSukunaFurnace || p.behaviorType === 'sukuna_furnace');
@@ -4750,8 +4789,8 @@ async function main() {
         throw new Error(`Expected _fireDivineFlame to spawn sukuna_furnace projectile!`);
       }
       const fugaVelocityAngle = Math.atan2(fugaProj.vy, fugaProj.vx);
-      if (Math.abs(fugaVelocityAngle - lockedFugaAngle) > 0.05) {
-        throw new Error(`Expected Fuga arrow velocity angle to match locked angle (${lockedFugaAngle.toFixed(2)}), got ${fugaVelocityAngle}`);
+      if (Math.abs(fugaVelocityAngle - updatedFugaAngle) > 0.05) {
+        throw new Error(`Expected Fuga arrow velocity angle to match locked angle (${updatedFugaAngle.toFixed(2)}), got ${fugaVelocityAngle}`);
       }
 
       // Test 6: Enemy out of trigger range (1500, 1500) -> should NOT trigger Fuga
@@ -5328,10 +5367,11 @@ async function main() {
         y.update(enemy, 0, state.arena);
       }
 
-      // Fast-forward channeling phase (150 frames) while verifying Yuta and Rika maintain locked committed aim angle
-      const lockedEmergenceAngle = y.pureLoveBeamLockedAngle;
+      // Fast-forward channeling phase while verifying Yuta smoothly auto-aims and tracks moving enemy with Rika
+      const initialChannelAngle = y.pureLoveBeamLockedAngle;
       enemy.x = y.x + 200;
       enemy.y = y.y + 150;
+      let finalChannelAngle = initialChannelAngle;
       while (y.isChannelingPureLoveBeam) {
         y.update(enemy, 0, state.arena);
 
@@ -5340,11 +5380,21 @@ async function main() {
             throw new Error(`Expected Rika angle (${y.rika.angle}) to match Yuta aim angle (${y.gunAngle}) during channeling!`);
           }
         }
+        if (y.isChannelingPureLoveBeam) {
+          finalChannelAngle = y.gunAngle;
+        }
       }
 
-      // Verify Yuta kept committed locked angle during channeling without rotating to moving enemy
-      if (Math.abs(y.gunAngle - lockedEmergenceAngle) > 0.001) {
-        throw new Error(`Expected Yuta gunAngle (${y.gunAngle}) to remain locked at initial angle (${lockedEmergenceAngle}) during channeling without aim rotation!`);
+      // Verify Yuta rotated toward moving enemy during channeling (auto-aim enabled)
+      let turnDelta = Math.abs(finalChannelAngle - initialChannelAngle);
+      while (turnDelta > Math.PI) turnDelta = Math.abs(turnDelta - Math.PI * 2);
+      if (turnDelta < 0.01) {
+        throw new Error(`Expected Yuta to rotate toward moving enemy during beam channeling (turned ${turnDelta} rad)!`);
+      }
+
+      // Verify Yuta committed to the final channeling angle upon firing (no snap on release)
+      if (Math.abs(y.gunAngle - finalChannelAngle) > 0.001) {
+        throw new Error(`Expected Yuta gunAngle (${y.gunAngle}) to commit to final channeling angle (${finalChannelAngle}) without snap on fire!`);
       }
 
       // Verify beam is now FIRING inside domain!
@@ -7470,6 +7520,51 @@ async function main() {
     errors++;
   }
 
+  // Todo Model Hair Asset & Pixel Body Test
+  console.log('💇 [Todo Model Hair Asset Test] Verifying Todo hair asset image loader, pixel body, facing directions, and drawTodoSkin rendering...');
+  try {
+    const TodoClass = FIGHTER_CLASS_MAP['todo'];
+    const todo = new TodoClass({ startX: 300, startY: 300 });
+
+    const hairImg = _getTodoHairImage();
+    if (!hairImg) {
+      throw new Error('_getTodoHairImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    _drawTodoHair(mockCtx, todo.r || 25, false);
+    assertCanvasStackBalance('_drawTodoHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawTodoHair(mockCtx, todo.r || 25, true);
+    assertCanvasStackBalance('_drawTodoHair(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawTodoPixelBody(mockCtx, todo.r || 25, false);
+    assertCanvasStackBalance('drawTodoPixelBody(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    drawTodoPixelBody(mockCtx, todo.r || 25, true);
+    assertCanvasStackBalance('drawTodoPixelBody(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawTodoSkin(mockCtx, todo);
+    assertCanvasStackBalance('drawTodoSkin(mockCtx, todo)');
+
+    mockCtx.resetStackDepth();
+    todo.draw(mockCtx);
+    assertCanvasStackBalance('todo.draw(mockCtx)');
+
+    // Test facing left mirroring
+    todo.gunAngle = Math.PI;
+    mockCtx.resetStackDepth();
+    drawTodoSkin(mockCtx, todo);
+    assertCanvasStackBalance('drawTodoSkin (facing left)');
+  } catch (err) {
+    console.error('❌ [TODO HAIR ASSET TEST ERROR]:', err);
+    errors++;
+  }
+
   // Nanami Ratio Hit-Pause Enemy Skill Channeling Preservation Test
   console.log('🥋 [Nanami Ratio Hit-Pause Channeling Preservation Test] Verifying enemy skill channeling is preserved and continues after 7:3 Ratio hit-pause...');
   try {
@@ -8637,6 +8732,67 @@ async function main() {
     errors++;
   }
 
+  // 11.5. John Wick Model Hair Asset & Procedural Body Canvas Stack Test
+  console.log('🔫 [John Wick Model Hair & Pixel Body Test] Verifying Johnwick-hair.png overlay and procedural pixel body stack balance...');
+  try {
+    const wickImg = _getJohnWickHairImage();
+    if (!wickImg) {
+      throw new Error('_getJohnWickHairImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    drawJohnWickPixelBody(mockCtx, 25);
+    assertCanvasStackBalance('drawJohnWickPixelBody(mockCtx, 25)');
+
+    mockCtx.resetStackDepth();
+    _drawJohnWickHair(mockCtx, 25, false);
+    assertCanvasStackBalance('_drawJohnWickHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawJohnWickHair(mockCtx, 25, true);
+    assertCanvasStackBalance('_drawJohnWickHair(mockCtx, 25, true)');
+
+    const JohnWickClass = FIGHTER_CLASS_MAP.john_wick;
+    const wick = new JohnWickClass({ x: 300, y: 300, color: '#475569', controls: {} });
+    mockCtx.resetStackDepth();
+    drawJohnWickSkin(mockCtx, wick);
+    assertCanvasStackBalance('drawJohnWickSkin(mockCtx, wick)');
+
+    // Test Pencil Stab Committed Aim Lock & Stability
+    const enemy = new JohnWickClass({ x: 340, y: 300, color: '#FF0000', controls: {} });
+    state.fighters = [wick, enemy];
+    wick.startAssassinationCombo(enemy);
+    wick.rollTimer = 0; // complete forward roll
+    wick.update(enemy, 0, state.arena);
+
+    if (wick.cqcComboPhase !== 'PENCIL_STAB') {
+      throw new Error(`Expected cqcComboPhase to be 'PENCIL_STAB', got '${wick.cqcComboPhase}'`);
+    }
+    if (wick.canAim() !== false) {
+      throw new Error(`Expected canAim() to return false during PENCIL_STAB`);
+    }
+    const lockedAngle = wick.pencilCastAngle;
+    if (lockedAngle === undefined || Number.isNaN(lockedAngle)) {
+      throw new Error(`Expected pencilCastAngle to be defined, got ${lockedAngle}`);
+    }
+
+    // Verify resolveFighterCollision does not separate or jitter them during stab
+    const initialWickX = wick.x;
+    const initialEnemyX = enemy.x;
+    resolveFighterCollision(wick, enemy);
+    if (wick.x !== initialWickX || enemy.x !== initialEnemyX) {
+      throw new Error(`resolveFighterCollision modified position during PENCIL_STAB! wick.x: ${wick.x} (expected ${initialWickX}), enemy.x: ${enemy.x} (expected ${initialEnemyX})`);
+    }
+
+    // Update through stab completion and verify drawing stack balance
+    mockCtx.resetStackDepth();
+    wick.draw(mockCtx, enemy);
+    assertCanvasStackBalance('wick.draw during PENCIL_STAB');
+  } catch (err) {
+    console.error('❌ [JOHN WICK MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
+    errors++;
+  }
+
   // 12. Makima Shatter Reformation Aim Tracking Test
   console.log('🩸 [Makima Shatter Reformation Aim Tracking Test] Verifying enemy fighters continue aiming toward Makima while she is reforming from contract...');
   try {
@@ -8692,7 +8848,7 @@ async function main() {
   try {
     console.log('🎛️ [HUD Settings Toggle Test] Verifying toggling to completely hide all HUD skill bars, stats, and health bars...');
 
-    const { updateHealthHud, drawHUD } = await import('../js/graphics/hudManager.js');
+    const { updateHealthHud, clearHealthHud, drawHUD } = await import('../js/graphics/hudManager.js');
     const { FighterRenderer } = await import('../js/graphics/renderers/fighterRenderer.js');
     const IchigoClass = FIGHTER_CLASS_MAP.ichigo;
     const ichigo = new IchigoClass({ x: 200, y: 200, color: '#FF7700', controls: {} });
@@ -8738,11 +8894,48 @@ async function main() {
       throw new Error('Overhead health text was NOT drawn when all HUD elements were enabled!');
     }
     
+    // 5. Test Yuji HUD Stats includes DEF and DMG
+    const YujiClass = FIGHTER_CLASS_MAP.yuji;
+    const yuji = new YujiClass({ x: 200, y: 200, color: '#D95C7E', controls: {} });
+    state.fighters = [yuji];
+    state.mode = '1v1';
+    state.gameState = 'matchEnd';
+    state._hudFrameCount = 0;
+    CONFIG.hudHideAll = false;
+    CONFIG.hudHideStats = false;
+    CONFIG.darkModeShowHudStats = 1;
+
+    let capturedHTML = '';
+    const origCreateElement = globalThis.document.createElement;
+    globalThis.document.createElement = (tag) => {
+      const el = origCreateElement(tag);
+      let _html = '';
+      Object.defineProperty(el, 'innerHTML', {
+        set(val) {
+          _html = val;
+          capturedHTML += val;
+        },
+        get() {
+          return _html;
+        }
+      });
+      return el;
+    };
+
+    clearHealthHud();
+    updateHealthHud();
+    globalThis.document.createElement = origCreateElement;
+
+    if (!capturedHTML.includes('DEF:') || !capturedHTML.includes('DMG:')) {
+      throw new Error(`[YUJI HUD STATS FAILED] Expected Yuji HUD HTML to contain 'DEF:' and 'DMG:', got: ${capturedHTML}`);
+    }
+    
     // Reset CONFIG back to normal defaults after test
     CONFIG.hudHideAll = false;
     CONFIG.hudHideHealthBars = false;
     CONFIG.hudHideSkillBars = false;
     CONFIG.hudHideStats = false;
+    CONFIG.darkModeShowHudStats = 0;
     CONFIG.hudHideOverheadHp = false;
     CONFIG.hudSkillBarsMode = 'all';
   } catch (err) {
@@ -8755,6 +8948,22 @@ async function main() {
   // ─────────────────────────────────────────────
   try {
     console.log('⚡ [Zeus Model & Pixel Body Test] Verifying Zeus pixel art skin, laurel crown, flowing beard, royal toga, and Canvas stack balance...');
+
+    mockCtx.resetStackDepth();
+    _drawZeusHair(mockCtx, 25, false, false);
+    assertCanvasStackBalance('_drawZeusHair(mockCtx, 25, false, false)');
+
+    mockCtx.resetStackDepth();
+    _drawZeusHair(mockCtx, 25, true, true);
+    assertCanvasStackBalance('_drawZeusHair(mockCtx, 25, true, true)');
+
+    mockCtx.resetStackDepth();
+    _drawZeusCrown(mockCtx, 25, false, false);
+    assertCanvasStackBalance('_drawZeusCrown(mockCtx, 25, false, false)');
+
+    mockCtx.resetStackDepth();
+    _drawZeusCrown(mockCtx, 25, true, true);
+    assertCanvasStackBalance('_drawZeusCrown(mockCtx, 25, true, true)');
 
     mockCtx.resetStackDepth();
     drawZeusPixelBody(mockCtx, 25, false);
@@ -9289,6 +9498,365 @@ async function main() {
     console.error('❌ [GENOS ULTIMATE OVERLAY TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[GENOS ULTIMATE OVERLAY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Zeus Storm Dim Screen Overlay & Canvas Stack Balance Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('⚡ [Zeus Storm Dim Screen Test] Verifying Zeus Storm Dim Screen overlay rendering and Canvas stack balance...');
+    const { drawStormDimScreen } = await import('../js/graphics/renderers/environmentalRenderer.js');
+    const { ZeusFighter } = await import('../js/entities/fighters/ZeusFighter.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+
+    const zeus = new ZeusFighter({ color: '#FFD700', name: 'Zeus' });
+    zeus.x = 400;
+    zeus.y = 300;
+    zeus.isChargingStorm = true;
+    zeus.stormTimer = 40;
+
+    const gojo = new GojoFighter({ color: '#4A90E2', name: 'Gojo' });
+    gojo.x = 250;
+    gojo.y = 300;
+    gojo.infinityActive = true;
+    gojo.infinityCooldown = 0;
+
+    state.fighters = [zeus, gojo];
+
+    // Test rect arena
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawStormDimScreen();
+    assertCanvasStackBalance('drawStormDimScreen (Zeus charging, rect arena)');
+
+    // Test circular arena during active storm strikes
+    zeus.isChargingStorm = false;
+    zeus.stormStrikesRemaining = 5;
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawStormDimScreen();
+    assertCanvasStackBalance('drawStormDimScreen (Zeus active strikes, circular arena)');
+
+    // Test idle transition (ease-out fade)
+    zeus.stormStrikesRemaining = 0;
+    mockCtx.resetStackDepth();
+    drawStormDimScreen();
+    assertCanvasStackBalance('drawStormDimScreen (Zeus fade-out)');
+  } catch (err) {
+    console.error('❌ [ZEUS STORM DIM SCREEN TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[ZEUS STORM DIM SCREEN TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Sukuna Domain Expansion Channeling Facing Angle & Stack Balance Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('⛩️ [Sukuna Domain Channeling Angle Test] Verifying Sukuna domain channeling faces player (angle 0) and maintains Canvas stack balance...');
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const { SukunaRenderer } = await import('../js/graphics/fighters/sukunaRenderer.js');
+    const sukuna = new SukunaFighter({ color: '#FF0000', name: 'Sukuna' });
+    sukuna.x = 400;
+    sukuna.y = 300;
+    sukuna.gunAngle = Math.PI / 4; // Arbitrary previous aim angle
+
+    const dummyEnemy = { x: 100, y: 100, r: 25, hp: 100, maxHp: 100, z: 0, vx: 0, vy: 0 };
+    state.fighters = [sukuna, dummyEnemy];
+
+    // Trigger domain channeling
+    sukuna.domainCooldown = 0;
+    sukuna.isChannelingDomainExpansion = true;
+    sukuna.domainChargeTimer = 10;
+    sukuna.aim(dummyEnemy);
+
+    if (sukuna.gunAngle !== 0 || sukuna.angle !== 0) {
+      throw new Error(`[SUKUNA DOMAIN ANGLE FAILED] Expected gunAngle & angle to be 0 (facing player), got gunAngle: ${sukuna.gunAngle}, angle: ${sukuna.angle}`);
+    }
+
+    // Verify update() maintains angle = 0 and stops movement
+    sukuna.update(dummyEnemy, 0, state.arena);
+    if (sukuna.gunAngle !== 0 || sukuna.angle !== 0) {
+      throw new Error(`[SUKUNA DOMAIN ANGLE UPDATE FAILED] Expected gunAngle & angle to remain 0 after update(), got gunAngle: ${sukuna.gunAngle}, angle: ${sukuna.angle}`);
+    }
+    if (sukuna.vx !== 0 || sukuna.vy !== 0) {
+      throw new Error(`[SUKUNA DOMAIN MOVEMENT LOCK FAILED] Expected vx/vy to be 0, got vx: ${sukuna.vx}, vy: ${sukuna.vy}`);
+    }
+
+    // Verify Canvas 2D stack balance during domain channeling
+    mockCtx.resetStackDepth();
+    sukuna.drawBody(mockCtx);
+    assertCanvasStackBalance('sukuna.drawBody during domain channeling');
+
+    mockCtx.resetStackDepth();
+    SukunaRenderer.draw(mockCtx, sukuna);
+    assertCanvasStackBalance('SukunaRenderer.draw during domain channeling');
+
+    sukuna.isChannelingDomainExpansion = false;
+  } catch (err) {
+    console.error('❌ [SUKUNA DOMAIN CHANNELING ANGLE TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[SUKUNA DOMAIN CHANNELING ANGLE TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Soul-Swapped Sukuna (Yuji) Fuga Smooth Aim Tracking & No Firing Snap Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🔥 [Soul-Swapped Sukuna Fuga Aim Tracking & No Firing Snap Test] Verifying smooth aim tracking during channeling and no snap upon firing...');
+    const { YujiFighter } = await import('../js/entities/fighters/YujiFighter.js');
+    const yuji = new YujiFighter({ color: '#E11D48', name: 'Yuji' });
+    yuji.x = 300;
+    yuji.y = 300;
+    yuji.gunAngle = 0;
+    yuji.angle = 0;
+    yuji.soulSwapActive = true;
+    yuji.soulSwapTimer = 1000;
+    yuji.isChannelingDivineFlame = true;
+    yuji.divineFlameChargeTimer = 10;
+    yuji.divineFlameChargeMax = 85;
+
+    const dummyEnemy = { x: 300, y: 500, r: 25, hp: 100, maxHp: 100, z: 0, vx: 0, vy: 0, isDead: false };
+    state.fighters = [yuji, dummyEnemy];
+
+    const angleBefore = yuji.gunAngle;
+    yuji.aim(dummyEnemy);
+    const angleAfter = yuji.gunAngle;
+
+    if (angleAfter <= angleBefore) {
+      throw new Error(`[SOUL SWAP FUGA AIM FAILED] Soul Swapped Sukuna did not rotate toward target. Before: ${angleBefore}, After: ${angleAfter}`);
+    }
+    if (Math.abs(angleAfter - Math.PI / 2) < 0.01) {
+      throw new Error(`[SOUL SWAP FUGA AIM SNAPPING FAILED] Soul Swapped Sukuna snapped instantly instead of turning smoothly. Got: ${angleAfter}`);
+    }
+
+    // Now test Fuga firing releases strictly at current facing gunAngle without snapping to relocated enemy
+    dummyEnemy.x = 100;
+    dummyEnemy.y = 300;
+    const savedGunAngle = yuji.gunAngle;
+    projectileSystem.projectiles = [];
+    yuji.divineFlameChargeTimer = yuji.divineFlameChargeMax;
+    yuji.update(dummyEnemy, 0, state.arena);
+
+    if (Math.abs(yuji.gunAngle - savedGunAngle) > 0.001) {
+      throw new Error(`[SOUL SWAP FUGA FIRING SNAP FAILED] Soul Swapped Sukuna snapped aim upon firing Fuga. Expected ${savedGunAngle}, got ${yuji.gunAngle}`);
+    }
+
+    const spawnedFuga = projectileSystem.projectiles.find(p => p.isSukunaFurnace || p.behaviorType === 'sukuna_furnace');
+    if (!spawnedFuga) {
+      throw new Error(`[SOUL SWAP FUGA SPAWN FAILED] Expected sukuna_furnace projectile to spawn!`);
+    }
+
+    const velAngle = Math.atan2(spawnedFuga.vy, spawnedFuga.vx);
+    if (Math.abs(velAngle - savedGunAngle) > 0.05) {
+      throw new Error(`[SOUL SWAP FUGA VELOCITY FAILED] Fuga projectile angle (${velAngle}) did not match release angle (${savedGunAngle})`);
+    }
+  } catch (err) {
+    console.error('❌ [SOUL SWAP FUGA AIM TRACKING TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[SOUL SWAP FUGA AIM TRACKING TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Todo Death Active Cursed Rock Clearing Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🪨 [Todo Death Active Rock Clearing Test] Verifying active cursed rocks are cleared when Todo dies...');
+    const { TodoFighter } = await import('../js/entities/fighters/TodoFighter.js');
+    const todo = new TodoFighter({ color: '#A855F7', name: 'Todo' });
+    todo.x = 200;
+    todo.y = 200;
+    todo.hp = 100;
+    todo.cursedRocks = [
+      { x: 300, y: 300, vx: 2, vy: 0, radius: 10, life: 100 }
+    ];
+
+    const enemy = { x: 500, y: 500, hp: 100, maxHp: 100, isDead: false };
+    state.fighters = [todo, enemy];
+
+    // 1. Verify rocks exist before death
+    if (!todo.cursedRocks || todo.cursedRocks.length !== 1) {
+      throw new Error(`Expected Todo to have 1 active cursed rock before death!`);
+    }
+
+    // 2. Kill Todo and verify cursedRocks is cleared
+    todo.takeDamage(150, enemy, {});
+    if (todo.hp > 0) {
+      throw new Error(`Expected Todo to be dead after taking lethal damage!`);
+    }
+    if (todo.cursedRocks && todo.cursedRocks.length > 0) {
+      throw new Error(`Expected Todo active cursed rocks to be cleared upon death, but found ${todo.cursedRocks.length} remaining!`);
+    }
+
+    // 3. Test onDeath() directly with a newly added rock
+    todo.cursedRocks = [{ x: 350, y: 350, vx: 1, vy: 1, radius: 10, life: 80 }];
+    todo.onDeath();
+    if (todo.cursedRocks && todo.cursedRocks.length > 0) {
+      throw new Error(`Expected Todo.onDeath() to clear active cursed rocks!`);
+    }
+
+    // 4. Test update() when dead clears rocks
+    todo.cursedRocks = [{ x: 400, y: 400, vx: 0, vy: 0, radius: 10, life: 50 }];
+    todo.update(enemy, 0, state.arena);
+    if (todo.cursedRocks && todo.cursedRocks.length > 0) {
+      throw new Error(`Expected Todo.update() while dead to clear active cursed rocks!`);
+    }
+  } catch (err) {
+    console.error('❌ [TODO DEATH ACTIVE ROCK CLEARING TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[TODO DEATH ACTIVE ROCK CLEARING TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Todo Ultimate Arena PNG Overlay (Todo-ultimate-overlay.png) Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🎤 [Todo Ultimate Arena Overlay Test] Verifying Todo-ultimate-overlay.png image loader, semi-transparency, and Canvas stack balance...');
+    const { getTodoUltimateOverlayImage, drawTodoUltimateArenaOverlay, drawTodoTakadaDimScreen, isTodoTakadaOverlayActive } = await import('../js/graphics/renderers/specialOverlayRenderer.js');
+    const { TodoFighter } = await import('../js/entities/fighters/TodoFighter.js');
+    const todo = new TodoFighter({ color: '#A855F7', name: 'Todo' });
+    todo.x = 400;
+    todo.y = 300;
+    todo.hp = 200;
+    todo.isTakadaUltActive = true;
+
+    const dummyEnemy = { x: 500, y: 300, r: 25, hp: 100, maxHp: 100, z: 0 };
+    state.fighters = [todo, dummyEnemy];
+
+    // Verify image loader
+    const todoImg = getTodoUltimateOverlayImage();
+    if (!todoImg) {
+      throw new Error('[TODO OVERLAY IMAGE FAILED] getTodoUltimateOverlayImage() returned null/undefined');
+    }
+    if (!todoImg.src.includes('Todo-ultimate-overlay.png')) {
+      throw new Error(`[TODO OVERLAY IMAGE FAILED] Expected image src to include Todo-ultimate-overlay.png, got ${todoImg.src}`);
+    }
+
+    // Verify config transparency
+    if (CONFIG.todo?.ultimateOverlayAlpha === undefined || CONFIG.todo.ultimateOverlayAlpha >= 1.0) {
+      throw new Error(`[TODO OVERLAY TRANSPARENCY FAILED] Expected ultimateOverlayAlpha to be transparent (< 1.0), got ${CONFIG.todo?.ultimateOverlayAlpha}`);
+    }
+
+    // Test rectangular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawTodoUltimateArenaOverlay();
+    assertCanvasStackBalance('drawTodoUltimateArenaOverlay (rect arena)');
+
+    mockCtx.resetStackDepth();
+    drawTodoTakadaDimScreen();
+    assertCanvasStackBalance('drawTodoTakadaDimScreen with ultimate overlay (rect arena)');
+
+    // Test circular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawTodoUltimateArenaOverlay();
+    assertCanvasStackBalance('drawTodoUltimateArenaOverlay (circular arena)');
+
+    mockCtx.resetStackDepth();
+    drawTodoTakadaDimScreen();
+    assertCanvasStackBalance('drawTodoTakadaDimScreen with ultimate overlay (circular arena)');
+
+    // Test during channeling phase (overlay, dim screen, and overlay active check must NOT activate)
+    todo.isTakadaUltActive = false;
+    todo.isTakadaChanneling = true;
+    if (isTodoTakadaOverlayActive()) {
+      throw new Error('[TODO OVERLAY CHANNELING REGRESSION] isTodoTakadaOverlayActive must be false during channeling phase');
+    }
+    let drewInChanneling = false;
+    const origDrawImage = mockCtx.drawImage;
+    const origFillRect = mockCtx.fillRect;
+    mockCtx.drawImage = () => { drewInChanneling = true; };
+    mockCtx.fillRect = () => { drewInChanneling = true; };
+    mockCtx.resetStackDepth();
+    drawTodoUltimateArenaOverlay();
+    drawTodoTakadaDimScreen();
+    mockCtx.drawImage = origDrawImage;
+    mockCtx.fillRect = origFillRect;
+    if (drewInChanneling) {
+      throw new Error('[TODO OVERLAY CHANNELING REGRESSION] drawTodoUltimateArenaOverlay and drawTodoTakadaDimScreen must NOT render during channeling phase');
+    }
+    assertCanvasStackBalance('drawTodoUltimateArenaOverlay and drawTodoTakadaDimScreen (channeling phase)');
+
+    // Test during active ultimate phase (overlay MUST draw)
+    todo.isTakadaChanneling = false;
+    todo.isTakadaUltActive = true;
+    let drewInUltimate = false;
+    mockCtx.drawImage = () => { drewInUltimate = true; };
+    mockCtx.resetStackDepth();
+    drawTodoUltimateArenaOverlay();
+    mockCtx.drawImage = origDrawImage;
+    if (!drewInUltimate) {
+      throw new Error('[TODO OVERLAY ULTIMATE FAILED] drawTodoUltimateArenaOverlay must render when ultimate / BG music is active');
+    }
+    assertCanvasStackBalance('drawTodoUltimateArenaOverlay (ultimate active phase)');
+  } catch (err) {
+    console.error('❌ [TODO ULTIMATE ARENA OVERLAY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[TODO ULTIMATE ARENA OVERLAY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Yuji Soul Swap Arena PNG Overlay (Yuji-soulswap-overlay.png) Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🔄 [Yuji Soul Swap Arena Overlay Test] Verifying Yuji-soulswap-overlay.png image loader, semi-transparency, and Canvas stack balance...');
+    const { getYujiSoulSwapOverlayImage, drawYujiSoulSwapArenaOverlay, drawYujiSoulSwapDimScreen } = await import('../js/graphics/renderers/specialOverlayRenderer.js');
+    const { YujiFighter } = await import('../js/entities/fighters/YujiFighter.js');
+    const yuji = new YujiFighter({ color: '#DC2626', name: 'Yuji' });
+    yuji.x = 400;
+    yuji.y = 300;
+    yuji.hp = 200;
+    yuji.soulSwapActive = true;
+
+    const dummyEnemy = { x: 500, y: 300, r: 25, hp: 100, maxHp: 100, z: 0 };
+    state.fighters = [yuji, dummyEnemy];
+
+    // Verify image loader
+    const yujiImg = getYujiSoulSwapOverlayImage();
+    if (!yujiImg) {
+      throw new Error('[YUJI SOUL SWAP OVERLAY IMAGE FAILED] getYujiSoulSwapOverlayImage() returned null/undefined');
+    }
+    if (!yujiImg.src.includes('Yuji-soulswap-overlay.png')) {
+      throw new Error(`[YUJI SOUL SWAP OVERLAY IMAGE FAILED] Expected image src to include Yuji-soulswap-overlay.png, got ${yujiImg.src}`);
+    }
+
+    // Verify config transparency
+    if (CONFIG.yuji?.soulSwapOverlayAlpha === undefined || CONFIG.yuji.soulSwapOverlayAlpha >= 1.0) {
+      throw new Error(`[YUJI OVERLAY TRANSPARENCY FAILED] Expected soulSwapOverlayAlpha to be transparent (< 1.0), got ${CONFIG.yuji?.soulSwapOverlayAlpha}`);
+    }
+
+    // Test rectangular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawYujiSoulSwapArenaOverlay();
+    assertCanvasStackBalance('drawYujiSoulSwapArenaOverlay (rect arena)');
+
+    mockCtx.resetStackDepth();
+    drawYujiSoulSwapDimScreen();
+    assertCanvasStackBalance('drawYujiSoulSwapDimScreen with soul swap overlay (rect arena)');
+
+    // Test circular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawYujiSoulSwapArenaOverlay();
+    assertCanvasStackBalance('drawYujiSoulSwapArenaOverlay (circular arena)');
+
+    mockCtx.resetStackDepth();
+    drawYujiSoulSwapDimScreen();
+    assertCanvasStackBalance('drawYujiSoulSwapDimScreen with soul swap overlay (circular arena)');
+
+    // Test during transition phase
+    yuji.soulSwapActive = false;
+    yuji.soulSwapTransitionTimer = 15;
+    mockCtx.resetStackDepth();
+    drawYujiSoulSwapArenaOverlay();
+    assertCanvasStackBalance('drawYujiSoulSwapArenaOverlay (transition phase)');
+
+    yuji.soulSwapTransitionTimer = 0;
+  } catch (err) {
+    console.error('❌ [YUJI SOUL SWAP ARENA OVERLAY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[YUJI SOUL SWAP ARENA OVERLAY TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

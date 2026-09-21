@@ -204,6 +204,13 @@ export class YutaFighter extends Fighter {
     return Math.min(0.98, baseChance + stackBonus);
   }
 
+  get channelTurnRate() {
+    if (this.isChannelingPureLoveBeam) {
+      return CONFIG.yuta?.pureLoveBeamChannelTurnRate ?? 0.030;
+    }
+    return 0.030;
+  }
+
   canAim() {
     if (this.hp <= 0 || this.isDead) return false;
     if (this.isTargetOfAmbush || (this.timeStopTimer > 0 && !this.isChainedByMakima)) return false;
@@ -213,7 +220,7 @@ export class YutaFighter extends Fighter {
                      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
                      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
     if (isHardCC) return false;
-    if (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return false; // Disable aim rotation while channeling/firing beam or during post-beam breather!
+    if (this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return false; // Disable aim rotation while firing beam or during post-beam breather!
     return true;
   }
 
@@ -242,7 +249,7 @@ export class YutaFighter extends Fighter {
   }
 
   aim(target) {
-    if (this.isFiringPureLoveBeam || this.isChannelingPureLoveBeam) {
+    if (this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) {
       if (this.pureLoveBeamLockedAngle !== undefined) {
         this.gunAngle = this.pureLoveBeamLockedAngle;
         this.angle = this.pureLoveBeamLockedAngle;
@@ -251,6 +258,9 @@ export class YutaFighter extends Fighter {
     }
     if (!this.canAim()) return;
     super.aim(target);
+    if (this.isChannelingPureLoveBeam) {
+      this.pureLoveBeamLockedAngle = this.gunAngle;
+    }
   }
 
   _getRandomParryThreshold() {
@@ -889,11 +899,21 @@ export class YutaFighter extends Fighter {
         this.rika.hp = Math.max(0, this.rika.hp - drainPerFrame);
       }
 
-      if (this.pureLoveBeamLockedAngle === undefined) {
-        this.pureLoveBeamLockedAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+      let aimTarget = opponent || this.beamRetreatTargetEnemy;
+      if (!aimTarget || aimTarget.isDead || (aimTarget.hp || 0) <= 0) {
+        const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
+        aimTarget = (state && state.fighters) ? state.fighters.find((f, idx) => {
+          if (!f || f.hp <= 0 || f === this || f.isDead) return false;
+          const eTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
+          return myTeam === null || eTeam === null || myTeam !== eTeam;
+        }) : null;
+      }
+      if (aimTarget && !aimTarget.isDead && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
+        this.aim(aimTarget);
       }
 
-      const beamAngle = this.pureLoveBeamLockedAngle;
+      const beamAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+      this.pureLoveBeamLockedAngle = beamAngle;
       this.gunAngle = beamAngle;
       this.angle = beamAngle;
 

@@ -150,6 +150,9 @@ export class FighterRenderer {
   }
 
   static drawStatusOverlays(ctx, fighter) {
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+    fighter._statusOverlaysRenderedFrame = currentFrame;
+
     const baseRadius = fighter.r;
     
     // Suppress white hit-flash during Yuji's soul-swap transformation or on match end / winner reveal; the
@@ -330,6 +333,15 @@ export class FighterRenderer {
 
     fighter.drawBody(ctx);
     fighter.drawOutline(ctx);
+    
+    // Safety check: ensure status overlays are rendered even if fighter's custom skin didn't call it
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+    if (fighter._statusOverlaysRenderedFrame !== currentFrame) {
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+      this.drawStatusOverlays(ctx, fighter);
+      ctx.restore();
+    }
     
     fighter.drawGun(ctx);
     fighter.drawHealth(ctx);

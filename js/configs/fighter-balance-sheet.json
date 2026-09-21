@@ -314,20 +314,20 @@
     "todo": {
       "name": "Aoi Todo",
       "archetype": "brawler",
-      "hp": 210,
-      "speed": 5.6,
-      "radius": 26,
+      "hp": 200,
+      "speed": 5.8,
+      "radius": 25,
       "baseDamage": 7,
       "baseCooldown": 60,
-      "themeColor": "#8A2BE2",
+      "themeColor": "#D2691E",
       "keySkills": {
         "boogieWoogie": {
-          "cooldown": 140,
+          "cooldown": 120,
           "swapDistanceMax": 500
         },
         "blackFlashCombo": {
-          "damage": 95,
-          "knockback": 22
+          "damage": 14,
+          "knockback": 18
         }
       }
     },
@@ -569,20 +569,26 @@
     "zeus": {
       "name": "Zeus",
       "archetype": "boss",
-      "hp": 230,
-      "speed": 5.5,
-      "radius": 27,
-      "baseDamage": 8,
-      "baseCooldown": 60,
-      "themeColor": "#FFD700",
+      "hp": 200,
+      "speed": 5.2,
+      "radius": 25,
+      "baseDamage": 10,
+      "baseCooldown": 80,
+      "themeColor": "#00BFFF",
       "keySkills": {
-        "lightningBolt": {
-          "damage": 90,
-          "stunDuration": 30
+        "chainLightning": {
+          "damage": 10,
+          "chainCount": 4,
+          "cooldown": 80
         },
-        "divineJudgment": {
-          "damage": 280,
-          "aoe": 200
+        "aegisShield": {
+          "damage": 12,
+          "cooldown": 300
+        },
+        "thunderStorm": {
+          "damage": 90,
+          "duration": 300,
+          "cooldown": 1500
         }
       }
     }

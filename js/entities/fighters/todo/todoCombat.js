@@ -76,7 +76,7 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
 
   if (this.justSwappedTimer > 0) {
     isBlackFlash = true;
-    damage *= 2;
+    damage *= (CONFIG.todo?.blackFlashDamageMultiplier || 2.0);
     this.justSwappedTimer = 0; // Consume the buff
     this.blackFlashGlowTimer = 35; // Keep glowing fists during and briefly after the hit!
   }

@@ -1370,6 +1370,7 @@ export function drawCjPixelMinigunBullet(ctx, p) {
   const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer > 0));
 
   // 1. Stepped Pixel World Tracer Trail
   if (p.history && p.history.length > 1) {
@@ -1378,7 +1379,11 @@ export function drawCjPixelMinigunBullet(ctx, p) {
       const h = p.history[i];
       const alpha = (i / p.history.length) * 0.95;
       const size = (i > p.history.length - 4) ? 5.0 : 3.0;
-      ctx.fillStyle = (i % 2 === 0) ? `rgba(249, 115, 22, ${alpha})` : `rgba(254, 240, 138, ${alpha})`;
+      if (isFrozen) {
+        ctx.fillStyle = (i % 2 === 0) ? `rgba(0, 229, 255, ${alpha})` : `rgba(224, 255, 255, ${alpha})`;
+      } else {
+        ctx.fillStyle = (i % 2 === 0) ? `rgba(249, 115, 22, ${alpha})` : `rgba(254, 240, 138, ${alpha})`;
+      }
       ctx.fillRect(snap(h.x - size * 0.5), snap(h.y - size * 0.5), size, size);
     }
     ctx.restore();
@@ -1389,7 +1394,7 @@ export function drawCjPixelMinigunBullet(ctx, p) {
   ctx.rotate(angle);
 
   // 2. Supersonic Stepped Pixel Shockwave Chevrons
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.fillStyle = isFrozen ? 'rgba(224, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.75)';
   ctx.fillRect(-10, -6, 2, 2);
   ctx.fillRect(-8, -4, 2, 2);
   ctx.fillRect(-6, -2, 2, 2);
@@ -1397,7 +1402,7 @@ export function drawCjPixelMinigunBullet(ctx, p) {
   ctx.fillRect(-8, 4, 2, 2);
   ctx.fillRect(-10, 6, 2, 2);
 
-  ctx.fillStyle = 'rgba(254, 240, 138, 0.50)';
+  ctx.fillStyle = isFrozen ? 'rgba(0, 229, 255, 0.60)' : 'rgba(254, 240, 138, 0.50)';
   ctx.fillRect(-18, -8, 2, 2);
   ctx.fillRect(-16, -6, 2, 2);
   ctx.fillRect(-14, -4, 2, 2);
@@ -1409,18 +1414,26 @@ export function drawCjPixelMinigunBullet(ctx, p) {
   ctx.fillStyle = '#0E0F14';
   ctx.fillRect(-10, -4, 21, 8);
 
-  // Tungsten Hardened Core
-  ctx.fillStyle = '#B45309';
+  // Core & Tip
+  ctx.fillStyle = isFrozen ? '#0077B6' : '#B45309';
   ctx.fillRect(-9, -3, 10, 6);
-  ctx.fillStyle = '#F97316';
+  ctx.fillStyle = isFrozen ? '#00B4D8' : '#F97316';
   ctx.fillRect(1, -3, 6, 6);
-  ctx.fillStyle = '#FBBF24';
+  ctx.fillStyle = isFrozen ? '#00E5FF' : '#FBBF24';
   ctx.fillRect(7, -2, 2, 4);
   ctx.fillRect(9, -1, 1, 2);
 
   // White-Hot Specular Center Line
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(-5, -1, 10, 2);
+
+  // Stasis cyan border when frozen by Infinity
+  if (isFrozen) {
+    const pulse = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.80 + 0.20 * pulse})`;
+    ctx.lineWidth = 1.0;
+    ctx.strokeRect(-12, -6, 25, 12);
+  }
 
   ctx.restore();
 }
@@ -1439,6 +1452,7 @@ export function drawCjMinigunBullet(ctx, p) {
   const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const len = 20;
   const width = 4.2;
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer > 0));
 
   // 1. World-Space Tracer Trail
   if (p.history && p.history.length > 1) {
@@ -1448,7 +1462,7 @@ export function drawCjMinigunBullet(ctx, p) {
     for (let i = 1; i < p.history.length; i++) {
       ctx.lineTo(p.history[i].x, p.history[i].y);
     }
-    ctx.strokeStyle = 'rgba(249, 115, 22, 0.65)'; // Fiery orange outer tracer
+    ctx.strokeStyle = isFrozen ? 'rgba(0, 229, 255, 0.70)' : 'rgba(249, 115, 22, 0.65)'; // Electric cyan or fiery orange
     ctx.lineWidth = 3.2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -1461,7 +1475,7 @@ export function drawCjMinigunBullet(ctx, p) {
     for (let i = sliceCount; i < p.history.length; i++) {
       ctx.lineTo(p.history[i].x, p.history[i].y);
     }
-    ctx.strokeStyle = 'rgba(254, 240, 138, 0.98)';
+    ctx.strokeStyle = isFrozen ? 'rgba(224, 255, 255, 0.98)' : 'rgba(254, 240, 138, 0.98)';
     ctx.lineWidth = 1.8;
     ctx.stroke();
     ctx.restore();
@@ -1472,7 +1486,11 @@ export function drawCjMinigunBullet(ctx, p) {
   ctx.rotate(angle);
 
   // 2. Trailing Supersonic Speed Streak
-  ctx.fillStyle = _getMinigunTrailGrad(ctx);
+  if (isFrozen) {
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.40)';
+  } else {
+    ctx.fillStyle = _getMinigunTrailGrad(ctx);
+  }
   ctx.beginPath();
   ctx.moveTo(4, -width * 0.5);
   ctx.lineTo(-38, 0);
@@ -1481,7 +1499,7 @@ export function drawCjMinigunBullet(ctx, p) {
   ctx.fill();
 
   // 3. Supersonic Mach Conical Shockwave Rings
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.strokeStyle = isFrozen ? 'rgba(0, 229, 255, 0.80)' : 'rgba(255, 255, 255, 0.55)';
   ctx.lineWidth = 1.0;
   ctx.beginPath();
   ctx.moveTo(-10, -6.0);
@@ -1489,7 +1507,7 @@ export function drawCjMinigunBullet(ctx, p) {
   ctx.lineTo(-10, 6.0);
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(254, 240, 138, 0.35)';
+  ctx.strokeStyle = isFrozen ? 'rgba(224, 255, 255, 0.60)' : 'rgba(254, 240, 138, 0.35)';
   ctx.lineWidth = 0.8;
   ctx.beginPath();
   ctx.moveTo(-20, -9.0);
@@ -1498,11 +1516,11 @@ export function drawCjMinigunBullet(ctx, p) {
   ctx.stroke();
 
   // 4. Armor-Piercing Tungsten Core & Brass Shell
-  ctx.fillStyle = '#B45309'; // Heavy brass casing
+  ctx.fillStyle = isFrozen ? '#0077B6' : '#B45309'; // Heavy cyan stasis or brass casing
   ctx.fillRect(-len * 0.5, -width * 0.5, len * 0.65, width);
 
-  // Hardened steel penetrator tip
-  ctx.fillStyle = '#F59E0B';
+  // Hardened penetrator tip
+  ctx.fillStyle = isFrozen ? '#00E5FF' : '#F59E0B';
   ctx.beginPath();
   ctx.arc(len * 0.15, 0, width * 0.5, -Math.PI / 2, Math.PI / 2);
   ctx.fill();
@@ -1510,6 +1528,16 @@ export function drawCjMinigunBullet(ctx, p) {
   // White-hot center highlight
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(-len * 0.25, -width * 0.2, len * 0.45, width * 0.4);
+
+  // Stasis cyan pulse ring when frozen by Infinity
+  if (isFrozen) {
+    const pulse = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.80 + 0.20 * pulse})`;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, 10 + pulse * 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }

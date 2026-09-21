@@ -40,11 +40,11 @@ body {
   font-family: Arial, sans-serif;
   background: #000000;
   color: #000000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
   min-height: 100vh;
   min-height: -webkit-fill-available;
   overflow: hidden;
@@ -59,17 +59,22 @@ body {
    Layout
 ───────────────────────────────────────────── */
 .game-container {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
   display: flex;
   justify-content: center;
   align-items: center;
   width: 540px;
   height: 960px;
-  margin: auto;
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
   flex-shrink: 0;
-  transform-origin: center center;
   touch-action: none;
+  will-change: transform;
 }
 
 .game-box {
@@ -83,7 +88,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin: auto;
+  margin: 0 auto;
   box-sizing: border-box;
   overflow: hidden;
   touch-action: none;
@@ -507,7 +512,7 @@ canvas {
 
 @media (max-width: 768px), (pointer: coarse) {
   body {
-    padding: 8px;
+    padding: 0;
   }
 
   .game-box {

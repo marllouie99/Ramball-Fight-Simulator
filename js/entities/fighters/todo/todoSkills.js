@@ -1,4 +1,5 @@
 import { CONFIG } from '../../../core/config.js';
+import { GAME_MODES } from '../../../core/modeConfig.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
@@ -128,7 +129,8 @@ export function modThrowCursedRock(target) {
     life: CONFIG.todo?.rockLife || 240,
     radius: rad,
     isRock: true,
-    hasTriggeredTeleport: false
+    hasTriggeredTeleport: false,
+    vanishTimer: 0
   };
 
   this.cursedRocks.push(newRock);
@@ -136,6 +138,12 @@ export function modThrowCursedRock(target) {
 }
 
 export function modUpdateCursedRocks(targets) {
+  if (this.isDead || this.hp <= 0) {
+    if (this.cursedRocks && this.cursedRocks.length > 0) {
+      this.cursedRocks.length = 0;
+    }
+    return;
+  }
   if (!this.cursedRocks || this.cursedRocks.length === 0) return;
 
   const enemies = targets && targets.length > 0
@@ -148,6 +156,10 @@ export function modUpdateCursedRocks(targets) {
   for (let i = this.cursedRocks.length - 1; i >= 0; i--) {
     let rock = this.cursedRocks[i];
     if (!rock) continue;
+
+    if (rock.vanishTimer && rock.vanishTimer > 0) {
+      rock.vanishTimer--;
+    }
 
     // Rock continuously travels along its velocity vector
     rock.x += rock.vx;
@@ -361,7 +373,7 @@ export function modExecutePendingSwap() {
 
       // Both Todo and swapped target vanish briefly during instantaneous swap
       this.vanishTimer = Math.max(this.vanishTimer || 0, vanishFrames);
-      if (!swapTarget.isRock) {
+      if (swapTarget) {
         swapTarget.vanishTimer = Math.max(swapTarget.vanishTimer || 0, vanishFrames);
       }
 
@@ -520,8 +532,9 @@ export function modExecutePendingSwap() {
       spawnImpactFlash(oldRockX, oldRockY, 35, '#00E5FF');
       spawnTodoClapCEParticles(oldRockX, oldRockY, 0);
 
-      // Todo vanishes briefly during instantaneous rock swap
+      // Todo and rock vanish briefly during instantaneous rock swap
       this.vanishTimer = Math.max(this.vanishTimer || 0, vanishFrames);
+      rock.vanishTimer = Math.max(rock.vanishTimer || 0, vanishFrames);
 
       // Trigger full Boogie Woogie Swap Visual Beam between original positions
       spawnBoogieWoogieSwapEffect(oldTodoX, oldTodoY, oldRockX, oldRockY);
@@ -882,27 +895,91 @@ export function modCheckTeammateRescue() {
 }
 
 /**
+ * Determines whether Todo's Takada-chan idol ultimate background music is active.
+ * Plays in 1v1 matches (1v1, Stand Off, Tactical 1v1, Tactical Stand Off, or any 2-fighter duel).
+ * In team matches (2v2, 4v4, 1v2, Tag Match) and FFA, the BGM is disabled unless explicitly configured.
+ * Also strictly respects user settings / test toggles (CONFIG.todo.enableTakadaBackgroundSong === false).
+ * @returns {boolean}
+ */
+export function isTodoTakadaSongEnabled() {
+  if (typeof CONFIG !== 'undefined' && CONFIG.todo?.enableTakadaBackgroundSong === false) {
+    return false;
+  }
+  if (typeof state !== 'undefined') {
+    const mode = state.mode;
+    if (!mode) return true;
+
+    // Explicit 1v1 and Stand Off duel modes
+    if (
+      mode === '1v1' ||
+      mode === '1 VS 1' ||
+      mode === '1v1 Match' ||
+      mode === 'Stand Off' ||
+      mode === 'Tactical 1v1' ||
+      mode === 'Tactical Stand Off' ||
+      (typeof GAME_MODES !== 'undefined' && (
+        mode === GAME_MODES.ONE_VS_ONE ||
+        mode === GAME_MODES.STAND_OFF ||
+        mode === GAME_MODES.TACTICAL_1V1 ||
+        mode === GAME_MODES.TACTICAL_STANDOFF
+      ))
+    ) {
+      return true;
+    }
+
+    // Check if it is a 2-fighter duel in a non-team / non-FFA mode
+    if (Array.isArray(state.fighters) && state.fighters.length === 2) {
+      const isTeamOrFfa = (
+        mode.includes('2v2') ||
+        mode.includes('4v4') ||
+        mode === 'Tag Match' ||
+        mode === 'TLFS' ||
+        mode === '1v2 Stand Off' ||
+        mode === '1v2' ||
+        mode === 'FFA' ||
+        mode === 'Tactical FFA' ||
+        (typeof GAME_MODES !== 'undefined' && (
+          mode === GAME_MODES.TWO_VS_TWO ||
+          mode === GAME_MODES.TACTICAL_2V2 ||
+          mode === GAME_MODES.TACTICAL_4V4 ||
+          mode === GAME_MODES.STAND_OFF_1V2 ||
+          mode === GAME_MODES.FFA ||
+          mode === GAME_MODES.TACTICAL_FFA ||
+          mode === GAME_MODES.TAG_MATCH ||
+          mode === GAME_MODES.TLFS
+        ))
+      );
+      if (!isTeamOrFfa) return true;
+    }
+
+    // In other modes (team, FFA, etc.), disabled
+    return false;
+  }
+  return true;
+}
+
+/**
  * Starts Aoi Todo's 3-second (180 frames) Takada-chan Imagination channeling phase.
  * Plays his channeling voiceline and schedules the background song fade-in!
  */
 export function modStartTakadaChanneling(force = false) {
   if ((this.takadaUltCooldown || 0) > 0 || this.isTakadaChanneling || this.isTakadaUltActive) return false;
 
-  // Strict 50% HP threshold check: Cannot auto-trigger ultimate if HP is above 50%!
-  const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
+  // Strict HP threshold check: Cannot auto-trigger ultimate if HP is above hpThreshold!
+  const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
   const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
   if (!force && hpUltEnabled && (this.hp / (this.maxHp || 100)) > hpThreshold) {
     return false;
   }
 
   const channelFrames = CONFIG.todo?.channelDuration || 180;
-  const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
+  const isSongEnabled = isTodoTakadaSongEnabled();
   this.isTakadaChanneling = true;
   this.takadaChannelTimer = channelFrames;
   this.takadaSongStarted = false;
   this.takadaSongHandle = null;
   this.takadaSongFadedOut = false;
-  this.isTakadaBackgroundPlaying = isSongEnabled;
+  this.isTakadaBackgroundPlaying = false;
   this.takadaUltCooldown = CONFIG.todo?.ultCooldown || 1200;
   this.pureLoveBeamRecoveryTimer = 0;
   this.hitStunTimer = 0;
@@ -912,7 +989,7 @@ export function modStartTakadaChanneling(force = false) {
 
   // Play 3.0s channeling voice line
   const channelVoice = CONFIG.todo?.takadaChannelingVoiceline || 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3';
-  const voiceVol = CONFIG.todo?.takadaChannelingVoiceVolume ?? 3.5;
+  const voiceVol = CONFIG.todo?.takadaChannelingVoiceVolume ?? 1.0;
   audioSystem.playSFX('skill_todotadakachannelvoice', voiceVol);
   audioSystem.playSFX(channelVoice, voiceVol);
 
@@ -923,12 +1000,13 @@ export function modStartTakadaChanneling(force = false) {
  * Activates Takada-chan Idol Ultimate mode after the 3-second channeling phase finishes.
  */
 export function modActivateTakadaUltimate() {
-  const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
+  const isSongEnabled = isTodoTakadaSongEnabled();
   this.isTakadaChanneling = false;
   const dur = CONFIG.todo?.ultDuration ?? 5000;
   this.isTakadaUltActive = true;
   this.isTakadaBackgroundPlaying = isSongEnabled;
   this.takadaUltTimer = dur;
+  this._maxTakadaUltPct = 0;
 
   // Reduce active Skill 1 cooldown immediately upon activating ultimate
   if (this.boogieWoogieCooldown > 0) {

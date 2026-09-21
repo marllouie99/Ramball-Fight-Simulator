@@ -141,12 +141,12 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
 
   // 2. Overtime 120% Grounded Clockwork Watch Dial Energy Field (Steady, Zero Pulsing)
   if (isOvertime) {
-    ctx.globalAlpha = auraAlpha;
-    const haloRadius = r * 1.55;
+    ctx.globalAlpha = auraAlpha * 0.70;
+    const haloRadius = r * 1.45;
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.70)';
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([10, 4, 3, 4]);
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.40)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([8, 4, 2, 4]);
     ctx.beginPath();
     ctx.arc(0, 0, haloRadius, 0, Math.PI * 2);
     ctx.stroke();
@@ -156,9 +156,9 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
     for (let i = 0; i < 12; i++) {
       const a = (i * Math.PI) / 6 - Math.PI / 2;
       const isOvertimeMark = (i === 6); // 18:00 (6 o'clock) Overtime Start Point
-      const innerTick = isOvertimeMark ? haloRadius - 9 : haloRadius - 5;
-      ctx.strokeStyle = isOvertimeMark ? '#EF4444' : 'rgba(255, 235, 120, 0.75)';
-      ctx.lineWidth = isOvertimeMark ? 2.5 : 1.2;
+      const innerTick = isOvertimeMark ? haloRadius - 7 : haloRadius - 4;
+      ctx.strokeStyle = isOvertimeMark ? 'rgba(239, 68, 68, 0.75)' : 'rgba(212, 175, 55, 0.40)';
+      ctx.lineWidth = isOvertimeMark ? 2.0 : 1.0;
       ctx.beginPath();
       ctx.moveTo(Math.cos(a) * innerTick, Math.sin(a) * innerTick);
       ctx.lineTo(Math.cos(a) * (haloRadius + 1), Math.sin(a) * (haloRadius + 1));
@@ -168,11 +168,11 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
     // Live Sweeping Golden Clockwork Second Hand Ray (Smooth 360° Sweep)
     const sweepAngle = (now * 0.002) % (Math.PI * 2) - Math.PI / 2;
     const sweepGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, haloRadius);
-    sweepGrad.addColorStop(0, 'rgba(255, 245, 160, 0.45)');
-    sweepGrad.addColorStop(0.7, 'rgba(255, 215, 0, 0.28)');
-    sweepGrad.addColorStop(1.0, 'rgba(245, 158, 11, 0)');
+    sweepGrad.addColorStop(0, 'rgba(255, 235, 150, 0.22)');
+    sweepGrad.addColorStop(0.7, 'rgba(212, 175, 55, 0.12)');
+    sweepGrad.addColorStop(1.0, 'rgba(212, 175, 55, 0)');
     ctx.strokeStyle = sweepGrad;
-    ctx.lineWidth = 2.0;
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(Math.cos(sweepAngle) * haloRadius, Math.sin(sweepAngle) * haloRadius);
@@ -180,21 +180,21 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
     ctx.restore();
 
     // Inner Gold Boundary Ring (Steady)
-    ctx.strokeStyle = 'rgba(255, 235, 120, 0.65)';
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.35)';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(0, 0, r * 1.18, 0, Math.PI * 2);
+    ctx.arc(0, 0, r * 1.15, 0, Math.PI * 2);
     ctx.stroke();
 
     // Crackling Golden Cursed Energy Lightning Arcs (Steady)
-    ctx.strokeStyle = 'rgba(255, 240, 150, 0.85)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255, 235, 140, 0.45)';
+    ctx.lineWidth = 1.2;
     for (let i = 0; i < 4; i++) {
       const arcAng = (Math.PI / 2) * i + Math.sin(now * 0.008 + i) * 0.35;
       const startDist = r * 0.9;
-      const endDist = r * 1.45;
+      const endDist = r * 1.35;
       const midDist = (startDist + endDist) * 0.5;
-      const perpOffset = (Math.sin(now * 0.02 + i * 3) - 0.5) * 10;
+      const perpOffset = (Math.sin(now * 0.02 + i * 3) - 0.5) * 7;
 
       const cosA = Math.cos(arcAng);
       const sinA = Math.sin(arcAng);

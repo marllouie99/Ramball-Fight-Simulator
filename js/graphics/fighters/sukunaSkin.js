@@ -318,11 +318,12 @@ export function drawSukunaBody(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y - z);
 
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+  const isChannelingDomain = Boolean(fighter.isChannelingDomainExpansion);
+  const angle = (fighter._isWinnerReveal || isChannelingDomain) ? 0 : (fighter.gunAngle || fighter.angle || 0);
   ctx.rotate(angle);
 
   // Mirror Y-axis vertically so top (-Y) stays on top and torso (+Y) stays on bottom when moving/aiming left (Rule #19)
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const facingLeft = !isChannelingDomain && Math.abs(angle) > Math.PI / 2;
   if (facingLeft) {
     ctx.scale(1, -1);
   }

@@ -197,7 +197,7 @@ export function drawYujiSkin(ctx, fighter) {
   const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
   const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI) * (r * 0.20) : 0;
 
-  let frontX = r * 0.95, frontY = 0;
+  let frontX = r * 0.95, frontY = r * 0.28;
   let backX = 0, backY = 0;
   let hideFrontHand = (typeof state !== 'undefined' && state.showSkinOnly) || isPodiumPreview;
   let hideBackHand = true; // Back hand hidden for brawler single front hand stance
@@ -205,10 +205,22 @@ export function drawYujiSkin(ctx, fighter) {
   fighter.hideBackHand = hideBackHand;
 
   const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
-  const isSlashActive = !isPodiumPreview && ((fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0));
+  const isSlashActive = !isPodiumPreview && !fighter.isChannelingDivineFlame && ((fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0));
 
-  // Single-Handed Sukuna Slash Swing Chop Animation
-  if (isSlashActive) {
+  // 1. Fuga (Divine Flame Arrow) Kamino Archer Bow Stance
+  if (fighter.isChannelingDivineFlame) {
+    const progress = Math.min(1.0, (fighter.divineFlameChargeTimer || 0) / Math.max(1, fighter.divineFlameChargeMax || 85));
+    // Leading Bow Arm (Left Hand extending forward along +X to hold bow riser):
+    backX = r * 0.5 + 24 + progress * 8;
+    backY = 0;
+    // Trailing Draw String Arm (Right Hand pulling arrow notch deep behind body along -X):
+    frontX = -r * 0.2 - (6 + progress * 24);
+    frontY = 0;
+    hideBackHand = false;
+    hideFrontHand = false;
+  }
+  // 2. Single-Handed Sukuna Slash Swing Chop Animation
+  else if (isSlashActive) {
     const maxT = fighter.slashSwingMaxTimer || 14;
     let rawT = 0;
     if (fighter.slashSwingTimer > 0) {
@@ -222,13 +234,16 @@ export function drawYujiSkin(ctx, fighter) {
       rawT = Math.min(1.0, Math.max(0.0, 1.0 - (timerVal / slashCd)));
     }
 
-    const startAngle = (fighter.slashHand === 1) ? -Math.PI / 2 : Math.PI / 2;
-    const endAngle   = (fighter.slashHand === 1) ?  Math.PI / 2 : -Math.PI / 2;
-    const chopAngle  = startAngle + rawT * (endAngle - startAngle);
+    // Transverse Arc Slash Sweep (ported from SukunaRenderer.js proven logic)
+    // easeT provides smooth extension-retraction arc: 0 → 1 → 0
+    const easeT = Math.sin(rawT * Math.PI);
+    // sweepAngle sweeps from -75° to +75° across the front arc (positive X direction)
+    const sweepAngle = (rawT - 0.5) * (Math.PI * 0.85);
+    // Reach extends forward dynamically with easeT
+    const reach = r * 0.4 + easeT * (r * 1.05);
 
-    const lungeOut = Math.sin(rawT * Math.PI) * (r * 1.5);
-    const chopX = Math.cos(chopAngle) * (r * 0.9) + lungeOut;
-    const chopY = Math.sin(chopAngle) * (r * 1.4);
+    const chopX = reach * Math.cos(sweepAngle);
+    const chopY = reach * Math.sin(sweepAngle);
 
     frontX = chopX;
     frontY = chopY;
@@ -236,18 +251,18 @@ export function drawYujiSkin(ctx, fighter) {
   } else if (isPunching && !isSukunaForm) {
     // All punches executed with the front hand extending forward from right edge
     frontX = r * 0.95 + lungeExtension * 1.40;
-    frontY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
+    frontY = r * 0.28 + Math.sin(rawProgress * Math.PI) * (r * 0.15);
   } else if (isSukunaForm) {
-    frontX = r * 0.95; frontY = 0;
+    frontX = r * 0.95; frontY = r * 0.28;
   } else {
-    // Idle brawler guard stance: front hand at the right edge of body circle
-    frontX = r * 0.95; frontY = 0;
+    // Idle brawler guard stance: front hand at the right edge of body circle, lowered to chest level
+    frontX = r * 0.95; frontY = r * 0.28;
   }
 
   const handRadius = getHandSize(7.5);
-  const skinColor = isSukunaForm ? '#C03030' : '#F0C090';
+  const skinColor = isSukunaForm ? '#FEDBC0' : '#F0C090';
 
-  // 1. Render Back Hand (Back Layer - Hidden for brawlers)
+  // 1. Render Back Hand (Back Layer - Hidden for brawlers unless in Fuga bow stance)
   if (!fighter._isWinnerReveal && !hideBackHand) {
     _drawFist(ctx, backX, backY, handRadius, skinColor, fighter);
   }
@@ -270,6 +285,39 @@ export function drawYujiSkin(ctx, fighter) {
   // ── Render Front Hand (Front Layer - On Top of Body Circle) ──
   if (!fighter._isWinnerReveal && !hideFrontHand) {
     _drawFist(ctx, frontX, frontY, handRadius, skinColor, fighter);
+  }
+
+  // Taut glowing fiery Cursed Energy bowstring during Fuga charge!
+  if (fighter.isChannelingDivineFlame && !hideFrontHand && !hideBackHand) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const progress = Math.min(1.0, (fighter.divineFlameChargeTimer || 0) / Math.max(1, fighter.divineFlameChargeMax || 85));
+
+    const perpY = 22; // In local rotated space, perpendicular along local Y axis
+
+    const upperTipX = backX;
+    const upperTipY = backY + perpY;
+    const lowerTipX = backX;
+    const lowerTipY = backY - perpY;
+
+    // Outer flame glow bowstring
+    ctx.strokeStyle = `rgba(255, 120, 0, ${0.75 * progress})`;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(upperTipX, upperTipY);
+    ctx.lineTo(frontX, frontY);
+    ctx.lineTo(lowerTipX, lowerTipY);
+    ctx.stroke();
+
+    // White-hot core bowstring
+    ctx.strokeStyle = `rgba(255, 255, 240, ${0.95 * progress})`;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(upperTipX, upperTipY);
+    ctx.lineTo(frontX, frontY);
+    ctx.lineTo(lowerTipX, lowerTipY);
+    ctx.stroke();
+    ctx.restore();
   }
 
   ctx.restore(); // end translate & rotate transform stream

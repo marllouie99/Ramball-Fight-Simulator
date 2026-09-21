@@ -71,7 +71,7 @@ export const yutaConfig = {
   thinIceBreakerKnockback: 35,             // Extreme knockback blast force applied on Thin Ice Breaker hit
 
   // Summon Companion: Rika Orimoto
-  rikaMaxHp: 100,                          // Maximum health pool when summoned
+  rikaMaxHp: 500,                          // Maximum health pool when summoned
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
   rikaSummonHpThreshold: 0.70,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
   rikaRechargeHpRatio: 0.20,               // HP ratio in damage required to re-summon Rika (20% of max HP)
@@ -79,7 +79,7 @@ export const yutaConfig = {
   rikaAriseDuration: 45,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
   rikaDuration: 999999,                    // Rika stays active indefinitely as long as she is alive (HP > 0)
   rikaSpeedMultiplier: 1.3,                // Movement speed multiplier relative to Yuta's base speed
-  rikaDamage: 6,                          // Physical damage dealt per attack tick by Rika
+  rikaDamage: 20,                          // Physical damage dealt per attack tick by Rika
   rikaAttackRate: 30,                      // Frames between Rika's attacks (90 frames = 1.5s at 60fps)
 
   // Rika Full Emergence (#1) & Vengeful Death Dispersion (#8) Config Tuning
@@ -110,7 +110,7 @@ export const yutaConfig = {
   domainRctHealRate: 0.90,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
   domainRegenMultiplier: 0.2,              // Domain expansion baseline RCT regen multiplier (when Rika is absent)
   domainRikaRegenMultiplier: 0.2,          // Total RCT regen multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
-  domainRikaDamageMultiplier: 0.2,         // Total damage dealt multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
+  domainRikaDamageMultiplier: 1.5,         // Total damage dealt multiplier inside domain while Rika is alive (1.50 * 2.0 = 3.0)
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
   domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
   domainOverlayAlpha: 0.75,                // Semi-transparent opacity for Yuta domain overlay image (0.75 = 75% opacity)
@@ -119,18 +119,19 @@ export const yutaConfig = {
   pureLoveBeamHpThreshold: 0.45,           // HP ratio required to trigger beam (15%)
   pureLoveBeamCooldown: 1200,              // Cooldown frames (20 seconds) before beam can be used again
   pureLoveBeamChargeFrames: 120,            // Channeling duration before firing (1.5 seconds)
+  pureLoveBeamChannelTurnRate: 0.030,      // Turn rate during beam charge/channeling (smooth tracking, reduced slightly for heavier feel)
   pureLoveBeamDuration: 550,               // Frames the beam stays active (3 seconds)
   pureLoveBeamActiveDuration: 350,         // Alias matching pureLoveBeamDuration for skill and HUD consistency
-  pureLoveBeamDamagePerTick: 2,           // Rapid multi-hit damage
+  pureLoveBeamDamagePerTick: 5,           // Rapid multi-hit damage
   pureLoveBeamWidth: 200,                  // Massive beam radius/width
   pureLoveBeamLength: 2500,                // Screen spanning length
   pureLoveBeamKnockback: 2,                // Outward push per tick
   pureLoveBeamSlowMultiplier: 0.20,        // Speed reduction multiplier applied during beam recovery phase
-  pureLoveBeamStunDuration: 120,           // Recovery stun duration frames after beam exposure
+  pureLoveBeamStunDuration: 50,           // Recovery stun duration frames after beam exposure
   pureLoveBeamShakeIntensity: 6,            // Arena shake intensity while beam is active (decays in final 30%)
   pureLoveBeamRegenDebuffDuration: 1500,      // Duration (600 frames = 10s) of reduced healing/regen after beam exposure
   pureLoveBeamRegenDebuffMultiplier: 1.00,  // Healing received multiplier (0.25 = 75% reduction) during the debuff
-  pureLoveBeamDamageStackPerTick: 0.1,      // Permanent base damage increase for Yuta per beam hit tick
+  pureLoveBeamDamageStackPerTick: 0.2,      // Permanent base damage increase for Yuta per beam hit tick
   pureLoveBeamLifestealPct: 0.5,            // Lifesteal percentage (0.1 = 10% of damage dealt) recovered as HP per beam hit tick
 
 

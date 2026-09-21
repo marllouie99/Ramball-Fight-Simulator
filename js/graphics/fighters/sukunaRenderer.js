@@ -273,8 +273,9 @@ export class SukunaRenderer {
       return;
     }
 
-    const angle = fighter.gunAngle || 0;
-    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    const isChannelingDomain = Boolean(fighter.isChannelingDomainExpansion);
+    const angle = (isWinnerScreen || isChannelingDomain) ? 0 : (fighter.gunAngle || 0);
+    const facingLeft = !isChannelingDomain && Math.abs(angle) > Math.PI / 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
     
@@ -350,8 +351,10 @@ export class SukunaRenderer {
 
     // 4. Malevolent Shrine Channeling Only — Enma Ten Hand Sign (Both hands pressed tight together on chest facing screen)
     else if (fighter.isChannelingDomainExpansion) {
-      frontHandX_loc = r * 0.50; frontHandY_loc = r * 0.03;
-      backHandX_loc  = r * 0.50; backHandY_loc  = -r * 0.03;
+      frontHandX_loc = -r * 0.12; frontHandY_loc = r * 0.28;
+      backHandX_loc  =  r * 0.12; backHandY_loc  = r * 0.28;
+      hideBackHand = true;
+      hideFrontHand = false;
     }
 
     // 5. Idle Brawler Guard Stance when in Melee Mode (Front hand at right edge of body circle)
@@ -391,13 +394,32 @@ export class SukunaRenderer {
     ctx.imageSmoothingEnabled = false;
 
     // Back hand (behind body circle)
-    if ((layer === 'all' || layer === 'back') && !hideBackHand) {
+    if ((layer === 'all' || layer === 'back') && !hideBackHand && !isChannelingDomain) {
       _drawPixelFist(backHandX, backHandY);
     }
 
     // Front hand (on top of body circle)
     if ((layer === 'all' || layer === 'front') && !hideFrontHand) {
-      _drawPixelFist(frontHandX, frontHandY);
+      if (isChannelingDomain) {
+        _drawPixelFist(backHandX, backHandY);
+        _drawPixelFist(frontHandX, frontHandY);
+
+        const maxTime = fighter.domainChargeMax || 90;
+        const progress = Math.min(1.0, Math.max(0, (fighter.domainChargeTimer || 0) / maxTime));
+        const pulseR = (2.5 + Math.sin(Date.now() * 0.02) * 1.2) * (0.6 + progress * 0.8);
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 36, 0, ${(0.6 + progress * 0.4).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc((frontHandX + backHandX) / 2, (frontHandY + backHandY) / 2, pulseR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc((frontHandX + backHandX) / 2, (frontHandY + backHandY) / 2, pulseR * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        _drawPixelFist(frontHandX, frontHandY);
+      }
     }
     ctx.restore();
 

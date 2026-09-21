@@ -1007,16 +1007,21 @@ export class IchigoFighter extends Fighter {
           if (!this.isAboutToUnleashNormalGetsuga() && this.getsugaCooldown <= 0 && dist >= gMin && dist <= gMax) {
             let cdMult = 1.0;
             if (isBankai) {
-              cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? CONFIG.ichigo?.bankaiGetsugaCooldownMultiplier ?? 0.50);
+              cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? CONFIG.ichigo?.bankaiGetsugaCooldownMultiplier ?? 0.65);
             }
             if (this.hollowMaskActive) {
-              cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? CONFIG.ichigo?.hollowGetsugaCooldownMultiplier ?? 0.25);
+              cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? CONFIG.ichigo?.hollowGetsugaCooldownMultiplier ?? 0.60);
             }
             const isFlurry = this._isFlurryEnabled();
             const baseCd = !isFlurry 
               ? (CONFIG.ichigo?.flashStepCooldown ?? CONFIG.ichigo?.singleShunpoCooldown ?? 320)
               : (CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.shunpoCooldown || CONFIG.ichigo?.getsugaCooldown || 450);
-            const finalCd = Math.round(baseCd * cdMult);
+            const minPostGetsugaBuffer = (isBankai && this.hollowMaskActive)
+              ? (CONFIG.ichigo?.bankaiHollowPostGetsugaCooldown ?? 120)
+              : (this.hollowMaskActive
+                ? (CONFIG.ichigo?.hollowPostGetsugaCooldown ?? 110)
+                : (isBankai ? (CONFIG.ichigo?.bankaiPostGetsugaCooldown ?? 100) : (CONFIG.ichigo?.postGetsugaCooldown ?? 120)));
+            const finalCd = Math.max(minPostGetsugaBuffer, Math.round(baseCd * cdMult));
             this.getsugaCooldown = finalCd;
             this.shunpoCooldown = finalCd;
             this.fireGetsuga(target, false);

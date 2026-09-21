@@ -167,6 +167,9 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
                 stopLoopingSound(ent.fugaSoundKey);
                 ent.fugaSoundKey = null;
               }
+              if (ent.characterId === 'yuji' && ent.soulSwapActive && typeof ent._triggerSoulSwapRevert === 'function') {
+                ent._triggerSoulSwapRevert();
+              }
             }
             if (ent.isChannelingGetsuga || ent.getsugaChargeTimer > 0) {
               ent.isChannelingGetsuga = false;

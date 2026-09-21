@@ -27,6 +27,10 @@ export class CJFighter extends Fighter {
     this.baseSpeed = (def && (def.moveSpeed || def.speed)) ? (def.moveSpeed || def.speed) : (cfg.speed || 5.5);
     this.speed = this._resolveSpeed(1.0);
 
+    // Pushback & Knockback Hit Effect Immunity (Config-driven)
+    this.immuneToPush = cfg.takeHitKnockback === true ? false : true;
+    this.immuneToKnockback = cfg.takeHitKnockback === true ? false : true;
+
     // ── Combat & Punch Variables (Brass Knuckles CQC) ──
     this.punchAnimTimer = 0;
     this.punchMaxTime = cfg.meleePunchCooldown || 18;
@@ -514,10 +518,38 @@ export class CJFighter extends Fighter {
     else this.electricStunTimer = 0;
   }
 
+  _isInsideGojoDomain() {
+    if (typeof state === 'undefined' || !state.fighters) return false;
+    const myIndex = state.fighters.indexOf(this);
+    const myTeam = (myIndex >= 0 && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : null;
+    return state.fighters.some((f, fIdx) => {
+      if (!f || f === this || f.hp <= 0) return false;
+      const isDomainActive = Boolean(f.domainActive || f.stolenDomainActive);
+      if (!isDomainActive) return false;
+      const isGojo = (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || (f.stolenType === 'gojo_domain' && (f.stolenDomainActive || f.domainActive)));
+      if (!isGojo) return false;
+      if (myTeam !== null && typeof state.getFighterTeam === 'function') {
+        const fTeam = state.getFighterTeam(fIdx);
+        if (fTeam !== null && fTeam === myTeam) return false;
+      }
+      return true;
+    }) && !this.domainImmunity;
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
+    this.punchAnimTimer = 0;
+    this.minigunRecoil = 0;
+    this.minigunFlashTimer = 0;
+    this.uziFlashTimerFront = 0;
+    this.uziFlashTimerBack = 0;
+  }
+
   applyTimeStop(frames, opts = {}) {
-    if (this.isBaguvixActive || this.isGodModeActive) return;
+    const isInsideGojo = this._isInsideGojoDomain() || Boolean(opts.isDomain || opts.isGojoDomain);
+    if ((this.isBaguvixActive || this.isGodModeActive) && !isInsideGojo) return;
     if (typeof super.applyTimeStop === 'function') super.applyTimeStop(frames, opts);
-    else this.timeStopTimer = 0;
+    else this.timeStopTimer = frames;
   }
 
   applyPoison(attacker) {
@@ -536,7 +568,8 @@ export class CJFighter extends Fighter {
   }
 
   applyKnockback(kx, ky) {
-    if (this.isBaguvixActive || this.isGodModeActive) return;
+    if (this.isBaguvixActive || this.isGodModeActive || this.immuneToKnockback || this.immuneToPush) return;
+    if (CONFIG.cj?.takeHitKnockback !== true) return;
     super.applyKnockback(kx, ky);
   }
 
@@ -559,6 +592,19 @@ export class CJFighter extends Fighter {
       }
     }
     if (this.dead) return;
+
+    // Gojo Unlimited Void Domain Stasis: absolute mental overload & time stop freezes everyone (even during BAGUVIX)
+    const isInsideGojoDomain = this._isInsideGojoDomain();
+    if (isInsideGojoDomain) {
+      this.interruptAttacks(true);
+      this.timeStopTimer = Math.max(this.timeStopTimer || 0, 15);
+      this.vx = 0;
+      this.vy = 0;
+      if (this.knockbackVx !== undefined) this.knockbackVx = 0;
+      if (this.knockbackVy !== undefined) this.knockbackVy = 0;
+      this._handleFrozenSkillCooldowns();
+      return; // Freeze update execution: CJ cannot move, aim, or fire inside Gojo's domain!
+    }
 
     // Rule 1: TimeStop & Ambush early exit guard (Immune to all CC & debuffs during BAGUVIX God Mode)
     if (this.isBaguvixActive || this.isGodModeActive) {
@@ -783,8 +829,10 @@ export class CJFighter extends Fighter {
     if (this.isBaguvixActive) {
       this.baguvixTimer--;
 
-      // Absolute God Mode status protection
-      this.timeStopTimer = 0;
+      // Absolute God Mode status protection (bypassed if inside Gojo domain)
+      if (!this._isInsideGojoDomain()) {
+        this.timeStopTimer = 0;
+      }
       this.hitStunTimer = 0;
       this.electricStunTimer = 0;
       this.isFrozenByInfinity = false;
@@ -1460,7 +1508,7 @@ export class CJFighter extends Fighter {
    * Fires high-velocity supersonic armor-piercing Minigun rounds
    */
   _fireMinigun(opponent) {
-    if (this.dead || this.isTypingCheat || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
+    if (this.dead || this.isTypingCheat || this._isInsideGojoDomain() || (this.timeStopTimer && this.timeStopTimer > 0) || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
     const cfg = CONFIG.cj || {};
     this.minigunFireCooldown = cfg.minigunFireRate || 2;
     // Dynamic rapid oscillating kickback vibration
@@ -1481,7 +1529,7 @@ export class CJFighter extends Fighter {
 
     if (typeof projectileSystem !== 'undefined' && projectileSystem) {
       projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'cjMinigunBullet', spawnX, spawnY, bulletAngle, {
-        knockback: cfg.minigunKnockback || 6.5
+        knockback: cfg.minigunKnockback !== undefined ? cfg.minigunKnockback : 0.0
       });
     }
 
@@ -1514,7 +1562,7 @@ export class CJFighter extends Fighter {
    * Rule 6 Unified Query on all enemy fighters & illusions
    */
   _triggerRiotShockwave() {
-    if (this.dead || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
+    if (this.dead || this._isInsideGojoDomain() || (this.timeStopTimer && this.timeStopTimer > 0) || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
     const cfg = CONFIG.cj || {};
     const radius = cfg.riotShockwaveRadius || 220;
     const dmg = cfg.riotShockwaveDamage || 25;
@@ -1579,7 +1627,7 @@ export class CJFighter extends Fighter {
   }
 
   _executeJetpackDive(opponent) {
-    if (this.dead || this.isTypingCheat || !opponent || opponent.dead) return;
+    if (this.dead || this.isTypingCheat || this._isInsideGojoDomain() || (this.timeStopTimer && this.timeStopTimer > 0) || !opponent || opponent.dead) return;
     const cfg = CONFIG.cj || {};
     const angle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
     if (typeof this.aim === 'function') {
@@ -1603,7 +1651,7 @@ export class CJFighter extends Fighter {
   }
 
   _emitJetpackThrusterBurn(arena) {
-    if (this.dead || this.isTypingCheat) return;
+    if (this.dead || this.isTypingCheat || this._isInsideGojoDomain() || (this.timeStopTimer && this.timeStopTimer > 0)) return;
     const cfg = CONFIG.cj || {};
     const burnDmg = cfg.jetpackThrusterBurnDamage || 2;
     const angle = (this.gunAngle || this.angle || 0);
@@ -1649,7 +1697,7 @@ export class CJFighter extends Fighter {
    * Fires high-velocity alternating Dual Micro-Uzi bursts during Jetpack flight
    */
   _fireJetpackUzi(opponent) {
-    if (this.dead || this.isTypingCheat || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
+    if (this.dead || this.isTypingCheat || this._isInsideGojoDomain() || (this.timeStopTimer && this.timeStopTimer > 0) || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
     const cfg = CONFIG.cj || {};
     const isFront = (this.uziSide === 0);
     this.uziSide = (this.uziSide === 0) ? 1 : 0; // Alternate between front and back guns
@@ -1674,7 +1722,9 @@ export class CJFighter extends Fighter {
 
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : 0;
     if (typeof projectileSystem !== 'undefined' && projectileSystem) {
-      projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'cjUziBullet', spawnX, spawnY, bulletAngle);
+      projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'cjUziBullet', spawnX, spawnY, bulletAngle, {
+        knockback: cfg.jetpackUziKnockback !== undefined ? cfg.jetpackUziKnockback : 0.0
+      });
     }
 
     if (isFront) {
@@ -1697,7 +1747,7 @@ export class CJFighter extends Fighter {
    * CQC Brass Knuckles Punch Combat (Rule 6 Unified Queries & Rule 8 Frontal Arc Multi-Target)
    */
   _updateMeleeCombat(opponent, arena) {
-    if (this.dead || this.isTypingCheat || this.isBaguvixActive) return;
+    if (this.dead || this.isTypingCheat || this.isBaguvixActive || this._isInsideGojoDomain() || (this.timeStopTimer && this.timeStopTimer > 0)) return;
 
     // ── 1. Rule 6 Unified Target Query: Find Closest Living Enemy Target ──
     let activeTarget = opponent;
@@ -1809,13 +1859,15 @@ export class CJFighter extends Fighter {
           target.takeDamage(baseDmg, this, { isMelee: true });
         }
 
-        // Kinetic Pushback
+        // Kinetic Pushback (skip pushing fighters locked in melee mode or immune to knockback)
         const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        if (typeof target.applyKnockback === 'function') {
-          target.applyKnockback(Math.cos(kbAngle) * baseKb, Math.sin(kbAngle) * baseKb);
-        } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
-          target.vx = (target.vx || 0) + Math.cos(kbAngle) * baseKb;
-          target.vy = (target.vy || 0) + Math.sin(kbAngle) * baseKb;
+        if (!target.isMeleeMode && !target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(Math.cos(kbAngle) * baseKb, Math.sin(kbAngle) * baseKb);
+          } else {
+            target.vx = (target.vx || 0) + Math.cos(kbAngle) * baseKb;
+            target.vy = (target.vy || 0) + Math.sin(kbAngle) * baseKb;
+          }
         }
 
         // Visual Spark FX & Impact Flash

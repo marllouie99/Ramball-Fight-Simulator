@@ -1239,18 +1239,6 @@ function updateHealthHud() {
       } else {
         info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
       }
-    } else if (f.characterId === 'yuji' || f.type === 'yuji') {
-      const punchBase = CONFIG.yuji?.punchDamage || 18;
-      const hasDmgBoost = f.soulSwapActive || f.blackFlashTimer > 0;
-      if (hasDmgBoost) {
-        let currentDmg = punchBase;
-        if (f.soulSwapActive) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.soulSwapDamageMultiplier || 2.5));
-        if (f.blackFlashTimer > 0) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.blackFlashMultiplier || 2.5));
-        const boost = currentDmg - punchBase;
-        info.push(`<b>DMG:</b> ${punchBase} + ${boost} <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else {
-        info.push(`<b>DMG:</b> ${punchBase}`);
-      }
     } else if (f.characterId === 'mahito' || f.type === 'mahito') {
       const baseDmg = CONFIG.mahito?.damage || 16;
       const baseReach = CONFIG.mahito?.punchRange || 75;
@@ -1275,6 +1263,40 @@ function updateHealthHud() {
         info.push(`<b>DMG:</b> ${baseDmg}`);
         info.push(`<b>DEF:</b> ${defVal}%`);
         info.push(`<b>ATK RANGE:</b> ${baseReach}`);
+      }
+    } else if (f.characterId === 'yuji' || f.type === 'yuji' || f._def?.id === 'yuji' || f._def?.type === 'yuji') {
+      const baseDmg = CONFIG.yuji?.punchDamage || 6;
+
+      // 1. DMG: Base + Black Flash Zone multiplier
+      if (f.blackFlashTimer > 0) {
+        const bfMult = CONFIG.yuji?.blackFlashMultiplier || 2.5;
+        const boostDmg = Math.round(baseDmg * bfMult) - baseDmg;
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else if (f.soulSwapActive) {
+        const ssMult = CONFIG.yuji?.soulSwapDamageMultiplier || 2.0;
+        const ssDmg = Math.round((CONFIG.sukuna?.slashDamage ?? (baseDmg * 2.5)) * ssMult);
+        info.push(`<b>DMG:</b> ${ssDmg} <span style="color: #DC2626; font-size: 10px;">SUKUNA</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
+
+      // 2. DEF: Base + Black Flash Zone / Soul Swap boost
+      const baseRed = Math.round((CONFIG.yuji?.baseDamageReduction ?? 0.05) * 100);
+      let currentRed = baseRed;
+
+      if (f.soulSwapActive) {
+        const ssRed = Math.round((CONFIG.yuji?.soulSwapDamageReduction ?? 0.25) * 100);
+        currentRed = Math.max(baseRed, ssRed);
+      } else if (f.blackFlashTimer > 0) {
+        const bfRed = Math.round((CONFIG.yuji?.blackFlashZoneDamageReduction ?? 0.15) * 100);
+        currentRed = Math.max(baseRed, bfRed);
+      }
+
+      if (currentRed > baseRed) {
+        const boost = currentRed - baseRed;
+        info.push(`<b>DEF:</b> ${baseRed}% + ${boost}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DEF:</b> ${baseRed}%`);
       }
     } else if (f.characterId === 'todo' || f.type === 'todo') {
       // 1. ATK Speed
@@ -1639,11 +1661,18 @@ function updateHealthHud() {
         info.push(`<b>Stun Dir:</b> ${stunDir}`);
       } else if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
         const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
-        const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.03;
-        const currentRegenRate = totalStages * rctPerStage;
+        const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage ?? 0.025;
+        const maxStages = CONFIG.mahoraga?.maxRctRegenStages ?? 6;
+        const maxRegenRate = CONFIG.mahoraga?.maxRctRegenRate ?? 0.12;
+        const effectiveStages = Math.min(totalStages, maxStages);
+        const maxPool = CONFIG.mahoraga?.maxRctHealingPool ?? ((f.maxHp || 250) * 1.5);
+        const poolDepleted = (f.totalRctHealedThisMatch || 0) >= maxPool;
+        const currentRegenRate = poolDepleted ? 0 : Math.min(maxRegenRate, effectiveStages * rctPerStage);
         const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
-        if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
+        if (poolDepleted) {
+          info.push(`<b>Regen:</b> Depleted <span style="color: #888888; font-size: 10px;">(Capped)</span>`);
+        } else if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
           info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
           const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50);

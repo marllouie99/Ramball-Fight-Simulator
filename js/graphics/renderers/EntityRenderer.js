@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
-import { drawSketchyCircle } from './fighterRenderer.js';
+import { drawSketchyCircle, FighterRenderer } from './fighterRenderer.js';
 import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal, drawParalyzeEffect, drawMinionHealthBar } from '../statusEffects.js';
 import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 import { drawCursedRocks } from '../fighters/todoSkin.js';
@@ -381,6 +381,16 @@ export function drawFighters() {
     try {
       fighter.draw(ctx, opponent);
       
+      // Universal Status Overlays Fallback: ensures debuffs/electrified visuals render even if fighter completely overrode draw()
+      const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+      if (fighter._statusOverlaysRenderedFrame !== currentFrame) {
+        fighter._statusOverlaysRenderedFrame = currentFrame;
+        ctx.save();
+        ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+        FighterRenderer.drawStatusOverlays(ctx, fighter);
+        ctx.restore();
+      }
+      
       // If Mahoraga is adapting (wheel clicking), dim the opponent so only Mahoraga is highlighted
       if (activeMaho && fighter !== activeMaho && mahoDimAlpha > 0.02) {
         ctx.save();
@@ -493,11 +503,11 @@ export function drawFighters() {
     }
   });
 
-  // Render in-flight cursed rocks from any defeated or vanished Todo fighters
+  // Render in-flight cursed rocks from any active/vanished Todo fighters
   if (state.fighters) {
     for (let i = 0; i < state.fighters.length; i++) {
       const f = state.fighters[i];
-      if (f && (f.hp <= 0 || (f.vanishTimer && f.vanishTimer > 0)) && f.cursedRocks && f.cursedRocks.length > 0 && typeof drawCursedRocks === 'function') {
+      if (f && f.hp > 0 && !f.isDead && (f.vanishTimer && f.vanishTimer > 0) && f.cursedRocks && f.cursedRocks.length > 0 && typeof drawCursedRocks === 'function') {
         drawCursedRocks(ctx, f);
       }
     }

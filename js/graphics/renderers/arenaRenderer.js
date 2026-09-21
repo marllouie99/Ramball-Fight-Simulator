@@ -433,6 +433,15 @@ export function drawArena() {
   }
 
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
+  const isStorming = Boolean(
+    (state.fighters && state.fighters.some(f => 
+      f && f.hp > 0 && (
+        ((f.characterId === 'zeus' || f.type === 'zeus' || f._def?.id === 'zeus') && (f.isChargingStorm || f.stormActive)) ||
+        (f.characterId === 'rubbick' && f.stormActive)
+      )
+    )) || (state.previewFighter && (state.previewFighter.isChargingStorm || state.previewFighter.stormActive))
+  );
+  const suppressArenaFloor = hasActiveDomain || isStorming;
 
   // 1. Draw outer background container (Original Colors)
   if (typeof window !== 'undefined' && window.PIXI && pixiApp && pixiLayers?.arena) {
@@ -465,7 +474,7 @@ export function drawArena() {
 
     const whiteTop = 0;
     const whiteBottom = pixiApp.screen.height;
-    if (!hasActiveDomain) {
+    if (!suppressArenaFloor) {
       g.beginFill(outerBg.color, outerBg.alpha);
       g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
       g.endFill();
@@ -476,7 +485,7 @@ export function drawArena() {
     }
 
     // 2. Draw Floor Background (Original Colors)
-    if (!hasActiveDomain) {
+    if (!suppressArenaFloor) {
       if (!state.floorGraphics && pixiLayers?.environment) {
         state.floorGraphics = new window.PIXI.Graphics();
         pixiLayers.environment.addChildAt(state.floorGraphics, 0);
@@ -527,7 +536,7 @@ export function drawArena() {
     }
 
     // ── Draw Floor Background in Canvas 2D (Synchronized under Camera) ──
-    if (!hasActiveDomain) {
+    if (!suppressArenaFloor) {
       ctx.save();
       applyCameraToCtx(ctx);
       ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff');

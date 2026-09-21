@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { drawTodoSkin, drawCursedRocks } from '../../graphics/fighters/todoSkin.js';
 import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
 import { modUpdateMeleeCombat } from './todo/todoCombat.js';
-import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, modCheckRockSwap, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate, applyBoogieDisorientation, applyBoogieEvadeBuff } from './todo/todoSkills.js';
+import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, modCheckRockSwap, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate, applyBoogieDisorientation, applyBoogieEvadeBuff, isTodoTakadaSongEnabled } from './todo/todoSkills.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
@@ -111,8 +111,6 @@ export class TodoFighter extends Fighter {
 
   isStationarySkillActive() {
     return Boolean(
-      this.isTakadaChanneling ||
-      (this.takadaChannelTimer > 0) ||
       (this.rockCounterComboLeft > 0) ||
       (this.comboHitsLeft > 0) ||
       super.isStationarySkillActive?.()
@@ -121,6 +119,8 @@ export class TodoFighter extends Fighter {
 
   reset() {
     super.reset();
+    this.cursedRocks = [];
+    this.rockThrowCooldown = 0;
     this.afterImages = [];
     if (this.takadaSongStarted) {
       const loopKey = `todo_takada_bg_${this.id || 'todo'}`;
@@ -136,6 +136,7 @@ export class TodoFighter extends Fighter {
     this.takadaChannelTimer = 0;
     this.takadaUltTimer = 0;
     this.pendingTakadaHpUlt = false;
+    this._maxTakadaUltPct = 0;
   }
 
   updateCursedRocks(targets) {
@@ -153,22 +154,28 @@ export class TodoFighter extends Fighter {
        targets = state.fighters.filter(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving));
     }
 
-    // ALWAYS update active cursed rocks FIRST so rocks continue traveling regardless of freezes, time-stops, stuns, or channelings!
-    this.updateCursedRocks(targets);
-
-    // Prevent updating dead fighter (and ensure death audio handling is triggered once)
+    // Prevent updating dead fighter (and ensure death audio & rock clearing is triggered once)
     if (this.isDead || this.hp <= 0) {
+      if (this.cursedRocks && this.cursedRocks.length > 0) {
+        this.cursedRocks.length = 0;
+      }
       if (this.isTakadaChanneling || this.isTakadaUltActive) {
         this.onDeath();
       }
       return;
     }
 
+    // ALWAYS update active cursed rocks FIRST so rocks continue traveling regardless of freezes, time-stops, stuns, or channelings!
+    this.updateCursedRocks(targets);
+
     // Takada-chan Ultimate Cooldown Exception: takadaUltCooldown MUST ALWAYS tick down every frame,
     // even if Todo is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
     if (!this.isTakadaUltActive && !this.isTakadaChanneling && (this.takadaUltCooldown || 0) > 0) {
       const decay = (this.blackFlashTimer > 0) ? (CONFIG.blackFlash?.zone?.cooldownDecayMultiplier ?? 1.20) : 1.0;
       this.takadaUltCooldown = Math.max(0, this.takadaUltCooldown - decay);
+      if (this.takadaUltCooldown <= 0) {
+        this.hasTriggeredTakadaHpUlt = false;
+      }
     }
 
     this.handleStatusEffects();
@@ -203,9 +210,12 @@ export class TodoFighter extends Fighter {
         }
       }
 
-      const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
+      const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
       const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
-      if (!this.isDemoFighter && hpUltEnabled && !this.hasTriggeredTakadaHpUlt && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold) {
+      const isCdReady = (this.takadaUltCooldown || 0) <= 0;
+      if (this.isTakadaChanneling) {
+        this.pendingTakadaHpUlt = true;
+      } else if (!this.isDemoFighter && hpUltEnabled && (!this.hasTriggeredTakadaHpUlt || isCdReady) && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold) {
         this.pendingTakadaHpUlt = true; // Hold Takada-chan ultimate until stasis expires!
       }
       this.interruptAttacks();
@@ -232,48 +242,25 @@ export class TodoFighter extends Fighter {
     // Decrease cooldowns (operating at 120% potential inside the Zone)
     const decay = (this.blackFlashTimer > 0) ? (CONFIG.blackFlash?.zone?.cooldownDecayMultiplier ?? 1.20) : 1.0;
 
-    // 50% HP Auto-Trigger: Todo channels his Takada-chan Ultimate when HP drops <= hpThreshold (or after beam/purple stasis expires!)
-    const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
+    // HP Auto-Trigger: Todo channels his Takada-chan Ultimate when HP drops <= hpThreshold (or after beam/purple stasis expires!)
+    const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
     const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
-    const isHpLow = !this.isDemoFighter && hpUltEnabled && !this.hasTriggeredTakadaHpUlt && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold;
+    const isCdReady = (this.takadaUltCooldown || 0) <= 0;
+    const isHpLow = !this.isDemoFighter && hpUltEnabled && (!this.hasTriggeredTakadaHpUlt || isCdReady) && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold;
 
-    if ((isHpLow || this.pendingTakadaHpUlt) && !this.isTakadaChanneling && !this.isTakadaUltActive) {
+    if ((isHpLow || this.pendingTakadaHpUlt) && !this.isTakadaChanneling && !this.isTakadaUltActive && isCdReady) {
       this.hasTriggeredTakadaHpUlt = true;
       this.pendingTakadaHpUlt = false;
       modStartTakadaChanneling.call(this);
     }
 
-    // Process Takada-chan 3.0s Channeling phase
+    // Process Takada-chan 3.0s Channeling phase (mobile channeling: Todo moves freely, voiceline plays)
     if (this.isTakadaChanneling) {
       this.takadaChannelTimer--;
-      this.vx = 0;
-      this.vy = 0;
-
-      // Cancel any active attack or swap animations
-      this.interruptAttacks();
-
-      // Start background song loop fade-in right as channeling starts!
-      // Uses a continuous audio loop so music plays for the ENTIRE ultDuration (e.g. 1500 frames / 25 seconds)
-      const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
-      if (isSongEnabled && !this.takadaSongStarted && this.takadaChannelTimer <= 175) {
-        this.takadaSongStarted = true;
-        this.isTakadaBackgroundPlaying = true;
-        const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
-        const songVol = CONFIG.todo?.takadaBackgroundSongVolume ?? 2.2;
-        const fadeInMs = CONFIG.todo?.takadaSongFadeInMs ?? 3500;
-        const loopKey = `todo_takada_bg_${this.id || 'todo'}`;
-        audioSystem.playLoop(loopKey, bgSong, songVol, 1.0, fadeInMs);
-      }
 
       if (this.takadaChannelTimer <= 0) {
         modActivateTakadaUltimate.call(this);
       }
-
-      // Decrement basic status cooldowns
-      if (this.boogieWoogieCooldown > 0) this.boogieWoogieCooldown = Math.max(0, this.boogieWoogieCooldown - decay);
-      if (this.rockThrowCooldown > 0) this.rockThrowCooldown = Math.max(0, this.rockThrowCooldown - decay);
-      if (this.cooldownTimer > 0) this.cooldownTimer = Math.max(0, this.cooldownTimer - decay);
-      return; // MANDATORY: Stop further movement, attacks, swapping, or AI updates while channeling!
     }
 
     // Process Active Takada-chan Idol Ultimate mode
@@ -281,13 +268,13 @@ export class TodoFighter extends Fighter {
       this.takadaUltTimer--;
 
       // If background song hasn't started yet, trigger looping fade-in
-      const isSongEnabled = CONFIG.todo?.enableTakadaBackgroundSong !== false;
+      const isSongEnabled = isTodoTakadaSongEnabled();
       if (isSongEnabled && !this.takadaSongStarted) {
         this.takadaSongStarted = true;
         this.isTakadaBackgroundPlaying = true;
         const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
-        const songVol = CONFIG.todo?.takadaBackgroundSongVolume ?? 2.2;
-        const fadeInMs = CONFIG.todo?.takadaSongFadeInMs ?? 3500;
+        const songVol = CONFIG.todo?.takadaBackgroundSongVolume ?? 0.85;
+        const fadeInMs = CONFIG.todo?.takadaSongFadeInMs ?? 4500;
         const loopKey = `todo_takada_bg_${this.id || 'todo'}`;
         audioSystem.playLoop(loopKey, bgSong, songVol, 1.0, fadeInMs);
       }
@@ -479,6 +466,10 @@ export class TodoFighter extends Fighter {
     const shouldCancelTakada = forceCancelAll || (!isMatchEnded && (this.hp <= 0 || isFrozen || this.isTargetOfAmbush || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0)));
 
     if (shouldCancelTakada) {
+      if (this.isTakadaChanneling && this.hp > 0 && !forceCancelAll) {
+        this.pendingTakadaHpUlt = true; // Preserve ultimate trigger when interrupted by freeze/stasis!
+        this.hasTriggeredTakadaHpUlt = false;
+      }
       this.punchAnimTimer = 0;
       this.isTakadaChanneling = false;
       this.takadaChannelTimer = 0;
@@ -495,6 +486,9 @@ export class TodoFighter extends Fighter {
 
   onDeath() {
     super.onDeath();
+    if (this.cursedRocks && this.cursedRocks.length > 0) {
+      this.cursedRocks.length = 0;
+    }
     const isLastSurvivor = !hasLiveTeammate(this);
 
     // If Todo has living teammates when he dies (match continues), smoothly fade out the song.
@@ -513,12 +507,17 @@ export class TodoFighter extends Fighter {
         const fadeOutMs = CONFIG.todo?.takadaDeathSongFadeOutMs ?? 1200;
         audioSystem.stopLoop(loopKey, fadeOutMs);
       } else {
-        // Todo died last: keep background music playing for champion / round-end reveal screen if song was active!
+        // Todo died last: cut off background music on death even during champion / round-end screen
         this.isTakadaChanneling = false;
         this.isTakadaUltActive = false;
-        this.isTakadaBackgroundPlaying = Boolean(this.takadaSongStarted && CONFIG.todo?.enableTakadaBackgroundSong !== false);
+        this.isTakadaBackgroundPlaying = false;
         this.takadaChannelTimer = 0;
         this.takadaUltTimer = 0;
+        this.takadaSongStarted = false;
+        this.takadaSongFadedOut = true;
+        const loopKey = `todo_takada_bg_${this.id || 'todo'}`;
+        const fadeOutMs = CONFIG.todo?.takadaDeathSongFadeOutMs ?? 1200;
+        audioSystem.stopLoop(loopKey, fadeOutMs);
       }
     }
   }
@@ -543,7 +542,13 @@ export class TodoFighter extends Fighter {
       spawnFloatingText(this.x, this.y - (this.r || 25) - 8, `ARMOR -${Math.round(reduction * 100)}%`, '#00E5FF');
     }
 
-    return super.takeDamage(finalAmount, attacker, opts);
+    const res = super.takeDamage(finalAmount, attacker, opts);
+    if (this.hp <= 0 || this.isDead) {
+      if (this.cursedRocks && this.cursedRocks.length > 0) {
+        this.cursedRocks.length = 0;
+      }
+    }
+    return res;
   }
 
   draw(ctx) {
@@ -552,10 +557,10 @@ export class TodoFighter extends Fighter {
       return;
     }
 
-    // If dead (HP <= 0), still render any active in-flight cursed rocks before returning
-    if (this.hp <= 0) {
+    // If dead (HP <= 0), clear rocks and do not draw
+    if (this.hp <= 0 || this.isDead) {
       if (this.cursedRocks && this.cursedRocks.length > 0) {
-        drawCursedRocks(ctx, this);
+        this.cursedRocks.length = 0;
       }
       return;
     }

@@ -525,8 +525,8 @@ class ProjectileSystem {
   /**
    * Spawns a chain lightning projectile for Zeus.
    */
-  fireChainLightning(fighter, ownerIndex, damage, chainCount = 3) {
-    const tipDist = GUN_TIP_DIST(fighter.r) + 15;
+  fireChainLightning(fighter, ownerIndex, damage, chainCount = (CONFIG.zeus?.chainCount || 4)) {
+    const tipDist = GUN_TIP_DIST(fighter.r) + (CONFIG.zeus?.boltReleaseOffset || 15);
     const dirX = Math.cos(fighter.gunAngle);
     const dirY = Math.sin(fighter.gunAngle);
     const speed = CONFIG.zeus?.lightningSpeed || (CONFIG.projectile.speed * 1.5);
@@ -536,12 +536,12 @@ class ProjectileSystem {
     proj.y = fighter.y + dirY * tipDist;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
-    proj.r = 6;
-    proj.life = 100;
-    proj.maxLife = 100;
-    proj.color = '#00BFFF';
+    proj.r = CONFIG.zeus?.lightningRadius || 6;
+    proj.life = CONFIG.zeus?.lightningLife || 100;
+    proj.maxLife = CONFIG.zeus?.lightningLife || 100;
+    proj.color = CONFIG.zeus?.color || '#00BFFF';
     proj.owner = ownerIndex;
-    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 0;
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (CONFIG.zeus?.lightningDamage || 10);
     proj.isChainLightning = true;
     proj.chainCount = chainCount;
     proj.visual = 'chainLightning';
@@ -3409,10 +3409,8 @@ class ProjectileSystem {
               }
 
               p.isFrozenByInfinity = true;
-              if (p.isArcaneBolt) {
-                p.color = '#00E5FF';
-                p.accentColor = '#00E5FF';
-              }
+              p.color = '#00E5FF';
+              p.accentColor = '#00E5FF';
               const freezeDuration = CONFIG.gojo?.infinityFreezeDuration ?? 240;
               p.infinityFreezeTimer = freezeDuration;
               p.life = freezeDuration;

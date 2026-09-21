@@ -868,6 +868,10 @@ export class GojoRenderer {
       mainColor = '#D4AF37'; // Warm Ochre / Golden Sand
       fillColor = `rgba(212, 175, 55, ${0.36 * progress})`;
       coreColor = `rgba(255, 235, 120, ${0.48 * progress})`;
+    } else if (colorTheme === 'fuga' || colorTheme === 'flame' || colorTheme === 'furnace') {
+      mainColor = '#FF4500';
+      fillColor = `rgba(255, 69, 0, ${0.38 * progress})`;
+      coreColor = `rgba(255, 210, 90, ${0.48 * progress})`;
     }
     const strokeColor = '#000000'; // Pure pitch black JJK ink contour
 

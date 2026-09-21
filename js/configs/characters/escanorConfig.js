@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────
 // Escanor Character Config
 // The Seven Deadly Sins (Nanatsu no Taizai) — Lion's Sin of Pride
 // ─────────────────────────────────────────────
@@ -64,7 +64,7 @@ export const escanorConfig = {
   chopLiftHoldFrames: 200,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
   chopStrikeFrames: 15,             // Frames for the explosive downward chop stroke (~0.13s)
   chopRecoveryFrames: 24,           // Frames to recover back to resting pose & wipe slash arc (~0.40s)
-  chopHitPauseFrames: 10,          // Cinematic hit-pause frame freeze upon axe impact (like Nanami's ratio impact)
+  chopHitPauseFrames: 20,          // Cinematic hit-pause frame freeze upon axe impact (like Nanami's ratio impact)
   basicImpactShake: 7.0,           // Concussive arena shake on initial weapon contact
   basicImpactShakeDuration: 12,
   basicUnpauseShake: 10.0,         // Heavy explosive arena shake on knockback release

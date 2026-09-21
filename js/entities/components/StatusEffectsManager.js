@@ -234,6 +234,25 @@ export class StatusEffectsManager {
 
   handleTimeStop() {
     const fighter = this.fighter;
+    // Check if trapped inside enemy Gojo's Unlimited Void domain (which overrides BAGUVIX and freezes the fighter)
+    const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some((g, gIdx) => {
+      if (!g || g === fighter || g.hp <= 0 || !g.domainActive) return false;
+      const isGojo = (g.characterId === 'gojo' || g.type === 'gojo' || g._def?.id === 'gojo' || (g.characterId === 'rubbick' && g.stolenType === 'gojo_domain'));
+      if (!isGojo) return false;
+      if (typeof state.getFighterTeam === 'function') {
+        const myIndex = state.fighters.indexOf(fighter);
+        const myTeam = myIndex >= 0 ? state.getFighterTeam(myIndex) : null;
+        const gTeam = state.getFighterTeam(gIdx);
+        if (myTeam !== null && gTeam !== null && myTeam === gTeam) return false;
+      }
+      return true;
+    }) && !fighter.domainImmunity && !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && fighter.characterId !== 'toji' && fighter.type !== 'toji';
+
+    if (isInsideGojoDomain) {
+      fighter.timeStopTimer = Math.max(fighter.timeStopTimer || 0, 15);
+      return true;
+    }
+
     if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima) {
       fighter.timeStopTimer = 0;
       fighter.isFrozenByInfinity = false;

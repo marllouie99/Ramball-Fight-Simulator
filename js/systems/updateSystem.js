@@ -166,7 +166,12 @@ export function updateGame() {
       const isRespectPlaying = Boolean(state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active));
       const hasOverlay = Boolean(state._hadMissionOverlay || isRespectPlaying || (state.wastedOverlay && state.wastedOverlay.active));
       const autoDelay = isRespectPlaying ? 620 : (hasOverlay ? 480 : 180);
-      if (state.roundEndTimer >= autoDelay && !state._isRespectMusicPlaying) {
+      const isTodoUltPlaying = Boolean(state.fighters && state.fighters.some(f => 
+        f && (f.characterId === 'todo' || f.type === 'todo') &&
+        f.hp > 0 && !f.isDead && !f.dead &&
+        ((f.takadaUltTimer > 0) || f.isTakadaUltActive || f.isTakadaChanneling || f.isTakadaBackgroundPlaying || f.takadaSongStarted)
+      ));
+      if (state.roundEndTimer >= autoDelay && !state._isRespectMusicPlaying && !isTodoUltPlaying) {
         startNextRound();
       }
     } else if (state.gameState === 'matchEnd') {
@@ -190,7 +195,12 @@ export function updateGame() {
 
       // Auto next match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Full Respect BGM playback)
       const matchEndAutoDelay = isRespectPlaying ? 640 : (hasOverlay ? 600 : 210);
-      if (state.matchEndTimer >= matchEndAutoDelay && !state._isRespectMusicPlaying) {
+      const isTodoUltPlaying = Boolean(state.fighters && state.fighters.some(f => 
+        f && (f.characterId === 'todo' || f.type === 'todo') &&
+        f.hp > 0 && !f.isDead && !f.dead &&
+        ((f.takadaUltTimer > 0) || f.isTakadaUltActive || f.isTakadaChanneling || f.isTakadaBackgroundPlaying || f.takadaSongStarted)
+      ));
+      if (state.matchEndTimer >= matchEndAutoDelay && !state._isRespectMusicPlaying && !isTodoUltPlaying) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();
         } else if (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH) {

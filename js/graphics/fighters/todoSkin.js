@@ -259,10 +259,88 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   ctx.restore();
 }
 
+let _todoHairImage = null;
+let _todoHairImageLoading = false;
+
+export function _getTodoHairImage() {
+  if (_todoHairImage && _todoHairImage.complete && _todoHairImage.naturalWidth > 0) {
+    return _todoHairImage;
+  }
+  if (!_todoHairImageLoading && typeof Image !== 'undefined') {
+    _todoHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _todoHairImage = img;
+      _todoHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Todo hair image at Assets/model/Todo-hair.png', e);
+      _todoHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Todo-hair.png?v=1';
+    _todoHairImage = img;
+  }
+  return _todoHairImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getTodoHairImage();
+}
+
+/**
+ * Draws Aoi Todo's authentic anime spiky topknot hair from Assets/model/Todo-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawTodoHair(ctx, r, facingLeft = false) {
+  const hairImg = _getTodoHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.todo) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // Todo-hair.png (1345x1170). True visible hair bounding box:
+    // X: [109, 1315] (width 1207, horizontal center at 712)
+    // Y: [28, 1108] (height 1081, top crown at 28)
+    // Calibrated to seamlessly frame the upper body circle with authentic topknot at -1.55r
+    const targetHairWidth = r * 2.50 * wMult;
+    const targetHairHeight = r * 2.25 * hMult;
+    const scaleX = targetHairWidth / 1207;
+    const scaleY = targetHairHeight / 1081;
+    const drawW = 1345 * scaleX;
+    const drawH = 1170 * scaleY;
+    const drawX = -712 * scaleX + offX;
+    const drawY = -r * 1.55 - 28 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
+}
+
+/**
+ * Public export for procedural Todo pixel body circle.
+ */
+export function drawTodoPixelBody(ctx, r, inBFState = false) {
+  _renderTodoPixelBodyToCanvas(ctx, r, inBFState);
+}
+
 /**
  * Procedural Pixel Art Render Function for Aoi Todo's body model.
  * Upright Front POV, Faceless (Rule #19 compliant), with signature left burn scar,
- * combed black hair, topknot man-bun, purple compression shirt, dark martial arts obi sash, and hakama pants.
+ * purple compression shirt, dark martial arts obi sash, and hakama pants.
  */
 function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
   destCtx.save();
@@ -271,49 +349,6 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
 
   const P = 2.0;
   const steps = Math.ceil((r + P) / P);
-
-  // Hairline shape calculation: smooth combed-back widow's peak
-  function getHairlineY(rx) {
-    const nx = rx / r; // -1 to +1
-    return -r * 0.40 + (1 - nx * nx) * (r * 0.14);
-  }
-
-  // ─────────────────────────────────────────────
-  // 1. TOPKNOT BUN (Above top edge of head at -Y)
-  // ─────────────────────────────────────────────
-  const bunCenterX = 0;
-  const bunCenterY = -r * 0.94;
-  const bunRadius  = r * 0.35;
-  const bunSteps   = Math.ceil((bunRadius + P) / P);
-
-  // Bun Outer Outline Shell & Fill
-  for (let gy = -bunSteps; gy <= bunSteps; gy++) {
-    for (let gx = -bunSteps; gx <= bunSteps; gx++) {
-      const rx = gx * P;
-      const ry = gy * P;
-      const dist = Math.hypot(rx, ry);
-      if (dist > bunRadius) continue;
-
-      const px = bunCenterX + rx - P / 2;
-      const py = bunCenterY + ry - P / 2;
-
-      const isBorder = (
-        Math.hypot((gx + 1) * P, gy * P) > bunRadius ||
-        Math.hypot((gx - 1) * P, gy * P) > bunRadius ||
-        Math.hypot(gx * P, (gy + 1) * P) > bunRadius ||
-        Math.hypot(gx * P, (gy - 1) * P) > bunRadius
-      );
-
-      if (isBorder) {
-        destCtx.fillStyle = '#0A0A0E';
-      } else if (ry < -bunRadius * 0.35 && Math.abs(rx) < bunRadius * 0.55) {
-        destCtx.fillStyle = '#242432'; // Topknot crown highlight
-      } else {
-        destCtx.fillStyle = '#0E0E14';
-      }
-      destCtx.fillRect(px, py, P, P);
-    }
-  }
 
   // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
@@ -340,36 +375,18 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
         continue;
       }
 
-      const hairlineY = getHairlineY(rx);
       const nx = rx / r;
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // ZONE 1: Combed Black Hair (ry < hairlineY)
+      // ZONE 1: Clean Faceless Skin & Iconic Left Burn Scar (ry < r * 0.12)
       // ──────────────────────────────────────────
-      if (ry < hairlineY) {
-        let col = '#0E0E14';
-        if (ry < -r * 0.72 && absX < 0.50) {
-          col = '#282836'; // Crown specular highlight
-        } else if (ry < -r * 0.52 && Math.abs(Math.round(rx / P) % 3) === 0) {
-          col = '#1E1E2A'; // Combed strand texture
-        } else if (ry > hairlineY - P * 1.8) {
-          col = '#08080C'; // Root shadow
-        } else if (absX > 0.75) {
-          col = '#0A0A10'; // Temple hair shadow
-        }
-        destCtx.fillStyle = col;
-        destCtx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE 2: Face Skin & Iconic Left Burn Scar (hairlineY <= ry < r * 0.12)
-      // ──────────────────────────────────────────
-      else if (ry < r * 0.12) {
+      if (ry < r * 0.12) {
         // Base Face Skin Palette
         let col = inBFState ? '#D88A75' : '#EBBF9E';
-        if (ry < hairlineY + P * 2.0) {
-          col = inBFState ? '#BF6E5A' : '#D69E7B'; // Hairline forehead shadow
-        } else if (ry < -r * 0.10 && absX < 0.40) {
+        if (ry < -r * 0.60 && absX < 0.50) {
+          col = inBFState ? '#F5B8A8' : '#FFF0E4'; // Crown dome volumetric glint
+        } else if (ry < -r * 0.35 && absX < 0.40) {
           col = inBFState ? '#E8A28E' : '#F5D2B8'; // Center forehead highlight
         } else if (absX > 0.72 || ry > r * 0.02) {
           col = inBFState ? '#A85A48' : '#D49D79'; // Jaw / cheek shadow
@@ -655,8 +672,8 @@ export function drawTodoSkin(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
-  // 1. Draw Takada-chan Idol Ultimate Aura if active or channeling
-  if (fighter.isTakadaUltActive || fighter.isTakadaChanneling) {
+  // 1. Draw Takada-chan Idol Ultimate Aura ONLY when ultimate is active (after channeling finishes)
+  if (fighter.isTakadaUltActive && !fighter.isTakadaChanneling) {
     ctx.save();
     drawTakadaIdolAura(ctx, fighter);
     ctx.restore();
@@ -759,15 +776,15 @@ export function drawTodoSkin(ctx, fighter) {
     }
 
     clapLeftHandX  = r * 0.88;
-    clapLeftHandY  = -spread;
+    clapLeftHandY  = r * 0.28 - spread;
     clapRightHandX = r * 0.88;
-    clapRightHandY = +spread;
+    clapRightHandY = r * 0.28 + spread;
   } else if (isPunching) {
     frontHandX = r * 0.95 + lungeExtension * 1.40;
-    frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
+    frontHandY = r * 0.28 + Math.sin(rawProgress * Math.PI) * (r * 0.15);
   } else {
     frontHandX = r * 0.95;
-    frontHandY = 0;
+    frontHandY = r * 0.28;
   }
 
   const handRadius = getHandSize(7.5);
@@ -777,8 +794,7 @@ export function drawTodoSkin(ctx, fighter) {
     if (!_cachedTodoNormalCanvas || !_cachedTodoZoneCanvas || _cachedTodoR !== r) {
       _cachedTodoR = r;
       const P = 2.0;
-      const maxExt = Math.max(r, r * 0.94 + r * 0.35 + P);
-      const steps = Math.ceil((maxExt + P) / P);
+      const steps = Math.ceil((r + P) / P);
       const size = (steps * 2 + 1) * P;
 
       _cachedTodoNormalCanvas = document.createElement('canvas');
@@ -803,6 +819,9 @@ export function drawTodoSkin(ctx, fighter) {
     _renderTodoPixelBodyToCanvas(ctx, r, inBFState);
   }
 
+  // ── 6.1 AUTHENTIC PIXEL ART HAIR MODEL (Assets/model/Todo-hair.png) ──
+  _drawTodoHair(ctx, r, facingLeft);
+
   // 7. Render Hands (Front Layer - On Top of Body Circle)
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isPodiumPreview;
   if (!shouldHideHands) {
@@ -821,13 +840,13 @@ export function drawTodoSkin(ctx, fighter) {
       if (windupTimer === 0 && animTimer > 8) {
         const flashAlpha = Math.min(1.0, (animTimer - 8) / 5.0);
         ctx.save();
-        const flashGrad = ctx.createRadialGradient(r * 0.88, 0, 2, r * 0.88, 0, handRadius * 2.2);
+        const flashGrad = ctx.createRadialGradient(r * 0.88, r * 0.28, 2, r * 0.88, r * 0.28, handRadius * 2.2);
         flashGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * flashAlpha})`);
         flashGrad.addColorStop(0.4, `rgba(0, 229, 255, ${0.75 * flashAlpha})`);
         flashGrad.addColorStop(1.0, 'rgba(0, 150, 255, 0)');
         ctx.fillStyle = flashGrad;
         ctx.beginPath();
-        ctx.arc(r * 0.88, 0, handRadius * 2.2, 0, Math.PI * 2);
+        ctx.arc(r * 0.88, r * 0.28, handRadius * 2.2, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -851,12 +870,15 @@ export function drawTodoSkin(ctx, fighter) {
  * Draws Todo's Cursed Rocks in authentic Pixel Art Style.
  */
 export function drawCursedRocks(ctx, fighter) {
-  if (!fighter.cursedRocks || fighter.cursedRocks.length === 0) return;
+  if (!fighter || fighter.isDead || fighter.hp <= 0 || !fighter.cursedRocks || fighter.cursedRocks.length === 0) return;
 
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
   for (let rock of fighter.cursedRocks) {
+    if (!rock) continue;
+    if (rock.vanishTimer && rock.vanishTimer > 0) continue;
+
     const isTargetOfClap = rock.hasTriggeredTeleport || 
       (fighter.pendingSwapData && (fighter.pendingSwapData.rock === rock || fighter.pendingSwapData.swapTarget === rock));
 

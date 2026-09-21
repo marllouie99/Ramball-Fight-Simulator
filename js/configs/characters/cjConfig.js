@@ -51,7 +51,7 @@ export const cjConfig = {
   meleePunchArc: (120 * Math.PI) / 180, // 120° wide multi-target frontal arc (Rule 8)
   meleePunchDamage: 4,        // Punch damage
   meleePunchCooldown: 18,      // 18 frames (~0.30s) fast boxing cadence
-  meleeKnockback: 18.0,        // Physical pushback impulse
+  meleeKnockback: 0.0,        // Physical pushback impulse
   meleeHitShakeIntensity: 2.2, // Screen shake on brass knuckle connection
   meleeHitShakeDuration: 4,
 
@@ -76,9 +76,10 @@ export const cjConfig = {
   jetpackUziBulletSpeed: 23.0, // High velocity strafe bullet speed
   jetpackUziSpread: 0.07,      // Natural Micro-SMG bullet spray spread
   jetpackUziRange: 320,        // Effective firing range while hovering
-  jetpackUziKnockback: 2.8,    // Impact impulse
+  jetpackUziKnockback: 0.0,    // Impact impulse
   jetpackRespectGain: 10,      // Respect gained on jetpack ignition
-  gunHitPushback: 3.5,         // Small physical pushback knockback on all CJ gun hits (Drive-by Tec-9, Dual Uzis, Minigun)
+  gunHitPushback: 0.0,         // Knockback/push back hit effects removed on CJ gun hits (Drive-by Tec-9, Dual Uzis, Minigun)
+  takeHitKnockback: false,     // Knockback/push back hit effects removed when CJ is struck by attacks
   gunHitShakeIntensity: 1.2,   // Subtle punchy screen shake on direct bullet impact
 
   // ── 6. SKILL 3: GROVESTREET4LIFE (Drive-By Backup) ──
@@ -93,7 +94,7 @@ export const cjConfig = {
   driveByBurstInterval: 22,    // Paced rhythmic fire cadence (~2.7 shots/sec alternating between homies)
   driveByCarSpeed: 6.5,        // Cinematic lowrider cruise & drift speed
   driveByRamDamage: 10,        // 22 impact damage when running over/ramming enemies
-  driveByRamKnockback: 18.0,   // Physical vehicular knockback impulse
+  driveByRamKnockback: 1.0,   // Physical vehicular knockback impulse
   driveByRamRespectGain: 4,    // Respect gained when ramming enemies
   driveByBulletRespectGain: 1, // Respect gained when drive-by barrage fires
   driveBySlowDuration: 120,    // 2.0s slow in burning tire burnout oil
@@ -108,7 +109,7 @@ export const cjConfig = {
   minigunFireRate: 5,          // Ultra-fast fire (every 2 frames = 30-45 rounds/sec)
   minigunBulletDamage: 1,     // 12 damage per armor-piercing round
   minigunBulletSpeed: 26.0,    // Supersonic armor-piercing projectile speed
-  minigunKnockback: 6.5,       // Physical bullet pushback impulse
+  minigunKnockback: 0.0,       // Physical bullet pushback impulse (removed)
   minigunSpread: 0.05,         // Tight high-velocity spread
   minigunSpinSpeed: 0.45,      // Barrel cluster rotation speed
   riotShockwaveInterval: 60,   // Every 1.0s (60 frames) trigger riot shockwave

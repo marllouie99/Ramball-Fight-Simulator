@@ -216,27 +216,11 @@ export function getSkillDataForFighter(f, getProjectiles) {
       shoutPct = Math.max(0, Math.min(100, (1 - (shoutTimer / shoutMax)) * 100));
     }
 
-    const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.03;
-    const currentRegenRate = totalStages * rctPerStage;
-    const currentRegenPerSec = Math.round(currentRegenRate * 60);
-
-    const skillList = [
+    return [
       { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `WOA - LVL ${lvlStr}` },
       { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: throwLabelHtml },
       { id: 'shout', pct: shoutPct, ready: shoutPct >= 99, color: themeColor, label: 'DIVINE SHOUT' }
     ];
-
-    if (totalStages > 0) {
-      skillList.push({
-        id: 'rct',
-        pct: 100,
-        ready: true,
-        color: themeColor,
-        label: `RCT REGEN: +${currentRegenPerSec}%`
-      });
-    }
-
-    return skillList;
   }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
     const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || CONFIG.saitama?.color || f.color || '#F5C400';
@@ -309,35 +293,36 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const rockReady = !hasTeammate && rockPct >= 99;
     const rockLabel = hasTeammate ? 'CURSED ROCK (SOLO)' : 'CURSED ROCK';
 
-    const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.65;
+    const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
     const hpRatio = (f.maxHp && f.maxHp > 0) ? (f.hp / f.maxHp) : 1.0;
     let ultPct = 0;
     let ultReady = false;
 
-    const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(g => 
-      g && (g.characterId === 'gojo' || g.type === 'gojo' || g._def?.id === 'gojo') && g.domainActive && g.hp > 0
-    );
-
     if (f.isTakadaUltActive) {
+      f._maxTakadaUltPct = 0;
       const remaining = f.takadaUltTimer || 0;
-      const dur = CONFIG.todo?.ultDuration ?? 3000;
+      const dur = CONFIG.todo?.ultDuration ?? 5000;
       ultPct = Math.max(0, Math.min(100, (remaining / dur) * 100));
-      ultReady = !isGojoDomainActive && remaining > 0;
+      ultReady = remaining > 0;
     } else if (f.isTakadaChanneling) {
-      const channelMax = CONFIG.todo?.channelDuration || 180;
-      const channelTimer = f.takadaChannelTimer || 0;
-      ultPct = Math.max(0, Math.min(100, (1 - (channelTimer / channelMax)) * 100));
-      ultReady = !isGojoDomainActive;
+      // While channeling, ultimate is fully committed and ready (does NOT drop/reset to 0%!)
+      ultPct = 100;
+      ultReady = true;
+    } else if (f.takadaUltCooldown && f.takadaUltCooldown > 0) {
+      const cdMax = f.takadaUltCooldownMax || CONFIG.todo?.ultCooldown || 1200;
+      const cdTimer = f.takadaUltCooldown || 0;
+      ultPct = Math.max(0, Math.min(100, (1 - (cdTimer / cdMax)) * 100));
+      ultReady = ultPct >= 99;
     } else if (f.hasTriggeredTakadaHpUlt) {
-      ultPct = 0;
-      ultReady = false;
-    } else if (isGojoDomainActive && (f.timeStopTimer > 0 || f.isFrozenByInfinity)) {
-      ultPct = 0;
-      ultReady = false;
+      // Cooldown finished: ready for next use
+      ultPct = 100;
+      ultReady = true;
     } else {
-      const progressRatio = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / (1.0 - hpThreshold)));
-      ultPct = Math.round(progressRatio * 100);
-      ultReady = hpRatio <= hpThreshold;
+      // First fill before first cast: monotonically fills up as Todo takes damage towards hpThreshold
+      const rawPct = Math.max(0, Math.min(100, ((1.0 - hpRatio) / (1.0 - hpThreshold)) * 100));
+      f._maxTakadaUltPct = Math.max(f._maxTakadaUltPct || 0, rawPct);
+      ultPct = Math.round(f._maxTakadaUltPct);
+      ultReady = ultPct >= 99 || hpRatio <= hpThreshold;
     }
 
     return [
@@ -965,7 +950,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const aegisPct = Math.max(0, Math.min(100, (1 - (aegisTimer / aegisMax)) * 100));
     const aegisReady = aegisPct >= 99;
 
-    const stormMax = CONFIG.zeus?.stormCooldown || 900;
+    const stormMax = CONFIG.zeus?.stormCooldown || 1500;
     const stormTimer = f.stormCooldown !== undefined ? f.stormCooldown : stormMax;
     let stormPct = 0;
     let stormReady = false;
@@ -975,7 +960,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       stormPct = Math.max(0, Math.min(100, (1 - f.stormCooldown / teleMax) * 100));
       stormReady = false;
     } else if (f.stormActive) {
-      const durationMax = CONFIG.zeus?.stormDuration || 130;
+      const durationMax = CONFIG.zeus?.stormDuration || 300;
       stormPct = Math.max(0, Math.min(100, (f.stormTimer / durationMax) * 100));
       stormReady = false;
     } else {

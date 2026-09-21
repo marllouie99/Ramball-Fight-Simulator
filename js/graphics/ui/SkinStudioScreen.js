@@ -14,7 +14,7 @@ import { drawTanjiroSkin } from '../fighters/tanjiroSkin.js';
 import { drawZenitsuSkin } from '../fighters/zenitsuSkin.js';
 import { drawNezukoSkin } from '../fighters/nezukoSkin.js';
 import { drawPowerSkin } from '../fighters/powerSkin.js';
-import { drawZeusSkin } from '../fighters/zeusSkin.js';
+import { drawZeusSkin, _drawZeusHair, _getZeusHairImage, _drawZeusCrown, _getZeusCrownImage } from '../fighters/zeusSkin.js';
 import { drawCronosSkin } from '../fighters/cronosSkin.js';
 import { drawBomberPixelBody } from '../fighters/bomberSkin.js';
 import { drawVoidmasterPixelBody } from '../fighters/voidmasterSkin.js';
@@ -23,6 +23,8 @@ import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighter
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
 import { drawGenosSkin, drawGenosHands, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
 import { drawEscanorSkin, _drawEscanorHair, _getEscanorHairImage } from '../fighters/escanorSkin.js';
+import { drawJohnWickSkin, _drawJohnWickHair, _getJohnWickHairImage } from '../fighters/johnWickSkin.js';
+import { drawTodoSkin, _drawTodoHair, _getTodoHairImage } from '../fighters/todoSkin.js';
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -51,11 +53,11 @@ let _copyToastTimer = 0;
 
 // Fighter Category Tabs in Skin Studio Modal
 export const SKIN_STUDIO_CATEGORIES = [
-  { id: 'ALL', label: 'ALL (21)', filter: () => true },
-  { id: 'JJK', label: 'JJK (8)', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'nanami', 'mahito'].includes(f.key) },
+  { id: 'ALL', label: 'ALL (23)', filter: () => true },
+  { id: 'JJK', label: 'JJK (9)', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM (3)', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER (3)', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE (7)', filter: (f) => ['genos', 'escanor', 'zeus', 'cronus', 'bomber', 'black', 'knight'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE (8)', filter: (f) => ['genos', 'escanor', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick'].includes(f.key) }
 ];
 
 // Fighter Definitions in Skin Studio
@@ -198,6 +200,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     centerX: 677.5,
     topY: 86,
     themeColor: '#7D3224',
+    forms: [
+      { id: 'default', label: 'STANDARD' }
+    ]
+  },
+  {
+    key: 'todo',
+    label: 'TODO',
+    asset: 'Todo-hair.png',
+    assetDims: '1345 x 1170',
+    baseW: 2.50,
+    baseH: 2.25,
+    baseCrownY: -1.55,
+    visW: 1207,
+    visH: 1081,
+    centerX: 712,
+    topY: 28,
+    themeColor: '#7C3AED',
     forms: [
       { id: 'default', label: 'STANDARD' }
     ]
@@ -391,6 +410,23 @@ export const SKIN_STUDIO_FIGHTERS = [
       { id: 'default', label: 'DAY FORM' },
       { id: 'theOne', label: 'THE ONE' }
     ]
+  },
+  {
+    key: 'john_wick',
+    label: 'JOHN WICK',
+    asset: 'Johnwick-hair.png',
+    assetDims: '1254 x 1254',
+    baseW: 2.85,
+    baseH: 2.40,
+    baseCrownY: -1.30,
+    visW: 924,
+    visH: 912,
+    centerX: 626.5,
+    topY: 209,
+    themeColor: '#475569',
+    forms: [
+      { id: 'default', label: 'STANDARD' }
+    ]
   }
 ];
 
@@ -531,6 +567,16 @@ function generateJsCode(fDef, custom) {
            `const drawH = 500 * scaleY;\n` +
            `const drawX = -251.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 122 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'todo') {
+    return `// Calibrated Hair for Todo (Assets/model/Todo-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 1207;\n` +
+           `const scaleY = targetHairHeight / 1081;\n` +
+           `const drawW = 1345 * scaleX;\n` +
+           `const drawH = 1170 * scaleY;\n` +
+           `const drawX = -712 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 28 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
@@ -776,6 +822,10 @@ export function drawSkinStudioScreen() {
       } else if (fDef.key === 'escanor') {
         dummyFighter.isTheOneActive = (state.studioSkinForm === 'theOne');
         drawEscanorSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'john_wick') {
+        drawJohnWickSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'todo') {
+        drawTodoSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -807,6 +857,13 @@ export function drawSkinStudioScreen() {
       _drawGenosHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'escanor') {
       _drawEscanorHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'john_wick') {
+      _drawJohnWickHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'todo') {
+      _drawTodoHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'zeus') {
+      _drawZeusHair(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
+      _drawZeusCrown(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
     }
     ctx.restore();
   }

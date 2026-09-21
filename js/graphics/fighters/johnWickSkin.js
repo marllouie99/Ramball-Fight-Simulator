@@ -38,8 +38,79 @@ export function _getJohnWickPixelSkinImage() {
   return _johnWickPixelSkinImage;
 }
 
+let _johnWickHairImage = null;
+let _johnWickHairImageLoading = false;
+
+/**
+ * Preload and retrieve the John Wick hair PNG image overlay
+ */
+export function _getJohnWickHairImage() {
+  if (_johnWickHairImage && _johnWickHairImage.complete && _johnWickHairImage.naturalWidth > 0) {
+    return _johnWickHairImage;
+  }
+  if (!_johnWickHairImageLoading && typeof Image !== 'undefined') {
+    _johnWickHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _johnWickHairImage = img;
+      _johnWickHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load John Wick hair image at Assets/model/Johnwick-hair.png', e);
+      _johnWickHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Johnwick-hair.png?v=1';
+    _johnWickHairImage = img;
+  }
+  return _johnWickHairImage;
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getJohnWickPixelSkinImage();
+  _getJohnWickHairImage();
+}
+
+/**
+ * Draws John Wick's authentic pixel-art hair from Assets/model/Johnwick-hair.png.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawJohnWickHair(ctx, r, facingLeft = false) {
+  const hairImg = _getJohnWickHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.john_wick) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // Johnwick-hair.png (1254x1254). True visible hair bounding box:
+    // X: [165, 1088] (width 924, horizontal center at 626.5)
+    // Y: [209, 1120] (height 912, top crown at 209)
+    // Calibrated to cleanly frame the upper circle with center-parted locks
+    const targetHairWidth = r * 2.85 * wMult;
+    const targetHairHeight = r * 2.40 * hMult;
+    const scaleX = targetHairWidth / 924;
+    const scaleY = targetHairHeight / 912;
+    const drawW = 1254 * scaleX;
+    const drawH = 1254 * scaleY;
+    const drawX = -626.5 * scaleX + offX;
+    const drawY = -r * 1.65 - 209 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+  }
 }
 
 /**
@@ -129,14 +200,11 @@ export function drawJohnWickPixelBody(ctx, r) {
   // Palette Constants matching Saitama standard
   const C = {
     outline: '#0E0F14',        // Pure dark manga ink border (exact Saitama tech)
-    hairBase: '#1B1C22',       // Dark charcoal hair base
-    hairDark: '#0E0F14',       // Deep black hair shadows
-    hairHighlight: '#343644',  // Layered hair strand sheen
-    hairSheen: '#484C5E',      // Specular glint
     skinBase: '#E8AC8B',       // Warm peach face skin
     skinHighlight: '#F3BF9F',  // Forehead highlight
+    skinCrownGlint: '#FFF0E4', // Top bald cranium glint
     skinShadow: '#CE8F6F',     // Cheek shadow dither
-    beardBase: '#121318',      // Keanu signature beard & mustache
+    beardBase: '#121318',      // Keanu signature beard & soul patch
     beardHighlight: '#262834', // Beard texture highlight
     scarRed: '#C42B2B',        // Cheek battle cut core
     scarDark: '#7A1010',       // Scab line
@@ -151,45 +219,7 @@ export function drawJohnWickPixelBody(ctx, r) {
   };
 
   // Helper functions for geometric regions
-  // 1. Hairline function
-  const getHairlineY = (nx) => {
-    return -0.42 - 0.12 * Math.cos(nx * Math.PI * 1.1);
-  };
-
-  // 2. Hanging forehead hair locks
-  const isRightHairStrand = (nx, ny) => {
-    // Character's left / viewer's right: prominent long strand plunging down to ny = -0.05
-    if (nx < 0.10 || nx > 0.40 || ny < -0.48 || ny > -0.04) return false;
-    const centerNx = 0.20 - (ny + 0.25) * 0.32;
-    const maxHalfW = 0.055 * Math.pow(1.0 - (ny + 0.04) / 0.44, 0.75);
-    return Math.abs(nx - centerNx) <= maxHalfW;
-  };
-
-  const isLeftHairStrand = (nx, ny) => {
-    // Character's right / viewer's left: secondary strand down to ny = -0.16
-    if (nx < -0.32 || nx > -0.10 || ny < -0.48 || ny > -0.15) return false;
-    const centerNx = -0.22 + (ny + 0.30) * 0.25;
-    const maxHalfW = 0.045 * Math.pow(1.0 - (ny + 0.15) / 0.33, 0.75);
-    return Math.abs(nx - centerNx) <= maxHalfW;
-  };
-
-  const isHair = (nx, ny) => {
-    const absX = Math.abs(nx);
-    if (ny < getHairlineY(nx)) return true;
-    if (absX > 0.65 && ny < -0.12 + (absX - 0.65) * 0.85) return true;
-    return isRightHairStrand(nx, ny) || isLeftHairStrand(nx, ny);
-  };
-
-  // 3. Mustache test
-  const isMustache = (nx, ny) => {
-    const absX = Math.abs(nx);
-    if (absX > 0.26) return false;
-    const topY = 0.01 + 0.09 * Math.pow(absX / 0.26, 2.0);
-    const botY = topY + 0.065 * (1.0 - (absX / 0.26) * 0.25);
-    return ny >= topY && ny <= botY;
-  };
-
-  // 4. Soul patch test
+  // 1. Soul patch test
   const isSoulPatch = (nx, ny) => {
     if (ny < 0.12 || ny > 0.19) return false;
     const t = (ny - 0.12) / 0.07;
@@ -197,26 +227,20 @@ export function drawJohnWickPixelBody(ctx, r) {
     return Math.abs(nx) <= halfW;
   };
 
-  // 5. Beard & jawline test
+  // 2. Beard & jawline test (clean jawline contour without mustache)
   const isBeard = (nx, ny) => {
     const absX = Math.abs(nx);
-    if (ny > 0.34) return false;
+    if (ny > 0.34 || ny < 0.10) return false;
     // Outer jawline
     const jawY = 0.32 - 0.42 * Math.pow(absX / 0.56, 2.0);
     if (ny > jawY) return false;
-
-    // Sideburn pointed tips
-    if (absX >= 0.42 && absX <= 0.56 && ny >= -0.10 && ny <= 0.15) {
-      const tipTopY = -0.10 + (0.56 - absX) * 1.5;
-      if (ny >= tipTopY) return true;
-    }
 
     // Inner boundary
     const innerY = 0.20 - 0.26 * Math.pow(absX / 0.42, 2.0);
     return ny >= innerY;
   };
 
-  // 6. Cheek battle cut scar test
+  // 3. Cheek battle cut scar test
   const isCheekScar = (nx, ny) => {
     // Left cheek (viewer's right, nx in [0.24, 0.39], ny in [-0.13, +0.03])
     if (nx < 0.24 || nx > 0.39 || ny < -0.13 || ny > 0.03) return false;
@@ -224,7 +248,7 @@ export function drawJohnWickPixelBody(ctx, r) {
     return Math.abs(ny - scarLineY) <= P / r * 0.9;
   };
 
-  // 7. Suit and tie test
+  // 4. Suit and tie test
   const getShirtHalfWidth = (ny) => {
     if (ny < 0.10 || ny > 0.72) return 0;
     return 0.30 * (1.0 - (ny - 0.10) / 0.62);
@@ -283,41 +307,20 @@ export function drawJohnWickPixelBody(ctx, r) {
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // LAYER A: HAIR ZONE
+      // LAYER A: BEARD & SOUL PATCH (Mustache removed)
       // ──────────────────────────────────────────
-      if (isHair(nx, ny)) {
-        // Strand border / edge
-        const isHairEdge = !isHair(nx + P / r, ny) || !isHair(nx - P / r, ny) || !isHair(nx, ny + P / r) || !isHair(nx, ny - P / r);
-        if (isHairEdge && ny >= -0.45) {
-          ctx.fillStyle = C.hairDark;
-        } else if (ny < -0.75 && (Math.abs(nx - 0.25) < 0.12 || Math.abs(nx + 0.25) < 0.12)) {
-          ctx.fillStyle = C.hairSheen; // Specular top sheen
-        } else if (Math.abs(Math.abs(nx) - 0.35) < P / r * 1.2 || Math.abs(Math.abs(nx) - 0.55) < P / r * 1.2) {
-          ctx.fillStyle = C.hairHighlight; // Flowing hair strand lines
-        } else if (ny > -0.15 || absX > 0.75) {
-          ctx.fillStyle = C.hairDark; // Lower hair shadow
-        } else {
-          ctx.fillStyle = C.hairBase;
-        }
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
-
-      // ──────────────────────────────────────────
-      // LAYER B: BEARD, MUSTACHE & SOUL PATCH
-      // ──────────────────────────────────────────
-      if (isMustache(nx, ny) || isSoulPatch(nx, ny) || isBeard(nx, ny)) {
+      if (isSoulPatch(nx, ny) || isBeard(nx, ny)) {
         // Outline test
         const isBeardEdge = (
-          (!isMustache(nx + P / r, ny) && !isSoulPatch(nx + P / r, ny) && !isBeard(nx + P / r, ny)) ||
-          (!isMustache(nx - P / r, ny) && !isSoulPatch(nx - P / r, ny) && !isBeard(nx - P / r, ny)) ||
-          (!isMustache(nx, ny + P / r) && !isSoulPatch(nx, ny + P / r) && !isBeard(nx, ny + P / r)) ||
-          (!isMustache(nx, ny - P / r) && !isSoulPatch(nx, ny - P / r) && !isBeard(nx, ny - P / r))
+          (!isSoulPatch(nx + P / r, ny) && !isBeard(nx + P / r, ny)) ||
+          (!isSoulPatch(nx - P / r, ny) && !isBeard(nx - P / r, ny)) ||
+          (!isSoulPatch(nx, ny + P / r) && !isBeard(nx, ny + P / r)) ||
+          (!isSoulPatch(nx, ny - P / r) && !isBeard(nx, ny - P / r))
         );
 
         if (isBeardEdge) {
           ctx.fillStyle = C.outline;
-        } else if ((gx + gy) % 2 === 0 && (ny > 0.22 || isMustache(nx, ny))) {
+        } else if ((gx + gy) % 2 === 0 && ny > 0.22) {
           ctx.fillStyle = C.beardHighlight; // Beard hair texture
         } else {
           ctx.fillStyle = C.beardBase;
@@ -327,7 +330,7 @@ export function drawJohnWickPixelBody(ctx, r) {
       }
 
       // ──────────────────────────────────────────
-      // LAYER C: CHEEK CUT SCAR
+      // LAYER B: CHEEK CUT SCAR
       // ──────────────────────────────────────────
       if (isCheekScar(nx, ny)) {
         if (nx > 0.34 || ny < -0.08) {
@@ -342,10 +345,10 @@ export function drawJohnWickPixelBody(ctx, r) {
       }
 
       // ──────────────────────────────────────────
-      // LAYER D: TORSO & SUIT (ny >= 0.10)
+      // LAYER C: TORSO & SUIT (ny >= 0.10)
       // ──────────────────────────────────────────
       if (ny >= 0.10) {
-        // D1. Tie
+        // C1. Tie
         if (isTie(nx, ny)) {
           const isTieEdge = !isTie(nx + P / r, ny) || !isTie(nx - P / r, ny) || !isTie(nx, ny + P / r) || !isTie(nx, ny - P / r);
           if (isTieEdge) {
@@ -356,7 +359,7 @@ export function drawJohnWickPixelBody(ctx, r) {
             ctx.fillStyle = C.tieBase;
           }
         }
-        // D2. White Dress Shirt
+        // C2. White Dress Shirt
         else if (isShirt(nx, ny)) {
           const isShirtEdge = !isShirt(nx + P / r, ny) || !isShirt(nx - P / r, ny);
           if (isShirtEdge || ny < 0.14) {
@@ -365,7 +368,7 @@ export function drawJohnWickPixelBody(ctx, r) {
             ctx.fillStyle = C.shirtWhite;
           }
         }
-        // D3. Suit Lapels
+        // C3. Suit Lapels
         else if (isLapel(nx, ny)) {
           const isLapelOuterEdge = Math.abs(absX - (getShirtHalfWidth(ny) + 0.24)) <= P / r * 0.8;
           if (isLapelOuterEdge) {
@@ -376,7 +379,7 @@ export function drawJohnWickPixelBody(ctx, r) {
             ctx.fillStyle = C.suitLapel;
           }
         }
-        // D4. Suit Base Jacket
+        // C4. Suit Base Jacket
         else {
           ctx.fillStyle = (absX > 0.70 || ny > 0.85) ? C.outline : C.suitBase;
         }
@@ -385,14 +388,18 @@ export function drawJohnWickPixelBody(ctx, r) {
       }
 
       // ──────────────────────────────────────────
-      // LAYER E: WARM FAIR FACE SKIN
+      // LAYER D: WARM FAIR FACE & BALD CRANIUM SKIN
       // ──────────────────────────────────────────
-      if (ny < -0.22 && absX < 0.35) {
-        ctx.fillStyle = C.skinHighlight; // Center forehead highlight
+      if (ny < -0.65 && absX < 0.45) {
+        ctx.fillStyle = C.skinCrownGlint; // Top crown bald glint / shine
+      } else if (ny < -0.35 && absX < 0.50) {
+        ctx.fillStyle = C.skinHighlight; // Forehead highlight
+      } else if (absX > 0.68) {
+        ctx.fillStyle = C.skinShadow; // Side temple & jaw shadow
       } else if (absX > 0.50 || ny > 0.02) {
-        ctx.fillStyle = ((gx + gy) % 2 === 0) ? C.skinShadow : C.skinBase; // Cheek & chin shadow
+        ctx.fillStyle = ((gx + gy) % 2 === 0) ? C.skinShadow : C.skinBase; // Lower cheek & chin shadow
       } else {
-        ctx.fillStyle = C.skinBase; // Base warm skin
+        ctx.fillStyle = C.skinBase; // Base warm peach skin
       }
       ctx.fillRect(px, py, P, P);
     }
@@ -531,7 +538,7 @@ export function drawJohnWickSkin(ctx, fighter) {
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
   // 1. Standard Upright Orientation & Local Angle Transforms (Rule 19)
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
   ctx.rotate(angle);
 
   const facingLeft = Math.abs(angle) > Math.PI / 2;
@@ -568,8 +575,8 @@ export function drawJohnWickSkin(ctx, fighter) {
   const lungeExtension = easePunch * (r * 1.15);
 
   // Hand Position Coordinates (CAR stance / CQC grapple / Pencil Assassination)
-  let frontX = r * 0.88, frontY = -r * 0.08;
-  let backX = r * 0.72, backY = r * 0.12;
+  let frontX = r * 0.88, frontY = r * 0.22;
+  let backX = r * 0.72, backY = r * 0.38;
   let hideFrontHand = false;
   let hideBackHand = false;
 
@@ -588,25 +595,25 @@ export function drawJohnWickSkin(ctx, fighter) {
       const chamberT = rawProgress / windupRatio;
       const easeChamber = (1 - Math.cos(chamberT * Math.PI)) * 0.5; // Smooth ease-in-out
       frontX = r * (0.88 - 0.45 * easeChamber);
-      frontY = -r * (0.08 + 0.06 * easeChamber);
+      frontY = r * (0.22 + 0.04 * easeChamber);
       backX = r * (0.45 + 0.05 * easeChamber);
-      backY = r * 0.16;
+      backY = r * 0.36;
     } else if (rawProgress < thrustRatio) {
       // 2. Explosive Forward Stab Phase: Plunges front hand straight forward deep into target
       const thrustT = (rawProgress - windupRatio) / (thrustRatio - windupRatio);
       const easeThrust = 1 - Math.pow(1 - thrustT, 3); // Snappy ease-out cubic
       frontX = r * (0.43 + 1.42 * easeThrust);
-      frontY = -r * (0.14 - 0.08 * easeThrust);
+      frontY = r * (0.24 - 0.02 * easeThrust);
       backX = r * 0.40;
-      backY = r * 0.16;
+      backY = r * 0.36;
     } else {
       // 3. Snappy Pullback Phase: Retracts hand cleanly back to guard position
       const pullT = (rawProgress - thrustRatio) / (1.0 - thrustRatio);
       const easePull = (1 - Math.cos(pullT * Math.PI)) * 0.5; // Smooth ease-in-out
       frontX = r * (1.85 - 0.97 * easePull);
-      frontY = -r * (0.06 + 0.02 * easePull);
+      frontY = r * (0.22 + 0.02 * easePull);
       backX = r * 0.45;
-      backY = r * 0.16;
+      backY = r * 0.36;
     }
   } else if (isPunching) {
     if (fighter.punchAnimHand === 1) {
@@ -671,9 +678,9 @@ export function drawJohnWickSkin(ctx, fighter) {
     // Default Pistol CAR Stance with Recoil
     const recoilKick = (fighter.recoilOffset || 0) * 0.60;
     frontX = r * 0.88 - recoilKick;
-    frontY = -r * 0.08;
+    frontY = r * 0.28;
     backX = r * 0.72 - recoilKick;
-    backY = r * 0.12;
+    backY = r * 0.42;
   }
 
   const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isRolling;
@@ -719,6 +726,9 @@ export function drawJohnWickSkin(ctx, fighter) {
 
   // ── LAYER 2: MAIN BODY CIRCLE (100% DISCRETE 2D PIXEL ART ENGINE) ──
   drawJohnWickPixelBody(ctx, r);
+
+  // ── LAYER 3: PIXEL ART HAIR OVERLAY (Assets/model/Johnwick-hair.png) ──
+  _drawJohnWickHair(ctx, r, facingLeft);
 
   // ── PASSIVE 1: BALLISTIC TAILORED SUIT (Kevlar Weave Shimmer Overlay) ──
   if (fighter.suitShimmerTimer > 0) {

@@ -9,7 +9,7 @@ import { handleObstacleCollision, STARTER_MAP } from '../../Tactical Force/maps/
 
 function shouldApplyPhysicalPush(target) {
   if (!target) return false;
-  if (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToPush || target.immuneToKnockback) return false;
+  if (target.characterId === 'escanor' || target.type === 'escanor' || target.characterId === 'cj' || target.type === 'cj' || target.immuneToPush || target.immuneToKnockback) return false;
   return true;
 }
 
@@ -349,14 +349,14 @@ export const HitImpactSystem = {
       return true; // Bullet spent on impact
     }
 
-    // Carl "CJ" Johnson Gunshots (Drive-By Tec-9, Dual Micro-Uzis, Riot Minigun) — Physical push back knockback & ballistic impact flash
+    // Carl "CJ" Johnson Gunshots (Drive-By Tec-9, Dual Micro-Uzis, Riot Minigun) — Ballistic impact flash
     const isCjBullet = projectile.visual === 'cjUziBullet' || projectile.visual === 'cjMinigunBullet' || (attacker && (attacker.characterId === 'cj' || attacker.type === 'cj') && projectile.visual && projectile.visual.includes('cj'));
     if (isCjBullet) {
-      const knockbackForce = projectile.knockback || (CONFIG.cj?.gunHitPushback || 3.5);
+      const knockbackForce = projectile.knockback !== undefined ? projectile.knockback : (CONFIG.cj?.gunHitPushback ?? 0.0);
       const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
 
-      // 1. Physical push back on target along the bullet velocity vector
-      if (shouldApplyPhysicalPush(target)) {
+      // 1. Physical push back on target along the bullet velocity vector (disabled by default when knockbackForce <= 0)
+      if (knockbackForce > 0 && shouldApplyPhysicalPush(target)) {
         target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
         target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
         target.x += Math.cos(hitAngle) * (knockbackForce * 0.45);
@@ -535,7 +535,7 @@ export const HitImpactSystem = {
       
       // Apply Zeus Debuffs
       if (Math.random() < (CONFIG.zeus.staticChance || 0)) {
-        target.staticDebuffTimer = CONFIG.zeus.staticDuration || 120;
+        target.staticDebuffTimer = CONFIG.zeus.staticDuration || 100;
       }
 
       const zeusAttacker = (typeof projectile.owner === 'number' && state.fighters) ? state.fighters[projectile.owner] : (attacker || null);
@@ -543,14 +543,14 @@ export const HitImpactSystem = {
       if (isNewHit && zeusAttacker) {
         const currentStunChance = zeusAttacker.stunChance !== undefined ? zeusAttacker.stunChance : (CONFIG.zeus.baseStunChance || 0.10);
         if (Math.random() < currentStunChance) {
-          target.electricStunTimer = Math.max(target.electricStunTimer || 0, CONFIG.zeus.stunDuration || 18);
+          target.electricStunTimer = Math.max(target.electricStunTimer || 0, CONFIG.zeus.stunDuration || 24);
           spawnFloatingText(target.x, target.y - target.r - 5, 'STUNNED!', '#00F3FF');
           // Reset stun chance to base after landing a stun
           zeusAttacker.stunChance = zeusAttacker.baseStunChance || 0.10;
         } else {
           // Increase stun chance on hit
-          const inc = CONFIG.zeus.stunChanceIncrease || 0.10;
-          const maxCap = CONFIG.zeus.maxStunChance || 0.80;
+          const inc = CONFIG.zeus.stunChanceIncrease || 0.05;
+          const maxCap = CONFIG.zeus.maxStunChance || 0.50;
           zeusAttacker.stunChance = Math.min(maxCap, (zeusAttacker.stunChance || 0.10) + inc);
         }
       }
@@ -570,18 +570,20 @@ export const HitImpactSystem = {
       }
       
       // Apply visual thunder roots effect
-      target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, 45);
+      target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration || 45);
       
       // Add vertical thunder strike visual and electric roots
       if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
+      const strikeLife = CONFIG.zeus?.stormStrikeVisualLife || 15;
       state.zeusStormStrikes.push({
         x: target.x,
         y: target.y,
-        life: 15,
-        maxLife: 15
+        life: strikeLife,
+        maxLife: strikeLife
       });
       
-      spawnImpactFlash(target.x, target.y, 50, 'lightningTrail');
+      spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius || 50, 'lightningTrail');
+      spawnSparks(target.x, target.y, CONFIG.zeus?.shootSparkCount || 12, 'lightningTrail', CONFIG.zeus?.color || '#00FFFF');
       
       // Play thunder strike sound on basic attack hit
       if (attacker && typeof attacker._def !== 'undefined') {
@@ -596,7 +598,7 @@ export const HitImpactSystem = {
         projectile.damage *= (CONFIG.zeus.chainDamageMultiplier || 0.8);
         
         // Find nearest valid enemy to chain towards
-        let bestDist = (CONFIG.zeus.chainRange || 150) ** 2;
+        let bestDist = (CONFIG.zeus.chainRange || 220) ** 2;
         let bestTarget = null;
         
         const checkTarget = (t, index = null) => {

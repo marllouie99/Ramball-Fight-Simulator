@@ -246,6 +246,11 @@ export function resolveFighterCollision(a, b) {
   const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive || b._wasFinalBlowSpin || (b.postUltimateRecoveryTimer && b.postUltimateRecoveryTimer > 0));
   if (a.isTargetOfAmbush || b.isTargetOfAmbush || aIsTojiAssault || bIsTojiAssault) return;
 
+  // John Wick pencil assassination grab: skip circle overlap push to eliminate jitter/shivering
+  const aIsWickStab = (a.cqcComboPhase === 'PENCIL_STAB' && a.cqcComboTarget === b);
+  const bIsWickStab = (b.cqcComboPhase === 'PENCIL_STAB' && b.cqcComboTarget === a);
+  if (aIsWickStab || bIsWickStab) return;
+
   // Telekinesis: lifted entity is in 3D air stasis and moved directly by Rubbick; skip ground circle collision push
   if (a.isCaughtInTelekinesis || b.isCaughtInTelekinesis) return;
 
@@ -425,14 +430,17 @@ export function resolveFighterCollision(a, b) {
     else { a.slowTimer = Math.max(a.slowTimer || 0, 20); a.slowMultiplier = Math.min(a.slowMultiplier || 1.0, 0.35); }
   }
 
-  const aIsEscanor = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor' || a.immuneToKnockback || a.immuneToPush));
-  const bIsEscanor = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor' || b.immuneToKnockback || b.immuneToPush));
+  const aIsEscanor = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor'));
+  const bIsEscanor = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor'));
 
   const aIsGenosBeam = Boolean(a && (a.characterId === 'genos' || a.type === 'genos') && (a.isFiringUlt || a.isChargingUlt));
   const bIsGenosBeam = Boolean(b && (b.characterId === 'genos' || b.type === 'genos') && (b.isFiringUlt || b.isChargingUlt));
 
-  const aIsImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor;
-  const bIsImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor;
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor;
+
+  const aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
+  const bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -459,10 +467,18 @@ export function resolveFighterCollision(a, b) {
   const dvx = b.vx - a.vx;
   const dvy = b.vy - a.vy;
   const dotN = dvx * nx + dvy * ny;
-  if (dotN >= 0) return;
+  if (dotN >= 0) {
+    if (a.isMeleeMode) { a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0; }
+    if (b.isMeleeMode) { b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0; }
+    return;
+  }
 
   // Prevent bounce response while brawlers are delivering combo flurries so they don't bounce apart
-  if (isBrawlerCombo) return;
+  if (isBrawlerCombo) {
+    if (a.isMeleeMode) { a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0; }
+    if (b.isMeleeMode) { b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0; }
+    return;
+  }
 
   // Laser slow & Infinity barrier contact should feel like a drag, not a push.
   // When either fighter is slowed or in contact with Infinity, damp the collision impulse heavily.

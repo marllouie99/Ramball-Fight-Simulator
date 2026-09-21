@@ -48,7 +48,9 @@ export function initGraphicsCache() {
     'Assets/Overlays/Yuta-domain-overlay.png',
     'Assets/Overlays/Toji-ultimate-overlay.png',
     'Assets/Overlays/CJ-baguvix-overlay.png',
-    'Assets/Overlays/Nanami-overtime-overlay.png'
+    'Assets/Overlays/Nanami-overtime-overlay.png',
+    'Assets/Overlays/Todo-ultimate-overlay.png',
+    'Assets/Overlays/Yuji-soulswap-overlay.png'
   ];
   models.forEach(preloadImage);
 }

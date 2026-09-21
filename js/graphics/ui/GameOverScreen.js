@@ -7,7 +7,7 @@ import { Fighter } from '../../entities/fighter.js';
 import { drawHUD, drawMissionPassedOverlay } from '../hudManager.js';
 import { state } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
-import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
+import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { startNextRound, restartCurrentRound, resetMatch, randomize1v1Fighters, randomize1v2Fighters, goToTitle } from '../../core/gameFlow.js';
@@ -391,9 +391,74 @@ function drawFollowForMoreBanner(ctx, cx, cy, timer) {
   ctx.restore();
 }
 
+// ──────────────────────────────────────────
+// TEAM WINNER FORMATTING HELPERS
+// ──────────────────────────────────────────
+
+function getTeamFighterNames(winningTeam, mode, fallbackWinner) {
+  if (winningTeam === null || winningTeam === undefined) {
+    if (fallbackWinner) {
+      const name = (fallbackWinner.name || fallbackWinner._def?.name || fallbackWinner.characterId || fallbackWinner.type || 'FIGHTER').toUpperCase();
+      return [name];
+    }
+    return [];
+  }
+
+  const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
+  if (isTagMatch && state.tagMatch) {
+    const teamKey = winningTeam === 0 ? 'team0Roster' : 'team1Roster';
+    const roster = state.tagMatch[teamKey] || [];
+    const currentDefs = (typeof getActiveFighterDefs === 'function' ? getActiveFighterDefs() : (typeof FIGHTER_DEFS !== 'undefined' ? FIGHTER_DEFS : []));
+    const names = roster.map(fIdx => {
+      const def = currentDefs[fIdx] || (typeof FIGHTER_DEFS !== 'undefined' ? FIGHTER_DEFS[fIdx] : null);
+      return (def?.name || def?.characterId || def?.type || 'FIGHTER').toUpperCase();
+    }).filter(Boolean);
+    if (names.length > 0) return names;
+  }
+
+  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
+
+  if (state.fighters && state.fighters.length > 0) {
+    let teamFighters = [];
+    if (is1v2) {
+      teamFighters = winningTeam === 0
+        ? [state.fighters[0]].filter(Boolean)
+        : [state.fighters[1], state.fighters[2]].filter(Boolean);
+    } else if (is2v2) {
+      teamFighters = winningTeam === 0
+        ? [state.fighters[0], state.fighters[1]].filter(Boolean)
+        : [state.fighters[2], state.fighters[3]].filter(Boolean);
+    } else {
+      teamFighters = state.fighters.filter((f, idx) => {
+        if (!f) return false;
+        const t = typeof state.getFighterTeam === 'function' ? state.getFighterTeam(idx) : f.team;
+        return t === winningTeam;
+      });
+    }
+
+    if (teamFighters.length > 0) {
+      return teamFighters.map(f => (f.name || f._def?.name || f.characterId || f.type || 'FIGHTER').toUpperCase());
+    }
+  }
+
+  if (fallbackWinner) {
+    const name = (fallbackWinner.name || fallbackWinner._def?.name || fallbackWinner.characterId || fallbackWinner.type || 'FIGHTER').toUpperCase();
+    return [name];
+  }
+  return [];
+}
+
+function formatTeamWinText(names, defaultFallback = 'FIGHTER WINS!') {
+  if (!names || names.length === 0) return defaultFallback;
+  if (names.length === 1) return `${names[0]} WINS!`;
+  if (names.length === 2) return `${names[0]} & ${names[1]} WIN!`;
+  return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]} WIN!`;
+}
+
 // ─────────────────────────────────────────────
 // SIMPLE IN-ARENA TACTICAL WINNER OVERLAY
-// (Clean In-Arena Text: e.g. "M4A1 WINS!")
+// (Clean In-Arena Text: e.g. "M4A1 & SPAS-12 WIN!")
 // ─────────────────────────────────────────────
 
 function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
@@ -409,7 +474,8 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
   const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
-  const isTeamMode = is1v2 || is2v2 || isTagMatch;
+  const is4v4 = (mode === 'Tactical 4v4' || mode === '4v4' || mode === GAME_MODES.TACTICAL_4V4);
+  const isTeamMode = is1v2 || is2v2 || isTagMatch || is4v4;
 
   let winCount = 0;
   if (isTeamMode) {
@@ -449,9 +515,13 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   if (isDraw) {
     winText = 'DOUBLE K.O.';
     themeColor = '#FF3366';
-  } else if (isTagMatch && state.winningTeam !== undefined) {
-    winText = state.winningTeam === 0 ? 'TEAM RED WINS!' : 'TEAM BLUE WINS!';
-    themeColor = state.winningTeam === 0 ? '#ff4d4d' : '#4da3ff';
+  } else if (isTeamMode) {
+    const winningTeam = (winnerIndex >= 0 && typeof state.getFighterTeam === 'function')
+      ? state.getFighterTeam(winnerIndex)
+      : (state.winningTeam !== undefined ? state.winningTeam : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1));
+    const teamNames = getTeamFighterNames(winningTeam, mode, effectiveWinner);
+    winText = formatTeamWinText(teamNames, (effectiveWinner ? (effectiveWinner.name || 'OPERATIVE').toUpperCase() + ' WINS!' : 'TEAM WINS!'));
+    themeColor = (effectiveWinner && (effectiveWinner.color || effectiveWinner.themeColor)) || (winningTeam === 0 ? '#ff4d4d' : '#4da3ff');
   } else if (effectiveWinner) {
     const rawName = (effectiveWinner.name || effectiveWinner._def?.name || 'OPERATIVE').toUpperCase();
     winText = `${rawName} WINS!`;
@@ -478,7 +548,7 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
   let textWidth = ctx.measureText(winText).width;
   if (textWidth > maxAllowedWidth) {
-    baseFontSize = Math.max(15, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
+    baseFontSize = Math.max(12, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
     ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
   }
 
@@ -497,7 +567,7 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
 
 // ─────────────────────────────────────────────
 // SIMPLE IN-ARENA WINNER OVERLAY
-// (Clean In-Arena Text: e.g. "GOJO WINS!" / "ROUND 1" in 1v1 mode, "FIGHTER WINS!" only in other modes)
+// (Clean In-Arena Text: e.g. "GOJO WINS!" / "ROUND 1" in 1v1 mode, "GOJO & SUKUNA WIN!" in 2v2)
 // ─────────────────────────────────────────────
 
 function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
@@ -513,6 +583,12 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
   const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
 
+  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
+  const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
+  const is4v4 = (mode === 'Tactical 4v4' || mode === '4v4' || mode === GAME_MODES.TACTICAL_4V4);
+  const isTeamMode = is1v2 || is2v2 || isTagMatch || is4v4;
+
   const is1v1 = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || !mode);
   const showSubText = is1v1 || isDraw;
 
@@ -524,10 +600,20 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
     : (isMatchEnd ? 'FINAL ROUND' : (roundNum === 2 ? 'ROUND 2' : (roundNum >= 3 ? 'FINAL ROUND' : 'ROUND 1')));
   let themeColor = '#FF3366';
 
-  if (!isDraw && effectiveWinner) {
-    const rawName = (effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase();
-    mainText = `${rawName} WINS!`;
-    themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#00E5FF';
+  if (!isDraw) {
+    if (isTeamMode) {
+      const winnerIndex = effectiveWinner ? (state.fighters ? state.fighters.indexOf(effectiveWinner) : -1) : -1;
+      const winningTeam = (winnerIndex >= 0 && typeof state.getFighterTeam === 'function')
+        ? state.getFighterTeam(winnerIndex)
+        : (state.winningTeam !== undefined ? state.winningTeam : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1));
+      const teamNames = getTeamFighterNames(winningTeam, mode, effectiveWinner);
+      mainText = formatTeamWinText(teamNames, (effectiveWinner ? (effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase() + ' WINS!' : 'TEAM WINS!'));
+      themeColor = (effectiveWinner && (effectiveWinner.color || effectiveWinner.themeColor)) || (winningTeam === 0 ? '#ff4d4d' : '#4da3ff');
+    } else if (effectiveWinner) {
+      const rawName = (effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase();
+      mainText = `${rawName} WINS!`;
+      themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#00E5FF';
+    }
   }
 
   // Smooth entrance scale & alpha
@@ -553,7 +639,7 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
   let textWidth = ctx.measureText(mainText).width;
   if (textWidth > maxAllowedWidth) {
-    baseFontSize = Math.max(15, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
+    baseFontSize = Math.max(12, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
     ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
   }
 
@@ -656,7 +742,9 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     state._hasPlayedChampionVictoryVoice = true;
 
     const isTodo = winner && (winner.characterId === 'todo' || winner.type === 'todo' || winner._def?.id === 'todo');
-    if (isTodo) {
+    const is1v1Mode = mode === '1v1' || mode === '1 VS 1' || mode === '1v1 Match' || mode === GAME_MODES.ONE_VS_ONE || mode === 'Stand Off' || mode === GAME_MODES.STAND_OFF || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || !mode;
+    const isTodoSongPlaying = Boolean(winner && (winner.isTakadaBackgroundPlaying || winner.isTakadaUltActive || winner.takadaSongStarted || (winner.takadaUltTimer > 0)));
+    if (isTodo && !is1v1Mode && !isTodoSongPlaying) {
       const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
       const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
       audioSystem.playSFX(todoSnd, vol);

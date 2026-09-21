@@ -1243,13 +1243,23 @@ export function applyRCTHeal(fighter) {
     const val = Number(CONFIG.mahoraga.rctHealFlatAmount);
     healAmount = (val <= 1.0 && val > 0) ? (maxHp * val) : val;
   } else {
-    healAmount = maxHp * 0.15;
+    healAmount = maxHp * 0.12;
   }
   healAmount = Math.max(1, Math.round(healAmount));
 
+  // Enforce Max RCT Healing Pool across the match
+  const maxPool = CONFIG.mahoraga?.maxRctHealingPool ?? (maxHp * 1.5);
+  const remainingPool = Math.max(0, maxPool - (fighter.totalRctHealedThisMatch || 0));
+  healAmount = Math.min(healAmount, remainingPool);
+
+  if (healAmount <= 0) return;
+
+  const prevHp = fighter.hp;
   fighter._bypassHealDebuff = true;
   fighter.takeDamage(-healAmount, fighter, { isHeal: true, bypassRegenDebuff: true });
   fighter._bypassHealDebuff = false;
+  const actualHealed = Math.max(0, fighter.hp - prevHp);
+  fighter.totalRctHealedThisMatch = (fighter.totalRctHealedThisMatch || 0) + (actualHealed > 0 ? actualHealed : healAmount);
 
   fighter._healthBarHealTimer = 14;
   spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');

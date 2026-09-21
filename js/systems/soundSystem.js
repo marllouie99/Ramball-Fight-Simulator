@@ -564,16 +564,57 @@ export function setLoopingSoundVolume(key, targetVolume, rampMs = 0) {
 }
 
 /**
+ * Checks whether an audio handle, key, or source corresponds to Todo's Takada-chan idol
+ * ultimate background music for a living Todo who has won the round/match and whose
+ * ultimate duration has not yet expired.
+ * @param {string} keyOrSrc
+ * @returns {boolean}
+ */
+export function isTodoTakadaWinnerSong(keyOrSrc) {
+  if (!keyOrSrc) return false;
+  const str = String(keyOrSrc).toLowerCase();
+  const isTakadaKeyOrSrc = str.startsWith('todo_takada_bg_') || str.includes('tadaka') || str.includes('takada') || str.includes('background-song');
+  if (!isTakadaKeyOrSrc) return false;
+
+  if (typeof state === 'undefined' || !state.fighters) return false;
+
+  return state.fighters.some((f, idx) => {
+    if (!f || (f.characterId !== 'todo' && f.type !== 'todo')) return false;
+    if (f.hp <= 0 || f.isDead || f.dead) return false;
+
+    // Ultimate duration not expired yet
+    const hasUnexpiredUlt = (f.takadaUltTimer > 0) || f.isTakadaUltActive || f.isTakadaChanneling || f.takadaSongStarted || f.isTakadaBackgroundPlaying;
+    if (!hasUnexpiredUlt) return false;
+
+    const isOver = (state.gameState === 'matchEnd' || state.gameState === 'roundEnd');
+    if (isOver) {
+      if (state.matchWinner === f || state.roundWinner === f) return true;
+      if (typeof state.getFighterTeam === 'function' && state.winningTeam !== undefined) {
+        if (state.getFighterTeam(idx) === state.winningTeam) return true;
+      }
+      const enemiesAlive = state.fighters.some(other => other && other !== f && !f.isTeammate?.(other) && other.hp > 0 && !other.isDead && !other.dead);
+      if (!enemiesAlive) return true;
+    } else {
+      // During active fight, Todo's ultimate song should not be killed by generic stopAllLoopingSounds
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
  * Stop all looping sounds with optional delay and smooth fade-out.
  * @param {number} [fadeDelayMs=2000] - Delay in ms before starting fade-out (default 2 seconds).
  * @param {number} [fadeDurationMs=500] - Fade duration in ms.
  * @param {boolean} [keepBgm=false] - If true, preserves arena BGM looping sound.
+ * @param {boolean} [forceStopAll=false] - If true, ignores protection and stops all sounds.
  */
-export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500, keepBgm = false) {
+export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500, keepBgm = false, forceStopAll = false) {
   const keys = Array.from(_loopingSounds.keys());
   if (fadeDelayMs > 0) {
     keys.forEach((key) => {
       if (keepBgm && (key === 'arena_bgm_loop' || key === 'arena_bgm_preview')) return;
+      if (!forceStopAll && isTodoTakadaWinnerSong(key)) return;
       const timerId = setTimeout(() => {
         _pendingSoundTimeouts.delete(timerId);
         fadeOutLoopingSound(key, fadeDurationMs);
@@ -583,10 +624,14 @@ export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500, k
   } else {
     keys.forEach((key) => {
       if (keepBgm && (key === 'arena_bgm_loop' || key === 'arena_bgm_preview')) return;
+      if (!forceStopAll && isTodoTakadaWinnerSong(key)) return;
       stopLoopingSound(key);
     });
     if (!keepBgm) {
-      _loopingSounds.clear();
+      for (const [k] of _loopingSounds) {
+        if (!forceStopAll && isTodoTakadaWinnerSong(k)) continue;
+        _loopingSounds.delete(k);
+      }
     }
   }
 }
@@ -1138,6 +1183,9 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
     if (!forceStopAll && isRespect) {
       continue; // CJ Respect music ALWAYS plays until it ends naturally!
     }
+    if (!forceStopAll && isTodoTakadaWinnerSong(src)) {
+      continue; // Todo Takada BG music ALWAYS plays until ultimate duration expires!
+    }
     if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(handle.src)) {
       continue;
     }
@@ -1162,6 +1210,9 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
       const isRespect = src.includes('respect') || src.includes('cj-respectoverlay-bgmusic');
       if (!forceStopAll && isRespect) {
         return; // CJ Respect music ALWAYS plays until it ends naturally!
+      }
+      if (!forceStopAll && isTodoTakadaWinnerSong(src)) {
+        return; // Todo Takada BG music ALWAYS plays until ultimate duration expires!
       }
       if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(audio.src)) {
         return;
@@ -1192,7 +1243,7 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
  */
 export function stopAllAudio(keepAnnouncer = false, fadeDelayMs = 0, fadeDurationMs = 350, forceStopAll = false) {
   stopAllSounds(keepAnnouncer, fadeDelayMs, fadeDurationMs, forceStopAll);
-  stopAllLoopingSounds(fadeDelayMs, fadeDurationMs);
+  stopAllLoopingSounds(fadeDelayMs, fadeDurationMs, false, forceStopAll);
 }
 
 // Auto-unlock AudioContext on first user interaction (click, keydown, touch)

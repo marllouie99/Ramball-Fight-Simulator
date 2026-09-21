@@ -7,6 +7,7 @@ import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import { playLoopingSound, stopLoopingSound, setLoopingSoundVolume, isLoopingSoundPlaying } from './soundSystem.js';
 import { _registerButton, drawChamferedRect, drawPanel, drawButton, fitSingleLineText } from '../graphics/ui/uiFramework.js';
+import { isTodoTakadaSongEnabled } from '../entities/fighters/todo/todoSkills.js';
 
 export const ARENA_BGM_LOOP_KEY = 'arena_bgm_loop';
 export const ARENA_BGM_PREVIEW_KEY = 'arena_bgm_preview';
@@ -523,13 +524,13 @@ export function shouldDuckArenaBgm() {
     return true;
   }
 
-  const isTodoBgmEnabled = (typeof CONFIG !== 'undefined' && CONFIG.todo?.enableTakadaBackgroundSong !== false);
+  const isTodoBgmEnabled = isTodoTakadaSongEnabled();
 
   for (let i = 0; i < state.fighters.length; i++) {
     const f = state.fighters[i];
     if (!f) continue;
 
-    if (isTodoBgmEnabled && (f.isTakadaBackgroundPlaying || f.isTakadaChanneling || f.isTakadaUltActive || f.takadaSongStarted)) {
+    if (isTodoBgmEnabled && !f.isTakadaChanneling && (f.isTakadaBackgroundPlaying || f.isTakadaUltActive || f.takadaSongStarted || (f.hp > 0 && f.takadaUltTimer > 0))) {
       return true;
     }
     if (f.hp > 0 && f.isChannelingPureLoveBeam && f.pureLoveBeamSoundHandle) {

@@ -1,6 +1,52 @@
 import { state } from '../../core/state.js';
 import { fastCleanArray } from '../particles/visualTrailSystem.js';
 
+let _sukunaSlashBuffer = null;
+let _sukunaSlashLow = null;
+let _sukunaSlashHighCtx = null;
+let _sukunaSlashLowCtx = null;
+
+function _getSukunaSlashBuffers() {
+  if (!_sukunaSlashBuffer) {
+    _sukunaSlashBuffer = document.createElement('canvas');
+    _sukunaSlashBuffer.width = 64;
+    _sukunaSlashBuffer.height = 64;
+    _sukunaSlashHighCtx = _sukunaSlashBuffer.getContext('2d');
+
+    _sukunaSlashLow = document.createElement('canvas');
+    _sukunaSlashLow.width = 32;
+    _sukunaSlashLow.height = 32;
+    _sukunaSlashLowCtx = _sukunaSlashLow.getContext('2d', { willReadFrequently: true });
+  }
+  return { high: _sukunaSlashBuffer, low: _sukunaSlashLow, highCtx: _sukunaSlashHighCtx, lowCtx: _sukunaSlashLowCtx };
+}
+
+function _renderVectorSukunaSlash(ctx, r, lifeRatio, isFrozen) {
+  ctx.globalAlpha = Math.max(0.70, 0.95 * lifeRatio);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -Math.PI * 0.58, Math.PI * 0.58, false);
+  ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+  ctx.closePath();
+  ctx.fillStyle = isFrozen ? 'rgba(0, 229, 255, 0.95)' : 'rgba(220, 10, 10, 0.95)';
+  ctx.fill();
+
+  ctx.strokeStyle = isFrozen ? `rgba(224, 255, 255, ${0.95 * lifeRatio})` : `rgba(255, 80, 80, ${0.95 * lifeRatio})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.98, -Math.PI * 0.54, Math.PI * 0.54, false);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(r * 0.45, 0, r * 0.82, Math.PI * 0.48, -Math.PI * 0.48, true);
+  ctx.stroke();
+
+  ctx.strokeStyle = isFrozen ? `rgba(255, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 255, 255, ${0.98 * lifeRatio})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.92, -Math.PI * 0.48, Math.PI * 0.48, false);
+  ctx.stroke();
+}
+
 export function drawSukunaSlash(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
@@ -9,41 +55,92 @@ export function drawSukunaSlash(ctx, p) {
   const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
 
+  const isFrozen = Boolean(p.isFrozenByInfinity);
+  const r = 24;
+
+  const { high, low, highCtx, lowCtx } = _getSukunaSlashBuffers();
+
+  // Render high-res vector slash
+  highCtx.clearRect(0, 0, 64, 64);
+  highCtx.save();
+  highCtx.translate(32, 32);
+  _renderVectorSukunaSlash(highCtx, r, lifeRatio, isFrozen);
+  highCtx.restore();
+
+  // Downsample to low-res discrete grid (32x32, P=2.0)
+  lowCtx.clearRect(0, 0, 32, 32);
+  lowCtx.imageSmoothingEnabled = false;
+  lowCtx.drawImage(high, 0, 0, 32, 32);
+
+  // Apply discrete outline & color snapping
+  const imgData = lowCtx.getImageData(0, 0, 32, 32);
+  const data = imgData.data;
+  const w = 32, h = 32;
+  const grid = new Array(h);
+  for (let y = 0; y < h; y++) {
+    grid[y] = new Uint8Array(w);
+    for (let x = 0; x < w; x++) {
+      const a = data[(y * w + x) * 4 + 3];
+      if (a > 30) grid[y][x] = 1;
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+      if (!grid[y][x]) {
+        data[idx + 3] = 0;
+        continue;
+      }
+
+      const isBorder = (
+        y === 0 || !grid[y - 1][x] ||
+        y === h - 1 || !grid[y + 1][x] ||
+        x === 0 || !grid[y][x - 1] ||
+        x === w - 1 || !grid[y][x + 1]
+      );
+
+      if (isBorder) {
+        data[idx] = 14;     // #0E
+        data[idx + 1] = 15; // #0F
+        data[idx + 2] = 20; // #14
+        data[idx + 3] = 255;
+      } else {
+        data[idx + 3] = 255;
+      }
+    }
+  }
+  lowCtx.putImageData(imgData, 0, 0);
+
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
   ctx.scale(scale, scale);
+  ctx.imageSmoothingEnabled = false;
 
-  const r = 24;
-  // Outer crescent arc & inner returning arc
-  ctx.beginPath();
-  ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
-  ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
-  ctx.closePath();
+  // 1. Ghost Trail - discrete stepped pixel slices
+  for (let i = 3; i >= 1; i--) {
+    const trailAlpha = 0.22 * lifeRatio * (4 - i) / 3;
+    const trailOffset = i * 8;
+    ctx.save();
+    ctx.globalAlpha = trailAlpha;
+    ctx.drawImage(low, 0, 0, 32, 32, -32 - trailOffset, -32, 64, 64);
+    ctx.restore();
+  }
 
-  ctx.fillStyle = `rgba(0, 0, 0, ${0.92 * lifeRatio})`;
-  ctx.fill();
-  ctx.strokeStyle = `rgba(0, 0, 0, ${0.95 * lifeRatio})`;
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  // 2. Main Pixelated Sukuna Slash Blade
+  ctx.drawImage(low, 0, 0, 32, 32, -32, -32, 64, 64);
 
-  // Vivid inner crescent fill (Electric Cyan if frozen by Limitless, Crimson if normal)
-  ctx.save();
-  ctx.scale(0.85, 0.85);
-  ctx.beginPath();
-  ctx.arc(0, 0, r, -Math.PI * 0.52, Math.PI * 0.52, false);
-  ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.48, -Math.PI * 0.48, true);
-  ctx.closePath();
-  ctx.fillStyle = p.isFrozenByInfinity ? `rgba(0, 229, 255, ${0.95 * lifeRatio})` : `rgba(220, 10, 10, ${0.95 * lifeRatio})`;
-  ctx.fill();
-  ctx.restore();
-
-  // Razor-sharp white/cyan crescent core line
-  ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(224, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 255, 255, ${0.98 * lifeRatio})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
-  ctx.stroke();
+  // 3. Discrete trailing pixel sparks
+  const sparkCol = isFrozen ? '#00E5FF' : '#FF2400';
+  ctx.fillStyle = sparkCol;
+  const time = Date.now() * 0.01;
+  const spark1X = -14 + Math.round(Math.sin(time + (p.x || 0) * 0.1) * 3) * 2;
+  const spark1Y = -18 + Math.round(Math.cos(time * 1.5) * 2) * 2;
+  const spark2X = -16 + Math.round(Math.cos(time + (p.y || 0) * 0.1) * 3) * 2;
+  const spark2Y = 18 + Math.round(Math.sin(time * 1.3) * 2) * 2;
+  ctx.fillRect(spark1X, spark1Y, 2, 2);
+  ctx.fillRect(spark2X, spark2Y, 2, 2);
 
   ctx.restore();
 }
@@ -199,45 +296,133 @@ export function drawGhostBlade(ctx, p) {
   ctx.restore();
 }
 
+let _cleaveBuffer = null;
+let _cleaveLow = null;
+let _cleaveHighCtx = null;
+let _cleaveLowCtx = null;
+
+function _getCleaveBuffers() {
+  if (!_cleaveBuffer) {
+    _cleaveBuffer = document.createElement('canvas');
+    _cleaveBuffer.width = 64;
+    _cleaveBuffer.height = 64;
+    _cleaveHighCtx = _cleaveBuffer.getContext('2d');
+
+    _cleaveLow = document.createElement('canvas');
+    _cleaveLow.width = 32;
+    _cleaveLow.height = 32;
+    _cleaveLowCtx = _cleaveLow.getContext('2d', { willReadFrequently: true });
+  }
+  return { high: _cleaveBuffer, low: _cleaveLow, highCtx: _cleaveHighCtx, lowCtx: _cleaveLowCtx };
+}
+
+function _renderVectorSukunaCleave(ctx, r, lifeRatio, isFrozen) {
+  ctx.globalAlpha = Math.max(0.75, 0.98 * lifeRatio);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
+  ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+  ctx.closePath();
+  ctx.fillStyle = isFrozen ? 'rgba(0, 229, 255, 0.98)' : 'rgba(255, 255, 255, 0.98)';
+  ctx.fill();
+
+  ctx.strokeStyle = isFrozen ? `rgba(224, 255, 255, ${0.98 * lifeRatio})` : `rgba(230, 240, 255, ${1.0 * lifeRatio})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
+  ctx.stroke();
+}
+
 export function drawSukunaCleave(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
   const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const owner = state.fighters && state.fighters[p.owner];
-  const scale = owner ? Math.max(1.2, owner.r / 15) : 1.4;
+  const scale = owner ? Math.max(1.1, owner.r / 16) : 1.3;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+  const isFrozen = Boolean(p.isFrozenByInfinity);
+  const r = 24;
+
+  const { high, low, highCtx, lowCtx } = _getCleaveBuffers();
+
+  highCtx.clearRect(0, 0, 64, 64);
+  highCtx.save();
+  highCtx.translate(32, 32);
+  _renderVectorSukunaCleave(highCtx, r, lifeRatio, isFrozen);
+  highCtx.restore();
+
+  lowCtx.clearRect(0, 0, 32, 32);
+  lowCtx.imageSmoothingEnabled = false;
+  lowCtx.drawImage(high, 0, 0, 32, 32);
+
+  const imgData = lowCtx.getImageData(0, 0, 32, 32);
+  const data = imgData.data;
+  const w = 32, h = 32;
+  const grid = new Array(h);
+  for (let y = 0; y < h; y++) {
+    grid[y] = new Uint8Array(w);
+    for (let x = 0; x < w; x++) {
+      const a = data[(y * w + x) * 4 + 3];
+      if (a > 30) grid[y][x] = 1;
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+      if (!grid[y][x]) {
+        data[idx + 3] = 0;
+        continue;
+      }
+
+      const isBorder = (
+        y === 0 || !grid[y - 1][x] ||
+        y === h - 1 || !grid[y + 1][x] ||
+        x === 0 || !grid[y][x - 1] ||
+        x === w - 1 || !grid[y][x + 1]
+      );
+
+      if (isBorder) {
+        data[idx] = 14;     // #0E
+        data[idx + 1] = 15; // #0F
+        data[idx + 2] = 20; // #14
+        data[idx + 3] = 255;
+      } else {
+        data[idx + 3] = 255;
+      }
+    }
+  }
+  lowCtx.putImageData(imgData, 0, 0);
 
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
   ctx.scale(scale, scale);
+  ctx.imageSmoothingEnabled = false;
 
-  const r = 24;
+  // 1. Ghost Trail
+  for (let i = 3; i >= 1; i--) {
+    const trailAlpha = 0.25 * lifeRatio * (4 - i) / 3;
+    const trailOffset = i * 8;
+    ctx.save();
+    ctx.globalAlpha = trailAlpha;
+    ctx.drawImage(low, 0, 0, 32, 32, -32 - trailOffset, -32, 64, 64);
+    ctx.restore();
+  }
 
-  // OPTIMIZED: Removed shadowBlur. Used a dark underlay path for drop shadow instead
-  ctx.beginPath();
-  ctx.arc(2, 2, r, -Math.PI * 0.55, Math.PI * 0.55, false);
-  ctx.arc(r * 0.45 + 2, 2, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
-  ctx.closePath();
-  ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * lifeRatio})`;
-  ctx.fill();
-  
-  // Draw the pure white crescent blade
-  ctx.beginPath();
-  ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
-  ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
-  ctx.closePath();
-  
-  ctx.fillStyle = `rgba(255, 255, 255, ${0.95 * lifeRatio})`;
-  ctx.fill();
+  // 2. Main Pixelated Cleave Blade
+  ctx.drawImage(low, 0, 0, 32, 32, -32, -32, 64, 64);
 
-  // Sharp core line for extra detail
-  ctx.shadowColor = 'transparent'; // turn off shadow for the inner details
-  ctx.strokeStyle = `rgba(230, 240, 255, ${1.0 * lifeRatio})`;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
-  ctx.stroke();
+  // 3. Trailing pixel sparks
+  const sparkCol = isFrozen ? '#00E5FF' : '#FFFFFF';
+  ctx.fillStyle = sparkCol;
+  const time = Date.now() * 0.01;
+  const spark1X = -14 + Math.round(Math.sin(time + (p.x || 0) * 0.1) * 3) * 2;
+  const spark1Y = -18 + Math.round(Math.cos(time * 1.5) * 2) * 2;
+  const spark2X = -16 + Math.round(Math.cos(time + (p.y || 0) * 0.1) * 3) * 2;
+  const spark2Y = 18 + Math.round(Math.sin(time * 1.3) * 2) * 2;
+  ctx.fillRect(spark1X, spark1Y, 2, 2);
+  ctx.fillRect(spark2X, spark2Y, 2, 2);
 
   ctx.restore();
 }
