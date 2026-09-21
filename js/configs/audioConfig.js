@@ -17,10 +17,12 @@ export const AUDIO_CONFIG = {
   'attack_fleshhit': 'Assets/Sound Effects/Attacks/fleshhit.mp3',
   'attack_groundsmash': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'attack_swordswing': 'Assets/Sound Effects/Attacks/swordswing.mp3',
+  'attack_escanor': 'Assets/Sound Effects/Attacks/Escanor-attack.mp3',
   
   // Effects
   'effect_flare': 'Assets/Sound Effects/SkillEffects/flare.mp3',
   'effect_infinity_collide': 'Assets/Sound Effects/SkillEffects/infinity-collide.mp3',
+  'effect_escanor_weapon_lift': 'Assets/Sound Effects/SkillEffects/Escanor-weapon-lift.mp3',
 
   // Skills
   'skill_backstab': 'Assets/Sound Effects/Skills/backstab.mp3',

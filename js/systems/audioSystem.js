@@ -60,6 +60,10 @@ class AudioEventEmitter {
     return this.emit('playSFX', id, volume, speed, offset, delay, onEnded);
   }
 
+  playSpatialSound(id, x, y, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null) {
+    return this.playSFX(id, volume, speed, offset, delay, onEnded);
+  }
+
   fadeInSFX(id, targetVolume = 1.0, fadeMs = 1500) {
     const src = AUDIO_CONFIG[id] || id;
     return fadeInSound(src, targetVolume, fadeMs);

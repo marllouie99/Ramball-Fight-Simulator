@@ -47,6 +47,8 @@ const ZOOM_DEFAULT = 2.4;
 // Interactive Drag States
 let isDraggingHairCenter = false;
 let isDraggingHairScale = false;
+let isDraggingHairWidth = false;
+let isDraggingHairHeight = false;
 let isDraggingHairRotate = false;
 let _copyToastText = '';
 let _copyToastTimer = 0;
@@ -482,8 +484,9 @@ function generateJsCode(fDef, custom) {
   } else if (fDef.key === 'makima') {
     return `// Calibrated Hair for Makima (Assets/model/Makima-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 322;\n` +
-           `const scaleY = scaleX * 0.98 * ${hMult};\n` +
+           `const scaleY = targetHairHeight / 322;\n` +
            `const drawW = 522 * scaleX;\n` +
            `const drawH = 478 * scaleY;\n` +
            `const drawX = -249.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
@@ -890,9 +893,35 @@ export function drawSkinStudioScreen() {
     ctx.stroke();
     ctx.restore();
 
-    // Scale Drag Handle (Amber Circle on top right)
-    const scaleHandleX = handleCenterX + (baseRadius * 1.4 * (custom.widthScale ?? 1.0));
-    const scaleHandleY = handleCenterY - (baseRadius * 0.8 * (custom.heightScale ?? 1.0));
+    // Width-Only Drag Handle (Emerald Circle on right edge)
+    const widthHandleX = handleCenterX + (baseRadius * 1.4 * (custom.widthScale ?? 1.0));
+    const widthHandleY = handleCenterY;
+    ctx.save();
+    ctx.fillStyle = '#10b981';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5 / currentScale;
+    ctx.beginPath();
+    ctx.arc(widthHandleX, widthHandleY, 4.5 / currentScale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Height-Only Drag Handle (Violet Circle on top edge)
+    const heightHandleX = handleCenterX;
+    const heightHandleY = handleCenterY - (baseRadius * 0.8 * (custom.heightScale ?? 1.0));
+    ctx.save();
+    ctx.fillStyle = '#8b5cf6';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5 / currentScale;
+    ctx.beginPath();
+    ctx.arc(heightHandleX, heightHandleY, 4.5 / currentScale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Dual/Uniform Scale Drag Handle (Amber Circle on top right)
+    const scaleHandleX = widthHandleX;
+    const scaleHandleY = heightHandleY;
     ctx.save();
     ctx.fillStyle = '#f59e0b';
     ctx.strokeStyle = '#ffffff';
@@ -1223,8 +1252,8 @@ export function drawSkinStudioScreen() {
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#64748b';
     ctx.font = '900 9px "Rajdhani", sans-serif';
-    ctx.fillText('TIP: DRAG AMBER HANDLE IN VIEWPORT', rowX, curY + 4);
-    ctx.fillText('FOR REAL-TIME VISUAL SCALING', rowX, curY + 18);
+    ctx.fillText('TIP: DRAG GREEN/VIOLET HANDLES FOR WIDTH/HEIGHT', rowX, curY + 4);
+    ctx.fillText('OR DRAG AMBER HANDLE FOR DUAL SCALING', rowX, curY + 18);
 
   } else if (state.studioSkinDetailTab === 'position') {
     // ── OFFSET X ROW ──
@@ -1813,9 +1842,25 @@ if (typeof window !== 'undefined') {
         return;
       }
 
-      // Check scale handle click
-      const scaleHandleX = handleCenterX + (baseRadius * 1.4 * (custom.widthScale ?? 1.0));
-      const scaleHandleY = handleCenterY - (baseRadius * 0.8 * (custom.heightScale ?? 1.0));
+      // Check width-only handle click (right edge, emerald)
+      const widthHandleX = handleCenterX + (baseRadius * 1.4 * (custom.widthScale ?? 1.0));
+      const widthHandleY = handleCenterY;
+      if (Math.hypot(localX - widthHandleX, localY - widthHandleY) < 14 / currentScale) {
+        isDraggingHairWidth = true;
+        return;
+      }
+
+      // Check height-only handle click (top edge, violet)
+      const heightHandleX = handleCenterX;
+      const heightHandleY = handleCenterY - (baseRadius * 0.8 * (custom.heightScale ?? 1.0));
+      if (Math.hypot(localX - heightHandleX, localY - heightHandleY) < 14 / currentScale) {
+        isDraggingHairHeight = true;
+        return;
+      }
+
+      // Check dual scale handle click (top right, amber)
+      const scaleHandleX = widthHandleX;
+      const scaleHandleY = heightHandleY;
       if (Math.hypot(localX - scaleHandleX, localY - scaleHandleY) < 14 / currentScale) {
         isDraggingHairScale = true;
         return;
@@ -1849,6 +1894,14 @@ if (typeof window !== 'undefined') {
         const baseCrownY = fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3;
         custom.offsetX = Math.round(localX);
         custom.offsetY = Math.round(localY - baseCrownY);
+      } else if (isDraggingHairWidth) {
+        const handleCenterX = custom.offsetX;
+        const dx = Math.abs(localX - handleCenterX);
+        custom.widthScale = Math.max(0.2, Math.min(3.5, Number((dx / (baseRadius * 1.4)).toFixed(2))));
+      } else if (isDraggingHairHeight) {
+        const handleCenterY = (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3) + custom.offsetY;
+        const dy = Math.abs(localY - handleCenterY);
+        custom.heightScale = Math.max(0.2, Math.min(3.5, Number((dy / (baseRadius * 0.8)).toFixed(2))));
       } else if (isDraggingHairScale) {
         const handleCenterX = custom.offsetX;
         const handleCenterY = (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3) + custom.offsetY;
@@ -1860,11 +1913,13 @@ if (typeof window !== 'undefined') {
     });
 
     window.addEventListener('mouseup', () => {
-      if (isDraggingHairCenter || isDraggingHairScale || isDraggingHairRotate) {
+      if (isDraggingHairCenter || isDraggingHairScale || isDraggingHairWidth || isDraggingHairHeight || isDraggingHairRotate) {
         saveSkinCustomizations();
       }
       isDraggingHairCenter = false;
       isDraggingHairScale = false;
+      isDraggingHairWidth = false;
+      isDraggingHairHeight = false;
       isDraggingHairRotate = false;
     });
 

@@ -135,7 +135,7 @@ export function _drawEscanorMustache(ctx, r, facingLeft = false) {
     // Y: [492, 772] (height 281, vertical center at 632, top at 492)
     // Width scales to 1.30r across the lower face, sitting naturally at y = -0.04r
     const targetMustacheWidth = r * 1.30 * wMult;
-    const targetMustacheHeight = (targetMustacheWidth * (281 / 885)) * hMult;
+    const targetMustacheHeight = (r * 1.30 * (281 / 885)) * hMult;
     const scaleX = targetMustacheWidth / 885;
     const scaleY = targetMustacheHeight / 281;
     const drawW = 1254 * scaleX;

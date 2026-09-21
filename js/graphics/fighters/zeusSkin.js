@@ -137,7 +137,7 @@ export function _drawZeusCrown(ctx, r, isStormActive = false, facingLeft = false
     // Y: [62, 966] (height 905, top crown peak at 62)
     // Scales to sit naturally across the brow at y ~ -0.08r with central peak reaching -1.05r
     const targetCrownWidth = r * 1.70 * wMult;
-    const targetCrownHeight = (targetCrownWidth * (905 / 1588)) * hMult;
+    const targetCrownHeight = (r * 1.70 * (905 / 1588)) * hMult;
     const scaleX = targetCrownWidth / 1588;
     const scaleY = targetCrownHeight / 905;
     const drawW = 1627 * scaleX;

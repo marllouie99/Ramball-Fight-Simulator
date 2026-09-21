@@ -29,6 +29,7 @@ export function initCameraState() {
     zoomSmoothing: CONFIG.camera?.zoomSmoothing ?? 0.05,
     minZoom: CONFIG.camera?.minZoom ?? 1.04,
     maxZoom: CONFIG.camera?.maxZoom ?? 1.14,
+    cinematicOverride: false,
     toastText: '',
     toastTimer: 0
   };
@@ -46,6 +47,7 @@ export function resetCamera(immediate = false) {
   state.camera.targetX = centerX;
   state.camera.targetY = centerY;
   state.camera.targetZoom = 1.0;
+  state.camera.cinematicOverride = false;
 
   if (immediate) {
     state.camera.x = centerX;
@@ -128,87 +130,109 @@ export function updateCamera() {
     camera.x = arenaCenterX;
     camera.y = arenaCenterY;
     camera.zoom = 1.0;
+    camera.cinematicOverride = false;
     return;
   }
 
-  if (!camera.enabled || camera.mode === 'fixed' || state.gameState === 'countdown') {
-    camera.targetX = arenaCenterX;
-    camera.targetY = arenaCenterY;
-    camera.targetZoom = 1.0;
+  // Check for cinematic camera focus (e.g. general cinematic focus targets)
+  const cinematicTarget = state.cameraFocusTarget;
+
+  if (cinematicTarget && typeof cinematicTarget.x === 'number' && typeof cinematicTarget.y === 'number' && state.gameState !== 'countdown') {
+    camera.cinematicOverride = true;
+
+    // Center camera on the victim with soft arena boundary clamp (keeps camera within arena margins)
+    const minCamX = arena.x + 40;
+    const maxCamX = arena.x + arena.width - 40;
+    const minCamY = arena.y + 40;
+    const maxCamY = arena.y + arena.height - 40;
+
+    camera.targetX = Math.max(minCamX, Math.min(maxCamX, cinematicTarget.x));
+    camera.targetY = Math.max(minCamY, Math.min(maxCamY, cinematicTarget.y));
+
+    const makimaCfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    camera.targetZoom = makimaCfg.crucifixionCameraZoom ?? 1.15;
   } else {
-    // Dynamic tracking mode
-    // NOTE: In this game engine, fighter health is stored in `f.hp` (NOT `f.health`)!
-    const aliveFighters = (state.fighters || []).filter(f => 
-      f && 
-      !f.isDead && 
-      (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0)) && 
-      !f.isIllusion && 
-      !f.isTurret && 
-      !f.isMinion && 
-      !f.isClone
-    );
+    camera.cinematicOverride = false;
 
-    if (aliveFighters.length >= 2) {
-      // Calculate combat bounding box spanning all active fighters
-      let minX = Infinity;
-      let maxX = -Infinity;
-      let minY = Infinity;
-      let maxY = -Infinity;
-
-      for (const f of aliveFighters) {
-        if (f.x < minX) minX = f.x;
-        if (f.x > maxX) maxX = f.x;
-        if (f.y < minY) minY = f.y;
-        if (f.y > maxY) maxY = f.y;
-      }
-
-      // Midpoint is the center of the bounding box spanning all active combatants
-      // (ensures 1v2, 2v2, 1v1, and FFA are never biased towards whichever team has more members!)
-      const midX = (minX + maxX) / 2;
-      const midY = (minY + maxY) / 2;
-      const spanX = maxX - minX;
-      const spanY = maxY - minY;
-      const dist = Math.hypot(spanX, spanY);
-
-      // Distance-to-zoom mapping (Smooth Hermite / Smoothstep)
-      // Gentle, wide zoom range (1.0x to 1.04x max) keeping full arena in view
-      const camCfg = CONFIG.camera || {};
-      const minD = camCfg.minDist ?? 80;
-      const maxD = camCfg.maxDist ?? 420;
-      const normDist = Math.max(0, Math.min(1, (dist - minD) / (maxD - minD)));
-      const smoothT = normDist * normDist * (3 - 2 * normDist);
-      const minZ = camera.minZoom ?? camCfg.minZoom ?? 1.04;
-      const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.14;
-      camera.targetZoom = maxZ - smoothT * (maxZ - minZ);
-
-      // Soft clamp target position relative to arena center
-      // Keeps the arena well-framed on mobile screen (max offset ~22% of arena size)
-      const maxPanRatio = camCfg.maxPanRatio ?? 0.22;
-      const maxPanX = (arena.width / 2) * maxPanRatio;
-      const maxPanY = (arena.height / 2) * maxPanRatio;
-      const relX = midX - arenaCenterX;
-      const relY = midY - arenaCenterY;
-
-      camera.targetX = arenaCenterX + Math.max(-maxPanX, Math.min(maxPanX, relX));
-      camera.targetY = arenaCenterY + Math.max(-maxPanY, Math.min(maxPanY, relY));
-
-    } else if (aliveFighters.length === 1) {
-      // Winner focus during victory or solo stance
-      const camCfg = CONFIG.camera || {};
-      const winner = aliveFighters[0];
-      const maxPanRatio = camCfg.maxPanRatio ?? 0.22;
-      const maxPanX = (arena.width / 2) * maxPanRatio;
-      const maxPanY = (arena.height / 2) * maxPanRatio;
-      const relX = winner.x - arenaCenterX;
-      const relY = winner.y - arenaCenterY;
-
-      camera.targetX = arenaCenterX + Math.max(-maxPanX, Math.min(maxPanX, relX));
-      camera.targetY = arenaCenterY + Math.max(-maxPanY, Math.min(maxPanY, relY));
-      camera.targetZoom = camCfg.winnerZoom ?? 1.08;
-    } else {
+    if (!camera.enabled || camera.mode === 'fixed' || state.gameState === 'countdown') {
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
       camera.targetZoom = 1.0;
+    } else {
+      // Dynamic tracking mode
+      // NOTE: In this game engine, fighter health is stored in `f.hp` (NOT `f.health`)!
+      const aliveFighters = (state.fighters || []).filter(f => 
+        f && 
+        !f.isDead && 
+        (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0)) && 
+        !f.isIllusion && 
+        !f.isTurret && 
+        !f.isMinion && 
+        !f.isClone
+      );
+
+      if (aliveFighters.length >= 2) {
+        // Calculate combat bounding box spanning all active fighters
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+
+        for (const f of aliveFighters) {
+          if (f.x < minX) minX = f.x;
+          if (f.x > maxX) maxX = f.x;
+          if (f.y < minY) minY = f.y;
+          if (f.y > maxY) maxY = f.y;
+        }
+
+        // Midpoint is the center of the bounding box spanning all active combatants
+        // (ensures 1v2, 2v2, 1v1, and FFA are never biased towards whichever team has more members!)
+        const midX = (minX + maxX) / 2;
+        const midY = (minY + maxY) / 2;
+        const spanX = maxX - minX;
+        const spanY = maxY - minY;
+        const dist = Math.hypot(spanX, spanY);
+
+        // Distance-to-zoom mapping (Smooth Hermite / Smoothstep)
+        // Gentle, wide zoom range (1.0x to 1.04x max) keeping full arena in view
+        const camCfg = CONFIG.camera || {};
+        const minD = camCfg.minDist ?? 80;
+        const maxD = camCfg.maxDist ?? 420;
+        const normDist = Math.max(0, Math.min(1, (dist - minD) / (maxD - minD)));
+        const smoothT = normDist * normDist * (3 - 2 * normDist);
+        const minZ = camera.minZoom ?? camCfg.minZoom ?? 1.04;
+        const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.14;
+        camera.targetZoom = maxZ - smoothT * (maxZ - minZ);
+
+        // Soft clamp target position relative to arena center
+        // Keeps the arena well-framed on mobile screen (max offset ~22% of arena size)
+        const maxPanRatio = camCfg.maxPanRatio ?? 0.22;
+        const maxPanX = (arena.width / 2) * maxPanRatio;
+        const maxPanY = (arena.height / 2) * maxPanRatio;
+        const relX = midX - arenaCenterX;
+        const relY = midY - arenaCenterY;
+
+        camera.targetX = arenaCenterX + Math.max(-maxPanX, Math.min(maxPanX, relX));
+        camera.targetY = arenaCenterY + Math.max(-maxPanY, Math.min(maxPanY, relY));
+
+      } else if (aliveFighters.length === 1) {
+        // Winner focus during victory or solo stance
+        const camCfg = CONFIG.camera || {};
+        const winner = aliveFighters[0];
+        const maxPanRatio = camCfg.maxPanRatio ?? 0.22;
+        const maxPanX = (arena.width / 2) * maxPanRatio;
+        const maxPanY = (arena.height / 2) * maxPanRatio;
+        const relX = winner.x - arenaCenterX;
+        const relY = winner.y - arenaCenterY;
+
+        camera.targetX = arenaCenterX + Math.max(-maxPanX, Math.min(maxPanX, relX));
+        camera.targetY = arenaCenterY + Math.max(-maxPanY, Math.min(maxPanY, relY));
+        camera.targetZoom = camCfg.winnerZoom ?? 1.08;
+      } else {
+        camera.targetX = arenaCenterX;
+        camera.targetY = arenaCenterY;
+        camera.targetZoom = 1.0;
+      }
     }
   }
 
@@ -224,7 +248,7 @@ export function applyCameraToCtx(ctx) {
   const screenCenterX = state.canvas.width / 2;
   const screenCenterY = arena.y + arena.height / 2;
 
-  if (cam && cam.enabled && cam.mode === 'dynamic') {
+  if (cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride)) {
     ctx.translate(screenCenterX + (cam.shakeX || 0), screenCenterY + (cam.shakeY || 0));
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
@@ -249,7 +273,7 @@ export function worldToScreen(worldX, worldY) {
   const screenCenterX = state.canvas ? (state.canvas.width / 2) : 270;
   const screenCenterY = arena.y + arena.height / 2;
 
-  if (cam && cam.enabled && cam.mode === 'dynamic') {
+  if (cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride)) {
     const sx = screenCenterX + (cam.shakeX || 0) + (worldX - cam.x) * cam.zoom;
     const sy = screenCenterY + (cam.shakeY || 0) + (worldY - cam.y) * cam.zoom;
     return { x: sx, y: sy };

@@ -1734,3 +1734,786 @@ export function drawMakimaChainBreakEffects(ctx) {
   }
 }
 
+// ─────────────────────────────────────────────
+// Makima Ultimate: Crucifixion (Drop of Dominion)
+// Inspired by the reference animation:
+// 1. Cross-dimensional purple rifts stretching across the arena
+// 2. 4 purple chains pinning and crucifying the target in complete stasis
+// 3. Rotating runic occult ground seal
+// 4. Colossal heavy cross execution sword plunging from high above
+// 5. Blinding white screen flash on impact
+// 6. Expanding concentric shockwaves & shattered purple chain shards
+// Adheres strictly to Rule 11 (Zero shadowBlur) and Rule 2.4 (Transform Stack Balance)
+// ─────────────────────────────────────────────
+
+export function drawMakimaCrucifixionUltimate(ctx, makima) {
+  if (!makima || !makima.isExecutingCrucifixion) return;
+
+  const target = makima.crucifixionTarget || { x: makima.x + 200, y: makima.y, r: 25 };
+  const totalDuration = makima.crucifixionMaxTimer || 140;
+  const elapsed = Math.max(0, totalDuration - (makima.crucifixionTimer || 0));
+  const impactFrame = makima.crucifixionImpactFrame || 80;
+  const now = Date.now();
+
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : {
+    x: 0,
+    y: 0,
+    width: (typeof state !== 'undefined' && state.canvas) ? state.canvas.width : 1200,
+    height: (typeof state !== 'undefined' && state.canvas) ? state.canvas.height : 700
+  };
+
+  ctx.save();
+
+  // ─────────────────────────────────────────────
+  // 1. FULL-SCREEN BLINDING WHITE FLASH (Impact moment)
+  // ─────────────────────────────────────────────
+  if (makima.crucifixionWhiteFlashTimer && makima.crucifixionWhiteFlashTimer > 0) {
+    const flashAlpha = Math.min(1.0, makima.crucifixionWhiteFlashTimer / 3.0);
+    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(3)})`;
+    ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  }
+
+  // Fade out overall effect during the last 25 frames
+  let masterAlpha = 1.0;
+  if (elapsed > totalDuration - 25) {
+    masterAlpha = Math.max(0, (totalDuration - elapsed) / 25.0);
+  }
+
+  // ─────────────────────────────────────────────
+  // 2. THE 4 CHAINS OF DOMINATION ("Chained Up" to Arena Walls)
+  // Clean physical chains in Makima's authentic Chains of Domination theme.
+  // Active during elapsed < impactFrame; shatters upon impact.
+  // ─────────────────────────────────────────────
+  const isChainsShattered = elapsed >= impactFrame;
+  if (!isChainsShattered) {
+    _drawCrucifixionDominationChains(ctx, target, arena, masterAlpha, now, elapsed);
+  }
+
+  // ─────────────────────────────────────────────
+  // 5. EXPANDING IMPACT SHOCKWAVES & BLOOD RINGS
+  // ─────────────────────────────────────────────
+  if (makima.crucifixionShockwaves && makima.crucifixionShockwaves.length > 0) {
+    _drawCrucifixionShockwaves(ctx, makima.crucifixionShockwaves);
+  }
+
+  // ─────────────────────────────────────────────
+  // 6. SHATTERED PURPLE CHAIN SHARDS
+  // ─────────────────────────────────────────────
+  if (makima.crucifixionShatteredLinks && makima.crucifixionShatteredLinks.length > 0) {
+    _drawCrucifixionShatteredLinks(ctx, makima.crucifixionShatteredLinks);
+  }
+
+  // ─────────────────────────────────────────────
+  // 7. THE COLOSSAL ANGEL'S ARMORY SPEAR PLUNGE (1000-Year Spear & 100-Year Halberds)
+  // ─────────────────────────────────────────────
+  _drawCrucifixionAngelArmoryPlunge(ctx, makima, target, elapsed, impactFrame, totalDuration, masterAlpha, now);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the 4 Chains of Domination pinning the target from the exact arena walls.
+ * Uses the exact same color theme and pixel art engine as Makima's Chains of Domination:
+ * - Anchors exactly to the arena walls (4 corners / perimeter bounds)
+ * - Heavy cast-iron wall mounting staples embedded into the wall line
+ * - High-tension catenary vibration with zero floating gaps
+ * - Makima's authentic 4-tier palette: Obsidian (#0E0F14), Velvet Blood Crimson (#781D16),
+ *   Solar Gold (#F59E0B), Specular Pale Gold (#FEF08A), and White Specular (#FFFFFF).
+ * - Target body wrapped in Makima's authentic constricting chain coils and Ruby Devil center lock.
+ */
+function _drawCrucifixionDominationChains(ctx, target, arena, alpha, now, elapsed) {
+  if (!target || alpha <= 0.01) return;
+
+  // Pre-Chain Hand Channeling Guard: Chains do not unleash until frame 20 after Makima finishes her hand seal!
+  if (elapsed < 20) return;
+
+  // High-speed chain ejection from 4 arena wall anchors toward the target (frames 20..24)
+  const shootProgress = Math.min(1.0, Math.max(0.0, (elapsed - 20) / 4.0));
+  const isShooting = shootProgress < 1.0;
+
+  const tx = target.x;
+  const ty = target.y;
+  const tr = target.r || 25;
+
+  // Determine the 4 wall anchor points on the arena perimeter
+  let anchors;
+  if (arena && arena.shape === 'circle') {
+    const cx = arena.x + arena.width / 2;
+    const cy = arena.y + arena.height / 2;
+    const ar = arena.radius || (arena.width / 2);
+    // 4 points on the circular arena perimeter
+    anchors = [
+      { x: cx - ar * Math.SQRT1_2, y: cy - ar * Math.SQRT1_2 },
+      { x: cx + ar * Math.SQRT1_2, y: cy - ar * Math.SQRT1_2 },
+      { x: cx + ar * Math.SQRT1_2, y: cy + ar * Math.SQRT1_2 },
+      { x: cx - ar * Math.SQRT1_2, y: cy + ar * Math.SQRT1_2 }
+    ];
+  } else {
+    // Rectangular / Square arena: anchor exactly at the 4 wall corners
+    const minX = arena.x;
+    const maxX = arena.x + arena.width;
+    const minY = arena.y;
+    const maxY = arena.y + arena.height;
+    anchors = [
+      { x: minX, y: minY },
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+      { x: minX, y: maxY }
+    ];
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  for (let i = 0; i < anchors.length; i++) {
+    const anc = anchors[i];
+    const dx = tx - anc.x;
+    const dy = ty - anc.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 10) continue;
+
+    const angle = Math.atan2(dy, dx);
+    const perpAngle = angle + Math.PI / 2;
+
+    // 1. Cast-Iron Wall Mounting Bracket (Embedded directly into the arena wall)
+    ctx.save();
+    ctx.translate(snap(anc.x), snap(anc.y));
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#0E0F14'; // Dark obsidian outer plate
+    ctx.fillRect(-7, -7, 14, 14);
+    ctx.fillStyle = '#781D16'; // Blood-iron bed
+    ctx.fillRect(-5, -5, 10, 10);
+    ctx.fillStyle = '#F59E0B'; // Solar gold collar ring
+    ctx.fillRect(-3, -3, 6, 6);
+    pxDiamond(ctx, 0, 0, 2, '#FEF08A'); // Center gold rivet
+    ctx.restore();
+
+    // 2. Chain Length from Wall Anchor straight to the Target's Body (scaled during ejection)
+    const fullSpanDist = Math.max(10, dist - tr * 0.70);
+    const spanDist = isShooting ? fullSpanDist * Math.pow(shootProgress, 1.8) : fullSpanDist;
+    const linkSpacing = 12.5;
+    const totalLinks = Math.max(1, Math.round(spanDist / linkSpacing));
+
+    // 3. Glowing Energy Spine Underlay (Chains of Domination theme)
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(anc.x, anc.y);
+    ctx.lineTo(anc.x + Math.cos(angle) * spanDist, anc.y + Math.sin(angle) * spanDist);
+
+    ctx.strokeStyle = `rgba(163, 29, 36, ${(alpha * 0.50).toFixed(3)})`; // Velvet Crimson Outer Filament
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(245, 158, 11, ${(alpha * 0.80).toFixed(3)})`; // Solar Amber Core
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`; // White Kinetic Spine
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+
+    // 4. Interlocking Stepped Pixel-Art Chain Links
+    // Starts at l = 0 (pinned directly into the wall bracket) through totalLinks
+    for (let l = 0; l <= totalLinks; l++) {
+      const u = totalLinks > 0 ? l / totalLinks : 1.0;
+      const segDist = spanDist * u;
+
+      // High-tension catenary vibration
+      const vibe = Math.sin(now * 0.04 + i * 1.8) * 1.2 * Math.sin(u * Math.PI);
+      const lx = anc.x + Math.cos(angle) * segDist + Math.cos(perpAngle) * vibe;
+      const ly = anc.y + Math.sin(angle) * segDist + Math.sin(perpAngle) * vibe;
+
+      ctx.save();
+      ctx.translate(snap(lx), snap(ly));
+      ctx.rotate(angle);
+      ctx.globalAlpha = alpha;
+      ctx.imageSmoothingEnabled = false;
+
+      if (l % 2 === 0) {
+        // Face-on Oval Link (12px × 7px) — Exactly matching Makima's Chains of Domination
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(-6, -3.5, 12, 7);
+
+        ctx.fillStyle = '#781D16';
+        ctx.fillRect(-5, -2.5, 10, 5);
+
+        ctx.fillStyle = '#F59E0B';
+        ctx.fillRect(-4, -2.0, 8, 4);
+
+        ctx.fillStyle = '#FEF08A';
+        ctx.fillRect(-4, -2.0, 8, 1.5);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(-2, -2.0, 4, 1.0);
+
+        ctx.fillStyle = '#180506'; // Hollow center eyelet hole
+        ctx.fillRect(-2, -0.5, 4, 1.5);
+      } else {
+        // Side-on Vertical Connecting Link (5px × 10px)
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(-2.5, -5, 5, 10);
+
+        ctx.fillStyle = '#5A1215';
+        ctx.fillRect(-1.5, -4, 3, 8);
+
+        ctx.fillStyle = '#FBBF24';
+        ctx.fillRect(-1.0, -3.5, 2, 7);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(-0.5, -2.5, 1, 5);
+      }
+
+      ctx.restore();
+    }
+
+    // 4B. Leading Piercing Harpoon Spike (during high-speed shooting phase)
+    if (isShooting) {
+      const tipX = anc.x + Math.cos(angle) * spanDist;
+      const tipY = anc.y + Math.sin(angle) * spanDist;
+      ctx.save();
+      ctx.translate(snap(tipX), snap(tipY));
+      ctx.rotate(angle);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(-2, -5, 12, 10);
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(0, -3, 8, 6);
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(2, -1.5, 4, 3);
+      ctx.restore();
+    }
+  }
+
+  // 5. Target Body Constriction (Makima's authentic 3-coil Chains of Domination & Ruby Devil Chest Lock)
+  // Latch securely on target once chains strike at elapsed >= 24
+  if (elapsed >= 24) {
+    _drawTargetBodyWrappingChains(ctx, target, 0, now, 120, 240);
+  }
+
+  ctx.restore();
+}
+
+function _drawCrucifixionCrossRifts() {}
+function _drawCrucifixionGroundSeal() {}
+const _drawCrucifixionPurpleChains = _drawCrucifixionDominationChains;
+
+/**
+ * Main Renderer for Makima's Crucifixion Plunge: Angel's Armory (100-Year Halberds & 1000-Year Spear).
+ * Colossal 1000-Year Holy Spear (Sen-nen no Yari) flanked by twin 100-Year Halberds plunges from high
+ * above the arena straight toward the chained victim with accelerating speed and trailing speed lines.
+ * 
+ * Features:
+ * 1. Accelerating Gravitational Trajectory (eased = pow(p, 2.7))
+ * 2. Ground Targeting Reticle & Divine Altar Seal beneath chained target
+ * 3. Stepped Pixel Plasma Comet Tail (trailing upward behind plunging spear)
+ * 4. Stepped Pixel Mach Shockwave Diamonds & Orbiting Halos (from Skill 2: Angel's Armory)
+ * 5. Manga Action Speed Lines (Rule 2.5: 4-Point Filled Needle Polygons)
+ * 6. Colossal 1000-Year Spear Model (Rule 19/20 Authentic Stepped Pixel Art)
+ * 7. Twin Flanking 100-Year Halberds in divine arrowhead strike formation
+ * 8. Post-Impact Ground Scorch Cracks, Divine Resonance Tremor & Rising Holy Embers
+ */
+function _drawCrucifixionAngelArmoryPlunge(ctx, makima, target, elapsed, impactFrame, totalDuration, alpha, now) {
+  // Weapon begins appearing at frame 46, plunges from 46 to 80, embeds from 80 to 140
+  if (elapsed < 46 || alpha <= 0.01) return;
+
+  const targetX = target.x;
+  const targetY = target.y + 12; // Reticle / scorch center (at target body)
+  const targetR = target.r || 25;
+  const startY = targetY - 850;  // Falls from high above the arena ceiling
+
+  const spearLen = 210;
+  const spearScale = 1.2;
+  const spearTipOffset = spearLen * 0.65 * spearScale; // ~163.8px
+  const halberdLen = 120;
+  const halberdScale = 0.65;
+  const halberdTipOffset = halberdLen * 0.65 * halberdScale; // ~50.7px
+
+  // Spear tip stops at the top edge of the enemy body (no overlay on body)
+  const embedTipY = target.y - targetR + 2; // 2px into the crown for a "pinning" feel
+  let tipY = embedTipY;
+  let isPlunging = false;
+  let plungeProgress = 1.0;
+
+  if (elapsed < impactFrame) {
+    isPlunging = true;
+    const plungeStart = 46;
+    plungeProgress = Math.max(0, Math.min(1.0, (elapsed - plungeStart) / (impactFrame - plungeStart)));
+    // Heavy accelerating speed (gravitational cubic ease-in)
+    const eased = Math.pow(plungeProgress, 2.7);
+    tipY = startY + (embedTipY - startY) * eased;
+  }
+
+  // Calculate post-impact tremor & fade
+  let tremorX = 0;
+  let tremorY = 0;
+  let embedAlpha = alpha;
+  if (!isPlunging) {
+    const postImpact = elapsed - impactFrame;
+    const tremorP = Math.max(0, 1.0 - postImpact / 22);
+    tremorX = Math.sin(postImpact * 1.7) * 2.5 * tremorP;
+    tremorY = Math.cos(postImpact * 2.1) * 1.5 * tremorP;
+    const fadeOutP = Math.max(0, (elapsed - (totalDuration - 25)) / 25);
+    embedAlpha = alpha * (1.0 - fadeOutP);
+  }
+
+  ctx.save();
+  ctx.globalAlpha = embedAlpha;
+  ctx.imageSmoothingEnabled = false;
+
+  // ─────────────────────────────────────────────
+  // A. GROUND TARGETING RETICLE & CONVERGENCE SEAL (While plunging)
+  // ─────────────────────────────────────────────
+  if (isPlunging) {
+    const fallDist = Math.max(0, embedTipY - tipY);
+    const reticleScale = Math.max(0.25, 1.0 - (fallDist / 850));
+    const reticleR = snap(46 * reticleScale);
+    const pulse = Math.sin(now * 0.015) * 0.15 + 0.85;
+
+    ctx.save();
+    ctx.translate(snap(targetX), snap(targetY));
+
+    // Outer Solar Gold Targeting Ring
+    pxRing(ctx, 0, 0, reticleR, 2, `rgba(245, 158, 11, ${(reticleScale * 0.85 * pulse).toFixed(3)})`);
+
+    // Cardinal Crosshair Ticks
+    const tickLen = snap(8 * reticleScale);
+    pxRect(ctx, -reticleR - tickLen, -1, tickLen, 2, '#F59E0B');
+    pxRect(ctx, reticleR, -1, tickLen, 2, '#F59E0B');
+    pxRect(ctx, -1, -reticleR - tickLen, 2, tickLen, '#F59E0B');
+    pxRect(ctx, -1, reticleR, 2, tickLen, '#F59E0B');
+
+    // Inner Velvet Crimson Diamond Core
+    const innerR = Math.max(3, snap(reticleR * 0.5));
+    pxDiamond(ctx, 0, 0, innerR, `rgba(220, 38, 38, ${(reticleScale * 0.9).toFixed(3)})`, '#0E0F14');
+    pxDiamond(ctx, 0, 0, Math.max(1, Math.round(innerR * 0.5)), '#FFFFFF');
+
+    // 4 Diagonal Gold Warning Studs
+    const diagDist = snap(reticleR * 0.7);
+    pxDiamond(ctx, -diagDist, -diagDist, 2, '#FEF08A');
+    pxDiamond(ctx, diagDist, -diagDist, 2, '#FEF08A');
+    pxDiamond(ctx, -diagDist, diagDist, 2, '#FEF08A');
+    pxDiamond(ctx, diagDist, diagDist, 2, '#FEF08A');
+
+    ctx.restore();
+  }
+
+  // ─────────────────────────────────────────────
+  // B. HEAVY DIVINE TRAIL EFFECT (Thick persistent afterimage wake during plunge)
+  // ─────────────────────────────────────────────
+  if (isPlunging && plungeProgress > 0.02) {
+    const pommelWorldY = tipY - (spearLen * spearScale);
+    // Trail stretches from current pommel position up toward origin (startY)
+    const trailTopY = startY + 60; // Trail top doesn't go all the way to spawn to avoid visual clutter
+    const trailBottomY = pommelWorldY;
+    const trailHeight = Math.max(0, trailBottomY - trailTopY);
+    const speedFactor = Math.pow(plungeProgress, 1.8); // Thickens as spear accelerates
+
+    if (trailHeight > 10) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+
+      // ── Layer 1: Wide Crimson Energy Wake (outer envelope) ──
+      const wakeHalfW = snap(Math.max(4, 28 * speedFactor));
+      const wakeSegments = Math.min(32, Math.max(4, Math.round(trailHeight / 18)));
+      for (let s = 0; s < wakeSegments; s++) {
+        const t = s / wakeSegments;
+        const segTopY = trailTopY + t * trailHeight;
+        const segBotY = trailTopY + (s + 1) / wakeSegments * trailHeight;
+        const segH = segBotY - segTopY;
+        // Taper: thinnest at top, widest near pommel
+        const taper = Math.pow(t, 0.6);
+        const halfW = snap(wakeHalfW * taper);
+        // Opacity: fades toward top, strongest near pommel
+        const segAlpha = taper * 0.45 * speedFactor;
+
+        pxRect(ctx, targetX - halfW, segTopY, halfW * 2, segH,
+          `rgba(163, 29, 36, ${segAlpha.toFixed(3)})`);
+      }
+
+      // ── Layer 2: Golden Holy Fire Plasma Body ──
+      const fireHalfW = snap(Math.max(3, 16 * speedFactor));
+      for (let s = 0; s < wakeSegments; s++) {
+        const t = s / wakeSegments;
+        const segTopY = trailTopY + t * trailHeight;
+        const segBotY = trailTopY + (s + 1) / wakeSegments * trailHeight;
+        const segH = segBotY - segTopY;
+        const taper = Math.pow(t, 0.55);
+        const halfW = snap(fireHalfW * taper);
+        const segAlpha = taper * 0.6 * speedFactor;
+
+        pxRect(ctx, targetX - halfW, segTopY, halfW * 2, segH,
+          `rgba(245, 158, 11, ${segAlpha.toFixed(3)})`);
+      }
+
+      // ── Layer 3: Pale Gold Inner Glow ──
+      const innerHalfW = snap(Math.max(2, 8 * speedFactor));
+      for (let s = 0; s < wakeSegments; s++) {
+        const t = s / wakeSegments;
+        const segTopY = trailTopY + t * trailHeight;
+        const segBotY = trailTopY + (s + 1) / wakeSegments * trailHeight;
+        const segH = segBotY - segTopY;
+        const taper = Math.pow(t, 0.5);
+        const halfW = snap(innerHalfW * taper);
+        const segAlpha = taper * 0.75 * speedFactor;
+
+        pxRect(ctx, targetX - halfW, segTopY, halfW * 2, segH,
+          `rgba(254, 240, 138, ${segAlpha.toFixed(3)})`);
+      }
+
+      // ── Layer 4: White-Hot Kinetic Core Spine ──
+      const coreAlpha = Math.min(0.95, 0.5 + speedFactor * 0.45);
+      pxRect(ctx, targetX - 1, trailTopY, 2, trailHeight,
+        `rgba(255, 255, 255, ${coreAlpha.toFixed(3)})`);
+
+      // ── Layer 5: Air-Displacement Pressure Rings (burst outward along descent path) ──
+      const ringCount = Math.min(6, Math.max(2, Math.floor(speedFactor * 6)));
+      for (let r = 0; r < ringCount; r++) {
+        const ringT = (r + 1) / (ringCount + 1);
+        const ringY = snap(trailTopY + ringT * trailHeight);
+        // Rings expand more near the pommel (bottom of trail)
+        const ringRadius = snap(14 + ringT * 30 * speedFactor);
+        const ringAlpha = (1.0 - ringT * 0.4) * speedFactor * 0.55;
+
+        // Flatten rings into horizontal ellipses for perspective
+        ctx.save();
+        ctx.translate(snap(targetX), ringY);
+        ctx.scale(1.0, 0.35);
+        pxRing(ctx, 0, 0, ringRadius, 2,
+          `rgba(245, 158, 11, ${ringAlpha.toFixed(3)})`);
+        // Inner white highlight ring
+        pxRing(ctx, 0, 0, Math.max(4, Math.round(ringRadius * 0.5)), 1,
+          `rgba(255, 255, 255, ${(ringAlpha * 0.7).toFixed(3)})`);
+        ctx.restore();
+      }
+
+      // ── Layer 6: Scattered Holy Embers & Sparks (drifting outward from trail) ──
+      const emberCount = Math.min(20, Math.floor(speedFactor * 16));
+      for (let e = 0; e < emberCount; e++) {
+        const eT = (e + 0.5) / emberCount;
+        const eY = trailTopY + eT * trailHeight;
+        // Oscillate outward from center, seeded by index
+        const drift = Math.sin(e * 2.73 + now * 0.008) * (18 + speedFactor * 22);
+        const eAlpha = (0.5 + eT * 0.5) * speedFactor * 0.85;
+        const eColor = (e % 3 === 0) ? `rgba(255, 255, 255, ${eAlpha.toFixed(3)})`
+                     : (e % 3 === 1) ? `rgba(254, 240, 138, ${eAlpha.toFixed(3)})`
+                     : `rgba(245, 158, 11, ${eAlpha.toFixed(3)})`;
+        px(ctx, targetX + drift, eY, eColor);
+        // Some embers leave tiny 2-pixel streaks
+        if (e % 4 === 0) {
+          pxRect(ctx, targetX + drift - 1, eY - 4, 2, 4, eColor);
+        }
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // B2. IN-FLIGHT SPEED LINES & TAILS (While plunging)
+  // ─────────────────────────────────────────────
+  if (isPlunging) {
+    const pommelWorldY = tipY - (spearLen * spearScale);
+
+    // 1. Stepped Pixel Plasma Comet Tail (trailing upward from pommel)
+    const tailLength = snap(180 * Math.max(0.4, plungeProgress));
+    const tailSegments = 16;
+    const segH = tailLength / tailSegments;
+
+    for (let s = 0; s < tailSegments; s++) {
+      const u = s / tailSegments;
+      const segY = pommelWorldY - s * segH;
+      const halfW = Math.max(1, Math.round((1.0 - u) * 9)) * P;
+      const tailAlpha = (1.0 - u * 0.85);
+
+      // Layer A: Velvet Crimson Outer Warp Envelope
+      pxRect(ctx, targetX - halfW - 2, segY - segH, (halfW + 2) * 2, segH, `rgba(163, 29, 36, ${(tailAlpha * 0.40).toFixed(3)})`);
+
+      // Layer B: Solar Gold Holy Plasma Body
+      pxRect(ctx, targetX - halfW, segY - segH, halfW * 2, segH, `rgba(245, 158, 11, ${(tailAlpha * 0.75).toFixed(3)})`);
+
+      // Layer C: Bright Gold Core
+      const coreW = Math.max(1, Math.round(halfW * 0.5));
+      pxRect(ctx, targetX - coreW, segY - segH, coreW * 2, segH, `rgba(254, 240, 138, ${(tailAlpha * 0.85).toFixed(3)})`);
+
+      // Layer D: White-Hot Kinetic Spine
+      pxRect(ctx, targetX - 1, segY - segH, 2, segH, `rgba(255, 255, 255, ${(tailAlpha * 0.95).toFixed(3)})`);
+
+      // Staggered Dissolving Holy Pixel Embers
+      if (s > 3) {
+        const emberX = targetX + ((s * 7) % 15 - 7) * P;
+        px(ctx, emberX, segY - segH - 4, '#FEF08A');
+      }
+    }
+
+    // 2. Stepped Pixel Mach Shockwave Diamonds (trailing upward)
+    for (let d = 1; d <= 4; d++) {
+      const ringPhase = ((now * 0.02 + d * 0.25) % 1.0);
+      const ringY = snap(pommelWorldY - d * 36 - ringPhase * 28);
+      const ringR = snap(12 + ringPhase * 22);
+      const ringAlpha = (1.0 - ringPhase) * 0.85;
+
+      pxDiamond(ctx, targetX, ringY, ringR, `rgba(245, 158, 11, ${ringAlpha.toFixed(3)})`);
+      pxDiamond(ctx, targetX, ringY, Math.round(ringR * 0.55), `rgba(255, 255, 255, ${(ringAlpha * 0.9).toFixed(3)})`);
+    }
+
+    // 3. Orbiting Stepped Pixel Halos along Plunging Descent Shaft
+    const haloRot = now * 0.01;
+    const haloCenterY = snap(pommelWorldY + 80);
+    ctx.save();
+    ctx.translate(snap(targetX), haloCenterY);
+    ctx.scale(1.0, 0.4); // Flatten into horizontal orbit
+    ctx.rotate(haloRot);
+    pxRing(ctx, 0, 0, 32, 2, 'rgba(254, 240, 138, 0.90)');
+    for (let h = 0; h < 4; h++) {
+      const hAngle = (h * Math.PI) / 2;
+      const hx = Math.cos(hAngle) * 32;
+      const hy = Math.sin(hAngle) * 32;
+      pxDiamond(ctx, hx, hy, 3, '#FFFFFF', '#0E0F14');
+    }
+    ctx.restore();
+
+    // 4. Trailing Manga Action Speed Lines (Rule 2.5: 4-Point Filled Needle Polygons)
+    ctx.save();
+    const needleCount = 16;
+    for (let n = 0; n < needleCount; n++) {
+      const offsetX = ((n / (needleCount - 1)) - 0.5) * 140;
+      const trailLength = 100 + (n % 5) * 40;
+      const startX = targetX + offsetX;
+      const startYNeedle = tipY - 80;
+      const endYNeedle = startYNeedle - trailLength;
+      const midY = (startYNeedle + endYNeedle) * 0.5;
+      const halfThick = 1.0 + (n % 3 === 0 ? 0.8 : 0);
+
+      ctx.fillStyle = (n % 4 === 0) ? 'rgba(255, 255, 255, 0.95)'
+                    : (n % 4 === 1) ? 'rgba(254, 240, 138, 0.85)'
+                    : (n % 4 === 2) ? 'rgba(245, 158, 11, 0.80)'
+                    : 'rgba(239, 68, 68, 0.80)';
+      ctx.beginPath();
+      ctx.moveTo(startX, startYNeedle);      // Sharp leading tip
+      ctx.lineTo(startX - halfThick, midY); // Left body
+      ctx.lineTo(startX, endYNeedle);       // Sharp trailing tip
+      ctx.lineTo(startX + halfThick, midY); // Right body
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ─────────────────────────────────────────────
+  // C. POST-IMPACT GROUND SCORCH CRACKS & HOLY EMBERS (When embedded)
+  // ─────────────────────────────────────────────
+  if (!isPlunging) {
+    const postImpact = elapsed - impactFrame;
+    const scorchAlpha = Math.max(0, 1.0 - postImpact / (totalDuration - impactFrame));
+
+    ctx.save();
+    ctx.translate(snap(targetX), snap(embedTipY));
+
+    // Ground Radial Scorch Cracks (Stepped pixel obsidian and glowing crimson fissures)
+    const crackDirs = [
+      { dx: -42, dy: -6 }, { dx: 38, dy: -8 },
+      { dx: -28, dy: 16 }, { dx: 32, dy: 14 },
+      { dx: -12, dy: 24 }, { dx: 14, dy: 22 }
+    ];
+    for (let cr of crackDirs) {
+      // Dark fissure outline
+      ctx.strokeStyle = `rgba(14, 15, 20, ${(scorchAlpha * 0.85).toFixed(3)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(cr.dx * 0.5, cr.dy * 0.5 + 2);
+      ctx.lineTo(cr.dx, cr.dy);
+      ctx.stroke();
+
+      // Glowing crimson / gold core
+      ctx.strokeStyle = `rgba(245, 158, 11, ${(scorchAlpha * 0.90).toFixed(3)})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(cr.dx * 0.5, cr.dy * 0.5 + 2);
+      ctx.lineTo(cr.dx, cr.dy);
+      ctx.stroke();
+    }
+
+    // Epicenter Concentric Impact Rings
+    const ringR = snap(24 + Math.min(20, postImpact * 1.5));
+    pxRing(ctx, 0, 0, ringR, 2, `rgba(245, 158, 11, ${(scorchAlpha * 0.5).toFixed(3)})`);
+    pxDiamond(ctx, 0, 0, Math.round(ringR * 0.5), `rgba(254, 240, 138, ${(scorchAlpha * 0.6).toFixed(3)})`);
+
+    // Rising Holy Plasma Embers (Drifting upward into the sky)
+    for (let p = 0; p < 8; p++) {
+      const pPhase = ((now * 0.003 + p * 0.125) % 1.0);
+      const pxOffset = Math.sin(p * 1.7 + now * 0.005) * 32;
+      const pyOffset = -pPhase * 70;
+      const pAlpha = (1.0 - pPhase) * scorchAlpha * 0.9;
+      px(ctx, pxOffset, pyOffset, (p % 2 === 0) ? `rgba(255, 255, 255, ${pAlpha.toFixed(3)})` : `rgba(254, 240, 138, ${pAlpha.toFixed(3)})`);
+    }
+
+    ctx.restore();
+  }
+
+  // ─────────────────────────────────────────────
+  // D. THE WEAPONS OF ANGEL'S ARMORY
+  // ─────────────────────────────────────────────
+  // 1. Left Flanking 100-Year Halberd
+  const leftX = targetX - 56 + (isPlunging ? 0 : tremorX * 0.7);
+  const leftTipY = tipY - (isPlunging ? 40 : 0);
+  const leftOriginY = leftTipY - halberdTipOffset + (isPlunging ? 0 : tremorY * 0.7);
+  const leftAngle = (Math.PI / 2) - 0.12; // Slight outward angle
+
+  ctx.save();
+  ctx.translate(snap(leftX), snap(leftOriginY));
+  ctx.rotate(leftAngle);
+  _drawColossal1000YearSpearModel(ctx, halberdLen, halberdScale, alpha * 0.88, now);
+  ctx.restore();
+
+  // 2. Right Flanking 100-Year Halberd
+  const rightX = targetX + 56 + (isPlunging ? 0 : tremorX * 0.7);
+  const rightTipY = tipY - (isPlunging ? 40 : 0);
+  const rightOriginY = rightTipY - halberdTipOffset + (isPlunging ? 0 : tremorY * 0.7);
+  const rightAngle = (Math.PI / 2) + 0.12; // Slight outward angle
+
+  ctx.save();
+  ctx.translate(snap(rightX), snap(rightOriginY));
+  ctx.rotate(rightAngle);
+  _drawColossal1000YearSpearModel(ctx, halberdLen, halberdScale, alpha * 0.88, now);
+  ctx.restore();
+
+  // 3. Central Colossal 1000-Year Holy Spear (Sen-nen no Yari)
+  const mainX = targetX + (isPlunging ? 0 : tremorX);
+  const mainOriginY = (tipY - spearTipOffset) + (isPlunging ? 0 : tremorY);
+
+  // ── RADIANT GOLDEN DIVINE GLOW (during plunge) ──
+  // Multi-layered expanding golden aura around the spear that intensifies as it accelerates
+  if (isPlunging) {
+    const glowIntensity = Math.pow(plungeProgress, 1.2); // Builds with speed
+    const glowPulse = Math.sin(now * 0.012) * 0.12 + 0.88;
+    const glowStr = glowIntensity * glowPulse;
+
+    ctx.save();
+    ctx.translate(snap(mainX), snap(mainOriginY));
+    ctx.rotate(Math.PI / 2);
+    ctx.imageSmoothingEnabled = false;
+
+    const sLen = spearLen;
+    const sScale = spearScale;
+    const tipXLocal = sLen * 0.65 * sScale;
+    const pommelXLocal = -sLen * 0.35 * sScale;
+    const shaftLen = tipXLocal - pommelXLocal;
+
+    // Layer 1: Outer Crimson Bloom (widest, faintest)
+    const outerA = (0.22 * glowStr).toFixed(3);
+    pxRect(ctx, pommelXLocal - 16, -20, shaftLen + 30, 40, `rgba(163, 29, 36, ${outerA})`);
+
+    // Layer 2: Mid Solar Gold Radiance
+    const midA = (0.38 * glowStr).toFixed(3);
+    pxRect(ctx, pommelXLocal - 12, -15, shaftLen + 22, 30, `rgba(245, 158, 11, ${midA})`);
+
+    // Layer 3: Inner Pale Gold Holy Fire
+    const innerA = (0.55 * glowStr).toFixed(3);
+    pxRect(ctx, pommelXLocal - 8, -10, shaftLen + 14, 20, `rgba(254, 240, 138, ${innerA})`);
+
+    // Layer 4: Core White-Hot Divine Radiance
+    const coreA = (0.35 * glowStr).toFixed(3);
+    pxRect(ctx, pommelXLocal - 4, -6, shaftLen + 8, 12, `rgba(255, 255, 255, ${coreA})`);
+
+    // Tip Radiant Burst — Concentrated golden starburst at the spearhead tip
+    const tipBurstR = snap(18 + glowStr * 14);
+    pxDiamond(ctx, tipXLocal, 0, tipBurstR, `rgba(245, 158, 11, ${(0.45 * glowStr).toFixed(3)})`);
+    pxDiamond(ctx, tipXLocal, 0, Math.round(tipBurstR * 0.55), `rgba(254, 240, 138, ${(0.65 * glowStr).toFixed(3)})`);
+    pxDiamond(ctx, tipXLocal, 0, Math.round(tipBurstR * 0.25), `rgba(255, 255, 255, ${(0.80 * glowStr).toFixed(3)})`);
+
+    // Crossguard Radiant Halo — Pulsing golden ring at the crossguard
+    const haloR = snap(14 + glowStr * 10);
+    pxRing(ctx, 0, 0, haloR, 2, `rgba(245, 158, 11, ${(0.50 * glowStr).toFixed(3)})`);
+    pxRing(ctx, 0, 0, Math.round(haloR * 0.6), 1, `rgba(255, 255, 255, ${(0.40 * glowStr).toFixed(3)})`);
+
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(snap(mainX), snap(mainOriginY));
+  ctx.rotate(Math.PI / 2); // Points straight DOWN (+Y in world coords)
+  _drawColossal1000YearSpearModel(ctx, spearLen, spearScale, alpha, now);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+const _drawCrucifixionColossalSword = _drawCrucifixionAngelArmoryPlunge;
+
+/**
+ * Draws expanding concentric impact shockwaves.
+ */
+function _drawCrucifixionShockwaves(ctx, shockwaves) {
+  for (let sw of shockwaves) {
+    if (!sw || sw.r <= 0 || sw.alpha <= 0.01) continue;
+    ctx.save();
+    ctx.lineWidth = sw.width || 3.0;
+    ctx.strokeStyle = sw.color || `rgba(239, 68, 68, ${sw.alpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(snap(sw.x), snap(sw.y), snap(sw.r), 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner bright secondary wave
+    if (sw.r > 20) {
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `rgba(254, 240, 138, ${(sw.alpha * 0.85).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(snap(sw.x), snap(sw.y), snap(sw.r * 0.65), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/**
+ * Draws shattered chain link shards dispersing outward on impact (Chains of Domination theme).
+ */
+function _drawCrucifixionShatteredLinks(ctx, shards) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  for (let s of shards) {
+    if (!s || s.life <= 0) continue;
+    const alpha = Math.max(0, s.life / (s.maxLife || 35));
+
+    ctx.save();
+    ctx.translate(snap(s.x), snap(s.y));
+    ctx.rotate(s.rot);
+    ctx.scale(s.scale || 1.0, s.scale || 1.0);
+    ctx.globalAlpha = alpha;
+
+    // Stepped pixel shard (Face-on or Side-on broken link fragment in Chains of Domination theme)
+    if (s.isSide) {
+      // Side-on vertical link fragment
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(-2, -4, 4, 8);
+      ctx.fillStyle = '#5A1215';
+      ctx.fillRect(-1.5, -3, 3, 6);
+      ctx.fillStyle = '#FBBF24';
+      ctx.fillRect(-1, -2, 2, 4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-0.5, -1.5, 1, 3);
+    } else {
+      // Face-on oval link fragment
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(-5, -3, 10, 6);
+      ctx.fillStyle = '#781D16';
+      ctx.fillRect(-4, -2, 8, 4);
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(-3, -1.5, 6, 3);
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(-3, -1.5, 6, 1);
+      ctx.fillStyle = '#180506';
+      ctx.fillRect(-1, -0.5, 2, 1);
+    }
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+

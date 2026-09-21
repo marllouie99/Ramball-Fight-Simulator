@@ -61,22 +61,22 @@ export const escanorConfig = {
   theOneReachMultiplier: 1.45,  // +45% weapon attack reach (232px reach) during "THE ONE"
   prideReachBonusPerStack: 0.06,// +6% weapon attack reach per Solar Pride stack (+30% reach at 5 stacks)
   chopLiftFrames: 80,              // Frames to lift axe up from guard to high overhead (~0.33s)
-  chopLiftHoldFrames: 200,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
+  chopLiftHoldFrames: 350,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
   chopStrikeFrames: 24,            // Frames for the explosive downward chop stroke (~0.40s) with heavy follow-through
-  chopRecoveryFrames: 28,          // Frames to recover back to resting pose & wipe slash arc (~0.47s)
+  chopRecoveryFrames: 20,          // Frames to recover back to resting pose & wipe slash arc (~0.47s)
   chopHitPauseFrames: 10,          // Cinematic hit-pause frame freeze upon axe impact (~0.43s)
   chopHitTremorIntensity: 1.5,     // Micro-tremor amplitude (px) during mid-chop hit-pause for visceral blade resistance
   chopBladeRadius: 24,             // Half-width radius of Rhitta's crescent blade collision capsule (eliminates phantom hits)
   chopFrontalArcLimit: 1.34,       // Max angular offset from aim angle (rad, ~77°) to register forward cleave hit
   chopLungeSpeed: 4.5,             // Physical forward step momentum speed during the downward chop strike
-  basicImpactShake: 7.0,           // Concussive arena shake on initial weapon contact
+  basicImpactShake: 10.0,           // Concussive arena shake on initial weapon contact
   basicImpactShakeDuration: 12,
   basicUnpauseShake: 10.0,         // Heavy explosive arena shake on knockback release
   basicUnpauseShakeDuration: 18,
   basicMissShake: 4.5,             // Concussive ground shake on downward chop miss
   basicMissShakeDuration: 8,
-  basicDamageMin: 30,
-  basicDamageMax: 38,
+  basicDamageMin: 100,
+  basicDamageMax: 100,
   basicBurnDamage: 6,
   basicKnockback: 50.0,            // Heavy physical axe knockback launched on unpause
   basicHitStunFrames: 7,
@@ -113,4 +113,32 @@ export const escanorConfig = {
   theOneFinisherDamage: 115,
   theOneFinisherReach: 165,    // Expanded from 120 -> 165 to reflect his colossal giant reach during THE ONE
   theOneFinisherKnockback: 42.0,
+
+  // ──────────────────────────────────────────
+  // AUDIO CONFIGURATION & SOUND VOLUMES
+  // ──────────────────────────────────────────
+  sounds: {
+    weaponLift: 'Assets/Sound Effects/SkillEffects/Escanor-weapon-lift.mp3',
+    attack: 'Assets/Sound Effects/Attacks/Escanor-attack.mp3',
+    swordSwing: 'Assets/Sound Effects/Attacks/Escanor-attack.mp3',
+    chopHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    unpauseHit: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    cruelSun: 'Assets/Sound Effects/Attacks/flamespray1.mp3',
+    prideFlare: 'Assets/Sound Effects/Attacks/flamespray1.mp3',
+    theOne: 'Assets/Sound Effects/Attacks/laserbeam.mp3',
+    divineSword: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    armorParry: 'Assets/Sound Effects/Skills/parry.mp3'
+  },
+  soundVolumes: {
+    weaponLift: 1.0,
+    attack: 1.0,
+    swordSwing: 1.0,
+    chopHit: 0.95,
+    unpauseHit: 1.0,
+    cruelSun: 0.7,
+    prideFlare: 0.9,
+    theOne: 0.9,
+    divineSword: 1.0,
+    armorParry: 0.35
+  }
 };

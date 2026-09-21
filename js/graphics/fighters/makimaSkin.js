@@ -10,6 +10,7 @@
 
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 const P = 2.0;
 function snap(v) {
@@ -71,10 +72,10 @@ export function _drawMakimaHair(ctx, r, facingLeft = false) {
     // True visible hair bounding box:
     // X: [89, 410] (visible width 322, symmetrical horizontal center at 249.5)
     // Y: [43, 450] (visible height 408, crown top at 43, bang bottom at 234)
-    // Proportional volumetric scaling for round circular dome without flatness
     const targetHairWidth = r * 2.30 * wMult;
+    const targetHairHeight = r * 2.254 * hMult;
     const scaleX = targetHairWidth / 322;
-    const scaleY = scaleX * 0.98 * hMult; // Balanced vertical ratio to prevent flatness and maintain rounded crown
+    const scaleY = targetHairHeight / 322; // Decoupled from scaleX: width and height scale independently
     const drawW = 522 * scaleX;
     const drawH = 478 * scaleY;
     const drawX = -249.5 * scaleX + offX;
@@ -128,16 +129,28 @@ export function drawMakimaSkin(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
+  const isCrucifixion = !isPodiumPreview && !isSuppressed && Boolean(fighter.isExecutingCrucifixion || fighter.isExecutingRitual);
+  let crucifixionElapsed = 0;
+  if (isCrucifixion) {
+    const maxT = fighter.crucifixionMaxTimer || 140;
+    const curT = fighter.crucifixionTimer !== undefined ? fighter.crucifixionTimer : (fighter.ritualTimer || 0);
+    crucifixionElapsed = Math.max(0, maxT - curT);
+  }
+
   // ── LAYER 0: GROUND SUMMONING SEAL (Floor POV Under Makima) ──
   if (isSummoning) {
     _drawMakimaSummoningGroundSeal(ctx, r, chargePct, now);
+  } else if (isCrucifixion && crucifixionElapsed < 24) {
+    const prePct = Math.min(1.0, crucifixionElapsed / 20.0);
+    _drawMakimaSummoningGroundSeal(ctx, r, prePct, now);
   }
 
   // 1. Standard Upright Orientation & Local Angle Transforms (Rule 19)
-  const angle = isPodiumPreview ? 0 : (fighter.gunAngle || 0);
+  // When executing Crucifixion, her angle is strictly facing towards the user (Front POV upright: angle = 0, facingLeft = false)
+  const angle = (isPodiumPreview || isCrucifixion) ? 0 : (fighter.gunAngle || 0);
   ctx.rotate(angle);
 
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const facingLeft = !isCrucifixion && Math.abs(angle) > Math.PI / 2;
   if (facingLeft) {
     ctx.scale(1, -1);
   }
@@ -231,23 +244,27 @@ export function drawMakimaSkin(ctx, fighter) {
   }
 
   // ── LAYER 3: HANDS IN FRONT (On Top of Body) ──
-  // A. Left Hand (Chain Cast / Grip Hand on the Left Side in Front)
-  // Hidden by default; displayed only when she prepares/throws/tethers chains on an enemy (or summons)
-  if (!hideBackHand) {
-    if (isSummoning) {
-      _drawMakimaChannelingBackHand(ctx, r, chargePct, now, skinBase, skinShadow);
-    } else if (isPreparingChain || isThrowingChain || isTetheringChain) {
-      _drawMakimaLeftHand(ctx, r, throwProgress, isTetheringChain, isPreparingChain, isThrowingChain, now, skinBase, skinShadow, fighter);
+  if (isCrucifixion && !hideHandsAndWeapon) {
+    _drawMakimaCrucifixionHands(ctx, r, crucifixionElapsed, now, skinBase, skinShadow, fighter);
+  } else {
+    // A. Left Hand (Chain Cast / Grip Hand on the Left Side in Front)
+    // Hidden by default; displayed only when she prepares/throws/tethers chains on an enemy (or summons)
+    if (!hideBackHand) {
+      if (isSummoning) {
+        _drawMakimaChannelingBackHand(ctx, r, chargePct, now, skinBase, skinShadow);
+      } else if (isPreparingChain || isThrowingChain || isTetheringChain) {
+        _drawMakimaLeftHand(ctx, r, throwProgress, isTetheringChain, isPreparingChain, isThrowingChain, now, skinBase, skinShadow, fighter);
+      }
     }
-  }
 
-  // B. Right Hand (Gunhand on the Right Side in Front)
-  if (!hideFrontHand) {
-    if (isSummoning) {
-      _drawMakimaRaisedCommandHand(ctx, r, chargePct, now, skinBase, skinShadow);
-    } else {
-      // Front hand always maintains her iconic finger-gun sign ("Bang!")
-      drawMakimaPixelFingerGun(ctx, frontX, frontY, rawProgress, r, isShooting, isPreparingBang, windupProgress);
+    // B. Right Hand (Gunhand on the Right Side in Front)
+    if (!hideFrontHand) {
+      if (isSummoning) {
+        _drawMakimaRaisedCommandHand(ctx, r, chargePct, now, skinBase, skinShadow);
+      } else {
+        // Front hand always maintains her iconic finger-gun sign ("Bang!")
+        drawMakimaPixelFingerGun(ctx, frontX, frontY, rawProgress, r, isShooting, isPreparingBang, windupProgress);
+      }
     }
   }
 
@@ -903,109 +920,74 @@ function _drawMakimaSummoningAura(ctx, r, chargePct, now) {
 }
 
 /**
- * Draws Makima's Back Hand resting calmly on her waist / hip in commanding authority.
+ * Draws Makima's Back Hand resting calmly on her left side in commanding authority.
+ * Uses standard round pixel hand on the left side of her body (-r * 0.85).
  */
 function _drawMakimaChannelingBackHand(ctx, r, chargePct, now, skinBase, skinShadow) {
   ctx.save();
-  ctx.translate(snap(-r * 0.36), snap(r * 0.38));
   ctx.imageSmoothingEnabled = false;
 
-  // 1. Crisp White Shirt Sleeve Cuff at -X side
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(snap(-8), snap(-4), 5, 8);
+  const handX = snap(-r * 0.85);
+  const handY = snap(r * 0.24);
+  const handRadius = getHandSize(7.2);
+  const skinOutline = '#0E0F14';
+
+  // Crisp White Shirt Sleeve Cuff behind hand at outer left side
+  ctx.fillStyle = skinOutline;
+  ctx.fillRect(snap(handX - 5), snap(handY - 4), 6, 8);
   ctx.fillStyle = '#FAFBF6';
-  ctx.fillRect(snap(-7), snap(-3), 3, 6);
+  ctx.fillRect(snap(handX - 4), snap(handY - 3), 4, 6);
   ctx.fillStyle = '#D4D8CB';
-  ctx.fillRect(snap(-7), snap(1), 3, 2);
+  ctx.fillRect(snap(handX - 4), snap(handY + 1), 4, 2);
 
-  // 2. Hand Resting on Hip (Curled fingers against waistband)
-  const handW = 7.0;
-  const handH = 6.5;
-
-  // Dark Outline
-  ctx.fillStyle = '#0E0F14';
-  ctx.fillRect(snap(-3), snap(-3.5), handW + 2, handH + 2);
-
-  // Base Skin
-  ctx.fillStyle = skinBase;
-  ctx.fillRect(snap(-2), snap(-2.5), handW, handH);
-
-  // Knuckle Depth Shadow
-  ctx.fillStyle = skinShadow;
-  ctx.fillRect(snap(-2), snap(0.5), handW, 3);
-
-  // Knuckle Highlight
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(snap(-2), snap(-2.5), handW - 2, 2);
-
+  // Standard Round Pixel Hand
+  drawPixelHand(ctx, handX, handY, handRadius, skinBase, skinOutline);
   ctx.restore();
 }
 
 /**
  * Draws Makima's Raised Front Hand Gesturing Skyward towards the Angel Halo.
+ * Uses standard round pixel hand on the right side of her body (+r * 0.85).
  * Features:
- * - Public Safety crisp white sleeve extending from body to wrist
- * - Stepped pixel open palm with 4 extended fingers pointing toward -Y (halo)
- * - Thumb extended outward along +X
+ * - Crisp white shirt cuff
+ * - Standard round pixel hand via drawPixelHand
  * - Orbiting Stepped Golden Sacred Wrist Rings
  * - Ascending fingertip sparks and light motes
  */
 function _drawMakimaRaisedCommandHand(ctx, r, chargePct, now, skinBase, skinShadow) {
   ctx.save();
-  // Hand positioned raised towards overhead halo (-Y)
-  const handX = snap(r * 0.22);
-  const handY = snap(-r * 0.96);
-  ctx.translate(handX, handY);
   ctx.imageSmoothingEnabled = false;
 
   const skinOutline = '#0E0F14';
-  const skinHighlight = '#FFFFFF';
-  const skinDeepShadow = '#D49B85';
+  const handX = snap(r * 0.85);
+  const handY = snap(-r * 0.35);
+  const handRadius = getHandSize(7.2);
 
-  // ── 1. PUBLIC SAFETY SLEEVE (Extending upward from body circle) ──
-  const sleeveStartX = -snap(r * 0.12);
-  const sleeveStartY = snap(r * 0.55);
-  const sleeveW = 7.0;
-
-  // Sleeve Outline
+  // Crisp White Shirt Sleeve Cuff behind hand
   ctx.fillStyle = skinOutline;
-  ctx.fillRect(snap(sleeveStartX - 1), 0, sleeveW + 2, snap(sleeveStartY + 1));
-
-  // Sleeve Fabric White
+  ctx.fillRect(snap(handX - 2), snap(handY + 3), 6, 6);
   ctx.fillStyle = '#FAFBF6';
-  ctx.fillRect(snap(sleeveStartX), 0, sleeveW, snap(sleeveStartY));
+  ctx.fillRect(snap(handX - 1), snap(handY + 4), 4, 4);
 
-  // Sleeve Fabric Shading & Crease
-  ctx.fillStyle = '#D4D8CB';
-  ctx.fillRect(snap(sleeveStartX + sleeveW - 2.5), 0, 2.5, snap(sleeveStartY));
-  ctx.fillStyle = '#B9BEAE';
-  ctx.fillRect(snap(sleeveStartX + sleeveW - 1), snap(sleeveStartY * 0.4), 1, snap(sleeveStartY * 0.6));
+  // Standard Round Pixel Hand
+  drawPixelHand(ctx, handX, handY, handRadius, skinBase, skinOutline);
 
-  // Crisp White Shirt Cuff Band at Wrist (Y = 0)
-  ctx.fillStyle = skinOutline;
-  ctx.fillRect(snap(sleeveStartX - 1.5), snap(-3.5), sleeveW + 3, 5);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(snap(sleeveStartX - 0.5), snap(-2.5), sleeveW + 1, 3);
-  // Pearl Button
-  ctx.fillStyle = '#E8ECE0';
-  ctx.fillRect(snap(sleeveStartX + 1.5), snap(-1.5), P, P);
-
-  // ── 2. ORBITING STEPPED GOLDEN SACRED WRIST RINGS ──
+  // Orbiting Golden Sacred Wrist Rings around the raised round hand
   const rotRing = now * 0.012;
   ctx.save();
-  ctx.translate(snap(sleeveStartX + sleeveW * 0.5), snap(-2));
+  ctx.translate(handX, handY);
   ctx.rotate(rotRing);
 
-  // Inner Ring (r: 9px)
-  _pxRingLocal(ctx, 0, 0, 9, 2, `rgba(254, 240, 138, ${(chargePct * 0.95).toFixed(3)})`);
-  // Outer Ring (r: 14px)
-  _pxRingLocal(ctx, 0, 0, 14, 2, `rgba(245, 158, 11, ${(chargePct * 0.85).toFixed(3)})`);
+  // Inner Ring (r: 8px)
+  _pxRingLocal(ctx, 0, 0, 8, 2, `rgba(254, 240, 138, ${(chargePct * 0.95).toFixed(3)})`);
+  // Outer Ring (r: 12px)
+  _pxRingLocal(ctx, 0, 0, 12, 1.5, `rgba(245, 158, 11, ${(chargePct * 0.85).toFixed(3)})`);
 
-  // 4 Cardinal Pixel Diamonds on Orbiting Wrist Ring
+  // 4 Cardinal Pixel Diamonds on Orbiting Ring
   for (let d = 0; d < 4; d++) {
     const da = (d * Math.PI) / 2;
-    const dx = snap(Math.cos(da) * 14);
-    const dy = snap(Math.sin(da) * 14);
+    const dx = snap(Math.cos(da) * 12);
+    const dy = snap(Math.sin(da) * 12);
     ctx.fillStyle = '#0E0F14';
     ctx.fillRect(dx - P, dy - P, P * 2, P * 2);
     ctx.fillStyle = '#FFFFFF';
@@ -1013,95 +995,19 @@ function _drawMakimaRaisedCommandHand(ctx, r, chargePct, now, skinBase, skinShad
   }
   ctx.restore();
 
-  // ── 3. PALM BASE & EXTENDED SKYWARD FINGERS (-Y) ──
-  ctx.save();
-  ctx.translate(snap(sleeveStartX + sleeveW * 0.5), snap(-4));
-
-  // Palm Base Block (Width 9px, Height 6px)
-  const palmW = 9.0;
-  const palmH = 6.0;
-  const palmHalfW = palmW * 0.5;
-
-  // Palm Outline
-  ctx.fillStyle = skinOutline;
-  ctx.fillRect(snap(-palmHalfW - 1), snap(-palmH - 1), palmW + 2, palmH + 2);
-
-  // Palm Core
-  ctx.fillStyle = skinBase;
-  ctx.fillRect(snap(-palmHalfW), snap(-palmH), palmW, palmH);
-
-  // Palm Shading & Creases
-  ctx.fillStyle = skinShadow;
-  ctx.fillRect(snap(-palmHalfW), snap(-2), palmW, 2);
-  ctx.fillStyle = skinDeepShadow;
-  ctx.fillRect(snap(-1), snap(-palmH + 2), 2, 2);
-
-  // ── 4 Extended Skyward Fingers (-Y) ──
-  // Fingers: Pinky, Ring, Middle, Index (Left to Right along X)
-  const fingers = [
-    { x: snap(-palmHalfW + 0.5), len: 8.5, w: 2.0 },  // Pinky
-    { x: snap(-palmHalfW + 2.8), len: 11.0, w: 2.2 }, // Ring
-    { x: snap(-palmHalfW + 5.2), len: 13.0, w: 2.4 }, // Middle (Apex)
-    { x: snap(-palmHalfW + 7.6), len: 10.5, w: 2.2 }  // Index
-  ];
-
-  for (let f = 0; f < fingers.length; f++) {
-    const fg = fingers[f];
-    const tipY = snap(-palmH - fg.len);
-
-    // Finger Outline
-    ctx.fillStyle = skinOutline;
-    ctx.fillRect(snap(fg.x - 0.5), snap(tipY - 1), fg.w + 1, fg.len + 2);
-
-    // Finger Skin
-    ctx.fillStyle = skinBase;
-    ctx.fillRect(snap(fg.x), snap(tipY), fg.w, fg.len);
-
-    // Fingertip Highlight
-    ctx.fillStyle = skinHighlight;
-    ctx.fillRect(snap(fg.x), snap(tipY), fg.w, P);
-
-    // Knuckle Crease
-    ctx.fillStyle = skinDeepShadow;
-    ctx.fillRect(snap(fg.x), snap(tipY + fg.len * 0.45), fg.w, 1.0);
-  }
-
-  // ── Extended Thumb along +X ──
-  const thumbLen = 7.0;
-  const thumbW = 2.4;
-  const thumbX = snap(palmHalfW);
-  const thumbY = snap(-palmH + 1.5);
-
-  // Thumb Outline
-  ctx.fillStyle = skinOutline;
-  ctx.fillRect(snap(thumbX), snap(thumbY - 1), thumbLen + 1, thumbW + 2);
-  // Thumb Skin
-  ctx.fillStyle = skinBase;
-  ctx.fillRect(snap(thumbX + 0.5), snap(thumbY), thumbLen, thumbW);
-  // Thumb Highlight & Nail
-  ctx.fillStyle = skinHighlight;
-  ctx.fillRect(snap(thumbX + thumbLen - P), snap(thumbY), P, thumbW);
-
-  // ── 4. FINGERTIP LIGHT MOTES & SPARK CONVERGENCE ──
-  const sparkCount = 4;
-  for (let s = 0; s < sparkCount; s++) {
+  // Ascending sparks and light motes
+  for (let s = 0; s < 4; s++) {
     const sPhase = ((now * 0.005 + s * 0.25) % 1.0);
-    const sY = snap(-palmH - 14 - sPhase * 18);
-    const sX = snap((s - 1.5) * 4.5 + Math.sin(now * 0.01 + s) * 2.5);
+    const sY = snap(handY - 6 - sPhase * 16);
+    const sX = snap(handX + (s - 1.5) * 3.5 + Math.sin(now * 0.01 + s) * 2.0);
     const sAlpha = Math.sin(sPhase * Math.PI) * chargePct * 0.95;
 
     ctx.fillStyle = (s % 2 === 0)
       ? `rgba(255, 255, 255, ${sAlpha.toFixed(3)})`
       : `rgba(254, 240, 138, ${sAlpha.toFixed(3)})`;
     ctx.fillRect(sX, sY, P, P);
-
-    if (sPhase < 0.5) {
-      ctx.fillStyle = `rgba(245, 158, 11, ${(sAlpha * 0.7).toFixed(3)})`;
-      ctx.fillRect(sX - 1, sY - 1, P * 1.5, P * 1.5);
-    }
   }
 
-  ctx.restore();
   ctx.restore();
 }
 
@@ -1119,6 +1025,382 @@ function _pxRingLocal(ctx, x, y, radius, thickness = 2, color = '#FFFFFF', isDot
     const pxY = snap(y + Math.sin(a) * radius);
     ctx.fillRect(pxX, pxY, thickness, thickness);
   }
+}
+
+/**
+ * Local Stepped Pixel Diamond Helper.
+ */
+function _pxDiamond(ctx, x, y, size, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(snap(x), snap(y - size));
+  ctx.lineTo(snap(x + size), snap(y));
+  ctx.lineTo(snap(x), snap(y + size));
+  ctx.lineTo(snap(x - size), snap(y));
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * Master hand animator for Makima's Crucifixion Ultimate.
+ * Adheres strictly to:
+ * - Round shape pixel hands rendered via drawPixelHand (Rule 20)
+ * - Placement on the SIDES of her body (-X left side, +X right side), NEVER clustered in the middle
+ * - Upright Front POV orientation (Rule 19) and zero shadowBlur (Rule 11)
+ *
+ * Phases:
+ * 1. elapsed < 24: Pre-Chain Channeling at both sides of her body -> release burst
+ * 2. 24 <= elapsed < 46: Anchoring Chain Leash on left side & Smooth Right Hand Elevation along right side
+ * 3. 46 <= elapsed < 85: Angel's Armory Celestial Summon (46..65) & Downward Plunge Command (65..85)
+ * 4. 85 <= elapsed <= 140: Resolute execution stance & recovery
+ */
+function _drawMakimaCrucifixionHands(ctx, r, elapsed, now, skinBase, skinShadow, fighter) {
+  const handRadius = getHandSize(7.2);
+  const skinOutline = '#0E0F14';
+
+  if (elapsed < 24) {
+    _drawMakimaCrucifixionPreChainHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline);
+  } else if (elapsed < 46) {
+    _drawMakimaCrucifixionLeashAndSkywardHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline);
+  } else if (elapsed < 85) {
+    _drawMakimaCrucifixionAngelArmoryHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline, fighter);
+  } else {
+    _drawMakimaCrucifixionRecoveryHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline);
+  }
+}
+
+/**
+ * 1. Pre-Chain Channeling Animation (elapsed < 24):
+ * Makima channels the Chains of Domination with round hands positioned symmetrically
+ * on the SIDES of her body (-r * 0.85 on left side and +r * 0.85 on right side).
+ * Weaves crimson & solar gold rings/filaments around both round hands.
+ * At elapsed = 20..24, both round hands burst slightly outward ("UNLEASH!").
+ */
+function _drawMakimaCrucifixionPreChainHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const channelPct = Math.min(1.0, elapsed / 20.0);
+  const baseY = snap(r * 0.24);
+  const bobY = Math.sin(now * 0.012) * 1.5;
+
+  if (elapsed <= 20) {
+    // ── Phase 1A: Round Hands at Sides Weaving Domination Power ──
+    const leftX = snap(-r * 0.85);
+    const rightX = snap(r * 0.85);
+    const handY = snap(baseY + bobY);
+
+    // Crisp White Shirt Cuffs behind hands on outer edges
+    // Left Cuff
+    ctx.fillStyle = skinOutline;
+    ctx.fillRect(snap(leftX - 5), snap(handY - 4), 6, 8);
+    ctx.fillStyle = '#FAFBF6';
+    ctx.fillRect(snap(leftX - 4), snap(handY - 3), 4, 6);
+    ctx.fillStyle = '#D4D8CB';
+    ctx.fillRect(snap(leftX - 4), snap(handY + 1), 4, 2);
+
+    // Right Cuff
+    ctx.fillStyle = skinOutline;
+    ctx.fillRect(snap(rightX - 1), snap(handY - 4), 6, 8);
+    ctx.fillStyle = '#FAFBF6';
+    ctx.fillRect(snap(rightX), snap(handY - 3), 4, 6);
+    ctx.fillStyle = '#D4D8CB';
+    ctx.fillRect(snap(rightX), snap(handY + 1), 4, 2);
+
+    // Standard Round Pixel Hands on left and right sides
+    drawPixelHand(ctx, leftX, handY, handRadius, skinBase, skinOutline);
+    drawPixelHand(ctx, rightX, handY, handRadius, skinBase, skinOutline);
+
+    // Golden & Crimson Domination Energy Rings weaving around each round hand at her sides
+    const ringR = snap(6 + ((now * 0.025 + elapsed * 0.8) % 14));
+    const ringAlpha = (1.0 - (ringR / 14)) * channelPct * 0.85;
+    _pxRingLocal(ctx, leftX, handY, ringR, 1.5, `rgba(245, 158, 11, ${ringAlpha.toFixed(3)})`);
+    _pxRingLocal(ctx, rightX, handY, ringR, 1.5, `rgba(245, 158, 11, ${ringAlpha.toFixed(3)})`);
+
+    const innerRingR = snap(4 + ((now * 0.035 + elapsed * 0.6) % 10));
+    const innerRingAlpha = (1.0 - (innerRingR / 10)) * channelPct * 0.70;
+    _pxRingLocal(ctx, leftX, handY, innerRingR, 1.2, `rgba(163, 29, 36, ${innerRingAlpha.toFixed(3)})`);
+    _pxRingLocal(ctx, rightX, handY, innerRingR, 1.2, `rgba(163, 29, 36, ${innerRingAlpha.toFixed(3)})`);
+
+    // Rotating Domination Rune Diamonds at each hand
+    const diaSize = 3.5 + Math.sin(now * 0.015) * 1.0;
+    _pxDiamond(ctx, leftX, handY, diaSize, '#FEF08A');
+    _pxDiamond(ctx, leftX, handY, diaSize * 0.5, '#A31D24');
+    _pxDiamond(ctx, rightX, handY, diaSize, '#FEF08A');
+    _pxDiamond(ctx, rightX, handY, diaSize * 0.5, '#A31D24');
+
+    // Ascending Stepped Light Motes on both sides
+    for (let m = 0; m < 3; m++) {
+      const mPhase = ((now * 0.006 + m * 0.33) % 1.0);
+      const mAlpha = Math.sin(mPhase * Math.PI) * channelPct * 0.80;
+      const col = (m % 2 === 0) ? `rgba(254, 240, 138, ${mAlpha.toFixed(3)})` : `rgba(255, 255, 255, ${mAlpha.toFixed(3)})`;
+      ctx.fillStyle = col;
+      ctx.fillRect(snap(leftX + Math.sin(m * 2.1 + now * 0.008) * 4), snap(handY - mPhase * 14), P, P);
+      ctx.fillRect(snap(rightX + Math.cos(m * 2.1 + now * 0.008) * 4), snap(handY - mPhase * 14), P, P);
+    }
+  } else {
+    // ── Phase 1B: Release Burst ("UNLEASH!") at elapsed = 20..24 ──
+    const burstP = (elapsed - 20) / 4.0;
+    const burstSpread = snap(burstP * 4.0);
+    const leftX = snap(-r * 0.85 - burstSpread);
+    const rightX = snap(r * 0.85 + burstSpread);
+    const handY = snap(baseY);
+
+    // Cuffs
+    ctx.fillStyle = skinOutline;
+    ctx.fillRect(snap(leftX - 5), snap(handY - 4), 6, 8);
+    ctx.fillRect(snap(rightX - 1), snap(handY - 4), 6, 8);
+    ctx.fillStyle = '#FAFBF6';
+    ctx.fillRect(snap(leftX - 4), snap(handY - 3), 4, 6);
+    ctx.fillRect(snap(rightX), snap(handY - 3), 4, 6);
+
+    // Round Hands pushed outward on the sides of her body
+    drawPixelHand(ctx, leftX, handY, handRadius, skinBase, skinOutline);
+    drawPixelHand(ctx, rightX, handY, handRadius, skinBase, skinOutline);
+
+    // Expanding Release Burst Shockwave Rings from each hand at the sides
+    const burstR = snap(8 + burstP * 18);
+    const burstAlpha = (1.0 - burstP * 0.5).toFixed(3);
+    _pxRingLocal(ctx, leftX, handY, burstR, 2.0, `rgba(245, 158, 11, ${burstAlpha})`);
+    _pxRingLocal(ctx, rightX, handY, burstR, 2.0, `rgba(245, 158, 11, ${burstAlpha})`);
+    _pxRingLocal(ctx, leftX, handY, snap(burstR * 0.6), 1.5, `rgba(255, 255, 255, ${burstAlpha})`);
+    _pxRingLocal(ctx, rightX, handY, snap(burstR * 0.6), 1.5, `rgba(255, 255, 255, ${burstAlpha})`);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Left Hand firmly gripping the chain leash on the LEFT SIDE of her body (-r * 0.85).
+ * Anchors the golden tether to the crucified victim with standard round shape hand.
+ */
+function _drawMakimaLeashGripHand(ctx, r, now, skinBase, skinShadow, handRadius, skinOutline) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const handX = snap(-r * 0.85);
+  const handY = snap(r * 0.24);
+
+  // Crisp White Shirt Sleeve Cuff behind hand at outer left side
+  ctx.fillStyle = skinOutline;
+  ctx.fillRect(snap(handX - 5), snap(handY - 4), 6, 8);
+  ctx.fillStyle = '#FAFBF6';
+  ctx.fillRect(snap(handX - 4), snap(handY - 3), 4, 6);
+  ctx.fillStyle = '#D4D8CB';
+  ctx.fillRect(snap(handX - 4), snap(handY + 1), 4, 2);
+
+  // Standard Round Shape Hand
+  drawPixelHand(ctx, handX, handY, handRadius, skinBase, skinOutline);
+
+  // Clutched Golden Chain Link inside hand
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(handX - 2), snap(handY - 1), 6, 4);
+  ctx.fillStyle = '#781D16';
+  ctx.fillRect(snap(handX - 1), snap(handY), 4, 2);
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(snap(handX), snap(handY), 2, 2);
+
+  // Taut Chain Leash extending downward from hand toward floor/enemy
+  const chainEndY = snap(handY + 22);
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(snap(handX + 1), snap(handY + 3), 4, chainEndY - (handY + 3));
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(snap(handX + 2), snap(handY + 3), 2, chainEndY - (handY + 3));
+  ctx.fillStyle = '#FEF08A';
+  ctx.fillRect(snap(handX + 2.5), snap(handY + 3), 1, chainEndY - (handY + 3));
+
+  ctx.restore();
+}
+
+/**
+ * 2. Intermediate Tethering Phase (elapsed = 24..46):
+ * Left Round Hand holds chain leash on left side (-r * 0.85).
+ * Right Round Hand transitions smoothly skyward on right side (+r * 0.85).
+ */
+function _drawMakimaCrucifixionLeashAndSkywardHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  // 1. Left Hand: Gripping Chain Leash on Left Side (-r * 0.85, r * 0.24)
+  _drawMakimaLeashGripHand(ctx, r, now, skinBase, skinShadow, handRadius, skinOutline);
+
+  // 2. Right Hand: Transitioning smoothly skyward along Right Side (+r * 0.85)
+  const raiseP = Math.min(1.0, (elapsed - 24) / 22.0);
+  const rightX = snap(r * 0.85);
+  const startY = snap(r * 0.24);
+  const endY = snap(-r * 0.35);
+  const curHandY = snap(startY + (endY - startY) * raiseP);
+
+  // Crisp White Shirt Cuff behind right hand
+  ctx.fillStyle = skinOutline;
+  ctx.fillRect(snap(rightX - 1), snap(curHandY + 2), 6, 6);
+  ctx.fillStyle = '#FAFBF6';
+  ctx.fillRect(snap(rightX), snap(curHandY + 3), 4, 4);
+
+  // Standard Round Shape Hand
+  drawPixelHand(ctx, rightX, curHandY, handRadius, skinBase, skinOutline);
+
+  // Subtle golden wrist glow in transition
+  _pxRingLocal(ctx, rightX, curHandY, 7, 1.2, `rgba(245, 158, 11, ${(0.6 * raiseP).toFixed(3)})`);
+
+  ctx.restore();
+}
+
+/**
+ * 3. Angel's Armory Plunge Animation (elapsed = 46..85):
+ * - elapsed 46..65: Right Round Hand raised skyward on right side (+r * 0.85) directing high-altitude descent with orbiting golden rings
+ * - elapsed 65..85: Right Round Hand SNAPS DOWNWARD along right side into commanding execution drop ("DROP!") with divine tracer beam
+ */
+function _drawMakimaCrucifixionAngelArmoryHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline, fighter) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  // 1. Left Hand: Firmly gripping chain leash on Left Side throughout entire Armory sequence
+  _drawMakimaLeashGripHand(ctx, r, now, skinBase, skinShadow, handRadius, skinOutline);
+
+  // 2. Right Hand Animation on Right Side:
+  if (elapsed < 65) {
+    // Skyward Raised Command Hand with Orbiting Sacred Rings along Right Side (+r * 0.85)
+    const chargePct = Math.min(1.0, (elapsed - 46) / 18.0);
+    const rightX = snap(r * 0.85);
+    const rightY = snap(-r * 0.35);
+
+    // Crisp White Shirt Cuff
+    ctx.fillStyle = skinOutline;
+    ctx.fillRect(snap(rightX - 2), snap(rightY + 3), 6, 6);
+    ctx.fillStyle = '#FAFBF6';
+    ctx.fillRect(snap(rightX - 1), snap(rightY + 4), 4, 4);
+
+    // Standard Round Shape Hand
+    drawPixelHand(ctx, rightX, rightY, handRadius, skinBase, skinOutline);
+
+    // Orbiting Stepped Golden Sacred Wrist Rings around the raised round hand
+    const rotRing = now * 0.012;
+    ctx.save();
+    ctx.translate(rightX, rightY);
+    ctx.rotate(rotRing);
+
+    _pxRingLocal(ctx, 0, 0, 8, 2, `rgba(254, 240, 138, ${(chargePct * 0.95).toFixed(3)})`);
+    _pxRingLocal(ctx, 0, 0, 12, 1.5, `rgba(245, 158, 11, ${(chargePct * 0.85).toFixed(3)})`);
+
+    for (let d = 0; d < 4; d++) {
+      const da = (d * Math.PI) / 2;
+      const dx = snap(Math.cos(da) * 12);
+      const dy = snap(Math.sin(da) * 12);
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(dx - P, dy - P, P * 2, P * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(dx - P * 0.5, dy - P * 0.5, P, P);
+    }
+    ctx.restore();
+
+    // Ascending fingertip sparks and light motes
+    for (let s = 0; s < 4; s++) {
+      const sPhase = ((now * 0.005 + s * 0.25) % 1.0);
+      const sY = snap(rightY - 6 - sPhase * 16);
+      const sX = snap(rightX + (s - 1.5) * 3.5 + Math.sin(now * 0.01 + s) * 2.0);
+      const sAlpha = Math.sin(sPhase * Math.PI) * chargePct * 0.95;
+
+      ctx.fillStyle = (s % 2 === 0)
+        ? `rgba(255, 255, 255, ${sAlpha.toFixed(3)})`
+        : `rgba(254, 240, 138, ${sAlpha.toFixed(3)})`;
+      ctx.fillRect(sX, sY, P, P);
+    }
+  } else {
+    // Execution Drop Gesture: Right round hand snaps downward on right side ("DROP!")
+    const dropPct = Math.min(1.0, (elapsed - 65) / 15.0);
+    _drawMakimaDownwardDropCommandHand(ctx, r, dropPct, now, skinBase, skinShadow, elapsed, handRadius, skinOutline);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Right Round Hand pointing forcefully downward in commanding execution drop gesture ("DROP!") on RIGHT SIDE.
+ * Emits a brilliant needle ray of celestial light and compression shockwave diamonds.
+ */
+function _drawMakimaDownwardDropCommandHand(ctx, r, dropPct, now, skinBase, skinShadow, elapsed, handRadius, skinOutline) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const easeDrop = 1.0 - Math.pow(1.0 - dropPct, 3.0);
+  const handX = snap(r * 0.85);
+  const startY = snap(-r * 0.35);
+  const endY = snap(r * 0.36);
+  const handY = snap(startY + (endY - startY) * easeDrop);
+
+  // Crisp White Shirt Cuff Band directly above the round hand
+  ctx.fillStyle = skinOutline;
+  ctx.fillRect(snap(handX - 3), snap(handY - 7), 6, 6);
+  ctx.fillStyle = '#FAFBF6';
+  ctx.fillRect(snap(handX - 2), snap(handY - 6), 4, 4);
+
+  // Standard Round Shape Hand on the right side of her body
+  drawPixelHand(ctx, handX, handY, handRadius, skinBase, skinOutline);
+
+  // ── DIVINE COMMAND TRACER BEAM & COMPRESSION DIAMONDS ──
+  const beamIntensity = Math.min(1.0, easeDrop * 1.2);
+  const beamLen = snap(60 + easeDrop * 40);
+  const beamStartY = snap(handY + handRadius);
+
+  ctx.save();
+  // Outer Amber Halo
+  ctx.fillStyle = `rgba(245, 158, 11, ${(0.45 * beamIntensity).toFixed(3)})`;
+  ctx.fillRect(snap(handX - 3), beamStartY, 7, beamLen);
+
+  // Solar Gold Core
+  ctx.fillStyle = `rgba(254, 240, 138, ${(0.85 * beamIntensity).toFixed(3)})`;
+  ctx.fillRect(snap(handX - 1.5), beamStartY, 4, beamLen);
+
+  // Pure White Kinetic Spine
+  ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * beamIntensity).toFixed(3)})`;
+  ctx.fillRect(snap(handX - 0.5), beamStartY, 2, beamLen - 4);
+
+  // Stepped Compression Diamonds traveling down the beam
+  _pxDiamond(ctx, handX + 0.5, beamStartY + 8, 3.5, '#FFFFFF');
+  _pxDiamond(ctx, handX + 0.5, beamStartY + 22, 4.5, '#FEF08A');
+  _pxDiamond(ctx, handX + 0.5, beamStartY + 42, 5.5, '#F59E0B');
+
+  // Pulsing Divine Command Ring at Wrist/Hand
+  _pxRingLocal(ctx, handX, handY, snap(8 + Math.sin(now * 0.02) * 1.5), 1.5, `rgba(245, 158, 11, ${(0.8 * beamIntensity).toFixed(3)})`);
+  _pxRingLocal(ctx, handX, handY, 5, 1.2, `rgba(254, 240, 138, ${(0.9 * beamIntensity).toFixed(3)})`);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
+ * 4. Post-Impact Recovery Phase (elapsed = 85..140):
+ * Right round hand smoothly returns to her right side while left round hand rests on her left side.
+ */
+function _drawMakimaCrucifixionRecoveryHands(ctx, r, elapsed, now, skinBase, skinShadow, handRadius, skinOutline) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const recoverP = Math.min(1.0, (elapsed - 85) / 35.0);
+
+  // Left Hand: Resting calmly on left side (-r * 0.85, r * 0.24)
+  const leftX = snap(-r * 0.85);
+  const leftY = snap(r * 0.24);
+  ctx.fillStyle = skinOutline;
+  ctx.fillRect(snap(leftX - 5), snap(leftY - 4), 6, 8);
+  ctx.fillStyle = '#FAFBF6';
+  ctx.fillRect(snap(leftX - 4), snap(leftY - 3), 4, 6);
+  drawPixelHand(ctx, leftX, leftY, handRadius, skinBase, skinOutline);
+
+  // Right Hand: Lowering smoothly from drop stance (r * 0.36) back to rest level (r * 0.24) on right side (r * 0.85)
+  const rightX = snap(r * 0.85);
+  const startY = snap(r * 0.36);
+  const endY = snap(r * 0.24);
+  const curY = snap(startY + (endY - startY) * recoverP);
+
+  ctx.fillStyle = skinOutline;
+  ctx.fillRect(snap(rightX - 1), snap(curY - 4), 6, 8);
+  ctx.fillStyle = '#FAFBF6';
+  ctx.fillRect(snap(rightX), snap(curY - 3), 4, 6);
+  drawPixelHand(ctx, rightX, curY, handRadius, skinBase, skinOutline);
+
+  ctx.restore();
 }
 
 /**

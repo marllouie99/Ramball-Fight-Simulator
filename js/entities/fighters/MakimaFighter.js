@@ -16,7 +16,7 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SPEED_MULTIPLIER, MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawMakimaSkin } from '../../graphics/fighters/makimaSkin.js';
-import { drawMakimaChainsOfDomination, drawMakimaMissedChains, getMakimaChainOrigin, resolveMakimaChainsSpeed, drawMakimaAngelSpearSummon, drawMakimaAngelSpearFlight, drawMakimaHolyCrossExplosion, spawnMakimaChainBreakEffect, drawMakimaChainBreakEffects } from '../../graphics/weapons/makimaWeaponGraphics.js';
+import { drawMakimaChainsOfDomination, drawMakimaMissedChains, getMakimaChainOrigin, resolveMakimaChainsSpeed, drawMakimaAngelSpearSummon, drawMakimaAngelSpearFlight, drawMakimaHolyCrossExplosion, spawnMakimaChainBreakEffect, drawMakimaChainBreakEffects, drawMakimaCrucifixionUltimate } from '../../graphics/weapons/makimaWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect, spawnFatalBloodSplash, spawnMakimaBloodShatter } from '../../graphics/particles/bloodEffect.js';
 import { spawnDeathShatter } from '../../graphics/particles/deathShatterEffect.js';
@@ -109,12 +109,29 @@ export class MakimaFighter extends Fighter {
     this.activeHolyExplosions = [];
     this.activeHalberds = [];
 
-    // Ultimate: Kyoto Shrine Ritual: Gravitational Splatter
-    this.shrineCooldownMax = cfg.shrineCooldown || 1920;
-    this.shrineCooldown = this.shrineCooldownMax;
+    // Ultimate: Crucifixion (Drop of Dominion) / Kyoto Shrine Ritual
+    const ultCd = (typeof cfg.crucifixionCooldown === 'number') ? cfg.crucifixionCooldown : ((typeof cfg.shrineCooldown === 'number') ? cfg.shrineCooldown : 1920);
+    this.crucifixionCooldownMax = ultCd;
+    this.crucifixionCooldown = this.crucifixionCooldownMax;
+    this.shrineCooldownMax = this.crucifixionCooldownMax;
+    this.shrineCooldown = this.crucifixionCooldownMax;
+    this.isCrucifixionSliding = false;
+    this.crucifixionSlideTimer = 0;
+    this.crucifixionSlideMaxTimer = 16;
+    this.crucifixionPendingTarget = null;
+    this.isExecutingCrucifixion = false;
+    this.crucifixionTimer = 0;
+    this.crucifixionMaxTimer = cfg.crucifixionDurationFrames || 140;
+    this.crucifixionImpactFrame = cfg.crucifixionImpactFrame || 80;
+    this.crucifixionTarget = null;
+    this.crucifixionStage = 0;
+    this.crucifixionWhiteFlashTimer = 0;
+    this.crucifixionShockwaves = [];
+    this.crucifixionShatteredLinks = [];
+    // Backwards compatibility aliases:
     this.isExecutingRitual = false;
     this.ritualTimer = 0;
-    this.ritualMaxTimer = cfg.shrineChannelFrames || 110;
+    this.ritualMaxTimer = this.crucifixionMaxTimer;
     this.ritualTarget = null;
     this.ritualStage = 0;
 
@@ -162,8 +179,17 @@ export class MakimaFighter extends Fighter {
         channelTimerKey: 'spearTimer'
       },
       {
+        id: 'crucifixion',
+        name: 'Crucifixion: Drop of Dominion',
+        type: 'ultimate',
+        cooldownKey: 'crucifixionCooldown',
+        cooldownMaxKey: 'crucifixionCooldownMax',
+        channelingKey: 'isExecutingCrucifixion',
+        channelTimerKey: 'crucifixionTimer'
+      },
+      {
         id: 'shrine_ritual',
-        name: 'Kyoto Shrine Ritual',
+        name: 'Crucifixion: Drop of Dominion',
         type: 'ultimate',
         cooldownKey: 'shrineCooldown',
         cooldownMaxKey: 'shrineCooldownMax',
@@ -202,8 +228,11 @@ export class MakimaFighter extends Fighter {
     this.chainsCooldown = this.chainsCooldownMax;
     this.angelCooldownMax = cfg.angelCooldown || 1500;
     this.angelCooldown = this.angelCooldownMax;
-    this.shrineCooldownMax = cfg.shrineCooldown || 1920;
-    this.shrineCooldown = this.shrineCooldownMax;
+    const ultCd = (typeof cfg.crucifixionCooldown === 'number') ? cfg.crucifixionCooldown : ((typeof cfg.shrineCooldown === 'number') ? cfg.shrineCooldown : 1920);
+    this.crucifixionCooldownMax = ultCd;
+    this.crucifixionCooldown = this.crucifixionCooldownMax;
+    this.shrineCooldownMax = this.crucifixionCooldownMax;
+    this.shrineCooldown = this.crucifixionCooldownMax;
     if (this.chainedTargets) {
       for (let t of this.chainedTargets) {
         this._releaseChainedTarget(t);
@@ -234,11 +263,21 @@ export class MakimaFighter extends Fighter {
     this.activeSpears = [];
     this.activeHolyExplosions = [];
     this.activeHalberds = [];
-    this.isExecutingRitual = false;
-    this.ritualTimer = 0;
+    this.isCrucifixionSliding = false;
+    this.crucifixionSlideTimer = 0;
+    this.crucifixionSlideMaxTimer = 16;
+    this.crucifixionPendingTarget = null;
+    this.isExecutingCrucifixion = false;
+    this.crucifixionTimer = 0;
+    this.crucifixionTarget = null;
+    this.crucifixionStage = 0;
+    this.crucifixionWhiteFlashTimer = 0;
+    this.crucifixionShockwaves = [];
+    this.crucifixionShatteredLinks = [];
     this.isExecutingRitual = false;
     this.ritualTimer = 0;
     this.ritualTarget = null;
+    this.ritualStage = 0;
     this.activeBangBeams = [];
     this.isPreparingBang = false;
     this.bangWindupTimer = 0;
@@ -248,25 +287,9 @@ export class MakimaFighter extends Fighter {
   }
 
   isStationarySkillActive() {
-    return Boolean(this.isPreparingBang || this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || (this.chainThrowAnimTimer && this.chainThrowAnimTimer > 0) || this.isRevivingFromContract || this.isShatterReviving || super.isStationarySkillActive?.());
+    return Boolean(this.isPreparingBang || this.isCrucifixionSliding || this.isExecutingCrucifixion || this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || (this.chainThrowAnimTimer && this.chainThrowAnimTimer > 0) || this.isRevivingFromContract || this.isShatterReviving || super.isStationarySkillActive?.());
   }
 
-  interruptAttacks(forceCancelAll = false) {
-    super.interruptAttacks(forceCancelAll);
-    this.isPreparingBang = false;
-    this.bangWindupTimer = 0;
-    this.bangTarget = null;
-    this.isPreparingChain = false;
-    this.isThrowingChain = false;
-    this.chainThrowAnimTimer = 0;
-    this.chainWindupTimer = 0;
-    this.isSummoningSpear = false;
-    this.spearTimer = 0;
-    this.isExecutingRitual = false;
-    this.ritualTimer = 0;
-    this.chainLockedAimAngle = null;
-    this.spearLaunchAngle = undefined;
-  }
 
   isEffectivelyAlive() {
     if (this.hp > 0 && !this.isDead) return true;
@@ -331,7 +354,7 @@ export class MakimaFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
     if (!enableBang) return false;
-    if (this.isPreparingBang || this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || this.isRevivingFromContract || this.isShatterReviving || this.isChainingActive) return false;
+    if (this.isPreparingBang || this.isCrucifixionSliding || this.isExecutingCrucifixion || this.isExecutingRitual || this.isSummoningSpear || this.isPreparingChain || this.isThrowingChain || this.isRevivingFromContract || this.isShatterReviving || this.isChainingActive) return false;
     return super.canPerformBasicAttack ? super.canPerformBasicAttack() : true;
   }
 
@@ -340,12 +363,12 @@ export class MakimaFighter extends Fighter {
    * Auto-aim rotation is STRICTLY DISABLED:
    * 1. When she is about to throw her chain (windup / preparation phase: isPreparingChain).
    * 2. While she is actively throwing her chain (isThrowingChain / chainThrowAnimTimer > 0).
-   * 3. During Angel's Spear summoning and Kyoto Shrine execution rituals.
+   * 3. During Angel's Spear summoning and Crucifixion execution rituals.
    */
   canAim() {
     if (typeof super.canAim === 'function' && !super.canAim()) return false;
     if (this.isThrowingChain || (this.chainThrowAnimTimer && this.chainThrowAnimTimer > 0)) return false;
-    if (this.isSummoningSpear || this.isExecutingRitual) return false;
+    if (this.isSummoningSpear || this.isExecutingCrucifixion || this.isExecutingRitual) return false;
     return true;
   }
 
@@ -367,6 +390,12 @@ export class MakimaFighter extends Fighter {
    * In normal combat and when firing Bang!, tracks enemy directly at any 360-degree angle.
    */
   aim(target) {
+    if (this.isExecutingCrucifixion || this.isExecutingRitual) {
+      this.gunAngle = 0;
+      this.angle = 0;
+      return false;
+    }
+
     if (!this.canAim()) {
       if (this.chainLockedAimAngle !== undefined && this.chainLockedAimAngle !== null) {
         this.gunAngle = this.chainLockedAimAngle;
@@ -400,7 +429,7 @@ export class MakimaFighter extends Fighter {
   shoot(ownerIndex) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
-    if (enableBang && this.bangCooldown <= 0 && !this.isPreparingBang && !this.isPreparingChain && !this.isSummoningSpear && !this.isExecutingRitual) {
+    if (enableBang && this.bangCooldown <= 0 && !this.isPreparingBang && !this.isPreparingChain && !this.isSummoningSpear && !this.isExecutingCrucifixion && !this.isExecutingRitual) {
       const target = this._acquirePrimaryTarget();
       this._startBangWindup(target);
       return true;
@@ -569,8 +598,11 @@ export class MakimaFighter extends Fighter {
     if (!this.skillManager || !this.skillManager.hasSkill('angel_spear')) {
       if (!this.isSummoningSpear && this.angelCooldown > 0) this.angelCooldown--;
     }
-    if (!this.skillManager || !this.skillManager.hasSkill('shrine_ritual')) {
-      if (!this.isExecutingRitual && this.shrineCooldown > 0) this.shrineCooldown--;
+    if (!this.skillManager || (!this.skillManager.hasSkill('crucifixion') && !this.skillManager.hasSkill('shrine_ritual'))) {
+      if (!this.isExecutingCrucifixion && !this.isExecutingRitual && this.crucifixionCooldown > 0) {
+        this.crucifixionCooldown--;
+      }
+      this.shrineCooldown = this.crucifixionCooldown;
     }
 
     // Update active visual beams
@@ -602,8 +634,12 @@ export class MakimaFighter extends Fighter {
       this._updateBangWindup();
       return;
     }
-    if (this.isExecutingRitual) {
-      this._updateKyotoShrineRitual();
+    if (this.isCrucifixionSliding) {
+      this._updateCrucifixionSlide(opponent, arena);
+      return;
+    }
+    if (this.isExecutingCrucifixion || this.isExecutingRitual) {
+      this._updateCrucifixionUltimate();
       return;
     }
 
@@ -643,10 +679,11 @@ export class MakimaFighter extends Fighter {
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
-      // A. Ultimate: Kyoto Shrine Ritual Check (Config Toggle: enableUltimate / enableShrine)
-      const enableUlt = cfg.enableUltimate ?? cfg.enableShrine ?? cfg.enableShrineRitual ?? true;
-      if (enableUlt && this.shrineCooldown <= 0 && (target.hp <= target.maxHp * 0.45 || this.hp <= this.maxHp * 0.50)) {
-        this._castKyotoShrineRitual(target);
+      // A. Ultimate: Crucifixion (Drop of Dominion) Check (Config Toggle: enableUltimate / enableCrucifixion)
+      // Unconditional trigger: Fires immediately whenever the skill is ready (zero HP conditions)
+      const enableUlt = cfg.enableUltimate ?? cfg.enableCrucifixion ?? cfg.enableShrine ?? cfg.enableShrineRitual ?? true;
+      if (enableUlt && this.crucifixionCooldown <= 0 && !this.isCrucifixionSliding && !this.isExecutingCrucifixion && !this.isExecutingRitual && !this.isChainingActive && this.chainTimer <= 0 && !this.isPreparingChain && !this.isThrowingChain) {
+        this._castCrucifixionUltimate(target);
         return;
       }
 
@@ -666,7 +703,7 @@ export class MakimaFighter extends Fighter {
 
       // D. Primary Attack: "Bang!" (Initiates windup animation before projectile beam spawns)
       const enableBang = cfg.enableBang ?? cfg.bangEnabled ?? true;
-      if (enableBang && this.bangCooldown <= 0 && dist <= (cfg.bangRange || 1600) && !this.isPreparingBang && !this.isPreparingChain && !this.isThrowingChain && !this.isSummoningSpear && !this.isExecutingRitual) {
+      if (enableBang && this.bangCooldown <= 0 && dist <= (cfg.bangRange || 1600) && !this.isPreparingBang && !this.isPreparingChain && !this.isThrowingChain && !this.isSummoningSpear && !this.isExecutingCrucifixion && !this.isExecutingRitual) {
         this._startBangWindup(target);
       }
     }
@@ -1689,66 +1726,349 @@ export class MakimaFighter extends Fighter {
   }
 
   /**
-   * Ultimate: Kyoto Shrine Ritual (Sacrificial Compression Splatter)
+   * Ultimate: Crucifixion (Drop of Dominion)
+   * Inspired by the reference animation:
+   * 1. 4 Purple Chains bind and crucify the target in complete stasis.
+   * 2. Runic occult ground seal & cross rifts stretch across the arena.
+   * 3. Colossal Heavy Cross Greatsword plunges down from the heavens.
+   * 4. Pure white screen flash on impact, violent screen shake, and expanding shockwaves.
+   * 5. Chains shatter into shards as true execution damage is dealt.
    */
-  _castKyotoShrineRitual(target) {
+  /**
+   * Ultimate: Crucifixion (Drop of Dominion)
+   * Phase 1: Smooth momentum deceleration slide into casting stance (zero abrupt movement snapping)
+   * Phase 2: 4 Chains of Domination bind victim in stasis; camera locks onto victim
+   * Phase 3: Colossal Holy Spear plunges from above and obliterates target
+   */
+  _castCrucifixionUltimate(target, skipSlide = false) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
-    this.shrineCooldown = this.shrineCooldownMax;
-    this.isExecutingRitual = true;
-    this.ritualTimer = this.ritualMaxTimer;
-    this.ritualTarget = target;
-    this.ritualStage = 1;
+    const enableSlide = cfg.enableCrucifixionSlide !== false;
 
-    // Lock all enemies in ritual stasis (Rule 5 compliant: freeze target only!)
+    if (enableSlide && !skipSlide && !this.isCrucifixionSliding) {
+      this._startCrucifixionSlide(target);
+      return;
+    }
+
+    this._executeCrucifixion(target);
+  }
+
+  _startCrucifixionSlide(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const ultCd = (typeof cfg.crucifixionCooldown === 'number') ? cfg.crucifixionCooldown : ((typeof cfg.shrineCooldown === 'number') ? cfg.shrineCooldown : 1920);
+    this.crucifixionCooldownMax = ultCd;
+    this.crucifixionCooldown = this.crucifixionCooldownMax;
+    this.shrineCooldown = this.crucifixionCooldownMax;
+
+    this.isCrucifixionSliding = true;
+    this.crucifixionSlideMaxTimer = cfg.crucifixionSlideDurationFrames || 16;
+    this.crucifixionSlideTimer = this.crucifixionSlideMaxTimer;
+    this.crucifixionPendingTarget = target;
+
+    // Preserve existing momentum or provide a clean initial slide impulse
+    const curSpeed = Math.hypot(this.vx, this.vy);
+    if (curSpeed > 1.2) {
+      const dir = Math.atan2(this.vy, this.vx);
+      const initialSpeed = Math.min(5.5, Math.max(4.0, curSpeed));
+      this.vx = Math.cos(dir) * initialSpeed;
+      this.vy = Math.sin(dir) * initialSpeed;
+    } else {
+      const slideAngle = (target && typeof target.x === 'number')
+        ? Math.atan2(target.y - this.y, target.x - this.x)
+        : (this.gunAngle || this.angle || 0);
+      this.vx = Math.cos(slideAngle) * 4.2;
+      this.vy = Math.sin(slideAngle) * 4.2;
+    }
+
+    const slideSnd = cfg.sounds?.crucifixionSlide || 'Assets/Sound Effects/Skills/woosh.mp3';
+    audioSystem.playSFX(slideSnd, 0.65);
+  }
+
+  _updateCrucifixionSlide(opponent, arena) {
+    this.crucifixionSlideTimer--;
+
+    // 1. Natural friction deceleration
+    this.vx *= 0.88;
+    this.vy *= 0.88;
+
+    // 2. Centralized Movement & Physics Standard (Rule 1.2)
+    this.applyMovementPhysics(1.0);
+    this.resolveWallBounce(arena, opponent || this.crucifixionPendingTarget);
+
+    // 3. Aim tracking during slide: keep gaze locked onto the target
+    const target = this.crucifixionPendingTarget || opponent;
+    if (target && this.canAim()) {
+      this.aim(target);
+    }
+
+    // 4. Subtle skid dust / floor sparks behind boots
+    if (this.crucifixionSlideTimer % 2 === 0) {
+      const moveAngle = Math.atan2(this.vy, this.vx);
+      const backAngle = moveAngle + Math.PI;
+      const dustX = this.x + Math.cos(backAngle) * (this.r * 0.7);
+      const dustY = this.y + Math.sin(backAngle) * (this.r * 0.7);
+      spawnSparks(dustX, dustY, 2, '#CBD5E1');
+    }
+
+    // 5. Completion of slide: come to complete halt and cast Crucifixion!
+    if (this.crucifixionSlideTimer <= 0) {
+      this.isCrucifixionSliding = false;
+      this.vx = 0;
+      this.vy = 0;
+      const finalTarget = this.crucifixionPendingTarget || target;
+      this.crucifixionPendingTarget = null;
+
+      const validTarget = (finalTarget && !finalTarget.isDead && (finalTarget.hp === undefined || finalTarget.hp > 0))
+        ? finalTarget
+        : this._acquirePrimaryTarget();
+      if (validTarget && !validTarget.isDead) {
+        this._executeCrucifixion(validTarget);
+      } else {
+        this.crucifixionCooldown = 0;
+        this.shrineCooldown = 0;
+      }
+    }
+  }
+
+  _executeCrucifixion(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const ultCd = (typeof cfg.crucifixionCooldown === 'number') ? cfg.crucifixionCooldown : ((typeof cfg.shrineCooldown === 'number') ? cfg.shrineCooldown : 1920);
+    this.crucifixionCooldownMax = ultCd;
+    this.crucifixionCooldown = this.crucifixionCooldownMax;
+    this.shrineCooldown = this.crucifixionCooldownMax;
+    this.isExecutingCrucifixion = true;
+    this.isExecutingRitual = true;
+    this.crucifixionMaxTimer = cfg.crucifixionDurationFrames || 140;
+    this.crucifixionTimer = this.crucifixionMaxTimer;
+    this.ritualTimer = this.crucifixionMaxTimer;
+    this.crucifixionImpactFrame = cfg.crucifixionImpactFrame || 80;
+    this.crucifixionTarget = target;
+    this.ritualTarget = target;
+    this.crucifixionStage = 1;
+    this.crucifixionWhiteFlashTimer = 0;
+    this.crucifixionShockwaves = [];
+    this.crucifixionShatteredLinks = [];
+    this.vx = 0;
+    this.vy = 0;
+    this.gunAngle = 0;
+    this.angle = 0;
+
+    // Fixed Full Arena view: cameraSystem holds zero-movement arena view during Crucifixion
+    if (state.cameraFocusTarget && (state.cameraFocusTarget === target || state.cameraFocusTarget === this.ritualTarget)) {
+      state.cameraFocusTarget = null;
+    }
+
+    // Lock all enemies in ritual stasis (Rule 1.1 & Rule 1.5 compliant: freeze targets only!)
+    if (target && typeof target.applyTimeStop === 'function') {
+      target.applyTimeStop(this.crucifixionMaxTimer);
+    }
     const allTargets = this._getAllValidTargets();
     for (let t of allTargets) {
       if (typeof t.applyTimeStop === 'function') {
-        t.applyTimeStop(this.ritualMaxTimer);
+        t.applyTimeStop(this.crucifixionMaxTimer);
       }
     }
 
-    spawnFloatingText(this.x, this.y - 40, 'SHRINE COMPRESSION RITUAL', '#A31D24');
-    triggerGlobalScreenShake(8, 16);
+    spawnFloatingText(this.x, this.y - 42, 'JUDGMENT: CRUCIFIED!', '#A31D24');
+    if (target) {
+      spawnFloatingText(target.x, target.y - 36, 'CRUCIFIED!', '#F59E0B');
+    }
+    triggerGlobalScreenShake(6, 14);
 
-    const ritualSnd = cfg.sounds?.shrineRitual || 'Assets/Sound Effects/Skills/shrine.mp3';
-    const ritualVol = cfg.soundVolumes?.shrineRitual ?? 1.20;
-    audioSystem.playSFX(ritualSnd, ritualVol);
+    const voicelineSnd = cfg.sounds?.crucifixionVoiceline || 'Assets/Sound Effects/Skills/makima-chain-voiceline1.mp3';
+    const voicelineVol = cfg.soundVolumes?.crucifixionVoiceline ?? 3.2;
+    audioSystem.playSFX(voicelineSnd, voicelineVol);
+
+    const riftSnd = cfg.sounds?.crucifixionRift || 'Assets/Sound Effects/Skills/shrine.mp3';
+    const riftVol = cfg.soundVolumes?.crucifixionRift ?? 1.25;
+    audioSystem.playSFX(riftSnd, riftVol);
   }
 
-  _updateKyotoShrineRitual() {
-    this.ritualTimer--;
+  _castKyotoShrineRitual(target) {
+    this._castCrucifixionUltimate(target);
+  }
 
-    // Final Stage: Squeeze & Meat Flattening Impact
-    if (this.ritualTimer <= 15 && this.ritualStage === 1) {
-      this.ritualStage = 2;
-      if (this.ritualTarget && !this.ritualTarget.isDead) {
-        const t = this.ritualTarget;
-        const maxHp = t.maxHp || 400;
-        const executeDmg = Math.round(maxHp * 0.45 + 280);
+  _updateCrucifixionUltimate() {
+    this.crucifixionTimer--;
+    this.ritualTimer = this.crucifixionTimer;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+    const totalDuration = this.crucifixionMaxTimer || 140;
+    const elapsed = Math.max(0, totalDuration - this.crucifixionTimer);
+    const impactFrame = this.crucifixionImpactFrame || 80;
 
-        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
-        applyDamageToTarget(t, executeDmg, this, 'true');
-        spawnBloodEffect(t, 45, null, { color: '#770000' });
-        spawnImpactFlash(t.x, t.y, 60, '#A31D24');
-        triggerGlobalScreenShake(20, 30);
+    // Makima angle is locked strictly facing forward towards the user (Front POV: 0)
+    this.gunAngle = 0;
+    this.angle = 0;
+    this.vx = 0;
+    this.vy = 0;
 
-        const splatterSnd = cfg.sounds?.shrineSplatter || 'Assets/Sound Effects/Attacks/groundSmash.mp3';
-        const splatterVol = cfg.soundVolumes?.shrineSplatter ?? 1.30;
-        audioSystem.playSFX(splatterSnd, splatterVol);
-
-        if (t.hp <= 0 || t.hp <= maxHp * 0.25) {
-          t.hp = 0;
-          t.isDead = true;
-          spawnFloatingText(t.x, t.y - 30, 'COMPRESSED', '#880000');
+    // Freeze enemies during the entire sequence (Rule 1.1 & Rule 1.5)
+    if (this.crucifixionTimer > 0) {
+      if (this.crucifixionTarget && typeof this.crucifixionTarget.applyTimeStop === 'function') {
+        this.crucifixionTarget.applyTimeStop(2);
+      }
+      const allTargets = this._getAllValidTargets();
+      for (let t of allTargets) {
+        if (typeof t.applyTimeStop === 'function') {
+          t.applyTimeStop(2);
         }
       }
     }
 
-    if (this.ritualTimer <= 0) {
-      this.isExecutingRitual = false;
-      this.ritualTarget = null;
-      this.ritualStage = 0;
+    // White flash decay
+    if (this.crucifixionWhiteFlashTimer > 0) {
+      this.crucifixionWhiteFlashTimer--;
     }
+
+    // Unleash chains at elapsed === 20 after pre-chain hand channeling finishes
+    if (elapsed === 20) {
+      const chainsSnd = cfg.sounds?.crucifixionChains || 'Assets/Sound Effects/Skills/hookchain.mp3';
+      const chainsVol = cfg.soundVolumes?.crucifixionChains ?? 1.10;
+      audioSystem.playSFX(chainsSnd, chainsVol);
+      triggerGlobalScreenShake(8, 14);
+    }
+
+    // Update shockwaves
+    if (this.crucifixionShockwaves && this.crucifixionShockwaves.length > 0) {
+      for (let i = this.crucifixionShockwaves.length - 1; i >= 0; i--) {
+        const sw = this.crucifixionShockwaves[i];
+        sw.r += sw.speed || 12;
+        sw.alpha -= 0.038;
+        if (sw.alpha <= 0 || sw.r >= sw.maxR) {
+          this.crucifixionShockwaves.splice(i, 1);
+        }
+      }
+    }
+
+    // Update shattered chain shards
+    if (this.crucifixionShatteredLinks && this.crucifixionShatteredLinks.length > 0) {
+      for (let i = this.crucifixionShatteredLinks.length - 1; i >= 0; i--) {
+        const s = this.crucifixionShatteredLinks[i];
+        s.x += s.vx;
+        s.y += s.vy;
+        s.vy += 0.45; // gravity
+        s.rot += s.vRot;
+        s.life--;
+        if (s.life <= 0) {
+          this.crucifixionShatteredLinks.splice(i, 1);
+        }
+      }
+    }
+
+    // Stage 1 -> 2: Sword Descent SFX at elapsed == 48
+    if (elapsed === 48 && this.crucifixionStage === 1) {
+      this.crucifixionStage = 2;
+      const descentSnd = cfg.sounds?.crucifixionDescent || 'Assets/Sound Effects/Skills/woosh.mp3';
+      const descentVol = cfg.soundVolumes?.crucifixionDescent ?? 1.15;
+      audioSystem.playSFX(descentSnd, descentVol);
+    }
+
+    // Drop Command Execution at elapsed == 65 (Right hand snaps downward in "DROP!" command with divine tracer beam)
+    if (elapsed === 65) {
+      const dropSnd = cfg.sounds?.crucifixionDropCommand || 'Assets/Sound Effects/Skills/woosh.mp3';
+      const dropVol = cfg.soundVolumes?.crucifixionDropCommand ?? 1.25;
+      audioSystem.playSFX(dropSnd, dropVol);
+      triggerGlobalScreenShake(6, 12);
+    }
+
+    // Stage 2 -> 3: Impact at elapsed == impactFrame (Frame 80)
+    if (elapsed === impactFrame && this.crucifixionStage <= 2) {
+      this.crucifixionStage = 3;
+      this.crucifixionWhiteFlashTimer = 4; // Blinding white flash!
+      triggerGlobalScreenShake(26, 34);
+
+      // Release cinematic camera focus upon spear impact so camera smoothly pulls back to combat view
+      if (state.cameraFocusTarget && (state.cameraFocusTarget === this.crucifixionTarget || state.cameraFocusTarget === this.ritualTarget)) {
+        state.cameraFocusTarget = null;
+      }
+
+      // Impact SFX
+      const impactSnd = cfg.sounds?.crucifixionImpact || 'Assets/Sound Effects/Attacks/groundSmash.mp3';
+      const impactVol = cfg.soundVolumes?.crucifixionImpact ?? 1.40;
+      audioSystem.playSFX(impactSnd, impactVol);
+
+      const heavyImpactSnd = cfg.sounds?.crucifixionHeavyImpact || 'Assets/Sound Effects/Skills/Makima-crucifix-heavy-impact.mp3';
+      const heavyVol = cfg.soundVolumes?.crucifixionHeavyImpact ?? 1.50;
+      audioSystem.playSFX(heavyImpactSnd, heavyVol);
+
+      const shatterSnd = cfg.sounds?.crucifixionShatter || 'Assets/Sound Effects/Attacks/explosion.mp3';
+      const shatterVol = cfg.soundVolumes?.crucifixionShatter ?? 1.10;
+      audioSystem.playSFX(shatterSnd, shatterVol);
+
+      const t = this.crucifixionTarget;
+      const tx = t ? t.x : this.x + 200;
+      const ty = t ? t.y : this.y;
+
+      // Spawn expanding shockwaves
+      this.crucifixionShockwaves.push(
+        { x: tx, y: ty, r: 10, maxR: 260, speed: 16, alpha: 0.95, color: '#EF4444', width: 4.0 },
+        { x: tx, y: ty, r: 6, maxR: 190, speed: 11, alpha: 0.85, color: '#F59E0B', width: 3.0 },
+        { x: tx, y: ty, r: 2, maxR: 130, speed: 7, alpha: 0.95, color: '#FFFFFF', width: 2.0 }
+      );
+
+      // Shatter the 4 chains into dispersing fragments
+      for (let k = 0; k < 28; k++) {
+        const sAng = Math.random() * Math.PI * 2;
+        const sSpd = 4 + Math.random() * 9;
+        this.crucifixionShatteredLinks.push({
+          x: tx + Math.cos(sAng) * 22,
+          y: ty + Math.sin(sAng) * 22,
+          vx: Math.cos(sAng) * sSpd,
+          vy: Math.sin(sAng) * sSpd - 5,
+          rot: Math.random() * Math.PI * 2,
+          vRot: (Math.random() - 0.5) * 0.45,
+          life: 35 + Math.floor(Math.random() * 20),
+          maxLife: 55,
+          scale: 0.8 + Math.random() * 0.5,
+          isSide: Math.random() > 0.5
+        });
+      }
+
+      // Spurt blood, sparks, and impact flash
+      if (t) {
+        spawnSparks(tx, ty, 24, '#FEF08A');
+        spawnImpactFlash(tx, ty, 80, '#EF4444');
+        spawnBloodEffect(t, 55, null, { color: '#770000' });
+        spawnFatalBloodSplash(tx, ty, '#880000', 35);
+      }
+
+      // True Damage Execution
+      if (t && !t.isDead) {
+        const maxHp = t.maxHp || 400;
+        const percentDmg = cfg.crucifixionPercentDamage ?? cfg.shrinePercentDamage ?? 0.45;
+        const flatDmg = cfg.crucifixionFlatDamage ?? cfg.shrineFlatDamage ?? 280;
+        const totalDmg = Math.round(maxHp * percentDmg + flatDmg);
+
+        applyDamageToTarget(t, totalDmg, this, 'true');
+
+        const execThreshold = cfg.crucifixionExecuteThreshold ?? cfg.shrineExecuteThreshold ?? 0.25;
+        if (t.hp <= 0 || t.hp <= maxHp * execThreshold) {
+          t.hp = 0;
+          t.isDead = true;
+          spawnFloatingText(t.x, t.y - 42, 'OBLITERATED', '#880000');
+        }
+      }
+    }
+
+    // End of Sequence
+    if (this.crucifixionTimer <= 0) {
+      if (state.cameraFocusTarget && (state.cameraFocusTarget === this.crucifixionTarget || state.cameraFocusTarget === this.ritualTarget)) {
+        state.cameraFocusTarget = null;
+      }
+      this.crucifixionCooldown = this.crucifixionCooldownMax;
+      this.shrineCooldown = this.crucifixionCooldownMax;
+      this.isExecutingCrucifixion = false;
+      this.isExecutingRitual = false;
+      this.crucifixionTarget = null;
+      this.ritualTarget = null;
+      this.crucifixionStage = 0;
+      this.crucifixionWhiteFlashTimer = 0;
+      this.crucifixionShockwaves = [];
+      this.crucifixionShatteredLinks = [];
+    }
+  }
+
+  _updateKyotoShrineRitual() {
+    this._updateCrucifixionUltimate();
   }
 
   /**
@@ -1919,7 +2239,17 @@ export class MakimaFighter extends Fighter {
         this.spearTimer = 0;
         this.spearTarget = null;
       }
-      if (this.isExecutingRitual) {
+      if (this.isExecutingCrucifixion || this.isExecutingRitual) {
+        if (state.cameraFocusTarget && (state.cameraFocusTarget === this.crucifixionTarget || state.cameraFocusTarget === this.ritualTarget)) {
+          state.cameraFocusTarget = null;
+        }
+        this.isExecutingCrucifixion = false;
+        this.crucifixionTimer = 0;
+        this.crucifixionTarget = null;
+        this.crucifixionStage = 0;
+        this.crucifixionWhiteFlashTimer = 0;
+        this.crucifixionShockwaves = [];
+        this.crucifixionShatteredLinks = [];
         this.isExecutingRitual = false;
         this.ritualTimer = 0;
         this.ritualTarget = null;
@@ -2027,7 +2357,12 @@ export class MakimaFighter extends Fighter {
     // 7. Draw Explosive Chain Break Shard Animations & Particle Debris
     drawMakimaChainBreakEffects(ctx);
 
-    // 8. Draw Health HUD & Freeze Timers
+    // 8. Draw Ultimate: Crucifixion (Drop of Dominion)
+    if (this.isExecutingCrucifixion || this.isExecutingRitual) {
+      drawMakimaCrucifixionUltimate(ctx, this);
+    }
+
+    // 9. Draw Health HUD & Freeze Timers
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
   }

@@ -672,31 +672,31 @@ export function getSkillDataForFighter(f, getProjectiles) {
       }
     }
 
-    // 5. Ultimate: Kyoto Shrine Ritual (Gravitational Splatter)
-    const enableUlt = mcfg.enableUltimate ?? mcfg.enableShrine ?? mcfg.enableShrineRitual ?? false;
+    // 5. Ultimate: Crucifixion (Drop of Dominion) / Kyoto Shrine Ritual
+    const enableUlt = mcfg.enableUltimate ?? mcfg.enableCrucifixion ?? mcfg.enableShrine ?? mcfg.enableShrineRitual ?? true;
     if (enableUlt) {
-      if (f.isExecutingRitual) {
-        const ritualMax = f.ritualMaxTimer || mcfg.shrineChannelFrames || 110;
-        const ritualCur = f.ritualTimer !== undefined ? f.ritualTimer : 0;
-        const ritualPct = Math.max(0, Math.min(100, (ritualCur / ritualMax) * 100));
+      if (f.isCrucifixionSliding || f.isExecutingCrucifixion || f.isExecutingRitual) {
+        const ultMax = f.crucifixionMaxTimer || f.ritualMaxTimer || mcfg.crucifixionDurationFrames || mcfg.shrineChannelFrames || 140;
+        const ultCur = (f.crucifixionTimer !== undefined && f.isExecutingCrucifixion) ? f.crucifixionTimer : (f.ritualTimer !== undefined ? f.ritualTimer : 0);
+        const ultPct = f.isCrucifixionSliding ? 0 : Math.max(0, Math.min(100, (1 - (ultCur / ultMax)) * 100));
         skills.push({
-          id: 'shrine',
-          pct: ritualPct,
+          id: 'crucifixion',
+          pct: ultPct,
           ready: false,
           color: themeColor,
-          label: 'KYOTO SHRINE RITUAL'
+          label: 'CRUCIFIXION'
         });
       } else {
-        const shrineMax = f.shrineCooldownMax || mcfg.shrineCooldown || 1920;
-        const shrineTimer = f.shrineCooldown !== undefined ? f.shrineCooldown : shrineMax;
-        const shrinePct = Math.max(0, Math.min(100, (1 - (shrineTimer / shrineMax)) * 100));
-        const shrineReady = shrinePct >= 99;
+        const ultMax = f.crucifixionCooldownMax || f.shrineCooldownMax || mcfg.crucifixionCooldown || mcfg.shrineCooldown || 1920;
+        const ultTimer = (f.crucifixionCooldown !== undefined) ? f.crucifixionCooldown : (f.shrineCooldown !== undefined ? f.shrineCooldown : ultMax);
+        const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+        const ultReady = ultPct >= 99;
         skills.push({
-          id: 'shrine',
-          pct: shrinePct,
-          ready: shrineReady,
+          id: 'crucifixion',
+          pct: ultPct,
+          ready: ultReady,
           color: themeColor,
-          label: 'KYOTO SHRINE RITUAL'
+          label: 'CRUCIFIXION'
         });
       }
     }

@@ -205,7 +205,7 @@ export function renderGame() {
         if (state.pixiLayers.environment) state.pixiLayers.environment.visible = true;
 
         const cam = state.camera;
-        const isCamActive = Boolean(cam && cam.enabled && cam.mode === 'dynamic');
+        const isCamActive = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
         const screenCenterX = state.canvas.width / 2;
         const screenCenterY = state.arena ? (state.arena.y + state.arena.height / 2) : (state.canvas.height / 2);
 

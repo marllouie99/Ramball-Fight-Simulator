@@ -519,7 +519,9 @@ export class EscanorFighter extends Fighter {
           spawnSparks(this.x, this.y - (this.z || 0), 6, 'gold', '#F59E0B');
           spawnSparks(this.x, this.y - (this.z || 0), 4, 'silverStreak', '#FBBF24');
           try {
-            audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.35);
+            const parrySnd = cfg.sounds?.armorParry || 'Assets/Sound Effects/Skills/parry.mp3';
+            const parryVol = cfg.soundVolumes?.armorParry !== undefined ? cfg.soundVolumes.armorParry : 0.35;
+            audioSystem.playSFX(parrySnd, parryVol);
           } catch (e) {}
         }
       }
@@ -661,7 +663,9 @@ export class EscanorFighter extends Fighter {
           spawnSparks(target.x, target.y, '#F59E0B', 14);
 
           try {
-            audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/heavypunch1.mp3', this.x, this.y, 1.0);
+            const unpauseSnd = cfg.sounds?.unpauseHit || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+            const unpauseVol = cfg.soundVolumes?.unpauseHit !== undefined ? cfg.soundVolumes.unpauseHit : 1.0;
+            audioSystem.playSFX(unpauseSnd, unpauseVol);
           } catch (e) {}
 
           // Residual forward cleave step on unpause carries weapon weight
@@ -727,6 +731,12 @@ export class EscanorFighter extends Fighter {
           this.slashOriginReach = this.currentRhittaReach;
           this.slashOriginRadius = this.r;
           this.slashOriginTheOne = Boolean(this.isTheOneActive);
+
+          try {
+            const attackSnd = cfg.sounds?.attack || 'Assets/Sound Effects/Attacks/Escanor-attack.mp3';
+            const attackVol = cfg.soundVolumes?.attack !== undefined ? cfg.soundVolumes.attack : 1.0;
+            audioSystem.playSFX(attackSnd, attackVol);
+          } catch (e) {}
         }
       }
 
@@ -945,7 +955,9 @@ export class EscanorFighter extends Fighter {
     }
 
     try {
-      audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/swordswing.mp3', this.x, this.y, 0.85);
+      const liftSnd = cfg.sounds?.weaponLift || 'Assets/Sound Effects/SkillEffects/Escanor-weapon-lift.mp3';
+      const liftVol = cfg.soundVolumes?.weaponLift !== undefined ? cfg.soundVolumes.weaponLift : 1.0;
+      audioSystem.playSFX(liftSnd, liftVol);
     } catch (e) {}
   }
 
@@ -1039,7 +1051,9 @@ export class EscanorFighter extends Fighter {
       spawnSparks(contactX, contactY, '#F59E0B', 14);
 
       try {
-        audioSystem.playSpatialSound(cfg.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3', contactX, contactY, 0.95);
+        const hitSnd = cfg.sounds?.chopHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+        const hitVol = cfg.soundVolumes?.chopHit !== undefined ? cfg.soundVolumes.chopHit : 0.95;
+        audioSystem.playSFX(hitSnd, hitVol);
       } catch (e) {}
 
       // Cinematic Hit-Pause (freeze at the exact point of impact)
@@ -1129,7 +1143,9 @@ export class EscanorFighter extends Fighter {
       spawnSparks(target.x, target.y, '#F59E0B', 14);
 
       try {
-        audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/heavypunch1.mp3', this.x, this.y, 1.0);
+        const unpauseSnd = cfg.sounds?.unpauseHit || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+        const unpauseVol = cfg.soundVolumes?.unpauseHit !== undefined ? cfg.soundVolumes.unpauseHit : 1.0;
+        audioSystem.playSFX(unpauseSnd, unpauseVol);
       } catch (e) {}
 
       this.chopHitPauseTarget = null;
@@ -1174,7 +1190,9 @@ export class EscanorFighter extends Fighter {
     spawnFloatingText(this.x, this.y - 30, 'CRUEL SUN!', '#F59E0B');
 
     try {
-      audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/flamespray1.mp3', this.x, this.y, 0.7);
+      const sunSnd = cfg.sounds?.cruelSun || 'Assets/Sound Effects/Attacks/flamespray1.mp3';
+      const sunVol = cfg.soundVolumes?.cruelSun !== undefined ? cfg.soundVolumes.cruelSun : 0.7;
+      audioSystem.playSFX(sunSnd, sunVol);
     } catch (e) {}
   }
 
@@ -1254,7 +1272,7 @@ export class EscanorFighter extends Fighter {
     }
 
     try {
-      audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/fleshhit.mp3', sun.x, sun.y, 0.9);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
     } catch (e) {}
   }
 
@@ -1307,7 +1325,9 @@ export class EscanorFighter extends Fighter {
     }
 
     try {
-      audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/flamespray1.mp3', this.x, this.y, 0.9);
+      const flareSnd = cfg.sounds?.prideFlare || 'Assets/Sound Effects/Attacks/flamespray1.mp3';
+      const flareVol = cfg.soundVolumes?.prideFlare !== undefined ? cfg.soundVolumes.prideFlare : 0.9;
+      audioSystem.playSFX(flareSnd, flareVol);
     } catch (e) {}
   }
 
@@ -1327,7 +1347,9 @@ export class EscanorFighter extends Fighter {
     spawnSparks(this.x, this.y, '#F59E0B', 32);
 
     try {
-      audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/laserbeam.mp3', this.x, this.y, 0.9);
+      const theOneSnd = cfg.sounds?.theOne || 'Assets/Sound Effects/Attacks/laserbeam.mp3';
+      const theOneVol = cfg.soundVolumes?.theOne !== undefined ? cfg.soundVolumes.theOne : 0.9;
+      audioSystem.playSFX(theOneSnd, theOneVol);
     } catch (e) {}
   }
 
@@ -1407,7 +1429,9 @@ export class EscanorFighter extends Fighter {
     }
 
     try {
-      audioSystem.playSpatialSound('Assets/Sound Effects/Attacks/heavypunch1.mp3', this.x, this.y, 1.0);
+      const swordSnd = cfg.sounds?.divineSword || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+      const swordVol = cfg.soundVolumes?.divineSword !== undefined ? cfg.soundVolumes.divineSword : 1.0;
+      audioSystem.playSFX(swordSnd, swordVol);
     } catch (e) {}
   }
 
