@@ -1,4 +1,7 @@
 export const genosConfig = {
+  bossTitle: 'Demon Cyborg',
+  title: 'Demon Cyborg',
+
   // Base Stats
   hp: 320,
   speed: 5.2,

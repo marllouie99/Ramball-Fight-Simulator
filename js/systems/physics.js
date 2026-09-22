@@ -574,7 +574,7 @@ export function getClosestOpponent(fighter) {
   const isTeamMode = (
     state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' ||
     state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2' ||
-    state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' ||
+    state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' ||
     state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4'
   );
 
@@ -733,7 +733,7 @@ function endRoundIfFFAEnded() {
 }
 
 function endRoundIf2v2Ended() {
-  const is1v2 = (state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2');
+  const is1v2 = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2');
   const is2v2 = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2');
   if ((!is2v2 && !is1v2) || state.gameState !== 'playing') return;
 

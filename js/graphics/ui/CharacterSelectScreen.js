@@ -914,17 +914,17 @@ function drawSelectScreen() {
     const btnText = isTac1v1 ? 'START TACTICAL DUEL' : 'START BATTLE';
     drawBottomCommandDeck(btnText, () => startGame(), () => randomize1v1Fighters());
 
-  } else if (!isTactical && (mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2')) {
+  } else if (!isTactical && (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2')) {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
     const stackedH = Math.floor((fullCardH - cardGap) / 2);
     const bottomY = topY + stackedH + cardGap;
 
-    drawPlayerCard('p1Index', 'BOSS CHAMPION', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
-    drawPlayerCard('p2Index', 'DUO SQUAD 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
-    drawPlayerCard('p3Index', 'DUO SQUAD 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+    drawPlayerCard('p1Index', 'THE BOSS', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
+    drawPlayerCard('p2Index', 'CHALLENGER 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
+    drawPlayerCard('p3Index', 'CHALLENGER 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
 
-    drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomize1v2Fighters());
+    drawBottomCommandDeck('START BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
 
   } else if (isTactical || mode === '2v2' || mode === 'Tactical 2v2' || mode === 'FFA' || mode === 'Tactical FFA') {
     const leftX = margin;

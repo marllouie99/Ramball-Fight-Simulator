@@ -20,6 +20,7 @@ import { updateArenaBgm, startArenaBgm, stopArenaBgm } from './arenaBgmSystem.js
 import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { audioSystem } from './audioSystem.js';
+import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 
 export function updateGame() {
     // Increment global frame count on EVERY frame across all game states
@@ -41,6 +42,11 @@ export function updateGame() {
           state.faceOffTimer = 120;
         }
       }
+      return;
+    }
+
+    if (state.gameState === 'boss_intro' || BossEntranceSequence.isActive) {
+      BossEntranceSequence.update(1);
       return;
     }
 
@@ -138,6 +144,7 @@ export function updateGame() {
       }
       updateArenaBgm();
       updateFighters();
+      BossManager.update(1);
       updateProjectiles();
       updateDriveBys();
       if (!isGlobalHitPausing) {

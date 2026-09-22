@@ -20,6 +20,8 @@ export const mahoragaConfig = {
     projectileSpeedMultiplier: 1.0,
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
     ability: 'Wheel of Adaptation',
+    bossTitle: 'Divine General',
+    title: 'Divine General',
     desc: 'Adapts to damage types, gaining speed, defense, and health regeneration with each wheel rotation.',
 
     // ── Neutral Close-Quarters Attack-Teleport Stance ──
@@ -48,20 +50,21 @@ export const mahoragaConfig = {
     wheelAdaptationSpeedMultiplier: 0.05, // Movement speed multiplier gained per wheel rotation / adaptation stage (+15% per stage)
     adaptationSpeedBoostPerStage: 0.05, // +15% movement speed multiplier per gold adaptation stage
     movementSpeedMultiplierPerAdaptation: 0.01, // Movement speed multiplier per wheel adaptation stage
-    rctRegenPerStage: 0.025,         // Passive RCT HP regeneration per frame per adaptation level (+1.5 HP/sec per stage)
-    maxRctRegenStages: 6,           // Maximum adaptation stages contributing to passive RCT regeneration
+    rctRegenPerStage: 0.25,         // Passive RCT HP regeneration per frame per adaptation level (+1.5 HP/sec per stage)
+    maxRctRegenStages: 12,           // Maximum adaptation stages contributing to passive RCT regeneration
     maxRctRegenRate: 0.12,          // Maximum passive RCT regeneration cap per frame (~7.2 HP/sec)
     enableRCTHeal: true,            // Toggle on/off Reverse Cursed Technique healing on wheel click
-    rctHealPercent: 0.12,           // Percentage of max HP healed on each wheel rotation click (12% max HP)
-    maxRctHealingPool: 250,         // Maximum total RCT healing capacity across a match (prevents infinite stall)
+    rctHealPercent: 0.50,           // Percentage of max HP healed on each wheel rotation click (12% max HP)
+    maxRctHealingPool: Infinity,    // Uncapped RCT healing capacity across a match
     rctCombatDamagePauseFrames: 45, // Duration (frames) passive RCT is paused upon taking direct damage (45 frames = 0.75s)
     defBuffPerClickPercent: 0.05,   // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,        // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,     // Maximum speed/KB resistance factor under stasis (60% max)
     fatalAdaptWindowFrames: 400,    // Rolling damage accumulator window (~6.6 seconds at 60fps)
-    fatalDamageThresholdPct: 0.80,  // 15% max HP damage threshold within window triggers wheel adaptation click
-    fatalAdaptCooldownFrames: 30,   // Cooldown frames between wheel clicks (30 frames = 0.5s)
+    fatalDamageThresholdPct: 0.50,  // 15% max HP damage threshold within window triggers wheel adaptation click
+    fatalAdaptCooldownFrames: 500,  // Cooldown frames between wheel clicks (180 frames = 3.0s cooldown before progressing again)
+    infinityAdaptFreezeCount: 10,   // Required Limitless Infinity freeze exposures to adapt (10 exposures)
 
     // ── Visuals, Screen Dim & Afterimages ──
     enableGoldenScreenDim: true,     // Toggle on/off dark golden cinematic screen dimming on wheel rotation

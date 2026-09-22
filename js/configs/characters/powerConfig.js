@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const powerConfig = {
+  bossTitle: 'Blood Fiend',
+  title: 'Blood Fiend',
+
   // Baseline Attributes
   hp: 330,
   maxHpRatio: 1.0,

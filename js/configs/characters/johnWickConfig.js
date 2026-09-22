@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const johnWickConfig = {
+  bossTitle: 'Baba Yaga',
+  title: 'Baba Yaga',
+
   // ── 1. BASE ATTRIBUTES ──
   hp: 220,
   speed: 5.6,

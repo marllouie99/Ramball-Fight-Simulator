@@ -3,6 +3,9 @@
 // ─────────────────────────────────────────────
 
 export const megumiConfig = {
+  bossTitle: 'Ten Shadows Summoner',
+  title: 'Ten Shadows Summoner',
+
   // Base Attributes
   hp: 380,
   speed: 5.8,

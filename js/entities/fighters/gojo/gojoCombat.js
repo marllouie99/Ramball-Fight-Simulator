@@ -8,6 +8,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../.
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { triggerAdaptation } from '../mahoraga/mahoragaAdaptation.js';
+import { mahoragaAdaptationConfig } from '../mahoraga/mahoragaAdaptationConfig.js';
 import { isInsideRubbickStolenVoid } from '../rubbick/rubbickThemes.js';
 
 export function clampEntityToArenaBounds(ent, arena, radius = null) {
@@ -252,7 +253,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
         attacker._lastInfinityCollisionTime = now;
         if (currentFrame !== null) attacker._lastInfinityCollisionFrame = currentFrame;
         attacker.infinityCollisionCount = (attacker.infinityCollisionCount || 0) + 1;
-        const collisionsNeeded = 2; // Rule 9 standard: 2 Infinity exposures
+        const configCount = mahoragaAdaptationConfig?.gojo?.infinity?.requiredFreezes;
+        const collisionsNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 10);
 
         if (!attacker.gojoInfinityImmune && attacker.infinityCollisionCount >= collisionsNeeded) {
           attacker.gojoInfinityImmune = true;

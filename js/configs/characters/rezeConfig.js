@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const rezeConfig = {
+  bossTitle: 'Bomb Devil',
+  title: 'Bomb Devil',
+
   // Baseline Attributes
   hp: 340,
   maxHpRatio: 1.0,

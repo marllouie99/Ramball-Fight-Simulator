@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const inosukeConfig = {
+  bossTitle: 'Beast Breathing Slayer',
+  title: 'Beast Breathing Slayer',
+
   // Baseline Attributes
   hp: 350,
   maxHpRatio: 1.0,

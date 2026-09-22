@@ -1,5 +1,6 @@
 import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
+import { GAME_MODES } from '../core/modeConfig.js';
 
 /**
  * Camera System for Circle Mini-Battle
@@ -172,29 +173,79 @@ export function updateCamera() {
       );
 
       if (aliveFighters.length >= 2) {
-        // Calculate combat bounding box spanning all active fighters
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
+        let midX = arenaCenterX;
+        let midY = arenaCenterY;
+        let dist = 200;
 
-        for (const f of aliveFighters) {
-          if (f.x < minX) minX = f.x;
-          if (f.x > maxX) maxX = f.x;
-          if (f.y < minY) minY = f.y;
-          if (f.y > maxY) maxY = f.y;
+        const is1v2 = Boolean(
+          state.mode === 'Boss Battle' ||
+          state.mode === '1v2 Stand Off' ||
+          state.mode === '1v2' ||
+          state.mode === 'Stand Off 1v2' ||
+          (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2))
+        );
+
+        if (is1v2) {
+          const boss = aliveFighters.find(f => f === state.fighters?.[0] || f.fighterIndex === 0) || aliveFighters[0];
+          const challengers = aliveFighters.filter(f => f !== boss);
+          if (boss && challengers.length > 0) {
+            let closestCh = challengers[0];
+            let minDistSq = Infinity;
+            for (const ch of challengers) {
+              const dSq = (ch.x - boss.x) ** 2 + (ch.y - boss.y) ** 2;
+              if (dSq < minDistSq) {
+                minDistSq = dSq;
+                closestCh = ch;
+              }
+            }
+            const clashMidX = (boss.x + closestCh.x) / 2;
+            const clashMidY = (boss.y + closestCh.y) / 2;
+            const clashDist = Math.hypot(boss.x - closestCh.x, boss.y - closestCh.y);
+
+            if (challengers.length > 1) {
+              let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+              for (const f of aliveFighters) {
+                if (f.x < minX) minX = f.x;
+                if (f.x > maxX) maxX = f.x;
+                if (f.y < minY) minY = f.y;
+                if (f.y > maxY) maxY = f.y;
+              }
+              const allMidX = (minX + maxX) / 2;
+              const allMidY = (minY + maxY) / 2;
+              const allDist = Math.hypot(maxX - minX, maxY - minY);
+
+              midX = clashMidX * 0.70 + allMidX * 0.30;
+              midY = clashMidY * 0.70 + allMidY * 0.30;
+              dist = clashDist * 0.65 + allDist * 0.35;
+            } else {
+              midX = clashMidX;
+              midY = clashMidY;
+              dist = clashDist;
+            }
+          }
+        } else {
+          // Standard combat bounding box spanning all active fighters
+          let minX = Infinity;
+          let maxX = -Infinity;
+          let minY = Infinity;
+          let maxY = -Infinity;
+
+          for (const f of aliveFighters) {
+            if (f.x < minX) minX = f.x;
+            if (f.x > maxX) maxX = f.x;
+            if (f.y < minY) minY = f.y;
+            if (f.y > maxY) maxY = f.y;
+          }
+
+          midX = (minX + maxX) / 2;
+          midY = (minY + maxY) / 2;
+          const spanX = maxX - minX;
+          const spanY = maxY - minY;
+          dist = Math.hypot(spanX, spanY);
         }
 
-        // Midpoint is the center of the bounding box spanning all active combatants
-        // (ensures 1v2, 2v2, 1v1, and FFA are never biased towards whichever team has more members!)
-        const midX = (minX + maxX) / 2;
-        const midY = (minY + maxY) / 2;
-        const spanX = maxX - minX;
-        const spanY = maxY - minY;
-        const dist = Math.hypot(spanX, spanY);
-
         // Distance-to-zoom mapping (Smooth Hermite / Smoothstep)
-        // Gentle, wide zoom range (1.0x to 1.04x max) keeping full arena in view
+        // Gentle, wide zoom range (1.0x to 1.14x max) keeping full arena in view
         const camCfg = CONFIG.camera || {};
         const minD = camCfg.minDist ?? 80;
         const maxD = camCfg.maxDist ?? 420;

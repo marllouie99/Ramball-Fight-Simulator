@@ -3,6 +3,9 @@
 // ─────────────────────────────────────────────
 
 export const nobaraConfig = {
+  bossTitle: 'Straw Doll Sorcerer',
+  title: 'Straw Doll Sorcerer',
+
   // Base Attributes
   hp: 400,
   speed: 5.4,

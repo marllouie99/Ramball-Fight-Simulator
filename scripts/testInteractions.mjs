@@ -135,13 +135,13 @@ async function runInteractionTests() {
     assert(!mahoraga.gojoInfinityImmune, 'Mahoraga must start without Gojo Infinity immunity');
     
     // Simulate adaptation triggers
-    mahoraga.infinityHitsTaken = (mahoraga.infinityHitsTaken || 0) + 2;
-    if (mahoraga.infinityHitsTaken >= 2) {
+    mahoraga.infinityHitsTaken = (mahoraga.infinityHitsTaken || 0) + 10;
+    if (mahoraga.infinityHitsTaken >= 10) {
       mahoraga.gojoInfinityImmune = true;
       if (mahoraga.adapted) mahoraga.adapted.melee = true;
     }
 
-    assert(mahoraga.gojoInfinityImmune === true, 'Mahoraga must adapt to Infinity after 2 exposures (Rule 9)');
+    assert(mahoraga.gojoInfinityImmune === true, 'Mahoraga must adapt to Infinity after 10 exposures');
     console.log('      ✅ Mahoraga adaptation wheel verified.');
   }
 

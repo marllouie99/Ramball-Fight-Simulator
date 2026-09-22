@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const ulquiorraConfig = {
+  bossTitle: '4th Espada',
+  title: '4th Espada',
+
   // ── Base Attributes ──
   hp: 240,
   speed: 6.4,

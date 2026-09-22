@@ -18,6 +18,8 @@ export const sukunaConfig = {
     cooldown: 80,
     projectileSpeedMultiplier: 3.0,
     ability: 'King of Curses',
+    bossTitle: 'King of Curses',
+    title: 'King of Curses',
     desc: 'Deploys Malevolent Shrine domain deals unblockable damage.',
     shrineWidth: 380,                 // Authentic Malevolent Shrine pixel-art model width in px
     shrineGlowRadius: 210,            // Atmospheric crimson ambient glow radius behind shrine

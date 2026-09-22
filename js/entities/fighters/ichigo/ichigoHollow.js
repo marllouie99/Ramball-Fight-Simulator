@@ -120,15 +120,17 @@ export function stopHollowTransformationVoiceline(fighter, force = false) {
     if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
       audioSystem.stopSFX(fighter._hollowVoiceHandle);
     }
-    fighter._hollowVoiceHandle = null;
   }
+  fighter._hollowVoiceHandle = null;
+
   if (fighter._hollowFlareHandle) {
     stopSound(fighter._hollowFlareHandle);
     if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
       audioSystem.stopSFX(fighter._hollowFlareHandle);
     }
-    fighter._hollowFlareHandle = null;
   }
+  fighter._hollowFlareHandle = null;
+
   if (fighter._activeVoicelineHandle) {
     const srcStr = String(fighter._activeVoicelineHandle.src || (fighter._activeVoicelineHandle.audio && fighter._activeVoicelineHandle.audio.src) || '').toLowerCase();
     if (srcStr.includes('hollow') || srcStr.includes('transformation') || srcStr.includes('flare')) {

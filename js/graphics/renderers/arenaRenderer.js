@@ -868,9 +868,16 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
   };
 
-  const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
+  const is1v2 = (state.mode === 'Boss Battle' || state.mode === GAME_MODES?.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
   const is2v2 = (state.mode === '2v2' || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES?.TWO_VS_TWO || state.mode === GAME_MODES?.TACTICAL_2V2);
   const is4v4 = (state.mode === '4v4' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES?.TACTICAL_4V4);
+
+  // In Boss Battle mode, the Boss Name is rendered directly on top of the Boss Health Bar in #hudTopContainer,
+  // and challengers are displayed in their dedicated bottom cards. Skip canvas names to prevent duplicate clashing.
+  if (is1v2) {
+    ctx.restore();
+    return;
+  }
 
   let team0 = [];
   let team1 = [];
@@ -885,10 +892,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   }
 
   if (team0.length === 0 && team1.length === 0) {
-    if (is1v2 && mainFighters.length >= 3) {
-      team0 = [mainFighters[0]];
-      team1 = [mainFighters[1], mainFighters[2]];
-    } else if (is2v2 && mainFighters.length >= 4) {
+    if (is2v2 && mainFighters.length >= 4) {
       team0 = [mainFighters[0], mainFighters[1]];
       team1 = [mainFighters[2], mainFighters[3]];
     } else if (mainFighters.length === 2) {
@@ -907,7 +911,8 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
 
     const team1Data = team1.map(f => ({
       name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-      color: getFighterThemeColor(f, '#F87171')
+      color: getFighterThemeColor(f, '#F87171'),
+      fighter: f
     }));
 
     const hasStackedTeam = team0.length > 1 || team1.length > 1;

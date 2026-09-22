@@ -572,14 +572,14 @@
       "hp": 200,
       "speed": 5.2,
       "radius": 25,
-      "baseDamage": 10,
-      "baseCooldown": 80,
+      "baseDamage": 20,
+      "baseCooldown": 120,
       "themeColor": "#00BFFF",
       "keySkills": {
         "chainLightning": {
-          "damage": 10,
+          "damage": 20,
           "chainCount": 4,
-          "cooldown": 80
+          "cooldown": 120
         },
         "aegisShield": {
           "damage": 12,

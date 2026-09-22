@@ -3,6 +3,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const mahitoConfig = {
+  bossTitle: 'Curse of Humanity',
+  title: 'Curse of Humanity',
+
   // ── 1. BASE ATTRIBUTES & CORE STATS ────────────────────────────────────────
   hp: 200,
   damage: 7,

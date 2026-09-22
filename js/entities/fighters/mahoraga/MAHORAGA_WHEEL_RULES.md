@@ -49,7 +49,7 @@
 - **Purple** (`isGojoPurple`): Sets `gojoPurpleDodgeReady = true`. Next time Gojo fires Hollow Purple, Mahoraga teleports perpendicular to the orb trajectory to dodge it cleanly. Wheel glow: `#8A2BE2`.
 - **Red** (`isRed`): Mahoraga tanks Reversal Red without dodging or teleporting away, taking **50% reduced damage**. Wheel glow: `#FF1144`.
 - **Blue** (`isGojoBlue`): Sets `gojoBlueDragImmune = true`. Mahoraga becomes immune to Cursed Technique Lapse: Blue's gravitational drag pull (still takes projectile damage). Wheel glow: `#00FFFF`.
-- **Infinity** (frozen by Limitless): After **2 Infinity freeze exposures** (`infinityAdaptFreezeCount >= 2`), sets `gojoInfinityImmune = true` and `adapted.melee = true`. Mahoraga completely bypasses Gojo's Limitless Infinity barrier from that point forward. Wheel glow: `#A0C8FF`.
+- **Infinity** (frozen by Limitless): After **10 Infinity freeze exposures** (`infinityAdaptFreezeCount >= 10`), sets `gojoInfinityImmune = true` and `adapted.melee = true`. Mahoraga completely bypasses Gojo's Limitless Infinity barrier from that point forward. Wheel glow: `#A0C8FF`.
 - Each Gojo adaptation color is permanently tracked in `gojoAdaptColorHistory[]` for the wheel sphere visuals (no duplicates, max 4: blue, red, purple, infinity).
 
 ## 8. Counter-Attack After Wheel Click

@@ -18,7 +18,7 @@ export const HitImpactSystem = {
    * Checks if two fighters are on the same team.
    */
   areOnSameTeam(ownerIndex, targetIndex) {
-    if (state.mode !== GAME_MODES.TWO_VS_TWO && state.mode !== GAME_MODES.STAND_OFF_1V2) return false;
+    if (state.mode !== GAME_MODES.TWO_VS_TWO && state.mode !== GAME_MODES.STAND_OFF_1V2 && state.mode !== GAME_MODES.BOSS_BATTLE && state.mode !== 'Boss Battle' && state.mode !== '1v2 Stand Off') return false;
     const ownerTeam = state.getFighterTeam(ownerIndex);
     const targetTeam = state.getFighterTeam(targetIndex);
     return ownerTeam !== null && ownerTeam === targetTeam;
@@ -534,8 +534,11 @@ export const HitImpactSystem = {
       projectile.hitFighters.add(target);
       
       // Apply Zeus Debuffs
-      if (Math.random() < (CONFIG.zeus.staticChance || 0)) {
-        target.staticDebuffTimer = CONFIG.zeus.staticDuration || 100;
+      if (Math.random() < (CONFIG.zeus?.staticChance ?? 0.40)) {
+        target.staticDebuffTimer = CONFIG.zeus?.staticDuration ?? 100;
+      }
+      if (target.applySlow && Math.random() < (CONFIG.zeus?.paralyzeChance ?? 0.25)) {
+        target.applySlow(CONFIG.zeus?.paralyzeDuration ?? 50, CONFIG.zeus?.paralyzeSlowMultiplier ?? 0.5);
       }
 
       const zeusAttacker = (typeof projectile.owner === 'number' && state.fighters) ? state.fighters[projectile.owner] : (attacker || null);
@@ -570,11 +573,11 @@ export const HitImpactSystem = {
       }
       
       // Apply visual thunder roots effect
-      target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration || 45);
+      target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration ?? 45);
       
       // Add vertical thunder strike visual and electric roots
       if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
-      const strikeLife = CONFIG.zeus?.stormStrikeVisualLife || 15;
+      const strikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 15;
       state.zeusStormStrikes.push({
         x: target.x,
         y: target.y,
@@ -582,8 +585,8 @@ export const HitImpactSystem = {
         maxLife: strikeLife
       });
       
-      spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius || 50, 'lightningTrail');
-      spawnSparks(target.x, target.y, CONFIG.zeus?.shootSparkCount || 12, 'lightningTrail', CONFIG.zeus?.color || '#00FFFF');
+      spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius ?? 50, 'lightningTrail');
+      spawnSparks(target.x, target.y, CONFIG.zeus?.shootSparkCount ?? 12, 'lightningTrail', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
       
       // Play thunder strike sound on basic attack hit
       if (attacker && typeof attacker._def !== 'undefined') {
@@ -595,10 +598,10 @@ export const HitImpactSystem = {
       
       if (projectile.chainCount > 0) {
         projectile.chainCount--;
-        projectile.damage *= (CONFIG.zeus.chainDamageMultiplier || 0.8);
+        projectile.damage *= (CONFIG.zeus?.chainDamageMultiplier ?? 0.8);
         
         // Find nearest valid enemy to chain towards
-        let bestDist = (CONFIG.zeus.chainRange || 220) ** 2;
+        let bestDist = (CONFIG.zeus?.chainRange ?? 220) ** 2;
         let bestTarget = null;
         
         const checkTarget = (t, index = null) => {
@@ -633,13 +636,13 @@ export const HitImpactSystem = {
           const ddx = bestTarget.x - projectile.x;
           const ddy = bestTarget.y - projectile.y;
           const dist = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
-          const speed = Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy) || 1;
+          const speed = Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy) || (CONFIG.zeus?.lightningSpeed ?? 30);
           projectile.vx = (ddx / dist) * speed;
           projectile.vy = (ddy / dist) * speed;
-          projectile.life = 100;
+          projectile.life = CONFIG.zeus?.lightningLife ?? 100;
         } else {
           const angle = Math.atan2(projectile.vy, projectile.vx) + (Math.random() - 0.5) * Math.PI;
-          const speed = Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy) || 1;
+          const speed = Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy) || (CONFIG.zeus?.lightningSpeed ?? 30);
           projectile.vx = Math.cos(angle) * speed;
           projectile.vy = Math.sin(angle) * speed;
         }

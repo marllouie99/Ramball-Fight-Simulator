@@ -2,6 +2,9 @@
 // Uryu Ishida — The Last Quincy & Sternritter "A" Config
 // ─────────────────────────────────────────────
 export const uryuConfig = {
+  bossTitle: 'Last Quincy',
+  title: 'Last Quincy',
+
   // ── Base Attributes ──
   hp: 230,
   speed: 6.2,

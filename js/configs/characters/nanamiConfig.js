@@ -3,6 +3,9 @@
 // ─────────────────────────────────────────────
 
 export const nanamiConfig = {
+  bossTitle: '7:3 Ratio Sorcerer',
+  title: '7:3 Ratio Sorcerer',
+
   // Base Attributes
   hp: 195,
   speed: 5.5,

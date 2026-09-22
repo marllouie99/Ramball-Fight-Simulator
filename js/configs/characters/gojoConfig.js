@@ -18,6 +18,8 @@ export const gojoConfig = {
   cooldown: 80,
   projectileSpeedMultiplier: 6.0,
   ability: 'Limitless',
+  bossTitle: 'The Honored One',
+  title: 'The Honored One',
   desc: 'Uses Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
 
   // ── 1. Limitless Infinity Passive Barrier ──

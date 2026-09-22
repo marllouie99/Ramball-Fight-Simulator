@@ -265,7 +265,7 @@ export function drawFaceOffThumbnailScreen() {
   let leftThemeColor = getFaceOffThemeColor(p1Def, '#38bdf8');
   let rightThemeColor = getFaceOffThemeColor(p2Def, '#e51a2e');
 
-  if (mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2') {
+  if (mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
     const t1 = Math.min(1.0, timer / 36);
     const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
     const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
@@ -338,7 +338,7 @@ export function drawFaceOffThumbnailScreen() {
     drawAnimeGrungeSplitBackground(ctx, canvas.width, canvas.height, leftThemeColor, rightThemeColor, timer);
 
     // 2. Render Mode-Specific Side-by-Side Face-Off Layout with "VS" to Countdown Transition
-    if (mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2') {
+    if (mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
       draw1v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, p3Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
     } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2') {
       draw2v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p3Def, p2Def, p4Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
@@ -1186,9 +1186,9 @@ function draw1v2FaceOff(ctx, width, height, p1Def, p2Def, p3Def, scale, timer, l
     ctx.restore();
   }
 
-  // 4. Center "1 VS 2" to Countdown Transition
+  // 4. Center "BOSS BATTLE" to Countdown Transition
   if (timer >= 96) {
-    drawCenterUnifiedCountdown(ctx, width / 2, centerY, timer, activeP1Def?.color || leftColor, rightColor, exitProgress, '1 VS 2');
+    drawCenterUnifiedCountdown(ctx, width / 2, centerY, timer, activeP1Def?.color || leftColor, rightColor, exitProgress, 'BOSS BATTLE');
   }
 }
 

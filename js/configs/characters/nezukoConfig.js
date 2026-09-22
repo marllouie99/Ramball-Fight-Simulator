@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const nezukoConfig = {
+  bossTitle: 'Demon Princess',
+  title: 'Demon Princess',
+
   // Baseline Attributes
   hp: 370,
   maxHpRatio: 1.0,

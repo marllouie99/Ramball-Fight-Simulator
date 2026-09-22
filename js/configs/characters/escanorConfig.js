@@ -1,9 +1,12 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Escanor Character Config
 // The Seven Deadly Sins (Nanatsu no Taizai) — Lion's Sin of Pride
 // ─────────────────────────────────────────────
 
 export const escanorConfig = {
+  bossTitle: 'Lion Sin of Pride',
+  title: 'Lion Sin of Pride',
+
   // Baseline Attributes
   hp: 390,
   maxHpRatio: 1.0,
@@ -67,7 +70,7 @@ export const escanorConfig = {
   chopHitPauseFrames: 10,          // Cinematic hit-pause frame freeze upon axe impact (~0.43s)
   chopHitTremorIntensity: 1.5,     // Micro-tremor amplitude (px) during mid-chop hit-pause for visceral blade resistance
   chopBladeRadius: 24,             // Half-width radius of Rhitta's crescent blade collision capsule (eliminates phantom hits)
-  chopFrontalArcLimit: 1.34,       // Max angular offset from aim angle (rad, ~77°) to register forward cleave hit
+  chopFrontalArcLimit: 1.54,       // Max angular offset from aim angle (rad, ~77°) to register forward cleave hit
   chopLungeSpeed: 4.5,             // Physical forward step momentum speed during the downward chop strike
   basicImpactShake: 10.0,           // Concussive arena shake on initial weapon contact
   basicImpactShakeDuration: 12,

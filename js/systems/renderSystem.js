@@ -36,6 +36,7 @@ import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserke
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
 import { getAudioLatencyMs } from './soundSystem.js';
+import { BossAuraRenderer, BossPhaseTransitionVfx, BossEntranceSequence } from '../bosses/index.js';
 // Cached DOM elements to adhere strictly to Rule 13 (UI & DOM Query Caching Requirement)
 let _cachedHudTop = null;
 let _cachedHudBot = null;
@@ -106,6 +107,8 @@ export function renderGame() {
       const maxTimer = (state.screenShake.maxTimer && state.screenShake.maxTimer > 0) ? state.screenShake.maxTimer : state.screenShake.timer;
       const dampRatio = maxTimer > 0 ? (state.screenShake.timer / maxTimer) : 1.0;
       const is1v2OrFFA = (typeof state !== 'undefined') && (
+        state.mode === 'Boss Battle' ||
+        state.mode === GAME_MODES.BOSS_BATTLE ||
         state.mode === GAME_MODES.STAND_OFF_1V2 || 
         state.mode === '1v2 Stand Off' || 
         state.mode === '1v2' ||
@@ -416,6 +419,16 @@ export function renderGame() {
           }
         }
 
+        // Draw Boss ground aura sigils and phase transition effects underneath the boss body
+        if (state.fighters) {
+          for (const f of state.fighters) {
+            if (f && f.isBoss && f.hp > 0) {
+              BossAuraRenderer.drawBossAura(state.ctx, f);
+              BossPhaseTransitionVfx.draw(state.ctx, f);
+            }
+          }
+        }
+
         drawFighters(); // Draw fighters ON TOP of dim screens & domain structures so fighters stay 100% visible & un-tinted!
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke
         drawIllusions(); // Draw Doppleganger illusions
@@ -554,6 +567,8 @@ export function renderGame() {
         if (isDarkPlaying && state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
           state.battleStartFadeTimer = 0;
         }
+      } else if (state.gameState === 'boss_intro' || BossEntranceSequence.isActive) {
+        BossEntranceSequence.draw(state.topLevelUiCtx || state.ctx);
       } else if (state.gameState === 'countdown') {
         drawCountdown();
 
@@ -610,7 +625,8 @@ export function renderGame() {
         (state.wastedOverlay && state.wastedOverlay.active) ||
         (state.killFeed && state.killFeed.length > 0) ||
         (state.cameraToast && state.cameraToast.timer > 0) ||
-        ['countdown', 'paused', 'roundEnd', 'matchEnd'].includes(state.gameState)
+        BossEntranceSequence.isActive ||
+        ['boss_intro', 'countdown', 'paused', 'roundEnd', 'matchEnd'].includes(state.gameState)
       );
       state.topLevelUiSprite.visible = hasTopUi;
       if (hasTopUi) {

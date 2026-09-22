@@ -101,6 +101,7 @@ globalThis.performance = { now: () => Date.now() };
 async function runTagMatchTests() {
   console.log('🥋 [Tag Match Test Suite] Starting 3v3 Relay mode tests...');
 
+  const { FIGHTER_CLASS_MAP } = await import('../js/entities/factories/fighterFactory.js');
   const { state } = await import('../js/core/state.js');
   const { GAME_MODES, MODE_SETTINGS } = await import('../js/core/modeConfig.js');
   const { reinitFighters, spawnTagInFighter } = await import('../js/core/gameFlow.js');

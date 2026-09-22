@@ -1,5 +1,5 @@
 import { Fighter } from '../fighter.js';
-import { state } from '../../core/state.js';
+import { state, registerFighterClassMap } from '../../core/state.js';
 import { drawSketchyCircle, drawPixelHand } from '../../graphics/renderers/fighterRenderer.js';
 import { NormalFighter } from '../fighters/NormalFighter.js';
 import { AimbotFighter } from '../fighters/AimbotFighter.js';
@@ -246,3 +246,6 @@ wrapFighterDraw(Fighter);
 for (const key in FIGHTER_CLASS_MAP) {
   wrapFighterDraw(FIGHTER_CLASS_MAP[key]);
 }
+
+// Synchronously register the class map into state to eliminate race conditions
+registerFighterClassMap(FIGHTER_CLASS_MAP);

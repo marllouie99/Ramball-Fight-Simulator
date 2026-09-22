@@ -13,7 +13,8 @@ import {
 export const GAME_MODES = {
   ONE_VS_ONE: '1v1',
   STAND_OFF: 'Stand Off',
-  STAND_OFF_1V2: '1v2 Stand Off',
+  STAND_OFF_1V2: 'Boss Battle',
+  BOSS_BATTLE: 'Boss Battle',
   TWO_VS_TWO: '2v2',
   FFA: 'FFA',
   TLFS: 'TLFS',
@@ -24,6 +25,25 @@ export const GAME_MODES = {
   TACTICAL_2V2: 'Tactical 2v2',
   TACTICAL_FFA: 'Tactical FFA',
   TACTICAL_RANDOM: 'Tactical Random',
+};
+
+const _bossBattleSettings = {
+  label: 'Boss Battle',
+  rounds: 1,
+  hpMultiplier: 1.0,
+  fixedHp: 500, // For the challengers
+  soloFixedHp: 1000, // For the boss
+  speedMultiplier: 1.00,
+  initialFuelPickups: 2,
+  arenaShakeIntensity: 3.0,
+  arenaShakeDuration: 3,
+  supportFourFighters: false,
+  maxAfterimages: 2,
+  afterimageDecayMultiplier: 1.1,
+  teamColors: {
+    team0: '#ff4d4d', // Boss
+    team1: '#4da3ff', // Challengers
+  },
 };
 
 export const MODE_SETTINGS = {
@@ -49,24 +69,9 @@ export const MODE_SETTINGS = {
     maxAfterimages: 6, // Configurable limit for afterimages in 1v1 Stand Off mode
     afterimageDecayMultiplier: 1.2,
   },
-  [GAME_MODES.STAND_OFF_1V2]: {
-    label: '1v2 Stand Off',
-    rounds: 1,
-    hpMultiplier: 1.0,
-    fixedHp: 500, // For the duo
-    soloFixedHp: 500, // For the alone fighter
-    speedMultiplier: 1.00,
-    initialFuelPickups: 2,
-    arenaShakeIntensity: 3.0, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)
-    arenaShakeDuration: 3,    // Configurable arena shake duration (in frames) for 1v2 mode
-    supportFourFighters: false, // We will manually handle 3 fighters
-    maxAfterimages: 2, // Configurable limit for afterimages in 1v2 Stand Off mode
-    afterimageDecayMultiplier: 1.1,
-    teamColors: {
-      team0: '#ff4d4d', // Solo
-      team1: '#4da3ff', // Duo
-    },
-  },
+  [GAME_MODES.STAND_OFF_1V2]: _bossBattleSettings,
+  '1v2 Stand Off': _bossBattleSettings,
+  'Boss Battle': _bossBattleSettings,
   [GAME_MODES.TLFS]: {
     label: 'TLFS',
     rounds: 1, // Only 1 round in TLFS
@@ -140,6 +145,9 @@ export const MODE_MAX_AFTERIMAGES = Object.fromEntries(
 export const MODE_TEAM_COLORS = {
   [GAME_MODES.TWO_VS_TWO]: MODE_SETTINGS[GAME_MODES.TWO_VS_TWO]?.teamColors,
   [GAME_MODES.STAND_OFF_1V2]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,
+  [GAME_MODES.BOSS_BATTLE]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,
+  '1v2 Stand Off': MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,
+  'Boss Battle': MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,
   [GAME_MODES.TAG_MATCH]: MODE_SETTINGS[GAME_MODES.TAG_MATCH]?.teamColors,
   [GAME_MODES.TACTICAL_4V4]: TACTICAL_MODE_SETTINGS[TACTICAL_GAME_MODES.TACTICAL_4V4]?.teamColors,
   [GAME_MODES.TACTICAL_2V2]: TACTICAL_MODE_SETTINGS[TACTICAL_GAME_MODES.TACTICAL_2V2]?.teamColors,

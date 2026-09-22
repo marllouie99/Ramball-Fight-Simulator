@@ -130,22 +130,53 @@ export function drawSlowEffect(ctx, baseRadius) {
 
 export function drawElectricStunEffect(ctx, baseRadius, useAggressiveMode) {
   ctx.save();
+  const now = Date.now();
   
-  // Clean electric gold pulse on the body
-  ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+  // 1. Clean electric gold pulse on the body
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.16)';
   ctx.beginPath();
   ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
   ctx.fill();
 
+  // 2. Tilted 3D Golden/Cyan Electric Arcs ORBITING around the enemy's body
+  const stunOrbits = [
+    { tilt: -0.38, rMult: 1.26, bRatio: 0.50, speed: 0.0080, span: 1.8, jitter: 3.8, phase: 0 },
+    { tilt: 0.58,  rMult: 1.32, bRatio: 0.44, speed: -0.0070, span: 2.0, jitter: 4.2, phase: 2.8 }
+  ];
+
+  for (let i = 0; i < stunOrbits.length; i++) {
+    const ob = stunOrbits[i];
+    const orbitR = baseRadius * ob.rMult;
+    const curAngle = now * ob.speed + ob.phase;
+    _drawOrbitingElectricArc(
+      ctx, orbitR, ob.bRatio, ob.tilt, curAngle, ob.span, 1.0, ob.jitter, now + i * 67,
+      'rgba(255, 215, 0, ', 'rgba(255, 255, 255, '
+    );
+  }
+
+  // 3. Orbiting golden spark particles
+  const numSparks = 4;
+  ctx.fillStyle = '#FFFFFF';
+  for (let s = 0; s < numSparks; s++) {
+    const ob = stunOrbits[s % stunOrbits.length];
+    const sparkAngle = (now * ob.speed * 1.25) + (s * (Math.PI * 2 / numSparks));
+    const ex = Math.cos(sparkAngle) * (baseRadius * ob.rMult);
+    const ey = Math.sin(sparkAngle) * (baseRadius * ob.rMult * ob.bRatio);
+    const cosT = Math.cos(ob.tilt);
+    const sinT = Math.sin(ob.tilt);
+    const sx = ex * cosT - ey * sinT;
+    const sy = ex * sinT + ey * cosT;
+    ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+  }
+
   // OPTIMIZATION: Skip shockwaves on low-end machines
   if (!useAggressiveMode) {
-    // Expanding golden electricity shockwaves
-    const timeFactor1 = (Date.now() % 200) / 200; // Loops every 200ms
-    const timeFactor2 = ((Date.now() + 100) % 200) / 200; // Offset by 100ms
+    const timeFactor1 = (now % 200) / 200; // Loops every 200ms
+    const timeFactor2 = ((now + 100) % 200) / 200; // Offset by 100ms
     
     // Inner thicker shockwave
     ctx.strokeStyle = `rgba(255, 235, 120, ${1 - timeFactor1})`;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(0, 0, baseRadius * (1 + timeFactor1 * 1.5), 0, Math.PI * 2);
     ctx.stroke();
@@ -326,29 +357,61 @@ function _drawElectricCorona(ctx, baseRadius, alpha) {
 }
 
 /**
- * Draws a multi-segmented jagged high-voltage lightning arc between two points.
+ * Draws a high-voltage electric arc dynamically orbiting around the character's body in pseudo-3D elliptical space.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} orbitRadius - Major semi-axis radius
+ * @param {number} semiMinorRatio - Elliptical squash factor (0.35 - 0.65 for pseudo-3D perspective)
+ * @param {number} orbitTilt - Incline tilt angle of the orbital plane in radians
+ * @param {number} curAngle - Current orbital position angle of the arc head (radians)
+ * @param {number} arcSpan - Angle length of the trailing arc (radians)
+ * @param {number} alpha - Overall opacity multiplier
+ * @param {number} jitterAmt - Maximum jagged zig-zag deviation amplitude
+ * @param {number} seed - Unique animation seed
  */
-function _drawJaggedElectricArc(ctx, x1, y1, x2, y2, alpha, jitterAmt, now) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const dist = Math.hypot(dx, dy) || 1;
-  const steps = Math.max(4, Math.floor(dist / 8));
-  const nx = -dy / dist;
-  const ny = dx / dist;
+function _drawOrbitingElectricArc(ctx, orbitRadius, semiMinorRatio, orbitTilt, curAngle, arcSpan, alpha, jitterAmt, seed, glowColor = 'rgba(0, 220, 255, ', coreColor = 'rgba(255, 255, 255, ') {
+  const steps = 12;
+  const cosT = Math.cos(orbitTilt);
+  const sinT = Math.sin(orbitTilt);
+  const b = orbitRadius * semiMinorRatio;
 
-  const points = [{ x: x1, y: y1 }];
-  for (let s = 1; s < steps; s++) {
-    const t = s / steps;
-    const basePx = x1 + dx * t;
-    const basePy = y1 + dy * t;
-    const wave = Math.sin(now * 0.05 + s * 17.3);
-    const offset = wave * jitterAmt;
-    points.push({ x: basePx + nx * offset, y: basePy + ny * offset });
+  // 0. Faint ionized orbital guide track for pseudo-3D orbital depth
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, orbitRadius, b, orbitTilt, 0, Math.PI * 2);
+  ctx.strokeStyle = `${glowColor}${0.14 * alpha})`;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.restore();
+
+  const points = [];
+  for (let s = 0; s <= steps; s++) {
+    const u = s / steps;
+    // Angle along the orbital ellipse from tail (u=0) to head (u=1)
+    const phi = curAngle - (1 - u) * arcSpan;
+    const ex = Math.cos(phi) * orbitRadius;
+    const ey = Math.sin(phi) * b;
+
+    // Rotate into tilted orbital plane
+    const rx = ex * cosT - ey * sinT;
+    const ry = ex * sinT + ey * cosT;
+
+    // Tangent vector along ellipse for perpendicular electric discharge jitter
+    const tx = -Math.sin(phi) * orbitRadius * cosT - Math.cos(phi) * b * sinT;
+    const ty = -Math.sin(phi) * orbitRadius * sinT + Math.cos(phi) * b * cosT;
+    const tLen = Math.hypot(tx, ty) || 1;
+    const nx = -ty / tLen;
+    const ny = tx / tLen;
+
+    // High frequency electric vibration (tapered at both tips)
+    const taper = Math.sin(u * Math.PI);
+    const wave = Math.sin(seed * 0.06 + s * 19.3 + u * 12.1);
+    const j = wave * jitterAmt * taper;
+
+    points.push({ x: rx + nx * j, y: ry + ny * j });
   }
-  points.push({ x: x2, y: y2 });
 
-  // Outer electric cyan glow stroke
-  ctx.strokeStyle = `rgba(0, 235, 255, ${0.85 * alpha})`;
+  // 1. Outer Electric Glow Stroke (Concentric semi-transparent stroke, Rule 11 compliant)
+  ctx.strokeStyle = `${glowColor}${0.75 * alpha})`;
   ctx.lineWidth = 3.6;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'bevel';
@@ -359,64 +422,90 @@ function _drawJaggedElectricArc(ctx, x1, y1, x2, y2, alpha, jitterAmt, now) {
   }
   ctx.stroke();
 
-  // Inner brilliant white core stroke
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
-  ctx.lineWidth = 1.8;
+  // 2. Inner White-Hot Electric Core Stroke
+  ctx.strokeStyle = `${coreColor}${0.95 * alpha})`;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) {
     ctx.lineTo(points[i].x, points[i].y);
   }
   ctx.stroke();
+
+  // 3. Bright Spark Bead at the leading tip of the orbiting bolt
+  const head = points[points.length - 1];
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(head.x, head.y, 2.0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `${glowColor}${0.85 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(head.x, head.y, 3.4, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 /**
- * Renders high-voltage electric shock on enemy when struck by Zeus lightning.
+ * Renders high-voltage electric shock dynamically ORBITING around enemy body when struck by Zeus lightning.
  */
 export function drawThunderRootsEffect(ctx, baseRadius, timer = 45) {
   ctx.save();
   const now = Date.now();
   const alpha = Math.max(0.35, Math.min(1.0, (timer || 45) / 30));
 
+  // 1. Outer electric corona glow & energetic vibrating rim
   _drawElectricCorona(ctx, baseRadius, alpha);
 
-  // Energetic lightning arcs wrapping across and around body circle
-  const numArcs = 5;
-  for (let a = 0; a < numArcs; a++) {
-    const startAngle = (now * 0.006 * (a % 2 === 0 ? 1 : -1)) + (a * (Math.PI * 2 / numArcs));
-    const endAngle = startAngle + Math.PI * (0.65 + (a % 3) * 0.25);
-    const r1 = baseRadius * (0.80 + (a % 2) * 0.25);
-    const r2 = baseRadius * (0.85 + ((a + 1) % 2) * 0.20);
-    const x1 = Math.cos(startAngle) * r1;
-    const y1 = Math.sin(startAngle) * r1;
-    const x2 = Math.cos(endAngle) * r2;
-    const y2 = Math.sin(endAngle) * r2;
+  // 2. Multi-angled 3D electric arcs ORBITING around the enemy's body
+  const orbits = [
+    { tilt: -0.45, rMult: 1.22, bRatio: 0.52, speed: 0.0075, span: 1.8, jitter: 4.2, phase: 0 },
+    { tilt: 0.60,  rMult: 1.32, bRatio: 0.48, speed: -0.0065, span: 2.1, jitter: 4.8, phase: 2.4 },
+    { tilt: -1.25, rMult: 1.18, bRatio: 0.60, speed: 0.0085, span: 1.6, jitter: 3.8, phase: 4.2 },
+    { tilt: 0.15,  rMult: 1.38, bRatio: 0.38, speed: -0.0095, span: 2.0, jitter: 5.0, phase: 1.1 }
+  ];
 
-    _drawJaggedElectricArc(ctx, x1, y1, x2, y2, alpha, baseRadius * 0.35, now + a * 50);
+  for (let i = 0; i < orbits.length; i++) {
+    const ob = orbits[i];
+    const orbitR = baseRadius * ob.rMult;
+    const curAngle = now * ob.speed + ob.phase;
+    _drawOrbitingElectricArc(ctx, orbitR, ob.bRatio, ob.tilt, curAngle, ob.span, alpha, ob.jitter, now + i * 77);
   }
 
-  // Snapping micro-sparks along rim
-  const numSparks = 4;
+  // 3. Orbiting detached electric micro-sparks along orbital perimeters
+  const numOrbitSparks = 6;
   ctx.fillStyle = '#FFFFFF';
-  for (let i = 0; i < numSparks; i++) {
-    const sparkAngle = (now * 0.008 * (i % 2 === 0 ? -1 : 1)) + (i * Math.PI / 2);
-    const sr = baseRadius * 1.05 + Math.sin(now * 0.02 + i) * 3;
-    const sx = Math.cos(sparkAngle) * sr;
-    const sy = Math.sin(sparkAngle) * sr;
+  for (let s = 0; s < numOrbitSparks; s++) {
+    const ob = orbits[s % orbits.length];
+    const sparkAngle = (now * ob.speed * 1.3) + (s * (Math.PI * 2 / numOrbitSparks));
+    const ex = Math.cos(sparkAngle) * (baseRadius * ob.rMult);
+    const ey = Math.sin(sparkAngle) * (baseRadius * ob.rMult * ob.bRatio);
+    const cosT = Math.cos(ob.tilt);
+    const sinT = Math.sin(ob.tilt);
+    const sx = ex * cosT - ey * sinT;
+    const sy = ex * sinT + ey * cosT;
+    
+    // Spark core
     ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+    
+    // Cyan glow around spark
+    ctx.fillStyle = `rgba(0, 240, 255, ${0.7 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
   }
 
   ctx.restore();
 }
 
 /**
- * Renders static electricity debuff visual when target is charged by Zeus lightning.
+ * Renders static electricity debuff visual with crackling electric rings ORBITING around enemy body.
  */
-export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 120) {
+export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 100) {
   ctx.save();
   const now = Date.now();
   const pulse = Math.sin(now * 0.015) * 0.5 + 0.5;
-  const alpha = Math.max(0.3, Math.min(1.0, (timer || 120) / 40));
+  const alpha = Math.max(0.3, Math.min(1.0, (timer || 100) / 40));
 
   // 1. Faint buzzing electric halo
   ctx.strokeStyle = `rgba(0, 235, 255, ${0.45 * alpha * (0.8 + pulse * 0.2)})`;
@@ -425,19 +514,35 @@ export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 120) {
   ctx.arc(0, 0, baseRadius * (1.06 + pulse * 0.06), 0, Math.PI * 2);
   ctx.stroke();
 
-  // 2. 3 crackling static micro-arcs skittering around the body
-  for (let i = 0; i < 3; i++) {
-    const angle = (now * 0.007 + i * 2.1);
-    const arcSpan = 0.5 + (i * 0.2);
-    const r = baseRadius * (0.95 + (Math.sin(now * 0.03 + i) * 0.15));
-    const x1 = Math.cos(angle) * r;
-    const y1 = Math.sin(angle) * r;
-    const x2 = Math.cos(angle + arcSpan) * r;
-    const y2 = Math.sin(angle + arcSpan) * r;
-    _drawJaggedElectricArc(ctx, x1, y1, x2, y2, alpha * 0.8, baseRadius * 0.18, now + i * 80);
+  // 2. Persistent static electric arcs ORBITING around the body
+  const staticOrbits = [
+    { tilt: 0.40,  rMult: 1.24, bRatio: 0.50, speed: 0.0050, span: 1.7, jitter: 3.2, phase: 0.5 },
+    { tilt: -0.70, rMult: 1.30, bRatio: 0.45, speed: -0.0045, span: 1.9, jitter: 3.6, phase: 3.2 }
+  ];
+
+  for (let i = 0; i < staticOrbits.length; i++) {
+    const ob = staticOrbits[i];
+    const orbitR = baseRadius * ob.rMult;
+    const curAngle = now * ob.speed + ob.phase;
+    _drawOrbitingElectricArc(ctx, orbitR, ob.bRatio, ob.tilt, curAngle, ob.span, alpha * 0.85, ob.jitter, now + i * 93);
   }
 
-  // 3. Upright floating "⚡ STATIC" status badge above head
+  // Orbiting static spark nodes
+  const numStaticSparks = 4;
+  ctx.fillStyle = '#FFFFFF';
+  for (let s = 0; s < numStaticSparks; s++) {
+    const ob = staticOrbits[s % staticOrbits.length];
+    const sparkAngle = (now * ob.speed * 1.2) + (s * (Math.PI * 2 / numStaticSparks));
+    const ex = Math.cos(sparkAngle) * (baseRadius * ob.rMult);
+    const ey = Math.sin(sparkAngle) * (baseRadius * ob.rMult * ob.bRatio);
+    const cosT = Math.cos(ob.tilt);
+    const sinT = Math.sin(ob.tilt);
+    const sx = ex * cosT - ey * sinT;
+    const sy = ex * sinT + ey * cosT;
+    ctx.fillRect(sx - 1.2, sy - 1.2, 2.4, 2.4);
+  }
+
+  // 3. Upright floating "⚡ STATIC (+33%)" status badge above head
   ctx.save();
   if (typeof ctx.getTransform === 'function') {
     const m = ctx.getTransform();
@@ -453,9 +558,9 @@ export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 120) {
   ctx.textBaseline = 'bottom';
   ctx.lineWidth = 2.8;
   ctx.strokeStyle = 'rgba(10, 20, 35, 0.90)';
-  ctx.strokeText('⚡ STATIC (+25%)', 0, badgeY);
+  ctx.strokeText('⚡ STATIC (+33%)', 0, badgeY);
   ctx.fillStyle = '#00F3FF';
-  ctx.fillText('⚡ STATIC (+25%)', 0, badgeY);
+  ctx.fillText('⚡ STATIC (+33%)', 0, badgeY);
 
   ctx.restore();
   ctx.restore();

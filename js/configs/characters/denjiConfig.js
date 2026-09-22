@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const denjiConfig = {
+  bossTitle: 'Chainsaw Man',
+  title: 'Chainsaw Man',
+
   // Baseline Attributes
   hp: 360,
   maxHpRatio: 1.0,

@@ -2,6 +2,9 @@
 // Aoi Todo — Boogie Woogie Brawler Config
 // ─────────────────────────────────────────────
 export const todoConfig = {
+    bossTitle: '530,000 IQ Brother',
+    title: '530,000 IQ Brother',
+
     // ── Base Attributes ──
     hp: 200,
     speed: 5.8,

@@ -32,6 +32,7 @@ import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { tacticalProjectileSystem } from '../../Tactical Force/systems/tacticalProjectileSystem.js';
 import { resetCamera } from '../systems/cameraSystem.js';
+import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -266,8 +267,8 @@ export function reinitFighters(isNewMatch = false) {
   } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4) {
     // Arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
-  } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
-    // 1v2 mode: Team 0 is p1, Team 1 is p2 and p3
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off') {
+    // 1v2 / Boss Battle mode: Team 0 is p1 (Boss), Team 1 is p2 and p3 (Challengers)
     fighterIndexes = [state.p1Index, state.p2Index, state.p3Index];
   }
  
@@ -298,16 +299,18 @@ export function reinitFighters(isNewMatch = false) {
       f.maxHp = hp;
       f.hp = hp;
     }
-  } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off') {
     const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
-    const soloFixedHp = MODE_SETTINGS[state.mode]?.soloFixedHp || 2000;
     state.fighters.forEach((f, idx) => {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
-        const baseHp = idx === 0 ? soloFixedHp : fixedHp;
-        const isMakima = (f.characterId === 'makima' || f.type === 'makima');
-        const hp = isMakima ? Math.round(baseHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : baseHp;
-        f.maxHp = hp;
-        f.hp = hp;
+        if (idx === 0) {
+          BossManager.initializeBoss(f);
+        } else {
+          const isMakima = (f.characterId === 'makima' || f.type === 'makima');
+          const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
+          f.maxHp = hp;
+          f.hp = hp;
+        }
       }
     });
   } else if (MODE_SETTINGS[state.mode]?.fixedHp) {
@@ -454,48 +457,53 @@ export function reinitFighters(isNewMatch = false) {
     const angle3 = Math.random() * Math.PI * 2;
     state.fighters[3].vx = Math.cos(angle3) * state.fighters[3].speed;
     state.fighters[3].vy = Math.sin(angle3) * state.fighters[3].speed;
-  } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
-    const leftX = arena.x + arena.width * 0.25;
-    const rightX = arena.x + arena.width * 0.75;
-    const centerY = arena.y + arena.height * 0.5;
-    const verticalSpread = arena.height * 0.25;
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off') {
+    // Boss Battle Triangle Formation: Boss at top center, Challengers at bottom-left and bottom-right
+    const centerX = arena.x + arena.width * 0.5;
+    const topY = arena.y + arena.height * 0.28;
+    const bottomY = arena.y + arena.height * 0.72;
+    const leftX = arena.x + arena.width * 0.28;
+    const rightX = arena.x + arena.width * 0.72;
 
-    // Team 1: Solo on left
+    // Team 1: Boss at top center, facing downward toward challengers
     if (state.fighters[0]) {
-      state.fighters[0].x = leftX;
-      state.fighters[0].y = centerY;
-      state.fighters[0].angle = 0;
-      state.fighters[0].gunAngle = 0;
-      state.fighters[0].rightGunAngle = 0;
-      state.fighters[0].leftGunAngle = 0;
+      state.fighters[0].x = centerX;
+      state.fighters[0].y = topY;
+      state.fighters[0].angle = Math.PI / 2;
+      state.fighters[0].gunAngle = Math.PI / 2;
+      state.fighters[0].rightGunAngle = Math.PI / 2;
+      state.fighters[0].leftGunAngle = Math.PI / 2;
       const angle0 = Math.random() * Math.PI * 2;
       state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
       state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
     }
 
-    // Team 2: Duo on right
+    // Team 2: Challenger 1 at bottom left, aiming toward Boss
     if (state.fighters[1]) {
-      state.fighters[1].x = rightX;
-      state.fighters[1].y = centerY - verticalSpread;
-      state.fighters[1].angle = Math.PI;
-      state.fighters[1].gunAngle = Math.PI;
-      state.fighters[1].rightGunAngle = Math.PI;
-      state.fighters[1].leftGunAngle = Math.PI;
-      const angle1 = Math.random() * Math.PI * 2;
-      state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
-      state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
+      state.fighters[1].x = leftX;
+      state.fighters[1].y = bottomY;
+      const angle1 = Math.atan2(topY - bottomY, centerX - leftX);
+      state.fighters[1].angle = angle1;
+      state.fighters[1].gunAngle = angle1;
+      state.fighters[1].rightGunAngle = angle1;
+      state.fighters[1].leftGunAngle = angle1;
+      const randAngle1 = Math.random() * Math.PI * 2;
+      state.fighters[1].vx = Math.cos(randAngle1) * state.fighters[1].speed;
+      state.fighters[1].vy = Math.sin(randAngle1) * state.fighters[1].speed;
     }
 
+    // Team 2: Challenger 2 at bottom right, aiming toward Boss
     if (state.fighters[2]) {
       state.fighters[2].x = rightX;
-      state.fighters[2].y = centerY + verticalSpread;
-      state.fighters[2].angle = Math.PI;
-      state.fighters[2].gunAngle = Math.PI;
-      state.fighters[2].rightGunAngle = Math.PI;
-      state.fighters[2].leftGunAngle = Math.PI;
-      const angle2 = Math.random() * Math.PI * 2;
-      state.fighters[2].vx = Math.cos(angle2) * state.fighters[2].speed;
-      state.fighters[2].vy = Math.sin(angle2) * state.fighters[2].speed;
+      state.fighters[2].y = bottomY;
+      const angle2 = Math.atan2(topY - bottomY, centerX - rightX);
+      state.fighters[2].angle = angle2;
+      state.fighters[2].gunAngle = angle2;
+      state.fighters[2].rightGunAngle = angle2;
+      state.fighters[2].leftGunAngle = angle2;
+      const randAngle2 = Math.random() * Math.PI * 2;
+      state.fighters[2].vx = Math.cos(randAngle2) * state.fighters[2].speed;
+      state.fighters[2].vy = Math.sin(randAngle2) * state.fighters[2].speed;
     }
   } else {
     // 1v1: Fighters on opposite sides, aligned horizontally, facing each other
@@ -829,7 +837,23 @@ export function proceedFromFaceOffToCountdown() {
       state.faceOffTimer = 216; // Fast-forward directly to match start
       return;
     }
+    const isBossBattle = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off');
+    if (isBossBattle && state.fighters && state.fighters[0]?.isBoss) {
+      state.gameState = 'boss_intro';
+      BossEntranceSequence.start(state.fighters[0], () => {
+        startMatchDirectlyFromFaceOff();
+      });
+      return;
+    }
     startMatchDirectlyFromFaceOff();
+    return;
+  }
+  const isBossBattle = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off');
+  if (isBossBattle && state.fighters && state.fighters[0]?.isBoss) {
+    state.gameState = 'boss_intro';
+    BossEntranceSequence.start(state.fighters[0], () => {
+      startCountdown();
+    });
     return;
   }
   startCountdown();
@@ -1066,11 +1090,22 @@ export function resetMatch(showFaceOff = true) {
   if (showFaceOff) {
     startFaceOffScreen(false);
   } else {
-    startCountdown();
+    const isBossBattle = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off');
+    if (isBossBattle && state.fighters && state.fighters[0]?.isBoss) {
+      state.gameState = 'boss_intro';
+      BossEntranceSequence.start(state.fighters[0], () => {
+        startCountdown();
+      });
+    } else {
+      startCountdown();
+    }
   }
 }
 
 export function goToTitle() {
+  BossManager.reset();
+  BossEntranceSequence.finish();
+
   if (state.announcerTimeoutIds) {
     state.announcerTimeoutIds.forEach(id => clearTimeout(id));
     state.announcerTimeoutIds = [];

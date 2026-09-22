@@ -2,6 +2,9 @@
 // Layla — Cosmic Marksman Config
 // ─────────────────────────────────────────────
 export const laylaConfig = {
+    bossTitle: 'Cosmic Gunner',
+    title: 'Cosmic Gunner',
+
     // ── Base Attributes ──
     hp: 55,
     speed: 4.5,

@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const cjConfig = {
+  bossTitle: 'Grove Street Legend',
+  title: 'Grove Street Legend',
+
   // ── 1. BASE ATTRIBUTES ──
   hp: 440,
   speed: 5.5,

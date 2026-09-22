@@ -3,7 +3,7 @@
 ## 1. Universal Fighter & Illusion Infinity Freeze Rule
 - ALL existing and future fighters, summoned minions, illusions, Doppelganger clones, turrets, and entities MUST be affected by Gojo's **Limitless Infinity barrier** when striking or approaching Gojo while Infinity is active (`infinityCooldown <= 0`).
 - The ONLY explicit lore exception is **Toji Fushiguro** (`characterId === 'toji'` or `type === 'toji'`), who wields the Inverted Spear of Heaven (ISOH) and Heavenly Restriction to bypass Limitless Infinity.
-- **Mahoraga** is blocked and frozen initially, but after 2 Infinity freeze exposures, Mahoraga's Eight-Handled Sword Wheel clicks to adapt (`gojoInfinityImmune = true` & `adapted.melee = true`), granting total immunity to Infinity freeze thereafter.
+- **Mahoraga** is blocked and frozen initially, but after 10 Infinity freeze exposures, Mahoraga's Eight-Handled Sword Wheel clicks to adapt (`gojoInfinityImmune = true` & `adapted.melee = true`), granting total immunity to Infinity freeze thereafter.
 
 ## 2. Multi-Target Proximity & Melee Attack Handling
 - **Proximity Contact**: When any enemy fighter or illusion enters close contact radius (`dist <= Gojo.r + entity.r`) while Gojo's Infinity is active, Gojo automatically triggers `triggerInfinityBlock(entity.x, entity.y, entity)`.

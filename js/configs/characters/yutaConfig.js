@@ -18,6 +18,8 @@ export const yutaConfig = {
   cooldown: 50,
   projectileSpeedMultiplier: 3.0,
   ability: 'Copy & Rika',
+  bossTitle: 'The Bush Camper',
+  title: 'The Bush Camper',
   desc: 'Summons Rika to assist Yuta in fight and uses Authentic Mutual Love domain.',
 
   // Passive: Reverse Cursed Technique (RCT) & Passive Regeneration
@@ -129,8 +131,6 @@ export const yutaConfig = {
   pureLoveBeamSlowMultiplier: 0.20,        // Speed reduction multiplier applied during beam recovery phase
   pureLoveBeamStunDuration: 50,           // Recovery stun duration frames after beam exposure
   pureLoveBeamShakeIntensity: 6,            // Arena shake intensity while beam is active (decays in final 30%)
-  pureLoveBeamRegenDebuffDuration: 1500,      // Duration (600 frames = 10s) of reduced healing/regen after beam exposure
-  pureLoveBeamRegenDebuffMultiplier: 1.00,  // Healing received multiplier (0.25 = 75% reduction) during the debuff
   pureLoveBeamDamageStackPerTick: 0.2,      // Permanent base damage increase for Yuta per beam hit tick
   pureLoveBeamLifestealPct: 0.5,            // Lifesteal percentage (0.1 = 10% of damage dealt) recovered as HP per beam hit tick
 

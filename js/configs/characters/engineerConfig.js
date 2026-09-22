@@ -3,6 +3,9 @@
 // ─────────────────────────────────────────────
 
 export const engineerConfig = {
+  bossTitle: 'Combat Engineer',
+  title: 'Combat Engineer',
+
   // Base Attributes
   hp: 400,
   speed: 5.0,

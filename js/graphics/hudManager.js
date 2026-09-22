@@ -5,10 +5,10 @@ import { drawBlueAimbotGun } from './weaponVisuals.js';
 import { drawPanel } from './ui.js';
 import { getFighterPreview } from './ui/FighterPreviewCache.js';
 
-import { syncHudPosition, initHudSync } from './ui/hudLayout.js';
+import { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking } from './ui/hudLayout.js';
 import { getSkillDataForFighter } from './ui/hudSkillProviders.js';
 
-export { syncHudPosition, initHudSync };
+export { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking };
 
 // Initialize immediately
 initHudSync();
@@ -98,6 +98,120 @@ export function getFighterHealthBarColor(fighter, ratio, isDark = null) {
   } catch (e) {}
 
   return fighter.themeColor || fighter.color || '#22c55e';
+}
+
+/**
+ * Resolves the primary theme color for any fighter entity.
+ */
+export function getFighterThemeColor(f, fallbackColor = '#38bdf8') {
+  if (!f) return fallbackColor;
+  const isYuta = Boolean(
+    f.characterId === 'yuta' ||
+    f.type === 'yuta' ||
+    (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta' || f._def.id === 23)) ||
+    (f.name && f.name.toUpperCase().includes('YUTA'))
+  );
+  if (isYuta) return '#FF1493';
+  return f.themeColor ||
+    f._def?.themeColor ||
+    (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].themeColor : null) ||
+    (f.characterId && CONFIG && CONFIG[f.characterId] ? CONFIG[f.characterId].themeColor : null) ||
+    f.color ||
+    f._def?.color ||
+    (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].color : null) ||
+    (f.characterId && CONFIG && CONFIG[f.characterId] ? CONFIG[f.characterId].color : null) ||
+    fallbackColor;
+}
+
+const BOSS_SUB_NAMES = {
+  yuta: 'The Bush Camper',
+  gojo: 'The Honored One',
+  sukuna: 'King of Curses',
+  toji: 'Sorcerer Killer',
+  saitama: 'One Punch Man',
+  genos: 'Demon Cyborg',
+  mahoraga: 'Divine General',
+  escanor: 'Lion Sin of Pride',
+  makima: 'Control Devil',
+  zeus: 'King of Olympus',
+  john_wick: 'Baba Yaga',
+  johnwick: 'Baba Yaga',
+  nanami: '7:3 Ratio Sorcerer',
+  mahito: 'Curse of Humanity',
+  yuji: 'Tiger of West Junior High',
+  todo: '530,000 IQ Brother',
+  cj: 'Grove Street Legend',
+  denji: 'Chainsaw Man',
+  reze: 'Bomb Devil',
+  nezuko: 'Demon Princess',
+  tanjiro: 'Sun Breathing Slayer',
+  zenitsu: 'Thunder Breathing Slayer',
+  inosuke: 'Beast Breathing Slayer',
+  nobara: 'Straw Doll Sorcerer',
+  megumi: 'Ten Shadows Summoner',
+  power: 'Blood Fiend',
+  uryu: 'Last Quincy',
+  ichigo: 'Substitute Soul Reaper',
+  ulquiorra: '4th Espada',
+  layla: 'Cosmic Gunner',
+  rubbick: 'Grand Magus',
+  engineer: 'Combat Engineer',
+  sharpshooter: 'Supreme Marksman',
+  normal: 'Supreme Marksman',
+  jazz: 'Dubstep Prodigy',
+  aimbot: 'Dubstep Prodigy',
+  spike: 'Thorn Brawler',
+  melee: 'Thorn Brawler',
+  laser: 'Beam Master',
+  bomber: 'Explosives Expert',
+  black: 'Shadow Operative',
+  ruby: 'Crimson Duelist',
+  musashi: 'Legendary Swordsman',
+  knight: 'Iron Paladin',
+  berserker: 'Untamed Warrior',
+  darkslategray: 'Obsidian Vanguard',
+  grenadier: 'Heavy Artillery',
+  gunslinger: 'Rapid Outlaw',
+  hydra: 'Multi-Headed Beast',
+  orange: 'Solar Striker',
+  dummy: 'Unbreakable Target',
+  targetdummy: 'Unbreakable Target',
+  doppleganger: 'Mirror Phantom',
+};
+
+/**
+ * Returns formatted boss subtitle (e.g. "- The Bush Camper -", "- The Honored One -").
+ */
+export function getBossSubName(fighter) {
+  if (!fighter) return '- Dreaded Arena Overlord -';
+  const rawId = String(fighter.characterId || fighter.type || (fighter._def && (fighter._def.id || fighter._def.type)) || '').toLowerCase();
+  const rawName = String(fighter.name || '').toLowerCase();
+
+  let title = (fighter.bossConfig && (fighter.bossConfig.bossTitle || fighter.bossConfig.title)) ||
+              fighter.bossTitle ||
+              (fighter._def && (fighter._def.bossTitle || fighter._def.title)) ||
+              (rawId && CONFIG && CONFIG[rawId] && (CONFIG[rawId].bossTitle || CONFIG[rawId].title)) ||
+              null;
+
+  if (!title) {
+    if (BOSS_SUB_NAMES[rawId]) {
+      title = BOSS_SUB_NAMES[rawId];
+    } else {
+      for (const key of Object.keys(BOSS_SUB_NAMES)) {
+        if (rawId.includes(key) || rawName.includes(key)) {
+          title = BOSS_SUB_NAMES[key];
+          break;
+        }
+      }
+    }
+  }
+
+  if (!title) {
+    title = 'Dreaded Arena Overlord';
+  }
+
+  const cleaned = String(title).trim().replace(/^[-–—\s]+|[-–—\s]+$/g, '');
+  return `- ${cleaned} -`;
 }
 
 /**
@@ -203,10 +317,20 @@ export function drawHUD() {
   const topContainer = _cachedTopContainer;
   const bottomContainer = _cachedBottomContainer;
 
+  const is1v2Mode = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2';
+
   // FOC & Tactical modes HUD visibility
   if (topContainer) {
-    topContainer.style.display = 'none';
-    topContainer.style.visibility = 'hidden';
+    if (is1v2Mode && hudOpacity > 0 && !CONFIG.hudHideAll && !CONFIG.hudHideHealthBars) {
+      topContainer.style.display = 'flex';
+      topContainer.style.visibility = 'visible';
+      topContainer.style.opacity = hudOpacity;
+      topContainer.style.pointerEvents = 'none';
+      updateTopHudCameraTracking(topContainer);
+    } else {
+      topContainer.style.display = 'none';
+      topContainer.style.visibility = 'hidden';
+    }
   }
   if (bottomContainer) {
     bottomContainer.style.display = 'none';
@@ -230,7 +354,6 @@ export function drawHUD() {
     containerBottom.classList.toggle('tactical-hud', isTactical);
     const is1v1Mode = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && fighters && fighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
     const isStandOffMode = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
-    const is1v2Mode = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
     const is2v2Mode = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
     const isTLFSMode = mode === GAME_MODES.TLFS || mode === 'TLFS';
     const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
@@ -246,6 +369,7 @@ export function drawHUD() {
       containerBottom.style.display = 'flex';
       containerBottom.style.visibility = 'visible';
       containerBottom.style.pointerEvents = 'auto';
+      updateBottomHudCameraTracking(containerBottom);
     }
   }
   if (containerLeft) {
@@ -1021,7 +1145,7 @@ function updateHealthHud() {
   const isTactical = isTacticalMatch(state);
   const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && fighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
   const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
-  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
+  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2';
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
@@ -1033,7 +1157,7 @@ function updateHealthHud() {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${q(f.divergentDashCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false},${f.isJetpackActive || false},${q(f.jetpackTimer)},${f.isBaguvixActive || false},${q(f.hesoyamShield)},${q(f.respect)},${q(f.jetpackCooldown)},${q(f.driveByCooldown)},${q(f.baguvixCooldown)},${q(f.baguvixTimer)},${q(f.driveByTimer)},${f.hasUsedHesoyam || false},${f.isDriveByActive || false},${f.isTypingCheat || false}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.fatalAdaptCooldown)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${q(f.divergentDashCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false},${f.isJetpackActive || false},${q(f.jetpackTimer)},${f.isBaguvixActive || false},${q(f.hesoyamShield)},${q(f.respect)},${q(f.jetpackCooldown)},${q(f.driveByCooldown)},${q(f.baguvixCooldown)},${q(f.baguvixTimer)},${q(f.driveByTimer)},${f.hasUsedHesoyam || false},${f.isDriveByActive || false},${f.isTypingCheat || false}`;
   }).join('|');
   const hpChanged = currentHpStr !== state._lastHpStr;
   const skillsChanged = currentSkillsStr !== state._lastSkillsStr;
@@ -1227,10 +1351,8 @@ function updateHealthHud() {
         : 1.0;
       const currentRegen = activeRate * regenMult;
 
-      if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
-        info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-      } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
-        const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50);
+      if (f.tojiRegenDebuffTimer > 0) {
+        const debuffMult = CONFIG.toji?.regenDebuffMultiplier ?? 0.40;
         const debuffedRegen = currentRegen * debuffMult;
         info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
       } else if (f.domainActive || isRikaAlive) {
@@ -1665,17 +1787,11 @@ function updateHealthHud() {
         const maxStages = CONFIG.mahoraga?.maxRctRegenStages ?? 6;
         const maxRegenRate = CONFIG.mahoraga?.maxRctRegenRate ?? 0.12;
         const effectiveStages = Math.min(totalStages, maxStages);
-        const maxPool = CONFIG.mahoraga?.maxRctHealingPool ?? ((f.maxHp || 250) * 1.5);
-        const poolDepleted = (f.totalRctHealedThisMatch || 0) >= maxPool;
-        const currentRegenRate = poolDepleted ? 0 : Math.min(maxRegenRate, effectiveStages * rctPerStage);
+        const currentRegenRate = Math.min(maxRegenRate, effectiveStages * rctPerStage);
         const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
-        if (poolDepleted) {
-          info.push(`<b>Regen:</b> Depleted <span style="color: #888888; font-size: 10px;">(Capped)</span>`);
-        } else if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
-          info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
-          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50);
+        if (f.tojiRegenDebuffTimer > 0) {
+          const debuffMult = CONFIG.toji?.regenDebuffMultiplier ?? 0.40;
           const debuffedRegenPerSec = Math.round(currentRegenPerSec * debuffMult);
           info.push(`<b>Regen:</b> +${debuffedRegenPerSec}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else if (totalStages > 0) {
@@ -2266,7 +2382,7 @@ function updateHealthHud() {
     };
   };
 
-  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null, titleAlign = 'left', singleColumn = false }) => {
+  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null, titleAlign = 'left', singleColumn = false, customHeaderHTML = '' }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
     const winnerStyle = '';
     const isTactical = isTacticalMatch(state) || (targetFighter && isTacticalFighter(targetFighter)) || (members && members.some(m => isTacticalFighter(m)));
@@ -2411,7 +2527,7 @@ function updateHealthHud() {
 
     const rightHeaderHTML = '';
 
-    const headerRowHTML = '';
+    const headerRowHTML = customHeaderHTML || '';
 
     const cardBgStyle = 'background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;';
     return `
@@ -2424,84 +2540,171 @@ function updateHealthHud() {
     `;
   };
 
-  const isCacheEmpty = is1v2
-    ? (_hudCache.fighters.size === 0 || _hudCache.teams.size === 0)
-    : (is2v2 ? _hudCache.teams.size === 0 : _hudCache.fighters.size === 0);
+  const isCacheEmpty = is2v2 ? (_hudCache.teams.size === 0) : (_hudCache.fighters.size === 0);
 
   if (isCacheEmpty) {
+    syncHudPosition();
     if (containerBottom) containerBottom.innerHTML = '';
     if (containerLeft) containerLeft.innerHTML = '';
     if (containerRight) containerRight.innerHTML = '';
 
     if (is1v2) {
-      // 1v2 Stand Off Mode: Solo player (fighters[0]) is rendered as individual card with skills & stats
-      const soloFighter = fighters[0];
-      if (soloFighter && !soloFighter.isTurret) {
-        const isSoloYuta = soloFighter && (soloFighter.characterId === 'yuta' || soloFighter.type === 'yuta' || (soloFighter.name && soloFighter.name.toUpperCase().includes('YUTA')));
-        let nameColor = (state.arenaTheme === 'dark') ? (isSoloYuta ? '#FF1493' : '#ffffff') : '#000000';
-        const ratio = soloFighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(soloFighter.hp) / Number(soloFighter.maxHp))) : 0;
-        const color = soloFighter.color || '#fff';
-        const fighterName = soloFighter.name || 'SOLO PLAYER';
-        const fighterStats = state.leaderboard[soloFighter.fighterIndex] || { wins: 0, losses: 0 };
+      // BOSS BATTLE MODE:
+      // Boss (fighters[0]) is rendered at the top of the arena (#hudTopContainer) with NO skill bars
+      const bossFighter = fighters[0];
+      if (bossFighter && !bossFighter.isTurret && _cachedTopContainer) {
+        const isDark = (state.arenaTheme === 'dark');
+        const curHp = (typeof bossFighter.getDisplayHp === 'function') ? bossFighter.getDisplayHp() : bossFighter.hp;
+        const maxHp = bossFighter._originalMaxHp || bossFighter.maxHp || 440;
+        const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
+        const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+        const barColor = getFighterHealthBarColor(bossFighter, ratio, isDark);
+        const bossName = (bossFighter.name || bossFighter.characterId || 'BOSS').toUpperCase();
+        const bossSubname = getBossSubName(bossFighter);
+        const bossColor = getFighterThemeColor(bossFighter, '#ef4444');
+        const hpValText = `${Math.floor(Math.max(0, Number(curHp) || 0))} / ${Math.floor(maxHp)}`;
+
+        const bossCardHTML = `
+          <div class="boss-card">
+            <div class="boss-card__header">
+              <span class="boss-card__name" style="color: ${bossColor};">${bossName}</span>
+              <span class="boss-card__subname" style="color: ${bossColor};">${bossSubname}</span>
+            </div>
+            <div class="health-card__bar boss-bar">
+              <div class="health-card__fill" style="width: ${percent}%; background: ${barColor};"></div>
+              <span class="boss-bar__text health-card__bar-text">${hpValText}</span>
+            </div>
+          </div>
+        `;
+
+        _cachedTopContainer.innerHTML = bossCardHTML;
+        _cachedTopContainer.style.display = 'flex';
+        _cachedTopContainer.style.visibility = 'visible';
+        _cachedTopContainer.style.opacity = '1';
+
+        const bossCardEl = _cachedTopContainer.firstElementChild;
+        const hpBar = bossCardEl ? bossCardEl.querySelector('.health-card__bar') : null;
+        const hpBarFill = bossCardEl ? bossCardEl.querySelector('.health-card__fill') : null;
+        const hpBarText = bossCardEl ? (bossCardEl.querySelector('.boss-bar__text') || bossCardEl.querySelector('.health-card__bar-text')) : null;
+        const bossCardName = bossCardEl ? bossCardEl.querySelector('.boss-card__name') : null;
+        const bossCardSubname = bossCardEl ? bossCardEl.querySelector('.boss-card__subname') : null;
+
+        _hudCache.fighters.set(bossFighter, {
+          cardElement: bossCardEl,
+          hpBar,
+          hpBarFill,
+          hpBarText,
+          bossCardName,
+          bossCardSubname,
+          lastBossName: bossName,
+          lastBossSubname: bossSubname,
+          lastBossThemeColor: bossColor,
+          lastBossNameOpacity: 1,
+          starsContainer: null,
+          moneyTextEl: null,
+          lastMoneyText: '',
+          lastStarCount: -1,
+          winBullets: [],
+          infoContainer: null,
+          checkbox: null,
+          skillsContainer: null,
+          skillBars: new Map(),
+          lastInfoHTML: '',
+          lastHpPct: percent,
+          lastBarColor: barColor,
+          lastHpText: hpValText,
+          lastChecked: null
+        });
+      }
+
+      // 2 Challengers (fighters[1], fighters[2]) placed side-by-side at bottom (#healthHud)
+      // Names are drawn on canvas by drawArenaMatchNames; cards hold healthbar, skills, and info.
+      const challengers = [fighters[1], fighters[2]].filter(f => f && !f.isTurret);
+      containerBottom.classList.add('boss-battle-hud');
+
+      challengers.forEach((chFighter, chIdx) => {
+        const fighterIndex = state.fighters.indexOf(chFighter);
+        const isDark = (state.arenaTheme === 'dark');
+        const curHp = (typeof chFighter.getDisplayHp === 'function') ? chFighter.getDisplayHp() : chFighter.hp;
+        const maxHp = chFighter._originalMaxHp || chFighter.maxHp || 440;
+        const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
+        const fighterThemeColor = getFighterThemeColor(chFighter, chIdx === 0 ? '#38bdf8' : '#f43f5e');
+        const chColor = chFighter.color || fighterThemeColor;
+        let nameColor = isDark ? (fighterThemeColor || '#ffffff') : '#000000';
+        const fighterName = (chFighter.name || chFighter.characterId || `CHALLENGER ${chIdx + 1}`).toUpperCase();
+        const fighterStats = state.leaderboard ? (state.leaderboard[chFighter.fighterIndex] || { wins: 0, losses: 0 }) : { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
         const losses = fighterStats.losses;
         const totalGames = careerWins + losses;
         const winRate = totalGames > 0 ? Math.round((careerWins / totalGames) * 100) : 0;
-        const fighterDef = soloFighter.fighterIndex !== undefined ? FIGHTER_DEFS[soloFighter.fighterIndex] : null;
-        const shakeTimer = soloFighter._healthBarShakeTimer || 0;
-        const matchWins = (state.scores && state.scores[0]) ? state.scores[0] : 0;
+        const fighterDef = chFighter.fighterIndex !== undefined ? FIGHTER_DEFS[chFighter.fighterIndex] : null;
+        const shakeTimer = chFighter._healthBarShakeTimer || 0;
+        const matchWins = (state.scores && fighterIndex >= 0 && state.scores[fighterIndex]) ? state.scores[fighterIndex] : 0;
         const cardDesc = (fighterDef && mode !== GAME_MODES.FFA) ? fighterDef.desc : '';
 
-        const soloCardHTML = buildCard({
+        const chHeaderHTML = `
+          <div class="challenger-header">
+            <span class="challenger-name" style="color: ${fighterThemeColor};">${fighterName}</span>
+          </div>
+        `;
+
+        const chCardHTML = buildCard({
           title: fighterName,
-          scoreText: totalGames > 0 ? `${winRate}% WR` : '',
-          fillColor: color,
+          scoreText: '',
+          fillColor: chColor,
           fillRatio: ratio,
-          metaLabel: `DMG: ${parseFloat(Math.max(0, Number(soloFighter.damage) || 0).toFixed(1))}`,
-          metaValue: `${Math.floor(Math.max(0, Number(soloFighter.hp) || 0))}`,
-          extraClass: isTactical ? 'tactical-card' : 'red solo-1v2-card',
-          borderColor: color,
+          metaLabel: `DMG: ${parseFloat(Math.max(0, Number(chFighter.damage) || 0).toFixed(1))}`,
+          metaValue: `${Math.floor(Math.max(0, Number(curHp) || 0))}`,
+          extraClass: `challenger-card challenger-${chIdx + 1}-card single-column`,
+          borderColor: fighterThemeColor,
           wins: matchWins,
           fighterColor: nameColor,
           shakeTimer,
-          isWinner: soloFighter === state.roundWinner,
+          isWinner: chFighter === state.roundWinner,
           description: cardDesc,
-          kills: state.matchKills ? state.matchKills[0] || [] : [],
+          kills: (state.matchKills && fighterIndex >= 0) ? state.matchKills[fighterIndex] || [] : [],
           maxBullets: 0,
-          targetFighter: soloFighter,
+          targetFighter: chFighter,
           titleAlign: 'left',
-          singleColumn: true
+          singleColumn: true,
+          customHeaderHTML: chHeaderHTML
         });
 
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = soloCardHTML;
-        const soloCardElement = tempDiv.firstElementChild;
-        containerBottom.appendChild(soloCardElement);
+        tempDiv.innerHTML = chCardHTML;
+        const cardElement = tempDiv.firstElementChild;
+        containerBottom.appendChild(cardElement);
 
-        const hpBar = soloCardElement.querySelector('.health-card__bar');
-        const hpBarFill = soloCardElement.querySelector('.health-card__fill');
-        const hpBarText = soloCardElement.querySelector('.health-card__bar-text');
-        const starsContainer = soloCardElement.querySelector('.hud-cj-stars');
-        const moneyTextEl = soloCardElement.querySelector('.hud-cj-money-text');
-        const winBullets = Array.from(soloCardElement.querySelectorAll('.health-card__win-bullet'));
-        const infoContainer = soloCardElement.querySelector('.health-card__info');
-        const checkbox = soloCardElement.querySelector('input[type="checkbox"]');
+        const hpBar = cardElement.querySelector('.health-card__bar');
+        const hpBarFill = cardElement.querySelector('.health-card__fill');
+        const hpBarText = cardElement.querySelector('.health-card__bar-text');
+        const starsContainer = cardElement.querySelector('.hud-cj-stars');
+        const moneyTextEl = cardElement.querySelector('.hud-cj-money-text');
+        const winBullets = Array.from(cardElement.querySelectorAll('.health-card__win-bullet'));
+        const infoContainer = cardElement.querySelector('.health-card__info');
+        const checkbox = cardElement.querySelector('input[type="checkbox"]');
 
-        const skillsContainer = soloCardElement.querySelector('.health-card__skills');
+        const skillsContainer = cardElement.querySelector('.health-card__skills');
         const skillBars = new Map();
-        soloCardElement.querySelectorAll('.hud-skill-box').forEach(box => {
+        cardElement.querySelectorAll('.hud-skill-box').forEach(box => {
           const id = box.getAttribute('data-skill-id');
           const fill = box.querySelector('.hud-skill-box-fill');
           const text = box.querySelector('.hud-skill-box-text');
           skillBars.set(id, { box, fill, text });
         });
 
-        _hudCache.fighters.set(soloFighter, {
-          cardElement: soloCardElement,
+        const chCardName = cardElement.querySelector('.challenger-name');
+
+        _hudCache.fighters.set(chFighter, {
+          cardElement,
           skillsContainer,
           hpBar,
           hpBarFill,
           hpBarText,
+          chCardName,
+          lastChName: fighterName,
+          lastChThemeColor: fighterThemeColor,
+          lastChOpacity: 1,
           starsContainer,
           moneyTextEl,
           lastMoneyText: '',
@@ -2513,66 +2716,9 @@ function updateHealthHud() {
           lastInfoHTML: '',
           lastHpPct: -1,
           lastBarColor: '',
-          lastHpText: '',
+          lastHpText: `${Math.floor(Math.max(0, Number(curHp) || 0))}`,
           lastChecked: null
         });
-      }
-
-      // Opponent Team (fighters[1], fighters[2])
-      const oppMembers = [fighters[1], fighters[2]].filter(Boolean);
-      const oppShakeTimer = oppMembers.reduce((max, fighter) => Math.max(max, fighter._healthBarShakeTimer || 0), 0);
-      const isOppWinner = state.roundWinner && oppMembers.includes(state.roundWinner);
-
-      const oppCardHTML = buildCard({
-        title: 'DUO TEAM',
-        scoreText: `${state.teamScores ? state.teamScores[1] || 0 : 0} WINS`,
-        fillColor: '#4da3ff',
-        members: oppMembers,
-        extraClass: isTactical ? 'blue tactical-card' : ('blue duo-1v2-card' + (isTeamSingleColumn ? ' single-column' : '')),
-        shakeTimer: oppShakeTimer,
-        isWinner: isOppWinner,
-        borderColor: isOppWinner ? '#ffd700' : null,
-        kills: oppMembers.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
-        maxBullets: 0,
-        titleAlign: 'right',
-        singleColumn: isTeamSingleColumn
-      });
-
-      const tempOppDiv = document.createElement('div');
-      tempOppDiv.innerHTML = oppCardHTML;
-      const oppCardElement = tempOppDiv.firstElementChild;
-      containerBottom.appendChild(oppCardElement);
-
-      const cachedOppMembers = [];
-      oppCardElement.querySelectorAll('.health-card__member').forEach((memberEl, i) => {
-        const fill = memberEl.querySelector('.health-card__fill');
-        const text = memberEl.querySelector('.health-card__bar-text');
-        const bar = memberEl.querySelector('.health-card__bar');
-        const starsContainer = memberEl.querySelector('.hud-cj-stars');
-        const moneyTextEl = memberEl.querySelector('.hud-cj-money-text');
-        const weaponIconEl = memberEl.querySelector('.hud-cj-weapon-icon');
-        const weaponAmmoEl = memberEl.querySelector('.hud-cj-weapon-ammo');
-        const clockTextEl = memberEl.querySelector('.hud-cj-clock-text');
-        const armorFillEl = memberEl.querySelector('.hud-cj-armor-fill');
-        const skillsContainer = memberEl.querySelector('.health-card__skills');
-        const infoContainer = memberEl.querySelector('.health-card__info') || oppCardElement.querySelector('.health-card__info');
-        const skillBars = new Map();
-        memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
-          const id = box.getAttribute('data-skill-id');
-          const fillEl = box.querySelector('.hud-skill-box-fill');
-          const textEl = box.querySelector('.hud-skill-box-text');
-          skillBars.set(id, { box, fill: fillEl, text: textEl });
-        });
-        cachedOppMembers.push({
-          fill, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
-          lastMoneyText: '', lastStarCount: -1, lastWeaponIcon: '', lastWeaponAmmo: '', lastClockText: '',
-          infoContainer, skillsContainer, skillBars, fighter: oppMembers[i], lastInfoHTML: ''
-        });
-      });
-
-      _hudCache.teams.set(1, {
-        cardElement: oppCardElement,
-        members: cachedOppMembers
       });
     } else if (is2v2) {
       // 2v2 Pure Team Mode
@@ -2989,9 +3135,12 @@ function updateHealthHud() {
         cachedCard.hpBarFill.className = glow.className || 'health-card__fill';
       }
 
+      const isBossBar = Boolean(_cachedTopContainer && cachedCard.hpBar && _cachedTopContainer.contains(cachedCard.hpBar));
+
       if (cachedCard.hpBar) {
         const cjBarClass = isCj ? ' hud-bar-cj' : '';
-        cachedCard.hpBar.className = `health-card__bar${cjBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+        const bossBarClass = isBossBar ? ' boss-bar' : '';
+        cachedCard.hpBar.className = `health-card__bar${bossBarClass}${cjBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
         const shakeTimer = fighter._healthBarShakeTimer || 0;
         const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
         cachedCard.hpBar.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
@@ -2999,10 +3148,69 @@ function updateHealthHud() {
 
       if (cachedCard.hpBarText) {
         const isTactical = isTacticalMatch(state);
-        const metaValue = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`;
+        const bossMaxHp = fighter._originalMaxHp || fighter.maxHp || 440;
+        const metaValue = isBossBar
+          ? `${Math.floor(Math.max(0, Number(curHp) || 0))} / ${Math.floor(bossMaxHp)}`
+          : ((curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`);
         if (cachedCard.lastHpText !== metaValue) {
           cachedCard.hpBarText.textContent = metaValue;
           cachedCard.lastHpText = metaValue;
+        }
+      }
+
+      if (cachedCard.bossCardName) {
+        if (curHp <= 0) {
+          if (cachedCard.lastBossNameOpacity !== 0.35) {
+            cachedCard.bossCardName.style.opacity = '0.35';
+            if (cachedCard.bossCardSubname) cachedCard.bossCardSubname.style.opacity = '0.35';
+            cachedCard.lastBossNameOpacity = 0.35;
+          }
+        } else {
+          if (cachedCard.lastBossNameOpacity !== 1) {
+            cachedCard.bossCardName.style.opacity = '1';
+            if (cachedCard.bossCardSubname) cachedCard.bossCardSubname.style.opacity = '0.92';
+            cachedCard.lastBossNameOpacity = 1;
+          }
+        }
+        const bossName = (fighter.name || fighter.characterId || 'BOSS').toUpperCase();
+        if (cachedCard.lastBossName !== bossName) {
+          cachedCard.bossCardName.textContent = bossName;
+          cachedCard.lastBossName = bossName;
+        }
+        const bossSubname = getBossSubName(fighter);
+        if (cachedCard.bossCardSubname && cachedCard.lastBossSubname !== bossSubname) {
+          cachedCard.bossCardSubname.textContent = bossSubname;
+          cachedCard.lastBossSubname = bossSubname;
+        }
+        const bossColor = getFighterThemeColor(fighter, '#ef4444');
+        if (cachedCard.lastBossThemeColor !== bossColor) {
+          cachedCard.bossCardName.style.color = bossColor;
+          if (cachedCard.bossCardSubname) cachedCard.bossCardSubname.style.color = bossColor;
+          cachedCard.lastBossThemeColor = bossColor;
+        }
+      }
+
+      if (cachedCard.chCardName) {
+        if (curHp <= 0) {
+          if (cachedCard.lastChOpacity !== 0.35) {
+            cachedCard.chCardName.style.opacity = '0.35';
+            cachedCard.lastChOpacity = 0.35;
+          }
+        } else {
+          if (cachedCard.lastChOpacity !== 1) {
+            cachedCard.chCardName.style.opacity = '1';
+            cachedCard.lastChOpacity = 1;
+          }
+        }
+        const chName = (fighter.name || fighter.characterId || 'CHALLENGER').toUpperCase();
+        if (cachedCard.lastChName !== chName) {
+          cachedCard.chCardName.textContent = chName;
+          cachedCard.lastChName = chName;
+        }
+        const chThemeColor = getFighterThemeColor(fighter, '#38bdf8');
+        if (cachedCard.lastChThemeColor !== chThemeColor) {
+          cachedCard.chCardName.style.color = chThemeColor;
+          cachedCard.lastChThemeColor = chThemeColor;
         }
       }
 

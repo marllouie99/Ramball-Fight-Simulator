@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -22,6 +22,8 @@ export const saitamaConfig = {
   cooldown: 200,
   projectileSpeedMultiplier: 1.0,
   ability: 'One Punch',
+  bossTitle: 'One Punch Man',
+  title: 'One Punch Man',
   desc: 'Hero for fun. Ignores basic hit flinches. Basic hits deal massive damage. Serious Punch ultimate obliterates anything across the arena.',
 
   // Basic Attack: Normal Punch
@@ -116,7 +118,7 @@ export const saitamaConfig = {
   counterPunchRecoveryFrames: 65, // Frames Saitama stands still after landing (post-punch stall)
   counterDodgeLockFrames: 20,      // Dodge cooldown after counter execution
   skillPunishCooldown: 1000,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
-  initialSkillPunishCooldown: 1000, // Cooldown at the start of the round before first counter is available (2000 frames)
+  initialSkillPunishCooldown: 100, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
   counterOverlayZoomMax: 0.08,           // Subtle expansion factor (1.0 -> 1.08) for Serious Punch overlay

@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const tanjiroConfig = {
+  bossTitle: 'Sun Breathing Slayer',
+  title: 'Sun Breathing Slayer',
+
   // Baseline Attributes
   hp: 340,
   maxHpRatio: 1.0,

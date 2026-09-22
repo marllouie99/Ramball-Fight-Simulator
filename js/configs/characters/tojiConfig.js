@@ -19,6 +19,8 @@ export const tojiConfig = {
   cooldown: 40,
   projectileSpeedMultiplier: 1.0,
   ability: 'Heavenly Restriction',
+  bossTitle: 'Sorcerer Killer',
+  title: 'Sorcerer Killer',
   desc: 'Zero Cursed Energy. Immune to Domains. Silences, slows, and reduces healing of enemies with the Inverted Spear of Heaven.',
 
   // Passive: Heavenly Restriction (Tenyo Jubaku)

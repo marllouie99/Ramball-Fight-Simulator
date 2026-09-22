@@ -16,11 +16,13 @@ export class ZeusFighter extends Fighter {
     super(def);
     this.characterId = 'zeus';
     this.type = 'zeus';
-    this.damageNumberColor = '#38bdf8';
+    this.damageNumberColor = CONFIG.zeus?.damageNumberColor ?? CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF';
     this.aegisCooldown = 0;
-    this.stormCooldown = CONFIG.zeus.stormCooldown;
+    this.stormCooldown = CONFIG.zeus?.stormCooldown ?? 1500;
     this.stormActive = false;
     this.stormTimer = 0;
+    this.shootCooldownMax = CONFIG.zeus?.attackCooldown ?? CONFIG.zeus?.cooldown ?? this._def?.cooldown ?? 120;
+    this.shootCooldown = 0;
     
     // Progressive Stun Chance Mechanic
     this.baseStunChance = CONFIG.zeus?.baseStunChance ?? 0.10;
@@ -63,12 +65,16 @@ export class ZeusFighter extends Fighter {
     super.reset();
     this.z = 25;
     this.aegisCooldown = 0;
-    this.stormCooldown = CONFIG.zeus.stormCooldown;
+    this.stormCooldown = CONFIG.zeus?.stormCooldown ?? 1500;
     this.stormActive = false;
     this.isChargingStorm = false;
     this.stormTimer = 0;
+    this.shootCooldownMax = CONFIG.zeus?.attackCooldown ?? CONFIG.zeus?.cooldown ?? this._def?.cooldown ?? 120;
+    this.shootCooldown = 0;
     this.baseStunChance = CONFIG.zeus?.baseStunChance ?? 0.10;
     this.stunChance = this.baseStunChance;
+    this.maxStunChance = CONFIG.zeus?.maxStunChance ?? 0.50;
+    this.stunChanceIncrease = CONFIG.zeus?.stunChanceIncrease ?? 0.05;
     this.auraPhase = 0;
     this._thunderCloudSoundPlayed = false;
   }
@@ -93,17 +99,17 @@ export class ZeusFighter extends Fighter {
   shoot(ownerIndex) {
     if (this.isCaughtInBeam()) return;
     if (projectileSystem && projectileSystem.fireChainLightning) {
-      const damage = CONFIG.zeus.lightningDamage;
-      const chains = CONFIG.zeus.chainCount;
+      const damage = CONFIG.zeus?.lightningDamage ?? CONFIG.zeus?.damage ?? 20;
+      const chains = CONFIG.zeus?.chainCount ?? 4;
       projectileSystem.fireChainLightning(this, ownerIndex, damage, chains);
     }
     
     // Flash at the release point (bolt tip)
-    const releaseDist = this.r + (CONFIG.zeus?.boltReleaseOffset || 20); 
+    const releaseDist = this.r + (CONFIG.zeus?.boltReleaseOffset ?? 20); 
     const rx = this.x + Math.cos(this.gunAngle) * releaseDist;
     const ry = (this.y - (this.z || 0)) + Math.sin(this.gunAngle) * releaseDist;
-    spawnImpactFlash(rx, ry, CONFIG.zeus?.shootFlashRadius || 35, 'lightningTrail'); 
-    spawnSparks(rx, ry, CONFIG.zeus?.shootSparkCount || 12, 'lightningTrail', CONFIG.zeus?.color || '#00BFFF');
+    spawnImpactFlash(rx, ry, CONFIG.zeus?.shootFlashRadius ?? 35, 'lightningTrail'); 
+    spawnSparks(rx, ry, CONFIG.zeus?.shootSparkCount ?? 12, 'lightningTrail', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
     
     // Play attack sound
     const sound = getBasicAttackSound(this._def?.id, this._def?.type);
@@ -132,25 +138,25 @@ export class ZeusFighter extends Fighter {
   }
 
   _triggerAegisShield(attacker) {
-    this.aegisCooldown = CONFIG.zeus.aegisCooldown;
+    this.aegisCooldown = CONFIG.zeus?.aegisCooldown ?? 300;
     
     // Deal shock damage
-    const damage = CONFIG.zeus.aegisShockDamage;
+    const damage = CONFIG.zeus?.aegisShockDamage ?? 12;
     attacker.takeDamage(damage, this, { isZeusShock: true });
     
     // Apply paralyze (we'll implement this as a combination of slow and electric stun)
     if (attacker.applySlow) {
-      attacker.applySlow(CONFIG.zeus.aegisParalyzeDuration, CONFIG.zeus.paralyzeSlowMultiplier);
+      attacker.applySlow(CONFIG.zeus?.aegisParalyzeDuration ?? 60, CONFIG.zeus?.paralyzeSlowMultiplier ?? 0.5);
     }
-    attacker.electricStunTimer = Math.max(attacker.electricStunTimer || 0, CONFIG.zeus?.stunDuration || 24);
-    attacker.thunderRootsTimer = Math.max(attacker.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration || 45);
+    attacker.electricStunTimer = Math.max(attacker.electricStunTimer || 0, CONFIG.zeus?.stunDuration ?? 24);
+    attacker.thunderRootsTimer = Math.max(attacker.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration ?? 45);
     
-    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'AEGIS!', CONFIG.zeus?.color || '#00BFFF');
+    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'AEGIS!', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
     
     // Visuals
-    spawnImpactFlash(attacker.x, attacker.y, CONFIG.zeus?.aegisFlashRadius || 40, 'lightningTrail');
-    spawnSparks(attacker.x, attacker.y, CONFIG.zeus?.aegisSparkCount || 15, 'thunderSpark');
-    triggerGlobalScreenShake(CONFIG.zeus?.aegisShakeIntensity || 4, CONFIG.zeus?.aegisShakeFrames || 5);
+    spawnImpactFlash(attacker.x, attacker.y, CONFIG.zeus?.aegisFlashRadius ?? 40, 'lightningTrail');
+    spawnSparks(attacker.x, attacker.y, CONFIG.zeus?.aegisSparkCount ?? 15, 'thunderSpark');
+    triggerGlobalScreenShake(CONFIG.zeus?.aegisShakeIntensity ?? 4, CONFIG.zeus?.aegisShakeFrames ?? 5);
     
     const sound = getSkillSound(this._def?.id, 'aegis');
     if (sound) audioSystem.playSFX(sound.src, sound.volume);
@@ -175,8 +181,8 @@ export class ZeusFighter extends Fighter {
       this.stormCooldown--;
       
       // Telegraph animation triggers when exactly TelegraphFrames remain
-      if (this.stormCooldown === CONFIG.zeus.stormTelegraphFrames) {
-        spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'CHARGING STORM...', '#00FFFF');
+      if (this.stormCooldown === (CONFIG.zeus?.stormTelegraphFrames ?? 120)) {
+        spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'CHARGING STORM...', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
         // Play an ominous gathering sound if available, otherwise reuse aegis logic
         const sound = getSkillSound(this._def?.id, 'aegis');
         if (sound) audioSystem.playSFX(sound.src, sound.volume * 0.7);
@@ -184,7 +190,7 @@ export class ZeusFighter extends Fighter {
     }
     
     // Are we in the telegraph window before storm casts?
-    this.isChargingStorm = this.stormCooldown > 0 && this.stormCooldown <= (CONFIG.zeus.stormTelegraphFrames || 120);
+    this.isChargingStorm = this.stormCooldown > 0 && this.stormCooldown <= (CONFIG.zeus?.stormTelegraphFrames ?? 120);
     
     // Play thundercloud sound once when throwing thunderbolt to the sky
     if (this.isChargingStorm && !this._thunderCloudSoundPlayed) {
@@ -259,14 +265,14 @@ export class ZeusFighter extends Fighter {
   
   _activateStorm() {
     this.stormActive = true;
-    this.stormTimer = CONFIG.zeus.stormDuration;
-    this.stormCooldown = CONFIG.zeus.stormCooldown;
+    this.stormTimer = CONFIG.zeus?.stormDuration ?? 300;
+    this.stormCooldown = CONFIG.zeus?.stormCooldown ?? 1500;
     this.stormLastStrikeTimer = 0;
     this.gunAngle = 0;
     this.angle = 0;
     
     spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'STORM!', '#FFFFFF');
-    triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
+    triggerGlobalScreenShake(CONFIG.zeus?.stormCastShakeIntensity ?? 8, CONFIG.zeus?.stormCastShakeFrames ?? 20);
     
     const sound = getSkillSound(this._def?.id, 'storm');
     if (sound) audioSystem.playSFX(sound.src, sound.volume);
@@ -275,7 +281,7 @@ export class ZeusFighter extends Fighter {
   _processStorm() {
     // Strike periodically based on strikes per second
     this.stormLastStrikeTimer++;
-    const interval = Math.floor(60 / (CONFIG.zeus.stormStrikesPerSec || 3));
+    const interval = Math.floor(60 / (CONFIG.zeus?.stormStrikesPerSec ?? 3));
     
     if (this.stormLastStrikeTimer >= interval) {
       this.stormLastStrikeTimer = 0;
@@ -311,37 +317,37 @@ export class ZeusFighter extends Fighter {
   
   _strikeEnemyWithStorm(target) {
     // Calculate damage based on static debuff
-    let damage = CONFIG.zeus.stormStrikeDamage;
+    let damage = CONFIG.zeus?.stormStrikeDamage ?? 20;
     if (target.staticDebuffTimer > 0) {
-      damage *= CONFIG.zeus.staticDamageBonus;
+      damage *= (CONFIG.zeus?.staticDamageBonus ?? 1.33);
     }
     
     target.takeDamage(damage, this, { isStorm: true });
     
     // Apply static and paralyze
-    target.staticDebuffTimer = CONFIG.zeus.staticDuration;
+    target.staticDebuffTimer = CONFIG.zeus?.staticDuration ?? 100;
     if (target.applySlow) {
-      target.applySlow(CONFIG.zeus.paralyzeDuration, CONFIG.zeus.paralyzeSlowMultiplier);
+      target.applySlow(CONFIG.zeus?.paralyzeDuration ?? 50, CONFIG.zeus?.paralyzeSlowMultiplier ?? 0.5);
     }
     
     // Apply visual thunder roots effect
-    target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration || 45);
+    target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration ?? 45);
     
     // Visuals
-    triggerGlobalScreenShake(CONFIG.zeus.stormStrikeShakeIntensity || 4, CONFIG.zeus.stormStrikeShakeFrames || 10);
-    spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius || 50, 'lightningTrail');
-    spawnSparks(target.x, target.y, CONFIG.zeus?.stormStrikeSparkCount || 10, 'lightningTrail', CONFIG.zeus?.color || '#00BFFF');
+    triggerGlobalScreenShake(CONFIG.zeus?.stormStrikeShakeIntensity ?? 4, CONFIG.zeus?.stormStrikeShakeFrames ?? 10);
+    spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius ?? 50, 'lightningTrail');
+    spawnSparks(target.x, target.y, CONFIG.zeus?.stormStrikeSparkCount ?? 10, 'lightningTrail', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
     
     // Play storm strike sound for each hit (both stormstrike.mp3 & thunderstrike.mp3)
     const stormSound = getSkillSound(this._def?.id, 'storm');
     if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.6);
 
     const thunderSound = getSkillSound(this._def?.id, 'thunderstrike');
-    if (thunderSound) audioSystem.playSFX(thunderSound.src, thunderSound.volume * 0.6);
+    if (thunderSound) audioSystem.playSFX(thunderSound.src, (thunderSound.volume || 1.0) * 0.6);
     
     // Register storm strike visual globally
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
-    const strikeLife = CONFIG.zeus?.stormStrikeVisualLife || 15;
+    const strikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 15;
     state.zeusStormStrikes.push({
       x: target.x,
       y: target.y,
@@ -503,7 +509,7 @@ export class ZeusFighter extends Fighter {
     if (!this.isChargingStorm) return;
     if (!drawBackground) return; // The flat ring is drawn behind Zeus
     
-    const chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120)); // 0.0 to 1.0
+    const chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus?.stormTelegraphFrames ?? 120)); // 0.0 to 1.0
     const zOffset = this.z || 0;
     ctx.save();
     ctx.translate(this.x, this.y - zOffset);
@@ -630,7 +636,7 @@ export class ZeusFighter extends Fighter {
     if (typeof state !== 'undefined' && state.showSkinOnly) return;
     let chargeProgress = 0;
     if (this.isChargingStorm) {
-      chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120));
+      chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus?.stormTelegraphFrames ?? 120));
     } else if (this.stormActive) {
       chargeProgress = 1.0;
     }

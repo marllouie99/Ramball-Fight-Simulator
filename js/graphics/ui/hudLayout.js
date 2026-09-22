@@ -1,5 +1,7 @@
 import { CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
+import { worldToScreen } from '../../systems/cameraSystem.js';
 
 let _hudSyncInitialized = false;
 let _cachedGameBox = null;
@@ -7,6 +9,25 @@ let _cachedContainerBottom = null;
 let _cachedTopContainer = null;
 let _cachedBottomContainer = null;
 let _cachedPixiView = null;
+
+/**
+ * Safely sets a style property on a DOM element, supporting both standard
+ * CSSStyleDeclaration (.setProperty) and mock style objects (used in unit tests).
+ */
+function setSafeStyle(el, prop, val, priority) {
+  if (!el || !el.style) return;
+  if (typeof el.style.setProperty === 'function') {
+    if (priority) {
+      el.style.setProperty(prop, val, priority);
+    } else {
+      el.style.setProperty(prop, val);
+    }
+  } else {
+    const camelProp = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    el.style[camelProp] = val;
+    el.style[prop] = val;
+  }
+}
 
 /**
  * Dynamically recalculates the HUD container positions based on the actual
@@ -55,20 +76,29 @@ export function syncHudPosition() {
   const hudCssLeft = isTactical ? arenaX : ((arenaX + arenaWidth / 2) - hudCssWidth / 2);
   const visualLeftPercent = (hudCssLeft / canvasWidth) * 100;
 
+  const is1v2 = Boolean(
+    state.mode === 'Boss Battle' ||
+    state.mode === '1v2 Stand Off' ||
+    state.mode === '1v2' ||
+    state.mode === 'Stand Off 1v2' ||
+    (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2))
+  );
+
   // 1. Position Top HUD Container
-  const topRatio = ((arena.y - 90) / canvasHeight);
+  const topRatio = is1v2 ? ((arena.y - 100) / canvasHeight) : ((arena.y - 90) / canvasHeight);
   const topPx = canvasTopInBox + canvasRect.height * topRatio;
   const topPercent = (topPx / boxRect.height) * 100;
   
   if (!_cachedTopContainer) _cachedTopContainer = document.getElementById('hudTopContainer');
   if (_cachedTopContainer) {
-    _cachedTopContainer.style.top = `${topPercent.toFixed(3)}%`;
-    _cachedTopContainer.style.width = `${visualWidthPercent.toFixed(3)}%`;
-    _cachedTopContainer.style.maxWidth = 'none';
-    _cachedTopContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
-    _cachedTopContainer.style.right = 'auto';
-    _cachedTopContainer.style.transform = isTactical ? 'none' : `scale(${hudScale})`;
-    _cachedTopContainer.style.transformOrigin = 'top center';
+    setSafeStyle(_cachedTopContainer, 'top', `${topPercent.toFixed(3)}%`);
+    setSafeStyle(_cachedTopContainer, 'width', `${visualWidthPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedTopContainer, 'max-width', 'none', 'important');
+    setSafeStyle(_cachedTopContainer, 'left', `${visualLeftPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedTopContainer, 'right', 'auto', 'important');
+    setSafeStyle(_cachedTopContainer, 'margin', '0', 'important');
+    setSafeStyle(_cachedTopContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`);
+    setSafeStyle(_cachedTopContainer, 'transform-origin', 'top center', 'important');
   }
 
   // 2. Position Bottom HUD Container
@@ -78,33 +108,35 @@ export function syncHudPosition() {
 
   if (!_cachedBottomContainer) _cachedBottomContainer = document.getElementById('hudBottomContainer');
   if (_cachedBottomContainer) {
-    _cachedBottomContainer.style.top = `${bottomPercent.toFixed(3)}%`;
-    _cachedBottomContainer.style.width = `${visualWidthPercent.toFixed(3)}%`;
-    _cachedBottomContainer.style.maxWidth = 'none';
-    _cachedBottomContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
-    _cachedBottomContainer.style.right = 'auto';
-    _cachedBottomContainer.style.transform = isTactical ? 'none' : `scale(${hudScale})`;
-    _cachedBottomContainer.style.transformOrigin = 'top center';
+    setSafeStyle(_cachedBottomContainer, 'top', `${bottomPercent.toFixed(3)}%`);
+    setSafeStyle(_cachedBottomContainer, 'width', `${visualWidthPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedBottomContainer, 'max-width', 'none', 'important');
+    setSafeStyle(_cachedBottomContainer, 'left', `${visualLeftPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedBottomContainer, 'right', 'auto', 'important');
+    setSafeStyle(_cachedBottomContainer, 'margin', '0', 'important');
+    setSafeStyle(_cachedBottomContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`);
+    setSafeStyle(_cachedBottomContainer, 'transform-origin', 'top center', 'important');
   }
 
   // 3. Position Health HUD
   const arenaBottomRatio = (arena.y + arena.height) / canvasHeight;
   const arenaBottomInBox = canvasTopInBox + canvasRect.height * arenaBottomRatio;
-  const hudMargin = canvasRect.height * (20 / canvasHeight);
+  const bottomMarginPx = is1v2 ? 40 : 20;
+  const hudMargin = canvasRect.height * (bottomMarginPx / canvasHeight);
   const hudTopPx = arenaBottomInBox + hudMargin;
   const hudTopPercent = (hudTopPx / boxRect.height) * 100;
 
   if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
   const healthHud = _cachedContainerBottom;
   if (healthHud) {
-    healthHud.style.top = `${hudTopPercent.toFixed(3)}%`;
-    healthHud.style.width = `${visualWidthPercent.toFixed(3)}%`;
-    healthHud.style.maxWidth = 'none';
-    healthHud.style.left = `${visualLeftPercent.toFixed(3)}%`;
-    healthHud.style.right = 'auto';
-    healthHud.style.margin = '0';
-    healthHud.style.transform = isTactical ? 'none' : `scale(${hudScale})`;
-    healthHud.style.transformOrigin = 'top center';
+    setSafeStyle(healthHud, 'top', `${hudTopPercent.toFixed(3)}%`);
+    setSafeStyle(healthHud, 'width', `${visualWidthPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(healthHud, 'max-width', 'none', 'important');
+    setSafeStyle(healthHud, 'left', `${visualLeftPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(healthHud, 'right', 'auto', 'important');
+    setSafeStyle(healthHud, 'margin', '0', 'important');
+    setSafeStyle(healthHud, 'transform', isTactical ? 'none' : `scale(${hudScale})`);
+    setSafeStyle(healthHud, 'transform-origin', 'top center', 'important');
   }
 }
 
@@ -132,4 +164,64 @@ export function initHudSync() {
     });
     ro.observe(gameBox);
   }
+}
+
+/**
+ * Dynamically updates the Top HUD Container (#hudTopContainer) transform to
+ * follow the arena top edge when dynamic camera tracking, zoom, or shake is active.
+ */
+export function updateTopHudCameraTracking(topContainer) {
+  if (!topContainer) return;
+  const cam = state.camera;
+  const scale = CONFIG.internalScale || 1.0;
+  const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+  const hudScale = isTactical ? 1.0 : (scale * 0.9);
+
+  if (!_cachedPixiView) {
+    if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
+    _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
+  }
+
+  const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
+  const displayRatio = _cachedPixiView && _cachedPixiView.clientWidth ? (_cachedPixiView.clientWidth / canvasWidth) : 1.0;
+
+  const shakeX = ((cam ? cam.shakeX : state.shakeX) || 0) * displayRatio;
+  const shakeY = ((cam ? cam.shakeY : state.shakeY) || 0) * displayRatio;
+
+  if (shakeX !== 0 || shakeY !== 0) {
+    setSafeStyle(topContainer, 'transform', `translate(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px) scale(${hudScale.toFixed(4)})`, 'important');
+  } else {
+    setSafeStyle(topContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`, 'important');
+  }
+  setSafeStyle(topContainer, 'transform-origin', 'top center', 'important');
+}
+
+/**
+ * Dynamically updates the Bottom HUD Container (#healthHud) transform to
+ * float with the camera screen overlay (with camera screen-shake).
+ */
+export function updateBottomHudCameraTracking(bottomContainer) {
+  if (!bottomContainer) return;
+  const cam = state.camera;
+  const scale = CONFIG.internalScale || 1.0;
+  const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+  const hudScale = isTactical ? 1.0 : (scale * 0.9);
+
+  if (!_cachedPixiView) {
+    if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
+    _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
+  }
+
+  const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
+  const displayRatio = _cachedPixiView && _cachedPixiView.clientWidth ? (_cachedPixiView.clientWidth / canvasWidth) : 1.0;
+
+  const shakeX = ((cam ? cam.shakeX : state.shakeX) || 0) * displayRatio;
+  const shakeY = ((cam ? cam.shakeY : state.shakeY) || 0) * displayRatio;
+
+  if (shakeX !== 0 || shakeY !== 0) {
+    setSafeStyle(bottomContainer, 'transform', `translate(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px) scale(${hudScale.toFixed(4)})`, 'important');
+  } else {
+    setSafeStyle(bottomContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`, 'important');
+  }
+  setSafeStyle(bottomContainer, 'transform-origin', 'top center', 'important');
 }

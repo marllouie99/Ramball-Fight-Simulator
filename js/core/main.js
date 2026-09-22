@@ -17,6 +17,7 @@ import { GAME_MODES } from './modeConfig.js';
 import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
 import { toggleCameraMode } from '../systems/cameraSystem.js';
 import { BalanceManager } from '../configs/balanceManager.js';
+import { BossEntranceSequence } from '../bosses/index.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
@@ -110,6 +111,11 @@ let activeTacticalAction = 'mode-1v1';
 window.addEventListener('keydown', (e) => {
   unlockAudio();
 
+  if (BossEntranceSequence.isActive) {
+    BossEntranceSequence.skip();
+    return;
+  }
+
   if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
     if (state.gameState === 'faceoff') {
       state.gameState = 'select';
@@ -138,7 +144,7 @@ window.addEventListener('keydown', (e) => {
     else if (state.gameState === 'select') startGame();
     else if (state.gameState === 'roundEnd') startNextRound();
     else if (state.gameState === 'matchEnd') {
-      if (state.mode === '1v2 Stand Off') resetMatchWithRandom1v2Fighters();
+      if (state.mode === 'Boss Battle' || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.STAND_OFF_1V2) resetMatchWithRandom1v2Fighters();
       else if (state.mode === '1v1' || state.mode === 'Stand Off') resetMatchWithRandom1v1Fighters();
       else resetMatch();
     }
@@ -309,6 +315,11 @@ inputTarget.addEventListener('touchend', (e) => {
 
     // Detect clean tap (finger moved less than 14px within 500ms)
     if (dist < 14 && duration < 500) {
+      if (BossEntranceSequence.isActive) {
+        BossEntranceSequence.skip();
+        return;
+      }
+
       const rect = inputTarget.getBoundingClientRect();
       const scaleX = state.canvas.width / rect.width;
       const scaleY = state.canvas.height / rect.height;
@@ -328,6 +339,11 @@ inputTarget.addEventListener('touchend', (e) => {
 
 inputTarget.addEventListener('click', (e) => {
   unlockAudio();
+
+  if (BossEntranceSequence.isActive) {
+    BossEntranceSequence.skip();
+    return;
+  }
 
   // Filter synthetic ghost clicks fired by browsers ~300ms after a touchend tap
   if (Date.now() - _lastTouchTapTime < 450) {
@@ -735,9 +751,9 @@ export function executeTacticalAction(action) {
     state.p4Index = state.p4Index ?? 3;
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
-  } else if (action === 'mode-standoff1v2') {
+  } else if (action === 'mode-bossbattle' || action === 'mode-standoff1v2') {
     state.gameCategory = 'foc';
-    state.mode = GAME_MODES.STAND_OFF_1V2 || '1v2 Stand Off';
+    state.mode = GAME_MODES.STAND_OFF_1V2 || 'Boss Battle';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   } else if (action === 'mode-tagmatch' || action === 'mode-tag') {

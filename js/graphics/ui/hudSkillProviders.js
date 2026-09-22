@@ -169,12 +169,29 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const isLevel8 = totalStages >= 8;
     const windowThreshold = f.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.15);
 
+    const isCoolingDown = (f.fatalAdaptCooldown || 0) > 0;
+    const cdMax = f.fatalAdaptCooldownMax || CONFIG.mahoraga?.fatalAdaptCooldownFrames || 180;
+
     let wheelPct = 0;
+    let wheelLabel = `WOA - LVL ${lvlStr}`;
+    let wheelReady = false;
+
     if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0 || f.pendingDomainAdaptation) {
       wheelPct = 100;
+      wheelReady = true;
+      wheelLabel = 'ADAPTING...';
+    } else if (isCoolingDown) {
+      // Cooldown phase: ticks progress from 0% to 100% as the cooldown timer elapses
+      wheelPct = Math.max(0, Math.min(100, (1 - (f.fatalAdaptCooldown / cdMax)) * 100));
+      wheelReady = false;
+      const secondsLeft = (f.fatalAdaptCooldown / 60).toFixed(1);
+      wheelLabel = `WOA COOLDOWN (${secondsLeft}s)`;
     } else {
+      // Accumulation phase: fills as incoming damage progresses toward adaptation threshold
       const accum = f.totalAccumDamage || 0;
       wheelPct = Math.max(0, Math.min(100, (accum / windowThreshold) * 100));
+      wheelReady = wheelPct >= 99;
+      wheelLabel = `WOA - LVL ${lvlStr}`;
     }
 
     const throwMax = CONFIG.mahoraga?.throwCooldown || 1000;
@@ -217,7 +234,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return [
-      { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `WOA - LVL ${lvlStr}` },
+      { id: 'wheel', pct: wheelPct, ready: wheelReady, color: themeColor, label: wheelLabel },
       { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: throwLabelHtml },
       { id: 'shout', pct: shoutPct, ready: shoutPct >= 99, color: themeColor, label: 'DIVINE SHOUT' }
     ];

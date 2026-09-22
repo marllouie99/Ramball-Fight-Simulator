@@ -2,6 +2,9 @@
 // Rubbick — Arcane Mage & Spell Steal Config
 // ─────────────────────────────────────────────
 export const rubbickConfig = {
+  bossTitle: 'Grand Magus',
+  title: 'Grand Magus',
+
   // ── Base Attributes ──
   hp: 85,
   speed: 8.2,

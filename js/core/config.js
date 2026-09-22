@@ -89,6 +89,16 @@ export const CONFIG = {
   barrett: barrettConfig,
   Barrett: barrettConfig,
   barrett50cal: barrettConfig,
+  camera: {
+    minZoom: 1.04,
+    maxZoom: 1.14,
+    winnerZoom: 1.08,
+    smoothing: 0.08,
+    zoomSmoothing: 0.05,
+    maxPanRatio: 0.22,
+    minDist: 80,
+    maxDist: 420
+  },
   arena: { x: 40, y: 170, width: 460, height: 460, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
@@ -1011,8 +1021,8 @@ export const FIGHTER_DEFS = [
     spinRate: 0,
     type: 'zeus',
     hp: zeusConfig.hp || 200,
-    damage: zeusConfig.damage || 10,
-    cooldown: zeusConfig.cooldown || 80,
+    damage: zeusConfig.lightningDamage ?? zeusConfig.damage ?? 20,
+    cooldown: zeusConfig.attackCooldown ?? zeusConfig.cooldown ?? 120,
     moveSpeed: zeusConfig.moveSpeed || 5.2,
     projectileSpeedMultiplier: zeusConfig.projectileSpeedMultiplier || 1.0,
     ability: zeusConfig.ability || 'Storm Bringer',

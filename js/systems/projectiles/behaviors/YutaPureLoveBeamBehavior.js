@@ -129,7 +129,6 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             ent.wasCaughtInPureLoveBeam = true;
             ent.pureLoveBeamTimer = 10;
             ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
-            ent.pureLoveBeamRegenDebuffTimer = CONFIG.yuta?.pureLoveBeamRegenDebuffDuration ?? 1500; // Disable & reduce regen after beam expires
 
             if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
               ent.neutralStanceTimer = 0;

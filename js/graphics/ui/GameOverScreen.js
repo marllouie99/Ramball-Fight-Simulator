@@ -416,7 +416,7 @@ function getTeamFighterNames(winningTeam, mode, fallbackWinner) {
     if (names.length > 0) return names;
   }
 
-  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is1v2 = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
 
   if (state.fighters && state.fighters.length > 0) {
@@ -471,7 +471,7 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   // Resolve winner entity or team
   const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
   const winnerIndex = effectiveWinner ? (state.fighters ? state.fighters.indexOf(effectiveWinner) : -1) : -1;
-  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is1v2 = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
   const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
   const is4v4 = (mode === 'Tactical 4v4' || mode === '4v4' || mode === GAME_MODES.TACTICAL_4V4);
@@ -583,7 +583,7 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
   const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
 
-  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is1v2 = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
   const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
   const is4v4 = (mode === 'Tactical 4v4' || mode === '4v4' || mode === GAME_MODES.TACTICAL_4V4);
@@ -696,7 +696,7 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
 
   const isDraw = !winner || Boolean(state.isRoundDraw || state.isDraw);
   const winnerIndex = winner ? (state.fighters ? state.fighters.indexOf(winner) : -1) : -1;
-  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is1v2 = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
   const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
   const isTeamMode = is1v2 || is2v2 || isTagMatch;
@@ -800,7 +800,7 @@ function drawRoundEndScreen() {
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
-  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is1v2 = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
   const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
   const isTagMatch = (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH');
   const isTeamMode = is1v2 || is2v2 || isTagMatch;
@@ -889,7 +889,7 @@ function drawMatchEndScreen() {
       resetMatch();
       goToTitle();
     } else {
-      const is1v2Mode = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+      const is1v2Mode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
       if (is1v2Mode) {
         import('../../core/gameFlow.js').then(m => m.randomize1v2Fighters());
       } else if (mode === '1v1' || mode === 'Stand Off') {

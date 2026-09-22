@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const makimaConfig = {
+  bossTitle: 'Control Devil',
+  title: 'Control Devil',
+
   // Baseline Attributes
   hp: 360,
   maxHpRatio: 1.00,         // Makima has 100% max HP based on the fixed HP in the game mode

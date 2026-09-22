@@ -108,7 +108,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
         fighter._lastGetsugaExposureProjId = projId;
         fighter.getsugaExposureCount = (fighter.getsugaExposureCount || 0) + 1;
 
-        if (fighter.getsugaExposureCount >= 2) {
+        if (fighter.getsugaExposureCount >= 2 && (fighter.fatalAdaptCooldown || 0) <= 0) {
           fighter.adaptedGetsuga = true;
           if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
           fighter.adaptedSkills['getsugaTensho'] = true;
@@ -210,7 +210,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   if (!fighter.isInfinityBlitz) {
     let windowFrames  = CONFIG.mahoraga?.fatalAdaptWindowFrames   ?? 400;
     let thresholdPct  = CONFIG.mahoraga?.fatalDamageThresholdPct  ?? 0.15;
-    const adaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+    const adaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
 
     // Check specific fighter config
     if (attacker) {
@@ -269,9 +269,11 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     const isGetsuga = isGetsugaHit || skillShotId === 'getsugaTensho' || skillShotId === 'getsuga';
     const isAdaptableSkill = (opts.isAdaptableSkillShot || (opts.projectile && opts.projectile.isAdaptableSkillShot)) && !isGetsuga;
     
-    // Always accumulate damage for all hits and continuous tick damages (Getsuga ticks, Bleed, Burn, Poison, Domain, etc.)
-    fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + finalAmount;
-    fighter.accumTimer = windowFrames;
+    // Accumulate damage for hits and continuous tick damages when NOT on adaptation cooldown
+    if ((fighter.fatalAdaptCooldown || 0) <= 0) {
+      fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + finalAmount;
+      fighter.accumTimer = windowFrames;
+    }
 
     if (gojoAttackType) {
       fighter._lastGojoHitType = gojoAttackType;
@@ -310,7 +312,8 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
           spawnFloatingText(fighter.x, (fighter.y - (fighter.z || 0)) - fighter.r - 25, '⚙️ ADAPTATION HELD (DOMAIN)', '#A0C8FF');
         }
         fighter.totalAccumDamage = 0;
-        fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+        fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+        fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
         // pendingAdaptation remains null so Mahoraga does NOT get fatal damage immunity or 1 HP revival inside the domain!
       } else {
         pendingAdaptation = {
@@ -385,7 +388,8 @@ export function triggerAdaptation(fighter, type, attacker) {
       spawnFloatingText(fighter.x, (fighter.y - (fighter.z || 0)) - fighter.r - 25, '⚙️ ADAPTATION HELD (DOMAIN)', '#A0C8FF');
     }
     fighter.totalAccumDamage = 0;
-    fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+    fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+    fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
     return;
   }
 
@@ -493,7 +497,8 @@ export function triggerAdaptation(fighter, type, attacker) {
   triggerGlobalScreenShake(6, 18);
 
   // Global Cooldown and Accumulation Resets
-  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+  fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
   fighter.totalAccumDamage = 0;
   fighter.accumTimer = 0;
 
@@ -629,7 +634,7 @@ export function handleInfinityFreeze(fighter) {
       fighter.infinityFreezeCount = (fighter.infinityFreezeCount || 0) + 1;
 
       const configCount = mahoragaAdaptationConfig.gojo?.infinity?.requiredFreezes;
-      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 2);
+      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 10);
       
       if (!fighter.gojoInfinityImmune && fighter.infinityFreezeCount >= freezesNeeded) {
         fighter._lastGojoHitType = 'infinity';
@@ -889,7 +894,8 @@ export function adaptToPureLoveBeam(fighter) {
   triggerGlobalScreenShake(6, 18);
 
   // Global Cooldown and Accumulation Resets
-  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+  fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
   fighter.totalAccumDamage = 0;
   fighter.accumTimer = 0;
 
@@ -995,7 +1001,8 @@ export function adaptToYutaFlurry(fighter) {
   triggerGlobalScreenShake(6, 18);
 
   // Global Cooldown and Accumulation Resets
-  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+  fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
   fighter.totalAccumDamage = 0;
   fighter.accumTimer = 0;
 
@@ -1059,7 +1066,8 @@ export function adaptToThinIceBreaker(fighter) {
   triggerGlobalScreenShake(6, 18);
 
   // Global Cooldown and Accumulation Resets
-  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+  fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
   fighter.totalAccumDamage = 0;
   fighter.accumTimer = 0;
 
@@ -1129,7 +1137,8 @@ export function adaptToSoulDisfigurement(fighter) {
   triggerGlobalScreenShake(6, 18);
 
   // Global Cooldown and Accumulation Resets
-  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+  fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
   fighter.totalAccumDamage = 0;
   fighter.accumTimer = 0;
 
@@ -1204,7 +1213,8 @@ export function adaptToSaitamaCounter(fighter, attacker) {
   triggerGlobalScreenShake(6, 18);
 
   // Global Cooldown and Accumulation Resets
-  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+  fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
   fighter.totalAccumDamage = 0;
   fighter.accumTimer = 0;
 
@@ -1246,11 +1256,6 @@ export function applyRCTHeal(fighter) {
     healAmount = maxHp * 0.12;
   }
   healAmount = Math.max(1, Math.round(healAmount));
-
-  // Enforce Max RCT Healing Pool across the match
-  const maxPool = CONFIG.mahoraga?.maxRctHealingPool ?? (maxHp * 1.5);
-  const remainingPool = Math.max(0, maxPool - (fighter.totalRctHealedThisMatch || 0));
-  healAmount = Math.min(healAmount, remainingPool);
 
   if (healAmount <= 0) return;
 

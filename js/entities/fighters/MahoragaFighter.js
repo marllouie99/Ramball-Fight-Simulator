@@ -63,6 +63,7 @@ export class MahoragaFighter extends Fighter {
     this.totalAccumDamage = 0;
     this.accumTimer = 0;
     this.fatalAdaptCooldown = 0;
+    this.fatalAdaptCooldownMax = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
     this.gojoAdaptColorHistory = [];
     this.infinityFreezeCount = 0;
     this.gojoInfinityImmune = false;
@@ -150,6 +151,7 @@ export class MahoragaFighter extends Fighter {
     this.totalAccumDamage = 0;
     this.accumTimer = 0;
     this.fatalAdaptCooldown = 0;
+    this.fatalAdaptCooldownMax = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
     this.gojoAdaptColorHistory = [];
     this.infinityFreezeCount = 0;
     this.gojoInfinityImmune = false;
@@ -1019,7 +1021,7 @@ export class MahoragaFighter extends Fighter {
     const speedBoost = CONFIG.mahoraga?.wheelAdaptationSpeedMultiplier ?? CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? CONFIG.mahoraga?.movementSpeedMultiplierPerAdaptation ?? 0.15;
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
 
-    // ── PASSIVE RCT REGEN (Scales per adaptation level with configurable caps & limits) ──
+    // ── PASSIVE RCT REGEN (Scales per adaptation level) ──
     if (this.rctRegenDamagePauseTimer > 0) {
       this.rctRegenDamagePauseTimer--;
     }
@@ -1030,13 +1032,9 @@ export class MahoragaFighter extends Fighter {
     const maxRegenRate = CONFIG.mahoraga?.maxRctRegenRate ?? 0.12;
     const currentRegenRate = Math.min(maxRegenRate, effectiveStages * rctPerStage);
 
-    const maxPool = CONFIG.mahoraga?.maxRctHealingPool ?? (this.maxHp * 1.5);
-    const poolRemaining = Math.max(0, maxPool - (this.totalRctHealedThisMatch || 0));
-
-    if (currentRegenRate > 0 && this.hp > 0 && !this.isDead && this.hp < this.maxHp && this.rctRegenDamagePauseTimer <= 0 && poolRemaining > 0) {
+    if (currentRegenRate > 0 && this.hp > 0 && !this.isDead && this.hp < this.maxHp && this.rctRegenDamagePauseTimer <= 0) {
       const oldHp = this.hp;
-      const desiredHeal = Math.min(currentRegenRate, poolRemaining);
-      this.hp = Math.min(this.maxHp, this.hp + desiredHeal);
+      this.hp = Math.min(this.maxHp, this.hp + currentRegenRate);
       const actualHealed = this.hp - oldHp;
       this.totalRctHealedThisMatch = (this.totalRctHealedThisMatch || 0) + actualHealed;
 

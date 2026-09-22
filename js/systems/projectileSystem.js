@@ -46,7 +46,7 @@ function areOnSameTeam(ownerIndex, targetIndex) {
   const isTeamMode = (
     mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' ||
     mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' ||
-    mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' ||
+    mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' ||
     mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4' || mode === '4v4'
   );
   if (!isTeamMode) return false;
@@ -316,7 +316,7 @@ class ProjectileSystem {
       this.maxActiveProjectiles = 100; // FFA with many entities
     } else if (totalEntities >= 4) {
       this.maxActiveProjectiles = 150; // 2v2 mode
-    } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+    } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off') {
       this.maxActiveProjectiles = 130; // 1v2: 3 fighters, more DPS → tighten cap
     } else if (state.mode === 'Stand Off') {
       this.maxActiveProjectiles = 120; // Stand Off high HP duel optimization
@@ -525,23 +525,23 @@ class ProjectileSystem {
   /**
    * Spawns a chain lightning projectile for Zeus.
    */
-  fireChainLightning(fighter, ownerIndex, damage, chainCount = (CONFIG.zeus?.chainCount || 4)) {
-    const tipDist = GUN_TIP_DIST(fighter.r) + (CONFIG.zeus?.boltReleaseOffset || 15);
+  fireChainLightning(fighter, ownerIndex, damage, chainCount = (CONFIG.zeus?.chainCount ?? 4)) {
+    const tipDist = GUN_TIP_DIST(fighter.r) + (CONFIG.zeus?.boltReleaseOffset ?? 20);
     const dirX = Math.cos(fighter.gunAngle);
     const dirY = Math.sin(fighter.gunAngle);
-    const speed = CONFIG.zeus?.lightningSpeed || (CONFIG.projectile.speed * 1.5);
+    const speed = CONFIG.zeus?.lightningSpeed ?? (CONFIG.projectile.speed * 1.5);
     
     const proj = this._getProjectile();
     proj.x = fighter.x + dirX * tipDist;
     proj.y = fighter.y + dirY * tipDist;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
-    proj.r = CONFIG.zeus?.lightningRadius || 6;
-    proj.life = CONFIG.zeus?.lightningLife || 100;
-    proj.maxLife = CONFIG.zeus?.lightningLife || 100;
-    proj.color = CONFIG.zeus?.color || '#00BFFF';
+    proj.r = CONFIG.zeus?.lightningRadius ?? 6;
+    proj.life = CONFIG.zeus?.lightningLife ?? 100;
+    proj.maxLife = CONFIG.zeus?.lightningLife ?? 100;
+    proj.color = CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF';
     proj.owner = ownerIndex;
-    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (CONFIG.zeus?.lightningDamage || 10);
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (CONFIG.zeus?.lightningDamage ?? CONFIG.zeus?.damage ?? 20);
     proj.isChainLightning = true;
     proj.chainCount = chainCount;
     proj.visual = 'chainLightning';
@@ -1483,6 +1483,10 @@ class ProjectileSystem {
             isSlashCrit = critRes.isCrit;
           }
 
+          if (projectile.isChainLightning && fighter.staticDebuffTimer > 0) {
+            finalProjDmg *= (CONFIG.zeus?.staticDamageBonus ?? 1.33);
+          }
+
           const applied = fighter.takeDamage(finalProjDmg, attacker, {
             isProjectile: true,
             projectile,
@@ -1590,7 +1594,11 @@ class ProjectileSystem {
       const hitRadiusSq = hitRadius * hitRadius;
       if (distSq < hitRadiusSq) {
         const attacker = fighters[projectile.owner];
-        applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
+        let illDamage = projectile.damage;
+        if (projectile.isChainLightning && illusion.staticDebuffTimer > 0) {
+          illDamage *= (CONFIG.zeus?.staticDamageBonus ?? 1.33);
+        }
+        applyDamageToTarget(illusion, illDamage, attacker, { isProjectile: true, projectile });
         
         if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
           this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);

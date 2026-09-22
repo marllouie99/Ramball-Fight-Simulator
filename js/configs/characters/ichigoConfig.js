@@ -2,6 +2,9 @@
 // Ichigo Kurosaki — Substitute Soul Reaper Config (Unified)
 // ─────────────────────────────────────────────
 export const ichigoConfig = {
+  bossTitle: 'Substitute Soul Reaper',
+  title: 'Substitute Soul Reaper',
+
   // ── Base Attributes & Identity ──
   hp: 240,
   speed: 7.0,

@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────
 
 export const zenitsuConfig = {
+  bossTitle: 'Thunder Breathing Slayer',
+  title: 'Thunder Breathing Slayer',
+
   // Baseline Attributes
   hp: 310,
   maxHpRatio: 1.0,

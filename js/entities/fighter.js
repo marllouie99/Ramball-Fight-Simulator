@@ -265,9 +265,7 @@ export class Fighter {
   set hp(value) {
     const oldHp = this._hp;
     if (oldHp !== undefined && value > oldHp && !this._bypassHealDebuff) {
-      if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0) {
-        value = oldHp; // Disable all healing while caught inside Yuta's Pure Love Beam
-      } else if (this.tojiRegenDebuffTimer > 0) {
+      if (this.tojiRegenDebuffTimer > 0) {
         const healingAmount = value - oldHp;
         const debuffMult = CONFIG.toji?.regenDebuffMultiplier ?? 0.40;
         const reducedHealing = healingAmount * debuffMult;
@@ -277,17 +275,6 @@ export class Fighter {
         if (!this._lastTojiRegenDebuffTextTime || now - this._lastTojiRegenDebuffTextTime > 600) {
           spawnFloatingText(this.x, this.y - this.r - 28, "REGEN DECREASED!", "#C084FC");
           this._lastTojiRegenDebuffTextTime = now;
-        }
-      } else if (this.pureLoveBeamRegenDebuffTimer > 0) {
-        const healingAmount = value - oldHp;
-        const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50;
-        const reducedHealing = healingAmount * debuffMult;
-        value = oldHp + reducedHealing;
-
-        const now = Date.now();
-        if (!this._lastRegenDebuffTextTime || now - this._lastRegenDebuffTextTime > 600) {
-          spawnFloatingText(this.x, this.y - this.r - 28, "Regen Debuffed", "#FF3366");
-          this._lastRegenDebuffTextTime = now;
         }
       } else if (this.blackFlashDebuffTimer > 0) {
         if (state && state.gameState === 'playing') {
@@ -2508,7 +2495,7 @@ export class Fighter {
 
     const isTagMatch = (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH || state.mode === 'TAG_MATCH');
     const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
-    const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
+    const is1v2 = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
     const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2);
 
     if (isTagMatch) {

@@ -2,6 +2,9 @@
 // Yuji Itadori — The Black Flash Brawler Config
 // ─────────────────────────────────────────────
 export const yujiConfig = {
+  bossTitle: 'Tiger of West Junior High',
+  title: 'Tiger of West Junior High',
+
   // ── Base Attributes ──
   hp: 200,
   speed: 6.0,

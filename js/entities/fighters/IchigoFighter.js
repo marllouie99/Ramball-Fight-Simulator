@@ -635,6 +635,10 @@ export class IchigoFighter extends Fighter {
 
   onDeath() {
     this.stopAllSkillAudios(true);
+    this._hollowVoiceHandle = null;
+    this._hollowFlareHandle = null;
+    this._hollowVoicePlaying = false;
+    this._hollowVoiceEndTime = 0;
     super.onDeath();
   }
 
@@ -763,6 +767,11 @@ export class IchigoFighter extends Fighter {
     stopBankaiVoiceline(this, force);
     stopHollowTransformationVoiceline(this, force);
     stopFinalGetsugaVoiceline(this, force);
+
+    this._hollowVoiceHandle = null;
+    this._hollowFlareHandle = null;
+    this._hollowVoicePlaying = false;
+    this._hollowVoiceEndTime = 0;
 
     if (force || this.isDead || this.hp <= 0) {
       if (this._activeVoicelineHandle) {
