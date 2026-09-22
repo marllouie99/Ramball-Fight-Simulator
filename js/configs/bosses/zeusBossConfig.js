@@ -17,8 +17,6 @@ export const zeusBossConfig = {
   hp: 2000,
   speed: 5.2,
   moveSpeed: 5.2,
-  r: 25,
-  radius: 25,
   color: '#00BFFF', // Deep Sky Blue / Olympian Cyan
   themeColor: '#00BFFF',
   startX: 300,

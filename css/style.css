@@ -955,6 +955,7 @@ canvas {
 .hud-top-container:has(.boss-card) {
   align-items: stretch !important;
   justify-content: center !important;
+  overflow: visible !important;
 }
 
 .boss-card {
@@ -964,6 +965,8 @@ canvas {
   flex-direction: column;
   padding: 0;
   margin: 0;
+  overflow: visible !important;
+  position: relative !important;
 }
 
 .boss-card__header {
@@ -977,6 +980,7 @@ canvas {
   padding: 0 2px !important;
   box-sizing: border-box !important;
   gap: 2px !important;
+  overflow: visible !important;
 }
 
 .boss-card__name {
@@ -1013,7 +1017,7 @@ canvas {
   background: rgba(10, 15, 25, 0.88) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.40) !important;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.75), inset 0 1px 3px rgba(0, 0, 0, 0.9) !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   position: relative !important;
   display: flex !important;
   align-items: center !important;
@@ -1026,7 +1030,7 @@ canvas {
   left: 0 !important;
   top: 0 !important;
   height: 100% !important;
-  border-radius: 2px !important;
+  border-radius: 2.5px !important;
   transition: width 0.12s ease-out, background-color 0.2s ease !important;
   z-index: 1 !important;
 }
@@ -1049,6 +1053,13 @@ canvas {
   pointer-events: none !important;
   z-index: 3 !important;
   white-space: nowrap !important;
+}
+
+.boss-bar .hud-heal-bubble {
+  font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
+  font-size: 16px !important;
+  top: -6px !important;
+  z-index: 9999 !important;
 }
 
 /* Bottom 2 Challengers Side-by-Side */

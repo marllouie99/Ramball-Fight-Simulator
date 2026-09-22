@@ -20,8 +20,6 @@ export const makimaBossConfig = {
   maxHp: 2600,
   speed: 5.6,
   moveSpeed: 5.6,
-  r: 25,
-  radius: 25,
   color: '#C2410C',
   startX: 300,
   startY: 250,

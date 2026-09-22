@@ -234,6 +234,7 @@ export const state = {
 
   indexCategory: 'All',
   gameCategory: 'foc', // 'foc' (Fight of Characters) | 'tactical' (Tactical Shooter)
+  activeFocMap: null, // Active FOC battleground map (e.g. Yuta's Cursed Grove)
   mode: GAME_MODES.ONE_VS_ONE,
   arenaTheme: 'light', // 'light' | 'dark'
   testMode: false, // Disables leaderboard recording

@@ -59,6 +59,13 @@ export function triggerHudHealBubble(target, healAmount) {
     if (fighter && _hudCache.fighters.has(fighter)) {
       hpBarElement = _hudCache.fighters.get(fighter)?.hpBar;
     }
+  } else if (typeof target === 'object' && target !== null && !(target instanceof Element)) {
+    if (_hudCache.fighters.has(target)) {
+      hpBarElement = _hudCache.fighters.get(target)?.hpBar;
+    } else if (target.isBoss || target._isBoss) {
+      const topContainer = document.getElementById('hudTopContainer');
+      hpBarElement = topContainer ? topContainer.querySelector('.boss-bar') : null;
+    }
   }
   if (!hpBarElement || typeof hpBarElement.appendChild !== 'function') return;
   const bubble = document.createElement('div');
@@ -283,6 +290,12 @@ export function drawHUD() {
 
   // Calculate HUD opacity during champion reveal fade-in (only if champion screen layout is active)
   let hudOpacity = 1;
+
+  // Boss entrance cutscene: completely hide all HUD elements during entrance
+  if (gameState === 'boss_intro' || state._bossEntranceActive) {
+    hudOpacity = 0;
+  }
+
   const isChampionActive = Boolean(state._isChampionLayoutActive);
   if (isChampionActive) {
     if (gameState === 'matchEnd') {
@@ -302,6 +315,17 @@ export function drawHUD() {
         const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
         hudOpacity = Math.max(0, 1 - (delayedTimer / 30));
       }
+    }
+  }
+
+  // Boss entrance HUD smooth fade-in (hidden → fully visible over ~50 frames / ~0.83s)
+  if (typeof state._bossEntranceHudFadeTimer === 'number') {
+    const fadeDuration = 50;
+    const fadeP = Math.min(1.0, state._bossEntranceHudFadeTimer / fadeDuration);
+    hudOpacity *= fadeP;
+    state._bossEntranceHudFadeTimer++;
+    if (state._bossEntranceHudFadeTimer > fadeDuration) {
+      state._bossEntranceHudFadeTimer = undefined;
     }
   }
 

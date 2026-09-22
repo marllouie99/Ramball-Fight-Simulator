@@ -36,7 +36,8 @@ import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserke
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
 import { getAudioLatencyMs } from './soundSystem.js';
-import { BossAuraRenderer, BossPhaseTransitionVfx, BossEntranceSequence } from '../bosses/index.js';
+import { BossAuraRenderer, BossPhaseTransitionVfx, BossEntranceSequence, YutaBushEntrance } from '../bosses/index.js';
+import { drawFocMap, getActiveFocMap } from '../../FOC Maps/index.js';
 // Cached DOM elements to adhere strictly to Rule 13 (UI & DOM Query Caching Requirement)
 let _cachedHudTop = null;
 let _cachedHudBot = null;
@@ -372,6 +373,13 @@ export function renderGame() {
         state.ctx.save();
         applyCameraToCtx(state.ctx);
 
+        // ── Custom FOC Battleground Maps (Interactive Foliage & Scenery) ──
+        // Rendered above all domain dim screens and arena overlays so sprites are never obscured or dimmed!
+        const focMap = state.activeFocMap || getActiveFocMap();
+        if (focMap) {
+          drawFocMap(state.ctx, focMap);
+        }
+
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && f.hp > 0 && (
           ((f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive) ||
           ((f.type === 'rubbick' || f.characterId === 'rubbick' || f.type === 'trickster' || f.characterId === 'trickster' || f._def?.id === 'rubbick' || f._def?.id === 'trickster') && (f.stolenDomainActive || (f.domainActive && f.stolenType === 'gojo_domain') || (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0)))
@@ -423,13 +431,25 @@ export function renderGame() {
         if (state.fighters) {
           for (const f of state.fighters) {
             if (f && f.isBoss && f.hp > 0) {
-              BossAuraRenderer.drawBossAura(state.ctx, f);
-              BossPhaseTransitionVfx.draw(state.ctx, f);
+              if (!YutaBushEntrance.isHiding(f)) {
+                BossAuraRenderer.drawBossAura(state.ctx, f);
+                BossPhaseTransitionVfx.draw(state.ctx, f);
+              }
+              if (YutaBushEntrance.isActive) {
+                YutaBushEntrance.drawGround(state.ctx, f);
+              }
             }
           }
         }
 
         drawFighters(); // Draw fighters ON TOP of dim screens & domain structures so fighters stay 100% visible & un-tinted!
+        if (state.fighters && YutaBushEntrance.isActive) {
+          for (const f of state.fighters) {
+            if (f && f.isBoss && f.hp > 0) {
+              YutaBushEntrance.drawForeground(state.ctx, f);
+            }
+          }
+        }
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke
         drawIllusions(); // Draw Doppleganger illusions
         drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
@@ -603,6 +623,10 @@ export function renderGame() {
       // Restore original context and canvas
       state.ctx = originalCtx;
       state.canvas = originalCanvas;
+
+      if (!state.pixiApp && state.topLevelUiCanvas) {
+        state.ctx.drawImage(state.topLevelUiCanvas, 0, 0);
+      }
     }
     
     // PIXIJS SYNC: Tell the GPU that the offscreen 2D canvas and floating text canvas have updated this frame.

@@ -1,7 +1,7 @@
 import { state, isGlobalHitPauseActive } from '../core/state.js';
 import { updateFighters, updateProjectiles } from './physics.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
-import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatchWithRandomTagMatchFighters, resetMatch, startCountdown, startMatchDirectlyFromFaceOff } from '../core/gameFlow.js';
+import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatchWithRandomTagMatchFighters, resetMatch, startCountdown, startMatchDirectlyFromFaceOff, launchMatchOrBossEntrance } from '../core/gameFlow.js';
 import { triggerFaceOffSFX } from '../graphics/ui/ThumbnailFaceOffScreen.js';
 import { updateDeathEffects } from '../graphics/particles/deathShatterEffect.js';
 import { updateIllusionDeathEffects } from '../graphics/particles/illusionDeathEffect.js';
@@ -19,8 +19,8 @@ import { FRAME_TIME } from './gameLoop.js';
 import { updateArenaBgm, startArenaBgm, stopArenaBgm } from './arenaBgmSystem.js';
 import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
-import { audioSystem } from './audioSystem.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
+import { updateFocMap, getActiveFocMap, resetFocMapState } from '../../FOC Maps/index.js';
 
 export function updateGame() {
     // Increment global frame count on EVERY frame across all game states
@@ -33,8 +33,8 @@ export function updateGame() {
       }
 
       if (state.faceOffAutoStart) {
-        // Skip showoff screen, launch in-arena countdown directly!
-        startCountdown();
+        // Launch in-arena countdown or boss entrance sequence directly!
+        launchMatchOrBossEntrance();
         return;
       } else {
         // Manual thumbnail hold mode: hold at frame 120 (VS settled)
@@ -247,5 +247,19 @@ export function updateGame() {
       });
     }
     burnEffectSystem.update(dtGlobal);
-    bomberExplosionSystem.update(dtGlobal);
+    // Update active FOC map physics (bush sway, rustle, leaf particles) strictly during battle
+    const isBattleActive = Boolean(
+      state.gameState === 'playing' ||
+      state.gameState === 'countdown' ||
+      state.gameState === 'roundEnd' ||
+      state.gameState === 'matchEnd'
+    );
+    if (isBattleActive) {
+      const activeFocMap = state.activeFocMap || getActiveFocMap();
+      if (activeFocMap) {
+        updateFocMap(1, activeFocMap);
+      }
+    } else {
+      resetFocMapState();
+    }
 }

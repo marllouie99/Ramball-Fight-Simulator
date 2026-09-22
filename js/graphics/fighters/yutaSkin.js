@@ -31,7 +31,7 @@ export function _getYutaHairImage() {
       console.warn('Failed to load Yuta hair image at Assets/model/Yuta-hair.png', e);
       _yutaHairImageLoading = false;
     };
-    img.src = 'Assets/model/Yuta-hair.png?v=1';
+    img.src = 'Assets/model/Yuta-hair.png?v=2';
     _yutaHairImage = img;
   }
   return _yutaHairImage;
@@ -250,24 +250,34 @@ function _renderYutaPixelBodyToCanvas(destCtx, r) {
  * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
  */
 export function drawYutaPixelBody(ctx, r) {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined') {
+    _renderYutaPixelBodyToCanvas(ctx, r);
+    return;
+  }
 
-  if (!_cachedYutaBodyCanvas || _cachedYutaBodyR !== r) {
-    _cachedYutaBodyR = r;
+  const intR = Math.round(r);
+  if (!_cachedYutaBodyCanvas || _cachedYutaBodyR !== intR) {
+    _cachedYutaBodyR = intR;
     const P = 2.0;
-    const steps = Math.ceil((r + P) / P);
+    const steps = Math.ceil((intR + P) / P);
     const size = (steps * 2 + 1) * P;
 
     _cachedYutaBodyCanvas = document.createElement('canvas');
     _cachedYutaBodyCanvas.width = size;
     _cachedYutaBodyCanvas.height = size;
     const offCtx = _cachedYutaBodyCanvas.getContext('2d');
-    _renderYutaPixelBodyToCanvas(offCtx, r);
+    _renderYutaPixelBodyToCanvas(offCtx, intR);
   }
 
   if (_cachedYutaBodyCanvas) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
+
+    // Enforce circular clip mask to prevent any rectangular canvas bleeding
+    ctx.beginPath();
+    ctx.arc(0, 0, intR + 1, 0, Math.PI * 2);
+    ctx.clip();
+
     ctx.drawImage(_cachedYutaBodyCanvas, -_cachedYutaBodyCanvas.width / 2, -_cachedYutaBodyCanvas.height / 2);
     ctx.restore();
   }
@@ -284,7 +294,8 @@ export function drawYutaSkin(ctx, fighter) {
   ctx.translate(fighter.x || 0, (fighter.y || 0) - (fighter.z || 0));
 
   // Facing orientation & Rule 19 local space transform
-  const angle = isPodiumPreview ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const isEntrance = Boolean((typeof state !== 'undefined' && state._bossEntranceActive) || fighter._hideInBush);
+  const angle = (isPodiumPreview || isEntrance) ? (fighter.angle || 0) : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
   ctx.rotate(angle);
 
   // Vertical flip when aiming left so hair stays at -Y (Top) and uniform stays at +Y (Bottom)

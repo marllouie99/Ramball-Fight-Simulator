@@ -11,6 +11,7 @@ import { renderYutaDomainBackground } from '../../entities/fighters/yuta/yutaDom
 import { updateRika, hasDodgingMechanic } from '../../entities/fighters/yuta/rikaLogic.js';
 import { drawYutaGhostSkin } from './yutaSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
+import { YutaBushEntrance } from '../../bosses/animations/YutaBushEntrance.js';
 
 // Pre-seeded static data for Yuta Domain Channeling VFX (0 GC per Rule #12 & #16)
 const _YUTA_DOMAIN_EMBERS = Array.from({ length: 32 }, (_, i) => ({
@@ -32,10 +33,17 @@ export class YutaRenderer {
   }
 
   static draw(ctx, fighter, opponent) {
+    if (YutaBushEntrance.isHiding(fighter)) {
+      return;
+    }
+
     const wasHidingHp = fighter.hideHpText;
     fighter.hideHpText = true;
 
     ctx.save();
+    if (fighter._bushStealthAlpha !== undefined && fighter._bushStealthAlpha < 0.99) {
+      ctx.globalAlpha *= fighter._bushStealthAlpha;
+    }
     let tremorX = 0;
     let tremorY = 0;
     if (fighter.isChannelingDomain) {

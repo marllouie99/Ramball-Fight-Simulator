@@ -23,6 +23,9 @@ export const AUDIO_CONFIG = {
   'effect_flare': 'Assets/Sound Effects/SkillEffects/flare.mp3',
   'effect_infinity_collide': 'Assets/Sound Effects/SkillEffects/infinity-collide.mp3',
   'effect_escanor_weapon_lift': 'Assets/Sound Effects/SkillEffects/Escanor-weapon-lift.mp3',
+  'walk_on_grass': 'Assets/Sound Effects/Sprites SFX/walk-on-grass.mp3',
+  'bush_rustle': 'Assets/Sound Effects/Sprites SFX/walk-on-grass.mp3',
+  'yuta_boss_entrance_voiceline': 'Assets/Sound Effects/Boss Voiceline SFX/yuta-boss-entrance-voiceline.mp3',
 
   // Skills
   'skill_backstab': 'Assets/Sound Effects/Skills/backstab.mp3',

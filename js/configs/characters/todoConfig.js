@@ -80,9 +80,9 @@ export const todoConfig = {
 
     // Ultimate Skill: Takada-chan Idol Imagination (530,000 IQ Idol Multiplier)
     ultCooldown: 1200,            // Ultimate cooldown in frames (20.0 seconds at 60fps)
-    ultDuration: 5000,             // Ultimate active duration in frames (8.0 seconds at 60fps)
+    ultDuration: 1000,             // Ultimate active duration in frames (8.0 seconds at 60fps)
     channelDuration: 180,         // Channeling windup duration in frames (3.0 seconds at 60fps)
-    hpThresholdUltTrigger: 0.70,  // HP ratio threshold (30% HP) that automatically triggers Takada-chan ultimate channeling
+    hpThresholdUltTrigger: 0.50,  // HP ratio threshold (30% HP) that automatically triggers Takada-chan ultimate channeling
     enableHpThresholdUlt: true,   // Toggle to enable/disable 30% HP threshold auto-activation
     enableTakadaDimScreen: true,  // Toggle to enable/disable full-screen romantic idol concert stage overlay
     takadaDimOpacity: 0.58,       // Luminous pastel pink, lavender & idol concert stage spotlight opacity

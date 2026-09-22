@@ -17,8 +17,6 @@ export const sukunaBossConfig = {
   hp: 2800,
   speed: 5.8,
   moveSpeed: 5.8,
-  r: 25,
-  radius: 25,
   color: '#8B0000', // Dark Crimson
   themeColor: '#8B0000',
   startX: 300,

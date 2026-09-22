@@ -128,14 +128,17 @@ export function spawnTojiWhirlingWindDebris(x, y, count = 2) {
  * @param {number} y - Y position
  * @param {number} radius - Flash radius
  */
-export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
+export function spawnImpactFlash(x, y, radius = 20, typeOrColor = 'default') {
   let pType = 'flash';
   let color = 'rgba(255, 255, 255, 1)';
-  if (type === 'crimsonSniper') {
+  if (typeOrColor === 'crimsonSniper') {
     pType = 'crimsonSniperFlash';
-  } else if (type === 'layla') {
+    color = '#FF2244';
+  } else if (typeOrColor === 'layla') {
     pType = 'flash_layla';
     color = 'rgba(0, 229, 255, 0.85)';
+  } else if (typeof typeOrColor === 'string' && (typeOrColor.startsWith('#') || typeOrColor.startsWith('rgb') || typeOrColor.startsWith('hsl'))) {
+    color = typeOrColor;
   }
   
   ParticleSystem.spawn(x, y, 1, 'flash_default', {
@@ -1080,15 +1083,30 @@ function drawDefaultImpactFlash(ctx, effect) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
-  const flashR = Math.max(P * 2, effect.size * effect.life);
+  const life = effect.life !== undefined ? effect.life : 1.0;
+  const flashR = Math.max(P * 2, effect.size * life);
+  const alpha = Math.max(0, Math.min(1, life));
 
-  ctx.fillStyle = `rgba(255, 200, 80, ${(effect.life * 0.75).toFixed(3)})`;
+  const mainColor = (typeof effect.color === 'string' && effect.color) ? effect.color : 'rgba(255, 200, 80, 1)';
+
+  // 1. Soft Outer Cross Beams (No solid square block!)
+  ctx.fillStyle = mainColor;
+  ctx.globalAlpha = alpha * 0.75;
   ctx.fillRect(effect.x - flashR, effect.y - P, flashR * 2, P * 2);
   ctx.fillRect(effect.x - P, effect.y - flashR, P * 2, flashR * 2);
 
-  ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
-  const coreR = Math.max(P, Math.round((flashR * 0.4) / P) * P);
-  ctx.fillRect(effect.x - coreR, effect.y - coreR, coreR * 2, coreR * 2);
+  // 2. Core Diamond Sparkle (Pixel-art 4-point diamond flare, NOT a solid square box)
+  ctx.fillStyle = '#FFFFFF';
+  ctx.globalAlpha = alpha * 0.95;
+  const coreR = Math.max(P, Math.round((flashR * 0.35) / P) * P);
+
+  ctx.beginPath();
+  ctx.moveTo(effect.x, effect.y - coreR);
+  ctx.lineTo(effect.x + coreR, effect.y);
+  ctx.lineTo(effect.x, effect.y + coreR);
+  ctx.lineTo(effect.x - coreR, effect.y);
+  ctx.closePath();
+  ctx.fill();
 
   ctx.restore();
 }

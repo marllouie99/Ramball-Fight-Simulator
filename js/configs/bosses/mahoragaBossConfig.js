@@ -18,8 +18,6 @@ export const mahoragaBossConfig = {
   maxHp: 2800,
   speed: 6.5,
   moveSpeed: 6.5,
-  r: 30,
-  radius: 30,
   color: '#FFD700',
   themeColor: '#FFD700',
   skinColor: '#F5F5DC',

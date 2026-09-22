@@ -75,98 +75,14 @@ export function applyDomainArenaVignetteCutout(ctx) {
 
   if (arena.shape === 'circle') {
     const ar = (arena.radius || ((arena.width || 800) / 2)) * zoom;
-    const innerR = ar * 0.85;
-
-    // 1. Clear solid center interior (100% transparent, completely unobstructed)
     ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
-    ctx.beginPath();
-    ctx.arc(arenaCenterX, arenaCenterY, innerR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 2. Subtle soft edge vignette at circular arena wall boundary
-    const ringGrad = ctx.createRadialGradient(
-      arenaCenterX, arenaCenterY, innerR,
-      arenaCenterX, arenaCenterY, ar
-    );
-    ringGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-    ringGrad.addColorStop(0.60, 'rgba(0, 0, 0, 0.70)');
-    ringGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.15)');
-
-    ctx.fillStyle = ringGrad;
     ctx.beginPath();
     ctx.arc(arenaCenterX, arenaCenterY, ar, 0, Math.PI * 2);
     ctx.fill();
   } else {
-    // Rectangular Arena
-    const vignetteSize = Math.max(16, Math.min(arenaW, arenaH) * 0.08); // Subtle ~25-35px border vignette
-    const innerX = arenaX + vignetteSize;
-    const innerY = arenaY + vignetteSize;
-    const innerW = Math.max(0, arenaW - vignetteSize * 2);
-    const innerH = Math.max(0, arenaH - vignetteSize * 2);
-
-    if (innerW > 0 && innerH > 0) {
-      // 1. Clear solid center interior (100% transparent, completely unobstructed)
-      ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
-      ctx.fillRect(innerX, innerY, innerW, innerH);
-
-      // 2. Subtle soft edge vignettes along the 4 borders
-      // Top border
-      const topGrad = ctx.createLinearGradient(innerX, arenaY, innerX, innerY);
-      topGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
-      topGrad.addColorStop(1, 'rgba(0, 0, 0, 1.0)');
-      ctx.fillStyle = topGrad;
-      ctx.fillRect(innerX, arenaY, innerW, vignetteSize);
-
-      // Bottom border
-      const botGrad = ctx.createLinearGradient(innerX, innerY + innerH, innerX, arenaY + arenaH);
-      botGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-      botGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-      ctx.fillStyle = botGrad;
-      ctx.fillRect(innerX, innerY + innerH, innerW, vignetteSize);
-
-      // Left border
-      const leftGrad = ctx.createLinearGradient(arenaX, innerY, innerX, innerY);
-      leftGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
-      leftGrad.addColorStop(1, 'rgba(0, 0, 0, 1.0)');
-      ctx.fillStyle = leftGrad;
-      ctx.fillRect(arenaX, innerY, vignetteSize, innerH);
-
-      // Right border
-      const rightGrad = ctx.createLinearGradient(innerX + innerW, innerY, arenaX + arenaW, innerY);
-      rightGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-      rightGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-      ctx.fillStyle = rightGrad;
-      ctx.fillRect(innerX + innerW, innerY, vignetteSize, innerH);
-
-      // 3. Four soft corner blends
-      // Top-Left corner
-      const tlGrad = ctx.createRadialGradient(innerX, innerY, 0, innerX, innerY, vignetteSize);
-      tlGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-      tlGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-      ctx.fillStyle = tlGrad;
-      ctx.fillRect(arenaX, arenaY, vignetteSize, vignetteSize);
-
-      // Top-Right corner
-      const trGrad = ctx.createRadialGradient(innerX + innerW, innerY, 0, innerX + innerW, innerY, vignetteSize);
-      trGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-      trGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-      ctx.fillStyle = trGrad;
-      ctx.fillRect(innerX + innerW, arenaY, vignetteSize, vignetteSize);
-
-      // Bottom-Left corner
-      const blGrad = ctx.createRadialGradient(innerX, innerY + innerH, 0, innerX, innerY + innerH, vignetteSize);
-      blGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-      blGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-      ctx.fillStyle = blGrad;
-      ctx.fillRect(arenaX, innerY + innerH, vignetteSize, vignetteSize);
-
-      // Bottom-Right corner
-      const brGrad = ctx.createRadialGradient(innerX + innerW, innerY + innerH, 0, innerX + innerW, innerY + innerH, vignetteSize);
-      brGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-      brGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-      ctx.fillStyle = brGrad;
-      ctx.fillRect(innerX + innerW, innerY + innerH, vignetteSize, vignetteSize);
-    }
+    // Rectangular Arena — 100% full arena interior & corner clearing
+    ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
+    ctx.fillRect(arenaX, arenaY, arenaW, arenaH);
   }
 
   ctx.restore();
@@ -884,8 +800,8 @@ export function drawYutaDomainDimScreen() {
   ctx.fillStyle = cornerGrad;
   ctx.fillRect(0, 0, w, h);
 
-  // 4. Clear arena interior with subtle edge vignette so domain artwork is 100% visible
-  if (yutaFighter && yutaFighter.domainActive) {
+  // 4. Clear arena interior so domain artwork and all corner foliage sprites are 100% visible
+  if (yutaFighter && (yutaFighter.domainActive || yutaFighter.isChannelingDomain)) {
     applyDomainArenaVignetteCutout(ctx);
   }
 

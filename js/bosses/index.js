@@ -10,4 +10,5 @@ export { BossAbilityRegistry } from './abilities/BossAbilityRegistry.js';
 export { BossEntranceSequence } from './animations/BossEntranceSequence.js';
 export { BossAuraRenderer } from './animations/BossAuraRenderer.js';
 export { BossPhaseTransitionVfx } from './animations/BossPhaseTransitionVfx.js';
+export { YutaBushEntrance } from './animations/YutaBushEntrance.js';
 export { BossRegistry, BOSS_ROSTER } from './registry/BossRegistry.js';

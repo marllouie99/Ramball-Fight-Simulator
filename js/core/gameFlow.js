@@ -33,6 +33,7 @@ import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRe
 import { tacticalProjectileSystem } from '../../Tactical Force/systems/tacticalProjectileSystem.js';
 import { resetCamera } from '../systems/cameraSystem.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
+import { getFocMapForBoss } from '../../FOC Maps/index.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -267,7 +268,7 @@ export function reinitFighters(isNewMatch = false) {
   } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4) {
     // Arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
-  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off') {
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2') {
     // 1v2 / Boss Battle mode: Team 0 is p1 (Boss), Team 1 is p2 and p3 (Challengers)
     fighterIndexes = [state.p1Index, state.p2Index, state.p3Index];
   }
@@ -299,7 +300,7 @@ export function reinitFighters(isNewMatch = false) {
       f.maxHp = hp;
       f.hp = hp;
     }
-  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off') {
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2') {
     const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
     state.fighters.forEach((f, idx) => {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
@@ -328,11 +329,23 @@ export function reinitFighters(isNewMatch = false) {
   const activeTacticalMap = state.activeMap || STARTER_MAP;
 
   if (isTacticalActive) {
+    state.activeFocMap = null;
     state.arena = { ...activeTacticalMap.arena };
     state.arenaTheme = 'dark';
     CONFIG.arenaTheme = 'dark';
-  } else if (!state.arena || state.arena.width === STARTER_MAP.arena.width) {
-    state.arena = { ...CONFIG.arena };
+  } else {
+    // Resolve dedicated FOC Boss Map if active boss exists (e.g. Yuta's Cursed Grove)
+    const isBoss = Boolean(state.fighters && state.fighters[0]?.isBoss);
+    const bossMap = isBoss ? getFocMapForBoss(state.fighters[0]) : null;
+    if (bossMap) {
+      state.activeFocMap = bossMap;
+      state.arena = { ...bossMap.arena };
+    } else {
+      state.activeFocMap = null;
+      if (!state.arena || state.arena.width === STARTER_MAP.arena.width) {
+        state.arena = { ...CONFIG.arena };
+      }
+    }
   }
 
   const arena = state.arena;
@@ -457,7 +470,7 @@ export function reinitFighters(isNewMatch = false) {
     const angle3 = Math.random() * Math.PI * 2;
     state.fighters[3].vx = Math.cos(angle3) * state.fighters[3].speed;
     state.fighters[3].vy = Math.sin(angle3) * state.fighters[3].speed;
-  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off') {
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === 'Stand Off 1v2') {
     // Boss Battle Triangle Formation: Boss at top center, Challengers at bottom-left and bottom-right
     const centerX = arena.x + arena.width * 0.5;
     const topY = arena.y + arena.height * 0.28;
@@ -774,10 +787,108 @@ export function spawnTagInFighter(teamIndex) {
 
 state.spawnTagInFighter = spawnTagInFighter;
 
+export function launchMatchOrBossEntrance() {
+  const isBossBattle = (
+    state.mode === 'Boss Battle' ||
+    state.mode === GAME_MODES.BOSS_BATTLE ||
+    state.mode === GAME_MODES.STAND_OFF_1V2 ||
+    state.mode === '1v2 Stand Off' ||
+    state.mode === '1v2' ||
+    state.mode === 'STAND_OFF_1V2' ||
+    state.mode === 'Stand Off 1v2' ||
+    Boolean(state.fighters && state.fighters[0]?.isBoss)
+  );
+
+  if (isBossBattle && state.fighters && state.fighters[0]?.isBoss) {
+    state.faceOffAutoStart = false;
+    state.gameState = 'boss_intro';
+
+    const boss = state.fighters[0];
+    const isYutaBoss = (boss.characterId === 'yuta' || boss.type === 'yuta');
+
+    BossEntranceSequence.start(boss, () => {
+      if (isYutaBoss) {
+        // Yuta's bush camper entrance transitions directly to FIGHT — no countdown
+        startBattleDirectlyAfterBossEntrance();
+      } else {
+        startCountdown();
+      }
+    });
+    return;
+  }
+
+  startCountdown();
+}
+
+/**
+ * Skips the 3-2-1 countdown after a boss entrance and goes directly to FIGHT.
+ * Plays the FIGHT announcer + ring bell, starts BGM, and enters the playing state.
+ */
+function startBattleDirectlyAfterBossEntrance() {
+  // Play FIGHT announcer + Ring Bell immediately
+  const fightSnd = getAnnouncerSound('fight');
+  const bellSnd = getAnnouncerSound('ringbell');
+  if (fightSnd && typeof audioSystem !== 'undefined') {
+    audioSystem.playSFX(fightSnd.src, fightSnd.volume, fightSnd.speed, fightSnd.offset || 0);
+  }
+  if (bellSnd && typeof audioSystem !== 'undefined') {
+    audioSystem.playSFX(bellSnd.src, bellSnd.volume, bellSnd.speed, bellSnd.offset || 0);
+  }
+
+  // Reset camera to arena center
+  resetCamera(true);
+
+  // Start arena background music
+  startArenaBgm(false);
+
+  // Transition directly to playing state (no countdown phase)
+  state._isChampionLayoutActive = false;
+  state.battleStartDelayTimer = 0;
+  state.battleStartFadeTimer = 0;
+  state.countdownTimer = state.countdownDuration || 180;
+  state.gameState = 'playing';
+  state.announcerSoundHandle = null;
+  state.announcerPlayingSequence = false;
+  state.announcerSubtitle = '';
+
+  if (!state.announcerTimeoutIds) {
+    state.announcerTimeoutIds = [];
+  }
+  state.announcerTimeoutIds.forEach(id => clearTimeout(id));
+  state.announcerTimeoutIds = [];
+
+  // Clear initial spawn cooldowns so fighters attack & engage immediately
+  if (state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f.hp > 0) {
+        f._isFaceOff = false;
+        f.hideHpText = false;
+        f.shootCooldown = 0;
+        f.cooldown = 0;
+        f.meleeCooldown = 0;
+        f.forcedMeleeTimer = 0;
+        f.hitStunTimer = 0;
+        f.knockbackStunTimer = 0;
+        // Randomize initial movement direction
+        const startAngle = Math.random() * Math.PI * 2;
+        const spd = f.speed || 3.0;
+        f.vx = Math.cos(startAngle) * spd;
+        f.vy = Math.sin(startAngle) * spd;
+        if (f.type === 'gojo' || (f._def && f._def.type === 'gojo')) {
+          f.combatAuraOpacity = 1;
+        } else if (f.type === 'sukuna' || (f._def && f._def.type === 'sukuna')) {
+          f.combatAuraOpacity = 1;
+        }
+      }
+    });
+    preloadActiveMatchSounds(state.fighters);
+  }
+}
+
 export function startFaceOffScreen(isThumbnailOnly = false) {
   if (!isThumbnailOnly) {
-    // Skip showoff screen, launch in-arena countdown directly!
-    startCountdown();
+    // Launch in-arena countdown or boss entrance directly!
+    launchMatchOrBossEntrance();
     return;
   }
   state.faceOffTimer = 0;
@@ -831,32 +942,7 @@ export function startMatchDirectlyFromFaceOff() {
 }
 
 export function proceedFromFaceOffToCountdown() {
-  if (state.gameState === 'faceoff') {
-    state.faceOffAutoStart = true;
-    if (state.faceOffTimer < 216) {
-      state.faceOffTimer = 216; // Fast-forward directly to match start
-      return;
-    }
-    const isBossBattle = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off');
-    if (isBossBattle && state.fighters && state.fighters[0]?.isBoss) {
-      state.gameState = 'boss_intro';
-      BossEntranceSequence.start(state.fighters[0], () => {
-        startMatchDirectlyFromFaceOff();
-      });
-      return;
-    }
-    startMatchDirectlyFromFaceOff();
-    return;
-  }
-  const isBossBattle = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off');
-  if (isBossBattle && state.fighters && state.fighters[0]?.isBoss) {
-    state.gameState = 'boss_intro';
-    BossEntranceSequence.start(state.fighters[0], () => {
-      startCountdown();
-    });
-    return;
-  }
-  startCountdown();
+  launchMatchOrBossEntrance();
 }
 
 export async function startGame() {
@@ -1090,21 +1176,14 @@ export function resetMatch(showFaceOff = true) {
   if (showFaceOff) {
     startFaceOffScreen(false);
   } else {
-    const isBossBattle = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off');
-    if (isBossBattle && state.fighters && state.fighters[0]?.isBoss) {
-      state.gameState = 'boss_intro';
-      BossEntranceSequence.start(state.fighters[0], () => {
-        startCountdown();
-      });
-    } else {
-      startCountdown();
-    }
+    launchMatchOrBossEntrance();
   }
 }
 
 export function goToTitle() {
   BossManager.reset();
   BossEntranceSequence.finish();
+  state.activeFocMap = null;
 
   if (state.announcerTimeoutIds) {
     state.announcerTimeoutIds.forEach(id => clearTimeout(id));

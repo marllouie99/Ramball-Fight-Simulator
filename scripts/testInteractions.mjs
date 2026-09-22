@@ -1091,11 +1091,13 @@ async function runInteractionTests() {
     let takadaSkill = skillList.find(s => s.id === 'takada');
     assert(takadaSkill && takadaSkill.pct === 0, `Takada skill bar must start at 0% at full HP (got ${takadaSkill?.pct}%)`);
 
-    // Take damage towards 70% threshold (e.g. 255 HP = 85% HP => 50% progress)
-    todo.hp = 255;
+    // Take damage towards configured hpThreshold (e.g. 50% way to threshold)
+    const hpThresh = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
+    const midHpRatio = 1.0 - (1.0 - hpThresh) * 0.5;
+    todo.hp = Math.round(todo.maxHp * midHpRatio);
     skillList = getSkillDataForFighter(todo);
     takadaSkill = skillList.find(s => s.id === 'takada');
-    assert(takadaSkill.pct === 50, `Takada skill bar should be at 50% at 85% HP (got ${takadaSkill.pct}%)`);
+    assert(takadaSkill.pct === 50, `Takada skill bar should be at 50% at midpoint HP (got ${takadaSkill.pct}%)`);
 
     // Simulate Gojo domain / infinity freeze: progress must NOT reset to 0!
     opponent.domainActive = true;
@@ -1106,8 +1108,8 @@ async function runInteractionTests() {
     opponent.domainActive = false;
     todo.timeStopTimer = 0;
 
-    // Reach 70% HP threshold (210 HP => 100% progress)
-    todo.hp = 210;
+    // Reach configured HP threshold => 100% progress
+    todo.hp = Math.round(todo.maxHp * hpThresh);
     skillList = getSkillDataForFighter(todo);
     takadaSkill = skillList.find(s => s.id === 'takada');
     assert(takadaSkill.pct >= 99 && takadaSkill.ready, 'Takada skill bar must be 100% and ready at HP threshold');

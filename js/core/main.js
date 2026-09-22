@@ -112,7 +112,9 @@ window.addEventListener('keydown', (e) => {
   unlockAudio();
 
   if (BossEntranceSequence.isActive) {
-    BossEntranceSequence.skip();
+    if (BossEntranceSequence.timer >= 15 && e.key === 'Escape') {
+      BossEntranceSequence.skip();
+    }
     return;
   }
 
@@ -316,7 +318,9 @@ inputTarget.addEventListener('touchend', (e) => {
     // Detect clean tap (finger moved less than 14px within 500ms)
     if (dist < 14 && duration < 500) {
       if (BossEntranceSequence.isActive) {
-        BossEntranceSequence.skip();
+        if (BossEntranceSequence.timer >= 15) {
+          BossEntranceSequence.skip();
+        }
         return;
       }
 
@@ -340,13 +344,14 @@ inputTarget.addEventListener('touchend', (e) => {
 inputTarget.addEventListener('click', (e) => {
   unlockAudio();
 
-  if (BossEntranceSequence.isActive) {
-    BossEntranceSequence.skip();
+  // Filter synthetic ghost clicks fired by browsers ~300ms after a touchend tap
+  if (Date.now() - _lastTouchTapTime < 450) {
     return;
   }
 
-  // Filter synthetic ghost clicks fired by browsers ~300ms after a touchend tap
-  if (Date.now() - _lastTouchTapTime < 450) {
+  if (BossEntranceSequence.isActive) {
+    // Mouse clicks on PC do not skip entrance animation
+    // Only ESC key on PC or touch tap on mobile can skip
     return;
   }
 

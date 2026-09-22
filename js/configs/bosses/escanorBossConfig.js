@@ -20,8 +20,6 @@ export const escanorBossConfig = {
   maxHp: 2700,
   speed: 5.5,
   moveSpeed: 5.5,
-  r: 28,
-  radius: 28,
   color: '#F59E0B',
   startX: 300,
   startY: 250,

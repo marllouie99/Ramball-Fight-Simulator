@@ -2162,7 +2162,8 @@ export class Fighter {
     }
 
     // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks
-    if (this.evadeBuffTimer > 0 && amount > 0 && !isGuaranteedHit && !this.isChainedByMakima) {
+    const hasBushEvade = Boolean(this.isBushEvadeActive && this.isHidingInBush);
+    if ((this.evadeBuffTimer > 0 || hasBushEvade) && amount > 0 && !isGuaranteedHit && !this.isChainedByMakima) {
       const isTickOrBeam = Boolean(
         opts && (
           opts.isPureLoveBeam ||
@@ -2903,6 +2904,17 @@ export class Fighter {
     const isAlive = (target.hp > 0 && !target.isDead && !target._hasDied) || isReforming || (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive());
     if (!isAlive) return false;
     if (target.vanishTimer > 0 || target.isSubmerged || target.isErupting) return false;
+
+    // Undetected Bush Camouflage (Boss Yuta hiding in foliage)
+    if (target.isUndetectedInBush || (target.isHidingInBush && target.bossConfig?.bushUndetected !== false)) {
+      if (typeof this.isTeammate === 'function' && !this.isTeammate(target)) {
+        const dist = Math.hypot((this.x || 0) - (target.x || 0), (this.y || 0) - (target.y || 0));
+        const touchRevealDist = (this.r || 25) + (target.r || 25) + 12;
+        if (dist > touchRevealDist) {
+          return false; // Undetected by opponents
+        }
+      }
+    }
     return true;
   }
 
@@ -3124,6 +3136,9 @@ export class Fighter {
     }
     if (this.speedMultiplier !== undefined && this.speedMultiplier !== 1) {
       targetSpeed *= this.speedMultiplier;
+    }
+    if (this.bushSpeedMultiplier !== undefined && this.bushSpeedMultiplier !== 1) {
+      targetSpeed *= this.bushSpeedMultiplier;
     }
     if (this.slowTimer > 0) {
       this.slowTimer--;

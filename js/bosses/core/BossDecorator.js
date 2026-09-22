@@ -16,6 +16,7 @@ export class BossDecorator {
     const config = getBossConfig(fighter);
     fighter.isBoss = true;
     fighter.bossConfig = config;
+    fighter.characterId = fighter.characterId || fighter.type || config.characterId;
 
     // 1. Stat Multipliers & Scaling
     const baseHp = config.hp || config.defaultHp || 2500;
@@ -23,9 +24,17 @@ export class BossDecorator {
     fighter.hp = baseHp;
     fighter._originalMaxHp = baseHp;
 
-    const baseR = config.r || config.radius || fighter.r || 25;
-    const sizeMult = (typeof config.sizeMultiplier === 'number' && config.sizeMultiplier > 0) ? config.sizeMultiplier : 1.0;
-    fighter.r = Math.round(baseR * sizeMult);
+    // Boss Radius Scaling: Keep the exact same scale size of their normal sizes
+    const normalR = fighter.r || fighter._baseRadius || fighter.baseRadius || 25;
+    fighter._baseRadius = normalR;
+
+    const sizeMult = (typeof config.sizeMultiplier === 'number' && config.sizeMultiplier > 0)
+      ? config.sizeMultiplier
+      : 1.0;
+
+    const bossR = Math.round(normalR * sizeMult);
+    fighter.r = bossR;
+    fighter.bossRadius = bossR;
 
     if (config.damage && !fighter._bossDamageDecorated) {
       fighter.damage = config.damage;
@@ -50,6 +59,16 @@ export class BossDecorator {
       isEnraged: false,
       phaseTransitionTimer: 0,
     };
+
+    // Preserve boss radius across any subclass reset() or transformation
+    const originalReset = fighter.reset?.bind(fighter);
+    if (originalReset) {
+      fighter.reset = function() {
+        originalReset();
+        this.r = bossR;
+        this.bossRadius = bossR;
+      };
+    }
 
     // 3. Super-Armor Knockback & Hit-Stun Interceptors
     const originalApplyHitStun = fighter.applyHitStun?.bind(fighter);

@@ -601,6 +601,15 @@ export function getClosestOpponent(fighter) {
     if (!fighter.isChainedByMakima && !other.isChainedByMakima && (other.owner === fighter || fighter.owner === other)) continue;
     if (!fighter.isChainedByMakima && !other.isChainedByMakima && other.owner && other.owner === fighter.owner) continue;
 
+    // Undetected Bush Camouflage (Boss Yuta hiding in foliage)
+    if (other.isUndetectedInBush || (other.isHidingInBush && other.bossConfig?.bushUndetected !== false)) {
+      const dist = Math.hypot(other.x - fighter.x, other.y - fighter.y);
+      const touchRevealDist = (fighter.r || 25) + (other.r || 25) + 12;
+      if (dist > touchRevealDist) {
+        continue; // Undetected by challengers!
+      }
+    }
+
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;
     const dSq = dx * dx + dy * dy;

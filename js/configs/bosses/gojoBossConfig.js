@@ -17,8 +17,6 @@ export const gojoBossConfig = {
   hp: 2700,
   speed: 5.5,
   moveSpeed: 5.5,
-  r: 25,
-  radius: 25,
   color: '#E0FFFF', // Light Cyan
   themeColor: '#E0FFFF',
   startX: 300,

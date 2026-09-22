@@ -135,10 +135,13 @@ export function updateCamera() {
     return;
   }
 
-  // Check for cinematic camera focus (e.g. general cinematic focus targets)
   const cinematicTarget = state.cameraFocusTarget;
 
-  if (cinematicTarget && typeof cinematicTarget.x === 'number' && typeof cinematicTarget.y === 'number' && state.gameState !== 'countdown') {
+  // Check for Boss Entrance Cinematic Sequence
+  if (state.gameState === 'boss_intro') {
+    camera.cinematicOverride = true;
+    // Keep camera targetX, targetY, targetZoom as set by BossEntranceSequence
+  } else if (cinematicTarget && typeof cinematicTarget.x === 'number' && typeof cinematicTarget.y === 'number' && state.gameState !== 'countdown') {
     camera.cinematicOverride = true;
 
     // Center camera on the victim with soft arena boundary clamp (keeps camera within arena margins)

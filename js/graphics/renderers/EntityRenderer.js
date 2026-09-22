@@ -342,7 +342,7 @@ export function drawFighters() {
     const fi = item.i;
     const isParalyzedInSoulDisfigurement = Boolean(fighter && fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0);
     const isMakimaReviving = Boolean(fighter && (fighter.isRevivingFromContract || fighter.isShatterReviving || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0)));
-    if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement && !isMakimaReviving) || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
+    if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement && !isMakimaReviving) || (fighter.vanishTimer && fighter.vanishTimer > 0) || fighter._hideInBush) return;
 
     // Only skip drawing living fighter when GameOverScreen is actively rendering the in-arena champion layout
     if (state._isChampionLayoutActive && fighter.hp > 0) return;
