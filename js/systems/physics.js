@@ -251,6 +251,11 @@ export function resolveFighterCollision(a, b) {
   const bIsWickStab = (b.cqcComboPhase === 'PENCIL_STAB' && b.cqcComboTarget === a);
   if (aIsWickStab || bIsWickStab) return;
 
+  // Yuta Okkotsu Phantom Flurry: skip circle overlap push so enemy is never pushed away during flurry slashes
+  const aIsYutaFlurry = (a.characterId === 'yuta' || a.type === 'yuta') && ((a.flurryHitsLeft > 0) || ((a.flurrySlashTimer || 0) > 0)) && a.flurryTarget === b;
+  const bIsYutaFlurry = (b.characterId === 'yuta' || b.type === 'yuta') && ((b.flurryHitsLeft > 0) || ((b.flurrySlashTimer || 0) > 0)) && b.flurryTarget === a;
+  if (aIsYutaFlurry || bIsYutaFlurry) return;
+
   // Telekinesis: lifted entity is in 3D air stasis and moved directly by Rubbick; skip ground circle collision push
   if (a.isCaughtInTelekinesis || b.isCaughtInTelekinesis) return;
 

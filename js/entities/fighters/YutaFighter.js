@@ -17,6 +17,58 @@ import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { drawYutaKatana } from '../../graphics/ui/WeaponIndexScreen.js';
 
+/**
+ * Computes minimum squared distance from point (px, py) to line segment [A, B] and closest projected point.
+ */
+function _distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 0.0001) {
+    const dpx = px - ax;
+    const dpy = py - ay;
+    return { distSq: dpx * dpx + dpy * dpy, projX: ax, projY: ay };
+  }
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const projX = ax + t * dx;
+  const projY = ay + t * dy;
+  const ex = px - projX;
+  const ey = py - projY;
+  return { distSq: ex * ex + ey * ey, projX, projY };
+}
+
+/**
+ * Tests direct geometric collision between target and Yuta's Katana blade segment across the swing.
+ */
+function _testKatanaBladeHit(fighter, target, currentTipPos, prevTipPos) {
+  if (!target || target.dead || target.isDead || (target.hp || 0) <= 0) return null;
+  const tr = target.r || 22;
+  const bladeRadius = 18;
+  const hitThresholdSq = Math.pow(tr + bladeRadius, 2);
+
+  if (prevTipPos && prevTipPos.inner && prevTipPos.outer) {
+    const samples = 3;
+    for (let i = 0; i < samples; i++) {
+      const t = i / (samples - 1);
+      const ax = prevTipPos.inner.x + t * (currentTipPos.inner.x - prevTipPos.inner.x);
+      const ay = prevTipPos.inner.y + t * (currentTipPos.inner.y - prevTipPos.inner.y);
+      const bx = prevTipPos.outer.x + t * (currentTipPos.outer.x - prevTipPos.outer.x);
+      const by = prevTipPos.outer.y + t * (currentTipPos.outer.y - prevTipPos.outer.y);
+      const res = _distToSegment(target.x, target.y, ax, ay, bx, by);
+      if (res.distSq <= hitThresholdSq) {
+        return { contactX: res.projX, contactY: res.projY };
+      }
+    }
+  } else if (currentTipPos && currentTipPos.inner && currentTipPos.outer) {
+    const res = _distToSegment(target.x, target.y, currentTipPos.inner.x, currentTipPos.inner.y, currentTipPos.outer.x, currentTipPos.outer.y);
+    if (res.distSq <= hitThresholdSq) {
+      return { contactX: res.projX, contactY: res.projY };
+    }
+  }
+  return null;
+}
+
 export class YutaFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -83,6 +135,7 @@ export class YutaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.flurrySlashTimer = 0;
+    this._flurryHitDelivered = false;
     this.isChannelingThinIceBreaker = false;
     this.thinIceBreakerChargeTimer = 0;
     this.thinIceBreakerPunchTimer = 0;
@@ -284,6 +337,8 @@ export class YutaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.flurrySlashTimer = 0;
+    this._flurryHitDelivered = false;
+    delete this._prevFlurryBladePos;
     this.meleeCooldown = 0;
     this.blockPoseTimer = 0;
     this.isChannelingThinIceBreaker = false;
@@ -321,6 +376,145 @@ export class YutaFighter extends Fighter {
 
   triggerDemoAttack() {
     this.executeKatanaMelee(0);
+  }
+
+  _getValidFlurryTarget(opponent) {
+    if (this.flurryTarget && !this.flurryTarget.isDead && (this.flurryTarget.hp || 0) > 0 && (!this.flurryTarget.vanishTimer || this.flurryTarget.vanishTimer <= 0)) {
+      return this.flurryTarget;
+    }
+    const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
+    let candidates = [];
+    if (state && state.fighters) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0 || f.isDead || (f.vanishTimer && f.vanishTimer > 0)) continue;
+        const eTeam = state.getFighterTeam ? state.getFighterTeam(i) : f.team;
+        if (myTeam !== null && eTeam !== null && myTeam === eTeam) continue;
+        candidates.push(f);
+      }
+    }
+    if (state && state.illusions) {
+      for (const ill of state.illusions) {
+        const isControlledRika = this.isMakimaControlledRikaTarget?.(ill);
+        if (!ill || ill.hp <= 0 || ill.isDead || (!isControlledRika && (ill.owner === this || ill.isRika)) || (ill.vanishTimer && ill.vanishTimer > 0)) continue;
+        if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
+        candidates.push(ill);
+      }
+    }
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y));
+      return candidates[0];
+    }
+    if (opponent && !opponent.isDead && (opponent.hp || 0) > 0) return opponent;
+    return null;
+  }
+
+  _executeFlurryHit(target, hit) {
+    if (!target || target.isDead || (target.hp || 0) <= 0) return;
+
+    const contactX = hit?.contactX ?? (target.x + (this.x - target.x) * 0.3);
+    const contactY = hit?.contactY ?? (target.y + (this.y - target.y) * 0.3);
+
+    const bonusDmg = this.pureLoveBeamBonusDamage || 0;
+    const dmgMult = typeof this.getRikaDamageMultiplier === 'function' ? this.getRikaDamageMultiplier() : 1.0;
+    const flurryDmg = ((CONFIG.yuta?.flurryDamage || 8) + bonusDmg) * dmgMult;
+
+    target.takeDamage(flurryDmg, this, {
+      isMelee: true,
+      isSkill: true,
+      isYutaFlurry: true
+    });
+
+    spawnFloatingText(contactX, contactY - 12, 'SLASH!', '#FF1493');
+    spawnSparks(contactX, contactY, 20, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
+    spawnImpactFlash(contactX, contactY, 28, 'rgba(255, 20, 147, 0.8)');
+    if (typeof spawnBloodEffect === 'function') {
+      spawnBloodEffect(target, 8, this.gunAngle);
+    }
+    triggerGlobalScreenShake(4, 5);
+
+    const hitSound = getBasicAttackSound('musashi');
+    if (hitSound) audioSystem.playSFX(hitSound.src, hitSound.volume);
+
+    // Escanor Mechanic: Small hit-pause stasis applied to enemy when weapon collides
+    // NO outward knockback push is applied!
+    const pauseFrames = CONFIG.yuta?.flurryHitPauseFrames || 10;
+    if (typeof target.applyTimeStop === 'function') {
+      target.applyTimeStop(pauseFrames);
+    } else {
+      target.timeStopTimer = Math.max(target.timeStopTimer || 0, pauseFrames);
+    }
+    target.suppressFreezeOverlay = true;
+
+    // Zero enemy velocity so they remain locked firmly in place
+    target.vx = 0;
+    target.vy = 0;
+    if (typeof target.knockbackVx === 'number') target.knockbackVx = 0;
+    if (typeof target.knockbackVy === 'number') target.knockbackVy = 0;
+    if (typeof target.applySlow === 'function') {
+      target.applySlow(60, 0.20);
+    }
+  }
+
+  _advanceFlurryStrike(target, opponent) {
+    if (this.flurryHitsLeft <= 1) {
+      // Final flurry hit: deliver hit with Escanor pause & zero push, then cancel directly into Thin Ice Breaker!
+      if (!this._flurryHitDelivered) {
+        const tipPos = this._getKatanaTipPositions();
+        const hit = _testKatanaBladeHit(this, target, tipPos, this._prevFlurryBladePos);
+        this._executeFlurryHit(target, hit);
+      }
+
+      this.flurryGhost = null;
+      this.flurryHitsLeft = 0;
+      this.flurrySlashTimer = 0;
+      this.flurryTimer = 0;
+      this._flurryHitDelivered = false;
+      delete this._prevFlurryBladePos;
+
+      if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 400) {
+        this.aim(target);
+        this.isChannelingThinIceBreaker = true;
+        this.thinIceBreakerChargeTimer = 8;
+        audioSystem.playSFX('skill_dash5', 0.9);
+        spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
+        const punchAngle = Math.atan2(target.y - this.y, target.x - this.x);
+        this.vx = Math.cos(punchAngle) * 4.0;
+        this.vy = Math.sin(punchAngle) * 4.0;
+      } else {
+        this.flurryTarget = null;
+        this.resumeMovement(target || opponent);
+      }
+      return;
+    }
+
+    this.flurryHitsLeft--;
+
+    // Teleport to next angle around target
+    const angle = Math.random() * Math.PI * 2;
+    const dist = (target.r || 22) + this.r + 15;
+    const oldX = this.x;
+    const oldY = this.y;
+    this.x = target.x + Math.cos(angle) * dist;
+    this.y = target.y + Math.sin(angle) * dist;
+    this.aim(target);
+    this.swordTrail = [];
+
+    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
+    spawnImpactFlash(oldX, oldY, 15, 'silver');
+    spawnImpactFlash(this.x, this.y, 20, 'silver');
+    audioSystem.playSFX('skill_dash3', 0.7);
+
+    this.activeSlashType = (this.activeSlashType === undefined) ? 0 : (this.activeSlashType + 1) % 3;
+    this.trailGenTimer = 40;
+    this.flurrySlashTimer = CONFIG.yuta?.flurrySlashFrames || 14;
+    this.flurryTimer = this.flurrySlashTimer;
+    this.meleeCooldown = this.meleeCooldownMax;
+    this._flurryHitDelivered = false;
+    delete this._prevFlurryBladePos;
+
+    const swingSnd = CONFIG.yuta?.katanaSwingSound || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    audioSystem.playSFX(swingSnd, CONFIG.yuta?.katanaSwingVolume ?? 0.7);
   }
 
   update(opponent, ownerIndex, arena, updateProjectiles = true) {
@@ -662,150 +856,59 @@ export class YutaFighter extends Fighter {
     this._prevY = this.y;
 
     // Phantom Flurry Execution Logic
-    if (this.flurrySlashTimer > 0) this.flurrySlashTimer--;
-
-    const isFlurryActive = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0);
+    const isFlurryActive = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0) || ((this.flurrySlashTimer || 0) > 0);
     if (isFlurryActive) {
-      this.flurryGhost = this.posHistory[0] || { x: this.x, y: this.y };
+      this.flurryGhost = (this.posHistory && this.posHistory[0]) || { x: this.x, y: this.y };
       this.vx *= 0.1;
       this.vy *= 0.1;
 
-      if (this.flurryTarget && !this.flurryTarget.isDead) {
-        this.aim(this.flurryTarget);
+      const target = this._getValidFlurryTarget(opponent);
+      if (!target || target.isDead || (target.hp || 0) <= 0) {
+        this.flurryHitsLeft = 0;
+        this.flurrySlashTimer = 0;
+        this.flurryTimer = 0;
+        this.flurryGhost = null;
+        this.flurryTarget = null;
+        this._flurryHitDelivered = false;
+        delete this._prevFlurryBladePos;
+        this.resumeMovement(opponent);
+        return;
+      }
+      this.flurryTarget = target;
+      this.aim(target);
+
+      // Active slash animation & blade collision detection
+      if (this.flurrySlashTimer > 0) {
+        this.flurrySlashTimer--;
+        this.flurryTimer = this.flurrySlashTimer;
+
+        if (!this._flurryHitDelivered) {
+          const maxF = CONFIG.yuta?.flurrySlashFrames || 14;
+          const rawProgress = Math.min(1.0, Math.max(0, (maxF - this.flurrySlashTimer) / maxF));
+          const tipPos = this._getKatanaTipPositions();
+          const hit = _testKatanaBladeHit(this, target, tipPos, this._prevFlurryBladePos);
+
+          const dx = target.x - this.x;
+          const dy = target.y - this.y;
+          const dist = Math.hypot(dx, dy);
+          const reachLimit = this.r + (target.r || 22) + (CONFIG.yuta?.meleeRange || 70) + 15;
+          const isMidSwing = (rawProgress >= 0.40 && dist <= reachLimit);
+
+          if (hit || isMidSwing) {
+            this._flurryHitDelivered = true;
+            this._executeFlurryHit(target, hit);
+          }
+
+          this._prevFlurryBladePos = {
+            inner: { x: tipPos.inner.x, y: tipPos.inner.y },
+            outer: { x: tipPos.outer.x, y: tipPos.outer.y }
+          };
+        }
       }
 
-      if (this.flurryTimer > 0) this.flurryTimer--;
-      if (this.flurryTimer <= 0) {
-        if (this.flurryHitsLeft <= 0) {
-          this.flurryGhost = null;
-          const target = this.flurryTarget;
-          this.flurryHitsLeft = 0;
-          this.flurryTimer = 0;
-
-          // Immediately follow up completed Flurry with Thin Ice Breaker!
-          if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 400) {
-            this.aim(target);
-            this.isChannelingThinIceBreaker = true;
-            this.thinIceBreakerChargeTimer = 8;
-            audioSystem.playSFX('skill_dash5', 0.9);
-            spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
-          } else {
-            this.flurryTarget = null; // Clear if not transitioning
-            this.resumeMovement(target || opponent);
-          }
-          return; // Flurry finished
-        }
-
-        this.flurryHitsLeft--;
-        this.flurryTimer = CONFIG.yuta.flurryHitInterval || 7;
-
-        // Ensure flurryTarget is valid; if dead or missing, acquire best available target
-        if (!this.flurryTarget || this.flurryTarget.isDead || (this.flurryTarget.hp || 0) <= 0) {
-          const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
-          let possibleTargets = (state.fighters || []).filter((f, idx) => {
-            if (!f || f === this || f.hp <= 0 || f.isDead) return false;
-            const enemyTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
-            if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) return false;
-            return true;
-          });
-
-          if (state.illusions) {
-            state.illusions.forEach(ill => {
-              const isControlledRika = this.isMakimaControlledRikaTarget(ill);
-              if (!ill || ill.hp <= 0 || ill.isDead || (!isControlledRika && (ill.owner === this || ill.isRika))) return;
-              if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
-              possibleTargets.push(ill);
-            });
-          }
-
-          if (possibleTargets.length > 0) {
-            this.flurryTarget = possibleTargets[0];
-          } else if (opponent && !opponent.isDead && (opponent.hp || 0) > 0) {
-            this.flurryTarget = opponent;
-          }
-        }
-
-        if (this.flurryTarget && !this.flurryTarget.isDead) {
-          this.activeSlashType = (this.activeSlashType === undefined) ? 0 : (this.activeSlashType + 1) % 3;
-          this.trailGenTimer = 40;
-          this.flurrySlashTimer = 18; // 18-frame smooth swing animation
-          this.meleeCooldown = this.meleeCooldownMax; // trigger swing animation
-          this.flurryTimer = (this.flurryHitsLeft === 0) ? 0 : 14; // Seamless 0-delay cancel into Thin Ice Breaker on final hit!
-
-          const bonusDmg = this.pureLoveBeamBonusDamage || 0;
-          const dmgMult = this.getRikaDamageMultiplier();
-          const flurryDmg = ((CONFIG.yuta.flurryDamage || 15) + bonusDmg) * dmgMult;
-          const targetX = this.flurryTarget.x;
-          const targetY = this.flurryTarget.y;
-
-          this.flurryTarget.takeDamage(flurryDmg, this, {
-            isMelee: true,
-            isSkill: true,
-            isYutaFlurry: true
-          });
-          spawnFloatingText(targetX, targetY - 10, 'SLASH!', '#FF1493');
-          spawnSparks(targetX, targetY, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
-
-          triggerGlobalScreenShake(6, 6);
-
-          const flurryAngle = Math.atan2(targetY - this.y, targetX - this.x);
-          const pushForce = (this.flurryHitsLeft === 1) ? 18 : 11;
-          const pushVx = Math.cos(flurryAngle) * pushForce;
-          const pushVy = Math.sin(flurryAngle) * pushForce;
-
-          if (this.flurryTarget) {
-            if (typeof this.flurryTarget.applyKnockback === 'function') {
-              this.flurryTarget.applyKnockback(pushVx, pushVy);
-              // Ensure knockbackStunTimer is NOT set so the enemy's aim rotation never freezes!
-              this.flurryTarget.knockbackStunTimer = 0;
-            } else {
-              this.flurryTarget.vx = (this.flurryTarget.vx || 0) + pushVx;
-              this.flurryTarget.vy = (this.flurryTarget.vy || 0) + pushVy;
-            }
-
-            if (typeof this.flurryTarget.applySlow === 'function') {
-              this.flurryTarget.applySlow(90, 0.30);
-            }
-          }
-
-          // Teleport around target
-          const angle = Math.random() * Math.PI * 2;
-          const dist = this.flurryTarget.r + this.r + 15;
-          const oldX = this.x;
-          const oldY = this.y;
-          this.x = this.flurryTarget.x + Math.cos(angle) * dist;
-          this.y = this.flurryTarget.y + Math.sin(angle) * dist;
-          this.aim(this.flurryTarget);
-          this.swordTrail = []; // Reset trail so it doesn't streak across the screen
-
-          this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
-
-          spawnImpactFlash(oldX, oldY, 15, 'silver');
-          spawnImpactFlash(this.x, this.y, 20, 'silver');
-          audioSystem.playSFX('skill_dash3', 0.7);
-
-          // If this was the final hit, cancel directly into Thin Ice Breaker without dead idle delay
-          if (this.flurryHitsLeft === 0) {
-            this.flurryTimer = 0;
-            this.flurryGhost = null;
-            const target = this.flurryTarget;
-
-            if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 400) {
-              this.aim(target);
-              this.isChannelingThinIceBreaker = true;
-              this.thinIceBreakerChargeTimer = 8;
-              audioSystem.playSFX('skill_dash5', 0.9);
-              spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
-            } else {
-              this.flurryTarget = null;
-            }
-          }
-
-        } else {
-          this.flurryHitsLeft = 0;
-          this.flurryGhost = null;
-          this.flurryTarget = null;
-        }
+      // Transition to next slash or finisher when slash animation finishes
+      if (this.flurrySlashTimer <= 0) {
+        this._advanceFlurryStrike(target, opponent);
       }
 
       this.x += this.vx;
@@ -1601,9 +1704,20 @@ export class YutaFighter extends Fighter {
 
     // Trigger Phantom Flurry counter/combo (which automatically completes into Thin Ice Breaker!)
     this.blockPoseTimer = 0; // Clear block pose so he swings!
-    this.flurryHitsLeft = CONFIG.yuta?.flurryHits || 7;
-    this.flurryTimer = 0;
+    const totalHits = CONFIG.yuta?.flurryHits || 7;
+    this.flurryHitsLeft = totalHits - 1; // First strike initiates immediately!
     this.flurryTarget = targetEntity;
+    this.activeSlashType = 0;
+    this.trailGenTimer = 40;
+    this.flurrySlashTimer = CONFIG.yuta?.flurrySlashFrames || 14;
+    this.flurryTimer = this.flurrySlashTimer;
+    this.meleeCooldown = this.meleeCooldownMax;
+    this._flurryHitDelivered = false;
+    delete this._prevFlurryBladePos;
+
+    const swingSnd = CONFIG.yuta?.katanaSwingSound || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    audioSystem.playSFX(swingSnd, CONFIG.yuta?.katanaSwingVolume ?? 0.7);
+
     const attackSound = getBasicAttackSound('musashi');
     if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
     const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 0.35;
@@ -2308,9 +2422,10 @@ export class YutaFighter extends Fighter {
     const wasChannelingIce = this.isChannelingThinIceBreaker;
     const currentIceCharge = this.thinIceBreakerChargeTimer;
 
-    const wasFlurrying = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0);
+    const wasFlurrying = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0) || ((this.flurrySlashTimer || 0) > 0);
     const currentFlurryHits = this.flurryHitsLeft;
     const currentFlurryTimer = this.flurryTimer;
+    const currentFlurrySlashTimer = this.flurrySlashTimer;
     const currentFlurryTarget = this.flurryTarget;
     const currentFlurryGhost = this.flurryGhost;
 
@@ -2343,6 +2458,9 @@ export class YutaFighter extends Fighter {
       this.thinIceBreakerChargeTimer = 0;
       this.flurryHitsLeft = 0;
       this.flurryTimer = 0;
+      this.flurrySlashTimer = 0;
+      this._flurryHitDelivered = false;
+      delete this._prevFlurryBladePos;
       this.flurryTarget = null;
       return;
     }
@@ -2353,12 +2471,16 @@ export class YutaFighter extends Fighter {
     if (wasFlurrying && !isFrozenByInfinityOrTimeStop && !forceCancelAll) {
       this.flurryHitsLeft = currentFlurryHits;
       this.flurryTimer = currentFlurryTimer;
+      this.flurrySlashTimer = currentFlurrySlashTimer;
       this.flurryTarget = currentFlurryTarget;
       this.flurryGhost = currentFlurryGhost;
     } else if (wasFlurrying) {
       // Flurry interrupted — clean up
       this.flurryHitsLeft = 0;
       this.flurryTimer = 0;
+      this.flurrySlashTimer = 0;
+      this._flurryHitDelivered = false;
+      delete this._prevFlurryBladePos;
       this.flurryTarget = null;
       this.flurryGhost = null;
     }

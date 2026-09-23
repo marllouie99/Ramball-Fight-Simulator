@@ -15,7 +15,7 @@ export const yutaConfig = {
   startVx: 1.2,
   startVy: 1.0,
   damage: 8,
-  cooldown: 50,
+  cooldown: 100,
   projectileSpeedMultiplier: 3.0,
   ability: 'Copy & Rika',
   bossTitle: 'The Bush Camper',
@@ -38,7 +38,7 @@ export const yutaConfig = {
   teleportDodgeDistance: 85,               // Distance teleported on dodge
 
   // Basic Attack: Katana Melee
-  meleeCooldown: 50,                       // Frames between katana strikes
+  meleeCooldown: 100,                       // Frames between katana strikes
   meleeRange: 50,                          // Katana blade length reach distance in pixels
   meleeDamage: 8,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
@@ -63,6 +63,9 @@ export const yutaConfig = {
   flurryHits: 7,                           // Number of rapid teleport slashes in Flurry execution
   flurryDamage: 8,                         // Damage per slash during Flurry
   flurryHitInterval: 7,                    // Frames delay between each Flurry slash
+  flurrySlashFrames: 14,                   // Frames duration for each flurry katana swing animation
+  flurryHitPauseFrames: 10,                // Stasis pause duration applied to enemy upon weapon collision (Escanor mechanic)
+  flurryKnockback: 0.0,                    // Outward knockback push force during flurry slashes (0 = no push)
 
   // Copied Techniques (Ranged Skill Cycle)
   cursedSpeechRadius: 150,                 // Impact shockwave radius in pixels for "DON'T MOVE!"
@@ -73,7 +76,7 @@ export const yutaConfig = {
   thinIceBreakerKnockback: 35,             // Extreme knockback blast force applied on Thin Ice Breaker hit
 
   // Summon Companion: Rika Orimoto
-  rikaMaxHp: 500,                          // Maximum health pool when summoned
+  rikaMaxHp: 250,                          // Maximum health pool when summoned
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
   rikaSummonHpThreshold: 0.70,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
   rikaRechargeHpRatio: 0.20,               // HP ratio in damage required to re-summon Rika (20% of max HP)
