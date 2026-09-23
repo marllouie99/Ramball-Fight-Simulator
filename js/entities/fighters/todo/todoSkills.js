@@ -963,7 +963,9 @@ export function isTodoTakadaSongEnabled() {
  * Plays his channeling voiceline and schedules the background song fade-in!
  */
 export function modStartTakadaChanneling(force = false) {
-  if ((this.takadaUltCooldown || 0) > 0 || this.isTakadaChanneling || this.isTakadaUltActive) return false;
+  if ((this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt) && !this.pendingTakadaHpUlt) return false;
+  if (this.isTakadaChanneling || this.isTakadaUltActive) return false;
+  if (!force && (this.takadaUltCooldown || 0) > 0) return false;
 
   // Strict HP threshold check: Cannot auto-trigger ultimate if HP is above hpThreshold!
   const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
@@ -975,6 +977,8 @@ export function modStartTakadaChanneling(force = false) {
   const channelFrames = CONFIG.todo?.channelDuration || 180;
   const isSongEnabled = isTodoTakadaSongEnabled();
   this.isTakadaChanneling = true;
+  this.hasUsedTakadaUlt = true;
+  this.hasTriggeredTakadaHpUlt = true;
   this.takadaChannelTimer = channelFrames;
   this.takadaSongStarted = false;
   this.takadaSongHandle = null;
@@ -1004,6 +1008,8 @@ export function modActivateTakadaUltimate() {
   this.isTakadaChanneling = false;
   const dur = CONFIG.todo?.ultDuration ?? 5000;
   this.isTakadaUltActive = true;
+  this.hasUsedTakadaUlt = true;
+  this.hasTriggeredTakadaHpUlt = true;
   this.isTakadaBackgroundPlaying = isSongEnabled;
   this.takadaUltTimer = dur;
   this._maxTakadaUltPct = 0;
@@ -1020,5 +1026,6 @@ export function modActivateTakadaUltimate() {
 }
 
 export function modTriggerTakadaUltimate() {
+  if (this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt || this.isTakadaChanneling || this.isTakadaUltActive) return false;
   return modStartTakadaChanneling.call(this, true);
 }

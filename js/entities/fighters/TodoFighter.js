@@ -42,6 +42,7 @@ export class TodoFighter extends Fighter {
     this.takadaUltCooldown = 0;
     this.takadaUltCooldownMax = CONFIG.todo?.ultCooldown || 1200;
     this.isTakadaUltActive = false;
+    this.hasUsedTakadaUlt = false;
     this.hasTriggeredTakadaHpUlt = false;
     this.pendingTakadaHpUlt = false;
     this.takadaSongStarted = false;
@@ -131,6 +132,7 @@ export class TodoFighter extends Fighter {
     this.isTakadaBackgroundPlaying = false;
     this.takadaSongStarted = false;
     this.takadaSongFadedOut = false;
+    this.hasUsedTakadaUlt = false;
     this.hasTriggeredTakadaHpUlt = false;
     this.takadaUltCooldown = 0;
     this.takadaChannelTimer = 0;
@@ -173,9 +175,6 @@ export class TodoFighter extends Fighter {
     if (!this.isTakadaUltActive && !this.isTakadaChanneling && (this.takadaUltCooldown || 0) > 0) {
       const decay = (this.blackFlashTimer > 0) ? (CONFIG.blackFlash?.zone?.cooldownDecayMultiplier ?? 1.20) : 1.0;
       this.takadaUltCooldown = Math.max(0, this.takadaUltCooldown - decay);
-      if (this.takadaUltCooldown <= 0) {
-        this.hasTriggeredTakadaHpUlt = false;
-      }
     }
 
     this.handleStatusEffects();
@@ -212,10 +211,10 @@ export class TodoFighter extends Fighter {
 
       const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
       const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
-      const isCdReady = (this.takadaUltCooldown || 0) <= 0;
+      const hasUsedUlt = Boolean(this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt);
       if (this.isTakadaChanneling) {
         this.pendingTakadaHpUlt = true;
-      } else if (!this.isDemoFighter && hpUltEnabled && (!this.hasTriggeredTakadaHpUlt || isCdReady) && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold) {
+      } else if (!this.isDemoFighter && hpUltEnabled && !hasUsedUlt && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold) {
         this.pendingTakadaHpUlt = true; // Hold Takada-chan ultimate until stasis expires!
       }
       this.interruptAttacks();
@@ -245,11 +244,10 @@ export class TodoFighter extends Fighter {
     // HP Auto-Trigger: Todo channels his Takada-chan Ultimate when HP drops <= hpThreshold (or after beam/purple stasis expires!)
     const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
     const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
-    const isCdReady = (this.takadaUltCooldown || 0) <= 0;
-    const isHpLow = !this.isDemoFighter && hpUltEnabled && (!this.hasTriggeredTakadaHpUlt || isCdReady) && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold;
+    const hasUsedUlt = Boolean(this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt);
+    const isHpLow = !this.isDemoFighter && hpUltEnabled && !hasUsedUlt && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold;
 
-    if ((isHpLow || this.pendingTakadaHpUlt) && !this.isTakadaChanneling && !this.isTakadaUltActive && isCdReady) {
-      this.hasTriggeredTakadaHpUlt = true;
+    if ((isHpLow || this.pendingTakadaHpUlt) && !this.isTakadaChanneling && !this.isTakadaUltActive && !this.hasUsedTakadaUlt) {
       this.pendingTakadaHpUlt = false;
       modStartTakadaChanneling.call(this);
     }
@@ -451,7 +449,7 @@ export class TodoFighter extends Fighter {
   }
 
   triggerUltimate() {
-    if (this.isTakadaChanneling) return false;
+    if (this.isTakadaChanneling || this.isTakadaUltActive || this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt) return false;
     return modTriggerTakadaUltimate.call(this);
   }
 
@@ -469,6 +467,7 @@ export class TodoFighter extends Fighter {
       if (this.isTakadaChanneling && this.hp > 0 && !forceCancelAll) {
         this.pendingTakadaHpUlt = true; // Preserve ultimate trigger when interrupted by freeze/stasis!
         this.hasTriggeredTakadaHpUlt = false;
+        this.hasUsedTakadaUlt = false;
       }
       this.punchAnimTimer = 0;
       this.isTakadaChanneling = false;

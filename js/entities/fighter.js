@@ -2907,7 +2907,8 @@ export class Fighter {
 
     // Undetected Bush Camouflage (Boss Yuta hiding in foliage)
     if (target.isUndetectedInBush || (target.isHidingInBush && target.bossConfig?.bushUndetected !== false)) {
-      if (typeof this.isTeammate === 'function' && !this.isTeammate(target)) {
+      const hasSukunaPerception = this.characterId === 'sukuna' || this.type === 'sukuna' || (this.characterId === 'yuji' && (this.soulSwapActive || (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0) || (this.rapidSlashHitsLeft && this.rapidSlashHitsLeft > 0) || this.isChannelingDivineFlame || (this.divineFlameRecoveryTimer && this.divineFlameRecoveryTimer > 0)));
+      if (!hasSukunaPerception && typeof this.isTeammate === 'function' && !this.isTeammate(target)) {
         const dist = Math.hypot((this.x || 0) - (target.x || 0), (this.y || 0) - (target.y || 0));
         const touchRevealDist = (this.r || 25) + (target.r || 25) + 12;
         if (dist > touchRevealDist) {

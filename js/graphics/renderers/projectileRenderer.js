@@ -695,7 +695,6 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
 
     // --- Yuta's Pure Love Beam (Pixel Art Mega-Beam) ---
     if (p.visual === 'yuta_pure_love_beam') {
-      const ownerFighter = (typeof state !== 'undefined' && state.fighters && p.owner !== undefined) ? state.fighters[p.owner] : null;
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
@@ -712,16 +711,12 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       }
       
       const frameStep20 = Math.floor(Date.now() / 50);
-      const pseudoRand = (seed) => {
-        const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-        return x - Math.floor(x);
-      };
-
       const throb = Math.sin(frameStep20 * 0.4) * 16;
       const currentRadius = (radius + throb) * sizeScale;
       
       const startBaseR = currentRadius * 0.25;
       const endBaseR = currentRadius * 2.7;
+
       const colStep = P * 2; // 8px per pixel beam column
 
       // ── 1. STEPPED PIXEL-ART BEAM ENERGY BODY ──
@@ -771,6 +766,10 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       }
 
       // ── 2. STEPPED PIXEL LIGHTNING CRACKLES & JAGGED ELECTRIC BOLTS ──
+      const pseudoRand = (seed) => {
+        const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+        return x - Math.floor(x);
+      };
       const numLightning = 6;
       for (let i = 0; i < numLightning; i++) {
         const side = (i % 2 === 0 ? -1 : 1);
@@ -790,37 +789,35 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
         }
       }
 
-      // ── 3. FLOATING DISPERSING PIXEL ENERGY EMBERS ──
-      const numEmbers = 24;
-      for (let i = 0; i < numEmbers; i++) {
-        const pSpeed = 22 + (i % 5) * 8;
-        const travel = ((Date.now() * 0.001 * pSpeed * 60 + i * 85) % length);
-        const prog = travel / length;
-        const beamW = (startBaseR + (endBaseR - startBaseR) * prog);
-        const side = (i % 2 === 0 ? -1 : 1);
-        const offset = side * (beamW * (0.3 + (i % 7) * 0.12));
-        const ex = Math.round(travel / P) * P;
-        const ey = Math.round(offset / P) * P;
-        const emberSize = (i % 3 === 0) ? P * 2 : P;
-        ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : ((i % 3 === 1) ? '#FF1493' : '#FF69B4');
-        ctx.fillRect(ex, ey, emberSize, emberSize);
+      // ── 3. STREAMING SPARK EMBERS SPREADING ALONG BEAM ──
+      const numBeamEmbers = 30;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      for (let i = 0; i < numBeamEmbers; i++) {
+        const seed = i * 47.11;
+        const emberX = ((frameStep20 * 18 + seed * 100) % length);
+        const spreadFactor = (emberX / length);
+        const maxSpreadY = startBaseR + (endBaseR - startBaseR) * spreadFactor;
+        const emberY = ((pseudoRand(frameStep20 * 13 + i * 29) - 0.5) * maxSpreadY * 1.7);
+        const emberR = 1.5 + (i % 3) * 1.0;
+        ctx.moveTo(emberX + emberR, emberY);
+        ctx.arc(emberX, emberY, emberR, 0, Math.PI * 2);
       }
+      ctx.fill();
 
-      // Re-draw owner Yuta & Rika so beam energy layers cleanly
-      if (ownerFighter) {
-        ctx.restore(); // Restore back to world space
-        ctx.save();
-        if (ownerFighter.rika && ownerFighter.rika.active && typeof ownerFighter.rika.draw === 'function') {
-          ownerFighter.rika.draw(ctx);
-        }
-        if (typeof ownerFighter.draw === 'function') {
-          ownerFighter.draw(ctx);
-        }
-        ctx.restore();
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.angle);
+      ctx.fillStyle = 'rgba(255, 105, 180, 0.85)';
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const seed = (i + 31) * 33.7;
+        const emberX = ((frameStep20 * 22 + seed * 80) % length);
+        const spreadFactor = (emberX / length);
+        const maxSpreadY = startBaseR + (endBaseR - startBaseR) * spreadFactor;
+        const emberY = ((pseudoRand(frameStep20 * 17 + i * 43) - 0.5) * maxSpreadY * 1.5);
+        const emberR = 2.0 + (i % 2) * 1.5;
+        ctx.moveTo(emberX + emberR, emberY);
+        ctx.arc(emberX, emberY, emberR, 0, Math.PI * 2);
       }
+      ctx.fill();
 
       // ── 4. PIXEL-ART ORIGIN MUZZLE FLARE (Stepped Pixel Diamond Blast at Hand) ──
       ctx.globalAlpha = 0.90 * beamAlpha;
@@ -830,8 +827,8 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
         for (let gx = -flareSteps; gx <= flareSteps; gx++) {
           const manhattan = Math.abs(gx * P) + Math.abs(gy * P);
           if (manhattan <= flareR) {
-            const fx = Math.round(gx * P / P) * P;
-            const fy = Math.round(gy * P / P) * P;
+            const fx = Math.round((gx * P) / P) * P;
+            const fy = Math.round((gy * P) / P) * P;
             let col = '#FFFFFF';
             if (manhattan > flareR * 0.7) col = '#111114';
             else if (manhattan > flareR * 0.45) col = '#FF1493';

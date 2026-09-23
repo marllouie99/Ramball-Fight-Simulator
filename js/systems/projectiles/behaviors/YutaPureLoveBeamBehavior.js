@@ -198,7 +198,8 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
               ent.katanaSlashFadeTimer = 0;
               ent._wasFinalBlowSpin = false;
             }
-            if (typeof ent.interruptAttacks === 'function') {
+            const isUnstoppableSoulSwap = Boolean(ent.characterId === 'yuji' && ent.soulSwapActive && ent.rapidSlashPhase && ent.rapidSlashPhase !== 'COMPLETE' && ent.rapidSlashPhase !== 'IDLE' && ent.rapidSlashPhase !== 'FUGA_CHANNEL');
+            if (!isUnstoppableSoulSwap && typeof ent.interruptAttacks === 'function') {
               ent.interruptAttacks(true);
             }
             const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.35;
@@ -227,6 +228,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
             const isIchigo = ent.characterId === 'ichigo' || ent.type === 'ichigo' || (ent._def && (ent._def.id === 'ichigo' || ent._def.type === 'ichigo'));
             const isEscanor = ent.characterId === 'escanor' || ent.type === 'escanor' || ent.immuneToKnockback || ent.immuneToPush;
+            const isYujiSoulSwapCombo = Boolean(ent.characterId === 'yuji' && ent.soulSwapActive && ent.rapidSlashPhase && ent.rapidSlashPhase !== 'COMPLETE' && ent.rapidSlashPhase !== 'IDLE');
             if (isMakimaShatter) {
               ent.vx = 0;
               ent.vy = 0;
@@ -236,7 +238,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
                 ent.x = ent._shatterLockedX;
                 ent.y = ent._shatterLockedY;
               }
-            } else if (!isIchigo && !isEscanor) {
+            } else if (!isIchigo && !isEscanor && !isYujiSoulSwapCombo) {
               const pushForce = p.knockback || 6;
               const pushAngle = p.angle;
               if (typeof ent.applyKnockback === 'function') {
@@ -252,14 +254,17 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             }
           }
           
-          spawnImpactFlash(ent.x, ent.y, 50, 'rgba(255, 20, 147, 0.7)');
-          spawnSparks(ent.x, ent.y, 4, 'rikaCurse');
+          if (p.hitTickTimer === 0) {
+            spawnImpactFlash(ent.x, ent.y, 45, 'rgba(255, 20, 147, 0.7)');
+            spawnSparks(ent.x, ent.y, 3, 'rikaCurse');
+          }
         } else if (ent.wasCaughtInPureLoveBeam || ent.caughtInPureLoveBeam) {
           ent.caughtInPureLoveBeam = false;
           ent.wasCaughtInPureLoveBeam = false;
           ent.pureLoveBeamTimer = 0;
           ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
-          if (typeof ent.interruptAttacks === 'function') {
+          const isUnstoppableSoulSwap = Boolean(ent.characterId === 'yuji' && ent.soulSwapActive && ent.rapidSlashPhase && ent.rapidSlashPhase !== 'COMPLETE' && ent.rapidSlashPhase !== 'IDLE' && ent.rapidSlashPhase !== 'FUGA_CHANNEL');
+          if (!isUnstoppableSoulSwap && typeof ent.interruptAttacks === 'function') {
             ent.interruptAttacks();
           }
 

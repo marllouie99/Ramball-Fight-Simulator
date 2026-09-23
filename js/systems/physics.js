@@ -603,10 +603,13 @@ export function getClosestOpponent(fighter) {
 
     // Undetected Bush Camouflage (Boss Yuta hiding in foliage)
     if (other.isUndetectedInBush || (other.isHidingInBush && other.bossConfig?.bushUndetected !== false)) {
-      const dist = Math.hypot(other.x - fighter.x, other.y - fighter.y);
-      const touchRevealDist = (fighter.r || 25) + (other.r || 25) + 12;
-      if (dist > touchRevealDist) {
-        continue; // Undetected by challengers!
+      const hasSukunaPerception = fighter.characterId === 'sukuna' || fighter.type === 'sukuna' || (fighter.characterId === 'yuji' && (fighter.soulSwapActive || (fighter.soulSwapTransitionTimer && fighter.soulSwapTransitionTimer > 0) || (fighter.rapidSlashHitsLeft && fighter.rapidSlashHitsLeft > 0) || fighter.isChannelingDivineFlame || (fighter.divineFlameRecoveryTimer && fighter.divineFlameRecoveryTimer > 0)));
+      if (!hasSukunaPerception) {
+        const dist = Math.hypot(other.x - fighter.x, other.y - fighter.y);
+        const touchRevealDist = (fighter.r || 25) + (other.r || 25) + 12;
+        if (dist > touchRevealDist) {
+          continue; // Undetected by challengers!
+        }
       }
     }
 
@@ -1002,7 +1005,8 @@ export function updateFighters() {
       // Post-Kill / Round End / Match End Continuous Movement:
       // If the round or match has ended (or all opponents are dead), ensure the living winner smoothly coasts!
       const isFinishingAbility = Boolean(fighter && typeof fighter.hasActiveFinishingAbility === 'function' && fighter.hasActiveFinishingAbility());
-      const isRoundOrMatchOver = (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || !opponent);
+      const hasLivingEnemies = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== fighter && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving) && (!fighter.isTeammate || !fighter.isTeammate(f)));
+      const isRoundOrMatchOver = (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || !hasLivingEnemies);
       if (isRoundOrMatchOver && fighter.hp > 0 && !state._isChampionLayoutActive && !isFinishingAbility) {
         // Clear stationary strike locks / melee stasis / channel freezes
         fighter.isMeleeMode = false;

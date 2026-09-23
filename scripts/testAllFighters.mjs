@@ -3242,6 +3242,7 @@ async function main() {
         fighter.isTakadaChanneling = false;
         fighter.isTakadaUltActive = false;
         fighter.takadaSongStarted = false;
+        fighter.hasUsedTakadaUlt = false;
         fighter.hasTriggeredTakadaHpUlt = false;
         fighter.update(dummyOpponent, 0, state.arena);
 
@@ -3272,6 +3273,7 @@ async function main() {
         fighter.isTakadaChanneling = false;
         fighter.isTakadaUltActive = false;
         fighter.takadaSongStarted = false;
+        fighter.hasUsedTakadaUlt = false;
         fighter.hasTriggeredTakadaHpUlt = false;
         fighter.update(dummyOpponent, 0, state.arena);
 

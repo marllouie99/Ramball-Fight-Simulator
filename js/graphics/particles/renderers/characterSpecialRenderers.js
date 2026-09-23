@@ -729,6 +729,7 @@ export function drawHealingEffect(ctx, effect) {
 
 export function drawYutaBeamPinkCore(ctx, effect) {
   const alpha = Math.max(0, Math.min(1.0, effect.life));
+  if (alpha <= 0.01) return;
   const lifeStep = Math.round(alpha * 20) / 20;
 
   const glowRadius = effect.size * 4.5;

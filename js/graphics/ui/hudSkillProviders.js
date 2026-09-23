@@ -325,15 +325,10 @@ export function getSkillDataForFighter(f, getProjectiles) {
       // While channeling, ultimate is fully committed and ready (does NOT drop/reset to 0%!)
       ultPct = 100;
       ultReady = true;
-    } else if (f.takadaUltCooldown && f.takadaUltCooldown > 0) {
-      const cdMax = f.takadaUltCooldownMax || CONFIG.todo?.ultCooldown || 1200;
-      const cdTimer = f.takadaUltCooldown || 0;
-      ultPct = Math.max(0, Math.min(100, (1 - (cdTimer / cdMax)) * 100));
-      ultReady = ultPct >= 99;
-    } else if (f.hasTriggeredTakadaHpUlt) {
-      // Cooldown finished: ready for next use
-      ultPct = 100;
-      ultReady = true;
+    } else if (f.hasUsedTakadaUlt || f.hasTriggeredTakadaHpUlt) {
+      // One-time ultimate: once used/expired, gauge is 0% and not ready for the remainder of the match
+      ultPct = 0;
+      ultReady = false;
     } else {
       // First fill before first cast: monotonically fills up as Todo takes damage towards hpThreshold
       const rawPct = Math.max(0, Math.min(100, ((1.0 - hpRatio) / (1.0 - hpThreshold)) * 100));

@@ -279,6 +279,38 @@ export class YujiFighter extends Fighter {
     }
   }
 
+  hasActiveFinishingAbility() {
+    if (this.hp <= 0 || this.dead || this.isDead || this._hasDied) return false;
+    if (
+      this.soulSwapActive ||
+      (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0) ||
+      (this.revertTransitionTimer && this.revertTransitionTimer > 0) ||
+      (this.rapidSlashHitsLeft && this.rapidSlashHitsLeft > 0) ||
+      this.isChannelingDivineFlame ||
+      (this.divineFlameChargeTimer && this.divineFlameChargeTimer > 0) ||
+      (this.divineFlameRecoveryTimer && this.divineFlameRecoveryTimer > 0) ||
+      (this.rapidSlashPhase && this.rapidSlashPhase !== 'IDLE' && this.rapidSlashPhase !== 'COMPLETE')
+    ) {
+      return true;
+    }
+    return super.hasActiveFinishingAbility ? super.hasActiveFinishingAbility() : false;
+  }
+
+  isValidAimTarget(target) {
+    if (!target || target === this) return false;
+    const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
+    const isAlive = (target.hp > 0 && !target.isDead && !target._hasDied) || isReforming || (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive());
+    if (!isAlive) return false;
+    if (target.vanishTimer > 0 || target.isSubmerged || target.isErupting) return false;
+
+    // During Sukuna Soul Swap, god-tier Cursed Energy perception bypasses bush camouflage completely
+    if (this.soulSwapActive || (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0) || (this.rapidSlashHitsLeft && this.rapidSlashHitsLeft > 0) || this.isChannelingDivineFlame || (this.divineFlameRecoveryTimer && this.divineFlameRecoveryTimer > 0)) {
+      return true;
+    }
+
+    return super.isValidAimTarget(target);
+  }
+
   _getValidEnemyTargets(opponent = null) {
     const enemies = [];
     if (opponent) {
@@ -301,7 +333,7 @@ export class YujiFighter extends Fighter {
           const f = state.fighters[i];
           const isFReforming = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving));
           if (!f || f === this) continue;
-          if (!isFReforming && (f.hp <= 0 || f.isDead)) continue;
+          if (!isFReforming && (f.hp <= 0 || f.isDead || f._hasDied)) continue;
           if (this.isTeammate(f)) continue;
           if (!enemies.includes(f)) enemies.push(f);
         }
@@ -316,6 +348,21 @@ export class YujiFighter extends Fighter {
       }
     }
     return enemies;
+  }
+
+  _findClosestEnemy() {
+    const enemies = this._getValidEnemyTargets();
+    if (enemies.length === 0) return null;
+    let closest = null;
+    let minDist = Infinity;
+    for (const e of enemies) {
+      const d = Math.hypot((e.x || 0) - this.x, (e.y || 0) - this.y);
+      if (d < minDist) {
+        minDist = d;
+        closest = e;
+      }
+    }
+    return closest || enemies[0];
   }
 
   update(opponent, ownerIndex, arena) {
@@ -443,9 +490,9 @@ export class YujiFighter extends Fighter {
         this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.12);
 
         let ft = this.flurryTarget;
-        if (!ft || ft.isDead || ft.hp <= 0) {
+        if (!ft || ft.isDead || ft.hp <= 0 || ft._hasDied) {
           const validEnemies = this._getValidEnemyTargets(opponent);
-          ft = validEnemies[0] || null;
+          ft = this._findClosestEnemy() || validEnemies[0] || null;
           this.flurryTarget = ft;
         }
 
@@ -473,9 +520,18 @@ export class YujiFighter extends Fighter {
             this.applyMovementPhysics(0);
 
             // Smooth auto-aim tracking while channeling Fuga (no sudden snap on firing)
-            const fugaAimTarget = ft || opponent || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+            const fugaAimTarget = ft || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null) || opponent;
             if (fugaAimTarget && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
-              this.aim(fugaAimTarget);
+              const targetZ = fugaAimTarget.z || 0;
+              const myZ = this.z || 0;
+              const targetAngle = Math.atan2((fugaAimTarget.y - targetZ) - (this.y - myZ), fugaAimTarget.x - this.x);
+              if (this.canAim() && this.isValidAimTarget(fugaAimTarget)) {
+                this.aim(fugaAimTarget);
+              } else {
+                this.gunAngle = targetAngle;
+                this.angle = targetAngle;
+                this.divineFlameCastAngle = targetAngle;
+              }
             }
           } else {
             this.isChannelingDivineFlame = false;
@@ -557,13 +613,20 @@ export class YujiFighter extends Fighter {
         }
 
         if (!ft) {
-          // No valid target remaining in arena during opening slashes, cleanly revert rather than freezing in place
-          this._triggerSoulSwapRevert();
-          return;
+          const fallbackEnemy = this._findClosestEnemy();
+          if (fallbackEnemy) {
+            ft = fallbackEnemy;
+            this.flurryTarget = ft;
+          } else {
+            // No valid target remaining in arena during opening slashes, cleanly revert rather than freezing in place
+            this._triggerSoulSwapRevert();
+            return;
+          }
         }
 
         // Default phase initialization if not set or corrupted
-        if (!this.rapidSlashPhase || this.rapidSlashPhase === 'IDLE' || (this.rapidSlashPhase !== 'START' && this.rapidSlashPhase !== 'LANDED' && this.rapidSlashPhase !== 'SLASH_RECOVERY')) {
+        const validPhases = ['START', 'LANDED', 'SLASH_RECOVERY', 'FUGA_CHANNEL', 'FUGA_RECOVERY', 'COMPLETE'];
+        if (!this.rapidSlashPhase || this.rapidSlashPhase === 'IDLE' || !validPhases.includes(this.rapidSlashPhase)) {
           this.rapidSlashPhase = 'START';
           this.rapidSlashTimer = 0;
           if (!this.rapidSlashHitsLeft || this.rapidSlashHitsLeft <= 0) {
@@ -681,7 +744,9 @@ export class YujiFighter extends Fighter {
           isMelee: true,
           isSukunaSlash: true,
           isCleave: true,
-          isSkill: true
+          isSkill: true,
+          isGuaranteedHit: true,
+          bypassEvade: true
         });
 
         // 2. Fire visible Sukuna Slash crescent through the target

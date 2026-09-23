@@ -1203,12 +1203,151 @@ async function runInteractionTests() {
     ));
     assert(isTodoUltPlayingExpired === false, 'isTodoUltPlaying must be false once ultimate duration naturally expires');
 
+    // Subtest F: Single-Use Ultimate Enforcement (Todo can only use Takada Ultimate once per match)
+    todo.reset();
+    state.mode = '1v1';
+    state.gameState = 'playing';
+    opponent.hp = 300;
+    opponent.dead = false;
+    opponent.isDead = false;
+    assert(todo.hasUsedTakadaUlt === false, 'Todo hasUsedTakadaUlt must start false');
+
+    // Drop HP to threshold to auto-trigger ultimate
+    todo.hp = Math.round(todo.maxHp * 0.30);
+    todo.update(opponent, 0, state.arena);
+    assert(todo.isTakadaChanneling === true, 'Todo must start channeling ultimate');
+    assert(todo.hasUsedTakadaUlt === true, 'Todo hasUsedTakadaUlt must be true once channeling starts');
+
+    // Fast-forward channeling to activation
+    todo.takadaChannelTimer = 1;
+    todo.update(opponent, 0, state.arena);
+    assert(todo.isTakadaUltActive === true, 'Todo must activate Takada Ultimate');
+
+    // Fast-forward active ultimate to natural expiration
+    todo.takadaUltTimer = 1;
+    todo.update(opponent, 0, state.arena);
+    assert(todo.isTakadaUltActive === false, 'Todo Takada Ultimate must expire when timer reaches 0');
+    assert(todo.hasUsedTakadaUlt === true, 'Todo hasUsedTakadaUlt must remain true after ultimate expires');
+
+    // Verify HUD skill bar remains 0% and not ready after use
+    skillList = getSkillDataForFighter(todo);
+    takadaSkill = skillList.find(s => s.id === 'takada');
+    assert(takadaSkill.pct === 0 && !takadaSkill.ready, 'Takada skill bar must be 0% and not ready after single use');
+
+    // Verify triggerUltimate returns false and does not restart ultimate
+    const triggerResult = todo.triggerUltimate();
+    assert(triggerResult === false, 'triggerUltimate() must return false once ultimate was used');
+    assert(todo.isTakadaChanneling === false && todo.isTakadaUltActive === false, 'Todo must not re-enter ultimate on manual trigger');
+
+    // Verify modStartTakadaChanneling returns false
+    const channelResult = modStartTakadaChanneling.call(todo, true);
+    assert(channelResult === false, 'modStartTakadaChanneling() must return false once ultimate was used');
+
+    // Verify update() with 0 cooldown and low HP does NOT re-trigger ultimate
+    todo.takadaUltCooldown = 0;
+    todo.hp = Math.round(todo.maxHp * 0.20);
+    for (let f = 0; f < 30; f++) {
+      todo.update(opponent, 0, state.arena);
+    }
+    assert(todo.isTakadaChanneling === false && todo.isTakadaUltActive === false, 'Todo update() must not re-trigger ultimate even at low HP and 0 cooldown');
+
+    // Verify reset() restores ability for next match/round
+    todo.reset();
+    assert(todo.hasUsedTakadaUlt === false, 'todo.reset() must reset hasUsedTakadaUlt to false for next round');
+
     // Restore config & state
     CONFIG.todo.enableTakadaBackgroundSong = origSongToggle;
     todo.reset();
     state.mode = '1v1';
 
-    console.log('      ✅ Todo Takada-chan idol BGM in 1v1 matches, ducking behavior, team mode isolation, and matchEnd winner preservation verified.');
+    console.log('      ✅ Todo Takada-chan idol BGM, team mode isolation, and single-use ultimate limit verified.');
+  }
+
+  // ── TEST 21: Yuji Soul Swap vs Undetected / Bush Concealed Boss Yuta ──
+  console.log('   21. Testing Yuji Soul Swap Uninterrupted Sequence vs Undetected Boss Yuta...');
+  {
+    const YujiClass = FIGHTER_CLASS_MAP['yuji'];
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const { getClosestOpponent } = await import('../js/systems/physics.js');
+    assert(YujiClass && YutaClass, 'Yuji and Yuta classes must exist in FIGHTER_CLASS_MAP');
+
+    const yuji = new YujiClass({ id: 'yuji', type: 'yuji', x: 100, y: 100, hp: 350 });
+    const bossYuta = new YutaClass({ id: 'yuta', type: 'yuta', x: 400, y: 400, hp: 2000 });
+    yuji.x = 100;
+    yuji.y = 100;
+    bossYuta.x = 400;
+    bossYuta.y = 400;
+    bossYuta.bossConfig = { bushUndetected: true };
+    bossYuta.isHidingInBush = true;
+    bossYuta.isUndetectedInBush = true;
+    bossYuta.isBushEvadeActive = true;
+
+    state.fighters = [yuji, bossYuta];
+    state.mode = '1v1';
+    state.gameState = 'playing';
+    state.arena = arena;
+
+    // Normal Yuji before transformation cannot aim at undetected Boss Yuta far away
+    assert(yuji.isValidAimTarget(bossYuta) === false, 'Normal Yuji must not target undetected Boss Yuta in bush');
+
+    // Trigger Yuji Soul Swap
+    yuji.hp = Math.round(yuji.maxHp * 0.25);
+    yuji.update(bossYuta, 0, state.arena);
+
+    // Verify transformation triggered
+    assert(yuji.soulSwapActive === true, 'Yuji must activate Soul Swap');
+    assert(yuji.hasActiveFinishingAbility() === true, 'Yuji hasActiveFinishingAbility must return true during Soul Swap');
+    assert(yuji.isValidAimTarget(bossYuta) === true, 'Sukuna perception must allow targeting undetected Boss Yuta in bush');
+
+    // Verify getClosestOpponent perceives Boss Yuta
+    const closest = getClosestOpponent(yuji);
+    assert(closest === bossYuta, 'getClosestOpponent must return Boss Yuta for Soul Swapped Yuji');
+
+    // Fast-forward takeover transition freeze
+    yuji.soulSwapTransitionTimer = 1;
+    yuji.update(bossYuta, 0, state.arena);
+    assert(yuji.rapidSlashPhase === 'START', 'Yuji must transition to rapid slash START phase');
+
+    // Run rapid slash combo strikes (all hits)
+    let comboSafetyTicks = 400;
+    while (yuji.soulSwapActive && yuji.rapidSlashHitsLeft > 0 && comboSafetyTicks > 0) {
+      comboSafetyTicks--;
+      // Keep Boss Yuta in bush/undetected status throughout the entire fight
+      bossYuta.isHidingInBush = true;
+      bossYuta.isUndetectedInBush = true;
+      bossYuta.isBushEvadeActive = true;
+      yuji.update(bossYuta, 0, state.arena);
+    }
+
+    assert(yuji.rapidSlashHitsLeft === 0, 'Yuji must successfully complete all rapid slash strikes against undetected enemy');
+    assert(yuji.soulSwapActive === true, 'Soul Swap must not get cancelled during rapid slash strikes');
+
+    // Advance past slash recovery to Fuga channeling phase
+    let fugaSafetyTicks = 100;
+    while (yuji.soulSwapActive && yuji.rapidSlashPhase !== 'FUGA_CHANNEL' && !yuji.isChannelingDivineFlame && fugaSafetyTicks > 0) {
+      fugaSafetyTicks--;
+      bossYuta.isHidingInBush = true;
+      bossYuta.isUndetectedInBush = true;
+      bossYuta.isBushEvadeActive = true;
+      yuji.update(bossYuta, 0, state.arena);
+    }
+    assert(yuji.rapidSlashPhase === 'FUGA_CHANNEL' || yuji.isChannelingDivineFlame, 'Yuji must transition to Fuga channeling');
+    assert(yuji.hasActiveFinishingAbility() === true, 'hasActiveFinishingAbility must remain true during Fuga');
+
+    // Complete Fuga channeling
+    yuji.divineFlameChargeTimer = yuji.divineFlameChargeMax;
+    yuji.update(bossYuta, 0, state.arena);
+    assert(yuji.rapidSlashPhase === 'FUGA_RECOVERY', 'Yuji must fire Fuga and enter FUGA_RECOVERY');
+
+    // Complete recovery
+    yuji.divineFlameRecoveryTimer = 1;
+    yuji.update(bossYuta, 0, state.arena);
+    assert(yuji.rapidSlashPhase === 'COMPLETE', 'Yuji must reach COMPLETE phase after Fuga');
+
+    // Clean up
+    yuji.reset();
+    bossYuta.reset();
+    console.log('      ✅ Yuji Soul Swap uninterrupted sequence vs undetected Boss Yuta verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');
