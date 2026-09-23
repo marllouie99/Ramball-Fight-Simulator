@@ -59,7 +59,7 @@ export { drawGojoBody, drawGojoPixelBody, _drawGojoHair, _getGojoHairImage } fro
 export { drawEngineerSkin } from './fighters/engineerSkin.js';
 export { drawTanjiroSkin } from './fighters/tanjiroSkin.js';
 export { drawNezukoSkin } from './fighters/nezukoSkin.js';
-export { drawZenitsuSkin } from './fighters/zenitsuSkin.js';
+export { drawZenitsuSkin, drawZenitsuPixelBody, _drawZenitsuHair, _getZenitsuHairImage } from './fighters/zenitsuSkin.js';
 export { drawInosukeSkin } from './fighters/inosukeSkin.js';
 export { drawEscanorSkin } from './fighters/escanorSkin.js';
 export { drawZeusSkin, drawZeusBody, drawZeusPixelBody, _drawZeusHair, _getZeusHairImage, _drawZeusCrown, _getZeusCrownImage } from './fighters/zeusSkin.js';

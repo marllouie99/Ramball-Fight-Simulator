@@ -189,35 +189,35 @@ function drawPauseScreen() {
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = '#ffd700';
-  ctx.font = 'bold 24px Arial';
+  ctx.fillStyle = '#b45309'; // Rich dark amber/gold
+  ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('PAUSED', cx, cy - 110);
+  ctx.fillText('PAUSED', Math.round(cx), Math.round(cy - 110));
 
   const btnW = 200;
   const btnH = 34;
 
-  drawButton('▶ Resume', cx, cy - 65, () => {
+  drawButton('▶ RESUME', cx, cy - 65, () => {
     state.gameState = state.previousGameState || 'playing';
   }, btnW, btnH);
 
   const isCamDynamic = Boolean(state.camera && state.camera.mode === 'dynamic');
-  const camBtnLabel = isCamDynamic ? '📷 Cam: Dynamic' : '📷 Cam: Fixed';
+  const camBtnLabel = isCamDynamic ? 'CAM: DYNAMIC' : 'CAM: FIXED';
   drawButton(camBtnLabel, cx, cy - 20, () => {
     toggleCameraMode();
   }, btnW, btnH);
 
-  drawButton('↺ Restart Round', cx, cy + 25, () => {
+  drawButton('↺ RESTART ROUND', cx, cy + 25, () => {
     restartCurrentRound();
   }, btnW, btnH);
 
-  drawButton('🏆 Leaderboard', cx, cy + 70, () => {
+  drawButton('LEADERBOARD', cx, cy + 70, () => {
     state.leaderboardReturnState = 'paused';
     state.gameState = 'leaderboard';
   }, btnW, btnH);
 
-  drawButton('⌂ Main Menu', cx, cy + 115, () => {
+  drawButton('MAIN MENU', cx, cy + 115, () => {
     goToTitle();
   }, btnW, btnH);
 }

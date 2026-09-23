@@ -34,8 +34,8 @@ export const zenitsuConfig = {
   // ABILITY MASTER TOGGLE SWITCHES
   // ──────────────────────────────────────────
   enableThunderclap: true,
-  enableRokuren: true,
-  enableFlamingThunderGod: true,
+  enableRokuren: false,
+  enableFlamingThunderGod: false,
   enableBattleTrance: true,
   enableStaticCharge: true,
 

@@ -162,6 +162,7 @@ async function main() {
   const { drawNanamiPixelBody, drawNanamiSkin } = await import('../js/graphics/fighters/nanamiSkin.js');
   const { drawZeusPixelBody, drawZeusSkin, _drawZeusHair, _getZeusHairImage, _drawZeusCrown, _getZeusCrownImage } = await import('../js/graphics/fighters/zeusSkin.js');
   const { _getJohnWickHairImage, _drawJohnWickHair, drawJohnWickPixelBody, drawJohnWickSkin } = await import('../js/graphics/fighters/johnWickSkin.js');
+  const { _getZenitsuHairImage, _drawZenitsuHair, drawZenitsuPixelBody, drawZenitsuSkin } = await import('../js/graphics/fighters/zenitsuSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -8850,6 +8851,36 @@ async function main() {
     assertCanvasStackBalance('wick.draw during PENCIL_STAB');
   } catch (err) {
     console.error('❌ [JOHN WICK MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 11.6. Zenitsu Model Hair Asset & Procedural Body Canvas Stack Test
+  console.log('⚡ [Zenitsu Model Hair & Pixel Body Test] Verifying Zenitsu-hair.png overlay and procedural pixel body stack balance...');
+  try {
+    const zenitsuImg = _getZenitsuHairImage();
+    if (!zenitsuImg) {
+      throw new Error('_getZenitsuHairImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    drawZenitsuPixelBody(mockCtx, 25);
+    assertCanvasStackBalance('drawZenitsuPixelBody(mockCtx, 25)');
+
+    mockCtx.resetStackDepth();
+    _drawZenitsuHair(mockCtx, 25, false);
+    assertCanvasStackBalance('_drawZenitsuHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawZenitsuHair(mockCtx, 25, true);
+    assertCanvasStackBalance('_drawZenitsuHair(mockCtx, 25, true)');
+
+    const ZenitsuClass = FIGHTER_CLASS_MAP.zenitsu;
+    const zenitsu = new ZenitsuClass({ x: 300, y: 300, color: '#f59e0b', controls: {} });
+    mockCtx.resetStackDepth();
+    drawZenitsuSkin(mockCtx, zenitsu);
+    assertCanvasStackBalance('drawZenitsuSkin(mockCtx, zenitsu)');
+  } catch (err) {
+    console.error('❌ [ZENITSU MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
     errors++;
   }
 

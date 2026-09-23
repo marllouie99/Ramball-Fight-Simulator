@@ -239,11 +239,15 @@ export const SKIN_STUDIO_FIGHTERS = [
   {
     key: 'zenitsu',
     label: 'ZENITSU',
-    asset: 'zenitsu-hair.png',
-    assetDims: '56 x 56 Pixel Model',
-    baseW: 2.30,
-    baseH: 2.00,
-    baseCrownY: -1.20,
+    asset: 'Zenitsu-hair.png',
+    assetDims: '516 x 484',
+    baseW: 2.35,
+    baseH: 1.95,
+    baseCrownY: -1.25,
+    visW: 407,
+    visH: 356,
+    centerX: 258,
+    topY: 54,
     themeColor: '#eab308',
     forms: [
       { id: 'default', label: 'STANDARD' }

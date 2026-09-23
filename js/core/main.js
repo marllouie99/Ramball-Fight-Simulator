@@ -58,23 +58,8 @@ export function fitGameToViewport() {
 
   container.style.width = `${targetW}px`;
   container.style.height = `${targetH}px`;
-
-  // Determine actual available viewport dimensions across devices (iOS Safari visualViewport, Android, Desktop)
-  let windowW = window.innerWidth;
-  let windowH = window.innerHeight;
-
-  if (typeof window !== 'undefined' && window.visualViewport) {
-    if (window.visualViewport.width > 0) windowW = window.visualViewport.width;
-    if (window.visualViewport.height > 0) windowH = window.visualViewport.height;
-  } else if (typeof document !== 'undefined' && document.documentElement) {
-    if (document.documentElement.clientWidth > 0) windowW = document.documentElement.clientWidth;
-    if (document.documentElement.clientHeight > 0) windowH = document.documentElement.clientHeight;
-  }
-
-  // Scale uniformly to fit within viewport without clipping
-  const scale = Math.min(windowW / targetW, windowH / targetH);
-  container.style.transform = `translate(-50%, -50%) scale(${scale})`;
-  container.style.transformOrigin = 'center center';
+  container.style.transform = '';
+  container.style.transformOrigin = '';
 }
 
 // Initial viewport auto-fit

@@ -159,14 +159,18 @@ function drawButton(text, cx, cy, action, w = 200, h = 40, customColor = null, r
   ctx.lineTo(x + w - radius - 1, topFaceY + 2);
   ctx.stroke();
 
-  // Button text
+  // Button text - crisp high-legibility typography snapped to integer pixels
   ctx.fillStyle = textColor;
-  ctx.font = isPrimary 
-    ? '700 8.5px "Press Start 2P", monospace'
-    : '700 7.5px "Press Start 2P", monospace';
+  let fontSize = isPrimary ? 13 : 11.5;
+  if (w < 40 || h < 26) {
+    fontSize = Math.min(11, Math.floor(h * 0.65));
+  } else if (text && text.length > 18) {
+    fontSize = 10;
+  }
+  ctx.font = `900 ${fontSize}px "Outfit", "Rajdhani", "Segoe UI", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, cx, topFaceY + h / 2 + 0.5);
+  ctx.fillText(text, Math.round(cx), Math.round(topFaceY + h / 2));
 
   ctx.restore();
 
@@ -269,10 +273,10 @@ function drawPremiumStatBar(ctx, x, y, width, label, valueStr, percentage, color
 function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b') {
   // Metric Label on left
   ctx.fillStyle = '#2d080c';
-  ctx.font = '700 7.5px "Silkscreen", monospace';
+  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, x, y + 3);
+  ctx.fillText(label, Math.round(x), Math.round(y + 3));
 
   const labelW = 28;
   const valueW = width > 120 ? 32 : 0;
@@ -299,10 +303,10 @@ function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b'
   // Metric Value on right
   if (valueW > 0) {
     ctx.fillStyle = '#702028';
-    ctx.font = '700 7.5px "Silkscreen", monospace';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText(typeof value === 'number' ? value : value, x + width, y + 3);
+    ctx.fillText(typeof value === 'number' ? value : value, Math.round(x + width), Math.round(y + 3));
   }
 }
 

@@ -39,7 +39,7 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
   ctx.fillRect(x + 12, y + 2, w - 24, 2);
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = '700 7.5px "Press Start 2P", monospace';
+  ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('ENEMY GAUNTLET POOL', x + w / 2, y + 15);
@@ -251,13 +251,13 @@ function drawTacticalMapSelectModal() {
 
   // Header Banner
   ctx.fillStyle = '#b81c3b';
-  ctx.font = '700 7.5px "Silkscreen", monospace';
+  ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText('TACTICAL SHOOTER // BATTLEGROUND MAP SELECTION // SYS.v2.5', mx + 18, my + 14);
 
   ctx.fillStyle = '#21050c';
-  ctx.font = '700 10.5px "Press Start 2P", monospace';
+  ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
   ctx.fillText('CHOOSE COMBAT SECTOR MAP', mx + 18, my + 28);
 
   // Header accent line
@@ -317,24 +317,24 @@ function drawTacticalMapSelectModal() {
 
     // Title
     ctx.fillStyle = isSelected ? '#b81c3b' : '#21050c';
-    ctx.font = '700 8.5px "Press Start 2P", monospace';
+    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(item.title, textX, cardY + 18);
 
     // Subtitle
     ctx.fillStyle = '#8b1524';
-    ctx.font = '700 7.5px "Silkscreen", monospace';
+    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(item.subtitle, textX, cardY + 36);
 
     // Features tag
     ctx.fillStyle = '#d97706';
-    ctx.font = '700 7px "Silkscreen", monospace';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(item.features, textX, cardY + 52);
 
     // Description
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7.5px "Silkscreen", monospace';
+    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
     wrapText(ctx, item.desc, textX, cardY + 70, maxTextW, 13);
 
     // Status pill button
@@ -413,13 +413,13 @@ function drawFighterSelectModal() {
   const slotLabel = pNumMatch ? `PLAYER ${pNumMatch[0]}` : 'PLAYER';
 
   ctx.fillStyle = '#b81c3b';
-  ctx.font = '700 7.5px "Silkscreen", monospace';
+  ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(isTactical ? 'TACTICAL FORCE // OPERATIVE ROSTER' : 'TACTICAL ROSTER // PROTOCOL 01', mx + 18, my + 14);
 
   ctx.fillStyle = '#21050c';
-  ctx.font = '700 10.5px "Press Start 2P", monospace';
+  ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
   ctx.fillText(`CHOOSE FIGHTER (${slotLabel})`, mx + 18, my + 28);
 
   // Header accent line
@@ -506,12 +506,12 @@ function drawFighterSelectModal() {
 
     // Card Name Tag
     ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
-    ctx.font = '700 6.5px "Press Start 2P", monospace';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 
     let shortName = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
-    if (shortName.length > 8) shortName = shortName.substring(0, 7) + '.';
+    if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
     ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
 
     _registerButton(itemX, itemY, cellW, cellH + 2, () => {
@@ -564,7 +564,7 @@ function drawFighterSelectModal() {
 
   // Page Indicator Text & Dot Pips
   ctx.fillStyle = '#21050c';
-  ctx.font = '700 7px "Press Start 2P", monospace';
+  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, paginationY + 11);
@@ -634,7 +634,7 @@ function drawFighterSelectModal() {
 
   // Champion Name
   ctx.fillStyle = '#21050c';
-  ctx.font = '700 9.5px "Press Start 2P", monospace';
+  ctx.font = '900 13.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 104);
@@ -650,7 +650,7 @@ function drawFighterSelectModal() {
   ctx.stroke();
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = '700 6.5px "Press Start 2P", monospace';
+  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
   ctx.fillText(`CLASS // ${selectedDef.type.toUpperCase()}`, previewX, detailY + 124.5);
 
   // Stat Bars
@@ -704,13 +704,13 @@ function drawFighterSelectModal() {
 
   // Weapon Title
   ctx.fillStyle = '#b81c3b';
-  ctx.font = '700 6.5px "Press Start 2P", monospace';
+  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${modalWeaponInfo.name}`, barW - 16), barX + 8, mWeaponBoxY + 7);
 
   ctx.fillStyle = '#8b1524';
-  ctx.font = '700 6px "Silkscreen", monospace';
+  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
   ctx.fillText(fitSingleLineText(ctx, `[ ${modalWeaponInfo.category} ]`, barW - 16), barX + 8, mWeaponBoxY + 20);
 
   // Live Weapon Graphic Stage
@@ -734,14 +734,14 @@ function drawFighterSelectModal() {
   // Ability Header & Text Below
   const mAbilityY = mWeaponBoxY + mWeaponBoxH + 8;
   ctx.fillStyle = '#b81c3b';
-  ctx.font = '700 6.5px "Press Start 2P", monospace';
+  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${selectedDef.ability.toUpperCase()}`, barW), barX, mAbilityY);
 
   ctx.fillStyle = '#21050c';
-  ctx.font = '700 7px "Silkscreen", monospace';
-  wrapText(ctx, selectedDef.desc, barX, mAbilityY + 14, barW, 11, 4);
+  ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+  wrapText(ctx, selectedDef.desc, barX, mAbilityY + 14, barW, 13, 4);
 
   // Footer Action Buttons
   const footerY = my + modalH - 34;
@@ -837,10 +837,10 @@ function drawSelectScreen() {
     ctx.stroke();
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7px "Press Start 2P", monospace';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(mapLabel, curCtrlX + mapW / 2, tmY + ctrlH / 2 + 0.5);
+    ctx.fillText(mapLabel, curCtrlX + mapW / 2, tmY + ctrlH / 2);
     ctx.restore();
 
     _registerButton(curCtrlX, tmY, mapW, ctrlH + 2, () => {
@@ -904,7 +904,7 @@ function drawSelectScreen() {
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '700 9.5px "Press Start 2P", monospace';
+    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('VS', vsX, vsY + 0.5);
@@ -975,7 +975,7 @@ function drawSelectScreen() {
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '700 9.5px "Press Start 2P", monospace';
+      ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('VS', vsX, vsY + 0.5);
@@ -1272,7 +1272,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
   ctx.fillRect(x + 12, y + 2, w - 24, 2);
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = '700 7.5px "Press Start 2P", monospace';
+  ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(title, x + w / 2, y + 15);
@@ -1295,7 +1295,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
   if (!enabled) {
     ctx.fillStyle = '#8b1524';
-    ctx.font = '700 8px "Press Start 2P", monospace';
+    ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('SLOT UNAVAILABLE', x + w / 2, y + h / 2);
@@ -1349,7 +1349,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
     // Fighter Name
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 10.5px "Press Start 2P", monospace';
+    ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(def.name.toUpperCase(), avatarX, y + 144);
@@ -1365,7 +1365,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '700 6.5px "Press Start 2P", monospace';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(`CLASS // ${def.type.toUpperCase()}`, avatarX, y + 164.5);
 
     // Stat Telemetry Block
@@ -1391,14 +1391,14 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.restore();
 
     ctx.fillStyle = '#b81c3b';
-    ctx.font = '700 6.5px "Press Start 2P", monospace';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, statBoxW - 16), statBoxX + 8, abilityY + 7);
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7px "Silkscreen", monospace';
-    wrapText(ctx, def.desc, statBoxX + 8, abilityY + 20, statBoxW - 16, 11, 5);
+    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+    wrapText(ctx, def.desc, statBoxX + 8, abilityY + 20, statBoxW - 16, 13, 5);
 
     // ── Live Weapon Graphic Visual Stage Sub-Panel (Warm Cream Sub-box) ──
     const weaponY = abilityY + abilityH + 8;
@@ -1415,13 +1415,13 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
     // Weapon Header & Category
     ctx.fillStyle = '#b81c3b';
-    ctx.font = '700 6.5px "Press Start 2P", monospace';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, statBoxW - 16), statBoxX + 8, weaponY + 7);
 
     ctx.fillStyle = '#8b1524';
-    ctx.font = '700 6px "Silkscreen", monospace';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, statBoxW - 16), statBoxX + 8, weaponY + 20);
 
     // Live Weapon Center Stage
@@ -1446,10 +1446,10 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
     // Weapon Description Telemetry
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7px "Silkscreen", monospace';
+    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 222, statBoxW - 16, 11, 4);
+    wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 222, statBoxW - 16, 13, 4);
 
     // Change Fighter Button
     const btnW = w - 24;
@@ -1474,13 +1474,13 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const detailW = w - 68;
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7.5px "Press Start 2P", monospace';
+    ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 28);
 
     ctx.fillStyle = '#8b1524';
-    ctx.font = '700 6px "Silkscreen", monospace';
+    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 40);
 
     drawStatBar(ctx, 'HP', def.hp, 150, detailX, y + 50, detailW, '#cc2b4d');
@@ -1502,7 +1502,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.restore();
 
     ctx.fillStyle = '#b81c3b';
-    ctx.font = '700 6px "Press Start 2P", monospace';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, boxW - 50), x + 12, weaponBoxY + 5);
@@ -1517,9 +1517,9 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.restore();
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 6px "Silkscreen", monospace';
+    ctx.font = '800 9px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
     ctx.textAlign = 'left';
-    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 12, weaponBoxY + 15, boxW - 55, 9.5, 3);
+    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 12, weaponBoxY + 17, boxW - 55, 11, 3);
 
     // Quick cycle arrows + Change Fighter Button
     const arrowW = 24;
@@ -1547,13 +1547,13 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const detailW = w - 82;
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 8.5px "Press Start 2P", monospace';
+    ctx.font = '900 12.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 32);
 
     ctx.fillStyle = '#8b1524';
-    ctx.font = '700 6.5px "Silkscreen", monospace';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 46);
 
     drawStatBar(ctx, 'HP', def.hp, 150, detailX, y + 58, detailW, '#cc2b4d');
@@ -1575,7 +1575,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.restore();
 
     ctx.fillStyle = '#b81c3b';
-    ctx.font = '700 6.5px "Press Start 2P", monospace';
+    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, boxW - 65), x + 15, weaponBoxY + 6);
@@ -1590,9 +1590,9 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.restore();
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '700 7px "Silkscreen", monospace';
+    ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
     ctx.textAlign = 'left';
-    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 15, weaponBoxY + 18, boxW - 75, 10.5, 4);
+    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 15, weaponBoxY + 18, boxW - 75, 12, 4);
 
     // Quick cycle arrows + Change Fighter Button
     const arrowW = 28;

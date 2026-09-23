@@ -49,6 +49,11 @@ export class ZenitsuFighter extends Fighter {
     this.hideBackHand = false;
     this.iaiComboCount = 0;
 
+    // ── Config-Driven Skill Enable/Disable Toggles ──
+    this.enableThunderclap = cfg.enableThunderclap !== undefined ? cfg.enableThunderclap : true;
+    this.enableRokuren = cfg.enableRokuren !== undefined ? cfg.enableRokuren : true;
+    this.enableFlamingThunderGod = cfg.enableFlamingThunderGod !== undefined ? cfg.enableFlamingThunderGod : true;
+
     // Skill 1: Thunderclap and Flash (Hekireki Issen)
     this.thunderclapCooldownMax = cfg.thunderclapCooldown || 228;
     this.thunderclapCooldown = this.thunderclapCooldownMax;
@@ -61,30 +66,38 @@ export class ZenitsuFighter extends Fighter {
     this.flamingGodCooldownMax = cfg.ultimateCooldown || 1440;
     this.flamingGodCooldown = this.flamingGodCooldownMax;
 
-    // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    // Declarative Skill Registration (config-driven)
+    const skills = [];
+    if (this.enableThunderclap) {
+      skills.push({
         id: 'thunderclap_and_flash',
         name: 'Thunderclap and Flash',
         type: 'active',
         cooldownKey: 'thunderclapCooldown',
         cooldownMaxKey: 'thunderclapCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.enableRokuren) {
+      skills.push({
         id: 'thunderclap_sixfold',
         name: 'Sixfold (Rokuren)',
         type: 'active',
         cooldownKey: 'rokurenCooldown',
         cooldownMaxKey: 'rokurenCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.enableFlamingThunderGod) {
+      skills.push({
         id: 'flaming_thunder_god',
         name: 'Flaming Thunder God',
         type: 'ultimate',
         cooldownKey: 'flamingGodCooldown',
         cooldownMaxKey: 'flamingGodCooldownMax'
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   update() {
@@ -101,22 +114,22 @@ export class ZenitsuFighter extends Fighter {
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
-    // Skill Cooldowns
-    if (this.thunderclapCooldown > 0) this.thunderclapCooldown--;
-    if (this.rokurenCooldown > 0) this.rokurenCooldown--;
-    if (this.flamingGodCooldown > 0) this.flamingGodCooldown--;
+    // Skill Cooldowns (config-driven)
+    if (this.enableThunderclap && this.thunderclapCooldown > 0) this.thunderclapCooldown--;
+    if (this.enableRokuren && this.rokurenCooldown > 0) this.rokurenCooldown--;
+    if (this.enableFlamingThunderGod && this.flamingGodCooldown > 0) this.flamingGodCooldown--;
 
     const target = this.getNearestTarget();
     if (!target) return;
 
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
-    // AI / Skill Priority
-    if (this.flamingGodCooldown <= 0 && dist < 190) {
+    // AI / Skill Priority (config-driven enable/disable)
+    if (this.enableFlamingThunderGod && this.flamingGodCooldown <= 0 && dist < 190) {
       this._triggerFlamingThunderGod(target);
-    } else if (this.rokurenCooldown <= 0 && dist < 150) {
+    } else if (this.enableRokuren && this.rokurenCooldown <= 0 && dist < 150) {
       this._triggerRokuren(target);
-    } else if (this.thunderclapCooldown <= 0 && dist < 180) {
+    } else if (this.enableThunderclap && this.thunderclapCooldown <= 0 && dist < 180) {
       this._triggerThunderclapAndFlash(target);
     } else if (dist < 80 && this.slashSwingTimer <= 0) {
       this._executeThunderIaiCombo(target);

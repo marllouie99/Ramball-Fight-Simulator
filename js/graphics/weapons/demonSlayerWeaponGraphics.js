@@ -131,16 +131,76 @@ export function drawNezukoDemonClaws(ctx, x, y, angle, r = 25, opts = {}) {
   ctx.restore();
 }
 
+// ─── Zenitsu Weapon PNG Asset Loader ───
+let _zenitsuWeaponImage = null;
+let _zenitsuWeaponImageLoading = false;
+
+export function _getZenitsuWeaponImage() {
+  if (_zenitsuWeaponImage && _zenitsuWeaponImage.complete && _zenitsuWeaponImage.naturalWidth > 0) {
+    return _zenitsuWeaponImage;
+  }
+  if (!_zenitsuWeaponImageLoading && typeof Image !== 'undefined') {
+    _zenitsuWeaponImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _zenitsuWeaponImage = img;
+      _zenitsuWeaponImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Zenitsu weapon image at Assets/model/Weapon/Zenitsu-weapon.png', e);
+      _zenitsuWeaponImageLoading = false;
+    };
+    img.src = 'Assets/model/Weapon/Zenitsu-weapon.png?v=1';
+    _zenitsuWeaponImage = img;
+  }
+  return _zenitsuWeaponImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getZenitsuWeaponImage();
+}
+
 /**
- * Draws Zenitsu's Lightning Nichirin Katana (Pixel Art)
+ * Draws Zenitsu's Lightning Nichirin Katana from Assets/model/Weapon/Zenitsu-weapon.png
+ * Falls back to procedural pixel art if the image has not loaded yet.
  */
 export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) {
   const isPreview = Boolean(opts.isPreview);
   const now = opts.now || Date.now();
 
+  // Weapon Studio customization support
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.zenitsu)
+    ? state.weaponCustomizations.zenitsu
+    : { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+
+  const customScale = custom.scale !== undefined ? custom.scale : 1.0;
+  const customOffsetX = custom.offsetX !== undefined ? custom.offsetX : 0;
+  const customOffsetY = custom.offsetY !== undefined ? custom.offsetY : 0;
+  const customAngle = custom.angleOffset !== undefined ? custom.angleOffset : 0;
+
   ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
+  ctx.translate(x + customOffsetX, y + customOffsetY);
+  ctx.rotate(angle + customAngle);
+  ctx.scale(customScale, customScale);
+
+  // ─── Try PNG Asset First ───
+  const img = _getZenitsuWeaponImage();
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor pixel art scaling
+
+    // Image is 2172x724. Scale so blade length matches ~94px gameplay size.
+    // Tsuba guard center is approximately at x=680, y=362 in the source image.
+    const bladeLen = 94;
+    const s = bladeLen / 1492.0; // 1492px = blade portion (from tsuba center to tip)
+    ctx.scale(s, s);
+    ctx.drawImage(img, -680, -362);
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
+
+  // ─── Procedural Pixel Art Fallback ───
   ctx.imageSmoothingEnabled = false;
 
   const bladeLength = snap(48);
