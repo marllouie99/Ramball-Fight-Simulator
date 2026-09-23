@@ -29,26 +29,19 @@ export const tanjiroConfig = {
   ability: 'Water & Sun Breathing ("Hinokami Kagura")',
   desc: 'Demon Slayer wielding Water Breathing & Hinokami Kagura (Sun Breathing). Senses the luminous Opening Thread in enemy defenses. Wields 140° Water Surface slashes, Constant Flux spiraling dragon lunges, Clear Blue Sky projectile deflections, and the Dragon Sun Halo Head Dance ultimate.',
 
-  // ──────────────────────────────────────────
-  // ABILITY MASTER TOGGLE SWITCHES
-  // ──────────────────────────────────────────
-  enableWaterBreathing: true,
-  enableConstantFlux: true,
-  enableClearBlueSky: true,
-  enableDragonSunDance: true,
-  enableOpeningThread: true,
-  enableTotalConcentration: true,
-
   // Passive 1: Scent of the Opening Thread
+  enableOpeningThread: true,        // Master toggle for Passive 1: Scent of the Opening Thread
   threadHpThreshold: 0.40,     // Triggers below 40% enemy HP
   threadCritChance: 0.25,      // +25% crit chance
   threadArmorPen: 0.35,        // 35% armor penetration
 
   // Passive 2: Total Concentration: Constant
+  enableTotalConcentration: true,   // Master toggle for Passive 2: Total Concentration
   concentrationSpeedBonus: 0.12,
   concentrationCdrBonus: 0.15,
 
   // Basic Attack: Water Breathing 3-Hit Flow (140° Frontal Arc)
+  enableWaterBreathing: true,       // Master toggle for Basic Attack: Water Breathing
   katanaArcAngle: Math.PI * 0.778, // ~140 degrees
   katanaReach: 80,
   hit1Damage: 18,
@@ -59,6 +52,7 @@ export const tanjiroConfig = {
   hit3Knockback: 24,
 
   // Skill 1: Water Tenth Form: Constant Flux
+  enableConstantFlux: true,         // Master toggle for Skill 1: Constant Flux
   fluxCooldown: 270,           // 4.5s
   fluxReach: 90,
   fluxHit1Damage: 16,
@@ -66,6 +60,7 @@ export const tanjiroConfig = {
   fluxHit3Damage: 32,
 
   // Skill 2: Sun Breathing: Clear Blue Sky
+  enableClearBlueSky: true,         // Master toggle for Skill 2: Clear Blue Sky
   sunCooldown: 360,            // 6.0s
   sunRadius: 75,
   sunDamage: 35,
@@ -73,6 +68,7 @@ export const tanjiroConfig = {
   sunBurnDurationSec: 3,
 
   // Ultimate: Hinokami Kagura: Dragon Sun Halo Head Dance
+  enableDragonSunDance: true,       // Master toggle for Ultimate: Dragon Sun Halo Head Dance
   ultimateCooldown: 1440,      // 24.0s
   ultimateStrikes: 4,
   ultimateStrikeDamage: 20,

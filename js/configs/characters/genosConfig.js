@@ -21,6 +21,7 @@ export const genosConfig = {
   desc: 'Demon Cyborg. Zones with explosive basic blasts, Rocket Stomps to close in, and uses a devastating continuous fire beam. Explodes upon defeat.',
 
   // Basic Attack: Incineration Palms (Ranged Fire Blasts)
+  enableBlast: true,         // Master toggle for Basic Attack: Incineration Palms
   blastDamage: 6,
   blastRange: 350,
   blastSpeed: 15,
@@ -28,6 +29,7 @@ export const genosConfig = {
   blastCooldown: 40, // ~0.45s at 60fps
 
   // Basic Attack Ammo & Stance System (Ranged Incineration Fireballs -> Melee Punches)
+  enableMeleeStance: true,   // Master toggle for Melee Stance
   maxHeatAmmo: 20,          // Maximum ranged fireball capacity before switching to melee mode
   ammoReloadFrames: 500,    // Reload cooldown duration (300 frames = 5.0 seconds at 60fps)
   maxMeleeDashes: 10,        // Maximum thruster dashes allowed during Melee Mode
@@ -36,6 +38,7 @@ export const genosConfig = {
   meleePunchCooldown: 15,  // Cooldown between melee punches (~0.3s)
 
   // Skill 1: Machine Gun Blows (Flurry)
+  enableFlurry: true,        // Master toggle for Skill 1: Machine Gun Blows
   initialFlurryCooldown: 1200,  // Starts on cooldown at match start (~8.0s at 60fps)
   flurryDamage: 7,
   flurryHitCount: 15,
@@ -48,6 +51,7 @@ export const genosConfig = {
   dashes: {
     // Skill 2: Rocket Stomp & Dash
     rocketDash: {
+      enableRocketDash: true, // Master toggle for Skill 2: Rocket Stomp & Dash
       cooldown: 360,     // 6 seconds at 60fps
       distance: 200,     // Distance of the dash (px)
       duration: 100,      // 0.3s dash duration (frames)
@@ -81,6 +85,7 @@ export const genosConfig = {
   blastProjectileRadius: 9,
 
   // Ultimate: Spiral Incineration Cannon
+  enableUltimate: true,      // Master toggle for Ultimate: Spiral Incineration Cannon
   initialUltCooldown: 1000, // Initial cooldown at match start (28s at 60fps)
   ultCooldown: 800, // 28 seconds at 60fps
   ultSlideFrames: 22, // Pre-ultimate cybernetic thruster friction-brake slide duration in frames (~0.36s)
@@ -117,6 +122,7 @@ export const genosConfig = {
   ultOverlayOffsetY: 0,
 
   // Passive: Core Overdrive (Self-Destruct)
+  enableSelfDestruct: true,  // Master toggle for Passive: Core Overdrive (Self-Destruct)
   selfDestructHpThreshold: 0.10,    // HP percentage threshold (0.10 = 10% HP) below which Genos initiates Core Overdrive Self-Destruct
   selfDestructCountdownFrames: 150, // 2.5 seconds
   selfDestructDamageReduction: 0.50, // 75% Damage Reduction (DEF) while charging core overload self-destruct

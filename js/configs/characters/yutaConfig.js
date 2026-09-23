@@ -23,6 +23,7 @@ export const yutaConfig = {
   desc: 'Summons Rika to assist Yuta in fight and uses Authentic Mutual Love domain.',
 
   // Passive: Reverse Cursed Technique (RCT) & Passive Regeneration
+  enableRCT: true,                         // Master toggle for Reverse Cursed Technique
   regenRate: 0.02,                         // HP restored per frame passively (Yuta alone: 1.2 HP/s)
   rikaActiveRegenRate: 0.06,               // Base RCT healing rate per frame when Rika is active outside domain (~3.6 HP/s)
   rikaActiveRegenMultiplier: 0.2,         // Regen multiplier applied when Rika is active outside domain
@@ -33,11 +34,13 @@ export const yutaConfig = {
   rctRevivalCooldown: 99999,               // Cooldown before RCT revival can trigger again (once per match)
 
   // Teleport Dodge / Evade Mechanic
+  enableTeleportDodge: true,               // Master toggle for Teleport Dodge / Evade Mechanic
   teleportDodgeChance: 0.30,               // 30% chance to teleport dodge incoming attacks
   teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
   teleportDodgeDistance: 85,               // Distance teleported on dodge
 
   // Basic Attack: Katana Melee
+  enableKatanaMelee: true,                 // Master toggle for Basic Attack: Katana Melee
   meleeCooldown: 100,                       // Frames between katana strikes
   meleeRange: 50,                          // Katana blade length reach distance in pixels
   meleeDamage: 8,                         // Base damage per katana swing
@@ -47,6 +50,7 @@ export const yutaConfig = {
   weaponOffsetY: 4.5,                      // Y-offset shift positioning hands & katana lower on Yuta's body/chest
 
   // Defensive / Counter Mechanic: Parry & Guard Stance
+  enableParry: true,                       // Master toggle for Parry & Guard Stance
   parryThreatRadius: 180,                  // Detection radius in pixels for incoming projectile threats
   parryMeleeThreatRadius: 120,             // Detection radius in pixels for incoming melee threats
   parryAnticipationDuration: 45,           // Frames to raise guard posture when threat is detected
@@ -57,6 +61,7 @@ export const yutaConfig = {
   maxParryStacks: 5,                        // Maximum parry mastery stacks (+25% bonus parry chance cap)
 
   // Special Mechanic: Phantom Flurry (Parry Counterattack & Basic Attack Combo)
+  enablePhantomFlurry: true,               // Master toggle for Phantom Flurry
   flurryParryMin: 5,                       // Minimum successful parries required to activate Flurry
   flurryParryMax: 5,                       // Maximum random target threshold for Flurry activation
   flurryBasicHitsRequired: 10,              // Number of successful basic attack hits required to activate Flurry
@@ -68,6 +73,7 @@ export const yutaConfig = {
   flurryKnockback: 0.0,                    // Outward knockback push force during flurry slashes (0 = no push)
 
   // Copied Techniques (Ranged Skill Cycle)
+  enableCopiedTechniques: true,            // Master toggle for Copied Techniques
   cursedSpeechRadius: 150,                 // Impact shockwave radius in pixels for "DON'T MOVE!"
   cursedSpeechFreezeTime: 45,              // Frames enemies are frozen in place (0.75 seconds)
   thinIceBreakerDamage: 5,                // Damage dealt by Thin Ice Breaker spatial distortion
@@ -76,6 +82,7 @@ export const yutaConfig = {
   thinIceBreakerKnockback: 35,             // Extreme knockback blast force applied on Thin Ice Breaker hit
 
   // Summon Companion: Rika Orimoto
+  enableRika: true,                        // Master toggle for Summon Rika Orimoto
   rikaMaxHp: 250,                          // Maximum health pool when summoned
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
   rikaSummonHpThreshold: 0.70,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
@@ -103,6 +110,7 @@ export const yutaConfig = {
   rikaDeathExplosionHitStun: 20,           // Hitstun duration (frames) applied by Death Dispersion (#8)
 
   // Ultimate Skill: Domain Expansion — Authentic Mutual Love
+  enableDomain: true,                      // Master toggle for Ultimate: Domain Expansion
   domainCooldown: 0,                        // Domain is based on HP lost (no cooldown timer!)
   domainHpThreshold: 0.50,                 // 1st Domain Expansion trigger threshold (60% HP)
   domain2HpDamageRequired: 0.75,           // 2nd Domain requirement: Yuta MUST take 20% max HP damage AFTER 1st domain ends!
@@ -121,6 +129,7 @@ export const yutaConfig = {
   domainOverlayAlpha: 0.75,                // Semi-transparent opacity for Yuta domain overlay image (0.75 = 75% opacity)
 
   // Ultimate Skill: Pure Love Beam (Sacrificial Nuke)
+  enablePureLoveBeam: true,                // Master toggle for Ultimate: Pure Love Beam
   pureLoveBeamHpThreshold: 0.45,           // HP ratio required to trigger beam (15%)
   pureLoveBeamCooldown: 1200,              // Cooldown frames (20 seconds) before beam can be used again
   pureLoveBeamChargeFrames: 120,            // Channeling duration before firing (1.5 seconds)

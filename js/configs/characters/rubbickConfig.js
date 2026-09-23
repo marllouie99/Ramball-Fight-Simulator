@@ -25,6 +25,7 @@ export const rubbickConfig = {
   desc: 'Fires bouncing arcane bolts. Telekinetically lifts and stuns enemies. Ultimate steals the last used enemy skill.',
 
   // ── Basic Attack: Arcane Bolt ──
+  enableArcaneBolt: true,    // Master toggle for Arcane Bolt basic attack
   boltDamage: 12,
   boltSpeed: 8,
   bounceCount: 4,
@@ -33,6 +34,7 @@ export const rubbickConfig = {
   flurryDamage: 10,
 
   // ── Skill 1: Telekinesis ──
+  enableTelekinesis: true,   // Master toggle for Telekinesis
   telekinesisCooldown: 1000,
   telekinesisDuration: 200, // Frames target is held in air
   telekinesisStunRadius: 100, // AoE stun on landing
@@ -41,6 +43,7 @@ export const rubbickConfig = {
   telekinesisLandDamage: 75, // Impact damage dealt when slammed onto the ground
 
   // ── Ultimate: Spell Steal ──
+  enableSpellSteal: true,    // Master toggle for Spell Steal ultimate
   spellStealCooldown: 700,
   spellStealDuration: 1000, // Duration stolen skill remains active (frames)
   spellStealRange: 350,

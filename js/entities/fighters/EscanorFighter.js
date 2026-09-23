@@ -50,8 +50,8 @@ function _getEscanorBladeWorldSegment(fighter, strikeP) {
   const r = fighter.r || 32;
   const overheadAngle = -2.45;
   const strikeEndAngle = 1.05;
-  const overheadHandX = -r * 0.25;
-  const overheadHandY = -r * 0.40;
+  const overheadHandX = -r * 0.48;
+  const overheadHandY = -r * 0.42;
   const strikeEndHandX = r * 1.15;
   const strikeEndHandY = r * 0.42;
   const overheadBackHandX = r * 0.35;
@@ -227,6 +227,16 @@ export class EscanorFighter extends Fighter {
     this.cruelSunCooldownMax = cfg.cruelSunCooldown || 510;
     this.cruelSunCooldown = this.cruelSunCooldownMax;
     this.activeCruelSuns = []; // Active orbs
+    this.isChannelingCruelSun = false;
+    this.cruelSunChargeTimer = 0;
+    this.cruelSunMaxChargeTimer = 0;
+    this.cruelSunCastAngle = undefined;
+    this.cruelSunRecoveryTimer = 0;
+    this.cruelSunMaxRecoveryTimer = 0;
+    this.cruelSunReleaseAngle = 0;
+
+    // Solar Poise / Master of Grace Sunshine: Complete immunity to any CC/stun effect
+    this.immuneToCC = true;
 
     // Skill 2: Pride Flare (プライド・フレア)
     this.prideFlareCooldownMax = cfg.prideFlareCooldown || 660;
@@ -291,6 +301,7 @@ export class EscanorFighter extends Fighter {
   reset() {
     super.reset();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    this._lastMoveAngle = undefined;
     this.baseDefense = cfg.defense ?? 0.20;
     this.defense = this.baseDefense;
     this.baseRadius = cfg.radius || 32;
@@ -324,9 +335,17 @@ export class EscanorFighter extends Fighter {
     this.prideStacks = 0;
     this.prideChargeTimer = 0;
     this.isTheOneActive = false;
-    this.theOneTimer = 0;
     this.theOneFinisherUsed = false;
+    this.isChannelingCruelSun = false;
+    this._cruelSunSnapSfxPlayed = false;
+    this.cruelSunChargeTimer = 0;
+    this.cruelSunMaxChargeTimer = 0;
+    this.cruelSunCastAngle = undefined;
+    this.cruelSunRecoveryTimer = 0;
+    this.cruelSunMaxRecoveryTimer = 0;
+    this.cruelSunReleaseAngle = 0;
     this.activeCruelSuns = [];
+    this.immuneToCC = true;
     this.slashOriginX = undefined;
     this.slashOriginY = undefined;
     this.slashOriginAngle = undefined;
@@ -343,11 +362,40 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
+   * Returns true if Cruel Sun is currently channeling, flying in the arena, or in post-throw breather recovery.
+   * Matches Gojo's Hollow Purple active lifecycle.
+   */
+  isCruelSunActive() {
+    return Boolean(
+      this.isChannelingCruelSun ||
+      (this.cruelSunChargeTimer && this.cruelSunChargeTimer > 0) ||
+      (this.activeCruelSuns && this.activeCruelSuns.length > 0) ||
+      (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0)
+    );
+  }
+
+  /**
+   * Basic Attack Validation:
+   * Prevents basic attacks while Cruel Sun is active/flying (just like Gojo firing Hollow Purple).
+   */
+  canPerformBasicAttack() {
+    if (this.isCruelSunActive()) return false;
+    if (this.isChannelingCruelSun || this.isChannelingDivineSword || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer > 0)) return false;
+    return super.canPerformBasicAttack ? super.canPerformBasicAttack() : true;
+  }
+
+  /**
    * Aim Validation Guard:
    * Allows smooth auto-aim tracking while lifting/holding Divine Axe Rhitta (isLiftingWeapon),
-   * but strictly locks aim during the downward chop strike, impact hit-pause, and recovery.
+   * but strictly locks aim during the downward chop strike, impact hit-pause, Cruel Sun channeling, in-flight, and post-throw breather recovery.
    */
   canAim() {
+    if (this.isChannelingCruelSun || (this.cruelSunChargeTimer && this.cruelSunChargeTimer > 0)) {
+      return true;
+    }
+    if (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0) {
+      return false;
+    }
     if (this.chopHitPauseTimer > 0) {
       return false;
     }
@@ -361,8 +409,35 @@ export class EscanorFighter extends Fighter {
    * Smooth Auto-Aim & Committed Swing Execution:
    * - While lifting weapon: smoothly tracks target using aimTurnRate (no angle snapping).
    * - Downward strike & recovery: locks strictly to the committed chopCastAngle.
+   * - Cruel Sun channeling: dynamically tracks target with pointing hand while body faces player (angle 0).
+   * - Cruel Sun 3s post-throw recovery: locks strictly to release direction before resuming free aim.
    */
   aim(target) {
+    if (this.isChannelingCruelSun || (this.cruelSunChargeTimer && this.cruelSunChargeTimer > 0)) {
+      this.gunAngle = 0;
+      this.angle = 0;
+      if (target) {
+        const targetZ = target.z || 0;
+        const myZ = this.z || 0;
+        const targetAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+        const turnRate = cfg.aimTurnRate || 0.12;
+        if (this.cruelSunCastAngle === undefined || Number.isNaN(this.cruelSunCastAngle)) {
+          this.cruelSunCastAngle = targetAngle;
+        } else {
+          let diff = targetAngle - this.cruelSunCastAngle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          this.cruelSunCastAngle += diff * Math.min(1.0, turnRate);
+        }
+      }
+      return true;
+    }
+    if (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0) {
+      this.gunAngle = 0;
+      this.angle = 0;
+      return false;
+    }
     if (this.chopHitPauseTimer > 0 || (this.slashSwingTimer > 0 && !this.isLiftingWeapon())) {
       if (this.chopCastAngle !== undefined) {
         this.gunAngle = this.chopCastAngle;
@@ -388,13 +463,64 @@ export class EscanorFighter extends Fighter {
     return this.slashSwingTimer > (strikeFrames + recFrames);
   }
 
+  // ── Universal Stun & CC Immunity: Getters return 0/false, Setters discard all incoming stun debuffs ──
+  get electricStunTimer() { return 0; }
+  set electricStunTimer(_) {}
+
+  get hitStunTimer() { return 0; }
+  set hitStunTimer(_) {}
+
+  get paralyzeTimer() { return 0; }
+  set paralyzeTimer(_) {}
+
+  get stunTimer() { return 0; }
+  set stunTimer(_) {}
+
+  get knockbackStunTimer() { return 0; }
+  set knockbackStunTimer(_) {}
+
+  get basicAttackHitPauseTimer() { return 0; }
+  set basicAttackHitPauseTimer(_) {}
+
+  get staticDebuffTimer() { return 0; }
+  set staticDebuffTimer(_) {}
+
+  get thunderRootsTimer() { return 0; }
+  set thunderRootsTimer(_) {}
+
+  get crimsonElectrifiedTimer() { return 0; }
+  set crimsonElectrifiedTimer(_) {}
+
+  get dubstepStunTimer() { return 0; }
+  set dubstepStunTimer(_) {}
+
+  get dubstepStunVisualTimer() { return 0; }
+  set dubstepStunVisualTimer(_) {}
+
+  get freezeTimer() { return 0; }
+  set freezeTimer(_) {}
+
+  get isParalyzed() { return false; }
+  set isParalyzed(_) {}
+
+  get isParalyzedByMahito() { return false; }
+  set isParalyzedByMahito(_) {}
+
+  get isParalyzedByMahoraga() { return false; }
+  set isParalyzedByMahoraga(_) {}
+
+  get slowTimer() { return 0; }
+  set slowTimer(_) {}
+
+  get slowMultiplier() { return 1.0; }
+  set slowMultiplier(_) {}
+
   /**
    * Super Armor / Solar Poise: Immune to all pushback / knockback attacks from enemies
    */
   applyKnockback(vx, vy, stunFrames = 0) {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
-    // Escanor is completely immune to any pull/push back mechanics coming from enemies
     return;
   }
 
@@ -408,13 +534,58 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
-   * Super Armor: Immune to hit-stun / flinch interruptions while lifting weapon
+   * Solar Poise: Complete immunity to all hit-stun / flinch effects
    */
   applyHitStun(duration, opts = {}) {
-    if (this.isLiftingWeapon() || (this.chopHitPauseTimer || 0) > 0) {
-      return; // Unwavering solar poise
+    return;
+  }
+
+  /**
+   * Solar Poise: Complete immunity to all paralyze effects
+   */
+  applyParalyze(frames, opts = {}) {
+    return;
+  }
+
+  /**
+   * Solar Poise: Complete immunity to all generic stun effects
+   */
+  applyStun(frames, opts = {}) {
+    return;
+  }
+
+  /**
+   * Solar Poise: Complete immunity to all electric stun effects
+   */
+  applyElectricStun(frames, opts = {}) {
+    return;
+  }
+
+  /**
+   * Solar Poise: Attack effects, weapon lifts, and swings are never suppressed by stuns or damage
+   */
+  areAttackEffectsSuppressed() {
+    if (this.hp <= 0 || this.dead || this.isDead) return true;
+    if (this.isTargetOfAmbush) return true;
+    return false;
+  }
+
+  /**
+   * Solar Poise: Immune to attack hit-pause and projectile time-stops
+   */
+  applyTimeStop(duration, opts = {}) {
+    const isDomainStasis = Boolean(opts && (opts.isDomain || opts.isGojoDomain));
+    if (!isDomainStasis) {
+      return; // Ignore minor attack hit-pause
     }
-    super.applyHitStun(duration, opts);
+    super.applyTimeStop(duration, opts);
+  }
+
+  /**
+   * Solar Poise: Enforces zero stun/paralyze/hit-pause timers before evaluating time-stop
+   */
+  _handleTimeStop() {
+    return super._handleTimeStop();
   }
 
   /**
@@ -491,6 +662,76 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
+   * Centralized Movement & Physics (Rule 1.2):
+   * Escanor marches steadily with Unshakable Solar Poise.
+   * Tracks and preserves movement heading without random direction re-rolls upon taking damage or zeroing velocity.
+   */
+  applyMovementPhysics(extraMultiplier = 1) {
+    let targetSpeed = this.speed;
+    if (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) {
+      targetSpeed = 0;
+    }
+    if (this.blackFlashTimer > 0) {
+      targetSpeed *= (CONFIG.blackFlash?.zone?.speedMultiplier ?? 1.20);
+    }
+    if (this.speedMultiplier !== undefined && this.speedMultiplier !== 1) {
+      targetSpeed *= this.speedMultiplier;
+    }
+    if (this.bushSpeedMultiplier !== undefined && this.bushSpeedMultiplier !== 1) {
+      targetSpeed *= this.bushSpeedMultiplier;
+    }
+    if (this.slowTimer > 0) {
+      this.slowTimer--;
+      targetSpeed *= this.slowMultiplier;
+      if (this.slowTimer <= 0) {
+        this.slowMultiplier = 1.0;
+      }
+    }
+    targetSpeed *= extraMultiplier;
+
+    const isStationaryState = Boolean(
+      this.isChannelingCruelSun ||
+      (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0) ||
+      (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)
+    );
+
+    if (isStationaryState) {
+      this.vx = 0;
+      this.vy = 0;
+      return;
+    }
+
+    let currentSpeed = Math.hypot(this.vx, this.vy);
+
+    // Track active travel heading whenever moving
+    if (currentSpeed >= 0.2) {
+      this._lastMoveAngle = Math.atan2(this.vy, this.vx);
+    } else if (targetSpeed > 0) {
+      // Restore movement along existing heading without random angle re-rolls
+      const moveAngle = (this._lastMoveAngle !== undefined)
+        ? this._lastMoveAngle
+        : ((this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0));
+      this.vx = Math.cos(moveAngle) * targetSpeed;
+      this.vy = Math.sin(moveAngle) * targetSpeed;
+      currentSpeed = targetSpeed;
+    }
+
+    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
+      const recoveryRate = currentSpeed < targetSpeed ? 0.30 : 0.08;
+      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * recoveryRate;
+      this.vx = (this.vx / currentSpeed) * newSpeed;
+      this.vy = (this.vy / currentSpeed) * newSpeed;
+    }
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    const defaultSpinRate = CONFIG.spin?.rate ?? 0.06;
+    const spinRate = this._def?.spinRate ?? defaultSpinRate;
+    this.angle += this.speed * spinRate;
+  }
+
+  /**
    * Solar Armor & Holy Knight DEF Damage Mitigation
    */
   takeDamage(amount, attacker, opts = {}) {
@@ -527,7 +768,31 @@ export class EscanorFighter extends Fighter {
       }
     }
 
-    return super.takeDamage(finalAmount, attacker, opts);
+    // Unyielding Solar Poise: preserve travel velocity across damage events
+    const prevVx = this.vx;
+    const prevVy = this.vy;
+
+    const damageOpts = {
+      ...opts,
+      skipInterrupt: true,
+      skipKnockback: true,
+      skipHitStun: true
+    };
+    const res = super.takeDamage(finalAmount, attacker, damageOpts);
+
+    const isStationaryState = Boolean(
+      this.isChannelingCruelSun ||
+      (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0) ||
+      (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)
+    );
+    if (!isStationaryState && Math.hypot(prevVx, prevVy) > 0.05) {
+      this.vx = prevVx;
+      this.vy = prevVy;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+    }
+
+    return res;
   }
 
   /**
@@ -536,11 +801,6 @@ export class EscanorFighter extends Fighter {
   applyBurn(attacker, duration) {
     this.burnTimer = 0;
     this.burnDamageTimer = 0;
-  }
-
-  canPerformBasicAttack() {
-    if ((this.chopHitPauseTimer || 0) > 0 || (this.slashSwingTimer || 0) > 0) return false;
-    return super.canPerformBasicAttack();
   }
 
   /**
@@ -579,11 +839,22 @@ export class EscanorFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
 
+    // Clear all stun, paralyze, electric stun, and hit-pause timers
+    this.hitStunTimer = 0;
+    this.paralyzeTimer = 0;
+    this.stunTimer = 0;
+    this.electricStunTimer = 0;
+    this.basicAttackHitPauseTimer = 0;
+    this.staticDebuffTimer = 0;
+    this.thunderRootsTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this.dubstepStunTimer = 0;
+
     // 1. Rule 1 Freeze / TimeStop Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
       const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-      if (!isNanamiPausing && !this.isChannelingCruelSun && !this.isChannelingDivineSword && !this.cruelSunCharging) {
+      if (!isNanamiPausing && !this.isChannelingCruelSun && !this.isChannelingDivineSword && !this.cruelSunCharging && !this.isLiftingWeapon() && (this.slashSwingTimer || 0) <= 0) {
         this.interruptAttacks();
       }
       return;
@@ -678,6 +949,98 @@ export class EscanorFighter extends Fighter {
       return; // Freeze Escanor's actions during the hit-pause!
     }
 
+    // ── Cruel Sun Channeling Animation (Finger Point -> Expanding Sun -> Projectile Launch) ──
+    if (this.isChannelingCruelSun) {
+      this.cruelSunChargeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Face directly towards player/camera (angle 0)
+      this.gunAngle = 0;
+      this.angle = 0;
+
+      // Continuous Aim Tracking: Dynamically track nearest target during channeling
+      const target = this.getNearestTarget(opponent);
+      if (target) {
+        this.aim(target);
+      }
+
+      const maxWindup = this.cruelSunMaxChargeTimer || 45;
+      const progress = 1.0 - (this.cruelSunChargeTimer / maxWindup);
+
+      // Play Escanor-weapon-lift.mp3 SFX as finger lowers to point at enemy before release
+      if (progress >= 0.75 && !this._cruelSunSnapSfxPlayed) {
+        this._cruelSunSnapSfxPlayed = true;
+        try {
+          const pointSnd = cfg.sounds?.cruelSunPoint || cfg.sounds?.weaponLift || 'Assets/Sound Effects/SkillEffects/Escanor-weapon-lift.mp3';
+          const pointVol = cfg.soundVolumes?.cruelSunPoint !== undefined ? cfg.soundVolumes.cruelSunPoint : (cfg.soundVolumes?.weaponLift !== undefined ? cfg.soundVolumes.weaponLift : 1.0);
+          audioSystem.playSFX(pointSnd, pointVol);
+        } catch (e) {}
+      }
+
+      // Update active Cruel Suns in flight
+      this._updateCruelSuns(arena);
+
+      // Keep Cruel Sun cooldown strictly locked at maximum throughout channeling (zero cooldown ticking while charging)
+      this.cruelSunCooldown = this.cruelSunCooldownMax;
+
+      // Decrement remaining skill cooldowns during channeling
+      if (this.prideFlareCooldown > 0) this.prideFlareCooldown--;
+      if (this.theOneCooldown > 0 && !this.isTheOneActive) this.theOneCooldown--;
+      if (this.isTheOneActive) {
+        this.theOneTimer--;
+        if (this.theOneTimer <= 0) {
+          this.isTheOneActive = false;
+          this.theOneCooldown = this.theOneCooldownMax;
+        }
+      }
+
+      if (this.cruelSunChargeTimer <= 0) {
+        this._releaseCruelSun();
+      }
+
+      this.applyMovementPhysics(0);
+      return;
+    }
+
+    // ── Cruel Sun Post-Throw Recovery Delay (Stay 3 Seconds Stationary -> Push Backwards -> Free Control) ──
+    if (this.cruelSunRecoveryTimer > 0) {
+      this.cruelSunRecoveryTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Face directly towards player/camera (angle 0) during the 3-second stay
+      this.gunAngle = 0;
+      this.angle = 0;
+
+      // When the 3-second stay finishes (timer hits 0): Escanor moves backwards!
+      if (this.cruelSunRecoveryTimer === 0) {
+        const castAngle = (this.cruelSunCastAngle !== undefined) ? this.cruelSunCastAngle : (this.cruelSunReleaseAngle || 0);
+        const recoilForce = cfg.cruelSunRecoilForce || 8.0;
+        this.vx = -Math.cos(castAngle) * recoilForce;
+        this.vy = -Math.sin(castAngle) * recoilForce;
+      }
+
+      // Update active Cruel Suns in flight
+      this._updateCruelSuns(arena);
+
+      // Decrement skill cooldowns during post-throw recovery
+      if (this.cruelSunCooldown > 0) this.cruelSunCooldown--;
+      if (this.prideFlareCooldown > 0) this.prideFlareCooldown--;
+      if (this.theOneCooldown > 0 && !this.isTheOneActive) this.theOneCooldown--;
+      if (this.isTheOneActive) {
+        this.theOneTimer--;
+        if (this.theOneTimer <= 0) {
+          this.isTheOneActive = false;
+          this.theOneCooldown = this.theOneCooldownMax;
+        }
+      }
+
+      this.applyMovementPhysics(0);
+      return;
+    }
+
+
     // Super Armor / Solar Poise: Zero out and negate any incoming knockback, pull, or wall-pin states
     this.knockbackVx = 0;
     this.knockbackVy = 0;
@@ -694,6 +1057,14 @@ export class EscanorFighter extends Fighter {
     this.preventKnockbackBounce = false;
     this.burnTimer = 0;
     this.burnDamageTimer = 0;
+    this.hitStunTimer = 0;
+    this.paralyzeTimer = 0;
+    this.stunTimer = 0;
+    this.electricStunTimer = 0;
+
+    if (Math.hypot(this.vx, this.vy) >= 0.2 && !this.isChannelingCruelSun && (this.slashSwingTimer || 0) <= 0) {
+      this._lastMoveAngle = Math.atan2(this.vy, this.vx);
+    }
 
     // Centralized Movement & Physics (Rule 1.1)
     super.update(opponent, ownerIndex, arena);
@@ -716,7 +1087,6 @@ export class EscanorFighter extends Fighter {
 
     // Cleaver / Axe Swing Timer & Downward Chop Hit Delivery
     if (this.slashSwingTimer > 0) {
-      this.slashSwingTimer--;
       const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 24);
       const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.escanor?.chopStrikeFrames || 15);
       
@@ -791,8 +1161,8 @@ export class EscanorFighter extends Fighter {
     if (this.prideFlareActiveTimer > 0) this.prideFlareActiveTimer--;
     if (this.divineSwordActiveTimer > 0) this.divineSwordActiveTimer--;
 
-    // Skill Cooldowns
-    if (this.cruelSunCooldown > 0) this.cruelSunCooldown--;
+    // Skill Cooldowns (Cruel Sun cooldown only ticks down when not actively channeling)
+    if (!this.isChannelingCruelSun && this.cruelSunCooldown > 0) this.cruelSunCooldown--;
     if (this.prideFlareCooldown > 0) this.prideFlareCooldown--;
     if (this.theOneCooldown > 0 && !this.isTheOneActive) this.theOneCooldown--;
 
@@ -834,33 +1204,34 @@ export class EscanorFighter extends Fighter {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
     // 1. Try Ultimate: "THE ONE" (Toggle: enableTheOne)
-    if (Boolean(cfg.enableTheOne ?? true) && this.theOneCooldown <= 0 && !this.isTheOneActive && (dist < 180 || this.hp < this.maxHp * 0.65)) {
+    const isLiftingWeapon = this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0);
+    if (Boolean(cfg.enableTheOne ?? true) && this.theOneCooldown <= 0 && !this.isTheOneActive && !this.isCruelSunActive() && !isLiftingWeapon && (dist < 180 || this.hp < this.maxHp * 0.65)) {
       this._activateTheOne();
       return;
     }
 
     // 2. Try Divine Sword Escanor during "The One" (Toggle: enableTheOne)
     const finisherReach = (this.r || 25) + this.currentFinisherReach;
-    if (Boolean(cfg.enableTheOne ?? true) && this.isTheOneActive && !this.theOneFinisherUsed && dist <= (finisherReach + (target.r || 25))) {
+    if (Boolean(cfg.enableTheOne ?? true) && this.isTheOneActive && !this.theOneFinisherUsed && !this.isCruelSunActive() && !isLiftingWeapon && dist <= (finisherReach + (target.r || 25))) {
       this._executeDivineSwordEscanor(target);
       return;
     }
 
     // 3. Try Skill 1: Cruel Sun (Toggle: enableCruelSun)
-    if (Boolean(cfg.enableCruelSun ?? true) && this.cruelSunCooldown <= 0 && dist > 70 && dist < 280) {
+    if (Boolean(cfg.enableCruelSun ?? true) && this.cruelSunCooldown <= 0 && !this.isCruelSunActive() && !isLiftingWeapon && dist > 70 && dist < 280) {
       this._castCruelSun(target);
       return;
     }
 
     // 4. Try Skill 2: Pride Flare (Toggle: enablePrideFlare)
-    if (Boolean(cfg.enablePrideFlare ?? true) && this.prideFlareCooldown <= 0 && (dist < 110 || this.activeCruelSuns.length > 0)) {
+    if (Boolean(cfg.enablePrideFlare ?? true) && this.prideFlareCooldown <= 0 && !this.isCruelSunActive() && !isLiftingWeapon && (dist < 110 || this.activeCruelSuns.length > 0)) {
       this._castPrideFlare();
       return;
     }
 
     // 5. Basic Attack: Divine Axe Rhitta Chop (Windup overhead lift -> downward chop strike)
     const reach = (this.r || 25) + this.currentRhittaReach + (target.r || 25);
-    if (this.shootCooldown <= 0 && this.slashSwingTimer <= 0 && dist <= reach) {
+    if (this.shootCooldown <= 0 && this.slashSwingTimer <= 0 && !this.isCruelSunActive() && dist <= reach) {
       this._startRhittaChop(target);
     }
   }
@@ -1077,7 +1448,7 @@ export class EscanorFighter extends Fighter {
       const impactDur = cfg.basicImpactShakeDuration || 12;
       triggerGlobalScreenShake(impactShake, impactDur);
 
-      if (this.prideStacks < this.prideMaxStacks) {
+      if (Boolean(cfg.enableSunshine ?? true) && this.prideStacks < this.prideMaxStacks) {
         this.prideStacks++;
       }
 
@@ -1163,28 +1534,105 @@ export class EscanorFighter extends Fighter {
 
   /**
    * Skill 1: Cruel Sun (無慈悲な太陽)
+   * Phase 1 & 2: Channeling Windup (Raises gauntlet, points finger skyward, sun expands above him)
    */
   _castCruelSun(target) {
+    if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     this.cruelSunCooldown = this.cruelSunCooldownMax;
-    this.aim(target);
 
-    const angle = this.gunAngle || 0;
-    const speed = CONFIG.escanor?.cruelSunSpeed || 9.5;
-    const spawnDist = this.r + 20;
+    if (target) {
+      const targetZ = target.z || 0;
+      const myZ = this.z || 0;
+      this.cruelSunCastAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
+    } else {
+      this.cruelSunCastAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
+    }
+
+    // Body faces forward towards user/camera (angle 0) during channeling
+    this.gunAngle = 0;
+    this.angle = 0;
+
+    const windupFrames = cfg.cruelSunCastWindupFrames || 45;
+    this.cruelSunChargeTimer = windupFrames;
+    this.cruelSunMaxChargeTimer = windupFrames;
+    this.isChannelingCruelSun = true;
+    this._cruelSunSnapSfxPlayed = false;
+    this.vx = 0;
+    this.vy = 0;
+
+    spawnFloatingText(this.x, this.y - 30, 'CRUEL SUN...', '#F59E0B');
+
+    try {
+      const chargeSnd = cfg.sounds?.cruelSunCharge || 'Assets/Sound Effects/Attacks/flamespray1.mp3';
+      const chargeVol = cfg.soundVolumes?.cruelSunCharge !== undefined ? cfg.soundVolumes.cruelSunCharge : 0.8;
+      audioSystem.playSFX(chargeSnd, chargeVol);
+    } catch (e) {}
+  }
+
+  /**
+   * Phase 3: Releases fully expanded Cruel Sun projectile towards the committed target angle
+   */
+  _releaseCruelSun() {
+    this.isChannelingCruelSun = false;
+    this.cruelSunChargeTimer = 0;
+    this.cruelSunCooldown = this.cruelSunCooldownMax; // Cooldown timer initiates fresh upon throw
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+
+    const angle = (this.cruelSunCastAngle !== undefined) ? this.cruelSunCastAngle : 0;
+    this.cruelSunReleaseAngle = angle;
+    this.gunAngle = 0;
+    this.angle = 0;
+
+    // 3-second post-throw stationary stay (180 frames = 3.0s at 60fps)
+    const postThrowFrames = Number.isFinite(Number(cfg.cruelSunRecoveryFrames))
+      ? Number(cfg.cruelSunRecoveryFrames)
+      : (Number.isFinite(Number(cfg.cruelSunPostThrowDelayFrames)) ? Number(cfg.cruelSunPostThrowDelayFrames) : 180);
+    this.cruelSunRecoveryTimer = postThrowFrames;
+    this.cruelSunMaxRecoveryTimer = postThrowFrames;
+
+    // Stay completely still for the 3 seconds (recoil impulse triggers after 3s)
+    this.vx = 0;
+    this.vy = 0;
+
+    const speed = cfg.cruelSunSpeed || 6.0;
+    const orbR = Number.isFinite(Number(cfg.cruelSunMaxExpandRadius))
+      ? Number(cfg.cruelSunMaxExpandRadius)
+      : (Number.isFinite(Number(cfg.cruelSunOrbRadius)) ? Number(cfg.cruelSunOrbRadius) : 48);
+    const handR = Math.max(this.r * 0.30, 7.0);
+    const fingerLen = Math.round(handR * 1.35);
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    const signX = facingLeft ? -1 : 1;
+    const spawnX = this.x + signX * (this.r * 0.90);
+    const spawnY = this.y - (this.r * 0.38) - fingerLen - orbR - 6;
+
+    const cruelLife = Number.isFinite(Number(cfg.cruelSunLife)) ? Number(cfg.cruelSunLife) : 220;
 
     const sunOrb = {
-      x: this.x + Math.cos(angle) * spawnDist,
-      y: this.y + Math.sin(angle) * spawnDist,
+      x: spawnX,
+      y: spawnY,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      r: CONFIG.escanor?.cruelSunOrbRadius || 18,
-      life: 90,
-      maxLife: 90,
-      damage: (CONFIG.escanor?.cruelSunDamage || 65) * (this.isTheOneActive ? 1.4 : 1.0),
-      aoeRadius: CONFIG.escanor?.cruelSunAoeRadius || 80,
-      aoeDamage: (CONFIG.escanor?.cruelSunAoeDamage || 38) * (this.isTheOneActive ? 1.4 : 1.0),
-      owner: this
+      r: orbR,
+      life: cruelLife,
+      maxLife: cruelLife,
+      damage: (cfg.cruelSunDamage || 100) * (this.isTheOneActive ? 1.4 : 1.0),
+      dps: (cfg.cruelSunDPS || 40) * (this.isTheOneActive ? 1.4 : 1.0),
+      aoeRadius: cfg.cruelSunAoeRadius || 160,
+      aoeDamage: (cfg.cruelSunAoeDamage || 65) * (this.isTheOneActive ? 1.4 : 1.0),
+      owner: this,
+      history: [],
+      historyMax: 16,
+      lastDPSTick: 0
     };
+
+    // Clamp spawn position strictly within arena bounds to prevent immediate wall clipping
+    const currentArena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    if (currentArena && currentArena.width && currentArena.height) {
+      const margin = orbR * 0.5;
+      sunOrb.x = Math.max(currentArena.x + margin, Math.min(currentArena.x + currentArena.width - margin, sunOrb.x));
+      sunOrb.y = Math.max(currentArena.y + margin, Math.min(currentArena.y + currentArena.height - margin, sunOrb.y));
+    }
 
     this.activeCruelSuns.push(sunOrb);
     spawnFloatingText(this.x, this.y - 30, 'CRUEL SUN!', '#F59E0B');
@@ -1197,32 +1645,294 @@ export class EscanorFighter extends Fighter {
   }
 
   /**
-   * Updates Cruel Sun projectiles and checks collision
+   * Updates Cruel Sun projectiles (piercing flight, gravitational drag, continuous DPS, wall impact & detonation)
    */
   _updateCruelSuns(arena) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    const validTargets = this._getAllValidEnemyTargets();
+
     for (let i = this.activeCruelSuns.length - 1; i >= 0; i--) {
       const sun = this.activeCruelSuns[i];
-      sun.x += sun.vx;
-      sun.y += sun.vy;
-      sun.life--;
+      const effectiveRadius = sun.r || (Number.isFinite(Number(cfg.cruelSunMaxExpandRadius))
+        ? Number(cfg.cruelSunMaxExpandRadius)
+        : (Number.isFinite(Number(cfg.cruelSunOrbRadius)) ? Number(cfg.cruelSunOrbRadius) : 48));
+      const pullRadius = Math.max(cfg.cruelSunPullRadius || 150, effectiveRadius * 2.5);
+      const pullForce = cfg.cruelSunPullForce || 18.0;
+      const trapRadius = effectiveRadius + 20;
 
-      let shouldExplode = (sun.life <= 0);
+      // Record flight history for flame trail rendering
+      if (!sun.history) sun.history = [];
+      sun.history.push({ x: sun.x, y: sun.y });
+      if (sun.history.length > (sun.historyMax || 16)) {
+        sun.history.shift();
+      }
 
-      // Arena boundary collision
-      if (arena) {
-        if (sun.x - sun.r <= arena.x || sun.x + sun.r >= arena.x + arena.width ||
-            sun.y - sun.r <= arena.y || sun.y + sun.r >= arena.y + arena.height) {
-          shouldExplode = true;
+      // 1. Destroy incoming enemy projectiles touching the sun (solar vaporization, like Gojo's Purple)
+      if (typeof projectileSystem !== 'undefined' && projectileSystem?.projectiles) {
+        for (let j = 0; j < projectileSystem.projectiles.length; j++) {
+          const p = projectileSystem.projectiles[j];
+          if (!p || p.life <= 0 || p.isVisual) continue;
+          if (p.ownerFighter === this || p.owner === this || (this.ownerIndex !== undefined && p.owner === this.ownerIndex)) continue;
+          if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.behaviorType === 'yuta_pure_love_beam') continue;
+          const pdx = sun.x - p.x;
+          const pdy = sun.y - p.y;
+          if (pdx * pdx + pdy * pdy <= (effectiveRadius + (p.r || 10)) * (effectiveRadius + (p.r || 10))) {
+            p.life = 0;
+            spawnSparks(p.x, p.y, 4, 'fireSparks', '#F59E0B');
+          }
         }
       }
 
-      // Check hit with enemy targets (Rule 6: Check fighters & illusions)
-      const validTargets = this._getAllValidEnemyTargets();
+      // 2. Flight Movement & Arena Boundary Interaction
+      if (!sun.isAtWall) {
+        sun.x += sun.vx;
+        sun.y += sun.vy;
+      }
+      sun.life--;
+      const shouldExplode = (sun.life <= 0);
+
+      // Arena boundary collision:
+      // Stops forward movement (vx = 0, vy = 0), persists at the wall for full duration
+      let isAtWall = Boolean(sun.isAtWall);
+      if (arena) {
+        const halfR = (sun.r || 48) / 2;
+        if (arena.shape === 'circle') {
+          const cx = arena.x + arena.width / 2;
+          const cy = arena.y + arena.height / 2;
+          const ar = arena.radius || (arena.width / 2);
+          const d = Math.hypot(sun.x - cx, sun.y - cy);
+          if (d + halfR >= ar && d > 0) {
+            const nx = (sun.x - cx) / d;
+            const ny = (sun.y - cy) / d;
+            sun.x = cx + nx * (ar - halfR);
+            sun.y = cy + ny * (ar - halfR);
+            isAtWall = true;
+          }
+        } else {
+          if (sun.x - halfR <= arena.x) {
+            sun.x = arena.x + halfR;
+            isAtWall = true;
+          } else if (sun.x + halfR >= arena.x + arena.width) {
+            sun.x = arena.x + arena.width - halfR;
+            isAtWall = true;
+          }
+          if (sun.y - halfR <= arena.y) {
+            sun.y = arena.y + halfR;
+            isAtWall = true;
+          } else if (sun.y + halfR >= arena.y + arena.height) {
+            sun.y = arena.y + arena.height - halfR;
+            isAtWall = true;
+          }
+        }
+
+        if (isAtWall) {
+          sun.isAtWall = true;
+          sun.vx = 0;
+          sun.vy = 0;
+
+          // Arena shake every 1 second (60 frames) while the Sun collides/presses against the wall (not during traveling)
+          sun.wallShakeTimer = (sun.wallShakeTimer || 0) + 1;
+          if (sun.wallShakeTimer % 60 === 1) {
+            triggerGlobalScreenShake(7.0, 14);
+            spawnImpactFlash(sun.x, sun.y, '#F59E0B', (sun.r || 48) * 1.3);
+            spawnSparks(sun.x, sun.y, 8, 'fireSparks', '#FEF08A');
+          }
+        } else {
+          sun.wallShakeTimer = 0;
+        }
+      }
+
+      // 3. Enemy Interaction: Mid-Flight Drag vs At-Wall Slow + Burn (No Pulling at Wall)
+      const slowMult = cfg.cruelSunSlowMultiplier || 0.20;
+
       for (const tgt of validTargets) {
-        const d = Math.hypot(tgt.x - sun.x, tgt.y - sun.y);
-        if (d <= sun.r + (tgt.r || 25)) {
-          shouldExplode = true;
-          break;
+        if (!tgt || tgt.hp <= 0) continue;
+        const dx = sun.x - tgt.x;
+        const dy = sun.y - tgt.y;
+        const dist = Math.hypot(dx, dy);
+
+        // Check if target is at or near arena boundary
+        let targetAtWall = false;
+        if (arena) {
+          const tr = tgt.r || 25;
+          if (arena.shape === 'circle') {
+            const cx = arena.x + arena.width / 2;
+            const cy = arena.y + arena.height / 2;
+            const ar = arena.radius || (arena.width / 2);
+            if (Math.hypot(tgt.x - cx, tgt.y - cy) + tr >= ar - 4) {
+              targetAtWall = true;
+            }
+          } else {
+            if (tgt.x - tr <= arena.x + 4 || tgt.x + tr >= arena.x + arena.width - 4 ||
+                tgt.y - tr <= arena.y + 4 || tgt.y + tr >= arena.y + arena.height - 4) {
+              targetAtWall = true;
+            }
+          }
+        }
+
+        if (sun.isAtWall || targetAtWall) {
+          // ── AT-WALL STATE: Apply 1-second stun upon wall impact, remove drag, apply slow & burn ──
+          tgt.isWallPinnedByEscanor = false;
+          if (tgt.wallPinTimer) tgt.wallPinTimer = 0;
+
+          // 1-Second Wall Collision Stun — ONLY for enemies actively dragged into the wall by the sun
+          if (tgt._draggedByCruelSun && !tgt._cruelSunWallStunApplied) {
+            tgt._draggedByCruelSun = false;
+            tgt._cruelSunWallStunApplied = true;
+
+            const stunDuration = cfg.cruelSunWallStunDuration || 60; // 1.0 second stun (60 frames)
+            if (typeof tgt.applyHitStun === 'function') {
+              tgt.applyHitStun(stunDuration, { isCruelSun: true });
+            }
+            if (typeof tgt.applyParalyze === 'function') {
+              tgt.applyParalyze(stunDuration, { isCruelSun: true });
+            }
+            tgt.hitStunTimer = Math.max(tgt.hitStunTimer || 0, stunDuration);
+            tgt.paralyzeTimer = Math.max(tgt.paralyzeTimer || 0, stunDuration);
+
+            // Interrupt any active actions/skills
+            if (typeof tgt.interruptAttacks === 'function') {
+              tgt.interruptAttacks(true);
+            }
+
+            // Zero out momentum
+            tgt.vx = 0;
+            tgt.vy = 0;
+            tgt.knockbackVx = 0;
+            tgt.knockbackVy = 0;
+
+            // Visual impact, floating text & concussive impact audio
+            spawnFloatingText(tgt.x, tgt.y - (tgt.r || 25) - 12, 'STUNNED!', '#F59E0B');
+            spawnSparks(tgt.x, tgt.y, 12, 'fireSparks', '#FEF08A');
+            triggerGlobalScreenShake(8.0, 16);
+            try {
+              audioSystem.playSFX('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.85);
+            } catch (e) {}
+          }
+
+          if (dist <= trapRadius) {
+            // Apply slow movement (entity can move after stun, but remains slowed in solar radius)
+            if (typeof tgt.applySlow === 'function') {
+              tgt.applySlow(30, slowMult, { isCruelSun: true });
+            } else {
+              tgt.slowTimer = Math.max(tgt.slowTimer || 0, 30);
+              tgt.slowMultiplier = Math.min(tgt.slowMultiplier || 1.0, slowMult);
+            }
+
+            // Apply burn effect
+            if (typeof tgt.applyBurn === 'function') {
+              tgt.applyBurn(this);
+            } else {
+              tgt.burnTimer = Math.max(tgt.burnTimer || 0, 180);
+              tgt.burnDamageTimer = 0;
+              tgt.lastBurnAttacker = this;
+            }
+
+            if (Math.random() < 0.35) {
+              spawnSparks(tgt.x, tgt.y, 2, 'fireSparks', '#F59E0B');
+            }
+          }
+        } else {
+          // ── MID-FLIGHT STATE: First contact drags along with sun's travel ──
+          if (dist < trapRadius) {
+            tgt._draggedByCruelSun = true;
+            tgt._cruelSunWallStunApplied = false;
+
+            // Heavy slow & carried forward along sun's velocity and centered into core
+            if (typeof tgt.applySlow === 'function') {
+              tgt.applySlow(30, slowMult, { isCruelSun: true });
+            } else {
+              tgt.slowTimer = Math.max(tgt.slowTimer || 0, 30);
+              tgt.slowMultiplier = Math.min(tgt.slowMultiplier || 1.0, slowMult);
+            }
+
+            const travelSpeed = Math.hypot(sun.vx, sun.vy);
+            if (travelSpeed > 0.05) {
+              const dirTravelX = sun.vx / travelSpeed;
+              const dirTravelY = sun.vy / travelSpeed;
+              const alongTravel = dx * dirTravelX + dy * dirTravelY;
+              const perpX = dx - alongTravel * dirTravelX;
+              const perpY = dy - alongTravel * dirTravelY;
+              const perpDist = Math.hypot(perpX, perpY);
+
+              const lateralPull = perpDist > 1 ? Math.min(perpDist, pullForce * 0.35) : 0;
+              const lateralDirX = perpDist > 1 ? perpX / perpDist : 0;
+              const lateralDirY = perpDist > 1 ? perpY / perpDist : 0;
+
+              const forwardCarryX = sun.vx * 0.90 + Math.max(0, alongTravel) * 0.20 * dirTravelX;
+              const forwardCarryY = sun.vy * 0.90 + Math.max(0, alongTravel) * 0.20 * dirTravelY;
+
+              tgt.x += forwardCarryX + lateralDirX * lateralPull;
+              tgt.y += forwardCarryY + lateralDirY * lateralPull;
+              tgt.vx = sun.vx * 0.6;
+              tgt.vy = sun.vy * 0.6;
+            } else {
+              tgt.x = sun.x;
+              tgt.y = sun.y;
+              tgt.vx = 0;
+              tgt.vy = 0;
+            }
+          } else if (dist < pullRadius) {
+            // Outer convection heat suction
+            const falloff = 1.0 - (dist - trapRadius) / (pullRadius - trapRadius);
+            const outerPull = pullForce * 0.35 * Math.pow(falloff, 0.8);
+            const dirX = dx / dist;
+            const dirY = dy / dist;
+
+            if (typeof tgt.applySlow === 'function') {
+              tgt.applySlow(15, 0.50, { isCruelSun: true });
+            }
+            tgt.x += dirX * outerPull + sun.vx * 0.35 * falloff;
+            tgt.y += dirY * outerPull + sun.vy * 0.35 * falloff;
+          }
+
+          // Clamp target strictly within arena bounds after displacement
+          if (arena) {
+            const tr = tgt.r || 25;
+            tgt.x = Math.max(arena.x + tr, Math.min(arena.x + arena.width - tr, tgt.x));
+            tgt.y = Math.max(arena.y + tr, Math.min(arena.y + arena.height - tr, tgt.y));
+          }
+        }
+      }
+
+      // 4. Piercing Continuous DPS & Burn Ticks (Every 10 frames, like Gojo's Purple)
+      sun.lastDPSTick = (sun.lastDPSTick || 0) + 1;
+      const dpsInterval = cfg.cruelSunDPSInterval || 10;
+      if (sun.lastDPSTick >= dpsInterval) {
+        sun.lastDPSTick = 0;
+        const tickDmg = (sun.dps || 40) * (dpsInterval / 60);
+        const dmgRadiusSq = (effectiveRadius + 25) * (effectiveRadius + 25);
+        let hasDamagedAny = false;
+
+        for (const tgt of validTargets) {
+          if (!tgt || tgt.hp <= 0) continue;
+          const dx = tgt.x - sun.x;
+          const dy = tgt.y - sun.y;
+          if (dx * dx + dy * dy <= dmgRadiusSq) {
+            hasDamagedAny = true;
+            applyDamageToTarget(tgt, tickDmg, this, {
+              isFlame: true,
+              isBurn: true,
+              isContinuous: true,
+              isCruelSunDPS: true
+            });
+            if (typeof tgt.applyBurn === 'function') {
+              tgt.applyBurn(this);
+            } else {
+              tgt.burnTimer = Math.max(tgt.burnTimer || 0, 180);
+              tgt.burnDamageTimer = 0;
+              tgt.lastBurnAttacker = this;
+            }
+            spawnSparks(tgt.x, tgt.y, 4, 'fireSparks', '#F59E0B');
+          }
+        }
+
+        // Arena screen shake + hit SFX triggered per damage tick!
+        if (hasDamagedAny) {
+          const tickShake = (cfg.cruelSunTickShake || 4.0) * (this.isTheOneActive ? 1.35 : 1.0);
+          const tickShakeDur = cfg.cruelSunTickShakeDuration || 6;
+          triggerGlobalScreenShake(tickShake, tickShakeDur);
+          audioSystem.playSFX('attack_fleshhit', 0.6);
         }
       }
 
@@ -1237,33 +1947,35 @@ export class EscanorFighter extends Fighter {
    * Detonates Cruel Sun in a massive AOE explosion
    */
   _detonateCruelSun(sun) {
-    spawnImpactFlash(sun.x, sun.y, '#F59E0B', sun.aoeRadius);
-    spawnSparks(sun.x, sun.y, '#FEF08A', 24);
-    triggerGlobalScreenShake(10, 16);
+    const aoeRadius = sun.aoeRadius || CONFIG.escanor?.cruelSunAoeRadius || 160;
+    spawnImpactFlash(sun.x, sun.y, '#F59E0B', aoeRadius);
+    spawnSparks(sun.x, sun.y, '#FEF08A', 28);
+    triggerGlobalScreenShake(14, 20);
 
     const validTargets = this._getAllValidEnemyTargets();
     for (const tgt of validTargets) {
+      tgt._draggedByCruelSun = false;
+      tgt._cruelSunWallStunApplied = false;
       const d = Math.hypot(tgt.x - sun.x, tgt.y - sun.y);
-      if (d <= sun.aoeRadius + (tgt.r || 25)) {
-        const isDirect = (d <= sun.r + (tgt.r || 25));
-        const dmg = isDirect ? sun.damage : sun.aoeDamage;
+      if (d <= aoeRadius + (tgt.r || 25)) {
+        const isDirect = (d <= (sun.r || 48) + (tgt.r || 25));
+        const dmg = isDirect ? (sun.damage || 100) : (sun.aoeDamage || 65);
 
         applyDamageToTarget(tgt, dmg, this, { isFlame: true, isBurn: true });
         if (typeof tgt.applyBurn === 'function') {
           tgt.applyBurn(this);
         } else {
-          tgt.burnTimer = Math.max(tgt.burnTimer || 0, 180);
+          tgt.burnTimer = Math.max(tgt.burnTimer || 0, 240);
           tgt.burnDamageTimer = 0;
           tgt.lastBurnAttacker = this;
         }
         if (typeof tgt.applyHitStun === 'function') {
-          tgt.applyHitStun(16);
+          tgt.applyHitStun(24);
         }
 
         // Radial Knockback
         const angle = Math.atan2(tgt.y - sun.y, tgt.x - sun.x);
-        const kb = CONFIG.escanor?.cruelSunKnockback || 14.0;
-        tgt.isWallPinnedByEscanor = true;
+        const kb = CONFIG.escanor?.cruelSunKnockback || 28.0;
         tgt._knockedBackByEscanorBasicAttack = true;
         tgt._escanorAttacker = this;
         tgt.knockbackVx = Math.cos(angle) * kb;
@@ -1272,7 +1984,7 @@ export class EscanorFighter extends Fighter {
     }
 
     try {
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 0.95);
     } catch (e) {}
   }
 
@@ -1280,6 +1992,7 @@ export class EscanorFighter extends Fighter {
    * Skill 2: Pride Flare (プライド・フレア)
    */
   _castPrideFlare() {
+    if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
     this.prideFlareCooldown = this.prideFlareCooldownMax;
     this.prideFlareActiveTimer = this.prideFlareMaxTimer;
 
@@ -1335,6 +2048,7 @@ export class EscanorFighter extends Fighter {
    * Ultimate: "THE ONE" (天上天下唯我独尊)
    */
   _activateTheOne() {
+    if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
     this.isTheOneActive = true;
     this.theOneTimer = this.theOneMaxTimer;
     this.theOneFinisherUsed = false;
@@ -1357,6 +2071,7 @@ export class EscanorFighter extends Fighter {
    * Finisher during The One: Divine Sword Escanor (聖剣エスカノール)
    */
   _executeDivineSwordEscanor(target) {
+    if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
     this.theOneFinisherUsed = true;
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this._chopHitDelivered = true;
@@ -1486,11 +2201,14 @@ export class EscanorFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
-    // Super Armor: Do not cancel weapon lift/hold on standard damage interruptions
-    if (!forceCancelAll && this.isLiftingWeapon()) {
+    // Divine Solar Poise: Never interrupt or reset basic attack or Cruel Sun while Escanor is alive
+    if (this.hp > 0 && !this.dead && !this.isDead) {
       return;
     }
     super.interruptAttacks(forceCancelAll);
+    this.isChannelingCruelSun = false;
+    this.cruelSunChargeTimer = 0;
+    this.cruelSunCastAngle = undefined;
     this.slashSwingTimer = 0;
     this.punchAnimTimer = 0;
     this.chopCastAngle = undefined;
@@ -1516,10 +2234,24 @@ export class EscanorFighter extends Fighter {
     this._chopPreviousStrikeP = 0;
   }
 
+  clearAllAttackEffects() {
+    if (this.hp > 0 && !this.dead && !this.isDead) {
+      return;
+    }
+    super.clearAllAttackEffects();
+  }
+
+  suppressCombatAndVisuals(options = {}) {
+    if (this.hp > 0 && !this.dead && !this.isDead) {
+      return;
+    }
+    super.suppressCombatAndVisuals(options);
+  }
+
   draw(ctx) {
     // 1. Draw Active Cruel Sun Orbs
     for (const sun of this.activeCruelSuns) {
-      drawCruelSunOrb(ctx, sun.x, sun.y, sun.r);
+      drawCruelSunOrb(ctx, sun.x, sun.y, sun.r, Date.now(), sun);
     }
 
     // 2. Draw Active Pride Flare Shockwave

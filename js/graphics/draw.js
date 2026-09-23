@@ -69,7 +69,7 @@ export { drawVoidmasterSkin, drawVoidmasterPixelBody, drawVoidmasterBody, drawVo
 export { drawKnightSkin, drawKnightPixelBody, drawKnightBody, drawKnightGhostModel } from './fighters/knightSkin.js';
 export { drawNanamiSkin, drawNanamiPixelBody, _drawNanamiHair, _getNanamiHairImage } from './fighters/nanamiSkin.js';
 export { drawMahitoSkin, drawMahitoPixelBody, _drawMahitoHair, _getMahitoHairImage } from './fighters/mahitoSkin.js';
-export { drawDivineAxeRhitta, drawRhittaSlashArc, _getEscanorSlashEffectImage, drawRhittaSolarFlash, drawCruelSunOrb, drawPrideFlareShockwave, drawDivineSwordEscanorBlade } from './weapons/escanorWeaponGraphics.js';
+export { drawDivineAxeRhitta, drawRhittaSlashArc, _getEscanorSlashEffectImage, drawRhittaSolarFlash, drawPixelCruelSunSphere, drawCruelSunOrb, drawCruelSunChargingExpansion, drawPrideFlareShockwave, drawDivineSwordEscanorBlade } from './weapons/escanorWeaponGraphics.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
 export { spawnTojiCleaveHitEffect, drawTojiImpactEffects, updateTojiImpactEffects } from './particles/tojiImpactEffect.js';
 

@@ -9,7 +9,7 @@ export const nanamiConfig = {
   // Base Attributes
   hp: 195,
   speed: 5.5,
-  moveSpeed: 6.5,
+  moveSpeed: 5.0,
   r: 25,
   radius: 25,
   color: '#D4AF37', // Refined Golden Sand / Warm Ochre
@@ -25,6 +25,7 @@ export const nanamiConfig = {
   desc: 'Wields a cloth-wrapped blunt cleaver. Passive: 7:3 Ratio Technique deals guaranteed True Damage critical strikes and fractures enemy defense. Enters Overtime under 40% HP or after 25s for a 120% cursed energy surge.',
 
   // Passive: Overtime (Jigai)
+  enableOvertime: true,             // Master toggle for Overtime (Jigai)
   overtimeThresholdSeconds: 25,     // Activates after 25s elapsed in the round
   overtimeHpThreshold: 0.40,        // Or when HP drops below 40%
   overtimeDamageMultiplier: 1.20,   // Balanced +20% damage boost
@@ -41,6 +42,7 @@ export const nanamiConfig = {
   overtimeDimOpacity: 0.94,         // Cinematic radiant golden gradient dim theme opacity level
 
   // Passive: Ratio Technique (7:3 — Shichisan no Jutsu)
+  enableRatioTechnique: true,       // Master toggle for Ratio Technique
   ratioCritMultiplier: 2.0,         // 2.0x True Damage in Standard shift
   overtimeRatioCritMultiplier: 1.80,// 1.8x True Damage in Overtime (prevents multiplicative one-shots)
   ratioBaseCritChance: 0.15,        // 15% base ratio critical rate in standard shift (balanced from 30%)
@@ -63,6 +65,7 @@ export const nanamiConfig = {
   ratioDimOpacity: 0.94,            // High-contrast cinematic darkness level
 
   // Primary Melee: Blunt Cleaver Chop (Frontal Arc — Rule 7)
+  enableCleaver: true,              // Master toggle for Primary Melee: Blunt Cleaver Chop
   cleaverRange: 65,                 // 65px melee reach
   cleaverArc: (130 * Math.PI) / 180,// 130° frontal arc
   cleaverDamage: 7,                 // Base chop damage
@@ -70,6 +73,7 @@ export const nanamiConfig = {
   cleaverKnockback: 16,             // Base physical knockback force
 
   // Skill 1: Decisive Strike / Ratio Lunge (Shichisan Issen)
+  enableLunge: true,                // Master toggle for Skill 1: Ratio Lunge
   lungeCooldown: 500,               // 7.0s (420 frames)
   lungeDamage: 14,                  // Base path cleave damage
   lungeCritDamage: 36,              // 36 True Damage on 7:3 Critical primary hit
@@ -84,6 +88,7 @@ export const nanamiConfig = {
   lungeMaxRange: 260,               // AI trigger maximum distance
 
   // Skill 2: Collapse (Tōka / Falling Rubble)
+  enableCollapse: false,             // Master toggle for Skill 2: Collapse
   collapseCooldown: 600,            // 10.0s (600 frames)
   collapseRadius: 200,              // 200px AOE shockwave
   collapseDamage: 24,               // 24 AOE Damage
@@ -99,6 +104,7 @@ export const nanamiConfig = {
   collapseCraterDuration: 45,       // Shockwave visual persistence duration (frames)
 
   // Ultimate: 4-Fold Black Flash Blitz (Kokusen Renpatsu)
+  enableBlackFlash: 0,           // Master toggle for Ultimate: 4-Fold Black Flash Blitz
   ultimateCooldown: 1800,           // 25.0s (1500 frames)
   ultimateVoicelineChannelDuration: 75, // Voiceline channeling/windup duration (frames) before voiceline ends
   ultimatePostVoicelineDelay: 15,   // Delay frames after voiceline finishes before triggering the 1st Black Flash strike

@@ -23,6 +23,7 @@ export const zeusConfig = {
   desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',
 
   // ── Basic Attack: Chain Lightning (Fast Projectile) ──
+  enableChainLightning: true,  // Master toggle for Chain Lightning basic attack
   lightningDamage: 20,         // Base damage per lightning hit (balanced with Sukuna slashes & Gojo basic)
   lightningSpeed: 30,          // Supersonic bolt speed (px/frame)
   lightningRadius: 6,          // Radius of chain lightning bolt projectile
@@ -36,6 +37,7 @@ export const zeusConfig = {
   shootSparkCount: 12,         // Spark count on basic bolt release
 
   // ── Debuff & Stun Progressive Mechanics ──
+  enableStunDebuffs: true,     // Master toggle for progressive stun & debuff system
   baseStunChance: 0.10,        // Starting stun chance (10%)
   stunChanceIncrease: 0.05,    // +5% stun chance added per landed hit (tuned from +10%)
   maxStunChance: 0.50,         // Maximum stun chance cap (50%, tuned from 80%)
@@ -50,6 +52,7 @@ export const zeusConfig = {
   electricVisualDuration: 45,  // Duration in frames (~0.75s) electric shock overlay persists on target
 
   // ── Passive: Aegis Shield (Melee Counter) ──
+  enableAegisShield: true,     // Master toggle for Aegis Shield melee counter
   aegisCooldown: 300,          // Recharge cooldown in frames (5.0s at 60fps)
   aegisShockDamage: 12,        // Shock counter damage dealt to melee attackers (tuned with Sukuna Spiderweb: 15)
   aegisParalyzeDuration: 60,   // Duration in frames (~1.0s) of slow applied to attacker
@@ -60,6 +63,7 @@ export const zeusConfig = {
   aegisShakeFrames: 5,         // Screen shake duration on Aegis trigger
 
   // ── Ultimate: Thunder Storm (Map-Wide Divine Wrath) ──
+  enableThunderStorm: true,    // Master toggle for Thunder Storm ultimate
   stormCooldown: 1500,         // 25.0s Cooldown (balanced with Gojo Hollow Purple & Sukuna Fuga / Domain)
   stormDuration: 300,          // 5.0 seconds total active storm duration
   stormStrikesPerSec: 3,       // Frequency of lightning strikes per enemy (3 per sec = 15 strikes total)

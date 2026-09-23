@@ -28,6 +28,7 @@ export const johnWickConfig = {
   desc: 'The Baba Yaga. Master of Center Axis Relock Gun-Fu and ruthless CQC. Passive: Ballistic Tailored Suit resists ranged damage. Wields the custom TTI Pit Viper 9mm and the infamous No. 2 Pencil for armor-piercing assassination takedowns.',
 
   // ── 2. PASSIVE 1: BALLISTIC TAILORED SUIT & FOCUS ──
+  enableBallisticSuit: true,         // Master toggle for Ballistic Tailored Suit passive
   ballisticSuitDamageReduction: 0.10, // 10% flat damage mitigation against all incoming attacks
   ballisticSuitDeflectSparks: true,   // Triggers Kevlar deflection sparks & audio on absorbing incoming hits
   ballisticSuitShimmerDuration: 14,   // Duration (frames) of hexagonal carbon-weave shimmer overlay on suit
@@ -37,6 +38,7 @@ export const johnWickConfig = {
   maxFocus: 100,                      // Maximum Focus meter (for Ultimate activation)
 
   // ── 3. PRIMARY WEAPON: TTI PIT VIPER 9mm (PISTOL) ──
+  enablePistol: true,                 // Master toggle for TTI Pit Viper 9mm pistol
   magazineSize: 12,                   // Rounds per magazine
   fireCooldown: 26,                   // ~0.43s between shots (26 frames at 60fps)
   bulletDamage: 6,                    // Base damage per 9mm projectile (72 total per mag)
@@ -57,6 +59,7 @@ export const johnWickConfig = {
   bulletHitBloodCount: 4,             // Number of blood droplets spawned per hit
 
   // ── 3.5. SECONDARY WEAPON: BENELLI M4 TACTICAL SHOTGUN ──
+  enableShotgun: true,                // Master toggle for Benelli M4 shotgun
   shotgunMagazineSize: 6,             // 6 12-gauge shells per tube
   shotgunFireCooldown: 52,            // ~0.86s between shotgun blasts (52 frames)
   shotgunPelletCount: 6,              // 6 heavy buckshot pellets per blast
@@ -83,6 +86,7 @@ export const johnWickConfig = {
   gunThrowSpinSpeed: 0.28,            // Rotation speed of tossed gun
 
   // ── 3.6. TERTIARY WEAPON: TTI M4 / BCM CARBINE (M4 RIFLE) ──
+  enableRifle: true,                  // Master toggle for M4 Rifle
   rifleMagazineSize: 20,              // 20 rounds 5.56x45mm NATO per PMAG
   rifleFireCooldown: 11,              // Machine gun auto-fire cadence (~5.5 shots/s, 11 frames per shot)
   rifleBulletDamage: 4,               // Base damage per 5.56 rifle round (80 total per mag)
@@ -104,6 +108,7 @@ export const johnWickConfig = {
   rifleCrackVolume: 0.90,
 
   // ── 4. CLOSE-QUARTERS COMBAT (CQC) MARTIAL ARTS ──
+  enableCQC: true,                    // Master toggle for CQC martial arts
   meleePunchReach: 85,                // 85px punch reach
   meleePunchArc: (130 * Math.PI) / 180, // 130° wide frontal arc
   meleePunchDamage: 5,                // Base CQC strike damage
@@ -114,6 +119,7 @@ export const johnWickConfig = {
   meleeHitBloodCount: 3,              // Blood droplet count on punch
 
   // ── 5. SKILL 1: TACTICAL COMBAT ROLL & EVADE INTANGIBILITY ──
+  enableTacticalRoll: true,           // Master toggle for Tactical Combat Roll & Evade
   rollCooldown: 240,                  // 4.0s cooldown between tactical rolls (240 frames)
   rollDistance: 150,                  // Roll dash travel distance in pixels
   rollDuration: 18,                   // 18 frames roll animation
@@ -128,6 +134,7 @@ export const johnWickConfig = {
   rollEvadeDuration: 22,              // Evade i-frames during tactical roll (frames)
 
   // ── 6. SKILL 2: THE INFAMOUS NO. 2 PENCIL (ASSASSINATION) ──
+  enablePencil: true,                 // Master toggle for No. 2 Pencil assassination
   pencilCooldown: 500,                // ~8.3s cooldown (500 frames)
   pencilReach: 60,                    // 60px strike reach
   pencilDamage: 30,                   // True Damage (ignores defense/armor)
@@ -169,6 +176,7 @@ export const johnWickConfig = {
   cqcSpotlightBloomRadius: 150,       // Underfoot Continental Gold floor glow radius (px)
 
   // ── 9. ULTIMATE SKILL: EXCOMMUNICADO / CONTINENTAL EXECUTION (M4 RIFLE ASCENSION) ──
+  enableExcommunicado: true,               // Master toggle for Excommunicado ultimate
   excommunicadoDefMultiplier: 1.30,        // 1.3x DEF multiplier while wielding M4 Rifle
   excommunicadoEvadeMultiplier: 1.25,      // Evade boost multiplier
   excommunicadoEvadeChance: 0.10,          // 10% Evade dodge chance in Excommunicado state

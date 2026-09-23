@@ -1768,8 +1768,20 @@ export function getSkillDataForFighter(f, getProjectiles) {
     if (Boolean(enableCruelSun)) {
       const cruelMax = f.cruelSunCooldownMax || cfg.cruelSunCooldown || 510;
       const cruelTimer = f.cruelSunCooldown !== undefined ? f.cruelSunCooldown : 0;
-      const cruelPct = Math.max(0, Math.min(100, (1 - (cruelTimer / cruelMax)) * 100));
-      skills.push({ id: 'cruel_sun', pct: cruelPct, ready: cruelPct >= 99, color: themeColor, label: 'CRUEL SUN' });
+      let cruelPct;
+      let cruelLabel = 'CRUEL SUN';
+      if (f.isChannelingCruelSun) {
+        const windupMax = f.cruelSunMaxChargeTimer || cfg.cruelSunCastWindupFrames || 45;
+        const curTimer = f.cruelSunChargeTimer || 0;
+        cruelPct = Math.max(0, Math.min(100, (1 - (curTimer / windupMax)) * 100));
+        cruelLabel = 'CRUEL SUN (CHARGING)';
+      } else if (f.activeCruelSuns && f.activeCruelSuns.length > 0) {
+        cruelPct = 0;
+        cruelLabel = 'CRUEL SUN (ACTIVE)';
+      } else {
+        cruelPct = Math.max(0, Math.min(100, (1 - (cruelTimer / cruelMax)) * 100));
+      }
+      skills.push({ id: 'cruel_sun', pct: cruelPct, ready: cruelPct >= 99 && !f.isCruelSunActive(), color: themeColor, label: cruelLabel });
     }
 
     // 3. Skill 2: Pride Flare (Toggle: enablePrideFlare)

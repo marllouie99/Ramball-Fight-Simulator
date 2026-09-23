@@ -60,14 +60,14 @@ export class StatusEffectsManager {
 
   applySlow(frames, multiplier, opts = {}) {
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isCountering || (this.fighter._counterPunchTimer && this.fighter._counterPunchTimer > 0) || (this.fighter._postCounterRecoveryTimer && this.fighter._postCounterRecoveryTimer > 0)) return;
-    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed && !opts.isInfinitySlow) return;
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji' || this.fighter.characterId === 'escanor' || this.fighter.type === 'escanor') && !opts.isPurple && !opts.isRed && !opts.isInfinitySlow) return;
     if (this.fighter.slowTimer < frames) this.fighter.slowTimer = frames;
     this.fighter.slowMultiplier = multiplier;
   }
 
   applyHitStun(frames, opts = {}) {
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isCountering || (this.fighter._counterPunchTimer && this.fighter._counterPunchTimer > 0) || (this.fighter._postCounterRecoveryTimer && this.fighter._postCounterRecoveryTimer > 0)) return;
-    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isRed) return;
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji' || this.fighter.characterId === 'escanor' || this.fighter.type === 'escanor') && !opts.isPurple && !opts.isRed) return;
     if (!this.fighter.hitStunTimer || this.fighter.hitStunTimer < frames) {
       this.fighter.hitStunTimer = frames;
       this.fighter.hitStunMultiplier = 0.3;
@@ -76,7 +76,7 @@ export class StatusEffectsManager {
 
   applyParalyze(frames, opts = {}) {
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isCountering || (this.fighter._counterPunchTimer && this.fighter._counterPunchTimer > 0) || (this.fighter._postCounterRecoveryTimer && this.fighter._postCounterRecoveryTimer > 0)) return;
-    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') && !opts.isPurple && !opts.isBlue) return;
+    if ((this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji' || this.fighter.characterId === 'escanor' || this.fighter.type === 'escanor') && !opts.isPurple && !opts.isBlue) return;
     if (!this.fighter.paralyzeTimer || this.fighter.paralyzeTimer < frames) {
       this.fighter.paralyzeTimer = frames;
     }
@@ -253,7 +253,7 @@ export class StatusEffectsManager {
       return true;
     }
 
-    if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima) {
+    if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.immuneToCC || fighter.characterId === 'escanor' || fighter.type === 'escanor' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima) {
       fighter.timeStopTimer = 0;
       fighter.isFrozenByInfinity = false;
       fighter.electricStunTimer = 0;

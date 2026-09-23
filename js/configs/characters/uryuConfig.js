@@ -25,6 +25,7 @@ export const uryuConfig = {
   desc: 'The Last Quincy. Attacks from long range with Heilig Bogen spirit arrows, glides with Hirenkyaku, traps enemies with Sprenger, and reverses damage with Schrift "A": The Antithesis.',
 
   // ── Basic Attack (Heilig Bogen: Ginrei Kojaku) ──
+  enableHeiligBogen: true,         // Master toggle for basic Heilig Bogen bow attacks
   attackSpeed: 1.0,              // Base attack speed multiplier
   arrowSpeed: 24,                // Supersonic Reishi arrow projectile velocity
   arrowDamage: 16,               // Base damage per arrow hit
@@ -37,6 +38,7 @@ export const uryuConfig = {
   arrowDrawDuration: 10,         // Frames to draw bow for standard basic shot
 
   // ── Hirenkyaku Flurry (Triggered every 3 arena wall rebounds) ──
+  enableHirenkyakuFlurry: true,    // Master toggle for wall-bounce Hirenkyaku flurry
   wallBounceFlurryThreshold: 5,  // Wall rebounds required to trigger flurry (every 3 wall bounces)
   flurryTeleportCount: 5,        // Number of Hirenkyaku teleports executed during the flurry sequence (e.g. 2, 3, 4, etc.)
   flurryBurstCount: 3,           // Number of arrows fired per teleport burst before executing the next teleport
@@ -51,6 +53,7 @@ export const uryuConfig = {
   stuckArrowFadeDuration: 30,    // Frames over which the stuck arrow fades to 0 opacity
 
   // ── Close-Quarters Intercept (Seele Schneider & Weapon Switch Buffer) ──
+  enableSeeleSchneider: true,      // Master toggle for Seele Schneider melee intercept
   seeleDamage: 16,               // Melee slice damage
   seeleRange: 68,                // Frontal melee reach
   seeleArc: 130,                 // Frontal arc degrees (Rule 7)
@@ -65,6 +68,7 @@ export const uryuConfig = {
   autoSwitchToMelee: true,       // Smoothly auto-switch to Seele Schneider melee mode when enemy is in range
 
   // ── Skill 1: Hirenkyaku & Licht Regen ──
+  enableHirenkyaku: true,          // Master toggle for Hirenkyaku dash & Licht Regen
   hirenkyakuCooldown: 360,           // ~6s cooldown between uses
   hirenkyakuDashDistance: 240,       // Distance glided backward during Hirenkyaku
   hirenkyakuDashFrames: 5,           // Evasion duration (frames)
@@ -93,15 +97,18 @@ export const uryuConfig = {
   hirenkyakuAiMidRangeChance: 0.006, // Random per-frame chance to trigger at mid range
 
   // ── Skill 2: Gintō Sprenger (Pentagram Trap) ──
+  enableSprenger: true,            // Master toggle for Gintō Sprenger pentagram
   sprengerCooldown: 480,         // ~8s cooldown
   sprengerDamage: 85,            // True damage within pentagram
   sprengerRadius: 90,            // Pentagram radius
 
   // ── Ultimate: Vollständig & The Antithesis ──
+  enableAntithesis: true,          // Master toggle for Vollständig & The Antithesis
   ultimateCooldown: 1200,        // 20s cooldown
   antithesisThreshold: 0.35,     // Trigger threshold (35% HP or manual)
 
   // ── Passive 1: Reishi Absorption & Sklaverei Gauge ──
+  enableReishiAbsorption: true,    // Master toggle for Reishi passive gauge
   reishiMaxGauge: 100,
   piercingLightDuration: 360,     // 6 seconds of Piercing Light state
   piercingArrowSpeedMult: 1.35,   // +35% arrow velocity
@@ -114,6 +121,7 @@ export const uryuConfig = {
   siphonMeleeGain: 8.0,           // Reishi gained on Seele Schneider parry
 
   // ── Passive 2: Ransōtengai (Heavenly Wild Puppet Suit) ──
+  enableRansotengai: true,         // Master toggle for Ransōtengai passive
   ransotengaiHpThreshold: 0.30,   // Triggers at <= 30% HP
   ransotengaiDuration: 360,       // 6 seconds duration
   ransotengaiCooldown: 1200,      // 20s cooldown

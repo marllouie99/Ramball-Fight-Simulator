@@ -29,6 +29,7 @@ export const yujiConfig = {
   soulSwapDamageReduction: 0.20,          // 25% damage reduction while Sukuna Soul Swap is active
 
   // Basic Attack: Cursed Energy Punch
+  enableBasicPunch: true,         // Master toggle for basic cursed energy punch
   punchDamage: 6,               // Base damage per melee punch
   knockback: 6,                 // Knockback impulse on punch hit
   punchSpeed: 25,               // Animation frames for a standard punch
@@ -36,6 +37,7 @@ export const yujiConfig = {
   basicPunchCooldown: 28,       // Cooldown in frames between basic punches (~0.46s)
 
   // Skill 1: Divergent Fist Dash — Gap-closing supersonic rush into punch
+  enableDivergentDash: true,      // Master toggle for Divergent Fist Dash
   divergentDashCooldown: 240,   // Cooldown in frames between dashes (4.0s at 60fps)
   divergentDashRange: 280,      // Max trigger distance for dash (px)
   divergentDashMinRange: 60,    // Min distance to initiate dash (prevents dashing when already in point-blank melee)
@@ -45,11 +47,13 @@ export const yujiConfig = {
   divergentDashVolume: 0.85,
 
   // Passive: Divergent Fist — Delayed shockwave after each punch
+  enableDivergentFist: true,      // Master toggle for Divergent Fist shockwave passive
   shockwaveDelay: 6,            // Frames after impact before shockwave fires
   shockwaveDamage: 10,           // Damage of the delayed cursed energy shockwave (Total punch = 6 + 4 = 10)
   shockwaveRadius: 40,          // Shockwave blast radius
 
   // Core Mechanic: Black Flash Buildup
+  enableBlackFlash: true,         // Master toggle for Black Flash mechanic
   blackFlashThreshold: 4,       // Hits required to trigger Black Flash
   blackFlashMultiplier: 5.5,    // Damage multiplier on Black Flash trigger (6 * 2.5 = 15 punch + 4 shockwave = 19)
   blackFlashKnockback: 14,      // Knockback on Black Flash hit
@@ -60,9 +64,11 @@ export const yujiConfig = {
   blackFlashZonePunchCooldown: 24, // Cooldown in frames between basic punches inside the Zone
 
   // Skill 2: Reverse Cursed Technique (RCT) — Passive
+  enableRCT: true,                // Master toggle for Reverse Cursed Technique
   rctHealPercent: 0.20,         // Percentage of max HP restored upon reverting from Sukuna transformation
 
   // Ultimate: Soul Swap — Sukuna Takes Over
+  enableSoulSwap: true,           // Master toggle for Soul Swap ultimate
   soulSwapHpThreshold: 0.50,       // Triggers when HP drops to 30% or below
   soulSwapDuration: 500,            // Duration of Soul Swap in frames (~1.67 seconds of free Dismantle combat at 60fps)
   soulSwapDamageMultiplier: 2.0,   // Damage multiplier while Sukuna is active

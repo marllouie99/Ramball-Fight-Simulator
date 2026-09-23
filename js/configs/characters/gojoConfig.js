@@ -23,6 +23,7 @@ export const gojoConfig = {
   desc: 'Uses Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
 
   // ── 1. Limitless Infinity Passive Barrier ──
+  enableInfinity: true,                    // Master toggle for Limitless Infinity barrier
   infinityCooldown: 100,                   // Recharge cooldown in frames before Infinity barrier reactivates after blocking
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact
   infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
@@ -40,6 +41,7 @@ export const gojoConfig = {
   infinityBounceForce: 5,                 // Knockback velocity force applied to enemies on Infinity barrier collision (higher = stronger rebound push)
   
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
+  enableBlue: true,                        // Master toggle for Basic Attack: Lapse Blue
   blueCooldown: 300,         // Fire rate for basic attack (Blue orb) - Lower is faster
   blueSpeed: 10.5,          // Speed of Blue orb projectile
   blueRadius: 50,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
@@ -54,6 +56,7 @@ export const gojoConfig = {
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
+  enableRed: true,                         // Master toggle for Skill: Reversal Red
   redCooldown: 1000,         // Cooldown of Red (frames)
   redDamage: 100,           // Base damage dealt by Reversal Red blast
   redKnockback: 10,         // Supersonic knockback force of Red
@@ -78,6 +81,7 @@ export const gojoConfig = {
   redDimColor: '#060002',   // Deep obsidian-crimson tone of the Red dim backdrop
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
+  enablePurple: true,                      // Master toggle for Secret Technique: Hollow Purple
   purpleCooldown: 1500,      // Cooldown of Hollow Purple
   purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
@@ -115,6 +119,7 @@ export const gojoConfig = {
   purpleSecondCastTextHeader200: 'PURPLE 200%',     // Skill HUD bar label for 200% cast
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
+  enableDomain: true,                      // Master toggle for Ultimate: Domain Expansion
   domainCooldown: 2000,     // 20s Ultimate cooldown
   domainChargeMax: 130,     // 2s Channeling duration before domain opens
   domainDuration: 300,      // Domain lasts ~6.6 seconds (paralyzes enemies)
@@ -135,6 +140,7 @@ export const gojoConfig = {
   rctRevivalHealAmount: 150,               // Flat HP restored on emergency revival
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
+  enableMeleeMode: true,                   // Master toggle for Melee Mode & Hand-to-Hand Martial Arts
   closeRangeRadius: 110,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
   initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
   meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)

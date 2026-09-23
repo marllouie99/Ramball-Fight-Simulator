@@ -514,12 +514,27 @@ export function resolveFighterCollision(a, b) {
       a.vy = 0;
       a.knockbackVx = 0;
       a.knockbackVy = 0;
-    } else if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked && !aIsEscanor) {
+    } else if (aIsEscanor) {
+      // Unyielding Solar Poise: never zero out velocity or redirect movement on body collision while moving!
+      const isStationary = Boolean(
+        (typeof a.isCruelSunActive === 'function' && a.isCruelSunActive()) ||
+        (a.chopHitPauseTimer && a.chopHitPauseTimer > 0) ||
+        (a.isChannelingCruelSun)
+      );
+      if (isStationary) {
+        a.vx = 0;
+        a.vy = 0;
+      } else {
+        a.normalizeSpeed();
+      }
+      a.knockbackVx = 0;
+      a.knockbackVy = 0;
+    } else if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked) {
       const mult = bIsImmovable ? 2.0 : 1.0;
       a.vx -= (impulse * mult * nx + randA * impulse * tx);
       a.vy -= (impulse * mult * ny + randA * impulse * ty);
       a.normalizeSpeed();
-    } else if (aIsCounterLocked || aIsEscanor) {
+    } else if (aIsCounterLocked) {
       a.vx = 0;
       a.vy = 0;
       a.knockbackVx = 0;
@@ -533,12 +548,26 @@ export function resolveFighterCollision(a, b) {
       b.vy = 0;
       b.knockbackVx = 0;
       b.knockbackVy = 0;
-    } else if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked && !bIsEscanor) {
+    } else if (bIsEscanor) {
+      const isStationary = Boolean(
+        (typeof b.isCruelSunActive === 'function' && b.isCruelSunActive()) ||
+        (b.chopHitPauseTimer && b.chopHitPauseTimer > 0) ||
+        (b.isChannelingCruelSun)
+      );
+      if (isStationary) {
+        b.vx = 0;
+        b.vy = 0;
+      } else {
+        b.normalizeSpeed();
+      }
+      b.knockbackVx = 0;
+      b.knockbackVy = 0;
+    } else if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked) {
       const mult = aIsImmovable ? 2.0 : 1.0;
       b.vx += (impulse * mult * nx + randB * impulse * tx);
       b.vy += (impulse * mult * ny + randB * impulse * ty);
       b.normalizeSpeed();
-    } else if (bIsCounterLocked || bIsEscanor) {
+    } else if (bIsCounterLocked) {
       b.vx = 0;
       b.vy = 0;
       b.knockbackVx = 0;

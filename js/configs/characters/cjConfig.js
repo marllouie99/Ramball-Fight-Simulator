@@ -31,12 +31,14 @@ export const cjConfig = {
   desc: 'Carl Johnson from Grove Street. Master of cheats and street brawling. Wields metallic brass knuckles, HESOYAM armor bursts, Area 69 Jetpack flight, Grove Street drive-by backup, and BAGUVIX God Mode.',
 
   // ── 1.1 STAMINA & FATIGUE SYSTEM ──
+  enableStaminaSystem: true,   // Master toggle for stamina & fatigue mechanics
   maxStamina: 100,             // 100 max stamina
   staminaDrainRate: 0.38,      // Stamina drained per frame when sprinting/punching (~4.4s full sprint)
   staminaRegenRate: 0.42,      // Stamina regenerated per frame when resting/exhausted (~4.0s full recharge)
   exhaustedSpeedMultiplier: 0.40, // Slow movement speed multiplier when out of breath
 
   // ── 2. PASSIVE: RESPECT+ & CHEAT DIALER ──
+  enableRespectSystem: true,   // Master toggle for Respect meter and cheat dialing
   respectGainPerPunch: 2,     // Respect meter gain per brass knuckle hit
   respectGainOnHit: 2,         // Respect gain when taking/blocking hits
   respectCooldownRefund: 90,   // Cooldown refund (1.5s / 90 frames) on active skills when reaching 100% OG
@@ -50,6 +52,7 @@ export const cjConfig = {
   cheatActivationPostDelay: 4,  // 4 frames (~0.06s) post-activation pose delay before resuming action
 
   // ── 3. BASIC ATTACK: BRASS KNUCKLES STREET BOXING ──
+  enableBrassKnuckles: true,   // Master toggle for Brass Knuckles street boxing
   meleePunchReach: 30,         // 50px punch reach
   meleePunchArc: (120 * Math.PI) / 180, // 120° wide multi-target frontal arc (Rule 8)
   meleePunchDamage: 4,        // Punch damage
@@ -59,6 +62,7 @@ export const cjConfig = {
   meleeHitShakeDuration: 4,
 
   // ── 4. SKILL 1: HESOYAM (Health, Armor & $250k Shockwave) ──
+  enableHesoyam: true,         // Master toggle for HESOYAM cheat skill
   hesoyamHpThreshold: 0.50,    // Triggers strictly when CJ loses 50% HP (HP drops to <= 50%)
   hesoyamHealPercent: 0.50,    // Instantly restores 50% of Max HP (permanent)
   hesoyamShieldAmount: 75,     // Equips 75 HP Bulletproof Kevlar Shield (permanent until broken by damage)
@@ -68,6 +72,7 @@ export const cjConfig = {
   hesoyamRespectGain: 15,      // Respect gained on successful activation
 
   // ── 5. SKILL 2: ROCKETMAN / YECGAA (DARPA Jetpack & Dual Micro-Uzi Strafe) ──
+  enableJetpack: true,         // Master toggle for Jetpack & Dual Uzis
   jetpackCooldown: 800,        // 13.3s (800 frames)
   jetpackDuration: 600,        // 10.0s flight duration (600 frames)
   jetpackSpeedMultiplier: 0.70,// Agile jetpack flight speed
@@ -86,6 +91,7 @@ export const cjConfig = {
   gunHitShakeIntensity: 1.2,   // Subtle punchy screen shake on direct bullet impact
 
   // ── 6. SKILL 3: GROVESTREET4LIFE (Drive-By Backup) ──
+  enableDriveBy: true,         // Master toggle for Greenwood Drive-By
   driveByCooldown: 1000,        // 10.0s (600 frames)
   driveByStayDuration: 300,    // 5.0s (300 frames) staying & drifting in arena per pass
   driveByCarHp: 100,           // Max HP minion health bar (can be targeted and damaged by enemies)
@@ -106,6 +112,7 @@ export const cjConfig = {
   driveByRespectGain: 15,      // Respect gained on successful drive-by invocation
 
   // ── 7. ULTIMATE: BAGUVIX (God Mode & Minigun Riot Overdrive) ──
+  enableBaguvix: true,         // Master toggle for BAGUVIX God Mode & Minigun
   baguvixCooldown: 1500,        // 12.0s (720 frames at 60fps) cooldown
   baguvixDuration: 800,        // 5.0s (300 frames) invulnerability
   baguvixSpeedMultiplier: 0.28,// Significantly reduced slow walking speed (~1.54 px/frame) while wielding heavy minigun

@@ -10,7 +10,7 @@ export const mahitoConfig = {
   hp: 200,
   damage: 7,
   speed: 5.8,
-  moveSpeed: 6.8,
+  moveSpeed: 5.0,
   r: 25,
   radius: 25,
   color: '#C026D3', // Vivid Magenta-Violet / Cursed Energy
@@ -25,6 +25,7 @@ export const mahitoConfig = {
   desc: 'Wields 4 curved scythe-talon claws. Passive: Phantom Soul Slip phases directly through enemies with a high-speed claw cross-slice. Secondary skill unleashes Subterranean Flesh Surge; transforms into Distorted Killing form.',
   
   // Basic Attack: Idle Transfiguration (Melee Morph)
+  enableIdleTransfiguration: true, // Master toggle for basic attack
   arcAngle: (135 * Math.PI) / 180, // 135° frontal cone sweep (Rule #7 & #8 compliant)
   basicPunchCooldown: 70,          // Frames between attack attempts
   punchSpeed: 50,                  // Duration in frames of the attack animation
@@ -42,6 +43,7 @@ export const mahitoConfig = {
 
   // ── 2. PASSIVE: PHANTOM SOUL SLIP (Phase-Through Claw Dash) ────────────────
   soulPhaseSlip: {
+    enableSoulPhaseSlip: true,     // Master toggle for Soul Slip passive
     cooldown: 500,                 // 3 seconds cooldown between passive dashes
     triggerRangeMin: 70,           // Minimum distance to target to trigger dash
     triggerRangeMax: 300,          // Maximum distance to target to trigger dash
@@ -55,6 +57,7 @@ export const mahitoConfig = {
 
   // ── 3. SKILL 2: SUBTERRANEAN FLESH SURGE (Underground Arm Eruption) ────────
   fleshSurge: {
+    enableFleshSurge: true,        // Master toggle for Subterranean Flesh Surge
     cooldown: 300,                 // 5 seconds cooldown
     minDistance: 240,              // Minimum distance to trigger skill (strictly long distance >= 240px)
     reachMax: 420,                 // Max reach distance across the arena
@@ -74,6 +77,7 @@ export const mahitoConfig = {
 
   // ── 4. SKILL 3: MUTATED MACE CANNON (Spiked Flesh Ball Shrapnel) ───────────
   maceCannon: {
+    enableMaceCannon: true,        // Master toggle for Mutated Mace Cannon
     cooldown: 300,                 // 5 seconds cooldown (shares unified cooldown)
     minDistance: 240,              // Minimum distance to trigger skill (strictly long distance >= 240px)
     reachMax: 380,                 // Max reach across the arena
@@ -93,6 +97,7 @@ export const mahitoConfig = {
 
   // ── 5. SKILL 4: DUAL SCYTHE PINCER GUILLOTINE (Twin Blade Ambush) ──────────
   twinScissor: {
+    enableTwinScissor: true,       // Master toggle for Dual Scythe Pincer Guillotine
     cooldown: 300,                 // 5 seconds cooldown (shares unified cooldown)
     minDistance: 240,              // Minimum distance to trigger skill (strictly long distance >= 240px)
     reachMax: 360,                 // Max reach across the arena
@@ -110,6 +115,7 @@ export const mahitoConfig = {
 
   // ── 6. SKILL 5: SOUL MULTIPLICITY & BODY REPEL ─────────────────────────────
   soulMultiplicity: {
+    enableSoulMultiplicity: true,  // Master toggle for Soul Multiplicity & Body Repel
     cooldown: 1000,                 // Cooldown in frames (approx. 8.3s)
     minDistanceAlt: 250,           // Below this: summon minions. Above this: fire Body Repel projectile.
     summonCount: 1,                // Summons Transfigured Humans
@@ -132,6 +138,7 @@ export const mahitoConfig = {
 
   // ── 7. SOUL DISFIGUREMENT & RUPTURE MECHANICS ──────────────────────────────
   soulDisfigurement: {
+    enableSoulDisfigurement: true, // Master toggle for Soul Disfigurement
     maxStacks: 5,                  // Stacks required for violent soul reshape detonation
     duration: 300,                 // Stacks linger for 300 frames (5s) before resetting
     burstDamage: 38,               // True unmitigated soul damage at max stacks
@@ -159,11 +166,13 @@ export const mahitoConfig = {
 
   // ── 8. SURVIVAL & REGENERATION MECHANICS ───────────────────────────────────
   regen: {
+    enableRegen: true,             // Master toggle for passive health regeneration
     delay: 100,                    // Frames without receiving damage before regen triggers
     rate: 0.10,                    // Health regenerated per frame
   },
 
   evasion: {
+    enableEvasion: true,           // Master toggle for miniature clone evasion state
     threshold: 0.75,               // HP percentage below which Evasion triggers on next dash
     duration: 300,                 // Evasion state duration in frames (5s)
     cloneCount: 3,                 // Number of small evasion clones spawned
@@ -176,7 +185,8 @@ export const mahitoConfig = {
 
   // ── 9. TRANSFORMATION: INSTANT SPIRIT BODY OF DISTORTED KILLING (ISBoDK) ───
   transformation: {
-    enabled: false,                 // Master toggle to enable or disable Distorted Killing transformation (set to false to disable)
+    enabled: false,                // Master toggle to enable or disable Distorted Killing transformation (set to false to disable)
+    enableTransformation: false,   // Master toggle alias
     duration: 600,                 // 10 seconds active duration
     cooldown: 1200,                // 20 seconds cooldown
     defenseMultiplier: 0.80,       // Takes 20% less damage (high armor)
@@ -211,6 +221,7 @@ export const mahitoConfig = {
 
   // ── 11. ULTIMATE: DOMAIN EXPANSION ──────────────────────────────
   domainExpansion: {
+    enableDomainExpansion: true,   // Master toggle for Domain Expansion
     cooldown: 2000,                // 33 seconds cooldown
     chargeMax: 120,                // 2 seconds channeling duration before domain opens
     duration: 600,                 // 5.0 seconds of paralyzing stasis

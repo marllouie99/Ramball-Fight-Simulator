@@ -756,81 +756,353 @@ export function drawDivineSwordEscanorBlade(ctx, x, y, angle, r = 28, reach = 16
 
   ctx.restore();
 }
-
 /**
- * Draws the Cruel Sun (無慈悲な太陽) Projectile Orb
+ * Draws the Authentic 2D Discrete Grid Pixel Art Cruel Sun (無慈悲な太陽) Sphere
+ * Adheres strictly to:
+ * - Rule 3.5: Authentic 2D Discrete Grid Rasterization Engine (P = 2.0px)
+ * - Rule 11 / Rule 2.2: Prohibition of shadowBlur CPU filters (Flat stepped pixel layers)
+ * - Rule 2.4: Canvas 2D Transform Stack Integrity (balanced save/restore)
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx - Center X coordinate
+ * @param {number} cy - Center Y coordinate
+ * @param {number} radius - Sphere core radius
+ * @param {boolean} [isTheOne=false] - Whether "The One" transformation palette is active
+ * @param {number} [now=Date.now()] - Current animation timestamp
+ * @param {number} [alpha=1.0] - Opacity multiplier
+ * @param {boolean} [showCorona=true] - Whether to render outer stepped solar prominence flares & diamond glints
  */
-export function drawCruelSunOrb(ctx, x, y, r = 18, now = Date.now()) {
+export function drawPixelCruelSunSphere(ctx, cx, cy, radius, isTheOne = false, now = Date.now(), alpha = 1.0, showCorona = true) {
+  if (radius <= 0 || alpha <= 0) return;
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
+  const P = 2.0; // 2.0px authentic discrete pixel grid unit
+  const snap = (v) => Math.round(v / P) * P;
+
+  const snapCx = snap(cx);
+  const snapCy = snap(cy);
+  const coreR = Math.max(P * 2, snap(radius));
+  const steps = Math.ceil((coreR + P) / P);
+
   ctx.save();
-  ctx.translate(x, y);
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
 
-  // 1. Concentric Solar Corona Flares (Rule 11: Zero shadowBlur)
-  const pulse = Math.sin(now * 0.015) * 3;
-  const coreR = r + pulse;
+  // 1. Concentric Stepped Pixel Heat Corona Rings (Rule 11 Compliant: Flat stepped pixel fills)
+  if (showCorona) {
+    // Outer Heat Distortion Corona (Stepped Ring)
+    const coronaOuterR = snap(coreR * 1.60);
+    const coronaSteps = Math.ceil((coronaOuterR + P) / P);
+    ctx.fillStyle = isTheOne ? 'rgba(254, 240, 138, 0.16)' : 'rgba(239, 68, 68, 0.12)';
+    for (let gy = -coronaSteps; gy <= coronaSteps; gy += 2) {
+      for (let gx = -coronaSteps; gx <= coronaSteps; gx += 2) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d > coreR * 1.15 && d <= coronaOuterR) {
+          ctx.fillRect(snapCx + gx * P, snapCy + gy * P, P * 2, P * 2);
+        }
+      }
+    }
 
-  ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-  ctx.beginPath();
-  ctx.arc(0, 0, coreR * 1.7, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
-  ctx.beginPath();
-  ctx.arc(0, 0, coreR * 1.35, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = 'rgba(251, 191, 36, 0.75)';
-  ctx.beginPath();
-  ctx.arc(0, 0, coreR * 1.05, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. White-Hot Solar Core
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(0, 0, coreR * 0.65, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 3. Rotating Solar Flare Spikes
-  ctx.save();
-  ctx.rotate(now * 0.005);
-  ctx.fillStyle = 'rgba(254, 240, 138, 0.85)';
-  for (let i = 0; i < 8; i++) {
-    ctx.rotate(Math.PI / 4);
-    ctx.fillRect(-2, coreR * 0.9, 4, 6);
+    // Mid Amber Corona Ring
+    const coronaMidR = snap(coreR * 1.30);
+    const midSteps = Math.ceil((coronaMidR + P) / P);
+    ctx.fillStyle = isTheOne ? 'rgba(255, 255, 255, 0.22)' : 'rgba(245, 158, 11, 0.20)';
+    for (let gy = -midSteps; gy <= midSteps; gy += 2) {
+      for (let gx = -midSteps; gx <= midSteps; gx += 2) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d > coreR && d <= coronaMidR) {
+          ctx.fillRect(snapCx + gx * P, snapCy + gy * P, P * 2, P * 2);
+        }
+      }
+    }
   }
-  ctx.restore();
+
+  // 2. Discrete Integer Grid Rasterization for the Main Solar Sphere
+  // 4-frame retro boiling plasma animation cycle (80ms per frame)
+  const plasmaTick = Math.floor(currentNow / 80) % 4;
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const d = Math.hypot(rx, ry);
+      if (d > coreR) continue;
+
+      const px = snapCx + snap(rx);
+      const py = snapCy + snap(ry);
+      const normD = d / coreR; // 0.0 at core center, 1.0 at outer rim
+
+      // Outer Stepped Ink Shell / Solar Burning Rim
+      if (d >= coreR - P) {
+        ctx.fillStyle = isTheOne ? '#78350F' : '#451A03';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Boiling Nuclear Plasma Noise
+      const plasmaNoise = Math.sin(gx * 0.7 + gy * 0.7 + plasmaTick * 1.57);
+
+      if (normD > 0.78) {
+        // Outer Corona / Solar Rim: Crimson Flare or Deep Amber
+        if (plasmaNoise > 0.4) {
+          ctx.fillStyle = isTheOne ? '#F59E0B' : '#DC2626'; // Red-hot prominence cell
+        } else if (plasmaNoise < -0.4) {
+          ctx.fillStyle = isTheOne ? '#FBBF24' : '#EA580C';
+        } else {
+          ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
+        }
+      } else if (normD > 0.52) {
+        // Mid Mantle: Brilliant Holy Gold / Solar Flare
+        if (plasmaNoise > 0.3) {
+          ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
+        } else {
+          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FBBF24';
+        }
+      } else if (normD > 0.28) {
+        // Inner Photosphere: Incandescent Light Gold / Bright Lemon
+        if (plasmaNoise > 0.2) {
+          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FDE047';
+        } else {
+          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
+        }
+      } else {
+        // White-Hot Incandescent Core
+        ctx.fillStyle = '#FFFFFF';
+      }
+
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+
+  // 3. Discrete Stepped Coronal Flares & Prominences (Arcade Stepped Solar Teeth)
+  if (showCorona && coreR >= P * 4) {
+    ctx.save();
+    ctx.translate(snapCx, snapCy);
+
+    // Primary Clockwise Rotating Flare Teeth (8 discrete 45° steps)
+    const rotFrame = Math.floor(currentNow / 90) % 8;
+    const rotAngle = (rotFrame * Math.PI) / 4;
+    ctx.rotate(rotAngle);
+
+    const numTeeth = 8;
+    const toothLen = snap(coreR * 0.35);
+    const toothBaseW = snap(P * 2);
+
+    for (let t = 0; t < numTeeth; t++) {
+      ctx.rotate((Math.PI * 2) / numTeeth);
+      // Draw 3-tiered discrete stepped pixel tooth pointing outward
+      const baseDist = snap(coreR - P);
+      ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
+      ctx.fillRect(snap(-toothBaseW / 2), baseDist, toothBaseW, snap(toothLen * 0.5));
+      ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
+      ctx.fillRect(snap(-P / 2), baseDist + snap(toothLen * 0.5), P, snap(toothLen * 0.5));
+    }
+    ctx.restore();
+
+    // 4. Retro 4-Point Arcade Diamond Starburst Glint (Optical Diffraction)
+    ctx.save();
+    ctx.translate(snapCx, snapCy);
+    const glintFrame = Math.floor(currentNow / 110) % 2;
+    const glintLen = snap(coreR * (1.6 + glintFrame * 0.25));
+    const glintThick = snap(P * 2);
+
+    // Horizontal Diamond Spike
+    ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
+    for (let d = -glintLen; d <= glintLen; d += P) {
+      const pRatio = 1.0 - Math.abs(d) / glintLen;
+      const h = (pRatio > 0.6) ? glintThick : P;
+      ctx.fillRect(snap(d), snap(-h / 2), P, h);
+    }
+
+    // Vertical Diamond Spike
+    for (let d = -glintLen; d <= glintLen; d += P) {
+      const pRatio = 1.0 - Math.abs(d) / glintLen;
+      const w = (pRatio > 0.6) ? glintThick : P;
+      ctx.fillRect(snap(-w / 2), snap(d), w, P);
+    }
+
+    // White-Hot Center Glint
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(snap(-P), snap(-P), P * 2, P * 2);
+
+    ctx.restore();
+  }
 
   ctx.restore();
 }
 
 /**
- * Draws the Pride Flare (プライド・フレア) Expanding Shockwave Nova
+ * Draws the Cruel Sun (無慈悲な太陽) Projectile Orb in Authentic Pixel Art Style
+ * - Renders discrete clustered pixel flame trail along flight history
+ * - Multi-tiered retro discrete pixel art solar sphere
+ * - Stepped coronal teeth, 4-point pixel diamond flares & boiling nuclear plasma
+ */
+export function drawCruelSunOrb(ctx, x, y, r = 48, now = Date.now(), sun = null) {
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Draw Discrete Pixel Art Fire Trail History
+  if (sun && sun.history && sun.history.length > 1) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const len = sun.history.length;
+    for (let k = 0; k < len; k++) {
+      const pt = sun.history[k];
+      const trailRatio = (k + 1) / len; // 0 (oldest) to 1.0 (newest)
+      const trailR = snap(r * (0.25 + 0.55 * trailRatio));
+      const alpha = 0.15 + 0.60 * trailRatio;
+
+      ctx.globalAlpha = alpha;
+      const tSteps = Math.ceil(trailR / P);
+      const snapPtX = snap(pt.x);
+      const snapPtY = snap(pt.y);
+
+      // Clustered discrete pixel blocks along trail
+      for (let gy = -tSteps; gy <= tSteps; gy += 2) {
+        for (let gx = -tSteps; gx <= tSteps; gx += 2) {
+          const d = Math.hypot(gx * P, gy * P);
+          if (d > trailR) continue;
+
+          const normD = d / trailR;
+          if (normD > 0.70) {
+            ctx.fillStyle = '#DC2626'; // Deep ember red
+          } else if (normD > 0.40) {
+            ctx.fillStyle = '#F59E0B'; // Solar flame amber
+          } else {
+            ctx.fillStyle = '#FEF08A'; // Bright core
+          }
+          ctx.fillRect(snapPtX + gx * P, snapPtY + gy * P, P * 2, P * 2);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  // 2. Dynamic Solar Radius Pulse (stepped on integer pixel grid)
+  const pulseFrames = Math.floor(currentNow / 100) % 4;
+  const pulse = (pulseFrames === 1 || pulseFrames === 2) ? P * 1.5 : 0;
+  const coreR = Math.max(12, snap(r + pulse));
+
+  // 3. Draw Main Pixel Cruel Sun Sphere with Corona & Lens Glints
+  const isTheOne = Boolean(sun && sun.owner && sun.owner.isTheOneActive);
+  drawPixelCruelSunSphere(ctx, x, y, coreR, isTheOne, currentNow, 1.0, true);
+}
+
+/**
+ * Draws the Expanding Cruel Sun (無慈悲な太陽) Activation Animation in Authentic Pixel Art Style
+ * - Manifests steadily above Escanor's raised index finger
+ * - Expands from a tiny 4-frame retro arcade spark to full roaring pixel star
+ * - Features discrete stepped boiling plasma, optical pixel cross-glints, and rising retro embers
+ */
+export function drawCruelSunChargingExpansion(ctx, x, y, expandProgress = 0, maxRadius = 22, isTheOne = false, now = Date.now()) {
+  const p = Math.max(0, Math.min(1.0, expandProgress));
+  if (p <= 0) return;
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Dynamic Radius Growth
+  const ease = p < 0.20
+    ? (p / 0.20) * 0.15
+    : 0.15 + 0.85 * Math.pow((p - 0.20) / 0.80, 1.25);
+
+  const currentR = Math.max(P * 2, snap(ease * maxRadius));
+
+  // 2. Tiny Early Ignition Phase (p < 0.15: 4-frame retro arcade spark)
+  if (p < 0.15) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const snapX = snap(x);
+    const snapY = snap(y);
+    const sparkFrame = Math.floor(currentNow / 70) % 4;
+
+    if (sparkFrame === 0) {
+      // 2x2 White Spark
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snapX - P / 2, snapY - P / 2, P, P);
+    } else if (sparkFrame === 1) {
+      // 4x4 Diamond Flash
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(snapX - P * 2, snapY - P * 2, P * 4, P * 4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snapX - P, snapY - P, P * 2, P * 2);
+    } else if (sparkFrame === 2) {
+      // 6x2 Horizontal + 2x6 Vertical Glint
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(snapX - P * 3, snapY - P / 2, P * 6, P);
+      ctx.fillRect(snapX - P / 2, snapY - P * 3, P, P * 6);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snapX - P, snapY - P, P * 2, P * 2);
+    } else {
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(snapX - P, snapY - P, P * 2, P * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snapX - P / 2, snapY - P / 2, P, P);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // 3. Expanding Pixel Solar Sphere
+  drawPixelCruelSunSphere(ctx, x, y, currentR, isTheOne, currentNow, 1.0, p >= 0.35);
+
+  // 4. Procedural Ascending Pixel Ember Motes (Thermal updraft sparkles)
+  if (p >= 0.25) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const snapX = snap(x);
+    const snapY = snap(y);
+    const emberCount = 5;
+
+    for (let i = 0; i < emberCount; i++) {
+      const emberPhase = ((currentNow * 0.003 + i * 0.45) % 1.0);
+      const emberAngle = (i * (Math.PI * 2 / emberCount)) + Math.sin(currentNow * 0.004 + i) * 0.5;
+      const emberDist = (currentR * 0.6) + emberPhase * (currentR * 1.2);
+      const px = snap(snapX + Math.cos(emberAngle) * emberDist);
+      const py = snap(snapY - Math.abs(Math.sin(emberAngle) * emberDist) - (emberPhase * 12)); // Drift upward into -Y
+
+      const emberAlpha = Math.sin(emberPhase * Math.PI) * (0.5 + 0.5 * p);
+      if (emberAlpha > 0.08) {
+        ctx.globalAlpha = emberAlpha;
+        ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : '#FEF08A';
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+/**
+ * Draws the Pride Flare (プライド・フレア) Expanding Shockwave Nova in Discrete Pixel Art Style
  */
 export function drawPrideFlareShockwave(ctx, x, y, currentRadius, maxRadius, alpha = 1.0) {
   if (currentRadius <= 0 || alpha <= 0) return;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
   ctx.save();
-  ctx.translate(x, y);
-  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.imageSmoothingEnabled = false;
+  ctx.translate(snap(x), snap(y));
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
 
-  // Outer Expanding Gold Ring
-  ctx.beginPath();
-  ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
-  ctx.strokeStyle = '#F59E0B';
-  ctx.lineWidth = 4.0;
-  ctx.stroke();
+  const curR = snap(currentRadius);
+  const steps = Math.ceil((curR + P) / P);
 
-  // White Hot Inner Ring
-  ctx.beginPath();
-  ctx.arc(0, 0, Math.max(0, currentRadius - 6), 0, Math.PI * 2);
-  ctx.strokeStyle = '#FEF08A';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  // Stepped Pixel Art Shockwave Ring
+  for (let gy = -steps; gy <= steps; gy += 2) {
+    for (let gx = -steps; gx <= steps; gx += 2) {
+      const d = Math.hypot(gx * P, gy * P);
+      if (d > curR || d < curR - P * 3) continue;
 
-  // Central Thermal Fill
-  ctx.fillStyle = 'rgba(245, 158, 11, 0.20)';
-  ctx.beginPath();
-  ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
-  ctx.fill();
+      if (d >= curR - P) {
+        ctx.fillStyle = '#F59E0B'; // Outer gold rim
+      } else if (d >= curR - P * 2) {
+        ctx.fillStyle = '#FEF08A'; // Mid hot yellow
+      } else {
+        ctx.fillStyle = '#FFFFFF'; // Inner white-hot rim
+      }
+      ctx.fillRect(gx * P, gy * P, P * 2, P * 2);
+    }
+  }
 
   ctx.restore();
 }

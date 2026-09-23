@@ -10,7 +10,7 @@
 
 import { getHandSize, CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
-import { drawDivineAxeRhitta, drawRhittaSlashArc, drawRhittaSolarFlash } from '../weapons/escanorWeaponGraphics.js';
+import { drawDivineAxeRhitta, drawRhittaSlashArc, drawRhittaSolarFlash, drawCruelSunChargingExpansion } from '../weapons/escanorWeaponGraphics.js';
 
 const P = 2.0; // 2.0px authentic retro pixel grid
 const snap = (v) => Math.round(v / P) * P;
@@ -172,12 +172,25 @@ export function drawEscanorSkin(ctx, fighter) {
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
   // 1. Standard Upright Orientation & Local Angle Transforms (Rule 19)
-  const angle = isPodiumPreview ? 0 : (fighter.gunAngle || 0);
+  // When casting Cruel Sun or holding the post-throw follow-through stance, Escanor faces directly towards the player/camera (angle 0)
+  const isChannelingSun = Boolean(fighter.isChannelingCruelSun);
+  const isPostThrowRecovery = Boolean(fighter.cruelSunRecoveryTimer && fighter.cruelSunRecoveryTimer > 0);
+  const isFacingPlayer = isPodiumPreview || isChannelingSun || isPostThrowRecovery;
+  const angle = isFacingPlayer ? 0 : (fighter.gunAngle || 0);
   ctx.rotate(angle);
 
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  // During Cruel Sun channeling or post-throw recovery, body flips horizontally based on target/cast angle
+  const enemyAngle = (isChannelingSun || isPostThrowRecovery)
+    ? ((fighter.cruelSunCastAngle !== undefined) ? fighter.cruelSunCastAngle : (fighter.cruelSunReleaseAngle || 0))
+    : angle;
+
+  const facingLeft = !isPodiumPreview && Math.abs(enemyAngle) > Math.PI / 2;
   if (facingLeft) {
-    ctx.scale(1, -1);
+    if (isFacingPlayer) {
+      ctx.scale(-1, 1); // Flip horizontally when facing player upright
+    } else {
+      ctx.scale(1, -1); // Standard Rule 19 vertical scale mirroring when rotated
+    }
   }
 
   // 2. Solar Heat / Sunshine Aura (Rule 11 compliant: Concentric flat rings)
@@ -192,7 +205,29 @@ export function drawEscanorSkin(ctx, fighter) {
   const isPunching = !isPodiumPreview && !isSuppressed && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
   const punchPhase = isPunching ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14))) : 0;
 
-  // 4. LAYER 0: BACK HAND (Behind Body Layer)
+  // ── Authentic Retro Game Stepped Breathing Animation (Rule 3.5: P = 2.0px discrete grid) ──
+  // Classic 4-step retro sprite keyframe loop: Inhale lift -> Peak hold -> Exhale drop -> Neutral rest.
+  // Strictly integer-stepped pixel displacement with ZERO float scaling or pulsing!
+  ctx.save();
+  if (!isPodiumPreview && !isSuppressed && (isChannelingSun || isPostThrowRecovery)) {
+    // 4-frame retro animation loop with 160ms per keyframe (~640ms total cycle)
+    const frameDuration = 160;
+    const currentFrame = Math.floor((now / frameDuration) % 4); // 0, 1, 2, 3
+
+    // Discrete stepped pixel displacement:
+    // Frame 0: Neutral Rest (0px)
+    // Frame 1: Inhale Lift (-2px / -P)
+    // Frame 2: Deep Inhale Hold (-2px / -P)
+    // Frame 3: Exhale Drop (0px)
+    const retroStepY = (currentFrame === 1 || currentFrame === 2) ? -P : 0;
+    ctx.translate(0, retroStepY);
+
+    if (currentFrame === 3) {
+      _drawEscanorRetroExhaleMotes(ctx, r, now);
+    }
+  }
+
+  // 4. LAYER 0: BACK HAND & RESTING WEAPON (Behind Body Layer)
   const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand;
   if (showBackHand) {
     _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase);
@@ -207,20 +242,71 @@ export function drawEscanorSkin(ctx, fighter) {
   // 7. LAYER 3: HAIR ASSET OVERLAY (Assets/model/Escanor-hair.png)
   _drawEscanorHair(ctx, r, facingLeft);
 
-  // 8. LAYER 4: FRONT HAND & DIVINE AXE RHITTA (On Top of Body, Mustache & Hair)
+  // 8. LAYER 4: FRONT HAND / POINTING GAUNTLET (On Top of Body, Mustache & Hair)
   const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand;
   if (showFrontHand) {
-    _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhase);
+    _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhase, now, facingLeft);
   }
 
   // 9. Active Rhitta Slash Arc Trail (Rule 2.6 / 15 Compliant: Dynamic Eraser Wipe)
   // Handled in world coordinates in EscanorFighter.js draw() so the attack effect stays anchored in the air when released!
+
+  // 10. Expanding Cruel Sun during Channeling (Poised steadily overhead above Escanor)
+  if (!isPodiumPreview && !isSuppressed && isChannelingSun) {
+    const maxTimer = fighter.cruelSunMaxChargeTimer || 45;
+    const curTimer = fighter.cruelSunChargeTimer || 0;
+    const progress = Math.max(0, Math.min(1.0, 1.0 - (curTimer / maxTimer)));
+    const expandProgress = Math.max(0, Math.min(1.0, (progress - 0.20) / 0.80));
+
+    if (expandProgress > 0) {
+      const handR = Math.max(r * 0.30, getHandSize(7.0));
+      const fingerLen = snap(handR * 1.35);
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : (fighter._config || {});
+      const maxSunR = Number.isFinite(Number(cfg.cruelSunMaxExpandRadius))
+        ? Number(cfg.cruelSunMaxExpandRadius)
+        : (Number.isFinite(Number(cfg.cruelSunOrbRadius)) ? Number(cfg.cruelSunOrbRadius) : 48);
+      const currentSunR = Math.max(3, expandProgress * maxSunR);
+
+      const poisedHandX = r * 0.90;
+      const poisedHandY = -r * 0.38;
+      const fingerTopY = poisedHandY - fingerLen;
+
+      // Sun remains steadily poised overhead above Escanor — ZERO rotation or movement around him
+      const sunX = poisedHandX;
+      const sunY = fingerTopY - currentSunR - 6;
+
+      drawCruelSunChargingExpansion(ctx, sunX, sunY, expandProgress, maxSunR, fighter.isTheOneActive, now);
+    }
+  }
+
+  ctx.restore();
 
   // Status Overlays
   if (typeof fighter.drawStatusOverlays === 'function') {
     fighter.drawStatusOverlays(ctx, r);
   }
 
+  ctx.restore();
+}
+
+/**
+ * Renders authentic retro discrete pixel steam motes exhaled on exhale keyframes.
+ * Adheres strictly to Rule 2.2 (Zero shadowBlur), Rule 2.4 (Stack Integrity), and Rule 3.5 (P = 2px).
+ */
+function _drawEscanorRetroExhaleMotes(ctx, r, now = Date.now()) {
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
+  ctx.save();
+  ctx.fillStyle = '#FEF08A';
+  // 3 discrete 2x2px pixel blocks stepped outward from mustache
+  const subTick = Math.floor((currentNow / 50) % 3);
+  const px1 = snap(4 + subTick * 2);
+  const py1 = snap(r * 0.18 + subTick * 2);
+  ctx.fillRect(px1, py1, P, P);
+
+  ctx.fillStyle = '#FFF795';
+  const px2 = snap(-4 - subTick * 2);
+  const py2 = snap(r * 0.18 + subTick * 2);
+  ctx.fillRect(px2, py2, P, P);
   ctx.restore();
 }
 
@@ -234,9 +320,11 @@ export function drawEscanorSkin(ctx, fighter) {
  * 5. High Noon "The One" Blazing Radiance & Solar Flares
  * Adheres strictly to Rule 11 (Zero shadowBlur) & Stack Integrity (Rule 2.4).
  */
-function _drawEscanorSolarAura(ctx, r, fighter, now) {
+function _drawEscanorSolarAura(ctx, r, fighter, now = Date.now()) {
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
   const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
   const isTheOne = Boolean(fighter.isTheOneActive);
+  if (cfg.enableSunshine === false && !isTheOne) return;
   const prideStacks = fighter.prideStacks || 0;
   const prideRatio = prideStacks / 5.0; // 0.0 to 1.0
 
@@ -245,7 +333,7 @@ function _drawEscanorSolarAura(ctx, r, fighter, now) {
     ? fighter.currentSunshineHeatRadius
     : ((typeof cfg.sunshineHeatRadius === 'number') ? cfg.sunshineHeatRadius : 200);
 
-  const heatPulse = Math.sin(now * 0.006) * (isTheOne ? 6.0 : 3.0);
+  const heatPulse = Math.sin(currentNow * 0.006) * (isTheOne ? 6.0 : 3.0);
   const totalHeatR = baseHeatR + heatPulse;
 
   ctx.save();
@@ -663,6 +751,91 @@ function _drawEscanorGoldenGauntlet(ctx, cx, cy, radius, isTheOne = false) {
 }
 
 /**
+ * Escanor Pointing Gauntlet (Retro Arcade Pixel Art Edition)
+ * Golden Holy Knight plate gauntlet with:
+ * - Quantized discrete 24-way arcade stick aiming angles (~15° notches)
+ * - Authentic 2D Discrete Grid (P = 2.0px) pixel art shading
+ * - 4-frame retro arcade cycling ignition spark at the extended fingertip
+ */
+function _drawEscanorPointingGauntlet(ctx, cx, cy, radius, isTheOne = false, pointProgress = 1.0, fingerAngle = -Math.PI / 2, now = Date.now()) {
+  if (radius <= 0) return;
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
+
+  const snapCx = snap(cx);
+  const snapCy = snap(cy);
+
+  // 1. Palm / Fist Base (Discrete Pixel Gauntlet)
+  _drawEscanorGoldenGauntlet(ctx, snapCx, snapCy, snap(radius * 0.85), isTheOne);
+
+  // 2. Extended Index Finger (Quantized 24-Way Arcade Stick Direction)
+  ctx.save();
+  ctx.translate(snapCx, snapCy);
+
+  // Quantize finger angle to authentic 24-way discrete arcade angles (~15° per step)
+  const angleStep = Math.PI / 12;
+  const rawRot = fingerAngle + Math.PI / 2;
+  const quantizedAngle = Math.round(rawRot / angleStep) * angleStep;
+  ctx.rotate(quantizedAngle);
+
+  const fingerLen = snap(radius * 1.40);
+  const fingerTopY = -fingerLen;
+  const outlineColor = isTheOne ? '#78350F' : '#5B210B';
+  const shadowColor = isTheOne ? '#B45309' : '#92400E';
+  const goldColor = isTheOne ? '#FDE047' : '#FBBF24';
+  const highlightColor = isTheOne ? '#FFFFFF' : '#FEF08A';
+
+  // 2a. Stepped Dark Ink Outline (Rule 3.5: Discrete grid bounding shell)
+  ctx.fillStyle = outlineColor;
+  ctx.fillRect(snap(-4), snap(fingerTopY - 2), 8, fingerLen + 4);
+
+  // 2b. Inner Gauntlet Armor Shadow
+  ctx.fillStyle = shadowColor;
+  ctx.fillRect(snap(-3), snap(fingerTopY), 6, fingerLen);
+
+  // 2c. Golden Armor Plate Base Fill
+  ctx.fillStyle = goldColor;
+  ctx.fillRect(snap(-2), snap(fingerTopY), 4, fingerLen - 2);
+
+  // 2d. Specular Highlight Core along leading edge
+  ctx.fillStyle = highlightColor;
+  ctx.fillRect(snap(-1), snap(fingerTopY), 2, snap(fingerLen * 0.80));
+
+  // 3. 4-Frame Retro Arcade Cycling Ignition Spark at Fingertip
+  if (pointProgress >= 0.15) {
+    const sparkFrame = Math.floor((currentNow / 75) % 4); // 75ms per retro arcade flash frame
+
+    if (sparkFrame === 0) {
+      // Small 2x2 intense white core
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snap(-1), snap(fingerTopY - 2), 2, 2);
+    } else if (sparkFrame === 1) {
+      // 4x4 Diamond Flash: Amber outer + White inner
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(snap(-3), snap(fingerTopY - 4), 6, 6);
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(snap(-2), snap(fingerTopY - 3), 4, 4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snap(-1), snap(fingerTopY - 2), 2, 2);
+    } else if (sparkFrame === 2) {
+      // 8x2 Horizontal Glint + 2x8 Vertical Cross Glint (Classic Arcade Beam Flare)
+      ctx.fillStyle = '#FEF08A';
+      ctx.fillRect(snap(-4), snap(fingerTopY - 2), 8, 2);
+      ctx.fillRect(snap(-1), snap(fingerTopY - 5), 2, 8);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snap(-2), snap(fingerTopY - 3), 4, 4);
+    } else {
+      // 4x4 Golden Mote Flare
+      ctx.fillStyle = '#F59E0B';
+      ctx.fillRect(snap(-2), snap(fingerTopY - 3), 4, 4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snap(-1), snap(fingerTopY - 2), 2, 2);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
  * Computes exact frame-by-frame state for Escanor's Divine Axe Rhitta Chop.
  * Directly honors chopLiftFrames, chopLiftHoldFrames, chopStrikeFrames, chopRecoveryFrames.
  */
@@ -740,10 +913,10 @@ export function _getEscanorChopAnimationState(fighter) {
 
   const elapsed = Math.max(0, totalFrames - fighter.slashSwingTimer);
 
-  // Frame 2: Lift stance (hand at upper-right / top-center, weapon shaft pointing up-left over back shoulder)
+  // Frame 2: Lift stance (hand at upper-left, weapon shaft pointing up-left over back shoulder)
   const overheadAngle = -2.45; // ~-140° pointing up-left
-  const overheadHandX = -r * 0.25; // Upper back
-  const overheadHandY = -r * 0.40; // Upper area
+  const overheadHandX = -r * 0.48; // Shifted to left side
+  const overheadHandY = -r * 0.42; // Upper area
   const overheadBackHandX = r * 0.35;
   const overheadBackHandY = -r * 0.10;
 
@@ -806,10 +979,16 @@ export function _getEscanorChopAnimationState(fighter) {
 }
 
 /**
- * Escanor Layer 0: Back Hand — Right Gauntlet (Behind Body / Forward Guard & Chop Counter-Balance)
+ * Escanor Layer 0: Back Hand & Resting Weapon — (Behind Body Layer)
  */
 function _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase) {
   const handR = Math.max(r * 0.28, getHandSize(6.5));
+
+  // While actively channeling Cruel Sun or holding the post-throw stationary follow-through pose, back hand is hidden
+  if (fighter.isChannelingCruelSun || (fighter.cruelSunRecoveryTimer && fighter.cruelSunRecoveryTimer > 0)) {
+    return;
+  }
+
   let handX = r * 0.65;
   let handY = -r * 0.18;
 
@@ -826,10 +1005,119 @@ function _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase
 }
 
 /**
- * Escanor Layer 2: Front Hand & Divine Axe Rhitta — Left Gauntlet (On Top of Body / Wielding Rhitta on the Lower Left Side -X/+Y)
+ * Escanor Layer 4: Front Hand & Divine Axe Rhitta / Pointing Gauntlet (On Top of Body Layer)
  */
-function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhase) {
+function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhase, now = Date.now(), facingLeft = false) {
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
   const handR = Math.max(r * 0.30, getHandSize(7.0));
+
+  // Cruel Sun Activation, Aim & 3-Second Post-Throw Follow-Through Pose:
+  // 1. Left Hand firmly grips Divine Axe Rhitta on the front lower-left (-X, +Y)
+  // 2. Right Hand:
+  //    - Phase 1 (0.00-0.25): Lifts from resting up to skyward pointing pose
+  //    - Phase 2 (0.25-0.75): Points skyward with muscular tension tremor as sun expands overhead
+  //    - Phase 3 (0.75-1.00): Smoothly lowers & aims pointing index finger directly forward at enemy along local +X!
+  //    - Post-Throw Recovery (3s): Holds extended index finger forward follow-through pose while stationary!
+  if (fighter.isChannelingCruelSun || (fighter.cruelSunRecoveryTimer && fighter.cruelSunRecoveryTimer > 0)) {
+    const isRecovery = !fighter.isChannelingCruelSun && Boolean(fighter.cruelSunRecoveryTimer > 0);
+    const maxTimer = fighter.cruelSunMaxChargeTimer || 45;
+    const curTimer = fighter.cruelSunChargeTimer || 0;
+    const progress = isRecovery ? 1.0 : Math.max(0, Math.min(1.0, 1.0 - (curTimer / maxTimer)));
+
+    // 1. Left Hand with Divine Axe Rhitta (Front Layer)
+    const leftHandX = snap(-r * 0.72);
+    const leftHandY = snap(r * 0.38);
+    const axeAngle = 0.35; // Angled down-right across bottom
+
+    drawDivineAxeRhitta(ctx, leftHandX, leftHandY, axeAngle, r, {
+      isSwinging: false,
+      isTheOne: fighter.isTheOneActive,
+      prideStacks: fighter.prideStacks || 0,
+      heatLevel: 1.0 + (fighter.prideStacks || 0) * 0.2
+    });
+    _drawEscanorGoldenGauntlet(ctx, leftHandX, leftHandY, handR, fighter.isTheOneActive);
+
+    // 2. Right Hand Retro Arcade Keyframed Aiming
+    const rawCastAngle = (fighter.cruelSunCastAngle !== undefined) ? fighter.cruelSunCastAngle : (fighter.cruelSunReleaseAngle || 0);
+    // When ctx.scale(-1, 1) is active (facingLeft), transform raw target angle into local flipped coordinate space
+    const castAngle = facingLeft ? (Math.PI - rawCastAngle) : rawCastAngle;
+    const restingHandX = snap(r * 0.75);
+    const restingHandY = snap(-r * 0.18);
+    const midLiftHandX = snap(r * 0.82);
+    const midLiftHandY = snap(-r * 0.28);
+    const poisedHandX = snap(r * 0.90);
+    const poisedHandY = snap(-r * 0.38);
+    const forwardHandX = snap(Math.cos(castAngle) * (r * 0.95));
+    const forwardHandY = snap(Math.sin(castAngle) * (r * 0.95));
+
+    let rightHandX = poisedHandX;
+    let rightHandY = poisedHandY;
+    let fingerAngle = -Math.PI / 2;
+
+    if (isRecovery) {
+      // 3-Second Post-Throw Follow-Through Lock:
+      // Holds crisp extended pointing pose in the exact launch direction
+      rightHandX = forwardHandX;
+      rightHandY = forwardHandY;
+      fingerAngle = castAngle;
+    } else if (progress < 0.25) {
+      // Phase 1: 3-Frame Discrete Arcade Arm Lift (Pose-to-Pose Keyframes)
+      if (progress < 0.08) {
+        // Frame 0: Resting Guard Pose
+        rightHandX = restingHandX;
+        rightHandY = restingHandY;
+        fingerAngle = -Math.PI * 0.15;
+      } else if (progress < 0.17) {
+        // Frame 1: Mid-Diagonal Lift Pose
+        rightHandX = midLiftHandX;
+        rightHandY = midLiftHandY;
+        fingerAngle = -Math.PI * 0.32;
+      } else {
+        // Frame 2: High Skyward Ready Pose
+        rightHandX = poisedHandX;
+        rightHandY = poisedHandY;
+        fingerAngle = -Math.PI / 2;
+      }
+    } else if (progress < 0.75) {
+      // Phase 2: Retro Stepped Poise Hold & Muscular Tension Tremor
+      // Discrete integer-stepped pixel displacement on 120ms retro cycle (0px / -2px)
+      const retroTremor = (Math.floor(currentNow / 120) % 2 === 0) ? -P : 0;
+      rightHandX = poisedHandX;
+      rightHandY = snap(poisedHandY + retroTremor);
+      fingerAngle = -Math.PI / 2;
+    } else {
+      // Phase 3: 3-Step Discrete Arcade Aim Snap Transition (Skyward -> Target Angle)
+      const phaseP = (progress - 0.75) / 0.25; // 0.0 -> 1.0
+
+      // Compute shortest angular path to target angle
+      let angleDiff = castAngle - (-Math.PI / 2);
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+      if (phaseP < 0.35) {
+        // Step 1 (Keyframe 1: 33% Snap)
+        const stepRatio = 0.33;
+        rightHandX = snap(poisedHandX + (forwardHandX - poisedHandX) * stepRatio);
+        rightHandY = snap(poisedHandY + (forwardHandY - poisedHandY) * stepRatio);
+        fingerAngle = -Math.PI / 2 + angleDiff * stepRatio;
+      } else if (phaseP < 0.70) {
+        // Step 2 (Keyframe 2: 66% Snap)
+        const stepRatio = 0.66;
+        rightHandX = snap(poisedHandX + (forwardHandX - poisedHandX) * stepRatio);
+        rightHandY = snap(poisedHandY + (forwardHandY - poisedHandY) * stepRatio);
+        fingerAngle = -Math.PI / 2 + angleDiff * stepRatio;
+      } else {
+        // Step 3 (Keyframe 3: 100% Target Lock)
+        rightHandX = forwardHandX;
+        rightHandY = forwardHandY;
+        fingerAngle = castAngle;
+      }
+    }
+
+    _drawEscanorPointingGauntlet(ctx, rightHandX, rightHandY, handR, fighter.isTheOneActive, progress, fingerAngle, currentNow);
+    return;
+  }
+
   let handX = chopState.handX;
   let handY = chopState.handY;
   let axeAngle = chopState.axeAngle;

@@ -29,19 +29,8 @@ export const denjiConfig = {
   ability: 'Chainsaw Devil & "Massacre Engine"',
   desc: 'The Chainsaw Devil. Relentless high-speed berserker entering the arena already fully transformed into his Chainsaw Devil form. Wields 140° Twin Forearm Chainsaw Shreds with 25% lifesteal, Engine Rev Lunges, Extended Chain Cleaves, Pochita Heart Revive, and the Massacre Engine ultimate.',
 
-  // ──────────────────────────────────────────
-  // ABILITY MASTER TOGGLE SWITCHES (1/true = Enabled, 0/false = Disabled)
-  // ──────────────────────────────────────────
-  enablePunches: true,              // Master toggle for Human Form: Street Brawler 3-Hit Combo
-  enableChainsawShred: true,        // Master toggle for Hybrid Form: 140° Twin Chainsaw Shred
-  enableEngineLunge: true,          // Master toggle for Skill 1: Ripcord Engine Rev Lunge
-  enableBloodCleave: true,          // Master toggle for Skill 2: Blood Intoxication Cleave
-  enableMassacreEngine: true,       // Master toggle for Ultimate: Massacre Engine
-  enablePochitaRevive: true,        // Master toggle for Passive 1: Pochita Heart Revive
-  enableBloodSiphon: true,          // Master toggle for Passive 2: Blood Lust Siphon (Lifesteal)
-  enableHemorrhage: true,           // Master toggle for Passive 3: Stacking Bleed & Vascular Rupture
-
   // Passive 1: Pochita Heart Ripcord Revive
+  enablePochitaRevive: true,        // Master toggle for Passive 1: Pochita Heart Revive
   maxReviveStocks: 1,               // 1 ripcord revive per round
   reviveHpPercent: 0.50,            // Restores 50% Max HP (180 HP)
   reviveShockwaveRadius: 150,       // Radial blood blast radius on trigger
@@ -50,16 +39,19 @@ export const denjiConfig = {
   hybridModeDurationFrames: 720,    // 12.0s Chainsaw Devil Form duration
 
   // Passive 2: Blood Lust Siphon
+  enableBloodSiphon: true,          // Master toggle for Passive 2: Blood Lust Siphon (Lifesteal)
   lifestealRatio: 0.25,             // 25% base chainsaw lifesteal
   bleedingTargetLifestealRatio: 0.35,// 35% lifesteal vs bleeding enemies
 
   // Passive 3: Hemorrhage & Vascular Rupture
+  enableHemorrhage: true,           // Master toggle for Passive 3: Stacking Bleed & Vascular Rupture
   maxHemorrhageStacks: 6,
   defenseShredPerStack: 0.05,       // 5% defense reduction per stack
   bleedDpsPerStack: 3,              // 3 damage per second per stack
   ruptureDamage: 28,                // Bonus true damage at max stacks
 
   // Human Form: Street Brawler Combo
+  enablePunches: true,              // Master toggle for Human Form: Street Brawler 3-Hit Combo
   punch1Damage: 12,
   punch2Damage: 14,
   punch3Damage: 20,
@@ -67,6 +59,7 @@ export const denjiConfig = {
   punchKnockback: 18,
 
   // Hybrid Form: Twin Forearm Chainsaw Shred (140° Frontal Arc)
+  enableChainsawShred: true,        // Master toggle for Hybrid Form: 140° Twin Chainsaw Shred
   sawArcAngle: Math.PI * 0.778,     // ~140 degrees
   sawReach: 75,
   sawHit1Damage: 16,
@@ -75,6 +68,7 @@ export const denjiConfig = {
   sawHitKnockback: 24,
 
   // Skill 1: Ripcord Engine Rev Lunge
+  enableEngineLunge: true,          // Master toggle for Skill 1: Ripcord Engine Rev Lunge
   lungeCooldown: 240,               // 4.0s
   lungeSpeed: 30.0,                 // Supersonic drag
   lungeMaxDistance: 300,
@@ -82,6 +76,7 @@ export const denjiConfig = {
   lungeWallStunFrames: 16,
 
   // Skill 2: Blood Intoxication Cleave
+  enableBloodCleave: true,          // Master toggle for Skill 2: Blood Intoxication Cleave
   cleaveCooldown: 360,              // 6.0s
   cleaveRange: 160,
   cleaveDamage: 28,
@@ -89,6 +84,7 @@ export const denjiConfig = {
   cleaveStaggerFrames: 12,
 
   // Ultimate: Chainsaw Devil Awakening — Massacre Engine
+  enableMassacreEngine: true,       // Master toggle for Ultimate: Massacre Engine
   ultimateCooldown: 1500,           // 25.0s
   ultimateTimeStopFrames: 35,
   ultimateCycloneRadius: 120,

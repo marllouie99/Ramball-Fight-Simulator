@@ -24,6 +24,7 @@ export const todoConfig = {
     desc: 'Claps hands to swap positions with enemies or cursed rocks. Focuses on disorienting opponents.',
 
     // Basic Combat & Stats
+    enableBasicPunch: true,       // Master toggle for basic melee punch
     baseDamageReduction: 0.05,    // 5% passive damage reduction (Grade 1 Cursed Energy brawler physique)
     zoneDamageReduction: 0.20,    // 20% damage reduction while in the Zone / Black Flash window
     counterStanceDamageReduction: 0.25, // 25% damage reduction during Rock Proximity Counter-Attack sequence
@@ -40,6 +41,7 @@ export const todoConfig = {
     blackFlashScreenShake: 0,  // Arena screen shake on Black Flash punch (0 = no shake)
 
     // Skill 1: Boogie Woogie (Clap Teleport & Teammate Rescue)
+    enableBoogieWoogie: true,     // Master toggle for Boogie Woogie clap swap
     clapCooldown: 200,            // Cooldown in frames between Boogie Woogie claps (2.0 seconds at 60fps)
     blackFlashWindow: 45,         // Window in frames after swapping where next punch triggers Black Flash (0.75 seconds)
     vanishDurationFrames: 15,     // Duration in frames (at 60fps) where Todo and swapped entities vanish during swap (~0.05s)
@@ -56,6 +58,7 @@ export const todoConfig = {
     enemyProximitySwapDistance: 130, // Distance to enemy at which Todo or partner triggers Boogie Woogie swap (swaps when either is very close to enemy)
 
     // Skill 2: Cursed Rock & Sequence Tuning
+    enableCursedRock: true,       // Master toggle for Cursed Rock throws & counter sequences
     maxRocks: 1,                  // Maximum active rocks allowed in arena at any time
     rockCooldown: 180,            // Base cooldown in frames between rock sequence attempts (3.0 seconds at 60fps)
     sequenceCooldown: 180,        // Cooldown in frames after completing a combo disengage before starting next sequence (3.0s)
@@ -79,6 +82,7 @@ export const todoConfig = {
     hitStunFrames: 20,            // Hitstun frames applied to enemy on arrival
 
     // Ultimate Skill: Takada-chan Idol Imagination (530,000 IQ Idol Multiplier)
+    enableTakadaUltimate: true,   // Master toggle for Takada-chan ultimate
     ultCooldown: 1200,            // Ultimate cooldown in frames (20.0 seconds at 60fps)
     ultDuration: 1000,             // Ultimate active duration in frames (8.0 seconds at 60fps)
     channelDuration: 180,         // Channeling windup duration in frames (3.0 seconds at 60fps)

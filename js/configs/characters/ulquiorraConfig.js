@@ -26,6 +26,7 @@ export const ulquiorraConfig = {
   desc: 'The 4th Espada. Possesses High-Speed Regeneration, Hierro defense, instantaneous Sonído vanishes, emerald Cero/Cero Oscuras beams, and evolves into Segunda Etapa with Lanza del Relámpago.',
 
   // ── Basic Attacks & Zanpakutō Murciélago ──
+  enableSwordAttack: true,         // Master toggle for basic Zanpakutō sword attacks
   swordRange: 72,                // Frontal melee blade reach
   swordArc: 130,                 // Frontal arc degrees (Rule 7)
   swordDamage: 22,               // Base sword slash damage
@@ -33,6 +34,7 @@ export const ulquiorraConfig = {
   swordCooldown: 26,             // Attack interval frames
 
   // ── Mid-Range Poke: Bala (Hollow Bullets) ──
+  enableBala: true,                // Master toggle for Bala hollow bullets
   balaSpeed: 24,                 // Bullet projectile velocity
   balaDamage: 10,                // Damage per bala hit
   balaRadius: 4.5,               // Bullet collision radius
@@ -41,18 +43,21 @@ export const ulquiorraConfig = {
   balaCooldown: 150,             // Cooldown between bursts
 
   // ── Skill 1: Sonído: Aceleración ──
+  enableSonido: true,              // Master toggle for Sonído teleport strike
   sonidoCooldown: 300,           // ~5s cooldown
   sonidoDistance: 220,           // Teleport distance
   sonidoDashFrames: 5,           // Evasion i-frames
   sonidoStrikeDamage: 28,        // Downward flank slash damage
 
   // ── Skill 2: Cero & Cero Oscuras ──
+  enableCero: true,                // Master toggle for Cero beam
   ceroDamage: 65,                // Base emerald cero damage
   ceroChargeFrames: 22,          // Beam charge windup
   ceroCooldown: 420,             // ~7s cooldown
   ceroOscurasDamage: 110,        // Resurrección pitch-black Cero damage
 
   // ── Transformations: Resurrección & Segunda Etapa ──
+  enableResurreccion: true,        // Master toggle for Resurrección transformations
   stage1HpThreshold: 0.60,       // Stage 1 trigger threshold (60% HP or full ult)
   stage2HpThreshold: 0.30,       // Segunda Etapa trigger threshold (30% HP)
   stage1SpeedMultiplier: 1.35,   // +35% speed in Murciélago
@@ -63,10 +68,12 @@ export const ulquiorraConfig = {
   lanzaCooldown: 720,            // 12s cooldown
 
   // ── Passive 1: Hierro (Steel Skin) ──
+  enableHierro: true,              // Master toggle for Hierro passive defense
   hierroDamageReduction: 0.15,   // 15% flat incoming damage mitigation
   hierroStunDecayBonus: 0.25,    // 25% faster CC recovery
 
   // ── Passive 2: High-Speed Regeneration ──
+  enableHighSpeedRegen: true,      // Master toggle for High-Speed Regeneration
   regenInterval: 60,             // 1 second (60 frames)
   regenAmount: 6,                // ~2.5% max HP per tick
   regenThreshold: 0.50,          // Triggers below 50% HP or out of combat

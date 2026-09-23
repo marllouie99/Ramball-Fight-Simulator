@@ -566,6 +566,10 @@ export class Fighter {
    */
   areAttackEffectsSuppressed() {
     if (this.hp <= 0 || this.isDead) return true;
+    if (this.characterId === 'escanor' || this.type === 'escanor') {
+      if (this.isTargetOfAmbush) return true;
+      return false;
+    }
     if (this.isTargetOfAmbush) return true;
     if (this.isCaughtInTelekinesis) return true;
     if (this._hitByFugaTimer && this._hitByFugaTimer > 0) return true;
@@ -991,6 +995,8 @@ export class Fighter {
       (this.thinIceBreakerChargeTimer && this.thinIceBreakerChargeTimer > 0) ||
       this.isChannelingCruelSun ||
       (this.cruelSunChargeTimer && this.cruelSunChargeTimer > 0) ||
+      (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0) ||
+      (this.activeCruelSuns && this.activeCruelSuns.length > 0) ||
       (this.seriousPunchChargeTimer && this.seriousPunchChargeTimer > 0) ||
       (this.basicPunchChargeTimer && this.basicPunchChargeTimer > 0) ||
       this.isChargingUlt ||

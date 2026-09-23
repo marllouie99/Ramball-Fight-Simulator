@@ -24,16 +24,19 @@ export const laylaConfig = {
     desc: 'Scaling marksman who gains damage and range with each hit. Uses Malefic Bomb, Void Dash, and Destruction Barrage ultimate.',
 
     // Ascending Power Passive
+    enableAscendingPower: true,  // Master toggle for Ascending Power passive
     maxStacks: 10,
     damagePerStack: 1.5,
     stackResetTime: 300, // 5 seconds at 60fps
 
     // Basic Attack
+    enableBasicAttack: true,     // Master toggle for basic ranged attack
     attackCooldown: 70,
     aimThreshold: 0.12,
     baseRange: 300,
 
     // Malefic Bomb (Skill 1)
+    enableMaleficBomb: true,     // Master toggle for Malefic Bomb
     maleficBombCooldown: 200, // 3 seconds at 60fps
     bombDamage: 20,
     bombSpeed: 12,
@@ -44,6 +47,7 @@ export const laylaConfig = {
     bombHitSpeedBoostMultiplier: 2.0, // 60% speed increase
 
     // Void Projectile (Skill 2)
+    enableVoidProjectile: true,  // Master toggle for Void Projectile
     voidDashCooldown: 120, // Keep variable name for HUD/cooldown slot mapping, 2 seconds at 60fps
     voidProjectileDamage: 15,
     voidProjectileSpeed: 8,
@@ -55,6 +59,7 @@ export const laylaConfig = {
     voidMarkStunDuration: 15, // 0.25 second stun (15 frames)
 
     // Destruction Rush (Ultimate)
+    enableDestructionRush: true, // Master toggle for Destruction Rush ultimate
     ultimateCooldown: 600, // 10 seconds at 60fps
     ultimateLaserDamage: 80, // Massive burst damage
     ultimateLaserRange: 700, // Very long range

@@ -81,27 +81,32 @@ export const saitamaConfig = {
   flurryScreenShakeDuration: 10,
 
   // Skill 2: Serious Side Hops
+  enableSideHops: true,          // Master toggle for Skill 2: Serious Side Hops
   sideHopsCooldown: 420, // 7 seconds at 60fps
   sideHopsDistance: 100,
 
   // Ultimate: Serious Punch
+  enableSeriousPunch: true,      // Master toggle for Ultimate: Serious Punch
   seriousPunchWindupFrames: 90, // 1.5 seconds at 60fps
   seriousPunchDamage: 999, // True damage one-shot
   seriousPunchBeamWidth: 80,
   seriousPunchCooldown: 2700, // 45 seconds at 60fps
 
   // Passive: Hero for Fun
+  enableHeroForFun: true,        // Master toggle for Passive: Hero for Fun
   boredomStackInterval: 300, // 5 seconds at 60fps
   boredomMaxStacks: 5,
   boredomDamagePerStack: 0.15, // +15% per stack
 
   // Passive: Caped Baldy Reflexes (Dodge Teleport)
+  enableDodge: true,             // Master toggle for Passive: Caped Baldy Reflexes
   dodgeChance: 0.70, // probability (0-1) of successfully dodging incoming attacks
   dodgeDistance: 100, // Short sidestep distance (left/right)
   dodgeCooldown: 1, // Minimum frames (~0.06s) between dodge sidesteps
   attackerTeleportChaseDelayFrames: 5, // Delay (frames) applied to teleporting chasers (Gojo/Sukuna) when Saitama dodges (~0.5s)
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)
+  enableSeriousCounter: true,    // Master toggle for Serious Skill Counter
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
   counterPunchDamageMultiplier: 5.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
   counterFrontalReach: 1000,        // Long frontal shockwave blast reach (px)

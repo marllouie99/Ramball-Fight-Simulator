@@ -27,6 +27,7 @@ export const ichigoConfig = {
   desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 60% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
 
   // ── Basic Attack: Zangetsu Melee Cleave ──
+  enableMeleeCleave: true,       // Master toggle for Basic Attack: Zangetsu Melee Cleave
   swordDamage: 8,               // Base damage per melee slash
   swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s at 60fps)
   swordRange: 50,                // Melee reach distance
@@ -62,6 +63,7 @@ export const ichigoConfig = {
   comboTriggerMaxDist: 400,      // Maximum trigger distance for AI
 
   // ── Special Attack: Getsuga Tensho Wave ──
+  enableGetsuga: true,           // Master toggle for Getsuga Tensho Wave
   getsugaDamage: 4,              // Base damage / tick damage for Getsuga wave
   getsugaTickDamage: 3,          // Multi-tick shredding damage per hit in Shikai
   getsugaSpeed: 11,              // Base projectile travel speed (px/frame)
@@ -88,6 +90,7 @@ export const ichigoConfig = {
   bankaiHollowPostGetsugaCooldown: 120, // Post-Getsuga delay buffer during Bankai + Hollow Mask (~2.0s at 60fps)
 
   // ── Passive: Hollow Mask Awakening ──
+  enableHollowMask: true,        // Master toggle for Hollow Mask Awakening
   hollowMaskThreshold: 0.60,     // Automatically activates when HP <= 60%
   hollowRechargeHpRatio: 0.20,   // Damage required to reactivate Hollow Mask after mask shatters (20% of max HP)
   hollowHpRecovery: 0.50,        // 50% HP recovery upon Hollow Mask transformation
@@ -111,6 +114,7 @@ export const ichigoConfig = {
   hollowGetsugaColor: '#FFFFFF', // Hollow Mask Getsuga theme color (Monochrome white/black)
 
   // ── Passive: Zanjutsu Blade Parry & Defense ──
+  enableParry: true,             // Master toggle for Zanjutsu Blade Parry
   parryChance: 0.15,             // Base parry chance in Shikai (15%)
   bankaiParryChance: 0.25,       // Parry chance during Bankai (25%)
   hollowParryChance: 0.30,       // Parry chance during Hollow Mask (30%)
@@ -119,6 +123,7 @@ export const ichigoConfig = {
   parryDeflectionPush: 7.0,      // Physical deflection push impulse applied to attacker
 
   // ── Ultimate: Bankai Awakening (Tensa Zangetsu) ──
+  enableBankai: true,            // Master toggle for Ultimate: Bankai Awakening
   ultimateThreshold: 0.80,       // Automatically activates when HP <= 90%
   bankaiCooldown: 600,           // Cooldown in frames between Bankai activations after expiration (~10.0s at 60fps)
   bankaiRechargeHpRatio: 0.20,   // Damage required to reactivate Bankai after it expires (20% of max HP)
@@ -156,6 +161,7 @@ export const ichigoConfig = {
   bankaiWindFreezeDuration: 12,  // Hit pause stasis frames from wind blast
 
   // ── Grand Finisher: Final Massive Kuroi Getsuga ──
+  enableFinalGetsuga: true,      // Master toggle for Grand Finisher: Final Massive Kuroi Getsuga
   bankaiFinalGetsugaTriggerTimer: 108,  // Bankai duration threshold frames when Grand Finisher triggers (80 frames charge + 28 frames slash wave release -> seamlessly awakens Hollow Mask)
   bankaiFinalGetsugaChargeFrames: 80,  // Gathering charge frames matching voiceline (~1.33s)
   bankaiFinalGetsugaRecoveryFrames: 24, // Post-release slash follow-through frames

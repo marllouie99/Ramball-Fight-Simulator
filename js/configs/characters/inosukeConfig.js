@@ -30,24 +30,18 @@ export const inosukeConfig = {
   ability: 'Beast Breathing ("King of the Mountain")',
   desc: 'Wild dual-serrated katana berserker with Spatial Awareness radar and dislocated joint reach. Wields 160° Dual Serrated Hacks, 360° Crazy Cutting whirlwind shredding, unstoppable Explosive Rush boar charges, and the King of the Mountain Cataclysm ultimate.',
 
-  // ──────────────────────────────────────────
-  // ABILITY MASTER TOGGLE SWITCHES
-  // ──────────────────────────────────────────
-  enableCrazyCutting: true,
-  enableExplosiveRush: true,
-  enableKingOfMountain: true,
-  enableSpatialAwareness: true,
-  enableDislocatedJoints: true,
-
   // Passive 1: Beast Spatial Awareness
+  enableSpatialAwareness: true,     // Master toggle for Passive 1: Spatial Awareness
   wallRicochetSpeedMultiplier: 1.25,
   antiBackstabImmunity: true,
 
   // Passive 2: Dislocated Joint Reach & Evasion
+  enableDislocatedJoints: true,     // Master toggle for Passive 2: Dislocated Joint Reach & Evasion
   projectileEvasionRate: 0.15,
   extendedReachBonus: 20,
 
   // Basic Attack: Beast Breathing Dual Serrated Hack (160° Frontal Arc)
+  enableBasicAttack: true,          // Master toggle for Basic Attack: Dual Serrated Hack
   dualKatanaArcAngle: Math.PI * 0.889, // ~160 degrees
   dualKatanaReach: 85,
   hit1Damage: 16,
@@ -58,18 +52,21 @@ export const inosukeConfig = {
   hit3Knockback: 26,
 
   // Skill 1: Beast Breathing Fifth Fang: Crazy Cutting (Kuruizaki)
+  enableCrazyCutting: true,         // Master toggle for Skill 1: Crazy Cutting
   crazyCuttingCooldown: 252,   // 4.2s
   crazyCuttingRadius: 100,
   crazyCuttingTicks: 3,
   crazyCuttingDamagePerTick: 12,
 
   // Skill 2: Beast Breathing Eighth Fang: Explosive Rush (Bakuretsu Mōshin)
+  enableExplosiveRush: true,        // Master toggle for Skill 2: Explosive Rush
   explosiveRushCooldown: 330,  // 5.5s
   explosiveRushSpeed: 30.0,
   explosiveRushDamage: 36,
   explosiveRushKnockback: 38,
 
   // Ultimate: Beast Breathing Ultimate: King of the Mountain Cataclysm
+  enableKingOfMountain: true,       // Master toggle for Ultimate: King of the Mountain Cataclysm
   ultimateCooldown: 1440,      // 24.0s
   ultimateComboHits: 8,
   ultimateHitDamage: 8,

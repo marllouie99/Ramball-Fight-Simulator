@@ -25,11 +25,13 @@ export const sukunaConfig = {
     shrineGlowRadius: 210,            // Atmospheric crimson ambient glow radius behind shrine
 
     // Basic Attack: Dismantle / Cleave Ranged Slashes
+    enableDismantle: true,            // Master toggle for Basic Attack: Dismantle / Cleave Slashes
     slashSpeed: 40,                   // Supersonic travel speed of Dismantle and Cleave slashes (px/frame)
     slashDamage: 10,                  // Base damage per slash
     slashCooldown: 70,                // Frames between ranged basic slash attacks
 
     // Stacking Slash Crit Passive
+    enableCritPassive: true,          // Master toggle for Stacking Slash Crit Passive
     baseCritChance: 0.25,             // 10% base crit chance
     baseCritMultiplier: 0.25,         // 1.50x base crit damage multiplier
     critChancePerSlashHit: 0.01 ,      // +2% crit chance per landed slash hit
@@ -38,12 +40,14 @@ export const sukunaConfig = {
     maxCritMultiplier: 1.0,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
+    enableRCT: true,                  // Master toggle for Reverse Cursed Technique (Passive)
     reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 25% or below
     reverseCursedTechniqueHealAmount: 0.50,   // % of Max HP healed per RCT trigger (0.50 = 50% Max HP)
     reverseCursedTechniqueCooldown: 1500,      // 20 second cooldown before it can trigger again
     rctRevivalHealAmount: 0.50,               // % of Max HP restored on emergency revival (0.50 = 50% Max HP)
 
     // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
+    enableMeleeMode: true,            // Master toggle for Melee Mode & Martial Arts
     closeRangeRadius: 110,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
     initialMeleeDuration: 150,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
     meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
@@ -55,19 +59,20 @@ export const sukunaConfig = {
     teleportSpeed: 15,                // Teleport movement slide speed
 
     // Teleport Dodge / Evade Mechanic
+    enableTeleportDodge: true,        // Master toggle for Teleport Dodge / Evade Mechanic
     teleportDodgeChance: 0.10,               // 10% chance to teleport dodge incoming attacks
     teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
     teleportDodgeDistance: 85,               // Distance teleported on dodge
     teleportSlideSpeed: 8.5,                 // Residual sliding velocity speed applied every time Sukuna teleports
 
     // Bleed Debuff
+    enableBleed: true,                // Master toggle for Bleed Debuff
     bleedDamagePerStack: 2,  // Damage per bleed stack
     maxBleedStacks: 5,        // Maximum bleed stacks
     bleedDuration: 180,       // Frames bleed lasts (3 seconds)
 
-
-
     // Passive / Defensive Skill: Spiderweb (Cleave / Dismantle Grid)
+    enableSpiderweb: true,            // Master toggle for Spiderweb Grid
     spiderwebRange: 100,      // Detection radius to trigger Spiderweb against surrounding enemies
     spiderwebCooldown: 300,   // Cooldown between Spiderweb activations (5.0 seconds at 60fps)
     spiderwebDamage: 15,      // Damage dealt by Spiderweb slashes
@@ -76,6 +81,7 @@ export const sukunaConfig = {
     spiderwebMinEnemies: 2,   // Minimum surrounding enemies required to trigger Spiderweb
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
+    enableFurnace: true,              // Master toggle for Furnace (Divine Flame / Fuga)
     divineFlameCooldown: 1500,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
     divineFlameChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Furnace / Fuga
     divineFlameCorridorHalfWidth: 45, // Straight corridor half-width for cardinal alignment detection (Up, Down, Left, Straight/Right)
@@ -101,6 +107,7 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
+    enableDomain: true,               // Master toggle for Ultimate: Malevolent Shrine
     domainCooldown: 2000,         // Cooldown before domain can trigger (~16.6s at 60 fps)
     domainChargeMax: 100,         // Channeling duration before domain opens (2.0s at 60 fps)
     domainDuration: 500,          // Domain active duration (~8.33s at 60 fps)

@@ -26,6 +26,7 @@ export const engineerConfig = {
   desc: 'Constructs an automated Sentry Turret to assault foes and a Dispenser to tether healing and boost reload speed.',
 
   // Primary Ranged Attack: Shotgun
+  enableShotgun: true,         // Master toggle for Shotgun primary ranged attack
   shotgunCooldown: 80,
   shotgunPellets: 8,
   shotgunSpread: 0.45,         // Spread angle in radians (~26°)
@@ -37,6 +38,7 @@ export const engineerConfig = {
   shotgunMuzzleOffset: 62,     // Distance from center to shotgun muzzle
 
   // Melee Weapon & Repair Tool: Wrench
+  enableWrench: true,          // Master toggle for Wrench melee & repair tool
   wrenchCooldown: 30,
   wrenchDamage: 15,
   wrenchRange: 85,             // Melee engagement distance
@@ -46,6 +48,7 @@ export const engineerConfig = {
   wrenchHitStunDuration: 8,    // Hit-stun frames applied to enemy
 
   // Skill 1: Sentry Turret (Primary Combat Building)
+  enableSentryTurret: true,    // Master toggle for Sentry Turret
   skillCooldown: 500,          // Rebuild cooldown after destruction (~8.3s)
   turretRadius: 18,            // Physical collision radius
   turretAimSpeed: 0.08,        // Aim rotation speed in radians per frame
@@ -63,18 +66,21 @@ export const engineerConfig = {
   turretAmmoPipSpacing: 6,     // Spacing between ammo pips
 
   // Level 1 Sentry Stats (Single Barrel Cannon)
+  enableSentryLevel1: true,
   turretLevel1Hp: 200,
   turretLevel1Damage: 2.2,     // Damage per bullet (single barrel)
   turretLevel1FireRate: 8,     // Frames between shots
   turretLevel1Ammo: 15,        // Shots per magazine
 
   // Level 2 Sentry Stats (Dual Gatling Miniguns)
+  enableSentryLevel2: true,
   turretLevel2Hp: 280,
   turretLevel2Damage: 1.8,     // Damage per bullet (twin volley = 3.6)
   turretLevel2FireRate: 6,     // Faster fire rate
   turretLevel2Ammo: 25,        // Shots per magazine
 
   // Level 3 Sentry Stats (Dual Heavy Gatlings + Quad Rocket Pod)
+  enableSentryLevel3: true,
   turretLevel3Hp: 380,
   turretLevel3Damage: 2.0,     // Damage per bullet (twin volley = 4.0)
   turretLevel3FireRate: 5,     // Supersonic Gatling fire rate
@@ -83,6 +89,7 @@ export const engineerConfig = {
   turretLevel3RocketInterval: 4, // Fires rocket salvo every 4 bullet volleys
 
   // Skill 2: Dispenser (Secondary Support Building)
+  enableDispenser: true,       // Master toggle for Dispenser
   dispenserHp: 300,            // Dispenser max health
   dispenserRadius: 19,         // Physical collision radius
   dispenserBuildTime: 110,     // Construction duration (~1.8s)

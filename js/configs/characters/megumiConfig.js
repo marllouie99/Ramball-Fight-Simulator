@@ -26,6 +26,7 @@ export const megumiConfig = {
   desc: 'Wields the Ten Shadows Technique. Uses liquid shadow submersion, Divine Dog: Totality, Nue lightning, and Chimera Shadow Garden. Invokes untamed Mahoraga when in critical danger.',
 
   // Melee & Cursed Dagger Attack
+  enableDaggerAttack: true,    // Master toggle for basic cursed dagger attack
   punchSpeed: 18,
   daggerRange: 55,
   daggerDamage: 14,
@@ -33,6 +34,7 @@ export const megumiConfig = {
   daggerArcAngle: 2.094, // 120 degrees in radians
 
   // Passive: Liquid Shadow Reservoir & Shadow Sink
+  enableShadowSink: true,      // Master toggle for Shadow Sink passive
   shadowSinkCooldown: 300, // 5.0s (300 frames)
   shadowSinkRequiredWallBounces: 1, // Number of arena wall bounces required before eruption
   shadowSinkGlideSpeedMultiplier: 1.45, // Submerged movement speed boost
@@ -44,25 +46,30 @@ export const megumiConfig = {
   thrustKnockback: 26, // Concussive knockback impulse for shadow thrust
 
   // Skill 1: Divine Dog: Totality (Kon: Zen)
+  enableTotality: true,        // Master toggle for Divine Dog: Totality
   totalityCooldown: 420, // 7.0s
   totalityDamage: 22,
   totalityBleedDuration: 180, // 3.0s
 
   // Skill 2: Nue (Thunder Bird) & Toad (Gama)
+  enableNue: true,             // Master toggle for Nue & Toad summons
   nueCooldown: 360, // 6.0s
   nueDamage: 18,
   nueStunFrames: 45, // 0.75s electric stun
   toadCooldown: 300, // 5.0s
 
   // Skill 3: Max Elephant & Rabbit Escape
+  enableMaxElephant: true,     // Master toggle for Max Elephant & Rabbit Escape
   maxElephantCooldown: 600, // 10.0s
   maxElephantDamage: 35,
   rabbitEscapeCooldown: 480, // 8.0s
 
   // Domain Expansion: Chimera Shadow Garden
+  enableDomainExpansion: true,  // Master toggle for Chimera Shadow Garden
   domainDuration: 600, // 10.0s
   domainSlowMultiplier: 0.50,
 
   // Desperation Climax: Mahoraga Ritual
+  enableMahoragaRitual: true,  // Master toggle for Mahoraga Ritual desperation summon
   mahoragaThresholdHpPercent: 0.20, // 20% max HP
 };
