@@ -326,7 +326,6 @@ export function renderMahitoDomainBackground(fighter, ctx, isClashSecondary = fa
   const ay = arena.y;
   const aw = arena.width;
   const ah = arena.height;
-  const ww = arena.wallWidth || 4;
 
   ctx.save();
 
@@ -335,10 +334,10 @@ export function renderMahitoDomainBackground(fighter, ctx, isClashSecondary = fa
   if (arena.shape === 'circle') {
     const acx = arena.x + arena.width / 2;
     const acy = arena.y + arena.height / 2;
-    const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+    const ar = arena.radius !== undefined ? arena.radius : (arena.width / 2);
     ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
   } else {
-    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
+    ctx.rect(ax, ay, aw, ah);
   }
   ctx.clip();
 
@@ -530,9 +529,8 @@ export function renderCjBaguvixBackground(fighter, ctx, isClashSecondary = false
   const isLocal = Boolean(options.isLocal || (ctx.canvas && Math.abs(ctx.canvas.width - arena.width) < 2));
   const ax = isLocal ? 0 : arena.x;
   const ay = isLocal ? 0 : arena.y;
-  const aw = arena.width;
-  const ah = arena.height;
-  const ww = arena.wallWidth || 4;
+  const aw = isLocal ? ctx.canvas.width : arena.width;
+  const ah = isLocal ? ctx.canvas.height : arena.height;
 
   ctx.save();
 
@@ -541,10 +539,10 @@ export function renderCjBaguvixBackground(fighter, ctx, isClashSecondary = false
   if (arena.shape === 'circle') {
     const acx = ax + aw / 2;
     const acy = ay + ah / 2;
-    const ar = (arena.radius !== undefined ? arena.radius : (aw / 2)) - ww;
+    const ar = arena.radius !== undefined ? arena.radius : (aw / 2);
     ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
   } else {
-    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
+    ctx.rect(ax, ay, aw, ah);
   }
   ctx.clip();
 
@@ -564,10 +562,10 @@ export function renderCjBaguvixBackground(fighter, ctx, isClashSecondary = false
   const img = getCjBaguvixOverlayImage();
   if (img && (img.complete || img.width > 0) && img.naturalWidth > 0) {
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling preserves crisp pixel art
-    const innerX = ax + ww;
-    const innerY = ay + ww;
-    const innerW = aw - ww * 2;
-    const innerH = ah - ww * 2;
+    const innerX = ax;
+    const innerY = ay;
+    const innerW = aw;
+    const innerH = ah;
     const custom = (typeof state !== 'undefined' && state.skinCustomizations?.cj_baguvix_overlay) || {};
     const zoom = custom.zoom ?? ((typeof CONFIG !== 'undefined' && CONFIG.cj?.baguvixOverlayZoom !== undefined) ? CONFIG.cj.baguvixOverlayZoom : 1.0);
     const cfgOffY = (typeof CONFIG !== 'undefined' && CONFIG.cj?.baguvixOverlayOffsetY !== undefined) ? (CONFIG.cj.baguvixOverlayOffsetY * innerH) : 0;

@@ -547,10 +547,11 @@ export function updateHybridEnvironment() {
     const data = getGojoDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    data.sprite.x = arena.x;
-    data.sprite.y = arena.y;
-    data.sprite.width = arena.width;
-    data.sprite.height = arena.height;
+    const bleed = 40;
+    data.sprite.x = arena.x - bleed;
+    data.sprite.y = arena.y - bleed;
+    data.sprite.width = arena.width + bleed * 2;
+    data.sprite.height = arena.height + bleed * 2;
 
     if (gojoArenaMask && gojoArenaMask.parent) {
       gojoArenaMask.parent.removeChild(gojoArenaMask);
@@ -584,10 +585,11 @@ export function updateHybridEnvironment() {
     const data = getRubbickDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    data.sprite.x = arena.x;
-    data.sprite.y = arena.y;
-    data.sprite.width = arena.width;
-    data.sprite.height = arena.height;
+    const bleed = 40;
+    data.sprite.x = arena.x - bleed;
+    data.sprite.y = arena.y - bleed;
+    data.sprite.width = arena.width + bleed * 2;
+    data.sprite.height = arena.height + bleed * 2;
 
     if (rubbickArenaMask && rubbickArenaMask.parent) {
       rubbickArenaMask.parent.removeChild(rubbickArenaMask);
@@ -633,14 +635,14 @@ export function updateHybridEnvironment() {
       sukunaArenaMask.clear();
       sukunaArenaMask.beginFill(0xFFFFFF);
       const arena = state.arena;
-      const ww = arena.wallWidth || 0;
+      const bleed = 40;
       if (arena.shape === 'circle') {
         const acx = arena.x + arena.width / 2;
         const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + bleed;
         sukunaArenaMask.drawCircle(acx, acy, Math.max(0, ar));
       } else {
-        sukunaArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+        sukunaArenaMask.drawRect(arena.x - bleed, arena.y - bleed, arena.width + bleed * 2, arena.height + bleed * 2);
       }
       sukunaArenaMask.endFill();
       bgData.sprite.mask = sukunaArenaMask;
@@ -693,14 +695,14 @@ export function updateHybridEnvironment() {
       yutaArenaMask.clear();
       yutaArenaMask.beginFill(0xFFFFFF);
       const arena = state.arena;
-      const ww = arena.wallWidth || 0;
+      const bleed = 40;
       if (arena.shape === 'circle') {
         const acx = arena.x + arena.width / 2;
         const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + bleed;
         yutaArenaMask.drawCircle(acx, acy, Math.max(0, ar));
       } else {
-        yutaArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+        yutaArenaMask.drawRect(arena.x - bleed, arena.y - bleed, arena.width + bleed * 2, arena.height + bleed * 2);
       }
       yutaArenaMask.endFill();
       data.sprite.mask = yutaArenaMask;
@@ -743,14 +745,14 @@ export function updateHybridEnvironment() {
       mahitoArenaMask.clear();
       mahitoArenaMask.beginFill(0xFFFFFF);
       const arena = state.arena;
-      const ww = arena.wallWidth || 0;
+      const bleed = 40;
       if (arena.shape === 'circle') {
         const acx = arena.x + arena.width / 2;
         const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + bleed;
         mahitoArenaMask.drawCircle(acx, acy, Math.max(0, ar));
       } else {
-        mahitoArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+        mahitoArenaMask.drawRect(arena.x - bleed, arena.y - bleed, arena.width + bleed * 2, arena.height + bleed * 2);
       }
       mahitoArenaMask.endFill();
       data.sprite.mask = mahitoArenaMask;
@@ -788,10 +790,11 @@ export function updateHybridEnvironment() {
     const data = getCjBaguvixDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    data.sprite.x = arena.x;
-    data.sprite.y = arena.y;
-    data.sprite.width = arena.width;
-    data.sprite.height = arena.height;
+    const bleed = 40;
+    data.sprite.x = arena.x - bleed;
+    data.sprite.y = arena.y - bleed;
+    data.sprite.width = arena.width + bleed * 2;
+    data.sprite.height = arena.height + bleed * 2;
 
     if (state.arena) {
       if (!cjBaguvixArenaMask) {
@@ -801,14 +804,13 @@ export function updateHybridEnvironment() {
       cjBaguvixArenaMask.clear();
       cjBaguvixArenaMask.beginFill(0xFFFFFF);
       const arena = state.arena;
-      const ww = arena.wallWidth || 0;
       if (arena.shape === 'circle') {
         const acx = arena.x + arena.width / 2;
         const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + bleed;
         cjBaguvixArenaMask.drawCircle(acx, acy, Math.max(0, ar));
       } else {
-        cjBaguvixArenaMask.drawRect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
+        cjBaguvixArenaMask.drawRect(arena.x - bleed, arena.y - bleed, arena.width + bleed * 2, arena.height + bleed * 2);
       }
       cjBaguvixArenaMask.endFill();
       data.sprite.mask = cjBaguvixArenaMask;

@@ -167,61 +167,27 @@ export function initHudSync() {
 }
 
 /**
- * Dynamically updates the Top HUD Container (#hudTopContainer) transform to
- * follow the arena top edge when dynamic camera tracking, zoom, or shake is active.
+ * Updates the Top HUD Container (#hudTopContainer) transform statically (never shakes).
  */
 export function updateTopHudCameraTracking(topContainer) {
   if (!topContainer) return;
-  const cam = state.camera;
   const scale = CONFIG.internalScale || 1.0;
   const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
   const hudScale = isTactical ? 1.0 : (scale * 0.9);
 
-  if (!_cachedPixiView) {
-    if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
-    _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
-  }
-
-  const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
-  const displayRatio = _cachedPixiView && _cachedPixiView.clientWidth ? (_cachedPixiView.clientWidth / canvasWidth) : 1.0;
-
-  const shakeX = ((cam ? cam.shakeX : state.shakeX) || 0) * displayRatio;
-  const shakeY = ((cam ? cam.shakeY : state.shakeY) || 0) * displayRatio;
-
-  if (shakeX !== 0 || shakeY !== 0) {
-    setSafeStyle(topContainer, 'transform', `translate(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px) scale(${hudScale.toFixed(4)})`, 'important');
-  } else {
-    setSafeStyle(topContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`, 'important');
-  }
+  setSafeStyle(topContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`, 'important');
   setSafeStyle(topContainer, 'transform-origin', 'top center', 'important');
 }
 
 /**
- * Dynamically updates the Bottom HUD Container (#healthHud) transform to
- * float with the camera screen overlay (with camera screen-shake).
+ * Updates the Bottom HUD Container (#healthHud) transform statically (never shakes).
  */
 export function updateBottomHudCameraTracking(bottomContainer) {
   if (!bottomContainer) return;
-  const cam = state.camera;
   const scale = CONFIG.internalScale || 1.0;
   const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
   const hudScale = isTactical ? 1.0 : (scale * 0.9);
 
-  if (!_cachedPixiView) {
-    if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
-    _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
-  }
-
-  const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
-  const displayRatio = _cachedPixiView && _cachedPixiView.clientWidth ? (_cachedPixiView.clientWidth / canvasWidth) : 1.0;
-
-  const shakeX = ((cam ? cam.shakeX : state.shakeX) || 0) * displayRatio;
-  const shakeY = ((cam ? cam.shakeY : state.shakeY) || 0) * displayRatio;
-
-  if (shakeX !== 0 || shakeY !== 0) {
-    setSafeStyle(bottomContainer, 'transform', `translate(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px) scale(${hudScale.toFixed(4)})`, 'important');
-  } else {
-    setSafeStyle(bottomContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`, 'important');
-  }
+  setSafeStyle(bottomContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`, 'important');
   setSafeStyle(bottomContainer, 'transform-origin', 'top center', 'important');
 }

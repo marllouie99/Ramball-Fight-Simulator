@@ -468,19 +468,21 @@ export function drawArena() {
     const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff'));
     const innerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff'));
 
+    const bleed = 60;
+    const bgW = pixiApp.screen.width + bleed * 2;
+    const bgH = pixiApp.screen.height + bleed * 2;
+
     g.beginFill(canvasBg.color, canvasBg.alpha);
-    g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
+    g.drawRect(-bleed, -bleed, bgW, bgH);
     g.endFill();
 
-    const whiteTop = 0;
-    const whiteBottom = pixiApp.screen.height;
     if (!suppressArenaFloor) {
       g.beginFill(outerBg.color, outerBg.alpha);
-      g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
+      g.drawRect(-bleed, -bleed, bgW, bgH);
       g.endFill();
     } else {
-      g.beginFill(canvasBg.color, canvasBg.alpha);
-      g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
+      g.beginFill(isDark ? 0x000000 : 0x080808, 1.0);
+      g.drawRect(-bleed, -bleed, bgW, bgH);
       g.endFill();
     }
 
@@ -494,7 +496,15 @@ export function drawArena() {
         const fg = state.floorGraphics;
         fg.clear();
         fg.beginFill(innerBg.color, innerBg.alpha);
-        fg.drawRect(arena.x, arena.y, arena.width, arena.height);
+        const fBleed = 4;
+        if (arena.shape === 'circle') {
+          const cx = arena.x + arena.width / 2;
+          const cy = arena.y + arena.height / 2;
+          const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + fBleed;
+          fg.drawCircle(cx, cy, ar);
+        } else {
+          fg.drawRect(arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
+        }
         fg.endFill();
       }
     } else {
@@ -502,6 +512,23 @@ export function drawArena() {
         state.floorGraphics.clear();
       }
     }
+  } else if (ctx && canvas) {
+    // Canvas 2D fallback: Draw outer background under camera transform with bleed
+    ctx.save();
+    applyCameraToCtx(ctx);
+    const bleed = 60;
+    const canvasBg = isDark ? '#000000' : (CONFIG.canvasBgColor || '#ffffffff');
+    const outerBg = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+    ctx.fillStyle = canvasBg;
+    ctx.fillRect(-bleed, -bleed, canvas.width + bleed * 2, canvas.height + bleed * 2);
+    if (!suppressArenaFloor) {
+      ctx.fillStyle = outerBg;
+      ctx.fillRect(-bleed, -bleed, canvas.width + bleed * 2, canvas.height + bleed * 2);
+    } else {
+      ctx.fillStyle = isDark ? '#000000' : '#080808';
+      ctx.fillRect(-bleed, -bleed, canvas.width + bleed * 2, canvas.height + bleed * 2);
+    }
+    ctx.restore();
   }
 
   // 3. Outer background theme details (Halftone Dots, Action Triangles, Speed Needles) removed for clean minimalist background
@@ -540,15 +567,16 @@ export function drawArena() {
       ctx.save();
       applyCameraToCtx(ctx);
       ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff');
+      const fBleed = 4;
       if (arena.shape === 'circle') {
         const cx = arena.x + arena.width / 2;
         const cy = arena.y + arena.height / 2;
-        const ar = arena.radius || (arena.width / 2);
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + fBleed;
         ctx.beginPath();
         ctx.arc(cx, cy, ar, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+        ctx.fillRect(arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
       }
       ctx.restore();
     } else if (hasActiveDomain && !state.pixiApp) {

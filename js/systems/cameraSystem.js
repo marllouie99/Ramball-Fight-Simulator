@@ -328,13 +328,11 @@ export function worldToScreen(worldX, worldY) {
   const screenCenterY = arena.y + arena.height / 2;
 
   if (cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride)) {
-    const sx = screenCenterX + (cam.shakeX || 0) + (worldX - cam.x) * cam.zoom;
-    const sy = screenCenterY + (cam.shakeY || 0) + (worldY - cam.y) * cam.zoom;
+    const sx = screenCenterX + (worldX - cam.x) * cam.zoom;
+    const sy = screenCenterY + (worldY - cam.y) * cam.zoom;
     return { x: sx, y: sy };
   } else {
-    const shakeX = (cam ? cam.shakeX : state.shakeX) || 0;
-    const shakeY = (cam ? cam.shakeY : state.shakeY) || 0;
-    return { x: worldX + shakeX, y: worldY + shakeY };
+    return { x: worldX, y: worldY };
   }
 }
 

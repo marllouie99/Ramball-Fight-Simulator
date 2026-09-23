@@ -50,24 +50,25 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
   if (!arena) return;
 
+  const bleed = 40;
   const isLocal = Boolean(ctx.canvas && Math.abs(ctx.canvas.width - arena.width) < 2);
-  const ax = isLocal ? 0 : arena.x;
-  const ay = isLocal ? 0 : arena.y;
-  const aw = arena.width;
-  const ah = arena.height;
+  const ax = (isLocal ? 0 : arena.x) - bleed;
+  const ay = (isLocal ? 0 : arena.y) - bleed;
+  const aw = arena.width + bleed * 2;
+  const ah = arena.height + bleed * 2;
   const ww = arena.wallWidth || 4;
 
   ctx.save();
 
-  // 1. Strictly clip Yuta's Domain Expansion environment visuals inside the arena bounds
+  // 1. Clip Yuta's Domain Expansion visuals with bleed margin to prevent shake gaps
   ctx.beginPath();
   if (arena.shape === 'circle') {
-    const acx = ax + aw / 2;
-    const acy = ay + ah / 2;
-    const ar = (arena.radius !== undefined ? arena.radius : (aw / 2)) - ww;
+    const acx = (isLocal ? 0 : arena.x) + arena.width / 2;
+    const acy = (isLocal ? 0 : arena.y) + arena.height / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + bleed;
     ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
   } else {
-    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
+    ctx.rect(ax, ay, aw, ah);
   }
   ctx.clip();
 
@@ -78,11 +79,11 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     ctx.globalAlpha = 0.75;
   }
 
-  // 2. Base Pitch Obsidian / Crimson Void Background (Semi-transparent when simultaneous ultimates are active)
+  // 2. Base Pitch Obsidian / Crimson Void Background (Solid base so canvas never leaks through)
   if (isTojiActive || isClashSecondary) {
-    ctx.fillStyle = 'rgba(8, 8, 8, 0.40)';
+    ctx.fillStyle = 'rgba(8, 8, 8, 0.70)';
   } else {
-    ctx.fillStyle = 'rgba(8, 8, 8, 0.75)';
+    ctx.fillStyle = '#080808';
   }
   ctx.fillRect(ax, ay, aw, ah);
 
@@ -90,7 +91,7 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
   const cy = ay + ah / 2;
   const maxR = Math.max(aw, ah) * 0.75;
 
-  // 3. Draw Yuta Domain Overlay Image occupying the arena (with semi-transparency)
+  // 3. Draw Yuta Domain Overlay Image occupying the arena with bleed padding
   const img = getYutaDomainImage();
   if (img && (img.complete || img.width > 0) && img.naturalWidth > 0) {
     ctx.save();

@@ -21,15 +21,14 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   const _isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
   const arena = state.arena || CONFIG.arena;
   if (_isDarkMode && arena) {
-    const ww = arena.wallWidth || 4;
     ctx.beginPath();
     if (arena.shape === 'circle') {
       const acx = arena.x + arena.width / 2;
       const acy = arena.y + arena.height / 2;
-      const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - ww;
+      const ar = arena.radius !== undefined ? arena.radius : (arena.width / 2);
       ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
     } else {
-      ctx.rect(arena.x + ww, arena.y + ww, arena.width - ww * 2, arena.height - ww * 2);
+      ctx.rect(arena.x, arena.y, arena.width, arena.height);
     }
     ctx.clip();
   }

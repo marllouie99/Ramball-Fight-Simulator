@@ -213,13 +213,6 @@ export function renderGame() {
         const screenCenterX = state.canvas.width / 2;
         const screenCenterY = state.arena ? (state.arena.y + state.arena.height / 2) : (state.canvas.height / 2);
 
-        // Keep arena outer background static at (0, 0) scale 1
-        if (state.pixiLayers.arena?.position?.set) {
-          state.pixiLayers.arena.pivot.set(0, 0);
-          state.pixiLayers.arena.position.set(0, 0);
-          state.pixiLayers.arena.scale.set(1, 1);
-        }
-
         // Synchronize WebGL arena floor graphics (resets local transform since environment container will be transformed)
         if (state.floorGraphics?.position?.set) {
           state.floorGraphics.pivot.set(0, 0);
@@ -227,24 +220,31 @@ export function renderGame() {
           state.floorGraphics.scale.set(1, 1);
         }
 
-        // Apply camera to WebGL hybrid layers (environment, projectiles, particles, effects)
-        const applyCamToPixiLayer = (layer) => {
+        // Apply camera to WebGL hybrid layers (arena, background, environment, projectiles, particles, effects)
+        const applyCamToPixiLayer = (layer, isWorldLayer = true) => {
           if (!layer || !layer.position?.set) return;
           if (isCamActive) {
             layer.pivot.set(cam.x, cam.y);
             layer.position.set(screenCenterX + (cam.shakeX || 0), screenCenterY + (cam.shakeY || 0));
             layer.scale.set(cam.zoom, cam.zoom);
-          } else {
+          } else if (isWorldLayer) {
             layer.pivot.set(0, 0);
             layer.position.set(shakeX, shakeY);
+            layer.scale.set(1, 1);
+          } else {
+            layer.pivot.set(0, 0);
+            layer.position.set(0, 0);
             layer.scale.set(1, 1);
           }
         };
 
-        applyCamToPixiLayer(state.pixiLayers.environment);
-        applyCamToPixiLayer(state.pixiLayers.projectiles);
-        applyCamToPixiLayer(state.pixiLayers.particles);
-        applyCamToPixiLayer(state.pixiLayers.effects);
+        applyCamToPixiLayer(state.pixiLayers.background, true);   // Background shakes with camera
+        applyCamToPixiLayer(state.pixiLayers.arena, true);        // Outer arena graphics shake seamlessly
+        applyCamToPixiLayer(state.pixiLayers.shadows, true);      // Shadows shake with fighters
+        applyCamToPixiLayer(state.pixiLayers.environment, true);  // Arena floor & domain expansions shake with arena
+        applyCamToPixiLayer(state.pixiLayers.projectiles, true);    // Projectiles inside arena shake
+        applyCamToPixiLayer(state.pixiLayers.particles, true);      // Particles inside arena shake
+        applyCamToPixiLayer(state.pixiLayers.effects, true);        // WebGL effects shake with arena
 
         // Fighters layer contains legacyCanvasSprite (the 2D canvas), which already has the camera matrix applied inside state.ctx!
         // So fighters layer must stay at (0, 0) scale 1 to avoid double transformation.
@@ -267,68 +267,13 @@ export function renderGame() {
       drawArena();
 
       try {
-
-        // ── Clip all dim effects & WebGL overlays strictly to arena boundaries ONLY IN DARK MODE ──
-        const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
-        const hasArenaClip = isDark && Boolean(state.arena);
-        if (hasArenaClip) {
-          state.ctx.save();
-          state.ctx.beginPath();
-          if (state.arena.shape === 'circle') {
-            const cx = state.arena.x + state.arena.width / 2;
-            const cy = state.arena.y + state.arena.height / 2;
-            const ar = state.arena.radius || (state.arena.width / 2);
-            state.ctx.arc(cx, cy, ar, 0, Math.PI * 2);
-          } else {
-            state.ctx.rect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
-          }
-          state.ctx.clip();
-
-          // Apply PIXI mask on WebGL effects and environment layers to clip dim/ring sprites to arena
-          if (state.pixiLayers && (state.pixiLayers.effects || state.pixiLayers.environment) && state.arena) {
-            if (!state._darkDimMask) {
-              state._darkDimMask = new window.PIXI.Graphics();
-            }
-            state._darkDimMask.clear();
-            state._darkDimMask.beginFill(0xffffff);
-            if (state.arena.shape === 'circle') {
-              const cx = state.arena.x + state.arena.width / 2;
-              const cy = state.arena.y + state.arena.height / 2;
-              const ar = state.arena.radius || (state.arena.width / 2);
-              state._darkDimMask.drawCircle(cx, cy, ar);
-            } else {
-              state._darkDimMask.drawRect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
-            }
-            state._darkDimMask.endFill();
-            if (state.pixiLayers.effects) state.pixiLayers.effects.mask = state._darkDimMask;
-            const hasActiveDomainOrUltimate = Boolean(
-              state.fighters && state.fighters.some(f =>
-                f && f.hp > 0 && (
-                  f.domainActive || 
-                  f.stolenDomainActive ||
-                  (f.stolenType === 'gojo_domain' && f.stolenWindUpTimer > 0) ||
-                  f._mahitoDomainActive || 
-                  (f.characterId === 'toji' && f.ultimateActive) ||
-                  (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive)) ||
-                  (f.characterId === 'ichigo' && (f.isChannelingBankai || (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) || (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0))) ||
-                  (f.characterId === 'saitama' && f._counterPunchTimer > 0) ||
-                  (f.characterId === 'nanami' && (f.ratioHitPauseTimer > 0 || f.isOvertimeActive)) ||
-                  (f.characterId === 'escanor' && f.chopHitPauseTimer > 0) ||
-                  ((f.characterId === 'todo' || f.type === 'todo' || f._def?.id === 'todo') && (f.isTakadaUltActive && !f.isTakadaChanneling)) ||
-                  ((f.characterId === 'yuji' || f.type === 'yuji' || f._def?.id === 'yuji') && (f.soulSwapActive || (f.soulSwapTransitionTimer && f.soulSwapTransitionTimer > 0))) ||
-                  ((f.characterId === 'zeus' || f.type === 'zeus' || f._def?.id === 'zeus') && (f.isChargingStorm || f.stormActive)) ||
-                  (f.characterId === 'rubbick' && f.stormActive)
-                )
-              )
-            );
-            if (state.pixiLayers.environment) state.pixiLayers.environment.mask = hasActiveDomainOrUltimate ? null : state._darkDimMask;
-          }
-        } else {
-          if (state.pixiLayers?.effects?.mask) state.pixiLayers.effects.mask = null;
-          if (state.pixiLayers?.environment?.mask) state.pixiLayers.environment.mask = null;
+        // Clear any residual PIXI masks on effects and environment layers
+        if (state.pixiLayers?.effects?.mask) state.pixiLayers.effects.mask = null;
+        if (state.pixiLayers?.environment?.mask && !state.fighters?.some(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive))) {
+          state.pixiLayers.environment.mask = null;
         }
 
-        // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Static, Un-shaken background environment) ──
+        // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS ──
         if (!state.disableDimEffects) {
           drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
           updateHybridEnvironment(); // WebGL & 2D full-screen dim effects (Gojo Purple, Sukuna Fuga, Mahoraga adaptation)
@@ -355,18 +300,6 @@ export function renderGame() {
           drawYujiSoulSwapDimScreen(); // 2D Yuji Soul Swap (Sukuna Takeover) arena overlay & cursed crimson dark background
         } else {
           updateHybridEnvironment(); // Cleans up and detaches any active WebGL dim sprites
-        }
-
-        // ── Restore clip after dim effects ──
-        if (hasArenaClip) {
-          state.ctx.restore();
-          // Remove PIXI mask so other WebGL layers are unaffected
-          if (state.pixiLayers?.effects) {
-            state.pixiLayers.effects.mask = null;
-          }
-          if (state.pixiLayers?.environment) {
-            state.pixiLayers.environment.mask = null;
-          }
         }
 
         // Apply Camera Viewport Transform (Dynamic Tracking, Distance Zoom, and Shake)
@@ -501,53 +434,53 @@ export function renderGame() {
         if (state.floatingTextSprite) state.floatingTextSprite.visible = true;
         drawFloatingTexts(); 
         drawUltimateChannelingTexts();
-
-        // ── Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA") ──
-        // Rendered on top of dim screens, shockwaves & particles so top names remain 100% visible at all times
-        drawArenaMatchNames(state.ctx, true);
-
-        // Draw FPS display and logs (if not hidden by user pressing H)
-        if (!state.hideFpsLogs) {
-          const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-          state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)'; // Light FPS text in dark mode, dark in light mode
-          const audioLat = getAudioLatencyMs();
-          const audioLatStr = audioLat > 0 ? ` | Lat: ${audioLat}ms` : '';
-          state.ctx.fillText(`FPS: ${state.fps}${audioLatStr}`, 10, 20);
-
-          // Draw FPS Drop Causes as a log list
-          if (state.fpsLogs && state.fpsLogs.length > 0) {
-            state.ctx.font = 'bold 12px monospace';
-            state.ctx.textAlign = 'left';
-
-            // Position logs directly below the bottom of the arena
-            let startY = CONFIG.arena.y + CONFIG.arena.height + 25;
-
-            // Draw copy and hide instructions if not copied recently
-            if (!state.fpsLogsCopiedTimer || state.fpsLogsCopiedTimer <= 0) {
-              state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.65)';
-              state.ctx.fillText('Press C to copy logs | Press H to hide', 10, startY - 12);
-            }
-
-            for (let i = 0; i < state.fpsLogs.length; i++) {
-              let log = state.fpsLogs[i];
-              let alpha = Math.min(1, log.timer / 60); // Fade out
-              state.ctx.fillStyle = isDark ? `rgba(255, 255, 255, ${alpha})` : `rgba(0, 0, 0, ${alpha})`;
-              state.ctx.fillText(log.text, 10, startY + (i * 16));
-            }
-          }
-
-          // Draw copied notification
-          if (state.fpsLogsCopiedTimer > 0) {
-            state.ctx.font = 'bold 12px monospace';
-            state.ctx.textAlign = 'left';
-            let startY = CONFIG.arena.y + CONFIG.arena.height + 25;
-            state.ctx.fillStyle = `rgba(100, 255, 100, ${Math.min(1, state.fpsLogsCopiedTimer / 30)})`;
-            state.ctx.fillText('Copied to clipboard!', 10, startY - 12);
-          }
-        }
       } finally {
         state.ctx.restore();
         state.ctx.setTransform(1, 0, 0, 1, 0, 0); // Always reset transform matrix cleanly
+      }
+
+      // ── Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA") ──
+      // Rendered on main 2D canvas at identity transform so it stays 100% visible throughout match with zero shake
+      drawArenaMatchNames(state.ctx, true);
+
+      // Draw FPS display and logs (on main canvas at identity transform, static zero shake)
+      if (!state.hideFpsLogs) {
+        const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
+        state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)'; // Light FPS text in dark mode, dark in light mode
+        const audioLat = getAudioLatencyMs();
+        const audioLatStr = audioLat > 0 ? ` | Lat: ${audioLat}ms` : '';
+        state.ctx.fillText(`FPS: ${state.fps}${audioLatStr}`, 10, 20);
+
+        // Draw FPS Drop Causes as a log list
+        if (state.fpsLogs && state.fpsLogs.length > 0) {
+          state.ctx.font = 'bold 12px monospace';
+          state.ctx.textAlign = 'left';
+
+          // Position logs directly below the bottom of the arena
+          let startY = CONFIG.arena.y + CONFIG.arena.height + 25;
+
+          // Draw copy and hide instructions if not copied recently
+          if (!state.fpsLogsCopiedTimer || state.fpsLogsCopiedTimer <= 0) {
+            state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.65)';
+            state.ctx.fillText('Press C to copy logs | Press H to hide', 10, startY - 12);
+          }
+
+          for (let i = 0; i < state.fpsLogs.length; i++) {
+            let log = state.fpsLogs[i];
+            let alpha = Math.min(1, log.timer / 60); // Fade out
+            state.ctx.fillStyle = isDark ? `rgba(255, 255, 255, ${alpha})` : `rgba(0, 0, 0, ${alpha})`;
+            state.ctx.fillText(log.text, 10, startY + (i * 16));
+          }
+        }
+
+        // Draw copied notification
+        if (state.fpsLogsCopiedTimer > 0) {
+          state.ctx.font = 'bold 12px monospace';
+          state.ctx.textAlign = 'left';
+          let startY = CONFIG.arena.y + CONFIG.arena.height + 25;
+          state.ctx.fillStyle = `rgba(100, 255, 100, ${Math.min(1, state.fpsLogsCopiedTimer / 30)})`;
+          state.ctx.fillText('Copied to clipboard!', 10, startY - 12);
+        }
       }
 
       // In native Canvas 2D mode, composite floating text canvas onto main canvas in identity space

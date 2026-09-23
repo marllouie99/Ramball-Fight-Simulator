@@ -182,9 +182,8 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   const isLocal = Boolean(options.isLocal || (ctx.canvas && Math.abs(ctx.canvas.width - arena.width) < 2));
   const ax = isLocal ? 0 : arena.x;
   const ay = isLocal ? 0 : arena.y;
-  const aw = arena.width;
-  const ah = arena.height;
-  const ww = arena.wallWidth || 4;
+  const aw = isLocal ? ctx.canvas.width : arena.width;
+  const ah = isLocal ? ctx.canvas.height : arena.height;
 
   ctx.save();
 
@@ -193,10 +192,10 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   if (arena.shape === 'circle') {
     const acx = ax + aw / 2;
     const acy = ay + ah / 2;
-    const ar = (arena.radius !== undefined ? arena.radius : (aw / 2)) - ww;
+    const ar = arena.radius !== undefined ? arena.radius : (aw / 2);
     ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
   } else {
-    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
+    ctx.rect(ax, ay, aw, ah);
   }
   ctx.clip();
 
