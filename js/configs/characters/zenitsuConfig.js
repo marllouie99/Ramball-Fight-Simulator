@@ -56,8 +56,8 @@ export const zenitsuConfig = {
 
   // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
   enableThunderclap: true,          // Master toggle for Skill 1: Thunderclap and Flash
-  thunderclapCooldown: 228,    // 3.8s
-  thunderclapChannelDuration: 120,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
+  thunderclapCooldown: 500,    // 3.8s
+  thunderclapChannelDuration: 150,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
   thunderclapDashCount: 4,          // 4 consecutive godspeed zig-zag slashes
   thunderclapDashDuration: 2,       // Travel frames per dash
   thunderclapDashPauseFrames: 5,    // Pause/windup frames between each consecutive dash
@@ -66,6 +66,7 @@ export const zenitsuConfig = {
   thunderclapFinisherDamage: 50,    // Finisher dash damage
   thunderclapStunFrames: 50,
   dashAudioFadeOutMs: 120,          // Fast audio fade-out in ms the moment all dashes are completed
+  firstFormToThunderclapGapFrames: 18, // Spacing/pause frames (~300ms) between "First Form" and "Thunderclap and Flash" voicelines
 
   // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)
   enableRokuren: false,             // Master toggle for Skill 2: Sixfold (Rokuren)
@@ -126,9 +127,9 @@ export const zenitsuConfig = {
     parry: 0.35,
     stance: 0.30,
     channelVoice: 0.90,
-    firstFormVoice: 0.90,
+    firstFormVoice: 0.0,
     sixfoldVoice: 0.90,
-    thunderclapFlashVoice: 0.90,
+    thunderclapFlashVoice: 0.0,
     lockIn: 0.35,
     electricNoise1: 0.70,
     electricNoise2: 0.70,

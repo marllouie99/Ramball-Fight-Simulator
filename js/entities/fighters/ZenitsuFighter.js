@@ -68,6 +68,7 @@ export class ZenitsuFighter extends Fighter {
     this._hasPlayedFirstFormVoice = false;
     this._hasPlayedThunderclapVoice = false;
     this._hasPlayedSixfoldVoice = false;
+    this._thunderclapVoiceDelayTimer = 0;
 
     // Active Consecutive Lightning Dash Travel State (4 Consecutive Godspeed Dashes)
     this.isDashingThunderclap = false;
@@ -324,6 +325,7 @@ export class ZenitsuFighter extends Fighter {
     this._hasPlayedFirstFormVoice = false;
     this._hasPlayedThunderclapVoice = false;
     this._hasPlayedSixfoldVoice = false;
+    this._thunderclapVoiceDelayTimer = 0;
     this.isDashingThunderclap = false;
     this.thunderclapDashIndex = 0;
     this.thunderclapDashPauseTimer = 0;
@@ -501,9 +503,19 @@ export class ZenitsuFighter extends Fighter {
         this._lastThunderclapBurstId = null;
       }
 
+      // Space delay countdown between First Form and Thunderclap & Flash
+      if (this._thunderclapVoiceDelayTimer > 0) {
+        this._thunderclapVoiceDelayTimer--;
+        if (this._thunderclapVoiceDelayTimer <= 0 && !this._hasPlayedThunderclapVoice) {
+          this._playThunderclapFlashVoice();
+        }
+      }
+
       // Voiceline sequence progression during channeling:
-      // Part 2: "Thunderclap and Flash" chained after "First Form" finishes (fallback fires at ~44% elapsed channel)
-      if (!this._hasPlayedThunderclapVoice && elapsedChannel >= Math.round(totalChannel * 0.44)) {
+      // Part 2: "Thunderclap and Flash" chained after "First Form" finishes (fallback fires at ~44% elapsed + gap frames)
+      const gapFrames = cfg.firstFormToThunderclapGapFrames !== undefined ? cfg.firstFormToThunderclapGapFrames : 18;
+      const part2FallbackFrame = Math.round(totalChannel * 0.44) + gapFrames;
+      if (!this._hasPlayedThunderclapVoice && this._thunderclapVoiceDelayTimer <= 0 && elapsedChannel >= part2FallbackFrame) {
         this._playThunderclapFlashVoice();
       }
 
@@ -637,9 +649,14 @@ export class ZenitsuFighter extends Fighter {
     const vol = cfg.soundVolumes?.firstFormVoice ?? cfg.soundVolumes?.channelVoice ?? 0.90;
 
     audioSystem.playSFX(sfx, vol, 1.0, 0, 0, () => {
-      // Anime sequence chaining: once "First Form" finishes, immediately play "Thunderclap and Flash" if still channeling and alive
+      // Space between First Form and Thunderclap & Flash voicelines:
       if (this.isChannelingThunderclap && !this._hasPlayedThunderclapVoice && !this.isDead) {
-        this._playThunderclapFlashVoice();
+        const gap = cfg.firstFormToThunderclapGapFrames !== undefined ? cfg.firstFormToThunderclapGapFrames : 18;
+        if (gap > 0) {
+          this._thunderclapVoiceDelayTimer = gap;
+        } else {
+          this._playThunderclapFlashVoice();
+        }
       }
     });
   }
@@ -679,6 +696,7 @@ export class ZenitsuFighter extends Fighter {
     this._hasPlayedFirstFormVoice = false;
     this._hasPlayedThunderclapVoice = false;
     this._hasPlayedSixfoldVoice = false;
+    this._thunderclapVoiceDelayTimer = 0;
 
     // Smooth aim initialization without instant snapping
     if (this.gunAngle === undefined) {

@@ -8968,19 +8968,26 @@ async function main() {
       throw new Error('Zenitsu config missing 3-element electricNoises array in sounds');
     }
 
-    // Test 3-step sequential voiceline progression
+    // Test 3-step sequential voiceline progression with space gap
     const dummyOpponent = new ZenitsuClass({ x: 500, y: 300, color: '#f59e0b', controls: {} });
     zenitsu._triggerThunderclapAndFlash(dummyOpponent);
     if (!zenitsu._hasPlayedFirstFormVoice || zenitsu._hasPlayedThunderclapVoice || zenitsu._hasPlayedSixfoldVoice) {
       throw new Error('Zenitsu _triggerThunderclapAndFlash must start with only firstFormVoice played');
     }
 
-    // Advance to 50% elapsed channel -> Thunderclap and Flash voiceline should trigger
+    // Advance into the space gap (48 elapsed of 100, gap is 18 frames) -> should still be paused in space gap
     zenitsu.thunderclapChannelDuration = 100;
-    zenitsu.thunderclapChannelTimer = 50; // 50 elapsed
+    zenitsu.thunderclapChannelTimer = 52; // 48 elapsed
+    zenitsu.update(dummyOpponent, 0, state.arena);
+    if (zenitsu._hasPlayedThunderclapVoice) {
+      throw new Error('Zenitsu thunderclapFlashVoice must not trigger during the space gap');
+    }
+
+    // Advance past the space gap (65 elapsed of 100) -> Thunderclap and Flash voiceline triggers
+    zenitsu.thunderclapChannelTimer = 35; // 65 elapsed
     zenitsu.update(dummyOpponent, 0, state.arena);
     if (!zenitsu._hasPlayedThunderclapVoice) {
-      throw new Error('Zenitsu thunderclapFlashVoice failed to trigger midway through channeling');
+      throw new Error('Zenitsu thunderclapFlashVoice failed to trigger after the space gap');
     }
 
     // Advance to final 10 frames (about to unleash) -> Sixfold voiceline should trigger
