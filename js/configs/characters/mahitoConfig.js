@@ -144,7 +144,7 @@ export const mahitoConfig = {
     burstDamage: 38,               // True unmitigated soul damage at max stacks
     burstHitStun: 300,             // Heavy stagger stun upon soul detonation
     paralyzeDuration: 20,          // Paralyze debuff duration in frames (0.75s) upon reaching max stacks
-    burstKnockback: 20,            // Massive physical explosion push
+    burstKnockback: 2,            // Massive physical explosion push
     burstScreenShake: 8,           // Impact screen shake intensity
     ruptureDamage: 16,             // Final soul rupture explosion damage right before paralyze expires
     ruptureKnockback: 14,          // Outward impulse from the expiration rupture
@@ -168,7 +168,7 @@ export const mahitoConfig = {
   regen: {
     enableRegen: true,             // Master toggle for passive health regeneration
     delay: 100,                    // Frames without receiving damage before regen triggers
-    rate: 0.10,                    // Health regenerated per frame
+    rate: 0.02,                    // Health regenerated per frame
   },
 
   evasion: {
@@ -179,7 +179,7 @@ export const mahitoConfig = {
     radius: 16,                    // Shrunk hurtbox radius for the clones and main body
     scale: 1.00,                   // Visual scale of the miniature models
     speedMultiplier: 1.50,         // Speed boost multiplier while fleeing in evasion state
-    regenRate: 0.05,               // Health regenerated per frame during evasion (~24 HP/sec)
+    regenRate: 0.02,               // Health regenerated per frame during evasion (~24 HP/sec)
     dodgeChance: 0.60              // Dodge chance to completely evade incoming attacks during evasion (60%)
   },
 
@@ -222,7 +222,7 @@ export const mahitoConfig = {
   // ── 11. ULTIMATE: DOMAIN EXPANSION ──────────────────────────────
   domainExpansion: {
     enableDomainExpansion: true,   // Master toggle for Domain Expansion
-    cooldown: 2000,                // 33 seconds cooldown
+    cooldown: 3000,                // 33 seconds cooldown
     chargeMax: 120,                // 2 seconds channeling duration before domain opens
     duration: 600,                 // 5.0 seconds of paralyzing stasis
     radius: 9999,                  // Closed barrier - covers the whole screen

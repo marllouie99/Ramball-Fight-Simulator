@@ -35,6 +35,7 @@ function playYujiPunchSound(disableVoice = false) {
  * Performs a frontal-arc collision check against all enemies.
  */
 export function modUpdateMeleeCombat(customTarget = null) {
+  if (!this.soulSwapActive && !this.isSkillEnabled(CONFIG.yuji?.enableBasicPunch, true)) return;
   // If already punching or slashing, don't restart
   if (this.punchAnimTimer > 0 || this.slashSwingTimer > 0) return;
 
@@ -108,10 +109,11 @@ export function modUpdateMeleeCombat(customTarget = null) {
   const arcAngle = Math.PI / 4; // 45 degrees either side (90 degree frontal cone)
 
   // Determine if this strike is a Black Flash (if charge has reached the threshold or we are in the Black Flash zone)
+  const isBlackFlashAllowed = this.isSkillEnabled(CONFIG.yuji?.enableBlackFlash, true);
   const threshold = this.soulSwapActive 
     ? (CONFIG.yuji?.soulSwapBlackFlashThreshold || 2)
     : (CONFIG.yuji?.blackFlashThreshold || 4);
-  const isBlackFlash = (this.blackFlashTimer > 0) || (this.blackFlashCharge >= threshold);
+  const isBlackFlash = isBlackFlashAllowed && ((this.blackFlashTimer > 0) || (this.blackFlashCharge >= threshold));
 
   for (const target of targetsToScan) {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -187,7 +189,7 @@ export function modUpdateMeleeCombat(customTarget = null) {
         }
 
         // Queue Divergent Fist delayed shockwave only if attack was not blocked
-        if (this.delayedShockwaves && didDamage !== false) {
+        if (this.isSkillEnabled(CONFIG.yuji?.enableDivergentFist, true) && this.delayedShockwaves && didDamage !== false) {
           let swDamage = CONFIG.yuji?.shockwaveDamage || 10;
           if (this.soulSwapActive) {
             swDamage *= (CONFIG.yuji?.soulSwapDamageMultiplier || 2.5);
@@ -209,32 +211,34 @@ export function modUpdateMeleeCombat(customTarget = null) {
     playYujiPunchSound(isBlackFlash || this.soulSwapActive);
     
     // Build Black Flash charge / manage zone
-    if (isBlackFlash) {
-      this.blackFlashCharge = 0; // Reset build-up charge after trigger
-      
-      if (this.blackFlashTimer <= 0) {
-        // Just entered the zone!
-        this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
-        this.blackFlashHitsLeft = CONFIG.yuji?.blackFlashZoneMaxHits || 4;
-      } else {
-        // Already in the zone, decrement hits left
-        this.blackFlashHitsLeft--;
-        if (this.blackFlashHitsLeft <= 0) {
-          this.blackFlashTimer = 0; // End zone early
-          this.blackFlashHitsLeft = 0;
-        } else {
-          // Refresh the timer
+    if (isBlackFlashAllowed) {
+      if (isBlackFlash) {
+        this.blackFlashCharge = 0; // Reset build-up charge after trigger
+        
+        if (this.blackFlashTimer <= 0) {
+          // Just entered the zone!
           this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
+          this.blackFlashHitsLeft = CONFIG.yuji?.blackFlashZoneMaxHits || 4;
+        } else {
+          // Already in the zone, decrement hits left
+          this.blackFlashHitsLeft--;
+          if (this.blackFlashHitsLeft <= 0) {
+            this.blackFlashTimer = 0; // End zone early
+            this.blackFlashHitsLeft = 0;
+          } else {
+            // Refresh the timer
+            this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
+          }
         }
+      } else {
+        this.blackFlashCharge++;
       }
-    } else {
-      this.blackFlashCharge++;
     }
   } else {
     // Punched the air
     playYujiPunchSound(isBlackFlash || this.soulSwapActive);
     // Only reset charge on whiff if we are NOT in the active Black Flash zone
-    if (this.blackFlashTimer <= 0 && CONFIG.yuji?.blackFlashResetOnMiss) {
+    if (isBlackFlashAllowed && this.blackFlashTimer <= 0 && CONFIG.yuji?.blackFlashResetOnMiss) {
       this.blackFlashCharge = 0; // Reset charge on whiff
     }
   }

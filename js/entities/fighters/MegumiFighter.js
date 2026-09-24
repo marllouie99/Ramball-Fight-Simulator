@@ -87,6 +87,67 @@ export class MegumiFighter extends Fighter {
 
     // Visual trails & shadow afterimages
     this.afterImages = [];
+
+    // Declarative Skill Registration
+    const megumiSkills = [];
+    if (this.isSkillEnabled(cfg.enableShadowSink, true)) {
+      megumiSkills.push({
+        id: 'shadow_sink',
+        name: 'Shadow Sink',
+        type: 'active',
+        cooldownKey: 'shadowSinkCooldown',
+        cooldownMax: () => CONFIG.megumi?.shadowSinkCooldown || 300
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableTotality, true)) {
+      megumiSkills.push({
+        id: 'totality',
+        name: 'Divine Dog: Totality',
+        type: 'active',
+        cooldownKey: 'totalityCooldown',
+        cooldownMax: () => CONFIG.megumi?.totalityCooldown || 420
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableNue, true)) {
+      megumiSkills.push({
+        id: 'nue',
+        name: 'Nue & Toad',
+        type: 'active',
+        cooldownKey: 'nueCooldown',
+        cooldownMax: () => CONFIG.megumi?.nueCooldown || 360
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableMaxElephant, true)) {
+      megumiSkills.push({
+        id: 'max_elephant',
+        name: 'Max Elephant',
+        type: 'active',
+        cooldownKey: 'maxElephantCooldown',
+        cooldownMax: () => CONFIG.megumi?.maxElephantCooldown || 600
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableDomainExpansion, true)) {
+      megumiSkills.push({
+        id: 'domain',
+        name: 'Chimera Shadow Garden',
+        type: 'domain',
+        cooldownKey: 'domainCooldown',
+        cooldownMax: () => CONFIG.megumi?.domainCooldown || 1800,
+        durationKey: 'domainTimer',
+        durationMax: () => CONFIG.megumi?.domainDuration || 600,
+        activeKey: 'domainActive'
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableMahoragaRitual, true)) {
+      megumiSkills.push({
+        id: 'mahoraga_ritual',
+        name: 'Mahoraga Ritual',
+        type: 'ultimate',
+        cooldownKey: 'mahoragaCooldown',
+        cooldownMax: () => 3600
+      });
+    }
+    this.skillManager.registerSkills(megumiSkills);
   }
 
   reset() {
@@ -188,6 +249,7 @@ export class MegumiFighter extends Fighter {
     if (this.hp <= 0 || this.isSubmerged || this.isErupting) return;
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.megumi) ? CONFIG.megumi : {};
+    if (!this.isSkillEnabled(cfg.enableDaggerAttack, true)) return;
     const reach = cfg.daggerRange || 60;
     const arc = cfg.daggerArcAngle || ((130 * Math.PI) / 180);
     const facing = this.gunAngle || this.angle || 0;
@@ -278,6 +340,8 @@ export class MegumiFighter extends Fighter {
    */
   _updateShadowSink(opponent, arena) {
     if (this.hp <= 0) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.megumi) ? CONFIG.megumi : {};
+    if (!this.isSkillEnabled(cfg.enableShadowSink, true)) return;
 
     // 1. INITIATION: Dive into liquid shadow pool when ready and enemy is engaged
     if (!this.isSubmerged && !this.isErupting && this.shadowSinkCooldown <= 0 && opponent && opponent.hp > 0) {

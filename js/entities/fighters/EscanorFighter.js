@@ -273,29 +273,37 @@ export class EscanorFighter extends Fighter {
     this._lastArmorDeflectTime = 0;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableCruelSun, true)) {
+      skills.push({
         id: 'cruel_sun',
         name: 'Cruel Sun (無慈悲な太陽)',
         type: 'active',
         cooldownKey: 'cruelSunCooldown',
         cooldownMaxKey: 'cruelSunCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enablePrideFlare, true)) {
+      skills.push({
         id: 'pride_flare',
         name: 'Pride Flare (プライド・フレア)',
         type: 'active',
         cooldownKey: 'prideFlareCooldown',
         cooldownMaxKey: 'prideFlareCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableTheOne, true)) {
+      skills.push({
         id: 'the_one',
         name: '"THE ONE" (天上天下唯我独尊)',
         type: 'ultimate',
         cooldownKey: 'theOneCooldown',
         cooldownMaxKey: 'theOneCooldownMax'
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   reset() {
@@ -595,6 +603,7 @@ export class EscanorFighter extends Fighter {
    */
   get currentDefense() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    if (!this.isSkillEnabled(cfg.enableSolarArmor, true)) return 0;
     const baseDef = cfg.defense ?? 0.20;
     const prideDef = (this.prideStacks || 0) * (cfg.prideDefBonusPerStack ?? 0.02);
     const theOneDef = this.isTheOneActive ? (cfg.theOneDefenseBonus ?? 0.25) : 0;
@@ -822,7 +831,8 @@ export class EscanorFighter extends Fighter {
    * Strictly verifies melee range so Escanor never chops when out of range!
    */
   shoot(ownerIndex) {
-    if (!this.canPerformBasicAttack() || this.chopHitPauseTimer > 0 || this.slashSwingTimer > 0) return false;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    if (!this.isSkillEnabled(cfg.enableRhittaChop, true) || !this.canPerformBasicAttack() || this.chopHitPauseTimer > 0 || this.slashSwingTimer > 0) return false;
     const target = this.getNearestTarget(null);
     if (!target) return false;
 
@@ -1178,8 +1188,8 @@ export class EscanorFighter extends Fighter {
     // Update Cruel Sun Projectiles
     this._updateCruelSuns(arena);
 
-    // Passive 1 & 2: Grace "Sunshine" — Solar Pride Escalation & Heat Aura (Toggle: enableSunshine)
-    if (Boolean(cfg.enableSunshine ?? true)) {
+    // Passive 2: Solar Pride Escalation (Toggle: enableSolarPride)
+    if (this.isSkillEnabled(cfg.enableSolarPride, true)) {
       this.prideChargeTimer++;
       if (this.prideChargeTimer >= (cfg.prideChargeIntervalFrames || 150)) {
         this.prideChargeTimer = 0;
@@ -1187,6 +1197,10 @@ export class EscanorFighter extends Fighter {
           this.prideStacks++;
         }
       }
+    }
+
+    // Passive 1: Grace "Sunshine" & Heat Aura (Toggle: enableSunshine)
+    if (this.isSkillEnabled(cfg.enableSunshine, true)) {
       this._updateSunshineHeat();
     }
 
@@ -1205,33 +1219,33 @@ export class EscanorFighter extends Fighter {
 
     // 1. Try Ultimate: "THE ONE" (Toggle: enableTheOne)
     const isLiftingWeapon = this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0);
-    if (Boolean(cfg.enableTheOne ?? true) && this.theOneCooldown <= 0 && !this.isTheOneActive && !this.isCruelSunActive() && !isLiftingWeapon && (dist < 180 || this.hp < this.maxHp * 0.65)) {
+    if (this.isSkillEnabled(cfg.enableTheOne, true) && this.theOneCooldown <= 0 && !this.isTheOneActive && !this.isCruelSunActive() && !isLiftingWeapon && (dist < 180 || this.hp < this.maxHp * 0.65)) {
       this._activateTheOne();
       return;
     }
 
     // 2. Try Divine Sword Escanor during "The One" (Toggle: enableTheOne)
     const finisherReach = (this.r || 25) + this.currentFinisherReach;
-    if (Boolean(cfg.enableTheOne ?? true) && this.isTheOneActive && !this.theOneFinisherUsed && !this.isCruelSunActive() && !isLiftingWeapon && dist <= (finisherReach + (target.r || 25))) {
+    if (this.isSkillEnabled(cfg.enableTheOne, true) && this.isTheOneActive && !this.theOneFinisherUsed && !this.isCruelSunActive() && !isLiftingWeapon && dist <= (finisherReach + (target.r || 25))) {
       this._executeDivineSwordEscanor(target);
       return;
     }
 
     // 3. Try Skill 1: Cruel Sun (Toggle: enableCruelSun)
-    if (Boolean(cfg.enableCruelSun ?? true) && this.cruelSunCooldown <= 0 && !this.isCruelSunActive() && !isLiftingWeapon && dist > 70 && dist < 280) {
+    if (this.isSkillEnabled(cfg.enableCruelSun, true) && this.cruelSunCooldown <= 0 && !this.isCruelSunActive() && !isLiftingWeapon && dist > 70 && dist < 280) {
       this._castCruelSun(target);
       return;
     }
 
     // 4. Try Skill 2: Pride Flare (Toggle: enablePrideFlare)
-    if (Boolean(cfg.enablePrideFlare ?? true) && this.prideFlareCooldown <= 0 && !this.isCruelSunActive() && !isLiftingWeapon && (dist < 110 || this.activeCruelSuns.length > 0)) {
+    if (this.isSkillEnabled(cfg.enablePrideFlare, true) && this.prideFlareCooldown <= 0 && !this.isCruelSunActive() && !isLiftingWeapon && (dist < 110 || this.activeCruelSuns.length > 0)) {
       this._castPrideFlare();
       return;
     }
 
     // 5. Basic Attack: Divine Axe Rhitta Chop (Windup overhead lift -> downward chop strike)
     const reach = (this.r || 25) + this.currentRhittaReach + (target.r || 25);
-    if (this.shootCooldown <= 0 && this.slashSwingTimer <= 0 && !this.isCruelSunActive() && dist <= reach) {
+    if (this.isSkillEnabled(cfg.enableRhittaChop, true) && this.shootCooldown <= 0 && this.slashSwingTimer <= 0 && !this.isCruelSunActive() && dist <= reach) {
       this._startRhittaChop(target);
     }
   }
@@ -1277,6 +1291,7 @@ export class EscanorFighter extends Fighter {
    */
   _startRhittaChop(target) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    if (!this.isSkillEnabled(cfg.enableRhittaChop, true)) return;
     const liftFrames = (typeof cfg.chopLiftFrames === 'number') ? cfg.chopLiftFrames : 80;
     const holdFrames = (typeof cfg.chopLiftHoldFrames === 'number') ? cfg.chopLiftHoldFrames : 100;
     const strikeFrames = (typeof cfg.chopStrikeFrames === 'number') ? cfg.chopStrikeFrames : 24;
@@ -1539,6 +1554,7 @@ export class EscanorFighter extends Fighter {
   _castCruelSun(target) {
     if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    if (!this.isSkillEnabled(cfg.enableCruelSun, true)) return;
     this.cruelSunCooldown = this.cruelSunCooldownMax;
 
     if (target) {
@@ -1993,6 +2009,8 @@ export class EscanorFighter extends Fighter {
    */
   _castPrideFlare() {
     if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    if (!this.isSkillEnabled(cfg.enablePrideFlare, true)) return;
     this.prideFlareCooldown = this.prideFlareCooldownMax;
     this.prideFlareActiveTimer = this.prideFlareMaxTimer;
 
@@ -2049,6 +2067,8 @@ export class EscanorFighter extends Fighter {
    */
   _activateTheOne() {
     if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    if (!this.isSkillEnabled(cfg.enableTheOne, true)) return;
     this.isTheOneActive = true;
     this.theOneTimer = this.theOneMaxTimer;
     this.theOneFinisherUsed = false;
@@ -2072,6 +2092,8 @@ export class EscanorFighter extends Fighter {
    */
   _executeDivineSwordEscanor(target) {
     if (this.isLiftingWeapon() || (this.slashSwingTimer > 0) || (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
+    if (!this.isSkillEnabled(cfg.enableTheOne, true)) return;
     this.theOneFinisherUsed = true;
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this._chopHitDelivered = true;

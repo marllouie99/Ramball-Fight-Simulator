@@ -42,6 +42,14 @@ export class JohnWickFighter extends Fighter {
     this.reloadTimer = 0;
     this.focusGauge = 0;
     this.maxFocusGauge = cfg.maxFocus || 100;
+
+    const pistolEnabled = this.isSkillEnabled(cfg.enablePistol, true);
+    const shotgunEnabled = this.isSkillEnabled(cfg.enableShotgun, true);
+    const rifleEnabled = this.isSkillEnabled(cfg.enableRifle, true) && this.isSkillEnabled(cfg.enableExcommunicado, true);
+    let defaultWeapon = 'pistol';
+    if (!pistolEnabled && shotgunEnabled) defaultWeapon = 'shotgun';
+    else if (!pistolEnabled && !shotgunEnabled && rifleEnabled) defaultWeapon = 'rifle';
+    this.currentEquippedWeapon = defaultWeapon;
     
     // Animation, Evade & CQC Assassination Combo timers
     this.punchAnimTimer = 0;
@@ -74,6 +82,49 @@ export class JohnWickFighter extends Fighter {
 
     // Demo attack cycle state
     this._demoAttackCycle = 0;
+
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = CONFIG.john_wick || {};
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableTacticalRoll, true)) {
+      skills.push({
+        id: 'tactical_roll',
+        name: 'Tactical Roll',
+        getCooldown: () => {
+          const max = cfg.rollCooldown || 240;
+          return { current: max - (this.rollCooldown || 0), max };
+        },
+        isActive: () => Boolean(this.isRolling || (this.evadeBuffTimer && this.evadeBuffTimer > 0)),
+        color: '#64748B'
+      });
+    }
+    if (this.isSkillEnabled(cfg.enablePencil, true)) {
+      skills.push({
+        id: 'pencil_assassination',
+        name: 'The Pencil',
+        getCooldown: () => {
+          const max = cfg.pencilCooldown || 500;
+          return { current: max, max };
+        },
+        isActive: () => Boolean(this.cqcComboPhase === 'PENCIL_STAB' || this.isPencilEquipped),
+        color: '#F59E0B'
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableExcommunicado, true)) {
+      skills.push({
+        id: 'excommunicado',
+        name: 'Excommunicado',
+        type: 'ultimate',
+        isActive: () => Boolean(this.isExcommunicado || this.currentEquippedWeapon === 'rifle'),
+        color: '#F59E0B'
+      });
+    }
+    if (skills.length > 0 && this.skillManager) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   reset() {
@@ -205,8 +256,19 @@ export class JohnWickFighter extends Fighter {
    * 5. Ready weapon and resume rapid-fire shooting.
    */
   startAssassinationCombo(target) {
-    if (!target || target.hp <= 0 || this.cqcComboPhase || this.hp <= 0) return;
     const cfg = CONFIG.john_wick || {};
+    if (!this.isSkillEnabled(cfg.enablePencil, true)) {
+      // Fallback reload if pencil is disabled
+      this.isReloading = true;
+      let rTime = cfg.reloadTime || 75;
+      if (this.currentEquippedWeapon === 'shotgun') rTime = cfg.shotgunReloadTime || 96;
+      else if (this.currentEquippedWeapon === 'rifle') rTime = cfg.rifleReloadTime || 85;
+      this.reloadTimer = rTime;
+      this.reloadMaxTime = rTime;
+      this.shootCooldown = rTime;
+      return;
+    }
+    if (!target || target.hp <= 0 || this.cqcComboPhase || this.hp <= 0) return;
 
     this.cqcComboPhase = 'FORWARD_ROLL';
     this.cqcComboTarget = target;
@@ -583,15 +645,24 @@ export class JohnWickFighter extends Fighter {
     // 1. Throw/Toss the current gun forward into the arena
     spawnThrownGun(this.x, this.y, this.gunAngle, this.currentEquippedWeapon || 'pistol', this.r);
 
-    // 2. 3-Way Cyclical Weapon Switch: Pistol -> Shotgun -> Rifle -> Pistol
+    // 2. Cyclical Weapon Switch among enabled weapons:
+    const pistolEnabled = this.isSkillEnabled(cfg.enablePistol, true);
+    const shotgunEnabled = this.isSkillEnabled(cfg.enableShotgun, true);
+    const rifleEnabled = this.isSkillEnabled(cfg.enableRifle, true) && this.isSkillEnabled(cfg.enableExcommunicado, true);
+
+    const available = [];
+    if (pistolEnabled) available.push('pistol');
+    if (shotgunEnabled) available.push('shotgun');
+    if (rifleEnabled) available.push('rifle');
+    if (available.length === 0) available.push('pistol');
+
     let nextWeapon = targetWeapon;
-    if (!nextWeapon) {
-      if (this.currentEquippedWeapon === 'pistol') {
-        nextWeapon = 'shotgun';
-      } else if (this.currentEquippedWeapon === 'shotgun') {
-        nextWeapon = 'rifle';
+    if (!nextWeapon || !available.includes(nextWeapon)) {
+      const curIdx = available.indexOf(this.currentEquippedWeapon);
+      if (curIdx === -1) {
+        nextWeapon = available[0];
       } else {
-        nextWeapon = 'pistol';
+        nextWeapon = available[(curIdx + 1) % available.length];
       }
     }
     this.currentEquippedWeapon = nextWeapon;
@@ -747,6 +818,7 @@ export class JohnWickFighter extends Fighter {
    * Executes a C.A.R. Gun-Fu martial arts melee strike in a frontal arc
    */
   _executeGunFuStrike(primaryTarget, facing, cfg) {
+    if (!this.isSkillEnabled(cfg.enableCQC, true)) return;
     const reach = cfg.meleePunchReach || 85;
     const arc = cfg.meleePunchArc || ((130 * Math.PI) / 180);
 
@@ -878,6 +950,7 @@ export class JohnWickFighter extends Fighter {
     const perpY = cosA;
 
     if (this.currentEquippedWeapon === 'shotgun') {
+      if (!this.isSkillEnabled(cfg.enableShotgun, true)) return;
       // ── BENELLI M4 TACTICAL SHOTGUN BLAST (Multi-pellet buckshot cone) ──
       const defaultScale = 1.20;
       const localTipX = this.r * 0.85 + 48 * defaultScale;
@@ -922,6 +995,7 @@ export class JohnWickFighter extends Fighter {
 
       this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 6) * 1.5);
     } else if (this.currentEquippedWeapon === 'rifle') {
+      if (!this.isSkillEnabled(cfg.enableRifle, true) || !this.isSkillEnabled(cfg.enableExcommunicado, true)) return;
       // ── M4A1 CARBINE / M4 RIFLE RAPID 5.56 FIRE ──
       const defaultScale = 1.18;
       const localTipX = this.r * 0.85 + 50 * defaultScale;
@@ -956,6 +1030,7 @@ export class JohnWickFighter extends Fighter {
 
       this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 6) * 0.6);
     } else {
+      if (!this.isSkillEnabled(cfg.enablePistol, true)) return;
       // ── TTI PIT VIPER 9mm BULLET ──
       const defaultWeaponScale = 1.25;
       const localTipX = this.r * 0.85 + 28 * defaultWeaponScale;
@@ -1034,8 +1109,9 @@ export class JohnWickFighter extends Fighter {
    * Grants active intangibility / evade buff where incoming attacks and projectiles pass harmlessly through
    */
   performCombatRoll(opponent) {
-    if (this.isRolling || this.isChainedByMakima || (this.hitStunTimer && this.hitStunTimer > 0) || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.hp <= 0) return;
     const cfg = CONFIG.john_wick || {};
+    if (!this.isSkillEnabled(cfg.enableTacticalRoll, true)) return;
+    if (this.isRolling || this.isChainedByMakima || (this.hitStunTimer && this.hitStunTimer > 0) || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.hp <= 0) return;
     this.isRolling = true;
     this.isRollingBack = false;
     this.rollTimer = cfg.rollDuration || 18;
@@ -1077,6 +1153,8 @@ export class JohnWickFighter extends Fighter {
    * Eliminates random rolling while simply moving across empty space.
    */
   _checkTacticalEvadeRoll(opponent, arena) {
+    const cfg = CONFIG.john_wick || {};
+    if (!this.isSkillEnabled(cfg.enableTacticalRoll, true)) return;
     if (this.isRolling || this.isChainedByMakima || this.cqcComboPhase || this.hp <= 0) return;
     if ((this.hitStunTimer && this.hitStunTimer > 0) || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isTargetOfAmbush) return;
     if (typeof state === 'undefined' || state.gameState !== 'playing') return;
@@ -1086,7 +1164,6 @@ export class JohnWickFighter extends Fighter {
       return;
     }
 
-    const cfg = CONFIG.john_wick || {};
     const closeDistThreshold = cfg.rollEnemyCloseDistance || 110;
 
     // Query for nearby enemy threat (fighters or illusions)
@@ -1249,7 +1326,7 @@ export class JohnWickFighter extends Fighter {
     let finalAmount = amount;
 
     // ── 2. PASSIVE 1: BALLISTIC TAILORED SUIT (Enhanced DEF Multiplier in Excommunicado) ──
-    if (!isTrueDamage && !isGuaranteedHit && !opts?.bypassShield && cfg.ballisticSuitDamageReduction) {
+    if (!isTrueDamage && !isGuaranteedHit && !opts?.bypassShield && cfg.ballisticSuitDamageReduction && this.isSkillEnabled(cfg.enableBallisticSuit, true)) {
       let defReduction = cfg.ballisticSuitDamageReduction;
       if (isExcommunicado) {
         defReduction = Math.min(0.85, defReduction * (cfg.excommunicadoDefMultiplier || 1.50));

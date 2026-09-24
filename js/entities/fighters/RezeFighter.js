@@ -116,40 +116,57 @@ export class RezeFighter extends Fighter {
     this.activeNukeBlasts = [];
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    const skills = [];
+
+    if (this.isSkillEnabled(cfg.enableSparkFlechette, false)) {
+      skills.push({
         id: 'spark_flechette',
         name: 'Spark Flechette',
         type: 'active',
         cooldownKey: 'sparkCooldown',
         cooldownMaxKey: 'sparkCooldownMax'
-      },
-      {
+      });
+    }
+
+    if (this.isSkillEnabled(cfg.enableDecoyBomb, false)) {
+      skills.push({
         id: 'decoy_bomb',
         name: 'Decoy Bomb',
         type: 'active',
         cooldownKey: 'decoyCooldown',
         cooldownMaxKey: 'decoyCooldownMax'
-      },
-      {
+      });
+    }
+
+    if (this.isSkillEnabled(cfg.enableRocketLunge, true)) {
+      skills.push({
         id: 'rocket_lunge',
         name: 'Rocket Lunge',
         type: 'active',
         cooldownKey: 'rocketCooldown',
         cooldownMaxKey: 'rocketCooldownMax'
-      },
-      {
-        id: 'hybrid_mode',
-        name: 'Bomb Devil Form',
-        type: 'transformation',
-        durationKey: 'hybridModeTimer',
-        durationMaxKey: 'hybridModeMaxTimer',
-        activeKey: 'isHybridModeActive',
-        onExpire: (fighter) => {
-          fighter.isHybridModeActive = false;
-        }
-      },
-      {
+      });
+    }
+
+    skills.push({
+      id: 'hybrid_mode',
+      name: 'Bomb Devil Form',
+      type: 'transformation',
+      durationKey: 'hybridModeTimer',
+      durationMaxKey: 'hybridModeMaxTimer',
+      activeKey: 'isHybridModeActive',
+      onExpire: (fighter) => {
+        fighter.isHybridModeActive = false;
+      }
+    });
+
+    if (this.isSkillEnabled(cfg.enableMegatonNuke, true)) {
+      skills.push({
         id: 'tsar_nuke',
         name: 'Megaton Tsar Nuke',
         type: 'ultimate',
@@ -157,8 +174,10 @@ export class RezeFighter extends Fighter {
         cooldownMaxKey: 'nukeCooldownMax',
         channelingKey: 'isExecutingNuke',
         channelTimerKey: 'nukeTimer'
-      }
-    ]);
+      });
+    }
+
+    this.skillManager.registerSkills(skills);
   }
 
   reset() {
@@ -226,8 +245,8 @@ export class RezeFighter extends Fighter {
 
   isEffectivelyAlive() {
     if (this.hp > 0 && !this.isDead) return true;
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
-    if (Boolean(cfg.enableCollarPinRevive) && this.reviveStocks > 0) return true;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    if (this.isSkillEnabled(cfg.enableCollarPinRevive, false) && this.reviveStocks > 0) return true;
     return false;
   }
 
@@ -249,7 +268,7 @@ export class RezeFighter extends Fighter {
     const target = this._findBestTarget() || (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && !f.isDead) : null);
     if (!target) return false;
 
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
     const reach = this.isHybridModeActive
       ? ((cfg.punchReach || 75) + (target.r || 25))
       : ((cfg.knifeReach || 60) + (target.r || 25));
@@ -258,12 +277,12 @@ export class RezeFighter extends Fighter {
     if (dist <= reach) {
       this.aim(target);
       if (this.isHybridModeActive) {
-        if (Boolean(cfg.enableMeleeCombo ?? true)) {
+        if (this.isSkillEnabled(cfg.enableMeleeCombo, true)) {
           this._performExplosivePunch(target);
           return true;
         }
       } else {
-        if (Boolean(cfg.enableHiddenKnifeCombo ?? true)) {
+        if (this.isSkillEnabled(cfg.enableHiddenKnifeCombo, true)) {
           this._performKnifeAttack(target);
           return true;
         }
@@ -379,44 +398,50 @@ export class RezeFighter extends Fighter {
    */
   _updateRezeCombatAI(target) {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
 
     // 1. Ultimate: Megaton Tsar Nuke
-    if (this.nukeCooldown <= 0 && Boolean(cfg.enableMegatonNuke) && dist < 350) {
+    if (this.nukeCooldown <= 0 && this.isSkillEnabled(cfg.enableMegatonNuke, true) && dist < 350) {
       this._activateMegatonNuke(target);
       return;
     }
 
     // 2. Mobility: Supersonic Rocket Lunge (Bomb Devil Form ONLY)
-    if (this.isHybridModeActive && this.rocketCooldown <= 0 && Boolean(cfg.enableRocketLunge) && dist > 140 && dist < 420) {
+    if (this.isHybridModeActive && this.rocketCooldown <= 0 && this.isSkillEnabled(cfg.enableRocketLunge, true) && dist > 140 && dist < 420) {
       this._activateRocketLunge(target);
       return;
     }
 
     // 3. Primary: Spark Flechette Barrage
-    if (this.sparkCooldown <= 0 && Boolean(cfg.enableSparkFlechette) && dist > 80 && dist < 380) {
+    if (this.sparkCooldown <= 0 && this.isSkillEnabled(cfg.enableSparkFlechette, false) && dist > 80 && dist < 380) {
       this._fireSparkFlechettes(target);
       return;
     }
 
     // 4. Secondary: Decoy Bomb
-    if (this.decoyCooldown <= 0 && Boolean(cfg.enableDecoyBomb) && dist < 220) {
+    if (this.decoyCooldown <= 0 && this.isSkillEnabled(cfg.enableDecoyBomb, false) && dist < 220) {
       this._deployDecoyBomb(target);
       return;
     }
 
-    // 5. Basic Attacks (Human vs Bomb Devil Hybrid Form)
+    // 5. Aerial Dive Bomb (Human Form ONLY)
+    if (!this.isHybridModeActive && this.diveBombCooldown <= 0 && this.isSkillEnabled(cfg.enableDiveBomb, false) && dist >= (cfg.diveBombMinRange || 70) && dist <= (cfg.diveBombMaxRange || 240)) {
+      this._performDiveBomb(target);
+      return;
+    }
+
+    // 6. Basic Attacks (Human vs Bomb Devil Hybrid Form)
     if (!this.isHybridModeActive) {
       // Human Form: Simple Knife Basic Attack when enemy is close in range
       const knifeReach = (cfg.knifeReach || 60) + (target.r || 25);
-      if (dist <= knifeReach && this.shootCooldown <= 0 && this.punchAnimTimer <= 0 && Boolean(cfg.enableHiddenKnifeCombo)) {
+      if (dist <= knifeReach && this.shootCooldown <= 0 && this.punchAnimTimer <= 0 && this.isSkillEnabled(cfg.enableHiddenKnifeCombo, true)) {
         this._performKnifeAttack(target);
         return;
       }
     } else {
       // Hybrid Form — Basic Attack: Explosive Martial Arts (120° Frontal Arc Melee & AOE Punch Detonations)
       const punchReach = (cfg.punchReach || 75) + (target.r || 25);
-      if (dist <= punchReach && this.shootCooldown <= 0 && this.punchAnimTimer <= 0 && Boolean(cfg.enableMeleeCombo ?? true)) {
+      if (dist <= punchReach && this.shootCooldown <= 0 && this.punchAnimTimer <= 0 && this.isSkillEnabled(cfg.enableMeleeCombo, true)) {
         this._performExplosivePunch(target);
         return;
       }
@@ -1093,8 +1118,9 @@ export class RezeFighter extends Fighter {
       return false;
     }
 
-    // Trigger Supersonic Rocket Lunge off wall (must respect skill cooldown)
-    if (!this.isPullingPin && !this.isExecutingNuke && !this.isVaulting && this.rocketCooldown <= 0) {
+    // Trigger Supersonic Rocket Lunge off wall (must respect skill cooldown and master toggle)
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    if (!this.isPullingPin && !this.isExecutingNuke && !this.isVaulting && this.rocketCooldown <= 0 && this.isSkillEnabled(cfg.enableRocketLunge, true)) {
       if ((this.wallLungeDebounceTimer || 0) <= 0) {
         this.wallLungeDebounceTimer = 18;
         this._triggerWallRocketLunge(opponent, normalX, normalY);
@@ -1457,7 +1483,7 @@ export class RezeFighter extends Fighter {
     const rawDamage = typeof amount === 'number' ? amount : (amount?.damage || 0);
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
     if (this.hp <= rawDamage && this.reviveStocks > 0) {
-      if (Boolean(cfg.enableCollarPinRevive)) {
+      if (this.isSkillEnabled(cfg.enableCollarPinRevive, false)) {
         this.reviveStocks--;
         this.hp = Math.round((this.maxHp || 340) * (cfg.reviveHpPercent || 0.50));
         this.isHybridModeActive = true;

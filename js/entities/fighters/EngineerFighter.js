@@ -33,7 +33,48 @@ export class EngineerFighter extends Fighter {
     this.isBuildingDispenser = false;
     this.buildTimer = 0;
     this.dispenserBuildTimer = 0;
-    this.sentryBuildLevel = 1;
+    
+    const lvl1Allowed = this.isSkillEnabled(CONFIG.Engineer?.enableSentryLevel1, true);
+    const lvl2Allowed = this.isSkillEnabled(CONFIG.Engineer?.enableSentryLevel2, true);
+    const lvl3Allowed = this.isSkillEnabled(CONFIG.Engineer?.enableSentryLevel3, true);
+    let startLvl = 1;
+    if (!lvl1Allowed && lvl2Allowed) startLvl = 2;
+    else if (!lvl1Allowed && !lvl2Allowed && lvl3Allowed) startLvl = 3;
+    this.sentryBuildLevel = startLvl;
+    
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = CONFIG.Engineer || {};
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableSentryTurret, true)) {
+      skills.push({
+        id: 'sentry',
+        name: 'Sentry Turret',
+        getCooldown: () => {
+          const max = cfg.skillCooldown || 500;
+          return { current: max - (this.skillCooldown || 0), max };
+        },
+        isActive: () => Boolean(this.turretEntity && this.turretEntity.hp > 0) || this.isBuildingTurret,
+        color: '#FFB800'
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableDispenser, true)) {
+      skills.push({
+        id: 'dispenser',
+        name: 'Dispenser',
+        getCooldown: () => {
+          const max = cfg.dispenserCooldown || 300;
+          return { current: max - (this.dispenserCooldown || 0), max };
+        },
+        isActive: () => Boolean(this.dispenserEntity && this.dispenserEntity.hp > 0) || this.isBuildingDispenser,
+        color: '#00FF88'
+      });
+    }
+    if (skills.length > 0 && this.skillManager) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   reset() {
@@ -186,10 +227,12 @@ export class EngineerFighter extends Fighter {
     }
 
     // -- 1. SKILL: DEPLOY TURRET (Disabled in demo mode) --
-    if (!this.isDemoFighter && this.skillCooldown <= 0 && !this.isBuildingTurret && !this.turretEntity) {
+    const cfg = CONFIG.Engineer || {};
+    const sentryEnabled = this.isSkillEnabled(cfg.enableSentryTurret, true);
+    if (sentryEnabled && !this.isDemoFighter && this.skillCooldown <= 0 && !this.isBuildingTurret && !this.turretEntity) {
       this.isBuildingTurret = true;
-      this.skillCooldown = CONFIG.Engineer?.skillCooldown || 500;
-      this.buildTimer = CONFIG.Engineer?.turretBuildTime || 90;
+      this.skillCooldown = cfg.skillCooldown || 500;
+      this.buildTimer = cfg.turretBuildTime || 90;
       
       // Direction to build the turret
       let spawnAngle = this.gunAngle;
@@ -197,7 +240,7 @@ export class EngineerFighter extends Fighter {
         spawnAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       }
       
-      const offset = CONFIG.Engineer.turretSpawnDistance ?? -40;
+      const offset = cfg.turretSpawnDistance ?? -40;
       let spawnX = this.x + Math.cos(spawnAngle) * offset;
       let spawnY = this.y + Math.sin(spawnAngle) * offset;
 
@@ -220,8 +263,13 @@ export class EngineerFighter extends Fighter {
       turret.isBuilding = true;
       turret.buildProgress = 0;
       
-      // Increment next build level (cap at 3)
-      this.sentryBuildLevel = Math.min(3, currentLvl + 1);
+      // Determine max allowed level based on toggles
+      const lvl3Allowed = this.isSkillEnabled(cfg.enableSentryLevel3, true);
+      const lvl2Allowed = this.isSkillEnabled(cfg.enableSentryLevel2, true);
+      const maxLvl = lvl3Allowed ? 3 : (lvl2Allowed ? 2 : 1);
+      
+      // Increment next build level (cap at maxLvl)
+      this.sentryBuildLevel = Math.min(maxLvl, currentLvl + 1);
       
       if (state && state.fighters) {
         state.fighters.push(turret);
@@ -237,7 +285,7 @@ export class EngineerFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       
-      const buildTime = CONFIG.Engineer.turretBuildTime || 90;
+      const buildTime = cfg.turretBuildTime || 90;
       if (this.turretEntity) {
         this.turretEntity.buildProgress = 1 - (this.buildTimer / buildTime);
       }
@@ -251,7 +299,7 @@ export class EngineerFighter extends Fighter {
       if (this.buildTimer % 15 === 0) {
         this.wrenchActive = true;
         this.lastWeaponUsed = 'wrench';
-        this.wrenchTimer = CONFIG.Engineer?.wrenchSwipeDuration || 16;
+        this.wrenchTimer = cfg.wrenchSwipeDuration || 16;
         this.wrenchAngle = this.gunAngle;
         
         if (this.turretEntity) {
@@ -267,7 +315,7 @@ export class EngineerFighter extends Fighter {
       
       if (this.buildTimer <= 0) {
         this.isBuildingTurret = false;
-        this.skillCooldown = CONFIG.Engineer.skillCooldown;
+        this.skillCooldown = cfg.skillCooldown || 500;
         
         if (this.turretEntity) {
           this.turretEntity.isBuilding = false;
@@ -282,15 +330,16 @@ export class EngineerFighter extends Fighter {
     }
 
     // -- 2. SECONDARY SKILL: DEPLOY DISPENSER (When Sentry is active) --
-    if (!this.isDemoFighter && !this.isBuildingTurret && !this.isBuildingDispenser &&
+    const dispenserEnabled = this.isSkillEnabled(cfg.enableDispenser, true);
+    if (dispenserEnabled && !this.isDemoFighter && !this.isBuildingTurret && !this.isBuildingDispenser &&
         this.turretEntity && this.turretEntity.hp > 0 && !this.dispenserEntity && this.dispenserCooldown <= 0) {
       this.isBuildingDispenser = true;
-      this.dispenserBuildTimer = CONFIG.Engineer?.dispenserBuildTime || 110;
+      this.dispenserBuildTimer = cfg.dispenserBuildTime || 110;
 
       // Position dispenser at an offset angle from the turret
       let turretAngle = Math.atan2(this.turretEntity.y - this.y, this.turretEntity.x - this.x);
       let dispenserAngle = turretAngle + Math.PI * 0.75; // Offset 135° to create a tactical base
-      const dOffset = CONFIG.Engineer?.dispenserSpawnDistance ?? 45;
+      const dOffset = cfg.dispenserSpawnDistance ?? 45;
       let spawnX = this.x + Math.cos(dispenserAngle) * dOffset;
       let spawnY = this.y + Math.sin(dispenserAngle) * dOffset;
 
@@ -322,7 +371,7 @@ export class EngineerFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
 
-      const buildTime = CONFIG.Engineer?.dispenserBuildTime || 110;
+      const buildTime = cfg.dispenserBuildTime || 110;
       if (this.dispenserEntity) {
         this.dispenserEntity.buildProgress = 1 - (this.dispenserBuildTimer / buildTime);
         this.gunAngle = Math.atan2(this.dispenserEntity.y - this.y, this.dispenserEntity.x - this.x);
@@ -331,7 +380,7 @@ export class EngineerFighter extends Fighter {
       if (this.dispenserBuildTimer % 15 === 0) {
         this.wrenchActive = true;
         this.lastWeaponUsed = 'wrench';
-        this.wrenchTimer = CONFIG.Engineer?.wrenchSwipeDuration || 16;
+        this.wrenchTimer = cfg.wrenchSwipeDuration || 16;
         this.wrenchAngle = this.gunAngle;
 
         if (this.dispenserEntity) {
@@ -347,7 +396,7 @@ export class EngineerFighter extends Fighter {
 
       if (this.dispenserBuildTimer <= 0) {
         this.isBuildingDispenser = false;
-        this.dispenserCooldown = CONFIG.Engineer?.dispenserCooldown || 300;
+        this.dispenserCooldown = cfg.dispenserCooldown || 300;
 
         if (this.dispenserEntity) {
           this.dispenserEntity.isBuilding = false;
@@ -360,13 +409,14 @@ export class EngineerFighter extends Fighter {
     }
 
     // -- 3. HEAL TURRET & DISPENSER ON BOUNCE (COLLISION) --
-    if (this.turretEntity && this.turretEntity.healCooldownTimer <= 0) {
+    const wrenchEnabled = this.isSkillEnabled(cfg.enableWrench, true);
+    if (wrenchEnabled && this.turretEntity && this.turretEntity.healCooldownTimer <= 0) {
       const distSq = (this.x - this.turretEntity.x) ** 2 + (this.y - this.turretEntity.y) ** 2;
       const combinedR = this.r + this.turretEntity.r;
       if (distSq <= combinedR * combinedR) {
         // Collided with turret, heal it
-        this.turretEntity.heal(CONFIG.Engineer.turretHealAmount);
-        this.turretEntity.healCooldownTimer = CONFIG.Engineer.turretHealCooldown;
+        this.turretEntity.heal(cfg.turretHealAmount || 30);
+        this.turretEntity.healCooldownTimer = cfg.turretHealCooldown || 60;
         
         // Visual text on self too
         spawnFloatingText(this.x, this.y - this.r - 5, "REPAIR!", "#00FF88");
@@ -377,12 +427,12 @@ export class EngineerFighter extends Fighter {
       }
     }
 
-    if (this.dispenserEntity && this.dispenserEntity.healCooldownTimer <= 0) {
+    if (wrenchEnabled && this.dispenserEntity && this.dispenserEntity.healCooldownTimer <= 0) {
       const distSq = (this.x - this.dispenserEntity.x) ** 2 + (this.y - this.dispenserEntity.y) ** 2;
       const combinedR = this.r + this.dispenserEntity.r;
       if (distSq <= combinedR * combinedR) {
-        this.dispenserEntity.heal(CONFIG.Engineer?.dispenserHealAmount || 30);
-        this.dispenserEntity.healCooldownTimer = CONFIG.Engineer?.dispenserHealCooldown || 60;
+        this.dispenserEntity.heal(cfg.dispenserHealAmount || 30);
+        this.dispenserEntity.healCooldownTimer = cfg.dispenserHealCooldown || 60;
 
         spawnFloatingText(this.x, this.y - this.r - 5, "REPAIR!", "#00FF88");
         spawnSparks(this.dispenserEntity.x, this.dispenserEntity.y, 8, 'green');
@@ -399,17 +449,21 @@ export class EngineerFighter extends Fighter {
       
       this.aim(opponent);
       
-      if (dist <= (CONFIG.Engineer.wrenchRange || 85)) {
+      const shotgunEnabled = this.isSkillEnabled(cfg.enableShotgun, true);
+      
+      if (dist <= (cfg.wrenchRange || 85) && wrenchEnabled) {
         // Close range: Wrench Strike
         if (this.wrenchCooldown <= 0) {
           this._executeWrenchStrike(opponent, arena);
         }
-      } else if (dist <= CONFIG.Engineer.shotgunRange) {
+      } else if (dist <= (cfg.shotgunRange || 400) && shotgunEnabled) {
         // Range: Shotgun
         if (this.shotgunCooldown <= 0) {
           this.lastWeaponUsed = 'shotgun';
           this._fireShotgun();
         }
+      } else if (wrenchEnabled && this.wrenchCooldown <= 0 && dist <= (cfg.wrenchRange || 85)) {
+        this._executeWrenchStrike(opponent, arena);
       }
     } else {
       this.gunAngle = Math.atan2(this.vy, this.vx);

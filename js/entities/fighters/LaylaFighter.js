@@ -44,33 +44,42 @@ export class LaylaFighter extends Fighter {
   }
 
   _registerSkills() {
-    this.skillManager.registerSkills([
-      {
+    const cfg = CONFIG.layla || {};
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableMaleficBomb, true)) {
+      skills.push({
         id: 'bomb',
         name: 'MALEFIC BOMB',
         type: 'offensive',
         cooldownKey: 'maleficBombCooldown',
-        cooldownMax: CONFIG.layla?.maleficBombCooldown || 180
-      },
-      {
+        cooldownMax: cfg.maleficBombCooldown || 180
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableVoidProjectile, true)) {
+      skills.push({
         id: 'dash',
         name: 'VOID DASH',
         type: 'mobility',
         cooldownKey: 'voidDashCooldown',
-        cooldownMax: CONFIG.layla?.voidDashCooldown || 180,
+        cooldownMax: cfg.voidDashCooldown || 180,
         activeKey: 'isDashing'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableDestructionRush, true)) {
+      skills.push({
         id: 'barrage',
         name: 'DESTRUCTION BARRAGE',
         type: 'ultimate',
         cooldownKey: 'destructionBarrageCooldown',
-        cooldownMax: CONFIG.layla?.destructionBarrageCooldown || 600,
+        cooldownMax: cfg.ultimateCooldown || 600,
         durationKey: 'ultimateFireTimer',
-        durationMax: CONFIG.layla?.ultimateFireDuration || 180,
+        durationMax: cfg.ultimateLaserDuration || 20,
         activeKey: 'isUltimateFiring'
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0 && this.skillManager) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   reset() {
@@ -97,17 +106,18 @@ export class LaylaFighter extends Fighter {
   }
 
   _fireWeapon(ownerIndex, isUltimateShot = false) {
+    const cfg = CONFIG.layla || {};
     let finalSpeed = CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1);
     let finalDamage = this.damage;
     
     // Apply passive damage bonus
-    if (this.powerStacks > 0) {
-      finalDamage += this.powerStacks * (CONFIG.layla.damagePerStack || 1.5);
+    if (this.isSkillEnabled(cfg.enableAscendingPower, true) && this.powerStacks > 0) {
+      finalDamage += this.powerStacks * (cfg.damagePerStack || 1.5);
     }
     
     // Apply ultimate damage multiplier
     if (isUltimateShot) {
-      finalDamage *= (CONFIG.layla.ultimateDamageMultiplier || 1.5);
+      finalDamage *= (cfg.ultimateDamageMultiplier || 1.5);
     }
     
     const scale = 0.92;
@@ -541,34 +551,39 @@ export class LaylaFighter extends Fighter {
         this.vy += Math.sin(awayAngle) * 0.2;
       }
 
+      const cfg = CONFIG.layla || {};
       let actionTaken = false;
 
       // Use Malefic Bomb when at appropriate range
-      if (this.maleficBombCooldown === 0 && distToOpponent <= (CONFIG.layla.bombRange || 250)) {
+      const maleficEnabled = this.isSkillEnabled(cfg.enableMaleficBomb, true);
+      if (maleficEnabled && this.maleficBombCooldown === 0 && distToOpponent <= (cfg.bombRange || 250)) {
         this._fireMaleficBomb(ownerIndex);
         actionTaken = true;
         this.shootCooldown = Math.max(this.shootCooldown || 0, 25);
       }
       
       // Use Void Projectile when enemy is in range
-      if (!actionTaken && this.voidDashCooldown === 0 && distToOpponent <= (CONFIG.layla.voidProjectileRange || 300)) {
+      const voidEnabled = this.isSkillEnabled(cfg.enableVoidProjectile, true);
+      if (!actionTaken && voidEnabled && this.voidDashCooldown === 0 && distToOpponent <= (cfg.voidProjectileRange || 300)) {
         this._fireVoidProjectile(ownerIndex);
         actionTaken = true;
         this.shootCooldown = Math.max(this.shootCooldown || 0, 20);
       }
       
       // Use Ultimate when available and have some stacks
-      if (!actionTaken && this.destructionBarrageCooldown === 0 && this.powerStacks >= 5) {
+      const ultEnabled = this.isSkillEnabled(cfg.enableDestructionRush, true);
+      if (!actionTaken && ultEnabled && this.destructionBarrageCooldown === 0 && this.powerStacks >= 5) {
         this._fireDestructionRush(opponent);
         actionTaken = true;
       }
 
       // Basic attack aiming and firing
+      const basicAttackEnabled = this.isSkillEnabled(cfg.enableBasicAttack, true);
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
-      const aligned = Math.abs(delta) < (CONFIG.layla.aimThreshold || 0.12);
+      const aligned = Math.abs(delta) < (cfg.aimThreshold || 0.12);
 
-      if (!actionTaken && aligned && (this.shootCooldown || 0) === 0 && !this.isUltimateCharging && !this.isUltimateFiring) {
+      if (!actionTaken && basicAttackEnabled && aligned && (this.shootCooldown || 0) === 0 && !this.isUltimateCharging && !this.isUltimateFiring) {
         this._fireWeapon(ownerIndex, false);
       }
     }
@@ -590,8 +605,9 @@ export class LaylaFighter extends Fighter {
   }
 
   onDamageDealt(target, projectile, ownerIndex) {
+    const cfg = CONFIG.layla || {};
     // Add power stack on hit
-    if (this.powerStacks < this.maxStacks) {
+    if (this.isSkillEnabled(cfg.enableAscendingPower, true) && this.powerStacks < this.maxStacks) {
       this.powerStacks++;
       this.stackTimer = 0; // Reset timer on successful hit
       

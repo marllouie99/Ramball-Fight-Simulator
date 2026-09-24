@@ -188,6 +188,7 @@ export function updateChainPhysics(fighter) {
 }
 
 export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) {
+  if (!fighter.isSkillEnabled(CONFIG.toji?.enableKatana, true)) return [];
   if (!fighter._secondSeqAudioPlayed) {
     const s2Chance = typeof CONFIG.toji?.soundChances?.secondWeaponAttack === 'number'
       ? CONFIG.toji.soundChances.secondWeaponAttack
@@ -306,6 +307,8 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
 }
 
 export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, isAmbushThrust = false) {
+  if (isAmbushThrust && !fighter.isSkillEnabled(CONFIG.toji?.enableAmbush, true)) return [];
+  if (!isAmbushThrust && !fighter.isSkillEnabled(CONFIG.toji?.enableSpear, true)) return [];
   if (!fighter.canPerformBasicAttack()) return [];
   fighter.spearCooldown = fighter.spearCooldownMax;
   fighter.isAmbushThrust = isAmbushThrust;

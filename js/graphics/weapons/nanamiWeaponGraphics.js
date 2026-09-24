@@ -135,7 +135,9 @@ export function drawNanamiCleaver(ctx, x, y, gunAngle, r, swingActive = false, s
   const gripBottomY = gripHeight * 0.5;           // +4.25
   const bladeBottomY = topY + bladeWidth;         // +17.75
 
-  if (opts.isCollapseSlam || opts.isCollapsing) {
+  if (opts.hitPauseAxeAngle !== undefined) {
+    ctx.rotate(opts.hitPauseAxeAngle);
+  } else if (opts.isCollapseSlam || opts.isCollapsing) {
     let swingAngle = 0;
     if (swingProgress < 0.45) {
       // 1. Structural Windup: Rear back high overhead to -1.55 rad (~12 o'clock high)
@@ -365,8 +367,14 @@ export function drawNanamiCleaver(ctx, x, y, gunAngle, r, swingActive = false, s
 export function drawNanamiCleaverSlashArc(ctx, fighter) {
   if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isTargetOfAmbush || (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())) return;
 
-  const maxT = fighter.slashSwingMaxTimer || 18;
-  const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+  const isHitPausing = Boolean(fighter.ratioHitPauseTimer && fighter.ratioHitPauseTimer > 0);
+  let rawProgress = 0;
+  if (isHitPausing && typeof fighter.ratioHitProgress === 'number') {
+    rawProgress = fighter.ratioHitProgress;
+  } else {
+    const maxT = fighter.slashSwingMaxTimer || 18;
+    rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+  }
   const isOvertime = fighter.isOvertimeActive;
 
   const r = fighter.r || 25;
@@ -404,7 +412,13 @@ export function drawNanamiCleaverSlashArc(ctx, fighter) {
   const windupCutoff = isBlitz ? 0.12 : 0.10;
   const cutCutoff = isBlitz ? (isFinalStrike ? 0.68 : 0.62) : 0.58;
 
-  if (rawProgress < windupCutoff) {
+  if (isHitPausing) {
+    const t = Math.max(0, Math.min(1.0, (rawProgress - windupCutoff) / Math.max(0.01, cutCutoff - windupCutoff)));
+    const eased = t * t * (3 - 2 * t);
+    currentTipOffset = startOffset + eased * (endOffset - startOffset);
+    currentTailOffset = startOffset;
+    trailAlpha = 1.0;
+  } else if (rawProgress < windupCutoff) {
     // Brief initial anticipation windup (trail hidden until cutting stroke begins)
     return;
   } else if (rawProgress < cutCutoff) {

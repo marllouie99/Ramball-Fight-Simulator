@@ -13,6 +13,7 @@
 
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
+import { tanjiroConfig } from '../../configs/characters/tanjiroConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawTanjiroSkin } from '../../graphics/fighters/tanjiroSkin.js';
@@ -29,7 +30,7 @@ export class TanjiroFighter extends Fighter {
     this.themeColor = '#10B981';
     this.secondaryColor = '#EF4444'; // Sunfire Crimson
 
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : {};
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : tanjiroConfig;
 
     // Standard HP initialization
     const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
@@ -39,6 +40,10 @@ export class TanjiroFighter extends Fighter {
       this.maxHp = Math.round((def?.hp || 340) * (MODE_HP_MULTIPLIER[state.mode] || 1));
     }
     this.hp = this.maxHp;
+
+    if (this.isSkillEnabled(cfg.enableTotalConcentration, true)) {
+      this.speed = (cfg.speed || 5.8) * (1 + (cfg.concentrationSpeedBonus || 0.12));
+    }
 
     // Animation & State Timers
     this.slashSwingTimer = 0;
@@ -71,29 +76,59 @@ export class TanjiroFighter extends Fighter {
     this.dragonDanceStrikesLeft = 0;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : tanjiroConfig;
+    const skills = [];
+
+    if (this.isSkillEnabled(cfg.enableConstantFlux, true)) {
+      skills.push({
         id: 'constant_flux',
         name: 'Tenth Form: Constant Flux',
         type: 'active',
         cooldownKey: 'fluxCooldown',
         cooldownMaxKey: 'fluxCooldownMax'
-      },
-      {
+      });
+    }
+
+    if (this.isSkillEnabled(cfg.enableClearBlueSky, true)) {
+      skills.push({
         id: 'clear_blue_sky',
         name: 'Sun Breathing: Blue Sky',
         type: 'active',
         cooldownKey: 'sunCooldown',
         cooldownMaxKey: 'sunCooldownMax'
-      },
-      {
+      });
+    }
+
+    if (this.isSkillEnabled(cfg.enableDragonSunDance, true)) {
+      skills.push({
         id: 'dragon_sun_dance',
         name: 'Hinokami Kagura: Dragon Sun Dance',
         type: 'ultimate',
         cooldownKey: 'dragonDanceCooldown',
         cooldownMaxKey: 'dragonDanceCooldownMax'
+      });
+    }
+
+    this.skillManager.registerSkills(skills);
+  }
+
+  shoot(ownerIndex) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : tanjiroConfig;
+    if (!this.isSkillEnabled(cfg.enableWaterBreathing, true)) return false;
+    const target = this.getNearestTarget();
+    if (!target) return false;
+    const dist = Math.hypot(target.x - this.x, target.y - this.y);
+    if (dist <= (cfg.katanaReach || 80) + (target.r || 25)) {
+      if (this.slashSwingTimer <= 0) {
+        this._executeWaterBreathingBasicAttack(target);
+        return true;
       }
-    ]);
+    }
+    return false;
   }
 
   update() {
@@ -119,15 +154,16 @@ export class TanjiroFighter extends Fighter {
     if (!target) return;
 
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : tanjiroConfig;
 
     // AI / Skill Priority
-    if (this.dragonDanceCooldown <= 0 && dist < 180 && !this.isFluxDashing && !this.isSunSpinning) {
+    if (this.dragonDanceCooldown <= 0 && this.isSkillEnabled(cfg.enableDragonSunDance, true) && dist < 180 && !this.isFluxDashing && !this.isSunSpinning) {
       this._triggerDragonSunDance(target);
-    } else if (this.sunCooldown <= 0 && dist < 90 && !this.isFluxDashing && !this.isDragonDancing) {
+    } else if (this.sunCooldown <= 0 && this.isSkillEnabled(cfg.enableClearBlueSky, true) && dist < 90 && !this.isFluxDashing && !this.isDragonDancing) {
       this._triggerClearBlueSky(target);
-    } else if (this.fluxCooldown <= 0 && dist < 160 && !this.isSunSpinning && !this.isDragonDancing) {
+    } else if (this.fluxCooldown <= 0 && this.isSkillEnabled(cfg.enableConstantFlux, true) && dist < 160 && !this.isSunSpinning && !this.isDragonDancing) {
       this._triggerConstantFlux(target);
-    } else if (dist < 85 && this.slashSwingTimer <= 0) {
+    } else if (dist < 85 && this.slashSwingTimer <= 0 && this.isSkillEnabled(cfg.enableWaterBreathing, true)) {
       this._executeWaterBreathingBasicAttack(target);
     }
   }
@@ -157,7 +193,11 @@ export class TanjiroFighter extends Fighter {
     const angle = this.gunAngle || 0;
 
     const damages = [18, 22, 28];
-    const dmg = damages[this.waterComboCount];
+    let dmg = damages[this.waterComboCount];
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : tanjiroConfig;
+    if (this.isSkillEnabled(cfg.enableOpeningThread, true) && target && target.maxHp && (target.hp / target.maxHp) <= (cfg.threadHpThreshold || 0.40)) {
+      dmg = Math.round(dmg * (1 + (cfg.threadCritChance || 0.25)));
+    }
 
     // Query all valid targets in 140° frontal arc (Rule 6 & 7)
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];

@@ -199,6 +199,7 @@ export function isFinalGetsugaVoicelinePlaying(fighter) {
  * @param {Object} [target=null]
  */
 export function fireFinalMassiveGetsuga(fighter, target = null) {
+  if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableFinalGetsuga, true)) return;
   if (fighter.isDead || fighter.hp <= 0 || fighter.isParalyzedOrBeamTrapped() || fighter.wallSlamPinnedX !== undefined || fighter.isWallSlammed) return;
   if (isGetsugaActive(fighter)) return;
   if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isChannelingGetsuga || isFinalGetsugaVoicelinePlaying(fighter)) return;
@@ -308,6 +309,7 @@ export function castBankaiFinalGetsuga(fighter) {
  * @param {boolean} [isCombo=false]
  */
 export function fireGetsuga(fighter, target = null, isCombo = false) {
+  if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableGetsuga, true)) return;
   if (fighter.isDead || fighter.hp <= 0 || fighter.isParalyzedOrBeamTrapped() || fighter.wallSlamPinnedX !== undefined || fighter.isWallSlammed) return;
   if (!isCombo && isGetsugaActive(fighter)) return;
   if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isChannelingGetsuga || fighter.getsugaRecoveryTimer > 0 || isFinalGetsugaVoicelinePlaying(fighter)) return;

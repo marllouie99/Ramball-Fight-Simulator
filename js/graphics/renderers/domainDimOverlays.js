@@ -1239,8 +1239,14 @@ export function drawTojiUltimateOverlay() {
  * centered on Nanami, screen corner vignette, and golden CE character spotlight.
  */
 export function drawNanamiOvertimeArenaOverlay() {
-  if (typeof state !== 'undefined' && state.disableDimEffects) return;
-  if (typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeDimEnabled === false) return;
+  if (typeof state !== 'undefined' && state.disableDimEffects) {
+    currentNanamiOvertimeOpacity = 0;
+    return;
+  }
+  if (typeof CONFIG !== 'undefined' && CONFIG.nanami?.overtimeDimEnabled === false) {
+    currentNanamiOvertimeOpacity = 0;
+    return;
+  }
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
@@ -1722,34 +1728,39 @@ export function drawNanamiRatioCritDimScreen() {
 
   if (opacity <= 0.01) return;
 
-  // 1. Full Screen Cinematic Black Background
+  // Single save/setTransform block for the entire dim screen and ruler overlay in Screen Space
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Full Screen Cinematic Black Background
   ctx.fillStyle = `rgba(3, 3, 6, ${opacity * 0.96})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.restore();
 
   // 2. Tilted 7:3 Measurement Ruler & Graphic Paint Splatter Overlay
   if (CONFIG.nanami?.enableRatioRulerOverlay !== false) {
     const target = nanami.ratioHitPauseTarget || nanami._chopTarget;
-    const impactX = target ? target.x : (nanami.x + Math.cos(nanami.gunAngle || 0) * (nanami.r + 30));
-    const impactY = target ? target.y : (nanami.y + Math.sin(nanami.gunAngle || 0) * (nanami.r + 30));
+    const impactX = (target && !target.isDead) ? target.x : (nanami.x + Math.cos(nanami.chopCastAngle ?? nanami.gunAngle ?? 0) * (nanami.r + 30));
+    const impactY = (target && !target.isDead) ? (target.y - (target.z || 0)) : (nanami.y - (nanami.z || 0) + Math.sin(nanami.chopCastAngle ?? nanami.gunAngle ?? 0) * (nanami.r + 30));
 
-    const baseAngle = nanami.gunAngle || 0;
-    const targetAngle = baseAngle - 0.20;
+    // Accurate Screen Space positioning accounting for Camera pan, zoom, and shake
+    const screenImpact = worldToScreen(impactX, impactY);
+    const camZoom = (state.camera && state.camera.enabled && (state.camera.mode === 'dynamic' || state.camera.cinematicOverride)) ? (state.camera.zoom || 1.0) : 1.0;
+
+    const baseAngle = (nanami.chopCastAngle !== undefined) ? nanami.chopCastAngle : ((nanami.gunAngle !== undefined) ? nanami.gunAngle : (nanami.angle || 0));
+    // Lay ruler across the strike line (perpendicular to cut angle) with subtle manga tilt (-0.15 rad)
+    const targetAngle = baseAngle + Math.PI / 2 - 0.15;
 
     const spinP = Math.min(1.0, rawProgress / 0.30);
     const easeSpin = 1.0 - Math.pow(1.0 - spinP, 3.0);
     const currentAngle = targetAngle + (1.0 - easeSpin) * (Math.PI * 2);
-    const rulerScale = 0.10 + 0.90 * easeSpin;
+    const rulerScale = (0.10 + 0.90 * easeSpin) * camZoom;
 
-    const screenImpact = worldToScreen(impactX, impactY);
     ctx.save();
     ctx.translate(screenImpact.x, screenImpact.y);
     ctx.rotate(currentAngle);
     ctx.scale(rulerScale, rulerScale);
 
-    const rulerLength = 360;
+    const rulerLength = 340;
     const halfL = rulerLength * 0.5;
     const step = rulerLength / 10;
     const alpha = Math.sin(rawProgress * Math.PI);
@@ -1823,6 +1834,8 @@ export function drawNanamiRatioCritDimScreen() {
 
     ctx.restore();
   }
+
+  ctx.restore();
 
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
 }

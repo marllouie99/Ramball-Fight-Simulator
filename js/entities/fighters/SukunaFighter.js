@@ -85,8 +85,9 @@ export class SukunaFighter extends Fighter {
   }
 
   _registerSkills() {
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableDomain, true)) {
+      skills.push({
         id: 'ms',
         name: 'MALEVOLENT SHRINE',
         type: 'domain',
@@ -106,8 +107,10 @@ export class SukunaFighter extends Fighter {
             fighter._hasPlayedDomainActivateSound = false;
           }
         }
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableFurnace, true)) {
+      skills.push({
         id: 'fuga',
         name: 'FUGA (FURNACE)',
         type: 'offensive',
@@ -116,16 +119,19 @@ export class SukunaFighter extends Fighter {
         channelingKey: 'isChannelingDivineFlame',
         channelTimerKey: 'divineFlameChargeTimer',
         channelMaxKey: 'divineFlameChargeMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableRCT, true)) {
+      skills.push({
         id: 'rct',
         name: 'RCT',
         type: 'healing',
         cooldownKey: 'reverseCursedTechniqueCooldown',
         cooldownMax: CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700,
         allowsFrozenCooldownTick: true
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(skills);
   }
 
   isStationarySkillActive() {
@@ -275,6 +281,9 @@ export class SukunaFighter extends Fighter {
 
   // ── STACKING SLASH CRIT PASSIVE ──
   evaluateSlashCrit(target, baseDamage = 15, opts = {}) {
+    if (!this.isSkillEnabled(CONFIG.sukuna?.enableCritPassive, true)) {
+      return { finalDamage: baseDamage, isCrit: false };
+    }
     if (!target || target.hp <= 0 || target.isDead) {
       return { finalDamage: baseDamage, isCrit: false };
     }
@@ -396,7 +405,8 @@ export class SukunaFighter extends Fighter {
     const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 85;
     const isAttackerChannelingGojo = attacker && (attacker.characterId === 'gojo' || attacker.type === 'gojo' || attacker._def?.id === 'gojo' || attacker._def?.type === 'gojo') &&
       (attacker.redBuildupPhase || (attacker.redEffectTimer || 0) > 0 || attacker.isDomainPreSlide || attacker.isChannelingDomainExpansion || (attacker.domainChargeTimer || 0) > 0);
-    if (!isChannelingSkill && !isAttackerChannelingGojo && !isDraggedOrTrapped && !opts.isGetsuga && !(opts.projectile && opts.projectile.isGetsuga) && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius))) {
+    const isMeleeAllowed = this.isSkillEnabled(CONFIG.sukuna?.enableMeleeMode, true);
+    if (isMeleeAllowed && !isChannelingSkill && !isAttackerChannelingGojo && !isDraggedOrTrapped && !opts.isGetsuga && !(opts.projectile && opts.projectile.isGetsuga) && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius))) {
       if (!this.isMeleeMode && (this.meleeModeCooldown || 0) <= 0) {
         this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
         this.isMeleeMode = true;
@@ -408,7 +418,8 @@ export class SukunaFighter extends Fighter {
     if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit || opts.isDivineFlame || opts.isFuga || opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga) || opts.isRed || opts.isPurple || opts.isDomain || opts.isDomainSlash || isDraggedOrTrapped);
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere()) || isDraggedOrTrapped;
-    if (!this.isTargetOfAmbush && !this.isChainedByMakima && !isChannelingSkill && !isGuaranteedHit && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
+    const isDodgeEnabled = this.isSkillEnabled(CONFIG.sukuna?.enableTeleportDodge, true);
+    if (isDodgeEnabled && !this.isTargetOfAmbush && !this.isChainedByMakima && !isChannelingSkill && !isGuaranteedHit && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.sukuna.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
       return false; // Negate damage
@@ -423,9 +434,10 @@ export class SukunaFighter extends Fighter {
     // If the attack is a sure kill (opts.isSaitamaCounter, opts.isSeriousPunch, or amount >= hpBefore fatal one-shot),
     // RCT is overwhelmed and does NOT trigger/revive.
     const isOverpoweredKill = (amount >= hpBefore) || Boolean(opts.isSaitamaCounter) || Boolean(opts.isSeriousPunch);
+    const isRCTEnabled = this.isSkillEnabled(CONFIG.sukuna?.enableRCT, true);
 
     // Emergency RCT Revival check on fatal damage (once per match, matching Gojo)
-    if (!this.hasUsedRCTRevival && this.hp <= 0 && amount > 0 && !opts.isStorm && !opts.isHeal) {
+    if (isRCTEnabled && !this.hasUsedRCTRevival && this.hp <= 0 && amount > 0 && !opts.isStorm && !opts.isHeal) {
       if (isOverpoweredKill) {
         // Hit was strong enough to kill him outright (e.g. Saitama counter) — no revival
         return result;
@@ -445,7 +457,7 @@ export class SukunaFighter extends Fighter {
     }
 
     // Low-HP RCT Healing Auto-Trigger (Non-fatal)
-    if (!opts.isHeal && !isOverpoweredKill && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
+    if (isRCTEnabled && !opts.isHeal && !isOverpoweredKill && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
       const threshold = CONFIG.sukuna.reverseCursedTechniqueHpThreshold || 0.30;
       const hpPercent = this.hp / this.maxHp;
 
@@ -467,12 +479,14 @@ export class SukunaFighter extends Fighter {
   }
 
   canPerformBasicAttack() {
+    if (!this.isSkillEnabled(CONFIG.sukuna?.enableDismantle, true)) return false;
     if (this.isChannelingDivineFlame || this.isChannelingDomainExpansion || (this.divineFlameRecoveryTimer || 0) > 0) return false;
     if (this.isMeleeMode) return false;
     return super.canPerformBasicAttack();
   }
 
   shoot(ownerIndex) {
+    if (!this.isSkillEnabled(CONFIG.sukuna?.enableDismantle, true)) return false;
     if (!this.canPerformBasicAttack()) return false;
     if (!projectileSystem) return;
 
@@ -866,7 +880,7 @@ export class SukunaFighter extends Fighter {
       const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
 
       // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine when enemy is in range!
-      if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
+      if (this.isSkillEnabled(CONFIG.sukuna?.enableFurnace, true) && !isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
         const alignedResult = (typeof this._findAlignedEnemyForFuga === 'function')
           ? this._findAlignedEnemyForFuga(opponent)
           : this._findCardinalAlignedEnemy(opponent);
@@ -900,14 +914,14 @@ export class SukunaFighter extends Fighter {
     }
 
     // Check for Spiderweb (Skill 1 - Passive trigger)
-    this._checkSpiderwebTrigger(arena);
-
-
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableSpiderweb, true)) {
+      this._checkSpiderwebTrigger(arena);
+    }
 
     const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
 
     // Check for Divine Flame (Skill 2 - disabled in demo mode)
-    if (!this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableFurnace, true) && !this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
       const alignedResult = (typeof this._findAlignedEnemyForFuga === 'function')
         ? this._findAlignedEnemyForFuga(opponent)
         : this._findCardinalAlignedEnemy(opponent);
@@ -946,7 +960,7 @@ export class SukunaFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate - disabled in demo mode)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && opponent && !opponent.isDead) {
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && opponent && !opponent.isDead) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
@@ -1048,9 +1062,11 @@ export class SukunaFighter extends Fighter {
         }
       } else if (isBeingMeleed && (this.meleeModeCooldown || 0) <= 0) {
         // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
-        this.isMeleeMode = true;
-        this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
-        this.meleeComboCount = 0;
+        if (this.isSkillEnabled(CONFIG.sukuna?.enableMeleeMode, true)) {
+          this.isMeleeMode = true;
+          this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
+          this.meleeComboCount = 0;
+        }
       }
     }
 
@@ -1162,6 +1178,7 @@ export class SukunaFighter extends Fighter {
   }
 
   applyBleed(target, stacks) {
+    if (!this.isSkillEnabled(CONFIG.sukuna?.enableBleed, true)) return;
     if (!this.bleedStacks.has(target)) {
       this.bleedStacks.set(target, 0);
     }

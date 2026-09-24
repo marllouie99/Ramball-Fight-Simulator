@@ -113,8 +113,9 @@ export class CJFighter extends Fighter {
     this.riotShockwaveTimer = 0;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const cjSkills = [];
+    if (this.isSkillEnabled(cfg.enableJetpack, true)) {
+      cjSkills.push({
         id: 'jetpack',
         name: 'ROCKETMAN',
         type: 'mode',
@@ -133,8 +134,10 @@ export class CJFighter extends Fighter {
           fighter.speed = fighter._resolveSpeed ? fighter._resolveSpeed(groundMult) : fighter.baseSpeed;
           fighter.jetpackCooldown = fighter.jetpackCooldownMax || 800;
         }
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableDriveBy, true)) {
+      cjSkills.push({
         id: 'drive_by',
         name: 'GREENWOOOD',
         type: 'mode',
@@ -144,8 +147,10 @@ export class CJFighter extends Fighter {
         durationMaxKey: 'driveByMaxTimer',
         activeKey: 'isDriveByActive',
         canCast: (fighter) => !fighter.isJetpackActive && !fighter.isBaguvixActive && !fighter.isTypingCheat
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableBaguvix, true)) {
+      cjSkills.push({
         id: 'baguvix',
         name: 'BAGUVIX',
         type: 'ultimate',
@@ -160,8 +165,9 @@ export class CJFighter extends Fighter {
           fighter.isGodModeActive = false;
           fighter.baguvixCooldown = fighter.baguvixCooldownMax || 2500;
         }
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(cjSkills);
   }
 
   reset() {
@@ -260,12 +266,14 @@ export class CJFighter extends Fighter {
   _getGroundSpeedMultiplier() {
     const cfg = CONFIG.cj || {};
     let base = 1.0;
-    if (this.isGroveStreetOg || this.hasTriggeredTier2 || this.respect >= 100) {
-      base = 1 + (cfg.respectSpeedBoost || 0.15) + 0.05;
-    } else if (this.hasTriggeredTier1 || this.respect >= 50) {
-      base = 1 + (cfg.respectSpeedBoost || 0.15);
+    if (this.isSkillEnabled(cfg.enableRespectSystem, true)) {
+      if (this.isGroveStreetOg || this.hasTriggeredTier2 || this.respect >= 100) {
+        base = 1 + (cfg.respectSpeedBoost || 0.15) + 0.05;
+      } else if (this.hasTriggeredTier1 || this.respect >= 50) {
+        base = 1 + (cfg.respectSpeedBoost || 0.15);
+      }
     }
-    if (this.isExhausted) {
+    if (this.isSkillEnabled(cfg.enableStaminaSystem, true) && this.isExhausted) {
       base *= (this.exhaustedSpeedMultiplier || 0.40);
     }
     return base;
@@ -290,7 +298,7 @@ export class CJFighter extends Fighter {
    * Passive: RESPECT+ Accumulation & Tier Progression (Permanent Buffs)
    */
   gainRespect(amount) {
-    if (this.dead) return;
+    if (this.dead || !this.isSkillEnabled(CONFIG.cj?.enableRespectSystem, true)) return;
     const cfg = CONFIG.cj || {};
     const prev = this.respect;
     this.respect = Math.min(this.maxRespect, this.respect + amount);
@@ -669,7 +677,7 @@ export class CJFighter extends Fighter {
     }
 
     // ── Stamina System & Sprint Fatigue Mechanic ──
-    if (!this.dead && !this.isTypingCheat) {
+    if (this.isSkillEnabled(cfg.enableStaminaSystem, true) && !this.dead && !this.isTypingCheat) {
       const isGroundSprinting = !this.isJetpackActive && !this.isBaguvixActive;
       const isMovingOrPunching = Math.hypot(this.vx, this.vy) > 0.4 || this.punchAnimTimer > 0;
 
@@ -949,7 +957,7 @@ export class CJFighter extends Fighter {
 
     // ── Check Strict Close-Range Collision with Dropped Floating Jetpack Pickup Item (ONLY when skill CD is ready!) ──
     const hasDroppedJetpack = Boolean(state.cjDroppedJetpacks && state.cjDroppedJetpacks.length > 0);
-    if (!this.dead && !this.isJetpackActive && this.jetpackCooldown <= 0 && hasDroppedJetpack) {
+    if (!this.dead && !this.isJetpackActive && this.jetpackCooldown <= 0 && hasDroppedJetpack && this.isSkillEnabled(cfg.enableJetpack, true)) {
       for (let i = state.cjDroppedJetpacks.length - 1; i >= 0; i--) {
         const item = state.cjDroppedJetpacks[i];
         if (!item) continue;
@@ -964,7 +972,7 @@ export class CJFighter extends Fighter {
     }
 
     // ── Ultimate: BAGUVIX Activation Condition (Cooldown Based) ──
-    if (!this.isBaguvixActive && !this.isJetpackActive && this.baguvixCooldown <= 0 && !this.dead && !this.isTypingCheat) {
+    if (this.isSkillEnabled(cfg.enableBaguvix, true) && !this.isBaguvixActive && !this.isJetpackActive && this.baguvixCooldown <= 0 && !this.dead && !this.isTypingCheat) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         this.activateBaguvix();
       }
@@ -973,14 +981,14 @@ export class CJFighter extends Fighter {
     // ── Skill 1: HESOYAM Activation Condition (Triggers when HP drops <= 50%) ──
     const hpRatio = (this.hp || 0) / (this.maxHp || 100);
     const hesoThreshold = cfg.hesoyamHpThreshold ?? 0.50;
-    if (hpRatio <= hesoThreshold && !this.hasUsedHesoyam && !this.dead && !this.isTypingCheat && !this.isBaguvixActive && !this.isJetpackActive) {
+    if (this.isSkillEnabled(cfg.enableHesoyam, true) && hpRatio <= hesoThreshold && !this.hasUsedHesoyam && !this.dead && !this.isTypingCheat && !this.isBaguvixActive && !this.isJetpackActive) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         this.activateHesoyam();
       }
     }
 
     // ── Skill 2: ROCKETMAN Jetpack Initial Activation Condition (When NO dropped jetpack on ground) ──
-    if (!this.isJetpackActive && this.jetpackCooldown <= 0 && !this.dead && !hasDroppedJetpack && !this.isBaguvixActive && !this.isTypingCheat) {
+    if (this.isSkillEnabled(cfg.enableJetpack, true) && !this.isJetpackActive && this.jetpackCooldown <= 0 && !this.dead && !hasDroppedJetpack && !this.isBaguvixActive && !this.isTypingCheat) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         const d = Math.hypot(opponent.x - this.x, opponent.y - this.y);
         if (d > 70) {
@@ -990,7 +998,7 @@ export class CJFighter extends Fighter {
     }
 
     // ── Skill 3: GROVESTREET4LIFE Drive-By Activation Condition ──
-    if (!this.isDriveByActive && !this.isJetpackActive && this.driveByCooldown <= 0 && !this.dead && !this.isTypingCheat && !this.isBaguvixActive) {
+    if (this.isSkillEnabled(cfg.enableDriveBy, true) && !this.isDriveByActive && !this.isJetpackActive && this.driveByCooldown <= 0 && !this.dead && !this.isTypingCheat && !this.isBaguvixActive) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         this.activateDriveBy();
       }
@@ -1178,6 +1186,7 @@ export class CJFighter extends Fighter {
    */
   activateHesoyam() {
     const cfg = CONFIG.cj || {};
+    if (!this.isSkillEnabled(cfg.enableHesoyam, true)) return;
     const hesoThreshold = cfg.hesoyamHpThreshold ?? 0.50;
     const hpRatio = (this.hp || 0) / (this.maxHp || 100);
 
@@ -1303,6 +1312,8 @@ export class CJFighter extends Fighter {
    * When a jetpack is dropped as a floating item on the ground, picking it up bypasses typing.
    */
   activateRocketman() {
+    const cfg = CONFIG.cj || {};
+    if (!this.isSkillEnabled(cfg.enableJetpack, true)) return;
     if (this.dead || this.isTypingCheat || this.isJetpackActive || this.jetpackCooldown > 0) return;
 
     // Immediately discharge cooldown on activation start
@@ -1373,6 +1384,8 @@ export class CJFighter extends Fighter {
    * Skill 3: GROVESTREET4LIFE (Gang Drive-By Backup)
    */
   activateDriveBy() {
+    const cfg = CONFIG.cj || {};
+    if (!this.isSkillEnabled(cfg.enableDriveBy, true)) return;
     if (this.dead || this.isTypingCheat || this.isDriveByActive || this.driveByCooldown > 0 || this.isJetpackActive) return;
 
     // Immediately discharge cooldown on activation start
@@ -1417,6 +1430,8 @@ export class CJFighter extends Fighter {
    * Ultimate: BAGUVIX (God Mode & Minigun Riot Overdrive - Cooldown Based)
    */
   activateBaguvix() {
+    const cfg = CONFIG.cj || {};
+    if (!this.isSkillEnabled(cfg.enableBaguvix, true)) return;
     if (this.dead || this.isTypingCheat || this.isBaguvixActive || this.baguvixCooldown > 0 || this.isJetpackActive) return;
 
     // Immediately discharge cooldown on activation start
@@ -1747,6 +1762,7 @@ export class CJFighter extends Fighter {
    * CQC Brass Knuckles Punch Combat (Rule 6 Unified Queries & Rule 8 Frontal Arc Multi-Target)
    */
   _updateMeleeCombat(opponent, arena) {
+    if (!this.isSkillEnabled(CONFIG.cj?.enableBrassKnuckles, true)) return;
     if (this.dead || this.isTypingCheat || this.isBaguvixActive || this._isInsideGojoDomain() || (this.timeStopTimer && this.timeStopTimer > 0)) return;
 
     // ── 1. Rule 6 Unified Target Query: Find Closest Living Enemy Target ──

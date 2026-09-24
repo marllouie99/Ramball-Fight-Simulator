@@ -84,11 +84,11 @@ export function isShunpoComboActive(fighter) {
  * @returns {boolean}
  */
 export function isFlashStepEnabled(fighter) {
-  return Boolean(
+  return fighter.isSkillEnabled(
     CONFIG.ichigo?.enableFlashStep ??
     CONFIG.ichigo?.enableShunpo ??
     CONFIG.ichigo?.flashStepEnabled ??
-    CONFIG.ichigo?.shunpoEnabled ??
+    CONFIG.ichigo?.shunpoEnabled,
     true
   );
 }
@@ -99,12 +99,14 @@ export function isFlashStepEnabled(fighter) {
  * @returns {boolean}
  */
 export function isFlurryEnabled(fighter) {
-  const val = CONFIG.ichigo?.enableFlurryAttack ??
+  return fighter.isSkillEnabled(
+    CONFIG.ichigo?.enableFlurryAttack ??
     CONFIG.ichigo?.enableFlurry ??
     CONFIG.ichigo?.flurryEnabled ??
     CONFIG.ichigo?.enableShunpoCombo ??
-    CONFIG.ichigo?.shunpoComboEnabled;
-  return val === undefined ? true : Boolean(val);
+    CONFIG.ichigo?.shunpoComboEnabled,
+    true
+  );
 }
 
 /**
@@ -233,6 +235,7 @@ export function performShunpoGetsugaCombo(fighter, target) {
  * @param {Object} target
  */
 export function performMeleeCleave(fighter, target) {
+  if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableMeleeCleave, true)) return;
   if (fighter.isDead || fighter.hp <= 0 || fighter.isParalyzedOrBeamTrapped() || fighter.wallSlamPinnedX !== undefined || fighter.isWallSlammed) return;
   if (isGetsugaActive(fighter)) return;
   if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isChannelingGetsuga || fighter.getsugaRecoveryTimer > 0 || fighter.isShunpoDashing || fighter.shunpoComboActive || isFinalGetsugaVoicelinePlaying(fighter)) return;
@@ -334,6 +337,7 @@ export function performMeleeCleave(fighter, target) {
  * @returns {number}
  */
 export function getParryChance(fighter) {
+  if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableParry, true)) return 0;
   // If trapped inside an enemy Gojo's Unlimited Void Domain Expansion, parry is completely disabled (0%)
   const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(fighter) : -1;
   const myTeam = (myIndex >= 0 && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : null;

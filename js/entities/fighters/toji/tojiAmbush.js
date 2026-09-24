@@ -93,6 +93,7 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 }
 
 export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
+  if (!fighter.isSkillEnabled(CONFIG.toji?.enableAmbush, true)) return;
   if (fighter.isChainedByMakima || (fighter.postUltimateRecoveryTimer || 0) > 0 || tojiIsTargetDeadOrRemoved(fighter, opponent)) return;
 
   fighter.isAmbushing = true;

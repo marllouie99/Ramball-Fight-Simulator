@@ -62,29 +62,60 @@ export class InosukeFighter extends Fighter {
     this.kingOfMountainCooldown = this.kingOfMountainCooldownMax;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableCrazyCutting, true)) {
+      skills.push({
         id: 'crazy_cutting',
         name: 'Fifth Fang: Crazy Cutting',
         type: 'active',
         cooldownKey: 'crazyCuttingCooldown',
         cooldownMaxKey: 'crazyCuttingCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableExplosiveRush, true)) {
+      skills.push({
         id: 'explosive_rush',
         name: 'Eighth Fang: Explosive Rush',
         type: 'active',
         cooldownKey: 'explosiveRushCooldown',
         cooldownMaxKey: 'explosiveRushCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableKingOfMountain, true)) {
+      skills.push({
         id: 'king_of_mountain',
         name: 'King of the Mountain',
         type: 'ultimate',
         cooldownKey: 'kingOfMountainCooldown',
         cooldownMaxKey: 'kingOfMountainCooldownMax'
+      });
+    }
+    if (skills.length > 0 && this.skillManager) {
+      this.skillManager.registerSkills(skills);
+    }
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.inosuke) ? CONFIG.inosuke : {};
+    if (opts && opts.isProjectile && this.isSkillEnabled(cfg.enableDislocatedJoints, true)) {
+      if (Math.random() < (cfg.projectileEvasionRate || 0.15)) {
+        spawnFloatingText(this.x, this.y - 20, 'DISLOCATE EVADE!', '#3B82F6');
+        return false;
       }
-    ]);
+    }
+    return super.takeDamage(amount, attacker, opts);
+  }
+
+  resolveWallBounce(arena, opponent) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.inosuke) ? CONFIG.inosuke : {};
+    const mult = this.isSkillEnabled(cfg.enableSpatialAwareness, true) ? (cfg.wallRicochetSpeedMultiplier || 1.25) : 1.0;
+    const oldVx = this.vx;
+    const oldVy = this.vy;
+    super.resolveWallBounce(arena, opponent);
+    if ((this.vx !== oldVx || this.vy !== oldVy) && mult > 1.0) {
+      this.vx *= mult;
+      this.vy *= mult;
+    }
   }
 
   update() {
@@ -110,15 +141,21 @@ export class InosukeFighter extends Fighter {
     if (!target) return;
 
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.inosuke) ? CONFIG.inosuke : {};
+    const kingOfMountainEnabled = this.isSkillEnabled(cfg.enableKingOfMountain, true);
+    const crazyCuttingEnabled = this.isSkillEnabled(cfg.enableCrazyCutting, true);
+    const explosiveRushEnabled = this.isSkillEnabled(cfg.enableExplosiveRush, true);
+    const basicAttackEnabled = this.isSkillEnabled(cfg.enableBasicAttack, true);
+    const reach = (cfg.dualKatanaReach || 85) + (this.isSkillEnabled(cfg.enableDislocatedJoints, true) ? (cfg.extendedReachBonus || 20) : 0);
 
     // AI / Skill Priority
-    if (this.kingOfMountainCooldown <= 0 && dist < 180) {
+    if (kingOfMountainEnabled && this.kingOfMountainCooldown <= 0 && dist < 180) {
       this._triggerKingOfMountain(target);
-    } else if (this.crazyCuttingCooldown <= 0 && dist < 100) {
+    } else if (crazyCuttingEnabled && this.crazyCuttingCooldown <= 0 && dist < 100) {
       this._triggerCrazyCutting(target);
-    } else if (this.explosiveRushCooldown <= 0 && dist < 170) {
+    } else if (explosiveRushEnabled && this.explosiveRushCooldown <= 0 && dist < 170) {
       this._triggerExplosiveRush(target);
-    } else if (dist < 85 && this.slashSwingTimer <= 0) {
+    } else if (basicAttackEnabled && dist < reach && this.slashSwingTimer <= 0) {
       this._executeBeastBreathingCombo(target);
     }
   }
@@ -139,15 +176,16 @@ export class InosukeFighter extends Fighter {
   }
 
   _executeBeastBreathingCombo(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.inosuke) ? CONFIG.inosuke : {};
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this.beastComboCount = (this.beastComboCount + 1) % 3;
 
     this.aim(target);
-    const reach = 85;
-    const arc = Math.PI * 0.889; // 160 degrees (Rule 7)
+    const reach = (cfg.dualKatanaReach || 85) + (this.isSkillEnabled(cfg.enableDislocatedJoints, true) ? (cfg.extendedReachBonus || 20) : 0);
+    const arc = cfg.dualKatanaArcAngle || (Math.PI * 0.889); // 160 degrees (Rule 7)
     const angle = this.gunAngle || 0;
 
-    const damages = [16, 22, 32];
+    const damages = [cfg.hit1Damage || 16, cfg.hit2Damage || 22, cfg.hit3Damage || 32];
     const dmg = damages[this.beastComboCount];
 
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];

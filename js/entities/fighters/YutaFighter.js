@@ -152,8 +152,9 @@ export class YutaFighter extends Fighter {
   }
 
   _registerSkills() {
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(CONFIG.yuta?.enableDomain, true)) {
+      skills.push({
         id: 'domain',
         name: 'AUTHENTIC MUTUAL LOVE',
         type: 'domain',
@@ -164,8 +165,10 @@ export class YutaFighter extends Fighter {
         activeKey: 'domainActive',
         channelingKey: 'isChannelingDomain',
         isDomain: true
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.yuta?.enablePureLoveBeam, true)) {
+      skills.push({
         id: 'love_beam',
         name: 'PURE LOVE BEAM',
         type: 'offensive',
@@ -174,23 +177,28 @@ export class YutaFighter extends Fighter {
         durationKey: 'pureLoveBeamActiveTimer',
         durationMax: CONFIG.yuta?.pureLoveBeamDuration || CONFIG.yuta?.pureLoveBeamActiveDuration || 280,
         channelingKey: 'isChannelingPureLoveBeam'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.yuta?.enableCopiedTechniques, true)) {
+      skills.push({
         id: 'copy',
         name: 'COPIED TECHNIQUE',
         type: 'offensive',
         cooldownKey: 'cooldown',
         cooldownMax: CONFIG.yuta?.techniqueCooldown || 300
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.yuta?.enableRCT, true)) {
+      skills.push({
         id: 'rct',
         name: 'RCT',
         type: 'healing',
         cooldownKey: 'rctCooldown',
         cooldownMax: CONFIG.yuta?.rctCooldown || 600,
         allowsFrozenCooldownTick: true
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(skills);
   }
 
   isSummoningRika() {
@@ -569,7 +577,7 @@ export class YutaFighter extends Fighter {
         }
 
         // Domain Reverse Cursed Technique (RCT): Continuous accelerated healing inside Authentic Mutual Love!
-        if (this.hp > 0 && this.hp < this.maxHp) {
+        if (this.isSkillEnabled(CONFIG.yuta?.enableRCT, true) && this.hp > 0 && this.hp < this.maxHp) {
           const regenMult = this.getRikaRegenMultiplier();
           const rctRate = (CONFIG.yuta?.domainRctHealRate ?? 0.90) * regenMult;
           this.hp = Math.min(this.maxHp, this.hp + rctRate);
@@ -963,7 +971,7 @@ export class YutaFighter extends Fighter {
     }
 
     // Passive RCT Healing
-    if (this.hp > 0 && this.hp < this.maxHp) {
+    if (this.isSkillEnabled(CONFIG.yuta?.enableRCT, true) && this.hp > 0 && this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + (CONFIG.yuta.regenRate || 0.05));
 
       // Visual feedback for passive healing (spawns 1-2 times per second)
@@ -1306,7 +1314,8 @@ export class YutaFighter extends Fighter {
     const isFirstTrigger = (this.domainUseCount === 0 && hpRatio <= domainHpThreshold1);
     const isSecondTrigger = (this.domainUseCount === 1 && hpLostSince1stDomain >= hpDamageNeededFor2ndDomain);
 
-    if (!this.isDemoFighter && canActivate && (isFirstTrigger || isSecondTrigger)) {
+    const isDomainAllowed = this.isSkillEnabled(CONFIG.yuta?.enableDomain, true);
+    if (isDomainAllowed && !this.isDemoFighter && canActivate && (isFirstTrigger || isSecondTrigger)) {
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
       const hasEnemies = state.fighters.some((f, idx) => {
         if (!f || f.hp <= 0 || f === this) return false;
@@ -1442,7 +1451,8 @@ export class YutaFighter extends Fighter {
     const isRikaActive = (this.isRikaAliveInDomain() || (this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0));
     const isControlledRika = this.isMakimaControlledRikaTarget(this.rika);
 
-    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !isEnemyDomainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive && !isControlledRika) {
+    const isBeamAllowed = this.isSkillEnabled(CONFIG.yuta?.enablePureLoveBeam, true);
+    if (isBeamAllowed && !this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !isEnemyDomainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive && !isControlledRika) {
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
       const hasEnemies = state.fighters.some((f, idx) => {
         if (!f || f.hp <= 0 || f === this) return false;
@@ -1553,7 +1563,8 @@ export class YutaFighter extends Fighter {
     // Allow Yuta to swing his katana while in hitstun ONLY if not actively taking knockback,
     // so he doesn't get infinitely stun-locked by Gojo or Sukuna's rapid punches.
     const isKnockedBack = (this.knockbackStunTimer || 0) > 0;
-    if (this.hitStunTimer > 0 && !isKnockedBack && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.pureLoveBeamBreatherTimer || 0) <= 0 && this.hp > 0 && this.meleeCooldown <= 0) {
+    const isKatanaAllowed = this.isSkillEnabled(CONFIG.yuta?.enableKatanaMelee, true);
+    if (isKatanaAllowed && this.hitStunTimer > 0 && !isKnockedBack && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.pureLoveBeamBreatherTimer || 0) <= 0 && this.hp > 0 && this.meleeCooldown <= 0) {
       let enemyInMelee = false;
       const range = CONFIG.yuta.meleeRange || 70;
       const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
@@ -1606,7 +1617,8 @@ export class YutaFighter extends Fighter {
     // --- Defensive Parry Anticipation ---
     // If Yuta is not actively swinging and isn't already holding a pose,
     // he detects incoming threats and raises his guard visually.
-    if (this.hp > 0 && !this.isChannelingDomain && !this.domainActive && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam) {
+    const isParryAllowed = this.isSkillEnabled(CONFIG.yuta?.enableParry, true);
+    if (isParryAllowed && this.hp > 0 && !this.isChannelingDomain && !this.domainActive && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam) {
       const isSwinging = (this.meleeCooldown > this.meleeCooldownMax - 15);
       const isKnockedBackOrStunned = (this.knockbackStunTimer || 0) > 0 || (this.hitStunTimer || 0) > 0;
       if (!isSwinging && !isKnockedBackOrStunned && (this.blockPoseTimer === undefined || this.blockPoseTimer <= 0)) {
@@ -1669,6 +1681,7 @@ export class YutaFighter extends Fighter {
   }
 
   triggerPhantomFlurry(targetEntity, isParry = false) {
+    if (!this.isSkillEnabled(CONFIG.yuta?.enablePhantomFlurry, true)) return false;
     if (!targetEntity || targetEntity.isDead || (targetEntity.hp || 0) <= 0) return false;
     if (this.isChannelingDomain || this.domainActive) return false;
 
@@ -1734,6 +1747,7 @@ export class YutaFighter extends Fighter {
   }
 
   registerBasicAttackHit(target) {
+    if (!this.isSkillEnabled(CONFIG.yuta?.enablePhantomFlurry, true)) return;
     if (this.domainActive || this.isChannelingDomain) return;
     const isAlreadyCountering = (this.flurryHitsLeft > 0) || (this.flurryTimer > 0) || this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0) || (this.flurrySlashTimer > 0);
     if (isAlreadyCountering) return;
@@ -1782,8 +1796,9 @@ export class YutaFighter extends Fighter {
     const blockChance = this.getParryChance();
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
     const isChannelingSkill = typeof this.isChannelingSkill === 'function' && this.isChannelingSkill();
+    const isParryEnabled = this.isSkillEnabled(CONFIG.yuta?.enableParry, true);
 
-    if (!this.domainActive && !isChannelingSkill && !isStunned && !isSwinging && !unblockable && !this.isSummoningRika() && this.hp > 0 && Math.random() < blockChance) {
+    if (isParryEnabled && !this.domainActive && !isChannelingSkill && !isStunned && !isSwinging && !unblockable && !this.isSummoningRika() && this.hp > 0 && Math.random() < blockChance) {
       // Successfully blocked!
       
       const isAlreadyCountering = (this.flurryHitsLeft > 0) || this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0) || (this.flurrySlashTimer > 0);
@@ -1862,7 +1877,8 @@ export class YutaFighter extends Fighter {
     this.blockPoseTimer = 0; // Guard is broken/dropped on hit!
 
     // Check for fatal blow to trigger RCT Revival (disabled inside Gojo's paralyzing Unlimited Void domain)
-    if (!this.hasUsedRCTRevival && this.invincibilityTimer <= 0 && amount > 0 && !opts.isSaitamaCounter && !opts.isSeriousPunch && !opts.isStorm && !opts.isHeal && !isInsideGojoDomain) {
+    const isRCTEnabled = this.isSkillEnabled(CONFIG.yuta?.enableRCT, true);
+    if (isRCTEnabled && !this.hasUsedRCTRevival && this.invincibilityTimer <= 0 && amount > 0 && !opts.isSaitamaCounter && !opts.isSeriousPunch && !opts.isStorm && !opts.isHeal && !isInsideGojoDomain) {
       if (this.hp - amount <= 0 && this.hp > 0) {
         this.hasUsedRCTRevival = true;
         const duration = CONFIG.yuta.rctRevivalDuration || 150; // 2.5 seconds by default
@@ -1887,7 +1903,7 @@ export class YutaFighter extends Fighter {
       }
 
       // Track 3-second damage window for non-fatal heavy damage RCT heal trigger.
-      if (!opts.isHeal && !opts.isStorm && (this.rctCooldown || 0) <= 0 && this.rctRevivalTimer <= 0 && (this.rctHealTimer || 0) <= 0) {
+      if (isRCTEnabled && !opts.isHeal && !opts.isStorm && (this.rctCooldown || 0) <= 0 && this.rctRevivalTimer <= 0 && (this.rctHealTimer || 0) <= 0) {
         const now = Date.now();
         if (!this.damageWindow) this.damageWindow = [];
         this.damageWindow.push({ amount, time: now });
@@ -2244,7 +2260,8 @@ export class YutaFighter extends Fighter {
       }
     }
 
-    if (enemyInMelee && closestEnemy) {
+    const isKatanaAllowed = this.isSkillEnabled(CONFIG.yuta?.enableKatanaMelee, true);
+    if (isKatanaAllowed && enemyInMelee && closestEnemy) {
       this.aim(closestEnemy);
       if (this.meleeCooldown <= 0) {
         this.executeKatanaMelee(this.gunAngle);
@@ -2253,7 +2270,8 @@ export class YutaFighter extends Fighter {
     }
 
     // Ranged attack (Copied Technique)
-    if (this.techniqueCooldown <= 0) {
+    const isCopyAllowed = this.isSkillEnabled(CONFIG.yuta?.enableCopiedTechniques, true);
+    if (isCopyAllowed && this.techniqueCooldown <= 0) {
       let closestRanged = null;
       let closestRangedDist = Infinity;
       for (let i = 0; i < allTargets.length; i++) {

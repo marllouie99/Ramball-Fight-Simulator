@@ -13,6 +13,7 @@
 
 import { Fighter, applyDamageToTarget, isSuppressedByGetsuga } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
+import { ulquiorraConfig } from '../../configs/characters/ulquiorraConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { drawUlquiorraSkin, drawUlquiorraGhostSkin } from '../../graphics/fighters/ulquiorraSkin.js';
 import { drawUlquiorraSlashArc } from '../../graphics/weapons/ulquiorraWeaponGraphics.js';
@@ -29,7 +30,7 @@ export class UlquiorraFighter extends Fighter {
     this.themeColor = '#00FF88';
     this.suppressSketchyOutline = true;
 
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : {};
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : ulquiorraConfig;
 
     // ── Combat & Animation Timers ──
     this.swordCooldown = 0;
@@ -86,33 +87,39 @@ export class UlquiorraFighter extends Fighter {
   }
 
   _registerSkills() {
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : {};
-    this.skillManager.registerSkills([
-      {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : ulquiorraConfig;
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableSonido, true)) {
+      skills.push({
         id: 'sonido',
         name: 'SONÍDO',
         type: 'mobility',
         cooldownKey: 'sonidoCooldown',
         cooldownMax: cfg.sonidoCooldown || 300,
         activeKey: 'isSonidoDashing'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableCero, true)) {
+      skills.push({
         id: 'cero',
         name: 'CERO',
         type: 'offensive',
         cooldownKey: 'ceroCooldown',
         cooldownMax: cfg.ceroCooldown || 420,
         channelingKey: 'isChannelingCero'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableBala, true)) {
+      skills.push({
         id: 'bala',
         name: 'BALA',
         type: 'offensive',
         cooldownKey: 'balaCooldown',
         cooldownMax: cfg.balaCooldown || 150,
         activeKey: 'isFiringBala'
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(skills);
   }
 
   isStationarySkillActive() {
@@ -141,14 +148,17 @@ export class UlquiorraFighter extends Fighter {
 
   takeDamage(amount, attacker = null, source = null) {
     // Passive 1: Hierro (15% Flat Damage Mitigation)
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : {};
-    const mitigation = cfg.hierroDamageReduction ?? 0.15;
-    const actualDamage = Math.max(1, amount * (1.0 - mitigation));
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : ulquiorraConfig;
+    let actualDamage = amount;
+    if (this.isSkillEnabled(cfg.enableHierro, true)) {
+      const mitigation = cfg.hierroDamageReduction ?? 0.15;
+      actualDamage = Math.max(1, amount * (1.0 - mitigation));
+    }
 
     const result = super.takeDamage(actualDamage, attacker, source);
 
     // Passive 1: Faster Stun Recovery
-    if (this.hitStunTimer > 0) {
+    if (this.isSkillEnabled(cfg.enableHierro, true) && this.hitStunTimer > 0) {
       this.hitStunTimer = Math.max(0, Math.floor(this.hitStunTimer * 0.75));
     }
 
@@ -163,6 +173,20 @@ export class UlquiorraFighter extends Fighter {
     if (this.afterImages) this.afterImages.length = 0;
   }
 
+  shoot(ownerIndex) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : ulquiorraConfig;
+    if (!this.isSkillEnabled(cfg.enableSwordAttack, true)) return false;
+    const target = (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && !f.isDead) : null);
+    if (target) {
+      const dist = Math.hypot(target.x - this.x, target.y - this.y);
+      if (dist <= (cfg.swordRange || 75) + (target.r || 25) && this.swordCooldown <= 0 && !this.isSlashing) {
+        this._updateMeleeCombat(target);
+        return true;
+      }
+    }
+    return false;
+  }
+
   update(opponent, ownerIndex, arenaObj) {
     // ── RULE 1: Freeze & Time-Stop Guard ──
     const isFrozen = (typeof this._handleTimeStop === 'function') ? this._handleTimeStop() : (this.timeStopTimer > 0);
@@ -171,40 +195,46 @@ export class UlquiorraFighter extends Fighter {
       return;
     }
 
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : ulquiorraConfig;
+
     // ── Transformation Checks ──
     const maxHp = this.maxHp || 240;
     const hpRatio = this.hp / maxHp;
 
-    // Stage 1: Murciélago (at <60% HP)
-    if (!this.stage1Active && !this.stage1Used && hpRatio <= 0.60 && this.hp > 0) {
-      this.stage1Active = true;
-      this.stage1Used = true;
-      this.wingsActive = true;
-      this.sonidoMaxCharges = 2;
-      this.sonidoCharges = 2;
-      this.speed *= 1.35;
-      this.moveSpeed *= 1.35;
-      triggerGlobalScreenShake(6, 15);
-      spawnFloatingText(this.x, this.y - 35, 'ENCLOSE, MURCIÉLAGO!', '#00FF88', 22);
-    }
+    if (this.isSkillEnabled(cfg.enableResurreccion, true)) {
+      // Stage 1: Murciélago (at <60% HP)
+      if (!this.stage1Active && !this.stage1Used && hpRatio <= (cfg.stage1HpThreshold || 0.60) && this.hp > 0) {
+        this.stage1Active = true;
+        this.stage1Used = true;
+        this.wingsActive = true;
+        this.sonidoMaxCharges = 2;
+        this.sonidoCharges = 2;
+        const spd1 = cfg.stage1SpeedMultiplier || 1.35;
+        this.speed *= spd1;
+        this.moveSpeed *= spd1;
+        triggerGlobalScreenShake(6, 15);
+        spawnFloatingText(this.x, this.y - 35, 'ENCLOSE, MURCIÉLAGO!', '#00FF88', 22);
+      }
 
-    // Stage 2: Segunda Etapa (at <30% HP)
-    if (this.stage1Active && !this.segundaEtapaActive && !this.segundaEtapaUsed && hpRatio <= 0.30 && this.hp > 0) {
-      this.segundaEtapaActive = true;
-      this.segundaEtapaUsed = true;
-      this.speed *= 1.15;
-      this.moveSpeed *= 1.15;
-      triggerGlobalScreenShake(10, 25);
-      spawnFloatingText(this.x, this.y - 45, 'RESURRECCIÓN: SEGUNDA ETAPA!', '#00FF88', 26);
+      // Stage 2: Segunda Etapa (at <30% HP)
+      if (this.stage1Active && !this.segundaEtapaActive && !this.segundaEtapaUsed && hpRatio <= (cfg.stage2HpThreshold || 0.30) && this.hp > 0) {
+        this.segundaEtapaActive = true;
+        this.segundaEtapaUsed = true;
+        const spd2 = cfg.stage2SpeedMultiplier || 1.15;
+        this.speed *= spd2;
+        this.moveSpeed *= spd2;
+        triggerGlobalScreenShake(10, 25);
+        spawnFloatingText(this.x, this.y - 45, 'RESURRECCIÓN: SEGUNDA ETAPA!', '#00FF88', 26);
+      }
     }
 
     // ── Passive 2: High-Speed Regeneration ──
-    if (this.hp > 0 && this.hp < maxHp) {
+    if (this.isSkillEnabled(cfg.enableHighSpeedRegen, true) && this.hp > 0 && this.hp < maxHp) {
       this.regenTimer++;
-      if (this.regenTimer >= this.regenInterval) {
+      if (this.regenTimer >= (cfg.regenInterval || 60)) {
         this.regenTimer = 0;
-        this.hp = Math.min(maxHp, this.hp + this.regenAmount);
-        spawnFloatingText(this.x, this.y - 20, `+${this.regenAmount}`, '#00FF88', 14);
+        this.hp = Math.min(maxHp, this.hp + (cfg.regenAmount || 6));
+        spawnFloatingText(this.x, this.y - 20, `+${cfg.regenAmount || 6}`, '#00FF88', 14);
       }
     }
 
@@ -239,6 +269,8 @@ export class UlquiorraFighter extends Fighter {
 
   _updateMeleeCombat(opponent) {
     if (!opponent || opponent.hp <= 0 || this.hp <= 0) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : ulquiorraConfig;
+    if (!this.isSkillEnabled(cfg.enableSwordAttack, true)) return;
 
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;

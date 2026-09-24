@@ -1032,7 +1032,7 @@ export class MahoragaFighter extends Fighter {
     const maxRegenRate = CONFIG.mahoraga?.maxRctRegenRate ?? 0.12;
     const currentRegenRate = Math.min(maxRegenRate, effectiveStages * rctPerStage);
 
-    if (currentRegenRate > 0 && this.hp > 0 && !this.isDead && this.hp < this.maxHp && this.rctRegenDamagePauseTimer <= 0) {
+    if (this.isSkillEnabled(CONFIG.mahoraga?.enableRCTHeal, true) && currentRegenRate > 0 && this.hp > 0 && !this.isDead && this.hp < this.maxHp && this.rctRegenDamagePauseTimer <= 0) {
       const oldHp = this.hp;
       this.hp = Math.min(this.maxHp, this.hp + currentRegenRate);
       const actualHealed = this.hp - oldHp;
@@ -1770,18 +1770,18 @@ export class MahoragaFighter extends Fighter {
         const shoutTriggerDist = shoutRadius + (target.r || 25);
 
         // Priority 0: Close-Quarters Proximity Attack (Instantly strikes when in melee contact/reach)
-        if (isAnyTargetInRange && this.swordCooldown <= 0) {
+        if (this.isSkillEnabled(CONFIG.mahoraga?.enableSwordOfExtermination, true) && isAnyTargetInRange && this.swordCooldown <= 0) {
           this._performMeleeAttack(target);
         }
         // Priority 1: Divine Shout (Instant AoE shockwave roar without stopping or windup pause)
-        else if (this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
+        else if (this.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true) && this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
           this._executeShout(target, ownerIndex);
           this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
           this.isShouting = false;
           this.shoutWindupTimer = 0;
         }
         // Priority 2: World Cleave (Heavy Cleave in close-medium range - Instant AoE execute on the move)
-        else if (this.cleaveCooldown <= 0 && distToOpponent <= meleeDist + 40) {
+        else if (this.isSkillEnabled(CONFIG.mahoraga?.enableCleave, true) && this.cleaveCooldown <= 0 && distToOpponent <= meleeDist + 40) {
           this._executeCleave(target);
           this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown ?? 600;
           this.isCleaving = false;
@@ -1789,16 +1789,16 @@ export class MahoragaFighter extends Fighter {
         }
         // Priority 3: Throw Skill (Debris Throw at Level 1-7 OR Wall Slam & Dash Execute at Level 8+)
         else if (this.throwCooldown <= 0 && (distToOpponent >= minThrowDist || hasWallSlam) && !isAnyTargetInRange) {
-          if (hasWallSlam) {
+          if (hasWallSlam && this.isSkillEnabled(CONFIG.mahoraga?.enableWallSlam, true)) {
             this.initiateLevel8WallSlam(target);
-          } else {
+          } else if (this.isSkillEnabled(CONFIG.mahoraga?.enableThrowBarrage, true)) {
             this.isThrowing = true;
             this.throwBarrageShotsLeft = CONFIG.mahoraga?.throwBarrageCount ?? 10;
             this.throwBarrageTimer = 0;
           }
         }
         // Priority 4: Active Close-Quarters Attack-Teleport Stance
-        else if (this.neutralStanceTimer > 0 && this.swordCooldown <= 0 && isAnyTargetInRange) {
+        else if (this.isSkillEnabled(CONFIG.mahoraga?.enableCloseQuartersTeleport, true) && this.neutralStanceTimer > 0 && this.swordCooldown <= 0 && isAnyTargetInRange) {
           this._performMeleeAttack(target);
         }
       }

@@ -48,7 +48,43 @@ export class Skill {
     this.canTickDuration = def.canTickDuration || null;
     this.getHudData = def.getHudData || null;
 
+    this.enabledKey = def.enabledKey || null;
+    this.configKey = def.configKey || null;
+    this.enabled = def.enabled !== undefined ? def.enabled : null;
+    this.isEnabled = def.isEnabled || null;
+
     this.customData = def.customData || {};
+  }
+
+  isEnabledSkill() {
+    if (typeof this.isEnabled === 'function') {
+      return Boolean(this.isEnabled(this.fighter, this));
+    }
+    if (this.enabled !== null) {
+      if (typeof this.enabled === 'boolean') return this.enabled;
+      if (typeof this.enabled === 'number') return this.enabled !== 0;
+      if (typeof this.enabled === 'string') return this.enabled !== 'false' && this.enabled !== '0';
+    }
+    const f = this.fighter;
+    if (!f) return true;
+    const cid = f.characterId || f.type;
+    const cfg = (CONFIG && cid && CONFIG[cid]) ? CONFIG[cid] : null;
+
+    if (this.configKey && cfg && cfg[this.configKey] !== undefined) {
+      const v = cfg[this.configKey];
+      return v !== false && v !== 0 && v !== 'false' && v !== '0';
+    }
+    if (this.enabledKey) {
+      if (cfg && cfg[this.enabledKey] !== undefined) {
+        const v = cfg[this.enabledKey];
+        return v !== false && v !== 0 && v !== 'false' && v !== '0';
+      }
+      if (f[this.enabledKey] !== undefined) {
+        const v = f[this.enabledKey];
+        return v !== false && v !== 0 && v !== 'false' && v !== '0';
+      }
+    }
+    return true;
   }
 
   get fighter() {
@@ -392,6 +428,7 @@ export class SkillManager {
   getHudSkillData(themeColor = '#00E5FF', getProjectiles = null) {
     const hudItems = [];
     for (const skill of this.skills.values()) {
+      if (!skill.isEnabledSkill()) continue;
       if (skill.type === 'passive' && !skill.customData.showOnHud) continue;
 
       if (typeof skill.getHudData === 'function') {

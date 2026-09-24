@@ -420,6 +420,10 @@ async function runInteractionTests() {
     escanor.prideStacks = 0;
     escanor.isTheOneActive = false;
 
+    // Temporarily enable Solar Armor for DEF tests (config may have enableSolarArmor: false)
+    const savedSolarArmor = CONFIG.escanor.enableSolarArmor;
+    CONFIG.escanor.enableSolarArmor = true;
+
     // Base DEF: 20% reduction (100 damage -> 80 damage taken)
     const initialHp = escanor.hp;
     escanor.takeDamage(100, gojo, {});
@@ -446,6 +450,9 @@ async function runInteractionTests() {
     escanor.takeDamage(100, gojo, { isTrueDamage: true });
     const damageTakenTrue = 390 - escanor.hp;
     assert(Math.round(damageTakenTrue) === 100, `True Damage must bypass DEF (expected 100 taken, got ${damageTakenTrue})`);
+
+    // Restore enableSolarArmor
+    CONFIG.escanor.enableSolarArmor = savedSolarArmor;
 
     // ── Escanor Size Growth & Dynamic Weapon Attack Range Scaling Test ──
     escanor.reset();

@@ -87,24 +87,28 @@ export class RubbickFighter extends Fighter {
 
   _registerSkills() {
     const cfg = (CONFIG.rubbick || CONFIG.trickster || {});
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableSpellSteal, true)) {
+      skills.push({
         id: 'spellsteal',
         name: 'SPELL STEAL',
         type: 'utility',
         cooldownKey: 'spellStealCooldown',
         cooldownMax: cfg.spellStealCooldown || 600,
         durationKey: 'stolenTimer'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableTelekinesis, true)) {
+      skills.push({
         id: 'telekinesis',
         name: 'TELEKINESIS',
         type: 'cc',
         cooldownKey: 'telekinesisCooldown',
         cooldownMax: cfg.telekinesisCooldown || 300,
         durationKey: 'tkTimer'
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(skills);
   }
 
   reset() {
@@ -259,6 +263,8 @@ export class RubbickFighter extends Fighter {
 
   canCastSpellSteal() {
     if (this.isDead || this.hp <= 0) return false;
+    const rubbickCfg = CONFIG.rubbick || CONFIG.trickster || {};
+    if (!this.isSkillEnabled(rubbickCfg.enableSpellSteal, true)) return false;
     if (this.spellStealCooldown > 0) return false;
     if (this.stolenType) return false;
     if (this.hasActiveSkillInArena()) return false;
@@ -267,6 +273,8 @@ export class RubbickFighter extends Fighter {
 
   canCastTelekinesis() {
     if (this.isDead || this.hp <= 0) return false;
+    const rubbickCfg = CONFIG.rubbick || CONFIG.trickster || {};
+    if (!this.isSkillEnabled(rubbickCfg.enableTelekinesis, true)) return false;
     if (this.telekinesisCooldown > 0) return false;
     if (this.stolenType) return false;
     if (this.hasActiveSkillInArena()) return false;
@@ -1344,8 +1352,8 @@ export class RubbickFighter extends Fighter {
       this.aim(opponent);
 
       // Ultimate: Spell Steal
-      const rubbickCfg = CONFIG.rubbick || CONFIG.trickster;
-      if (this.spellStealCooldown <= 0 && !this.stolenType && !this.hasActiveSkillInArena() && !this.isTeammate(opponent) && distSq < rubbickCfg.spellStealRange * rubbickCfg.spellStealRange) {
+      const rubbickCfg = CONFIG.rubbick || CONFIG.trickster || {};
+      if (this.spellStealCooldown <= 0 && this.isSkillEnabled(rubbickCfg.enableSpellSteal, true) && !this.stolenType && !this.hasActiveSkillInArena() && !this.isTeammate(opponent) && distSq < (rubbickCfg.spellStealRange || 350) * (rubbickCfg.spellStealRange || 350)) {
         const isGojoOpponent = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.type === 'gojo' || opponent._def?.id === 'gojo');
         
         // If opponent is Gojo, Rubbick can steal whichever skill Gojo has cast (Hollow Purple, Reversal Red, or Unlimited Void)!
@@ -1442,7 +1450,7 @@ export class RubbickFighter extends Fighter {
       }
 
       // Skill 1: Telekinesis
-      if (this.telekinesisCooldown <= 0 && !this.stolenType && !this.hasActiveSkillInArena() && !this.isTeammate(opponent) && distSq < rubbickCfg.telekinesisRange * rubbickCfg.telekinesisRange && !opponent.immuneToCC) {
+      if (this.telekinesisCooldown <= 0 && this.isSkillEnabled(rubbickCfg.enableTelekinesis, true) && !this.stolenType && !this.hasActiveSkillInArena() && !this.isTeammate(opponent) && distSq < (rubbickCfg.telekinesisRange || 250) * (rubbickCfg.telekinesisRange || 250) && !opponent.immuneToCC) {
         this.telekinesisCooldown = rubbickCfg.telekinesisCooldown;
         this.tkTarget = opponent;
         this.tkTimer = rubbickCfg.telekinesisDuration;
@@ -1513,7 +1521,7 @@ export class RubbickFighter extends Fighter {
           castedSpammable = this.executeStolenSkill(opponent, ownerIndex);
         }
         
-        if (!castedSpammable) {
+        if (!castedSpammable && this.isSkillEnabled(rubbickCfg.enableArcaneBolt, true)) {
           // Aim toward opponent before firing and triggering VFX
           if (opponent && !opponent.isDead) {
             this.aim(opponent);

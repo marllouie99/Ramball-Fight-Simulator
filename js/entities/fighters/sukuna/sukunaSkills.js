@@ -12,7 +12,7 @@ import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js
 import { spawnDomainSlashLines } from './sukunaDomainVisuals.js';
 
 export function checkSpiderwebTrigger(fighter, arena) {
-  if (fighter.spiderwebCooldown > 0) return;
+  if (!fighter.isSkillEnabled(CONFIG.sukuna?.enableSpiderweb, true) || fighter.spiderwebCooldown > 0) return;
 
   const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
   const spiderwebRange = CONFIG.sukuna?.spiderwebRange || 100;

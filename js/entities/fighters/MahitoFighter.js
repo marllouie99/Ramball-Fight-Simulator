@@ -97,43 +97,54 @@ export class MahitoFighter extends Fighter {
     this.originalRadius = this.r;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const mahitoSkills = [];
+    if (this.isSkillEnabled(CONFIG.mahito?.soulPhaseSlip?.enableSoulPhaseSlip, true)) {
+      mahitoSkills.push({
         id: 'soul_phase_slip',
         name: 'Phantom Soul Slip',
         type: 'active',
         cooldownKey: 'soulPhaseDashCooldown',
         cooldownMax: () => CONFIG.mahito?.soulPhaseSlip?.cooldown || 100
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.mahito?.fleshSurge?.enableFleshSurge, true)) {
+      mahitoSkills.push({
         id: 'flesh_surge',
         name: 'Subterranean Flesh Surge',
         type: 'active',
         cooldownKey: 'fleshSurgeCooldown',
         cooldownMax: () => CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.fleshSurge?.cooldown || 300
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.mahito?.maceCannon?.enableMaceCannon, true)) {
+      mahitoSkills.push({
         id: 'mace_cannon',
         name: 'Mutated Mace Cannon',
         type: 'active',
         cooldownKey: 'maceCannonCooldown',
         cooldownMax: () => CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.maceCannon?.cooldown || 300
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.mahito?.twinScissor?.enableTwinScissor, true)) {
+      mahitoSkills.push({
         id: 'twin_scissor',
         name: 'Dual Scythe Guillotine',
         type: 'active',
         cooldownKey: 'twinScissorCooldown',
         cooldownMax: () => CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.twinScissor?.cooldown || 300
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.mahito?.soulMultiplicity?.enableSoulMultiplicity, true)) {
+      mahitoSkills.push({
         id: 'soul_multiplicity',
         name: 'Soul Multiplicity',
         type: 'active',
         cooldownKey: 'soulMultiplicityCooldown',
         cooldownMax: () => CONFIG.mahito?.soulMultiplicity?.cooldown || 1000
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.mahito?.transformation?.enableTransformation ?? CONFIG.mahito?.transformation?.enabled, false)) {
+      mahitoSkills.push({
         id: 'isbodk',
         name: 'Distorted Killing',
         type: 'transformation',
@@ -145,8 +156,10 @@ export class MahitoFighter extends Fighter {
         onExpire: (fighter) => {
           fighter.revertTransformation();
         }
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.mahito?.domainExpansion?.enableDomainExpansion, true)) {
+      mahitoSkills.push({
         id: 'domain',
         name: 'Self-Embodiment of Perfection',
         type: 'domain',
@@ -159,8 +172,10 @@ export class MahitoFighter extends Fighter {
         onExpire: (fighter) => {
           fighter.domainActive = false;
         }
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.mahito?.evasion?.enableEvasion, true)) {
+      mahitoSkills.push({
         id: 'evasion',
         name: 'Soul Split Evasion',
         type: 'buff',
@@ -170,8 +185,9 @@ export class MahitoFighter extends Fighter {
         onExpire: (fighter) => {
           fighter.endEvasion();
         }
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(mahitoSkills);
   }
 
   get _dashAfterimages() {
@@ -545,9 +561,7 @@ export class MahitoFighter extends Fighter {
       if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
-      }
-      if (!isNanamiPausing && !this.isChannelingDomainExpansion && !this.domainActive) {
-        this.interruptAttacks();
+        this.interruptAttacks(true);
       }
       return;
     }
@@ -567,7 +581,7 @@ export class MahitoFighter extends Fighter {
     const regenDelay = regenCfg.delay ?? 100;
     const regenRate = regenCfg.rate ?? 0.10;
 
-    if (this.noDamageTimer >= regenDelay && this.hp > 0 && this.hp < this.maxHp) {
+    if (this.isSkillEnabled(regenCfg.enableRegen, true) && this.noDamageTimer >= regenDelay && this.hp > 0 && this.hp < this.maxHp) {
       const oldHp = this.hp;
       this.hp = Math.min(this.maxHp, this.hp + regenRate);
       const actualHealed = this.hp - oldHp;
@@ -918,30 +932,37 @@ export class MahitoFighter extends Fighter {
           // Inside Domain (Sure-Hit Domain Effect): Trigger Idle Transfiguration skills at ANY distance across the screen!
           this.aim(target);
           if (sharedSkillCd <= 0) {
-            const availableSkills = ['fleshSurge', 'maceCannon', 'twinScissor'];
-            const chosenSkill = availableSkills[Math.floor(Math.random() * availableSkills.length)];
-            if (chosenSkill === 'twinScissor') {
-              this.executeTwinScissor(target);
-            } else if (chosenSkill === 'maceCannon') {
-              this.executeMaceCannon(target);
-            } else {
-              this.executeSubterraneanFleshSurge(target);
+            const availableSkills = [];
+            if (this.isSkillEnabled(CONFIG.mahito?.fleshSurge?.enableFleshSurge, true)) availableSkills.push('fleshSurge');
+            if (this.isSkillEnabled(CONFIG.mahito?.maceCannon?.enableMaceCannon, true)) availableSkills.push('maceCannon');
+            if (this.isSkillEnabled(CONFIG.mahito?.twinScissor?.enableTwinScissor, true)) availableSkills.push('twinScissor');
+            if (availableSkills.length > 0) {
+              const chosenSkill = availableSkills[Math.floor(Math.random() * availableSkills.length)];
+              if (chosenSkill === 'twinScissor') {
+                this.executeTwinScissor(target);
+              } else if (chosenSkill === 'maceCannon') {
+                this.executeMaceCannon(target);
+              } else {
+                this.executeSubterraneanFleshSurge(target);
+              }
+            } else if ((this.cooldownTimer || 0) <= 0 && this.isSkillEnabled(CONFIG.mahito?.enableIdleTransfiguration, true)) {
+              this.executeIdleTransfigurationStrike(target);
             }
-          } else if ((this.cooldownTimer || 0) <= 0) {
+          } else if ((this.cooldownTimer || 0) <= 0 && this.isSkillEnabled(CONFIG.mahito?.enableIdleTransfiguration, true)) {
             this.executeIdleTransfigurationStrike(target);
           }
         } else {
           // 0. Ultimate: Domain Expansion — Self-Embodiment of Perfection
-          if ((this.domainCooldown || 0) <= 0 && !this.domainActive && this.domainChargeTimer <= 0) {
+          if (this.isSkillEnabled(CONFIG.mahito?.domainExpansion?.enableDomainExpansion, true) && (this.domainCooldown || 0) <= 0 && !this.domainActive && this.domainChargeTimer <= 0) {
             this.executeDomainExpansion(target);
           }
           // 1. Passive Trigger: Phantom Soul Slip (Phase-Through Claw Dash) in Mid-Range
-          else if (dist >= dashRangeMin && dist <= dashRangeMax && (this.soulPhaseDashCooldown || 0) <= 0) {
+          else if (this.isSkillEnabled(CONFIG.mahito?.soulPhaseSlip?.enableSoulPhaseSlip, true) && dist >= dashRangeMin && dist <= dashRangeMax && (this.soulPhaseDashCooldown || 0) <= 0) {
             this.executeSoulPhaseSlip(target);
           }
           // 2. Soul Multiplicity & Body Repel (Fifth Skill - Independent Cooldown)
           //    Block summoning if previous transfigured human minions are still alive
-          else if ((this.soulMultiplicityCooldown || 0) <= 0) {
+          else if (this.isSkillEnabled(CONFIG.mahito?.soulMultiplicity?.enableSoulMultiplicity, true) && (this.soulMultiplicityCooldown || 0) <= 0) {
             const hasLivingMinions = state.illusions && state.illusions.some(
               il => il && il.isTransfiguredHuman && il.owner === this && il.hp > 0
             );
@@ -950,7 +971,7 @@ export class MahitoFighter extends Fighter {
             }
           }
           // 3. Close-Range Combat: If enemy is near, execute Melee Strikes
-          else if (dist <= maxReach) {
+          else if (dist <= maxReach && this.isSkillEnabled(CONFIG.mahito?.enableIdleTransfiguration, true)) {
             if ((this.cooldownTimer || 0) <= 0) {
               this.executeIdleTransfigurationStrike(target);
             }
@@ -958,9 +979,9 @@ export class MahitoFighter extends Fighter {
           // 3. Special Morph Skills (Skills 2, 3, and 4): Single Shared Cooldown, Random Choice at Long Range (>= 240px)
           else if (dist >= 240 && sharedSkillCd <= 0) {
             const availableSkills = [];
-            if (dist <= maxSurgeDist) availableSkills.push('fleshSurge');
-            if (dist <= maceMaxDist) availableSkills.push('maceCannon');
-            if (dist <= scissorMaxDist) availableSkills.push('twinScissor');
+            if (dist <= maxSurgeDist && this.isSkillEnabled(CONFIG.mahito?.fleshSurge?.enableFleshSurge, true)) availableSkills.push('fleshSurge');
+            if (dist <= maceMaxDist && this.isSkillEnabled(CONFIG.mahito?.maceCannon?.enableMaceCannon, true)) availableSkills.push('maceCannon');
+            if (dist <= scissorMaxDist && this.isSkillEnabled(CONFIG.mahito?.twinScissor?.enableTwinScissor, true)) availableSkills.push('twinScissor');
 
             if (availableSkills.length > 0) {
               const chosenSkill = availableSkills[Math.floor(Math.random() * availableSkills.length)];
@@ -983,6 +1004,7 @@ export class MahitoFighter extends Fighter {
    * Guarded to prevent triggering when the enemy is in close quarters (< minScissorDist).
    */
   executeTwinScissor(target = null) {
+    if (!this.isSkillEnabled(CONFIG.mahito?.twinScissor?.enableTwinScissor, true)) return;
     if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0) return;
 
     // Proximity Guard: Do NOT trigger if target is in close quarters
@@ -1009,6 +1031,7 @@ export class MahitoFighter extends Fighter {
    * Guarded to prevent triggering when the enemy is in close quarters (< minMaceDist).
    */
   executeMaceCannon(target = null) {
+    if (!this.isSkillEnabled(CONFIG.mahito?.maceCannon?.enableMaceCannon, true)) return;
     if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.twinScissorAnimTimer > 0) return;
 
     // Proximity Guard: Do NOT trigger if target is in close quarters
@@ -1035,8 +1058,10 @@ export class MahitoFighter extends Fighter {
    */
   executeSoulPhaseSlip(target = null) {
     if (this.domainActive) return;
+    if (!this.isSkillEnabled(CONFIG.mahito?.soulPhaseSlip?.enableSoulPhaseSlip, true)) return;
     const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.75;
-    const canEvade = (typeof state !== 'undefined' && state.gameState === 'playing') && 
+    const isEvasionEnabled = this.isSkillEnabled(CONFIG.mahito?.evasion?.enableEvasion, true);
+    const canEvade = isEvasionEnabled && (typeof state !== 'undefined' && state.gameState === 'playing') && 
                      this.hp > 0 && this.maxHp > 0 && 
                      (this.hp / this.maxHp) <= evasionThreshold && 
                      !this.hasTriggeredEvasion;
@@ -1057,6 +1082,7 @@ export class MahitoFighter extends Fighter {
    * Executes Idle Transfiguration Punch / Blade / Mace Swing adhering to Rule #7 & #8 Frontal Arc standard.
    */
   executeIdleTransfigurationStrike(target = null) {
+    if (!this.isSkillEnabled(CONFIG.mahito?.enableIdleTransfiguration, true)) return;
     if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0) return;
     executeIdleTransfigurationStrike(this, target);
   }
@@ -1066,6 +1092,7 @@ export class MahitoFighter extends Fighter {
    * Guarded to prevent triggering when the enemy is in close quarters (< minSurgeDist).
    */
   executeSubterraneanFleshSurge(target = null) {
+    if (!this.isSkillEnabled(CONFIG.mahito?.fleshSurge?.enableFleshSurge, true)) return;
     if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0) return;
 
     // Proximity Guard: Do NOT trigger if target is in close quarters
@@ -1092,6 +1119,7 @@ export class MahitoFighter extends Fighter {
    */
   executeSoulMultiplicity(target = null) {
     if (this.domainActive) return;
+    if (!this.isSkillEnabled(CONFIG.mahito?.soulMultiplicity?.enableSoulMultiplicity, true)) return;
     if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0 || this.domainChargeTimer > 0) return;
     executeMahitoSoulMultiplicity(this, target);
   }
@@ -1101,6 +1129,7 @@ export class MahitoFighter extends Fighter {
    */
   executeDomainExpansion(target = null) {
     if (this.domainActive) return;
+    if (!this.isSkillEnabled(CONFIG.mahito?.domainExpansion?.enableDomainExpansion, true)) return;
     if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0) return;
     this.punchAnimTimer = 0;
     this.fleshSurgeAnimTimer = 0;

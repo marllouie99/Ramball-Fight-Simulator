@@ -33,6 +33,7 @@ export function getClapCooldown(fighter) {
 
 export function modUpdateBoogieWoogie(targets) {
   if (this.isTakadaChanneling) return;
+  if (this && typeof this.isSkillEnabled === 'function' && !this.isSkillEnabled(CONFIG.todo?.enableBoogieWoogie, true)) return;
   if (this.boogieWoogieCooldown > 0 || this.clapWindupTimer > 0 || this.clapHoldTimer > 0 || (this.rockCounterComboLeft || 0) > 0) return;
 
   // 1. If cursed rocks are active and Todo has no live teammate, swap with the rock anytime cooldown is up!
@@ -94,6 +95,7 @@ export function hasLiveTeammate(fighter) {
 }
 
 export function modThrowCursedRock(target) {
+  if (this && typeof this.isSkillEnabled === 'function' && !this.isSkillEnabled(CONFIG.todo?.enableCursedRock, true)) return;
   // Disable throwing cursed rocks if Todo has a live teammate (only used when solo / teammate dies)
   if (hasLiveTeammate(this)) return;
   // Prevent throwing rocks while executing counter combo flurry
@@ -963,6 +965,7 @@ export function isTodoTakadaSongEnabled() {
  * Plays his channeling voiceline and schedules the background song fade-in!
  */
 export function modStartTakadaChanneling(force = false) {
+  if (this && typeof this.isSkillEnabled === 'function' && !this.isSkillEnabled(CONFIG.todo?.enableTakadaUltimate, true)) return false;
   if ((this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt) && !this.pendingTakadaHpUlt) return false;
   if (this.isTakadaChanneling || this.isTakadaUltActive) return false;
   if (!force && (this.takadaUltCooldown || 0) > 0) return false;

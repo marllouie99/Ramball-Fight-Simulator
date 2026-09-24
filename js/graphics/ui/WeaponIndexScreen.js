@@ -2180,7 +2180,7 @@ function drawWeaponPreview(ctx, type, color) {
         return;
 
       case 'zenitsu':
-        drawZenitsuLightningKatana(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        drawZenitsuLightningKatana(ctx, 0, 0, gunAngle, r, { isPreview: true, showHands: true });
         return;
 
       case 'inosuke':

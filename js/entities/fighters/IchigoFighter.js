@@ -146,15 +146,18 @@ export class IchigoFighter extends Fighter {
     this._finalGetsugaVoiceEndTime = 0;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const ichigoSkills = [];
+    if (this.isSkillEnabled(CONFIG.ichigo?.enableMeleeCleave, true)) {
+      ichigoSkills.push({
         id: 'sword',
         name: 'Zangetsu Slash',
         type: 'active',
         cooldownKey: 'swordCooldown',
         cooldownMax: () => CONFIG.ichigo?.swordCooldown || 22
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.ichigo?.enableGetsuga, true)) {
+      ichigoSkills.push({
         id: 'getsuga',
         name: 'Getsuga Tensho',
         type: 'active',
@@ -162,15 +165,19 @@ export class IchigoFighter extends Fighter {
         cooldownMax: () => CONFIG.ichigo?.getsugaCooldown || 450,
         channelingKey: 'isChannelingGetsuga',
         channelTimerKey: 'getsugaChargeTimer'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.ichigo?.enableShunpo, true)) {
+      ichigoSkills.push({
         id: 'shunpo',
         name: 'Flash Step',
         type: 'active',
         cooldownKey: 'shunpoCooldown',
         cooldownMax: () => CONFIG.ichigo?.shunpoCooldown || 300
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.ichigo?.enableHollowMask, true)) {
+      ichigoSkills.push({
         id: 'hollow_mask',
         name: 'Hollow Mask',
         type: 'buff',
@@ -184,8 +191,10 @@ export class IchigoFighter extends Fighter {
           if (typeof spawnHollowMaskShatter === 'function') spawnHollowMaskShatter(fighter);
           if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "MASK SHATTERED!", "#FFFFFF");
         }
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.ichigo?.enableBankai, true)) {
+      ichigoSkills.push({
         id: 'bankai',
         name: 'Tensa Zangetsu',
         type: 'transformation',
@@ -226,10 +235,10 @@ export class IchigoFighter extends Fighter {
           fighter.afterImages = [];
           fighter._lastBankaiTrailX = undefined;
           fighter._lastBankaiTrailY = undefined;
-          if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "BANKAI EXPIRED", "#FF1E00");
         }
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(ichigoSkills);
   }
 
   isStationarySkillActive() {
@@ -992,7 +1001,7 @@ export class IchigoFighter extends Fighter {
         const isSubsequentTrigger = (this.bankaiUsed && ((cd <= 0 && hpRatio <= ultThreshold) || (damageTaken >= reqDamage) || (cd <= 0)));
 
         const isBusy = this.isAboutToUnleashNormalGetsuga() || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this._isGetsugaVoicelinePlaying() || this._isFinalGetsugaVoicelinePlaying() || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.isShunpoDashing || this.shunpoComboActive;
-        const canBankai = !this.bankaiActive && !this.isChannelingBankai && !isBusy && (isFirstTrigger || isSubsequentTrigger);
+        const canBankai = this.isSkillEnabled(CONFIG.ichigo?.enableBankai, true) && !this.bankaiActive && !this.isChannelingBankai && !isBusy && (isFirstTrigger || isSubsequentTrigger);
         if (canBankai) {
           this.activateBankai();
         }
@@ -1009,7 +1018,7 @@ export class IchigoFighter extends Fighter {
             this.aim(target); // Rule #3: aim immediately after teleport
             return;
           }
-        } else {
+        } else if (this.isSkillEnabled(CONFIG.ichigo?.enableGetsuga, true)) {
           // When Flash Step is disabled in config, trigger standalone Getsuga Tensho wave at range
           const gMin = isBankai ? (CONFIG.ichigo?.bankaiComboTriggerMinDist ?? 0) : (CONFIG.ichigo?.getsugaTriggerMinDist ?? 0);
           const gMax = isBankai ? (CONFIG.ichigo?.bankaiComboTriggerMaxDist || 400) : (CONFIG.ichigo?.getsugaTriggerMaxDist || 400);
@@ -1040,7 +1049,7 @@ export class IchigoFighter extends Fighter {
 
         // 3. Melee attacks (Tensa Zangetsu cleave)
         const reach = CONFIG.ichigo?.swordRange || 70;
-        if (dist <= reach + target.r && this.swordCooldown <= 0 && !this.isGetsugaActive()) {
+        if (this.isSkillEnabled(CONFIG.ichigo?.enableMeleeCleave, true) && dist <= reach + target.r && this.swordCooldown <= 0 && !this.isGetsugaActive()) {
           this.performMeleeCleave(target);
         }
       }

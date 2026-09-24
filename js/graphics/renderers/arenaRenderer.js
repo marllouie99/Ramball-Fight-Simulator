@@ -679,6 +679,7 @@ export function drawArena() {
   const drawH = state._titleHeaderCanvas.height * scale;
   
   ctx.save();
+  applyCameraToCtx(ctx);
   ctx.drawImage(state._titleHeaderCanvas, centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
   
   // The title header banner ("FIGHT OF CHARACTERS") is drawn bright and clear above the arena

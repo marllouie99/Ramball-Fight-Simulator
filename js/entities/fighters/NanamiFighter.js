@@ -20,6 +20,146 @@ import { spawnBloodEffect, spawnNanamiRatioBloodBurst } from '../../graphics/par
 import { audioSystem } from '../../systems/audioSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
+/**
+ * Computes minimum squared distance from point (px, py) to segment [A, B] and closest projected point.
+ */
+function _distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 0.0001) {
+    const dpx = px - ax;
+    const dpy = py - ay;
+    return { distSq: dpx * dpx + dpy * dpy, projX: ax, projY: ay };
+  }
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const projX = ax + t * dx;
+  const projY = ay + t * dy;
+  const ex = px - projX;
+  const ey = py - projY;
+  return { distSq: ex * ex + ey * ey, projX, projY };
+}
+
+/**
+ * Calculates world-space blade segment [inner, tip] and hand coordinates for Nanami's Blunt Cleaver at given strike progress.
+ */
+function _getNanamiCleaverWorldSegment(fighter, strikeP) {
+  const r = fighter.r || 25;
+  const clampedP = Math.max(0, Math.min(1.0, strikeP));
+
+  let localCleaverAngle = 0;
+  let easeChop = 0;
+  if (clampedP < 0.12) {
+    const t = clampedP / 0.12;
+    const easeWindup = Math.sin(t * (Math.PI / 2));
+    localCleaverAngle = -easeWindup * 1.05;
+    easeChop = 0;
+  } else if (clampedP < 0.60) {
+    const t = (clampedP - 0.12) / 0.48;
+    const easePower = t * t * (3 - 2 * t);
+    localCleaverAngle = -1.05 + easePower * (1.10 - (-1.05));
+    easeChop = Math.pow(Math.sin(clampedP * Math.PI), 1.25);
+  } else {
+    const recP = (clampedP - 0.60) / 0.40;
+    const easeRec = 0.5 + 0.5 * Math.cos(recP * Math.PI);
+    localCleaverAngle = 1.10 * easeRec;
+    easeChop = Math.pow(Math.sin(clampedP * Math.PI), 1.25);
+  }
+
+  const lungeExtension = easeChop * (r * 0.95);
+  const localHandX = r * 0.95 + lungeExtension;
+  const localHandY = r * 0.25 + Math.sin(clampedP * Math.PI) * (r * 0.20);
+
+  const aimAngle = (fighter.chopCastAngle !== undefined)
+    ? fighter.chopCastAngle
+    : ((fighter.gunAngle !== undefined) ? fighter.gunAngle : (fighter.angle || 0));
+  const facingLeft = Math.abs(aimAngle) > Math.PI / 2;
+
+  const effHandY = facingLeft ? -localHandY : localHandY;
+  const cosA = Math.cos(aimAngle);
+  const sinA = Math.sin(aimAngle);
+  const worldHandX = fighter.x + (cosA * localHandX - sinA * effHandY);
+  const worldHandY = (fighter.y - (fighter.z || 0)) + (sinA * localHandX + cosA * effHandY);
+  const worldCleaverAngle = facingLeft ? (aimAngle - localCleaverAngle) : (aimAngle + localCleaverAngle);
+
+  const reach = (typeof fighter.currentCleaverReach === 'number')
+    ? fighter.currentCleaverReach
+    : ((typeof CONFIG !== 'undefined' && CONFIG.nanami?.cleaverRange) ? CONFIG.nanami.cleaverRange : 55);
+
+  const innerDist = 8;
+  const tipDist = reach + 10;
+
+  return {
+    innerX: worldHandX + Math.cos(worldCleaverAngle) * innerDist,
+    innerY: worldHandY + Math.sin(worldCleaverAngle) * innerDist,
+    tipX: worldHandX + Math.cos(worldCleaverAngle) * tipDist,
+    tipY: worldHandY + Math.sin(worldCleaverAngle) * tipDist,
+    worldHandX,
+    worldHandY,
+    worldCleaverAngle,
+    localCleaverAngle,
+    localHandX,
+    localHandY
+  };
+}
+
+/**
+ * Tests direct geometric collision between target and Nanami's blunt cleaver swept across strike progress.
+ */
+function _testNanamiCleaverBladeHit(fighter, target, currentStrikeP, prevStrikeP) {
+  if (!target || target.dead || target.isDead || target.hp <= 0) return null;
+
+  const dx = target.x - fighter.x;
+  const dy = target.y - (fighter.y - (fighter.z || 0));
+  const dist = Math.hypot(dx, dy);
+  const r = fighter.r || 25;
+  const targetRadius = target.r || 25;
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nanami) ? CONFIG.nanami : {};
+  const reach = (typeof fighter.currentCleaverReach === 'number') ? fighter.currentCleaverReach : (cfg.cleaverRange || 55);
+
+  const arcLimit = (typeof cfg.chopFrontalArcLimit === 'number') ? cfg.chopFrontalArcLimit : ((cfg.cleaverArc || ((130 * Math.PI) / 180)) / 2 + 0.2);
+  const bladeRadius = (typeof cfg.chopBladeRadius === 'number') ? cfg.chopBladeRadius : 20;
+
+  // 1. Strict Frontal Arc Guard (Rule 1.6): Cleaver chop can only strike targets in front
+  const aimAngle = (fighter.chopCastAngle !== undefined)
+    ? fighter.chopCastAngle
+    : ((fighter.gunAngle !== undefined) ? fighter.gunAngle : (fighter.angle || 0));
+  const angleToTarget = Math.atan2(dy, dx);
+  let angleDiff = angleToTarget - aimAngle;
+  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+  if (Math.abs(angleDiff) > arcLimit) return null;
+
+  // 2. Maximum reach boundary guard
+  if (dist > (r + reach + targetRadius + 15)) return null;
+
+  // 3. Forward cutting progress bounds: blade is winding up when strikeP < 0.10
+  const minP = Math.min(prevStrikeP, currentStrikeP);
+  const maxP = Math.max(prevStrikeP, currentStrikeP);
+  if (maxP < 0.10) return null;
+
+  const startP = Math.max(0.10, minP);
+  const endP = Math.max(0.10, maxP);
+  const pDiff = endP - startP;
+  const numSamples = (pDiff > 0.25) ? 7 : ((pDiff > 0.06) ? 5 : 3);
+  const hitThresholdSq = Math.pow(targetRadius + bladeRadius, 2);
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = (numSamples === 1) ? 1.0 : (i / (numSamples - 1));
+    const sampleP = startP + t * (endP - startP);
+    const blade = _getNanamiCleaverWorldSegment(fighter, sampleP);
+    const res = _distToSegment(target.x, target.y, blade.innerX, blade.innerY, blade.tipX, blade.tipY);
+
+    if (res.distSq <= hitThresholdSq) {
+      return { sampleP, blade, contactX: res.projX, contactY: res.projY, angleToTarget, angleDiff };
+    }
+  }
+
+  return null;
+}
+
 export class NanamiFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -36,9 +176,19 @@ export class NanamiFighter extends Fighter {
     this.hideFrontHand = false;
     this.hideBackHand = true; // One-handed cleaver stance
     this.slashSwingTimer = 0;
-    this.slashSwingMaxTimer = 18;
-    this.slashSwingImpactTimer = 9; // Exact 50% midpoint of 18-frame attack animation
+    this.slashSwingMaxTimer = 20;
+    this.slashSwingImpactTimer = 8;
+    this.chopWindupFrames = 2;
+    this.chopStrikeFrames = 10;
+    this.chopRecoveryFrames = 8;
     this._chopHitDelivered = true;
+    this._chopHitConnected = false;
+    this.chopCastAngle = undefined;
+    this._chopPreviousStrikeP = 0;
+    this.ratioHitProgress = null;
+    this.ratioHitCleaverAngle = null;
+    this.ratioHitHandX = null;
+    this.ratioHitHandY = null;
     this._chopTarget = null;
     this.ratioImpactEffects = [];
     this.shockwaveEffects = [];
@@ -96,32 +246,40 @@ export class NanamiFighter extends Fighter {
 
   _registerSkills() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nanami) ? CONFIG.nanami : {};
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableLunge, true)) {
+      skills.push({
         id: 'lunge',
         name: 'RATIO LUNGE',
         type: 'mobility',
         cooldownKey: 'lungeCooldown',
         cooldownMax: cfg.lungeCooldown || 200,
         activeKey: 'isLunging'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableCollapse, true)) {
+      skills.push({
         id: 'collapse',
         name: 'COLLAPSE',
         type: 'offensive',
         cooldownKey: 'collapseCooldown',
         cooldownMax: cfg.collapseCooldown || 600,
         activeKey: 'isCollapsing'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableBlackFlash, true)) {
+      skills.push({
         id: 'ultimate',
         name: '4-FOLD BLACK FLASH BLITZ',
         type: 'ultimate',
         cooldownKey: 'ultimateCooldown',
         cooldownMax: cfg.ultimateCooldown || 2000,
         activeKey: 'isBlitzing'
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   reset() {
@@ -129,8 +287,18 @@ export class NanamiFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nanami) ? CONFIG.nanami : {};
     this.punchAnimTimer = 0;
     this.slashSwingTimer = 0;
-    this.slashSwingImpactTimer = 9;
+    this.slashSwingImpactTimer = 8;
+    this.chopWindupFrames = 2;
+    this.chopStrikeFrames = 10;
+    this.chopRecoveryFrames = 8;
     this._chopHitDelivered = true;
+    this._chopHitConnected = false;
+    this.chopCastAngle = undefined;
+    this._chopPreviousStrikeP = 0;
+    this.ratioHitProgress = null;
+    this.ratioHitCleaverAngle = null;
+    this.ratioHitHandX = null;
+    this.ratioHitHandY = null;
     this._chopTarget = null;
     if (this.ratioImpactEffects) this.ratioImpactEffects.length = 0;
     if (this.shockwaveEffects) this.shockwaveEffects.length = 0;
@@ -200,6 +368,12 @@ export class NanamiFighter extends Fighter {
     this.punchAnimTimer = 0;
     this.slashSwingTimer = 0;
     this._chopHitDelivered = true;
+    this._chopHitConnected = false;
+    this.chopCastAngle = undefined;
+    this.ratioHitProgress = null;
+    this.ratioHitCleaverAngle = null;
+    this.ratioHitHandX = null;
+    this.ratioHitHandY = null;
     this._chopTarget = null;
     this.ratioHitPauseTimer = 0;
     this.isLunging = false;
@@ -225,11 +399,62 @@ export class NanamiFighter extends Fighter {
   }
 
   /**
-   * Overrides aim to lock aim angle during supersonic straight-line lunge, ground collapse, or hit pause.
+   * Basic Attack Validation:
+   * Prevents initiating new basic attacks while already swinging or paused in 7:3 ratio impact stasis.
+   */
+  canPerformBasicAttack() {
+    if ((this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) || (this.slashSwingTimer && this.slashSwingTimer > 0)) return false;
+    return super.canPerformBasicAttack ? super.canPerformBasicAttack() : true;
+  }
+
+  /**
+   * Holds round and match transitions active while Nanami completes his attack animation,
+   * 7:3 Ratio hit-pause, and unpause knockback burst, preventing premature celebration cutoffs.
+   */
+  hasActiveFinishingAbility() {
+    if (this.hp <= 0 || this.dead || this.isDead) return false;
+    if ((this.slashSwingTimer && this.slashSwingTimer > 0) || (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) || this.isBlitzing || this.isCollapsing || this.isLunging) {
+      return true;
+    }
+    return super.hasActiveFinishingAbility ? super.hasActiveFinishingAbility() : false;
+  }
+
+  /**
+   * Aim Validation Guard:
+   * Smooth auto-aim tracking is permitted during windup/neutral, but locks strictly during cutting sweep and hit-pause (Rule 1.4).
+   */
+  canAim() {
+    if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return false;
+    if (this.isLunging || this.isBlitzing || this.isCollapsing) return false;
+    if (this.slashSwingTimer > 0 && !this.isWindupWeapon()) return false;
+    return super.canAim ? super.canAim() : true;
+  }
+
+  isWindupWeapon() {
+    if (this.slashSwingTimer <= 0) return false;
+    const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (CONFIG.nanami?.chopStrikeFrames || 10);
+    const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.nanami?.chopRecoveryFrames || 8);
+    return this.slashSwingTimer > (strikeFrames + recFrames);
+  }
+
+  /**
+   * Smooth Aim & Committed Cast Angle Alignment (Rule 1.4)
    */
   aim(opponent) {
-    if (this.isLunging || this.isBlitzing || this.isCollapsing || (this.ratioHitPauseTimer || 0) > 0) return;
-    super.aim(opponent);
+    if (this.ratioHitPauseTimer > 0 || (this.slashSwingTimer > 0 && !this.isWindupWeapon())) {
+      if (this.chopCastAngle !== undefined) {
+        this.gunAngle = this.chopCastAngle;
+        this.angle = this.chopCastAngle;
+      }
+      return false;
+    }
+    if (this.isLunging || this.isBlitzing || this.isCollapsing) return false;
+    if (!opponent) return false;
+    const aimed = super.aim(opponent);
+    if (this.isWindupWeapon()) {
+      this.chopCastAngle = this.gunAngle;
+    }
+    return aimed;
   }
 
   triggerDemoAttack() {
@@ -248,15 +473,16 @@ export class NanamiFighter extends Fighter {
    * Basic attacks are executed as melee cleaver chops via distance check and AI steering.
    */
   shoot(ownerIndex) {
-    if (!this.canPerformBasicAttack()) return false;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nanami) ? CONFIG.nanami : {};
+    if (!this.isSkillEnabled(cfg.enableCleaver, true) || !this.canPerformBasicAttack() || (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) || this.slashSwingTimer > 0) return false;
     const target = this._findClosestEnemy();
     if (target) {
       this.aim(target);
-      const reach = (CONFIG.nanami?.cleaverRange || 65) + target.r;
+      const reach = (cfg.cleaverRange || 55) + (target.r || 25) + 15;
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
       if (dist <= reach && this.shootCooldown <= 0 && this.slashSwingTimer <= 0) {
         this.combatAuraOpacity = 1.0;
-        this._startCleaverChop(target, CONFIG.nanami || {});
+        this._startCleaverChop(target, cfg);
         return true;
       }
     }
@@ -270,30 +496,39 @@ export class NanamiFighter extends Fighter {
     // Nanami wields his blunt cleaver, not a standard gun barrel.
   }
 
-  _findClosestEnemy() {
-    let closest = null;
-    let minDist = Infinity;
+  _getAllValidEnemyTargets() {
+    const targets = [];
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
     const myTeam = (typeof state !== 'undefined' && state.getFighterTeam) ? state.getFighterTeam(myIndex) : this.team;
 
-    const allTargets = [];
+    const allEntities = [];
     if (typeof state !== 'undefined') {
-      if (state.fighters) allTargets.push(...state.fighters);
-      if (state.illusions) allTargets.push(...state.illusions);
+      if (state.fighters) allEntities.push(...state.fighters);
+      if (state.illusions) allEntities.push(...state.illusions);
     }
 
-    for (const ent of allTargets) {
-      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
+    for (const ent of allEntities) {
       if (!ent || ent === this) continue;
+      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
       if (!isEntReforming && (ent.hp <= 0 || ent.isDead || ent.isInvulnerable)) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {
-        const entIdx = state.fighters.indexOf(ent);
-        if (entIdx !== -1 && state.getFighterTeam(entIdx) === myTeam) continue;
+        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+        if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
         if (ent.team !== undefined && ent.team === myTeam) continue;
       }
+      targets.push(ent);
+    }
+    return targets;
+  }
 
+  _findClosestEnemy() {
+    let closest = null;
+    let minDist = Infinity;
+    const targets = this._getAllValidEnemyTargets();
+
+    for (const ent of targets) {
       const dist = Math.hypot(ent.x - this.x, ent.y - this.y);
       if (dist < minDist) {
         minDist = dist;
@@ -400,6 +635,8 @@ export class NanamiFighter extends Fighter {
 
     if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
       this.combatAuraOpacity = 0.0;
+    } else if (this.isOvertimeActive) {
+      this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.15);
     } else if (isAttacking) {
       this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.25);
     } else {
@@ -436,20 +673,27 @@ export class NanamiFighter extends Fighter {
       this.ratioHitPauseTimer--;
       this.vx = 0;
       this.vy = 0;
-      // Hold cleaver slash firmly at the exact middle time of the attack animation (50% progress / frame 9 of 18)
-      const midFrame = Math.floor((this.slashSwingMaxTimer || 18) * 0.50);
-      this.slashSwingTimer = this.slashSwingImpactTimer || midFrame;
 
-      // On pause completion (unpause moment): blast enemy backwards with physical knockback push & screen shake!
+      // On pause completion (unpause moment): blast enemy backwards with physical knockback push & heavy unpause shake!
       if (this.ratioHitPauseTimer === 0) {
+        const unpauseShake = cfg.ratioHitPauseUnpauseShake || 8.0;
+        const unpauseShakeDur = cfg.ratioHitPauseUnpauseShakeDuration || 16;
+        triggerGlobalScreenShake(unpauseShake, unpauseShakeDur);
+
+        const unpauseSound = cfg.sounds?.unpauseHit || cfg.sounds?.ratioBloodSplash || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+        const unpauseVol = cfg.soundVolumes?.unpauseHit !== undefined ? cfg.soundVolumes.unpauseHit : 1.25;
+        audioSystem.playSFX(unpauseSound, unpauseVol);
+
         if (this.ratioHitPauseTarget) {
           const target = this.ratioHitPauseTarget;
           target.suppressFreezeOverlay = false;
+          if (typeof target.applyTimeStop === 'function') {
+            target.timeStopTimer = 0;
+          }
 
-          // Apply physical knockback push to the target upon unpause
-          const knockbackAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
+          // Apply physical knockback push along committed chop angle
+          const knockbackAngle = (this.chopCastAngle !== undefined) ? this.chopCastAngle : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
           const isOvertime = this.isOvertimeActive;
-          const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nanami) ? CONFIG.nanami : {};
           const baseKnockback = this.isLunging ? (cfg.ratioHitPauseLungeKnockback || cfg.lungeKnockback || 18) : (cfg.ratioHitPauseKnockback || cfg.cleaverKnockback || 16);
           const knockbackForce = baseKnockback * (isOvertime ? (cfg.overtimeDamageMultiplier || 1.25) : 1.0);
 
@@ -462,20 +706,38 @@ export class NanamiFighter extends Fighter {
             target.vy = target.knockbackVy;
           }
 
-          // Spawn clean authentic blood particles bursting out of the enemy on unpause
-          const bloodAmount = cfg.ratioUnpauseBloodParticles !== undefined ? cfg.ratioUnpauseBloodParticles : 14;
+          // Apply hit-stun & slow on unpause
+          const stunDur = cfg.ratioHitStunFrames || 30;
+          if (typeof target.applyHitStun === 'function') {
+            target.applyHitStun(stunDur);
+          } else {
+            target.hitStunTimer = Math.max(target.hitStunTimer || 0, stunDur);
+          }
+
+          const slowDur = cfg.ratioSlowDuration || 60;
+          const slowMult = cfg.ratioSlowMultiplier || 0.60;
+          if (typeof target.applySlow === 'function') {
+            target.applySlow(slowDur, slowMult);
+          } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+            target.statusEffects.applySlow(slowDur, slowMult);
+          }
+
+          // Spawn authentic blood burst particles blasting out on unpause
+          const bloodAmount = cfg.ratioUnpauseBloodParticles !== undefined ? cfg.ratioUnpauseBloodParticles : 16;
           if (typeof spawnNanamiRatioBloodBurst === 'function' && bloodAmount > 0) {
             spawnNanamiRatioBloodBurst(target, bloodAmount, knockbackAngle);
           } else if (typeof spawnBloodEffect === 'function' && bloodAmount > 0) {
             spawnBloodEffect(target, bloodAmount, knockbackAngle);
           }
 
+          spawnSparks(target.x, target.y, 14, '#FFD700', '#FFFFFF');
           this.ratioHitPauseTarget = null;
-          triggerGlobalScreenShake(cfg.ratioHitPauseUnpauseShake || 6.0, cfg.ratioHitPauseUnpauseShakeDuration || 14);
-        } else {
-          const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nanami) ? CONFIG.nanami : {};
-          triggerGlobalScreenShake(cfg.ratioHitPauseUnpauseShake || 6.0, cfg.ratioHitPauseUnpauseShakeDuration || 14);
         }
+
+        this.ratioHitProgress = null;
+        this.ratioHitCleaverAngle = null;
+        this.ratioHitHandX = null;
+        this.ratioHitHandY = null;
       }
       this.combatAuraOpacity = 1.0; // Keep CE aura at full during ratio hit-pause
       return;
@@ -552,8 +814,9 @@ export class NanamiFighter extends Fighter {
     this.roundElapsedFrames++;
     const overtimeThresholdFrames = (cfg.overtimeThresholdSeconds || 25) * 60;
     const hpRatio = this.hp / (this.maxHp || 195);
+    const overtimeEnabled = this.isSkillEnabled(cfg.enableOvertime, true);
 
-    if (!this.isOvertimeActive && (this.roundElapsedFrames >= overtimeThresholdFrames || hpRatio <= (cfg.overtimeHpThreshold || 0.40))) {
+    if (overtimeEnabled && !this.isOvertimeActive && (this.roundElapsedFrames >= overtimeThresholdFrames || hpRatio <= (cfg.overtimeHpThreshold || 0.40))) {
       this.isOvertimeActive = true;
       this.overtimeWatchTimer = 45; // 0.75s floating watch badge
 
@@ -595,13 +858,40 @@ export class NanamiFighter extends Fighter {
     if (this.shootCooldown > 0) this.shootCooldown--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
-    // Process Cleaver Swing Animation & Exact Impact Timing
+    // Process Cleaver Swing Animation & Exact Continuous Swept Collision
     if (this.slashSwingTimer > 0) {
+      const strikeFrames = (typeof this.chopStrikeFrames === 'number') ? this.chopStrikeFrames : (cfg.chopStrikeFrames || 10);
+      const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (cfg.chopRecoveryFrames || 8);
+      const windupFrames = (typeof this.chopWindupFrames === 'number') ? this.chopWindupFrames : (cfg.chopWindupFrames || 2);
+      const totalFrames = windupFrames + strikeFrames + recFrames;
+
+      const elapsed = totalFrames - this.slashSwingTimer;
+      const strikeP = Math.max(0, Math.min(1.0, elapsed / Math.max(1, totalFrames)));
+
+      // Forward lunge momentum step during active strike phase (before hit connects)
+      if (!this._chopHitConnected && strikeP >= 0.10 && strikeP <= 0.60) {
+        const stepSpeed = cfg.chopLungeSpeed || 3.2;
+        const chopAngle = (this.chopCastAngle !== undefined) ? this.chopCastAngle : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
+        const stepDecay = (1.0 - (strikeP - 0.10) / 0.50);
+        this.vx += Math.cos(chopAngle) * (stepSpeed * stepDecay * 0.35);
+        this.vy += Math.sin(chopAngle) * (stepSpeed * stepDecay * 0.35);
+      }
+
+      // Swept Blade Collision Detection across the frame's progress interval
+      if (!this._chopHitConnected && strikeP >= 0.10 && strikeP <= 0.85) {
+        this._executeCleaverChopHit(strikeP, this._chopPreviousStrikeP || 0, cfg);
+      }
+      this._chopPreviousStrikeP = strikeP;
+
       this.slashSwingTimer--;
-      // Deliver damage at the exact middle time of the attack animation (50% progress / frame 9 of 18)
-      if (this.slashSwingTimer <= (this.slashSwingImpactTimer || 9) && !this._chopHitDelivered) {
-        this._executeCleaverChopHit(cfg);
+      if (this.slashSwingTimer === 0) {
+        this.chopCastAngle = undefined;
+        this._chopHitConnected = false;
         this._chopHitDelivered = true;
+        this.ratioHitProgress = null;
+        this.ratioHitCleaverAngle = null;
+        this.ratioHitHandX = null;
+        this.ratioHitHandY = null;
       }
     }
 
@@ -665,7 +955,7 @@ export class NanamiFighter extends Fighter {
     }
 
     // 1. Skill 1: Decisive Strike / Ratio Lunge (Shichisan Issen)
-    if (this.lungeCooldown <= 0 && !this.isLunging && !this.isCollapsing && !this.isBlitzing && this.slashSwingTimer <= 0 && this.punchAnimTimer <= 0 && (this.ratioHitPauseTimer || 0) <= 0 && this.canPerformBasicAttack()) {
+    if (this.isSkillEnabled(cfg.enableLunge, true) && this.lungeCooldown <= 0 && !this.isLunging && !this.isCollapsing && !this.isBlitzing && this.slashSwingTimer <= 0 && this.punchAnimTimer <= 0 && (this.ratioHitPauseTimer || 0) <= 0 && this.canPerformBasicAttack()) {
       const minRange = cfg.lungeMinRange !== undefined ? cfg.lungeMinRange : 0;
       const maxRange = cfg.lungeMaxRange || 260;
       if (dist <= maxRange && dist >= minRange) {
@@ -675,7 +965,7 @@ export class NanamiFighter extends Fighter {
     }
 
     // 2. Skill 2: Collapse (Tōka / Falling Rubble Ground Shatter)
-    if (this.collapseCooldown <= 0 && !this.isCollapsing && !this.isLunging && !this.isBlitzing && this.slashSwingTimer <= 0 && this.punchAnimTimer <= 0 && (this.ratioHitPauseTimer || 0) <= 0 && this.canPerformBasicAttack()) {
+    if (this.isSkillEnabled(cfg.enableCollapse, true) && this.collapseCooldown <= 0 && !this.isCollapsing && !this.isLunging && !this.isBlitzing && this.slashSwingTimer <= 0 && this.punchAnimTimer <= 0 && (this.ratioHitPauseTimer || 0) <= 0 && this.canPerformBasicAttack()) {
       const minRange = cfg.collapseMinRange !== undefined ? cfg.collapseMinRange : 0;
       const maxRange = cfg.collapseMaxRange || 180;
       const edgeDist = Math.max(0, dist - (target.r || 25) - (this.r || 25));
@@ -685,10 +975,10 @@ export class NanamiFighter extends Fighter {
       }
     }
 
-    const reach = (cfg.cleaverRange || 65) + target.r;
+    const reach = (cfg.cleaverRange || 55) + target.r + 15;
 
     // 3. Ultimate: 4-Fold Black Flash Blitz (Kokusen Renpatsu - Close Melee Range Only)
-    if (this.ultimateCooldown <= 0 && !this.isBlitzing && !this.isCollapsing && !this.isLunging && this.slashSwingTimer <= 0 && this.punchAnimTimer <= 0 && (this.ratioHitPauseTimer || 0) <= 0 && this.canPerformBasicAttack()) {
+    if (this.isSkillEnabled(cfg.enableBlackFlash, true) && this.ultimateCooldown <= 0 && !this.isBlitzing && !this.isCollapsing && !this.isLunging && this.slashSwingTimer <= 0 && this.punchAnimTimer <= 0 && (this.ratioHitPauseTimer || 0) <= 0 && this.canPerformBasicAttack()) {
       if (dist <= reach) {
         this.performUltimate(target, cfg);
         return;
@@ -696,13 +986,13 @@ export class NanamiFighter extends Fighter {
     }
 
     // Basic Melee Range Check (Frontal Arc Reach - Rule 7)
-    if (dist <= reach && this.shootCooldown <= 0 && this.punchAnimTimer <= 0 && this.slashSwingTimer <= 0 && this.canPerformBasicAttack()) {
+    if (this.isSkillEnabled(cfg.enableCleaver, true) && dist <= reach && this.shootCooldown <= 0 && this.punchAnimTimer <= 0 && this.slashSwingTimer <= 0 && this.canPerformBasicAttack()) {
       this._startCleaverChop(target, cfg);
     }
   }
 
   performUltimate(target = null, cfg = (CONFIG.nanami || {})) {
-    if (this.isDead || this.hp <= 0) return;
+    if (this.isDead || this.hp <= 0 || !this.isSkillEnabled(cfg.enableBlackFlash, true)) return;
     if (this.isBlitzing || this.isCollapsing || this.isLunging || (this.ratioHitPauseTimer || 0) > 0) return;
 
     const closestTarget = target || this._findClosestEnemy();
@@ -1013,7 +1303,8 @@ export class NanamiFighter extends Fighter {
       if (!this.ratioImpactEffects) this.ratioImpactEffects = [];
       this.ratioImpactEffects.push({
         x: target.x,
-        y: target.y,
+        y: target.y - (target.z || 0),
+        target: target,
         angle: this.gunAngle,
         timer: 30,
         maxTimer: 30
@@ -1033,7 +1324,7 @@ export class NanamiFighter extends Fighter {
   }
 
   performCollapse(cfg = (CONFIG.nanami || {}), target = null) {
-    if (this.isDead || this.hp <= 0) return;
+    if (this.isDead || this.hp <= 0 || !this.isSkillEnabled(cfg.enableCollapse, true)) return;
     if (this.isCollapsing || this.isLunging || this.isBlitzing || (this.ratioHitPauseTimer || 0) > 0) return;
 
     const closestTarget = target || this._findClosestEnemy();
@@ -1219,7 +1510,7 @@ export class NanamiFighter extends Fighter {
   }
 
   performDecisiveStrike(target, cfg = (CONFIG.nanami || {})) {
-    if (this.isDead || this.hp <= 0) return;
+    if (this.isDead || this.hp <= 0 || !this.isSkillEnabled(cfg.enableLunge, true)) return;
     if (this.isLunging || this.isCollapsing || this.isBlitzing || (this.ratioHitPauseTimer || 0) > 0) return;
 
     this.lungeCooldown = cfg.lungeCooldown || 420;
@@ -1377,10 +1668,17 @@ export class NanamiFighter extends Fighter {
             ent.suppressFreezeOverlay = true;
           }
 
+          const blade = _getNanamiCleaverWorldSegment(this, 0.50);
+          this.ratioHitProgress = 0.50;
+          this.ratioHitCleaverAngle = blade.localCleaverAngle;
+          this.ratioHitHandX = blade.localHandX;
+          this.ratioHitHandY = blade.localHandY;
+
           if (!this.ratioImpactEffects) this.ratioImpactEffects = [];
           this.ratioImpactEffects.push({
             x: ent.x,
-            y: ent.y,
+            y: ent.y - (ent.z || 0),
+            target: ent,
             angle: this.lungeAngle,
             timer: Math.max(16, pauseFrames + 6),
             maxTimer: Math.max(16, pauseFrames + 6)
@@ -1439,16 +1737,37 @@ export class NanamiFighter extends Fighter {
   }
 
   _startCleaverChop(target, cfg) {
+    if (!this.isSkillEnabled(cfg.enableCleaver, true)) return;
     this.combatAuraOpacity = 1.0;
     const isOvertime = this.isOvertimeActive;
-    const maxTimer = 18;
-    this.slashSwingTimer = maxTimer;
-    this.slashSwingMaxTimer = maxTimer;
-    this.slashSwingImpactTimer = Math.floor(maxTimer * 0.50); // Exact 50% midpoint of attack animation
+
+    this.chopWindupFrames = (typeof cfg.chopWindupFrames === 'number') ? cfg.chopWindupFrames : 2;
+    this.chopStrikeFrames = (typeof cfg.chopStrikeFrames === 'number') ? cfg.chopStrikeFrames : 10;
+    this.chopRecoveryFrames = (typeof cfg.chopRecoveryFrames === 'number') ? cfg.chopRecoveryFrames : 8;
+    const totalFrames = this.chopWindupFrames + this.chopStrikeFrames + this.chopRecoveryFrames;
+
+    this.slashSwingTimer = totalFrames;
+    this.slashSwingMaxTimer = totalFrames;
+    this.slashSwingImpactTimer = this.chopWindupFrames + Math.floor(this.chopStrikeFrames * 0.50);
     this._chopHitDelivered = false;
+    this._chopHitConnected = false;
+    this._chopPreviousStrikeP = 0;
+    this.ratioHitProgress = null;
+    this.ratioHitCleaverAngle = null;
+    this.ratioHitHandX = null;
+    this.ratioHitHandY = null;
     this._chopTarget = target;
     this.isRightPunch = !this.isRightPunch;
     this.shootCooldown = isOvertime ? Math.round((cfg.cleaverCooldown || 55) * 0.80) : (cfg.cleaverCooldown || 55);
+
+    // Snapshot committed chop cast angle (Rule 1.4)
+    if (target && !target.isDead && target.hp > 0) {
+      this.chopCastAngle = Math.atan2(target.y - (this.y - (this.z || 0)), target.x - this.x);
+    } else {
+      this.chopCastAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
+    }
+    this.gunAngle = this.chopCastAngle;
+    this.angle = this.chopCastAngle;
 
     if (cfg.sounds?.cleaverSwing) {
       audioSystem.playSFX(cfg.sounds.cleaverSwing, cfg.soundVolumes?.cleaverSwing !== undefined ? cfg.soundVolumes.cleaverSwing : 0.95);
@@ -1475,87 +1794,104 @@ export class NanamiFighter extends Fighter {
     }
   }
 
-  _executeCleaverChopHit(cfg) {
+  _executeCleaverChopHit(currentStrikeP, prevStrikeP, cfg) {
+    if (!this.isSkillEnabled(cfg.enableCleaver, true)) return;
     const isOvertime = this.isOvertimeActive;
-    const aimAngle = this.gunAngle || 0;
-    const reach = (cfg.cleaverRange || 65);
-    const arc = cfg.cleaverArc || ((130 * Math.PI) / 180);
-
-    // Overtime Shockwave Dispersion triggered at physical impact point
-    if (isOvertime) {
-      if (!this.shockwaveEffects) this.shockwaveEffects = [];
-      this.shockwaveEffects.push({
-        x: this.x,
-        y: this.y,
-        angle: aimAngle,
-        radius: 95,
-        timer: 12,
-        maxTimer: 12
-      });
+    const candidates = this._getAllValidEnemyTargets();
+    if (this._chopTarget && !candidates.includes(this._chopTarget)) {
+      candidates.unshift(this._chopTarget);
     }
 
-    const candidates = [];
-    if (typeof state !== 'undefined') {
-      if (state.fighters) candidates.push(...state.fighters);
-      if (state.illusions) candidates.push(...state.illusions);
-    }
-
-    let hitAny = false;
-    for (const ent of candidates) {
+    for (let i = 0; i < candidates.length; i++) {
+      const ent = candidates[i];
       if (!ent || ent === this || ent.isDead || ent.hp <= 0 || ent.isInvulnerable) continue;
-      if (ent.team !== undefined && this.team !== undefined && ent.team === this.team) continue;
 
-      const edx = ent.x - this.x;
-      const edy = ent.y - this.y;
-      const edist = Math.hypot(edx, edy) - ent.r;
+      const hitInfo = _testNanamiCleaverBladeHit(this, ent, currentStrikeP, prevStrikeP);
+      if (!hitInfo) continue;
 
-      if (edist <= reach) {
-        let angleToTarget = Math.atan2(edy, edx);
-        let diff = angleToTarget - aimAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-
-        if (Math.abs(diff) <= arc / 2) {
-          this._applyRatioChopHit(ent, cfg, isOvertime, Math.abs(diff));
-          hitAny = true;
+      // Gojo Limitless Infinity Barrier Guard (Rule 1.7)
+      const isGojoInfinity = (typeof ent.hasActiveInfinity === 'function') && ent.hasActiveInfinity();
+      if (isGojoInfinity) {
+        const barrierR = CONFIG.gojo?.infinityRadius ?? (ent.r + 30);
+        const contactAngle = Math.atan2(this.y - ent.y, this.x - ent.x);
+        const bx = ent.x + Math.cos(contactAngle) * barrierR;
+        const by = ent.y + Math.sin(contactAngle) * barrierR;
+        if (typeof ent.triggerInfinityBlock === 'function') {
+          ent.triggerInfinityBlock(bx, by, this);
         }
-      } else if (isOvertime && edist <= 95) {
-        // Overtime Shockwave Splash on entities behind primary target
-        let angleToTarget = Math.atan2(edy, edx);
-        let diff = angleToTarget - aimAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
+        this.interruptAttacks();
+        spawnSparks(bx, by, 10, '#00E5FF', '#FFFFFF');
+        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(2.5, 8);
+        return;
+      }
 
-        if (Math.abs(diff) <= ((160 * Math.PI) / 180) / 2) {
-          const splashDmg = (cfg.cleaverDamage || 7) * 0.50 * (cfg.overtimeDamageMultiplier || 1.20);
-          applyDamageToTarget(ent, splashDmg, this, {
-            isMelee: true,
-            isTrueDamage: false,
-            knockback: 10,
-            knockbackAngle: aimAngle
-          });
-          spawnSparks(ent.x, ent.y, 4, '#FFD700', '#F59E0B');
+      // Snapshot Exact Collision Pose for Escanor-style Hit-Pause Render Freeze
+      this._chopHitConnected = true;
+      this.ratioHitProgress = hitInfo.sampleP;
+      this.ratioHitCleaverAngle = hitInfo.blade.localCleaverAngle;
+      this.ratioHitHandX = hitInfo.blade.localHandX;
+      this.ratioHitHandY = hitInfo.blade.localHandY;
+
+      // Evaluate 7:3 Ratio Technique Critical Hit
+      const critResult = this._evaluateRatioCrit(ent, hitInfo.angleDiff, cfg);
+
+      // Apply Hit Results, true damage, and hit-pause stasis
+      this._applyRatioChopHitResult(ent, hitInfo, critResult, cfg);
+
+      // Overtime Shockwave Dispersion on Secondary Targets in frontal arc
+      if (isOvertime) {
+        const aimAngle = (this.chopCastAngle !== undefined) ? this.chopCastAngle : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
+        if (!this.shockwaveEffects) this.shockwaveEffects = [];
+        this.shockwaveEffects.push({
+          x: hitInfo.contactX,
+          y: hitInfo.contactY,
+          angle: aimAngle,
+          radius: 95,
+          timer: 12,
+          maxTimer: 12
+        });
+
+        for (let j = 0; j < candidates.length; j++) {
+          const secondary = candidates[j];
+          if (secondary === ent || !secondary || secondary.isDead || secondary.hp <= 0 || secondary.isInvulnerable) continue;
+          const sDx = secondary.x - this.x;
+          const sDy = secondary.y - this.y;
+          const sDist = Math.hypot(sDx, sDy) - (secondary.r || 25);
+          if (sDist <= 95) {
+            let sAngle = Math.atan2(sDy, sDx);
+            let sDiff = sAngle - aimAngle;
+            while (sDiff < -Math.PI) sDiff += Math.PI * 2;
+            while (sDiff > Math.PI) sDiff -= Math.PI * 2;
+            if (Math.abs(sDiff) <= ((160 * Math.PI) / 180) / 2) {
+              const splashDmg = (cfg.cleaverDamage || 7) * 0.50 * (cfg.overtimeDamageMultiplier || 1.20);
+              applyDamageToTarget(secondary, splashDmg, this, {
+                isMelee: true,
+                isTrueDamage: false,
+                knockback: 10,
+                knockbackAngle: aimAngle
+              });
+              spawnSparks(secondary.x, secondary.y, 4, '#FFD700', '#F59E0B');
+            }
+          }
         }
       }
+
+      break; // Primary chop collision handled
     }
   }
 
-  _applyRatioChopHit(target, cfg, isOvertime, angleOffset = 0) {
-    let baseDmg = cfg.cleaverDamage || 7;
-    if (isOvertime) baseDmg *= (cfg.overtimeDamageMultiplier || 1.20);
-
-    // Dynamic Ratio Sweet-Spot Angle Bonus:
-    // Calculates precision alignment: 1.0 at dead-center aim (0 rad), decaying smoothly to 0.0 at outer arc boundary
-    const halfArc = (cfg.cleaverArc || ((130 * Math.PI) / 180)) / 2;
-    const angleAlignment = Math.max(0, Math.min(1.0, 1.0 - (angleOffset / halfArc)));
+  _evaluateRatioCrit(target, angleOffset, cfg) {
+    const isOvertime = this.isOvertimeActive;
+    const halfArc = (typeof cfg.chopFrontalArcLimit === 'number') ? cfg.chopFrontalArcLimit : ((cfg.cleaverArc || ((130 * Math.PI) / 180)) / 2);
+    const angleAlignment = Math.max(0, Math.min(1.0, 1.0 - (Math.abs(angleOffset) / Math.max(0.01, halfArc))));
     const maxAngleBonus = cfg.ratioSweetSpotMaxBonus !== undefined ? cfg.ratioSweetSpotMaxBonus : 0.15;
     const dynamicAngleBonus = angleAlignment * maxAngleBonus;
 
-    // Balanced 7:3 Ratio Calculation with Internal Cooldown (prevents over-frequent triggers and perma-freeze spam)
+    const ratioEnabled = this.isSkillEnabled(cfg.enableRatioTechnique, true);
     let isRatioCrit = false;
     const isRatioOnCooldown = (this.ratioCritCooldownTimer || 0) > 0;
 
-    if (!isRatioOnCooldown) {
+    if (ratioEnabled && !isRatioOnCooldown) {
       if (isOvertime) {
         if (this.overtimeGuaranteedCritTimer <= 0) {
           isRatioCrit = true;
@@ -1579,17 +1915,33 @@ export class NanamiFighter extends Fighter {
       }
     }
 
-    let finalDmg = baseDmg;
-    const critMult = isOvertime ? (cfg.overtimeRatioCritMultiplier || 1.80) : (cfg.ratioCritMultiplier || 2.0);
-
-    // Soul Geometry Piercing (vs Mahito)
-    const isTargetMahito = target.characterId === 'mahito' || target.type === 'mahito' || target._def?.type === 'mahito';
-
     const precisionThreshold = cfg.ratioSweetSpotPrecisionThreshold !== undefined ? cfg.ratioSweetSpotPrecisionThreshold : 0.75;
     const isSweetSpotPrecision = isRatioCrit && (angleAlignment >= precisionThreshold);
 
-    if (isRatioCrit) {
-      finalDmg *= critMult;
+    return { isRatioCrit, isSweetSpotPrecision, angleAlignment };
+  }
+
+  _applyRatioChopHitResult(target, hitInfo, critResult, cfg) {
+    const isOvertime = this.isOvertimeActive;
+    let baseDmg = cfg.cleaverDamage || 7;
+    if (isOvertime) baseDmg *= (cfg.overtimeDamageMultiplier || 1.20);
+
+    // Initial Contact SFX (crisp cutting sound on collision)
+    const chopHitSound = cfg.sounds?.chopHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+    const chopHitVol = cfg.soundVolumes?.chopHit !== undefined ? cfg.soundVolumes.chopHit : 1.10;
+    audioSystem.playSFX(chopHitSound, chopHitVol);
+
+    // Initial Contact Sparks & Flash at contact coordinates
+    spawnImpactFlash(hitInfo.contactX, hitInfo.contactY, '#D4AF37');
+    spawnSparks(hitInfo.contactX, hitInfo.contactY, critResult.isRatioCrit ? 14 : 8, '#FFD700', '#FFFFFF');
+
+    // Soul Geometry Piercing (vs Mahito)
+    const isTargetMahito = target.characterId === 'mahito' || target.type === 'mahito' || target._def?.type === 'mahito';
+    const chopAngle = (this.chopCastAngle !== undefined) ? this.chopCastAngle : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
+
+    if (critResult.isRatioCrit) {
+      const critMult = isOvertime ? (cfg.overtimeRatioCritMultiplier || 1.80) : (cfg.ratioCritMultiplier || 2.0);
+      const finalDmg = baseDmg * critMult;
       this.ratioCritCharge = 20;
 
       const pauseFrames = cfg.ratioCritHitPauseFrames || 30;
@@ -1600,7 +1952,7 @@ export class NanamiFighter extends Fighter {
       this._ratioRulerSpinPlayed = false;
       this._ratioBloodSplashPlayed = false;
 
-      // Freeze target in time during cinematic hit-pause
+      // Freeze target in time during cinematic hit-pause stasis
       if (typeof target.applyTimeStop === 'function') {
         target.applyTimeStop(pauseFrames);
         target.suppressFreezeOverlay = true;
@@ -1612,40 +1964,61 @@ export class NanamiFighter extends Fighter {
       if (!this.ratioImpactEffects) this.ratioImpactEffects = [];
       this.ratioImpactEffects.push({
         x: target.x,
-        y: target.y,
-        angle: this.gunAngle || 0,
+        y: target.y - (target.z || 0),
+        target: target,
+        angle: chopAngle,
         timer: Math.max(16, pauseFrames + 6),
         maxTimer: Math.max(16, pauseFrames + 6)
       });
 
-      triggerGlobalScreenShake(isSweetSpotPrecision ? 8.0 : 6.5, isSweetSpotPrecision ? 20 : 18);
-      spawnSparks(target.x, target.y, isSweetSpotPrecision ? 16 : 10, '#FFD700', '#FFFFFF');
+      const initialShake = critResult.isSweetSpotPrecision ? (cfg.ratioHitShakePrecision || 8.0) : (cfg.ratioHitShake || 6.5);
+      triggerGlobalScreenShake(initialShake, 18);
 
-      if (isSweetSpotPrecision) {
+      if (critResult.isSweetSpotPrecision) {
         spawnFloatingText(target.x, target.y - target.r - 26, '7:3 SWEET SPOT!', '#FFD700');
+      } else {
+        spawnFloatingText(target.x, target.y - target.r - 18, '7:3 CRITICAL!', '#D4AF37');
       }
-    }
 
-    // 1. Apply Damage first (True Damage on 7:3 Critical or against Mahito's soul)
-    applyDamageToTarget(target, finalDmg, this, {
-      isMelee: true,
-      isTrueDamage: isRatioCrit || isTargetMahito,
-      isRatioCrit: isRatioCrit,
-      isNanamiPause: isRatioCrit,
-      skipInterrupt: isRatioCrit,
-      bypassShield: isRatioCrit,
-      undodgeable: isRatioCrit,
-      bypassEvade: isRatioCrit,
-      noBlood: isRatioCrit,
-      suppressBlood: isRatioCrit,
-      knockback: (cfg.cleaverKnockback || 16) * (isOvertime ? 1.2 : 1.0),
-      knockbackAngle: this.gunAngle
-    });
+      // Apply Damage (True Damage on 7:3 Critical) — blood is suppressed here and burst upon unpause
+      applyDamageToTarget(target, finalDmg, this, {
+        isMelee: true,
+        isTrueDamage: true,
+        isRatioCrit: true,
+        isNanamiPause: true,
+        skipInterrupt: true,
+        bypassShield: true,
+        undodgeable: true,
+        bypassEvade: true,
+        noBlood: true,
+        suppressBlood: true,
+        knockback: 0, // Applied on unpause release
+        knockbackAngle: chopAngle
+      });
 
-    // 2. Inflict / Refresh Armor Fracture Debuff for SUBSEQUENT hits (does not multiply the triggering hit)
-    if (isRatioCrit && target && !target.isDead && target.hp > 0) {
-      target.nanamiArmorFractureTimer = cfg.armorFractureDuration || 180;
-      target.nanamiArmorFractureAmount = cfg.armorFractureBonusDamage || 0.20;
+      // Inflict Armor Fracture Debuff for subsequent hits
+      if (target && !target.isDead && target.hp > 0) {
+        target.nanamiArmorFractureTimer = cfg.armorFractureDuration || 180;
+        target.nanamiArmorFractureAmount = cfg.armorFractureBonusDamage || 0.20;
+      }
+    } else {
+      // Non-critical chop hit
+      const basicStun = cfg.basicHitStunFrames || 12;
+      if (typeof target.applyHitStun === 'function') {
+        target.applyHitStun(basicStun);
+      } else {
+        target.hitStunTimer = Math.max(target.hitStunTimer || 0, basicStun);
+      }
+
+      triggerGlobalScreenShake(cfg.basicImpactShake || 2.5, 8);
+
+      applyDamageToTarget(target, baseDmg, this, {
+        isMelee: true,
+        isTrueDamage: isTargetMahito,
+        isRatioCrit: false,
+        knockback: (cfg.cleaverKnockback || 14) * (isOvertime ? 1.2 : 1.0),
+        knockbackAngle: chopAngle
+      });
     }
   }
 
@@ -1688,7 +2061,12 @@ export class NanamiFighter extends Fighter {
     if (this.ratioImpactEffects && this.ratioImpactEffects.length > 0) {
       for (let i = 0; i < this.ratioImpactEffects.length; i++) {
         const eff = this.ratioImpactEffects[i];
-        drawRatioGridImpact(ctx, eff.x, eff.y, eff.angle, 1.0, eff.timer, eff.maxTimer);
+        const posX = (eff.target && !eff.target.isDead) ? eff.target.x : eff.x;
+        const posY = (eff.target && !eff.target.isDead) ? (eff.target.y - (eff.target.z || 0)) : eff.y;
+        const targetR = (eff.target && eff.target.r) ? eff.target.r : 25;
+        const effectScale = Math.max(0.85, (targetR / 25) * (eff.scale || 1.0));
+        const gridAngle = (eff.angle !== undefined) ? (eff.angle + Math.PI / 2) : (Math.PI / 2);
+        drawRatioGridImpact(ctx, posX, posY, gridAngle, effectScale, eff.timer, eff.maxTimer);
       }
     }
 

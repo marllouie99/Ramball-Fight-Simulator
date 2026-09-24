@@ -74,8 +74,9 @@ export class TojiFighter extends Fighter {
   }
 
   _registerSkills() {
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(CONFIG.toji?.enableAmbush, true)) {
+      skills.push({
         id: 'ambush',
         name: 'STEALTH AMBUSH',
         type: 'buff',
@@ -85,8 +86,10 @@ export class TojiFighter extends Fighter {
         durationMax: CONFIG.toji?.stealthDuration || 240,
         activeKey: 'isStealthed',
         allowsFrozenCooldownTick: true
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.toji?.enableUltimate, true)) {
+      skills.push({
         id: 'ult',
         name: 'CURSE INVENTORY',
         type: 'ultimate',
@@ -96,8 +99,11 @@ export class TojiFighter extends Fighter {
         durationMax: CONFIG.toji?.ultimateSwarmDuration || 500,
         activeKey: 'ultimateActive',
         allowsFrozenCooldownTick: true
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   _initChainPhysics() {
@@ -359,6 +365,7 @@ export class TojiFighter extends Fighter {
    * @returns {boolean} True if successfully dodged, false otherwise.
    */
   dodgeSliceLine(lineData = {}) {
+    if (!this.isSkillEnabled(CONFIG.toji?.enableHeavenlyRestriction, true)) return false;
     if (this.hp <= 0 || this.isChainedByMakima) return false;
     if (this.ultimateActive) return true; // Invulnerable in full arsenal ultimate
 
@@ -513,7 +520,7 @@ export class TojiFighter extends Fighter {
       dodgeChance = Math.min(1.0, Math.max(dodgeChance + domainDodgeBonus, domainDodgeChance));
     }
     
-    if (isDodgeable && (dodgeChance >= 1.0 || Math.random() < dodgeChance)) {
+    if (this.isSkillEnabled(CONFIG.toji?.enableHeavenlyRestriction, true) && isDodgeable && (dodgeChance >= 1.0 || Math.random() < dodgeChance)) {
       spawnFloatingText(this.x, this.y - this.r - 8, 'MISS!', '#C084FC');
       audioSystem.playSFX('skill_parry', 0.65);
       
@@ -545,7 +552,7 @@ export class TojiFighter extends Fighter {
     const parryChance = CONFIG.toji?.parryChance || 0.10;
     const canParry = isEnemyDomainActive && (opts.isMelee || opts.isPhysical || !opts.isTrueDamage) && !isGuaranteedHit && !opts.bypassShield;
 
-    if (canParry && Math.random() < parryChance) {
+    if (this.isSkillEnabled(CONFIG.toji?.enableHeavenlyRestriction, true) && canParry && Math.random() < parryChance) {
       this.blockPoseTimer = 25; // 25-frame parry deflection pose
       this.parryType = Math.random() < 0.25 ? 'guard' : 'deflect';
 
@@ -571,7 +578,7 @@ export class TojiFighter extends Fighter {
           realTarget = attacker.owner;
         }
       }
-      if (!this.isAmbushing && (this._parryAmbushCooldown || 0) <= 0 && !tojiIsTargetDeadOrRemoved(this, realTarget)) {
+      if (this.isSkillEnabled(CONFIG.toji?.enableAmbush, true) && !this.isAmbushing && (this._parryAmbushCooldown || 0) <= 0 && !tojiIsTargetDeadOrRemoved(this, realTarget)) {
         this._parryAmbushCooldown = CONFIG.toji?.parryAmbushCooldownFrames || 360; // 6 second cooldown between parry counter-ambushes
         this.startAmbushSequence(realTarget);
       }
@@ -594,6 +601,7 @@ export class TojiFighter extends Fighter {
    * Triggers Toji's Ultimate: Curse Inventory - Full Arsenal Unleashed
    */
   triggerUltimate() {
+    if (!this.isSkillEnabled(CONFIG.toji?.enableUltimate, true)) return;
     if (this.isDead || this.hp <= 0 || this.ultimateCooldown > 0 || this.isAmbushing || this.ultimateActive || (this.postUltimateRecoveryTimer || 0) > 0) return;
     
     // Cannot cast Ultimate while inside an active Domain Expansion
@@ -1664,7 +1672,7 @@ export class TojiFighter extends Fighter {
 
     // Auto-trigger ultimate when ready (AI logic)
     const isEnemyDomainActive = state.fighters && state.fighters.some(f => f && f !== this && f.hp > 0 && (f.domainActive || f.isChannelingDomainExpansion || f.isChannelingDomain));
-    if (this.ultimateCooldown <= 0 && !this.ultimateActive && !this.isAmbushing && (this.postUltimateRecoveryTimer || 0) <= 0 && opponent && !tojiIsTargetDeadOrRemoved(this, opponent) && (this.forcedMeleeTimer || 0) <= 0 && !isEnemyDomainActive) {
+    if (this.isSkillEnabled(CONFIG.toji?.enableUltimate, true) && this.ultimateCooldown <= 0 && !this.ultimateActive && !this.isAmbushing && (this.postUltimateRecoveryTimer || 0) <= 0 && opponent && !tojiIsTargetDeadOrRemoved(this, opponent) && (this.forcedMeleeTimer || 0) <= 0 && !isEnemyDomainActive) {
       this.triggerUltimate();
       return;
     }
@@ -1704,7 +1712,7 @@ export class TojiFighter extends Fighter {
     if (this.isCaughtInBeam()) {
       this.spearSwingTimer = 0;
       this.katanaSlashTimer = 0;
-    } else if ((this.postUltimateRecoveryTimer || 0) <= 0 && !tojiIsTargetDeadOrRemoved(this, opponent)) {
+    } else if (this.isSkillEnabled(CONFIG.toji?.enableSpear, true) && (this.postUltimateRecoveryTimer || 0) <= 0 && !tojiIsTargetDeadOrRemoved(this, opponent)) {
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;
       const dist = Math.hypot(dx, dy);

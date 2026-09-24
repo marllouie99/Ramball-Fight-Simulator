@@ -12,6 +12,7 @@ import { stopFinalGetsugaVoiceline } from './ichigoGetsuga.js';
  * @param {import('../IchigoFighter.js').IchigoFighter} fighter
  */
 export function activateHollowMask(fighter) {
+  if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableHollowMask, true)) return;
   if (fighter.isDead || fighter.hp <= 0 || fighter.isTargetOfAmbush || fighter.isParalyzedOrBeamTrapped() || fighter.wallSlamPinnedX !== undefined || fighter.isWallSlammed) return;
   if (fighter.hollowMaskActive || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0) return;
   // Hollow Mask strictly requires Bankai form to be actively running!

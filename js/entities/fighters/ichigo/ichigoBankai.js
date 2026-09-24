@@ -67,6 +67,7 @@ export function isBankaiVoicelinePlaying(fighter) {
  * @param {import('../IchigoFighter.js').IchigoFighter} fighter
  */
 export function activateBankai(fighter) {
+  if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableBankai, true)) return;
   if (fighter.isDead || fighter.hp <= 0 || fighter.isTargetOfAmbush || fighter.isParalyzedOrBeamTrapped() || fighter.wallSlamPinnedX !== undefined || fighter.isWallSlammed) return;
   if (
     fighter.isChannelingBankai || 
@@ -438,7 +439,9 @@ export function updateBankai(fighter, opponent, isMatchEnded) {
       const isPlaying = typeof state === 'undefined' || state.gameState === 'playing';
       const isAboutToUnleashNormalGetsugaWave = fighter.isAboutToUnleashNormalGetsuga();
       if (isPlaying && !fighter.isDemoFighter && !fighter._isFaceOff && !fighter.bankaiFinalGetsugaTriggered && fighter.bankaiTimer > 0 && fighter.bankaiTimer <= finalTriggerThreshold && !fighter.isChannelingBankai && !isHollowTransforming) {
-        if (isAboutToUnleashNormalGetsugaWave) {
+        if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableFinalGetsuga, true)) {
+          fighter.bankaiFinalGetsugaTriggered = true; // Mark triggered so it doesn't loop
+        } else if (isAboutToUnleashNormalGetsugaWave) {
           fighter.bankaiTimer = Math.max(fighter.bankaiTimer, finalTriggerThreshold + 1);
         } else {
           fighter.bankaiFinalGetsugaTriggered = true;

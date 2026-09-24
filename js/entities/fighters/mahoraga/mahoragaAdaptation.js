@@ -25,6 +25,9 @@ export function triggerMahoragaGammaRayRainbow(fighter) {
  */
 export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   const type = opts.isMelee ? 'melee' : (opts.isSkill || opts.isUltimate || opts.isTrueDamage || opts.isExplosion ? 'skill' : 'ranged');
+  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableAdaptation, true)) {
+    return { finalAmount: amount, type, pendingAdaptation: null };
+  }
   const reductionPerStage = CONFIG.mahoraga?.adaptationReductionPerStage || 0.12;
 
   // ── Gojo-Specific Attack Detection ──
@@ -346,6 +349,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
  * freezes enemies, heals via RCT, and checks for Level 8 awakening.
  */
 export function triggerAdaptation(fighter, type, attacker) {
+  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableAdaptation, true)) return;
   // If caught in Pure Love Beam or beam stasis, unfreeze immediately upon adaptation click!
   if (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0) {
     fighter.caughtInPureLoveBeam = false;
@@ -1229,8 +1233,7 @@ export function adaptToSaitamaCounter(fighter, attacker) {
 }
 
 export function applyRCTHeal(fighter) {
-  const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
-  if (!enableRCT || !fighter) return;
+  if (!fighter || !fighter.isSkillEnabled(CONFIG.mahoraga?.enableRCTHeal, true)) return;
 
   fighter.dead = false;
   fighter.isDead = false;

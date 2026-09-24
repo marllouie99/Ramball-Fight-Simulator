@@ -13,9 +13,10 @@
 
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
+import { zenitsuConfig } from '../../configs/characters/zenitsuConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
-import { drawZenitsuSkin } from '../../graphics/fighters/zenitsuSkin.js';
+import { drawZenitsuSkin, isZenitsuThunderclapBurst } from '../../graphics/fighters/zenitsuSkin.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -29,7 +30,7 @@ export class ZenitsuFighter extends Fighter {
     this.themeColor = '#F59E0B';
     this.secondaryColor = '#FBBF24'; // Electric Amber
 
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : {};
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
 
     // Standard HP initialization
     const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
@@ -48,15 +49,30 @@ export class ZenitsuFighter extends Fighter {
     this.hideFrontHand = false;
     this.hideBackHand = false;
     this.iaiComboCount = 0;
-
-    // ── Config-Driven Skill Enable/Disable Toggles ──
-    this.enableThunderclap = cfg.enableThunderclap !== undefined ? cfg.enableThunderclap : true;
-    this.enableRokuren = cfg.enableRokuren !== undefined ? cfg.enableRokuren : true;
-    this.enableFlamingThunderGod = cfg.enableFlamingThunderGod !== undefined ? cfg.enableFlamingThunderGod : true;
+    this.inBattleTrance = false;
 
     // Skill 1: Thunderclap and Flash (Hekireki Issen)
     this.thunderclapCooldownMax = cfg.thunderclapCooldown || 228;
-    this.thunderclapCooldown = this.thunderclapCooldownMax;
+    this.thunderclapCooldown = 0; // Ready immediately on combat start
+    this.thunderclapChannelDuration = cfg.thunderclapChannelDuration || 36;
+    this.thunderclapChannelTimer = 0;
+    this.isChannelingThunderclap = false;
+    this.thunderclapTarget = null;
+    this.skillCastAngle = 0;
+    this.isThunderclapAimLocked = false;
+    this.thunderclapLockedDistance = 260;
+
+    // Active 6-Frame Lightning Dash Travel State
+    this.isDashingThunderclap = false;
+    this.thunderclapDashStep = 0;
+    this.thunderclapDashDuration = 6;
+    this.thunderclapDashStartX = 0;
+    this.thunderclapDashStartY = 0;
+    this.thunderclapDashDestX = 0;
+    this.thunderclapDashDestY = 0;
+    this.thunderclapDashAngle = 0;
+    this.thunderclapDashDist = 0;
+    this.thunderclapDashTarget = null;
 
     // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)
     this.rokurenCooldownMax = cfg.rokurenCooldown || 420;
@@ -66,9 +82,15 @@ export class ZenitsuFighter extends Fighter {
     this.flamingGodCooldownMax = cfg.ultimateCooldown || 1440;
     this.flamingGodCooldown = this.flamingGodCooldownMax;
 
-    // Declarative Skill Registration (config-driven)
+    // Declarative Skill Registration
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     const skills = [];
-    if (this.enableThunderclap) {
+
+    if (this.isSkillEnabled(cfg.enableThunderclap, true)) {
       skills.push({
         id: 'thunderclap_and_flash',
         name: 'Thunderclap and Flash',
@@ -77,7 +99,8 @@ export class ZenitsuFighter extends Fighter {
         cooldownMaxKey: 'thunderclapCooldownMax'
       });
     }
-    if (this.enableRokuren) {
+
+    if (this.isSkillEnabled(cfg.enableRokuren, false)) {
       skills.push({
         id: 'thunderclap_sixfold',
         name: 'Sixfold (Rokuren)',
@@ -86,7 +109,8 @@ export class ZenitsuFighter extends Fighter {
         cooldownMaxKey: 'rokurenCooldownMax'
       });
     }
-    if (this.enableFlamingThunderGod) {
+
+    if (this.isSkillEnabled(cfg.enableFlamingThunderGod, false)) {
       skills.push({
         id: 'flaming_thunder_god',
         name: 'Flaming Thunder God',
@@ -95,12 +119,82 @@ export class ZenitsuFighter extends Fighter {
         cooldownMaxKey: 'flamingGodCooldownMax'
       });
     }
-    if (skills.length > 0) {
-      this.skillManager.registerSkills(skills);
-    }
+
+    this.skillManager.registerSkills(skills);
   }
 
-  update() {
+  takeDamage(amount, attacker, opts = {}) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    const rawDamage = typeof amount === 'number' ? amount : (amount?.damage || 0);
+    const hpRatio = (this.hp - rawDamage) / (this.maxHp || 310);
+    let finalAmount = amount;
+
+    // Passive 1: Battle Trance (25% damage reduction below 35% HP)
+    if (this.isSkillEnabled(cfg.enableBattleTrance, true) && hpRatio <= (cfg.tranceHpThreshold || 0.35)) {
+      if (!this.inBattleTrance) {
+        this.inBattleTrance = true;
+        spawnFloatingText(this.x, this.y - 35, 'BATTLE TRANCE AWAKENED!', '#F59E0B');
+        spawnImpactFlash(this.x, this.y, '#FBBF24', 30);
+      }
+      const dr = cfg.tranceDamageReduction || 0.25;
+      finalAmount = typeof amount === 'number' ? amount * (1 - dr) : { ...amount, damage: rawDamage * (1 - dr) };
+    }
+
+    return super.takeDamage(finalAmount, attacker, opts);
+  }
+
+  shoot(ownerIndex) {
+    if (this.isChannelingThunderclap || this.thunderclapChannelTimer > 0) return false;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    if (!this.isSkillEnabled(cfg.enableBasicAttack, true)) return false;
+    const target = this.getNearestTarget();
+    if (!target) return false;
+    const dist = Math.hypot(target.x - this.x, target.y - this.y);
+    if (dist <= (cfg.katanaReach || 78) + (target.r || 25) && this.slashSwingTimer <= 0) {
+      this._executeThunderIaiCombo(target);
+      return true;
+    }
+    return false;
+  }
+
+  canAim() {
+    if (this.isDashingThunderclap) {
+      return false;
+    }
+    if (this.isChannelingThunderclap) {
+      const halfTime = Math.floor((this.thunderclapChannelDuration || 36) / 2);
+      // Once locked into Frame 2 (Charge phase), disable auto-aim so he commits strictly to 1 direction
+      if (this.isThunderclapAimLocked || this.thunderclapChannelTimer <= halfTime) {
+        return false;
+      }
+    }
+    return super.canAim ? super.canAim() : true;
+  }
+
+  get channelTurnRate() {
+    return 0.065; // Smooth rotational auto-aim tracking during preparation phase
+  }
+
+  isChannelingSkill() {
+    return Boolean(this.isChannelingThunderclap || this.thunderclapChannelTimer > 0);
+  }
+
+  isStationarySkillActive() {
+    return Boolean(this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap);
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    if (typeof super.interruptAttacks === 'function') {
+      super.interruptAttacks(forceCancelAll);
+    }
+    this.isChannelingThunderclap = false;
+    this.isThunderclapAimLocked = false;
+    this.thunderclapChannelTimer = 0;
+    this.thunderclapTarget = null;
+    this.isDashingThunderclap = false;
+  }
+
+  update(opponent, ownerIndex, arena) {
     // 1. Rule 1 Freeze / TimeStop Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -108,35 +202,152 @@ export class ZenitsuFighter extends Fighter {
       return;
     }
 
-    super.update();
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    const target = this.getNearestTarget(opponent);
+
+    // Active 6-Frame Lightning Dash Travel (Hekireki Issen Godspeed Travel)
+    if (this.isDashingThunderclap) {
+      this.thunderclapDashStep++;
+      const travelT = Math.min(1.0, this.thunderclapDashStep / this.thunderclapDashDuration);
+      const easeT = travelT * (2 - travelT); // Quadratic ease-out godspeed burst
+      this.x = this.thunderclapDashStartX + (this.thunderclapDashDestX - this.thunderclapDashStartX) * easeT;
+      this.y = this.thunderclapDashStartY + (this.thunderclapDashDestY - this.thunderclapDashStartY) * easeT;
+      this.vx = 0;
+      this.vy = 0;
+      this.gunAngle = this.thunderclapDashAngle;
+      this.angle = this.thunderclapDashAngle;
+
+      spawnSparks(this.x, this.y, 2, 'cyan', '#38BDF8');
+
+      if (this.thunderclapDashStep >= this.thunderclapDashDuration) {
+        this.isDashingThunderclap = false;
+        this.x = this.thunderclapDashDestX;
+        this.y = this.thunderclapDashDestY;
+        const dashSpeed = (this.speed || 6.4) * 1.5;
+        this.vx = Math.cos(this.thunderclapDashAngle) * dashSpeed;
+        this.vy = Math.sin(this.thunderclapDashAngle) * dashSpeed;
+
+        this._finalizeThunderclapHit(
+          this.thunderclapDashTarget,
+          this.thunderclapDashStartX,
+          this.thunderclapDashStartY,
+          this.thunderclapDashDestX,
+          this.thunderclapDashDestY,
+          this.thunderclapDashAngle
+        );
+      }
+
+      if (this.thunderclapDashVFX) {
+        this.thunderclapDashVFX.timer++;
+        if (this.thunderclapDashVFX.timer >= this.thunderclapDashVFX.maxTimer) {
+          this.thunderclapDashVFX = null;
+        }
+      }
+      return;
+    }
+
+    // Skill 1 Channeling Update (Frames 1-2 Stance & Charge Build-Up)
+    if (this.isChannelingThunderclap && this.thunderclapChannelTimer > 0) {
+      this.thunderclapChannelTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      const halfTime = Math.floor((this.thunderclapChannelDuration || 36) / 2);
+
+      // Phase 1: Preparation (Timer > halfTime) -> Auto-Aim Enabled & Smoothly Tracking Opponent
+      if (this.thunderclapChannelTimer > halfTime) {
+        const aimTarget = (this.thunderclapTarget && this.thunderclapTarget.hp > 0 && !this.thunderclapTarget.isDead)
+          ? this.thunderclapTarget
+          : target;
+        if (aimTarget) {
+          this.aim(aimTarget);
+        }
+        this.skillCastAngle = this.gunAngle;
+      } else {
+        // Phase 2: Lock-in to 1 Direction (Timer <= halfTime) -> Commit strictly, NO direction change
+        if (!this.isThunderclapAimLocked) {
+          this.isThunderclapAimLocked = true;
+          const lockedTarget = (this.thunderclapTarget && this.thunderclapTarget.hp > 0 && !this.thunderclapTarget.isDead)
+            ? this.thunderclapTarget
+            : target;
+          if (lockedTarget) {
+            const dist = Math.hypot(lockedTarget.x - this.x, lockedTarget.y - this.y);
+            this.thunderclapLockedDistance = Math.min(480, Math.max(160, dist + (lockedTarget.r || 25) + 35));
+          } else {
+            this.thunderclapLockedDistance = 260;
+          }
+
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_parry', 0.25);
+          }
+        }
+
+        // Strictly clamp to committed lock angle: NO snapping, NO turning
+        this.gunAngle = this.skillCastAngle;
+        this.angle = this.skillCastAngle;
+      }
+
+      // Energy particles around feet and haori: ONLY during active lightning bursts
+      const totalChannel = this.thunderclapChannelDuration || 100;
+      const elapsedChannel = totalChannel - this.thunderclapChannelTimer;
+      if (isZenitsuThunderclapBurst(totalChannel, elapsedChannel)) {
+        spawnSparks(
+          this.x + (Math.random() - 0.5) * (this.r || 25) * 1.2,
+          this.y + (Math.random() - 0.5) * (this.r || 25) * 0.8,
+          2,
+          'cyan',
+          '#38BDF8'
+        );
+      }
+
+      // Channel complete -> explosive burst dash along committed 1 direction!
+      if (this.thunderclapChannelTimer <= 0) {
+        this.isChannelingThunderclap = false;
+        this.isThunderclapAimLocked = false;
+        const dashTarget = (this.thunderclapTarget && this.thunderclapTarget.hp > 0 && !this.thunderclapTarget.isDead)
+          ? this.thunderclapTarget
+          : target;
+        this._executeThunderclapDash(dashTarget);
+      }
+      return;
+    }
+
+    super.update(opponent, ownerIndex, arena);
+
+    // Update active 6-frame lightning dash visual effect timer
+    if (this.thunderclapDashVFX) {
+      this.thunderclapDashVFX.timer++;
+      if (this.thunderclapDashVFX.timer >= this.thunderclapDashVFX.maxTimer) {
+        this.thunderclapDashVFX = null;
+      }
+    }
 
     // Decay swing timers
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
-    // Skill Cooldowns (config-driven)
-    if (this.enableThunderclap && this.thunderclapCooldown > 0) this.thunderclapCooldown--;
-    if (this.enableRokuren && this.rokurenCooldown > 0) this.rokurenCooldown--;
-    if (this.enableFlamingThunderGod && this.flamingGodCooldown > 0) this.flamingGodCooldown--;
+    // Skill Cooldowns
+    if (this.thunderclapCooldown > 0) this.thunderclapCooldown--;
+    if (this.rokurenCooldown > 0) this.rokurenCooldown--;
+    if (this.flamingGodCooldown > 0) this.flamingGodCooldown--;
 
-    const target = this.getNearestTarget();
     if (!target) return;
 
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
     // AI / Skill Priority (config-driven enable/disable)
-    if (this.enableFlamingThunderGod && this.flamingGodCooldown <= 0 && dist < 190) {
+    if (this.isSkillEnabled(cfg.enableFlamingThunderGod, false) && this.flamingGodCooldown <= 0 && dist < 220) {
       this._triggerFlamingThunderGod(target);
-    } else if (this.enableRokuren && this.rokurenCooldown <= 0 && dist < 150) {
+    } else if (this.isSkillEnabled(cfg.enableRokuren, false) && this.rokurenCooldown <= 0 && dist < 200) {
       this._triggerRokuren(target);
-    } else if (this.enableThunderclap && this.thunderclapCooldown <= 0 && dist < 180) {
+    } else if (this.isSkillEnabled(cfg.enableThunderclap, true) && this.thunderclapCooldown <= 0 && dist < 450) {
       this._triggerThunderclapAndFlash(target);
-    } else if (dist < 80 && this.slashSwingTimer <= 0) {
+    } else if (dist < (cfg.katanaReach || 78) + (target.r || 25) && this.slashSwingTimer <= 0 && this.isSkillEnabled(cfg.enableBasicAttack, true)) {
       this._executeThunderIaiCombo(target);
     }
   }
 
-  getNearestTarget() {
+  getNearestTarget(fallbackOpponent = null) {
     let nearest = null;
     let minDist = Infinity;
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
@@ -148,7 +359,11 @@ export class ZenitsuFighter extends Fighter {
         nearest = ent;
       }
     }
-    return nearest;
+    if (nearest) return nearest;
+    if (fallbackOpponent && fallbackOpponent !== this && fallbackOpponent.hp > 0 && !fallbackOpponent.isDead) {
+      return fallbackOpponent;
+    }
+    return null;
   }
 
   _executeThunderIaiCombo(target) {
@@ -161,7 +376,11 @@ export class ZenitsuFighter extends Fighter {
     const angle = this.gunAngle || 0;
 
     const damages = [18, 22, 28];
-    const dmg = damages[this.iaiComboCount];
+    let dmg = damages[this.iaiComboCount];
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    if (this.isSkillEnabled(cfg.enableBattleTrance, true) && this.inBattleTrance) {
+      dmg = Math.round(dmg * 1.5);
+    }
 
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
     for (const ent of allEntities) {
@@ -177,7 +396,7 @@ export class ZenitsuFighter extends Fighter {
 
         if (Math.abs(angleDiff) <= arc / 2) {
           applyDamageToTarget(ent, dmg, this);
-          spawnSparks(ent.x, ent.y, '#F59E0B', 8);
+          spawnSparks(ent.x, ent.y, 8, 'gold', '#F59E0B');
           spawnBloodEffect(ent.x, ent.y, ent.bloodColor || '#DC2626');
           if (this.iaiComboCount === 2) {
             ent.applyKnockback?.(Math.cos(angle) * 22, Math.sin(angle) * 22);
@@ -192,20 +411,135 @@ export class ZenitsuFighter extends Fighter {
   }
 
   _triggerThunderclapAndFlash(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     this.thunderclapCooldown = this.thunderclapCooldownMax;
+    this.thunderclapChannelDuration = cfg.thunderclapChannelDuration || 36;
+    this.thunderclapChannelTimer = this.thunderclapChannelDuration;
+    this.isChannelingThunderclap = true;
+    this.thunderclapTarget = target;
+
+    // Smooth aim initialization without instant snapping
+    if (this.gunAngle === undefined) {
+      this.gunAngle = this.angle || 0;
+    }
+    this.skillCastAngle = this.gunAngle;
+    this.vx = 0;
+    this.vy = 0;
+
+    if (target) {
+      this.aim(target);
+      this.skillCastAngle = this.gunAngle;
+    }
+
+    // Frame 1: calm-before-the-storm stance sound
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_dash1', 0.25);
+    }
+  }
+
+  _executeThunderclapDash(target) {
     this.slashSwingTimer = this.slashSwingMaxTimer;
 
-    this.aim(target);
-    const angle = this.gunAngle || 0;
-    this.x = target.x + Math.cos(angle) * 30;
-    this.y = target.y + Math.sin(angle) * 30;
+    // Commit strictly to the locked angle: ZERO snap change in direction!
+    const angle = this.skillCastAngle;
+    this.gunAngle = angle;
+    this.angle = angle;
 
-    applyDamageToTarget(target, 38, this);
-    target.applyKnockback?.(Math.cos(angle) * 26, Math.sin(angle) * 26);
-    spawnSparks(target.x, target.y, '#38BDF8', 14);
-    spawnImpactFlash(target.x, target.y, '#FBBF24', 26);
+    const dashDist = this.thunderclapLockedDistance || 260;
+    const startX = this.x;
+    const startY = this.y;
+
+    // Destination is strictly along the committed angle vector
+    let destX = startX + Math.cos(angle) * dashDist;
+    let destY = startY + Math.sin(angle) * dashDist;
+
+    // Clamp destination to arena bounds
+    if (state.arena) {
+      const pad = (this.r || 25) + 12;
+      destX = Math.max(state.arena.x + pad, Math.min(state.arena.x + state.arena.width - pad, destX));
+      destY = Math.max(state.arena.y + pad, Math.min(state.arena.y + state.arena.height - pad, destY));
+    }
+
+    const actualDashDist = Math.hypot(destX - startX, destY - startY);
+
+    // Initialize 6-Frame Godspeed Travel State
+    this.isDashingThunderclap = true;
+    this.thunderclapDashStep = 0;
+    this.thunderclapDashDuration = 6;
+    this.thunderclapDashStartX = startX;
+    this.thunderclapDashStartY = startY;
+    this.thunderclapDashDestX = destX;
+    this.thunderclapDashDestY = destY;
+    this.thunderclapDashAngle = angle;
+    this.thunderclapDashDist = actualDashDist;
+    this.thunderclapDashTarget = target;
+
+    // Initialize Lightning Dash VFX with air linger & disappearance animation
+    const travelDuration = 6;
+    const lingerDuration = 8;
+    const disappearDuration = 12;
+    this.thunderclapDashVFX = {
+      startX: startX,
+      startY: startY,
+      destX: destX,
+      destY: destY,
+      angle: angle,
+      dist: actualDashDist,
+      timer: 0,
+      travelDuration: travelDuration,
+      lingerDuration: lingerDuration,
+      disappearDuration: disappearDuration,
+      maxTimer: travelDuration + lingerDuration + disappearDuration // 26 frames (~0.43s)
+    };
+
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_dash1', 0.35);
+    }
+  }
+
+  _finalizeThunderclapHit(target, startX, startY, destX, destY, angle) {
+    this.slashSwingTimer = this.slashSwingMaxTimer;
+
+    // Check collision / hit on any targets along or near the dash line
+    const hitEntities = [];
+    const allEnemies = [...(state.fighters || []), ...(state.illusions || [])];
+    for (const ent of allEnemies) {
+      if (ent === this || ent.isDead || ent.hp <= 0) continue;
+      if (ent.ownerIndex !== undefined && this.ownerIndex !== undefined && ent.ownerIndex === this.ownerIndex) continue;
+
+      const hitRadius = (this.r || 25) + (ent.r || 25) + 30;
+
+      // Point-to-segment distance check
+      const segDx = destX - startX;
+      const segDy = destY - startY;
+      const segLenSq = segDx * segDx + segDy * segDy;
+      let t = segLenSq > 0 ? ((ent.x - startX) * segDx + (ent.y - startY) * segDy) / segLenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      const projX = startX + t * segDx;
+      const projY = startY + t * segDy;
+      const dProj = Math.hypot(ent.x - projX, ent.y - projY);
+
+      if (dProj <= hitRadius || (target && ent === target)) {
+        hitEntities.push(ent);
+      }
+    }
+
+    if (hitEntities.length === 0 && target && target.hp > 0 && !target.isDead) {
+      hitEntities.push(target);
+    }
+
+    for (const hitEnt of hitEntities) {
+      applyDamageToTarget(hitEnt, 38, this);
+      hitEnt.applyKnockback?.(Math.cos(angle) * 26, Math.sin(angle) * 26);
+      spawnSparks(hitEnt.x, hitEnt.y, 14, 'cyan', '#38BDF8');
+      spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 26);
+    }
+
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_thunderstrike', 0.4);
+    }
     triggerGlobalScreenShake(5, 12);
-    spawnFloatingText(this.x, this.y - 30, '霹靂一閃 HEKIREKI ISSEN!', '#F59E0B');
+    spawnFloatingText(this.x, this.y - 30, '霹靂一閃 HEKIREKI ISSEN!', '#38BDF8');
   }
 
   _triggerRokuren(target) {
@@ -214,7 +548,7 @@ export class ZenitsuFighter extends Fighter {
 
     applyDamageToTarget(target, 48, this);
     target.applyKnockback?.(Math.cos(this.gunAngle || 0) * 30, Math.sin(this.gunAngle || 0) * 30);
-    spawnSparks(target.x, target.y, '#F59E0B', 18);
+    spawnSparks(target.x, target.y, 18, 'gold', '#F59E0B');
     triggerGlobalScreenShake(6, 14);
     spawnFloatingText(this.x, this.y - 30, '霹靂一閃・六連 ROKUREN!', '#F59E0B');
   }
@@ -231,7 +565,7 @@ export class ZenitsuFighter extends Fighter {
     applyDamageToTarget(target, 85, this);
     target.applyKnockback?.(Math.cos(angle) * 48, Math.sin(angle) * 48);
 
-    spawnSparks(target.x, target.y, '#FBBF24', 24);
+    spawnSparks(target.x, target.y, 24, 'flame', '#FBBF24');
     spawnImpactFlash(target.x, target.y, '#EF4444', 45);
     triggerGlobalScreenShake(9, 20);
     spawnFloatingText(this.x, this.y - 40, '火雷神 FLAMING THUNDER GOD!', '#F59E0B');

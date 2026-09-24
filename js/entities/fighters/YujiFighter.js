@@ -75,23 +75,28 @@ export class YujiFighter extends Fighter {
     this.rctChannelTimer = 0;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(CONFIG.yuji?.enableDivergentDash, true)) {
+      skills.push({
         id: 'divergent_fist',
         name: 'Divergent Fist',
         type: 'active',
         cooldownKey: 'divergentDashCooldown',
         cooldownMax: () => CONFIG.yuji?.divergentDashCooldown || 180
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.yuji?.enableRCT, true)) {
+      skills.push({
         id: 'rct',
         name: 'Reverse Cursed Technique',
         type: 'active',
         cooldownKey: 'rctCooldown',
         cooldownMax: () => CONFIG.yuji?.rctCooldown || 800,
         channelingKey: 'isChannelingRCT'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.yuji?.enableSoulSwap, true)) {
+      skills.push({
         id: 'soul_swap',
         name: 'Sukuna Takeover',
         type: 'transformation',
@@ -103,8 +108,9 @@ export class YujiFighter extends Fighter {
         onExpire: (fighter) => {
           fighter._triggerSoulSwapRevert();
         }
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(skills);
   }
 
   reset() {
@@ -150,7 +156,8 @@ export class YujiFighter extends Fighter {
     const incoming = (Number(amount) || 0) * (1 - reduction);
     const thresholdHp = this.maxHp * (CONFIG.yuji?.soulSwapHpThreshold || 0.30);
     // Auto-trigger Soul Swap if fatal or drops below threshold before having swapped
-    if (!this.hasSoulSwapped && this.hp > 0) {
+    const isSoulSwapAllowed = this.isSkillEnabled(CONFIG.yuji?.enableSoulSwap, true);
+    if (isSoulSwapAllowed && !this.hasSoulSwapped && this.hp > 0) {
       if ((this.hp - incoming) <= thresholdHp) {
         // Prevent fatal one-shot death on the triggering hit so he can transform
         const safeDamage = Math.min(incoming, Math.max(0, this.hp - 1));
@@ -264,18 +271,20 @@ export class YujiFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
 
-      const healPercent = CONFIG.yuji?.rctHealPercent || 0.25;
-      const healAmount = Math.round(this.maxHp * healPercent);
-      if (typeof this.heal === 'function') {
-        this.heal(healAmount, { color: '#00FF00' });
-      } else {
-        this.hp = Math.min(this.maxHp, this.hp + healAmount);
-      }
+      if (this.isSkillEnabled(CONFIG.yuji?.enableRCT, true)) {
+        const healPercent = CONFIG.yuji?.rctHealPercent || 0.25;
+        const healAmount = Math.round(this.maxHp * healPercent);
+        if (typeof this.heal === 'function') {
+          this.heal(healAmount, { color: '#00FF00' });
+        } else {
+          this.hp = Math.min(this.maxHp, this.hp + healAmount);
+        }
 
-      spawnFloatingText(this.x, this.y - this.r - 28, "PASSIVE RCT HEAL!", "#00FF00");
-      spawnFloatingText(this.x, this.y - this.r - 48, `+${healAmount} HP`, "#00FF00");
-      audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
-      spawnImpactFlash(this.x, this.y, 45, 'rgba(0, 255, 120, 0.8)');
+        spawnFloatingText(this.x, this.y - this.r - 28, "PASSIVE RCT HEAL!", "#00FF00");
+        spawnFloatingText(this.x, this.y - this.r - 48, `+${healAmount} HP`, "#00FF00");
+        audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
+        spawnImpactFlash(this.x, this.y, 45, 'rgba(0, 255, 120, 0.8)');
+      }
     }
   }
 
@@ -391,7 +400,7 @@ export class YujiFighter extends Fighter {
     }
 
     // Auto-trigger Ultimate: Soul Swap — Sukuna Takes Over (Once per match, HP critically low)
-    if (this.hp / this.maxHp <= (CONFIG.yuji?.soulSwapHpThreshold || 0.30) && !this.hasSoulSwapped) {
+    if (this.isSkillEnabled(CONFIG.yuji?.enableSoulSwap, true) && this.hp / this.maxHp <= (CONFIG.yuji?.soulSwapHpThreshold || 0.30) && !this.hasSoulSwapped) {
       this._triggerSoulSwapTransformation(opponent);
     }
 
@@ -888,12 +897,12 @@ export class YujiFighter extends Fighter {
         // AI: Divergent Fist Dash gap closer check
         const dashMax = CONFIG.yuji?.divergentDashRange || 280;
         const dashMin = CONFIG.yuji?.divergentDashMinRange || 60;
-        if (!this.soulSwapActive && (this.divergentDashCooldown || 0) <= 0 && dist >= dashMin && dist <= dashMax) {
+        if (this.isSkillEnabled(CONFIG.yuji?.enableDivergentDash, true) && !this.soulSwapActive && (this.divergentDashCooldown || 0) <= 0 && dist >= dashMin && dist <= dashMax) {
           this.triggerDivergentDash(target);
           return;
         }
 
-        if (!this.soulSwapActive && dist <= maxPunchReach && (this.cooldownTimer || 0) <= 0) {
+        if (this.isSkillEnabled(CONFIG.yuji?.enableBasicPunch, true) && !this.soulSwapActive && dist <= maxPunchReach && (this.cooldownTimer || 0) <= 0) {
           this.aim(target);
           modUpdateMeleeCombat.call(this, target);
         }
@@ -915,6 +924,7 @@ export class YujiFighter extends Fighter {
   }
 
   shoot() {
+    if (!this.soulSwapActive && !this.isSkillEnabled(CONFIG.yuji?.enableBasicPunch, true)) return false;
     if (!this.canPerformBasicAttack()) return false;
     // Block all attacks and manual input during Soul Swap opening sequence, transition freezes, or revert freeze
     if (this.soulSwapTransitionTimer > 0 || this.revertTransitionTimer > 0 || (this.rapidSlashHitsLeft || 0) > 0 || (this.soulSwapActive && this.rapidSlashPhase !== 'COMPLETE')) return false;
@@ -1002,6 +1012,7 @@ export class YujiFighter extends Fighter {
   }
 
   triggerDivergentDash(customTarget = null) {
+    if (!this.isSkillEnabled(CONFIG.yuji?.enableDivergentDash, true)) return false;
     if (this.isDead || this.hp <= 0 || (this.divergentDashCooldown || 0) > 0 || this.isDivergentDashing) return false;
     if (this.soulSwapActive || this.soulSwapTransitionTimer > 0 || this.revertTransitionTimer > 0 || (this.rapidSlashHitsLeft || 0) > 0) return false;
 

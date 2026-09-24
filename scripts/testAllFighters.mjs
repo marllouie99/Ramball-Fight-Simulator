@@ -162,7 +162,7 @@ async function main() {
   const { drawNanamiPixelBody, drawNanamiSkin } = await import('../js/graphics/fighters/nanamiSkin.js');
   const { drawZeusPixelBody, drawZeusSkin, _drawZeusHair, _getZeusHairImage, _drawZeusCrown, _getZeusCrownImage } = await import('../js/graphics/fighters/zeusSkin.js');
   const { _getJohnWickHairImage, _drawJohnWickHair, drawJohnWickPixelBody, drawJohnWickSkin } = await import('../js/graphics/fighters/johnWickSkin.js');
-  const { _getZenitsuHairImage, _drawZenitsuHair, drawZenitsuPixelBody, drawZenitsuSkin } = await import('../js/graphics/fighters/zenitsuSkin.js');
+  const { _getZenitsuHairImage, _getZenitsuLightningSpriteImage, _getZenitsuDashSpriteImage, _drawZenitsuHair, drawZenitsuPixelBody, drawZenitsuSkin, _getThunderclapBurst, isZenitsuThunderclapBurst, _drawZenitsuThunderclapDashVFX } = await import('../js/graphics/fighters/zenitsuSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -530,18 +530,41 @@ async function main() {
           throw new Error(`Reze Human Form HUD skill violated Rule 18 with mismatched color ${hudSkillsHuman[0].color}`);
         }
 
-        // Bomb Devil Hybrid Form (Ultimate activated): all 4 skill bars are displayed
-        fighter.isHybridModeActive = true;
-        const hudSkillsHybrid = getSkillDataForFighter(fighter);
-        if (!hudSkillsHybrid || hudSkillsHybrid.length !== 4) {
-          throw new Error(`Reze Bomb Devil Hybrid Form expected 4 HUD skill bars, got ${hudSkillsHybrid?.length}`);
-        }
-        for (let s of hudSkillsHybrid) {
-          if (s.color !== expectedColor) {
-            throw new Error(`Reze HUD skill '${s.label}' violated Rule 18 with mismatched color ${s.color}`);
+        // Bomb Devil Hybrid Form (Ultimate activated):
+        const origSpark = CONFIG.reze?.enableSparkFlechette;
+        const origDecoy = CONFIG.reze?.enableDecoyBomb;
+        try {
+          if (CONFIG.reze) {
+            CONFIG.reze.enableSparkFlechette = 1;
+            CONFIG.reze.enableDecoyBomb = 1;
           }
+          fighter.isHybridModeActive = true;
+          const hudSkillsHybridAll = getSkillDataForFighter(fighter);
+          if (!hudSkillsHybridAll || hudSkillsHybridAll.length !== 4) {
+            throw new Error(`Reze Bomb Devil Hybrid Form (all enabled) expected 4 HUD skill bars, got ${hudSkillsHybridAll?.length}`);
+          }
+          for (let s of hudSkillsHybridAll) {
+            if (s.color !== expectedColor) {
+              throw new Error(`Reze HUD skill '${s.label}' violated Rule 18 with mismatched color ${s.color}`);
+            }
+          }
+
+          // Test that disabling skills hides them in HUD
+          if (CONFIG.reze) {
+            CONFIG.reze.enableSparkFlechette = 0;
+            CONFIG.reze.enableDecoyBomb = 0;
+          }
+          const hudSkillsHybridFiltered = getSkillDataForFighter(fighter);
+          if (!hudSkillsHybridFiltered || hudSkillsHybridFiltered.length !== 2) {
+            throw new Error(`Reze Bomb Devil Hybrid Form (spark & decoy disabled) expected 2 HUD skill bars, got ${hudSkillsHybridFiltered?.length}`);
+          }
+        } finally {
+          if (CONFIG.reze) {
+            CONFIG.reze.enableSparkFlechette = origSpark;
+            CONFIG.reze.enableDecoyBomb = origDecoy;
+          }
+          fighter.isHybridModeActive = false;
         }
-        fighter.isHybridModeActive = false;
 
         // 2. Test Collar Pin Revive on lethal damage
         const origRevive = CONFIG.reze?.enableCollarPinRevive;
@@ -7806,6 +7829,10 @@ async function main() {
     state.arena = testArena;
     state.gameState = 'playing';
 
+    // Temporarily enable Black Flash for this test (config has enableBlackFlash: 0)
+    const savedBlackFlash = CONFIG.nanami.enableBlackFlash;
+    CONFIG.nanami.enableBlackFlash = true;
+
     // 1. Initiate Blitz
     nanami.performBlitz(CONFIG.nanami, target);
     if (!nanami.isChannelingBlackFlash) {
@@ -7835,8 +7862,10 @@ async function main() {
       throw new Error(`Expected target to take damage from 4-Fold Black Flash Blitz! HP before: ${initialTargetHp}, HP after: ${target.hp}`);
     }
 
+    CONFIG.nanami.enableBlackFlash = savedBlackFlash;
     state.fighters = [];
   } catch (err) {
+    if (typeof savedBlackFlash !== 'undefined') CONFIG.nanami.enableBlackFlash = savedBlackFlash;
     console.error('❌ [NANAMI 4-FOLD BLACK FLASH BLITZ TEST ERROR]:', err);
     errors++;
   }
@@ -8861,6 +8890,10 @@ async function main() {
     if (!zenitsuImg) {
       throw new Error('_getZenitsuHairImage() returned null or undefined');
     }
+    const zenitsuLightningImg = _getZenitsuLightningSpriteImage();
+    if (!zenitsuLightningImg) {
+      throw new Error('_getZenitsuLightningSpriteImage() returned null or undefined');
+    }
 
     mockCtx.resetStackDepth();
     drawZenitsuPixelBody(mockCtx, 25);
@@ -8879,6 +8912,72 @@ async function main() {
     mockCtx.resetStackDepth();
     drawZenitsuSkin(mockCtx, zenitsu);
     assertCanvasStackBalance('drawZenitsuSkin(mockCtx, zenitsu)');
+
+    // Channeling Frame 1 (Stance) stack test
+    zenitsu.isChannelingThunderclap = true;
+    zenitsu.thunderclapChannelDuration = 36;
+    zenitsu.thunderclapChannelTimer = 30; // Frame 1: Stance
+    mockCtx.resetStackDepth();
+    drawZenitsuSkin(mockCtx, zenitsu);
+    assertCanvasStackBalance('drawZenitsuSkin Frame 1 Stance Channeling');
+
+    // Channeling Frame 2 (Charge / Lightning VFX) stack test
+    zenitsu.thunderclapChannelTimer = 10; // Frame 2: Charge (elapsed = 26, triggers Burst 2)
+    mockCtx.resetStackDepth();
+    drawZenitsuSkin(mockCtx, zenitsu);
+    assertCanvasStackBalance('drawZenitsuSkin Frame 2 Charge Channeling');
+
+    // 11.6.1 Sporadic Lightning Burst Schedule Test
+    // For standard 100-frame combat channel:
+    // Burst 1: Frame 6 (1 frame)
+    if (!_getThunderclapBurst(100, 6) || _getThunderclapBurst(100, 6).burstId !== 1) {
+      throw new Error('Zenitsu Burst 1 (1-frame early flicker) failed to trigger at frame 6 of 100');
+    }
+    // Quiet tension pause (~1.2-1.5s wait = zero lightning)
+    if (_getThunderclapBurst(100, 7) !== null || _getThunderclapBurst(100, 50) !== null || _getThunderclapBurst(100, 77) !== null) {
+      throw new Error('Zenitsu quiet tension pause must have zero lightning between bursts');
+    }
+    // Burst 2: Frame 78 (2 frames)
+    const b2_0 = _getThunderclapBurst(100, 78);
+    const b2_1 = _getThunderclapBurst(100, 79);
+    const b2_after = _getThunderclapBurst(100, 80);
+    if (!b2_0 || b2_0.burstId !== 2 || !b2_1 || b2_1.burstId !== 2 || b2_after !== null) {
+      throw new Error('Zenitsu Burst 2 must be exactly 2 frames after the quiet pause');
+    }
+    // Pre-launch surge (frames 97..99)
+    if (!_getThunderclapBurst(100, 98) || _getThunderclapBurst(100, 98).burstId !== 3) {
+      throw new Error('Zenitsu Pre-launch surge must trigger right before launch dash');
+    }
+
+    // Aim lock test during channeling
+    if (zenitsu.canAim() !== false) {
+      throw new Error('Zenitsu canAim() should return false during Thunderclap channeling');
+    }
+    zenitsu.interruptAttacks();
+    if (zenitsu.isChannelingThunderclap !== false) {
+      throw new Error('Zenitsu interruptAttacks() should clear isChannelingThunderclap');
+    }
+
+    // 11.6.2 Six-Frame Lightning Dash Animation & Disappearance Stack Test
+    for (const testTimer of [2, 8, 16, 22]) {
+      zenitsu.thunderclapDashVFX = {
+        startX: 100,
+        startY: 100,
+        destX: 360,
+        destY: 100,
+        angle: 0,
+        dist: 260,
+        timer: testTimer,
+        travelDuration: 6,
+        lingerDuration: 8,
+        disappearDuration: 12,
+        maxTimer: 26
+      };
+      mockCtx.resetStackDepth();
+      drawZenitsuSkin(mockCtx, zenitsu);
+      assertCanvasStackBalance(`drawZenitsuSkin with dash VFX at timer ${testTimer}`);
+    }
+    zenitsu.thunderclapDashVFX = null;
   } catch (err) {
     console.error('❌ [ZENITSU MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
     errors++;
@@ -9948,6 +10047,157 @@ async function main() {
     console.error('❌ [YUJI SOUL SWAP ARENA OVERLAY TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[YUJI SOUL SWAP ARENA OVERLAY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Disabled Skill Bar Hiding Verification Test (Across Multi-Fighters)
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('🎛️ [Disabled Skill Bar Hiding Test] Verifying that disabling any skill in CONFIG hides its HUD skill bar...');
+
+    // 1. Gojo: Red, Purple, Domain (uv)
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const gojo = new GojoFighter({ color: '#3B82F6', name: 'Gojo' });
+    const origGojoRed = CONFIG.gojo?.enableRed;
+    const origGojoPurple = CONFIG.gojo?.enablePurple;
+    const origGojoDomain = CONFIG.gojo?.enableDomain;
+    try {
+      if (CONFIG.gojo) {
+        CONFIG.gojo.enableRed = 1;
+        CONFIG.gojo.enablePurple = 1;
+        CONFIG.gojo.enableDomain = 1;
+      }
+      const gojoAll = getSkillDataForFighter(gojo);
+      const hasRed = gojoAll.some(s => s.id === 'red');
+      const hasPurple = gojoAll.some(s => s.id === 'purple');
+      const hasDomain = gojoAll.some(s => s.id === 'uv');
+      if (!hasRed || !hasPurple || !hasDomain) {
+        throw new Error(`Gojo expected red, purple, uv skill bars when enabled. Found: ${gojoAll.map(s => s.id).join(', ')}`);
+      }
+
+      if (CONFIG.gojo) {
+        CONFIG.gojo.enableRed = 0;
+        CONFIG.gojo.enablePurple = 0;
+      }
+      const gojoFiltered = getSkillDataForFighter(gojo);
+      if (gojoFiltered.some(s => s.id === 'red')) {
+        throw new Error(`Gojo 'red' skill bar was not hidden when enableRed=0!`);
+      }
+      if (gojoFiltered.some(s => s.id === 'purple')) {
+        throw new Error(`Gojo 'purple' skill bar was not hidden when enablePurple=0!`);
+      }
+      if (!gojoFiltered.some(s => s.id === 'uv')) {
+        throw new Error(`Gojo 'uv' skill bar was unexpectedly hidden when enableDomain=1!`);
+      }
+    } finally {
+      if (CONFIG.gojo) {
+        CONFIG.gojo.enableRed = origGojoRed;
+        CONFIG.gojo.enablePurple = origGojoPurple;
+        CONFIG.gojo.enableDomain = origGojoDomain;
+      }
+    }
+
+    // 2. Sukuna: Fuga, Domain (ms)
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const sukuna = new SukunaFighter({ color: '#E11D48', name: 'Sukuna' });
+    const origSukunaFuga = CONFIG.sukuna?.enableFuga;
+    const origSukunaDomain = CONFIG.sukuna?.enableDomain;
+    try {
+      if (CONFIG.sukuna) {
+        CONFIG.sukuna.enableFuga = 0;
+        CONFIG.sukuna.enableDomain = 0;
+      }
+      const sukunaFiltered = getSkillDataForFighter(sukuna);
+      if (sukunaFiltered.some(s => s.id === 'fuga')) {
+        throw new Error(`Sukuna 'fuga' skill bar was not hidden when enableFuga=0!`);
+      }
+      if (sukunaFiltered.some(s => s.id === 'ms')) {
+        throw new Error(`Sukuna 'ms' skill bar was not hidden when enableDomain=0!`);
+      }
+    } finally {
+      if (CONFIG.sukuna) {
+        CONFIG.sukuna.enableFuga = origSukunaFuga;
+        CONFIG.sukuna.enableDomain = origSukunaDomain;
+      }
+    }
+
+    // 3. Nanami: Collapse, Black Flash
+    const { NanamiFighter } = await import('../js/entities/fighters/NanamiFighter.js');
+    const nanami = new NanamiFighter({ color: '#F59E0B', name: 'Nanami' });
+    const origNanamiCollapse = CONFIG.nanami?.enableCollapse;
+    const origNanamiBF = CONFIG.nanami?.enableBlackFlash;
+    try {
+      if (CONFIG.nanami) {
+        CONFIG.nanami.enableCollapse = 0;
+        CONFIG.nanami.enableBlackFlash = 0;
+      }
+      const nanamiFiltered = getSkillDataForFighter(nanami);
+      if (nanamiFiltered.some(s => s.id === 'collapse')) {
+        throw new Error(`Nanami 'collapse' skill bar was not hidden when enableCollapse=0!`);
+      }
+      if (nanamiFiltered.some(s => s.id === 'blackflash')) {
+        throw new Error(`Nanami 'blackflash' skill bar was not hidden when enableBlackFlash=0!`);
+      }
+    } finally {
+      if (CONFIG.nanami) {
+        CONFIG.nanami.enableCollapse = origNanamiCollapse;
+        CONFIG.nanami.enableBlackFlash = origNanamiBF;
+      }
+    }
+
+    // 4. CJ: Jetpack, Drive-By, Hesoyam
+    const { CJFighter } = await import('../js/entities/fighters/CJFighter.js');
+    const cj = new CJFighter({ color: '#22C55E', name: 'CJ' });
+    const origCjJetpack = CONFIG.cj?.enableJetpack;
+    const origCjDriveBy = CONFIG.cj?.enableDriveBy;
+    try {
+      if (CONFIG.cj) {
+        CONFIG.cj.enableJetpack = 0;
+        CONFIG.cj.enableDriveBy = 0;
+      }
+      const cjFiltered = getSkillDataForFighter(cj);
+      if (cjFiltered.some(s => s.id === 'jetpack')) {
+        throw new Error(`CJ 'jetpack' skill bar was not hidden when enableJetpack=0!`);
+      }
+      if (cjFiltered.some(s => s.id === 'driveby')) {
+        throw new Error(`CJ 'driveby' skill bar was not hidden when enableDriveBy=0!`);
+      }
+    } finally {
+      if (CONFIG.cj) {
+        CONFIG.cj.enableJetpack = origCjJetpack;
+        CONFIG.cj.enableDriveBy = origCjDriveBy;
+      }
+    }
+
+    // 5. Zenitsu: Thunderclap, Rokuren, Flaming God
+    const { ZenitsuFighter } = await import('../js/entities/fighters/ZenitsuFighter.js');
+    const zenitsu = new ZenitsuFighter({ color: '#FACC15', name: 'Zenitsu' });
+    const origZenitsuRokuren = CONFIG.zenitsu?.enableRokuren;
+    const origZenitsuFlamingGod = CONFIG.zenitsu?.enableFlamingGod;
+    try {
+      if (CONFIG.zenitsu) {
+        CONFIG.zenitsu.enableRokuren = 0;
+        CONFIG.zenitsu.enableFlamingGod = 0;
+      }
+      const zenitsuFiltered = getSkillDataForFighter(zenitsu);
+      if (zenitsuFiltered.some(s => s.id === 'rokuren')) {
+        throw new Error(`Zenitsu 'rokuren' skill bar was not hidden when enableRokuren=0!`);
+      }
+      if (zenitsuFiltered.some(s => s.id === 'flamingGod')) {
+        throw new Error(`Zenitsu 'flamingGod' skill bar was not hidden when enableFlamingGod=0!`);
+      }
+    } finally {
+      if (CONFIG.zenitsu) {
+        CONFIG.zenitsu.enableRokuren = origZenitsuRokuren;
+        CONFIG.zenitsu.enableFlamingGod = origZenitsuFlamingGod;
+      }
+    }
+
+    console.log('✅ [Disabled Skill Bar Hiding Test] All fighters correctly hide disabled skills from HUD.');
+  } catch (err) {
+    console.error('❌ [DISABLED SKILL BAR HIDING TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[DISABLED SKILL BAR HIDING TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

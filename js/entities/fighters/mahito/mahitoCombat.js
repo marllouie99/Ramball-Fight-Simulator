@@ -139,6 +139,7 @@ export function getMahitoFrontRadiusTargets(fighter, reachOffset = 75, coneAngle
  * Alternates between Giant Blade and Spiked Mace morphs.
  */
 export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
+  if (typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.enableIdleTransfiguration, true)) return;
   const cfg = CONFIG.mahito || {};
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
@@ -324,6 +325,7 @@ export function triggerMahitoParalyzeExplosion(entity) {
 }
 
 export function applySoulDisfigurementStack(ent, fighter) {
+  if (fighter && typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.soulDisfigurement?.enableSoulDisfigurement, true)) return;
   if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga') {
     if (ent.adaptedSoulDisfigurement) {
       // Immune to any debuff - no stacks, no paralyze!
@@ -496,6 +498,7 @@ export function applySoulDisfigurementStack(ent, fighter) {
  * 3. Phase 3 (Frames 18–90+): Sequential tendril eruptions dynamically chasing the enemy 1-by-1.
  */
 export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
+  if (typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.fleshSurge?.enableFleshSurge, true)) return;
   const cfg = CONFIG.mahito || {};
   const surgeCfg = cfg.fleshSurge || {};
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
@@ -932,6 +935,7 @@ export function updateSoulDisfigurementDecay() {
  */
 export function executeMahitoSoulPhaseSlip(fighter, target) {
   if (!fighter || !target || fighter.hp <= 0 || target.hp <= 0) return;
+  if (typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.soulPhaseSlip?.enableSoulPhaseSlip, true)) return;
   if ((fighter.paralyzeTimer || 0) > 0 || fighter.isParalyzed || fighter.fleshSurgeAnimTimer > 0) return;
 
   const cfg = CONFIG.mahito || {};
@@ -1082,6 +1086,7 @@ export function updateMahitoSoulPhaseSlip(fighter) {
  */
 export function executeMahitoMaceCannon(fighter, targetHint = null) {
   if (!fighter || fighter.hp <= 0 || fighter.isDead) return;
+  if (typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.maceCannon?.enableMaceCannon, true)) return;
   if ((fighter.paralyzeTimer || 0) > 0 || fighter.isParalyzed || fighter.fleshSurgeAnimTimer > 0 || (fighter.soulPhaseDashTimer || 0) > 0) return;
 
   const cfg = CONFIG.mahito || {};
@@ -1738,6 +1743,7 @@ export function updateMahitoMaceCannon(fighter) {
  * - Inward scissor clamp cross-slash across the target.
  */
 export function executeMahitoTwinScissor(fighter, target = null) {
+  if (typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.twinScissor?.enableTwinScissor, true)) return;
   const cfg = CONFIG.mahito || {};
   const scissorCfg = cfg.twinScissor || {};
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
@@ -2382,6 +2388,7 @@ export function updateMahitoTwinScissor(fighter) {
  * If the target is far (distance > minDistanceAlt), Mahito fires the high-knockback Body Repel projectile.
  */
 export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
+  if (typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.soulMultiplicity?.enableSoulMultiplicity, true)) return;
   const cfg = CONFIG.mahito || {};
   const skillCfg = cfg.soulMultiplicity || {};
 
@@ -2520,6 +2527,7 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
 // ============================================================================
 
 export function executeMahitoDomainExpansion(fighter, targetHint = null) {
+  if (typeof fighter.isSkillEnabled === 'function' && !fighter.isSkillEnabled(CONFIG.mahito?.domainExpansion?.enableDomainExpansion, true)) return;
   const cfg = CONFIG.mahito || {};
   
   // Set domain charge max and start channeling

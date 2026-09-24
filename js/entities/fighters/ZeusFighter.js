@@ -1,5 +1,6 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
+import { zeusConfig } from '../../configs/characters/zeusConfig.js';
 import { spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -43,8 +44,15 @@ export class ZeusFighter extends Fighter {
     this._thunderCloudSoundPlayed = false;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    const skills = [];
+
+    if (this.isSkillEnabled(cfg.enableThunderStorm, true)) {
+      skills.push({
         id: 'storm',
         name: 'Thunder Storm',
         type: 'ultimate',
@@ -57,8 +65,10 @@ export class ZeusFighter extends Fighter {
           fighter.stormActive = false;
           fighter.isChargingStorm = false;
         }
-      }
-    ]);
+      });
+    }
+
+    this.skillManager.registerSkills(skills);
   }
 
   reset() {
@@ -98,18 +108,20 @@ export class ZeusFighter extends Fighter {
 
   shoot(ownerIndex) {
     if (this.isCaughtInBeam()) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    if (!this.isSkillEnabled(cfg.enableChainLightning, true)) return;
     if (projectileSystem && projectileSystem.fireChainLightning) {
-      const damage = CONFIG.zeus?.lightningDamage ?? CONFIG.zeus?.damage ?? 20;
-      const chains = CONFIG.zeus?.chainCount ?? 4;
+      const damage = cfg.lightningDamage ?? cfg.damage ?? 20;
+      const chains = cfg.chainCount ?? 4;
       projectileSystem.fireChainLightning(this, ownerIndex, damage, chains);
     }
     
     // Flash at the release point (bolt tip)
-    const releaseDist = this.r + (CONFIG.zeus?.boltReleaseOffset ?? 20); 
+    const releaseDist = this.r + (cfg.boltReleaseOffset ?? 20); 
     const rx = this.x + Math.cos(this.gunAngle) * releaseDist;
     const ry = (this.y - (this.z || 0)) + Math.sin(this.gunAngle) * releaseDist;
-    spawnImpactFlash(rx, ry, CONFIG.zeus?.shootFlashRadius ?? 35, 'lightningTrail'); 
-    spawnSparks(rx, ry, CONFIG.zeus?.shootSparkCount ?? 12, 'lightningTrail', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
+    spawnImpactFlash(rx, ry, cfg.shootFlashRadius ?? 35, 'lightningTrail'); 
+    spawnSparks(rx, ry, cfg.shootSparkCount ?? 12, 'lightningTrail', cfg.themeColor ?? cfg.color ?? '#00BFFF');
     
     // Play attack sound
     const sound = getBasicAttackSound(this._def?.id, this._def?.type);
@@ -121,9 +133,10 @@ export class ZeusFighter extends Fighter {
     const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit));
     const applied = super.takeDamage(amount, attacker, opts);
 
-    // Aegis Shield Passive
-    if (applied && attacker && this.hp > 0 && !this.isTurret && !opts.isSaitamaCounter && !opts.isCounter && !isGuaranteedHit) {
-      if (this.aegisCooldown <= 0 && this._isAttackerInRange(attacker, CONFIG.zeus?.aegisTriggerRange ?? 180)) {
+    // Aegis Shield Passive (gated by master toggle)
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    if (this.isSkillEnabled(cfg.enableAegisShield, true) && applied && attacker && this.hp > 0 && !this.isTurret && !opts.isSaitamaCounter && !opts.isCounter && !isGuaranteedHit) {
+      if (this.aegisCooldown <= 0 && this._isAttackerInRange(attacker, cfg.aegisTriggerRange ?? 180)) {
         this._triggerAegisShield(attacker);
       }
     }
@@ -206,8 +219,9 @@ export class ZeusFighter extends Fighter {
     // If charging, the clouds billow and flash wildly
     this.auraPhase += this.isChargingStorm ? 0.45 : 0.15;
     
-    // Ultimate check
-    if (this.stormCooldown <= 0 && !this.stormActive && opponent) {
+    // Ultimate check (gated by master toggle)
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    if (this.isSkillEnabled(cfg.enableThunderStorm, true) && this.stormCooldown <= 0 && !this.stormActive && opponent) {
       this._activateStorm();
     }
     
@@ -228,10 +242,10 @@ export class ZeusFighter extends Fighter {
       this.gunAngle = 0;
       this.angle = 0;
     } else {
-      // Basic attack
+      // Basic attack (gated by enableChainLightning master toggle)
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
-      } else {
+      } else if (this.isSkillEnabled(cfg.enableChainLightning, true)) {
         this.shoot(ownerIndex);
         this.shootCooldown = this.shootCooldownMax;
       }

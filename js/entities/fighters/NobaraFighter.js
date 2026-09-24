@@ -61,6 +61,49 @@ export class NobaraFighter extends Fighter {
     this.blitzMaxTimer = cfg.ultimateDashDuration || 14;
     this.blackFlashAuraTimer = 0;
     this.blitzTarget = null;
+
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nobara) ? CONFIG.nobara : {};
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableHairpin, true)) {
+      skills.push({
+        id: 'hairpin',
+        name: 'Kanzashi (Hairpin)',
+        type: 'active',
+        cooldownKey: 'hairpinCooldown',
+        cooldownMaxKey: 'hairpinCooldownMax'
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableResonance, true)) {
+      skills.push({
+        id: 'resonance',
+        name: 'Resonance',
+        type: 'active',
+        cooldownKey: 'resonanceCooldown',
+        cooldownMaxKey: 'resonanceCooldownMax'
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableUltimate, true)) {
+      skills.push({
+        id: 'ultimate',
+        name: 'Black Flash & Resonance',
+        type: 'ultimate',
+        cooldownKey: 'ultimateCooldown',
+        cooldownMaxKey: 'ultimateCooldownMax'
+      });
+    }
+    if (skills.length > 0 && this.skillManager) {
+      this.skillManager.registerSkills(skills);
+    }
+  }
+
+  shoot(ownerIndex) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nobara) ? CONFIG.nobara : {};
+    if (!this.isSkillEnabled(cfg.enableNailSnipe, true)) return;
+    super.shoot(ownerIndex);
   }
 
   reset() {
@@ -102,9 +145,12 @@ export class NobaraFighter extends Fighter {
 
     if (this.hp <= 0) return;
 
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nobara) ? CONFIG.nobara : {};
+
     // 2. Passive: Unflinching Ecstasy State Check (<50% HP)
+    const ecstasyEnabled = this.isSkillEnabled(cfg.enableEcstasy, true);
     const hpRatio = this.hp / (this.maxHp || 400);
-    if (hpRatio <= 0.50) {
+    if (ecstasyEnabled && hpRatio <= (cfg.ecstasyHpThreshold || 0.50)) {
       if (!this.isEcstasyActive) {
         this.isEcstasyActive = true;
         if (!this.ecstasyAnnounced) {
@@ -138,6 +184,7 @@ export class NobaraFighter extends Fighter {
     if (this.slashSwingTimer > 0 || this.hp <= 0) return;
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nobara) ? CONFIG.nobara : {};
+    if (!this.isSkillEnabled(cfg.enableHammerCleave, true)) return;
     const reach = cfg.hammerRange || 65;
     const arc = cfg.hammerArc || ((120 * Math.PI) / 180);
     const facing = this.gunAngle || this.angle || 0;
@@ -173,8 +220,10 @@ export class NobaraFighter extends Fighter {
           applyDamageToTarget(target, dmg, this);
 
           // Embed 2 nails (Rule 6 compliant)
-          target.embeddedNails = Math.min(5, (target.embeddedNails || 0) + (cfg.hammerNailsEmbedded || 2));
-          target.embeddedNailsTimer = cfg.nailDurationFrames || 480;
+          if (this.isSkillEnabled(cfg.enableStrawDollNails, true)) {
+            target.embeddedNails = Math.min(cfg.maxEmbeddedNails || 5, (target.embeddedNails || 0) + (cfg.hammerNailsEmbedded || 2));
+            target.embeddedNailsTimer = cfg.nailDurationFrames || 480;
+          }
 
           // Impact sparks & knockback
           spawnSparks(target.x, target.y, 8, '#D94E68');

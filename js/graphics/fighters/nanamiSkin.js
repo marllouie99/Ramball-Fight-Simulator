@@ -139,26 +139,47 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
     GojoRenderer._drawJJKCursedEnergyAura(ctx, fighter, 'blue', 0, 0, r);
   }
 
-  // 2. Overtime 120% Grounded Clockwork Watch Dial Energy Field (Steady, Zero Pulsing)
+  // 2. Overtime 120% Radiant Golden Glow, Corona Bloom & Grounded Clockwork Dial
   if (isOvertime) {
-    ctx.globalAlpha = auraAlpha * 0.70;
-    const haloRadius = r * 1.45;
+    // A. Luminous Golden Corona Aura Bloom (Rule 11 concentric radial gradient)
+    const pulse = Math.sin(now * 0.008) * 2.0;
+    const glowR = r * 1.65 + pulse;
+    const glowGrad = ctx.createRadialGradient(0, 0, r * 0.6, 0, 0, glowR);
+    glowGrad.addColorStop(0.0, `rgba(255, 235, 120, ${0.42 * auraAlpha})`);
+    glowGrad.addColorStop(0.35, `rgba(255, 215, 0, ${0.28 * auraAlpha})`);
+    glowGrad.addColorStop(0.70, `rgba(212, 175, 55, ${0.12 * auraAlpha})`);
+    glowGrad.addColorStop(1.0, 'rgba(212, 175, 55, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // B. Brilliant Champagne Gold Perimeter Ring
+    ctx.strokeStyle = `rgba(255, 240, 160, ${0.75 * auraAlpha})`;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.18 + Math.sin(now * 0.01) * 1.0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // C. Clockwork Watch Dial Ground Field
+    ctx.globalAlpha = auraAlpha * 0.85;
+    const haloRadius = r * 1.50;
     ctx.save();
-    ctx.strokeStyle = 'rgba(212, 175, 55, 0.40)';
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.55)';
+    ctx.lineWidth = 1.5;
     ctx.setLineDash([8, 4, 2, 4]);
     ctx.beginPath();
     ctx.arc(0, 0, haloRadius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 12-Hour Watch Dial Radial Indices on the Ground (Steady)
+    // 12-Hour Watch Dial Radial Indices on the Ground
     for (let i = 0; i < 12; i++) {
       const a = (i * Math.PI) / 6 - Math.PI / 2;
       const isOvertimeMark = (i === 6); // 18:00 (6 o'clock) Overtime Start Point
       const innerTick = isOvertimeMark ? haloRadius - 7 : haloRadius - 4;
-      ctx.strokeStyle = isOvertimeMark ? 'rgba(239, 68, 68, 0.75)' : 'rgba(212, 175, 55, 0.40)';
-      ctx.lineWidth = isOvertimeMark ? 2.0 : 1.0;
+      ctx.strokeStyle = isOvertimeMark ? 'rgba(239, 68, 68, 0.90)' : 'rgba(255, 215, 0, 0.55)';
+      ctx.lineWidth = isOvertimeMark ? 2.2 : 1.2;
       ctx.beginPath();
       ctx.moveTo(Math.cos(a) * innerTick, Math.sin(a) * innerTick);
       ctx.lineTo(Math.cos(a) * (haloRadius + 1), Math.sin(a) * (haloRadius + 1));
@@ -168,33 +189,26 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
     // Live Sweeping Golden Clockwork Second Hand Ray (Smooth 360° Sweep)
     const sweepAngle = (now * 0.002) % (Math.PI * 2) - Math.PI / 2;
     const sweepGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, haloRadius);
-    sweepGrad.addColorStop(0, 'rgba(255, 235, 150, 0.22)');
-    sweepGrad.addColorStop(0.7, 'rgba(212, 175, 55, 0.12)');
+    sweepGrad.addColorStop(0, 'rgba(255, 245, 180, 0.35)');
+    sweepGrad.addColorStop(0.7, 'rgba(255, 215, 0, 0.20)');
     sweepGrad.addColorStop(1.0, 'rgba(212, 175, 55, 0)');
     ctx.strokeStyle = sweepGrad;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(Math.cos(sweepAngle) * haloRadius, Math.sin(sweepAngle) * haloRadius);
     ctx.stroke();
     ctx.restore();
 
-    // Inner Gold Boundary Ring (Steady)
-    ctx.strokeStyle = 'rgba(212, 175, 55, 0.35)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.15, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Crackling Golden Cursed Energy Lightning Arcs (Steady)
-    ctx.strokeStyle = 'rgba(255, 235, 140, 0.45)';
-    ctx.lineWidth = 1.2;
-    for (let i = 0; i < 4; i++) {
-      const arcAng = (Math.PI / 2) * i + Math.sin(now * 0.008 + i) * 0.35;
-      const startDist = r * 0.9;
-      const endDist = r * 1.35;
+    // D. Crackling Golden Cursed Energy Lightning Arcs
+    ctx.strokeStyle = `rgba(255, 245, 180, ${0.85 * auraAlpha})`;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 5; i++) {
+      const arcAng = ((Math.PI * 2) / 5) * i + Math.sin(now * 0.008 + i) * 0.40;
+      const startDist = r * 0.95;
+      const endDist = r * 1.45;
       const midDist = (startDist + endDist) * 0.5;
-      const perpOffset = (Math.sin(now * 0.02 + i * 3) - 0.5) * 7;
+      const perpOffset = (Math.sin(now * 0.02 + i * 3) - 0.5) * 8;
 
       const cosA = Math.cos(arcAng);
       const sinA = Math.sin(arcAng);
@@ -206,6 +220,16 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
       ctx.lineTo(cosA * midDist + perpX * perpOffset, sinA * midDist + perpY * perpOffset);
       ctx.lineTo(cosA * endDist, sinA * endDist);
       ctx.stroke();
+    }
+
+    // E. Surging Golden Micro-Sparks around Perimeter
+    ctx.fillStyle = '#FFF5A0';
+    for (let i = 0; i < 4; i++) {
+      const spkAng = (now * 0.003 * (i % 2 === 0 ? 1 : -1)) + (i * Math.PI * 0.5);
+      const spkDist = r * 1.25 + Math.sin(now * 0.015 + i) * 6;
+      const px = Math.cos(spkAng) * spkDist;
+      const py = Math.sin(spkAng) * spkDist;
+      ctx.fillRect(px - 1, py - 1, 2, 2);
     }
   }
 
@@ -371,12 +395,15 @@ export function drawNanamiSkin(ctx, fighter) {
 
   // 3. Melee Chop, Punch & Collapse Animation Progress (Continuous Smooth Curve)
   const isCollapsing = Boolean(fighter.isCollapsing || (fighter.collapseTimer && fighter.collapseTimer > 0));
-  const isPunching = !isPodiumPreview && (fighter.punchAnimTimer > 0 || fighter.slashSwingTimer > 0 || isCollapsing);
+  const isHitPausing = Boolean(fighter.ratioHitPauseTimer && fighter.ratioHitPauseTimer > 0);
+  const isPunching = !isPodiumPreview && (fighter.punchAnimTimer > 0 || fighter.slashSwingTimer > 0 || isCollapsing || isHitPausing);
   let rawProgress = 0;
   if (isCollapsing) {
     const maxT = fighter.collapseMaxTimer || 14;
     const curTimer = fighter.collapseTimer || 0;
     rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (curTimer / maxT)));
+  } else if (isHitPausing && typeof fighter.ratioHitProgress === 'number') {
+    rawProgress = fighter.ratioHitProgress;
   } else if (isPunching) {
     const maxT = fighter.slashSwingMaxTimer || fighter.punchMaxTime || 18;
     const curTimer = fighter.slashSwingTimer > 0 ? fighter.slashSwingTimer : fighter.punchAnimTimer;
@@ -391,6 +418,7 @@ export function drawNanamiSkin(ctx, fighter) {
   let frontX = r * 0.95, frontY = 0;
   let backX = r * 0.70, backY = 0;
   let hideBackHand = true;
+  let hitPauseAngleOverride = undefined;
 
   const isBlitzing = Boolean(fighter.isBlitzing);
   const blitzIndex = isBlitzing ? (fighter.blitzStrikeIndex || 0) : 0;
@@ -414,6 +442,24 @@ export function drawNanamiSkin(ctx, fighter) {
       frontY = r * 0.15 - r * 0.45 + easeSlam * (r * 0.80);
       backX = frontX - 13;
       backY = frontY + 3;
+    }
+  } else if (isHitPausing) {
+    // Cinematic 7:3 Ratio Hit-Pause: Lock in exact collision pose with kinetic friction micro-tremor
+    const tremorAmp = (typeof CONFIG !== 'undefined' && CONFIG.nanami?.ratioHitTremorIntensity) ? CONFIG.nanami.ratioHitTremorIntensity : 1.4;
+    const tremor = Math.sin((fighter.ratioHitPauseTimer || 0) * 2.8) * tremorAmp;
+
+    const baseHandX = (typeof fighter.ratioHitHandX === 'number' && fighter.ratioHitHandX < r * 2.5)
+      ? fighter.ratioHitHandX
+      : (r * 0.95 + lungeExtension);
+    const baseHandY = (typeof fighter.ratioHitHandY === 'number' && Math.abs(fighter.ratioHitHandY) < r * 2.5)
+      ? fighter.ratioHitHandY
+      : (r * 0.25 + Math.sin(rawProgress * Math.PI) * (r * 0.20));
+
+    frontX = baseHandX + tremor * 0.4;
+    frontY = baseHandY + tremor * 0.8;
+
+    if (typeof fighter.ratioHitCleaverAngle === 'number') {
+      hitPauseAngleOverride = fighter.ratioHitCleaverAngle + tremor * 0.02;
     }
   } else if (isBlitzing) {
     if (isFinalBlitz) {
@@ -466,7 +512,9 @@ export function drawNanamiSkin(ctx, fighter) {
       isOvertime: isOvertime,
       isCollapseSlam: isCollapsing,
       isBlitzing: isBlitzing,
-      blitzStrikeIndex: blitzIndex
+      blitzStrikeIndex: blitzIndex,
+      hitPauseAxeAngle: hitPauseAngleOverride,
+      isHitPausing: isHitPausing
     });
 
     // 2. Draw Front Hand with watch and natural skin tone gripping the handle

@@ -88,6 +88,48 @@ export class GenosFighter extends Fighter {
     // Movement-driven body rotation
     this.bodyRotAngle = 0; // smoothly tracks velocity direction
     this.damageNumberColor = CONFIG.genos?.color || '#FF5500';
+
+    // Declarative Skill Registration
+    const genosSkills = [];
+    if (this.isSkillEnabled(CONFIG.genos?.enableFlurry, true)) {
+      genosSkills.push({
+        id: 'flurry',
+        name: 'Machine Gun Blows',
+        type: 'active',
+        cooldownKey: 'flurryCooldown',
+        cooldownMax: () => CONFIG.genos?.flurryCooldown || 1200
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.genos?.dashes?.rocketDash?.enableRocketDash ?? CONFIG.genos?.enableRocketDash, true)) {
+      genosSkills.push({
+        id: 'rocket_dash',
+        name: 'Rocket Stomp & Dash',
+        type: 'active',
+        cooldownKey: 'dashCooldown',
+        cooldownMax: () => CONFIG.genos?.dashes?.rocketDash?.cooldown ?? CONFIG.genos?.dashCooldown ?? 360
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.genos?.enableUltimate, true)) {
+      genosSkills.push({
+        id: 'ultimate',
+        name: 'Spiral Incineration Cannon',
+        type: 'ultimate',
+        cooldownKey: 'ultCooldown',
+        cooldownMax: () => CONFIG.genos?.ultCooldown || 800,
+        durationKey: 'ultTimer',
+        activeKey: 'isFiringUlt',
+        channelingKey: 'isChargingUlt'
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.genos?.enableSelfDestruct, true)) {
+      genosSkills.push({
+        id: 'self_destruct',
+        name: 'Core Overdrive',
+        type: 'passive',
+        activeKey: 'isSelfDestructing'
+      });
+    }
+    this.skillManager.registerSkills(genosSkills);
   }
 
   /**
@@ -736,11 +778,12 @@ export class GenosFighter extends Fighter {
     }
 
     // 3. Trigger Core Overdrive when HP drops to threshold (non-fatal damage only)
+    const isSelfDestructEnabled = this.isSkillEnabled(CONFIG.genos?.enableSelfDestruct, true);
     const thresholdRatio = CONFIG.genos?.selfDestructHpThreshold ?? CONFIG.genos?.selfDestructThreshold ?? 0.10;
     const sdThreshold = this.maxHp * thresholdRatio;
     const nextHp = this.hp - amount;
 
-    if (!this.usedSelfDestruct && nextHp > 0 && nextHp <= sdThreshold) {
+    if (isSelfDestructEnabled && !this.usedSelfDestruct && nextHp > 0 && nextHp <= sdThreshold) {
       this.hp = Math.max(1, Math.min(sdThreshold, nextHp));
       this.isSelfDestructing = true;
       this.selfDestructTimer = CONFIG.genos?.selfDestructCountdownFrames || 150;
@@ -795,7 +838,8 @@ export class GenosFighter extends Fighter {
     }
 
     // ── MELEE MODE (PUNCH ATTACK) ──
-    if (this.isMeleeStance || this.heatAmmo <= 0) {
+    const isMeleeStanceEnabled = this.isSkillEnabled(CONFIG.genos?.enableMeleeStance, true);
+    if (isMeleeStanceEnabled && (this.isMeleeStance || this.heatAmmo <= 0)) {
       // Guarantee stance flag and reload timer are active — covers edge cases
       // where heatAmmo reached 0 but isMeleeStance wasn't set yet.
       if (!this.isMeleeStance) {
@@ -871,6 +915,10 @@ export class GenosFighter extends Fighter {
           audioSystem.playSFX(punchSrc, punchVol);
         }
       }
+      return;
+    }
+
+    if (!this.isSkillEnabled(CONFIG.genos?.enableBlast, true)) {
       return;
     }
 
@@ -970,7 +1018,7 @@ export class GenosFighter extends Fighter {
   }
 
   executeMachineGunBlows(opponent) {
-    if (this.flurryCooldown > 0 || !opponent) return;
+    if (!this.isSkillEnabled(CONFIG.genos?.enableFlurry, true) || this.flurryCooldown > 0 || !opponent) return;
 
     this.isDashing = false;
     this.dashTimer = 0;
@@ -1104,7 +1152,7 @@ export class GenosFighter extends Fighter {
   }
 
   executeRocketStomp(opponent) {
-    if (this.dashCooldown > 0) return;
+    if (!this.isSkillEnabled(CONFIG.genos?.dashes?.rocketDash?.enableRocketDash ?? CONFIG.genos?.enableRocketDash, true) || this.dashCooldown > 0) return;
 
     this.isDashing = false;
     this.dashTimer = 0;
@@ -1202,7 +1250,7 @@ export class GenosFighter extends Fighter {
   }
 
   executeSpiralIncinerationCannon(opponent) {
-    if (this.ultCooldown > 0) return;
+    if (!this.isSkillEnabled(CONFIG.genos?.enableUltimate, true) || this.ultCooldown > 0) return;
     const target = opponent || this._findClosestEnemy();
     if (!target && (!this.gunAngle || Number.isNaN(this.gunAngle))) return;
 
@@ -2193,15 +2241,15 @@ export class GenosFighter extends Fighter {
       const punchReach = CONFIG.genos?.meleePunchReach || 65;
       const blastRange = CONFIG.genos?.blastRange || 350;
 
-      if (this.flurryCooldown <= 0 && dist <= flurryTriggerRange) {
+      if (this.isSkillEnabled(CONFIG.genos?.enableFlurry, true) && this.flurryCooldown <= 0 && dist <= flurryTriggerRange) {
         this.executeMachineGunBlows(opponent);
       }
       // Ultimate Priority: Medium range
-      else if (this.ultCooldown <= 0 && dist >= ultMinRange && dist <= ultMaxRange) {
+      else if (this.isSkillEnabled(CONFIG.genos?.enableUltimate, true) && this.ultCooldown <= 0 && dist >= ultMinRange && dist <= ultMaxRange) {
         this.executeSpiralIncinerationCannon(opponent);
       }
       // Skill 2 Priority: Rocket Stomp
-      else if (this.dashCooldown <= 0 && dist <= stompTriggerRange) {
+      else if (this.isSkillEnabled(CONFIG.genos?.dashes?.rocketDash?.enableRocketDash ?? CONFIG.genos?.enableRocketDash, true) && this.dashCooldown <= 0 && dist <= stompTriggerRange) {
         this.executeRocketStomp(opponent);
       }
       // Basic Attack: Range

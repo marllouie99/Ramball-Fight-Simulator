@@ -7,6 +7,7 @@ import { getFighterPreview } from './ui/FighterPreviewCache.js';
 
 import { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking } from './ui/hudLayout.js';
 import { getSkillDataForFighter } from './ui/hudSkillProviders.js';
+import { applyCameraToCtx } from '../systems/cameraSystem.js';
 
 export { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking };
 
@@ -450,6 +451,9 @@ export function drawTagMatchRosterHUD(ctx) {
   const { team0Roster, team1Roster, team0ActiveSlot, team1ActiveSlot } = state.tagMatch;
   if (!team0Roster || !team1Roster || team0Roster.length < 3 || team1Roster.length < 3) return;
 
+  ctx.save();
+  applyCameraToCtx(ctx);
+
   const slotSize = 28;
   const slotGap = 6;
   const teamBlockWidth = 3 * slotSize + 2 * slotGap;
@@ -592,6 +596,8 @@ export function drawTagMatchRosterHUD(ctx) {
     }
     ctx.restore();
   }
+
+  ctx.restore();
 }
 
 /**
@@ -3043,7 +3049,8 @@ function updateHealthHud() {
 
         // Skill Bars Update for Team Member
         if (m.skillsContainer || (m.skillBars && m.skillBars.size > 0)) {
-          const skills = getSkillDataForFighter(fighter);
+          const rawSkills = getSkillDataForFighter(fighter) || [];
+          const skills = rawSkills.filter(s => shouldShowFighterSkill(fighter, s));
           if (m.skillsContainer && (skills.length !== m.skillBars.size || skills.some(s => !m.skillBars.has(s.id)))) {
             const isRight = (cachedCard.cardElement.classList.contains('align-right') || cachedCard.cardElement.parentElement?.id === 'hud-top-right' || cachedCard.cardElement.parentElement?.id === 'hud-bottom-right');
             const align = isRight ? 'right' : 'left';
@@ -3317,7 +3324,8 @@ function updateHealthHud() {
       const showDescription = CONFIG.hudShowFighterDescription || isDummy;
 
       if (!showDescription && (cachedCard.skillsContainer || cachedCard.skillBars.size > 0)) {
-        const skills = getSkillDataForFighter(fighter);
+        const rawSkills = getSkillDataForFighter(fighter) || [];
+        const skills = rawSkills.filter(s => shouldShowFighterSkill(fighter, s));
         if (cachedCard.skillsContainer && (skills.length !== cachedCard.skillBars.size || skills.some(s => !cachedCard.skillBars.has(s.id)))) {
           const isRight = (cachedCard.cardElement.classList.contains('align-right') || cachedCard.cardElement.parentElement?.id === 'hud-top-right' || cachedCard.cardElement.parentElement?.id === 'hud-bottom-right');
           const align = isRight ? 'right' : 'left';

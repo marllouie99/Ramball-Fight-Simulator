@@ -30,6 +30,7 @@ function playTodoPunchSound(fighter = null, isCombo = false) {
 
 export function modUpdateMeleeCombat(target, isCombo = false) {
   if (this.isTakadaChanneling) return;
+  if (this && typeof this.isSkillEnabled === 'function' && !this.isSkillEnabled(CONFIG.todo?.enableBasicPunch, true)) return;
   // If we are currently punching and it's not a combo trigger, we can't start a new punch
   if (!isCombo && this.punchAnimTimer > 0) return;
 

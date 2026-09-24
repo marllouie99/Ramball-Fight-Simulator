@@ -6,6 +6,8 @@
 // ─────────────────────────────────────────────
 
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
+import { getHandSize } from '../../core/config.js';
 
 const P = 2.0; // 2.0px authentic retro pixel grid
 const snap = (v) => Math.round(v / P) * P;
@@ -131,37 +133,49 @@ export function drawNezukoDemonClaws(ctx, x, y, angle, r = 25, opts = {}) {
   ctx.restore();
 }
 
-// ─── Zenitsu Weapon PNG Asset Loader ───
-let _zenitsuWeaponImage = null;
-let _zenitsuWeaponImageLoading = false;
+// ─── Zenitsu Weapon Sprite Sheet Asset Loader ───
+let _zenitsuAssemblyImage = null;
+let _zenitsuAssemblyImageLoading = false;
 
-export function _getZenitsuWeaponImage() {
-  if (_zenitsuWeaponImage && _zenitsuWeaponImage.complete && _zenitsuWeaponImage.naturalWidth > 0) {
-    return _zenitsuWeaponImage;
+export function _getZenitsuAssemblyImage() {
+  if (_zenitsuAssemblyImage && _zenitsuAssemblyImage.complete && _zenitsuAssemblyImage.naturalWidth > 0) {
+    return _zenitsuAssemblyImage;
   }
-  if (!_zenitsuWeaponImageLoading && typeof Image !== 'undefined') {
-    _zenitsuWeaponImageLoading = true;
+  if (!_zenitsuAssemblyImageLoading && typeof Image !== 'undefined') {
+    _zenitsuAssemblyImageLoading = true;
     const img = new Image();
     img.onload = () => {
-      _zenitsuWeaponImage = img;
-      _zenitsuWeaponImageLoading = false;
+      _zenitsuAssemblyImage = img;
+      _zenitsuAssemblyImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu weapon image at Assets/model/Weapon/Zenitsu-weapon.png', e);
-      _zenitsuWeaponImageLoading = false;
+      console.warn('Failed to load Zenitsu assembly sprite sheet at Assets/model/Weapon/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png', e);
+      _zenitsuAssemblyImageLoading = false;
     };
-    img.src = 'Assets/model/Weapon/Zenitsu-weapon.png?v=1';
-    _zenitsuWeaponImage = img;
+    img.src = encodeURI('Assets/model/Weapon/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png?v=1');
+    _zenitsuAssemblyImage = img;
   }
-  return _zenitsuWeaponImage;
+  return _zenitsuAssemblyImage;
+}
+
+// Backward-compatibility alias
+export function _getZenitsuWeaponImage() {
+  return _getZenitsuAssemblyImage();
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getZenitsuWeaponImage();
+  _getZenitsuAssemblyImage();
 }
 
 /**
- * Draws Zenitsu's Lightning Nichirin Katana from Assets/model/Weapon/Zenitsu-weapon.png
+ * Draws Zenitsu's Modular Lightning Nichirin Katana from:
+ * "Assets/model/Weapon/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png"
+ * Supports independent per-part tuning in Weapon Studio:
+ * 1. Blade (Nagasa)
+ * 2. Guard (Tsuba)
+ * 3. Collar (Habaki)
+ * 4. Handle (Tsuka)
+ * 5. Hands Grip (Rear & Lead Hands)
  * Falls back to procedural pixel art if the image has not loaded yet.
  */
 export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) {
@@ -171,9 +185,11 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
   // Weapon Studio customization support
   const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.zenitsu)
     ? state.weaponCustomizations.zenitsu
-    : { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+    : { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0, widthScale: 1.0, lengthScale: 1.0 };
 
   const customScale = custom.scale !== undefined ? custom.scale : 1.0;
+  const customWidthScale = custom.widthScale !== undefined ? custom.widthScale : 1.0;
+  const customLengthScale = custom.lengthScale !== undefined ? custom.lengthScale : 1.0;
   const customOffsetX = custom.offsetX !== undefined ? custom.offsetX : 0;
   const customOffsetY = custom.offsetY !== undefined ? custom.offsetY : 0;
   const customAngle = custom.angleOffset !== undefined ? custom.angleOffset : 0;
@@ -181,22 +197,138 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
   ctx.save();
   ctx.translate(x + customOffsetX, y + customOffsetY);
   ctx.rotate(angle + customAngle);
-  ctx.scale(customScale, customScale);
+  ctx.scale(customScale * customLengthScale, customScale * customWidthScale);
 
-  // ─── Try PNG Asset First ───
-  const img = _getZenitsuWeaponImage();
+  if (isPreview) {
+    ctx.translate(-24, 0); // Center the full katana in the preview window
+  }
+
+  // ─── Try Assembled Sprite Sheet First ───
+  const img = _getZenitsuAssemblyImage();
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor pixel art scaling
 
-    // Image is 2172x724. Scale so blade length matches ~94px gameplay size.
-    // Tsuba guard center is approximately at x=680, y=362 in the source image.
-    const bladeLen = 94;
-    const s = bladeLen / 1492.0; // 1492px = blade portion (from tsuba center to tip)
-    ctx.scale(s, s);
-    ctx.drawImage(img, -680, -362);
-    ctx.restore();
-    ctx.restore();
+    // Base scale maps 1130px blade to ~94px gameplay size
+    const baseScale = 94.0 / 1130.0;
+
+    const parts = custom.parts || {};
+    const handleCfg = parts.handle || {};
+    const tsubaCfg = parts.tsuba || {};
+    const habakiCfg = parts.habaki || {};
+    const bladeCfg = parts.blade || {};
+
+    // ── 1. HANDLE (Tsuka) ──
+    // Source: sx=16, sy=78, sw=475, sh=108
+    // Connects flush to left face of Tsuba (attachX = -4.53px)
+    {
+      const hw = 475 * baseScale;
+      const hh = 108 * baseScale;
+      const hScale = handleCfg.scale ?? 1.0;
+      const hL = handleCfg.lengthScale ?? 1.0;
+      const hW = handleCfg.widthScale ?? 1.0;
+      const hRot = handleCfg.angleOffset ?? 0;
+      const hOffX = handleCfg.offsetX ?? 0;
+      const hOffY = handleCfg.offsetY ?? 0;
+
+      ctx.save();
+      ctx.translate(-4.53 + hOffX, hOffY);
+      ctx.rotate(hRot);
+      ctx.scale(hScale * hL, hScale * hW);
+      ctx.drawImage(img, 16, 78, 475, 108, -hw, -4.45, hw, hh);
+      ctx.restore();
+    }
+
+    // ── 2. GUARD (Tsuba) ──
+    // Source: sx=505, sy=30, sw=121, sh=210
+    // Centered at (0, 0)
+    {
+      const tw = 121 * baseScale;
+      const th = 210 * baseScale;
+      const tScale = tsubaCfg.scale ?? 1.0;
+      const tL = tsubaCfg.lengthScale ?? 1.0;
+      const tW = tsubaCfg.widthScale ?? 1.0;
+      const tRot = tsubaCfg.angleOffset ?? 0;
+      const tOffX = tsubaCfg.offsetX ?? 0;
+      const tOffY = tsubaCfg.offsetY ?? 0;
+
+      ctx.save();
+      ctx.translate(tOffX, tOffY);
+      ctx.rotate(tRot);
+      ctx.scale(tScale * tL, tScale * tW);
+      ctx.drawImage(img, 505, 30, 121, 210, -tw / 2, -th / 2, tw, th);
+      ctx.restore();
+    }
+
+    // ── 3. COLLAR (Habaki) ──
+    // Source: sx=656, sy=93, sw=80, sh=93
+    // Connects flush to right face of Tsuba (attachX = 4.53px)
+    {
+      const hbw = 80 * baseScale;
+      const hbh = 93 * baseScale;
+      const hbScale = habakiCfg.scale ?? 1.0;
+      const hbL = habakiCfg.lengthScale ?? 1.0;
+      const hbW = habakiCfg.widthScale ?? 1.0;
+      const hbRot = habakiCfg.angleOffset ?? 0;
+      const hbOffX = habakiCfg.offsetX ?? 0;
+      const hbOffY = habakiCfg.offsetY ?? 0;
+
+      ctx.save();
+      ctx.translate(4.53 + hbOffX, hbOffY);
+      ctx.rotate(hbRot);
+      ctx.scale(hbScale * hbL, hbScale * hbW);
+      ctx.drawImage(img, 656, 93, 80, 93, 0, -hbh / 2, hbw, hbh);
+      ctx.restore();
+    }
+
+    // ── 4. BLADE (Nagasa) ──
+    // Source: sx=751, sy=100, sw=1130, sh=98
+    // Connects flush to right face of Habaki (attachX = 10.68px)
+    {
+      const bw = 1130 * baseScale;
+      const bh = 98 * baseScale;
+      const bScale = bladeCfg.scale ?? 1.0;
+      const bL = bladeCfg.lengthScale ?? 1.0;
+      const bW = bladeCfg.widthScale ?? 1.0;
+      const bRot = bladeCfg.angleOffset ?? 0;
+      const bOffX = bladeCfg.offsetX ?? 0;
+      const bOffY = bladeCfg.offsetY ?? 0;
+
+      ctx.save();
+      ctx.translate(10.68 + bOffX, bOffY);
+      ctx.rotate(bRot);
+      ctx.scale(bScale * bL, bScale * bW);
+      ctx.drawImage(img, 751, 100, 1130, 98, 0, -3.24, bw, bh);
+      ctx.restore();
+    }
+
+    // ── 5. HANDS (Two-Hand Grip on Tsuka Handle) ──
+    const shouldDrawHands = opts.drawHands || (isPreview && opts.showHands !== false);
+    if (shouldDrawHands) {
+      const handsCfg = parts.hands || {};
+      const handsOffX = handsCfg.offsetX ?? 0;
+      const handsOffY = handsCfg.offsetY ?? 0;
+      const handsScale = handsCfg.scale ?? 1.0;
+      const handsSpacing = handsCfg.spacing ?? 1.0;
+      const skinColor = opts.skinColor || '#FEE8D6';
+
+      // Rear Hand (near pommel)
+      if (!opts.hideBackHand) {
+        const backR = (getHandSize ? getHandSize(4.4) : 4.4) * handsScale;
+        const backX = -20.5 - 6.5 * handsSpacing + handsOffX;
+        drawPixelHand(ctx, backX, handsOffY, backR, skinColor, '#000000');
+      }
+
+      // Front Hand (lead grip)
+      if (!opts.hideFrontHand) {
+        const frontR = (getHandSize ? getHandSize(4.8) : 4.8) * handsScale;
+        const frontX = -20.5 + 6.5 * handsSpacing + handsOffX;
+        drawPixelHand(ctx, frontX, handsOffY, frontR, skinColor, '#000000');
+      }
+    }
+
+    ctx.restore(); // restore imageSmoothing
+    ctx.restore(); // restore outer transform
     return;
   }
 
@@ -206,7 +338,7 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
   const bladeLength = snap(48);
   const bladeWidth = snap(4);
   const hiltLength = snap(14);
-  const startX = snap(r * 0.75);
+  const startX = 0; // Tsuba guard anchored at (0, 0)
 
   // 1. Pixelated Black & Gold Scabbard (Preview / Stance)
   if (isPreview) {
@@ -240,7 +372,7 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
   ctx.fillRect(startX - 2, -5, 4, 10);
   ctx.fillRect(startX - 5, -2, 10, 4);
 
-  // 5. White Tsuka (Hilt) with Gold Diamond Wrap
+  // 5. White Tsuka (Hilt) with Gold Diamond Wrap (Extends backward from tsuba)
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(startX - hiltLength, -2, hiltLength, 4);
   ctx.fillStyle = '#F59E0B';
@@ -251,7 +383,19 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
   ctx.fillStyle = '#FBBF24';
   ctx.fillRect(startX - hiltLength - 2, -3, 2, 6);
 
-  // 6. Electric Cyan Spark Pixel
+  // 6. Hands in Procedural Fallback
+  const shouldDrawHandsFallback = opts.drawHands || (isPreview && opts.showHands !== false);
+  if (shouldDrawHandsFallback) {
+    const skinColor = opts.skinColor || '#FEE8D6';
+    if (!opts.hideBackHand) {
+      drawPixelHand(ctx, -hiltLength * 0.75, 0, getHandSize ? getHandSize(4.4) : 4.4, skinColor, '#000000');
+    }
+    if (!opts.hideFrontHand) {
+      drawPixelHand(ctx, -hiltLength * 0.25, 0, getHandSize ? getHandSize(4.8) : 4.8, skinColor, '#000000');
+    }
+  }
+
+  // 7. Electric Cyan Spark Pixel
   const isSpark = (Math.floor(now * 0.02) % 2 === 0);
   if (isSpark) {
     ctx.fillStyle = '#38BDF8';

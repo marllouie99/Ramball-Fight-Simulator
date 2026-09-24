@@ -65,29 +65,37 @@ export class NezukoFighter extends Fighter {
     this.awakeningCooldown = this.awakeningCooldownMax;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableFlyingDropkick, true)) {
+      skills.push({
         id: 'flying_dropkick',
         name: 'Flying Demon Dropkick',
         type: 'active',
         cooldownKey: 'dropkickCooldown',
         cooldownMaxKey: 'dropkickCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableExplodingBlood, true)) {
+      skills.push({
         id: 'exploding_blood',
         name: 'Exploding Blood (Bakketsu)',
         type: 'active',
         cooldownKey: 'bakketsuCooldown',
         cooldownMaxKey: 'bakketsuCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableFullAwakening, true)) {
+      skills.push({
         id: 'crimson_lotus_awakening',
         name: 'Full Demon Awakening',
         type: 'ultimate',
         cooldownKey: 'awakeningCooldown',
         cooldownMaxKey: 'awakeningCooldownMax'
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0 && this.skillManager) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   update() {
@@ -104,13 +112,21 @@ export class NezukoFighter extends Fighter {
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nezuko) ? CONFIG.nezuko : {};
+
     // Passive Demonic Regeneration (every 120 frames = 2.0s)
-    this.regenTimer++;
-    if (this.regenTimer >= 120) {
-      this.regenTimer = 0;
-      if (this.hp < this.maxHp) {
-        this.hp = Math.min(this.maxHp, this.hp + 10);
-        spawnFloatingText(this.x, this.y - 20, '+10 HP', '#4ADE80');
+    if (this.isSkillEnabled(cfg.enableDemonRegeneration, true)) {
+      this.regenTimer++;
+      const interval = cfg.regenIntervalFrames || 120;
+      if (this.regenTimer >= interval) {
+        this.regenTimer = 0;
+        if (this.hp < this.maxHp) {
+          const isLowHp = this.hp <= this.maxHp * 0.35;
+          const mult = isLowHp ? (cfg.lowHpRegenMultiplier || 2.0) : 1.0;
+          const amt = Math.round((cfg.regenAmount || 10) * mult);
+          this.hp = Math.min(this.maxHp, this.hp + amt);
+          spawnFloatingText(this.x, this.y - 20, `+${amt} HP`, '#4ADE80');
+        }
       }
     }
 
@@ -123,15 +139,19 @@ export class NezukoFighter extends Fighter {
     if (!target) return;
 
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
+    const dropkickEnabled = this.isSkillEnabled(cfg.enableFlyingDropkick, true);
+    const bakketsuEnabled = this.isSkillEnabled(cfg.enableExplodingBlood, true);
+    const awakeningEnabled = this.isSkillEnabled(cfg.enableFullAwakening, true);
+    const axeKicksEnabled = this.isSkillEnabled(cfg.enableAxeKicks, true);
 
     // AI / Skill Priority
-    if (this.awakeningCooldown <= 0 && dist < 170) {
+    if (awakeningEnabled && this.awakeningCooldown <= 0 && dist < 170) {
       this._triggerCrimsonLotusAwakening(target);
-    } else if (this.bakketsuCooldown <= 0 && dist < 130) {
+    } else if (bakketsuEnabled && this.bakketsuCooldown <= 0 && dist < 130) {
       this._triggerExplodingBlood(target);
-    } else if (this.dropkickCooldown <= 0 && dist < 160) {
+    } else if (dropkickEnabled && this.dropkickCooldown <= 0 && dist < 160) {
       this._triggerFlyingDropkick(target);
-    } else if (dist < 75 && this.slashSwingTimer <= 0) {
+    } else if (axeKicksEnabled && dist < (cfg.clawReach || 75) && this.slashSwingTimer <= 0) {
       this._executeDemonMartialCombo(target);
     }
   }
@@ -152,16 +172,20 @@ export class NezukoFighter extends Fighter {
   }
 
   _executeDemonMartialCombo(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nezuko) ? CONFIG.nezuko : {};
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this.clawComboCount = (this.clawComboCount + 1) % 3;
 
     this.aim(target);
-    const reach = 70;
-    const arc = Math.PI * 0.667; // 120 degrees (Rule 8)
+    const reach = cfg.clawReach || 70;
+    const arc = cfg.clawArcAngle || (Math.PI * 0.667); // 120 degrees (Rule 8)
     const angle = this.gunAngle || 0;
 
-    const damages = [16, 20, 30];
-    const dmg = damages[this.clawComboCount];
+    const damages = [cfg.hit1Damage || 16, cfg.hit2Damage || 20, cfg.hit3Damage || 30];
+    let dmg = damages[this.clawComboCount];
+    if (this.isSkillEnabled(cfg.enableBakketsuEmpower, true) && this.hp <= this.maxHp * 0.5) {
+      dmg *= (1 + (cfg.empoweredDamageBonus || 0.20));
+    }
 
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
     for (const ent of allEntities) {
@@ -180,7 +204,7 @@ export class NezukoFighter extends Fighter {
           spawnSparks(ent.x, ent.y, '#EC4899', 8);
           spawnBloodEffect(ent.x, ent.y, ent.bloodColor || '#DC2626');
           if (this.clawComboCount === 2) {
-            ent.applyKnockback?.(Math.cos(angle) * 26, Math.sin(angle) * 26);
+            ent.applyKnockback?.(Math.cos(angle) * (cfg.hit3Knockback || 26), Math.sin(angle) * (cfg.hit3Knockback || 26));
           }
         }
       }
@@ -192,15 +216,18 @@ export class NezukoFighter extends Fighter {
   }
 
   _triggerFlyingDropkick(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nezuko) ? CONFIG.nezuko : {};
     this.dropkickCooldown = this.dropkickCooldownMax;
     this.slashSwingTimer = this.slashSwingMaxTimer;
 
     this.aim(target);
     const angle = this.gunAngle || 0;
-    this.vx = Math.cos(angle) * 16;
-    this.vy = Math.sin(angle) * 16;
+    const spd = cfg.dropkickSpeed || 28.0;
+    this.vx = Math.cos(angle) * (spd * 0.55);
+    this.vy = Math.sin(angle) * (spd * 0.55);
 
-    applyDamageToTarget(target, 32, this);
+    const dmg = cfg.dropkickDamage || 32;
+    applyDamageToTarget(target, dmg, this);
     target.applyKnockback?.(Math.cos(angle) * 32, Math.sin(angle) * 32);
     spawnSparks(target.x, target.y, '#F472B6', 12);
     triggerGlobalScreenShake(4, 10);
@@ -208,15 +235,19 @@ export class NezukoFighter extends Fighter {
   }
 
   _triggerExplodingBlood(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nezuko) ? CONFIG.nezuko : {};
     this.bakketsuCooldown = this.bakketsuCooldownMax;
     this.slashSwingTimer = this.slashSwingMaxTimer;
+
+    const radius = cfg.bakketsuRadius || 160;
+    const dmg = cfg.bakketsuDamage || 40;
 
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
     for (const ent of allEntities) {
       if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.team === this.team) continue;
       const d = Math.hypot(ent.x - this.x, ent.y - this.y);
-      if (d <= 160 + ent.r) {
-        applyDamageToTarget(ent, 40, this);
+      if (d <= radius + ent.r) {
+        applyDamageToTarget(ent, dmg, this);
         spawnSparks(ent.x, ent.y, '#E11D48', 16);
         spawnImpactFlash(ent.x, ent.y, '#EC4899', 24);
       }
@@ -226,6 +257,7 @@ export class NezukoFighter extends Fighter {
   }
 
   _triggerCrimsonLotusAwakening(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nezuko) ? CONFIG.nezuko : {};
     this.awakeningCooldown = this.awakeningCooldownMax;
     this.slashSwingTimer = this.slashSwingMaxTimer * 2;
 
@@ -234,9 +266,13 @@ export class NezukoFighter extends Fighter {
     this.x = target.x - Math.cos(angle) * 35;
     this.y = target.y - Math.sin(angle) * 35;
 
-    applyDamageToTarget(target, 70, this);
-    target.applyKnockback?.(Math.cos(angle) * 44, Math.sin(angle) * 44);
-    this.hp = Math.min(this.maxHp, this.hp + 40);
+    const dmg = cfg.ultimateFinisherDamage || 70;
+    const knockback = cfg.ultimateFinisherKnockback || 44;
+    const heal = cfg.ultimateHealAmount || 40;
+
+    applyDamageToTarget(target, dmg, this);
+    target.applyKnockback?.(Math.cos(angle) * knockback, Math.sin(angle) * knockback);
+    this.hp = Math.min(this.maxHp, this.hp + heal);
 
     spawnSparks(target.x, target.y, '#BE185D', 20);
     spawnImpactFlash(target.x, target.y, '#EC4899', 40);

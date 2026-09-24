@@ -84,30 +84,35 @@ export class DenjiFighter extends Fighter {
     this.massacreTarget = null;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const denjiSkills = [];
+    if (this.isSkillEnabled(cfg.enableEngineLunge, true)) {
+      denjiSkills.push({
         id: 'engine_lunge',
         name: 'Engine Lunge',
         type: 'active',
         cooldownKey: 'lungeCooldown',
         cooldownMaxKey: 'lungeCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableBloodCleave, true)) {
+      denjiSkills.push({
         id: 'blood_cleave',
         name: 'Blood Cleave',
         type: 'active',
         cooldownKey: 'cleaveCooldown',
         cooldownMaxKey: 'cleaveCooldownMax'
-      },
-
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableMassacreEngine, true)) {
+      denjiSkills.push({
         id: 'massacre_engine',
         name: 'Massacre Engine',
         type: 'ultimate',
         cooldownKey: 'massacreCooldown',
         cooldownMaxKey: 'massacreCooldownMax'
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(denjiSkills);
   }
 
   takeDamage(amount, attacker = null) {
@@ -115,7 +120,7 @@ export class DenjiFighter extends Fighter {
     const actualDamage = super.takeDamage(amount, attacker);
 
     // Passive 1: Pochita Heart Ripcord Revive Trigger
-    if (this.hp <= 0 && this.reviveStocks > 0 && !this.isExecutingMassacre) {
+    if (this.isSkillEnabled(CONFIG.denji?.enablePochitaRevive, true) && this.hp <= 0 && this.reviveStocks > 0 && !this.isExecutingMassacre) {
       this._triggerPochitaRevive();
     }
 
@@ -209,25 +214,27 @@ export class DenjiFighter extends Fighter {
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
       // Ultimate check
-      if (this.massacreCooldown <= 0 && dist < 180) {
+      if (this.isSkillEnabled(CONFIG.denji?.enableMassacreEngine, true) && this.massacreCooldown <= 0 && dist < 180) {
         this._startMassacreEngine(target);
         return;
       }
 
       // Skill 1: Engine Lunge
-      if (this.lungeCooldown <= 0 && dist > 100 && dist < 260) {
+      if (this.isSkillEnabled(CONFIG.denji?.enableEngineLunge, true) && this.lungeCooldown <= 0 && dist > 100 && dist < 260) {
         this._startEngineLunge(target);
         return;
       }
 
       // Skill 2: Blood Cleave
-      if (this.cleaveCooldown <= 0 && dist > 80 && dist < 160) {
+      if (this.isSkillEnabled(CONFIG.denji?.enableBloodCleave, true) && this.cleaveCooldown <= 0 && dist > 80 && dist < 160) {
         this._performBloodCleave(target);
         return;
       }
 
       // Basic Attack String
-      if (this.attackCooldown <= 0 && dist <= (this.isHybridModeActive ? 75 : 65)) {
+      const canPunch = !this.isHybridModeActive && this.isSkillEnabled(CONFIG.denji?.enablePunches, true);
+      const canSaw = this.isHybridModeActive && this.isSkillEnabled(CONFIG.denji?.enableChainsawShred, true);
+      if ((canPunch || canSaw) && this.attackCooldown <= 0 && dist <= (this.isHybridModeActive ? 75 : 65)) {
         this._performBasicAttack(target);
       }
     }
@@ -251,6 +258,7 @@ export class DenjiFighter extends Fighter {
 
   _performBasicAttack(target) {
     if (this.isHybridModeActive) {
+      if (!this.isSkillEnabled(CONFIG.denji?.enableChainsawShred, true)) return;
       // 140° Twin Forearm Chainsaw Shred
       this.slashSwingTimer = this.slashSwingMaxTimer;
       this.sawComboCount = (this.sawComboCount + 1) % 3;
@@ -259,6 +267,7 @@ export class DenjiFighter extends Fighter {
       const dmg = (this.sawComboCount === 2) ? 24 : 16;
       this._executeFrontalArcHit(target, Math.PI * 0.778, 75, dmg, 24, true);
     } else {
+      if (!this.isSkillEnabled(CONFIG.denji?.enablePunches, true)) return;
       // 3-Hit Street Brawler Punch
       this.punchAnimTimer = this.punchMaxTime;
       this.punchComboCount = (this.punchComboCount + 1) % 3;
@@ -290,7 +299,7 @@ export class DenjiFighter extends Fighter {
           t.knockbackVy = Math.sin(targetAngle) * knockback;
 
           // Lifesteal on Saw Hit
-          if (isSaw) {
+          if (isSaw && this.isSkillEnabled(CONFIG.denji?.enableBloodSiphon, true)) {
             const heal = Math.round(damage * 0.25);
             this.hp = Math.min(this.maxHp, this.hp + heal);
             spawnBloodEffect(t.x, t.y, 6);
@@ -303,6 +312,7 @@ export class DenjiFighter extends Fighter {
   }
 
   _startEngineLunge(target) {
+    if (!this.isSkillEnabled(CONFIG.denji?.enableEngineLunge, true)) return;
     this.isEngineLunging = true;
     this.lungeTimer = this.lungeMaxTimer;
     this.lungeCooldown = this.lungeCooldownMax;
@@ -337,6 +347,7 @@ export class DenjiFighter extends Fighter {
   }
 
   _performBloodCleave(target) {
+    if (!this.isSkillEnabled(CONFIG.denji?.enableBloodCleave, true)) return;
     this.cleaveCooldown = this.cleaveCooldownMax;
     this.slashSwingTimer = this.slashSwingMaxTimer;
 
@@ -348,6 +359,7 @@ export class DenjiFighter extends Fighter {
   }
 
   _startMassacreEngine(target) {
+    if (!this.isSkillEnabled(CONFIG.denji?.enableMassacreEngine, true)) return;
     this.isExecutingMassacre = true;
     this.massacreCooldown = this.massacreCooldownMax;
     this.massacreTarget = target;
@@ -371,7 +383,9 @@ export class DenjiFighter extends Fighter {
     this.massacreTimer--;
     if (this.massacreTimer % 8 === 0 && this.massacreTarget) {
       applyDamageToTarget(this.massacreTarget, 15, this);
-      this.hp = Math.min(this.maxHp, this.hp + 6);
+      if (this.isSkillEnabled(CONFIG.denji?.enableBloodSiphon, true)) {
+        this.hp = Math.min(this.maxHp, this.hp + 6);
+      }
       spawnBloodEffect(this.massacreTarget.x, this.massacreTarget.y, 8);
     }
 

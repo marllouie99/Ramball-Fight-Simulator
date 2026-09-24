@@ -368,7 +368,7 @@ export function clampRikaToArena(rk, arena = (typeof state !== 'undefined' ? sta
 }
 
 export function updateRika(fighter, arena) {
-  if (!fighter.rika) return;
+  if (!fighter.rika || !fighter.isSkillEnabled(CONFIG.yuta?.enableRika, true)) return;
 
   const rk = fighter.rika;
   const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;

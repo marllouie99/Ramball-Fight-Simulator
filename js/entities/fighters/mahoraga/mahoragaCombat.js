@@ -84,6 +84,7 @@ export function getFrontRadiusTargets(fighter, maxRangeOffset = 75, coneAngle = 
  */
 export function performMeleeAttack(fighter, opponent) {
   if (!fighter) return;
+  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableSwordOfExtermination, true)) return;
 
   const isInsideDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
@@ -262,6 +263,7 @@ export function performMeleeAttack(fighter, opponent) {
  * Execute Cleave — Sword of Extermination AoE frontal arc.
  */
 export function executeCleave(fighter, opponent) {
+  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableCleave, true)) return;
   triggerGlobalScreenShake(8, 15);
   const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
   const swordVol = (CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0) * 0.9;
@@ -306,6 +308,7 @@ export function executeCleave(fighter, opponent) {
  */
 export function shootBladeBarrage(fighter, ownerIndex) {
   if (!projectileSystem) return;
+  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableThrowBarrage, true)) return;
 
   const throwDamage = CONFIG.mahoraga?.throwDamage ?? 14;
   const throwSpeed = CONFIG.mahoraga?.throwSpeed ?? 20;
@@ -377,6 +380,7 @@ export function shootBladeBarrage(fighter, ownerIndex) {
  * Level 8 Transformed Throw Skill: Wall Slam & Supersonic Dash Execute Combo.
  */
 export function initiateLevel8WallSlam(fighter, opponent) {
+  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableWallSlam, true)) return;
   if (!opponent || opponent.hp <= 0 || opponent.isDead) return;
   if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0 || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
 
@@ -846,6 +850,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
  * Execute Divine Shout — AoE shockwave roar.
  */
 export function executeShout(fighter, opponent, ownerIndex) {
+  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true)) return;
   const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
   const shoutDamage = CONFIG.mahoraga?.shoutDamage || 30;
   const shoutKnockback = CONFIG.mahoraga?.shoutKnockback || 18;

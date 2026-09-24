@@ -81,32 +81,40 @@ export class SaitamaFighter extends Fighter {
   }
 
   _registerSkills() {
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(CONFIG.saitama?.enableSeriousPunch, true)) {
+      skills.push({
         id: 'serious_punch',
         name: 'SERIOUS PUNCH',
         type: 'ultimate',
         cooldownKey: 'seriousPunchCooldown',
         cooldownMax: CONFIG.saitama?.seriousPunchCooldown || 1800,
         channelingKey: 'isChargingSeriousPunch'
-      },
-      {
+      });
+    }
+    if (this.isConsecutivePunchesEnabled()) {
+      skills.push({
         id: 'flurry',
         name: 'CONSECUTIVE NORMAL PUNCHES',
         type: 'offensive',
         cooldownKey: 'flurryCooldown',
         cooldownMax: CONFIG.saitama?.flurryCooldown || 540,
         activeKey: 'isFlurrying'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.saitama?.enableSideHops, true)) {
+      skills.push({
         id: 'side_hops',
         name: 'OMNI-DIRECTIONAL SIDE HOPS',
         type: 'mobility',
         cooldownKey: 'sideHopsCooldown',
         cooldownMax: CONFIG.saitama?.sideHopsCooldown || 600,
         activeKey: 'isSideHopping'
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   /**
@@ -187,8 +195,8 @@ export class SaitamaFighter extends Fighter {
    */
   isNormalPunchEnabled() {
     if (CONFIG.saitama?.disableNormalPunch === true) return false;
-    if (CONFIG.saitama?.normalPunchEnabled !== undefined) return Boolean(CONFIG.saitama.normalPunchEnabled);
-    if (CONFIG.saitama?.punchEnabled !== undefined) return Boolean(CONFIG.saitama.punchEnabled);
+    if (!this.isSkillEnabled(CONFIG.saitama?.normalPunchEnabled, true)) return false;
+    if (!this.isSkillEnabled(CONFIG.saitama?.punchEnabled, true)) return false;
     return true;
   }
 
@@ -197,8 +205,8 @@ export class SaitamaFighter extends Fighter {
    */
   isConsecutivePunchesEnabled() {
     if (CONFIG.saitama?.disableConsecutivePunches === true || CONFIG.saitama?.disableFlurry === true) return false;
-    if (CONFIG.saitama?.consecutivePunchesEnabled !== undefined) return Boolean(CONFIG.saitama.consecutivePunchesEnabled);
-    if (CONFIG.saitama?.flurryEnabled !== undefined) return Boolean(CONFIG.saitama.flurryEnabled);
+    if (!this.isSkillEnabled(CONFIG.saitama?.consecutivePunchesEnabled, true)) return false;
+    if (!this.isSkillEnabled(CONFIG.saitama?.flurryEnabled, true)) return false;
     return true;
   }
 
@@ -540,7 +548,7 @@ export class SaitamaFighter extends Fighter {
     // Check if Nanami or Escanor is currently executing a hit-pause
     const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
 
-    if (this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isGlobalHitPausing) {
+    if (!this.isSkillEnabled(CONFIG.saitama?.enableDodge, true) || this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isGlobalHitPausing) {
       return false;
     }
     // Block dodge if time-stopped by non-domain effects
@@ -836,6 +844,7 @@ export class SaitamaFighter extends Fighter {
    * The actual punch damage lands after _counterPunchTimer counts down (Phase 2).
    */
   executeSkillCounterPunish(target) {
+    if (!this.isSkillEnabled(CONFIG.saitama?.enableSeriousCounter, true)) return false;
     if (this.hp <= 0 || !target || target.hp <= 0 || target === this) return false;
     if (this.skillPunishCooldown > 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
@@ -2090,14 +2099,19 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Passive: Boredom Threshold counter (5 seconds without dealing damage = +1 stack)
-    const interval = CONFIG.saitama?.boredomStackInterval || 300;
-    const maxStacks = CONFIG.saitama?.boredomMaxStacks || 5;
-    if (this.boredomStacks < maxStacks) {
-      this.boredomTimer = (this.boredomTimer || 0) + 1;
-      if (this.boredomTimer >= interval) {
-        this.boredomStacks++;
-        this.boredomTimer = 0;
+    if (this.isSkillEnabled(CONFIG.saitama?.enableHeroForFun, true)) {
+      const interval = CONFIG.saitama?.boredomStackInterval || 300;
+      const maxStacks = CONFIG.saitama?.boredomMaxStacks || 5;
+      if (this.boredomStacks < maxStacks) {
+        this.boredomTimer = (this.boredomTimer || 0) + 1;
+        if (this.boredomTimer >= interval) {
+          this.boredomStacks++;
+          this.boredomTimer = 0;
+        }
       }
+    } else {
+      this.boredomStacks = 0;
+      this.boredomTimer = 0;
     }
 
     if (this.dodgeStallTimer > 0) {

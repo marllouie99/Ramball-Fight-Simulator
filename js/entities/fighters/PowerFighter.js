@@ -74,30 +74,42 @@ export class PowerFighter extends Fighter {
     this.bloodRainTimer = 0;
     this.isHammerLunging = false;
 
-    // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    this._registerSkills();
+  }
+
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.power) ? CONFIG.power : {};
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableBloodScythe, true)) {
+      skills.push({
         id: 'blood_scythe',
         name: 'Blood Scythe',
         type: 'active',
         cooldownKey: 'scytheCooldown',
         cooldownMaxKey: 'scytheCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableBloodDaggers, true)) {
+      skills.push({
         id: 'blood_daggers',
         name: 'Thousand Daggers',
         type: 'active',
         cooldownKey: 'daggersCooldown',
         cooldownMaxKey: 'daggersCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableBloodRainCataclysm, true)) {
+      skills.push({
         id: 'blood_rain',
         name: 'Blood Rain Cataclysm',
         type: 'ultimate',
         cooldownKey: 'bloodRainCooldown',
         cooldownMaxKey: 'bloodRainCooldownMax'
-      }
-    ]);
+      });
+    }
+    if (skills.length > 0 && this.skillManager) {
+      this.skillManager.registerSkills(skills);
+    }
   }
 
   _queryAllTargets() {
@@ -152,27 +164,33 @@ export class PowerFighter extends Fighter {
     if (target) {
       this.aim(target);
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.power) ? CONFIG.power : {};
+
+      const ultEnabled = this.isSkillEnabled(cfg.enableBloodRainCataclysm, true);
+      const daggersEnabled = this.isSkillEnabled(cfg.enableBloodDaggers, true);
+      const scytheEnabled = this.isSkillEnabled(cfg.enableBloodScythe, true);
+      const hammerEnabled = this.isSkillEnabled(cfg.enableBloodHammer, true);
 
       // Ultimate
-      if (this.bloodRainCooldown <= 0 && dist < 220) {
+      if (ultEnabled && this.bloodRainCooldown <= 0 && dist < 220) {
         this._startBloodRain(target);
         return;
       }
 
       // Skill 2: Thousand Blood Daggers
-      if (this.daggersCooldown <= 0 && dist > 120 && dist < 320) {
+      if (daggersEnabled && this.daggersCooldown <= 0 && dist > 120 && dist < 320) {
         this._launchBloodDaggers(target);
         return;
       }
 
       // Skill 1: Blood Scythe
-      if (this.scytheCooldown <= 0 && dist < 110) {
+      if (scytheEnabled && this.scytheCooldown <= 0 && dist < 110) {
         this._startScytheSpin();
         return;
       }
 
       // Basic Attack: Gigantic Blood Hammer
-      if (this.attackCooldown <= 0 && dist <= 85) {
+      if (hammerEnabled && this.attackCooldown <= 0 && dist <= (cfg.hammerReach || 85)) {
         this._performBloodHammerAttack(target);
       }
     }
@@ -195,24 +213,37 @@ export class PowerFighter extends Fighter {
   }
 
   _performBloodHammerAttack(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.power) ? CONFIG.power : {};
+    if (!this.isSkillEnabled(cfg.enableBloodHammer, true)) return;
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this.hammerComboCount = (this.hammerComboCount + 1) % 3;
     this.attackCooldown = 22;
 
-    const dmg = (this.hammerComboCount === 2) ? 36 : 24;
-    const kb = (this.hammerComboCount === 2) ? 28 : 18;
+    const hitDamages = [cfg.hammerHit1Damage || 24, cfg.hammerHit2Damage || 24, cfg.hammerHit3Damage || 36];
+    let dmg = hitDamages[this.hammerComboCount];
+    const kb = (this.hammerComboCount === 2) ? (cfg.hammerHit2Knockback || 28) : 18;
+
+    // Passive 1: Blood Reservoir bonus
+    if (this.isSkillEnabled(cfg.enableBloodReservoir, true) && this.bloodGauge > 0) {
+      const bloodSteps = Math.floor(this.bloodGauge / 25);
+      dmg *= (1 + bloodSteps * (cfg.damageBonusPer25Blood || 0.05));
+    }
+    // Passive 2: Fiend Arrogance bonus vs bleeding
+    if (this.isSkillEnabled(cfg.enableFiendArrogance, true) && (target?.isBleeding || target?.bleedTimer > 0)) {
+      dmg *= (1 + (cfg.bonusDamageVsBleeding || 0.20));
+    }
 
     // 140° Frontal Arc Multi-Target Cleave
     const targets = this._queryAllTargets();
     const aim = this.gunAngle || this.angle || 0;
-    const arc = Math.PI * 0.778; // 140 deg
+    const arc = cfg.hammerArcAngle || (Math.PI * 0.778); // 140 deg
 
     for (let t of targets) {
       const dx = t.x - this.x;
       const dy = t.y - this.y;
       const d = Math.hypot(dx, dy);
 
-      if (d <= 85 + (t.r || 20)) {
+      if (d <= (cfg.hammerReach || 85) + (t.r || 20)) {
         const targetAngle = Math.atan2(dy, dx);
         let diff = targetAngle - aim;
         while (diff < -Math.PI) diff += Math.PI * 2;

@@ -12,6 +12,7 @@ const ZOOM_STEP = 0.3;
 const ZOOM_DEFAULT = 2.4;
 // Selected detail group for editing: null | 'finger' | 'position' | 'scale_angle'
 if (state.studioSelectedDetail === undefined) state.studioSelectedDetail = null;
+if (state.studioZenitsuPart === undefined) state.studioZenitsuPart = 'overall';
 
 // Interactive Drag States
 let isDraggingBase = false;
@@ -44,7 +45,17 @@ function initCustomizations() {
       megumi: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       cj: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-      escanor: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+      escanor: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      zenitsu: {
+        offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0, widthScale: 1.0, lengthScale: 1.0,
+        parts: {
+          blade:  { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          tsuba:  { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          habaki: { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          handle: { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          hands:  { offsetX: 0, offsetY: 0, scale: 1.0, spacing: 1.0 }
+        }
+      }
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
@@ -67,13 +78,43 @@ function initCustomizations() {
   if (!state.weaponCustomizations.escanor) {
     state.weaponCustomizations.escanor = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
-  // Ensure drawOrder exists (migration for older saves)
+  if (!state.weaponCustomizations.zenitsu) {
+    state.weaponCustomizations.zenitsu = {
+      offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0, widthScale: 1.0, lengthScale: 1.0,
+      parts: {
+        blade:  { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+        tsuba:  { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+        habaki: { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+        handle: { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+        hands:  { offsetX: 0, offsetY: 0, scale: 1.0, spacing: 1.0 }
+      }
+    };
+  } else {
+    if (!state.weaponCustomizations.zenitsu.parts) {
+      state.weaponCustomizations.zenitsu.parts = {};
+    }
+    const p = state.weaponCustomizations.zenitsu.parts;
+    ['blade', 'tsuba', 'habaki', 'handle'].forEach(k => {
+      if (!p[k]) p[k] = { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 };
+      if (p[k].widthScale === undefined) p[k].widthScale = 1.0;
+      if (p[k].lengthScale === undefined) p[k].lengthScale = 1.0;
+    });
+    if (!p.hands) p.hands = { offsetX: 0, offsetY: 0, scale: 1.0, spacing: 1.0 };
+  }
   if (!state.weaponCustomizations.mahito.drawOrder) {
     state.weaponCustomizations.mahito.drawOrder = [0, 1, 2, 3];
   }
   if (state.weaponCustomizations.mahito.weaponScale === undefined) {
     state.weaponCustomizations.mahito.weaponScale = 1.0;
   }
+  
+  // Migration for widthScale and lengthScale
+  Object.keys(state.weaponCustomizations).forEach(k => {
+    if (k !== 'mahito' && state.weaponCustomizations[k]) {
+      if (state.weaponCustomizations[k].widthScale === undefined) state.weaponCustomizations[k].widthScale = 1.0;
+      if (state.weaponCustomizations[k].lengthScale === undefined) state.weaponCustomizations[k].lengthScale = 1.0;
+    }
+  });
 }
 
 export function drawWeaponStudioScreen() {
@@ -128,95 +169,67 @@ export function drawWeaponStudioScreen() {
     { key: 'megumi', label: 'MEGUMI' },
     { key: 'john_wick', label: 'JOHN WICK' },
     { key: 'cj', label: 'CJ' },
-    { key: 'escanor', label: 'ESCANOR' }
+    { key: 'escanor', label: 'ESCANOR' },
+    { key: 'zenitsu', label: 'ZENITSU' }
   ];
 
-  // Row 1: First 6 weapons, Row 2: Remaining 6 weapons
-  const row1 = weapons.slice(0, 6);
-  const row2 = weapons.slice(6);
+  // Distribute across 3 rows for better spacing (5, 5, 4)
+  const row1 = weapons.slice(0, 5);
+  const row2 = weapons.slice(5, 10);
+  const row3 = weapons.slice(10);
 
   const rW = 80;
   const rH = 22;
   const rSpacing = 5;
-  const rTotalW = row1.length * rW + (row1.length - 1) * rSpacing;
-  let r1StartX = (canvas.width - rTotalW) / 2;
 
-  row1.forEach((w) => {
-    const isSelected = activeWeaponKey === w.key;
-    ctx.save();
-    if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.2;
-    } else {
-      ctx.fillStyle = 'rgba(16, 20, 28, 0.90)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
-    }
-    drawChamferedRect(ctx, r1StartX, 88, rW, rH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+  const renderRow = (row, startY) => {
+    const rTotalW = row.length * rW + (row.length - 1) * rSpacing;
+    let rStartX = (canvas.width - rTotalW) / 2;
 
-    ctx.fillStyle = isSelected ? '#f8fafc' : '#64748b';
-    ctx.font = '900 9.5px "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(w.label, r1StartX + rW / 2, 88 + rH / 2);
+    row.forEach((w) => {
+      const isSelected = activeWeaponKey === w.key;
+      ctx.save();
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.2;
+      } else {
+        ctx.fillStyle = 'rgba(16, 20, 28, 0.90)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, rStartX, startY, rW, rH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
 
-    _registerButton(r1StartX, 88, rW, rH, () => {
-      state.studioSelectedWeapon = w.key;
-      state.studioSelectedDetail = null;
-      isDraggingBase = false;
-      isDraggingTip = false;
-      activeDragFinger = -1;
-      activeDragType = null;
+      ctx.fillStyle = isSelected ? '#f8fafc' : '#64748b';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(w.label, rStartX + rW / 2, startY + rH / 2);
+
+      _registerButton(rStartX, startY, rW, rH, () => {
+        state.studioSelectedWeapon = w.key;
+        state.studioSelectedDetail = null;
+        isDraggingBase = false;
+        isDraggingTip = false;
+        activeDragFinger = -1;
+        activeDragType = null;
+      });
+      rStartX += rW + rSpacing;
     });
-    r1StartX += rW + rSpacing;
-  });
+  };
 
-  // Row 2: Remaining 6 weapons
-  let r2StartX = (canvas.width - rTotalW) / 2;
-
-  row2.forEach((w) => {
-    const isSelected = activeWeaponKey === w.key;
-    ctx.save();
-    if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.2;
-    } else {
-      ctx.fillStyle = 'rgba(16, 20, 28, 0.90)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
-    }
-    drawChamferedRect(ctx, r2StartX, 114, rW, rH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.fillStyle = isSelected ? '#f8fafc' : '#64748b';
-    ctx.font = '900 9.5px "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(w.label, r2StartX + rW / 2, 114 + rH / 2);
-
-    _registerButton(r2StartX, 114, rW, rH, () => {
-      state.studioSelectedWeapon = w.key;
-      state.studioSelectedDetail = null;
-      isDraggingBase = false;
-      isDraggingTip = false;
-      activeDragFinger = -1;
-      activeDragType = null;
-    });
-    r2StartX += rW + rSpacing;
-  });
+  renderRow(row1, 88);
+  renderRow(row2, 114);
+  renderRow(row3, 140);
 
   // ── Tier 2: Precision Viewport Stage ──
   const viewportX = 16;
-  const viewportY = 142;
+  const viewportY = 168;
   const viewportW = canvas.width - 32; // 508px
-  const viewportH = 372;
+  const viewportH = 346;
   const heroX = canvas.width / 2;
   const heroY = viewportY + viewportH / 2;
 
@@ -301,6 +314,34 @@ export function drawWeaponStudioScreen() {
         // Guide line
         ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(tx, ty);
         ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 0.8; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
+      }
+    } else if (activeWeaponKey === 'zenitsu') {
+      const custom = state.weaponCustomizations.zenitsu;
+      const partKey = state.studioZenitsuPart || 'overall';
+      const target = (partKey === 'overall')
+        ? custom
+        : ((custom.parts && custom.parts[partKey]) ? custom.parts[partKey] : custom);
+
+      const baseLx = -64 + custom.offsetX + (partKey !== 'overall' ? (target.offsetX || 0) : 0);
+      const baseLy = custom.offsetY + (partKey !== 'overall' ? (target.offsetY || 0) : 0);
+
+      if (state.studioSelectedDetail === 'position') {
+        ctx.beginPath(); ctx.arc(baseLx, baseLy, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = isDraggingBase ? '#00ffff' : 'rgba(0, 255, 255, 0.85)';
+        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.0; ctx.stroke();
+      } else if (state.studioSelectedDetail === 'scale_angle' || state.studioSelectedDetail === 'hands_size') {
+        const lineLen = 70;
+        const curScale = target.scale ?? 1.0;
+        const curAngle = target.angleOffset ?? 0;
+        const tipLx = baseLx + lineLen * curScale * Math.cos(curAngle);
+        const tipLy = baseLy + lineLen * curScale * Math.sin(curAngle);
+
+        ctx.beginPath(); ctx.arc(tipLx, tipLy, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = isDraggingTip ? '#f59e0b' : 'rgba(245, 158, 11, 0.85)';
+        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.0; ctx.stroke();
+
+        ctx.beginPath(); ctx.moveTo(baseLx, baseLy); ctx.lineTo(tipLx, tipLy);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 0.8; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
       }
     } else if (activeWeaponKey !== 'mahito') {
       const custom = state.weaponCustomizations[activeWeaponKey];
@@ -608,20 +649,26 @@ export function drawWeaponStudioScreen() {
     const custom = state.weaponCustomizations.cj || { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
     let curY = consoleY + 34;
 
-    const modeW = Math.floor((rightConsoleW - 36) / 2);
-    const isPosMode = (state.studioSelectedDetail !== 'scale_angle');
+    const modeW = Math.floor((rightConsoleW - 44) / 3);
+    const isPosMode = (state.studioSelectedDetail === 'position');
+    const isScaleMode = (state.studioSelectedDetail === 'scale_angle');
+    const isPropMode = (state.studioSelectedDetail === 'proportions');
 
-    drawButton('📍 POSITION', rightConsoleX + 14 + modeW / 2, curY + 10, () => {
+    drawButton('📍 POS', rightConsoleX + 14 + modeW / 2, curY + 10, () => {
       state.studioSelectedDetail = 'position';
     }, modeW, 22, isPosMode ? '#16a34a' : null, 3);
 
-    drawButton('📐 SCALE & ROT', rightConsoleX + 22 + modeW + modeW / 2, curY + 10, () => {
+    drawButton('📐 ROT', rightConsoleX + 22 + modeW + modeW / 2, curY + 10, () => {
       state.studioSelectedDetail = 'scale_angle';
-    }, modeW, 22, !isPosMode ? '#16a34a' : null, 3);
+    }, modeW, 22, isScaleMode ? '#16a34a' : null, 3);
+
+    drawButton('📏 PROP', rightConsoleX + 30 + modeW * 2 + modeW / 2, curY + 10, () => {
+      state.studioSelectedDetail = 'proportions';
+    }, modeW, 22, isPropMode ? '#16a34a' : null, 3);
 
     curY += 40;
 
-    if (isPosMode) {
+    if (state.studioSelectedDetail === 'position') {
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 11.5px "Rajdhani", sans-serif';
       ctx.fillText(`OFFSET X: ${Math.round(custom.offsetX)}px`, rightConsoleX + 14, curY + 4);
@@ -638,7 +685,7 @@ export function drawWeaponStudioScreen() {
       ctx.font = '900 9.5px "Rajdhani", sans-serif';
       ctx.fillText('DRAG TEAL HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
       ctx.fillText('FOR REAL-TIME POSITIONING', rightConsoleX + 14, curY + 26);
-    } else {
+    } else if (state.studioSelectedDetail === 'scale_angle') {
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 11.5px "Rajdhani", sans-serif';
       ctx.fillText(`SCALE: ${custom.scale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
@@ -656,6 +703,222 @@ export function drawWeaponStudioScreen() {
       ctx.font = '900 9.5px "Rajdhani", sans-serif';
       ctx.fillText('DRAG AMBER HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
       ctx.fillText('FOR REAL-TIME ROTATION & SCALE', rightConsoleX + 14, curY + 26);
+    } else if (state.studioSelectedDetail === 'proportions') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11.5px "Rajdhani", sans-serif';
+      ctx.fillText(`WIDTH: ${custom.widthScale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.widthScale = Math.max(0.3, custom.widthScale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.widthScale = Math.min(3.0, custom.widthScale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 36;
+
+      ctx.fillText(`LENGTH: ${custom.lengthScale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.lengthScale = Math.max(0.3, custom.lengthScale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.lengthScale = Math.min(3.0, custom.lengthScale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 36;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.fillText('DRAG AMBER HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+      ctx.fillText('FOR REAL-TIME PROPORTIONS', rightConsoleX + 14, curY + 26);
+    }
+  } else if (activeWeaponKey === 'zenitsu') {
+    ctx.fillText('KATANA ASSEMBLY PARTS //', leftConsoleX + 14, consoleY + 12);
+    ctx.fillText('PART CALIBRATION //', rightConsoleX + 14, consoleY + 12);
+
+    if (state.studioZenitsuPart === undefined) state.studioZenitsuPart = 'overall';
+
+    const zenitsuParts = [
+      { id: 'overall', label: '[ALL] ASSEMBLY', desc: 'Whole Katana & grip sync' },
+      { id: 'blade', label: '1. BLADE (NAGASA)', desc: 'Lightning hamon edge' },
+      { id: 'tsuba', label: '2. GUARD (TSUBA)', desc: 'Black & gold oval disc' },
+      { id: 'habaki', label: '3. COLLAR (HABAKI)', desc: 'Blade collar connector' },
+      { id: 'handle', label: '4. HANDLE (TSUKA)', desc: 'Tsuka wrap & pommel' },
+      { id: 'hands', label: '5. HANDS GRIP', desc: 'Two-hand grip & size' }
+    ];
+
+    zenitsuParts.forEach((part, idx) => {
+      const cardY = consoleY + 28 + idx * 47;
+      const cardW = leftConsoleW - 24;
+      const cardH = 41;
+      const cardX = leftConsoleX + 12;
+      const isSelected = (state.studioZenitsuPart === part.id);
+
+      ctx.save();
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, cardX, cardY, cardW, cardH, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = isSelected ? '#ffffff' : '#94a3b8';
+      ctx.font = '900 10px "Rajdhani", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(part.label, cardX + 10, cardY + 7);
+
+      ctx.fillStyle = isSelected ? '#f59e0b' : '#64748b';
+      ctx.font = '900 8.5px "Rajdhani", sans-serif';
+      ctx.fillText(part.desc, cardX + 10, cardY + 22);
+
+      _registerButton(cardX, cardY, cardW, cardH, () => {
+        state.studioZenitsuPart = part.id;
+        if (!state.studioSelectedDetail) {
+          state.studioSelectedDetail = 'position';
+        }
+      });
+    });
+
+    // Right Console Metrics for Zenitsu
+    const activePartKey = state.studioZenitsuPart || 'overall';
+    const zenitsuCustom = state.weaponCustomizations.zenitsu;
+    if (!zenitsuCustom.parts) zenitsuCustom.parts = {};
+    if (!zenitsuCustom.parts[activePartKey] && activePartKey !== 'overall') {
+      zenitsuCustom.parts[activePartKey] = (activePartKey === 'hands')
+        ? { offsetX: 0, offsetY: 0, scale: 1.0, spacing: 1.0 }
+        : { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 };
+    }
+    const targetObj = (activePartKey === 'overall') ? zenitsuCustom : zenitsuCustom.parts[activePartKey];
+
+    let curY = consoleY + 34;
+
+    if (activePartKey === 'hands') {
+      // Hands modes: POS & SIZE
+      const modeW = Math.floor((rightConsoleW - 36) / 2);
+      const isPosMode = (state.studioSelectedDetail === 'position');
+      const isSizeMode = (state.studioSelectedDetail === 'hands_size' || state.studioSelectedDetail === 'scale_angle');
+
+      drawButton('📍 POS', rightConsoleX + 14 + modeW / 2, curY + 10, () => {
+        state.studioSelectedDetail = 'position';
+      }, modeW, 22, isPosMode ? '#f59e0b' : null, 3);
+
+      drawButton('📐 SIZE & SPACING', rightConsoleX + 22 + modeW + modeW / 2, curY + 10, () => {
+        state.studioSelectedDetail = 'hands_size';
+      }, modeW, 22, isSizeMode ? '#f59e0b' : null, 3);
+
+      curY += 40;
+
+      if (isPosMode) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 11.5px "Rajdhani", sans-serif';
+        ctx.fillText(`OFFSET X: ${Math.round(targetObj.offsetX || 0)}px`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.offsetX = (targetObj.offsetX || 0) - 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.offsetX = (targetObj.offsetX || 0) + 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        ctx.fillText(`OFFSET Y: ${Math.round(targetObj.offsetY || 0)}px`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.offsetY = (targetObj.offsetY || 0) - 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.offsetY = (targetObj.offsetY || 0) + 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '900 9.5px "Rajdhani", sans-serif';
+        ctx.fillText('NUDGE HANDS ALONG KATANA TSUKA', rightConsoleX + 14, curY + 10);
+        ctx.fillText('FOR PERFECT TWO-HAND GRIP ALIGNMENT', rightConsoleX + 14, curY + 26);
+      } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 11.5px "Rajdhani", sans-serif';
+        const hScale = targetObj.scale ?? 1.0;
+        ctx.fillText(`HAND SIZE: ${hScale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.scale = Math.max(0.3, (targetObj.scale ?? 1.0) - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.scale = Math.min(2.5, (targetObj.scale ?? 1.0) + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        const hSpacing = targetObj.spacing ?? 1.0;
+        ctx.fillText(`GRIP SPACING: ${hSpacing.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.spacing = Math.max(0.2, (targetObj.spacing ?? 1.0) - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.spacing = Math.min(2.5, (targetObj.spacing ?? 1.0) + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '900 9.5px "Rajdhani", sans-serif';
+        ctx.fillText('ADJUST HAND PROPORTIONS & DISTANCE', rightConsoleX + 14, curY + 10);
+        ctx.fillText('BETWEEN REAR AND LEAD HANDS', rightConsoleX + 14, curY + 26);
+      }
+    } else {
+      // General parts & overall: POS, ROT, PROP
+      const modeW = Math.floor((rightConsoleW - 44) / 3);
+      const isPosMode = (state.studioSelectedDetail === 'position');
+      const isScaleMode = (state.studioSelectedDetail === 'scale_angle');
+      const isPropMode = (state.studioSelectedDetail === 'proportions');
+
+      drawButton('📍 POS', rightConsoleX + 14 + modeW / 2, curY + 10, () => {
+        state.studioSelectedDetail = 'position';
+      }, modeW, 22, isPosMode ? '#f59e0b' : null, 3);
+
+      drawButton('📐 ROT', rightConsoleX + 22 + modeW + modeW / 2, curY + 10, () => {
+        state.studioSelectedDetail = 'scale_angle';
+      }, modeW, 22, isScaleMode ? '#f59e0b' : null, 3);
+
+      drawButton('📏 PROP', rightConsoleX + 30 + modeW * 2 + modeW / 2, curY + 10, () => {
+        state.studioSelectedDetail = 'proportions';
+      }, modeW, 22, isPropMode ? '#f59e0b' : null, 3);
+
+      curY += 40;
+
+      if (isPosMode) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 11.5px "Rajdhani", sans-serif';
+        ctx.fillText(`OFFSET X: ${Math.round(targetObj.offsetX || 0)}px`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.offsetX = (targetObj.offsetX || 0) - 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.offsetX = (targetObj.offsetX || 0) + 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        ctx.fillText(`OFFSET Y: ${Math.round(targetObj.offsetY || 0)}px`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.offsetY = (targetObj.offsetY || 0) - 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.offsetY = (targetObj.offsetY || 0) + 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '900 9.5px "Rajdhani", sans-serif';
+        ctx.fillText('DRAG TEAL HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+        ctx.fillText('FOR REAL-TIME POSITIONING', rightConsoleX + 14, curY + 26);
+      } else if (isScaleMode) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 11.5px "Rajdhani", sans-serif';
+        const curScale = targetObj.scale ?? 1.0;
+        ctx.fillText(`SCALE: ${curScale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.scale = Math.max(0.2, (targetObj.scale ?? 1.0) - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.scale = Math.min(3.0, (targetObj.scale ?? 1.0) + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        const deg = Math.round((targetObj.angleOffset || 0) * (180 / Math.PI));
+        ctx.fillText(`ROTATION: ${deg}°`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.angleOffset = (targetObj.angleOffset || 0) - 0.05; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.angleOffset = (targetObj.angleOffset || 0) + 0.05; saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '900 9.5px "Rajdhani", sans-serif';
+        ctx.fillText('DRAG AMBER HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+        ctx.fillText('FOR REAL-TIME ROTATION & SCALE', rightConsoleX + 14, curY + 26);
+      } else if (isPropMode) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 11.5px "Rajdhani", sans-serif';
+        const curW = targetObj.widthScale ?? 1.0;
+        ctx.fillText(`WIDTH: ${curW.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.widthScale = Math.max(0.2, (targetObj.widthScale ?? 1.0) - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.widthScale = Math.min(3.0, (targetObj.widthScale ?? 1.0) + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        const curL = targetObj.lengthScale ?? 1.0;
+        ctx.fillText(`LENGTH: ${curL.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+        drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { targetObj.lengthScale = Math.max(0.2, (targetObj.lengthScale ?? 1.0) - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { targetObj.lengthScale = Math.min(3.0, (targetObj.lengthScale ?? 1.0) + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+        curY += 36;
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '900 9.5px "Rajdhani", sans-serif';
+        ctx.fillText('ADJUST THICKNESS & LENGTH', rightConsoleX + 14, curY + 10);
+        ctx.fillText('OF THE SELECTED COMPONENT', rightConsoleX + 14, curY + 26);
+      }
     }
   } else {
     // Non-Mahito / Non-CJ Weapons Console
@@ -664,7 +927,8 @@ export function drawWeaponStudioScreen() {
 
     const detailOptions = [
       { id: 'position', label: 'POSITION (X, Y)', desc: 'Translate weapon grip point' },
-      { id: 'scale_angle', label: 'SCALE & ROTATION', desc: 'Adjust size & tilt angle' }
+      { id: 'scale_angle', label: 'SCALE & ROTATION', desc: 'Adjust size & tilt angle' },
+      { id: 'proportions', label: 'PROPORTIONS (W, L)', desc: 'Adjust width & length' }
     ];
 
     detailOptions.forEach((opt, idx) => {
@@ -744,6 +1008,24 @@ export function drawWeaponStudioScreen() {
       ctx.fillText('DRAG AMBER HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
       ctx.fillText('FOR REAL-TIME ROTATION & SCALE', rightConsoleX + 14, curY + 26);
 
+    } else if (state.studioSelectedDetail === 'proportions') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11.5px "Rajdhani", sans-serif';
+      ctx.fillText(`WIDTH: ${custom.widthScale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.widthScale = Math.max(0.3, custom.widthScale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.widthScale = Math.min(3.0, custom.widthScale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 38;
+
+      ctx.fillText(`LENGTH: ${custom.lengthScale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.lengthScale = Math.max(0.3, custom.lengthScale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.lengthScale = Math.min(3.0, custom.lengthScale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 38;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.fillText('DRAG AMBER HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+      ctx.fillText('FOR REAL-TIME PROPORTIONS', rightConsoleX + 14, curY + 26);
+
     } else {
       ctx.fillStyle = '#64748b';
       ctx.font = '900 10px "Rajdhani", sans-serif';
@@ -766,11 +1048,28 @@ export function drawWeaponStudioScreen() {
         state.weaponCustomizations.mahito.drawOrder = [0, 1, 2, 3];
         state.weaponCustomizations.mahito.weaponScale = 1.0;
         state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+      } else if (activeWeaponKey === 'zenitsu') {
+        const custom = state.weaponCustomizations.zenitsu;
+        custom.offsetX = 0;
+        custom.offsetY = 0;
+        custom.scale = 1.0;
+        custom.widthScale = 1.0;
+        custom.lengthScale = 1.0;
+        custom.angleOffset = 0;
+        custom.parts = {
+          blade:  { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          tsuba:  { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          habaki: { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          handle: { offsetX: 0, offsetY: 0, scale: 1.0, widthScale: 1.0, lengthScale: 1.0, angleOffset: 0 },
+          hands:  { offsetX: 0, offsetY: 0, scale: 1.0, spacing: 1.0 }
+        };
       } else {
         const custom = state.weaponCustomizations[activeWeaponKey];
         custom.offsetX = 0;
         custom.offsetY = 0;
         custom.scale = 1.0;
+        custom.widthScale = 1.0;
+        custom.lengthScale = 1.0;
         custom.angleOffset = 0;
       }
       saveWeaponCustomizations();
@@ -836,6 +1135,32 @@ if (typeof window !== 'undefined') {
         activeDragType = 'tip';
         return;
       }
+    } else if (activeWeaponKey === 'zenitsu') {
+      const custom = state.weaponCustomizations.zenitsu;
+      const partKey = state.studioZenitsuPart || 'overall';
+      const target = (partKey === 'overall')
+        ? custom
+        : ((custom.parts && custom.parts[partKey]) ? custom.parts[partKey] : custom);
+
+      const baseLx = -64 + custom.offsetX + (partKey !== 'overall' ? (target.offsetX || 0) : 0);
+      const baseLy = custom.offsetY + (partKey !== 'overall' ? (target.offsetY || 0) : 0);
+
+      if (state.studioSelectedDetail === 'position') {
+        if (Math.hypot(localX - baseLx, localY - baseLy) < 16) {
+          isDraggingBase = true;
+          return;
+        }
+      } else if (state.studioSelectedDetail === 'scale_angle' || state.studioSelectedDetail === 'hands_size') {
+        const lineLen = 70;
+        const curScale = target.scale ?? 1.0;
+        const curAngle = target.angleOffset ?? 0;
+        const tipLx = baseLx + lineLen * curScale * Math.cos(curAngle);
+        const tipLy = baseLy + lineLen * curScale * Math.sin(curAngle);
+        if (Math.hypot(localX - tipLx, localY - tipLy) < 16) {
+          isDraggingTip = true;
+          return;
+        }
+      }
     } else {
       const custom = state.weaponCustomizations[activeWeaponKey];
       let offsetX = -40;
@@ -897,6 +1222,32 @@ if (typeof window !== 'undefined') {
         const dy = localY - b.knuckleY;
         b.length = Math.max(15, Math.hypot(dx, dy));
         b.fanAngle = Math.atan2(dy, dx);
+      }
+    } else if (activeWeaponKey === 'zenitsu') {
+      const custom = state.weaponCustomizations.zenitsu;
+      const partKey = state.studioZenitsuPart || 'overall';
+      const target = (partKey === 'overall')
+        ? custom
+        : ((custom.parts && custom.parts[partKey]) ? custom.parts[partKey] : custom);
+
+      if (isDraggingBase && state.studioSelectedDetail === 'position') {
+        if (partKey === 'overall') {
+          custom.offsetX = localX - (-64);
+          custom.offsetY = localY;
+        } else {
+          target.offsetX = localX - (-64 + custom.offsetX);
+          target.offsetY = localY - custom.offsetY;
+        }
+      } else if (isDraggingTip && (state.studioSelectedDetail === 'scale_angle' || state.studioSelectedDetail === 'hands_size')) {
+        const parentX = -64 + custom.offsetX + (partKey !== 'overall' ? (target.offsetX || 0) : 0);
+        const parentY = custom.offsetY + (partKey !== 'overall' ? (target.offsetY || 0) : 0);
+        const dx = localX - parentX;
+        const dy = localY - parentY;
+        const lineLen = 70;
+        target.scale = Math.max(0.2, Math.hypot(dx, dy) / lineLen);
+        if (partKey !== 'hands') {
+          target.angleOffset = Math.atan2(dy, dx);
+        }
       }
     } else {
       const custom = state.weaponCustomizations[activeWeaponKey];

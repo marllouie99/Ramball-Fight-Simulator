@@ -41,6 +41,8 @@ function getTojiTarget(fighter, opponent) {
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateChannelSense(fighter, opponent) {
+  if (!fighter.isSkillEnabled(CONFIG.toji?.enableHeavenlyRestriction, true)) return false;
+  if (!fighter.isSkillEnabled(CONFIG.toji?.enableAmbush, true)) return false;
   if (fighter.isChainedByMakima) return false;
   if (fighter._channelInterruptCooldown > 0) fighter._channelInterruptCooldown--;
 
@@ -121,6 +123,7 @@ export function modUpdateChannelSense(fighter, opponent) {
  */
 export function modUpdateStealth(fighter, opponent) {
   if (!fighter) return false;
+  if (!fighter.isSkillEnabled(CONFIG.toji?.enableHeavenlyRestriction, true)) return false;
 
   const target = getTojiTarget(fighter, opponent);
   const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 55;
@@ -144,7 +147,7 @@ export function modUpdateStealth(fighter, opponent) {
   const canAmbush = !fighter.isAmbushing && !isStunnedOrPinned && (fighter.postUltimateRecoveryTimer || 0) <= 0;
 
   // If Ambush is ready and target is valid, launch Ambush sequence immediately!
-  if (isAmbushReady && canAmbush && !tojiIsTargetDeadOrRemoved(fighter, target)) {
+  if (fighter.isSkillEnabled(CONFIG.toji?.enableAmbush, true) && isAmbushReady && canAmbush && !tojiIsTargetDeadOrRemoved(fighter, target)) {
     fighter.startAmbushSequence(target);
     return true; // Abort update loop
   }

@@ -440,8 +440,8 @@ export function renderGame() {
       }
 
       // ── Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA") ──
-      // Rendered on main 2D canvas at identity transform so it stays 100% visible throughout match with zero shake
-      drawArenaMatchNames(state.ctx, true);
+      // Rendered on main 2D canvas anchored to the arena in camera space (moves & scales with camera tracking)
+      drawArenaMatchNames(state.ctx, false);
 
       // Draw FPS display and logs (on main canvas at identity transform, static zero shake)
       if (!state.hideFpsLogs) {

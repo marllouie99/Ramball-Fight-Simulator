@@ -90,22 +90,27 @@ export class GojoFighter extends Fighter {
     this.isParalyzingDomain = true;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const skills = [];
+    if (this.isSkillEnabled(CONFIG.gojo?.enableInfinity, true)) {
+      skills.push({
         id: 'infinity',
         name: 'Limitless Infinity',
         type: 'buff',
         cooldownKey: 'infinityCooldown',
         activeKey: 'infinityActive'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.gojo?.enableRed, true)) {
+      skills.push({
         id: 'red',
         name: 'Cursed Technique Reversal: Red',
         type: 'active',
         cooldownKey: 'redCooldown',
         cooldownMax: () => CONFIG.gojo?.redCooldown || 1000
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.gojo?.enablePurple, true)) {
+      skills.push({
         id: 'purple',
         name: 'Hollow Purple',
         type: 'ultimate',
@@ -113,16 +118,20 @@ export class GojoFighter extends Fighter {
         cooldownMax: () => CONFIG.gojo?.purpleCooldown || 1500,
         channelingKey: 'isChannelingPurple',
         channelTimerKey: 'purpleChargeTimer'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.gojo?.enableRCTHeal, true)) {
+      skills.push({
         id: 'rct',
         name: 'Reverse Cursed Technique',
         type: 'active',
         cooldownKey: 'reverseCursedTechniqueCooldown',
         cooldownMax: () => CONFIG.gojo?.reverseCursedTechniqueCooldown || 700,
         channelingKey: 'isChannelingRCT'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true)) {
+      skills.push({
         id: 'domain',
         name: 'Unlimited Void',
         type: 'domain',
@@ -136,8 +145,9 @@ export class GojoFighter extends Fighter {
         onExpire: (fighter) => {
           fighter.domainActive = false;
         }
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(skills);
   }
 
   isStationarySkillActive() {
@@ -553,6 +563,7 @@ export class GojoFighter extends Fighter {
   }
 
   canPerformBasicAttack() {
+    if (!this.isSkillEnabled(CONFIG.gojo?.enableBlue, true)) return false;
     if (this.isPurpleActive()) return false;
     if (this.isChannelingPurple || this.isChannelingDomainExpansion || (this.redEffectTimer || 0) > 0 || this.redBuildupPhase) return false;
     if (this.isMeleeMode) return false;
@@ -573,6 +584,7 @@ export class GojoFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
+    if (!this.isSkillEnabled(CONFIG.gojo?.enableBlue, true)) return false;
     if (!this.canPerformBasicAttack() || this.isPurpleActive()) return false;
     const target = this.target || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
     let aimAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
@@ -604,6 +616,7 @@ export class GojoFighter extends Fighter {
    * and able to block/freeze incoming attacks or proximity entities.
    */
   hasActiveInfinity() {
+    if (!this.isSkillEnabled(CONFIG.gojo?.enableInfinity, true)) return false;
     if (this.isMeleeMode || this.isChainedByMakima || this.isChannelingPurple || this.isTargetOfAmbush) return false;
     if ((this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0) return false;
     if ((this.z || 0) > 0 && !this.isChannelingPurple) return false;
@@ -660,7 +673,8 @@ export class GojoFighter extends Fighter {
     // --- GOJO LIMITLESS INFINITY INTERCEPTION ---
     // If Infinity is active, Gojo intercepts ALL incoming attacks (melee AND projectile), completely blocking 100% of damage!
     // Melee attacks are NOT excluded — Infinity blocks everything except explicit lore bypass exceptions (Toji ISOH, Saitama Counter, adapted Mahoraga, domains, etc.)
-    const isInfinityBarrierReady = !inRubbickVoid && !this.isMeleeMode && !this.isChainedByMakima && !isPurple && !isPurpleInFlight && !this.isTargetOfAmbush && !isTojiUltimateAssault && this.infinityActive && (this.infinityCooldown || 0) <= 0 && !this.isChannelingPurple && !isSaitamaCountering && !isAttackerChannelingDomain && attacker && attacker !== this && !(attacker.isAmbushing) && !(attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')) && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !opts.isBang && !opts?.projectile?.infinityBypassed && !opts.isRatioCrit && !opts.isNanamiPause && !opts.isSureKill && !opts.isSaitamaCounter && !opts.isDomainSlash && !opts.isRed && !opts.isDivineFlame && !opts.isFuga;
+    const isInfinityEnabled = this.isSkillEnabled(CONFIG.gojo?.enableInfinity, true);
+    const isInfinityBarrierReady = isInfinityEnabled && !inRubbickVoid && !this.isMeleeMode && !this.isChainedByMakima && !isPurple && !isPurpleInFlight && !this.isTargetOfAmbush && !isTojiUltimateAssault && this.infinityActive && (this.infinityCooldown || 0) <= 0 && !this.isChannelingPurple && !isSaitamaCountering && !isAttackerChannelingDomain && attacker && attacker !== this && !(attacker.isAmbushing) && !(attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')) && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !opts.isBang && !opts?.projectile?.infinityBypassed && !opts.isRatioCrit && !opts.isNanamiPause && !opts.isSureKill && !opts.isSaitamaCounter && !opts.isDomainSlash && !opts.isRed && !opts.isDivineFlame && !opts.isFuga;
     if (isInfinityBarrierReady) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
@@ -725,7 +739,8 @@ export class GojoFighter extends Fighter {
     // Melee mode activation: Now that Infinity has had its chance to intercept, enter Melee Mode if hit by close-range melee
     const isSpatialOrRanged = Boolean(opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.isProjectile || opts.isGetsuga || opts.isFlame || opts.isDivineFlame || opts.fromDomain || opts.isTick || opts.isTickDamage || opts.isContinuous || opts.isRed);
     const isAttackerAmbushing = attacker && (attacker.isAmbushing || (attacker.isStealthed && !this.domainActive) || (attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')));
-    if (!isGojoSkillOrPurpleActive && !isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
+    const isMeleeAllowed = this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true);
+    if (isMeleeAllowed && !isGojoSkillOrPurpleActive && !isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
       if (!this.isMeleeMode) {
         this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
         this.isMeleeMode = true;
@@ -1412,7 +1427,7 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (!this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && opponent && !opponent.isDead) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && opponent && !opponent.isDead) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
@@ -1467,7 +1482,7 @@ export class GojoFighter extends Fighter {
     // Check for Hollow Purple (Skill)
     // Don't cast if Sukuna is already channeling Fuga to prevent simultaneous freezes
     // Gojo unleashes Hollow Purple at any angle towards an aligned enemy within range
-    if (!this.isChannelingAnySkill() && !this.isPurpleActive() && this.purpleCooldown <= 0 && this.forcedMeleeTimer <= 0 && (!opponent || !opponent.isChannelingDivineFlame)) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enablePurple, true) && !this.isChannelingAnySkill() && !this.isPurpleActive() && this.purpleCooldown <= 0 && this.forcedMeleeTimer <= 0 && (!opponent || !opponent.isChannelingDivineFlame)) {
       const purpleTarget = (typeof this._findAlignedEnemyForPurple === 'function')
         ? this._findAlignedEnemyForPurple(opponent)
         : this._findHorizontallyAlignedEnemy(opponent);
@@ -1648,7 +1663,7 @@ export class GojoFighter extends Fighter {
     }
 
     // Check for Red (Close-range repel: triggers when an enemy is detected within trigger range)
-    if (!this.isChannelingAnySkill() && !this.isPurpleActive() && this.redCooldown <= 0 && this.forcedMeleeTimer <= 0) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enableRed, true) && !this.isChannelingAnySkill() && !this.isPurpleActive() && this.redCooldown <= 0 && this.forcedMeleeTimer <= 0) {
       const redTarget = (typeof this._findAlignedEnemyForRed === 'function')
         ? this._findAlignedEnemyForRed(opponent)
         : this._findVerticallyAlignedEnemy(opponent);
@@ -1735,7 +1750,7 @@ export class GojoFighter extends Fighter {
           this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120;
           this._teleportAwayFrom(opponent, arena);
         }
-      } else if (isBeingMeleed && (this.meleeModeCooldown || 0) <= 0) {
+      } else if (this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true) && isBeingMeleed && (this.meleeModeCooldown || 0) <= 0) {
         // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
         this.isMeleeMode = true;
         this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
@@ -2344,6 +2359,12 @@ export class GojoFighter extends Fighter {
   }
 
   _checkInfinityCollisions() {
+    if (!this.isSkillEnabled(CONFIG.gojo?.enableInfinity, true)) {
+      this.infinityActive = false;
+      this.infinityFadeOpacity = 0;
+      this.infinityBlockTimer = 0;
+      return;
+    }
     if (this.isCaughtInTelekinesis || (this.timeStopTimer && this.timeStopTimer > 0)) return;
     if (this.isMeleeMode) {
       this.infinityActive = false;
@@ -2627,6 +2648,7 @@ export class GojoFighter extends Fighter {
   }
 
   _checkReverseCursedTechnique(opponent, arena) {
+    if (!this.isSkillEnabled(CONFIG.gojo?.enableRCTHeal, true)) return;
     if (this.isDead || this.isChannelingAnySkill() || this.isChannelingRCT || this.isPurpleActive()) return;
     if (this.reverseCursedTechniqueCooldown > 0) return;
 

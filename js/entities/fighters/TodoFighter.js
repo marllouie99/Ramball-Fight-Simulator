@@ -63,22 +63,27 @@ export class TodoFighter extends Fighter {
     this.teammateDamageResetTimer = 0;
 
     // Declarative Skill Registration
-    this.skillManager.registerSkills([
-      {
+    const todoSkills = [];
+    if (this.isSkillEnabled(CONFIG.todo?.enableBoogieWoogie, true)) {
+      todoSkills.push({
         id: 'boogie_woogie',
         name: 'Boogie Woogie',
         type: 'active',
         cooldownKey: 'swapCooldown',
         cooldownMaxKey: 'swapCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.todo?.enableCursedRock, true)) {
+      todoSkills.push({
         id: 'rock_throw',
         name: 'Cursed Rock Infusion',
         type: 'active',
         cooldownKey: 'rockThrowCooldown',
         cooldownMaxKey: 'rockThrowCooldownMax'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(CONFIG.todo?.enableTakadaUltimate, true)) {
+      todoSkills.push({
         id: 'takada_ult',
         name: 'Idol Motivation',
         type: 'ultimate',
@@ -106,8 +111,9 @@ export class TodoFighter extends Fighter {
           fighter.takadaSongStarted = false;
           fighter.takadaSongFadedOut = false;
         }
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(todoSkills);
   }
 
   isStationarySkillActive() {
@@ -210,7 +216,7 @@ export class TodoFighter extends Fighter {
       }
 
       const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
-      const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
+      const hpUltEnabled = this.isSkillEnabled(CONFIG.todo?.enableHpThresholdUlt, true) && this.isSkillEnabled(CONFIG.todo?.enableTakadaUltimate, true);
       const hasUsedUlt = Boolean(this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt);
       if (this.isTakadaChanneling) {
         this.pendingTakadaHpUlt = true;
@@ -243,7 +249,7 @@ export class TodoFighter extends Fighter {
 
     // HP Auto-Trigger: Todo channels his Takada-chan Ultimate when HP drops <= hpThreshold (or after beam/purple stasis expires!)
     const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.70;
-    const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
+    const hpUltEnabled = this.isSkillEnabled(CONFIG.todo?.enableHpThresholdUlt, true) && this.isSkillEnabled(CONFIG.todo?.enableTakadaUltimate, true);
     const hasUsedUlt = Boolean(this.hasUsedTakadaUlt || this.hasTriggeredTakadaHpUlt);
     const isHpLow = !this.isDemoFighter && hpUltEnabled && !hasUsedUlt && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold;
 

@@ -14,6 +14,7 @@ export const zenitsuConfig = {
   moveSpeed: 6.4,
   r: 25,
   radius: 25,
+  weaponOffsetY: 15.0,        // Y-offset positioning hands & katana lower at belt level
   color: '#F59E0B',           // Lightning Gold
   themeColor: '#F59E0B',
   secondaryColor: '#FBBF24',   // Electric Amber
@@ -56,6 +57,7 @@ export const zenitsuConfig = {
   // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
   enableThunderclap: true,          // Master toggle for Skill 1: Thunderclap and Flash
   thunderclapCooldown: 228,    // 3.8s
+  thunderclapChannelDuration: 100,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
   thunderclapSpeed: 36.0,
   thunderclapDamage: 38,
   thunderclapStunFrames: 12,

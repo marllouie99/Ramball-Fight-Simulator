@@ -103,6 +103,25 @@ export function hasActiveInfinity(entity) {
 }
 
 /**
+ * Universal helper: checks whether a skill, ability, or mechanic toggle is enabled in config.
+ * Handles boolean true/false, numeric 1/0, string 'true'/'false', and undefined fallbacks.
+ * @param {*} configValue
+ * @param {boolean} [defaultValue=true]
+ * @returns {boolean}
+ */
+export function isSkillEnabled(configValue, defaultValue = true) {
+  if (configValue === undefined || configValue === null) return Boolean(defaultValue);
+  if (typeof configValue === 'boolean') return configValue;
+  if (typeof configValue === 'number') return configValue !== 0;
+  if (typeof configValue === 'string') {
+    const s = configValue.trim().toLowerCase();
+    if (s === 'false' || s === '0' || s === 'off' || s === 'disabled') return false;
+    if (s === 'true' || s === '1' || s === 'on' || s === 'enabled') return true;
+  }
+  return Boolean(configValue);
+}
+
+/**
  * Clears afterimages on target.
  */
 export function suppressAfterimagesAndAttackEffects(target) {
@@ -321,6 +340,11 @@ export class Fighter {
       const sound = getBasicAttackSound(this.id, this._def?.type);
       if (sound) audioSystem.playSFX(sound.src, sound.volume);
     } catch (e) {}
+  }
+
+  /** Check if a skill or feature toggle is enabled in config. */
+  isSkillEnabled(configValue, defaultValue = true) {
+    return isSkillEnabled(configValue, defaultValue);
   }
 
   /** Check if another fighter/entity is on the same team. */

@@ -8,6 +8,7 @@
 
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
+import { uryuConfig } from '../../configs/characters/uryuConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { drawUryuSkin } from '../../graphics/fighters/uryuSkin.js';
 import { drawUryuSeeleSlashArc } from '../../graphics/weapons/uryuWeaponGraphics.js';
@@ -144,25 +145,30 @@ export class UryuFighter extends Fighter {
   }
 
   _registerSkills() {
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : {};
-    this.skillManager.registerSkills([
-      {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : uryuConfig;
+    const skills = [];
+    if (this.isSkillEnabled(cfg.enableHirenkyaku, true)) {
+      skills.push({
         id: 'hirenkyaku',
         name: 'HIRENKYAKU',
         type: 'mobility',
         cooldownKey: 'hirenkyakuCooldown',
         cooldownMax: cfg.hirenkyakuCooldown || 360,
         activeKey: 'isLichtRegenActive'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableSprenger, true)) {
+      skills.push({
         id: 'sprenger',
         name: 'GINTO SPRENGER',
         type: 'offensive',
         cooldownKey: 'sprengerCooldown',
         cooldownMax: cfg.sprengerCooldown || 480,
         activeKey: 'isDeployingSprenger'
-      },
-      {
+      });
+    }
+    if (this.isSkillEnabled(cfg.enableAntithesis, true)) {
+      skills.push({
         id: 'vollstandig',
         name: 'VOLLSTÄNDIG',
         type: 'ultimate',
@@ -170,8 +176,9 @@ export class UryuFighter extends Fighter {
         cooldownMax: cfg.ultimateCooldown || 1200,
         activeKey: 'vollstandigActive',
         durationKey: 'vollstandigTimer'
-      }
-    ]);
+      });
+    }
+    this.skillManager.registerSkills(skills);
   }
 
   isStationarySkillActive() {
@@ -751,10 +758,11 @@ export class UryuFighter extends Fighter {
     }
 
     // ── PASSIVE 2: RANSŌTENGAI (HEAVENLY WILD PUPPET SUIT) ──
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : uryuConfig;
     if (this.ransotengaiCooldown > 0) this.ransotengaiCooldown--;
 
     const hpRatio = (this.maxHp > 0) ? (this.hp / this.maxHp) : 1.0;
-    const shouldTriggerPuppet = !this.ransotengaiActive && this.ransotengaiCooldown <= 0 && (hpRatio <= (CONFIG.uryu?.ransotengaiHpThreshold || 0.30));
+    const shouldTriggerPuppet = this.isSkillEnabled(cfg.enableRansotengai, true) && !this.ransotengaiActive && this.ransotengaiCooldown <= 0 && (hpRatio <= (cfg.ransotengaiHpThreshold || 0.30));
 
     if (shouldTriggerPuppet) {
       this.ransotengaiActive = true;
@@ -784,71 +792,73 @@ export class UryuFighter extends Fighter {
     }
 
     // ── PASSIVE 1: REISHI ABSORPTION & SKLAVEREI GAUGE ──
-    if (this.isPiercingLightActive) {
-      this.piercingLightTimer--;
-      if (this.piercingLightTimer <= 0) {
-        this.isPiercingLightActive = false;
-        this.reishiGauge = 0;
-      }
-      // Accelerated bow cooldowns during Piercing Light (-40% draw delay)
-      if (this.shootCooldown > 0) {
-        this.shootCooldown = Math.max(0, this.shootCooldown - 1);
-      }
-    } else {
-      // 1. Natural ambient battlefield Reishi siphon
-      this.reishiGauge = Math.min(100, this.reishiGauge + 0.10);
+    if (this.isSkillEnabled(cfg.enableReishiAbsorption, true)) {
+      if (this.isPiercingLightActive) {
+        this.piercingLightTimer--;
+        if (this.piercingLightTimer <= 0) {
+          this.isPiercingLightActive = false;
+          this.reishiGauge = 0;
+        }
+        // Accelerated bow cooldowns during Piercing Light (-40% draw delay)
+        if (this.shootCooldown > 0) {
+          this.shootCooldown = Math.max(0, this.shootCooldown - 1);
+        }
+      } else {
+        // 1. Natural ambient battlefield Reishi siphon
+        this.reishiGauge = Math.min(100, this.reishiGauge + 0.10);
 
-      // 2. Siphon Reishi from nearby enemy projectiles within 190px
-      if (state && state.projectiles && state.projectiles.length > 0) {
-        const resolvedOwner = (typeof ownerIndex === 'number' && ownerIndex >= 0) ? ownerIndex : (state.fighters ? state.fighters.indexOf(this) : -1);
-        for (let i = 0; i < state.projectiles.length; i++) {
-          const p = state.projectiles[i];
-          if (!p || p.owner === resolvedOwner) continue;
-          if (typeof state.getFighterTeam === 'function' && resolvedOwner >= 0) {
-            const myTeam = state.getFighterTeam(resolvedOwner);
-            const theirTeam = state.getFighterTeam(p.owner);
-            if (myTeam !== null && myTeam === theirTeam) continue;
-          }
-          const dist = Math.hypot(p.x - this.x, p.y - this.y);
-          if (dist <= 190) {
-            const gain = CONFIG.uryu?.siphonProjectileGain || 0.85;
-            this.reishiGauge = Math.min(100, this.reishiGauge + gain);
-            if (Math.random() < 0.10 && typeof spawnSparks === 'function') {
-              spawnSparks(p.x, p.y, 2, 'cyan', '#00E5FF');
+        // 2. Siphon Reishi from nearby enemy projectiles within 190px
+        if (state && state.projectiles && state.projectiles.length > 0) {
+          const resolvedOwner = (typeof ownerIndex === 'number' && ownerIndex >= 0) ? ownerIndex : (state.fighters ? state.fighters.indexOf(this) : -1);
+          for (let i = 0; i < state.projectiles.length; i++) {
+            const p = state.projectiles[i];
+            if (!p || p.owner === resolvedOwner) continue;
+            if (typeof state.getFighterTeam === 'function' && resolvedOwner >= 0) {
+              const myTeam = state.getFighterTeam(resolvedOwner);
+              const theirTeam = state.getFighterTeam(p.owner);
+              if (myTeam !== null && myTeam === theirTeam) continue;
+            }
+            const dist = Math.hypot(p.x - this.x, p.y - this.y);
+            if (dist <= 190) {
+              const gain = cfg.siphonProjectileGain || 0.85;
+              this.reishiGauge = Math.min(100, this.reishiGauge + gain);
+              if (Math.random() < 0.10 && typeof spawnSparks === 'function') {
+                spawnSparks(p.x, p.y, 2, 'cyan', '#00E5FF');
+              }
             }
           }
         }
-      }
 
-      // 3. Siphon Reishi from active enemy domains (Malevolent Shrine, Unlimited Void, etc.)
-      if (state && state.fighters) {
-        for (let i = 0; i < state.fighters.length; i++) {
-          const f = state.fighters[i];
-          if (!f || f === this || f.hp <= 0) continue;
-          if (f.domainActive || f.isDomainActive || f.domainRadius > 0) {
-            const gain = CONFIG.uryu?.siphonDomainGain || 0.65;
-            this.reishiGauge = Math.min(100, this.reishiGauge + gain);
+        // 3. Siphon Reishi from active enemy domains (Malevolent Shrine, Unlimited Void, etc.)
+        if (state && state.fighters) {
+          for (let i = 0; i < state.fighters.length; i++) {
+            const f = state.fighters[i];
+            if (!f || f === this || f.hp <= 0) continue;
+            if (f.domainActive || f.isDomainActive || f.domainRadius > 0) {
+              const gain = cfg.siphonDomainGain || 0.65;
+              this.reishiGauge = Math.min(100, this.reishiGauge + gain);
+            }
           }
         }
-      }
 
-      // 4. Threshold trigger: 100% Reishi Gauge -> Piercing Light
-      if (this.reishiGauge >= 100) {
-        this.reishiGauge = 100;
-        this.isPiercingLightActive = true;
-        this.piercingLightTimer = this.piercingLightMax;
-        spawnFloatingText(this.x, this.y - 32, 'PIERCING LIGHT!', '#00E5FF');
-        spawnImpactFlash(this.x, this.y, '#00E5FF');
-        if (typeof spawnSparks === 'function') {
-          spawnSparks(this.x, this.y, 14, 'cyan', '#00E5FF');
-          spawnSparks(this.x, this.y, 8, 'silverStreak', '#FFFFFF');
+        // 4. Threshold trigger: 100% Reishi Gauge -> Piercing Light
+        if (this.reishiGauge >= 100) {
+          this.reishiGauge = 100;
+          this.isPiercingLightActive = true;
+          this.piercingLightTimer = this.piercingLightMax;
+          spawnFloatingText(this.x, this.y - 32, 'PIERCING LIGHT!', '#00E5FF');
+          spawnImpactFlash(this.x, this.y, '#00E5FF');
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(this.x, this.y, 14, 'cyan', '#00E5FF');
+            spawnSparks(this.x, this.y, 8, 'silverStreak', '#FFFFFF');
+          }
+          this._playSound('hirenkyaku', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
         }
-        this._playSound('hirenkyaku', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
       }
     }
 
     // ── AI TRIGGER: SKILL 1 (HIRENKYAKU & LICHT REGEN) ──
-    if (this.hirenkyakuCooldown <= 0 && !this.isLichtRegenActive && !this.isHirenkyakuDashing && !this.isDeployingSprenger && !this.vollstandigActive) {
+    if (this.isSkillEnabled(cfg.enableHirenkyaku, true) && this.hirenkyakuCooldown <= 0 && !this.isLichtRegenActive && !this.isHirenkyakuDashing && !this.isDeployingSprenger && !this.vollstandigActive) {
       const nearestEnemy = this._findNearestEnemy() || opponent;
       if (nearestEnemy && !nearestEnemy.isDead && nearestEnemy.hp > 0) {
         const dist = Math.hypot(nearestEnemy.x - this.x, nearestEnemy.y - this.y);
@@ -890,13 +900,14 @@ export class UryuFighter extends Fighter {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
     // Close-quarters melee intercept vs ranged bow attack:
-    if (dist <= (CONFIG.uryu?.seeleRange || 75) && this.seeleCooldown <= 0) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : uryuConfig;
+    if (dist <= (cfg.seeleRange || 75) && this.seeleCooldown <= 0 && this.isSkillEnabled(cfg.enableSeeleSchneider, true)) {
       if (this.currentWeaponMode !== 'SEELE') {
         this.currentWeaponMode = 'SEELE';
         this.weaponSwitchTimer = this.weaponSwitchMeleeBuffer;
       }
       this._executeSeeleSchneider(target);
-    } else if (!this.isShooting && this.shootCooldown <= 0) {
+    } else if (!this.isShooting && this.shootCooldown <= 0 && this.isSkillEnabled(cfg.enableHeiligBogen, true)) {
       if (this.currentWeaponMode !== 'BOW') {
         this.currentWeaponMode = 'BOW';
         this.weaponSwitchTimer = this.weaponSwitchDuration;
@@ -1190,7 +1201,7 @@ export class UryuFighter extends Fighter {
           spawnSparks(this.x, this.y, 6, 'cyan', '#00E5FF');
         }
 
-        const maxBounces = CONFIG.uryu?.wallBounceFlurryThreshold || 3;
+        const maxBounces = cfg.wallBounceFlurryThreshold || 3;
         if (this.wallBounceCount >= maxBounces) {
           this.wallBounceCount = 0;
           spawnFloatingText(this.x, this.y - 35, `${maxBounces}/${maxBounces} FLURRY!`, '#00E5FF');
@@ -1198,7 +1209,7 @@ export class UryuFighter extends Fighter {
             spawnMeleeClashShockwave(this.x, this.y, 45, '#00E5FF');
           }
           const target = this._findNearestEnemy() || opponent;
-          if (target && !target.isDead && target.hp > 0 && !this.isFlurrying && !this.isHirenkyakuDashing && !this.isLichtRegenActive) {
+          if (this.isSkillEnabled(cfg.enableHirenkyakuFlurry, true) && target && !target.isDead && target.hp > 0 && !this.isFlurrying && !this.isHirenkyakuDashing && !this.isLichtRegenActive) {
             this.triggerFlurry(target);
           }
         } else {
