@@ -60,6 +60,7 @@ export const zenitsuConfig = {
   thunderclapChannelDuration: 120,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
   thunderclapDashCount: 4,          // 4 consecutive godspeed zig-zag slashes
   thunderclapDashDuration: 5,       // Travel frames per dash
+  thunderclapDashPauseFrames: 2,    // Pause/windup frames between each consecutive dash
   thunderclapSpeed: 36.0,
   thunderclapDamage: 14,            // Damage per intermediate dash
   thunderclapFinisherDamage: 38,    // Finisher dash damage

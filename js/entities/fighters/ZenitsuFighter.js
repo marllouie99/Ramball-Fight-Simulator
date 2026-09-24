@@ -68,6 +68,7 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapTotalDashes = cfg.thunderclapDashCount || 4;
     this.thunderclapDashStep = 0;
     this.thunderclapDashDuration = cfg.thunderclapDashDuration || 5;
+    this.thunderclapDashPauseTimer = 0;
     this.thunderclapDashStartX = 0;
     this.thunderclapDashStartY = 0;
     this.thunderclapDashDestX = 0;
@@ -185,7 +186,7 @@ export class ZenitsuFighter extends Fighter {
   }
 
   isStationarySkillActive() {
-    return Boolean(this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap);
+    return Boolean(this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0);
   }
 
   _updateDashVFX() {
@@ -218,6 +219,7 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapTarget = null;
     this.isDashingThunderclap = false;
     this.thunderclapDashIndex = 0;
+    this.thunderclapDashPauseTimer = 0;
     if (forceCancelAll) {
       this.thunderclapDashVFX = null;
       this.thunderclapDashVFXList = [];
@@ -237,6 +239,21 @@ export class ZenitsuFighter extends Fighter {
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     const target = this.getNearestTarget(opponent);
+
+    // Pause / Windup between consecutive dashes
+    if (this.thunderclapDashPauseTimer > 0) {
+      this.thunderclapDashPauseTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      if (Math.random() < 0.6) {
+        spawnSparks(this.x, this.y, 1, 'cyan', '#38BDF8');
+      }
+      if (this.thunderclapDashPauseTimer <= 0) {
+        this.thunderclapDashIndex++;
+        this._startThunderclapDashStep(this.thunderclapDashTarget, this.thunderclapDashIndex);
+      }
+      return;
+    }
 
     // Active Consecutive Lightning Dash Travel (Hekireki Issen: Consecutive Godspeed Dashes)
     if (this.isDashingThunderclap) {
@@ -274,13 +291,20 @@ export class ZenitsuFighter extends Fighter {
         );
 
         if (!isFinisher) {
-          // Chain into next consecutive dash immediately!
-          this.thunderclapDashIndex++;
-          this._startThunderclapDashStep(this.thunderclapDashTarget, this.thunderclapDashIndex);
+          const pauseFrames = cfg.thunderclapDashPauseFrames !== undefined ? cfg.thunderclapDashPauseFrames : 2;
+          if (pauseFrames > 0) {
+            this.isDashingThunderclap = false;
+            this.thunderclapDashPauseTimer = pauseFrames;
+          } else {
+            // Chain into next consecutive dash immediately!
+            this.thunderclapDashIndex++;
+            this._startThunderclapDashStep(this.thunderclapDashTarget, this.thunderclapDashIndex);
+          }
         } else {
           // All consecutive dashes completed!
           this.isDashingThunderclap = false;
           this.thunderclapDashIndex = 0;
+          this.thunderclapDashPauseTimer = 0;
           const dashSpeed = (this.speed || 6.4) * 1.5;
           this.vx = Math.cos(this.thunderclapDashAngle) * dashSpeed;
           this.vy = Math.sin(this.thunderclapDashAngle) * dashSpeed;
