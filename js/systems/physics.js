@@ -283,6 +283,9 @@ export function resolveFighterCollision(a, b) {
   // Mahito phases directly through fighters during Phantom Soul Slip claw dash
   if ((a.soulPhaseDashTimer && a.soulPhaseDashTimer > 0) || (b.soulPhaseDashTimer && b.soulPhaseDashTimer > 0)) return;
 
+  // Zenitsu phases directly through entities during godspeed lightning dashes (Hekireki Issen)
+  if (a.isDashingThunderclap || b.isDashingThunderclap) return;
+
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const distSq = dx * dx + dy * dy;
@@ -1125,9 +1128,9 @@ export function updateFighters() {
       if (!fighter || fighter.hp <= 0) continue;
       // Skip during Wall Slam grab or when submerged/erupting in liquid shadow
       if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga || fighter.isSubmerged || fighter.isErupting) continue;
-      // Cronos / Rubbick phases through illusions while sphere is active; Mahito phases during Phantom Soul Slip
+      // Cronos / Rubbick phases through illusions while sphere is active; Mahito phases during Phantom Soul Slip; Zenitsu phases during Thunderclap dashes
       const isFighterSpherePhasing = fighter._isInsideOwnSphere?.() || fighter.sphereActive;
-      if (isFighterSpherePhasing || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0)) continue;
+      if (isFighterSpherePhasing || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0) || fighter.isDashingThunderclap) continue;
 
       const nearbyEntities = spatialGrid.getNearby(fighter.x, fighter.y, fighter.r * 2 + 50);
       for (const entity of nearbyEntities) {

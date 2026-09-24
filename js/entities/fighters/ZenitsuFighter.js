@@ -150,7 +150,7 @@ export class ZenitsuFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
-    if (this.isChannelingThunderclap || this.thunderclapChannelTimer > 0) return false;
+    if (this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return false;
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     if (!this.isSkillEnabled(cfg.enableBasicAttack, true)) return false;
     const target = this.getNearestTarget();
@@ -164,7 +164,7 @@ export class ZenitsuFighter extends Fighter {
   }
 
   canAim() {
-    if (this.isDashingThunderclap) {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) {
       return false;
     }
     if (this.isChannelingThunderclap) {

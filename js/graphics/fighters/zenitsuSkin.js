@@ -1240,8 +1240,9 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
 
   const total = fighter.thunderclapChannelDuration || 36;
   const current = fighter.thunderclapChannelTimer || 0;
-  const elapsed = total - current;
-  const currentBurst = _getThunderclapBurst(total, elapsed);
+  const isDashingOrPause = Boolean(fighter.isDashingThunderclap || (fighter.thunderclapDashPauseTimer && fighter.thunderclapDashPauseTimer > 0));
+  const elapsed = isDashingOrPause ? total : (total - current);
+  const currentBurst = isDashingOrPause ? null : _getThunderclapBurst(total, elapsed);
 
   // Proximity lighting on nearby entities during active lightning burst surges
   if (currentBurst) {
@@ -1252,7 +1253,7 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   ctx.translate(fighter.x, fighter.y);
 
   // 1. Standard Upright Orientation & Local Angle Transforms (Rule 19)
-  const angle = fighter.gunAngle || fighter.skillCastAngle || 0;
+  const angle = fighter.gunAngle || fighter.thunderclapDashAngle || fighter.skillCastAngle || 0;
   ctx.rotate(angle);
 
   const facingLeft = Math.abs(angle) > Math.PI / 2;
@@ -1260,12 +1261,12 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
     ctx.scale(1, -1);
   }
 
-  const progress = Math.max(0, Math.min(1.0, 1.0 - (current / total)));
+  const progress = isDashingOrPause ? 1.0 : Math.max(0, Math.min(1.0, 1.0 - (current / total)));
 
   // Smooth entrance interpolation over first 8 frames (avoids visual snapping into crouch)
   const entranceFrames = 8;
-  const entranceT = Math.min(1.0, elapsed / entranceFrames);
-  const easeEntrance = entranceT * entranceT * (3 - 2 * entranceT); // Smooth cubic hermite curve
+  const entranceT = isDashingOrPause ? 1.0 : Math.min(1.0, elapsed / entranceFrames);
+  const easeEntrance = isDashingOrPause ? 1.0 : (entranceT * entranceT * (3 - 2 * entranceT)); // Smooth cubic hermite curve
 
   // Frame 1 (Stance) during first half (0 to 0.5)
   // Frame 2 (Charge) during second half (0.5 to 1.0)
@@ -1274,7 +1275,7 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   // Stored explosive power vibration / micro-jitter: ONLY during active lightning bursts or pre-launch surge
   let jitterX = 0;
   let jitterY = 0;
-  if (currentBurst || progress >= 0.90) {
+  if (currentBurst || (!isDashingOrPause && progress >= 0.90)) {
     const intensity = currentBurst ? (currentBurst.intensity || 0.8) : (progress - 0.90) * 10;
     jitterX = (Math.random() - 0.5) * 1.4 * intensity;
     jitterY = (Math.random() - 0.5) * 1.2 * intensity;
@@ -1301,7 +1302,9 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   _drawZenitsuBreathSteam(ctx, r, progress, isChargePhase, jitterX, jitterY, elapsed, easeEntrance);
 
   // LAYER 5: Sporadic Golden Lightning & Energy Bursts (Burst 1 -> ~1.5s quiet breath tension pause -> Burst 2 -> Burst 3)
-  _drawThunderclapChargeVFX(ctx, r, progress, elapsed, total, jitterX, jitterY);
+  if (!isDashingOrPause) {
+    _drawThunderclapChargeVFX(ctx, r, progress, elapsed, total, jitterX, jitterY);
+  }
 
   // Status Overlays
   if (typeof fighter.drawStatusOverlays === 'function') {
@@ -1340,11 +1343,14 @@ export function drawZenitsuSkin(ctx, fighter) {
     (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())
   );
 
-  const isChanneling = !isPodiumPreview && !fighter.isTargetOfAmbush && Boolean(
-    fighter.isChannelingThunderclap || (fighter.thunderclapChannelTimer && fighter.thunderclapChannelTimer > 0)
+  const isIaidoStance = !isPodiumPreview && !fighter.isTargetOfAmbush && Boolean(
+    fighter.isChannelingThunderclap ||
+    (fighter.thunderclapChannelTimer && fighter.thunderclapChannelTimer > 0) ||
+    fighter.isDashingThunderclap ||
+    (fighter.thunderclapDashPauseTimer && fighter.thunderclapDashPauseTimer > 0)
   );
 
-  if (isChanneling) {
+  if (isIaidoStance) {
     _drawZenitsuThunderclapChannel(ctx, fighter, r);
     return;
   }

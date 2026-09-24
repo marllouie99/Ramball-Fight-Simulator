@@ -9006,13 +9006,22 @@ async function main() {
     }
     zenitsu.interruptAttacks(true);
 
-    // 11.6.4 Consecutive 4-Dash Execution & Pause Frame Test
+    // 11.6.4 Consecutive 4-Dash Execution, Stance Persistence & Pass-Through Test
     zenitsu.thunderclapTotalDashes = 4;
     zenitsu.thunderclapDashDuration = 5;
     zenitsu._executeThunderclapDash(null);
     if (!zenitsu.isDashingThunderclap || zenitsu.thunderclapDashIndex !== 0) {
       throw new Error('Expected Zenitsu to begin Dash 1 of 4');
     }
+
+    // Test entity pass-through collision solver during active dash
+    const dummyEnemy = new ZenitsuClass({ x: zenitsu.x + 10, y: zenitsu.y, color: '#ff0000', controls: {} });
+    dummyEnemy.vx = 0; dummyEnemy.vy = 0;
+    resolveFighterCollision(zenitsu, dummyEnemy);
+    if (dummyEnemy.vx !== 0 || dummyEnemy.vy !== 0) {
+      throw new Error('Expected entity pass-through: dummyEnemy should not receive collision displacement while Zenitsu is dashing');
+    }
+
     // Simulate all 4 dashes + 3 pauses (4 * 5f travel + 3 * 2f pause = 26 frames)
     for (let f = 0; f < 30; f++) {
       mockCtx.resetStackDepth();
