@@ -301,6 +301,7 @@ export class ZenitsuFighter extends Fighter {
   _fadeOutAllDashAudio(fadeMs = 80) {
     this._fadeOutIntermediateDashAudio(fadeMs);
     fadeOutSoundBySrc('Zenitsu-dash2', fadeMs);
+    fadeOutSoundBySrc('Zenitsu-inhale', fadeMs);
     fadeOutSoundBySrc('zenitsu', fadeMs);
   }
 
@@ -630,8 +631,12 @@ export class ZenitsuFighter extends Fighter {
       this.skillCastAngle = this.gunAngle;
     }
 
-    // Frame 1: calm-before-the-storm stance sound
+    // Frame 1: Stance initiation & deep breathing inhale sound
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      const inhaleSfx = cfg.sounds?.inhale || 'Assets/Sound Effects/Skills/Zenitsu-inhale.mp3';
+      const inhaleVol = cfg.soundVolumes?.inhale !== undefined ? cfg.soundVolumes.inhale : 0.85;
+      audioSystem.playSFX(inhaleSfx, inhaleVol);
+
       const stanceSfx = cfg.sounds?.stance || 'Assets/Sound Effects/Skills/dash1.mp3';
       const stanceVol = cfg.soundVolumes?.stance !== undefined ? cfg.soundVolumes.stance : 0.30;
       audioSystem.playSFX(stanceSfx, stanceVol);

@@ -8949,8 +8949,11 @@ async function main() {
       throw new Error('Zenitsu Pre-launch surge must trigger right before launch dash');
     }
 
-    // 11.6.1.1 Zenitsu Electric Noise Audio Config & Channeling Burst Trigger Test
+    // 11.6.1.1 Zenitsu Electric Noise & Inhale Audio Config & Channeling Burst Trigger Test
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    if (!cfg.sounds?.inhale) {
+      throw new Error('Zenitsu config missing inhale sound in sounds');
+    }
     if (!cfg.sounds?.electricNoise1 || !cfg.sounds?.electricNoise2 || !cfg.sounds?.electricNoise3) {
       throw new Error('Zenitsu config missing electricNoise1, electricNoise2, or electricNoise3 in sounds');
     }

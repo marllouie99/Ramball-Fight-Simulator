@@ -90,6 +90,7 @@ export const zenitsuConfig = {
 
     // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
     stance: 'Assets/Sound Effects/Skills/dash1.mp3',
+    inhale: 'Assets/Sound Effects/Skills/Zenitsu-inhale.mp3',
     lockIn: 'Assets/Sound Effects/Skills/parry.mp3',
     electricNoise1: 'Assets/Sound Effects/Skills/Zenitsu-electric-noise1.mp3',
     electricNoise2: 'Assets/Sound Effects/Skills/Zenitsu-electric-noise2.mp3',
@@ -117,6 +118,7 @@ export const zenitsuConfig = {
     slashHit: 0.80,
     parry: 0.35,
     stance: 0.30,
+    inhale: 0.85,
     lockIn: 0.35,
     electricNoise1: 0.70,
     electricNoise2: 0.70,
