@@ -65,6 +65,7 @@ export const zenitsuConfig = {
   thunderclapDamage: 14,            // Damage per intermediate dash
   thunderclapFinisherDamage: 38,    // Finisher dash damage
   thunderclapStunFrames: 50,
+  dashAudioFadeOutMs: 120,          // Fast audio fade-out in ms the moment all dashes are completed
 
   // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)
   enableRokuren: false,             // Master toggle for Skill 2: Sixfold (Rokuren)

@@ -10361,8 +10361,12 @@ async function main() {
     zenitsu._finalizeThunderclapDashStep(dummyOpponent, 300, 250, 400, 250, 0, 0, false);
     zenitsu._finalizeThunderclapDashStep(dummyOpponent, 300, 250, 400, 250, 0, 3, true);
     zenitsu.isDashingThunderclap = false;
+    zenitsu._fadeOutAllDashAudio(120);
+    if (zenitsu._activeDashSounds.length !== 0) {
+      throw new Error(`_activeDashSounds was not cleared after _fadeOutAllDashAudio()!`);
+    }
 
-    console.log('✅ [Zenitsu Dash CC Immunity Test] Zenitsu correctly maintains 100% CC and movement-stopping immunity during dashing and dash pauses, and plays configured audio mix.');
+    console.log('✅ [Zenitsu Dash CC Immunity Test] Zenitsu correctly maintains 100% CC and movement-stopping immunity during dashing and dash pauses, and fast fades out dash audio on completion.');
   } catch (err) {
     console.error('❌ [ZENITSU DASH CC IMMUNITY TEST ERROR]:', err.message || err);
     errors++;
