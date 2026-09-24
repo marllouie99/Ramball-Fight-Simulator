@@ -59,12 +59,12 @@ export const zenitsuConfig = {
   thunderclapCooldown: 228,    // 3.8s
   thunderclapChannelDuration: 120,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
   thunderclapDashCount: 4,          // 4 consecutive godspeed zig-zag slashes
-  thunderclapDashDuration: 5,       // Travel frames per dash
-  thunderclapDashPauseFrames: 2,    // Pause/windup frames between each consecutive dash
+  thunderclapDashDuration: 2,       // Travel frames per dash
+  thunderclapDashPauseFrames: 5,    // Pause/windup frames between each consecutive dash
   thunderclapSpeed: 36.0,
   thunderclapDamage: 14,            // Damage per intermediate dash
   thunderclapFinisherDamage: 38,    // Finisher dash damage
-  thunderclapStunFrames: 12,
+  thunderclapStunFrames: 50,
 
   // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)
   enableRokuren: false,             // Master toggle for Skill 2: Sixfold (Rokuren)

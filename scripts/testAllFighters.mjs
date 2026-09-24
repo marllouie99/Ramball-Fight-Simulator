@@ -10282,6 +10282,77 @@ async function main() {
     errorList.push(`[DISABLED SKILL BAR HIDING TEST]: ${err.stack || err.message}`);
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Zenitsu Dash CC & Movement-Stopping Immunity Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('⚡ [Zenitsu Dash CC Immunity Test] Verifying full immunity to CC and movement-stopping effects during dash...');
+    const { ZenitsuFighter } = await import('../js/entities/fighters/ZenitsuFighter.js');
+    const zenitsu = new ZenitsuFighter({ color: '#FACC15', name: 'Zenitsu' });
+
+    // 1. Normal state (should accept CC normally)
+    zenitsu.applyHitStun(15);
+    if (zenitsu.hitStunTimer !== 15) {
+      throw new Error(`Zenitsu should receive hit stun when not dashing, expected 15, got ${zenitsu.hitStunTimer}`);
+    }
+    zenitsu.hitStunTimer = 0;
+
+    // 2. Dashing state (isDashingThunderclap = true)
+    zenitsu.isDashingThunderclap = true;
+    zenitsu.applyHitStun(20);
+    zenitsu.applyParalyze(20);
+    zenitsu.applySlow(20, 0.2);
+    zenitsu.applyTimeStop(20);
+    zenitsu.vx = 5;
+    zenitsu.vy = 5;
+    zenitsu.applyKnockback(100, 100);
+
+    if (zenitsu.hitStunTimer !== 0 || zenitsu.paralyzeTimer !== 0 || zenitsu.slowTimer !== 0 || zenitsu.timeStopTimer !== 0) {
+      throw new Error(`Zenitsu received CC while isDashingThunderclap=true! hitStun=${zenitsu.hitStunTimer}, paralyze=${zenitsu.paralyzeTimer}, slow=${zenitsu.slowTimer}, timeStop=${zenitsu.timeStopTimer}`);
+    }
+    if (zenitsu.vx !== 5 || zenitsu.vy !== 5) {
+      throw new Error(`Zenitsu received knockback during dash! vx=${zenitsu.vx}, vy=${zenitsu.vy}`);
+    }
+    if (zenitsu._handleTimeStop() !== false) {
+      throw new Error(`_handleTimeStop() should return false during isDashingThunderclap!`);
+    }
+    if (zenitsu.isCaughtInBeam() !== false) {
+      throw new Error(`isCaughtInBeam() should return false during isDashingThunderclap!`);
+    }
+
+    // 3. Transient interrupt should not break active dash
+    zenitsu.interruptAttacks(false);
+    if (!zenitsu.isDashingThunderclap) {
+      throw new Error(`Transient interruptAttacks(false) broke active dash state!`);
+    }
+
+    // 4. Force interrupt (death/round end) should clean up
+    zenitsu.interruptAttacks(true);
+    if (zenitsu.isDashingThunderclap) {
+      throw new Error(`interruptAttacks(true) failed to cancel dash state!`);
+    }
+
+    // 5. Pause between dashes state (thunderclapDashPauseTimer > 0)
+    zenitsu.thunderclapDashPauseTimer = 10;
+    zenitsu.applyHitStun(20);
+    zenitsu.applyParalyze(20);
+    zenitsu.applySlow(20, 0.2);
+    zenitsu.applyTimeStop(20);
+    if (zenitsu.hitStunTimer !== 0 || zenitsu.paralyzeTimer !== 0 || zenitsu.slowTimer !== 0 || zenitsu.timeStopTimer !== 0) {
+      throw new Error(`Zenitsu received CC while thunderclapDashPauseTimer > 0! hitStun=${zenitsu.hitStunTimer}, paralyze=${zenitsu.paralyzeTimer}`);
+    }
+    if (zenitsu._handleTimeStop() !== false) {
+      throw new Error(`_handleTimeStop() should return false during thunderclapDashPauseTimer!`);
+    }
+    zenitsu.thunderclapDashPauseTimer = 0;
+
+    console.log('✅ [Zenitsu Dash CC Immunity Test] Zenitsu correctly maintains 100% CC and movement-stopping immunity during dashing and dash pauses.');
+  } catch (err) {
+    console.error('❌ [ZENITSU DASH CC IMMUNITY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[ZENITSU DASH CC IMMUNITY TEST]: ${err.stack || err.message}`);
+  }
+
   console.log('───────────────────────────────────────────────────────');
   if (errors === 0) {
     console.log(`✅ Successfully tested all ${totalTested} fighter classes, skins, weapon previews, and UI screens with ZERO runtime errors and 100% BALANCED Canvas 2D stacks!`);

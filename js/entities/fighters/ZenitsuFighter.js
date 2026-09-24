@@ -209,7 +209,64 @@ export class ZenitsuFighter extends Fighter {
     }
   }
 
+  _handleTimeStop() {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) {
+      // Dashing state: Unstoppable godspeed motion immune to all CC and movement-stopping effects
+      this.timeStopTimer = 0;
+      this.paralyzeTimer = 0;
+      this.hitStunTimer = 0;
+      this.slowTimer = 0;
+      this.freezeTimer = 0;
+      this.electricStunTimer = 0;
+      this.isCaughtInTelekinesis = false;
+      this.isWallSlammed = false;
+      this.isWallPinned = false;
+      this.isGrabbedByMahoraga = false;
+      if (this.statusEffects) {
+        this.statusEffects.timeStopTimer = 0;
+        this.statusEffects.paralyzeTimer = 0;
+        this.statusEffects.hitStunTimer = 0;
+        this.statusEffects.slowTimer = 0;
+      }
+      return false;
+    }
+    return super._handleTimeStop();
+  }
+
+  applyHitStun(frames, opts = {}) {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return;
+    super.applyHitStun(frames, opts);
+  }
+
+  applyParalyze(frames, opts = {}) {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return;
+    super.applyParalyze(frames, opts);
+  }
+
+  applySlow(frames, mult, opts = {}) {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return;
+    super.applySlow(frames, mult, opts);
+  }
+
+  applyTimeStop(duration, opts = {}) {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return;
+    super.applyTimeStop(duration, opts);
+  }
+
+  applyKnockback(vx, vy, isMelee = false, isProjectile = false, attacker = null) {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return;
+    super.applyKnockback(vx, vy, isMelee, isProjectile, attacker);
+  }
+
+  isCaughtInBeam() {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return false;
+    return super.isCaughtInBeam ? super.isCaughtInBeam() : false;
+  }
+
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0)) {
+      return; // Dashing state is unstoppable; transient hit interrupts do not break consecutive dashes
+    }
     if (typeof super.interruptAttacks === 'function') {
       super.interruptAttacks(forceCancelAll);
     }
@@ -229,7 +286,7 @@ export class ZenitsuFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     // 1. Rule 1 Freeze / TimeStop Guard
     const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
+    if (isFrozen || (this.isTargetOfAmbush && !this.isDashingThunderclap && this.thunderclapDashPauseTimer <= 0)) {
       this.interruptAttacks();
       return;
     }
