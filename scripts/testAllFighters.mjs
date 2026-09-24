@@ -10345,6 +10345,9 @@ async function main() {
     if (!CONFIG.zenitsu?.sounds?.dashNoise || CONFIG.zenitsu.sounds.dashNoise !== 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3') {
       throw new Error(`CONFIG.zenitsu.sounds.dashNoise is missing or incorrect! Got: ${CONFIG.zenitsu?.sounds?.dashNoise}`);
     }
+    if (!CONFIG.zenitsu?.sounds?.thunderStrike || CONFIG.zenitsu.sounds.thunderStrike !== 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3') {
+      throw new Error(`CONFIG.zenitsu.sounds.thunderStrike is missing or incorrect! Got: ${CONFIG.zenitsu?.sounds?.thunderStrike}`);
+    }
     if (!CONFIG.zenitsu?.sounds?.dashSFX || !CONFIG.zenitsu?.sounds?.katanaSwing || !CONFIG.zenitsu?.sounds?.slashHit) {
       throw new Error(`CONFIG.zenitsu.sounds is missing required audio mappings!`);
     }

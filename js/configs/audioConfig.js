@@ -125,6 +125,8 @@ export const AUDIO_CONFIG = {
   // Zenitsu (Thunder Breathing)
   'skill_zenitsu_dash_noise': 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
   'skill_zenitsu_dash_sfx': 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
+  'skill_zenitsu_dash2': 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
   'zenitsu_dash_noise': 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
-  'zenitsu_dash_sfx': 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3'
+  'zenitsu_dash_sfx': 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
+  'zenitsu_dash2': 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3'
 };

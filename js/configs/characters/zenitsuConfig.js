@@ -93,7 +93,7 @@ export const zenitsuConfig = {
     dashNoise: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
     dashSFX: 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
     dashWhoosh: 'Assets/Sound Effects/Skills/dash1.mp3',
-    thunderStrike: 'Assets/Sound Effects/Skills/thunderstrike.mp3',
+    thunderStrike: 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
 
     // Skill 2: Sixfold (Rokuren)
     rokurenDash: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',

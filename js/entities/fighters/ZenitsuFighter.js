@@ -802,7 +802,7 @@ export class ZenitsuFighter extends Fighter {
 
     if (isFinisher) {
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        const finSfx = cfg.sounds?.thunderStrike || 'Assets/Sound Effects/Skills/thunderstrike.mp3';
+        const finSfx = cfg.sounds?.thunderStrike || 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3';
         const finVol = cfg.soundVolumes?.thunderStrike !== undefined ? cfg.soundVolumes.thunderStrike : 0.90;
         audioSystem.playSFX(finSfx, finVol);
       }
