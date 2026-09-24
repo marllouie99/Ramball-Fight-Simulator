@@ -64,6 +64,7 @@ export class ZenitsuFighter extends Fighter {
     this.isThunderclapAimLocked = false;
     this.thunderclapLockedDistance = 260;
     this._lastThunderclapBurstId = null;
+    this._channelVoiceIdx = 0;
 
     // Active Consecutive Lightning Dash Travel State (4 Consecutive Godspeed Dashes)
     this.isDashingThunderclap = false;
@@ -301,7 +302,6 @@ export class ZenitsuFighter extends Fighter {
   _fadeOutAllDashAudio(fadeMs = 80) {
     this._fadeOutIntermediateDashAudio(fadeMs);
     fadeOutSoundBySrc('Zenitsu-dash2', fadeMs);
-    fadeOutSoundBySrc('Zenitsu-inhale', fadeMs);
     fadeOutSoundBySrc('zenitsu', fadeMs);
   }
 
@@ -631,11 +631,20 @@ export class ZenitsuFighter extends Fighter {
       this.skillCastAngle = this.gunAngle;
     }
 
-    // Frame 1: Stance initiation & deep breathing inhale sound
+    // Frame 1: Stance initiation & anime channeling voiceline (cycles through First Form, Sixfold, and Thunderclap & Flash)
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      const inhaleSfx = cfg.sounds?.inhale || 'Assets/Sound Effects/Skills/Zenitsu-inhale.mp3';
-      const inhaleVol = cfg.soundVolumes?.inhale !== undefined ? cfg.soundVolumes.inhale : 0.85;
-      audioSystem.playSFX(inhaleSfx, inhaleVol);
+      const voicePool = cfg.sounds?.channelVoicelines || [
+        cfg.sounds?.firstFormVoice || 'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3',
+        cfg.sounds?.sixfoldVoice || 'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3',
+        cfg.sounds?.thunderclapFlashVoice || 'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3'
+      ];
+      if (Array.isArray(voicePool) && voicePool.length > 0) {
+        const voiceIdx = (this._channelVoiceIdx !== undefined ? this._channelVoiceIdx : 0) % voicePool.length;
+        this._channelVoiceIdx = voiceIdx + 1;
+        const voiceSfx = voicePool[voiceIdx];
+        const voiceVol = cfg.soundVolumes?.channelVoice !== undefined ? cfg.soundVolumes.channelVoice : 0.90;
+        audioSystem.playSFX(voiceSfx, voiceVol);
+      }
 
       const stanceSfx = cfg.sounds?.stance || 'Assets/Sound Effects/Skills/dash1.mp3';
       const stanceVol = cfg.soundVolumes?.stance !== undefined ? cfg.soundVolumes.stance : 0.30;

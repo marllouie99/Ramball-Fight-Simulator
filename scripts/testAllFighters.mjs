@@ -8949,10 +8949,13 @@ async function main() {
       throw new Error('Zenitsu Pre-launch surge must trigger right before launch dash');
     }
 
-    // 11.6.1.1 Zenitsu Electric Noise & Inhale Audio Config & Channeling Burst Trigger Test
+    // 11.6.1.1 Zenitsu Electric Noise & Channeling Voiceline Audio Config Test
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
-    if (!cfg.sounds?.inhale) {
-      throw new Error('Zenitsu config missing inhale sound in sounds');
+    if (!Array.isArray(cfg.sounds?.channelVoicelines) || cfg.sounds.channelVoicelines.length !== 3) {
+      throw new Error('Zenitsu config missing 3-element channelVoicelines array in sounds');
+    }
+    if (!cfg.sounds?.firstFormVoice || !cfg.sounds?.sixfoldVoice || !cfg.sounds?.thunderclapFlashVoice) {
+      throw new Error('Zenitsu config missing firstFormVoice, sixfoldVoice, or thunderclapFlashVoice in sounds');
     }
     if (!cfg.sounds?.electricNoise1 || !cfg.sounds?.electricNoise2 || !cfg.sounds?.electricNoise3) {
       throw new Error('Zenitsu config missing electricNoise1, electricNoise2, or electricNoise3 in sounds');
