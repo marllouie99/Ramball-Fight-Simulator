@@ -734,10 +734,14 @@ function drawIndexDetailScreen() {
       else if (btn.id === 'bankai' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/Ichigo-bankai-charging-voiceline.mp3', 1.0);
       else if (btn.id === 'incinerate' && def.type === 'genos') {
         if (CONFIG.genos?.ultVoiceEnabled !== false) {
-          audioSystem.playSFX(CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3', CONFIG.genos?.ultVoiceVolume ?? 3.5);
+          const ultVoiceSrc = CONFIG.genos?.sounds?.ultVoice || CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3';
+          const ultVoiceVol = CONFIG.genos?.soundVolumes?.ultVoice ?? CONFIG.genos?.ultVoiceVolume ?? 0.90;
+          audioSystem.playSFX(ultVoiceSrc, ultVoiceVol);
         }
-        if (CONFIG.genos?.ultChargeEnabled) {
-          audioSystem.playSFX(CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-incenerate-charging.mp3', CONFIG.genos?.ultChargeVolume ?? 2.0);
+        if (CONFIG.genos?.ultChargeEnabled !== false) {
+          const ultChargeSrc = CONFIG.genos?.sounds?.ultCharge || CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3';
+          const ultChargeVol = CONFIG.genos?.soundVolumes?.ultCharge ?? CONFIG.genos?.ultChargeVolume ?? 0.55;
+          audioSystem.playSFX(ultChargeSrc, ultChargeVol);
         }
       }
     });

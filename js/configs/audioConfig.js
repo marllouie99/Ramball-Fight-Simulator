@@ -64,6 +64,8 @@ export const AUDIO_CONFIG = {
   'skill_genosrecovery': 'Assets/Sound Effects/Skills/genos-recovery.mp3',
   'skill_genosrangeattack': 'Assets/Sound Effects/Attacks/genos-range-attack.mp3',
   'skill_genosdashnoise': 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
+  'skill_genosselfdestructcharging': 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3',
+  'skill_genosselfdestructexplosion': 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3',
   'skill_todotadakachannelvoice': 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3',
   'skill_todotadakabgsong': 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',
   'skill_todomybestfriend': 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3',

@@ -136,59 +136,101 @@ export const genosConfig = {
   selfDestructShakeDuration: 50,
   selfDestructRecoveryFrames: 90, // Breather recovery pause duration in frames (~1.5s) after exploding
 
-  //----------------------------------AUDIO CONFIG-----------------------------------------//
+  // ─────────────────────────────────────────────────────────────────────────
+  // AUDIO CONFIGURATION & SOUND VOLUMES
+  // ─────────────────────────────────────────────────────────────────────────
+  sounds: {
+    // Basic Attack: Incineration Palms (Ranged Fireball) & Melee Mode Punches
+    basicBlast: 'Assets/Sound Effects/Attacks/genos-range-attack.mp3',
+    basicCharge: 'Assets/Sound Effects/Skills/genos-incenerate-charging.mp3',
+    meleePunch: 'Assets/Sound Effects/Attacks/punch.mp3',
 
-  // Basic Attack: Incineration Palms (Ranged Fireball)
+    // Thruster Dashes & Stomp
+    dashSound: 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
+    dashFallback: 'Assets/Sound Effects/Skills/dash1.mp3',
+    stompSound: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+
+    // Skill 1: Machine Gun Blows (Flurry)
+    flurryVoice: 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3',
+    flurryPunch: 'Assets/Sound Effects/Attacks/punch.mp3',
+
+    // Ultimate: Spiral Incineration Cannon
+    ultVoice: 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3',
+    ultCharge: 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
+    ultBlast: 'Assets/Sound Effects/Skills/genos-ultimateblast.mp3',
+    ultRecovery: 'Assets/Sound Effects/Skills/genos-recovery.mp3',
+
+    // Passive: Core Overdrive (Self-Destruct)
+    selfDestructCharge: 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3',
+    selfDestructExplosion: 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3'
+  },
+
+  soundVolumes: {
+    // Normalized SFX volume levels (balanced to prevent audio clipping & ear fatigue)
+    basicBlast: 0.45,
+    basicCharge: 0.40,
+    meleePunch: 0.45,
+    flurryPunch: 0.28,        // Balanced per-hit punch volume during 15-hit flurry
+    dashSound: 0.28,
+    dashFallback: 0.35,
+    stompSound: 0.50,
+    flurryVoice: 0.85,
+    ultVoice: 0.90,
+    ultCharge: 0.55,
+    ultBlast: 0.65,
+    ultRecovery: 0.40,
+    selfDestructCharge: 0.50,
+    selfDestructExplosion: 0.70
+  },
+
+  // ── Backward Compatibility Audio Keys & Volume Aliases ──
   basicBlastSound: 'Assets/Sound Effects/Attacks/genos-range-attack.mp3',
-  basicBlastVolume: 0.9,
+  basicBlastVolume: 0.45,
   basicBlastEnabled: true,
 
   basicChargeSound: 'Assets/Sound Effects/Skills/genos-incenerate-charging.mp3',
-  basicChargeVolume: 1.0,
+  basicChargeVolume: 0.40,
   basicChargeEnabled: true,
 
-  // Melee Mode Basic Attack (Close Quarters Martial Punch - Same punch sound Gojo uses)
   meleePunchSound: 'Assets/Sound Effects/Attacks/punch.mp3',
-  meleePunchVolume: 1.0,
+  meleePunchVolume: 0.45,
   meleePunchEnabled: true,
 
-  // Thruster Dash Audio (plays on high-speed thruster dash with cooldown to prevent frequency spam)
   dashSound: 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
-  dashSoundVolume: 1.0,
+  dashSoundVolume: 0.28,
   dashSoundEnabled: true,
-  dashSoundCooldownFrames: 180, // 3.0s cooldown between dash noise plays
+  dashSoundCooldownFrames: 180,
 
-  // Skill 1: Machine Gun Blows Voice
+  stompSound: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+  stompVolume: 0.50,
+
   flurryVoiceSound: 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3',
-  flurryVoiceVolume: 2.0,
-  flurryVoiceDelay: -0.15, // Timing delay in frames before voice plays (0 = immediate)
+  flurryVoiceVolume: 0.85,
+  flurryVoiceDelay: -0.15,
   flurryVoiceEnabled: true,
 
-  // Ultimate: Spiral Incineration Cannon Audio
   ultVoiceSound: 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3',
-  ultVoiceVolume: 2.2,
+  ultVoiceVolume: 0.90,
   ultVoiceEnabled: true,
 
   ultChargeSound: 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
-  ultChargeVolume: 1.8,
+  ultChargeVolume: 0.55,
   ultChargeEnabled: true,
 
   ultBlastSound: 'Assets/Sound Effects/Skills/genos-ultimateblast.mp3',
-  ultBlastVolume: 1.8,
+  ultBlastVolume: 0.65,
   ultBlastEnabled: true,
 
-  // Ultimate Recovery Cooling SFX
   ultRecoverySound: 'Assets/Sound Effects/Skills/genos-recovery.mp3',
-  ultRecoveryVolume: 0.5,
+  ultRecoveryVolume: 0.40,
   ultRecoveryEnabled: true,
   ultRecoveryDelay: 0,
 
-  // Passive: Self-Destruct Explosion & Charging Audio
   selfDestructChargeSound: 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3',
-  selfDestructChargeVolume: 1.8,
+  selfDestructChargeVolume: 0.50,
   selfDestructChargeEnabled: true,
+
   selfDestructSound: 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3',
-  selfDestructVolume: 2.0,
-  selfDestructDelay: 0,
-  selfDestructRecoveryFrames: 90, // Breather recovery pause duration in frames (~1.5s) after exploding
+  selfDestructVolume: 0.70,
+  selfDestructDelay: 0
 };

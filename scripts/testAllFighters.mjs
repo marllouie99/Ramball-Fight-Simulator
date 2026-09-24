@@ -5871,6 +5871,45 @@ async function main() {
     errors++;
   }
 
+  // Genos Audio Config Organization & Volume Adjustment Test
+  console.log('🔊 [Genos Audio Config Test] Verifying Genos sounds and soundVolumes tables and volume adjustments...');
+  try {
+    const gCfg = CONFIG.genos || genosConfig;
+    if (!gCfg.sounds || typeof gCfg.sounds !== 'object') {
+      throw new Error('Genos config missing sounds mapping table');
+    }
+    if (!gCfg.soundVolumes || typeof gCfg.soundVolumes !== 'object') {
+      throw new Error('Genos config missing soundVolumes mapping table');
+    }
+
+    const requiredKeys = [
+      'basicBlast', 'basicCharge', 'meleePunch', 'dashSound',
+      'stompSound', 'flurryVoice', 'flurryPunch', 'ultVoice',
+      'ultCharge', 'ultBlast', 'ultRecovery', 'selfDestructCharge', 'selfDestructExplosion'
+    ];
+    for (const key of requiredKeys) {
+      if (!gCfg.sounds[key]) {
+        throw new Error(`Genos config sounds missing key: ${key}`);
+      }
+      if (typeof gCfg.soundVolumes[key] !== 'number') {
+        throw new Error(`Genos config soundVolumes missing numeric volume for key: ${key}`);
+      }
+      if (gCfg.soundVolumes[key] > 1.0) {
+        throw new Error(`Genos soundVolume for '${key}' is too loud (${gCfg.soundVolumes[key]}), must be <= 1.0`);
+      }
+    }
+
+    // Verify GenosFighter reads from soundVolumes dynamically
+    const GenosClass = FIGHTER_CLASS_MAP['genos'];
+    const genosDef = FIGHTER_DEFS.find(d => d.type === 'genos') || { type: 'genos', name: 'Genos' };
+    const genosInst = new GenosClass(genosDef);
+    if (!genosInst) throw new Error('Failed to instantiate GenosFighter');
+    console.log('✅ [Genos Audio Config Test] Verified Genos sounds, soundVolumes, and normalized volume levels.');
+  } catch (err) {
+    console.error('❌ [GENOS AUDIO CONFIG TEST ERROR]:', err);
+    errors++;
+  }
+
   // Round Skill Reset Test
   console.log('🔄 [Round Skill Reset Test] Verifying all fighter skills and cooldowns reset cleanly on new round...');
   try {

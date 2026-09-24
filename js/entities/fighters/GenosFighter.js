@@ -342,12 +342,14 @@ export class GenosFighter extends Fighter {
     this.angle = dashAngle;
 
     if (CONFIG.genos?.dashSoundEnabled !== false && (this.dashSoundCooldownTimer || 0) <= 0) {
-      const dashSrc = CONFIG.genos?.dashSound || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3';
-      const dashVol = CONFIG.genos?.dashSoundVolume ?? 1.8;
+      const dashSrc = CONFIG.genos?.sounds?.dashSound || CONFIG.genos?.dashSound || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3';
+      const dashVol = CONFIG.genos?.soundVolumes?.dashSound ?? CONFIG.genos?.dashSoundVolume ?? 0.28;
       audioSystem.playSFX(dashSrc, dashVol);
       this.dashSoundCooldownTimer = CONFIG.genos?.dashSoundCooldownFrames ?? 180;
     } else {
-      audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.9);
+      const fallbackSrc = CONFIG.genos?.sounds?.dashFallback || 'Assets/Sound Effects/Skills/dash1.mp3';
+      const fallbackVol = CONFIG.genos?.soundVolumes?.dashFallback ?? 0.35;
+      audioSystem.playSFX(fallbackSrc, fallbackVol);
     }
 
     if (typeof spawnGenosThrusterDashVisual === 'function') {
@@ -794,8 +796,8 @@ export class GenosFighter extends Fighter {
 
       // Play self-destruct charging audio
       if (CONFIG.genos?.selfDestructChargeEnabled !== false) {
-        const chargeSrc = CONFIG.genos?.selfDestructChargeSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3';
-        const chargeVol = CONFIG.genos?.selfDestructChargeVolume ?? 2.0;
+        const chargeSrc = CONFIG.genos?.sounds?.selfDestructCharge || CONFIG.genos?.selfDestructChargeSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3';
+        const chargeVol = CONFIG.genos?.soundVolumes?.selfDestructCharge ?? CONFIG.genos?.selfDestructChargeVolume ?? 0.50;
         this._selfDestructChargeHandle = audioSystem.playSFX(chargeSrc, chargeVol);
       }
 
@@ -910,8 +912,8 @@ export class GenosFighter extends Fighter {
           triggerGlobalScreenShake(1.2, 8);
         }
         if (CONFIG.genos?.meleePunchEnabled !== false) {
-          const punchSrc = CONFIG.genos?.meleePunchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
-          const punchVol = CONFIG.genos?.meleePunchVolume ?? 2.8;
+          const punchSrc = CONFIG.genos?.sounds?.meleePunch || CONFIG.genos?.meleePunchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
+          const punchVol = CONFIG.genos?.soundVolumes?.meleePunch ?? CONFIG.genos?.meleePunchVolume ?? 0.45;
           audioSystem.playSFX(punchSrc, punchVol);
         }
       }
@@ -984,8 +986,8 @@ export class GenosFighter extends Fighter {
     }
 
     if (CONFIG.genos?.basicBlastEnabled !== false) {
-      const blastSrc = CONFIG.genos?.basicBlastSound || 'Assets/Sound Effects/Attacks/genos-range-attack.mp3';
-      const blastVol = CONFIG.genos?.basicBlastVolume ?? 2.0;
+      const blastSrc = CONFIG.genos?.sounds?.basicBlast || CONFIG.genos?.basicBlastSound || 'Assets/Sound Effects/Attacks/genos-range-attack.mp3';
+      const blastVol = CONFIG.genos?.soundVolumes?.basicBlast ?? CONFIG.genos?.basicBlastVolume ?? 0.45;
       audioSystem.playSFX(blastSrc, blastVol);
     }
 
@@ -1093,8 +1095,8 @@ export class GenosFighter extends Fighter {
       if (delay > 0) {
         this.flurryVoiceTimer = delay;
       } else {
-        const flurrySrc = CONFIG.genos?.flurryVoiceSound || 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3';
-        const flurryVol = CONFIG.genos?.flurryVoiceVolume ?? 2.5;
+        const flurrySrc = CONFIG.genos?.sounds?.flurryVoice || CONFIG.genos?.flurryVoiceSound || 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3';
+        const flurryVol = CONFIG.genos?.soundVolumes?.flurryVoice ?? CONFIG.genos?.flurryVoiceVolume ?? 0.85;
         audioSystem.playSFX(flurrySrc, flurryVol);
       }
     }
@@ -1110,7 +1112,9 @@ export class GenosFighter extends Fighter {
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(2.5, 18);
     }
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/groundSmash.mp3', 1.5);
+    const stompSrc = CONFIG.genos?.sounds?.stompSound || CONFIG.genos?.stompSound || 'Assets/Sound Effects/Attacks/groundSmash.mp3';
+    const stompVol = CONFIG.genos?.soundVolumes?.stompSound ?? CONFIG.genos?.stompVolume ?? 0.50;
+    audioSystem.playSFX(stompSrc, stompVol);
 
     // ── STOMP EXPANDING THERMAL SHOCKWAVE RING ──
     if (typeof spawnMeleeClashShockwave === 'function') {
@@ -1326,8 +1330,8 @@ export class GenosFighter extends Fighter {
     const shakeIntensity = CONFIG.genos?.selfDestructShakeIntensity || 18;
     const shakeDuration = CONFIG.genos?.selfDestructShakeDuration || 50;
     triggerGlobalScreenShake(shakeIntensity, shakeDuration);
-    const sdSoundSrc = CONFIG.genos?.selfDestructSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3';
-    const sdSoundVol = CONFIG.genos?.selfDestructVolume ?? 2.5;
+    const sdSoundSrc = CONFIG.genos?.sounds?.selfDestructExplosion || CONFIG.genos?.selfDestructSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3';
+    const sdSoundVol = CONFIG.genos?.soundVolumes?.selfDestructExplosion ?? CONFIG.genos?.selfDestructVolume ?? 0.70;
     audioSystem.playSFX(sdSoundSrc, sdSoundVol);
 
     const radius = CONFIG.genos?.selfDestructRadius || 200;
@@ -1615,8 +1619,8 @@ export class GenosFighter extends Fighter {
     if (this.flurryVoiceTimer > 0) {
       this.flurryVoiceTimer--;
       if (this.flurryVoiceTimer === 0) {
-        const flurrySrc = CONFIG.genos?.flurryVoiceSound || 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3';
-        const flurryVol = CONFIG.genos?.flurryVoiceVolume ?? 2.5;
+        const flurrySrc = CONFIG.genos?.sounds?.flurryVoice || CONFIG.genos?.flurryVoiceSound || 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3';
+        const flurryVol = CONFIG.genos?.soundVolumes?.flurryVoice ?? CONFIG.genos?.flurryVoiceVolume ?? 0.85;
         audioSystem.playSFX(flurrySrc, flurryVol);
       }
     }
@@ -1735,13 +1739,13 @@ export class GenosFighter extends Fighter {
           triggerGlobalScreenShake(windupShake, CONFIG.genos?.ultWindupShakeDuration || 6);
         }
         if (CONFIG.genos?.ultVoiceEnabled !== false) {
-          const ultVoiceSrc = CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3';
-          const ultVoiceVol = CONFIG.genos?.ultVoiceVolume ?? 3.5;
+          const ultVoiceSrc = CONFIG.genos?.sounds?.ultVoice || CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3';
+          const ultVoiceVol = CONFIG.genos?.soundVolumes?.ultVoice ?? CONFIG.genos?.ultVoiceVolume ?? 0.90;
           this.soundHandle = audioSystem.playSFX(ultVoiceSrc, ultVoiceVol);
         }
         if (CONFIG.genos?.ultChargeEnabled !== false) {
-          const ultChargeSrc = CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3';
-          const ultChargeVol = CONFIG.genos?.ultChargeVolume ?? 2.0;
+          const ultChargeSrc = CONFIG.genos?.sounds?.ultCharge || CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3';
+          const ultChargeVol = CONFIG.genos?.soundVolumes?.ultCharge ?? CONFIG.genos?.ultChargeVolume ?? 0.55;
           this._ultChargeSoundHandle = audioSystem.playSFX(ultChargeSrc, ultChargeVol);
         }
       }
@@ -1787,8 +1791,8 @@ export class GenosFighter extends Fighter {
           triggerGlobalScreenShake(blastShake, CONFIG.genos?.ultBlastShakeDuration || 12);
         }
         if (CONFIG.genos?.ultBlastEnabled !== false) {
-          const blastSrc = CONFIG.genos?.ultBlastSound || 'Assets/Sound Effects/Skills/genos-incenerate-blast.mp3';
-          const blastVol = CONFIG.genos?.ultBlastVolume ?? 2.0;
+          const blastSrc = CONFIG.genos?.sounds?.ultBlast || CONFIG.genos?.ultBlastSound || 'Assets/Sound Effects/Skills/genos-ultimateblast.mp3';
+          const blastVol = CONFIG.genos?.soundVolumes?.ultBlast ?? CONFIG.genos?.ultBlastVolume ?? 0.65;
           audioSystem.playSFX(blastSrc, blastVol);
         }
       }
@@ -1930,8 +1934,8 @@ export class GenosFighter extends Fighter {
         this.immuneToPull = false;
         this.ultRecoveryTimer = CONFIG.genos?.ultRecoveryFrames || 45; // ~0.75 seconds of recovery (repositioning hands & smoking)
         if (CONFIG.genos?.ultRecoveryEnabled !== false) {
-          const recSrc = CONFIG.genos?.ultRecoverySound || 'Assets/Sound Effects/Skills/genos-recovery.mp3';
-          const recVol = CONFIG.genos?.ultRecoveryVolume ?? 1.5;
+          const recSrc = CONFIG.genos?.sounds?.ultRecovery || CONFIG.genos?.ultRecoverySound || 'Assets/Sound Effects/Skills/genos-recovery.mp3';
+          const recVol = CONFIG.genos?.soundVolumes?.ultRecovery ?? CONFIG.genos?.ultRecoveryVolume ?? 0.40;
           audioSystem.playSFX(recSrc, recVol);
         }
 
@@ -2151,7 +2155,9 @@ export class GenosFighter extends Fighter {
           }
         }
 
-        audioSystem.playSFX('Assets/Sound Effects/Attacks/punch.mp3', 1.0);
+        const fPunchSrc = CONFIG.genos?.sounds?.flurryPunch || CONFIG.genos?.sounds?.meleePunch || 'Assets/Sound Effects/Attacks/punch.mp3';
+        const fPunchVol = CONFIG.genos?.soundVolumes?.flurryPunch ?? 0.28;
+        audioSystem.playSFX(fPunchSrc, fPunchVol);
       }
 
       if (this.flurryHitsLeft <= 0) {
