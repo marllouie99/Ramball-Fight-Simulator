@@ -65,6 +65,9 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapLockedDistance = 260;
     this._lastThunderclapBurstId = null;
     this._channelVoiceIdx = 0;
+    this._hasPlayedFirstFormVoice = false;
+    this._hasPlayedThunderclapVoice = false;
+    this._hasPlayedSixfoldVoice = false;
 
     // Active Consecutive Lightning Dash Travel State (4 Consecutive Godspeed Dashes)
     this.isDashingThunderclap = false;
@@ -302,7 +305,8 @@ export class ZenitsuFighter extends Fighter {
   _fadeOutAllDashAudio(fadeMs = 80) {
     this._fadeOutIntermediateDashAudio(fadeMs);
     fadeOutSoundBySrc('Zenitsu-dash2', fadeMs);
-    fadeOutSoundBySrc('zenitsu', fadeMs);
+    fadeOutSoundBySrc('Zenitsu-Dash-SFX', fadeMs);
+    fadeOutSoundBySrc('Zenitsu-dash-noise', fadeMs);
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -317,6 +321,9 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapChannelTimer = 0;
     this.thunderclapTarget = null;
     this._lastThunderclapBurstId = null;
+    this._hasPlayedFirstFormVoice = false;
+    this._hasPlayedThunderclapVoice = false;
+    this._hasPlayedSixfoldVoice = false;
     this.isDashingThunderclap = false;
     this.thunderclapDashIndex = 0;
     this.thunderclapDashPauseTimer = 0;
@@ -494,6 +501,17 @@ export class ZenitsuFighter extends Fighter {
         this._lastThunderclapBurstId = null;
       }
 
+      // Voiceline sequence progression during channeling:
+      // Part 2: "Thunderclap and Flash" chained after "First Form" finishes (fallback fires at ~44% elapsed channel)
+      if (!this._hasPlayedThunderclapVoice && elapsedChannel >= Math.round(totalChannel * 0.44)) {
+        this._playThunderclapFlashVoice();
+      }
+
+      // Part 3: "Sixfold!" fires right when he is about to unleash the skill (final ~16 frames / ~0.26s before dash release)
+      if (!this._hasPlayedSixfoldVoice && this.thunderclapChannelTimer <= Math.min(16, Math.max(4, Math.round(totalChannel * 0.14)))) {
+        this._playSixfoldVoice();
+      }
+
       // Channel complete -> explosive burst dash along committed 1 direction!
       if (this.thunderclapChannelTimer <= 0) {
         this.isChannelingThunderclap = false;
@@ -609,6 +627,47 @@ export class ZenitsuFighter extends Fighter {
     }
   }
 
+  _playFirstFormVoice() {
+    if (this._hasPlayedFirstFormVoice) return;
+    this._hasPlayedFirstFormVoice = true;
+    if (typeof audioSystem === 'undefined' || !audioSystem.playSFX) return;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    const sfx = cfg.sounds?.firstFormVoice || 'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3';
+    const vol = cfg.soundVolumes?.firstFormVoice ?? cfg.soundVolumes?.channelVoice ?? 0.90;
+
+    audioSystem.playSFX(sfx, vol, 1.0, 0, 0, () => {
+      // Anime sequence chaining: once "First Form" finishes, immediately play "Thunderclap and Flash" if still channeling and alive
+      if (this.isChannelingThunderclap && !this._hasPlayedThunderclapVoice && !this.isDead) {
+        this._playThunderclapFlashVoice();
+      }
+    });
+  }
+
+  _playThunderclapFlashVoice() {
+    if (this._hasPlayedThunderclapVoice) return;
+    this._hasPlayedThunderclapVoice = true;
+    if (typeof audioSystem === 'undefined' || !audioSystem.playSFX) return;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    const sfx = cfg.sounds?.thunderclapFlashVoice || 'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3';
+    const vol = cfg.soundVolumes?.thunderclapFlashVoice ?? cfg.soundVolumes?.channelVoice ?? 0.90;
+
+    audioSystem.playSFX(sfx, vol);
+  }
+
+  _playSixfoldVoice() {
+    if (this._hasPlayedSixfoldVoice) return;
+    this._hasPlayedSixfoldVoice = true;
+    if (typeof audioSystem === 'undefined' || !audioSystem.playSFX) return;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    const sfx = cfg.sounds?.sixfoldVoice || 'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3';
+    const vol = cfg.soundVolumes?.sixfoldVoice ?? cfg.soundVolumes?.channelVoice ?? 0.90;
+
+    audioSystem.playSFX(sfx, vol);
+  }
+
   _triggerThunderclapAndFlash(target) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     this.thunderclapCooldown = this.thunderclapCooldownMax;
@@ -617,6 +676,9 @@ export class ZenitsuFighter extends Fighter {
     this.isChannelingThunderclap = true;
     this.thunderclapTarget = target;
     this._lastThunderclapBurstId = null;
+    this._hasPlayedFirstFormVoice = false;
+    this._hasPlayedThunderclapVoice = false;
+    this._hasPlayedSixfoldVoice = false;
 
     // Smooth aim initialization without instant snapping
     if (this.gunAngle === undefined) {
@@ -631,21 +693,11 @@ export class ZenitsuFighter extends Fighter {
       this.skillCastAngle = this.gunAngle;
     }
 
-    // Frame 1: Stance initiation & anime channeling voiceline (cycles through First Form, Sixfold, and Thunderclap & Flash)
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      const voicePool = cfg.sounds?.channelVoicelines || [
-        cfg.sounds?.firstFormVoice || 'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3',
-        cfg.sounds?.sixfoldVoice || 'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3',
-        cfg.sounds?.thunderclapFlashVoice || 'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3'
-      ];
-      if (Array.isArray(voicePool) && voicePool.length > 0) {
-        const voiceIdx = (this._channelVoiceIdx !== undefined ? this._channelVoiceIdx : 0) % voicePool.length;
-        this._channelVoiceIdx = voiceIdx + 1;
-        const voiceSfx = voicePool[voiceIdx];
-        const voiceVol = cfg.soundVolumes?.channelVoice !== undefined ? cfg.soundVolumes.channelVoice : 0.90;
-        audioSystem.playSFX(voiceSfx, voiceVol);
-      }
+    // Step 1: The moment he channels the skill, play First Form voiceline ("First Form...")
+    this._playFirstFormVoice();
 
+    // Frame 1: Stance initiation sound
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
       const stanceSfx = cfg.sounds?.stance || 'Assets/Sound Effects/Skills/dash1.mp3';
       const stanceVol = cfg.soundVolumes?.stance !== undefined ? cfg.soundVolumes.stance : 0.30;
       audioSystem.playSFX(stanceSfx, stanceVol);
@@ -654,6 +706,11 @@ export class ZenitsuFighter extends Fighter {
 
   _executeThunderclapDash(target) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    // Safety check: ensure "Sixfold!" voiceline has played before unleashing dashes
+    if (!this._hasPlayedSixfoldVoice) {
+      this._playSixfoldVoice();
+    }
+
     this.thunderclapDashIndex = 0;
     this.thunderclapTotalDashes = cfg.thunderclapDashCount || 4;
     this.thunderclapDashTarget = target;

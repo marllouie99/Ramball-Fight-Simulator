@@ -8949,19 +8949,45 @@ async function main() {
       throw new Error('Zenitsu Pre-launch surge must trigger right before launch dash');
     }
 
-    // 11.6.1.1 Zenitsu Electric Noise & Channeling Voiceline Audio Config Test
+    // 11.6.1.1 Zenitsu Electric Noise & Sequential Anime Voicelines Test
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     if (!Array.isArray(cfg.sounds?.channelVoicelines) || cfg.sounds.channelVoicelines.length !== 3) {
       throw new Error('Zenitsu config missing 3-element channelVoicelines array in sounds');
     }
-    if (!cfg.sounds?.firstFormVoice || !cfg.sounds?.sixfoldVoice || !cfg.sounds?.thunderclapFlashVoice) {
-      throw new Error('Zenitsu config missing firstFormVoice, sixfoldVoice, or thunderclapFlashVoice in sounds');
+    if (
+      cfg.sounds?.firstFormVoice !== 'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3' ||
+      cfg.sounds?.thunderclapFlashVoice !== 'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3' ||
+      cfg.sounds?.sixfoldVoice !== 'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3'
+    ) {
+      throw new Error('Zenitsu config missing exact sequential voiceline paths in sounds');
     }
     if (!cfg.sounds?.electricNoise1 || !cfg.sounds?.electricNoise2 || !cfg.sounds?.electricNoise3) {
       throw new Error('Zenitsu config missing electricNoise1, electricNoise2, or electricNoise3 in sounds');
     }
     if (!Array.isArray(cfg.sounds?.electricNoises) || cfg.sounds.electricNoises.length !== 3) {
       throw new Error('Zenitsu config missing 3-element electricNoises array in sounds');
+    }
+
+    // Test 3-step sequential voiceline progression
+    const dummyOpponent = new ZenitsuClass({ x: 500, y: 300, color: '#f59e0b', controls: {} });
+    zenitsu._triggerThunderclapAndFlash(dummyOpponent);
+    if (!zenitsu._hasPlayedFirstFormVoice || zenitsu._hasPlayedThunderclapVoice || zenitsu._hasPlayedSixfoldVoice) {
+      throw new Error('Zenitsu _triggerThunderclapAndFlash must start with only firstFormVoice played');
+    }
+
+    // Advance to 50% elapsed channel -> Thunderclap and Flash voiceline should trigger
+    zenitsu.thunderclapChannelDuration = 100;
+    zenitsu.thunderclapChannelTimer = 50; // 50 elapsed
+    zenitsu.update(dummyOpponent, 0, state.arena);
+    if (!zenitsu._hasPlayedThunderclapVoice) {
+      throw new Error('Zenitsu thunderclapFlashVoice failed to trigger midway through channeling');
+    }
+
+    // Advance to final 10 frames (about to unleash) -> Sixfold voiceline should trigger
+    zenitsu.thunderclapChannelTimer = 10;
+    zenitsu.update(dummyOpponent, 0, state.arena);
+    if (!zenitsu._hasPlayedSixfoldVoice) {
+      throw new Error('Zenitsu sixfoldVoice failed to trigger when about to unleash skill');
     }
 
     // Aim lock test during channeling
@@ -8971,6 +8997,9 @@ async function main() {
     zenitsu.interruptAttacks();
     if (zenitsu.isChannelingThunderclap !== false) {
       throw new Error('Zenitsu interruptAttacks() should clear isChannelingThunderclap');
+    }
+    if (zenitsu._hasPlayedFirstFormVoice || zenitsu._hasPlayedThunderclapVoice || zenitsu._hasPlayedSixfoldVoice) {
+      throw new Error('Zenitsu interruptAttacks() should reset all voiceline flags');
     }
 
     // 11.6.2 Six-Frame Lightning Dash Animation & Disappearance Stack Test

@@ -26,7 +26,7 @@ export const zenitsuConfig = {
   startVx: 1.1,
   startVy: 1.0,
   damage: 26,
-  cooldown: 24,
+  cooldown: 60,
   projectileSpeedMultiplier: 1.0,
   ability: 'Thunder Breathing ("Thunderclap and Flash")',
   desc: 'Thunder Breathing godspeed iai swordsman. Awakens unstoppable Battle Trance during crises. Wields 140° Thunder Iai quickdraw slashes, lightspeed First Form: Thunderclap and Flash teleport slashes, Sixfold wall-ricochet flurries, and the Flaming Thunder God dragon ultimate.',
@@ -62,8 +62,8 @@ export const zenitsuConfig = {
   thunderclapDashDuration: 2,       // Travel frames per dash
   thunderclapDashPauseFrames: 5,    // Pause/windup frames between each consecutive dash
   thunderclapSpeed: 36.0,
-  thunderclapDamage: 14,            // Damage per intermediate dash
-  thunderclapFinisherDamage: 38,    // Finisher dash damage
+  thunderclapDamage: 20,            // Damage per intermediate dash
+  thunderclapFinisherDamage: 50,    // Finisher dash damage
   thunderclapStunFrames: 50,
   dashAudioFadeOutMs: 120,          // Fast audio fade-out in ms the moment all dashes are completed
 
@@ -90,14 +90,14 @@ export const zenitsuConfig = {
 
     // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
     stance: 'Assets/Sound Effects/Skills/dash1.mp3',
+    firstFormVoice: 'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3',
+    thunderclapFlashVoice: 'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3',
+    sixfoldVoice: 'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3',
     channelVoicelines: [
       'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3',
-      'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3',
-      'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3'
+      'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3',
+      'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3'
     ],
-    firstFormVoice: 'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3',
-    sixfoldVoice: 'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3',
-    thunderclapFlashVoice: 'Assets/Sound Effects/Skills/Zenitsu-thunderclap&flash-voiceline.mp3',
     lockIn: 'Assets/Sound Effects/Skills/parry.mp3',
     electricNoise1: 'Assets/Sound Effects/Skills/Zenitsu-electric-noise1.mp3',
     electricNoise2: 'Assets/Sound Effects/Skills/Zenitsu-electric-noise2.mp3',
@@ -136,7 +136,7 @@ export const zenitsuConfig = {
     electricNoise: 0.70,
     dashNoise: 0.85,
     dashSFX: 0.60,
-    dashWhoosh: 0.35,
+    dashWhoosh: 0.0,
     thunderStrike: 0.90,
     rokurenDash: 0.85,
     ultimateCast: 1.0,
