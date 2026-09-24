@@ -96,7 +96,9 @@ export class ZenitsuFighter extends Fighter {
         name: 'Thunderclap and Flash',
         type: 'active',
         cooldownKey: 'thunderclapCooldown',
-        cooldownMaxKey: 'thunderclapCooldownMax'
+        cooldownMaxKey: 'thunderclapCooldownMax',
+        channelingKey: 'isChannelingThunderclap',
+        channelTimerKey: 'thunderclapChannelTimer'
       });
     }
 
@@ -326,8 +328,10 @@ export class ZenitsuFighter extends Fighter {
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
-    // Skill Cooldowns
-    if (this.thunderclapCooldown > 0) this.thunderclapCooldown--;
+    // Skill Cooldowns (cooldowns do NOT tick down while actively channeling or dashing)
+    if (!this.isChannelingThunderclap && !this.isDashingThunderclap && this.thunderclapCooldown > 0) {
+      this.thunderclapCooldown--;
+    }
     if (this.rokurenCooldown > 0) this.rokurenCooldown--;
     if (this.flamingGodCooldown > 0) this.flamingGodCooldown--;
 
@@ -439,6 +443,7 @@ export class ZenitsuFighter extends Fighter {
 
   _executeThunderclapDash(target) {
     this.slashSwingTimer = this.slashSwingMaxTimer;
+    this.thunderclapCooldown = this.thunderclapCooldownMax;
 
     // Commit strictly to the locked angle: ZERO snap change in direction!
     const angle = this.skillCastAngle;

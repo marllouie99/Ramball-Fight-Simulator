@@ -8977,10 +8977,11 @@ async function main() {
       drawZenitsuSkin(mockCtx, zenitsu);
       assertCanvasStackBalance(`drawZenitsuSkin with dash VFX at timer ${testTimer}`);
     }
-    // 11.6.3 Dash VFX Timer Progress During Channeling Test (Custom Duration = 200)
+    // 11.6.3 Dash VFX Timer Progress & Cooldown Channeling Protection Test (Custom Duration = 200)
     zenitsu.isChannelingThunderclap = true;
     zenitsu.thunderclapChannelDuration = 200;
     zenitsu.thunderclapChannelTimer = 200;
+    zenitsu.thunderclapCooldown = 228;
     zenitsu.thunderclapDashVFX = {
       startX: 100,
       startY: 100,
@@ -8999,6 +9000,9 @@ async function main() {
     }
     if (zenitsu.thunderclapDashVFX !== null) {
       throw new Error(`Zenitsu dash VFX failed to clear during channeling! timer: ${zenitsu.thunderclapDashVFX?.timer}`);
+    }
+    if (zenitsu.thunderclapCooldown !== 228) {
+      throw new Error(`Zenitsu thunderclapCooldown ticked down during channeling! Expected 228, got ${zenitsu.thunderclapCooldown}`);
     }
     zenitsu.interruptAttacks(true);
   } catch (err) {

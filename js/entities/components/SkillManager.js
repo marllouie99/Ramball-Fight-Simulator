@@ -293,6 +293,8 @@ export class SkillManager {
       if (isFrozen && !skill.canTickCooldownInFreeze) continue;
       if (isParalyzed && !skill.bypassParalyze) continue;
       if (isSilenced && !skill.isImmuneToSilence) continue;
+      // Do not tick cooldown while the skill is actively channeling / charging
+      if (skill.isChanneling()) continue;
 
       if (skill.cooldownKey) {
         const curCd = skill.getCooldown();
