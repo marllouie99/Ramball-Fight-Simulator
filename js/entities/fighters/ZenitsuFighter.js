@@ -62,10 +62,12 @@ export class ZenitsuFighter extends Fighter {
     this.isThunderclapAimLocked = false;
     this.thunderclapLockedDistance = 260;
 
-    // Active 6-Frame Lightning Dash Travel State
+    // Active Consecutive Lightning Dash Travel State (4 Consecutive Godspeed Dashes)
     this.isDashingThunderclap = false;
+    this.thunderclapDashIndex = 0;
+    this.thunderclapTotalDashes = cfg.thunderclapDashCount || 4;
     this.thunderclapDashStep = 0;
-    this.thunderclapDashDuration = 6;
+    this.thunderclapDashDuration = cfg.thunderclapDashDuration || 5;
     this.thunderclapDashStartX = 0;
     this.thunderclapDashStartY = 0;
     this.thunderclapDashDestX = 0;
@@ -73,6 +75,7 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapDashAngle = 0;
     this.thunderclapDashDist = 0;
     this.thunderclapDashTarget = null;
+    this.thunderclapDashVFXList = [];
 
     // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)
     this.rokurenCooldownMax = cfg.rokurenCooldown || 420;
@@ -192,6 +195,17 @@ export class ZenitsuFighter extends Fighter {
         this.thunderclapDashVFX = null;
       }
     }
+    if (Array.isArray(this.thunderclapDashVFXList)) {
+      for (let i = this.thunderclapDashVFXList.length - 1; i >= 0; i--) {
+        const vfx = this.thunderclapDashVFXList[i];
+        if (vfx) {
+          vfx.timer++;
+          if (vfx.timer >= vfx.maxTimer) {
+            this.thunderclapDashVFXList.splice(i, 1);
+          }
+        }
+      }
+    }
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -203,8 +217,10 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapChannelTimer = 0;
     this.thunderclapTarget = null;
     this.isDashingThunderclap = false;
+    this.thunderclapDashIndex = 0;
     if (forceCancelAll) {
       this.thunderclapDashVFX = null;
+      this.thunderclapDashVFXList = [];
     }
   }
 
@@ -222,7 +238,7 @@ export class ZenitsuFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     const target = this.getNearestTarget(opponent);
 
-    // Active 6-Frame Lightning Dash Travel (Hekireki Issen Godspeed Travel)
+    // Active Consecutive Lightning Dash Travel (Hekireki Issen: Consecutive Godspeed Dashes)
     if (this.isDashingThunderclap) {
       this.thunderclapDashStep++;
       const travelT = Math.min(1.0, this.thunderclapDashStep / this.thunderclapDashDuration);
@@ -237,21 +253,39 @@ export class ZenitsuFighter extends Fighter {
       spawnSparks(this.x, this.y, 2, 'cyan', '#38BDF8');
 
       if (this.thunderclapDashStep >= this.thunderclapDashDuration) {
-        this.isDashingThunderclap = false;
         this.x = this.thunderclapDashDestX;
         this.y = this.thunderclapDashDestY;
-        const dashSpeed = (this.speed || 6.4) * 1.5;
-        this.vx = Math.cos(this.thunderclapDashAngle) * dashSpeed;
-        this.vy = Math.sin(this.thunderclapDashAngle) * dashSpeed;
 
-        this._finalizeThunderclapHit(
+        // Current dash finished travel -> lock head anchor at destination
+        if (this.thunderclapDashVFX) {
+          this.thunderclapDashVFX.isCurrentDash = false;
+        }
+
+        const isFinisher = (this.thunderclapDashIndex >= this.thunderclapTotalDashes - 1);
+        this._finalizeThunderclapDashStep(
           this.thunderclapDashTarget,
           this.thunderclapDashStartX,
           this.thunderclapDashStartY,
           this.thunderclapDashDestX,
           this.thunderclapDashDestY,
-          this.thunderclapDashAngle
+          this.thunderclapDashAngle,
+          this.thunderclapDashIndex,
+          isFinisher
         );
+
+        if (!isFinisher) {
+          // Chain into next consecutive dash immediately!
+          this.thunderclapDashIndex++;
+          this._startThunderclapDashStep(this.thunderclapDashTarget, this.thunderclapDashIndex);
+        } else {
+          // All consecutive dashes completed!
+          this.isDashingThunderclap = false;
+          this.thunderclapDashIndex = 0;
+          const dashSpeed = (this.speed || 6.4) * 1.5;
+          this.vx = Math.cos(this.thunderclapDashAngle) * dashSpeed;
+          this.vy = Math.sin(this.thunderclapDashAngle) * dashSpeed;
+          this.thunderclapCooldown = this.thunderclapCooldownMax;
+        }
       }
       return;
     }
@@ -442,19 +476,54 @@ export class ZenitsuFighter extends Fighter {
   }
 
   _executeThunderclapDash(target) {
-    this.slashSwingTimer = this.slashSwingMaxTimer;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    this.thunderclapDashIndex = 0;
+    this.thunderclapTotalDashes = cfg.thunderclapDashCount || 4;
+    this.thunderclapDashTarget = target;
+    this.thunderclapDashVFXList = [];
     this.thunderclapCooldown = this.thunderclapCooldownMax;
 
-    // Commit strictly to the locked angle: ZERO snap change in direction!
-    const angle = this.skillCastAngle;
-    this.gunAngle = angle;
-    this.angle = angle;
+    this._startThunderclapDashStep(target, 0);
+  }
 
-    const dashDist = this.thunderclapLockedDistance || 260;
+  _startThunderclapDashStep(target, index) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    this.slashSwingTimer = this.slashSwingMaxTimer;
+    this.thunderclapCooldown = this.thunderclapCooldownMax;
+    this.thunderclapDashIndex = index;
+    this.thunderclapDashTarget = target;
+
     const startX = this.x;
     const startY = this.y;
+    let angle;
+    let dashDist;
 
-    // Destination is strictly along the committed angle vector
+    if (index === 0) {
+      // Dash 1: Follows committed locked charge angle
+      angle = this.skillCastAngle;
+      dashDist = this.thunderclapLockedDistance || 260;
+    } else {
+      // Dashes 2, 3, 4: Dynamic zig-zag targeting around nearest target
+      const curTarget = this.getNearestTarget(target);
+      if (curTarget && curTarget.hp > 0 && !curTarget.isDead) {
+        const dx = curTarget.x - startX;
+        const dy = curTarget.y - startY;
+        const baseAngle = Math.atan2(dy, dx);
+        const tDist = Math.hypot(dx, dy);
+
+        // Dynamic zig-zag offset angles for 4-fold star pattern
+        const offsets = [0, 0.65, -0.75, 0];
+        const angleOffset = offsets[index] !== undefined ? offsets[index] : (index % 2 === 1 ? 0.65 : -0.65);
+        angle = baseAngle + angleOffset;
+        const extraDist = index === (this.thunderclapTotalDashes - 1) ? 75 : 55;
+        dashDist = Math.max(160, Math.min(460, tDist + (curTarget.r || 25) + extraDist));
+      } else {
+        const altOffsets = [0, 0.8, -0.8, 0];
+        angle = (this.gunAngle || 0) + (altOffsets[index] || 0);
+        dashDist = 240;
+      }
+    }
+
     let destX = startX + Math.cos(angle) * dashDist;
     let destY = startY + Math.sin(angle) * dashDist;
 
@@ -467,23 +536,25 @@ export class ZenitsuFighter extends Fighter {
 
     const actualDashDist = Math.hypot(destX - startX, destY - startY);
 
-    // Initialize 6-Frame Godspeed Travel State
+    this.gunAngle = angle;
+    this.angle = angle;
+
     this.isDashingThunderclap = true;
     this.thunderclapDashStep = 0;
-    this.thunderclapDashDuration = 6;
+    this.thunderclapDashDuration = cfg.thunderclapDashDuration || 5;
     this.thunderclapDashStartX = startX;
     this.thunderclapDashStartY = startY;
     this.thunderclapDashDestX = destX;
     this.thunderclapDashDestY = destY;
     this.thunderclapDashAngle = angle;
     this.thunderclapDashDist = actualDashDist;
-    this.thunderclapDashTarget = target;
 
-    // Initialize Lightning Dash VFX with air linger & disappearance animation
-    const travelDuration = 6;
-    const lingerDuration = 8;
-    const disappearDuration = 16;
-    this.thunderclapDashVFX = {
+    // Create Lightning Dash VFX for this dash step (with extended air linger so all 4 trails stay visible)
+    const travelDuration = this.thunderclapDashDuration;
+    const lingerDuration = 22;
+    const disappearDuration = 18;
+    const vfx = {
+      dashIndex: index,
       startX: startX,
       startY: startY,
       destX: destX,
@@ -491,19 +562,27 @@ export class ZenitsuFighter extends Fighter {
       angle: angle,
       dist: actualDashDist,
       timer: 0,
+      isCurrentDash: true,
       travelDuration: travelDuration,
       lingerDuration: lingerDuration,
       disappearDuration: disappearDuration,
-      maxTimer: travelDuration + lingerDuration + disappearDuration // 30 frames (~0.50s)
+      maxTimer: travelDuration + lingerDuration + disappearDuration
     };
+
+    this.thunderclapDashVFX = vfx;
+    if (!Array.isArray(this.thunderclapDashVFXList)) {
+      this.thunderclapDashVFXList = [];
+    }
+    this.thunderclapDashVFXList.push(vfx);
 
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
       audioSystem.playSFX('skill_dash1', 0.35);
     }
   }
 
-  _finalizeThunderclapHit(target, startX, startY, destX, destY, angle) {
+  _finalizeThunderclapDashStep(target, startX, startY, destX, destY, angle, dashIndex, isFinisher) {
     this.slashSwingTimer = this.slashSwingMaxTimer;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
 
     // Check collision / hit on any targets along or near the dash line
     const hitEntities = [];
@@ -514,7 +593,6 @@ export class ZenitsuFighter extends Fighter {
 
       const hitRadius = (this.r || 25) + (ent.r || 25) + 30;
 
-      // Point-to-segment distance check
       const segDx = destX - startX;
       const segDy = destY - startY;
       const segLenSq = segDx * segDx + segDy * segDy;
@@ -533,18 +611,35 @@ export class ZenitsuFighter extends Fighter {
       hitEntities.push(target);
     }
 
+    const baseDmg = isFinisher ? (cfg.thunderclapFinisherDamage || 38) : (cfg.thunderclapDamage || 14);
+    let dmg = (this.isSkillEnabled(cfg.enableBattleTrance, true) && this.inBattleTrance) ? Math.round(baseDmg * 1.5) : baseDmg;
+
     for (const hitEnt of hitEntities) {
-      applyDamageToTarget(hitEnt, 38, this);
-      hitEnt.applyKnockback?.(Math.cos(angle) * 26, Math.sin(angle) * 26);
-      spawnSparks(hitEnt.x, hitEnt.y, 14, 'cyan', '#38BDF8');
-      spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 26);
+      applyDamageToTarget(hitEnt, dmg, this);
+      if (isFinisher) {
+        hitEnt.applyKnockback?.(Math.cos(angle) * 28, Math.sin(angle) * 28);
+        spawnSparks(hitEnt.x, hitEnt.y, 18, 'cyan', '#38BDF8');
+        spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 35);
+      } else {
+        hitEnt.applyKnockback?.(Math.cos(angle) * 8, Math.sin(angle) * 8);
+        spawnSparks(hitEnt.x, hitEnt.y, 8, 'cyan', '#38BDF8');
+        spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 18);
+      }
     }
 
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('skill_thunderstrike', 0.4);
+    if (isFinisher) {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_thunderstrike', 0.45);
+      }
+      triggerGlobalScreenShake(7, 16);
+      spawnFloatingText(this.x, this.y - 32, '霹靂一閃・四連 HEKIREKI ISSEN!', '#38BDF8');
+    } else {
+      triggerGlobalScreenShake(2, 6);
     }
-    triggerGlobalScreenShake(5, 12);
-    spawnFloatingText(this.x, this.y - 30, '霹靂一閃 HEKIREKI ISSEN!', '#38BDF8');
+  }
+
+  _finalizeThunderclapHit(target, startX, startY, destX, destY, angle) {
+    this._finalizeThunderclapDashStep(target, startX, startY, destX, destY, angle, 0, true);
   }
 
   _triggerRokuren(target) {

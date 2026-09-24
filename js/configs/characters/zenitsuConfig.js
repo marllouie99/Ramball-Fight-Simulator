@@ -57,9 +57,12 @@ export const zenitsuConfig = {
   // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
   enableThunderclap: true,          // Master toggle for Skill 1: Thunderclap and Flash
   thunderclapCooldown: 228,    // 3.8s
-  thunderclapChannelDuration: 200,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
+  thunderclapChannelDuration: 120,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
+  thunderclapDashCount: 4,          // 4 consecutive godspeed zig-zag slashes
+  thunderclapDashDuration: 5,       // Travel frames per dash
   thunderclapSpeed: 36.0,
-  thunderclapDamage: 38,
+  thunderclapDamage: 14,            // Damage per intermediate dash
+  thunderclapFinisherDamage: 38,    // Finisher dash damage
   thunderclapStunFrames: 12,
 
   // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)

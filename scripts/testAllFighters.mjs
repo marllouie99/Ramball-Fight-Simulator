@@ -9005,6 +9005,28 @@ async function main() {
       throw new Error(`Zenitsu thunderclapCooldown ticked down during channeling! Expected 228, got ${zenitsu.thunderclapCooldown}`);
     }
     zenitsu.interruptAttacks(true);
+
+    // 11.6.4 Consecutive 4-Dash Execution Test
+    zenitsu.thunderclapTotalDashes = 4;
+    zenitsu.thunderclapDashDuration = 5;
+    zenitsu._executeThunderclapDash(null);
+    if (!zenitsu.isDashingThunderclap || zenitsu.thunderclapDashIndex !== 0) {
+      throw new Error('Expected Zenitsu to begin Dash 1 of 4');
+    }
+    // Simulate all 4 dashes (4 dashes * 5 frames = 20 frames)
+    for (let f = 0; f < 20; f++) {
+      mockCtx.resetStackDepth();
+      drawZenitsuSkin(mockCtx, zenitsu);
+      assertCanvasStackBalance(`drawZenitsuSkin during consecutive multi-dash frame ${f}`);
+      zenitsu.update(null, 0, state.arena);
+    }
+    if (zenitsu.isDashingThunderclap) {
+      throw new Error('Expected Zenitsu 4 consecutive dashes to be completed after 20 frames');
+    }
+    if (!Array.isArray(zenitsu.thunderclapDashVFXList) || zenitsu.thunderclapDashVFXList.length !== 4) {
+      throw new Error(`Expected 4 dash VFX trails in thunderclapDashVFXList, got ${zenitsu.thunderclapDashVFXList?.length}`);
+    }
+    zenitsu.interruptAttacks(true);
   } catch (err) {
     console.error('❌ [ZENITSU MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
     errors++;

@@ -568,7 +568,7 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
   // Head anchor position:
   // Phase 1 (Active travel): Attach head directly to Zenitsu's circle so the streak stretches behind him.
   // Phase 2 & 3 (Air linger & disappearance): Anchor head at destination where he dashed.
-  const isDashing = Boolean(fighter && fighter.isDashingThunderclap && vfx.timer < travelDuration);
+  const isDashing = Boolean(fighter && fighter.isDashingThunderclap && vfx.isCurrentDash !== false && vfx.timer < travelDuration);
   let headX = isDashing ? fighter.x : (vfx.destX ?? (startX + Math.cos(angle) * (vfx.dist || 260)));
   let headY = isDashing ? fighter.y : (vfx.destY ?? (startY + Math.sin(angle) * (vfx.dist || 260)));
 
@@ -1318,12 +1318,20 @@ export function drawZenitsuSkin(ctx, fighter) {
   const r = fighter.r || 25;
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
 
-  // 0. Render 6-Frame Lightning Dash Animation along trajectory in World Coordinates
-  if (!isPodiumPreview && fighter.thunderclapDashVFX) {
-    if (fighter.thunderclapDashVFX.timer >= fighter.thunderclapDashVFX.maxTimer) {
-      fighter.thunderclapDashVFX = null;
-    } else {
-      _drawZenitsuThunderclapDashVFX(ctx, fighter.thunderclapDashVFX, fighter);
+  // 0. Render Consecutive Lightning Dash Animations along trajectory in World Coordinates
+  if (!isPodiumPreview) {
+    if (Array.isArray(fighter.thunderclapDashVFXList) && fighter.thunderclapDashVFXList.length > 0) {
+      for (const vfx of fighter.thunderclapDashVFXList) {
+        if (vfx && vfx.timer < vfx.maxTimer) {
+          _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter);
+        }
+      }
+    } else if (fighter.thunderclapDashVFX) {
+      if (fighter.thunderclapDashVFX.timer >= fighter.thunderclapDashVFX.maxTimer) {
+        fighter.thunderclapDashVFX = null;
+      } else {
+        _drawZenitsuThunderclapDashVFX(ctx, fighter.thunderclapDashVFX, fighter);
+      }
     }
   }
 
