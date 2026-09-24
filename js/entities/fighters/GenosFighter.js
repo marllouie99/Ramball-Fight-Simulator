@@ -197,6 +197,21 @@ export class GenosFighter extends Fighter {
     );
   }
 
+  interruptAttacks(forceCancelAll = false) {
+    super.interruptAttacks(forceCancelAll);
+    this.basicBlastAnimTimer = 0;
+    this.punchAnimTimer = 0;
+    this.punchActiveMaxTime = 0;
+    this._basicHitConnectedTimer = 0;
+    this._flurryHitConnectedTimer = 0;
+    this.isFlurrying = false;
+    this.flurryHitsLeft = 0;
+    this.isChargingUlt = false;
+    this.isFiringUlt = false;
+    this.isUltSliding = false;
+    this.isUltRecovering = false;
+  }
+
   canAim() {
     if (this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating || this.machineGunFlurryTimer > 0 || this.machineGunBlowTimer > 0) {
       return false; // Disable auto-aim while channeling ultimate beam or stationary skills!
@@ -483,6 +498,7 @@ export class GenosFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    if (this.shatteredPieces && this.shatteredPieces.length > 0) return;
     // Mechanical hands are rendered here in drawGun so they overlay the body outline!
     drawGenosHands(ctx, this);
   }
@@ -791,6 +807,7 @@ export class GenosFighter extends Fighter {
       this.selfDestructTimer = CONFIG.genos?.selfDestructCountdownFrames || 150;
       
       this.interruptAttacks(true);
+      this.startSkillCooldownsAfterSelfDestruct();
       this.hitFlashTimer = 8;
       audioSystem.playSFX('attack_fleshhit', 0.6);
 
@@ -1301,12 +1318,65 @@ export class GenosFighter extends Fighter {
     this.knockbackVy = 0;
 
     // Play thruster friction dash SFX
-    audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+    const slideDashSrc = CONFIG.genos?.sounds?.dashFallback || CONFIG.genos?.sounds?.dashSound || 'Assets/Sound Effects/Skills/dash1.mp3';
+    const slideDashVol = CONFIG.genos?.soundVolumes?.dashFallback ?? CONFIG.genos?.soundVolumes?.dashSound ?? 0.35;
+    audioSystem.playSFX(slideDashSrc, slideDashVol);
+  }
+
+  resetAllSkillCooldowns() {
+    if (this.skillManager) {
+      for (const skill of this.skillManager.getAllSkills()) {
+        if (skill.cooldownKey) skill.setCooldown(0);
+      }
+    }
+    this.shootCooldown = 0;
+    this.flurryCooldown = 0;
+    this.dashCooldown = 0;
+    this.ultCooldown = 0;
+    this.cooldownTimer = 0;
+    this.skillCooldown = 0;
+    this.meleeDashDelayTimer = 0;
+    this.dashSoundCooldownTimer = 0;
+    this.ammoReloadTimer = 0;
+    this.heatAmmo = this.maxHeatAmmo || 20;
+    this.isMeleeStance = false;
+    this.meleeDashCount = 0;
+  }
+
+  startSkillCooldownsAfterSelfDestruct() {
+    if (this.skillManager) {
+      for (const skill of this.skillManager.getAllSkills()) {
+        if (skill.cooldownKey) skill.setCooldown(skill.getMaxCooldown());
+      }
+    }
+    this.shootCooldown = CONFIG.genos?.blastCooldown || this.shootCooldownMax || 27;
+    this.flurryCooldown = CONFIG.genos?.flurryCooldown || 1200;
+    this.dashCooldown = CONFIG.genos?.dashes?.rocketDash?.cooldown ?? CONFIG.genos?.dashCooldown ?? 360;
+    this.ultCooldown = CONFIG.genos?.ultCooldown || 1000;
+    this.cooldownTimer = CONFIG.genos?.skillCooldown || 0;
+    this.skillCooldown = CONFIG.genos?.skillCooldown || 0;
+    this.meleeDashDelayTimer = 0;
+    this.dashSoundCooldownTimer = 0;
+    this.ammoReloadTimer = this.ammoReloadMax || CONFIG.genos?.ammoReloadFrames || 500;
+    this.heatAmmo = 0;
+    this.isMeleeStance = true;
+    this.meleeDashCount = 0;
   }
 
   performSelfDestructExplosion() {
     this.isSelfDestructing = false;
     this.usedSelfDestruct = true;
+    this.basicBlastAnimTimer = 0;
+    this.punchAnimTimer = 0;
+    this.punchActiveMaxTime = 0;
+    this._basicHitConnectedTimer = 0;
+    this._flurryHitConnectedTimer = 0;
+    this.isFlurrying = false;
+    this.flurryHitsLeft = 0;
+    this.interruptAttacks(true);
+
+    // Reset all skill & attack cooldowns immediately after self-destruct explosion
+    this.startSkillCooldownsAfterSelfDestruct();
 
     // Immediately restore recovered HP upon explosion
     const cfg = CONFIG.genos || {};
@@ -1468,18 +1538,8 @@ export class GenosFighter extends Fighter {
           const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
           this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
 
-          // Reset all skill & attack cooldowns to 0 so all skills are ready!
-          this.shootCooldown = 0;
-          this.flurryCooldown = 0;
-          this.dashCooldown = 0;
-          this.ultCooldown = 0;
-          this.meleeDashDelayTimer = 0;
-
-          // Restore Ranged Mode stance with 100% full Heat Ammo
-          this.isMeleeStance = false;
-          this.heatAmmo = this.maxHeatAmmo || 20;
-          this.ammoReloadTimer = 0;
-          this.meleeDashCount = 0;
+          // Restart all skill cooldowns after the self-destruct reboot.
+          this.startSkillCooldownsAfterSelfDestruct();
 
           // Clean motion trails & ghosts
           if (this.afterImages) this.afterImages.length = 0;
@@ -1500,9 +1560,17 @@ export class GenosFighter extends Fighter {
 
     // Core Self-Destruct Stasis Countdown
     if (this.isSelfDestructing) {
+      this.basicBlastAnimTimer = 0;
+      this.punchAnimTimer = 0;
+      this.punchActiveMaxTime = 0;
+      this._basicHitConnectedTimer = 0;
+      this._flurryHitConnectedTimer = 0;
+      this.isFlurrying = false;
+      this.flurryHitsLeft = 0;
       if (this.hp <= 0 || this.isDead) {
         this.isSelfDestructing = false;
         this.usedSelfDestruct = true;
+        this.startSkillCooldownsAfterSelfDestruct();
         return;
       }
       this.selfDestructTimer--;

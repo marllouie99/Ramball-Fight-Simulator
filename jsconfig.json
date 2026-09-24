@@ -2,13 +2,9 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowJs": true,
-    "checkJs": false,
-    "baseUrl": ".",
-    "paths": {
-      "*": ["*"]
-    }
+    "checkJs": false
   },
   "include": [
     "js/**/*",

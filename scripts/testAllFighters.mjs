@@ -7599,6 +7599,70 @@ async function main() {
     mockCtx.resetStackDepth();
     drawGenosSkin(mockCtx, genos);
     assertCanvasStackBalance('drawGenosSkin (facing left)');
+
+    // ── Genos Self-Destruct Basic Attack Suppression Test ──
+    genos.basicBlastAnimTimer = 20;
+    genos.punchAnimTimer = 10;
+    genos.isSelfDestructing = true;
+    genos.selfDestructTimer = 100;
+
+    mockCtx.resetStackDepth();
+    genos.draw(mockCtx);
+    assertCanvasStackBalance('genos.draw during self-destruct with active attack timer');
+
+    // Update step must clear basicBlastAnimTimer & punchAnimTimer
+    const dummyTarget = { x: 500, y: 500, r: 25, hp: 100 };
+    genos.update(dummyTarget, 0, { width: 800, height: 600 });
+    if (genos.basicBlastAnimTimer !== 0) {
+      throw new Error(`Expected basicBlastAnimTimer to be 0 during self-destruct, but got ${genos.basicBlastAnimTimer}`);
+    }
+    if (genos.punchAnimTimer !== 0) {
+      throw new Error(`Expected punchAnimTimer to be 0 during self-destruct, but got ${genos.punchAnimTimer}`);
+    }
+
+    // ── Genos Post-Self-Destruct Skill Cooldown Reset Test ──
+    const savedFighters = state.fighters;
+    const savedGameState = state.gameState;
+    state.fighters = [genos];
+    state.gameState = 'playing';
+
+    genos.flurryCooldown = 500;
+    genos.dashCooldown = 250;
+    genos.ultCooldown = 900;
+    genos.shootCooldown = 30;
+    genos.heatAmmo = 0;
+    genos.ammoReloadTimer = 150;
+    genos.isMeleeStance = true;
+
+    genos.performSelfDestructExplosion();
+
+    state.fighters = savedFighters;
+    state.gameState = savedGameState;
+
+    const expectedFlurryCooldown = CONFIG.genos?.flurryCooldown || 1200;
+    const expectedDashCooldown = CONFIG.genos?.dashes?.rocketDash?.cooldown ?? CONFIG.genos?.dashCooldown ?? 360;
+    const expectedUltCooldown = CONFIG.genos?.ultCooldown || 1000;
+    const expectedShootCooldown = CONFIG.genos?.blastCooldown || genos.shootCooldownMax || 27;
+    const expectedAmmoReload = genos.ammoReloadMax || CONFIG.genos?.ammoReloadFrames || 500;
+
+    if (genos.flurryCooldown !== expectedFlurryCooldown) {
+      throw new Error(`Expected flurryCooldown to restart at ${expectedFlurryCooldown} after self-destruct, got ${genos.flurryCooldown}`);
+    }
+    if (genos.dashCooldown !== expectedDashCooldown) {
+      throw new Error(`Expected dashCooldown to restart at ${expectedDashCooldown} after self-destruct, got ${genos.dashCooldown}`);
+    }
+    if (genos.ultCooldown !== expectedUltCooldown) {
+      throw new Error(`Expected ultCooldown to restart at ${expectedUltCooldown} after self-destruct, got ${genos.ultCooldown}`);
+    }
+    if (genos.shootCooldown !== expectedShootCooldown) {
+      throw new Error(`Expected shootCooldown to restart at ${expectedShootCooldown} after self-destruct, got ${genos.shootCooldown}`);
+    }
+    if (genos.ammoReloadTimer !== expectedAmmoReload) {
+      throw new Error(`Expected ammoReloadTimer to restart at ${expectedAmmoReload} after self-destruct, got ${genos.ammoReloadTimer}`);
+    }
+    if (genos.heatAmmo !== 0) {
+      throw new Error(`Expected heatAmmo to be empty while reloading after self-destruct, got ${genos.heatAmmo}`);
+    }
   } catch (err) {
     console.error('❌ [GENOS HAIR ASSET TEST ERROR]:', err);
     errors++;
@@ -9036,9 +9100,9 @@ async function main() {
       throw new Error('Zenitsu sixfoldVoice failed to trigger when about to unleash skill');
     }
 
-    // Aim lock test during channeling
-    if (zenitsu.canAim() !== false) {
-      throw new Error('Zenitsu canAim() should return false during Thunderclap channeling');
+    // Auto-aim stays enabled throughout entire channeling phase (continuous tracking until dash fires)
+    if (zenitsu.canAim() !== true) {
+      throw new Error('Zenitsu canAim() should return true during Thunderclap channeling (continuous auto-aim tracking)');
     }
     zenitsu.interruptAttacks();
     if (zenitsu.isChannelingThunderclap !== false) {
@@ -10460,6 +10524,107 @@ async function main() {
     console.error('❌ [ZENITSU DASH CC IMMUNITY TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[ZENITSU DASH CC IMMUNITY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Zenitsu Post-Dash Slide, Breather Stance & Return to Normal Pose Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('⚡ [Zenitsu Slide & Breather Test] Verifying slide -> breather stance hold -> gradual pose return -> resume movement...');
+    const { ZenitsuFighter } = await import('../js/entities/fighters/ZenitsuFighter.js');
+    const { drawZenitsuSkin } = await import('../js/graphics/fighters/zenitsuSkin.js');
+    const zenitsu = new ZenitsuFighter({ color: '#FACC15', name: 'Zenitsu' });
+    const dummyOpponent = { x: 500, y: 250, r: 25, hp: 100, isDead: false, bloodColor: '#DC2626', applyParalyze: () => {}, applyHitStun: () => {}, applyKnockback: () => {} };
+
+    // 1. Channel and execute skill
+    zenitsu._triggerThunderclapAndFlash(dummyOpponent);
+    zenitsu.thunderclapChannelTimer = 0; // complete channel
+    zenitsu._executeThunderclapDash(dummyOpponent);
+
+    if (!zenitsu.isDashingThunderclap) {
+      throw new Error('Zenitsu failed to enter isDashingThunderclap');
+    }
+
+    // Step through all consecutive dashes until completed
+    while (zenitsu.isDashingThunderclap || zenitsu.thunderclapDashPauseTimer > 0) {
+      if (zenitsu.isDashingThunderclap) {
+        zenitsu.thunderclapDashStep = zenitsu.thunderclapDashDuration;
+      }
+      if (zenitsu.thunderclapDashPauseTimer > 0) {
+        zenitsu.thunderclapDashPauseTimer = 1;
+      }
+      zenitsu.update(dummyOpponent, 0, state.arena);
+    }
+
+    // 2. Must now enter isThunderclapSliding
+    if (!zenitsu.isThunderclapSliding) {
+      throw new Error('Zenitsu failed to enter isThunderclapSliding after all dashes completed!');
+    }
+    if (Math.hypot(zenitsu.vx, zenitsu.vy) <= 0.1) {
+      throw new Error('Zenitsu should have slide velocity during isThunderclapSliding!');
+    }
+    if (zenitsu.canAim() !== false) {
+      throw new Error('Zenitsu should not be able to auto-aim during isThunderclapSliding!');
+    }
+
+    // Draw frame during slide to verify 100% clean Canvas stack balance & stance rendering
+    const mockCtx = createMockCtx();
+    drawZenitsuSkin(mockCtx, zenitsu);
+
+    // 3. Step through slide until it finishes
+    while (zenitsu.isThunderclapSliding) {
+      zenitsu.update(dummyOpponent, 0, state.arena);
+      drawZenitsuSkin(mockCtx, zenitsu);
+    }
+
+    // 4. Must now enter isThunderclapBreather with 0 velocity
+    if (!zenitsu.isThunderclapBreather) {
+      throw new Error('Zenitsu failed to enter isThunderclapBreather after slide completed!');
+    }
+    if (zenitsu.vx !== 0 || zenitsu.vy !== 0) {
+      throw new Error(`Zenitsu should have 0 velocity during breather, got vx=${zenitsu.vx}, vy=${zenitsu.vy}`);
+    }
+    if (zenitsu.canAim() !== false) {
+      throw new Error('Zenitsu should not be able to auto-aim during isThunderclapBreather!');
+    }
+
+    // Draw frame during deep stance breather
+    drawZenitsuSkin(mockCtx, zenitsu);
+
+    // 5. Step through breather until near expiry (transition phase)
+    while (zenitsu.isThunderclapBreather && zenitsu.thunderclapBreatherTimer > 10) {
+      zenitsu.update(dummyOpponent, 0, state.arena);
+      drawZenitsuSkin(mockCtx, zenitsu);
+    }
+
+    // Still in breather during transition back to normal pose
+    if (!zenitsu.isThunderclapBreather) {
+      throw new Error('Zenitsu exited breather too early before timer expired!');
+    }
+    drawZenitsuSkin(mockCtx, zenitsu);
+
+    // 6. Complete remaining breather frames
+    while (zenitsu.isThunderclapBreather) {
+      zenitsu.update(dummyOpponent, 0, state.arena);
+      drawZenitsuSkin(mockCtx, zenitsu);
+    }
+
+    // 7. Breather expired: Zenitsu resumes normal aim and movement!
+    if (zenitsu.isThunderclapBreather || zenitsu.isThunderclapSliding) {
+      throw new Error('Zenitsu state flags not cleared after breather expired!');
+    }
+    if (zenitsu.canAim() !== true) {
+      throw new Error('Zenitsu canAim should be true after breather expired!');
+    }
+
+    // Verify clean drawing in normal pose
+    drawZenitsuSkin(mockCtx, zenitsu);
+
+    console.log('✅ [Zenitsu Slide & Breather Test] Successfully verified post-dash slide, breather stance hold, gradual pose return, and resume movement.');
+  } catch (err) {
+    console.error('❌ [ZENITSU SLIDE & BREATHER TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[ZENITSU SLIDE & BREATHER TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

@@ -44,7 +44,7 @@ export const zenitsuConfig = {
   staticStunFrames: 18,
 
   // Basic Attack: Thunder Iai Quickdraw & Sheath Flurry (140° Frontal Arc)
-  enableBasicAttack: true,          // Master toggle for Basic Attack: Thunder Iai Quickdraw
+  enableBasicAttack: false,         // Master toggle for Basic Attack: Thunder Iai Quickdraw (DISABLED: Zenitsu maintains Iaido stance at all times)
   katanaArcAngle: Math.PI * 0.778, // ~140 degrees
   katanaReach: 78,
   hit1Damage: 18,
@@ -56,9 +56,9 @@ export const zenitsuConfig = {
 
   // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
   enableThunderclap: true,          // Master toggle for Skill 1: Thunderclap and Flash
-  thunderclapCooldown: 500,    // 3.8s
+  thunderclapCooldown: 300,    // 3.8s
   thunderclapChannelDuration: 150,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
-  thunderclapDashCount: 4,          // 4 consecutive godspeed zig-zag slashes
+  thunderclapDashCount: 5,          // 4 consecutive godspeed zig-zag slashes
   thunderclapDashDuration: 2,       // Travel frames per dash
   thunderclapDashPauseFrames: 5,    // Pause/windup frames between each consecutive dash
   thunderclapSpeed: 36.0,
@@ -67,6 +67,15 @@ export const zenitsuConfig = {
   thunderclapStunFrames: 50,
   dashAudioFadeOutMs: 120,          // Fast audio fade-out in ms the moment all dashes are completed
   firstFormToThunderclapGapFrames: 18, // Spacing/pause frames (~300ms) between "First Form" and "Thunderclap and Flash" voicelines
+  thunderclapSlideFrames: 16,       // Post-dash friction-brake slide duration in frames (~0.27s)
+  thunderclapSlideSpeed: 8.5,       // Initial post-dash slide speed (px/frame)
+  thunderclapSlideFriction: 0.88,   // Slide deceleration friction multiplier per frame
+  thunderclapBreatherFrames: 45,    // Stance hold & breather pause duration in frames (~0.75s)
+  thunderclapBreatherExitFrames: 0,  // Duration in frames to transition from stance back to normal pose (0 = stay in stance permanently)
+
+  // Voice Line Play Chances (0.0 = never, 1.0 = always)
+  firstFormVoiceChance: 0.45,        // Chance to play "First Form..." voiceline on channel start
+  sixfoldVoiceChance: 0.55,          // Chance to play "Sixfold!" voiceline before dash unleash
 
   // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)
   enableRokuren: false,             // Master toggle for Skill 2: Sixfold (Rokuren)
@@ -109,7 +118,6 @@ export const zenitsuConfig = {
       'Assets/Sound Effects/Skills/Zenitsu-electric-noise3.mp3'
     ],
     dashNoise: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
-    dashSFX: 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
     dashWhoosh: 'Assets/Sound Effects/Skills/dash1.mp3',
     thunderStrike: 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
 
@@ -118,7 +126,7 @@ export const zenitsuConfig = {
     rokurenSlash: 'Assets/Sound Effects/Attacks/swordswing.mp3',
 
     // Ultimate: Flaming Thunder God (Honoikazuchi no Kami)
-    ultimateCast: 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
+    ultimateCast: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
     ultimateImpact: 'Assets/Sound Effects/Attacks/thunderstrike.mp3'
   },
   soundVolumes: {
@@ -127,7 +135,7 @@ export const zenitsuConfig = {
     parry: 0.35,
     stance: 0.30,
     channelVoice: 0.90,
-    firstFormVoice: 0.0,
+    firstFormVoice: 0.90,
     sixfoldVoice: 0.90,
     thunderclapFlashVoice: 0.0,
     lockIn: 0.35,
@@ -136,7 +144,6 @@ export const zenitsuConfig = {
     electricNoise3: 0.75,
     electricNoise: 0.70,
     dashNoise: 0.85,
-    dashSFX: 0.60,
     dashWhoosh: 0.0,
     thunderStrike: 0.90,
     rokurenDash: 0.85,

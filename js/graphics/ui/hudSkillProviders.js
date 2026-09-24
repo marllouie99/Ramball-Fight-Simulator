@@ -931,6 +931,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
   if (f.characterId === 'genos' || f.type === 'genos') {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.genos) ? CONFIG.genos : {};
     const themeColor = cfg.themeColor || cfg.color || f.color || '#FF5500';
+    const isSelfDestructing = Boolean(f.isSelfDestructing || (f.selfDestructTimer && f.selfDestructTimer > 0));
     const skills = [];
 
     // Heat Ammo

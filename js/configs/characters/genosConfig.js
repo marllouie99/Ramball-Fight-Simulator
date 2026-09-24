@@ -87,7 +87,7 @@ export const genosConfig = {
   // Ultimate: Spiral Incineration Cannon
   enableUltimate: true,      // Master toggle for Ultimate: Spiral Incineration Cannon
   initialUltCooldown: 1000, // Initial cooldown at match start (28s at 60fps)
-  ultCooldown: 800, // 28 seconds at 60fps
+  ultCooldown: 1000, // 28 seconds at 60fps
   ultSlideFrames: 22, // Pre-ultimate cybernetic thruster friction-brake slide duration in frames (~0.36s)
   ultSlideSpeed: 8.5, // Initial slide velocity speed (px/frame)
   ultWindupFrames: 60, // 1.0s windup

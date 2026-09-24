@@ -22,6 +22,25 @@ import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
 
+// ─── Module-Level Dash Targeting Helpers ───
+
+/** Compute signed shortest angular difference from angle A to angle B (result in [-PI, PI]) */
+function _angleDiff(targetAngle, sourceAngle) {
+  let d = targetAngle - sourceAngle;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+/** Identify which arena wall a position is closest to within threshold */
+function _identifyHitWall(x, y, minX, maxX, minY, maxY, threshold = 12) {
+  if (Math.abs(x - maxX) < threshold) return 'right';
+  if (Math.abs(x - minX) < threshold) return 'left';
+  if (Math.abs(y - maxY) < threshold) return 'bottom';
+  if (Math.abs(y - minY) < threshold) return 'top';
+  return null;
+}
+
 export class ZenitsuFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -89,6 +108,14 @@ export class ZenitsuFighter extends Fighter {
     // Skill 2: Thunderclap and Flash: Sixfold (Rokuren)
     this.rokurenCooldownMax = cfg.rokurenCooldown || 420;
     this.rokurenCooldown = this.rokurenCooldownMax;
+
+    // Post-Dash Slide & Breather Stance State
+    this.isThunderclapSliding = false;
+    this.thunderclapSlideTimer = 0;
+    this.isThunderclapBreather = false;
+    this.thunderclapBreatherTimer = 0;
+    this.thunderclapBreatherMaxTimer = 0;
+    this.thunderclapBreatherExitFrames = cfg.thunderclapBreatherExitFrames !== undefined ? cfg.thunderclapBreatherExitFrames : 18;
 
     // Ultimate: Flaming Thunder God (Honoikazuchi no Kami)
     this.flamingGodCooldownMax = cfg.ultimateCooldown || 1440;
@@ -158,7 +185,7 @@ export class ZenitsuFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
-    if (this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) return false;
+    if (this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0 || this.isThunderclapSliding || this.isThunderclapBreather) return false;
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     if (!this.isSkillEnabled(cfg.enableBasicAttack, true)) return false;
     const target = this.getNearestTarget();
@@ -172,16 +199,10 @@ export class ZenitsuFighter extends Fighter {
   }
 
   canAim() {
-    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) {
+    if (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0 || this.isThunderclapSliding || this.isThunderclapBreather) {
       return false;
     }
-    if (this.isChannelingThunderclap) {
-      const halfTime = Math.floor((this.thunderclapChannelDuration || 36) / 2);
-      // Once locked into Frame 2 (Charge phase), disable auto-aim so he commits strictly to 1 direction
-      if (this.isThunderclapAimLocked || this.thunderclapChannelTimer <= halfTime) {
-        return false;
-      }
-    }
+    // Auto-aim stays enabled throughout the entire channeling phase until dash fires
     return super.canAim ? super.canAim() : true;
   }
 
@@ -310,6 +331,33 @@ export class ZenitsuFighter extends Fighter {
     fadeOutSoundBySrc('Zenitsu-dash-noise', fadeMs);
   }
 
+  _playAftermathBurstAudio(cfg, aftermathFrame) {
+    if (typeof audioSystem === 'undefined' || !audioSystem.playSFX) return;
+    const cycleLen = 30;
+    const cyclePos = aftermathFrame % cycleLen;
+
+    // Burst start frames within the 30-frame cycle (matching skin VFX timing)
+    let burstId = null;
+    if (cyclePos === 2) burstId = 1;
+    else if (cyclePos === 14) burstId = 2;
+    else if (cyclePos === 24) burstId = 3;
+
+    if (burstId === null) return;
+    if (this._lastAftermathBurstId === `${aftermathFrame}-${burstId}`) return;
+    this._lastAftermathBurstId = `${aftermathFrame}-${burstId}`;
+
+    const noises = cfg.sounds?.electricNoises || [
+      cfg.sounds?.electricNoise1 || 'Assets/Sound Effects/Skills/Zenitsu-electric-noise1.mp3',
+      cfg.sounds?.electricNoise2 || 'Assets/Sound Effects/Skills/Zenitsu-electric-noise2.mp3',
+      cfg.sounds?.electricNoise3 || 'Assets/Sound Effects/Skills/Zenitsu-electric-noise3.mp3'
+    ];
+    const soundIndex = Math.max(0, Math.min(noises.length - 1, burstId - 1));
+    const sfx = noises[soundIndex] || noises[0];
+    const volKey = `electricNoise${burstId}`;
+    const baseVol = cfg.soundVolumes?.[volKey] ?? cfg.soundVolumes?.electricNoise ?? 0.70;
+    audioSystem.playSFX(sfx, baseVol * 0.60); // 60% volume for aftermath (reduced from channeling)
+  }
+
   interruptAttacks(forceCancelAll = false) {
     if (!forceCancelAll && (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0)) {
       return; // Dashing state is unstoppable; transient hit interrupts do not break consecutive dashes
@@ -329,6 +377,10 @@ export class ZenitsuFighter extends Fighter {
     this.isDashingThunderclap = false;
     this.thunderclapDashIndex = 0;
     this.thunderclapDashPauseTimer = 0;
+    this.isThunderclapSliding = false;
+    this.thunderclapSlideTimer = 0;
+    this.isThunderclapBreather = false;
+    this.thunderclapBreatherTimer = 0;
     if (forceCancelAll) {
       this._fadeOutAllDashAudio(80);
       this.thunderclapDashVFX = null;
@@ -349,6 +401,98 @@ export class ZenitsuFighter extends Fighter {
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     const target = this.getNearestTarget(opponent);
+
+    // Post-Dash Slide Phase (Smooth friction slide along the dash angle)
+    if (this.isThunderclapSliding) {
+      this.thunderclapSlideTimer--;
+      this.x += this.vx;
+      this.y += this.vy;
+      const friction = cfg.thunderclapSlideFriction !== undefined ? cfg.thunderclapSlideFriction : 0.88;
+      this.vx *= friction;
+      this.vy *= friction;
+      // Smooth angle: hold dash angle during most of slide, begin gentle turn in last 6 frames
+      if (this.thunderclapSlideTimer <= 6) {
+        const slideTarget = this.getNearestTarget();
+        if (slideTarget && slideTarget.hp > 0 && !slideTarget.isDead) {
+          const targetAngle = Math.atan2(slideTarget.y - this.y, slideTarget.x - this.x);
+          let diff = targetAngle - this.gunAngle;
+          while (diff > Math.PI) diff -= 2 * Math.PI;
+          while (diff < -Math.PI) diff += 2 * Math.PI;
+          this.gunAngle += diff * 0.06;
+          this.angle = this.gunAngle;
+        } else {
+          this.gunAngle = this.thunderclapDashAngle;
+          this.angle = this.thunderclapDashAngle;
+        }
+      } else {
+        this.gunAngle = this.thunderclapDashAngle;
+        this.angle = this.thunderclapDashAngle;
+      }
+
+      if (typeof spawnSparks === 'function' && Math.random() < 0.6) {
+        spawnSparks(this.x, this.y + (this.r || 25) * 0.3, 2, 'cyan', '#38BDF8');
+      }
+
+      // Aftermath electric noise audio (same 30-frame cycle as skin VFX)
+      this._playAftermathBurstAudio(cfg, 16 - this.thunderclapSlideTimer);
+
+      if (typeof this.resolveWallBounce === 'function') {
+        this.resolveWallBounce(arena, opponent);
+      }
+
+      if (this.thunderclapSlideTimer <= 0) {
+        this.isThunderclapSliding = false;
+        this.vx = 0;
+        this.vy = 0;
+
+        // Transition to Breather Phase: Stop moving while keeping stance/pose
+        const breatherFrames = cfg.thunderclapBreatherFrames !== undefined ? cfg.thunderclapBreatherFrames : 45;
+        if (breatherFrames > 0) {
+          this.isThunderclapBreather = true;
+          this.thunderclapBreatherMaxTimer = breatherFrames;
+          this.thunderclapBreatherTimer = breatherFrames;
+          this.thunderclapBreatherExitFrames = cfg.thunderclapBreatherExitFrames !== undefined ? cfg.thunderclapBreatherExitFrames : 18;
+        }
+      }
+      return;
+    }
+
+    // Post-Dash Breather Phase: Stop moving while keeping stance/pose, smoothly return angle to face opponent
+    if (this.isThunderclapBreather) {
+      this.thunderclapBreatherTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Smooth angle return: rotate toward the opponent throughout entire breather with increasing speed
+      const maxTimer = this.thunderclapBreatherMaxTimer || 45;
+      const remaining = this.thunderclapBreatherTimer;
+      const breatherTarget = this.getNearestTarget();
+
+      if (breatherTarget && breatherTarget.hp > 0 && !breatherTarget.isDead) {
+        const targetAngle = Math.atan2(breatherTarget.y - this.y, breatherTarget.x - this.x);
+        // Progress ramps from 0.0 (start) to 1.0 (end of breather)
+        const t = 1.0 - (remaining / Math.max(1, maxTimer));
+        const ease = t * t * (3 - 2 * t); // Smooth hermite S-curve
+        const lerpRate = 0.08 + ease * 0.17; // Starts at 0.08, ramps to 0.25 rad/frame
+        let diff = targetAngle - this.gunAngle;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        this.gunAngle += diff * lerpRate;
+        this.angle = this.gunAngle;
+      }
+
+      if (Math.random() < 0.15) {
+        spawnSparks(this.x, this.y, 1, 'cyan', '#38BDF8');
+      }
+
+      // Aftermath electric noise audio (same 30-frame cycle as skin VFX)
+      this._playAftermathBurstAudio(cfg, 45 - this.thunderclapBreatherTimer + 16);
+
+      if (this.thunderclapBreatherTimer <= 0) {
+        this.isThunderclapBreather = false;
+      }
+      return;
+    }
 
     // Pause / Windup between consecutive dashes
     if (this.thunderclapDashPauseTimer > 0) {
@@ -417,10 +561,27 @@ export class ZenitsuFighter extends Fighter {
           this.isDashingThunderclap = false;
           this.thunderclapDashIndex = 0;
           this.thunderclapDashPauseTimer = 0;
-          const dashSpeed = (this.speed || 6.4) * 1.5;
-          this.vx = Math.cos(this.thunderclapDashAngle) * dashSpeed;
-          this.vy = Math.sin(this.thunderclapDashAngle) * dashSpeed;
           this.thunderclapCooldown = this.thunderclapCooldownMax;
+
+          // Phase 1: Post-dash friction slide along the dash direction
+          const slideFrames = cfg.thunderclapSlideFrames !== undefined ? cfg.thunderclapSlideFrames : 16;
+          if (slideFrames > 0) {
+            this.isThunderclapSliding = true;
+            this.thunderclapSlideTimer = slideFrames;
+            const slideSpeed = cfg.thunderclapSlideSpeed !== undefined ? cfg.thunderclapSlideSpeed : ((this.speed || 6.4) * 1.35);
+            this.vx = Math.cos(this.thunderclapDashAngle) * slideSpeed;
+            this.vy = Math.sin(this.thunderclapDashAngle) * slideSpeed;
+          } else {
+            this.vx = 0;
+            this.vy = 0;
+            const breatherFrames = cfg.thunderclapBreatherFrames !== undefined ? cfg.thunderclapBreatherFrames : 45;
+            if (breatherFrames > 0) {
+              this.isThunderclapBreather = true;
+              this.thunderclapBreatherMaxTimer = breatherFrames;
+              this.thunderclapBreatherTimer = breatherFrames;
+              this.thunderclapBreatherExitFrames = cfg.thunderclapBreatherExitFrames !== undefined ? cfg.thunderclapBreatherExitFrames : 18;
+            }
+          }
         }
       }
       return;
@@ -432,42 +593,15 @@ export class ZenitsuFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
 
-      const halfTime = Math.floor((this.thunderclapChannelDuration || 36) / 2);
-
-      // Phase 1: Preparation (Timer > halfTime) -> Auto-Aim Enabled & Smoothly Tracking Opponent
-      if (this.thunderclapChannelTimer > halfTime) {
-        const aimTarget = (this.thunderclapTarget && this.thunderclapTarget.hp > 0 && !this.thunderclapTarget.isDead)
-          ? this.thunderclapTarget
-          : target;
-        if (aimTarget) {
-          this.aim(aimTarget);
-        }
-        this.skillCastAngle = this.gunAngle;
-      } else {
-        // Phase 2: Lock-in to 1 Direction (Timer <= halfTime) -> Commit strictly, NO direction change
-        if (!this.isThunderclapAimLocked) {
-          this.isThunderclapAimLocked = true;
-          const lockedTarget = (this.thunderclapTarget && this.thunderclapTarget.hp > 0 && !this.thunderclapTarget.isDead)
-            ? this.thunderclapTarget
-            : target;
-          if (lockedTarget) {
-            const dist = Math.hypot(lockedTarget.x - this.x, lockedTarget.y - this.y);
-            this.thunderclapLockedDistance = Math.min(480, Math.max(160, dist + (lockedTarget.r || 25) + 35));
-          } else {
-            this.thunderclapLockedDistance = 260;
-          }
-
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            const lockSfx = cfg.sounds?.lockIn || 'Assets/Sound Effects/Skills/parry.mp3';
-            const lockVol = cfg.soundVolumes?.lockIn !== undefined ? cfg.soundVolumes.lockIn : 0.35;
-            audioSystem.playSFX(lockSfx, lockVol);
-          }
-        }
-
-        // Strictly clamp to committed lock angle: NO snapping, NO turning
-        this.gunAngle = this.skillCastAngle;
-        this.angle = this.skillCastAngle;
+      // Continuous auto-aim tracking: smoothly track opponent throughout entire channel
+      const aimTarget = (this.thunderclapTarget && this.thunderclapTarget.hp > 0 && !this.thunderclapTarget.isDead)
+        ? this.thunderclapTarget
+        : target;
+      if (aimTarget) {
+        this.aim(aimTarget);
       }
+      // Continuously update skillCastAngle so dash always fires toward opponent's latest position
+      this.skillCastAngle = this.gunAngle;
 
       // Energy particles around feet/haori & electric noise audio on PNG flicker bursts
       const totalChannel = this.thunderclapChannelDuration || 100;
@@ -645,6 +779,11 @@ export class ZenitsuFighter extends Fighter {
     if (typeof audioSystem === 'undefined' || !audioSystem.playSFX) return;
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+
+    // Random chance gate: skip voice if roll fails (still marked as played to prevent retries)
+    const chance = cfg.firstFormVoiceChance !== undefined ? cfg.firstFormVoiceChance : 0.45;
+    if (Math.random() >= chance) return;
+
     const sfx = cfg.sounds?.firstFormVoice || 'Assets/Sound Effects/Skills/Zenitsu-firstform-voiceline.mp3';
     const vol = cfg.soundVolumes?.firstFormVoice ?? cfg.soundVolumes?.channelVoice ?? 0.90;
 
@@ -679,6 +818,11 @@ export class ZenitsuFighter extends Fighter {
     if (typeof audioSystem === 'undefined' || !audioSystem.playSFX) return;
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+
+    // Random chance gate: skip voice if roll fails (still marked as played to prevent retries)
+    const chance = cfg.sixfoldVoiceChance !== undefined ? cfg.sixfoldVoiceChance : 0.55;
+    if (Math.random() >= chance) return;
+
     const sfx = cfg.sounds?.sixfoldVoice || 'Assets/Sound Effects/Skills/zenitsu-sixfold-voiceline.mp3';
     const vol = cfg.soundVolumes?.sixfoldVoice ?? cfg.soundVolumes?.channelVoice ?? 0.90;
 
@@ -729,6 +873,9 @@ export class ZenitsuFighter extends Fighter {
       this._playSixfoldVoice();
     }
 
+    this.isChannelingThunderclap = false;
+    this.isThunderclapAimLocked = false;
+    this.thunderclapChannelTimer = 0;
     this.thunderclapDashIndex = 0;
     this.thunderclapTotalDashes = cfg.thunderclapDashCount || 4;
     this.thunderclapDashTarget = target;
@@ -793,25 +940,101 @@ export class ZenitsuFighter extends Fighter {
     const startY = this.y;
     let angle;
 
+    // Track which walls have been visited by previous dashes
+    if (index === 0) {
+      this._thunderclapVisitedWalls = [];
+    }
+
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG?.arena || { x: 0, y: 0, width: 1000, height: 700 });
+    const pad = (this.r || 25) + 8;
+    const minX = (arena.x || 0) + pad;
+    const maxX = (arena.x || 0) + (arena.width || 1000) - pad;
+    const minY = (arena.y || 0) + pad;
+    const maxY = (arena.y || 0) + (arena.height || 700) - pad;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
     if (index === 0) {
       // Dash 1: Follows committed locked charge angle all the way to the arena wall
       angle = this.skillCastAngle;
     } else {
-      // Dashes 2, 3, 4: Rebound from wall, slicing through nearest target across to the next wall
-      const curTarget = this.getNearestTarget(target);
-      if (curTarget && curTarget.hp > 0 && !curTarget.isDead) {
-        const dx = curTarget.x - startX;
-        const dy = curTarget.y - startY;
-        const baseAngle = Math.atan2(dy, dx);
+      // Dashes 2-4: Target a wall that hasn't been visited yet, sweeping through the opponent
+      // Determine which wall we just landed on from last dash
+      const wallThreshold = 12;
+      let lastWall = null;
+      if (Math.abs(startX - maxX) < wallThreshold) lastWall = 'right';
+      else if (Math.abs(startX - minX) < wallThreshold) lastWall = 'left';
+      else if (Math.abs(startY - maxY) < wallThreshold) lastWall = 'bottom';
+      else if (Math.abs(startY - minY) < wallThreshold) lastWall = 'top';
 
-        // Zig-zag cross angle offsets (finisher dash pierces dead center through target)
-        const isFinisher = (index === this.thunderclapTotalDashes - 1);
-        const offsets = [0, 0.28, -0.32, 0];
-        const angleOffset = isFinisher ? 0 : (offsets[index] !== undefined ? offsets[index] : (index % 2 === 1 ? 0.28 : -0.28));
-        angle = baseAngle + angleOffset;
+      if (lastWall && !this._thunderclapVisitedWalls.includes(lastWall)) {
+        this._thunderclapVisitedWalls.push(lastWall);
+      }
+
+      // All 4 wall targets with their representative center points
+      const wallTargets = {
+        right:  { x: maxX, y: centerY },
+        left:   { x: minX, y: centerY },
+        bottom: { x: centerX, y: maxY },
+        top:    { x: centerX, y: minY }
+      };
+
+      // Filter to unvisited walls only
+      const allWalls = ['right', 'left', 'bottom', 'top'];
+      let candidates = allWalls.filter(w => !this._thunderclapVisitedWalls.includes(w));
+      if (candidates.length === 0) candidates = allWalls; // Safety fallback
+
+      // Find the current target to bias toward opponent
+      const curTarget = this.getNearestTarget(target);
+      let bestWall = candidates[0];
+
+      if (curTarget && curTarget.hp > 0 && !curTarget.isDead) {
+        // Pick the wall whose direct angle from start passes closest to the opponent
+        let bestScore = -Infinity;
+        for (const wall of candidates) {
+          const wt = wallTargets[wall];
+          const wallAngle = Math.atan2(wt.y - startY, wt.x - startX);
+
+          // Score: how close the opponent is to the dash line toward this wall
+          const toTargetAngle = Math.atan2(curTarget.y - startY, curTarget.x - startX);
+          let angleDiff = Math.abs(wallAngle - toTargetAngle);
+          if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+
+          // Prefer walls where the opponent is roughly along the path (lower angleDiff = higher score)
+          // But also prefer walls that are far from start position (longer dashes look more dramatic)
+          const wallDist = Math.hypot(wt.x - startX, wt.y - startY);
+          const score = wallDist * 0.5 - angleDiff * 200;
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestWall = wall;
+          }
+        }
+
+        // Compute angle toward opponent, then adjust slightly toward the chosen wall
+        const opponentAngle = Math.atan2(curTarget.y - startY, curTarget.x - startX);
+        const wallPt = wallTargets[bestWall];
+        const pureWallAngle = Math.atan2(wallPt.y - startY, wallPt.x - startX);
+
+        // Blend: bias 35% toward wall guarantee, 65% toward opponent for slicing through them
+        let blendedAngle = opponentAngle + 0.35 * _angleDiff(pureWallAngle, opponentAngle);
+
+        // Verify the blended angle still hits the chosen wall; if not, use pure wall angle
+        const testHit = this._getArenaWallIntersection(startX, startY, blendedAngle);
+        const hitWall = _identifyHitWall(startX + Math.cos(blendedAngle) * testHit.dist, startY + Math.sin(blendedAngle) * testHit.dist, minX, maxX, minY, maxY, wallThreshold);
+        if (hitWall !== bestWall) {
+          blendedAngle = pureWallAngle;
+        }
+        angle = blendedAngle;
       } else {
-        const altOffsets = [0, 2.2, -2.2, 2.2, -2.2, 2.2];
-        angle = (this.gunAngle || 0) + (altOffsets[index] || 2.2);
+        // No target available — just dash to the best unvisited wall center
+        const wt = wallTargets[bestWall];
+        angle = Math.atan2(wt.y - startY, wt.x - startX);
+      }
+
+      // Record the wall we're heading to
+      if (!this._thunderclapVisitedWalls.includes(bestWall)) {
+        this._thunderclapVisitedWalls.push(bestWall);
       }
     }
 

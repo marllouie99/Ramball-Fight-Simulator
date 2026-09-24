@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────
 
 import { getHandSize, CONFIG } from '../../core/config.js';
+import { zenitsuConfig } from '../../configs/characters/zenitsuConfig.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { drawZenitsuLightningKatana } from '../weapons/demonSlayerWeaponGraphics.js';
@@ -1071,8 +1072,45 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   const total = fighter.thunderclapChannelDuration || 36;
   const current = fighter.thunderclapChannelTimer || 0;
   const isDashingOrPause = Boolean(fighter.isDashingThunderclap || (fighter.thunderclapDashPauseTimer && fighter.thunderclapDashPauseTimer > 0));
-  const elapsed = isDashingOrPause ? total : (total - current);
-  const currentBurst = isDashingOrPause ? null : _getThunderclapBurst(total, elapsed);
+  const isPostDashActive = Boolean(fighter.isThunderclapSliding || fighter.isThunderclapBreather);
+
+  const elapsed = (isDashingOrPause || isPostDashActive) ? total : (total - current);
+
+  // Aftermath burst cycle: looping lightning effects during post-dash slide & breather
+  let aftermathBurst = null;
+  let aftermathElapsed = 0;
+  if (isPostDashActive) {
+    // Create a repeating 30-frame burst cycle so lightning keeps crackling after the dash
+    const slideTimer = fighter.thunderclapSlideTimer || 0;
+    const breatherTimer = fighter.thunderclapBreatherTimer || 0;
+    const aftermathFrame = (fighter.isThunderclapSliding ? (16 - slideTimer) : (45 - breatherTimer + 16));
+    aftermathElapsed = aftermathFrame;
+    const cycleLen = 30;
+    const cyclePos = aftermathFrame % cycleLen;
+
+    // Burst at frames 2-3, 14-15, and 24-26 of each 30-frame cycle (reduced intensity)
+    if (cyclePos >= 2 && cyclePos <= 3) {
+      aftermathBurst = {
+        burstId: 1, frameIdx: cyclePos - 2, scale: 2.0, alpha: 0.80,
+        flipX: false, snapX: -1.0, isDoubleFlash: false, intensity: 0.50
+      };
+    } else if (cyclePos >= 14 && cyclePos <= 15) {
+      aftermathBurst = {
+        burstId: 2, frameIdx: cyclePos - 14, scale: 2.25, alpha: 0.85,
+        flipX: cyclePos === 15, snapX: cyclePos === 15 ? 2.0 : -2.0, isDoubleFlash: cyclePos === 15, intensity: 0.65
+      };
+    } else if (cyclePos >= 24 && cyclePos <= 26) {
+      const step = cyclePos - 24;
+      aftermathBurst = {
+        burstId: 3, frameIdx: Math.min(2, step + 1), scale: 2.50 + step * 0.10, alpha: 0.90,
+        flipX: step % 2 === 1, snapX: step % 2 === 0 ? -1.5 : 1.5, isDoubleFlash: true, intensity: 0.70
+      };
+    }
+  }
+
+  const currentBurst = isDashingOrPause ? null
+    : isPostDashActive ? aftermathBurst
+    : _getThunderclapBurst(total, elapsed);
 
   // Proximity lighting on nearby entities during active lightning burst surges
   if (currentBurst) {
@@ -1091,21 +1129,26 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
     ctx.scale(1, -1);
   }
 
-  const progress = isDashingOrPause ? 1.0 : Math.max(0, Math.min(1.0, 1.0 - (current / total)));
+  const progress = (isDashingOrPause || isPostDashActive) ? 1.0 : Math.max(0, Math.min(1.0, 1.0 - (current / total)));
 
-  // Smooth entrance interpolation over first 8 frames (avoids visual snapping into crouch)
-  const entranceFrames = 8;
-  const entranceT = isDashingOrPause ? 1.0 : Math.min(1.0, elapsed / entranceFrames);
-  const easeEntrance = isDashingOrPause ? 1.0 : (entranceT * entranceT * (3 - 2 * entranceT)); // Smooth cubic hermite curve
+  // Calculate easeEntrance: smoothly lower into stance, hold stance throughout dash, slide & breather
+  let easeEntrance = 1.0;
+  if (fighter.isThunderclapBreather || fighter.isThunderclapSliding || isDashingOrPause) {
+    easeEntrance = 1.0;
+  } else {
+    const entranceFrames = 8;
+    const entranceT = Math.min(1.0, elapsed / entranceFrames);
+    easeEntrance = entranceT * entranceT * (3 - 2 * entranceT);
+  }
 
   // Frame 1 (Stance) during first half (0 to 0.5)
   // Frame 2 (Charge) during second half (0.5 to 1.0)
-  const isChargePhase = progress >= 0.5;
+  const isChargePhase = progress >= 0.5 && !isPostDashActive;
 
-  // Stored explosive power vibration / micro-jitter: ONLY during active lightning bursts or pre-launch surge
+  // Stored explosive power vibration / micro-jitter: during active lightning bursts, pre-launch surge, OR aftermath bursts
   let jitterX = 0;
   let jitterY = 0;
-  if (currentBurst || (!isDashingOrPause && progress >= 0.90)) {
+  if (currentBurst || (!isDashingOrPause && !isPostDashActive && progress >= 0.90)) {
     const intensity = currentBurst ? (currentBurst.intensity || 0.8) : (progress - 0.90) * 10;
     jitterX = (Math.random() - 0.5) * 1.4 * intensity;
     jitterY = (Math.random() - 0.5) * 1.2 * intensity;
@@ -1113,7 +1156,8 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
 
   // ── Retro Arcade Character Breathing Animation (Stepped Body Expansion & Chest Rhythm) ──
   const breathFreq = isChargePhase ? 0.32 : 0.16;
-  const rawBreath = Math.sin(elapsed * breathFreq);
+  const effectiveElapsed = isPostDashActive ? aftermathElapsed : elapsed;
+  const rawBreath = Math.sin(effectiveElapsed * breathFreq);
   const breathQuantized = (rawBreath > 0.3 ? 1.0 : (rawBreath < -0.3 ? -1.0 : 0.0));
   const breathLiftY = breathQuantized * 1.5 * easeEntrance;
   const chestExpansionX = Math.max(0, breathQuantized) * 1.0 * easeEntrance;
@@ -1132,12 +1176,18 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   _drawZenitsuHair(ctx, r, false);
   ctx.restore();
 
-  // LAYER 3: Katana & Both Hands Gripping Sword Near Waist (Smoothly draws back to hip)
-  _drawZenitsuWaistGripKatana(ctx, fighter, r, isChargePhase, jitterX, jitterY, easeEntrance);
+  // LAYER 3: Katana & Both Hands Gripping Sword Near Waist (Smoothly draws back to hip & eases forward on exit)
+  if (easeEntrance > 0.001) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1.0, easeEntrance / 0.35);
+    _drawZenitsuWaistGripKatana(ctx, fighter, r, isChargePhase, jitterX, jitterY, easeEntrance);
+    ctx.restore();
+  }
 
-  // LAYER 4: Sporadic Golden Lightning & Energy Bursts (Burst 1 -> ~1.5s quiet tension pause -> Burst 2 -> Burst 3)
+  // LAYER 4: Sporadic Golden Lightning & Energy Bursts (Channel + Aftermath)
   if (!isDashingOrPause) {
-    _drawThunderclapChargeVFX(ctx, r, progress, elapsed, total, jitterX, jitterY);
+    const vfxElapsed = isPostDashActive ? aftermathElapsed : elapsed;
+    _drawThunderclapChargeVFX(ctx, r, progress, vfxElapsed, isPostDashActive ? 30 : total, jitterX, jitterY);
   }
 
   // Status Overlays
@@ -1181,7 +1231,9 @@ export function drawZenitsuSkin(ctx, fighter) {
     fighter.isChannelingThunderclap ||
     (fighter.thunderclapChannelTimer && fighter.thunderclapChannelTimer > 0) ||
     fighter.isDashingThunderclap ||
-    (fighter.thunderclapDashPauseTimer && fighter.thunderclapDashPauseTimer > 0)
+    (fighter.thunderclapDashPauseTimer && fighter.thunderclapDashPauseTimer > 0) ||
+    fighter.isThunderclapSliding ||
+    fighter.isThunderclapBreather
   );
 
   if (isIaidoStance) {

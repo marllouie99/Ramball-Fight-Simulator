@@ -107,10 +107,14 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   const now = Date.now();
 
   // Movement & state flags
-  const isPunching = (fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || fighter.isFlurrying;
-  const isBasicAttacking = fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0;
-  const isUltSliding = Boolean(fighter.isUltSliding);
-  const isChargingUlt = fighter.isChargingUlt || fighter.isFiringUlt;
+  const isSelfDestructing = Boolean(fighter.isSelfDestructing || (fighter.selfDestructTimer && fighter.selfDestructTimer > 0));
+  const isSelfDestructRecovering = Boolean(fighter.isSelfDestructRecovering || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0));
+  const isSelfDestructActive = isSelfDestructing || isSelfDestructRecovering;
+
+  const isPunching = !isSelfDestructActive && Boolean((fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || fighter.isFlurrying);
+  const isBasicAttacking = !isSelfDestructActive && Boolean(fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0);
+  const isUltSliding = !isSelfDestructActive && Boolean(fighter.isUltSliding);
+  const isChargingUlt = !isSelfDestructActive && Boolean(fighter.isChargingUlt || fighter.isFiringUlt);
   const isAttacking = isPunching || isChargingUlt || isBasicAttacking || isUltSliding;
   const isMoving = Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5;
 
@@ -130,7 +134,6 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   // 1. THRUSTER BOOST & SELF-DESTRUCT AURA (No shadowBlur - Rule #11)
   // -------------------------------------------------------------------------
   const isDashing = fighter.isDashing;
-  const isSelfDestructing = fighter.isSelfDestructing;
 
   if ((isMoving || isDashing || isChargingUlt || isSelfDestructing || isUltSliding) && !isLowQuality) {
     ctx.save();
@@ -346,15 +349,19 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
  */
 export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   if ((typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands) return;
+  if (fighter.shatteredPieces && fighter.shatteredPieces.length > 0) return;
 
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
-  const isFlurrying = !isPodiumPreview && Boolean(fighter.isFlurrying);
-  const isPunching = !isPodiumPreview && Boolean((fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || isFlurrying);
-  const isBasicAttacking = !isPodiumPreview && Boolean(fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0);
-  const isUltSliding = !isPodiumPreview && Boolean(fighter.isUltSliding);
-  const isChargingUlt = !isPodiumPreview && Boolean(fighter.isChargingUlt || fighter.isFiringUlt);
-  const isUltRecovering = !isPodiumPreview && Boolean(fighter.isUltRecovering);
-  const isSelfDestructing = !isPodiumPreview && Boolean(fighter.isSelfDestructing);
+  const isSelfDestructing = !isPodiumPreview && Boolean(fighter.isSelfDestructing || (fighter.selfDestructTimer && fighter.selfDestructTimer > 0));
+  const isSelfDestructRecovering = !isPodiumPreview && Boolean(fighter.isSelfDestructRecovering || (fighter.selfDestructRecoveryTimer !== undefined && fighter.selfDestructRecoveryTimer > 0));
+  const isSelfDestructActive = isSelfDestructing || isSelfDestructRecovering;
+
+  const isFlurrying = !isPodiumPreview && !isSelfDestructActive && Boolean(fighter.isFlurrying);
+  const isPunching = !isPodiumPreview && !isSelfDestructActive && Boolean((fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || isFlurrying);
+  const isBasicAttacking = !isPodiumPreview && !isSelfDestructActive && Boolean(fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0);
+  const isUltSliding = !isPodiumPreview && !isSelfDestructActive && Boolean(fighter.isUltSliding);
+  const isChargingUlt = !isPodiumPreview && !isSelfDestructActive && Boolean(fighter.isChargingUlt || fighter.isFiringUlt);
+  const isUltRecovering = !isPodiumPreview && !isSelfDestructActive && Boolean(fighter.isUltRecovering);
 
   const r = fighter.r || 25;
   const hr = Math.max(r * 0.32, getHandSize(7.5)); // hand radius
@@ -627,6 +634,11 @@ function _drawGhostMechFist(ctx, cx, cy, hr, alpha, palmColor) {
  * @param {boolean} [isLeftHand=false] - Whether this is the left arm (framing the left flank)
  */
 function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructing, isFiringArm, blastProgress, punchGlow = 0, isLeftHand = false) {
+  if (isSelfDestructing) {
+    isFiringArm = false;
+    blastProgress = 0;
+    punchGlow = 0;
+  }
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const P = 2.0;
@@ -772,6 +784,7 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
 function drawGenosAmmoGauge(ctx, fighter) {
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
   if (isPodiumPreview || fighter._isAfterImage) return;
+  if (fighter.isSelfDestructing || (fighter.selfDestructTimer && fighter.selfDestructTimer > 0) || fighter.isSelfDestructRecovering || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0)) return;
 
   const r = fighter.r || 25;
   const maxAmmo = fighter.maxHeatAmmo || 6;
