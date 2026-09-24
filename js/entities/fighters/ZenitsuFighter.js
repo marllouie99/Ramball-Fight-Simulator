@@ -183,6 +183,15 @@ export class ZenitsuFighter extends Fighter {
     return Boolean(this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap);
   }
 
+  _updateDashVFX() {
+    if (this.thunderclapDashVFX) {
+      this.thunderclapDashVFX.timer++;
+      if (this.thunderclapDashVFX.timer >= this.thunderclapDashVFX.maxTimer) {
+        this.thunderclapDashVFX = null;
+      }
+    }
+  }
+
   interruptAttacks(forceCancelAll = false) {
     if (typeof super.interruptAttacks === 'function') {
       super.interruptAttacks(forceCancelAll);
@@ -192,6 +201,9 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapChannelTimer = 0;
     this.thunderclapTarget = null;
     this.isDashingThunderclap = false;
+    if (forceCancelAll) {
+      this.thunderclapDashVFX = null;
+    }
   }
 
   update(opponent, ownerIndex, arena) {
@@ -201,6 +213,9 @@ export class ZenitsuFighter extends Fighter {
       this.interruptAttacks();
       return;
     }
+
+    // Always tick dash VFX timer so air linger and disappearance fadeout never freeze during channeling
+    this._updateDashVFX();
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     const target = this.getNearestTarget(opponent);
@@ -235,13 +250,6 @@ export class ZenitsuFighter extends Fighter {
           this.thunderclapDashDestY,
           this.thunderclapDashAngle
         );
-      }
-
-      if (this.thunderclapDashVFX) {
-        this.thunderclapDashVFX.timer++;
-        if (this.thunderclapDashVFX.timer >= this.thunderclapDashVFX.maxTimer) {
-          this.thunderclapDashVFX = null;
-        }
       }
       return;
     }
@@ -313,14 +321,6 @@ export class ZenitsuFighter extends Fighter {
     }
 
     super.update(opponent, ownerIndex, arena);
-
-    // Update active 6-frame lightning dash visual effect timer
-    if (this.thunderclapDashVFX) {
-      this.thunderclapDashVFX.timer++;
-      if (this.thunderclapDashVFX.timer >= this.thunderclapDashVFX.maxTimer) {
-        this.thunderclapDashVFX = null;
-      }
-    }
 
     // Decay swing timers
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;

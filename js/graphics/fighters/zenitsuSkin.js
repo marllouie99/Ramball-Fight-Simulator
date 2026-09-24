@@ -1320,7 +1320,11 @@ export function drawZenitsuSkin(ctx, fighter) {
 
   // 0. Render 6-Frame Lightning Dash Animation along trajectory in World Coordinates
   if (!isPodiumPreview && fighter.thunderclapDashVFX) {
-    _drawZenitsuThunderclapDashVFX(ctx, fighter.thunderclapDashVFX, fighter);
+    if (fighter.thunderclapDashVFX.timer >= fighter.thunderclapDashVFX.maxTimer) {
+      fighter.thunderclapDashVFX = null;
+    } else {
+      _drawZenitsuThunderclapDashVFX(ctx, fighter.thunderclapDashVFX, fighter);
+    }
   }
 
   const isSuppressed = !isPodiumPreview && Boolean(

@@ -8977,7 +8977,30 @@ async function main() {
       drawZenitsuSkin(mockCtx, zenitsu);
       assertCanvasStackBalance(`drawZenitsuSkin with dash VFX at timer ${testTimer}`);
     }
-    zenitsu.thunderclapDashVFX = null;
+    // 11.6.3 Dash VFX Timer Progress During Channeling Test (Custom Duration = 200)
+    zenitsu.isChannelingThunderclap = true;
+    zenitsu.thunderclapChannelDuration = 200;
+    zenitsu.thunderclapChannelTimer = 200;
+    zenitsu.thunderclapDashVFX = {
+      startX: 100,
+      startY: 100,
+      destX: 360,
+      destY: 100,
+      angle: 0,
+      dist: 260,
+      timer: 0,
+      travelDuration: 6,
+      lingerDuration: 8,
+      disappearDuration: 16,
+      maxTimer: 30
+    };
+    for (let f = 0; f < 35; f++) {
+      zenitsu.update(null, 0, state.arena);
+    }
+    if (zenitsu.thunderclapDashVFX !== null) {
+      throw new Error(`Zenitsu dash VFX failed to clear during channeling! timer: ${zenitsu.thunderclapDashVFX?.timer}`);
+    }
+    zenitsu.interruptAttacks(true);
   } catch (err) {
     console.error('❌ [ZENITSU MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
     errors++;
