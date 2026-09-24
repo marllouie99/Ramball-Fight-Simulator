@@ -17,7 +17,7 @@ import { zenitsuConfig } from '../../configs/characters/zenitsuConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawZenitsuSkin, isZenitsuThunderclapBurst } from '../../graphics/fighters/zenitsuSkin.js';
-import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnParrySparksEffect, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -694,13 +694,19 @@ export class ZenitsuFighter extends Fighter {
         hitEnt.hitStunTimer = Math.max(hitEnt.hitStunTimer || 0, stunDur);
       }
 
+      // Ricochet Hit Effect: High-velocity welding needle sparks, star embers, clash ring, cyan lightning & blood
+      spawnParrySparksEffect(hitEnt.x, hitEnt.y, isFinisher ? 32 : 18);
+      spawnMeleeClashShockwave(hitEnt.x, hitEnt.y, isFinisher ? 70 : 42, 'gojo');
+      spawnSparks(hitEnt.x, hitEnt.y, isFinisher ? 20 : 12, 'cyan', '#38BDF8');
+      spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', isFinisher ? 40 : 22);
+      spawnBloodEffect(hitEnt.x, hitEnt.y, hitEnt.bloodColor || '#DC2626');
+
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_parry', isFinisher ? 0.45 : 0.32);
+      }
+
       if (isFinisher) {
         hitEnt.applyKnockback?.(Math.cos(angle) * 28, Math.sin(angle) * 28);
-        spawnSparks(hitEnt.x, hitEnt.y, 18, 'cyan', '#38BDF8');
-        spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 35);
-      } else {
-        spawnSparks(hitEnt.x, hitEnt.y, 10, 'cyan', '#38BDF8');
-        spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 18);
       }
     }
 
