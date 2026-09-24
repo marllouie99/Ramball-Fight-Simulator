@@ -1054,144 +1054,233 @@ function _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisap
 }
 
 /**
- * Frame 1: Stance Breath Wisps
- * Rhythmic, calm white vapor puffs expanding and curling forward from mouth.
+ * Frame 1: Retro Arcade Style Stance Breath & Deep Concentration Inhale
+ * 1. Inward Suction Needles (Retro speed chevrons drawing inward toward mouth nozzle)
+ * 2. Pixel Mouth Vent Glint
+ * 3. Discrete Stepped Billowing Puffs with Manga Ink Outline Shells
  */
 function _drawZenitsuStanceBreath(ctx, r, mouthX, mouthY, elapsed, easeEntrance) {
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
-  const puffCycle = 16;
-  const puffCount = 3;
 
-  // Mouth breath seal highlight at lips
+  // 1. Retro Inhale Suction Streamers (Air drawing inward into mouth nozzle)
+  const suctionCycle = 14;
+  for (let i = 0; i < 3; i++) {
+    const sAge = (elapsed + i * 4.6) % suctionCycle;
+    const sT = sAge / suctionCycle; // 0 (far) to 1 (at mouth)
+    const inDist = (1.0 - sT) * (r * 1.4);
+    if (inDist < P * 2) continue;
+
+    const sx = snap(mouthX + inDist);
+    const syOffset = (i === 1 ? -P * 2 : (i === 2 ? P * 2 : 0)) * (1.0 - sT * 0.7);
+    const sy = snap(mouthY + syOffset);
+    const sAlpha = Math.sin(sT * Math.PI) * 0.80 * easeEntrance;
+    if (sAlpha <= 0.05) continue;
+
+    ctx.globalAlpha = sAlpha;
+    // Dark ink shell around needle
+    ctx.fillStyle = '#0B0F19';
+    ctx.fillRect(sx - P, sy - P, P * 3, P * 3);
+    // Light cyan body
+    ctx.fillStyle = (i % 2 === 0) ? '#38BDF8' : '#BAE6FD';
+    ctx.fillRect(sx, sy, P * 2, P);
+    // White core tip
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(sx, sy, P, P);
+  }
+
+  // 2. Mouth Vent Glint / Breath Seal
+  const pulse = 0.6 + 0.4 * Math.sin(elapsed * 0.25);
+  ctx.globalAlpha = pulse * easeEntrance;
+  // Dark ink outline box
+  ctx.fillStyle = '#0B0F19';
+  ctx.fillRect(mouthX - P, mouthY - P, P * 4, P * 3);
+  // Bright Cyan rim
+  ctx.fillStyle = '#38BDF8';
+  ctx.fillRect(mouthX, mouthY - P, P * 2, P * 3);
+  // White Core
   ctx.fillStyle = '#FFFFFF';
-  ctx.globalAlpha = 0.75 * easeEntrance;
   ctx.fillRect(mouthX, mouthY, P * 2, P);
 
+  // 3. Stepped Retro Billowing Puffs (Exhale / Concentration Vapor)
+  const puffCycle = 18;
+  const puffCount = 3;
   for (let i = 0; i < puffCount; i++) {
-    const puffAge = (elapsed + i * 5.3) % puffCycle;
+    const puffAge = (elapsed + i * 6.0) % puffCycle;
     const t = puffAge / puffCycle;
-    if (t < 0.08) continue;
+    if (t < 0.05) continue;
 
-    const travelDist = t * (r * 1.3);
+    const travelDist = t * (r * 1.35);
     const px = snap(mouthX + travelDist);
-    const lift = Math.sin(t * Math.PI) * (r * 0.16);
-    const spreadY = (i === 1 ? -P : (i === 2 ? P : 0)) * (t * 1.5);
-    const py = snap(mouthY - lift + spreadY);
+    const liftY = Math.sin(t * Math.PI) * (r * 0.20);
+    const spreadY = (i === 1 ? -P * 1.5 : (i === 2 ? P * 1.5 : 0)) * t;
+    const py = snap(mouthY - liftY + spreadY);
 
-    const fadeIn = Math.min(1.0, (t - 0.08) * 5.0);
+    const fadeIn = Math.min(1.0, (t - 0.05) * 6.0);
     const fadeOut = Math.max(0, 1.0 - t);
-    const alpha = fadeIn * fadeOut * 0.85 * easeEntrance;
-    if (alpha <= 0.02) continue;
+    const alpha = fadeIn * fadeOut * 0.90 * easeEntrance;
+    if (alpha <= 0.03) continue;
 
     ctx.globalAlpha = alpha;
 
-    if (t < 0.3) {
-      // Stage 1: Tight vapor nozzle
+    if (t < 0.28) {
+      // Stage 1: Tight high-velocity nozzle ejection
+      ctx.fillStyle = '#0B0F19';
+      ctx.fillRect(px - P, py - P, P * 4, P * 3);
+      ctx.fillStyle = '#7DD3FC';
+      ctx.fillRect(px, py, P * 3, P);
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(px, py, P * 2, P);
-      ctx.fillStyle = '#E0F2FE';
-      ctx.fillRect(px + P * 2, py, P, P);
-    } else if (t < 0.7) {
-      // Stage 2: Expanding billowing cloud
-      ctx.fillStyle = '#FFFFFF';
+    } else if (t < 0.72) {
+      // Stage 2: Chunky 8-bit stepped diamond cloud cluster with dark boundary
+      // Outer Manga Ink Shell
+      ctx.fillStyle = '#0B0F19';
+      ctx.fillRect(px - P * 2, py, P * 6, P * 2);
+      ctx.fillRect(px - P, py - P, P * 4, P * 4);
+      ctx.fillRect(px, py - P * 2, P * 2, P * 6);
+
+      // Cyan / Ice-Blue Shading
+      ctx.fillStyle = '#38BDF8';
+      ctx.fillRect(px - P, py, P * 4, P * 2);
+      ctx.fillRect(px, py - P, P * 2, P * 4);
+
+      // Bright Ice Midtone
+      ctx.fillStyle = '#BAE6FD';
       ctx.fillRect(px, py, P * 2, P * 2);
-      ctx.fillStyle = '#E0F2FE';
-      ctx.fillRect(px - P, py, P, P * 2);
-      ctx.fillRect(px, py - P, P * 2, P);
-      ctx.fillRect(px, py + P * 2, P * 2, P);
-      ctx.fillStyle = '#BAE6FD';
-      ctx.fillRect(px + P * 3, py + (i % 2 === 0 ? -P : P), P, P);
+      ctx.fillRect(px - P * 0.5, py, P * 3, P);
+
+      // White-Hot Core
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(px, py, P * 2, P);
     } else {
-      // Stage 3: Dissipating mist droplets
-      ctx.fillStyle = '#E0F2FE';
+      // Stage 3: Dissipating retro pixel droplets
+      ctx.fillStyle = '#0B0F19';
+      ctx.fillRect(px - P, py - P, P * 3, P * 3);
+      ctx.fillRect(px + P * 2, py - P * 2, P * 3, P * 3);
+      ctx.fillStyle = '#7DD3FC';
       ctx.fillRect(px, py, P, P);
-      ctx.fillRect(px + P * 2, py - P, P, P);
-      ctx.fillStyle = '#BAE6FD';
-      ctx.fillRect(px + P, py + P, P, P);
+      ctx.fillRect(px + P * 3, py - P, P, P);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(px, py, P, P);
     }
   }
 }
 
 /**
- * Frame 2: High-Pressure Charge Steam Jets
- * Pressurized dual steam jets shooting forward with white core, icy cyan rims,
- * turbulent billowing plumes, and lightning-charged vapor sparks.
+ * Frame 2: Retro Arcade Overdrive Steam Jets (Charge Phase)
+ * Supercharged dual turbo exhausts with sharp manga outlines,
+ * stepped diamond shockwaves, and lightning-infused spark flecks.
  */
 function _drawZenitsuChargeSteamJets(ctx, r, mouthX, mouthY, progress, elapsed) {
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const chargeIntensity = Math.min(1.0, (progress - 0.5) * 2.0);
-  const jetLen = snap(r * (1.1 + 0.9 * chargeIntensity));
+  const jetLen = snap(r * (1.2 + 1.1 * chargeIntensity));
 
-  // 1. Mouth nozzle: pressurized white steam base at lips
-  ctx.globalAlpha = 0.95;
-  ctx.fillStyle = '#FFFFFF';
+  // 1. Mouth Base Vent Nozzle with Arcade Ink Frame
+  ctx.globalAlpha = 1.0;
+  ctx.fillStyle = '#0B0F19';
+  ctx.fillRect(mouthX - P * 2, mouthY - P * 2, P * 5, P * 5);
+  ctx.fillStyle = '#38BDF8';
   ctx.fillRect(mouthX - P, mouthY - P, P * 3, P * 3);
-  ctx.fillStyle = '#BAE6FD';
-  ctx.fillRect(mouthX - P * 2, mouthY, P, P);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(mouthX - P, mouthY - P * 0.5, P * 2, P * 2);
 
-  // 2. High-Pressure Dual Steam Jets (Upper & Lower streams)
-  const segs = Math.max(4, Math.floor(jetLen / (P * 2)));
+  // 2. High-Pressure Dual Arcade Steam Streams (Upper & Lower Jets)
+  const segs = Math.max(5, Math.floor(jetLen / (P * 2)));
   for (let s = 0; s < segs; s++) {
     const segT = s / segs;
     const segDist = snap(s * P * 2);
-    const segAlpha = Math.max(0.15, 1.0 - segT * 0.75);
+    const segAlpha = Math.max(0.20, 1.0 - segT * 0.65);
 
-    const upSpread = -Math.pow(segT, 1.2) * (r * 0.28);
+    const upSpread = -Math.pow(segT, 1.1) * (r * 0.26);
+    const downSpread = Math.pow(segT, 1.1) * (r * 0.22);
+
     const upX = snap(mouthX + segDist);
     const upY = snap(mouthY + upSpread - P);
 
-    const downSpread = Math.pow(segT, 1.2) * (r * 0.20);
     const downX = snap(mouthX + segDist + P);
     const downY = snap(mouthY + downSpread + P);
 
     ctx.globalAlpha = segAlpha;
+
+    // Dark Arcade Ink Outlines
+    ctx.fillStyle = '#0B0F19';
+    ctx.fillRect(upX - P, upY - P, P * 4, P * 3);
+    ctx.fillRect(downX - P, downY - P, P * 4, P * 3);
+
+    // Cyan High-Voltage Edge
+    ctx.fillStyle = '#38BDF8';
+    ctx.fillRect(upX, upY - P * 0.5, P * 2, P * 2);
+    ctx.fillRect(downX, downY - P * 0.5, P * 2, P * 2);
+
+    // Solid Pure White Core
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(upX, upY, P * 2, P);
     ctx.fillRect(downX, downY, P * 2, P);
-
-    ctx.globalAlpha = segAlpha * 0.85;
-    ctx.fillStyle = '#E0F2FE';
-    ctx.fillRect(upX, upY - P, P * 2, P);
-    ctx.fillRect(downX, downY + P, P * 2, P);
-
-    if (segT > 0.3) {
-      ctx.fillStyle = '#BAE6FD';
-      ctx.fillRect(upX + P, upY - P * 2, P, P);
-      ctx.fillRect(downX + P, downY + P * 2, P, P);
-    }
   }
 
-  // 3. Expanding Turbulent Billowing Plumes at Jet Tips
+  // 3. Arcade Shockwave Diamonds along the stream
+  const diamondCount = 3;
+  for (let d = 0; d < diamondCount; d++) {
+    const dT = (d + 1) / (diamondCount + 1);
+    const dx = snap(mouthX + jetLen * dT);
+    const pulseOffset = Math.sin(elapsed * 0.4 + d * 1.5) * P;
+    const dyUp = snap(mouthY - Math.pow(dT, 1.1) * (r * 0.26) + pulseOffset);
+    const dyDown = snap(mouthY + Math.pow(dT, 1.1) * (r * 0.22) - pulseOffset);
+
+    // Ink outline diamond
+    ctx.fillStyle = '#0B0F19';
+    ctx.fillRect(dx - P, dyUp - P, P * 3, P * 3);
+    ctx.fillRect(dx - P, dyDown - P, P * 3, P * 3);
+    // Cyan inner diamond
+    ctx.fillStyle = '#7DD3FC';
+    ctx.fillRect(dx, dyUp - P * 0.5, P, P * 2);
+    ctx.fillRect(dx, dyDown - P * 0.5, P, P * 2);
+    // White center
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(dx, dyUp, P, P);
+    ctx.fillRect(dx, dyDown, P, P);
+  }
+
+  // 4. Chunky 8-bit Billowing Cloud Bursts at Jet Terminus
   const plumeCycle = 8;
-  const plumeT = ((elapsed * 0.4) % plumeCycle) / plumeCycle;
+  const plumeT = ((elapsed * 0.35) % plumeCycle) / plumeCycle;
   for (let p = 0; p < 3; p++) {
     const ptT = (plumeT + p * 0.33) % 1.0;
-    const plX = snap(mouthX + jetLen * (0.75 + 0.4 * ptT));
-    const plY = snap(mouthY + (p === 0 ? -r * 0.25 : (p === 1 ? r * 0.18 : -r * 0.05)) * (0.8 + 0.4 * ptT));
-    const plAlpha = Math.max(0, (1.0 - ptT) * 0.85 * chargeIntensity);
-    if (plAlpha <= 0.03) continue;
+    const plX = snap(mouthX + jetLen * (0.80 + 0.35 * ptT));
+    const plY = snap(mouthY + (p === 0 ? -r * 0.26 : (p === 1 ? r * 0.22 : -r * 0.04)) * (0.85 + 0.35 * ptT));
+    const plAlpha = Math.max(0, (1.0 - ptT) * 0.90 * chargeIntensity);
+    if (plAlpha <= 0.04) continue;
 
     ctx.globalAlpha = plAlpha;
+    // Dark ink shell
+    ctx.fillStyle = '#0B0F19';
+    ctx.fillRect(plX - P * 2, plY - P, P * 6, P * 4);
+    ctx.fillRect(plX - P, plY - P * 2, P * 4, P * 6);
+
+    // Cyan / Ice-Blue body
+    ctx.fillStyle = '#38BDF8';
+    ctx.fillRect(plX - P, plY - P, P * 4, P * 4);
+    ctx.fillStyle = '#BAE6FD';
+    ctx.fillRect(plX, plY - P * 0.5, P * 2, P * 3);
+
+    // White core
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(plX, plY, P * 2, P * 2);
-    ctx.fillStyle = '#E0F2FE';
-    ctx.fillRect(plX - P, plY, P, P * 2);
-    ctx.fillRect(plX + P * 2, plY, P, P * 2);
-    ctx.fillStyle = '#7DD3FC';
-    ctx.fillRect(plX + P * 3, plY + (p % 2 === 0 ? -P : P), P, P);
   }
 
-  // 4. Drifting Vapor Flecks & Golden Sparks
-  for (let f = 0; f < 3; f++) {
-    const fT = (elapsed * 0.06 + f * 0.33) % 1.0;
-    const fx = snap(mouthX + r * 0.2 + fT * (r * 1.5));
-    const fy = snap(mouthY - r * 0.05 - Math.sin(fT * Math.PI) * (r * 0.35) - f * P * 1.5);
-    const fAlpha = Math.sin(fT * Math.PI) * 0.75 * chargeIntensity;
-    if (fAlpha > 0.04) {
+  // 5. Lightning-Charged Static Flecks
+  for (let f = 0; f < 4; f++) {
+    const fT = (elapsed * 0.08 + f * 0.25) % 1.0;
+    const fx = snap(mouthX + r * 0.15 + fT * (jetLen * 1.1));
+    const fy = snap(mouthY - r * 0.06 + (f % 2 === 0 ? -1 : 1) * Math.sin(fT * Math.PI) * (r * 0.38));
+    const fAlpha = Math.sin(fT * Math.PI) * 0.85 * chargeIntensity;
+    if (fAlpha > 0.05) {
       ctx.globalAlpha = fAlpha;
-      ctx.fillStyle = f === 1 ? '#FDE047' : (f === 0 ? '#FFFFFF' : '#BAE6FD');
+      ctx.fillStyle = '#0B0F19';
+      ctx.fillRect(fx - P * 0.5, fy - P * 0.5, P * 2, P * 2);
+      ctx.fillStyle = (f === 1 || f === 3) ? '#F59E0B' : '#38BDF8';
       ctx.fillRect(fx, fy, P, P);
     }
   }
@@ -1212,8 +1301,8 @@ function _drawZenitsuBreathSteam(ctx, r, progress, isChargePhase, jitterX, jitte
 
   const headDropY = (r * 0.08) * easeEntrance;
   const headForwardX = (r * 0.06) * easeEntrance;
-  const mouthX = snap(r * 0.06 + headForwardX + jitterX);
-  const mouthY = snap(r * 0.08 + headDropY + jitterY);
+  const mouthX = snap(r * 0.35 + headForwardX + jitterX);
+  const mouthY = snap(-r * 0.08 + headDropY + jitterY);
 
   if (!isChargePhase) {
     _drawZenitsuStanceBreath(ctx, r, mouthX, mouthY, elapsed, easeEntrance);
@@ -1226,7 +1315,7 @@ function _drawZenitsuBreathSteam(ctx, r, progress, isChargePhase, jitterX, jitte
 
 /**
  * Draws Zenitsu's Skill 1 Channeling Animation on the circular character model:
- * Frame 1: Stance / Preparation (Full 1:1 round body, head smoothly lowered in focused stance, both hands gripping sword near waist)
+ * Frame 1: Stance / Preparation (Full 1:1 round body with retro arcade breathing expansion, head smoothly lowered in focused stance, both hands gripping sword near waist)
  * Frame 2: Charge / Energy Build-Up (Same stance, micro-tremor jitter, crackling golden lightning around body & sword, energy particles at feet & haori)
  */
 export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
@@ -1281,16 +1370,23 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
     jitterY = (Math.random() - 0.5) * 1.2 * intensity;
   }
 
-  // LAYER 1: Full Round Pixel Body (100% round, 1:1 circle, no flattening)
+  // ── Retro Arcade Character Breathing Animation (Stepped Body Expansion & Chest Rhythm) ──
+  const breathFreq = isChargePhase ? 0.32 : 0.16;
+  const rawBreath = Math.sin(elapsed * breathFreq);
+  const breathQuantized = (rawBreath > 0.3 ? 1.0 : (rawBreath < -0.3 ? -1.0 : 0.0));
+  const breathLiftY = breathQuantized * 1.5 * easeEntrance;
+  const chestExpansionX = Math.max(0, breathQuantized) * 1.0 * easeEntrance;
+
+  // LAYER 1: Full Round Pixel Body (100% round, 1:1 circle, no flattening + Retro Breathing Lift)
   ctx.save();
-  ctx.translate(jitterX, jitterY);
+  ctx.translate(jitterX + chestExpansionX * 0.3, jitterY + breathLiftY * 0.4);
   drawZenitsuPixelBody(ctx, r);
   ctx.restore();
 
-  // LAYER 2: Head Lowered (Smoothly lowers forward into deep focus without snapping)
+  // LAYER 2: Head Lowered (Smoothly lowers forward into deep focus + Retro Breathing Rhythm)
   ctx.save();
-  const headDropY = (r * 0.08) * easeEntrance;
-  const headForwardX = (r * 0.06) * easeEntrance;
+  const headDropY = (r * 0.08) * easeEntrance + breathLiftY * 0.6;
+  const headForwardX = (r * 0.06) * easeEntrance + chestExpansionX * 0.5;
   ctx.translate(headForwardX + jitterX, headDropY + jitterY);
   _drawZenitsuHair(ctx, r, false);
   ctx.restore();
@@ -1298,7 +1394,7 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   // LAYER 3: Katana & Both Hands Gripping Sword Near Waist (Smoothly draws back to hip)
   _drawZenitsuWaistGripKatana(ctx, fighter, r, isChargePhase, jitterX, jitterY, easeEntrance);
 
-  // LAYER 4: Total Concentration Breath Steam (Wisps in Frame 1, High-Pressure Jets in Frame 2)
+  // LAYER 4: Total Concentration Breath Steam (Retro Arcade Wisps in Frame 1, High-Pressure Turbo Jets in Frame 2)
   _drawZenitsuBreathSteam(ctx, r, progress, isChargePhase, jitterX, jitterY, elapsed, easeEntrance);
 
   // LAYER 5: Sporadic Golden Lightning & Energy Bursts (Burst 1 -> ~1.5s quiet breath tension pause -> Burst 2 -> Burst 3)
