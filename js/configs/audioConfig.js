@@ -120,5 +120,11 @@ export const AUDIO_CONFIG = {
   'skill_reze_rocket_jet': 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
   'skill_reze_nuke_charge': 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
   'skill_reze_nuke_dive': 'Assets/Sound Effects/Skills/fugatravel.mp3',
-  'skill_reze_nuke_impact': 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3'
+  'skill_reze_nuke_impact': 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3',
+
+  // Zenitsu (Thunder Breathing)
+  'skill_zenitsu_dash_noise': 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
+  'skill_zenitsu_dash_sfx': 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
+  'zenitsu_dash_noise': 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
+  'zenitsu_dash_sfx': 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3'
 };

@@ -79,6 +79,7 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('rikaappearance') ||
          s.includes('toji-ultimate') ||
          s.includes('finalblow') ||
+         s.includes('zenitsu') ||
          s.includes('ui');
 }
 

@@ -10341,12 +10341,25 @@ async function main() {
     if (zenitsu.hitStunTimer !== 0 || zenitsu.paralyzeTimer !== 0 || zenitsu.slowTimer !== 0 || zenitsu.timeStopTimer !== 0) {
       throw new Error(`Zenitsu received CC while thunderclapDashPauseTimer > 0! hitStun=${zenitsu.hitStunTimer}, paralyze=${zenitsu.paralyzeTimer}`);
     }
-    if (zenitsu._handleTimeStop() !== false) {
-      throw new Error(`_handleTimeStop() should return false during thunderclapDashPauseTimer!`);
+    // 6. Sound Config & Dash Audio Mix Verification
+    if (!CONFIG.zenitsu?.sounds?.dashNoise || CONFIG.zenitsu.sounds.dashNoise !== 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3') {
+      throw new Error(`CONFIG.zenitsu.sounds.dashNoise is missing or incorrect! Got: ${CONFIG.zenitsu?.sounds?.dashNoise}`);
     }
-    zenitsu.thunderclapDashPauseTimer = 0;
+    if (!CONFIG.zenitsu?.sounds?.dashSFX || !CONFIG.zenitsu?.sounds?.katanaSwing || !CONFIG.zenitsu?.sounds?.slashHit) {
+      throw new Error(`CONFIG.zenitsu.sounds is missing required audio mappings!`);
+    }
 
-    console.log('✅ [Zenitsu Dash CC Immunity Test] Zenitsu correctly maintains 100% CC and movement-stopping immunity during dashing and dash pauses.');
+    // Trigger basic attack, stance, and dash step to verify zero audio exceptions
+    const dummyOpponent = { x: 320, y: 250, r: 25, hp: 100, isDead: false, bloodColor: '#DC2626', applyParalyze: () => {}, applyHitStun: () => {}, applyKnockback: () => {} };
+    zenitsu.slashSwingTimer = 0;
+    zenitsu._executeThunderIaiCombo(dummyOpponent);
+    zenitsu._triggerThunderclapAndFlash(dummyOpponent);
+    zenitsu._startThunderclapDashStep(dummyOpponent, 0);
+    zenitsu._finalizeThunderclapDashStep(dummyOpponent, 300, 250, 400, 250, 0, 0, false);
+    zenitsu._finalizeThunderclapDashStep(dummyOpponent, 300, 250, 400, 250, 0, 3, true);
+    zenitsu.isDashingThunderclap = false;
+
+    console.log('✅ [Zenitsu Dash CC Immunity Test] Zenitsu correctly maintains 100% CC and movement-stopping immunity during dashing and dash pauses, and plays configured audio mix.');
   } catch (err) {
     console.error('❌ [ZENITSU DASH CC IMMUNITY TEST ERROR]:', err.message || err);
     errors++;

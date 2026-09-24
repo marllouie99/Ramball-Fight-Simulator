@@ -405,7 +405,9 @@ export class ZenitsuFighter extends Fighter {
           }
 
           if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('skill_parry', 0.25);
+            const lockSfx = cfg.sounds?.lockIn || 'Assets/Sound Effects/Skills/parry.mp3';
+            const lockVol = cfg.soundVolumes?.lockIn !== undefined ? cfg.soundVolumes.lockIn : 0.35;
+            audioSystem.playSFX(lockSfx, lockVol);
           }
         }
 
@@ -503,6 +505,7 @@ export class ZenitsuFighter extends Fighter {
       dmg = Math.round(dmg * 1.5);
     }
 
+    let didHit = false;
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
     for (const ent of allEntities) {
       if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.team === this.team) continue;
@@ -519,6 +522,7 @@ export class ZenitsuFighter extends Fighter {
           applyDamageToTarget(ent, dmg, this);
           spawnSparks(ent.x, ent.y, 8, 'gold', '#F59E0B');
           spawnBloodEffect(ent.x, ent.y, ent.bloodColor || '#DC2626');
+          didHit = true;
           if (this.iaiComboCount === 2) {
             ent.applyKnockback?.(Math.cos(angle) * 22, Math.sin(angle) * 22);
           }
@@ -527,7 +531,15 @@ export class ZenitsuFighter extends Fighter {
     }
 
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('skill_dash1', 0.25);
+      const swingSfx = cfg.sounds?.katanaSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+      const swingVol = cfg.soundVolumes?.katanaSwing !== undefined ? cfg.soundVolumes.katanaSwing : 0.75;
+      audioSystem.playSFX(swingSfx, swingVol);
+
+      if (didHit) {
+        const hitSfx = cfg.sounds?.slashHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+        const hitVol = cfg.soundVolumes?.slashHit !== undefined ? cfg.soundVolumes.slashHit : 0.80;
+        audioSystem.playSFX(hitSfx, hitVol);
+      }
     }
   }
 
@@ -554,7 +566,9 @@ export class ZenitsuFighter extends Fighter {
 
     // Frame 1: calm-before-the-storm stance sound
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('skill_dash1', 0.25);
+      const stanceSfx = cfg.sounds?.stance || 'Assets/Sound Effects/Skills/dash1.mp3';
+      const stanceVol = cfg.soundVolumes?.stance !== undefined ? cfg.soundVolumes.stance : 0.30;
+      audioSystem.playSFX(stanceSfx, stanceVol);
     }
   }
 
@@ -691,8 +705,23 @@ export class ZenitsuFighter extends Fighter {
     }
     this.thunderclapDashVFXList.push(vfx);
 
+    // Dash sound mix: Play iconic Zenitsu dash noise layered with dash whoosh/SFX
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('skill_dash1', 0.35);
+      const dashNoise = cfg.sounds?.dashNoise || 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3';
+      const dashNoiseVol = cfg.soundVolumes?.dashNoise !== undefined ? cfg.soundVolumes.dashNoise : 0.85;
+      audioSystem.playSFX(dashNoise, dashNoiseVol);
+
+      const dashSFX = cfg.sounds?.dashSFX;
+      if (dashSFX) {
+        const dashSFXVol = cfg.soundVolumes?.dashSFX !== undefined ? cfg.soundVolumes.dashSFX : 0.60;
+        audioSystem.playSFX(dashSFX, dashSFXVol);
+      }
+
+      const dashWhoosh = cfg.sounds?.dashWhoosh;
+      if (dashWhoosh) {
+        const whooshVol = cfg.soundVolumes?.dashWhoosh !== undefined ? cfg.soundVolumes.dashWhoosh : 0.35;
+        audioSystem.playSFX(dashWhoosh, whooshVol);
+      }
     }
   }
 
@@ -759,7 +788,11 @@ export class ZenitsuFighter extends Fighter {
       spawnBloodEffect(hitEnt.x, hitEnt.y, hitEnt.bloodColor || '#DC2626');
 
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_parry', isFinisher ? 0.45 : 0.32);
+        const ricochetSfx = cfg.sounds?.parry || 'Assets/Sound Effects/Skills/parry.mp3';
+        const ricochetVol = isFinisher
+          ? (cfg.soundVolumes?.thunderStrike !== undefined ? cfg.soundVolumes.thunderStrike * 0.5 : 0.45)
+          : (cfg.soundVolumes?.parry !== undefined ? cfg.soundVolumes.parry : 0.32);
+        audioSystem.playSFX(ricochetSfx, ricochetVol);
       }
 
       if (isFinisher) {
@@ -769,7 +802,9 @@ export class ZenitsuFighter extends Fighter {
 
     if (isFinisher) {
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_thunderstrike', 0.45);
+        const finSfx = cfg.sounds?.thunderStrike || 'Assets/Sound Effects/Skills/thunderstrike.mp3';
+        const finVol = cfg.soundVolumes?.thunderStrike !== undefined ? cfg.soundVolumes.thunderStrike : 0.90;
+        audioSystem.playSFX(finSfx, finVol);
       }
       triggerGlobalScreenShake(7, 16);
       spawnFloatingText(this.x, this.y - 32, '霹靂一閃・四連 HEKIREKI ISSEN!', '#38BDF8');

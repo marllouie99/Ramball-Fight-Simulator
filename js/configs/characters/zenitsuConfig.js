@@ -79,4 +79,43 @@ export const zenitsuConfig = {
   ultimateDamage: 85,
   ultimateKnockback: 48,
   ultimateTimeStopFrames: 30,
+
+  // ── Audio Assets & Sound Volumes ──
+  sounds: {
+    // Basic Attack & Iai Slash
+    katanaSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    slashHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    parry: 'Assets/Sound Effects/Skills/parry.mp3',
+
+    // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
+    stance: 'Assets/Sound Effects/Skills/dash1.mp3',
+    lockIn: 'Assets/Sound Effects/Skills/parry.mp3',
+    dashNoise: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
+    dashSFX: 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
+    dashWhoosh: 'Assets/Sound Effects/Skills/dash1.mp3',
+    thunderStrike: 'Assets/Sound Effects/Skills/thunderstrike.mp3',
+
+    // Skill 2: Sixfold (Rokuren)
+    rokurenDash: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
+    rokurenSlash: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+
+    // Ultimate: Flaming Thunder God (Honoikazuchi no Kami)
+    ultimateCast: 'Assets/Sound Effects/Skills/Zenitsu-Dash-SFX.mp3',
+    ultimateImpact: 'Assets/Sound Effects/Attacks/thunderstrike.mp3'
+  },
+  soundVolumes: {
+    katanaSwing: 0.75,
+    slashHit: 0.80,
+    parry: 0.35,
+    stance: 0.30,
+    lockIn: 0.35,
+    dashNoise: 0.85,
+    dashSFX: 0.60,
+    dashWhoosh: 0.35,
+    thunderStrike: 0.90,
+    rokurenDash: 0.85,
+    ultimateCast: 1.0,
+    ultimateImpact: 1.0
+  }
 };
+
