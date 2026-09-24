@@ -584,8 +584,8 @@ export class ZenitsuFighter extends Fighter {
         const angleOffset = isFinisher ? 0 : (offsets[index] !== undefined ? offsets[index] : (index % 2 === 1 ? 0.28 : -0.28));
         angle = baseAngle + angleOffset;
       } else {
-        const altOffsets = [0, 0.6, -0.6, 0];
-        angle = (this.gunAngle || 0) + (altOffsets[index] || 0);
+        const altOffsets = [0, 2.2, -2.2, 2.2, -2.2, 2.2];
+        angle = (this.gunAngle || 0) + (altOffsets[index] || 2.2);
       }
     }
 
@@ -675,13 +675,31 @@ export class ZenitsuFighter extends Fighter {
 
     for (const hitEnt of hitEntities) {
       applyDamageToTarget(hitEnt, dmg, this);
+
+      // Apply Stun / Paralyze debuff to stop enemy entity movement
+      const stunDur = isFinisher
+        ? (cfg.thunderclapFinisherStunFrames || cfg.thunderclapStunFrames || 50)
+        : (cfg.thunderclapStunFrames || 50);
+
+      // Completely halt enemy velocity so they freeze/stop movement in place
+      hitEnt.vx = 0;
+      hitEnt.vy = 0;
+
+      if (typeof hitEnt.applyParalyze === 'function') {
+        hitEnt.applyParalyze(stunDur, { isElectric: true });
+      } else if (typeof hitEnt.applyHitStun === 'function') {
+        hitEnt.applyHitStun(stunDur, { isElectric: true });
+      } else {
+        hitEnt.paralyzeTimer = Math.max(hitEnt.paralyzeTimer || 0, stunDur);
+        hitEnt.hitStunTimer = Math.max(hitEnt.hitStunTimer || 0, stunDur);
+      }
+
       if (isFinisher) {
         hitEnt.applyKnockback?.(Math.cos(angle) * 28, Math.sin(angle) * 28);
         spawnSparks(hitEnt.x, hitEnt.y, 18, 'cyan', '#38BDF8');
         spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 35);
       } else {
-        hitEnt.applyKnockback?.(Math.cos(angle) * 8, Math.sin(angle) * 8);
-        spawnSparks(hitEnt.x, hitEnt.y, 8, 'cyan', '#38BDF8');
+        spawnSparks(hitEnt.x, hitEnt.y, 10, 'cyan', '#38BDF8');
         spawnImpactFlash(hitEnt.x, hitEnt.y, '#38BDF8', 18);
       }
     }
