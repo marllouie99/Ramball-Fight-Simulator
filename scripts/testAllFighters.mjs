@@ -9006,7 +9006,15 @@ async function main() {
     }
     zenitsu.interruptAttacks(true);
 
-    // 11.6.4 Consecutive 4-Dash Execution, Stance Persistence & Pass-Through Test
+    // 11.6.4 Consecutive 4-Dash Wall-to-Wall Execution, Stance Persistence & Pass-Through Test
+    const wallHit = zenitsu._getArenaWallIntersection(300, 300, 0);
+    const arena = state.arena || { x: 0, y: 0, width: 1000, height: 700 };
+    const pad = (zenitsu.r || 25) + 8;
+    const expectedMaxX = (arena.x || 0) + (arena.width || 1000) - pad;
+    if (Math.abs(wallHit.destX - expectedMaxX) > 1.0) {
+      throw new Error(`Zenitsu _getArenaWallIntersection failed to reach right wall! Expected ${expectedMaxX}, got ${wallHit.destX}`);
+    }
+
     zenitsu.thunderclapTotalDashes = 4;
     zenitsu.thunderclapDashDuration = 5;
     zenitsu._executeThunderclapDash(null);

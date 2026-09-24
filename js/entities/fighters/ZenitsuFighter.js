@@ -279,6 +279,8 @@ export class ZenitsuFighter extends Fighter {
         }
 
         const isFinisher = (this.thunderclapDashIndex >= this.thunderclapTotalDashes - 1);
+        spawnSparks(this.x, this.y, isFinisher ? 14 : 6, 'cyan', '#38BDF8');
+        spawnImpactFlash(this.x, this.y, '#38BDF8', isFinisher ? 25 : 12);
         this._finalizeThunderclapDashStep(
           this.thunderclapDashTarget,
           this.thunderclapDashStartX,
@@ -510,6 +512,50 @@ export class ZenitsuFighter extends Fighter {
     this._startThunderclapDashStep(target, 0);
   }
 
+  _getArenaWallIntersection(startX, startY, angle) {
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG?.arena || { x: 0, y: 0, width: 1000, height: 700 });
+    const pad = (this.r || 25) + 8;
+    const minX = (arena.x || 0) + pad;
+    const maxX = (arena.x || 0) + (arena.width || 1000) - pad;
+    const minY = (arena.y || 0) + pad;
+    const maxY = (arena.y || 0) + (arena.height || 700) - pad;
+
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    let tMin = Infinity;
+
+    // Check vertical walls (X boundaries)
+    if (cosA > 1e-5) {
+      const t = (maxX - startX) / cosA;
+      if (t > 8 && t < tMin) tMin = t;
+    } else if (cosA < -1e-5) {
+      const t = (minX - startX) / cosA;
+      if (t > 8 && t < tMin) tMin = t;
+    }
+
+    // Check horizontal walls (Y boundaries)
+    if (sinA > 1e-5) {
+      const t = (maxY - startY) / sinA;
+      if (t > 8 && t < tMin) tMin = t;
+    } else if (sinA < -1e-5) {
+      const t = (minY - startY) / sinA;
+      if (t > 8 && t < tMin) tMin = t;
+    }
+
+    if (!Number.isFinite(tMin) || tMin <= 0) {
+      tMin = 260; // Safe fallback
+    }
+
+    let destX = startX + cosA * tMin;
+    let destY = startY + sinA * tMin;
+
+    destX = Math.max(minX, Math.min(maxX, destX));
+    destY = Math.max(minY, Math.min(maxY, destY));
+
+    const dist = Math.hypot(destX - startX, destY - startY);
+    return { destX, destY, dist };
+  }
+
   _startThunderclapDashStep(target, index) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     this.slashSwingTimer = this.slashSwingMaxTimer;
@@ -520,45 +566,34 @@ export class ZenitsuFighter extends Fighter {
     const startX = this.x;
     const startY = this.y;
     let angle;
-    let dashDist;
 
     if (index === 0) {
-      // Dash 1: Follows committed locked charge angle
+      // Dash 1: Follows committed locked charge angle all the way to the arena wall
       angle = this.skillCastAngle;
-      dashDist = this.thunderclapLockedDistance || 260;
     } else {
-      // Dashes 2, 3, 4: Dynamic zig-zag targeting around nearest target
+      // Dashes 2, 3, 4: Rebound from wall, slicing through nearest target across to the next wall
       const curTarget = this.getNearestTarget(target);
       if (curTarget && curTarget.hp > 0 && !curTarget.isDead) {
         const dx = curTarget.x - startX;
         const dy = curTarget.y - startY;
         const baseAngle = Math.atan2(dy, dx);
-        const tDist = Math.hypot(dx, dy);
 
-        // Dynamic zig-zag offset angles for 4-fold star pattern
-        const offsets = [0, 0.65, -0.75, 0];
-        const angleOffset = offsets[index] !== undefined ? offsets[index] : (index % 2 === 1 ? 0.65 : -0.65);
+        // Zig-zag cross angle offsets (finisher dash pierces dead center through target)
+        const isFinisher = (index === this.thunderclapTotalDashes - 1);
+        const offsets = [0, 0.28, -0.32, 0];
+        const angleOffset = isFinisher ? 0 : (offsets[index] !== undefined ? offsets[index] : (index % 2 === 1 ? 0.28 : -0.28));
         angle = baseAngle + angleOffset;
-        const extraDist = index === (this.thunderclapTotalDashes - 1) ? 75 : 55;
-        dashDist = Math.max(160, Math.min(460, tDist + (curTarget.r || 25) + extraDist));
       } else {
-        const altOffsets = [0, 0.8, -0.8, 0];
+        const altOffsets = [0, 0.6, -0.6, 0];
         angle = (this.gunAngle || 0) + (altOffsets[index] || 0);
-        dashDist = 240;
       }
     }
 
-    let destX = startX + Math.cos(angle) * dashDist;
-    let destY = startY + Math.sin(angle) * dashDist;
-
-    // Clamp destination to arena bounds
-    if (state.arena) {
-      const pad = (this.r || 25) + 12;
-      destX = Math.max(state.arena.x + pad, Math.min(state.arena.x + state.arena.width - pad, destX));
-      destY = Math.max(state.arena.y + pad, Math.min(state.arena.y + state.arena.height - pad, destY));
-    }
-
-    const actualDashDist = Math.hypot(destX - startX, destY - startY);
+    // Compute direct wall intersection so dash travels all the way to the arena boundary wall
+    const wallHit = this._getArenaWallIntersection(startX, startY, angle);
+    const destX = wallHit.destX;
+    const destY = wallHit.destY;
+    const actualDashDist = wallHit.dist;
 
     this.gunAngle = angle;
     this.angle = angle;
