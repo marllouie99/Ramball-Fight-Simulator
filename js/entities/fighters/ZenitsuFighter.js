@@ -51,7 +51,7 @@ export class ZenitsuFighter extends Fighter {
     this.hideBackHand = false;
     this.iaiComboCount = 0;
     this.inBattleTrance = false;
-    this._activeDashSounds = [];
+    this._intermediateDashSounds = [];
 
     // Skill 1: Thunderclap and Flash (Hekireki Issen)
     this.thunderclapCooldownMax = cfg.thunderclapCooldown || 228;
@@ -265,38 +265,42 @@ export class ZenitsuFighter extends Fighter {
     return super.isCaughtInBeam ? super.isCaughtInBeam() : false;
   }
 
-  _playDashSound(src, volume = 1.0, speed = 1.0) {
+  _playIntermediateDashSound(src, volume = 1.0, speed = 1.0) {
     if (!src) return null;
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
       const handle = audioSystem.playSFX(src, volume, speed);
       if (handle) {
-        if (!Array.isArray(this._activeDashSounds)) {
-          this._activeDashSounds = [];
+        if (!Array.isArray(this._intermediateDashSounds)) {
+          this._intermediateDashSounds = [];
         }
-        this._activeDashSounds.push(handle);
+        this._intermediateDashSounds.push(handle);
       }
       return handle;
     }
     return null;
   }
 
-  _fadeOutAllDashAudio(fadeMs = 120) {
+  _fadeOutIntermediateDashAudio(fadeMs = 100) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     const fadeDuration = cfg?.dashAudioFadeOutMs !== undefined ? cfg.dashAudioFadeOutMs : fadeMs;
 
-    if (Array.isArray(this._activeDashSounds)) {
-      for (const handle of this._activeDashSounds) {
+    if (Array.isArray(this._intermediateDashSounds)) {
+      for (const handle of this._intermediateDashSounds) {
         if (handle) {
           fadeOutSound(handle, fadeDuration);
         }
       }
-      this._activeDashSounds = [];
+      this._intermediateDashSounds = [];
     }
 
     fadeOutSoundBySrc('Zenitsu-dash-noise', fadeDuration);
     fadeOutSoundBySrc('Zenitsu-Dash-SFX', fadeDuration);
-    fadeOutSoundBySrc('Zenitsu-dash2', fadeDuration);
-    fadeOutSoundBySrc('zenitsu', fadeDuration);
+  }
+
+  _fadeOutAllDashAudio(fadeMs = 80) {
+    this._fadeOutIntermediateDashAudio(fadeMs);
+    fadeOutSoundBySrc('Zenitsu-dash2', fadeMs);
+    fadeOutSoundBySrc('zenitsu', fadeMs);
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -406,8 +410,8 @@ export class ZenitsuFighter extends Fighter {
           this.vy = Math.sin(this.thunderclapDashAngle) * dashSpeed;
           this.thunderclapCooldown = this.thunderclapCooldownMax;
 
-          // The moment all dashes are used, fast fade out all dash audio so it does not linger
-          this._fadeOutAllDashAudio(cfg.dashAudioFadeOutMs || 120);
+          // Fade out intermediate travel noise, but let the last dash (Zenitsu-dash2 / finisher) play in full!
+          this._fadeOutIntermediateDashAudio(cfg.dashAudioFadeOutMs || 100);
         }
       }
       return;
@@ -745,21 +749,26 @@ export class ZenitsuFighter extends Fighter {
     }
     this.thunderclapDashVFXList.push(vfx);
 
+    // Fade out previous intermediate dash noises when starting the next dash so sound is crisp
+    if (index > 0) {
+      this._fadeOutIntermediateDashAudio(60);
+    }
+
     // Dash sound mix: Play iconic Zenitsu dash noise layered with dash whoosh/SFX
     const dashNoise = cfg.sounds?.dashNoise || 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3';
     const dashNoiseVol = cfg.soundVolumes?.dashNoise !== undefined ? cfg.soundVolumes.dashNoise : 0.85;
-    this._playDashSound(dashNoise, dashNoiseVol);
+    this._playIntermediateDashSound(dashNoise, dashNoiseVol);
 
     const dashSFX = cfg.sounds?.dashSFX;
     if (dashSFX) {
       const dashSFXVol = cfg.soundVolumes?.dashSFX !== undefined ? cfg.soundVolumes.dashSFX : 0.60;
-      this._playDashSound(dashSFX, dashSFXVol);
+      this._playIntermediateDashSound(dashSFX, dashSFXVol);
     }
 
     const dashWhoosh = cfg.sounds?.dashWhoosh;
     if (dashWhoosh) {
       const whooshVol = cfg.soundVolumes?.dashWhoosh !== undefined ? cfg.soundVolumes.dashWhoosh : 0.35;
-      this._playDashSound(dashWhoosh, whooshVol);
+      this._playIntermediateDashSound(dashWhoosh, whooshVol);
     }
   }
 
@@ -839,9 +848,12 @@ export class ZenitsuFighter extends Fighter {
     }
 
     if (isFinisher) {
+      // Last dash impact audio: Plays Zenitsu-dash2.mp3 to completion without being cut off
       const finSfx = cfg.sounds?.thunderStrike || 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3';
       const finVol = cfg.soundVolumes?.thunderStrike !== undefined ? cfg.soundVolumes.thunderStrike : 0.90;
-      this._playDashSound(finSfx, finVol);
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX(finSfx, finVol);
+      }
       triggerGlobalScreenShake(7, 16);
       spawnFloatingText(this.x, this.y - 32, '霹靂一閃・四連 HEKIREKI ISSEN!', '#38BDF8');
     } else {
