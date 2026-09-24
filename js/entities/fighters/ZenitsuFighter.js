@@ -307,7 +307,6 @@ export class ZenitsuFighter extends Fighter {
     if (!forceCancelAll && (this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0)) {
       return; // Dashing state is unstoppable; transient hit interrupts do not break consecutive dashes
     }
-    this._fadeOutAllDashAudio(80);
     if (typeof super.interruptAttacks === 'function') {
       super.interruptAttacks(forceCancelAll);
     }
@@ -319,6 +318,7 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapDashIndex = 0;
     this.thunderclapDashPauseTimer = 0;
     if (forceCancelAll) {
+      this._fadeOutAllDashAudio(80);
       this.thunderclapDashVFX = null;
       this.thunderclapDashVFXList = [];
     }
@@ -409,9 +409,6 @@ export class ZenitsuFighter extends Fighter {
           this.vx = Math.cos(this.thunderclapDashAngle) * dashSpeed;
           this.vy = Math.sin(this.thunderclapDashAngle) * dashSpeed;
           this.thunderclapCooldown = this.thunderclapCooldownMax;
-
-          // Fade out intermediate travel noise, but let the last dash (Zenitsu-dash2 / finisher) play in full!
-          this._fadeOutIntermediateDashAudio(cfg.dashAudioFadeOutMs || 100);
         }
       }
       return;
@@ -749,12 +746,7 @@ export class ZenitsuFighter extends Fighter {
     }
     this.thunderclapDashVFXList.push(vfx);
 
-    // Fade out previous intermediate dash noises when starting the next dash so sound is crisp
-    if (index > 0) {
-      this._fadeOutIntermediateDashAudio(60);
-    }
-
-    // Dash sound mix: Play iconic Zenitsu dash noise layered with dash whoosh/SFX
+    // Dash sound mix: Play iconic Zenitsu dash noise layered with dash whoosh/SFX in full
     const dashNoise = cfg.sounds?.dashNoise || 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3';
     const dashNoiseVol = cfg.soundVolumes?.dashNoise !== undefined ? cfg.soundVolumes.dashNoise : 0.85;
     this._playIntermediateDashSound(dashNoise, dashNoiseVol);
