@@ -170,6 +170,73 @@ export class FighterRenderer {
       ctx.restore();
     }
 
+    // Radiant Electric Bloom from nearby Zenitsu Lightning Dash (matching Hyperion beam bloom intensity)
+    if (typeof state !== 'undefined' && state.fighters && !isMatchEnded && fighter.characterId !== 'zenitsu' && fighter.hp > 0 && !fighter._isWinnerReveal && !fighter._isFaceOff) {
+      for (let zi = 0; zi < state.fighters.length; zi++) {
+        const z = state.fighters[zi];
+        if (!z || z.hp <= 0 || z.characterId !== 'zenitsu' || !z.thunderclapDashVFX) continue;
+        const vfx = z.thunderclapDashVFX;
+        if (vfx.timer >= vfx.maxTimer) continue;
+
+        const startX = vfx.startX;
+        const startY = vfx.startY;
+        const headX = (z.isDashingThunderclap && z.x !== undefined) ? z.x : (vfx.destX ?? (startX + Math.cos(vfx.angle || 0) * (vfx.dist || 260)));
+        const headY = (z.isDashingThunderclap && z.y !== undefined) ? z.y : (vfx.destY ?? (startY + Math.sin(vfx.angle || 0) * (vfx.dist || 260)));
+        const dx = headX - startX;
+        const dy = headY - startY;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq <= 16) continue;
+
+        const entX = fighter.x;
+        const entY = fighter.y - (fighter.z || 0);
+        const t = Math.max(0, Math.min(1, ((entX - startX) * dx + (entY - startY) * dy) / lenSq));
+        const projX = startX + t * dx;
+        const projY = startY + t * dy;
+        const dist = Math.hypot(entX - projX, entY - projY);
+        const maxLightDist = baseRadius + 140;
+
+        if (dist < maxLightDist) {
+          const travelDuration = vfx.travelDuration ?? 6;
+          const lingerDuration = vfx.lingerDuration ?? 8;
+          const lingerEnd = travelDuration + lingerDuration;
+          let vfxAlpha = 1.0;
+          if (vfx.timer >= lingerEnd) {
+            const disappearTimer = vfx.timer - lingerEnd;
+            const disappearTotal = Math.max(1, vfx.maxTimer - lingerEnd);
+            vfxAlpha = Math.max(0, 1.0 - (disappearTimer / disappearTotal));
+          }
+
+          const intensity = Math.pow(1.0 - (dist / maxLightDist), 0.85) * vfxAlpha;
+          if (intensity > 0.02) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            // 1. Massive Radial Bloom around the fighter (matches Hyperion's beam bloom radius and intensity)
+            const bloomRadius = baseRadius * 3.0;
+            const hitGlow = ctx.createRadialGradient(0, 0, baseRadius * 0.15, 0, 0, bloomRadius);
+            hitGlow.addColorStop(0, `rgba(255, 255, 255, ${(0.95 + Math.random() * 0.05) * intensity})`);
+            hitGlow.addColorStop(0.22, `rgba(224, 242, 254, ${0.90 * intensity})`);
+            hitGlow.addColorStop(0.50, `rgba(0, 229, 255, ${0.75 * intensity})`);
+            hitGlow.addColorStop(0.78, `rgba(2, 132, 199, ${0.35 * intensity})`);
+            hitGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = hitGlow;
+            ctx.beginPath();
+            ctx.arc(0, 0, bloomRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. White-Hot Core High-Voltage Wash
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.75 * intensity})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, baseRadius * 0.95, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+          }
+        }
+      }
+    }
+
     // Process all declarative status overlays from registry
     for (let i = 0; i < STATUS_OVERLAY_REGISTRY.length; i++) {
       const entry = STATUS_OVERLAY_REGISTRY[i];

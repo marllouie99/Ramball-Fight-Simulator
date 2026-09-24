@@ -314,6 +314,7 @@ export function isZenitsuThunderclapBurst(total, elapsed) {
  * Renders the clean sprite sheet frames on active sporadic bursts.
  * Rule 11 (Zero shadowBlur) & Rule 2.4 (Stack integrity) compliant.
  */
+// Charge Sprite
 function _drawThunderclapChargeSprite(ctx, r, burst, jitterX = 0, jitterY = 0) {
   const lightningImg = _getZenitsuLightningSpriteImage();
   if (!lightningImg || !lightningImg.complete || lightningImg.naturalWidth <= 0) {
@@ -337,6 +338,65 @@ function _drawThunderclapChargeSprite(ctx, r, burst, jitterX = 0, jitterY = 0) {
     ctx.scale(-1, 1);
   }
 
+  const isDark = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+  const alpha = burst.alpha || 1.0;
+
+  // ── TIER 1: BASE CRISP PNG SPRITE PASS (Solid source-over for 100% sharpness & contrast) ──
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = Math.min(1.0, alpha);
+  ctx.drawImage(
+    lightningImg,
+    frame.sx, frame.sy, frame.sw, frame.sh,
+    -drawW / 2, -drawH / 2,
+    drawW, drawH
+  );
+  ctx.restore();
+
+  // ── TIER 2: ADDITIVE ELECTRIC CORONA BLOOM (Tight edge aura in lighter mode) ──
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Outer Electric Cyan Corona (4 samples @ 5px)
+  const outerRadius = Math.max(3, Math.min(7, r * 0.24 * (burst.intensity || 0.8)));
+  const outerAlpha = (isDark ? 0.12 : 0.08) * alpha;
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2 + (Math.PI / 4);
+    const ox = Math.cos(ang) * outerRadius;
+    const oy = Math.sin(ang) * outerRadius;
+    ctx.globalAlpha = outerAlpha;
+    ctx.drawImage(
+      lightningImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawW / 2 + ox, -drawH / 2 + oy,
+      drawW, drawH
+    );
+  }
+
+  // Tight Electric Rim (4 samples @ 2.5px)
+  const innerRadius = Math.max(1.5, outerRadius * 0.45);
+  const innerAlpha = (isDark ? 0.20 : 0.14) * alpha;
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2;
+    const ox = Math.cos(ang) * innerRadius;
+    const oy = Math.sin(ang) * innerRadius;
+    ctx.globalAlpha = innerAlpha;
+    ctx.drawImage(
+      lightningImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawW / 2 + ox, -drawH / 2 + oy,
+      drawW, drawH
+    );
+  }
+
+  // ── TIER 3: ADDITIVE WHITE-HOT CORE PASS (1:1 aligned core glint) ──
+  ctx.globalAlpha = Math.min(1.0, alpha * (isDark ? 0.38 : 0.28));
   ctx.drawImage(
     lightningImg,
     frame.sx, frame.sy, frame.sw, frame.sh,
@@ -344,17 +404,18 @@ function _drawThunderclapChargeSprite(ctx, r, burst, jitterX = 0, jitterY = 0) {
     drawW, drawH
   );
 
-  // Additive blinding flash layer on peak overdrive frames
+  // Blinding overdrive flash on peak burst frames
   if (burst.isDoubleFlash) {
-    ctx.globalAlpha = Math.min(1.0, (burst.alpha || 1.0) * 0.50);
+    ctx.globalAlpha = Math.min(1.0, alpha * 0.35);
     ctx.drawImage(
       lightningImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
-      -(drawW * 1.06) / 2, -(drawH * 1.06) / 2,
-      drawW * 1.06, drawH * 1.06
+      -drawW / 2, -drawH / 2,
+      drawW, drawH
     );
   }
 
+  ctx.restore();
   ctx.restore();
   return true;
 }
@@ -402,8 +463,25 @@ function _drawThunderclapChargeVFX(ctx, r, progress, elapsed = 0, total = 100, j
 
   ctx.save();
 
-  // 1. Jagged Ground Static Arcs under feet (only during active burst!)
+  // 0. Radiant Floor / Ground Lighting Wash around Zenitsu's stance during active lightning surge
   const feetY = r * 0.85;
+  const groundRadius = Math.max(48, r * (2.4 + (burst.intensity || 0.8) * 1.2));
+  const groundGlow = ctx.createRadialGradient(jitterX, feetY * 0.4 + jitterY, 0, jitterX, feetY * 0.4 + jitterY, groundRadius);
+  const gIntensity = 0.65 * (burst.intensity || 0.8) * (burst.alpha || 1.0);
+  groundGlow.addColorStop(0, `rgba(255, 255, 255, ${gIntensity * 0.95})`);
+  groundGlow.addColorStop(0.20, `rgba(224, 242, 254, ${gIntensity * 0.85})`);
+  groundGlow.addColorStop(0.45, `rgba(0, 229, 255, ${gIntensity * 0.70})`);
+  groundGlow.addColorStop(0.75, `rgba(2, 132, 199, ${gIntensity * 0.30})`);
+  groundGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = groundGlow;
+  ctx.beginPath();
+  ctx.arc(jitterX, feetY * 0.4 + jitterY, groundRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 1. Jagged Ground Static Arcs under feet (only during active burst!)
   const spread = r * (0.75 + 0.35 * (burst.intensity || 0.8));
   ctx.globalAlpha = Math.min(1.0, burst.alpha || 1.0);
 
@@ -545,6 +623,12 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
     )
   );
 
+  // ── LAYER -1: PROXIMITY ENTITY LIGHTING & BLOOM ──
+  // Casts an additive electric cyan directional specular highlight and rim arc on nearby entities
+  if (currentDist > 8 && alpha > 0.05) {
+    _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, alpha, isDark, fighter, vfx.timer);
+  }
+
   ctx.save();
   ctx.translate(startX, startY);
   ctx.rotate(angle);
@@ -553,87 +637,281 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
     ? (_getZenitsuDashDisappearanceImage() || _getZenitsuDashSpriteImage())
     : _getZenitsuDashSpriteImage();
 
-  // ── 1. THUNDERCLAP ARRIVAL IMPACT RADIAL BLOOM ──
-  // Concentric radial electric flash at Zenitsu's destination landing point (Zero stick / capsule geometry)
-  if (!isDisappearancePhase && frameIdx >= 2) {
+  // ── LAYER 0: AMBIENT FLOOR / GROUND LIGHTING WASH ──
+  // Casts a soft, continuous pool of radiant electric cyan illumination onto the arena floor beneath the dash
+  if (drawW > 6 && alpha > 0.05) {
     ctx.save();
-    ctx.globalCompositeOperation = isDark ? 'lighter' : 'source-over';
-    const hitRadius = Math.max(12, r * 1.5 * alpha);
-    const hitGlow = ctx.createRadialGradient(drawW, 0, r * 0.15, drawW, 0, hitRadius);
-    hitGlow.addColorStop(0, `rgba(255, 255, 255, ${0.90 * alpha})`);
-    hitGlow.addColorStop(0.35, isDark ? `rgba(0, 230, 255, ${0.60 * alpha})` : `rgba(0, 210, 255, ${0.50 * alpha})`);
-    hitGlow.addColorStop(1, 'rgba(0, 120, 255, 0)');
-    ctx.fillStyle = hitGlow;
-    ctx.beginPath();
-    ctx.arc(drawW, 0, hitRadius, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    const groundNodes = Math.max(3, Math.min(8, Math.round(drawW / 45)));
+    const groundLightRadius = Math.max(36, Math.min(85, r * 2.6));
+    const groundIntensity = (isDark ? 0.28 : 0.20) * alpha;
+
+    for (let i = 0; i < groundNodes; i++) {
+      const t = groundNodes === 1 ? 0.5 : i / (groundNodes - 1);
+      const nx = t * drawW;
+      const ny = Math.sin(t * Math.PI) * (drawH * 0.06);
+      const nodeR = groundLightRadius * (0.85 + Math.sin(t * Math.PI) * 0.30);
+
+      const groundGlow = ctx.createRadialGradient(nx, ny, 0, nx, ny, nodeR);
+      groundGlow.addColorStop(0, `rgba(0, 229, 255, ${groundIntensity * 1.0})`);
+      groundGlow.addColorStop(0.35, isDark ? `rgba(2, 132, 199, ${groundIntensity * 0.55})` : `rgba(14, 165, 233, ${groundIntensity * 0.45})`);
+      groundGlow.addColorStop(0.70, isDark ? `rgba(3, 105, 161, ${groundIntensity * 0.20})` : `rgba(2, 132, 199, ${groundIntensity * 0.15})`);
+      groundGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = groundGlow;
+      ctx.beginPath();
+      ctx.arc(nx, ny, nodeR, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
-  // ── 2. OVERLAY PNG LIGHTNING BOLT SPRITE ──
   if (dashImg && dashImg.complete && dashImg.naturalWidth > 0) {
-    if (!isDark) {
-      // Light Mode: Draw glowing lightning asset directly over the bloom beam in source-over
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = Math.min(1.0, Math.max(0, alpha));
-      ctx.drawImage(
-        dashImg,
-        frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
-        0, -drawH / 2,
-        drawW, drawH
-      );
-      ctx.restore();
+    // ── TIER 1: BASE CRISP PNG SPRITE PASS (Solid source-over for 100% sharpness & contrast) ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = Math.min(1.0, alpha);
+    ctx.drawImage(
+      dashImg,
+      frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
+      0, -drawH / 2,
+      drawW, drawH
+    );
+    ctx.restore();
 
-      // Core luminosity reinforcement for extra crispness
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = Math.min(1.0, alpha * 0.40);
-      ctx.drawImage(
-        dashImg,
-        frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
-        0, -drawH / 2,
-        drawW, drawH
-      );
-      ctx.restore();
-    } else {
-      // Dark Mode: Base layer in source-over + additive pass in lighter
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = Math.min(1.0, Math.max(0, alpha * 0.85));
-      ctx.drawImage(
-        dashImg,
-        frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
-        0, -drawH / 2,
-        drawW, drawH
-      );
-      ctx.restore();
+    // ── TIER 2: ADDITIVE ELECTRIC CORONA BLOOM (Tight edge aura in lighter mode) ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
 
-      // Additive bloom pass in lighter
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = Math.min(1.0, alpha * 0.60);
+    // Outer Electric Cyan Corona (4 samples @ 6px)
+    const outerRadius = Math.max(3, Math.min(8, r * 0.28));
+    const outerAlpha = (isDark ? 0.10 : 0.07) * alpha;
+    for (let i = 0; i < 4; i++) {
+      const ang = (i / 4) * Math.PI * 2 + (Math.PI / 4);
+      const ox = Math.cos(ang) * outerRadius;
+      const oy = Math.sin(ang) * outerRadius;
+      ctx.globalAlpha = outerAlpha;
       ctx.drawImage(
         dashImg,
         frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
-        0, -drawH / 2,
+        ox, -drawH / 2 + oy,
         drawW, drawH
       );
-
-      // Peak flash on arrival / air linger
-      if (!isDisappearancePhase && (frameIdx === 3 || frameIdx === 2)) {
-        ctx.globalAlpha = Math.min(1.0, alpha * 0.35);
-        ctx.drawImage(
-          dashImg,
-          frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
-          0, -drawH / 2,
-          drawW, drawH
-        );
-      }
-      ctx.restore();
     }
+
+    // Tight Electric Rim (4 samples @ 2.5px)
+    const innerRadius = Math.max(1.5, outerRadius * 0.45);
+    const innerAlpha = (isDark ? 0.18 : 0.12) * alpha;
+    for (let i = 0; i < 4; i++) {
+      const ang = (i / 4) * Math.PI * 2;
+      const ox = Math.cos(ang) * innerRadius;
+      const oy = Math.sin(ang) * innerRadius;
+      ctx.globalAlpha = innerAlpha;
+      ctx.drawImage(
+        dashImg,
+        frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
+        ox, -drawH / 2 + oy,
+        drawW, drawH
+      );
+    }
+
+    // ── TIER 3: ADDITIVE WHITE-HOT CORE PASS (1:1 aligned core glint) ──
+    ctx.globalAlpha = Math.min(1.0, alpha * (isDark ? 0.40 : 0.28));
+    ctx.drawImage(
+      dashImg,
+      frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
+      0, -drawH / 2,
+      drawW, drawH
+    );
+
+    // Peak Flash on Arrival / Searing Air Linger
+    if (!isDisappearancePhase && (frameIdx === 3 || frameIdx === 2)) {
+      ctx.globalAlpha = Math.min(1.0, alpha * 0.30);
+      ctx.drawImage(
+        dashImg,
+        frameDef.sx, frameDef.sy, frameDef.sw, frameDef.sh,
+        0, -drawH / 2,
+        drawW, drawH
+      );
+    }
+    ctx.restore();
   } else {
     _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisappearancePhase, isDark);
+  }
+
+  // Subtle electrical arrival spark flecks during disappearance
+  if (isDisappearancePhase && alpha > 0.15) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const sparkCount = 6;
+    for (let i = 0; i < sparkCount; i++) {
+      const seed = i * 47 + Math.floor(vfx.timer * 7);
+      const px = ((seed % 100) / 100) * drawW;
+      const py = ((seed % 13) - 6) * (drawH * 0.06);
+      ctx.fillStyle = (i % 2 === 0) ? `rgba(255, 255, 255, ${0.75 * alpha})` : `rgba(56, 189, 248, ${0.60 * alpha})`;
+      ctx.fillRect(px, py, 2, 2);
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders directional electric bloom & rim lighting on entities near Zenitsu's lightning dash path.
+ * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
+ */
+function _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, alpha, isDark, excludeFighter = null, vfxTimer = 0) {
+  if (!ctx || alpha <= 0.05) return;
+
+  const segDx = headX - startX;
+  const segDy = headY - startY;
+  const segLenSq = segDx * segDx + segDy * segDy;
+  if (segLenSq < 16) return;
+
+  const entities = [];
+  if (typeof state !== 'undefined') {
+    if (Array.isArray(state.fighters)) entities.push(...state.fighters);
+    if (Array.isArray(state.illusions)) entities.push(...state.illusions);
+  }
+  if (entities.length === 0) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (let i = 0; i < entities.length; i++) {
+    const ent = entities[i];
+    if (!ent || ent === excludeFighter || ent.hp <= 0 || ent.isDead) continue;
+    if (ent._isWinnerReveal || ent._isFaceOff || ent.hideHpText) continue;
+
+    const entX = ent.x;
+    const entY = ent.y - (ent.z || 0);
+    const entR = ent.r || 25;
+
+    // Point-to-segment projection from entity center to dash trajectory
+    const t = Math.max(0, Math.min(1, ((entX - startX) * segDx + (entY - startY) * segDy) / segLenSq));
+    const projX = startX + t * segDx;
+    const projY = startY + t * segDy;
+    const dist = Math.hypot(entX - projX, entY - projY);
+
+    const maxReach = entR + 140;
+    if (dist >= maxReach) continue;
+
+    // Smooth proximity falloff (matches Hyperion laser beam distance curve)
+    const prox = Math.pow(1.0 - (dist / maxReach), 0.85);
+    const intensity = prox * alpha;
+    if (intensity <= 0.01) continue;
+
+    const lightAngle = Math.atan2(projY - entY, projX - entX);
+
+    // 1. Massive Radial Electric Bloom around entity (matches Hyperion beam bloom)
+    const gradR = entR * 3.0;
+    const bodyGlow = ctx.createRadialGradient(entX, entY, entR * 0.15, entX, entY, gradR);
+    bodyGlow.addColorStop(0, `rgba(255, 255, 255, ${(0.95 + Math.random() * 0.05) * intensity})`);
+    bodyGlow.addColorStop(0.22, `rgba(224, 242, 254, ${0.90 * intensity})`);
+    bodyGlow.addColorStop(0.50, `rgba(0, 229, 255, ${(isDark ? 0.85 : 0.75) * intensity})`);
+    bodyGlow.addColorStop(0.78, isDark ? `rgba(2, 132, 199, ${0.40 * intensity})` : `rgba(14, 165, 233, ${0.30 * intensity})`);
+    bodyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = bodyGlow;
+    ctx.beginPath();
+    ctx.arc(entX, entY, gradR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. White-Hot Core High-Voltage Wash
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.75 * intensity})`;
+    ctx.beginPath();
+    ctx.arc(entX, entY, entR * 0.95, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. High-Voltage Directional Electric Rim Arc
+    const rimWidth = Math.max(1.8, Math.min(3.6, entR * 0.12));
+    ctx.strokeStyle = `rgba(0, 229, 255, ${intensity * 0.95})`;
+    ctx.lineWidth = rimWidth;
+    ctx.beginPath();
+    ctx.arc(entX, entY, entR + 1.2, lightAngle - Math.PI * 0.45, lightAngle + Math.PI * 0.45);
+    ctx.stroke();
+
+    // White-hot inner specular crest
+    ctx.strokeStyle = `rgba(255, 255, 255, ${intensity * 0.98})`;
+    ctx.lineWidth = Math.max(1.2, rimWidth * 0.55);
+    ctx.beginPath();
+    ctx.arc(entX, entY, entR + 0.6, lightAngle - Math.PI * 0.25, lightAngle + Math.PI * 0.25);
+    ctx.stroke();
+
+    // 3. Close-Proximity Micro-Spark Flecks
+    if (dist <= entR + 42 && alpha > 0.35) {
+      const sparkCount = 2;
+      for (let s = 0; s < sparkCount; s++) {
+        const seed = Math.floor(vfxTimer * 5 + entX * 7 + s * 19);
+        const sparkOffset = ((seed % 100) / 100 - 0.5) * 0.7;
+        const sparkAng = lightAngle + sparkOffset;
+        const spDist = entR + 2.5 + ((seed % 5) - 2);
+        const spX = entX + Math.cos(sparkAng) * spDist;
+        const spY = entY + Math.sin(sparkAng) * spDist;
+        ctx.fillStyle = (s === 0) ? `rgba(255, 255, 255, ${intensity * 0.95})` : `rgba(56, 189, 248, ${intensity * 0.85})`;
+        ctx.fillRect(spX - 1, spY - 1, 2, 2);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders ambient proximity electric lighting on nearby entities during Zenitsu's charging stance bursts.
+ * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
+ */
+function _drawZenitsuChannelingEntityLighting(ctx, zenX, zenY, burst, isDark, excludeFighter = null) {
+  if (!ctx || !burst) return;
+  const entities = [];
+  if (typeof state !== 'undefined') {
+    if (Array.isArray(state.fighters)) entities.push(...state.fighters);
+    if (Array.isArray(state.illusions)) entities.push(...state.illusions);
+  }
+  if (entities.length === 0) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (let i = 0; i < entities.length; i++) {
+    const ent = entities[i];
+    if (!ent || ent === excludeFighter || ent.hp <= 0 || ent.isDead) continue;
+    if (ent._isWinnerReveal || ent._isFaceOff || ent.hideHpText) continue;
+
+    const entX = ent.x;
+    const entY = ent.y - (ent.z || 0);
+    const entR = ent.r || 25;
+    const dist = Math.hypot(entX - zenX, entY - zenY);
+    const maxReach = entR + 75;
+    if (dist >= maxReach) continue;
+
+    const prox = Math.pow(1.0 - (dist / maxReach), 1.25);
+    const intensity = prox * (burst.intensity || 0.8) * (burst.alpha || 1.0) * (isDark ? 0.45 : 0.32);
+    if (intensity <= 0.01) continue;
+
+    const lightAngle = Math.atan2(zenY - entY, zenX - entX);
+    const hx = entX + Math.cos(lightAngle) * (entR * 0.35);
+    const hy = entY + Math.sin(lightAngle) * (entR * 0.35);
+    const gradR = entR * 1.25;
+
+    const bodyGlow = ctx.createRadialGradient(hx, hy, 0, entX, entY, gradR);
+    bodyGlow.addColorStop(0, `rgba(255, 255, 255, ${intensity * 0.75})`);
+    bodyGlow.addColorStop(0.35, `rgba(0, 229, 255, ${intensity * 0.60})`);
+    bodyGlow.addColorStop(0.70, isDark ? `rgba(2, 132, 199, ${intensity * 0.25})` : `rgba(14, 165, 233, ${intensity * 0.18})`);
+    bodyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = bodyGlow;
+    ctx.beginPath();
+    ctx.arc(entX, entY, gradR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Directional rim arc
+    ctx.strokeStyle = `rgba(0, 229, 255, ${intensity * 0.80})`;
+    ctx.lineWidth = Math.max(1.2, entR * 0.08);
+    ctx.beginPath();
+    ctx.arc(entX, entY, entR + 0.8, lightAngle - Math.PI * 0.35, lightAngle + Math.PI * 0.35);
+    ctx.stroke();
   }
 
   ctx.restore();
@@ -880,6 +1158,24 @@ function _drawZenitsuBreathSteam(ctx, r, progress, isChargePhase, jitterX, jitte
  * Frame 2: Charge / Energy Build-Up (Same stance, micro-tremor jitter, crackling golden lightning around body & sword, energy particles at feet & haori)
  */
 export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
+  const isDark = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
+  const total = fighter.thunderclapChannelDuration || 36;
+  const current = fighter.thunderclapChannelTimer || 0;
+  const elapsed = total - current;
+  const currentBurst = _getThunderclapBurst(total, elapsed);
+
+  // Proximity lighting on nearby entities during active lightning burst surges
+  if (currentBurst) {
+    _drawZenitsuChannelingEntityLighting(ctx, fighter.x, fighter.y - (fighter.z || 0), currentBurst, isDark, fighter);
+  }
+
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
@@ -892,13 +1188,10 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
     ctx.scale(1, -1);
   }
 
-  const total = fighter.thunderclapChannelDuration || 36;
-  const current = fighter.thunderclapChannelTimer || 0;
   const progress = Math.max(0, Math.min(1.0, 1.0 - (current / total)));
 
   // Smooth entrance interpolation over first 8 frames (avoids visual snapping into crouch)
   const entranceFrames = 8;
-  const elapsed = total - current;
   const entranceT = Math.min(1.0, elapsed / entranceFrames);
   const easeEntrance = entranceT * entranceT * (3 - 2 * entranceT); // Smooth cubic hermite curve
 
@@ -909,7 +1202,6 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   // Stored explosive power vibration / micro-jitter: ONLY during active lightning bursts or pre-launch surge
   let jitterX = 0;
   let jitterY = 0;
-  const currentBurst = _getThunderclapBurst(total, elapsed);
   if (currentBurst || progress >= 0.90) {
     const intensity = currentBurst ? (currentBurst.intensity || 0.8) : (progress - 0.90) * 10;
     jitterX = (Math.random() - 0.5) * 1.4 * intensity;
