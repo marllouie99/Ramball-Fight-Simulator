@@ -477,7 +477,7 @@ export class ZenitsuFighter extends Fighter {
     // Initialize Lightning Dash VFX with air linger & disappearance animation
     const travelDuration = 6;
     const lingerDuration = 8;
-    const disappearDuration = 12;
+    const disappearDuration = 16;
     this.thunderclapDashVFX = {
       startX: startX,
       startY: startY,
@@ -489,7 +489,7 @@ export class ZenitsuFighter extends Fighter {
       travelDuration: travelDuration,
       lingerDuration: lingerDuration,
       disappearDuration: disappearDuration,
-      maxTimer: travelDuration + lingerDuration + disappearDuration // 26 frames (~0.43s)
+      maxTimer: travelDuration + lingerDuration + disappearDuration // 30 frames (~0.50s)
     };
 
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {

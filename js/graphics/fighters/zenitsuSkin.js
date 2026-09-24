@@ -739,19 +739,91 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
     _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisappearancePhase, isDark);
   }
 
-  // Subtle electrical arrival spark flecks during disappearance
-  if (isDisappearancePhase && alpha > 0.15) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const sparkCount = 6;
-    for (let i = 0; i < sparkCount; i++) {
-      const seed = i * 47 + Math.floor(vfx.timer * 7);
-      const px = ((seed % 100) / 100) * drawW;
-      const py = ((seed % 13) - 6) * (drawH * 0.06);
-      ctx.fillStyle = (i % 2 === 0) ? `rgba(255, 255, 255, ${0.75 * alpha})` : `rgba(56, 189, 248, ${0.60 * alpha})`;
-      ctx.fillRect(px, py, 2, 2);
+  // Lingering flickering electric trails & drifting sparks in the air
+  _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, isDark);
+
+  ctx.restore();
+}
+
+/**
+ * Renders small lingering electric trails and sparks flickering in the air after Zenitsu's dash.
+ * Similar to Yuta's Pure Love Beam lingering lightning crackles and spark embers.
+ * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
+ */
+function _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, isDark) {
+  if (!ctx || drawW <= 12 || alpha <= 0.05) return;
+
+  const pseudoRand = (seed) => {
+    const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
+  const timer = vfx.timer || 0;
+  const flickerFrame = Math.floor(timer * 2.5);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // ── 1. FLICKERING JAGGED LIGHTNING ARCS IN THE AIR ──
+  const arcCount = Math.max(3, Math.min(7, Math.round(drawW / 55)));
+  for (let i = 0; i < arcCount; i++) {
+    const seed = i * 43 + flickerFrame * 17;
+    // Skip some frames randomly for rapid electrical flicker
+    if (pseudoRand(seed + 1) > 0.72) continue;
+
+    const segCount = 4;
+    const centerT = (i + 0.5 + (pseudoRand(seed + 2) - 0.5) * 0.4) / arcCount;
+    const startX = centerT * drawW - (r * 0.6);
+    const endX = startX + (r * 1.2) + (pseudoRand(seed + 3) * r * 0.5);
+    const stepX = (endX - startX) / segCount;
+
+    const baseSpreadY = (pseudoRand(seed + 4) - 0.5) * (drawH * 0.45);
+    const arcPoints = [];
+
+    for (let s = 0; s <= segCount; s++) {
+      const px = startX + s * stepX;
+      const jag = (s === 0 || s === segCount) ? 0 : (pseudoRand(seed + s * 13) - 0.5) * (r * 0.55);
+      const py = baseSpreadY + jag;
+      arcPoints.push({ x: px, y: py });
     }
-    ctx.restore();
+
+    if (arcPoints.length >= 2) {
+      // Outer Cyan Corona Stroke
+      ctx.strokeStyle = (i % 2 === 0) ? `rgba(0, 229, 255, ${0.85 * alpha})` : `rgba(56, 189, 248, ${0.75 * alpha})`;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(arcPoints[0].x, arcPoints[0].y);
+      for (let s = 1; s < arcPoints.length; s++) {
+        ctx.lineTo(arcPoints[s].x, arcPoints[s].y);
+      }
+      ctx.stroke();
+
+      // Inner White-Hot Core Stroke
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(arcPoints[0].x, arcPoints[0].y);
+      for (let s = 1; s < arcPoints.length; s++) {
+        ctx.lineTo(arcPoints[s].x, arcPoints[s].y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // ── 2. FLOATING & DRIFTING PIXEL ELECTRIC SPARK EMBERS ──
+  const emberCount = Math.max(8, Math.min(18, Math.round(drawW / 22)));
+  for (let i = 0; i < emberCount; i++) {
+    const seed = i * 31.7;
+    const emberT = ((seed * 11 + timer * 7) % 100) / 100;
+    const emberX = emberT * drawW;
+    const spreadY = (pseudoRand(seed + flickerFrame * 3) - 0.5) * (drawH * 0.55);
+    const emberY = spreadY + Math.sin(emberT * Math.PI * 4 + timer * 0.2) * 4;
+
+    const sz = (i % 3 === 0) ? 3 : 2;
+    const isWhite = (i % 2 === 0);
+
+    ctx.fillStyle = isWhite ? `rgba(255, 255, 255, ${0.90 * alpha})` : `rgba(0, 229, 255, ${0.75 * alpha})`;
+    ctx.fillRect(emberX - sz / 2, emberY - sz / 2, sz, sz);
   }
 
   ctx.restore();
