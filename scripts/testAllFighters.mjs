@@ -8949,6 +8949,15 @@ async function main() {
       throw new Error('Zenitsu Pre-launch surge must trigger right before launch dash');
     }
 
+    // 11.6.1.1 Zenitsu Electric Noise Audio Config & Channeling Burst Trigger Test
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    if (!cfg.sounds?.electricNoise1 || !cfg.sounds?.electricNoise2 || !cfg.sounds?.electricNoise3) {
+      throw new Error('Zenitsu config missing electricNoise1, electricNoise2, or electricNoise3 in sounds');
+    }
+    if (!Array.isArray(cfg.sounds?.electricNoises) || cfg.sounds.electricNoises.length !== 3) {
+      throw new Error('Zenitsu config missing 3-element electricNoises array in sounds');
+    }
+
     // Aim lock test during channeling
     if (zenitsu.canAim() !== false) {
       throw new Error('Zenitsu canAim() should return false during Thunderclap channeling');
@@ -9042,7 +9051,6 @@ async function main() {
     }
 
     // Simulate all dashes + pauses (dynamically accounts for configured dash count, duration, and pause frames)
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
     const totalDashes = zenitsu.thunderclapTotalDashes || cfg.thunderclapDashCount || 4;
     const dashDuration = cfg.thunderclapDashDuration || 5;
     const pauseFrames = cfg.thunderclapDashPauseFrames !== undefined ? cfg.thunderclapDashPauseFrames : 2;

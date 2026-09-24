@@ -16,7 +16,7 @@ import { CONFIG } from '../../core/config.js';
 import { zenitsuConfig } from '../../configs/characters/zenitsuConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
-import { drawZenitsuSkin, isZenitsuThunderclapBurst } from '../../graphics/fighters/zenitsuSkin.js';
+import { drawZenitsuSkin, isZenitsuThunderclapBurst, _getThunderclapBurst } from '../../graphics/fighters/zenitsuSkin.js';
 import { spawnSparks, spawnImpactFlash, spawnParrySparksEffect, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -63,6 +63,7 @@ export class ZenitsuFighter extends Fighter {
     this.skillCastAngle = 0;
     this.isThunderclapAimLocked = false;
     this.thunderclapLockedDistance = 260;
+    this._lastThunderclapBurstId = null;
 
     // Active Consecutive Lightning Dash Travel State (4 Consecutive Godspeed Dashes)
     this.isDashingThunderclap = false;
@@ -314,6 +315,7 @@ export class ZenitsuFighter extends Fighter {
     this.isThunderclapAimLocked = false;
     this.thunderclapChannelTimer = 0;
     this.thunderclapTarget = null;
+    this._lastThunderclapBurstId = null;
     this.isDashingThunderclap = false;
     this.thunderclapDashIndex = 0;
     this.thunderclapDashPauseTimer = 0;
@@ -457,10 +459,29 @@ export class ZenitsuFighter extends Fighter {
         this.angle = this.skillCastAngle;
       }
 
-      // Energy particles around feet and haori: ONLY during active lightning bursts
+      // Energy particles around feet/haori & electric noise audio on PNG flicker bursts
       const totalChannel = this.thunderclapChannelDuration || 100;
       const elapsedChannel = totalChannel - this.thunderclapChannelTimer;
-      if (isZenitsuThunderclapBurst(totalChannel, elapsedChannel)) {
+      const burst = _getThunderclapBurst ? _getThunderclapBurst(totalChannel, elapsedChannel) : null;
+
+      if (burst) {
+        if (this._lastThunderclapBurstId !== burst.burstId) {
+          this._lastThunderclapBurstId = burst.burstId;
+
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            const noises = cfg.sounds?.electricNoises || [
+              cfg.sounds?.electricNoise1 || 'Assets/Sound Effects/Skills/Zenitsu-electric-noise1.mp3',
+              cfg.sounds?.electricNoise2 || 'Assets/Sound Effects/Skills/Zenitsu-electric-noise2.mp3',
+              cfg.sounds?.electricNoise3 || 'Assets/Sound Effects/Skills/Zenitsu-electric-noise3.mp3'
+            ];
+            const soundIndex = Math.max(0, Math.min(noises.length - 1, (burst.burstId || 1) - 1));
+            const electricSfx = noises[soundIndex] || cfg.sounds?.[`electricNoise${burst.burstId}`] || noises[0];
+            const volKey = `electricNoise${burst.burstId}`;
+            const electricVol = cfg.soundVolumes?.[volKey] ?? cfg.soundVolumes?.electricNoise ?? 0.70;
+            audioSystem.playSFX(electricSfx, electricVol);
+          }
+        }
+
         spawnSparks(
           this.x + (Math.random() - 0.5) * (this.r || 25) * 1.2,
           this.y + (Math.random() - 0.5) * (this.r || 25) * 0.8,
@@ -468,12 +489,15 @@ export class ZenitsuFighter extends Fighter {
           'cyan',
           '#38BDF8'
         );
+      } else {
+        this._lastThunderclapBurstId = null;
       }
 
       // Channel complete -> explosive burst dash along committed 1 direction!
       if (this.thunderclapChannelTimer <= 0) {
         this.isChannelingThunderclap = false;
         this.isThunderclapAimLocked = false;
+        this._lastThunderclapBurstId = null;
         const dashTarget = (this.thunderclapTarget && this.thunderclapTarget.hp > 0 && !this.thunderclapTarget.isDead)
           ? this.thunderclapTarget
           : target;
@@ -591,6 +615,7 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapChannelTimer = this.thunderclapChannelDuration;
     this.isChannelingThunderclap = true;
     this.thunderclapTarget = target;
+    this._lastThunderclapBurstId = null;
 
     // Smooth aim initialization without instant snapping
     if (this.gunAngle === undefined) {
