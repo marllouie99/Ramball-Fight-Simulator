@@ -46,10 +46,14 @@ export function spawnDeathShatter(fighter) {
   } catch (e) {}
 
   for (let i = 0; i < shardCount; i++) {
-    // If we reached the global limit, remove the oldest death effect using swap-and-pop
+    // If we reached the global limit, remove the oldest non-permanent death effect first
     if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
-      state.deathEffects[0] = state.deathEffects[state.deathEffects.length - 1];
-      state.deathEffects.pop();
+      const nonPermIndex = state.deathEffects.findIndex(e => !e.isEyeOfCthulhuGore && !e.isPermanentGore);
+      if (nonPermIndex !== -1) {
+        state.deathEffects.splice(nonPermIndex, 1);
+      } else if (state.deathEffects.length > 80) {
+        state.deathEffects.shift();
+      }
     }
     
     // Random angle for each shard
@@ -365,7 +369,12 @@ export function spawnHollowMaskShatter(fighter) {
 
   for (let i = 0; i < shardCount; i++) {
     if (state.deathEffects && state.deathEffects.length >= 60) {
-      state.deathEffects.shift();
+      const nonPermIndex = state.deathEffects.findIndex(e => !e.isEyeOfCthulhuGore && !e.isPermanentGore);
+      if (nonPermIndex !== -1) {
+        state.deathEffects.splice(nonPermIndex, 1);
+      } else if (state.deathEffects.length > 80) {
+        state.deathEffects.shift();
+      }
     }
 
     const angle = (Math.PI * 2 * i) / shardCount + (Math.random() - 0.5) * 0.6;

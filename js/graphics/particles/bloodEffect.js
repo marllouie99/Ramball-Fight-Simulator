@@ -854,7 +854,10 @@ export function clearAllBattleEffects() {
     }
     state.sparkEffects.length = 0;
   }
-  if (state.deathEffects) state.deathEffects.length = 0;
+  if (state.deathEffects) {
+    // Retain permanent Eye of Cthulhu gore pieces and permanent death shatters so they remain on the arena floor during win reveals!
+    state.deathEffects = state.deathEffects.filter(e => e && (e.isEyeOfCthulhuGore || e.isPermanentGore));
+  }
   if (state.doppelgangerDeathEffects) state.doppelgangerDeathEffects.length = 0;
   if (state.illusionDeathEffects) state.illusionDeathEffects.length = 0;
   if (state.illusionSpawnEffects) state.illusionSpawnEffects.length = 0;
