@@ -537,6 +537,39 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
+  applyKnockback(vx, vy, stunFrames = 0, opts = {}) {
+    const options = (typeof stunFrames === 'object' && stunFrames !== null)
+      ? stunFrames
+      : (typeof opts === 'object' && opts !== null ? opts : {});
+
+    // Preserve pulling / dragging / beam suction mechanics (Getsuga, Pure Love Beam, Cruel Sun, Vortex, Black Hole)
+    const isPullOrDrag = Boolean(
+      options.isPull ||
+      options.isDrag ||
+      options.isBeam ||
+      options.isPureLoveBeam ||
+      options.isGetsuga ||
+      options.isCruelSun ||
+      options.isVortex ||
+      options.fromBlackHole ||
+      this.isDraggedByGetsuga ||
+      this._draggedByCruelSun ||
+      this.isCaughtInCruelSun ||
+      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
+      this.isCaughtInBlackHole ||
+      this._insideBlackHole
+    );
+
+    if (isPullOrDrag) {
+      const stun = typeof stunFrames === 'number' ? stunFrames : (options.stunDuration || 0);
+      return super.applyKnockback(vx, vy, stun);
+    }
+    // 100% Immune to standard hit knockback & push back from strikes, bullets, and explosions
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    return;
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
       ? CONFIG.eye_of_cthulhu
@@ -546,6 +579,10 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (!this.isPhase2 && !this.isTransforming) {
       const dr = (cfg.defenseReductionPhase1 !== undefined) ? cfg.defenseReductionPhase1 : 0.15;
       amount = Math.max(1, amount * (1 - dr));
+    }
+
+    if (opts && typeof opts === 'object') {
+      opts.skipKnockback = true;
     }
 
     return super.takeDamage(amount, attacker, opts);
@@ -668,7 +705,7 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   resolveWallBounce(arena, opponent) {
-    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this._draggedByCruelSun || this.isCaughtInCruelSun || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
       return super.resolveWallBounce(arena, opponent);
     }
     // Terraria-accurate flight: zero rigid wall reflections

@@ -78,7 +78,10 @@ The Eye of Cthulhu represents a classic **dual-phase attrition-to-rushdown arche
 
 ### Passive: Eldritch Levitation & Dual-Phase Metamorphosis
 
-- **Levitation Hover**: The Eye ignores ground hazards and maintains a smooth floating physics vector with gentle inertia dampening.
+- **Levitation Hover & Hit Knockback Immunity**:
+  - The Eye ignores ground hazards and maintains a smooth floating physics vector with gentle inertia dampening.
+  - **Hit Knockback / Pushback Immunity**: The Eye is 100% immune to being pushed back or knocked away by standard hits, strikes, bullets, and explosions. Its flight and charge vectors are never disrupted by incoming damage.
+  - **Vulnerability to Pull & Drag Mechanics**: Remains fully susceptible to gravitational suction, black holes, and beam drags (e.g. Gojo's *Hollow Purple* / *Lapse Blue*, Escanor's *Cruel Sun*, Yuta's *Pure Love Beam*, Ichigo's *Getsuga Tensho*).
 - **Phase Metamorphosis (50% HP Threshold)**:
   - When HP drops to or below 50%, the boss enters a **75-frame (1.25s) stationary transformation state**.
   - **Stationary Vulnerability Window**: Halts completely in mid-air (`vx = 0, vy = 0`) and takes full damage without retaliating, creating an authentic high-reward burst DPS opening for the player.
