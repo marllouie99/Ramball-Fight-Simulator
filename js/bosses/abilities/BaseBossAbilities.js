@@ -22,8 +22,7 @@ export class BaseBossAbilities {
     // 1. Global Screen Tremor
     triggerGlobalScreenShake(shakeIntensity, shakeFrames);
 
-    // 2. Visual FX: Concentric shockwave sparks & flash
-    spawnImpactFlash(boss.x, boss.y, boss.r * 2.2, config.enrageAuraColor || '#FF3344');
+    // 2. Visual FX: Concentric shockwave sparks
     spawnSparks(boss.x, boss.y, 24, config.enrageAuraColor || '#FF3344', 8);
 
     // 3. Floating Announcement Text

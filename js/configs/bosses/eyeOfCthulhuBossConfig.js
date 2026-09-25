@@ -11,21 +11,28 @@ export const eyeOfCthulhuBossConfig = {
   // ── Boss Presentation & Metadata ──
   bossTitle: 'Ancient Ocular Horror',
   bossSubtitle: 'YOU FEEL AN EVIL PRESENCE WATCHING YOU...',
+  entranceDurationFrames: 110,
+  entranceCameraZoom: 1.25,
+  entranceRoar: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise3.mp3',
+  entranceRoarVolume: 1.0,
+  entranceRumble: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3',
+  entranceRumbleVolume: 0.95,
   entranceAuraColor: '#E11D48',
   themeColor: '#E11D48',
   enrageAuraColor: '#DC2626',
 
   // ── Boss Scaling Attributes ──
-  hp: 12000,
-  defaultHp: 12000,
+  hp: 1000,
+  defaultHp: 1000,
   sizeMultiplier: 1.25,
-  damageMultiplier: 1.30,
-  speedMultiplier: 1.10,
+  damageMultiplier: 0.00,
+  speedMultiplier: 0.00,
 
   // ── Phase 1 Boss Tuning ──
   servantCountPerSpawn: 4,
   servantMaxActive: 6,
   servantHp: 180,
+  servantScale: 1.0, // Companion scale multiplier for Boss mode
   ramSpeed: 18.0,
   ramCount: 3,
 

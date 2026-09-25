@@ -1,461 +1,457 @@
 import { state } from '../../core/state.js';
 import { getHandSize } from '../../core/config.js';
-
-// gunSlingerWeaponGraphics.js
-//  - Use this file for Gun Slinger-specific weapon graphics (dual revolvers).
-//  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
-//  - If you want to change Gun Slinger weapon visuals, edit the palette or drawGunSlingerDualRevolver() below.
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 // ─────────────────────────────────────────────
-// GUNSLINGER BULLET GRAPHICS CONFIG
+// GUNSLINGER WEAPON GRAPHICS (Authentic Pixel Art Western Revolvers)
+// Features:
+// 1. Authentic 2D Discrete Grid Rasterization Engine ($P = 1.25\text{px}$) (Rule 3.5)
+// 2. 4-Tier Stepped Metal, Fluted 6-Chamber Cylinder & Polished Walnut Wood Grip
+// 3. Brass Colt Star Medallion, Cocked Serrated Hammer & Match Trigger
+// 4. Stepped 16-Bit Pixel Art Muzzle Starburst & Flying Powder Sparks (Rule 11 Zero shadowBlur)
+// 5. Pixel Cartridge Bullet with Brass Casing & Silver Tip
+// 6. Dual-Wield Front-POV Support, Recoil Tilt, and Reload Spin
 // ─────────────────────────────────────────────
+
 export const GUNSLINGER_BULLET_GRAPHICS = {
-  // Bullet casing colors (brass/copper revolver bullets)
-  casingColor: '#d4a84b',        // Brass casing
-  casingHighlight: '#f0c060',    // Bright brass highlight
-  casingShadow: '#8b6914',       // Dark brass shadow
-  tipColor: '#c0c0c0',           // Silver bullet tip
-  tipHighlight: '#e8e8e8',      // Bright silver
-  trailColor: 'rgba(255, 200, 100, 0.4)',  // Hot muzzle trail
-  glowColor: 'rgba(255, 180, 80, 0.6)',    // Bullet glow
-  // Bullet dimensions (relative to base radius)
+  casingColor: '#F59E0B',        // Brass casing
+  casingHighlight: '#FDE047',    // Bright brass highlight
+  casingShadow: '#92400E',       // Dark brass shadow
+  tipColor: '#CBD5E1',           // Silver bullet tip
+  tipHighlight: '#FFFFFF',       // Bright silver glint
+  tipShadow: '#64748B',          // Silver shadow
   lengthRatio: 2.8,              // Length relative to width
   tipRatio: 0.35,                // Tip length relative to total length
-  // Animation
-  pulseSpeed: 0.15,              // Trail pulse speed
-  trailLength: 3.5,              // Trail length in bullet widths
 };
 
+/**
+ * Draws an authentic discrete pixel art revolver bullet and speed streak
+ */
 export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1) {
-  const g = GUNSLINGER_BULLET_GRAPHICS;
-  
-  // Calculate bullet dimensions based on scale
-  const bulletWidth = 5 * scale;
-  const bulletLength = bulletWidth * g.lengthRatio;
-  const tipLength = bulletLength * g.tipRatio;
-  const casingLength = bulletLength - tipLength;
-  
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
   ctx.translate(x, y);
   ctx.rotate(angle);
-  
-  // ── Motion Trail ──────────────────────────────────────────────
-  const trailPulse = 0.7 + Math.sin(Date.now() * g.pulseSpeed) * 0.3;
-  const trailAlpha = 0.5 * lifeRatio * trailPulse;
-  
-  // Outer trail glow - clean line-based trail
-  const trailGradient = ctx.createLinearGradient(-bulletLength * g.trailLength, 0, 0, 0);
-  trailGradient.addColorStop(0, 'rgba(255, 180, 80, 0)');
-  trailGradient.addColorStop(0.5, `rgba(255, 160, 60, ${trailAlpha * 0.5})`);
-  trailGradient.addColorStop(1, `rgba(255, 200, 100, ${trailAlpha})`);
-  
-  // Draw as a thin line instead of triangle
-  ctx.beginPath();
-  ctx.moveTo(-bulletLength * g.trailLength, 0);
-  ctx.lineTo(0, 0);
-  ctx.strokeStyle = trailGradient;
-  ctx.lineWidth = bulletWidth * 0.6;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-  
-  // ── Bullet Glow ────────────────────────────────────────────────
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
-  
-  // ── Bullet Casing (brass body) ────────────────────────────────
-  // Main casing body - using manual rounded rect for broad compatibility
-  const crX = -casingLength;
-  const crY = -bulletWidth * 0.45;
-  const crW = casingLength;
-  const crH = bulletWidth * 0.9;
-  const crR = bulletWidth * 0.2;
-  ctx.beginPath();
-  ctx.moveTo(crX + crR, crY);
-  ctx.lineTo(crX + crW - crR, crY);
-  ctx.arcTo(crX + crW, crY, crX + crW, crY + crR, crR);
-  ctx.lineTo(crX + crW, crY + crH - crR);
-  ctx.arcTo(crX + crW, crY + crH, crX + crW - crR, crY + crH, crR);
-  ctx.lineTo(crX + crR, crY + crH);
-  ctx.arcTo(crX, crY + crH, crX, crY + crH - crR, crR);
-  ctx.lineTo(crX, crY + crR);
-  ctx.arcTo(crX, crY, crX + crR, crY, crR);
-  ctx.closePath();
-  ctx.fillStyle = g.casingColor;
-  ctx.fill();
-  
-  // Disable shadow for internal details to improve performance
-  // OPTIMIZED: Removed shadowBlur
 
-  // Casing highlight (top edge) - manual rounded rect
-  const hlX = -casingLength + bulletWidth * 0.1;
-  const hlY = -bulletWidth * 0.45;
-  const hlW = casingLength * 0.6;
-  const hlH = bulletWidth * 0.25;
-  const hlR = bulletWidth * 0.1;
-  ctx.beginPath();
-  ctx.moveTo(hlX + hlR, hlY);
-  ctx.lineTo(hlX + hlW - hlR, hlY);
-  ctx.arcTo(hlX + hlW, hlY, hlX + hlW, hlY + hlR, hlR);
-  ctx.lineTo(hlX + hlW, hlY + hlH - hlR);
-  ctx.arcTo(hlX + hlW, hlY + hlH, hlX + hlW - hlR, hlY + hlH, hlR);
-  ctx.lineTo(hlX + hlR, hlY + hlH);
-  ctx.arcTo(hlX, hlY + hlH, hlX, hlY + hlH - hlR, hlR);
-  ctx.lineTo(hlX, hlY + hlR);
-  ctx.arcTo(hlX, hlY, hlX + hlR, hlY, hlR);
-  ctx.closePath();
-  ctx.fillStyle = g.casingHighlight;
-  ctx.fill();
-  
-  // Casing shadow (bottom edge) - manual rounded rect
-  const shX = -casingLength + bulletWidth * 0.1;
-  const shY = bulletWidth * 0.2;
-  const shW = casingLength * 0.6;
-  const shH = bulletWidth * 0.2;
-  const shR = bulletWidth * 0.1;
-  ctx.beginPath();
-  ctx.moveTo(shX + shR, shY);
-  ctx.lineTo(shX + shW - shR, shY);
-  ctx.arcTo(shX + shW, shY, shX + shW, shY + shR, shR);
-  ctx.lineTo(shX + shW, shY + shH - shR);
-  ctx.arcTo(shX + shW, shY + shH, shX + shW - shR, shY + shH, shR);
-  ctx.lineTo(shX + shR, shY + shH);
-  ctx.arcTo(shX, shY + shH, shX, shY + shH - shR, shR);
-  ctx.lineTo(shX, shY + shR);
-  ctx.arcTo(shX, shY, shX + shR, shY, shR);
-  ctx.closePath();
-  ctx.fillStyle = g.casingShadow;
-  ctx.fill();
-  
-  // Casing groove detail (circular groove around casing)
-  ctx.strokeStyle = g.casingShadow;
-  ctx.lineWidth = 1 * scale;
-  ctx.beginPath();
-  ctx.arc(-casingLength * 0.3, 0, bulletWidth * 0.35, 0, Math.PI * 2);
-  ctx.stroke();
-  
-  // ── Bullet Tip (silver pointed tip) ───────────────────────────
-  // Tip base
-  ctx.beginPath();
-  ctx.moveTo(0, -bulletWidth * 0.45);
-  ctx.lineTo(tipLength * 0.3, -bulletWidth * 0.45);
-  ctx.lineTo(tipLength * 0.3, bulletWidth * 0.45);
-  ctx.lineTo(0, bulletWidth * 0.45);
-  ctx.closePath();
-  ctx.fillStyle = g.tipColor;
-  ctx.fill();
-  
-  // Pointed tip
-  ctx.beginPath();
-  ctx.moveTo(tipLength * 0.3, -bulletWidth * 0.45);
-  ctx.lineTo(tipLength, 0);
-  ctx.lineTo(tipLength * 0.3, bulletWidth * 0.45);
-  ctx.closePath();
-  ctx.fillStyle = g.tipColor;
-  ctx.fill();
-  
-  // Tip highlight
-  ctx.beginPath();
-  ctx.moveTo(tipLength * 0.3, -bulletWidth * 0.45);
-  ctx.lineTo(tipLength * 0.5, -bulletWidth * 0.15);
-  ctx.lineTo(tipLength * 0.3, -bulletWidth * 0.1);
-  ctx.closePath();
-  ctx.fillStyle = g.tipHighlight;
-  ctx.fill();
-  
+  const P = 0.85 * scale;
+
+  // Discrete pixel block painter
+  const px = (gx, gy, color) => {
+    if (!color) return;
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(P), Math.round(P));
+  };
+
+  const rect = (gx, gy, gw, gh, color) => {
+    if (!color) return;
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(gw * P), Math.round(gh * P));
+  };
+
+  // ── 1. Discrete Pixel Speed Smoke Trail (Trailing Behind) ──
+  const trailLen = Math.round(10 * lifeRatio);
+  for (let i = 1; i <= trailLen; i++) {
+    const alpha = Math.max(0, (1.0 - i / trailLen) * 0.7 * lifeRatio);
+    ctx.globalAlpha = alpha;
+    if (i % 2 === 0) {
+      rect(-i * 2 - 4, -1, 2, 2, '#FDE047');
+    } else {
+      rect(-i * 2 - 4, 0, 2, 1, '#F97316');
+    }
+  }
+  ctx.globalAlpha = 1.0;
+
+  // ── 2. Brass Casing Body (gx: -6 to -1, gy: -2 to 1) ──
+  // Dark ink outline shell
+  rect(-7, -2, 7, 4, '#0F1218');
+
+  // Brass Extractor Rim & Base
+  rect(-6, -1, 1, 2, '#FDE047');
+  rect(-6, 0, 1, 1, '#D97706');
+  // Extractor groove
+  rect(-5, -1, 1, 2, '#78350F');
+
+  // Main Brass Body with Stepped Lighting
+  rect(-4, -1, 4, 1, '#FEF08A'); // Top glint
+  rect(-4, 0, 4, 1, '#F59E0B');  // Mid brass
+  rect(-4, 1, 4, 1, '#B45309');  // Bottom shadow
+
+  // ── 3. Silver Lead Pointed Bullet Tip (gx: 0 to 4) ──
+  // Outline shell
+  px(0, -2, '#0F1218');
+  px(1, -2, '#0F1218');
+  px(2, -1, '#0F1218');
+  px(3, -1, '#0F1218');
+  px(4, 0, '#0F1218');
+  px(3, 1, '#0F1218');
+  px(2, 1, '#0F1218');
+  px(1, 2, '#0F1218');
+  px(0, 2, '#0F1218');
+
+  // Silver Shading Fill
+  rect(0, -1, 2, 1, '#FFFFFF'); // Specular glint
+  rect(0, 0, 3, 1, '#CBD5E1');  // Core silver
+  rect(0, 1, 2, 1, '#64748B');  // Shadow underside
+  px(3, 0, '#CBD5E1');
+
   ctx.restore();
 }
 
-// ─────────────────────────────────────────────
-// GUNSLINGER MUZZLE FLASH GRAPHICS
-// ─────────────────────────────────────────────
+/**
+ * Draws an authentic 16-bit discrete pixel art muzzle flash starburst and powder sparks.
+ * Strictly adheres to Rule 11 (Zero shadowBlur CPU filters).
+ */
 export function drawGunSlingerMuzzleFlash(ctx, x, y, angle, scale = 1, intensity = 1) {
-  const g = GUNSLINGER_BULLET_GRAPHICS;
-  
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
-
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
   ctx.translate(x, y);
   ctx.rotate(angle);
-  
-  const flashSize = 15 * scale * intensity;
-  const alpha = intensity;
-  
-  // Multiple flash layers for realistic effect
-  // Outer glow
-  const outerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, flashSize * 2);
-  outerGlow.addColorStop(0, `rgba(255, 200, 100, ${0.6 * alpha})`);
-  outerGlow.addColorStop(0.4, `rgba(255, 150, 50, ${0.3 * alpha})`);
-  outerGlow.addColorStop(1, 'rgba(255, 100, 0, 0)');
-  
-  ctx.beginPath();
-  ctx.arc(0, 0, flashSize * 2, 0, Math.PI * 2);
-  ctx.fillStyle = outerGlow;
-  ctx.fill();
-  
-  // Inner bright core
-  ctx.beginPath();
-  ctx.arc(0, 0, flashSize * 0.5, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255, 255, 200, ${0.9 * alpha})`;
-  ctx.fill();
-  
-  // Flash spokes
-  ctx.strokeStyle = `rgba(255, 220, 150, ${0.7 * alpha})`;
-  ctx.lineWidth = 2 * scale;
-  for (let i = 0; i < 6; i++) {
-    const spokeAngle = (i / 6) * Math.PI * 2 + Date.now() * 0.01;
-    const innerR = flashSize * 0.3;
-    const outerR = flashSize * (0.8 + Math.random() * 0.4);
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(spokeAngle) * innerR, Math.sin(spokeAngle) * innerR);
-    ctx.lineTo(Math.cos(spokeAngle) * outerR, Math.sin(spokeAngle) * outerR);
-    ctx.stroke();
-  }
-  
-  ctx.rotate(-angle);
-  ctx.translate(-x, -y);
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
+
+  const P = 1.6 * scale;
+  const alpha = Math.min(1.0, Math.max(0, intensity));
+  ctx.globalAlpha = alpha;
+
+  const px = (gx, gy, color) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(P), Math.round(P));
+  };
+
+  const rect = (gx, gy, gw, gh, color) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(gw * P), Math.round(gh * P));
+  };
+
+  // ── 1. Outer Crimson / Red Fire Spikes ──
+  rect(-2, -5, 4, 10, '#DC2626');
+  rect(-5, -2, 10, 4, '#DC2626');
+  rect(4, -3, 4, 6, '#DC2626');
+  rect(7, -1, 3, 2, '#DC2626');
+  px(-3, -3, '#DC2626');
+  px(3, -3, '#DC2626');
+  px(-3, 3, '#DC2626');
+  px(3, 3, '#DC2626');
+
+  // ── 2. Mid Fiery Orange Blast Petals ──
+  rect(-1, -4, 2, 8, '#F97316');
+  rect(-4, -1, 8, 2, '#F97316');
+  rect(3, -2, 3, 4, '#F97316');
+  rect(5, -1, 2, 2, '#F97316');
+  px(-2, -2, '#FB923C');
+  px(2, -2, '#FB923C');
+  px(-2, 2, '#FB923C');
+  px(2, 2, '#FB923C');
+
+  // ── 3. Inner Neon Yellow Core ──
+  rect(-1, -2, 4, 4, '#FDE047');
+  rect(1, -1, 3, 2, '#FDE047');
+
+  // ── 4. White-Hot Flash Center ──
+  rect(0, -1, 2, 2, '#FFFFFF');
+  px(1, 0, '#FFFFFF');
+
+  // ── 5. Flying Powder Sparks (Pixel Clusters) ──
+  px(8, -4, '#FEF08A');
+  px(10, -2, '#F97316');
+  px(9, 3, '#FEF08A');
+  px(11, 1, '#FDE047');
+  px(6, 5, '#EF4444');
+  px(7, -6, '#F97316');
+
+  ctx.restore();
 }
 
 export const GUNSLINGER_WEAPON_GRAPHICS = {
   revolver: {
-    bodyColor: '#63707e',        // Brighter metallic silver-grey
-    bodyHighlight: '#b0bcc7',    // Bright glossy silver reflection
-    bodyShadow: '#222831',       // Deep shadow for contrast
-    barrelColor: '#4a5562',      // Lighter steel barrel
-    cylinderColor: '#3f4955',    // Brighter cylinder body
-    cylinderDetail: '#161a21',   // Cylinder grooves
-    gripColor: '#5c3d2e',        // Brighter reddish-brown wood
-    gripHighlight: '#7a5643',    // Lighter wood highlight
-    medallion: '#e3c16f',        // Brighter gold/brass medallion
-    triggerColor: '#a9b3c4',     // Bright metallic trigger
-    muzzleGlow: '#ffcc00',       // Bright muzzle flash
-    muzzleShadow: '#ff6600',     // Muzzle shadow glow
+    // Blued Steel / Gunmetal Palette
+    outline: '#0D0F14',          // Dark manga ink pixel shell
+    metalGlint: '#FFFFFF',       // Specular glint highlight
+    metalHighlight: '#CBD5E1',   // Light steel bevel
+    metalLight: '#94A3B8',       // Upper slide / cylinder highlight
+    metalMid: '#475569',         // Mid gunmetal body
+    metalDark: '#334155',        // Receiver shadow
+    metalDeep: '#1E293B',        // Deep steel crease
+    metalBlack: '#0F172A',       // Ejector rod / bore core
+    
+    // Cylinder Details
+    cylinderFlute: '#0A0E17',    // Deep flute grooves
+    cylinderNotch: '#1E293B',    // Index notch
+    cylinderCrane: '#E2E8F0',    // Center axis pin
+
+    // Rich Walnut / Amber Wood Grip
+    gripOutline: '#120904',      // Deep dark wood outline
+    gripGlint: '#D97706',        // Amber edge glint
+    gripLight: '#B45309',        // Rich polished wood
+    gripMid: '#78350F',          // Base walnut body
+    gripShadow: '#451A03',       // Dark wood shadow
+    
+    // Golden Colt Medallion
+    medallionGold: '#FBBF24',    // Bright gold medallion
+    medallionGlint: '#FEF08A',   // Specular gold glint
+    medallionShadow: '#B45309',  // Gold rim shadow
+
+    // Match Trigger & Controls
+    triggerSilver: '#E2E8F0',    // Silver trigger
+    hammerSteel: '#64748B',      // Serrated hammer spur
   },
   positioning: {
-    scale: 0.68,
-    gunOffset: 2,                // Distance from fighter body edge
-    leftGunOffset: 50,           // Left gun offset (same as right for symmetry)
-  },
-  muzzleFlash: {
-    glowColor: '#ffaa00',
-    glowBlur: 10,
-    coreColor: '#ffffcc',
-    coreRadius: 3,
-    maxBlur: 20,
-    maxCoreRadius: 6,
+    scale: 0.72,
+    gunOffset: 2,
+    leftGunOffset: 50,
   },
   recoil: {
-    maxRecoil: 8,                 // Maximum recoil offset in pixels
-    recoilDecay: 0.15,            // How fast recoil recovers
-    maxTilt: 0.6,                 // Maximum tilt angle in radians
-    tiltDecay: 0.05,              // How fast tilt recovers
+    maxRecoil: 8,
+    recoilDecay: 0.15,
+    maxTilt: 0.6,
+    tiltDecay: 0.05,
   },
 };
 
-export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r, isFiring = false, flashFrame = 0, rightRecoilOffset = 0, rightRecoilTilt = 0, leftRecoilOffset = 0, leftRecoilTilt = 0, gunSpinAngle = 0, fighterColor = '#888', leftIsFiring = false, leftFlashFrame = 0) {
+/**
+ * Draws Gunslinger's authentic pixel art Dual Western Revolvers
+ */
+export function drawGunSlingerDualRevolver(
+  x,
+  y,
+  rightGunAngle,
+  leftGunAngle,
+  r,
+  isFiring = false,
+  flashFrame = 0,
+  rightRecoilOffset = 0,
+  rightRecoilTilt = 0,
+  leftRecoilOffset = 0,
+  leftRecoilTilt = 0,
+  gunSpinAngle = 0,
+  fighterColor = '#888',
+  leftIsFiring = false,
+  leftFlashFrame = 0
+) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const ctx = state.ctx;
   if (!ctx) return;
-  const scale = GUNSLINGER_WEAPON_GRAPHICS.positioning.scale;
-  const p = GUNSLINGER_WEAPON_GRAPHICS.revolver;
 
-  function drawRevolver(gunIsFiring, gunFlashFrame) {
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations?.gunslinger) || {};
+  const customScale = custom.scale ?? 1.0;
+  const customOffX = custom.offsetX ?? 0;
+  const customOffY = custom.offsetY ?? 0;
+  const customRot = custom.angleOffset ?? 0;
 
-    // --- 1. Grip ---
-    ctx.fillStyle = p.gripColor; 
-    ctx.beginPath();
-    ctx.moveTo(-5 * scale, 5 * scale);
-    ctx.lineTo(-11 * scale, 5 * scale);
-    // Curve down and back
-    ctx.bezierCurveTo(-14 * scale, 10 * scale, -18 * scale, 20 * scale, -19 * scale, 26 * scale);
-    // Bottom flat edge
-    ctx.lineTo(-10 * scale, 26 * scale);
-    // Front edge of grip, curving back up to trigger guard
-    ctx.bezierCurveTo(-8 * scale, 18 * scale, -3 * scale, 12 * scale, 0 * scale, 8 * scale);
-    ctx.closePath();
-    ctx.fill();
+  const baseScale = GUNSLINGER_WEAPON_GRAPHICS.positioning.scale * customScale;
+  const C = GUNSLINGER_WEAPON_GRAPHICS.revolver;
 
-    // Grip texture (checkering indication)
-    ctx.strokeStyle = '#1e110b';
-    ctx.lineWidth = 0.5 * scale;
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const offset = i * 1.5 * scale;
-      ctx.moveTo((-14 + offset) * scale, 8 * scale);
-      ctx.lineTo((-17 + offset) * scale, 24 * scale);
-      
-      ctx.moveTo((-17 + offset) * scale, 8 * scale);
-      ctx.lineTo((-14 + offset) * scale, 24 * scale);
-    }
-    ctx.stroke();
+  /**
+   * Discrete 2D Pixel Art Single Action Western Revolver
+   */
+  function drawPixelRevolver(gunIsFiring, gunFlashFrame) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
 
-    // Colt Medallion
-    ctx.fillStyle = p.medallion; 
-    ctx.beginPath();
-    ctx.arc(-9 * scale, 8 * scale, 1.8 * scale, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#221100';
-    ctx.lineWidth = 0.5 * scale;
-    ctx.stroke();
+    // Fixed discrete grid block unit
+    const P = 1.25 * baseScale;
 
-    // --- 2. Frame Body ---
-    ctx.fillStyle = p.bodyColor;
-    ctx.beginPath();
-    ctx.moveTo(-11 * scale, -2 * scale); // top back
-    ctx.lineTo(-5 * scale, 5 * scale);   // down to grip
-    ctx.lineTo(0 * scale, 8 * scale);    // back of trigger guard
-    ctx.lineTo(13 * scale, 8 * scale);   // under cylinder
-    ctx.lineTo(15 * scale, 3 * scale);   // curve up to barrel
-    ctx.lineTo(15 * scale, -3 * scale);  // up front of cylinder
-    ctx.lineTo(0 * scale, -3 * scale);   // top strap
-    ctx.quadraticCurveTo(-5 * scale, -3 * scale, -11 * scale, -2 * scale); // curve to back
-    ctx.closePath();
-    ctx.fill();
+    const px = (gx, gy, fill) => {
+      if (!fill) return;
+      ctx.fillStyle = fill;
+      ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(P), Math.round(P));
+    };
 
-    // Frame Highlight
-    ctx.fillStyle = p.bodyHighlight;
-    ctx.beginPath();
-    ctx.moveTo(-10 * scale, -1.5 * scale);
-    ctx.lineTo(14 * scale, -2.5 * scale);
-    ctx.lineTo(14 * scale, -1.5 * scale);
-    ctx.lineTo(-10 * scale, -0.5 * scale);
-    ctx.fill();
+    const rect = (gx, gy, gw, gh, fill) => {
+      if (!fill) return;
+      ctx.fillStyle = fill;
+      ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(gw * P), Math.round(gh * P));
+    };
 
-    // --- 3. Cylinder ---
-    // Background for cylinder area
-    ctx.fillStyle = p.cylinderColor;
-    ctx.fillRect(0 * scale, -2 * scale, 14 * scale, 9 * scale);
-    
-    // Glossy metallic gradient for cylinder
-    const cylGrad = ctx.createLinearGradient(0, -2 * scale, 0, 7 * scale);
-    cylGrad.addColorStop(0, p.bodyShadow);
-    cylGrad.addColorStop(0.2, p.bodyHighlight);
-    cylGrad.addColorStop(0.5, p.cylinderColor);
-    cylGrad.addColorStop(0.8, p.bodyHighlight);
-    cylGrad.addColorStop(1, p.bodyShadow);
-    ctx.fillStyle = cylGrad;
-    ctx.fillRect(0 * scale, -2 * scale, 14 * scale, 9 * scale);
+    // ═══════════════════════════════════════════════════════════════════
+    // 1. POLISHED WALNUT WOOD GRIP (Planted curve, gx: -18 to 0, gy: 5 to 25)
+    // ═══════════════════════════════════════════════════════════════════
+    // Grip Solid Dark Outline Shell
+    rect(-12, 5, 8, 2, C.gripOutline);
+    rect(-15, 7, 5, 4, C.gripOutline);
+    rect(-18, 11, 4, 7, C.gripOutline);
+    rect(-19, 18, 4, 6, C.gripOutline);
+    rect(-18, 24, 10, 3, C.gripOutline); // Grip bottom butt
+    rect(-8, 22, 5, 4, C.gripOutline);
+    rect(-5, 16, 4, 7, C.gripOutline);
+    rect(-2, 9, 3, 8, C.gripOutline);
 
-    // Cylinder Flutes (horizontal grooves)
-    ctx.fillStyle = p.cylinderDetail;
-    ctx.fillRect(1 * scale, -0.5 * scale, 12 * scale, 1.5 * scale);
-    ctx.fillRect(1 * scale, 2.5 * scale, 12 * scale, 2 * scale);
-    ctx.fillRect(1 * scale, 6 * scale, 12 * scale, 1.5 * scale);
+    // Grip Rich Wood Fill & 4-Tier Shading
+    rect(-10, 6, 6, 2, C.gripMid);
+    rect(-13, 8, 10, 3, C.gripMid);
+    rect(-16, 11, 13, 7, C.gripMid);
+    rect(-17, 18, 13, 6, C.gripMid);
+    rect(-15, 24, 6, 2, C.gripShadow);
 
-    // Cylinder Notches (back edge)
-    ctx.fillStyle = p.bodyShadow;
-    for (let i = 0; i < 3; i++) {
-      ctx.fillRect(-0.5 * scale, (-1 + i * 3.5) * scale, 1.5 * scale, 1.5 * scale);
-    }
-    
-    // Frame boundary over cylinder
-    ctx.strokeStyle = p.bodyShadow;
-    ctx.lineWidth = 1 * scale;
-    ctx.strokeRect(0 * scale, -2 * scale, 14 * scale, 9 * scale);
+    // Wood Grain & Edge Highlights
+    rect(-11, 6, 4, 1, C.gripGlint);
+    rect(-14, 8, 2, 4, C.gripLight);
+    rect(-16, 12, 2, 6, C.gripLight);
+    rect(-17, 18, 2, 5, C.gripLight);
+    rect(-16, 23, 3, 1, C.gripLight);
 
-    // --- 4. Barrel ---
-    ctx.fillStyle = p.barrelColor;
-    ctx.beginPath();
-    ctx.moveTo(15 * scale, -3 * scale);
-    ctx.lineTo(45 * scale, -2.5 * scale); // slightly thinner at tip
-    ctx.lineTo(45 * scale, 1.5 * scale);
-    ctx.lineTo(15 * scale, 2 * scale);
-    ctx.closePath();
-    ctx.fill();
+    // Deep Rear & Bottom Wood Shadow
+    rect(-17, 14, 2, 5, C.gripShadow);
+    rect(-18, 19, 2, 4, C.gripShadow);
+    rect(-14, 23, 6, 2, C.gripShadow);
 
-    // Barrel Gloss Highlight
-    ctx.fillStyle = p.bodyHighlight;
-    ctx.fillRect(15 * scale, -2.5 * scale, 29 * scale, 0.8 * scale);
-    ctx.fillStyle = p.bodyShadow;
-    ctx.fillRect(15 * scale, 1 * scale, 30 * scale, 0.8 * scale);
+    // Brass Colt Star Medallion (gx: -9 to -6, gy: 12 to 15)
+    rect(-9, 12, 4, 4, C.medallionShadow);
+    rect(-8, 12, 2, 4, C.medallionGold);
+    rect(-9, 13, 4, 2, C.medallionGold);
+    px(-8, 13, C.medallionGlint); // Center specular sparkle
 
-    // Front Sight (semi-circle)
-    ctx.fillStyle = p.bodyColor;
-    ctx.beginPath();
-    ctx.moveTo(41 * scale, -2.5 * scale);
-    ctx.quadraticCurveTo(42.5 * scale, -5 * scale, 44 * scale, -2.5 * scale);
-    ctx.fill();
+    // ═══════════════════════════════════════════════════════════════════
+    // 2. RECEIVER FRAME, TOP STRAP & SIGHT GROOVE
+    // ═══════════════════════════════════════════════════════════════════
+    // Dark Frame Outline
+    rect(-9, -4, 24, 2, C.outline); // Top strap line
+    rect(-10, -3, 3, 9, C.outline); // Recoil shield back
+    rect(14, -4, 2, 13, C.outline); // Forward cylinder frame
 
-    // --- 5. Ejector Rod ---
-    ctx.fillStyle = p.bodyShadow;
-    ctx.fillRect(15 * scale, 2.5 * scale, 18 * scale, 1.2 * scale);
-    // Ejector rod tip
-    ctx.fillStyle = p.bodyColor;
-    ctx.fillRect(32 * scale, 2 * scale, 2 * scale, 2 * scale);
+    // Frame Metal Body
+    rect(-8, -3, 8, 8, C.metalMid);
+    rect(-8, -3, 23, 2, C.metalLight); // Top strap
+    rect(-7, -4, 21, 1, C.metalGlint); // Upper bevel sheen
+    rect(-9, -2, 3, 7, C.metalDark);  // Recoil shield curve
+    rect(13, -3, 2, 11, C.metalDark); // Forward frame bridge
 
-    // --- 6. Trigger Guard & Trigger ---
-    ctx.strokeStyle = p.bodyColor;
-    ctx.lineWidth = 1.2 * scale;
-    ctx.beginPath();
-    ctx.moveTo(2 * scale, 7.5 * scale);
-    ctx.quadraticCurveTo(5 * scale, 16 * scale, 10 * scale, 14 * scale);
-    ctx.quadraticCurveTo(12 * scale, 10 * scale, 12 * scale, 8 * scale);
-    ctx.stroke();
+    // ═══════════════════════════════════════════════════════════════════
+    // 3. FLUTED 6-CHAMBER CYLINDER (gx: 0 to 13, gy: -2 to 8)
+    // ═══════════════════════════════════════════════════════════════════
+    // Cylinder Dark Border
+    rect(0, -2, 14, 11, C.outline);
 
-    // Trigger
-    ctx.strokeStyle = p.triggerColor; 
-    ctx.lineWidth = 1 * scale;
-    ctx.beginPath();
-    ctx.moveTo(8 * scale, 8 * scale);
-    ctx.quadraticCurveTo(6 * scale, 11 * scale, 8.5 * scale, 12.5 * scale);
-    ctx.stroke();
+    // Cylinder Metallic Core
+    rect(1, -1, 12, 9, C.metalMid);
 
-    // --- 7. Hammer ---
-    ctx.fillStyle = p.bodyColor;
-    ctx.beginPath();
-    ctx.moveTo(-10 * scale, -2 * scale);
-    ctx.lineTo(-13 * scale, -6 * scale);
-    ctx.lineTo(-10 * scale, -7 * scale);
-    ctx.lineTo(-7 * scale, -3 * scale);
-    ctx.fill();
+    // Upper Chamber & Glint
+    rect(1, -1, 12, 1, C.metalLight);
+    rect(2, -1, 10, 1, C.metalGlint);
 
-    // --- 8. Muzzle Flash & Sparks ---
+    // Cylinder Flute 1 (Top Dark Groove)
+    rect(2, 0, 10, 1, C.cylinderFlute);
+
+    // Mid Chamber Face & Specular Ridge
+    rect(1, 1, 12, 3, C.metalLight);
+    rect(2, 2, 10, 1, C.metalGlint);
+
+    // Cylinder Flute 2 (Center Dark Groove)
+    rect(2, 4, 10, 1, C.cylinderFlute);
+
+    // Lower Chamber & Shadow
+    rect(1, 5, 12, 2, C.metalDark);
+    rect(2, 7, 10, 1, C.cylinderFlute); // Flute 3
+
+    // Cylinder Notches & Center Axis Pin
+    rect(0, 2, 2, 2, C.cylinderCrane);
+    rect(12, 2, 2, 2, C.cylinderCrane);
+    px(0, 0, C.cylinderNotch);
+    px(0, 5, C.cylinderNotch);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 4. LONG RIFLED STEEL BARREL & EJECTOR TUBE (gx: 14 to 45)
+    // ═══════════════════════════════════════════════════════════════════
+    // Barrel Dark Outline Shell
+    rect(14, -3, 31, 6, C.outline);
+
+    // Top Bevel Glint Line
+    rect(15, -3, 30, 1, C.metalGlint);
+
+    // Barrel Steel Body
+    rect(15, -2, 30, 2, C.metalHighlight);
+    rect(15, 0, 30, 2, C.metalMid);
+    rect(15, 2, 30, 1, C.metalDark);
+
+    // Barrel Underside Shadow
+    rect(15, 2, 30, 1, C.metalDeep);
+
+    // Front Blade Sight (gx: 41 to 44, gy: -5 to -3)
+    rect(41, -5, 3, 3, C.outline);
+    rect(41, -4, 2, 2, C.metalHighlight);
+    px(42, -5, C.metalGlint); // Sight post glint
+
+    // Muzzle Crown & Rifled Bore (gx: 44 to 45)
+    rect(44, -2, 1, 4, C.metalHighlight);
+    rect(45, -1, 1, 2, C.metalBlack);
+
+    // Ejector Rod Housing & Knurled Head (Underneath Barrel, gx: 14 to 34, gy: 3 to 5)
+    rect(14, 3, 20, 2, C.outline);
+    rect(15, 3, 16, 1, C.metalDark);
+    rect(15, 4, 16, 1, C.metalBlack);
+    // Ejector rod knurled thumb head
+    rect(31, 2, 3, 3, C.metalHighlight);
+    px(32, 2, C.metalGlint);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 5. TRIGGER GUARD & MATCH TRIGGER (gx: 0 to 13, gy: 8 to 16)
+    // ═══════════════════════════════════════════════════════════════════
+    // Trigger Guard Steel Loop
+    rect(1, 8, 2, 7, C.outline);
+    rect(3, 14, 8, 2, C.outline);
+    rect(10, 8, 2, 7, C.outline);
+
+    rect(2, 9, 1, 5, C.metalMid);
+    rect(4, 14, 6, 1, C.metalLight);
+    rect(9, 9, 1, 5, C.metalMid);
+
+    // Curved Silver Trigger (gx: 5 to 7, gy: 9 to 13)
+    rect(5, 9, 2, 2, C.triggerSilver);
+    rect(6, 11, 2, 2, C.triggerSilver);
+    px(6, 9, C.metalGlint);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 6. SERRATED HAMMER & SPUR (gx: -12 to -7, gy: -8 to -3)
+    // ═══════════════════════════════════════════════════════════════════
+    rect(-12, -8, 5, 6, C.outline);
+    rect(-11, -7, 3, 2, C.hammerSteel);
+    rect(-10, -5, 3, 3, C.metalDark);
+    px(-11, -7, C.metalGlint); // Hammer cocked spur notch
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 7. MUZZLE FLASH & SPARK STARBURST
+    // ═══════════════════════════════════════════════════════════════════
     if (gunIsFiring || gunFlashFrame > 0) {
-      const intensity = gunFlashFrame > 0 ? Math.min(1.0, Math.max(0.3, gunFlashFrame / 6.0)) : 1.0;
+      const intensity = gunFlashFrame > 0 ? Math.min(1.0, Math.max(0.35, gunFlashFrame / 6.0)) : 1.0;
       ctx.save();
-      drawGunSlingerMuzzleFlash(ctx, 45 * scale, -0.5 * scale, 0, scale, intensity);
+      drawGunSlingerMuzzleFlash(ctx, 45 * P, -0.5 * P, 0, baseScale, intensity);
       ctx.restore();
     }
-    
-    // --- 9. Hand ---
-    ctx.fillStyle = fighterColor;
-    ctx.beginPath();
-    ctx.arc(-8 * scale, 12 * scale, getHandSize(6 * scale), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = 1.5 * scale;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 8. AUTHENTIC RETRO PIXEL ART HAND (Rule 20 / Rule 3.6)
+    // ═══════════════════════════════════════════════════════════════════
+    const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly);
+    if (!shouldHideHands) {
+      const handR = getHandSize(6.2 * baseScale);
+      drawPixelHand(ctx, -6 * P, 14 * P, handR, fighterColor || '#FFE0BD', '#0D0F14');
+    }
+
+    ctx.restore();
   }
 
-  // ── Upright Front-POV Orientation & Positioning (Matching John Wick / Anime Fighters) ──
+  // ── Upright Front-POV Orientation & Positioning (Matching Anime Fighters) ──
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x + customOffX, y + customOffY);
 
-  // Primary aim angle determines fighter facing
+  // Primary aim angle determines fighter facing & rotation
   const primaryAngle = (rightGunAngle !== undefined && !Number.isNaN(rightGunAngle)) ? rightGunAngle : (leftGunAngle || 0);
   const facingLeft = Math.abs(primaryAngle) > Math.PI / 2;
-  const baseAngle = facingLeft ? Math.PI : 0;
 
-  ctx.rotate(baseAngle);
+  ctx.rotate(primaryAngle + customRot);
   if (facingLeft) {
     ctx.scale(1, -1);
   }
 
   // Dual-Wield Stance Coordinates in Front-POV:
-  // Rear Revolver (Left Gun): Held on the left/back side of his body (hand at ≈ -0.68r)
+  // Rear Revolver (Left Gun): Held on the left/back side of body (-0.45r)
   const supportX = -r * 0.45;
   const supportY = 0;
 
-  // Front Revolver (Right Gun): Held on the right/front side of his body (hand at ≈ +0.67r)
+  // Front Revolver (Right Gun): Held on the right/front side of body (+0.90r)
   const leadX = r * 0.90;
   const leadY = 0;
 
   // ── 1. Draw Lower / Support Revolver (Left Gun) Behind Lead Gun ──
-  let leftDiff = (leftGunAngle !== undefined && !Number.isNaN(leftGunAngle) ? leftGunAngle : primaryAngle) - baseAngle;
+  let leftDiff = (leftGunAngle !== undefined && !Number.isNaN(leftGunAngle) ? leftGunAngle : primaryAngle) - primaryAngle;
   let normLeftDiff = Math.atan2(Math.sin(leftDiff), Math.cos(leftDiff));
   if (facingLeft) normLeftDiff = -normLeftDiff;
 
@@ -467,16 +463,16 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
 
   // Gun spin animation during reload (pivots around trigger guard / index finger)
   if (gunSpinAngle !== 0) {
-    ctx.translate(-8 * scale, 12 * scale);
+    ctx.translate(-8 * baseScale, 12 * baseScale);
     ctx.rotate(-gunSpinAngle);
-    ctx.translate(8 * scale, -12 * scale);
+    ctx.translate(8 * baseScale, -12 * baseScale);
   }
 
-  drawRevolver(leftIsFiring !== undefined ? leftIsFiring : isFiring, leftFlashFrame || flashFrame);
+  drawPixelRevolver(leftIsFiring !== undefined ? leftIsFiring : isFiring, leftFlashFrame || flashFrame);
   ctx.restore();
 
   // ── 2. Draw Upper / Lead Revolver (Right Gun) In Front ──
-  let rightDiff = (rightGunAngle !== undefined && !Number.isNaN(rightGunAngle) ? rightGunAngle : primaryAngle) - baseAngle;
+  let rightDiff = (rightGunAngle !== undefined && !Number.isNaN(rightGunAngle) ? rightGunAngle : primaryAngle) - primaryAngle;
   let normRightDiff = Math.atan2(Math.sin(rightDiff), Math.cos(rightDiff));
   if (facingLeft) normRightDiff = -normRightDiff;
 
@@ -488,13 +484,14 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
 
   // Gun spin animation during reload (pivots around trigger guard / index finger)
   if (gunSpinAngle !== 0) {
-    ctx.translate(-8 * scale, 12 * scale);
+    ctx.translate(-8 * baseScale, 12 * baseScale);
     ctx.rotate(gunSpinAngle);
-    ctx.translate(8 * scale, -12 * scale);
+    ctx.translate(8 * baseScale, -12 * baseScale);
   }
 
-  drawRevolver(isFiring, flashFrame);
+  drawPixelRevolver(isFiring, flashFrame);
   ctx.restore();
 
   ctx.restore();
 }
+

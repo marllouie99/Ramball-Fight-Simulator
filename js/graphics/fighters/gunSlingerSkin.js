@@ -432,12 +432,12 @@ export function drawGunslingerSkin(ctx, fighterOrX, y, r, angle, color) {
   ctx.save();
   ctx.translate(posX, posY);
 
-  // Upright Front-POV Orientation with horizontal scale mirroring (Rule 19)
-  const facingLeft = Math.abs(renderAngle) > Math.PI / 2;
-  const baseAngle = isWinnerReveal ? 0 : (facingLeft ? Math.PI : 0);
+  // Upright Front-POV Orientation with horizontal scale mirroring (Rule 19 / Rule 3.1)
+  const skinAngle = isWinnerReveal ? 0 : renderAngle;
+  ctx.rotate(skinAngle);
 
-  ctx.rotate(baseAngle);
-  if (facingLeft && !isWinnerReveal) {
+  const facingLeft = Math.abs(skinAngle) > Math.PI / 2;
+  if (facingLeft) {
     ctx.scale(1, -1);
   }
 

@@ -334,18 +334,18 @@ inputTarget.addEventListener('click', (e) => {
     return;
   }
 
-  if (BossEntranceSequence.isActive) {
-    // Mouse clicks on PC do not skip entrance animation
-    // Only ESC key on PC or touch tap on mobile can skip
-    return;
-  }
-
   const rect = inputTarget.getBoundingClientRect();
   // Handle scaling if CSS sizes canvas differently
   const scaleX = state.canvas.width / rect.width;
   const scaleY = state.canvas.height / rect.height;
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
+
+  if (BossEntranceSequence.isActive) {
+    // Mouse clicks on PC do not skip entrance animation
+    // Only ESC key on PC or touch tap on mobile can skip
+    return;
+  }
 
   const clickedButton = handleUIClick(mx, my);
   if (!clickedButton && state.gameState === 'title') {

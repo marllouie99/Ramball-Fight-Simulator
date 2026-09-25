@@ -769,6 +769,13 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
       return CONFIG.escanor?.soundVolumes?.attack !== undefined ? CONFIG.escanor.soundVolumes.attack : 1.0;
     },
     delay: 0,
+  },
+
+  // Eye of Cthulhu — Ancient Ocular Horror
+  'eye_of_cthulhu': {
+    src: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
+    volume: 0.85,
+    delay: 0,
   }
 };
 

@@ -389,6 +389,29 @@ export function drawFighters() {
     }
 
     const opponent = mode === 'FFA' ? null : fighters[1 - fi];
+
+    // Retro arcade idle breathing animation for challengers during boss entrance sequence
+    const isBossIntroActive = Boolean(typeof state !== 'undefined' && (state.gameState === 'boss_intro' || state._bossEntranceActive));
+    const isChallengerInIntro = isBossIntroActive && !fighter.isBoss && fighter.hp > 0;
+    let hasBreathingTransform = false;
+
+    if (isChallengerInIntro) {
+      hasBreathingTransform = true;
+      ctx.save();
+      const animFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Math.floor(Date.now() / 16);
+      // Authentic retro arcade 50-frame breathing cadence with stepped discrete pixel snapping
+      const breathPhase = (animFrame * 0.10) % (Math.PI * 2);
+      const breathSin = Math.sin(breathPhase);
+      const retroBobY = Math.round(breathSin * 1.5);
+      const retroScaleY = 1.0 + breathSin * 0.03;
+      const retroScaleX = 1.0 - breathSin * 0.015;
+      const feetY = (fighter.y - (fighter.z || 0)) + (fighter.r || 25);
+
+      ctx.translate(fighter.x, feetY);
+      ctx.scale(retroScaleX, retroScaleY);
+      ctx.translate(-fighter.x, -feetY + retroBobY);
+    }
+
     try {
       fighter.draw(ctx, opponent);
       
@@ -414,6 +437,10 @@ export function drawFighters() {
       }
     } catch (e) {
       console.error('fighter.draw error:', e);
+    } finally {
+      if (hasBreathingTransform) {
+        ctx.restore();
+      }
     }
 
     if (shiverX !== 0 || shiverY !== 0) {

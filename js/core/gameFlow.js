@@ -483,43 +483,43 @@ export function reinitFighters(isNewMatch = false) {
     }
 
     if (state.bossBattleNoTeammate) {
-      // Team 2: Solo Challenger at bottom center, aiming directly upward at Boss
+      // Team 2: Solo Challenger at bottom center: gun aims at Boss, body stays in normal upright stance
       if (state.fighters[1]) {
         state.fighters[1].x = centerX;
         state.fighters[1].y = bottomY;
-        const angle1 = -Math.PI / 2;
-        state.fighters[1].angle = angle1;
-        state.fighters[1].gunAngle = angle1;
-        state.fighters[1].rightGunAngle = angle1;
-        state.fighters[1].leftGunAngle = angle1;
+        const aimAngle1 = Math.atan2(topY - bottomY, centerX - centerX); // -Math.PI / 2
+        state.fighters[1].angle = 0; // Body upright facing normal
+        state.fighters[1].gunAngle = aimAngle1;
+        state.fighters[1].rightGunAngle = aimAngle1;
+        state.fighters[1].leftGunAngle = aimAngle1;
         const randAngle1 = Math.random() * Math.PI * 2;
         state.fighters[1].vx = Math.cos(randAngle1) * state.fighters[1].speed;
         state.fighters[1].vy = Math.sin(randAngle1) * state.fighters[1].speed;
       }
     } else {
-      // Team 2: Challenger 1 at bottom left, aiming toward Boss
+      // Team 2: Challenger 1 at bottom left: gun aims at Boss, body stays in normal upright stance
       if (state.fighters[1]) {
         state.fighters[1].x = leftX;
         state.fighters[1].y = bottomY;
-        const angle1 = Math.atan2(topY - bottomY, centerX - leftX);
-        state.fighters[1].angle = angle1;
-        state.fighters[1].gunAngle = angle1;
-        state.fighters[1].rightGunAngle = angle1;
-        state.fighters[1].leftGunAngle = angle1;
+        const aimAngle1 = Math.atan2(topY - bottomY, centerX - leftX);
+        state.fighters[1].angle = 0; // Body upright facing right
+        state.fighters[1].gunAngle = aimAngle1;
+        state.fighters[1].rightGunAngle = aimAngle1;
+        state.fighters[1].leftGunAngle = aimAngle1;
         const randAngle1 = Math.random() * Math.PI * 2;
         state.fighters[1].vx = Math.cos(randAngle1) * state.fighters[1].speed;
         state.fighters[1].vy = Math.sin(randAngle1) * state.fighters[1].speed;
       }
 
-      // Team 2: Challenger 2 at bottom right, aiming toward Boss
+      // Team 2: Challenger 2 at bottom right: gun aims at Boss, body stays in normal upright stance
       if (state.fighters[2]) {
         state.fighters[2].x = rightX;
         state.fighters[2].y = bottomY;
-        const angle2 = Math.atan2(topY - bottomY, centerX - rightX);
-        state.fighters[2].angle = angle2;
-        state.fighters[2].gunAngle = angle2;
-        state.fighters[2].rightGunAngle = angle2;
-        state.fighters[2].leftGunAngle = angle2;
+        const aimAngle2 = Math.atan2(topY - bottomY, centerX - rightX);
+        state.fighters[2].angle = Math.PI; // Body upright facing left
+        state.fighters[2].gunAngle = aimAngle2;
+        state.fighters[2].rightGunAngle = aimAngle2;
+        state.fighters[2].leftGunAngle = aimAngle2;
         const randAngle2 = Math.random() * Math.PI * 2;
         state.fighters[2].vx = Math.cos(randAngle2) * state.fighters[2].speed;
         state.fighters[2].vy = Math.sin(randAngle2) * state.fighters[2].speed;
@@ -813,15 +813,10 @@ export function launchMatchOrBossEntrance() {
     state.gameState = 'boss_intro';
 
     const boss = state.fighters[0];
-    const isYutaBoss = (boss.characterId === 'yuta' || boss.type === 'yuta');
 
     BossEntranceSequence.start(boss, () => {
-      if (isYutaBoss) {
-        // Yuta's bush camper entrance transitions directly to FIGHT — no countdown
-        startBattleDirectlyAfterBossEntrance();
-      } else {
-        startCountdown();
-      }
+      // Seamless direct transition to FIGHT after cinematic boss intro concludes
+      startBattleDirectlyAfterBossEntrance();
     });
     return;
   }
@@ -878,6 +873,11 @@ function startBattleDirectlyAfterBossEntrance() {
         f.forcedMeleeTimer = 0;
         f.hitStunTimer = 0;
         f.knockbackStunTimer = 0;
+        // Aim challenger dynamically at boss upon battle start
+        const boss = state.fighters[0];
+        if (f !== boss && boss && typeof f.aim === 'function') {
+          f.aim(boss);
+        }
         // Randomize initial movement direction
         const startAngle = Math.random() * Math.PI * 2;
         const spd = f.speed || 3.0;

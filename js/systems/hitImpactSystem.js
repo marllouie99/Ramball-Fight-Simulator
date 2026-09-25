@@ -575,6 +575,53 @@ export const HitImpactSystem = {
       return true; // Bullet spent on impact
     }
 
+    // Gun Slinger Dual Revolvers (Wild West Brass/Lead Cartridges) — Ballistic impact & fiery sparks
+    const isGunslingerBullet = projectile.visual === 'gunslingerBullet' || (attacker && (attacker.characterId === 'gunslinger' || attacker.type === 'gunslinger') && projectile.visual !== 'gunslinger_skill');
+    if (isGunslingerBullet) {
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      // 1. Kinetic push back on target
+      if (shouldApplyPhysicalPush(target)) {
+        const pushForce = 2.0;
+        target.vx = (target.vx || 0) + Math.cos(hitAngle) * pushForce;
+        target.vy = (target.vy || 0) + Math.sin(hitAngle) * pushForce;
+        target.x += Math.cos(hitAngle) * (pushForce * 0.4);
+        target.y += Math.sin(hitAngle) * (pushForce * 0.4);
+
+        if (state && state.arena) {
+          const minX = state.arena.x + (target.r || 20);
+          const maxX = state.arena.x + state.arena.width - (target.r || 20);
+          const minY = state.arena.y + (target.r || 20);
+          const maxY = state.arena.y + state.arena.height - (target.r || 20);
+          target.x = Math.max(minX, Math.min(maxX, target.x));
+          target.y = Math.max(minY, Math.min(maxY, target.y));
+        }
+      }
+
+      // 2. Fiery golden ricochet sparks & amber impact flash
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 20, '#F59E0B');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 7, 'gold', '#FEF08A');
+        spawnSparks(target.x, target.y, 5, 'flame', '#F97316');
+        spawnSparks(target.x, target.y, 4, 'silverStreak', '#CBD5E1');
+      }
+
+      // 3. Directional blood splatter particles
+      if (typeof spawnBloodEffect === 'function') {
+        spawnBloodEffect(target, 11, hitAngle, { minSize: 2.2, maxSize: 3.8, count: 3 });
+      }
+
+      // 4. Flesh hit SFX & subtle screen shake
+      audioSystem.playSFX('attack_fleshhit', 0.52);
+      if (typeof triggerGlobalScreenShake === 'function') {
+        triggerGlobalScreenShake(1.2, 2);
+      }
+
+      return true; // Bullet spent on impact
+    }
+
     // Layla Steampunk Cannon - custom cyan sparks and flash impact effects
     const isLaylaBasic = projectile.visual === 'layla_basic_bullet';
     const isLaylaUlt = projectile.visual === 'layla_ultimate_bullet';
@@ -812,6 +859,23 @@ export const HitImpactSystem = {
         target.x = Math.max(minX, Math.min(maxX, target.x));
         target.y = Math.max(minY, Math.min(maxY, target.y));
       }
+    }
+
+    // Default universal spark effect & impact flash for any projectile hitting an entity
+    const sparkColor = projectile.color || (attacker && attacker.color) || '#F59E0B';
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(target.x, target.y, Math.min(28, Math.max(16, (projectile.r || 5) * 3)), sparkColor);
+    }
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(target.x, target.y, 6, 'flash', sparkColor);
+      spawnSparks(target.x, target.y, 4, 'silverStreak', '#CBD5E1');
+    }
+    if (typeof spawnBloodEffect === 'function') {
+      const hitAngle = Math.atan2(projectile.vy || 0, projectile.vx || 0.001);
+      spawnBloodEffect(target, 10, hitAngle, { minSize: 2.0, maxSize: 3.5, count: 3 });
+    }
+    if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX('attack_fleshhit', 0.45);
     }
 
     return true; // Default behavior: destroy projectile

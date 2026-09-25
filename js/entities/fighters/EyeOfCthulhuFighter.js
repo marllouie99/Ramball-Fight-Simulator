@@ -307,17 +307,21 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.z = 0;
     }
 
+    const isMatchEnded = typeof state !== 'undefined' && (
+      state.gameState === 'roundEnd' || 
+      state.gameState === 'matchEnd' || 
+      state.gameState === 'gameOver' || 
+      state.gameState === 'champion' || 
+      Boolean(this._isWinnerReveal)
+    );
     const isTargetAlive = Boolean(opponent && !opponent.isDead && opponent.hp > 0);
 
     // 4. State Machine Execution
-    if (isTargetAlive) {
+    if (isTargetAlive && !isMatchEnded) {
       this._updateTerrariaAI(opponent, ownerIndex, arena, cfg);
     } else {
-      // Idle float when target is down
-      this.vx *= 0.92;
-      this.vy *= 0.92;
-      this.x += this.vx;
-      this.y += this.vy;
+      // Return smoothly inside the arena and idle float when enemy is eliminated / match won
+      this._updateVictoryReturnInside(arena, cfg);
     }
 
     // Always update active gore particles and dash afterimages
@@ -325,7 +329,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     this._updateAfterImages();
 
     // Periodic ambient action noise / vocalization
-    if (!this.isTransforming && isTargetAlive) {
+    if (!this.isTransforming && isTargetAlive && !isMatchEnded) {
       if (this.ambientNoiseTimer === undefined) {
         this.ambientNoiseTimer = 180 + Math.floor(Math.random() * 120);
       }
@@ -336,8 +340,54 @@ export class EyeOfCthulhuFighter extends Fighter {
       }
     }
 
-    // 5. Soft Arena Leashing (Bypass standard rigid wall bounce)
+    // 5. Soft Arena Leashing (Bypass standard rigid wall bounce during combat, enforce return on victory)
     this.resolveWallBounce(arena, opponent);
+  }
+
+  _updateVictoryReturnInside(arena, cfg) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
+    if (!arena) {
+      this.vx *= 0.92;
+      this.vy *= 0.92;
+      this.x += this.vx;
+      this.y += this.vy;
+      return;
+    }
+
+    const cx = arena.x + arena.width / 2;
+    const cy = arena.y + arena.height / 2;
+    const ar = (arena.radius || (arena.width / 2));
+    const safeRadius = Math.max(30, ar - this.r - 35);
+
+    const dx = cx - this.x;
+    const dy = cy - this.y;
+    const distFromCenter = Math.hypot(dx, dy);
+
+    if (distFromCenter > safeRadius && distFromCenter > 0) {
+      // Outside or near the wall: fly smoothly inward back inside the arena
+      const nx = dx / distFromCenter;
+      const ny = dy / distFromCenter;
+      const returnSpeed = Math.min(8.5, Math.max(4.0, (distFromCenter - safeRadius) * 0.08 + 3.0));
+      this.vx = this.vx * 0.88 + nx * returnSpeed * 0.18;
+      this.vy = this.vy * 0.88 + ny * returnSpeed * 0.18;
+      const currentSpeed = Math.hypot(this.vx, this.vy);
+      if (currentSpeed > returnSpeed) {
+        this.vx = (this.vx / currentSpeed) * returnSpeed;
+        this.vy = (this.vy / currentSpeed) * returnSpeed;
+      }
+      this.gunAngle = Math.atan2(this.vy, this.vx);
+      this.angle = this.gunAngle;
+    } else {
+      // Comfortably inside the arena: smoothly decelerate to an upright idle
+      this.vx *= 0.90;
+      this.vy *= 0.90;
+      // Settle facing upright towards player (angle 0)
+      this.gunAngle = 0;
+      this.angle = 0;
+    }
+
+    this.x += this.vx;
+    this.y += this.vy;
   }
 
   _updateTerrariaAI(opponent, ownerIndex, arena, cfg) {
@@ -444,11 +494,13 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (activeServants >= maxActive) return;
 
     const spawnCount = Math.min(cfg.servantCountPerSpawn || 1, maxActive - activeServants);
+    const servantScale = (typeof cfg.servantScale === 'number') ? cfg.servantScale : ((typeof cfg.servantSizeMultiplier === 'number') ? cfg.servantSizeMultiplier : 1.0);
+    const servantRadius = (cfg.servantRadius !== undefined ? cfg.servantRadius : 10) * servantScale;
 
     for (let s = 0; s < spawnCount; s++) {
       const pAngle = this.gunAngle + (Math.random() - 0.5) * 0.6;
-      const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 8) + (Math.random() - 0.5) * 6;
-      const spawnY = this.y + Math.sin(this.gunAngle) * (this.r + 8) + (Math.random() - 0.5) * 6;
+      const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 8 * servantScale) + (Math.random() - 0.5) * 6;
+      const spawnY = this.y + Math.sin(this.gunAngle) * (this.r + 8 * servantScale) + (Math.random() - 0.5) * 6;
       const initSpeed = cfg.servantInitialSpeed || 2.2;
 
       const minion = {
@@ -456,7 +508,8 @@ export class EyeOfCthulhuFighter extends Fighter {
         y: spawnY,
         vx: Math.cos(pAngle) * initSpeed,
         vy: Math.sin(pAngle) * initSpeed,
-        r: cfg.servantRadius || 10,
+        r: servantRadius,
+        scale: servantScale,
         hp: cfg.servantHp || 120,
         maxHp: cfg.servantHp || 120,
         damage: cfg.servantDamage || 12,
@@ -477,7 +530,7 @@ export class EyeOfCthulhuFighter extends Fighter {
         attackInterval: cfg.servantAttackInterval || 24,
         hoverAngle: Math.random() * Math.PI * 2,
         hoverOrbitSpeed: 0.035 + Math.random() * 0.02,
-        hoverDistance: (cfg.servantHoverRadius || 20) + Math.random() * 8,
+        hoverDistance: ((cfg.servantHoverRadius || 20) * servantScale) + Math.random() * 8,
         hitFlashTimer: 0,
         timeStopTimer: 0,
         hitStunTimer: 0,
@@ -986,8 +1039,37 @@ export class EyeOfCthulhuFighter extends Fighter {
     const cx = arena.x + arena.width / 2;
     const cy = arena.y + arena.height / 2;
     const ar = (arena.radius || (arena.width / 2));
-    const maxAllowedDist = ar + (eyeOfCthulhuConfig.softLeashRadius || 140);
 
+    const isMatchEnded = typeof state !== 'undefined' && (
+      state.gameState === 'roundEnd' || 
+      state.gameState === 'matchEnd' || 
+      state.gameState === 'gameOver' || 
+      state.gameState === 'champion' || 
+      Boolean(this._isWinnerReveal)
+    );
+    const isTargetAlive = Boolean(opponent && !opponent.isDead && opponent.hp > 0);
+
+    // If the Eye has won the match or target is dead, enforce safe return inside arena
+    if (isMatchEnded || !isTargetAlive) {
+      const safeRadius = Math.max(30, ar - this.r - 25);
+      const distFromCenter = Math.hypot(this.x - cx, this.y - cy);
+      if (distFromCenter > safeRadius && distFromCenter > 0) {
+        const nx = (cx - this.x) / distFromCenter;
+        const ny = (cy - this.y) / distFromCenter;
+        const pullSpeed = Math.min(8.5, Math.max(4.0, (distFromCenter - safeRadius) * 0.10));
+        this.vx += nx * pullSpeed * 0.30;
+        this.vy += ny * pullSpeed * 0.30;
+        const currentSpeed = Math.hypot(this.vx, this.vy);
+        if (currentSpeed > pullSpeed) {
+          this.vx = (this.vx / currentSpeed) * pullSpeed;
+          this.vy = (this.vy / currentSpeed) * pullSpeed;
+        }
+      }
+      return false;
+    }
+
+    // During active combat: soft parabolic tether
+    const maxAllowedDist = ar + (eyeOfCthulhuConfig.softLeashRadius || 140);
     const distFromCenter = Math.hypot(this.x - cx, this.y - cy);
     if (distFromCenter > maxAllowedDist && distFromCenter > 0) {
       // Gentle soft steering back towards arena center (smooth parabolic tether)

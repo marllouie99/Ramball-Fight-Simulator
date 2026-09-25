@@ -9,6 +9,7 @@ import { resetCamera, worldToScreen } from '../../systems/cameraSystem.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks } from '../../graphics/particles/sparkEffect.js';
 import { YutaBushEntrance } from './YutaBushEntrance.js';
+import { EyeOfCthulhuEntrance } from './EyeOfCthulhuEntrance.js';
 
 class BossEntranceSequenceClass {
   constructor() {
@@ -46,13 +47,33 @@ class BossEntranceSequenceClass {
       state.camera.smoothing = 0.12;
     }
 
+    // Initialize challenger gun angles aiming directly at the boss while keeping body upright
+    if (state.fighters) {
+      const bossTargetX = boss.x;
+      const bossTargetY = boss.y - (boss.z || 0) * 0.4;
+      state.fighters.forEach((f) => {
+        if (f && f !== boss && !f.isBoss) {
+          const dx = bossTargetX - f.x;
+          const dy = bossTargetY - f.y;
+          const aimAngle = Math.atan2(dy, dx);
+          f.gunAngle = aimAngle;
+          if (typeof f.rightGunAngle !== 'undefined') f.rightGunAngle = aimAngle;
+          if (typeof f.leftGunAngle !== 'undefined') f.leftGunAngle = aimAngle;
+          // Normal upright body angle facing the boss horizontally (0 for right, Math.PI for left)
+          f.angle = (dx >= 0) ? 0 : Math.PI;
+        }
+      });
+    }
+
     // 2. Initial ground burst or character-specific entrance initialization
     const isYuta = (boss.characterId === 'yuta' || boss.type === 'yuta');
+    const isEye = (boss.characterId === 'eye_of_cthulhu' || boss.type === 'eye_of_cthulhu');
     if (isYuta) {
       YutaBushEntrance.start(boss, this.durationFrames);
+    } else if (isEye) {
+      EyeOfCthulhuEntrance.start(boss, this.durationFrames);
     } else {
       const flashColor = boss.bossConfig?.entranceAuraColor || '#00BFFF';
-      spawnImpactFlash(boss.x, boss.y, boss.r * 2.8, flashColor);
       spawnSparks(boss.x, boss.y, 25, flashColor, 10);
     }
   }
@@ -74,8 +95,29 @@ class BossEntranceSequenceClass {
     this.timer += dt;
 
     const isYuta = (this.boss?.characterId === 'yuta' || this.boss?.type === 'yuta');
+    const isEye = (this.boss?.characterId === 'eye_of_cthulhu' || this.boss?.type === 'eye_of_cthulhu');
     if (isYuta) {
       YutaBushEntrance.update(dt, this.timer, this.durationFrames);
+    } else if (isEye) {
+      EyeOfCthulhuEntrance.update(dt, this.timer, this.durationFrames);
+    }
+
+    // Continuously aim challenger gun angles dynamically at boss throughout the entrance sequence
+    if (this.boss && state.fighters) {
+      const bossTargetX = this.boss.x;
+      const bossTargetY = this.boss.y - (this.boss.z || 0) * 0.4;
+      state.fighters.forEach((f) => {
+        if (f && f !== this.boss && !f.isBoss && f.hp > 0) {
+          const dx = bossTargetX - f.x;
+          const dy = bossTargetY - f.y;
+          const aimAngle = Math.atan2(dy, dx);
+          f.gunAngle = aimAngle;
+          if (typeof f.rightGunAngle !== 'undefined') f.rightGunAngle = aimAngle;
+          if (typeof f.leftGunAngle !== 'undefined') f.leftGunAngle = aimAngle;
+          // Keep body upright facing toward boss side
+          f.angle = (dx >= 0) ? 0 : Math.PI;
+        }
+      });
     }
 
     // Keep camera smoothly tracking the boss throughout entrance
@@ -95,11 +137,19 @@ class BossEntranceSequenceClass {
       }
     }
 
-    const isVoicelinePlaying = isYuta && YutaBushEntrance.isVoicelinePlaying();
+    const isVoicelinePlaying = (isYuta && YutaBushEntrance.isVoicelinePlaying());
 
-    if (this.timer >= this.durationFrames && !isVoicelinePlaying) {
+    if ((this.timer >= this.durationFrames && !isVoicelinePlaying) || this.timer >= (this.durationFrames + 180)) {
       this.finish();
     }
+  }
+
+  /**
+   * Immediately skips the entrance animation and transitions to battle
+   */
+  skip() {
+    if (!this.isActive) return;
+    this.finish();
   }
 
   /**
@@ -116,6 +166,7 @@ class BossEntranceSequenceClass {
     }
 
     YutaBushEntrance.finish(this.boss);
+    EyeOfCthulhuEntrance.finish(this.boss);
 
     // Signal HUD to smoothly fade in after boss entrance concludes
     state._bossEntranceHudFadeTimer = 0;
@@ -149,10 +200,11 @@ class BossEntranceSequenceClass {
 
     // 1. Ambient Darkness Overlay removed per user request (Zero screen dim)
 
-    // 2. Thematic Entrance Divine Bolt (Zeus) or Light Column — skip for Yuta's Bush Camper entrance
+    // 2. Thematic Entrance Divine Bolt (Zeus) or Light Column — skip for Yuta and Eye of Cthulhu
     const isYuta = (this.boss.characterId === 'yuta' || this.boss.type === 'yuta');
+    const isEye = (this.boss.characterId === 'eye_of_cthulhu' || this.boss.type === 'eye_of_cthulhu');
     const screenPos = worldToScreen(this.boss.x, this.boss.y);
-    if (!isYuta && this.timer >= 10 && this.timer <= 45) {
+    if (!isYuta && !isEye && this.timer >= 10 && this.timer <= 45) {
       const strikeProg = (this.timer - 10) / 35;
       const boltAlpha = Math.max(0, 1 - strikeProg) * alpha;
 
@@ -186,6 +238,10 @@ class BossEntranceSequenceClass {
       topTag = '✦ BOSS ENCOUNTER ✦';
       bossName = (this.boss.name || this.boss._def?.name || 'YUTA OKKOTSU').toUpperCase();
       bossSubtitle = this.boss.bossConfig?.bossSubtitle || config.bossSubtitle || 'THE BUSH CAMPER — SPECIAL GRADE SORCERER';
+    } else if (isEye) {
+      topTag = '✦ BOSS ENCOUNTER ✦';
+      bossName = 'EYE OF CTHULHU';
+      bossSubtitle = this.boss.bossConfig?.bossSubtitle || config.bossSubtitle || 'YOU FEEL AN EVIL PRESENCE WATCHING YOU...';
     }
 
     ctx.textAlign = 'center';

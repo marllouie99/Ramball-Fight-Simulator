@@ -651,9 +651,26 @@ export function updateIllusions() {
           }
         }
       } else {
-        // Idle drift when no active target
-        illusion.vx *= 0.90;
-        illusion.vy *= 0.90;
+        // Idle drift when no active target: return to and orbit around owner inside arena
+        if (illusion.owner && illusion.owner.hp > 0) {
+          const ownerX = illusion.owner.x;
+          const ownerY = illusion.owner.y;
+          illusion.hoverAngle = (illusion.hoverAngle || 0) + 0.035;
+          const hDist = (illusion.hoverDistance || 20) + 25;
+          const destX = ownerX + Math.cos(illusion.hoverAngle) * hDist;
+          const destY = ownerY + Math.sin(illusion.hoverAngle) * hDist;
+          const dx = destX - illusion.x;
+          const dy = destY - illusion.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const maxSpeed = illusion.moveSpeed || 3.4;
+          illusion.vx += (dx / dist) * maxSpeed * 0.12;
+          illusion.vy += (dy / dist) * maxSpeed * 0.12;
+          illusion.vx *= 0.92;
+          illusion.vy *= 0.92;
+        } else {
+          illusion.vx *= 0.90;
+          illusion.vy *= 0.90;
+        }
         illusion.x += illusion.vx;
         illusion.y += illusion.vy;
       }

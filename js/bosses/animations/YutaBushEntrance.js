@@ -468,26 +468,12 @@ class YutaBushEntranceClass {
 
       // Pink cursed energy ambient glow
       ctx.beginPath();
-      ctx.arc(0, 0, 18 * glintScale, 0, Math.PI * 2);
+      ctx.arc(0, 0, 14 * glintScale, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255, 20, 147, 0.35)';
       ctx.fill();
 
-      // 4-point Diamond Specular Flare
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.moveTo(0, -14 * glintScale);
-      ctx.lineTo(3.5 * glintScale, -2 * glintScale);
-      ctx.lineTo(14 * glintScale, 0);
-      ctx.lineTo(3.5 * glintScale, 2 * glintScale);
-      ctx.moveTo(0, 14 * glintScale);
-      ctx.lineTo(-3.5 * glintScale, 2 * glintScale);
-      ctx.lineTo(-14 * glintScale, 0);
-      ctx.lineTo(-3.5 * glintScale, -2 * glintScale);
-      ctx.closePath();
-      ctx.fill();
-
       // Sharp central twinkle core
-      ctx.fillStyle = '#FF69B4';
+      ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.arc(0, 0, 3.5 * glintScale, 0, Math.PI * 2);
       ctx.fill();

@@ -11,4 +11,5 @@ export { BossEntranceSequence } from './animations/BossEntranceSequence.js';
 export { BossAuraRenderer } from './animations/BossAuraRenderer.js';
 export { BossPhaseTransitionVfx } from './animations/BossPhaseTransitionVfx.js';
 export { YutaBushEntrance } from './animations/YutaBushEntrance.js';
+export { EyeOfCthulhuEntrance } from './animations/EyeOfCthulhuEntrance.js';
 export { BossRegistry, BOSS_ROSTER } from './registry/BossRegistry.js';

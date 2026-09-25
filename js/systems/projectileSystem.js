@@ -3848,6 +3848,43 @@ class ProjectileSystem {
           }
         }
 
+        const isGunslingerBullet = p.visual === 'gunslingerBullet';
+        if (isGunslingerBullet && expired && !hit) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          if (arena) {
+            if (arena.shape === 'circle') {
+              const cx = arena.x + arena.width / 2;
+              const cy = arena.y + arena.height / 2;
+              const ar = arena.radius || (arena.width / 2);
+              const d = Math.hypot(p.x - cx, p.y - cy);
+              if (d > ar) {
+                const angle = Math.atan2(p.y - cy, p.x - cx);
+                wallX = cx + Math.cos(angle) * (ar - 2);
+                wallY = cy + Math.sin(angle) * (ar - 2);
+              }
+            } else {
+              wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+              wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+            }
+          }
+
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(wallX, wallY, 7, 'gold', '#FEF08A');
+            spawnSparks(wallX, wallY, 5, 'flame', '#F97316');
+            spawnSparks(wallX, wallY, 4, 'silverStreak', '#CBD5E1');
+          }
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(wallX, wallY, 18, '#F59E0B');
+          }
+
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
         if (p.isExplosive || p.visual === 'genosFireball') {
           const expRadius = p.explosionRadius || 35;
           if (typeof spawnImpactFlash === 'function') {
@@ -3864,6 +3901,46 @@ class ProjectileSystem {
 
         if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
           continue;
+        }
+
+        // Universal Wall Impact Sparks for all other projectiles hitting the arena boundary
+        if (expired && !hit && !p.isFrozenByInfinity && !p.isSkywardBeacon && !p.isServantOfCthulhu) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          let isWallHit = false;
+          if (arena) {
+            if (arena.shape === 'circle') {
+              const cx = arena.x + arena.width / 2;
+              const cy = arena.y + arena.height / 2;
+              const ar = arena.radius || (arena.width / 2);
+              const d = Math.hypot(p.x - cx, p.y - cy);
+              if (d + (p.r || 5) >= ar) {
+                isWallHit = true;
+                const angle = Math.atan2(p.y - cy, p.x - cx);
+                wallX = cx + Math.cos(angle) * (ar - 2);
+                wallY = cy + Math.sin(angle) * (ar - 2);
+              }
+            } else {
+              const pr = p.r || 5;
+              if (p.x - pr <= arena.x || p.x + pr >= arena.x + arena.width || p.y - pr <= arena.y || p.y + pr >= arena.y + arena.height) {
+                isWallHit = true;
+                wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+                wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+              }
+            }
+          }
+
+          if (isWallHit) {
+            const sparkColor = p.color || (fighters[p.owner] && fighters[p.owner].color) || '#F59E0B';
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 6, 'flash', sparkColor);
+              spawnSparks(wallX, wallY, 3, 'silverStreak', '#CBD5E1');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, Math.min(22, Math.max(14, (p.r || 5) * 2.5)), sparkColor);
+            }
+          }
         }
 
         if (p.history && p.history.length > 1) {

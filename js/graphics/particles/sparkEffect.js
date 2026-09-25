@@ -1081,31 +1081,15 @@ function drawArcaneSparkle(ctx, effect) {
 
 function drawDefaultImpactFlash(ctx, effect) {
   ctx.save();
-  ctx.imageSmoothingEnabled = false;
-  const P = 2.0;
   const life = effect.life !== undefined ? effect.life : 1.0;
-  const flashR = Math.max(P * 2, effect.size * life);
+  const flashR = Math.min(12, Math.max(2, (effect.size || 8) * life * 0.35));
   const alpha = Math.max(0, Math.min(1, life));
-
-  const mainColor = (typeof effect.color === 'string' && effect.color) ? effect.color : 'rgba(255, 200, 80, 1)';
-
-  // 1. Soft Outer Cross Beams (No solid square block!)
-  ctx.fillStyle = mainColor;
-  ctx.globalAlpha = alpha * 0.75;
-  ctx.fillRect(effect.x - flashR, effect.y - P, flashR * 2, P * 2);
-  ctx.fillRect(effect.x - P, effect.y - flashR, P * 2, flashR * 2);
-
-  // 2. Core Diamond Sparkle (Pixel-art 4-point diamond flare, NOT a solid square box)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.globalAlpha = alpha * 0.95;
-  const coreR = Math.max(P, Math.round((flashR * 0.35) / P) * P);
+  const mainColor = (typeof effect.color === 'string' && effect.color) ? effect.color : '#FFFFFF';
 
   ctx.beginPath();
-  ctx.moveTo(effect.x, effect.y - coreR);
-  ctx.lineTo(effect.x + coreR, effect.y);
-  ctx.lineTo(effect.x, effect.y + coreR);
-  ctx.lineTo(effect.x - coreR, effect.y);
-  ctx.closePath();
+  ctx.arc(effect.x, effect.y, flashR, 0, Math.PI * 2);
+  ctx.fillStyle = mainColor;
+  ctx.globalAlpha = alpha * 0.30;
   ctx.fill();
 
   ctx.restore();

@@ -36,7 +36,7 @@ import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserke
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
 import { getAudioLatencyMs } from './soundSystem.js';
-import { BossAuraRenderer, BossPhaseTransitionVfx, BossEntranceSequence, YutaBushEntrance } from '../bosses/index.js';
+import { BossAuraRenderer, BossPhaseTransitionVfx, BossEntranceSequence, YutaBushEntrance, EyeOfCthulhuEntrance } from '../bosses/index.js';
 import { drawFocMap, getActiveFocMap } from '../../FOC Maps/index.js';
 // Cached DOM elements to adhere strictly to Rule 13 (UI & DOM Query Caching Requirement)
 let _cachedHudTop = null;
@@ -372,15 +372,23 @@ export function renderGame() {
               if (YutaBushEntrance.isActive) {
                 YutaBushEntrance.drawGround(state.ctx, f);
               }
+              if (EyeOfCthulhuEntrance.isActive) {
+                EyeOfCthulhuEntrance.drawGround(state.ctx, f);
+              }
             }
           }
         }
 
         drawFighters(); // Draw fighters ON TOP of dim screens & domain structures so fighters stay 100% visible & un-tinted!
-        if (state.fighters && YutaBushEntrance.isActive) {
+        if (state.fighters && (YutaBushEntrance.isActive || EyeOfCthulhuEntrance.isActive)) {
           for (const f of state.fighters) {
             if (f && f.isBoss && f.hp > 0) {
-              YutaBushEntrance.drawForeground(state.ctx, f);
+              if (YutaBushEntrance.isActive) {
+                YutaBushEntrance.drawForeground(state.ctx, f);
+              }
+              if (EyeOfCthulhuEntrance.isActive) {
+                EyeOfCthulhuEntrance.drawForeground(state.ctx, f);
+              }
             }
           }
         }

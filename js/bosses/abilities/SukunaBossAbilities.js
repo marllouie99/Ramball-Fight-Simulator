@@ -14,7 +14,6 @@ export class SukunaBossAbilities {
     const damage = Math.round((config?.slashDamage || 24) * 1.25);
     const color = config?.enrageAuraColor || '#7F1D1D';
 
-    spawnImpactFlash(boss.x, boss.y, boss.r * 2.2, color);
     spawnSparks(boss.x, boss.y, 16, color, 8);
 
     const step = (Math.PI * 2) / count;

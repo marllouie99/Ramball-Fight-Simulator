@@ -20,7 +20,6 @@ export class ZeusBossAbilities {
     const damage = Math.round((config?.lightningDamage || 20) * (config?.phase2DamageMultiplier || 1.35));
     const boltColor = config?.enrageAuraColor || '#A855F7';
 
-    spawnImpactFlash(boss.x, boss.y, boss.r * 2.5, boltColor);
     spawnSparks(boss.x, boss.y, 20, boltColor, 10);
 
     const step = (Math.PI * 2) / count;

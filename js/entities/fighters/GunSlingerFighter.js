@@ -81,46 +81,53 @@ export class GunSlingerFighter extends Fighter {
   }
 
   _spawnSmoke() {
-    // Spawn smoke particles around the guns when skill is used
-    const particleCount = 6; // Reduced from 8 for better performance
+    // Spawn discrete pixel smoke puffs around the guns when skill is activated
+    const particleCount = 6;
     for (let i = 0; i < particleCount; i++) {
       const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.5;
-      const speed = 0.3 + Math.random() * 0.5;
+      const speed = 0.4 + Math.random() * 0.6;
       const offsetX = Math.cos(this.rightGunAngle) * 25;
       const offsetY = Math.sin(this.rightGunAngle) * 25;
       this.smokeParticles.push({
-        x: this.x + offsetX + (Math.random() - 0.5) * 10,
-        y: this.y + offsetY + (Math.random() - 0.5) * 10,
+        x: this.x + offsetX + (Math.random() - 0.5) * 8,
+        y: this.y + offsetY + (Math.random() - 0.5) * 8,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 30 + Math.random() * 20,
-        maxLife: 30 + Math.random() * 20,
-        size: 8 + Math.random() * 6,
+        vy: Math.sin(angle) * speed - 0.3,
+        life: 25 + Math.random() * 15,
+        maxLife: 35,
+        size: 3.5 + Math.random() * 2.5,
       });
     }
-    this.smokeTimer = 40;
+  }
+
+  _spawnMuzzleSmoke(muzzleX, muzzleY, gunAngle) {
+    if (!this.smokeParticles) this.smokeParticles = [];
+    if (this.smokeParticles.length > 20) return;
+    const speed = 0.5 + Math.random() * 0.5;
+    this.smokeParticles.push({
+      x: muzzleX + (Math.random() - 0.5) * 4,
+      y: muzzleY + (Math.random() - 0.5) * 4,
+      vx: Math.cos(gunAngle) * speed + (Math.random() - 0.5) * 0.4,
+      vy: Math.sin(gunAngle) * speed - (0.4 + Math.random() * 0.3),
+      life: 24,
+      maxLife: 24,
+      size: 3.0 + Math.random() * 2.0,
+    });
   }
 
   _updateSmoke() {
-    // OPTIMIZATION: Quality-based smoke updates
-    const qualityLevel = state.qualityLevel || 1.0;
-    const fps = state.fps || 60;
-    const useAggressiveMode = false;
+    if (!this.smokeParticles || this.smokeParticles.length === 0) return;
 
-    if (useAggressiveMode && Math.random() > 0.5) return;
-
-    if (this.smokeTimer > 0) {
-      this.smokeTimer--;
-    }
     // Update existing particles - iterate backwards for safe removal
     let i = this.smokeParticles.length;
     while (i--) {
       const p = this.smokeParticles[i];
       p.x += p.vx;
       p.y += p.vy;
-      p.vx *= 0.96;
-      p.vy *= 0.96;
-      p.size += 0.15;
+      p.vx *= 0.94;
+      p.vy *= 0.94;
+      p.vy -= 0.025; // Gentle upward thermal smoke buoyancy
+      p.size += 0.06;
       p.life--;
       if (p.life <= 0) {
         this.smokeParticles[i] = this.smokeParticles[this.smokeParticles.length - 1];
@@ -130,76 +137,33 @@ export class GunSlingerFighter extends Fighter {
   }
 
   _drawSmoke(ctx) {
-    const count = this.smokeParticles.length;
+    const count = this.smokeParticles ? this.smokeParticles.length : 0;
     if (count === 0) return;
 
-    // Pre-compute common values
+    const P = 2.0; // Discrete pixel unit
     ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.imageSmoothingEnabled = false;
 
     for (let i = 0; i < count; i++) {
       const p = this.smokeParticles[i];
-      const alpha = (p.life / p.maxLife) * 0.35;
-      const size = p.size;
+      const lifeRatio = p.life / p.maxLife;
+      const alpha = lifeRatio * 0.65;
+      const s = Math.max(1, Math.round(p.size / P));
+      const px = Math.round(p.x / P) * P;
+      const py = Math.round(p.y / P) * P;
 
-      // Use solid circle with alpha instead of expensive gradient
-      // Inner bright core
-      ctx.globalAlpha = alpha * 0.6;
-      ctx.fillStyle = '#a0a0a0';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Outer soft ring
-      ctx.globalAlpha = alpha * 0.3;
-      ctx.fillStyle = '#606060';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
-  _drawLowAmmoSmoke(ctx) {
-    const ratio = this.magazineBullets / this.maxMagazine;
-    const threshold = 0.3;
-    if (ratio >= threshold) return;
-
-    const intensity = 1 - ratio / threshold;
-    const alpha = intensity * 0.4;
-
-    const scale = GUNSLINGER_WEAPON_GRAPHICS?.positioning?.scale || 0.68;
-    const muzzleDist = 45 * scale;
-
-    const rLocalX = this.r * 0.45 + muzzleDist;
-    const rLocalY = 0;
-    const rightMuzzleX = this.x + Math.cos(this.rightGunAngle) * rLocalX - Math.sin(this.rightGunAngle) * rLocalY;
-    const rightMuzzleY = this.y + Math.sin(this.rightGunAngle) * rLocalX + Math.cos(this.rightGunAngle) * rLocalY;
-
-    const lLocalX = -this.r * 0.45 + muzzleDist;
-    const lLocalY = 0;
-    const leftMuzzleX = this.x + Math.cos(this.leftGunAngle) * lLocalX - Math.sin(this.leftGunAngle) * lLocalY;
-    const leftMuzzleY = this.y + Math.sin(this.leftGunAngle) * lLocalX + Math.cos(this.leftGunAngle) * lLocalY;
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-
-    for (const [mx, my] of [[rightMuzzleX, rightMuzzleY], [leftMuzzleX, leftMuzzleY]]) {
-      // Use solid circles instead of expensive gradient
-      // Inner core
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#888888';
-      ctx.beginPath();
-      ctx.arc(mx, my, 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Outer soft ring
-      ctx.globalAlpha = alpha * 0.4;
-      ctx.fillStyle = '#555555';
-      ctx.beginPath();
-      ctx.arc(mx, my, 14, 0, Math.PI * 2);
-      ctx.fill();
+      // Outer dark pixel smoke boundary
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(px - s * P, py - s * P, s * 2 * P, s * 2 * P);
+      // Mid silver smoke body
+      ctx.fillStyle = '#94A3B8';
+      ctx.fillRect(px - (s - 1) * P, py - (s - 1) * P, (s - 1) * 2 * P, (s - 1) * 2 * P);
+      // Specular highlight center
+      if (s >= 2) {
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fillRect(px - Math.floor(s / 2) * P, py - Math.floor(s / 2) * P, Math.floor(s / 2) * 2 * P, Math.floor(s / 2) * 2 * P);
+      }
     }
 
     ctx.restore();
@@ -332,8 +296,9 @@ export class GunSlingerFighter extends Fighter {
 
     const proj = projectileSystem.fireProjectile(this, ownerIndex, bulletDamage, false, speed, false, null, spawnX, spawnY, gunAngle);
     
-    // Spawn fiery golden sparks on the tip of the gun barrel
+    // Spawn fiery golden sparks and dynamic pixel muzzle smoke on the tip of the gun barrel
     spawnSparks(spawnX, spawnY, 6, 'flash');
+    this._spawnMuzzleSmoke(spawnX, spawnY, gunAngle);
 
     if (isRightGun) {
       this.rightMuzzleFlashTimer = 8;
@@ -616,10 +581,8 @@ export class GunSlingerFighter extends Fighter {
       this.leftMuzzleFlashTimer > 0,
       this.leftMuzzleFlashTimer
     );
-    // Draw smoke effect around the guns
+    // Draw dynamic pixel art smoke puffs around the guns
     this._drawSmoke(ctx);
-    // Draw low ammo smoke effect
-    this._drawLowAmmoSmoke(ctx);
   }
 
   drawMagazineBar(ctx) {

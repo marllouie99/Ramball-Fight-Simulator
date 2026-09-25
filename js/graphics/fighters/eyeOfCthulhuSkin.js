@@ -348,18 +348,18 @@ function _drawShreddingBodyOverlay(ctx, r, progress, isPhase2) {
       for (let f = 0; f < peelingPatches.length; f++) {
         const patch = peelingPatches[f];
         const flapAngle = (f * Math.PI / 3) + progress * 2.8;
-        const fx = Math.cos(flapAngle) * (r * (0.65 + progress * 0.40));
-        const fy = Math.sin(flapAngle) * (r * (0.65 + progress * 0.40));
-        const flapScale = (0.50 + progress * 0.55) * ((r * 1.5) / Math.max(patch.sw, patch.sh));
+        const fx = Math.cos(flapAngle) * (r * (0.60 + progress * 0.30));
+        const fy = Math.sin(flapAngle) * (r * (0.60 + progress * 0.30));
+        const flapScale = (0.35 + progress * 0.35) * ((r * 0.70) / Math.max(patch.sw, patch.sh));
         const drawW = patch.sw * flapScale;
         const drawH = patch.sh * flapScale;
 
         // Fleshy red connecting ligament stringers from rupture core to peeling flap
         ctx.strokeStyle = '#991B1B';
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.moveTo(r * 0.35, 0);
-        ctx.quadraticCurveTo(fx * 0.5, fy * 0.5 + Math.sin(progress * 10 + f) * 5, fx, fy);
+        ctx.quadraticCurveTo(fx * 0.5, fy * 0.5 + Math.sin(progress * 10 + f) * 4, fx, fy);
         ctx.stroke();
 
         ctx.save();
@@ -399,9 +399,9 @@ function _drawShreddingBodyOverlay(ctx, r, progress, isPhase2) {
       ];
       for (let m = 0; m < mawSprites.length; m++) {
         const ms = mawSprites[m];
-        const mx = Math.cos(ms.angle) * (r * 0.88);
-        const my = Math.sin(ms.angle) * (r * 0.88);
-        const mScale = (r * 1.1) / Math.max(ms.patch.sw, ms.patch.sh);
+        const mx = Math.cos(ms.angle) * (r * 0.80);
+        const my = Math.sin(ms.angle) * (r * 0.80);
+        const mScale = (r * 0.60) / Math.max(ms.patch.sw, ms.patch.sh);
         const mW = ms.patch.sw * mScale;
         const mH = ms.patch.sh * mScale;
         ctx.save();
