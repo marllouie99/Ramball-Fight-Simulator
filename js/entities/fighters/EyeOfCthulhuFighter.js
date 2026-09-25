@@ -200,6 +200,12 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   _updateHoverState(opponent, ownerIndex, cfg) {
+    if (this.isPhase2) {
+      this.aiState = EOC_STATE.P2_CHASE;
+      this.stateTimer = cfg.p2RamRecoveryPauseFrames || 12;
+      return;
+    }
+
     this.isRamming = false;
     this.isWindupTelegraph = false;
     this.hoverOrbitTime += 0.035;
@@ -226,11 +232,13 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.gunAngle = aimAngle;
     this.angle = aimAngle;
 
-    // Periodic Servant Spawning
-    this.servantSpawnTimer--;
-    if (this.servantSpawnTimer <= 0) {
-      this.servantSpawnTimer = cfg.servantSpawnIntervalInHover || 140;
-      this._spawnServantProjectile(ownerIndex, cfg);
+    // Periodic Servant Spawning (Phase 1 only)
+    if (!this.isPhase2 && !this.isTransforming) {
+      this.servantSpawnTimer--;
+      if (this.servantSpawnTimer <= 0) {
+        this.servantSpawnTimer = cfg.servantSpawnIntervalInHover || 140;
+        this._spawnServantProjectile(ownerIndex, cfg);
+      }
     }
 
     this.stateTimer--;
@@ -243,6 +251,8 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   _spawnServantProjectile(ownerIndex, cfg) {
+    if (this.isPhase2 || this.isTransforming) return; // Strict zero minions in Phase 2
+
     if (projectileSystem && projectileSystem.fireProjectile) {
       const pAngle = this.gunAngle + (Math.random() - 0.5) * 0.4;
       const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 5);
@@ -353,19 +363,36 @@ export class EyeOfCthulhuFighter extends Fighter {
 
   _updateTurnaroundState(opponent, cfg) {
     this.isRamming = false;
-    this.vx *= 0.92;
-    this.vy *= 0.92;
+    this.vx *= 0.88;
+    this.vy *= 0.88;
     this.x += this.vx;
     this.y += this.vy;
 
     this.stateTimer--;
     if (this.stateTimer <= 0) {
-      if (this.ramsRemaining > 0) {
-        this.aiState = EOC_STATE.WINDUP_RAM;
-        this.stateTimer = cfg.ramWindupFrames || 24;
+      if (this.isPhase2) {
+        if (this.ramsRemaining > 0) {
+          // Immediately chain next high-speed physical charge
+          this.committedRamAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+          this.gunAngle = this.committedRamAngle;
+          this.angle = this.committedRamAngle;
+          this.aiState = EOC_STATE.P2_CHAIN_DASH;
+          this.stateTimer = cfg.p2RamDuration || 15;
+          this.isRamming = true;
+          this.hitOpponentThisRam = false;
+        } else {
+          // Sequence complete — brief 12-frame alignment reset before next chain
+          this.aiState = EOC_STATE.P2_CHASE;
+          this.stateTimer = cfg.p2RamRecoveryPauseFrames || 12;
+        }
       } else {
-        this.aiState = EOC_STATE.FATIGUE_PAUSE;
-        this.stateTimer = cfg.ramFatiguePauseFrames || 45;
+        if (this.ramsRemaining > 0) {
+          this.aiState = EOC_STATE.WINDUP_RAM;
+          this.stateTimer = cfg.ramWindupFrames || 24;
+        } else {
+          this.aiState = EOC_STATE.FATIGUE_PAUSE;
+          this.stateTimer = cfg.ramFatiguePauseFrames || 45;
+        }
       }
     }
   }
@@ -380,8 +407,13 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     this.stateTimer--;
     if (this.stateTimer <= 0) {
-      this.aiState = EOC_STATE.HOVER;
-      this.stateTimer = cfg.hoverDurationFrames || 260;
+      if (this.isPhase2) {
+        this.aiState = EOC_STATE.P2_CHASE;
+        this.stateTimer = cfg.p2RamRecoveryPauseFrames || 12;
+      } else {
+        this.aiState = EOC_STATE.HOVER;
+        this.stateTimer = cfg.hoverDurationFrames || 260;
+      }
     }
   }
 
@@ -498,18 +530,32 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
+  takeDamage(amount, attacker, opts = {}) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
+      ? CONFIG.eye_of_cthulhu
+      : eyeOfCthulhuConfig;
+
+    // Phase 1 has 15% DR from its protective outer lens; Phase 2 drops defense completely to 0 (100% full unmitigated damage)
+    if (!this.isPhase2 && !this.isTransforming) {
+      const dr = (cfg.defenseReductionPhase1 !== undefined) ? cfg.defenseReductionPhase1 : 0.15;
+      amount = Math.max(1, amount * (1 - dr));
+    }
+
+    return super.takeDamage(amount, attacker, opts);
+  }
+
   _updateP2ChaseState(opponent, ownerIndex, cfg) {
     this.isRamming = false;
     this.isWindupTelegraph = false;
 
-    // High speed pursuit directly towards player
+    // High speed pursuit and alignment towards player
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
     const dist = Math.hypot(dx, dy) || 1;
 
-    const chaseSpeed = cfg.phase2Speed || 7.8;
-    this.vx += (dx / dist) * 0.42;
-    this.vy += (dy / dist) * 0.42;
+    const chaseSpeed = cfg.p2Speed || cfg.phase2Speed || 8.5;
+    this.vx += (dx / dist) * 0.55;
+    this.vy += (dy / dist) * 0.55;
 
     const currentSpeed = Math.hypot(this.vx, this.vy);
     if (currentSpeed > chaseSpeed) {
@@ -524,33 +570,62 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.gunAngle = aimAngle;
     this.angle = aimAngle;
 
-    // Melee Chomp bite check
-    if (dist <= (cfg.chompReach || 70) && this.p2ChompCooldown <= 0) {
-      this.p2ChompCooldown = cfg.chompCooldown || 24;
-      this._applyRamHit(opponent, cfg.chompDamage || 36, 8.0);
+    // Melee Chomp bite check if opponent is in proximity
+    if (dist <= (cfg.chompReach || 75) && this.p2ChompCooldown <= 0) {
+      this.p2ChompCooldown = cfg.chompCooldown || 20;
+      this._applyRamHit(opponent, cfg.chompDamage || 40, 10.0);
     }
     if (this.p2ChompCooldown > 0) this.p2ChompCooldown--;
 
-    // Decrement special move cooldowns
-    this.p2ChainDashCooldown--;
-    if (this.p2ChainDashCooldown <= 0) {
-      this.p2ChainDashCooldown = cfg.chainDashCooldown || 480;
-      this.ramsRemaining = cfg.chainDashMaxCount || 5;
-      this.aiState = EOC_STATE.WINDUP_RAM;
-      this.stateTimer = 12; // fast telegraph in Phase 2
-      return;
-    }
-
-    this.p2RoarCooldown--;
-    if (this.p2RoarCooldown <= 0) {
-      this.p2RoarCooldown = cfg.roarCooldown || 840;
-      this.aiState = EOC_STATE.P2_ROAR;
-      this.stateTimer = cfg.roarWindupFrames || 15;
+    this.stateTimer--;
+    if (this.stateTimer <= 0) {
+      // Initiate continuous physical charge sequence
+      const hpRatio = (this.hp / (this.maxHp || 1));
+      const chainCount = hpRatio < 0.25 ? (cfg.p2RamChainMax || 6) : (cfg.p2RamChainMin || 3);
+      this.ramsRemaining = chainCount;
+      this.committedRamAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      this.gunAngle = this.committedRamAngle;
+      this.angle = this.committedRamAngle;
+      this.aiState = EOC_STATE.P2_CHAIN_DASH;
+      this.stateTimer = cfg.p2RamDuration || 15;
+      this.isRamming = true;
+      this.hitOpponentThisRam = false;
     }
   }
 
   _updateP2ChainDashState(opponent, ownerIndex, cfg) {
-    this._updateRamDashState(opponent, ownerIndex, cfg);
+    this.isRamming = true;
+    this.isWindupTelegraph = false;
+
+    // Strict Committed Aim Lock (Rule 1.4)
+    this.gunAngle = this.committedRamAngle;
+    this.angle = this.committedRamAngle;
+
+    // Speed scales based on current health (Expert mode enrage scaling)
+    const hpRatio = (this.hp / (this.maxHp || 1));
+    const speed = hpRatio < 0.25 ? (cfg.p2RamSpeedEnraged || 23.5) : (cfg.p2RamSpeedBase || 19.5);
+
+    this.vx = Math.cos(this.committedRamAngle) * speed;
+    this.vy = Math.sin(this.committedRamAngle) * speed;
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Contact Damage check (Phase 2 contact damage boosted to 40)
+    if (!this.hitOpponentThisRam) {
+      const dist = Math.hypot(this.x - opponent.x, this.y - opponent.y);
+      if (dist <= this.r + opponent.r) {
+        this.hitOpponentThisRam = true;
+        this._applyRamHit(opponent, cfg.p2ContactDamage || 40, cfg.p2ContactKnockback || 16.0);
+      }
+    }
+
+    this.stateTimer--;
+    if (this.stateTimer <= 0) {
+      this.ramsRemaining--;
+      this.aiState = EOC_STATE.TURNAROUND;
+      this.stateTimer = cfg.p2RamTurnaroundFrames || 6;
+    }
   }
 
   _updateP2RoarState(opponent, ownerIndex, cfg) {

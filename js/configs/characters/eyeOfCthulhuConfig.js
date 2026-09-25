@@ -85,30 +85,37 @@ export const eyeOfCthulhuConfig = {
   transformationGoreChunkCount: 6,
   transformationBloodSparkInterval: 4,
 
-  // ── Phase 2: Ravenous Maw Rushdown & Stat Shift ──
-  phase2Speed: 7.8,
-  phase2DefenseMod: -0.25, // takes 25% extra damage
+  // ── Phase 2: Defense Drop & Contact Damage Boost ──
+  defensePhase1: 12,
+  defenseReductionPhase1: 0.15, // 15% damage reduction in Phase 1
+  defensePhase2: 0,
+  defenseReductionPhase2: 0.00, // 0 defense / 0% DR: takes 100% full unmitigated damage
+  p2ContactDamage: 40, // increased physical contact / ram damage (boosted from Phase 1's 28)
+  p2ContactKnockback: 16.0,
+  p2Speed: 8.5,
+  phase2Speed: 8.5,
+  p2Radius: 36,
   phase2Radius: 36,
 
+  // ── Phase 2: Relentless Continuous Physical Charges ──
+  p2RamWindupFrames: 10, // rapid telegraph before each charge (0.16s)
+  p2RamSpeedBase: 19.5, // initial charge speed
+  p2RamSpeedEnraged: 23.5, // sub-25% HP berserk speed
+  p2RamDuration: 15, // charge duration frames
+  p2RamTurnaroundFrames: 6, // tight turnaround between chain rams (0.10s)
+  p2RamChainMin: 3, // minimum rams per sequence
+  p2RamChainMax: 6, // maximum rams per sequence (scales with lower HP)
+  p2RamRecoveryPauseFrames: 12, // brief alignment breather before next charge chain (0.20s)
+
   // ── Phase 2: Basic Attack (Ravenous Chomp) ──
-  chompDamage: 36,
-  chompReach: 70,
+  chompDamage: 40,
+  chompReach: 75,
   chompArc: 120 * (Math.PI / 180),
-  chompCooldown: 24,
+  chompCooldown: 20,
   bleedDurationFrames: 180, // 3.0s
   bleedTickInterval: 30, // 0.5s
   bleedDamagePerTick: 15,
   bleedHealReduction: 0.50,
-
-  // ── Phase 2: Expert Chain Zig-Zag Dashes ──
-  chainDashCooldown: 480, // 8.0s
-  chainDashMinCount: 4,
-  chainDashMaxCount: 6,
-  chainDashSpeedBase: 18.0,
-  chainDashSpeedMax: 22.0,
-  chainDashDuration: 14,
-  chainDashPauseBetween: 4,
-  chainDashDamage: 32,
 
   // ── Phase 2: Crimson Roar & Blood Spike Burst ──
   roarCooldown: 840, // 14.0s

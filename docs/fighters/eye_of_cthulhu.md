@@ -107,34 +107,19 @@ Phase 1 follows a rhythmic 3-stage combat cycle:
 
 ---
 
-### Phase 2: Abilities & Attacks (50% – 0% HP)
+### Phase 2: The Maw (50% – 0% HP)
 
-#### Basic Attack: Ravenous Maw Chomp
-- **Mechanic**: A rapid forward snapping bite in a $120^\circ$ frontal cone ($70\text{px}$ reach).
-- **Damage**: `36 damage`.
-- **Status Effect (Bleed)**: Inflicts a 3-second bleed debuff (ticking 15 damage every 30 frames) and cuts enemy healing by 50%.
-- **Cooldown**: `24 frames` (~0.4s).
+#### Passive: Complete Minion Cessation & Zero Defense (Glass Cannon Rushdown)
+- **Minion Cessation**: Spawns **zero** Servants of Cthulhu throughout Phase 2, abandoning all ranged zoning.
+- **Defense Drop to 0**: Defense drops completely from 15% damage reduction down to **0 DEF / 0% DR**, taking 100% full unmitigated raw damage from all player attacks.
+- **Increased Contact Damage**: Physical collision and charge damage increases from 28 to **40 contact damage**.
 
-#### Skill 1: Expert Mode Chain Zig-Zag Dashes
-- **Mechanic**: Executes a blistering sequence of **4 to 6 rapid micro-dashes** targeting the opponent's predicted movement vectors.
-- **VFX & Speed Lines**: Renders 4-point needle speed lines (Rule 16 standard) in Crimson (`#E11D48`) and White Core (`#FFFFFF`) behind the body.
-- **Scaling**: Dash speed scales higher as health drops lower (reaching up to `22.0 px/frame` below 15% HP).
-- **Cooldown**: `8.0 seconds`.
-
-#### Skill 2: Crimson Roar & Blood Spike Burst
-- **Mechanic**: Pauses for 15 frames and screeches, generating a $160\text{px}$ radial shockwave.
-- **Spike Burst**: Scatters 12 piercing bone/blood needles radially in $360^\circ$ (`damage: 22` each).
-- **Control Effect**: Pushes the opponent back and interrupts non-super-armor channeling.
-- **Cooldown**: `14.0 seconds`.
-
-#### Ultimate: True Night Horrors (Blood Moon Surge)
-- **Mechanic**: Enters total frenzy for 6 seconds.
-- **Effects**:
-  - Gaze lights the arena in Blood Moon crimson darkness.
-  - Grants 100% immunity to hit-stun and movement-stopping CC.
-  - Decreases all dash cooldowns by 50%.
-  - Leaves lingering hazardous crimson ichor pools on the arena floor that deal contact burn damage.
-- **Cooldown**: `35.0 seconds`.
+#### Core Loop: Relentless Continuous Physical Charges
+- **Mechanic**: The Eye engages in rapid, continuous physical charges through opponents, chaining **3 to 6 high-speed rams** in rapid succession.
+- **Turnaround Window**: Executes ultra-tight **6-frame (0.10s) turnarounds** between chain dashes with near-instant re-aiming.
+- **Enrage Speed Scaling**: Dash velocity scales from `19.5 px/frame` at 50% HP up to `23.5 px/frame` below 25% HP.
+- **VFX & Speed Lines**: Renders 4-point filled needle speed lines (Rule 16 standard) in Crimson (`#E11D48`) and White Core (`#FFFFFF`) behind the trailing tendrils.
+- **Melee Chomp Bite**: In close proximity ($75\text{px}$ reach), snaps in a $120^\circ$ frontal cone dealing 40 damage and inflicting Bleed debuff.
 
 ---
 
