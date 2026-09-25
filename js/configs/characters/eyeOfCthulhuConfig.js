@@ -55,8 +55,8 @@ export const eyeOfCthulhuConfig = {
   servantMaxActive: 4,
   servantHp: 120,
   servantRadius: 10,
-  servantInitialSpeed: 5.2,
-  servantSpeed: 3.4, // controlled pursuit speed (tight body tracking)
+  servantInitialSpeed: 7.2,
+  servantSpeed: 7.4, // controlled pursuit speed (tight body tracking)
   servantTurnRate: 0.08, // responsive turning without wide slingshot overshoots
   servantDamage: 12,
   servantAttackInterval: 24, // bite attack tick interval when hovering on target (0.4s)

@@ -10,6 +10,10 @@ import { GAME_MODES } from '../../core/modeConfig.js';
  * @param {Object} fighter - The fighter that died
  */
 export function spawnDeathShatter(fighter) {
+  if (fighter.characterId === 'eye_of_cthulhu' || fighter.type === 'eye_of_cthulhu' || fighter.isServantOfCthulhu) {
+    return spawnEyeOfCthulhuTerrariaDeath(fighter, Boolean(fighter.isServantOfCthulhu));
+  }
+
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   
   // OPTIMIZED: Apply quality level to death effect limits
@@ -73,6 +77,95 @@ export function spawnDeathShatter(fighter) {
   }
 }
 
+/**
+ * Spawns an authentic Terraria-style gore shatter death effect for Eye of Cthulhu.
+ * Drops distinct anatomical gore chunks (optic nerve tendril bundle, curved sclera shells with veins,
+ * pupil/iris in phase 1 or fanged jaws in phase 2, and visceral pixelated meat gibs).
+ * @param {Object} fighter - The Eye of Cthulhu fighter or minion entity that died
+ * @param {boolean} isMinion - True if this is a Servant of Cthulhu minion
+ */
+export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
+  const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 25 : 60) * qualityMultiplier);
+
+  const isPhase2 = Boolean(
+    fighter.isPhase2 ||
+    fighter._isPhase2 ||
+    fighter.aiState === 'P2_CHASE' ||
+    fighter.aiState === 'P2_CHAIN_DASH' ||
+    fighter.aiState === 'P2_ROAR' ||
+    fighter.hasTransformed
+  );
+
+  const baseR = fighter.r || (isMinion ? 10 : 32);
+  const goreDefs = [
+    // 1. Optic Nerve Tendril Cluster
+    { type: 'eoc_nerve_tendril', size: baseR * 0.45, color: '#881337', angleOffset: Math.PI },
+    // 2. Upper Sclera Shell (with red branching veins)
+    { type: 'eoc_sclera_top', size: baseR * 0.50, color: '#F8FAFC', angleOffset: -Math.PI / 2 },
+    // 3. Lower Sclera Shell (with crimson torn edges)
+    { type: 'eoc_sclera_bottom', size: baseR * 0.46, color: '#E2E8F0', angleOffset: Math.PI / 2 },
+  ];
+
+  if (isPhase2) {
+    // Phase 2: Upper and Lower razor fanged jaws
+    goreDefs.push(
+      { type: 'eoc_fanged_maw_top', size: baseR * 0.44, color: '#7F1D1D', angleOffset: -0.3 },
+      { type: 'eoc_fanged_maw_bottom', size: baseR * 0.42, color: '#991B1B', angleOffset: 0.3 }
+    );
+  } else {
+    // Phase 1: Iris & Pupil core chunk
+    goreDefs.push(
+      { type: 'eoc_iris_pupil', size: baseR * 0.42, color: '#06B6D4', angleOffset: 0 }
+    );
+  }
+
+  // Add visceral organic gib chunks
+  const gibCount = isMinion ? 3 : Math.max(4, Math.floor(7 * qualityMultiplier));
+  const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#4C0519', '#7F1D1D'];
+  for (let g = 0; g < gibCount; g++) {
+    goreDefs.push({
+      type: 'eoc_visceral_chunk',
+      size: baseR * (0.18 + Math.random() * 0.16),
+      color: gibColors[g % gibColors.length],
+      angleOffset: (Math.PI * 2 * g) / gibCount
+    });
+  }
+
+  const baseSpeed = isMinion ? 3.5 : 5.8;
+
+  for (let i = 0; i < goreDefs.length; i++) {
+    if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
+      state.deathEffects.shift();
+    }
+
+    const def = goreDefs[i];
+    const angle = def.angleOffset !== undefined
+      ? def.angleOffset + (Math.random() - 0.5) * 0.6
+      : (Math.PI * 2 * i) / goreDefs.length + (Math.random() - 0.5) * 0.5;
+
+    const speed = baseSpeed + Math.random() * (isMinion ? 2.5 : 4.5);
+
+    state.deathEffects.push({
+      x: fighter.x + (Math.random() - 0.5) * (baseR * 0.4),
+      y: fighter.y + (Math.random() - 0.5) * (baseR * 0.4),
+      vx: Math.cos(angle) * speed + (fighter.vx || 0) * 0.25,
+      vy: Math.sin(angle) * speed - ((isMinion ? 1.5 : 2.5) + Math.random() * 3.0),
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.45,
+      size: def.size,
+      color: def.color,
+      goreType: def.type,
+      isEyeOfCthulhuGore: true,
+      life: 1.0,
+      maxLife: 1.0,
+      decay: isMinion ? 0.024 : (0.009 + Math.random() * 0.004),
+      gravity: 0.15,
+    });
+  }
+}
+
 export function spawnMachineCorpse(x, y, angle) {
   // Spawn a large "dead turret" piece that stays on the floor where it was destroyed
   state.deathEffects.push({
@@ -109,6 +202,13 @@ export function updateDeathEffects() {
       effect.vx *= 0.98;
       effect.vy *= 0.98;
       effect.rotation += effect.rotationSpeed;
+
+      // Eye of Cthulhu gore blood dripping trail
+      if (effect.isEyeOfCthulhuGore && effect.life > 0.25 && Math.random() < 0.20) {
+        import('./sparkEffect.js').then(module => {
+          module.spawnSparks(effect.x + (Math.random() - 0.5) * 4, effect.y + (Math.random() - 0.5) * 4, 1, 'bloodSpark', '#E11D48');
+        });
+      }
     } else {
       // Machine corpse occasionally emits smoke sparks
       if (Math.random() < 0.15) {
@@ -177,8 +277,11 @@ export function drawDeathEffects() {
     ctx.save();
     ctx.translate(effect.x, effect.y);
     ctx.rotate(effect.rotation);
-    ctx.globalAlpha = Math.min(1, effect.life);
-    if (effect.isHollowMaskShard) {
+    ctx.globalAlpha = Math.min(1, Math.max(0, effect.life));
+
+    if (effect.isEyeOfCthulhuGore) {
+      drawTerrariaEyeGore(ctx, effect);
+    } else if (effect.isHollowMaskShard) {
       const s = effect.size;
       // Draw sharp polygonal porcelain mask fragment
       ctx.beginPath();
@@ -325,5 +428,243 @@ export function drawDeathEffects() {
     }
     
     ctx.restore();
+  }
+}
+
+/**
+ * Renders an authentic pixel art Terraria gore chunk for the Eye of Cthulhu death shatter.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} effect
+ */
+function drawTerrariaEyeGore(ctx, effect) {
+  const s = effect.size || 12;
+
+  switch (effect.goreType) {
+    case 'eoc_nerve_tendril': {
+      // Optic nerve root muscle
+      ctx.fillStyle = '#881337';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.6, -s * 0.4);
+      ctx.lineTo(s * 0.2, -s * 0.5);
+      ctx.lineTo(s * 0.5, 0);
+      ctx.lineTo(s * 0.2, s * 0.5);
+      ctx.lineTo(-s * 0.6, s * 0.4);
+      ctx.lineTo(-s * 0.9, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Trailing jagged tendril tentacles
+      ctx.fillStyle = '#4C0519';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.6, -s * 0.3);
+      ctx.lineTo(-s * 1.1, -s * 0.5);
+      ctx.lineTo(-s * 0.7, -s * 0.1);
+      ctx.lineTo(-s * 1.2, s * 0.1);
+      ctx.lineTo(-s * 0.6, s * 0.2);
+      ctx.lineTo(-s * 1.0, s * 0.4);
+      ctx.lineTo(-s * 0.5, s * 0.3);
+      ctx.closePath();
+      ctx.fill();
+
+      // Manga ink outline
+      ctx.strokeStyle = '#111114';
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+      break;
+    }
+
+    case 'eoc_sclera_top': {
+      // Upper ivory sclera dome
+      ctx.fillStyle = '#F8FAFC';
+      ctx.beginPath();
+      ctx.arc(0, 0, s, -Math.PI, 0);
+      ctx.lineTo(s * 0.8, s * 0.2);
+      ctx.lineTo(s * 0.3, 0);
+      ctx.lineTo(-s * 0.2, s * 0.25);
+      ctx.lineTo(-s * 0.7, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Branching crimson veins
+      ctx.strokeStyle = '#DC2626';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.6, -s * 0.3);
+      ctx.lineTo(-s * 0.3, -s * 0.5);
+      ctx.lineTo(0, -s * 0.4);
+      ctx.lineTo(s * 0.4, -s * 0.6);
+      ctx.moveTo(-s * 0.1, -s * 0.4);
+      ctx.lineTo(s * 0.2, -s * 0.2);
+      ctx.stroke();
+
+      // Torn bloody bottom edge
+      ctx.fillStyle = '#991B1B';
+      ctx.beginPath();
+      ctx.moveTo(-s, 0);
+      ctx.lineTo(-s * 0.6, s * 0.15);
+      ctx.lineTo(-s * 0.2, s * 0.25);
+      ctx.lineTo(s * 0.3, 0);
+      ctx.lineTo(s * 0.8, s * 0.2);
+      ctx.lineTo(s, 0);
+      ctx.lineTo(s * 0.8, -s * 0.1);
+      ctx.lineTo(-s * 0.8, -s * 0.1);
+      ctx.closePath();
+      ctx.fill();
+
+      // Dark outline
+      ctx.strokeStyle = '#111114';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      break;
+    }
+
+    case 'eoc_sclera_bottom': {
+      // Lower sclera shell
+      ctx.fillStyle = '#E2E8F0';
+      ctx.beginPath();
+      ctx.arc(0, 0, s, 0, Math.PI);
+      ctx.lineTo(-s * 0.7, -s * 0.15);
+      ctx.lineTo(-s * 0.2, -s * 0.3);
+      ctx.lineTo(s * 0.3, -s * 0.1);
+      ctx.lineTo(s * 0.8, -s * 0.2);
+      ctx.closePath();
+      ctx.fill();
+
+      // Red capillary veins
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.5, s * 0.3);
+      ctx.lineTo(-s * 0.2, s * 0.6);
+      ctx.lineTo(s * 0.3, s * 0.4);
+      ctx.stroke();
+
+      // Crimson torn meat
+      ctx.fillStyle = '#7F1D1D';
+      ctx.beginPath();
+      ctx.moveTo(-s, 0);
+      ctx.lineTo(-s * 0.7, -s * 0.15);
+      ctx.lineTo(-s * 0.2, -s * 0.3);
+      ctx.lineTo(s * 0.3, -s * 0.1);
+      ctx.lineTo(s * 0.8, -s * 0.2);
+      ctx.lineTo(s, 0);
+      ctx.lineTo(s * 0.6, s * 0.15);
+      ctx.lineTo(-s * 0.6, s * 0.15);
+      ctx.closePath();
+      ctx.fill();
+
+      // Dark outline
+      ctx.strokeStyle = '#111114';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      break;
+    }
+
+    case 'eoc_iris_pupil': {
+      // Sclera tissue ring
+      ctx.fillStyle = '#F8FAFC';
+      ctx.beginPath();
+      ctx.arc(0, 0, s, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cyan Iris
+      ctx.fillStyle = '#06B6D4';
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.72, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dark Pupil
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+
+      // White Specular shine
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(-s * 0.22, -s * 0.22, s * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Red perimeter capillaries
+      ctx.strokeStyle = '#DC2626';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(s * 0.6, -s * 0.6); ctx.lineTo(s * 0.85, -s * 0.85);
+      ctx.moveTo(-s * 0.7, s * 0.5); ctx.lineTo(-s * 0.9, s * 0.7);
+      ctx.stroke();
+
+      // Dark outline
+      ctx.strokeStyle = '#111114';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, s, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+
+    case 'eoc_fanged_maw_top':
+    case 'eoc_fanged_maw_bottom': {
+      const isTop = effect.goreType === 'eoc_fanged_maw_top';
+      // Mouth cavity flesh
+      ctx.fillStyle = '#7F1D1D';
+      ctx.beginPath();
+      ctx.moveTo(-s, 0);
+      ctx.quadraticCurveTo(0, isTop ? -s * 0.75 : s * 0.75, s, 0);
+      ctx.lineTo(s * 0.8, isTop ? s * 0.35 : -s * 0.35);
+      ctx.lineTo(-s * 0.8, isTop ? s * 0.35 : -s * 0.35);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3 Sharp triangular ivory teeth
+      ctx.fillStyle = '#FFFFFF';
+      const teethX = [-s * 0.55, -s * 0.05, s * 0.45];
+      for (const tx of teethX) {
+        ctx.beginPath();
+        ctx.moveTo(tx - s * 0.14, 0);
+        ctx.lineTo(tx + s * 0.14, 0);
+        ctx.lineTo(tx, isTop ? s * 0.55 : -s * 0.55);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+      }
+
+      // Gum/bone edge
+      ctx.fillStyle = '#991B1B';
+      ctx.fillRect(-s * 0.9, isTop ? -s * 0.25 : 0, s * 1.8, s * 0.25);
+
+      // Dark outline
+      ctx.strokeStyle = '#111114';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(-s * 0.9, isTop ? -s * 0.25 : 0, s * 1.8, s * 0.25);
+      break;
+    }
+
+    case 'eoc_visceral_chunk':
+    default: {
+      ctx.fillStyle = effect.color || '#DC2626';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.8, -s * 0.4);
+      ctx.lineTo(-s * 0.2, -s * 0.9);
+      ctx.lineTo(s * 0.7, -s * 0.5);
+      ctx.lineTo(s * 0.9, s * 0.3);
+      ctx.lineTo(s * 0.3, s * 0.8);
+      ctx.lineTo(-s * 0.6, s * 0.7);
+      ctx.closePath();
+      ctx.fill();
+
+      // Dark meat core
+      ctx.fillStyle = '#7F1D1D';
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dark ink outline
+      ctx.strokeStyle = '#111114';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      break;
+    }
   }
 }

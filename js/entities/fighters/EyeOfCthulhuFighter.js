@@ -892,6 +892,16 @@ export class EyeOfCthulhuFighter extends Fighter {
 
   onDeath() {
     this._playAudio('death', 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', 1.0);
+    triggerGlobalScreenShake(10, 25);
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 70, 'crimsonSniper');
+    }
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(this.x, this.y, 25, 'bloodSpark', '#E11D48');
+    }
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 20, 'EYE DEFEATED! 👁️💀', '#E11D48');
+    }
     super.onDeath();
   }
 

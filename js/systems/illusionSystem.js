@@ -2,6 +2,7 @@ import { state, isGlobalHitPauseActive, spawnFloatingText, isChampionScreenActiv
 import { CONFIG } from '../core/config.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { spawnIllusionSpawn } from '../graphics/particles/illusionSpawnEffect.js';
+import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
 import { spatialGrid } from './physics.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { triggerMahitoParalyzeExplosion, applySoulDisfigurementStack } from '../entities/fighters/mahito/mahitoCombat.js';
@@ -170,7 +171,11 @@ export function updateIllusions() {
       }
 
       if (illusion.isServantOfCthulhu) {
-        spawnIllusionDeath({ ...illusion, color: '#E11D48' });
+        if (typeof spawnDeathShatter === 'function') {
+          spawnDeathShatter(illusion);
+        } else {
+          spawnIllusionDeath({ ...illusion, color: '#E11D48' });
+        }
         if (typeof spawnSparks === 'function') {
           spawnSparks(illusion.x, illusion.y, 14, 'bloodSpark', '#E11D48');
         }
