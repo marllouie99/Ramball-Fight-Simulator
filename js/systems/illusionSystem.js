@@ -469,7 +469,7 @@ export function updateIllusions() {
 
       // Only apply base movement if not being heavily knocked back
       const isKnockedBack = illusion.knockbackVx !== undefined && (Math.abs(illusion.knockbackVx) > 2 || Math.abs(illusion.knockbackVy) > 2);
-      if (!isKnockedBack && !illusion.isRika) { // Rika handles her own movement
+      if (!isKnockedBack && !illusion.isRika && !illusion.isServantOfCthulhu) { // Rika and Servant handle their own movement
         // Freeze movement if currently targeted by ambush
         if (illusion.isTargetOfAmbush) {
           illusion.vx = 0;
@@ -518,7 +518,7 @@ export function updateIllusions() {
           illusion.vx = Math.cos(randAngle) * targetSpeed;
           illusion.vy = Math.sin(randAngle) * targetSpeed;
         }
-      } else {
+      } else if (!illusion.isServantOfCthulhu) {
         // Normalize speed every frame to match owner's movement speed (non-evasion illusions)
         const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
         let targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null)
@@ -560,21 +560,25 @@ export function updateIllusions() {
         const cx = arena.x + arena.width / 2;
         const cy = arena.y + arena.height / 2;
         const ar = (arena.radius || (arena.width / 2));
-        const maxLeash = ar + 350;
+        const maxLeash = ar - (illusion.r || 10) - 15;
         const distFromC = Math.hypot(illusion.x - cx, illusion.y - cy);
         if (distFromC > maxLeash && distFromC > 0) {
           const nx = (cx - illusion.x) / distFromC;
           const ny = (cy - illusion.y) / distFromC;
-          illusion.vx += nx * 0.5;
-          illusion.vy += ny * 0.5;
+          const excess = distFromC - maxLeash;
+          illusion.vx += nx * Math.min(excess * 0.15, 2.5);
+          illusion.vy += ny * Math.min(excess * 0.15, 2.5);
         }
       }
 
       if (nearestTarget && !insideSphere) {
-        illusion.hoverAngle = (illusion.hoverAngle || 0) + (illusion.hoverOrbitSpeed || 0.05);
-        const hDist = illusion.hoverDistance || 24;
+        const targetVx = nearestTarget.vx || 0;
+        const targetVy = nearestTarget.vy || 0;
 
-        // Orbit destination point around the enemy body
+        illusion.hoverAngle = (illusion.hoverAngle || 0) + (illusion.hoverOrbitSpeed || 0.04);
+        const hDist = illusion.hoverDistance || 20;
+
+        // Orbit destination point closely around the enemy body
         const destX = nearestTarget.x + Math.cos(illusion.hoverAngle) * hDist;
         const destY = nearestTarget.y + Math.sin(illusion.hoverAngle) * hDist;
 
@@ -582,13 +586,31 @@ export function updateIllusions() {
         const dy = destY - illusion.y;
         const dist = Math.hypot(dx, dy) || 1;
 
-        const maxSpeed = illusion.moveSpeed || 5.2;
-        const turnRate = illusion.turnRate || 0.06;
-        const desiredVx = (dx / dist) * maxSpeed;
-        const desiredVy = (dy / dist) * maxSpeed;
+        const maxSpeed = illusion.moveSpeed || 3.4;
+        const turnRate = illusion.turnRate || 0.08;
+
+        let desiredVx = (dx / dist) * maxSpeed + targetVx * 0.5;
+        let desiredVy = (dy / dist) * maxSpeed + targetVy * 0.5;
+
+        const desMag = Math.hypot(desiredVx, desiredVy);
+        if (desMag > maxSpeed * 1.25 && desMag > 0) {
+          desiredVx = (desiredVx / desMag) * maxSpeed * 1.25;
+          desiredVy = (desiredVy / desMag) * maxSpeed * 1.25;
+        }
 
         illusion.vx += (desiredVx - illusion.vx) * turnRate;
         illusion.vy += (desiredVy - illusion.vy) * turnRate;
+
+        // Damping to prevent slingshot oscillation
+        illusion.vx *= 0.94;
+        illusion.vy *= 0.94;
+
+        const curSpd = Math.hypot(illusion.vx, illusion.vy);
+        if (curSpd > maxSpeed) {
+          illusion.vx = (illusion.vx / curSpd) * maxSpeed;
+          illusion.vy = (illusion.vy / curSpd) * maxSpeed;
+        }
+
         illusion.x += illusion.vx;
         illusion.y += illusion.vy;
 
@@ -598,7 +620,7 @@ export function updateIllusions() {
 
         // Continuous Contact / Bite Attack Ticks (Hovering on Target's Body)
         const bodyDist = Math.hypot(nearestTarget.x - illusion.x, nearestTarget.y - illusion.y);
-        const touchDist = (nearestTarget.r || 20) + illusion.r + 14;
+        const touchDist = (nearestTarget.r || 20) + illusion.r + 12;
 
         if (illusion.attackCooldown > 0) {
           illusion.attackCooldown--;
@@ -625,8 +647,8 @@ export function updateIllusions() {
         }
       } else {
         // Idle drift when no active target
-        illusion.vx *= 0.95;
-        illusion.vy *= 0.95;
+        illusion.vx *= 0.90;
+        illusion.vy *= 0.90;
         illusion.x += illusion.vx;
         illusion.y += illusion.vy;
       }

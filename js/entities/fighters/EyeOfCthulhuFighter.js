@@ -318,7 +318,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       const pAngle = this.gunAngle + (Math.random() - 0.5) * 0.6;
       const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 8) + (Math.random() - 0.5) * 6;
       const spawnY = this.y + Math.sin(this.gunAngle) * (this.r + 8) + (Math.random() - 0.5) * 6;
-      const initSpeed = cfg.servantInitialSpeed || 3.5;
+      const initSpeed = cfg.servantInitialSpeed || 2.2;
 
       const minion = {
         x: spawnX,
@@ -340,13 +340,13 @@ export class EyeOfCthulhuFighter extends Fighter {
         themeColor: cfg.themeColor || '#E11D48',
         angle: pAngle,
         gunAngle: pAngle,
-        moveSpeed: cfg.servantSpeed || 5.2,
-        turnRate: cfg.servantTurnRate || 0.055,
+        moveSpeed: cfg.servantSpeed || 3.4,
+        turnRate: cfg.servantTurnRate || 0.08,
         attackCooldown: 0,
         attackInterval: cfg.servantAttackInterval || 24,
         hoverAngle: Math.random() * Math.PI * 2,
-        hoverOrbitSpeed: 0.045 + Math.random() * 0.03,
-        hoverDistance: (cfg.servantHoverRadius || 24) + Math.random() * 12,
+        hoverOrbitSpeed: 0.035 + Math.random() * 0.02,
+        hoverDistance: (cfg.servantHoverRadius || 20) + Math.random() * 8,
         hitFlashTimer: 0,
         timeStopTimer: 0,
         hitStunTimer: 0,

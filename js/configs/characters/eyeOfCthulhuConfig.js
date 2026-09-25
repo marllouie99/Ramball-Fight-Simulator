@@ -55,12 +55,12 @@ export const eyeOfCthulhuConfig = {
   servantMaxActive: 4,
   servantHp: 120,
   servantRadius: 10,
-  servantInitialSpeed: 3.5,
-  servantSpeed: 5.2, // max pursuit speed
-  servantTurnRate: 0.055, // smooth Terraria tracking acceleration
+  servantInitialSpeed: 2.2,
+  servantSpeed: 3.4, // controlled pursuit speed (tight body tracking)
+  servantTurnRate: 0.08, // responsive turning without wide slingshot overshoots
   servantDamage: 12,
   servantAttackInterval: 24, // bite attack tick interval when hovering on target (0.4s)
-  servantHoverRadius: 24, // hovering distance around enemy body
+  servantHoverRadius: 20, // close body hovering distance
   servantHealOrbValue: 80,
 
   // ── Phase 1: Telegraphed Triple Ram (Terraria State Machine) ──
