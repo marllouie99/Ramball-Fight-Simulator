@@ -125,7 +125,7 @@ Phase 1 follows a rhythmic 3-stage combat cycle:
 - **Mechanic**: The Eye engages in rapid, continuous physical charges through opponents, chaining **3 to 6 high-speed rams** in rapid succession.
 - **Turnaround Window**: Executes ultra-tight **6-frame (0.10s) turnarounds** between chain dashes with near-instant re-aiming.
 - **Enrage Speed Scaling**: Dash velocity scales from `19.5 px/frame` at 50% HP up to `23.5 px/frame` below 25% HP.
-- **VFX & Speed Lines**: Renders 4-point filled needle speed lines (Rule 16 standard) in Crimson (`#E11D48`) and White Core (`#FFFFFF`) behind the trailing tendrils.
+- **VFX & Ghost Afterimages**: Renders smooth fading ethereal sprite afterimages trailing in world space behind the charging ocular horror.
 - **Melee Chomp Bite**: In close proximity ($75\text{px}$ reach), snaps in a $120^\circ$ frontal cone dealing 40 damage and inflicting Bleed debuff.
 
 ---

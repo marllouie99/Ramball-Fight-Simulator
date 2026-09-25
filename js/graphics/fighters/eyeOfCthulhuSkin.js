@@ -108,26 +108,49 @@ function _drawProceduralEye(ctx, r, isPhase2) {
   ctx.restore();
 }
 
-function _drawDashSpeedLines(ctx, r) {
-  ctx.save();
-  const colors = ['#E11D48', '#FF4D6D', '#FFFFFF', '#881337'];
-  for (let i = 0; i < 5; i++) {
-    const yOff = (i - 2) * (r * 0.35) + ((i * 17) % 7) - 3;
-    const startX = -r * 1.6 - ((i * 23) % 25);
-    const endX = startX - (r * 1.8 + ((i * 31) % 30));
-    const thick = 1.2 + (i % 2) * 0.8;
-    const midX = (startX + endX) / 2;
+function _drawAfterImages(ctx, afterImages, r) {
+  if (!afterImages || afterImages.length === 0) return;
+  const p1Img = _getPhase1Image();
+  const p2Img = _getPhase2Image();
 
-    ctx.fillStyle = colors[i % colors.length];
-    ctx.beginPath();
-    ctx.moveTo(startX, yOff);
-    ctx.lineTo(midX, yOff - thick);
-    ctx.lineTo(endX, yOff);
-    ctx.lineTo(midX, yOff + thick);
-    ctx.closePath();
-    ctx.fill();
+  for (let i = 0; i < afterImages.length; i++) {
+    const ai = afterImages[i];
+    if (!ai || ai.timer <= 0) continue;
+    const progress = ai.timer / (ai.maxTimer || 14);
+    const alpha = progress * 0.36; // Soft ethereal ghost trail opacity
+    const img = ai.isPhase2 ? p2Img : p1Img;
+    const frames = ai.isPhase2 ? PHASE2_FRAMES : PHASE1_FRAMES;
+    const fBox = frames[0] || { sx: 16, sy: 345, sw: 270, sh: 198 };
+    const aiR = ai.r || r || 32;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(ai.x, ai.y);
+    ctx.rotate(ai.angle);
+
+    const facingLeft = Math.abs(ai.angle) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const drawHeight = aiR * 2.2;
+      const drawWidth = drawHeight * (fBox.sw / fBox.sh);
+      const drawX = -drawWidth * 0.65;
+      const drawY = -drawHeight * 0.50;
+
+      ctx.drawImage(
+        img,
+        fBox.sx, fBox.sy, fBox.sw, fBox.sh,
+        drawX, drawY, drawWidth, drawHeight
+      );
+    } else {
+      _drawProceduralEye(ctx, aiR, ai.isPhase2);
+    }
+
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 function _drawWindupTelegraph(ctx, r) {
@@ -197,6 +220,11 @@ function _drawShedGoreParticles(ctx, particles) {
 export function drawEyeOfCthulhuSkin(ctx, fighter) {
   if (!ctx || !fighter) return;
 
+  // Render dash afterimages in world space behind the fighter
+  if (fighter.afterImages && fighter.afterImages.length > 0) {
+    _drawAfterImages(ctx, fighter.afterImages, fighter.r || 32);
+  }
+
   // Render flying shed gore particles in world space
   if (fighter.shedGoreParticles && fighter.shedGoreParticles.length > 0) {
     _drawShedGoreParticles(ctx, fighter.shedGoreParticles);
@@ -249,11 +277,6 @@ export function drawEyeOfCthulhuSkin(ctx, fighter) {
   // Draw Windup Telegraph Indicator
   if (fighter.isWindupTelegraph) {
     _drawWindupTelegraph(ctx, r);
-  }
-
-  // Draw 4-point Needle Dash Speed Lines behind tendrils
-  if (fighter.isRamming) {
-    _drawDashSpeedLines(ctx, r);
   }
 
   // Draw sprite image or fallback

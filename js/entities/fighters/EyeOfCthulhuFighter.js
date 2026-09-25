@@ -70,6 +70,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.transformationSpinAngle = 0;
     this.transformationProgress = 0;
     this.shedGoreParticles = [];
+    this.afterImages = [];
     this.p2ChainDashCooldown = cfg.chainDashCooldown || 480;
     this.p2RoarCooldown = cfg.roarCooldown || 840;
     this.p2ChompCooldown = 0;
@@ -161,8 +162,9 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.y += this.vy;
     }
 
-    // Always update active gore particles
+    // Always update active gore particles and dash afterimages
     this._updateShedGoreParticles();
+    this._updateAfterImages();
 
     // 5. Soft Arena Leashing (Bypass standard rigid wall bounce)
     this.resolveWallBounce(arena, opponent);
@@ -556,6 +558,36 @@ export class EyeOfCthulhuFighter extends Fighter {
       p.alpha = Math.max(0, p.life / p.maxLife);
       if (p.life <= 0) {
         this.shedGoreParticles.splice(i, 1);
+      }
+    }
+  }
+
+  _updateAfterImages() {
+    if (!this.afterImages) this.afterImages = [];
+
+    // Push new ghost snapshot while actively charging/ramming
+    if (this.isRamming && !this.isTransforming) {
+      this.afterImages.push({
+        x: this.x,
+        y: this.y - (this.z || 0),
+        angle: this.gunAngle || this.angle || 0,
+        r: this.r || 32,
+        isPhase2: Boolean(this.isPhase2 || this._isPhase2),
+        timer: 14,
+        maxTimer: 14
+      });
+      if (this.afterImages.length > 7) {
+        this.afterImages.shift();
+      }
+    }
+
+    // Decay existing afterimages
+    if (this.afterImages.length > 0) {
+      for (let i = this.afterImages.length - 1; i >= 0; i--) {
+        this.afterImages[i].timer--;
+        if (this.afterImages[i].timer <= 0) {
+          this.afterImages.splice(i, 1);
+        }
       }
     }
   }
