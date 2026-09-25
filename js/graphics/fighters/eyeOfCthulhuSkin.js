@@ -30,7 +30,7 @@ const PHASE2_FRAMES = [
   { sx: 1494, sy: 348, sw: 256, sh: 197 },
 ];
 
-function _getPhase1Image() {
+export function getEyePhase1Image() {
   if (!_phase1Image && typeof Image !== 'undefined') {
     _phase1Image = new Image();
     _phase1Image.onload = () => { _p1Loaded = true; };
@@ -40,7 +40,7 @@ function _getPhase1Image() {
   return _phase1Image;
 }
 
-function _getPhase2Image() {
+export function getEyePhase2Image() {
   if (!_phase2Image && typeof Image !== 'undefined') {
     _phase2Image = new Image();
     _phase2Image.onload = () => { _p2Loaded = true; };
@@ -50,10 +50,13 @@ function _getPhase2Image() {
   return _phase2Image;
 }
 
+const _getPhase1Image = getEyePhase1Image;
+const _getPhase2Image = getEyePhase2Image;
+
 // Pre-initialize cached image references on load
 if (typeof window !== 'undefined') {
-  _getPhase1Image();
-  _getPhase2Image();
+  getEyePhase1Image();
+  getEyePhase2Image();
 }
 
 /**
@@ -212,6 +215,9 @@ function _drawTransformationVortex(ctx, r, spinAngle, progress) {
  */
 function _drawShreddingBodyOverlay(ctx, r, progress, isPhase2) {
   ctx.save();
+  const p1Img = _getPhase1Image();
+  const p2Img = _getPhase2Image();
+
   if (!isPhase2) {
     // Stage 1: Expanding tearing stress fractures across cornea/pupil before shed
     const crackAlpha = Math.min(1.0, progress * 2.2);
@@ -252,21 +258,90 @@ function _drawShreddingBodyOverlay(ctx, r, progress, isPhase2) {
     ctx.arc(r * 0.35, 0, pulseSize, 0, Math.PI * 2);
     ctx.fill();
 
-    // Peeling tissue flaps around the eye circumference
-    ctx.fillStyle = '#991B1B';
-    for (let f = 0; f < 4; f++) {
-      const flapAngle = (f * Math.PI / 2) + progress * 2.0;
-      const fx = Math.cos(flapAngle) * (r * 0.85);
-      const fy = Math.sin(flapAngle) * (r * 0.85);
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx + Math.cos(flapAngle) * (r * 0.3), fy + Math.sin(flapAngle) * (r * 0.3));
-      ctx.lineTo(fx - Math.sin(flapAngle) * (r * 0.15), fy + Math.cos(flapAngle) * (r * 0.15));
-      ctx.closePath();
-      ctx.fill();
+    // Model PNG Textured Peeling Strips curling outward from the eye body
+    if (p1Img && p1Img.complete && p1Img.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const flapPatches = [
+        { sx: 171, sy: 383, sw: 70, sh: 70 }, // Iris/Pupil patch
+        { sx: 120, sy: 350, sw: 70, sh: 70 }, // Upper Sclera Veins
+        { sx: 120, sy: 440, sw: 70, sh: 70 }, // Lower Sclera Veins
+        { sx: 60,  sy: 380, sw: 60, sh: 60 }, // Optic Nerve Roots
+      ];
+
+      for (let f = 0; f < flapPatches.length; f++) {
+        const flapAngle = (f * Math.PI / 2) + progress * 2.5;
+        const fx = Math.cos(flapAngle) * (r * (0.65 + progress * 0.35));
+        const fy = Math.sin(flapAngle) * (r * (0.65 + progress * 0.35));
+        const flapScale = 0.55 + progress * 0.65;
+        const flapSize = r * 0.55 * flapScale;
+
+        // Fleshy red connecting ligament stringers from rupture core to peeling flap
+        ctx.strokeStyle = '#991B1B';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(r * 0.35, 0);
+        ctx.quadraticCurveTo(fx * 0.5, fy * 0.5 + Math.sin(progress * 10 + f) * 5, fx, fy);
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(fx, fy);
+        ctx.rotate(flapAngle + progress * Math.PI * 0.9);
+        const patch = flapPatches[f];
+        ctx.drawImage(
+          p1Img,
+          patch.sx, patch.sy, patch.sw, patch.sh,
+          -flapSize * 0.5, -flapSize * 0.5, flapSize, flapSize
+        );
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-flapSize * 0.5, -flapSize * 0.5, flapSize, flapSize);
+        ctx.restore();
+      }
+    } else {
+      // Procedural peeling flaps fallback
+      ctx.fillStyle = '#991B1B';
+      for (let f = 0; f < 4; f++) {
+        const flapAngle = (f * Math.PI / 2) + progress * 2.0;
+        const fx = Math.cos(flapAngle) * (r * 0.85);
+        const fy = Math.sin(flapAngle) * (r * 0.85);
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(fx + Math.cos(flapAngle) * (r * 0.3), fy + Math.sin(flapAngle) * (r * 0.3));
+        ctx.lineTo(fx - Math.sin(flapAngle) * (r * 0.15), fy + Math.cos(flapAngle) * (r * 0.15));
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   } else {
     // Stage 2: Torn, ragged socket rim and bleeding meat flaps around the exposed maw
+    if (p2Img && p2Img.complete && p2Img.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const mawPatches = [
+        { sx: 120, sy: 350, sw: 60, sh: 60, angle: -0.4 },
+        { sx: 120, sy: 440, sw: 60, sh: 60, angle: 0.4 },
+        { sx: 160, sy: 350, sw: 60, sh: 60, angle: -0.8 },
+        { sx: 160, sy: 440, sw: 60, sh: 60, angle: 0.8 },
+      ];
+      for (let m = 0; m < mawPatches.length; m++) {
+        const mp = mawPatches[m];
+        const mx = Math.cos(mp.angle) * (r * 0.85);
+        const my = Math.sin(mp.angle) * (r * 0.85);
+        const mSize = r * 0.40;
+        ctx.save();
+        ctx.translate(mx, my);
+        ctx.rotate(mp.angle + Math.PI / 2);
+        ctx.drawImage(
+          p2Img,
+          mp.sx, mp.sy, mp.sw, mp.sh,
+          -mSize * 0.5, -mSize * 0.5, mSize, mSize
+        );
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.0;
+        ctx.strokeRect(-mSize * 0.5, -mSize * 0.5, mSize, mSize);
+        ctx.restore();
+      }
+    }
+
     ctx.strokeStyle = '#991B1B';
     ctx.lineWidth = 2.4;
     ctx.beginPath();

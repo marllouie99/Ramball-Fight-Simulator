@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
+import { getEyePhase1Image, getEyePhase2Image } from '../fighters/eyeOfCthulhuSkin.js';
 
 /**
  * Spawns a death shatter effect at the fighter's position.
@@ -482,232 +483,344 @@ export function drawDeathEffects() {
  */
 export function drawTerrariaEyeGore(ctx, effect) {
   const s = effect.size || 12;
+  const p1Img = typeof getEyePhase1Image === 'function' ? getEyePhase1Image() : null;
+  const p2Img = typeof getEyePhase2Image === 'function' ? getEyePhase2Image() : null;
+  const p1Ready = Boolean(p1Img && p1Img.complete && p1Img.naturalWidth > 0);
+  const p2Ready = Boolean(p2Img && p2Img.complete && p2Img.naturalWidth > 0);
 
   switch (effect.goreType) {
     case 'eoc_nerve_tendril': {
-      // Optic nerve root muscle
-      ctx.fillStyle = '#881337';
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.6, -s * 0.4);
-      ctx.lineTo(s * 0.2, -s * 0.5);
-      ctx.lineTo(s * 0.5, 0);
-      ctx.lineTo(s * 0.2, s * 0.5);
-      ctx.lineTo(-s * 0.6, s * 0.4);
-      ctx.lineTo(-s * 0.9, 0);
-      ctx.closePath();
-      ctx.fill();
+      if (p1Ready) {
+        ctx.imageSmoothingEnabled = false;
+        const drawW = s * 1.6;
+        const drawH = s * 2.2;
+        ctx.drawImage(p1Img, 16, 345, 95, 198, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
+      } else {
+        // Optic nerve root muscle
+        ctx.fillStyle = '#881337';
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.6, -s * 0.4);
+        ctx.lineTo(s * 0.2, -s * 0.5);
+        ctx.lineTo(s * 0.5, 0);
+        ctx.lineTo(s * 0.2, s * 0.5);
+        ctx.lineTo(-s * 0.6, s * 0.4);
+        ctx.lineTo(-s * 0.9, 0);
+        ctx.closePath();
+        ctx.fill();
 
-      // Trailing jagged tendril tentacles
-      ctx.fillStyle = '#4C0519';
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.6, -s * 0.3);
-      ctx.lineTo(-s * 1.1, -s * 0.5);
-      ctx.lineTo(-s * 0.7, -s * 0.1);
-      ctx.lineTo(-s * 1.2, s * 0.1);
-      ctx.lineTo(-s * 0.6, s * 0.2);
-      ctx.lineTo(-s * 1.0, s * 0.4);
-      ctx.lineTo(-s * 0.5, s * 0.3);
-      ctx.closePath();
-      ctx.fill();
+        // Trailing jagged tendril tentacles
+        ctx.fillStyle = '#4C0519';
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.6, -s * 0.3);
+        ctx.lineTo(-s * 1.1, -s * 0.5);
+        ctx.lineTo(-s * 0.7, -s * 0.1);
+        ctx.lineTo(-s * 1.2, s * 0.1);
+        ctx.lineTo(-s * 0.6, s * 0.2);
+        ctx.lineTo(-s * 1.0, s * 0.4);
+        ctx.lineTo(-s * 0.5, s * 0.3);
+        ctx.closePath();
+        ctx.fill();
 
-      // Manga ink outline
-      ctx.strokeStyle = '#111114';
-      ctx.lineWidth = 1.3;
-      ctx.stroke();
+        // Manga ink outline
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+      }
       break;
     }
 
     case 'eoc_sclera_top': {
-      // Upper ivory sclera dome
-      ctx.fillStyle = '#F8FAFC';
-      ctx.beginPath();
-      ctx.arc(0, 0, s, -Math.PI, 0);
-      ctx.lineTo(s * 0.8, s * 0.2);
-      ctx.lineTo(s * 0.3, 0);
-      ctx.lineTo(-s * 0.2, s * 0.25);
-      ctx.lineTo(-s * 0.7, 0);
-      ctx.closePath();
-      ctx.fill();
+      if (p1Ready) {
+        ctx.imageSmoothingEnabled = false;
+        const drawW = s * 2.2;
+        const drawH = s * 1.35;
+        ctx.drawImage(p1Img, 111, 345, 165, 99, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
+      } else {
+        // Upper ivory sclera dome
+        ctx.fillStyle = '#F8FAFC';
+        ctx.beginPath();
+        ctx.arc(0, 0, s, -Math.PI, 0);
+        ctx.lineTo(s * 0.8, s * 0.2);
+        ctx.lineTo(s * 0.3, 0);
+        ctx.lineTo(-s * 0.2, s * 0.25);
+        ctx.lineTo(-s * 0.7, 0);
+        ctx.closePath();
+        ctx.fill();
 
-      // Branching crimson veins
-      ctx.strokeStyle = '#DC2626';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.6, -s * 0.3);
-      ctx.lineTo(-s * 0.3, -s * 0.5);
-      ctx.lineTo(0, -s * 0.4);
-      ctx.lineTo(s * 0.4, -s * 0.6);
-      ctx.moveTo(-s * 0.1, -s * 0.4);
-      ctx.lineTo(s * 0.2, -s * 0.2);
-      ctx.stroke();
+        // Branching crimson veins
+        ctx.strokeStyle = '#DC2626';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.6, -s * 0.3);
+        ctx.lineTo(-s * 0.3, -s * 0.5);
+        ctx.lineTo(0, -s * 0.4);
+        ctx.lineTo(s * 0.4, -s * 0.6);
+        ctx.moveTo(-s * 0.1, -s * 0.4);
+        ctx.lineTo(s * 0.2, -s * 0.2);
+        ctx.stroke();
 
-      // Torn bloody bottom edge
-      ctx.fillStyle = '#991B1B';
-      ctx.beginPath();
-      ctx.moveTo(-s, 0);
-      ctx.lineTo(-s * 0.6, s * 0.15);
-      ctx.lineTo(-s * 0.2, s * 0.25);
-      ctx.lineTo(s * 0.3, 0);
-      ctx.lineTo(s * 0.8, s * 0.2);
-      ctx.lineTo(s, 0);
-      ctx.lineTo(s * 0.8, -s * 0.1);
-      ctx.lineTo(-s * 0.8, -s * 0.1);
-      ctx.closePath();
-      ctx.fill();
+        // Torn bloody bottom edge
+        ctx.fillStyle = '#991B1B';
+        ctx.beginPath();
+        ctx.moveTo(-s, 0);
+        ctx.lineTo(-s * 0.6, s * 0.15);
+        ctx.lineTo(-s * 0.2, s * 0.25);
+        ctx.lineTo(s * 0.3, 0);
+        ctx.lineTo(s * 0.8, s * 0.2);
+        ctx.lineTo(s, 0);
+        ctx.lineTo(s * 0.8, -s * 0.1);
+        ctx.lineTo(-s * 0.8, -s * 0.1);
+        ctx.closePath();
+        ctx.fill();
 
-      // Dark outline
-      ctx.strokeStyle = '#111114';
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
+        // Dark outline
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
       break;
     }
 
     case 'eoc_sclera_bottom': {
-      // Lower sclera shell
-      ctx.fillStyle = '#E2E8F0';
-      ctx.beginPath();
-      ctx.arc(0, 0, s, 0, Math.PI);
-      ctx.lineTo(-s * 0.7, -s * 0.15);
-      ctx.lineTo(-s * 0.2, -s * 0.3);
-      ctx.lineTo(s * 0.3, -s * 0.1);
-      ctx.lineTo(s * 0.8, -s * 0.2);
-      ctx.closePath();
-      ctx.fill();
+      if (p1Ready) {
+        ctx.imageSmoothingEnabled = false;
+        const drawW = s * 2.2;
+        const drawH = s * 1.35;
+        ctx.drawImage(p1Img, 111, 444, 165, 99, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
+      } else {
+        // Lower sclera shell
+        ctx.fillStyle = '#E2E8F0';
+        ctx.beginPath();
+        ctx.arc(0, 0, s, 0, Math.PI);
+        ctx.lineTo(-s * 0.7, -s * 0.15);
+        ctx.lineTo(-s * 0.2, -s * 0.3);
+        ctx.lineTo(s * 0.3, -s * 0.1);
+        ctx.lineTo(s * 0.8, -s * 0.2);
+        ctx.closePath();
+        ctx.fill();
 
-      // Red capillary veins
-      ctx.strokeStyle = '#EF4444';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.5, s * 0.3);
-      ctx.lineTo(-s * 0.2, s * 0.6);
-      ctx.lineTo(s * 0.3, s * 0.4);
-      ctx.stroke();
+        // Red capillary veins
+        ctx.strokeStyle = '#EF4444';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.5, s * 0.3);
+        ctx.lineTo(-s * 0.2, s * 0.6);
+        ctx.lineTo(s * 0.3, s * 0.4);
+        ctx.stroke();
 
-      // Crimson torn meat
-      ctx.fillStyle = '#7F1D1D';
-      ctx.beginPath();
-      ctx.moveTo(-s, 0);
-      ctx.lineTo(-s * 0.7, -s * 0.15);
-      ctx.lineTo(-s * 0.2, -s * 0.3);
-      ctx.lineTo(s * 0.3, -s * 0.1);
-      ctx.lineTo(s * 0.8, -s * 0.2);
-      ctx.lineTo(s, 0);
-      ctx.lineTo(s * 0.6, s * 0.15);
-      ctx.lineTo(-s * 0.6, s * 0.15);
-      ctx.closePath();
-      ctx.fill();
+        // Crimson torn meat
+        ctx.fillStyle = '#7F1D1D';
+        ctx.beginPath();
+        ctx.moveTo(-s, 0);
+        ctx.lineTo(-s * 0.7, -s * 0.15);
+        ctx.lineTo(-s * 0.2, -s * 0.3);
+        ctx.lineTo(s * 0.3, -s * 0.1);
+        ctx.lineTo(s * 0.8, -s * 0.2);
+        ctx.lineTo(s, 0);
+        ctx.lineTo(s * 0.6, s * 0.15);
+        ctx.lineTo(-s * 0.6, s * 0.15);
+        ctx.closePath();
+        ctx.fill();
 
-      // Dark outline
-      ctx.strokeStyle = '#111114';
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
+        // Dark outline
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
       break;
     }
 
     case 'eoc_iris_pupil': {
-      // Sclera tissue ring
-      ctx.fillStyle = '#F8FAFC';
-      ctx.beginPath();
-      ctx.arc(0, 0, s, 0, Math.PI * 2);
-      ctx.fill();
+      if (p1Ready) {
+        ctx.imageSmoothingEnabled = false;
+        const drawW = s * 1.8;
+        const drawH = s * 1.8;
+        ctx.drawImage(p1Img, 171, 383, 105, 120, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
+      } else {
+        // Sclera tissue ring
+        ctx.fillStyle = '#F8FAFC';
+        ctx.beginPath();
+        ctx.arc(0, 0, s, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Cyan Iris
-      ctx.fillStyle = '#06B6D4';
-      ctx.beginPath();
-      ctx.arc(0, 0, s * 0.72, 0, Math.PI * 2);
-      ctx.fill();
+        // Cyan Iris
+        ctx.fillStyle = '#06B6D4';
+        ctx.beginPath();
+        ctx.arc(0, 0, s * 0.72, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Dark Pupil
-      ctx.fillStyle = '#0F172A';
-      ctx.beginPath();
-      ctx.arc(0, 0, s * 0.42, 0, Math.PI * 2);
-      ctx.fill();
+        // Dark Pupil
+        ctx.fillStyle = '#0F172A';
+        ctx.beginPath();
+        ctx.arc(0, 0, s * 0.42, 0, Math.PI * 2);
+        ctx.fill();
 
-      // White Specular shine
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(-s * 0.22, -s * 0.22, s * 0.16, 0, Math.PI * 2);
-      ctx.fill();
+        // White Specular shine
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(-s * 0.22, -s * 0.22, s * 0.16, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Red perimeter capillaries
-      ctx.strokeStyle = '#DC2626';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      ctx.moveTo(s * 0.6, -s * 0.6); ctx.lineTo(s * 0.85, -s * 0.85);
-      ctx.moveTo(-s * 0.7, s * 0.5); ctx.lineTo(-s * 0.9, s * 0.7);
-      ctx.stroke();
+        // Red perimeter capillaries
+        ctx.strokeStyle = '#DC2626';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(s * 0.6, -s * 0.6); ctx.lineTo(s * 0.85, -s * 0.85);
+        ctx.moveTo(-s * 0.7, s * 0.5); ctx.lineTo(-s * 0.9, s * 0.7);
+        ctx.stroke();
 
-      // Dark outline
-      ctx.strokeStyle = '#111114';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.arc(0, 0, s, 0, Math.PI * 2);
-      ctx.stroke();
+        // Dark outline
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(0, 0, s, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       break;
     }
 
-    case 'eoc_fanged_maw_top':
-    case 'eoc_fanged_maw_bottom': {
-      const isTop = effect.goreType === 'eoc_fanged_maw_top';
-      // Mouth cavity flesh
-      ctx.fillStyle = '#7F1D1D';
-      ctx.beginPath();
-      ctx.moveTo(-s, 0);
-      ctx.quadraticCurveTo(0, isTop ? -s * 0.75 : s * 0.75, s, 0);
-      ctx.lineTo(s * 0.8, isTop ? s * 0.35 : -s * 0.35);
-      ctx.lineTo(-s * 0.8, isTop ? s * 0.35 : -s * 0.35);
-      ctx.closePath();
-      ctx.fill();
-
-      // 3 Sharp triangular ivory teeth
-      ctx.fillStyle = '#FFFFFF';
-      const teethX = [-s * 0.55, -s * 0.05, s * 0.45];
-      for (const tx of teethX) {
+    case 'eoc_fanged_maw_top': {
+      if (p2Ready) {
+        ctx.imageSmoothingEnabled = false;
+        const drawW = s * 2.2;
+        const drawH = s * 1.35;
+        ctx.drawImage(p2Img, 112, 348, 162, 98, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
+      } else {
+        // Mouth cavity flesh
+        ctx.fillStyle = '#7F1D1D';
         ctx.beginPath();
-        ctx.moveTo(tx - s * 0.14, 0);
-        ctx.lineTo(tx + s * 0.14, 0);
-        ctx.lineTo(tx, isTop ? s * 0.55 : -s * 0.55);
+        ctx.moveTo(-s, 0);
+        ctx.quadraticCurveTo(0, -s * 0.75, s, 0);
+        ctx.lineTo(s * 0.8, s * 0.35);
+        ctx.lineTo(-s * 0.8, s * 0.35);
         ctx.closePath();
         ctx.fill();
+
+        // Sharp triangular ivory teeth
+        ctx.fillStyle = '#FFFFFF';
+        const teethX = [-s * 0.55, -s * 0.05, s * 0.45];
+        for (const tx of teethX) {
+          ctx.beginPath();
+          ctx.moveTo(tx - s * 0.14, 0);
+          ctx.lineTo(tx + s * 0.14, 0);
+          ctx.lineTo(tx, s * 0.55);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#111114';
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
+        }
+
+        // Gum/bone edge
+        ctx.fillStyle = '#991B1B';
+        ctx.fillRect(-s * 0.9, -s * 0.25, s * 1.8, s * 0.25);
+
+        // Dark outline
         ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(-s * 0.9, -s * 0.25, s * 1.8, s * 0.25);
       }
+      break;
+    }
 
-      // Gum/bone edge
-      ctx.fillStyle = '#991B1B';
-      ctx.fillRect(-s * 0.9, isTop ? -s * 0.25 : 0, s * 1.8, s * 0.25);
+    case 'eoc_fanged_maw_bottom': {
+      if (p2Ready) {
+        ctx.imageSmoothingEnabled = false;
+        const drawW = s * 2.2;
+        const drawH = s * 1.35;
+        ctx.drawImage(p2Img, 112, 446, 162, 99, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
+      } else {
+        // Mouth cavity flesh
+        ctx.fillStyle = '#7F1D1D';
+        ctx.beginPath();
+        ctx.moveTo(-s, 0);
+        ctx.quadraticCurveTo(0, s * 0.75, s, 0);
+        ctx.lineTo(s * 0.8, -s * 0.35);
+        ctx.lineTo(-s * 0.8, -s * 0.35);
+        ctx.closePath();
+        ctx.fill();
 
-      // Dark outline
-      ctx.strokeStyle = '#111114';
-      ctx.lineWidth = 1.4;
-      ctx.strokeRect(-s * 0.9, isTop ? -s * 0.25 : 0, s * 1.8, s * 0.25);
+        // Sharp triangular ivory teeth
+        ctx.fillStyle = '#FFFFFF';
+        const teethX = [-s * 0.55, -s * 0.05, s * 0.45];
+        for (const tx of teethX) {
+          ctx.beginPath();
+          ctx.moveTo(tx - s * 0.14, 0);
+          ctx.lineTo(tx + s * 0.14, 0);
+          ctx.lineTo(tx, -s * 0.55);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#111114';
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
+        }
+
+        // Gum/bone edge
+        ctx.fillStyle = '#991B1B';
+        ctx.fillRect(-s * 0.9, 0, s * 1.8, s * 0.25);
+
+        // Dark outline
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(-s * 0.9, 0, s * 1.8, s * 0.25);
+      }
       break;
     }
 
     case 'eoc_visceral_chunk':
     default: {
-      ctx.fillStyle = effect.color || '#DC2626';
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.8, -s * 0.4);
-      ctx.lineTo(-s * 0.2, -s * 0.9);
-      ctx.lineTo(s * 0.7, -s * 0.5);
-      ctx.lineTo(s * 0.9, s * 0.3);
-      ctx.lineTo(s * 0.3, s * 0.8);
-      ctx.lineTo(-s * 0.6, s * 0.7);
-      ctx.closePath();
-      ctx.fill();
+      const activeImg = p1Ready ? p1Img : (p2Ready ? p2Img : null);
+      if (activeImg) {
+        ctx.imageSmoothingEnabled = false;
+        const drawSize = s * 1.5;
+        // Pseudo-random sampling of meaty/veiny sections based on size
+        const patchX = 120 + (Math.abs(Math.floor(s * 17)) % 80);
+        const patchY = 360 + (Math.abs(Math.floor(s * 23)) % 100);
+        ctx.drawImage(activeImg, patchX, patchY, 50, 50, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.0;
+        ctx.strokeRect(-drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
+      } else {
+        ctx.fillStyle = effect.color || '#DC2626';
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.8, -s * 0.4);
+        ctx.lineTo(-s * 0.2, -s * 0.9);
+        ctx.lineTo(s * 0.7, -s * 0.5);
+        ctx.lineTo(s * 0.9, s * 0.3);
+        ctx.lineTo(s * 0.3, s * 0.8);
+        ctx.lineTo(-s * 0.6, s * 0.7);
+        ctx.closePath();
+        ctx.fill();
 
-      // Dark meat core
-      ctx.fillStyle = '#7F1D1D';
-      ctx.beginPath();
-      ctx.arc(0, 0, s * 0.35, 0, Math.PI * 2);
-      ctx.fill();
+        // Dark meat core
+        ctx.fillStyle = '#7F1D1D';
+        ctx.beginPath();
+        ctx.arc(0, 0, s * 0.35, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Dark ink outline
-      ctx.strokeStyle = '#111114';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
+        // Dark ink outline
+        ctx.strokeStyle = '#111114';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
       break;
     }
   }
