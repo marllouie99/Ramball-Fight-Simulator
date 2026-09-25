@@ -149,6 +149,47 @@ function _drawWindupTelegraph(ctx, r) {
   ctx.restore();
 }
 
+function _drawTransformationVortex(ctx, r, spinAngle, progress) {
+  ctx.save();
+  const alpha = Math.min(0.65, progress * 0.7 + 0.25);
+  ctx.strokeStyle = `rgba(225, 29, 72, ${alpha})`;
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 3 Swirling concentric arcs around the eye
+  for (let i = 0; i < 3; i++) {
+    const arcStart = spinAngle + (i * Math.PI * 2 / 3);
+    ctx.strokeStyle = (i === 1) ? `rgba(6, 182, 212, ${alpha * 0.85})` : `rgba(255, 77, 109, ${alpha})`;
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (0.95 + i * 0.22), arcStart, arcStart + Math.PI * 0.85);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function _drawShedGoreParticles(ctx, particles) {
+  if (!particles || particles.length === 0) return;
+  ctx.save();
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation || 0);
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha !== undefined ? p.alpha : 1.0));
+    ctx.fillStyle = p.color || '#DC2626';
+    const s = p.size || 6;
+    ctx.fillRect(-s / 2, -s / 2, s, s);
+    // Inner glint highlight
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(-s / 4, -s / 4, s / 2, s / 2);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 /**
  * Main Eye of Cthulhu Skin Renderer
  * Renders the authentic animated 6-frame pixel art sprite sheet
@@ -156,17 +197,29 @@ function _drawWindupTelegraph(ctx, r) {
 export function drawEyeOfCthulhuSkin(ctx, fighter) {
   if (!ctx || !fighter) return;
 
+  // Render flying shed gore particles in world space
+  if (fighter.shedGoreParticles && fighter.shedGoreParticles.length > 0) {
+    _drawShedGoreParticles(ctx, fighter.shedGoreParticles);
+  }
+
   const r = fighter.r || 32;
-  const isPhase2 = Boolean(
-    (fighter.bossState && fighter.bossState.phase === 2) ||
-    fighter.isPhase2 ||
-    fighter._isPhase2 ||
-    (fighter.hp > 0 && fighter.maxHp > 0 && (fighter.hp / fighter.maxHp) <= 0.50)
-  );
+  const isTransforming = Boolean(fighter.isTransforming || fighter.aiState === 'TRANSFORMATION');
+  
+  let isPhase2 = false;
+  if (isTransforming) {
+    isPhase2 = Boolean(fighter.hasShedPupil || (fighter.transformationProgress !== undefined && fighter.transformationProgress >= 0.48));
+  } else {
+    isPhase2 = Boolean(
+      (fighter.bossState && fighter.bossState.phase === 2) ||
+      fighter.isPhase2 ||
+      fighter._isPhase2 ||
+      (fighter.hp > 0 && fighter.maxHp > 0 && (fighter.hp / fighter.maxHp) <= 0.50)
+    );
+  }
 
   const img = isPhase2 ? _getPhase2Image() : _getPhase1Image();
   const frames = isPhase2 ? PHASE2_FRAMES : PHASE1_FRAMES;
-  const ticksPerFrame = isPhase2 ? 4 : 8;
+  const ticksPerFrame = isTransforming ? 3 : (isPhase2 ? 4 : 8);
 
   const currentFrameCount = (typeof state !== 'undefined' && state.frameCount !== undefined)
     ? state.frameCount
@@ -178,12 +231,19 @@ export function drawEyeOfCthulhuSkin(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
-  ctx.rotate(angle);
+  if (isTransforming) {
+    // Rapid 360° axial rotation during transformation
+    const spinAngle = fighter.transformationSpinAngle || 0;
+    ctx.rotate(spinAngle);
+    _drawTransformationVortex(ctx, r, spinAngle, fighter.transformationProgress || 0);
+  } else {
+    const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+    ctx.rotate(angle);
 
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) {
-    ctx.scale(1, -1);
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
   }
 
   // Draw Windup Telegraph Indicator

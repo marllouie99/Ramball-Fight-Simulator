@@ -61,8 +61,15 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.isWindupTelegraph = false;
     this.hitOpponentThisRam = false;
 
-    // Phase 2 state
+    // Phase 2 & Transformation state
     this.isPhase2 = false;
+    this._isPhase2 = false;
+    this.isTransforming = false;
+    this.hasTransformed = false;
+    this.hasShedPupil = false;
+    this.transformationSpinAngle = 0;
+    this.transformationProgress = 0;
+    this.shedGoreParticles = [];
     this.p2ChainDashCooldown = cfg.chainDashCooldown || 480;
     this.p2RoarCooldown = cfg.roarCooldown || 840;
     this.p2ChompCooldown = 0;
@@ -104,20 +111,29 @@ export class EyeOfCthulhuFighter extends Fighter {
       : eyeOfCthulhuConfig;
 
     // 2. Check Phase 2 Transformation Threshold (50% HP)
-    if (!this.isPhase2 && this.hp > 0 && (this.hp / (this.maxHp || 1)) <= (cfg.phase2Threshold || 0.50)) {
-      this.isPhase2 = true;
-      this._isPhase2 = true;
+    if (!this.hasTransformed && this.hp > 0 && (this.hp / (this.maxHp || 1)) <= (cfg.phase2Threshold || 0.50)) {
+      this.hasTransformed = true;
+      this.isTransforming = true;
+      this.hasShedPupil = false;
+      this.transformationProgress = 0;
+      this.transformationSpinAngle = this.gunAngle || this.angle || 0;
       this.aiState = EOC_STATE.TRANSFORMATION;
-      this.stateTimer = cfg.transformationStasisFrames || 45;
-      triggerGlobalScreenShake(cfg.transformationScreenShake || 8, 30);
+      this.stateTimer = cfg.transformationDurationFrames || 75;
+      this.vx = 0;
+      this.vy = 0;
       try {
+        spawnFloatingText(this.x, this.y - this.r - 20, 'TRANSFORMATION!', '#E11D48');
         audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.95);
       } catch (e) {}
     }
 
-    // 3. Floating Hover Oscillation
-    this.hoverPhase += (cfg.hoverOscillationFreq || 0.06);
-    this.z = Math.sin(this.hoverPhase) * (cfg.hoverOscillationAmp || 8.0);
+    // 3. Floating Hover Oscillation (skipped when transforming to stay completely stationary)
+    if (!this.isTransforming) {
+      this.hoverPhase += (cfg.hoverOscillationFreq || 0.06);
+      this.z = Math.sin(this.hoverPhase) * (cfg.hoverOscillationAmp || 8.0);
+    } else {
+      this.z = 0;
+    }
 
     const isTargetAlive = Boolean(opponent && !opponent.isDead && opponent.hp > 0);
 
@@ -131,6 +147,9 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.x += this.vx;
       this.y += this.vy;
     }
+
+    // Always update active gore particles
+    this._updateShedGoreParticles();
 
     // 5. Soft Arena Leashing (Bypass standard rigid wall bounce)
     this.resolveWallBounce(arena, opponent);
@@ -369,15 +388,113 @@ export class EyeOfCthulhuFighter extends Fighter {
   _updateTransformationState(opponent, cfg) {
     this.isRamming = false;
     this.isWindupTelegraph = false;
-    this.vx *= 0.85;
-    this.vy *= 0.85;
-    this.x += this.vx;
-    this.y += this.vy;
+    this.isTransforming = true;
+
+    // Completely stationary in mid-air (vulnerable to attack)
+    this.vx = 0;
+    this.vy = 0;
+
+    const totalDuration = cfg.transformationDurationFrames || 75;
+    this.transformationProgress = Math.min(1, Math.max(0, 1 - (this.stateTimer / totalDuration)));
+
+    // Rapid axial spin
+    const spinSpeed = cfg.transformationSpinSpeed || 0.55;
+    this.transformationSpinAngle = (this.transformationSpinAngle || 0) + spinSpeed;
+    this.angle = this.transformationSpinAngle;
+    this.gunAngle = this.transformationSpinAngle;
+
+    // Centrifugal blood sparks flung outwards from spinning body
+    const bloodInterval = cfg.transformationBloodSparkInterval || 4;
+    if (this.stateTimer % bloodInterval === 0) {
+      const spawnDist = this.r * (0.8 + Math.random() * 0.4);
+      const bx = this.x + Math.cos(this.transformationSpinAngle) * spawnDist;
+      const by = this.y + Math.sin(this.transformationSpinAngle) * spawnDist;
+      spawnSparks(bx, by, 3, 'crimson', '#E11D48');
+    }
+
+    // Midpoint Shedding Event (~frame 36 / 48% progress)
+    const shedThreshold = cfg.transformationShedThreshold || 0.48;
+    if (this.transformationProgress >= shedThreshold && !this.hasShedPupil) {
+      this.hasShedPupil = true;
+      this.isPhase2 = true;
+      this._isPhase2 = true;
+      this._spawnSheddingGore(cfg);
+      triggerGlobalScreenShake(6, 12);
+      try {
+        spawnImpactFlash(this.x, this.y, 45, 'crimsonSniper');
+        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 1.0);
+      } catch (e) {}
+    }
 
     this.stateTimer--;
     if (this.stateTimer <= 0) {
+      // Transformation complete! Climax Roar & Shockwave
+      this.isTransforming = false;
+      this.isPhase2 = true;
+      this._isPhase2 = true;
+      triggerGlobalScreenShake(cfg.transformationScreenShake || 10, 25);
+      spawnImpactFlash(this.x, this.y, cfg.transformationShockwaveRadius || 190, 'crimsonSniper');
+      spawnSparks(this.x, this.y, cfg.transformationBloodBurstCount || 20, 'crimson', '#E11D48');
+
+      // Radial pushback on opponent if nearby
+      if (opponent && !opponent.isDead) {
+        const dx = opponent.x - this.x;
+        const dy = opponent.y - this.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const shockRadius = cfg.transformationShockwaveRadius || 190;
+        if (dist <= shockRadius) {
+          const pushForce = cfg.transformationShockwaveKnockback || 18;
+          if (typeof opponent.applyKnockback === 'function') {
+            opponent.applyKnockback((dx / dist) * pushForce, (dy / dist) * pushForce);
+          }
+        }
+      }
+
+      try {
+        spawnFloatingText(this.x, this.y - this.r - 25, 'ROAAAR!', '#E11D48');
+        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 1.0);
+      } catch (e) {}
+
       this.aiState = EOC_STATE.P2_CHASE;
-      this.stateTimer = 180;
+      this.stateTimer = 120;
+    }
+  }
+
+  _spawnSheddingGore(cfg) {
+    const chunkCount = cfg.transformationGoreChunkCount || 6;
+    for (let i = 0; i < chunkCount; i++) {
+      const angle = (i / chunkCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const speed = 4.5 + Math.random() * 4.0;
+      this.shedGoreParticles.push({
+        x: this.x + Math.cos(angle) * (this.r * 0.5),
+        y: this.y + Math.sin(angle) * (this.r * 0.5),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.35,
+        size: 5 + Math.random() * 5,
+        color: i % 2 === 0 ? '#06B6D4' : '#DC2626', // Iris Cyan / Cornea Red
+        alpha: 1.0,
+        life: 45,
+        maxLife: 45
+      });
+    }
+  }
+
+  _updateShedGoreParticles() {
+    if (!this.shedGoreParticles || this.shedGoreParticles.length === 0) return;
+    for (let i = this.shedGoreParticles.length - 1; i >= 0; i--) {
+      const p = this.shedGoreParticles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.94;
+      p.vy *= 0.94;
+      p.rotation += p.rotSpeed;
+      p.life--;
+      p.alpha = Math.max(0, p.life / p.maxLife);
+      if (p.life <= 0) {
+        this.shedGoreParticles.splice(i, 1);
+      }
     }
   }
 

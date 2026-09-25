@@ -80,10 +80,12 @@ The Eye of Cthulhu represents a classic **dual-phase attrition-to-rushdown arche
 
 - **Levitation Hover**: The Eye ignores ground hazards and maintains a smooth floating physics vector with gentle inertia dampening.
 - **Phase Metamorphosis (50% HP Threshold)**:
-  - When HP drops to or below 50%, the boss enters a **45-frame transformation state**.
-  - Emits the iconic **Terraria Boss Roar SFX** and generates an 8px camera trauma screen shake.
-  - Replaces texture with Phase 2 fanged maw.
-  - Pushes all nearby enemies back with an enrage shockwave ($180\text{px}$ radius).
+  - When HP drops to or below 50%, the boss enters a **75-frame (1.25s) stationary transformation state**.
+  - **Stationary Vulnerability Window**: Halts completely in mid-air (`vx = 0, vy = 0`) and takes full damage without retaliating, creating an authentic high-reward burst DPS opening for the player.
+  - **Rapid Axial 360° Spin**: Violent continuous rotation around its central axis, causing trailing optic nerve tendrils to whip like a vortex.
+  - **Cornea / Pupil Shedding**: Mid-spin (~48% progress), the outer cornea/pupil bursts away in flying fleshy lens fragments and centrifugal blood sparks.
+  - **Razor-Fanged Maw Reveal**: Seamlessly reveals the circular mouth with razor-sharp teeth.
+  - **Climax Roar**: Emits the iconic Terraria Boss Roar SFX, triggers a 10px camera trauma screen shake, and pushes all nearby enemies back with an expanding enrage shockwave ($190\text{px}$ radius).
 
 ---
 

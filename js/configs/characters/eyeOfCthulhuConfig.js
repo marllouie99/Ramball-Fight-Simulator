@@ -75,10 +75,15 @@ export const eyeOfCthulhuConfig = {
 
   // ── Phase Transition (50% HP Threshold) ──
   phase2Threshold: 0.50,
-  transformationStasisFrames: 45,
-  transformationScreenShake: 8,
-  transformationShockwaveRadius: 180,
+  transformationDurationFrames: 75, // 1.25s stationary vulnerability window
+  transformationStasisFrames: 75,
+  transformationSpinSpeed: 0.55, // rapid axial 360° rotation (~5.2 full revolutions)
+  transformationShedThreshold: 0.48, // fraction of duration when pupil sheds (reveals maw)
+  transformationScreenShake: 10,
+  transformationShockwaveRadius: 190,
   transformationShockwaveKnockback: 18,
+  transformationGoreChunkCount: 6,
+  transformationBloodSparkInterval: 4,
 
   // ── Phase 2: Ravenous Maw Rushdown & Stat Shift ──
   phase2Speed: 7.8,
