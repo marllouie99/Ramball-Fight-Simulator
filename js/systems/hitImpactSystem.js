@@ -168,6 +168,20 @@ export const HitImpactSystem = {
       return true; // Destroyed on final hit
     }
 
+    // ── Servant of Cthulhu Minion Impact ──
+    if (projectile.isServantOfCthulhu || projectile.visual === 'servantOfCthulhu' || projectile.type === 'servantOfCthulhu') {
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 8, 'bloodSpark', '#E11D48');
+      }
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 22, '#E11D48');
+      }
+      if (audioSystem && typeof audioSystem.playSFX === 'function') {
+        audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
+      }
+      return true; // Destroyed on target impact
+    }
+
     // Genos Incineration Palm Fireball — Physical push back knockback & impact flash on hit!
     if (projectile.visual === 'genosFireball') {
       const knockbackForce = CONFIG.genos?.blastKnockback || 8.5;

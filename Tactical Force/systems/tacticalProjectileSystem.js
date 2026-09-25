@@ -310,6 +310,9 @@ export class TacticalProjectileSystem {
    * to guarantee projectiles NEVER tunnel, jump, or clip through map walls.
    */
   _checkWallAndObstacleCollisions(p, arena, obstacles) {
+    if (p.isServantOfCthulhu || p.visual === 'servantOfCthulhu' || p.isGhostTerrain) {
+      return false; // Ghost entities pass freely through solid blocks and walls
+    }
     const maxBounces = tacticalMainConfig.bulletMaxWallBounces ?? 2;
     const pr = p.r || 5;
     const restitution = tacticalMainConfig.restitution || 0.95;

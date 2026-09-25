@@ -257,13 +257,14 @@ export class EyeOfCthulhuFighter extends Fighter {
       const pAngle = this.gunAngle + (Math.random() - 0.5) * 0.4;
       const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 5);
       const spawnY = this.y + Math.sin(this.gunAngle) * (this.r + 5);
+      const initSpeed = cfg.servantInitialSpeed || 3.5;
 
       const p = projectileSystem.fireProjectile(
         this,
         ownerIndex,
         cfg.servantDamage || 12,
         false,
-        cfg.servantSpeed || 6.5,
+        initSpeed,
         false,
         'servantOfCthulhu',
         spawnX,
@@ -276,6 +277,11 @@ export class EyeOfCthulhuFighter extends Fighter {
         p.visual = 'servantOfCthulhu';
         p.r = cfg.servantRadius || 11;
         p.color = '#E11D48';
+        p.life = cfg.servantLife || 600;
+        p.maxLife = cfg.servantLife || 600;
+        p.maxSpeed = cfg.servantSpeed || 5.2;
+        p.turnRate = cfg.servantTurnRate || 0.055;
+        p.wobblePhase = Math.random() * Math.PI * 2;
       }
 
       spawnSparks(spawnX, spawnY, 8, 'bloodSpark', '#E11D48');

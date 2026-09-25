@@ -2552,6 +2552,11 @@ class ProjectileSystem {
       return p.life <= 0;
     }
 
+    // Servants of Cthulhu fly freely through solid terrain and arena boundaries just like the Eye
+    if (p.isServantOfCthulhu || p.visual === 'servantOfCthulhu' || p.type === 'servantOfCthulhu') {
+      return p.life <= 0;
+    }
+
     // Arcane bolts bounce off walls while bouncesLeft > 0, so they don't expire on wall touch
     if (p.isArcaneBolt && (p.bouncesLeft ?? 0) > 0) {
       return p.life <= 0;
@@ -3194,6 +3199,68 @@ class ProjectileSystem {
       if (p.visual === 'EngineerBullet') {
         p.vx *= 0.92;
         p.vy *= 0.92;
+      }
+
+      // ── SERVANT OF CTHULHU TRACKING & GHOST FLIGHT (Terraria Minion AI) ──
+      if (p.isServantOfCthulhu || p.visual === 'servantOfCthulhu' || p.type === 'servantOfCthulhu') {
+        const ownerIndex = p.owner;
+        let target = null;
+        let minDist = Infinity;
+        if (fighters && fighters.length > 0) {
+          for (let fi = 0; fi < fighters.length; fi++) {
+            if (fi === ownerIndex) continue;
+            if (areOnSameTeam(ownerIndex, fi)) continue;
+            const f = fighters[fi];
+            if (f && !f.isDead && f.hp > 0 && !f.isSubmerged) {
+              const d = Math.hypot(f.x - p.x, f.y - p.y);
+              if (d < minDist) {
+                minDist = d;
+                target = f;
+              }
+            }
+          }
+        }
+
+        // Evaluate illusions if no primary fighter is alive or targeted
+        if (!target && typeof state !== 'undefined' && state.illusions) {
+          for (const ill of state.illusions) {
+            if (!ill || ill.hp <= 0) continue;
+            const illOwnerIdx = (typeof ill.ownerIndex === 'number') ? ill.ownerIndex : (fighters ? fighters.indexOf(ill.owner) : -1);
+            if (illOwnerIdx !== -1 && (ownerIndex === illOwnerIdx || areOnSameTeam(ownerIndex, illOwnerIdx))) continue;
+            const d = Math.hypot(ill.x - p.x, ill.y - p.y);
+            if (d < minDist) {
+              minDist = d;
+              target = ill;
+            }
+          }
+        }
+
+        if (target) {
+          const dx = target.x - p.x;
+          const dy = target.y - p.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const maxSpeed = p.maxSpeed || 5.2;
+          const turnRate = p.turnRate || 0.055;
+          const desiredVx = (dx / dist) * maxSpeed;
+          const desiredVy = (dy / dist) * maxSpeed;
+
+          p.vx += (desiredVx - p.vx) * turnRate;
+          p.vy += (desiredVy - p.vy) * turnRate;
+        }
+
+        // Gentle floating oscillation
+        if (p.wobblePhase === undefined || Number.isNaN(p.wobblePhase)) {
+          p.wobblePhase = Math.random() * Math.PI * 2;
+        }
+        p.wobblePhase += 0.08;
+        const curSpd = Math.hypot(p.vx, p.vy);
+        if (curSpd > 0.1) {
+          const perpX = -p.vy / curSpd;
+          const perpY = p.vx / curSpd;
+          const wobbleAmp = 0.55;
+          p.x += perpX * Math.sin(p.wobblePhase) * wobbleAmp;
+          p.y += perpY * Math.sin(p.wobblePhase) * wobbleAmp;
+        }
       }
 
       // Normal projectile movement

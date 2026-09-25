@@ -50,12 +50,15 @@ export const eyeOfCthulhuConfig = {
 
   // ── Phase 1: Servant of Cthulhu Summons ──
   servantSpawnCooldown: 720, // 12.0s at 60 FPS
-  servantSpawnIntervalInHover: 140, // spawns a minion every ~2.3s during hover state
+  servantSpawnIntervalInHover: 50, // spawns a minion every ~2.3s during hover state
   servantCountPerSpawn: 3,
   servantMaxActive: 4,
   servantHp: 120,
   servantRadius: 10,
-  servantSpeed: 6.5,
+  servantInitialSpeed: 3.5,
+  servantSpeed: 5.2, // max pursuit speed
+  servantTurnRate: 0.055, // smooth Terraria tracking acceleration
+  servantLife: 600, // 10.0s lifetime
   servantDamage: 12,
   servantHealOrbValue: 80,
 

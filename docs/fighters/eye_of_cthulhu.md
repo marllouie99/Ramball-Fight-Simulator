@@ -102,7 +102,11 @@ The Eye of Cthulhu represents a classic **dual-phase attrition-to-rushdown arche
 #### Combat Loop: Hover, Spawn & Triple Ram Cycle
 Phase 1 follows a rhythmic 3-stage combat cycle:
 1. **Hover & Tracking Phase (3–4s)**: Drifts into positioning above the target while keeping aim locked with its iris.
-2. **Servant Summoning**: Dilates its pupil and spawns **3–4 Servants of Cthulhu** ($r = 10\text{px}$, $120\text{ HP}$) that fly directly at the player. Defeating a Servant drops a restorative health orb ($+80\text{ HP}$).
+2. **Servant Summoning & Minion Behavior**:
+   - Spawns miniature **Servants of Cthulhu** from its pupil.
+   - **Tracking & Flight**: Once spawned, Servants slowly float and steer directly toward the player's current position with authentic Terraria homing flight physics.
+   - **Solid Block Intangibility**: Like the Eye, Servants pass freely through all solid blocks, obstacles, and terrain geometry without impedance.
+   - **Contact Impact**: Upon reaching the target, deals 12 damage, creates crimson blood sparks and impact flash, and is destroyed.
 3. **Telegraphed Triple Ram Sequence**:
    - **Wind-up (24 frames)**: Halts in mid-air, flashes red, and locks onto the player's position.
    - **Charge 1 $\rightarrow$ Charge 2 $\rightarrow$ Charge 3**: Executes **3 rapid sequential ramming dashes** in direct succession (`velocity: 16.0 px/frame`, `damage: 28` per collision).
