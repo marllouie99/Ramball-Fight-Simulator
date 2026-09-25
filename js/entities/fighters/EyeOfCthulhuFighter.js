@@ -2,7 +2,7 @@
 // Eye of Cthulhu — Ancient Ocular Horror Fighter Entity
 // Authentic Terraria Flight Physics & Multi-Phase AI State Machine
 // ─────────────────────────────────────────────
-import { Fighter } from '../fighter.js';
+import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { eyeOfCthulhuConfig } from '../../configs/characters/eyeOfCthulhuConfig.js';
 import { drawEyeOfCthulhuSkin } from '../../graphics/fighters/eyeOfCthulhuSkin.js';
@@ -252,7 +252,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.servantSpawnTimer--;
       if (this.servantSpawnTimer <= 0) {
         this.servantSpawnTimer = cfg.servantSpawnIntervalInHover || 140;
-        this._spawnServantProjectile(ownerIndex, cfg);
+        this._spawnServantMinion(ownerIndex, cfg);
       }
     }
 
@@ -265,43 +265,67 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
-  _spawnServantProjectile(ownerIndex, cfg) {
-    if (this.isPhase2 || this.isTransforming) return; // Strict zero minions in Phase 2
+  _spawnServantMinion(ownerIndex, cfg) {
+    if (this.isPhase2 || this.isTransforming || this.hp <= 0) return; // Strict zero minions in Phase 2
+    if (!state.illusions) state.illusions = [];
 
-    if (projectileSystem && projectileSystem.fireProjectile) {
-      const pAngle = this.gunAngle + (Math.random() - 0.5) * 0.4;
-      const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 5);
-      const spawnY = this.y + Math.sin(this.gunAngle) * (this.r + 5);
+    const activeServants = state.illusions.filter(ill => ill && ill.isServantOfCthulhu && ill.owner === this && ill.hp > 0).length;
+    const maxActive = cfg.servantMaxActive || 4;
+    if (activeServants >= maxActive) return;
+
+    const spawnCount = Math.min(cfg.servantCountPerSpawn || 1, maxActive - activeServants);
+
+    for (let s = 0; s < spawnCount; s++) {
+      const pAngle = this.gunAngle + (Math.random() - 0.5) * 0.6;
+      const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 8) + (Math.random() - 0.5) * 6;
+      const spawnY = this.y + Math.sin(this.gunAngle) * (this.r + 8) + (Math.random() - 0.5) * 6;
       const initSpeed = cfg.servantInitialSpeed || 3.5;
 
-      const p = projectileSystem.fireProjectile(
-        this,
-        ownerIndex,
-        cfg.servantDamage || 12,
-        false,
-        initSpeed,
-        false,
-        'servantOfCthulhu',
-        spawnX,
-        spawnY,
-        pAngle
-      );
+      const minion = {
+        x: spawnX,
+        y: spawnY,
+        vx: Math.cos(pAngle) * initSpeed,
+        vy: Math.sin(pAngle) * initSpeed,
+        r: cfg.servantRadius || 10,
+        hp: cfg.servantHp || 120,
+        maxHp: cfg.servantHp || 120,
+        damage: cfg.servantDamage || 12,
+        owner: this,
+        ownerIndex: (typeof ownerIndex === 'number') ? ownerIndex : (state.fighters ? state.fighters.indexOf(this) : 0),
+        team: this.team,
+        isMinion: true,
+        isIllusion: true,
+        isServantOfCthulhu: true,
+        isGhostTerrain: true,
+        color: cfg.color || '#E11D48',
+        themeColor: cfg.themeColor || '#E11D48',
+        angle: pAngle,
+        gunAngle: pAngle,
+        moveSpeed: cfg.servantSpeed || 5.2,
+        turnRate: cfg.servantTurnRate || 0.055,
+        attackCooldown: 0,
+        attackInterval: cfg.servantAttackInterval || 24,
+        hoverAngle: Math.random() * Math.PI * 2,
+        hoverOrbitSpeed: 0.045 + Math.random() * 0.03,
+        hoverDistance: (cfg.servantHoverRadius || 24) + Math.random() * 12,
+        hitFlashTimer: 0,
+        timeStopTimer: 0,
+        hitStunTimer: 0,
+        knockbackVx: 0,
+        knockbackVy: 0,
+        applyTimeStop(duration) { this.timeStopTimer = Math.max(this.timeStopTimer || 0, duration); },
+        applyHitStun(duration) { this.hitStunTimer = Math.max(this.hitStunTimer || 0, duration); },
+        applyKnockback(vx, vy) { this.knockbackVx = vx; this.knockbackVy = vy; },
+        takeDamage(amount, attacker, opts = {}) {
+          return applyDamageToTarget(this, amount, attacker, opts);
+        },
+      };
 
-      if (p) {
-        p.isServantOfCthulhu = true;
-        p.visual = 'servantOfCthulhu';
-        p.r = cfg.servantRadius || 11;
-        p.color = '#E11D48';
-        p.life = cfg.servantLife || 600;
-        p.maxLife = cfg.servantLife || 600;
-        p.maxSpeed = cfg.servantSpeed || 5.2;
-        p.turnRate = cfg.servantTurnRate || 0.055;
-        p.wobblePhase = Math.random() * Math.PI * 2;
-      }
-
+      state.illusions.push(minion);
       spawnSparks(spawnX, spawnY, 8, 'bloodSpark', '#E11D48');
-      this._playAudio('servantSpawn', 'Assets/Sound Effects/Skills/dash1.mp3', 0.45);
     }
+
+    this._playAudio('servantSpawn', 'Assets/Sound Effects/Skills/dash1.mp3', 0.45);
   }
 
   _updateWindupState(opponent, cfg) {

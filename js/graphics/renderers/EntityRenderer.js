@@ -8,6 +8,7 @@ import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbedded
 import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 import { drawCursedRocks } from '../fighters/todoSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
+import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
 
 let _sortedFightersBuffer = [];
 
@@ -1300,6 +1301,11 @@ export function drawIllusions() {
         drawTargetChainsOverlay(ctx, illusion, illusion._makimaChainer || null);
       }
       continue; // Skip standard doppelganger loop
+    }
+
+    if (illusion.isServantOfCthulhu) {
+      drawServantOfCthulhuMinion(ctx, illusion);
+      continue;
     }
 
     ctx.save();

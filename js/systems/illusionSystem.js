@@ -6,7 +6,7 @@ import { spatialGrid } from './physics.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { triggerMahitoParalyzeExplosion, applySoulDisfigurementStack } from '../entities/fighters/mahito/mahitoCombat.js';
 import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
-import { spawnMahitoSoulExplosion, spawnBiteAttackEffect } from '../graphics/particles/sparkEffect.js';
+import { spawnMahitoSoulExplosion, spawnBiteAttackEffect, spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
 import { audioSystem } from './audioSystem.js';
 import { clampRikaToArena } from '../entities/fighters/yuta/rikaLogic.js';
 
@@ -169,6 +169,26 @@ export function updateIllusions() {
         continue; // Wait for expansion to finish before deleting
       }
 
+      if (illusion.isServantOfCthulhu) {
+        spawnIllusionDeath({ ...illusion, color: '#E11D48' });
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(illusion.x, illusion.y, 14, 'bloodSpark', '#E11D48');
+        }
+        if (typeof spawnBloodEffect === 'function') {
+          spawnBloodEffect({ x: illusion.x, y: illusion.y, r: illusion.r, color: '#E11D48' }, 20);
+        }
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(illusion.x, illusion.y, 28, '#E11D48');
+        }
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+          audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
+        }
+        spawnFloatingText(illusion.x, illusion.y - illusion.r - 8, 'SERVANT SLAIN!', '#E11D48');
+        state.illusions[i] = state.illusions[state.illusions.length - 1];
+        state.illusions.pop();
+        continue;
+      }
+
       const deathColor = illusion.isEvasionMinion ? '#D946EF' : (illusion.color || '#9966ff');
       spawnIllusionDeath({ ...illusion, color: deathColor });
       if (illusion.isEvasionMinion) {
@@ -280,8 +300,8 @@ export function updateIllusions() {
       if (Math.abs(illusion.knockbackVx) <= 0.1) illusion.knockbackVx = 0;
       if (Math.abs(illusion.knockbackVy) <= 0.1) illusion.knockbackVy = 0;
 
-      // Always clamp illusion to arena boundaries even during knockback
-      if (arena) {
+      // Always clamp illusion to arena boundaries even during knockback (except ghost terrain entities)
+      if (arena && !illusion.isGhostTerrain && !illusion.isServantOfCthulhu) {
         if (illusion.isRika) {
           clampRikaToArena(illusion, arena);
         } else {
@@ -532,6 +552,85 @@ export function updateIllusions() {
           }
         }
       }
+    }
+
+    // ── SERVANT OF CTHULHU MINION AI (Continuous Hovering & Bite Attacks) ──
+    if (illusion.isServantOfCthulhu) {
+      if (arena) {
+        const cx = arena.x + arena.width / 2;
+        const cy = arena.y + arena.height / 2;
+        const ar = (arena.radius || (arena.width / 2));
+        const maxLeash = ar + 350;
+        const distFromC = Math.hypot(illusion.x - cx, illusion.y - cy);
+        if (distFromC > maxLeash && distFromC > 0) {
+          const nx = (cx - illusion.x) / distFromC;
+          const ny = (cy - illusion.y) / distFromC;
+          illusion.vx += nx * 0.5;
+          illusion.vy += ny * 0.5;
+        }
+      }
+
+      if (nearestTarget && !insideSphere) {
+        illusion.hoverAngle = (illusion.hoverAngle || 0) + (illusion.hoverOrbitSpeed || 0.05);
+        const hDist = illusion.hoverDistance || 24;
+
+        // Orbit destination point around the enemy body
+        const destX = nearestTarget.x + Math.cos(illusion.hoverAngle) * hDist;
+        const destY = nearestTarget.y + Math.sin(illusion.hoverAngle) * hDist;
+
+        const dx = destX - illusion.x;
+        const dy = destY - illusion.y;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        const maxSpeed = illusion.moveSpeed || 5.2;
+        const turnRate = illusion.turnRate || 0.06;
+        const desiredVx = (dx / dist) * maxSpeed;
+        const desiredVy = (dy / dist) * maxSpeed;
+
+        illusion.vx += (desiredVx - illusion.vx) * turnRate;
+        illusion.vy += (desiredVy - illusion.vy) * turnRate;
+        illusion.x += illusion.vx;
+        illusion.y += illusion.vy;
+
+        const aimAngle = Math.atan2(nearestTarget.y - illusion.y, nearestTarget.x - illusion.x);
+        illusion.gunAngle = aimAngle;
+        illusion.angle = aimAngle;
+
+        // Continuous Contact / Bite Attack Ticks (Hovering on Target's Body)
+        const bodyDist = Math.hypot(nearestTarget.x - illusion.x, nearestTarget.y - illusion.y);
+        const touchDist = (nearestTarget.r || 20) + illusion.r + 14;
+
+        if (illusion.attackCooldown > 0) {
+          illusion.attackCooldown--;
+        }
+
+        if (bodyDist <= touchDist && illusion.attackCooldown <= 0) {
+          illusion.attackCooldown = illusion.attackInterval || 24;
+
+          if (typeof applyDamageToTarget === 'function') {
+            applyDamageToTarget(nearestTarget, illusion.damage || 12, illusion.owner || illusion, { isMelee: true, isMinion: true });
+          } else if (typeof nearestTarget.takeDamage === 'function') {
+            nearestTarget.takeDamage(illusion.damage || 12, illusion.owner || illusion, { isMelee: true, isMinion: true });
+          }
+
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(nearestTarget.x, nearestTarget.y, 6, 'bloodSpark', '#E11D48');
+          }
+          if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+            audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.55);
+          }
+          if (typeof spawnFloatingText === 'function') {
+            spawnFloatingText(nearestTarget.x + (Math.random() - 0.5) * 16, nearestTarget.y - nearestTarget.r - 8, 'BITE! 👁️', '#E11D48');
+          }
+        }
+      } else {
+        // Idle drift when no active target
+        illusion.vx *= 0.95;
+        illusion.vy *= 0.95;
+        illusion.x += illusion.vx;
+        illusion.y += illusion.vy;
+      }
+      continue;
     }
 
     // Spatial grid was fetched early

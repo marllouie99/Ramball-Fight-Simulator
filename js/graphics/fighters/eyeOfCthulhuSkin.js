@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
 import { FighterRenderer } from '../renderers/fighterRenderer.js';
+import { drawMinionHealthBar } from '../statusEffects.js';
 
 let _phase1Image = null;
 let _phase2Image = null;
@@ -307,11 +308,11 @@ export function drawEyeOfCthulhuSkin(ctx, fighter) {
 }
 
 /**
- * Renders the Servant of Cthulhu minion projectile using the miniature animated Phase 1 sprite sheet
+ * Renders the Servant of Cthulhu minion entity using the miniature animated Phase 1 sprite sheet
  */
-export function drawServantOfCthulhuProjectile(ctx, p) {
-  if (!ctx || !p) return;
-  const r = p.r || 10;
+export function drawServantOfCthulhuMinion(ctx, minion) {
+  if (!ctx || !minion) return;
+  const r = minion.r || 10;
   const img = _getPhase1Image();
   const ticksPerFrame = 6;
   const currentFrameCount = (typeof state !== 'undefined' && state.frameCount !== undefined)
@@ -322,9 +323,9 @@ export function drawServantOfCthulhuProjectile(ctx, p) {
   const fBox = PHASE1_FRAMES[frameIndex] || PHASE1_FRAMES[0];
 
   ctx.save();
-  ctx.translate(p.x, p.y);
+  ctx.translate(minion.x, minion.y);
 
-  const angle = Math.atan2(p.vy || 0, p.vx || 0);
+  const angle = minion.gunAngle !== undefined ? minion.gunAngle : (minion.angle !== undefined ? minion.angle : (Math.atan2(minion.vy || 0, minion.vx || 0)));
   ctx.rotate(angle);
 
   const facingLeft = Math.abs(angle) > Math.PI / 2;
@@ -353,5 +354,33 @@ export function drawServantOfCthulhuProjectile(ctx, p) {
     _drawProceduralEye(ctx, r, false);
   }
 
+  // Hit flash white overlay
+  if (minion.hitFlashTimer > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1.0, minion.hitFlashTimer / 6)})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.restore();
+
+  // Draw floating minion health bar in world space above servant head
+  if (minion.hp > 0) {
+    drawMinionHealthBar(
+      ctx,
+      minion.x,
+      minion.y - r - 10,
+      Math.max(26, r * 2.4),
+      5,
+      minion.hp,
+      minion.maxHp || 120,
+      minion.color || '#E11D48'
+    );
+  }
 }
+
+// Backwards compatibility alias
+export const drawServantOfCthulhuProjectile = drawServantOfCthulhuMinion;
