@@ -80,6 +80,58 @@ export class EyeOfCthulhuFighter extends Fighter {
     this._registerSkills();
   }
 
+  // ── Unyielding Boss Poise: Zero Hit-Pause & Zero Flinch on Projectile Impacts ──
+  get basicAttackHitPauseTimer() {
+    return 0;
+  }
+  set basicAttackHitPauseTimer(val) {
+    // No-op: Eye never flinches or pauses flight on bullet/strike impacts
+  }
+
+  get knockbackStunTimer() {
+    return 0;
+  }
+  set knockbackStunTimer(val) {
+    // No-op
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    const options = {
+      ...opts,
+      skipHitStun: true,
+      skipKnockback: true,
+      skipInterrupt: true,
+    };
+    const result = super.takeDamage(amount, attacker, options);
+    this.basicAttackHitPauseTimer = 0;
+    this.hitStunTimer = 0;
+    this.knockbackStunTimer = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    return result;
+  }
+
+  applyKnockback(vx, vy, stunFrames = 0, opts = {}) {
+    // Allow suction/pull gravitational vortexes (Gojo Blue/Purple, Cruel Sun, Pure Love Beam, Black Hole)
+    if (opts && (opts.isPull || opts.isSuction || opts.isVortex || opts.isGravitationalPull)) {
+      this.vx += vx;
+      this.vy += vy;
+      return;
+    }
+    // Zero knockback from standard bullets, explosions, and melee strikes
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+  }
+
+  applyRedKnockback(vx, vy) {
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+  }
+
+  applyHitStun(duration, opts = {}) {
+    this.hitStunTimer = 0;
+  }
+
   _registerSkills() {
     this.skills = [
       {
@@ -958,18 +1010,19 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
+  /**
+   * Terraria Ghost Flight Physics:
+   * Eye of Cthulhu completely ignores arena walls and bounds, hovering and gliding freely
+   * through borders and blocks. Never clamps, bounces, or collides with the arena wall.
+   */
   resolveWallBounce(arena, opponent) {
-    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this._draggedByCruelSun || this.isCaughtInCruelSun || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
-      return super.resolveWallBounce(arena, opponent);
-    }
-    // Terraria-accurate flight: zero rigid wall reflections
     if (!arena && typeof state !== 'undefined') arena = state.arena;
     if (!arena) return false;
 
     const cx = arena.x + arena.width / 2;
     const cy = arena.y + arena.height / 2;
     const ar = (arena.radius || (arena.width / 2));
-    const maxAllowedDist = ar + (eyeOfCthulhuConfig.softLeashRadius || 100);
+    const maxAllowedDist = ar + (eyeOfCthulhuConfig.softLeashRadius || 140);
 
     const distFromCenter = Math.hypot(this.x - cx, this.y - cy);
     if (distFromCenter > maxAllowedDist && distFromCenter > 0) {
