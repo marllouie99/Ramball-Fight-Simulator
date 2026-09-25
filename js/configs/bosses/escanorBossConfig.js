@@ -27,6 +27,6 @@ export const escanorBossConfig = {
   startVy: 0.9,
   damage: 22,
   cooldown: 56,
-  ability: 'Grace "Sunshine" & "The One"',
-  desc: 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta, Cruel Sun blazing stars, and invincible high noon ultimate "The One".',
+  ability: 'Cruel Sun (無慈悲な太陽)',
+  desc: 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta, signature Cruel Sun (無慈悲な太陽) blazing star, and invincible high noon ultimate "The One".',
 };

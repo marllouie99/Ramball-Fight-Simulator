@@ -352,6 +352,7 @@ export const HitImpactSystem = {
     // Carl "CJ" Johnson Gunshots (Drive-By Tec-9, Dual Micro-Uzis, Riot Minigun) — Ballistic impact flash
     const isCjBullet = projectile.visual === 'cjUziBullet' || projectile.visual === 'cjMinigunBullet' || (attacker && (attacker.characterId === 'cj' || attacker.type === 'cj') && projectile.visual && projectile.visual.includes('cj'));
     if (isCjBullet) {
+      const isMinigun = projectile.visual === 'cjMinigunBullet';
       const knockbackForce = projectile.knockback !== undefined ? projectile.knockback : (CONFIG.cj?.gunHitPushback ?? 0.0);
       const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
 
@@ -373,23 +374,151 @@ export const HitImpactSystem = {
         }
       }
 
-      // 3. High-contrast golden-amber kinetic impact sparks & flash
+      // 2. High-contrast golden-amber kinetic impact sparks & flash
       if (typeof spawnImpactFlash === 'function') {
-        spawnImpactFlash(target.x, target.y, 22, '#F59E0B');
+        spawnImpactFlash(target.x, target.y, isMinigun ? 26 : 20, '#F59E0B');
       }
       if (typeof spawnSparks === 'function') {
-        spawnSparks(target.x, target.y, 6, '#F59E0B');
+        spawnSparks(target.x, target.y, isMinigun ? 8 : 6, 'gold', '#FEF08A');
+        spawnSparks(target.x, target.y, isMinigun ? 5 : 3, 'silverStreak', '#CBD5E1');
       }
 
-      // 4. Directional blood splatter particles on bullet entry/exit
+      // 3. Directional blood splatter particles on bullet entry/exit
       if (typeof spawnBloodEffect === 'function') {
-        spawnBloodEffect(target, 10, hitAngle, { minSize: 2.2, maxSize: 4.2, count: 3 });
+        spawnBloodEffect(target, 10, hitAngle, { minSize: 2.2, maxSize: isMinigun ? 4.5 : 3.8, count: isMinigun ? 4 : 3 });
       }
+
+      // 4. Punchy bullet flesh hit SFX
+      audioSystem.playSFX('attack_fleshhit', isMinigun ? 0.65 : 0.50);
 
       // 5. Subtle punchy screen shake on direct bullet impact
       if (typeof triggerGlobalScreenShake === 'function') {
-        const shakeInt = CONFIG.cj?.gunHitShakeIntensity || 1.2;
+        const shakeInt = isMinigun ? 2.0 : (CONFIG.cj?.gunHitShakeIntensity || 1.2);
         triggerGlobalScreenShake(shakeInt, 3);
+      }
+
+      return true; // Bullet spent on impact
+    }
+
+    // Engineer 12-Gauge Buckshot Pellets — Heavy ballistic buckshot impact
+    const isEngineerShotgun = projectile.visual === 'EngineerBullet' || (attacker && (attacker.characterId === 'engineer' || attacker.type === 'engineer') && projectile.visual === 'EngineerBullet');
+    if (isEngineerShotgun) {
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      // 1. Kinetic push back on target along buckshot trajectory
+      if (shouldApplyPhysicalPush(target)) {
+        const pushForce = 1.6;
+        target.vx = (target.vx || 0) + Math.cos(hitAngle) * pushForce;
+        target.vy = (target.vy || 0) + Math.sin(hitAngle) * pushForce;
+        target.x += Math.cos(hitAngle) * (pushForce * 0.4);
+        target.y += Math.sin(hitAngle) * (pushForce * 0.4);
+
+        if (state && state.arena) {
+          const minX = state.arena.x + (target.r || 20);
+          const maxX = state.arena.x + state.arena.width - (target.r || 20);
+          const minY = state.arena.y + (target.r || 20);
+          const maxY = state.arena.y + state.arena.height - (target.r || 20);
+          target.x = Math.max(minX, Math.min(maxX, target.x));
+          target.y = Math.max(minY, Math.min(maxY, target.y));
+        }
+      }
+
+      // 2. Fiery buckshot impact flash & metal/flame sparks
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 22, '#F97316');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 6, 'flame', '#F97316');
+        spawnSparks(target.x, target.y, 4, 'silverStreak', '#E2E8F0');
+      }
+
+      // 3. Directional blood splatter particles
+      if (typeof spawnBloodEffect === 'function') {
+        spawnBloodEffect(target, 12, hitAngle, { minSize: 2.4, maxSize: 4.2, count: 3 });
+      }
+
+      // 4. Punchy shotgun pellet flesh hit audio
+      audioSystem.playSFX('attack_fleshhit', 0.52);
+
+      // 5. Punchy screen shake
+      if (typeof triggerGlobalScreenShake === 'function') {
+        triggerGlobalScreenShake(1.6, 2);
+      }
+
+      return true; // Bullet spent on impact
+    }
+
+    // Engineer Sentry Turret Bullets & Level 3 Micro-Rockets
+    const isTurretBullet = projectile.visual === 'turretBullet' || projectile.isTurretBullet;
+    if (isTurretBullet) {
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      if (projectile.isRocket) {
+        // ── Level 3 Micro-Rocket Explosive Detonation ──
+        if (shouldApplyPhysicalPush(target)) {
+          const rocketPush = 5.0;
+          target.vx = (target.vx || 0) + Math.cos(hitAngle) * rocketPush;
+          target.vy = (target.vy || 0) + Math.sin(hitAngle) * rocketPush;
+          target.x += Math.cos(hitAngle) * (rocketPush * 0.4);
+          target.y += Math.sin(hitAngle) * (rocketPush * 0.4);
+
+          if (state && state.arena) {
+            const minX = state.arena.x + (target.r || 20);
+            const maxX = state.arena.x + state.arena.width - (target.r || 20);
+            const minY = state.arena.y + (target.r || 20);
+            const maxY = state.arena.y + state.arena.height - (target.r || 20);
+            target.x = Math.max(minX, Math.min(maxX, target.x));
+            target.y = Math.max(minY, Math.min(maxY, target.y));
+          }
+        }
+
+        // Explosive impact flash & fiery shrapnel sparks
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(target.x, target.y, 45, '#F97316');
+        }
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(target.x, target.y, 14, 'flame', '#EA580C');
+          spawnSparks(target.x, target.y, 8, 'orange', '#F59E0B');
+          spawnSparks(target.x, target.y, 6, 'silverStreak', '#CBD5E1');
+        }
+
+        // Heavy blood splatter
+        if (typeof spawnBloodEffect === 'function') {
+          spawnBloodEffect(target, 14, hitAngle, { minSize: 3.0, maxSize: 5.5, count: 6 });
+        }
+
+        // Detonation SFX & Heavy Screen Shake
+        audioSystem.playSFX('attack_explosion', 0.65);
+        if (typeof triggerGlobalScreenShake === 'function') {
+          triggerGlobalScreenShake(8.0, 6);
+        }
+      } else {
+        // ── Standard Sentry High-Velocity Rivet/Bullet ──
+        if (shouldApplyPhysicalPush(target)) {
+          const bulletPush = 1.2;
+          target.vx = (target.vx || 0) + Math.cos(hitAngle) * bulletPush;
+          target.vy = (target.vy || 0) + Math.sin(hitAngle) * bulletPush;
+        }
+
+        // Rapid kinetic rivet sparks & flash
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(target.x, target.y, 20, '#F59E0B');
+        }
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(target.x, target.y, 6, 'gold', '#FEF08A');
+          spawnSparks(target.x, target.y, 4, 'orange', '#EA580C');
+        }
+
+        // Directional blood splatter
+        if (typeof spawnBloodEffect === 'function') {
+          spawnBloodEffect(target, 10, hitAngle, { minSize: 2.0, maxSize: 3.8, count: 3 });
+        }
+
+        // Flesh hit SFX & screen shake
+        audioSystem.playSFX('attack_fleshhit', 0.48);
+        if (typeof triggerGlobalScreenShake === 'function') {
+          triggerGlobalScreenShake(1.2, 2);
+        }
       }
 
       return true; // Bullet spent on impact

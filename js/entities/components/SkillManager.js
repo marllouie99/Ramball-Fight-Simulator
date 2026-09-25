@@ -15,6 +15,9 @@ export class Skill {
     this.id = def.id;
     this.name = def.name || def.id;
     this.type = def.type || 'active'; // 'active' | 'transformation' | 'mode' | 'buff' | 'ultimate' | 'domain' | 'passive'
+    this.isSignature = Boolean(def.isSignature || def.signature);
+    this.signature = Boolean(def.isSignature || def.signature);
+    this.isUltimate = Boolean(def.isUltimate || def.type === 'ultimate');
 
     // Property keys on the fighter instance
     this.cooldownKey = def.cooldownKey || null;
@@ -455,13 +458,18 @@ export class SkillManager {
       }
 
       const ready = skill.isReady() || skill.isActive();
+      const isSig = Boolean(skill.isSignature || skill.signature || skill.customData?.isSignature || skill.customData?.signature);
+      const isUlt = Boolean(skill.isUltimate || skill.type === 'ultimate' || skill.customData?.isUltimate);
       hudItems.push({
         id: skill.id,
         pct: pct,
         ready: ready,
         color: themeColor,
         label: skill.name.toUpperCase(),
-        active: skill.isActive()
+        active: skill.isActive(),
+        isSignature: isSig,
+        signature: isSig,
+        isUltimate: isUlt
       });
     }
 

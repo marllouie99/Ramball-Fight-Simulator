@@ -21,6 +21,8 @@ import { SKILL_REGISTRY } from '../../configs/skills/skillRegistry.js';
 export class MahoragaFighter extends Fighter {
   constructor(def) {
     super(def);
+    this.characterId = this.characterId || 'mahoraga';
+    this.type = this.type || 'mahoraga';
 
     this.themeColor = (def && def.themeColor) || (def && def.color) || (CONFIG.mahoraga?.themeColor) || '#FFD700';
     this.skinColor = (def && def.skinColor) || (CONFIG.mahoraga?.skinColor) || '#F5F5DC';
@@ -592,7 +594,7 @@ export class MahoragaFighter extends Fighter {
     if (this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || ((this.pureLoveBeamRecoveryTimer || 0) > 0)) return true;
     if (this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0)) return true;
     if (this.isWallPinnedBySaitama || this._knockedBackBySaitamaBasicPunch || this.caughtInSaitamaFlurry) return true;
-    if (this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0) || this._knockedBackByEscanorBasicAttack) return true;
+    if (this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0) || this._knockedBackByEscanorBasicAttack || this._draggedByCruelSun || this.isCaughtInCruelSun) return true;
     if (this.preventKnockbackBounce) return true;
     if (this._frozenByCronosSphere) return true;
     if (this.isCaughtInPurple || this.isPulledByPurple || this.isCaughtInPurpleVortex || this.isCaughtInHollowPurple) return true;

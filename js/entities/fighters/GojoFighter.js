@@ -33,6 +33,7 @@ export class GojoFighter extends Fighter {
     this.infinityFadeOpacity = 0;
 
     this.redCooldown = CONFIG.gojo.redCooldown || 1000;
+    this.globalSkillCooldown = 0;
     this.hasFiredRed = false;
     this.lastCastSkill = null;
     this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1500; // Delay initial cast
@@ -150,6 +151,11 @@ export class GojoFighter extends Fighter {
     this.skillManager.registerSkills(skills);
   }
 
+  triggerSkillReleaseCooldown() {
+    const cd = CONFIG.gojo?.postSkillCooldown ?? 300;
+    this.globalSkillCooldown = Math.max(this.globalSkillCooldown || 0, cd);
+  }
+
   isStationarySkillActive() {
     return Boolean(
       this.isChannelingPurple ||
@@ -177,6 +183,7 @@ export class GojoFighter extends Fighter {
     this.infinityCooldown = 0;
     this.infinityActive = true;
     this.redCooldown = CONFIG.gojo.redCooldown || 1000;
+    this.globalSkillCooldown = 0;
     this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1500;
     this.purpleUseCount = 0;
     this.hasFiredPurple = false;
@@ -1427,7 +1434,7 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && opponent && !opponent.isDead) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && opponent && !opponent.isDead) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
@@ -1482,7 +1489,7 @@ export class GojoFighter extends Fighter {
     // Check for Hollow Purple (Skill)
     // Don't cast if Sukuna is already channeling Fuga to prevent simultaneous freezes
     // Gojo unleashes Hollow Purple at any angle towards an aligned enemy within range
-    if (this.isSkillEnabled(CONFIG.gojo?.enablePurple, true) && !this.isChannelingAnySkill() && !this.isPurpleActive() && this.purpleCooldown <= 0 && this.forcedMeleeTimer <= 0 && (!opponent || !opponent.isChannelingDivineFlame)) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enablePurple, true) && !this.isChannelingAnySkill() && !this.isPurpleActive() && this.purpleCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && this.forcedMeleeTimer <= 0 && (!opponent || !opponent.isChannelingDivineFlame)) {
       const purpleTarget = (typeof this._findAlignedEnemyForPurple === 'function')
         ? this._findAlignedEnemyForPurple(opponent)
         : this._findHorizontallyAlignedEnemy(opponent);
@@ -1663,7 +1670,7 @@ export class GojoFighter extends Fighter {
     }
 
     // Check for Red (Close-range repel: triggers when an enemy is detected within trigger range)
-    if (this.isSkillEnabled(CONFIG.gojo?.enableRed, true) && !this.isChannelingAnySkill() && !this.isPurpleActive() && this.redCooldown <= 0 && this.forcedMeleeTimer <= 0) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enableRed, true) && !this.isChannelingAnySkill() && !this.isPurpleActive() && this.redCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && this.forcedMeleeTimer <= 0) {
       const redTarget = (typeof this._findAlignedEnemyForRed === 'function')
         ? this._findAlignedEnemyForRed(opponent)
         : this._findVerticallyAlignedEnemy(opponent);
@@ -2518,6 +2525,7 @@ export class GojoFighter extends Fighter {
     this.hasFiredDomain = true;
     this._hasFiredDomainAtLeastOnce = true;
     this.lastCastSkill = 'domain';
+    this.triggerSkillReleaseCooldown();
     this.domainTimer = CONFIG.gojo.domainDuration || 300;
     this.domainCooldown = CONFIG.gojo.domainCooldown || 1200;
     this.domainExpansionAudioDelay = CONFIG.gojo.domainExpansionAudioDelay ?? 90; // Delay (in frames) after deployment before gojodomainexpansion.mp3 plays
@@ -2650,7 +2658,7 @@ export class GojoFighter extends Fighter {
   _checkReverseCursedTechnique(opponent, arena) {
     if (!this.isSkillEnabled(CONFIG.gojo?.enableRCTHeal, true)) return;
     if (this.isDead || this.isChannelingAnySkill() || this.isChannelingRCT || this.isPurpleActive()) return;
-    if (this.reverseCursedTechniqueCooldown > 0) return;
+    if (this.reverseCursedTechniqueCooldown > 0 || (this.globalSkillCooldown || 0) > 0) return;
 
     const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.25;
     const hpPercent = this.hp / this.maxHp;
@@ -2684,6 +2692,7 @@ export class GojoFighter extends Fighter {
     if ((this.reverseCursedTechniqueCooldown || 0) > 0 || this.isChannelingRCT) return;
     // Set cooldown immediately as sentinel before ANY heal/visual logic runs
     this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;
+    this.triggerSkillReleaseCooldown();
 
     const duration = CONFIG.gojo?.rctChannelDuration || 90; // visual-only duration (no longer gates the heal)
     this.isChannelingRCT = true;

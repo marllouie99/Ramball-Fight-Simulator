@@ -757,12 +757,18 @@ function _drawEscanorGoldenGauntlet(ctx, cx, cy, radius, isTheOne = false) {
  * - Authentic 2D Discrete Grid (P = 2.0px) pixel art shading
  * - 4-frame retro arcade cycling ignition spark at the extended fingertip
  */
-function _drawEscanorPointingGauntlet(ctx, cx, cy, radius, isTheOne = false, pointProgress = 1.0, fingerAngle = -Math.PI / 2, now = Date.now()) {
-  if (radius <= 0) return;
+function _drawEscanorPointingGauntlet(ctx, cx, cy, radius, isTheOne = false, pointProgress = 1.0, fingerAngle = -Math.PI / 2, now = Date.now(), alpha = 1.0, showSpark = true) {
+  if (radius <= 0 || alpha <= 0.001) return;
   const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
 
   const snapCx = snap(cx);
   const snapCy = snap(cy);
+
+  const needAlphaWrap = (alpha < 0.999);
+  if (needAlphaWrap) {
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+  }
 
   // 1. Palm / Fist Base (Discrete Pixel Gauntlet)
   _drawEscanorGoldenGauntlet(ctx, snapCx, snapCy, snap(radius * 0.85), isTheOne);
@@ -801,7 +807,7 @@ function _drawEscanorPointingGauntlet(ctx, cx, cy, radius, isTheOne = false, poi
   ctx.fillRect(snap(-1), snap(fingerTopY), 2, snap(fingerLen * 0.80));
 
   // 3. 4-Frame Retro Arcade Cycling Ignition Spark at Fingertip
-  if (pointProgress >= 0.15) {
+  if (showSpark && pointProgress >= 0.15) {
     const sparkFrame = Math.floor((currentNow / 75) % 4); // 75ms per retro arcade flash frame
 
     if (sparkFrame === 0) {
@@ -833,6 +839,10 @@ function _drawEscanorPointingGauntlet(ctx, cx, cy, radius, isTheOne = false, poi
   }
 
   ctx.restore();
+
+  if (needAlphaWrap) {
+    ctx.restore();
+  }
 }
 
 /**
@@ -984,8 +994,29 @@ export function _getEscanorChopAnimationState(fighter) {
 function _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase) {
   const handR = Math.max(r * 0.28, getHandSize(6.5));
 
-  // While actively channeling Cruel Sun or holding the post-throw stationary follow-through pose, back hand is hidden
-  if (fighter.isChannelingCruelSun || (fighter.cruelSunRecoveryTimer && fighter.cruelSunRecoveryTimer > 0)) {
+  // While actively channeling Cruel Sun, back hand is hidden
+  if (fighter.isChannelingCruelSun) {
+    return;
+  }
+
+  // During post-throw recovery, back hand smoothly fades in as pointing hand hides
+  if (fighter.cruelSunRecoveryTimer && fighter.cruelSunRecoveryTimer > 0) {
+    const maxRecTimer = fighter.cruelSunMaxRecoveryTimer || 180;
+    const recRemaining = fighter.cruelSunRecoveryTimer || 0;
+    const recElapsed = Math.max(0, maxRecTimer - recRemaining);
+    const recP = Math.max(0, Math.min(1.0, recElapsed / maxRecTimer));
+
+    if (recP < 0.25) {
+      return; // Fully hidden while pointing hand is visible
+    }
+
+    const backHandAlpha = Math.min(1.0, (recP - 0.25) / 0.30);
+    ctx.save();
+    ctx.globalAlpha *= backHandAlpha;
+    let handX = r * 0.65;
+    let handY = -r * 0.18;
+    _drawEscanorGoldenGauntlet(ctx, handX, handY, handR, fighter.isTheOneActive);
+    ctx.restore();
     return;
   }
 
@@ -1011,13 +1042,13 @@ function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhas
   const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
   const handR = Math.max(r * 0.30, getHandSize(7.0));
 
-  // Cruel Sun Activation, Aim & 3-Second Post-Throw Follow-Through Pose:
+  // Cruel Sun Activation, Aim & Smooth Post-Throw Hand Hide Pose:
   // 1. Left Hand firmly grips Divine Axe Rhitta on the front lower-left (-X, +Y)
   // 2. Right Hand:
   //    - Phase 1 (0.00-0.25): Lifts from resting up to skyward pointing pose
   //    - Phase 2 (0.25-0.75): Points skyward with muscular tension tremor as sun expands overhead
   //    - Phase 3 (0.75-1.00): Smoothly lowers & aims pointing index finger directly forward at enemy along local +X!
-  //    - Post-Throw Recovery (3s): Holds extended index finger forward follow-through pose while stationary!
+  //    - Post-Throw Recovery: Smoothly retracts pointing gauntlet and fades it to 0 opacity
   if (fighter.isChannelingCruelSun || (fighter.cruelSunRecoveryTimer && fighter.cruelSunRecoveryTimer > 0)) {
     const isRecovery = !fighter.isChannelingCruelSun && Boolean(fighter.cruelSunRecoveryTimer > 0);
     const maxTimer = fighter.cruelSunMaxChargeTimer || 45;
@@ -1025,17 +1056,9 @@ function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhas
     const progress = isRecovery ? 1.0 : Math.max(0, Math.min(1.0, 1.0 - (curTimer / maxTimer)));
 
     // 1. Left Hand with Divine Axe Rhitta (Front Layer)
-    const leftHandX = snap(-r * 0.72);
-    const leftHandY = snap(r * 0.38);
-    const axeAngle = 0.35; // Angled down-right across bottom
-
-    drawDivineAxeRhitta(ctx, leftHandX, leftHandY, axeAngle, r, {
-      isSwinging: false,
-      isTheOne: fighter.isTheOneActive,
-      prideStacks: fighter.prideStacks || 0,
-      heatLevel: 1.0 + (fighter.prideStacks || 0) * 0.2
-    });
-    _drawEscanorGoldenGauntlet(ctx, leftHandX, leftHandY, handR, fighter.isTheOneActive);
+    let leftHandX = snap(-r * 0.72);
+    let leftHandY = snap(r * 0.38);
+    let axeAngle = 0.35; // Angled down-right across bottom
 
     // 2. Right Hand Retro Arcade Keyframed Aiming
     const rawCastAngle = (fighter.cruelSunCastAngle !== undefined) ? fighter.cruelSunCastAngle : (fighter.cruelSunReleaseAngle || 0);
@@ -1053,13 +1076,43 @@ function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhas
     let rightHandX = poisedHandX;
     let rightHandY = poisedHandY;
     let fingerAngle = -Math.PI / 2;
+    let handAlpha = 1.0;
+    let showSpark = !isRecovery;
 
     if (isRecovery) {
-      // 3-Second Post-Throw Follow-Through Lock:
-      // Holds crisp extended pointing pose in the exact launch direction
-      rightHandX = forwardHandX;
-      rightHandY = forwardHandY;
-      fingerAngle = castAngle;
+      // Post-Throw Smooth Hand Retraction & Fade Out:
+      const maxRecTimer = fighter.cruelSunMaxRecoveryTimer || 180;
+      const recRemaining = fighter.cruelSunRecoveryTimer || 0;
+      const recElapsed = Math.max(0, maxRecTimer - recRemaining);
+      const recP = Math.max(0, Math.min(1.0, recElapsed / maxRecTimer));
+
+      if (recP <= 0.08) {
+        // Initial follow-through hold right after release
+        rightHandX = forwardHandX;
+        rightHandY = forwardHandY;
+        fingerAngle = castAngle;
+        handAlpha = 1.0;
+      } else if (recP < 0.45) {
+        // Smoothly ease back towards resting guard position while fading out to 0
+        const fadeNorm = (recP - 0.08) / 0.37; // 0.0 -> 1.0
+        const smoothEase = 0.5 - 0.5 * Math.cos(fadeNorm * Math.PI);
+        rightHandX = snap(forwardHandX + (restingHandX - forwardHandX) * smoothEase);
+        rightHandY = snap(forwardHandY + (restingHandY - forwardHandY) * smoothEase);
+        fingerAngle = castAngle + (-Math.PI * 0.15 - castAngle) * smoothEase;
+        handAlpha = Math.max(0, 1.0 - smoothEase);
+      } else {
+        // Pointing hand is fully hidden
+        handAlpha = 0.0;
+      }
+
+      // Smoothly blend left hand holding Divine Axe Rhitta into resting pose
+      if (recP > 0.25) {
+        const blendP = Math.min(1.0, (recP - 0.25) / 0.30);
+        const ease = 0.5 - 0.5 * Math.cos(blendP * Math.PI);
+        leftHandX = snap(-r * 0.72 + (chopState.handX - (-r * 0.72)) * ease);
+        leftHandY = snap(r * 0.38 + (chopState.handY - r * 0.38) * ease);
+        axeAngle = 0.35 + (chopState.axeAngle - 0.35) * ease;
+      }
     } else if (progress < 0.25) {
       // Phase 1: 3-Frame Discrete Arcade Arm Lift (Pose-to-Pose Keyframes)
       if (progress < 0.08) {
@@ -1114,7 +1167,17 @@ function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhas
       }
     }
 
-    _drawEscanorPointingGauntlet(ctx, rightHandX, rightHandY, handR, fighter.isTheOneActive, progress, fingerAngle, currentNow);
+    drawDivineAxeRhitta(ctx, leftHandX, leftHandY, axeAngle, r, {
+      isSwinging: false,
+      isTheOne: fighter.isTheOneActive,
+      prideStacks: fighter.prideStacks || 0,
+      heatLevel: 1.0 + (fighter.prideStacks || 0) * 0.2
+    });
+    _drawEscanorGoldenGauntlet(ctx, leftHandX, leftHandY, handR, fighter.isTheOneActive);
+
+    if (handAlpha > 0.001) {
+      _drawEscanorPointingGauntlet(ctx, rightHandX, rightHandY, handR, fighter.isTheOneActive, progress, fingerAngle, currentNow, handAlpha, showSpark);
+    }
     return;
   }
 

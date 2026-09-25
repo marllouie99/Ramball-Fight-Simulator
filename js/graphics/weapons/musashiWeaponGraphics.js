@@ -1,434 +1,313 @@
+// ─────────────────────────────────────────────
+// Musashi Weapon Graphics & Visual Effects (Authentic Upright Anime Edition)
+// Dual Niten Ichi-ryū Katanas:
+// 1. Primary Katana (Dark Damascus steel with glowing neon stance hamon edge)
+// 2. Companion Wakizashi (Polished gunmetal metallic blade with wavy temper line)
+// 3. Dual Sheaths (Saya) with Sageo cords & physics-simulated Kusari hanging chains
+// 4. Calligraphy Ink-Brush Smoke Trail after Phantom Flurry
+// Adheres strictly to Rule 19 (Upright Front POV), Rule 20 (Pixel Hands), and Rule 11 (Zero shadowBlur)
+// ─────────────────────────────────────────────
+
 import { getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
-export function drawMusashiWeapons(ctx, fighter) {
+export function drawMusashiWeapons(ctx, fighter, isLocal = false) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
+  if (!fighter) return;
+
+  const r = fighter.r || 25;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+
+  // Weapon Studio customization support
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.musashi)
+    ? state.weaponCustomizations.musashi
+    : { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+
+  const customScale = custom.scale !== undefined ? custom.scale : 1.0;
+  const customOffsetX = custom.offsetX !== undefined ? custom.offsetX : 0;
+  const customOffsetY = custom.offsetY !== undefined ? custom.offsetY : 0;
+  const customAngle = custom.angleOffset !== undefined ? custom.angleOffset : 0;
+
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-  
-  // Draw Dual Swords (Katana and Wakizashi)
-  
-  // Handle strike animation
-  let targetRightHandAngle = fighter.gunAngle;
-  let targetLeftHandAngle = fighter.gunAngle;
-  let targetRightBladeAngle = 0;
-  let targetLeftBladeAngle = 0;
-  let lerpSpeed = 1.0; // Snapping transition for stances
-    
-    const strikeMax = 15;
-    if (fighter.strikeTimer > 0) {
-      const prog = 1 - (fighter.strikeTimer / strikeMax);
-      // If niten active, separate logic
-      if (fighter.nitenActiveTimer > 0 || fighter.isNitenSecondHit) {
-        if (!fighter.isNitenSecondHit) {
-          // Wakizashi quick strike
-          targetLeftHandAngle = fighter.strikeAngle - Math.PI/4 + (prog * Math.PI/2);
-          targetRightHandAngle = fighter.gunAngle + Math.PI/6; // held back
-        } else {
-          // Katana heavy strike
-          targetRightHandAngle = fighter.strikeAngle - Math.PI/2 + (prog * Math.PI);
-          targetLeftHandAngle = fighter.gunAngle - Math.PI/6; // held back
-        }
+
+  if (!isLocal) {
+    ctx.translate(fighter.x, fighter.y);
+    const angle = isPodiumPreview ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+    ctx.rotate(angle);
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft && !fighter.isSpinning) {
+      ctx.scale(1, -1);
+    }
+  }
+
+  if (customOffsetX !== 0 || customOffsetY !== 0) {
+    ctx.translate(customOffsetX, customOffsetY);
+  }
+  if (customAngle !== 0) {
+    ctx.rotate(customAngle);
+  }
+  if (customScale !== 1.0) {
+    ctx.scale(customScale, customScale);
+  }
+
+  // ── 1. Calculate Local Upright Stance Angles & Hand Coordinates ──
+  // In local upright front-POV: +X is Forward (towards enemy), -X is Back, -Y is Up (Hair), +Y is Down (Hakama)
+  let targetKatanaAngle = -Math.PI / 14;   // Slight upward tilt (~ -12.8 deg)
+  let targetWakizashiAngle = Math.PI / 10; // Downward-forward guard (~ +18 deg)
+
+  let katanaHandX = r * 0.85;
+  let katanaHandY = -r * 0.12;
+
+  let wakizashiHandX = r * 0.65;
+  let wakizashiHandY = r * 0.22;
+
+  const strikeMax = 15;
+  if (fighter.strikeTimer && fighter.strikeTimer > 0) {
+    const prog = 1.0 - (fighter.strikeTimer / strikeMax);
+    if (fighter.nitenActiveTimer > 0 || fighter.isNitenSecondHit) {
+      if (!fighter.isNitenSecondHit) {
+        // Quick Wakizashi Thrust/Slash
+        targetWakizashiAngle = -Math.PI / 4 + (prog * Math.PI * 0.55);
+        wakizashiHandX = r * 0.92;
+        targetKatanaAngle = -Math.PI / 10; // Katana held in steady guard
       } else {
-        // Basic dual strike
-        targetRightHandAngle = fighter.strikeAngle - Math.PI/4 + (prog * Math.PI/2);
-        targetLeftHandAngle = fighter.strikeAngle + Math.PI/4 - (prog * Math.PI/2);
+        // Heavy Katana Overhead/Cross Cleave
+        targetKatanaAngle = -Math.PI / 2.2 + (prog * Math.PI * 0.85);
+        katanaHandX = r * 0.95 + Math.sin(prog * Math.PI) * 6;
+        targetWakizashiAngle = Math.PI / 6; // Wakizashi held back at hip
       }
     } else {
-      // Point Katana towards the target during a dash, but keep Wakizashi at the side
-      if (fighter.dashAnimTimer && fighter.dashAnimTimer > 0) {
-        targetRightHandAngle = fighter.gunAngle;
-        targetRightBladeAngle = 0;
-        
-        targetLeftHandAngle = fighter.gunAngle - Math.PI/3;
-        targetLeftBladeAngle = Math.PI/10;
-      }
+      // Basic Niten Dual Slash (Scissor / Cross X swing)
+      targetKatanaAngle = -Math.PI / 3 + (prog * Math.PI * 0.65);
+      targetWakizashiAngle = Math.PI / 3 - (prog * Math.PI * 0.65);
+      katanaHandX = r * 0.88 + Math.sin(prog * Math.PI) * 4;
+      wakizashiHandX = r * 0.72 + Math.sin(prog * Math.PI) * 4;
     }
-    
-    const isIdle = (fighter.dashAnimTimer || 0) <= 0 && 
-                   (fighter.strikeTimer || 0) <= 0 && 
-                   (fighter.flurryHitsLeft || 0) <= 0;
+  } else if (fighter.dashAnimTimer && fighter.dashAnimTimer > 0) {
+    // Aerodynamic Dash / Piercing Stance: Katana points dead straight forward, Wakizashi tight at flank
+    targetKatanaAngle = 0;
+    katanaHandX = r * 1.05;
+    katanaHandY = -r * 0.08;
 
-    if (isIdle) {
-      // If undefined (like in UI menu), default to 0 so he shows the X-guard
-      const distSq = fighter.distToTargetSq !== undefined ? fighter.distToTargetSq : 0;
-      const isClose = distSq < 40000; // ~200 pixels
+    targetWakizashiAngle = Math.PI / 14;
+    wakizashiHandX = r * 0.75;
+    wakizashiHandY = r * 0.20;
+  } else {
+    // IDLE / COMBAT SPACING
+    const distSq = fighter.distToTargetSq !== undefined ? fighter.distToTargetSq : 0;
+    const isClose = distSq < 40000; // ~200 pixels
 
-      if (isClose) {
-         // X-shape guard (Close range)
-         targetRightHandAngle = fighter.gunAngle + Math.PI/5;
-         targetRightBladeAngle = -Math.PI/2.2;
-         targetLeftHandAngle = fighter.gunAngle - Math.PI/5;
-         targetLeftBladeAngle = Math.PI/2.2;
-      } else {
-         // Relaxed holding stance (Out of range)
-         targetRightHandAngle = fighter.gunAngle + Math.PI/3;
-         targetRightBladeAngle = -Math.PI/10;
-         targetLeftHandAngle = fighter.gunAngle - Math.PI/3;
-         targetLeftBladeAngle = Math.PI/10;
-      }
+    if (isClose) {
+      // X-Shape Niten Guard (Close combat parry guard)
+      targetKatanaAngle = -Math.PI / 5.5;  // Angled forward-up
+      katanaHandX = r * 0.80;
+      katanaHandY = -r * 0.16;
+
+      targetWakizashiAngle = Math.PI / 5.5; // Crossed forward-up to lock blades in front
+      wakizashiHandX = r * 0.72;
+      wakizashiHandY = r * 0.14;
     } else {
-      lerpSpeed = 1.0; // Snappy instant updates during attacks and dashes
+      // Flowing Ready Stance (Out of range)
+      targetKatanaAngle = -Math.PI / 14;
+      katanaHandX = r * 0.85;
+      katanaHandY = -r * 0.12;
+
+      targetWakizashiAngle = Math.PI / 10;
+      wakizashiHandX = r * 0.65;
+      wakizashiHandY = r * 0.22;
     }
+  }
 
-    // Initialize visual angles on first frame
-    if (fighter.vRightHandAngle === undefined) {
-       fighter.vRightHandAngle = targetRightHandAngle;
-       fighter.vRightBladeAngle = targetRightBladeAngle;
-       fighter.vLeftHandAngle = targetLeftHandAngle;
-       fighter.vLeftBladeAngle = targetLeftBladeAngle;
-    }
+  // Smooth shortest-path angle interpolation
+  const lerpAngle = (current, target, t) => {
+    let diff = (target - current) % (Math.PI * 2);
+    if (diff > Math.PI) diff -= Math.PI * 2;
+    if (diff < -Math.PI) diff += Math.PI * 2;
+    return current + diff * t;
+  };
 
-    // Smooth shortest-path angle interpolation
-    const lerpAngle = (current, target, t) => {
-       let diff = (target - current) % (Math.PI * 2);
-       if (diff > Math.PI) diff -= Math.PI * 2;
-       if (diff < -Math.PI) diff += Math.PI * 2;
-       return current + diff * t;
-    };
+  if (fighter.vLocalKatanaAngle === undefined) {
+    fighter.vLocalKatanaAngle = targetKatanaAngle;
+    fighter.vLocalWakizashiAngle = targetWakizashiAngle;
+    fighter.vKatanaHandX = katanaHandX;
+    fighter.vKatanaHandY = katanaHandY;
+    fighter.vWakizashiHandX = wakizashiHandX;
+    fighter.vWakizashiHandY = wakizashiHandY;
+  }
 
-    fighter.vRightHandAngle = lerpAngle(fighter.vRightHandAngle, targetRightHandAngle, lerpSpeed);
-    fighter.vRightBladeAngle = lerpAngle(fighter.vRightBladeAngle, targetRightBladeAngle, lerpSpeed);
-    fighter.vLeftHandAngle = lerpAngle(fighter.vLeftHandAngle, targetLeftHandAngle, lerpSpeed);
-    fighter.vLeftBladeAngle = lerpAngle(fighter.vLeftBladeAngle, targetLeftBladeAngle, lerpSpeed);
-    
-    // Stance colors (Solid for intense glow)
-    let aura = '#fff';
-    if (fighter.currentStance === 'earth') aura = 'rgb(220, 100, 50)';
-    if (fighter.currentStance === 'water') aura = 'rgb(50, 180, 255)';
-    if (fighter.currentStance === 'fire') aura = 'rgb(255, 80, 20)';
-    if (fighter.currentStance === 'wind') aura = 'rgb(80, 220, 130)';
-    if (fighter.currentStance === 'void') aura = 'rgb(180, 80, 255)';
-    
-    // ── INK-BRUSH SMOKE TRAIL (after Phantom Flurry) ──
-    if (fighter.flurrySmokeTimer > 0) {
-      const smokeAlpha = fighter.flurrySmokeTimer / 150;
-      _drawBrushSmokeTrail(ctx, fighter.vRightHandAngle, fighter.r, smokeAlpha, 87, false);
-      _drawBrushSmokeTrail(ctx, fighter.vLeftHandAngle, fighter.r, smokeAlpha, 58, true);
-    }
+  const lerpSpeed = (fighter.strikeTimer > 0 || (fighter.dashAnimTimer || 0) > 0) ? 1.0 : 0.25;
+  fighter.vLocalKatanaAngle = lerpAngle(fighter.vLocalKatanaAngle, targetKatanaAngle, lerpSpeed);
+  fighter.vLocalWakizashiAngle = lerpAngle(fighter.vLocalWakizashiAngle, targetWakizashiAngle, lerpSpeed);
+  fighter.vKatanaHandX += (katanaHandX - fighter.vKatanaHandX) * lerpSpeed;
+  fighter.vKatanaHandY += (katanaHandY - fighter.vKatanaHandY) * lerpSpeed;
+  fighter.vWakizashiHandX += (wakizashiHandX - fighter.vWakizashiHandX) * lerpSpeed;
+  fighter.vWakizashiHandY += (wakizashiHandY - fighter.vWakizashiHandY) * lerpSpeed;
 
-    // Draw Katana (Right) — dark blade with glowing neon edge
-    ctx.save();
-    ctx.rotate(fighter.vRightHandAngle);
-    ctx.translate(fighter.r, 0); // Pivot at hand
-    ctx.rotate(fighter.vRightBladeAngle);
-    ctx.translate(-fighter.r, 0); // Revert translate for drawKatana
-    drawKatana(ctx, fighter.r, 1.0, aura, fighter.color);
-    ctx.restore();
-    
-    // Draw Wakizashi (Left) — shorter, wider metallic blade
-    ctx.save();
-    ctx.rotate(fighter.vLeftHandAngle);
-    ctx.translate(fighter.r, 0); // Pivot at hand
-    ctx.rotate(fighter.vLeftBladeAngle);
-    ctx.translate(-fighter.r, 0); // Revert translate for drawWakizashi
-    ctx.scale(1, -1);
-    drawWakizashi(ctx, fighter.r, 1.0, aura, fighter.color);
-    ctx.restore();
-  
+  // Stance aura color palette
+  let aura = '#fff';
+  if (fighter.currentStance === 'earth') aura = 'rgb(220, 100, 50)';
+  if (fighter.currentStance === 'water') aura = 'rgb(50, 180, 255)';
+  if (fighter.currentStance === 'fire') aura = 'rgb(255, 80, 20)';
+  if (fighter.currentStance === 'wind') aura = 'rgb(80, 220, 130)';
+  if (fighter.currentStance === 'void') aura = 'rgb(180, 80, 255)';
+
+  // ── INK-BRUSH SMOKE TRAIL (after Phantom Flurry) ──
+  if (fighter.flurrySmokeTimer && fighter.flurrySmokeTimer > 0) {
+    const smokeAlpha = fighter.flurrySmokeTimer / 150;
+    _drawBrushSmokeTrail(ctx, fighter.vKatanaHandX, fighter.vKatanaHandY, fighter.vLocalKatanaAngle, smokeAlpha, 87, false);
+    _drawBrushSmokeTrail(ctx, fighter.vWakizashiHandX, fighter.vWakizashiHandY, fighter.vLocalWakizashiAngle, smokeAlpha, 58, true);
+  }
+
+  // ── LAYER 1: Draw Wakizashi (Left/Offhand Sword) ──
+  drawWakizashiAt(ctx, fighter.vWakizashiHandX, fighter.vWakizashiHandY, fighter.vLocalWakizashiAngle, 0.95, aura, '#E0A882');
+
+  // ── LAYER 2: Draw Katana (Right/Lead Sword) on top ──
+  drawKatanaAt(ctx, fighter.vKatanaHandX, fighter.vKatanaHandY, fighter.vLocalKatanaAngle, 1.0, aura, '#E0A882');
+
   ctx.restore();
 }
 
-// ─────────────────────────────────────────────
-// INK-BRUSH SMOKE TRAIL — calligraphy-style wispy trail on weapon
-// Uses rough brush strokes with dark #374669 and white
-// ─────────────────────────────────────────────
-function _drawBrushSmokeTrail(ctx, bladeAngle, offset, alpha, bladeLen, isFlipped) {
+/**
+ * Draws the Primary Katana at the specified local hand coordinates and angle.
+ */
+export function drawKatanaAt(ctx, handX, handY, angle, scale = 1.0, auraColor = '#32b4ff', skinColor = '#E0A882') {
   ctx.save();
-  ctx.rotate(bladeAngle);
-  if (isFlipped) ctx.scale(1, -1);
-  
-  const tipX = offset + bladeLen - 5;
-  // Lock the animation to exactly 30 frames per second for a stylized look
-  const fps30Time = Math.floor(performance.now() / (1000 / 30)) * (1000 / 30);
-  const time = fps30Time * 0.003; // Very slow speed for calm sea wave flow
-  
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  
-  // ── Dark Ink Flame Tongues ──
-  // Each flame is a single curved stroke originating from the blade tip
-  // Using round lineCap eliminates all square edges
-  const numFlames = 7;
-  
-  for (let i = 0; i < numFlames; i++) {
-    const phase = i * 2.718;
-    const speed = 1 + (i % 3) * 0.2;
-    const t = time * speed + phase;
-    
-    // Crescent silhouette: center flames are longest
-    const distFromCenter = Math.abs(i - (numFlames - 1) / 2);
-    const length = 160 - (distFromCenter * 30);
-    
-    const spread = (i - (numFlames - 1) / 2) * 3; // Tightly packed, lines overlap
-    
-    // Flowing control points
-    const cp1x = tipX - (length * 0.35);
-    const cp1y = (spread * 0.5) + Math.sin(t) * 10;
-    
-    const cp2x = tipX - (length * 0.7);
-    const cp2y = (spread * 1.3) + Math.sin(t * 1.3) * 18;
-    
-    const endX = tipX - length;
-    const endY = (spread * 1.8) + Math.sin(t * 1.6) * 22;
-    
-    // Draw as a single curved stroke — no flat edges anywhere
-    ctx.beginPath();
-    ctx.moveTo(tipX, 0); // All flames start from the same point
-    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
-    
-    const grad = ctx.createLinearGradient(tipX, 0, endX, endY);
-    
-    if (i === 3) {
-      // Center flame: bright white core
-      grad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.95})`);
-      grad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha * 0.5})`);
-      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      ctx.lineWidth = 8;
-    } else if (i === 2 || i === 4) {
-      // Near-center: white highlight
-      grad.addColorStop(0, `rgba(200, 210, 230, ${alpha * 0.8})`);
-      grad.addColorStop(0.5, `rgba(200, 210, 230, ${alpha * 0.3})`);
-      grad.addColorStop(1, 'rgba(200, 210, 230, 0)');
-      ctx.lineWidth = 5;
-    } else {
-      // Outer flames: dark ink
-      grad.addColorStop(0, `rgba(55, 70, 105, ${alpha * 0.9})`);
-      grad.addColorStop(0.6, `rgba(42, 53, 80, ${alpha * 0.6})`);
-      grad.addColorStop(1, 'rgba(42, 53, 80, 0)');
-      ctx.lineWidth = 3 + (3 - distFromCenter);
-    }
-    
-    ctx.strokeStyle = grad;
-    ctx.stroke();
-  }
-  
-  // ── Five Rings Particles ──
-  // All 5 stance colors appear at once as glowing particles
-  const stanceColors = [
-    'rgb(220, 100, 50)',   // Earth (orange)
-    'rgb(50, 180, 255)',   // Water (blue)
-    'rgb(255, 80, 20)',    // Fire (red)
-    'rgb(80, 220, 130)',   // Wind (green)
-    'rgb(180, 80, 255)',   // Void (purple)
-  ];
-  
-  for (let i = 0; i < 15; i++) {
-    const colorIdx = i % 5;
-    const t = time * 1.2 + i * 2.094; // Stagger each particle
-    const driftX = (t * 55) % 180; // Drift distance loops
-    
-    // Fade out as they get further away
-    const partAlpha = Math.max(0, 1 - (driftX / 180)) * alpha;
-    if (partAlpha <= 0) continue;
-    
-    const px = tipX - driftX;
-    const py = Math.sin(t * 1.8 + i) * 30 + Math.cos(i * 77) * 15;
-    
-    const size = Math.max(0.5, 3.5 - (driftX / 45)); // Shrink as they fly
-    
-    // Glow
-    ctx.save();
-    ctx.globalAlpha = partAlpha * 0.4;
-    // ctx.shadowColor = stanceColors[colorIdx]; // Removed for performance
-    ctx.beginPath();
-    ctx.arc(px, py, size * 1.8, 0, Math.PI * 2);
-    ctx.fillStyle = stanceColors[colorIdx];
-    ctx.fill();
-    ctx.restore();
-    
-    // Core dot
-    ctx.save();
-    ctx.globalAlpha = partAlpha;
-    ctx.beginPath();
-    ctx.arc(px, py, size, 0, Math.PI * 2);
-    ctx.fillStyle = stanceColors[colorIdx];
-    ctx.fill();
-    
-    // Bright white center
-    ctx.beginPath();
-    ctx.arc(px, py, size * 0.4, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255, 255, 255, ${partAlpha})`;
-    ctx.fill();
-    ctx.restore();
-  }
-  
-  ctx.restore();
-}
-
-
-// ─────────────────────────────────────────────
-// KATANA — Dark blade with glowing neon edge (Reference Image 1)
-// ─────────────────────────────────────────────
-function drawKatana(ctx, offset, scale, auraColor, fighterColor = '#555') {
-  ctx.save();
-  ctx.translate(offset, 0);
+  ctx.translate(handX, handY);
+  ctx.rotate(angle);
   ctx.scale(scale, scale);
 
-  // ── Pommel (end cap) ──
-  ctx.fillStyle = '#1a1a1a';
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(-20, -3, 4, 6, 1);
-  ctx.fill();
-  ctx.stroke();
+  // ── 1. Kashira (Pommel End Cap) ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-22, -3.5, 5, 7);
+  ctx.fillStyle = '#1A1C22';
+  ctx.fillRect(-21, -2.5, 3, 5);
 
-  // ── Handle with cutout holes (like reference) ──
-  ctx.fillStyle = '#0d0d0d';
-  ctx.strokeStyle = '#2a2a2a';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(-16, -2.5, 18, 5, 1);
-  ctx.fill();
-  ctx.stroke();
+  // ── 2. Tsuka (Handle with Diamond Cutout Wrapping) ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-17, -3, 18, 6);
+  ctx.fillStyle = '#1C1F28';
+  ctx.fillRect(-16, -2, 16, 4);
 
-  // Cutout holes in handle
-  ctx.fillStyle = '#050505';
-  ctx.strokeStyle = '#1a1a1a';
-  ctx.lineWidth = 0.5;
+  // Diamond wraps (Tsuka-ito)
+  ctx.fillStyle = '#3A4154';
   for (let i = 0; i < 3; i++) {
-    ctx.beginPath();
-    ctx.roundRect(-13 + i * 5, -1, 3, 2, 0.5);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillRect(-14 + i * 5, -1, 3, 2);
   }
 
-  // ── Tsuba (rectangular guard) ──
-  ctx.fillStyle = '#1c1c1c';
-  ctx.strokeStyle = '#444';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.roundRect(0, -6, 3, 12, 1);
-  ctx.fill();
-  ctx.stroke();
-  
-  // Guard accent line
-  ctx.fillStyle = '#555';
-  ctx.fillRect(1, -5, 1, 10);
+  // ── 3. Tsuba (Rectangular Handguard) ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-1, -7, 4, 14);
+  ctx.fillStyle = '#2A2E3B';
+  ctx.fillRect(0, -6, 2, 12);
+  ctx.fillStyle = '#5A637C';
+  ctx.fillRect(0, -5, 1, 10);
 
-  // ── Habaki (blade collar) ──
-  ctx.fillStyle = '#8a7a50';
-  ctx.fillRect(3, -3.5, 4, 7);
-  ctx.strokeStyle = '#6b5c3a';
-  ctx.lineWidth = 0.8;
-  ctx.strokeRect(3, -3.5, 4, 7);
+  // ── 4. Habaki (Gold Blade Collar) ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(2, -4, 5, 8);
+  ctx.fillStyle = '#D4AF37';
+  ctx.fillRect(3, -3.5, 3, 7);
+  ctx.fillStyle = '#FFF2A8';
+  ctx.fillRect(3, -3.5, 1, 7);
 
-  // ── Blade body (dark, beautiful sweeping curve) ──
+  // ── 5. Blade Body (Sweeping Dark Steel Kissaki) ──
   ctx.beginPath();
-  ctx.moveTo(7, -3.5);
-  // Spine: smoothly curves up then flattens towards tip
-  ctx.bezierCurveTo(30, -4.5, 60, -6.5, 82, -4); 
-  // Kissaki (tip)
-  ctx.lineTo(87, 0); 
-  // Edge: sharp sweeping curve back to base
-  ctx.bezierCurveTo(60, 3.5, 30, 3.5, 7, 3.5);
+  ctx.moveTo(6, -3.5);
+  // Curved spine
+  ctx.bezierCurveTo(30, -4.5, 60, -6.5, 82, -4);
+  // Kissaki sharp tip
+  ctx.lineTo(87, 0);
+  // Sweeping cutting edge
+  ctx.bezierCurveTo(60, 3.5, 30, 3.5, 6, 3.5);
   ctx.closePath();
 
-  // Dark steel gradient
-  const bladeGrad = ctx.createLinearGradient(7, -5, 7, 4);
-  bladeGrad.addColorStop(0, '#1a1a1e');
-  bladeGrad.addColorStop(0.4, '#2a2a30');
-  bladeGrad.addColorStop(0.6, '#1e1e22');
-  bladeGrad.addColorStop(1, '#111115');
+  // Damascus steel gradient
+  const bladeGrad = ctx.createLinearGradient(6, -5, 6, 4);
+  bladeGrad.addColorStop(0, '#161820');
+  bladeGrad.addColorStop(0.4, '#2A2E3A');
+  bladeGrad.addColorStop(0.6, '#1C1F28');
+  bladeGrad.addColorStop(1, '#101217');
   ctx.fillStyle = bladeGrad;
   ctx.fill();
 
-  // Thick dark outline for visibility
-  ctx.strokeStyle = '#050505';
-  ctx.lineWidth = 1.5;
+  // Dark outline
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.4;
   ctx.stroke();
 
-  // ── Shinogi (ridge line running along the blade) ──
+  // ── 6. Shinogi (Ridge line) ──
   ctx.beginPath();
-  ctx.moveTo(7, -1);
+  ctx.moveTo(6, -1);
   ctx.bezierCurveTo(30, -2, 60, -3, 82, -2);
-  ctx.strokeStyle = '#3a3a42';
-  ctx.lineWidth = 0.7;
+  ctx.strokeStyle = '#3E465A';
+  ctx.lineWidth = 0.8;
   ctx.stroke();
 
-  // ── Glowing Neon Edge (the signature feature from reference) ──
+  // ── 7. Glowing Stance Aura along the cutting edge (Simulated Glow - Rule 11) ──
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  
+
   ctx.beginPath();
-  ctx.moveTo(7, 3.5);
+  ctx.moveTo(6, 3.5);
   ctx.bezierCurveTo(30, 3.5, 60, 3.5, 87, 0);
-  
-  // Large faint outer bloom
+
+  // Outer bloom
   ctx.strokeStyle = auraColor;
-  ctx.lineWidth = 14;
+  ctx.lineWidth = 12;
   ctx.globalAlpha = 0.15;
   ctx.stroke();
 
-  // Medium outer glow
-  ctx.lineWidth = 7;
-  ctx.globalAlpha = 0.4;
+  // Mid glow
+  ctx.lineWidth = 6;
+  ctx.globalAlpha = 0.40;
   ctx.stroke();
 
-  // Intense inner core glow
-  ctx.lineWidth = 3;
+  // Inner core glow
+  ctx.lineWidth = 2.8;
+  ctx.globalAlpha = 0.95;
+  ctx.stroke();
+
+  // Razor white cutting line
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.2;
   ctx.globalAlpha = 1.0;
   ctx.stroke();
 
-  // Pure white center line
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-  
   ctx.restore();
 
-  // ── Small accent notches along the spine ──
-  ctx.fillStyle = '#555';
-  for (const px of [15, 28, 40]) {
-    ctx.beginPath();
-    ctx.arc(px, -2.8, 0.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ── Hand ──
-  ctx.fillStyle = fighterColor;
-  ctx.beginPath();
-  ctx.arc(-7, 0, getHandSize(6), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
+  // ── 8. Pixel Hand Gripping the Katana Tsuka ──
+  drawPixelHand(ctx, -7, 0, getHandSize(5.8), skinColor || '#E0A882', '#0E0F14');
 
   ctx.restore();
 }
 
-// ─────────────────────────────────────────────
-// WAKIZASHI — Wide metallic blade with wrapped handle (Reference Image 2)
-// ─────────────────────────────────────────────
-function drawWakizashi(ctx, offset, scale, auraColor, fighterColor = '#555') {
+/**
+ * Draws the Companion Wakizashi at the specified local hand coordinates and angle.
+ */
+export function drawWakizashiAt(ctx, handX, handY, angle, scale = 1.0, auraColor = '#32b4ff', skinColor = '#E0A882') {
   ctx.save();
-  ctx.translate(offset, 0);
+  ctx.translate(handX, handY);
+  ctx.rotate(angle);
   ctx.scale(scale, scale);
 
-  // ── Pommel (kashira) ──
-  ctx.fillStyle = '#1a1a1a';
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(-14, 0, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // ── 1. Kashira (Pommel) ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-16, -3, 4, 6);
+  ctx.fillStyle = '#1A1C22';
+  ctx.fillRect(-15, -2, 2, 4);
 
-  // ── Handle with cross-hatch wrapping (tsuka-ito) ──
-  ctx.fillStyle = '#111';
-  ctx.strokeStyle = '#222';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(-12, -2, 14, 4, 1);
-  ctx.fill();
-  ctx.stroke();
+  // ── 2. Handle with Cross-Hatch Tsuka Wrapping ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-13, -2.5, 14, 5);
+  ctx.fillStyle = '#181A20';
+  ctx.fillRect(-12, -2, 12, 4);
 
-  // Cross-hatch wrap pattern
-  ctx.strokeStyle = '#2a2a2a';
+  ctx.strokeStyle = '#353B4B';
   ctx.lineWidth = 0.6;
-  for (let i = 0; i < 6; i++) {
-    const wx = -10 + i * 2.0;
+  for (let i = 0; i < 5; i++) {
+    const wx = -10 + i * 2.2;
     ctx.beginPath();
     ctx.moveTo(wx, -2);
     ctx.lineTo(wx + 1.5, 2);
@@ -439,200 +318,176 @@ function drawWakizashi(ctx, offset, scale, auraColor, fighterColor = '#555') {
     ctx.stroke();
   }
 
-  // ── Tsuba (simple rectangular guard) ──
-  ctx.fillStyle = '#8a7a50';
-  ctx.strokeStyle = '#6b5c3a';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(0, -4.5, 3, 9, 1);
-  ctx.fill();
-  ctx.stroke();
+  // ── 3. Tsuba (Rectangular Guard) ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-1, -5.5, 3, 11);
+  ctx.fillStyle = '#8A7A50';
+  ctx.fillRect(0, -4.5, 2, 9);
+  ctx.fillStyle = '#D4AF37';
+  ctx.fillRect(0, -3.5, 1, 7);
 
-  // ── Habaki (blade collar) ──
-  ctx.fillStyle = '#b0a070';
-  ctx.fillRect(3, -4.5, 3, 9);
+  // ── 4. Habaki (Collar) ──
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(1, -4, 4, 8);
+  ctx.fillStyle = '#B0A070';
+  ctx.fillRect(2, -3.5, 2, 7);
 
-  // ── Blade (wider, metallic sheen) ──
+  // ── 5. Blade Body (Wide Metallic Gunmetal Profile) ──
   ctx.beginPath();
-  ctx.moveTo(6, -4.5);
-  // Spine curve
-  ctx.bezierCurveTo(20, -5, 40, -7.5, 54, -5);
-  // Tip point
-  ctx.lineTo(58, -0.5);
-  // Edge curve
-  ctx.bezierCurveTo(40, 3.5, 20, 4.5, 6, 4.5);
+  ctx.moveTo(4, -4.0);
+  ctx.bezierCurveTo(18, -4.5, 38, -6.5, 52, -4.5);
+  ctx.lineTo(56, -0.5); // Wakizashi tip
+  ctx.bezierCurveTo(38, 3.5, 18, 4.0, 4, 4.0);
   ctx.closePath();
 
-  // Metallic steel gradient (darker gunmetal for better contrast against white)
-  const bladeGrad = ctx.createLinearGradient(6, -6, 6, 5);
-  bladeGrad.addColorStop(0, '#66666e');
-  bladeGrad.addColorStop(0.3, '#99999f');
-  bladeGrad.addColorStop(0.5, '#55555a');
-  bladeGrad.addColorStop(0.7, '#88888e');
-  bladeGrad.addColorStop(1, '#333338');
+  // Gunmetal steel gradient
+  const bladeGrad = ctx.createLinearGradient(4, -5, 4, 4);
+  bladeGrad.addColorStop(0, '#555A66');
+  bladeGrad.addColorStop(0.3, '#888F9E');
+  bladeGrad.addColorStop(0.5, '#4A505C');
+  bladeGrad.addColorStop(0.7, '#788090');
+  bladeGrad.addColorStop(1, '#2E323A');
   ctx.fillStyle = bladeGrad;
   ctx.fill();
 
-  // Strong dark outline for visibility
-  ctx.strokeStyle = '#111';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.4;
   ctx.stroke();
 
-  // ── Shinogi (ridge line) ──
+  // ── 6. Shinogi & Hamon Wave ──
   ctx.beginPath();
-  ctx.moveTo(6, -1);
-  ctx.bezierCurveTo(20, -2, 40, -3, 54, -2.5);
-  ctx.strokeStyle = '#bbb';
+  ctx.moveTo(4, -1);
+  ctx.bezierCurveTo(18, -2, 38, -2.8, 52, -2);
+  ctx.strokeStyle = '#CBD5E1';
   ctx.lineWidth = 0.6;
   ctx.stroke();
 
-  // ── Hamon (temper line — wavy pattern near the edge) ──
+  // Hamon temper wave
   ctx.beginPath();
-  ctx.moveTo(6, 2.5);
-  ctx.quadraticCurveTo(15, 1, 25, 2.5);
-  ctx.quadraticCurveTo(35, 4, 45, 1.5);
-  ctx.quadraticCurveTo(50, 0, 56, 0);
-  ctx.strokeStyle = 'rgba(200, 200, 210, 0.5)';
+  ctx.moveTo(4, 2);
+  ctx.quadraticCurveTo(14, 0.5, 24, 2);
+  ctx.quadraticCurveTo(34, 3.5, 44, 1);
+  ctx.quadraticCurveTo(48, 0, 54, 0);
+  ctx.strokeStyle = 'rgba(220, 230, 245, 0.65)';
   ctx.lineWidth = 0.8;
   ctx.stroke();
 
-  // ── Glowing edge aura ──
+  // ── 7. Glowing Stance Aura on cutting edge ──
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  
-  ctx.beginPath();
-  ctx.moveTo(6, 4.5);
-  ctx.bezierCurveTo(20, 4.5, 40, 3.5, 58, -0.5);
 
-  // Large faint outer bloom
+  ctx.beginPath();
+  ctx.moveTo(4, 4.0);
+  ctx.bezierCurveTo(18, 4.0, 38, 3.0, 56, -0.5);
+
   ctx.strokeStyle = auraColor;
-  ctx.lineWidth = 12;
+  ctx.lineWidth = 10;
   ctx.globalAlpha = 0.15;
   ctx.stroke();
 
-  // Medium outer glow
-  ctx.lineWidth = 6;
-  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 5;
+  ctx.globalAlpha = 0.40;
   ctx.stroke();
 
-  // Intense inner core glow
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.4;
+  ctx.globalAlpha = 0.95;
+  ctx.stroke();
+
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.0;
   ctx.globalAlpha = 1.0;
   ctx.stroke();
 
-  // Pure white center line
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-  
   ctx.restore();
 
-  // ── Hand ──
-  ctx.fillStyle = fighterColor;
-  ctx.beginPath();
-  ctx.arc(-5, 0, getHandSize(6), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
+  // ── 8. Pixel Hand Gripping Wakizashi Tsuka ──
+  drawPixelHand(ctx, -5, 0, getHandSize(5.4), skinColor || '#E0A882', '#0E0F14');
 
   ctx.restore();
 }
 
-// ─────────────────────────────────────────────
-// SAYA (SHEATHS) — For Nōtō (sheathing idle animation)
-// ─────────────────────────────────────────────
-export function drawMusashiSheaths(ctx, fighter, hasSwords) {
-  ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-  ctx.rotate(fighter.gunAngle); // Align with the direction he is looking
+/**
+ * Backward compatibility functions for legacy callers.
+ */
+export function drawKatana(ctx, offset, scale, auraColor, fighterColor = '#555') {
+  drawKatanaAt(ctx, offset, 0, 0, scale, auraColor, fighterColor);
+}
 
-  // ── Wakizashi Sheath (Shorter, worn closer to waist) ──
-  ctx.save();
-  ctx.translate(-8, 6); // Moved closer to body
-  ctx.rotate(-Math.PI / 7); // Angled slightly up
+export function drawWakizashi(ctx, offset, scale, auraColor, fighterColor = '#555') {
+  drawWakizashiAt(ctx, offset, 0, 0, scale, auraColor, fighterColor);
+}
 
-  // Sheath body
-  ctx.fillStyle = '#111';
-  ctx.strokeStyle = '#2a2a2a';
-  ctx.lineWidth = 1;
+/**
+ * SAYA (SHEATHS) — Mounted at the samurai's hip in Upright Anime POV
+ */
+export function drawMusashiSheaths(ctx, fighter, hasSwords = false, isLocal = false) {
+  if (!fighter) return;
+  const r = fighter.r || 25;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+
+  ctx.save();
+
+  if (!isLocal) {
+    ctx.translate(fighter.x, fighter.y);
+    const angle = isPodiumPreview ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+    ctx.rotate(angle);
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft && !fighter.isSpinning) {
+      ctx.scale(1, -1);
+    }
+  }
+
+  // Hip attachment point in front POV coordinates: (-r * 0.35, r * 0.40)
+  const hipX = -r * 0.35;
+  const hipY = r * 0.38;
+
+  // ── 1. Katana Sheath (Longer sweeping scabbard angled backward-down) ──
+  ctx.save();
+  ctx.translate(hipX, hipY);
+  ctx.rotate(Math.PI * 0.92); // Points backward and slightly down (-X, +Y)
+
+  ctx.fillStyle = '#08090C';
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.moveTo(0, -3.5);
-  ctx.quadraticCurveTo(-15, -6, -32, -3); // shorter length
-  ctx.lineTo(-34, 1);
-  ctx.quadraticCurveTo(-15, 3.5, 0, 3.5);
+  ctx.bezierCurveTo(20, -3.5, 45, -1.5, 60, 1);
+  ctx.lineTo(61, 4.5);
+  ctx.bezierCurveTo(45, 5, 20, 4.5, 0, 3.5);
+  ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Sageo (decorative cord)
-  ctx.strokeStyle = '#444';
-  ctx.lineWidth = 1;
-  for(let i = 0; i < 3; i++) {
-     ctx.beginPath();
-     ctx.moveTo(-8 - i*3, -4.5);
-     ctx.lineTo(-10 - i*3, 3.5);
-     ctx.stroke();
-  }
-
-  // Handle sticking out (if sheathed)
-  if (hasSwords) {
-    ctx.fillStyle = '#111';
+  // Sageo cords
+  ctx.strokeStyle = '#3A4154';
+  ctx.lineWidth = 1.0;
+  for (let i = 0; i < 4; i++) {
     ctx.beginPath();
-    ctx.roundRect(0, -2, 12, 4, 1);
-    ctx.fill();
+    ctx.moveTo(12 + i * 4, -3.5);
+    ctx.lineTo(15 + i * 4, 4);
     ctx.stroke();
-    // Kashira (pommel)
-    ctx.fillStyle = '#1a1a1a';
-    ctx.beginPath();
-    ctx.arc(13, 0, 2, 0, Math.PI*2);
-    ctx.fill();
-    // Tsuba (guard)
-    ctx.fillStyle = '#8a7a50';
-    ctx.fillRect(0, -4.5, 2, 9);
-  }
-  ctx.restore();
-
-  // ── Katana Sheath (Longer, sweeping curve) ──
-  ctx.save();
-  ctx.translate(-10, -4); // Moved closer to body
-  ctx.rotate(Math.PI / 8); // Angled down
-
-  // Sheath body
-  ctx.fillStyle = '#080808';
-  ctx.strokeStyle = '#222';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, -3.5);
-  ctx.bezierCurveTo(-20, -3.5, -45, -1.5, -60, 1); // shorter length
-  ctx.lineTo(-61, 4.5);
-  ctx.bezierCurveTo(-45, 5, -20, 4.5, 0, 3.5);
-  ctx.fill();
-  ctx.stroke();
-
-  // Sageo (decorative cord)
-  ctx.strokeStyle = '#333';
-  for(let i = 0; i < 4; i++) {
-     ctx.beginPath();
-     ctx.moveTo(-12 - i*4, -3.5);
-     ctx.lineTo(-15 - i*4, 4);
-     ctx.stroke();
   }
 
-  // ── Hanging Chains (Kusari) ──
-  
-  // We want the chains to trail away from the movement direction.
+  // If sheathed, sword handle sticks out of scabbard opening (pointing forward in local space)
+  if (hasSwords) {
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(-17, -2.5, 17, 5);
+    ctx.fillStyle = '#1C1F28';
+    ctx.fillRect(-16, -2, 15, 4);
+    // Tsuba
+    ctx.fillStyle = '#2A2E3B';
+    ctx.fillRect(0, -6, 3, 12);
+  }
+
+  // ── Hanging Kusari Chains Physics ──
   let chainVx = -(fighter.vx || 0) * 1.5;
-  let chainVy = 5 - (fighter.vy || 0) * 1.5; // 5 represents gravity pulling down
-  
-  // The target angle the chain "wants" to hang at based on gravity and movement
+  let chainVy = 5 - (fighter.vy || 0) * 1.5;
   let targetAngle = Math.atan2(chainVy, chainVx);
-  
-  // Initialize independent physics arrays for each chain if they don't exist
+
   if (!fighter.chainAngles) fighter.chainAngles = [targetAngle, targetAngle];
   if (!fighter.chainVelocities) fighter.chainVelocities = [0, 0];
-  
-  // 30 FPS physics limiter for stylized movement
+
   const now = performance.now();
   if (fighter.lastChainUpdate === undefined) fighter.lastChainUpdate = now;
   const updatePhysics = (now - fighter.lastChainUpdate) >= (1000 / 30);
@@ -640,55 +495,39 @@ export function drawMusashiSheaths(ctx, fighter, hasSwords) {
     fighter.lastChainUpdate = now;
   }
 
-  // Two chains dangling from different points on the sheath
   const chainConfigs = [
-    // Different lengths, attachments, and adjusted physics constants for 30 FPS timestep
-    { attachX: -18, numLinks: 6, charmColor: '#ff4500', stiffness: 0.1, damping: 0.88 }, 
-    { attachX: -26, numLinks: 8, charmColor: '#ff4500', stiffness: 0.07, damping: 0.92 }  
+    { attachX: 18, numLinks: 6, charmColor: '#FF4500', stiffness: 0.1, damping: 0.88 },
+    { attachX: 26, numLinks: 8, charmColor: '#FF4500', stiffness: 0.07, damping: 0.92 }
   ];
-  
+
   for (let c = 0; c < chainConfigs.length; c++) {
     const config = chainConfigs[c];
-    
+
     if (updatePhysics) {
-      // Per-chain pendulum physics calculation
       let diff = targetAngle - fighter.chainAngles[c];
-      diff = Math.atan2(Math.sin(diff), Math.cos(diff)); // Normalize to -PI to PI
-      
-      // Each chain swings at a different frequency because of unique stiffness and damping
-      fighter.chainVelocities[c] += diff * config.stiffness; 
-      fighter.chainVelocities[c] *= config.damping; 
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      fighter.chainVelocities[c] += diff * config.stiffness;
+      fighter.chainVelocities[c] *= config.damping;
       fighter.chainAngles[c] += fighter.chainVelocities[c];
     }
-    
+
     ctx.save();
-    // Move to the attachment point on the sheath
     ctx.translate(config.attachX, 4.5);
-    
-    // Revert the local rotation so that 0 is Right and Math.PI/2 is Down on the screen
-    ctx.rotate(-fighter.gunAngle - Math.PI / 8);
-    
-    // Rotate so the Y-axis points along the chain
-    // Removed the artificial angle offset since true independent physics handles variation naturally
-    ctx.rotate(fighter.chainAngles[c] - Math.PI / 2);
-    
-    ctx.strokeStyle = '#a0a0aa'; // Bright silver
-    ctx.lineWidth = 1.5;
-    
+
+    const chainAngle = fighter.chainAngles[c] || Math.PI / 2;
+    ctx.rotate(chainAngle - Math.PI * 0.92);
+
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.lineWidth = 1.2;
+
     for (let i = 0; i < config.numLinks; i++) {
       ctx.beginPath();
       const linkY = i * 4;
-      
-      // Flexible bending: the tip lags behind the swing creating a natural curve.
       const bendProgress = i / config.numLinks;
-      const flexLag = Math.pow(bendProgress, 1.5) * (fighter.chainVelocities[c] * -35);
-      
-      // Extremely subtle wave so the chain constantly looks alive and fluid
-      // Use lastChainUpdate instead of performance.now() to lock the animation to 30 FPS
-      const ambientWave = Math.sin(fighter.lastChainUpdate * 0.002 - i * 0.4 + c * 2.5) * 0.8;
+      const flexLag = Math.pow(bendProgress, 1.5) * ((fighter.chainVelocities[c] || 0) * -35);
+      const ambientWave = Math.sin((fighter.lastChainUpdate || 0) * 0.002 - i * 0.4 + c * 2.5) * 0.8;
       const linkX = flexLag + ambientWave;
-      
-      // Alternate ellipses to simulate 3D chain links
+
       if (i % 2 === 0) {
         ctx.ellipse(linkX, linkY, 1.5, 2.5, 0, 0, Math.PI * 2);
       } else {
@@ -696,40 +535,167 @@ export function drawMusashiSheaths(ctx, fighter, hasSwords) {
       }
       ctx.stroke();
     }
-    
-    // Small weight/charm at the end of the chain
-    const tipFlex = Math.pow(1, 1.5) * (fighter.chainVelocities[c] * -35);
-    const tipWave = Math.sin(fighter.lastChainUpdate * 0.002 - config.numLinks * 0.4 + c * 2.5) * 0.8;
+
+    // Small talisman charm at tip
+    const tipFlex = Math.pow(1, 1.5) * ((fighter.chainVelocities[c] || 0) * -35);
+    const tipWave = Math.sin((fighter.lastChainUpdate || 0) * 0.002 - config.numLinks * 0.4 + c * 2.5) * 0.8;
     const tipX = tipFlex + tipWave;
 
     ctx.fillStyle = config.charmColor;
     ctx.beginPath();
     ctx.arc(tipX, config.numLinks * 4, 2.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#444';
-    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = 0.6;
     ctx.stroke();
 
     ctx.restore();
   }
 
-  // Handle sticking out (if sheathed)
-  if (hasSwords) {
-    ctx.fillStyle = '#0d0d0d';
-    ctx.beginPath();
-    ctx.roundRect(0, -2.5, 16, 5, 1);
-    ctx.fill();
-    ctx.stroke();
-    // Kashira (pommel)
-    ctx.fillStyle = '#1a1a1a';
-    ctx.beginPath();
-    ctx.roundRect(16, -3, 3, 6, 1);
-    ctx.fill();
-    // Tsuba (guard)
-    ctx.fillStyle = '#1c1c1c';
-    ctx.fillRect(-1, -6, 3, 12);
-  }
   ctx.restore();
+
+  // ── 2. Wakizashi Sheath (Shorter scabbard mounted parallel above Katana) ──
+  ctx.save();
+  ctx.translate(hipX + 2, hipY - 6);
+  ctx.rotate(Math.PI * 0.88);
+
+  ctx.fillStyle = '#101218';
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(0, -3.0);
+  ctx.quadraticCurveTo(15, -4.5, 34, -2.0);
+  ctx.lineTo(36, 2.0);
+  ctx.quadraticCurveTo(15, 3.5, 0, 3.0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Sageo wrap
+  ctx.strokeStyle = '#4B556C';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(8 + i * 3, -3.5);
+    ctx.lineTo(10 + i * 3, 3.0);
+    ctx.stroke();
+  }
+
+  if (hasSwords) {
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(-13, -2, 13, 4);
+    ctx.fillStyle = '#181A20';
+    ctx.fillRect(-12, -1.5, 11, 3);
+    // Tsuba
+    ctx.fillStyle = '#8A7A50';
+    ctx.fillRect(0, -4.5, 2, 9);
+  }
+
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
+ * Calligraphy-Style Ink-Brush Smoke Trail on blade tips after Phantom Flurry
+ */
+function _drawBrushSmokeTrail(ctx, handX, handY, bladeAngle, alpha, bladeLen, isFlipped) {
+  ctx.save();
+  ctx.translate(handX, handY);
+  ctx.rotate(bladeAngle);
+  if (isFlipped) ctx.scale(1, -1);
+
+  const tipX = bladeLen - 5;
+  const fps30Time = Math.floor(performance.now() / (1000 / 30)) * (1000 / 30);
+  const time = fps30Time * 0.003;
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const numFlames = 7;
+  for (let i = 0; i < numFlames; i++) {
+    const phase = i * 2.718;
+    const speed = 1 + (i % 3) * 0.2;
+    const t = time * speed + phase;
+
+    const distFromCenter = Math.abs(i - (numFlames - 1) / 2);
+    const length = 160 - (distFromCenter * 30);
+    const spread = (i - (numFlames - 1) / 2) * 3;
+
+    const cp1x = tipX - (length * 0.35);
+    const cp1y = (spread * 0.5) + Math.sin(t) * 10;
+    const cp2x = tipX - (length * 0.7);
+    const cp2y = (spread * 1.3) + Math.sin(t * 1.3) * 18;
+    const endX = tipX - length;
+    const endY = (spread * 1.8) + Math.sin(t * 1.6) * 22;
+
+    ctx.beginPath();
+    ctx.moveTo(tipX, 0);
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+
+    const grad = ctx.createLinearGradient(tipX, 0, endX, endY);
+    if (i === 3) {
+      grad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.95})`);
+      grad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha * 0.5})`);
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.lineWidth = 8;
+    } else if (i === 2 || i === 4) {
+      grad.addColorStop(0, `rgba(200, 210, 230, ${alpha * 0.8})`);
+      grad.addColorStop(0.5, `rgba(200, 210, 230, ${alpha * 0.3})`);
+      grad.addColorStop(1, 'rgba(200, 210, 230, 0)');
+      ctx.lineWidth = 5;
+    } else {
+      grad.addColorStop(0, `rgba(55, 70, 105, ${alpha * 0.9})`);
+      grad.addColorStop(0.6, `rgba(42, 53, 80, ${alpha * 0.6})`);
+      grad.addColorStop(1, 'rgba(42, 53, 80, 0)');
+      ctx.lineWidth = 3 + (3 - distFromCenter);
+    }
+
+    ctx.strokeStyle = grad;
+    ctx.stroke();
+  }
+
+  // 5 Stance Glowing Embers
+  const stanceColors = [
+    'rgb(220, 100, 50)',
+    'rgb(50, 180, 255)',
+    'rgb(255, 80, 20)',
+    'rgb(80, 220, 130)',
+    'rgb(180, 80, 255)'
+  ];
+
+  for (let i = 0; i < 15; i++) {
+    const colorIdx = i % 5;
+    const t = time * 1.2 + i * 2.094;
+    const driftX = (t * 55) % 180;
+    const partAlpha = Math.max(0, 1 - (driftX / 180)) * alpha;
+    if (partAlpha <= 0) continue;
+
+    const px = tipX - driftX;
+    const py = Math.sin(t * 1.8 + i) * 30 + Math.cos(i * 77) * 15;
+    const size = Math.max(0.5, 3.5 - (driftX / 45));
+
+    ctx.save();
+    ctx.globalAlpha = partAlpha * 0.4;
+    ctx.beginPath();
+    ctx.arc(px, py, size * 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = stanceColors[colorIdx];
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = partAlpha;
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fillStyle = stanceColors[colorIdx];
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(px, py, size * 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${partAlpha})`;
+    ctx.fill();
+    ctx.restore();
+  }
 
   ctx.restore();
 }

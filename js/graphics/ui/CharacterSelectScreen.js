@@ -1182,7 +1182,8 @@ export function getFighterWeaponInfo(def) {
     case 'doppleganger':
       return { name: 'PHANTOM SHADOWBLADE', category: 'ILLUSION // MELEE', desc: 'Ghostly curved sword that synchronizes strikes with spawned clones.' };
     case 'engineer':
-      return { name: 'AUTO-SENTRY RIVET GUN', category: 'DEPLOYABLE // TURRET', desc: 'Rapid rivet fire backed by automated 360-degree combat sentry turrets.' };
+    case 'Engineer':
+      return { name: '12-GAUGE SHOTGUN & WRENCH', category: 'BALLISTIC // DEPLOYABLE', desc: 'Pump-action 12-gauge shotgun and heavy pipe wrench backed by deployable Sentry Turrets (Lv 1-3) and Dispenser.' };
     case 'spike':
       return { name: 'CRYSTALLINE SPINE EMITTER', category: 'PROJECTILE // PIERCING', desc: 'Fires clusters of razor needle quills in multi-directional needle bursts.' };
     case 'voidmaster':
@@ -1234,11 +1235,13 @@ export function getFighterWeaponInfo(def) {
     case 'nezuko':
       return { name: 'DEMON CLAWS & BAKKETSU FLAMES', category: 'DEMON // PYROKINESIS', desc: 'Demonic claw flurries, 120° Demonic Axe Kicks, supersonic Flying Dropkicks, and Exploding Blood (Bakketsu) anti-demon pyrokinesis.' };
     case 'zenitsu':
-      return { name: 'LIGHTNING NICHIRIN KATANA', category: 'BREATHING // THUNDER IAI', desc: 'Golden lightning-hamon blade unleashing First Form: Thunderclap and Flash godspeed teleport slashes, Sixfold wall bounces, and Flaming Thunder God.' };
+      return { name: 'LIGHTNING NICHIRIN KATANA', category: 'SIGNATURE // THUNDERCLAP & FLASH', desc: "Golden lightning-hamon blade unleashing Zenitsu's signature First Form: Thunderclap and Flash godspeed teleport slashes, Sixfold wall bounces, and Flaming Thunder God." };
     case 'inosuke':
       return { name: 'DUAL SERRATED NICHIRIN KATANAS', category: 'BREATHING // BEAST KENJUTSU', desc: 'Twin chipped serrated blades with 160° Dual Hacks, 360° Crazy Cutting whirlwind shredding, Explosive Rush boar charges, and Spatial Awareness.' };
     case 'escanor':
-      return { name: 'DIVINE AXE RHITTA', category: 'SACRED TREASURE // SOLAR HEAT', desc: 'Legendary giant golden battleaxe capable of storing and releasing Escanor\'s boundless solar heat. Channels 140° Divine Slashes, Cruel Sun blazing orbs, Pride Flare solar bursts, and the invincible "The One" form.' };
+      return { name: 'DIVINE AXE RHITTA & CRUEL SUN', category: 'SIGNATURE // CRUEL SUN', desc: "Legendary giant golden battleaxe and Escanor's signature Cruel Sun (無慈悲な太陽). Channels 140° Divine Slashes, colossal blazing solar spheres dragging & paralyzing enemies along arena walls, Pride Flare, and the invincible \"The One\" form." };
+    case 'zeus':
+      return { name: 'DIVINE LIGHTNING & AEGIS', category: 'SIGNATURE // THUNDER STORM', desc: "Olympian God of Thunder wielding Chain Lightning, Aegis Counter Barrier, and signature Ultimate: Thunder Storm arena-wide divine judgment wrath." };
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:

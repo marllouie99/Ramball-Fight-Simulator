@@ -1,0 +1,269 @@
+{
+  "meta": {
+    "app": "Ramball Lightning FX Generator",
+    "version": "1.0",
+    "image": "lightning_spritesheet_360x640_4x3.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1440,
+      "h": 1920
+    },
+    "scale": "1",
+    "frame_count": 12,
+    "fps": 30
+  },
+  "frames": {
+    "lightning_strike_01": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_02": {
+      "frame": {
+        "x": 360,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_03": {
+      "frame": {
+        "x": 720,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_04": {
+      "frame": {
+        "x": 1080,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_05": {
+      "frame": {
+        "x": 0,
+        "y": 640,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_06": {
+      "frame": {
+        "x": 360,
+        "y": 640,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_07": {
+      "frame": {
+        "x": 720,
+        "y": 640,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_08": {
+      "frame": {
+        "x": 1080,
+        "y": 640,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_09": {
+      "frame": {
+        "x": 0,
+        "y": 1280,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_10": {
+      "frame": {
+        "x": 360,
+        "y": 1280,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_11": {
+      "frame": {
+        "x": 720,
+        "y": 1280,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    },
+    "lightning_strike_12": {
+      "frame": {
+        "x": 1080,
+        "y": 1280,
+        "w": 360,
+        "h": 640
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 640
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 640
+      },
+      "duration": 33
+    }
+  }
+}

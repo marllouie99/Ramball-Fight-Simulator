@@ -234,7 +234,7 @@ export const GUNSLINGER_WEAPON_GRAPHICS = {
     muzzleShadow: '#ff6600',     // Muzzle shadow glow
   },
   positioning: {
-    scale: 0.9,
+    scale: 0.68,
     gunOffset: 2,                // Distance from fighter body edge
     leftGunOffset: 50,           // Left gun offset (same as right for symmetry)
   },
@@ -257,29 +257,13 @@ export const GUNSLINGER_WEAPON_GRAPHICS = {
 export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r, isFiring = false, flashFrame = 0, rightRecoilOffset = 0, rightRecoilTilt = 0, leftRecoilOffset = 0, leftRecoilTilt = 0, gunSpinAngle = 0, fighterColor = '#888', leftIsFiring = false, leftFlashFrame = 0) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const ctx = state.ctx;
+  if (!ctx) return;
   const scale = GUNSLINGER_WEAPON_GRAPHICS.positioning.scale;
-  const gunOffset = r + GUNSLINGER_WEAPON_GRAPHICS.positioning.gunOffset;
   const p = GUNSLINGER_WEAPON_GRAPHICS.revolver;
-  const mf = GUNSLINGER_WEAPON_GRAPHICS.muzzleFlash;
-
-  // Manual state tracking for performance
-  const prevLineJoin = ctx.lineJoin;
-  const prevLineCap = ctx.lineCap;
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
-  const prevShadowOffsetY = ctx.shadowOffsetY;
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
 
   function drawRevolver(gunIsFiring, gunFlashFrame) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-
-    // Apply a slight shadow for depth
-    // OPTIMIZED: Removed shadowColor
-    // OPTIMIZED: Removed shadowBlur
-    ctx.shadowOffsetY = 2;
 
     // --- 1. Grip ---
     ctx.fillStyle = p.gripColor; 
@@ -294,10 +278,6 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     ctx.bezierCurveTo(-8 * scale, 18 * scale, -3 * scale, 12 * scale, 0 * scale, 8 * scale);
     ctx.closePath();
     ctx.fill();
-
-    // Disable shadow for internal details
-    // OPTIMIZED: Removed shadowBlur
-    ctx.shadowOffsetY = 0;
 
     // Grip texture (checkering indication)
     ctx.strokeStyle = '#1e110b';
@@ -442,7 +422,6 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     }
     
     // --- 9. Hand ---
-    // OPTIMIZED: Removed shadowBlur
     ctx.fillStyle = fighterColor;
     ctx.beginPath();
     ctx.arc(-8 * scale, 12 * scale, getHandSize(6 * scale), 0, Math.PI * 2);
@@ -452,51 +431,70 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     ctx.stroke();
   }
 
-  // Define ideal offsets for dual-wielding
-  const forwardOffset = r * 0.8;
-  const sideOffset = r * 1.1;
-
-  // ── Draw right revolver ──
+  // ── Upright Front-POV Orientation & Positioning (Matching John Wick / Anime Fighters) ──
+  ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(rightGunAngle);
-  ctx.translate(forwardOffset, sideOffset);
-  ctx.translate(-rightRecoilOffset, 0);
-  ctx.rotate(rightRecoilTilt);
-  ctx.rotate(gunSpinAngle);
-  ctx.scale(1, -1);
-  drawRevolver(isFiring, flashFrame);
-  // Reverse right gun transforms
-  ctx.scale(1, -1);
-  ctx.rotate(-gunSpinAngle);
-  ctx.rotate(-rightRecoilTilt);
-  ctx.translate(rightRecoilOffset, 0);
-  ctx.translate(-forwardOffset, -sideOffset);
-  ctx.rotate(-rightGunAngle);
-  ctx.translate(-x, -y);
 
-  // ── Draw left revolver ──
-  ctx.translate(x, y);
-  ctx.rotate(leftGunAngle);
-  ctx.translate(forwardOffset, -sideOffset);
+  // Primary aim angle determines fighter facing
+  const primaryAngle = (rightGunAngle !== undefined && !Number.isNaN(rightGunAngle)) ? rightGunAngle : (leftGunAngle || 0);
+  const facingLeft = Math.abs(primaryAngle) > Math.PI / 2;
+  const baseAngle = facingLeft ? Math.PI : 0;
+
+  ctx.rotate(baseAngle);
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
+
+  // Dual-Wield Stance Coordinates in Front-POV:
+  // Rear Revolver (Left Gun): Held on the left/back side of his body (hand at ≈ -0.68r)
+  const supportX = -r * 0.45;
+  const supportY = 0;
+
+  // Front Revolver (Right Gun): Held on the right/front side of his body (hand at ≈ +0.67r)
+  const leadX = r * 0.90;
+  const leadY = 0;
+
+  // ── 1. Draw Lower / Support Revolver (Left Gun) Behind Lead Gun ──
+  let leftDiff = (leftGunAngle !== undefined && !Number.isNaN(leftGunAngle) ? leftGunAngle : primaryAngle) - baseAngle;
+  let normLeftDiff = Math.atan2(Math.sin(leftDiff), Math.cos(leftDiff));
+  if (facingLeft) normLeftDiff = -normLeftDiff;
+
+  ctx.save();
+  ctx.translate(supportX, supportY);
+  ctx.rotate(normLeftDiff);
   ctx.translate(-leftRecoilOffset, 0);
-  ctx.rotate(-leftRecoilTilt);
-  ctx.rotate(-gunSpinAngle);
-  drawRevolver(leftIsFiring !== undefined ? leftIsFiring : isFiring, leftFlashFrame || flashFrame);
-  // Reverse left gun transforms
-  ctx.rotate(gunSpinAngle);
-  ctx.rotate(leftRecoilTilt);
-  ctx.translate(leftRecoilOffset, 0);
-  ctx.translate(-forwardOffset, sideOffset);
-  ctx.rotate(-leftGunAngle);
-  ctx.translate(-x, -y);
+  ctx.rotate(-leftRecoilTilt); // Barrel kicks upward on recoil
 
-  // Restore state
-  ctx.lineJoin = prevLineJoin;
-  ctx.lineCap = prevLineCap;
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
-  ctx.shadowOffsetY = prevShadowOffsetY;
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
+  // Gun spin animation during reload (pivots around trigger guard / index finger)
+  if (gunSpinAngle !== 0) {
+    ctx.translate(-8 * scale, 12 * scale);
+    ctx.rotate(-gunSpinAngle);
+    ctx.translate(8 * scale, -12 * scale);
+  }
+
+  drawRevolver(leftIsFiring !== undefined ? leftIsFiring : isFiring, leftFlashFrame || flashFrame);
+  ctx.restore();
+
+  // ── 2. Draw Upper / Lead Revolver (Right Gun) In Front ──
+  let rightDiff = (rightGunAngle !== undefined && !Number.isNaN(rightGunAngle) ? rightGunAngle : primaryAngle) - baseAngle;
+  let normRightDiff = Math.atan2(Math.sin(rightDiff), Math.cos(rightDiff));
+  if (facingLeft) normRightDiff = -normRightDiff;
+
+  ctx.save();
+  ctx.translate(leadX, leadY);
+  ctx.rotate(normRightDiff);
+  ctx.translate(-rightRecoilOffset, 0);
+  ctx.rotate(-rightRecoilTilt); // Barrel kicks upward on recoil
+
+  // Gun spin animation during reload (pivots around trigger guard / index finger)
+  if (gunSpinAngle !== 0) {
+    ctx.translate(-8 * scale, 12 * scale);
+    ctx.rotate(gunSpinAngle);
+    ctx.translate(8 * scale, -12 * scale);
+  }
+
+  drawRevolver(isFiring, flashFrame);
+  ctx.restore();
+
+  ctx.restore();
 }

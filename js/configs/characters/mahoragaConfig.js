@@ -72,6 +72,13 @@ export const mahoragaConfig = {
     // ── Visuals, Screen Dim & Afterimages ──
     enableGoldenScreenDim: true,     // Toggle on/off dark golden cinematic screen dimming on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay
+    enableWheelOverlay: true,        // Toggle on/off Eight-Handled Sword Wheel arena overlay pop on wheel click
+    wheelOverlayOpacity: 0.85,       // Maximum opacity of the Mahoraga wheel arena overlay (0.0 to 1.0)
+    wheelOverlayZoom: 0.95,          // Scale of the Mahoraga wheel overlay relative to arena dimensions
+    wheelOverlayOffsetX: 0,          // Horizontal offset in pixels for wheel overlay
+    wheelOverlayOffsetY: 0,          // Vertical offset in pixels for wheel overlay
+    wheelOverlayRotationMultiplier: 1.0, // Rotation animation speed multiplier
+    wheelOverlayFadeRate: 0.08,      // Smooth fade-out rate when disappearing (smaller = longer, smoother fade)
     wheelClickDuration: 25,          // Frame duration for 1-spoke wheel click rotation animation & flare
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 to 1.0)
     afterimageLifetimeFrames: 12,    // Lifetime frames for teleport afterimage ghosts (12 frames = ~0.20s)

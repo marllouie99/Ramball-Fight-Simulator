@@ -1,6 +1,7 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
+import { getBerserkerStreamImage } from '../particles/berserkerTrailGraphics.js';
 
 // berserkerWeaponGraphics.js
 //  - Use this file for Berserker-specific weapon graphics (dual axes).
@@ -239,15 +240,56 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
     ctx.quadraticCurveTo(thickness * 0.7, 0, 0, -length / 2);
     ctx.closePath();
 
-    // --- Main Fill (Gradient for depth) ---
-    const grad = ctx.createLinearGradient(0, -length / 2, 0, length / 2);
-    grad.addColorStop(0, hexToTransparentRgba(baseColor, 0));
-    grad.addColorStop(0.5, baseColor);
-    grad.addColorStop(1, hexToTransparentRgba(baseColor, 0));
+    // --- Dynamic Fluid Blood Wave PNG Overlay (Animated 3-Frame Spritesheet) ---
+    const frameIdx = Math.min(2, Math.floor(slashProgress * 3));
+    const streamImg = getBerserkerStreamImage(frameIdx);
+    const hasStreamImg = streamImg && streamImg.complete && (streamImg.naturalWidth > 0 || streamImg.width > 0);
 
-    ctx.fillStyle = grad;
-    ctx.globalAlpha = alpha;
-    ctx.fill();
+    if (hasStreamImg) {
+      ctx.save();
+      // Clip to curved slash crescent
+      ctx.beginPath();
+      ctx.moveTo(0, -length / 2);
+      ctx.quadraticCurveTo(thickness * 1.15, 0, 0, length / 2);
+      ctx.quadraticCurveTo(thickness * 0.45, 0, 0, -length / 2);
+      ctx.closePath();
+      ctx.clip();
+
+      // Dynamic Eraser Wipe: tail chases tip during recovery
+      const recP = slashProgress > 0.5 ? (slashProgress - 0.5) / 0.5 : 0;
+      const tailErase = Math.pow(recP, 1.35);
+
+      ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
+      ctx.rotate(isLeft ? Math.PI * 0.5 : -Math.PI * 0.5);
+
+      const waveW = length * (1.25 + (isInRage ? 0.35 : 0));
+      const waveH = thickness * 2.6;
+
+      if (tailErase > 0) {
+        ctx.beginPath();
+        ctx.rect(-waveW * 0.5 + waveW * tailErase, -waveH, waveW * (1 - tailErase), waveH * 2);
+        ctx.clip();
+      }
+
+      ctx.drawImage(streamImg, -waveW * 0.5, -waveH * 0.5, waveW, waveH);
+
+      if (isInRage) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = alpha * 0.55;
+        ctx.drawImage(streamImg, -waveW * 0.5, -waveH * 0.5, waveW, waveH);
+      }
+      ctx.restore();
+    } else {
+      // --- Procedural Main Fill (Fallback) ---
+      const grad = ctx.createLinearGradient(0, -length / 2, 0, length / 2);
+      grad.addColorStop(0, hexToTransparentRgba(baseColor, 0));
+      grad.addColorStop(0.5, baseColor);
+      grad.addColorStop(1, hexToTransparentRgba(baseColor, 0));
+
+      ctx.fillStyle = grad;
+      ctx.globalAlpha = alpha;
+      ctx.fill();
+    }
 
     // --- Inner Core (Bright, hot center of the slash) ---
     if (slashProgress < 0.8) {

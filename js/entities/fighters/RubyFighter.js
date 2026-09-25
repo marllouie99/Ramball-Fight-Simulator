@@ -45,13 +45,13 @@ export class RubyFighter extends Fighter {
     this.pullTargets = [];           // array of references to hooked opponents
 
     // Phase durations (frames)
-    this.pullPhaseWindUp = 14;
+    this.pullPhaseWindUp = 22;       // 22-frame scythe windup spin & continuous aim tracking
     this.pullPhaseSwingOut = 10;
-    this.pullPhaseHookGrab = 3;
+    this.pullPhaseHookGrab = 4;
     this.pullPhasePullDrag = 15;
-    this.pullPhaseDisengage = 7;
+    this.pullPhaseDisengage = 8;
     this.activePullTotalDuration = this.pullPhaseWindUp + this.pullPhaseSwingOut + this.pullPhaseHookGrab
-      + this.pullPhasePullDrag + this.pullPhaseDisengage; // 43
+      + this.pullPhasePullDrag + this.pullPhaseDisengage; // 59 frames (~1 sec full sequence)
 
     // Passive spin
     this.passiveSpinCooldownTimer = 0;
@@ -163,7 +163,7 @@ export class RubyFighter extends Fighter {
     const range = cfg.activePullRange || 200;
     if (dist > range) return;
 
-    // Lock-in the angle and target
+    // Initialize wind-up: angle tracks towards target
     this.activePullAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
     this.applyAim(opponent, this.activePullAngle);
     this.activePullActive = true;
@@ -171,21 +171,17 @@ export class RubyFighter extends Fighter {
     this.activePullPhaseTimer = this.pullPhaseWindUp;
     // Do not lock targets yet. We will lock them when the hook actually extends and grabs (phase 2)
     this.pullTargets = [];
-    // We store the primary opponent just in case we want to give them priority later,
-    // but we will verify their distance again when the hook lands.
     this.primaryHookTarget = opponent;
     
     this.activePullCooldown = cfg.activePullCooldown || 240;
 
-    // We do NOT trigger the core dash here because pulling requires her to brace herself.
-    // Dashing forward while pulling feels contradictory.
-    
-    // Stop her movement while casting the hook
+    // Stop her movement while winding up and casting the hook
     this.vx = 0;
     this.vy = 0;
 
-    const sound = getSkillSound(this._def?.id, 'pull');
-    if (sound) audioSystem.playSFX(sound.src, sound.volume);
+    // Play subtle wind-up charge sound
+    const dashSound = getSkillSound(this._def?.id, 'dash');
+    if (dashSound) audioSystem.playSFX(dashSound.src, 0.4, 0.85);
   }
 
   /** Advance the multi-phase pull each frame. */
@@ -197,6 +193,39 @@ export class RubyFighter extends Fighter {
     // Phase-specific logic
     const targets = this.pullTargets || [];
     const cfg = CONFIG.ruby || {};
+
+    if (this.activePullPhase === 0) {
+      // Phase 0: WIND_UP — Continuously aim and track the opponent while coiling weapon in charging stance!
+      if (opponent && !opponent.isDead) {
+        this.activePullAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.gunAngle = this.activePullAngle;
+        this.angle = this.activePullAngle;
+      }
+      this.vx = 0;
+      this.vy = 0;
+
+      // Gathering crimson sparks around the coiled scythe blade in charging pose
+      if (Math.random() < 0.6) {
+        const t = 1 - (this.activePullPhaseTimer / this.pullPhaseWindUp);
+        const flipSign = Math.abs(this.activePullAngle || this.gunAngle) > Math.PI / 2 ? -1 : 1;
+        const coilAngle = (this.activePullAngle || this.gunAngle) - (Math.PI * 0.62 * t * flipSign);
+        const sparkDist = this.r + 20 + (Math.random() * 18);
+        const px = this.x + Math.cos(coilAngle) * sparkDist + (Math.random() - 0.5) * 8;
+        const py = this.y + Math.sin(coilAngle) * sparkDist + (Math.random() - 0.5) * 8;
+        spawnSparks(px, py, 2, 'crimson');
+      }
+
+      // Transition to hook throw release (frame 1)
+      if (this.activePullPhaseTimer === 1) {
+        if (opponent && !opponent.isDead) {
+          this.activePullAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+          this.gunAngle = this.activePullAngle;
+          this.angle = this.activePullAngle;
+        }
+        const hookSound = getSkillSound(this._def?.id, 'pull');
+        if (hookSound) audioSystem.playSFX(hookSound.src, hookSound.volume);
+      }
+    }
 
     if (this.activePullPhase === 2) {
       // HOOK_GRAB phase
@@ -454,7 +483,12 @@ export class RubyFighter extends Fighter {
       this.applyMovementPhysics();
     }
 
-    this.aim(opponent);
+    if (!this.activePullActive || this.activePullPhase === 0) {
+      this.aim(opponent);
+    } else {
+      this.gunAngle = this.activePullAngle;
+      this.angle = this.activePullAngle;
+    }
     this.resolveWallBounce(arena);
   }
 
@@ -517,6 +551,41 @@ export class RubyFighter extends Fighter {
     if (suppressEffects || !this.activePullActive) return;
     const phase = this.activePullPhase;
     const targets = this.pullTargets || [];
+
+    // Phase 0 (WIND_UP) — pulsating crimson aiming corridor & targeting arc
+    if (phase === 0) {
+      const t = 1 - (this.activePullPhaseTimer / this.pullPhaseWindUp);
+      const range = (CONFIG.ruby.activePullRange || 200);
+
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.activePullAngle);
+
+      // Faint crimson aiming cone & center laser
+      ctx.save();
+      ctx.globalAlpha = 0.35 * Math.sin(t * Math.PI);
+      ctx.strokeStyle = '#E0115F';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+
+      // Center aim line
+      ctx.beginPath();
+      ctx.moveTo(this.r, 0);
+      ctx.lineTo(range * (0.3 + 0.7 * t), 0);
+      ctx.stroke();
+
+      // Cone boundary lines (±45 deg)
+      const coneAngle = Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(this.r, 0);
+      ctx.lineTo(range * (0.3 + 0.7 * t) * Math.cos(coneAngle), range * (0.3 + 0.7 * t) * Math.sin(coneAngle));
+      ctx.moveTo(this.r, 0);
+      ctx.lineTo(range * (0.3 + 0.7 * t) * Math.cos(-coneAngle), range * (0.3 + 0.7 * t) * Math.sin(-coneAngle));
+      ctx.stroke();
+
+      ctx.restore();
+      ctx.restore();
+    }
 
     // Phase 2 (HOOK_GRAB) or Phase 3 (PULL_DRAG) — active tether connected to enemies
     if (phase === 2 || phase === 3) {

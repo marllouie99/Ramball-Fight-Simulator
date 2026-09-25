@@ -134,6 +134,8 @@ export class ZenitsuFighter extends Fighter {
         id: 'thunderclap_and_flash',
         name: 'Thunderclap and Flash',
         type: 'active',
+        isSignature: true,
+        signature: true,
         cooldownKey: 'thunderclapCooldown',
         cooldownMaxKey: 'thunderclapCooldownMax',
         channelingKey: 'isChannelingThunderclap',

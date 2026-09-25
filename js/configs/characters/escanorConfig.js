@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Escanor Character Config
 // The Seven Deadly Sins (Nanatsu no Taizai) — Lion's Sin of Pride
 // ─────────────────────────────────────────────
@@ -30,8 +30,8 @@ export const escanorConfig = {
   damage: 15,
   cooldown: 56,
   projectileSpeedMultiplier: 1.0,
-  ability: 'Grace "Sunshine" & "The One"',
-  desc: 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta. Radiates intense solar heat, gaining Solar Pride power escalation. Wields 140° Divine Slashes, Cruel Sun blazing stars, Pride Flare solar novas, and the invincible high noon ultimate: "The One" with Divine Sword Escanor.',
+  ability: 'Cruel Sun (無慈悲な太陽)',
+  desc: 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta and signature Cruel Sun (無慈悲な太陽) blazing star. Wields 140° Divine Slashes, solar drag & paralyze vortexes, Pride Flare solar novas, and the invincible high noon ultimate: "The One" with Divine Sword Escanor.',
 
   // ──────────────────────────────────────────
   // Passive 1: Grace "Sunshine" & Thermal Updraft
@@ -52,7 +52,7 @@ export const escanorConfig = {
   // ──────────────────────────────────────────
   // Passive 3: Solar Armor & Holy Knight DEF (Damage Reduction)
   // ──────────────────────────────────────────
-  enableSolarArmor: false,          // Master toggle for Passive 3: Solar Armor & Holy Knight DEF
+  enableSolarArmor: 1,          // Master toggle for Passive 3: Solar Armor & Holy Knight DEF
   defense: 0.20,                // Base 20% flat damage reduction / armor mitigation
   prideDefBonusPerStack: 0.02,  // +2% DEF per Solar Pride stack (+10% at 5 stacks)
   theOneDefenseBonus: 0.25,     // +25% DEF bonus during "THE ONE" (invincible noon state)
@@ -68,7 +68,7 @@ export const escanorConfig = {
   theOneReachMultiplier: 1.45,  // +45% weapon attack reach (232px reach) during "THE ONE"
   prideReachBonusPerStack: 0.06,// +6% weapon attack reach per Solar Pride stack (+30% reach at 5 stacks)
   chopLiftFrames: 80,              // Frames to lift axe up from guard to high overhead (~0.33s)
-  chopLiftHoldFrames: 350,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
+  chopLiftHoldFrames: 200,         // EXACT number of frames Escanor stays poised in high overhead lift stance before striking down (~1.67s)
   chopStrikeFrames: 10,            // Frames for the explosive downward chop stroke (~0.40s) with heavy follow-through
   chopRecoveryFrames: 10,          // Frames to recover back to resting pose & wipe slash arc (~0.47s)
   chopHitPauseFrames: 10,          // Cinematic hit-pause frame freeze upon axe impact (~0.43s)
@@ -101,25 +101,26 @@ export const escanorConfig = {
   // Skill 1: Cruel Sun (無慈悲な太陽)
   // ──────────────────────────────────────────
   enableCruelSun: 1,            // Master toggle for Skill 1: Cruel Sun (無慈悲な太陽)
-  cruelSunCooldown: 3000,       // Cooldown in frames (preserved user tuning)
+  cruelSunCooldown: 100,       // Cooldown in frames (preserved user tuning)
   cruelSunCastWindupFrames: 200, // Two-phase activation windup (Finger Point -> Expanding Sun)
   cruelSunPointFrames: 14,     // Frames to raise arm and extend index finger upward
   cruelSunExpandFrames: 36,    // Frames for the solar sphere to swell to full size
-  cruelSunMaxExpandRadius: 80, // Unified solar star radius: governs both expanding charge animation AND the thrown sun projectile
-  cruelSunOrbRadius: 80,       // Alias/fallback mirroring cruelSunMaxExpandRadius
-  cruelSunRecoveryFrames: 50,  // Post-throw stationary recovery frames (3.0s delay before moving)
+  cruelSunMaxExpandRadius: 130, // Unified solar star radius: governs both expanding charge animation AND the thrown sun projectile
+  cruelSunOrbRadius: 130,       // Alias/fallback mirroring cruelSunMaxExpandRadius
+  cruelSunRecoveryFrames: 200,  // Post-throw stationary recovery frames (3.0s delay before moving)
   cruelSunPostThrowDelayFrames: 180, // Delay frames after throwing Cruel Sun before Escanor moves (3.0s)
   cruelSunSpeed: 5.0,          // Imposing projectile flight speed matching Gojo's Hollow Purple (6.0)
   cruelSunLife: 300,           // Sustained flight duration across arena (frames)
-  cruelSunDPS: 40,             // Continuous piercing tick damage dealt as sun plows through enemies
+  cruelSunDPS: 100,             // Continuous piercing tick damage dealt as sun plows through enemies
   cruelSunDPSInterval: 10,     // Frames between continuous DPS ticks (every 10 frames = 6 ticks/sec)
   cruelSunPullRadius: 150,     // Radius of solar convection/gravitational suction (150px)
   cruelSunPullForce: 18.0,     // Force carrying and dragging enemies along with the sun
   cruelSunSlowMultiplier: 0.10,// Heavy convective slow on caught enemies (20% move speed)
   cruelSunDamage: 100,         // Direct explosion damage upon final detonation
   cruelSunAoeRadius: 160,      // Massive blast epicenter radius
-  cruelSunAoeDamage: 65,       // Outer AOE explosion damage
+  cruelSunAoeDamage: 100,       // Outer AOE explosion damage
   cruelSunKnockback: 28.0,     // Heavy outward explosive knockback
+  cruelSunParalyzeDuration: 60,// Paralyze debuff duration in frames (1.0s) applied on collision with Cruel Sun
   cruelSunWallStunDuration: 60,// 1.0s stun (60 frames) upon wall collision while dragged
   cruelSunBurnDps: 6,          // Lingering burn DPS
   cruelSunBurnDurationSec: 4,  // Lingering burn duration

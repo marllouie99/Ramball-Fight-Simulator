@@ -2811,40 +2811,59 @@ export class Fighter {
     const isGenosTrapped = Boolean(this.caughtInGenosFlurry);
     const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));
     const isEscanorPinned = Boolean(this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0));
+    const isCruelSunDragged = Boolean(this._draggedByCruelSun || this.isCaughtInCruelSun);
     const isStationaryHover = ((this.purpleRecoveryTimer || 0) > 0) || this.isChannelingPurple || this.isChannelingDomainExpansion;
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned || isStationaryHover;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned || isCruelSunDragged || isStationaryHover;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
-      if (this.x - this.r < arena.x) {
-        this.x = arena.x + this.r;
-        this.vx = 0;
-        this.vy = 0;
-        this.knockbackVx = 0;
-        this.knockbackVy = 0;
-        clamped = true;
-      } else if (this.x + this.r > arena.x + arena.width) {
-        this.x = arena.x + arena.width - this.r;
-        this.vx = 0;
-        this.vy = 0;
-        this.knockbackVx = 0;
-        this.knockbackVy = 0;
-        clamped = true;
-      }
-      if (this.y - this.r < arena.y) {
-        this.y = arena.y + this.r;
-        this.vx = 0;
-        this.vy = 0;
-        this.knockbackVx = 0;
-        this.knockbackVy = 0;
-        clamped = true;
-      } else if (this.y + this.r > arena.y + arena.height) {
-        this.y = arena.y + arena.height - this.r;
-        this.vx = 0;
-        this.vy = 0;
-        this.knockbackVx = 0;
-        this.knockbackVy = 0;
-        clamped = true;
+      if (arena.shape === 'circle') {
+        const cx = arena.x + arena.width / 2;
+        const cy = arena.y + arena.height / 2;
+        const ar = arena.radius || (arena.width / 2);
+        const d = Math.hypot(this.x - cx, this.y - cy);
+        if (d + this.r >= ar && d > 0) {
+          const nx = (this.x - cx) / d;
+          const ny = (this.y - cy) / d;
+          this.x = cx + nx * (ar - this.r);
+          this.y = cy + ny * (ar - this.r);
+          this.vx = 0;
+          this.vy = 0;
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
+          clamped = true;
+        }
+      } else {
+        if (this.x - this.r < arena.x) {
+          this.x = arena.x + this.r;
+          this.vx = 0;
+          this.vy = 0;
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
+          clamped = true;
+        } else if (this.x + this.r > arena.x + arena.width) {
+          this.x = arena.x + arena.width - this.r;
+          this.vx = 0;
+          this.vy = 0;
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
+          clamped = true;
+        }
+        if (this.y - this.r < arena.y) {
+          this.y = arena.y + this.r;
+          this.vx = 0;
+          this.vy = 0;
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
+          clamped = true;
+        } else if (this.y + this.r > arena.y + arena.height) {
+          this.y = arena.y + arena.height - this.r;
+          this.vx = 0;
+          this.vy = 0;
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
+          clamped = true;
+        }
       }
       if (clamped && isSaitamaHit) {
         this._triggerSaitamaWallPinAndCrack(arena);

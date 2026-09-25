@@ -50,7 +50,8 @@ export function initGraphicsCache() {
     'Assets/Overlays/CJ-baguvix-overlay.png',
     'Assets/Overlays/Nanami-overtime-overlay.png',
     'Assets/Overlays/Todo-ultimate-overlay.png',
-    'Assets/Overlays/Yuji-soulswap-overlay.png'
+    'Assets/Overlays/Yuji-soulswap-overlay.png',
+    'Assets/Overlays/Mahoraga-wheel-overlay.png'
   ];
   models.forEach(preloadImage);
 }

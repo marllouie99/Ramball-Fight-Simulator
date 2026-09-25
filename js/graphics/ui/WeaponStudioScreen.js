@@ -44,8 +44,8 @@ function initCustomizations() {
       nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       megumi: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-      cj: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       escanor: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      engineer: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       zenitsu: {
         offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0, widthScale: 1.0, lengthScale: 1.0,
         parts: {
@@ -77,6 +77,9 @@ function initCustomizations() {
   }
   if (!state.weaponCustomizations.escanor) {
     state.weaponCustomizations.escanor = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+  }
+  if (!state.weaponCustomizations.engineer) {
+    state.weaponCustomizations.engineer = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
   if (!state.weaponCustomizations.zenitsu) {
     state.weaponCustomizations.zenitsu = {
@@ -139,7 +142,7 @@ export function drawWeaponStudioScreen() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const activeWeaponKey = state.studioSelectedWeapon;
-  const activeDef = FIGHTER_DEFS.find(f => f.type === activeWeaponKey);
+  const activeDef = FIGHTER_DEFS.find(f => f.type === activeWeaponKey || (f.type && f.type.toLowerCase() === activeWeaponKey.toLowerCase()));
   const themeColor = activeDef?.color || '#f59e0b';
 
   // ── Tier 1: Header Section ──
@@ -170,13 +173,14 @@ export function drawWeaponStudioScreen() {
     { key: 'john_wick', label: 'JOHN WICK' },
     { key: 'cj', label: 'CJ' },
     { key: 'escanor', label: 'ESCANOR' },
-    { key: 'zenitsu', label: 'ZENITSU' }
+    { key: 'zenitsu', label: 'ZENITSU' },
+    { key: 'engineer', label: 'ENGINEER' }
   ];
 
-  // Distribute across 3 rows for better spacing (5, 5, 4)
+  // Distribute across 3 rows for better spacing (5, 5, 5)
   const row1 = weapons.slice(0, 5);
   const row2 = weapons.slice(5, 10);
-  const row3 = weapons.slice(10);
+  const row3 = weapons.slice(10, 15);
 
   const rW = 80;
   const rH = 22;

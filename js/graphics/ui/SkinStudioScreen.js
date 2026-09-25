@@ -23,8 +23,11 @@ import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighter
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
 import { drawGenosSkin, drawGenosHands, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
 import { drawEscanorSkin, _drawEscanorHair, _getEscanorHairImage } from '../fighters/escanorSkin.js';
+import { drawEngineerSkin, _drawEngineerHair, _getEngineerHairImage } from '../fighters/engineerSkin.js';
 import { drawJohnWickSkin, _drawJohnWickHair, _getJohnWickHairImage } from '../fighters/johnWickSkin.js';
 import { drawTodoSkin, _drawTodoHair, _getTodoHairImage } from '../fighters/todoSkin.js';
+import { drawMusashiSkin, _drawMusashiHair } from '../fighters/musashiSkin.js';
+import { drawGunslingerSkin, _drawGunslingerHair, _getGunslingerHairImage } from '../fighters/gunSlingerSkin.js';
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -55,11 +58,11 @@ let _copyToastTimer = 0;
 
 // Fighter Category Tabs in Skin Studio Modal
 export const SKIN_STUDIO_CATEGORIES = [
-  { id: 'ALL', label: 'ALL (23)', filter: () => true },
+  { id: 'ALL', label: 'ALL (25)', filter: () => true },
   { id: 'JJK', label: 'JJK (9)', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM (3)', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER (3)', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE (8)', filter: (f) => ['genos', 'escanor', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE (10)', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger'].includes(f.key) }
 ];
 
 // Fighter Definitions in Skin Studio
@@ -433,6 +436,40 @@ export const SKIN_STUDIO_FIGHTERS = [
     forms: [
       { id: 'default', label: 'STANDARD' }
     ]
+  },
+  {
+    key: 'engineer',
+    label: 'ENGINEER',
+    asset: 'Hair/Engineer-Hair.png',
+    assetDims: '1280 x 1229',
+    baseW: 2.60,
+    baseH: 1.55,
+    baseCrownY: -1.15,
+    visW: 1039,
+    visH: 775,
+    centerX: 639.5,
+    topY: 234,
+    themeColor: '#EA580C',
+    forms: [
+      { id: 'default', label: 'STANDARD' }
+    ]
+  },
+  {
+    key: 'gunslinger',
+    label: 'GUNSLINGER',
+    asset: 'Hair/Gunslinger-hair.png',
+    assetDims: '1536 x 1024',
+    baseW: 2.80,
+    baseH: 1.85,
+    baseCrownY: -1.32,
+    visW: 1517,
+    visH: 1017,
+    centerX: 758,
+    topY: 7,
+    themeColor: '#D97706',
+    forms: [
+      { id: 'default', label: 'COWBOY' }
+    ]
   }
 ];
 
@@ -584,6 +621,26 @@ function generateJsCode(fDef, custom) {
            `const drawH = 1170 * scaleY;\n` +
            `const drawX = -712 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 28 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'engineer') {
+    return `// Calibrated Hard Hat for Engineer (Assets/model/Hair/Engineer-Hair.png)\n` +
+           `const targetHatWidth = r * ${targetW};\n` +
+           `const targetHatHeight = r * ${targetH};\n` +
+           `const scaleX = targetHatWidth / 1039;\n` +
+           `const scaleY = targetHatHeight / 775;\n` +
+           `const drawW = 1280 * scaleX;\n` +
+           `const drawH = 1229 * scaleY;\n` +
+           `const drawX = -639.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 234 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'gunslinger') {
+    return `// Calibrated Cowboy Hat for Gunslinger (Assets/model/Hair/Gunslinger-hair.png)\n` +
+           `const targetHatWidth = r * ${targetW};\n` +
+           `const targetHatHeight = r * ${targetH};\n` +
+           `const scaleX = targetHatWidth / 1517;\n` +
+           `const scaleY = targetHatHeight / 1017;\n` +
+           `const drawW = 1536 * scaleX;\n` +
+           `const drawH = 1024 * scaleY;\n` +
+           `const drawX = -758 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 7 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
@@ -833,6 +890,12 @@ export function drawSkinStudioScreen() {
         drawJohnWickSkin(ctx, dummyFighter);
       } else if (fDef.key === 'todo') {
         drawTodoSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'engineer') {
+        drawEngineerSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'musashi') {
+        drawMusashiSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'gunslinger') {
+        drawGunslingerSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -868,6 +931,12 @@ export function drawSkinStudioScreen() {
       _drawJohnWickHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'todo') {
       _drawTodoHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'engineer') {
+      _drawEngineerHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'musashi') {
+      _drawMusashiHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'gunslinger') {
+      _drawGunslingerHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'zeus') {
       _drawZeusHair(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
       _drawZeusCrown(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);

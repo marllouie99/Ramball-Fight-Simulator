@@ -163,6 +163,8 @@ async function main() {
   const { drawZeusPixelBody, drawZeusSkin, _drawZeusHair, _getZeusHairImage, _drawZeusCrown, _getZeusCrownImage } = await import('../js/graphics/fighters/zeusSkin.js');
   const { _getJohnWickHairImage, _drawJohnWickHair, drawJohnWickPixelBody, drawJohnWickSkin } = await import('../js/graphics/fighters/johnWickSkin.js');
   const { _getZenitsuHairImage, _getZenitsuLightningSpriteImage, _getZenitsuDashSpriteImage, _drawZenitsuHair, drawZenitsuPixelBody, drawZenitsuSkin, _getThunderclapBurst, isZenitsuThunderclapBurst, _drawZenitsuThunderclapDashVFX } = await import('../js/graphics/fighters/zenitsuSkin.js');
+  const { drawPixelCruelSunSphere, spawnCruelSunHitImpact, updateCruelSunHitImpacts, drawCruelSunHitImpacts, clearCruelSunHitImpacts, _getEscanorCruelSunSpriteImage, ESCANOR_CRUEL_SUN_FRAMES, _getEscanorSunExplosionSpriteImage, ESCANOR_SUN_EXPLOSION_FRAMES, drawProceduralPixelCruelSunExplosion, drawPixelCruelSunExplosion, drawCruelSunFloorLighting, drawCruelSunProximityEntityLighting, spawnCruelSunExplosion, updateCruelSunExplosions, drawCruelSunExplosions, clearCruelSunExplosions } = await import('../js/graphics/weapons/escanorWeaponGraphics.js');
+  const { drawEscanorSkin } = await import('../js/graphics/fighters/escanorSkin.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -9482,11 +9484,23 @@ async function main() {
     _drawEscanorMustache(mockCtx, 25, false);
     assertCanvasStackBalance('_drawEscanorMustache(mockCtx, 25, false)');
 
-    const { drawDivineAxeRhitta, drawRhittaSlashArc, _getEscanorSlashEffectImage, drawRhittaSolarFlash } = await import('../js/graphics/weapons/escanorWeaponGraphics.js');
+    const { drawDivineAxeRhitta, drawRhittaSlashArc, _getEscanorSlashEffectImage, drawRhittaSolarFlash, drawPixelCruelSunSphere, drawCruelSunOrb, drawCruelSunChargingExpansion, _getEscanorCruelSunSpriteImage, ESCANOR_CRUEL_SUN_FRAMES } = await import('../js/graphics/weapons/escanorWeaponGraphics.js');
 
     const slashEffectImg = _getEscanorSlashEffectImage();
     if (!slashEffectImg) {
       throw new Error('_getEscanorSlashEffectImage() returned null or undefined');
+    }
+
+    const cruelSunImg = _getEscanorCruelSunSpriteImage(false);
+    if (!cruelSunImg) {
+      throw new Error('_getEscanorCruelSunSpriteImage(false) returned null or undefined');
+    }
+    const cruelSunTheOneImg = _getEscanorCruelSunSpriteImage(true);
+    if (!cruelSunTheOneImg) {
+      throw new Error('_getEscanorCruelSunSpriteImage(true) returned null or undefined');
+    }
+    if (!Array.isArray(ESCANOR_CRUEL_SUN_FRAMES) || ESCANOR_CRUEL_SUN_FRAMES.length !== 6) {
+      throw new Error(`ESCANOR_CRUEL_SUN_FRAMES must be an array of 6 frames, got ${ESCANOR_CRUEL_SUN_FRAMES?.length}`);
     }
 
     mockCtx.resetStackDepth();
@@ -9508,6 +9522,26 @@ async function main() {
     mockCtx.resetStackDepth();
     drawRhittaSolarFlash(mockCtx, 50, 50, true, 1.0);
     assertCanvasStackBalance('drawRhittaSolarFlash(true, 1.0)');
+
+    mockCtx.resetStackDepth();
+    drawPixelCruelSunSphere(mockCtx, 100, 100, 48, false, 0, 1.0, true);
+    assertCanvasStackBalance('drawPixelCruelSunSphere(standard mode, 48px)');
+
+    mockCtx.resetStackDepth();
+    drawPixelCruelSunSphere(mockCtx, 100, 100, 48, true, 0, 1.0, true);
+    assertCanvasStackBalance('drawPixelCruelSunSphere(the one mode, 48px)');
+
+    mockCtx.resetStackDepth();
+    drawCruelSunOrb(mockCtx, 100, 100, 48, 0, { history: [{ x: 90, y: 100 }, { x: 100, y: 100 }] });
+    assertCanvasStackBalance('drawCruelSunOrb(with history)');
+
+    mockCtx.resetStackDepth();
+    drawCruelSunChargingExpansion(mockCtx, 100, 100, 0.1, 48, false, 0);
+    assertCanvasStackBalance('drawCruelSunChargingExpansion(spark phase p=0.1)');
+
+    mockCtx.resetStackDepth();
+    drawCruelSunChargingExpansion(mockCtx, 100, 100, 0.6, 48, false, 0);
+    assertCanvasStackBalance('drawCruelSunChargingExpansion(expanding phase p=0.6)');
 
     const EscanorClass = FIGHTER_CLASS_MAP.escanor;
     if (!EscanorClass) {
@@ -10285,6 +10319,103 @@ async function main() {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // Mahoraga Wheel Arena Overlay & Animated Rotation Test
+  // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('⚙️ [Mahoraga Wheel Arena Overlay Test] Verifying Mahoraga-wheel-overlay.png image loader, pop animation, rotation, and Canvas stack balance...');
+    const { getMahoragaWheelOverlayImage, drawMahoragaWheelArenaOverlay, drawMahoragaAdaptationDimScreen } = await import('../js/graphics/draw.js');
+    const { MahoragaFighter } = await import('../js/entities/fighters/MahoragaFighter.js');
+    const mahoraga = new MahoragaFighter({ color: '#FFD700', name: 'Mahoraga' });
+    mahoraga.x = 400;
+    mahoraga.y = 300;
+    mahoraga.wheelRotation = 0;
+    mahoraga.wheelStartRotation = 0;
+    mahoraga.wheelTargetRotation = Math.PI / 4;
+    mahoraga.wheelClickTimer = 15;
+    mahoraga.wheelClickMax = 25;
+
+    const dummyEnemy = { x: 500, y: 300, r: 25, hp: 100, maxHp: 100, z: 0 };
+    state.fighters = [mahoraga, dummyEnemy];
+
+    // Verify image loader
+    const mahoImg = getMahoragaWheelOverlayImage();
+    if (!mahoImg) {
+      throw new Error('[MAHORAGA OVERLAY IMAGE FAILED] getMahoragaWheelOverlayImage() returned null/undefined');
+    }
+    if (!mahoImg.src.includes('Mahoraga-wheel-overlay.png')) {
+      throw new Error(`[MAHORAGA OVERLAY IMAGE FAILED] Expected image src to include Mahoraga-wheel-overlay.png, got ${mahoImg.src}`);
+    }
+
+    // Verify config parameters
+    if (CONFIG.mahoraga?.enableWheelOverlay === false) {
+      throw new Error('[MAHORAGA OVERLAY CONFIG FAILED] Expected enableWheelOverlay to be true by default');
+    }
+    if (CONFIG.mahoraga?.wheelOverlayOpacity === undefined || CONFIG.mahoraga.wheelOverlayOpacity <= 0) {
+      throw new Error(`[MAHORAGA OVERLAY CONFIG FAILED] Expected valid wheelOverlayOpacity, got ${CONFIG.mahoraga?.wheelOverlayOpacity}`);
+    }
+
+    // Test rectangular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rect', wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawMahoragaWheelArenaOverlay();
+    assertCanvasStackBalance('drawMahoragaWheelArenaOverlay (rect arena)');
+
+    mockCtx.resetStackDepth();
+    drawMahoragaAdaptationDimScreen();
+    assertCanvasStackBalance('drawMahoragaAdaptationDimScreen (rect arena)');
+
+    // Test circular arena clipping
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'circle', radius: 300, wallWidth: 4 };
+    mockCtx.resetStackDepth();
+    drawMahoragaWheelArenaOverlay();
+    assertCanvasStackBalance('drawMahoragaWheelArenaOverlay (circular arena)');
+
+    mockCtx.resetStackDepth();
+    drawMahoragaAdaptationDimScreen();
+    assertCanvasStackBalance('drawMahoragaAdaptationDimScreen (circular arena)');
+
+    // Test active wheel click (overlay MUST draw)
+    mahoraga.wheelClickTimer = 12;
+    mahoraga.wheelClickMax = 25;
+    let drewDuringClick = false;
+    let rotationCaptured = null;
+    const origRotate = mockCtx.rotate;
+    const origDrawImage = mockCtx.drawImage;
+    mockCtx.rotate = (rad) => { rotationCaptured = rad; };
+    mockCtx.drawImage = () => { drewDuringClick = true; };
+    mockCtx.resetStackDepth();
+    drawMahoragaWheelArenaOverlay();
+    mockCtx.drawImage = origDrawImage;
+    mockCtx.rotate = origRotate;
+    if (!drewDuringClick) {
+      throw new Error('[MAHORAGA OVERLAY POP FAILED] drawMahoragaWheelArenaOverlay failed to render during active wheel click');
+    }
+    if (rotationCaptured === null || isNaN(rotationCaptured)) {
+      throw new Error(`[MAHORAGA OVERLAY ROTATION FAILED] drawMahoragaWheelArenaOverlay did not apply valid rotation: ${rotationCaptured}`);
+    }
+    assertCanvasStackBalance('drawMahoragaWheelArenaOverlay (active wheel click with rotation)');
+
+    // Test smooth gradual fade-out disappearance across multiple frames after click ends
+    mahoraga.wheelClickTimer = 0;
+    mahoraga.adaptationPauseTimer = 0;
+    let fadeDrawCount = 0;
+    mockCtx.drawImage = () => { fadeDrawCount++; };
+    for (let frame = 0; frame < 60; frame++) {
+      mockCtx.resetStackDepth();
+      drawMahoragaWheelArenaOverlay();
+    }
+    mockCtx.drawImage = origDrawImage;
+    if (fadeDrawCount === 0) {
+      throw new Error('[MAHORAGA OVERLAY SMOOTH FADE FAILED] Overlay cut off abruptly instead of smoothly fading out across multiple frames');
+    }
+    assertCanvasStackBalance('drawMahoragaWheelArenaOverlay (smooth multi-frame fade-out)');
+  } catch (err) {
+    console.error('❌ [MAHORAGA WHEEL ARENA OVERLAY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[MAHORAGA WHEEL ARENA OVERLAY TEST]: ${err.stack || err.message}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Disabled Skill Bar Hiding Verification Test (Across Multi-Fighters)
   // ─────────────────────────────────────────────────────────────
   try {
@@ -10625,6 +10756,181 @@ async function main() {
     console.error('❌ [ZENITSU SLIDE & BREATHER TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[ZENITSU SLIDE & BREATHER TEST]: ${err.stack || err.message}`);
+  }
+
+  // -------------------------------------------------------------
+  // ESCANOR CRUEL SUN SPRITE SHEET & EXPLOSION VFX TEST
+  // -------------------------------------------------------------
+  try {
+    console.log('☀️ [Escanor Cruel Sun & Sun Explosion Test] Testing sprite sheet frames, upright rendering, zero spin, hit impact VFX, and explosion expiration animation...');
+    const mockCtx = createMockCtx();
+
+    // 1. Verify Cruel Sun sprite sheet frame definition integrity
+    if (!Array.isArray(ESCANOR_CRUEL_SUN_FRAMES) || ESCANOR_CRUEL_SUN_FRAMES.length !== 6) {
+      throw new Error(`Expected 6 sprite sheet frames for Cruel Sun, found: ${ESCANOR_CRUEL_SUN_FRAMES?.length}`);
+    }
+
+    // 2. Verify Cruel Sun Explosion sprite sheet frame definition integrity
+    if (!Array.isArray(ESCANOR_SUN_EXPLOSION_FRAMES) || ESCANOR_SUN_EXPLOSION_FRAMES.length !== 6) {
+      throw new Error(`Expected 6 sprite sheet frames for Sun Explosion, found: ${ESCANOR_SUN_EXPLOSION_FRAMES?.length}`);
+    }
+
+    // 3. Verify drawPixelCruelSunSphere upright rendering without stack corruption
+    for (let frame = 0; frame < 6; frame++) {
+      drawPixelCruelSunSphere(mockCtx, 250, 250, 45, frame, false);
+      assertCanvasStackBalance(`drawPixelCruelSunSphere frame ${frame} normal`);
+      drawPixelCruelSunSphere(mockCtx, 250, 250, 60, frame, true);
+      assertCanvasStackBalance(`drawPixelCruelSunSphere frame ${frame} The One`);
+    }
+
+    // 4. Verify drawPixelCruelSunExplosion across all 6 frames and normalized progress
+    for (let frame = 0; frame < 6; frame++) {
+      drawPixelCruelSunExplosion(mockCtx, 250, 250, 48, frame, false);
+      assertCanvasStackBalance(`drawPixelCruelSunExplosion frame ${frame} normal`);
+      drawPixelCruelSunExplosion(mockCtx, 250, 250, 64, frame, true);
+      assertCanvasStackBalance(`drawPixelCruelSunExplosion frame ${frame} The One`);
+    }
+
+    for (let p = 0; p <= 1.0; p += 0.1) {
+      drawPixelCruelSunExplosion(mockCtx, 250, 250, 48, p, false);
+      assertCanvasStackBalance(`drawPixelCruelSunExplosion progress ${p}`);
+    }
+
+    // 5. Verify ambient floor lighting and proximity entity lighting
+    drawCruelSunFloorLighting(mockCtx, 250, 250, 48, false, 1.0, false, 0);
+    assertCanvasStackBalance('drawCruelSunFloorLighting normal');
+    drawCruelSunFloorLighting(mockCtx, 250, 250, 60, true, 1.0, false, 0);
+    assertCanvasStackBalance('drawCruelSunFloorLighting The One');
+    drawCruelSunFloorLighting(mockCtx, 250, 250, 48, false, 1.0, true, 0.5);
+    assertCanvasStackBalance('drawCruelSunFloorLighting explosion');
+
+    drawCruelSunProximityEntityLighting(mockCtx, 250, 250, 48, false, 1.0);
+    assertCanvasStackBalance('drawCruelSunProximityEntityLighting normal');
+    drawCruelSunProximityEntityLighting(mockCtx, 250, 250, 60, true, 1.0);
+    assertCanvasStackBalance('drawCruelSunProximityEntityLighting The One');
+
+    // 6. Verify hit impact spawning, updating, rendering and clearing
+    clearCruelSunHitImpacts();
+    spawnCruelSunHitImpact(200, 300, 0, false);
+    spawnCruelSunHitImpact(350, 400, Math.PI / 4, true);
+
+    for (let t = 0; t < 30; t++) {
+      drawCruelSunHitImpacts(mockCtx);
+      assertCanvasStackBalance(`drawCruelSunHitImpacts frame ${t}`);
+      updateCruelSunHitImpacts();
+    }
+
+    clearCruelSunHitImpacts();
+    drawCruelSunHitImpacts(mockCtx);
+    assertCanvasStackBalance('drawCruelSunHitImpacts after clear');
+
+    // 7. Verify standalone explosion spawning, updating, rendering and clearing
+    clearCruelSunExplosions();
+    spawnCruelSunExplosion(200, 300, 48, false, 30);
+    spawnCruelSunExplosion(350, 400, 64, true, 30);
+
+    for (let t = 0; t < 35; t++) {
+      drawCruelSunExplosions(mockCtx);
+      assertCanvasStackBalance(`drawCruelSunExplosions frame ${t}`);
+      updateCruelSunExplosions();
+    }
+
+    clearCruelSunExplosions();
+    drawCruelSunExplosions(mockCtx);
+    assertCanvasStackBalance('drawCruelSunExplosions after clear');
+
+    console.log('✅ [Escanor Cruel Sun & Sun Explosion Test] Successfully verified 6 Cruel Sun frames, 6 Explosion frames, expiration animation, ambient floor lighting, entity rim lighting, hit impact particle simulation & balanced Canvas 2D stack depths.');
+  } catch (err) {
+    console.error('❌ [ESCANOR CRUEL SUN & EXPLOSION TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[ESCANOR CRUEL SUN & EXPLOSION TEST]: ${err.stack || err.message}`);
+  }
+
+  // ── TEST: Escanor Cruel Sun Post-Throw Hand Smooth Hide & Stack Balance ──
+  try {
+    const EscanorClass = FIGHTER_CLASS_MAP.escanor;
+    const escanorInstance = new EscanorClass({ x: 250, y: 250, color: '#F59E0B', controls: {} });
+
+    // 1. Channeling Cruel Sun phase
+    escanorInstance.isChannelingCruelSun = true;
+    escanorInstance.cruelSunChargeTimer = 30;
+    escanorInstance.cruelSunMaxChargeTimer = 45;
+    escanorInstance.cruelSunCastAngle = 0;
+    drawEscanorSkin(mockCtx, escanorInstance);
+    assertCanvasStackBalance('drawEscanorSkin Cruel Sun Channeling');
+
+    // 2. Post-Throw Recovery frames (recP from 0.0 to 1.0)
+    escanorInstance.isChannelingCruelSun = false;
+    escanorInstance.cruelSunChargeTimer = 0;
+    const totalRec = 180;
+    escanorInstance.cruelSunMaxRecoveryTimer = totalRec;
+
+    const testFrames = [180, 160, 140, 100, 70, 40, 10, 0];
+    for (const rem of testFrames) {
+      escanorInstance.cruelSunRecoveryTimer = rem;
+      drawEscanorSkin(mockCtx, escanorInstance);
+      assertCanvasStackBalance(`drawEscanorSkin Cruel Sun Recovery (remaining: ${rem})`);
+    }
+
+    console.log('✅ [Escanor Cruel Sun Hand Smooth Hide Test] Successfully verified smooth hand hide, alpha fade, resting gauntlet blend-in, and 100% balanced Canvas 2D stack depths across all post-throw recovery frames.');
+  } catch (err) {
+    console.error('❌ [ESCANOR CRUEL SUN HAND SMOOTH HIDE TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[ESCANOR CRUEL SUN HAND SMOOTH HIDE TEST]: ${err.stack || err.message}`);
+  }
+
+  // ── TEST: Zenitsu & Zeus Signature Skills in HUD & SkillManager ──
+  try {
+    const ZenitsuClass = FIGHTER_CLASS_MAP.zenitsu;
+    const ZeusClass = FIGHTER_CLASS_MAP.zeus;
+    const zenitsuInstance = new ZenitsuClass({ x: 200, y: 200, color: '#F59E0B', controls: {} });
+    const zeusInstance = new ZeusClass({ x: 300, y: 300, color: '#00BFFF', controls: {} });
+
+    // 1. Verify Zenitsu Skill 1 in getSkillDataForFighter
+    const zenitsuSkills = getSkillDataForFighter(zenitsuInstance);
+    const zenitsuSkill1 = zenitsuSkills.find(s => s.id === 'thunderclap');
+    if (!zenitsuSkill1) {
+      throw new Error('Zenitsu Skill 1 (thunderclap) not found in getSkillDataForFighter');
+    }
+    if (!zenitsuSkill1.isSignature || !zenitsuSkill1.signature) {
+      throw new Error('Zenitsu Skill 1 (thunderclap) is missing isSignature / signature flag');
+    }
+
+    // 2. Verify Zenitsu SkillManager HUD skill data
+    const zenitsuSkillManagerData = zenitsuInstance.skillManager.getHudSkillData();
+    const zenitsuSmSkill1 = zenitsuSkillManagerData.find(s => s.id === 'thunderclap_and_flash');
+    if (!zenitsuSmSkill1) {
+      throw new Error('Zenitsu thunderclap_and_flash not found in skillManager');
+    }
+    if (!zenitsuSmSkill1.isSignature || !zenitsuSmSkill1.signature) {
+      throw new Error('Zenitsu SkillManager thunderclap is missing isSignature / signature flag');
+    }
+
+    // 3. Verify Zeus Ultimate in getSkillDataForFighter
+    const zeusSkills = getSkillDataForFighter(zeusInstance);
+    const zeusStorm = zeusSkills.find(s => s.id === 'storm');
+    if (!zeusStorm) {
+      throw new Error('Zeus Ultimate (storm) not found in getSkillDataForFighter');
+    }
+    if (!zeusStorm.isSignature || !zeusStorm.signature || !zeusStorm.isUltimate) {
+      throw new Error('Zeus Ultimate (storm) is missing isSignature / signature / isUltimate flag');
+    }
+
+    // 4. Verify Zeus SkillManager HUD skill data
+    const zeusSkillManagerData = zeusInstance.skillManager.getHudSkillData();
+    const zeusSmStorm = zeusSkillManagerData.find(s => s.id === 'storm');
+    if (!zeusSmStorm) {
+      throw new Error('Zeus storm not found in skillManager');
+    }
+    if (!zeusSmStorm.isSignature || !zeusSmStorm.signature || !zeusSmStorm.isUltimate) {
+      throw new Error('Zeus SkillManager storm is missing isSignature / signature / isUltimate flag');
+    }
+
+    console.log('✅ [Signature Skills Test] Successfully verified Zenitsu Skill 1 (Thunderclap and Flash) and Zeus Ultimate (Thunder Storm) signature flags across getSkillDataForFighter and SkillManager!');
+  } catch (err) {
+    console.error('❌ [SIGNATURE SKILLS TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[SIGNATURE SKILLS TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

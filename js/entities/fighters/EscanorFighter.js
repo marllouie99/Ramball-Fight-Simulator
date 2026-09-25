@@ -17,7 +17,7 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawEscanorSkin, _getEscanorChopAnimationState } from '../../graphics/fighters/escanorSkin.js';
-import { drawCruelSunOrb, drawPrideFlareShockwave, drawDivineSwordEscanorBlade, drawRhittaSlashArc } from '../../graphics/weapons/escanorWeaponGraphics.js';
+import { drawCruelSunOrb, drawPrideFlareShockwave, drawDivineSwordEscanorBlade, drawRhittaSlashArc, spawnCruelSunHitImpact, updateCruelSunHitImpacts, drawCruelSunHitImpacts, clearCruelSunHitImpacts, spawnCruelSunExplosion, updateCruelSunExplosions, drawCruelSunExplosions, clearCruelSunExplosions } from '../../graphics/weapons/escanorWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -1664,6 +1664,8 @@ export class EscanorFighter extends Fighter {
    * Updates Cruel Sun projectiles (piercing flight, gravitational drag, continuous DPS, wall impact & detonation)
    */
   _updateCruelSuns(arena) {
+    updateCruelSunHitImpacts();
+    updateCruelSunExplosions();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const validTargets = this._getAllValidEnemyTargets();
 
@@ -1699,61 +1701,156 @@ export class EscanorFighter extends Fighter {
         }
       }
 
-      // 2. Flight Movement & Arena Boundary Interaction
-      if (!sun.isAtWall) {
-        sun.x += sun.vx;
-        sun.y += sun.vy;
-      }
+      // 2. Flight Movement & Arena Boundary Sliding Physics
+      sun.x += sun.vx;
+      sun.y += sun.vy;
       sun.life--;
+
+      // Expiration deceleration & detonation trigger (final 30 frames of life play 6-frame explosion sprite animation)
+      if (sun.life <= 30) {
+        sun.isExpiring = true;
+        sun.vx *= 0.85;
+        sun.vy *= 0.85;
+        if (!sun.detonated) {
+          sun.detonated = true;
+          this._detonateCruelSun(sun, false);
+        }
+      }
+
       const shouldExplode = (sun.life <= 0);
 
-      // Arena boundary collision:
-      // Stops forward movement (vx = 0, vy = 0), persists at the wall for full duration
-      let isAtWall = Boolean(sun.isAtWall);
+      // Arena boundary collision with strict 1-direction wall sliding:
+      let isAtWall = false;
       if (arena) {
-        const halfR = (sun.r || 48) / 2;
+        const wallMargin = (sun.r || 48) / 2;
         if (arena.shape === 'circle') {
           const cx = arena.x + arena.width / 2;
           const cy = arena.y + arena.height / 2;
           const ar = arena.radius || (arena.width / 2);
           const d = Math.hypot(sun.x - cx, sun.y - cy);
-          if (d + halfR >= ar && d > 0) {
+          if (d + wallMargin >= ar && d > 0) {
             const nx = (sun.x - cx) / d;
             const ny = (sun.y - cy) / d;
-            sun.x = cx + nx * (ar - halfR);
-            sun.y = cy + ny * (ar - halfR);
+            // Clamp position right on the circular wall boundary
+            sun.x = cx + nx * (ar - wallMargin);
+            sun.y = cy + ny * (ar - wallMargin);
             isAtWall = true;
+
+            // On first wall impact: lock in ONE committed sliding direction (clockwise or counter-clockwise)
+            if (!sun.wallSlideLocked) {
+              sun.wallSlideLocked = true;
+              triggerGlobalScreenShake(7.0, 14);
+              spawnImpactFlash(sun.x, sun.y, '#F59E0B', (sun.r || 48) * 1.3);
+              spawnSparks(sun.x, sun.y, 12, 'fireSparks', '#FEF08A');
+
+              const dotTangent = sun.vx * (-ny) + sun.vy * nx;
+              sun.slideSign = dotTangent >= 0 ? 1 : -1;
+              sun.slideSpeed = Math.max(1.5, Math.abs(dotTangent) || ((cfg.cruelSunSpeed || 4.5) * 0.75));
+            }
+
+            // Slide strictly in that 1 committed direction along the circle perimeter
+            if (sun.slideSpeed > 0.05) {
+              sun.vx = -ny * sun.slideSign * sun.slideSpeed;
+              sun.vy = nx * sun.slideSign * sun.slideSpeed;
+              sun.slideSpeed *= 0.992;
+            } else {
+              sun.vx = 0;
+              sun.vy = 0;
+            }
+
+            // Emit dynamic grinding friction sparks while sliding along the perimeter
+            if (Math.random() < 0.40) {
+              const sparkContactX = cx + nx * ar;
+              const sparkContactY = cy + ny * ar;
+              spawnSparks(sparkContactX, sparkContactY, 3, 'fireSparks', '#FEF08A');
+            }
           }
         } else {
-          if (sun.x - halfR <= arena.x) {
-            sun.x = arena.x + halfR;
-            isAtWall = true;
-          } else if (sun.x + halfR >= arena.x + arena.width) {
-            sun.x = arena.x + arena.width - halfR;
-            isAtWall = true;
+          // Rectangular Arena: Lock into 1 sliding direction along the struck wall
+          if (!sun.wallSlideLocked) {
+            const hitLeft = (sun.x - wallMargin <= arena.x && sun.vx <= 0);
+            const hitRight = (sun.x + wallMargin >= arena.x + arena.width && sun.vx >= 0);
+            const hitTop = (sun.y - wallMargin <= arena.y && sun.vy <= 0);
+            const hitBottom = (sun.y + wallMargin >= arena.y + arena.height && sun.vy >= 0);
+
+            if (hitLeft || hitRight) {
+              sun.wallSlideLocked = true;
+              sun.slideWallAxis = 'vertical';
+              sun.slideWallSide = hitLeft ? 'left' : 'right';
+              sun.slideDir = (sun.vy >= 0 ? 1 : -1);
+              sun.slideSpeed = Math.max(1.5, Math.abs(sun.vy) || ((cfg.cruelSunSpeed || 4.5) * 0.75));
+
+              triggerGlobalScreenShake(7.0, 14);
+              spawnImpactFlash(sun.x, sun.y, '#F59E0B', (sun.r || 48) * 1.3);
+              spawnSparks(sun.x, sun.y, 10, 'fireSparks', '#FEF08A');
+            } else if (hitTop || hitBottom) {
+              sun.wallSlideLocked = true;
+              sun.slideWallAxis = 'horizontal';
+              sun.slideWallSide = hitTop ? 'top' : 'bottom';
+              sun.slideDir = (sun.vx >= 0 ? 1 : -1);
+              sun.slideSpeed = Math.max(1.5, Math.abs(sun.vx) || ((cfg.cruelSunSpeed || 4.5) * 0.75));
+
+              triggerGlobalScreenShake(7.0, 14);
+              spawnImpactFlash(sun.x, sun.y, '#F59E0B', (sun.r || 48) * 1.3);
+              spawnSparks(sun.x, sun.y, 10, 'fireSparks', '#FEF08A');
+            }
           }
-          if (sun.y - halfR <= arena.y) {
-            sun.y = arena.y + halfR;
+
+          if (sun.wallSlideLocked) {
             isAtWall = true;
-          } else if (sun.y + halfR >= arena.y + arena.height) {
-            sun.y = arena.y + arena.height - halfR;
-            isAtWall = true;
+            if (sun.slideWallAxis === 'vertical') {
+              sun.x = (sun.slideWallSide === 'left') ? (arena.x + wallMargin) : (arena.x + arena.width - wallMargin);
+              sun.vx = 0;
+              sun.vy = sun.slideDir * sun.slideSpeed;
+              sun.slideSpeed *= 0.992;
+
+              // Stop sliding when reaching corner
+              if (sun.y - wallMargin <= arena.y) {
+                sun.y = arena.y + wallMargin;
+                sun.vy = 0;
+                sun.slideSpeed = 0;
+              } else if (sun.y + wallMargin >= arena.y + arena.height) {
+                sun.y = arena.y + arena.height - wallMargin;
+                sun.vy = 0;
+                sun.slideSpeed = 0;
+              }
+            } else if (sun.slideWallAxis === 'horizontal') {
+              sun.y = (sun.slideWallSide === 'top') ? (arena.y + wallMargin) : (arena.y + arena.height - wallMargin);
+              sun.vy = 0;
+              sun.vx = sun.slideDir * sun.slideSpeed;
+              sun.slideSpeed *= 0.992;
+
+              // Stop sliding when reaching corner
+              if (sun.x - wallMargin <= arena.x) {
+                sun.x = arena.x + wallMargin;
+                sun.vx = 0;
+                sun.slideSpeed = 0;
+              } else if (sun.x + wallMargin >= arena.x + arena.width) {
+                sun.x = arena.x + arena.width - wallMargin;
+                sun.vx = 0;
+                sun.slideSpeed = 0;
+              }
+            }
+
+            if (Math.random() < 0.35) {
+              spawnSparks(sun.x, sun.y, 2, 'fireSparks', '#FEF08A');
+            }
           }
         }
 
+        sun.lastVx = sun.vx;
+        sun.lastVy = sun.vy;
+
         if (isAtWall) {
           sun.isAtWall = true;
-          sun.vx = 0;
-          sun.vy = 0;
-
-          // Arena shake every 1 second (60 frames) while the Sun collides/presses against the wall (not during traveling)
           sun.wallShakeTimer = (sun.wallShakeTimer || 0) + 1;
           if (sun.wallShakeTimer % 60 === 1) {
-            triggerGlobalScreenShake(7.0, 14);
-            spawnImpactFlash(sun.x, sun.y, '#F59E0B', (sun.r || 48) * 1.3);
-            spawnSparks(sun.x, sun.y, 8, 'fireSparks', '#FEF08A');
+            triggerGlobalScreenShake(5.0, 10);
+            spawnImpactFlash(sun.x, sun.y, '#F59E0B', (sun.r || 48) * 1.1);
+            spawnSparks(sun.x, sun.y, 6, 'fireSparks', '#FEF08A');
           }
         } else {
+          sun.isAtWall = false;
           sun.wallShakeTimer = 0;
         }
       }
@@ -1827,6 +1924,47 @@ export class EscanorFighter extends Fighter {
           }
 
           if (dist <= trapRadius) {
+            // First contact hit impact at wall
+            if (!sun.hitEntities) sun.hitEntities = new Set();
+            const tgtKey = tgt.id !== undefined ? tgt.id : tgt;
+            if (!sun.hitEntities.has(tgtKey)) {
+              sun.hitEntities.add(tgtKey);
+              const contactX = (sun.x + tgt.x) / 2;
+              const contactY = (sun.y + tgt.y) / 2;
+              const hitAngle = Math.atan2(tgt.y - sun.y, tgt.x - sun.x);
+              spawnCruelSunHitImpact(contactX, contactY, hitAngle, Boolean(this.isTheOneActive));
+              spawnSparks(contactX, contactY, 14, 'fireSparks', '#FEF08A');
+              spawnImpactFlash(contactX, contactY, '#F59E0B', (sun.r || 48) * 1.3);
+
+              // Apply Paralyze Debuff & Hitstun on initial collision
+              const paralyzeDur = cfg.cruelSunParalyzeDuration || 60;
+              if (typeof tgt.applyParalyze === 'function') {
+                tgt.applyParalyze(paralyzeDur, { isCruelSun: true });
+              } else {
+                tgt.paralyzeTimer = Math.max(tgt.paralyzeTimer || 0, paralyzeDur);
+              }
+              if (typeof tgt.applyHitStun === 'function') {
+                tgt.applyHitStun(paralyzeDur, { isCruelSun: true });
+              }
+              if (typeof tgt.interruptAttacks === 'function') {
+                tgt.interruptAttacks(true);
+              }
+              spawnFloatingText(tgt.x, tgt.y - (tgt.r || 25) - 12, 'PARALYZED!', '#F59E0B');
+            }
+
+            // While trapped/sliding at wall, maintain paralyze debuff
+            if (typeof tgt.applyParalyze === 'function') {
+              tgt.applyParalyze(15, { isCruelSun: true });
+            } else {
+              tgt.paralyzeTimer = Math.max(tgt.paralyzeTimer || 0, 15);
+            }
+
+            // While sliding on the wall, carried smoothly along the wall tangent if caught
+            if (Math.hypot(sun.vx, sun.vy) > 0.1) {
+              tgt.x += sun.vx * 0.70;
+              tgt.y += sun.vy * 0.70;
+            }
+
             // Apply slow movement (entity can move after stun, but remains slowed in solar radius)
             if (typeof tgt.applySlow === 'function') {
               tgt.applySlow(30, slowMult, { isCruelSun: true });
@@ -1853,6 +1991,45 @@ export class EscanorFighter extends Fighter {
           if (dist < trapRadius) {
             tgt._draggedByCruelSun = true;
             tgt._cruelSunWallStunApplied = false;
+
+            // First contact hit impact in mid-flight
+            if (!sun.hitEntities) sun.hitEntities = new Set();
+            const tgtKey = tgt.id !== undefined ? tgt.id : tgt;
+            if (!sun.hitEntities.has(tgtKey)) {
+              sun.hitEntities.add(tgtKey);
+              const contactX = (sun.x + tgt.x) / 2;
+              const contactY = (sun.y + tgt.y) / 2;
+              const hitAngle = Math.atan2(tgt.y - sun.y, tgt.x - sun.x);
+              spawnCruelSunHitImpact(contactX, contactY, hitAngle, Boolean(this.isTheOneActive));
+              spawnSparks(contactX, contactY, 16, 'fireSparks', '#FEF08A');
+              spawnImpactFlash(contactX, contactY, '#F59E0B', (sun.r || 48) * 1.4);
+              triggerGlobalScreenShake(6.0, 12);
+              try {
+                audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 0.85);
+              } catch (e) {}
+
+              // Apply Paralyze Debuff & Hitstun on initial collision
+              const paralyzeDur = cfg.cruelSunParalyzeDuration || 60;
+              if (typeof tgt.applyParalyze === 'function') {
+                tgt.applyParalyze(paralyzeDur, { isCruelSun: true });
+              } else {
+                tgt.paralyzeTimer = Math.max(tgt.paralyzeTimer || 0, paralyzeDur);
+              }
+              if (typeof tgt.applyHitStun === 'function') {
+                tgt.applyHitStun(paralyzeDur, { isCruelSun: true });
+              }
+              if (typeof tgt.interruptAttacks === 'function') {
+                tgt.interruptAttacks(true);
+              }
+              spawnFloatingText(tgt.x, tgt.y - (tgt.r || 25) - 12, 'PARALYZED!', '#F59E0B');
+            }
+
+            // While trapped/dragged in flight, maintain paralyze debuff
+            if (typeof tgt.applyParalyze === 'function') {
+              tgt.applyParalyze(15, { isCruelSun: true });
+            } else {
+              tgt.paralyzeTimer = Math.max(tgt.paralyzeTimer || 0, 15);
+            }
 
             // Heavy slow & carried forward along sun's velocity and centered into core
             if (typeof tgt.applySlow === 'function') {
@@ -1901,12 +2078,54 @@ export class EscanorFighter extends Fighter {
             tgt.x += dirX * outerPull + sun.vx * 0.35 * falloff;
             tgt.y += dirY * outerPull + sun.vy * 0.35 * falloff;
           }
+        }
 
-          // Clamp target strictly within arena bounds after displacement
-          if (arena) {
-            const tr = tgt.r || 25;
-            tgt.x = Math.max(arena.x + tr, Math.min(arena.x + arena.width - tr, tgt.x));
-            tgt.y = Math.max(arena.y + tr, Math.min(arena.y + arena.height - tr, tgt.y));
+        // Universal Strict Arena Boundary Clamping (Zero clipping out of arena)
+        if (arena) {
+          const tr = tgt.r || 25;
+          if (arena.shape === 'circle') {
+            const cx = arena.x + arena.width / 2;
+            const cy = arena.y + arena.height / 2;
+            const ar = arena.radius || (arena.width / 2);
+            const td = Math.hypot(tgt.x - cx, tgt.y - cy);
+            const maxD = ar - tr;
+            if (td > maxD && td > 0) {
+              const tnx = (tgt.x - cx) / td;
+              const tny = (tgt.y - cy) / td;
+              tgt.x = cx + tnx * maxD;
+              tgt.y = cy + tny * maxD;
+
+              // Zero outward velocity directed into wall
+              const vNorm = tgt.vx * tnx + tgt.vy * tny;
+              if (vNorm > 0) {
+                tgt.vx -= vNorm * tnx;
+                tgt.vy -= vNorm * tny;
+              }
+              const kbNorm = (tgt.knockbackVx || 0) * tnx + (tgt.knockbackVy || 0) * tny;
+              if (kbNorm > 0) {
+                tgt.knockbackVx -= kbNorm * tnx;
+                tgt.knockbackVy -= kbNorm * tny;
+              }
+            }
+          } else {
+            if (tgt.x - tr <= arena.x) {
+              tgt.x = arena.x + tr;
+              if (tgt.vx < 0) tgt.vx = 0;
+              if ((tgt.knockbackVx || 0) < 0) tgt.knockbackVx = 0;
+            } else if (tgt.x + tr >= arena.x + arena.width) {
+              tgt.x = arena.x + arena.width - tr;
+              if (tgt.vx > 0) tgt.vx = 0;
+              if ((tgt.knockbackVx || 0) > 0) tgt.knockbackVx = 0;
+            }
+            if (tgt.y - tr <= arena.y) {
+              tgt.y = arena.y + tr;
+              if (tgt.vy < 0) tgt.vy = 0;
+              if ((tgt.knockbackVy || 0) < 0) tgt.knockbackVy = 0;
+            } else if (tgt.y + tr >= arena.y + arena.height) {
+              tgt.y = arena.y + arena.height - tr;
+              if (tgt.vy > 0) tgt.vy = 0;
+              if ((tgt.knockbackVy || 0) > 0) tgt.knockbackVy = 0;
+            }
           }
         }
       }
@@ -1953,7 +2172,9 @@ export class EscanorFighter extends Fighter {
       }
 
       if (shouldExplode) {
-        this._detonateCruelSun(sun);
+        if (!sun.detonated) {
+          this._detonateCruelSun(sun, true);
+        }
         this.activeCruelSuns.splice(i, 1);
       }
     }
@@ -1961,12 +2182,18 @@ export class EscanorFighter extends Fighter {
 
   /**
    * Detonates Cruel Sun in a massive AOE explosion
+   * @param {Object} sun - Cruel Sun projectile instance
+   * @param {boolean} [spawnVisualExplosion=true] - Whether to spawn standalone explosion entity
    */
-  _detonateCruelSun(sun) {
+  _detonateCruelSun(sun, spawnVisualExplosion = true) {
     const aoeRadius = sun.aoeRadius || CONFIG.escanor?.cruelSunAoeRadius || 160;
     spawnImpactFlash(sun.x, sun.y, '#F59E0B', aoeRadius);
     spawnSparks(sun.x, sun.y, '#FEF08A', 28);
     triggerGlobalScreenShake(14, 20);
+
+    if (spawnVisualExplosion) {
+      spawnCruelSunExplosion(sun.x, sun.y, sun.r || 48, Boolean(this.isTheOneActive));
+    }
 
     const validTargets = this._getAllValidEnemyTargets();
     for (const tgt of validTargets) {
@@ -2257,6 +2484,8 @@ export class EscanorFighter extends Fighter {
   }
 
   clearAllAttackEffects() {
+    clearCruelSunHitImpacts();
+    clearCruelSunExplosions();
     if (this.hp > 0 && !this.dead && !this.isDead) {
       return;
     }
@@ -2271,10 +2500,12 @@ export class EscanorFighter extends Fighter {
   }
 
   draw(ctx) {
-    // 1. Draw Active Cruel Sun Orbs
+    // 1. Draw Active Cruel Sun Orbs & Collision Hit Impacts & Explosions
     for (const sun of this.activeCruelSuns) {
       drawCruelSunOrb(ctx, sun.x, sun.y, sun.r, Date.now(), sun);
     }
+    drawCruelSunHitImpacts(ctx);
+    drawCruelSunExplosions(ctx);
 
     // 2. Draw Active Pride Flare Shockwave
     if (this.prideFlareActiveTimer > 0) {

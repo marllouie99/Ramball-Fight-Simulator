@@ -1532,32 +1532,66 @@ export function drawGenosUltimateArenaOverlay() {
   state.globalDimEdgeColor = `rgba(5, 1, 0, ${(opacity * 0.98).toFixed(3)})`;
 }
 
+let currentMahoragaAdaptationDimOpacity = 0;
+
 /**
  * Draws a dark golden cinematic dim screen overlay when Mahoraga adapts and rotates his 3D Dharma Wheel.
+ * Features smooth fade-in and graceful exponential fade-out.
  */
 export function drawMahoragaAdaptationDimScreen() {
-  if (typeof state !== 'undefined' && state.disableDimEffects) return;
-  if (CONFIG.mahoraga?.enableGoldenScreenDim === false) return;
+  if (typeof state !== 'undefined' && state.disableDimEffects) {
+    currentMahoragaAdaptationDimOpacity = 0;
+    return;
+  }
+  if (CONFIG.mahoraga?.enableGoldenScreenDim === false) {
+    currentMahoragaAdaptationDimOpacity = 0;
+    return;
+  }
 
   const { ctx, canvas, arena } = state;
-  const mahoraga = state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0));
-  if (!mahoraga) return;
+  if (!ctx || !canvas || !arena) return;
 
-  const timer = (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0) ? mahoraga.adaptationPauseTimer : mahoraga.wheelClickTimer;
-  const clickMax = mahoraga.adaptationPauseMax || mahoraga.wheelClickMax || CONFIG.mahoraga?.wheelClickDuration || 25;
-  const rawProgress = (clickMax - timer) / clickMax;
-  const progress = Math.min(1.0, Math.max(0.0, rawProgress));
-  const maxOpacity = CONFIG.mahoraga?.goldenDimOpacity ?? 0.85;
-  const opacity = Math.sin(progress * Math.PI) * maxOpacity;
+  const mahoraga = state.fighters?.find(f => f && (f.characterId === 'mahoraga' || f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')));
+  const isClicking = Boolean(mahoraga && ((mahoraga.wheelClickTimer && mahoraga.wheelClickTimer > 0) || (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0)));
 
-  if (opacity <= 0.01) return;
+  let targetOpacity = 0;
+  if (isClicking) {
+    const timer = (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0) ? mahoraga.adaptationPauseTimer : mahoraga.wheelClickTimer;
+    const clickMax = mahoraga.adaptationPauseMax || mahoraga.wheelClickMax || CONFIG.mahoraga?.wheelClickDuration || 25;
+    const rawProgress = (clickMax - timer) / Math.max(1, clickMax);
+    const progress = Math.min(1.0, Math.max(0.0, rawProgress));
+    const maxOpacity = CONFIG.mahoraga?.goldenDimOpacity ?? 0.85;
+
+    // Fast pop-in, sustained hold, soft initial drop
+    if (progress < 0.25) {
+      targetOpacity = (progress / 0.25) * maxOpacity;
+    } else if (progress < 0.70) {
+      targetOpacity = maxOpacity;
+    } else {
+      targetOpacity = Math.max(0, 1.0 - (progress - 0.70) / 0.30) * maxOpacity;
+    }
+  }
+
+  // Smooth interpolation: snappy rise, graceful buttery fade out
+  if (targetOpacity > currentMahoragaAdaptationDimOpacity) {
+    currentMahoragaAdaptationDimOpacity += (targetOpacity - currentMahoragaAdaptationDimOpacity) * 0.35;
+  } else {
+    const fadeRate = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayFadeRate !== undefined) ? CONFIG.mahoraga.wheelOverlayFadeRate : 0.08;
+    currentMahoragaAdaptationDimOpacity += (targetOpacity - currentMahoragaAdaptationDimOpacity) * fadeRate;
+  }
+
+  if (currentMahoragaAdaptationDimOpacity <= 0.005) {
+    currentMahoragaAdaptationDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentMahoragaAdaptationDimOpacity;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  const screenMaho = worldToScreen(mahoraga.x, mahoraga.y - mahoraga.r - 28);
-  const drawX = screenMaho.x;
-  const wheelY = screenMaho.y;
+  const drawX = mahoraga ? worldToScreen(mahoraga.x, mahoraga.y - mahoraga.r - 28).x : canvas.width / 2;
+  const wheelY = mahoraga ? worldToScreen(mahoraga.x, mahoraga.y - mahoraga.r - 28).y : canvas.height / 2;
   const maxRadius = Math.max(arena.width, arena.height) * 0.70;
   const grad = ctx.createRadialGradient(
     drawX, wheelY, 15,
@@ -1576,6 +1610,189 @@ export function drawMahoragaAdaptationDimScreen() {
   
   state.globalDimEdgeColor = `rgba(18, 10, 2, ${opacity * 0.95})`;
 }
+
+let mahoragaWheelOverlayImg = null;
+let mahoragaWheelOverlayImgLoading = false;
+let currentMahoragaWheelOverlayOpacity = 0;
+let lastMahoragaWheelOverlayRotation = 0;
+
+export function loadMahoragaWheelOverlayImage() {
+  if (mahoragaWheelOverlayImg || mahoragaWheelOverlayImgLoading) return;
+  mahoragaWheelOverlayImgLoading = true;
+  mahoragaWheelOverlayImg = new Image();
+  mahoragaWheelOverlayImg.onload = () => {
+    mahoragaWheelOverlayImgLoading = false;
+  };
+  mahoragaWheelOverlayImg.onerror = (e) => {
+    console.error("Failed to load Mahoraga wheel overlay image at Assets/Overlays/Mahoraga-wheel-overlay.png:", e);
+    mahoragaWheelOverlayImgLoading = false;
+    mahoragaWheelOverlayImg = null;
+  };
+  mahoragaWheelOverlayImg.src = 'Assets/Overlays/Mahoraga-wheel-overlay.png';
+}
+
+export function getMahoragaWheelOverlayImage() {
+  if (mahoragaWheelOverlayImg && mahoragaWheelOverlayImg.complete && mahoragaWheelOverlayImg.naturalWidth > 0) {
+    return mahoragaWheelOverlayImg;
+  }
+  if (!mahoragaWheelOverlayImgLoading && typeof Image !== 'undefined') {
+    loadMahoragaWheelOverlayImage();
+  }
+  return mahoragaWheelOverlayImg;
+}
+
+/**
+ * Draws the Eight-Handled Sword Wheel Arena Overlay (Assets/Overlays/Mahoraga-wheel-overlay.png)
+ * inside the arena when Mahoraga's wheel clicks.
+ * Features:
+ * - Pops in promptly when the wheel clicks.
+ * - Buttery smooth, gradual fade-out disappearance across subsequent frames.
+ * - Animated mechanical rotation matching the Dharma wheel click with zero snap during fade out.
+ * - Scaled to arena with nearest-neighbor crisp pixel art rendering.
+ * - Clipped strictly within circular / rectangular arena boundaries.
+ */
+export function drawMahoragaWheelArenaOverlay() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) {
+    currentMahoragaWheelOverlayOpacity = 0;
+    return;
+  }
+  if (CONFIG.mahoraga?.enableWheelOverlay === false) {
+    currentMahoragaWheelOverlayOpacity = 0;
+    return;
+  }
+
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  const mahoraga = (state.fighters?.find(f =>
+    f && (f.characterId === 'mahoraga' || f.type === 'mahoraga' || f._def?.id === 'mahoraga' || f._def?.type === 'mahoraga')
+  )) || (state.previewFighter && (state.previewFighter.characterId === 'mahoraga' || state.previewFighter.type === 'mahoraga') ? state.previewFighter : null);
+
+  const isClicking = Boolean(mahoraga && ((mahoraga.wheelClickTimer && mahoraga.wheelClickTimer > 0) || (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0)));
+
+  if (!mahoragaWheelOverlayImg && !mahoragaWheelOverlayImgLoading) {
+    loadMahoragaWheelOverlayImage();
+  }
+
+  let targetOpacity = 0;
+  let clickProgress = 1.0;
+
+  if (isClicking) {
+    const timer = (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0) ? mahoraga.adaptationPauseTimer : mahoraga.wheelClickTimer;
+    const clickMax = mahoraga.adaptationPauseMax || mahoraga.wheelClickMax || CONFIG.mahoraga?.wheelClickDuration || 25;
+    const rawProgress = (clickMax - timer) / Math.max(1, clickMax);
+    clickProgress = Math.min(1.0, Math.max(0.0, rawProgress));
+
+    const baseAlpha = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayOpacity !== undefined) ? CONFIG.mahoraga.wheelOverlayOpacity : 0.85;
+
+    // Fast snappy pop-in during first 25%, sustained peak, then target transitions towards 0
+    if (clickProgress < 0.25) {
+      targetOpacity = (clickProgress / 0.25) * baseAlpha;
+    } else if (clickProgress < 0.65) {
+      targetOpacity = baseAlpha;
+    } else {
+      targetOpacity = Math.max(0, 1.0 - (clickProgress - 0.65) / 0.35) * baseAlpha;
+    }
+
+    // Mechanical rotation animation:
+    // Smooth cubic ease-out for tactile anime gear click
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    const rotProgress = easeOutCubic(clickProgress);
+
+    const startRot = (mahoraga.wheelStartRotation !== undefined)
+      ? mahoraga.wheelStartRotation
+      : ((mahoraga.wheelRotation || 0) - Math.PI / 4);
+    const targetRot = (mahoraga.wheelTargetRotation !== undefined)
+      ? mahoraga.wheelTargetRotation
+      : (startRot + Math.PI / 4);
+
+    const rotMultiplier = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayRotationMultiplier !== undefined) ? CONFIG.mahoraga.wheelOverlayRotationMultiplier : 1.0;
+    lastMahoragaWheelOverlayRotation = startRot + (targetRot - startRot) * rotProgress * rotMultiplier;
+  } else if (mahoraga && mahoraga.wheelRotation !== undefined) {
+    lastMahoragaWheelOverlayRotation = mahoraga.wheelRotation;
+  }
+
+  // Smooth interpolation: snappy rise, buttery smooth fade-out disappearance
+  if (targetOpacity > currentMahoragaWheelOverlayOpacity) {
+    currentMahoragaWheelOverlayOpacity += (targetOpacity - currentMahoragaWheelOverlayOpacity) * 0.35;
+  } else {
+    const fadeRate = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayFadeRate !== undefined) ? CONFIG.mahoraga.wheelOverlayFadeRate : 0.08;
+    currentMahoragaWheelOverlayOpacity += (targetOpacity - currentMahoragaWheelOverlayOpacity) * fadeRate;
+  }
+
+  if (currentMahoragaWheelOverlayOpacity <= 0.005) {
+    currentMahoragaWheelOverlayOpacity = 0;
+    return;
+  }
+
+  const opacity = currentMahoragaWheelOverlayOpacity;
+  const currentRotation = lastMahoragaWheelOverlayRotation;
+
+  // Arena Screen Center & Geometry
+  const zoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+  const worldArenaCenterX = (arena.x || 0) + (arena.width || 800) / 2;
+  const worldArenaCenterY = (arena.y || 0) + (arena.height || 600) / 2;
+  const arenaScreenCenter = worldToScreen(worldArenaCenterX, worldArenaCenterY);
+  const cx = arenaScreenCenter.x;
+  const cy = arenaScreenCenter.y;
+
+  const arenaW = (arena.width || 800) * zoom;
+  const arenaH = (arena.height || 600) * zoom;
+  const arenaX = cx - arenaW / 2;
+  const arenaY = cy - arenaH / 2;
+  const wallW = (arena.wallWidth || 4) * zoom;
+
+  ctx.save();
+  ctx.beginPath();
+  if (arena.shape === 'circle') {
+    const ar = (arena.radius || ((arena.width || 800) / 2)) * zoom - wallW;
+    ctx.arc(cx, cy, Math.max(0, ar), 0, Math.PI * 2);
+  } else {
+    ctx.rect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+  }
+  ctx.clip();
+
+  // Subtle golden ambient pulse inside arena floor
+  ctx.fillStyle = `rgba(255, 215, 0, ${(opacity * 0.12).toFixed(3)})`;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  // Draw Mahoraga Wheel Overlay Image
+  const img = getMahoragaWheelOverlayImage();
+  const overlayZoom = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayZoom !== undefined) ? CONFIG.mahoraga.wheelOverlayZoom : 0.95;
+  const offX = (((typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayOffsetX !== undefined) ? CONFIG.mahoraga.wheelOverlayOffsetX : 0) * zoom);
+  const offY = (((typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayOffsetY !== undefined) ? CONFIG.mahoraga.wheelOverlayOffsetY : 0) * zoom);
+
+  // Subtle tactile pop expansion that smoothly relaxes
+  const baseAlpha = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayOpacity !== undefined) ? CONFIG.mahoraga.wheelOverlayOpacity : 0.85;
+  const popScale = 0.94 + 0.06 * Math.min(1.0, opacity / Math.max(0.01, baseAlpha));
+  const minDim = Math.min(arenaW - wallW * 2, arenaH - wallW * 2);
+  const drawW = minDim * overlayZoom * popScale;
+  const drawH = minDim * overlayZoom * popScale;
+
+  if (img && (img.complete || img.width > 0) && (img.naturalWidth === undefined || img.naturalWidth > 0 || img.width > 0)) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling preserves pixel art clarity
+    ctx.globalAlpha = opacity;
+
+    ctx.translate(cx + offX, cy + offY);
+    ctx.rotate(currentRotation);
+    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+
+    ctx.restore();
+  }
+
+  // Golden perimeter radial vignette framing the wheel inside arena boundaries
+  const maxR = Math.max(arenaW, arenaH) * 0.70;
+  const vignetteGrad = ctx.createRadialGradient(cx, cy, Math.min(arenaW, arenaH) * 0.20, cx, cy, maxR);
+  vignetteGrad.addColorStop(0.00, 'rgba(0, 0, 0, 0)');
+  vignetteGrad.addColorStop(0.65, `rgba(218, 165, 32, ${(opacity * 0.16).toFixed(3)})`);
+  vignetteGrad.addColorStop(1.00, `rgba(130, 85, 12, ${(opacity * 0.35).toFixed(3)})`);
+  ctx.fillStyle = vignetteGrad;
+  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
+
+  ctx.restore();
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Nanami Classic Graphic Paint Splatter

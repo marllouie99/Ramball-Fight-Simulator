@@ -1357,6 +1357,60 @@ async function runInteractionTests() {
     console.log('      ✅ Yuji Soul Swap uninterrupted sequence vs undetected Boss Yuta verified.');
   }
 
+  // ── TEST 22: Gojo 300-Frame Post-Skill Cooldown & Anti-Spam Gate ──
+  console.log('   22. Testing Gojo 300-Frame Post-Skill Cooldown & Anti-Spam Gate...');
+  {
+    const GojoClass = FIGHTER_CLASS_MAP.gojo;
+    const SukunaClass = FIGHTER_CLASS_MAP.sukuna;
+    const gojo = new GojoClass({ radius: 25, x: 200, y: 300, hp: 200, color: '#00E5FF' });
+    const sukuna = new SukunaClass({ radius: 25, x: 400, y: 300, hp: 300, color: '#DC2626' });
+    state.fighters = [gojo, sukuna];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+    state.gameState = 'playing';
+
+    gojo.reset();
+    assert(gojo.globalSkillCooldown === 0, 'Gojo globalSkillCooldown must initialize to 0');
+
+    // 1. Detonating Red triggers 300 frames post-skill cooldown
+    gojo._activateRed();
+    gojo._detonateRed();
+    assert(gojo.globalSkillCooldown === 300, `Gojo globalSkillCooldown must be 300 after Red detonation (got ${gojo.globalSkillCooldown})`);
+
+    // 2. While globalSkillCooldown > 0, Gojo cannot initiate Purple or Domain even if cooldowns are ready
+    gojo.purpleCooldown = 0;
+    gojo.domainCooldown = 0;
+    gojo.update(sukuna, 0, state.arena);
+    assert(gojo.isChannelingPurple === false, 'Gojo must NOT start channeling Purple while globalSkillCooldown > 0');
+    assert(gojo.isChannelingDomainExpansion === false && gojo.isDomainPreSlide === false, 'Gojo must NOT start Domain while globalSkillCooldown > 0');
+
+    // 3. Cooldown ticks down each frame
+    const prevCD = gojo.globalSkillCooldown;
+    gojo.update(sukuna, 0, state.arena);
+    assert(gojo.globalSkillCooldown === prevCD - 1, `globalSkillCooldown must decrement by 1 per frame (expected ${prevCD - 1}, got ${gojo.globalSkillCooldown})`);
+
+    // 4. Firing Purple triggers 300 frames post-skill cooldown
+    gojo.globalSkillCooldown = 0;
+    gojo.isChannelingPurple = true;
+    gojo._firePurple(0);
+    assert(gojo.globalSkillCooldown === 300, `Gojo globalSkillCooldown must be 300 after firing Purple (got ${gojo.globalSkillCooldown})`);
+
+    // Clear active projectiles before activating domain
+    if (state.projectiles) state.projectiles.length = 0;
+    if (projectileSystem.projectiles) projectileSystem.projectiles.length = 0;
+
+    // 5. Activating Domain triggers 300 frames post-skill cooldown
+    gojo.globalSkillCooldown = 0;
+    gojo._activateDomain(state.arena);
+    assert(gojo.globalSkillCooldown === 300, `Gojo globalSkillCooldown must be 300 after activating Domain (got ${gojo.globalSkillCooldown})`);
+
+    // Clean up
+    if (state.projectiles) state.projectiles.length = 0;
+    if (projectileSystem.projectiles) projectileSystem.projectiles.length = 0;
+    gojo.reset();
+    sukuna.reset();
+    console.log('      ✅ Gojo 300-frame post-skill cooldown and anti-spam lockout verified.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

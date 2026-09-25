@@ -1181,42 +1181,61 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
 
   // ─────────────────────────────────────────────
-  // ZEUS (Lord of Olympus)
+  // ZEUS (King of Olympus & God of Thunder)
   // ─────────────────────────────────────────────
   if (f.characterId === 'zeus' || f.type === 'zeus') {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : {};
     const themeColor = f.color || '#00BFFF';
     const skills = [];
-    
-    // Skill 1: Aegis Shield
-    if (isSkillEnabled(cfg.enableAegisShield, true)) {
-      const aegisMax = cfg.aegisCooldown || 300;
-      const aegisTimer = f.aegisCooldown || 0;
-      const aegisPct = Math.max(0, Math.min(100, (1 - (aegisTimer / aegisMax)) * 100));
-      const aegisReady = aegisPct >= 99;
-      skills.push({ id: 'aegis', pct: aegisPct, ready: aegisReady, color: themeColor, label: 'AEGIS SHIELD' });
-    }
 
-    // Ultimate: Thunder Storm
+    // 1. Signature Skill / Ultimate: Thunder Storm (Map-Wide Divine Wrath) (Toggle: enableThunderStorm)
     if (isSkillEnabled(cfg.enableThunderStorm, true)) {
-      const stormMax = cfg.stormCooldown || 1500;
-      const stormTimer = f.stormCooldown !== undefined ? f.stormCooldown : stormMax;
+      const stormMax = f.stormCooldownMax || cfg.stormCooldown || 1500;
+      const stormTimer = f.stormCooldown !== undefined ? f.stormCooldown : 0;
       let stormPct = 0;
-      let stormReady = false;
+      let stormLabel = 'THUNDER STORM';
+      let isReady = false;
 
       if (f.isChargingStorm) {
-        const teleMax = cfg.stormTelegraphFrames || 120;
-        stormPct = Math.max(0, Math.min(100, (1 - f.stormCooldown / teleMax) * 100));
-        stormReady = false;
+        const telegraphMax = cfg.stormTelegraphFrames || 120;
+        const curCharge = f.stormChargeTimer !== undefined ? f.stormChargeTimer : (telegraphMax - (f.stormTelegraphTimer || 0));
+        stormPct = Math.max(0, Math.min(100, (curCharge / telegraphMax) * 100));
+        stormLabel = 'THUNDER STORM (CHARGING)';
       } else if (f.stormActive) {
-        const durationMax = cfg.stormDuration || 300;
-        stormPct = Math.max(0, Math.min(100, (f.stormTimer / durationMax) * 100));
-        stormReady = false;
+        const stormDur = cfg.stormDuration || 300;
+        const remaining = f.stormTimer !== undefined ? f.stormTimer : stormDur;
+        stormPct = Math.max(0, Math.min(100, (remaining / stormDur) * 100));
+        stormLabel = 'THUNDER STORM (ACTIVE)';
+        isReady = true;
       } else {
         stormPct = Math.max(0, Math.min(100, (1 - (stormTimer / stormMax)) * 100));
-        stormReady = stormPct >= 99;
+        isReady = stormPct >= 99;
       }
-      skills.push({ id: 'storm', pct: stormPct, ready: stormReady, color: themeColor, label: 'ULTIMATE STORM' });
+
+      skills.push({
+        id: 'storm',
+        pct: stormPct,
+        ready: isReady,
+        color: themeColor,
+        label: stormLabel,
+        isSignature: true,
+        signature: true,
+        isUltimate: true
+      });
+    }
+
+    // 2. Passive / Counter: Aegis Shield (Toggle: enableAegisShield)
+    if (isSkillEnabled(cfg.enableAegisShield, true)) {
+      const aegisMax = cfg.aegisCooldown || 300;
+      const aegisTimer = f.aegisCooldown !== undefined ? f.aegisCooldown : 0;
+      const aegisPct = Math.max(0, Math.min(100, (1 - (aegisTimer / aegisMax)) * 100));
+      skills.push({
+        id: 'aegis',
+        pct: aegisPct,
+        ready: aegisPct >= 99,
+        color: themeColor,
+        label: 'AEGIS SHIELD'
+      });
     }
 
     return skills;
@@ -1951,25 +1970,69 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const themeColor = f.color || '#F59E0B';
     const skills = [];
 
+    // 1. Signature Skill / Skill 1: Thunderclap and Flash (Hekireki Issen) (Toggle: enableThunderclap)
+    if (isSkillEnabled(cfg.enableThunderclap, true)) {
+      const thunderMax = f.thunderclapCooldownMax || cfg.thunderclapCooldown || 228;
+      const thunderTimer = f.thunderclapCooldown !== undefined ? f.thunderclapCooldown : 0;
+      let thunderPct = 0;
+      let thunderLabel = 'THUNDERCLAP & FLASH';
+      let isReady = false;
+
+      if (f.isChannelingThunderclap) {
+        const windupMax = f.thunderclapChannelDuration || cfg.thunderclapChannelDuration || 36;
+        const remaining = f.thunderclapChannelTimer || 0;
+        thunderPct = Math.max(0, Math.min(100, (1 - (remaining / windupMax)) * 100));
+        thunderLabel = 'THUNDERCLAP (CHARGING)';
+      } else if (f.isDashingThunderclap) {
+        thunderPct = 100;
+        thunderLabel = 'THUNDERCLAP (DASHING)';
+        isReady = true;
+      } else if (f.isThunderclapSliding || f.isThunderclapBreather) {
+        thunderPct = 100;
+        thunderLabel = 'THUNDERCLAP (RECOVERY)';
+      } else {
+        thunderPct = Math.max(0, Math.min(100, (1 - (thunderTimer / thunderMax)) * 100));
+        isReady = thunderPct >= 99;
+      }
+
+      skills.push({
+        id: 'thunderclap',
+        pct: thunderPct,
+        ready: isReady,
+        color: themeColor,
+        label: thunderLabel,
+        isSignature: true,
+        signature: true
+      });
+    }
+
+    // 2. Ultimate: Flaming Thunder God (Honoikazuchi no Kami) (Toggle: enableFlamingThunderGod)
     if (isSkillEnabled(cfg.enableFlamingThunderGod, false)) {
       const ultMax = f.flamingGodCooldownMax || cfg.ultimateCooldown || 1440;
       const ultTimer = f.flamingGodCooldown !== undefined ? f.flamingGodCooldown : 0;
       const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
-      skills.push({ id: 'flaming_thunder_god', pct: ultPct, ready: ultPct >= 99, color: themeColor, label: 'FLAMING THUNDER GOD' });
+      skills.push({
+        id: 'flaming_thunder_god',
+        pct: ultPct,
+        ready: ultPct >= 99,
+        color: themeColor,
+        label: 'FLAMING THUNDER GOD',
+        isUltimate: true
+      });
     }
 
-    if (isSkillEnabled(cfg.enableThunderclap, true)) {
-      const thunderMax = f.thunderclapCooldownMax || cfg.thunderclapCooldown || 228;
-      const thunderTimer = f.thunderclapCooldown !== undefined ? f.thunderclapCooldown : 0;
-      const thunderPct = Math.max(0, Math.min(100, (1 - (thunderTimer / thunderMax)) * 100));
-      skills.push({ id: 'thunderclap', pct: thunderPct, ready: thunderPct >= 99, color: themeColor, label: 'THUNDERCLAP & FLASH' });
-    }
-
+    // 3. Skill 2: Sixfold (Rokuren) (Toggle: enableRokuren)
     if (isSkillEnabled(cfg.enableRokuren, false)) {
       const rokurenMax = f.rokurenCooldownMax || cfg.rokurenCooldown || 420;
       const rokurenTimer = f.rokurenCooldown !== undefined ? f.rokurenCooldown : 0;
       const rokurenPct = Math.max(0, Math.min(100, (1 - (rokurenTimer / rokurenMax)) * 100));
-      skills.push({ id: 'rokuren', pct: rokurenPct, ready: rokurenPct >= 99, color: themeColor, label: 'SIXFOLD (ROKUREN)' });
+      skills.push({
+        id: 'rokuren',
+        pct: rokurenPct,
+        ready: rokurenPct >= 99,
+        color: themeColor,
+        label: 'SIXFOLD (ROKUREN)'
+      });
     }
 
     return skills;
@@ -2015,17 +2078,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const skills = [];
 
-    // 1. Ultimate: "THE ONE" — Divine Sword Escanor (Toggle: enableTheOne)
-    if (isSkillEnabled(cfg.enableTheOne, true)) {
-      const theOneMax = f.theOneCooldownMax || cfg.theOneCooldown || 1560;
-      const theOneTimer = f.theOneCooldown !== undefined ? f.theOneCooldown : 0;
-      const theOnePct = f.isTheOneActive
-        ? Math.max(0, Math.min(100, (f.theOneTimer / (f.theOneMaxTimer || 480)) * 100))
-        : Math.max(0, Math.min(100, (1 - (theOneTimer / theOneMax)) * 100));
-      skills.push({ id: 'the_one', pct: theOnePct, ready: theOnePct >= 99 || f.isTheOneActive, color: themeColor, label: f.isTheOneActive ? 'THE ONE (ACTIVE)' : '"THE ONE"' });
-    }
-
-    // 2. Skill 1: Cruel Sun (Toggle: enableCruelSun)
+    // 1. Signature Skill: Cruel Sun (無慈悲な太陽) (Toggle: enableCruelSun)
     if (isSkillEnabled(cfg.enableCruelSun, true)) {
       const cruelMax = f.cruelSunCooldownMax || cfg.cruelSunCooldown || 510;
       const cruelTimer = f.cruelSunCooldown !== undefined ? f.cruelSunCooldown : 0;
@@ -2042,7 +2095,32 @@ export function getSkillDataForFighter(f, getProjectiles) {
       } else {
         cruelPct = Math.max(0, Math.min(100, (1 - (cruelTimer / cruelMax)) * 100));
       }
-      skills.push({ id: 'cruel_sun', pct: cruelPct, ready: cruelPct >= 99 && !f.isCruelSunActive(), color: themeColor, label: cruelLabel });
+      skills.push({
+        id: 'cruel_sun',
+        pct: cruelPct,
+        ready: cruelPct >= 99 && !f.isCruelSunActive(),
+        color: themeColor,
+        label: cruelLabel,
+        isSignature: true,
+        signature: true
+      });
+    }
+
+    // 2. Ultimate: "THE ONE" — Divine Sword Escanor (Toggle: enableTheOne)
+    if (isSkillEnabled(cfg.enableTheOne, true)) {
+      const theOneMax = f.theOneCooldownMax || cfg.theOneCooldown || 1560;
+      const theOneTimer = f.theOneCooldown !== undefined ? f.theOneCooldown : 0;
+      const theOnePct = f.isTheOneActive
+        ? Math.max(0, Math.min(100, (f.theOneTimer / (f.theOneMaxTimer || 480)) * 100))
+        : Math.max(0, Math.min(100, (1 - (theOneTimer / theOneMax)) * 100));
+      skills.push({
+        id: 'the_one',
+        pct: theOnePct,
+        ready: theOnePct >= 99 || f.isTheOneActive,
+        color: themeColor,
+        label: f.isTheOneActive ? 'THE ONE (ACTIVE)' : '"THE ONE"',
+        isUltimate: true
+      });
     }
 
     // 3. Skill 2: Pride Flare (Toggle: enablePrideFlare)
@@ -2051,6 +2129,38 @@ export function getSkillDataForFighter(f, getProjectiles) {
       const prideTimer = f.prideFlareCooldown !== undefined ? f.prideFlareCooldown : 0;
       const pridePct = Math.max(0, Math.min(100, (1 - (prideTimer / prideMax)) * 100));
       skills.push({ id: 'pride_flare', pct: pridePct, ready: pridePct >= 99, color: themeColor, label: 'PRIDE FLARE' });
+    }
+
+    return skills;
+  }
+
+  // ─────────────────────────────────────────────
+  // SPIKE (Thorn Brawler)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'spike' || f.characterId === 'melee' || f.type === 'melee' || f.type === 'spike') {
+    const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.spike || CONFIG.melee)) ? (CONFIG.spike || CONFIG.melee) : {};
+    const themeColor = f.color || cfg.themeColor || '#e5c158';
+    const skills = [];
+
+    // 1. Spiked Shell / Smash Attack Cooldown
+    if (isSkillEnabled(cfg.enableBasicAttack, true)) {
+      const meleeMax = cfg.meleeCooldown || 50;
+      const meleeTimer = f.meleeCooldown !== undefined ? f.meleeCooldown : 0;
+      const meleePct = Math.max(0, Math.min(100, (1 - (meleeTimer / meleeMax)) * 100));
+      skills.push({ id: 'smash', pct: meleePct, ready: meleePct >= 99 && (f.meleeCooldown || 0) <= 0, color: themeColor, label: 'SPIKED SHELL' });
+    }
+
+    // 2. Permanent Stacking Speed Boost (SPD)
+    if (isSkillEnabled(cfg.enableStackingSpeed, true)) {
+      const maxStacks = cfg.maxSpeedStacks || 12;
+      const currentStacks = f.speedStacks || 0;
+      const currentSpeed = f.speed || 5.5;
+      const maxPossibleSpeed = ((f.baseSpeed || 5.5) + maxStacks * (cfg.speedStackPerHit || 0.85)) * (cfg.speedBoostMultiplier || 1.25);
+      const spdPct = Math.max(0, Math.min(100, (currentSpeed / maxPossibleSpeed) * 100));
+      const spdLabel = currentStacks > 0 ? `SPD: ${currentSpeed.toFixed(1)} (x${currentStacks})` : `SPD: ${currentSpeed.toFixed(1)}`;
+      const isReady = currentStacks > 0;
+
+      skills.push({ id: 'spd', pct: spdPct, ready: isReady, color: themeColor, label: spdLabel });
     }
 
     return skills;

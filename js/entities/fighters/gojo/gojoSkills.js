@@ -161,6 +161,11 @@ export function detonateRed(fighter) {
   fighter.hasFiredRed = true;
   fighter._hasFiredRedAtLeastOnce = true;
   fighter.lastCastSkill = 'red';
+  if (typeof fighter.triggerSkillReleaseCooldown === 'function') {
+    fighter.triggerSkillReleaseCooldown();
+  } else {
+    fighter.globalSkillCooldown = CONFIG.gojo?.postSkillCooldown ?? 300;
+  }
 
   // Stop channeling/charging audio immediately when detonating into blast
   if (fighter._redChannelingSoundHandle) {
@@ -337,6 +342,11 @@ export function firePurple(fighter, ownerIndex) {
   fighter.hasFiredPurple = true;
   fighter._hasFiredPurpleAtLeastOnce = true;
   fighter.lastCastSkill = 'purple';
+  if (typeof fighter.triggerSkillReleaseCooldown === 'function') {
+    fighter.triggerSkillReleaseCooldown();
+  } else {
+    fighter.globalSkillCooldown = CONFIG.gojo?.postSkillCooldown ?? 300;
+  }
   const enableBoost = CONFIG.gojo?.enablePurpleSecondCastBoost !== false;
   const isSecondCast = enableBoost && (fighter.purpleUseCount === 2);
   const damageMult = isSecondCast ? (CONFIG.gojo?.purpleSecondCastDamageMultiplier ?? 2.0) : 1.0;

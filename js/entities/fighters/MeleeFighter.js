@@ -1,18 +1,21 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { drawSpikeWeapon } from '../../graphics/weaponVisuals.js';
-import { drawSpikeSkin } from '../../graphics/fighters/spikeSkin.js';
+import { drawSpikeSkin, drawSpikeGhostModel } from '../../graphics/fighters/spikeSkin.js';
+import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 
 /**
- * Melee Fighter (Yellow)
- * Deals contact damage upon collision, and draws rotating spikes around its body.
+ * Melee Fighter (Spike / Thorn Brawler)
+ * Deals contact damage upon collision, freezes opponent, stacks speed on hit,
+ * spins as it moves, and renders ghost model afterimages while accelerating.
  */
 export class MeleeFighter extends Fighter {
   constructor(def) {
     super(def);
     this.speedBoostTimer = 0;
+    this.speedStacks = 0;
     this.trailHistory = [];
   }
 
@@ -20,9 +23,10 @@ export class MeleeFighter extends Fighter {
     super.reset();
     this.meleeCooldown = 0;
     this.speedBoostTimer = 0;
+    this.speedStacks = 0;
+    this.speed = this.baseSpeed;
     this.trailHistory = [];
   }
-
 
   /** Gold outline (removed per global stroke removal standard). */
   drawOutline(ctx) {
@@ -34,26 +38,79 @@ export class MeleeFighter extends Fighter {
     drawSpikeWeapon(ctx, this.x, this.y, this.angle, this.r);
   }
 
-  /** Contact damage hook. */
+  /** Contact damage hook with hit-pause and stacking speed. */
   onCollide(opponent) {
     if (this.isCaughtInBeam()) return;
     if (this.isTeammate(opponent)) return;
     if (this.meleeCooldown === 0) {
-      // TUNING: contact damage and melee hit cooldown can be adjusted here.
-      opponent.takeDamage(this.damage, this, { isMelee: true });
-      spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SMASH!', '#ffd700');
-      // TUNING: melee attack cooldown in frames.
-      this.meleeCooldown = this.shootCooldownMax;
+      const cfg = CONFIG.spike || CONFIG.melee || {};
+      const dmg = cfg.contactDamage ?? this.damage;
+      opponent.takeDamage(dmg, this, { isMelee: true });
+
+      // 1. Pause Hit Mechanic (Freeze both the enemy and Spike upon collision)
+      const pauseDuration = cfg.hitPauseDuration || 14;
+      if (typeof opponent.applyTimeStop === 'function') {
+        opponent.applyTimeStop(pauseDuration);
+      } else if (typeof opponent.applyHitStun === 'function') {
+        opponent.applyHitStun(pauseDuration);
+      }
+
+      // Spike pauses as well upon impact
+      const selfPauseDuration = cfg.selfHitPauseDuration ?? pauseDuration;
+      if (typeof this.applyTimeStop === 'function') {
+        this.applyTimeStop(selfPauseDuration);
+      }
+
+      // 2. Increment Stacking Speed Boost
+      const maxStacks = cfg.maxSpeedStacks || 12;
+      this.speedStacks = Math.min(maxStacks, (this.speedStacks || 0) + 1);
       this.applySpeedBoost();
+
+      // 3. Floating Text & Visual Feedback
+      const floatLabel = (this.speedStacks > 1) ? `SMASH! x${this.speedStacks}` : (cfg.floatingText || 'SMASH!');
+      spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, floatLabel, cfg.floatingTextColor || '#ffd700');
+      spawnSparks(opponent.x, opponent.y, 8, 'gold');
+      spawnImpactFlash(opponent.x, opponent.y, 28, '#E5C158');
+      triggerGlobalScreenShake(cfg.hitShakeIntensity || 3.5, cfg.hitShakeDuration || 4);
+
+      // 4. Cooldown & Audio SFX
+      this.meleeCooldown = cfg.meleeCooldown ?? this.shootCooldownMax;
       const sound = getBasicAttackSound(this._def?.id);
-      this._attackSoundTimer = sound.delay;
-      this._attackSoundConfig = sound;
+      if (sound) {
+        this._attackSoundTimer = sound.delay;
+        this._attackSoundConfig = sound;
+      }
     }
   }
 
   applySpeedBoost() {
-    this.speedBoostTimer = CONFIG.melee.speedBoostDuration;
-    this.speed = this.baseSpeed * CONFIG.melee.speedBoostMultiplier;
+    const cfg = CONFIG.spike || CONFIG.melee || {};
+    const stackGains = (this.speedStacks || 1) * (cfg.speedStackPerHit || 0.85);
+    const burstMult = cfg.speedBoostMultiplier || 1.25;
+    this.speed = (this.baseSpeed + stackGains) * burstMult;
+    this.normalizeSpeed();
+  }
+
+  aim(opponent) {
+    if (!this.canAim() || !this.isValidAimTarget(opponent)) return;
+    const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    this.gunAngle = targetAngle;
+    // Note: this.angle is reserved for continuous movement spin roll
+  }
+
+  /**
+   * Override turnToNormalPosition: Spike keeps spinning smoothly upon killing enemies or winning the match.
+   */
+  turnToNormalPosition(turnRate) {
+    const cfg = CONFIG.spike || CONFIG.melee || {};
+    const baseSpin = cfg.baseSpinRate || 0.035;
+    const speedMag = Math.hypot(this.vx, this.vy) || this.speed || 5.5;
+    const baseSpd = this.baseSpeed || 5.5;
+    const speedRatio = Math.max(1.0, speedMag / baseSpd);
+    const stackBonus = 1.0 + (this.speedStacks || 0) * (cfg.spinStackBonus ?? 0.12);
+    const maxSpin = cfg.maxSpinRate || 0.38;
+    const effectiveSpinRate = Math.min(maxSpin, baseSpin * speedRatio * stackBonus);
+    this.angle += effectiveSpinRate;
   }
 
   update(opponent, ownerIndex, arena) {
@@ -61,16 +118,11 @@ export class MeleeFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
+    const isFrozen = this._handleTimeStop();
     // Time stop - freeze ALL movement, spinning, and actions
-    if (this._handleTimeStop()) {
+    if (isFrozen) {
+      this.trailHistory.length = 0; // Hide afterimages when frozen
       return;
-    }
-
-    if (this.speedBoostTimer > 0) {
-      this.speedBoostTimer--;
-      if (this.speedBoostTimer === 0) {
-        this.speed = this.baseSpeed;
-      }
     }
 
     if (this.meleeCooldown > 0) {
@@ -79,9 +131,34 @@ export class MeleeFighter extends Fighter {
 
     this.applyMovementPhysics();
 
-    this.trailHistory.push({ x: this.x, y: this.y, alpha: 0.5 });
-    if (this.trailHistory.length > CONFIG.melee.trailLength) {
-      this.trailHistory.shift();
+    // Continuous Spin as he moves and during post-kill / match win celebration
+    const cfg = CONFIG.spike || CONFIG.melee || {};
+    const isStopped = Math.abs(this.vx) < 0.05 && Math.abs(this.vy) < 0.05;
+    const isMatchOver = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.matchWinner || state.roundWinner);
+    if (!isStopped || isMatchOver) {
+      const speedMag = Math.hypot(this.vx, this.vy) || this.speed || 5.5;
+      const baseSpd = this.baseSpeed || 5.5;
+      const speedRatio = Math.max(1.0, speedMag / baseSpd);
+      const stackBonus = 1.0 + (this.speedStacks || 0) * (cfg.spinStackBonus ?? 0.12);
+      const baseSpin = cfg.baseSpinRate || 0.035;
+      const maxSpin = cfg.maxSpinRate || 0.38;
+      const effectiveSpinRate = Math.min(maxSpin, baseSpin * speedRatio * stackBonus);
+      this.angle += effectiveSpinRate;
+    }
+
+    // Afterimages Management: active whenever he has speed stacks, hidden when stopped
+    if (isStopped || (this.speedStacks || 0) <= 0) {
+      this.trailHistory.length = 0;
+    } else {
+      const lastPoint = this.trailHistory[this.trailHistory.length - 1];
+      const distFromLast = lastPoint ? Math.hypot(this.x - lastPoint.x, this.y - lastPoint.y) : 999;
+      if (distFromLast >= 6) {
+        this.trailHistory.push({ x: this.x, y: this.y, angle: this.angle, r: this.r });
+        const maxTrail = cfg.trailLength ?? 5;
+        if (this.trailHistory.length > maxTrail) {
+          this.trailHistory.shift();
+        }
+      }
     }
 
     this.aim(opponent);
@@ -99,7 +176,8 @@ export class MeleeFighter extends Fighter {
       (Math.abs(this.y + this.r - (arena.y + arena.height)) < epsilon);
 
     if (bounced) {
-      const lockChance = CONFIG.melee.rebounceLockChance ?? 0;
+      const cfg = CONFIG.spike || CONFIG.melee || {};
+      const lockChance = cfg.rebounceLockChance ?? 0.40;
       if (Math.random() < lockChance) {
         let target = opponent;
 
@@ -149,17 +227,20 @@ export class MeleeFighter extends Fighter {
   }
 
   draw(ctx) {
-    if (this.speedBoostTimer > 0) {
+    const isFrozen = this._handleTimeStop();
+    const isStopped = Math.abs(this.vx) < 0.05 && Math.abs(this.vy) < 0.05;
+
+    // Render Ghost Model Afterimages (active when he has speed stacks, hidden when stopped or frozen)
+    if ((this.speedStacks || 0) > 0 && !isFrozen && !isStopped && this.trailHistory.length > 0) {
+      const cfg = CONFIG.spike || CONFIG.melee || {};
+      const alphaMult = cfg.ghostAlphaMultiplier ?? 0.55;
+      const ghostColor = cfg.ghostThemeColor || '#e5c158';
+
       for (let i = 0; i < this.trailHistory.length; i++) {
         const trail = this.trailHistory[i];
-        const opacity = (i + 1) / this.trailHistory.length * 0.4;
-        ctx.save();
-        ctx.globalAlpha = opacity;
-        ctx.fillStyle = 'gold';
-        ctx.beginPath();
-        ctx.arc(trail.x, trail.y, this.r * 0.85, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        const progress = (i + 1) / this.trailHistory.length;
+        const alpha = progress * alphaMult;
+        drawSpikeGhostModel(ctx, trail.x, trail.y, trail.r || this.r, trail.angle || 0, alpha, ghostColor);
       }
     }
 

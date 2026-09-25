@@ -6,6 +6,7 @@ import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawBerserkerDualAxes } from '../../graphics/weaponVisuals.js';
 import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
+import { updateBerserkerFluidTrail, drawBerserkerFluidTrail, drawAxeBladeRibbon } from '../../graphics/particles/berserkerTrailGraphics.js';
 import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 import { state } from '../../core/state.js';
 
@@ -35,6 +36,11 @@ export class BerserkerFighter extends Fighter {
     this.axeHitShakeX = 0;
     this.axeHitShakeY = 0;
     this.axeHitShakeTimer = 0;
+
+    // Dynamic Fluid Blood Ribbon Trail & Droplet Particles
+    this.fluidTrailHistory = [];
+    this.fluidDropletParticles = [];
+    this._fluidTrailTick = 0;
 
     // Declarative Skill Registration
     this.skillManager.registerSkills([
@@ -77,6 +83,9 @@ export class BerserkerFighter extends Fighter {
     this.axeHitShakeX = 0;
     this.axeHitShakeY = 0;
     this.axeHitShakeTimer = 0;
+    this.fluidTrailHistory = [];
+    this.fluidDropletParticles = [];
+    this._fluidTrailTick = 0;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -342,6 +351,9 @@ export class BerserkerFighter extends Fighter {
     } else {
       this.resolveWallBounce(arena, opponent);
     }
+
+    // Update dynamic fluid blood ribbon trail and world droplets
+    updateBerserkerFluidTrail(this);
   }
 
   drawOutline(ctx) {
@@ -405,6 +417,7 @@ export class BerserkerFighter extends Fighter {
   }
 
   draw(ctx) {
+    drawBerserkerFluidTrail(ctx, this);
     super.draw(ctx);
     this._drawAxeParticles(ctx);
     this.drawRageBar(ctx);
@@ -496,11 +509,8 @@ export class BerserkerFighter extends Fighter {
           }
           
           if (shouldPush) {
-              // Reduced smoke counts significantly to avoid making it too intense
               let smokeCount = 0;
-              if (this.isInRage) {
-                  smokeCount = isSwinging ? 3 : 1;
-              } else {
+              if (!this.isInRage) {
                   smokeCount = isSwinging ? 2 : (Math.random() > 0.5 ? 1 : 0); 
               }
               
@@ -537,19 +547,17 @@ export class BerserkerFighter extends Fighter {
   }
 
   _drawAxeParticles(ctx) {
-    // 1. Draw thick demonic smoke clouds (organic smudges)
-    if (this.axeSmokeParticles) {
+    // 1. Draw demonic smoke clouds (organic smudges) - only in normal mode
+    if (this.axeSmokeParticles && !this.isInRage) {
         for (const p of this.axeSmokeParticles) {
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(p.angle);
             
             const progress = p.life / p.maxLife; // 1 to 0
-            // Reduced alpha slightly so the black smoke isn't completely opaque and overbearing
             ctx.globalAlpha = progress * 0.7; 
             ctx.fillStyle = p.color;
             
-            // Draw an elongated, random oval/smudge instead of a perfect circle
             ctx.beginPath();
             ctx.ellipse(0, 0, p.size, p.size * p.stretch, 0, 0, Math.PI * 2);
             ctx.fill();
@@ -557,90 +565,51 @@ export class BerserkerFighter extends Fighter {
         }
     }
 
-    // 2. Draw sharp, vibrating anime slashes (using filled polygons to prevent 'sausage' ends)
-    ctx.save();
-    
-    const drawCrescentPolygon = (trail, r, g, b, baseThickness) => {
-        if (!trail || trail.length < 2) return;
-        
-        // The slash stays mostly solid
-        const headLife = trail[trail.length - 1].life / 12;
-        const globalAlpha = headLife > 0.2 ? 1.0 : (headLife / 0.2);
-        
-        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${globalAlpha})`;
-        ctx.beginPath();
-        
-        const outer = [];
-        const inner = [];
-        
-        for (let i = 0; i < trail.length; i++) {
-            const p = trail[i];
-            const progress = p.life / 12; // 0 to 1
-            
-            // Thickness tapers to 0 at the tail, is thickest in the middle, and tapers sharply to 0 at the head
-            let thickness = baseThickness * progress;
-            if (i === trail.length - 1 || i === 0) {
-                thickness = 0; // Razor sharp tips at both ends! (no sausage)
-            }
-            
-            // Only add chaotic vibration/jitter if in rage mode!
-            if (this.isInRage) {
-                thickness += (p.jitter * progress * 0.4);
-            }
-            
-            // Compute normal
-            let prev = i > 0 ? trail[i - 1] : trail[0];
-            let next = i < trail.length - 1 ? trail[i + 1] : trail[trail.length - 1];
-            
-            // Fallback for endpoints
-            if (i === 0 && trail.length > 1) next = trail[1];
-            if (i === trail.length - 1 && trail.length > 1) prev = trail[trail.length - 2];
-            
-            let dx = next.x - prev.x;
-            let dy = next.y - prev.y;
-            let len = Math.hypot(dx, dy) || 1;
-            
-            // Outward normal
-            let nx = -dy / len;
-            let ny = dx / len;
-            
-            outer.push({ x: p.x + nx * thickness, y: p.y + ny * thickness });
-            inner.push({ x: p.x - nx * thickness, y: p.y - ny * thickness });
-        }
-        
-        // Connect outer curve
-        ctx.moveTo(outer[0].x, outer[0].y);
-        for (let i = 1; i < outer.length; i++) {
-            ctx.lineTo(outer[i].x, outer[i].y);
-        }
-        // Connect inner curve (in reverse)
-        for (let i = inner.length - 1; i >= 0; i--) {
-            ctx.lineTo(inner[i].x, inner[i].y);
-        }
-        
-        ctx.closePath();
-        ctx.fill();
-    };
+    // 2. Dynamic Fluid Blood PNG Ribbon Trail along axe blade sweeps (Active in Rage Mode!)
+    drawAxeBladeRibbon(ctx, this.rightAxeTrail, this.isInRage, this._fluidTrailTick);
+    drawAxeBladeRibbon(ctx, this.leftAxeTrail, this.isInRage, this._fluidTrailTick);
 
-    if (this.isInRage) {
-        // Draw the massive 3 layers for the anime style: Black Aura, Crimson Aura, White Core
-        drawCrescentPolygon(this.rightAxeTrail, 0, 0, 0, 16);
-        drawCrescentPolygon(this.rightAxeTrail, 220, 0, 0, 8);
-        drawCrescentPolygon(this.rightAxeTrail, 255, 255, 255, 2);
+    // 3. Subtle non-rage trail (only when NOT in rage)
+    if (!this.isInRage) {
+        ctx.save();
+        const drawCrescentPolygon = (trail, r, g, b, baseThickness) => {
+            if (!trail || trail.length < 2) return;
+            const headLife = trail[trail.length - 1].life / 12;
+            const globalAlpha = headLife > 0.2 ? 1.0 : (headLife / 0.2);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${globalAlpha})`;
+            ctx.beginPath();
+            const outer = [];
+            const inner = [];
+            for (let i = 0; i < trail.length; i++) {
+                const p = trail[i];
+                const progress = p.life / 12;
+                let thickness = baseThickness * progress;
+                if (i === trail.length - 1 || i === 0) thickness = 0;
+                let prev = i > 0 ? trail[i - 1] : trail[0];
+                let next = i < trail.length - 1 ? trail[i + 1] : trail[trail.length - 1];
+                if (i === 0 && trail.length > 1) next = trail[1];
+                if (i === trail.length - 1 && trail.length > 1) prev = trail[trail.length - 2];
+                let dx = next.x - prev.x;
+                let dy = next.y - prev.y;
+                let len = Math.hypot(dx, dy) || 1;
+                let nx = -dy / len;
+                let ny = dx / len;
+                outer.push({ x: p.x + nx * thickness, y: p.y + ny * thickness });
+                inner.push({ x: p.x - nx * thickness, y: p.y - ny * thickness });
+            }
+            ctx.moveTo(outer[0].x, outer[0].y);
+            for (let i = 1; i < outer.length; i++) ctx.lineTo(outer[i].x, outer[i].y);
+            for (let i = inner.length - 1; i >= 0; i--) ctx.lineTo(inner[i].x, inner[i].y);
+            ctx.closePath();
+            ctx.fill();
+        };
 
-        drawCrescentPolygon(this.leftAxeTrail, 0, 0, 0, 16);
-        drawCrescentPolygon(this.leftAxeTrail, 220, 0, 0, 8);
-        drawCrescentPolygon(this.leftAxeTrail, 255, 255, 255, 2);
-    } else {
-        // Draw a dark "black neon" trail for normal non-rage swings
         drawCrescentPolygon(this.rightAxeTrail, 0, 0, 0, 4); // Pitch black outer aura
-        drawCrescentPolygon(this.rightAxeTrail, 51, 51, 51, 2); // #333333 inner core (matches axe)
-
+        drawCrescentPolygon(this.rightAxeTrail, 51, 51, 51, 2); // #333333 inner core
         drawCrescentPolygon(this.leftAxeTrail, 0, 0, 0, 4);
         drawCrescentPolygon(this.leftAxeTrail, 51, 51, 51, 2);
+        ctx.restore();
     }
-    
-    ctx.restore();
   }
 
   onFrozenSkillDurationTick(isInsideGojoDomain) {

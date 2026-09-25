@@ -6,6 +6,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from '../../graphics/weapons/musashiWeaponGraphics.js';
+import { drawMusashiSkin, drawMusashiGhostSkin } from '../../graphics/fighters/musashiSkin.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 export class MusashiFighter extends Fighter {
@@ -610,38 +611,21 @@ export class MusashiFighter extends Fighter {
     }
   }
 
-  drawBody(ctx) {
-    // Draw sheaths on back (behind body but above trail)
-    if (drawMusashiSheaths) {
-      drawMusashiSheaths(ctx, this, this.isSheathed);
-    }
+  drawSkin(ctx) {
+    drawMusashiSkin(ctx, this);
+  }
 
-    if (this.afterImages && this.afterImages.length > 0) {
-      this.afterImages.forEach(img => {
-        const alpha = img.timer / 20.0;
-        ctx.save();
-        ctx.globalAlpha = alpha * 0.6;
-        ctx.translate(img.x, img.y);
-        ctx.beginPath();
-        ctx.arc(0, 0, this.r, 0, Math.PI * 2);
-        
-        ctx.fillStyle = this.color;
-        ctx.fill();
-        ctx.restore();
-      });
-    }
-    super.drawBody(ctx);
+  drawBody(ctx) {
+    drawMusashiSkin(ctx, this);
   }
 
   drawGun(ctx) {
     if (typeof state !== 'undefined' && state.showSkinOnly) return;
-    if (drawMusashiWeapons && !this.isSheathed) {
-      drawMusashiWeapons(ctx, this);
-    }
+    // Handled internally in drawMusashiSkin with correct layer ordering
   }
 
   draw(ctx) {
-    // Update slash effects
+    // 1. Slash effects
     if (this.slashEffects && this.slashEffects.length > 0) {
       this.slashEffects.forEach(effect => {
         const prog = 1 - (effect.timer / effect.maxTimer);
@@ -705,9 +689,18 @@ export class MusashiFighter extends Fighter {
       });
     }
 
-    super.draw(ctx);
+    // 2. Render Afterimages (Ghost Model Trail with Stance Aura & Silhouette)
+    if (this.afterImages && this.afterImages.length > 0) {
+      this.afterImages.forEach(img => {
+        const alpha = img.timer / 20.0;
+        drawMusashiGhostSkin(ctx, img.x, img.y, img.gunAngle !== undefined ? img.gunAngle : (this.gunAngle || 0), img.r || this.r, alpha * 0.65, img.currentStance || this.currentStance);
+      });
+    }
+
+    // 3. Render Main Upright Front POV Skin & Dual Weapons
+    drawMusashiSkin(ctx, this);
     
-    // Stance aura
+    // 4. Stance aura
     ctx.save();
     let r = 0, g = 0, b = 0;
     if (this.currentStance === 'earth') { r = 160; g = 82; b = 45; }

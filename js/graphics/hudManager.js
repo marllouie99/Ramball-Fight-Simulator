@@ -1278,7 +1278,10 @@ function updateHealthHud() {
       john_wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
       johnwick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
       wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
-      makima: ['chains', 'shrine', 'contract', 'CHAINS', 'SHRINE', 'CONTRACT']
+      makima: ['chains', 'shrine', 'contract', 'CHAINS', 'SHRINE', 'CONTRACT'],
+      escanor: ['cruel_sun', 'cruel sun', 'CRUEL SUN', 'SUN'],
+      zenitsu: ['thunderclap', 'hekireki', 'THUNDERCLAP', 'FLASH', 'THUNDER'],
+      zeus: ['storm', 'thunder_storm', 'THUNDER STORM', 'STORM']
     };
 
     const keys = signatureMap[fId];
@@ -1960,6 +1963,27 @@ function updateHealthHud() {
       else if (fType.includes('sniper') || fType.includes('awp')) caliber = '.338 LAPUA';
       else if (fType.includes('barrett')) caliber = '.50 BMG';
       info.push(`<b>CALIBER:</b> ${caliber}`);
+    }
+
+    // Spike (Thorn Brawler / Melee) stats info
+    if (f.characterId === 'spike' || f.characterId === 'melee' || fType === 'spike' || fType === 'melee' || f._def?.type === 'melee' || (f._def && f._def.name === 'Spike')) {
+      const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.spike || CONFIG.melee)) ? (CONFIG.spike || CONFIG.melee) : {};
+      const baseDmg = cfg.contactDamage ?? (f.damage || 25);
+      info.push(`<b>DMG:</b> ${baseDmg}`);
+
+      const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+      const baseSpd = (f.baseSpeed || cfg.speed || 5.5) * modeMult;
+      const currentSpd = (f.speed || baseSpd) * modeMult;
+      const spdDiff = Math.max(0, currentSpd - baseSpd);
+      const stacks = f.speedStacks || 0;
+
+      if (spdDiff > 0.05 && stacks > 0) {
+        info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)} + ${spdDiff.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else if (spdDiff > 0.05) {
+        info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)} + ${spdDiff.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)}`);
+      }
     }
 
     // Tick Damage

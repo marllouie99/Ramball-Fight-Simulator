@@ -13,7 +13,7 @@ import {
   drawWhiteRailgun, drawWhiteChargeEffect, drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee,
   drawGrayShield, drawGraySword, drawGrayBrokenSword, drawBerserkerDualAxes,
   drawCronosCrescentBlade, drawSpikeWeapon, drawSingleSpike, drawGunSlingerDualRevolver,
-  drawEngineer, drawZeusWeapon, drawInvertedSpear, drawSplitSoulKatana,
+  drawEngineer, drawEngineerShotgun, drawEngineerWrench, drawTurret, drawDispenser, drawZeusWeapon, drawInvertedSpear, drawSplitSoulKatana,
   drawMahoragaSword, drawMahoraga3DWheel, drawMahoragaChestNecklace, drawMahoragaLeftPunch,
   drawMahitoClawWeapon
 } from '../weaponVisuals.js';
@@ -943,6 +943,29 @@ function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, curre
         try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
       }
     });
+  } else if (def.type === 'Engineer' || def.type === 'engineer') {
+    state.engineerWeaponIndex = state.engineerWeaponIndex || 0;
+    const engWeapons = [
+      { name: '🔫 12-GAUGE SHOTGUN', w: 145, idx: 0, wpn: 'shotgun' },
+      { name: '🔧 PIPE WRENCH', w: 125, idx: 1, wpn: 'wrench' },
+      { name: '🤖 SENTRY TURRET', w: 135, idx: 2, wpn: 'sentry' },
+      { name: '📦 DISPENSER', w: 115, idx: 3, wpn: 'dispenser' }
+    ];
+    engWeapons.forEach(wItem => {
+      buttons.push({
+        text: wItem.name,
+        active: state.engineerWeaponIndex === wItem.idx,
+        width: wItem.w,
+        action: () => {
+          state.engineerWeaponIndex = wItem.idx;
+          if (state.previewFighter) {
+            state.previewFighter.lastWeaponUsed = (wItem.idx === 1 ? 'wrench' : 'shotgun');
+            state.previewFighter.previewWeaponIndex = wItem.idx;
+          }
+          try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+        }
+      });
+    });
   }
 
   if (buttons.length === 0) return;
@@ -1069,6 +1092,23 @@ function drawWeaponInfoCard(ctx, def) {
     } else {
       nameText = 'TEC-9 (Intratec / GROVESTREET4LIFE)';
       descText = 'Iconic GTA: San Andreas TEC-9. Features a worn matte gunmetal gray receiver with stamped weld lines, molded dark charcoal polymer lower frame & grip, and contrasting matte black barrel shroud with cooling perforations. Wielded during Grove Street Drive-Bys.';
+    }
+  }
+
+  if (def.type === 'Engineer' || def.type === 'engineer') {
+    const activeIndex = (state.gameState === 'weaponDetail') ? (state.engineerWeaponIndex || 0) : 0;
+    if (activeIndex === 0) {
+      nameText = '12-Gauge Pump Shotgun (Walnut & Gunmetal)';
+      descText = 'Authentic Team Fortress 2 RED Engineer pump-action shotgun. Features a rich walnut stock and ribbed pump forend, beveled gunmetal receiver, and brass bead front sight. Unleashes 8 high-velocity buckshot pellets per blast with dynamic recoil and pump-racking ejection.';
+    } else if (activeIndex === 1) {
+      nameText = 'Heavy Cast-Iron Pipe Wrench';
+      descText = 'Industrial heavy-duty cast-iron pipe wrench. Features forged steel hook jaws, brass adjustment knurl, dipped red handle, and reinforced shank. Delivers rapid 135° frontal-cone bludgeoning melee slashes and repairs/upgrades friendly buildings on contact.';
+    } else if (activeIndex === 2) {
+      nameText = 'Automated Combat Sentry Turret (Lv 1 - 3)';
+      descText = 'Automated combat sentry turret. Upgradable across 3 tiers: Level 1 Single Barrel (rapid rivet fire), Level 2 Dual Gatling Barrels (high-RPM suppression), and Level 3 Quad Rocket Pod (lock-on salvo micro-missiles and laser targeting).';
+    } else {
+      nameText = 'Provision Dispenser Station';
+      descText = 'Heavy automated support structure. Features an armored steel cabinet, glowing neon medical cross, CRT scanline gauges, and dual tether hoses. Deploys tethered healing beams that restore HP, supply ammo, and boost combat reload speed.';
     }
   }
 
@@ -1357,6 +1397,9 @@ function drawWeaponDetailScreen() {
         previewFighter.rika.x = 0;
         previewFighter.rika.y = 0;
         previewFighter._drawRika(ctx, { x: 100, y: 0 });
+      } else if (state.showSummonModel && (def.type === 'Engineer' || def.type === 'engineer')) {
+        drawTurret(ctx, { x: -45, y: 0, level: 3, angle: 0, r: 20, color: '#EA580C', maxHp: 100, hp: 100 });
+        drawDispenser(ctx, { x: 45, y: 0, r: 22, color: '#EA580C', maxHp: 100, hp: 100, metal: 200, maxMetal: 200, pulseTimer: 0 });
       } else if (state.showWeaponOnly) {
         drawWeaponPreview(ctx, def.type, def.color);
       } else {
@@ -1881,6 +1924,10 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'megumi') offsetX = -45;
   else if (type === 'layla') offsetX = -30;
   else if (type === 'uryu' || type === 'rubbick' || type === 'trickster') offsetX = 0;
+  else if (type === 'Engineer' || type === 'engineer') {
+    const wIdx = (state.gameState === 'weaponDetail') ? (state.engineerWeaponIndex || 0) : 0;
+    offsetX = (wIdx === 2 || wIdx === 3) ? 0 : -35;
+  }
   else if (type === 'ichigo') {
     offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -55;
   }
@@ -2093,8 +2140,36 @@ function drawWeaponPreview(ctx, type, color) {
       }
 
       case 'Engineer':
-        drawEngineer(ctx, { x: 0, y: 0, gunAngle: gunAngle, r: r, lastWeaponUsed: 'shotgun' });
+      case 'engineer': {
+        const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.engineer)
+          ? state.weaponCustomizations.engineer
+          : null;
+        const offX = custom ? (custom.offsetX || 0) : 0;
+        const offY = custom ? (custom.offsetY || 0) : 0;
+        const sc = custom ? (custom.scale ?? 1.0) : 1.0;
+        const rot = custom ? (custom.angleOffset || 0) : 0;
+        const wSc = custom ? (custom.widthScale ?? 1.0) : 1.0;
+        const lSc = custom ? (custom.lengthScale ?? 1.0) : 1.0;
+
+        ctx.save();
+        ctx.translate(offX, offY);
+        ctx.rotate(rot);
+        ctx.scale(sc * lSc, sc * wSc);
+
+        const wIndex = (state.gameState === 'weaponDetail') ? (state.engineerWeaponIndex || 0) : 0;
+        if (wIndex === 1) {
+          drawEngineerWrench(ctx, 0, 0, gunAngle, r, true, 0, false, color || '#EA580C', 0, false, true);
+        } else if (wIndex === 2) {
+          drawTurret(ctx, { x: 0, y: 0, level: 3, angle: gunAngle, r: 22, color: '#EA580C', maxHp: 100, hp: 100 });
+        } else if (wIndex === 3) {
+          drawDispenser(ctx, { x: 0, y: 0, r: 24, color: '#EA580C', maxHp: 100, hp: 100, metal: 200, maxMetal: 200, pulseTimer: 0 });
+        } else {
+          drawEngineerShotgun(ctx, 0, 0, gunAngle, r, true, 0, false, color || '#EA580C', false, true);
+        }
+
+        ctx.restore();
         return;
+      }
 
       case 'zeus':
         drawZeusWeapon(ctx, 0, 0, gunAngle, r, Date.now() / 200);

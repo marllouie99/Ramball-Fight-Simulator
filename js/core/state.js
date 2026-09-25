@@ -228,7 +228,8 @@ export const state = {
     toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
     cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
     ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-    nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+    nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+    engineer: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0, widthScale: 1.0, lengthScale: 1.0 }
   },
   mahitoClawCustomBlades: null,
 
@@ -419,7 +420,8 @@ export const state = {
     tanjiro: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
     zenitsu: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
     nezuko: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    power: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false }
+    power: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    engineer: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false }
   },
   matchTimer: 0,
 };

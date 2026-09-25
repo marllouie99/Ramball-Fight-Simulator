@@ -756,8 +756,558 @@ export function drawDivineSwordEscanorBlade(ctx, x, y, angle, r = 28, reach = 16
 
   ctx.restore();
 }
+
+// ─── Escanor Cruel Sun Pixel Art Sprite Sheet Asset Loader ───
+let _escanorCruelSunSpriteImage = null;
+let _escanorCruelSunStandardCanvas = null;
+let _escanorCruelSunTheOneCanvas = null;
+let _escanorCruelSunSpriteLoading = false;
+
+/**
+ * 6-Frame Discrete Grid Pixel Art Cruel Sun Sprite Coordinates
+ * Sourced from Assets/model/Sprites/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png (1536 x 1024)
+ * 3 columns x 2 rows, each cell 512x512 with transparent background.
+ * Anchored precisely on the core solar sphere center across all 6 frames.
+ */
+export const ESCANOR_CRUEL_SUN_FRAMES = [
+  // Frame 0: Initial solar ignition & rising crown flame (BBox: 420x420, Center: 250, 280, Anchor: 169, 169)
+  { sx: 81, sy: 111, sw: 420, sh: 420, cx: 250, cy: 280, anchorX: 169, anchorY: 169 },
+  // Frame 1: Expanding curved solar prominences (BBox: 501x424, Center: 765, 280, Anchor: 250, 173)
+  { sx: 515, sy: 107, sw: 501, sh: 424, cx: 765, cy: 280, anchorX: 250, anchorY: 173 },
+  // Frame 2: Rotating clockwise solar flares (BBox: 501x451, Center: 1276, 280, Anchor: 250, 200)
+  { sx: 1026, sy: 80, sw: 501, sh: 451, cx: 1276, cy: 280, anchorX: 250, anchorY: 200 },
+  // Frame 3: Swirling spiral prominence loop (BBox: 457x493, Center: 250, 780, Anchor: 206, 250)
+  { sx: 44, sy: 530, sw: 457, sh: 493, cx: 250, cy: 780, anchorX: 206, anchorY: 250 },
+  // Frame 4: Roaring plasma vortex (BBox: 501x493, Center: 765, 780, Anchor: 250, 250)
+  { sx: 515, sy: 530, sw: 501, sh: 493, cx: 765, cy: 780, anchorX: 250, anchorY: 250 },
+  // Frame 5: Peak thermonuclear vortex (BBox: 501x493, Center: 1276, 780, Anchor: 250, 250)
+  { sx: 1026, sy: 530, sw: 501, sh: 493, cx: 1276, cy: 780, anchorX: 250, anchorY: 250 }
+];
+
+const BASE_CRUEL_SUN_RADIUS = 158.0;
+
+function _generateTheOneCruelSunCanvas(img) {
+  if (typeof document === 'undefined') return img;
+  try {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return img;
+
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = w;
+    offCanvas.height = h;
+    const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+    if (!offCtx || typeof offCtx.drawImage !== 'function' || typeof offCtx.getImageData !== 'function' || typeof offCtx.putImageData !== 'function') return img;
+
+    offCtx.drawImage(img, 0, 0);
+    const imgData = offCtx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    // Remap pixels to High Noon "The One" Solar Radiance (Blinding white core, golden corona)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const a = data[idx + 3];
+        if (a < 10) {
+          data[idx + 3] = 0;
+          continue;
+        }
+
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        const maxC = Math.max(r, g, b) / 255;
+        const minC = Math.min(r, g, b) / 255;
+        const sat = maxC > 0 ? (maxC - minC) / maxC : 0;
+        const v = maxC;
+
+        if (v >= 0.88 && sat < 0.40) {
+          data[idx] = 255;
+          data[idx + 1] = 255;
+          data[idx + 2] = 255;
+        } else if (v >= 0.65) {
+          const t = (v - 0.65) / 0.35;
+          data[idx] = 255;
+          data[idx + 1] = Math.round(240 + 15 * t);
+          data[idx + 2] = Math.round(138 + 117 * t);
+        } else if (v >= 0.35) {
+          const t = (v - 0.35) / 0.30;
+          data[idx] = Math.round(245 + 10 * t);
+          data[idx + 1] = Math.round(158 + 82 * t);
+          data[idx + 2] = Math.round(11 + 127 * t);
+        } else {
+          const t = v / 0.35;
+          data[idx] = Math.round(124 + 121 * t);
+          data[idx + 1] = Math.round(45 + 113 * t);
+          data[idx + 2] = Math.round(18 - 7 * t);
+        }
+      }
+    }
+
+    offCtx.putImageData(imgData, 0, 0);
+    return offCanvas;
+  } catch (err) {
+    console.warn('Failed to generate The One Cruel Sun canvas', err);
+    return img;
+  }
+}
+
+export function _getEscanorCruelSunSpriteImage(isTheOne = false) {
+  if (isTheOne && _escanorCruelSunTheOneCanvas) {
+    return _escanorCruelSunTheOneCanvas;
+  }
+  if (!isTheOne && _escanorCruelSunStandardCanvas) {
+    return _escanorCruelSunStandardCanvas;
+  }
+  if (_escanorCruelSunSpriteImage && _escanorCruelSunSpriteImage.complete && _escanorCruelSunSpriteImage.naturalWidth > 0) {
+    _escanorCruelSunStandardCanvas = _escanorCruelSunSpriteImage;
+    _escanorCruelSunTheOneCanvas = _generateTheOneCruelSunCanvas(_escanorCruelSunSpriteImage);
+    return isTheOne ? _escanorCruelSunTheOneCanvas : _escanorCruelSunStandardCanvas;
+  }
+  if (!_escanorCruelSunSpriteLoading && typeof Image !== 'undefined') {
+    _escanorCruelSunSpriteLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _escanorCruelSunSpriteImage = img;
+      _escanorCruelSunStandardCanvas = img;
+      _escanorCruelSunTheOneCanvas = _generateTheOneCruelSunCanvas(img);
+      _escanorCruelSunSpriteLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Escanor Cruel Sun sprite sheet at Assets/model/Sprites/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png', e);
+      _escanorCruelSunSpriteLoading = false;
+    };
+    img.src = encodeURI('Assets/model/Sprites/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png?v=1');
+    _escanorCruelSunSpriteImage = img;
+  }
+  return _escanorCruelSunSpriteImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getEscanorCruelSunSpriteImage();
+}
+
+// ─── Escanor Sun Explosion Pixel Art Sprite Sheet Asset Loader ───
+let _escanorSunExplosionSpriteImage = null;
+let _escanorSunExplosionStandardCanvas = null;
+let _escanorSunExplosionTheOneCanvas = null;
+let _escanorSunExplosionSpriteLoading = false;
+
+/**
+ * 6-Frame Discrete Grid Pixel Art Sun Explosion / Expiration Sprite Coordinates
+ * Sourced from Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png (1536 x 1024)
+ * 3 columns x 2 rows, each cell 512x512 with transparent background.
+ * Frame 0: Intact solar sphere with inner fissure fractures
+ * Frame 1: Expanding solar cracks, molten fragments detaching
+ * Frame 2: Core nuclear eruption & explosive fracture rays
+ * Frame 3: Radial needle shockwave & dispersing lava chunks
+ * Frame 4: Expanding solar ash cloud & dissipating ember fragments
+ * Frame 5: Fading stellar embers vanishing into the void
+ */
+export const ESCANOR_SUN_EXPLOSION_FRAMES = [
+  { sx: 0, sy: 0, sw: 512, sh: 512, cx: 256, cy: 288, anchorX: 256, anchorY: 288 },
+  { sx: 512, sy: 0, sw: 512, sh: 512, cx: 240, cy: 288, anchorX: 240, anchorY: 288 },
+  { sx: 1024, sy: 0, sw: 512, sh: 512, cx: 232, cy: 280, anchorX: 232, anchorY: 280 },
+  { sx: 0, sy: 512, sw: 512, sh: 512, cx: 256, cy: 240, anchorX: 256, anchorY: 240 },
+  { sx: 512, sy: 512, sw: 512, sh: 512, cx: 240, cy: 230, anchorX: 240, anchorY: 230 },
+  { sx: 1024, sy: 512, sw: 512, sh: 512, cx: 230, cy: 250, anchorX: 230, anchorY: 250 }
+];
+
+const BASE_EXPLOSION_RADIUS = 158.0;
+
+function _generateTheOneExplosionCanvas(img) {
+  if (typeof document === 'undefined') return img;
+  try {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return img;
+
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = w;
+    offCanvas.height = h;
+    const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+    if (!offCtx || typeof offCtx.drawImage !== 'function' || typeof offCtx.getImageData !== 'function' || typeof offCtx.putImageData !== 'function') return img;
+
+    offCtx.drawImage(img, 0, 0);
+    const imgData = offCtx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    // Remap pixels to High Noon "The One" Solar Radiance
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const a = data[idx + 3];
+        if (a < 10) {
+          data[idx + 3] = 0;
+          continue;
+        }
+
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        const maxC = Math.max(r, g, b) / 255;
+        const minC = Math.min(r, g, b) / 255;
+        const sat = maxC > 0 ? (maxC - minC) / maxC : 0;
+        const v = maxC;
+
+        if (v >= 0.85 && sat < 0.45) {
+          data[idx] = 255;
+          data[idx + 1] = 255;
+          data[idx + 2] = 255;
+        } else if (v >= 0.60) {
+          const t = (v - 0.60) / 0.40;
+          data[idx] = 255;
+          data[idx + 1] = Math.round(235 + 20 * t);
+          data[idx + 2] = Math.round(130 + 125 * t);
+        } else if (v >= 0.30) {
+          const t = (v - 0.30) / 0.30;
+          data[idx] = Math.round(245 + 10 * t);
+          data[idx + 1] = Math.round(158 + 77 * t);
+          data[idx + 2] = Math.round(11 + 119 * t);
+        } else {
+          const t = v / 0.30;
+          data[idx] = Math.round(124 + 121 * t);
+          data[idx + 1] = Math.round(45 + 113 * t);
+          data[idx + 2] = Math.round(18 - 7 * t);
+        }
+      }
+    }
+
+    offCtx.putImageData(imgData, 0, 0);
+    return offCanvas;
+  } catch (err) {
+    console.warn('Failed to generate The One Sun Explosion canvas', err);
+    return img;
+  }
+}
+
+export function _getEscanorSunExplosionSpriteImage(isTheOne = false) {
+  if (isTheOne && _escanorSunExplosionTheOneCanvas) {
+    return _escanorSunExplosionTheOneCanvas;
+  }
+  if (!isTheOne && _escanorSunExplosionStandardCanvas) {
+    return _escanorSunExplosionStandardCanvas;
+  }
+  if (_escanorSunExplosionSpriteImage && _escanorSunExplosionSpriteImage.complete && _escanorSunExplosionSpriteImage.naturalWidth > 0) {
+    _escanorSunExplosionStandardCanvas = _escanorSunExplosionSpriteImage;
+    _escanorSunExplosionTheOneCanvas = _generateTheOneExplosionCanvas(_escanorSunExplosionSpriteImage);
+    return isTheOne ? _escanorSunExplosionTheOneCanvas : _escanorSunExplosionStandardCanvas;
+  }
+  if (!_escanorSunExplosionSpriteLoading && typeof Image !== 'undefined') {
+    _escanorSunExplosionSpriteLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _escanorSunExplosionSpriteImage = img;
+      _escanorSunExplosionStandardCanvas = img;
+      _escanorSunExplosionTheOneCanvas = _generateTheOneExplosionCanvas(img);
+      _escanorSunExplosionSpriteLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Escanor Sun Explosion sprite sheet at Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png', e);
+      _escanorSunExplosionSpriteLoading = false;
+    };
+    img.src = encodeURI('Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png?v=1');
+    _escanorSunExplosionSpriteImage = img;
+  }
+  return _escanorSunExplosionSpriteImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getEscanorSunExplosionSpriteImage();
+}
+
+/**
+ * Procedural Discrete Integer Grid Solar Sphere Fallback
+ * Used when sprite sheet is loading or unavailable.
+ */
+export function drawProceduralPixelCruelSunSphere(ctx, cx, cy, radius, isTheOne = false, now = Date.now(), alpha = 1.0, showCorona = true) {
+  if (radius <= 0 || alpha <= 0) return;
+  const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  const snapCx = snap(cx);
+  const snapCy = snap(cy);
+  const coreR = Math.max(P * 2, snap(radius));
+  const steps = Math.ceil((coreR + P) / P);
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
+
+  if (showCorona) {
+    const haloFrame = Math.floor(currentNow / 120) % 3;
+    const haloCells = [
+      [-0.95, -0.18, 3], [-0.78, -0.62, 2], [-0.36, -1.02, 3], [0.18, -1.12, 2],
+      [0.72, -0.72, 3], [1.06, -0.18, 2], [0.98, 0.42, 3], [0.52, 0.88, 2],
+      [0.05, 1.10, 3], [-0.52, 0.92, 2], [-1.02, 0.52, 3], [-1.14, 0.05, 2]
+    ];
+    for (let i = 0; i < haloCells.length; i++) {
+      const [hx, hy, length] = haloCells[(i + haloFrame) % haloCells.length];
+      const cellSize = P * (1 + (i % 2));
+      ctx.fillStyle = isTheOne ? 'rgba(255, 255, 255, 0.34)' : 'rgba(220, 38, 38, 0.42)';
+      ctx.fillRect(
+        snapCx + snap(hx * coreR) - cellSize / 2,
+        snapCy + snap(hy * coreR) - cellSize / 2,
+        cellSize * length,
+        cellSize
+      );
+    }
+  }
+
+  const plasmaTick = Math.floor(currentNow / 80) % 4;
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const d = Math.hypot(rx, ry);
+      if (d > coreR) continue;
+
+      const px = snapCx + snap(rx);
+      const py = snapCy + snap(ry);
+      const normD = d / coreR;
+
+      if (d >= coreR - P) {
+        ctx.fillStyle = isTheOne ? '#7C2D12' : '#3B0A0A';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      const plasmaNoise = Math.sin(gx * 0.7 + gy * 0.7 + plasmaTick * 1.57);
+
+      if (normD > 0.78) {
+        if (plasmaNoise > 0.4) {
+          ctx.fillStyle = isTheOne ? '#F59E0B' : '#B91C1C';
+        } else if (plasmaNoise < -0.4) {
+          ctx.fillStyle = isTheOne ? '#FBBF24' : '#EA580C';
+        } else {
+          ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
+        }
+      } else if (normD > 0.52) {
+        if (plasmaNoise > 0.3) {
+          ctx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24';
+        } else {
+          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FDE047';
+        }
+      } else if (normD > 0.28) {
+        if (plasmaNoise > 0.2) {
+          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FDE047';
+        } else {
+          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
+        }
+      } else {
+        ctx.fillStyle = '#FFFFFF';
+      }
+
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+
+  if (showCorona && coreR >= P * 4) {
+    ctx.save();
+    ctx.translate(snapCx, snapCy);
+
+    const tongueFrame = Math.floor(currentNow / 100) % 2;
+    const tongues = [
+      [0, -1, 0.42, 2], [0.82, -0.62, 0.30, 2], [1.02, 0.18, 0.25, 1],
+      [0.54, 0.86, 0.34, 2], [-0.24, 1.04, 0.28, 1], [-0.86, 0.68, 0.38, 2],
+      [-1.02, -0.32, 0.24, 1], [-0.54, -0.88, 0.30, 2]
+    ];
+    for (let i = 0; i < tongues.length; i++) {
+      const [tx, ty, lengthRatio, width] = tongues[(i + tongueFrame) % tongues.length];
+      const distance = snap(coreR * (1.0 + lengthRatio));
+      const endX = snap(tx * distance);
+      const endY = snap(ty * distance);
+      const baseX = snap(tx * (coreR - P));
+      const baseY = snap(ty * (coreR - P));
+      const sideX = snap(-ty * P * width);
+      const sideY = snap(tx * P * width);
+
+      ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : (isTheOne ? '#FEF08A' : '#F59E0B');
+      ctx.beginPath();
+      ctx.moveTo(baseX - sideX, baseY - sideY);
+      ctx.lineTo(endX, endY);
+      ctx.lineTo(baseX + sideX, baseY + sideY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    const glintFrame = Math.floor(currentNow / 130) % 2;
+    const glintLen = snap(coreR * (0.72 + glintFrame * 0.18));
+    ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
+    for (let d = -glintLen; d <= glintLen; d += P) {
+      const taper = 1 - Math.abs(d) / glintLen;
+      const h = taper > 0.55 ? P * 2 : P;
+      ctx.fillRect(snap(d), snap(-h / 2), P, h);
+      ctx.fillRect(snap(-h / 2), snap(d), h, P);
+    }
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(snap(-P), snap(-P), P * 2, P * 2);
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
 /**
  * Draws the Authentic 2D Discrete Grid Pixel Art Cruel Sun (無慈悲な太陽) Sphere
+ * Renders the 6-frame pixel art sprite sheet animation with centered rotation flares,
+ * multi-tier solar corona bloom, and white-hot optical core glints.
+ * Adheres strictly to:
+ * - Rule 3.5: Authentic 2D Discrete Grid Rasterization Engine (P = 2.0px)
+ * - Rule 11 / Rule 2.2: Prohibition of shadowBlur CPU filters (Flat stepped pixel layers)
+ * - Rule 2.4: Canvas 2D Transform Stack Integrity (balanced save/restore)
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx - Center X coordinate
+ * @param {number} cy - Center Y coordinate
+ * @param {number} radius - Sphere core radius
+ * @param {boolean} [isTheOne=false] - Whether "The One" transformation palette is active
+ * @param {number} [now=Date.now()] - Current animation timestamp
+ * @param {number} [alpha=1.0] - Opacity multiplier
+ * @param {boolean} [showCorona=true] - Whether to render outer stepped solar prominence flares & diamond glints
+ */
+/**
+ * Renders the ambient floor / ground solar illumination wash beneath Cruel Sun.
+ * Casts a soft, radiant pool of warm golden and crimson solar lighting onto the arena floor.
+ * Matches the multi-tiered floor lighting architecture used in Zenitsu's PNG Dash.
+ * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx - Center X
+ * @param {number} cy - Center Y
+ * @param {number} radius - Sun sphere radius
+ * @param {boolean} [isTheOne=false] - Whether Escanor is in "The One" state
+ * @param {number} [alpha=1.0] - Opacity
+ * @param {boolean} [isExplosion=false] - Whether rendering during explosion / expiration
+ * @param {number} [explosionProgress=0] - Normalized explosion progress (0.0 to 1.0)
+ */
+export function drawCruelSunFloorLighting(ctx, cx, cy, radius, isTheOne = false, alpha = 1.0, isExplosion = false, explosionProgress = 0) {
+  if (!ctx || radius <= 0 || alpha <= 0.02) return;
+  const isDark = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  let floorR;
+  let intensity;
+
+  if (isExplosion) {
+    const expP = Math.max(0, Math.min(1.0, explosionProgress));
+    // Explosion expands rapidly outward during peak burst (frames 1-3), then dims (clamped to prevent full-canvas gradient stall)
+    floorR = Math.min(320, radius * (2.8 + expP * 3.2));
+    intensity = (isDark ? 0.42 : 0.30) * Math.max(0, 1.0 - Math.pow(expP, 1.3)) * (isTheOne ? 1.4 : 1.0) * alpha;
+  } else {
+    // Continuous radiant thermal pulse (clamped to prevent GPU fill-rate drop on large sun scales)
+    const pulse = Math.sin(Date.now() * 0.005) * 0.08;
+    floorR = Math.min(280, radius * (isTheOne ? 3.6 : 3.0) * (1.0 + pulse));
+    intensity = (isDark ? 0.32 : 0.22) * (isTheOne ? 1.35 : 1.0) * alpha;
+  }
+
+  if (floorR > 2 && intensity > 0.01) {
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, floorR);
+    if (isTheOne) {
+      glow.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1.0, intensity * 1.0)})`);
+      glow.addColorStop(0.25, `rgba(254, 240, 138, ${intensity * 0.85})`);
+      glow.addColorStop(0.55, `rgba(251, 191, 36, ${intensity * 0.45})`);
+      glow.addColorStop(0.82, `rgba(217, 119, 6, ${intensity * 0.18})`);
+      glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else {
+      glow.addColorStop(0, `rgba(255, 250, 220, ${Math.min(1.0, intensity * 1.0)})`);
+      glow.addColorStop(0.28, `rgba(254, 240, 138, ${intensity * 0.75})`);
+      glow.addColorStop(0.60, `rgba(245, 158, 11, ${intensity * 0.40})`);
+      glow.addColorStop(0.85, `rgba(220, 38, 38, ${intensity * 0.16})`);
+      glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    }
+
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, floorR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders directional solar bloom & rim lighting on entities near Cruel Sun.
+ * Casts a warm golden solar specular highlight on fighters/illusions facing the star.
+ * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} sunX - Sun world X
+ * @param {number} sunY - Sun world Y
+ * @param {number} sunRadius - Sun sphere radius
+ * @param {boolean} [isTheOne=false] - Whether Escanor is in "The One" state
+ * @param {number} [alpha=1.0] - Opacity
+ */
+export function drawCruelSunProximityEntityLighting(ctx, sunX, sunY, sunRadius, isTheOne = false, alpha = 1.0) {
+  if (!ctx || sunRadius <= 0 || alpha <= 0.05) return;
+  const entities = [];
+  if (typeof state !== 'undefined') {
+    if (Array.isArray(state.fighters)) entities.push(...state.fighters);
+    if (Array.isArray(state.illusions)) entities.push(...state.illusions);
+  }
+  if (entities.length === 0) return;
+
+  const lightRadius = Math.min(320, sunRadius * 3.2);
+  const lightRadiusSq = lightRadius * lightRadius;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (let i = 0; i < entities.length; i++) {
+    const ent = entities[i];
+    if (!ent || ent.hp <= 0 || (ent.dead && !ent._isWinnerReveal)) continue;
+    const dx = sunX - ent.x;
+    const dy = sunY - (ent.y - (ent.z || 0));
+    const distSq = dx * dx + dy * dy;
+    if (distSq > lightRadiusSq || distSq <= 4) continue;
+
+    const dist = Math.sqrt(distSq);
+    const norm = 1.0 - (dist / lightRadius);
+    const rimIntensity = Math.pow(norm, 1.3) * (isTheOne ? 0.45 : 0.32) * alpha;
+    if (rimIntensity <= 0.02) continue;
+
+    const entR = ent.r || 25;
+    const angleToSun = Math.atan2(dy, dx);
+
+    ctx.save();
+    ctx.translate(ent.x, ent.y - (ent.z || 0));
+
+    // Directional Solar Rim Arc
+    ctx.strokeStyle = isTheOne
+      ? `rgba(254, 240, 138, ${rimIntensity * 0.90})`
+      : `rgba(245, 158, 11, ${rimIntensity * 0.80})`;
+    ctx.lineWidth = Math.max(1.5, entR * 0.12);
+    ctx.beginPath();
+    ctx.arc(0, 0, entR * 1.05, angleToSun - Math.PI * 0.35, angleToSun + Math.PI * 0.35);
+    ctx.stroke();
+
+    // Secondary White-Hot Glint on leading edge
+    ctx.strokeStyle = `rgba(255, 255, 255, ${rimIntensity * 0.70})`;
+    ctx.lineWidth = Math.max(1.0, entR * 0.06);
+    ctx.beginPath();
+    ctx.arc(0, 0, entR * 1.05, angleToSun - Math.PI * 0.15, angleToSun + Math.PI * 0.15);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Authentic 2D Discrete Grid Pixel Art Cruel Sun (無慈悲な太陽) Sphere
+ * Renders the 6-frame pixel art sprite sheet animation with centered rotation flares,
+ * multi-tier solar corona bloom (multi-sample offset aura in lighter mode), and white-hot optical core glints.
  * Adheres strictly to:
  * - Rule 3.5: Authentic 2D Discrete Grid Rasterization Engine (P = 2.0px)
  * - Rule 11 / Rule 2.2: Prohibition of shadowBlur CPU filters (Flat stepped pixel layers)
@@ -774,223 +1324,343 @@ export function drawDivineSwordEscanorBlade(ctx, x, y, angle, r = 28, reach = 16
 export function drawPixelCruelSunSphere(ctx, cx, cy, radius, isTheOne = false, now = Date.now(), alpha = 1.0, showCorona = true) {
   if (radius <= 0 || alpha <= 0) return;
   const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
-  const P = 2.0; // 2.0px authentic discrete pixel grid unit
+  const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
   const snapCx = snap(cx);
   const snapCy = snap(cy);
-  const coreR = Math.max(P * 2, snap(radius));
-  const steps = Math.ceil((coreR + P) / P);
+  const spriteImg = _getEscanorCruelSunSpriteImage(isTheOne);
 
+  if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
+    const frameIdx = Math.floor(currentNow / 80) % ESCANOR_CRUEL_SUN_FRAMES.length;
+    const frame = ESCANOR_CRUEL_SUN_FRAMES[frameIdx] || ESCANOR_CRUEL_SUN_FRAMES[0];
+    const scale = radius / BASE_CRUEL_SUN_RADIUS;
+    const drawW = frame.sw * scale;
+    const drawH = frame.sh * scale;
+    const drawX = -frame.anchorX * scale;
+    const drawY = -frame.anchorY * scale;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(snapCx, snapCy);
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
+
+    // ── TIER 1 (BACK LAYER): ADDITIVE SOLAR CORONA BLOOM (Aura glowing around the sides/perimeter) ──
+    if (showCorona) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Outer Solar Flare Bloom around perimeter (4 cardinal/diagonal samples @ radius * 0.16)
+      const outerRadius = Math.max(3.0, radius * 0.16);
+      const outerAlpha = (isTheOne ? 0.24 : 0.18) * alpha;
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2;
+        const ox = Math.cos(ang) * outerRadius;
+        const oy = Math.sin(ang) * outerRadius;
+        ctx.globalAlpha = outerAlpha;
+        ctx.drawImage(
+          spriteImg,
+          frame.sx, frame.sy, frame.sw, frame.sh,
+          drawX + ox, drawY + oy, drawW, drawH
+        );
+      }
+
+      // Tight Solar Flare Rim (4 diagonal samples @ radius * 0.08)
+      const innerRadius = Math.max(1.5, outerRadius * 0.48);
+      const innerAlpha = (isTheOne ? 0.32 : 0.25) * alpha;
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2 + (Math.PI / 4);
+        const ox = Math.cos(ang) * innerRadius;
+        const oy = Math.sin(ang) * innerRadius;
+        ctx.globalAlpha = innerAlpha;
+        ctx.drawImage(
+          spriteImg,
+          frame.sx, frame.sy, frame.sw, frame.sh,
+          drawX + ox, drawY + oy, drawW, drawH
+        );
+      }
+      ctx.restore();
+    }
+
+    // ── TIER 2 (FOREGROUND LAYER): CRISP UPRIGHT PIXEL ART SPRITE PASS (Solid source-over) ──
+    // Drawn on top of the bloom aura so the sun core stays 100% crisp and detailed while glowing around the sides
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(
+      spriteImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      drawX, drawY, drawW, drawH
+    );
+    ctx.restore();
+
+    // ── TIER 3: WHITE-HOT OPTICAL CORE SPARKLE (Upright lens cross-glint) ──
+    if (radius >= 14) {
+      ctx.save();
+      ctx.fillStyle = '#FFFFFF';
+      const glintTick = Math.floor(currentNow / 110) % 2;
+      const glintSize = snap(Math.max(P, radius * 0.12 * (glintTick ? 1.25 : 0.85)));
+      ctx.fillRect(-glintSize, -P / 2, glintSize * 2, P);
+      ctx.fillRect(-P / 2, -glintSize, P, glintSize * 2);
+      ctx.restore();
+    }
+
+    ctx.restore();
+    return;
+  }
+
+  // Fallback: Procedural Discrete Integer Grid Solar Sphere
+  drawProceduralPixelCruelSunSphere(ctx, snapCx, snapCy, radius, isTheOne, currentNow, alpha, showCorona);
+}
+
+/**
+ * Procedural Fallback for Sun Expiration / Explosion
+ * Used when explosion sprite sheet is loading or unavailable.
+ */
+export function drawProceduralPixelCruelSunExplosion(ctx, snapCx, snapCy, radius, frameIdx = 0, isTheOne = false, alpha = 1.0) {
+  if (radius <= 0 || alpha <= 0) return;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
 
-  // 1. Concentric Stepped Pixel Heat Corona Rings (Rule 11 Compliant: Flat stepped pixel fills)
-  if (showCorona) {
-    // Outer Heat Distortion Corona (Stepped Ring)
-    const coronaOuterR = snap(coreR * 1.60);
-    const coronaSteps = Math.ceil((coronaOuterR + P) / P);
-    ctx.fillStyle = isTheOne ? 'rgba(254, 240, 138, 0.16)' : 'rgba(239, 68, 68, 0.12)';
-    for (let gy = -coronaSteps; gy <= coronaSteps; gy += 2) {
-      for (let gx = -coronaSteps; gx <= coronaSteps; gx += 2) {
-        const d = Math.hypot(gx * P, gy * P);
-        if (d > coreR * 1.15 && d <= coronaOuterR) {
+  const progress = Math.max(0, Math.min(1.0, frameIdx / 5));
+  const expandR = snap(radius * (1.0 + progress * 0.85));
+  const steps = Math.ceil(expandR / P);
+
+  for (let gy = -steps; gy <= steps; gy += 2) {
+    for (let gx = -steps; gx <= steps; gx += 2) {
+      const d = Math.hypot(gx * P, gy * P);
+      if (d > expandR) continue;
+      const normD = d / expandR;
+      const angle = Math.atan2(gy, gx);
+      const shatterNoise = Math.sin(angle * 6 + frameIdx * 1.8);
+
+      if (frameIdx <= 1) {
+        if (normD > 0.80) {
+          ctx.fillStyle = isTheOne ? '#FEF08A' : '#DC2626';
+        } else if (normD > 0.40) {
+          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#F59E0B';
+        } else {
+          ctx.fillStyle = '#FFFFFF';
+        }
+        ctx.fillRect(snapCx + gx * P, snapCy + gy * P, P * 2, P * 2);
+      } else if (frameIdx <= 3) {
+        if (shatterNoise > -0.2 && normD > 0.3) {
+          ctx.fillStyle = (normD > 0.75) ? (isTheOne ? '#F59E0B' : '#DC2626') : (isTheOne ? '#FFFFFF' : '#FEF08A');
           ctx.fillRect(snapCx + gx * P, snapCy + gy * P, P * 2, P * 2);
-        }
-      }
-    }
-
-    // Mid Amber Corona Ring
-    const coronaMidR = snap(coreR * 1.30);
-    const midSteps = Math.ceil((coronaMidR + P) / P);
-    ctx.fillStyle = isTheOne ? 'rgba(255, 255, 255, 0.22)' : 'rgba(245, 158, 11, 0.20)';
-    for (let gy = -midSteps; gy <= midSteps; gy += 2) {
-      for (let gx = -midSteps; gx <= midSteps; gx += 2) {
-        const d = Math.hypot(gx * P, gy * P);
-        if (d > coreR && d <= coronaMidR) {
-          ctx.fillRect(snapCx + gx * P, snapCy + gy * P, P * 2, P * 2);
-        }
-      }
-    }
-  }
-
-  // 2. Discrete Integer Grid Rasterization for the Main Solar Sphere
-  // 4-frame retro boiling plasma animation cycle (80ms per frame)
-  const plasmaTick = Math.floor(currentNow / 80) % 4;
-
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const rx = gx * P;
-      const ry = gy * P;
-      const d = Math.hypot(rx, ry);
-      if (d > coreR) continue;
-
-      const px = snapCx + snap(rx);
-      const py = snapCy + snap(ry);
-      const normD = d / coreR; // 0.0 at core center, 1.0 at outer rim
-
-      // Outer Stepped Ink Shell / Solar Burning Rim
-      if (d >= coreR - P) {
-        ctx.fillStyle = isTheOne ? '#78350F' : '#451A03';
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
-
-      // Boiling Nuclear Plasma Noise
-      const plasmaNoise = Math.sin(gx * 0.7 + gy * 0.7 + plasmaTick * 1.57);
-
-      if (normD > 0.78) {
-        // Outer Corona / Solar Rim: Crimson Flare or Deep Amber
-        if (plasmaNoise > 0.4) {
-          ctx.fillStyle = isTheOne ? '#F59E0B' : '#DC2626'; // Red-hot prominence cell
-        } else if (plasmaNoise < -0.4) {
-          ctx.fillStyle = isTheOne ? '#FBBF24' : '#EA580C';
-        } else {
-          ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
-        }
-      } else if (normD > 0.52) {
-        // Mid Mantle: Brilliant Holy Gold / Solar Flare
-        if (plasmaNoise > 0.3) {
-          ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
-        } else {
-          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FBBF24';
-        }
-      } else if (normD > 0.28) {
-        // Inner Photosphere: Incandescent Light Gold / Bright Lemon
-        if (plasmaNoise > 0.2) {
-          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FDE047';
-        } else {
-          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
         }
       } else {
-        // White-Hot Incandescent Core
-        ctx.fillStyle = '#FFFFFF';
+        if (shatterNoise > 0.3 && normD > 0.5) {
+          ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
+          ctx.fillRect(snapCx + gx * P, snapCy + gy * P, P, P);
+        }
       }
-
-      ctx.fillRect(px, py, P, P);
     }
   }
 
-  // 3. Discrete Stepped Coronal Flares & Prominences (Arcade Stepped Solar Teeth)
-  if (showCorona && coreR >= P * 4) {
-    ctx.save();
-    ctx.translate(snapCx, snapCy);
-
-    // Primary Clockwise Rotating Flare Teeth (8 discrete 45° steps)
-    const rotFrame = Math.floor(currentNow / 90) % 8;
-    const rotAngle = (rotFrame * Math.PI) / 4;
-    ctx.rotate(rotAngle);
-
-    const numTeeth = 8;
-    const toothLen = snap(coreR * 0.35);
-    const toothBaseW = snap(P * 2);
-
-    for (let t = 0; t < numTeeth; t++) {
-      ctx.rotate((Math.PI * 2) / numTeeth);
-      // Draw 3-tiered discrete stepped pixel tooth pointing outward
-      const baseDist = snap(coreR - P);
-      ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
-      ctx.fillRect(snap(-toothBaseW / 2), baseDist, toothBaseW, snap(toothLen * 0.5));
-      ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
-      ctx.fillRect(snap(-P / 2), baseDist + snap(toothLen * 0.5), P, snap(toothLen * 0.5));
-    }
-    ctx.restore();
-
-    // 4. Retro 4-Point Arcade Diamond Starburst Glint (Optical Diffraction)
-    ctx.save();
-    ctx.translate(snapCx, snapCy);
-    const glintFrame = Math.floor(currentNow / 110) % 2;
-    const glintLen = snap(coreR * (1.6 + glintFrame * 0.25));
-    const glintThick = snap(P * 2);
-
-    // Horizontal Diamond Spike
-    ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A';
-    for (let d = -glintLen; d <= glintLen; d += P) {
-      const pRatio = 1.0 - Math.abs(d) / glintLen;
-      const h = (pRatio > 0.6) ? glintThick : P;
-      ctx.fillRect(snap(d), snap(-h / 2), P, h);
-    }
-
-    // Vertical Diamond Spike
-    for (let d = -glintLen; d <= glintLen; d += P) {
-      const pRatio = 1.0 - Math.abs(d) / glintLen;
-      const w = (pRatio > 0.6) ? glintThick : P;
-      ctx.fillRect(snap(-w / 2), snap(d), w, P);
-    }
-
-    // White-Hot Center Glint
+  // White core flash during peak burst (frames 1-3)
+  if (frameIdx >= 1 && frameIdx <= 3) {
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(snap(-P), snap(-P), P * 2, P * 2);
-
-    ctx.restore();
+    const coreFlash = snap(radius * 0.35 * (1 - (frameIdx - 1) / 3));
+    ctx.fillRect(snapCx - coreFlash, snapCy - P / 2, coreFlash * 2, P);
+    ctx.fillRect(snapCx - P / 2, snapCy - coreFlash, P, coreFlash * 2);
   }
 
   ctx.restore();
 }
 
 /**
+ * Draws the Sun Expiration / Explosion Animation in Authentic Pixel Art Style
+ * Uses 6-frame pixel art sprite sheet from Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png
+ * Features multi-tiered additive solar corona bloom and nuclear core radiance.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
+ * @param {number} cx - Center X coordinate in world space
+ * @param {number} cy - Center Y coordinate in world space
+ * @param {number} radius - Base radius of Cruel Sun
+ * @param {number} progressOrFrame - Normalized progress (0.0 to 1.0) or discrete frame index (0..5)
+ * @param {boolean} [isTheOne=false] - Whether High Noon "The One" palette is active
+ * @param {number} [alpha=1.0] - Opacity multiplier
+ */
+export function drawPixelCruelSunExplosion(ctx, cx, cy, radius, progressOrFrame = 0, isTheOne = false, alpha = 1.0) {
+  if (radius <= 0 || alpha <= 0) return;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const snapCx = snap(cx);
+  const snapCy = snap(cy);
+
+  let frameIdx = 0;
+  if (typeof progressOrFrame === 'number') {
+    if (progressOrFrame >= 0 && progressOrFrame <= 1.0) {
+      frameIdx = Math.min(5, Math.floor(progressOrFrame * 6));
+    } else {
+      frameIdx = Math.max(0, Math.min(5, Math.floor(progressOrFrame)));
+    }
+  }
+
+  const spriteImg = _getEscanorSunExplosionSpriteImage(isTheOne);
+  if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
+    const frame = ESCANOR_SUN_EXPLOSION_FRAMES[frameIdx] || ESCANOR_SUN_EXPLOSION_FRAMES[0];
+    const scale = radius / BASE_EXPLOSION_RADIUS;
+    const drawW = frame.sw * scale;
+    const drawH = frame.sh * scale;
+    const drawX = -frame.anchorX * scale;
+    const drawY = -frame.anchorY * scale;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(snapCx, snapCy);
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
+
+    // ── TIER 1 (BACK LAYER): ADDITIVE SOLAR EXPLOSION CORONA BLOOM (Aura glowing around the sides of fragments) ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const bloomScale = frameIdx < 3 ? 1.0 : Math.max(0, 1.0 - (frameIdx - 3) / 3);
+
+    // Outer Blast Bloom (4 radial samples @ radius * 0.20)
+    const outerRadius = Math.max(3.0, radius * 0.20 * (1.0 + frameIdx * 0.12));
+    const outerAlpha = (isTheOne ? 0.24 : 0.18) * alpha * bloomScale;
+    if (outerAlpha > 0.01) {
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2;
+        const ox = Math.cos(ang) * outerRadius;
+        const oy = Math.sin(ang) * outerRadius;
+        ctx.globalAlpha = outerAlpha;
+        ctx.drawImage(
+          spriteImg,
+          frame.sx, frame.sy, frame.sw, frame.sh,
+          drawX + ox, drawY + oy, drawW, drawH
+        );
+      }
+    }
+
+    // Tight Blast Rim (4 samples @ radius * 0.09)
+    const innerRadius = Math.max(1.5, outerRadius * 0.45);
+    const innerAlpha = (isTheOne ? 0.32 : 0.24) * alpha * bloomScale;
+    if (innerAlpha > 0.01) {
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2 + (Math.PI / 4);
+        const ox = Math.cos(ang) * innerRadius;
+        const oy = Math.sin(ang) * innerRadius;
+        ctx.globalAlpha = innerAlpha;
+        ctx.drawImage(
+          spriteImg,
+          frame.sx, frame.sy, frame.sw, frame.sh,
+          drawX + ox, drawY + oy, drawW, drawH
+        );
+      }
+    }
+    ctx.restore();
+
+    // ── TIER 2 (FOREGROUND LAYER): CRISP UPRIGHT PIXEL ART EXPLOSION FRAME (Solid source-over) ──
+    // Drawn on top of the bloom aura so fragments, fissures, and ash stay 100% crisp and distinct
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(
+      spriteImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      drawX, drawY, drawW, drawH
+    );
+    ctx.restore();
+
+    ctx.restore();
+    return;
+  }
+
+  // Fallback: Procedural Discrete Integer Grid Solar Explosion
+  drawProceduralPixelCruelSunExplosion(ctx, snapCx, snapCy, radius, frameIdx, isTheOne, alpha);
+}
+
+/**
  * Draws the Cruel Sun (無慈悲な太陽) Projectile Orb in Authentic Pixel Art Style
- * - Renders discrete clustered pixel flame trail along flight history
- * - Multi-tiered retro discrete pixel art solar sphere
- * - Stepped coronal teeth, 4-point pixel diamond flares & boiling nuclear plasma
+ * - Renders Layer 0 ambient floor solar illumination wash & proximity entity rim lighting
+ * - Renders high-performance O(1) multi-tier discrete pixel flame nodes along flight history (60 FPS at any scale!)
+ * - 6-frame animated spinning pixel art Cruel Sun sprite sheet orb with multi-tiered bloom during active flight
+ * - 6-frame animated pixel art Sun Explosion sprite sheet with expanding floor wash when about to expire (final 30 frames or detonating)
  */
 export function drawCruelSunOrb(ctx, x, y, r = 48, now = Date.now(), sun = null) {
   const currentNow = (typeof now === 'number' && !Number.isNaN(now)) ? now : Date.now();
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
+  const isTheOne = Boolean(sun && sun.owner && sun.owner.isTheOneActive);
 
-  // 1. Draw Discrete Pixel Art Fire Trail History
-  if (sun && sun.history && sun.history.length > 1) {
+  // Check if Cruel Sun is about to expire (final 30 frames of life or marked expiring)
+  const isExpiring = Boolean(sun && (sun.isExpiring || (typeof sun.life === 'number' && sun.life <= 30)));
+
+  // ── LAYER 0: AMBIENT FLOOR / GROUND SOLAR ILLUMINATION WASH & ENTITY RIM LIGHTING ──
+  if (isExpiring) {
+    let expireP = 0.0;
+    if (sun && typeof sun.life === 'number') {
+      expireP = Math.max(0, Math.min(1.0, 1.0 - Math.max(0, sun.life) / 30));
+    }
+    drawCruelSunFloorLighting(ctx, x, y, snap(r), isTheOne, 1.0, true, expireP);
+    drawCruelSunProximityEntityLighting(ctx, x, y, snap(r), isTheOne, 1.0 - expireP * 0.5);
+  } else {
+    drawCruelSunFloorLighting(ctx, x, y, snap(r), isTheOne, 1.0, false, 0);
+    drawCruelSunProximityEntityLighting(ctx, x, y, snap(r), isTheOne, 1.0);
+  }
+
+  // 1. Draw High-Performance O(1) Discrete Pixel Art Fire Trail (Zero O(N*r^2) nested loop stalls!)
+  if (!isExpiring && sun && sun.history && sun.history.length > 1) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     const len = sun.history.length;
-    for (let k = 0; k < len; k++) {
+    // Step by 2 along history to keep trail clean and lightweight
+    for (let k = 0; k < len; k += 2) {
       const pt = sun.history[k];
       const trailRatio = (k + 1) / len; // 0 (oldest) to 1.0 (newest)
-      const trailR = snap(r * (0.25 + 0.55 * trailRatio));
-      const alpha = 0.15 + 0.60 * trailRatio;
-
-      ctx.globalAlpha = alpha;
-      const tSteps = Math.ceil(trailR / P);
+      const baseNodeR = snap(r * (0.20 + 0.45 * trailRatio));
+      const alpha = (0.12 + 0.55 * trailRatio);
       const snapPtX = snap(pt.x);
       const snapPtY = snap(pt.y);
 
-      // Clustered discrete pixel blocks along trail
-      for (let gy = -tSteps; gy <= tSteps; gy += 2) {
-        for (let gx = -tSteps; gx <= tSteps; gx += 2) {
-          const d = Math.hypot(gx * P, gy * P);
-          if (d > trailR) continue;
+      ctx.globalAlpha = alpha;
 
-          const normD = d / trailR;
-          if (normD > 0.70) {
-            ctx.fillStyle = '#DC2626'; // Deep ember red
-          } else if (normD > 0.40) {
-            ctx.fillStyle = '#F59E0B'; // Solar flame amber
-          } else {
-            ctx.fillStyle = '#FEF08A'; // Bright core
-          }
-          ctx.fillRect(snapPtX + gx * P, snapPtY + gy * P, P * 2, P * 2);
-        }
-      }
+      // Tier 1: Outer Ember Diamond Outline (Deep Crimson Red)
+      const outR = Math.max(P * 2, snap(baseNodeR));
+      ctx.fillStyle = isTheOne ? '#B45309' : '#DC2626';
+      ctx.fillRect(snapPtX - outR, snapPtY - P, outR * 2, P * 2);
+      ctx.fillRect(snapPtX - P, snapPtY - outR, P * 2, outR * 2);
+      ctx.fillRect(snapPtX - snap(outR * 0.65), snapPtY - snap(outR * 0.65), snap(outR * 1.3), snap(outR * 1.3));
+
+      // Tier 2: Mid Plasma Solar Core (Fiery Amber)
+      const midR = Math.max(P, snap(baseNodeR * 0.58));
+      ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
+      ctx.fillRect(snapPtX - midR, snapPtY - P / 2, midR * 2, P);
+      ctx.fillRect(snapPtX - P / 2, snapPtY - midR, P, midR * 2);
+      ctx.fillRect(snapPtX - snap(midR * 0.6), snapPtY - snap(midR * 0.6), snap(midR * 1.2), snap(midR * 1.2));
+
+      // Tier 3: Nuclear White-Hot Core Pixel
+      const coreR = Math.max(P, snap(baseNodeR * 0.25));
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(snapPtX - coreR, snapPtY - coreR, coreR * 2, coreR * 2);
+
+      // Trailing upward drift spark mote
+      const sparkDriftY = snap((1.0 - trailRatio) * 6);
+      const sparkDriftX = snap(Math.sin(k * 1.4) * 4);
+      ctx.fillStyle = (k % 4 === 0) ? '#FFFFFF' : (isTheOne ? '#FEF08A' : '#FBBF24');
+      ctx.fillRect(snapPtX + sparkDriftX, snapPtY - sparkDriftY, P, P);
     }
     ctx.restore();
   }
 
-  // 2. Dynamic Solar Radius Pulse (stepped on integer pixel grid)
-  const pulseFrames = Math.floor(currentNow / 100) % 4;
-  const pulse = (pulseFrames === 1 || pulseFrames === 2) ? P * 1.5 : 0;
-  const coreR = Math.max(12, snap(r + pulse));
-
-  // 3. Draw Main Pixel Cruel Sun Sphere with Corona & Lens Glints
-  const isTheOne = Boolean(sun && sun.owner && sun.owner.isTheOneActive);
-  drawPixelCruelSunSphere(ctx, x, y, coreR, isTheOne, currentNow, 1.0, true);
+  // 2. Draw Main Cruel Sun Sphere (Flight Sprite) or Sun Explosion Animation (Expiration Sprite)
+  if (isExpiring) {
+    let expireP = 0.0;
+    if (sun && typeof sun.life === 'number') {
+      expireP = Math.max(0, Math.min(1.0, 1.0 - Math.max(0, sun.life) / 30));
+    }
+    drawPixelCruelSunExplosion(ctx, x, y, snap(r), expireP, isTheOne, 1.0);
+  } else {
+    drawPixelCruelSunSphere(ctx, x, y, snap(r), isTheOne, currentNow, 1.0, true);
+  }
 }
 
 /**
  * Draws the Expanding Cruel Sun (無慈悲な太陽) Activation Animation in Authentic Pixel Art Style
  * - Manifests steadily above Escanor's raised index finger
- * - Expands from a tiny 4-frame retro arcade spark to full roaring pixel star
+ * - Casts ambient floor lighting & solar proximity rim highlights
+ * - Expands from a tiny 4-frame retro arcade spark to full roaring animated pixel star
  * - Features discrete stepped boiling plasma, optical pixel cross-glints, and rising retro embers
  */
 export function drawCruelSunChargingExpansion(ctx, x, y, expandProgress = 0, maxRadius = 22, isTheOne = false, now = Date.now()) {
@@ -1006,6 +1676,12 @@ export function drawCruelSunChargingExpansion(ctx, x, y, expandProgress = 0, max
     : 0.15 + 0.85 * Math.pow((p - 0.20) / 0.80, 1.25);
 
   const currentR = Math.max(P * 2, snap(ease * maxRadius));
+
+  // Cast ambient floor lighting & proximity entity rim lighting while charging above finger
+  if (p >= 0.15) {
+    drawCruelSunFloorLighting(ctx, x, y, currentR, isTheOne, p * 0.85, false, 0);
+    drawCruelSunProximityEntityLighting(ctx, x, y, currentR, isTheOne, p * 0.75);
+  }
 
   // 2. Tiny Early Ignition Phase (p < 0.15: 4-frame retro arcade spark)
   if (p < 0.15) {
@@ -1042,7 +1718,7 @@ export function drawCruelSunChargingExpansion(ctx, x, y, expandProgress = 0, max
     return;
   }
 
-  // 3. Expanding Pixel Solar Sphere
+  // 3. Expanding Animated Pixel Solar Sphere
   drawPixelCruelSunSphere(ctx, x, y, currentR, isTheOne, currentNow, 1.0, p >= 0.35);
 
   // 4. Procedural Ascending Pixel Ember Motes (Thermal updraft sparkles)
@@ -1105,4 +1781,267 @@ export function drawPrideFlareShockwave(ctx, x, y, currentRadius, maxRadius, alp
   }
 
   ctx.restore();
+}
+
+// ─── Cruel Sun First-Collision Hit Impact VFX Pipeline ───
+const MAX_CRUEL_SUN_IMPACTS = 24;
+const _cruelSunImpactPool = [];
+
+for (let i = 0; i < MAX_CRUEL_SUN_IMPACTS; i++) {
+  const particles = [];
+  for (let j = 0; j < 10; j++) {
+    particles.push({ x: 0, y: 0, vx: 0, vy: 0, size: 2, color: '#FFFFFF' });
+  }
+  _cruelSunImpactPool.push({
+    active: false,
+    x: 0,
+    y: 0,
+    hitAngle: 0,
+    isTheOne: false,
+    frame: 0,
+    maxFrames: 18,
+    particles
+  });
+}
+
+/**
+ * Spawns an authentic anime Cruel Sun first-collision solar burst hit effect.
+ * @param {number} x Collision contact X
+ * @param {number} y Collision contact Y
+ * @param {number} [hitAngle=0] Incoming hit angle from sun center to target
+ * @param {boolean} [isTheOne=false] Whether Escanor is in "The One" state
+ */
+export function spawnCruelSunHitImpact(x, y, hitAngle = 0, isTheOne = false) {
+  let impact = _cruelSunImpactPool.find(imp => !imp.active);
+  if (!impact) {
+    impact = _cruelSunImpactPool[0];
+  }
+  impact.active = true;
+  impact.x = x;
+  impact.y = y;
+  impact.hitAngle = hitAngle;
+  impact.isTheOne = Boolean(isTheOne);
+  impact.frame = 0;
+  impact.maxFrames = 18;
+
+  for (let i = 0; i < impact.particles.length; i++) {
+    const p = impact.particles[i];
+    p.x = 0;
+    p.y = 0;
+    const spread = (Math.random() - 0.5) * Math.PI * 1.3;
+    const ang = hitAngle + spread;
+    const spd = 3.0 + Math.random() * 6.0;
+    p.vx = Math.cos(ang) * spd;
+    p.vy = Math.sin(ang) * spd;
+    p.size = (i % 3 === 0) ? 4.0 : 2.0;
+    p.color = (i % 2 === 0) ? '#FFFFFF' : (isTheOne ? '#FEF08A' : '#F59E0B');
+  }
+}
+
+/**
+ * Updates all active Cruel Sun hit impact particles.
+ */
+export function updateCruelSunHitImpacts() {
+  for (let i = 0; i < _cruelSunImpactPool.length; i++) {
+    const imp = _cruelSunImpactPool[i];
+    if (!imp.active) continue;
+    imp.frame++;
+    if (imp.frame >= imp.maxFrames) {
+      imp.active = false;
+      continue;
+    }
+    for (let j = 0; j < imp.particles.length; j++) {
+      const p = imp.particles[j];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.88;
+      p.vy *= 0.88;
+    }
+  }
+}
+
+/**
+ * Draws active Cruel Sun first-collision solar burst hit effects in Discrete Pixel Art Style.
+ * Adheres strictly to:
+ * - Rule 3.5: Authentic 2D Discrete Grid Unit (P = 2.0px)
+ * - Rule 11 / Rule 2.2: Prohibition of shadowBlur (stepped pixel layers & lighter blend modes)
+ * - Rule 16: Manga Speed Line Standard (4-point filled needle polygons)
+ * - Rule 2.4: Canvas 2D Transform Stack Integrity (balanced save/restore)
+ * @param {CanvasRenderingContext2D} ctx
+ */
+export function drawCruelSunHitImpacts(ctx) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  for (let i = 0; i < _cruelSunImpactPool.length; i++) {
+    const imp = _cruelSunImpactPool[i];
+    if (!imp.active) continue;
+
+    const progress = imp.frame / imp.maxFrames;
+    const invP = 1.0 - progress;
+    const snapX = snap(imp.x);
+    const snapY = snap(imp.y);
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(snapX, snapY);
+
+    // 1. Concentric Expanding Discrete Pixel Shockwave Rings
+    const ringR = snap(progress * 52.0);
+    const ringSteps = Math.ceil((ringR + P) / P);
+
+    for (let gy = -ringSteps; gy <= ringSteps; gy += 2) {
+      for (let gx = -ringSteps; gx <= ringSteps; gx += 2) {
+        const d = Math.hypot(gx * P, gy * P);
+        if (d > ringR || d < ringR - P * 3) continue;
+
+        ctx.globalAlpha = Math.max(0, invP * 0.85);
+        if (d >= ringR - P) {
+          ctx.fillStyle = imp.isTheOne ? '#FEF08A' : '#DC2626';
+        } else if (d >= ringR - P * 2) {
+          ctx.fillStyle = imp.isTheOne ? '#FFFFFF' : '#F59E0B';
+        } else {
+          ctx.fillStyle = '#FFFFFF';
+        }
+        ctx.fillRect(gx * P, gy * P, P * 2, P * 2);
+      }
+    }
+
+    // 2. Radial Solar Prominence Spikes (Rule 16: Manga 4-Point Filled Needles)
+    const spikeCount = 6;
+    for (let s = 0; s < spikeCount; s++) {
+      const sAngle = imp.hitAngle + (s - (spikeCount - 1) / 2) * 0.45;
+      const spikeLen = snap((28 + (s % 2) * 16) * Math.sin(progress * Math.PI));
+      const spikeThick = snap(Math.max(P, P * 2 * invP));
+      if (spikeLen <= 0) continue;
+
+      const cosA = Math.cos(sAngle);
+      const sinA = Math.sin(sAngle);
+      const perpX = snap(-sinA * spikeThick);
+      const perpY = snap(cosA * spikeThick);
+      const midX = snap(cosA * (spikeLen * 0.45));
+      const midY = snap(sinA * (spikeLen * 0.45));
+      const tipX = snap(cosA * spikeLen);
+      const tipY = snap(sinA * spikeLen);
+
+      ctx.globalAlpha = Math.max(0, invP * 0.95);
+      ctx.fillStyle = (s % 2 === 0) ? '#FFFFFF' : (imp.isTheOne ? '#FEF08A' : '#F59E0B');
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(midX + perpX, midY + perpY);
+      ctx.lineTo(tipX, tipY);
+      ctx.lineTo(midX - perpX, midY - perpY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 3. Central Solar Optical Diamond Flare (Peak at early frames)
+    if (progress < 0.50) {
+      const flashP = progress / 0.50;
+      const flashSize = snap(Math.sin(flashP * Math.PI) * 18);
+      if (flashSize > 0) {
+        ctx.globalAlpha = Math.sin(flashP * Math.PI);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(-flashSize, -P / 2, flashSize * 2, P);
+        ctx.fillRect(-P / 2, -flashSize, P, flashSize * 2);
+        ctx.fillRect(-flashSize / 2, -flashSize / 2, flashSize, flashSize);
+      }
+    }
+
+    // 4. Flying Solar Pixel Ember Shards
+    ctx.globalAlpha = Math.max(0, invP * 0.90);
+    for (let j = 0; j < imp.particles.length; j++) {
+      const pt = imp.particles[j];
+      ctx.fillStyle = pt.color;
+      ctx.fillRect(snap(pt.x), snap(pt.y), pt.size, pt.size);
+    }
+
+    ctx.restore();
+  }
+}
+
+/**
+ * Clears all active Cruel Sun hit impact visual effects.
+ */
+export function clearCruelSunHitImpacts() {
+  for (let i = 0; i < _cruelSunImpactPool.length; i++) {
+    _cruelSunImpactPool[i].active = false;
+  }
+}
+
+// ─── Standalone Cruel Sun Explosion Pool (Zero-Allocation) ───
+const MAX_CRUEL_SUN_EXPLOSIONS = 16;
+const _cruelSunExplosionPool = [];
+
+for (let i = 0; i < MAX_CRUEL_SUN_EXPLOSIONS; i++) {
+  _cruelSunExplosionPool.push({
+    active: false,
+    x: 0,
+    y: 0,
+    r: 48,
+    isTheOne: false,
+    frame: 0,
+    maxFrames: 30
+  });
+}
+
+/**
+ * Spawns an independent Cruel Sun 6-frame pixel art explosion animation.
+ * @param {number} x - Center X
+ * @param {number} y - Center Y
+ * @param {number} [radius=48] - Sphere base radius
+ * @param {boolean} [isTheOne=false] - Whether Escanor is in "The One" state
+ * @param {number} [durationFrames=30] - Total frames for animation to play
+ */
+export function spawnCruelSunExplosion(x, y, radius = 48, isTheOne = false, durationFrames = 30) {
+  let exp = _cruelSunExplosionPool.find(e => !e.active);
+  if (!exp) {
+    exp = _cruelSunExplosionPool[0];
+  }
+  exp.active = true;
+  exp.x = x;
+  exp.y = y;
+  exp.r = radius;
+  exp.isTheOne = Boolean(isTheOne);
+  exp.frame = 0;
+  exp.maxFrames = Math.max(6, durationFrames || 30);
+}
+
+/**
+ * Updates all active Cruel Sun explosion animations.
+ */
+export function updateCruelSunExplosions() {
+  for (let i = 0; i < _cruelSunExplosionPool.length; i++) {
+    const exp = _cruelSunExplosionPool[i];
+    if (!exp.active) continue;
+    exp.frame++;
+    if (exp.frame >= exp.maxFrames) {
+      exp.active = false;
+    }
+  }
+}
+
+/**
+ * Renders all active Cruel Sun explosion animations.
+ * @param {CanvasRenderingContext2D} ctx
+ */
+export function drawCruelSunExplosions(ctx) {
+  for (let i = 0; i < _cruelSunExplosionPool.length; i++) {
+    const exp = _cruelSunExplosionPool[i];
+    if (!exp.active) continue;
+    const progress = exp.frame / exp.maxFrames;
+    const alpha = progress > 0.85 ? Math.max(0, 1.0 - ((progress - 0.85) / 0.15)) : 1.0;
+    drawCruelSunFloorLighting(ctx, exp.x, exp.y, exp.r, exp.isTheOne, alpha, true, progress);
+    drawCruelSunProximityEntityLighting(ctx, exp.x, exp.y, exp.r, exp.isTheOne, alpha * (1.0 - progress * 0.5));
+    drawPixelCruelSunExplosion(ctx, exp.x, exp.y, exp.r, progress, exp.isTheOne, alpha);
+  }
+}
+
+/**
+ * Clears all active Cruel Sun explosions.
+ */
+export function clearCruelSunExplosions() {
+  for (let i = 0; i < _cruelSunExplosionPool.length; i++) {
+    _cruelSunExplosionPool[i].active = false;
+  }
 }

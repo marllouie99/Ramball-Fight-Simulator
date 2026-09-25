@@ -11,7 +11,7 @@ import {
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
-  drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, drawGenosUltimateArenaOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
+  drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, drawGenosUltimateArenaOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaWheelArenaOverlay, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaDimScreen, drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
@@ -289,6 +289,7 @@ export function renderGame() {
           drawYutaDomainDimScreen(); // Dark cursed purple dim overlay when Yuta's domain is active (full-screen, unclipped)
           drawMahitoDomainDimScreen(); // Dark cursed purple dim overlay when Mahito's Self-Embodiment of Perfection domain is active (full-screen, unclipped)
           drawMahoragaAdaptationDimScreen();
+          drawMahoragaWheelArenaOverlay(); // 2D Eight-Handled Sword Wheel pop & rotation arena overlay
           drawMahoragaLevel8DimScreen();
           drawTojiUltimateOverlay();
           drawNanamiOvertimeArenaOverlay(); // 2D Nanami Overtime (Jigai) golden arena overlay & dark background

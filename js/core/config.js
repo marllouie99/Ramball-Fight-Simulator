@@ -30,8 +30,10 @@ import { zenitsuConfig } from '../configs/characters/zenitsuConfig.js';
 import { inosukeConfig } from '../configs/characters/inosukeConfig.js';
 import { escanorConfig } from '../configs/characters/escanorConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js';
+import { spikeConfig } from '../configs/characters/spikeConfig.js';
 import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { zeusConfig } from '../configs/characters/zeusConfig.js';
+import { gunslingerConfig } from '../configs/characters/gunslingerConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
@@ -41,6 +43,9 @@ export const CONFIG = {
   tactical: tacticalMainConfig,
   tacticalMain: tacticalMainConfig,
   blood: bloodConfig,
+  spike: spikeConfig,
+  Spike: spikeConfig,
+  melee: spikeConfig,
   saitama: saitamaConfig,
   genos: genosConfig,
   mahito: mahitoConfig,
@@ -68,6 +73,8 @@ export const CONFIG = {
   zenitsu: zenitsuConfig,
   inosuke: inosukeConfig,
   escanor: escanorConfig,
+  rubbick: rubbickConfig,
+  zeus: zeusConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -212,13 +219,6 @@ export const CONFIG = {
     electricStunChance: 0.40,  // 0.0 to 1.0 chance of triggering the stun on hit (0.5 = 50%)
   },
 
-  /** Yellow ΓÇö Melee fighter */
-  melee: {
-    speedBoostDuration: 120, // frames the speed burst lasts after a hit (120 = 2 s at 60 fps)
-    speedBoostMultiplier: 2.5, // how many times faster Yellow moves during the boost
-    trailLength: 10,  // how many past positions are kept for the ghost trail visual
-    rebounceLockChance: 0.4, // chance (0-1) to aggressively dash toward the nearest target upon hitting a wall
-  },
 
 
   /** Orange ΓÇö Flamethrower fighter */
@@ -417,6 +417,9 @@ export const CONFIG = {
 
     // Rage radius ring size = axeRange * rageRadiusScale
     rageRadiusScale: 1.0,
+
+    // Fluid Blood Trail VFX
+    enableFluidTrail: true,
   },
 
   /** Cronos ΓÇö Time Stop fighter */
@@ -501,39 +504,9 @@ export const CONFIG = {
     steeringForce: 0.35,     // how strongly bomber steers toward optimal distance (0-1)
   },
 
-  /** Gun Slinger ΓÇö Dual revolver fighter */
-  gunslinger: {
-    // TUNING: Magazine system
-    magazineSize: 24,         // number of bullets in the magazine (6 per gun)
-    reloadTime: 90,           // frames to reload (1.5 seconds at 60 fps)
-    magazineRegenRate: 0,     // bullets regenerated per second (0 = manual reload only)
-    reloadSpeedPenalty: 0.5,  // movement speed multiplier during reload (0.5 = 50% speed)
-
-    // TUNING: Basic attack (alternating dual revolvers)
-    leftGunDelay: 8,          // frames delay for left gun shot after right gun
-    shotCooldown: 15,         // frames between alternating shots (rapid fire)
-    bulletDamage: 10,          // damage per bullet
-    bulletSpeed: 15.0,        // speed of bullets
-    basicAttackKnockback: 5.0,// very small knockback on basic attacks
-
-    // TUNING: Passive skill (damage multiplier chance)
-    critChance: 0.20,         // chance (0-1) to deal critical damage
-    critMultiplier: 1.8,      // damage multiplier on critical hit
-    critChanceIncrease: 0.05, // increase in crit chance (0-1) per crit hit
-    critMultiplierIncrease: 0.15, // increase in damage multiplier per crit hit
-    maxCritChance: 0.80,      // maximum crit chance cap (80%)
-    maxCritMultiplier: 3.5,   // maximum crit multiplier cap (3.5x)
-
-    // TUNING: Active skill (rapid sync fire) - requires full magazine
-    skillCooldown: 300,       // frames between skill uses (5 seconds at 60 fps)
-    skillDuration: 60,        // frames the rapid sync fire lasts (1 second at 60 fps)
-    skillBurstCount: 8,       // number of bullet pairs fired during skill
-    skillBurstInterval: 8,    // frames between each bullet pair during skill
-    skillDamage: 7,           // damage per bullet during skill (lower but balanced)
-    skillRequiresFullMag: true, // skill can only be activated with full magazine
-    autoSkillThreshold: 3,     // bullets or less triggers active skill before reload
-    leftGunAngleOffset: 0.3,   // default left gun aim offset when no secondary target exists
-  },
+  /** Gun Slinger — Dual revolver fighter */
+  gunslinger: gunslingerConfig,
+  Gunslinger: gunslingerConfig,
 
   /** Doppleganger ΓÇö Illusion melee fighter */
   doppleganger: {
@@ -714,6 +687,7 @@ export const FIGHTER_DEFS = [
     startVx: 1.6, startVy: -1.2,
     radius: 25,
     aimbot: false,
+    spinRate: 0,
     type: 'melee',
     hp: 100,
     damage: 25,
@@ -894,20 +868,22 @@ export const FIGHTER_DEFS = [
     id: 13,
     name: 'Gun Slinger',
     category: 'Sci-Fi & Modern',
-    color: '#C19A6B',
-    startX: 260, startY: 250,
-    startVx: 1.4, startVy: -0.8,
-    radius: 25,
+    color: gunslingerConfig.color || '#C19A6B',
+    startX: gunslingerConfig.startX || 260,
+    startY: gunslingerConfig.startY || 250,
+    startVx: gunslingerConfig.startVx || 1.4,
+    startVy: gunslingerConfig.startVy || -0.8,
+    radius: gunslingerConfig.radius || gunslingerConfig.r || 25,
     aimbot: false,
-    spinRate: 0.03,
+    spinRate: gunslingerConfig.spinRate || 0.03,
     type: 'gunslinger',
-    hp: 70,
-    damage: 10,
-    cooldown: 15,
-    moveSpeed: 5.0,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Dual Revolvers',
-    desc: 'Wields dual revolvers on both sides. Active skill fires both guns rapidly.',
+    hp: gunslingerConfig.hp || 80,
+    damage: gunslingerConfig.damage || 6,
+    cooldown: gunslingerConfig.cooldown || 25,
+    moveSpeed: gunslingerConfig.moveSpeed || 5.0,
+    projectileSpeedMultiplier: gunslingerConfig.projectileSpeedMultiplier || 1.0,
+    ability: gunslingerConfig.ability || 'Dual Revolvers',
+    desc: gunslingerConfig.desc || 'Wields dual revolvers on both sides. Alternates rapid-fire shots and activates rapid sync fire.',
   },
   {
     id: 14,
@@ -1631,8 +1607,8 @@ export const FIGHTER_DEFS = [
     cooldown: escanorConfig.cooldown || 28,
     moveSpeed: escanorConfig.moveSpeed || escanorConfig.speed || 5.7,
     projectileSpeedMultiplier: escanorConfig.projectileSpeedMultiplier || 1.0,
-    ability: escanorConfig.ability || 'Grace "Sunshine" & "The One"',
-    desc: escanorConfig.desc || 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta. Radiates intense solar heat, gaining Solar Pride power escalation. Wields 140° Divine Slashes, Cruel Sun blazing stars, Pride Flare solar novas, and the invincible high noon ultimate: "The One" with Divine Sword Escanor.',
+    ability: escanorConfig.ability || 'Cruel Sun (無慈悲な太陽)',
+    desc: escanorConfig.desc || 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta and signature Cruel Sun (無慈悲な太陽) blazing star. Wields 140° Divine Slashes, solar drag & paralyze vortexes, Pride Flare solar novas, and the invincible high noon ultimate: "The One" with Divine Sword Escanor.',
   }
 ];
 

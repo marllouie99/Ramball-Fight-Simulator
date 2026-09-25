@@ -7,6 +7,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { drawGunSlingerDualRevolver, GUNSLINGER_WEAPON_GRAPHICS } from '../../graphics/weapons/gunSlingerWeaponGraphics.js';
+import { drawGunslingerSkin } from '../../graphics/fighters/gunSlingerSkin.js';
 import { spatialGrid } from '../../systems/physics.js';
 import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 
@@ -39,8 +40,8 @@ export class GunSlingerFighter extends Fighter {
     this.isReloading = false; // Is currently reloading
 
     // Dynamic crit stats
-    this.critChance = CONFIG.gunslinger.critChance || 0.20;
-    this.critMultiplier = CONFIG.gunslinger.critMultiplier || 1.8;
+    this.critChance = CONFIG.gunslinger?.critChance ?? 0.15;
+    this.critMultiplier = CONFIG.gunslinger?.critMultiplier ?? 1.50;
 
     // Smoke effect for skill
     this.smokeTimer = 0; // Timer for smoke effect duration
@@ -69,8 +70,8 @@ export class GunSlingerFighter extends Fighter {
     this.magazineBullets = this.maxMagazine;
     this.reloadTimer = 0;
     this.isReloading = false;
-    this.critChance = CONFIG.gunslinger.critChance || 0.20;
-    this.critMultiplier = CONFIG.gunslinger.critMultiplier || 1.8;
+    this.critChance = CONFIG.gunslinger?.critChance ?? 0.15;
+    this.critMultiplier = CONFIG.gunslinger?.critMultiplier ?? 1.50;
     this.smokeTimer = 0;
     this.smokeParticles = [];
     this.rightRecoilOffset = 0;
@@ -168,15 +169,18 @@ export class GunSlingerFighter extends Fighter {
     const intensity = 1 - ratio / threshold;
     const alpha = intensity * 0.4;
 
-    const p = GUNSLINGER_WEAPON_GRAPHICS.positioning;
-    const scale = p.scale;
-    const gunOffset = this.r + p.gunOffset;
-    const leftOffset = p.leftGunOffset;
+    const scale = GUNSLINGER_WEAPON_GRAPHICS?.positioning?.scale || 0.68;
+    const muzzleDist = 45 * scale;
 
-    const rightMuzzleX = this.x + Math.cos(this.rightGunAngle) * (gunOffset + 26 * scale);
-    const rightMuzzleY = this.y + Math.sin(this.rightGunAngle) * (gunOffset + 26 * scale);
-    const leftMuzzleX = this.x + Math.cos(this.leftGunAngle) * (-gunOffset + leftOffset + 26 * scale);
-    const leftMuzzleY = this.y + Math.sin(this.leftGunAngle) * (-gunOffset + leftOffset + 26 * scale);
+    const rLocalX = this.r * 0.45 + muzzleDist;
+    const rLocalY = 0;
+    const rightMuzzleX = this.x + Math.cos(this.rightGunAngle) * rLocalX - Math.sin(this.rightGunAngle) * rLocalY;
+    const rightMuzzleY = this.y + Math.sin(this.rightGunAngle) * rLocalX + Math.cos(this.rightGunAngle) * rLocalY;
+
+    const lLocalX = -this.r * 0.45 + muzzleDist;
+    const lLocalY = 0;
+    const leftMuzzleX = this.x + Math.cos(this.leftGunAngle) * lLocalX - Math.sin(this.leftGunAngle) * lLocalY;
+    const leftMuzzleY = this.y + Math.sin(this.leftGunAngle) * lLocalX + Math.cos(this.leftGunAngle) * lLocalY;
 
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
@@ -309,16 +313,22 @@ export class GunSlingerFighter extends Fighter {
 
     // Calculate exact spawn position at the gun barrel tip
     const isRightGun = this.currentGun === 'right';
+    const scale = GUNSLINGER_WEAPON_GRAPHICS?.positioning?.scale || 0.68;
+    const muzzleDist = 45 * scale;
 
-    // Based on gunSlingerWeaponGraphics:
-    // The guns are positioned at X = r * 0.3 (forward) and Y = +/- (r * 0.6) (sides)
-    // The muzzle flash is drawn at X = 26 * 0.9 = 23.4 relative to gun center
-    const forwardOffset = (this.r * 0.3) + 23.4;
-    const sideOffset = isRightGun ? (this.r * 0.6) : -(this.r * 0.6);
+    // Upright Front-POV positioning (matching gunSlingerWeaponGraphics):
+    // Front (right) gun at (+r * 0.90, 0)
+    // Rear (left) gun at (-r * 0.45, 0)
+    const localGunX = isRightGun ? (this.r * 0.90) : (-this.r * 0.45);
+    const localGunY = 0;
 
-    // Convert local offsets to global coordinates based on gunAngle
-    const spawnX = this.x + Math.cos(gunAngle) * forwardOffset - Math.sin(gunAngle) * sideOffset;
-    const spawnY = this.y + Math.sin(gunAngle) * forwardOffset + Math.cos(gunAngle) * sideOffset;
+    const localTotalX = localGunX + muzzleDist;
+    const localTotalY = localGunY;
+
+    const cosA = Math.cos(gunAngle);
+    const sinA = Math.sin(gunAngle);
+    const spawnX = this.x + cosA * localTotalX - sinA * localTotalY;
+    const spawnY = this.y + sinA * localTotalX + cosA * localTotalY;
 
     const proj = projectileSystem.fireProjectile(this, ownerIndex, bulletDamage, false, speed, false, null, spawnX, spawnY, gunAngle);
     
@@ -567,6 +577,14 @@ export class GunSlingerFighter extends Fighter {
     this.applyMovementPhysics(speedMult);
 
     this.resolveWallBounce(arena);
+  }
+
+  drawSkin(ctx) {
+    drawGunslingerSkin(ctx, this);
+  }
+
+  drawBody(ctx) {
+    drawGunslingerSkin(ctx, this);
   }
 
   drawGun(ctx) {

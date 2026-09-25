@@ -47,52 +47,79 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   let stretchAmount = 0;
   let bladeRotation = 0;
 
+  const flipAngle = fighter.activePullActive 
+    ? (fighter.activePullAngle !== undefined ? fighter.activePullAngle : fighter.gunAngle) 
+    : (fighter.scytheSwingActive ? fighter.scytheSwingAngle : currentAngle);
+  const isFlipped = Math.abs(flipAngle) > Math.PI / 2 && !fighter.passiveSpinActive;
+  const flipSign = isFlipped ? -1 : 1;
+
   if (fighter.passiveSpinActive) {
     const progress = 1 - (fighter.passiveSpinTimer / fighter.passiveSpinDuration);
     currentAngle += progress * Math.PI * 4;
   }
   else if (fighter.activePullActive) {
     const phase = fighter.activePullPhase;
-    currentAngle = fighter.activePullAngle;
+    const baseAngle = (fighter.activePullAngle !== undefined ? fighter.activePullAngle : fighter.gunAngle) || 0;
     const maxStretch = (CONFIG.ruby.activePullRange || 200) - fighter.r;
 
     if (phase === 0) {
-      // WIND_UP: Smoothly pull the scythe back in anticipation
-      const t = 1 - (fighter.activePullPhaseTimer / fighter.pullPhaseWindUp);
-      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      stretchAmount = -40 * ease; // pull the shaft backwards heavily
-      bladeRotation = -Math.PI / 1.5 * ease; // wind up the blade to open it completely
-      
-      const rotSign = (Math.abs(fighter.activePullAngle) > Math.PI / 2) ? -1 : 1;
-      currentAngle -= (Math.PI / 1.5 * ease) * rotSign; // rotate the weapon far back behind her (120 degrees)
+      // WIND_UP (Toji-style Coiled Charging Stance):
+      // Smoothly pulls the scythe back along the shaft and rotates it behind her shoulder into a deep coiled charge!
+      const windUpDur = fighter.pullPhaseWindUp || 22;
+      const t = 1 - (fighter.activePullPhaseTimer / windUpDur);
+      const ease = Math.sin(t * Math.PI * 0.5); // Smooth charge curve
+
+      // Draw shaft heavily backward (-38px) into deep cocked throwing stance
+      stretchAmount = -38 * ease;
+
+      // Coil the scythe back behind her shoulder (~ -110 deg)
+      const coilAngle = -Math.PI * 0.62 * ease;
+
+      // Tension vibration tremors as energy builds up
+      const tremorVal = (Math.random() - 0.5) * 2.0 * t;
+      const angleTremor = (Math.random() - 0.5) * 0.035 * t;
+
+      stretchAmount += tremorVal;
+      currentAngle = baseAngle + (coilAngle * flipSign) + angleTremor;
+
+      // Cock the scythe blade back on the neck
+      bladeRotation = -Math.PI * 0.40 * ease + (Math.random() - 0.5) * 0.04 * t;
     }
     else if (phase === 1) {
-      // SWING_OUT: Snap forward
-      const t = 1 - (fighter.activePullPhaseTimer / fighter.pullPhaseSwingOut);
+      // SWING_OUT: Explosively snap forward from the coiled charge position and launch scythe on chain!
+      const t = 1 - (fighter.activePullPhaseTimer / (fighter.pullPhaseSwingOut || 10));
       const easeOut = 1 - Math.pow(1 - t, 3);
-      stretchAmount = -40 * (1 - easeOut) + maxStretch * easeOut; // transition from -40
-      bladeRotation = -Math.PI / 1.5 * (1 - easeOut); // snap blade closed from 120 deg
-      
-      const rotSign = (Math.abs(fighter.activePullAngle) > Math.PI / 2) ? -1 : 1;
-      
-      // We also snap the angle forward from the wind-up position (-Math.PI/1.5)
-      // The old +0.35 is kept for a slight overshoot effect
-      currentAngle += (-Math.PI / 1.5 * rotSign) * (1 - easeOut) + (1 - easeOut) * 0.35 * rotSign;
+
+      // Transition smoothly from -38px coiled position to maxStretch
+      stretchAmount = -38 * (1 - easeOut) + maxStretch * easeOut;
+
+      // Snap the scythe angle forward from coiled position to locked target trajectory
+      const coilAngle = -Math.PI * 0.62 * (1 - easeOut);
+      currentAngle = baseAngle + (coilAngle * flipSign);
+
+      // Snap blade outward into aggressive hook grab shape
+      bladeRotation = -Math.PI * 0.40 * (1 - easeOut) + (Math.PI / 6) * easeOut;
     }
     else if (phase === 2) {
-      // HOOK_GRAB
+      // HOOK_GRAB: Hook clamped around target
       stretchAmount = maxStretch;
+      bladeRotation = Math.PI / 6;
+      currentAngle = baseAngle;
     }
     else if (phase === 3) {
-      // PULL_DRAG
-      const t = 1 - (fighter.activePullPhaseTimer / fighter.pullPhasePullDrag);
-      // Use ease-out to match the spring-like drag physics of the target
+      // PULL_DRAG: Dragging targets back
+      const t = 1 - (fighter.activePullPhaseTimer / (fighter.pullPhasePullDrag || 15));
       const easeOut = 1 - Math.pow(1 - t, 3);
       stretchAmount = maxStretch * (1 - easeOut);
+      bladeRotation = Math.PI / 6;
+      currentAngle = baseAngle;
     }
     else if (phase === 4) {
-      // DISENGAGE
+      // DISENGAGE: Recovery
+      const t = 1 - (fighter.activePullPhaseTimer / (fighter.pullPhaseDisengage || 8));
       stretchAmount = 0;
+      bladeRotation = (1 - t) * (Math.PI / 8);
+      currentAngle = baseAngle;
     }
   }
   else if (fighter.scytheSwingActive) {
@@ -101,13 +128,27 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
     currentAngle = fighter.scytheSwingAngle - (swingArc / 2) + (swingArc * progress);
   }
 
-  let flipAngle = currentAngle;
-  if (fighter.activePullActive) {
-    flipAngle = fighter.activePullAngle;
-  } else if (fighter.scytheSwingActive) {
-    flipAngle = fighter.scytheSwingAngle;
+  // Whirling Crimson Energy Streams around Ruby during Hook Wind-Up (Toji-style charge visual)
+  if (fighter.activePullActive && fighter.activePullPhase === 0 && !suppressEffects) {
+    const windUpDur = fighter.pullPhaseWindUp || 22;
+    const t = 1 - (fighter.activePullPhaseTimer / windUpDur);
+    const now = Date.now();
+    ctx.save();
+    ctx.translate(fighter.x, fighter.y);
+    const windTime = now / 110;
+    for (let w = 0; w < 3; w++) {
+      const windAngle = windTime * 3.0 + (w * Math.PI * 2 / 3);
+      const windRadius = fighter.r + 10 + w * 14 + Math.sin(windTime * 2.5 + w) * 4;
+      const windArcLen = 0.75 + Math.sin(windTime * 2 + w) * 0.25;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, windRadius, windAngle, windAngle + windArcLen);
+      ctx.strokeStyle = `rgba(224, 17, 95, ${(0.25 + t * 0.50).toFixed(3)})`;
+      ctx.lineWidth = 1.6 + (w % 2) * 0.8;
+      ctx.stroke();
+    }
+    ctx.restore();
   }
-  const isFlipped = Math.abs(flipAngle) > Math.PI / 2 && !fighter.passiveSpinActive;
   
   const basePoleLength = 100;
   const poleLength = basePoleLength; // The pole stays a fixed length, no longer stretching like rubber
@@ -162,7 +203,7 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   if (shouldAddTrail && fighter.bladeTrail.length > 0) {
     const last = fighter.bladeTrail[fighter.bladeTrail.length - 1];
     const dist = Math.hypot(outerPos.x - last.outer.x, outerPos.y - last.outer.y);
-    if (dist < 1 && !fighter.scytheSwingActive && !fighter.passiveSpinActive) {
+    if (dist < 1 && !fighter.scytheSwingActive && !fighter.passiveSpinActive && !fighter.activePullActive) {
       shouldAddTrail = false; // Don't build up points when standing perfectly still
     }
   }

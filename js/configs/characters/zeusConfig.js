@@ -15,7 +15,7 @@ export const zeusConfig = {
   startVx: 1.1,
   startVy: 0.9,
   damage: 20,
-  cooldown: 120,
+  cooldown: 200,
   projectileSpeedMultiplier: 1.0,
   ability: 'Storm Bringer',
   bossTitle: 'King of Olympus',
@@ -31,7 +31,7 @@ export const zeusConfig = {
   chainCount: 4,               // Max target bounces (down from 6, preventing excessive AOE wipes)
   chainRange: 220,             // Search range in pixels to find next chain target
   chainDamageMultiplier: 0.8,  // Decay factor per bounce (10 -> 8 -> 6.4 -> 5.1)
-  attackCooldown: 120,         // Synchronized attack cooldown (matches cooldown: 120)
+  attackCooldown: 300,         // Synchronized attack cooldown (matches cooldown: 120)
   boltReleaseOffset: 20,       // Tip release distance beyond fighter body radius
   shootFlashRadius: 35,        // Flash radius on basic bolt release
   shootSparkCount: 12,         // Spark count on basic bolt release
@@ -40,13 +40,13 @@ export const zeusConfig = {
   enableStunDebuffs: true,     // Master toggle for progressive stun & debuff system
   baseStunChance: 0.10,        // Starting stun chance (10%)
   stunChanceIncrease: 0.05,    // +5% stun chance added per landed hit (tuned from +10%)
-  maxStunChance: 0.50,         // Maximum stun chance cap (50%, tuned from 80%)
-  stunChance: 1.00,            // Initial fallback stun chance
+  maxStunChance: 0.00,         // Maximum stun chance cap (50%, tuned from 80%)
+  stunChance: 0.10,            // Initial fallback stun chance
   stunDuration: 50,            // Duration in frames (~0.4s) target is stunned on electric hit
-  paralyzeChance: 0.25,        // 25% chance to apply paralyze slow
+  paralyzeChance: 0.10,        // 25% chance to apply paralyze slow
   paralyzeDuration: 50,        // Duration in frames (~0.83s) of paralyze slow
   paralyzeSlowMultiplier: 0.5, // Movement speed multiplier while paralyzed (50% speed)
-  staticChance: 0.40,          // 40% chance to afflict target with Static debuff
+  staticChance: 0.10,          // 40% chance to afflict target with Static debuff
   staticDuration: 100,         // Duration in frames (~1.67s) static lasts
   staticDamageBonus: 1.33,     // 33% extra damage to static targets (tuned down from 1.50)
   electricVisualDuration: 45,  // Duration in frames (~0.75s) electric shock overlay persists on target
@@ -64,7 +64,7 @@ export const zeusConfig = {
 
   // ── Ultimate: Thunder Storm (Map-Wide Divine Wrath) ──
   enableThunderStorm: true,    // Master toggle for Thunder Storm ultimate
-  stormCooldown: 1500,         // 25.0s Cooldown (balanced with Gojo Hollow Purple & Sukuna Fuga / Domain)
+  stormCooldown: 1000,         // 25.0s Cooldown (balanced with Gojo Hollow Purple & Sukuna Fuga / Domain)
   stormDuration: 300,          // 5.0 seconds total active storm duration
   stormStrikesPerSec: 3,       // Frequency of lightning strikes per enemy (3 per sec = 15 strikes total)
   stormStrikeDamage: 20,        // Base damage per strike (15 strikes * 6 = 90 base dmg; ~115-120 with static bonus)

@@ -54,6 +54,7 @@ export const gojoConfig = {
   blueWallLingerDuration: 50, // Frames (~1.5s) Blue orb stays pinned on the wall after colliding, pulling & grinding enemies
   modeSwitchBreatherDuration: 45, // Breather pause (frames) when Gojo switches to Ranged/Blue mode (~0.75s)
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
+  postSkillCooldown: 300,   // Anti-spam shared cooldown in frames (5.0s @ 60fps) after releasing any skill before triggering another skill
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
   enableRed: true,                         // Master toggle for Skill: Reversal Red

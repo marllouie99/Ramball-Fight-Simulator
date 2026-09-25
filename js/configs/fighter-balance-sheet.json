@@ -591,6 +591,34 @@
           "cooldown": 1500
         }
       }
+    },
+    "gunslinger": {
+      "name": "Gun Slinger",
+      "archetype": "tactical",
+      "hp": 80,
+      "speed": 5.0,
+      "radius": 25,
+      "baseDamage": 6,
+      "baseCooldown": 15,
+      "themeColor": "#C19A6B",
+      "keySkills": {
+        "basicAttack": {
+          "damage": 6,
+          "speed": 16.0,
+          "cooldown": 15
+        },
+        "criticalPassive": {
+          "baseChance": 0.15,
+          "baseMultiplier": 1.50,
+          "maxChance": 0.50,
+          "maxMultiplier": 2.20
+        },
+        "rapidSyncFire": {
+          "damage": 4.0,
+          "burstCount": 6,
+          "cooldown": 360
+        }
+      }
     }
   }
 }

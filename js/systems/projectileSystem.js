@@ -3578,6 +3578,143 @@ class ProjectileSystem {
           continue;
         }
 
+        const isCjBullet = (p.visual === 'cjUziBullet' || p.visual === 'cjMinigunBullet' || (p.visual && p.visual.includes('cj')));
+        if (isCjBullet && expired && !hit) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          if (arena) {
+            if (arena.shape === 'circle') {
+              const cx = arena.x + arena.width / 2;
+              const cy = arena.y + arena.height / 2;
+              const ar = arena.radius || (arena.width / 2);
+              const d = Math.hypot(p.x - cx, p.y - cy);
+              if (d > ar) {
+                const angle = Math.atan2(p.y - cy, p.x - cx);
+                wallX = cx + Math.cos(angle) * (ar - 2);
+                wallY = cy + Math.sin(angle) * (ar - 2);
+              }
+            } else {
+              wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+              wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+            }
+          }
+
+          if (p.visual === 'cjMinigunBullet') {
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 8, 'gold', '#FEF08A');
+              spawnSparks(wallX, wallY, 5, 'silverStreak', '#CBD5E1');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, 22, '#F59E0B');
+            }
+            if (typeof triggerGlobalScreenShake === 'function') {
+              triggerGlobalScreenShake(1.4, 2);
+            }
+          } else {
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 6, 'gold', '#F59E0B');
+              spawnSparks(wallX, wallY, 4, 'silverStreak', '#E2E8F0');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, 16, '#F59E0B');
+            }
+          }
+
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
+        const isEngineerShotgun = p.visual === 'EngineerBullet';
+        if (isEngineerShotgun && expired && !hit) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          if (arena) {
+            if (arena.shape === 'circle') {
+              const cx = arena.x + arena.width / 2;
+              const cy = arena.y + arena.height / 2;
+              const ar = arena.radius || (arena.width / 2);
+              const d = Math.hypot(p.x - cx, p.y - cy);
+              if (d > ar) {
+                const angle = Math.atan2(p.y - cy, p.x - cx);
+                wallX = cx + Math.cos(angle) * (ar - 2);
+                wallY = cy + Math.sin(angle) * (ar - 2);
+              }
+            } else {
+              wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+              wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+            }
+          }
+
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(wallX, wallY, 6, 'flame', '#F97316');
+            spawnSparks(wallX, wallY, 4, 'silverStreak', '#E2E8F0');
+          }
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(wallX, wallY, 18, '#F97316');
+          }
+
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
+        const isTurretBullet = p.visual === 'turretBullet' || p.isTurretBullet;
+        if (isTurretBullet && expired && !hit) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          if (arena) {
+            if (arena.shape === 'circle') {
+              const cx = arena.x + arena.width / 2;
+              const cy = arena.y + arena.height / 2;
+              const ar = arena.radius || (arena.width / 2);
+              const d = Math.hypot(p.x - cx, p.y - cy);
+              if (d > ar) {
+                const angle = Math.atan2(p.y - cy, p.x - cx);
+                wallX = cx + Math.cos(angle) * (ar - 2);
+                wallY = cy + Math.sin(angle) * (ar - 2);
+              }
+            } else {
+              wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+              wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+            }
+          }
+
+          if (p.isRocket) {
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, 40, '#F97316');
+            }
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 14, 'flame', '#EA580C');
+              spawnSparks(wallX, wallY, 8, 'orange', '#F59E0B');
+              spawnSparks(wallX, wallY, 6, 'silverStreak', '#CBD5E1');
+            }
+            audioSystem.playSFX('attack_explosion', 0.65);
+            if (typeof triggerGlobalScreenShake === 'function') {
+              triggerGlobalScreenShake(6.0, 5);
+            }
+          } else {
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 7, 'gold', '#FEF08A');
+              spawnSparks(wallX, wallY, 5, 'orange', '#EA580C');
+              spawnSparks(wallX, wallY, 3, 'silverStreak', '#CBD5E1');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, 18, '#F59E0B');
+            }
+          }
+
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
         const isHeiligPfeil = (p.visual === 'heiligPfeil' || p.isHeiligPfeil || p.type === 'heilig_pfeil') && !p.isSkywardBeacon;
         if (isHeiligPfeil && expired && !hit) {
           const arena = CONFIG.arena;
