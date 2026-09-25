@@ -140,9 +140,9 @@ export const eyeOfCthulhuConfig = {
   // AUDIO CONFIGURATION & SOUND VOLUMES
   // ──────────────────────────────────────────
   sounds: {
-    transformationStart: 'Assets/Sound Effects/Skills/dash1.mp3',
+    transformationStart: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3',
     pupilShed: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
-    transformationRoar: 'Assets/Sound Effects/Skills/ragescream.mp3',
+    transformationRoar: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise3.mp3',
     ramDash: 'Assets/Sound Effects/Skills/dash1.mp3',
     ramHit: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
     fleshHitLight: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
@@ -150,7 +150,7 @@ export const eyeOfCthulhuConfig = {
     servantImpact: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     p2ChainDash: 'Assets/Sound Effects/Skills/dash2.mp3',
     p2Chomp: 'Assets/Sound Effects/Skills/backstab.mp3',
-    p2Roar: 'Assets/Sound Effects/Skills/ragescream.mp3',
+    p2Roar: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
     spikeBurst: 'Assets/Sound Effects/Attacks/spikestab.mp3',
     death: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
     actionNoises: [
@@ -176,8 +176,8 @@ export const eyeOfCthulhuConfig = {
     actionNoise: 0.85,
   },
   soundChances: {
-    actionNoise: 0.45,
+    actionNoise: 0.30,
   },
-  actionNoiseChance: 0.45,
+  actionNoiseChance: 0.30,
   actionNoiseVolume: 0.85,
 };

@@ -163,7 +163,8 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.vy = 0;
       try {
         spawnFloatingText(this.x, this.y - this.r - 20, 'TRANSFORMATION!', '#E11D48');
-        this._playAudio('transformationStart', 'Assets/Sound Effects/Skills/dash1.mp3', 0.95);
+        this._playAudio('transformationStart', 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3', 0.95);
+        this._playActionNoise(true);
       } catch (e) {}
     }
 
@@ -534,7 +535,10 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.angle = this.transformationSpinAngle;
     this.gunAngle = this.transformationSpinAngle;
 
-    // Centrifugal blood sparks flung outwards from spinning body
+    // Screech noises and centrifugal blood sparks flung outwards from spinning body
+    if (this.stateTimer % 22 === 0) {
+      this._playActionNoise(true);
+    }
     const bloodInterval = cfg.transformationBloodSparkInterval || 4;
     if (this.stateTimer % bloodInterval === 0) {
       const spawnDist = this.r * (0.8 + Math.random() * 0.4);
@@ -584,7 +588,7 @@ export class EyeOfCthulhuFighter extends Fighter {
 
       try {
         spawnFloatingText(this.x, this.y - this.r - 25, 'ROAAAR!', '#E11D48');
-        this._playAudio('transformationRoar', 'Assets/Sound Effects/Skills/ragescream.mp3', 1.0);
+        this._playAudio('transformationRoar', 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise3.mp3', 1.0);
         this._playActionNoise(true);
       } catch (e) {}
 
