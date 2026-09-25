@@ -270,6 +270,9 @@ export const state = {
   tlfsAllowedEnemies: [], // Will be populated with all fighter indices
   tlfsDefeatedEnemies: 0,
 
+  // Boss Battle gamemode state
+  bossBattleNoTeammate: (typeof localStorage !== 'undefined' && localStorage.getItem('circleMiniBattleBossBattleNoTeammate') === 'true') || false,
+
   // Tag Match gamemode state (3v3 relay)
   tagMatch: {
     team0Roster: [], // Array of 3 fighter indices [p1, p3, p5]
@@ -710,12 +713,14 @@ export function saveFighterSelections() {
       p3Index: state.p3Index ?? 2,
       p4Index: state.p4Index ?? 3,
       p5Index: state.p5Index ?? 4,
-      p6Index: state.p6Index ?? 5
+      p6Index: state.p6Index ?? 5,
+      bossBattleNoTeammate: Boolean(state.bossBattleNoTeammate)
     };
     const allSavedStr = localStorage.getItem('circleMiniBattleFighterSelections');
     const allSaved = allSavedStr ? JSON.parse(allSavedStr) : {};
     allSaved[cat] = selections;
     localStorage.setItem('circleMiniBattleFighterSelections', JSON.stringify(allSaved));
+    localStorage.setItem('circleMiniBattleBossBattleNoTeammate', String(Boolean(state.bossBattleNoTeammate)));
   } catch (e) {
     console.warn('Could not save fighter selections:', e);
   }
@@ -736,7 +741,12 @@ export function loadFighterSelections(targetCat = null) {
         if (typeof sel.p4Index === 'number') state.p4Index = sel.p4Index;
         if (typeof sel.p5Index === 'number') state.p5Index = sel.p5Index;
         if (typeof sel.p6Index === 'number') state.p6Index = sel.p6Index;
+        if (typeof sel.bossBattleNoTeammate === 'boolean') state.bossBattleNoTeammate = sel.bossBattleNoTeammate;
       }
+    }
+    const soloSaved = localStorage.getItem('circleMiniBattleBossBattleNoTeammate');
+    if (soloSaved !== null) {
+      state.bossBattleNoTeammate = (soloSaved === 'true');
     }
   } catch (e) {
     console.warn('Could not load fighter selections:', e);

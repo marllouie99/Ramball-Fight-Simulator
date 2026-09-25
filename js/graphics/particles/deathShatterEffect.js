@@ -3,8 +3,9 @@
 // Creates a shattering body effect when fighters die
 // ─────────────────────────────────────────────
 import { state, triggerGlobalScreenShake } from '../../core/state.js';
+import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
-import { getEyePhase1Image, getEyePhase2Image } from '../fighters/eyeOfCthulhuSkin.js';
+import { getEyePhase1Image, getEyePhase2Image, getEyeShatterImage, EOC_SHATTER_SPRITES } from '../fighters/eyeOfCthulhuSkin.js';
 import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
 
 /**
@@ -123,38 +124,78 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
     spawnSparks(fighter.x, fighter.y, isMinion ? 8 : 22, 'bloodSpark', '#4C0519');
   } catch (e) {}
 
-  const goreDefs = [
-    // 1. Optic Nerve Tendril Cluster
-    { type: 'eoc_nerve_tendril', size: baseR * 0.50, color: '#881337', angleOffset: Math.PI, speedMult: 1.1 },
-    // 2. Upper Sclera Shell (with red branching veins)
-    { type: 'eoc_sclera_top', size: baseR * 0.54, color: '#F8FAFC', angleOffset: -Math.PI / 2, speedMult: 1.2 },
-    // 3. Lower Sclera Shell (with crimson torn edges)
-    { type: 'eoc_sclera_bottom', size: baseR * 0.48, color: '#E2E8F0', angleOffset: Math.PI / 2, speedMult: 1.15 },
-  ];
+  const goreDefs = [];
 
-  if (isPhase2) {
-    // Phase 2: Upper and Lower razor fanged jaws
-    goreDefs.push(
-      { type: 'eoc_fanged_maw_top', size: baseR * 0.48, color: '#7F1D1D', angleOffset: -0.3, speedMult: 1.25 },
-      { type: 'eoc_fanged_maw_bottom', size: baseR * 0.46, color: '#991B1B', angleOffset: 0.3, speedMult: 1.25 }
-    );
-  } else {
-    // Phase 1: Iris & Pupil core chunk
-    goreDefs.push(
-      { type: 'eoc_iris_pupil', size: baseR * 0.46, color: '#06B6D4', angleOffset: 0, speedMult: 1.3 }
-    );
+  // 1. Optic Nerve Tendril Cluster
+  const tendrilCount = isMinion ? 1 : EOC_SHATTER_SPRITES.tendrils.length;
+  for (let t = 0; t < tendrilCount; t++) {
+    goreDefs.push({
+      type: 'eoc_nerve_tendril',
+      spriteFrame: EOC_SHATTER_SPRITES.tendrils[t % EOC_SHATTER_SPRITES.tendrils.length],
+      scale: (baseR * 1.1) / 65,
+      size: baseR * 0.50,
+      color: '#881337',
+      angleOffset: Math.PI + (t - 1) * 0.4,
+      speedMult: 1.1 + t * 0.1,
+    });
   }
 
-  // Add visceral organic gib chunks bursting in all directions
-  const gibCount = isMinion ? 4 : Math.max(8, Math.floor(14 * qualityMultiplier));
+  // 2. Large Curved Sclera Shells
+  const shellCount = isMinion ? 2 : Math.min(4, EOC_SHATTER_SPRITES.scleraShells.length);
+  for (let s = 0; s < shellCount; s++) {
+    goreDefs.push({
+      type: 'eoc_sclera_shell',
+      spriteFrame: EOC_SHATTER_SPRITES.scleraShells[s],
+      scale: (baseR * 1.2) / 75,
+      size: baseR * 0.55,
+      color: '#F8FAFC',
+      angleOffset: (Math.PI * 2 * s) / shellCount - Math.PI / 2,
+      speedMult: 1.15 + s * 0.08,
+    });
+  }
+
+  // 3. Phase 2: Razor Fanged Jaws
+  if (isPhase2) {
+    const mawCount = isMinion ? 2 : Math.min(4, EOC_SHATTER_SPRITES.fangedMaws.length);
+    for (let m = 0; m < mawCount; m++) {
+      goreDefs.push({
+        type: 'eoc_fanged_maw',
+        spriteFrame: EOC_SHATTER_SPRITES.fangedMaws[m],
+        scale: (baseR * 1.2) / 55,
+        size: baseR * 0.50,
+        color: '#7F1D1D',
+        angleOffset: (m % 2 === 0 ? -0.35 : 0.35) + (m * 0.2),
+        speedMult: 1.25,
+      });
+    }
+  }
+
+  // 4. Waving Flesh Ribbons
+  const ribbonCount = isMinion ? 2 : 4;
+  for (let r = 0; r < ribbonCount; r++) {
+    goreDefs.push({
+      type: 'eoc_flesh_ribbon',
+      spriteFrame: EOC_SHATTER_SPRITES.fleshRibbons[r % EOC_SHATTER_SPRITES.fleshRibbons.length],
+      scale: (baseR * 1.1) / 65,
+      size: baseR * 0.35,
+      color: '#991B1B',
+      angleOffset: (Math.PI * 2 * r) / ribbonCount,
+      speedMult: 1.05 + r * 0.1,
+    });
+  }
+
+  // 5. Visceral Meat & Capillary Debris Chunks
+  const chunkCount = isMinion ? 4 : Math.max(8, Math.floor(14 * qualityMultiplier));
   const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#4C0519', '#7F1D1D'];
-  for (let g = 0; g < gibCount; g++) {
+  for (let c = 0; c < chunkCount; c++) {
     goreDefs.push({
       type: 'eoc_visceral_chunk',
+      spriteFrame: EOC_SHATTER_SPRITES.debrisChunks[c % EOC_SHATTER_SPRITES.debrisChunks.length],
+      scale: (baseR * 1.0) / 20,
       size: baseR * (0.16 + Math.random() * 0.20),
-      color: gibColors[g % gibColors.length],
-      angleOffset: (Math.PI * 2 * g) / gibCount,
-      speedMult: 0.85 + Math.random() * 0.75
+      color: gibColors[c % gibColors.length],
+      angleOffset: (Math.PI * 2 * c) / chunkCount + (Math.random() - 0.5) * 0.4,
+      speedMult: 0.85 + Math.random() * 0.75,
     });
   }
 
@@ -173,7 +214,7 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
 
     const def = goreDefs[i];
     const angle = def.angleOffset !== undefined
-      ? def.angleOffset + (Math.random() - 0.5) * 0.7
+      ? def.angleOffset + (Math.random() - 0.5) * 0.6
       : (Math.PI * 2 * i) / goreDefs.length + (Math.random() - 0.5) * 0.5;
 
     const speed = (baseSpeed + Math.random() * (isMinion ? 4.0 : 8.5)) * (def.speedMult || 1.0);
@@ -186,6 +227,8 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 0.70,
       size: def.size,
+      scale: def.scale || 1.0,
+      spriteFrame: def.spriteFrame || null,
       color: def.color,
       goreType: def.type,
       isEyeOfCthulhuGore: true,
@@ -223,68 +266,78 @@ export function spawnMachineCorpse(x, y, angle) {
  * Updates all death shatter effects.
  */
 export function updateDeathEffects() {
-  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 });
+  const wallW = (arena && arena.wallWidth) || 4;
+  const arenaBottom = (arena ? arena.y + arena.height : 800) - wallW;
+  const arenaTop = (arena ? arena.y : 0) + wallW;
+  const arenaLeft = (arena ? arena.x : 0) + wallW;
+  const arenaRight = (arena ? arena.x + arena.width : 1200) - wallW;
 
   for (let i = state.deathEffects.length - 1; i >= 0; i--) {
     const effect = state.deathEffects[i];
     
-    // 1. Permanent Eye of Cthulhu Terraria Gore: drops all the way down to arena floor, bounces & splashes
+    // 1. Eye of Cthulhu Terraria Gore: drops to arena floor, bounces, settles, and slowly disappears
     if (effect.isEyeOfCthulhuGore || effect.isPermanentGore) {
       if (!effect.isSettled) {
         effect.x += effect.vx;
         effect.y += effect.vy;
 
-        // Downward gravity acceleration
-        effect.vy += (effect.gravity || 0.40);
+        // Downward gravity acceleration (bullet shell physics feel)
+        effect.vy += (effect.gravity || 0.45);
 
-        // Low flight air friction so trajectory arcs wide and drops fast
-        effect.vx *= 0.988;
-        effect.vy *= 0.992;
+        // Air drag
+        effect.vx *= 0.985;
+        effect.vy *= 0.99;
         effect.rotation += effect.rotationSpeed;
 
-        // Arena boundary and bottom floor resolution
-        if (arena) {
-          const cx = arena.x + arena.width / 2;
-          const cy = arena.y + arena.height / 2;
-          const ar = arena.radius || (arena.width / 2);
-          const maxR = ar - (effect.size || 10) - 4;
+        const pieceMargin = (effect.size || 10) * 0.5;
+        const leftBound = arenaLeft + pieceMargin;
+        const rightBound = arenaRight - pieceMargin;
+        const bottomBound = arenaBottom - pieceMargin;
 
-          // Wall horizontal clamp
-          const dx = effect.x - cx;
-          if (Math.abs(dx) > maxR) {
-            effect.x = cx + Math.sign(dx) * maxR;
-            effect.vx = -effect.vx * 0.45;
-          }
+        // Wall horizontal bounce clamp
+        if (effect.x <= leftBound) {
+          effect.x = leftBound;
+          effect.vx = Math.abs(effect.vx) * 0.45;
+          effect.rotationSpeed = -effect.rotationSpeed * 0.6;
+        } else if (effect.x >= rightBound) {
+          effect.x = rightBound;
+          effect.vx = -Math.abs(effect.vx) * 0.45;
+          effect.rotationSpeed = -effect.rotationSpeed * 0.6;
+        }
 
-          // Calculate bottom floor level of circular arena at current x
-          const safeDx = Math.min(maxR * 0.98, Math.abs(effect.x - cx));
-          const dyFloor = Math.sqrt(Math.max(0, maxR * maxR - safeDx * safeDx));
-          const floorY = cy + dyFloor;
+        // Ceiling bounce
+        if (effect.y <= arenaTop + pieceMargin) {
+          effect.y = arenaTop + pieceMargin;
+          if (effect.vy < 0) effect.vy = -effect.vy * 0.35;
+        }
 
-          // Landed / hit the arena floor!
-          if (effect.y >= floorY) {
-            effect.y = floorY;
+        // Landed / hit the arena bottom floor!
+        if (effect.y >= bottomBound) {
+          effect.y = bottomBound;
+          effect.groundFrames = (effect.groundFrames || 0) + 1;
 
-            if (effect.vy > 0) {
-              if (effect.vy > 1.8) {
-                // Ground bounce!
-                effect.vy = -effect.vy * (effect.restitution || 0.35);
-                effect.vx *= 0.82; // Ground friction
-                effect.rotationSpeed = (effect.vx >= 0 ? 1 : -1) * Math.min(0.3, Math.abs(effect.vx) * 0.06);
+          if (effect.vy > 0) {
+            if (effect.vy > 1.4 && effect.groundFrames < 15) {
+              // Ground bounce!
+              effect.vy = -effect.vy * (effect.restitution || 0.35);
+              effect.vx *= 0.76; // Ground friction
+              effect.rotationSpeed = (effect.vx >= 0 ? 1 : -1) * Math.min(0.25, Math.abs(effect.vx) * 0.08);
 
-                // Secondary blood splash on floor impact
-                spawnSparks(effect.x, effect.y, 4, 'bloodSpark', '#E11D48');
-              } else {
-                // Settle on the floor
-                effect.vy = 0;
-                effect.vx *= 0.78;
-                effect.rotationSpeed *= 0.78;
+              // Secondary blood splash on floor impact
+              spawnSparks(effect.x, effect.y, 4, 'bloodSpark', '#E11D48');
+            } else {
+              // Settle on the bottom floor
+              effect.vy = 0;
+              effect.vx *= 0.65;
+              effect.rotationSpeed *= 0.65;
 
-                if (Math.abs(effect.vx) < 0.06) {
-                  effect.vx = 0;
-                  effect.rotationSpeed = 0;
-                  effect.isSettled = true;
-                }
+              if (Math.abs(effect.vx) < 0.05 || effect.groundFrames > 25) {
+                effect.vx = 0;
+                effect.rotationSpeed = 0;
+                effect.isSettled = true;
+                effect.settleHoldTimer = 90; // Rest fully visible on floor for 1.5s
+                effect.decay = 0.004;        // Slowly fade out over ~250 frames (~4.1s)
               }
             }
           }
@@ -296,8 +349,17 @@ export function updateDeathEffects() {
         }
       }
 
-      // Permanent gore: DO NOT DECAY! Keep effect.life = 1.0
-      effect.life = 1.0;
+      // Once landed and settled, hold briefly and slowly fade out
+      if (effect.isSettled) {
+        if (effect.settleHoldTimer !== undefined && effect.settleHoldTimer > 0) {
+          effect.settleHoldTimer--;
+        } else {
+          effect.life -= (effect.decay || 0.004);
+          if (effect.life <= 0) {
+            state.deathEffects.splice(i, 1);
+          }
+        }
+      }
       continue;
     }
 
@@ -318,32 +380,35 @@ export function updateDeathEffects() {
     // 3. Standard Character Death Shards
     effect.x += effect.vx;
     effect.y += effect.vy;
-    effect.vy += (effect.gravity || 0.32);
+    effect.vy += (effect.gravity || 0.38);
     effect.vx *= 0.985;
     effect.vy *= 0.99;
     effect.rotation += effect.rotationSpeed;
 
-    // Standard shard floor bounce & drop
-    if (arena) {
-      const cx = arena.x + arena.width / 2;
-      const cy = arena.y + arena.height / 2;
-      const ar = arena.radius || (arena.width / 2);
-      const maxR = ar - (effect.size || 8) - 4;
+    const shardMargin = (effect.size || 8) * 0.5;
+    const leftBound = arenaLeft + shardMargin;
+    const rightBound = arenaRight - shardMargin;
+    const bottomBound = arenaBottom - shardMargin;
 
-      const safeDx = Math.min(maxR * 0.98, Math.abs(effect.x - cx));
-      const dyFloor = Math.sqrt(Math.max(0, maxR * maxR - safeDx * safeDx));
-      const floorY = cy + dyFloor;
+    if (effect.x <= leftBound) {
+      effect.x = leftBound;
+      effect.vx = Math.abs(effect.vx) * 0.45;
+      effect.rotationSpeed = -effect.rotationSpeed * 0.6;
+    } else if (effect.x >= rightBound) {
+      effect.x = rightBound;
+      effect.vx = -Math.abs(effect.vx) * 0.45;
+      effect.rotationSpeed = -effect.rotationSpeed * 0.6;
+    }
 
-      if (effect.y >= floorY) {
-        effect.y = floorY;
-        if (effect.vy > 0) {
-          if (effect.vy > 1.5) {
-            effect.vy = -effect.vy * (effect.restitution || 0.32);
-            effect.vx *= 0.82;
-          } else {
-            effect.vy = 0;
-            effect.vx *= 0.78;
-          }
+    if (effect.y >= bottomBound) {
+      effect.y = bottomBound;
+      if (effect.vy > 0) {
+        if (effect.vy > 1.4) {
+          effect.vy = -effect.vy * (effect.restitution || 0.32);
+          effect.vx *= 0.78;
+        } else {
+          effect.vy = 0;
+          effect.vx *= 0.65;
         }
       }
     }
@@ -566,350 +631,48 @@ export function drawDeathEffects() {
 
 /**
  * Renders an authentic pixel art Terraria gore chunk for the Eye of Cthulhu death shatter.
+ * Uses dedicated sprite cuts from getEyeShatterImage with zero square strokeRect box borders.
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} effect
  */
 export function drawTerrariaEyeGore(ctx, effect) {
-  const s = effect.size || 12;
-  const p1Img = typeof getEyePhase1Image === 'function' ? getEyePhase1Image() : null;
-  const p2Img = typeof getEyePhase2Image === 'function' ? getEyePhase2Image() : null;
-  const p1Ready = Boolean(p1Img && p1Img.complete && p1Img.naturalWidth > 0);
-  const p2Ready = Boolean(p2Img && p2Img.complete && p2Img.naturalWidth > 0);
+  const sImg = typeof getEyeShatterImage === 'function' ? getEyeShatterImage() : null;
+  const sReady = Boolean(sImg && sImg.complete && sImg.naturalWidth > 0);
 
-  switch (effect.goreType) {
-    case 'eoc_nerve_tendril': {
-      if (p1Ready) {
-        ctx.imageSmoothingEnabled = false;
-        const drawW = s * 1.6;
-        const drawH = s * 2.2;
-        ctx.drawImage(p1Img, 16, 345, 95, 198, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
-      } else {
-        // Optic nerve root muscle
-        ctx.fillStyle = '#881337';
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.6, -s * 0.4);
-        ctx.lineTo(s * 0.2, -s * 0.5);
-        ctx.lineTo(s * 0.5, 0);
-        ctx.lineTo(s * 0.2, s * 0.5);
-        ctx.lineTo(-s * 0.6, s * 0.4);
-        ctx.lineTo(-s * 0.9, 0);
-        ctx.closePath();
-        ctx.fill();
-
-        // Trailing jagged tendril tentacles
-        ctx.fillStyle = '#4C0519';
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.6, -s * 0.3);
-        ctx.lineTo(-s * 1.1, -s * 0.5);
-        ctx.lineTo(-s * 0.7, -s * 0.1);
-        ctx.lineTo(-s * 1.2, s * 0.1);
-        ctx.lineTo(-s * 0.6, s * 0.2);
-        ctx.lineTo(-s * 1.0, s * 0.4);
-        ctx.lineTo(-s * 0.5, s * 0.3);
-        ctx.closePath();
-        ctx.fill();
-
-        // Manga ink outline
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.3;
-        ctx.stroke();
-      }
-      break;
-    }
-
-    case 'eoc_sclera_top': {
-      if (p1Ready) {
-        ctx.imageSmoothingEnabled = false;
-        const drawW = s * 2.2;
-        const drawH = s * 1.35;
-        ctx.drawImage(p1Img, 111, 345, 165, 99, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
-      } else {
-        // Upper ivory sclera dome
-        ctx.fillStyle = '#F8FAFC';
-        ctx.beginPath();
-        ctx.arc(0, 0, s, -Math.PI, 0);
-        ctx.lineTo(s * 0.8, s * 0.2);
-        ctx.lineTo(s * 0.3, 0);
-        ctx.lineTo(-s * 0.2, s * 0.25);
-        ctx.lineTo(-s * 0.7, 0);
-        ctx.closePath();
-        ctx.fill();
-
-        // Branching crimson veins
-        ctx.strokeStyle = '#DC2626';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.6, -s * 0.3);
-        ctx.lineTo(-s * 0.3, -s * 0.5);
-        ctx.lineTo(0, -s * 0.4);
-        ctx.lineTo(s * 0.4, -s * 0.6);
-        ctx.moveTo(-s * 0.1, -s * 0.4);
-        ctx.lineTo(s * 0.2, -s * 0.2);
-        ctx.stroke();
-
-        // Torn bloody bottom edge
-        ctx.fillStyle = '#991B1B';
-        ctx.beginPath();
-        ctx.moveTo(-s, 0);
-        ctx.lineTo(-s * 0.6, s * 0.15);
-        ctx.lineTo(-s * 0.2, s * 0.25);
-        ctx.lineTo(s * 0.3, 0);
-        ctx.lineTo(s * 0.8, s * 0.2);
-        ctx.lineTo(s, 0);
-        ctx.lineTo(s * 0.8, -s * 0.1);
-        ctx.lineTo(-s * 0.8, -s * 0.1);
-        ctx.closePath();
-        ctx.fill();
-
-        // Dark outline
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
-      }
-      break;
-    }
-
-    case 'eoc_sclera_bottom': {
-      if (p1Ready) {
-        ctx.imageSmoothingEnabled = false;
-        const drawW = s * 2.2;
-        const drawH = s * 1.35;
-        ctx.drawImage(p1Img, 111, 444, 165, 99, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
-      } else {
-        // Lower sclera shell
-        ctx.fillStyle = '#E2E8F0';
-        ctx.beginPath();
-        ctx.arc(0, 0, s, 0, Math.PI);
-        ctx.lineTo(-s * 0.7, -s * 0.15);
-        ctx.lineTo(-s * 0.2, -s * 0.3);
-        ctx.lineTo(s * 0.3, -s * 0.1);
-        ctx.lineTo(s * 0.8, -s * 0.2);
-        ctx.closePath();
-        ctx.fill();
-
-        // Red capillary veins
-        ctx.strokeStyle = '#EF4444';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.5, s * 0.3);
-        ctx.lineTo(-s * 0.2, s * 0.6);
-        ctx.lineTo(s * 0.3, s * 0.4);
-        ctx.stroke();
-
-        // Crimson torn meat
-        ctx.fillStyle = '#7F1D1D';
-        ctx.beginPath();
-        ctx.moveTo(-s, 0);
-        ctx.lineTo(-s * 0.7, -s * 0.15);
-        ctx.lineTo(-s * 0.2, -s * 0.3);
-        ctx.lineTo(s * 0.3, -s * 0.1);
-        ctx.lineTo(s * 0.8, -s * 0.2);
-        ctx.lineTo(s, 0);
-        ctx.lineTo(s * 0.6, s * 0.15);
-        ctx.lineTo(-s * 0.6, s * 0.15);
-        ctx.closePath();
-        ctx.fill();
-
-        // Dark outline
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
-      }
-      break;
-    }
-
-    case 'eoc_iris_pupil': {
-      if (p1Ready) {
-        ctx.imageSmoothingEnabled = false;
-        const drawW = s * 1.8;
-        const drawH = s * 1.8;
-        ctx.drawImage(p1Img, 171, 383, 105, 120, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
-      } else {
-        // Sclera tissue ring
-        ctx.fillStyle = '#F8FAFC';
-        ctx.beginPath();
-        ctx.arc(0, 0, s, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Cyan Iris
-        ctx.fillStyle = '#06B6D4';
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.72, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Dark Pupil
-        ctx.fillStyle = '#0F172A';
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.42, 0, Math.PI * 2);
-        ctx.fill();
-
-        // White Specular shine
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(-s * 0.22, -s * 0.22, s * 0.16, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Red perimeter capillaries
-        ctx.strokeStyle = '#DC2626';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(s * 0.6, -s * 0.6); ctx.lineTo(s * 0.85, -s * 0.85);
-        ctx.moveTo(-s * 0.7, s * 0.5); ctx.lineTo(-s * 0.9, s * 0.7);
-        ctx.stroke();
-
-        // Dark outline
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.arc(0, 0, s, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      break;
-    }
-
-    case 'eoc_fanged_maw_top': {
-      if (p2Ready) {
-        ctx.imageSmoothingEnabled = false;
-        const drawW = s * 2.2;
-        const drawH = s * 1.35;
-        ctx.drawImage(p2Img, 112, 348, 162, 98, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
-      } else {
-        // Mouth cavity flesh
-        ctx.fillStyle = '#7F1D1D';
-        ctx.beginPath();
-        ctx.moveTo(-s, 0);
-        ctx.quadraticCurveTo(0, -s * 0.75, s, 0);
-        ctx.lineTo(s * 0.8, s * 0.35);
-        ctx.lineTo(-s * 0.8, s * 0.35);
-        ctx.closePath();
-        ctx.fill();
-
-        // Sharp triangular ivory teeth
-        ctx.fillStyle = '#FFFFFF';
-        const teethX = [-s * 0.55, -s * 0.05, s * 0.45];
-        for (const tx of teethX) {
-          ctx.beginPath();
-          ctx.moveTo(tx - s * 0.14, 0);
-          ctx.lineTo(tx + s * 0.14, 0);
-          ctx.lineTo(tx, s * 0.55);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = '#111114';
-          ctx.lineWidth = 1.0;
-          ctx.stroke();
-        }
-
-        // Gum/bone edge
-        ctx.fillStyle = '#991B1B';
-        ctx.fillRect(-s * 0.9, -s * 0.25, s * 1.8, s * 0.25);
-
-        // Dark outline
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.4;
-        ctx.strokeRect(-s * 0.9, -s * 0.25, s * 1.8, s * 0.25);
-      }
-      break;
-    }
-
-    case 'eoc_fanged_maw_bottom': {
-      if (p2Ready) {
-        ctx.imageSmoothingEnabled = false;
-        const drawW = s * 2.2;
-        const drawH = s * 1.35;
-        ctx.drawImage(p2Img, 112, 446, 162, 99, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(-drawW * 0.5, -drawH * 0.5, drawW, drawH);
-      } else {
-        // Mouth cavity flesh
-        ctx.fillStyle = '#7F1D1D';
-        ctx.beginPath();
-        ctx.moveTo(-s, 0);
-        ctx.quadraticCurveTo(0, s * 0.75, s, 0);
-        ctx.lineTo(s * 0.8, -s * 0.35);
-        ctx.lineTo(-s * 0.8, -s * 0.35);
-        ctx.closePath();
-        ctx.fill();
-
-        // Sharp triangular ivory teeth
-        ctx.fillStyle = '#FFFFFF';
-        const teethX = [-s * 0.55, -s * 0.05, s * 0.45];
-        for (const tx of teethX) {
-          ctx.beginPath();
-          ctx.moveTo(tx - s * 0.14, 0);
-          ctx.lineTo(tx + s * 0.14, 0);
-          ctx.lineTo(tx, -s * 0.55);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = '#111114';
-          ctx.lineWidth = 1.0;
-          ctx.stroke();
-        }
-
-        // Gum/bone edge
-        ctx.fillStyle = '#991B1B';
-        ctx.fillRect(-s * 0.9, 0, s * 1.8, s * 0.25);
-
-        // Dark outline
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.4;
-        ctx.strokeRect(-s * 0.9, 0, s * 1.8, s * 0.25);
-      }
-      break;
-    }
-
-    case 'eoc_visceral_chunk':
-    default: {
-      const activeImg = p1Ready ? p1Img : (p2Ready ? p2Img : null);
-      if (activeImg) {
-        ctx.imageSmoothingEnabled = false;
-        const drawSize = s * 1.5;
-        // Pseudo-random sampling of meaty/veiny sections based on size
-        const patchX = 120 + (Math.abs(Math.floor(s * 17)) % 80);
-        const patchY = 360 + (Math.abs(Math.floor(s * 23)) % 100);
-        ctx.drawImage(activeImg, patchX, patchY, 50, 50, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.0;
-        ctx.strokeRect(-drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
-      } else {
-        ctx.fillStyle = effect.color || '#DC2626';
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.8, -s * 0.4);
-        ctx.lineTo(-s * 0.2, -s * 0.9);
-        ctx.lineTo(s * 0.7, -s * 0.5);
-        ctx.lineTo(s * 0.9, s * 0.3);
-        ctx.lineTo(s * 0.3, s * 0.8);
-        ctx.lineTo(-s * 0.6, s * 0.7);
-        ctx.closePath();
-        ctx.fill();
-
-        // Dark meat core
-        ctx.fillStyle = '#7F1D1D';
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Dark ink outline
-        ctx.strokeStyle = '#111114';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-      }
-      break;
-    }
+  // If sprite frame is provided and shatter image is loaded, render the authentic transparent sprite!
+  if (sReady && effect.spriteFrame) {
+    const frame = effect.spriteFrame;
+    const scale = effect.scale || ((effect.size * 2) / Math.max(frame.sw, frame.sh));
+    const drawW = frame.sw * scale;
+    const drawH = frame.sh * scale;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      sImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawW * 0.5, -drawH * 0.5, drawW, drawH
+    );
+    return;
   }
+
+  // Organic vector fallback with zero rectangular box outlines (no strokeRect)
+  const s = effect.size || 12;
+  ctx.fillStyle = effect.color || '#DC2626';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.8, -s * 0.4);
+  ctx.lineTo(-s * 0.2, -s * 0.9);
+  ctx.lineTo(s * 0.7, -s * 0.5);
+  ctx.lineTo(s * 0.9, s * 0.3);
+  ctx.lineTo(s * 0.3, s * 0.8);
+  ctx.lineTo(-s * 0.6, s * 0.7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#7F1D1D';
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#111114';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
 }

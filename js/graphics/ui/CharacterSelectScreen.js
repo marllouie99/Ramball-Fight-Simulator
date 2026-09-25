@@ -827,12 +827,14 @@ function drawSelectScreen() {
   ctx.fillText(titleText, canvas.width / 2, 64);
   ctx.restore();
 
-  // Tactical Sub-Controls (Map Selector & Arena BGM)
+  // Tactical Sub-Controls (Map Selector & Arena BGM) & Boss Battle Team Toggle
+  const isBossBattleMode = !isTactical && (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
   const mapW = isTactical ? 130 : 0;
+  const teamToggleW = isBossBattleMode ? 140 : 0;
   const bgmW = 130;
   const ctrlH = 24;
   const gap = 10;
-  const totalCtrlW = (isTactical ? mapW + gap : 0) + bgmW;
+  const totalCtrlW = (isTactical ? mapW + gap : 0) + (isBossBattleMode ? teamToggleW + gap : 0) + bgmW;
   const startCtrlX = canvas.width / 2 - totalCtrlW / 2;
   
   const tmY = 96;
@@ -869,6 +871,38 @@ function drawSelectScreen() {
     });
 
     curCtrlX += mapW + gap;
+  } else if (isBossBattleMode) {
+    const isSolo = Boolean(state.bossBattleNoTeammate);
+    const toggleLabel = isSolo ? '👤 TEAM: SOLO (1v1)' : '👥 TEAM: DUO (1v2)';
+
+    ctx.save();
+    ctx.fillStyle = '#baa88c';
+    drawChamferedRect(ctx, curCtrlX, tmY + 2, teamToggleW, ctrlH, 3);
+    ctx.fill();
+
+    ctx.fillStyle = isSolo ? '#fff5f7' : '#faedf0';
+    ctx.strokeStyle = isSolo ? '#b81c3b' : '#21050c';
+    ctx.lineWidth = 1.6;
+    drawChamferedRect(ctx, curCtrlX, tmY, teamToggleW, ctrlH, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = isSolo ? '#b81c3b' : '#21050c';
+    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(toggleLabel, curCtrlX + teamToggleW / 2, tmY + ctrlH / 2);
+    ctx.restore();
+
+    _registerButton(curCtrlX, tmY, teamToggleW, ctrlH + 2, () => {
+      state.bossBattleNoTeammate = !state.bossBattleNoTeammate;
+      saveFighterSelections();
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash1', 0.25);
+      }
+    });
+
+    curCtrlX += teamToggleW + gap;
   }
 
   // Arena BGM Selector Button
@@ -932,17 +966,62 @@ function drawSelectScreen() {
     const btnText = isTac1v1 ? 'START TACTICAL DUEL' : 'START BATTLE';
     drawBottomCommandDeck(btnText, () => startGame(), () => randomize1v1Fighters());
 
-  } else if (!isTactical && (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2')) {
+  } else if (isBossBattleMode) {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
-    const stackedH = Math.floor((fullCardH - cardGap) / 2);
-    const bottomY = topY + stackedH + cardGap;
+    const isSolo = Boolean(state.bossBattleNoTeammate);
 
-    drawPlayerCard('p1Index', 'THE BOSS', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
-    drawPlayerCard('p2Index', 'CHALLENGER 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
-    drawPlayerCard('p3Index', 'CHALLENGER 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+    if (isSolo) {
+      // 1v1 Solo Challenger vs Boss
+      drawPlayerCard('p1Index', 'THE BOSS', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
+      drawPlayerCard('p2Index', 'SOLO CHALLENGER', rightX, topY, cardW, fullCardH, '#38bdf8', true, true);
 
-    drawBottomCommandDeck('START BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+      // Center Retro Pixel VS Crest
+      const vsX = canvas.width / 2;
+      const vsY = topY + fullCardH / 2 - 10;
+      
+      ctx.save();
+      // 3D Shadow
+      ctx.fillStyle = '#5e0d1f';
+      ctx.beginPath();
+      ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Center berry badge
+      ctx.fillStyle = '#b81c3b';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Inset highlight
+      ctx.strokeStyle = '#ffaec0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('VS', vsX, vsY + 0.5);
+      ctx.restore();
+
+      drawBottomCommandDeck('START SOLO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+    } else {
+      // 1v2 Duo Challengers vs Boss
+      const stackedH = Math.floor((fullCardH - cardGap) / 2);
+      const bottomY = topY + stackedH + cardGap;
+
+      drawPlayerCard('p1Index', 'THE BOSS', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
+      drawPlayerCard('p2Index', 'CHALLENGER 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
+      drawPlayerCard('p3Index', 'CHALLENGER 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+
+      drawBottomCommandDeck('START DUO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+    }
 
   } else if (isTactical || mode === '2v2' || mode === 'Tactical 2v2' || mode === 'FFA' || mode === 'Tactical FFA') {
     const leftX = margin;
@@ -1123,8 +1202,10 @@ function randomize1v2Fighters() {
     state.p1Index = available[Math.floor(Math.random() * available.length)];
     const rem1 = available.filter(idx => idx !== state.p1Index);
     state.p2Index = rem1.length > 0 ? rem1[Math.floor(Math.random() * rem1.length)] : state.p1Index;
-    const rem2 = rem1.filter(idx => idx !== state.p2Index);
-    state.p3Index = rem2.length > 0 ? rem2[Math.floor(Math.random() * rem2.length)] : state.p2Index;
+    if (!state.bossBattleNoTeammate) {
+      const rem2 = rem1.filter(idx => idx !== state.p2Index);
+      state.p3Index = rem2.length > 0 ? rem2[Math.floor(Math.random() * rem2.length)] : state.p2Index;
+    }
   }
 }
 

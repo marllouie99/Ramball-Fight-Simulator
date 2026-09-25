@@ -339,7 +339,11 @@ export function drawFaceOffThumbnailScreen() {
 
     // 2. Render Mode-Specific Side-by-Side Face-Off Layout with "VS" to Countdown Transition
     if (mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
-      draw1v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, p3Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+      if (state.bossBattleNoTeammate) {
+        draw1v1FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+      } else {
+        draw1v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, p3Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+      }
     } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2') {
       draw2v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p3Def, p2Def, p4Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
     } else if (mode === 'TLFS') {

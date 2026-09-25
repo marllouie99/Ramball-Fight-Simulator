@@ -5,7 +5,7 @@
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { eyeOfCthulhuConfig } from '../../configs/characters/eyeOfCthulhuConfig.js';
-import { drawEyeOfCthulhuSkin } from '../../graphics/fighters/eyeOfCthulhuSkin.js';
+import { drawEyeOfCthulhuSkin, EOC_SHATTER_SPRITES } from '../../graphics/fighters/eyeOfCthulhuSkin.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -158,6 +158,9 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
     // 1. Universal Freeze & TimeStop Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -626,22 +629,35 @@ export class EyeOfCthulhuFighter extends Fighter {
   _spawnSheddingGore(cfg) {
     const baseR = this.r || 32;
     const goreDefs = [
-      // 1. Torn Iris & Pupil core chunk flung off
-      { type: 'eoc_iris_pupil', size: baseR * 0.46, color: '#06B6D4', speedMult: 1.3 },
-      // 2. Upper Sclera Shell shard
-      { type: 'eoc_sclera_top', size: baseR * 0.52, color: '#F8FAFC', speedMult: 1.2 },
-      // 3. Lower Sclera Shell shard
-      { type: 'eoc_sclera_bottom', size: baseR * 0.48, color: '#E2E8F0', speedMult: 1.15 },
+      // 1. Torn Sclera / Cornea curved shell shards
+      { type: 'eoc_sclera_shell', spriteFrame: EOC_SHATTER_SPRITES.scleraShells[0], scale: (baseR * 1.2) / 75, size: baseR * 0.52, color: '#F8FAFC', speedMult: 1.25 },
+      { type: 'eoc_sclera_shell', spriteFrame: EOC_SHATTER_SPRITES.scleraShells[1], scale: (baseR * 1.2) / 75, size: baseR * 0.48, color: '#E2E8F0', speedMult: 1.20 },
+      { type: 'eoc_sclera_shell', spriteFrame: EOC_SHATTER_SPRITES.scleraShells[3], scale: (baseR * 1.1) / 70, size: baseR * 0.45, color: '#F8FAFC', speedMult: 1.15 },
     ];
 
+    // Flesh ribbons
+    for (let r = 0; r < 3; r++) {
+      goreDefs.push({
+        type: 'eoc_flesh_ribbon',
+        spriteFrame: EOC_SHATTER_SPRITES.fleshRibbons[r % EOC_SHATTER_SPRITES.fleshRibbons.length],
+        scale: (baseR * 1.1) / 65,
+        size: baseR * 0.35,
+        color: '#991B1B',
+        speedMult: 1.1 + r * 0.1,
+      });
+    }
+
+    // Visceral debris chunks
     const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#7F1D1D', '#4C0519'];
     const gibCount = cfg.transformationGoreChunkCount || 10;
     for (let g = 0; g < gibCount; g++) {
       goreDefs.push({
         type: 'eoc_visceral_chunk',
+        spriteFrame: EOC_SHATTER_SPRITES.debrisChunks[g % EOC_SHATTER_SPRITES.debrisChunks.length],
+        scale: (baseR * 1.0) / 20,
         size: baseR * (0.16 + Math.random() * 0.18),
         color: gibColors[g % gibColors.length],
-        speedMult: 0.9 + Math.random() * 0.75
+        speedMult: 0.9 + Math.random() * 0.75,
       });
     }
 
@@ -663,14 +679,15 @@ export class EyeOfCthulhuFighter extends Fighter {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - (4.5 + Math.random() * 6.0), // High upward explosive launch
         rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.65,
+        rotationSpeed: (Math.random() - 0.5) * 0.65,
         size: def.size,
+        scale: def.scale || 1.0,
+        spriteFrame: def.spriteFrame || null,
         color: def.color,
         goreType: def.type,
         isEyeOfCthulhuGore: true,
         isPermanentGore: true,
         restitution: 0.35 + Math.random() * 0.15,
-        alpha: 1.0,
         life: 1.0,
         maxLife: 1.0,
         decay: 0, // Permanent on arena floor
@@ -729,6 +746,14 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
+  // Complete Poise: 100% immune to hit-pause, flinch, and basic attack hit-stop
+  get basicAttackHitPauseTimer() { return 0; }
+  set basicAttackHitPauseTimer(_) {}
+  get knockbackStunTimer() { return 0; }
+  set knockbackStunTimer(_) {}
+  get hitStunTimer() { return 0; }
+  set hitStunTimer(_) {}
+
   applyKnockback(vx, vy, stunFrames = 0, opts = {}) {
     const options = (typeof stunFrames === 'object' && stunFrames !== null)
       ? stunFrames
@@ -762,6 +787,32 @@ export class EyeOfCthulhuFighter extends Fighter {
     return;
   }
 
+  applyRedKnockback(vx, vy) {
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    return;
+  }
+
+  applyHitStun(duration, opts = {}) {
+    const options = (typeof duration === 'object' && duration !== null)
+      ? duration
+      : (typeof opts === 'object' && opts !== null ? opts : {});
+    const isPullOrDrag = Boolean(
+      options.isPull ||
+      options.isDrag ||
+      options.isBeam ||
+      options.isPureLoveBeam ||
+      options.isGetsuga ||
+      options.isCruelSun ||
+      options.isVortex ||
+      options.fromBlackHole
+    );
+    if (isPullOrDrag) {
+      return super.applyHitStun(typeof duration === 'number' ? duration : 0, options);
+    }
+    return;
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
       ? CONFIG.eye_of_cthulhu
@@ -773,11 +824,15 @@ export class EyeOfCthulhuFighter extends Fighter {
       amount = Math.max(1, amount * (1 - dr));
     }
 
-    if (opts && typeof opts === 'object') {
-      opts.skipKnockback = true;
-    }
+    const passOpts = (opts && typeof opts === 'object') ? { ...opts } : {};
+    passOpts.skipKnockback = true;
+    passOpts.skipHitStun = true;
+    passOpts.skipInterrupt = true;
 
-    return super.takeDamage(amount, attacker, opts);
+    const res = super.takeDamage(amount, attacker, passOpts);
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    return res;
   }
 
   _updateP2ChaseState(opponent, ownerIndex, cfg) {

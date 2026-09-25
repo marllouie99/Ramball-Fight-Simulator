@@ -260,8 +260,8 @@ export function reinitFighters(isNewMatch = false) {
     // Arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
   } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2') {
-    // 1v2 / Boss Battle mode: Team 0 is p1 (Boss), Team 1 is p2 and p3 (Challengers)
-    fighterIndexes = [state.p1Index, state.p2Index, state.p3Index];
+    // 1v2 / Boss Battle mode: Team 0 is p1 (Boss), Team 1 is p2 and p3 (Challengers) or solo p2
+    fighterIndexes = state.bossBattleNoTeammate ? [state.p1Index, state.p2Index] : [state.p1Index, state.p2Index, state.p3Index];
   }
  
   const isTacticalActive = (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
@@ -462,7 +462,7 @@ export function reinitFighters(isNewMatch = false) {
     state.fighters[3].vx = Math.cos(angle3) * state.fighters[3].speed;
     state.fighters[3].vy = Math.sin(angle3) * state.fighters[3].speed;
   } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === 'Stand Off 1v2') {
-    // Boss Battle Triangle Formation: Boss at top center, Challengers at bottom-left and bottom-right
+    // Boss Battle Formation: Boss at top center, Solo Challenger at bottom center (or Challengers at bottom-left and bottom-right in Duo)
     const centerX = arena.x + arena.width * 0.5;
     const topY = arena.y + arena.height * 0.28;
     const bottomY = arena.y + arena.height * 0.72;
@@ -482,32 +482,48 @@ export function reinitFighters(isNewMatch = false) {
       state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
     }
 
-    // Team 2: Challenger 1 at bottom left, aiming toward Boss
-    if (state.fighters[1]) {
-      state.fighters[1].x = leftX;
-      state.fighters[1].y = bottomY;
-      const angle1 = Math.atan2(topY - bottomY, centerX - leftX);
-      state.fighters[1].angle = angle1;
-      state.fighters[1].gunAngle = angle1;
-      state.fighters[1].rightGunAngle = angle1;
-      state.fighters[1].leftGunAngle = angle1;
-      const randAngle1 = Math.random() * Math.PI * 2;
-      state.fighters[1].vx = Math.cos(randAngle1) * state.fighters[1].speed;
-      state.fighters[1].vy = Math.sin(randAngle1) * state.fighters[1].speed;
-    }
+    if (state.bossBattleNoTeammate) {
+      // Team 2: Solo Challenger at bottom center, aiming directly upward at Boss
+      if (state.fighters[1]) {
+        state.fighters[1].x = centerX;
+        state.fighters[1].y = bottomY;
+        const angle1 = -Math.PI / 2;
+        state.fighters[1].angle = angle1;
+        state.fighters[1].gunAngle = angle1;
+        state.fighters[1].rightGunAngle = angle1;
+        state.fighters[1].leftGunAngle = angle1;
+        const randAngle1 = Math.random() * Math.PI * 2;
+        state.fighters[1].vx = Math.cos(randAngle1) * state.fighters[1].speed;
+        state.fighters[1].vy = Math.sin(randAngle1) * state.fighters[1].speed;
+      }
+    } else {
+      // Team 2: Challenger 1 at bottom left, aiming toward Boss
+      if (state.fighters[1]) {
+        state.fighters[1].x = leftX;
+        state.fighters[1].y = bottomY;
+        const angle1 = Math.atan2(topY - bottomY, centerX - leftX);
+        state.fighters[1].angle = angle1;
+        state.fighters[1].gunAngle = angle1;
+        state.fighters[1].rightGunAngle = angle1;
+        state.fighters[1].leftGunAngle = angle1;
+        const randAngle1 = Math.random() * Math.PI * 2;
+        state.fighters[1].vx = Math.cos(randAngle1) * state.fighters[1].speed;
+        state.fighters[1].vy = Math.sin(randAngle1) * state.fighters[1].speed;
+      }
 
-    // Team 2: Challenger 2 at bottom right, aiming toward Boss
-    if (state.fighters[2]) {
-      state.fighters[2].x = rightX;
-      state.fighters[2].y = bottomY;
-      const angle2 = Math.atan2(topY - bottomY, centerX - rightX);
-      state.fighters[2].angle = angle2;
-      state.fighters[2].gunAngle = angle2;
-      state.fighters[2].rightGunAngle = angle2;
-      state.fighters[2].leftGunAngle = angle2;
-      const randAngle2 = Math.random() * Math.PI * 2;
-      state.fighters[2].vx = Math.cos(randAngle2) * state.fighters[2].speed;
-      state.fighters[2].vy = Math.sin(randAngle2) * state.fighters[2].speed;
+      // Team 2: Challenger 2 at bottom right, aiming toward Boss
+      if (state.fighters[2]) {
+        state.fighters[2].x = rightX;
+        state.fighters[2].y = bottomY;
+        const angle2 = Math.atan2(topY - bottomY, centerX - rightX);
+        state.fighters[2].angle = angle2;
+        state.fighters[2].gunAngle = angle2;
+        state.fighters[2].rightGunAngle = angle2;
+        state.fighters[2].leftGunAngle = angle2;
+        const randAngle2 = Math.random() * Math.PI * 2;
+        state.fighters[2].vx = Math.cos(randAngle2) * state.fighters[2].speed;
+        state.fighters[2].vy = Math.sin(randAngle2) * state.fighters[2].speed;
+      }
     }
   } else {
     // 1v1: Fighters on opposite sides, aligned horizontally, facing each other
@@ -574,7 +590,7 @@ export function startRandomStandoffBattle() {
 
 export function randomize1v2Fighters() {
   const currentDefs = getActiveFighterDefs();
-  if (currentDefs.length < 3) return;
+  if (currentDefs.length < 2) return;
   const indices = currentDefs.map((_, idx) => idx);
   for (let i = indices.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -582,7 +598,9 @@ export function randomize1v2Fighters() {
   }
   state.p1Index = indices[0];
   state.p2Index = indices[1];
-  state.p3Index = indices[2];
+  if (!state.bossBattleNoTeammate && indices.length > 2) {
+    state.p3Index = indices[2];
+  }
 }
 
 export function resetMatchWithRandom1v2Fighters() {

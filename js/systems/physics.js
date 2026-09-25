@@ -346,7 +346,6 @@ export function resolveFighterCollision(a, b) {
   const aIsGojoInfinity = isEnemy && (typeof a.hasActiveInfinity === 'function') && a.hasActiveInfinity() && !b.isMeleeMode;
   const bIsGojoInfinity = isEnemy && (typeof b.hasActiveInfinity === 'function') && b.hasActiveInfinity() && !a.isMeleeMode;
 
-  // Apply Limitless Infinity movement slow on physical collision instead of pushing enemies back
   if (aIsGojoInfinity && !b.gojoInfinityImmune) {
     if (typeof b.applySlow === 'function') b.applySlow(20, 0.35, { isInfinitySlow: true });
     else { b.slowTimer = Math.max(b.slowTimer || 0, 20); b.slowMultiplier = Math.min(b.slowMultiplier || 1.0, 0.35); }
@@ -359,11 +358,14 @@ export function resolveFighterCollision(a, b) {
   const aIsEscanor = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor'));
   const bIsEscanor = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor'));
 
+  const aIsEye = Boolean(a && (a.characterId === 'eye_of_cthulhu' || a.type === 'eye_of_cthulhu'));
+  const bIsEye = Boolean(b && (b.characterId === 'eye_of_cthulhu' || b.type === 'eye_of_cthulhu'));
+
   const aIsGenosBeam = Boolean(a && (a.characterId === 'genos' || a.type === 'genos') && (a.isFiringUlt || a.isChargingUlt));
   const bIsGenosBeam = Boolean(b && (b.characterId === 'genos' || b.type === 'genos') && (b.isFiringUlt || b.isChargingUlt));
 
-  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor;
-  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor;
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye;
 
   const aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
   const bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
@@ -450,6 +452,10 @@ export function resolveFighterCollision(a, b) {
       }
       a.knockbackVx = 0;
       a.knockbackVy = 0;
+    } else if (aIsEye) {
+      // Ancient Ocular Horror: Terraria ghost flight physics — completely unaffected by collision bounce
+      a.knockbackVx = 0;
+      a.knockbackVy = 0;
     } else if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked) {
       const mult = bIsImmovable ? 2.0 : 1.0;
       a.vx -= (impulse * mult * nx + randA * impulse * tx);
@@ -481,6 +487,10 @@ export function resolveFighterCollision(a, b) {
       } else {
         b.normalizeSpeed();
       }
+      b.knockbackVx = 0;
+      b.knockbackVy = 0;
+    } else if (bIsEye) {
+      // Ancient Ocular Horror: Terraria ghost flight physics — completely unaffected by collision bounce
       b.knockbackVx = 0;
       b.knockbackVy = 0;
     } else if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked) {
