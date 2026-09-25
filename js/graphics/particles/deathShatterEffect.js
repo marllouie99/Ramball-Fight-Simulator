@@ -87,7 +87,7 @@ export function spawnDeathShatter(fighter) {
 export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
   const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
-  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 25 : 60) * qualityMultiplier);
+  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 40 : 100) * qualityMultiplier);
 
   const isPhase2 = Boolean(
     fighter.isPhase2 ||
@@ -137,7 +137,13 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
 
   for (let i = 0; i < goreDefs.length; i++) {
     if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
-      state.deathEffects.shift();
+      // Prioritize removing non-permanent temporary shards first so permanent boss gore stays
+      const nonPermIndex = state.deathEffects.findIndex(e => !e.isEyeOfCthulhuGore && !e.isPermanentGore);
+      if (nonPermIndex !== -1) {
+        state.deathEffects.splice(nonPermIndex, 1);
+      } else if (state.deathEffects.length > 80) {
+        state.deathEffects.shift();
+      }
     }
 
     const def = goreDefs[i];
@@ -158,9 +164,10 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
       color: def.color,
       goreType: def.type,
       isEyeOfCthulhuGore: true,
+      isPermanentGore: true,
       life: 1.0,
       maxLife: 1.0,
-      decay: isMinion ? 0.024 : (0.009 + Math.random() * 0.004),
+      decay: 0, // Permanent: stays on the arena floor
       gravity: 0.15,
     });
   }
@@ -189,6 +196,8 @@ export function spawnMachineCorpse(x, y, angle) {
  * Updates all death shatter effects.
  */
 export function updateDeathEffects() {
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
+
   for (let i = state.deathEffects.length - 1; i >= 0; i--) {
     const effect = state.deathEffects[i];
     
@@ -196,19 +205,54 @@ export function updateDeathEffects() {
     effect.x += effect.vx;
     effect.y += effect.vy;
     
+    if (effect.isEyeOfCthulhuGore || effect.isPermanentGore) {
+      // Eye of Cthulhu Terraria Gore: flies in arc, decelerates on ground, and STAYS permanently on the arena
+      effect.vy += (effect.gravity || 0.15);
+      effect.vx *= 0.94;
+      effect.vy *= 0.94;
+      effect.rotation += effect.rotationSpeed;
+      effect.rotationSpeed *= 0.94;
+
+      // Stop completely once settled on the ground
+      if (Math.hypot(effect.vx, effect.vy) < 0.12) {
+        effect.vx = 0;
+        effect.vy = 0;
+        effect.rotationSpeed = 0;
+      }
+
+      // Clamp inside arena boundaries so gore stays on the arena floor
+      if (arena) {
+        const ar = arena.radius || (arena.width / 2);
+        const cx = arena.x + arena.width / 2;
+        const cy = arena.y + arena.height / 2;
+        const dist = Math.hypot(effect.x - cx, effect.y - cy);
+        const maxR = ar - (effect.size || 10) - 6;
+        if (dist > maxR && dist > 0) {
+          effect.x = cx + ((effect.x - cx) / dist) * maxR;
+          effect.y = cy + ((effect.y - cy) / dist) * maxR;
+          effect.vx = -effect.vx * 0.35;
+          effect.vy = -effect.vy * 0.35;
+        }
+      }
+
+      // Trail blood sparks while actively airborne
+      if (Math.hypot(effect.vx, effect.vy) > 1.2 && Math.random() < 0.15) {
+        import('./sparkEffect.js').then(module => {
+          module.spawnSparks(effect.x + (Math.random() - 0.5) * 4, effect.y + (Math.random() - 0.5) * 4, 1, 'bloodSpark', '#E11D48');
+        });
+      }
+
+      // Permanent gore: DO NOT DECAY! Keep effect.life = 1.0
+      effect.life = 1.0;
+      continue;
+    }
+
     if (!effect.isMachineCorpse) {
       // Apply gravity and physics for standard shards
       effect.vy += effect.gravity;
       effect.vx *= 0.98;
       effect.vy *= 0.98;
       effect.rotation += effect.rotationSpeed;
-
-      // Eye of Cthulhu gore blood dripping trail
-      if (effect.isEyeOfCthulhuGore && effect.life > 0.25 && Math.random() < 0.20) {
-        import('./sparkEffect.js').then(module => {
-          module.spawnSparks(effect.x + (Math.random() - 0.5) * 4, effect.y + (Math.random() - 0.5) * 4, 1, 'bloodSpark', '#E11D48');
-        });
-      }
     } else {
       // Machine corpse occasionally emits smoke sparks
       if (Math.random() < 0.15) {
@@ -219,7 +263,7 @@ export function updateDeathEffects() {
     }
     
     // Fade out
-    effect.life -= effect.decay;
+    effect.life -= (effect.decay || 0.015);
     
     // Remove dead effects
     if (effect.life <= 0) {

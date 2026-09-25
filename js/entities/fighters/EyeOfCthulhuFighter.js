@@ -645,11 +645,13 @@ export class EyeOfCthulhuFighter extends Fighter {
       });
     }
 
+    if (!state.deathEffects) state.deathEffects = [];
+
     for (let i = 0; i < goreDefs.length; i++) {
       const def = goreDefs[i];
       const angle = (i / goreDefs.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
       const speed = (5.5 + Math.random() * 4.5) * (def.speedMult || 1.0);
-      this.shedGoreParticles.push({
+      const piece = {
         x: this.x + Math.cos(angle) * (baseR * 0.45),
         y: this.y + Math.sin(angle) * (baseR * 0.45),
         vx: Math.cos(angle) * speed,
@@ -660,10 +662,15 @@ export class EyeOfCthulhuFighter extends Fighter {
         color: def.color,
         goreType: def.type,
         isEyeOfCthulhuGore: true,
+        isPermanentGore: true,
         alpha: 1.0,
-        life: 60,
-        maxLife: 60
-      });
+        life: 1.0,
+        maxLife: 1.0,
+        decay: 0, // Permanent on arena floor
+        gravity: 0.15,
+      };
+
+      state.deathEffects.push(piece);
     }
   }
 
