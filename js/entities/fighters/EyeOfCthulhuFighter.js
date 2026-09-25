@@ -624,22 +624,45 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   _spawnSheddingGore(cfg) {
-    const chunkCount = cfg.transformationGoreChunkCount || 6;
-    for (let i = 0; i < chunkCount; i++) {
-      const angle = (i / chunkCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-      const speed = 4.5 + Math.random() * 4.0;
+    const baseR = this.r || 32;
+    const goreDefs = [
+      // 1. Torn Iris & Pupil core chunk flung off
+      { type: 'eoc_iris_pupil', size: baseR * 0.40, color: '#06B6D4', speedMult: 1.2 },
+      // 2. Upper Sclera Shell shard
+      { type: 'eoc_sclera_top', size: baseR * 0.45, color: '#F8FAFC', speedMult: 1.1 },
+      // 3. Lower Sclera Shell shard
+      { type: 'eoc_sclera_bottom', size: baseR * 0.42, color: '#E2E8F0', speedMult: 1.0 },
+    ];
+
+    const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#7F1D1D'];
+    const gibCount = cfg.transformationGoreChunkCount || 8;
+    for (let g = 0; g < gibCount; g++) {
+      goreDefs.push({
+        type: 'eoc_visceral_chunk',
+        size: baseR * (0.16 + Math.random() * 0.16),
+        color: gibColors[g % gibColors.length],
+        speedMult: 0.8 + Math.random() * 0.6
+      });
+    }
+
+    for (let i = 0; i < goreDefs.length; i++) {
+      const def = goreDefs[i];
+      const angle = (i / goreDefs.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const speed = (5.5 + Math.random() * 4.5) * (def.speedMult || 1.0);
       this.shedGoreParticles.push({
-        x: this.x + Math.cos(angle) * (this.r * 0.5),
-        y: this.y + Math.sin(angle) * (this.r * 0.5),
+        x: this.x + Math.cos(angle) * (baseR * 0.45),
+        y: this.y + Math.sin(angle) * (baseR * 0.45),
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        vy: Math.sin(angle) * speed - (1.5 + Math.random() * 2.5),
         rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.35,
-        size: 5 + Math.random() * 5,
-        color: i % 2 === 0 ? '#06B6D4' : '#DC2626', // Iris Cyan / Cornea Red
+        rotSpeed: (Math.random() - 0.5) * 0.45,
+        size: def.size,
+        color: def.color,
+        goreType: def.type,
+        isEyeOfCthulhuGore: true,
         alpha: 1.0,
-        life: 45,
-        maxLife: 45
+        life: 60,
+        maxLife: 60
       });
     }
   }

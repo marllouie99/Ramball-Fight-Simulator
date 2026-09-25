@@ -436,7 +436,7 @@ export function drawDeathEffects() {
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} effect
  */
-function drawTerrariaEyeGore(ctx, effect) {
+export function drawTerrariaEyeGore(ctx, effect) {
   const s = effect.size || 12;
 
   switch (effect.goreType) {

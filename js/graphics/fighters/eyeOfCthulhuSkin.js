@@ -4,6 +4,7 @@
 import { state } from '../../core/state.js';
 import { FighterRenderer } from '../renderers/fighterRenderer.js';
 import { drawMinionHealthBar } from '../statusEffects.js';
+import { drawTerrariaEyeGore } from '../particles/deathShatterEffect.js';
 
 let _phase1Image = null;
 let _phase2Image = null;
@@ -175,43 +176,137 @@ function _drawWindupTelegraph(ctx, r) {
 
 function _drawTransformationVortex(ctx, r, spinAngle, progress) {
   ctx.save();
-  const alpha = Math.min(0.65, progress * 0.7 + 0.25);
-  ctx.strokeStyle = `rgba(225, 29, 72, ${alpha})`;
-  ctx.lineWidth = 2.0;
+  const alpha = Math.min(0.85, progress * 0.8 + 0.30);
+
+  // 1. Concentric pulsing blood shockwave rings
+  ctx.strokeStyle = `rgba(225, 29, 72, ${alpha * 0.6})`;
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2);
+  ctx.arc(0, 0, r * 1.35, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 3 Swirling concentric arcs around the eye
-  for (let i = 0; i < 3; i++) {
-    const arcStart = spinAngle + (i * Math.PI * 2 / 3);
-    ctx.strokeStyle = (i === 1) ? `rgba(6, 182, 212, ${alpha * 0.85})` : `rgba(255, 77, 109, ${alpha})`;
+  // 2. Swirling spiral peeling ribbons (4 arcs in crimson & iris cyan)
+  for (let i = 0; i < 4; i++) {
+    const arcStart = spinAngle * 1.5 + (i * Math.PI * 0.5);
+    ctx.strokeStyle = (i % 2 === 1) ? `rgba(6, 182, 212, ${alpha * 0.9})` : `rgba(225, 29, 72, ${alpha})`;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (0.85 + i * 0.20), arcStart, arcStart + Math.PI * 0.75);
+    ctx.stroke();
+  }
+
+  // 3. Peeling flesh tendril sparks flung outward
+  ctx.fillStyle = '#DC2626';
+  for (let j = 0; j < 6; j++) {
+    const fAngle = spinAngle * 2.0 + (j * Math.PI / 3);
+    const fDist = r * (1.1 + (j % 3) * 0.25);
+    ctx.beginPath();
+    ctx.arc(Math.cos(fAngle) * fDist, Math.sin(fAngle) * fDist, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * Draws dynamic shredding cracks, tearing fissures, and peeling flaps across the eye during transformation
+ */
+function _drawShreddingBodyOverlay(ctx, r, progress, isPhase2) {
+  ctx.save();
+  if (!isPhase2) {
+    // Stage 1: Expanding tearing stress fractures across cornea/pupil before shed
+    const crackAlpha = Math.min(1.0, progress * 2.2);
+    ctx.globalAlpha = crackAlpha;
+
+    // Jagged radiating tearing crack lines across the eye
+    ctx.strokeStyle = '#DC2626';
     ctx.lineWidth = 2.0;
     ctx.beginPath();
-    ctx.arc(0, 0, r * (0.95 + i * 0.22), arcStart, arcStart + Math.PI * 0.85);
+    // Crack 1: center to top right
+    ctx.moveTo(r * 0.35, 0);
+    ctx.lineTo(r * 0.55, -r * 0.25);
+    ctx.lineTo(r * 0.45, -r * 0.50);
+    ctx.lineTo(r * 0.75, -r * 0.70);
+    // Crack 2: center to bottom right
+    ctx.moveTo(r * 0.35, 0);
+    ctx.lineTo(r * 0.60, r * 0.30);
+    ctx.lineTo(r * 0.50, r * 0.60);
+    ctx.lineTo(r * 0.80, r * 0.65);
+    // Crack 3: center across sclera
+    ctx.moveTo(r * 0.35, 0);
+    ctx.lineTo(0, -r * 0.35);
+    ctx.lineTo(-r * 0.45, -r * 0.20);
     ctx.stroke();
+
+    // Dark ink under-fissures for depth
+    ctx.strokeStyle = '#111114';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.35, 0); ctx.lineTo(r * 0.55, -r * 0.25);
+    ctx.moveTo(r * 0.35, 0); ctx.lineTo(r * 0.60, r * 0.30);
+    ctx.stroke();
+
+    // Pulsing red central rupture core
+    const pulseSize = r * (0.25 + progress * 0.35);
+    ctx.fillStyle = `rgba(225, 29, 72, ${0.40 + Math.sin(Date.now() / 40) * 0.25})`;
+    ctx.beginPath();
+    ctx.arc(r * 0.35, 0, pulseSize, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Peeling tissue flaps around the eye circumference
+    ctx.fillStyle = '#991B1B';
+    for (let f = 0; f < 4; f++) {
+      const flapAngle = (f * Math.PI / 2) + progress * 2.0;
+      const fx = Math.cos(flapAngle) * (r * 0.85);
+      const fy = Math.sin(flapAngle) * (r * 0.85);
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx + Math.cos(flapAngle) * (r * 0.3), fy + Math.sin(flapAngle) * (r * 0.3));
+      ctx.lineTo(fx - Math.sin(flapAngle) * (r * 0.15), fy + Math.cos(flapAngle) * (r * 0.15));
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    // Stage 2: Torn, ragged socket rim and bleeding meat flaps around the exposed maw
+    ctx.strokeStyle = '#991B1B';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.95, -Math.PI * 0.6, Math.PI * 0.6);
+    ctx.stroke();
+
+    // Bleeding crimson teeth rim glints
+    ctx.fillStyle = '#DC2626';
+    for (let i = -3; i <= 3; i++) {
+      const angle = (i * 0.28);
+      const bx = Math.cos(angle) * (r * 0.85);
+      const by = Math.sin(angle) * (r * 0.85);
+      ctx.beginPath();
+      ctx.arc(bx, by, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
 
 function _drawShedGoreParticles(ctx, particles) {
   if (!particles || particles.length === 0) return;
-  ctx.save();
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i];
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rotation || 0);
     ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha !== undefined ? p.alpha : 1.0));
-    ctx.fillStyle = p.color || '#DC2626';
-    const s = p.size || 6;
-    ctx.fillRect(-s / 2, -s / 2, s, s);
-    // Inner glint highlight
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(-s / 4, -s / 4, s / 2, s / 2);
+    if (p.isEyeOfCthulhuGore && typeof drawTerrariaEyeGore === 'function') {
+      drawTerrariaEyeGore(ctx, p);
+    } else {
+      ctx.fillStyle = p.color || '#DC2626';
+      const s = p.size || 6;
+      ctx.fillRect(-s / 2, -s / 2, s, s);
+      // Inner glint highlight
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-s / 4, -s / 4, s / 2, s / 2);
+    }
     ctx.restore();
   }
-  ctx.restore();
 }
 
 /**
@@ -257,8 +352,11 @@ export function drawEyeOfCthulhuSkin(ctx, fighter) {
   const frameIndex = Math.floor(currentFrameCount / ticksPerFrame) % frames.length;
   const fBox = frames[frameIndex] || frames[0];
 
+  const shudderX = isTransforming ? (Math.random() - 0.5) * ((fighter.transformationProgress || 0) * 8.0) : 0;
+  const shudderY = isTransforming ? (Math.random() - 0.5) * ((fighter.transformationProgress || 0) * 8.0) : 0;
+
   ctx.save();
-  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+  ctx.translate(fighter.x + shudderX, fighter.y - (fighter.z || 0) + shudderY);
 
   if (isTransforming) {
     // Rapid 360° axial rotation during transformation
@@ -299,6 +397,11 @@ export function drawEyeOfCthulhuSkin(ctx, fighter) {
     ctx.restore();
   } else {
     _drawProceduralEye(ctx, r, isPhase2);
+  }
+
+  // Draw tearing cracks and peeling overlays during transformation
+  if (isTransforming) {
+    _drawShreddingBodyOverlay(ctx, r, fighter.transformationProgress || 0, isPhase2);
   }
 
   // Status overlays & hit flash
