@@ -812,6 +812,11 @@ export class EyeOfCthulhuFighter extends Fighter {
     return false;
   }
 
+  onDeath() {
+    this._playAudio('death', 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', 1.0);
+    super.onDeath();
+  }
+
   drawSkin(ctx) {
     drawEyeOfCthulhuSkin(ctx, this);
   }
