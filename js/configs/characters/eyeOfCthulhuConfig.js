@@ -153,6 +153,11 @@ export const eyeOfCthulhuConfig = {
     p2Roar: 'Assets/Sound Effects/Skills/ragescream.mp3',
     spikeBurst: 'Assets/Sound Effects/Attacks/spikestab.mp3',
     death: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
+    actionNoises: [
+      'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3',
+      'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
+      'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise3.mp3',
+    ],
   },
   soundVolumes: {
     transformationStart: 0.95,
@@ -168,5 +173,11 @@ export const eyeOfCthulhuConfig = {
     p2Roar: 1.0,
     spikeBurst: 0.75,
     death: 1.0,
+    actionNoise: 0.85,
   },
+  soundChances: {
+    actionNoise: 0.45,
+  },
+  actionNoiseChance: 0.45,
+  actionNoiseVolume: 0.85,
 };

@@ -112,6 +112,32 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
+  _playActionNoise(force = false) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
+      ? CONFIG.eye_of_cthulhu
+      : eyeOfCthulhuConfig;
+    const noiseSounds = cfg?.sounds?.actionNoises || [
+      'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3',
+      'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
+      'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise3.mp3',
+    ];
+    const chance = (typeof cfg?.soundChances?.actionNoise === 'number')
+      ? cfg.soundChances.actionNoise
+      : ((typeof cfg?.actionNoiseChance === 'number') ? cfg.actionNoiseChance : 0.45);
+
+    if (force || Math.random() < chance) {
+      if (noiseSounds && noiseSounds.length > 0 && audioSystem && typeof audioSystem.playSFX === 'function') {
+        const sound = noiseSounds[Math.floor(Math.random() * noiseSounds.length)];
+        const vol = cfg?.soundVolumes?.actionNoise !== undefined
+          ? cfg.soundVolumes.actionNoise
+          : (cfg?.actionNoiseVolume !== undefined ? cfg.actionNoiseVolume : 0.85);
+        try {
+          audioSystem.playSFX(sound, vol);
+        } catch (e) {}
+      }
+    }
+  }
+
   update(opponent, ownerIndex, arena) {
     // 1. Universal Freeze & TimeStop Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
@@ -165,6 +191,18 @@ export class EyeOfCthulhuFighter extends Fighter {
     // Always update active gore particles and dash afterimages
     this._updateShedGoreParticles();
     this._updateAfterImages();
+
+    // Periodic ambient action noise / vocalization
+    if (!this.isTransforming && isTargetAlive) {
+      if (this.ambientNoiseTimer === undefined) {
+        this.ambientNoiseTimer = 180 + Math.floor(Math.random() * 120);
+      }
+      this.ambientNoiseTimer--;
+      if (this.ambientNoiseTimer <= 0) {
+        this.ambientNoiseTimer = 180 + Math.floor(Math.random() * 120);
+        this._playActionNoise();
+      }
+    }
 
     // 5. Soft Arena Leashing (Bypass standard rigid wall bounce)
     this.resolveWallBounce(arena, opponent);
@@ -326,6 +364,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
 
     this._playAudio('servantSpawn', 'Assets/Sound Effects/Skills/dash1.mp3', 0.45);
+    this._playActionNoise();
   }
 
   _updateWindupState(opponent, cfg) {
@@ -351,6 +390,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.isWindupTelegraph = false;
       this.hitOpponentThisRam = false;
       this._playAudio('ramDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+      this._playActionNoise();
     }
   }
 
@@ -414,6 +454,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     spawnSparks(opponent.x, opponent.y, 14, 'bloodSpark', '#E11D48');
     spawnImpactFlash(opponent.x, opponent.y, 35, 'bloodExplosion');
     this._playAudio('ramHit', 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 0.90);
+    this._playActionNoise();
   }
 
   _updateTurnaroundState(opponent, cfg) {
@@ -436,6 +477,7 @@ export class EyeOfCthulhuFighter extends Fighter {
           this.isRamming = true;
           this.hitOpponentThisRam = false;
           this._playAudio('p2ChainDash', 'Assets/Sound Effects/Skills/dash2.mp3', 0.95);
+          this._playActionNoise();
         } else {
           // Sequence complete — brief 12-frame alignment reset before next chain
           this.aiState = EOC_STATE.P2_CHASE;
@@ -445,6 +487,7 @@ export class EyeOfCthulhuFighter extends Fighter {
         if (this.ramsRemaining > 0) {
           this.aiState = EOC_STATE.WINDUP_RAM;
           this.stateTimer = cfg.ramWindupFrames || 24;
+          this._playActionNoise();
         } else {
           this.aiState = EOC_STATE.FATIGUE_PAUSE;
           this.stateTimer = cfg.ramFatiguePauseFrames || 45;
@@ -511,6 +554,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       try {
         spawnImpactFlash(this.x, this.y, 45, 'crimsonSniper');
         this._playAudio('pupilShed', 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', 0.85);
+        this._playActionNoise(true);
       } catch (e) {}
     }
 
@@ -541,6 +585,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       try {
         spawnFloatingText(this.x, this.y - this.r - 25, 'ROAAAR!', '#E11D48');
         this._playAudio('transformationRoar', 'Assets/Sound Effects/Skills/ragescream.mp3', 1.0);
+        this._playActionNoise(true);
       } catch (e) {}
 
       this.aiState = EOC_STATE.P2_CHASE;
@@ -698,6 +743,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.p2ChompCooldown = cfg.chompCooldown || 20;
       this._applyRamHit(opponent, cfg.chompDamage || 40, 10.0);
       this._playAudio('p2Chomp', 'Assets/Sound Effects/Skills/backstab.mp3', 0.85);
+      this._playActionNoise();
     }
     if (this.p2ChompCooldown > 0) this.p2ChompCooldown--;
 
@@ -715,6 +761,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.isRamming = true;
       this.hitOpponentThisRam = false;
       this._playAudio('p2ChainDash', 'Assets/Sound Effects/Skills/dash2.mp3', 0.95);
+      this._playActionNoise();
     }
   }
 
@@ -765,6 +812,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       triggerGlobalScreenShake(6, 15);
       this._playAudio('p2Roar', 'Assets/Sound Effects/Skills/ragescream.mp3', 1.0);
       this._playAudio('spikeBurst', 'Assets/Sound Effects/Attacks/spikestab.mp3', 0.75);
+      this._playActionNoise(true);
       if (projectileSystem && projectileSystem.fireProjectile) {
         const spikeCount = cfg.roarSpikeCount || 12;
         for (let i = 0; i < spikeCount; i++) {
