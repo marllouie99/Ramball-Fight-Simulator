@@ -282,3 +282,53 @@ export function drawEyeOfCthulhuSkin(ctx, fighter) {
 
   ctx.restore();
 }
+
+/**
+ * Renders the Servant of Cthulhu minion projectile using the miniature animated Phase 1 sprite sheet
+ */
+export function drawServantOfCthulhuProjectile(ctx, p) {
+  if (!ctx || !p) return;
+  const r = p.r || 10;
+  const img = _getPhase1Image();
+  const ticksPerFrame = 6;
+  const currentFrameCount = (typeof state !== 'undefined' && state.frameCount !== undefined)
+    ? state.frameCount
+    : Math.floor(Date.now() / 16);
+
+  const frameIndex = Math.floor(currentFrameCount / ticksPerFrame) % PHASE1_FRAMES.length;
+  const fBox = PHASE1_FRAMES[frameIndex] || PHASE1_FRAMES[0];
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  const angle = Math.atan2(p.vy || 0, p.vx || 0);
+  ctx.rotate(angle);
+
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
+
+  // Draw miniature sprite image or fallback
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    // Scale to miniature servant size (~10-12px radius)
+    const drawHeight = r * 2.2;
+    const drawWidth = drawHeight * (fBox.sw / fBox.sh);
+    const drawX = -drawWidth * 0.65;
+    const drawY = -drawHeight * 0.50;
+
+    ctx.drawImage(
+      img,
+      fBox.sx, fBox.sy, fBox.sw, fBox.sh,
+      drawX, drawY, drawWidth, drawHeight
+    );
+    ctx.restore();
+  } else {
+    _drawProceduralEye(ctx, r, false);
+  }
+
+  ctx.restore();
+}

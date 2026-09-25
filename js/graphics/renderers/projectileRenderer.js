@@ -25,6 +25,7 @@ import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeap
 import { tacticalProjectileSystem } from '../../../Tactical Force/systems/tacticalProjectileSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawPixelFlameProjectile } from '../weapons/flamewardenWeaponGraphics.js';
+import { drawServantOfCthulhuProjectile } from '../fighters/eyeOfCthulhuSkin.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
@@ -109,6 +110,12 @@ export function drawProjectiles() {
 }
 
 function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
+    // ── Servant of Cthulhu Minion: Miniature animated Phase 1 Eye of Cthulhu ──
+    if (p.isServantOfCthulhu || p.visual === 'servantOfCthulhu' || p.type === 'servantOfCthulhu') {
+      drawServantOfCthulhuProjectile(ctx, p);
+      return;
+    }
+
     // ── Layla Cosmic Blast: check BEFORE generic isExplosion so the correct draw fn is always used ──
     if (p.visual === 'layla_cosmic_blast') {
       ctx.save();
