@@ -98,6 +98,19 @@ export class EyeOfCthulhuFighter extends Fighter {
     ];
   }
 
+  _playAudio(soundKey, defaultPath, defaultVol = 1.0) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
+      ? CONFIG.eye_of_cthulhu
+      : eyeOfCthulhuConfig;
+    const soundPath = cfg?.sounds?.[soundKey] || defaultPath;
+    const volume = cfg?.soundVolumes?.[soundKey] !== undefined ? cfg.soundVolumes[soundKey] : defaultVol;
+    if (audioSystem && soundPath) {
+      try {
+        audioSystem.playSFX(soundPath, volume);
+      } catch (e) {}
+    }
+  }
+
   update(opponent, ownerIndex, arena) {
     // 1. Universal Freeze & TimeStop Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
@@ -123,7 +136,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.vy = 0;
       try {
         spawnFloatingText(this.x, this.y - this.r - 20, 'TRANSFORMATION!', '#E11D48');
-        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.95);
+        this._playAudio('transformationStart', 'Assets/Sound Effects/Skills/dash1.mp3', 0.95);
       } catch (e) {}
     }
 
@@ -285,6 +298,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       }
 
       spawnSparks(spawnX, spawnY, 8, 'bloodSpark', '#E11D48');
+      this._playAudio('servantSpawn', 'Assets/Sound Effects/Skills/dash1.mp3', 0.45);
     }
   }
 
@@ -310,6 +324,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.isRamming = true;
       this.isWindupTelegraph = false;
       this.hitOpponentThisRam = false;
+      this._playAudio('ramDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
     }
   }
 
@@ -372,6 +387,7 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     spawnSparks(opponent.x, opponent.y, 14, 'bloodSpark', '#E11D48');
     spawnImpactFlash(opponent.x, opponent.y, 35, 'bloodExplosion');
+    this._playAudio('ramHit', 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 0.90);
   }
 
   _updateTurnaroundState(opponent, cfg) {
@@ -393,6 +409,7 @@ export class EyeOfCthulhuFighter extends Fighter {
           this.stateTimer = cfg.p2RamDuration || 15;
           this.isRamming = true;
           this.hitOpponentThisRam = false;
+          this._playAudio('p2ChainDash', 'Assets/Sound Effects/Skills/dash2.mp3', 0.95);
         } else {
           // Sequence complete — brief 12-frame alignment reset before next chain
           this.aiState = EOC_STATE.P2_CHASE;
@@ -467,7 +484,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       triggerGlobalScreenShake(6, 12);
       try {
         spawnImpactFlash(this.x, this.y, 45, 'crimsonSniper');
-        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 1.0);
+        this._playAudio('pupilShed', 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', 0.85);
       } catch (e) {}
     }
 
@@ -497,7 +514,7 @@ export class EyeOfCthulhuFighter extends Fighter {
 
       try {
         spawnFloatingText(this.x, this.y - this.r - 25, 'ROAAAR!', '#E11D48');
-        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 1.0);
+        this._playAudio('transformationRoar', 'Assets/Sound Effects/Skills/ragescream.mp3', 1.0);
       } catch (e) {}
 
       this.aiState = EOC_STATE.P2_CHASE;
@@ -624,6 +641,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (dist <= (cfg.chompReach || 75) && this.p2ChompCooldown <= 0) {
       this.p2ChompCooldown = cfg.chompCooldown || 20;
       this._applyRamHit(opponent, cfg.chompDamage || 40, 10.0);
+      this._playAudio('p2Chomp', 'Assets/Sound Effects/Skills/backstab.mp3', 0.85);
     }
     if (this.p2ChompCooldown > 0) this.p2ChompCooldown--;
 
@@ -640,6 +658,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       this.stateTimer = cfg.p2RamDuration || 15;
       this.isRamming = true;
       this.hitOpponentThisRam = false;
+      this._playAudio('p2ChainDash', 'Assets/Sound Effects/Skills/dash2.mp3', 0.95);
     }
   }
 
@@ -688,6 +707,8 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (this.stateTimer <= 0) {
       // Release 360° Blood Spike burst
       triggerGlobalScreenShake(6, 15);
+      this._playAudio('p2Roar', 'Assets/Sound Effects/Skills/ragescream.mp3', 1.0);
+      this._playAudio('spikeBurst', 'Assets/Sound Effects/Attacks/spikestab.mp3', 0.75);
       if (projectileSystem && projectileSystem.fireProjectile) {
         const spikeCount = cfg.roarSpikeCount || 12;
         for (let i = 0; i < spikeCount; i++) {

@@ -142,9 +142,30 @@ Phase 1 follows a rhythmic 3-stage combat cycle:
 
 ---
 
+## Audio & SFX Configuration
+
+All sound effects, audio paths, and playback volumes are strictly configured in [`eyeOfCthulhuConfig.js`](file:///c:/Users/asus/OneDrive/Desktop/Circle%20Mini-Battle/js/configs/characters/eyeOfCthulhuConfig.js):
+
+| Key | File Path | Default Vol | Usage / Event |
+|---|---|---|---|
+| `transformationStart` | `Assets/Sound Effects/Skills/dash1.mp3` | `0.95` | 50% HP threshold transformation initiation |
+| `pupilShed` | `Assets/Sound Effects/Skills/mahito-body-explode.mp3` | `0.85` | Cornea and pupil shedding gore burst (~48% progress) |
+| `transformationRoar` | `Assets/Sound Effects/Skills/ragescream.mp3` | `1.00` | Climax boss enrage screech & radial shockwave |
+| `ramDash` | `Assets/Sound Effects/Skills/dash1.mp3` | `0.85` | Phase 1 telegraphed triple ram charge launch |
+| `ramHit` | `Assets/Sound Effects/Attacks/heavypunch1.mp3` | `0.90` | Physical ram contact impact on target |
+| `fleshHitLight` | `Assets/Sound Effects/Attacks/fleshhit.mp3` | `0.60` | Light projectile / needle strike contact |
+| `servantSpawn` | `Assets/Sound Effects/Skills/dash1.mp3` | `0.45` | Servant of Cthulhu spawn from pupil |
+| `servantImpact` | `Assets/Sound Effects/Attacks/fleshhit.mp3` | `0.60` | Servant minion collision with enemy |
+| `p2ChainDash` | `Assets/Sound Effects/Skills/dash2.mp3` | `0.95` | Phase 2 continuous high-speed chain dash launch |
+| `p2Chomp` | `Assets/Sound Effects/Skills/backstab.mp3` | `0.85` | Phase 2 proximity melee chomp bite attack |
+| `p2Roar` | `Assets/Sound Effects/Skills/ragescream.mp3` | `1.00` | Phase 2 Crimson Roar special skill activation |
+| `spikeBurst` | `Assets/Sound Effects/Attacks/spikestab.mp3` | `0.75` | 360° Blood Spike burst projectile release |
+
+---
+
 ## Technical & Architecture Standards
 
-1. **Config-Driven Stats**: All attributes, damage values, minion health caps, and dash speeds configured cleanly in `js/configs/bosses/eyeOfCthulhuBossConfig.js` and `js/configs/characters/eyeOfCthulhuConfig.js`.
+1. **Config-Driven Stats & Audio**: All stats, timers, sound effect paths (`cfg.sounds`), and volumes (`cfg.soundVolumes`) derive from `js/configs/characters/eyeOfCthulhuConfig.js` and `js/configs/bosses/eyeOfCthulhuBossConfig.js`.
 2. **Transform Stack Integrity**: All PNG rendering in `js/graphics/fighters/eyeOfCthulhuSkin.js` strictly encapsulates `ctx.save()` / `ctx.restore()` ensuring stack depth is always 0.
 3. **Zero `shadowBlur`**: Glowing crimson auras and ocular gazes rendered via layered transparent concentric arcs and gradient meshes.
 4. **Committed 360° Ramming Angles**: Directional charges snapshot target angle at wind-up and lock facing rotation throughout dash execution.

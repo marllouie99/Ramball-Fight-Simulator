@@ -134,4 +134,36 @@ export const eyeOfCthulhuConfig = {
   bloodMoonDuration: 360, // 6.0s
   bloodMoonIchorPoolDuration: 240, // 4.0s
   bloodMoonIchorDamagePerTick: 8,
+
+  // ──────────────────────────────────────────
+  // AUDIO CONFIGURATION & SOUND VOLUMES
+  // ──────────────────────────────────────────
+  sounds: {
+    transformationStart: 'Assets/Sound Effects/Skills/dash1.mp3',
+    pupilShed: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
+    transformationRoar: 'Assets/Sound Effects/Skills/ragescream.mp3',
+    ramDash: 'Assets/Sound Effects/Skills/dash1.mp3',
+    ramHit: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    fleshHitLight: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    servantSpawn: 'Assets/Sound Effects/Skills/dash1.mp3',
+    servantImpact: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    p2ChainDash: 'Assets/Sound Effects/Skills/dash2.mp3',
+    p2Chomp: 'Assets/Sound Effects/Skills/backstab.mp3',
+    p2Roar: 'Assets/Sound Effects/Skills/ragescream.mp3',
+    spikeBurst: 'Assets/Sound Effects/Attacks/spikestab.mp3',
+  },
+  soundVolumes: {
+    transformationStart: 0.95,
+    pupilShed: 0.85,
+    transformationRoar: 1.0,
+    ramDash: 0.85,
+    ramHit: 0.90,
+    fleshHitLight: 0.60,
+    servantSpawn: 0.45,
+    servantImpact: 0.60,
+    p2ChainDash: 0.95,
+    p2Chomp: 0.85,
+    p2Roar: 1.0,
+    spikeBurst: 0.75,
+  },
 };
