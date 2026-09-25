@@ -29,21 +29,31 @@ export function drawFighters() {
   const { ctx, fighters, mode } = state;
   // Removed debug overlay hiding to prevent DOM layout thrashing
 
-  // Helper to render team indicator ring for team modes (2v2 and 1v2 Stand Off / Boss Battle)
-  const isTeamMode = (mode === '2v2' || mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.TWO_VS_TWO || mode === GAME_MODES.STAND_OFF_1V2);
+  // Helper to render team indicator ring for team modes (2v2, Tactical 2v2, 4v4)
+  const isBossBattleMode = Boolean(
+    mode === 'Boss Battle' || 
+    mode === GAME_MODES.BOSS_BATTLE || 
+    mode === '1v2 Stand Off' || 
+    mode === '1v2' || 
+    mode === GAME_MODES.STAND_OFF_1V2 || 
+    mode === 'STAND_OFF_1V2' || 
+    state.mode === 'Boss Battle' || 
+    state.mode === GAME_MODES.BOSS_BATTLE || 
+    state.mode === '1v2 Stand Off' || 
+    state.mode === '1v2' || 
+    state.mode === GAME_MODES.STAND_OFF_1V2 || 
+    state.mode === 'STAND_OFF_1V2'
+  );
+  const isTeamMode = !isBossBattleMode && (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === '4v4' || mode === 'Tactical 4v4');
 
   const drawTeamRing = (fighter, fi) => {
-    if (!isTeamMode || !fighter || fighter.hp <= 0 || fighter.isDead || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
+    if (!isTeamMode || isBossBattleMode || !fighter || fighter.hp <= 0 || fighter.isDead || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
 
     // Immediately hide team indicators when champion screen or round end is active
     if (state._isChampionLayoutActive || state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.roundWinner || state.matchWinner) return;
 
     const team = state.getFighterTeam(fi);
     if (team === null) return;
-
-    // In 1v2 mode / Boss Battle, remove team indicator for the solo boss fighter (team 0)
-    const is1v2Mode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === GAME_MODES.STAND_OFF_1V2);
-    if (is1v2Mode && team === 0) return;
 
     // Immediately hide team indicator as soon as all opposing enemy fighters die
     if (fighters) {
