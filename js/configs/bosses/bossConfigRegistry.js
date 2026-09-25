@@ -48,8 +48,8 @@ export function getBossConfig(fighterOrId) {
 
   return {
     ...baseBossConfig,
-    bossTitle: `SUPREME ${fighterName}`,
-    bossSubtitle: 'DREADED ARENA OVERLORD',
+    bossTitle: 'BOSS',
+    bossSubtitle: 'BOSS',
     themeColor,
     entranceAuraColor: themeColor,
     enrageAuraColor: '#DC2626',

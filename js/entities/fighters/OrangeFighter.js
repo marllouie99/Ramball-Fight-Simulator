@@ -2,15 +2,17 @@ import { fadeOutLoopingSound, playLoopingSound } from '../../systems/soundSystem
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state } from '../../core/state.js';
+import { state, spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { drawOrangeFlamethrowerGun } from '../../graphics/weaponVisuals.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
+import { drawEmberSkin } from '../../graphics/fighters/flamewardenSkin.js';
 
 /**
- * Orange Fighter
+ * Orange Fighter (Ember)
  * Automatically locks onto the opponent and draws a V-shaped aim indicator.
+ * Features a Flamethrower Heat & Overheat Cooldown mechanic.
  */
 export class OrangeFighter extends Fighter {
   constructor(def) {
@@ -18,20 +20,39 @@ export class OrangeFighter extends Fighter {
     this.shootCooldownMax = CONFIG.orange.burstCooldown;
     this._flameSoundKey = null;
     this._isFlameSoundPlaying = false;
-    // Fuel mechanic state
-    this.fuel = CONFIG.orange.maxFuel;
+
+    // Flamethrower Heat & Overheat mechanic
+    this.heat = 0;
+    this.maxHeat = CONFIG.orange.maxHeat || 100;
+    this.isOverheated = false;
+    this.heatPerBurst = CONFIG.orange.heatPerBurst || 2.0;
+    this.coolRatePerFrame = CONFIG.orange.coolRatePerFrame || 0.40;
+    this.overheatCoolRate = CONFIG.orange.overheatCoolRate || 0.55;
+    this.hideHands = true; // Weapon renders custom themed volcanic pixel hands
+  }
+
+  // Backward compatibility fuel getter/setter
+  get fuel() {
+    return Math.max(0, (1 - this.heat / this.maxHeat) * (CONFIG.orange.maxFuel || 100));
+  }
+
+  set fuel(val) {
+    const maxF = CONFIG.orange.maxFuel || 100;
+    const ratio = Math.max(0, Math.min(1.0, val / maxF));
+    this.heat = (1 - ratio) * this.maxHeat;
   }
 
   reset() {
     super.reset();
-    this.fuel = CONFIG.orange.maxFuel;
+    this.heat = 0;
+    this.isOverheated = false;
     this._flameSoundKey = null;
     this._isFlameSoundPlaying = false;
   }
 
   shoot(ownerIndex, opponent) {
-    if (!projectileSystem || this.isCaughtInBeam()) return false;
-    if (!opponent) return false;
+    if (!projectileSystem || this.isCaughtInBeam() || !opponent) return false;
+    if (this.isOverheated) return false; // Cannot fire while weapon is overheated
 
     const distance = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     const maxRange = CONFIG.orange.flameRange;
@@ -40,13 +61,13 @@ export class OrangeFighter extends Fighter {
       return false; // Opponent too far to hit with flame
     }
 
-    // Check if has enough fuel
-    if (this.fuel < CONFIG.orange.fuelPerBurst) {
-      return false; // Cannot shoot if out of fuel
+    // Accumulate heat per burst
+    this.heat = Math.min(this.maxHeat, this.heat + this.heatPerBurst);
+    if (this.heat >= this.maxHeat) {
+      this.isOverheated = true;
+      this.heat = this.maxHeat;
+      spawnFloatingText(this.x, this.y - this.r - 12, 'OVERHEAT!', '#FF3300');
     }
-
-    // Consume fuel
-    this.fuel -= CONFIG.orange.fuelPerBurst;
 
     if (this.shootCooldown <= 0) {
       const flameCount = CONFIG.orange.flameCount;
@@ -90,7 +111,7 @@ export class OrangeFighter extends Fighter {
 
     // Fan shape originating from the front of the body, serving as an aim indicator
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 170, 90, 0.18)';
+    ctx.fillStyle = this.isOverheated ? 'rgba(255, 60, 0, 0.08)' : 'rgba(255, 170, 90, 0.18)';
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(end1X, end1Y);
@@ -100,7 +121,7 @@ export class OrangeFighter extends Fighter {
     ctx.restore();
 
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 150, 0, 0.14)';
+    ctx.fillStyle = this.isOverheated ? 'rgba(255, 40, 0, 0.06)' : 'rgba(255, 150, 0, 0.14)';
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(end1X, end1Y);
@@ -110,7 +131,7 @@ export class OrangeFighter extends Fighter {
 
     ctx.beginPath();
     ctx.arc(startX, startY, 4, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 200, 100, 0.9)';
+    ctx.fillStyle = this.isOverheated ? 'rgba(255, 50, 50, 0.8)' : 'rgba(255, 200, 100, 0.9)';
     ctx.fill();
     ctx.restore();
   }
@@ -119,23 +140,8 @@ export class OrangeFighter extends Fighter {
     if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
       return super.resolveWallBounce(arena, opponent);
     }
-    // Find nearest active fuel pickup
-    let nearestPickup = null;
-    let nearestPickupDist = Infinity;
 
-    if (state.fuelPickups && state.fuelPickups.length > 0) {
-      for (const pickup of state.fuelPickups) {
-        if (!pickup.active) continue;
-        const dist = Math.hypot(pickup.x - this.x, pickup.y - this.y);
-        if (dist < nearestPickupDist) {
-          nearestPickupDist = dist;
-          nearestPickup = pickup;
-        }
-      }
-    }
-
-    // Find nearest fighter (opponent) for "good fuel" re-bounce.
-    // If opponent provided, prefer it, but still pick nearest for better targeting.
+    // Find nearest valid opponent target
     let nearestFighter = null;
     let nearestFighterDist = Infinity;
     if (state.fighters && state.fighters.length > 0) {
@@ -172,23 +178,14 @@ export class OrangeFighter extends Fighter {
     if (bounced) {
       const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
 
-      // Decide bounce target:
-      // - when about to run out of fuel -> toward nearest fuel
-      // - otherwise -> toward nearest fighter
-      // Also: if the nearest fighter is DarkSlateGray and currently in stealth,
-      // don't home toward them (prevents "stealth abuse" feedback loops).
-      const fuelLowThreshold = CONFIG.orange.fuelPerBurst * 2; // "about to run out"
-      const shouldGoToFuel = this.fuel <= fuelLowThreshold;
-
       const isStealthFighter = (f) => {
         if (!f || f._def?.type !== 'darkslategray') return false;
         return (f.invincibilityTimer > 0 || f.flashStepTimer > 0);
       };
 
-      let safeNearestFighter = nearestFighter;
-      if (isStealthFighter(safeNearestFighter)) {
-        // find next nearest non-stealth fighter
-        safeNearestFighter = null;
+      let safeTarget = nearestFighter;
+      if (isStealthFighter(safeTarget)) {
+        safeTarget = null;
         let best = Infinity;
         if (state.fighters && state.fighters.length > 0) {
           for (const f of state.fighters) {
@@ -197,26 +194,21 @@ export class OrangeFighter extends Fighter {
             const dist = Math.hypot(f.x - this.x, f.y - this.y);
             if (dist < best) {
               best = dist;
-              safeNearestFighter = f;
+              safeTarget = f;
             }
           }
         }
       }
 
-      const target = shouldGoToFuel
-        ? (nearestPickup || safeNearestFighter)
-        : (safeNearestFighter || nearestPickup);
-
-      if (target) {
-        const tx = target.x;
-        const ty = target.y;
+      if (safeTarget) {
+        const tx = safeTarget.x;
+        const ty = safeTarget.y;
         const dx = tx - this.x;
         const dy = ty - this.y;
         const dist = Math.hypot(dx, dy) || 1;
         this.vx = (dx / dist) * currentSpeed * restitution;
         this.vy = (dy / dist) * currentSpeed * restitution;
       } else {
-        // fallback random bounce
         const angleJitter = 3.5;
         if (this.x - this.r <= arena.x || this.x + this.r >= arena.x + arena.width) {
           this.vx = -Math.abs(this.vx) * restitution;
@@ -233,7 +225,6 @@ export class OrangeFighter extends Fighter {
 
   update(opponent, ownerIndex, arena) {
     if (this._handleTimeStop()) {
-      // Ensure flames are fully stopped while time-stopped
       if (this._isFlameSoundPlaying) {
         fadeOutLoopingSound(this._flameSoundKey, 300);
         this._isFlameSoundPlaying = false;
@@ -241,14 +232,28 @@ export class OrangeFighter extends Fighter {
       flamewardenFlameSystem.stopEmitting();
       return;
     }
-    // Standard fighter updates (movement, poison, etc.)
+
     super.update(opponent, ownerIndex, arena);
 
-    // Block shooting if inside a Cronos time-stop sphere
-    const frozenBySphere = this.isInsideCronosSphere();
+    // Overheat recovery vs passive cooling
+    if (this.isOverheated) {
+      this.heat = Math.max(0, this.heat - this.overheatCoolRate);
+      if (this.heat <= 0) {
+        this.isOverheated = false;
+        this.heat = 0;
+        spawnFloatingText(this.x, this.y - this.r - 10, 'READY', '#00FF66');
+      }
+    }
 
-    // Override shooting behavior for continuous fire within range
-    const isFiring = !frozenBySphere && !this.isCaughtInBeam() && this.shoot(ownerIndex, opponent);
+    const frozenBySphere = this.isInsideCronosSphere();
+    const canAttemptShot = !frozenBySphere && !this.isCaughtInBeam() && !this.isOverheated;
+    const isFiring = canAttemptShot && this.shoot(ownerIndex, opponent);
+
+    if (!isFiring && !this.isOverheated) {
+      // Passive cooling when not actively shooting
+      this.heat = Math.max(0, this.heat - this.coolRatePerFrame);
+    }
+
     if (isFiring) {
       if (!this._flameSoundKey) {
         this._flameSoundKey = `orange-flame-${ownerIndex}`;
@@ -260,7 +265,7 @@ export class OrangeFighter extends Fighter {
       }
 
       // Update flame particle system - calculate nozzle position
-      const nozzleDistance = this.r + 45; // Nozzle is at the tip of the gun
+      const nozzleDistance = this.r + 45;
       const nozzleX = this.x + Math.cos(this.gunAngle) * nozzleDistance;
       const nozzleY = this.y + Math.sin(this.gunAngle) * nozzleDistance;
       flamewardenFlameSystem.startEmitting(nozzleX, nozzleY, this.gunAngle);
@@ -272,17 +277,23 @@ export class OrangeFighter extends Fighter {
       flamewardenFlameSystem.stopEmitting();
     }
 
-    // Replace base wall bounce behavior with orange's fuel-aware bounce.
-    // (We re-run bounce here so it reacts immediately on edge contact.)
     this.resolveWallBounce(arena, opponent);
+  }
+
+  drawSkin(ctx) {
+    drawEmberSkin(ctx, this);
+  }
+
+  drawBody(ctx) {
+    drawEmberSkin(ctx, this);
   }
 
   drawGun(ctx) {
     drawOrangeFlamethrowerGun(ctx, this.x, this.y, this.gunAngle, this.r);
   }
 
-  drawFuelBar(ctx) {
-    const fuelRatio = this.fuel / CONFIG.orange.maxFuel;
+  drawHeatBar(ctx) {
+    const heatRatio = Math.max(0, Math.min(1.0, this.heat / this.maxHeat));
 
     // Curved meter settings
     const meterRadius = this.r + 18;
@@ -290,80 +301,94 @@ export class OrangeFighter extends Fighter {
     const startAngle = Math.PI * 0.7;  // Start from left side
     const endAngle = Math.PI * 0.3;    // End at right side (curved upward)
     const totalAngle = startAngle - endAngle;
-    const filledAngle = endAngle + (totalAngle * fuelRatio);
+    const filledAngle = endAngle + (totalAngle * (1 - heatRatio));
 
     ctx.save();
     ctx.translate(this.x, this.y);
 
-    // Draw background arc (dark)
+    // Draw background arc (dark obsidian)
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, endAngle, startAngle);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.strokeStyle = 'rgba(10, 10, 15, 0.75)';
     ctx.lineWidth = meterThickness;
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // Determine color based on fuel level
+    // Determine color gradient based on heat status
     let startColor, endColor;
-    if (fuelRatio > 0.5) {
-      startColor = '#ff9900';
-      endColor = '#ff6600';
-    } else if (fuelRatio > 0.25) {
-      startColor = '#ff6600';
-      endColor = '#ff4400';
+    if (this.isOverheated) {
+      const flash = (Math.sin(Date.now() / 100) > 0);
+      startColor = flash ? '#FF0000' : '#FF6600';
+      endColor = flash ? '#FFFFFF' : '#FF0000';
+    } else if (heatRatio > 0.75) {
+      startColor = '#FF4400';
+      endColor = '#FF0000';
+    } else if (heatRatio > 0.40) {
+      startColor = '#FF9900';
+      endColor = '#FF5500';
     } else {
-      startColor = '#ff4400';
-      endColor = '#ff0000';
+      startColor = '#FFD700';
+      endColor = '#FF8C00';
     }
 
-    // Draw filled arc with gradient
-    const gradient = ctx.createLinearGradient(
-      Math.cos(startAngle) * meterRadius,
-      Math.sin(startAngle) * meterRadius,
-      Math.cos(endAngle) * meterRadius,
-      Math.sin(endAngle) * meterRadius
-    );
-    gradient.addColorStop(0, startColor);
-    gradient.addColorStop(1, endColor);
+    if (heatRatio > 0.02) {
+      const gradient = ctx.createLinearGradient(
+        Math.cos(startAngle) * meterRadius,
+        Math.sin(startAngle) * meterRadius,
+        Math.cos(endAngle) * meterRadius,
+        Math.sin(endAngle) * meterRadius
+      );
+      gradient.addColorStop(0, startColor);
+      gradient.addColorStop(1, endColor);
 
-    ctx.beginPath();
-    ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
-    ctx.strokeStyle = gradient;
-    ctx.lineWidth = meterThickness;
-    ctx.lineCap = 'round';
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = meterThickness;
+      ctx.lineCap = 'round';
+      ctx.stroke();
 
-    // Outer glow simulation (Rule 11 compliant: layered concentric strokes, zero shadowBlur)
-    ctx.beginPath();
-    ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
-    ctx.strokeStyle = `rgba(255, 150, 0, ${(0.15 + fuelRatio * 0.25).toFixed(2)})`;
-    ctx.lineWidth = meterThickness + 4;
-    ctx.stroke();
+      // Outer glow simulation (Rule 11 compliant: layered concentric strokes, zero shadowBlur)
+      ctx.beginPath();
+      ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
+      ctx.strokeStyle = this.isOverheated
+        ? `rgba(255, 50, 0, ${(0.3 + 0.2 * Math.sin(Date.now() / 80)).toFixed(2)})`
+        : `rgba(255, 140, 0, ${(0.15 + heatRatio * 0.25).toFixed(2)})`;
+      ctx.lineWidth = meterThickness + 4;
+      ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
-    ctx.strokeStyle = `rgba(255, 180, 50, ${(0.25 + fuelRatio * 0.30).toFixed(2)})`;
-    ctx.lineWidth = meterThickness + 1.5;
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
+      ctx.strokeStyle = this.isOverheated
+        ? 'rgba(255, 200, 200, 0.4)'
+        : `rgba(255, 200, 50, ${(0.20 + heatRatio * 0.25).toFixed(2)})`;
+      ctx.lineWidth = meterThickness + 1.5;
+      ctx.stroke();
+    }
 
-    // Draw fuel text in center
-    ctx.fillStyle = '#ffffff00';
-    ctx.font = 'bold 11px Arial';
+    // Status label below the meter
+    ctx.font = 'bold 9px "Silkscreen", Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${Math.round(this.fuel)}`, 0, 0);
-
-    // Draw small "F" label below the meter
-    ctx.fillStyle = 'rgba(255, 150, 0, 0.8)';
-    ctx.font = 'bold 8px Arial';
-    ctx.fillText('FUEL', 0, meterRadius + 12);
+    if (this.isOverheated) {
+      const blink = (Math.sin(Date.now() / 120) > 0);
+      ctx.fillStyle = blink ? '#FF3300' : '#FFAA00';
+      ctx.fillText('OVERHEAT', 0, meterRadius + 14);
+    } else if (heatRatio > 0.05) {
+      ctx.fillStyle = heatRatio > 0.75 ? '#FF5500' : '#FFAA00';
+      ctx.fillText(`HEAT ${Math.round(heatRatio * 100)}%`, 0, meterRadius + 14);
+    }
 
     ctx.restore();
+  }
+
+  drawFuelBar(ctx) {
+    this.drawHeatBar(ctx);
   }
 
   draw(ctx) {
     super.draw(ctx);
     this.drawAimV(ctx);
-    this.drawFuelBar(ctx);
+    this.drawHeatBar(ctx);
   }
 }
+

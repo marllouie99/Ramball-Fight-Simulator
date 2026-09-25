@@ -271,6 +271,10 @@ export class DopplegangerFighter extends Fighter {
     this.resolveWallBounce(arena, opponent);
   }
 
+  drawSkin(ctx) {
+    drawDoppelgangerSkin(ctx, this);
+  }
+
   drawBody(ctx) {
     const animTime = this.animationTime || Date.now();
     

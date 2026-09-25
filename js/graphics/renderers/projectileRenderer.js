@@ -24,6 +24,7 @@ import { _getUryuArrowImage } from '../weapons/uryuWeaponGraphics.js';
 import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeaponGraphics.js';
 import { tacticalProjectileSystem } from '../../../Tactical Force/systems/tacticalProjectileSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
+import { drawPixelFlameProjectile } from '../weapons/flamewardenWeaponGraphics.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
@@ -332,8 +333,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     }
 
     if (p.isFlame) {
-      // Skip individual flame drawing - flames are batched in drawFlames()
-      // This improves performance by reducing draw calls
+      drawPixelFlameProjectile(ctx, p);
       return;
     }
 

@@ -188,38 +188,10 @@ const BOSS_SUB_NAMES = {
 };
 
 /**
- * Returns formatted boss subtitle (e.g. "- The Bush Camper -", "- The Honored One -").
+ * Returns formatted boss subtitle for Boss Battle mode (e.g. "- BOSS -").
  */
 export function getBossSubName(fighter) {
-  if (!fighter) return '- Dreaded Arena Overlord -';
-  const rawId = String(fighter.characterId || fighter.type || (fighter._def && (fighter._def.id || fighter._def.type)) || '').toLowerCase();
-  const rawName = String(fighter.name || '').toLowerCase();
-
-  let title = (fighter.bossConfig && (fighter.bossConfig.bossTitle || fighter.bossConfig.title)) ||
-              fighter.bossTitle ||
-              (fighter._def && (fighter._def.bossTitle || fighter._def.title)) ||
-              (rawId && CONFIG && CONFIG[rawId] && (CONFIG[rawId].bossTitle || CONFIG[rawId].title)) ||
-              null;
-
-  if (!title) {
-    if (BOSS_SUB_NAMES[rawId]) {
-      title = BOSS_SUB_NAMES[rawId];
-    } else {
-      for (const key of Object.keys(BOSS_SUB_NAMES)) {
-        if (rawId.includes(key) || rawName.includes(key)) {
-          title = BOSS_SUB_NAMES[key];
-          break;
-        }
-      }
-    }
-  }
-
-  if (!title) {
-    title = 'Dreaded Arena Overlord';
-  }
-
-  const cleaned = String(title).trim().replace(/^[-–—\s]+|[-–—\s]+$/g, '');
-  return `- ${cleaned} -`;
+  return '- BOSS -';
 }
 
 /**

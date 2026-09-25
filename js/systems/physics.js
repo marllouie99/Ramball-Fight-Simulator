@@ -140,97 +140,15 @@ export function isFighterEffectivelyAlive(fighter) {
 }
 
 // ─────────────────────────────────────────────
-// FUEL PICKUP SYSTEM
+// FUEL PICKUP SYSTEM (Deprecated — Ember now uses Overheat Cooldown)
 // ─────────────────────────────────────────────
 
-/**
- * Spawns a fuel pickup at a random position within the arena.
- */
 export function spawnFuelPickup() {
-  const arena = CONFIG.arena;
-  const padding = 30;
-  const x = arena.x + padding + Math.random() * (arena.width - padding * 2);
-  const y = arena.y + padding + Math.random() * (arena.height - padding * 2);
-
-  state.fuelPickups.push({
-    x,
-    y,
-    radius: CONFIG.orange.fuelPickupRadius,
-    respawnTimer: 0,
-    active: true,
-    pulsePhase: Math.random() * Math.PI * 2,
-  });
+  // Fuel pickups removed in favor of built-in Overheat & Cooldown mechanic
 }
 
-/**
-/**
- * Updates fuel pickups (handles respawning and collision with fighters).
- */
 export function updateFuelPickups() {
-  if (state.gameState !== 'playing') return;
-  if (isGlobalHitPauseActive(state)) return;
-
-  // Spawn new fuel pickups periodically
-  state.fuelPickupSpawnTimer++;
-  if (state.fuelPickupSpawnTimer >= CONFIG.orange.fuelPickupSpawnInterval) {
-    state.fuelPickupSpawnTimer = 0;
-
-    // Only spawn if we haven't reached max pickups
-    const activePickups = state.fuelPickups.filter(p => p.active).length;
-    if (activePickups < CONFIG.orange.maxFuelPickups) {
-      spawnFuelPickup();
-    }
-  }
-
-  // Update existing pickups
-  for (let i = state.fuelPickups.length - 1; i >= 0; i--) {
-    const pickup = state.fuelPickups[i];
-
-    if (!pickup.active) {
-      pickup.respawnTimer--;
-      if (pickup.respawnTimer <= 0) {
-        pickup.active = true;
-        pickup.x = CONFIG.arena.x + 30 + Math.random() * (CONFIG.arena.width - 60);
-        pickup.y = CONFIG.arena.y + 30 + Math.random() * (CONFIG.arena.height - 60);
-      }
-      continue;
-    }
-
-    // Check collision with Orange fighters (fuel should only exist in arena when Orange is present)
-    let hasOrange = false;
-    for (let j = 0; j < state.fighters.length; j++) {
-      const f = state.fighters[j];
-      if (f && f.hp > 0 && f._def.type === 'orange') {
-        hasOrange = true;
-        break;
-      }
-    }
-    if (!hasOrange) {
-      pickup.active = false;
-      continue;
-    }
-
-    for (const fighter of state.fighters) {
-      if (!fighter || fighter.hp <= 0 || fighter._def.type !== 'orange') continue;
-
-
-      const dist = Math.hypot(fighter.x - pickup.x, fighter.y - pickup.y);
-      if (dist < fighter.r + pickup.radius) {
-        // Pickup collected
-        const fuelAmount = CONFIG.orange.fuelPickupAmount;
-        fighter.fuel = Math.min(CONFIG.orange.maxFuel, fighter.fuel + fuelAmount);
-        spawnFloatingText(fighter.x, fighter.y - fighter.r - 10, `+${fuelAmount} FUEL`, '#ff6600');
-
-        // Deactivate pickup and start respawn timer
-        pickup.active = false;
-        pickup.respawnTimer = CONFIG.orange.fuelPickupRespawnTime;
-        break;
-      }
-    }
-
-    // Update pulse animation
-    pickup.pulsePhase += 0.1;
-  }
+  // Fuel pickups removed in favor of built-in Overheat & Cooldown mechanic
 }
 
 /**

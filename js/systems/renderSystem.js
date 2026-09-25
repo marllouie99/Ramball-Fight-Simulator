@@ -429,6 +429,11 @@ export function renderGame() {
           drawNanamiRatioCritDimScreen();
         }
 
+        // Render Flamethrower pixel flame particles
+        if (flamewardenFlameSystem && flamewardenFlameSystem.isActive()) {
+          flamewardenFlameSystem.draw(state.ctx);
+        }
+
         // Composite flame canvas onto main canvas (clipped to arena bounds)
         compositeFlameCanvas();
 

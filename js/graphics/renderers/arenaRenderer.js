@@ -721,9 +721,10 @@ export {
 // ──────────────────────────────────────────
 export function drawFuelPickups() {
   const { ctx, fuelPickups, fighters } = state;
+  if (!fuelPickups || fuelPickups.length === 0) return;
 
   // Only draw fuel pickups if an Orange fighter is currently alive in the arena.
-  const hasOrange = fighters.some(f => f && f.hp > 0 && f._def.type === 'orange');
+  const hasOrange = fighters && fighters.some(f => f && f.hp > 0 && f._def && f._def.type === 'orange');
   if (!hasOrange) return;
 
   fuelPickups.forEach(pickup => {
@@ -827,15 +828,22 @@ export function drawFuelPickups() {
 
 // Helper: draw a rounded rectangle path
 function roundedRect(ctx, x, y, w, h, r) {
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.arcTo(x + w, y, x + w, y + r, r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-  ctx.lineTo(x + r, y + h);
-  ctx.arcTo(x, y, x + h - r, r);
-  ctx.lineTo(x, y + r);
-  ctx.arcTo(x, y, x + r, y, r);
+  if (w < 0) { x += w; w = -w; }
+  if (h < 0) { y += h; h = -h; }
+  const radius = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, radius);
+    return;
+  }
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.arcTo(x + w, y, x + w, y + radius, radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+  ctx.lineTo(x + radius, y + h);
+  ctx.arcTo(x, y + h, x, y + h - radius, radius);
+  ctx.lineTo(x, y + radius);
+  ctx.arcTo(x, y, x + radius, y, radius);
   ctx.closePath();
 }
 

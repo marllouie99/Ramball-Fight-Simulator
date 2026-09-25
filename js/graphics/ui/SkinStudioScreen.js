@@ -28,6 +28,8 @@ import { drawJohnWickSkin, _drawJohnWickHair, _getJohnWickHairImage } from '../f
 import { drawTodoSkin, _drawTodoHair, _getTodoHairImage } from '../fighters/todoSkin.js';
 import { drawMusashiSkin, _drawMusashiHair } from '../fighters/musashiSkin.js';
 import { drawGunslingerSkin, _drawGunslingerHair, _getGunslingerHairImage } from '../fighters/gunSlingerSkin.js';
+import { drawDoppelgangerSkin, drawDoppelgangerPixelBody } from '../fighters/doppelgangerSkin.js';
+import { drawEmberSkin } from '../fighters/flamewardenSkin.js';
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -58,11 +60,11 @@ let _copyToastTimer = 0;
 
 // Fighter Category Tabs in Skin Studio Modal
 export const SKIN_STUDIO_CATEGORIES = [
-  { id: 'ALL', label: 'ALL (25)', filter: () => true },
+  { id: 'ALL', label: 'ALL (27)', filter: () => true },
   { id: 'JJK', label: 'JJK (9)', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM (3)', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER (3)', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE (10)', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE (12)', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange'].includes(f.key) }
 ];
 
 // Fighter Definitions in Skin Studio
@@ -469,6 +471,32 @@ export const SKIN_STUDIO_FIGHTERS = [
     themeColor: '#D97706',
     forms: [
       { id: 'default', label: 'COWBOY' }
+    ]
+  },
+  {
+    key: 'doppleganger',
+    label: 'DOPPELGANGER',
+    asset: 'Procedural Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.30,
+    baseH: 2.00,
+    baseCrownY: -1.20,
+    themeColor: '#9b59b6',
+    forms: [
+      { id: 'default', label: 'MIRROR PHANTOM' }
+    ]
+  },
+  {
+    key: 'orange',
+    label: 'EMBER',
+    asset: 'Procedural Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.30,
+    baseH: 2.00,
+    baseCrownY: -1.20,
+    themeColor: '#f97316',
+    forms: [
+      { id: 'default', label: 'FLAMEWARDEN' }
     ]
   }
 ];
@@ -896,6 +924,10 @@ export function drawSkinStudioScreen() {
         drawMusashiSkin(ctx, dummyFighter);
       } else if (fDef.key === 'gunslinger') {
         drawGunslingerSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'doppleganger') {
+        drawDoppelgangerSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'orange') {
+        drawEmberSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);

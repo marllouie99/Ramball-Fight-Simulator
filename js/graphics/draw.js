@@ -70,6 +70,8 @@ export { drawVoidmasterSkin, drawVoidmasterPixelBody, drawVoidmasterBody, drawVo
 export { drawKnightSkin, drawKnightPixelBody, drawKnightBody, drawKnightGhostModel } from './fighters/knightSkin.js';
 export { drawNanamiSkin, drawNanamiPixelBody, _drawNanamiHair, _getNanamiHairImage } from './fighters/nanamiSkin.js';
 export { drawMahitoSkin, drawMahitoPixelBody, _drawMahitoHair, _getMahitoHairImage } from './fighters/mahitoSkin.js';
+export { drawEmberSkin, drawEmberPixelBody, drawFlamewardenSkin } from './fighters/flamewardenSkin.js';
+export { drawOrangeFlamethrowerGun, drawPixelFlameProjectile } from './weapons/flamewardenWeaponGraphics.js';
 export { drawDivineAxeRhitta, drawRhittaSlashArc, _getEscanorSlashEffectImage, drawRhittaSolarFlash, drawPixelCruelSunSphere, drawCruelSunOrb, drawCruelSunChargingExpansion, drawPrideFlareShockwave, drawDivineSwordEscanorBlade, _getEscanorCruelSunSpriteImage, ESCANOR_CRUEL_SUN_FRAMES, _getEscanorSunExplosionSpriteImage, ESCANOR_SUN_EXPLOSION_FRAMES, drawProceduralPixelCruelSunExplosion, drawPixelCruelSunExplosion, drawCruelSunFloorLighting, drawCruelSunProximityEntityLighting, spawnCruelSunHitImpact, updateCruelSunHitImpacts, drawCruelSunHitImpacts, clearCruelSunHitImpacts, spawnCruelSunExplosion, updateCruelSunExplosions, drawCruelSunExplosions, clearCruelSunExplosions } from './weapons/escanorWeaponGraphics.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
 export { spawnTojiCleaveHitEffect, drawTojiImpactEffects, updateTojiImpactEffects } from './particles/tojiImpactEffect.js';

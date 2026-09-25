@@ -242,17 +242,14 @@ export const CONFIG = {
     burnDamagePerSecond: 2.0,       // damage per second while burning
     burnDamageInterval: 60,         // frames between burn damage ticks (1 second at 60 fps)
     burnSpreadCooldown: 120,        // frames before burn can spread again on same collision
-    // Fuel mechanic settings
-    maxFuel: 200,                   // maximum fuel capacity
-    fuelPerBurst: 1.5,                // fuel consumed per flame burst
-    fuelPickupAmount: 120,          // fuel restored per pickup
-    fuelPickupRespawnTime: 500,     // frames before fuel pickup respawns (3 seconds at 60 fps)
-    maxFuelPickups: 2,              // maximum number of fuel pickups in arena at once
-    fuelPickupSpawnInterval: 120,   // frames between attempting to spawn new fuel pickups (2 seconds)
-    fuelPickupRadius: 12,          // radius of fuel pickup for collision detection
-    fuelBarWidth: 60,              // width of fuel meter bar in pixels
-    fuelBarHeight: 8,              // height of fuel meter bar in pixels
-    fuelBarOffsetY: 40,            // vertical offset from fighter center for fuel bar
+    // Flamethrower Heat & Overheat mechanic settings
+    maxHeat: 100,                   // maximum heat capacity before overheat trigger
+    heatPerBurst: 2.0,              // heat accumulated per flame burst
+    coolRatePerFrame: 0.40,         // passive heat dissipation per frame when not firing (~24 heat/s)
+    overheatCoolRate: 0.55,         // cooling rate per frame during full overheat lockout (~33 heat/s, ~3s total)
+    // Legacy fuel aliases for backward compatibility
+    maxFuel: 100,
+    fuelPerBurst: 2.0,
   },
 
   /** White ΓÇö Laser fighter */

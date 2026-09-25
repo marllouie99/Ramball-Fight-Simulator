@@ -235,15 +235,6 @@ export function reinitFighters(isNewMatch = false) {
   state.fuelPickups.length = 0;
   state.fuelPickupSpawnTimer = 0;
  
-  // Spawn initial fuel pickups immediately
-  const initialFuelPickups = MODE_SETTINGS[state.mode]?.initialFuelPickups ?? 2;
-  const hasOrange = state.fighters.some(f => f && f._def.type === 'orange');
-  if (hasOrange) {
-    for (let i = 0; i < initialFuelPickups; i++) {
-      spawnFuelPickup();
-    }
-  }
- 
   // Clear any lingering last-kill badges from previous rounds
   state.fighters.forEach((f) => { if (f) f.lastKilledDef = null; });
  
