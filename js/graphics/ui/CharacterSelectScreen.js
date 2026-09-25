@@ -13,6 +13,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { STARTER_MAP, MONOLITH_MAP } from '../../../Tactical Force/maps/index.js';
+import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
@@ -970,10 +971,15 @@ function drawSelectScreen() {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
     const isSolo = Boolean(state.bossBattleNoTeammate);
+    const currentDefs = getActiveFighterDefs();
+    const p1Def = currentDefs[state.p1Index] || currentDefs[0];
+    const p1BossCfg = getBossConfig(p1Def);
+    const p1BossTitle = (p1BossCfg?.bossTitle || p1Def?.bossTitle || '').toUpperCase();
+    const bossCardTitle = (p1BossTitle && p1BossTitle !== 'BOSS') ? `BOSS // ${p1BossTitle}` : 'THE BOSS';
 
     if (isSolo) {
       // 1v1 Solo Challenger vs Boss
-      drawPlayerCard('p1Index', 'THE BOSS', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
+      drawPlayerCard('p1Index', bossCardTitle, leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
       drawPlayerCard('p2Index', 'SOLO CHALLENGER', rightX, topY, cardW, fullCardH, '#38bdf8', true, true);
 
       // Center Retro Pixel VS Crest
@@ -1016,7 +1022,7 @@ function drawSelectScreen() {
       const stackedH = Math.floor((fullCardH - cardGap) / 2);
       const bottomY = topY + stackedH + cardGap;
 
-      drawPlayerCard('p1Index', 'THE BOSS', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
+      drawPlayerCard('p1Index', bossCardTitle, leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
       drawPlayerCard('p2Index', 'CHALLENGER 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
       drawPlayerCard('p3Index', 'CHALLENGER 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
 
@@ -1349,7 +1355,8 @@ export function getFighterWeaponInfo(def) {
 }
 
 function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLarge = false) {
-  const { ctx } = state;
+  const { ctx, mode } = state;
+  const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
   const isAnyModalOpen = (selectingSlot !== null || isTacticalMapModalOpen || isArenaBgmModalOpen());
   const isInteractive = enabled && !isAnyModalOpen;
 
@@ -1456,8 +1463,17 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.textBaseline = 'middle';
     ctx.fillText(def.name.toUpperCase(), avatarX, y + 144);
 
-    // Class Tag Pill
-    const pillW = 96;
+    // Class / Boss Tag Pill
+    const isBossCard = isBossBattleMode && slotProp === 'p1Index';
+    const p1BossCfg = isBossCard ? getBossConfig(def) : null;
+    const p1BossTitle = isBossCard ? (p1BossCfg?.bossTitle || def?.bossTitle || '').toUpperCase() : '';
+    const pillText = (isBossCard && p1BossTitle && p1BossTitle !== 'BOSS')
+      ? `BOSS // ${p1BossTitle}`
+      : `CLASS // ${def.type.toUpperCase()}`;
+
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+    const measuredPillW = Math.max(96, ctx.measureText(pillText).width + 18);
+    const pillW = Math.min(w - 24, measuredPillW);
     const pillH = 16;
     ctx.fillStyle = '#b81c3b';
     ctx.strokeStyle = '#21050c';
@@ -1467,8 +1483,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(`CLASS // ${def.type.toUpperCase()}`, avatarX, y + 164.5);
+    ctx.fillText(pillText, avatarX, y + 164.5);
 
     // Stat Telemetry Block
     const statBoxX = x + 10;

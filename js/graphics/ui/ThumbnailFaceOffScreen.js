@@ -12,6 +12,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { _clearButtons, _registerButton, drawChamferedRect } from './uiFramework.js';
 import { proceedFromFaceOffToCountdown, startMatchDirectlyFromFaceOff } from '../../core/gameFlow.js';
 import { clearHealthHud } from '../hudManager.js';
+import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
 
 // Cache for live fighter preview instances (Pooled by character type to eliminate GC churn)
 const _fighterTypePreviewCache = {};
@@ -1070,6 +1071,20 @@ function draw1v1FaceOff(ctx, width, height, p1Def, p2Def, scale, timer, leftColo
     ctx.save();
     ctx.globalAlpha = p1NameAlpha;
     drawFighterCleanName(ctx, leftX, nameY, activeP1Def?.name || '', activeP1Def?.color || leftColor);
+
+    const isBossBattleMode = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === 'STAND_OFF_1V2');
+    if (isBossBattleMode && activeP1Def) {
+      const bossCfg = getBossConfig(activeP1Def);
+      const bossSub = bossCfg?.bossTitle || bossCfg?.bossSubtitle || (typeof CONFIG !== 'undefined' && CONFIG[activeP1Def.id || activeP1Def.type]?.bossTitle);
+      if (bossSub && String(bossSub).trim().toUpperCase() !== 'BOSS') {
+        const subY = nameY + 22;
+        ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+        ctx.fillStyle = activeP1Def?.color || leftColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`- ${String(bossSub).trim().toUpperCase()} -`, leftX, subY);
+      }
+    }
     ctx.restore();
   }
 
@@ -1147,6 +1162,19 @@ function draw1v2FaceOff(ctx, width, height, p1Def, p2Def, p3Def, scale, timer, l
     ctx.save();
     ctx.globalAlpha = soloNameAlpha;
     drawFighterCleanName(ctx, leftX, soloNameY, activeP1Def?.name || '', activeP1Def?.color || leftColor, 1.0);
+
+    if (activeP1Def) {
+      const bossCfg = getBossConfig(activeP1Def);
+      const bossSub = bossCfg?.bossTitle || bossCfg?.bossSubtitle || (typeof CONFIG !== 'undefined' && CONFIG[activeP1Def.id || activeP1Def.type]?.bossTitle);
+      if (bossSub && String(bossSub).trim().toUpperCase() !== 'BOSS') {
+        const subY = soloNameY + 22;
+        ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+        ctx.fillStyle = activeP1Def?.color || leftColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`- ${String(bossSub).trim().toUpperCase()} -`, leftX, subY);
+      }
+    }
     ctx.restore();
   }
 

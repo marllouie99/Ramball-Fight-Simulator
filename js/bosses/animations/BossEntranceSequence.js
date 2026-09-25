@@ -178,8 +178,8 @@ class BossEntranceSequenceClass {
     const arenaTop = (state.arena && typeof state.arena.y === 'number') ? state.arena.y : 170;
     const cardY = Math.max(50, arenaTop - 78);
     let bossName = (this.boss.name || this.boss._def?.name || this.boss.characterId || 'BOSS').toUpperCase();
-    let bossTitle = config.bossTitle || '✦ SUPREME BOSS ✦';
-    let bossSubtitle = config.bossSubtitle || 'DREADED ARENA OVERLORD';
+    let bossTitle = this.boss.bossConfig?.bossTitle || config.bossTitle || '✦ SUPREME BOSS ✦';
+    let bossSubtitle = this.boss.bossConfig?.bossSubtitle || config.bossSubtitle || this.boss.bossConfig?.bossTitle || config.bossTitle || 'DREADED ARENA OVERLORD';
     let topTag = '✦ BOSS ENCOUNTER ✦';
 
     if (isYuta) {

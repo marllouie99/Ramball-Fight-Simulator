@@ -13,6 +13,7 @@ import { yutaBossConfig } from './yutaBossConfig.js';
 import { escanorBossConfig } from './escanorBossConfig.js';
 import { makimaBossConfig } from './makimaBossConfig.js';
 import { eyeOfCthulhuBossConfig } from './eyeOfCthulhuBossConfig.js';
+import { CONFIG } from '../../core/config.js';
 
 const _bossConfigs = new Map([
   ['zeus', zeusBossConfig],
@@ -34,7 +35,7 @@ const _bossConfigs = new Map([
 export function getBossConfig(fighterOrId) {
   const characterId = typeof fighterOrId === 'string'
     ? fighterOrId.toLowerCase()
-    : (fighterOrId?.characterId || fighterOrId?.type || '').toLowerCase();
+    : (fighterOrId?.characterId || fighterOrId?.type || fighterOrId?._def?.id || fighterOrId?._def?.type || '').toLowerCase();
 
   if (_bossConfigs.has(characterId)) {
     return _bossConfigs.get(characterId);
@@ -49,10 +50,14 @@ export function getBossConfig(fighterOrId) {
     ? (fighterOrId.themeColor || fighterOrId.color || fighterOrId._def?.color)
     : '#EF4444';
 
+  const charCfg = (typeof CONFIG !== 'undefined' && characterId) ? CONFIG[characterId] : null;
+  const bossTitle = charCfg?.bossTitle || fighterOrId?.bossTitle || fighterOrId?._def?.bossTitle || 'BOSS';
+  const bossSubtitle = charCfg?.bossSubtitle || charCfg?.bossTitle || fighterOrId?.bossSubtitle || fighterOrId?._def?.bossSubtitle || bossTitle;
+
   return {
     ...baseBossConfig,
-    bossTitle: 'BOSS',
-    bossSubtitle: 'BOSS',
+    bossTitle,
+    bossSubtitle,
     themeColor,
     entranceAuraColor: themeColor,
     enrageAuraColor: '#DC2626',

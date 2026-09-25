@@ -8,6 +8,7 @@ import { getFighterPreview } from './ui/FighterPreviewCache.js';
 import { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking } from './ui/hudLayout.js';
 import { getSkillDataForFighter } from './ui/hudSkillProviders.js';
 import { applyCameraToCtx } from '../systems/cameraSystem.js';
+import { getBossConfig } from '../configs/bosses/bossConfigRegistry.js';
 
 export { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking };
 
@@ -188,9 +189,19 @@ const BOSS_SUB_NAMES = {
 };
 
 /**
- * Returns formatted boss subtitle for Boss Battle mode (e.g. "- BOSS -").
+ * Returns formatted boss subtitle for Boss Battle mode (e.g. "- ANCIENT OCULAR HORROR -").
  */
 export function getBossSubName(fighter) {
+  if (!fighter) return '- BOSS -';
+  const charId = (fighter.characterId || fighter.type || (fighter._def && (fighter._def.id || fighter._def.type)) || '').toLowerCase();
+  const config = fighter.bossConfig || (typeof getBossConfig === 'function' ? getBossConfig(fighter) : null);
+  const charConfig = (typeof CONFIG !== 'undefined' && charId && CONFIG[charId]) ? CONFIG[charId] : null;
+
+  const sub = config?.bossTitle || config?.bossSubtitle || charConfig?.bossTitle || charConfig?.bossSubtitle || fighter.bossTitle || fighter.bossSubtitle;
+
+  if (sub && String(sub).trim().toUpperCase() !== 'BOSS') {
+    return `- ${String(sub).trim().toUpperCase()} -`;
+  }
   return '- BOSS -';
 }
 
