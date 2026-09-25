@@ -2,9 +2,10 @@
 // DEATH SHATTER EFFECT
 // Creates a shattering body effect when fighters die
 // ─────────────────────────────────────────────
-import { state } from '../../core/state.js';
+import { state, triggerGlobalScreenShake } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { getEyePhase1Image, getEyePhase2Image } from '../fighters/eyeOfCthulhuSkin.js';
+import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
 
 /**
  * Spawns a death shatter effect at the fighter's position.
@@ -22,11 +23,11 @@ export function spawnDeathShatter(fighter) {
   const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 20 : 50) * qualityMultiplier);
   
   // OPTIMIZED: Reduce shard count based on quality level
-  const baseShardCount = isMulti ? 8 : 14;
+  const baseShardCount = isMulti ? 10 : 16;
   const isYuta = fighter.characterId === 'yuta' || fighter.type === 'yuta';
   const isRika = Boolean(fighter.isRika || fighter.type === 'rika' || fighter.characterId === 'rika');
-  const shardCount = isRika ? Math.max(12, Math.floor(20 * qualityMultiplier)) : Math.max(4, Math.floor(baseShardCount * qualityMultiplier));
-  const baseSpeed = isRika ? 5.5 : 4.5;    // Outward explosive velocity
+  const shardCount = isRika ? Math.max(14, Math.floor(22 * qualityMultiplier)) : Math.max(6, Math.floor(baseShardCount * qualityMultiplier));
+  const baseSpeed = isRika ? 8.5 : 7.0;    // Outward explosive velocity
   let primaryColor = fighter.color || '#ff4444';
   if (isRika) {
     primaryColor = '#FFFFFF';
@@ -36,7 +37,14 @@ export function spawnDeathShatter(fighter) {
     primaryColor = fighter.secondaryColor || '#64748b';
   }
   const secondaryColor = isRika ? '#FF1493' : (isYuta ? '#1E293B' : (fighter.secondaryColor || '#881337'));
-  
+
+  // Radial explosive splash of sparks and flash on death
+  try {
+    spawnImpactFlash(fighter.x, fighter.y, (fighter.r || 30) * 1.3, 'crimsonSniper');
+    spawnSparks(fighter.x, fighter.y, Math.floor(16 * qualityMultiplier), 'crimson', primaryColor);
+    spawnSparks(fighter.x, fighter.y, Math.floor(10 * qualityMultiplier), 'bloodSpark', secondaryColor);
+  } catch (e) {}
+
   for (let i = 0; i < shardCount; i++) {
     // If we reached the global limit, remove the oldest death effect using swap-and-pop
     if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
@@ -46,7 +54,7 @@ export function spawnDeathShatter(fighter) {
     
     // Random angle for each shard
     const angle = (Math.PI * 2 * i) / shardCount + (Math.random() - 0.5) * 0.5;
-    const speed = baseSpeed + Math.random() * 4.0;
+    const speed = baseSpeed + Math.random() * 5.5;
     
     // Random size for each shard
     const size = (fighter.r || 30) * (0.18 + Math.random() * 0.28);
@@ -65,15 +73,16 @@ export function spawnDeathShatter(fighter) {
       x: fighter.x,
       y: fighter.y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - (1.0 + Math.random() * 2.0), // Explosive vertical kick
+      vy: Math.sin(angle) * speed - (2.5 + Math.random() * 4.5), // Explosive vertical upward kick
       rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: (Math.random() - 0.5) * 0.45,
+      rotationSpeed: (Math.random() - 0.5) * 0.55,
       size: size,
       color: shardColor,
       life: 1.0,           // 1.0 = full life, 0 = dead
       maxLife: 1.0,
-      decay: 0.015 + Math.random() * 0.008, // Smooth fade-out
-      gravity: 0.12,       // Downward gravity pull to floor
+      decay: 0.012 + Math.random() * 0.008, // Smooth fade-out
+      gravity: 0.32,       // Downward gravity pull to drop all the way to the floor
+      restitution: 0.32 + Math.random() * 0.12,
     });
   }
 }
@@ -88,7 +97,7 @@ export function spawnDeathShatter(fighter) {
 export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
   const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
-  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 40 : 100) * qualityMultiplier);
+  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 50 : 120) * qualityMultiplier);
 
   const isPhase2 = Boolean(
     fighter.isPhase2 ||
@@ -100,41 +109,52 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
   );
 
   const baseR = fighter.r || (isMinion ? 10 : 32);
+
+  // Explosive impact shockwave, screen shake, and radial blood burst splash
+  try {
+    triggerGlobalScreenShake(isMinion ? 4 : 10, isMinion ? 12 : 24);
+    spawnImpactFlash(fighter.x, fighter.y, isMinion ? 35 : 90, 'crimsonSniper');
+    spawnSparks(fighter.x, fighter.y, isMinion ? 16 : 45, 'bloodSpark', '#E11D48');
+    spawnSparks(fighter.x, fighter.y, isMinion ? 10 : 30, 'bloodSpark', '#991B1B');
+    spawnSparks(fighter.x, fighter.y, isMinion ? 8 : 22, 'bloodSpark', '#4C0519');
+  } catch (e) {}
+
   const goreDefs = [
     // 1. Optic Nerve Tendril Cluster
-    { type: 'eoc_nerve_tendril', size: baseR * 0.45, color: '#881337', angleOffset: Math.PI },
+    { type: 'eoc_nerve_tendril', size: baseR * 0.50, color: '#881337', angleOffset: Math.PI, speedMult: 1.1 },
     // 2. Upper Sclera Shell (with red branching veins)
-    { type: 'eoc_sclera_top', size: baseR * 0.50, color: '#F8FAFC', angleOffset: -Math.PI / 2 },
+    { type: 'eoc_sclera_top', size: baseR * 0.54, color: '#F8FAFC', angleOffset: -Math.PI / 2, speedMult: 1.2 },
     // 3. Lower Sclera Shell (with crimson torn edges)
-    { type: 'eoc_sclera_bottom', size: baseR * 0.46, color: '#E2E8F0', angleOffset: Math.PI / 2 },
+    { type: 'eoc_sclera_bottom', size: baseR * 0.48, color: '#E2E8F0', angleOffset: Math.PI / 2, speedMult: 1.15 },
   ];
 
   if (isPhase2) {
     // Phase 2: Upper and Lower razor fanged jaws
     goreDefs.push(
-      { type: 'eoc_fanged_maw_top', size: baseR * 0.44, color: '#7F1D1D', angleOffset: -0.3 },
-      { type: 'eoc_fanged_maw_bottom', size: baseR * 0.42, color: '#991B1B', angleOffset: 0.3 }
+      { type: 'eoc_fanged_maw_top', size: baseR * 0.48, color: '#7F1D1D', angleOffset: -0.3, speedMult: 1.25 },
+      { type: 'eoc_fanged_maw_bottom', size: baseR * 0.46, color: '#991B1B', angleOffset: 0.3, speedMult: 1.25 }
     );
   } else {
     // Phase 1: Iris & Pupil core chunk
     goreDefs.push(
-      { type: 'eoc_iris_pupil', size: baseR * 0.42, color: '#06B6D4', angleOffset: 0 }
+      { type: 'eoc_iris_pupil', size: baseR * 0.46, color: '#06B6D4', angleOffset: 0, speedMult: 1.3 }
     );
   }
 
-  // Add visceral organic gib chunks
-  const gibCount = isMinion ? 3 : Math.max(4, Math.floor(7 * qualityMultiplier));
+  // Add visceral organic gib chunks bursting in all directions
+  const gibCount = isMinion ? 4 : Math.max(8, Math.floor(14 * qualityMultiplier));
   const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#4C0519', '#7F1D1D'];
   for (let g = 0; g < gibCount; g++) {
     goreDefs.push({
       type: 'eoc_visceral_chunk',
-      size: baseR * (0.18 + Math.random() * 0.16),
+      size: baseR * (0.16 + Math.random() * 0.20),
       color: gibColors[g % gibColors.length],
-      angleOffset: (Math.PI * 2 * g) / gibCount
+      angleOffset: (Math.PI * 2 * g) / gibCount,
+      speedMult: 0.85 + Math.random() * 0.75
     });
   }
 
-  const baseSpeed = isMinion ? 3.5 : 5.8;
+  const baseSpeed = isMinion ? 6.5 : 11.5;
 
   for (let i = 0; i < goreDefs.length; i++) {
     if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
@@ -142,25 +162,25 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
       const nonPermIndex = state.deathEffects.findIndex(e => !e.isEyeOfCthulhuGore && !e.isPermanentGore);
       if (nonPermIndex !== -1) {
         state.deathEffects.splice(nonPermIndex, 1);
-      } else if (state.deathEffects.length > 80) {
+      } else if (state.deathEffects.length > 90) {
         state.deathEffects.shift();
       }
     }
 
     const def = goreDefs[i];
     const angle = def.angleOffset !== undefined
-      ? def.angleOffset + (Math.random() - 0.5) * 0.6
+      ? def.angleOffset + (Math.random() - 0.5) * 0.7
       : (Math.PI * 2 * i) / goreDefs.length + (Math.random() - 0.5) * 0.5;
 
-    const speed = baseSpeed + Math.random() * (isMinion ? 2.5 : 4.5);
+    const speed = (baseSpeed + Math.random() * (isMinion ? 4.0 : 8.5)) * (def.speedMult || 1.0);
 
     state.deathEffects.push({
       x: fighter.x + (Math.random() - 0.5) * (baseR * 0.4),
       y: fighter.y + (Math.random() - 0.5) * (baseR * 0.4),
-      vx: Math.cos(angle) * speed + (fighter.vx || 0) * 0.25,
-      vy: Math.sin(angle) * speed - ((isMinion ? 1.5 : 2.5) + Math.random() * 3.0),
+      vx: Math.cos(angle) * speed + (fighter.vx || 0) * 0.35,
+      vy: Math.sin(angle) * speed - (isMinion ? (2.5 + Math.random() * 3.5) : (5.5 + Math.random() * 8.0)), // Explosive vertical launch
       rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: (Math.random() - 0.5) * 0.45,
+      rotationSpeed: (Math.random() - 0.5) * 0.70,
       size: def.size,
       color: def.color,
       goreType: def.type,
@@ -169,7 +189,9 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
       life: 1.0,
       maxLife: 1.0,
       decay: 0, // Permanent: stays on the arena floor
-      gravity: 0.15,
+      gravity: isMinion ? 0.32 : 0.42, // Strong gravity to drop all the way down
+      restitution: 0.35 + Math.random() * 0.15,
+      isSettled: false,
     });
   }
 }
@@ -202,45 +224,72 @@ export function updateDeathEffects() {
   for (let i = state.deathEffects.length - 1; i >= 0; i--) {
     const effect = state.deathEffects[i];
     
-    // Update position
-    effect.x += effect.vx;
-    effect.y += effect.vy;
-    
+    // 1. Permanent Eye of Cthulhu Terraria Gore: drops all the way down to arena floor, bounces & splashes
     if (effect.isEyeOfCthulhuGore || effect.isPermanentGore) {
-      // Eye of Cthulhu Terraria Gore: flies in arc, decelerates on ground, and STAYS permanently on the arena
-      effect.vy += (effect.gravity || 0.15);
-      effect.vx *= 0.94;
-      effect.vy *= 0.94;
-      effect.rotation += effect.rotationSpeed;
-      effect.rotationSpeed *= 0.94;
+      if (!effect.isSettled) {
+        effect.x += effect.vx;
+        effect.y += effect.vy;
 
-      // Stop completely once settled on the ground
-      if (Math.hypot(effect.vx, effect.vy) < 0.12) {
-        effect.vx = 0;
-        effect.vy = 0;
-        effect.rotationSpeed = 0;
-      }
+        // Downward gravity acceleration
+        effect.vy += (effect.gravity || 0.40);
 
-      // Clamp inside arena boundaries so gore stays on the arena floor
-      if (arena) {
-        const ar = arena.radius || (arena.width / 2);
-        const cx = arena.x + arena.width / 2;
-        const cy = arena.y + arena.height / 2;
-        const dist = Math.hypot(effect.x - cx, effect.y - cy);
-        const maxR = ar - (effect.size || 10) - 6;
-        if (dist > maxR && dist > 0) {
-          effect.x = cx + ((effect.x - cx) / dist) * maxR;
-          effect.y = cy + ((effect.y - cy) / dist) * maxR;
-          effect.vx = -effect.vx * 0.35;
-          effect.vy = -effect.vy * 0.35;
+        // Low flight air friction so trajectory arcs wide and drops fast
+        effect.vx *= 0.988;
+        effect.vy *= 0.992;
+        effect.rotation += effect.rotationSpeed;
+
+        // Arena boundary and bottom floor resolution
+        if (arena) {
+          const cx = arena.x + arena.width / 2;
+          const cy = arena.y + arena.height / 2;
+          const ar = arena.radius || (arena.width / 2);
+          const maxR = ar - (effect.size || 10) - 4;
+
+          // Wall horizontal clamp
+          const dx = effect.x - cx;
+          if (Math.abs(dx) > maxR) {
+            effect.x = cx + Math.sign(dx) * maxR;
+            effect.vx = -effect.vx * 0.45;
+          }
+
+          // Calculate bottom floor level of circular arena at current x
+          const safeDx = Math.min(maxR * 0.98, Math.abs(effect.x - cx));
+          const dyFloor = Math.sqrt(Math.max(0, maxR * maxR - safeDx * safeDx));
+          const floorY = cy + dyFloor;
+
+          // Landed / hit the arena floor!
+          if (effect.y >= floorY) {
+            effect.y = floorY;
+
+            if (effect.vy > 0) {
+              if (effect.vy > 1.8) {
+                // Ground bounce!
+                effect.vy = -effect.vy * (effect.restitution || 0.35);
+                effect.vx *= 0.82; // Ground friction
+                effect.rotationSpeed = (effect.vx >= 0 ? 1 : -1) * Math.min(0.3, Math.abs(effect.vx) * 0.06);
+
+                // Secondary blood splash on floor impact
+                spawnSparks(effect.x, effect.y, 4, 'bloodSpark', '#E11D48');
+              } else {
+                // Settle on the floor
+                effect.vy = 0;
+                effect.vx *= 0.78;
+                effect.rotationSpeed *= 0.78;
+
+                if (Math.abs(effect.vx) < 0.06) {
+                  effect.vx = 0;
+                  effect.rotationSpeed = 0;
+                  effect.isSettled = true;
+                }
+              }
+            }
+          }
         }
-      }
 
-      // Trail blood sparks while actively airborne
-      if (Math.hypot(effect.vx, effect.vy) > 1.2 && Math.random() < 0.15) {
-        import('./sparkEffect.js').then(module => {
-          module.spawnSparks(effect.x + (Math.random() - 0.5) * 4, effect.y + (Math.random() - 0.5) * 4, 1, 'bloodSpark', '#E11D48');
-        });
+        // Trail blood sparks while actively airborne and traveling fast
+        if (Math.hypot(effect.vx, effect.vy) > 2.5 && Math.random() < 0.22) {
+          spawnSparks(effect.x + (Math.random() - 0.5) * 6, effect.y + (Math.random() - 0.5) * 6, 1, 'bloodSpark', '#E11D48');
+        }
       }
 
       // Permanent gore: DO NOT DECAY! Keep effect.life = 1.0
@@ -248,25 +297,55 @@ export function updateDeathEffects() {
       continue;
     }
 
-    if (!effect.isMachineCorpse) {
-      // Apply gravity and physics for standard shards
-      effect.vy += effect.gravity;
-      effect.vx *= 0.98;
-      effect.vy *= 0.98;
-      effect.rotation += effect.rotationSpeed;
-    } else {
-      // Machine corpse occasionally emits smoke sparks
+    // 2. Machine Corpse
+    if (effect.isMachineCorpse) {
+      effect.x += effect.vx;
+      effect.y += effect.vy;
       if (Math.random() < 0.15) {
-        import('./sparkEffect.js').then(module => {
-           module.spawnSparks(effect.x + (Math.random()-0.5)*10, effect.y + (Math.random()-0.5)*10, 1, 'gray');
-        });
+        spawnSparks(effect.x + (Math.random() - 0.5) * 10, effect.y + (Math.random() - 0.5) * 10, 1, 'gray');
+      }
+      effect.life -= (effect.decay || 0.005);
+      if (effect.life <= 0) {
+        state.deathEffects.splice(i, 1);
+      }
+      continue;
+    }
+
+    // 3. Standard Character Death Shards
+    effect.x += effect.vx;
+    effect.y += effect.vy;
+    effect.vy += (effect.gravity || 0.32);
+    effect.vx *= 0.985;
+    effect.vy *= 0.99;
+    effect.rotation += effect.rotationSpeed;
+
+    // Standard shard floor bounce & drop
+    if (arena) {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      const maxR = ar - (effect.size || 8) - 4;
+
+      const safeDx = Math.min(maxR * 0.98, Math.abs(effect.x - cx));
+      const dyFloor = Math.sqrt(Math.max(0, maxR * maxR - safeDx * safeDx));
+      const floorY = cy + dyFloor;
+
+      if (effect.y >= floorY) {
+        effect.y = floorY;
+        if (effect.vy > 0) {
+          if (effect.vy > 1.5) {
+            effect.vy = -effect.vy * (effect.restitution || 0.32);
+            effect.vx *= 0.82;
+          } else {
+            effect.vy = 0;
+            effect.vx *= 0.78;
+          }
+        }
       }
     }
-    
+
     // Fade out
     effect.life -= (effect.decay || 0.015);
-    
-    // Remove dead effects
     if (effect.life <= 0) {
       state.deathEffects.splice(i, 1);
     }

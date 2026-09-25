@@ -627,47 +627,55 @@ export class EyeOfCthulhuFighter extends Fighter {
     const baseR = this.r || 32;
     const goreDefs = [
       // 1. Torn Iris & Pupil core chunk flung off
-      { type: 'eoc_iris_pupil', size: baseR * 0.40, color: '#06B6D4', speedMult: 1.2 },
+      { type: 'eoc_iris_pupil', size: baseR * 0.46, color: '#06B6D4', speedMult: 1.3 },
       // 2. Upper Sclera Shell shard
-      { type: 'eoc_sclera_top', size: baseR * 0.45, color: '#F8FAFC', speedMult: 1.1 },
+      { type: 'eoc_sclera_top', size: baseR * 0.52, color: '#F8FAFC', speedMult: 1.2 },
       // 3. Lower Sclera Shell shard
-      { type: 'eoc_sclera_bottom', size: baseR * 0.42, color: '#E2E8F0', speedMult: 1.0 },
+      { type: 'eoc_sclera_bottom', size: baseR * 0.48, color: '#E2E8F0', speedMult: 1.15 },
     ];
 
-    const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#7F1D1D'];
-    const gibCount = cfg.transformationGoreChunkCount || 8;
+    const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#7F1D1D', '#4C0519'];
+    const gibCount = cfg.transformationGoreChunkCount || 10;
     for (let g = 0; g < gibCount; g++) {
       goreDefs.push({
         type: 'eoc_visceral_chunk',
-        size: baseR * (0.16 + Math.random() * 0.16),
+        size: baseR * (0.16 + Math.random() * 0.18),
         color: gibColors[g % gibColors.length],
-        speedMult: 0.8 + Math.random() * 0.6
+        speedMult: 0.9 + Math.random() * 0.75
       });
     }
 
     if (!state.deathEffects) state.deathEffects = [];
 
+    // Radial explosive blood splash burst
+    try {
+      spawnSparks(this.x, this.y, 35, 'bloodSpark', '#E11D48');
+      spawnSparks(this.x, this.y, 22, 'bloodSpark', '#991B1B');
+    } catch (e) {}
+
     for (let i = 0; i < goreDefs.length; i++) {
       const def = goreDefs[i];
-      const angle = (i / goreDefs.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const speed = (5.5 + Math.random() * 4.5) * (def.speedMult || 1.0);
+      const angle = (i / goreDefs.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const speed = (9.5 + Math.random() * 6.5) * (def.speedMult || 1.0);
       const piece = {
         x: this.x + Math.cos(angle) * (baseR * 0.45),
         y: this.y + Math.sin(angle) * (baseR * 0.45),
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - (1.5 + Math.random() * 2.5),
+        vy: Math.sin(angle) * speed - (4.5 + Math.random() * 6.0), // High upward explosive launch
         rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.45,
+        rotSpeed: (Math.random() - 0.5) * 0.65,
         size: def.size,
         color: def.color,
         goreType: def.type,
         isEyeOfCthulhuGore: true,
         isPermanentGore: true,
+        restitution: 0.35 + Math.random() * 0.15,
         alpha: 1.0,
         life: 1.0,
         maxLife: 1.0,
         decay: 0, // Permanent on arena floor
-        gravity: 0.15,
+        gravity: 0.40, // Drops all the way down to arena floor
+        isSettled: false,
       };
 
       state.deathEffects.push(piece);
