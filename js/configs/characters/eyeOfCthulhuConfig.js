@@ -55,7 +55,7 @@ export const eyeOfCthulhuConfig = {
   servantMaxActive: 4,
   servantHp: 120,
   servantRadius: 10,
-  servantInitialSpeed: 2.2,
+  servantInitialSpeed: 5.2,
   servantSpeed: 3.4, // controlled pursuit speed (tight body tracking)
   servantTurnRate: 0.08, // responsive turning without wide slingshot overshoots
   servantDamage: 12,
@@ -180,4 +180,5 @@ export const eyeOfCthulhuConfig = {
   },
   actionNoiseChance: 0.30,
   actionNoiseVolume: 0.85,
+  actionNoiseCooldown: 50, // Minimum cooldown frames (~0.83s) between action noises to prevent overlapping audio
 };

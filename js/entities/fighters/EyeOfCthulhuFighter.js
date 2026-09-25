@@ -74,6 +74,8 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.p2ChainDashCooldown = cfg.chainDashCooldown || 480;
     this.p2RoarCooldown = cfg.roarCooldown || 840;
     this.p2ChompCooldown = 0;
+    this.actionNoiseCooldown = 0;
+    this.lastActionNoise = null;
 
     this._registerSkills();
   }
@@ -116,6 +118,18 @@ export class EyeOfCthulhuFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
       ? CONFIG.eye_of_cthulhu
       : eyeOfCthulhuConfig;
+
+    const minCooldown = (typeof cfg?.actionNoiseCooldown === 'number')
+      ? cfg.actionNoiseCooldown
+      : ((typeof cfg?.sounds?.actionNoiseCooldown === 'number') ? cfg.sounds.actionNoiseCooldown : 50);
+
+    // If noise cooldown is still active, strictly prevent overlapping sounds
+    if (this.actionNoiseCooldown > 0) {
+      if (!force || this.actionNoiseCooldown > (minCooldown - 15)) {
+        return;
+      }
+    }
+
     const noiseSounds = cfg?.sounds?.actionNoises || [
       'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3',
       'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
@@ -123,16 +137,21 @@ export class EyeOfCthulhuFighter extends Fighter {
     ];
     const chance = (typeof cfg?.soundChances?.actionNoise === 'number')
       ? cfg.soundChances.actionNoise
-      : ((typeof cfg?.actionNoiseChance === 'number') ? cfg.actionNoiseChance : 0.45);
+      : ((typeof cfg?.actionNoiseChance === 'number') ? cfg.actionNoiseChance : 0.30);
 
     if (force || Math.random() < chance) {
       if (noiseSounds && noiseSounds.length > 0 && audioSystem && typeof audioSystem.playSFX === 'function') {
-        const sound = noiseSounds[Math.floor(Math.random() * noiseSounds.length)];
+        const candidates = (noiseSounds.length > 1 && this.lastActionNoise)
+          ? noiseSounds.filter(s => s !== this.lastActionNoise)
+          : noiseSounds;
+        const sound = candidates[Math.floor(Math.random() * candidates.length)];
         const vol = cfg?.soundVolumes?.actionNoise !== undefined
           ? cfg.soundVolumes.actionNoise
           : (cfg?.actionNoiseVolume !== undefined ? cfg.actionNoiseVolume : 0.85);
         try {
           audioSystem.playSFX(sound, vol);
+          this.lastActionNoise = sound;
+          this.actionNoiseCooldown = minCooldown;
         } catch (e) {}
       }
     }
@@ -144,6 +163,11 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (isFrozen || this.isTargetOfAmbush) {
       this.interruptAttacks();
       return;
+    }
+
+    // Decrement action noise cooldown timer
+    if (this.actionNoiseCooldown > 0) {
+      this.actionNoiseCooldown--;
     }
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
@@ -164,7 +188,8 @@ export class EyeOfCthulhuFighter extends Fighter {
       try {
         spawnFloatingText(this.x, this.y - this.r - 20, 'TRANSFORMATION!', '#E11D48');
         this._playAudio('transformationStart', 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3', 0.95);
-        this._playActionNoise(true);
+        this.actionNoiseCooldown = cfg.actionNoiseCooldown || 50;
+        this.lastActionNoise = 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise1.mp3';
       } catch (e) {}
     }
 
@@ -536,7 +561,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.gunAngle = this.transformationSpinAngle;
 
     // Screech noises and centrifugal blood sparks flung outwards from spinning body
-    if (this.stateTimer % 22 === 0) {
+    if (this.stateTimer % 35 === 0 && this.actionNoiseCooldown <= 0) {
       this._playActionNoise(true);
     }
     const bloodInterval = cfg.transformationBloodSparkInterval || 4;
@@ -558,7 +583,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       try {
         spawnImpactFlash(this.x, this.y, 45, 'crimsonSniper');
         this._playAudio('pupilShed', 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', 0.85);
-        this._playActionNoise(true);
+        this.actionNoiseCooldown = cfg.actionNoiseCooldown || 50;
       } catch (e) {}
     }
 
@@ -589,7 +614,8 @@ export class EyeOfCthulhuFighter extends Fighter {
       try {
         spawnFloatingText(this.x, this.y - this.r - 25, 'ROAAAR!', '#E11D48');
         this._playAudio('transformationRoar', 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise3.mp3', 1.0);
-        this._playActionNoise(true);
+        this.actionNoiseCooldown = cfg.actionNoiseCooldown || 50;
+        this.lastActionNoise = 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise3.mp3';
       } catch (e) {}
 
       this.aiState = EOC_STATE.P2_CHASE;
@@ -816,7 +842,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       triggerGlobalScreenShake(6, 15);
       this._playAudio('p2Roar', 'Assets/Sound Effects/Skills/ragescream.mp3', 1.0);
       this._playAudio('spikeBurst', 'Assets/Sound Effects/Attacks/spikestab.mp3', 0.75);
-      this._playActionNoise(true);
+      this.actionNoiseCooldown = cfg.actionNoiseCooldown || 50;
       if (projectileSystem && projectileSystem.fireProjectile) {
         const spikeCount = cfg.roarSpikeCount || 12;
         for (let i = 0; i < spikeCount; i++) {
