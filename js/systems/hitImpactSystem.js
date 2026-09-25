@@ -9,7 +9,7 @@ import { handleObstacleCollision, STARTER_MAP } from '../../Tactical Force/maps/
 
 function shouldApplyPhysicalPush(target) {
   if (!target) return false;
-  if (target.characterId === 'escanor' || target.type === 'escanor' || target.characterId === 'cj' || target.type === 'cj' || target.immuneToPush || target.immuneToKnockback) return false;
+  if (target.characterId === 'escanor' || target.type === 'escanor' || target.characterId === 'cj' || target.type === 'cj' || target.characterId === 'eye_of_cthulhu' || target.type === 'eye_of_cthulhu' || target.isGhostTerrain || target.immuneToPush || target.immuneToKnockback) return false;
   return true;
 }
 

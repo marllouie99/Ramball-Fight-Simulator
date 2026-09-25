@@ -385,8 +385,12 @@ export class GunSlingerFighter extends Fighter {
       const dy = target.y - this.y;
       const dist = Math.hypot(dx, dy) || 1;
       const knockbackStrength = CONFIG.gunslinger.basicAttackKnockback;
-      target.knockbackVx = (target.knockbackVx || 0) + (dx / dist) * knockbackStrength;
-      target.knockbackVy = (target.knockbackVy || 0) + (dy / dist) * knockbackStrength;
+      if (typeof target.applyKnockback === 'function') {
+        target.applyKnockback((dx / dist) * knockbackStrength, (dy / dist) * knockbackStrength);
+      } else {
+        target.knockbackVx = (target.knockbackVx || 0) + (dx / dist) * knockbackStrength;
+        target.knockbackVy = (target.knockbackVy || 0) + (dy / dist) * knockbackStrength;
+      }
 
       // Apply critical damage if the projectile was a crit
       if (projectile.isCrit) {

@@ -1108,10 +1108,10 @@ export function updateFighters() {
             }
             fighter.x -= nx * overlap * 2;
             fighter.y -= ny * overlap * 2;
-          } else if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0)) {
+          } else if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter.isGhostTerrain || fighter.characterId === 'eye_of_cthulhu' || fighter.type === 'eye_of_cthulhu') {
             entity.x += nx * overlap;
             entity.y += ny * overlap;
-          } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai || (entity.bankaiBurstTimer && entity.bankaiBurstTimer > 0) || (entity.isChannelingGetsuga && entity.isFinalMassiveGetsuga) || (entity.hollowMaskFormationTimer && entity.hollowMaskFormationTimer > 0) || (entity.hollowBurstTimer && entity.hollowBurstTimer > 0)) {
+          } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai || (entity.bankaiBurstTimer && entity.bankaiBurstTimer > 0) || (entity.isChannelingGetsuga && entity.isFinalMassiveGetsuga) || (entity.hollowMaskFormationTimer && entity.hollowMaskFormationTimer > 0) || (entity.hollowBurstTimer && entity.hollowBurstTimer > 0) || entity.isGhostTerrain || entity.isServantOfCthulhu) {
             fighter.x -= nx * overlap;
             fighter.y -= ny * overlap;
           } else {
@@ -1121,19 +1121,21 @@ export function updateFighters() {
             entity.y += ny * overlap * 0.5;
           }
 
-          // Re-clamp entity and fighter to arena so physics push never ejects them outside the wall
+          // Re-clamp entity and fighter to arena so physics push never ejects them outside the wall (except ghost terrain)
           const arena = state.arena || CONFIG.arena;
           if (arena) {
             if (entity.isRika) {
               clampRikaToArena(entity, arena);
-            } else {
+            } else if (!entity.isGhostTerrain && !entity.isServantOfCthulhu) {
               const eR = entity.r || 20;
               entity.x = Math.max(arena.x + eR, Math.min(arena.x + arena.width - eR, entity.x));
               entity.y = Math.max(arena.y + eR, Math.min(arena.y + arena.height - eR, entity.y));
             }
-            const fR = fighter.r || 25;
-            fighter.x = Math.max(arena.x + fR, Math.min(arena.x + arena.width - fR, fighter.x));
-            fighter.y = Math.max(arena.y + fR, Math.min(arena.y + arena.height - fR, fighter.y));
+            if (!fighter.isGhostTerrain && fighter.characterId !== 'eye_of_cthulhu' && fighter.type !== 'eye_of_cthulhu') {
+              const fR = fighter.r || 25;
+              fighter.x = Math.max(arena.x + fR, Math.min(arena.x + arena.width - fR, fighter.x));
+              fighter.y = Math.max(arena.y + fR, Math.min(arena.y + arena.height - fR, fighter.y));
+            }
           }
         }
       }

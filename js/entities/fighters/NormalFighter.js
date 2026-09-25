@@ -225,8 +225,12 @@ export class NormalFighter extends Fighter {
     const dx = target.x - this.x;
     const dy = target.y - this.y;
     const dist = Math.hypot(dx, dy) || 1;
-    target.knockbackVx = (target.knockbackVx || 0) + (dx / dist) * knockbackStrength;
-    target.knockbackVy = (target.knockbackVy || 0) + (dy / dist) * knockbackStrength;
+    if (typeof target.applyKnockback === 'function') {
+      target.applyKnockback((dx / dist) * knockbackStrength, (dy / dist) * knockbackStrength);
+    } else {
+      target.knockbackVx = (target.knockbackVx || 0) + (dx / dist) * knockbackStrength;
+      target.knockbackVy = (target.knockbackVy || 0) + (dy / dist) * knockbackStrength;
+    }
   }
 
   /** Custom sniper-style gun for Red. */

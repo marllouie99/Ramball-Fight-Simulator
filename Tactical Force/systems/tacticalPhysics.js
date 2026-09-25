@@ -218,7 +218,7 @@ export function handleTacticalObstaclePass(fighters) {
 
   for (let i = 0; i < fighters.length; i++) {
     const fighter = fighters[i];
-    if (fighter && fighter.hp > 0) {
+    if (fighter && fighter.hp > 0 && !fighter.isGhostTerrain && fighter.characterId !== 'eye_of_cthulhu' && fighter.type !== 'eye_of_cthulhu') {
       handleObstacleCollision(fighter, activeObstacles);
       if (state.arena && typeof fighter.resolveWallBounce === 'function') {
         fighter.resolveWallBounce(state.arena);

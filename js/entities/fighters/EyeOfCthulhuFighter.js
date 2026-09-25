@@ -46,6 +46,9 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     // Terrain & Obstacle intangibility (Terraria ghost flight)
     this.isGhostTerrain = true;
+    this.immuneToKnockback = true;
+    this.immuneToPush = true;
+    this.immuneToCC = true;
 
     // AI State Machine
     this.aiState = EOC_STATE.HOVER;
@@ -80,56 +83,104 @@ export class EyeOfCthulhuFighter extends Fighter {
     this._registerSkills();
   }
 
-  // ── Unyielding Boss Poise: Zero Hit-Pause & Zero Flinch on Projectile Impacts ──
+  // ── Unyielding Boss Poise: Zero Hit-Pause, Zero Flinch & Zero Knockback ──
+  get knockbackVx() {
+    return 0;
+  }
+  set knockbackVx(_) {}
+
+  get knockbackVy() {
+    return 0;
+  }
+  set knockbackVy(_) {}
+
   get basicAttackHitPauseTimer() {
     return 0;
   }
-  set basicAttackHitPauseTimer(val) {
-    // No-op: Eye never flinches or pauses flight on bullet/strike impacts
-  }
+  set basicAttackHitPauseTimer(_) {}
 
   get knockbackStunTimer() {
     return 0;
   }
-  set knockbackStunTimer(val) {
-    // No-op
-  }
+  set knockbackStunTimer(_) {}
 
-  takeDamage(amount, attacker, opts = {}) {
-    const options = {
-      ...opts,
-      skipHitStun: true,
-      skipKnockback: true,
-      skipInterrupt: true,
-    };
-    const result = super.takeDamage(amount, attacker, options);
-    this.basicAttackHitPauseTimer = 0;
-    this.hitStunTimer = 0;
-    this.knockbackStunTimer = 0;
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
-    return result;
+  get hitStunTimer() {
+    return 0;
   }
+  set hitStunTimer(_) {}
 
   applyKnockback(vx, vy, stunFrames = 0, opts = {}) {
-    // Allow suction/pull gravitational vortexes (Gojo Blue/Purple, Cruel Sun, Pure Love Beam, Black Hole)
-    if (opts && (opts.isPull || opts.isSuction || opts.isVortex || opts.isGravitationalPull)) {
-      this.vx += vx;
-      this.vy += vy;
-      return;
+    const options = (typeof stunFrames === 'object' && stunFrames !== null)
+      ? stunFrames
+      : (typeof opts === 'object' && opts !== null ? opts : {});
+
+    // Preserve pulling / dragging / beam suction mechanics (Getsuga, Pure Love Beam, Cruel Sun, Vortex, Black Hole)
+    const isPullOrDrag = Boolean(
+      options.isPull ||
+      options.isDrag ||
+      options.isBeam ||
+      options.isPureLoveBeam ||
+      options.isGetsuga ||
+      options.isCruelSun ||
+      options.isVortex ||
+      options.fromBlackHole ||
+      this.isDraggedByGetsuga ||
+      this._draggedByCruelSun ||
+      this.isCaughtInCruelSun ||
+      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
+      this.isCaughtInBlackHole ||
+      this._insideBlackHole
+    );
+
+    if (isPullOrDrag) {
+      const stun = typeof stunFrames === 'number' ? stunFrames : (options.stunDuration || 0);
+      return super.applyKnockback(vx, vy, stun);
     }
-    // Zero knockback from standard bullets, explosions, and melee strikes
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
+    // 100% Immune to standard hit knockback & push back from strikes, bullets, and explosions
+    return;
   }
 
   applyRedKnockback(vx, vy) {
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
+    return;
   }
 
   applyHitStun(duration, opts = {}) {
-    this.hitStunTimer = 0;
+    const options = (typeof duration === 'object' && duration !== null)
+      ? duration
+      : (typeof opts === 'object' && opts !== null ? opts : {});
+    const isPullOrDrag = Boolean(
+      options.isPull ||
+      options.isDrag ||
+      options.isBeam ||
+      options.isPureLoveBeam ||
+      options.isGetsuga ||
+      options.isCruelSun ||
+      options.isVortex ||
+      options.fromBlackHole
+    );
+    if (isPullOrDrag) {
+      return super.applyHitStun(typeof duration === 'number' ? duration : 0, options);
+    }
+    return;
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
+      ? CONFIG.eye_of_cthulhu
+      : eyeOfCthulhuConfig;
+
+    // Phase 1 has 15% DR from its protective outer lens; Phase 2 drops defense completely to 0 (100% full unmitigated damage)
+    if (!this.isPhase2 && !this.isTransforming) {
+      const dr = (cfg.defenseReductionPhase1 !== undefined) ? cfg.defenseReductionPhase1 : 0.15;
+      amount = Math.max(1, amount * (1 - dr));
+    }
+
+    const passOpts = (opts && typeof opts === 'object') ? { ...opts } : {};
+    passOpts.skipKnockback = true;
+    passOpts.skipHitStun = true;
+    passOpts.skipInterrupt = true;
+
+    return super.takeDamage(amount, attacker, passOpts);
   }
 
   _registerSkills() {
@@ -798,94 +849,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
-  // Complete Poise: 100% immune to hit-pause, flinch, and basic attack hit-stop
-  get basicAttackHitPauseTimer() { return 0; }
-  set basicAttackHitPauseTimer(_) {}
-  get knockbackStunTimer() { return 0; }
-  set knockbackStunTimer(_) {}
-  get hitStunTimer() { return 0; }
-  set hitStunTimer(_) {}
 
-  applyKnockback(vx, vy, stunFrames = 0, opts = {}) {
-    const options = (typeof stunFrames === 'object' && stunFrames !== null)
-      ? stunFrames
-      : (typeof opts === 'object' && opts !== null ? opts : {});
-
-    // Preserve pulling / dragging / beam suction mechanics (Getsuga, Pure Love Beam, Cruel Sun, Vortex, Black Hole)
-    const isPullOrDrag = Boolean(
-      options.isPull ||
-      options.isDrag ||
-      options.isBeam ||
-      options.isPureLoveBeam ||
-      options.isGetsuga ||
-      options.isCruelSun ||
-      options.isVortex ||
-      options.fromBlackHole ||
-      this.isDraggedByGetsuga ||
-      this._draggedByCruelSun ||
-      this.isCaughtInCruelSun ||
-      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
-      this.isCaughtInBlackHole ||
-      this._insideBlackHole
-    );
-
-    if (isPullOrDrag) {
-      const stun = typeof stunFrames === 'number' ? stunFrames : (options.stunDuration || 0);
-      return super.applyKnockback(vx, vy, stun);
-    }
-    // 100% Immune to standard hit knockback & push back from strikes, bullets, and explosions
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
-    return;
-  }
-
-  applyRedKnockback(vx, vy) {
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
-    return;
-  }
-
-  applyHitStun(duration, opts = {}) {
-    const options = (typeof duration === 'object' && duration !== null)
-      ? duration
-      : (typeof opts === 'object' && opts !== null ? opts : {});
-    const isPullOrDrag = Boolean(
-      options.isPull ||
-      options.isDrag ||
-      options.isBeam ||
-      options.isPureLoveBeam ||
-      options.isGetsuga ||
-      options.isCruelSun ||
-      options.isVortex ||
-      options.fromBlackHole
-    );
-    if (isPullOrDrag) {
-      return super.applyHitStun(typeof duration === 'number' ? duration : 0, options);
-    }
-    return;
-  }
-
-  takeDamage(amount, attacker, opts = {}) {
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
-      ? CONFIG.eye_of_cthulhu
-      : eyeOfCthulhuConfig;
-
-    // Phase 1 has 15% DR from its protective outer lens; Phase 2 drops defense completely to 0 (100% full unmitigated damage)
-    if (!this.isPhase2 && !this.isTransforming) {
-      const dr = (cfg.defenseReductionPhase1 !== undefined) ? cfg.defenseReductionPhase1 : 0.15;
-      amount = Math.max(1, amount * (1 - dr));
-    }
-
-    const passOpts = (opts && typeof opts === 'object') ? { ...opts } : {};
-    passOpts.skipKnockback = true;
-    passOpts.skipHitStun = true;
-    passOpts.skipInterrupt = true;
-
-    const res = super.takeDamage(amount, attacker, passOpts);
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
-    return res;
-  }
 
   _updateP2ChaseState(opponent, ownerIndex, cfg) {
     this.isRamming = false;
