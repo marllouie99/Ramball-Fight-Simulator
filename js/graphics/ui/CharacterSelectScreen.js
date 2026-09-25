@@ -677,6 +677,24 @@ function drawFighterSelectModal() {
       3
     );
     textY += 20;
+  } else if (selectedDef.type === 'eye_of_cthulhu') {
+    const isP2 = Boolean(state.showEyeOfCthulhuPhase2);
+    drawButton(
+      isP2 ? '🦷 PHASE 2 (FANGED MAW)' : '👁️ PHASE 1 (OCULAR)',
+      previewX,
+      detailY + 142,
+      () => {
+        state.showEyeOfCthulhuPhase2 = !state.showEyeOfCthulhuPhase2;
+        try {
+          audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+        } catch (e) {}
+      },
+      135,
+      18,
+      isP2 ? '#e11d48' : null,
+      3
+    );
+    textY += 20;
   }
   const barW = detailW - 20;
   const barX = detailX + 10;

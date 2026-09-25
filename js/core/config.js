@@ -34,6 +34,7 @@ import { spikeConfig } from '../configs/characters/spikeConfig.js';
 import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { zeusConfig } from '../configs/characters/zeusConfig.js';
 import { gunslingerConfig } from '../configs/characters/gunslingerConfig.js';
+import { eyeOfCthulhuConfig } from '../configs/characters/eyeOfCthulhuConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
@@ -75,6 +76,9 @@ export const CONFIG = {
   escanor: escanorConfig,
   rubbick: rubbickConfig,
   zeus: zeusConfig,
+  eye_of_cthulhu: eyeOfCthulhuConfig,
+  EyeOfCthulhu: eyeOfCthulhuConfig,
+  eyeofcthulhu: eyeOfCthulhuConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1606,6 +1610,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: escanorConfig.projectileSpeedMultiplier || 1.0,
     ability: escanorConfig.ability || 'Cruel Sun (無慈悲な太陽)',
     desc: escanorConfig.desc || 'The Lion\'s Sin of Pride. Colossal solar juggernaut wielding the Sacred Treasure Divine Axe Rhitta and signature Cruel Sun (無慈悲な太陽) blazing star. Wields 140° Divine Slashes, solar drag & paralyze vortexes, Pride Flare solar novas, and the invincible high noon ultimate: "The One" with Divine Sword Escanor.',
+  },
+  {
+    id: 47,
+    name: 'Eye of Cthulhu',
+    category: 'Terraria & Bosses',
+    color: eyeOfCthulhuConfig.color || '#E11D48',
+    themeColor: eyeOfCthulhuConfig.themeColor || '#E11D48',
+    secondaryColor: eyeOfCthulhuConfig.secondaryColor || '#06B6D4',
+    startX: eyeOfCthulhuConfig.startX || 300,
+    startY: eyeOfCthulhuConfig.startY || 250,
+    startVx: eyeOfCthulhuConfig.startVx || 1.0,
+    startVy: eyeOfCthulhuConfig.startVy || 0.8,
+    radius: eyeOfCthulhuConfig.radius || eyeOfCthulhuConfig.r || 32,
+    aimbot: false,
+    spinRate: 0,
+    type: 'eye_of_cthulhu',
+    hp: eyeOfCthulhuConfig.hp || 480,
+    damage: eyeOfCthulhuConfig.damage || 28,
+    cooldown: eyeOfCthulhuConfig.cooldown || 90,
+    moveSpeed: eyeOfCthulhuConfig.moveSpeed || eyeOfCthulhuConfig.speed || 4.6,
+    projectileSpeedMultiplier: eyeOfCthulhuConfig.projectileSpeedMultiplier || 1.0,
+    ability: eyeOfCthulhuConfig.ability || 'The Evil Presence',
+    desc: eyeOfCthulhuConfig.desc || 'Floats freely through terrain. Summons Servants of Cthulhu and executes telegraphed triple rams. At 50% HP, tears into a ravenous berserk fanged maw.',
   }
 ];
 

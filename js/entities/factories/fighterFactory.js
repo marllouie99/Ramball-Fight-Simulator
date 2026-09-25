@@ -50,6 +50,7 @@ import { NezukoFighter } from '../fighters/NezukoFighter.js';
 import { ZenitsuFighter } from '../fighters/ZenitsuFighter.js';
 import { InosukeFighter } from '../fighters/InosukeFighter.js';
 import { EscanorFighter } from '../fighters/EscanorFighter.js';
+import { EyeOfCthulhuFighter } from '../fighters/EyeOfCthulhuFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -106,6 +107,9 @@ export const FIGHTER_CLASS_MAP = {
   'zenitsu':   ZenitsuFighter,
   'inosuke':   InosukeFighter,
   'escanor':   EscanorFighter,
+  'eye_of_cthulhu': EyeOfCthulhuFighter,
+  'eyeofcthulhu':   EyeOfCthulhuFighter,
+  'eye of cthulhu': EyeOfCthulhuFighter,
   'rifle':     RifleFighter,
   'm4a1':      RifleFighter,
   'shotgun':   ShotgunFighter,

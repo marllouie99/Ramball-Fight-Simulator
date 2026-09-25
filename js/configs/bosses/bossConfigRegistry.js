@@ -12,6 +12,7 @@ import { mahoragaBossConfig } from './mahoragaBossConfig.js';
 import { yutaBossConfig } from './yutaBossConfig.js';
 import { escanorBossConfig } from './escanorBossConfig.js';
 import { makimaBossConfig } from './makimaBossConfig.js';
+import { eyeOfCthulhuBossConfig } from './eyeOfCthulhuBossConfig.js';
 
 const _bossConfigs = new Map([
   ['zeus', zeusBossConfig],
@@ -21,6 +22,8 @@ const _bossConfigs = new Map([
   ['yuta', yutaBossConfig],
   ['escanor', escanorBossConfig],
   ['makima', makimaBossConfig],
+  ['eye_of_cthulhu', eyeOfCthulhuBossConfig],
+  ['eyeofcthulhu', eyeOfCthulhuBossConfig],
 ]);
 
 /**

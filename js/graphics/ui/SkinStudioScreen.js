@@ -30,6 +30,7 @@ import { drawMusashiSkin, _drawMusashiHair } from '../fighters/musashiSkin.js';
 import { drawGunslingerSkin, _drawGunslingerHair, _getGunslingerHairImage } from '../fighters/gunSlingerSkin.js';
 import { drawDoppelgangerSkin, drawDoppelgangerPixelBody } from '../fighters/doppelgangerSkin.js';
 import { drawEmberSkin } from '../fighters/flamewardenSkin.js';
+import { drawEyeOfCthulhuSkin } from '../fighters/eyeOfCthulhuSkin.js';
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -498,6 +499,21 @@ export const SKIN_STUDIO_FIGHTERS = [
     forms: [
       { id: 'default', label: 'FLAMEWARDEN' }
     ]
+  },
+  {
+    key: 'eye_of_cthulhu',
+    label: 'EYE OF CTHULHU',
+    category: 'boss',
+    asset: 'Eye of Cthulhu.png',
+    assetDims: '1774 x 887 (6-Frame Sprite Strip)',
+    baseW: 2.20,
+    baseH: 2.20,
+    baseCrownY: -1.00,
+    themeColor: '#e11d48',
+    forms: [
+      { id: 'default', label: 'PHASE 1 (OCULAR)' },
+      { id: 'phase2', label: 'PHASE 2 (FANGED MAW)' }
+    ]
   }
 ];
 
@@ -928,6 +944,10 @@ export function drawSkinStudioScreen() {
         drawDoppelgangerSkin(ctx, dummyFighter);
       } else if (fDef.key === 'orange') {
         drawEmberSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'eye_of_cthulhu') {
+        dummyFighter.isPhase2 = (state.studioSkinForm === 'phase2');
+        dummyFighter._isPhase2 = (state.studioSkinForm === 'phase2');
+        drawEyeOfCthulhuSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -1053,14 +1073,27 @@ export function drawSkinStudioScreen() {
   topBarX += 98;
 
   // Form Selector Button (if fighter has multiple forms)
-  if (fDef.forms && fDef.forms.length > 1) {
+  if (fDef.key === 'eye_of_cthulhu') {
+    const isP2 = state.studioSkinForm === 'phase2';
+    drawButton('👁️ PHASE 1', topBarX + 44, topBarY + 10, () => {
+      state.studioSkinForm = 'default';
+    }, 88, 20, !isP2 ? '#e11d48' : null, 3);
+    topBarX += 94;
+
+    drawButton('🦷 PHASE 2', topBarX + 44, topBarY + 10, () => {
+      state.studioSkinForm = 'phase2';
+    }, 88, 20, isP2 ? '#e11d48' : null, 3);
+    topBarX += 94;
+  } else if (fDef.forms && fDef.forms.length > 1) {
     const currentFormDef = fDef.forms.find(fm => fm.id === state.studioSkinForm) || fDef.forms[0];
-    drawButton(`FORM: ${currentFormDef.label}`, topBarX + 55, topBarY + 10, () => {
+    const btnLabel = `FORM: ${currentFormDef.label}`;
+    const btnW = Math.max(110, btnLabel.length * 7.5 + 16);
+    drawButton(btnLabel, topBarX + btnW / 2, topBarY + 10, () => {
       const idx = fDef.forms.findIndex(fm => fm.id === state.studioSkinForm);
       const nextIdx = (idx + 1) % fDef.forms.length;
       state.studioSkinForm = fDef.forms[nextIdx].id;
-    }, 110, 20, null, 3);
-    topBarX += 118;
+    }, btnW, 20, null, 3);
+    topBarX += btnW + 8;
   }
 
   // Body Toggle Button

@@ -59,6 +59,14 @@ export const BOSS_ROSTER = [
     subtitle: 'SPECIAL GRADE SORCERER & CURSED SPIRIT QUEEN',
     themeColor: '#FF1493',
     isFeatured: true
+  },
+  {
+    id: 'eye_of_cthulhu',
+    name: 'Eye of Cthulhu',
+    title: 'ANCIENT OCULAR HORROR',
+    subtitle: 'YOU FEEL AN EVIL PRESENCE WATCHING YOU...',
+    themeColor: '#E11D48',
+    isFeatured: true
   }
 ];
 

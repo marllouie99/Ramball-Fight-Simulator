@@ -10,4 +10,5 @@ export { mahoragaBossConfig } from './mahoragaBossConfig.js';
 export { yutaBossConfig } from './yutaBossConfig.js';
 export { escanorBossConfig } from './escanorBossConfig.js';
 export { makimaBossConfig } from './makimaBossConfig.js';
+export { eyeOfCthulhuBossConfig } from './eyeOfCthulhuBossConfig.js';
 export { getBossConfig, registerBossConfig } from './bossConfigRegistry.js';
