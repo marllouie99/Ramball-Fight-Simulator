@@ -13,6 +13,7 @@ import { yutaBossConfig } from './yutaBossConfig.js';
 import { escanorBossConfig } from './escanorBossConfig.js';
 import { makimaBossConfig } from './makimaBossConfig.js';
 import { eyeOfCthulhuBossConfig } from './eyeOfCthulhuBossConfig.js';
+import { enderDragonBossConfig } from './enderDragonBossConfig.js';
 import { CONFIG } from '../../core/config.js';
 
 const _bossConfigs = new Map([
@@ -25,6 +26,8 @@ const _bossConfigs = new Map([
   ['makima', makimaBossConfig],
   ['eye_of_cthulhu', eyeOfCthulhuBossConfig],
   ['eyeofcthulhu', eyeOfCthulhuBossConfig],
+  ['ender_dragon', enderDragonBossConfig],
+  ['enderdragon', enderDragonBossConfig],
 ]);
 
 /**

@@ -6,6 +6,7 @@ import { state, triggerGlobalScreenShake } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { getEyePhase1Image, getEyePhase2Image, getEyeShatterImage, EOC_SHATTER_SPRITES } from '../fighters/eyeOfCthulhuSkin.js';
+import { getEnderDragonDisintegrationImages } from '../fighters/enderDragonSkin.js';
 import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
 
 /**
@@ -15,6 +16,9 @@ import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
 export function spawnDeathShatter(fighter) {
   if (fighter.characterId === 'eye_of_cthulhu' || fighter.type === 'eye_of_cthulhu' || fighter.isServantOfCthulhu) {
     return spawnEyeOfCthulhuTerrariaDeath(fighter, Boolean(fighter.isServantOfCthulhu));
+  }
+  if (fighter.characterId === 'ender_dragon' || fighter.type === 'ender_dragon') {
+    return spawnEnderDragonDisintegrationDeath(fighter);
   }
 
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
@@ -262,6 +266,28 @@ export function spawnMachineCorpse(x, y, angle) {
   });
 }
 
+export function spawnEnderDragonDisintegrationDeath(fighter) {
+  triggerGlobalScreenShake(12, 35);
+  const baseR = fighter.r || 36;
+  const aimAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const facingLeft = (fighter.vx < -0.4) || (Math.abs(aimAngle) > Math.PI / 2);
+  state.deathEffects.push({
+    x: fighter.x,
+    y: fighter.y,
+    vx: 0,
+    vy: -0.35, // Slow majestic upward ascension
+    r: baseR,
+    rotation: 0, // Strictly upright at all times
+    facingLeft,
+    life: 1.0,
+    maxLife: 1.0,
+    frameTimer: 0,
+    totalFrames: 90,
+    decay: 1.0 / 90,
+    isEnderDragonDeath: true,
+  });
+}
+
 /**
  * Updates all death shatter effects.
  */
@@ -275,6 +301,23 @@ export function updateDeathEffects() {
 
   for (let i = state.deathEffects.length - 1; i >= 0; i--) {
     const effect = state.deathEffects[i];
+
+    // 0. Ender Dragon Disintegration Sequence
+    if (effect.isEnderDragonDeath) {
+      effect.x += effect.vx;
+      effect.y += effect.vy;
+      effect.frameTimer = (effect.frameTimer || 0) + 1;
+      effect.life -= effect.decay;
+      if (Math.random() < 0.35) {
+        spawnSparks(effect.x + (Math.random() - 0.5) * effect.r * 2, effect.y + (Math.random() - 0.5) * effect.r * 2, '#D946EF', 2, 2.5);
+      }
+      if (effect.life <= 0) {
+        spawnImpactFlash(effect.x, effect.y, effect.r * 2.5, '#F5D0FE');
+        spawnSparks(effect.x, effect.y, '#C026D3', 24, 7.5);
+        state.deathEffects.splice(i, 1);
+      }
+      continue;
+    }
     
     // 1. Eye of Cthulhu Terraria Gore: drops to arena floor, bounces, settles, and slowly disappears
     if (effect.isEyeOfCthulhuGore || effect.isPermanentGore) {
@@ -477,7 +520,38 @@ export function drawDeathEffects() {
     ctx.rotate(effect.rotation);
     ctx.globalAlpha = Math.min(1, Math.max(0, effect.life));
 
-    if (effect.isEyeOfCthulhuGore) {
+    if (effect.isEnderDragonDeath) {
+      const { dis1, dis2 } = getEnderDragonDisintegrationImages();
+      const img = dis1 || dis2;
+      const progress = Math.min(0.99, (effect.frameTimer || 0) / (effect.totalFrames || 90));
+      const frameIdx = Math.floor(progress * 6);
+      const row = Math.floor(frameIdx / 3);
+      const col = frameIdx % 3;
+      const sx = col * 512;
+      const sy = row * 512;
+      const drawSize = effect.r * 3.8;
+
+      if (effect.facingLeft) {
+        ctx.scale(-1, 1);
+      }
+
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, sx, sy, 512, 512, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+      }
+
+      // Radiating purple void beams
+      const beamCount = 8;
+      const beamLength = effect.r * (1.8 + progress * 2.8);
+      ctx.strokeStyle = progress > 0.5 ? '#F5D0FE' : '#D946EF';
+      ctx.lineWidth = Math.max(1, 3.5 * (1 - progress));
+      for (let b = 0; b < beamCount; b++) {
+        const bAngle = (b / beamCount) * Math.PI * 2 + progress * 2.0;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(bAngle) * beamLength, Math.sin(bAngle) * beamLength);
+        ctx.stroke();
+      }
+    } else if (effect.isEyeOfCthulhuGore) {
       drawTerrariaEyeGore(ctx, effect);
     } else if (effect.isHollowMaskShard) {
       const s = effect.size;

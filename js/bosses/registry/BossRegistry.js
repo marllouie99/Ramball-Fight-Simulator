@@ -67,6 +67,14 @@ export const BOSS_ROSTER = [
     subtitle: 'YOU FEEL AN EVIL PRESENCE WATCHING YOU...',
     themeColor: '#E11D48',
     isFeatured: true
+  },
+  {
+    id: 'ender_dragon',
+    name: 'Ender Dragon',
+    title: 'RULER OF THE END',
+    subtitle: 'THE END IS NEAR — BEAST OF THE VOID',
+    themeColor: '#C026D3',
+    isFeatured: true
   }
 ];
 

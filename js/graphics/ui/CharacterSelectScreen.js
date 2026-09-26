@@ -1347,6 +1347,9 @@ export function getFighterWeaponInfo(def) {
       return { name: 'DIVINE AXE RHITTA & CRUEL SUN', category: 'SIGNATURE // CRUEL SUN', desc: "Legendary giant golden battleaxe and Escanor's signature Cruel Sun (無慈悲な太陽). Channels 140° Divine Slashes, colossal blazing solar spheres dragging & paralyzing enemies along arena walls, Pride Flare, and the invincible \"The One\" form." };
     case 'zeus':
       return { name: 'DIVINE LIGHTNING & AEGIS', category: 'SIGNATURE // THUNDER STORM', desc: "Olympian God of Thunder wielding Chain Lightning, Aegis Counter Barrier, and signature Ultimate: Thunder Storm arena-wide divine judgment wrath." };
+    case 'ender_dragon':
+    case 'enderdragon':
+      return { name: "DRAGON'S BREATH & VOID WINGS", category: 'VOID LEVIATHAN // KINETIC SWOOP', desc: 'Ancient draconic arsenal deploying lingering acidic Dragon Breath pools, supersonic 120° Wing Buffet kinetic swoops, and 360° Void Cataclysm shockwaves.' };
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:

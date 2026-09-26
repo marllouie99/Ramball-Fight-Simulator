@@ -51,8 +51,10 @@ class BossEntranceSequenceClass {
     if (state.fighters) {
       const bossTargetX = boss.x;
       const bossTargetY = boss.y - (boss.z || 0) * 0.4;
+      let primaryChallenger = null;
       state.fighters.forEach((f) => {
         if (f && f !== boss && !f.isBoss) {
+          if (!primaryChallenger) primaryChallenger = f;
           const dx = bossTargetX - f.x;
           const dy = bossTargetY - f.y;
           const aimAngle = Math.atan2(dy, dx);
@@ -63,6 +65,20 @@ class BossEntranceSequenceClass {
           f.angle = (dx >= 0) ? 0 : Math.PI;
         }
       });
+
+      // Also aim the boss at the primary challenger from frame 1
+      if (primaryChallenger && boss) {
+        const isEyeOrYuta = (boss.characterId === 'eye_of_cthulhu' || boss.type === 'eye_of_cthulhu' || boss.characterId === 'yuta' || boss.type === 'yuta');
+        if (!isEyeOrYuta) {
+          const bdx = primaryChallenger.x - boss.x;
+          const bdy = primaryChallenger.y - boss.y;
+          const bossAim = Math.atan2(bdy, bdx);
+          boss.gunAngle = bossAim;
+          boss.angle = bossAim;
+          if (typeof boss.rightGunAngle !== 'undefined') boss.rightGunAngle = bossAim;
+          if (typeof boss.leftGunAngle !== 'undefined') boss.leftGunAngle = bossAim;
+        }
+      }
     }
 
     // 2. Initial ground burst or character-specific entrance initialization
@@ -106,8 +122,10 @@ class BossEntranceSequenceClass {
     if (this.boss && state.fighters) {
       const bossTargetX = this.boss.x;
       const bossTargetY = this.boss.y - (this.boss.z || 0) * 0.4;
+      let primaryChallenger = null;
       state.fighters.forEach((f) => {
         if (f && f !== this.boss && !f.isBoss && f.hp > 0) {
+          if (!primaryChallenger) primaryChallenger = f;
           const dx = bossTargetX - f.x;
           const dy = bossTargetY - f.y;
           const aimAngle = Math.atan2(dy, dx);
@@ -118,6 +136,17 @@ class BossEntranceSequenceClass {
           f.angle = (dx >= 0) ? 0 : Math.PI;
         }
       });
+
+      // Continuously aim boss at primary challenger
+      if (primaryChallenger && !isEye && !isYuta) {
+        const bdx = primaryChallenger.x - this.boss.x;
+        const bdy = primaryChallenger.y - this.boss.y;
+        const bossAim = Math.atan2(bdy, bdx);
+        this.boss.gunAngle = bossAim;
+        this.boss.angle = bossAim;
+        if (typeof this.boss.rightGunAngle !== 'undefined') this.boss.rightGunAngle = bossAim;
+        if (typeof this.boss.leftGunAngle !== 'undefined') this.boss.leftGunAngle = bossAim;
+      }
     }
 
     // Keep camera smoothly tracking the boss throughout entrance

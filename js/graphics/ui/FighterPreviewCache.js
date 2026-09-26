@@ -20,9 +20,12 @@ function renderPreviewForDef(def, cacheKey) {
     startX: previewSize / 2,
     startY: previewSize / 2,
   });
-  const isUpright = def.type === 'Engineer' || def.type === 'engineer' || def.type === 'tanjiro' || def.type === 'nezuko' || def.type === 'zenitsu' || def.type === 'inosuke' || def.type === 'denji' || def.type === 'power' || def.type === 'uryu' || def.type === 'ulquiorra' || def.type === 'reze' || def.type === 'makima' || def.type === 'toji' || def.type === 'nanami' || def.type === 'yuji' || def.type === 'yuta' || def.type === 'gojo' || def.type === 'sukuna' || def.type === 'saitama' || def.type === 'genos' || def.type === 'ichigo' || def.type === 'mahito' || def.type === 'megumi' || def.type === 'nobara' || def.type === 'escanor' || def.type === 'zeus' || def.type === 'cronos' || def.type === 'bomber' || def.type === 'black' || def.type === 'knight' || def.type === 'eye_of_cthulhu' || def.category === 'Anime' || def.category === 'Greek Mythology';
+  const isUpright = def.type === 'Engineer' || def.type === 'engineer' || def.type === 'tanjiro' || def.type === 'nezuko' || def.type === 'zenitsu' || def.type === 'inosuke' || def.type === 'denji' || def.type === 'power' || def.type === 'uryu' || def.type === 'ulquiorra' || def.type === 'reze' || def.type === 'makima' || def.type === 'toji' || def.type === 'nanami' || def.type === 'yuji' || def.type === 'yuta' || def.type === 'gojo' || def.type === 'sukuna' || def.type === 'saitama' || def.type === 'genos' || def.type === 'ichigo' || def.type === 'mahito' || def.type === 'megumi' || def.type === 'nobara' || def.type === 'escanor' || def.type === 'zeus' || def.type === 'cronos' || def.type === 'bomber' || def.type === 'black' || def.type === 'knight' || def.type === 'eye_of_cthulhu' || def.type === 'ender_dragon' || def.category === 'Anime' || def.category === 'Greek Mythology';
   previewFighter.angle = 0; // Static angle for consistent previews
   previewFighter.gunAngle = isUpright ? 0 : Math.PI / 4; // Upright fighters aim forward
+  if (def.type === 'ender_dragon') {
+    previewFighter._isPreview = true;
+  }
   if (def.type === 'uryu') {
     previewFighter.smoothDrawProgress = 0.30;
   }

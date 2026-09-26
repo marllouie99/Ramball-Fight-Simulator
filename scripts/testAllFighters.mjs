@@ -10933,6 +10933,59 @@ async function main() {
     errorList.push(`[SIGNATURE SKILLS TEST]: ${err.stack || err.message}`);
   }
 
+  // ── TEST: Ender Dragon Model, Movement Sprite Sheet & Canvas Stack Balance ──
+  try {
+    console.log('🐉 [Ender Dragon Circle Skin & Wings Test] Verifying circle body, animated wings, canvas stack balance & skills...');
+    const EnderDragonClass = FIGHTER_CLASS_MAP.ender_dragon;
+    if (!EnderDragonClass) {
+      throw new Error('EnderDragonFighter class not found in FIGHTER_CLASS_MAP.ender_dragon');
+    }
+    const dragonInstance = new EnderDragonClass({ x: 250, y: 250, color: '#18181B', controls: {} });
+    
+    // 1. Draw upright preview (Model)
+    mockCtx.resetStackDepth();
+    dragonInstance._isPreview = true;
+    dragonInstance.draw(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] Ender Dragon preview draw stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    // 2. Draw combat movement flight across all 8 directions
+    dragonInstance._isPreview = false;
+    const testDirs = [
+      { name: 'East (->)', vx: 2, vy: 0, angle: 0 },
+      { name: 'North-East (^>)', vx: 2, vy: -2, angle: -Math.PI / 4 },
+      { name: 'North (^)', vx: 0, vy: -2, angle: -Math.PI / 2 },
+      { name: 'North-West (<^)', vx: -2, vy: -2, angle: -3 * Math.PI / 4 },
+      { name: 'West (<-)', vx: -2, vy: 0, angle: Math.PI },
+      { name: 'South-West (<v)', vx: -2, vy: 2, angle: 3 * Math.PI / 4 },
+      { name: 'South (v)', vx: 0, vy: 2, angle: Math.PI / 2 },
+      { name: 'South-East (v>)', vx: 2, vy: 2, angle: Math.PI / 4 },
+    ];
+
+    for (const dir of testDirs) {
+      mockCtx.resetStackDepth();
+      dragonInstance.vx = dir.vx;
+      dragonInstance.vy = dir.vy;
+      dragonInstance.gunAngle = dir.angle;
+      dragonInstance.draw(mockCtx);
+      if (mockCtx.getStackDepth() !== 0) {
+        throw new Error(`[CANVAS STACK LEAK] Ender Dragon 8-dir flight (${dir.name}) draw stackDepth=${mockCtx.getStackDepth()} != 0`);
+      }
+    }
+
+    // 3. Verify skills
+    if (!dragonInstance.skills || dragonInstance.skills.length < 3) {
+      throw new Error('Ender Dragon does not have at least 3 skills registered');
+    }
+
+    console.log('✅ [Ender Dragon Test] Successfully verified model, 8-directional movement flight, skills, and 100% balanced Canvas 2D stacks!');
+  } catch (err) {
+    console.error('❌ [ENDER DRAGON TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[ENDER DRAGON TEST]: ${err.stack || err.message}`);
+  }
+
   console.log('───────────────────────────────────────────────────────');
   if (errors === 0) {
     console.log(`✅ Successfully tested all ${totalTested} fighter classes, skins, weapon previews, and UI screens with ZERO runtime errors and 100% BALANCED Canvas 2D stacks!`);

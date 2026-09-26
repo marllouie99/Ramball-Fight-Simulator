@@ -35,6 +35,7 @@ import { rubbickConfig } from '../configs/characters/rubbickConfig.js';
 import { zeusConfig } from '../configs/characters/zeusConfig.js';
 import { gunslingerConfig } from '../configs/characters/gunslingerConfig.js';
 import { eyeOfCthulhuConfig } from '../configs/characters/eyeOfCthulhuConfig.js';
+import { enderDragonConfig } from '../configs/characters/enderDragonConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
@@ -79,6 +80,9 @@ export const CONFIG = {
   eye_of_cthulhu: eyeOfCthulhuConfig,
   EyeOfCthulhu: eyeOfCthulhuConfig,
   eyeofcthulhu: eyeOfCthulhuConfig,
+  ender_dragon: enderDragonConfig,
+  enderDragon: enderDragonConfig,
+  enderdragon: enderDragonConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1633,6 +1637,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: eyeOfCthulhuConfig.projectileSpeedMultiplier || 1.0,
     ability: eyeOfCthulhuConfig.ability || 'The Evil Presence',
     desc: eyeOfCthulhuConfig.desc || 'Floats freely through terrain. Summons Servants of Cthulhu and executes telegraphed triple rams. At 50% HP, tears into a ravenous berserk fanged maw.',
+  },
+  {
+    id: 48,
+    name: 'Ender Dragon',
+    category: 'Terraria & Bosses',
+    color: enderDragonConfig.color || '#18181B',
+    themeColor: enderDragonConfig.themeColor || '#C026D3',
+    secondaryColor: enderDragonConfig.secondaryColor || '#E879F9',
+    startX: enderDragonConfig.startX || 300,
+    startY: enderDragonConfig.startY || 250,
+    startVx: enderDragonConfig.startVx || 1.0,
+    startVy: enderDragonConfig.startVy || 0.8,
+    radius: enderDragonConfig.radius || enderDragonConfig.r || 36,
+    aimbot: false,
+    spinRate: 0,
+    type: 'ender_dragon',
+    hp: enderDragonConfig.hp || 520,
+    damage: enderDragonConfig.damage || 32,
+    cooldown: enderDragonConfig.cooldown || 80,
+    moveSpeed: enderDragonConfig.moveSpeed || enderDragonConfig.speed || 4.4,
+    projectileSpeedMultiplier: enderDragonConfig.projectileSpeedMultiplier || 1.0,
+    ability: enderDragonConfig.ability || 'Ruler of The End',
+    desc: enderDragonConfig.desc || 'Colossal flying draconic leviathan. Bypasses terrain with void flight, shoots lingering Dragon Breath acid pools, executes kinetic wing swoops, and unleashes cataclysmic void shockwaves.',
   }
 ];
 

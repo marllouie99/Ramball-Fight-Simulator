@@ -358,8 +358,8 @@ export function resolveFighterCollision(a, b) {
   const aIsEscanor = Boolean(a && (a.characterId === 'escanor' || a.type === 'escanor'));
   const bIsEscanor = Boolean(b && (b.characterId === 'escanor' || b.type === 'escanor'));
 
-  const aIsEye = Boolean(a && (a.characterId === 'eye_of_cthulhu' || a.type === 'eye_of_cthulhu'));
-  const bIsEye = Boolean(b && (b.characterId === 'eye_of_cthulhu' || b.type === 'eye_of_cthulhu'));
+  const aIsEye = Boolean(a && (a.characterId === 'eye_of_cthulhu' || a.type === 'eye_of_cthulhu' || a.characterId === 'ender_dragon' || a.type === 'ender_dragon'));
+  const bIsEye = Boolean(b && (b.characterId === 'eye_of_cthulhu' || b.type === 'eye_of_cthulhu' || b.characterId === 'ender_dragon' || b.type === 'ender_dragon'));
 
   const aIsGenosBeam = Boolean(a && (a.characterId === 'genos' || a.type === 'genos') && (a.isFiringUlt || a.isChargingUlt));
   const bIsGenosBeam = Boolean(b && (b.characterId === 'genos' || b.type === 'genos') && (b.isFiringUlt || b.isChargingUlt));
@@ -1131,7 +1131,7 @@ export function updateFighters() {
               entity.x = Math.max(arena.x + eR, Math.min(arena.x + arena.width - eR, entity.x));
               entity.y = Math.max(arena.y + eR, Math.min(arena.y + arena.height - eR, entity.y));
             }
-            if (!fighter.isGhostTerrain && fighter.characterId !== 'eye_of_cthulhu' && fighter.type !== 'eye_of_cthulhu') {
+            if (!fighter.isGhostTerrain && fighter.characterId !== 'eye_of_cthulhu' && fighter.type !== 'eye_of_cthulhu' && fighter.characterId !== 'ender_dragon' && fighter.type !== 'ender_dragon') {
               const fR = fighter.r || 25;
               fighter.x = Math.max(arena.x + fR, Math.min(arena.x + arena.width - fR, fighter.x));
               fighter.y = Math.max(arena.y + fR, Math.min(arena.y + arena.height - fR, fighter.y));

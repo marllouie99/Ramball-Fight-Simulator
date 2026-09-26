@@ -776,6 +776,13 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     src: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
     volume: 0.85,
     delay: 0,
+  },
+
+  // Ender Dragon — Ruler of The End
+  'ender_dragon': {
+    src: 'Assets/Sound Effects/Skills/redblast.mp3',
+    volume: 0.85,
+    delay: 0,
   }
 };
 
