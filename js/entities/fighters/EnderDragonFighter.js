@@ -301,8 +301,35 @@ export class EnderDragonFighter extends Fighter {
     }
   }
 
+  // ── Pushback, Pull & Knockback Immunity Guard ──
+  applyKnockback(vx, vy, opts = 0) {
+    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY;
+    if (isDivebombActive || this.immuneToKnockback || this.immuneToPush) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    super.applyKnockback(vx, vy, opts);
+  }
+
+  applyPull(targetX, targetY, strength) {
+    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY;
+    if (isDivebombActive || this.immuneToPull || this.immuneToPush) {
+      return;
+    }
+    if (typeof super.applyPull === 'function') {
+      super.applyPull(targetX, targetY, strength);
+    }
+  }
+
   // ── Main Update Loop ──
   update(opponent, ownerIndex, arena) {
+    // Dynamic divebomb pushback and pull immunity sync
+    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY;
+    this.immuneToKnockback = isDivebombActive;
+    this.immuneToPush = isDivebombActive;
+    this.immuneToPull = isDivebombActive;
+
     // Rule 1.1: Freeze & TimeStop Early Guard
     const isFrozen = (typeof this._handleTimeStop === 'function') ? this._handleTimeStop() : false;
     if (isFrozen || this.isTargetOfAmbush) {
