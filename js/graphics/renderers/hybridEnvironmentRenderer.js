@@ -790,11 +790,10 @@ export function updateHybridEnvironment() {
     const data = getCjBaguvixDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    const bleed = 40;
-    data.sprite.x = arena.x - bleed;
-    data.sprite.y = arena.y - bleed;
-    data.sprite.width = arena.width + bleed * 2;
-    data.sprite.height = arena.height + bleed * 2;
+    data.sprite.x = arena.x;
+    data.sprite.y = arena.y;
+    data.sprite.width = arena.width;
+    data.sprite.height = arena.height;
 
     if (state.arena) {
       if (!cjBaguvixArenaMask) {
@@ -807,10 +806,10 @@ export function updateHybridEnvironment() {
       if (arena.shape === 'circle') {
         const acx = arena.x + arena.width / 2;
         const acy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + bleed;
+        const ar = arena.radius !== undefined ? arena.radius : (arena.width / 2);
         cjBaguvixArenaMask.drawCircle(acx, acy, Math.max(0, ar));
       } else {
-        cjBaguvixArenaMask.drawRect(arena.x - bleed, arena.y - bleed, arena.width + bleed * 2, arena.height + bleed * 2);
+        cjBaguvixArenaMask.drawRect(arena.x, arena.y, arena.width, arena.height);
       }
       cjBaguvixArenaMask.endFill();
       data.sprite.mask = cjBaguvixArenaMask;
