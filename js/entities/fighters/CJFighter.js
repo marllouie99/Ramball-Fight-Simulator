@@ -37,6 +37,8 @@ export class CJFighter extends Fighter {
     this.punchAnimHand = 0; // 0 = lead jab (front hand), 1 = cross hook (back hand)
     this.meleeCooldown = 0;
     this.meleeCooldownMax = cfg.meleePunchCooldown || 18;
+    this.hideHands = false;
+    this.hideGun = false;
     this.hideFrontHand = false;
     this.hideBackHand = false;
 
@@ -179,6 +181,8 @@ export class CJFighter extends Fighter {
     this.punchAnimHand = 0;
     this.meleeCooldown = 0;
     this.meleeCooldownMax = cfg.meleePunchCooldown || 18;
+    this.hideHands = false;
+    this.hideGun = false;
     this.hideFrontHand = false;
     this.hideBackHand = false;
 

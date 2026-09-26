@@ -320,7 +320,8 @@ class YutaBushEntranceClass {
    */
   finish(boss = null) {
     const targetBoss = boss || this.boss;
-    if (targetBoss) {
+    const isYuta = Boolean(targetBoss && (targetBoss.characterId === 'yuta' || targetBoss.type === 'yuta'));
+    if (this.isActive && isYuta && targetBoss) {
       targetBoss._hideInBush = false;
       targetBoss.z = 0;
     }

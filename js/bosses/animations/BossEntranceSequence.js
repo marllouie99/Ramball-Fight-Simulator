@@ -194,8 +194,20 @@ class BossEntranceSequenceClass {
       resetCamera(false);
     }
 
-    YutaBushEntrance.finish(this.boss);
-    EyeOfCthulhuEntrance.finish(this.boss);
+    const isYuta = Boolean(this.boss && (this.boss.characterId === 'yuta' || this.boss.type === 'yuta'));
+    const isEye = Boolean(this.boss && (this.boss.characterId === 'eye_of_cthulhu' || this.boss.type === 'eye_of_cthulhu' || this.boss.characterId === 'eyeofcthulhu' || this.boss.type === 'eyeofcthulhu'));
+
+    if (isYuta) {
+      YutaBushEntrance.finish(this.boss);
+    } else {
+      YutaBushEntrance.finish(null);
+    }
+
+    if (isEye) {
+      EyeOfCthulhuEntrance.finish(this.boss);
+    } else {
+      EyeOfCthulhuEntrance.finish(null);
+    }
 
     // Signal HUD to smoothly fade in after boss entrance concludes
     state._bossEntranceHudFadeTimer = 0;

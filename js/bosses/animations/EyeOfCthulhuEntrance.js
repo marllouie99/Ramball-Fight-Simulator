@@ -335,7 +335,8 @@ class EyeOfCthulhuEntranceClass {
    */
   finish(boss = null) {
     const targetBoss = boss || this.boss;
-    if (targetBoss) {
+    const isEye = Boolean(targetBoss && (targetBoss.characterId === 'eye_of_cthulhu' || targetBoss.type === 'eye_of_cthulhu' || targetBoss.characterId === 'eyeofcthulhu' || targetBoss.type === 'eyeofcthulhu'));
+    if (this.isActive && isEye && targetBoss) {
       const arena = state.arena || CONFIG.arena || { x: 20, y: 120, width: 500, height: 700 };
       const fallbackX = (typeof arena.x === 'number' && typeof arena.width === 'number')
         ? arena.x + arena.width * 0.5

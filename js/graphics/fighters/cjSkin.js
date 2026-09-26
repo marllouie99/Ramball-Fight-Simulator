@@ -1313,6 +1313,7 @@ function _drawCjGroundShadow(ctx, fighter, r, z, isJetpackActive) {
  */
 export function drawCjSkin(ctx, fighter) {
   const r = fighter.r || 25;
+  const scaleMult = r / 25;
   const z = fighter.z || 0;
   const previewIdx = fighter.previewWeaponIndex !== undefined ? fighter.previewWeaponIndex : null;
   const isTec9Active = Boolean(previewIdx === 4 || fighter.isTec9Active);
@@ -1360,7 +1361,7 @@ export function drawCjSkin(ctx, fighter) {
 
   if (isMinigunActive) {
     hideBackHand = false; // Both hands grip the heavy M134 Minigun
-    const mgScale = 1.15;
+    const mgScale = 1.15 * scaleMult;
     const mgAnchorX = r * 1.67;
     // Back hand grips the forward upright carry handle loop in front
     backX = mgAnchorX + (6.0 * mgScale);
@@ -1390,7 +1391,7 @@ export function drawCjSkin(ctx, fighter) {
   if (hideHandsAndWeapon || fighter.hideFrontHand) hideFrontHand = true;
   if (hideHandsAndWeapon || fighter.hideBackHand) hideBackHand = true;
 
-  const handRadius = getHandSize(7.5);
+  const handRadius = getHandSize(7.5 * scaleMult);
   const skinColor = '#8D5538'; // Authentic warm brown skin tone
 
   // Status checks for Jetpack & Cheats
@@ -1413,16 +1414,16 @@ export function drawCjSkin(ctx, fighter) {
   // ── LAYER 1: BACK HAND (Behind Body Layer — Left Micro-Uzi / Minigun Forward Grip / Fist) ──
   if (!hideBackHand) {
     if (isMinigunActive) {
-      const minigunRecoil = fighter.minigunRecoil || 0;
+      const minigunRecoil = (fighter.minigunRecoil || 0) * scaleMult;
       // Back hand grips forward upright support handle loop
       drawCjPixelHand(ctx, backX - minigunRecoil, backY, handRadius * 0.92, skinColor, 0, true);
     } else if (isJetpackActive && isUziActive) {
-      const recoilB = fighter.uziRecoilBack || 0;
+      const recoilB = (fighter.uziRecoilBack || 0) * scaleMult;
       const flashB = fighter.uziFlashTimerBack || 0;
       // 1. Draw hand base FIRST behind the gun
-      drawCjPixelHand(ctx, backX - recoilB * 0.5 - 6, backY, handRadius * 0.92, skinColor, 0, true);
+      drawCjPixelHand(ctx, backX - recoilB * 0.5 - 6 * scaleMult, backY, handRadius * 0.92, skinColor, 0, true);
       // 2. Draw Micro-Uzi ON TOP of the hand (never overlayed by hand)
-      drawCjMicroUzi(ctx, backX, backY, 1.05, recoilB, flashB);
+      drawCjMicroUzi(ctx, backX, backY, 1.05 * scaleMult, recoilB, flashB);
     } else {
       drawCjPixelHand(ctx, backX, backY, handRadius * 0.92, skinColor, rawProgress, false);
     }
@@ -1434,14 +1435,14 @@ export function drawCjSkin(ctx, fighter) {
   // ── LAYER 3: FRONT HAND (Front Layer — On Top of Body Circle — Minigun / Right Micro-Uzi / Fist) ──
   if (!hideFrontHand) {
     if (isMinigunActive) {
-      const minigunRecoil = fighter.minigunRecoil || 0;
+      const minigunRecoil = (fighter.minigunRecoil || 0) * scaleMult;
       const minigunFlash = fighter.minigunFlashTimer || 0;
       const minigunHeat = (previewIdx === 3) ? 0.35 : (fighter.minigunHeat || 0);
       const minigunSpin = (previewIdx === 3) ? (Date.now() * 0.004) : (fighter.minigunSpinAngle || 0);
 
       // 1. Draw M134 Heavy Minigun centered at fighter forward anchor
       drawCjMinigun(ctx, r * 0.92, 0, 0, r, {
-        scale: 1.15,
+        scale: 1.15 * scaleMult,
         recoil: minigunRecoil,
         flashTimer: minigunFlash,
         heat: minigunHeat,
@@ -1451,19 +1452,19 @@ export function drawCjSkin(ctx, fighter) {
       // 2. Draw front hand gripping the rear trigger spade housing holder at the back
       drawCjPixelHand(ctx, frontX - minigunRecoil, frontY, handRadius, skinColor, 0, true);
     } else if (isTec9Active) {
-      const recoilTec = fighter.tec9Recoil || 0;
+      const recoilTec = (fighter.tec9Recoil || 0) * scaleMult;
       const flashTec = fighter.tec9Flash || 0;
       // 1. Draw hand base FIRST behind the gun
-      drawCjPixelHand(ctx, frontX - recoilTec * 0.5 - 6, frontY, handRadius, skinColor, 0, true);
+      drawCjPixelHand(ctx, frontX - recoilTec * 0.5 - 6 * scaleMult, frontY, handRadius, skinColor, 0, true);
       // 2. Draw Intratec TEC-9 ON TOP of the hand
-      drawCjTec9(ctx, frontX, frontY, 1.15, recoilTec, flashTec);
+      drawCjTec9(ctx, frontX, frontY, 1.15 * scaleMult, recoilTec, flashTec);
     } else if (isJetpackActive && isUziActive) {
-      const recoilF = fighter.uziRecoilFront || 0;
+      const recoilF = (fighter.uziRecoilFront || 0) * scaleMult;
       const flashF = fighter.uziFlashTimerFront || 0;
       // 1. Draw hand base FIRST behind the gun
-      drawCjPixelHand(ctx, frontX - recoilF * 0.5 - 6, frontY, handRadius, skinColor, 0, true);
+      drawCjPixelHand(ctx, frontX - recoilF * 0.5 - 6 * scaleMult, frontY, handRadius, skinColor, 0, true);
       // 2. Draw Micro-Uzi ON TOP of the hand (never overlayed by hand)
-      drawCjMicroUzi(ctx, frontX, frontY, 1.05, recoilF, flashF);
+      drawCjMicroUzi(ctx, frontX, frontY, 1.05 * scaleMult, recoilF, flashF);
     } else {
       drawCjPixelHand(ctx, frontX, frontY, handRadius, skinColor, rawProgress, false);
     }
