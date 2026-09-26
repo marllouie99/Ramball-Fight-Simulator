@@ -780,7 +780,16 @@ export function updateBloodEffects() {
 
       // Decays ONLY after it has dropped to the bottom floor
       // STOP decaying once the round winner is declared — blood stays as battle scars
-      const roundOver = !!(state.roundWinner || state.matchEndTimer > 0);
+      const roundOver = Boolean(
+        state.roundWinner ||
+        state.matchWinner ||
+        state.matchEndTimer > 0 ||
+        state.roundEndTimer > 0 ||
+        state.gameState === 'roundEnd' ||
+        state.gameState === 'matchEnd' ||
+        state.isRoundDraw ||
+        state.isDraw
+      );
       if (!roundOver) {
         effect.life -= effect.decay;
       }
@@ -808,7 +817,8 @@ export function updateBloodEffects() {
  * Renders blood effects in Canvas 2D fallback mode when PixiJS is unavailable or in test environments.
  */
 export function drawBloodEffects(ctx) {
-  if (!ctx || !state.bloodEffects || state.bloodEffects.length === 0) return;
+  const drawCtx = ctx || (typeof state !== 'undefined' ? state.ctx : null);
+  if (!drawCtx || !state.bloodEffects || state.bloodEffects.length === 0) return;
   // If PixiJS is actively rendering these sprites, skip 2D canvas drawing to prevent double-draw
   if (state.pixiLayers && state.pixiLayers.particles && state.bloodSquareTexture) return;
 
@@ -819,31 +829,24 @@ export function drawBloodEffects(ctx) {
     const g = (e.numericColor >> 8) & 0xFF;
     const b = e.numericColor & 0xFF;
     const alpha = e.onGround ? Math.max(0, Math.min(1, e.life)) : 1.0;
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+    drawCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
     if (e.onGround) {
-      ctx.fillRect(e.x - e.size * 0.75, e.y - e.size * 0.325, e.size * 1.5, e.size * 0.65);
+      drawCtx.fillRect(e.x - e.size * 0.75, e.y - e.size * 0.325, e.size * 1.5, e.size * 0.65);
     } else {
-      ctx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+      drawCtx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
     }
   }
 }
 
 /**
- * Immediately clears ALL lingering battle visual effects so they vanish cleanly
- * when the champion-screen black overlay starts fading in (matchEndTimer === 60).
- * Properly releases PixiJS blood sprites back to the pool and clears every effect array.
+ * Immediately clears transient battle visual effects when the champion-screen black overlay fades in.
+ * Note: Blood effects and permanent gore are PRESERVED as battle scars during the winner state.
  */
 export function clearAllBattleEffects() {
-  // 1. Release PixiJS blood sprites back to pool before clearing the array
-  if (state.bloodEffects && state.bloodEffects.length > 0) {
-    for (let i = 0; i < state.bloodEffects.length; i++) {
-      const e = state.bloodEffects[i];
-      if (e && e.sprite) releaseBloodSprite(e.sprite);
-    }
-    state.bloodEffects.length = 0;
-  }
+  // Blood effects are intentionally PRESERVED during the winner state as permanent battle scars!
+  // (They are only cleaned up when a new round or match begins in reinitFighters)
 
-  // 2. Clear 2D-canvas & PixiJS-drawn effect arrays
+  // 1. Clear 2D-canvas & PixiJS-drawn spark effect arrays
   if (state.sparkEffects && state.sparkEffects.length > 0) {
     // Safely return all spark particles & their PixiJS Sprites to object pools
     for (let i = 0; i < state.sparkEffects.length; i++) {

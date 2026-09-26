@@ -415,7 +415,7 @@ export function renderGame() {
         drawBerserkerRageEffects(); // Draw berserker rage effects
         updateHybridBerserkerRage();
 
-        drawBloodEffects(); // Draw blood effects on top of everything
+        drawBloodEffects(state.ctx); // Draw blood effects on top of everything
         updateDroppedMagazines();
         drawDroppedMagazines(state.ctx); // Draw John Wick dropped magazines on the arena floor
         updateFloatingJetpacks();
