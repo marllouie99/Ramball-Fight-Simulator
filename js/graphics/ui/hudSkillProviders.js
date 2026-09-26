@@ -1,5 +1,6 @@
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { isSukunaPresentInMatch } from '../../entities/fighters/yuji/yujiSkills.js';
 
 const checkHasTeammate = (f) => {
   if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
@@ -481,7 +482,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
       skills.push({ id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' });
     }
 
-    if (isSkillEnabled(cfg.enableSoulSwap, true)) {
+    const isSoulSwapAllowed = isSkillEnabled(cfg.enableSoulSwap, true) && !isSukunaPresentInMatch(f);
+    if (isSoulSwapAllowed || f.soulSwapActive) {
       let ultPct = 0;
       let ultReady = false;
 

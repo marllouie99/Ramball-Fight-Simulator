@@ -642,12 +642,28 @@ export class IchigoFighter extends Fighter {
     return handleIchigoTakeDamage(this, amount, attacker, opts, (amt, atk, op) => super.takeDamage(amt, atk, op));
   }
 
-  onDeath() {
-    this.stopAllSkillAudios(true);
+  stopAllSkillAudios(force = true) {
+    stopFinalGetsugaVoiceline(this, force);
+    stopHollowTransformationVoiceline(this, force);
+    stopBankaiVoiceline(this, force);
     this._hollowVoiceHandle = null;
     this._hollowFlareHandle = null;
     this._hollowVoicePlaying = false;
     this._hollowVoiceEndTime = 0;
+    this._getsugaVoiceHandle = null;
+    this._getsugaChargeHandle = null;
+    this._getsugaVoicePlaying = false;
+    this._getsugaVoiceEndTime = 0;
+    this._finalGetsugaVoiceHandle = null;
+    this._finalGetsugaVoicePlaying = false;
+    this._finalGetsugaVoiceEndTime = 0;
+    this._bankaiVoiceHandle = null;
+    this._bankaiVoicePlaying = false;
+    this._bankaiVoiceEndTime = 0;
+  }
+
+  onDeath() {
+    this.stopAllSkillAudios(true);
     super.onDeath();
   }
 

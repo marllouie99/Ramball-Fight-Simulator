@@ -1,8 +1,78 @@
-import { CONFIG } from '../../../core/config.js';
+import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../../core/config.js';
+import { state } from '../../../core/state.js';
 import { modUpdateMeleeCombat } from './yujiCombat.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
+
+/**
+ * Checks whether Ryomen Sukuna is present as a combatant in the current match across all gamemodes
+ * (1v1, 1v2, 2v2, Tag Match active & roster bench, FFA, Boss Battle, Tactical Modes, etc.).
+ * When Sukuna is present in the battle, Yuji's Sukuna Takeover (Soul Swap) transformation is disabled.
+ *
+ * @param {object|null} excludeFighter - Fighter entity to exclude (e.g. Yuji himself).
+ * @returns {boolean} True if Sukuna is present in the match.
+ */
+export function isSukunaPresentInMatch(excludeFighter = null) {
+  if (typeof state === 'undefined') return false;
+
+  // 1. Check live active combatants in arena
+  if (Array.isArray(state.fighters)) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (!f || f === excludeFighter) continue;
+      if (
+        f.characterId === 'sukuna' ||
+        f.type === 'sukuna' ||
+        f._def?.id === 'sukuna' ||
+        f._def?.type === 'sukuna' ||
+        (typeof f._def?.name === 'string' && f._def.name.toLowerCase().includes('sukuna'))
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Check Tag Match rosters (bench + upcoming fighters across both teams)
+  if (state.tagMatch) {
+    const defs = typeof getActiveFighterDefs === 'function'
+      ? getActiveFighterDefs()
+      : (typeof FIGHTER_DEFS !== 'undefined' ? FIGHTER_DEFS : []);
+
+    const checkRoster = (roster) => {
+      if (!Array.isArray(roster)) return false;
+      return roster.some(idx => {
+        const def = defs[idx];
+        return def && (
+          def.id === 'sukuna' ||
+          def.type === 'sukuna' ||
+          def.characterId === 'sukuna' ||
+          (typeof def.name === 'string' && def.name.toLowerCase().includes('sukuna'))
+        );
+      });
+    };
+
+    if (checkRoster(state.tagMatch.team0Roster) || checkRoster(state.tagMatch.team1Roster)) {
+      return true;
+    }
+  }
+
+  // 3. Check standalone boss fighter reference if defined
+  if (state.bossFighter && state.bossFighter !== excludeFighter) {
+    const bf = state.bossFighter;
+    if (
+      bf.characterId === 'sukuna' ||
+      bf.type === 'sukuna' ||
+      bf._def?.id === 'sukuna' ||
+      bf._def?.type === 'sukuna' ||
+      (typeof bf._def?.name === 'string' && bf._def.name.toLowerCase().includes('sukuna'))
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Handles Yuji Itadori's Skill 1: Divergent Fist Dash.

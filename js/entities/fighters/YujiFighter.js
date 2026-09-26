@@ -6,7 +6,7 @@ import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
 import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { modUpdateMeleeCombat } from './yuji/yujiCombat.js';
-import { modUpdateDivergentDash, modUpdateReverseCursedTechnique } from './yuji/yujiSkills.js';
+import { modUpdateDivergentDash, modUpdateReverseCursedTechnique, isSukunaPresentInMatch } from './yuji/yujiSkills.js';
 import { spawnMeleeClashShockwave, spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { playSound, playLoopingSound, stopLoopingSound, pauseLoopingSound, resumeLoopingSound } from '../../systems/soundSystem.js';
@@ -139,6 +139,10 @@ export class YujiFighter extends Fighter {
     this._slashSoundCooldown = 0;
   }
 
+  isSukunaPresentInMatch() {
+    return isSukunaPresentInMatch(this);
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     if (opts.isHeal || amount < 0) {
       return super.takeDamage(amount, attacker, opts);
@@ -155,8 +159,8 @@ export class YujiFighter extends Fighter {
 
     const incoming = (Number(amount) || 0) * (1 - reduction);
     const thresholdHp = this.maxHp * (CONFIG.yuji?.soulSwapHpThreshold || 0.30);
-    // Auto-trigger Soul Swap if fatal or drops below threshold before having swapped
-    const isSoulSwapAllowed = this.isSkillEnabled(CONFIG.yuji?.enableSoulSwap, true);
+    // Auto-trigger Soul Swap if fatal or drops below threshold before having swapped (disabled if Sukuna is in match)
+    const isSoulSwapAllowed = this.isSkillEnabled(CONFIG.yuji?.enableSoulSwap, true) && !this.isSukunaPresentInMatch();
     if (isSoulSwapAllowed && !this.hasSoulSwapped && this.hp > 0) {
       if ((this.hp - incoming) <= thresholdHp) {
         // Prevent fatal one-shot death on the triggering hit so he can transform
@@ -205,7 +209,7 @@ export class YujiFighter extends Fighter {
   }
 
   _triggerSoulSwapTransformation(customTarget = null) {
-    if (this.hasSoulSwapped || this.hp <= 0) return;
+    if (this.hasSoulSwapped || this.hp <= 0 || this.isSukunaPresentInMatch()) return;
     this.hasSoulSwapped = true;
     this.soulSwapActive = true;
     this.soulSwapTimer = CONFIG.yuji?.soulSwapDuration || 100;
@@ -399,8 +403,8 @@ export class YujiFighter extends Fighter {
       });
     }
 
-    // Auto-trigger Ultimate: Soul Swap — Sukuna Takes Over (Once per match, HP critically low)
-    if (this.isSkillEnabled(CONFIG.yuji?.enableSoulSwap, true) && this.hp / this.maxHp <= (CONFIG.yuji?.soulSwapHpThreshold || 0.30) && !this.hasSoulSwapped) {
+    // Auto-trigger Ultimate: Soul Swap — Sukuna Takes Over (Once per match, HP critically low, disabled if Sukuna is present)
+    if (this.isSkillEnabled(CONFIG.yuji?.enableSoulSwap, true) && !this.isSukunaPresentInMatch() && this.hp / this.maxHp <= (CONFIG.yuji?.soulSwapHpThreshold || 0.30) && !this.hasSoulSwapped) {
       this._triggerSoulSwapTransformation(opponent);
     }
 

@@ -4526,7 +4526,9 @@ async function main() {
   console.log('🔄 [Yuji Soul Swap Mortality Test] Verifying Yuji takes damage and dies during Soul Swap...');
   try {
     const YujiClass = FIGHTER_CLASS_MAP['yuji'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
     if (YujiClass) {
+      state.fighters = [];
       // Test Yuji Base Passive Damage Reduction (DEF)
       const baseDefYuji = new YujiClass({ startX: 200, startY: 200, hp: 500, maxHp: 500 });
       const hpBeforeHit = baseDefYuji.hp;
@@ -4539,15 +4541,16 @@ async function main() {
         throw new Error(`Expected Yuji to take ${expectedDamage} damage (with ${expectedReduction * 100}% DEF reduction), but took ${actualDamage}!`);
       }
 
+      // Test 1: Yuji without Sukuna present -> Soul Swap activates normally
       const yuji = new YujiClass({ startX: 200, startY: 200, hp: 1000, maxHp: 1000 });
-      // Damage below threshold -> triggers Soul Swap
+      state.fighters = [yuji];
       const swapThreshold = CONFIG.yuji?.soulSwapHpThreshold ?? 0.30;
       const defReduction = CONFIG.yuji?.baseDamageReduction ?? 0;
       // Account for passive DEF: divide by (1 - reduction) so effective post-DEF damage crosses threshold
       const rawDamageNeeded = yuji.maxHp * (1 - swapThreshold + 0.1);
       yuji.takeDamage(defReduction > 0 ? rawDamageNeeded / (1 - defReduction) : rawDamageNeeded, null);
       if (!yuji.soulSwapActive) {
-        throw new Error('Expected Yuji to activate Soul Swap below threshold HP');
+        throw new Error('Expected Yuji to activate Soul Swap below threshold HP when Sukuna is not in match');
       }
       const hpBefore = yuji.hp;
       // Deal 50 damage during active Soul Swap -> HP must reduce
@@ -4563,6 +4566,19 @@ async function main() {
       if (typeof yuji.isEffectivelyAlive === 'function' && yuji.isEffectivelyAlive()) {
         throw new Error('Expected isEffectivelyAlive() to return false when Yuji HP <= 0');
       }
+
+      // Test 2: Yuji with Sukuna present in match -> Soul Swap is strictly disabled
+      if (SukunaClass) {
+        const yuji2 = new YujiClass({ startX: 200, startY: 200, hp: 1000, maxHp: 1000 });
+        const sukuna2 = new SukunaClass({ startX: 400, startY: 200, hp: 1000, maxHp: 1000 });
+        state.fighters = [yuji2, sukuna2];
+        // Deal damage below threshold
+        yuji2.takeDamage(defReduction > 0 ? rawDamageNeeded / (1 - defReduction) : rawDamageNeeded, sukuna2);
+        if (yuji2.soulSwapActive || yuji2.hasSoulSwapped) {
+          throw new Error('Expected Yuji transformation to be disabled when Sukuna is present in match!');
+        }
+      }
+      state.fighters = [];
     }
   } catch (err) {
     console.error('❌ [YUJI SOUL SWAP MORTALITY TEST ERROR]:', err);
@@ -5962,6 +5978,14 @@ async function main() {
 
     // 1. 1v1 Mode: requires 2 wins
     state.mode = '1v1';
+    state.gameCategory = 'foc';
+    state.isRoundDraw = false;
+    state.isDraw = false;
+    state.deathEffects = [];
+    state.missionPassedOverlay = null;
+    state.wastedOverlay = null;
+    state._hadMissionOverlay = false;
+    state._isRespectMusicPlaying = false;
     state.p1Index = allDefs.findIndex(d => d.type === 'gojo');
     state.p2Index = allDefs.findIndex(d => d.type === 'sukuna');
     reinitFighters(true);
