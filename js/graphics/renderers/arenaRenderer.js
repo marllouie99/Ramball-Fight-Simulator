@@ -468,7 +468,7 @@ export function drawArena() {
     const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff'));
     const innerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff'));
 
-    const bleed = 60;
+    const bleed = 600;
     const bgW = pixiApp.screen.width + bleed * 2;
     const bgH = pixiApp.screen.height + bleed * 2;
 
@@ -516,7 +516,7 @@ export function drawArena() {
     // Canvas 2D fallback: Draw outer background under camera transform with bleed
     ctx.save();
     applyCameraToCtx(ctx);
-    const bleed = 60;
+    const bleed = 600;
     const canvasBg = isDark ? '#000000' : (CONFIG.canvasBgColor || '#ffffffff');
     const outerBg = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
     ctx.fillStyle = canvasBg;
