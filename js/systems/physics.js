@@ -219,25 +219,6 @@ export function resolveFighterCollision(a, b) {
     return; // Skip standard elastic bounce and separation physics
   }
 
-  // Ender Dragon during divebomb windup (setup/telegraph), cataclysm channel, or recovery: 100% IMMOVABLE by other entities
-  const aIsDragonWindup = aIsDragon && (a.isTelegraphingDivebomb || a.isChannelingCataclysm || a.aiState === 'DIVEBOMB_SETUP' || a.aiState === 'DIVEBOMB_TELEGRAPH' || a.aiState === 'DIVEBOMB_RECOVERY' || a.aiState === 'CATACLYSM_CHANNEL');
-  const bIsDragonWindup = bIsDragon && (b.isTelegraphingDivebomb || b.isChannelingCataclysm || b.aiState === 'DIVEBOMB_SETUP' || b.aiState === 'DIVEBOMB_TELEGRAPH' || b.aiState === 'DIVEBOMB_RECOVERY' || b.aiState === 'CATACLYSM_CHANNEL');
-  if (aIsDragonWindup || bIsDragonWindup) {
-    if (aIsDragonWindup) {
-      a.knockbackVx = 0; a.knockbackVy = 0;
-      b.x += nx * effectiveOverlap * 2;
-      b.y += ny * effectiveOverlap * 2;
-      if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
-    }
-    if (bIsDragonWindup) {
-      b.knockbackVx = 0; b.knockbackVy = 0;
-      a.x -= nx * effectiveOverlap * 2;
-      a.y -= ny * effectiveOverlap * 2;
-      if (state && state.arena && typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
-    }
-    return;
-  }
-
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const distSq = dx * dx + dy * dy;
@@ -285,6 +266,25 @@ export function resolveFighterCollision(a, b) {
   
   // Pause circle-circle physical push response during Nanami or Escanor Hit-Pause
   if (isGlobalHitPauseActive(state)) {
+    return;
+  }
+
+  // Ender Dragon during divebomb windup (setup/telegraph), cataclysm channel, or recovery: 100% IMMOVABLE by other entities
+  const aIsDragonWindup = aIsDragon && (a.isTelegraphingDivebomb || a.isChannelingCataclysm || a.aiState === 'DIVEBOMB_SETUP' || a.aiState === 'DIVEBOMB_TELEGRAPH' || a.aiState === 'DIVEBOMB_RECOVERY' || a.aiState === 'CATACLYSM_CHANNEL');
+  const bIsDragonWindup = bIsDragon && (b.isTelegraphingDivebomb || b.isChannelingCataclysm || b.aiState === 'DIVEBOMB_SETUP' || b.aiState === 'DIVEBOMB_TELEGRAPH' || b.aiState === 'DIVEBOMB_RECOVERY' || b.aiState === 'CATACLYSM_CHANNEL');
+  if (aIsDragonWindup || bIsDragonWindup) {
+    if (aIsDragonWindup) {
+      a.knockbackVx = 0; a.knockbackVy = 0;
+      b.x += nx * effectiveOverlap * 2;
+      b.y += ny * effectiveOverlap * 2;
+      if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
+    }
+    if (bIsDragonWindup) {
+      b.knockbackVx = 0; b.knockbackVy = 0;
+      a.x -= nx * effectiveOverlap * 2;
+      a.y -= ny * effectiveOverlap * 2;
+      if (state && state.arena && typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
+    }
     return;
   }
 
