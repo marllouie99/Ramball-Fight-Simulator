@@ -180,7 +180,7 @@ export class EnderDragonFighter extends Fighter {
     }
 
     // Allow unrestricted off-screen flight and transit during divebomb sequence
-    if (this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE) {
+    if (this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY) {
       return false;
     }
 
@@ -303,7 +303,7 @@ export class EnderDragonFighter extends Fighter {
 
   // ── Pushback, Pull & Knockback Immunity Guard ──
   applyKnockback(vx, vy, opts = 0) {
-    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY;
+    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY || this.isChannelingCataclysm || this.aiState === DRAGON_STATE.CATACLYSM_CHANNEL;
     if (isDivebombActive || this.immuneToKnockback || this.immuneToPush) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
@@ -313,7 +313,7 @@ export class EnderDragonFighter extends Fighter {
   }
 
   applyPull(targetX, targetY, strength) {
-    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY;
+    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY || this.isChannelingCataclysm || this.aiState === DRAGON_STATE.CATACLYSM_CHANNEL;
     if (isDivebombActive || this.immuneToPull || this.immuneToPush) {
       return;
     }
@@ -325,10 +325,20 @@ export class EnderDragonFighter extends Fighter {
   // ── Main Update Loop ──
   update(opponent, ownerIndex, arena) {
     // Dynamic divebomb pushback and pull immunity sync
-    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY;
+    const isDivebombActive = this.isTelegraphingDivebomb || this.isDivebombing || this.aiState === DRAGON_STATE.DIVEBOMB_SETUP || this.aiState === DRAGON_STATE.DIVEBOMB_TELEGRAPH || this.aiState === DRAGON_STATE.DIVEBOMB_STRIKE || this.aiState === DRAGON_STATE.DIVEBOMB_RECOVERY || this.isChannelingCataclysm || this.aiState === DRAGON_STATE.CATACLYSM_CHANNEL;
     this.immuneToKnockback = isDivebombActive;
     this.immuneToPush = isDivebombActive;
     this.immuneToPull = isDivebombActive;
+
+    if (isDivebombActive) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.isDraggedByGetsuga = false;
+      this.isWallPinnedByMakima = false;
+      this.isWallPinnedBySaitama = false;
+      this.caughtInGenosFlurry = false;
+      this.caughtInSaitamaFlurry = false;
+    }
 
     // Rule 1.1: Freeze & TimeStop Early Guard
     const isFrozen = (typeof this._handleTimeStop === 'function') ? this._handleTimeStop() : false;
@@ -1451,13 +1461,17 @@ export class EnderDragonFighter extends Fighter {
     this.stateTimer--;
     this.divebombTelegraphProgress = 1.0 - Math.max(0, this.stateTimer / this.divebombTelegraphMax);
 
+    // Keep position strictly locked in place off-screen during windup (no push/drift)
+    this.x = this.divebombStartX;
+    this.y = this.divebombStartY;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
     // Keep facing locked strictly to attack corridor vector (Rule 1.4)
     this.gunAngle = this.divebombAngle;
     this.angle = this.divebombAngle;
-
-    // Smooth hover damping in place off-screen (gentle breathing bob)
-    this.vx *= 0.88;
-    this.vy *= 0.88;
 
     // Periodic telegraph spark cue along corridor
     if (this.stateTimer % 8 === 0) {

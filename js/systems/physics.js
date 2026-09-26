@@ -206,8 +206,10 @@ export function resolveFighterCollision(a, b) {
 
   // Zenitsu phases directly through entities during godspeed lightning dashes (Hekireki Issen)
   // Ender Dragon hyper-velocity divebomb strafe: Dragon is an unstoppable freight train, dragging victims along its flight path without deflection or speed loss
-  const aIsDragonDive = (a.characterId === 'ender_dragon' || a.type === 'ender_dragon') && (a.isDivebombing || a.aiState === 'DIVEBOMB_STRIKE');
-  const bIsDragonDive = (b.characterId === 'ender_dragon' || b.type === 'ender_dragon') && (b.isDivebombing || b.aiState === 'DIVEBOMB_STRIKE');
+  const aIsDragon = Boolean(a && (a.characterId === 'ender_dragon' || a.type === 'ender_dragon'));
+  const bIsDragon = Boolean(b && (b.characterId === 'ender_dragon' || b.type === 'ender_dragon'));
+  const aIsDragonDive = aIsDragon && (a.isDivebombing || a.aiState === 'DIVEBOMB_STRIKE');
+  const bIsDragonDive = bIsDragon && (b.isDivebombing || b.aiState === 'DIVEBOMB_STRIKE');
   if (aIsDragonDive || bIsDragonDive) {
     const dragon = aIsDragonDive ? a : b;
     const victim = aIsDragonDive ? b : a;
@@ -215,6 +217,25 @@ export function resolveFighterCollision(a, b) {
       dragon._catchAndDragVictim(victim);
     }
     return; // Skip standard elastic bounce and separation physics
+  }
+
+  // Ender Dragon during divebomb windup (setup/telegraph), cataclysm channel, or recovery: 100% IMMOVABLE by other entities
+  const aIsDragonWindup = aIsDragon && (a.isTelegraphingDivebomb || a.isChannelingCataclysm || a.aiState === 'DIVEBOMB_SETUP' || a.aiState === 'DIVEBOMB_TELEGRAPH' || a.aiState === 'DIVEBOMB_RECOVERY' || a.aiState === 'CATACLYSM_CHANNEL');
+  const bIsDragonWindup = bIsDragon && (b.isTelegraphingDivebomb || b.isChannelingCataclysm || b.aiState === 'DIVEBOMB_SETUP' || b.aiState === 'DIVEBOMB_TELEGRAPH' || b.aiState === 'DIVEBOMB_RECOVERY' || b.aiState === 'CATACLYSM_CHANNEL');
+  if (aIsDragonWindup || bIsDragonWindup) {
+    if (aIsDragonWindup) {
+      a.knockbackVx = 0; a.knockbackVy = 0;
+      b.x += nx * effectiveOverlap * 2;
+      b.y += ny * effectiveOverlap * 2;
+      if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
+    }
+    if (bIsDragonWindup) {
+      b.knockbackVx = 0; b.knockbackVy = 0;
+      a.x -= nx * effectiveOverlap * 2;
+      a.y -= ny * effectiveOverlap * 2;
+      if (state && state.arena && typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
+    }
+    return;
   }
 
   const dx = b.x - a.x;
@@ -377,8 +398,8 @@ export function resolveFighterCollision(a, b) {
   const aIsGenosBeam = Boolean(a && (a.characterId === 'genos' || a.type === 'genos') && (a.isFiringUlt || a.isChargingUlt));
   const bIsGenosBeam = Boolean(b && (b.characterId === 'genos' || b.type === 'genos') && (b.isFiringUlt || b.isChargingUlt));
 
-  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye;
-  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye;
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon;
 
   const aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
   const bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
@@ -465,8 +486,8 @@ export function resolveFighterCollision(a, b) {
       }
       a.knockbackVx = 0;
       a.knockbackVy = 0;
-    } else if (aIsEye) {
-      // Ancient Ocular Horror: Terraria ghost flight physics — completely unaffected by collision bounce
+    } else if (aIsEye || aIsDragon) {
+      // Boss flight physics — completely unaffected by collision bounce
       a.knockbackVx = 0;
       a.knockbackVy = 0;
     } else if (!a.isInRage && !aIsGojoInfinity && !aIsCounterLocked) {
@@ -502,8 +523,8 @@ export function resolveFighterCollision(a, b) {
       }
       b.knockbackVx = 0;
       b.knockbackVy = 0;
-    } else if (bIsEye) {
-      // Ancient Ocular Horror: Terraria ghost flight physics — completely unaffected by collision bounce
+    } else if (bIsEye || bIsDragon) {
+      // Boss flight physics — completely unaffected by collision bounce
       b.knockbackVx = 0;
       b.knockbackVy = 0;
     } else if (!b.isInRage && !bIsGojoInfinity && !bIsCounterLocked) {
